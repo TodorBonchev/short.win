@@ -1,0 +1,14 @@
+| market | scenario | ring at the venue change | outcome | exit vs event | price at exit | lender P&L | seconds with the settlement box wider than 1 % in L (first 60 s after the change) |
+|---|---|---|---|---|---|---|---|
+| D@90% | graduation, then +2x on AMM over 60s | carried over (v0.3 ARCH) | liquidation | +60s | 2.60x | +5.3% | 4 |
+| D@90% | graduation, then +2x on AMM over 60s | rewritten (v0.4.1) | liquidation | +60s | 2.60x | +5.3% | 0 |
+| D@90% | graduation, then +3x on AMM over 60s | carried over (v0.3 ARCH) | liquidation | +52s | 2.74x | +5.3% | 4 |
+| D@90% | graduation, then +3x on AMM over 60s | rewritten (v0.4.1) | liquidation | +52s | 2.74x | +5.3% | 0 |
+| D@97% | graduation, then +2x on AMM over 60s | carried over (v0.3 ARCH) | liquidation | +87s | 2.60x | +5.3% | 4 |
+| D@97% | graduation, then +2x on AMM over 60s | rewritten (v0.4.1) | liquidation | +87s | 2.60x | +5.3% | 0 |
+| RA | halt -> fast path to a 25% pool, then pump 2x/120s | carried over (v0.3 ARCH) | liquidation | +388s | 1.66x | +2.2% | 4 |
+| RA | halt -> fast path to a 25% pool, then pump 2x/120s | rewritten (v0.4.1) | liquidation | +388s | 1.66x | +2.2% | 0 |
+| RB | halt -> fast path to a 25% pool, then pump 2x/120s | carried over (v0.3 ARCH) | liquidation | +413s | 1.92x | +3.5% | 4 |
+| RB | halt -> fast path to a 25% pool, then pump 2x/120s | rewritten (v0.4.1) | liquidation | +413s | 1.92x | +3.5% | 0 |
+| RC | halt -> fast path to a 25% pool, then pump 2x/120s | carried over (v0.3 ARCH) | liquidation | +426s | 2.00x | +4.2% | 4 |
+| RC | halt -> fast path to a 25% pool, then pump 2x/120s | rewritten (v0.4.1) | liquidation | +426s | 2.00x | +4.2% | 0 |

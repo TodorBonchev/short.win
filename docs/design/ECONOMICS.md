@@ -1,0 +1,2668 @@
+# short.win — Economic & Risk Model
+
+*Design document • v0.4.1 (fourth review round; see the changelog) • 2026-09-27 • baseline: [`docs/SPEC.md`](../SPEC.md) v0.3 incl. owner decisions D1–D4 (owner-approved, not modified here)*
+*Simulation: [`sim/shortwin_sim.py`](sim/shortwin_sim.py) v0.4.1 (venues, positions, observation/EMA layer, settlement box, exits, scenarios, Monte Carlo, exit fuzz), [`sim/pool_model.py`](sim/pool_model.py) v0.4.1 (lender-pool accounting, property tests, liveness check), the attack scripts in [`sim/attacks/`](sim/attacks/), the parameter gate [`sim/config_check.py`](sim/config_check.py) and the keeper cost model [`sim/keeper_cost.py`](sim/keeper_cost.py). The frozen v0.3 model in `sim/legacy/v0_3/` is used only for "v0.3" comparison rows; "v0.4" comparison rows use the analysis switches of the v0.4.1 sim (`box_obs`, `pprime_raw`, `ref_cap_lo = False`, `liq_reserve = "rent+penalty"`). Standard library only; every run is deterministic (fixed seeds). Every table in this document was regenerated with the v0.4.1 defaults; the generated outputs are in `sim/out/`.*
+
+This document turns the economics of SPEC §2, §4, §5 and §6 into formulas an Anchor program can implement: units, fixed-point types, rounding direction, closed forms, state updates and payout orders. It reports what the simulations say about lenders, borrowers and attackers. `ARCHITECTURE.md` aligns to this version; where the two disagree, this document is the economic source of truth, and `sim/shortwin_sim.py` + `sim/pool_model.py` v0.4.1 are the normative reference implementation for the math crate (they implement the program's formulas exactly, R3A-3; the analysis-only switches are listed in each sim's header).
+
+**Conventions**
+
+- **SPEC**: the value is taken from `docs/SPEC.md` v0.3.
+- **OWNER (D1–D4)**: an owner decision recorded in SPEC v0.3 §0/§14 on 2026-09-27. Binding.
+- **ADOPTED**: a default the owner adopted from the first-pass questions (Q4–Q24). Still a configurable parameter (§15).
+- **PROPOSED**: a new rule or parameter. Every PROPOSED parameter is configurable, has a default and compiled hard bounds (§15), and sits behind the SPEC §11 timelock.
+- **UNVERIFIED**: a claim I could not check against a primary source.
+- Finding IDs: `C0-n` / `C1-n` (first review), `V1-n` / `V2-n` (second review), `R3A-n` / `R3B-n` (third review), `R4A-n` / `R4B-n` (fourth review, 2026-09-27). Appendix A lists the economic side of every round-3 finding; the v0.4.1 changelog below lists the round-4 changes; `ARCHITECTURE.md` Appendix A records the outcome of every finding of every round.
+
+---
+
+## Changelog v0.4 → v0.4.1 (fourth review round)
+
+The fourth review (findings `R4A-1` … `R4A-10`, `R4B-1` … `R4B-10`, 2026-09-27) verified the v0.4 fixes and found that two of them created new problems: the penalty reserve (#50) blocked honest liquidations, and the settlement box (#51) could be moved by a push followed by "frozen" seconds. Every finding was re-checked before it was fixed; `ARCHITECTURE.md` Appendix A ("Review resolution — round 4") records the outcome of each one, including the parts rejected with evidence. Every table below and in the changed sections was regenerated with the v0.4.1 sims (`sim/out/`).
+
+| # | Change | Finding | Where |
+|---|---|---|---|
+| 74 | **A liquidation reserves nothing in `max_in`** (supersedes #50 for liquidations; SPEC §5.2 literal): it buys back iff `B̂_live ≤ min(⌊B̂_ref·(10⁴ + δ)/10⁴⌋, V − K_s − ert)`. Both reviewers' findings reproduce: the penalty reserve turns 6 of the reviewer's 960 genuine-pump cells and 6 noisy battery rows from liquidation (lender +0.4 … +3.1 %) into S1 (−32 … −70 %). Both reviewers proposed reverting to v0.3's rent-only reserve; R4B-1 on the premise that rent due stays below `K_s`. It does not for aged positions (Tier A at 25 days and 90 % utilisation: rent due 6.04 SOL against `K_s` 0.25 SOL), so rent-only has the same dead band: on the new 1,655-run battery it loses one aged liquidation (C, 90 %, 6×/40 s with ±0.3 % noise: S1 −46.1 % instead of +0.6 %), and 3–4 more at in-bound maximum rates. No reserve has no dead band. The cost is in the held model on aged positions (Tier A at 90 %: lenders + protocol −8.02 SOL, against −1.92 with rent-only); fresh positions are identical under both rules. The exact liveness invariant R4B-1 asked for now holds: a liquidatable, buyback-allowed position with a fresh reference never waits while `B̂_live ≤ B̂_ref·(1 + δ)` | R4A-1, R4B-1 | §8.2, §12.2, §12.6 |
+| 75 | **Expiry keeps rent and the expiry fee senior** (unchanged from v0.4; nothing is urgent, and an expiry that waits becomes a liquidation if the price keeps rising). No battery row changes with any expiry reserve rule. `ε` (`exec_tol_bps`) now enters only the expiry bound | R4A-1 (expiry part) | §8.2, §8.4 |
+| 76 | **Liveness battery extended to 1,655 runs** (`config_check.py`, the governance CI gate): the 65 core rows; the same rows with deterministic per-second price noise of ±0.3 % and ±1 % (3 seeds each), so live and reference differ within a second as on a real pool; the reviewer's 960-cell genuine-pump grid (8 markets × 5 multiples × 6 durations × 2 sizes × keeper latency 1 and 2 s); 240 aged-position runs (rent due above `K_s`). Re-deriving τ and κ on it: τ = 6 loses 83 runs and κ = 2,250 loses 38, so `EMA_TAU_S = 5` and `kappa_liq_bps ≥ 2,500` stay, now for reasons independent of any reserve | R4A-1, R4B-1 | §5.7, §15 |
+| 77 | **Compiled bounds re-derived on the full battery for every parameter with a liveness effect** (the v0.4 corner check covered 7): settlement keeper terms capped at their SPEC / ADOPTED values (`settle_keeper_fixed ≤ 0.01 SOL`, `_bps ≤ 100`, `_cap ≤ 0.25 SOL`; larger values lose 4–31 runs); `liq_persist_n ≤ 3` (4 loses 58 runs); the SPEC §4 opening and liquidation CRs become per-tier compiled **minima** (lower values lose 109–362 runs); the relational check `liq_persist_n + kappa_growth_n ≤ 7` is now implied by the bounds. The scan compares sizing parameters at equal position size (their v0.4 "failures" were the size effect of `K_s`'s fixed part). All 128 corners of the core box and a stress corner with every scanned parameter at its adverse extreme pass the 1,655 runs | R4A-4 | §5.7, §15 |
+| 78 | **Settlement-box medians over bucket extremes**: each ring entry stores its bucket's `(lo, hi, llo, lhi)` instead of the clamped `(obs, lobs)`; `P_lo = min(P_ema, lower median of the lows)`, `P_hi = max(P_ema, upper median of the highs)`, likewise `L`. A "frozen" second — the honest keeper's observation plus an attacker observation just beyond `P_ema`, which leaves `obs = P_ema` — keeps its honest low and high, so push-then-freeze no longer moves the box: the (M) flips need 5 attacker-only seconds instead of 1 push + 4 frozen seconds (v0.4: +2.37 to +5.58 SOL), and the refutation delays S1 by 8 s instead of indefinitely. New residual, disclosed: a paid contrary observation every second widens the box and defers S1 (like the V1-2 veto) or an S3 amount on an executable venue | R4B-2 | §2.1, §5.2, §5.4, §5.6, §12.10, §12.11 |
+| 79 | **Liquidation reference also capped at `lo_x·(1 + κ_eff)`**: a pushed-and-frozen `P_ema` no longer lifts the 2 % bound (v0.4: `B̂_ref` ×1.156 and the Tier A borrower's remainder 19.49 → 0.22 SOL; v0.4.1: ×0.999, the atomic-sandwich loss of 1.90 SOL). No battery row changes | R4B-2 | §8.2 |
+| 80 | **FV's `p'` is decided on the box corner it is evaluated at**: the locked penalty, or the expiry fee if the position is expired and `CR(V_eff, B̂_FV) ≥ L` at that corner. The robust-spot leg no longer enters, so one contrary observation cannot switch the reading (v0.4: lenders −2.9 % … −7.3 % on the flag-S3 cases for a 0.02–0.71 SOL veto; v0.4.1: no change) | R4A-3 | §5.6, §8.6 |
+| 81 | **Immediate part of an S2/S3 take = `min(x, ⌊Q·P_ema/WAD⌋ + R_due)`**; impact, fees and the penalty above it vest like a lump. A token whale's `[deposit → sol_settle → withdraw → claim]` took 90 % of the premium over market value (7 % premium: 31.5 SOL on a 500 SOL position); now 0. This also removes the reconstruction of `B̂_FV` from FV that made the sim's lump differ from ARCH's formula by 1 lamport in 76 of 86 settlements | R4B-6, R4A-5 | §8.6, §9.4 |
+| 82 | **Lock expiry calendar**: the aggregate lock term lives in day buckets keyed by `lock_until`, which is rounded up to the bucket end, so an expired lock leaves the aggregate at its `lock_until` without its holder being touched (v0.4: an idle lender's expired lock inflated everyone else's allowance (sum 1.15·T), and the idle lender got nothing). Lock terms are floored, so the aggregate never exceeds the lenders' own locks. I-P4 is now asserted on the state the program sees (each lender touched alone): 92 of 954 sampled states violated it under v0.4 (worst 2.72·T), 0 now | R4A-2, R4B-3 | §9.3, §13 |
+| 83 | **Locks cover each position's S3 tail**: `lock_until = ⌈(max(now, max_release) + lock_grace_s)/1 d⌉·1 d` with `max_release` = the latest `deadline + max_migration_pause_s + grad_grace_s + s3_wait_s` (the position's snapshot values) of any position opened. No relational check with governance values is needed | R4A-8, R4B-8 | §9.3 |
+| 84 | **Value-weighted vest end**: `vest_end' = now + ⌈(vest_bal·(vest_end − now) + x·lump_vest_s)/(vest_bal + x)⌉`. A 1-lamport sweep every minute left 63 % of a lump released after 6 h (v0.4), now 98 % | R4B-5 | §9.4 |
+| 85 | **Deposits wait for the post-wipe sweep**: while a full-wipe record is live, `deposit` requires that `sweep_trader` and `claim_venue_rewards` have run since the wipe (both permissionless; a depositor bundles them). The wiping keeper's `[sol_settle → deposit(2 raw units) → claim_venue_rewards]` took the whole pre-wipe cashback (v0.4), now the wiped lenders get it | R4A-7 | §9.5 |
+| 86 | **Exit forfeits the unreleased vest to whoever remains** (disclosed; the "last lender is paid the vest" rule is kept for `S → 0` only). The reviewer's threshold flush was tested and rejected: it lets a whale that deposits 199× just before a lump take 99.5 % of it atomically | R4B-4 | §9.4 |
+| 87 | **Consecutive attacker-only seconds** quantified: 5 in a row (of 8 ring entries) flip a capped S2 into an uncapped S1 on the drained-RA model cases (+2.37 … +5.58 SOL for 1.1–2.0 SOL); with one honest second in between, none up to 6. This is the degraded-mode (censored or absent keeper) exposure; §5.6 now says "5 of 8 in either direction" | R4A-9 | §5.6, §12.6, §12.11 |
+| 88 | Keeper batches are **v1 transactions** (a v0 transaction with the protocol ALT fits 4 PumpSwap / CPMM or 5 curve cranks, not 6); `keeper_cost.py` shows the v0 fallback (k = 4: +50 % base fees per market-day) | R4B-9 | §5.8 |
+| 89 | Text fixes: the keeper floor formula of #63 (`⌊π·split⌋ + min(max(0, K_s − ⌊π·split⌋), remainder)`), the S3 condition in §10.3 ("liquidatable **or expired**", global hard cap), R3A-8 (a) "resolved pending O15" | R4A-10 | #63, §10.3, Appendix A |
+| 90 | **Doc sync after M0b** (no economic change; from the `shortwin-math` README's documentation items): **one source of parameter validation** — `shortwin_sim.validate_params` now also checks the penalty split's protocol and keeper parts (≤ 5,000) and every per-tier bound (`cr_open_bps ≤ 100,000`, penalty, duration, impacts, S2 slippage, rates, minimum rent), so the program's `params::validate` is that function exactly; `params::validate_econ` keeps only the bounds of parameters the sim does not model (§15; before, the sim accepted configurations the program refused). §2.2's overflow table adds σ's numerator, the impact caps' `X²·(10⁴ + ι)` and the tier threshold; §4 states the D4 margin with an undefined EMA quote (the spot quote alone, as the sim); §5.6 "sustained" uptrend; §6.1 the integer cap forms; §8.6, §14, §17 O15 as recorded (S2 and S3, SPEC §5.3); §9.4 the vest end after a governance decrease of `lump_vest_s` | M0b notes | §2.2, §4, §5.6, §6.1, §8.6, §9.4, §14, §15, §17 |
+
+**Changed in v0.4.1 — for `shortwin-math`** (the exact delete / change / add list is ARCH §9 M0b): `RingEntry` stores the bucket's `(lo, hi, llo, lhi)` instead of `(obs, lobs)`; the box's medians (lower of the lows, upper of the highs); FV's `p'` per evaluated state; `max_in` split into a liquidation form without reserve and the expiry form with rent and fee; the liquidation reference's `lo_x·(1 + κ_eff)` cap; the S2/S3 lump `x − min(x, ⌊Q·P_ema/WAD⌋ + R_due)`; in `pool`, the lock expiry calendar, `max_release`, floored lock terms, the value-weighted vest end and the post-wipe deposit gate; the risk quote above the fee hard cap charges one combined fee at the cap (the sims' form).
+
+## Changelog v0.3 → v0.4 (third review round)
+
+The round-3 brief asked for two things at once: fix every finding, and remove complexity that the reviewers showed buys no safety. Items marked **(simplification)** delete mechanisms; the list of what to delete from the math crate follows the table. Earlier changelogs are in Appendix B.
+
+| # | Change | Finding / decision | Where |
+|---|---|---|---|
+| 49 | **Fixed liquidation bound** `δ_liq = 2 %` over the reference (compiled `[2 %, 5 %]`) **(simplification)**. The Dutch exit clock (per-entry ring low `lo`, the "executable run", `liq_exec_since`, `delta_liq_min/slope/max`) is removed. Re-running the reviewer's `dutch*.py`: 0 of 144 genuine-move cells change; 1 of 96 near-band cells liquidates 2 s later at a higher price (lenders +2.2 % instead of +4.5 %); a fixed 1 % turns 3 drain-then-pump liquidations into S1, so 2 % is the compiled minimum. The atomic first-second sandwich doubles (Tier A +1.50 SOL, v0.3 +0.71) but no longer ramps (after 4 s: +1.50 instead of +3.86), and blocking the spot leg can no longer widen the bound | decision 1; R3A-7; R3A-11 (c) | §8.2, §12.2, §12.9 |
+| 50 | *(Withdrawn for liquidations in v0.4.1, #74: it blocked honest liquidations in fast pumps, and lenders were not "never worse off" on aged positions.)* **Penalty and expiry fee reserved in `max_in`** like rent: `max_in ≤ max(V − R − π_ref − ert, B̂_ref·(1 + ε))`, `π_ref = ⌈p·B̂_ref/10⁴⌉`. Found by the full attack suite under the fixed bound: in the held model the attacker bought the vault down to `V − K_s − ert` and truncated the penalty (Tier A lenders + protocol −2.06 SOL). With the reserve, lenders are never worse off than with an honest keeper in any held row, and the Tier A attacker's extra falls from +7.26 SOL (v0.3) to +4.61 | decision 1 verification (new) | §8.2, §12.6 |
+| 51 | *(v0.4.1: medians over bucket extremes and `p'` on the box, #78–#80.)* **One settlement rule, the settlement box** **(simplification)**: every settlement decision (arm or keep, refute, choose the kind, pay) must come out the same on the whole box spanned by the EMA state `(P_ema, L_ema)` and the ring-median state `(P_med, L_med)`; amounts must agree within `fv_dev_bps`. It replaces three special cases: the FV gate (S2 only), the refutation on the raw `P_ema` and the kind chosen from raw legs. The lender's S2 → S1 flip is closed (v0.3 +2.37 to +5.58 SOL, now none); the borrower's refutation push is closed (v0.3: no S1 within 600 s at 3 % beyond the boundary; now S1 +4 s); a one-second push still moves an S2/S3 amount by at most ±1 % (realistic Emergency-flag S3: +0.70 SOL, against +10.48 SOL without the box) | decision 5; R3A-1; R3A-6 (a); V2-9 | §5.6, §8.6, §12.10, §12.11 |
+| 52 | An armed settlement clock keeps running on every call that is not a box-robust refutation; "not liquidatable" disarms only if the box corner most favourable to liquidation agrees. 12–20 s spot-leg vetoes no longer restart the clock (v0.3: +34–42 s; v0.4: +0–2 s) | R3A-6 (b) | §5.6, §12.10 |
+| 53 | Liquidation EMA leg on the **newest `liq_persist_n` ring entries** only; `liq_persist_s` and `settle_persist_s` removed (the ring integrates at most once per second, so n entries span ≥ n − 1 s) **(simplification)** | decision 2 | §5.5, §5.6 |
+| 54 | Ring entries **cache the position-independent reprojection** `(X_i, Y_i)` at integration (once per second per market instead of once per position per call) **(simplification)**; `reprice` rounds `X` down and `Y` up with a ceiling square root, so `Y/X ≥ P` and every reprojected quote is an upper bound | decision 3; R3B-7 (c); R3B-3 | §2.3, §5.2 |
+| 55 | Every venue change (graduation, Raydium fast path) **rewrites each ring entry's `L` and `lobs`** to the reset liquidity and clears the bucket. Carrying them over (v0.3 ARCH text) left the settlement box more than 1 % wide in `L` for 3 s after each change | R3B-7 (a); R3A-11 (d) | §5.2, §10.1 |
+| 56 | Quotes on hypothetical states (EMA leg, reference, FV) use the **live venue fee tier** | R3B-7 (b) | §3.1 |
+| 57 | **Numerics table** (type, scale, rounding and order of operations for every quantity) and a **corrected overflow table**: quotes, reprice, fees, EMA, CR, caps and FV fit u128; 256-bit intermediates only for rent-index products, share/accumulator/lock products and σ, κ, g at absurd prices; no U256 square root anywhere | decision 8; R3A-12; R3B-3 | §2 |
+| 58 | **Lender SOL, option (a) kept** (continuous rent entitlement, SPEC §2.4) and made live: surplus realised SOL goes to an O(1) **MarketVault pot `unmatched`**, drawable by each lender up to its own entitlement deficit. The liveness invariant (after wind-down, sequential claims pay out `lender_sol − dust`) is asserted every 2,000 fuzz operations. The reviewer's stranding test: 68.12 SOL stranded (v0.3) → 0.00002 SOL. Option (b) (one realised accumulator, all lender SOL released linearly) is owner option O16 | lender SOL decision; R3A-2 | §9.4 |
+| 59 | **Lump credits vest** linearly over `lump_vest_s` = 6 h (lender half of the penalty, expiry fee, penalty part of an S2/S3 take, trader sweeps, venue cashback); settlement principal stays immediate. The atomic "deposit → expire → withdraw → claim" bundle captured 33.5 % of the position's lender income in v0.3, and captures 0 % now; a whale that holds `h` hours takes `h/6` of its pro-rata lump share and none of the rent | R3B-2 | §9.4 |
+| 60 | *(v0.4.1: expiry calendar and the S3 tail, #82–#83.)* **Withdrawal locks expire** at `lock_until = max(now, latest deadline of any position opened so far) + lock_grace_s` (1 d). Π / `b_min` is kept because the sim shows it matters: when interest fades, a lender that withdrew once regains 94 % of its pro-rata allowance within 24 h, against 0 % for 31 days with `lock_until` alone | R3B-1; decision 6 | §9.3 |
+| 61 | SOL credited while `S = 0` without a live wipe record goes to `protocol_fees` (**`unassigned` removed**); the last lender to leave is paid the unreleased vest first; a full wipe flushes the vest into the wipe record | R3A-10; R3B-2 (post-wipe) | §9.5 |
+| 62 | `rent_protocol_bps` **snapshot per position** and folded into the rent aggregate `A_j`; `receivable` returns to 0 whenever no position is open (asserted under random governance changes; v0.3 left a 0.075 SOL phantom in the reviewer's example) | R3A-5; R3B-9 | §7, §9.4 |
+| 63 | **Liquidation keeper reward ≥ `K_s`**: the keeper gets `kp + min(max(0, K_s − kp), W)` with `kp = ⌊π·keeper_split/10⁴⌋` and `W` the borrower remainder after the penalty (v0.4.1 text fix, R4A-10 a), the top-up paid from the borrower remainder, so no third-party keeper does better by waiting for S1 | R3B-10 | §8.3, §8.5 |
+| 64 | *(v0.4.1: "CR-liquidatable" is decided on the box corner, #80; the reading stays pending owner item O15.)* FV of an expired, not CR-liquidatable position stays priced with the **expiry fee** (SPEC §4: "a 2 % expiry fee instead of the full liquidation penalty"). With the Emergency flag set, S3 at this reading pays lenders what a normal expiry pays; the penalty reading moves 3–8 % of `B̂` from the borrower to lenders (Tier A: 1.82 SOL) and gives lenders a reason to prefer S3 over expiry | R3A-8 (a) (reviewer's alternative); owner item O15 | §8.6 |
+| 65 | **Owner-option knobs not built** **(simplification)**: `fv_liq`, `settle_s2_first`, `margin_ema_own_sale` removed from Params, the position snapshot and `validate_params` (bytes reserved); O1/O2 appear only as analysis columns | decision 5; R3A-8 (c) | §4, §8.6, §15 |
+| 66 | S2 kept as one predicate; the exit fuzz now reaches S2 (σ_max overrides) and S3 (Emergency flag): 9 S2 and 49 S3 of 772 exits. S2 is unreachable before S1 at defaults (48× on PumpSwap, 126× on a fully drained adoptable Raydium pool, never on the curve) | R3A-1; R3B simplification | §8.6, §13 |
+| 67 | **The sim is the program** (differential tests need no exceptions): `ert = 0` on Raydium; caps on `min(X_now, L_slow/√P_ema[, D/(λ_min·√P_ema)])`; one-way fee carried in ppm (no rounding); risk-fee cap, route-broken flag, S3 on an executable venue, `pool_fail` chain and Raydium fast path; rent through the three basis indices; lower median | R3A-3 (i)–(v) | §2, §6, §11 |
+| 68 | *(v0.4.1: re-derived on the 1,655-run battery for every liveness parameter, #76–#77.)* **Compiled bounds tightened** to the simulated-safe region, checked on every corner of the box (160 configurations) and enforced by a CI gate (`config_check.py`): `ema_tau_s` becomes a **compile-time constant** (5 s) **(simplification)**, `kappa_liq_bps` [2,500, 3,000], `kappa_growth_n` [3, 4], `liq_persist_n` [2, 4] with `liq_persist_n + kappa_growth_n ≤ 7`, `delta_liq_bps` [200, 500], `ema_clamp_bps` [5,000, 10,000], `ref_max_age_s` [1, 3]. The reviewer's suggested κ ≥ 1,500 and τ ≤ 8 fail (Tier C/D 10×/60 s liquidations become S1), and a first candidate box with τ up to 6 s and κ from 22.5 % failed on 256 of 416 corners | R3B-6; R3A-11 (a, b) | §5.7, §15 |
+| 69 | **Keeper cost model and degraded mode**: continuous per-second coverage costs 0.07–0.10 SOL per market-day batched against 0.005–0.04 SOL/day of protocol rent at the beta cap, so coverage is targeted; `sol_settle`/`liquidate` count as observations; degraded mode pauses opens and is visible on-chain; the operating budget is owner decision O17 | R3B-5; decision 10 | §5.8 |
+| 70 | Raydium pool selection (economic side): non-fast adoption only while the market has no open position (`pool_switch_delay_s` and the pending-switch slot removed **(simplification)**); the fast path runs on the explicit `pool_fail` predicate with its own chain | decision 7; R3A-4; R3B-8 | §6.2, §10.3 |
+| 71 | O13 (age from listing) extended to PumpSwap and pre-`T_CLAMP` CPMM pools | R3B-12 | §6.2, §14 |
+| 72 | Text hygiene: ring row, allowance formula, boost wording, attack-script docstrings | R3A-13 | §2, §9.3, §17 |
+| 73 | §11.6 restated: the 2 % expiry fee is 36 % of per-position lender income (Tier A) | R3B-2 | §11.6 |
+
+### Removed in v0.4 — delete from `shortwin-math`, the program and the keeper
+
+| Mechanism (v0.3) | Delete | Replaced by |
+|---|---|---|
+| Dutch exit clock (V1-1) | `delta_liq_min_bps`, `delta_liq_slope_bps`, `delta_liq_max_bps` (params and position snapshot); `persist::exec_run`; `liq_exec_since`; the `lo` field of `RingEntry`; δ-from-exec-run in `bounds::liq_reference`; I-E1's clock clause | `delta_liq_bps` (fixed) |
+| Seconds conditions of persistence | `liq_persist_s`, `settle_persist_s` (params, snapshot, the "spanning ≥ M s" checks) | count of ring entries / EMA updates only |
+| Per-position reprojection of every ring entry | reprojection inside `persist::liq_ema_leg` | `(X_i, Y_i)` cached in `RingEntry` at `integrate` |
+| FV gate (S2 only), raw refutation, kind on raw legs | `risk::fv_ok`, `risk::refuted` on `P_ema` | `risk::settle_box`, box-evaluated legs, refutation and amount check (§5.6) |
+| Owner options O1/O2 as parameters | `fv_liq`, `settle_s2_first`, `margin_ema_own_sale` (params, snapshot fields, bounds) | nothing (reserved bytes) |
+| Recycling of surplus realised SOL | `pool::recycle` (the division by `S − shares`, its guard) and the keeper's recycling duty | `MarketVault.unmatched` pot drawn in `claim` |
+| `unassigned_sol` | the field and its genesis credit | credits with `S = 0` go to the live wipe record or to `protocol_fees` |
+| Global `rent_protocol_bps` in rent crediting | the global value in `lender_credit` / `credited_for` | per-position snapshot folded into `A_j` |
+| Raydium pending switch | `pool_switch_delay_s`, the pending-switch slot for non-fast adoptions, `execute_pool_switch` for them | immediate adoption while `open_positions == 0` |
+| Sim-only knobs | `arming`, `dutch_clock`, `ref_liq`, `obs_when_halted`, `straddle_exec`, `ref_lo_k`/`lb_hist`, `liq_ema`, the per-tier rent index | — (the frozen v0.3 model keeps them for comparisons) |
+
+**Added in v0.4** (new math or state): `RingEntry.{x, y}` (cached reprojection; `lo` dropped); `risk::settle_box` and the box predicates; `π_ref` in `bounds::max_in`; the liquidation keeper floor in `waterfall::liquidate`; `reprice` with a ceiling square root; `MarketVault.unmatched`; `Market.{vest_bal, vest_last, vest_end, max_deadline}`; `LenderPosition.lock_until`; per-position `rent_protocol_bps`; `Market.{pool_fail_since, last_pool_fail_obs}`; the `CoverageGap` event; `config_check.py` as a governance CI gate.
+
+### Sim deviations of v0.3, all fixed (R3A-3)
+
+| v0.3 deviation of the sim from the normative formulas | v0.4 |
+|---|---|
+| (i) `ert` = 6,500,000 applied on Raydium | effective `ert` stored per position: 6,500,000 on pump venues, 0 on Raydium |
+| (ii) caps on `X_now` only | `min(X_now, ⌊L_slow·10⁹/⌈√P_ema⌉⌋[, ⌊D·10⁹·10⁴/(λ_min·⌈√P_ema⌉)⌋])` |
+| (iii) CPMM one-way fee `⌊(t + c)/100⌋` | fee carried in ppm; the bps value `⌈ppm/100⌉` is used only in fee-cap comparisons, which read the ppm directly |
+| (iv) no risk-fee cap, route-broken flag, S3 on an executable venue | all three modelled; `s3_no_route` and `pool_fail` chains; fast path |
+| (v) ring `L` reset at graduation only in the sim | rewrite rule is normative (#55) and applies to every venue change |
+| rent through one index per tier (≤ 1 lamport per accrual) | the program's three basis indices with per-position coefficients |
+
+---
+
+## 0. Findings in brief
+
+1. **All three venue families are constant-product pools** (§1). Buyback cost has a closed form, and an immediate sell-then-buy of `Q` costs only the fee pair (2.53 % of proceeds on the curve).
+2. **The SPEC §4 table holds under D4.** Enforcing the opening CR after fees at spot and at the EMA costs borrowers 0.8–3.9 % of notional more than the "initial margin" column for small positions and up to 17.6 % at the size cap, where the literal EMA leg charges the open's own price impact (§4).
+3. **The exit sandwich is bounded by a fixed 2 % over the reference** (v0.4). Under the atomic model a keeper sandwiching a liquidation gains at most +1.50 SOL over an honest keeper on a capped Tier A position (borrower −2.02 SOL), whether it acts at once or waits; expiry: +0.35 SOL; lenders lose nothing. Blocking the spot leg can no longer widen the bound, and (v0.4.1) neither can a pushed-and-frozen EMA (§12.2, §12.9).
+4. **Atomic-bundle EMA manipulation does not work** when any other observation lands in the same second — the in-house keeper provides one every second near thresholds (§5.8). Near-threshold, fresh-position and OI-basket attacks cannot force any exit under that model (§12.3–12.5).
+5. **Held pumps remain the residual.** An attacker who holds the pool at a manipulated price for whole seconds, with nobody trading against it, looks like a genuine pump. A keeper can take the remainder of a borrower who is already being liquidated (Tier A: +5.66 SOL over an honest keeper, borrower −19.5 SOL), and lenders and protocol lose the part of the penalty — and, on positions whose rent due exceeds the settlement reward, of the rent — that the bought-down vault no longer covers (Tier A −2.06 SOL; −8.02 SOL on a position aged 25 days at 90 % utilisation). v0.4's claim that lenders are never worse off rested on a penalty reserve that blocked honest liquidations in genuine fast pumps and did not hold on aged positions; v0.4.1 removes it (§8.2). Low-fee Raydium baskets stay marginally profitable (+0.5 to +8.5 SOL at the OI cap). The same numbers are the exposure of a market the keeper stops covering (degraded mode, §5.8) (§12.6).
+6. **Liquidations keep working in fast pumps.** Tier C liquidates a 10×/60 s pump at 2.93× and Tier D at 3.29×. A liquidatable position whose buyback fits within 2 % of the reference never waits (v0.4.1: no reserve in the liquidation bound). The simulated-safe parameter region is narrow and compiled: τ = 5 s (a constant), κ ≥ 25 %, persistence ≤ 3 updates, a growth window of ≤ 4 steps, δ ≥ 2 %, SPEC CRs as minima; it is checked on 1,655 runs that include per-second price noise, the reviewer's genuine-pump grid and aged positions (§5.7, §15).
+7. **Settlement decisions are robust to manipulated seconds** (settlement box; v0.4.1 takes its medians over the ring's bucket lows and highs). S1 pays lenders `V − K_s` and needs every S1 leg — including the EMA leg on the box — to hold; S2/S3 pay `min(V − K_s, FV)` with FV on EMA reserves, and only when the amount agrees within 1 % across the box. Moving a decision needs 5 attacker-only seconds of the ring's 8; seconds that also hold an honest observation count for nothing, so v0.4's push-then-freeze is closed along with the v0.3 S2 → S1 flip and refutation push. A paid contrary observation every second can still defer S1 or an S3 on an executable venue (§5.6, §12.10–12.11).
+8. **Gap risk is unchanged and still borne by lenders.** Lenders start losing only when a gap outruns the whole cushion (≈ 2.1× A, 2.6× B, 3.1× C, 4× D); at 10× they lose 78 / 73 / 68 / 58 % of the lent tokens' value (§11.5). Whether rent compensates this depends on uncalibrated gap frequencies (§11.6).
+9. **Graduation carries a deterministic +45.66 % push** from the proportional boost; positions opened at 80–90 % curve progress are liquidated normally on the completing buy or by the boost push (§10.1).
+10. **Lender accounting is live and bounded**: every realised lamport is claimable by someone after wind-down (stranding 68.12 SOL → 0.00002 SOL on the reviewer's test), repeated claims pay 0, lumps and the premium of an S2/S3 take over market value vest over 6 h so just-in-time deposits capture none of them atomically, no lock outlives the positions it stands for (including their S3 tail), and an expired lock stops counting for everyone at its expiry, not at its holder's next touch (v0.4.1). A run before an S1 still gains the runner 4.3 % over fair value at 90 % utilisation and up to 11.1 % at 50 %, and a lender who exits forfeits its unreleased vest to whoever stays (§9).
+11. **Keepers are the protocol's operating cost.** Per-second coverage of every market costs more than a beta market earns; coverage is targeted and budgeted by the owner, and a market the keeper cannot cover pauses opens visibly (§5.8).
+
+---
+
+## 1. Venue facts (verified)
+
+### 1.1 Pump.fun bonding curve (program `6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P`)
+
+Unchanged from v0.1 and re-verified by the fact-check (C1 "verified OK").
+
+- The curve is "based on Uniswap V2 and uses synthetic x and y reserves" [S1]. State: `virtual_token_reserves` (vt), `virtual_quote_reserves` (vs), `real_token_reserves` (rt), `real_quote_reserves` (rs), `complete` [S1, S3]. Virtual and real reserves move by the same amounts, so `vt − rt = 279,900,000,000,000` and (non-mayhem SOL curves) `vs − rs = 30,000,000,000` are constant [T1, T4]; mayhem curves have other offsets [T2, T3, T5, T12] and are rejected (ADOPTED Q6).
+- Live `Global` [A1]: initial virtual tokens 1,073,000,000,000,000; initial virtual SOL 30,000,000,000; initial real tokens 793,100,000,000,000; supply 10¹⁵ (6 decimals); `pool_migration_fee` 15,000,001.
+- **Buy, exact out:** `net = ⌊Q·vs/(vt − Q)⌋ + 1`; protocol and creator fees `⌈net·bps/10⁴⌉` on top [S4]. `amount ≤ rt` [S2].
+- **Sell, exact in:** `gross = ⌊Q·vs/(vt + Q)⌋`; fees deducted [S4].
+- **Fees:** pump `FeeConfig` has one tier: 95 bps protocol + 30 bps creator = **1.25 %** each way [A2].
+- **Completion and migration:** the buy that makes `rt = 0` sets `complete`; `migrate_v2` is permissionless [S1]. Migration seeds the canonical pool with 206,900,000,000,000 tokens and `rs − pool_migration_fee` lamports [T7, T8].
+
+### 1.2 PumpSwap AMM (program `pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA`)
+
+- **Buy, exact base out:** `quote_in = ⌈Y·b/(X − b)⌉`, `Y = real quote + virtual_quote_reserves`; lp, protocol and creator fees `⌈quote_in·bps/10⁴⌉` on top; the LP fee stays in the pool [S6, T9–T11].
+- **Sell, exact base in:** `⌊Y·b/(X + b)⌋` minus fees; **payouts are capped by the real quote reserve** (error `InsufficientRealQuoteReserves`), so the price has a floor `VQR/X` that sellers cannot go through [R-VEN §1.4].
+- **Fees:** canonical pools 125 bps (2/93/30) below a 420 SOL market cap, then 25 tiers down to 30 bps at ≥ 98,240 SOL [A3]. Note that the tier just above 420 SOL is (20 lp / 5 protocol / **95 creator**) = 1.20 %.
+- **Boost (C1-13).** `migrate_v2` moves part of the migrated SOL into a boost vault and books the same amount as `virtual_quote_reserves`, so the price is unchanged at migration; pump's boost authority then spends the vault on zero-fee buy-and-burn (~40 calls, vault empty after ~6 min) [R-VEN §1.4]. On both pools I checked, **`VQR = ⌊migrated_sol × 2069/10⁴⌋` to the lamport** (32UVHz1W…: 17,584,505,333; 8DY32U41…: 17,584,505,348; mainnet slot 450,832,464–469) [A5], and the research note finds the same rule on **all 130 non-mayhem migrations** decoded between 2026-09-25 and 09-27 (115 SOL, 9 USDC, 6 custom-quote pools) [R-VEN §1.4]. The rule is inferred from data; the program source is closed (UNVERIFIED as a rule). Consequence (sim): VQR = 17,584,505,348 lamports (20.69% of migrated SOL); after the zero-fee buy-and-burn the price is 1.4566x the graduation price (constant-product: (1 + 0.2069)^2 = 1.4566), independent of the migrated amount.
+- Canonical pools have 100 % burned LP and boost pools reject deposit/withdraw [R-VEN §1.4]: **LP drains are impossible on canonical PumpSwap pools.**
+
+### 1.3 Raydium AMM v4 and CPMM (owner decision D2)
+
+The economic model uses a generic constant-product pool with configurable fees on the input. Its structure matches the verified research note `docs/research/raydium-amm.md` [R-RAY], which reproduces 388 AMM v4 and 285 CPMM mainnet swaps to the raw unit (v0.2.1 alignment, #26):
+
+- **CPMM** (`raydium-io/raydium-cp-swap@59fb845a`): the trade fee is charged on the **input** amount, `trade_fee = ⌈input·rate/10⁶⌉`; exact-out swaps gross the input up with `⌈post_fee·10⁶/(10⁶ − rate)⌉`; the curve rounds exact-out input up (`checked_ceil_div`) [R1]. Pricing reserves are the vault balances **minus accrued protocol, fund and creator fees** [R2]; the counters can be large (one pool: 792.6 SOL in the vault, 547.1 SOL of reserves) [R-RAY §2.4]. Fee rates come from the pool's `AmmConfig`: all 21 live configs have trade fees from 0.005 % to 4 % and carve protocol 12 % and fund 4 % out of the trade fee (these only move the excluded counters, not the trader's cost). The creator fee (0.05 %–1.495 % by config) applies only if the pool enabled it at creation (launchpads such as LaunchLab), on the input or the output side [R-RAY §2.5, §3.3]. No virtual reserves.
+- **AMM v4** (`raydium-io/raydium-amm@d26944bf`): the trader pays `swap_fee_numerator/denominator` of the input, read per pool (25/10⁴ on every sampled pool); the whole fee stays in the vault, and the protocol later removes 12/100 of the constant-product growth through `withdrawpnl`, which only moves `need_take_pnl`; pricing reserves are `vault − need_take_pnl`; exact-out input is grossed up with a ceiling division [R3; R-RAY §2.2–2.3]. No creator or fund fee; SPL-Token mints only.
+- **LP is withdrawable** on both unless burned; the main pools of the D2 target coins have 92–99.8 % of their LP permanently burned [R-RAY §6.4]. Drain scenarios apply to the unlocked part; the architecture's pool rule requires ≥ 50 % locked LP (ARCH §2.6).
+- Simulation defaults (examples, not facts about any pool): AMM v4 25 bps with 12 % of the fee leaving the reserves (a slight overstatement of the between-withdrawals state, in which the whole fee stays); CPMM 25 bps with 16 % leaving (protocol 12 % + fund 4 %, the value of every live config). v0.4: the example pools have a permanently locked LP share λ = 50 %, the worst pool the market can adopt at `pool_lock_min_bps`; the sim tracks LP units, so unlocked LP can be withdrawn only down to the locked part (drains beyond it are labelled model cases).
+
+### 1.4 What the model takes from this
+
+All venues are **x·y = k pools**. The fee rates are parameters φ read live from the venue's fee state, never cached. Pump venues add fees on the SOL leg; Raydium takes them from the input. For CR, S1/S2 and FV the protocol only needs `B̂(q; X, Y)`, an executable-cost quote on a (real or hypothetical) reserve state.
+
+
+---
+
+## 2. Units, fixed point, rounding, overflow (R3A-12, R3B-3, decision 8)
+
+### 2.1 Numerics table (normative for `shortwin-math`)
+
+Every quantity that must match the sims bit for bit. "Floor"/"ceil" are the rounding of the last division; `isqrt` is the floor integer square root and `isqrt⁺` the ceiling one. The sims implement exactly these forms.
+
+| Quantity | Program type | Scale / unit | Formula and rounding |
+|---|---|---|---|
+| `Q, S, M, V, R, B̂, π, e, K_s, K_e, ert` | u64 | raw token units / lamports | as stated per formula; quotes and fees **up**, payouts and cuts **down** |
+| `X, Y` pricing reserves | u64 (PumpSwap `Y = real + VQR`, VQR i128 in the pool account → u128 intermediate) | raw / lamports | read from venue state (ARCH §4.1) |
+| `P` (spot, `P_ema`, `obs`, bucket `lo`/`hi`, `P_rs`, `P_ref`, `P_mlo`, `P_mhi`) | u128 | WAD (lamports per raw unit × 10¹⁸) | `P = ⌊Y·WAD/X⌋` |
+| `L` (live, `L_ema`, `lobs`, bucket `llo`/`lhi`, `L_slow`, `L_mlo`, `L_mhi`) | u128 | √(raw·lamports) | `L = isqrt(X·Y)` (`X·Y < 2¹²⁸`, u128 square root) |
+| `reprice(L, P)` | u128 → (u128, u128) | — | `sp = isqrt⁺(P)`; `X = ⌊L·10⁹/sp⌋`; `Y = ⌈L·sp/10⁹⌉` — so `Y/X ≥ P` and every reprojected quote is an upper bound (R3B-7 c) |
+| EMA step | u128 | WAD / √ | `obs = clamp(P_ema, b_lo, b_hi)` then `clamp(obs, ⌊P_ema·10⁴/(10⁴ + C)⌋, ⌊P_ema·(10⁴ + C)/10⁴⌋)`; `P_ema ← ⌊(P_ema·τ + obs·dt)/(τ + dt)⌋`, `dt = min(now − ema_ts, dt_max)`; `L_ema`, `L_slow` likewise |
+| `RingEntry` | `ts` i64; `p, l, x, y, lo, hi, llo, lhi` u128 | — | pushed at `integrate`; `(x, y) = reprice(l, p)` cached (decision 3); **v0.4.1 (R4B-2): `(lo, hi, llo, lhi)` = the integrated bucket's price and liquidity extremes, replacing the clamped `obs`, `lobs`** |
+| ring medians `P_mlo`, `P_mhi`, `L_mlo`, `L_mhi` | u128 | — | `P_mlo` = **lower** median of the ring's 8 `lo` (the 4th smallest, index `⌊(n − 1)/2⌋` of the sorted values); `P_mhi` = **upper** median of the 8 `hi` (index `⌊n/2⌋`); `L_mlo`, `L_mhi` likewise over `llo`, `lhi` |
+| `g` sustained growth | i128 intermediate → u32 | bps per second | per step `⌊(P_i − P_{i−1})·10⁴/(P_{i−1}·Δt_i)⌋`; `g = max(0, min over the last kappa_growth_n steps)` |
+| `κ_eff` | u32 | bps | `min(kappa_liq_bps, kappa_base_bps + (τ + 1)·g)` |
+| `P_ref` (liquidation) | u128 | WAD | `lo_x = ⌊lb_lo·(10⁴ + g·(now − lb_sec))/10⁴⌋`; `P_ref = min(max(P_ema, lo_x), ⌊P_ema·(10⁴ + κ_eff)/10⁴⌋, ⌊lo_x·(10⁴ + κ_eff)/10⁴⌋)` (last term v0.4.1) |
+| `P_ref` (expiry) | u128 | WAD | `min(P_ema, min_i p_i, lb_lo)` |
+| σ (S2 slippage) | u32 | bps | `⌊n·WAD·10⁴/(Q·P)⌋ − 10⁴`, `n` the pre-fee input of the quote and `P = ⌊Y·WAD/X⌋` of the same state |
+| CR | u32 | bps | `⌊V_eff·10⁴/B̂⌋` |
+| bound, `max_in` | u64 | lamports | `⌊B̂_ref·(10⁴ + δ)/10⁴⌋`; expiry only (v0.4.1): `⌊B̂_ref·(10⁴ + ε)/10⁴⌋`, `π_ref = ⌈expiry_fee_bps·B̂_ref/10⁴⌉` |
+| φ one-way venue fee | u32 | **ppm** (pump bps × 100 exactly; AMM v4 `⌈num·10⁶/den⌉`; CPMM `t + c`) | caps `⌊cap_x100·φ·X/(100·10⁶)⌋`; fee gates compare `φ` with `cap_bps·100` (no rounding, R3A-3 iii) |
+| `λ` locked LP share | u32 | bps | `⌊(lp_counter − lp_supply)·10⁴/lp_counter⌋` |
+| `D` locked depth | u128 | √ | `⌊λ_bps·isqrt(X·Y)/10⁴⌋` |
+| locked SOL, `R_eff` term | u64 | lamports | `⌊D·isqrt(P_ema)/10⁹⌋`; `⌊locked·10⁴/λ_min_bps⌋` |
+| conservative token reserve for caps | u64 | raw | curve `vT`; AMMs `min(X_now, ⌊L_slow·10⁹/isqrt⁺(P_ema)⌋)`; Raydium also `⌊D·10⁹·10⁴/(λ_min_bps·isqrt⁺(P_ema))⌋` |
+| `K_s`, `K_e` | u64 | lamports | `min(fixed + ⌊V·bps/10⁴⌋, cap, V)`; `min(fixed + ⌊B̂_ref·bps/10⁴⌋, cap, remainder)` |
+| penalty split | u64 | lamports | keeper `⌊π·3,000/10⁴⌋`, protocol `⌊π·2,000/10⁴⌋`, lenders the rest |
+| FV | u64 | lamports | `B̂_FV + ⌈p'·B̂_FV/10⁴⌉ + R_due`, `B̂_FV` a risk quote on `reprice(L, P)`; `p'` = locked penalty, or the expiry fee if expired and `⌊V_eff·10⁴/B̂_FV⌋ ≥ L` **on the same `(P, L)`** (v0.4.1) |
+| S2/S3 immediate part and lump | u64 | lamports | `immediate = min(x, ⌊Q·P_ema/WAD⌋ + R_due)`; `lump = x − immediate` (vests; v0.4.1) |
+| box amount check | u64 | lamports | settle iff `(x_hi − x_lo)·10⁴ ≤ fv_dev_bps·x_lo` (exact integers) |
+| `U` | u32 | bps | `⌈B_Q·10⁴/(T + B_Q)⌉` |
+| rent basis `J0, J1, J2` | u128 | WAD·s | `J0 += P̃·Δt`; `J1 += ⌈P̃·min(U, k)·Δt/10⁴⌉`; `J2 += ⌈P̃·max(U − k, 0)·Δt/10⁴⌉`, `P̃ = min(P_ema, P_ACC_MAX)` before this instruction's roll |
+| `rent_accrued`, `R_min` | u64 (U256 intermediate) | lamports | `⌈Q·(b·ΔJ0 + s1·ΔJ1 + s2·ΔJ2)/(10⁴·31,536,000·WAD)⌉`; `⌈Q·P_ema·(b·10⁴ + s1·min(U, k) + s2·max(U − k, 0))·T_min/(10⁴·10⁴·31,536,000·WAD)⌉` |
+| lender rent credit | u64 (U256 intermediate) | lamports | `⌊Σ_j A_j·δJ_j/(10⁴·10⁴·31,536,000·WAD)⌋`, `A_j = Σ_open Q·coef_j·(10⁴ − p_pos)`; true-up `credited_for = ⌈Q·Σ_j coef_j·ΔJ_j·(10⁴ − p_pos)/(10⁴·10⁴·31,536,000·WAD)⌉` |
+| shares | u128 (U256 intermediate) | shares | mint `⌊a·(S + VS)/(T + B + VA)⌋`; burn value `⌊s·(T + B + VA)/(S + VS)⌋` |
+| `acc`, `acc_r` | i128 / u128 | WAD lamports per share | `Δ = ⌊(x·WAD + carry)/S⌋`, remainder kept in `carry` |
+| `pending`, `real` | i64 / u64 (U256 intermediate) | lamports | `+= ⌊shares·Δacc/WAD⌋` (floor toward −∞ for signed) |
+| locks | u128 (U256 intermediate) | shares | own lock `⌈lock·Π/lock_Π⌉`; term `⌊lock·WAD/Π⌋` into the day bucket of `lock_until` (v0.4.1: floor); `locked = min(⌊Σ_live buckets·Π/WAD⌋, S)`; `Π ← ⌈Π·B'/b_min⌉` |
+| `lock_until` | i64 | s | `⌈(max(now, max_release) + lock_grace_s)/86,400⌉·86,400` (v0.4.1) |
+| vest release | u64 | lamports | `⌊vest_bal·(now − vest_last)/(vest_end − vest_last)⌋`, all of it once `now ≥ vest_end`; a lump `x` sets `vest_end = now + ⌈(vest_bal·(vest_end − now) + x·lump_vest_s)/(vest_bal + x)⌉` after the release (v0.4.1) |
+
+**Order of operations inside one instruction** (ARCH §3.0): (1) rent accrues on `P_ema` **before** this instruction's roll; (2) the completed bucket is integrated (the roll); (3) this instruction's pre-trade observation is recorded; (4) the body reads the **post-roll** EMA state — including the D4 margin's EMA leg, which uses the newest ring entry's cached `(x, y)` (R3A-12).
+
+### 2.2 Overflow: where 256-bit intermediates are needed (R3B-3; corrects v0.3's table)
+
+Bounds used: `Q, X ≤ 2⁶⁴ ≈ 1.8·10¹⁹`; `Y ≤` total SOL supply `≈ 6·10¹⁷` lamports; `P ≤ Y·WAD ≈ 6·10³⁵`; `L ≤ 3.3·10¹⁸`; `S ≤ R_MAX·(T + B + VA) ≤ 1.8·10²⁵`; `τ = 5` (a constant), `dt ≤ 2` (compiled bound, §15).
+
+| Product | Worst case | Type |
+|---|---|---|
+| `Q·Y` in every quote and sale (incl. σ's pre-fee input `n`) | `1.1·10³⁷ < 2¹²⁸ = 3.4·10³⁸` | **u128** |
+| `L·10⁹`, `L·isqrt⁺(P)` in `reprice` | `3.3·10²⁷`, `2.5·10³⁶` | **u128** |
+| `X·Y` under `isqrt` | `1.1·10³⁷` | **u128** (no U256 square root anywhere) |
+| fees `n·φ` (ppm), CR `V·10⁴`, caps `X·φ·cap_x100` | `< 10³⁰` | **u128** |
+| EMA `P_ema·(τ + dt)`, `L_slow·(τ_slow + dts)` | `4.2·10³⁶`, `3·10²³` | **u128** |
+| FV, bounds, box check, waterfalls | u64 sums | **u64/u128** |
+| rent basis increments `P̃·Δt` and the cumulative `J_i` | `J_i ≤ P_ACC_MAX·3.2·10⁹ s` (100 years) | **u128** with `P_ACC_MAX = 10²⁹` (a price of 100 SOL per raw unit); opens are refused while `P_ema > P_OPEN_MAX = 10²⁷` |
+| `Q·coef·ΔJ`, `A_j·δJ_j`, `Q·P_ema·r·T_min` | `> 10⁴⁰` | **U256** |
+| shares and accumulators: `a·(S + VS)`, `s·(T + B + VA)`, `shares·Δacc`, `lock·Π` | up to `3·10⁴⁴` | **U256** |
+| σ denominator `Q·P`, κ and g products `P·(10⁴ + κ)`, `ΔP·10⁴` | overflow only above `P ≈ 2·10³⁴` | **u128 fast path, U256 fallback** (`mul_div` checks the product) |
+| σ numerator `n·WAD·10⁴` | exceeds `2¹²⁸` once `n > 3.4·10¹⁶` lamports, inside the bound `Y ≤ 6·10¹⁷` | **u128 fast path, U256 fallback** |
+| impact caps (§6.1) `X²·(10⁴ + ι)` and `X²·10⁴` | exceed `2¹²⁸` once `X > ≈ 1.8·10¹⁷`; the radicand `⌊X²·(10⁴ + ι)/10⁴⌋` itself once `X > 2⁶⁴/√(1 + ι)` | **u128 fast path, U256 product and quotient**; the root stays u128: `⌊√q⌋` from `⌊√⌊q/4ᵏ⌋⌋` (the smallest `k` that fits) plus its `k` low bits, checked against `s² ≤ q` (no U256 square root) |
+| tier threshold (§6.2) `Λ·price·10^(expo+6)` against `θ_usd_e6·10⁹` | `θ_usd_e6·10⁹ < 2⁹⁴`; the left side `< 10³¹` for any realistic pool (`Λ ≤ 10¹⁴` lamports, a Pyth price `≤ 10¹³`, `\|expo + 6\| ≤ 4`) | **u128 fast path, U256 fallback** (a comparison, no division) |
+
+Implementation rule for the math crate: every `mul_div` takes the u128 path when `a.checked_mul(b)` succeeds and falls back to a limb-based 256/128 division (never bit-by-bit) otherwise; ARCH §8.1 sets per-primitive CU budgets as an M0 gate. With the cached reprojection (§2.3) a liquidation evaluates at most `liq_persist_n` + 3 quotes per position instead of up to 18 reprojection-plus-quote pairs.
+
+### 2.3 `reprice` and the cached ring reprojection
+
+`reprice(L, P)` is the constant-product state with liquidity `L` at price `P` (§2.1). On the curve `√(vT·vQ)` is constant, so `reprice(L_curve, P)` is the curve itself at `P`; its real token reserve follows from the constant offset `vT − rT`. Every ring entry stores `(x, y) = reprice(l, p)` computed once at `integrate`; the EMA leg, the settlement box corners that coincide with ring states, and the D4 margin read the cached pair. The cache depends only on the market, never on a position (decision 3).
+
+### 2.4 Position record (locked at open)
+
+Extends SPEC §10 (ADOPTED Q9, C0-8, V1-5): `Q, S, M, V, N_open, fee_open, J_open[3], R_min, t_open, deadline, entry_price`; locked tier terms `L, penalty, σ_max, expiry_fee, rate curve (base, slope1, slope2)`; **`rent_protocol_bps`** (v0.4, R3A-5/R3B-9); settlement and keeper terms (`K_s` fixed/bps/cap, `K_e` fixed/bps/cap, penalty split); exit-bound and persistence terms (**`δ_liq`**, `δ_exp`, `κ_max`, `κ_base`, `kappa_growth_n`, `liq_persist_n`, `settle_persist_n`, arm gap); execution and settlement terms (`ε` — the expiry bound's tolerance since v0.4.1 —, effective `ert` — 0 on Raydium —, `ref_max_age_s`, `fv_dev_bps`, `venue_fee_hard_cap_bps`, `s3_wait_s`, `grad_grace_s`, `max_migration_pause_s`; the last three also raise the market's `max_release = deadline + their sum`, which bounds the lenders' locks, §9.3); settlement arming state `(s_armed, s_count, s_since, s_last)`. Removed in v0.4: `delta_liq_min/slope/max`, `liq_persist_s`, `settle_persist_s`, `fv_liq`, `settle_s2_first`. τ is a compile-time constant since v0.4 (§5.7); `dt_max`, the clamp and the slow-liquidity EMA parameters are market-level (params-version rule; forced adoption after `ema_force_delay_s` — their compiled ranges keep a forced adoption inside the simulated-safe region, R3B-6). `util_kink_bps` carries its own version and is adopted only with no open position; a forced EMA adoption does not advance it (R3A-9).
+
+---
+
+## 3. Pricing primitives
+
+### 3.1 Executable buyback cost `B̂(q)` — closed forms
+
+**Fees on the SOL leg** (pump curve, PumpSwap; `ε₁ = 1` on the curve, 0 on PumpSwap):
+
+```
+n(q)  = ⌈q·Y/(X − q)⌉ + ε₁
+B̂(q) = n + Σ_i ⌈n·φ_i/10⁴⌉                       φ_i: lp, protocol, creator (creator only if set)
+```
+
+The curve charges `⌊·⌋ + 1`, so `B̂` exceeds the charge by at most one lamport per fee component (asserted in the sim: charge ∈ [B̂ − 5, B̂]).
+
+**Fees on the input** (Raydium AMM v4 / CPMM; rate `f` in ppm incl. an input-side creator fee):
+
+```
+n(q)  = ⌈q·Y/(X − q)⌉
+B̂(q) = ⌈n·10⁶/(10⁶ − f)⌉
+```
+
+`B̂ = +∞` (no quote) if `q ≥ X`, the curve is complete, or the pool cannot execute. **Straddle quote** for a live curve with `q > rt`: `B̂_str(q) = B̂_pool(q)` on the deterministic post-migration pool `(206.9 M, rs + n_curve(rt) − fee)` — the executed ≥ 3-transaction bundle path (V1-9). Exact per-venue forms are normative in ARCH §4.3.
+
+**Two fee views.** *Execution quotes* (`B̂_live` in close affordability, "normal buyback allowed" and the `B̂_live ≤ max_in` check) use the live fee. *Risk quotes* — every CR, the S1/S2 legs, `B̂_ref`, refutation, the penalty base and FV — cap the one-way fee at the position's locked `venue_fee_hard_cap_bps` (for pump venues the capped fee is charged as one combined component). **Hypothetical states use the live fee tier** (R3B-7 b): a PumpSwap quote on `reprice(L_i, P_i)` uses the tier of the live market cap, not of the hypothetical one (the sims do the same).
+
+Sale proceeds at open: pump venues `g = ⌊q·Y/(X+q)⌋`, `S = g − Σ⌈g·φ_i/10⁴⌉`; Raydium `q_n = q − ⌈q·f/10⁶⌉`, `S = ⌊Y·q_n/(X + q_n)⌋`.
+
+### 3.2 Round-trip retention and the curve round trip
+
+```
+ρ := S/B̂_open ≈ (1 − φ_sell)/(1 + φ_buy)   (pump venues)      ρ ≈ (1 − f)²   (Raydium)
+```
+
+ρ = 0.9753 (curve, 125 bps), 0.9821 (PumpSwap 90 bps), 0.9950 (Raydium 25 bps). Measured by the sim on the curve state of R-PUMP §4.2:
+
+- sell 10,000,000,000,000 raw then buy it back: proceeds 462,410,820, buyback 474,117,427 lamports -> round-trip cost 2.53% of proceeds (fees only; impact cancels). Buying Q on the pre-sale state costs 485,764,634 -> 5.05% (the same-state bid/ask spread for size Q).
+
+The first-pass research note's "5.05 % round trip" priced both legs on the pre-trade state; it is the same-state spread, not the round-trip cost (C1-6).
+
+### 3.3 Notional, CR and the execution venue
+
+| Name | Definition | Used for |
+|---|---|---|
+| `N_open` | `B̂_spot(Q)` on post-open reserves | open fee, reporting |
+| `N_mark(t)` | `Q·P_ema/WAD` | UI |
+| `B̂_live` | `B̂(Q)` on the live reserves of the canonical venue | CR spot leg, S1, execution |
+
+`R_due = max(rent_accrued, R_min)`, `V_eff = V − R_due`, `CR = V_eff·10⁴/B̂`.
+
+Execution (D1, D2): the canonical constant-product pool is traded directly (PumpSwap for pump graduates, Raydium AMM v4/CPMM otherwise). Jupiter (v1.1) may only be used if it delivers `Q` for no more than the on-chain bound of §8.2; any saving goes to the borrower (ADOPTED Q20).
+
+**Liquidation price** (UI and keepers only; constant product with invariant K, fee φ, target `b = V_eff/L`): `s = (−bQ + √(b²Q² + 4(1+φ)·K·Q·b))/(2(1+φ)·√K·Q)`, `P_liq = s²`. With `b = V − K_s` it gives the S1 price.
+
+---
+
+## 4. Opening: margin (D4), fee, opening CR
+
+Procedure (atomic): prologue (rent accrual, roll, observation) → caps (§6) → CPI sell `Q` with the borrower's `min_proceeds` → reload → quotes → margin and fee.
+
+```
+B̂_spot  = B̂(Q; live post-open reserves)
+B̂_ema   = B̂(Q; x, y of the newest ring entry)          # EMA reserves after this instruction's roll (R3A-12); D4 literal
+M        = ⌈CR_open,T · max(B̂_spot, B̂_ema) / 10⁴⌉ − S   # OWNER D4
+                                                        # B̂_ema undefined (e.g. Q ≥ x): B̂_spot alone (sim Market.open)
+fee_open = ⌈25·B̂_spot/10⁴⌉                              # SPEC 0.25 % of notional, on top of M, to protocol
+V = S + M,  R_min per §2.1
+```
+
+Open guards (PROPOSED): refuse opens while the market is younger than `market_warmup_s` (50 s), `|P_spot/P_ema − 1| > 10 %`, `P_ema > P_OPEN_MAX` (§2.2), during the post-graduation boost window (ADOPTED Q15), after a venue program upgrade until re-validated (ADOPTED Q13), below `min_notional` 0.1 SOL (ADOPTED Q11), above the per-market beta cap 25 SOL of open notional (ADOPTED Q21), and while the market's opens are paused (including keeper degraded mode, §5.8).
+
+The literal D4 EMA leg costs `Q` at the pre-sale EMA price and so charges the borrower a second time for its own impact at the size cap. The shifted reading (owner option O2) is **not built**; its margin is shown for the owner only (analysis column).
+
+| market | size | q=Q/X0 | venue fee (one way) | rho=S/B_open | CR if M = m x B_open (literal column) | table CR (enforced) | D4 margin, literal: EMA leg on EMA reserves (% of B_open) | owner option O2 (not built): EMA leg shifted by the open's own sale (% of B_open) |
+|---|---|---|---|---|---|---|---|---|
+| A | 100% of cap | 2.47% | 0.90% | 0.9821 | 1.982 | 2.00 | 111.9% | 101.8% |
+| A | 10% of cap | 0.25% | 0.90% | 0.9822 | 1.982 | 2.00 | 102.8% | 101.8% |
+| B | 100% of cap | 2.47% | 1.00% | 0.9801 | 2.480 | 2.50 | 164.6% | 152.0% |
+| B | 10% of cap | 0.25% | 1.00% | 0.9802 | 2.480 | 2.50 | 153.2% | 152.0% |
+| C | 100% of cap | 2.47% | 1.20% | 0.9762 | 2.976 | 3.00 | 217.6% | 202.4% |
+| C | 10% of cap | 0.25% | 1.20% | 0.9763 | 2.976 | 3.00 | 203.9% | 202.4% |
+| D@0% | 100% of cap | 1.49% | 1.25% | 0.9753 | 3.975 | 4.00 | 314.6% | 302.5% |
+| D@0% | 10% of cap | 0.15% | 1.25% | 0.9753 | 3.975 | 4.00 | 303.7% | 302.5% |
+| D@50% | 100% of cap | 1.49% | 1.25% | 0.9753 | 3.975 | 4.00 | 314.6% | 302.5% |
+| D@50% | 10% of cap | 0.15% | 1.25% | 0.9753 | 3.975 | 4.00 | 303.7% | 302.5% |
+| D@90% | 100% of cap | 1.49% | 1.25% | 0.9753 | 3.975 | 4.00 | 314.6% | 302.5% |
+| D@90% | 10% of cap | 0.15% | 1.25% | 0.9753 | 3.975 | 4.00 | 303.7% | 302.5% |
+| RA | 100% of cap | 0.75% | 0.25% | 0.9950 | 1.995 | 2.00 | 103.5% | 100.5% |
+| RA | 10% of cap | 0.07% | 0.25% | 0.9950 | 1.995 | 2.00 | 100.8% | 100.5% |
+| RB | 100% of cap | 0.75% | 0.25% | 0.9950 | 2.495 | 2.50 | 154.3% | 150.5% |
+| RB | 10% of cap | 0.07% | 0.25% | 0.9950 | 2.495 | 2.50 | 150.9% | 150.5% |
+| RC | 100% of cap | 0.75% | 0.25% | 0.9950 | 2.995 | 3.00 | 205.0% | 200.5% |
+| RC | 10% of cap | 0.07% | 0.25% | 0.9950 | 2.995 | 3.00 | 200.9% | 200.5% |
+
+SPEC §4 says borrowers post "about 2 % more" than the initial-margin column. Under the literal D4 rule that holds for small positions (+2.8 % A, +3.2 % B, +3.9 % C, +3.7 % D, +0.8 % on 25 bps Raydium pools at 10 % of the cap); at the size cap the EMA leg adds the open's own impact (+11.9 % A, +14.6 % B, +17.6 % C, +14.6 % D, +3.5 % Raydium).
+
+| market | venue | token reserve X | SOL reserve Y | mcap (SOL) | venue fee one way | max Q per position | N_open = B_open (SOL) | margin M (SOL) | vault V (SOL) | open fee (SOL) | OI cap notional (SOL) | S1-S3 keeper reward K_s (SOL) | expiry keeper reward (SOL) | ert (SOL) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| A | PumpSwap | 150.0M | 2,500.00 | 16,667 | 0.90% | 3.704M | 60.795 | 68.034 | 127.741 | 0.1520 | 168.75 | 0.2500 | 0.0500 | 0.0065 |
+| B | PumpSwap | 200.0M | 1,000.00 | 5,000 | 1.00% | 4.939M | 24.342 | 40.075 | 63.934 | 0.0609 | 75.00 | 0.2500 | 0.0253 | 0.0065 |
+| C | PumpSwap | 171.4M | 102.57 | 577 | 1.20% | 4.234M | 2.502 | 5.443 | 7.885 | 0.0063 | 8.94 | 0.0889 | 0.0035 | 0.0065 |
+| D@0% | pump curve | vt 1,073.0M / rt 793.1M | 30.00 (virtual) | 28 | 1.25% | 15.976M | 0.446 | 1.402 | 1.836 | 0.0011 | 1.40 | 0.0284 | 0.0014 | 0.0065 |
+| D@50% | pump curve | vt 676.5M / rt 396.6M | 47.59 (virtual) | 70 | 1.25% | 10.072M | 0.707 | 2.223 | 2.913 | 0.0018 | 2.21 | 0.0391 | 0.0017 | 0.0065 |
+| D@90% | pump curve | vt 359.2M / rt 79.3M | 89.61 (virtual) | 249 | 1.25% | 5.348M | 1.331 | 4.187 | 5.485 | 0.0033 | 4.17 | 0.0649 | 0.0023 | 0.0065 |
+| RA | AMMv4 | 150.0M | 2,500.00 | 16,667 | 0.25% | 1.125M | 18.654 | 19.310 | 37.870 | 0.0466 | 46.87 | 0.2500 | 0.0197 | 0.0000 |
+| RB | CPMM | 200.0M | 1,000.00 | 5,000 | 0.25% | 1.500M | 7.463 | 11.513 | 18.939 | 0.0187 | 18.75 | 0.1994 | 0.0085 | 0.0000 |
+| RC | CPMM | 206.9M | 84.99 | 411 | 0.25% | 1.551M | 0.634 | 1.300 | 1.931 | 0.0016 | 1.59 | 0.0293 | 0.0016 | 0.0000 |
+| D@97% | pump curve | vt 303.7M / rt 23.8M | 106.00 (virtual) | 349 | 1.25% | 4.522M | 1.574 | 4.953 | 6.488 | 0.0039 | 4.93 | 0.0749 | 0.0026 | 0.0065 |
+
+*Raydium rows use 25 bps; their size caps are the fee-scaled ones of §6. `ert` is 0 on Raydium (R3A-3 i).*
+
+**Price rise to liquidation** (spot multiple from the post-open price, EMA caught up):
+
+| market | spec (CR_open/L) | actual, tiny size, no rent | actual, size at cap, no rent | actual, size at cap, rent for max duration @80% util |
+|---|---|---|---|---|
+| A | 1.60x | 1.60x | 1.67x | 1.64x |
+| B | 1.85x | 1.85x | 1.93x | 1.90x |
+| C | 2.00x | 2.00x | 2.08x | 2.05x |
+| D@0% | 2.29x | 2.28x | 2.34x | 2.32x |
+| D@50% | 2.29x | 2.28x | 2.34x | 2.32x |
+| D@90% | 2.29x | 2.29x | 2.32x | 2.30x |
+| RA | 1.60x | 1.60x | 1.62x | 1.59x |
+| RC | 2.00x | 2.00x | 2.02x | 2.00x |
+
+---
+
+## 5. Price observation, EMA, persistence and settlement (SPEC §5.1, §5.3, §9)
+
+### 5.1 Observation buckets — PROPOSED (unchanged)
+
+Every instruction that carries the market's venue accounts (open, close, liquidate, expire, sol_settle, crank_price, propose_pool) runs a prologue **before any CPI trade**. `deposit` and `withdraw` roll a completed bucket but record no observation; `claim_sol`, `cover_deficit`, `sync_lender` and `add_margin` do not touch market state.
+
+```
+observe(now):
+    if b_sec is set and now > b_sec:  integrate(now)            # roll the completed second into the EMA
+    update the S3 chain (s3_no_route) and, on Raydium, the fast-path chain (pool_fail)   (§10.3)
+    if the venue is executable (or a migrating curve, whose final state is still recorded):
+        add (P_spot, √(X·Y)) of the PRE-TRADE state to the bucket of second `now`
+```
+
+Every instruction of the second records (there is no one-per-slot limit). A venue that cannot execute records nothing (V2-5); a fee above the hard cap does not stop observation, because the pool still trades.
+
+### 5.2 EMA integration — PROPOSED
+
+```
+integrate(now):                                           # at most once per second
+    obs  = clamp(P_ema, b_lo, b_hi), then clamp to [P_ema/(1 + C), P_ema·(1 + C)]      # C = 100 %
+    lobs = same for liquidity (L_ema, b_llo, b_lhi)
+    dt   = min(now − ema_ts, dt_max)                      # dt_max = 2 s
+    P_ema = (P_ema·τ + obs·dt)/(τ + dt);  L_ema likewise  # τ = 5 s
+    L_slow = (L_slow·3,600 + lobs·dts)/(3,600 + dts), dts = min(now − slow_ts, 60)
+    ring.push(now, P_ema, L_ema, x, y = reprice(L_ema, P_ema), b_lo, b_hi, b_llo, b_lhi)  # v0.4.1: bucket extremes
+    lb_lo, lb_hi, lb_sec = bucket; clear the bucket
+```
+
+- **One-second lag.** The EMA an instruction uses never contains that instruction's own observation, so `[pump → liquidate → dump]` cannot feed its own trigger.
+- **Directional aggregation.** The EMA moves up only if every observation of a second was above it, down only if every one was below it. Self-test: single integration after an atomic 3x bundle alone in its second: EMA +16.67% (bound +16.7% at dt=1, +28.6% at dt=2, tau=5s); with an honest observation in the same second: +0.00%
+- **Step bounds** (τ = 5 s, C = 100 %): +16.7 % / −8.3 % per 1 s step, +28.6 % / −14.3 % at `dt = 2 s`.
+- **The freeze cuts both ways** (V1-2): one contrary observation per second freezes the EMA or fails the robust-spot leg; §12.9 prices this veto.
+- **Initialisation and venue changes** (v0.4, R3B-7 a, R3A-11 d). At creation `P_ema = P_spot`, `L_ema = L_slow = √(X·Y)`. At graduation `P_ema` carries over and both liquidity EMAs reset to the new pool; at a Raydium fast-path switch they reset to `min(√(X·Y)_new, current)`. In both cases **every ring entry's `l`, `llo` and `lhi` are rewritten to the reset `L_ema`** (and `(x, y)` recomputed), and the open bucket is cleared. Without the rewrite, the ring medians would still carry the old venue's liquidity and the settlement box would stay more than 1 % wide in `L` for 3 s (v0.4.1's bucket-extremes box: 4 s) after each change (§10.1, `attacks/venue_switch.py`).
+
+### 5.3 EMA reprojection
+
+The EMA state prices the venue **at the EMA price with EMA liquidity**, `B̂_ema(Q) = B̂(Q; x, y)` of the newest ring entry (§2.3). On the curve this is the curve itself at `P_ema` (with `B̂_str` if `Q > rt`). `L_slow` feeds tiering (§6.2), the caps' conservative token reserve (§6.1) and the exit references (§8.2).
+
+### 5.4 History ring and robust spot
+
+- **Ring:** the last 8 integrations `(ts, P_ema, L_ema, x, y, lo, hi, llo, lhi)`. The liquidation EMA leg, the expiry reference, the sustained-growth estimate and the settlement box (via the medians of the bucket extremes, v0.4.1) read it.
+- **Robust spot:** `P_rs = min(P_live, lb_lo)`, valid only if `lb_sec ≥ now − ref_max_age_s` (2 s). Without a fresh completed bucket the spot leg cannot be confirmed (the keeper cranks one second and acts the next).
+- **Sustained EMA growth** `g` and `κ_eff`: §2.1. A single held second produces one step; a genuine trend produces three.
+
+### 5.5 Liquidatable (SPEC §5.1)
+
+```
+spot leg:  venue executable ? CR(V_eff, B̂(Q; reprice(L_live, P_rs))) < L : true         (P_rs fresh; SPEC: CR_spot := 0)
+EMA leg:   the newest liq_persist_n (= 3) ring entries all have CR(V_eff, B̂(Q; x_i, y_i)) < L       (v0.4: no seconds condition)
+liquidatable ⇔ (spot leg ∧ EMA leg) ∨ now ≥ deadline
+```
+
+The ring integrates at most once per second, so 3 entries always span ≥ 2 s; the separate `liq_persist_s` added nothing (decision 2). The route-broken flag and the fee hard cap never make the spot leg true (V2-1); every CR here is a risk quote (§3.1). `L` is the position's locked liquidation CR.
+
+### 5.6 SOL settlement: one rule for every decision (the settlement box) — PROPOSED (v0.4; medians v0.4.1)
+
+`K_s = min(10,000,000 + ⌊V·100/10⁴⌋, K_cap, V)`, `K_cap` = 0.25 SOL (ADOPTED Q4). `ert` is the position's effective venue-side rent tolerance (6,500,000 lamports on pump venues, 0 on Raydium). σ(q; X, Y) is SPEC's slippage (§2.1). σ_max = 20 % (Tier D 30 %).
+
+**The rule.** A settlement decision may rest on EMA evidence only if manipulated seconds could not have produced that evidence. One attacker-only second moves `P_ema` by up to +16.7 % / −8.3 % and `L_ema` alike. v0.4 bounded it with the lower median of the ring's 8 clamped observations `obs`; the fourth review showed that a second which also holds the honest keeper's observation can still be used: if the attacker adds an observation just beyond the (pushed) `P_ema`, the bucket straddles `P_ema` and `obs = P_ema`, so one attacker-only push followed by 3–4 such **frozen** seconds moved the median onto the pushed value (R4B-2). v0.4.1 therefore takes the medians over each ring entry's **bucket extremes**: a frozen second contains the honest observation, so its bucket low is at most the honest price and its bucket high at least the honest price. Raising the lower median of the lows, or lowering the upper median of the highs, needs 5 of the 8 entries, and only an attacker-only second can raise a low or lower a high. Every EMA-based settlement decision is evaluated on the **settlement box**
+
+```
+P_mlo = lower median of the ring's bucket lows,  P_mhi = upper median of the bucket highs  (L_mlo, L_mhi likewise)
+P_lo = min(P_ema, P_mlo),  P_hi = max(P_ema, P_mhi),  L_lo = min(L_ema, L_mlo),  L_hi = max(L_ema, L_mhi)
+(the box is the EMA point alone if nothing has been integrated for more than ring_len seconds: a venue
+ that records no observations cannot have been pushed since, and a halted venue's S3 must not be blocked)
+```
+
+and requires the decision to come out the same everywhere in it. Because B̂ and σ increase with `P` and decrease with `L` (§2.1), "everywhere in the box" means "at the box corner least favourable to the decision":
+
+```
+S1 legs    ⇔ B̂_live + ert > V − K_s  ∧  B̂(Q; reprice(L_live, P_rs)) + ert > V − K_s  ∧  B̂(Q; reprice(L_hi, P_lo)) + ert > V − K_s
+S2 legs    ⇔ σ_live > σ_max  ∧  σ(Q; reprice(L_live, P_rs)) > σ_max  ∧  σ(Q; reprice(L_hi, P_lo)) > σ_max
+refuted    ⇔ B̂(Q; reprice(L_lo, P_hi)) + ert ≤ V − K_s  ∧  σ(Q; reprice(min(L_live, L_lo), P_hi)) ≤ σ_max
+not liquidatable (disarms) ⇔ EMA leg fails  ∧  CR(V_eff, B̂(Q; reprice(L_lo, P_hi))) ≥ L          (and not expired)
+amount (S2, S3): x(P, L) = min(V − K_s, FV(P, L)), FV's p' decided at the same (P, L)           (v0.4.1, R4A-3)
+                 settle only if  x(P_hi, L_lo) − x(P_lo, L_hi) ≤ fv_dev_bps·x(P_lo, L_hi)/10⁴;
+                 pay x(P_ema, L_ema)                                                          (D3 literal: EMA reserves)
+normal buyback allowed ⇔ B̂_live(execution fee) + ert ≤ V − K_s  ∧  σ_live ≤ σ_max            (then §8.2)
+```
+
+**Arming (one eligibility clock for S1 and S2, V2-4 as amended).**
+
+- The first evaluation at which the S1 legs or the S2 legs hold arms the position (`s_count = ema_count`, `s_since = now`).
+- Only box-robust evidence disarms: `refuted`, or "not liquidatable" as above. **Every other evaluation of an armed position keeps the clock running** (`s_last = now`) — a failing live or robust-spot leg, a stale bucket, a spot-leg veto (R3A-6 b).
+- Evaluations more than `settle_arm_gap_s` (10 s) apart re-arm it.
+- Settlement executes when the S1 or S2 legs hold now and `ema_count − s_count ≥ settle_persist_n` (40 updates, hence ≥ 39 s; `settle_persist_s` is gone). The kind is chosen then: **S1 if the S1 legs hold** (box included), else S2; an S2 whose amount is not box-consistent waits (no state change).
+- S3 (no route, §10.3) needs no arming; its amount obeys the same box check.
+
+**What the rule closes and what it leaves.** The corner choice keeps honest liveness where it matters: in a sustained uptrend `P_ema ≤ P_mlo` (the EMA lags more than the median of the last 8 bucket lows), so the S1 corner is `P_ema` itself and S1 timing is unchanged (in a ramp's first ≈ 8–11 s, after a step that fills 4 of the 8 entries, or in a steady ramp of ≈ 9.5–16.7 %/s, where the EMA's steady lag `(1 + g)/(1 + 6g)` is smaller than the median's `(1 + g)⁻⁴`, the S1 corner is `P_mlo`, which delays S1 but never makes it easier); in a genuine reversal `P_ema ≥ P_mhi`, so refutation reads `P_ema` itself. **`p'` on the box (R4A-3).** FV prices an expired position with the expiry fee only if it is not CR-liquidatable; v0.4 read that from the raw "CR-liquidatable" flag, whose robust-spot leg one contrary low observation (the V1-2 primitive, not an attacker-only second) fails, and both box corners then used the manipulated `p'`. v0.4.1 decides `p'` at each evaluated state: a disagreement between corners shows up as an amount difference and the settlement waits. Evidence (§12.10, §12.11):
+
+- *S2 → S1 flip* (R3A-1): a lender-keeper's 1–2 pushed seconds plus `[pump → sol_settle → dump]` no longer produce an uncapped S1 (v0.3: +2.37 to +5.58 SOL for lenders on the drained RA cases); neither does one push followed by up to 10 frozen seconds (v0.4: +2.37 to +5.58 SOL after 4 frozen seconds).
+- *Refutation push* (R3A-6 a, R4B-2): a borrower's one-second dump before maturity, or a dump plus 4 frozen seconds repeated every cycle, delays S1 by at most 8 s (v0.3, and v0.4 under push-then-freeze: no S1 within 600 s at 3 % beyond the boundary).
+- *Amount push* (V2-9): a one-second push up or down moves an S2/S3 amount by at most `fv_dev_bps` (±1 %); on the realistic case — Emergency flag set, healthy position expires, S3 capped hard — +0.70 SOL for a lender push instead of +10.48 SOL without the box. A contrary observation before an S3 no longer changes `p'` (v0.4: −2.9 % to −7.3 % for lenders).
+- *Residual — consecutive attacker-only seconds* (R4A-9): **5 of 8 in either direction** move a median; on the drained-RA model cases 5 consecutive attacker-only seconds flip a capped S2 into S1 (+2.37 to +5.58 SOL for 1.1–2.0 SOL of fees), none of 6 with one honest second in between. Only a censored or absent keeper (degraded mode, §5.8) leaves 5 consecutive seconds to an attacker.
+- *Residual — deferral by widening* (v0.4.1): a contrary observation in every second (a paid round trip; on Raydium an LP add and remove costs no swap fee but moves `L` too little to matter) keeps the box wide on one side. It cannot flip a decision, but it defers S1 (like the robust-spot veto of §12.9) and an S3 amount on an executable venue for as long as it is paid: indefinitely at a 1 % round trip per second, which costs 0.002 SOL/s (RC) to 0.21 SOL/s (A); a 3 % round trip every second delays an S1 2 % beyond its boundary from 60 s to 225 s on Tier A at 0.81 SOL/s (`refute_push.py` (d)). A pushed EMA alone defers an S2/S3 by ≈ 13 s per attacker-only second (§12.11). A deferred S3 on an executable venue can still be expired or liquidated normally when the route works for short.win.
+
+The literal "lender-adverse corner for everything" reading of the brief was tested and rejected: for refutation it is the corner that makes refutation *easiest* (a borrower push would disarm), and for the amount it lets a borrower's one-second push lower FV by up to 8 %. "The same decision on the whole box" is the one rule that closes both directions.
+
+If spot says "cannot buy back" but neither S1 nor S2 is confirmed, the position waits. `ert` enters the S1 threshold so that no band exists in which neither a buyback (budget `V − K_s − ert`) nor S1 is possible.
+
+### 5.7 Parameter choice: lag versus manipulation, and the simulated-safe region (R3B-6)
+
+The EMA must be fast enough that liquidations track genuine pumps and slow enough that manipulation costs more than it earns. Manipulation resistance comes from aggregation, persistence and the bounds (§12); the choice of τ, κ, persistence and δ is driven by liveness. The lag study (lender P&L valued at the terminal price), including values outside the compiled ranges to show where they come from:
+
+| market | setting | pump 10x/60s | pump 10x/3min | pump 10x/10min | gap 5x |
+|---|---|---|---|---|---|
+| A | v0.4 default (tau 5 s, fresh ref, kappa <= 25 %, fixed delta 2 %, persist 3) | S1 @10.00x +65s, lender -78% | liqu @1.87x +49s, lender +0% | liqu @1.73x +143s, lender +0% | S1 @5.00x +47s, lender -57% |
+| A | no liquidation persistence (1 update) | S1 @10.00x +65s, lender -78% | liqu @1.82x +47s, lender +0% | liqu @1.72x +141s, lender +0% | S1 @5.00x +45s, lender -57% |
+| A | persistence 5 updates (above the compiled maximum) | S1 @10.00x +65s, lender -78% | liqu @1.92x +51s, lender +1% | liqu @1.74x +145s, lender +0% | S1 @5.00x +49s, lender -57% |
+| A | fixed delta 1 % (below the compiled minimum) | S1 @10.00x +65s, lender -78% | liqu @1.87x +49s, lender +0% | liqu @1.73x +143s, lender +0% | S1 @5.00x +47s, lender -57% |
+| A | EMA-only reference, delta 16.7 % (critic's C0-1 suggestion) | S1 @10.00x +65s, lender -78% | liqu @1.87x +49s, lender +0% | liqu @1.73x +143s, lender +0% | S1 @5.00x +47s, lender -57% |
+| A | kappa 15 % (reviewer's suggested minimum) | S1 @10.00x +65s, lender -78% | liqu @1.87x +49s, lender +0% | liqu @1.73x +143s, lender +0% | S1 @5.00x +47s, lender -57% |
+| A | tau 8 s (reviewer's suggested maximum) | S1 @10.00x +67s, lender -78% | liqu @1.94x +52s, lender +1% | liqu @1.75x +146s, lender +0% | S1 @5.00x +48s, lender -57% |
+| A | tau 10 s (v0.1 value) | S1 @10.00x +69s, lender -78% | liqu @2.00x +54s, lender +0% | liqu @1.76x +148s, lender +0% | S1 @5.00x +49s, lender -57% |
+| C | v0.4 default (tau 5 s, fresh ref, kappa <= 25 %, fixed delta 2 %, persist 3) | liqu @2.93x +28s, lender +1% | liqu @2.33x +66s, lender +1% | liqu @2.15x +200s, lender +1% | S1 @5.00x +48s, lender -35% |
+| C | no liquidation persistence (1 update) | liqu @2.71x +26s, lender +1% | liqu @2.27x +64s, lender +1% | liqu @2.14x +198s, lender +1% | S1 @5.00x +48s, lender -35% |
+| C | persistence 5 updates (above the compiled maximum) | S1 @10.00x +75s, lender -68% | liqu @2.39x +68s, lender +1% | liqu @2.17x +202s, lender +1% | S1 @5.00x +50s, lender -35% |
+| C | fixed delta 1 % (below the compiled minimum) | liqu @2.93x +28s, lender +1% | liqu @2.33x +66s, lender +1% | liqu @2.15x +200s, lender +1% | S1 @5.00x +48s, lender -35% |
+| C | EMA-only reference, delta 16.7 % (critic's C0-1 suggestion) | S1 @10.00x +75s, lender -68% | liqu @2.33x +66s, lender +1% | liqu @2.15x +200s, lender +1% | S1 @5.00x +48s, lender -35% |
+| C | kappa 15 % (reviewer's suggested minimum) | S1 @10.00x +75s, lender -68% | liqu @2.33x +66s, lender +1% | liqu @2.15x +200s, lender +1% | S1 @5.00x +48s, lender -35% |
+| C | tau 8 s (reviewer's suggested maximum) | S1 @10.00x +77s, lender -68% | liqu @2.42x +69s, lender +1% | liqu @2.18x +203s, lender +1% | S1 @5.00x +51s, lender -35% |
+| C | tau 10 s (v0.1 value) | S1 @10.00x +79s, lender -68% | liqu @2.48x +71s, lender +1% | liqu @2.20x +205s, lender +1% | S1 @5.00x +54s, lender -35% |
+| D@0% | v0.4 default (tau 5 s, fresh ref, kappa <= 25 %, fixed delta 2 %, persist 3) | liqu @3.29x +31s, lender +2% | liqu @2.64x +76s, lender +1% | liqu @2.42x +230s, lender +1% | S1 @5.00x +51s, lender -17% |
+| D@0% | no liquidation persistence (1 update) | liqu @3.04x +29s, lender +2% | liqu @2.58x +74s, lender +1% | liqu @2.40x +228s, lender +1% | S1 @5.00x +51s, lender -17% |
+| D@0% | persistence 5 updates (above the compiled maximum) | liqu @3.55x +33s, lender +2% | liqu @2.71x +78s, lender +1% | liqu @2.44x +232s, lender +1% | S1 @5.00x +51s, lender -17% |
+| D@0% | fixed delta 1 % (below the compiled minimum) | liqu @3.29x +31s, lender +2% | liqu @2.64x +76s, lender +1% | liqu @2.42x +230s, lender +1% | S1 @5.00x +51s, lender -17% |
+| D@0% | EMA-only reference, delta 16.7 % (critic's C0-1 suggestion) | S1 @10.00x +82s, lender -58% | liqu @2.64x +76s, lender +1% | liqu @2.42x +230s, lender +1% | S1 @5.00x +51s, lender -17% |
+| D@0% | kappa 15 % (reviewer's suggested minimum) | S1 @10.00x +82s, lender -58% | liqu @2.64x +76s, lender +1% | liqu @2.42x +230s, lender +1% | S1 @5.00x +51s, lender -17% |
+| D@0% | tau 8 s (reviewer's suggested maximum) | S1 @10.00x +84s, lender -58% | liqu @2.71x +78s, lender +1% | liqu @2.45x +233s, lender +1% | S1 @5.00x +57s, lender -17% |
+| D@0% | tau 10 s (v0.1 value) | S1 @10.00x +86s, lender -58% | liqu @2.78x +80s, lender +1% | liqu @2.46x +235s, lender +1% | S1 @5.00x +60s, lender -17% |
+| RA | v0.4 default (tau 5 s, fresh ref, kappa <= 25 %, fixed delta 2 %, persist 3) | S1 @10.00x +64s, lender -80% | liqu @1.82x +47s, lender +0% | liqu @1.68x +135s, lender +0% | S1 @5.00x +47s, lender -59% |
+| RA | no liquidation persistence (1 update) | S1 @10.00x +64s, lender -80% | liqu @1.78x +45s, lender +0% | liqu @1.67x +133s, lender +0% | S1 @5.00x +45s, lender -59% |
+| RA | persistence 5 updates (above the compiled maximum) | S1 @10.00x +64s, lender -80% | liqu @1.87x +49s, lender +0% | liqu @1.69x +137s, lender +0% | S1 @5.00x +49s, lender -59% |
+| RA | fixed delta 1 % (below the compiled minimum) | S1 @10.00x +64s, lender -80% | liqu @1.82x +47s, lender +0% | liqu @1.68x +135s, lender +0% | S1 @5.00x +47s, lender -59% |
+| RA | EMA-only reference, delta 16.7 % (critic's C0-1 suggestion) | S1 @10.00x +64s, lender -80% | liqu @1.82x +47s, lender +0% | liqu @1.68x +135s, lender +0% | S1 @5.00x +47s, lender -59% |
+| RA | kappa 15 % (reviewer's suggested minimum) | S1 @10.00x +64s, lender -80% | liqu @1.82x +47s, lender +0% | liqu @1.68x +135s, lender +0% | S1 @5.00x +47s, lender -59% |
+| RA | tau 8 s (reviewer's suggested maximum) | S1 @10.00x +66s, lender -80% | liqu @1.90x +50s, lender +0% | liqu @1.70x +138s, lender +0% | S1 @5.00x +48s, lender -59% |
+| RA | tau 10 s (v0.1 value) | S1 @10.00x +68s, lender -80% | liqu @1.94x +52s, lender +0% | liqu @1.71x +140s, lender +0% | S1 @5.00x +49s, lender -59% |
+
+Reading: τ = 5 s with κ = 25 % is what liquidates Tier C (2.93×) and D (3.29×) in a 10×/60 s pump; τ = 8 s or κ = 15 % (the reviewer's suggested bounds) or 5 updates of persistence each turn them into S1 losses (−68 % / −58 %), as does the critic's EMA-only 16.7 % bound. A fixed 1 % bound liquidates every pump here but fails after LP drains (§12.2). Tier A (cushion 1.6×) cannot survive a 10×/60 s pump with any setting.
+
+**The battery (v0.4.1, R4A-1, R4B-1, R4A-4).** v0.4 checked its bounds on 65 runs in which the price was set once per second, so the live quote always equalled the one-second-old reference, and on 7 parameters. Both reviewers showed that this hid the dead band of the penalty reserve (§8.2). `config_check.py` — the governance CI gate — now runs 1,655:
+
+| part | runs | what it adds | default outcome |
+|---|---|---|---|
+| core | 65 | the lag-study pumps above, gaps, 3×/60 s and 2×/20 s pumps, 50 % Raydium LP drains followed by pumps | 43 liquidations, 12 S1, mean lender −8.35 % of Q |
+| noise | 390 | the core rows with deterministic per-second price noise ±0.3 % and ±1 %, 3 seeds each: live and reference differ within a second, as on a real pool | 267 liquidations, 72 S1, −8.28 % |
+| grid | 960 | the reviewer's genuine-pump grid: 8 markets × 4–15× × 20–100 s × size 1 and 0.5 × keeper latency 1 and 2 s | 437 liquidations, 523 S1, −36.22 % |
+| aged | 240 | positions aged close to their maximum duration at 80 / 90 % utilisation (rent due far above `K_s`), then a ramp, with ±0.3 % noise | 156 liquidations, 84 S1, −14.88 % |
+
+A proposal fails if any run that liquidates, expires or stays open under the defaults becomes an S1 or stays open although liquidatable ("liveness"); a run that leaves lenders more than 1 % of the value of `Q` worse is reported as a lender-income warning for the owner. Sizing parameters (fee-scaled caps, λ_min, impact caps, γ) are compared at equal position size, because a smaller position is S1-prone only through `K_s`'s fixed part (v0.4's scan counted that size effect as a failure: `pool_lock_min_bps` = 10,000 and `fee_size_cap_x100` = 100 lose nothing at equal size).
+
+**Bound re-derivation** (`--targeted`; values just outside, or at, the compiled bounds, each alone):
+
+| parameter | value | rows worse on the 1,655-run battery (liveness / lender -1 %) | first liveness rows |
+|---|---|---|---|
+| `tau` | 6 | 83 / 5 | C pump 10x/60s noise 0.3% s3 -> S1; C pump 10x/60s noise 1.0% s1 -> S1 |
+| `tau` | 7 | 223 / 9 | C pump 10x/60s -> S1; D@0% pump 10x/60s -> S1 |
+| `kappa_liq_bps` | 2,250 | 38 / 0 | D@0% pump 6x/40s -> S1; D@0% pump 8x/50s -> S1 |
+| `kappa_liq_bps` | 2,000 | 104 / 0 | C pump 10x/60s -> S1; D@0% pump 10x/60s -> S1 |
+| `kappa_growth_n` | 5 | 0 / 0 |  |
+| `liq_persist_n` | 4 | 58 / 12 | C pump 10x/60s noise 1.0% s3 -> S1; B pump 8x/70s -> S1 |
+| `liq_persist_n` | 5 | 144 / 37 | C pump 10x/60s -> S1; RC pump 10x/60s -> S1 |
+| `delta_liq_bps` | 150 | 28 / 0 | C pump 10x/60s noise 1.0% s3 -> S1; D@0% pump 6x/40s -> S1 |
+| `delta_liq_bps` | 100 | 34 / 1 | RA drain 50%+2.0x/120s -> S1; RB drain 50%+3.0x/600s -> S1 |
+| `settle_fixed` | 20,000,000 | 5 / 4 | RC pump 6x/40s size 0.5 lat 1 -> S1; RC pump 8x/50s size 0.5 lat 1 -> S1 |
+| `settle_fixed` | 50,000,000 | 21 / 88 | RC pump 8x/50s -> S1; RC pump 6x/40s size 0.5 lat 1 -> S1 |
+| `settle_bps` | 200 | 10 / 12 | RC pump 6x/40s size 0.5 lat 1 -> S1; RC pump 8x/50s size 0.5 lat 1 -> S1 |
+| `settle_bps` | 500 | 31 / 176 | RC pump 8x/50s -> S1; C pump 8x/50s size 0.5 lat 1 -> S1 |
+| `settle_cap` | 1,000,000,000 | 4 / 0 | A pump 8x/100s size 1.0 lat 2 -> S1; B pump 4x/50s size 1.0 lat 2 -> S1 |
+| `cr_liq_bps` | 12,500 | 362 / 121 | C pump 10x/60s -> S1; D@0% pump 10x/60s -> S1 |
+| `cr_open_bps` | 0 | 109 / 906 | A gap 2x -> S1; A pump 2x/20s -> S1 |
+| `rate_base_bps` | 0 | 2 / 2 | D@0% aged pump 6x/40s noise 0.3% s3 U90 -> S1; D@50% aged pump 6x/40s noise 0.3% s3 U90 -> S1 |
+| `rate_s1_bps` | 0 | 5 / 4 | D@0% aged pump 6x/40s noise 0.3% s3 U90 -> S1; D@50% aged pump 6x/40s noise 0.3% s3 U90 -> S1 |
+| `rate_s2_bps` | 0 | 2 / 32 | D@0% aged pump 6x/40s noise 0.3% s3 U90 -> S1; D@50% aged pump 6x/40s noise 0.3% s3 U90 -> S1 |
+| `exec_tol_bps` | 0 | 0 / 0 |  |
+| `penalty_bps` | 2,000 | 0 / 0 |  |
+| `pool_lock_min_bps` | 10,000 | 0 / 0 |  |
+
+- **τ and κ** keep their v0.4 bounds (τ the constant 5 s, κ ≥ 25 %), now on this battery rather than because of the withdrawn penalty reserve: τ = 6 loses 83 runs, κ = 22.5 % 38 (6–8× pumps over 40–50 s on Tier C, D and RC, in the grid and among the aged runs). The growth window would pass at 5 but stays compiled at [3, 4].
+- **Persistence** tightens to `liq_persist_n ≤ 3` (4 loses 58 runs, mostly noisy fast pumps), which makes v0.4's relational check `liq_persist_n + kappa_growth_n ≤ 7` redundant.
+- **Settlement keeper terms** are capped at their SPEC / ADOPTED values (0.01 SOL, 1 %, 0.25 SOL): any larger `K_s` widens the S1 region (`B̂ + ert > V − K_s`) and loses fast-pump liquidations of half-size positions first.
+- **SPEC CRs become per-tier compiled minima**: lower opening or liquidation CRs lose 109–362 runs.
+- **Rates at 0** lose 2–5 aged runs (less rent erosion, so liquidation triggers closer to the S1 boundary). Rates are SPEC fee parameters and keep their compiled range; the gate rejects such a proposal.
+- `exec_tol_bps` = 0, `penalty_bps` = 2,000 and `pool_lock_min_bps` = 10,000 now lose nothing (they failed in the reviewer's v0.4 check through the penalty reserve or the size effect).
+
+**Scan** (`--scan`: every parameter with a liveness effect at each compiled extreme alone, on core, noise and aged, 695 runs per value). Every value not listed passes — `curve_oi_gamma_bps`, `delta_exp_bps`, `delta_liq_bps`, `ema_clamp_bps`, `ema_dtmax_s`, `exec_rent_tol`, `exec_tol_bps`, `expiry_fee_bps`, `expiry_keeper_bps`, `expiry_keeper_cap`, `expiry_keeper_fixed`, `fee_oi_cap_x100`, `fee_size_cap_x100`, `fv_dev_bps`, `grad_grace_s`, `impact_mkt_bps`, `impact_pos_bps`, `kappa_base_bps`, `kappa_growth_n`, `kappa_liq_bps`, `liq_persist_n`, `liq_slow_dtmax_s`, `liq_slow_tau_s`, `max_liq_slip_bps`, `max_migration_pause_s`, `min_rent_s`, `penalty_bps`, `pool_lock_min_bps`, `rate_base_bps`, `rate_s1_bps`, `rate_s2_bps`, `ref_max_age_s`, `rent_protocol_bps`, `s3_wait_s`, `settle_arm_gap_s`, `settle_bps`, `settle_fixed`, `settle_persist_n`, `util_cap_bps`, `util_kink_bps`, `venue_fee_hard_cap_bps` — and these do not:
+
+| parameter | value | rows worse than the default (liquidation -> S1, or lender -1 % of Q) |
+|---|---|---|
+| `settle_cap` | 0 | (rejected by validate_params: settle_fixed <= settle_cap) |
+| `util_kink_bps` | 9500 | (rejected by validate_params: util_kink_bps <= util_cap_bps) |
+| `util_cap_bps` | 0 | (rejected by validate_params: util_kink_bps <= util_cap_bps) |
+| `delta_exp_bps` | 300 | (rejected by validate_params: delta_liq_bps >= delta_exp_bps) |
+| `expiry_keeper_cap` | 0 | (rejected by validate_params: expiry_keeper_fixed <= expiry_keeper_cap) |
+| `cr_liq_bps` | 10500 | (rejected by validate_params: tier A: cr_open >= 20,000 and cr_liq >= 12,500 (SPEC minima)) |
+| `cr_liq_bps` | 100000 | 0 liveness / 117 lender -1 %: B pump 3x/60s -> liquidation; C pump 3x/60s -> liquidation; D@0% pump 3x/60s -> liquidation (+114 more) |
+| `penalty_bps` | 0 | 0 liveness / 306 lender -1 %: A gap 2x -> liquidation; A pump 3x/60s -> liquidation; A pump 2x/20s -> liquidation (+303 more) |
+| `rate_base_bps` | 0 | 2 liveness / 2 lender -1 %: D@0% aged pump 6x/40s noise 0.3% s1 U90 -> liquidation; D@0% aged pump 6x/40s noise 0.3% s3 U90 -> S1; D@50% aged pump 6x/40s noise 0.3% s1 U90 -> liquidation (+1 more) |
+| `rate_s1_bps` | 0 | 5 liveness / 4 lender -1 %: RC drain 50%+2.0x/600s noise 0.3% s3 -> open; RC drain 50%+2.0x/120s noise 0.3% s3 -> open; D@0% aged pump 6x/40s noise 0.3% s1 U90 -> liquidation (+6 more) |
+| `rate_s2_bps` | 0 | 2 liveness / 32 lender -1 %: A aged pump 3x/60s noise 0.3% s1 U90 -> liquidation; A aged pump 3x/60s noise 0.3% s2 U90 -> liquidation; A aged pump 3x/60s noise 0.3% s3 U90 -> liquidation (+31 more) |
+| `cr_open_bps` | 0 | (rejected by validate_params: tier A: cr_open >= 20,000 and cr_liq >= 12,500 (SPEC minima)) |
+| `cr_open_bps` | 100000 | 0 liveness / 231 lender -1 %: A gap 2x -> open; A pump 3x/60s -> open; A pump 2x/20s -> open (+228 more) |
+
+`cr_liq_bps` = 100,000 and `cr_open_bps` = 100,000 lose only lender income (earlier liquidation on a smaller penalty base; healthier positions that never liquidate); `penalty_bps` = 0 likewise. **Corners** (`--corners`): every corner of the core box that passes the relational checks — κ ∈ {25 %, 30 %}, persistence ∈ {2, 3}, growth window ∈ {3, 4}, `dt_max` ∈ {1, 2}, clamp ∈ {50 %, 100 %}, bucket age ∈ {1, 3}, δ ∈ {2 %, 5 %}: 128 configurations — on the full 1,655 runs: core-box corners that pass the relational checks (tau = 5 s): 128; failing on the full battery (1655 runs each): 0. A stress corner with every scanned parameter at its liveness-adverse compiled extreme at once (κ 25 %, persistence 3, growth 4, `dt_max` 1, clamp 50 %, bucket age 1 s, δ 2 %, the settlement keeper terms at their maxima, `L_slow` τ 1 day, `fv_dev` 0.5 %, ε 0, hard cap 3 %, σ_max 5 %, maximum rates) loses 0 runs. What this does **not** cover: combinations beyond the core box other than that one stress corner, and price paths outside the battery (§17). "The compiled bounds are the simulated-safe region" means exactly this.
+
+Defaults (PROPOSED, all tiers): **τ = 5 s (constant), dt_max = 2 s, C = 10,000 bps, ring 8, liq_persist_n = 3, settle_persist_n = 40, arm gap 10 s, κ_max = 25 %, kappa_growth_n = 3, δ_liq = 2 %, δ_exp = 1 %, fv_dev = 1 %.**
+
+### 5.8 Keepers: duties, cost model, degraded mode (R3B-5, decision 10)
+
+**Duties** (off-chain, PROPOSED; the manipulation resistance of §12's atomic model assumes them):
+
+1. At least one observation **per second** on every market with a position whose live CR is below 1.3·L, whose deadline is within 60 s, or that is armed, and wherever `|P_spot/P_ema − 1| > 2 %`; otherwise at least every 30 s for markets with open positions.
+2. After any observation it did not make that deviates from its own view by more than 2 %, observe that market **every slot for 60 s** (atomic bundles then have no second of their own, and the settlement-box deferral of §5.6 gets no consecutive attacker-only seconds).
+3. Liquidate at the first executable second (Jito bundle with tip); `expire` when the expiry bound is met.
+4. Call `sol_settle` every second for armed positions.
+5. Observe every market without a route at least every 30 s (continuous S3 chain, §10.3); on Raydium, run the fast path (§10.3).
+6. Call pump `migrate_v2` top-level as soon as a curve completes (ADOPTED Q16); `claim_venue_rewards` and `sweep_trader` right after a full wipe (so pre-wipe cashback reaches the wiped epoch's lenders, §9.5; since v0.4.1 deposits also wait for this sweep, R4A-7).
+7. While an S3 on an executable venue is due, observe that market **once per second** (not per slot): the settlement box of v0.4.1 (§5.6) takes the medians of bucket lows and highs, so several honest observations at different prices within one second widen it for no benefit.
+
+`sol_settle`, `liquidate`, `expire` and `close_short` carry the venue accounts, so each of them **is** that second's observation; the keeper never sends a separate crank in a second in which it already acts. Several markets' `crank_price` instructions share one transaction (one signature). A `crank_price` keeps its per-market accounts inline (6 keys on PumpSwap / CPMM, 5 on the curve, ARCH §6.4), so a v0 transaction with the protocol ALT fits only 4 PumpSwap / CPMM cranks or 5 curve cranks in 1,232 B, not the 6 v0.4 assumed (R4B-9). **Keeper batches are v1 transactions** (4,096 B, 64 inline addresses, no ALT; live since slot 447,120,000): about 6 shared keys plus 6 per market, so up to 9 cranks; the cost model uses 6 and shows the v0 fallback (UNVERIFIED until T-SIZE):
+
+| k | v0 PumpSwap / CPMM | v0 curve | v1 (all keys inline) |
+|---|---|---|---|
+| 3 | 848 | 749 | 953 B, 24 keys |
+| 4 | 1,061 | 929 | 1,166 B, 30 keys |
+| 5 | 1,274 (too large) | 1,109 | 1,379 B, 36 keys |
+| 6 | 1,487 (too large) | 1,289 (too large) | 1,592 B, 42 keys |
+| 9 | 2,126 (too large) | 1,829 (too large) | 2,231 B, 60 keys |
+
+
+**Cost model** (`python3 sim/keeper_cost.py`). Inputs: base fee 5,000 lamports per signature (mainnet `getFeeForMessage`, slot 450,897,283); priority price scenarios 0–100,000 µlamports/CU (mainnet `getRecentPrioritizationFees` on pAMM, a PumpSwap pool and AMM v4 over slots 450,897,105–255: the lowest landed fee was 0 in ≥ 75 % of slots, spikes to 1.31 lamports/CU); CU per instruction from ARCH §6.1 (UNVERIFIED until T-CU): crank 35 k, `sol_settle` 90 k, `liquidate` 220 k.
+
+| priority price (micro-lamports/CU) | unbatched (k = 1) | 4 per v0 tx (ALT) | 6 per v1 tx | 9 per v1 tx (64-address limit) |
+|---|---|---|---|---|
+| 0 | 0.4320 | 0.1080 | 0.0720 | 0.0480 |
+| 1,000 | 0.4350 | 0.1110 | 0.0750 | 0.0510 |
+| 10,000 | 0.4622 | 0.1382 | 0.1022 | 0.0782 |
+| 100,000 | 0.7344 | 0.4104 | 0.3744 | 0.3504 |
+
+| share of the day near a threshold (f) | 1,000 uL/CU | 10,000 uL/CU | 100,000 uL/CU |
+|---|---|---|---|
+| 0 % | 0.0025 | 0.0034 | 0.0125 |
+| 1 % | 0.0032 | 0.0044 | 0.0161 |
+| 5 % | 0.0061 | 0.0083 | 0.0306 |
+| 20 % | 0.0170 | 0.0232 | 0.0849 |
+| 100 % | 0.0750 | 0.1022 | 0.3744 |
+
+| priority price (uL/CU) | one armed position (45 x sol_settle) | one deviation burst (150 slots x crank) | one liquidation (+0.001 SOL tip) |
+|---|---|---|---|
+| 1,000 | 0.00023 | 0.00076 | 0.00101 |
+| 10,000 | 0.00027 | 0.00080 | 0.00101 |
+| 100,000 | 0.00063 | 0.00128 | 0.00103 |
+
+| tier | rent APR at 80 % | rent (all) | protocol share (15 %) | lender share (85 %) |
+|---|---|---|---|---|
+| A | 50 % | 0.0342 | 0.0051 | 0.0291 |
+| B | 100 % | 0.0685 | 0.0103 | 0.0582 |
+| C | 200 % | 0.1370 | 0.0205 | 0.1164 |
+| D | 400 % | 0.2740 | 0.0411 | 0.2329 |
+
+| priority price (uL/CU) | coverage cost (SOL/day) | A | B | C | D |
+|---|---|---|---|---|---|
+| 1,000 | 0.0750 | 365 SOL | 183 SOL | 91 SOL | 46 SOL |
+| 10,000 | 0.1022 | 498 SOL | 249 SOL | 124 SOL | 62 SOL |
+
+Reading: covering every market every second costs 0.43 SOL per market-day unbatched and 0.07–0.10 SOL batched in v1 transactions (0.11–0.14 SOL in the v0 fallback), against 0.005–0.04 SOL per day of protocol rent (0.03–0.23 SOL of lender rent) for a market at the 25 SOL beta cap; per-second coverage of every market pays for itself only above ≈ 180–500 SOL of open notional on Tier A/B markets. Targeted coverage (duty 1: per second only near thresholds) costs 0.003–0.03 SOL per market-day at normal priority prices; armed positions, deviation bursts and liquidations cost fractions of a millisol each. **The operating budget is an owner decision (O17)**: per-market daily budget, the priority-price ceiling, and the markets the keeper covers.
+
+**Degraded mode (PROPOSED).** Coverage lapses when the budget is exhausted, the keeper is down, or blocks are contested. Without an honest observation in a second, an attacker's atomic bundle achieves what the held model assumes at the atomic cost: the §12.6 held-model numbers become that market's exposure. Throttling must therefore be visible, not silent:
+
+1. **Opens pause.** New opens are paused on a market whose coverage SLO (duties 1–2) the keeper cannot meet, with reason code `KeeperCoverage`; the market page shows it, and the pause lifts when coverage returns. SPEC §11 gives the pause power to a multisig; for the keeper to do this automatically, ARCH would add a narrower role that can only pause and unpause *opens* (it moves no funds) — an owner decision taken with O17. Closes, liquidations, settlements, withdrawals and claims are never paused.
+2. **On-chain signal.** Each integration that follows a gap of more than 30 s on a market with open positions emits `CoverageGap{market, gap_s, open_positions}`; indexers and the UI show coverage per market.
+3. **Existing positions** keep their locked rules (A26); their exposure during degraded mode is disclosed as the held-model bounds of §12.6.
+4. **Not adopted: raising persistence in degraded mode.** Persistence is a locked per-position term, so a raise could reach only new positions, which degraded mode pauses anyway; and 5 updates already break Tier C liveness (§5.7).
+
+---
+
+## 6. Caps and tier assignment
+
+### 6.1 Size caps
+
+With `X₀` the conservative token reserve before the open (§2.1: curve `vT`; AMMs `min(X_now, ⌊L_slow·10⁹/isqrt⁺(P_ema)⌋)`, Raydium also `≤ ⌊D·10⁹·10⁴/(λ_min_bps·isqrt⁺(P_ema))⌋` — now implemented in the sim, R3A-3 ii) and `X₁ = X₀ + Q`. The impact caps' closed forms below are real-valued; the normative integer forms are the sim's `max_q_impact`, `isqrt(⌊X₀²·(10⁴ + ι_pos)/10⁴⌋) − X₀`, and `max_total_q_market`, `X₁ − isqrt(⌊X₁²·10⁴/(10⁴ + ι_mkt)⌋)`, which the flooring inside the root can put one raw unit above the real-valued market bound:
+
+| Cap | Rule | Closed form |
+|---|---|---|
+| Per position (SPEC) | buying `Q` back from post-open reserves moves price ≤ ι_pos (5 %; D 3 %) | `Q ≤ X₀(√(1+ι_pos) − 1)` → 2.470 % / 1.489 % of X₀ |
+| Per position, fee-scaled (PROPOSED) | `Q ≤ 3.00·φ·X₀` (φ in ppm, §2.1) | binds when φ < 0.82 % (D: 0.50 %) |
+| Per market (SPEC) | buying all outstanding back moves price ≤ ι_mkt (20 %; D 10 %) | `ΣQ ≤ X₁(1 − 1/√(1+ι_mkt))` → 8.713 % / 4.654 % of X₁ |
+| Per market, fee-scaled (PROPOSED) | `ΣQ ≤ 7.50·φ·X₁` | binds when φ < 1.16 % (D: 0.62 %) |
+| Utilisation (SPEC) | `B_Q + Q ≤ 0.9·(T + B_Q)` | |
+| Per wallet (ADOPTED Q10) | 25 % of the market OI cap | per-(wallet, market) PDA |
+| Tier D graduation guard | `ΣQ + Q ≤ γ·(rt + Q)`, γ = 50 % | |
+| Minimum / beta (ADOPTED Q11, Q21) | `N_open ≥ 0.1 SOL`; Σ N_open per market ≤ 25 SOL during beta | |
+
+Caps are checked at open only and never force a close. **Why fee-scaled caps:** manipulating a constant-product pool for one second costs about φ times the liquidity moved, while the payoff of forcing and sandwiching exits grows with the size at risk; 25 bps Raydium pools are 3.6–5× cheaper to manipulate than pump venues. Held-model basket attack (§12.5) by ratio (re-run on v0.4.1; positions below the 0.1 SOL minimum notional are no longer counted):
+
+| fee_oi_cap_x100 | market | OI cap notional (SOL) | positions / margin (SOL) | held basket net (SOL) | borrower margin lost (SOL) |
+|---|---|---|---|---|---|
+| off | A | 217.82 | 6 / 280.87 | -118.95 | 229.64 |
+| off | B | 87.13 | 6 / 162.85 | -73.44 | 133.11 |
+| off | RA | 217.82 | 14 / 250.23 | +138.00 | 217.96 |
+| off | RB | 87.13 | 14 / 146.99 | +69.10 | 114.05 |
+| off | RC | 7.41 | 13 / 16.41 | +4.83 | 10.54 |
+| 750 (default) | A | 168.75 | 5 / 223.62 | -48.96 | 190.17 |
+| 750 (default) | B | 75.00 | 5 / 145.20 | -23.03 | 112.44 |
+| 750 (default) | RA | 46.87 | 4 / 49.99 | +3.15 | 43.05 |
+| 750 (default) | RB | 18.75 | 3 / 29.59 | +8.51 | 29.51 |
+| 750 (default) | RC | 1.59 | 3 / 3.34 | +0.52 | 2.63 |
+| 1000 | A | 217.82 | 6 / 280.87 | -118.95 | 229.64 |
+| 1000 | B | 87.13 | 6 / 162.85 | -73.44 | 133.11 |
+| 1000 | RA | 62.50 | 5 / 67.38 | +16.66 | 57.66 |
+| 1000 | RB | 25.00 | 4 / 39.84 | +13.41 | 38.66 |
+| 1000 | RC | 2.12 | 4 / 4.49 | +1.35 | 3.53 |
+| 500 | A | 112.50 | 4 / 135.22 | -85.00 | 109.45 |
+| 500 | B | 50.00 | 4 / 88.61 | -43.30 | 77.47 |
+| 500 | RA | 31.25 | 3 / 32.94 | -10.22 | 28.57 |
+| 500 | RB | 12.50 | 2 / 19.51 | -0.86 | 19.51 |
+| 500 | RC | 1.06 | 2 / 2.20 | -0.29 | 1.74 |
+
+**OWNER** visibility: this tightens SPEC's size caps. On PumpSwap the held basket attack is unprofitable even without the market cap, so `fee_oi_cap_x100 = 1000` would leave PumpSwap A/B unchanged at the cost of a larger Raydium residual (RA +16.7 SOL); `500` removes the Raydium residual at the cost of about half of the PumpSwap Tier A/B OI capacity.
+
+| tier | pos. impact | max Q per position | mkt impact | max total Q (OI cap) | per-wallet (25% of OI cap) | S2 slippage | Q/X at which S2 triggers |
+|---|---|---|---|---|---|---|---|
+| A | 5% | 2.470% of X0 | 20% | 8.713% of X | 2.178% of X | 20% | 16.67% of X |
+| B | 5% | 2.470% of X0 | 20% | 8.713% of X | 2.178% of X | 20% | 16.67% of X |
+| C | 5% | 2.470% of X0 | 20% | 8.713% of X | 2.178% of X | 20% | 16.67% of X |
+| D | 3% | 1.489% of X0 | 10% | 4.654% of X | 1.163% of X | 30% | 23.08% of X |
+
+### 6.2 Tier function (re-evaluated on every interaction; applies to new opens)
+
+```
+D  if venue = pump curve (live or migrating)
+else Λ = 2·R_eff                                         (ADOPTED Q19: real SOL only, no VQR/boost)
+     age = now − graduated_at                            (ADOPTED Q18)
+     C  if age < 24 h  or  Λ < θ_B  or  the oracle cache is stale (ADOPTED Q8)
+     A  if Λ ≥ θ_A  and  age ≥ 7 d
+     B  otherwise
+```
+
+Inputs: `R_eff = min(R_now, R_slow)` with `R_slow = Y(reprice(L_slow, P_ema)) − VQR_live` (≥ 0); on Raydium also `R_eff ≤ ⌊D·√P_ema/10⁹⌋·10⁴/λ_min_bps` (locked SOL divided by λ_min, V2-8; rounding in §2.1). Age: PumpSwap first on-chain observation of the pool, AMM v4 listing time, CPMM `min(listing, max(open_time, T_CLAMP))`.
+
+**Age from listing (O13, extended, R3B-12).** A token that graduated to PumpSwap months ago, or a CPMM pool whose `open_time` is before `T_CLAMP`, but is listed today gets `graduated_at` = listing time: it is Tier C for 24 h and at most Tier B until day 7 — higher margins, lower caps and shorter durations than SPEC §4's criteria would give it. This is conservative and applies equally to AMM v4 (unusable `pool_open_time`), PumpSwap and pre-`T_CLAMP` CPMM pools; markets created before graduation observe the transition live and are unaffected. The UI's "tier and why" shows it; owner item O13 now covers all three.
+
+**Raydium pool selection (economic side, decision 7).** A market adopts a different Raydium pool without a failure only while it has **no open position** (with the 25 % depth margin, 5 % inside the listing window); the one-hour pending switch (`pool_switch_delay_s`) is gone. Open positions therefore see a pool change only through the fast path on incumbent failure (§10.3), and every such change rewrites the ring's liquidity (§5.2).
+
+### 6.3 USD thresholds (ADOPTED Q8)
+
+θ_A = $500 k and θ_B = $100 k of pool liquidity are converted with a cached Pyth SOL/USD price. If the cache is older than `oracle_stale_s` (3,600 s), graduated markets tier as C (fail-safe). Exits never read the oracle. The sponsored feed updates on a 55 s heartbeat or a 0.5 % move, so the crank accepts updates up to `oracle_max_age_s = 120 s` old; only tiering of new opens depends on it.
+
+---
+
+## 7. Rent
+
+SPEC §6.1 kinked curve; minimum rent fixed at open; 85/15 split; no protocol share in settlements.
+
+| tier | base | slope1 (per 100% U) | slope2 (per 100% U) | rate@80% | rate@90% (cap) | rate@100% | min rent @80% | max-duration rent @80% | max-duration rent @90% |
+|---|---|---|---|---|---|---|---|---|---|
+| A | 10% | 50.00% | 1000% | 50% | 150% | 250% | 0.006% | 4.11% | 12.33% |
+| B | 25% | 93.75% | 1500% | 100% | 250% | 400% | 0.011% | 3.84% | 9.59% |
+| C | 50% | 187.50% | 3000% | 200% | 500% | 800% | 0.023% | 3.84% | 9.59% |
+| D | 100% | 375.00% | 5500% | 400% | 950% | 1500% | 0.183% | 3.29% | 7.81% |
+
+**Implementation (normative; the sims now use exactly this form, R3A-3).** The position locks its rate curve and, since v0.4, its protocol share. Three market-level basis indices integrate the curve in O(1):
+
+```
+k = util_kink_bps (market-level, own version; adopted only with no open position — R3A-9)
+accrue(Δt):  J0 += P̃·Δt ;  J1 += ⌈P̃·min(U, k)·Δt/10⁴⌉ ;  J2 += ⌈P̃·max(U − k, 0)·Δt/10⁴⌉      P̃ = min(P_ema, P_ACC_MAX), before the roll
+rent_accrued(pos) = ⌈Q·(base·ΔJ0 + slope1·ΔJ1 + slope2·ΔJ2)/(10⁴·31,536,000·WAD)⌉            (ΔJ since open)
+lender credit per accrual = ⌊Σ_j A_j·δJ_j / (10⁴·10⁴·31,536,000·WAD)⌋,   A_j = Σ_open Q·coef_j·(10⁴ − rent_protocol_bps_pos)
+true-up at exit: credited_for(pos) = ⌈Q·Σ_j coef_j·ΔJ_j·(10⁴ − rent_protocol_bps_pos)/(10⁴·10⁴·31,536,000·WAD)⌉
+```
+
+**Protocol share per position (R3A-5, R3B-9).** v0.3 applied the global `rent_protocol_bps` at every accrual and again at the true-up, so a governance change while a position was open left lenders an entitlement with no SOL behind it (15 % → 30 %: a phantom receivable of 0.075 SOL on the reviewer's 0.5 SOL example) or took `receivable` belonging to other positions. v0.4 snapshots it at open and folds `(10⁴ − p)` into `A_j`, so continuous credits and the per-position true-up describe the same money; the pool fuzz changes the value at random and asserts `receivable = 0` whenever no position is open (§9.6). A governance change applies to new positions only (A26 is now accurate). Because each accrual floors the aggregate while each true-up ceils per position, `receivable` never goes negative before the clamp `receivable −= min(credited_for, receivable)`, which ARCH §3.3 states explicitly.
+
+---
+
+## 8. Exits: execution bounds and waterfalls (SPEC §2.2, §5.2–5.3, §6.2–6.3)
+
+Notation: `V` vault lamports, `R = R_due`, `p` locked penalty bps, `K_s` settlement reward (§5.6), `ert` effective venue-side rent tolerance (6,500,000 lamports on pump venues — the worst PumpSwap buy with every optional account missing costs 5,811,520 — and 0 on Raydium), `ε` venue rounding tolerance of the expiry bound (10 bps).
+
+### 8.1 Close (borrower)
+
+Preconditions: a route exists and `B̂_live + R + ert ≤ V`. `max_in = min(max_buyback_cost, V − R − ert)`. Closing while liquidatable is allowed with no penalty. Waterfall: `B` (measured spend) → `R` (85 % lenders / 15 % protocol, the position's split) → remainder to the borrower.
+
+### 8.2 Keeper-initiated buybacks: reference price and bound — PROPOSED
+
+Applies to `liquidate` and `expire`. Requires a fresh completed bucket (`lb_sec ≥ now − 2 s`).
+
+```
+L_b   = max(L_live, L_ema, L_slow)                                   # deepest liquidity -> lowest reference cost
+lo_x  = lb_lo·(1 + g·(now − lb_sec))
+liquidation:  P_ref = min( max(P_ema, lo_x), P_ema·(1 + κ_eff), lo_x·(1 + κ_eff) );   δ = δ_liq = 2 %   (last term v0.4.1)
+expiry (not CR-liquidatable):  P_ref = min(P_ema, min_i p_i, lb_lo);  δ = δ_exp = 1 %
+B̂_ref  = B̂(Q; reprice(L_b, P_ref))                                   (risk quote)
+liquidation (v0.4.1):  max_in = min( B̂_ref·(1 + δ_liq),  V − K_s − ert )                       (no reserve; SPEC §5.2)
+expiry:                max_in = min( B̂_ref·(1 + δ_exp),  V − K_s − ert,  max(V − R − π_ref − ert, B̂_ref·(1 + ε)) ),
+                       π_ref = ⌈expiry_fee_bps·B̂_ref/10⁴⌉                                     (rent and fee senior)
+execute iff B̂_live (execution quote) ≤ max_in;  otherwise the position waits (keeper retries next second)
+```
+
+- **Reference price.** For expiry nothing is urgent, so the reference is the lowest recent robust price. For liquidation it must follow a genuine fast pump: the last-second low extrapolated by one second of *sustained* EMA growth, capped at `P_ema·(1 + κ_eff)`. **v0.4.1 (R4B-2)** also caps it at `lo_x·(1 + κ_eff)`: a `P_ema` pushed by one attacker-only second and then frozen (§5.6) has no sustained growth, so the reference stays at the honest bucket low instead of the pushed EMA (v0.4: `B̂_ref` ×1.156 and the Tier A borrower's remainder 19.49 → 0.22 SOL, the attacker net −15.7 SOL; v0.4.1: `B̂_ref` ×0.999, borrower −1.90 SOL, the ordinary atomic sandwich; `attacks/ptf_sandwich.py`). In a genuine pump `P_ema ≤ lo_x`, so the new term never binds; no row of the 1,655-run battery changes.
+- **Fixed δ (v0.4, decision 1).** v0.3 widened the bound 1 %/s from 1 % to 5 % over consecutive executable seconds (the Dutch clock). The reviewer's liveness runs and ours (§12.2) show the ramp never changed a genuine outcome at 2 %; a fixed 1 % does (it turns three drain-then-pump liquidations into S1), so the bound is a fixed 2 % with a compiled minimum of 2 %. It costs the borrower more when a keeper acts at once (Tier A atomic sandwich: borrower −2.02 SOL instead of −0.95) and less when keepers wait (−2.02 instead of −5.11 after 4 s), and it removes the V1-1 blocking attack class, the ring's `lo` field and the executable-run scan.
+- **A liquidation reserves nothing; an expiry keeps rent and fee senior (v0.4.1, R4A-1, R4B-1).** v0.4 reserved rent *and* the penalty in the liquidation bound (`max(V − R − π_ref − ert, B̂_ref·(1 + ε))`), so that the held-model attacker could not buy the vault down to `V − K_s − ert`. Any reserve creates a dead band `V − R − π_ref − ert < B̂_live ≤ min(B̂_ref·(1 + δ), V − K_s − ert)` in which a liquidation that is due can execute only if `B̂_live ≤ B̂_ref·(1 + ε)` and the S1 legs are false. In a genuine fast pump the live cost is a few tenths of a percent above the one-second-old reference, so the keeper waits and the position gaps into S1. v0.3's rent-only reserve has the same band whenever the rent due exceeds `K_s` — which aged positions reach (Tier A at 25 days and 90 % utilisation: 6.04 SOL against 0.25 SOL). The trade-off on the 1,655-run battery (§5.7) and the held model (§12.6):
+
+| liquidation bound | extra S1 on the 1,655-run battery | its worst row (lender P&L vs no reserve) | held model, fresh Tier A: lenders + protocol | held model, Tier A aged 25 d at 90 %: lenders + protocol | parameter |
+|---|---|---|---|---|---|
+| v0.4: rent and penalty reserved | 35 | RC pump 10×/60 s with ±0.3 % noise: S1 −69.7 % instead of liquidation +1.1 % | +0.46 SOL | −5.72 SOL | `ε` load-bearing |
+| v0.3: rent reserved (the reviewers' proposal) | 1 (and 3–4 more at in-bound maximum rates) | C aged 6 d, 90 %, pump 6×/40 s with ±0.3 % noise: S1 −46.1 % instead of +0.6 % | −2.06 SOL | −1.92 SOL | `ε` load-bearing for aged positions |
+| **v0.4.1: no reserve (SPEC §5.2)** | **0** | — | −2.06 SOL | −8.02 SOL | none |
+
+The liquidation bound is now the complement of S1 exactly: every liquidatable, buyback-allowed position with a fresh reference executes as soon as `B̂_live ≤ B̂_ref·(1 + δ)` (I-E11). What it costs: in the last few percent before S1, where the vault cannot cover the whole waterfall anyway, a sandwiching keeper can take rent and penalty up to the bound's slack (I-E3), and a held-model attacker can buy the vault down to `V − K_s − ert` (§12.6). An expiry is never urgent — if the price keeps rising it becomes a liquidation — so it keeps rent and the expiry fee senior; no battery row changes with any expiry reserve rule.
+- **`V − K_s − ert`** keeps the buyback region disjoint from S1 (§5.6).
+- **Invariant I-E1:** measured spend `B ≤ max_in`, and the venue part `≤ B̂_ref·(1 + δ)`. **I-E11 (v0.4.1):** a liquidatable, buyback-allowed position with a fresh completed bucket never waits while `B̂_live ≤ ⌊B̂_ref·(10⁴ + δ_liq)/10⁴⌋`.
+
+v1.1 Jupiter routes are held to the same `max_in`.
+
+### 8.3 Normal liquidation
+
+Preconditions: liquidatable (§5.5), normal buyback allowed (§5.6), venue not migrating, bound satisfied (§8.2).
+
+| Step | Amount | To |
+|---|---|---|
+| 1 | buy `Q` with `max_in` → measured `B` | venue; `Q` tokens → pool |
+| 2 | `r = min(R, V − B)` | 85 % lenders / 15 % protocol (position's split) |
+| 3 | `π = min(⌈p·base/10⁴⌉, V − B − r)`, **`base = min(B̂_live, B̂_ref)`** (risk quotes) | 30 % keeper, 20 % protocol, 50 % lenders (rounding remainder to lenders) |
+| 4 | **keeper floor** `top = min(max(0, K_s − ⌊0.3·π⌋), V − B − r − π)` (v0.4, R3B-10) | keeper, paid by the borrower |
+| 5 | `V − B − r − π − top` | borrower |
+
+### 8.4 Expiry (SPEC §4 "Duration")
+
+Precondition: `now ≥ deadline` and not CR-liquidatable (if both, §8.3 applies). Steps 1–2 as §8.3, then:
+
+| Step | Amount | To |
+|---|---|---|
+| 3 | `e = min(⌈200·base/10⁴⌉, V − B − r)`, `base = min(B̂_live, B̂_ref)` | 100 % lenders (SPEC); vests (§9.4) |
+| 4 | `K_e = min(1,000,000 + ⌊10·B̂_ref/10⁴⌋, 50,000,000, V − B − r − e)` (PROPOSED) | keeper, paid by the borrower |
+| 5 | remainder | borrower |
+
+### 8.5 Keeper incentives (R3B-10)
+
+The SPEC keeper share of a liquidation is `0.3·p·base ≈ 0.3·p·V/L`; the settlement reward is `K_s = 0.01 SOL + 1 %·V` (capped at 0.25 SOL). Below a vault of ≈ 5.0 SOL (Tier A), 1.8 (B), 1.7 (C) or 1.4 (D), `K_s` is larger: a third-party keeper earns more by letting a small position gap into S1 (a lender loss) than by liquidating it, and at the 0.1 SOL minimum notional a Tier A liquidation paid ≈ 0.0024 SOL, less than a 220 k CU transaction at congested priority prices. v0.4 floors the liquidation keeper reward at `K_s` whenever the borrower has equity left, paid from that equity (step 4 of §8.3): liquidating never pays less than settling, and never less than 0.01 SOL. The top-up is at most `K_s − 0.3·π`, which the borrower would lose entirely in S1; it is zero above the crossover vaults — in none of the 36 liquidations of the §11 scenarios (positions at the size cap) — and applies to small positions: in a 10×/10 min pump at 10 % of the cap it tops the keeper up by 0.0049 SOL (C), 0.0086 SOL (D@0 %), 0.0009 SOL (RA) and 0.0087 SOL (RC). Small positions still depend on the in-house keeper for prompt action (disclosed).
+
+### 8.6 SOL settlement S1 / S2 / S3 (OWNER D3)
+
+Preconditions: liquidatable (or expired), and S1 or S2 confirmed on one clock with persistence (§5.6), or S3 (§10.3).
+
+```
+keeper:   K_s
+lenders:  S1:      x = V − K_s                                  (never capped; SPEC-literal)
+          S2, S3:  x = min(V − K_s, FV(P_ema, L_ema)),  only if the amount agrees within fv_dev_bps on the settlement box (§5.6)
+          FV(P, L) = B̂_FV + ⌈p'·B̂_FV/10⁴⌉ + R_due,   B̂_FV = B̂(Q; reprice(L, P)) at φ_FV = min(φ_live, venue_fee_hard_cap_bps)
+          p' = locked penalty, or the locked expiry fee if the position is expired and
+               CR(V_eff, B̂_FV) ≥ L at the same (P, L)                          (SPEC §4, §5.3; O15: S2 and S3; v0.4.1 on the box, R4A-3)
+          stuck migration: B̂_FV prices the deterministic post-migration pool at P
+borrower: V − K_s − x;   protocol: nothing (SPEC §6.3)
+S1 SOL is immediate; of an S2/S3 take, min(x, ⌊Q·P_ema/WAD⌋ + R_due) is immediate and the rest — impact, fees,
+penalty — vests like a lump (§9.4; v0.4.1, R4B-6)
+```
+
+**S2 is unreachable at default parameters for capped positions** (R3B). σ ≈ Q/(X − Q) grows with √P, so on the live state:
+
+```text
+- S2 reachability at the per-position cap (price multiple at which each first holds, live state):
+  A: S1 at x2.09, S2 at x48.0
+  C: S1 at x3.08, S2 at x48.0
+  D@0%: S1 at x3.99, S2 at never (curve completes first)
+  RA (all unlocked LP drained): S1 at x2.01, S2 at x125.9
+  RC (all unlocked LP drained): S1 at x2.96, S2 at x125.9
+```
+
+S1 always comes first. S2 stays one predicate, built and tested (the exit fuzz reaches it through σ_max overrides, §13), and the amount check matters in practice for **S3 on an executable venue** — the Emergency route-broken flag or a venue fee above the hard cap (ARCH §5.3) — and for the stuck-migration S3. The drained-pool S2 cases of v0.3 remain as model cases (the LP lock broken, `attacks/fvcap.py`):
+
+| market | LP drained | move | outcome | V - K_s (SOL) | FV at EMA executable cost (SOL) | lenders get (SOL) | borrower gets (SOL) | S1 lenders' take == V - K_s |
+|---|---|---|---|---|---|---|---|---|
+| A | 70% | x2.0 | S1 | 127.491 | 140.439 | 127.491 | 0.000 | yes |
+| A | 80% | x1.9 | S1 | 127.491 | 141.809 | 127.491 | 0.000 | yes |
+| A | 80% | x2.0 | S1 | 127.491 | 150.055 | 127.491 | 0.000 | yes |
+| B | 80% | x2.0 | S2 | 63.684 | 61.318 | 61.318 | 2.366 | n/a (S2) |
+| RA | 80% | x2.0 | S1 | 37.620 | 41.069 | 37.620 | 0.000 | yes |
+
+| market | LP drained | move | outcome | V - K_s (SOL) | FV (SOL) | lenders get (SOL) | borrower gets (SOL) | lenders' take / value of Q at spot |
+|---|---|---|---|---|---|---|---|---|
+| RA | 95% | x1.4 | S2 | 37.620 | 33.048 | 33.048 | 4.573 | 1.278 |
+| A | 95% | x1.0 | S2 | 127.491 | 120.267 | 120.267 | 7.225 | 2.045 |
+
+Every S1 pays lenders exactly `V − K_s`; the cap binds only in S2/S3 when the vault exceeds fair value.
+
+**`p'` for expired, not CR-liquidatable positions (R3A-8 a; owner decision O15, SPEC §0, §5.3, §14).** D3 names the "liquidation penalty" in FV; SPEC §4 says an expired position pays "a 2 % expiry fee instead of the full liquidation penalty". The owner recorded the expiry fee for a position settled in **S2 or S3** only because it expired ("the same reasoning applies to S2 as to S3", SPEC §5.3): the reading under which an S2/S3 of an expired position pays lenders what a normal expiry would have paid (the reviewer's alternative resolution of R3A-8 a). The sim applies it to every S2 and S3 amount (`Market.fv_parts`); ECON §13's exit fuzz pays one S2 of an expired Tier A position at the expiry fee. **Which positions count as CR-liquidatable is decided on the settlement box (v0.4.1, R4A-3):** each evaluated state `(P, L)` uses the penalty iff `CR(V_eff, B̂_FV(P, L)) < L`, never the raw flag, whose robust-spot leg one contrary low observation fails. In v0.4 that observation, in the second before an honest keeper's `sol_settle(S3)`, switched an expired, CR-liquidatable position to the expiry fee on both corners (lenders −3.12 SOL on Tier A for a 0.71 SOL veto, −0.09 SOL on D@0 % for 0.02 SOL); now the amount is unchanged (`fv_push.py` (V)). Evidence, with the Emergency flag set 30 minutes before a healthy position's deadline:
+
+| market | who exits (Emergency flag set, position expires) | outcome | V - K_s (SOL) | FV (SOL) | lenders get (SOL) | tokens returned | borrower gets (SOL) | keeper (SOL) |
+|---|---|---|---|---|---|---|---|---|
+| A | honest keeper: expire() | expiry | 127.4912 | - | 1.2216 | 100% | 65.6736 | 0.0500 |
+| A | lender-keeper: sol_settle(S3), FV with the expiry fee (default) | S3 | 127.4912 | 62.0177 | 62.0177 | 0% | 65.4736 | 0.2500 |
+| A | lender-keeper: sol_settle(S3), FV with the tier penalty (R3A-8a reading) | S3 | 127.4912 | 63.8415 | 63.8415 | 0% | 63.6497 | 0.2500 |
+| RA | honest keeper: expire() | expiry | 37.6204 | - | 0.3749 | 100% | 18.8219 | 0.0197 |
+| RA | lender-keeper: sol_settle(S3), FV with the expiry fee (default) | S3 | 37.6204 | 19.0289 | 19.0289 | 0% | 18.5915 | 0.2500 |
+| RA | lender-keeper: sol_settle(S3), FV with the tier penalty (R3A-8a reading) | S3 | 37.6204 | 19.5885 | 19.5885 | 0% | 18.0319 | 0.2500 |
+| C | honest keeper: expire() | expiry | 7.7963 | - | 0.0510 | 100% | 5.3287 | 0.0035 |
+| C | lender-keeper: sol_settle(S3), FV with the expiry fee (default) | S3 | 7.7963 | 2.5530 | 2.5530 | 0% | 5.2434 | 0.0889 |
+| C | lender-keeper: sol_settle(S3), FV with the tier penalty (R3A-8a reading) | S3 | 7.7963 | 2.7031 | 2.7031 | 0% | 5.0933 | 0.0889 |
+| D@0% | honest keeper: expire() | expiry | 1.8080 | - | 0.0096 | 100% | 1.3796 | 0.0014 |
+| D@0% | lender-keeper: sol_settle(S3), FV with the expiry fee (default) | S3 | 1.8080 | 0.4554 | 0.4554 | 0% | 1.3527 | 0.0284 |
+| D@0% | lender-keeper: sol_settle(S3), FV with the tier penalty (R3A-8a reading) | S3 | 1.8080 | 0.4910 | 0.4910 | 0% | 1.3170 | 0.0284 |
+
+At the expiry-fee reading a lender-keeper that races the honest keeper to `sol_settle(S3)` takes the tokens' executable value in SOL plus the 2 % fee and rent — the same as the expiry, paid in SOL instead of tokens — and the borrower loses only `K_s − K_e` more. At the penalty reading the same race moves 3–8 % of `B̂` from the borrower to lenders (Tier A: 1.82 SOL), which rewards lenders for any no-route condition. The owner confirmed the expiry-fee reading for S2 and S3 (O15).
+
+Other settlement cases (the stuck migration is priced on the post-migration pool at `P_ema`; the halted-pool row shows the freeze of a healthy position, §10.3):
+
+| market | scenario | outcome | price at exit | V - K_s (SOL) | FV (SOL) | lender SOL | spot value of Q (SOL) | lender P&L vs holding | borrower P&L |
+|---|---|---|---|---|---|---|---|---|---|
+| D@80% | graduation, migration stuck | S3 | 2.53x | 4.4384 | 3.0872 | 3.0872 | 2.6827 | +15.1% | -2.0814 (-61% of M) |
+| A | gap 10x | S1 | 10.00x | 127.4912 | - | 127.4912 | 588.0071 | -78.3% | -68.1857 (-100% of M) |
+| D@0% | gap 10x | S1 | 10.00x | 1.8080 | - | 1.8080 | 4.3366 | -58.3% | -1.4029 (-100% of M) |
+| RA | pool disabled | open | 1.00x | 37.6204 | - | 0.0000 | 18.4686 | +0.0% | - |
+
+**Fee ceiling in FV (PROPOSED, OWNER visibility).** Venue fees are admin-set and can be raised immediately, to almost 100 % on Raydium. Above `venue_fee_hard_cap_bps` (500 bps) the route counts as broken for S3 and FV uses the ceiling; between the open cap (150 bps) and the ceiling FV follows the live fee (owner option O5: `min(current fee, fee at open)`).
+
+### 8.7 Open fee
+
+`fee_open = ⌈0.25 %·N_open⌉`, paid on top of `M` straight to the protocol; not collateral, not refundable.
+
+---
+
+## 9. Lender-pool accounting
+
+Reference model with fuzzed invariants and a liveness check: [`sim/pool_model.py`](sim/pool_model.py) v0.4.1 (normative for `shortwin-math::pool`).
+
+### 9.1 State
+
+Market: `T` unborrowed tokens (internal counter), `B_Q` tokens lent out, `S` shares (u128), `acc` entitlement per share (i128, WAD), `acc_r` realised allocation per share (u128, WAD), their carries, `receivable`, the rent aggregate `A_j` (§7), share `epoch` and per-epoch records, `wipe_live` and **the post-wipe sweep flags** (v0.4.1), lock state `Π`, `Π_epoch`, `b_min` and **the lock expiry calendar** (day buckets of lock terms and their live sum `lock_norm`, v0.4.1), **`max_release`** (latest `deadline + S3 tail` of any position opened; v0.4 `max_deadline`), **`vest_bal`, `vest_last`, `vest_end`** (v0.4). MarketVault: `lender_sol`, **`unmatched`** (v0.4 pot), `protocol_fees`. Per lender: `shares, snap, pending (i64), snap_r, real, claimed, epoch, lock, lock_Π, lock_epoch, lock_term`, **`lock_until`** (v0.4). Removed: `unassigned_sol`.
+
+### 9.2 Deposits and share value
+
+```
+deposit a:    minted = ⌊a·(S + VS)/(T + B_Q + VA)⌋, T += a            (VS = 1,000, VA = 1)
+share value:  (T + B_Q + VA)/(S + VS) tokens + SOL entitlement via acc
+```
+
+Internal counters ignore donations (first-depositor attack: a victim's 10⁹ deposit redeems 10⁹).
+
+### 9.3 Pro-rata withdrawal with bounded locks (SPEC §2.4; C0-9, V2-3, R3B-1)
+
+A lender may withdraw only its pro-rata part of unborrowed inventory, computed over the shares that still have a claim on it (the exact form of ARCH §3.3 and `pool_model.free_allowance`, R3A-13):
+
+```
+lock_i(now)  = 0 if now ≥ lock_until_i or lock_epoch_i ≠ Π_epoch, else min(⌈lock_i·Π/lock_Π_i⌉, shares_i)
+locked       = min(⌊lock_norm·Π/WAD⌋, S),  lock_norm = Σ of the calendar buckets not yet expired            (v0.4.1)
+u_i          = shares_i − lock_i(now)
+allowance_i  = min( ⌊u_i·T/max(S − locked, u_i)⌋,  value of shares_i,  T )                          (tokens)
+withdraw s:   tokens = ⌊s·(T + B_Q + VA)/(S + VS)⌋ ≤ allowance_i, ≤ T; requires pending_i ≥ 0 (§9.4)
+              new lock_i = lock_i + ⌈min(s, b_max)·(u_i − b_max)/b_max⌉ (b_max = shares that burn allowance_i)
+              lock_until_i = max(lock_until_i, ⌈(max(now, max_release) + lock_grace_s)/1 d⌉·1 d)          (v0.4.1)
+              a live lock's term leaves its bucket; the new term ⌊new lock_i·WAD/Π⌋ enters bucket lock_until_i/1 d
+max_release  = max over positions opened of (deadline + max_migration_pause_s + grad_grace_s + s3_wait_s),
+               each with the position's snapshot values                                                   (v0.4.1)
+on each resolution of q borrowed tokens, B' = B_Q − q:
+    if B' = 0: Π_epoch += 1 (all locks and every bucket clear)
+    elif locks exist and B' < b_min: Π ← ⌈Π·B'/b_min⌉, b_min = B'                                   (net reductions only, V2-3)
+a bucket leaves lock_norm when its day ends, i.e. exactly at the lock_until of every lock in it           (v0.4.1)
+```
+
+**Why `lock_until` (R3B-1).** v0.3's locks decayed only when `B_Q` fell below its minimum since the first lock of the Π epoch and cleared only at `B_Q = 0`. In a market whose borrowing stays at or above that level — steady or growing demand, the success case — a lender that once took its free part stayed locked for good, even after every position that existed at lock time had closed. Every position open at lock time resolves by its deadline plus its own S3 tail — a migration pause, the graduation grace and the S3 wait, at the position's snapshot values — so no lock needs to outlive `max_release + lock_grace_s`. v0.4 used the deadline alone: with the three timers at their compiled maxima (1 day each) and `lock_grace_s` at its minimum (1 h), a lock expired on day 30.04 while its position could stay open in `PumpMigrating` until day 33 (R4A-8, R4B-8). Folding each position's tail into `max_release` needs no relational check against governance values, which change after a position snapshots them; `lock_grace_s` (1 day) then covers keeper latency and exits that wait for their bound.
+
+**Why an expiry calendar (R4A-2, R4B-3).** Every lender's allowance divides `T` among the shares that are not locked, using the aggregate `locked`. In v0.4 an expired lock left that aggregate only at its holder's next touch, and the program cannot touch every lender; until then every other lender's denominator was too small, the sum of allowances exceeded `T`, and the first withdrawers took the idle lender's pro-rata part — the C0-9 run, reopened for exactly the lenders R3B-1 meant to release. The fuzz could not see it because `check()` touched every lender first. v0.4.1 keys each lock term by its expiry day: `lock_until` is rounded up to the end of its day, the aggregate drops a bucket when that day ends, and the lender's own view expires at the same second. Lock terms are floored, so the aggregate never exceeds the lenders' own (ceiled) locks — v0.4's ceilings let two lenders with one unlocked share each draw all of `T` when everyone else was locked down to rounding dust. On-chain this is a ring of `LOCK_BUCKETS = 128` day buckets (ARCH §2.3.6); `lock_until` is at most 90 d (compiled maximum duration) + 3 d (S3 tail) + 7 d (`lock_grace_s`) + 1 d ahead. `check()` now asserts I-P4 on the state the program sees, with only the withdrawing lender touched:
+
+| model | E's lock_until (day) | free T | F gets | G gets | E gets |
+|---|---|---|---|---|---|
+| v0.4 (expiry leaves the aggregate at the holder's touch) | 31.06 | 1,000,000,000,000 | 500,000,000,000 | 500,000,000,000 | 0 |
+| v0.4.1 (day-bucket expiry calendar) | 32.00 | 1,000,000,000,000 | 400,000,000,000 | 400,000,000,000 | 200,000,000,000 |
+
+(E, F and G deposit equally; E takes its free part at 50 % utilisation; positions roll so Π stays; on day 33 nobody has touched E; F, G, then E withdraw the most they may.) Over the reviewers' lock-heavy operation mix (6 seeds × 4,000 operations, sampled every 25), the states in which the allowances as the program sees them sum above `T` + dust:
+
+| model | sampled states | states with sum(allowances) > T + dust | worst sum / T |
+|---|---|---|---|
+| v0.4 (touch-time expiry, ceil'd terms) | 954 | 92 | 2.72 |
+| expiry calendar, ceil'd terms | 954 | 1 | 1.27 |
+| v0.4.1 (calendar, floored terms) | 954 | 0 | 0.00 |
+
+The day buckets lengthen a lock by less than a day (it ends at the end of its `lock_until` day).
+
+**Why Π / `b_min` is kept** (decision 6: keep it only if it matters). The reviewer's scenario and a fading-interest one, showing the lender's allowance as a share of its pro-rata part of unborrowed inventory:
+
+| market path | lock rule | after 24 h | after 7 d | after 30 d | after 32 d |
+|---|---|---|---|---|---|
+| growing, always busy | v0.3 (PI / running minimum only) | 0% | 0% | 0% | 0% |
+| growing, always busy | v0.4 (PI + lock_until) | 0% | 0% | 0% | 100% |
+| growing, always busy | v0.4 without PI (lock_until only) | 0% | 0% | 0% | 100% |
+| interest fades (100 of 900 stays out) | v0.3 (PI / running minimum only) | 94% | 94% | 94% | 94% |
+| interest fades (100 of 900 stays out) | v0.4 (PI + lock_until) | 94% | 94% | 94% | 100% |
+| interest fades (100 of 900 stays out) | v0.4 without PI (lock_until only) | 0% | 0% | 0% | 100% |
+
+In a busy market only the time bound helps; when interest fades, Π returns 94 % of the allowance within a day while `lock_until` alone keeps it at 0 for a month. Both are kept.
+
+Run test (two equal lenders, 90 % utilisation, then the whole borrowed inventory SOL-settled for 50 % of its token value; 1 raw token = 1 lamport):
+
+| withdrawal rule | tokens A withdrew before S1 | A final value | B final value |
+|---|---|---|---|
+| v0.1 first come, first served | 200,000,000,000 | 599,999,999,999 | 500,000,000,000 |
+| v0.4 pro-rata + lock | 100,000,000,000 | 573,684,210,526 | 526,315,789,473 |
+
+**Residual (disclose).** With fungible shares a runner still gains over its fair value; the gain depends on utilisation, and churn of other positions cannot raise it:
+
+| utilisation | no churn | churn |
+|---|---|---|
+| 90% | +4.3% | +4.3% |
+| 80% | +7.4% | +7.4% |
+| 60% | +10.7% | +10.7% |
+| 50% | +11.1% | +11.1% |
+| 30% | +9.5% | +9.5% |
+
+Exact pro-rata needs a separate share class for withdrawn lenders' borrowed claims (a withdrawal queue, owner item O10).
+
+### 9.4 Lender SOL: entitlement, realised allocation, pot and vesting (R3A-2, R3B-2)
+
+**Decision: option (a), SPEC-faithful and now live.** SPEC §2.4 says "rent accrues to the pool continuously". The brief offered (a) keep continuous rent entitlement and fix liveness with a MarketVault pot plus linear vesting of lump credits, or (b) one realised accumulator with linear release of all lender SOL. (a) is chosen because it can be made provably live, bounded and O(1) (below), and because (b) changes who earns rent in a way the sims show is materially worse for long-term lenders (table below). (b) is recorded as owner option O16.
+
+```
+accrue:        lender credit (§7) → acc (entitlement) and receivable;  vest release → acc AND acc_r
+repay/settle:  Δ = paid lender rent (or settlement principal) − credited_for(pos) → acc;  receivable −= min(credited_for, receivable)
+               paid lender rent / principal → acc_r (realised, allocated to the shares holding now)
+               LUMPS → vest: lender half of the penalty, expiry fee, and the part of an S2/S3 take above
+               ⌊Q·P_ema/WAD⌋ + R_due (impact, fees, penalty; v0.4.1); S1 and the rest of an S2/S3 take are immediate
+sweeps, cashback: → vest
+vest:          release ⌊vest_bal·Δt/(vest_end − vest_last)⌋ first; a lump x then sets
+               vest_end = now + ⌈(vest_bal·(vest_end − now) + x·lump_vest_s)/(vest_bal + x)⌉    (value-weighted, v0.4.1)
+touch(lender): pending += shares·Δacc; real += shares·Δacc_r;
+               surplus = (real − claimed) − max(pending, 0) > 0  →  real −= surplus; MarketVault.unmatched += surplus      (v0.4)
+claim_sol:     own = real − claimed;  draw = min(unmatched, max(0, pending − own));  unmatched −= draw; real += draw
+               pay = min(pending, real − claimed, lender_sol);  pending −= pay; claimed += pay
+cover_deficit: pending += x, real += x (that lender)
+withdraw:      requires pending ≥ 0
+```
+
+- **Why a realised allocation at all.** Entitlement accrues continuously, but rent is paid only at exit; paying claims from any SOL in the vault would let a lender claim rent that is still a receivable (C0-13) and escape a later shortfall. Each lender therefore claims from SOL allocated to its shares when it arrived (`real`) — memoryful, so a second call pays 0 (V2-2).
+- **Why the pot (R3A-2).** Realised SOL is allocated to the shares that hold when it arrives, entitlement to the shares that held while it accrued. A lender that withdrew between accrual and payment keeps an entitlement it could never claim, while newcomers receive realised SOL beyond their entitlement. v0.3 recycled that surplus into `acc_r` (to the other *current* shares, dividing by `S − shares`), which never reaches a 0-share lender: the reviewer's wind-down test stranded 68.12 SOL of 51,169 SOL (worst seed 15.35 SOL). v0.4 moves the surplus into one MarketVault counter that any lender may draw from, up to its own deficit. It needs no division and no keeper recycling duty (`claim_sol` already writes `MarketVault`); a surplus reaches the pot at the surplus lender's next touch, and `sync_lender` stays permissionless for lenders that never return. First-come priority among deficit lenders is accepted.
+- **Liveness invariant (asserted).** After every position resolves, the vest is released and every lender is synced, sequential claims pay out `lender_sol − dust`: `Σ_i max(pending_i, 0) ≥ lender_sol − dust` by the entitlement identity, `Σ_i (real_i − claimed_i) + unmatched = lender_sol − dust` by the realised identity, and each lender's own allocation never exceeds its entitlement after the move to the pot. `pool_model.check()` and the fuzz run the full wind-down on a copy every 2,000 operations. Dust is per-touch flooring plus SOL credited to rebase-orphan shares (§9.5).
+- **Bounded.** A claim never exceeds the lender's own entitlement; the pot never goes negative; `Σ(real − claimed) + unmatched + vest_bal ≤ lender_sol` and `claimed ≤ real` for every lender (I-P2).
+- **Lumps vest (R3B-2).** Rent is credited continuously, so a just-in-time depositor earns ≈ 0 of it; every lump used to be credited to the shares existing when it arrived and was claimable at once, so any holder of the token could bundle `[deposit → expire / liquidate / claim_venue_rewards / sweep_trader → withdraw → claim_sol]` and take its pro-rata share. With linear vesting over `lump_vest_s` (6 h), the atomic bundle gets nothing and a whale must hold its shares through the window, exposed like any lender, to earn `h/6` of its pro-rata lump share.
+- **The premium of an S2/S3 take vests too (v0.4.1, R4B-6).** An S2/S3 pays `x = min(V − K_s, FV)`, and FV is an executable buyback cost at EMA reserves: it exceeds the market value `Q·P` by impact and fees, in S2 by more than σ_max by definition. v0.4 paid `B̂_FV + R_due` immediately, so a token whale could bundle `[deposit → sol_settle → withdraw → claim_sol]` (the S3 timer is public and `sol_settle` permissionless) and take its pro-rata share of that premium. Now only `min(x, ⌊Q·P_ema/WAD⌋ + R_due)` — the zero-impact value of the extinguished tokens at the EMA price plus the rent, which was entitled to the lenders who held while it accrued — is immediate; the rest vests. S1 stays immediate: it pays `V − K_s < B̂ + ert`, a loss against the buyback cost, and vesting it would shift S1 SOL towards lenders who stay through a loss event. A whale at 9× the pool around an S2/S3 of the last open position (Q worth 500 SOL at `P_ema`):
+
+| premium of B_FV over Q.P_ema | model | take above Q.P_ema (lamports) | whale's atomic gain (lamports) |
+|---|---|---|---|
+| 3.5% | v0.4 | 27,850,000,000 | 15,749,999,999 |
+| 3.5% | v0.4.1 | 27,850,000,000 | 0 |
+| 7.0% | v0.4 | 45,700,000,000 | 31,499,999,999 |
+| 7.0% | v0.4.1 | 45,700,000,000 | 0 |
+| 20.0% | v0.4 | 112,000,000,000 | 89,999,999,999 |
+| 20.0% | v0.4.1 | 112,000,000,000 | 0 |
+
+- **The vest end is value-weighted (v0.4.1, R4B-5).** v0.4 restarted the 6 h window for the whole balance on every lump, so a 1-lamport donation plus a permissionless `sweep_trader` every minute turned the linear release into a roughly exponential one (τ ≈ 6 h). Now a lump moves the end by its share of the balance, and a dust lump by at most 1 s (the ceiling). The end never moves earlier while `lump_vest_s ≥ vest_end − now`; after a timelocked decrease of `lump_vest_s` below the remaining span a lump pulls it earlier, to a weighted point between the old end and `now + lump_vest_s` (it costs about the vest balance itself, so it is no practical grief). A 10 SOL lump, then a 1-lamport sweep every k seconds:
+
+| model | k (s) | released after 6 h | after 24 h |
+|---|---|---|---|
+| v0.4 (every lump restarts the window) | 3600 | 66.5% | 98.7% |
+| v0.4 (every lump restarts the window) | 600 | 63.7% | 98.3% |
+| v0.4 (every lump restarts the window) | 60 | 63.3% | 98.2% |
+| v0.4.1 (value-weighted end) | 3600 | 100.0% | 100.0% |
+| v0.4.1 (value-weighted end) | 600 | 99.8% | 100.0% |
+| v0.4.1 (value-weighted end) | 60 | 98.4% | 100.0% |
+
+- **An exit forfeits the unreleased vest (disclosed, R4B-4).** Vesting pays lumps to whoever holds shares during the window, so a lender that leaves forfeits its unreleased part to the lenders who stay — to a dust holder, if only dust stays: an honest lender with all shares but 1,000 raw units that leaves 10 minutes after 3 SOL of lumps gets 0.083 SOL and the dust holder 2.917 SOL. The "last lender is paid the vest" rule applies only when the withdrawal takes `S` to 0 (the SOL would otherwise have no lender). The reviewer's suggested fix — release the vest to the current shares before any withdrawal that leaves less than 1 % of `S` — is **rejected**: it is the JIT snipe again for a whale large enough to trigger it (199× the pool around a 3 SOL lump: the whale takes 2.985 SOL atomically, against 0 without the flush). A standing dust position that captures lumps must be alone in the market for up to 6 h after the real lenders leave; that is the normal wind-down of a short-lived memecoin market, so the frontend warns a lender that exits with an unreleased vest.
+
+| model | realised inflow (SOL) | stranded (SOL) | worst seed (SOL) | seeds above 0.01 SOL |
+|---|---|---|---|---|
+| v0.3 (surplus recycled into acc_r) | 51,169.3 | 68.121466 | 15.353244 | 34 |
+| v0.4 (unmatched pot) | 51,186.4 | 0.000020 | 0.000001 | 0 |
+
+| accounting | rent paid (lamports) | attacker SOL | honest lender SOL | attacker tokens back |
+|---|---|---|---|---|
+| (a) continuous | 36,986,302 | 0 (0.0%) | 31,438,350 (85.0%) | 9,000,000,000 |
+| (b) release | 36,986,302 | 0 (0.0%) | 31,438,357 (85.0%) | 9,000,000,000 |
+
+| model | h | whale SOL (share of lender income) | honest lender SOL |
+|---|---|---|---|
+| v0.3 (lumps immediate) | 0 | 1.0943 (33.5%) | 2.1756 |
+| (a) v0.4: continuous rent, lumps vest 6 h | 0 | 0.0000 (0.0%) | 3.2699 |
+| (a) v0.4: continuous rent, lumps vest 6 h | 1 | 0.1824 (5.6%) | 3.0875 |
+| (a) v0.4: continuous rent, lumps vest 6 h | 3 | 0.5472 (16.7%) | 2.7228 |
+| (a) v0.4: continuous rent, lumps vest 6 h | 6 | 1.0943 (33.5%) | 2.1756 |
+| (a) v0.4: continuous rent, lumps vest 6 h | 24 | 1.0943 (33.5%) | 2.1756 |
+| (b) owner option: all lender SOL released over 6 h | 0 | 0.0000 (0.0%) | 3.2699 |
+| (b) owner option: all lender SOL released over 6 h | 1 | 0.4905 (15.0%) | 2.7794 |
+| (b) owner option: all lender SOL released over 6 h | 3 | 1.4715 (45.0%) | 1.7985 |
+| (b) owner option: all lender SOL released over 6 h | 6 | 2.9429 (90.0%) | 0.3270 |
+| (b) owner option: all lender SOL released over 6 h | 24 | 2.9429 (90.0%) | 0.3270 |
+
+The last table is also the case against option (b): under (b) the whale that holds for 6 hours takes 90 % of the position's rent *and* lump (2.94 SOL of 3.27), because all lender SOL is released to whoever holds shares during the window; under (a) it takes 90 % of the lump only (1.09 SOL) and none of the rent, which was entitled to the lenders who held while it accrued.
+
+**Owner option O16 — option (b), one realised accumulator.** All lender SOL (rent paid at exit, lumps; settlement principal immediate) enters `vest` and is released into a single accumulator; claims pay `min(pending, lender_sol)`. It removes `acc_r`, `real`, `claimed`, `unmatched`, `receivable`, true-ups, negative pending and `cover_deficit`, and is trivially live (the fuzz runs it too). Trade-off: rent goes to whoever holds shares during the release window rather than over the position's life, so just-in-time capital earns rent it did not fund (table above), and SPEC §2.4's "rent accrues to the pool continuously" holds for the pool but not per lender. A longer window reduces the capture per hour held but delays every lender's income.
+
+Other checks:
+
+| claim rule | calls | A's fair realised share | A received | sol_vault left for B |
+|---|---|---|---|---|
+| v0.2 (memoryless) | 1 | 76,500,000,000 | 76,500,000,000 | 76,500,000,000 |
+| v0.2 (memoryless) | 2 | 76,500,000,000 | 102,000,000,000 | 51,000,000,000 |
+| v0.2 (memoryless) | 5 | 76,500,000,000 | 127,500,000,000 | 25,500,000,000 |
+| v0.2 (memoryless) | 20 | 76,500,000,000 | 145,714,285,711 | 7,285,714,289 |
+| v0.2 (memoryless) | 100 | 76,500,000,000 | 151,485,148,497 | 1,514,851,503 |
+| v0.4 (own allocation + pot) | 1 | 76,500,000,000 | 76,500,000,000 | 76,500,000,000 |
+| v0.4 (own allocation + pot) | 2 | 76,500,000,000 | 76,500,000,000 | 76,500,000,000 |
+| v0.4 (own allocation + pot) | 5 | 76,500,000,000 | 76,500,000,000 | 76,500,000,000 |
+| v0.4 (own allocation + pot) | 20 | 76,500,000,000 | 76,500,000,000 | 76,500,000,000 |
+| v0.4 (own allocation + pot) | 100 | 76,500,000,000 | 76,500,000,000 | 76,500,000,000 |
+
+| model | receivable after the position closed | lender pending | sol_vault |
+|---|---|---|---|
+| v0.3 (global value at every accrual and at the true-up) | 75,000,000 | 775,000,000 | 700,000,000 |
+| v0.4 (snapshot per position) | 0 | 850,000,000 | 850,000,000 |
+
+Shortfalls (`Δ < 0`) arise only when a position exits with less than `R` of equity left: an expiry reserves rent against any sandwich, a liquidation does not (v0.4.1, §8.2), so in the last few percent before S1 a sandwiching keeper can add to a shortfall up to the bound's slack. A shortfall is debited pro-rata to current shares, so a lender who joined after the rent was credited bears part of it (disclosed); a lender with `pending < 0` must `cover_deficit` before withdrawing.
+
+| model | A claimed | A pending after shortfall | A could exit | B claims now | B pending left | sol_vault | receivable |
+|---|---|---|---|---|---|---|---|
+| v0.1 | 516,883,561,643 | -15,195,205,480 | True | 486,493,150,686 | 15,195,205,478 | 0 | 0 |
+| v0.4 | 500,000,000,000 | 1,688,356,163 | True | 501,688,356,164 | 0 | 1,688,356,165 | 0 |
+
+### 9.5 Share epochs, post-wipe credits and `S = 0` (C0-6, V2-12, R3A-10)
+
+Tokens per share only fall (settlements extinguish token claims and keep shares).
+
+```
+after every settlement:
+    if T + B_Q = 0 and S > 0:  flush vest_bal into acc/acc_r;  roll(num = 0, den = 1)          # v0.4: the wiped lenders keep their unreleased lumps
+    elif S + VS > R_MAX·(T + B_Q + VA):  roll(1, 1,000^k)
+roll(num, den):  epochs[e] = (acc, acc_r, num, den, S); e += 1; S = ⌊S·num/den⌋; every calendar bucket scaled; acc = acc_r = 0
+lender touch:    for each epoch behind: pending/real from the record; shares = ⌊shares·num/den⌋; lock and lock_term scaled
+credit while S = 0:   live full-wipe record → acc_end += x·WAD/S_old (V2-12);   otherwise → protocol_fees (v0.4)
+deposit while the wipe record is live: requires sweep_trader and claim_venue_rewards since the wipe   (v0.4.1, R4A-7)
+last lender leaving (withdraw of all remaining shares): the unreleased vest is released to it first (v0.4)
+```
+
+- **`S = 0` without a wipe (R3A-10).** If every lender withdrew, a later trader sweep or venue cashback used to go to `unassigned`, which the next depositor took in full, even with a dust deposit (and `claim_venue_rewards` is permissionless). No lender exists to own such SOL, so v0.4 sends it to `protocol_fees` and drops `unassigned`:
+
+| model | dust depositor claims | former lender claims | to protocol |
+|---|---|---|---|
+| v0.3 | 1,000,000,000 | 0 | 0 |
+| v0.4 | 0 | 0 | 1,000,000,000 |
+
+- **Post-wipe credits (V2-12, R3B-2).** The full-wipe record takes the unreleased vest at the wipe and every credit while `S = 0`: V2-12 / R3B-2 after a full wipe: old epoch's lenders +4,000,000,000 lamports (3 SOL unreleased vest + 1 SOL post-wipe sweep); dust depositor that arrives first and triggers a 1 SOL sweep: 0 at once, 2,777,777 in total after a lender joins a minute later (that lender: 997,222,222); a lender with 0 shares 6 epochs behind caught up in one touch: True **v0.4 left one gap (R4A-7):** the first deposit finalised the record, so the keeper that executed the wiping `sol_settle` could land `[sol_settle → deposit(2 raw units) → claim_venue_rewards]` atomically and, if nobody else deposited within the vesting window, receive all of the pre-wipe cashback. v0.4.1 makes a deposit into a live wipe record wait until `sweep_trader` and `claim_venue_rewards` have run since the wipe (both permissionless, so a depositor bundles them; they credit the record while `S = 0`); on Raydium markets, which have no venue cashback, only the trader sweep is required, and a venue that cannot execute does not block deposits (nothing can be claimed from it then). SOL that reaches the trader after the first deposit comes from the new epoch's own activity or from donations, and vests to the new shares:
+
+| model | first step after the wipe | dust depositor gets (lamports) | wiped lenders get (lamports) |
+|---|---|---|---|
+| v0.4 (deposit finalises the record at once) | ATT deposits first | 1,000,000,000 | 0 |
+| v0.4.1 (deposit waits for the post-wipe sweep) | deposit refused (WipeSweepPending) | 0 | 1,000,000,000 |
+
+The keeper still sweeps right after a full wipe (§5.8 duty 6); it is no longer the only protection.
+- **Rebase-orphan dust.** A rebase converts each lender with `⌊shares/1,000^k⌋` and `S` with `⌊S/1,000^k⌋`, leaving up to one orphan share per lender; SOL credited to orphan shares is claimable by nobody. It is at most `(lenders in the epoch)/S_new` of later credits, with `S_new ≥ 1,000·(T + B_Q)`: negligible unless the pool holds a few raw token units, which only the fuzz reaches (§9.6).
+
+| model | new deposit 1e14 mints | new lender pending after 1,000 SOL lump + rent (lamports) | next deposit after 2nd wipe would mint | > u128 | epochs |
+|---|---|---|---|---|---|
+| v0.1 (no epochs) | 1.000e+31 | 0 | 1.000e+45 | True | 0 |
+| v0.4 (share epochs) | 1.000e+17 | 1,000,042,500,000 | 1.000e+17 | False | 2 |
+
+`R_MAX = 10⁶` shares per raw token keeps `S ≤ 1.8·10²⁵ ≪ 2¹²⁸`; epoch records are per `(market, epoch)` and O(1) per lender per epoch; a lender whose shares convert to 0 jumps straight to the current epoch.
+
+### 9.6 Fuzz results
+
+```text
+fuzz[continuous, util cap 90%]: 60000 ops, invariants held (liveness checked every 2,000 ops); share epochs rolled 1011; largest sum of negative pendings 226,933,401 lamports; worst stranded SOL after wind-down 177,483,247 lamports (all within the bound: rounding + 177,475,485 lamports credited to rebase-orphan shares); op counts {'accrue': 3391, 'adv': 3338, 'borrow': 2846, 'borrow!': 523, 'churn': 3172, 'churn!': 248, 'claim': 3381, 'claimN': 3418, 'cover': 3388, 'dep': 6638, 'donate': 3336, 'gov': 3291, 'repay': 3239, 'settle': 3344, 'sweep': 3302, 'wd': 6290, 'wd!': 225, 'wdall': 2933, 'wdall!': 351, 'wipe': 3346}
+fuzz[continuous, util cap 100%]: 60000 ops, invariants held (liveness checked every 2,000 ops); share epochs rolled 1930; largest sum of negative pendings 254,896,038 lamports; worst stranded SOL after wind-down 6,760 lamports (all within the bound: rounding + 39 lamports credited to rebase-orphan shares); op counts {'accrue': 3345, 'adv': 3340, 'borrow': 3372, 'churn': 3466, 'claim': 3378, 'claimN': 3459, 'cover': 3407, 'dep': 6100, 'dep!': 504, 'donate': 3299, 'gov': 3305, 'repay': 3275, 'settle': 3322, 'sweep': 3279, 'wd': 5558, 'wd!': 988, 'wdall': 2834, 'wdall!': 474, 'wipe': 3295}
+fuzz[release, util cap 90%]: 60000 ops, invariants held (liveness checked every 2,000 ops); share epochs rolled 1012; largest sum of negative pendings 0 lamports; worst stranded SOL after wind-down 402,882,754 lamports (all within the bound: rounding + 402,875,834 lamports credited to rebase-orphan shares); op counts {'accrue': 3374, 'adv': 3356, 'borrow': 2853, 'borrow!': 508, 'churn': 3177, 'churn!': 254, 'claim': 3378, 'claimN': 3407, 'cover': 3401, 'dep': 6651, 'donate': 3323, 'gov': 3290, 'repay': 3257, 'settle': 3322, 'sweep': 3299, 'wd': 6308, 'wd!': 197, 'wdall': 2916, 'wdall!': 373, 'wipe': 3356}
+```
+
+The pool fuzz draws 18 operations, including time passing, governance changes of `rent_protocol_bps`, withdrawals of everything, repeated claims in one transaction, churn between withdrawals, sweeps, covers, shortfalls, partial and full wipes (a depositor bundles the post-wipe sweep 70 % of the time; a refused deposit is counted as `dep!`). After every operation it asserts I-P1–I-P7 — v0.4.1: I-P4 first on the state the program sees, each lender's allowance computed with only that lender touched, then after touching everyone; every 2,000 operations it runs the full wind-down on a copy and asserts the liveness bound. The residue it reports is rounding plus SOL credited to rebase-orphan shares in dust-sized pools. The reviewers' lock-heavy mix (§9.3) runs separately with the same untouched-state check.
+
+---
+
+## 10. Bonding-curve specifics, graduation and venue changes
+
+### 10.1 Graduation and the boost (C1-13, ADOPTED Q15)
+
+The curve completes when price reaches `(vt/279.9 M)²` times the current price (14.7× from 0 % progress, 5.84× from 50 %, 2.46× from 80 %, 1.65× from 90 %, 1.18× from 97 %). After migration the proportional boost adds a deterministic **+45.66 %** within ~6 minutes. Opens are refused while `boost_vault.amount > 0.05 SOL` and `now < graduated_at + 900 s`. Simulated with migration 2 s after completion and the boost spent over 360 s:
+
+| market | scenario | outcome | exit vs event | price at exit / terminal | CR spot/EMA at exit | value of Q at terminal price (SOL) | borrower P&L (SOL) | lender gets | lender P&L vs holding at terminal price (SOL, % of Q value) | keeper SOL |
+|---|---|---|---|---|---|---|---|---|---|---|
+| D@50% | graduation gap (1 buy completes curve) | S1 | +50s | 6.39x / 6.39x | 0.62/0.63 | 4.398 | -2.2253 (-100% of M) | 0% + 2.8738 SOL | -1.5243 (-34.7%) | 0.0391 |
+| D@50% | graduation, then +2x on AMM over 60s | S1 | +50s | 8.14x / 8.14x | 0.48/0.52 | 5.598 | -2.2253 (-100% of M) | 0% + 2.8738 SOL | -2.7238 (-48.7%) | 0.0391 |
+| D@50% | graduation, then +3x on AMM over 60s | S1 | +50s | 9.37x / 9.37x | 0.42/0.47 | 6.446 | -2.2253 (-100% of M) | 0% + 2.8738 SOL | -3.5724 (-55.4%) | 0.0391 |
+| D@50% | graduation, migration stuck | S3 | +4200s | 6.02x / 6.02x | 0.00/0.66 | 4.138 | -2.2253 (-100% of M) | 0% + 2.8738 SOL | -1.2645 (-30.6%) | 0.0391 |
+| D@80% | graduation gap (1 buy completes curve) | liquidation | +15s | 2.58x / 2.58x | 1.57/1.66 | 2.738 | -2.0910 (-61% of M) | 100% + 0.1449 SOL | +0.1449 (+5.3%) | 0.0859 |
+| D@80% | graduation, then +2x on AMM over 60s | liquidation | +15s | 2.58x / 2.58x | 1.57/1.66 | 2.738 | -2.0910 (-61% of M) | 100% + 0.1449 SOL | +0.1449 (+5.3%) | 0.0859 |
+| D@80% | graduation, then +3x on AMM over 60s | liquidation | +15s | 2.58x / 2.58x | 1.57/1.66 | 2.738 | -2.0910 (-61% of M) | 100% + 0.1449 SOL | +0.1449 (+5.3%) | 0.0859 |
+| D@80% | graduation, migration stuck | S3 | +4200s | 2.53x / 2.53x | 0.00/1.60 | 2.683 | -2.0814 (-61% of M) | 0% + 3.0872 SOL | +0.4045 (+15.1%) | 0.0549 |
+| D@90% | graduation gap (1 buy completes curve) | liquidation | +302s | 2.34x / 2.34x | 1.73/1.74 | 3.038 | -2.1934 (-52% of M) | 100% + 0.1598 SOL | +0.1598 (+5.3%) | 0.0946 |
+| D@90% | graduation, then +2x on AMM over 60s | liquidation | +60s | 2.60x / 2.60x | 1.56/1.68 | 3.365 | -2.5777 (-62% of M) | 100% + 0.1780 SOL | +0.1780 (+5.3%) | 0.1056 |
+| D@90% | graduation, then +3x on AMM over 60s | liquidation | +52s | 2.74x / 2.74x | 1.48/1.65 | 3.551 | -2.7946 (-67% of M) | 100% + 0.1878 SOL | +0.1878 (+5.3%) | 0.1115 |
+| D@90% | graduation, migration stuck | open | +10800s | 1.70x / 1.70x | 0.00/2.40 | 2.198 | - | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| D@97% | graduation gap (1 buy completes curve) | open | +1800s | 1.77x / 1.77x | 2.31/2.31 | 2.706 | -1.2834 (-26% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| D@97% | graduation, then +2x on AMM over 60s | liquidation | +87s | 2.60x / 2.60x | 1.56/1.68 | 3.978 | -3.0457 (-61% of M) | 100% + 0.2104 SOL | +0.2104 (+5.3%) | 0.1248 |
+| D@97% | graduation, then +3x on AMM over 60s | liquidation | +70s | 2.77x / 2.77x | 1.46/1.63 | 4.238 | -3.3499 (-68% of M) | 100% + 0.2242 SOL | +0.2242 (+5.3%) | 0.1331 |
+| D@97% | graduation, migration stuck | open | +10800s | 1.21x / 1.21x | 0.00/3.37 | 1.858 | - | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+
+Positions opened at 80–90 % progress are liquidated on the completing buy or by the boost push that follows (D@90 %: at 2.34×, 302 s after completion), lenders made whole (+5.3 %); at 97 % the position survives graduation and is liquidated only if the price keeps rising; positions opened at ≤ 50 % progress go to S1 on the completing buy.
+
+**Ring liquidity across venue changes (R3B-7 a).** The curve's `√(vT·vQ)` at completion (≈ 5.7·10¹²) is ≈ 1.35× the new pool's (≈ 4.2·10¹²); a Raydium fast path may land on a pool with a quarter of the depth. v0.4 rewrites every ring entry's `l` and `lobs` at the change (v0.4.1: `l`, `llo`, `lhi`; §5.2):
+
+| market | scenario | ring at the venue change | outcome | exit vs event | price at exit | lender P&L | seconds with the settlement box wider than 1 % in L (first 60 s after the change) |
+|---|---|---|---|---|---|---|---|
+| D@90% | graduation, then +2x on AMM over 60s | carried over (v0.3 ARCH) | liquidation | +60s | 2.60x | +5.3% | 4 |
+| D@90% | graduation, then +2x on AMM over 60s | rewritten (v0.4.1) | liquidation | +60s | 2.60x | +5.3% | 0 |
+| D@90% | graduation, then +3x on AMM over 60s | carried over (v0.3 ARCH) | liquidation | +52s | 2.74x | +5.3% | 4 |
+| D@90% | graduation, then +3x on AMM over 60s | rewritten (v0.4.1) | liquidation | +52s | 2.74x | +5.3% | 0 |
+| D@97% | graduation, then +2x on AMM over 60s | carried over (v0.3 ARCH) | liquidation | +87s | 2.60x | +5.3% | 4 |
+| D@97% | graduation, then +2x on AMM over 60s | rewritten (v0.4.1) | liquidation | +87s | 2.60x | +5.3% | 0 |
+| RA | halt -> fast path to a 25% pool, then pump 2x/120s | carried over (v0.3 ARCH) | liquidation | +388s | 1.66x | +2.2% | 4 |
+| RA | halt -> fast path to a 25% pool, then pump 2x/120s | rewritten (v0.4.1) | liquidation | +388s | 1.66x | +2.2% | 0 |
+| RB | halt -> fast path to a 25% pool, then pump 2x/120s | carried over (v0.3 ARCH) | liquidation | +413s | 1.92x | +3.5% | 4 |
+| RB | halt -> fast path to a 25% pool, then pump 2x/120s | rewritten (v0.4.1) | liquidation | +413s | 1.92x | +3.5% | 0 |
+| RC | halt -> fast path to a 25% pool, then pump 2x/120s | carried over (v0.3 ARCH) | liquidation | +426s | 2.00x | +4.2% | 4 |
+| RC | halt -> fast path to a 25% pool, then pump 2x/120s | rewritten (v0.4.1) | liquidation | +426s | 2.00x | +4.2% | 0 |
+
+The outcomes of these genuine moves do not depend on it, but carry-over leaves the settlement box more than 1 % wide in `L` for the first 4 seconds after every change (3 with v0.4's median of the clamped observations) — long enough to block or defer an S2/S3 amount that depends on it.
+
+### 10.2 Buyback larger than `real_token_reserves`
+
+- `q = rt`: allowed; the buy completes the curve and the market enters Migrating.
+- `q > rt` on a live curve: pump rejects the buy (6021). Prevented at open (`γ = 50 %`, ADOPTED Q14) and executed through a **Jito bundle of ≥ 3 transactions** (keeper completes the curve with its own SOL; `migrate_v2`; the position buys all of `q` on the new pool), priced with `B̂_str` (§3.1). Because pump rejects any buy above `rT` and never fills partially, a curve trade landing between the keeper's read and the bundle reverts it; ARCH adopts a `complete_curve(max_sol_cost)` helper that reads `rT` at execution (R3B-11, no economic change).
+
+| policy | scenario | outcome | exit vs event | price at exit | buyback cost (SOL) | B_open (SOL) | borrower P&L (SOL) |
+|---|---|---|---|---|---|---|---|
+| straddle quote B_str (bundle path) | rt -> Q/2, borrower closes 30s later | close | +30s | 1.193x | 1.9227 | 1.5745 | -0.3939 |
+| straddle quote B_str (bundle path) | rt -> Q/2, then others complete curve at +10min, close after | close | +30s | 1.193x | 1.9227 | 1.5745 | -0.3939 |
+| no straddle quote | rt -> Q/2, borrower closes 30s later | S1 | +56s | 1.193x | 0.0000 | 1.5745 | -4.9566 |
+| no straddle quote | rt -> Q/2, then others complete curve at +10min, close after | S1 | +56s | 1.193x | 0.0000 | 1.5745 | -4.9566 |
+
+Without a straddle quote the position looks unquotable and settles S1 (the "no straddle quote" rows), which is why every pricing account is mandatory (C0-2).
+
+### 10.3 Migration pause, the S3 timer and the Raydium fast path (SPEC §5.3; C0-16; ADOPTED Q5; R3A-4, R3B-8)
+
+- While Migrating, liquidations and closes pause; rent accrues; the EMA keeps integrating the completed curve's (final) price. After `max_migration_pause_s = 3,600 s` a stuck migration counts as no route.
+- **Halted venues (V2-5).** While a pool cannot execute, no observation is recorded; liquidatable positions reach S3 after the continuous chain, healthy positions stay frozen until the route returns or their deadline (owner item O14). The settlement box of such a market is the EMA point (nothing can be pushed).
+- **Continuous S3 chain:** every observation records `s3_no_route = !venue_executable ∨ route_broken ∨ φ_live > venue_fee_hard_cap_bps`, with the **global** hard cap (a market-level predicate; ARCH §5.3, A26); `no_route_since` restarts if consecutive no-route observations are more than 60 s apart. S3 is allowed iff the position is liquidatable **or expired**, `s3_no_route` holds now (global cap), the chain is unbroken, and `now ≥ max(no_route_since, graduated_at + grad_grace_s, migration_seen_at + max_migration_pause_s·[migrating]) + s3_wait_s`, the three timers at the position's snapshot values (defaults 600, 3,600 and 600 s). A no-route caused only by the flag or the fee cap still needs the position to be liquidatable with the spot leg evaluated normally, or expired. S3 on an executable venue (flag or fee above the hard cap) is simulated (§8.6).
+- **Raydium fast path on its own predicate (R3A-4, R3B-8).** `pool_fail = !venue_executable ∨ φ_live > venue_fee_hard_cap_bps` — venue-side evidence only, never the Emergency flag — drives a separate chain `pool_fail_since` / `last_pool_fail_obs` with the same 60 s gap rule. After `pool_fast_route_s` (120 s) of continuous failure plus the 60 s collection window, the deepest eligible candidate is adopted; with the ring rewrite, positions continue normally on the new pool:
+
+| market | scenario | outcome | exit vs event | price at exit / terminal | CR spot/EMA at exit | value of Q at terminal price (SOL) | borrower P&L (SOL) | lender gets | lender P&L vs holding at terminal price (SOL, % of Q value) | keeper SOL |
+|---|---|---|---|---|---|---|---|---|---|---|
+| RA | halt -> fast path to a 50% pool, then pump 2x/120s | liquidation | +391s | 1.69x / 2.00x | 1.19/1.23 | 36.937 | -15.0202 (-78% of M) | 100% + 0.7990 SOL | +0.7990 (+2.2%) | 0.4788 |
+| RA | halt -> fast path to a 25% pool, then pump 2x/120s | liquidation | +388s | 1.66x / 2.00x | 1.18/1.23 | 36.937 | -15.0960 (-78% of M) | 100% + 0.8008 SOL | +0.8008 (+2.2%) | 0.4799 |
+| RB | halt -> fast path to a 50% pool, then pump 2x/120s | liquidation | +416s | 1.95x / 2.00x | 1.28/1.33 | 14.778 | -8.4124 (-73% of M) | 100% + 0.5180 SOL | +0.5180 (+3.5%) | 0.3103 |
+| RB | halt -> fast path to a 25% pool, then pump 2x/120s | liquidation | +413s | 1.92x / 2.00x | 1.28/1.32 | 14.778 | -8.4722 (-74% of M) | 100% + 0.5199 SOL | +0.5199 (+3.5%) | 0.3115 |
+| RC | halt -> fast path to a 50% pool, then pump 2x/120s | open | +1500s | 2.00x / 2.00x | 1.50/1.50 | 1.256 | -0.6568 (-51% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| RC | halt -> fast path to a 25% pool, then pump 2x/120s | liquidation | +426s | 2.00x / 2.00x | 1.47/1.49 | 1.256 | -0.7901 (-61% of M) | 100% + 0.0527 SOL | +0.0527 (+4.2%) | 0.0315 |
+
+Self-test (a lender-keeper cranks only during outages; the route was back, unobserved, for 2 minutes):
+
+```text
+S3 with observation-gap rule off: first S3 600 s after the first outage (route was back, unobserved, from +300 s to +420 s)
+S3 with observation-gap rule 60 s: first S3 1020 s after the first outage (route was back, unobserved, from +300 s to +420 s)
+```
+
+### 10.4 Other curve cases
+
+Non-SOL quote curves and mayhem-mode curves are rejected at market creation (ADOPTED Q6); legacy SPL-Token pump coins are allowed. Venue fees, virtual reserves and the boost parameters are admin-changeable on pump's side: they are read on every quote, and opens are refused after a venue program upgrade until re-validated (ADOPTED Q13).
+
+---
+
+## 11. Simulation
+
+### 11.1 Method
+
+Venues: exact integer math of §1/§3 with the live pump fee schedules; Raydium with the generic fee-on-input model and tracked LP units (λ = 50 %). Example markets:
+
+| Key | Venue |
+|---|---|
+| A | PumpSwap 150 M tokens / 2,500 SOL (90 bps) |
+| B | PumpSwap 200 M / 1,000 SOL (100 bps) |
+| C | fresh pump graduate after the boost: 171.4 M / 102.57 SOL effective (84.99 real + 17.58 virtual; 120 bps) |
+| D@x | pump curve at x % progress (125 bps) |
+| RA / RB / RC | Raydium AMM v4 150 M / 2,500 SOL; CPMM 200 M / 1,000 SOL; CPMM 206.9 M / 84.99 SOL (all 25 bps; λ = 50 %) |
+
+Positions at the per-position cap, 80 % utilisation, event 1 h after open. The in-house keeper observes every second near thresholds (§5.8) and acts 1 s after a position becomes actionable, retrying every second. Borrower P&L = payout − M − open fee. **Lender P&L vs holding** = SOL received − value of the tokens not returned, at the scenario's **terminal** price. Tables come from `python3 docs/design/sim/shortwin_sim.py --mc 400 --fuzz 1000` (output `sim/out/full.txt`); the drain scenarios are limited to the unlocked half of the LP (an adopted pool cannot lose more), and the Emergency-flag rows set the route-broken flag one second before the move.
+
+### 11.2 Deterministic scenarios
+
+| market | scenario | outcome | exit vs event | price at exit / terminal | CR spot/EMA at exit | value of Q at terminal price (SOL) | borrower P&L (SOL) | lender gets | lender P&L vs holding at terminal price (SOL, % of Q value) | keeper SOL |
+|---|---|---|---|---|---|---|---|---|---|---|
+| A | gap 2x | liquidation | +10s | 2.00x / 2.00x | 1.04/1.13 | 117.601 | -68.1857 (-100% of M) | 100% + 2.5404 SOL | +2.5404 (+2.2%) | 1.5225 |
+| A | gap 5x | S1 | +47s | 5.00x / 5.00x | 0.41/0.41 | 294.004 | -68.1857 (-100% of M) | 0% + 127.4912 SOL | -166.5123 (-56.6%) | 0.2500 |
+| A | gap 10x | S1 | +47s | 10.00x / 10.00x | 0.20/0.20 | 588.007 | -68.1857 (-100% of M) | 0% + 127.4912 SOL | -460.5158 (-78.3%) | 0.2500 |
+| A | pump 10x/60s | S1 | +65s | 10.00x / 10.00x | 0.20/0.22 | 588.007 | -68.1857 (-100% of M) | 0% + 127.4912 SOL | -460.5158 (-78.3%) | 0.2500 |
+| A | pump 10x/10min | liquidation | +143s | 1.73x / 10.00x | 1.21/1.23 | 588.007 | -51.7113 (-76% of M) | 100% + 2.6515 SOL | +2.6515 (+0.5%) | 1.5891 |
+| A | pump 3x/1h | liquidation | +1691s | 1.68x / 3.00x | 1.25/1.25 | 176.402 | -48.0730 (-71% of M) | 100% + 2.5670 SOL | +2.5670 (+1.5%) | 1.5374 |
+| A | spike 10x/5s | open | +600s | 1.00x / 1.00x | 2.10/2.10 | 58.801 | -1.2391 (-2% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| A | pool disabled | open | +3600s | 1.00x / 1.00x | 0.00/2.10 | 58.801 | - | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| A | route flagged (Emergency) + gap 2x | liquidation | +11s | 2.00x / 2.00x | 1.04/1.13 | 117.601 | -68.1857 (-100% of M) | 100% + 2.5404 SOL | +2.5404 (+2.2%) | 1.5225 |
+| A | dump -50%, close | close | +3600s | 0.50x / 0.50x | 4.23/4.22 | 29.400 | +29.3408 (+43% of M) | 100% + 0.0049 SOL | +0.0049 (+0.0%) | 0.0000 |
+| A | flat to expiry | expiry | +2592001s | 1.00x / 1.00x | 2.06/2.06 | 58.801 | -4.9219 (-7% of M) | 100% + 3.2699 SOL | +3.2699 (+5.6%) | 0.0500 |
+| B | gap 2x | liquidation | +18s | 2.00x / 2.00x | 1.30/1.32 | 47.041 | -28.8347 (-72% of M) | 100% + 1.7239 SOL | +1.7239 (+3.7%) | 1.0329 |
+| B | gap 5x | S1 | +48s | 5.00x / 5.00x | 0.51/0.51 | 117.601 | -40.1359 (-100% of M) | 0% + 63.6839 SOL | -53.9175 (-45.8%) | 0.2500 |
+| B | gap 10x | S1 | +48s | 10.00x / 10.00x | 0.25/0.25 | 235.203 | -40.1359 (-100% of M) | 0% + 63.6839 SOL | -171.5189 (-72.9%) | 0.2500 |
+| B | pump 10x/60s | S1 | +71s | 10.00x / 10.00x | 0.25/0.26 | 235.203 | -40.1359 (-100% of M) | 0% + 63.6839 SOL | -171.5189 (-72.9%) | 0.2500 |
+| B | pump 10x/10min | liquidation | +180s | 2.00x / 10.00x | 1.30/1.33 | 235.203 | -28.7071 (-72% of M) | 100% + 1.7194 SOL | +1.7194 (+0.7%) | 1.0302 |
+| B | pump 3x/1h | liquidation | +2159s | 1.93x / 3.00x | 1.35/1.35 | 70.561 | -27.0324 (-67% of M) | 100% + 1.6667 SOL | +1.6667 (+2.4%) | 0.9975 |
+| B | spike 10x/5s | open | +600s | 1.00x / 1.00x | 2.63/2.63 | 23.520 | -0.5455 (-1% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| B | pool disabled | open | +3600s | 1.00x / 1.00x | 0.00/2.63 | 23.520 | - | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| B | route flagged (Emergency) + gap 2x | liquidation | +19s | 2.00x / 2.00x | 1.30/1.32 | 47.041 | -28.8347 (-72% of M) | 100% + 1.7239 SOL | +1.7239 (+3.7%) | 1.0329 |
+| B | dump -50%, close | close | +3600s | 0.50x / 0.50x | 5.28/5.28 | 11.760 | +11.6919 (+29% of M) | 100% + 0.0039 SOL | +0.0039 (+0.0%) | 0.0000 |
+| B | flat to expiry | expiry | +1209601s | 1.00x / 1.00x | 2.59/2.59 | 23.520 | -1.9584 (-5% of M) | 100% + 1.2537 SOL | +1.2537 (+5.3%) | 0.0253 |
+| C | gap 2x | open | +3600s | 2.00x / 2.00x | 1.56/1.56 | 4.825 | -2.6209 (-48% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| C | gap 5x | S1 | +48s | 5.00x / 5.00x | 0.61/0.61 | 12.063 | -5.4491 (-100% of M) | 0% + 7.7963 SOL | -4.2666 (-35.4%) | 0.0889 |
+| C | gap 10x | S1 | +48s | 10.00x / 10.00x | 0.30/0.30 | 24.126 | -5.4491 (-100% of M) | 0% + 7.7963 SOL | -16.3296 (-67.7%) | 0.0889 |
+| C | pump 10x/60s | liquidation | +28s | 2.93x / 10.00x | 1.06/1.31 | 24.126 | -5.4491 (-100% of M) | 100% + 0.2156 SOL | +0.2156 (+0.9%) | 0.1291 |
+| C | pump 10x/10min | liquidation | +200s | 2.15x / 10.00x | 1.45/1.48 | 24.126 | -3.4536 (-63% of M) | 100% + 0.2186 SOL | +0.2186 (+0.9%) | 0.1308 |
+| C | pump 3x/1h | liquidation | +2406s | 2.08x / 3.00x | 1.50/1.50 | 7.238 | -3.2579 (-60% of M) | 100% + 0.2118 SOL | +0.2118 (+2.9%) | 0.1265 |
+| C | spike 10x/5s | open | +600s | 1.00x / 1.00x | 3.15/3.15 | 2.413 | -0.0662 (-1% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| C | pool disabled | open | +3600s | 1.00x / 1.00x | 0.00/3.15 | 2.413 | - | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| C | route flagged (Emergency) + gap 2x | open | +3600s | 2.00x / 2.00x | 1.56/1.56 | 4.825 | -2.6209 (-48% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| C | dump -50%, close | close | +3600s | 0.50x / 0.50x | 6.35/6.34 | 1.206 | +1.1926 (+22% of M) | 100% + 0.0008 SOL | +0.0008 (+0.1%) | 0.0000 |
+| C | flat to expiry | expiry | +604801s | 1.00x / 1.00x | 3.11/3.11 | 2.413 | -0.2118 (-4% of M) | 100% + 0.1287 SOL | +0.1287 (+5.3%) | 0.0035 |
+| D@0% | gap 2x | open | +3600s | 2.00x / 2.00x | 2.05/2.05 | 0.867 | -0.4641 (-33% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| D@0% | gap 5x | S1 | +51s | 5.00x / 5.00x | 0.81/0.81 | 2.168 | -1.4029 (-100% of M) | 0% + 1.8080 SOL | -0.3603 (-16.6%) | 0.0284 |
+| D@0% | gap 10x | S1 | +49s | 10.00x / 10.00x | 0.40/0.40 | 4.337 | -1.4029 (-100% of M) | 0% + 1.8080 SOL | -2.5286 (-58.3%) | 0.0284 |
+| D@0% | pump 10x/60s | liquidation | +31s | 3.29x / 10.00x | 1.24/1.53 | 4.337 | -1.1977 (-85% of M) | 100% + 0.0748 SOL | +0.0748 (+1.7%) | 0.0445 |
+| D@0% | pump 10x/10min | liquidation | +230s | 2.42x / 10.00x | 1.69/1.73 | 4.337 | -0.7621 (-54% of M) | 100% + 0.0550 SOL | +0.0550 (+1.3%) | 0.0326 |
+| D@0% | pump 3x/1h | liquidation | +2789s | 2.34x / 3.00x | 1.74/1.75 | 1.301 | -0.7246 (-52% of M) | 100% + 0.0533 SOL | +0.0533 (+4.1%) | 0.0316 |
+| D@0% | spike 10x/5s | open | +600s | 1.00x / 1.00x | 4.12/4.12 | 0.434 | -0.0129 (-1% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| D@0% | dump -50%, close | close | +3600s | 0.50x / 0.50x | 8.27/8.26 | 0.217 | +0.2108 (+15% of M) | 100% + 0.0007 SOL | +0.0007 (+0.3%) | 0.0000 |
+| D@0% | flat to expiry | expiry | +259201s | 1.00x / 1.00x | 4.09/4.09 | 0.434 | -0.0367 (-3% of M) | 100% + 0.0210 SOL | +0.0210 (+4.8%) | 0.0014 |
+| D@50% | gap 2x | open | +3600s | 2.00x / 2.00x | 2.05/2.05 | 1.376 | -0.7361 (-33% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| D@50% | gap 5x | S1 | +51s | 5.00x / 5.00x | 0.81/0.81 | 3.439 | -2.2253 (-100% of M) | 0% + 2.8738 SOL | -0.5657 (-16.4%) | 0.0391 |
+| D@50% | gap 10x | S1 | +50s | 10.00x / 10.00x | 0.39/0.39 | 6.879 | -2.2253 (-100% of M) | 0% + 2.8738 SOL | -4.0051 (-58.2%) | 0.0391 |
+| D@50% | pump 10x/60s | liquidation | +31s | 3.29x / 10.00x | 1.24/1.53 | 6.879 | -1.8999 (-85% of M) | 100% + 0.1186 SOL | +0.1186 (+1.7%) | 0.0705 |
+| D@50% | pump 10x/10min | liquidation | +230s | 2.42x / 10.00x | 1.69/1.73 | 6.879 | -1.2088 (-54% of M) | 100% + 0.0872 SOL | +0.0872 (+1.3%) | 0.0517 |
+| D@50% | pump 3x/1h | liquidation | +2789s | 2.34x / 3.00x | 1.74/1.75 | 2.064 | -1.1494 (-52% of M) | 100% + 0.0845 SOL | +0.0845 (+4.1%) | 0.0501 |
+| D@50% | spike 10x/5s | open | +600s | 1.00x / 1.00x | 4.10/4.10 | 0.688 | -0.0242 (-1% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| D@50% | dump -50%, close | close | +3600s | 0.50x / 0.50x | 8.27/8.26 | 0.344 | +0.3344 (+15% of M) | 100% + 0.0011 SOL | +0.0011 (+0.3%) | 0.0000 |
+| D@50% | flat to expiry | expiry | +259201s | 1.00x / 1.00x | 4.09/4.09 | 0.688 | -0.0577 (-3% of M) | 100% + 0.0334 SOL | +0.0334 (+4.8%) | 0.0017 |
+| D@90% | gap 2x | open | +3600s | 2.00x / 2.00x | 2.03/2.03 | 2.591 | -1.4051 (-34% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| D@90% | gap 5x | S1 | +52s | 5.00x / 5.00x | 0.80/0.80 | 6.477 | -4.1905 (-100% of M) | 0% + 5.4206 SOL | -1.0564 (-16.3%) | 0.0649 |
+| D@90% | gap 10x | S1 | +50s | 10.00x / 10.00x | 0.39/0.39 | 12.954 | -4.1905 (-100% of M) | 0% + 5.4206 SOL | -7.5334 (-58.2%) | 0.0649 |
+| D@90% | pump 10x/60s | liquidation | +31s | 3.29x / 10.00x | 1.23/1.52 | 12.954 | -3.6226 (-87% of M) | 100% + 0.2253 SOL | +0.2253 (+1.7%) | 0.1339 |
+| D@90% | pump 10x/10min | liquidation | +228s | 2.40x / 10.00x | 1.69/1.73 | 12.954 | -2.2762 (-54% of M) | 100% + 0.1642 SOL | +0.1642 (+1.3%) | 0.0973 |
+| D@90% | pump 3x/1h | liquidation | +2764s | 2.32x / 3.00x | 1.74/1.75 | 3.886 | -2.1641 (-52% of M) | 100% + 0.1592 SOL | +0.1592 (+4.1%) | 0.0943 |
+| D@90% | spike 10x/5s | open | +600s | 1.00x / 1.00x | 4.10/4.10 | 1.295 | -0.0456 (-1% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| D@90% | dump -50%, close | close | +3600s | 0.50x / 0.50x | 8.27/8.26 | 0.648 | +0.6298 (+15% of M) | 100% + 0.0021 SOL | +0.0021 (+0.3%) | 0.0000 |
+| D@90% | flat to expiry | expiry | +259201s | 1.00x / 1.00x | 4.09/4.09 | 1.295 | -0.1077 (-3% of M) | 100% + 0.0628 SOL | +0.0628 (+4.8%) | 0.0023 |
+| RA | gap 2x | liquidation | +9s | 2.00x / 2.00x | 1.01/1.12 | 36.937 | -19.3565 (-100% of M) | 100% + 0.2238 SOL | +0.2238 (+0.6%) | 0.1337 |
+| RA | gap 5x | S1 | +47s | 5.00x / 5.00x | 0.40/0.40 | 92.343 | -19.3565 (-100% of M) | 0% + 37.6204 SOL | -54.7227 (-59.3%) | 0.2500 |
+| RA | gap 10x | S1 | +47s | 10.00x / 10.00x | 0.20/0.20 | 184.686 | -19.3565 (-100% of M) | 0% + 37.6204 SOL | -147.0658 (-79.6%) | 0.2500 |
+| RA | pump 10x/60s | S1 | +64s | 10.00x / 10.00x | 0.20/0.22 | 184.686 | -19.3565 (-100% of M) | 0% + 37.6204 SOL | -147.0658 (-79.6%) | 0.2500 |
+| RA | pump 10x/10min | liquidation | +135s | 1.68x / 10.00x | 1.21/1.23 | 184.686 | -14.4417 (-75% of M) | 100% + 0.7854 SOL | +0.7854 (+0.4%) | 0.4707 |
+| RA | pump 3x/1h | liquidation | +1592s | 1.63x / 3.00x | 1.25/1.25 | 55.406 | -13.3916 (-69% of M) | 100% + 0.7610 SOL | +0.7610 (+1.4%) | 0.4558 |
+| RA | spike 10x/5s | open | +600s | 1.00x / 1.00x | 2.03/2.03 | 18.469 | -0.1409 (-1% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| RA | drain all unlocked LP (50%) | open | +600s | 1.00x / 1.00x | 2.01/2.01 | 18.469 | -0.2820 (-1% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| RA | drain 50% + x1.5 | open | +600s | 1.50x / 1.50x | 1.34/1.34 | 27.703 | -9.7754 (-51% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| RA | drain 50% + pump 2x/120s | liquidation | +151s | 1.69x / 2.00x | 1.19/1.23 | 36.937 | -15.0049 (-78% of M) | 100% + 0.7913 SOL | +0.7913 (+2.1%) | 0.4742 |
+| RA | pool disabled | open | +3600s | 1.00x / 1.00x | 0.00/2.03 | 18.469 | - | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| RA | route flagged (Emergency) + gap 2x | liquidation | +10s | 2.00x / 2.00x | 1.01/1.12 | 36.937 | -19.3565 (-100% of M) | 100% + 0.2238 SOL | +0.2238 (+0.6%) | 0.1337 |
+| RA | dump -50%, close | close | +3600s | 0.50x / 0.50x | 4.07/4.06 | 9.234 | +9.2057 (+48% of M) | 100% + 0.0015 SOL | +0.0015 (+0.0%) | 0.0000 |
+| RA | flat to expiry | expiry | +2592001s | 1.00x / 1.00x | 1.99/1.99 | 18.469 | -1.2915 (-7% of M) | 100% + 1.0182 SOL | +1.0182 (+5.5%) | 0.0197 |
+| RB | gap 2x | liquidation | +15s | 2.00x / 2.00x | 1.26/1.31 | 14.778 | -8.6143 (-75% of M) | 100% + 0.5248 SOL | +0.5248 (+3.6%) | 0.3144 |
+| RB | gap 5x | S1 | +48s | 5.00x / 5.00x | 0.50/0.50 | 36.945 | -11.5320 (-100% of M) | 0% + 18.7396 SOL | -18.2049 (-49.3%) | 0.1994 |
+| RB | gap 10x | S1 | +48s | 10.00x / 10.00x | 0.25/0.25 | 73.889 | -11.5320 (-100% of M) | 0% + 18.7396 SOL | -55.1495 (-74.6%) | 0.1994 |
+| RB | pump 10x/60s | S1 | +70s | 10.00x / 10.00x | 0.25/0.26 | 73.889 | -11.5320 (-100% of M) | 0% + 18.7396 SOL | -55.1495 (-74.6%) | 0.1994 |
+| RB | pump 10x/10min | liquidation | +173s | 1.94x / 10.00x | 1.30/1.33 | 73.889 | -8.1502 (-71% of M) | 100% + 0.5095 SOL | +0.5095 (+0.7%) | 0.3052 |
+| RB | pump 3x/1h | liquidation | +2068s | 1.88x / 3.00x | 1.35/1.35 | 22.167 | -7.6461 (-66% of M) | 100% + 0.4936 SOL | +0.4936 (+2.2%) | 0.2954 |
+| RB | spike 10x/5s | open | +600s | 1.00x / 1.00x | 2.54/2.54 | 7.389 | -0.0569 (-0% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| RB | drain all unlocked LP (50%) | open | +600s | 1.00x / 1.00x | 2.52/2.52 | 7.389 | -0.1133 (-1% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| RB | drain 50% + x1.5 | open | +600s | 1.50x / 1.50x | 1.67/1.67 | 11.083 | -3.9115 (-34% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| RB | drain 50% + pump 2x/120s | liquidation | +176s | 1.95x / 2.00x | 1.28/1.33 | 14.778 | -8.4018 (-73% of M) | 100% + 0.5126 SOL | +0.5126 (+3.5%) | 0.3071 |
+| RB | pool disabled | open | +3600s | 1.00x / 1.00x | 0.00/2.54 | 7.389 | - | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| RB | route flagged (Emergency) + gap 2x | liquidation | +16s | 2.00x / 2.00x | 1.26/1.31 | 14.778 | -8.6143 (-75% of M) | 100% + 0.5248 SOL | +0.5248 (+3.6%) | 0.3144 |
+| RB | dump -50%, close | close | +3600s | 0.50x / 0.50x | 5.09/5.08 | 3.694 | +3.6823 (+32% of M) | 100% + 0.0012 SOL | +0.0012 (+0.0%) | 0.0000 |
+| RB | flat to expiry | expiry | +1209601s | 1.00x / 1.00x | 2.50/2.50 | 7.389 | -0.4971 (-4% of M) | 100% + 0.3902 SOL | +0.3902 (+5.3%) | 0.0085 |
+| RC | gap 2x | open | +3600s | 2.00x / 2.00x | 1.52/1.52 | 1.256 | -0.6433 (-49% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| RC | gap 5x | S1 | +48s | 5.00x / 5.00x | 0.60/0.60 | 3.139 | -1.3018 (-100% of M) | 0% + 1.9019 SOL | -1.2374 (-39.4%) | 0.0293 |
+| RC | gap 10x | S1 | +48s | 10.00x / 10.00x | 0.30/0.30 | 6.279 | -1.3018 (-100% of M) | 0% + 1.9019 SOL | -4.3767 (-69.7%) | 0.0293 |
+| RC | pump 10x/60s | liquidation | +27s | 2.82x / 10.00x | 1.07/1.33 | 6.279 | -1.3018 (-100% of M) | 100% + 0.0674 SOL | +0.0674 (+1.1%) | 0.0404 |
+| RC | pump 10x/10min | liquidation | +193s | 2.10x / 10.00x | 1.45/1.48 | 6.279 | -0.8120 (-62% of M) | 100% + 0.0535 SOL | +0.0535 (+0.9%) | 0.0320 |
+| RC | pump 3x/1h | liquidation | +2319s | 2.03x / 3.00x | 1.50/1.50 | 1.884 | -0.7651 (-59% of M) | 100% + 0.0519 SOL | +0.0519 (+2.8%) | 0.0310 |
+| RC | spike 10x/5s | open | +600s | 1.00x / 1.00x | 3.04/3.04 | 0.628 | -0.0049 (-0% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| RC | drain all unlocked LP (50%) | open | +600s | 1.00x / 1.00x | 3.02/3.02 | 0.628 | -0.0097 (-1% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| RC | drain 50% + x1.5 | open | +600s | 1.50x / 1.50x | 2.01/2.01 | 0.942 | -0.3325 (-26% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| RC | drain 50% + pump 2x/120s | open | +900s | 2.00x / 2.00x | 1.50/1.50 | 1.256 | -0.6567 (-51% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| RC | pool disabled | open | +3600s | 1.00x / 1.00x | 0.00/3.04 | 0.628 | - | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| RC | route flagged (Emergency) + gap 2x | open | +3600s | 2.00x / 2.00x | 1.52/1.52 | 1.256 | -0.6433 (-49% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| RC | dump -50%, close | close | +3600s | 0.50x / 0.50x | 6.10/6.10 | 0.314 | +0.3128 (+24% of M) | 100% + 0.0002 SOL | +0.0002 (+0.1%) | 0.0000 |
+| RC | flat to expiry | expiry | +604801s | 1.00x / 1.00x | 3.01/3.01 | 0.628 | -0.0432 (-3% of M) | 100% + 0.0332 SOL | +0.0332 (+5.3%) | 0.0016 |
+
+What changed against v0.3: every genuine outcome is unchanged (the fixed 2 % bound executes at the same second as v0.3's 1 % Dutch start; §12.2), except RA/RC figures that move in the last digit (conservative token reserve and `ert = 0` on Raydium). The 90–98 % drain rows are gone: an adopted pool keeps ≥ 50 % of its LP locked, so "drain all unlocked LP (50 %)" is the realistic worst case, and it liquidates nothing on its own; 50 % drains followed by a pump liquidate normally (RA 1.69×, RB 1.95×; RC stays open at 2×). The Emergency flag leaves every liquidation unchanged (the flag is S3 evidence only, V2-1).
+
+### 11.3 Keeper latency
+
+| keeper latency | market | scenario | outcome | exit vs event | price at exit / terminal | CR spot/EMA at exit | value of Q at terminal price (SOL) | borrower P&L (SOL) | lender gets | lender P&L vs holding at terminal price (SOL, % of Q value) | keeper SOL |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1s | A | gap 5x | S1 | +47s | 5.00x / 5.00x | 0.41/0.41 | 294.004 | -68.1857 (-100% of M) | 0% + 127.4912 SOL | -166.5123 (-56.6%) | 0.2500 |
+| 1s | A | pump 10x/60s | S1 | +65s | 10.00x / 10.00x | 0.20/0.22 | 588.007 | -68.1857 (-100% of M) | 0% + 127.4912 SOL | -460.5158 (-78.3%) | 0.2500 |
+| 1s | C | gap 5x | S1 | +48s | 5.00x / 5.00x | 0.61/0.61 | 12.063 | -5.4491 (-100% of M) | 0% + 7.7963 SOL | -4.2666 (-35.4%) | 0.0889 |
+| 1s | C | pump 10x/60s | liquidation | +28s | 2.93x / 10.00x | 1.06/1.31 | 24.126 | -5.4491 (-100% of M) | 100% + 0.2156 SOL | +0.2156 (+0.9%) | 0.1291 |
+| 1s | D@0% | gap 5x | S1 | +51s | 5.00x / 5.00x | 0.81/0.81 | 2.168 | -1.4029 (-100% of M) | 0% + 1.8080 SOL | -0.3603 (-16.6%) | 0.0284 |
+| 1s | D@0% | pump 10x/60s | liquidation | +31s | 3.29x / 10.00x | 1.24/1.53 | 4.337 | -1.1977 (-85% of M) | 100% + 0.0748 SOL | +0.0748 (+1.7%) | 0.0445 |
+| 1s | RA | gap 5x | S1 | +47s | 5.00x / 5.00x | 0.40/0.40 | 92.343 | -19.3565 (-100% of M) | 0% + 37.6204 SOL | -54.7227 (-59.3%) | 0.2500 |
+| 1s | RA | pump 10x/60s | S1 | +64s | 10.00x / 10.00x | 0.20/0.22 | 184.686 | -19.3565 (-100% of M) | 0% + 37.6204 SOL | -147.0658 (-79.6%) | 0.2500 |
+| 5s | A | gap 5x | S1 | +51s | 5.00x / 5.00x | 0.41/0.41 | 294.004 | -68.1857 (-100% of M) | 0% + 127.4912 SOL | -166.5123 (-56.6%) | 0.2500 |
+| 5s | A | pump 10x/60s | S1 | +66s | 10.00x / 10.00x | 0.20/0.21 | 588.007 | -68.1857 (-100% of M) | 0% + 127.4912 SOL | -460.5158 (-78.3%) | 0.2500 |
+| 5s | C | gap 5x | S1 | +52s | 5.00x / 5.00x | 0.61/0.61 | 12.063 | -5.4491 (-100% of M) | 0% + 7.7963 SOL | -4.2666 (-35.4%) | 0.0889 |
+| 5s | C | pump 10x/60s | S1 | +75s | 10.00x / 10.00x | 0.30/0.30 | 24.126 | -5.4491 (-100% of M) | 0% + 7.7963 SOL | -16.3296 (-67.7%) | 0.0889 |
+| 5s | D@0% | gap 5x | S1 | +53s | 5.00x / 5.00x | 0.81/0.81 | 2.168 | -1.4029 (-100% of M) | 0% + 1.8080 SOL | -0.3603 (-16.6%) | 0.0284 |
+| 5s | D@0% | pump 10x/60s | liquidation | +35s | 3.83x / 10.00x | 1.06/1.31 | 4.337 | -1.4029 (-100% of M) | 100% + 0.0525 SOL | +0.0525 (+1.2%) | 0.0311 |
+| 5s | RA | gap 5x | S1 | +51s | 5.00x / 5.00x | 0.40/0.40 | 92.343 | -19.3565 (-100% of M) | 0% + 37.6204 SOL | -54.7227 (-59.3%) | 0.2500 |
+| 5s | RA | pump 10x/60s | S1 | +65s | 10.00x / 10.00x | 0.20/0.22 | 184.686 | -19.3565 (-100% of M) | 0% + 37.6204 SOL | -147.0658 (-79.6%) | 0.2500 |
+| 30s | A | gap 5x | S1 | +76s | 5.00x / 5.00x | 0.41/0.41 | 294.004 | -68.1857 (-100% of M) | 0% + 127.4912 SOL | -166.5123 (-56.6%) | 0.2500 |
+| 30s | A | pump 10x/60s | S1 | +91s | 10.00x / 10.00x | 0.20/0.20 | 588.007 | -68.1857 (-100% of M) | 0% + 127.4912 SOL | -460.5158 (-78.3%) | 0.2500 |
+| 30s | C | gap 5x | S1 | +77s | 5.00x / 5.00x | 0.61/0.61 | 12.063 | -5.4491 (-100% of M) | 0% + 7.7963 SOL | -4.2666 (-35.4%) | 0.0889 |
+| 30s | C | pump 10x/60s | S1 | +97s | 10.00x / 10.00x | 0.30/0.30 | 24.126 | -5.4491 (-100% of M) | 0% + 7.7963 SOL | -16.3296 (-67.7%) | 0.0889 |
+| 30s | D@0% | gap 5x | S1 | +78s | 5.00x / 5.00x | 0.81/0.81 | 2.168 | -1.4029 (-100% of M) | 0% + 1.8080 SOL | -0.3603 (-16.6%) | 0.0284 |
+| 30s | D@0% | pump 10x/60s | S1 | +100s | 10.00x / 10.00x | 0.40/0.40 | 4.337 | -1.4029 (-100% of M) | 0% + 1.8080 SOL | -2.5286 (-58.3%) | 0.0284 |
+| 30s | RA | gap 5x | S1 | +76s | 5.00x / 5.00x | 0.40/0.40 | 92.343 | -19.3565 (-100% of M) | 0% + 37.6204 SOL | -54.7227 (-59.3%) | 0.2500 |
+| 30s | RA | pump 10x/60s | S1 | +90s | 10.00x / 10.00x | 0.20/0.20 | 184.686 | -19.3565 (-100% of M) | 0% + 37.6204 SOL | -147.0658 (-79.6%) | 0.2500 |
+
+A 5 s keeper already loses Tier C's 10×/60 s liquidation (S1, −68 %); a 30 s keeper loses Tier D's too. The keeper must act within 1–2 s (§5.8).
+
+### 11.4 EMA and exit-bound study
+
+See §5.7.
+
+### 11.5 Loss given gap
+
+| gap | A | B | C | D@0% | D@50% | D@90% | RA |
+|---|---|---|---|---|---|---|---|
+| 1.5x | +0.0% (open) | +0.0% (open) | +0.0% (open) | +0.0% (open) | +0.0% (open) | +0.0% (open) | +0.0% (open) |
+| 1.75x | +2.6% (liqu) | +0.0% (open) | +0.0% (open) | +0.0% (open) | +0.0% (open) | +0.0% (open) | +2.5% (liqu) |
+| 2x | +2.2% (liqu) | +3.7% (liqu) | +0.0% (open) | +0.0% (open) | +0.0% (open) | +0.0% (open) | +0.6% (liqu) |
+| 2.25x | -3.6% (S1) | +3.7% (liqu) | +4.2% (liqu) | +0.0% (open) | +0.0% (open) | +0.0% (open) | -9.5% (S1) |
+| 2.5x | -13.3% (S1) | +1.9% (liqu) | +4.2% (liqu) | +5.2% (liqu) | +5.2% (liqu) | +5.3% (liqu) | -18.5% (S1) |
+| 3x | -27.7% (S1) | -9.7% (S1) | +1.7% (liqu) | +5.2% (liqu) | +5.2% (liqu) | +5.3% (liqu) | -32.1% (S1) |
+| 3.5x | -38.1% (S1) | -22.6% (S1) | -7.7% (S1) | +5.3% (liqu) | +5.3% (liqu) | +5.3% (liqu) | -41.8% (S1) |
+| 4x | -45.8% (S1) | -32.3% (S1) | -19.2% (S1) | +4.2% (S1) | +4.4% (S1) | +4.6% (S1) | -49.1% (S1) |
+| 5x | -56.6% (S1) | -45.8% (S1) | -35.4% (S1) | -16.6% (S1) | -16.4% (S1) | -16.3% (S1) | -59.3% (S1) |
+| 6x | -63.9% (S1) | -54.9% (S1) | -46.1% (S1) | -30.5% (S1) | -30.4% (S1) | -30.3% (S1) | -66.1% (S1) |
+| 8x | -72.9% (S1) | -66.2% (S1) | -59.6% (S1) | -47.9% (S1) | -47.8% (S1) | -47.7% (S1) | -74.5% (S1) |
+| 10x | -78.3% (S1) | -72.9% (S1) | -67.7% (S1) | -58.3% (S1) | -58.2% (S1) | -58.2% (S1) | -79.6% (S1) |
+| 15x | -85.5% (S1) | -81.9% (S1) | -78.5% (S1) | -72.2% (S1) | -72.1% (S1) | -72.1% (S1) | -86.4% (S1) |
+| 20x | -89.2% (S1) | -86.5% (S1) | -83.8% (S1) | -79.2% (S1) | -79.1% (S1) | -79.1% (S1) | -89.8% (S1) |
+| 50x | -95.7% (S1) | -94.6% (S1) | -93.5% (S1) | -91.7% (S1) | -91.6% (S1) | -91.6% (S1) | -95.9% (S1) |
+
+### 11.6 Expected lender loss per tier
+
+| market | T_max | lender income per position (% of notional) | expiry fee share of it | alpha=1.5: E_J / break-even rate | alpha=2: E_J / break-even rate | alpha=3: E_J / break-even rate |
+|---|---|---|---|---|---|---|
+| A | 30 d | 5.49% | 36% | -196.5% / 1 per 1,073 d | -98.0% / 1 per 535 d | -34.2% / 1 per 187 d |
+| B | 14 d | 5.26% | 38% | -169.9% / 1 per 452 d | -76.9% / 1 per 205 d | -21.1% / 1 per 56 d |
+| C | 7 d | 5.26% | 38% | -150.5% / 1 per 200 d | -63.1% / 1 per 84 d | -14.2% / 1 per 19 d |
+| D@0% | 3 d | 4.79% | 42% | -123.6% / 1 per 77 d | -45.4% / 1 per 28 d | -6.6% / 1 per 4 d |
+| D@50% | 3 d | 4.79% | 42% | -123.4% / 1 per 77 d | -45.2% / 1 per 28 d | -6.5% / 1 per 4 d |
+| RA | 30 d | 5.49% | 36% | -204.7% / 1 per 1,118 d | -105.0% / 1 per 574 d | -39.4% / 1 per 215 d |
+
+The 2 % expiry fee is about a third of per-position lender income (column 4; Tier A 36 %) — the lump that R3B-2's just-in-time bundle used to capture and that now vests (§9.4).
+
+| regime | market | assumptions | paths | outcomes | E[lender P&L vs holding] (% of N_open) | P(lender loss > 10% of N_open) | E[borrower P&L] (% of M) |
+|---|---|---|---|---|---|---|---|
+| calm | A | sigma=1.5, up/dn gaps 0.002/d, alpha=2 | 400 | S1 7%, expiry 86%, liquidation 6% | -2.10% +/- 2.14% | 5.0% | -6.4% |
+| calm | B | sigma=2.5, up/dn gaps 0.005/d, alpha=2 | 400 | S1 4%, expiry 89%, liquidation 6% | -0.08% +/- 1.84% | 3.2% | -7.2% |
+| calm | C | sigma=4, up/dn gaps 0.02/d, alpha=2 | 400 | S1 4%, expiry 89%, liquidation 7% | -13.57% +/- 8.62% | 3.8% | -4.5% |
+| calm | D@0% | sigma=6, up/dn gaps 0.05/d, alpha=2 | 400 | S1 2%, expiry 90%, liquidation 8% | -0.70% +/- 3.10% | 2.0% | -5.6% |
+| calm | D@50% | sigma=6, up/dn gaps 0.05/d, alpha=2 | 400 | S1 5%, expiry 86%, liquidation 9% | -3.83% +/- 2.79% | 4.0% | -10.6% |
+| calm | RA | sigma=1.5, up/dn gaps 0.002/d, alpha=2 | 400 | S1 6%, expiry 88%, liquidation 6% | +0.89% +/- 1.02% | 5.5% | -5.1% |
+| stressed | A | sigma=1.5, up/dn gaps 0.02/d, alpha=1.5 | 400 | S1 26%, expiry 62%, liquidation 12% | -71.60% +/- 14.53% | 23.5% | -20.0% |
+| stressed | B | sigma=2.5, up/dn gaps 0.05/d, alpha=1.5 | 400 | S1 24%, expiry 64%, liquidation 12% | -99.63% +/- 19.02% | 21.5% | -23.0% |
+| stressed | C | sigma=4, up/dn gaps 0.2/d, alpha=1.5 | 400 | S1 24%, expiry 55%, liquidation 21% | -121.25% +/- 22.16% | 21.5% | -30.2% |
+| stressed | D@0% | sigma=6, up/dn gaps 1/d, alpha=1.5 | 400 | S1 28%, expiry 40%, liquidation 32% | -188.28% +/- 37.44% | 26.5% | -44.3% |
+| stressed | D@50% | sigma=6, up/dn gaps 1/d, alpha=1.5 | 400 | S1 30%, expiry 39%, liquidation 31% | -155.77% +/- 27.02% | 25.8% | -46.0% |
+| stressed | RA | sigma=1.5, up/dn gaps 0.02/d, alpha=1.5 | 400 | S1 24%, expiry 66%, liquidation 9% | -107.47% +/- 25.84% | 21.5% | -11.8% |
+
+Calm regime: −13.6 % to +0.9 % of `N_open`, every cell within two standard errors of break-even (≈ 5 % of rent and fees against rare gaps); Tier C's mean (−13.6 % ± 8.6 %) is set by a handful of large gaps in 400 paths. Stressed regime: −72 % to −188 %. v0.4 draws each path from its own seeded random stream, so these cells no longer shift when an exit elsewhere moves by a second (v0.3's shared stream did; its figures are not comparable cell by cell). Both regimes are illustrative and uncalibrated; calibrating gap frequencies per tier from indexer data is the top open question before mainnet (§17).
+
+### 11.7 Conclusions
+
+1. **Moves slower than the EMA are handled well** (10× over ≥ 2–3 min): liquidation within seconds of the threshold, lenders get `Q` + rent + half the penalty.
+2. **Short spikes never liquidate**, and an atomic spike cannot move the EMA.
+3. **Gaps larger than the cushion become S1 losses** shared pro-rata by lenders; the keeper must act within 1–2 s for Tier C/D fast pumps.
+4. **Tier A lenders are the most exposed per unit of move** (cushion 1.6×).
+5. **LP drains on adoptable pools do not liquidate** on their own; S2 is unreachable at capped sizes; the D3 cap matters for S3 (flag, fee hike, stuck migration).
+6. **Graduation includes the boost:** positions opened at 80–90 % curve progress are liquidated on the completing buy or by the +45.66 % push that follows, lenders made whole.
+7. **Lender economics** still hinge on uncalibrated gap frequencies (OWNER).
+
+---
+
+## 12. Manipulation and MEV analysis
+
+### 12.1 Attacker models
+
+Every attack script is in `sim/attacks/` and was re-run on v0.4.1; "v0.3" rows come from the frozen model. All costs assume **no arbitrage** (round-trip venue fees only; lower bounds).
+
+- **Atomic (C0-5):** once per second the attacker lands `[pump → crank_price → dump]`; the in-house keeper also observes every second (§5.8). The attacker is also the keeper of the final exit and sandwiches it.
+- **Held (stronger):** the attacker holds the pool at the target price for whole seconds, so every observation of those seconds sees it. On-chain this is indistinguishable from a genuine pump. **It is also the exposure of a market in degraded mode** (§5.8): without an honest observer an atomic bundle alone in its second achieves the held effect at the atomic cost.
+- **Contrary (V1-2):** one observation per second below the EMA or the liquidation price, to freeze `P_ema` or fail the robust-spot leg (§12.9).
+- **Attacker-only second:** a second in which the only observation is the attacker's; the building block of the settlement attacks (§12.10–12.11). **Consecutive** attacker-only seconds (R4A-9) model a censored or absent keeper.
+- **Frozen second (R4B-2, v0.4.1):** a second that holds the honest keeper's observation *and* an attacker observation just beyond `P_ema`; the bucket straddles `P_ema`, so the EMA does not move. After one attacker-only push, frozen seconds keep the pushed EMA in place ("push-then-freeze"); v0.4's box, built on the clamped observations, recorded it, v0.4.1's box on bucket extremes does not.
+- **Widening (v0.4.1 residual):** a contrary observation in every second, frozen or not, which widens one side of the box without moving any decision; it can only defer (§5.6).
+- **Noise (R4B-1):** not an attacker — deterministic per-second price noise of ±0.3 % / ±1 % in the §5.7 battery, so that the live quote and the one-second-old reference differ as they do on a real pool.
+
+### 12.2 Exit sandwich and the fixed bound (`sandwich.py`, `fixed_delta.py`; C0-1, decision 1)
+
+Expiry, atomic model (the held model gives identical numbers because the expiry reference includes the ring minimum):
+
+| market | vault V (SOL) | honest: B / rent / fee / borrower | attacked: B / rent / fee / borrower | held pump before exit | attacker net incl. keeper reward (SOL) | extra over an honest keeper (SOL) | borrower loss (SOL) | lender+protocol loss (SOL) |
+|---|---|---|---|---|---|---|---|---|
+| A | 127.741 | 60.795 / 2.4165 / 1.2159 / 63.264 | 61.353 / 2.4165 / 1.2159 / 62.706 | none | +0.400 | +0.350 | 0.558 | +0.0000 |
+| B | 63.934 | 24.342 / 0.9022 / 0.4868 / 38.177 | 24.566 / 0.9022 / 0.4868 / 37.954 | none | +0.156 | +0.131 | 0.224 | +0.0000 |
+| C | 7.885 | 2.502 / 0.0925 / 0.0500 / 5.237 | 2.525 / 0.0925 / 0.0500 / 5.214 | none | +0.015 | +0.012 | 0.023 | +0.0000 |
+| D@0% | 1.836 | 0.446 / 0.0143 / 0.0089 / 1.366 | 0.450 / 0.0143 / 0.0089 / 1.362 | none | +0.002 | +0.001 | 0.004 | -0.0000 |
+| D@50% | 2.913 | 0.707 / 0.0226 / 0.0141 / 2.168 | 0.713 / 0.0226 / 0.0141 / 2.161 | none | +0.003 | +0.001 | 0.006 | +0.0000 |
+| D@90% | 5.485 | 1.331 / 0.0426 / 0.0266 / 4.083 | 1.343 / 0.0426 / 0.0266 / 4.071 | none | +0.004 | +0.002 | 0.012 | -0.0000 |
+| RA | 37.870 | 18.654 / 0.7590 / 0.3731 / 18.065 | 18.824 / 0.7590 / 0.3731 / 17.895 | none | +0.133 | +0.113 | 0.170 | +0.0000 |
+| RB | 18.939 | 7.463 / 0.2834 / 0.1493 / 11.035 | 7.531 / 0.2834 / 0.1493 / 10.967 | none | +0.054 | +0.045 | 0.068 | +0.0000 |
+| RC | 1.931 | 0.634 / 0.0241 / 0.0127 / 1.259 | 0.640 / 0.0241 / 0.0127 / 1.253 | none | +0.005 | +0.004 | 0.006 | +0.0000 |
+
+Liquidation, atomic model, keeper acts at the first executable second, and after waiting 4 s:
+
+| market | vault V (SOL) | honest: B / rent / penalty / borrower | attacked: B / rent / penalty / borrower | held pump before exit | attacker net incl. keeper reward (SOL) | extra over an honest keeper (SOL) | borrower loss (SOL) | lender+protocol loss (SOL) |
+|---|---|---|---|---|---|---|---|---|
+| A | 127.741 | 103.094 / 0.0035 / 5.1547 / 19.490 | 105.115 / 0.0035 / 5.1547 / 17.468 | none | +3.050 | +1.504 | 2.022 | +0.0000 |
+| B | 63.934 | 47.782 / 0.0028 / 3.3447 / 12.804 | 48.720 / 0.0028 / 3.3447 / 11.866 | none | +1.669 | +0.666 | 0.938 | +0.0000 |
+| C | 7.885 | 5.300 / 0.0006 / 0.4238 / 2.161 | 5.399 / 0.0006 / 0.4238 / 2.062 | none | +0.192 | +0.065 | 0.099 | +0.0000 |
+| D@0% | 1.836 | 1.058 / 0.0008 / 0.1058 / 0.672 | 1.079 / 0.0008 / 0.1058 / 0.651 | none | +0.041 | +0.009 | 0.021 | -0.0000 |
+| D@50% | 2.913 | 1.678 / 0.0013 / 0.1677 / 1.066 | 1.709 / 0.0013 / 0.1677 / 1.035 | none | +0.064 | +0.014 | 0.031 | +0.0000 |
+| D@90% | 5.485 | 3.159 / 0.0024 / 0.3156 / 2.009 | 3.217 / 0.0024 / 0.3156 / 1.950 | none | +0.130 | +0.035 | 0.059 | +0.0000 |
+| RA | 37.870 | 30.566 / 0.0011 / 1.5274 / 5.776 | 31.127 / 0.0011 / 1.5274 / 5.215 | none | +0.873 | +0.415 | 0.561 | +0.0000 |
+| RB | 18.939 | 14.146 / 0.0009 / 0.9896 / 3.802 | 14.406 / 0.0009 / 0.9896 / 3.543 | none | +0.494 | +0.197 | 0.260 | +0.0000 |
+| RC | 1.931 | 1.299 / 0.0001 / 0.1038 / 0.528 | 1.323 / 0.0001 / 0.1038 / 0.505 | none | +0.049 | +0.018 | 0.024 | +0.0000 |
+
+| market | vault V (SOL) | honest: B / rent / penalty / borrower | attacked: B / rent / penalty / borrower | held pump before exit | attacker net incl. keeper reward (SOL) | extra over an honest keeper (SOL) | borrower loss (SOL) | lender+protocol loss (SOL) |
+|---|---|---|---|---|---|---|---|---|
+| A | 127.741 | 103.094 / 0.0035 / 5.1547 / 19.490 | 105.115 / 0.0035 / 5.1553 / 17.467 | none | +3.051 | +1.504 | 2.022 | -0.0004 |
+| B | 63.934 | 47.782 / 0.0028 / 3.3447 / 12.804 | 48.720 / 0.0028 / 3.3451 / 11.866 | none | +1.669 | +0.666 | 0.939 | -0.0003 |
+| C | 7.885 | 5.300 / 0.0006 / 0.4238 / 2.161 | 5.404 / 0.0006 / 0.4241 / 2.056 | none | +0.196 | +0.068 | 0.104 | -0.0002 |
+| D@0% | 1.836 | 1.058 / 0.0008 / 0.1058 / 0.672 | 1.079 / 0.0008 / 0.1058 / 0.651 | none | +0.041 | +0.009 | 0.021 | -0.0000 |
+| D@50% | 2.913 | 1.678 / 0.0013 / 0.1677 / 1.066 | 1.711 / 0.0013 / 0.1678 / 1.033 | none | +0.065 | +0.015 | 0.033 | -0.0001 |
+| D@90% | 5.485 | 3.159 / 0.0024 / 0.3156 / 2.009 | 3.221 / 0.0024 / 0.3159 / 1.947 | none | +0.132 | +0.038 | 0.062 | -0.0002 |
+| RA | 37.870 | 30.566 / 0.0011 / 1.5274 / 5.776 | 31.159 / 0.0011 / 1.5285 / 5.182 | none | +0.897 | +0.439 | 0.594 | -0.0008 |
+| RB | 18.939 | 14.146 / 0.0009 / 0.9896 / 3.802 | 14.421 / 0.0009 / 0.9904 / 3.527 | none | +0.505 | +0.208 | 0.275 | -0.0005 |
+| RC | 1.931 | 1.299 / 0.0001 / 0.1038 / 0.528 | 1.324 / 0.0001 / 0.1039 / 0.503 | none | +0.051 | +0.019 | 0.025 | -0.0001 |
+
+**Result.** The extraction is ≤ 2 % of the reference cost whether or not other keepers act: Tier A +1.50 SOL over an honest keeper (borrower −2.02), lenders never lose. v0.3's Dutch clock allowed +0.71 at the first second but +3.86 after 4 s (borrower −5.11).
+
+**Why a fixed 2 %** (the reviewer's `dutch.py`, `dutch2.py`, `dutch3.py`, `sandwich_fixed.py`, re-run against the v0.3 model with its clock, with a fixed 1 % and 2 %, and against v0.4):
+
+| keeper latency | variant | runs | cells different (outcome, exit price or lender P&L) | of which worse for lenders |
+|---|---|---|---|---|
+| latency 1 s | v0.3 fixed 1 % | 72 | 0 | 0 |
+| latency 1 s | v0.3 fixed 2 % | 72 | 0 | 0 |
+| latency 1 s | v0.4.1 (fixed 2 %) | 72 | 0 | 0 |
+| latency 2 s | v0.3 fixed 1 % | 72 | 0 | 0 |
+| latency 2 s | v0.3 fixed 2 % | 72 | 0 | 0 |
+| latency 2 s | v0.4.1 (fixed 2 %) | 72 | 0 | 0 |
+
+| keeper latency | variant | runs | cells different | of which worse for lenders |
+|---|---|---|---|---|
+| latency 1 s | v0.3 fixed 1 % | 32 | 1 | 1 |
+| latency 1 s | v0.3 fixed 2 % | 32 | 1 | 1 |
+| latency 1 s | v0.4.1 (fixed 2 %) | 32 | 1 | 1 |
+| latency 3 s | v0.3 fixed 1 % | 32 | 0 | 0 |
+| latency 3 s | v0.3 fixed 2 % | 32 | 0 | 0 |
+| latency 3 s | v0.4.1 (fixed 2 %) | 32 | 0 | 0 |
+| latency 5 s | v0.3 fixed 1 % | 32 | 0 | 0 |
+| latency 5 s | v0.3 fixed 2 % | 32 | 0 | 0 |
+| latency 5 s | v0.4.1 (fixed 2 %) | 32 | 0 | 0 |
+
+The one differing near-band cell (latency 1 s, D@0 %, a 3.9× pump over 30 s): the Dutch clock liquidated at +29 s at 3.73× (lenders +4.5 %), every fixed variant at +31 s at 3.90× (lenders +2.2 %) — still whole.
+
+| market | path | v0.3 Dutch 1->5 % | v0.3 fixed 1 % | v0.3 fixed 2 % | v0.4.1 (fixed 2 %) |
+|---|---|---|---|---|---|
+| RA | drain 50 % + 2x/600s | liqu @1.62x, lender +2% | liqu @1.62x, lender +2% | liqu @1.62x, lender +2% | liqu @1.62x, lender +2% |
+| RA | drain 50 % + 2x/120s | liqu @1.69x, lender +2% | S1 @2.00x, lender +2% | liqu @1.69x, lender +2% | liqu @1.69x, lender +2% |
+| RA | drain 50 % + 3x/600s | liqu @1.63x, lender +1% | liqu @1.63x, lender +1% | liqu @1.63x, lender +1% | liqu @1.63x, lender +1% |
+| RB | drain 50 % + 2x/600s | liqu @1.88x, lender +3% | liqu @1.88x, lender +3% | liqu @1.88x, lender +3% | liqu @1.88x, lender +3% |
+| RB | drain 50 % + 2x/120s | liqu @1.95x, lender +4% | liqu @2.00x, lender +4% | liqu @1.95x, lender +4% | liqu @1.95x, lender +4% |
+| RB | drain 50 % + 3x/600s | liqu @1.89x, lender +2% | S1 @2.69x, lender -16% | liqu @1.89x, lender +2% | liqu @1.89x, lender +2% |
+| RC | drain 50 % + 2x/600s | open @2.00x, lender +0% | open @2.00x, lender +0% | open @2.00x, lender +0% | open @2.00x, lender +0% |
+| RC | drain 50 % + 2x/120s | open @2.00x, lender +0% | open @2.00x, lender +0% | open @2.00x, lender +0% | open @2.00x, lender +0% |
+| RC | drain 50 % + 3x/600s | liqu @2.04x, lender +3% | S1 @3.00x, lender +1% | liqu @2.04x, lender +3% | liqu @2.04x, lender +3% |
+
+| variant | keeper waits | A | B | C | D@0% | RA | RB | RC |
+|---|---|---|---|---|---|---|---|---|
+| v0.3 Dutch 1->5 % | 0 s | +0.706 / 0.950 | +0.313 / 0.441 | +0.032 / 0.049 | +0.004 / 0.010 | +0.206 / 0.279 | +0.098 / 0.129 | +0.009 / 0.012 |
+| v0.3 Dutch 1->5 % | 4 s | +3.855 / 5.111 | +1.689 / 2.372 | +0.174 / 0.264 | +0.024 / 0.052 | +1.142 / 1.532 | +0.541 / 0.710 | +0.050 / 0.065 |
+| v0.3 fixed 1 % | 0 s | +0.706 / 0.950 | +0.313 / 0.441 | +0.032 / 0.049 | +0.004 / 0.010 | +0.206 / 0.279 | +0.098 / 0.129 | +0.009 / 0.012 |
+| v0.3 fixed 1 % | 4 s | +0.706 / 0.951 | +0.313 / 0.441 | +0.032 / 0.049 | +0.004 / 0.010 | +0.206 / 0.280 | +0.098 / 0.130 | +0.009 / 0.012 |
+| v0.3 fixed 2 % | 0 s | +1.504 / 2.022 | +0.666 / 0.938 | +0.065 / 0.099 | +0.009 / 0.021 | +0.415 / 0.561 | +0.197 / 0.260 | +0.018 / 0.024 |
+| v0.3 fixed 2 % | 4 s | +1.504 / 2.022 | +0.666 / 0.939 | +0.068 / 0.104 | +0.009 / 0.021 | +0.439 / 0.594 | +0.208 / 0.275 | +0.019 / 0.025 |
+| v0.4.1 (fixed 2 %) | 0 s | +1.504 / 2.022 | +0.666 / 0.938 | +0.065 / 0.099 | +0.009 / 0.021 | +0.415 / 0.561 | +0.197 / 0.260 | +0.018 / 0.024 |
+| v0.4.1 (fixed 2 %) | 4 s | +1.504 / 2.022 | +0.666 / 0.939 | +0.068 / 0.104 | +0.009 / 0.021 | +0.439 / 0.594 | +0.208 / 0.275 | +0.019 / 0.025 |
+
+A fixed 1 % turns three drain-then-pump liquidations into S1 (RB −16 %), so 2 % is the compiled minimum; 2 % and the Dutch clock agree in every liveness cell.
+
+### 12.3 Near-threshold EMA push (`ema_near.py`, C0-5)
+
+Atomic model — the EMA cannot be moved:
+
+| market | honest price rise (EMA caught up) | CR_ema before (x L) | best push (x price, seconds) | push cost (SOL) | final sandwich + keeper (SOL) | attacker net (SOL) | borrower left (SOL) |
+|---|---|---|---|---|---|---|---|
+| A | x1.30 | 1.289 | not reached within 30 s | | | | |
+| A | x1.40 | 1.195 | not reached within 30 s | | | | |
+| A | x1.50 | 1.114 | not reached within 30 s | | | | |
+| A | x1.55 | 1.078 | not reached within 30 s | | | | |
+| C | x1.56 | 1.338 | not reached within 30 s | | | | |
+| C | x1.68 | 1.241 | not reached within 30 s | | | | |
+| C | x1.80 | 1.157 | not reached within 30 s | | | | |
+| C | x1.86 | 1.119 | not reached within 30 s | | | | |
+| D@0% | x1.82 | 1.287 | not reached within 30 s | | | | |
+| D@0% | x1.96 | 1.194 | not reached within 30 s | | | | |
+| D@0% | x2.10 | 1.113 | not reached within 30 s | | | | |
+| D@0% | x2.17 | 1.077 | not reached within 30 s | | | | |
+| RA | x1.30 | 1.248 | not reached within 30 s | | | | |
+| RA | x1.40 | 1.158 | not reached within 30 s | | | | |
+| RA | x1.50 | 1.080 | not reached within 30 s | | | | |
+| RA | x1.55 | 1.045 | not reached within 30 s | | | | |
+| RC | x1.56 | 1.298 | not reached within 30 s | | | | |
+| RC | x1.68 | 1.205 | not reached within 30 s | | | | |
+| RC | x1.80 | 1.124 | not reached within 30 s | | | | |
+| RC | x1.86 | 1.088 | not reached within 30 s | | | | |
+
+Held model:
+
+| market | honest price rise (EMA caught up) | CR_ema before (x L) | best push (x price, seconds) | push cost (SOL) | final sandwich + keeper (SOL) | attacker net (SOL) | borrower left (SOL) |
+|---|---|---|---|---|---|---|---|
+| A | x1.30 | 1.289 | x1.5, 8 s | 77.851 | +33.963 | -43.888 | 0.000 |
+| A | x1.40 | 1.195 | x1.5, 6 s | 60.679 | +31.597 | -29.082 | 0.000 |
+| A | x1.50 | 1.114 | x1.3, 6 s | 39.456 | +25.147 | -14.310 | 0.000 |
+| A | x1.55 | 1.078 | x1.3, 5 s | 32.390 | +25.045 | -7.345 | 0.000 |
+| C | x1.56 | 1.338 | x1.75, 7 s | 6.485 | +2.403 | -4.082 | 0.043 |
+| C | x1.68 | 1.241 | x1.5, 7 s | 4.807 | +1.752 | -3.055 | 0.717 |
+| C | x1.80 | 1.157 | x1.3, 7 s | 3.118 | +1.167 | -1.951 | 1.289 |
+| C | x1.86 | 1.119 | x1.3, 6 s | 2.719 | +1.247 | -1.471 | 1.036 |
+| D@0% | x1.82 | 1.287 | x1.5, 8 s | 1.792 | +0.239 | -1.554 | 0.437 |
+| D@0% | x1.96 | 1.194 | x1.5, 6 s | 1.395 | +0.271 | -1.124 | 0.320 |
+| D@0% | x2.10 | 1.113 | x1.2, 8 s | 0.818 | +0.133 | -0.685 | 0.557 |
+| D@0% | x2.17 | 1.077 | x1.15, 7 s | 0.552 | +0.114 | -0.438 | 0.570 |
+| RA | x1.30 | 1.248 | x1.5, 7 s | 18.385 | +10.362 | -8.023 | 0.000 |
+| RA | x1.40 | 1.158 | x1.3, 8 s | 14.504 | +7.305 | -7.200 | 1.036 |
+| RA | x1.50 | 1.080 | x1.3, 5 s | 9.407 | +7.428 | -1.979 | 0.000 |
+| RA | x1.55 | 1.045 | x1.15, 5 s | 5.224 | +4.567 | -0.657 | 1.817 |
+| RC | x1.56 | 1.298 | x2, 5 s | 0.798 | +0.753 | -0.045 | 0.000 |
+| RC | x1.68 | 1.205 | x1.75, 5 s | 0.685 | +0.691 | +0.006 | 0.000 |
+| RC | x1.80 | 1.124 | x1.75, 4 s | 0.567 | +0.626 | +0.059 | 0.000 |
+| RC | x1.86 | 1.088 | x1.5, 5 s | 0.537 | +0.579 | +0.042 | 0.000 |
+
+**Result:** unprofitable under the atomic model; held model at most **+0.06 SOL** (RC near 1.12·L); on PumpSwap, the curve and the deep Raydium example every row loses money.
+
+### 12.4 Fresh position (`ema_atomic.py`)
+
+| market | margin M (SOL) | best push (x true price, seconds) | push cost (SOL) | final sandwich + keeper (SOL) | attacker net (SOL) | borrower loss (SOL) |
+|---|---|---|---|---|---|---|
+| A | 68.034 | not liquidatable within 60 s at any push level | | | | |
+| B | 40.075 | not liquidatable within 60 s at any push level | | | | |
+| C | 5.443 | not liquidatable within 60 s at any push level | | | | |
+| D@0% | 1.402 | not liquidatable within 60 s at any push level | | | | |
+| D@50% | 2.223 | not liquidatable within 60 s at any push level | | | | |
+| D@90% | 4.187 | not liquidatable within 60 s at any push level | | | | |
+| RA | 19.310 | not liquidatable within 60 s at any push level | | | | |
+| RB | 11.513 | not liquidatable within 60 s at any push level | | | | |
+| RC | 1.300 | not liquidatable within 60 s at any push level | | | | |
+
+| market | margin M (SOL) | best push (x true price, seconds) | push cost (SOL) | final sandwich + keeper (SOL) | attacker net (SOL) | borrower loss (SOL) |
+|---|---|---|---|---|---|---|
+| A | 68.034 | x2.5, 7 s | 146.326 | +48.454 | -97.873 | 68.034 |
+| B | 40.075 | x2.5, 9 s | 95.580 | +27.114 | -68.465 | 40.075 |
+| C | 5.443 | x3, 9 s | 14.926 | +3.458 | -11.468 | 5.443 |
+| D@0% | 1.402 | x3, 11 s | 5.951 | +0.413 | -5.538 | 1.112 |
+| D@50% | 2.223 | x3, 11 s | 9.439 | +0.655 | -8.785 | 1.764 |
+| D@90% | 4.187 | not liquidatable within 60 s at any push level | | | | |
+| RA | 19.310 | x2.5, 7 s | 33.110 | +14.879 | -18.231 | 19.310 |
+| RB | 11.513 | x2.5, 9 s | 17.215 | +9.264 | -7.952 | 11.513 |
+| RC | 1.300 | x3, 9 s | 1.705 | +1.067 | -0.637 | 1.300 |
+
+**Result:** unprofitable in every tier.
+
+### 12.5 OI-cap basket and S1 forcing (`ema_atomic_multi.py`)
+
+Positions below the 0.1 SOL minimum notional are no longer opened (v0.3 counted dust slivers: "14 positions" were 5 real ones). (a) A keeper forces and sandwiches liquidations of the whole OI-cap basket:
+
+| market | positions / total margin (SOL) | best push | seconds | push cost (SOL) | in-tx round trips incl. sandwiches (SOL) | keeper shares (SOL) | S1/S2 windfall to lenders (SOL) | liquidated / SOL-settled | attacker net (SOL) | borrower margin lost (SOL) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| A | | no exit forced within 120 s at any push level | | | | | | 0 / 0 | | |
+| B | | no exit forced within 120 s at any push level | | | | | | 0 / 0 | | |
+| C | | no exit forced within 120 s at any push level | | | | | | 0 / 0 | | |
+| D@0% | | no exit forced within 120 s at any push level | | | | | | 0 / 0 | | |
+| D@50% | | no exit forced within 120 s at any push level | | | | | | 0 / 0 | | |
+| RA | | no exit forced within 120 s at any push level | | | | | | 0 / 0 | | |
+| RB | | no exit forced within 120 s at any push level | | | | | | 0 / 0 | | |
+| RC | | no exit forced within 120 s at any push level | | | | | | 0 / 0 | | |
+
+| market | positions / total margin (SOL) | best push | seconds | push cost (SOL) | in-tx round trips incl. sandwiches (SOL) | keeper shares (SOL) | S1/S2 windfall to lenders (SOL) | liquidated / SOL-settled | attacker net (SOL) | borrower margin lost (SOL) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| A | 5 / 223.62 | x2.50 | 9 | 189.11 | +135.02 | 5.14 | +0.00 | 4 / 0 | -48.96 | 190.17 |
+| B | 5 / 145.20 | x3.00 | 9 | 115.94 | +89.95 | 2.97 | +0.00 | 3 / 0 | -23.03 | 112.44 |
+| C | 5 / 21.89 | x3.00 | 11 | 17.40 | +0.88 | 0.14 | +0.00 | 2 / 0 | -16.37 | 3.64 |
+| D@0% | | no exit forced within 120 s at any push level | | | | | | 0 / 0 | | |
+| D@50% | | no exit forced within 120 s at any push level | | | | | | 0 / 0 | | |
+| RA | 4 / 49.99 | x2.50 | 7 | 32.73 | +34.59 | 1.30 | +0.00 | 4 / 0 | +3.15 | 43.05 |
+| RB | 3 / 29.59 | x2.50 | 9 | 17.02 | +24.81 | 0.72 | +0.00 | 3 / 0 | +8.51 | 29.51 |
+| RC | 3 / 3.34 | x3.00 | 9 | 1.69 | +2.11 | 0.09 | +0.00 | 3 / 0 | +0.52 | 2.63 |
+
+(b) A lender owning 100 % of the pool forces SOL settlement (the largest payoff: vault minus the value of the debt):
+
+| market | positions / total margin (SOL) | best push | seconds | push cost (SOL) | in-tx round trips incl. sandwiches (SOL) | keeper shares (SOL) | S1/S2 windfall to lenders (SOL) | liquidated / SOL-settled | attacker net (SOL) | borrower margin lost (SOL) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| A | | no exit forced within 120 s at any push level | | | | | | 0 / 0 | | |
+| B | | no exit forced within 120 s at any push level | | | | | | 0 / 0 | | |
+| C | | no exit forced within 120 s at any push level | | | | | | 0 / 0 | | |
+| D@0% | | no exit forced within 120 s at any push level | | | | | | 0 / 0 | | |
+| D@50% | | no exit forced within 120 s at any push level | | | | | | 0 / 0 | | |
+| RA | | no exit forced within 120 s at any push level | | | | | | 0 / 0 | | |
+| RB | | no exit forced within 120 s at any push level | | | | | | 0 / 0 | | |
+| RC | | no exit forced within 120 s at any push level | | | | | | 0 / 0 | | |
+
+| market | positions / total margin (SOL) | best push | seconds | push cost (SOL) | in-tx round trips incl. sandwiches (SOL) | keeper shares (SOL) | S1/S2 windfall to lenders (SOL) | liquidated / SOL-settled | attacker net (SOL) | borrower margin lost (SOL) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| A | 5 / 223.62 | x2.20 | 31 | 551.11 | +128.68 | 5.02 | +0.00 | 3 / 0 | -417.41 | 206.45 |
+| B | 5 / 145.20 | x3.25 | 53 | 723.63 | -568.32 | 1.03 | +149.83 | 0 / 5 | -1141.09 | 145.20 |
+| C | 5 / 21.89 | x3.90 | 55 | 112.36 | -87.71 | 0.36 | +22.23 | 0 / 5 | -177.49 | 21.89 |
+| D@0% | 4 / 4.68 | x4.40 | 58 | 45.50 | -32.16 | 0.01 | +0.36 | 0 / 1 | -77.29 | 0.38 |
+| D@50% | 4 / 7.42 | x4.40 | 62 | 77.15 | -53.51 | 0.14 | +7.36 | 0 / 4 | -123.16 | 7.42 |
+| RA | 4 / 49.99 | x2.20 | 53 | 215.17 | -173.95 | 0.73 | +50.03 | 0 / 4 | -338.35 | 49.99 |
+| RB | 3 / 29.59 | x2.75 | 54 | 111.29 | -84.54 | 0.51 | +29.38 | 0 / 3 | -165.94 | 29.59 |
+| RC | 3 / 3.34 | x3.30 | 55 | 11.20 | -8.39 | 0.08 | +3.28 | 0 / 3 | -16.23 | 3.34 |
+
+**Result:** S1 forcing is unprofitable everywhere (40-update persistence on the settlement box costs more than the windfall). Basket liquidation is unprofitable on PumpSwap and the curve; on 25 bps Raydium pools it is marginally profitable (§6.1, §12.6). Honest cascades on a full basket end like isolated positions, at most 1 s later (`cascade.py`):
+
+| market | path | positions | basket outcomes | isolated outcomes | largest delay of a basket exit vs isolation (s) |
+|---|---|---|---|---|---|
+| A | gap 1.8x | 5 | {'liquidation': 1} | {'open': 4, 'liquidation': 1} | 0 |
+| A | pump 2x/60s | 5 | {'liquidation': 5} | {'liquidation': 5} | 1 |
+| A | pump 3x/10min | 5 | {'liquidation': 5} | {'liquidation': 5} | 1 |
+| A | pump 10x/10min | 5 | {'liquidation': 5} | {'liquidation': 5} | 1 |
+| RA | gap 1.8x | 4 | {'liquidation': 4} | {'liquidation': 4} | 1 |
+| RA | pump 2x/60s | 4 | {'liquidation': 4} | {'liquidation': 4} | 1 |
+| RA | pump 3x/10min | 4 | {'liquidation': 4} | {'liquidation': 4} | 0 |
+| RA | pump 10x/10min | 4 | {'liquidation': 4} | {'liquidation': 4} | 1 |
+| C | gap 1.8x | 5 | {} | {'open': 5} | 0 |
+| C | pump 2x/60s | 5 | {} | {'open': 5} | 0 |
+| C | pump 3x/10min | 5 | {'liquidation': 5} | {'liquidation': 5} | 1 |
+| C | pump 10x/10min | 5 | {'liquidation': 5} | {'liquidation': 5} | 1 |
+
+### 12.6 Residual risk under the held model (and in degraded mode)
+
+Liquidation, held model (the attacker holds the pool for 1–3 s at +2.5–30 % before sandwiching an exit that is already due; v0.4.1: a liquidation reserves nothing in its bound, §8.2):
+
+| market | vault V (SOL) | honest: B / rent / penalty / borrower | attacked: B / rent / penalty / borrower | held pump before exit | attacker net incl. keeper reward (SOL) | extra over an honest keeper (SOL) | borrower loss (SOL) | lender+protocol loss (SOL) |
+|---|---|---|---|---|---|---|---|---|
+| A | 127.741 | 103.094 / 0.0035 / 5.1547 / 19.490 | 125.522 / 0.0035 / 2.2161 / 0.000 | 3 s at +15.0% | +7.202 | +5.655 | 19.490 | +2.0570 |
+| B | 63.934 | 47.782 / 0.0028 / 3.3447 / 12.804 | 61.478 / 0.0028 / 2.4531 / 0.000 | 3 s at +20.0% | +2.941 | +1.938 | 12.804 | +0.6242 |
+| C | 7.885 | 5.300 / 0.0006 / 0.4238 / 2.161 | 7.612 / 0.0006 / 0.2728 / 0.000 | 3 s at +30.0% | +0.207 | +0.079 | 2.161 | +0.1057 |
+| D@0% | 1.836 | 1.058 / 0.0008 / 0.1058 / 0.672 | 1.079 / 0.0008 / 0.1058 / 0.651 | none | +0.041 | +0.009 | 0.021 | -0.0000 |
+| D@50% | 2.913 | 1.678 / 0.0013 / 0.1677 / 1.066 | 1.709 / 0.0013 / 0.1677 / 1.035 | none | +0.064 | +0.014 | 0.031 | +0.0000 |
+| D@90% | 5.485 | 3.159 / 0.0024 / 0.3156 / 2.009 | 3.217 / 0.0024 / 0.3156 / 1.950 | none | +0.130 | +0.035 | 0.059 | +0.0000 |
+| RA | 37.870 | 30.566 / 0.0011 / 1.5274 / 5.776 | 37.156 / 0.0011 / 0.7135 / 0.000 | 3 s at +15.0% | +1.981 | +1.523 | 5.776 | +0.5697 |
+| RB | 18.939 | 14.146 / 0.0009 / 0.9896 / 3.802 | 18.156 / 0.0009 / 0.7823 / 0.000 | 3 s at +20.0% | +1.556 | +1.259 | 3.802 | +0.1451 |
+| RC | 1.931 | 1.299 / 0.0001 / 0.1038 / 0.528 | 1.857 / 0.0001 / 0.0736 / 0.000 | 3 s at +30.0% | +0.243 | +0.212 | 0.528 | +0.0212 |
+
+**Result.** The held attacker raises the reference with its held seconds and then buys the vault down to `V − K_s − ert`: it takes the whole remainder of the borrower being liquidated (Tier A +5.66 SOL over an honest keeper, borrower −19.49 SOL), and lenders and protocol lose the part of the penalty the vault no longer covers (Tier A −2.06 SOL; penalty 5.15 → 2.22 SOL). v0.4's penalty reserve prevented that on these fresh positions, but it blocked honest liquidations in genuine fast pumps (§8.2) and did not hold on aged ones; v0.3's Dutch clock reached the same point more slowly. How the three reserve rules compare, on fresh positions and on positions aged at 90 % utilisation whose rent due is far above `K_s` (`sandwich.py`, last section; loss positive = lenders and protocol lose):
+
+| market | position | rule | rent due / K_s (SOL) | lender+protocol loss vs honest (SOL) | attacker extra over an honest keeper (SOL) | borrower loss (SOL) |
+|---|---|---|---|---|---|---|
+| A | fresh (1 h), 80 % | none (v0.4.1) | 0.004 / 0.250 | +2.057 | +5.655 | 19.490 |
+| A | fresh (1 h), 80 % | rent | 0.004 / 0.250 | +2.057 | +5.655 | 19.490 |
+| A | fresh (1 h), 80 % | rent+penalty | 0.004 / 0.250 | -0.458 | +4.608 | 16.034 |
+| A | aged 25 d, 90 % | none (v0.4.1) | 6.043 / 0.250 | +8.016 | +6.176 | 18.603 |
+| A | aged 25 d, 90 % | rent | 6.043 / 0.250 | +1.924 | +4.639 | 18.603 |
+| A | aged 25 d, 90 % | rent+penalty | 6.043 / 0.250 | +5.719 | +4.369 | 18.603 |
+| B | fresh (1 h), 80 % | none (v0.4.1) | 0.003 / 0.250 | +0.624 | +1.938 | 12.804 |
+| B | fresh (1 h), 80 % | rent | 0.003 / 0.250 | +0.624 | +1.938 | 12.804 |
+| B | fresh (1 h), 80 % | rent+penalty | 0.003 / 0.250 | -0.457 | +1.893 | 11.063 |
+| B | aged 12 d, 90 % | none (v0.4.1) | 1.935 / 0.250 | -0.445 | +1.704 | 10.729 |
+| B | aged 12 d, 90 % | rent | 1.935 / 0.250 | -0.445 | +1.704 | 10.729 |
+| B | aged 12 d, 90 % | rent+penalty | 1.935 / 0.250 | -0.445 | +1.704 | 10.729 |
+| RA | fresh (1 h), 80 % | none (v0.4.1) | 0.001 / 0.250 | +0.570 | +1.523 | 5.776 |
+| RA | fresh (1 h), 80 % | rent | 0.001 / 0.250 | +0.570 | +1.523 | 5.776 |
+| RA | fresh (1 h), 80 % | rent+penalty | 0.001 / 0.250 | -0.135 | +1.264 | 4.719 |
+| RA | aged 25 d, 90 % | none (v0.4.1) | 1.898 / 0.250 | +2.272 | +1.715 | 5.512 |
+| RA | aged 25 d, 90 % | rent | 1.898 / 0.250 | +0.519 | +1.334 | 5.512 |
+| RA | aged 25 d, 90 % | rent+penalty | 1.898 / 0.250 | +1.603 | +1.175 | 5.512 |
+
+On fresh positions no reserve and the rent-only reserve are identical (rent due is ≈ 0). On aged Tier A and RA positions the rent-only reserve keeps the rent out of the attacker's reach (−1.92 instead of −8.02 SOL on A) — at the price of the dead band that costs honest lenders a whole position in a genuine fast pump (§8.2). The held model needs the attacker to own whole seconds with nobody trading against the pool: a degraded-mode exposure (§5.8), not a genuine-market one; v0.4.1 chooses liveness in genuine markets. Owner item O19 lists it.
+
+| Residual | Size (capped positions, no arbitrage) | Why it remains | Levers |
+|---|---|---|---|
+| Keeper takes part of the remainder of a borrower being liquidated | Tier A +5.66 SOL over an honest keeper (borrower −19.5, all of it); B +1.94 (−12.8); RA +1.52 (−5.8); RB, RC take the whole remainder (3.8, 0.53 SOL); C/D ≤ 0.08 | a price held for 3 s at +10–30 % opens the sustained-growth cap κ exactly like a genuine trend; the fixed 2 % then applies to that reference | lower `κ_max` (costs Tier C/D liveness, §5.7); competitive keepers; real arbitrage |
+| Lenders + protocol lose penalty (and, on aged positions, rent) the bought-down vault no longer covers | Tier A −2.06 SOL, B −0.62, RA −0.57 (fresh); Tier A −8.02 SOL, RA −2.27 aged 25 d at 90 % | a liquidation reserves nothing (v0.4.1, §8.2): any reserve blocks honest liquidations in fast pumps | the rent-only reserve (−1.92 SOL aged A; one extra S1 in 1,655 battery runs) — an owner choice, O19 |
+| Near-threshold push | ≤ +0.06 SOL (RC) | the push needed is small | as above |
+| Raydium basket liquidation | RA +3.15, RB +8.51, RC +0.52 SOL at the OI cap | 25 bps makes held seconds cheap | `fee_oi_cap_x100` = 500 (§6.1); the 25 SOL beta cap bounds it |
+| Borrower's paid veto (V1-2) | Tier A 0.35 SOL/s at the threshold, ≈ 4.6× that 5 % further (§12.9) | one contrary observation per second | cost grows with the move; disclose |
+| Settlement amount push (V2-9) | ≤ `fv_dev_bps` of the take either way (§12.11) | the box lets a settlement through once within 1 % | tighter `fv_dev_bps` slows S2/S3 in trends |
+| Settlement deferral | ≈ 13 s per attacker-only second (§12.11); indefinitely while a contrary observation is paid every second: 0.002 SOL/s (RC) to 0.21 SOL/s (A) for an S3 on an executable venue (v0.4.1, §5.6) | a pushed EMA, or a widened side of the box, makes the corners disagree | keeper duty 2; an executable venue still allows a normal expiry or liquidation |
+| Consecutive attacker-only seconds (degraded mode) | 5 in a row flip a capped S2 into S1 on the drained-RA model cases: +2.37 to +5.58 SOL for 1.1–2.0 SOL (R4A-9) | 5 of the ring's 8 entries move a median | keeper duties 1–2; degraded mode pauses opens (§5.8) |
+| Censoring the keeper's observations | not modelled | the attacker must fill the market account's write-lock budget every slot (ARCH §6.6) | priority fees, bundles |
+
+Every held-model attack needs the manipulated price to sit on the pool for whole seconds, including slot boundaries, while every other trader can sell into it. On deep pools that is expensive in practice; the numbers are the no-arbitrage bound — and the per-market exposure in degraded mode.
+
+### 12.7 Lender pool (`pool_edge.py`, C0-6, C0-9, C0-13)
+
+```text
+--- (a) share/asset ratio after full SOL settlement (pump token: 1e15 raw supply) ---
+before settle: T=0 B=90000000000000 S=9.000e+16 epoch=0
+after settle : T=0 B=0 S=0.000e+00 epoch=1 (old lender pending 49999999999 lamports)
+new deposit 1e14 raw -> minted 1.000e+17 shares; S=1.000e+17 (u128 max 3.403e+38)
+credit 1,000 SOL -> acc delta = 10000000000000 WAD-units/share; new lender pending = 1000000000000 lamports
+second wipe: next deposit would mint 1.000e+17 shares -> exceeds u128: False (epochs rolled 2)
+
+--- (b) exited lender with a negative SOL balance ---
+A claimed 500000000000, A pending now 4727397259, A shares left 666666666666677, A tokens withdrawn 250000000000
+A exits with pending >= 0
+B pending before claim 498649315068, B claims 498649315068, sol_vault left 4727397261, receivable 0
+
+--- (b2) a lender whose pending turns negative cannot withdraw until it covers ---
+C pending after shortfall: -688500000
+C withdraw blocked: negative SOL balance: cover it first
+after cover: C withdraws 4500000000000 tokens
+
+--- (c) withdraw-then-settle run (two equal lenders, 90 % util, S1 pays 50 % of token value) ---
+v0.1 first come, first served    runner withdrew 200000000000; runner 599999999999 (+9.1% vs fair), other 500000000000 (-9.1%)
+v0.4.1 pro-rata + lock           runner withdrew 100000000000; runner 573684210526 (+4.3% vs fair), other 526315789473 (-4.3%)
+```
+
+### 12.8 Creator fees on short.win volume (R1, C0-18)
+
+The coin creator earns the venue's creator fee on every short.win leg: 30 bps per leg on the curve; on canonical PumpSwap pools 30 bps below 420 SOL market cap, **95 bps** in the 420–1,470 SOL tier (where fresh graduates sit) and falling to 5 bps at the top. A position that opens and closes pays the creator ≈ 2 × creator bps of notional (0.6 % on the curve, 1.9 % on a fresh graduate). The R1 disclosure and the market page show it.
+
+### 12.9 Blocking the spot leg (`block_spot.py`, V1-1, V1-2)
+
+**(a) Offensive use (V1-1).** One atomic `[sell → crank → buy back]` per second fails the robust-spot leg for every keeper; v0.2/v0.3 let δ ramp while nobody could act. With a fixed δ the block cannot widen the bound:
+
+| market | w (s) | exit bound | block cost (SOL) | first executable second after the block | sandwich + keeper share (SOL) | extra over an honest keeper (SOL) | borrower remainder honest -> attacked (SOL) | delta at the exit | lenders + protocol honest -> attacked (SOL) |
+|---|---|---|---|---|---|---|---|---|---|
+| A | 1 | v0.2 Dutch clock (EMA-leg run) | 0.295 | +1 s | +1.692 | -0.150 | 19.490 -> 19.315 | 0.99% | 3.6118 -> 3.5869 |
+| A | 1 | v0.3 Dutch clock (executable seconds) | 0.295 | +1 s | +1.692 | -0.150 | 19.490 -> 19.315 | 0.99% | 3.6118 -> 3.5869 |
+| A | 1 | v0.4.1 fixed delta 2 % | 0.295 | +1 s | +2.480 | +0.638 | 19.490 -> 18.255 | 1.99% | 3.6118 -> 3.5869 |
+| A | 4 | v0.2 Dutch clock (EMA-leg run) | 1.332 | +1 s | +3.861 | +0.982 | 19.490 -> 16.089 | 3.99% | 3.6118 -> 3.5887 |
+| A | 4 | v0.3 Dutch clock (executable seconds) | 1.332 | +1 s | +1.537 | -1.342 | 19.490 -> 19.208 | 0.99% | 3.6118 -> 3.5887 |
+| A | 4 | v0.4.1 fixed delta 2 % | 1.332 | +1 s | +2.325 | -0.554 | 19.490 -> 18.148 | 1.99% | 3.6118 -> 3.5887 |
+| A | 8 | v0.2 Dutch clock (EMA-leg run) | 3.070 | +1 s | +4.401 | -0.215 | 19.490 -> 14.986 | 4.99% | 3.6118 -> 3.5912 |
+| A | 8 | v0.3 Dutch clock (executable seconds) | 3.070 | +3 s | +2.356 | -2.261 | 19.490 -> 17.426 | 0.99% | 3.6118 -> 3.6477 |
+| A | 8 | v0.4.1 fixed delta 2 % | 3.070 | +1 s | +2.011 | -2.605 | 19.490 -> 18.147 | 1.99% | 3.6118 -> 3.5912 |
+| B | 1 | v0.2 Dutch clock (EMA-leg run) | 0.160 | +1 s | +1.066 | -0.098 | 12.804 -> 12.730 | 0.99% | 2.3441 -> 2.3280 |
+| B | 1 | v0.3 Dutch clock (executable seconds) | 0.160 | +1 s | +1.066 | -0.098 | 12.804 -> 12.730 | 0.99% | 2.3441 -> 2.3280 |
+| B | 1 | v0.4.1 fixed delta 2 % | 0.160 | +1 s | +1.414 | +0.251 | 12.804 -> 12.238 | 1.99% | 2.3441 -> 2.3280 |
+| B | 4 | v0.2 Dutch clock (EMA-leg run) | 0.722 | +1 s | +1.990 | +0.264 | 12.804 -> 11.283 | 3.99% | 2.3441 -> 2.3291 |
+| B | 4 | v0.3 Dutch clock (executable seconds) | 0.722 | +1 s | +0.997 | -0.729 | 12.804 -> 12.680 | 0.99% | 2.3441 -> 2.3291 |
+| B | 4 | v0.4.1 fixed delta 2 % | 0.722 | +1 s | +1.346 | -0.380 | 12.804 -> 12.188 | 1.99% | 2.3441 -> 2.3291 |
+| B | 8 | v0.2 Dutch clock (EMA-leg run) | 1.663 | +1 s | +2.216 | -0.451 | 12.804 -> 10.772 | 4.99% | 2.3441 -> 2.3307 |
+| B | 8 | v0.3 Dutch clock (executable seconds) | 1.663 | +3 s | +1.365 | -1.302 | 12.804 -> 11.837 | 0.99% | 2.3441 -> 2.3675 |
+| B | 8 | v0.4.1 fixed delta 2 % | 1.663 | +1 s | +1.207 | -1.459 | 12.804 -> 12.187 | 1.99% | 2.3441 -> 2.3307 |
+| C | 1 | v0.2 Dutch clock (EMA-leg run) | 0.019 | +1 s | +0.133 | -0.013 | 2.161 -> 2.152 | 0.99% | 0.2972 -> 0.2953 |
+| C | 1 | v0.3 Dutch clock (executable seconds) | 0.019 | +1 s | +0.133 | -0.013 | 2.161 -> 2.152 | 0.99% | 0.2972 -> 0.2953 |
+| C | 1 | v0.4.1 fixed delta 2 % | 0.019 | +1 s | +0.169 | +0.023 | 2.161 -> 2.098 | 1.99% | 0.2972 -> 0.2953 |
+| C | 4 | v0.2 Dutch clock (EMA-leg run) | 0.088 | +1 s | +0.228 | +0.013 | 2.161 -> 1.992 | 3.99% | 0.2972 -> 0.2955 |
+| C | 4 | v0.3 Dutch clock (executable seconds) | 0.088 | +1 s | +0.126 | -0.089 | 2.161 -> 2.147 | 0.99% | 0.2972 -> 0.2955 |
+| C | 4 | v0.4.1 fixed delta 2 % | 0.088 | +1 s | +0.162 | -0.053 | 2.161 -> 2.092 | 1.99% | 0.2972 -> 0.2955 |
+| C | 8 | v0.2 Dutch clock (EMA-leg run) | 0.204 | +1 s | +0.252 | -0.079 | 2.161 -> 1.935 | 4.99% | 0.2972 -> 0.2957 |
+| C | 8 | v0.3 Dutch clock (executable seconds) | 0.204 | +3 s | +0.165 | -0.166 | 2.161 -> 2.052 | 0.99% | 0.2972 -> 0.3003 |
+| C | 8 | v0.4.1 fixed delta 2 % | 0.204 | +1 s | +0.148 | -0.183 | 2.161 -> 2.092 | 1.99% | 0.2972 -> 0.2957 |
+| D@0% | 1 | v0.2 Dutch clock (EMA-leg run) | 0.006 | +1 s | +0.033 | -0.005 | 0.672 -> 0.669 | 0.99% | 0.0749 -> 0.0744 |
+| D@0% | 1 | v0.3 Dutch clock (executable seconds) | 0.006 | +1 s | +0.033 | -0.005 | 0.672 -> 0.669 | 0.99% | 0.0749 -> 0.0744 |
+| D@0% | 1 | v0.4.1 fixed delta 2 % | 0.006 | +1 s | +0.037 | -0.001 | 0.672 -> 0.660 | 1.99% | 0.0749 -> 0.0744 |
+| D@0% | 4 | v0.2 Dutch clock (EMA-leg run) | 0.029 | +1 s | +0.046 | -0.015 | 0.672 -> 0.638 | 3.99% | 0.0749 -> 0.0744 |
+| D@0% | 4 | v0.3 Dutch clock (executable seconds) | 0.029 | +1 s | +0.032 | -0.030 | 0.672 -> 0.669 | 0.99% | 0.0749 -> 0.0744 |
+| D@0% | 4 | v0.4.1 fixed delta 2 % | 0.029 | +1 s | +0.036 | -0.025 | 0.672 -> 0.659 | 1.99% | 0.0749 -> 0.0744 |
+| D@0% | 8 | v0.2 Dutch clock (EMA-leg run) | 0.068 | +1 s | +0.049 | -0.050 | 0.672 -> 0.626 | 4.99% | 0.0749 -> 0.0744 |
+| D@0% | 8 | v0.3 Dutch clock (executable seconds) | 0.068 | +3 s | +0.037 | -0.062 | 0.672 -> 0.650 | 0.99% | 0.0749 -> 0.0756 |
+| D@0% | 8 | v0.4.1 fixed delta 2 % | 0.068 | +1 s | +0.034 | -0.065 | 0.672 -> 0.658 | 1.99% | 0.0749 -> 0.0744 |
+| RA | 1 | v0.2 Dutch clock (EMA-leg run) | 0.094 | +1 s | +0.524 | -0.029 | 5.777 -> 5.694 | 0.99% | 1.0705 -> 1.0638 |
+| RA | 1 | v0.3 Dutch clock (executable seconds) | 0.094 | +1 s | +0.524 | -0.029 | 5.777 -> 5.694 | 0.99% | 1.0705 -> 1.0638 |
+| RA | 1 | v0.4.1 fixed delta 2 % | 0.094 | +1 s | +0.730 | +0.178 | 5.776 -> 5.413 | 2.00% | 1.0702 -> 1.0636 |
+| RA | 4 | v0.2 Dutch clock (EMA-leg run) | 0.423 | +1 s | +1.135 | +0.253 | 5.777 -> 4.779 | 3.99% | 1.0705 -> 1.0643 |
+| RA | 4 | v0.3 Dutch clock (executable seconds) | 0.423 | +1 s | +0.456 | -0.426 | 5.777 -> 5.694 | 0.99% | 1.0705 -> 1.0643 |
+| RA | 4 | v0.4.1 fixed delta 2 % | 0.423 | +1 s | +0.685 | -0.196 | 5.776 -> 5.382 | 1.99% | 1.0702 -> 1.0641 |
+| RA | 8 | v0.2 Dutch clock (EMA-leg run) | 0.974 | +1 s | +1.284 | -0.148 | 5.777 -> 4.456 | 4.99% | 1.0705 -> 1.0651 |
+| RA | 8 | v0.3 Dutch clock (executable seconds) | 0.974 | +3 s | +0.694 | -0.738 | 5.777 -> 5.171 | 0.99% | 1.0705 -> 1.0816 |
+| RA | 8 | v0.4.1 fixed delta 2 % | 0.974 | +1 s | +0.617 | -0.815 | 5.776 -> 5.350 | 1.99% | 1.0702 -> 1.0648 |
+| RB | 1 | v0.2 Dutch clock (EMA-leg run) | 0.039 | +1 s | +0.327 | -0.008 | 3.802 -> 3.766 | 0.99% | 0.6936 -> 0.6893 |
+| RB | 1 | v0.3 Dutch clock (executable seconds) | 0.039 | +1 s | +0.327 | -0.008 | 3.802 -> 3.766 | 0.99% | 0.6936 -> 0.6893 |
+| RB | 1 | v0.4.1 fixed delta 2 % | 0.039 | +1 s | +0.426 | +0.090 | 3.802 -> 3.636 | 1.99% | 0.6936 -> 0.6893 |
+| RB | 4 | v0.2 Dutch clock (EMA-leg run) | 0.175 | +1 s | +0.617 | +0.145 | 3.802 -> 3.342 | 3.99% | 0.6936 -> 0.6896 |
+| RB | 4 | v0.3 Dutch clock (executable seconds) | 0.175 | +1 s | +0.295 | -0.177 | 3.802 -> 3.765 | 0.99% | 0.6936 -> 0.6896 |
+| RB | 4 | v0.4.1 fixed delta 2 % | 0.175 | +1 s | +0.404 | -0.068 | 3.802 -> 3.621 | 1.99% | 0.6936 -> 0.6896 |
+| RB | 8 | v0.2 Dutch clock (EMA-leg run) | 0.405 | +1 s | +0.688 | -0.014 | 3.802 -> 3.192 | 4.99% | 0.6936 -> 0.6901 |
+| RB | 8 | v0.3 Dutch clock (executable seconds) | 0.405 | +3 s | +0.410 | -0.292 | 3.802 -> 3.519 | 0.99% | 0.6936 -> 0.7008 |
+| RB | 8 | v0.4.1 fixed delta 2 % | 0.405 | +1 s | +0.372 | -0.330 | 3.802 -> 3.607 | 1.99% | 0.6936 -> 0.6901 |
+| RC | 1 | v0.2 Dutch clock (EMA-leg run) | 0.004 | +1 s | +0.034 | -0.001 | 0.529 -> 0.525 | 0.99% | 0.0728 -> 0.0724 |
+| RC | 1 | v0.3 Dutch clock (executable seconds) | 0.004 | +1 s | +0.034 | -0.001 | 0.529 -> 0.525 | 0.99% | 0.0728 -> 0.0724 |
+| RC | 1 | v0.4.1 fixed delta 2 % | 0.004 | +1 s | +0.043 | +0.008 | 0.528 -> 0.513 | 1.99% | 0.0728 -> 0.0724 |
+| RC | 4 | v0.2 Dutch clock (EMA-leg run) | 0.016 | +1 s | +0.061 | +0.014 | 0.529 -> 0.486 | 3.99% | 0.0728 -> 0.0724 |
+| RC | 4 | v0.3 Dutch clock (executable seconds) | 0.016 | +1 s | +0.031 | -0.016 | 0.529 -> 0.525 | 0.99% | 0.0728 -> 0.0724 |
+| RC | 4 | v0.4.1 fixed delta 2 % | 0.016 | +1 s | +0.041 | -0.006 | 0.528 -> 0.512 | 1.99% | 0.0728 -> 0.0724 |
+| RC | 8 | v0.2 Dutch clock (EMA-leg run) | 0.037 | +1 s | +0.067 | -0.000 | 0.529 -> 0.473 | 4.99% | 0.0728 -> 0.0725 |
+| RC | 8 | v0.3 Dutch clock (executable seconds) | 0.037 | +3 s | +0.042 | -0.026 | 0.529 -> 0.502 | 0.99% | 0.0728 -> 0.0736 |
+| RC | 8 | v0.4.1 fixed delta 2 % | 0.037 | +1 s | +0.038 | -0.030 | 0.528 -> 0.511 | 1.99% | 0.0728 -> 0.0725 |
+
+**Result.** Under v0.4 every blocking plan earns less than an unblocked first-second sandwich (Tier A +0.64 SOL after a 1 s block against +1.50 without one); the V1-1 attack class is gone with the clock.
+
+**(b) Defensive use (V1-2).** The same observation lets a borrower veto its own liquidation for as long as it pays:
+
+| market | borrower remainder if liquidated at the first executable second (SOL) | spot / liquidation price | cost to fail the spot leg (SOL per s) | cost to freeze P_ema (SOL per s) | seconds of spot-leg veto the equity pays for |
+|---|---|---|---|---|---|
+| A | 19.490 | x1.00 | 0.3457 | 0.1767 | 56 |
+| A | 19.490 | x1.05 | 1.6048 | 1.4348 | 12 |
+| A | 19.490 | x1.10 | 2.8419 | 2.6708 | 7 |
+| A | 19.490 | x1.20 | 5.0937 | 4.9257 | 4 |
+| B | 12.804 | x1.00 | 0.1874 | 0.0949 | 68 |
+| B | 12.804 | x1.05 | 0.8630 | 0.7700 | 15 |
+| B | 12.804 | x1.10 | 1.4881 | 1.3969 | 9 |
+| B | 12.804 | x1.20 | 2.7477 | 2.6556 | 5 |
+| C | 2.161 | x1.00 | 0.0228 | 0.0121 | 95 |
+| C | 2.161 | x1.05 | 0.1091 | 0.0984 | 20 |
+| C | 2.161 | x1.10 | 0.1937 | 0.1829 | 11 |
+| C | 2.161 | x1.20 | 0.3583 | 0.3474 | 6 |
+| D@0% | 0.672 | x1.00 | 0.0076 | 0.0040 | 88 |
+| D@0% | 0.672 | x1.05 | 0.0356 | 0.0320 | 19 |
+| D@0% | 0.672 | x1.10 | 0.0630 | 0.0593 | 11 |
+| D@0% | 0.672 | x1.20 | 0.1159 | 0.1122 | 6 |
+| RA | 5.776 | x1.00 | 0.1098 | 0.0554 | 53 |
+| RA | 5.776 | x1.05 | 0.5036 | 0.4490 | 11 |
+| RA | 5.776 | x1.10 | 0.8893 | 0.8346 | 6 |
+| RA | 5.776 | x1.20 | 1.6387 | 1.5836 | 4 |
+| RB | 3.802 | x1.00 | 0.0455 | 0.0238 | 84 |
+| RB | 3.802 | x1.05 | 0.2150 | 0.1932 | 18 |
+| RB | 3.802 | x1.10 | 0.3811 | 0.3593 | 10 |
+| RB | 3.802 | x1.20 | 0.7044 | 0.6824 | 5 |
+| RC | 0.528 | x1.00 | 0.0041 | 0.0021 | 127 |
+| RC | 0.528 | x1.05 | 0.0191 | 0.0171 | 28 |
+| RC | 0.528 | x1.10 | 0.0338 | 0.0317 | 16 |
+| RC | 0.528 | x1.20 | 0.0623 | 0.0603 | 8 |
+
+**Result.** The veto is cheap only at the threshold (Tier A 0.35 SOL/s, which the 19.5 SOL of remaining equity covers for ≈ 56 s); 5 % further into the pump it costs ≈ 4.6× as much. Settlement arming is not affected (§12.10).
+
+### 12.10 Resetting settlement arming (`arming.py`, `refute_push.py`; V2-4, R3A-6)
+
+A position sits in S1 a few percent beyond the S1 boundary after a genuine gap; the keeper calls `sol_settle` every second. (i) Every 20 s the borrower lands an atomic `[dump below the S1 price → sol_settle → buy back]`:
+
+| market | arming rule | borrower bundles every 20 s | outcome | settled after (s) | borrower bundles | borrower cost (SOL) |
+|---|---|---|---|---|---|---|
+| A | v0.2 (any false check disarms) | no | S1 | 55 | 0 | 0.000 |
+| A | v0.2 (any false check disarms) | yes | none | > 600 | 30 | 47.575 |
+| A | v0.3 (non-atomic evidence only) | no | S1 | 55 | 0 | 0.000 |
+| A | v0.3 (non-atomic evidence only) | yes | S1 | 55 | 2 | 3.079 |
+| A | v0.4.1 (settlement box) | no | S1 | 55 | 0 | 0.000 |
+| A | v0.4.1 (settlement box) | yes | S1 | 55 | 2 | 3.079 |
+| B | v0.2 (any false check disarms) | no | S1 | 56 | 0 | 0.000 |
+| B | v0.2 (any false check disarms) | yes | none | > 600 | 30 | 27.818 |
+| B | v0.3 (non-atomic evidence only) | no | S1 | 56 | 0 | 0.000 |
+| B | v0.3 (non-atomic evidence only) | yes | S1 | 56 | 2 | 1.801 |
+| B | v0.4.1 (settlement box) | no | S1 | 56 | 0 | 0.000 |
+| B | v0.4.1 (settlement box) | yes | S1 | 56 | 2 | 1.801 |
+| C | v0.2 (any false check disarms) | no | S1 | 57 | 0 | 0.000 |
+| C | v0.2 (any false check disarms) | yes | none | > 600 | 30 | 3.766 |
+| C | v0.3 (non-atomic evidence only) | no | S1 | 57 | 0 | 0.000 |
+| C | v0.3 (non-atomic evidence only) | yes | S1 | 57 | 2 | 0.244 |
+| C | v0.4.1 (settlement box) | no | S1 | 57 | 0 | 0.000 |
+| C | v0.4.1 (settlement box) | yes | S1 | 57 | 2 | 0.244 |
+| D@0% | v0.2 (any false check disarms) | no | S1 | 59 | 0 | 0.000 |
+| D@0% | v0.2 (any false check disarms) | yes | none | > 600 | 30 | 1.314 |
+| D@0% | v0.3 (non-atomic evidence only) | no | S1 | 59 | 0 | 0.000 |
+| D@0% | v0.3 (non-atomic evidence only) | yes | S1 | 59 | 2 | 0.088 |
+| D@0% | v0.4.1 (settlement box) | no | S1 | 59 | 0 | 0.000 |
+| D@0% | v0.4.1 (settlement box) | yes | S1 | 59 | 2 | 0.088 |
+| RA | v0.2 (any false check disarms) | no | S1 | 55 | 0 | 0.000 |
+| RA | v0.2 (any false check disarms) | yes | none | > 600 | 30 | 16.524 |
+| RA | v0.3 (non-atomic evidence only) | no | S1 | 55 | 0 | 0.000 |
+| RA | v0.3 (non-atomic evidence only) | yes | S1 | 55 | 2 | 1.062 |
+| RA | v0.4.1 (settlement box) | no | S1 | 55 | 0 | 0.000 |
+| RA | v0.4.1 (settlement box) | yes | S1 | 55 | 2 | 1.062 |
+| RB | v0.2 (any false check disarms) | no | S1 | 56 | 0 | 0.000 |
+| RB | v0.2 (any false check disarms) | yes | none | > 600 | 30 | 7.389 |
+| RB | v0.3 (non-atomic evidence only) | no | S1 | 56 | 0 | 0.000 |
+| RB | v0.3 (non-atomic evidence only) | yes | S1 | 56 | 2 | 0.475 |
+| RB | v0.4.1 (settlement box) | no | S1 | 56 | 0 | 0.000 |
+| RB | v0.4.1 (settlement box) | yes | S1 | 56 | 2 | 0.475 |
+| RC | v0.2 (any false check disarms) | no | S1 | 57 | 0 | 0.000 |
+| RC | v0.2 (any false check disarms) | yes | none | > 600 | 30 | 0.686 |
+| RC | v0.3 (non-atomic evidence only) | no | S1 | 57 | 0 | 0.000 |
+| RC | v0.3 (non-atomic evidence only) | yes | S1 | 57 | 2 | 0.044 |
+| RC | v0.4.1 (settlement box) | no | S1 | 57 | 0 | 0.000 |
+| RC | v0.4.1 (settlement box) | yes | S1 | 57 | 2 | 0.044 |
+
+(ii) The borrower's attacker-only dump one second before the clock would mature, every cycle (R3A-6 a; the reviewer's `r3_refute_push.py`), including the rejected "lender-adverse corner" reading of the rule:
+
+| market | beyond S1 boundary | rule | attack | outcome | settled after (s) | attacker-only seconds | cost (SOL) |
+|---|---|---|---|---|---|---|---|
+| A | x1.03 | v0.3 | yes | none | > 600 | 13 | 124.811 |
+| A | x1.03 | v0.4.1 | no | S1 | 58 | 0 | 0.000 |
+| A | x1.03 | v0.4.1 | yes | S1 | 62 | 1 | 9.560 |
+| A | x1.03 | rejected reading: lender-adverse corner | yes | none | > 600 | 13 | 124.811 |
+| A | x1.05 | v0.3 | yes | S1 | 57 | 1 | 9.358 |
+| A | x1.05 | v0.4.1 | no | S1 | 55 | 0 | 0.000 |
+| A | x1.05 | v0.4.1 | yes | S1 | 57 | 1 | 9.358 |
+| A | x1.05 | rejected reading: lender-adverse corner | yes | S1 | 57 | 1 | 9.358 |
+| A | x1.08 | v0.3 | yes | S1 | 55 | 1 | 9.192 |
+| A | x1.08 | v0.4.1 | no | S1 | 53 | 0 | 0.000 |
+| A | x1.08 | v0.4.1 | yes | S1 | 55 | 1 | 9.192 |
+| A | x1.08 | rejected reading: lender-adverse corner | yes | S1 | 55 | 1 | 9.192 |
+| B | x1.03 | v0.3 | yes | none | > 600 | 13 | 67.500 |
+| B | x1.03 | v0.4.1 | no | S1 | 59 | 0 | 0.000 |
+| B | x1.03 | v0.4.1 | yes | S1 | 63 | 1 | 5.170 |
+| B | x1.03 | rejected reading: lender-adverse corner | yes | none | > 600 | 13 | 67.500 |
+| B | x1.05 | v0.3 | yes | S1 | 58 | 1 | 5.220 |
+| B | x1.05 | v0.4.1 | no | S1 | 56 | 0 | 0.000 |
+| B | x1.05 | v0.4.1 | yes | S1 | 58 | 1 | 5.220 |
+| B | x1.05 | rejected reading: lender-adverse corner | yes | S1 | 58 | 1 | 5.220 |
+| B | x1.08 | v0.3 | yes | S1 | 56 | 1 | 5.294 |
+| B | x1.08 | v0.4.1 | no | S1 | 54 | 0 | 0.000 |
+| B | x1.08 | v0.4.1 | yes | S1 | 56 | 1 | 5.294 |
+| B | x1.08 | rejected reading: lender-adverse corner | yes | S1 | 56 | 1 | 5.294 |
+| C | x1.03 | v0.3 | yes | none | > 600 | 13 | 9.057 |
+| C | x1.03 | v0.4.1 | no | S1 | 60 | 0 | 0.000 |
+| C | x1.03 | v0.4.1 | yes | S1 | 64 | 1 | 0.694 |
+| C | x1.03 | rejected reading: lender-adverse corner | yes | none | > 600 | 13 | 9.057 |
+| C | x1.05 | v0.3 | yes | S1 | 227 | 5 | 3.507 |
+| C | x1.05 | v0.4.1 | no | S1 | 57 | 0 | 0.000 |
+| C | x1.05 | v0.4.1 | yes | S1 | 59 | 1 | 0.700 |
+| C | x1.05 | rejected reading: lender-adverse corner | yes | S1 | 227 | 5 | 3.507 |
+| C | x1.08 | v0.3 | yes | S1 | 57 | 1 | 0.710 |
+| C | x1.08 | v0.4.1 | no | S1 | 55 | 0 | 0.000 |
+| C | x1.08 | v0.4.1 | yes | S1 | 57 | 1 | 0.710 |
+| C | x1.08 | rejected reading: lender-adverse corner | yes | S1 | 57 | 1 | 0.710 |
+| D@0% | x1.03 | v0.3 | yes | none | > 600 | 13 | 3.178 |
+| D@0% | x1.03 | v0.4.1 | no | S1 | 62 | 0 | 0.000 |
+| D@0% | x1.03 | v0.4.1 | yes | S1 | 66 | 1 | 0.244 |
+| D@0% | x1.03 | rejected reading: lender-adverse corner | yes | none | > 600 | 13 | 3.178 |
+| D@0% | x1.05 | v0.3 | yes | none | > 600 | 13 | 3.209 |
+| D@0% | x1.05 | v0.4.1 | no | S1 | 59 | 0 | 0.000 |
+| D@0% | x1.05 | v0.4.1 | yes | S1 | 61 | 1 | 0.247 |
+| D@0% | x1.05 | rejected reading: lender-adverse corner | yes | none | > 600 | 13 | 3.209 |
+| D@0% | x1.08 | v0.3 | yes | S1 | 59 | 1 | 0.250 |
+| D@0% | x1.08 | v0.4.1 | no | S1 | 57 | 0 | 0.000 |
+| D@0% | x1.08 | v0.4.1 | yes | S1 | 59 | 1 | 0.250 |
+| D@0% | x1.08 | rejected reading: lender-adverse corner | yes | S1 | 59 | 1 | 0.250 |
+| RA | x1.03 | v0.3 | yes | none | > 600 | 13 | 38.610 |
+| RA | x1.03 | v0.4.1 | no | S1 | 57 | 0 | 0.000 |
+| RA | x1.03 | v0.4.1 | yes | S1 | 61 | 1 | 2.956 |
+| RA | x1.03 | rejected reading: lender-adverse corner | yes | none | > 600 | 13 | 38.614 |
+| RA | x1.05 | v0.3 | yes | S1 | 57 | 1 | 2.985 |
+| RA | x1.05 | v0.4.1 | no | S1 | 55 | 0 | 0.000 |
+| RA | x1.05 | v0.4.1 | yes | S1 | 57 | 1 | 2.985 |
+| RA | x1.05 | rejected reading: lender-adverse corner | yes | S1 | 57 | 1 | 2.985 |
+| RA | x1.08 | v0.3 | yes | S1 | 55 | 1 | 3.027 |
+| RA | x1.08 | v0.4.1 | no | S1 | 53 | 0 | 0.000 |
+| RA | x1.08 | v0.4.1 | yes | S1 | 55 | 1 | 3.027 |
+| RA | x1.08 | rejected reading: lender-adverse corner | yes | S1 | 55 | 1 | 3.027 |
+| RB | x1.03 | v0.3 | yes | none | > 600 | 13 | 17.287 |
+| RB | x1.03 | v0.4.1 | no | S1 | 59 | 0 | 0.000 |
+| RB | x1.03 | v0.4.1 | yes | S1 | 63 | 1 | 1.324 |
+| RB | x1.03 | rejected reading: lender-adverse corner | yes | none | > 600 | 13 | 17.290 |
+| RB | x1.05 | v0.3 | yes | S1 | 58 | 1 | 1.336 |
+| RB | x1.05 | v0.4.1 | no | S1 | 56 | 0 | 0.000 |
+| RB | x1.05 | v0.4.1 | yes | S1 | 58 | 1 | 1.337 |
+| RB | x1.05 | rejected reading: lender-adverse corner | yes | S1 | 58 | 1 | 1.337 |
+| RB | x1.08 | v0.3 | yes | S1 | 56 | 1 | 1.355 |
+| RB | x1.08 | v0.4.1 | no | S1 | 54 | 0 | 0.000 |
+| RB | x1.08 | v0.4.1 | yes | S1 | 56 | 1 | 1.356 |
+| RB | x1.08 | rejected reading: lender-adverse corner | yes | S1 | 56 | 1 | 1.356 |
+| RC | x1.03 | v0.3 | yes | none | > 600 | 13 | 1.602 |
+| RC | x1.03 | v0.4.1 | no | S1 | 60 | 0 | 0.000 |
+| RC | x1.03 | v0.4.1 | yes | S1 | 64 | 1 | 0.123 |
+| RC | x1.03 | rejected reading: lender-adverse corner | yes | none | > 600 | 13 | 1.605 |
+| RC | x1.05 | v0.3 | yes | S1 | 185 | 4 | 0.496 |
+| RC | x1.05 | v0.4.1 | no | S1 | 57 | 0 | 0.000 |
+| RC | x1.05 | v0.4.1 | yes | S1 | 59 | 1 | 0.124 |
+| RC | x1.05 | rejected reading: lender-adverse corner | yes | S1 | 185 | 4 | 0.497 |
+| RC | x1.08 | v0.3 | yes | S1 | 57 | 1 | 0.126 |
+| RC | x1.08 | v0.4.1 | no | S1 | 55 | 0 | 0.000 |
+| RC | x1.08 | v0.4.1 | yes | S1 | 57 | 1 | 0.126 |
+| RC | x1.08 | rejected reading: lender-adverse corner | yes | S1 | 57 | 1 | 0.126 |
+
+(iii) A spot-leg veto for `w` seconds starting 20 s after arming (R3A-6 b; the reviewer's `r3_spotblock_arm.py`):
+
+| market | w (s) | rule | outcome | settled after (s) | cost (SOL) |
+|---|---|---|---|---|---|
+| A | 0 | v0.3 | S1 | 55 | 0.000 |
+| A | 0 | v0.4.1 | S1 | 55 | 0.000 |
+| A | 9 | v0.3 | S1 | 55 | 63.439 |
+| A | 9 | v0.4.1 | S1 | 55 | 63.439 |
+| A | 12 | v0.3 | S1 | 89 | 84.895 |
+| A | 12 | v0.4.1 | S1 | 55 | 84.895 |
+| A | 20 | v0.3 | S1 | 97 | 142.885 |
+| A | 20 | v0.4.1 | S1 | 61 | 142.885 |
+| C | 0 | v0.3 | S1 | 57 | 0.000 |
+| C | 0 | v0.4.1 | S1 | 57 | 0.000 |
+| C | 9 | v0.3 | S1 | 57 | 7.730 |
+| C | 9 | v0.4.1 | S1 | 57 | 7.730 |
+| C | 12 | v0.3 | S1 | 91 | 10.349 |
+| C | 12 | v0.4.1 | S1 | 57 | 10.349 |
+| C | 20 | v0.3 | S1 | 99 | 17.437 |
+| C | 20 | v0.4.1 | S1 | 63 | 17.437 |
+| D@0% | 0 | v0.3 | S1 | 59 | 0.000 |
+| D@0% | 0 | v0.4.1 | S1 | 59 | 0.000 |
+| D@0% | 9 | v0.3 | S1 | 59 | 3.463 |
+| D@0% | 9 | v0.4.1 | S1 | 59 | 3.463 |
+| D@0% | 12 | v0.3 | S1 | 93 | 4.617 |
+| D@0% | 12 | v0.4.1 | S1 | 59 | 4.617 |
+| D@0% | 20 | v0.3 | S1 | 101 | 7.695 |
+| D@0% | 20 | v0.4.1 | S1 | 65 | 7.695 |
+| RA | 0 | v0.3 | S1 | 55 | 0.000 |
+| RA | 0 | v0.4.1 | S1 | 55 | 0.000 |
+| RA | 9 | v0.3 | S1 | 55 | 20.877 |
+| RA | 9 | v0.4.1 | S1 | 55 | 20.892 |
+| RA | 12 | v0.3 | S1 | 89 | 27.956 |
+| RA | 12 | v0.4.1 | S1 | 55 | 27.975 |
+| RA | 20 | v0.3 | S1 | 97 | 47.130 |
+| RA | 20 | v0.4.1 | S1 | 61 | 47.162 |
+
+(iv) Push-then-freeze (R4B-2; the reviewer's `ptf_refute2.py`): one attacker-only dump second (×0.7), then 4 seconds in which the honest keeper observes **and** the borrower adds an observation just below `P_ema` — the bucket straddles `P_ema`, so v0.4's clamped `obs = P_ema` and its median moves onto the dumped EMA — landed 3 s before the clock matures, every cycle:
+
+| market | beyond S1 boundary | rule | attack | outcome | settled after (s) | attacker-only s | frozen s | cost (SOL) |
+|---|---|---|---|---|---|---|---|---|
+| A | x1.03 | v0.4 (box on clamped obs) | PTF | none | > 600 | 12 | 48 | 182.300 |
+| A | x1.03 | v0.4.1 (box on bucket extremes) | no | S1 | 58 | 0 | 0 | 0.000 |
+| A | x1.03 | v0.4.1 (box on bucket extremes) | PTF | S1 | 66 | 1 | 4 | 15.149 |
+| A | x1.05 | v0.4 (box on clamped obs) | PTF | S1 | 203 | 4 | 16 | 59.356 |
+| A | x1.05 | v0.4.1 (box on bucket extremes) | no | S1 | 55 | 0 | 0 | 0.000 |
+| A | x1.05 | v0.4.1 (box on bucket extremes) | PTF | S1 | 63 | 1 | 4 | 14.815 |
+| C | x1.03 | v0.4 (box on clamped obs) | PTF | none | > 600 | 12 | 48 | 13.522 |
+| C | x1.03 | v0.4.1 (box on bucket extremes) | no | S1 | 60 | 0 | 0 | 0.000 |
+| C | x1.03 | v0.4.1 (box on bucket extremes) | PTF | S1 | 68 | 1 | 4 | 1.120 |
+| C | x1.05 | v0.4 (box on clamped obs) | PTF | S1 | 201 | 4 | 14 | 4.314 |
+| C | x1.05 | v0.4.1 (box on bucket extremes) | no | S1 | 57 | 0 | 0 | 0.000 |
+| C | x1.05 | v0.4.1 (box on bucket extremes) | PTF | S1 | 65 | 1 | 4 | 1.131 |
+| D@0% | x1.03 | v0.4 (box on clamped obs) | PTF | none | > 600 | 12 | 48 | 4.771 |
+| D@0% | x1.03 | v0.4.1 (box on bucket extremes) | no | S1 | 62 | 0 | 0 | 0.000 |
+| D@0% | x1.03 | v0.4.1 (box on bucket extremes) | PTF | S1 | 70 | 1 | 4 | 0.398 |
+| D@0% | x1.05 | v0.4 (box on clamped obs) | PTF | none | > 600 | 12 | 48 | 4.817 |
+| D@0% | x1.05 | v0.4.1 (box on bucket extremes) | no | S1 | 59 | 0 | 0 | 0.000 |
+| D@0% | x1.05 | v0.4.1 (box on bucket extremes) | PTF | S1 | 67 | 1 | 4 | 0.401 |
+| RA | x1.03 | v0.4 (box on clamped obs) | PTF | none | > 600 | 12 | 48 | 58.302 |
+| RA | x1.03 | v0.4.1 (box on bucket extremes) | no | S1 | 57 | 0 | 0 | 0.000 |
+| RA | x1.03 | v0.4.1 (box on bucket extremes) | PTF | S1 | 65 | 1 | 4 | 4.825 |
+| RA | x1.05 | v0.4 (box on clamped obs) | PTF | S1 | 155 | 3 | 12 | 14.633 |
+| RA | x1.05 | v0.4.1 (box on bucket extremes) | no | S1 | 55 | 0 | 0 | 0.000 |
+| RA | x1.05 | v0.4.1 (box on bucket extremes) | PTF | S1 | 63 | 1 | 4 | 4.872 |
+| RC | x1.03 | v0.4 (box on clamped obs) | PTF | none | > 600 | 12 | 48 | 2.420 |
+| RC | x1.03 | v0.4.1 (box on bucket extremes) | no | S1 | 60 | 0 | 0 | 0.000 |
+| RC | x1.03 | v0.4.1 (box on bucket extremes) | PTF | S1 | 68 | 1 | 4 | 0.200 |
+| RC | x1.05 | v0.4 (box on clamped obs) | PTF | S1 | 157 | 3 | 12 | 0.608 |
+| RC | x1.05 | v0.4.1 (box on bucket extremes) | no | S1 | 57 | 0 | 0 | 0.000 |
+| RC | x1.05 | v0.4.1 (box on bucket extremes) | PTF | S1 | 65 | 1 | 4 | 0.202 |
+
+**Result.** v0.3 refuted on the instantaneous `P_ema`: at 3 % beyond the boundary the borrower postponed S1 indefinitely (13 pushes in 600 s; Tier A 124.8 SOL, D@0 % 3.2 SOL against a 1.84 SOL vault). v0.4 refuted only on the box, which stopped the plain push (S1 at most 4 s later) but not push-then-freeze (no S1 within 600 s at 3 % beyond the boundary in any market). v0.4.1's box on bucket extremes stops both: the frozen seconds keep their honest highs, the refutation corner does not move, and S1 lands 8 s later. Vetoes longer than the 10 s arm gap no longer restart the clock (v0.3 +34–42 s; v0.4.1 +0–6 s: the veto's low observations widen the box's low side for the few seconds they stay among the ring's 8 entries).
+
+### 12.11 Settlement amount, kind and deferral (`fv_push.py`; V2-9, R3A-1)
+
+(M) The drained RA model case of v0.3 (97 % of the LP pulled, beyond any adopted pool) and the reviewer's S2 → S1 flip cases (`r3_s1_bypass.py`):
+
+| rule | attack | outcome | settles at (s after the first push) | FV (SOL) | lenders get (SOL) | change for lenders vs honest (SOL) | attacker cost (SOL) |
+|---|---|---|---|---|---|---|---|
+| v0.3 (FV gate on S2 only, kind from instantaneous legs) | honest | S2 | 0 | 32.051 | 32.051 | 0 | 0 |
+| v0.3 (FV gate on S2 only, kind from instantaneous legs) | lender pushes up (1 s) | S2 | 17 | 32.460 | 32.460 | +0.409 | 0.180 |
+| v0.3 (FV gate on S2 only, kind from instantaneous legs) | S2 -> S1 flip, 1 pushed s + [pump, sol_settle, dump] | none within the horizon | | | | | 0.361 |
+| v0.3 (FV gate on S2 only, kind from instantaneous legs) | S2 -> S1 flip, 2 pushed s + [pump, sol_settle, dump] | S1 | 3 | - | 37.628 | +5.577 | 0.542 |
+| v0.3 (FV gate on S2 only, kind from instantaneous legs) | borrower pushes down (1 s) | S2 | 56 | 32.128 | 32.128 | +0.077 | 0.182 |
+| v0.3 (FV gate on S2 only, kind from instantaneous legs) | borrower pushes down whenever settlement is due (12 pushes in 600 s) | none within the horizon | | | | | 2.206 |
+| v0.4.1 (settlement box, fv_dev 1 %) | honest | S2 | 0 | 32.042 | 32.042 | 0 | 0 |
+| v0.4.1 (settlement box, fv_dev 1 %) | lender pushes up (1 s) | S2 | 18 | 32.394 | 32.394 | +0.352 | 0.180 |
+| v0.4.1 (settlement box, fv_dev 1 %) | S2 -> S1 flip, 1 pushed s + [pump, sol_settle, dump] | none within the horizon | | | | | 0.361 |
+| v0.4.1 (settlement box, fv_dev 1 %) | S2 -> S1 flip, 2 pushed s + [pump, sol_settle, dump] | none within the horizon | | | | | 0.542 |
+| v0.4.1 (settlement box, fv_dev 1 %) | borrower pushes down (1 s) | S2 | 16 | 31.909 | 31.909 | -0.133 | 0.182 |
+| v0.4.1 (settlement box, fv_dev 1 %) | borrower pushes down whenever settlement is due (40 pushes in 600 s) | none within the horizon | | | | | 7.573 |
+
+| rule | attack | outcome | settles at (s after the first push) | FV (SOL) | lenders get (SOL) | change for lenders vs honest (SOL) | attacker cost (SOL) |
+|---|---|---|---|---|---|---|---|
+| v0.3 (FV gate on S2 only, kind from instantaneous legs) | honest | S2 | 0 | 35.262 | 35.262 | 0 | 0 |
+| v0.3 (FV gate on S2 only, kind from instantaneous legs) | lender pushes up (1 s) | S2 | 17 | 35.715 | 35.715 | +0.453 | 0.188 |
+| v0.3 (FV gate on S2 only, kind from instantaneous legs) | S2 -> S1 flip, 1 pushed s + [pump, sol_settle, dump] | S1 | 2 | - | 37.628 | +2.366 | 0.376 |
+| v0.3 (FV gate on S2 only, kind from instantaneous legs) | S2 -> S1 flip, 2 pushed s + [pump, sol_settle, dump] | S1 | 3 | - | 37.628 | +2.366 | 0.564 |
+| v0.3 (FV gate on S2 only, kind from instantaneous legs) | borrower pushes down (1 s) | S2 | 44 | 35.345 | 35.345 | +0.084 | 0.189 |
+| v0.3 (FV gate on S2 only, kind from instantaneous legs) | borrower pushes down whenever settlement is due (37 pushes in 600 s) | none within the horizon | | | | | 7.269 |
+| v0.4.1 (settlement box, fv_dev 1 %) | honest | S2 | 0 | 35.252 | 35.252 | 0 | 0 |
+| v0.4.1 (settlement box, fv_dev 1 %) | lender pushes up (1 s) | S2 | 18 | 35.642 | 35.642 | +0.390 | 0.188 |
+| v0.4.1 (settlement box, fv_dev 1 %) | S2 -> S1 flip, 1 pushed s + [pump, sol_settle, dump] | none within the horizon | | | | | 0.376 |
+| v0.4.1 (settlement box, fv_dev 1 %) | S2 -> S1 flip, 2 pushed s + [pump, sol_settle, dump] | none within the horizon | | | | | 0.564 |
+| v0.4.1 (settlement box, fv_dev 1 %) | borrower pushes down (1 s) | S2 | 14 | 35.001 | 35.001 | -0.251 | 0.189 |
+| v0.4.1 (settlement box, fv_dev 1 %) | borrower pushes down whenever settlement is due (49 pushes in 600 s) | none within the horizon | | | | | 9.750 |
+
+| rule | attack | outcome | settles at (s after the first push) | FV (SOL) | lenders get (SOL) | change for lenders vs honest (SOL) | attacker cost (SOL) |
+|---|---|---|---|---|---|---|---|
+| v0.3 (FV gate on S2 only, kind from instantaneous legs) | honest | S2 | 0 | 33.056 | 33.056 | 0 | 0 |
+| v0.3 (FV gate on S2 only, kind from instantaneous legs) | lender pushes up (1 s) | S2 | 17 | 33.453 | 33.453 | +0.397 | 0.325 |
+| v0.3 (FV gate on S2 only, kind from instantaneous legs) | S2 -> S1 flip, 1 pushed s + [pump, sol_settle, dump] | none within the horizon | | | | | 0.650 |
+| v0.3 (FV gate on S2 only, kind from instantaneous legs) | S2 -> S1 flip, 2 pushed s + [pump, sol_settle, dump] | S1 | 3 | - | 37.628 | +4.572 | 0.976 |
+| v0.3 (FV gate on S2 only, kind from instantaneous legs) | borrower pushes down (1 s) | S2 | 48 | 33.133 | 33.133 | +0.078 | 0.327 |
+| v0.3 (FV gate on S2 only, kind from instantaneous legs) | borrower pushes down whenever settlement is due (13 pushes in 600 s) | none within the horizon | | | | | 4.307 |
+| v0.4.1 (settlement box, fv_dev 1 %) | honest | S2 | 0 | 33.048 | 33.048 | 0 | 0 |
+| v0.4.1 (settlement box, fv_dev 1 %) | lender pushes up (1 s) | S2 | 17 | 33.445 | 33.445 | +0.397 | 0.325 |
+| v0.4.1 (settlement box, fv_dev 1 %) | S2 -> S1 flip, 1 pushed s + [pump, sol_settle, dump] | none within the horizon | | | | | 0.650 |
+| v0.4.1 (settlement box, fv_dev 1 %) | S2 -> S1 flip, 2 pushed s + [pump, sol_settle, dump] | none within the horizon | | | | | 0.976 |
+| v0.4.1 (settlement box, fv_dev 1 %) | borrower pushes down (1 s) | S2 | 14 | 32.834 | 32.834 | -0.214 | 0.327 |
+| v0.4.1 (settlement box, fv_dev 1 %) | borrower pushes down whenever settlement is due (43 pushes in 600 s) | none within the horizon | | | | | 14.705 |
+
+(E) The realistic case: the Emergency route-broken flag is set and a healthy position expires, so a lender-keeper's `sol_settle(S3)` is capped hard at FV:
+
+| rule | attack | outcome | settles at (s after the first push) | FV (SOL) | lenders get (SOL) | change for lenders vs honest (SOL) | attacker cost (SOL) |
+|---|---|---|---|---|---|---|---|
+| v0.4.1 (settlement box, fv_dev 1 %) | honest | S3 | 0 | 62.018 | 62.018 | 0 | 0 |
+| v0.4.1 (settlement box, fv_dev 1 %) | lender pushes up (1 s) | S3 | 17 | 62.719 | 62.719 | +0.702 | 25.291 |
+| v0.4.1 (settlement box, fv_dev 1 %) | S3 -> S1 flip, 1 pushed s + [pump, sol_settle, dump] | none within the horizon | | | | | 50.640 |
+| v0.4.1 (settlement box, fv_dev 1 %) | S3 -> S1 flip, 2 pushed s + [pump, sol_settle, dump] | none within the horizon | | | | | 76.048 |
+| v0.4.1 (settlement box, fv_dev 1 %) | borrower pushes down (1 s) | S3 | 13 | 61.559 | 61.559 | -0.458 | 21.281 |
+| v0.4.1 (settlement box, fv_dev 1 %) | borrower pushes down whenever settlement is due (43 pushes in 600 s) | none within the horizon | | | | | 961.388 |
+| v0.4.1 without the box (fv_dev 100 %) | honest | S3 | 0 | 62.018 | 62.018 | 0 | 0 |
+| v0.4.1 without the box (fv_dev 100 %) | lender pushes up (1 s) | S3 | 1 | 72.496 | 72.496 | +10.478 | 25.291 |
+| v0.4.1 without the box (fv_dev 100 %) | S3 -> S1 flip, 1 pushed s + [pump, sol_settle, dump] | S3 | 2 | 72.281 | 72.281 | +10.263 | 50.640 |
+| v0.4.1 without the box (fv_dev 100 %) | S3 -> S1 flip, 2 pushed s + [pump, sol_settle, dump] | S3 | 3 | 84.507 | 84.507 | +22.489 | 76.048 |
+| v0.4.1 without the box (fv_dev 100 %) | borrower pushes down (1 s) | S3 | 1 | 56.790 | 56.790 | -5.227 | 21.281 |
+| v0.4.1 without the box (fv_dev 100 %) | borrower pushes down whenever settlement is due (268 pushes in 600 s) | none within the horizon | | | | | 7700.195 |
+| rejected reading: lender-adverse corner for every decision | honest | S3 | 0 | 62.018 | 62.018 | 0 | 0 |
+| rejected reading: lender-adverse corner for every decision | lender pushes up (1 s) | S3 | 1 | 62.018 | 62.018 | -0.000 | 25.291 |
+| rejected reading: lender-adverse corner for every decision | S3 -> S1 flip, 1 pushed s + [pump, sol_settle, dump] | S3 | 2 | 61.833 | 61.833 | -0.184 | 50.640 |
+| rejected reading: lender-adverse corner for every decision | S3 -> S1 flip, 2 pushed s + [pump, sol_settle, dump] | S3 | 3 | 61.833 | 61.833 | -0.185 | 76.048 |
+| rejected reading: lender-adverse corner for every decision | borrower pushes down (1 s) | S3 | 1 | 56.790 | 56.790 | -5.227 | 21.281 |
+| rejected reading: lender-adverse corner for every decision | borrower pushes down whenever settlement is due (601 pushes in 600 s) | none within the horizon | | | | | 24012.338 |
+
+| rule | attack | outcome | settles at (s after the first push) | FV (SOL) | lenders get (SOL) | change for lenders vs honest (SOL) | attacker cost (SOL) |
+|---|---|---|---|---|---|---|---|
+| v0.4.1 (settlement box, fv_dev 1 %) | honest | S3 | 0 | 19.029 | 19.029 | 0 | 0 |
+| v0.4.1 (settlement box, fv_dev 1 %) | lender pushes up (1 s) | S3 | 17 | 19.239 | 19.239 | +0.210 | 5.487 |
+| v0.4.1 (settlement box, fv_dev 1 %) | S3 -> S1 flip, 1 pushed s + [pump, sol_settle, dump] | none within the horizon | | | | | 10.984 |
+| v0.4.1 (settlement box, fv_dev 1 %) | S3 -> S1 flip, 2 pushed s + [pump, sol_settle, dump] | none within the horizon | | | | | 16.493 |
+| v0.4.1 (settlement box, fv_dev 1 %) | borrower pushes down (1 s) | S3 | 13 | 18.890 | 18.890 | -0.139 | 5.528 |
+| v0.4.1 (settlement box, fv_dev 1 %) | borrower pushes down whenever settlement is due (43 pushes in 600 s) | none within the horizon | | | | | 248.474 |
+| v0.4.1 without the box (fv_dev 100 %) | honest | S3 | 0 | 19.029 | 19.029 | 0 | 0 |
+| v0.4.1 without the box (fv_dev 100 %) | lender pushes up (1 s) | S3 | 1 | 22.213 | 22.213 | +3.184 | 5.487 |
+| v0.4.1 without the box (fv_dev 100 %) | S3 -> S1 flip, 1 pushed s + [pump, sol_settle, dump] | S3 | 2 | 22.213 | 22.213 | +3.184 | 10.984 |
+| v0.4.1 without the box (fv_dev 100 %) | S3 -> S1 flip, 2 pushed s + [pump, sol_settle, dump] | S3 | 3 | 25.932 | 25.932 | +6.903 | 16.493 |
+| v0.4.1 without the box (fv_dev 100 %) | borrower pushes down (1 s) | S3 | 1 | 17.438 | 17.438 | -1.591 | 5.528 |
+| v0.4.1 without the box (fv_dev 100 %) | borrower pushes down whenever settlement is due (268 pushes in 600 s) | none within the horizon | | | | | 1985.948 |
+| rejected reading: lender-adverse corner for every decision | honest | S3 | 0 | 19.029 | 19.029 | 0 | 0 |
+| rejected reading: lender-adverse corner for every decision | lender pushes up (1 s) | S3 | 1 | 19.029 | 19.029 | -0.000 | 5.487 |
+| rejected reading: lender-adverse corner for every decision | S3 -> S1 flip, 1 pushed s + [pump, sol_settle, dump] | S3 | 2 | 19.029 | 19.029 | -0.000 | 10.984 |
+| rejected reading: lender-adverse corner for every decision | S3 -> S1 flip, 2 pushed s + [pump, sol_settle, dump] | S3 | 3 | 19.029 | 19.029 | -0.000 | 16.493 |
+| rejected reading: lender-adverse corner for every decision | borrower pushes down (1 s) | S3 | 1 | 17.438 | 17.438 | -1.591 | 5.528 |
+| rejected reading: lender-adverse corner for every decision | borrower pushes down whenever settlement is due (601 pushes in 600 s) | none within the horizon | | | | | 6653.258 |
+
+| rule | attack | outcome | settles at (s after the first push) | FV (SOL) | lenders get (SOL) | change for lenders vs honest (SOL) | attacker cost (SOL) |
+|---|---|---|---|---|---|---|---|
+| v0.4.1 (settlement box, fv_dev 1 %) | honest | S3 | 0 | 2.553 | 2.553 | 0 | 0 |
+| v0.4.1 (settlement box, fv_dev 1 %) | lender pushes up (1 s) | S3 | 17 | 2.582 | 2.582 | +0.029 | 1.661 |
+| v0.4.1 (settlement box, fv_dev 1 %) | S3 -> S1 flip, 1 pushed s + [pump, sol_settle, dump] | none within the horizon | | | | | 3.326 |
+| v0.4.1 (settlement box, fv_dev 1 %) | S3 -> S1 flip, 2 pushed s + [pump, sol_settle, dump] | none within the horizon | | | | | 4.994 |
+| v0.4.1 (settlement box, fv_dev 1 %) | borrower pushes down (1 s) | S3 | 13 | 2.532 | 2.532 | -0.021 | 1.108 |
+| v0.4.1 (settlement box, fv_dev 1 %) | borrower pushes down whenever settlement is due (43 pushes in 600 s) | none within the horizon | | | | | 49.228 |
+| v0.4.1 without the box (fv_dev 100 %) | honest | S3 | 0 | 2.553 | 2.553 | 0 | 0 |
+| v0.4.1 without the box (fv_dev 100 %) | lender pushes up (1 s) | S3 | 1 | 2.984 | 2.984 | +0.431 | 1.661 |
+| v0.4.1 without the box (fv_dev 100 %) | S3 -> S1 flip, 1 pushed s + [pump, sol_settle, dump] | S3 | 2 | 2.983 | 2.983 | +0.430 | 3.326 |
+| v0.4.1 without the box (fv_dev 100 %) | S3 -> S1 flip, 2 pushed s + [pump, sol_settle, dump] | S3 | 3 | 3.487 | 3.487 | +0.934 | 4.994 |
+| v0.4.1 without the box (fv_dev 100 %) | borrower pushes down (1 s) | S3 | 1 | 2.338 | 2.338 | -0.215 | 1.108 |
+| v0.4.1 without the box (fv_dev 100 %) | borrower pushes down whenever settlement is due (268 pushes in 600 s) | none within the horizon | | | | | 368.528 |
+| rejected reading: lender-adverse corner for every decision | honest | S3 | 0 | 2.553 | 2.553 | 0 | 0 |
+| rejected reading: lender-adverse corner for every decision | lender pushes up (1 s) | S3 | 1 | 2.553 | 2.553 | -0.000 | 1.661 |
+| rejected reading: lender-adverse corner for every decision | S3 -> S1 flip, 1 pushed s + [pump, sol_settle, dump] | S3 | 2 | 2.552 | 2.552 | -0.001 | 3.326 |
+| rejected reading: lender-adverse corner for every decision | S3 -> S1 flip, 2 pushed s + [pump, sol_settle, dump] | S3 | 3 | 2.552 | 2.552 | -0.001 | 4.994 |
+| rejected reading: lender-adverse corner for every decision | borrower pushes down (1 s) | S3 | 1 | 2.338 | 2.338 | -0.215 | 1.108 |
+| rejected reading: lender-adverse corner for every decision | borrower pushes down whenever settlement is due (601 pushes in 600 s) | none within the horizon | | | | | 1105.298 |
+
+(M, R4B-2) One attacker-only push (×3), then `k` frozen seconds (the honest keeper observes and the lender-keeper adds an observation just above `P_ema`), then the flip bundle `[pump → sol_settle → dump]`:
+
+| case | rule | honest | k frozen s | outcome | lenders (SOL) | vs honest (SOL) | cost (SOL) |
+|---|---|---|---|---|---|---|---|
+| RA 97% x1.2 | v0.4 (box on clamped obs) | S2 32.042 | 0 | none |  |  | 0.361 |
+| RA 97% x1.2 | v0.4 (box on clamped obs) | S2 32.042 | 2 | none |  |  | 0.421 |
+| RA 97% x1.2 | v0.4 (box on clamped obs) | S2 32.042 | 3 | none |  |  | 0.452 |
+| RA 97% x1.2 | v0.4 (box on clamped obs) | S2 32.042 | 4 | S2 | 37.620 | +5.578 | 0.482 |
+| RA 97% x1.2 | v0.4 (box on clamped obs) | S2 32.042 | 5 | S2 | 37.620 | +5.578 | 0.512 |
+| RA 97% x1.2 | v0.4 (box on clamped obs) | S2 32.042 | 6 | S2 | 37.620 | +5.578 | 0.542 |
+| RA 97% x1.2 | v0.4 (box on clamped obs) | S2 32.042 | 8 | S2 | 37.620 | +5.578 | 0.601 |
+| RA 97% x1.2 | v0.4 (box on clamped obs) | S2 32.042 | 10 | none |  |  | 0.661 |
+| RA 97% x1.2 | v0.4.1 (box on bucket extremes) | S2 32.042 | 0 | none |  |  | 0.361 |
+| RA 97% x1.2 | v0.4.1 (box on bucket extremes) | S2 32.042 | 2 | none |  |  | 0.421 |
+| RA 97% x1.2 | v0.4.1 (box on bucket extremes) | S2 32.042 | 3 | none |  |  | 0.452 |
+| RA 97% x1.2 | v0.4.1 (box on bucket extremes) | S2 32.042 | 4 | none |  |  | 0.482 |
+| RA 97% x1.2 | v0.4.1 (box on bucket extremes) | S2 32.042 | 5 | none |  |  | 0.512 |
+| RA 97% x1.2 | v0.4.1 (box on bucket extremes) | S2 32.042 | 6 | none |  |  | 0.542 |
+| RA 97% x1.2 | v0.4.1 (box on bucket extremes) | S2 32.042 | 8 | none |  |  | 0.601 |
+| RA 97% x1.2 | v0.4.1 (box on bucket extremes) | S2 32.042 | 10 | none |  |  | 0.661 |
+| RA 97% x1.3 | v0.4 (box on clamped obs) | S2 35.252 | 0 | none |  |  | 0.376 |
+| RA 97% x1.3 | v0.4 (box on clamped obs) | S2 35.252 | 2 | none |  |  | 0.439 |
+| RA 97% x1.3 | v0.4 (box on clamped obs) | S2 35.252 | 3 | none |  |  | 0.470 |
+| RA 97% x1.3 | v0.4 (box on clamped obs) | S2 35.252 | 4 | S2 | 37.620 | +2.368 | 0.501 |
+| RA 97% x1.3 | v0.4 (box on clamped obs) | S2 35.252 | 5 | S2 | 37.620 | +2.368 | 0.533 |
+| RA 97% x1.3 | v0.4 (box on clamped obs) | S2 35.252 | 6 | S2 | 37.620 | +2.368 | 0.564 |
+| RA 97% x1.3 | v0.4 (box on clamped obs) | S2 35.252 | 8 | S2 | 37.620 | +2.368 | 0.626 |
+| RA 97% x1.3 | v0.4 (box on clamped obs) | S2 35.252 | 10 | none |  |  | 0.688 |
+| RA 97% x1.3 | v0.4.1 (box on bucket extremes) | S2 35.252 | 0 | none |  |  | 0.376 |
+| RA 97% x1.3 | v0.4.1 (box on bucket extremes) | S2 35.252 | 2 | none |  |  | 0.439 |
+| RA 97% x1.3 | v0.4.1 (box on bucket extremes) | S2 35.252 | 3 | none |  |  | 0.470 |
+| RA 97% x1.3 | v0.4.1 (box on bucket extremes) | S2 35.252 | 4 | none |  |  | 0.501 |
+| RA 97% x1.3 | v0.4.1 (box on bucket extremes) | S2 35.252 | 5 | none |  |  | 0.533 |
+| RA 97% x1.3 | v0.4.1 (box on bucket extremes) | S2 35.252 | 6 | none |  |  | 0.564 |
+| RA 97% x1.3 | v0.4.1 (box on bucket extremes) | S2 35.252 | 8 | none |  |  | 0.626 |
+| RA 97% x1.3 | v0.4.1 (box on bucket extremes) | S2 35.252 | 10 | none |  |  | 0.688 |
+| RA 95% x1.4 | v0.4 (box on clamped obs) | S2 33.048 | 0 | none |  |  | 0.650 |
+| RA 95% x1.4 | v0.4 (box on clamped obs) | S2 33.048 | 2 | none |  |  | 0.759 |
+| RA 95% x1.4 | v0.4 (box on clamped obs) | S2 33.048 | 3 | none |  |  | 0.813 |
+| RA 95% x1.4 | v0.4 (box on clamped obs) | S2 33.048 | 4 | S2 | 37.620 | +4.573 | 0.867 |
+| RA 95% x1.4 | v0.4 (box on clamped obs) | S2 33.048 | 5 | S2 | 37.620 | +4.573 | 0.921 |
+| RA 95% x1.4 | v0.4 (box on clamped obs) | S2 33.048 | 6 | S2 | 37.620 | +4.573 | 0.975 |
+| RA 95% x1.4 | v0.4 (box on clamped obs) | S2 33.048 | 8 | S2 | 37.620 | +4.573 | 1.083 |
+| RA 95% x1.4 | v0.4 (box on clamped obs) | S2 33.048 | 10 | none |  |  | 1.190 |
+| RA 95% x1.4 | v0.4.1 (box on bucket extremes) | S2 33.048 | 0 | none |  |  | 0.650 |
+| RA 95% x1.4 | v0.4.1 (box on bucket extremes) | S2 33.048 | 2 | none |  |  | 0.759 |
+| RA 95% x1.4 | v0.4.1 (box on bucket extremes) | S2 33.048 | 3 | none |  |  | 0.813 |
+| RA 95% x1.4 | v0.4.1 (box on bucket extremes) | S2 33.048 | 4 | none |  |  | 0.867 |
+| RA 95% x1.4 | v0.4.1 (box on bucket extremes) | S2 33.048 | 5 | none |  |  | 0.921 |
+| RA 95% x1.4 | v0.4.1 (box on bucket extremes) | S2 33.048 | 6 | none |  |  | 0.975 |
+| RA 95% x1.4 | v0.4.1 (box on bucket extremes) | S2 33.048 | 8 | none |  |  | 1.083 |
+| RA 95% x1.4 | v0.4.1 (box on bucket extremes) | S2 33.048 | 10 | none |  |  | 1.190 |
+
+(M, R4A-9) `n` consecutive attacker-only pushes, then the flip bundle; and the same with one honest second (keeper crank and `sol_settle`) between pushes:
+
+| case | honest | n | honest s between pushes | outcome | lenders (SOL) | vs honest (SOL) | cost (SOL) |
+|---|---|---|---|---|---|---|---|
+| RA 97% x1.2 | S2 32.042 | 1 | 0 | none |  |  | 0.361 |
+| RA 97% x1.2 | S2 32.042 | 2 | 0 | none |  |  | 0.542 |
+| RA 97% x1.2 | S2 32.042 | 2 | 1 | none |  |  | 0.542 |
+| RA 97% x1.2 | S2 32.042 | 3 | 0 | none |  |  | 0.724 |
+| RA 97% x1.2 | S2 32.042 | 3 | 1 | none |  |  | 0.724 |
+| RA 97% x1.2 | S2 32.042 | 4 | 0 | none |  |  | 0.905 |
+| RA 97% x1.2 | S2 32.042 | 4 | 1 | none |  |  | 0.905 |
+| RA 97% x1.2 | S2 32.042 | 5 | 0 | S1 | 37.620 | +5.578 | 1.087 |
+| RA 97% x1.2 | S2 32.042 | 5 | 1 | none |  |  | 1.087 |
+| RA 97% x1.2 | S2 32.042 | 6 | 0 | S1 | 37.620 | +5.578 | 1.270 |
+| RA 97% x1.2 | S2 32.042 | 6 | 1 | none |  |  | 1.270 |
+| RA 97% x1.3 | S2 35.252 | 1 | 0 | none |  |  | 0.376 |
+| RA 97% x1.3 | S2 35.252 | 2 | 0 | none |  |  | 0.564 |
+| RA 97% x1.3 | S2 35.252 | 2 | 1 | none |  |  | 0.564 |
+| RA 97% x1.3 | S2 35.252 | 3 | 0 | none |  |  | 0.753 |
+| RA 97% x1.3 | S2 35.252 | 3 | 1 | none |  |  | 0.753 |
+| RA 97% x1.3 | S2 35.252 | 4 | 0 | none |  |  | 0.942 |
+| RA 97% x1.3 | S2 35.252 | 4 | 1 | none |  |  | 0.942 |
+| RA 97% x1.3 | S2 35.252 | 5 | 0 | S1 | 37.620 | +2.368 | 1.132 |
+| RA 97% x1.3 | S2 35.252 | 5 | 1 | none |  |  | 1.132 |
+| RA 97% x1.3 | S2 35.252 | 6 | 0 | S1 | 37.620 | +2.368 | 1.322 |
+| RA 97% x1.3 | S2 35.252 | 6 | 1 | none |  |  | 1.322 |
+| RA 95% x1.4 | S2 33.048 | 1 | 0 | none |  |  | 0.650 |
+| RA 95% x1.4 | S2 33.048 | 2 | 0 | none |  |  | 0.976 |
+| RA 95% x1.4 | S2 33.048 | 2 | 1 | none |  |  | 0.976 |
+| RA 95% x1.4 | S2 33.048 | 3 | 0 | none |  |  | 1.303 |
+| RA 95% x1.4 | S2 33.048 | 3 | 1 | none |  |  | 1.303 |
+| RA 95% x1.4 | S2 33.048 | 4 | 0 | none |  |  | 1.630 |
+| RA 95% x1.4 | S2 33.048 | 4 | 1 | none |  |  | 1.630 |
+| RA 95% x1.4 | S2 33.048 | 5 | 0 | S1 | 37.620 | +4.573 | 1.958 |
+| RA 95% x1.4 | S2 33.048 | 5 | 1 | none |  |  | 1.958 |
+| RA 95% x1.4 | S2 33.048 | 6 | 0 | S1 | 37.620 | +4.573 | 2.287 |
+| RA 95% x1.4 | S2 33.048 | 6 | 1 | none |  |  | 2.287 |
+
+(V, R4A-3) The Emergency flag is set and a genuine move makes the position expired **and** CR-liquidatable at its deadline; in the second before the honest keeper's `sol_settle(S3)` the borrower lands one contrary low observation `[sell → crank → buy back]` (lenders / penalty-part lump / borrower, SOL):
+
+| market | move | rule | legs at the call (spot / EMA) | honest: lenders / lump / borrower | veto: lenders / lump / borrower | veto cost (SOL) |
+|---|---|---|---|---|---|---|
+| A | x1.7 | v0.4 (p' from the raw legs) | False / True | S3 109.290 / 9.274 / 18.201 | S3 106.168 / 6.152 / 21.324 | 0.712 |
+| A | x1.7 | v0.4.1 (p' on the box corner) | False / True | S3 109.290 / 9.274 / 18.201 | S3 109.290 / 9.274 / 18.201 | 0.712 |
+| RA | x1.62 | v0.4 (p' from the raw legs) | False / True | S3 31.813 / 1.877 / 5.808 | S3 30.904 / 0.968 / 6.717 | 0.080 |
+| RA | x1.62 | v0.4.1 (p' on the box corner) | False / True | S3 31.813 / 1.877 / 5.808 | S3 31.813 / 1.877 / 5.808 | 0.080 |
+| C | x2.1 | v0.4 (p' from the raw legs) | False / True | S3 5.743 / 0.672 / 2.054 | S3 5.424 / 0.353 / 2.373 | 0.037 |
+| C | x2.1 | v0.4.1 (p' on the box corner) | False / True | S3 5.743 / 0.672 / 2.054 | S3 5.743 / 0.672 / 2.054 | 0.037 |
+| D@0% | x2.4 | v0.4 (p' from the raw legs) | False / True | S3 1.187 / 0.145 / 0.621 | S3 1.101 / 0.059 / 0.707 | 0.021 |
+| D@0% | x2.4 | v0.4.1 (p' on the box corner) | False / True | S3 1.187 / 0.145 / 0.621 | S3 1.187 / 0.145 / 0.621 | 0.021 |
+
+**Result.**
+
+- **Kind (R3A-1, R4B-2, R4A-9).** v0.3 let a lender-keeper turn a capped S2 into an uncapped S1 with 1–2 pushed seconds (+2.37 to +5.58 SOL); v0.4 required the S1 EMA leg on the whole box, but one push plus 4 frozen seconds did it again. v0.4.1's box on bucket extremes needs 5 attacker-only seconds of the ring's 8: no flip with any number of frozen seconds up to 10, none with pushes interleaved with honest seconds, and 5 consecutive attacker-only seconds — the degraded-mode case — do flip (+2.37 to +5.58 SOL for 1.1–2.0 SOL).
+- **`p'` (R4A-3).** v0.4 took `p'` from the raw flag, so one contrary observation cut the lenders' S3 take by 2.9 % (A) to 7.3 % (D@0 %) for 0.02–0.71 SOL; v0.4.1 decides it on the box corner and the take is unchanged.
+- **Amount (V2-9).** One pushed second moves an S2/S3 amount by at most `fv_dev_bps`: +0.35 to +0.70 SOL for a lender push up, −0.13 to −0.46 SOL for a borrower push down, against +10.48 / −5.23 SOL without the box on Tier A (E).
+- **The rejected reading.** Evaluating every decision "on the lender-adverse side" (refutation and amount at `(P_lo, L_hi)`, no amount check) closes the lender's push but hands the borrower both the refutation push (§12.10: no S1 within 600 s) and a one-second FV cut of 5.23 SOL (8.4 %) on Tier A.
+- **Deferral (residual).** A party that owns an attacker-only second can keep the box wider than 1 % and defer an S2/S3 amount by ≈ 13 s per push; repeated every time the settlement becomes due, it blocks S2/S3 for as long as it pays (A: 43 pushes in 600 s). It needs a whole second without an honest observation each time, which keeper duty 2 denies after the first. v0.4.1 adds a cheaper form: a contrary observation in every second, even one that also holds the keeper's, widens one side of the box and defers an S3 on an executable venue for 0.002 SOL/s (RC) to 0.21 SOL/s (A) at a 1 % round trip (`refute_push.py` (d), §5.6). A push-then-freeze on the S3 amount now only defers it the same way: re-running the reviewer's `ptf.py` on v0.4.1, no S3 settles while the freeze lasts (200 s, 1.5–600 SOL of bundles) and the honest amount follows when it stops (v0.4: the frozen box let the pushed amount through, +3.14 to +10.48 SOL for a lender push or −5.22 SOL for a borrower push on Tier A, unprofitable at 17.7–54 SOL of bundles). An expired position deferred this way can still be expired normally when short.win's route works.
+
+---
+
+## 13. Economic invariants
+
+Asserted in `shortwin_sim.py` (every exit, every settlement, the exit fuzz) and in `pool_model.py` (after every fuzz operation; liveness every 2,000). ARCH carries them into LiteSVM/Crucible.
+
+| ID | Invariant |
+|---|---|
+| I-E1 | Keeper-initiated buyback: measured spend `≤ max_in`, venue part `≤ B̂_ref·(1 + δ)` with the position's fixed `δ` (v0.4: no clock). |
+| I-E2 | **Expiry:** rent and expiry fee are paid in full whenever `V − R − π_ref − ert ≥ B̂_ref·(1 + ε)`, and a sandwich never reduces an expiry's rent. **Liquidation (v0.4.1):** no reserve (§8.2). |
+| I-E3 | Penalty / expiry fee `≤ ⌈rate·min(B̂_live, B̂_ref)/10⁴⌉`; where no reserve applies (every liquidation), a sandwich reduces rent + penalty + fee by at most `max_in − honest spend` (the bound's slack). |
+| I-E4 | Waterfall legs are non-negative and sum to `V` (including the keeper top-up). |
+| I-E5 | S1: lenders' take `= V − K_s`, and the S1 EMA leg holds at the box corner `(P_lo, L_hi)`; S2/S3: take `= min(V − K_s, FV(P_ema, L_ema))`, it lies within `[x(P_lo, L_hi), x(P_hi, L_lo)]` (±2 lamports of `reprice` rounding), and `x(P_hi, L_lo) − x(P_lo, L_hi) ≤ fv_dev_bps·x(P_lo, L_hi)/10⁴`, each corner with its own `p'` (v0.4.1). |
+| I-E6 | The venue charge lies in `[B̂ − 5, B̂]` (quotes are upper bounds; `reprice` gives `Y/X ≥ P`). |
+| I-E7 | EMA: at most one integration per second; single step within `[−C/(1+C), +C]·dt/(τ + dt)`; an instruction's own observation is never in the EMA it reads. |
+| I-E8 | S1/S2 execute only after `settle_persist_n` EMA updates of one eligibility clock that only box-robust evidence resets; liquidation only with the EMA leg on the newest `liq_persist_n` ring entries. |
+| I-E9 | S3 only after a continuous no-route chain (gaps ≤ 60 s) of ≥ `s3_wait_s`. |
+| I-E10 | A liquidation that leaves the borrower equity pays the keeper at least `K_s` (v0.4). |
+| I-E11 | **Liveness (v0.4.1, R4B-1):** a liquidatable, buyback-allowed position with a fresh completed bucket never waits while `B̂_live ≤ ⌊B̂_ref·(10⁴ + δ_liq)/10⁴⌋` (the liquidation bound has no other term below `V − K_s − ert`). The exit fuzz counts the waits an expiry's reserve causes. |
+| I-P1 | Σ token claims `≤ T + ΣB_Q`; Σ shares `≤ S`. |
+| I-P2 | Claim side, strict per lender: `Σ(real − claimed) + unmatched + vest_bal ≤ lender_sol`, `claimed ≤ real`, and each lender's own allocation `real − claimed ≤ max(pending, 0)` after a touch; entitlement side, signed aggregate: `Σ pending ≤ lender_sol − vest_bal + receivable`; no lender with `pending < 0` reduces its shares. |
+| I-P3 | `S + VS ≤ R_MAX·(T + ΣB_Q + VA)` (or `S = 0`); `S < 2¹²⁸`. |
+| I-P4 | Every withdrawal `≤` the lender's pro-rata allowance; Σ allowances `≤ T` (+ dust) **on the state the program sees — each lender touched alone, no other lender synced** (v0.4.1); another position's open + close never reduces a lock; no lock is effective at or after its `lock_until`, and an expired lock leaves the aggregate at its `lock_until` (v0.4.1). |
+| I-P5 | `claim_sol` never pays more than the lender's own entitlement; a second call in the same state pays 0. |
+| I-P6 | **Liveness** (v0.4, R3A-2): after every position resolves, the vest is released and every lender is synced, sequential claims leave at most dust (rounding + rebase-orphan credits) in `lender_sol`. |
+| I-P7 | `receivable = 0` and `A_j = 0` whenever no position is open, under any sequence of `rent_protocol_bps` changes (v0.4, R3B-9). |
+
+Fuzz results. `pool_model.py`: 60,000 operations per configuration (continuous rent at 90 % and 100 % utilisation caps, and option (b)), all invariants held, I-P4 also on the untouched state (§9.6). Exit fuzz (1,000 random paths; attacker bundles in 30 % of seconds; a contrary observation every second in 20 % of runs; a lender-attacker landing attacker-only seconds before settlements in 30 % of runs; **v0.4.1: per-second price noise of ±0.3 % or ±1 % in half of the runs, and a freezer that lands an opposite observation in seconds that also hold the keeper's, around armed and expiring positions, in a quarter of the runs**; σ_max overrides in a third of runs so S2 is reachable; the Emergency flag in a fifth of runs; sandwiches on 60 % of exits):
+
+```text
+{'runs': 1000, 'exits': 709, 'sandwich_attempts': 8191, 'bundles': 256972, 'attacker_only_seconds': 817, 'blocker_runs': 196, 'noisy_runs': 519, 'freezer_runs': 246, 'frozen_seconds': 1907, 'penalty_truncated_by_sandwich': 22, 'max_loss_over_bref_bps': 103, 'max_settle_box_bps': 95, 'reserve_waits_liq': 0, 'reserve_waits_exp': 0, 'kinds': {'liquidation': 213, 'expiry': 286, 'S1': 174, 'S2': 8, 'S3': 28}}
+```
+
+`max_settle_box_bps` is the widest box an S2/S3 settled on, `(x(P_hi, L_lo) − x(P_lo, L_hi))/x(P_lo, L_hi)` (bound: `fv_dev_bps` = 100; every take lay inside its box, I-E5); `reserve_waits_liq = 0` is I-E11 (no liquidation ever waited for a reserve) and `reserve_waits_exp = 0` counts the expiry reserve's waits; every rent, penalty or fee truncated by a sandwich stayed within I-E3's slack (the largest, 103 bps of `B̂_ref`, against the bound's 200). Fewer S2/S3 exits than in v0.4 (8 and 28, against 9 and 49) because the freezer, blocker and noisy runs now defer settlements they used to let through, and more paths end still open within their horizon.
+
+---
+
+## 14. Decision register (SPEC §15)
+
+| # | SPEC § | Item | Decision / default | Status |
+|---|---|---|---|---|
+| D1 | §2.1, §9 | Graduated pump tokens | Trade the canonical PumpSwap pool; Jupiter v1.1, bounded by §8.2, surplus to borrower (Q20) | OWNER |
+| D2 | §3 | Raydium AMM v4 / CPMM | MVP venues (constant product, fee on input); CLMM/DLMM/Whirlpool tokens listable and lendable, not shortable | OWNER |
+| D3 | §5.3 | Fair-value cap | S1 never capped; S2/S3 `min(V − K_s, FV)`, FV executable at `(P_ema, L_ema)` + penalty (expiry fee for expired, not CR-liquidatable positions) + rent; the amount must agree within `fv_dev_bps` on the settlement box | OWNER (literal); expiry-fee reading for S2 and S3: OWNER O15 |
+| D4 | §4 | Margin rule | `M = ⌈CR_open·max(B̂_spot, B̂_ema)⌉ − S`, `B̂_ema` on the post-roll EMA reserves as they stand | OWNER (literal); own-sale shift O2 not built |
+| G1 | §4, §6 | Notional | `N_open = B̂_spot` post-open; `N_mark = Q·P_ema` | PROPOSED |
+| G3 | §6.2 | Open fee source | On top of `M`, base `N_open`, to protocol | PROPOSED |
+| G4/G5 | §4 | Impact caps | Marginal-price move on post-open reserves; token reserve conservative (§6.1) | PROPOSED |
+| G6 | §4 | Per-wallet cap | 25 % of the market OI cap | ADOPTED Q10 |
+| G7 | §6.1 | Utilisation | `U = B_Q/(T + B_Q)`, SOL not counted | PROPOSED |
+| G8 | §4 | USD thresholds | Pyth SOL/USD cache; stale ⇒ Tier C; exits never read it | ADOPTED Q8 |
+| G9 | §4 | Pool liquidity | `Λ = 2·R_eff` (real SOL, locked-depth bound on Raydium) | ADOPTED Q19 |
+| G10 | §4 | Pool age | First on-chain observation / listing; CPMM `open_time` as lower bound where valid; age from listing covers AMM v4, PumpSwap and pre-`T_CLAMP` CPMM (O13, R3B-12) | ADOPTED Q18 |
+| G11 | §3, §4 | Locked position terms | Tier, settlement/keeper, exit-bound/persistence, execution and settlement terms and (v0.4) `rent_protocol_bps` snapshot at open (§2.4); EMA params market-level | ADOPTED Q9 + C0-8 |
+| G12 | §5.1, §9 | EMA and dual check | Buckets, τ = 5 s, ring with cached reprojection, persistence on ring entries, robust spot | PROPOSED |
+| G13 | §5.3 | S1/S2 manipulation | Legs on live, robust spot and the settlement box (v0.4.1: medians over the ring's bucket lows and highs; FV's `p'` per corner); 40 updates on one clock that only box-robust evidence resets | PROPOSED (v0.4.1) |
+| G14 | §5.2, §6.3 | Penalty base | `min(B̂_live, B̂_ref)` (risk quotes); the expiry fee is reserved in the expiry's `max_in` where the reference leaves room, a liquidation reserves nothing (v0.4.1) | PROPOSED (v0.4.1) |
+| G15 | §4 Duration | Expiry | Fee base `min(B̂_live, B̂_ref)`, 100 % lenders (vests); keeper reward `K_e` paid by the borrower | PROPOSED |
+| G16 | §6.3 | Settlement keeper cap | 0.25 SOL | ADOPTED Q4 |
+| G18 | §5.3 | S2 "slippage" | Fee-free average premium over the pre-trade marginal price | PROPOSED |
+| G19 | §5.3 | S3 proof | Continuous observed no-route chain (60 s gaps) | PROPOSED |
+| G20 | §5.3 | Stuck migration | 3,600 s, then S3 timer | ADOPTED Q5 |
+| G21 | §2.2 | Straddle | γ = 50 % at open; `B̂_str` on the bundle path; ≥ 3-tx Jito bundle with the `complete_curve` helper (R3B-11); keeper fallback | ADOPTED Q14 |
+| G22 | §2.4 | Rent crediting | Continuous entitlement, claims from realised allocation plus the pot (option a); lumps and the premium of an S2/S3 take over `Q·P_ema` vest with a value-weighted end (v0.4.1) | PROPOSED (v0.4.1); option (b) = O16 |
+| G26 | §8 | Minimum position | 0.1 SOL notional | ADOPTED Q11 |
+| G27 | §2 | `add_margin` | In MVP | ADOPTED Q12 |
+| G28 | §5 | Close while liquidatable | Allowed, no penalty; closes use the live fee and never read the route-broken flag | PROPOSED |
+| G29/G40 | §3 | Non-SOL quote, mayhem coins | Rejected at creation; legacy SPL pump coins allowed | ADOPTED Q6 |
+| G33 | §2.4 | Lender run | Pro-rata withdrawal with borrowed-inventory locks that expire at `lock_until` (v0.4.1: day-bucket expiry calendar, each position's S3 tail included); no cooldown | ADOPTED Q22 + C0-9 (v0.4.1) |
+| G37 | §7, §13 | Gap-frequency calibration | Calibrate before mainnet; levers CR_open, OI caps, rent | OWNER |
+| N1 | §5.2 | Exit bounds | §8.2 reference (v0.4.1: also ≤ `lo_x·(1 + κ_eff)`), κ, **fixed δ_liq = 2 %**, δ_exp = 1 %; liquidation: no reserve (v0.4.1); expiry: rent and fee senior | PROPOSED (v0.4.1; replaces N14's Dutch clock) |
+| N2 | §4 caps | Fee-scaled caps | 3.0·φ per position, 7.5·φ per market | PROPOSED (**OWNER** visibility) |
+| N3 | §2.4 | Share epochs | R_MAX 10⁶, rebase 1,000ᵏ, full roll at T + B_Q = 0 (vest flushed into the record; v0.4.1: deposits wait for the post-wipe sweep) | PROPOSED |
+| N4 | §2.4 | Negative pending | Withdraw blocked until covered | PROPOSED |
+| N5 | §9 | Keeper duties | §5.8 | PROPOSED |
+| N6 | §4 | Beta market cap | 25 SOL of open notional per market | ADOPTED Q21 |
+| N7 | §6.2 | Market creation fee | 0.005 SOL + account rent | ADOPTED Q24 |
+| N8 | §11 | Venue upgrade | Auto-refuse opens after a venue program upgrade (event-driven latch, ARCH) | ADOPTED Q13 |
+| N9 | §3 | Boost window | Opens blocked while boost vault > 0.05 SOL and < 900 s after graduation | ADOPTED Q15 |
+| N10 | §4 caps, §5.3 | Venue fee caps | Opens refused above 150 bps one-way; above 500 bps the route counts as broken (S3 evidence) and every risk quote and FV use at most that fee | PROPOSED (**OWNER** visibility) |
+| N11 | §3 | Raydium reference pool | Locked depth `λ·√(X·Y)`, ≥ 50 % locked LP, ≥ 25 SOL real reserve; non-fast adoption only with no open position (25 % margin; 5 % inside the listing window); fast path on `pool_fail` (120 s + 60 s window) | PROPOSED (**OWNER**; v0.4, decision 7) |
+| N12 | §6.1 | Rent implementation | Three basis indices, per-position locked rate curve and protocol share (§7) | PROPOSED (v0.4) |
+| N13 | §4 | Pool age and tier inputs | Precise `R`, `R_slow`, CPMM `open_time` bound; oracle ages | ADOPTED Q8/Q18/Q19 |
+| N15 | §5.3 | Settlement decisions | One rule: the settlement box (§5.6) for arming, refutation, kind and amount | PROPOSED (v0.4; replaces N15/N16 of v0.3) |
+| N17 | §2.4 | Claims | Own realised allocation + MarketVault pot up to the own deficit; liveness invariant | PROPOSED (v0.4, R3A-2) |
+| N18 | §2.4 | Lock decay | Running minimum of `B_Q` and `lock_until` | PROPOSED (v0.4, R3B-1) |
+| N19 | §2.4 | Post-wipe credits, `S = 0` | Wipe record while live; otherwise protocol; last lender gets the unreleased vest; 0-share lenders skip records | PROPOSED (v0.4, R3A-10) |
+| N20 | §4 caps | Raydium sizing | Tier and cap liquidity ≤ locked depth / `λ_min` | PROPOSED |
+| N21 | §2.4, §6.3 | Lump vesting | Lender lumps vest linearly over `lump_vest_s` (6 h); settlement principal immediate | PROPOSED (v0.4, R3B-2) |
+| N22 | §6.3 | Liquidation keeper floor | Keeper reward ≥ `K_s` when the borrower has equity left, top-up paid by the borrower | PROPOSED (v0.4, R3B-10; **OWNER** visibility: a new borrower charge, like `K_e`) |
+| N23 | §6.1 | Protocol share of rent | Snapshot per position | PROPOSED (v0.4, R3A-5/R3B-9) |
+| N24 | §11 | Keeper degraded mode | Opens paused on markets the keeper cannot cover (reason `KeeperCoverage`); `CoverageGap` event | PROPOSED (v0.4, R3B-5) |
+| N25 | §9 | Keeper operating budget | Per-market daily budget, priority ceiling, coverage list | **OWNER** (O17) |
+| N26 | §15 | Governance CI gate | `config_check.py` (liveness battery + corners) must pass for every parameter proposal | PROPOSED (v0.4, R3B-6) |
+
+---
+
+## 15. Parameter registry
+
+Scope: G = global config, T = per tier, P = snapshot per position at open, M = market-level (params-version rule), C = compile-time constant. Every value is configurable within the compiled **hard bounds**, which v0.4 tightened to the simulated-safe region (R3B-6) and v0.4.1 re-derived on the 1,655-run battery for every parameter with a liveness effect (R4A-4, §5.7), and timelocked (SPEC §11). ARCH §2.3.3 carries the same table. **Bold** = changed in v0.4 or v0.4.1.
+
+| Parameter | Default | Hard bounds | Unit | Scope | Status |
+|---|---|---|---|---|---|
+| `open_fee_bps` | 25 | [0, 100] | bps of N_open | G | SPEC |
+| `rent_protocol_bps` | 1,500 | [0, 3,000] | bps of rent | **G→P** | SPEC (snapshot per position, R3A-5/R3B-9) |
+| `penalty_split` lender/protocol/keeper | 5,000/2,000/3,000 | keeper ≤ 5,000, protocol ≤ 5,000, sum 10,000 | bps | G→P | SPEC |
+| `expiry_fee_bps` | 200 | [0, 500] | bps of base | G→P | SPEC |
+| `settle_keeper_fixed` / `_bps` / `_cap` | 10,000,000 / 100 / 250,000,000 | **[0, 10,000,000] / [0, 100] / [0, 250,000,000]** (v0.4.1: larger values widen the S1 region and lose 4–31 battery runs) | lamports / bps of V / lamports | G→P | SPEC / SPEC / ADOPTED Q4 |
+| `expiry_keeper_fixed` / `_bps` / `_cap` | 1,000,000 / 10 / 50,000,000 | [0, 10,000,000] / [0, 100] / [0, 250,000,000] | lamports / bps of B̂_ref / lamports | G→P | PROPOSED |
+| `util_kink_bps` / `util_cap_bps` | 8,000 / 9,000 | kink ≤ cap ≤ 9,500 | bps | M (own version, R3A-9) / G | SPEC |
+| `wallet_cap_bps` | 2,500 | [500, 10,000] | bps of OI cap | G | ADOPTED Q10 |
+| `curve_oi_gamma_bps` | 5,000 | [1,000, 9,000] | bps of rt | G | PROPOSED |
+| `fee_size_cap_x100` | 300 | **[100, 500]** (no "off") | 1/100 × φ | G | PROPOSED (N2) |
+| `fee_oi_cap_x100` | 750 | **[300, 1,000]** (no "off"; off = +138 SOL Raydium basket, §6.1) | 1/100 × φ | G | PROPOSED (N2) |
+| `min_notional` | 100,000,000 | [10,000,000, 10⁹] | lamports | G | ADOPTED Q11 |
+| `market_max_notional` | 25,000,000,000 (beta) | **[10⁹, 10¹⁴]** (finite, R3A-11 a) | lamports | G | ADOPTED Q21 |
+| `market_creation_fee` | 5,000,000 | [0, 100,000,000] | lamports | G | ADOPTED Q24 |
+| `s3_wait_s` / `grad_grace_s` | 600 / 600 | [600, 86,400] | s | G→P | SPEC |
+| `S3_OBS_GAP_S` | 60 | – | s | C | PROPOSED |
+| `max_migration_pause_s` | 3,600 | [600, 86,400] | s | G→P | ADOPTED Q5 |
+| `boost_dust_lamports` / `boost_window_s` | 50,000,000 / 900 | [0, 10⁹] / [0, 7,200] | lamports / s | G | ADOPTED Q15 |
+| `open_ema_dev_bps` / `market_warmup_s` | 1,000 / 50 | [100, 5,000] / [10·τ, 3,600] | bps / s | G | PROPOSED |
+| **`EMA_TAU_S`** | **5** | – (**compile-time constant**) | s | **C** | PROPOSED (R3B-6; v0.4.1: τ = 6 loses 83 of the 1,655 battery runs, §5.7) |
+| `ema_dtmax_s` / `ema_clamp_bps` | 2 / 10,000 | **[1, 2] / [5,000, 10,000]** | s / bps | M | PROPOSED (clamp 1,000 loses 10 battery rows) |
+| `ema_force_delay_s` | 604,800 | [86,400, 2,592,000] | s | G | PROPOSED |
+| `ring_len` | 8 | – | entries | C | PROPOSED |
+| `ref_max_age_s` | 2 | **[1, 3]** | s | G→P | PROPOSED |
+| `liq_persist_n` | 3 | **[2, 3]** (v0.4.1: 4 loses 58 battery runs) | ring entries | G→P | PROPOSED (`liq_persist_s` **removed**) |
+| `settle_persist_n` / `settle_arm_gap_s` | 40 / 10 | **[40, 600]** / [2, 60] | EMA updates / s | G→P | PROPOSED (`settle_persist_s` **removed**) |
+| `kappa_liq_bps` / `kappa_base_bps` / `kappa_growth_n` | 2,500 / 0 / 3 | **[2,500, 3,000] / [0, 1,000] / [3, 4]** | bps / bps / updates | G→P | PROPOSED (v0.4.1: κ = 2,250 loses 38 battery runs, 6–8× pumps over 40–50 s; the growth window stays at ≤ 4 although 5 now passes) |
+| **`delta_liq_bps`** | **200** | **[200, 500]** | bps over `B̂_ref` | G→P | PROPOSED (v0.4, decision 1; replaces `delta_liq_min/slope/max_bps`) |
+| `delta_exp_bps` | 100 | **[50, 300]** | bps | G→P | PROPOSED |
+| `exec_tol_bps` (ε) | 10 | [0, 100] | bps | G→P | PROPOSED (**expiry bound only since v0.4.1**) |
+| `exec_rent_tol` (ert) | 6,500,000 | **[6,000,000, 10,000,000]** (must cover the 5,811,520 worst case) | lamports | G→P | PROPOSED; 0 on Raydium (stored per position) |
+| `fv_dev_bps` | 100 | **[50, 200]** | bps | G→P | PROPOSED (v0.4: the settlement-box tolerance for amounts) |
+| `liq_slow_tau_s` / `_dtmax_s` | 3,600 / 60 | [600, 86,400] / [1, 600] | s | M | PROPOSED |
+| **`lump_vest_s`** | **21,600** | **[3,600, 604,800]** | s | G | PROPOSED (v0.4, R3B-2) |
+| **`lock_grace_s`** | **86,400** | **[3,600, 604,800]** | s | G | PROPOSED (v0.4, R3B-1; v0.4.1: added after `max_release`, which already contains each position's S3 tail, R4A-8/R4B-8) |
+| **`LOCK_BUCKET_S` / `LOCK_BUCKETS`** | **86,400 / 128** | – | s / buckets | C | PROPOSED (v0.4.1 lock expiry calendar; compile-time assert `LOCK_BUCKETS·LOCK_BUCKET_S ≥` max duration 90 d + S3 tail 3 d + `lock_grace_s` 7 d + 2 d) |
+| `virtual_shares` / `virtual_assets` | 1,000 / 1 | – | – | C | PROPOSED |
+| `R_MAX` / `REBASE` | 10⁶ / 1,000 | – | shares per raw token / factor | C | PROPOSED |
+| **`P_ACC_MAX` / `P_OPEN_MAX`** | **10²⁹ / 10²⁷** | – | WAD | C | PROPOSED (v0.4, §2.2) |
+| `theta_A` / `theta_B` | $500 k / $100 k | [$50 k, $50 M] / [$10 k, θ_A) | USD of pool liquidity | G | SPEC; oracle ADOPTED Q8 |
+| `AGE_C_S` / `AGE_A_S` | 86,400 / 604,800 | – | s | C | SPEC §4 |
+| `oracle_max_age_s` / `oracle_stale_s` | 120 / 3,600 | [60, 600] / [600, 86,400] | s | G | ADOPTED Q8 |
+| `oracle_max_conf_bps` / `oracle_max_step_bps` | 200 / 2,000 | [10, 1,000] / [500, 5,000] | bps | G | PROPOSED |
+| `venue_fee_cap_bps` | 150 | [25, 300] | bps, one-way | G | PROPOSED (N10) |
+| `venue_fee_hard_cap_bps` | 500 | [300, 2,000] | bps | G→P | PROPOSED (N10) |
+| `pool_min_real_sol` | 25,000,000,000 | [10⁹, 10¹³] | lamports | G | PROPOSED (N11) |
+| `pool_lock_min_bps` (λ_min) | 5,000 | [2,000, 10,000] | bps of LP permanently locked | G | PROPOSED (N11; S2 stays unreachable at capped sizes even at 2,000) |
+| `pool_switch_margin_bps` / `pool_list_window_s` / `pool_list_margin_bps` | 2,500 / 3,600 / 500 | [500, 10,000] / [0, 86,400] / [0, 2,500] | bps / s / bps | G | PROPOSED (N11); `pool_switch_delay_s` **removed** |
+| `pool_fast_route_s` / `pool_fast_min_bps` / `pool_fast_window_s` | 120 / 2,500 / 60 | **[30, 420]** / [1,000, 10,000] / **[10, 120]** | s / bps / s | G | PROPOSED (N11; R3A-11 a, b) |
+| `T_CLAMP` | 1,717,200,000 | – | unix s | C | PROPOSED |
+| `m_bps` | 10,000 / 15,000 / 20,000 / 30,000 | informational | bps | T | SPEC |
+| `cr_open_bps` | 20,000 / 25,000 / 30,000 / 40,000 | **≥ the SPEC value of the tier** (v0.4.1), ≥ cr_liq + 2,000, ≤ 100,000 | bps | T | SPEC (lower values lose 109 battery runs) |
+| `cr_liq_bps` | 12,500 / 13,500 / 15,000 / 17,500 | **[SPEC value of the tier, cr_open − 2,000]** (v0.4.1) | bps | T→P | SPEC (lower values lose 362 battery runs at 12,500 for every tier) |
+| `penalty_bps` | 500 / 700 / 800 / 1,000 | [0, 2,000] | bps of base | T→P | SPEC |
+| `max_duration_s` | 30 d / 14 d / 7 d / 72 h | [1 h, 90 d] | s | T→P | SPEC |
+| `impact_pos_bps` / `impact_mkt_bps` | 500 / 2,000 (D 300 / 1,000) | [0, 1,000] / [0, 5,000] | bps | T | SPEC |
+| `max_liq_slip_bps` | 2,000 (D 3,000) | [500, 5,000] | bps | T→P | SPEC |
+| `rate_base/slope1/slope2_bps` | per SPEC §6.1 (§7) | base ≤ 50,000; slopes ≤ 1,000,000 | APR bps | T→P | SPEC / derived |
+| `min_rent_s` | 3,600 (D 14,400) | [0, 86,400] | s | T→P | SPEC |
+
+**Removed in v0.4:** `ema_tau_s` as a parameter (now the constant `EMA_TAU_S`), `delta_liq_min_bps`, `delta_liq_slope_bps`, `delta_liq_max_bps`, `liq_persist_s`, `settle_persist_s`, `fv_liq`, `settle_s2_first`, `margin_ema_own_sale`, `ref_lo_k`, `pool_switch_delay_s` (and, ARCH-only, `venue_sync_max_age_slots` with the A7 mirror, decision 4). `fv_cap` is not a parameter (SPEC). The liquidation keeper floor, the expiry reserve and (v0.4.1) the absence of a liquidation reserve are rules, not parameters.
+
+**Relational checks in `validate_params()`** (v0.4 additions in bold):
+
+- `cr_open_bps ≥ cr_liq_bps + 2,000`; `cr_liq_bps ≥ 10,500`; `util_kink_bps ≤ util_cap_bps ≤ 9,500`; penalty split sums to 10,000;
+- `market_warmup_s ≥ 10·EMA_TAU_S`; `venue_fee_cap_bps < venue_fee_hard_cap_bps`; `settle_keeper_fixed ≤ settle_keeper_cap`; `expiry_keeper_fixed ≤ expiry_keeper_cap`; `theta_B < theta_A`;
+- **`kappa_base_bps ≤ kappa_liq_bps`**; **`delta_liq_bps ≥ delta_exp_bps`**; **`fee_size_cap_x100 ≤ fee_oi_cap_x100`**; **per tier, `cr_open_bps` and `cr_liq_bps` ≥ the SPEC §4 values** (v0.4.1); v0.4's `liq_persist_n + kappa_growth_n ≤ 7` is implied by the v0.4.1 bounds (3 + 4) and dropped;
+- **`pool_fast_route_s + pool_fast_window_s ≤ 540`**, checked against the compiled minimum of `s3_wait_s` (600) minus the 60 s chain gap, so that no position — whatever `s3_wait_s` it snapshot — reaches S3 before the fast path can complete (R3A-11 b);
+- `ring_len ≥ max(liq_persist_n, kappa_growth_n + 1)` (holds for all compiled values).
+
+`shortwin_sim.validate_params()` is the executable reference of these bounds and checks for every parameter the sim models, including the penalty split's parts and every per-tier bound (M1 doc sync), and the program's `shortwin_math::params::validate` is the same function (T-CONFIG); the bounds of the parameters the sim does not model (`min_notional`, `market_max_notional`, `market_creation_fee`, the boost pair, `market_warmup_s` and its `≥ 10·EMA_TAU_S`, `ema_force_delay_s`, `lump_vest_s`, `lock_grace_s`, θ and `theta_B < theta_A`, the oracle limits, the Raydium selection parameters and `pool_fast_min_bps`) are `params::validate_econ`, transcribed from this table; the program runs both (ARCH §2.3.3). The default configuration validates. **CI gate** (R3B-6, v0.4.1): every `Params`, `TierParams` or `EmaParams` proposal runs `python3 sim/config_check.py <overrides>`, which applies `validate_params()` and then the 1,655-run liveness battery of §5.7 (core rows, per-second noise, the genuine-pump grid, aged positions), comparing sizing parameters at equal position size; it must print `OK`. A proposal that only lowers lender income (penalty, rates, expiry fee) reports "lender −1 %" rows and needs the owner's explicit sign-off. `--corners` re-checks every corner of the core box and a stress corner with every scanned parameter at its adverse extreme; `--scan` moves every parameter with a liveness effect to each compiled extreme alone.
+
+---
+
+## 16. Sources
+
+**Code and docs**
+
+- [S1] `pump-fun/pump-public-docs@81091419e4457566469d4e2a27f64ed84d42419c` `docs/PUMP_PROGRAM_README.md`: synthetic reserves, completion, permissionless idempotent `migrate`, appended `BondingCurve` fields.
+- [S2] same commit, `docs/instructions/BUY.md` l. 46: `amount` "cannot exceed the bonding curve's real token reserves".
+- [S3] same commit, `idl/pump.json` and `idl/pump_amm.json`: layouts, `Pool.virtual_quote_reserves: i128`, events.
+- [S4] npm `@pump-fun/pump-sdk@2.0.0`, `src/bondingCurve.ts`, `src/fees.ts` (fee = ceil).
+- [S5] same commit, `docs/FEE_PROGRAM_README.md`: dynamic fees by market cap.
+- [S6] npm `@pump-fun/pump-swap-sdk@1.20.0`, `src/sdk/buy.ts`, `src/sdk/sell.ts`.
+- [S7] same commit, `docs/PUMP_SWAP_README.md` l. 128: canonical pool index 0.
+- [R1] `raydium-io/raydium-cp-swap@59fb845a9e5bb569c8b2f3415f13b0c0ebcc6b92` `programs/cp-swap/src/curve/fees.rs`, `curve/calculator.rs`, `curve/constant_product.rs`.
+- [R2] same commit, `programs/cp-swap/src/states/pool.rs` L200–221 `vault_amount_without_fee`.
+- [R3] `raydium-io/raydium-amm@d26944bfb76fb5fa8f91e5d440c2050ed358ef81` `program/src/state.rs` L463–476 and `program/src/processor.rs` `process_swap_base_out`.
+- [R-VEN], [R-PUMP], [R-RAY]: `docs/research/graduated-venues.md`, `docs/research/pumpfun-bonding-curve.md`, `docs/research/raydium-amm.md`.
+- Design reviews: `critics.md` (C0-1 … C1-15), the second review (V1-1 … V2-14) and the third (R3A-1 … R3A-13, R3B-1 … R3B-12, 2026-09-27). The third review's experiment scripts (`scratchpad/r3/xdoc/sim/…`, `scratchpad/r3/R3B/sim/…`) were adapted into `sim/attacks/fv_push.py` (`r3_s1_bypass.py`), `refute_push.py` (`r3_refute_push.py`, `r3_spotblock_arm.py`), `fixed_delta.py` (`dutch.py`, `dutch2.py`, `dutch3.py`, `sandwich_fixed.py`), `cascade.py`, `pool_r3.py` and `pool_model.py` (`r3_stranded.py`, `jit_lump.py`, `stuck_lock.py`, `wipe_dust.py`); their v0.3 figures reproduce on the frozen model.
+
+**Mainnet accounts and RPC**
+
+- [A1] pump `Global` `4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf` (slot 450,799,240).
+- [A2] pump `FeeConfig` `8Wf5TiAheLUqBrKXeYg2JtAFFMWtKdG2BSFgqUcPVwTt` (slot 450,799,233): one tier, 0/95/30 bps.
+- [A3] pump_amm `FeeConfig` `5PHirr8joyTMp9JMm6nW7hNDVyEYdkzDqazxPD7RaTjx` (slot 450,799,236): 25 market-cap tiers.
+- [A4] CoinGecko SOL = $121.2 (2026-09-27), used only for illustrating the USD thresholds.
+- [A5] PumpSwap pools `32UVHz1WQ44Azr26EJTJZbGUp2Eb6QjWKy21BrGf3k4e` (VQR 17,584,505,333, slot 450,832,464) and `8DY32U41qDx6rGj1zDkPzwL2FZi34j6wQANc27N75mKb` (VQR 17,584,505,348, slot 450,832,469).
+- [A6] `getFeeForMessage` on api.mainnet-beta.solana.com, slot 450,897,283: a one-signature legacy message costs **5,000 lamports** (keeper cost model).
+- [A7] `getRecentPrioritizationFees` for `pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA`, `32UVHz1WQ44Azr26EJTJZbGUp2Eb6QjWKy21BrGf3k4e` and `675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8`, slots 450,897,105–255: per-slot minimum landed fee 0 µlamports/CU at p50 and p75 on all three; p90 3 / 0 / 1,943; maximum 718,304 / 0 / 1,310,078.
+
+**Mainnet transactions** — [T1]–[T12] as in v0.1 (buys, sells, completing buy, migrations, mayhem trades).
+
+---
+
+## 17. UNVERIFIED items and open questions
+
+**UNVERIFIED**
+
+- The proportional boost rule `VQR = ⌊0.2069·migrated⌋`: exact on all 130 non-mayhem migrations decoded (two checked by hand here); the program source is closed.
+- Raydium: CPMM exact-out with the creator fee on the output side (source only), byte-identical builds of the deployed binaries, and whether Raydium's pool admin has historically disabled pools or raised fees.
+- Whether held pumps of 1–3 s at +10–30 % on real pools are arbitraged (the §12.6 residuals assume they are not).
+- CU per instruction in the keeper cost model (ARCH §6.1 estimates until T-CU); the number of `crank_price` instructions that fit one transaction (v0.4.1 byte estimate: 4 PumpSwap / CPMM or 5 curve cranks per v0 transaction, up to 9 per v1 transaction; ARCH §6.4, T-SIZE).
+- The intra-second price noise of the §5.7 battery (±0.3 %, ±1 %) is an assumption, not a measurement of the per-tier live-versus-reference gap on mainnet.
+- Gap-frequency parameters of the Monte Carlo (illustrative, uncalibrated).
+- Mainnet activation of the 24 M CU per-writable-account block limit relevant to observation censoring.
+
+**Open questions (OWNER)**
+
+- Calibrate the frequency and size of sustained up-gaps per tier from indexer data (§11.6).
+- **O15** is no longer open: the owner recorded the expiry fee in `p'` for expired, not CR-liquidatable positions, in S2 and S3 (SPEC §0, §5.3, §14; §8.6).
+- **O16:** keep option (a) for lender SOL (continuous rent entitlement, pot, lump vesting) or switch to option (b) (one accumulator, linear release of all lender SOL) (§9.4).
+- **O17:** the keeper operating budget per market and the priority-price ceiling; which markets the keeper covers; and whether the keeper gets a narrow role that can only pause and unpause opens, so degraded mode is automatic (§5.8).
+- **O13 (extended):** accept that markets listed after graduation start at Tier C for 24 h and Tier B until day 7, on AMM v4, PumpSwap and pre-`T_CLAMP` CPMM pools (§6.2).
+- **N22:** accept the liquidation keeper floor (a borrower-paid top-up of at most `K_s − 0.3·π`), or cap `K_s` instead (a SPEC §6.3 change) (§8.5).
+- No-route liveness (O14): accept the freeze of healthy positions during a venue halt, or add a borrower-initiated SOL close.
+- Accept the fee-scaled caps (N2) and their effect on Raydium position sizes, or trade them for a lower `κ_max`.
+- Accept the residual run advantage of §9.3 or fund a withdrawal queue (O10).
+- Accept the residuals of §12.6: the held-model share of a liquidated borrower's remainder (Tier A +5.66 SOL) and the penalty and rent the bought-down vault no longer covers (Tier A −2.06 SOL fresh, −8.02 SOL aged 25 days at 90 %), or buy back the aged-position rent with the rent-only reserve at the cost of one extra S1 in 1,655 battery runs (§8.2); the borrower's paid veto; the ±1 % settlement-amount push; the settlement deferral, including the paid per-second widening of v0.4.1; 5 consecutive attacker-only seconds in degraded mode (O19).
+
+---
+
+## Appendix A. Review resolution — round 3 (economic side)
+
+The full record, including the ARCH-only findings, is in `ARCHITECTURE.md` Appendix A. "Fixed" means fixed in this document and the sims; "ARCH" means the change is architectural and this document only aligns to it. The fourth review revised several of these fixes; the changelog v0.4 → v0.4.1 (#74–#89) lists the economic side of every round-4 finding, and ARCH Appendix A's "Review resolution — round 4" records them all.
+
+| ID | Sev. | Finding (short) | Resolution | Where |
+|---|---|---|---|---|
+| R3A-1 | MED | FV gate protects S2 only; a lender flips S2 → S1 with 1–2 pushed seconds | **FIXED**: the settlement box (one rule) — S1 needs its EMA leg at `(P_lo, L_hi)`; flip cases added to `fv_push.py` (none succeeds; v0.3 +2.37–5.58 SOL); exit fuzz now produces S2 (9) and S3 (49) and asserts I-E5 against the ring-median state (max deviation 90 bps ≤ 100) | §5.6, §12.11, §13 |
+| R3A-2 | MED | Memoryful claim not live: realised SOL stranded | **FIXED**: MarketVault pot `unmatched`, drawable up to the own deficit; liveness invariant I-P6 asserted every 2,000 fuzz ops; reviewer's test 68.12 → 0.00002 SOL; "nothing is stranded" wording removed; `S == shares` needs no special case | §9.4, §9.6 |
+| R3A-3 | MED | Contradictory differential targets; sim deviations (i)–(v) | **FIXED** (sim side): all five deviations and the rent-index tolerance removed, so differential tests need no exceptions; v0.4 sims are normative (ARCH §8.1/M0 point to v0.4) | changelog #67, §2 |
+| R3A-4 | MED | Fast-path trigger undefined / no state | **FIXED** (with ARCH): explicit `pool_fail` predicate and chain, simulated; the flag never triggers it | §10.3 |
+| R3A-5 | LOW | Global `rent_protocol_bps` breaks the true-up | **FIXED**: snapshot per position, folded into `A_j`; I-P7 asserted under random governance changes; receivable clamp stated | §7, §9.4 |
+| R3A-6 | LOW | (a) refutation on raw `P_ema`; (b) spot-leg veto restarts the clock | **FIXED**: box-robust refutation and disarm; armed clock kept on every non-refuting call (a: S1 +4 s instead of never; b: +0–2 s instead of +34–42 s) | §5.6, §12.10 |
+| R3A-7 | LOW | Dutch clock counted non-executable seconds; residual attribution | **RESOLVED by removal** of the clock (fixed δ); the held residual is re-attributed to κ opening plus the fixed 2 % | §8.2, §12.6 |
+| R3A-8 | LOW | Non-literal defaults: `p'`, O6, compiled bounds of O1/O2 knobs | (a) **Resolved pending O15** (R4A-10 f): the reviewer's alternative needs the SPEC §14 record of O15, which gates M2; until then the expiry-fee reading is the build default, with SPEC §4 cited and sim evidence (§8.6), and v0.4.1 decides "CR-liquidatable" on the box (#80); (b) ARCH (O6 as SPEC §9 amendment); (c) **FIXED**: the knobs are not built at all | §8.6, §15 |
+| R3A-9 | LOW | Forced adoption vs `params_version` | ARCH; this document states that `util_kink_bps` has its own version and forced EMA adoption does not advance it | §2.4, §7 |
+| R3A-10 | LOW | `S == 0` after withdrawals: next dust depositor takes credits | **FIXED**: such credits go to `protocol_fees`; last lender gets the unreleased vest | §9.5 |
+| R3A-11 | LOW | Missing compiled maxima; fast-path relation vs snapshot; δ ring dependence; ring L at venue change | **FIXED**: `pool_fast_route_s ≤ 420`, window ≤ 120, sum ≤ 540 against the compiled `s3_wait_s` minimum; finite `market_max_notional`; (c) moot (clock removed); (d) ring rewrite normative | §15, §5.2 |
+| R3A-12 | LOW | Numerics unspecified (g, κ, median, σ, λ, D, locked SOL, EMA timing) | **FIXED**: numerics table and order of operations | §2.1 |
+| R3A-13 | LOW | Stale texts | **FIXED**: ring row, allowance formula, boost wording, pool_model and fv_push docstrings, sim header | §2, §9.3, §17 |
+| R3B-1 | HIGH | Locks can pin a lender forever | **FIXED**: `lock_until`; Π kept (it returns 94 % of the allowance within 24 h when interest fades); I-P4 extended | §9.3 |
+| R3B-2 | MED | Lump credits sniped just in time | **FIXED**: lumps vest over 6 h (atomic capture 33.5 % → 0 %); post-wipe vest flush; §11.6 restated (expiry fee = 36 % of Tier A lender income) | §9.4, §9.5, §11.6 |
+| R3B-3 | MED | CU of naive U256 everywhere; overflow table wrong | **FIXED** (economic side): corrected overflow table, u128 fast paths, cached reprojection; CU gates are ARCH | §2.2, §2.3 |
+| R3B-4 | MED | u128 alignment in zero-copy layouts | ARCH only (decision 9) | — |
+| R3B-5 | MED | Keeper economics unpriced | **FIXED**: cost model, batching, observations counted, degraded mode; budget is OWNER O17 | §5.8 |
+| R3B-6 | LOW | Hard bounds admit unsafe values | **FIXED**: τ made a constant; bounds tightened to the simulated-safe region, every corner checked, CI gate; the reviewer's own suggestions κ ≥ 1,500 and τ ≤ 8 were tested and rejected (they fail) | §5.7, §15 |
+| R3B-7 | LOW | Venue-change ring L, hypothetical fee tier, reprice rounding, ring row | **FIXED**: ring rewrite + Raydium switch scenario; live fee tier stated; `Y/X ≥ P` rounding; ring row | §5.2, §3.1, §2.1, §10 |
+| R3B-8 | LOW | Fast-path predicate has no state | **FIXED** with R3A-4 | §10.3 |
+| R3B-9 | LOW | `rent_protocol_bps` change while positions open | **FIXED** with R3A-5 | §7 |
+| R3B-10 | LOW | Keeper prefers waiting for S1 on small positions | **FIXED**: liquidation keeper floor at `K_s` (I-E10); dependence of small positions on the in-house keeper disclosed | §8.3, §8.5 |
+| R3B-11 | LOW | Straddle bundle fragile | ARCH (`complete_curve` helper); noted | §10.2 |
+| R3B-12 | LOW | Age from listing on PumpSwap / pre-T_CLAMP CPMM | **FIXED**: O13 extended, disclosed | §6.2 |
+| Simpl. (A) | — | One settlement rule; drop O1/O2 knobs; O(1) pot; drop `lb_hist`/`ref_lo_k`; separate fast-path chain | **ADOPTED** (the "lender-adverse side" wording refined to "the same decision on the whole box", with evidence) | §5.6, §9.4, §10.3 |
+| Simpl. (B) | — | Fixed δ; EMA leg on newest n; cached reprojection; event-driven venue latch; S2 as one predicate; single accumulator; lock_until; pool selection only at 0 positions; U256 only where needed | **ADOPTED**, except the single accumulator (option (b) → owner option O16, rejected as default with evidence) and the venue latch (ARCH) | changelog |
+
+---
+
+## Appendix B. Earlier changelogs (v0.1 → v0.3)
+
+Section numbers in these tables refer to the document version current at the time.
+
+### Changelog v0.1 → v0.2
+
+| # | Change | Issue / decision | Where |
+|---|---|---|---|
+| 1 | **S1 is never capped.** In S2/S3 lenders take `min(V − K_s, FV)` with **FV = executable buyback cost of Q at the EMA price on EMA reserves + penalty + accrued rent** (was: marginal EMA price, cap applied in every settlement, default "off"). PROPOSED details (v0.2; **superseded in v0.3, #36**): FV liquidity = the deeper of the fast and slow liquidity EMAs, so a temporary LP drain does not raise FV; and when both the S1 and the S2 legs hold, the settlement is **S2** (liquidity-driven), so draining LP cannot manufacture an uncapped S1. | **D3**, C0-7, C0-11 | §5.6, §8.6, §12.5 |
+| 2 | **Margin rule enforced:** `M = ⌈CR_open·max(B̂_spot, B̂_ema)⌉ − S`. PROPOSED precise reading (v0.2; **superseded in v0.3, #36**: now owner option O2): the EMA leg is evaluated on the EMA reserves shifted by the open's own sale (otherwise at the size cap the borrower is charged twice for its own price impact, +10 % of notional in Tier A). | **D4**, C0-11 | §4 |
+| 3 | **Exit buybacks are bounded by a manipulation-resistant reference price.** Expiry: `max_in ≤ B̂(Q at min(P_ema, ring minimum, last-second low))·(1+1 %)`. Liquidation: fresh last-second low, extrapolated by the *sustained* EMA growth and capped at `P_ema·(1+κ_eff)`, with a Dutch bound `δ = 1 % → 5 %` (1 %/s) after the first executable second. | C0-1 (1) | §8.2 |
+| 4 | Penalty and expiry fee are computed on `min(B̂_live, B̂_ref)` — both **quotes**, never the measured spend. | C0-1 (2), C0-14 | §8.3–8.4 |
+| 5 | **Rent is senior to the buyback** wherever the fair (reference) cost leaves room for it: `max_in ≤ max(V − R − ert, B̂_ref·(1+ε))`. | C0-1 (3) | §8.2 |
+| 6 | **Expiry keeper reward** `K_e = min(0.001 SOL + 0.1 %·B̂_ref, 0.05 SOL)`, paid from the borrower's remainder (the SPEC 2 % expiry fee still goes 100 % to lenders). | C0-1 (4) | §8.4 |
+| 7 | **Observation layer rebuilt.** Every market instruction records its pre-trade spot into a per-second bucket (later same-second observations count); the EMA integrates the *previous* second's bucket, moving only if every observation of that second was on one side of the EMA. An instruction never sees its own observation. EMA history ring (8 entries). | C0-5 (b), (c) | §5.1–5.3 |
+| 8 | **Persistence ("armed") rules:** the liquidation EMA leg must hold on ≥ 3 consecutive updates spanning ≥ 2 s; S1/S2 must hold at every check for ≥ 40 EMA updates spanning ≥ 30 s. The spot leg uses the robust spot `min(P_live, last-second low)`. | C0-5 (a) | §5.4–5.6 |
+| 9 | **EMA time constant 10 s → 5 s** (clamp and Δt cap unchanged). With the one-second observation lag and the persistence rules, τ = 5 s is what keeps Tier C/D liquidations working in a 10×/60 s pump. | C0-5 (d) | §5.7 |
+| 10 | **Attacker model redone** with atomic `[pump, crank, dump]` bundles every second and with a stronger "held pump" model; every critic attack script re-run and saved under `sim/attacks/`. | C0-5 (d), C0-12 | §12 |
+| 11 | **Fee-scaled size caps** (PROPOSED): per position `q/X ≤ 3.0·φ`, per market `ΣQ/X ≤ 7.5·φ` (φ = one-way venue fee). The per-position cap binds below φ ≈ 0.82 % (Raydium 25 bps pools; PumpSwap only above ≈ 24,560 SOL market cap); the per-market cap binds below φ ≈ 1.16 % (Raydium, and PumpSwap pools above ≈ 1,470 SOL market cap, whose OI cap shrinks by up to 23 % at 90 bps). Reason: manipulation cost scales with φ, payoff with size. | C0-5, D2 | §6.1, §12.6 |
+| 12 | **Share epochs:** when `T + ΣB_Q = 0` or shares per token exceed `R_MAX = 10⁶`, the share epoch rolls (old shares' SOL frozen, shares converted 0/1 or 1/1000ᵏ). No u128 overflow; new lenders earn rent after a wipe. | C0-6 | §9.5 |
+| 13 | **Pro-rata withdrawal** (SPEC §2.4 literal): a lender may take only its pro-rata part of unborrowed inventory; the borrowed part of what it withdrew is locked and unlocks as borrowed tokens are resolved. Repeated withdrawals cannot drain `T`. | C0-9, Q22 | §9.3 |
+| 14 | **Realised-only claims:** `claim_sol` pays `pending·sol/(sol + receivable)`; a lender with negative pending cannot withdraw shares until it covers the deficit. | C0-13 | §9.4 |
+| 15 | Waterfall budgets include the venue-side rent tolerance `ert` (close: `max_in ≤ V − R − ert`; S1 threshold `B̂ + ert > V − K_s`); `ert` default 5,000,000 → 6,500,000 lamports. | C0-14, C1-9 | §8 |
+| 16 | **Continuous S3 timer:** no-route observations more than 60 s apart restart it. | C0-16 | §10.3 |
+| 17 | Economic invariants listed and asserted by the sims (exit bound, senior rent, fee bases, S1 take, waterfall sums, per-lender solvency, share-ratio bound, pro-rata withdrawal, no exit with negative pending, EMA step bounds, S3 continuity). | C0-12 | §13 |
+| 18 | Curve round trip: selling Q and buying it straight back costs **2.53 % of proceeds (fees only)**; 5.05 % is the same-state bid/ask spread for size Q. | C1-6 | §3.2 |
+| 19 | **Graduation boost is proportional:** `VQR = ⌊0.2069·migrated SOL⌋` (matches all 130 non-mayhem migrations checked on 2026-09-27 [R-VEN §1.4]; rule inferred from data, source closed); after the zero-fee buy-and-burn the price is **1.4566×** the graduation price, whatever the migrated amount. Now simulated. | C1-13, Q15 | §1.2, §10.1 |
+| 20 | **Raydium AMM v4 / CPMM venues** (constant product, fee on the input amount, configurable rates). | **D2** | §1.3, §3.1 |
+| 21 | PumpSwap is traded directly for pump graduates; Jupiter moves to v1.1 bounded by the on-chain quote, surplus to the borrower. | **D1**, Q20 | §3.3 |
+| 22 | Straddle execution is a Jito bundle of ≥ 3 transactions (pricing unchanged: B̂₂; **changed in v0.3, #47**). | C1-1, Q14 | §10.2 |
+| 23 | Adopted defaults recorded: Q4 K_cap 0.25 SOL, Q5 3,600 s, Q6, Q8 (+C1-12), Q9 (+C0-8 snapshots), Q10 25 % of OI cap, Q11 0.1 SOL, Q12 add_margin, Q13, Q15, Q16, Q18, Q19, Q21 25 SOL beta cap, Q22, Q23 hard bounds, Q24 0.005 SOL. | brief | §14, §15 |
+| 24 | Lender P&L in scenario tables is valued at the scenario's **terminal** price (v0.1 used the price at the exit transaction, which understated S1 losses when a pump continued). | — | §11 |
+| 25 | Creator-fee income from short.win volume added to the R1 disclosure. | C0-18 (2) | §12.8 |
+
+Findings addressed elsewhere (no economics component): C0-2, C0-3, C0-4, C0-8 (except the parameter bounds and snapshots in §15), C0-10, C0-15, C0-17, C0-18 (1), C1-2 (boost-gate mechanics; economics in §10.1), C1-3, C1-4, C1-5, C1-7, C1-8, C1-10, C1-11, C1-12 (cadence; its economic consequence is in §6.3), C1-14, C1-15. `ARCHITECTURE.md` records their resolution.
+
+### Alignment edits v0.2 → v0.2.1 (for ARCHITECTURE v0.2)
+
+Minimal edits so that this document and `ARCHITECTURE.md` v0.2 carry the same parameter names, defaults and formulas. The sims (`sim/*.py`) are unchanged and still produce every table in this document; three edits differ from them only in edge cases that do not change any conclusion: the sims apply `ert` on Raydium markets too (#32: thresholds there shift by ≤ 0.0065 SOL), never reach the FV fee ceiling (#33: every simulated fee is ≤ 125 bps against a 500 bps ceiling), and use one rent index per tier (#31: ≤ 1 lamport of rounding per accrual per position).
+
+| # | Change | Reason | Where |
+|---|---|---|---|
+| 26 | Raydium facts reconciled with the verified research note `docs/research/raydium-amm.md` (AMM v4 per-pool fee `num/den`, whole fee stays in the pool, reserves `vault − need_take_pnl`; CPMM 21 configs with protocol 12 % / fund 4 % of the trade fee, creator fee only if enabled and on the input or output side, reserves exclude the fee counters). The "researched in parallel" note and the matching UNVERIFIED item are replaced | D2 | §1.3, §17 |
+| 27 | Exact per-venue quote forms referenced (AMM v4 uses its own `num/den`; CPMM creator fee on the output side grosses `Q` up first); the generic fee-on-input form is unchanged | D2 | §3.1 |
+| 28 | `deposit` and `withdraw` roll the observation bucket but record no observation (they carry no venue accounts); `claim_sol` and `add_margin` do not touch market state | ARCH A16, C0-17 | §5.1 |
+| 29 | Tier inputs made precise: `R` per venue, `R_slow = Y(reprice(L_slow, P_ema)) − VQR`; CPMM age bound `min(now, max(open_time, T_CLAMP))`; AMM v4 age from listing; Raydium opens also need the locked-LP share and minimum real SOL of the adopted pool | Q18, Q19, D2 | §6.2 |
+| 30 | Oracle: the sponsored feed's heartbeat is 55 s (research correction to C1-12), so `oracle_max_age_s` 60 → **120**; new `oracle_stale_s` (3,600 s, the cache age that triggers Tier C), `oracle_max_conf_bps`, `oracle_max_step_bps` | C1-12, Q8 | §6.3, §15 |
+| 31 | Rent implemented with three market-level basis indices so each position's rate curve is locked exactly (same integral; ≤ 1 lamport per accrual rounding difference from the sims' per-tier index); `util_kink_bps` becomes market-level | Q9, C0-8 | §7, §15 |
+| 32 | `ert` applies on pump venues only; Raydium charges no venue-side rent, so `ert = 0` there | D2, C1-9 | §8 |
+| 33 | FV prices the venue fee at `min(live fee, venue_fee_hard_cap_bps)`, so an admin fee hike cannot inflate the S2/S3 cap without bound | D3, D2 | §8.6 |
+| 34 | New venue parameters with compiled bounds: `venue_fee_cap_bps`, `venue_fee_hard_cap_bps`, Raydium pool-selection parameters, `T_CLAMP` | D2 | §15 |
+| 35 | Register rows N10–N13 for the items above | SPEC §15 | §14 |
+
+### Changelog v0.2.1 → v0.3 (second review round)
+
+| # | Change | Issue | Where |
+|---|---|---|---|
+| 36 | **SPEC-literal defaults for the D3 and D4 readings.** Margin EMA leg on the EMA reserves as they stand (`margin_ema_own_sale = false`: +10.1 % of notional at the Tier A size cap, +12.1 % Tier D); FV on the fast liquidity EMA (`fv_liq = ema`); **a settlement whose S1 legs all hold is S1** (never capped). v0.2's readings are owner options O1/O2 and are not built before sign-off. Every table was regenerated; positions at the size cap now carry more margin (Tier A vault 127.74 SOL instead of 121.59). | V1-3, V1-4 | §0, §4, §5.6, §8.6, §11, §12 |
+| 37 | S2/S3 lender outcomes are measured against the **executable** cost of `Q` at EMA reserves, not its spot value; the drain scenarios are reconciled with the `λ_min` rule (an adopted pool can lose at most half of the depth a position was sized on; no drain up to 90 % reaches S2 at capped sizes). The expiry-fee-in-FV reading is flagged to the owner. | V1-3 | §8.6, §12.5 |
+| 38 | **Dutch exit clock on executable seconds.** δ widens only over consecutive EMA-ring entries on which both legs held (the ring stores the low of each integrated bucket). Blocking the spot leg with one low observation per second no longer ramps δ: Tier A attack after a 4 s block +0.98 → −1.34 SOL, borrower loss 3.40 → 0.28 SOL. Exit references use `max(L_live, L_ema, L_slow)`. | V1-1, V2-14 | §8.2, §12.9 |
+| 39 | **Defensive direction modelled** (the borrower vetoes its own liquidation, or freezes the EMA, with one contrary observation per second): cost per second against the equity at stake; §0 finding 3 restated as the bound it is. | V1-2, V2-14 | §0, §5.2, §12.1, §12.9 |
+| 40 | **Settlement arming reset only by non-atomic evidence**; one eligibility clock for S1 and S2; the kind is chosen at execution. A borrower's atomic `[dump → sol_settle → buy back]` every 20 s blocked S1 forever in v0.2 and changes nothing in v0.3. | V2-4 | §5.6, §12.10 |
+| 41 | **FV gate:** S2/S3 settle only while `P_ema` and `L_ema` are within 1 % of the median of the ring's integrated observations; a lender's attacker-only push gains +0.41 SOL instead of +5.58 SOL on the drained RA example. | V2-9 | §8.6, §12.11 |
+| 42 | **Claims with memory** (realised SOL allocated to shares when it arrives; `claim_sol` pays `min(pending, real − claimed, sol_vault)`; surplus recycled): 100 claims in one transaction take 76.5 SOL, not 151.5 of 153. Strict per-lender solvency asserted on the claim side; the literal entitlement form is shown not to hold. | V2-2, V1-10 | §9.4, §9.6, §13 |
+| 43 | **Locks decay only on net reductions** of the borrowed inventory (running minimum); churn no longer unlocks a runner; the run residual is restated as a function of utilisation (4.3 % at 90 %, up to 11.1 % at 50 %). | V2-3 | §0, §9.3, §9.6 |
+| 44 | Share epochs: a lender converted to 0 shares skips later records; SOL credited after a full wipe goes to the wiped epoch's lenders, not to the next (dust) depositor. | V2-12 | §9.5 |
+| 45 | Raydium tier and cap liquidity bounded by locked depth / `λ_min`; opens are no longer refused on `λ_now` (unlocked deposits could block them). | V2-8 | §6.2 |
+| 46 | No observations while the venue cannot execute; the freeze of healthy positions during a halt is stated. | V2-5 | §5.1, §10.3 |
+| 47 | Straddles priced on the executed bundle path (the position buys all of `Q` on the post-migration pool). | V1-9 | §3.1, §10.2 |
+| 48 | Register and registry aligned with ARCHITECTURE v0.3: `cr_open_bps` scope T; `ref_lo_k` removed (constant 1); age thresholds as SPEC constants; G28 restored; new N14–N20; snapshots of the execution and settlement terms; θ bounds. Boost wording (130/130 migrations) and the 485,764,634-lamport figure corrected. | V1-5, V1-12 | §1.2, §3.2, §14, §15 |
