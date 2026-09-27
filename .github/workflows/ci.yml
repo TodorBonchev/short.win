@@ -1,0 +1,326 @@
+# CI for the on-chain workspace (ARCHITECTURE §1.1, §8.4, §9 M0, M0b).
+# Actions are pinned to commit SHAs; the tag each SHA was resolved from is in the comment.
+# The host Rust toolchain (1.98.1, rustfmt, clippy, wasm32) comes from rust-toolchain.toml.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  AGAVE_VERSION: "4.1.2"
+  ANCHOR_VERSION: "1.2.0"
+  PLATFORM_TOOLS: "v1.57"
+  SBPF_ARCH: "v3"
+  CARGO_DENY_VERSION: "0.20.2"
+  CARGO_AUDIT_VERSION: "0.22.2"
+  PYTHON_VERSION: "3.14"
+
+jobs:
+  fmt:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install || rustup show
+      - run: cargo fmt --all --check
+      - name: T-CU-MATH bench workspace (standalone, tests/bench/cu_math)
+        run: cargo fmt --all --check --manifest-path tests/bench/cu_math/Cargo.toml
+
+  clippy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: shortwin-math keeps the ARCHITECTURE §2.2 deny lints
+        run: |
+          block=$(tr '\n' ' ' < crates/shortwin-math/src/lib.rs | grep -o '#!\[deny([^]]*\]' || true)
+          for lint in arithmetic_side_effects cast_possible_truncation cast_sign_loss unwrap_used; do
+            grep -q "clippy::$lint" <<< "$block" || { echo "::error::crates/shortwin-math/src/lib.rs must #![deny(clippy::$lint)]"; exit 1; }
+          done
+          grep -q '^#!\[no_std\]' crates/shortwin-math/src/lib.rs || { echo "::error::shortwin-math must be #![no_std]"; exit 1; }
+      - name: shortwin-math has zero runtime dependencies
+        run: |
+          deps=$(cargo metadata --format-version 1 --no-deps --locked \
+            | python3 -c 'import json,sys; m=json.load(sys.stdin); p=[p for p in m["packages"] if p["name"]=="shortwin-math"][0]; print(" ".join(d["name"] for d in p["dependencies"] if d["kind"] is None))')
+          [ -z "$deps" ] || { echo "::error::shortwin-math must have no runtime dependencies, found: $deps"; exit 1; }
+      - run: cargo clippy -p shortwin-math --all-targets --locked -- -D warnings
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+  test:
+    runs-on: ubuntu-24.04
+    env:
+      PROPTEST_CASES: "2000"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - run: cargo test -p shortwin-math -p shortwin-math-wasm --locked
+
+  vectors:
+    # Committed test vectors must be exactly what the normative sims generate today.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Regenerate every tests/vectors/<track>/gen_*.py
+        run: |
+          shopt -s nullglob
+          for gen in crates/shortwin-math/tests/vectors/*/gen_*.py; do
+            echo "::group::$gen"; python3 "$gen"; echo "::endgroup::"
+          done
+      - run: git diff --exit-code -- crates/shortwin-math/tests/vectors
+      # T-CONFIG, host part (ARCH §8.1, A73): the default configuration passes
+      # shortwin_sim.validate_params and the 1,655-run liveness battery of config_check.py
+      # (the Rust side, params::validate = validate_params, is tests/params_vectors.rs).
+      - name: T-CONFIG default configuration passes config_check.py
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          out=$(python3 docs/design/sim/config_check.py)
+          echo "$out"
+          [ "$out" = "OK" ] || { echo "::error::config_check.py did not print OK for the defaults"; exit 1; }
+      # T-CONFIG, governance gate (A73): scripts/config-gate.sh rejects a proposal with a
+      # liveness row or outside validate_params and asks for the owner's sign-off on
+      # lender-income-only rows.
+      - name: T-CONFIG config gate (scripts/config-gate.sh)
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3 scripts/test_config_gate.py -v
+
+  deny:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: taiki-e/install-action@4cef1412cce204788f482e778a0b9187f9626a29 # v2.87.21
+        with:
+          tool: cargo-deny@${{ env.CARGO_DENY_VERSION }},cargo-audit@${{ env.CARGO_AUDIT_VERSION }}
+      - run: cargo deny check
+      # Same exceptions as deny.toml (unmaintained, not vulnerable): bincode 1.3.3 via
+      # anchor-lang 1.2.0; ansi_term, derivative, paste, libsecp256k1 via the LiteSVM test harness.
+      - name: cargo audit (workspace and the standalone bench lockfiles)
+        run: |
+          ignore="--ignore RUSTSEC-2025-0141 --ignore RUSTSEC-2021-0139 --ignore RUSTSEC-2024-0388 --ignore RUSTSEC-2024-0436 --ignore RUSTSEC-2025-0161"
+          for lock in Cargo.lock tests/bench/cu_math/Cargo.lock tests/bench/m1_cu/Cargo.lock; do
+            echo "::group::$lock"; cargo audit -f "$lock" --deny warnings $ignore; echo "::endgroup::"
+          done
+
+  wasm:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - run: cargo build -p shortwin-math -p shortwin-math-wasm --target wasm32-unknown-unknown --release --locked
+
+  cu-math:
+    # T-CU-MATH (ARCH §6.1, §8.1, §9 M0b): per-primitive CU budgets of shortwin-math on SBF v3,
+    # measured with Mollusk (tests/bench/cu_math, a standalone workspace with its own lockfile).
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: cu-math-${{ env.PLATFORM_TOOLS }}
+          workspaces: tests/bench/cu_math
+      - name: Cache Agave and platform-tools
+        id: tools
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.local/share/solana/install
+            ~/.cache/solana/${{ env.PLATFORM_TOOLS }}
+          key: sbf-tools-agave-${{ env.AGAVE_VERSION }}-${{ env.PLATFORM_TOOLS }}-${{ runner.os }}
+      - name: Install Agave ${{ env.AGAVE_VERSION }}
+        if: steps.tools.outputs.cache-hit != 'true'
+        run: sh -c "$(curl -sSfL https://release.anza.xyz/v${AGAVE_VERSION}/install)"
+      - name: Select Agave ${{ env.AGAVE_VERSION }}
+        run: |
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/share/solana/install/active_release/bin/agave-install" init "$AGAVE_VERSION"
+      - name: Build the bench program (platform-tools v1.57, SBPF v3)
+        run: |
+          cargo-build-sbf --tools-version "$PLATFORM_TOOLS" --arch "$SBPF_ARCH" \
+            --manifest-path tests/bench/cu_math/program/Cargo.toml --sbf-out-dir tests/bench/cu_math/target/deploy
+          flags=$(od -An -t x4 -j 48 -N 4 tests/bench/cu_math/target/deploy/cu_math_bench.so | tr -d ' ')
+          [ "$flags" = "00000003" ] || { echo "::error::e_flags=$flags, expected SBPF v3 (00000003)"; exit 1; }
+      - run: cargo clippy --manifest-path tests/bench/cu_math/Cargo.toml --release --all-targets --locked -- -D warnings
+      - name: Budgets (fails above the §6.1 value + 20 %)
+        run: CU_MATH_WRITE=1 cargo test --manifest-path tests/bench/cu_math/Cargo.toml --release --locked -- --nocapture
+      - name: results.md is current (informational)
+        run: git diff --exit-code -- tests/bench/cu_math/results.md || echo "::warning::CU figures changed; commit tests/bench/cu_math/results.md"
+
+  anchor-build:
+    # Always `anchor build --tools-version v1.57 --arch v3`, never a bare `cargo build-sbf`
+    # (Agave 4.1.2's cargo-build-sbf 4.1.0 defaults to platform-tools v1.54 / arch v0).
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: anchor-${{ env.ANCHOR_VERSION }}-${{ env.PLATFORM_TOOLS }}
+      - name: Cache Agave, platform-tools and the Anchor CLI
+        id: tools
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.local/share/solana/install
+            ~/.cache/solana/${{ env.PLATFORM_TOOLS }}
+            ~/.cargo/bin/anchor
+          key: sbf-tools-agave-${{ env.AGAVE_VERSION }}-anchor-${{ env.ANCHOR_VERSION }}-${{ env.PLATFORM_TOOLS }}-${{ runner.os }}
+      - name: Install Agave ${{ env.AGAVE_VERSION }}
+        if: steps.tools.outputs.cache-hit != 'true'
+        run: sh -c "$(curl -sSfL https://release.anza.xyz/v${AGAVE_VERSION}/install)"
+      - name: Select Agave ${{ env.AGAVE_VERSION }}
+        run: |
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/share/solana/install/active_release/bin/agave-install" init "$AGAVE_VERSION"
+      - name: Install Anchor CLI ${{ env.ANCHOR_VERSION }}
+        if: steps.tools.outputs.cache-hit != 'true'
+        run: cargo install --git https://github.com/otter-sec/anchor --tag "v${ANCHOR_VERSION}" anchor-cli --locked
+      - name: Versions
+        run: |
+          solana --version
+          anchor --version
+          cargo-build-sbf --version
+      # --ignore-keys: the program-id keypair is never committed, so a CI checkout gets a
+      # throwaway one; the program id itself comes from declare_id! in the source.
+      - run: anchor build --tools-version "$PLATFORM_TOOLS" --arch "$SBPF_ARCH" --ignore-keys
+      - name: Artifact is SBPF v3
+        run: |
+          flags=$(od -An -t x4 -j 48 -N 4 target/deploy/shortwin.so | tr -d ' ')
+          [ "$flags" = "00000003" ] || { echo "::error::e_flags=$flags, expected SBPF v3 (00000003)"; exit 1; }
+          sha256sum target/deploy/shortwin.so
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: shortwin-program
+          path: |
+            target/deploy/shortwin.so
+            target/idl/shortwin.json
+            target/types/shortwin.ts
+          if-no-files-found: error
+
+  program-tests:
+    # Program tests on LiteSVM 0.16 (ARCH §8.2, §8.3) against the anchor-build artifact, incl.
+    # crank_sol_usd on the committed mainnet PriceUpdateV2 dump (tests/litesvm/tests/oracle_*.rs);
+    # the fixtures' checksums; the unit tests of the program and the venue-state readers; and
+    # the T-LAYOUT wasm32 leg (the layout asserts compiled for wasm32).
+    needs: anchor-build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: program-tests
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: shortwin-program
+          path: target
+      - name: Mainnet fixtures match their recorded checksums (tests/fixtures/manifest.json)
+        run: cd tests/fixtures && sha256sum -c SHA256SUMS
+      - name: T-LAYOUT wasm32 leg
+        run: cargo check -p shortwin --target wasm32-unknown-unknown --locked
+      - run: cargo test -p shortwin -p shortwin-venue-state -p shortwin-litesvm-tests --locked
+
+  t-pot:
+    # T-POT gate (ARCH §8.2, §9 M1 exit criteria; M1-FID-2): every `pool_model` v0.4.1 trace
+    # replayed through the program in release — the reviewer's 40-seed stranding table (the
+    # R3A-2 row asserted exactly: 40 seeds, 20,399 lamports, worst seed 596), the lock-heavy mix
+    # with the untouched-state I-P4, the extended profiles and both ECON §9.6 fuzz runs (60,000
+    # operations each) — with the invariant hooks after every instruction and the I-P6 liveness
+    # cap at the model's own figure. The `program-tests` job replays only a quick subset. ~4 min.
+    needs: anchor-build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: t-pot
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: shortwin-program
+          path: target
+      - name: T-POT, every trace (SHORTWIN_TRACES=full)
+        env:
+          SHORTWIN_TRACES: full
+        run: "cargo test --release --locked -p shortwin-litesvm-tests --test lender_it traces:: -- --nocapture"
+
+  codama:
+    # Codama client (ARCH §1.1, §8.4 "IDL and Codama diff checks"): the committed IDL copy is
+    # the anchor-build IDL, the committed client is what Codama generates from it, and it
+    # typechecks and passes its tests (incl. the T-LAYOUT Codama leg). Node and pnpm come from
+    # mise.toml.
+    needs: anchor-build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: shortwin-program
+          path: target
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+      - run: pnpm install --frozen-lockfile
+      - name: IDL copy is current
+        run: |
+          diff -u clients/js/idl/shortwin.json target/idl/shortwin.json || {
+            echo "::error::clients/js/idl/shortwin.json is stale: pnpm --filter @shortwin/client idl:sync && pnpm --filter @shortwin/client generate"
+            exit 1
+          }
+      - name: Generated client is current
+        run: |
+          pnpm --filter @shortwin/client generate
+          git diff --exit-code -- clients/js
+          untracked=$(git status --porcelain --untracked-files=all -- clients/js)
+          [ -z "$untracked" ] || { echo "$untracked"; echo "::error::regenerate and commit clients/js"; exit 1; }
+      - run: pnpm --filter @shortwin/client typecheck
+      - run: pnpm --filter @shortwin/client test
+
+  m1-cu:
+    # M1 CU baseline (ARCH §6.1, §9 M1): every M1 instruction on Mollusk 0.15.1 within its
+    # budget, cross-checked on LiteSVM (tests/bench/m1_cu, a standalone workspace with its own
+    # lockfile; README.md there).
+    needs: anchor-build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: m1-cu
+          workspaces: tests/bench/m1_cu
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: shortwin-program
+          path: target
+      - run: cargo fmt --manifest-path tests/bench/m1_cu/Cargo.toml -p m1-cu-bench --check
+      - run: cargo clippy --manifest-path tests/bench/m1_cu/Cargo.toml --all-targets --locked -- -D warnings
+      - name: Budgets (fails above a budget or on a failed case)
+        run: M1_CU_WRITE=1 cargo test --manifest-path tests/bench/m1_cu/Cargo.toml --locked -- --nocapture
+      - name: results.md is current (informational)
+        run: git diff --exit-code -- tests/bench/m1_cu/results.md || echo "::warning::M1 CU figures changed; commit tests/bench/m1_cu/results.md"

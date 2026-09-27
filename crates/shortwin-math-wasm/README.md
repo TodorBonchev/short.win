@@ -1,0 +1,49 @@
+# shortwin-math-wasm
+
+wasm-bindgen facade over [`shortwin-math`](../shortwin-math) for the frontend
+(`packages/math-wasm`, ARCHITECTURE §1.2, §7.3). Every export converts its arguments,
+makes one `shortwin-math` call and converts the result, so the UI computes exactly what
+the program will; the frontend never re-implements protocol math.
+
+## JS conventions
+
+- `u64`/`i64`/`u128`/`i128` amounts, prices (WAD) and indices are `bigint`; bps, ppm,
+  seconds and small counters are `number`.
+- An undefined result is `undefined` (e.g. a quote with `q ≥ X`).
+- A `MathError` is thrown as an `Error` whose message is its `as_str()` text, e.g.
+  `"above pro-rata allowance"` or `"invalid input"`.
+- Argument names in the generated `.d.ts` are the Rust (snake_case) names.
+
+## Exports
+
+| Area | Exports | Math |
+|---|---|---|
+| Venue and quotes | `Venue.{pumpSwap, rayV4, cpmm, pumpCurve}`; `buy`, `sell` on `(x, y)` = (token, SOL); `buyCurve`, `sellCurve` on a `CurveState`; `buyRepriced(q, L, P)` (at the live fee tier, R3B-7 b); `capped(capBps)` (risk view: one combined fee at the cap on pump venues); `onewayPpm` (φ), `onewayBps` (display); `exceedsCap(φPpm, capBps)` (the fee gate); `BuyQuote`, `SellQuote` | `quote::{Pricing, CurvePricing}` (curve: straddle, repriced straddle, liquidation price) |
+| Fees | `Fees` (`onewayPpm`, `onewayBps`, `capped`), `CurveSchedule`, `PammSchedule` (`addTier`, `resolve`) | `fees::{pump_curve, pump_amm, ray_v4, cpmm, exceeds_cap}` |
+| States | `reprice` (`isqrt⁺(P)`, `X` floor, `Y` ceil; `undefined` when `X = 0`), `CurveState.reprice`, `CurveState.migratedPool`, `liquidity` (throws `overflow` if `X·Y ≥ 2¹²⁸`), `priceWad`, `Reserves` | `quote::{reprice, curve_reprice, migrated_pool, liquidity}`, `risk::price_wad` |
+| CR and liquidation | `vEff`, `crBps`, `crBelow`, `Venue.liquidationPrice`, `sigma`, `sigmaXy` | `risk` |
+| Opening | `marginD4`, `openFee` | `risk::{margin_d4, open_fee}` |
+| Exit bounds | `maxInLiq` (no reserve), `maxInExp` (rent and fee senior), `piRef` | `bounds::{max_in_liq, max_in_exp, pi_ref}` |
+| Settlement | `OracleState` (`push` ring entries, `settleBox(now)`, `ringMedians`, `sustainedGrowth`), `SettleBox` (`pLo`, `pHi`, `lLo`, `lHi`, `isPoint`, `contains`), `ringLen`, `pprime`, `amountOk`, `fairValue`, `fvRateBps`, `settleKeeperReward`, `expiryKeeperReward` | `settle::{box_of, pprime, amount_ok}`, `observe::{ring_medians, sustained_growth}`, `risk` |
+| Rent | `utilizationBps`, `rateBps` (display: each slope term floored), `minRent`, `RentBasis` (`accrue` preview, `P_ACC_MAX` clamp), `PositionRent` (with its `rent_protocol_bps`; `accrued`, `due`) | `rent` |
+| Waterfall previews | `previewClose`, `previewLiquidation` (keeper floor at `K_s`), `previewExpiry`, `previewSettlement` (vesting lump) → `Payout` (`keeperTopup`, `lump`) | `waterfall` |
+| Caps | `maxQPosition`, `maxTotalQ`, `feeSizeCap`, `feeOiCap`, `oiCap` (φ in ppm), `utilOk`, `curveGammaOk`, `curveGammaMaxQ`, `walletOk`, `notionalOk`, `conservativeX0` | `caps` |
+| Tiers | `TierInputs` (`tier`, `liquidityLamports`), `tierParams`, `TierParams` | `tier` |
+| Lender previews | `PoolState` (Market lender-pool group and `MarketVault`: pot `unmatched`, `protocolFees`, vest `vestBal`/`vestLast`/`vestEnd`, `maxRelease`, `wipeSwept`, `calDay`, `setLockBucket`), `LenderState` (`lockUntil`), `ShareEpochs`; `sharesForTokens`, `tokensForShares`, `previewTouch`, `previewAllowance`, `previewLock`, `previewLockedTotal`, `previewLockUntil`, `previewVestRelease`, `previewTokenValue`, `previewWithdraw` (`lockGraceS`), `previewDeposit` (`rewardsRequired`; throws `post-wipe sweep pending`), `previewClaim` (pot draw); every preview takes `now` | `pool` (on copies) |
+| Parameters | `ParamSet` (`get`, `set` by ECON §15 name and tier 0–3, `validate` (what the program refuses: the sim's rules, then the bounds of the parameters the sim does not model, `validate_econ`), `validateSim` (= `shortwin_sim.validate_params`), `violations`) | `params::{ParamSet, check, validate, validate_econ}` |
+
+The keeper-side state machines (`observe::{record, integrate}`, `persist`, `settle::evaluate`
+and the reference prices of `bounds`) are not exported: the frontend reads their results
+(EMA, ring, arming state) from the accounts. `OracleState` rebuilds the box of the stored
+state; `sol_settle` evaluates it after its own roll.
+
+## Build and check
+
+```sh
+cargo test -p shortwin-math-wasm                     # native unit tests of the wrappers (Ok paths)
+cargo build -p shortwin-math-wasm --target wasm32-unknown-unknown --release
+# JS glue: the wasm-bindgen CLI must match the pinned crate (=0.2.129)
+cargo install wasm-bindgen-cli --version =0.2.129 --locked
+wasm-bindgen --target nodejs --out-dir target/wasm-pkg target/wasm32-unknown-unknown/release/shortwin_math_wasm.wasm
+node crates/shortwin-math-wasm/js/smoke.cjs target/wasm-pkg   # BigInt ABI, undefined, thrown errors, worked examples
+```

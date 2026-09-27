@@ -1,0 +1,41 @@
+# Rust / Anchor / Solana
+/target/
+**/target/
+**/*.rs.bk
+.anchor/
+test-ledger/
+.surfpool/
+.crates/
+
+# Program-id keypairs are never committed (address squatting); see docs/DEVELOPMENT.md.
+/keys/
+*-keypair.json
+
+# JS
+node_modules/
+.pnpm-store/
+dist/
+coverage/
+*.tsbuildinfo
+.vite/
+playwright-report/
+test-results/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Environment, editors, OS
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+.DS_Store

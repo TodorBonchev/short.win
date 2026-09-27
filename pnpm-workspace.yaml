@@ -1,0 +1,6 @@
+# JS workspaces (ARCHITECTURE §1.2). None exist in M0; the globs are ready for
+# packages/{sdk,math-wasm,config}, apps/web and the Codama client in clients/js.
+packages:
+  - "packages/*"
+  - "apps/*"
+  - "clients/*"

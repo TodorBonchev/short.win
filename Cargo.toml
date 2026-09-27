@@ -1,0 +1,27 @@
+# On-chain workspace (ARCHITECTURE §1.2). Host-only crates (keeper, indexer, Agave 4.3
+# clients) live in services/ with their own lockfile and must never join this one.
+# tests/litesvm is the exception ARCH §1.2 names: the program tests share this lockfile so the
+# Agave line LiteSVM resolves is pinned next to the program's (C1-14).
+[workspace]
+resolver = "3"
+members = [
+    "crates/shortwin-math",
+    "crates/shortwin-math-wasm",
+    "crates/shortwin-venue-state",
+    "programs/shortwin",
+    "tests/litesvm",
+]
+
+# solana-verify picks its build image from this (ARCHITECTURE §1.1).
+[workspace.metadata.cli]
+solana = "4.1.2"
+
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1
+
+[profile.release.build-override]
+opt-level = 3
+incremental = false
+codegen-units = 1

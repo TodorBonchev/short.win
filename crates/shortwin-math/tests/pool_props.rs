@@ -1,0 +1,655 @@
+//! Property tests for `shortwin_math::pool` (v0.4.1): random operation sequences (dust to
+//! u64-extreme amounts, time passing, `rent_protocol_bps` governance changes, full wipes
+//! with post-wipe sweeps, deep rebases, runs, churn, repeated claims, covers, lumps,
+//! shortfalls; lazy or touch-all lenders; lump and lock parameters at their compiled
+//! extremes) with the ECON §13 invariants I-P1–I-P7 / ARCH §8.3 I8 asserted after every
+//! operation — I-P4 also on the untouched state — plus the calendar's own invariants, the
+//! per-operation ghost checks of `pool_model.fuzz`, atomicity of refusals and the claim
+//! side of the liveness wind-down (I-P6).
+
+mod common;
+#[path = "pool_harness.rs"]
+mod pool_harness;
+
+use pool_harness::{DAY, Market, Model, S3_TAIL_S};
+use proptest::prelude::*;
+use shortwin_math::MathError;
+use shortwin_math::pool::{self, NO_LOCK_EPOCH, Standing, SweepSource};
+
+#[derive(Clone, Debug)]
+enum Op {
+    Deposit(usize, u64, bool),
+    /// user, how (0 random, 1 at allowance, 2 all shares, 3 one share), seed
+    Withdraw(usize, u8, u64),
+    /// C0-9: withdraw at the allowance in a loop
+    Run(usize, u8),
+    /// amount seed, duration index
+    Borrow(u64, u8),
+    /// seconds, index growth
+    Accrue(u16, u128),
+    /// time passes: index into ADVANCES
+    Advance(u8),
+    /// governance: index into GOV_BPS
+    Gov(u8),
+    /// position seed, rent paid in full, shortfall seed, lender lump
+    Repay(u64, bool, u64, u64),
+    /// position seed, SOL in, lump seed
+    Settle(u64, u64, u64),
+    /// borrow what the cap allows, settle everything
+    Wipe(u64),
+    /// leave 1..=3 raw units of claims: a deep rebase
+    Deep(u64, u64),
+    /// V2-2: claim, then claim again `n` times
+    Claim(usize, u8),
+    Cover(usize, u64),
+    Sweep(u64, bool),
+    /// V2-3: another position opens and closes
+    Churn(u64),
+    Touch(usize),
+    /// R4A-2 / R4B-3: the allowances as the program sees them (each lender touched alone)
+    View,
+}
+
+const ADVANCES: [i64; 7] = [60, 3_600, 6 * 3_600, DAY, 2 * DAY, 9 * DAY, 31 * DAY];
+const DURATIONS: [i64; 5] = [3_600, DAY, 7 * DAY, 30 * DAY, 90 * DAY];
+const GOV_BPS: [u32; 5] = [0, 1_000, 1_500, 3_000, 5_000];
+/// `(lump_vest_s, lock_grace_s)`: defaults and compiled extremes (ECON §15).
+const PARAMS: [(u32, u32); 3] = [(21_600, 86_400), (3_600, 3_600), (604_800, 604_800)];
+
+#[derive(Clone, Debug)]
+struct Cfg {
+    cap_bps: u64,
+    touch_all: bool,
+    params: (u32, u32),
+    /// S3 tail of every position: default or compiled maximum (3 d).
+    tail: i64,
+}
+
+fn tokens() -> impl Strategy<Value = u64> {
+    prop_oneof![
+        3 => 1u64..40,
+        4 => 1u64..10_000_000_000_000,
+        2 => (1u64 << 60)..=u64::MAX,
+        1 => Just(u64::MAX),
+    ]
+}
+
+fn lamports() -> impl Strategy<Value = u64> {
+    prop_oneof![2 => 0u64..12, 3 => 0u64..1_000_000_000_000, 1 => 0u64..100_000_000_000_000]
+}
+
+fn op(users: usize) -> impl Strategy<Value = Op> {
+    let u = 0..users;
+    prop_oneof![
+        4 => (u.clone(), tokens(), any::<bool>()).prop_map(|(u, a, r)| Op::Deposit(u, a, r)),
+        4 => (u.clone(), 0u8..4, any::<u64>()).prop_map(|(u, h, s)| Op::Withdraw(u, h, s)),
+        2 => (u.clone(), 1u8..25).prop_map(|(u, n)| Op::Run(u, n)),
+        3 => (any::<u64>(), 0u8..5).prop_map(|(s, d)| Op::Borrow(s, d)),
+        2 => (0u16..600, prop_oneof![0u128..1_000_000_000_000_000, 0u128..10_000_000_000_000_000_000_000]).prop_map(|(t, d)| Op::Accrue(t, d)),
+        2 => (0u8..7).prop_map(Op::Advance),
+        1 => (0u8..5).prop_map(Op::Gov),
+        3 => (any::<u64>(), prop::bool::weighted(0.8), any::<u64>(), lamports()).prop_map(|(k, f, s, l)| Op::Repay(k, f, s, l)),
+        3 => (any::<u64>(), lamports(), any::<u64>()).prop_map(|(k, s, l)| Op::Settle(k, s, l)),
+        1 => lamports().prop_map(Op::Wipe),
+        1 => (1u64..4, lamports()).prop_map(|(r, s)| Op::Deep(r, s)),
+        3 => (u.clone(), 0u8..6).prop_map(|(u, n)| Op::Claim(u, n)),
+        1 => (u.clone(), lamports()).prop_map(|(u, x)| Op::Cover(u, x)),
+        2 => (lamports(), any::<bool>()).prop_map(|(x, r)| Op::Sweep(x, r)),
+        2 => any::<u64>().prop_map(Op::Churn),
+        1 => u.prop_map(Op::Touch),
+        1 => Just(Op::View),
+    ]
+}
+
+fn scenario() -> impl Strategy<Value = (Cfg, Vec<Op>)> {
+    (
+        prop::bool::weighted(0.6),
+        any::<bool>(),
+        0usize..3,
+        any::<bool>(),
+        2usize..8,
+    )
+        .prop_flat_map(|(full, touch_all, params, tail_max, users)| {
+            let cfg = Cfg {
+                cap_bps: if full { 10_000 } else { 9_000 },
+                touch_all,
+                params: PARAMS[params],
+                tail: if tail_max { 3 * DAY } else { S3_TAIL_S },
+            };
+            (Just(cfg), prop::collection::vec(op(users), 1..120))
+        })
+}
+
+struct Driver {
+    cfg: Cfg,
+    s: Model,
+}
+
+/// Refusals are pool rules (their own variants) or on-chain field limits.
+fn refusal(e: MathError) -> Result<(), TestCaseError> {
+    prop_assert!(
+        matches!(
+            e,
+            MathError::DepositTooSmall
+                | MathError::WipeSweepPending
+                | MathError::NegativePending
+                | MathError::InsufficientShares
+                | MathError::InsufficientInventory
+                | MathError::AboveAllowance
+                | MathError::Overflow
+                | MathError::Underflow
+        ),
+        "unexpected error {e:?}"
+    );
+    Ok(())
+}
+
+impl Driver {
+    fn m(&self) -> &Market {
+        &self.s.m
+    }
+
+    /// `pool_model.Pool.borrow`: above the utilisation cap the open is refused after the
+    /// vest release (`None`); otherwise `pool::borrow`, whose own refusals (field limits)
+    /// change nothing.
+    fn borrow(&mut self, q: u64, duration: i64) -> Result<Option<u64>, TestCaseError> {
+        let p = self.m().pool;
+        let (t, b) = (u128::from(p.tokens_free), u128::from(p.borrowed_q));
+        if q == 0
+            || q > p.tokens_free
+            || (b + u128::from(q)) * 10_000 > u128::from(self.cfg.cap_bps) * (t + b)
+        {
+            self.s
+                .m
+                .release()
+                .map_err(|e| TestCaseError::fail(format!("release: {e}")))?;
+            return Ok(None);
+        }
+        let before = self.s.m.clone();
+        let deadline = self.m().now + duration;
+        match self.s.m.borrow(q, deadline + self.cfg.tail) {
+            Ok(()) => Ok(Some(self.s.rent.open(q, deadline))),
+            Err(e) => {
+                refusal(e)?;
+                prop_assert_eq!(&self.s.m, &before);
+                Ok(None)
+            }
+        }
+    }
+
+    fn repay(&mut self, id: u64, paid: Option<u64>, lump: u64) -> Result<(), TestCaseError> {
+        let owed = self.s.owed(id);
+        let paid = paid.map_or(owed, |s| s % (owed + 1));
+        let before = self.s.m.clone();
+        if let Err(e) = self.s.repay(id, paid, lump) {
+            refusal(e)?;
+            prop_assert_eq!(&self.s.m, &before);
+        }
+        Ok(())
+    }
+
+    fn settle(&mut self, id: u64, sol: u64, lump: u64) -> Result<(), TestCaseError> {
+        let before = self.s.m.clone();
+        if let Err(e) = self.s.settle(id, sol, lump) {
+            refusal(e)?;
+            prop_assert_eq!(&self.s.m, &before);
+        }
+        Ok(())
+    }
+
+    fn pick(&self, seed: u64) -> Option<u64> {
+        let n = self.s.rent.positions.len() as u64;
+        (n > 0).then(|| self.s.rent.positions[(seed % n) as usize].id)
+    }
+
+    /// The market after `user`'s release + touch (the committed first step of `d` / `w`).
+    fn touched(&self, user: usize) -> Market {
+        let mut t = self.s.m.clone();
+        let _ = t.pre(user);
+        t
+    }
+
+    /// Withdraws `shares` with the ghost checks of `pool_model.fuzz`: I-P2 (no share
+    /// reduction with pending < 0) and I-P4 (at most the allowance just computed).
+    fn withdraw(
+        &mut self,
+        user: usize,
+        shares: u128,
+        allow: u64,
+    ) -> Result<Option<u64>, TestCaseError> {
+        let pending = self.m().lender(user).map_or(0, |l| l.pending);
+        let before = self.touched(user);
+        match self.s.withdraw(user, shares) {
+            Ok(got) => {
+                prop_assert!(pending >= 0, "withdrew with pending {pending}");
+                prop_assert!(got <= allow, "withdrew {got} above allowance {allow}");
+                Ok(Some(got))
+            }
+            Err(e) => {
+                refusal(e)?;
+                prop_assert_eq!(&self.s.m, &before);
+                Ok(None)
+            }
+        }
+    }
+
+    fn step(&mut self, op: &Op) -> Result<(), TestCaseError> {
+        match *op {
+            Op::Deposit(u, a, rewards) => {
+                if self.m().pool.is_wipe_live() && self.m().pool.wipe_swept == 0 && a % 3 != 0 {
+                    // The depositor bundles the post-wipe sweeps (R4A-7).
+                    self.s
+                        .m
+                        .sweep_from(a % 1_000, SweepSource::Trader)
+                        .expect("sweep");
+                    if rewards {
+                        self.s
+                            .m
+                            .sweep_from(0, SweepSource::VenueRewards)
+                            .expect("claim");
+                    }
+                }
+                let before = self.touched(u);
+                if let Err(e) = self.s.m.deposit_with(u, a, rewards) {
+                    refusal(e)?;
+                    prop_assert_eq!(&self.s.m, &before);
+                }
+            }
+            Op::Withdraw(u, how, seed) => {
+                if self.m().lender(u).is_none() {
+                    return Ok(());
+                }
+                let allow = match self.s.free_allowance(u) {
+                    Ok(a) => a,
+                    Err(e) => return refusal(e),
+                };
+                let shares = self.s.shares(u);
+                if shares == 0 {
+                    return Ok(());
+                }
+                let s = match how {
+                    0 => 1 + u128::from(seed) % shares,
+                    1 => self.s.shares_at(allow).max(1).min(shares),
+                    2 => shares,
+                    _ => 1,
+                };
+                self.withdraw(u, s, allow)?;
+            }
+            Op::Run(u, n) => {
+                // C0-9: a loop of withdrawals at the allowance takes at most the first
+                // allowance, plus one unit of rounding per withdrawal.
+                if self.m().lender(u).is_none() {
+                    return Ok(());
+                }
+                let first = self.s.free_allowance(u).unwrap_or(0);
+                let (mut took, mut k) = (0u128, 0u128);
+                for _ in 0..n {
+                    let allow = self.s.free_allowance(u).unwrap_or(0);
+                    let shares = self.s.shares(u);
+                    if allow == 0 || shares == 0 {
+                        break;
+                    }
+                    match self.withdraw(u, self.s.shares_at(allow).max(1).min(shares), allow)? {
+                        Some(got) => {
+                            took += u128::from(got);
+                            k += 1;
+                        }
+                        None => break,
+                    }
+                }
+                prop_assert!(
+                    took <= u128::from(first) + k,
+                    "run took {took} > first allowance {first} + {k}"
+                );
+            }
+            Op::Borrow(seed, d) => {
+                let t = self.m().pool.tokens_free;
+                if t > 0 {
+                    self.borrow(1 + seed % t, DURATIONS[usize::from(d)])?;
+                }
+            }
+            Op::Accrue(dt, d) => {
+                // ARCH §9 M0b note (4): rent credited while S = 0 and ΣB_Q > 0 (after a dust
+                // exit) reaches the protocol sink before any SOL arrived and breaks I-P2's
+                // claim side in pool_model too (vectors `ext_scripted_no_shares`, where the
+                // model's check() fails). The property lets only time pass there.
+                if self.m().pool.total_shares == 0 && self.m().pool.borrowed_q > 0 {
+                    self.s.advance(i64::from(dt), 0);
+                    return Ok(());
+                }
+                // SOL amounts stay within the SOL supply: an accrual adds at most 10¹⁴
+                // lamports of rent across the open positions (i64 `pending` holds them).
+                let a = self.s.rent.a.max(1);
+                let d = d.min(100_000_000_000_000 * shortwin_math::num::WAD * 10_000 / a);
+                let before = self.s.clone();
+                let c = self.s.rent.accrue(d);
+                if let Err(e) = self.s.m.accrue(i64::from(dt), c) {
+                    // Only a credit while S = 0 (ARCH §9 M0b note 4) can be refused.
+                    refusal(e)?;
+                    prop_assert_eq!(before.m.pool.total_shares, 0);
+                    self.s = before;
+                }
+            }
+            Op::Advance(i) => self.s.advance(ADVANCES[usize::from(i)], 0),
+            Op::Gov(i) => self.s.rent.protocol_bps = GOV_BPS[usize::from(i)],
+            Op::Repay(k, full, seed, lump) => {
+                if let Some(id) = self.pick(k) {
+                    self.repay(id, (!full).then_some(seed), lump)?;
+                }
+            }
+            Op::Settle(k, sol, lump) => {
+                if let Some(id) = self.pick(k) {
+                    let lump = if lump % 3 == 0 { lump % (sol + 1) } else { 0 };
+                    self.settle(id, sol, lump)?;
+                }
+            }
+            Op::Wipe(sol) => {
+                let p = self.m().pool;
+                if p.tokens_free > 0 && p.total_shares > 0 {
+                    let q = u64::try_from(
+                        u128::from(p.tokens_free) * u128::from(self.cfg.cap_bps) / 10_000,
+                    )
+                    .expect("q");
+                    self.borrow(q, 30 * DAY)?;
+                    for pos in self.s.rent.positions.clone() {
+                        self.settle(pos.id, sol, 0)?;
+                    }
+                }
+            }
+            Op::Deep(r, sol) => {
+                let p = self.m().pool;
+                if p.tokens_free > 3 && p.total_shares > 0 {
+                    self.borrow(p.tokens_free - r, 30 * DAY)?;
+                    for pos in self.s.rent.positions.clone() {
+                        self.settle(pos.id, sol, 0)?;
+                    }
+                }
+            }
+            Op::Claim(u, again) => {
+                // I-P5: pays at most the lender's entitlement; again in the same state pays 0.
+                let mut view = self.s.m.clone();
+                if let Err(e) = view.touch(u) {
+                    return refusal(e);
+                }
+                let bound = view.lender(u).expect("lender").pending.max(0);
+                let paid = match self.s.claim(u) {
+                    Ok(p) => p,
+                    Err(e) => return refusal(e),
+                };
+                prop_assert!(
+                    i128::from(paid) <= i128::from(bound),
+                    "claim {paid} > {bound}"
+                );
+                for _ in 0..again {
+                    prop_assert_eq!(self.s.claim(u), Ok(0), "repeated claim paid");
+                }
+            }
+            Op::Cover(u, x) => {
+                if self.m().lender(u).is_none() {
+                    return Ok(());
+                }
+                if let Err(e) = self.s.m.touch(u) {
+                    return refusal(e);
+                }
+                let pending = self.m().lender(u).expect("lender").pending;
+                let x = if pending < 0 {
+                    pending.unsigned_abs()
+                } else {
+                    x
+                };
+                let before = self.s.m.clone();
+                match self.s.m.cover(u, x) {
+                    Ok(()) if pending < 0 => {
+                        prop_assert_eq!(self.m().lender(u).expect("lender").pending, 0);
+                    }
+                    Ok(()) => {}
+                    Err(e) => {
+                        refusal(e)?;
+                        prop_assert_eq!(&self.s.m, &before);
+                    }
+                }
+            }
+            Op::Sweep(x, rewards) => {
+                let before = self.s.m.clone();
+                let src = if rewards {
+                    SweepSource::VenueRewards
+                } else {
+                    SweepSource::Trader
+                };
+                if let Err(e) = self.s.m.sweep_from(x, src) {
+                    refusal(e)?;
+                    prop_assert_eq!(&self.s.m, &before);
+                }
+            }
+            Op::Churn(seed) => {
+                // I-P4 (V2-3): another position's open + close never reduces a lock.
+                let p = self.m().pool;
+                if p.tokens_free == 0 || p.borrowed_q == 0 {
+                    return Ok(());
+                }
+                let users: Vec<usize> = self.m().lenders.iter().map(|(u, _)| *u).collect();
+                let mut locks = Vec::new();
+                for &u in &users {
+                    if let Err(e) = self.s.m.touch(u) {
+                        return refusal(e);
+                    }
+                    locks.push(self.s.m.lock_of(u).expect("lock"));
+                }
+                if let Some(id) = self.borrow(1 + seed % p.tokens_free, 3_600)? {
+                    self.repay(id, Some(0), 0)?;
+                }
+                for (&u, &before) in users.iter().zip(&locks) {
+                    self.s.m.touch(u).expect("touch");
+                    let now = self.s.m.lock_of(u).expect("lock");
+                    prop_assert!(
+                        now >= before,
+                        "churn released a lock of u{u}: {before} -> {now}"
+                    );
+                }
+            }
+            Op::Touch(u) => {
+                let before = self.s.m.clone();
+                match self.s.m.touch(u) {
+                    Ok(st) => {
+                        prop_assert!(st != Standing::Behind);
+                        // Idempotent at one time.
+                        let once = self.s.m.clone();
+                        self.s.m.touch(u).expect("second touch");
+                        prop_assert_eq!(&self.s.m, &once);
+                    }
+                    Err(e) => {
+                        refusal(e)?;
+                        prop_assert_eq!(&self.s.m, &before);
+                    }
+                }
+            }
+            Op::View => {
+                // allowance_view is pure and equals the allowance after that lender's
+                // own touch.
+                let before = self.s.m.clone();
+                for (u, _) in before.lenders.clone() {
+                    let v = self.s.m.allowance_view(u);
+                    prop_assert_eq!(&self.s.m, &before);
+                    let mut t = before.clone();
+                    prop_assert_eq!(v, t.allowance(u));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// ECON §13 / I8 plus the calendar: `lock_norm` is the sum of the live buckets, which
+    /// holds at least the live locks' terms (each within its own bucket).
+    fn check(&mut self) -> Result<(), TestCaseError> {
+        let b: u64 = self.s.rent.positions.iter().map(|p| p.q).sum();
+        prop_assert_eq!(self.m().pool.borrowed_q, b, "ΣB_Q == Σ open q");
+        prop_assert!(
+            self.m().pool.max_release
+                >= self
+                    .s
+                    .rent
+                    .positions
+                    .iter()
+                    .map(|p| p.deadline + self.cfg.tail)
+                    .max()
+                    .unwrap_or(0),
+            "I6: max_release covers every open position's release"
+        );
+        let r = if self.cfg.touch_all {
+            self.s.m.check_touch_all()
+        } else {
+            self.s.m.invariants()
+        };
+        if let Err(e) = r {
+            return Err(TestCaseError::fail(format!(
+                "{e}\nstate {}",
+                self.m().canonical()
+            )));
+        }
+        let v = &self.m().vault;
+        let sum: u128 = v.buckets().map(|(_, t)| t).sum();
+        prop_assert_eq!(sum, v.lock_norm, "lock_norm = Σ buckets");
+        let mut live = 0u128;
+        for (u, l) in &self.m().lenders {
+            let is_live = l.epoch == self.m().pool.share_epoch
+                && l.lock != 0
+                && l.lock_epoch == v.pi_epoch
+                && self.m().now < l.lock_until;
+            if is_live {
+                prop_assert_eq!(l.lock_until % DAY, 0, "u{} lock_until is a day end", u);
+                let day = l.lock_until / DAY;
+                let bucket = v.buckets().find(|(d, _)| *d == day).map_or(0, |(_, t)| t);
+                prop_assert!(l.lock_term <= bucket, "u{u}'s term outside its bucket");
+                live += l.lock_term;
+            }
+            if l.lock_epoch == NO_LOCK_EPOCH {
+                prop_assert_eq!(l.lock_term, 0);
+            }
+        }
+        prop_assert!(live <= v.lock_norm, "Σ live terms {live} > lock_norm");
+        Ok(())
+    }
+
+    /// I-P6, claim side: after the wind-down nobody is owed while SOL allocated to it or
+    /// in the pot remains (the vault drains to dust unless every entitlement is paid).
+    fn liveness(&self) -> Result<(), TestCaseError> {
+        let mut w = self.s.clone();
+        for pos in w.rent.positions.clone() {
+            let owed = w.rent.owed(&pos);
+            if w.repay(pos.id, owed, 0).is_err() {
+                return Ok(()); // a close refused while S = 0 (ARCH §9 M0b note 4)
+            }
+        }
+        w.advance(i64::from(w.m.lump_vest_s) + 1, 0);
+        let users: Vec<usize> = w.m.lenders.iter().map(|(u, _)| *u).collect();
+        for &u in &users {
+            w.touch(u);
+        }
+        for _ in 0..2 {
+            for &u in &users {
+                w.claim(u).expect("claim");
+            }
+        }
+        for (u, l) in &w.m.lenders {
+            if l.pending > 0 && w.m.vault.lender_sol > 0 {
+                prop_assert!(
+                    l.real == l.claimed && w.m.vault.unmatched == 0,
+                    "I-P6: u{u} owed {} with real − claimed {} and pot {}",
+                    l.pending,
+                    l.real - l.claimed,
+                    w.m.vault.unmatched
+                );
+            }
+        }
+        Ok(())
+    }
+}
+
+proptest! {
+    #![proptest_config(common::proptest_config())]
+
+    /// ECON §13 I-P1–I-P7 and ARCH §8.3 I8 hold after every operation, I-P4 also on the
+    /// untouched state; the wind-down is live at the end.
+    #[test]
+    fn invariants_hold_after_every_operation((cfg, ops) in scenario()) {
+        let (lump, grace) = cfg.params;
+        let mut d = Driver { s: Model::with_params(cfg.cap_bps, lump, grace), cfg };
+        for (i, op) in ops.iter().enumerate() {
+            d.step(op).map_err(|e| TestCaseError::fail(format!("op {i} {op:?}: {e}")))?;
+            d.check().map_err(|e| TestCaseError::fail(format!("after op {i} {op:?}: {e}")))?;
+        }
+        d.liveness()?;
+    }
+
+    /// Share epochs keep `S` bounded (I-P3) through any number of full wipes (each followed
+    /// by its post-wipe sweep) and deep rebases, and a lender wiped out long ago catches up
+    /// with the records it needs.
+    #[test]
+    fn repeated_wipes_and_rebases(rounds in prop::collection::vec((1u64..u64::MAX / 4, 0u64..4, 0u64..1_000_000_000), 1..40)) {
+        let mut m = Market::new();
+        m.deposit(0, 1_000_000).expect("first deposit");
+        for (i, &(amount, left, sol)) in rounds.iter().enumerate() {
+            let user = 1 + i % 5;
+            if m.pool.is_wipe_live() {
+                prop_assert_eq!(m.deposit(user, amount), Err(MathError::WipeSweepPending));
+                m.sweep(sol / 3).expect("post-wipe sweep");
+            }
+            if m.deposit(user, amount).is_err() {
+                continue;
+            }
+            let t = m.pool.tokens_free;
+            let q = t.saturating_sub(left).max(1);
+            m.borrow(q, m.now + 30 * DAY).expect("borrow");
+            m.settle(q, sol, 0, sol / 7).expect("settle");
+            let p = m.pool;
+            let claims = u128::from(p.tokens_free) + u128::from(p.borrowed_q);
+            prop_assert!(p.total_shares == 0 || p.total_shares + pool::VIRTUAL_SHARES <= pool::R_MAX * (claims + pool::VIRTUAL_ASSETS));
+            m.accrue(3_600, 0).expect("time");
+            m.invariants().map_err(TestCaseError::fail)?;
+        }
+        // The first lender (never touched since) converts through every record at once.
+        prop_assert!(m.touch(0).is_ok());
+        let l = *m.lender(0).expect("lender 0");
+        prop_assert!(l.epoch == m.pool.share_epoch || m.pool.is_wipe_live());
+        m.invariants().map_err(TestCaseError::fail)?;
+    }
+
+    /// R4A-2 / R4B-3: an idle lender's expired lock leaves the aggregate at its
+    /// `lock_until`, whoever is touched; the allowances as the program sees them (each
+    /// lender touched alone) never sum above T + dust.
+    #[test]
+    fn expired_locks_leave_the_aggregate_untouched(
+        deps in prop::collection::vec(1_000_000u64..10_000_000_000_000, 2..6),
+        util in 10u64..90,
+        dur in 0usize..5,
+        wait in 0i64..100,
+    ) {
+        let mut s = Model::new(9_000);
+        for (u, &a) in deps.iter().enumerate() {
+            s.deposit(u, a).expect("deposit");
+        }
+        let q = s.m.pool.tokens_free / 100 * util;
+        s.borrow(q, DURATIONS[dur], S3_TAIL_S).expect("open");
+        let a = s.free_allowance(0).expect("allowance");
+        let sh = s.shares_at(a).max(1).min(s.shares(0));
+        s.withdraw(0, sh).expect("withdraw");
+        let l0 = *s.m.lender(0).expect("lender");
+        prop_assert_eq!(l0.lock_until % DAY, 0);
+        prop_assert!(l0.lock_until >= DURATIONS[dur] + S3_TAIL_S + i64::from(pool_harness::LOCK_GRACE_S));
+        // Nothing resolves (Π stays); only the calendar can release the lock.
+        s.advance(wait * DAY / 3, 0);
+        let mut total = 0u128;
+        for u in 0..deps.len() {
+            total += u128::from(s.m.allowance_view(u).expect("view"));
+        }
+        prop_assert!(total <= u128::from(s.m.pool.tokens_free) + deps.len() as u128);
+        let locked = pool::locked_total(&s.m.pool, &s.m.vault, s.m.now).expect("locked");
+        if s.m.now >= l0.lock_until {
+            prop_assert_eq!(locked, 0, "an expired lock still counts for everyone");
+            prop_assert_eq!(pool::lock_of(&s.m.vault, &l0, s.m.now), Ok(0));
+        } else if l0.lock_term > 0 {
+            // Π = WAD while nothing resolves: the aggregate is the term itself.
+            prop_assert_eq!(locked, l0.lock_term.min(s.m.pool.total_shares));
+        }
+    }
+}

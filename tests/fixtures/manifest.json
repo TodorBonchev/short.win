@@ -1,0 +1,44 @@
+{
+  "description": "Mainnet accounts, programs and transactions dumped for the program tests (ARCHITECTURE §1.2, §8.2). Each entry records how it was fetched; SHA256SUMS pins the bytes (CI: cd tests/fixtures && sha256sum -c SHA256SUMS).",
+  "accounts": [
+    {
+      "name": "pyth_sol_usd_shard0",
+      "description": "Pyth sponsored shard-0 SOL/USD PriceUpdateV2 (ARCH §4.7, R-VEN §5, V7), the account crank_sol_usd reads.",
+      "address": "7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE",
+      "owner": "rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ",
+      "cluster": "mainnet-beta",
+      "rpc": "https://api.mainnet-beta.solana.com",
+      "fetched_at": "2026-09-27T15:31:04Z",
+      "slot": 451037803,
+      "cli": "solana-cli 4.1.2 (src:182084b8; feat:c763ae0a, client:Agave)",
+      "command": "solana account 7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE --url https://api.mainnet-beta.solana.com --output json > accounts/pyth_sol_usd_shard0.json",
+      "slot_command": "solana slot --url https://api.mainnet-beta.solana.com (451037803 immediately before and after the dump)",
+      "files": {
+        "accounts/pyth_sol_usd_shard0.json": "the solana account output, verbatim",
+        "accounts/pyth_sol_usd_shard0.bin": "the account data: base64 -d of account.data[0] of the JSON (134 bytes)"
+      },
+      "decoded": {
+        "discriminator": "22f123639d7ef4cd",
+        "write_authority": "7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE",
+        "verification_level": "Full",
+        "feed_id": "ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d",
+        "price": 12179606511,
+        "conf": 1399451,
+        "exponent": -8,
+        "publish_time": 1790523057,
+        "publish_time_utc": "2026-09-27T15:30:57Z",
+        "prev_publish_time": 1790523056,
+        "ema_price": 12221353350,
+        "ema_conf": 1476255,
+        "posted_slot": 451037781,
+        "lamports": 1825031,
+        "space": 134
+      },
+      "used_by": [
+        "crates/shortwin-venue-state/src/pyth.rs (unit tests)",
+        "tests/litesvm/tests/oracle_crank.rs (crank_sol_usd and its mutated copies)",
+        "tests/bench/m1_cu (crank_sol_usd CU baseline)"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,306 @@
+//! Compile-time constants (ARCH §2.1 `constants.rs`, §2.3.2, §2.3.3 scope C; C0-8).
+//!
+//! Venue program ids, their static PDAs and authorities, the venue ProgramData addresses and
+//! the Pyth receiver are constants: **no config path can change them; only an audited program
+//! upgrade can** (C0-8). `tests::static_addresses_rederive` re-derives every PDA below.
+//!
+//! The protocol constants (`EMA_TAU_S`, `RING_LEN`, `S3_OBS_GAP_S`, `COVERAGE_GAP_S`,
+//! `P_ACC_MAX`, `P_OPEN_MAX`, the lock calendar) and the compiled parameter bounds live in
+//! `shortwin-math` (one table, shared with the keeper and the frontend) and are re-exported
+//! here; the program never restates a bound.
+
+use anchor_lang::prelude::*;
+
+pub use shortwin_math::consts::{
+    COVERAGE_GAP_S, EMA_TAU_S, LOCK_BUCKETS, LOCK_BUCKET_S, MAX_RELEASE_SPAN_S, P_ACC_MAX,
+    P_OPEN_MAX, RING_LEN, S3_OBS_GAP_S,
+};
+/// The compiled hard bounds of every parameter (ARCH §2.3.3; ECON §15): `Rule::bounds()`.
+/// `params::validate` / `params::validate_econ` enforce them with the relational checks.
+pub use shortwin_math::params::Rule as ParamRule;
+pub use shortwin_math::pool::{REBASE, R_MAX, VIRTUAL_ASSETS, VIRTUAL_SHARES};
+pub use shortwin_math::tier::{AGE_A_S, AGE_C_S};
+
+// ---- layout versions ---------------------------------------------------------------------
+
+/// `GlobalConfig.version` (ARCH §2.3.2).
+pub const CONFIG_VERSION: u16 = 1;
+/// `VenueGuard.version`.
+pub const VENUE_GUARD_VERSION: u16 = 1;
+/// `VenueExtras.version`.
+pub const VENUE_EXTRAS_VERSION: u16 = 1;
+/// `Market.version` (ARCH §2.3.4).
+pub const MARKET_VERSION: u16 = 1;
+
+// ---- governance --------------------------------------------------------------------------
+
+/// Compiled floor of `GlobalConfig.timelock_s` (A8): 24 h.
+pub const MIN_TIMELOCK_S: u32 = 86_400;
+/// Default `timelock_s` (48 h, SPEC §11).
+pub const DEFAULT_TIMELOCK_S: u32 = 172_800;
+/// Compiled ceiling of `GlobalConfig.timelock_s`: 30 days. A unit slip (48 h in milliseconds)
+/// or a hostile `Timelock` change could otherwise freeze every later change, key rotations
+/// included, for years (M1-SEC-4; not in ARCH §2.3.2 yet, see the M1 review notes).
+pub const MAX_TIMELOCK_S: u32 = 2_592_000;
+/// How long after `not_before` a pending change may still be applied: 14 days. Later,
+/// `apply_config` refuses (`PendingChangeExpired`) and governance proposes it again, so a
+/// forgotten proposal cannot be applied long after users stopped watching it (M1-SEC-9; not
+/// in ARCH §3.1 yet).
+pub const CONFIG_APPLY_WINDOW_S: i64 = 1_209_600;
+
+/// CPMM `open_time` clamp cut-off, 2024-06-01T00:00Z (ARCH §2.3.3, §4.7; R-RAY §7).
+pub const T_CLAMP: i64 = 1_717_200_000;
+
+// ---- `GlobalConfig.venue_enabled` / `venue_route_broken` bits (ARCH §2.3.2) --------------
+
+/// Pump.fun bonding curve.
+pub const VENUE_BIT_PUMP_CURVE: u32 = 1 << 0;
+/// PumpSwap.
+pub const VENUE_BIT_PUMP_SWAP: u32 = 1 << 1;
+/// Raydium AMM v4.
+pub const VENUE_BIT_RAYDIUM_V4: u32 = 1 << 2;
+/// Raydium CPMM.
+pub const VENUE_BIT_RAYDIUM_CPMM: u32 = 1 << 3;
+/// Jupiter (v1.1).
+pub const VENUE_BIT_JUPITER: u32 = 1 << 4;
+/// Every bit `venue_enabled` may hold.
+pub const VENUE_BITS_KNOWN: u32 = VENUE_BIT_PUMP_CURVE
+    | VENUE_BIT_PUMP_SWAP
+    | VENUE_BIT_RAYDIUM_V4
+    | VENUE_BIT_RAYDIUM_CPMM
+    | VENUE_BIT_JUPITER;
+
+// ---- venue programs (VenueGuard indices, ARCH §2.3.2) ------------------------------------
+
+/// Venue programs the upgrade latch watches, in `VenueGuard` bit / slot order.
+pub const VENUE_PROGRAMS: usize = 6;
+/// `VenueGuard` index: pump (bonding curve).
+pub const GUARD_PUMP: u8 = 0;
+/// `VenueGuard` index: pump AMM (PumpSwap).
+pub const GUARD_PUMP_AMM: u8 = 1;
+/// `VenueGuard` index: pump fees.
+pub const GUARD_PUMP_FEES: u8 = 2;
+/// `VenueGuard` index: Raydium AMM v4.
+pub const GUARD_RAYDIUM_V4: u8 = 3;
+/// `VenueGuard` index: Raydium CPMM.
+pub const GUARD_RAYDIUM_CPMM: u8 = 4;
+/// `VenueGuard` index: Jupiter (v1.1).
+pub const GUARD_JUPITER: u8 = 5;
+
+/// `VenueGuard.upgraded` mask that blocks opens on a `PumpCurve` market: pump + pfee +
+/// **pAMM** (a curve position exits on PumpSwap after graduation, and `B̂_str` prices the pAMM
+/// pool; ARCH §3.1, R4B-7).
+pub const GUARD_MASK_PUMP_CURVE: u32 =
+    (1 << GUARD_PUMP) | (1 << GUARD_PUMP_FEES) | (1 << GUARD_PUMP_AMM);
+/// Mask for a `PumpSwap` market: pAMM + pfee.
+pub const GUARD_MASK_PUMP_SWAP: u32 = (1 << GUARD_PUMP_AMM) | (1 << GUARD_PUMP_FEES);
+/// Mask for a `RaydiumV4` or `RaydiumCpmm` market: **both** Raydium programs (a fast path can
+/// move the market between them with positions open).
+pub const GUARD_MASK_RAYDIUM: u32 = (1 << GUARD_RAYDIUM_V4) | (1 << GUARD_RAYDIUM_CPMM);
+
+/// Pump.fun bonding-curve program.
+pub const PUMP_PROGRAM_ID: Pubkey = pubkey!("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P");
+/// PumpSwap (pump AMM) program.
+pub const PUMP_AMM_PROGRAM_ID: Pubkey = pubkey!("pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA");
+/// Pump fees program.
+pub const PUMP_FEES_PROGRAM_ID: Pubkey = pubkey!("pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ");
+/// Raydium AMM v4 program.
+pub const RAYDIUM_V4_PROGRAM_ID: Pubkey = pubkey!("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8");
+/// Raydium CPMM program.
+pub const RAYDIUM_CPMM_PROGRAM_ID: Pubkey = pubkey!("CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C");
+/// Jupiter v6 aggregator (v1.1).
+pub const JUPITER_PROGRAM_ID: Pubkey = pubkey!("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4");
+
+/// Venue program ids in `VenueGuard` order.
+pub const VENUE_PROGRAM_IDS: [Pubkey; VENUE_PROGRAMS] = [
+    PUMP_PROGRAM_ID,
+    PUMP_AMM_PROGRAM_ID,
+    PUMP_FEES_PROGRAM_ID,
+    RAYDIUM_V4_PROGRAM_ID,
+    RAYDIUM_CPMM_PROGRAM_ID,
+    JUPITER_PROGRAM_ID,
+];
+
+/// ProgramData accounts of the venue programs, in `VenueGuard` order
+/// (`PDA(BPFLoaderUpgradeable, [program_id])`; R-PUMP §1, R-VEN §7, R-RAY §1.1, R-JUP §1).
+pub const VENUE_PROGRAM_DATA: [Pubkey; VENUE_PROGRAMS] = [
+    pubkey!("B5MvUwXdiW1NMM6QFFD3ssPKBujD4zMohncbM73Z2BQu"),
+    pubkey!("6naEzKeUuFh1Jeeu51NXQgr5qkXgXtc9WKNct4xynVJc"),
+    pubkey!("75Uu23mqWBb8LM8vDppqC1mQAnCcBuLXhVaDezVMQLRw"),
+    pubkey!("A7ZG7ByDi8DpzT9Ab7CiXhvgYTJQmaDPJkMDoPitaCQV"),
+    pubkey!("DMawCQzbgNTmbzaESc7o6pvL1KAeetY8zA7jNpzntHhU"),
+    pubkey!("4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT"),
+];
+
+/// Deploy slots validated when v0.4.1 was written (ARCH §2.3.2 [V9]); `initialize_config`
+/// takes the live values as arguments.
+pub const VENUE_GUARD_SLOTS_2026_09_27: [u64; VENUE_PROGRAMS] = [
+    449_734_335,
+    446_462_733,
+    446_465_969,
+    445_763_204,
+    445_763_504,
+    449_280_566,
+];
+
+/// The ProgramData address of venue program `venue` (a `VenueGuard` index), or `None`.
+pub const fn venue_program_data(venue: u8) -> Option<Pubkey> {
+    let i = venue as usize;
+    if i < VENUE_PROGRAMS {
+        Some(VENUE_PROGRAM_DATA[i])
+    } else {
+        None
+    }
+}
+
+// ---- static venue PDAs and authorities (ARCH §2.3.2; R-PUMP §3.1, R-VEN §1.1, R-RAY §1.1) --
+
+/// pump `Global` = PDA(pump, ["global"]).
+pub const PUMP_GLOBAL: Pubkey = pubkey!("4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf");
+/// pump `event_authority` = PDA(pump, ["__event_authority"]).
+pub const PUMP_EVENT_AUTHORITY: Pubkey = pubkey!("Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1");
+/// pump global volume accumulator = PDA(pump, ["global_volume_accumulator"]).
+pub const PUMP_GLOBAL_VOLUME_ACCUMULATOR: Pubkey =
+    pubkey!("Hq2wp8uJ9jCPsYgNHex8RtqdvMPfVGoYwjvF1ATiwn2Y");
+/// pump-fees `FeeConfig` of pump = PDA(pfee, ["fee_config", pump]).
+pub const PUMP_FEE_CONFIG: Pubkey = pubkey!("8Wf5TiAheLUqBrKXeYg2JtAFFMWtKdG2BSFgqUcPVwTt");
+/// PumpSwap `GlobalConfig` = PDA(pAMM, ["global_config"]).
+pub const PUMP_AMM_GLOBAL_CONFIG: Pubkey = pubkey!("ADyA8hdefvWN2dbGGWFotbzWxrAvLW83WG6QCVXvJKqw");
+/// PumpSwap `event_authority` = PDA(pAMM, ["__event_authority"]).
+pub const PUMP_AMM_EVENT_AUTHORITY: Pubkey =
+    pubkey!("GS4CU59F31iL7aR2Q8zVS8DRrcRnXX1yjQ66TqNVQnaR");
+/// PumpSwap global volume accumulator = PDA(pAMM, ["global_volume_accumulator"]).
+pub const PUMP_AMM_GLOBAL_VOLUME_ACCUMULATOR: Pubkey =
+    pubkey!("C2aFPdENg4A2HQsmrd5rTw5TaYBX5Ku887cWjbFKtZpw");
+/// pump-fees `FeeConfig` of PumpSwap = PDA(pfee, ["fee_config", pAMM]).
+pub const PUMP_AMM_FEE_CONFIG: Pubkey = pubkey!("5PHirr8joyTMp9JMm6nW7hNDVyEYdkzDqazxPD7RaTjx");
+/// Raydium AMM v4 vault / LP authority = `create_program_address(["amm authority", 254])`.
+pub const RAYDIUM_V4_AUTHORITY: Pubkey = pubkey!("5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1");
+/// The only AMM v4 authority nonce a market accepts (R-RAY §1.1).
+pub const RAYDIUM_V4_AUTHORITY_NONCE: u8 = 254;
+/// Raydium CPMM vault / LP authority = PDA(CPMM, ["vault_and_lp_mint_auth_seed"]).
+pub const RAYDIUM_CPMM_AUTHORITY: Pubkey = pubkey!("GpMZbSM2GgvTKHJirzeGfMFoaZ8UR2X7F4v8vHTvxFbL");
+
+// ---- tokens --------------------------------------------------------------------------------
+
+/// SPL Token (p-token on mainnet).
+pub const TOKEN_PROGRAM_ID: Pubkey = pubkey!("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+/// Token-2022.
+pub const TOKEN_2022_PROGRAM_ID: Pubkey = pubkey!("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
+/// Associated Token Account program.
+pub const ASSOCIATED_TOKEN_PROGRAM_ID: Pubkey =
+    pubkey!("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+/// Wrapped SOL (SPL Token native mint); the only SOL side a venue may use (ARCH §2.6).
+pub const WSOL_MINT: Pubkey = pubkey!("So11111111111111111111111111111111111111112");
+/// Token-2022 native mint (never listable, never a SOL side; R-MINT §9.2).
+pub const WSOL_2022_MINT: Pubkey = pubkey!("9pan9bMn5HatX4EJdBwg9VgCa7Uz5HL8N1m5D3NdXejP");
+/// spl-memo v3/v4 (`MemoSq4g…`): `withdraw` CPIs it before a transfer into a Token-2022
+/// account that requires incoming-transfer memos (ARCH §3.3; R-MINT §8.4; T-MEMO, U17).
+pub const MEMO_PROGRAM_ID: Pubkey = pubkey!("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
+
+// ---- oracle (ARCH §4.7, A10, A29; R-VEN §5) ------------------------------------------------
+
+/// Pyth Solana receiver: owner of every `PriceUpdateV2`.
+pub const PYTH_RECEIVER_ID: Pubkey = pubkey!("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ");
+/// Sponsored shard-0 SOL/USD `PriceUpdateV2` (the `initialize_config` default).
+pub const PYTH_SOL_USD_ACCOUNT: Pubkey = pubkey!("7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE");
+/// SOL/USD feed id `ef0d8b6f…b56d`.
+pub const PYTH_SOL_USD_FEED_ID: [u8; 32] = [
+    0xef, 0x0d, 0x8b, 0x6f, 0xda, 0x2c, 0xeb, 0xa4, 0x1d, 0xa1, 0x5d, 0x40, 0x95, 0xd1, 0xda, 0x39,
+    0x2a, 0x0d, 0x2f, 0x8e, 0xd0, 0xc6, 0xc7, 0xbc, 0x0f, 0x4c, 0xfa, 0xc8, 0xc2, 0x80, 0xb5, 0x6d,
+];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anchor_lang::solana_program::bpf_loader_upgradeable;
+
+    fn pda(program: &Pubkey, seeds: &[&[u8]]) -> Pubkey {
+        Pubkey::find_program_address(seeds, program).0
+    }
+
+    /// ARCH §2.3.2: every static address re-derived from its program and seeds (C0-8).
+    #[test]
+    fn static_addresses_rederive() {
+        assert_eq!(pda(&PUMP_PROGRAM_ID, &[b"global"]), PUMP_GLOBAL);
+        assert_eq!(
+            pda(&PUMP_PROGRAM_ID, &[b"__event_authority"]),
+            PUMP_EVENT_AUTHORITY
+        );
+        assert_eq!(
+            pda(&PUMP_PROGRAM_ID, &[b"global_volume_accumulator"]),
+            PUMP_GLOBAL_VOLUME_ACCUMULATOR
+        );
+        assert_eq!(
+            pda(
+                &PUMP_FEES_PROGRAM_ID,
+                &[b"fee_config", PUMP_PROGRAM_ID.as_ref()]
+            ),
+            PUMP_FEE_CONFIG
+        );
+        assert_eq!(
+            pda(&PUMP_AMM_PROGRAM_ID, &[b"global_config"]),
+            PUMP_AMM_GLOBAL_CONFIG
+        );
+        assert_eq!(
+            pda(&PUMP_AMM_PROGRAM_ID, &[b"__event_authority"]),
+            PUMP_AMM_EVENT_AUTHORITY
+        );
+        assert_eq!(
+            pda(&PUMP_AMM_PROGRAM_ID, &[b"global_volume_accumulator"]),
+            PUMP_AMM_GLOBAL_VOLUME_ACCUMULATOR
+        );
+        assert_eq!(
+            pda(
+                &PUMP_FEES_PROGRAM_ID,
+                &[b"fee_config", PUMP_AMM_PROGRAM_ID.as_ref()]
+            ),
+            PUMP_AMM_FEE_CONFIG
+        );
+        assert_eq!(
+            Pubkey::create_program_address(
+                &[b"amm authority", &[RAYDIUM_V4_AUTHORITY_NONCE]],
+                &RAYDIUM_V4_PROGRAM_ID
+            )
+            .ok(),
+            Some(RAYDIUM_V4_AUTHORITY)
+        );
+        assert_eq!(
+            pda(&RAYDIUM_CPMM_PROGRAM_ID, &[b"vault_and_lp_mint_auth_seed"]),
+            RAYDIUM_CPMM_AUTHORITY
+        );
+        for (id, data) in VENUE_PROGRAM_IDS.iter().zip(VENUE_PROGRAM_DATA.iter()) {
+            assert_eq!(pda(&bpf_loader_upgradeable::ID, &[id.as_ref()]), *data);
+        }
+    }
+
+    #[test]
+    fn venue_state_constants_agree() {
+        assert_eq!(
+            shortwin_venue_state::program_data::LOADER_UPGRADEABLE,
+            bpf_loader_upgradeable::ID.to_bytes()
+        );
+        assert_eq!(
+            shortwin_venue_state::pyth::RECEIVER,
+            PYTH_RECEIVER_ID.to_bytes()
+        );
+    }
+
+    #[test]
+    fn guard_indices_and_masks() {
+        assert_eq!(
+            venue_program_data(GUARD_JUPITER),
+            Some(VENUE_PROGRAM_DATA[5])
+        );
+        assert_eq!(venue_program_data(6), None);
+        assert_eq!(VENUE_PROGRAMS, 6);
+        assert_eq!(GUARD_MASK_PUMP_CURVE, 0b00111);
+        assert_eq!(GUARD_MASK_PUMP_SWAP, 0b00110);
+        assert_eq!(GUARD_MASK_RAYDIUM, 0b11000);
+        assert_eq!(VENUE_BITS_KNOWN, 0b11111);
+        assert_eq!(T_CLAMP, 1_717_200_000);
+        const { assert!(MIN_TIMELOCK_S <= DEFAULT_TIMELOCK_S) };
+        const { assert!(DEFAULT_TIMELOCK_S <= MAX_TIMELOCK_S) };
+        const { assert!(CONFIG_APPLY_WINDOW_S > 0) };
+    }
+}

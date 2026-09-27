@@ -1,0 +1,346 @@
+//! Program errors (ARCH §3.11): one `#[error_code]` enum (Anchor 1.x allows one per program
+//! [R-TOOL §1.3]).
+//!
+//! **Codes are stable.** Anchor numbers the variants from 6000 in declaration order, so the
+//! groups below follow ARCH §3.11 exactly and new codes are appended at the end (the M1
+//! foundation's temporary `NotImplemented` = 6091 was removed with the last M1 stub before any
+//! deployment; the M1 review's codes 6091–6097 follow, each naming its ARCH §3.11 group).
+//! `tests::codes_are_stable` pins every code.
+
+use anchor_lang::prelude::*;
+use shortwin_math::MathError;
+
+/// Every error short.win returns.
+#[error_code]
+#[derive(PartialEq, Eq)]
+pub enum ShortwinError {
+    // ---- Math / accounts (6000–6007) ----
+    #[msg("Arithmetic overflow, underflow or an undefined value")]
+    MathOverflow,
+    #[msg("An account does not match the key, owner or state the instruction expects")]
+    AccountMismatch,
+    #[msg("A venue account does not match its compile-time, cached or re-derived key")]
+    VenueAccountMismatch,
+    #[msg("A protocol account was passed where it is denied (e.g. as a venue extra)")]
+    DeniedAccount,
+    #[msg("Remaining accounts are missing, extra or out of order")]
+    BadRemainingAccounts,
+    #[msg("A venue extras set or entry is invalid")]
+    BadExtras,
+    #[msg("Account layout version is not the one this program expects")]
+    ConfigVersion,
+    #[msg("A ShareEpoch record does not match the market or epoch")]
+    EpochRecordMismatch,
+
+    // ---- Admin (6008–6015) ----
+    #[msg("Signer is not the authority this instruction requires")]
+    Unauthorized,
+    #[msg("The pending config change is still timelocked")]
+    TimelockNotElapsed,
+    #[msg("There is no pending config change")]
+    NoPendingChange,
+    #[msg("A parameter is outside its compiled bounds or fails a relational check")]
+    InvalidParams,
+    #[msg("Timelock is below the compiled minimum")]
+    TimelockTooShort,
+    #[msg("The venue program's deploy slot has not changed")]
+    VenueNotUpgraded,
+    #[msg("The venue program's deploy slot is not the expected slot")]
+    VenueSlotMismatch,
+    #[msg("The coverage authority is disabled")]
+    CoverageAuthorityDisabled,
+
+    // ---- Mint (6016–6022) ----
+    #[msg("Mint is not owned by SPL Token or Token-2022")]
+    MintUnsupportedProgram,
+    #[msg("Native (wrapped SOL) mints cannot be listed")]
+    MintNative,
+    #[msg("Mint has an active freeze authority")]
+    MintFreezeAuthority,
+    #[msg("Mint carries a Token-2022 extension that is not allowlisted (or unknown)")]
+    MintDisallowedExtension,
+    #[msg("Mint account data is malformed or uninitialized")]
+    MintMalformed,
+    #[msg("Mint passes the safety filter")]
+    MintSafe,
+    #[msg("Mint has been flagged unsafe")]
+    MintUnsafeFlagged,
+
+    // ---- Venue (6023–6041) ----
+    #[msg("Market has no supported venue")]
+    NoSupportedVenue,
+    #[msg("Pump venues take precedence for this mint")]
+    PumpVenuePrecedence,
+    #[msg("Mayhem-mode curves and pools are not supported")]
+    CurveMayhemUnsupported,
+    #[msg("Curve quote mint is not SOL")]
+    CurveQuoteNotSol,
+    #[msg("Bonding curve account must be extended first")]
+    CurveNeedsExtend,
+    #[msg("Venue is migrating")]
+    VenueMigrating,
+    #[msg("No executable route")]
+    NoRoute,
+    #[msg("Route is flagged broken")]
+    RouteBroken,
+    #[msg("Buyback exceeds the curve's real token reserves; use the straddle bundle")]
+    CurveStraddle,
+    #[msg("Venue is disabled for opens")]
+    VenueDisabled,
+    #[msg("A venue program was upgraded and not yet re-validated")]
+    VenueUpgraded,
+    #[msg("Venue is flagged")]
+    VenueFlagged,
+    #[msg("Venue fee is above the cap")]
+    VenueFeeTooHigh,
+    #[msg("PumpSwap boost in progress")]
+    BoostInProgress,
+    #[msg("Venue result does not match the quote or the expected deltas")]
+    VenueResultMismatch,
+    #[msg("Venue took rent on a sell beyond the tolerance")]
+    VenueRentOnSell,
+    #[msg("Trader state is invalid")]
+    TraderStateInvalid,
+    #[msg("Pool vault delegate was not cleared")]
+    DelegateNotCleared,
+    #[msg("An account authority was tampered with")]
+    AuthorityTampered,
+
+    // ---- Pool selection (6042–6049) ----
+    #[msg("Pool is not eligible")]
+    PoolIneligible,
+    #[msg("Candidate pool does not dominate the incumbent")]
+    PoolNotDominant,
+    #[msg("Market has open positions")]
+    PositionsOpen,
+    #[msg("Pool switch is not due")]
+    PoolSwitchNotDue,
+    #[msg("No pending pool switch")]
+    NoPendingSwitch,
+    #[msg("Opens wait for the pool listing window")]
+    PoolListWindow,
+    #[msg("Locked LP share is too low")]
+    PoolLockTooLow,
+    #[msg("Pool is too thin")]
+    PoolTooThin,
+
+    // ---- Opens (6050–6065) ----
+    #[msg("Opens are paused")]
+    OpensPaused,
+    #[msg("Opens are paused for keeper coverage")]
+    CoveragePaused,
+    #[msg("Market is warming up")]
+    MarketWarmingUp,
+    #[msg("Spot price deviates from the EMA")]
+    PriceDeviatesFromEma,
+    #[msg("EMA price is above the open maximum")]
+    PriceAboveOpenMax,
+    #[msg("Position impact cap exceeded")]
+    CapPositionImpact,
+    #[msg("Market open-interest cap exceeded")]
+    CapMarketOi,
+    #[msg("Utilisation cap exceeded")]
+    CapUtilization,
+    #[msg("Curve gamma cap exceeded")]
+    CapCurveGamma,
+    #[msg("Wallet cap exceeded")]
+    CapWallet,
+    #[msg("Insufficient pool inventory")]
+    InsufficientInventory,
+    #[msg("Notional below the minimum")]
+    BelowMinNotional,
+    #[msg("Market notional cap exceeded")]
+    MarketNotionalCap,
+    #[msg("Sale proceeds below the minimum")]
+    ProceedsBelowMin,
+    #[msg("Margin above the maximum")]
+    MarginAboveMax,
+    #[msg("Open fee above the maximum")]
+    OpenFeeAboveMax,
+
+    // ---- Exits (6066–6075) ----
+    #[msg("Vault SOL cannot cover the buyback, rent and tolerance")]
+    InsufficientVault,
+    #[msg("Buyback cost above the maximum")]
+    BuybackAboveMax,
+    #[msg("Position is not liquidatable")]
+    NotLiquidatable,
+    #[msg("Normal buyback not allowed; use sol_settle")]
+    UseSolSettle,
+    #[msg("Position is expired but not CR-liquidatable; use expire")]
+    UseExpire,
+    #[msg("Position is not expired")]
+    NotExpired,
+    #[msg("No fresh completed observation bucket")]
+    ReferenceStale,
+    #[msg("Live buyback cost exceeds the exit bound")]
+    ExitBoundNotMet,
+    #[msg("SOL settlement is not allowed")]
+    SettlementNotAllowed,
+    #[msg("S3 timer is still running")]
+    S3TimerRunning,
+
+    // ---- Lenders (6076–6084) ----
+    #[msg("Amount is zero")]
+    ZeroAmount,
+    #[msg("Shares minted below the minimum")]
+    SharesBelowMin,
+    #[msg("Tokens withdrawn below the minimum")]
+    TokensBelowMin,
+    #[msg("Insufficient shares")]
+    InsufficientShares,
+    #[msg("Insufficient free (unborrowed) inventory")]
+    InsufficientFreeInventory,
+    #[msg("Withdrawal above the pro-rata allowance")]
+    AboveProRataAllowance,
+    #[msg("Lender SOL balance is negative; cover the deficit first")]
+    NegativePending,
+    #[msg("Lender is behind the current share epoch; pass the ShareEpoch records or sync_lender")]
+    LenderBehindEpochs,
+    #[msg("Deposit waits for the post-wipe sweep and reward claim")]
+    WipeSweepPending,
+
+    // ---- Oracle (6085–6090) ----
+    #[msg("Oracle account owner is not the Pyth receiver")]
+    OracleOwner,
+    #[msg("Oracle account or feed id mismatch")]
+    OracleFeed,
+    #[msg("Oracle price is stale or not newer than the cache")]
+    OracleStale,
+    #[msg("Oracle confidence too wide")]
+    OracleConfidence,
+    #[msg("Oracle price step too large")]
+    OracleStep,
+    #[msg("Oracle update is not fully verified")]
+    OracleVerification,
+
+    // ---- Appended after the M1 review (6091–6097); ARCH §3.11 groups in brackets ----
+    /// [Lenders] `withdraw`: the SOL part is below the caller's `min_sol` (M1-SEC-2).
+    #[msg("SOL paid below the minimum")]
+    SolBelowMin,
+    /// [Lenders] `withdraw`: the last shares cannot leave while tokens are borrowed (ARCH §9
+    /// M0b note 4; M1-SEC-3).
+    #[msg("The last shares cannot be withdrawn while tokens are borrowed")]
+    LastSharesBorrowed,
+    /// [Admin] `timelock_s` above the compiled maximum (M1-SEC-4).
+    #[msg("Timelock is above the compiled maximum")]
+    TimelockTooLong,
+    /// [Admin] `apply_config` after the pending change's apply window (M1-SEC-9).
+    #[msg("The pending config change expired; propose it again")]
+    PendingChangeExpired,
+    /// [Lenders] `withdraw` to a Token-2022 account that requires memos, without the memo
+    /// program (ARCH §3.3; M1-SEC-7).
+    #[msg("The destination requires a memo: pass the memo program")]
+    MemoProgramRequired,
+    /// [Opens/markets] `create_market`: the configured creation fee is above the creator's
+    /// `max_creation_fee` (M1-SEC-11).
+    #[msg("Market creation fee above the maximum")]
+    CreationFeeAboveMax,
+    /// [Oracle] `publish_time` more than `oracle_max_age_s` ahead of the clock (M1-SEC-8).
+    #[msg("Oracle publish time is in the future")]
+    OracleFutureDated,
+}
+
+impl From<MathError> for ShortwinError {
+    /// `shortwin-math` refusals map one to one onto the lender codes (the crate's codes 6–12
+    /// mirror ARCH §3.11's lender group); arithmetic and domain failures are `MathOverflow`,
+    /// malformed inputs `InvalidParams`.
+    fn from(e: MathError) -> Self {
+        match e {
+            MathError::Overflow
+            | MathError::Underflow
+            | MathError::DivByZero
+            | MathError::Undefined
+            | MathError::Invariant => Self::MathOverflow,
+            MathError::InvalidInput => Self::InvalidParams,
+            MathError::NegativePending => Self::NegativePending,
+            MathError::InsufficientShares => Self::InsufficientShares,
+            MathError::InsufficientInventory => Self::InsufficientFreeInventory,
+            MathError::AboveAllowance => Self::AboveProRataAllowance,
+            MathError::LenderBehind => Self::LenderBehindEpochs,
+            MathError::DepositTooSmall => Self::ZeroAmount,
+            MathError::WipeSweepPending => Self::WipeSweepPending,
+        }
+    }
+}
+
+/// `.math()?` on a `shortwin-math` result: maps [`MathError`] through
+/// `From<MathError> for ShortwinError`.
+pub trait MathResultExt<T> {
+    /// The value, or the mapped program error.
+    fn math(self) -> Result<T>;
+}
+
+impl<T> MathResultExt<T> for core::result::Result<T, MathError> {
+    fn math(self) -> Result<T> {
+        self.map_err(|e| error!(ShortwinError::from(e)))
+    }
+}
+
+/// `.or_math()?` on a checked-arithmetic `Option` (`None` = overflow).
+pub trait CheckedExt<T> {
+    /// The value, or `MathOverflow`.
+    fn or_math(self) -> Result<T>;
+}
+
+impl<T> CheckedExt<T> for Option<T> {
+    fn or_math(self) -> Result<T> {
+        self.ok_or_else(|| error!(ShortwinError::MathOverflow))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn code(e: ShortwinError) -> u32 {
+        u32::from(e)
+    }
+
+    /// ARCH §3.11 codes are stable: the first and last of every group.
+    #[test]
+    fn codes_are_stable() {
+        let pins = [
+            (ShortwinError::MathOverflow, 6000),
+            (ShortwinError::EpochRecordMismatch, 6007),
+            (ShortwinError::Unauthorized, 6008),
+            (ShortwinError::CoverageAuthorityDisabled, 6015),
+            (ShortwinError::MintUnsupportedProgram, 6016),
+            (ShortwinError::MintUnsafeFlagged, 6022),
+            (ShortwinError::NoSupportedVenue, 6023),
+            (ShortwinError::AuthorityTampered, 6041),
+            (ShortwinError::PoolIneligible, 6042),
+            (ShortwinError::PoolTooThin, 6049),
+            (ShortwinError::OpensPaused, 6050),
+            (ShortwinError::OpenFeeAboveMax, 6065),
+            (ShortwinError::InsufficientVault, 6066),
+            (ShortwinError::S3TimerRunning, 6075),
+            (ShortwinError::ZeroAmount, 6076),
+            (ShortwinError::WipeSweepPending, 6084),
+            (ShortwinError::OracleOwner, 6085),
+            (ShortwinError::OracleVerification, 6090),
+            (ShortwinError::SolBelowMin, 6091),
+            (ShortwinError::LastSharesBorrowed, 6092),
+            (ShortwinError::TimelockTooLong, 6093),
+            (ShortwinError::PendingChangeExpired, 6094),
+            (ShortwinError::MemoProgramRequired, 6095),
+            (ShortwinError::CreationFeeAboveMax, 6096),
+            (ShortwinError::OracleFutureDated, 6097),
+        ];
+        for (e, c) in pins {
+            assert_eq!(code(e), c, "{e:?}");
+        }
+    }
+
+    #[test]
+    fn math_errors_map_to_lender_codes() {
+        for e in MathError::ALL {
+            let mapped = ShortwinError::from(e);
+            match e.code() {
+                0..=2 | 4 | 5 => assert_eq!(mapped, ShortwinError::MathOverflow),
+                3 => assert_eq!(mapped, ShortwinError::InvalidParams),
+                _ => assert!(code(mapped) >= 6076 && code(mapped) <= 6084, "{e:?}"),
+            }
+        }
+    }
+}

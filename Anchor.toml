@@ -1,0 +1,25 @@
+# Always build with `anchor build --tools-version v1.57 --arch v3` (docs/DEVELOPMENT.md).
+# Program tests run in-process (LiteSVM, from M1), so `anchor test` starts no validator.
+skip_local_validator = true
+
+[toolchain]
+anchor_version = "1.2.0"
+solana_version = "4.1.2"
+package_manager = "pnpm"
+
+[features]
+resolution = true
+skip-lint = false
+
+[workspace]
+members = ["programs/shortwin"]
+
+[programs.localnet]
+shortwin = "5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "cargo test"
