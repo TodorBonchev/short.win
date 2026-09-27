@@ -2967,6 +2967,11 @@
       "code": 6097,
       "name": "OracleFutureDated",
       "msg": "Oracle publish time is in the future"
+    },
+    {
+      "code": 6098,
+      "name": "EmergencyCannotCancel",
+      "msg": "Only governance may cancel an authorities or timelock change"
     }
   ],
   "types": [

@@ -239,6 +239,10 @@ pub enum ShortwinError {
     /// [Oracle] `publish_time` more than `oracle_max_age_s` ahead of the clock (M1-SEC-8).
     #[msg("Oracle publish time is in the future")]
     OracleFutureDated,
+    /// [Admin] `cancel_config`: only Governance may cancel a pending `Authorities` or
+    /// `Timelock` change (owner decision on M1-SEC-1, SPEC §11).
+    #[msg("Only governance may cancel an authorities or timelock change")]
+    EmergencyCannotCancel,
 }
 
 impl From<MathError> for ShortwinError {
@@ -326,6 +330,7 @@ mod tests {
             (ShortwinError::MemoProgramRequired, 6095),
             (ShortwinError::CreationFeeAboveMax, 6096),
             (ShortwinError::OracleFutureDated, 6097),
+            (ShortwinError::EmergencyCannotCancel, 6098),
         ];
         for (e, c) in pins {
             assert_eq!(code(e), c, "{e:?}");

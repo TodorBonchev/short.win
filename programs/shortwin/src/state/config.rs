@@ -648,14 +648,19 @@ pub enum ConfigChange {
 pub const CONFIG_CHANGE_KINDS: u8 = 7;
 
 impl ConfigChange {
+    /// `kind` of [`ConfigChange::Authorities`].
+    pub const KIND_AUTHORITIES: u8 = 4;
+    /// `kind` of [`ConfigChange::Timelock`].
+    pub const KIND_TIMELOCK: u8 = 5;
+
     /// `kind` of this change (variant index + 1).
     pub fn kind(&self) -> u8 {
         match self {
             Self::Params { .. } => 1,
             Self::EmaParams { .. } => 2,
             Self::Kink { .. } => 3,
-            Self::Authorities { .. } => 4,
-            Self::Timelock { .. } => 5,
+            Self::Authorities { .. } => Self::KIND_AUTHORITIES,
+            Self::Timelock { .. } => Self::KIND_TIMELOCK,
             Self::EnableVenues { .. } => 6,
             Self::OracleFeed { .. } => 7,
         }

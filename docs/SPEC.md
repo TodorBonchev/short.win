@@ -269,6 +269,7 @@ Lending is not staking and not risk-free.
 - **Venue-breakage powers ✅ Owner (v0.3, O6; amends §9's "emergency pause and fee parameters" list).** The emergency multisig may also, without timelock:
   - set a **"route broken"** flag on a venue or market, which refuses new opens and starts the §5.3 S3 timer — it never pauses closes or liquidations and moves no funds;
   - set a **bounded list of extra accounts** passed to a venue's instructions after that venue changes its interface, so exits keep working without a program upgrade. Callers can always choose the previous or empty set, so a bad setting cannot block exits, and no setting can move funds.
+- **Emergency cancel of governance changes ✅ Owner (v0.3, M1-SEC-1).** The emergency multisig may cancel a pending *parameter* change during its timelock (a fast check on a compromised governance multisig), but not a change of the authorities or of the timelock itself, so governance can always rotate a compromised emergency key once the timelock has run.
 
 ---
 
@@ -310,6 +311,7 @@ Lendable inventory; utilization; unique lenders/borrowers; OI; rental fees; prot
 | O6 | Emergency venue-breakage powers | Route-broken flag + bounded venue extra accounts; no fund movement (§11) | ✅ Owner (v0.3, 2026-09-27) |
 | O15 | Fair value for expired positions in S2/S3 | 2% expiry fee, not the liquidation penalty (§5.3) | ✅ Owner (v0.3, 2026-09-27) |
 | N22 | Liquidation keeper pay on small positions | Floor at the SOL-settlement keeper reward, topped up from the borrower remainder (§6.3) | ✅ Owner (v0.3, 2026-09-27) |
+| M1-SEC-1 | Emergency veto over pending governance changes | Parameter changes only; authorities and timelock changes can be cancelled only by governance (§11) | ✅ Owner (v0.3, 2026-09-27) |
 | 17 | Who executes the short? | short.win, atomically at open | ✅ Owner |
 | — | Sale proceeds kept in position vault | Yes | ✅ Owner (v0.3, 2026-09-27) |
 | 18 | Fee split | §6.3 | ✅ Delegated, proposed |

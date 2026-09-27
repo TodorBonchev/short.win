@@ -210,6 +210,8 @@ export const SHORTWIN_ERROR__MEMO_PROGRAM_REQUIRED = 0x17cf; // 6095
 export const SHORTWIN_ERROR__CREATION_FEE_ABOVE_MAX = 0x17d0; // 6096
 /** OracleFutureDated: Oracle publish time is in the future */
 export const SHORTWIN_ERROR__ORACLE_FUTURE_DATED = 0x17d1; // 6097
+/** EmergencyCannotCancel: Only governance may cancel an authorities or timelock change */
+export const SHORTWIN_ERROR__EMERGENCY_CANNOT_CANCEL = 0x17d2; // 6098
 
 export type ShortwinError =
   | typeof SHORTWIN_ERROR__ABOVE_PRO_RATA_ALLOWANCE
@@ -235,6 +237,7 @@ export type ShortwinError =
   | typeof SHORTWIN_ERROR__CURVE_STRADDLE
   | typeof SHORTWIN_ERROR__DELEGATE_NOT_CLEARED
   | typeof SHORTWIN_ERROR__DENIED_ACCOUNT
+  | typeof SHORTWIN_ERROR__EMERGENCY_CANNOT_CANCEL
   | typeof SHORTWIN_ERROR__EPOCH_RECORD_MISMATCH
   | typeof SHORTWIN_ERROR__EXIT_BOUND_NOT_MET
   | typeof SHORTWIN_ERROR__INSUFFICIENT_FREE_INVENTORY
@@ -337,6 +340,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [SHORTWIN_ERROR__CURVE_STRADDLE]: `Buyback exceeds the curve's real token reserves; use the straddle bundle`,
     [SHORTWIN_ERROR__DELEGATE_NOT_CLEARED]: `Pool vault delegate was not cleared`,
     [SHORTWIN_ERROR__DENIED_ACCOUNT]: `A protocol account was passed where it is denied (e.g. as a venue extra)`,
+    [SHORTWIN_ERROR__EMERGENCY_CANNOT_CANCEL]: `Only governance may cancel an authorities or timelock change`,
     [SHORTWIN_ERROR__EPOCH_RECORD_MISMATCH]: `A ShareEpoch record does not match the market or epoch`,
     [SHORTWIN_ERROR__EXIT_BOUND_NOT_MET]: `Live buyback cost exceeds the exit bound`,
     [SHORTWIN_ERROR__INSUFFICIENT_FREE_INVENTORY]: `Insufficient free (unborrowed) inventory`,

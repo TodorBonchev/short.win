@@ -104,28 +104,19 @@ fn create_market_for(env: &mut Env, program: TokenProgram) -> Pubkey {
     pda::market(&mint).0
 }
 
-// ---- M1-SEC-1: the Emergency vault's cancel power (owner decision pending) ------------------
+// ---- M1-SEC-1: the Emergency vault's cancel power (owner decision: params, not keys) -------
 
-/// M1-SEC-1 is **not** changed in code: ARCH §3.1 lets `pause_authority` cancel any pending
-/// change, including the `Authorities` change that would rotate it out, and SPEC §11 does not
-/// list that power. Restricting it moves power between the two multisigs, which is the owner's
-/// decision (SPEC §11, ARCH §3.1). This pins the ARCH behaviour the review reproduced so the
-/// owner's ruling shows up here as a deliberate test change.
+/// The Emergency vault may cancel a pending parameter change, but not an `Authorities` or
+/// `Timelock` change, so Governance can always rotate a compromised Emergency key once the
+/// timelock has run (owner decision on M1-SEC-1, SPEC §11). Governance may cancel anything.
 #[test]
-fn sec_1_emergency_cancel_is_unlimited_pending_owner_decision() {
+fn sec_1_emergency_cancels_params_but_not_keys_or_timelock() {
     let mut env = Env::initialized();
     let pause = env.pause_authority.insecure_clone();
-    let new_pause = env.funded_keypair();
+    let gov = env.governance.insecure_clone();
     let fee = env.fee_recipient.pubkey();
-    for _round in 0..5 {
-        let change = authorities(&env, new_pause.pubkey(), fee);
-        ok(propose(&mut env, change));
-        // The Emergency waits until the last second of the timelock and cancels.
-        env.warp(i64::from(DEFAULT_TIMELOCK_S) - 1);
-        ok(env.send(&[ix::cancel_config(&pause.pubkey())], &[&pause]));
-        env.warp(1);
-        assert_err(&apply(&mut env), ShortwinError::NoPendingChange);
-    }
+
+    // Parameter changes: the Emergency's veto still works.
     let mut params = Params::defaults();
     params.open_fee_bps = 30;
     ok(propose(
@@ -138,10 +129,38 @@ fn sec_1_emergency_cancel_is_unlimited_pending_owner_decision() {
     ok(env.send(&[ix::cancel_config(&pause.pubkey())], &[&pause]));
     env.warp(i64::from(DEFAULT_TIMELOCK_S));
     assert_err(&apply(&mut env), ShortwinError::NoPendingChange);
+    assert_eq!(
+        env.config().params.open_fee_bps,
+        Params::defaults().open_fee_bps
+    );
 
-    let c = env.config();
-    assert_eq!(c.pause_authority, pause.pubkey(), "never rotated");
-    assert_eq!(c.params.open_fee_bps, Params::defaults().open_fee_bps);
+    // A Timelock change: the Emergency cannot cancel it; Governance can.
+    ok(propose(
+        &mut env,
+        ConfigChange::Timelock {
+            timelock_s: DEFAULT_TIMELOCK_S + 3_600,
+        },
+    ));
+    assert_err(
+        &env.send(&[ix::cancel_config(&pause.pubkey())], &[&pause]),
+        ShortwinError::EmergencyCannotCancel,
+    );
+    ok(env.send(&[ix::cancel_config(&gov.pubkey())], &[&gov]));
+    assert_err(&apply(&mut env), ShortwinError::NoPendingChange);
+
+    // An Authorities change rotating the Emergency out: its cancel fails at the last second of
+    // the timelock, and the rotation applies.
+    let new_pause = env.funded_keypair();
+    let change = authorities(&env, new_pause.pubkey(), fee);
+    ok(propose(&mut env, change));
+    env.warp(i64::from(DEFAULT_TIMELOCK_S) - 1);
+    assert_err(
+        &env.send(&[ix::cancel_config(&pause.pubkey())], &[&pause]),
+        ShortwinError::EmergencyCannotCancel,
+    );
+    env.warp(1);
+    ok(apply(&mut env));
+    assert_eq!(env.config().pause_authority, new_pause.pubkey(), "rotated");
 }
 
 // ---- M1-SEC-4: `timelock_s` has a compiled ceiling ------------------------------------------
