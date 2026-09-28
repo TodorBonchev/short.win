@@ -19,7 +19,8 @@ use crate::venues::VenueState;
 pub struct ExitBound {
     /// `P_ref`.
     pub p_ref: u128,
-    /// `L_b = max(L_live, L_ema, L_slow)` (V2-14).
+    /// `L_b = max(L_live, L_ema', L_slow)` (V2-14), `L_ema' = min(L_ema, L_mlo)` while the
+    /// post-change reference guard is set (M4R).
     pub l_b: u128,
     /// `B̂_ref = B̂(Q; reprice(L_b, P_ref))` at the risk fee; `None` if undefined.
     pub b_ref: Option<u64>,
@@ -36,7 +37,7 @@ pub fn liq_reference(
 ) -> Result<Option<ExitBound>> {
     let p =
         bounds::liq_reference(&obs.ema, &obs.ring, &obs.last, now, &pos.exit_params()).math()?;
-    Ok(p.map(|p_ref| reference(pos, obs, state, p_ref)))
+    p.map(|p_ref| reference(pos, obs, state, p_ref)).transpose()
 }
 
 /// The expiry reference (ARCH §3.7): `P_ref = min(P_ema, min over the ring of p_i, lb_lo)`.
@@ -48,18 +49,23 @@ pub fn expiry_reference(
 ) -> Result<Option<ExitBound>> {
     let p =
         bounds::expiry_reference(&obs.ema, &obs.ring, &obs.last, now, &pos.exit_params()).math()?;
-    Ok(p.map(|p_ref| reference(pos, obs, state, p_ref)))
+    p.map(|p_ref| reference(pos, obs, state, p_ref)).transpose()
 }
 
-fn reference(pos: &ShortPosition, obs: &Observation, state: &VenueState, p_ref: u128) -> ExitBound {
+fn reference(
+    pos: &ShortPosition,
+    obs: &Observation,
+    state: &VenueState,
+    p_ref: u128,
+) -> Result<ExitBound> {
     let l_live = state.liquidity().unwrap_or(obs.ema.liq);
-    let l_b = bounds::ref_liquidity(l_live, &obs.ema);
+    let l_b = bounds::ref_liquidity(l_live, &obs.ema, &obs.ring).math()?;
     let b_ref = state.pricing.and_then(|pr| {
         pr.capped(u64::from(pos.venue_fee_hard_cap_bps))
             .buy_repriced(pos.q, l_b, p_ref)
             .map(|b| b.cost)
     });
-    ExitBound { p_ref, l_b, b_ref }
+    Ok(ExitBound { p_ref, l_b, b_ref })
 }
 
 /// `max_in` of a liquidation: `min(⌊B̂_ref·(10⁴ + δ_liq)/10⁴⌋, V − K_s − ert)` (no reserve,

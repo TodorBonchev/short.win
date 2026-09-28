@@ -2,8 +2,12 @@
 //! `Market` with its `MarketVault`, the venue accounts of its ReadSet, and its open
 //! `ShortPosition`s — decoded with the **program's own types** (the `shortwin` crate), and the
 //! venue state computed by the **program's own reader** (`shortwin::venues::read_state` on
-//! host-side `AccountInfo`s), so the keeper's view of a venue is the program's bit for bit
-//! (R-TOOL §4.3: "the same crates as the program").
+//! host-side `AccountInfo`s, [`with_account_infos`]), so the keeper's view of a venue is the
+//! program's bit for bit (R-TOOL §4.3: "the same crates as the program").
+//!
+//! List-only (`None`) markets have no venue and no ReadSet: the coverage duties skip them, and
+//! [`ChainView::list_only`] hands them to the pool monitor (duty 12, [`crate::pool_monitor`]),
+//! which moves them onto an eligible Raydium pool with `propose_pool` (ARCH §2.5 `None`).
 
 use std::collections::HashMap;
 
@@ -65,12 +69,22 @@ pub struct MarketView {
     pub extras: Option<Box<VenueExtras>>,
 }
 
+/// A covered list-only (`None`) market: no venue, no ReadSet (module docs).
+#[derive(Clone)]
+pub struct ListOnlyView {
+    pub key: Pubkey,
+    pub market: Box<Market>,
+}
+
 /// Everything read in one tick.
 #[derive(Clone)]
 pub struct ChainView {
     pub clock: ChainClock,
     pub config: Box<GlobalConfig>,
     pub markets: Vec<MarketView>,
+    /// The covered list-only markets (also in `skipped`: the coverage duties skip them; the
+    /// pool monitor does not).
+    pub list_only: Vec<ListOnlyView>,
     /// Markets skipped this tick, with why (unsupported venue, unreadable account).
     pub skipped: Vec<(Pubkey, String)>,
 }
@@ -80,6 +94,40 @@ impl ChainView {
     pub fn market(&self, key: &Pubkey) -> Option<&MarketView> {
         self.markets.iter().find(|m| m.key == *key)
     }
+}
+
+/// Runs `f` on host-side `AccountInfo`s of `keys` built from the fetched `accounts` (in
+/// order; read-only, not signers): the program's own readers and verifiers then run on the
+/// keeper's copy of the chain exactly as on-chain. A missing account (or one past the end of
+/// `accounts`) reads as an empty System-owned one, which no reader accepts.
+pub fn with_account_infos<R>(
+    keys: &[Pubkey],
+    accounts: &[Option<AccountData>],
+    f: impl FnOnce(&[AccountInfo]) -> R,
+) -> R {
+    let system = anchor_lang::system_program::ID;
+    let acc = |i: usize| accounts.get(i).and_then(Option::as_ref);
+    let mut lamports: Vec<u64> = (0..keys.len())
+        .map(|i| acc(i).map_or(0, |a| a.lamports))
+        .collect();
+    let mut datas: Vec<Vec<u8>> = (0..keys.len())
+        .map(|i| acc(i).map_or_else(Vec::new, |a| a.data.clone()))
+        .collect();
+    let owners: Vec<Pubkey> = (0..keys.len())
+        .map(|i| acc(i).map_or(system, |a| a.owner))
+        .collect();
+    let execs: Vec<bool> = (0..keys.len())
+        .map(|i| acc(i).is_some_and(|a| a.executable))
+        .collect();
+    let infos: Vec<AccountInfo> = keys
+        .iter()
+        .zip(lamports.iter_mut())
+        .zip(datas.iter_mut())
+        .zip(owners.iter())
+        .zip(execs.iter())
+        .map(|((((k, l), d), o), e)| AccountInfo::new(k, false, false, l, d.as_mut_slice(), o, *e))
+        .collect();
+    f(&infos)
 }
 
 /// The venue state the program computes from a ReadSet (`venues::read_state` on host-side
@@ -92,32 +140,9 @@ pub fn venue_state(
     accounts: &[Option<AccountData>],
     now: i64,
 ) -> VenueState {
-    let system = anchor_lang::system_program::ID;
-    let mut lamports: Vec<u64> = accounts
-        .iter()
-        .map(|a| a.as_ref().map_or(0, |a| a.lamports))
-        .collect();
-    let mut datas: Vec<Vec<u8>> = accounts
-        .iter()
-        .map(|a| a.as_ref().map_or_else(Vec::new, |a| a.data.clone()))
-        .collect();
-    let owners: Vec<Pubkey> = accounts
-        .iter()
-        .map(|a| a.as_ref().map_or(system, |a| a.owner))
-        .collect();
-    let execs: Vec<bool> = accounts
-        .iter()
-        .map(|a| a.as_ref().is_some_and(|a| a.executable))
-        .collect();
-    let infos: Vec<AccountInfo> = keys
-        .iter()
-        .zip(lamports.iter_mut())
-        .zip(datas.iter_mut())
-        .zip(owners.iter())
-        .zip(execs.iter())
-        .map(|((((k, l), d), o), e)| AccountInfo::new(k, false, false, l, d.as_mut_slice(), o, *e))
-        .collect();
-    shortwin::venues::read_state(market, kind, &infos, now)
+    with_account_infos(keys, accounts, |infos| {
+        shortwin::venues::read_state(market, kind, infos, now)
+    })
 }
 
 /// Every `Market` of the program (`getProgramAccounts` on its discriminator).
@@ -183,6 +208,7 @@ pub async fn load<C: Chain>(chain: &C, markets: &[Pubkey]) -> anyhow::Result<Cha
         .ok_or_else(|| anyhow::anyhow!("GlobalConfig not found"))?;
     let n = markets.len();
     let mut skipped = Vec::new();
+    let mut list_only = Vec::new();
     // First pass: the markets and their ReadSet keys.
     struct Partial {
         key: Pubkey,
@@ -209,6 +235,12 @@ pub async fn load<C: Chain>(chain: &C, markets: &[Pubkey]) -> anyhow::Result<Cha
             skipped.push((*key, format!("unknown venue byte {}", m.venue)));
             continue;
         };
+        if kind == VenueKind::None {
+            list_only.push(ListOnlyView {
+                key: *key,
+                market: Box::new(m),
+            });
+        }
         match venue::read_set(kind, &m) {
             Ok(read_keys) => partial.push(Partial {
                 key: *key,
@@ -265,6 +297,7 @@ pub async fn load<C: Chain>(chain: &C, markets: &[Pubkey]) -> anyhow::Result<Cha
         clock,
         config: Box::new(config),
         markets: out,
+        list_only,
         skipped,
     })
 }

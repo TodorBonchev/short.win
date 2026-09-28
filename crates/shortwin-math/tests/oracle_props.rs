@@ -1,8 +1,8 @@
 //! Properties of `observe`, `persist` and `bounds` (ARCHITECTURE §8.1: EMA step bounds and
 //! "own observation never read" (I-E7), directional aggregation, the ring's bucket
 //! extremes and medians, the venue-change rewrite, the liquidation EMA leg (I-E8), exit
-//! references and `max_in` incl. the rent-and-fee seniority of an expiry (I-E2) and the
-//! liquidation liveness invariant I-E11).
+//! references and `max_in` incl. the rent-and-fee seniority of an expiry (I-E2), the
+//! liquidation liveness invariant I-E11, and M4R's post-change warm-up seed P1–P4).
 #![allow(clippy::unwrap_used, clippy::arithmetic_side_effects)]
 
 mod common;
@@ -13,9 +13,10 @@ use shortwin_math::bounds::{
     ExitParams, expiry_reference, kappa_eff, liq_reference, max_in_exp, max_in_liq, pi_ref,
 };
 use shortwin_math::consts::EMA_TAU_S;
+use shortwin_math::consts::EMA_WARMUP_BUCKETS;
 use shortwin_math::observe::{
     Bucket, EmaParams, LastBucket, Observation, RING_LEN, Ring, RingEntry, VenueChange,
-    ring_medians, robust_spot, sustained_growth,
+    ring_liq_lower_median, ring_medians, robust_spot, sustained_growth,
 };
 use shortwin_math::persist::liq_ema_leg;
 use shortwin_math::quote::reprice;
@@ -52,6 +53,101 @@ fn step(p: u128, lo: u128, hi: u128, gap: i64, prm: &EmaParams) -> Observation {
 
 fn entry(ts: i64, p: u128, lo: u128, hi: u128, llo: u128, lhi: u128) -> RingEntry {
     RingEntry::reprojected(ts, p, 1_000_000, lo, hi, llo, lhi)
+}
+
+/// One sample of the candidate pool in a warm-up second (M4R, §4.1 properties): the honest
+/// `(p*, H)`, or an instruction wrapped by an unlocked LP's withdrawal (`L = D`), a deposit of
+/// `k` times the pool (`L = (1 + k)·H`), or a pump / dump of the price by `m/10⁴`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Sample {
+    Honest,
+    Withdraw,
+    Deposit(u8),
+    Pump(u32),
+    Dump(u32),
+}
+
+fn sample() -> impl Strategy<Value = Sample> {
+    prop_oneof![
+        1 => Just(Sample::Honest),
+        2 => Just(Sample::Withdraw),
+        1 => (1u8..=8).prop_map(Sample::Deposit),
+        1 => (10_001u32..=60_000).prop_map(Sample::Pump),
+        1 => (10_001u32..=60_000).prop_map(Sample::Dump),
+    ]
+}
+
+/// A warm-up second: whether an honest observer (the keeper) recorded, and the attacker's
+/// samples. A second with neither is observed by the keeper alone.
+fn second() -> impl Strategy<Value = (bool, Vec<Sample>)> {
+    (any::<bool>(), prop::collection::vec(sample(), 0..3))
+}
+
+/// `(P, L)` of `s` on a pool of honest price `p`, depth `h` and locked depth `d`.
+fn value(s: Sample, p: u128, h: u128, d: u128) -> (u128, u128) {
+    match s {
+        Sample::Honest => (p, h),
+        Sample::Withdraw => (p, d),
+        Sample::Deposit(k) => (p, h * (1 + u128::from(k))),
+        Sample::Pump(m) => (p * u128::from(m) / 10_000, h),
+        Sample::Dump(m) => ((p * 10_000 / u128::from(m)).max(1), h),
+    }
+}
+
+/// A market whose `P_ema` converged at `p_pre` adopted onto the candidate at second 100
+/// (anchor `cap`, `L_slow ≤ D`, marked), then the warm-up seconds `secs` observed; returns the
+/// state after each integration.
+fn warm_up(
+    p: u128,
+    p_pre: u128,
+    h: u128,
+    d: u128,
+    cap: u128,
+    c_bps: u32,
+    secs: &[(bool, Vec<Sample>)],
+) -> Vec<Observation> {
+    let prm = EmaParams::new(2, c_bps, 3_600, 60);
+    let mut o = Observation::new(0, p_pre, 7 * h).unwrap();
+    for t in 1..6i64 {
+        o.record(t, p_pre, 5 * h).unwrap();
+        o.roll(t + 1, &prm).unwrap();
+    }
+    o.rewrite_liquidity(cap, VenueChange::RaydiumLocked { slow_cap: d })
+        .unwrap();
+    o.mark_restart();
+    let mut out = Vec::new();
+    for (i, (honest, att)) in secs.iter().enumerate() {
+        let t = 100 + i as i64;
+        if *honest || att.is_empty() {
+            o.record(t, p, h).unwrap();
+        }
+        for &s in att {
+            let (sp, sl) = value(s, p, h, d);
+            o.record(t, sp, sl).unwrap();
+        }
+        o.roll(t + 1, &prm).unwrap();
+        out.push(o);
+    }
+    out
+}
+
+/// The largest v0.4.1 price step (ECON §5.2, τ = 5; the observation at `+C`), recomputed:
+/// `⌊(P·τ + ⌊P·(10⁴ + C)/10⁴⌋·dt)/(τ + dt)⌋`.
+fn up(pe: u128, dt: u128, c_bps: u32) -> u128 {
+    (pe * 5 + pe * (10_000 + u128::from(c_bps)) / 10_000 * dt) / (5 + dt)
+}
+
+/// The §4.1 seed over bucket extremes `(lo, lhi)`, the price also bounded by `bound` (the
+/// largest v0.4.1 step from the previous `P_ema`, M4X-1).
+fn seed_of(buckets: &[(u128, u128)], c_bps: u32, bound: u128) -> (u128, u128) {
+    let p = buckets.iter().map(|b| b.0).min().unwrap().min(bound);
+    let mut hs: Vec<u128> = buckets.iter().map(|b| b.1).collect();
+    hs.sort_unstable();
+    let lomed = hs[(hs.len() - 1) / 2];
+    (
+        p,
+        (*hs.last().unwrap()).min(lomed * (10_000 + u128::from(c_bps)) / 10_000),
+    )
 }
 
 proptest! {
@@ -238,12 +334,13 @@ proptest! {
 
     /// Venue changes (ECON §5.2; ARCH §4.4, A72): every entry's l, llo, lhi become the reset
     /// L_ema with (x, y) re-cached, prices and price extremes carry over, the bucket clears;
-    /// a Raydium change never raises L_ema or L_slow, a graduation sets both.
+    /// v0.4.1's Raydium change never raises L_ema or L_slow, a graduation sets both; the
+    /// program's Raydium change (M4-SEC-5/-6) sets L_ema and lowers L_slow to at most the cap.
     #[test]
     fn rewrite_liquidity_resets_the_ring(p in 1_000u128..10u128.pow(24), l in 1u128..10u128.pow(18),
                                          slow in 1u128..10u128.pow(18), l_new in 1u128..10u128.pow(18),
                                          prices in prop::collection::vec((1_000u128..10u128.pow(24), 1u128..10u128.pow(18)), 0..8),
-                                         raydium in any::<bool>()) {
+                                         which in 0u8..3, cap in 1u128..10u128.pow(18)) {
         let mut o = Observation::new(0, p, l).unwrap();
         o.ema.liq_slow = slow;
         for (i, &(q, lq)) in prices.iter().enumerate() {
@@ -251,12 +348,22 @@ proptest! {
         }
         o.record(9, p, l).unwrap();
         let before = o;
-        let kind = if raydium { VenueChange::Raydium } else { VenueChange::Graduation };
+        let kind = match which {
+            0 => VenueChange::Raydium,
+            1 => VenueChange::RaydiumLocked { slow_cap: cap },
+            _ => VenueChange::Graduation,
+        };
         o.rewrite_liquidity(l_new, kind).unwrap();
-        if raydium {
-            prop_assert_eq!((o.ema.liq, o.ema.liq_slow), (l_new.min(l), l_new.min(slow)));
-        } else {
-            prop_assert_eq!((o.ema.liq, o.ema.liq_slow), (l_new, l_new));
+        match kind {
+            VenueChange::Raydium => {
+                prop_assert_eq!((o.ema.liq, o.ema.liq_slow), (l_new.min(l), l_new.min(slow)));
+            }
+            VenueChange::RaydiumLocked { .. } => {
+                prop_assert_eq!((o.ema.liq, o.ema.liq_slow), (l_new, slow.min(cap)));
+            }
+            VenueChange::Graduation => {
+                prop_assert_eq!((o.ema.liq, o.ema.liq_slow), (l_new, l_new));
+            }
         }
         prop_assert_eq!((o.ema.price, o.ema.ts, o.ema.count), (before.ema.price, before.ema.ts, before.ema.count));
         prop_assert_eq!(o.bucket, Bucket::EMPTY);
@@ -265,6 +372,118 @@ proptest! {
             prop_assert_eq!((e.ts, e.p, e.lo, e.hi), (b.ts, b.p, b.lo, b.hi));
             prop_assert_eq!((e.l, e.llo, e.lhi), (o.ema.liq, o.ema.liq, o.ema.liq));
             prop_assert_eq!((e.x, e.y), reprice(o.ema.liq, e.p).unwrap_or((0, 0)));
+        }
+    }
+
+    /// M4R §4.1 (P1–P5): the post-change warm-up seed over random schedules of 8 observed
+    /// seconds, each with or without an honest observation and with withdraw-, deposit-, pump-
+    /// and dump-wrapped samples, after a `P_ema` carried at ¼–4× the pool's price. At every step
+    /// the seed is the §4.1 formula over the post-change buckets, the price bounded by the
+    /// largest v0.4.1 step; (P1) one honest bucket bounds `P_ema ≤ p*`, and a withdraw-wrapped
+    /// sample in a bucket with an honest one changes nothing; (P2) `L_ema ≥ min(H, ⌊D·(10⁴ +
+    /// C)/10⁴⌋)` with one honest bucket; (P3) at most 4 buckets above `H` bound `L_ema ≤ ⌊H·(10⁴
+    /// + C)/10⁴⌋`; (P4) constant honest buckets give `L_ema = H` and `P_ema = min(p*, the bound
+    /// chained 8 times from the carried P_ema)` exactly, and clear the guard at the gate; (P5,
+    /// M4X-1) no step raises `P_ema` above the largest v0.4.1 step from the previous one, so
+    /// the seed stays below the chained bound whatever the samples. `warm` counts down, `L_slow`
+    /// never moves, the guard is never set.
+    #[test]
+    fn warm_up_seed_properties(p in 10u128.pow(9)..10u128.pow(27), h in 10u128.pow(6)..10u128.pow(18),
+                               pre_bps in 2_500u128..=40_000,
+                               lam in 1_000u128..=10_000, lam_min in 2_000u64..=10_000, c_bps in 5_000u32..=10_000,
+                               secs in prop::collection::vec(second(), 8)) {
+        let d = (h * lam / 10_000).max(1);
+        let cap = shortwin_math::pool_select::depth_at_lambda(d, lam_min).max(1);
+        let p_pre = (p * pre_bps / 10_000).max(1);
+        let states = warm_up(p, p_pre, h, d, cap, c_bps, &secs);
+        let slow = states[0].ema.liq_slow;
+        prop_assert!(slow <= d);
+        let mut seen = Vec::new();
+        let (mut prev, mut chain) = (p_pre, p_pre);
+        for (i, o) in states.iter().enumerate() {
+            let e = o.ring.newest().unwrap();
+            seen.push((e.lo, e.lhi));
+            // The first warm-up roll comes 95 s after the last one (dt = Δt_max = 2), then 1 s.
+            let dt = if i == 0 { 2 } else { 1 };
+            let bound = up(prev, dt, c_bps);
+            prop_assert_eq!((o.ema.price, o.ema.liq), seed_of(&seen, c_bps, bound), "step {}", i + 1);
+            prop_assert_eq!((e.p, e.l), (o.ema.price, o.ema.liq));
+            // P5.
+            chain = up(chain, dt, c_bps);
+            prop_assert!(o.ema.price <= bound && o.ema.price <= chain, "step {}", i + 1);
+            prev = o.ema.price;
+            prop_assert_eq!(o.ema.warm, EMA_WARMUP_BUCKETS - 1 - i as u8);
+            prop_assert_eq!(o.ema.liq_slow, slow);
+            if i < 7 {
+                prop_assert_eq!(o.ema.guard, 1);
+            }
+        }
+        let end = states[7];
+        let honest_any = secs.iter().any(|(hon, att)| *hon || att.is_empty());
+        let c = u128::from(c_bps);
+        if honest_any {
+            // P1 and P2.
+            prop_assert!(end.ema.price <= p);
+            prop_assert!(end.ema.liq >= h.min(d * (10_000 + c) / 10_000));
+            let stripped: Vec<(bool, Vec<Sample>)> = secs.iter().map(|(hon, att)| {
+                if *hon || att.is_empty() {
+                    (true, att.iter().copied().filter(|s| *s != Sample::Withdraw).collect())
+                } else {
+                    (false, att.clone())
+                }
+            }).collect();
+            let alt = warm_up(p, p_pre, h, d, cap, c_bps, &stripped)[7];
+            prop_assert_eq!((alt.ema.price, alt.ema.liq), (end.ema.price, end.ema.liq));
+        }
+        // P3.
+        let above = secs.iter().filter(|(_, att)| att.iter().any(|s| matches!(s, Sample::Deposit(_)))).count();
+        if above <= 4 {
+            prop_assert!(end.ema.liq <= h * (10_000 + c) / 10_000);
+        }
+        // P4.
+        if secs.iter().all(|(_, att)| att.is_empty()) {
+            prop_assert_eq!((end.ema.price, end.ema.liq), (p.min(chain), h));
+            prop_assert_eq!((end.ema.warm, end.ema.guard), (0, 0));
+            prop_assert_eq!(ring_liq_lower_median(&end.ring).unwrap(), h);
+        }
+        // Once confirmed, the guard only ever clears.
+        if end.ema.guard == 0 {
+            prop_assert!(end.ema.liq * 10_000 <= ring_medians(&end.ring).unwrap().2 * 10_100);
+        }
+    }
+
+    /// M4X-2: while the post-change guard is set, an integration never lifts `L_slow` above
+    /// `max(L_slow before, L_mlo after)` — whatever the samples (deposit freezes, withdrawals,
+    /// honest), `L_slow` follows at most the ring's honest lows, never a pushed `L_ema`; with the
+    /// guard clear it is the v0.4.1 step.
+    #[test]
+    fn guarded_l_slow_follows_the_lows(p in 10u128.pow(9)..10u128.pow(27), h in 10u128.pow(9)..10u128.pow(18),
+                                        lam in 1_000u128..=10_000, c_bps in 5_000u32..=10_000,
+                                        secs in prop::collection::vec(second(), 8..60)) {
+        let d = (h * lam / 10_000).max(1);
+        let cap = shortwin_math::pool_select::depth_at_lambda(d, 5_000).max(1);
+        let prm = EmaParams::new(2, c_bps, 3_600, 60);
+        let mut o = Observation::new(0, p, h).unwrap();
+        o.rewrite_liquidity(cap, VenueChange::RaydiumLocked { slow_cap: d }).unwrap();
+        o.mark_restart();
+        for (i, (honest, att)) in secs.iter().enumerate() {
+            let t = 100 + i as i64;
+            if *honest || att.is_empty() {
+                o.record(t, p, h).unwrap();
+            }
+            for &s in att {
+                let (sp, sl) = value(s, p, h, d);
+                o.record(t, sp, sl).unwrap();
+            }
+            let pre = o.ema;
+            o.roll(t + 1, &prm).unwrap();
+            if pre.warm > 0 {
+                prop_assert_eq!(o.ema.liq_slow, pre.liq_slow);
+            } else if pre.guard == 1 {
+                let l_mlo = ring_liq_lower_median(&o.ring).unwrap();
+                prop_assert!(o.ema.liq_slow <= pre.liq_slow.max(l_mlo),
+                    "t {}: L_slow {} -> {}, L_mlo {}, L_ema {}", t, pre.liq_slow, o.ema.liq_slow, l_mlo, o.ema.liq);
+            }
         }
     }
 

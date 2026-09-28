@@ -20,6 +20,11 @@
 //!    mint that fails the filter now is reported with `MintSafetyTripped`, never a revert).
 //!    The venue trades (`NoRoute` for `None`, `VenueMigrating` while `PumpMigrating`) and is
 //!    `venue_executable` (`NoRoute`). The curve's `CurveStraddle` arrives with M5.
+//!    **1b** (M4R, **PROPOSED**, owner item O18): the post-change warm-up is over, `ema_warm ==
+//!    0` after the roll (`EmaWarmingUp`): a restart — a Raydium adoption, a listing — wrote an
+//!    anchor, and the next `EMA_WARMUP_BUCKETS` integrations re-seed the EMA from the new pool;
+//!    no exit rests on the anchor or a partial seed. With a keeper cranking every second, exits
+//!    resume at adoption + 9 s.
 //! 2. A fresh completed bucket, `lb_sec ≥ now − ref_max_age_s` (locked), else
 //!    `ReferenceStale` (the keeper cranks one second and acts the next, ECON §5.4).
 //! 3. `liquidatable := (spot leg ∧ EMA leg) ∨ now ≥ deadline`, else `NotLiquidatable`: the
@@ -30,7 +35,8 @@
 //! 5. Expired but not CR-liquidatable: `UseExpire` (expired **and** CR-liquidatable pays the
 //!    penalty, ECON §8.4; the event says `expired`).
 //! 6. The reference bound (v0.4.1, no reserve; `engine::bounds::{liq_reference,
-//!    max_in_liq}`): `max_in = min(⌊B̂_ref·(10⁴ + δ_liq)/10⁴⌋, V − K_s − ert)`; `B̂_live ≤
+//!    max_in_liq}`; `L_b` reads `min(L_ema, L_mlo)` while the post-change reference guard is set,
+//!    M4R): `max_in = min(⌊B̂_ref·(10⁴ + δ_liq)/10⁴⌋, V − K_s − ert)`; `B̂_live ≤
 //!    max_in`, else `ExitBoundNotMet` (the position waits; an undefined reference quote waits
 //!    too). Liveness (I11, I-E11): nothing else can refuse a liquidatable, buyback-allowed
 //!    position with a fresh bucket once `B̂_live ≤ ⌊B̂_ref·(10⁴ + δ)/10⁴⌋`.
@@ -534,6 +540,9 @@ pub(crate) fn keeper_exit<'info>(
             clock.slot,
         )?;
         require!(state.executable, ShortwinError::NoRoute);
+        // Precondition 1b (M4R): no keeper exit while the observation state is in its
+        // post-change warm-up on this (executable) venue.
+        require!(market.ema_warm == 0, ShortwinError::EmaWarmingUp);
         let plan = plan(which, pos, &market, &state, pro.now)?;
         (
             kind,

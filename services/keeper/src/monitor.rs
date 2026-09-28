@@ -426,6 +426,9 @@ pub fn diff(
 /// Per-market monitor state.
 #[derive(Clone, Debug, Default)]
 pub struct PoolWatch {
+    /// The pool watched. A market that adopts another pool (M4, [`crate::pool_monitor`]) starts
+    /// a new watch: the new pool's first sight, never a "change" of the old one.
+    pub pool: Option<Pubkey>,
     pub last: Option<PoolSnapshot>,
     /// The last readable fee.
     pub last_fee: Option<u32>,

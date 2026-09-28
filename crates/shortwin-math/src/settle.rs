@@ -440,6 +440,10 @@ pub struct SettleInputs {
     pub ema_leg: bool,
     /// `venue_executable` (false while `PumpMigrating`): gates step 3 (arming and legs).
     pub executable: bool,
+    /// The post-change warm-up is over (`observe::warmed` after this instruction's roll; M4R,
+    /// **PROPOSED**, owner item O18). While it is not, on an executable venue, [`evaluate`]
+    /// decides nothing.
+    pub warmed: bool,
     /// Robust spot `P_rs` ([`crate::observe::robust_spot`]); `None` without a fresh
     /// completed bucket.
     pub p_rs: Option<u128>,
@@ -517,6 +521,14 @@ pub struct Evaluation {
 /// 4. S3 ([`s3_due`], no arming): settle, subject to the same amount check. (An S2 that
 ///    waited in step 3 falls through to here, as in the sim.)
 ///
+/// **Post-change gate** (M4R, **PROPOSED**, owner item O18; ARCH §3.8): while the observation
+/// state is in its post-change warm-up (`!inp.warmed`) on an **executable** venue, nothing is
+/// evaluated — no arm change, no settlement, no step 4: the EMA, the ring and the box hold the
+/// restart's anchor and partial seeds, which no decision may rest on. S3 cannot be due then
+/// (every restart clears the no-route chain — an adoption — or has no position — a creation —
+/// and the warm-up ends within `EMA_WARMUP_BUCKETS` observed seconds), and a venue that cannot
+/// execute is never gated, so S3 is never deadlocked.
+///
 /// Every "no change" is an `Ok` with no settlement: the call's prologue (observation, route
 /// chains) stands and the keeper's per-second call doubles as a crank. The state is only
 /// written as described (a disarm clears `armed` alone).
@@ -531,6 +543,10 @@ pub fn evaluate<Q: BoxQuotes>(
     quotes: &mut Q,
 ) -> Result<Evaluation, MathError> {
     let now = inp.now;
+    if inp.executable && !inp.warmed {
+        debug_assert!(!s3_due(&inp.s3, &terms.s3, now, true));
+        return Ok(Evaluation::default());
+    }
     let expired = inp.expired();
     let v_eff = inp.v_eff();
     let bx = &inp.bx;
@@ -754,6 +770,7 @@ mod tests {
             cr_liquidatable: true,
             ema_leg: true,
             executable: true,
+            warmed: true,
             p_rs: Some(bx.p_lo),
             l_live: bx.l_hi,
             b_live: None,
@@ -1014,6 +1031,67 @@ mod tests {
             evaluate(&mut bad, &inp, &TERMS, &mut q),
             Err(MathError::Underflow)
         );
+    }
+
+    /// M4R: in the post-change warm-up an executable venue's evaluation decides nothing (no
+    /// arm, no disarm, no settlement); a venue that cannot execute is not gated (S3 proceeds).
+    #[test]
+    fn warm_up_gates_an_executable_venue_only() {
+        let bx = SettleBox::point(10, 2);
+        let mut q = toy();
+        let mut inp = inputs(10, bx);
+        inp.warmed = false;
+        for armed in [0u8, 1] {
+            let mut st = ArmState {
+                armed,
+                count: 1,
+                since: 1,
+                last: 9,
+                _pad: [0; 7],
+            };
+            let before = st;
+            assert_eq!(
+                evaluate(&mut st, &inp, &TERMS, &mut q).unwrap(),
+                Evaluation::default()
+            );
+            assert_eq!(st, before);
+            // Not liquidatable either: no disarm.
+            let mut calm = inp;
+            calm.cr_liquidatable = false;
+            calm.ema_leg = false;
+            calm.budget.v = 1_000_000;
+            assert_eq!(
+                evaluate(&mut st, &calm, &TERMS, &mut q).unwrap(),
+                Evaluation::default()
+            );
+            assert_eq!(st, before);
+        }
+        // The same inputs once warmed: armed.
+        inp.warmed = true;
+        let mut st = ArmState::default();
+        assert_eq!(
+            evaluate(&mut st, &inp, &TERMS, &mut q).unwrap().arm,
+            ArmChange::Armed
+        );
+        // A venue that cannot execute while warming: S3 as always.
+        let mut inp = inputs(700, bx);
+        inp.warmed = false;
+        inp.executable = false;
+        inp.budget = Budget {
+            v: 100_000,
+            k_s: 250,
+            ert: 0,
+        };
+        inp.s3 = S3Chain {
+            no_route_now: true,
+            no_route_since: Some(0),
+            graduated_at: None,
+            migrating: false,
+            migration_seen_at: None,
+        };
+        let mut st = ArmState::default();
+        let e = evaluate(&mut st, &inp, &TERMS, &mut q).unwrap();
+        assert_eq!(e.settlement.unwrap().kind, SettleKind::S3);
     }
 
     #[test]

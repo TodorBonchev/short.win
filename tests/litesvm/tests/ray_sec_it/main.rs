@@ -7,7 +7,7 @@
 //! |---|---|
 //! | `m3_sec_1_*` | a CPMM config whose trade fee the admin sets to 0: every buy of a pool whose creator fee is on its input reverts (`ZeroTradingTokens`); the pool is no route (S3 chain, frozen healthy positions), never an uncapped S1, and its risk view is fee-free, never `+∞` |
 //! | `m3_sec_2_*` | a Raydium listing waits for the review of a flagged Raydium upgrade (`VenueUpgraded`), as opens do; the I17 listing hook |
-//! | `m3_sec_3_*` | TRIPWIRE (deferred to M4 by ARCH §2.5 / §2.6): the first listing pins a mint's venue until `propose_pool` exists |
+//! | `m3_sec_3_*` | the M3 tripwire, inverted by M4: a list-only front-run is adopted onto the token's pool by `propose_pool`, and a thin eligible listing is replaced inside `pool_list_window_s` |
 //!
 //! M3-SEC-4 (ARCH's CPMM age formula) is a documentation finding; the code's O13 behaviour is
 //! pinned by `ray_it listing::pool_age_follows_o13` and the reader's `age_start_clamps`.

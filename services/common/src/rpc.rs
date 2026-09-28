@@ -89,6 +89,43 @@ impl RpcChain {
             data,
         })
     }
+
+    /// `getProgramAccounts` of `program` with a `dataSize` filter (if any) and `filters`.
+    async fn get_program_accounts(
+        &self,
+        program: &Pubkey,
+        data_size: Option<usize>,
+        filters: &[Memcmp],
+    ) -> anyhow::Result<Vec<(Pubkey, AccountData)>> {
+        let mut rpc_filters: Vec<RpcFilterType> = data_size
+            .map(|n| RpcFilterType::DataSize(n as u64))
+            .into_iter()
+            .collect();
+        rpc_filters.extend(
+            filters
+                .iter()
+                .map(|f| RpcFilterType::Memcmp(RpcMemcmp::new_base58_encoded(f.offset, &f.bytes))),
+        );
+        let config = RpcProgramAccountsConfig {
+            filters: Some(rpc_filters),
+            account_config: RpcAccountInfoConfig {
+                encoding: Some(UiAccountEncoding::Base64),
+                commitment: Some(self.commitment),
+                ..RpcAccountInfoConfig::default()
+            },
+            with_context: None,
+            sort_results: None,
+        };
+        let res = self
+            .client
+            .get_program_ui_accounts_with_config(program, config)
+            .await
+            .context("getProgramAccounts")?;
+        Ok(res
+            .into_iter()
+            .filter_map(|(k, a)| Self::account_of(a).map(|a| (k, a)))
+            .collect())
+    }
 }
 
 /// `true` if an RPC error means the cluster refused the transaction before running it.
@@ -206,32 +243,21 @@ impl Chain for RpcChain {
         program: &Pubkey,
         filters: &[Memcmp],
     ) -> anyhow::Result<Vec<(Pubkey, AccountData)>> {
-        let config = RpcProgramAccountsConfig {
-            filters: Some(
-                filters
-                    .iter()
-                    .map(|f| {
-                        RpcFilterType::Memcmp(RpcMemcmp::new_base58_encoded(f.offset, &f.bytes))
-                    })
-                    .collect(),
-            ),
-            account_config: RpcAccountInfoConfig {
-                encoding: Some(UiAccountEncoding::Base64),
-                commitment: Some(self.commitment),
-                ..RpcAccountInfoConfig::default()
-            },
-            with_context: None,
-            sort_results: None,
-        };
-        let res = self
-            .client
-            .get_program_ui_accounts_with_config(program, config)
-            .await
-            .context("getProgramAccounts")?;
-        Ok(res
-            .into_iter()
-            .filter_map(|(k, a)| Self::account_of(a).map(|a| (k, a)))
-            .collect())
+        self.get_program_accounts(program, None, filters).await
+    }
+
+    async fn program_accounts_sized(
+        &self,
+        program: &Pubkey,
+        data_size: usize,
+        filters: &[Memcmp],
+    ) -> anyhow::Result<Vec<(Pubkey, AccountData)>> {
+        let mut out = self
+            .get_program_accounts(program, Some(data_size), filters)
+            .await?;
+        // A node that ignored the filter must not hand the caller another layout.
+        out.retain(|(_, a)| a.data.len() == data_size);
+        Ok(out)
     }
 
     async fn latest_blockhash(&self) -> anyhow::Result<Hash> {

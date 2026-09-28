@@ -163,7 +163,7 @@ def would_liq(m, pos, t):
     transaction: EMA leg held on the newest liq_persist_n ring entries (cached reprojections)
     and the bucket-low leg below L."""
     st = m.status(pos, t)
-    if not st["ema_leg"] or not st["lo_ok"]:
+    if not st["ema_leg"] or not st["lo_ok"] or st.get("gated"):     # M4R: no keeper exit during the warm-up
         return False
     q = m.quote_repriced(pos.Q, m.lb_lo, m.venue.sqrt_k())
     return q is None or st["Veff"] * BPS // q[1] < pos.L

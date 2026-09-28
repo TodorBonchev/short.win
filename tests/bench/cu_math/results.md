@@ -17,7 +17,7 @@ Per-call compute units of `shortwin-math` on SBF v3 (platform-tools v1.57, Mollu
 | `rent::due` | 1287 | 1420 | 1545 |
 | `rent::credited_for` | 2637 | 2991 | 3165 |
 | `rent::accrue` | 1109 | 608 | 1331 |
-| `record` + `integrate` (one EMA roll incl. the cached `reprice`) | 3833 | 4322 | 4600 |
+| `record` + `integrate` (one EMA roll incl. the cached `reprice`) | 3833 | 4391 | 4600 |
 | `ring_medians` (4 × 8 bucket extremes) | 3208 | 3484 | 3850 |
 | `sigma_xy` | 1473 | 1201 | 1768 |
 | EMA-leg entry, v0.4 (cached `(x, y)` + quote + CR) | 1468 | 951 | 1762 |

@@ -16,6 +16,32 @@ pub const EMA_TAU_S: u32 = 5;
 /// §5.6; ARCH §3.8).
 pub const RING_LEN: usize = 8;
 
+/// **PROPOSED** (M4R, post-change confirmation; owner item O18): integrations of the warm-up
+/// that every **restart** of the observation state runs — a Raydium adoption (a listing
+/// window's, a zero-position, a fast-path or a list-only market's window adoption), a Raydium
+/// listing, a list-only market's first adoption (`observe::mark_restart`). A restart reads no
+/// sample of the new pool: it writes the anchor `⌊D·10⁴/λ_min⌋` into `L_ema` and the ring (or,
+/// for a price start, `min(√(X·Y), anchor)` at the pool's spot) and sets `Ema.warm` to this
+/// value; each of the next `EMA_WARMUP_BUCKETS` integrations re-seeds the EMA over the
+/// post-change ring entries only (`P_ema = min lo`, rising by at most the largest v0.4.1 step,
+/// `L_ema = min(max lhi, ⌊lomed(lhi)·(10⁴ + C)/10⁴⌋)`, `observe::integrate`) and counts `warm`
+/// down. While `warm > 0` on an executable
+/// venue, opens, `liquidate` and `expire` refuse `EmaWarmingUp` and `sol_settle` evaluates
+/// nothing (ECON §5.2, §5.5; ARCH §2.6 rule 4, §3.4, §3.6–§3.8, §4.4). `= RING_LEN`: when the
+/// gate opens every ring entry is post-change; `≥` the largest `liq_persist_n`, so the EMA leg
+/// reads post-change entries only.
+// `RING_LEN ≤ u8::MAX` is asserted below, so the cast is exact.
+#[allow(clippy::cast_possible_truncation)]
+pub const EMA_WARMUP_BUCKETS: u8 = RING_LEN as u8;
+
+/// **PROPOSED** (M4R; owner item O18): the tolerance of the post-change reference guard,
+/// bps (`= fv_dev_bps`'s default). The guard `Ema.guard`, set by every restart, makes the
+/// keeper exits' reference liquidity read `min(L_ema, L_mlo)` (`bounds::ref_liquidity`); it
+/// clears at the first integration after the warm-up with `L_ema·10⁴ ≤ L_mlo·(10⁴ +
+/// REF_GUARD_TOL_BPS)`, i.e. once `L_ema` is within 1 % of the ring's lower median of the
+/// bucket liquidity lows (an honest switch: at the gate).
+pub const REF_GUARD_TOL_BPS: u32 = 100;
+
 /// Rent accrual clamps the price at `P̃ = min(P_ema, P_ACC_MAX)` (WAD, a price of 100 SOL
 /// per raw unit), which keeps the rent basis indices below 2¹²⁸ for 100 years (ECON §2.2).
 pub const P_ACC_MAX: u128 = 100_000_000_000_000_000_000_000_000_000;
@@ -46,6 +72,12 @@ const _: () = assert!(
         && RING_LEN <= u8::MAX as usize
 );
 const _: () = assert!(P_OPEN_MAX < P_ACC_MAX);
+// M4R: the warm-up refills the whole ring, and the EMA leg's `liq_persist_n` newest entries are
+// post-change entries once it ends.
+const _: () = assert!(
+    Rule::LiqPersistN.bounds().1 <= EMA_WARMUP_BUCKETS as u64
+        && EMA_WARMUP_BUCKETS as usize == RING_LEN
+);
 
 /// Longest time from open to a position's last possible resolution that a lock must cover:
 /// the compiled maxima of `max_duration_s` and of the S3 tail `max_migration_pause_s +
@@ -72,6 +104,7 @@ mod tests {
         assert_eq!(P_ACC_MAX, 10u128.pow(29));
         assert_eq!(P_OPEN_MAX, 10u128.pow(27));
         assert_eq!((EMA_TAU_S, RING_LEN, COVERAGE_GAP_S), (5, 8, 30));
+        assert_eq!((EMA_WARMUP_BUCKETS, REF_GUARD_TOL_BPS), (8, 100));
         assert_eq!(
             (S3_OBS_GAP_S, LOCK_BUCKET_S, LOCK_BUCKETS),
             (60, 86_400, 128)

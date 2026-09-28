@@ -1258,6 +1258,111 @@
       ]
     },
     {
+      "name": "execute_pool_switch",
+      "docs": [
+        "Anyone resolves a collection window once it has run: adopts the best candidate if it is",
+        "still eligible (with its locked SOL at the SOL floor), its program is not latched and,",
+        "on a Raydium market, the `pool_fail` chain that armed the window still holds; else",
+        "cancels."
+      ],
+      "discriminator": [
+        255,
+        50,
+        233,
+        181,
+        206,
+        56,
+        90,
+        172
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "venue_guard",
+          "docs": [
+            "The venue-upgrade latch: a window whose candidate's program bit is set is cancelled, not",
+            "adopted (module docs step 5; M4-SEC-8, M4V-4). Read only."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  110,
+                  117,
+                  101,
+                  95,
+                  103,
+                  117,
+                  97,
+                  114,
+                  100
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "docs": [
+            "the handler)."
+          ],
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "expire",
       "docs": [
         "A keeper exits an expired, not CR-liquidatable position (ARCH §3.7)."
@@ -2466,6 +2571,116 @@
               "name": "ConfigChange"
             }
           }
+        }
+      ]
+    },
+    {
+      "name": "propose_pool",
+      "docs": [
+        "Anyone proposes a Raydium pool of kind `candidate_kind` (4 AMM v4, 5 CPMM) for a",
+        "list-only or Raydium market: an immediate adoption (a list-only market without open",
+        "positions; no open position with the listing-window or zero-position margin) or a",
+        "collection window (the fast path; a list-only market with open positions)."
+      ],
+      "discriminator": [
+        13,
+        47,
+        166,
+        121,
+        182,
+        244,
+        168,
+        236
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "venue_guard",
+          "docs": [
+            "The venue-upgrade latch (A7; module docs step 3): a proposal is refused while the bit of",
+            "the candidate's program is set (`VenueUpgraded`, M4-SEC-8). Read only."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  110,
+                  117,
+                  101,
+                  95,
+                  103,
+                  117,
+                  97,
+                  114,
+                  100
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "docs": [
+            "the handler); the candidate's token side must be this mint under that program."
+          ],
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "candidate_kind",
+          "type": "u8"
         }
       ]
     },
@@ -4553,6 +4768,16 @@
       "code": 6099,
       "name": "UseLiquidate",
       "msg": "Position is expired and CR-liquidatable; use liquidate"
+    },
+    {
+      "code": 6100,
+      "name": "PoolWindowClosed",
+      "msg": "The fast-path collection window has closed; call execute_pool_switch"
+    },
+    {
+      "code": 6101,
+      "name": "EmaWarmingUp",
+      "msg": "The price state is warming up after a venue change; opens and keeper exits wait"
     }
   ],
   "types": [
@@ -6360,13 +6585,23 @@
             "type": "u8"
           },
           {
-            "name": "_pad0",
-            "type": {
-              "array": [
-                "u8",
-                2
-              ]
-            }
+            "name": "ema_warm",
+            "docs": [
+              "Integrations left in the post-change warm-up (M4R, **PROPOSED**, owner item O18; was",
+              "`_pad0[0]`): `EMA_WARMUP_BUCKETS` after a restart (a Raydium adoption or listing), counted",
+              "down by the prologue's roll; `0` = confirmed (every account created before M4R). While it",
+              "is positive on an executable venue opens, `liquidate` and `expire` refuse `EmaWarmingUp`",
+              "and `sol_settle` evaluates nothing (`shortwin_math::observe::Ema::warm`)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "ema_guard",
+            "docs": [
+              "`1` while the post-change reference guard is set (M4R; was `_pad0[1]`): the keeper exits'",
+              "reference liquidity reads `min(L_ema, L_mlo)` (`shortwin_math::bounds::ref_liquidity`)."
+            ],
+            "type": "u8"
           },
           {
             "name": "created_at",
@@ -6501,10 +6736,27 @@
           },
           {
             "name": "_pad1",
+            "type": "u8"
+          },
+          {
+            "name": "_pad1a",
+            "docs": [
+              "Retired `fp_lambda_bps` (M4-SEC-5's record of the candidate's `λ`; M4R: an adoption reads",
+              "no sample of the pool): padding, zeroed by `clear_window`."
+            ],
             "type": {
               "array": [
                 "u8",
-                7
+                2
+              ]
+            }
+          },
+          {
+            "name": "_pad1b",
+            "type": {
+              "array": [
+                "u8",
+                4
               ]
             }
           },
@@ -7589,7 +7841,7 @@
     {
       "name": "PoolProposed",
       "docs": [
-        "`propose_pool` opened or improved a window, or proposed."
+        "`propose_pool` opened or improved a fast-path collection window (ARCH §2.6 rule 3)."
       ],
       "type": {
         "kind": "struct",
@@ -7608,25 +7860,39 @@
           },
           {
             "name": "candidate",
+            "docs": [
+              "The candidate pool (`PoolSwitched`: the pool now adopted)."
+            ],
             "type": "pubkey"
           },
           {
             "name": "kind",
             "docs": [
-              "Listing / zero-position / fast."
+              "`POOL_KIND_*`: listing / listing window / zero-position / fast."
             ],
             "type": "u8"
           },
           {
             "name": "d_cand",
+            "docs": [
+              "The candidate's locked depth `D` (`PoolSwitchCancelled`: the best one seen)."
+            ],
             "type": "u128"
           },
           {
             "name": "d_inc",
+            "docs": [
+              "The incumbent's locked depth `pool_d` (0 for a list-only market)."
+            ],
             "type": "u128"
           },
           {
             "name": "window_ends",
+            "docs": [
+              "`PoolProposed` / `PoolSwitchCancelled`: the end of the fast-path collection",
+              "window; `PoolSwitched`: the end of the listing window after the adoption (opens",
+              "resume then)."
+            ],
             "type": "i64"
           }
         ]
@@ -7635,7 +7901,13 @@
     {
       "name": "PoolSwitchCancelled",
       "docs": [
-        "A fast-path window closed without adoption."
+        "A collection window closed without adoption (`execute_pool_switch`, ARCH §2.6 rule 3):",
+        "the window's candidate is no longer eligible or no longer passes the window floor (its",
+        "locked SOL at `P_ema`, M4V-1); on a Raydium market the `pool_fail` chain that armed the",
+        "window broke — the incumbent no longer fails `pool_fail`, or it recovered and failed",
+        "again (M4-SEC-2); on a list-only market its detection set now shows a pump venue (D1,",
+        "M4-SEC-4); or the candidate's own Raydium program is flagged in the venue-upgrade latch",
+        "(M4V-4: not adoptable now; the chain stays armed)."
       ],
       "type": {
         "kind": "struct",
@@ -7654,25 +7926,39 @@
           },
           {
             "name": "candidate",
+            "docs": [
+              "The candidate pool (`PoolSwitched`: the pool now adopted)."
+            ],
             "type": "pubkey"
           },
           {
             "name": "kind",
             "docs": [
-              "Listing / zero-position / fast."
+              "`POOL_KIND_*`: listing / listing window / zero-position / fast."
             ],
             "type": "u8"
           },
           {
             "name": "d_cand",
+            "docs": [
+              "The candidate's locked depth `D` (`PoolSwitchCancelled`: the best one seen)."
+            ],
             "type": "u128"
           },
           {
             "name": "d_inc",
+            "docs": [
+              "The incumbent's locked depth `pool_d` (0 for a list-only market)."
+            ],
             "type": "u128"
           },
           {
             "name": "window_ends",
+            "docs": [
+              "`PoolProposed` / `PoolSwitchCancelled`: the end of the fast-path collection",
+              "window; `PoolSwitched`: the end of the listing window after the adoption (opens",
+              "resume then)."
+            ],
             "type": "i64"
           }
         ]
@@ -7681,7 +7967,8 @@
     {
       "name": "PoolSwitched",
       "docs": [
-        "A pool adoption."
+        "A pool adoption (`propose_pool`: listing, listing window, zero-position;",
+        "`execute_pool_switch`: fast path). ARCH §2.6 rule 4."
       ],
       "type": {
         "kind": "struct",
@@ -7700,25 +7987,39 @@
           },
           {
             "name": "candidate",
+            "docs": [
+              "The candidate pool (`PoolSwitched`: the pool now adopted)."
+            ],
             "type": "pubkey"
           },
           {
             "name": "kind",
             "docs": [
-              "Listing / zero-position / fast."
+              "`POOL_KIND_*`: listing / listing window / zero-position / fast."
             ],
             "type": "u8"
           },
           {
             "name": "d_cand",
+            "docs": [
+              "The candidate's locked depth `D` (`PoolSwitchCancelled`: the best one seen)."
+            ],
             "type": "u128"
           },
           {
             "name": "d_inc",
+            "docs": [
+              "The incumbent's locked depth `pool_d` (0 for a list-only market)."
+            ],
             "type": "u128"
           },
           {
             "name": "window_ends",
+            "docs": [
+              "`PoolProposed` / `PoolSwitchCancelled`: the end of the fast-path collection",
+              "window; `PoolSwitched`: the end of the listing window after the adoption (opens",
+              "resume then)."
+            ],
             "type": "i64"
           }
         ]

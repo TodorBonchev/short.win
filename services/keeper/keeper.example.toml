@@ -43,6 +43,10 @@ recovery_s = 600
 s3_probe_interval_s = 10
 # Seconds between getProgramAccounts discoveries of new markets.
 discovery_interval_s = 10
+# M4V-5: a Raydium market with no open position is observed every 60 s inside its listing
+# window, and every second in the window's last EMA_WARMUP_BUCKETS + 2 = 10 seconds and after it
+# until its price state has warmed up (opens refuse EmaWarmingUp before that).
+listing_interval_s = 60
 
 [budget]
 # O17: lamports per market per UTC day for observations (unset: unlimited). Exits are never
@@ -64,3 +68,25 @@ flag_upgrades = true
 # Duty 10: report admin actions on each covered market's pool and CPMM config (Raydium SetParams,
 # update_pool_status, update_amm_config): route lost / restored, status, open time, fee vs caps.
 pool_admin = true
+
+[pool_select]
+# Duty 5's Raydium fast path and duty 12's pool monitor (ARCH §2.6, §7.1): discover every
+# Raydium SOL pool of each covered mint, rank the eligible ones by locked depth D with the
+# program's own verifier, and propose_pool / execute_pool_switch exactly when the program would
+# accept (listing window, zero-position adoption, fast path).
+enabled = true
+# getProgramAccounts discovery per covered mint (4 filtered calls: AMM v4 and CPMM, WSOL on
+# either side), and the faster cadence while the incumbent fails pool_fail or a window runs.
+discovery_interval_s = 300
+fast_discovery_interval_s = 10
+# Re-read the candidates' accounts this often when nothing is pending.
+eval_interval_s = 30
+# R4B-10: alert when a dominant candidate has been blocked this long by open positions.
+pinned_alert_s = 3600
+# A separate endpoint for the getProgramAccounts calls (empty: the keeper's --rpc).
+discovery_rpc = ""
+# M4-SEC-7: anyone can create pools for a mint, so the keeper ranks a discovery's pools by their
+# locked SOL (one read of each pool's WSOL vault and LP mint, at most rank_keys_per_tick accounts
+# a tick) and evaluates only the best max_candidates each tick.
+max_candidates = 8
+rank_keys_per_tick = 200

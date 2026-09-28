@@ -34,6 +34,12 @@ pub struct MarketMetrics {
     pub coverage_gaps: u64,
     /// Admin actions seen on the market's pool or CPMM config (duty 10).
     pub venue_admin_changes: u64,
+    /// `propose_pool` calls landed (duties 5 and 12).
+    pub pool_proposals: u64,
+    /// `execute_pool_switch` calls landed (duty 5).
+    pub pool_executions: u64,
+    /// Pool adoptions seen (the keeper's or anyone's).
+    pub pool_switches: u64,
     /// Degraded (1) or not (0).
     pub degraded: bool,
     /// The last second covered.
@@ -64,6 +70,8 @@ pub struct Metrics {
     pub v1_rejections: u64,
     /// `flag_venue_upgraded` calls landed (duty 10).
     pub venue_flags: u64,
+    /// Raydium pool discoveries run (duty 12; four `getProgramAccounts` calls each).
+    pub pool_discoveries: u64,
 }
 
 impl Metrics {
@@ -132,8 +140,14 @@ impl Metrics {
             "flag_venue_upgraded calls landed.",
             self.venue_flags,
         );
+        g(
+            &mut s,
+            "shortwin_keeper_pool_discoveries_total",
+            "Raydium pool discoveries run (four getProgramAccounts calls each).",
+            self.pool_discoveries,
+        );
         type Row = (&'static str, &'static str, fn(&MarketMetrics) -> u64);
-        let rows: [Row; 14] = [
+        let rows: [Row; 17] = [
             (
                 "covered_seconds",
                 "Seconds with a keeper observation.",
@@ -165,6 +179,15 @@ impl Metrics {
                 "Admin actions seen on the market's pool or CPMM config.",
                 |m| m.venue_admin_changes,
             ),
+            ("pool_proposals", "propose_pool calls landed.", |m| {
+                m.pool_proposals
+            }),
+            (
+                "pool_executions",
+                "execute_pool_switch calls landed.",
+                |m| m.pool_executions,
+            ),
+            ("pool_switches", "Pool adoptions seen.", |m| m.pool_switches),
             ("degraded", "1 while the market is in degraded mode.", |m| {
                 u64::from(m.degraded)
             }),

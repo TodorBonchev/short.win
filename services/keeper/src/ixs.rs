@@ -1,10 +1,12 @@
-//! The instructions the keeper sends (ARCHITECTURE §3.6–§3.9), built from the program's own
-//! Anchor account and instruction types (`shortwin::accounts::*`, `shortwin::instruction::*`),
-//! with the venue's remaining accounts from [`crate::venue`].
+//! The instructions the keeper sends (ARCHITECTURE §3.6–§3.9, pool selection included), built
+//! from the program's own Anchor account and instruction types (`shortwin::accounts::*`,
+//! `shortwin::instruction::*`), with the venue's remaining accounts from [`crate::venue`].
 
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
 use anchor_lang::{InstructionData, ToAccountMetas};
+
+use shortwin::state::{Market, VenueKind};
 
 use crate::pda;
 use crate::venue::{self, ExtrasChoice};
@@ -73,6 +75,80 @@ pub fn flag_venue_upgraded(venue: u8) -> anyhow::Result<Instruction> {
         shortwin::instruction::FlagVenueUpgraded { venue },
         Vec::new(),
     ))
+}
+
+fn read_only_keys(keys: &[Pubkey]) -> Vec<AccountMeta> {
+    keys.iter()
+        .map(|k| AccountMeta::new_readonly(*k, false))
+        .collect()
+}
+
+/// `propose_pool(candidate_kind)` on `market` (ARCH §2.6, §3.9; M4): no signer. Remaining, all
+/// read-only: `prefix` — a list-only market's detection set `[bonding_curve, canonical_pool]`
+/// ([`detection_set`]) or a Raydium market's own ReadSet — then the candidate's ReadSet in its
+/// adapter's order (AMM v4 `[pool, coin vault, pc vault, LP mint]`, CPMM `[pool, amm_config,
+/// token 0 vault, token 1 vault, LP mint]`). `candidate_kind` is 4 (AMM v4) or 5 (CPMM).
+pub fn propose_pool(
+    market_key: &Pubkey,
+    mint: &Pubkey,
+    prefix: &[Pubkey],
+    candidate_kind: VenueKind,
+    candidate: &[Pubkey],
+) -> Instruction {
+    let mut rest = read_only_keys(prefix);
+    rest.extend(read_only_keys(candidate));
+    build(
+        shortwin::accounts::ProposePool {
+            config: pda::config(),
+            venue_guard: pda::venue_guard(),
+            market: *market_key,
+            mint: *mint,
+            event_authority: pda::event_authority(),
+            program: shortwin::ID,
+        },
+        shortwin::instruction::ProposePool {
+            candidate_kind: candidate_kind as u8,
+        },
+        rest,
+    )
+}
+
+/// `execute_pool_switch()` on `mv`'s market (collection windows only; ARCH §2.6 rule 3, §3.9):
+/// the market's ReadSet, then the collection window's candidate —
+/// `fp_keys[..read_len(fp_venue)]` ([`crate::pool_monitor::window_candidate`]) — all read-only.
+pub fn execute_pool_switch(mv: &MarketView, candidate: &[Pubkey]) -> Instruction {
+    execute_pool_switch_with(&mv.key, &mv.market.mint, &mv.read_keys, candidate)
+}
+
+/// `execute_pool_switch()` on `market_key` with the incumbent's accounts `prefix` — a Raydium
+/// market's ReadSet, or a list-only market's detection set (a window of a list-only market with
+/// positions, M4-SEC-4) — then the window candidate's ReadSet, all read-only.
+pub fn execute_pool_switch_with(
+    market_key: &Pubkey,
+    mint: &Pubkey,
+    prefix: &[Pubkey],
+    candidate: &[Pubkey],
+) -> Instruction {
+    let mut rest = read_only_keys(prefix);
+    rest.extend(read_only_keys(candidate));
+    build(
+        shortwin::accounts::ExecutePoolSwitch {
+            config: pda::config(),
+            venue_guard: pda::venue_guard(),
+            market: *market_key,
+            mint: *mint,
+            event_authority: pda::event_authority(),
+            program: shortwin::ID,
+        },
+        shortwin::instruction::ExecutePoolSwitch {},
+        rest,
+    )
+}
+
+/// A list-only market's detection set `[bonding_curve, canonical_pool]` (the market's stored
+/// PDAs; `propose_pool` key-checks them and runs `classify_pump` on them, D1).
+pub fn detection_set(market: &Market) -> [Pubkey; 2] {
+    [market.bonding_curve, market.canonical_pool]
 }
 
 /// `liquidate(extras)` of `pos` by `keeper` (ARCH §3.6).

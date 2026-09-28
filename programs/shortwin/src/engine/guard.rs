@@ -11,6 +11,7 @@
 
 use anchor_lang::prelude::*;
 
+use crate::constants::{GUARD_RAYDIUM_CPMM, GUARD_RAYDIUM_V4};
 use crate::errors::ShortwinError;
 use crate::mint_filter::check_mint_safety;
 use crate::state::{
@@ -104,6 +105,40 @@ pub fn latch(guard: &VenueGuard, kind: VenueKind) -> Result<()> {
     Ok(())
 }
 
+/// The latch mask of a pool-selection candidate on `kind` (M4-SEC-8): the bit of the
+/// candidate's **own** program only — its compiled reader is the one a pending upgrade puts
+/// at risk. The whole Raydium mask stays the rule for opens (R4B-7: a position may later exit
+/// on either program), but on proposals and fast-path adoptions it would disable the fast path
+/// exactly when an upgrade of the incumbent's program makes its pools fail `pool_fail`.
+pub const fn candidate_guard_mask(kind: VenueKind) -> u32 {
+    match kind {
+        VenueKind::RaydiumV4 => 1 << GUARD_RAYDIUM_V4,
+        VenueKind::RaydiumCpmm => 1 << GUARD_RAYDIUM_CPMM,
+        k => k.guard_mask(),
+    }
+}
+
+/// The venue-upgrade latch of `propose_pool` (M4-SEC-8; ARCH §2.6 rule 3, §3.9): no candidate
+/// on `kind` while its program's upgrade awaits the Emergency review (`VenueUpgraded`).
+pub fn candidate_latch(guard: &VenueGuard, kind: VenueKind) -> Result<()> {
+    require!(
+        !candidate_latched(guard, kind),
+        ShortwinError::VenueUpgraded
+    );
+    Ok(())
+}
+
+/// Whether the program of a candidate of `kind` awaits the Emergency review of an upgrade
+/// ([`candidate_guard_mask`]). `execute_pool_switch` treats such a window candidate as **not
+/// adoptable now** and cancels the window instead of reverting (M4V-4): a reverting execution
+/// left the window in place, and every other proposal — on the other, unflagged Raydium
+/// program too — refused `PoolWindowClosed` until the review, so the fast path stayed frozen
+/// while the halted incumbent's positions ran towards S3. The chain stays armed, so a proposal
+/// on the other program opens a new window at once.
+pub fn candidate_latched(guard: &VenueGuard, kind: VenueKind) -> bool {
+    guard.blocks(candidate_guard_mask(kind))
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -116,6 +151,42 @@ mod tests {
             anchor_lang::error::Error::AnchorError(a) => Some(a.error_code_number),
             anchor_lang::error::Error::ProgramError(_) => None,
         }
+    }
+
+    /// M4-SEC-8: a pool-selection candidate waits only for the review of its own program; an
+    /// open on either Raydium venue waits for both (R4B-7).
+    #[test]
+    fn a_candidate_latches_on_its_own_program() {
+        let mut g = VenueGuard::zeroed();
+        for (flagged, v4_ok, cpmm_ok) in [
+            (None, true, true),
+            (Some(GUARD_RAYDIUM_V4), false, true),
+            (Some(GUARD_RAYDIUM_CPMM), true, false),
+        ] {
+            g.upgraded = flagged.map_or(0, |b| 1 << b);
+            assert_eq!(
+                candidate_latch(&g, VenueKind::RaydiumV4).is_ok(),
+                v4_ok,
+                "{flagged:?}"
+            );
+            assert_eq!(
+                candidate_latch(&g, VenueKind::RaydiumCpmm).is_ok(),
+                cpmm_ok,
+                "{flagged:?}"
+            );
+            let open_ok = flagged.is_none();
+            assert_eq!(latch(&g, VenueKind::RaydiumV4).is_ok(), open_ok);
+            assert_eq!(latch(&g, VenueKind::RaydiumCpmm).is_ok(), open_ok);
+        }
+        assert_eq!(
+            candidate_guard_mask(VenueKind::RaydiumV4)
+                | candidate_guard_mask(VenueKind::RaydiumCpmm),
+            crate::constants::GUARD_MASK_RAYDIUM
+        );
+        assert_eq!(
+            candidate_guard_mask(VenueKind::PumpSwap),
+            VenueKind::PumpSwap.guard_mask()
+        );
     }
 
     #[test]

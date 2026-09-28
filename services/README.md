@@ -6,8 +6,8 @@ workspace's lockfile.
 
 | Crate | What |
 |---|---|
-| `common/` (`shortwin-services-common`) | The chain-client abstraction (`Chain`: clock, accounts, account headers, program accounts, blockhash, simulate, send, recent priority fees), its JSON-RPC backend (`RpcChain`), transaction building: v1 (SIMD-0385) with a v0 fallback (ComputeBudget instructions, optional lookup tables), `⌈simulated × 1.1⌉` compute units, sizes, decompilation |
-| `keeper/` (`shortwin-keeper`) | Keeper v1 (ARCH §7.1 duties 1–5, 7–10, 14 on Raydium AMM v4 and CPMM) and its binary; `shortwin-build-alt`, the protocol address lookup table of A28 (`scripts/build-alt.sh`) |
+| `common/` (`shortwin-services-common`) | The chain-client abstraction (`Chain`: clock, accounts, account headers, program accounts — also by exact size, a `dataSize` filter on JSON-RPC —, blockhash, simulate, send, recent priority fees), its JSON-RPC backend (`RpcChain`), transaction building: v1 (SIMD-0385) with a v0 fallback (ComputeBudget instructions, optional lookup tables), `⌈simulated × 1.1⌉` compute units, sizes, decompilation |
+| `keeper/` (`shortwin-keeper`) | Keeper v1 (ARCH §7.1 duties 1–5, 7–10, 12, 14 on Raydium AMM v4 and CPMM, with duty 5's Raydium fast path) and its binary; `shortwin-build-alt`, the protocol address lookup table of A28 (`scripts/build-alt.sh`) |
 | `keeper-litesvm/` (`shortwin-keeper-litesvm`) | TEST-ONLY: the in-process LiteSVM backend (the program-test harness's invariant hooks after every instruction of every keeper transaction) and the keeper's scenario tests on the mock venue and on the Raydium mainnet fork |
 
 ## Keeper
@@ -23,7 +23,16 @@ What it does, per tick (one per slot; `keeper/src/keeper.rs`):
 - **Duty 1, coverage** (`coverage.rs`, `decide.rs`): one observation per second on a market with a
   position near a threshold (live CR below 1.3·L, deadline within 60 s, armed) or with
   `|P_spot/P_ema − 1| > 2 %`; every 30 s on markets with open positions; every 30 s on markets
-  without a route (the continuous S3 chain, duty 5); none on markets without positions.
+  without a route (the continuous S3 chain, duty 5); none on markets without positions — except
+  a Raydium market inside its listing window (M4V-5): every `listing_interval_s` (60 s) through
+  the window and every second in its last `EMA_WARMUP_BUCKETS + 2` (10) seconds, and after it
+  until its post-change warm-up is over (`ema_warm == 0` as the next instruction's roll sees it,
+  M4R), so the first open after the window passes the program's gate (`EmaWarmingUp`) on a
+  `P_ema` the pool's own buckets seeded. After a `PoolSwitched` (any market with open positions
+  and `ema_warm > 0` on an executable venue; M4R, duty 5) every second until the warm-up is over:
+  the program refuses keeper exits until then, so the positions' plan is `Watch` and no
+  `liquidate` / `expire` is sent; the first second the projection shows `ema_warm == 0` (adoption
+  + 9 s with per-second observations) the exits go out as usual.
 - **Duty 2, bursts**: an observation in the open or last completed bucket that deviates by more
   than 2 % from the spot prices the keeper itself read in that second was not the keeper's (an
   atomic `[pump, crank, dump]` leaves exactly that): one observation every slot for 60 s
@@ -76,13 +85,66 @@ What it does, per tick (one per slot; `keeper/src/keeper.rs`):
     status, open time, and the one-way fee measured against `venue_fee_cap_bps` (opens refused)
     and `venue_fee_hard_cap_bps` (`s3_no_route`), naming the instruction that writes the field. A
     pool that stops parsing is reported as such ("not executable", A63).
+- **Duty 12, the Raydium pool monitor, and duty 5's Raydium fast path** (`pool_monitor.rs`,
+  config `[pool_select]`; ARCH §2.5 `None`, §2.6):
+  - **Discovery.** Every Raydium SOL pool of each covered Raydium or list-only market's mint,
+    through `getProgramAccounts` byte filters: AMM v4 `coin_vault_mint` @400 / `pc_vault_mint`
+    @432 and CPMM `token_0_mint` @168 / `token_1_mint` @200, the mint on one side and WSOL on
+    the other (four calls per mint, each filtered to the one pool size the program verifies —
+    `dataSize` 752 B for AMM v4, 637 B for CPMM), at the first sight of a market and every
+    `discovery_interval_s` (300 s) after — every `fast_discovery_interval_s` (10 s) while the
+    incumbent fails `pool_fail` or a collection window runs (never while a ranking is still in
+    progress). The calls can go to another endpoint (`discovery_rpc`, `--discovery-rpc`).
+  - **Ranking** (M4-SEC-7: anyone can create pools for a mint, ≈ 0.17 SOL each). Each discovered
+    pool is scored once per discovery by its locked SOL `λ·R` — its pool account (a status or
+    nonce the verifier would refuse scores nothing) and one batched read of its WSOL vault and
+    LP mint, at most `rank_keys_per_tick` (200) accounts a tick and market, a large discovery
+    over several ticks with the previous ranking in force — and only the best `max_candidates`
+    (8) are evaluated. Unlocked liquidity scores nothing, so junk pools rank last.
+  - **Evaluation.** Each ranked candidate's ReadSet, read fresh, goes through the program's own
+    verifier (`engine::pool_select::verify_candidate`: the adapters' `verify` and `eligible()`,
+    the locked-depth floor at the market's `P_ema`; plus `window_floor_ok`, the window floor of
+    a collection window's candidate, M4V-1) on host `AccountInfo`s, which gives the
+    program's locked depth `D`; a list-only market's D1 check is the program's `classify_pump`
+    on its detection set. Pool selection runs after the tick's exits and crank batch, so its RPC
+    work never delays duties 1–4 (the observation that keeps a failing market's `pool_fail`
+    chain goes out in a batch of its own right after). Every `eval_interval_s` (30 s),
+    and every tick while the fast path is armed, a window runs, the incumbent just started or
+    stopped failing, or a waiting candidate meets a market whose last position just closed.
+  - **Decision.** The program's own `engine::pool_select::decide` on the market projected to
+    the clock (the prologue: `pool_d` refreshed, the `pool_fail` chain stepped), for the deepest
+    eligible candidate other than the incumbent and the window's own: `propose_pool` exactly
+    when it accepts — a list-only market's first pool, a listing-window replacement (5 %), a
+    zero-position adoption (25 %; in the tick the keeper sees the last position closed), the
+    fast path's collection window (opened at the first armed second, outbidding a shallower
+    window of someone else's); `execute_pool_switch` at the first second after the window (a
+    cancelled window is proposed again if the fast path is still armed; a list-only market with
+    open positions — M5's curve that graduated elsewhere — collects its candidates in a window
+    the same way, M4-SEC-4). A window is opened or improved only with a candidate above the
+    window floor (else nothing, `PoolTooThin`). Nothing while positions are open and the
+    incumbent is healthy (`PositionsOpen`); a candidate whose own program the `VenueGuard` latch
+    holds is left out of the ranking (`VenueUpgraded`; M4-SEC-8: an upgrade of the other Raydium
+    program does not hold the fast path up), and a window whose candidate's program is latched
+    is executed anyway — the program cancels it (M4V-4) and the best pool on the other program
+    opens the next window in the same tick. A failing market **without** positions, which duty 5's no-route cadence
+    does not observe, is observed by the monitor (at once, then every 30 s) while a candidate is
+    deep enough for the fast path, so its `pool_fail` chain arms. Sends are simulated first, at
+    the exit priority ceiling, outside the O17 observation budget.
+  - **Reports.** The decoded `PoolProposed` / `PoolSwitched` / `PoolSwitchCancelled` of the
+    keeper's transactions; `Alert::PoolSwitched`, `PoolWindow`, `PoolSwitchCancelled` for the
+    keeper's actions and for anyone else's seen on chain; `Alert::PoolPinned` when a candidate
+    with ≥ 25 % more locked depth has waited `pinned_alert_s` (1 h) behind open positions
+    (R4B-10: page the Emergency multisig to pause opens there so the market drains);
+    `Alert::PoolSelectRefused` for an unexpected refusal. After an adoption the duty-10 admin
+    watch starts afresh on the new pool.
 - Per-market metrics (coverage seconds, observations, exits, settlements, CU, lamports, misses,
-  bursts, gaps, venue admin changes, degraded) and `venue_flags` in the Prometheus text format
-  (`--metrics`).
+  bursts, gaps, venue admin changes, pool proposals / executions / switches, degraded) and
+  `venue_flags`, `pool_discoveries` in the Prometheus text format (`--metrics`).
 
 **The program's own code decides.** The keeper links the `shortwin` crate (account types,
 instruction builders, the venue reader `venues::read_state` and the adapters' account lists, the
-market prologue `engine::prologue::run`, the exit references `engine::bounds`),
+market prologue `engine::prologue::run`, the exit references `engine::bounds`, the pool
+selection's `engine::pool_select::{verify_candidate, decide}` and `venues::detect::classify_pump`),
 `shortwin-venue-state` (the AMM v4 / CPMM / ProgramData readers) and `shortwin-math` (legs, CR,
 buyback test, S3 timer): each decision is the program's on a copy of the market projected to
 the cluster's clock. Every send is still simulated first, and the simulation is the final word
@@ -91,16 +153,18 @@ the cluster's clock. Every send is still simulated first, and the simulation is 
 Not yet (later milestones, ARCH §7.1): Jito bundles with tips for liquidations (the priority-fee
 RPC path is built; T-SIZE shows a tip transfer fits the worst Raydium exit); Yellowstone gRPC
 subscriptions (the keeper polls `getMultipleAccounts` / `getProgramAccounts`, and watches admin
-actions through the accounts they write rather than the admin's transactions); duty 5's Raydium
-fast path and duty 12's pool monitor (M4); duty 6's graduation work and the pump venues' lists
-(M5/M6); duties 11 and 13 (`crank_sol_usd`, lender pot).
+actions through the accounts they write rather than the admin's transactions; it sees other
+parties' pool selection through the market's state, not their transactions); duty 6's
+graduation work and the pump venues' lists (M5/M6), including `crank_price` on list-only
+markets (their pump re-detection); duties 11 and 13 (`crank_sol_usd`, lender pot).
 
 ### Run
 
 ```sh
 cargo build --manifest-path services/Cargo.toml -p shortwin-keeper --release
 services/target/release/shortwin-keeper --rpc https://… --keypair keeper.json \
-  --config services/keeper/keeper.example.toml --metrics 127.0.0.1:9464
+  --config services/keeper/keeper.example.toml --metrics 127.0.0.1:9464 \
+  [--discovery-rpc https://…]   # getProgramAccounts for the pool discovery (default: --rpc)
 ```
 
 The keypair is a hot fee payer with no protocol authority. `keeper.example.toml` documents every
@@ -181,6 +245,25 @@ Raydium scenarios (`raydium*.rs`, the dumped AMM v4 and CPMM programs and pools)
   mainnet dumps), frozen, through the keeper's own chain backend and `alt` module; it holds every
   address the program tests' T-SIZE table assumes; the keeper's v0 crank batch and a liquidation
   run through it.
+- `pool_select` (M4; planted sibling pools, `shortwin_litesvm_tests::pool_select`, traded by the
+  dumped ELFs): a thin eligible listing (Fartcoin's reversed pool) replaced by the main pool in
+  the keeper's first tick, inside the listing window; a list-only market moved onto its deepest
+  eligible pool (Fartcoin's real curve: D1 and `graduated_elsewhere`; a thinner CPMM sibling and
+  the too-thin reversed pool passed over), a pump coin's list-only market left alone; an
+  incumbent halted with two positions open — the window opened on the deepest sibling at the
+  first armed second (`pool_fail` for 120 s), executed at the first second after it, positions
+  byte for byte unchanged, `P_ema` carried at the adoption, the ring's liquidity the new pool's
+  anchor, the new pool observed every second through the post-change warm-up and its depth,
+  a clear guard and a ≤ 1 % box after it, the positions closed on the new pool; underwater
+  positions liquidated at adoption + 9 s with no exit sent during the warm-up (M4R); a front-running
+  outsider's shallower window outbid and the deepest pool adopted; a deeper pool created during
+  the window found by the fast discovery, proposed and adopted; a halted pool without
+  positions taken through the fast path by the keeper's own chain observations; nothing
+  proposed while a position is open and the incumbent healthy (twice the depth waiting), one
+  `PoolPinned` alert, the adoption in the tick the position closed; proposals held by a flagged
+  Raydium upgrade until `revalidate_venue`; M4V-5's listing-window observations (60 observations
+  60 s apart and 10 in the last 10 s, the first open after the window lands; a window nobody
+  observed is warmed up in the 8 s after it, the open refused `EmaWarmingUp` until then).
 
 The JSON-RPC backend has its own check against a live local cluster (`common/tests/rpc_local.rs`,
 ignored by default): clock, accounts, program accounts, recent fees, and a transfer simulated and

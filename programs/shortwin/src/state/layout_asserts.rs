@@ -122,7 +122,7 @@ layout!(acct Market, 3_104, {
     // header
     version @ 8, flags @ 10, bump @ 12, pool_vault_bump @ 13, market_vault_bump @ 14,
     trader_bump @ 15, trader_wsol_bump @ 16, venue @ 17, tier @ 18, decimals @ 19,
-    ring_head @ 20, ring_count @ 21, _pad0 @ 22, created_at @ 24,
+    ring_head @ 20, ring_count @ 21, ema_warm @ 22, ema_guard @ 23, created_at @ 24,
     // identity
     mint @ 32, token_program @ 64, creator @ 96,
     // own accounts
@@ -137,7 +137,7 @@ layout!(acct Market, 3_104, {
     pool_cache @ 608,
     // pool selection
     pool_seen_at @ 928, pool_d @ 936, fp_keys @ 952, fp_d @ 1_144, fp_t0 @ 1_160,
-    fp_venue @ 1_168, _pad1 @ 1_169,
+    fp_venue @ 1_168, _pad1 @ 1_169, _pad1a @ 1_170, _pad1b @ 1_172,
     // venue timing
     migration_seen_at @ 1_176, graduated_at @ 1_184, tier_computed_at @ 1_192,
     // route chains

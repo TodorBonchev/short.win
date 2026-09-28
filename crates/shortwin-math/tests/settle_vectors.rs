@@ -436,14 +436,25 @@ impl Replay {
                 "obs"
             }
             // rewrite t g|r l_new
+            // rewrite t g|r l_new | rewrite t R l_new slow_cap (M4R: the anchor, then the
+            // restart marks)
             "rewrite" => {
                 let _now: i64 = t.v();
-                let (k, name) = match t.s() {
+                let kind = t.s();
+                let l_new: u128 = t.v();
+                let (k, name) = match kind {
                     "g" => (VenueChange::Graduation, "graduation"),
                     "r" => (VenueChange::Raydium, "raydium"),
+                    "R" => (
+                        VenueChange::RaydiumLocked { slow_cap: t.v() },
+                        "raydium_restart",
+                    ),
                     k => panic!("unknown venue change {k}"),
                 };
-                self.obs.rewrite_liquidity(t.v(), k).unwrap();
+                self.obs.rewrite_liquidity(l_new, k).unwrap();
+                if kind == "R" {
+                    self.obs.mark_restart();
+                }
                 *cov.rewrites.entry(name).or_default() += 1;
                 "rewrite"
             }
@@ -509,7 +520,9 @@ impl Replay {
                 };
                 assert_eq!(got, Ok(p_ref), "P_ref, {ctx}");
                 match l_b {
-                    Some(l) => assert_eq!(ref_liquidity(l_live, &o.ema), l, "L_b, {ctx}"),
+                    Some(l) => {
+                        assert_eq!(ref_liquidity(l_live, &o.ema, &o.ring), Ok(l), "L_b, {ctx}")
+                    }
                     None => cov.stale_refs += 1,
                 }
                 "ref"
@@ -673,6 +686,7 @@ impl Replay {
             cr_liquidatable: cr_liq,
             ema_leg,
             executable: exec,
+            warmed: shortwin_math::observe::warmed(&self.obs.ema),
             p_rs,
             l_live,
             b_live,

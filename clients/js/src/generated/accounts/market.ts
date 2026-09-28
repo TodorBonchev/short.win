@@ -88,7 +88,19 @@ export type Market = {
   decimals: number;
   ringHead: number;
   ringCount: number;
-  pad0: ReadonlyUint8Array;
+  /**
+   * Integrations left in the post-change warm-up (M4R, **PROPOSED**, owner item O18; was
+   * `_pad0[0]`): `EMA_WARMUP_BUCKETS` after a restart (a Raydium adoption or listing), counted
+   * down by the prologue's roll; `0` = confirmed (every account created before M4R). While it
+   * is positive on an executable venue opens, `liquidate` and `expire` refuse `EmaWarmingUp`
+   * and `sol_settle` evaluates nothing (`shortwin_math::observe::Ema::warm`).
+   */
+  emaWarm: number;
+  /**
+   * `1` while the post-change reference guard is set (M4R; was `_pad0[1]`): the keeper exits'
+   * reference liquidity reads `min(L_ema, L_mlo)` (`shortwin_math::bounds::ref_liquidity`).
+   */
+  emaGuard: number;
   createdAt: bigint;
   mint: Address;
   tokenProgram: Address;
@@ -118,7 +130,13 @@ export type Market = {
   fpD: PodU128;
   fpT0: bigint;
   fpVenue: number;
-  pad1: ReadonlyUint8Array;
+  pad1: number;
+  /**
+   * Retired `fp_lambda_bps` (M4-SEC-5's record of the candidate's `λ`; M4R: an adoption reads
+   * no sample of the pool): padding, zeroed by `clear_window`.
+   */
+  pad1a: ReadonlyUint8Array;
+  pad1b: ReadonlyUint8Array;
   migrationSeenAt: bigint;
   graduatedAt: bigint;
   tierComputedAt: bigint;
@@ -197,7 +215,19 @@ export type MarketArgs = {
   decimals: number;
   ringHead: number;
   ringCount: number;
-  pad0: ReadonlyUint8Array;
+  /**
+   * Integrations left in the post-change warm-up (M4R, **PROPOSED**, owner item O18; was
+   * `_pad0[0]`): `EMA_WARMUP_BUCKETS` after a restart (a Raydium adoption or listing), counted
+   * down by the prologue's roll; `0` = confirmed (every account created before M4R). While it
+   * is positive on an executable venue opens, `liquidate` and `expire` refuse `EmaWarmingUp`
+   * and `sol_settle` evaluates nothing (`shortwin_math::observe::Ema::warm`).
+   */
+  emaWarm: number;
+  /**
+   * `1` while the post-change reference guard is set (M4R; was `_pad0[1]`): the keeper exits'
+   * reference liquidity reads `min(L_ema, L_mlo)` (`shortwin_math::bounds::ref_liquidity`).
+   */
+  emaGuard: number;
   createdAt: number | bigint;
   mint: Address;
   tokenProgram: Address;
@@ -227,7 +257,13 @@ export type MarketArgs = {
   fpD: PodU128Args;
   fpT0: number | bigint;
   fpVenue: number;
-  pad1: ReadonlyUint8Array;
+  pad1: number;
+  /**
+   * Retired `fp_lambda_bps` (M4-SEC-5's record of the candidate's `λ`; M4R: an adoption reads
+   * no sample of the pool): padding, zeroed by `clear_window`.
+   */
+  pad1a: ReadonlyUint8Array;
+  pad1b: ReadonlyUint8Array;
   migrationSeenAt: number | bigint;
   graduatedAt: number | bigint;
   tierComputedAt: number | bigint;
@@ -305,7 +341,8 @@ export function getMarketEncoder(): FixedSizeEncoder<MarketArgs> {
       ["decimals", getU8Encoder()],
       ["ringHead", getU8Encoder()],
       ["ringCount", getU8Encoder()],
-      ["pad0", fixEncoderSize(getBytesEncoder(), 2)],
+      ["emaWarm", getU8Encoder()],
+      ["emaGuard", getU8Encoder()],
       ["createdAt", getI64Encoder()],
       ["mint", getAddressEncoder()],
       ["tokenProgram", getAddressEncoder()],
@@ -332,7 +369,9 @@ export function getMarketEncoder(): FixedSizeEncoder<MarketArgs> {
       ["fpD", getPodU128Encoder()],
       ["fpT0", getI64Encoder()],
       ["fpVenue", getU8Encoder()],
-      ["pad1", fixEncoderSize(getBytesEncoder(), 7)],
+      ["pad1", getU8Encoder()],
+      ["pad1a", fixEncoderSize(getBytesEncoder(), 2)],
+      ["pad1b", fixEncoderSize(getBytesEncoder(), 4)],
       ["migrationSeenAt", getI64Encoder()],
       ["graduatedAt", getI64Encoder()],
       ["tierComputedAt", getI64Encoder()],
@@ -407,7 +446,8 @@ export function getMarketDecoder(): FixedSizeDecoder<Market> {
     ["decimals", getU8Decoder()],
     ["ringHead", getU8Decoder()],
     ["ringCount", getU8Decoder()],
-    ["pad0", fixDecoderSize(getBytesDecoder(), 2)],
+    ["emaWarm", getU8Decoder()],
+    ["emaGuard", getU8Decoder()],
     ["createdAt", getI64Decoder()],
     ["mint", getAddressDecoder()],
     ["tokenProgram", getAddressDecoder()],
@@ -434,7 +474,9 @@ export function getMarketDecoder(): FixedSizeDecoder<Market> {
     ["fpD", getPodU128Decoder()],
     ["fpT0", getI64Decoder()],
     ["fpVenue", getU8Decoder()],
-    ["pad1", fixDecoderSize(getBytesDecoder(), 7)],
+    ["pad1", getU8Decoder()],
+    ["pad1a", fixDecoderSize(getBytesDecoder(), 2)],
+    ["pad1b", fixDecoderSize(getBytesDecoder(), 4)],
     ["migrationSeenAt", getI64Decoder()],
     ["graduatedAt", getI64Decoder()],
     ["tierComputedAt", getI64Decoder()],

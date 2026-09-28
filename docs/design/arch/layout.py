@@ -1,4 +1,4 @@
-"""ARCH v0.4.1 account layouts: explicit, no implicit padding, every field align <= 8 (PodU128/PodI128 = [u8;16])."""
+"""ARCH v0.4.1 account layouts (as built through M4): explicit, no implicit padding, every field align <= 8 (PodU128/PodI128 = [u8;16])."""
 import sys
 SZ = {"u8":1,"u16":2,"u32":4,"u64":8,"i64":8,"Pubkey":32,"PodU128":16,"PodI128":16}
 AL = {"u8":1,"u16":2,"u32":4,"u64":8,"i64":8,"Pubkey":1,"PodU128":1,"PodI128":1}
@@ -39,13 +39,16 @@ M = []
 def g(grp, *fs):
     for f,t in fs: M.append((grp,f,t))
 g("header", ("version","u16"),("flags","u16"),("bump","u8"),("pool_vault_bump","u8"),("market_vault_bump","u8"),("trader_bump","u8"),
-  ("trader_wsol_bump","u8"),("venue","u8"),("tier","u8"),("decimals","u8"),("ring_head","u8"),("ring_count","u8"),("_pad0",arr("u8",2)),("created_at","i64"))
+  ("trader_wsol_bump","u8"),("venue","u8"),("tier","u8"),("decimals","u8"),("ring_head","u8"),("ring_count","u8"),
+  ("ema_warm","u8"),("ema_guard","u8"),   # M4R: the post-change warm-up countdown and reference guard, from _pad0 (size, offsets unchanged)
+  ("created_at","i64"))
 g("identity", ("mint","Pubkey"),("token_program","Pubkey"),("creator","Pubkey"))
 g("own accounts", ("pool_vault","Pubkey"),("market_vault","Pubkey"),("trader","Pubkey"),("trader_base_ata","Pubkey"),("trader_wsol","Pubkey"))
 g("pump detection keys", ("bonding_curve","Pubkey"),("canonical_pool","Pubkey"))
 g("curve venue cache", ("curve_cache",arr("Pubkey",8)))
 g("pool venue cache (union by venue)", ("pool_cache",arr("Pubkey",10)))
-g("pool selection", ("pool_seen_at","i64"),("pool_d","PodU128"),("fp_keys",arr("Pubkey",6)),("fp_d","PodU128"),("fp_t0","i64"),("fp_venue","u8"),("_pad1",arr("u8",7)))
+g("pool selection", ("pool_seen_at","i64"),("pool_d","PodU128"),("fp_keys",arr("Pubkey",6)),("fp_d","PodU128"),("fp_t0","i64"),("fp_venue","u8"),("_pad1","u8"),
+  ("_pad1a",arr("u8",2)),("_pad1b",arr("u8",4)))   # M4R: M4-SEC-5's fp_lambda_bps retired to padding (size, offsets unchanged)
 g("venue timing", ("migration_seen_at","i64"),("graduated_at","i64"),("tier_computed_at","i64"))
 g("route chains", ("no_route_since","i64"),("last_no_route_obs","i64"),("pool_fail_since","i64"),("last_pool_fail_obs","i64"))
 g("lender pool (Market part)", ("tokens_free","u64"),("borrowed_q","u64"),("borrowed_q_by_tier",arr("u64",4)),("total_shares","PodU128"),("acc","PodI128"),

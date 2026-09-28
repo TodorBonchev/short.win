@@ -47,11 +47,19 @@ export type PoolSwitchCancelledEvent = {
   market: Address;
   slot: bigint;
   ts: bigint;
+  /** The candidate pool (`PoolSwitched`: the pool now adopted). */
   candidate: Address;
-  /** Listing / zero-position / fast. */
+  /** `POOL_KIND_*`: listing / listing window / zero-position / fast. */
   kind: number;
+  /** The candidate's locked depth `D` (`PoolSwitchCancelled`: the best one seen). */
   dCand: bigint;
+  /** The incumbent's locked depth `pool_d` (0 for a list-only market). */
   dInc: bigint;
+  /**
+   * `PoolProposed` / `PoolSwitchCancelled`: the end of the fast-path collection
+   * window; `PoolSwitched`: the end of the listing window after the adoption (opens
+   * resume then).
+   */
   windowEnds: bigint;
 };
 
@@ -59,11 +67,19 @@ export type PoolSwitchCancelledEventArgs = {
   market: Address;
   slot: number | bigint;
   ts: number | bigint;
+  /** The candidate pool (`PoolSwitched`: the pool now adopted). */
   candidate: Address;
-  /** Listing / zero-position / fast. */
+  /** `POOL_KIND_*`: listing / listing window / zero-position / fast. */
   kind: number;
+  /** The candidate's locked depth `D` (`PoolSwitchCancelled`: the best one seen). */
   dCand: number | bigint;
+  /** The incumbent's locked depth `pool_d` (0 for a list-only market). */
   dInc: number | bigint;
+  /**
+   * `PoolProposed` / `PoolSwitchCancelled`: the end of the fast-path collection
+   * window; `PoolSwitched`: the end of the listing window after the adoption (opens
+   * resume then).
+   */
   windowEnds: number | bigint;
 };
 

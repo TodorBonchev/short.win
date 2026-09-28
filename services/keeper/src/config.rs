@@ -1,6 +1,6 @@
-//! Keeper configuration (ARCHITECTURE §7.1 "Operations" 7–9, 14; owner item O17: the
-//! per-market daily budget, the priority-price ceiling and the markets covered are the owner's
-//! to set).
+//! Keeper configuration (ARCHITECTURE §7.1 "Operations" 7–9, 14; duties 10 and 12; owner item
+//! O17: the per-market daily budget, the priority-price ceiling and the markets covered are the
+//! owner's to set).
 //!
 //! Every field has the design default (ECON §5.8 duties, ARCH §7.1), so an empty file is a
 //! valid configuration. `keeper.example.toml` documents each one.
@@ -82,6 +82,11 @@ pub struct CoverageConfig {
     pub s3_probe_interval_s: i64,
     /// Seconds between `getProgramAccounts` discoveries of markets: 10.
     pub discovery_interval_s: i64,
+    /// Cadence for a Raydium market with no open position inside its listing window (M4V-5):
+    /// 60 s. Its last `EMA_WARMUP_BUCKETS + 2` seconds, and the seconds after it until the
+    /// post-change warm-up is over (`Market.ema_warm == 0`, M4R), are observed every second, so
+    /// the first open after the window finds an honest `P_ema` and a confirmed EMA.
+    pub listing_interval_s: i64,
 }
 
 impl Default for CoverageConfig {
@@ -98,6 +103,7 @@ impl Default for CoverageConfig {
             recovery_s: 600,
             s3_probe_interval_s: 10,
             discovery_interval_s: 10,
+            listing_interval_s: 60,
         }
     }
 }
@@ -156,6 +162,64 @@ impl Default for VenueWatchConfig {
     }
 }
 
+/// Raydium pool selection (ARCH §2.6; §7.1 duty 5's fast path and duty 12, the pool monitor;
+/// [`crate::pool_monitor`]).
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, deny_unknown_fields)]
+pub struct PoolSelectConfig {
+    /// Run the pool monitor and the fast path: true.
+    pub enabled: bool,
+    /// Seconds between `getProgramAccounts` discoveries of a covered mint's Raydium SOL pools
+    /// (four filtered calls per mint: AMM v4 and CPMM, WSOL on either side): 300. A market is
+    /// discovered at once the first time the keeper sees it.
+    pub discovery_interval_s: i64,
+    /// The same while the market's incumbent fails `pool_fail` or a fast-path collection window
+    /// runs (a pool created or refilled for the fast path is seen within this): 10.
+    pub fast_discovery_interval_s: i64,
+    /// Seconds between re-reads of the candidates' accounts when nothing is pending (at once
+    /// when the incumbent starts or stops failing `pool_fail`; every tick while the fast path is
+    /// armed, a window runs, or a waiting candidate meets a market whose last position just
+    /// closed): 30.
+    pub eval_interval_s: i64,
+    /// R4B-10: a market whose adoption of a dominant candidate (≥ `pool_switch_margin_bps` more
+    /// locked depth) is blocked this long by open positions is reported as pinned
+    /// (`Alert::PoolPinned`: page the Emergency multisig to pause opens there so it drains):
+    /// 3,600 s.
+    pub pinned_alert_s: i64,
+    /// A separate JSON-RPC endpoint for the discovery's `getProgramAccounts` calls (many
+    /// providers restrict or meter them); empty: the keeper's own `--rpc`.
+    pub discovery_rpc: String,
+    /// M4-SEC-7: the best candidates (by locked SOL) evaluated each tick; the rest of a mint's
+    /// pools — anyone can create them — are never fetched per tick: 8.
+    pub max_candidates: usize,
+    /// M4-SEC-7: the accounts (two per pool: its WSOL vault and LP mint) a discovery's ranking
+    /// reads per tick and market; a larger discovery is ranked over several ticks: 200.
+    pub rank_keys_per_tick: usize,
+}
+
+impl Default for PoolSelectConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            discovery_interval_s: 300,
+            fast_discovery_interval_s: 10,
+            eval_interval_s: 30,
+            pinned_alert_s: 3_600,
+            discovery_rpc: String::new(),
+            max_candidates: 8,
+            rank_keys_per_tick: 200,
+        }
+    }
+}
+
+impl PoolSelectConfig {
+    /// The discovery endpoint, if one is set.
+    pub fn discovery_rpc(&self) -> Option<&str> {
+        let s = self.discovery_rpc.trim();
+        (!s.is_empty()).then_some(s)
+    }
+}
+
 /// The keeper's configuration.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, deny_unknown_fields)]
@@ -178,6 +242,7 @@ pub struct KeeperConfig {
     pub coverage: CoverageConfig,
     pub budget: BudgetConfig,
     pub venue_watch: VenueWatchConfig,
+    pub pool_select: PoolSelectConfig,
 }
 
 impl Default for KeeperConfig {
@@ -193,6 +258,7 @@ impl Default for KeeperConfig {
             coverage: CoverageConfig::default(),
             budget: BudgetConfig::default(),
             venue_watch: VenueWatchConfig::default(),
+            pool_select: PoolSelectConfig::default(),
         }
     }
 }
@@ -228,12 +294,29 @@ impl KeeperConfig {
         if c.burst_s < 0 || c.recovery_s < 0 || c.s3_probe_interval_s <= 0 {
             bail!("coverage intervals must be non-negative");
         }
+        if c.listing_interval_s <= 0 {
+            bail!("listing_interval_s must be positive");
+        }
         let b = &self.budget;
         if b.priority_floor > b.priority_ceiling || b.priority_floor > b.exit_priority_ceiling {
             bail!("priority_floor exceeds a ceiling");
         }
         if b.priority_percentile_bps > 10_000 {
             bail!("priority_percentile_bps above 10,000");
+        }
+        let p = &self.pool_select;
+        if p.discovery_interval_s <= 0
+            || p.fast_discovery_interval_s <= 0
+            || p.eval_interval_s <= 0
+            || p.pinned_alert_s < 0
+        {
+            bail!("pool_select intervals must be positive");
+        }
+        if p.fast_discovery_interval_s > p.discovery_interval_s {
+            bail!("pool_select.fast_discovery_interval_s exceeds discovery_interval_s");
+        }
+        if p.max_candidates == 0 || p.rank_keys_per_tick < 2 {
+            bail!("pool_select.max_candidates must be positive and rank_keys_per_tick at least 2");
         }
         self.markets.keys()?;
         for t in &self.lookup_tables {
@@ -284,6 +367,9 @@ mod tests {
             priority_ceiling = 5000
             [venue_watch]
             pool_admin = false
+            [pool_select]
+            eval_interval_s = 5
+            discovery_rpc = "https://gpa.example"
             "#
         ))
         .unwrap();
@@ -295,6 +381,10 @@ mod tests {
         assert_eq!(cfg.budget.per_market_daily_lamports, Some(30_000_000));
         assert_eq!(cfg.budget.priority_ceiling, 5_000);
         assert!(!cfg.venue_watch.pool_admin && cfg.venue_watch.flag_upgrades);
+        assert_eq!(cfg.pool_select.eval_interval_s, 5);
+        assert_eq!(cfg.pool_select.discovery_rpc(), Some("https://gpa.example"));
+        assert!(cfg.pool_select.enabled);
+        assert_eq!(KeeperConfig::default().pool_select.discovery_rpc(), None);
     }
 
     #[test]
@@ -306,6 +396,9 @@ mod tests {
             "[budget]\npriority_floor = 20000",
             "unknown = 1",
             "markets = { only = [\"nope\"] }",
+            "[pool_select]\neval_interval_s = 0",
+            "[pool_select]\nfast_discovery_interval_s = 600",
+            "[pool_select]\nunknown = 1",
         ] {
             assert!(KeeperConfig::from_toml(bad).is_err(), "{bad}");
         }

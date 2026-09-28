@@ -7,7 +7,8 @@
 //! `expire` (which share `liquidate`'s keeper-exit machinery), `sol_settle`, `crank_price`, the
 //! O6 powers `set_route_broken` and `set_venue_extras`, and `sweep_trader` (ARCH §3.9, brought
 //! forward from M6 by M2-SEC-4: a full wipe is reachable from M2 on and a deposit then waits
-//! for it).
+//! for it). M4: `propose_pool` and `execute_pool_switch` (Raydium pool selection, ARCH §2.6,
+//! §3.9; the rules are `crate::engine::pool_select`).
 
 pub mod add_margin;
 pub mod apply_config;
@@ -20,6 +21,7 @@ pub mod crank_sol_usd;
 pub mod create_market;
 pub mod deposit;
 pub mod disable_venue;
+pub mod execute_pool_switch;
 pub mod expire;
 pub mod flag_unsafe_mint;
 pub mod flag_venue_upgraded;
@@ -27,6 +29,7 @@ pub mod initialize_config;
 pub mod liquidate;
 pub mod open_short;
 pub mod propose_config;
+pub mod propose_pool;
 pub mod revalidate_venue;
 pub mod set_pause;
 pub mod set_route_broken;
@@ -53,6 +56,7 @@ pub use crank_sol_usd::*;
 pub use create_market::*;
 pub use deposit::*;
 pub use disable_venue::*;
+pub use execute_pool_switch::*;
 pub use expire::*;
 pub use flag_unsafe_mint::*;
 pub use flag_venue_upgraded::*;
@@ -60,6 +64,7 @@ pub use initialize_config::*;
 pub use liquidate::*;
 pub use open_short::*;
 pub use propose_config::*;
+pub use propose_pool::*;
 pub use revalidate_venue::*;
 pub use set_pause::*;
 pub use set_route_broken::*;

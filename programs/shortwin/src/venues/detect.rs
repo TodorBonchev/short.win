@@ -22,11 +22,12 @@
 //!     && pool.quote_mint == WSOL && !pool.is_mayhem_mode
 //! ```
 //!
-//! **M3 scope.** Only the Raydium hints run it (the precedence check). The `Auto` listing and
+//! **Scope (M3, M4).** Only the Raydium adoptions run it (the precedence check): the Raydium
+//! hints of `create_market` and `propose_pool` on a list-only market (M4). The `Auto` listing and
 //! `crank_price`'s re-detection of a `None` market adopt the pump venues with their adapters
 //! (M5 / M6); until then `Auto` lists as `None`, as in M1. A pump-owned account at the curve
 //! address that carries the discriminator but does not parse cannot be classified, so it is
-//! refused as `PumpVenuePrecedence` (a Raydium listing needs the proof that no pump venue
+//! refused as `PumpVenuePrecedence` (a Raydium adoption needs the proof that no pump venue
 //! applies).
 
 use anchor_lang::prelude::*;

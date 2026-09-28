@@ -12,7 +12,7 @@
 //! | I10 | `check_ix` | an exit (`Close`, `Liquidate`, `Expire`, `SolSettle`) names neither `oracle_cache` nor `venue_guard` among its accounts |
 //! | I11 | `check_ix` (event part) | a liquidation's spend `≤ ⌊B̂_ref·(10⁴ + δ_liq)/10⁴⌋` with the position's locked δ, an expiry's `≤ ⌊B̂_ref·(10⁴ + δ_exp)/10⁴⌋`; `B ≤ max_in + ert` and `max_in ≤` that fixed bound; penalty / expiry fee `≤ ⌈rate·min(B̂_live,risk, B̂_ref)/10⁴⌉`; an expiry's `π_ref = ⌈fee·B̂_ref/10⁴⌉`, its `K_e = min(fixed + ⌊bps·B̂_ref/10⁴⌋, cap, V − B − r − e)`, and its rent (`R_due` on the post-accrual basis) and fee paid in full whenever `V − R − π_ref − ert ≥ ⌊B̂_ref·(10⁴ + ε)/10⁴⌋`. The liveness clause (I-E11) is a scenario test (`tests/liquidate_it.rs`, `tests/attacks_exit_it.rs`) |
 //! | I12 | `check_ix` (event part and the state around it) | S1 take `= V − K_s`; an S2/S3 take inside `[x_lo, x_hi]` (±2) with the corners within `fv_dev_bps`; `K_s` = the locked terms' reward; a liquidation that leaves the borrower equity pays the keeper `≥ K_s`; S1/S2 only on a live clock (armed, last evaluation within `settle_arm_gap_s`) that has run `settle_persist_n` EMA updates (the position's `s_count` before, the market's `ema_count` after); S3 only on a continuous no-route chain observed now and at least `s3_wait_s` (and the graduation / migration timers) long, with the position's locked terms; `p'` per corner: the penalty on both corners of a position not expired, and on an expired one the expiry fee at the dearer corner `(P_hi, L_lo)` only if the cheaper corner has it too |
-//! | I13 | `check_all` + `check_ix` | every ring entry's `(x, y) = reprice(l, p)`; the newest ring entry is the EMA state (`ts = ema_ts`, `p = P_ema`, `l = L_ema`); no decision state holds the current second (`lb_sec <` now, `b_sec ≤` now, `ema_ts ≤` now, with now = `max(clock, last_accrual_ts)`: the one-second lag); a venue charge ∈ `[B̂ − 5, B̂]` for `Close`, `Liquidate`, `Expire`; on the mock and the Raydium venues, an `Open`'s proceeds ∈ `[S_exp, S_exp + 5]` and a `Close`'s `b_live` = `B̂_live(q)`, both re-quoted (`quote::cpmm` / `quote::ray_v4` on the readers' reserves, `venue_view`) on the pool just before the instruction; one EMA integration moves `P_ema` and `L_ema` within their single-step bounds |
+//! | I13 | `check_all` + `check_ix` | every ring entry's `(x, y) = reprice(l, p)`; the newest ring entry is the EMA state (`ts = ema_ts`, `p = P_ema`, `l = L_ema`); no decision state holds the current second (`lb_sec <` now, `b_sec ≤` now, `ema_ts ≤` now, with now = `max(clock, last_accrual_ts)`: the one-second lag); a venue charge ∈ `[B̂ − 5, B̂]` for `Close`, `Liquidate`, `Expire`; on the mock and the Raydium venues, an `Open`'s proceeds ∈ `[S_exp, S_exp + 5]` and a `Close`'s `b_live` = `B̂_live(q)`, both re-quoted (`quote::cpmm` / `quote::ray_v4` on the readers' reserves, `venue_view`) on the pool just before the instruction; one EMA integration of a confirmed state (`ema_warm = 0`, M4R) moves `P_ema` and `L_ema` within their single-step bounds |
 //! | I14 | structural tests (`tests/engine_it/structure.rs`; `tests/add_margin_it.rs`; `tests/liquidate_it.rs` `remaining_accounts_are_strict` / `named_accounts_are_checked`; `tests/settle_it.rs` account checks) | every ReadSet / TradeExtras slot is mandatory and key-checked on `open_short`, `close_short`, `crank_price`, `liquidate`, `expire` and `sol_settle` (omitted, replaced, swapped, appended); the named accounts of every M2 instruction |
 //! | I16 | `check_ix` | no observation is recorded while the (mock or Raydium) venue is not executable; the route chains are sound (A40, V2-1, R3A-4): a hit of the S3 chain only when `s3_no_route` held on the state just before the instruction, a clear only when it did not; a hit of the `pool_fail` chain only when `pool_fail` held (not executable or fee above the **global** hard cap — never because of the route-broken flag), a clear only when it did not; the risk-quote part (every CR leg, box corner, `B̂_ref` and FV at `min(φ_live, venue_fee_hard_cap_bps_pos)`) is checked by scenario: `tests/route_it.rs` `fee_hike` (FV exactly at the locked cap under a 6 % live fee), `tests/expire_it.rs` `a_fee_far_above_the_hard_cap_holds_expiries_for_s3`, `tests/liquidate_it.rs` `liquidations_ignore_…_fee_cap_…` (the oracle prices at the capped fee) |
 //!
@@ -23,7 +23,7 @@ use std::cell::Cell;
 use anchor_lang::AccountDeserialize;
 use anchor_lang::prelude::Pubkey;
 use litesvm::LiteSVM;
-use shortwin::events::{Close, Expire, Liquidate, Open, SolSettle};
+use shortwin::events::{Close, Expire, Liquidate, Open, PoolSwitched, SolSettle};
 use shortwin::state::{
     GlobalConfig, MARKET_FLAG_ROUTE_BROKEN, Market, ShortPosition, VenueKind, WalletExposure,
 };
@@ -340,6 +340,11 @@ pub struct IxFacts<'a> {
     pub liquidations: &'a [Liquidate],
     pub expiries: &'a [Expire],
     pub settlements: &'a [SolSettle],
+    /// Pool adoptions (M4): a market that adopted a pool in this instruction had its
+    /// liquidity EMAs lowered and both route chains cleared by the adoption (ARCH §2.6 rule
+    /// 4), which `super::pool_select` (I15) checks instead of the one-step and chain rules
+    /// below.
+    pub switched: &'a [PoolSwitched],
     /// The instruction's account keys (I10).
     pub accounts: &'a [Pubkey],
 }
@@ -357,6 +362,10 @@ impl IxFacts<'_> {
             || self.closes.iter().any(|e| e.market == *market)
             || self.liquidations.iter().any(|e| e.market == *market)
             || self.expiries.iter().any(|e| e.market == *market)
+    }
+
+    fn switched(&self, market: &Pubkey) -> bool {
+        self.switched.iter().any(|e| e.market == *market)
     }
 
     fn is_exit(&self) -> bool {
@@ -575,8 +584,12 @@ pub fn check_ix(svm: &LiteSVM, pre: &PositionsSnapshot, ix: &IxFacts<'_>) -> Res
             }
         }
         // I13: one EMA integration moves P_ema and L_ema within their single-step bounds
-        // (ECON §5.2).
-        if post.ema_count == mp.state.ema_count + 1 {
+        // (ECON §5.2). An adoption in the same instruction rewrites `L_ema` to the new pool's
+        // anchor after the integration (A72, M4R): only `P_ema` is bounded then (I15 checks the
+        // rewrite). A warm-up integration (M4R: `ema_warm > 0` before it) re-seeds the EMA with
+        // no step bound; I18 checks the seed.
+        let switched = ix.switched(&market);
+        if post.ema_count == mp.state.ema_count + 1 && mp.state.ema_warm == 0 {
             let tau = u128::from(shortwin_math::consts::EMA_TAU_S);
             let c = u128::from(post.ema_clamp_bps);
             let dt = u128::from(post.ema_dtmax_s.max(1));
@@ -584,7 +597,7 @@ pub fn check_ix(svm: &LiteSVM, pre: &PositionsSnapshot, ix: &IxFacts<'_>) -> Res
                 ("P_ema", mp.state.ema_price.get(), post.ema_price.get()),
                 ("L_ema", mp.state.ema_liq.get(), post.ema_liq.get()),
             ] {
-                if old == 0 {
+                if old == 0 || (switched && what == "L_ema") {
                     continue;
                 }
                 // new ≤ (E·τ + E·(1 + C)·dt)/(τ + dt) and ≥ (E·τ + E/(1 + C)·dt)/(τ + dt).
@@ -617,8 +630,9 @@ pub fn check_ix(svm: &LiteSVM, pre: &PositionsSnapshot, ix: &IxFacts<'_>) -> Res
                 )
             })?;
         }
-        // I16: the route chains are sound; `pool_fail` never reads the route-broken flag.
-        if let Some(config) = config.as_ref() {
+        // I16: the route chains are sound; `pool_fail` never reads the route-broken flag. An
+        // adoption clears both chains (the new pool is observed afresh; I15).
+        if let Some(config) = config.as_ref().filter(|_| !switched) {
             route_chains(config, mp, &post)?;
         }
     }

@@ -445,10 +445,12 @@ fn write_market(env: &mut Env, mm: &MockMarket, m: &Market) {
 
 /// A72 / T-VENUE-SWITCH (M2 shape): the program's `rewrite_liquidity` on a full ring, stored
 /// as a transition would store it; the hooks accept it, the ring carries the new liquidity,
-/// the box is 0 wide in `L`, and the cranks continue from it.
+/// the box is 0 wide in `L`, and the cranks continue from it. `RaydiumLocked` is the variant
+/// the program's adoptions use since M4-SEC-5 / M4-SEC-6 (`L_slow` to at most the locked
+/// depth, here half the new pool's liquidity).
 #[test]
 fn ring_rewrite_on_a_venue_change() {
-    for kind in [VenueChange::Graduation, VenueChange::Raydium] {
+    for which in 0..3 {
         let (mut env, mm, _b, _n) = with_position();
         let actor = big_actor(&mut env, &mm);
         // A full ring of varied seconds.
@@ -465,6 +467,13 @@ fn ring_rewrite_on_a_venue_change() {
         ok(removed);
         let l_new = observed(&env, &mm).1;
         assert!(l_new < m0.ema_liq.get());
+        let kind = match which {
+            0 => VenueChange::Graduation,
+            1 => VenueChange::Raydium,
+            _ => VenueChange::RaydiumLocked {
+                slow_cap: l_new / 2,
+            },
+        };
         let mut obs = m0.observation();
         shortwin::engine::observe::rewrite_liquidity(&mut obs, l_new, kind).unwrap();
         let mut m = m0;
@@ -479,6 +488,9 @@ fn ring_rewrite_on_a_venue_change() {
             VenueChange::Graduation => assert_eq!(m1.liq_slow.get(), l_new),
             VenueChange::Raydium => {
                 assert_eq!(m1.liq_slow.get(), l_new.min(m0.liq_slow.get()))
+            }
+            VenueChange::RaydiumLocked { slow_cap } => {
+                assert_eq!(m1.liq_slow.get(), slow_cap.min(m0.liq_slow.get()))
             }
         }
         let (r0, r1) = (m0.ring_math(), m1.ring_math());

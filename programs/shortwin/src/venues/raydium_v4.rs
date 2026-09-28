@@ -232,21 +232,24 @@ pub fn fee_view(read: &[AccountInfo], cap_bps: u64) -> Pricing {
     Pricing::RayV4(fee).capped(cap_bps)
 }
 
-/// `create_market(venue_hint = RaydiumV4)`: verifies the candidate ReadSet `read` for `mint`
-/// under `token_program` (module docs, ARCH §2.6) and checks `eligible()`.
+/// `create_market(venue_hint = RaydiumV4)` and pool selection: verifies the candidate ReadSet
+/// `read` for `mint` under `token_program` (module docs, ARCH §2.6) and checks `eligible()` at
+/// the reference price `p_ref` (`raydium::check_eligible`: the market's `P_ema`, or `None` for
+/// the candidate's own spot on a market without a price).
 ///
 /// Errors: `BadRemainingAccounts` (not exactly the ReadSet); `PoolIneligible` (not an AMM v4
 /// pool of 752 bytes, a status outside {1, 6, 7}, another nonce, not a WSOL pool of `mint`, a
 /// Token-2022 market, vaults that are not the authority's Tokenkeg accounts of the pool's
 /// mints, an LP mint that does not parse, a pool that cannot execute or whose fee is above
 /// `venue_fee_cap_bps`); `VenueAccountMismatch` (a vault or the LP mint is not the pool's);
-/// `PoolTooThin` (`R < pool_min_real_sol`); `PoolLockTooLow` (`λ < pool_lock_min_bps`).
+/// `PoolTooThin` (the locked depth under the floor, M4-SEC-1 / M4-SEC-3).
 pub fn verify(
     read: &[AccountInfo],
     mint: &Pubkey,
     token_program: &Pubkey,
     params: &Params,
     now: i64,
+    p_ref: Option<u128>,
 ) -> Result<Adoption> {
     require!(read.len() == READ_LEN, ShortwinError::BadRemainingAccounts);
     let pool = at(read, R_POOL)?;
@@ -306,7 +309,7 @@ pub fn verify(
     }
     let parsed = parse(read).ok_or(ShortwinError::PoolIneligible)?;
     let state = state_of(&parsed, now).ok_or(ShortwinError::PoolIneligible)?;
-    check_eligible(&state, info.lp_amount, parsed.lp_supply, params)?;
+    check_eligible(&state, params, p_ref)?;
     let (vault_sol, vault_tok) = if sol_is_coin {
         (coin_i.key(), pc_i.key())
     } else {
@@ -485,7 +488,7 @@ mod tests {
         let params = Params::defaults();
         let mut accounts = fartcoin();
         let a = with_infos(&mut accounts, |r| {
-            verify(r, &mint, &TOKEN_PROGRAM_ID, &params, NOW)
+            verify(r, &mint, &TOKEN_PROGRAM_ID, &params, NOW, None)
         })
         .unwrap();
         assert_eq!(a.kind, VenueKind::RaydiumV4);
@@ -539,7 +542,7 @@ mod tests {
         m.token_program = TOKEN_PROGRAM_ID;
         let mut accounts = fartcoin();
         let a = with_infos(&mut accounts, |r| {
-            verify(r, &mint, &TOKEN_PROGRAM_ID, &Params::defaults(), NOW)
+            verify(r, &mint, &TOKEN_PROGRAM_ID, &Params::defaults(), NOW, None)
         })
         .unwrap();
         a.apply(&mut m, NOW).unwrap();

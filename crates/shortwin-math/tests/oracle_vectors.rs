@@ -383,7 +383,7 @@ fn references_match_sim() {
             "overflow" => assert_eq!(got, Err(MathError::Overflow), "{ctx}"),
             "ok" => {
                 assert_eq!(got, Ok(pref), "{ctx}");
-                assert_eq!(Some(ref_liquidity(l_live, &o.ema)), lb, "{ctx}");
+                assert_eq!(ref_liquidity(l_live, &o.ema, &o.ring).ok(), lb, "{ctx}");
             }
             k => panic!("unknown result kind {k}"),
         }

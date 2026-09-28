@@ -42,7 +42,14 @@ recorded; tests/settle_vectors.rs documents each layout next to its parser):
           ref_max_age | liq_n eps expiry_fee | settle_n arm_gap fv_dev | s3_wait grace pause
   init    t p l
   obs     t gap [p l]                      (gap: pre-roll gap, "-" if nothing rolled)
-  rewrite t g|r l_new                      (graduation | Raydium fast path)
+  rewrite t g|r l_new                      (graduation | Raydium fast path, v0.4.1 rule: fast_switch)
+  rewrite t R l_new slow_cap               (Raydium adoption, M4R post-change confirmation: Market.adopt_pool =
+                                            rewrite_liquidity(l_new = floor(D*1e4/lambda_min),
+                                            RaydiumLocked { slow_cap: D }), then observe::mark_restart
+                                            (ema_warm = 8, ema_guard = 1); the next 8 rolls are warm-up
+                                            integrations; chk's leg is the pure EMA-leg predicate, the gate
+                                            is try_exit's: no ref / maxin / settle line while ema_warm > 0 on
+                                            an executable venue)
   pos     pid Q V K_s ert L penalty slip_max
   chk     t pid flags leg p_live p_rs lo_ok g P_mlo P_mhi L_mlo L_mhi
                                            (flags: EMA-leg predicate on each ring entry's
@@ -93,8 +100,8 @@ ECON_13_EXIT_FUZZ = {'runs': 1000, 'exits': 709, 'sandwich_attempts': 8191, 'bun
                      'max_settle_box_bps': 95, 'reserve_waits_liq': 0, 'reserve_waits_exp': 0,
                      'kinds': {'liquidation': 213, 'expiry': 286, 'S1': 174, 'S2': 8, 'S3': 28}}
 ORIG = {name: getattr(M, name) for name in (
-    "__init__", "observe", "_integrate", "_switch_to_pool", "fast_switch", "reset_ema_to_spot", "open",
-    "status", "exit_reference", "_buyback_exit", "try_exit", "settle_box", "_settlement", "_not_liq_box",
+    "__init__", "observe", "_integrate", "_switch_to_pool", "fast_switch", "adopt_pool", "reset_ema_to_spot",
+    "open", "status", "exit_reference", "_buyback_exit", "try_exit", "settle_box", "_settlement", "_not_liq_box",
     "_refuted", "_legs", "_settle", "quote_repriced")}
 MODE = {"full": True, "sample": None, "copies": False}
 CAPTURE = []
@@ -253,6 +260,12 @@ def p_fast(self, pool, t):
     ORIG["fast_switch"](self, pool, t)
     if MODE["full"]:
         emit(self, line("rewrite", t, "r", l_new))
+
+
+def p_adopt(self, pool, t):
+    ORIG["adopt_pool"](self, pool, t)
+    if MODE["full"]:
+        emit(self, line("rewrite", t, "R", self.liq, pool.locked_depth()))
 
 
 def p_reset(self, t):
@@ -494,8 +507,8 @@ def p_try_exit(self, pos, t, borrower_close=False, borrower_limit=None, settle_o
 
 
 PATCHES = {"__init__": p_init, "observe": p_observe, "_integrate": p_integrate, "_switch_to_pool": p_switch,
-           "fast_switch": p_fast, "reset_ema_to_spot": p_reset, "open": p_open, "status": p_status,
-           "exit_reference": p_exit_ref, "_buyback_exit": p_buyback, "try_exit": p_try_exit,
+           "fast_switch": p_fast, "adopt_pool": p_adopt, "reset_ema_to_spot": p_reset, "open": p_open,
+           "status": p_status, "exit_reference": p_exit_ref, "_buyback_exit": p_buyback, "try_exit": p_try_exit,
            "settle_box": p_settle_box, "_settlement": p_settlement, "_not_liq_box": p_not_liq,
            "_refuted": p_refuted, "_legs": p_legs, "_settle": p_settle, "quote_repriced": p_quote_repriced,
            "__deepcopy__": m_deepcopy}

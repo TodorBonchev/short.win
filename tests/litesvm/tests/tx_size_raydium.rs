@@ -1,6 +1,7 @@
 //! T-SIZE on Raydium (ARCH §6.4, §6.2, §8.2; M3 exit criterion "T-SIZE … for Raydium"): every
 //! Raydium transaction the protocol and its keeper send — `open_short`, `close_short`,
-//! `liquidate`, `expire`, `sol_settle` and `crank_price` batches — fits **1,232 B and 64
+//! `liquidate`, `expire`, `sol_settle`, `crank_price` batches and (M4) the pool-selection
+//! instructions `propose_pool` / `execute_pool_switch` — fits **1,232 B and 64
 //! accounts** as a v0 transaction through the protocol ALT (A28) in its **worst case**, and
 //! **executes** that way on the mainnet fork (the dumped AMM v4 and CPMM programs and pools),
 //! with the invariant hooks after every instruction.
@@ -33,6 +34,13 @@
 //! `ComputeBudget ×2 + crank_price + liquidate` (ARCH §6.2) and an exit carrying a Jito tip
 //! transfer (duty 3's bundle path).
 //!
+//! **Pool selection** (M4; ARCH §3.9, §7.1 duties 5 and 12): the keeper's `propose_pool` and
+//! `execute_pool_switch` in their largest shapes — a CPMM incumbent's ReadSet and a CPMM
+//! candidate's (5 + 5 remaining accounts; AMM v4 ReadSets are a key shorter), and a list-only
+//! market's detection set with a CPMM candidate — with both ComputeBudget instructions and a
+//! separate fee payer; each executes through the table (a list-only adoption, a zero-position
+//! adoption, a fast-path window opened on a halted incumbent and its execution).
+//!
 //! Run with `-- --nocapture` for the table.
 
 // `TxResult` is LiteSVM's own `TransactionResult` (as in the harness library).
@@ -43,7 +51,10 @@ use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
 use anchor_lang::{InstructionData, ToAccountMetas};
 use litesvm::types::TransactionMetadata;
 use shortwin::errors::ShortwinError as E;
-use shortwin::events::{Close, Expire, Liquidate, Open, PriceCranked, SolSettle};
+use shortwin::events::{
+    Close, Expire, Liquidate, Open, POOL_KIND_FAST, POOL_KIND_LISTING, POOL_KIND_ZERO_POSITION,
+    PoolProposed, PoolSwitched, PriceCranked, SolSettle,
+};
 use shortwin::state::{ENTRY_FIXED, EXTRAS_IX_BUY, EXTRAS_IX_SELL, EXTRAS_MAX_ENTRIES, VenueKind};
 use shortwin::venues::{EXTRAS_SET_CURRENT, ExtrasSel};
 use shortwin::{ExtraEntryArg, SeedPartArg};
@@ -53,6 +64,9 @@ use shortwin_litesvm_tests::engine::{
 };
 use shortwin_litesvm_tests::errors::{custom_code, ok};
 use shortwin_litesvm_tests::fork::{self, AnyPool, CpmmFixture, V4Fixture};
+use shortwin_litesvm_tests::pool_select::{
+    detection_set, execute_pool_switch_ix, plant_cpmm, propose_pool_ix, spec_like,
+};
 use shortwin_litesvm_tests::raydium::{
     self, RayFixture, RayMarket, RaySpec, install_alt, protocol_alt_addresses,
 };
@@ -675,4 +689,119 @@ fn crank_batches_fit_through_the_protocol_alt() {
         &b,
     ));
     assert_eq!(events::of::<PriceCranked>(&meta).len(), 2);
+}
+
+/// `λ_bps` of `pool` now.
+fn lambda_of(env: &Env, pool: &AnyPool) -> u64 {
+    let counter = raydium::lp_counter(&env.svm, pool);
+    let supply = raydium::mint_supply(&env.svm, &raydium::lp_mint(pool));
+    u64::from(shortwin_math::pool_select::lambda_bps(counter, supply))
+}
+
+/// A CPMM pool of `base`'s token planted with `base`'s reserves scaled by `num/den` and its
+/// locked share (a real pool account cloned from USELESS's; `pool_select::plant_cpmm`).
+fn plant_like(env: &mut Env, base: &AnyPool, num: u64, den: u64) -> AnyPool {
+    let lam = lambda_of(env, base);
+    let spec = spec_like(&env.svm, base, true, lam).scaled(num, den);
+    AnyPool::Cpmm(plant_cpmm(env, CpmmFixture::Useless, spec))
+}
+
+/// Measures `ixs` (with the compute budget) through both tables for an instruction nobody but
+/// the fee payer signs (`propose_pool` and `execute_pool_switch` take no signer: the keeper is
+/// the payer); asserts it fits.
+fn assert_fits_unsigned(what: &str, env: &Env, ixs: &[Instruction]) {
+    let all = with_budget(ixs);
+    let bh = env.svm.latest_blockhash();
+    for alt in tables() {
+        let (size, keys) = measure(&v0_tx(&env.payer, &[], &all, &alt, bh));
+        println!(
+            "  {what:<44} {:<9} {size:>5} B / {keys:>2} accounts; margin {} B",
+            alt.name,
+            TX_MAX as i64 - size as i64
+        );
+        assert!(size <= TX_MAX, "{what} through {}: {size} B", alt.name);
+        assert!(keys <= ACCOUNTS_MAX, "{what}: {keys} accounts");
+    }
+}
+
+/// Pool selection (module docs; ARCH §3.9, §6.4): `propose_pool` and `execute_pool_switch` in
+/// their largest shapes fit 1,232 B and 64 accounts through both tables, and execute that way —
+/// a list-only adoption (the detection set + a CPMM candidate), a zero-position adoption and a
+/// fast-path window between two CPMM pools (5 + 5 remaining accounts), and the window's
+/// execution. Neither instruction has a signer, so the fee payer is the only signature.
+#[test]
+fn pool_selection_fits_and_executes_through_the_protocol_alt() {
+    // A list-only market of USELESS adopts its CPMM pool.
+    {
+        let mut env = Env::ray_fork();
+        let [a, b] = tables();
+        install_alt(&mut env.svm, &a.table.key, &a.table.addresses);
+        install_alt(&mut env.svm, &b.table.key, &b.table.addresses);
+        let pool = env.load_ray_pool(USELESS);
+        let (mint, program) = pool.token();
+        ok(env.list_auto(&mint, program));
+        let ix = propose_pool_ix(&env.svm, &mint, &detection_set(&mint), &pool);
+        assert_fits_unsigned(
+            "propose_pool (list-only, CPMM candidate)",
+            &env,
+            std::slice::from_ref(&ix),
+        );
+        let meta = ok(send_v0_hooked(&mut env, &[ix], &[], &a));
+        let ev: PoolSwitched = one(&meta);
+        assert_eq!(ev.kind, POOL_KIND_LISTING);
+    }
+
+    // A CPMM market (USELESS), no position: a zero-position adoption onto a planted CPMM pool
+    // twice as deep, then a fast path onto a thinner one while the new incumbent is halted.
+    let mut env = Env::ray_fork();
+    let (rm, _) = add_market(&mut env, USELESS);
+    let [a, b] = tables();
+    install_alt(&mut env.svm, &a.table.key, &a.table.addresses);
+    install_alt(&mut env.svm, &b.table.key, &b.table.addresses);
+    let mint = rm.pool.token().0;
+    let deep = plant_like(&mut env, &rm.pool, 2, 1);
+    let incumbent = raydium::candidate_read_set(&env.svm, &rm.pool, false);
+    let ix = propose_pool_ix(&env.svm, &mint, &incumbent, &deep);
+    assert_fits_unsigned(
+        "propose_pool (CPMM incumbent, CPMM candidate)",
+        &env,
+        std::slice::from_ref(&ix),
+    );
+    env.warp(1);
+    let meta = ok(send_v0_hooked(&mut env, &[ix], &[], &b));
+    let ev: PoolSwitched = one(&meta);
+    assert_eq!(ev.kind, POOL_KIND_ZERO_POSITION);
+
+    // The fast path: the new incumbent halted and observed for 150 s, a candidate at 60 %.
+    let AnyPool::Cpmm(deep_cpmm) = &deep else {
+        unreachable!("planted as CPMM")
+    };
+    fork::set_cpmm_status(&mut env.svm, deep_cpmm, 4);
+    let rm = rm.on_pool(&env.svm, deep);
+    for _ in 0..5 {
+        env.warp(30);
+        env.crank(&rm);
+    }
+    let thin = plant_like(&mut env, &deep, 60, 100);
+    let incumbent = raydium::candidate_read_set(&env.svm, &deep, false);
+    let ix = propose_pool_ix(&env.svm, &mint, &incumbent, &thin);
+    assert_fits_unsigned(
+        "propose_pool (fast-path window, CPMM → CPMM)",
+        &env,
+        std::slice::from_ref(&ix),
+    );
+    env.warp(1);
+    let meta = ok(send_v0_hooked(&mut env, &[ix], &[], &a));
+    let ev: PoolProposed = one(&meta);
+    assert_eq!(ev.kind, POOL_KIND_FAST);
+    env.warp(60);
+    let ix = execute_pool_switch_ix(&env.svm, &mint, &deep, &thin);
+    assert_fits_unsigned(
+        "execute_pool_switch (CPMM → CPMM)",
+        &env,
+        std::slice::from_ref(&ix),
+    );
+    let meta = ok(send_v0_hooked(&mut env, &[ix], &[], &b));
+    let ev: PoolSwitched = one(&meta);
+    assert_eq!(ev.kind, POOL_KIND_FAST);
 }

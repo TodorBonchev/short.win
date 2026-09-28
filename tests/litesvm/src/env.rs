@@ -287,7 +287,7 @@ impl Env {
 
     /// `ixs` signed by [`Env::payer`] and those of `signers` the message requires (a prefix of
     /// a transaction may need fewer signers than the whole).
-    fn transaction(&self, ixs: &[Instruction], signers: &[&Keypair]) -> Transaction {
+    pub fn transaction(&self, ixs: &[Instruction], signers: &[&Keypair]) -> Transaction {
         let needed = |k: &Pubkey| {
             ixs.iter()
                 .flat_map(|ix| ix.accounts.iter())

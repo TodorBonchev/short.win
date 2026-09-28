@@ -89,7 +89,7 @@ proptest! {
             ring.push(RingEntry { lo: a.min(b), hi: a.max(b), llo: c.min(d), lhi: c.max(d), ts: i as i64,
                                   ..RingEntry::default() }).unwrap();
         }
-        let ema = Ema { price: p, liq: l, liq_slow: l, ts: 100, slow_ts: 100, count: 7, _pad: [0; 8] };
+        let ema = Ema { price: p, liq: l, liq_slow: l, ts: 100, slow_ts: 100, count: 7, ..Ema::default() };
         let bx = box_of(&ema, &ring, 100 + age, exec).unwrap();
         prop_assert!(bx.contains(p, l));
         if age > 8 && !exec {
@@ -197,7 +197,7 @@ proptest! {
             let bx = SettleBox { p_lo: pe.min(a), p_hi: pe.max(a), l_lo: 1_000u128.min(b), l_hi: 1_000u128.max(b) };
             let inp = SettleInputs {
                 now, deadline: now + 1_000 - i64::from(w / 6) * 1_500, ema_count: count, p_ema: pe, l_ema: 1_000, bx,
-                budget, r_due: 0, cr_liquidatable: liq, ema_leg: liq || w == 1, executable: exec, p_rs,
+                budget, r_due: 0, cr_liquidatable: liq, ema_leg: liq || w == 1, executable: exec, warmed: true, p_rs,
                 l_live: 1_000, b_live: None, sigma_live: u64::MAX,
                 s3: S3Chain { no_route_now: halted || !exec, no_route_since: Some(now - 700), ..S3_OFF },
             };
@@ -334,6 +334,7 @@ fn fee_above_the_hard_cap_is_s3_evidence_and_refutes() {
         cr_liquidatable: true,
         ema_leg: true,
         executable: true,
+        warmed: true,
         p_rs: Some(p),
         l_live: l,
         b_live: live.capped(cap).buy(q, x, y).map(|b| b.cost),

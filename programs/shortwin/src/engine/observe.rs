@@ -58,10 +58,11 @@ pub fn record(obs: &mut Observation, now: i64, state: &VenueState) -> Result<boo
     }
 }
 
-/// A venue change's liquidity rewrite (A72; R3B-7 a): `L_ema`, `L_slow` reset (graduation) or
-/// lowered (Raydium adoption, fast path) to the new venue's `√(X·Y)`, every ring entry's
-/// `l`, `llo`, `lhi` and cached `(x, y)` rewritten, the open bucket cleared
-/// (`observe::rewrite_liquidity`). Used by the venue transitions of M4–M6.
+/// A venue change's liquidity rewrite (A72; R3B-7 a): `L_ema`, `L_slow` reset (graduation) or,
+/// for a Raydium adoption, `L_ema` = the new pool's anchor `⌊D·10⁴/λ_min⌋` and `L_slow ≤ D` (M4R),
+/// every ring entry's `l`, `llo`, `lhi` and cached `(x, y)` rewritten, the open bucket cleared
+/// (`observe::rewrite_liquidity`). Used by every Raydium adoption (`engine::pool_select`, M4, which
+/// then marks the restart) and the pump transitions of M5–M6.
 pub fn rewrite_liquidity(obs: &mut Observation, l_new: u128, kind: VenueChange) -> Result<()> {
     obs.rewrite_liquidity(l_new, kind).math()
 }
@@ -70,9 +71,23 @@ pub fn rewrite_liquidity(obs: &mut Observation, l_new: u128, kind: VenueChange) 
 /// "Initialisation"): `P_ema = P_spot`, `L_ema = L_slow = √(X·Y)`, `ema_ts = slow_ts = now`,
 /// one ring entry `(now, P, L, reprice(L, P), P, P, L, L)`, an empty bucket.
 pub fn initial(now: i64, state: &VenueState) -> Result<Box<Observation>> {
-    let (p, l) = match (state.price(), state.liquidity()) {
-        (Some(p), Some(l)) => (p, l),
-        _ => return err!(crate::errors::ShortwinError::PoolIneligible),
-    };
+    let (p, l) = spot(state)?;
     Ok(Box::new(Observation::new(now, p, l).math()?))
+}
+
+/// A Raydium price start (M4R, **PROPOSED**, owner item O18; ARCH §3.2, §4.4: a Raydium listing, a
+/// list-only market's first adoption): [`initial`] with `L = min(√(X·Y), cap)`, `cap =
+/// ⌊D·10⁴/λ_min⌋` the pool's anchor, marked for the post-change warm-up
+/// (`Observation::new_raydium`: `ema_warm = EMA_WARMUP_BUCKETS`, `ema_guard = 1`).
+pub fn initial_raydium(now: i64, state: &VenueState, cap: u128) -> Result<Box<Observation>> {
+    let (p, l) = spot(state)?;
+    Ok(Box::new(Observation::new_raydium(now, p, l, cap).math()?))
+}
+
+/// The pool's pre-trade `(P_spot, √(X·Y))`, `PoolIneligible` if either is undefined.
+fn spot(state: &VenueState) -> Result<(u128, u128)> {
+    match (state.price(), state.liquidity()) {
+        (Some(p), Some(l)) => Ok((p, l)),
+        _ => err!(crate::errors::ShortwinError::PoolIneligible),
+    }
 }

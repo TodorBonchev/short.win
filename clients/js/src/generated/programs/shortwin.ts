@@ -74,6 +74,7 @@ import {
   getCreateMarketInstructionAsync,
   getDepositInstructionAsync,
   getDisableVenueInstructionAsync,
+  getExecutePoolSwitchInstructionAsync,
   getExpireInstructionAsync,
   getFlagUnsafeMintInstructionAsync,
   getFlagVenueUpgradedInstructionAsync,
@@ -81,6 +82,7 @@ import {
   getLiquidateInstructionAsync,
   getOpenShortInstructionAsync,
   getProposeConfigInstructionAsync,
+  getProposePoolInstructionAsync,
   getRevalidateVenueInstructionAsync,
   getSetPauseInstructionAsync,
   getSetRouteBrokenInstructionAsync,
@@ -101,6 +103,7 @@ import {
   parseCreateMarketInstruction,
   parseDepositInstruction,
   parseDisableVenueInstruction,
+  parseExecutePoolSwitchInstruction,
   parseExpireInstruction,
   parseFlagUnsafeMintInstruction,
   parseFlagVenueUpgradedInstruction,
@@ -108,6 +111,7 @@ import {
   parseLiquidateInstruction,
   parseOpenShortInstruction,
   parseProposeConfigInstruction,
+  parseProposePoolInstruction,
   parseRevalidateVenueInstruction,
   parseSetPauseInstruction,
   parseSetRouteBrokenInstruction,
@@ -128,6 +132,7 @@ import {
   type CreateMarketAsyncInput,
   type DepositAsyncInput,
   type DisableVenueAsyncInput,
+  type ExecutePoolSwitchAsyncInput,
   type ExpireAsyncInput,
   type FlagUnsafeMintAsyncInput,
   type FlagVenueUpgradedAsyncInput,
@@ -145,6 +150,7 @@ import {
   type ParsedCreateMarketInstruction,
   type ParsedDepositInstruction,
   type ParsedDisableVenueInstruction,
+  type ParsedExecutePoolSwitchInstruction,
   type ParsedExpireInstruction,
   type ParsedFlagUnsafeMintInstruction,
   type ParsedFlagVenueUpgradedInstruction,
@@ -152,6 +158,7 @@ import {
   type ParsedLiquidateInstruction,
   type ParsedOpenShortInstruction,
   type ParsedProposeConfigInstruction,
+  type ParsedProposePoolInstruction,
   type ParsedRevalidateVenueInstruction,
   type ParsedSetPauseInstruction,
   type ParsedSetRouteBrokenInstruction,
@@ -162,6 +169,7 @@ import {
   type ParsedSyncLenderInstruction,
   type ParsedWithdrawInstruction,
   type ProposeConfigAsyncInput,
+  type ProposePoolAsyncInput,
   type RevalidateVenueAsyncInput,
   type SetPauseAsyncInput,
   type SetRouteBrokenAsyncInput,
@@ -824,22 +832,24 @@ export const ShortwinInstruction = {
   8: "CreateMarket",
   9: "Deposit",
   10: "DisableVenue",
-  11: "Expire",
-  12: "FlagUnsafeMint",
-  13: "FlagVenueUpgraded",
-  14: "InitializeConfig",
-  15: "Liquidate",
-  16: "OpenShort",
-  17: "ProposeConfig",
-  18: "RevalidateVenue",
-  19: "SetPause",
-  20: "SetRouteBroken",
-  21: "SetVenueExtras",
-  22: "SolSettle",
-  23: "SweepProtocolFees",
-  24: "SweepTrader",
-  25: "SyncLender",
-  26: "Withdraw",
+  11: "ExecutePoolSwitch",
+  12: "Expire",
+  13: "FlagUnsafeMint",
+  14: "FlagVenueUpgraded",
+  15: "InitializeConfig",
+  16: "Liquidate",
+  17: "OpenShort",
+  18: "ProposeConfig",
+  19: "ProposePool",
+  20: "RevalidateVenue",
+  21: "SetPause",
+  22: "SetRouteBroken",
+  23: "SetVenueExtras",
+  24: "SolSettle",
+  25: "SweepProtocolFees",
+  26: "SweepTrader",
+  27: "SyncLender",
+  28: "Withdraw",
   AddMargin: 0,
   ApplyConfig: 1,
   CancelConfig: 2,
@@ -851,22 +861,24 @@ export const ShortwinInstruction = {
   CreateMarket: 8,
   Deposit: 9,
   DisableVenue: 10,
-  Expire: 11,
-  FlagUnsafeMint: 12,
-  FlagVenueUpgraded: 13,
-  InitializeConfig: 14,
-  Liquidate: 15,
-  OpenShort: 16,
-  ProposeConfig: 17,
-  RevalidateVenue: 18,
-  SetPause: 19,
-  SetRouteBroken: 20,
-  SetVenueExtras: 21,
-  SolSettle: 22,
-  SweepProtocolFees: 23,
-  SweepTrader: 24,
-  SyncLender: 25,
-  Withdraw: 26,
+  ExecutePoolSwitch: 11,
+  Expire: 12,
+  FlagUnsafeMint: 13,
+  FlagVenueUpgraded: 14,
+  InitializeConfig: 15,
+  Liquidate: 16,
+  OpenShort: 17,
+  ProposeConfig: 18,
+  ProposePool: 19,
+  RevalidateVenue: 20,
+  SetPause: 21,
+  SetRouteBroken: 22,
+  SetVenueExtras: 23,
+  SolSettle: 24,
+  SweepProtocolFees: 25,
+  SweepTrader: 26,
+  SyncLender: 27,
+  Withdraw: 28,
 } as const;
 
 export type ShortwinInstruction = (typeof ShortwinInstruction)[Exclude<
@@ -1003,6 +1015,17 @@ export function identifyShortwinInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([255, 50, 233, 181, 206, 56, 90, 172]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinInstruction.ExecutePoolSwitch;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([243, 83, 205, 58, 57, 201, 247, 146]),
       ),
       0,
@@ -1075,6 +1098,17 @@ export function identifyShortwinInstruction(
     )
   ) {
     return ShortwinInstruction.ProposeConfig;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([13, 47, 166, 121, 182, 244, 168, 236]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinInstruction.ProposePool;
   }
   if (
     containsBytes(
@@ -1218,6 +1252,9 @@ export type ParsedShortwinInstruction<
       instructionType: typeof ShortwinInstruction.DisableVenue;
     } & ParsedDisableVenueInstruction<TProgram>)
   | ({
+      instructionType: typeof ShortwinInstruction.ExecutePoolSwitch;
+    } & ParsedExecutePoolSwitchInstruction<TProgram>)
+  | ({
       instructionType: typeof ShortwinInstruction.Expire;
     } & ParsedExpireInstruction<TProgram>)
   | ({
@@ -1238,6 +1275,9 @@ export type ParsedShortwinInstruction<
   | ({
       instructionType: typeof ShortwinInstruction.ProposeConfig;
     } & ParsedProposeConfigInstruction<TProgram>)
+  | ({
+      instructionType: typeof ShortwinInstruction.ProposePool;
+    } & ParsedProposePoolInstruction<TProgram>)
   | ({
       instructionType: typeof ShortwinInstruction.RevalidateVenue;
     } & ParsedRevalidateVenueInstruction<TProgram>)
@@ -1348,6 +1388,13 @@ export function parseShortwinInstruction<TProgram extends string>(
         ...parseDisableVenueInstruction(instruction),
       };
     }
+    case ShortwinInstruction.ExecutePoolSwitch: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: ShortwinInstruction.ExecutePoolSwitch,
+        ...parseExecutePoolSwitchInstruction(instruction),
+      };
+    }
     case ShortwinInstruction.Expire: {
       assertIsInstructionWithAccounts(instruction);
       return {
@@ -1395,6 +1442,13 @@ export function parseShortwinInstruction<TProgram extends string>(
       return {
         instructionType: ShortwinInstruction.ProposeConfig,
         ...parseProposeConfigInstruction(instruction),
+      };
+    }
+    case ShortwinInstruction.ProposePool: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: ShortwinInstruction.ProposePool,
+        ...parseProposePoolInstruction(instruction),
       };
     }
     case ShortwinInstruction.RevalidateVenue: {
@@ -1541,6 +1595,10 @@ export type ShortwinPluginInstructions = {
     input: DisableVenueAsyncInput,
   ) => ReturnType<typeof getDisableVenueInstructionAsync> &
     SelfPlanAndSendFunctions;
+  executePoolSwitch: (
+    input: ExecutePoolSwitchAsyncInput,
+  ) => ReturnType<typeof getExecutePoolSwitchInstructionAsync> &
+    SelfPlanAndSendFunctions;
   expire: (
     input: ExpireAsyncInput,
   ) => ReturnType<typeof getExpireInstructionAsync> & SelfPlanAndSendFunctions;
@@ -1567,6 +1625,10 @@ export type ShortwinPluginInstructions = {
   proposeConfig: (
     input: ProposeConfigAsyncInput,
   ) => ReturnType<typeof getProposeConfigInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  proposePool: (
+    input: ProposePoolAsyncInput,
+  ) => ReturnType<typeof getProposePoolInstructionAsync> &
     SelfPlanAndSendFunctions;
   revalidateVenue: (
     input: RevalidateVenueAsyncInput,
@@ -1705,6 +1767,11 @@ export function shortwinProgram() {
               client,
               getDisableVenueInstructionAsync(input),
             ),
+          executePoolSwitch: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getExecutePoolSwitchInstructionAsync(input),
+            ),
           expire: (input) =>
             addSelfPlanAndSendFunctions(
               client,
@@ -1739,6 +1806,11 @@ export function shortwinProgram() {
             addSelfPlanAndSendFunctions(
               client,
               getProposeConfigInstructionAsync(input),
+            ),
+          proposePool: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getProposePoolInstructionAsync(input),
             ),
           revalidateVenue: (input) =>
             addSelfPlanAndSendFunctions(

@@ -1,4 +1,5 @@
-//! M3 CU bench (ARCHITECTURE §6.1, §8.2 T-RAY-CU / T-CU, §9 M3): every Raydium-path instruction
+//! M3 CU bench (ARCHITECTURE §6.1, §8.2 T-RAY-CU / T-CU, §9 M3; M4 adds `propose_pool` and
+//! `execute_pool_switch`): every Raydium-path instruction
 //! of the release short.win on the dumped AMM v4 and CPMM programs (SPL and Token-2022 bases),
 //! on Mollusk 0.15.1, cross-checked on LiteSVM 0.16.0, within its ARCH §6.1 budget; the trace
 //! entries and the peak stack height of each instruction next to ARCH §6.2's figure; the venue
@@ -18,7 +19,8 @@ use m3_cu_bench::{cases, measure, repo_path};
 
 const HEADER: &str = "# M3 CU bench (Raydium)
 
-Compute units of every Raydium-path instruction (ARCH §9 M3: T-RAY-CU, T-CU) of the **release** \
+Compute units of every Raydium-path instruction (ARCH §9 M3: T-RAY-CU, T-CU; M4: `propose_pool` \
+and `execute_pool_switch`) of the **release** \
 short.win (`anchor build --tools-version v1.57 --arch v3`) against the **dumped mainnet** Raydium \
 AMM v4 and CPMM programs and pools (`tests/fixtures/`), measured with Mollusk 0.15.1 on account \
 states built by the LiteSVM harness on the mainnet fork, with the same short.win, Raydium, SPL \

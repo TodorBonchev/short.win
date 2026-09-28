@@ -6,7 +6,8 @@
 //! foundation's temporary `NotImplemented` = 6091 was removed with the last M1 stub before any
 //! deployment; the M1 review's codes 6091–6098 follow, each naming its ARCH §3.11 group; M2's
 //! temporary `NotImplemented` = 6099 was likewise removed when the last M2 track landed, before
-//! any deployment, and M2's `UseLiquidate` took 6099). `tests::codes_are_stable` pins every code.
+//! any deployment, and M2's `UseLiquidate` took 6099; M4 appended `PoolWindowClosed` = 6100).
+//! `tests::codes_are_stable` pins every code.
 
 use anchor_lang::prelude::*;
 use shortwin_math::MathError;
@@ -120,6 +121,8 @@ pub enum ShortwinError {
     NoPendingSwitch,
     #[msg("Opens wait for the pool listing window")]
     PoolListWindow,
+    // No longer returned since M4-SEC-1 (eligibility tests the locked depth, not `λ_now`);
+    // kept so every later code keeps its number.
     #[msg("Locked LP share is too low")]
     PoolLockTooLow,
     #[msg("Pool is too thin")]
@@ -251,6 +254,23 @@ pub enum ShortwinError {
     /// mirror of `UseExpire`.
     #[msg("Position is expired and CR-liquidatable; use liquidate")]
     UseLiquidate,
+
+    // ---- Appended in M4 (6100; group in brackets) ----
+    /// [Pool selection] `propose_pool` while a fast-path collection window has run its
+    /// `pool_fast_window_s` without being resolved, or while the `pool_fail` chain that armed
+    /// it is broken (M4-SEC-2: the window can then only be cancelled): the window takes no more
+    /// candidates, and `execute_pool_switch` adopts or cancels it first (ARCH §2.6 rule 3).
+    #[msg("The fast-path collection window has closed; call execute_pool_switch")]
+    PoolWindowClosed,
+
+    // ---- Appended after M4 (6101; group in brackets) ----
+    /// [Opens, keeper exits] The observation state was (re)started by a venue change or a price
+    /// start and has integrated fewer than `EMA_WARMUP_BUCKETS` buckets since (`Market.ema_warm >
+    /// 0`); opens (`open_short` on Raydium) and keeper exits (`liquidate`, `expire`, on an
+    /// executable venue) wait (M4R post-change confirmation, **PROPOSED**, owner item O18; M4V-5;
+    /// ARCH §2.6 rule 4, §3.4 step 3, §3.6 precondition 1b, §3.7; `shortwin_math::observe::warmed`).
+    #[msg("The price state is warming up after a venue change; opens and keeper exits wait")]
+    EmaWarmingUp,
 }
 
 impl From<MathError> for ShortwinError {
@@ -340,6 +360,8 @@ mod tests {
             (ShortwinError::OracleFutureDated, 6097),
             (ShortwinError::EmergencyCannotCancel, 6098),
             (ShortwinError::UseLiquidate, 6099),
+            (ShortwinError::PoolWindowClosed, 6100),
+            (ShortwinError::EmaWarmingUp, 6101),
         ];
         for (e, c) in pins {
             assert_eq!(code(e), c, "{e:?}");

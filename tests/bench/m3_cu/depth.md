@@ -24,3 +24,5 @@ Peak stack height (1 = top level) of every Raydium-path instruction of the relea
 | `crank_price` | CPMM, Token-2022 base: pool halted, chains start | 2 | 3 | 4 | 5 |
 | `create_market` | CPMM, Token-2022 base | 2 | 3 | 4 | 5 |
 | `flag_venue_upgraded` | AMM v4, the dumped ProgramData | 2 | 3 | 4 | 5 |
+| `propose_pool` | CPMM, Token-2022 base: zero-position adoption | 2 | 3 | 4 | 5 |
+| `execute_pool_switch` | AMM v4, SPL (Fartcoin): fast adoption, a position open | 2 | 3 | 4 | 5 |

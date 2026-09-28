@@ -25,10 +25,13 @@
 //! post-conditions after it (rule 5, I7). The swap itself is the adapter's
 //! ([`invoke_as_trader`]: the CPI metas mark only `trader` as a signer, rule 4).
 //!
-//! **Listing** ([`Adoption`], [`check_eligible`]): each adapter verifies its candidate pool
-//! (ARCH §2.6 "Verification of a candidate") into an [`Adoption`]; [`check_eligible`] is
-//! `eligible()` with one error per failing clause; [`Adoption::apply`] writes the market's
-//! pool cache, the SOL-side flag, the locked depth and the pool's age (O13).
+//! **Listing and pool selection** ([`Adoption`], [`check_eligible`], [`position_floor_ok`]):
+//! each adapter verifies its candidate pool (ARCH §2.6 "Verification of a candidate") into an
+//! [`Adoption`]; [`check_eligible`] is `eligible()` with one error per failing clause,
+//! [`position_floor_ok`] the stricter floor of a collection window's candidate (M4V-1);
+//! [`Adoption::apply`]
+//! writes a new market's pool cache, SOL-side flag, locked depth and pool age (O13), and
+//! [`Adoption::write_pool`] the pool alone for a re-adoption (`crate::engine::pool_select`, M4).
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
@@ -123,10 +126,43 @@ pub struct Adoption {
 }
 
 impl Adoption {
-    /// Writes the adopted pool into `market` (ARCH §3.2 "Effects", §2.6 rule 1): the venue,
-    /// the pool cache (`raydium_cache`), the SOL-side flag, the locked depth `pool_d`,
-    /// `graduated_at` and `pool_seen_at = now` (opens wait `pool_list_window_s`).
-    pub fn apply(&self, market: &mut Market, now: i64) -> Result<()> {
+    /// The candidate's ReadSet keys in its adapter's order (ARCH §3.12), padded to the six
+    /// slots of the fast-path window (`Market.fp_keys`, ARCH §2.3.4): AMM v4 `[pool, coin vault,
+    /// pc vault, LP mint, default, default]`; CPMM `[pool, amm_config, token 0 vault, token 1
+    /// vault, LP mint, observation]` (the observation is not in the ReadSet: it is the pool's
+    /// own `observation_key`, kept so `execute_pool_switch` adopts exactly what was proposed).
+    pub fn window_keys(&self) -> [Pubkey; 6] {
+        let (first, second) = if self.sol_first {
+            (self.vault_sol, self.vault_tok)
+        } else {
+            (self.vault_tok, self.vault_sol)
+        };
+        match self.kind {
+            VenueKind::RaydiumCpmm => [
+                self.pool,
+                self.amm_config,
+                first,
+                second,
+                self.lp_mint,
+                self.observation,
+            ],
+            _ => [
+                self.pool,
+                first,
+                second,
+                self.lp_mint,
+                Pubkey::default(),
+                Pubkey::default(),
+            ],
+        }
+    }
+
+    /// Writes the pool itself into `market` (ARCH §2.6 rule 4, §3.2 "Effects"): the venue, the
+    /// whole pool cache (`raydium_cache`; every other slot cleared, so nothing of a previous
+    /// venue's union stays), the SOL-side flag and the locked depth `pool_d`. The age, the
+    /// listing window, the price state and the chains are the caller's.
+    pub fn write_pool(&self, market: &mut Market) -> Result<()> {
+        market.pool_cache = [Pubkey::default(); 10];
         let entries = [
             (raydium_cache::RAY_POOL, self.pool),
             (raydium_cache::RAY_VAULT_SOL, self.vault_sol),
@@ -144,46 +180,68 @@ impl Adoption {
         }
         market.set_flag(MARKET_FLAG_SOL_IS_TOKEN0_OR_COIN, self.sol_first);
         market.pool_d.set(self.state.locked_depth);
+        market.venue = self.kind as u8;
+        Ok(())
+    }
+
+    /// Writes the adopted pool into a new market (ARCH §3.2 "Effects", §2.6 rule 1): the pool
+    /// ([`Adoption::write_pool`]), `graduated_at` (O13) and `pool_seen_at = now` (opens wait
+    /// `pool_list_window_s`).
+    pub fn apply(&self, market: &mut Market, now: i64) -> Result<()> {
+        self.write_pool(market)?;
         market.graduated_at = self.age_start;
         market.pool_seen_at = now;
-        market.venue = self.kind as u8;
         Ok(())
     }
 }
 
-/// `eligible(P)` of ARCH §2.6 on a verified candidate, one error per clause: the pool is
-/// executable and its one-way fee `φ_ppm ≤ venue_fee_cap_bps·100` (`PoolIneligible`); its real
-/// SOL `R ≥ pool_min_real_sol` (`PoolTooThin`); its permanently locked LP share `λ ≥
-/// pool_lock_min_bps` (`PoolLockTooLow`). The same clauses as `pool_select::eligible`, which
-/// the keeper and the frontend run off-chain, and which must agree.
-pub fn check_eligible(
-    state: &VenueState,
-    lp_counter: u64,
-    lp_supply: u64,
-    params: &Params,
-) -> Result<()> {
+/// `eligible(P)` of ARCH §2.6 as amended by the M4 security review, on a verified candidate,
+/// one error per clause: the pool is executable and its one-way fee `φ_ppm ≤
+/// venue_fee_cap_bps·100` (`PoolIneligible`); its locked depth passes the floor
+/// `⌊⌊D·isqrt(P_ref)/10⁹⌋·10⁴/λ_min⌋ ≥ pool_min_real_sol` (`PoolTooThin`;
+/// `shortwin_math::pool_select::locked_floor_ok`), with `P_ref = p_ref` — the market's `P_ema`
+/// whenever the market has a price — or, for a market without one (a listing, a list-only
+/// market that never had a pool), the candidate's own spot.
+///
+/// v0.4.1 read `R ≥ pool_min_real_sol` on the live SOL reserve (a buy raises it for one
+/// instruction: `[buy, propose_pool, sell]` adopted a pool under the floor, M4-SEC-3) and `λ ≥
+/// pool_lock_min_bps` on the live LP counter and supply (anyone's unlocked deposit lowers it for
+/// as long as the deposit stays, blocking every adoption and the fast path, M4-SEC-1; the pool's
+/// own LP holder raises it for one instruction). `D` moves with neither, and at `P_ema` neither
+/// does the floor. On a market without a price the spot can still be pushed for one
+/// instruction: such a market has no position, and opens re-check the floor on `R_eff` after
+/// the listing window (ARCH §2.6 rule 5). The same clauses as `pool_select::eligible`, which the
+/// keeper and the frontend run off-chain, and which must agree.
+///
+/// `PoolLockTooLow` is no longer returned.
+///
+/// This is the floor of every adoption that carries no open position (a listing, a list-only
+/// market's adoption, a listing-window replacement, a zero-position adoption). A collection
+/// window's candidate — whose adoption moves open positions — must also pass
+/// [`position_floor_ok`] (M4V-1).
+pub fn check_eligible(state: &VenueState, params: &Params, p_ref: Option<u128>) -> Result<()> {
     require!(state.executable, ShortwinError::PoolIneligible);
     require!(
         !fees::exceeds_cap(state.fee_ppm, u64::from(params.venue_fee_cap_bps)),
         ShortwinError::PoolIneligible
     );
-    require_gte!(
-        state.r,
-        params.pool_min_real_sol,
-        ShortwinError::PoolTooThin
-    );
+    let p_ref = reference(state, p_ref).ok_or(ShortwinError::PoolIneligible)?;
     require!(
-        pool_select::lock_share_ok(lp_counter, lp_supply, u64::from(params.pool_lock_min_bps)),
-        ShortwinError::PoolLockTooLow
+        pool_select::locked_floor_ok(
+            state.locked_depth,
+            p_ref,
+            u64::from(params.pool_lock_min_bps),
+            params.pool_min_real_sol,
+        ),
+        ShortwinError::PoolTooThin
     );
     require!(
         pool_select::eligible(
             &PoolFacts {
                 executable: state.executable,
                 fee_ppm: state.fee_ppm,
-                real_sol: state.r,
-                lp_counter,
-                lp_supply,
+                locked_depth: state.locked_depth,
+                p_ref,
             },
             &EligibilityParams {
                 venue_fee_cap_bps: u64::from(params.venue_fee_cap_bps),
@@ -194,6 +252,28 @@ pub fn check_eligible(
         ShortwinError::PoolIneligible
     );
     Ok(())
+}
+
+/// The reference price of eligibility: `p_ref` (the market's `P_ema`) when the market has a
+/// price, else the candidate's own spot.
+fn reference(state: &VenueState, p_ref: Option<u128>) -> Option<u128> {
+    p_ref.or_else(|| state.price())
+}
+
+/// The floor of an adoption that carries open positions (M4V-1; ARCH §2.6 "Eligibility" as
+/// amended; owner item O18): the candidate's **locked SOL** at the reference price itself reaches
+/// `pool_min_real_sol` (`⌊D·isqrt(P_ref)/10⁹⌋ ≥ pool_min_real_sol`,
+/// `shortwin_math::pool_select::position_floor_ok`: [`check_eligible`]'s floor without the
+/// `/λ_min`). Applied to a collection window's candidate — a Raydium market's fast path and a
+/// list-only market with open positions — when a proposal opens or improves the window
+/// (`PoolTooThin`) and when `execute_pool_switch` resolves it (a cancellation). The listing floor
+/// admits fully locked pools holding only `λ_min·pool_min_real_sol` (12.5 SOL), which is harmless
+/// where no position exists (opens stay gated by `R_eff`, rule 5) but moved open positions onto
+/// them with no manipulation at all (M4V-1). `false` without a reference price.
+pub fn position_floor_ok(state: &VenueState, params: &Params, p_ref: Option<u128>) -> bool {
+    reference(state, p_ref).is_some_and(|p| {
+        pool_select::position_floor_ok(state.locked_depth, p, params.pool_min_real_sol)
+    })
 }
 
 /// The venue CPI of a leg: `metas` (the venue's own list; `trader` its only signer) followed

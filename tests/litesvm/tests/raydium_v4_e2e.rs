@@ -57,7 +57,9 @@ fn lifecycle() {
     // Opens wait out the listing window (ARCH §2.6 rule 1), to the second.
     let window = i64::from(env.config().params.pool_list_window_s);
     let open_at = created.ts + window;
-    env.warp(open_at - 1 - env.now());
+    // The keeper's observations at the end of the listing window (M4V-5's price warm-up).
+    env.warp(open_at - 1 - raydium::PRICE_WARMUP_CRANKS - env.now());
+    env.warm_up_price(&rm);
     crank_checked(&mut env, &rm);
     let q_a = q_for_sol(&env, &rm, 4 * SOL);
     let mut probe = env.borrower();

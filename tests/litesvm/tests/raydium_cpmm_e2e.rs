@@ -50,7 +50,7 @@ use shortwin_litesvm_tests::fork::{
     self, AnyPool, CpmmFixture, CpmmPool, CpmmSwapEvent, Swap, Trader,
 };
 use shortwin_litesvm_tests::ix::{self, LenderKeys};
-use shortwin_litesvm_tests::raydium::{RayFixture, RayMarket, RaySpec};
+use shortwin_litesvm_tests::raydium::{self, RayFixture, RayMarket, RaySpec};
 use shortwin_litesvm_tests::tokens::TokenProgram;
 use shortwin_litesvm_tests::{Env, events, pda, read};
 use shortwin_math::fees::Direction;
@@ -254,6 +254,13 @@ fn drain_to(env: &mut Env, rm: &RayMarket, x_target: u64) {
 fn second(env: &mut Env, rm: &RayMarket) {
     env.warp(1);
     env.crank(rm);
+}
+
+/// `secs` of the listing window, the last `PRICE_WARMUP_CRANKS` of them observed every second
+/// (the keeper's listing-window observations: the price warm-up of M4V-5 before the first open).
+fn warm_window(env: &mut Env, rm: &RayMarket, secs: i64) {
+    env.warp(secs - raydium::PRICE_WARMUP_CRANKS);
+    env.warm_up_price(rm);
 }
 
 /// Keeper seconds until the spot and the EMA agree within `bps` (at most `max_s`).
@@ -536,7 +543,7 @@ fn useless_journey() {
     let deposits = q * 60;
 
     let mut b1 = env.borrower();
-    env.warp(LIST_WINDOW_S - 1);
+    warm_window(&mut env, &rm, LIST_WINDOW_S - 1);
     env.fresh_oracle();
     env.crank(&rm);
     assert_err(&env.open(&rm, &mut b1, q).0, E::PoolListWindow);
@@ -849,7 +856,7 @@ fn token_2022_journey() {
     let rm = list(&mut env, T22, pool, q * 40);
     assert_eq!(market(&env, &rm).graduated_at, open_time);
     let (lender, keys) = (rm.lender.insecure_clone(), rm.lender_keys());
-    env.warp(LIST_WINDOW_S);
+    warm_window(&mut env, &rm, LIST_WINDOW_S);
     env.fresh_oracle();
     env.crank(&rm);
     assert_eq!(
@@ -1268,7 +1275,7 @@ fn u11_exact_out_creator_fee_on_either_side() {
         let (x, y) = pool.io_reserves(&env.svm, Direction::Sell).unwrap();
         let q = (u128::from(x) * 2_000_000_000 / u128::from(y)) as u64;
         let rm = list(&mut env, fixture, pool, q * 40);
-        env.warp(LIST_WINDOW_S);
+        warm_window(&mut env, &rm, LIST_WINDOW_S);
         env.crank(&rm);
 
         // The open's sale (exact in).
@@ -1396,7 +1403,7 @@ fn creator_fee_journey() {
         i64::try_from(st.open_time).unwrap()
     );
     let (lender, keys) = (rm.lender.insecure_clone(), rm.lender_keys());
-    env.warp(LIST_WINDOW_S);
+    warm_window(&mut env, &rm, LIST_WINDOW_S);
     env.fresh_oracle();
     env.crank(&rm);
     assert_eq!(
@@ -1534,6 +1541,7 @@ fn o13_age_of_a_cpmm_pool() {
     assert_eq!((m.graduated_at, m.pool_seen_at), (opened, listed));
 
     let mut b = env.borrower();
+    warm_window(&mut env, &rm, LIST_WINDOW_S - 2);
     assert_eq!(
         tier_at(&mut env, &rm, listed + LIST_WINDOW_S - 1),
         Tier::C as u8
@@ -1591,6 +1599,7 @@ fn o13_age_of_a_cpmm_pool() {
     let listed = env.now();
     let rm = list(&mut env, USELESS, pool, q * 40);
     assert_eq!(market(&env, &rm).graduated_at, listed);
+    warm_window(&mut env, &rm, LIST_WINDOW_S - 1);
     assert_eq!(
         tier_at(&mut env, &rm, listed + LIST_WINDOW_S),
         Tier::C as u8
@@ -1650,7 +1659,7 @@ fn settle_case(fixture: RayFixture, creator_on_token: bool, trigger: Trigger) {
     let (x, y) = pool.io_reserves(&env.svm, Direction::Sell).unwrap();
     let q = (u128::from(x) * 2_000_000_000 / u128::from(y)) as u64;
     let rm = list(&mut env, fixture, pool, q * 40);
-    env.warp(LIST_WINDOW_S);
+    warm_window(&mut env, &rm, LIST_WINDOW_S);
     env.crank(&rm);
     let mut b = env.borrower();
     let p_entry = spot(&env, &rm);

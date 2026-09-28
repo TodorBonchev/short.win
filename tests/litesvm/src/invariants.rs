@@ -18,8 +18,11 @@
 //! lender pool (I1 token claims in both directions, the whole of I8 on the state the program
 //! sees, the instruction-level allowance, claim, conservation and lock bounds) is [`lender`];
 //! the position engine's I3, I5–I7, I9, I10, I13, I16 are [`positions`] (I11, I12: the
-//! liquidation / expiry / settlement tracks; I14: a structural test). Positions are in I2 and
-//! I4, opens in I17 (and, since M3-SEC-2, listings on a venue with a latch mask). Every check here works on **stored** values, which is sound where noted:
+//! liquidation / expiry / settlement tracks; I14: a structural test); Raydium pool selection's
+//! I15 is [`pool_select`] (M4); the post-change confirmation's I18 is [`confirm`] (M4R).
+//! Positions are in I2 and I4, opens in I17 (and, since
+//! M3-SEC-2, listings on a venue with a latch mask; since M4, pool adoptions and fast-path
+//! window candidates). Every check here works on **stored** values, which is sound where noted:
 //! an untouched lender's stored `real` only lags its true value, so a stored-value upper bound
 //! implies the true one.
 
@@ -30,14 +33,17 @@ use litesvm::LiteSVM;
 use litesvm::types::TransactionMetadata;
 use shortwin::events::{
     ClaimSol, Close, DeficitCovered, Deposit, Expire, LenderSynced, Liquidate, MarketCreated, Open,
-    SolSettle, Withdraw,
+    PoolProposed, PoolSwitchCancelled, PoolSwitched, SettleArmed, SettleDisarmed, SolSettle,
+    Withdraw,
 };
 use shortwin::state::{LenderPosition, Market, MarketVault, ShortPosition, VenueGuard, VenueKind};
 use shortwin_math::pool::{R_MAX, VIRTUAL_ASSETS, VIRTUAL_SHARES};
 
 use crate::{events, pda, read};
 
+pub mod confirm;
 pub mod lender;
+pub mod pool_select;
 pub mod positions;
 pub mod venue_view;
 
@@ -303,8 +309,16 @@ pub struct IxEvents {
     pub liquidations: Vec<Liquidate>,
     pub expiries: Vec<Expire>,
     pub settlements: Vec<SolSettle>,
+    /// Settlement-clock changes (I18's gate, M4R).
+    pub armed: Vec<SettleArmed>,
+    pub disarmed: Vec<SettleDisarmed>,
     /// Listings (I17's M3-SEC-2 extension).
     pub created: Vec<MarketCreated>,
+    /// Pool selection (M4; I15, and I17 on adoptions): adoptions, fast-path windows opened or
+    /// improved, windows cancelled.
+    pub switched: Vec<PoolSwitched>,
+    pub proposed: Vec<PoolProposed>,
+    pub cancelled: Vec<PoolSwitchCancelled>,
     /// The instruction's account keys (empty when unknown).
     pub accounts: Vec<Pubkey>,
 }
@@ -323,7 +337,12 @@ impl IxEvents {
             liquidations: events::of_ix(meta, ix),
             expiries: events::of_ix(meta, ix),
             settlements: events::of_ix(meta, ix),
+            armed: events::of_ix(meta, ix),
+            disarmed: events::of_ix(meta, ix),
             created: events::of_ix(meta, ix),
+            switched: events::of_ix(meta, ix),
+            proposed: events::of_ix(meta, ix),
+            cancelled: events::of_ix(meta, ix),
             accounts: Vec::new(),
         }
     }
@@ -347,7 +366,31 @@ impl IxEvents {
             liquidations: &self.liquidations,
             expiries: &self.expiries,
             settlements: &self.settlements,
+            switched: &self.switched,
             accounts: &self.accounts,
+        }
+    }
+
+    fn confirm_facts(&self) -> confirm::ConfirmFacts<'_> {
+        confirm::ConfirmFacts {
+            created: &self.created,
+            switched: &self.switched,
+            opens: &self.opens,
+            liquidations: &self.liquidations,
+            expiries: &self.expiries,
+            settlements: &self.settlements,
+            armed: &self.armed,
+            disarmed: &self.disarmed,
+        }
+    }
+
+    fn pool_facts(&self) -> pool_select::PoolFacts<'_> {
+        pool_select::PoolFacts {
+            created: &self.created,
+            opens: &self.opens,
+            switched: &self.switched,
+            proposed: &self.proposed,
+            cancelled: &self.cancelled,
         }
     }
 }
@@ -376,7 +419,10 @@ pub fn check_ix(
     }
     i17_no_open_on_flagged_venue(pre, &ev.opens)?;
     i17_no_listing_on_flagged_venue(pre, &ev.created)?;
+    i17_no_adoption_on_flagged_venue(svm, pre, &ev.switched, &ev.proposed)?;
     positions::check_ix(svm, &pre.positions, &ev.position_facts())?;
+    pool_select::check_ix(svm, &pre.positions, &ev.pool_facts())?;
+    confirm::check_ix(svm, &pre.positions, &ev.confirm_facts())?;
     lender::check_ix(svm, &pre.lender, ev)
 }
 
@@ -477,6 +523,49 @@ pub fn i17_no_listing_on_flagged_venue(
             format!(
                 "market {} listed on venue {} while VenueGuard.upgraded = {:#b}",
                 c.market, c.venue, guard.upgraded
+            )
+        })?;
+    }
+    Ok(())
+}
+
+/// I17, extended by M4 (as the listings of M3-SEC-2; beyond ARCH §8.3's wording): no Raydium
+/// pool is adopted (`PoolSwitched`) and no fast-path window records a candidate
+/// (`PoolProposed`) while **the candidate's own program** is flagged in `venue_guard.upgraded`
+/// just before the instruction — the candidate is verified with that program's compiled reader
+/// and an adoption fixes the pool and its SOL side (M4-SEC-8: the other Raydium program's flag
+/// does not hold up the fast path; a pool whose owner is neither program is checked against
+/// the whole Raydium mask). A cancelled window (`PoolSwitchCancelled`) adopts nothing and is
+/// not latched; a window whose candidate's program is flagged is cancelled (M4V-4).
+pub fn i17_no_adoption_on_flagged_venue(
+    svm: &LiteSVM,
+    pre: &TxSnapshot,
+    switched: &[PoolSwitched],
+    proposed: &[PoolProposed],
+) -> Result<(), Violation> {
+    let Some(guard) = pre.guard else {
+        return Ok(());
+    };
+    let pools = switched
+        .iter()
+        .map(|e| (e.market, e.candidate))
+        .chain(proposed.iter().map(|e| (e.market, e.candidate)));
+    for (market, pool) in pools {
+        let owner = svm.get_account(&pool).map(|a| a.owner);
+        let mask = match owner {
+            Some(o) if o == shortwin::constants::RAYDIUM_V4_PROGRAM_ID => {
+                1u32 << shortwin::constants::GUARD_RAYDIUM_V4
+            }
+            Some(o) if o == shortwin::constants::RAYDIUM_CPMM_PROGRAM_ID => {
+                1u32 << shortwin::constants::GUARD_RAYDIUM_CPMM
+            }
+            _ => VenueKind::RaydiumV4.guard_mask(),
+        };
+        ensure(!guard.blocks(mask), "I17", || {
+            format!(
+                "market {market} adopted or proposed Raydium pool {pool} (owner {owner:?}) while \
+                 VenueGuard.upgraded = {:#b}",
+                guard.upgraded
             )
         })?;
     }

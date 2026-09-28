@@ -163,6 +163,23 @@ pub trait Chain {
         filters: &[Memcmp],
     ) -> anyhow::Result<Vec<(Pubkey, AccountData)>>;
 
+    /// Every account of `program` of exactly `data_size` bytes matching all `filters`: the
+    /// Raydium pool discovery (ARCH §7.1 duty 12), whose programs hold one account layout of
+    /// each size the program verifies (AMM v4 `AmmInfo` 752 B, CPMM `PoolState` 637 B). The
+    /// default filters [`Chain::program_accounts`]' result by length; a JSON-RPC backend
+    /// overrides it with a `dataSize` filter, so the node compares bytes only on accounts of
+    /// that size.
+    async fn program_accounts_sized(
+        &self,
+        program: &Pubkey,
+        data_size: usize,
+        filters: &[Memcmp],
+    ) -> anyhow::Result<Vec<(Pubkey, AccountData)>> {
+        let mut out = self.program_accounts(program, filters).await?;
+        out.retain(|(_, a)| a.data.len() == data_size);
+        Ok(out)
+    }
+
     /// A recent blockhash for new transactions.
     async fn latest_blockhash(&self) -> anyhow::Result<Hash>;
 

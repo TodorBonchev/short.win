@@ -2,8 +2,11 @@
 //!
 //! ```text
 //! shortwin-keeper --rpc <url> --keypair <file> [--config keeper.toml] [--tick-ms 400]
-//!                 [--metrics 127.0.0.1:9464] [--once]
+//!                 [--metrics 127.0.0.1:9464] [--discovery-rpc <url>] [--once]
 //! ```
+//!
+//! `--discovery-rpc` (or `pool_select.discovery_rpc` in the configuration) sends the Raydium
+//! pool discovery's `getProgramAccounts` calls to another endpoint (duty 12).
 //!
 //! One tick per `--tick-ms` (a slot by default); alerts and errors go to the log
 //! (`RUST_LOG`, default `info`); `--metrics` serves the Prometheus counters on `/metrics`.
@@ -24,12 +27,13 @@ struct Args {
     config: Option<String>,
     tick_ms: u64,
     metrics: Option<String>,
+    discovery_rpc: Option<String>,
     once: bool,
 }
 
 fn usage() -> &'static str {
     "usage: shortwin-keeper --rpc <url> --keypair <file> [--config keeper.toml] [--tick-ms 400] \
-     [--metrics 127.0.0.1:9464] [--once]"
+     [--metrics 127.0.0.1:9464] [--discovery-rpc <url>] [--once]"
 }
 
 fn parse_args() -> anyhow::Result<Args> {
@@ -38,6 +42,7 @@ fn parse_args() -> anyhow::Result<Args> {
     let mut config = None;
     let mut tick_ms = 400;
     let mut metrics = None;
+    let mut discovery_rpc = None;
     let mut once = false;
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
@@ -51,6 +56,7 @@ fn parse_args() -> anyhow::Result<Args> {
             "--config" => config = Some(val()?),
             "--tick-ms" => tick_ms = val()?.parse().context("--tick-ms")?,
             "--metrics" => metrics = Some(val()?),
+            "--discovery-rpc" => discovery_rpc = Some(val()?),
             "--once" => once = true,
             "-h" | "--help" => bail!("{}", usage()),
             other => bail!("unknown argument {other}\n{}", usage()),
@@ -62,6 +68,7 @@ fn parse_args() -> anyhow::Result<Args> {
         config,
         tick_ms,
         metrics,
+        discovery_rpc,
         once,
     })
 }
@@ -106,7 +113,15 @@ async fn main() -> anyhow::Result<()> {
     let payer = read_keypair_file(&args.keypair)
         .map_err(|e| anyhow::anyhow!("reading {}: {e}", args.keypair))?;
     let chain = RpcChain::new(args.rpc.clone());
+    let discovery = args
+        .discovery_rpc
+        .clone()
+        .or_else(|| cfg.pool_select.discovery_rpc().map(str::to_string));
     let mut keeper = Keeper::new(chain, payer, cfg)?;
+    if let Some(url) = discovery {
+        tracing::info!(%url, "pool discovery endpoint");
+        keeper = keeper.with_discovery_chain(RpcChain::new(url));
+    }
     tracing::info!(payer = %keeper.payer(), rpc = %args.rpc, "keeper starting");
 
     let text = Arc::new(Mutex::new(String::new()));

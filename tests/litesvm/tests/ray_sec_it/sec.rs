@@ -476,23 +476,28 @@ fn m3_sec_2_the_i17_hook_refuses_a_listing_on_a_flagged_venue() {
     assert!(invariants::check_ix(&env.svm, &flagged, false, &created(VenueKind::None)).is_ok());
 }
 
-/// M3-SEC-3 TRIPWIRE (deferred to M4 by ARCH §2.5 / §2.6; the finding's own remedy). In M3 the
-/// first listing fixes a mint's venue: (a) an `Auto` (list-only `None`) listing of a Raydium
-/// token blocks every Raydium listing (the market PDA exists), and (b) a thin but eligible pool
-/// listed first (Fartcoin's reversed pool topped up to exactly `pool_min_real_sol` with its LP
-/// burned to λ = 50 %) pins the market to itself instead of the 38,000-SOL main pool. The
-/// remedies — `propose_pool` adopting a pool for a `None` market and replacing a thin listing
-/// inside `pool_list_window_s` — are M4 (T-RAY-SWITCH). **M4 must invert this test**; until
-/// then no deployment may enable the Raydium venue bits (open item of the M3 review).
+/// M3-SEC-3, inverted by M4 (the tripwire of the M3 review; ARCH §9 M4, §2.5 `None`, §2.6 rules
+/// 1 and 4). In M3 the first listing fixed a mint's venue. Now: (a) an `Auto` (list-only
+/// `None`) listing of a Raydium token — a front-run of the real listing, which then fails because
+/// the market exists — is moved onto the token's main pool by the permissionless
+/// `propose_pool`; (b) a thin but eligible pool listed first (Fartcoin's reversed pool, its LP
+/// burned to λ = 50 %, topped up to just over the locked-depth floor, i.e. `pool_min_real_sol`
+/// of real SOL and the floor's rounding: M4-SEC-1 / -3) is replaced within
+/// `pool_list_window_s` by the 38,000-SOL main pool, and the market's opens wait out the window
+/// that the thin listing started (a replacement inside it does not extend it). This is the
+/// program side of the M3 review's condition on the Raydium venue bits (ARCH §9 M4); enabling
+/// them on a deployment stays the owner's call once M4's keeper duties are in.
 #[test]
-fn m3_sec_3_first_listing_pins_the_venue_until_m4() {
+fn m3_sec_3_propose_pool_unpins_the_first_listing() {
+    use shortwin::events::{POOL_KIND_LISTING, POOL_KIND_LISTING_WINDOW, PoolSwitched};
     use shortwin_litesvm_tests::raydium::{
-        lp_counter, lp_mint, set_mint_supply, supply_for_lambda,
+        fartcoin_curve_bytes, lp_counter, lp_mint, plant_curve, set_mint_supply, supply_for_lambda,
     };
     // (a) list-only front-run.
     let mut env = Env::ray_fork();
     let pool = env.load_ray_pool(FART);
     let (mint, program) = pool.token();
+    plant_curve(&mut env.svm, &mint, fartcoin_curve_bytes());
     let griefer = env.funded_keypair();
     let auto = shortwin_litesvm_tests::ix::create_market(
         &griefer.pubkey(),
@@ -504,14 +509,19 @@ fn m3_sec_3_first_listing_pins_the_venue_until_m4() {
     ok(env.send(&[auto], &[&griefer]));
     assert!(
         env.list_ray(&pool, VENUE_HINT_V4).is_err(),
-        "M3: no Raydium listing any more"
+        "the market exists: no second listing"
     );
-    assert_eq!(
-        env.market(&pda::market(&mint).0).venue,
-        VenueKind::None as u8
-    );
+    let meta = ok(env.propose(None, &pool));
+    let ev: PoolSwitched = events::one(&meta);
+    let AnyPool::V4(p) = &pool else {
+        unreachable!()
+    };
+    assert_eq!((ev.kind, ev.candidate), (POOL_KIND_LISTING, p.pool));
+    let m = env.market(&pda::market(&mint).0);
+    assert_eq!(m.venue, VenueKind::RaydiumV4 as u8);
+    assert_eq!(m.pool_cache[0], p.pool);
 
-    // (b) a thin eligible pool front-runs the deep one.
+    // (b) a thin eligible pool front-runs the deep one, and is replaced inside the window.
     let mut env = Env::ray_fork();
     let deep = env.load_ray_pool(FART);
     let thin = env.load_ray_pool(FART_REV);
@@ -522,23 +532,29 @@ fn m3_sec_3_first_listing_pins_the_venue_until_m4() {
     let AnyPool::V4(dp) = &deep else {
         unreachable!()
     };
-    let (cv, _) = tp.vault_amounts(&env.svm);
-    let need = min + tp.info(&env.svm).need_take_pnl_pc;
-    fork::set_token_amount(&mut env.svm, &tp.pc_vault, need.max(cv));
     let supply = supply_for_lambda(lp_counter(&env.svm, &thin), 5_000);
     set_mint_supply(&mut env.svm, &lp_mint(&thin), supply);
+    let real = shortwin_litesvm_tests::pool_select::top_up_pc_to_floor(&mut env, &thin, min);
+    assert!(real - min < 1_000_000, "{real} lamports of real SOL");
     ok(env.list_ray(&thin, VENUE_HINT_V4));
-    let m = env.market(&pda::market(&mint).0);
-    assert_eq!(m.pool_cache[0], tp.pool, "M3: pinned to the thin pool");
+    let market = pda::market(&mint).0;
+    let listed = env.market(&market);
+    assert_eq!(listed.pool_cache[0], tp.pool, "the thin pool listed first");
+    env.warp(i64::from(env.config().params.pool_list_window_s) - 1);
+    let meta = ok(env.propose(Some(&thin), &deep));
+    let ev: PoolSwitched = events::one(&meta);
+    assert_eq!((ev.kind, ev.candidate), (POOL_KIND_LISTING_WINDOW, dp.pool));
+    let m = env.market(&market);
+    assert_eq!(m.pool_cache[0], dp.pool, "replaced by the deep pool");
+    assert_eq!(
+        m.pool_seen_at, listed.pool_seen_at,
+        "the window is not extended"
+    );
     let (_, y_thin) = thin.io_reserves(&env.svm, Direction::Sell).unwrap();
     let (_, y_deep) = deep.io_reserves(&env.svm, Direction::Sell).unwrap();
-    println!(
-        "M3-SEC-3 tripwire: market pinned to {} (SOL reserve {y_thin}) instead of {} ({y_deep})",
-        tp.pool, dp.pool
-    );
     assert!(y_deep > 1_000 * y_thin);
-    assert!(
-        env.list_ray(&deep, VENUE_HINT_V4).is_err(),
-        "M3: no way to adopt the deep pool"
+    println!(
+        "M3-SEC-3: market moved from {} (SOL reserve {y_thin}) to {} ({y_deep})",
+        tp.pool, dp.pool
     );
 }

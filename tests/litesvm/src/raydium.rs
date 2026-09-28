@@ -282,9 +282,16 @@ pub struct RaySpec {
     /// authority).
     pub lend: u64,
     /// Seconds to warp after listing (default: `pool_list_window_s` + 1 = 3,601, which also
-    /// covers the 50 s warm-up).
+    /// covers the 50 s warm-up). A warp of at least the listing window ends with the post-change
+    /// warm-up of M4R / M4V-5 ([`PRICE_WARMUP_CRANKS`] cranks one second apart, as the keeper
+    /// observes a market at the end of its listing window); a shorter one warps only.
     pub warmup: i64,
 }
+
+/// Cranks one second apart that finish the post-change warm-up of a freshly listed or adopted
+/// pool (M4R / M4V-5: `EMA_WARMUP_BUCKETS` integrations, `ema_warm == 0`): after them the EMA has
+/// integrated `EMA_WARMUP_BUCKETS + 1` buckets.
+pub const PRICE_WARMUP_CRANKS: i64 = shortwin_math::consts::EMA_WARMUP_BUCKETS as i64 + 2;
 
 impl RaySpec {
     /// `fixture` with `lend` tokens lent and the default warm-up.
@@ -360,8 +367,23 @@ impl Env {
             let lender = rm.lender.insecure_clone();
             errors::ok(self.send(&[ix::deposit(&rm.lender_keys(), spec.lend, 0)], &[&lender]));
         }
-        self.warp(spec.warmup);
+        let window = i64::from(self.config().params.pool_list_window_s);
+        if spec.warmup >= window && spec.warmup > PRICE_WARMUP_CRANKS {
+            self.warp(spec.warmup - PRICE_WARMUP_CRANKS);
+            self.warm_up_price(&rm);
+        } else {
+            self.warp(spec.warmup);
+        }
         rm
+    }
+
+    /// [`PRICE_WARMUP_CRANKS`] cranks of `rm`, one second apart (the first after one second):
+    /// the observations the keeper sends at the end of a listing window (M4V-5).
+    pub fn warm_up_price(&mut self, rm: &RayMarket) {
+        for _ in 0..PRICE_WARMUP_CRANKS {
+            self.warp(1);
+            self.crank(rm);
+        }
     }
 }
 

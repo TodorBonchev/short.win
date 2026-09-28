@@ -40,7 +40,7 @@
 //! below and its own module; until then their markets refuse trades with `NoSupportedVenue`
 //! (no market can be on them yet: `create_market` lists `None`, a verified Raydium pool and,
 //! in a test build, the mock). [`detect`] is the part of the pump detection a Raydium listing
-//! needs today (D1 precedence).
+//! and a list-only market's `propose_pool` need today (D1 precedence).
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::instruction::AccountMeta;

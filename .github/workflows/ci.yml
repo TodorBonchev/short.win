@@ -442,7 +442,8 @@ jobs:
 
   m3-cu:
     # M3 CU bench, T-TRACE and stack depth on Raydium (ARCH §6.1–§6.4, §8.2 T-RAY-CU / T-RAY-TRACE /
-    # T-CU / T-TRACE, §9 M3): every Raydium-path instruction of the release build on the dumped
+    # T-CU / T-TRACE, §9 M3; since M4 also `propose_pool` / `execute_pool_switch` within §6.1's
+    # 100 k): every Raydium-path instruction of the release build on the dumped
     # AMM v4 / CPMM programs on Mollusk 0.15.1 within its budget, cross-checked on LiteSVM; the
     # worst-case Raydium transactions at their exact trace counts (≤ 64); every path through 0–3
     # levels of the TEST-ONLY CPI wrapper (tests/bench/m3_cu, a standalone workspace with its own
@@ -493,8 +494,9 @@ jobs:
     # The off-chain services workspace (services/, its own Cargo.lock; ARCH §1.2, §7.1): fmt,
     # clippy (the workspace, and the keeper alone on its release feature set, without the
     # TEST-ONLY `test-venue`), cargo-deny and cargo-audit on its lockfile, the keeper's unit
-    # tests and its LiteSVM scenarios (duties 1–4, batching, degraded mode; every keeper
-    # transaction under the invariant hooks) against the anchor-build artifacts, and the A49
+    # tests and its LiteSVM scenarios (duties 1–4, batching, degraded mode, duty 10's venue
+    # monitor, M4's duty 5 Raydium fast path and duty 12 pool monitor; every keeper transaction
+    # under the invariant hooks) against the anchor-build artifacts, and the A49
     # check that the keeper binary carries no mock-venue code.
     needs: anchor-build
     runs-on: ubuntu-24.04

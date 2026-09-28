@@ -31,7 +31,10 @@
 //!    refutation, then the S1 / S2 legs on one clock with `settle_persist_n` EMA updates, the
 //!    kind chosen at execution (S1 if its legs hold, else S2; an S2 whose amount is not
 //!    box-consistent waits); S3 (no arming) when due on the market's continuous chain with the
-//!    position's locked timers.
+//!    position's locked timers. **M4R gate** (**PROPOSED**, owner item O18): while the
+//!    post-change warm-up runs on an executable venue (`Market.ema_warm > 0` after the roll)
+//!    nothing is evaluated — no arm change, no settlement, no S3 — and the call is an `Ok` crank;
+//!    a venue that cannot execute is never gated.
 //! 5. **Every "no change" outcome is an `Ok` no-op** that keeps the prologue (its observation
 //!    and route chains), so the keeper's per-second call doubles as a crank. `SettleArmed` /
 //!    `SettleDisarmed` are emitted when the clock changed state; a clock that only keeps

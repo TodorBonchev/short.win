@@ -78,6 +78,24 @@ What it models (integer math wherever the on-chain program uses integers):
         the bounds of parameters the model does not have (market sizing, boost, warm-up,
         force delay, lender timing, theta, oracle, Raydium selection) are
         shortwin_math::params::validate_econ.
+  * Raydium pool selection as built after M4 (ECONOMICS.md changelog #91-#95; M4-SEC-1/-3/-5/-6,
+    M4V-1/-2/-3): locked_floor_ok (listing / zero-position / list-only floor, /lambda_min),
+    position_floor_ok (a collection window's floor: the locked SOL itself); pool_min_real_sol is the
+    module constant POOL_MIN_REAL_SOL, not a Params field.
+  * Post-change confirmation (M4R, ECONOMICS.md changelog #96; PROPOSED, owner item O18; replaces
+    #92's adoption_liquidity, whose rule attacks/venue_switch.py keeps as the "M4 as built" comparison):
+    Market.adopt_pool reads no sample of the adopted pool -- L_ema and the ring's L := the anchor
+    floor(D*1e4/lambda_min), L_slow = min(L_slow, D) -- and marks the state unconfirmed (warm = 8,
+    guard = 1); _integrate_warmup re-seeds P_ema = min(min of the post-change bucket lows, the largest v0.4.1
+    step from the previous P_ema) (M4X-1: the seed rises no faster than the v0.4.1 EMA can) and
+    L_ema = min(max lhi, lomed(lhi)*(1 + C)) over the post-change entries; gated() (liquidate / expire /
+    sol_settle wait while warm > 0 on an executable venue; Raydium opens refused); exit_reference's guard
+    min(L_ema, L_mlo), and while the guard is set L_slow integrates min(lobs, L_mlo) (M4X-2); window_floor_ok
+    (a proposal's window floor at min(P_ema, P_cand), M4R-2).  A market
+    that never switches runs the v0.4.1 paths unchanged.  A Raydium price start (Observation::new_raydium, the
+    M4V-5 first-open gate) is not modelled: every Market is created unmarked.  Market.fast_switch keeps the v0.4.1
+    rewrite for the math crate's differential vectors only; FAST_SCENARIOS replays adopt_pool;
+    attacks/switch_warmup.py compares the rule with the M4 rule as built.
   * Scenario library, EMA / exit-bound lag study, loss-given-gap curves,
     break-even gap frequencies, an ILLUSTRATIVE (uncalibrated) jump-diffusion
     Monte Carlo, and a randomised exit fuzz with attacker bundles, attacker-only
@@ -751,6 +769,62 @@ def max_total_q_market(X_now: int, impact_bps: int) -> int:
 
 
 # ----------------------------------------------------------------------------
+# Raydium pool selection as built after M4 (ECON §5.2, §6.2, §10.1; ARCH §2.6; shortwin_math::pool_select)
+# ----------------------------------------------------------------------------
+# pool_min_real_sol (ECON §15) is a params::validate_econ parameter: it is deliberately NOT a Params field,
+# so validate_params and the math crate's params vectors are unchanged.
+POOL_MIN_REAL_SOL = 25_000_000_000
+
+
+def locked_sol(D: int, p_wad: int) -> int:
+    """floor(D*isqrt(P)/1e9): the SOL side of the locked depth at price P (ECON §2.1; tier::locked_sol)."""
+    return D * math.isqrt(p_wad) // SQRT_WAD
+
+
+def depth_at_lambda(D: int, lam_bps: int) -> int:
+    """floor(D*1e4/lambda): the sqrt(X*Y) a pool of locked depth D has at locked share lambda; 0 for lambda = 0.
+    With lambda_min it is the most depth sizing ever credits the pool with (the adoption cap)."""
+    return D * BPS // lam_bps if lam_bps else 0
+
+
+def locked_floor_ok(D: int, p_ref: int, P: Params = DEFAULT, floor: int = POOL_MIN_REAL_SOL) -> bool:
+    """Eligibility floor of a listing, a zero-position and a list-only adoption (M4-SEC-1, M4-SEC-3):
+    floor(floor(D*isqrt(P_ref)/1e9)*1e4/lambda_min) >= pool_min_real_sol, i.e. floor*lambda_min <= locked*1e4.
+    No lambda_now clause.  P_ref = the market's P_ema, or the candidate's spot on a market without a price."""
+    lm = P.pool_lock_min_bps
+    return lm > 0 and floor * lm <= locked_sol(D, p_ref) * BPS
+
+
+def position_floor_ok(D: int, p_ref: int, floor: int = POOL_MIN_REAL_SOL) -> bool:
+    """Floor of an adoption that carries open positions (a collection window's; M4V-1): the locked SOL
+    itself, floor(D*isqrt(P_ref)/1e9) >= pool_min_real_sol (locked_floor_ok without the /lambda_min)."""
+    return locked_sol(D, p_ref) >= floor
+
+
+def window_floor_ok(D: int, p_ema: Optional[int], p_cand: int, floor: int = POOL_MIN_REAL_SOL) -> bool:
+    """M4R-2 (ECON §10.3; ARCH §3.9 propose_pool): a proposal that opens or improves a collection window
+    judges the window floor at p_win = min(P_ema, P_cand), P_cand the candidate's pre-trade floor(Y*WAD/X) in
+    the proposing instruction (P_cand alone on a market without a price).  execute_pool_switch keeps the
+    floor at P_ema (position_floor_ok), and every failure there still cancels."""
+    p_win = p_cand if p_ema is None else min(p_ema, p_cand)
+    return position_floor_ok(D, p_win, floor)
+
+
+# ----------------------------------------------------------------------------
+# Post-change confirmation (M4R, ECON §5.2, changelog #96; PROPOSED, owner item O18)
+# ----------------------------------------------------------------------------
+# Every Raydium adoption writes the anchor cap = floor(D*1e4/lambda_min) into L_ema and every ring entry (no
+# sample of the adopted pool is read) and marks the observation state unconfirmed: ema_warm = EMA_WARMUP_BUCKETS,
+# ema_guard = 1.  The next EMA_WARMUP_BUCKETS integrations re-seed P_ema and L_ema from the post-change bucket
+# extremes on the side that cannot force an exit (Market._integrate); while ema_warm > 0 on an executable venue
+# the keeper exits wait (Market.gated); while ema_guard = 1 the exit reference reads min(L_ema, L_mlo)
+# (Market.exit_reference).  A market that never switches pools keeps ema_warm = ema_guard = 0 and runs exactly
+# the v0.4.1 code paths.
+EMA_WARMUP_BUCKETS = 8          # = RING_LEN (compiled; u8); >= liq_persist_n's compiled maximum (3)
+REF_GUARD_TOL_BPS = 100         # compiled; = fv_dev_bps's default: the guard clears once L_ema <= L_mlo*(1 + 1 %)
+
+
+# ----------------------------------------------------------------------------
 # Position & market engine
 # ----------------------------------------------------------------------------
 class Position:
@@ -782,6 +856,9 @@ class Market:
     # price and liquidity extremes (v0.4.1, R4B-2: the settlement box takes the lower median of the
     # lows and the upper median of the highs, so a frozen second -- which contains an honest
     # observation -- keeps its honest low and high).
+    warm = 0            # M4R ema_warm / ema_guard defaults (also for states built without __init__, e.g. the
+    guard = False       # math crate's vector generators): a market that never switches has both at 0
+
     def __init__(self, venue: Venue, tier: Tier, P: Params = DEFAULT, util_bps: int = 8000, t0: int = 0):
         self.venue, self.tier, self.P = venue, tier, P
         self.util_bps = util_bps
@@ -807,6 +884,8 @@ class Market:
         self.pool_fail_since: Optional[int] = None  # fast-path chain (pool_fail, R3B-8 / R3A-4)
         self.last_pool_fail_obs: Optional[int] = None
         self.pending_target: Optional[int] = None
+        self.warm = 0                             # Market.ema_warm: integrations left in the post-change warm-up
+        self.guard = False                        # Market.ema_guard: the post-change reference guard (M4R)
         self._q_hint = 0                          # sim helper: size of the position under test
 
     @staticmethod
@@ -893,7 +972,12 @@ class Market:
 
     def _integrate(self, t: int) -> None:
         """Integrate the completed bucket (C0-5): the observation is the EMA clamped
-        into [bucket low, bucket high], then to +-C, time-weighted with dt <= DT_MAX."""
+        into [bucket low, bucket high], then to +-C, time-weighted with dt <= DT_MAX.
+        While ema_warm > 0 (M4R post-change confirmation) the warm-up branch runs instead;
+        after either branch an integration with ema_warm = 0 may clear the reference guard."""
+        if self.warm > 0:
+            self._integrate_warmup(t)
+            return
         P, T = self.P, self.tier
         c = T.ema_clamp_bps
         obs = min(max(self.ema, self.b_lo), self.b_hi)
@@ -904,17 +988,79 @@ class Market:
         if dt > 0:
             self.ema = (self.ema * T.ema_tau_s + obs * dt) // (T.ema_tau_s + dt)
             self.liq = (self.liq * T.ema_tau_s + lobs * dt) // (T.ema_tau_s + dt)
-            dts = min(t - self.slow_t, P.liq_slow_dtmax_s)
-            self.liq_slow = (self.liq_slow * P.liq_slow_tau_s + lobs * dts) // (P.liq_slow_tau_s + dts)
-            self.slow_t = t
             self.ema_t = t
             self.ema_count += 1
             self.ring.append(self._entry(t, self.ema, self.liq, self.b_lo, self.b_hi, self.b_llo, self.b_lhi,
                                          obs, lobs))
             if len(self.ring) > P.ring_len:
                 del self.ring[0]
+            # M4X-2: while the post-change guard is set, L_slow integrates no more than the ring's honest lows
+            # (L_mlo after the push): a deposit-frozen L_ema must not climb into L_slow, which the reference
+            # L_b reads unguarded.
+            slow_in = min(lobs, self.ring_medians()[2]) if self.guard else lobs
+            dts = min(t - self.slow_t, P.liq_slow_dtmax_s)
+            self.liq_slow = (self.liq_slow * P.liq_slow_tau_s + slow_in * dts) // (P.liq_slow_tau_s + dts)
+            self.slow_t = t
+            self._guard_check()
         self.lb_sec, self.lb_lo, self.lb_hi = self.b_sec, self.b_lo, self.b_hi
         self.b_sec = None
+
+    def _integrate_warmup(self, t: int) -> None:
+        """M4R warm-up integration (ECON §5.2; shortwin_math::observe::integrate, ema.warm > 0).  With
+        k = EMA_WARMUP_BUCKETS - ema_warm post-change entries already in the ring and E = this bucket plus
+        those k entries (n = k + 1 <= 8):
+            P_ema = min(min over E of the bucket price lows,                (fresh, the safe side)
+                        floor((P_ema*tau + floor(P_ema*(1e4 + C)/1e4)*dt)/(tau + dt)))
+                                                                            the largest v0.4.1 step (M4X-1)
+            L_ema = min(max H, floor(lomed(H)*(1e4 + C)/1e4))               H = the bucket liquidity highs of E,
+                                                                            lomed = H[(n-1)//2] ascending
+        with dt as in _integrate; no liquidity blend; the ring entry is pushed with the bucket's extremes and the
+        reprojection of the seed; L_slow and slow_ts unchanged; ema_warm -= 1.  The price seed falls freely but
+        rises per integration by no more than the v0.4.1 EMA can (x(tau + dt*(1 + C))/(tau + dt): 9/7 at dt = 2,
+        7/6 at dt = 1): attacker-only warm-up seconds reach no higher than the same seconds in steady state with a
+        large enough pump (M4X-1), while a genuine move is tracked at that rate (2.2x by the gate).  A
+        withdraw-wrapped sample lowers only its bucket's llo, which the seed never reads; a deposit-wrapped one
+        raises one bucket's lhi, bounded by the lower median unless >= 5 of 8 buckets are pushed.  The dt <= 0
+        path is as in _integrate: no step."""
+        if t > self.ema_t:
+            T = self.tier
+            k = EMA_WARMUP_BUCKETS - self.warm
+            ents = self.ring[len(self.ring) - k:] if k else []
+            dt = min(t - self.ema_t, T.ema_dtmax_s)
+            up = (self.ema * T.ema_tau_s + self.ema * (BPS + T.ema_clamp_bps) // BPS * dt) // (T.ema_tau_s + dt)
+            p = min([e[5] for e in ents] + [self.b_lo, up])
+            H = sorted([e[8] for e in ents] + [self.b_lhi])
+            n = len(H)
+            l = min(H[n - 1], H[(n - 1) // 2] * (BPS + self.tier.ema_clamp_bps) // BPS)
+            self.ema, self.liq = p, l
+            self.ema_t = t
+            self.ema_count += 1
+            self.warm -= 1
+            self.ring.append(self._entry(t, p, l, self.b_lo, self.b_hi, self.b_llo, self.b_lhi))
+            if len(self.ring) > self.P.ring_len:
+                del self.ring[0]
+            self._guard_check()
+        self.lb_sec, self.lb_lo, self.lb_hi = self.b_sec, self.b_lo, self.b_hi
+        self.b_sec = None
+
+    def _guard_check(self) -> None:
+        """M4R reference guard: cleared at the first integration with ema_warm = 0 after it and
+        L_ema*1e4 <= L_mlo*(1e4 + REF_GUARD_TOL_BPS), L_mlo = lower median of the ring's bucket liquidity lows.
+        An honest switch clears it at the gate (the 8th warm-up integration)."""
+        if self.guard and self.warm == 0 and self.liq * BPS <= self.ring_medians()[2] * (BPS + REF_GUARD_TOL_BPS):
+            self.guard = False
+
+    def mark_restart(self) -> None:
+        """observe::mark_restart: the observation state was (re)started by a Raydium venue change or a Raydium
+        price start; it is unconfirmed until EMA_WARMUP_BUCKETS integrations have re-seeded it."""
+        self.warm = EMA_WARMUP_BUCKETS
+        self.guard = True
+
+    def gated(self) -> bool:
+        """M4R gate (ARCH §3.6-§3.8): while ema_warm > 0 on an EXECUTABLE venue, liquidate / expire fail with
+        EmaWarmingUp and sol_settle evaluates nothing (no arm change, no settlement).  A venue that cannot execute
+        is never gated, so S3 is never deadlocked."""
+        return self.warm > 0 and self.venue.has_route()
 
     def step_to(self, t: int) -> None:
         """Honest crank at time t (advance + observe)."""
@@ -948,14 +1094,34 @@ class Market:
         self._rewrite_ring_liq(self.liq)
 
     def fast_switch(self, pool: Venue, t: int) -> None:
-        """Raydium fast path (incumbent failure): L_ema and L_slow reset to
-        min(new sqrt(k), current value); ring L rewritten; age kept (ARCH §2.6)."""
+        """Raydium fast path (incumbent failure), v0.4.1 rule: L_ema and L_slow reset to
+        min(new sqrt(k), current value); ring L rewritten; age kept (ARCH §2.6).  Kept unchanged
+        ONLY for the math crate's differential vectors (VenueChange::Raydium); the program's rule is
+        adopt_pool (M4R post-change confirmation), which FAST_SCENARIOS replays."""
         self.venue = pool
         self.liq = min(pool.sqrt_k(), self.liq)
         self.liq_slow = min(pool.sqrt_k(), self.liq_slow)
         self._rewrite_ring_liq(self.liq)
         self.pool_fail_since = self.last_pool_fail_obs = None
         self.no_route_since = self.last_no_route_obs = None
+
+    def adopt_pool(self, pool: Venue, t: int) -> None:
+        """Raydium adoption of a priced market (ECON §5.2; ARCH §2.6 rule 4; engine::pool_select::adopt: every
+        Raydium adoption -- listing-window replacement, zero-position, fast path, a list-only market's window):
+        NO sample of the adopted pool is read.  With D its locked depth and cap = floor(D*1e4/lambda_min),
+        L_ema and every ring entry's l / llo / lhi := cap ((x, y) recomputed; VenueChange::RaydiumLocked
+        { slow_cap: D }), L_slow = min(L_slow, D), never raised; the open bucket and both route chains cleared;
+        P_ema, the ring prices and the age kept; then mark_restart (ema_warm = 8, ema_guard = 1).  The warm-up
+        integrations re-seed P_ema and L_ema from the new pool's own post-change buckets (_integrate_warmup)."""
+        D = pool.locked_depth()
+        cap = depth_at_lambda(D, self.P.pool_lock_min_bps)
+        self.venue = pool
+        self.liq = cap
+        self.liq_slow = min(self.liq_slow, D)
+        self._rewrite_ring_liq(cap)
+        self.pool_fail_since = self.last_pool_fail_obs = None
+        self.no_route_since = self.last_no_route_obs = None
+        self.mark_restart()
 
     def exo_move(self, p_wad: int) -> None:
         """Other market participants trade the venue toward price p_wad."""
@@ -1053,6 +1219,8 @@ class Market:
         v, T, P = self.venue, self.tier, self.P
         if self.ema > P_OPEN_MAX:
             raise ValueError("price above P_OPEN_MAX")
+        if self.warm > 0 and v.kind == "ray":      # M4R: opens wait for ema_warm == 0 on Raydium (EmaWarmingUp)
+            raise ValueError("EmaWarmingUp")
         spot_pre = v.spot_wad()
         e = self.ring[-1]                       # EMA state after this instruction's roll (R3A-12)
         S = v.sell(Q)
@@ -1135,15 +1303,18 @@ class Market:
             if not below(self.quote_xy(pos.Q, e[3], e[4])):
                 break
             run += 1
-        ema_leg = run >= P.liq_persist_n
+        ema_leg = run >= P.liq_persist_n             # persist::liq_ema_leg (pure; the M4R gate is not part of it)
         if not live:
             spot_leg = True                          # SPEC: no route -> CR_spot := 0
         else:
             spot_leg = lo_ok and (qrs is None or cr(qrs) < L)
+        # M4R gate (ARCH §3.6 precondition 1b): while ema_warm > 0 on an executable venue nothing is liquidatable
+        # for a keeper exit; try_exit returns before any evaluation (no arm change)
+        gated = self.gated()
         return dict(R=R, Veff=Veff, qs=qs, qs_r=qs_r, qrs=qrs, qe=qe, p_live=p_live, p_rs=p_rs, lo_ok=lo_ok,
                     L_live=L_live, cr_s=cr(qs), cr_rs=cr(qrs) if qrs else None, cr_e=cr(qe),
-                    liq=spot_leg and ema_leg, ema_leg=ema_leg, spot_leg=spot_leg, ema_run=run,
-                    expired=t >= pos.deadline)
+                    liq=spot_leg and ema_leg and not gated, ema_leg=ema_leg, spot_leg=spot_leg, ema_run=run,
+                    expired=t >= pos.deadline, gated=gated)
 
     def ema_growth_bps(self) -> int:
         """Sustained EMA growth g: the MINIMUM per-second growth (bps/s, floor) over the
@@ -1173,7 +1344,10 @@ class Market:
         if not st["lo_ok"]:
             return None
         lo = self.lb_lo
-        L_b = max(st["L_live"], self.liq, self.liq_slow)   # deepest liquidity -> lowest reference cost
+        # deepest liquidity -> lowest reference cost; M4R: while the post-change guard is set, the EMA term is
+        # min(L_ema, L_mlo) (bounds::ref_liquidity), so a pushed-up L_ema cannot lift the reference
+        l_e = min(self.liq, self.ring_medians()[2]) if self.guard else self.liq
+        L_b = max(st["L_live"], l_e, self.liq_slow)
         if is_liq:
             if P.exit_ref == "ema":
                 pref = self.ema
@@ -1311,6 +1485,9 @@ class Market:
                        borrower=V - B - R)
             return res
 
+        if self.gated():
+            # M4R gate: liquidate / expire fail (EmaWarmingUp), sol_settle evaluates nothing -- no arm change
+            return None
         K = self.settle_reward(V)
         box = self.settle_box(t)
         if not (st["liq"] or st["expired"]):
@@ -1334,6 +1511,8 @@ class Market:
         return self._settlement(pos, st, t, K, res, box)
 
     def _buyback_exit(self, pos, st, t, res, K):
+        if self.gated():                             # M4R gate (try_exit returns before; direct callers)
+            return None
         P = self.P
         V, Q = pos.V, pos.Q
         ert = pos.ert
@@ -1399,6 +1578,8 @@ class Market:
         taken on the settlement box (ECON §5.6)."""
         P = self.P
         v = self.venue
+        if self.gated():                             # M4R gate: evaluate() is a no-op (S3 cannot be due: the
+            return None                              # adoption cleared the no-route chain)
         if v.has_route():
             armed = pos.armed and t - pos.s_last <= P.settle_arm_gap_s
             if pos.armed and self._refuted(pos, st, box, K):
@@ -1729,7 +1910,8 @@ def flag_route(m: Market):
 def fast_path_events(t0: int, cand_frac_bps: int, horizon: int = 900):
     """Raydium incumbent halted at t0; the keeper proposes the deepest eligible candidate
     (cand_frac_bps of the incumbent depth, same price) once pool_fail has held for
-    pool_fast_route_s, and executes the switch after the collection window.  (Per-market
+    pool_fast_route_s, and executes the switch after the collection window (Market.adopt_pool:
+    the M4R post-change confirmation; exits resume after the 8-bucket warm-up).  (Per-market
     state lives on the Market object, so the scenario can be reused.)"""
     def halt(m: Market):
         v = m.venue
@@ -1744,7 +1926,7 @@ def fast_path_events(t0: int, cand_frac_bps: int, horizon: int = 900):
             return
         if m.t >= m.pool_fail_since + P.pool_fast_route_s + P.pool_fast_window_s:
             c.move_to_price(m.ema)                   # candidate trades at the market price
-            m.fast_switch(c, m.t)
+            m.adopt_pool(c, m.t)                     # M4R: anchor cap, warm-up, guard (v0.4.1: fast_switch)
             m._fp = None
     return ((t0, halt),) + tuple((t0 + i, maybe_switch) for i in range(1, horizon))
 

@@ -1,14 +1,17 @@
-# m3_cu — M3 CU bench, T-TRACE and stack depth on Raydium
+# m3_cu — M3 CU bench, T-TRACE and stack depth on Raydium (with M4 pool selection)
 
 This is the M3 compute, trace and depth gate for the Raydium venues (ARCHITECTURE §6.1–§6.4,
-§8.2 T-RAY-CU / T-RAY-TRACE / T-CU / T-TRACE, §9 M3). Everything runs the **release** short.win
+§8.2 T-RAY-CU / T-RAY-TRACE / T-CU / T-TRACE, §9 M3), and since M4 also the gate of the Raydium
+pool-selection instructions `propose_pool` and `execute_pool_switch` (§9 M4; §6.1 budget
+100 k). Everything runs the **release** short.win
 (`anchor build --tools-version v1.57 --arch v3`) against the **dumped mainnet** Raydium AMM v4
 and CPMM programs, pools, mints and configs of `tests/fixtures/`, on the LiteSVM harness's
 mainnet fork (`shortwin_litesvm_tests::fork` / `raydium`).
 
 - **CU bench** (`tests/m3_cu.rs` → `results.md`): every Raydium-path instruction —
   `create_market`, `open_short`, `close_short`, `liquidate`, `expire`, `sol_settle`,
-  `crank_price`, `flag_venue_upgraded`, `revalidate_venue` — on AMM v4 (SPL Token; AMM v4 is SPL
+  `crank_price`, `flag_venue_upgraded`, `revalidate_venue`, and (M4) `propose_pool` /
+  `execute_pool_switch` — on AMM v4 (SPL Token; AMM v4 is SPL
   Token only), CPMM with an SPL base and CPMM with a Token-2022 base, plus the CPMM variants that
   change the path (creator fee on the SOL side, WSOL as token 1). Mollusk 0.15.1 gives the figure
   the budget applies to; LiteSVM 0.16.0 runs the same instruction as a cross-check that must
@@ -54,7 +57,9 @@ bench.
 ## Pre-states
 
 - Every case builds a fresh fork (`Env::ray_fork`), lists the pool with the real
-  `create_market(RaydiumV4 | RaydiumCpmm)`, lends `40·Q` and waits out the listing window, where
+  `create_market(RaydiumV4 | RaydiumCpmm)`, lends `40·Q` and waits out the listing window (its last
+  `PRICE_WARMUP_CRANKS` = 10 seconds cranked every second: the price warm-up opens need since the
+  M4 verification, M4V-5), where
   `Q = min(X/400, 2 SOL of notional)` (the `ray_it` size). Every transaction that builds the state
   goes through `Env::send`, so the invariant hooks run.
 - The keeper exits are prepared the way a keeper decides: `liquidate` after a real whale buy
@@ -72,6 +77,25 @@ bench.
   (`fork::set_deploy_slot`); the U5 case writes a synthetic 10,485,760-byte ProgramData (pump's
   size; pump is not dumped) at pump's compile-time address.
 
+- **M4 pool selection** (`pool_cases`): every `propose_pool` outcome that writes — a list-only
+  market's adoption (Fartcoin with its real mainnet bonding curve planted, so the D1 detection
+  reads a curve that graduated elsewhere; USELESS), a listing-window replacement (Fartcoin's
+  reversed pool listed thin — LP burned to λ = 50 %, topped up to just over the locked-depth
+  floor (`pool_min_real_sol` and its rounding, M4-SEC-1 / -3), as
+  `ray_sec_it`'s M3-SEC-3 case — replaced by the main pool), a zero-position adoption after the
+  window onto a CPMM pool twice as deep, and on a halted incumbent with a position open (halted
+  by its admin's own instruction, observed every 30 s for 150 s) a fast-path window opened on a
+  candidate at 40 % of `D` and improved by one at 60 % — and both `execute_pool_switch` outcomes
+  after the 60 s window: the fast adoption with the position open, and a cancellation (the
+  incumbent resumed by its admin); since M4R also the `crank_price` that ends the post-change
+  warm-up after that fast adoption (eight per-second cranks of the new pool before it: the seed
+  over the eight post-change entries and the guard cleared at the gate). The candidates the fixtures lack are **planted** CPMM pools
+  (`shortwin_litesvm_tests::pool_select::plant_cpmm`: USELESS's dumped pool bytes on fresh keys,
+  with the token's mint, their own vaults, LP mint and observation; the dumped ELF trades
+  them). Before every adoption the observation ring is full (`RING_LEN` + 2 cranked seconds), so
+  the A72 ring rewrite is measured at its largest. The planted keys come from
+  `Pubkey::new_unique()` in a fixed order, so the figures are reproducible as well.
+
 ## Workspace and pins
 
 A standalone workspace with its own `Cargo.lock`, like `tests/bench/m2_cu`, so Mollusk does not
@@ -85,7 +109,7 @@ library on the host.
 
 ## Findings (see `results.md`, `trace.md` and `depth.md` for the figures)
 
-- **Mollusk and LiteSVM agree to the unit on all 46 cases.**
+- **Mollusk and LiteSVM agree to the unit on all 67 cases** (46 M3, 21 M4 / M4R).
 - **CU, all within ARCH §6.1:**
   - `open_short`: 98.7–130.5 k (limit 150 k). The venue CPI is 15.4 k (AMM v4) and 25.1 k /
     28.0 k (CPMM SPL / Token-2022), as R-RAY §4.3 measured, but short.win's own part is
@@ -94,14 +118,28 @@ library on the host.
   - `close_short` 68.3–89.2 k, `liquidate` 90.5–111.1 k, `expire` 86.1–104.5 k (limit 200 k;
     §6.1 estimated 70–107 k for the keeper exits).
   - `sol_settle` 38.4–42.0 k as a no-op, 47.4–53.1 k for S3 (limit 150 k).
-  - `crank_price` 22.9–27.8 k (limit 60 k; §6.1 estimated 18–23 k).
+  - `crank_price` 22.9–27.9 k (limit 60 k; §6.1 estimated 18–23 k); the last post-change
+    warm-up integration (M4R: the seed over 8 post-change entries, its step bound — M4X-1,
+    +0.9 k — and the guard check) 27.0 k, below a steady roll.
   - `create_market` 59.2–71.2 k (limit 250 k).
-  - **U5**: `flag_venue_upgraded` costs 6,032 CU and `revalidate_venue` 8,440 CU on the
+  - **U5**: `flag_venue_upgraded` costs 6,026 CU and `revalidate_venue` 8,438 CU on the
     1,406,429-byte AMM v4 and 793,869-byte CPMM ProgramData **and** on a 10 MiB one: copying the
     account into the input region is not metered in CU. §6.1's 400 k request is far more than
     needed.
   - The buy leg's venue CPI (`swap_base_out_v2` on AMM v4) is 15.9–16.0 k, a little above
     R-RAY's 15.2–15.5 k range for the v2 swaps.
+- **M4, pool selection** (budget 100 k, ARCH §6.1's estimate 25–35 k; since M4R an adoption
+  writes the anchor `D/λ_min` and the restart marks, reading no liquidity of the pool — ≈ 1.1 k
+  less than M4V's two-sample minimum — and a window proposal also prices the candidate for the
+  floor at `min(P_ema, P_cand)`, ≈ 0.5 k more): `propose_pool` 25.1–26.4 k without an adoption's
+  rewrite (a list-only market's first pool, whose price state starts fresh and marked; a window
+  opened or improved), 40.3–43.6 k for an adoption that rewrites a full ring (zero position;
+  listing window); `execute_pool_switch` 34.4–34.9 k for the fast adoption (a position open,
+  ring rewritten), 27.8–28.0 k for a cancellation. So an adoption that
+  rewrites a full ring is ≈ 5 k above §6.1's estimate, with 60 k of headroom. Every path makes
+  exactly one CPI (its `emit_cpi!` event): 2 trace entries, peak height 2, three wrapper levels
+  fit; with both ComputeBudget instructions a pool-selection transaction is 4 entries, ≤ 694 B
+  legacy and ≤ 606 B as v0 + ALT (17 accounts: CPMM incumbent and CPMM candidate).
 - **Trace:** a wallet's first open is 15 entries, a repeat borrower's 14, a normalising open 18;
   every exit is 9 (12 normalising); a crank is 2, or 3 when the pool just halted
   (`RouteChainChanged`); S3 is 2, the no-op `sol_settle` 1; `create_market` 7; the latch

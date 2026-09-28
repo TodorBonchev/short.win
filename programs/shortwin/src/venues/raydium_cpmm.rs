@@ -330,22 +330,24 @@ fn live_fees(market: &Market, read: &[AccountInfo]) -> Option<Pricing> {
     })
 }
 
-/// `create_market(venue_hint = RaydiumCpmm)`: verifies the candidate ReadSet `read` for `mint`
-/// under `token_program` (module docs, ARCH §2.6) and checks `eligible()`.
+/// `create_market(venue_hint = RaydiumCpmm)` and pool selection: verifies the candidate ReadSet
+/// `read` for `mint` under `token_program` (module docs, ARCH §2.6) and checks `eligible()` at
+/// the reference price `p_ref` (`raydium::check_eligible`).
 ///
 /// Errors: `BadRemainingAccounts` (not exactly the ReadSet); `PoolIneligible` (not a CPMM
 /// `PoolState` of 637 bytes, a config that is not a CPMM `AmmConfig`, not a WSOL pool of
 /// `mint`, WSOL not under Tokenkeg or the token side not under the mint's program, vaults that
 /// are not the authority's accounts of the pool's mints and programs, an LP mint that does not
 /// parse, a pool that cannot execute or whose fee is above `venue_fee_cap_bps`);
-/// `VenueAccountMismatch` (the config, a vault or the LP mint is not the pool's); `PoolTooThin`;
-/// `PoolLockTooLow`.
+/// `VenueAccountMismatch` (the config, a vault or the LP mint is not the pool's); `PoolTooThin`
+/// (the locked depth under the floor, M4-SEC-1 / M4-SEC-3).
 pub fn verify(
     read: &[AccountInfo],
     mint: &Pubkey,
     token_program: &Pubkey,
     params: &Params,
     now: i64,
+    p_ref: Option<u128>,
 ) -> Result<Adoption> {
     require!(read.len() == READ_LEN, ShortwinError::BadRemainingAccounts);
     let pool_i = at(read, R_POOL)?;
@@ -400,7 +402,7 @@ pub fn verify(
     }
     let parsed = parse(read).ok_or(ShortwinError::PoolIneligible)?;
     let state = state_of(&parsed, now).ok_or(ShortwinError::PoolIneligible)?;
-    check_eligible(&state, pool.lp_supply, parsed.lp_supply, params)?;
+    check_eligible(&state, params, p_ref)?;
     let (vault_sol, vault_tok) = if sol0 {
         (v0_i.key(), v1_i.key())
     } else {
@@ -621,7 +623,7 @@ mod tests {
         let mint = key(USELESS_MINT);
         let mut accounts = useless();
         let a = with_infos(&mut accounts, |r| {
-            verify(r, &mint, &TOKEN_PROGRAM_ID, &Params::defaults(), NOW)
+            verify(r, &mint, &TOKEN_PROGRAM_ID, &Params::defaults(), NOW, None)
         })
         .unwrap();
         assert_eq!(a.kind, VenueKind::RaydiumCpmm);
@@ -651,7 +653,7 @@ mod tests {
         acc[0].2[raydium_cpmm::OFF_OPEN_TIME..raydium_cpmm::OFF_OPEN_TIME + 8]
             .copy_from_slice(&1_600_000_000u64.to_le_bytes());
         let a = with_infos(&mut acc, |r| {
-            verify(r, &mint, &TOKEN_PROGRAM_ID, &Params::defaults(), NOW)
+            verify(r, &mint, &TOKEN_PROGRAM_ID, &Params::defaults(), NOW, None)
         })
         .unwrap();
         assert_eq!(a.age_start, NOW);
@@ -660,7 +662,7 @@ mod tests {
         acc[0].2[raydium_cpmm::OFF_OPEN_TIME..raydium_cpmm::OFF_OPEN_TIME + 8]
             .copy_from_slice(&T_CLAMP.unsigned_abs().to_le_bytes());
         let a = with_infos(&mut acc, |r| {
-            verify(r, &mint, &TOKEN_PROGRAM_ID, &Params::defaults(), NOW)
+            verify(r, &mint, &TOKEN_PROGRAM_ID, &Params::defaults(), NOW, None)
         })
         .unwrap();
         assert_eq!(a.age_start, T_CLAMP);
@@ -671,7 +673,7 @@ mod tests {
         let mint = key(USELESS_MINT);
         let mut accounts = useless();
         let a = with_infos(&mut accounts, |r| {
-            verify(r, &mint, &TOKEN_PROGRAM_ID, &Params::defaults(), NOW)
+            verify(r, &mint, &TOKEN_PROGRAM_ID, &Params::defaults(), NOW, None)
         })
         .unwrap();
         let mut m = Market::zeroed();
@@ -742,7 +744,7 @@ mod tests {
         let mint = key(USELESS_MINT);
         let mut accounts = useless();
         let a = with_infos(&mut accounts, |r| {
-            verify(r, &mint, &TOKEN_PROGRAM_ID, &Params::defaults(), NOW)
+            verify(r, &mint, &TOKEN_PROGRAM_ID, &Params::defaults(), NOW, None)
         })
         .unwrap();
         let mut m = Market::zeroed();
@@ -781,7 +783,7 @@ mod tests {
         // Not eligible for a listing.
         let mut acc = with_rates(0, 0, true, 0);
         let err = with_infos(&mut acc, |r| {
-            verify(r, &mint, &TOKEN_PROGRAM_ID, &Params::defaults(), NOW)
+            verify(r, &mint, &TOKEN_PROGRAM_ID, &Params::defaults(), NOW, None)
         })
         .unwrap_err();
         let code = match err {

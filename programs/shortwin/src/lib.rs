@@ -13,7 +13,8 @@
 //! `set_venue_extras`. `set_coverage_pause` waits for O17. M3: the Raydium AMM v4 and CPMM
 //! adapters (`venues::raydium_v4`, `venues::raydium_cpmm`, `venues::raydium`) and the Raydium
 //! listing `create_market(venue_hint = RaydiumV4 | RaydiumCpmm)` with the D1 precedence check
-//! (`venues::detect`).
+//! (`venues::detect`). M4: Raydium pool selection (`propose_pool`, `execute_pool_switch`;
+//! `engine::pool_select`).
 //!
 //! Feature `test-venue` (TEST-ONLY, A49): `VenueKind::Mock`, the adapter of the mock venue
 //! `tests/mock_cpamm`, for the LiteSVM engine tests. Release builds never enable it
@@ -236,6 +237,27 @@ pub mod shortwin {
     /// credits the wipe record and sets `wipe_trader_swept` (ARCH §3.9; M2-SEC-4).
     pub fn sweep_trader<'info>(ctx: Context<'info, SweepTrader<'info>>) -> Result<()> {
         instructions::sweep_trader::handler(ctx)
+    }
+
+    // ---- Raydium pool selection (ARCH §2.6, §3.9; M4) ----
+
+    /// Anyone proposes a Raydium pool of kind `candidate_kind` (4 AMM v4, 5 CPMM) for a
+    /// list-only or Raydium market: an immediate adoption (a list-only market without open
+    /// positions; no open position with the listing-window or zero-position margin) or a
+    /// collection window (the fast path; a list-only market with open positions).
+    pub fn propose_pool<'info>(
+        ctx: Context<'info, ProposePool<'info>>,
+        candidate_kind: u8,
+    ) -> Result<()> {
+        instructions::propose_pool::handler(ctx, candidate_kind)
+    }
+
+    /// Anyone resolves a collection window once it has run: adopts the best candidate if it is
+    /// still eligible (with its locked SOL at the SOL floor), its program is not latched and,
+    /// on a Raydium market, the `pool_fail` chain that armed the window still holds; else
+    /// cancels.
+    pub fn execute_pool_switch<'info>(ctx: Context<'info, ExecutePoolSwitch<'info>>) -> Result<()> {
+        instructions::execute_pool_switch::handler(ctx)
     }
 
     // ---- O6 Emergency powers (ARCH §3.1; SPEC §11) ----

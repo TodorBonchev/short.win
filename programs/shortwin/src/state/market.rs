@@ -237,7 +237,15 @@ pub struct Market {
     pub decimals: u8,
     pub ring_head: u8,
     pub ring_count: u8,
-    pub _pad0: [u8; 2],
+    /// Integrations left in the post-change warm-up (M4R, **PROPOSED**, owner item O18; was
+    /// `_pad0[0]`): `EMA_WARMUP_BUCKETS` after a restart (a Raydium adoption or listing), counted
+    /// down by the prologue's roll; `0` = confirmed (every account created before M4R). While it
+    /// is positive on an executable venue opens, `liquidate` and `expire` refuse `EmaWarmingUp`
+    /// and `sol_settle` evaluates nothing (`shortwin_math::observe::Ema::warm`).
+    pub ema_warm: u8,
+    /// `1` while the post-change reference guard is set (M4R; was `_pad0[1]`): the keeper exits'
+    /// reference liquidity reads `min(L_ema, L_mlo)` (`shortwin_math::bounds::ref_liquidity`).
+    pub ema_guard: u8,
     pub created_at: i64,
     // ---- identity @32 (96) ----
     pub mint: Pubkey,
@@ -273,7 +281,11 @@ pub struct Market {
     pub fp_d: PodU128,
     pub fp_t0: i64,
     pub fp_venue: u8,
-    pub _pad1: [u8; 7],
+    pub _pad1: u8,
+    /// Retired `fp_lambda_bps` (M4-SEC-5's record of the candidate's `λ`; M4R: an adoption reads
+    /// no sample of the pool): padding, zeroed by `clear_window`.
+    pub _pad1a: [u8; 2],
+    pub _pad1b: [u8; 4],
     // ---- venue timing @1176 (24); 0 = unset ----
     pub migration_seen_at: i64,
     pub graduated_at: i64,
@@ -497,7 +509,9 @@ impl Market {
             ts: self.ema_ts,
             slow_ts: self.slow_ts,
             count: self.ema_count,
-            _pad: [0; 8],
+            warm: self.ema_warm,
+            guard: self.ema_guard,
+            _pad: [0; 6],
         };
         o.ring = self.ring_math();
         o
@@ -541,6 +555,8 @@ impl Market {
         self.ema_ts = o.ema.ts;
         self.slow_ts = o.ema.slow_ts;
         self.ema_count = o.ema.count;
+        self.ema_warm = o.ema.warm;
+        self.ema_guard = o.ema.guard;
         for (e, m) in self.ring.iter_mut().zip(o.ring.entries.iter()) {
             e.p.set(m.p);
             e.l.set(m.l);

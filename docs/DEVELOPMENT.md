@@ -148,7 +148,9 @@ cargo test -p shortwin -p shortwin-venue-state        # host unit tests of the p
 
 Other builds: `SHORTWIN_SO` (the release program: the M1 binaries and every Raydium binary),
 `SHORTWIN_TEST_VENUE_SO` (the test-venue program, M2 binaries), `MOCK_CPAMM_SO` (the mock
-venue). `Env::test_venue()` loads the test-venue program and the mock; `Env::new()` the release
+venue); `SHORTWIN_PRE_M4R_SO` and `SHORTWIN_PRE_M4R_TEST_VENUE_SO` name a release and a
+test-venue build of the tree before M4R, for `switch_confirm_it`'s ignored lockstep
+differentials only. `Env::test_venue()` loads the test-venue program and the mock; `Env::new()` the release
 program only; `Env::ray_fork()` the release program and the dumped Raydium programs (below). A
 stale `target/deploy/shortwin.so` fails the Raydium binaries in confusing ways: rebuild after any
 program change.
@@ -179,17 +181,25 @@ program change.
 | `--test raydium_cpmm_e2e` | M3 fork E2E on CPMM: the USELESS, Token-2022 and creator-fee journeys (list → deposit → open → real price moves → close / liquidation / expiry → S3 on an admin halt and on a fee hike above the hard cap → S2 on an out-of-model drained pool → lender exit), the settlement matrix on every fixture pool, U11 through short.win's exits, O13 ages |
 | `--test latch_raydium_it` | M3, T-LATCH on the dumped ProgramData: real loader upgrades (the Squads vault's signature forged), opens refused on every Raydium market while exits keep working, revalidation only at the loader's slot, a second upgrade during review, both Raydium bits, `[flag, open]` vs `[open, flag]`, U5 (the same CU on 1.4 MB, 0.79 MB and 10 MiB) |
 | `--test trace_raydium_it` | M3, T-RAY-TRACE: the exact call shape (program and stack height of every CPI) and trace entries of every Raydium-path instruction on AMM v4, CPMM and Token-2022 CPMM; peak height 3; the worst-case transactions ≤ 64 and the runtime's refusal of one open more |
-| `--test ray_sec_it` | M3 security review regressions on the fork: M3-SEC-1 (a CPMM config trade fee of 0 is no route — S3 chain, healthy positions frozen, never an uncapped S1 — and a fee-free risk view; the fee-split predicate against the ELF), M3-SEC-2 (Raydium listings refused while the Raydium latch is set), the M3-SEC-3 tripwire (the first listing pins the venue until M4 `propose_pool`; M4 inverts it) |
-| `--test tx_size_raydium` | M3, T-SIZE: every Raydium transaction in its worst case (both ComputeBudget instructions, a separate fee payer, a first-time borrower, the largest extras set) fits 1,232 B and 64 accounts as v0 through the protocol ALT (A28 as enumerated, and the table `scripts/build-alt.sh` builds) and executes that way; crank batches (4 per v0 transaction); the keeper's composite and a Jito tip (`-- --nocapture` prints the table) |
+| `--test ray_sec_it` | M3 security review regressions on the fork: M3-SEC-1 (a CPMM config trade fee of 0 is no route — S3 chain, healthy positions frozen, never an uncapped S1 — and a fee-free risk view; the fee-split predicate against the ELF), M3-SEC-2 (Raydium listings refused while the Raydium latch is set), M3-SEC-3 as inverted by M4 (`m3_sec_3_propose_pool_unpins_the_first_listing`: a list-only front-run of a Raydium token moved onto its main pool by `propose_pool`; a thin eligible listing replaced by the main pool inside `pool_list_window_s`, the window not extended) |
+| `--test pool_select_it` | M4, Raydium pool selection on the fork (release build, dumped programs, **planted** candidate pools — `pool_select::plant_v4` / `plant_cpmm`, a dumped pool's bytes on fresh keys that the dumped ELFs trade): a list-only market's adoption (exact state, O13 / O13b ages, D1 on real and planted curves, base/quote order); the listing window's 5 % margin, never extended; zero-position adoption at 25 % and `PositionsOpen`; AMM v4 ↔ CPMM switches with trades on the new pool; the fast path with open positions (the `pool_fail` chain — halt, fee above the hard cap, never the Emergency flag —, 120 s, the 60 s window keeping the deepest candidate, locked terms and EMA continuity, the ring rewrite and a ≤ 1 % box from the first second, exits on the new pool), cancellations, the latch; every refusal; T-RAY-SWITCH's attacks; the I15 hook's mutants; T-TRACE / CU (`-- --nocapture` prints them) |
+| `--test pool_attacks_it` | M4 pool-capture attacks on the fork (ARCH §2.6's attack table; the attacker's liquidity moves by the dumped CPMM ELF's real `deposit` / `withdraw`): unlocked-LP capture and pull (`D` unchanged), λ burn / locker / "unburn" games, hysteresis and the wash-trading cost of a flip, fast-path front-running, R4B-10 griefing and the pause remedy, mirrored and look-alike quotes, the latch (per candidate program, M4-SEC-8), `venue_switch.py`'s RA / RB / RC rows, no forced exit through a switch; the implementer's two tripwires are **inverted** by the M4 security review (`lambda_games::lp_dilution_no_longer_cancels_the_fast_path`, `…::a_round_trip_under_the_sol_floor_no_longer_cancels_the_fast_path`: an atomic `[deposit LP / sell, execute_pool_switch, withdraw / buy back]` no longer cancels the fast-path window, eligibility being the locked depth at `P_ema`) (`-- --nocapture` prints the figures) |
+| `--test m4_sec_it` | the M4 security review's findings as regressions on the fork (each fails on the pre-fix build): M4-SEC-1 (a persistent unlocked deposit no longer blocks the fast path; the halted market adopts and the underwater position is liquidated with and without it), M4-SEC-2 (a window whose arming chain broke — flapping or stale — cancels; the new failure re-arms after 120 s), M4-SEC-3 (eligibility unmovable inside a transaction on a market with a price; the bounded residual on a list-only market), M4-SEC-4 (a list-only market with positions collects the deepest pool; a pump venue cancels the window), M4-SEC-5 (restated by M4R: the adoption writes the anchor `⌊D·10⁴/λ_min⌋` and reads no sample, so a deposit or an unlocked LP's withdrawal around the execution — or around the proposal and the execution — changes nothing; after the warm-up `L_ema` is the pool's depth), M4-SEC-6 (a deeper or thinner candidate: the box is ≤ 1 % wide in `L` from the gate on), M4-SEC-8 (the latch holds only the candidate's program). M4-SEC-7 is the keeper scenario `junk_pools_cost_a_bounded_ranking_after_the_cranks` (`-- --nocapture` prints the figures) |
+| `--test m4v_it` | the M4 verification's findings as regressions on the fork: M4V-1 (a collection window's candidate needs its locked SOL alone at `P_ema` above `pool_min_real_sol`: 20- and 13-SOL pools refused `PoolTooThin`), M4V-2 (restated by M4R: deposits around the proposal, the execution or both change nothing; the underwater position is liquidated at adoption + 9 s; a deposit-wrapped crank every second does not block a big position's liquidation — the reference guard), M4V-3 (a `λ < λ_min` candidate: `L_ema = √(X·Y)` ±1 % at the gate, the box ≤ 1 % after it), M4V-4 (a latched window candidate cancels, the chain stays armed), M4V-5 (a captured list-only market opens nothing until `ema_warm = 0`, then `R_eff` refuses the pushed open) |
+| `--test m4r_it` | M4R, the post-change confirmation (PROPOSED, O18), on the fork: M4R-1 (a withdraw-wrapped switch and per-second withdraw-wrapped cranks and liquidations force nothing; every liquidation before the gate fails `EmaWarmingUp`; the genuinely liquidatable control is liquidated at +9 / +10 s; the degraded mode with an attacker-only warm-up), M4R-2 (a dump during the halt keeps a thin pool out; the pump-wrapped proposal residual), ★T-SWITCH-CONFIRM (a genuine 2.2× pump liquidated at adoption + 9 s; a keeper back after 600 s liquidates 8–9 s later); the M4R verification's M4X-1 (attacker-only price bundles through the warm-up: the seed rises by at most the largest v0.4.1 step, checked per integration; a position with a ≈ 3× threshold is no longer liquidated at a flat 1.00×), M4X-2 (a deposit freeze held for 900 s: `L_slow` stays at the honest lows while the guard is set, the genuine pump ends in a liquidation, not S1; the I18 mutant) and M4X-3 (a dump inside the collection window is adopted at `P_ema`, then re-seeded; the disclosed residual); `m4r_explore_liquidation_grid` is ignored (knobs `M4R_GRID`, `M4R_SECS`, `M4R_SOL`) (`-- --nocapture` prints the figures) |
+| `--test switch_confirm_it` | M4R's gate and guard: `liquidate` / `expire` fail `EmaWarmingUp` and `sol_settle` evaluates nothing during the warm-up on an executable venue, and only there (a new pool that halts in the warm-up reaches S3); the guard clears at the gate on an honest pool; a market without a switch is never marked; the ignored `lockstep_*` differentials send every instruction of a 90-s scenario to the pre-M4R build too and compare the accounts byte for byte (they run when `SHORTWIN_PRE_M4R_SO` / `SHORTWIN_PRE_M4R_TEST_VENUE_SO` name the pre-M4R release and test-venue builds; `-- --ignored lockstep`) |
+| `--test tx_size_raydium` | M3, T-SIZE: every Raydium transaction in its worst case (both ComputeBudget instructions, a separate fee payer, a first-time borrower, the largest extras set) fits 1,232 B and 64 accounts as v0 through the protocol ALT (A28 as enumerated, and the table `scripts/build-alt.sh` builds) and executes that way; crank batches (4 per v0 transaction); the keeper's composite and a Jito tip; M4's `propose_pool` / `execute_pool_switch` in their largest shapes (CPMM incumbent + CPMM candidate, a list-only market's detection set), executed through the table (`-- --nocapture` prints the table) |
 
 Every instruction goes through `Env::send`, which runs the invariant hooks — I1, I2, I6, I7,
 I8, I13 (state part) on every market a transaction names or creates; I3, I4, I5, I7, I9–I13,
-I16, I17, A26 (snapshot rules) and the lender transaction bounds against a pre-instruction
-snapshot — after the transaction and, for a transaction of several instructions, after each
-instruction (prefixes replayed on a clone of the VM). I14 is structural (account lists). A
-violation panics with the logs. Only a test that plants an impossible state on purpose (the
-hooks' own mutant tests, a copied account, an overflowed field) turns them off. Details and
-conventions: [`tests/litesvm/README.md`](../tests/litesvm/README.md).
+I15 (M4: listings, adoptions, windows, Raydium opens on locked depth), I16, I17 (M4: also
+adoptions and window candidates while the candidate's own Raydium program is flagged), A26
+(snapshot rules) and the lender transaction bounds against a pre-instruction snapshot — after
+the transaction and, for a transaction of several instructions, after each instruction
+(prefixes replayed on a clone of the VM). I14 is structural (account lists). A violation panics
+with the logs. Only a test that plants an impossible state on purpose (the hooks' own mutant
+tests, a copied account, an overflowed field) turns them off. Details and conventions:
+[`tests/litesvm/README.md`](../tests/litesvm/README.md).
 
 The quick run replays a subset of the `pool_model` traces. All of them (the 40 stranding seeds,
 the lock-heavy mix, both ECON §9.6 fuzz runs; about 4 minutes):
@@ -259,7 +269,8 @@ cargo test --manifest-path tests/bench/m2_cu/Cargo.toml -- --nocapture
 
 # M3 CU bench, T-TRACE and stack depth on Raydium: the release build on the dumped AMM v4 / CPMM
 # programs (Mollusk, cross-checked on LiteSVM), the worst-case Raydium transactions, and every
-# path through 0–3 levels of the TEST-ONLY CPI wrapper (tests/bench/m3_cu/wrapper, never deployed)
+# path through 0–3 levels of the TEST-ONLY CPI wrapper (tests/bench/m3_cu/wrapper, never deployed);
+# since M4 also propose_pool / execute_pool_switch (every writing outcome, ARCH §6.1's 100 k)
 anchor build --tools-version v1.57 --arch v3
 cargo-build-sbf --tools-version v1.57 --arch v3 --manifest-path tests/bench/m3_cu/wrapper/Cargo.toml \
   --sbf-out-dir tests/bench/m3_cu/target/deploy -- --locked       # the wrapper (t_depth only)
@@ -271,24 +282,31 @@ cargo test --manifest-path tests/bench/m3_cu/Cargo.toml --locked -- --nocapture
 (The `cu_math` bench program and the `m3_cu` wrapper are separate crates, so their build
 commands name their manifests; the no-bare-`cargo build-sbf` rule is about the short.win
 program.) The figures are in each bench's `results.md` (and `trace.md`, `depth.md`); commit them
-when they change. The M3 bench uses fixed borrower and attacker keys, so its reports are
-byte-identical across runs. See
+when they change. The M3 bench uses fixed borrower and attacker keys and draws the keys of its
+planted M4 pools in a fixed order, so its reports are byte-identical across runs (the M1 and M2
+benches use random keys: their PDA bump searches move the figures by ≈ 1.5 k CU per iteration
+from run to run). See
 [`tests/bench/cu_math/README.md`](../tests/bench/cu_math/README.md),
 [`tests/bench/m1_cu/README.md`](../tests/bench/m1_cu/README.md),
 [`tests/bench/m2_cu/README.md`](../tests/bench/m2_cu/README.md) and
 [`tests/bench/m3_cu/README.md`](../tests/bench/m3_cu/README.md).
 
-## Services and the keeper (keeper v1, M3)
+## Services and the keeper (keeper v1, M3; pool selection, M4)
 
 `services/` is a separate **host** workspace with its own `Cargo.lock` (ARCHITECTURE §1.2,
 §7.1): `common` (the chain client: JSON-RPC backend, v1 / v0 transaction building),
-`keeper` (keeper v1: duties 1–4, batching packed by size, degraded mode, priority fees, and
+`keeper` (keeper v1: duties 1–4, batching packed by size, degraded mode, priority fees,
 duty 10's venue monitor — ProgramData upgrades flagged with `flag_venue_upgraded`, Raydium pool
-admin actions alerted — on Raydium AMM v4 and CPMM markets; the `shortwin-keeper` binary and
-`shortwin-build-alt`, the protocol ALT) and the TEST-ONLY `keeper-litesvm` (an in-process
-LiteSVM backend that runs the program-test hooks after every instruction of every keeper
-transaction, and the scenario tests on the mock and on the Raydium fork). Its lockfile holds the
-same Agave 4.2.2 line as the harness it links.
+admin actions alerted — and, since M4, duty 12's Raydium pool monitor and duty 5's Raydium fast
+path — `getProgramAccounts` discovery of every Raydium SOL pool of a mint, the program's own
+verifier and `pool_select::decide`, `propose_pool` / `execute_pool_switch` — on Raydium AMM v4,
+CPMM and list-only markets; M4-SEC-7: discovered pools ranked by locked SOL, at most
+`rank_keys_per_tick` (200) accounts read a tick and the best `max_candidates` (8) evaluated,
+after the tick's exits and crank batch; config `[pool_select]` in `keeper.example.toml`); the
+`shortwin-keeper` binary and `shortwin-build-alt`, the protocol ALT) and the TEST-ONLY
+`keeper-litesvm` (an in-process LiteSVM backend that runs the program-test hooks after every
+instruction of every keeper transaction, and the scenario tests on the mock and on the Raydium
+fork). Its lockfile holds the same Agave 4.2.2 line as the harness it links.
 
 ```sh
 anchor build --tools-version v1.57 --arch v3 && scripts/build-test-venue.sh
@@ -306,12 +324,14 @@ SHORTWIN_RPC_URL=http://127.0.0.1:8899 \
 # run the keeper
 cargo build --manifest-path services/Cargo.toml -p shortwin-keeper --release
 services/target/release/shortwin-keeper --rpc <url> --keypair keeper.json \
-  --config services/keeper/keeper.example.toml --metrics 127.0.0.1:9464   # --once, --tick-ms
+  --config services/keeper/keeper.example.toml --metrics 127.0.0.1:9464   # --once, --tick-ms,
+                                                  # --discovery-rpc <url> (M4 pool discovery)
 ```
 
 The scenarios load the same builds as the program tests: the mock scenarios the test-venue
 build and the mock (`SHORTWIN_TEST_VENUE_SO`, `MOCK_CPAMM_SO`), the Raydium scenarios
-(`raydium*.rs`) the release build (`SHORTWIN_SO`) with the committed fork fixtures. The keeper
+(`raydium*.rs`, and M4's `pool_select.rs` with its planted sibling pools) the release build
+(`SHORTWIN_SO`) with the committed fork fixtures. The keeper
 knows the Raydium venues through the adapters' own account lists and the TEST-ONLY mock venue
 only with the feature `test-venue` of its scenario crate; the release keeper binary must not
 contain the mock's id (CI checks it). What each duty does and what v1 leaves out:
@@ -429,6 +449,6 @@ throwaway keypair to `target/deploy/`. The built program is unaffected (the id c
 | `codama` | IDL copy and generated client are current; `tsc`; `node --test` (T-LAYOUT Codama leg) |
 | `m1-cu` | M1 CU baseline bench (`tests/bench/m1_cu`) within budget |
 | `m2-cu` | M2 CU bench and T-TRACE (`tests/bench/m2_cu`) within budget and 64 trace entries |
-| `m3-cu` | M3 CU bench, T-TRACE and stack depth on Raydium (`tests/bench/m3_cu`): builds the TEST-ONLY CPI wrapper (SBPF v3 asserted), every Raydium-path instruction within budget, the worst-case transactions at their exact trace counts, every path through 0–3 wrapper levels |
+| `m3-cu` | M3 CU bench, T-TRACE and stack depth on Raydium (`tests/bench/m3_cu`): builds the TEST-ONLY CPI wrapper (SBPF v3 asserted), every Raydium-path instruction (M4's `propose_pool` / `execute_pool_switch` included) within budget, the worst-case transactions at their exact trace counts, every path through 0–3 wrapper levels |
 | `services` | the services workspace: fmt, clippy (also the keeper without `test-venue`), cargo-deny, cargo-audit, unit tests and the LiteSVM scenarios (mock and Raydium fork) on the `anchor-build` artifacts, and the A49 check on the release keeper binary |
 | `t-size` | T-SIZE on Raydium (`--test tx_size_raydium`, the size table in the log) and the protocol ALT's static part (`scripts/build-alt.sh print`, uploaded as an artifact) |

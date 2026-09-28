@@ -9,14 +9,17 @@
 //! Exits never check the venue guard, pause flags, the route-broken flag or the oracle (I10).
 //!
 //! **Preconditions** (ARCH §3.7, in this order): the prologue and the exit-path mint guard;
-//! the venue trades and is executable (`NoRoute` / `VenueMigrating`); `now ≥ deadline`
+//! the venue trades and is executable (`NoRoute` / `VenueMigrating`); the post-change warm-up is
+//! over (`EmaWarmingUp`, `liquidate`'s precondition 1b; M4R); `now ≥ deadline`
 //! (`NotExpired`); a fresh completed bucket (`ReferenceStale`); **not** CR-liquidatable
 //! (`UseLiquidate`: an expired position whose spot and EMA legs hold pays the penalty through
 //! `liquidate`, ECON §8.4); normal buyback allowed (`UseSolSettle`); the expiry reference
 //!
 //! ```text
 //! P_ref  = min(P_ema, min over the ring of p_i, lb_lo)          (nothing is urgent at expiry)
-//! B̂_ref  = B̂(Q; reprice(max(L_live, L_ema, L_slow), P_ref))      (risk quote)
+//! B̂_ref  = B̂(Q; reprice(max(L_live, L_ema', L_slow), P_ref))     (risk quote; L_ema' =
+//!                                                                  min(L_ema, L_mlo) while the
+//!                                                                  post-change guard is set, M4R)
 //! π_ref  = ⌈expiry_fee_bps·B̂_ref/10⁴⌉
 //! max_in = min(⌊B̂_ref·(10⁴ + δ_exp)/10⁴⌋, V − K_s − ert, max(V − R − π_ref − ert, ⌊B̂_ref·(10⁴ + ε)/10⁴⌋))
 //! ```

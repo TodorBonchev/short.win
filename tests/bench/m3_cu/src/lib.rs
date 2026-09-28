@@ -25,6 +25,16 @@
 //!
 //! The worst-case transactions of T-TRACE are [`worst_case_transactions`]; the stack-depth runs
 //! through the TEST-ONLY wrapper program (`wrapper/`, [`WRAPPER_ID`]) are [`depth_cases`].
+//!
+//! **M4 (Raydium pool selection):** `propose_pool` and `execute_pool_switch` join every table
+//! (section "M4" below): a list-only market's adoption (Fartcoin with its real mainnet curve, so
+//! the D1 detection runs; USELESS), a listing-window replacement of Fartcoin's thin reversed pool
+//! by its main pool, zero-position adoptions across the programs, a fast-path window opened and
+//! improved on a halted incumbent with a position open, and its execution (adoption with the
+//! ring rewrite, and a cancellation). Candidates the fixtures lack are **planted** pools
+//! (`shortwin_litesvm_tests::pool_select::plant_cpmm`: a dumped pool's bytes on fresh keys, which
+//! the dumped ELF trades). Every ring is full (`RING_LEN` integrated seconds) before an adoption,
+//! so the rewrite is measured at its largest.
 
 use std::path::PathBuf;
 
@@ -45,8 +55,12 @@ use shortwin_litesvm_tests::engine::{
     Borrower, close_short_ix, crank_price_ix, expire_ix, liquidate_ix, open_short_ix, sol_settle_ix,
 };
 use shortwin_litesvm_tests::fork::{self, AnyPool, CpmmFixture, RaydiumProgram, V4Fixture};
+use shortwin_litesvm_tests::pool_select::{
+    detection_set, execute_pool_switch_ix, plant_cpmm, propose_pool_ix, spec_like,
+};
 use shortwin_litesvm_tests::raydium::{
-    RayFixture, RayMarket, RaySpec, create_ray_market_ix, lp_mint, set_mint_supply,
+    RayFixture, RayMarket, RaySpec, candidate_read_set, create_ray_market_ix, fartcoin_curve_bytes,
+    lp_counter, lp_mint, mint_supply, plant_curve, set_mint_supply, supply_for_lambda,
 };
 use shortwin_litesvm_tests::tokens::TokenProgram;
 use shortwin_litesvm_tests::{Env, TxResult, events, fixtures, ix};
@@ -128,6 +142,11 @@ pub const CREATE: Budget = Budget {
     cu: 250_000,
     source: "§6.1 `create_market`",
 };
+/// ARCH §6.1 `propose_pool` / `execute_pool_switch` (M4; est. 25–35 k).
+pub const POOL: Budget = Budget {
+    cu: 100_000,
+    source: "§6.1 `propose_pool` / `execute_pool_switch`",
+};
 /// ARCH §6.1 `flag_venue_upgraded` / `revalidate_venue` (U5).
 pub const LATCH: Budget = Budget {
     cu: 400_000,
@@ -158,7 +177,8 @@ pub const SETTLE_ROW: Option<TraceRow> = Some(TraceRow {
     arch: 2,
     arch_max: 5,
 });
-/// ARCH §6.2 `crank_price`, `flag_venue_upgraded`: 2.
+/// ARCH §6.2 `crank_price`, `propose_pool`, `flag_venue_upgraded`: 2 (`execute_pool_switch`
+/// has no row; it makes the same single event CPI).
 pub const TWO_ROW: Option<TraceRow> = Some(TraceRow {
     arch: 2,
     arch_max: 2,
@@ -710,6 +730,285 @@ fn revalidate_raydium(venue: u8) -> Prepared {
     prepared(env, ix, &[&ea])
 }
 
+// ---- M4: pool selection ---------------------------------------------------------------------
+
+/// Fartcoin's tiny reversed-order AMM v4 pool `9GWMrDgH…` (WSOL as pc; thin, not eligible as
+/// dumped).
+pub const FART_REV: RayFixture = RayFixture::V4(V4Fixture::FartcoinReversed);
+
+/// Integrated seconds that fill the observation ring (`RING_LEN` = 8) with a margin, so an
+/// adoption rewrites every entry (ARCH §2.6 rule 4, A72).
+pub const RING_FILL: u32 = shortwin_math::consts::RING_LEN as u32 + 2;
+
+/// `λ_bps` of `pool` now.
+pub fn lambda_of(env: &Env, pool: &AnyPool) -> u64 {
+    let supply = mint_supply(&env.svm, &lp_mint(pool));
+    u64::from(shortwin_math::pool_select::lambda_bps(
+        lp_counter(&env.svm, pool),
+        supply,
+    ))
+}
+
+/// A planted CPMM pool (USELESS's bytes, config 0) of `base`'s token, WSOL as token 0, with
+/// `base`'s reserves scaled by `num/den` (its price) and its locked share: `D` scales by the same
+/// factor.
+pub fn plant_like(env: &mut Env, base: &AnyPool, num: u64, den: u64) -> AnyPool {
+    let lam = lambda_of(env, base);
+    let spec = spec_like(&env.svm, base, true, lam).scaled(num, den);
+    AnyPool::Cpmm(plant_cpmm(env, CpmmFixture::Useless, spec))
+}
+
+/// A list-only (`Auto`) market of `fixture`'s token; Fartcoin's with its real mainnet bonding
+/// curve at the curve PDA, so `propose_pool`'s D1 detection reads a curve that graduated
+/// elsewhere (ARCH §2.5).
+fn list_only(fixture: RayFixture) -> (Env, AnyPool) {
+    let mut env = Env::ray_fork();
+    let pool = env.load_ray_pool(fixture);
+    let (mint, program) = pool.token();
+    if fixture == FART {
+        plant_curve(&mut env.svm, &mint, fartcoin_curve_bytes());
+    }
+    ok(env.list_auto(&mint, program));
+    (env, pool)
+}
+
+fn propose_list_only(fixture: RayFixture) -> Prepared {
+    let (env, pool) = list_only(fixture);
+    let mint = pool.token().0;
+    let ix = propose_pool_ix(&env.svm, &mint, &detection_set(&mint), &pool);
+    prepared(env, ix, &[])
+}
+
+/// Fartcoin's thin reversed pool listed first — its LP burned to λ = 50 %, topped up to just
+/// over the locked-depth floor, i.e. `pool_min_real_sol` and the floor's rounding (`ray_sec_it`'s
+/// M3-SEC-3 case; M4-SEC-1 / -3) — with a lender, cranked for [`RING_FILL`] seconds; the main
+/// pool loaded. Returns the market on the thin pool and the main pool.
+fn thin_listing() -> (Env, RayMarket, AnyPool) {
+    let mut env = Env::ray_fork();
+    let deep = env.load_ray_pool(FART);
+    let thin = env.load_ray_pool(FART_REV);
+    let min = env.config().params.pool_min_real_sol;
+    let supply = supply_for_lambda(lp_counter(&env.svm, &thin), 5_000);
+    set_mint_supply(&mut env.svm, &lp_mint(&thin), supply);
+    shortwin_litesvm_tests::pool_select::top_up_pc_to_floor(&mut env, &thin, min);
+    ok(env.list_ray(&thin, FART_REV.hint()));
+    let q = q_of(&env, &thin);
+    let spec = RaySpec {
+        warmup: 0,
+        ..RaySpec::new(FART_REV, q.saturating_mul(40))
+    };
+    let rm = env.ray_market_listed(spec, thin);
+    env.tick(&rm, RING_FILL);
+    (env, rm, deep)
+}
+
+/// A listing-window replacement (ARCH §2.6 rule 1): the thin listing, [`RING_FILL`] seconds
+/// old, replaced by Fartcoin's main pool (5 % margin, no position; the ring rewritten).
+fn propose_listing_window() -> Prepared {
+    let (mut env, rm, deep) = thin_listing();
+    env.warp(1);
+    let mint = deep.token().0;
+    let inc = candidate_read_set(&env.svm, &rm.pool, false);
+    let ix = propose_pool_ix(&env.svm, &mint, &inc, &deep);
+    prepared(env, ix, &[])
+}
+
+/// A zero-position adoption after the listing window (ARCH §2.6 rule 2) from `fixture`'s pool
+/// onto a planted CPMM pool twice as deep, the ring full.
+fn propose_zero_position(fixture: RayFixture) -> Prepared {
+    let (mut env, rm, _) = setup(fixture);
+    env.tick(&rm, RING_FILL);
+    let cand = plant_like(&mut env, &rm.pool, 2, 1);
+    env.warp(1);
+    let mint = rm.pool.token().0;
+    let inc = candidate_read_set(&env.svm, &rm.pool, false);
+    let ix = propose_pool_ix(&env.svm, &mint, &inc, &cand);
+    prepared(env, ix, &[])
+}
+
+/// The fast path armed (ARCH §2.6 rule 3) on `fixture` with one position open: the ring full,
+/// two planted CPMM candidates at 40 % and 60 % of the incumbent's `D`, then the pool halted by
+/// its admin's own instruction and observed every 30 s for 150 s (`pool_fail` ≥
+/// `pool_fast_route_s`). The clock is one second past the last crank.
+fn fast_path_armed(fixture: RayFixture) -> (Env, RayMarket, AnyPool, AnyPool) {
+    let (mut env, rm, _, _, _) = with_position(fixture);
+    env.tick(&rm, RING_FILL);
+    let a = plant_like(&mut env, &rm.pool, 40, 100);
+    let c = plant_like(&mut env, &rm.pool, 60, 100);
+    halt(&mut env, &rm);
+    for _ in 0..5 {
+        env.warp(30);
+        env.crank(&rm);
+    }
+    env.warp(1);
+    (env, rm, a, c)
+}
+
+fn propose_ix_on(env: &Env, rm: &RayMarket, cand: &AnyPool) -> Instruction {
+    let mint = rm.pool.token().0;
+    let inc = candidate_read_set(&env.svm, &rm.pool, false);
+    propose_pool_ix(&env.svm, &mint, &inc, cand)
+}
+
+/// The first armed proposal opens a collection window on the 40 % candidate.
+fn propose_open_window(fixture: RayFixture) -> Prepared {
+    let (env, rm, a, _) = fast_path_armed(fixture);
+    let ix = propose_ix_on(&env, &rm, &a);
+    prepared(env, ix, &[])
+}
+
+/// A deeper candidate (60 %) replaces the window's (40 %) five seconds later.
+fn propose_improve_window(fixture: RayFixture) -> Prepared {
+    let (mut env, rm, a, c) = fast_path_armed(fixture);
+    ok(env.send(&[propose_ix_on(&env, &rm, &a)], &[]));
+    env.warp(5);
+    let ix = propose_ix_on(&env, &rm, &c);
+    prepared(env, ix, &[])
+}
+
+/// A window of the 60 % candidate that has run `pool_fast_window_s` (the incumbent observed
+/// every 30 s meanwhile); `resume` reopens the incumbent's pool first (a cancellation).
+fn window_due(fixture: RayFixture, resume: bool) -> Prepared {
+    let (mut env, rm, _, c) = fast_path_armed(fixture);
+    ok(env.send(&[propose_ix_on(&env, &rm, &c)], &[]));
+    let window = i64::from(env.config().params.pool_fast_window_s);
+    env.warp(window / 2);
+    env.crank(&rm);
+    if resume {
+        let ix = match &rm.pool {
+            AnyPool::V4(p) => fork::v4_set_params_ix(p, 0, 6),
+            AnyPool::Cpmm(p) => fork::cpmm_update_pool_status_ix(p, 0),
+        };
+        ok(fork::raydium_admin_send(&mut env, ix));
+    }
+    env.warp(window - window / 2);
+    let mint = rm.pool.token().0;
+    let ix = execute_pool_switch_ix(&env.svm, &mint, &rm.pool, &c);
+    prepared(env, ix, &[])
+}
+
+/// The last post-change warm-up integration (M4R): a fast adoption of the 60 % candidate with a
+/// position open, then eight per-second cranks of the new pool (the first records, the next seven
+/// integrate: `ema_warm` 1), and one second later the measured crank, which re-seeds the EMA over
+/// the eight post-change entries and clears the guard at the gate.
+fn crank_warm_up(fixture: RayFixture) -> Prepared {
+    let (mut env, rm, _, c) = fast_path_armed(fixture);
+    ok(env.send(&[propose_ix_on(&env, &rm, &c)], &[]));
+    let window = i64::from(env.config().params.pool_fast_window_s);
+    env.warp(window / 2);
+    env.crank(&rm);
+    env.warp(window - window / 2);
+    let mint = rm.pool.token().0;
+    ok(env.send(
+        &[execute_pool_switch_ix(&env.svm, &mint, &rm.pool, &c)],
+        &[],
+    ));
+    let rm2 = rm.on_pool(&env.svm, c);
+    for _ in 0..8 {
+        env.warp(1);
+        env.crank(&rm2);
+    }
+    assert_eq!(
+        env.market(&rm2.keys.market).ema_warm,
+        1,
+        "the last warm-up step"
+    );
+    env.warp(1);
+    let ix = crank_price_ix(&rm2);
+    prepared(env, ix, &[])
+}
+
+/// The Raydium pool-selection instructions (ARCH §9 M4) on both programs and both token
+/// programs: every `propose_pool` outcome that writes (a list-only adoption, a listing-window
+/// replacement, a zero-position adoption, a window opened, a window improved) and both
+/// `execute_pool_switch` outcomes (the fast adoption with a position open, a cancellation).
+pub fn pool_cases() -> Vec<Case> {
+    let mut v: Vec<Case> = Vec::new();
+    let mut add = |handler: &'static str, case: String, setup: Box<dyn Fn() -> Prepared>| {
+        v.push(Case {
+            handler,
+            case,
+            budget: POOL,
+            trace: TWO_ROW,
+            setup,
+        });
+    };
+    add(
+        "propose_pool",
+        format!(
+            "{}: list-only market adopts it (Fartcoin's real curve: D1 detection)",
+            label(FART)
+        ),
+        Box::new(|| propose_list_only(FART)),
+    );
+    add(
+        "propose_pool",
+        format!("{}: list-only market adopts it", label(USELESS)),
+        Box::new(|| propose_list_only(USELESS)),
+    );
+    add(
+        "propose_pool",
+        "AMM v4: listing-window replacement of the thin reversed Fartcoin pool by the main pool, ring rewritten".into(),
+        Box::new(propose_listing_window),
+    );
+    for f in VARIANTS {
+        add(
+            "propose_pool",
+            format!(
+                "{}: zero-position adoption of a planted CPMM pool 2× as deep, ring rewritten",
+                label(f)
+            ),
+            Box::new(move || propose_zero_position(f)),
+        );
+    }
+    for f in VARIANTS {
+        add(
+            "propose_pool",
+            format!(
+                "{}: halted incumbent, a position open: fast-path window opened (CPMM candidate at 40 % of D)",
+                label(f)
+            ),
+            Box::new(move || propose_open_window(f)),
+        );
+        add(
+            "propose_pool",
+            format!(
+                "{}: fast-path window improved (60 % replaces 40 %)",
+                label(f)
+            ),
+            Box::new(move || propose_improve_window(f)),
+        );
+    }
+    for f in VARIANTS {
+        add(
+            "execute_pool_switch",
+            format!(
+                "{}: fast adoption after the window, a position open, ring rewritten",
+                label(f)
+            ),
+            Box::new(move || window_due(f, false)),
+        );
+        add(
+            "execute_pool_switch",
+            format!("{}: window cancelled (the incumbent resumed)", label(f)),
+            Box::new(move || window_due(f, true)),
+        );
+    }
+    for f in VARIANTS {
+        v.push(Case {
+            handler: "crank_price",
+            case: format!(
+                "{}: the last post-change warm-up integration (seed over 8 entries, guard cleared; M4R)",
+                label(f)
+            ),
+            budget: CRANK,
+            trace: TWO_ROW,
+            setup: Box::new(move || crank_warm_up(f)),
+        });
+    }
+    v
+}
+
 /// Every Raydium-path instruction (ARCH §9 M3) on both programs, SPL and Token-2022, with the
 /// fee and side variants of the CPMM adapter where they change the path; the latch on the
 /// dumped ProgramData and on a 10 MiB one.
@@ -894,6 +1193,7 @@ pub fn cases() -> Vec<Case> {
         TWO_ROW,
         Box::new(|| revalidate_raydium(GUARD_RAYDIUM_CPMM)),
     );
+    v.extend(pool_cases());
     v
 }
 
@@ -1243,7 +1543,36 @@ pub fn worst_case_transactions() -> Vec<TraceTx> {
         v1: false,
         setup: Box::new(tx_flag_both),
     });
+    // M4: the keeper's pool-selection transactions (ARCH §7.1 duties 5 and 12).
+    for f in [FART, T22] {
+        v.push(TraceTx {
+            name: format!(
+                "{}: ComputeBudget ×2 + propose_pool (zero-position adoption, ring rewritten)",
+                label(f)
+            ),
+            arch: "2 + 2 (§6.2 `propose_pool`)",
+            expected: 2 + 2,
+            v1: false,
+            setup: Box::new(move || single_with_cb(propose_zero_position(f))),
+        });
+        v.push(TraceTx {
+            name: format!(
+                "{}: ComputeBudget ×2 + execute_pool_switch (fast adoption, a position open)",
+                label(f)
+            ),
+            arch: "2 + 2 (no row; as `propose_pool`)",
+            expected: 2 + 2,
+            v1: false,
+            setup: Box::new(move || single_with_cb(window_due(f, false))),
+        });
+    }
     v
+}
+
+/// One prepared instruction with the two ComputeBudget instructions in front.
+fn single_with_cb(p: Prepared) -> (Env, Vec<Instruction>, Vec<Keypair>) {
+    let Prepared { env, ix, signers } = p;
+    (env, with_cb(vec![ix]), signers)
 }
 
 // ---- stack depth ----------------------------------------------------------------------------
@@ -1362,6 +1691,19 @@ pub fn depth_cases() -> Vec<DepthCase> {
         case: "AMM v4, the dumped ProgramData".into(),
         direct_peak: 2,
         setup: Box::new(|| flag_raydium(GUARD_RAYDIUM_V4)),
+    });
+    // M4: pool selection makes only its event CPI.
+    v.push(DepthCase {
+        handler: "propose_pool",
+        case: format!("{}: zero-position adoption", label(T22)),
+        direct_peak: 2,
+        setup: Box::new(|| propose_zero_position(T22)),
+    });
+    v.push(DepthCase {
+        handler: "execute_pool_switch",
+        case: format!("{}: fast adoption, a position open", label(FART)),
+        direct_peak: 2,
+        setup: Box::new(|| window_due(FART, false)),
     });
     v
 }

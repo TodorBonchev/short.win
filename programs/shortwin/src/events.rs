@@ -333,28 +333,52 @@ macro_rules! pool_event {
             pub market: Pubkey,
             pub slot: u64,
             pub ts: i64,
+            /// The candidate pool (`PoolSwitched`: the pool now adopted).
             pub candidate: Pubkey,
-            /// Listing / zero-position / fast.
+            /// `POOL_KIND_*`: listing / listing window / zero-position / fast.
             pub kind: u8,
+            /// The candidate's locked depth `D` (`PoolSwitchCancelled`: the best one seen).
             pub d_cand: u128,
+            /// The incumbent's locked depth `pool_d` (0 for a list-only market).
             pub d_inc: u128,
+            /// `PoolProposed` / `PoolSwitchCancelled`: the end of the fast-path collection
+            /// window; `PoolSwitched`: the end of the listing window after the adoption (opens
+            /// resume then).
             pub window_ends: i64,
         }
     };
 }
 
 pool_event!(
-    /// `propose_pool` opened or improved a window, or proposed.
+    /// `propose_pool` opened or improved a fast-path collection window (ARCH §2.6 rule 3).
     PoolProposed
 );
 pool_event!(
-    /// A pool adoption.
+    /// A pool adoption (`propose_pool`: listing, listing window, zero-position;
+    /// `execute_pool_switch`: fast path). ARCH §2.6 rule 4.
     PoolSwitched
 );
 pool_event!(
-    /// A fast-path window closed without adoption.
+    /// A collection window closed without adoption (`execute_pool_switch`, ARCH §2.6 rule 3):
+    /// the window's candidate is no longer eligible or no longer passes the window floor (its
+    /// locked SOL at `P_ema`, M4V-1); on a Raydium market the `pool_fail` chain that armed the
+    /// window broke — the incumbent no longer fails `pool_fail`, or it recovered and failed
+    /// again (M4-SEC-2); on a list-only market its detection set now shows a pump venue (D1,
+    /// M4-SEC-4); or the candidate's own Raydium program is flagged in the venue-upgrade latch
+    /// (M4V-4: not adoptable now; the chain stays armed).
     PoolSwitchCancelled
 );
+
+/// `Pool*.kind` (ARCH §3.10 "listing / zero-position / fast", with the listing split in two):
+/// a list-only (`None`) market adopts its first Raydium pool (ARCH §2.5 `None`, §2.6 rule 1).
+pub const POOL_KIND_LISTING: u8 = 0;
+/// A replacement inside the listing window, `pool_list_margin_bps` (ARCH §2.6 rule 1).
+pub const POOL_KIND_LISTING_WINDOW: u8 = 1;
+/// An adoption without a failure on a market with no open position,
+/// `pool_switch_margin_bps` (ARCH §2.6 rule 2).
+pub const POOL_KIND_ZERO_POSITION: u8 = 2;
+/// The fast path on an incumbent failing `pool_fail` (ARCH §2.6 rule 3).
+pub const POOL_KIND_FAST: u8 = 3;
 
 /// `TraderSwept.to` / `VenueRewardsClaimed.to`: credited through `vest`.
 pub const SWEEP_TO_VEST: u8 = 0;

@@ -1,6 +1,6 @@
-//! Alerts (ARCHITECTURE §7.1 "Keys and ops", duties 9 and 10): what the keeper pages about. The
-//! keeper returns them in each [`crate::keeper::TickReport`] and logs them; the binary forwards
-//! them to its log (a pager integration is an ops choice).
+//! Alerts (ARCHITECTURE §7.1 "Keys and ops", duties 5, 9, 10 and 12): what the keeper pages
+//! about. The keeper returns them in each [`crate::keeper::TickReport`] and logs them; the
+//! binary forwards them to its log (a pager integration is an ops choice).
 
 use anchor_lang::prelude::Pubkey;
 use shortwin::state::VenueKind;
@@ -82,6 +82,58 @@ pub enum Alert {
         pool: Pubkey,
         change: AdminChange,
     },
+    /// Duty 5 / 12 (ARCH §2.6): `market` adopted another pool — by the keeper's own
+    /// `propose_pool` / `execute_pool_switch` (`kind`: its `POOL_KIND_*`), or seen on chain
+    /// (`kind` `None`: someone else's transaction). A list-only market's `from` is the default
+    /// key.
+    PoolSwitched {
+        market: Pubkey,
+        from: Pubkey,
+        to: Pubkey,
+        venue: VenueKind,
+        kind: Option<u8>,
+        d_inc: u128,
+        d_cand: u128,
+        by_keeper: bool,
+    },
+    /// Duty 5: a fast-path collection window opened (or took a deeper candidate) on
+    /// `candidate`; it resolves at `window_ends`.
+    PoolWindow {
+        market: Pubkey,
+        candidate: Pubkey,
+        d_cand: u128,
+        window_ends: i64,
+        improved: bool,
+        by_keeper: bool,
+    },
+    /// Duty 5: a collection window closed without an adoption (the best candidate no longer
+    /// eligible, or the incumbent no longer failing).
+    PoolSwitchCancelled {
+        market: Pubkey,
+        candidate: Pubkey,
+        by_keeper: bool,
+    },
+    /// Duty 12, R4B-10: a candidate with at least `pool_switch_margin_bps` more locked depth has
+    /// been waiting since `since` while open positions pin the market to its thinner incumbent
+    /// — page the Emergency multisig to pause opens on the market so it drains; the keeper
+    /// adopts the candidate in the slot the last position closes.
+    PoolPinned {
+        market: Pubkey,
+        incumbent: Pubkey,
+        candidate: Pubkey,
+        d_inc: u128,
+        d_cand: u128,
+        open_positions: u32,
+        since: i64,
+    },
+    /// A pool-selection instruction the keeper's projection expected to pass was refused by the
+    /// program (custom error `code`) or failed on chain; alerted once per pool and code.
+    PoolSelectRefused {
+        market: Pubkey,
+        pool: Pubkey,
+        code: Option<u32>,
+        detail: String,
+    },
 }
 
 impl Alert {
@@ -99,6 +151,13 @@ impl Alert {
             }
             Self::VenueAdmin { change, .. } if change.is_severe() => {
                 tracing::error!(alert = ?self, "venue admin action");
+            }
+            Self::PoolPinned { .. } => tracing::error!(alert = ?self, "pool selection alert"),
+            Self::PoolSwitched { .. }
+            | Self::PoolWindow { .. }
+            | Self::PoolSwitchCancelled { .. }
+            | Self::PoolSelectRefused { .. } => {
+                tracing::warn!(alert = ?self, "pool selection");
             }
             _ => tracing::warn!(alert = ?self, "keeper alert"),
         }

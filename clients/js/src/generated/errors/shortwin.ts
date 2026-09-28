@@ -214,6 +214,10 @@ export const SHORTWIN_ERROR__ORACLE_FUTURE_DATED = 0x17d1; // 6097
 export const SHORTWIN_ERROR__EMERGENCY_CANNOT_CANCEL = 0x17d2; // 6098
 /** UseLiquidate: Position is expired and CR-liquidatable; use liquidate */
 export const SHORTWIN_ERROR__USE_LIQUIDATE = 0x17d3; // 6099
+/** PoolWindowClosed: The fast-path collection window has closed; call execute_pool_switch */
+export const SHORTWIN_ERROR__POOL_WINDOW_CLOSED = 0x17d4; // 6100
+/** EmaWarmingUp: The price state is warming up after a venue change; opens and keeper exits wait */
+export const SHORTWIN_ERROR__EMA_WARMING_UP = 0x17d5; // 6101
 
 export type ShortwinError =
   | typeof SHORTWIN_ERROR__ABOVE_PRO_RATA_ALLOWANCE
@@ -239,6 +243,7 @@ export type ShortwinError =
   | typeof SHORTWIN_ERROR__CURVE_STRADDLE
   | typeof SHORTWIN_ERROR__DELEGATE_NOT_CLEARED
   | typeof SHORTWIN_ERROR__DENIED_ACCOUNT
+  | typeof SHORTWIN_ERROR__EMA_WARMING_UP
   | typeof SHORTWIN_ERROR__EMERGENCY_CANNOT_CANCEL
   | typeof SHORTWIN_ERROR__EPOCH_RECORD_MISMATCH
   | typeof SHORTWIN_ERROR__EXIT_BOUND_NOT_MET
@@ -284,6 +289,7 @@ export type ShortwinError =
   | typeof SHORTWIN_ERROR__POOL_NOT_DOMINANT
   | typeof SHORTWIN_ERROR__POOL_SWITCH_NOT_DUE
   | typeof SHORTWIN_ERROR__POOL_TOO_THIN
+  | typeof SHORTWIN_ERROR__POOL_WINDOW_CLOSED
   | typeof SHORTWIN_ERROR__POSITIONS_OPEN
   | typeof SHORTWIN_ERROR__PRICE_ABOVE_OPEN_MAX
   | typeof SHORTWIN_ERROR__PRICE_DEVIATES_FROM_EMA
@@ -343,6 +349,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [SHORTWIN_ERROR__CURVE_STRADDLE]: `Buyback exceeds the curve's real token reserves; use the straddle bundle`,
     [SHORTWIN_ERROR__DELEGATE_NOT_CLEARED]: `Pool vault delegate was not cleared`,
     [SHORTWIN_ERROR__DENIED_ACCOUNT]: `A protocol account was passed where it is denied (e.g. as a venue extra)`,
+    [SHORTWIN_ERROR__EMA_WARMING_UP]: `The price state is warming up after a venue change; opens and keeper exits wait`,
     [SHORTWIN_ERROR__EMERGENCY_CANNOT_CANCEL]: `Only governance may cancel an authorities or timelock change`,
     [SHORTWIN_ERROR__EPOCH_RECORD_MISMATCH]: `A ShareEpoch record does not match the market or epoch`,
     [SHORTWIN_ERROR__EXIT_BOUND_NOT_MET]: `Live buyback cost exceeds the exit bound`,
@@ -388,6 +395,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [SHORTWIN_ERROR__POOL_NOT_DOMINANT]: `Candidate pool does not dominate the incumbent`,
     [SHORTWIN_ERROR__POOL_SWITCH_NOT_DUE]: `Pool switch is not due`,
     [SHORTWIN_ERROR__POOL_TOO_THIN]: `Pool is too thin`,
+    [SHORTWIN_ERROR__POOL_WINDOW_CLOSED]: `The fast-path collection window has closed; call execute_pool_switch`,
     [SHORTWIN_ERROR__POSITIONS_OPEN]: `Market has open positions`,
     [SHORTWIN_ERROR__PRICE_ABOVE_OPEN_MAX]: `EMA price is above the open maximum`,
     [SHORTWIN_ERROR__PRICE_DEVIATES_FROM_EMA]: `Spot price deviates from the EMA`,

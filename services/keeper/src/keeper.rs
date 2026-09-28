@@ -19,6 +19,17 @@
 //! 4. closes the previous second's coverage accounting (misses → degraded mode; `CoverageGap`
 //!    events from the program → degraded mode; duty 9) and the metrics (duty 8).
 //!
+//! After the exits and before the cranks, Raydium pool selection (duty 5's fast path and duty
+//! 12, the pool monitor; [`crate::pool_monitor`]) on every covered Raydium and list-only
+//! market: discover the mint's Raydium SOL pools, rank the eligible ones with the program's own
+//! verifier, and send `propose_pool` / `execute_pool_switch` exactly when the program's own
+//! `pool_select::decide` accepts — a list-only market's first pool, a listing-window
+//! replacement (5 %), a zero-position adoption (25 %; in the tick the last position closes),
+//! the fast path's window (opened at the first armed second on the deepest candidate, improved
+//! by a deeper one, executed at the first second after it); pool events are reported, a market
+//! pinned by open positions to a much thinner pool is alerted (R4B-10). A market adopted in
+//! the tick is re-read, so its crank that tick names the new pool.
+//!
 //! Before the markets, the venue drift monitor (duty 10, [`crate::monitor`]): the venue
 //! ProgramData headers against the `VenueGuard` latch — an upgrade is flagged with
 //! `flag_venue_upgraded` in the slot the keeper sees it, at the exit priority ceiling — and
@@ -38,9 +49,11 @@ use std::collections::{BTreeMap, HashSet, VecDeque};
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::Instruction;
 use anyhow::anyhow;
+use shortwin::engine::pool_select::{self, Proposal, SelectParams, Situation};
+use shortwin::engine::{guard, prologue};
 use shortwin::errors::ShortwinError;
 use shortwin::events::{CoverageGap, SolSettle};
-use shortwin::state::{EXTRAS_IX_BUY, VenueGuard};
+use shortwin::state::{EXTRAS_IX_BUY, Market, VenueGuard, VenueKind};
 use shortwin::venues::ExtrasSel;
 use shortwin_services_common::tx::{self, ComputeBudget, TxFormat};
 use shortwin_services_common::{Chain, ChainClock, TxError, TxOutcome};
@@ -52,12 +65,13 @@ use crate::alerts::Alert;
 use crate::config::{KeeperConfig, TxFormatPolicy};
 use crate::coverage::{Due, MarketTrack};
 use crate::decide::{self, MarketNeeds, Plan, PositionEval};
-use crate::events;
+use crate::events::{self, PoolEvent, PoolEventKind};
 use crate::fees;
 use crate::ixs;
 use crate::metrics::Metrics;
 use crate::monitor::{self, FeeCaps, LatchAction, PoolWatch};
 use crate::pda;
+use crate::pool_monitor::{self, Action, PoolPlan, PoolTrack, Seen};
 use crate::venue;
 use crate::view::{self, ChainView, MarketView, PositionView};
 
@@ -141,6 +155,79 @@ pub struct BatchRecord {
     pub unit_limit: u32,
 }
 
+/// What became of a pool-selection attempt (`propose_pool`, `execute_pool_switch`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum PoolResult {
+    /// Landed, with its pool events.
+    Landed {
+        outcome: TxOutcome,
+        events: Vec<PoolEvent>,
+    },
+    /// The program refused it in simulation (`code`: its custom error, if any).
+    Refused {
+        code: Option<u32>,
+        outcome: TxOutcome,
+    },
+    /// Sent, and failed on chain.
+    Failed { outcome: TxOutcome },
+    /// Dry run: simulated only.
+    DryRun { outcome: TxOutcome },
+    /// A transport or building error.
+    Error(String),
+}
+
+impl PoolResult {
+    /// Whether it landed.
+    pub fn landed(&self) -> bool {
+        matches!(self, Self::Landed { .. })
+    }
+}
+
+/// One pool-selection attempt.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PoolActionRecord {
+    pub market: Pubkey,
+    pub action: Action,
+    pub result: PoolResult,
+}
+
+/// Pool-selection refusals that are the program's normal "not now" answers after a race (a
+/// proposal or adoption landed between the keeper's read and its send; the latch) — no alert.
+fn benign_pool(code: Option<u32>) -> bool {
+    [
+        ShortwinError::PoolNotDominant,
+        ShortwinError::PositionsOpen,
+        ShortwinError::PoolWindowClosed,
+        ShortwinError::PoolSwitchNotDue,
+        ShortwinError::NoPendingSwitch,
+        ShortwinError::VenueUpgraded,
+    ]
+    .into_iter()
+    .any(|e| code == Some(u32::from(e)))
+}
+
+/// A failing Raydium market without positions whose candidate the fast path could take (the
+/// plan's `keep_chain`): duty 5's no-route cadence does not observe a market without positions,
+/// so the pool monitor queues its crank — at once while the chain has not started, then every
+/// `every` seconds (< `S3_OBS_GAP_S`, so the chain stays continuous until the fast path arms).
+fn keep_pool_fail_chain(
+    key: Pubkey,
+    mv: Option<&MarketView>,
+    now: i64,
+    every: i64,
+    report: &TickReport,
+    crank_queue: &mut Vec<(Pubkey, Due)>,
+) {
+    let Some(mv) = mv else { return };
+    let m = &mv.market;
+    if crank_queue.iter().any(|(k, _)| *k == key) || report.observed(&key) {
+        return;
+    }
+    if m.pool_fail_since == 0 || now.saturating_sub(m.last_pool_fail_obs) >= every {
+        crank_queue.push((key, Due::NoRoute));
+    }
+}
+
 /// What one tick did (for tests, logs and metrics).
 #[derive(Clone, Debug, Default)]
 pub struct TickReport {
@@ -163,6 +250,13 @@ pub struct TickReport {
     pub bursts: Vec<(Pubkey, i64)>,
     /// `flag_venue_upgraded` calls that landed this tick: (venue, deploy slot) (duty 10).
     pub flagged: Vec<(u8, u64)>,
+    /// Pool selection (duty 5's fast path, duty 12): the plan of every market whose candidates
+    /// were evaluated this tick.
+    pub pool_plans: BTreeMap<Pubkey, PoolPlan>,
+    /// `propose_pool` / `execute_pool_switch` attempts.
+    pub pool_actions: Vec<PoolActionRecord>,
+    /// The pool events of the keeper's landed pool-selection transactions.
+    pub pool_events: Vec<PoolEvent>,
     pub skipped: Vec<(Pubkey, String)>,
     pub errors: Vec<String>,
 }
@@ -246,6 +340,10 @@ pub struct Keeper<C: Chain> {
     /// The second of the last `flag_venue_upgraded` attempt per (venue, deploy slot): at most
     /// one a second for the same upgrade; a new deploy slot is attempted at once.
     flag_tried: BTreeMap<(u8, u64), i64>,
+    /// Duties 5 and 12: each covered Raydium or list-only market's pool-selection state.
+    pool_tracks: BTreeMap<Pubkey, PoolTrack>,
+    /// The chain the pool discovery's `getProgramAccounts` calls go to (`None`: `chain`).
+    discovery: Option<C>,
     /// Counters (duty 8).
     pub metrics: Metrics,
 }
@@ -271,8 +369,27 @@ impl<C: Chain> Keeper<C> {
             upgrades_alerted: HashSet::new(),
             flag_failures_alerted: HashSet::new(),
             flag_tried: BTreeMap::new(),
+            pool_tracks: BTreeMap::new(),
+            discovery: None,
             metrics: Metrics::default(),
         })
+    }
+
+    /// Sends the pool discovery's `getProgramAccounts` calls to `chain` instead of the
+    /// keeper's own (`pool_select.discovery_rpc`, `--discovery-rpc`).
+    pub fn with_discovery_chain(mut self, chain: C) -> Self {
+        self.discovery = Some(chain);
+        self
+    }
+
+    /// The chain the pool discovery uses.
+    fn discovery_chain(&self) -> &C {
+        self.discovery.as_ref().unwrap_or(&self.chain)
+    }
+
+    /// A market's pool-selection state (duties 5 and 12).
+    pub fn pool_track(&self, market: &Pubkey) -> Option<&PoolTrack> {
+        self.pool_tracks.get(market)
     }
 
     /// The chain backend.
@@ -588,6 +705,18 @@ impl<C: Chain> Keeper<C> {
             }
         }
         self.send_cranks(&view, crank_queue, &mut report).await;
+        // Pool selection after this second's observations and exits (M4-SEC-7): its RPC work —
+        // discovery, ranking, the best candidates' accounts — never delays duties 1–4; the
+        // cranks it asks for (a failing market's `pool_fail` chain) go out in a batch of their
+        // own.
+        if self.cfg.pool_select.enabled {
+            let mut chain_cranks: Vec<(Pubkey, Due)> = Vec::new();
+            self.select_pools(&mut view, &mut report, &mut chain_cranks)
+                .await;
+            if !chain_cranks.is_empty() {
+                self.send_cranks(&view, chain_cranks, &mut report).await;
+            }
+        }
 
         for (key, track) in &self.tracks {
             self.metrics.market(*key).degraded = track.state.is_degraded();
@@ -636,7 +765,13 @@ impl<C: Chain> Keeper<C> {
                     }
                 })
                 .collect();
-            let needs = decide::market_needs(&mv, &proj, &evals, &cov);
+            let needs = decide::market_needs(
+                &mv,
+                &proj,
+                &evals,
+                &cov,
+                view.config.params.pool_list_window_s,
+            );
             if due_before.is_none() {
                 let due = self.tracks[&key].observation_due(&needs, now, slot, &cov);
                 if let Some(d) = due {
@@ -940,6 +1075,492 @@ impl<C: Chain> Keeper<C> {
             .unwrap_or(0)
     }
 
+    /// Duty 5's Raydium fast path and duty 12's pool monitor ([`crate::pool_monitor`]) on every
+    /// covered Raydium and list-only market (module docs): after the exits, so a market whose
+    /// last position the keeper just closed is proposed for in the same tick, and after the
+    /// tick's cranks (M4-SEC-7: its RPC work never delays an observation or an exit); the
+    /// observation that keeps a failing market's `pool_fail` chain goes out in a batch of its
+    /// own right after, and a market adopted this tick is cranked on its new pool from the
+    /// next tick on.
+    async fn select_pools(
+        &mut self,
+        view: &mut ChainView,
+        report: &mut TickReport,
+        crank_queue: &mut Vec<(Pubkey, Due)>,
+    ) {
+        let covered: Vec<Pubkey> = view
+            .markets
+            .iter()
+            .filter(|m| m.kind.is_raydium())
+            .map(|m| m.key)
+            .chain(view.list_only.iter().map(|l| l.key))
+            .collect();
+        let mut latched: Option<Option<VenueGuard>> = None;
+        for key in &covered {
+            if let Err(e) = self
+                .select_market(view, *key, &mut latched, report, crank_queue)
+                .await
+            {
+                report.errors.push(format!("{key}: pool selection: {e:#}"));
+            }
+        }
+        let keep: HashSet<Pubkey> = covered.into_iter().collect();
+        self.pool_tracks.retain(|k, _| keep.contains(k));
+    }
+
+    /// Whether the `VenueGuard` latch holds an upgrade of the program of a candidate on `kind`
+    /// (`VenueUpgraded`: no proposal of it until `revalidate_venue`; M4-SEC-8: the candidate's
+    /// own program only); the guard is read at most once a tick. An unreadable guard counts as
+    /// clear (the simulation decides).
+    async fn candidate_latched(
+        &self,
+        kind: VenueKind,
+        cache: &mut Option<Option<VenueGuard>>,
+    ) -> bool {
+        if cache.is_none() {
+            let g = self
+                .chain
+                .accounts(&[pda::venue_guard()])
+                .await
+                .ok()
+                .and_then(|v| v.into_iter().next().flatten())
+                .and_then(|a| view::decode_zc::<VenueGuard>(&a));
+            *cache = Some(g);
+        }
+        cache
+            .as_ref()
+            .and_then(|g| g.as_ref())
+            .is_some_and(|g| guard::candidate_latched(g, kind))
+    }
+
+    /// Reports what changed on `market` since the keeper last saw it and was not its own doing:
+    /// another pool adopted, a collection window opened or closed (someone else's
+    /// `propose_pool` / `execute_pool_switch`).
+    fn note_pool_changes(&mut self, key: Pubkey, market: &Market, fast_window_s: u32) {
+        let seen = Seen::of(market);
+        let track = self.pool_tracks.entry(key).or_default();
+        let Some(before) = track.seen.replace(seen) else {
+            return;
+        };
+        if before.pool != seen.pool {
+            self.metrics.market(key).pool_switches += 1;
+            self.alerts.push(Alert::PoolSwitched {
+                market: key,
+                from: before.pool,
+                to: seen.pool,
+                venue: market.venue_kind().unwrap_or(VenueKind::None),
+                kind: None,
+                d_inc: before.pool_d,
+                d_cand: seen.pool_d,
+                by_keeper: false,
+            });
+        } else if before.fp_t0 == 0 && seen.fp_t0 != 0 {
+            self.alerts.push(Alert::PoolWindow {
+                market: key,
+                candidate: seen.fp_pool,
+                d_cand: market.fp_d.get(),
+                window_ends: pool_select::window_ends(seen.fp_t0, fast_window_s).unwrap_or(0),
+                improved: false,
+                by_keeper: false,
+            });
+        } else if before.fp_t0 != 0 && seen.fp_t0 == 0 {
+            self.alerts.push(Alert::PoolSwitchCancelled {
+                market: key,
+                candidate: before.fp_pool,
+                by_keeper: false,
+            });
+        }
+    }
+
+    /// One market's pool selection this tick ([`Self::select_pools`]): discovery and evaluation
+    /// on their cadence, the plan, and at most one action (two when a resolved window is
+    /// followed by a new proposal in the same tick).
+    async fn select_market(
+        &mut self,
+        view: &mut ChainView,
+        key: Pubkey,
+        latched: &mut Option<Option<VenueGuard>>,
+        report: &mut TickReport,
+        crank_queue: &mut Vec<(Pubkey, Due)>,
+    ) -> anyhow::Result<()> {
+        let clock = view.clock;
+        let now = clock.unix_timestamp;
+        let sp = SelectParams::of(&view.config.params);
+        let pcfg = self.cfg.pool_select.clone();
+        for round in 0..2 {
+            // The market as the next instruction sees it: a Raydium market's prologue projected
+            // to the clock (`pool_d` refreshed, the `pool_fail` chain stepped); a list-only
+            // market as stored.
+            let (market, s, mv): (Box<Market>, Situation, Option<MarketView>) =
+                match view.markets.iter().find(|m| m.key == key) {
+                    Some(mv) if mv.kind.is_raydium() => {
+                        let proj = decide::project(&view.config, mv, clock)?;
+                        let s = Situation::of(&proj.market, mv.kind, proj.now, proj.pool_fail);
+                        (proj.market, s, Some(mv.clone()))
+                    }
+                    Some(_) => return Ok(()),
+                    None => match view.list_only.iter().find(|l| l.key == key) {
+                        Some(l) => {
+                            let t = prologue::market_now(&l.market, now);
+                            let s = Situation::of(&l.market, VenueKind::None, t, false);
+                            (l.market.clone(), s, None)
+                        }
+                        None => return Ok(()),
+                    },
+                };
+            if round == 0 {
+                self.note_pool_changes(key, &market, sp.fast_window_s);
+            }
+
+            // Discovery (the mint's Raydium SOL pools), then their ranking within this tick's
+            // key budget (M4-SEC-7): only the best `max_candidates` are evaluated.
+            let fast = s.pool_fail || s.fp_t0 != 0;
+            let discover = self
+                .pool_tracks
+                .get(&key)
+                .is_none_or(|t| t.discovery_due(now, fast, &pcfg));
+            if discover {
+                let found = pool_monitor::discover(self.discovery_chain(), &market.mint).await;
+                self.metrics.pool_discoveries += 1;
+                let t = self.pool_tracks.entry(key).or_default();
+                t.last_discovery = Some(now);
+                match found {
+                    Ok(c) => t.start_ranking(c),
+                    Err(e) => report.errors.push(format!("{key}: pool discovery: {e:#}")),
+                }
+            }
+            let t = self.pool_tracks.entry(key).or_default();
+            if round == 0 && !t.rank_queue.is_empty() {
+                let batch = t.next_rank_batch(pcfg.rank_keys_per_tick);
+                let keys: Vec<Pubkey> = batch.iter().flat_map(|c| c.rank_keys()).collect();
+                let accs = self.chain.accounts(&keys).await?;
+                let scored: Vec<(u128, pool_monitor::CandidatePool)> = batch
+                    .into_iter()
+                    .zip(accs.chunks(2))
+                    .map(|(c, a)| (pool_monitor::score(&c, a), c))
+                    .collect();
+                let t = self.pool_tracks.entry(key).or_default();
+                if t.finish_rank_batch(scored, pcfg.max_candidates) {
+                    t.last_eval = None;
+                }
+            }
+
+            // Evaluation, on its cadence (every tick while it matters).
+            let track = self.pool_tracks.entry(key).or_default();
+            let urgent = pool_monitor::urgent(&s, &sp, track);
+            let window_due = s.fp_t0 != 0
+                && pool_select::window_ends(s.fp_t0, sp.fast_window_s).is_ok_and(|e| s.now >= e);
+            if !track.eval_due(now, urgent, &pcfg) && !window_due {
+                if track.keep_chain {
+                    let every = self.cfg.coverage.no_route_interval_s;
+                    keep_pool_fail_chain(key, mv.as_ref(), now, every, report, crank_queue);
+                }
+                return Ok(());
+            }
+            let cands = track.candidates.clone();
+            let list_only = s.venue == VenueKind::None;
+            let mut keys: Vec<Pubkey> = cands
+                .iter()
+                .flat_map(|c| c.read_keys.iter().copied())
+                .collect();
+            // D1's detection set, only when there is a candidate to check it for.
+            if list_only && !cands.is_empty() {
+                keys.extend(ixs::detection_set(&market));
+            }
+            let accs = if keys.is_empty() {
+                Vec::new()
+            } else {
+                self.chain.accounts(&keys).await?
+            };
+            let mut at = 0usize;
+            let mut evaluated = Vec::with_capacity(cands.len());
+            for c in &cands {
+                let n = c.read_keys.len();
+                let slice = accs.get(at..at.saturating_add(n)).unwrap_or(&[]);
+                at = at.saturating_add(n);
+                evaluated.push(pool_monitor::evaluate(
+                    &market,
+                    &view.config.params,
+                    now,
+                    c,
+                    slice,
+                ));
+            }
+            // M4-SEC-8 / M4V-4: the program refuses a proposal of a candidate whose own program
+            // is latched, so the plan ranks only the others — after a latched window candidate is
+            // cancelled, the best pool on the other Raydium program opens the next window.
+            let mut any_latched = false;
+            for e in &mut evaluated {
+                if e.d().is_some() && self.candidate_latched(e.kind, latched).await {
+                    any_latched = true;
+                    e.verdict = pool_monitor::Verdict::Refused {
+                        code: Some(u32::from(ShortwinError::VenueUpgraded)),
+                        detail: "the candidate's program awaits the venue review".into(),
+                    };
+                }
+            }
+            let mut plan = pool_monitor::plan(&s, &sp, &market, &evaluated);
+            if plan.action.is_none() && plan.blocked.is_none() && any_latched {
+                plan.blocked = Some(u32::from(ShortwinError::VenueUpgraded));
+            }
+            if list_only && !cands.is_empty() {
+                // D1: a pump coin keeps its pump venue (`crank_price`'s re-detection, M5).
+                let det = accs.get(at..at.saturating_add(2)).unwrap_or(&[]);
+                let refused = match pool_monitor::classify(&market, det) {
+                    Ok(class) if class.pump_venue() => {
+                        Some(Some(u32::from(ShortwinError::PumpVenuePrecedence)))
+                    }
+                    Ok(_) => None,
+                    Err(code) => Some(code),
+                };
+                if let Some(code) = refused {
+                    plan.action = None;
+                    plan.blocked = code;
+                }
+            }
+            // The latch of the candidate's own program (M4-SEC-8). An execution is sent anyway:
+            // the program cancels a window whose candidate's program is latched (M4V-4), and a
+            // proposal on the other program can follow in the same tick.
+            if let Some(Action::Propose { kind, .. }) = plan.action
+                && self.candidate_latched(kind, latched).await
+            {
+                plan.action = None;
+                plan.blocked = Some(u32::from(ShortwinError::VenueUpgraded));
+            }
+            let track = self.pool_tracks.entry(key).or_default();
+            track.evaluated = evaluated;
+            track.last_eval = Some(now);
+            track.last_pool_fail = Some(s.pool_fail);
+            track.keep_chain = plan.keep_chain;
+            let pinned = if plan.pinned {
+                plan.best.map(|b| b.0)
+            } else {
+                None
+            };
+            if let Some(since) = track.note_pinned(pinned, now, &pcfg)
+                && let Some((candidate, d_cand)) = plan.best
+            {
+                self.alerts.push(Alert::PoolPinned {
+                    market: key,
+                    incumbent: pool_monitor::incumbent_pool(&market),
+                    candidate,
+                    d_inc: s.pool_d,
+                    d_cand,
+                    open_positions: s.open_positions,
+                    since,
+                });
+            }
+            if plan.keep_chain {
+                let every = self.cfg.coverage.no_route_interval_s;
+                keep_pool_fail_chain(key, mv.as_ref(), now, every, report, crank_queue);
+            }
+            report.pool_plans.insert(key, plan.clone());
+
+            // Act: at most once a second per pool; a refused proposal backs off.
+            let Some(action) = plan.action else {
+                return Ok(());
+            };
+            let track = self.pool_tracks.entry(key).or_default();
+            if track.tried == Some((now, action.pool()))
+                || (matches!(action, Action::Propose { .. }) && now < track.backoff_until)
+            {
+                return Ok(());
+            }
+            track.tried = Some((now, action.pool()));
+            let ix = match &action {
+                Action::Execute { candidate, .. } => match &mv {
+                    Some(mv) => ixs::execute_pool_switch(mv, candidate),
+                    // A list-only market's window (positions open, M4-SEC-4).
+                    None => ixs::execute_pool_switch_with(
+                        &key,
+                        &market.mint,
+                        &ixs::detection_set(&market),
+                        candidate,
+                    ),
+                },
+                Action::Propose {
+                    kind, candidate, ..
+                } => {
+                    let prefix: Vec<Pubkey> = match &mv {
+                        Some(mv) => mv.read_keys.clone(),
+                        None => ixs::detection_set(&market).to_vec(),
+                    };
+                    ixs::propose_pool(&key, &market.mint, &prefix, *kind, candidate)
+                }
+            };
+            let result = match self.send_ixs(&[ix], &[key], true, now).await {
+                Ok(Sent::Landed { out, .. }) => {
+                    let events = events::pool_events(&out);
+                    PoolResult::Landed {
+                        outcome: out,
+                        events,
+                    }
+                }
+                Ok(Sent::SimFailed { out, .. }) => PoolResult::Refused {
+                    code: out.err.as_ref().and_then(TxError::custom_code),
+                    outcome: out,
+                },
+                Ok(Sent::Failed { out }) => PoolResult::Failed { outcome: out },
+                Ok(Sent::DryRun { out }) => PoolResult::DryRun { outcome: out },
+                Ok(Sent::TooLarge) => PoolResult::Error("transaction too large".into()),
+                Err(e) => PoolResult::Error(format!("{e:#}")),
+            };
+            let landed = self.account_pool_action(key, &market, &action, &result, now, report);
+            report.pool_actions.push(PoolActionRecord {
+                market: key,
+                action: action.clone(),
+                result,
+            });
+            if !landed {
+                return Ok(());
+            }
+            // Re-read the market: the action moved it (an adoption, a window).
+            let fresh = view::load(&self.chain, &[key]).await?;
+            view.markets.retain(|m| m.key != key);
+            view.list_only.retain(|l| l.key != key);
+            let seen = fresh
+                .markets
+                .iter()
+                .map(|m| Seen::of(&m.market))
+                .chain(fresh.list_only.iter().map(|l| Seen::of(&l.market)))
+                .next();
+            view.markets.extend(fresh.markets);
+            view.list_only.extend(fresh.list_only);
+            let track = self.pool_tracks.entry(key).or_default();
+            if seen.is_some() {
+                track.seen = seen;
+            }
+            // A resolved window may be followed by a new proposal in the same tick.
+            if !matches!(action, Action::Execute { .. }) {
+                return Ok(());
+            }
+            track.last_eval = None;
+        }
+        Ok(())
+    }
+
+    /// Books a pool-selection attempt (metrics, alerts, back-off); returns whether it landed.
+    fn account_pool_action(
+        &mut self,
+        key: Pubkey,
+        before: &Market,
+        action: &Action,
+        result: &PoolResult,
+        now: i64,
+        report: &mut TickReport,
+    ) -> bool {
+        let pool = action.pool();
+        let backoff = if action.fast() {
+            1
+        } else {
+            self.cfg.pool_select.eval_interval_s
+        };
+        let kind = match action {
+            Action::Execute { kind, .. } | Action::Propose { kind, .. } => *kind,
+        };
+        match result {
+            PoolResult::Landed { events, .. } => {
+                let m = self.metrics.market(key);
+                match action {
+                    Action::Execute { .. } => m.pool_executions += 1,
+                    Action::Propose { .. } => m.pool_proposals += 1,
+                }
+                for e in events {
+                    report.pool_events.push(*e);
+                    match e.what {
+                        PoolEventKind::Switched => {
+                            self.metrics.market(key).pool_switches += 1;
+                            self.alerts.push(Alert::PoolSwitched {
+                                market: key,
+                                from: pool_monitor::incumbent_pool(before),
+                                to: e.candidate,
+                                venue: kind,
+                                kind: Some(e.kind),
+                                d_inc: e.d_inc,
+                                d_cand: e.d_cand,
+                                by_keeper: true,
+                            });
+                        }
+                        PoolEventKind::Proposed => self.alerts.push(Alert::PoolWindow {
+                            market: key,
+                            candidate: e.candidate,
+                            d_cand: e.d_cand,
+                            window_ends: e.window_ends,
+                            improved: matches!(
+                                action,
+                                Action::Propose {
+                                    expect: Proposal::ImproveWindow,
+                                    ..
+                                }
+                            ),
+                            by_keeper: true,
+                        }),
+                        PoolEventKind::Cancelled => self.alerts.push(Alert::PoolSwitchCancelled {
+                            market: key,
+                            candidate: e.candidate,
+                            by_keeper: true,
+                        }),
+                    }
+                }
+                let t = self.pool_tracks.entry(key).or_default();
+                t.refusals_alerted.clear();
+                t.backoff_until = 0;
+                true
+            }
+            PoolResult::Refused { code, outcome } => {
+                self.pool_refused(key, pool, *code, format!("{:?}", outcome.err), now, backoff);
+                false
+            }
+            PoolResult::Failed { outcome } => {
+                let code = outcome.err.as_ref().and_then(TxError::custom_code);
+                self.pool_refused(
+                    key,
+                    pool,
+                    code,
+                    format!("failed on chain: {:?}", outcome.err),
+                    now,
+                    backoff,
+                );
+                false
+            }
+            PoolResult::Error(e) => {
+                report.errors.push(format!("{key}: pool selection: {e}"));
+                false
+            }
+            PoolResult::DryRun { .. } => {
+                // Simulated only: the same cadence as a refusal, without an alert.
+                let t = self.pool_tracks.entry(key).or_default();
+                t.backoff_until = now.saturating_add(backoff);
+                false
+            }
+        }
+    }
+
+    /// A refused or failed pool-selection attempt: back off; alert once per pool and code unless
+    /// the refusal is a race's normal answer ([`benign_pool`]).
+    fn pool_refused(
+        &mut self,
+        key: Pubkey,
+        pool: Pubkey,
+        code: Option<u32>,
+        detail: String,
+        now: i64,
+        backoff: i64,
+    ) {
+        let t = self.pool_tracks.entry(key).or_default();
+        t.backoff_until = now.saturating_add(backoff);
+        if benign_pool(code) || t.refusals_alerted.contains(&(pool, code)) {
+            return;
+        }
+        t.refusals_alerted.push((pool, code));
+        self.alerts.push(Alert::PoolSelectRefused {
+            market: key,
+            pool,
+            code,
+            detail,
+        });
+    }
+
     /// Duty 10, upgrades ([`crate::monitor`]): reads the latch and the watched ProgramData
     /// headers in one call; flags every upgrade the program would accept
     /// (`flag_venue_upgraded`, simulated first, at the exit priority ceiling) and alerts once
@@ -1066,12 +1687,16 @@ impl<C: Chain> Keeper<C> {
         let caps = FeeCaps::of(&view.config);
         for mv in &view.markets {
             let snap = monitor::snapshot(mv);
-            let changes = self
-                .pools
-                .entry(mv.key)
-                .or_default()
-                .observe(mv.kind, snap, caps);
             let pool = mv.read_keys.first().copied().unwrap_or_default();
+            let watch = self.pools.entry(mv.key).or_default();
+            if watch.pool != Some(pool) {
+                // A new pool (an adoption): its first sight, not a change of the old one.
+                *watch = PoolWatch {
+                    pool: Some(pool),
+                    ..PoolWatch::default()
+                };
+            }
+            let changes = watch.observe(mv.kind, snap, caps);
             for change in changes {
                 self.metrics.market(mv.key).venue_admin_changes += 1;
                 self.alerts.push(Alert::VenueAdmin {

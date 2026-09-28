@@ -18,6 +18,7 @@
 //! | Situation | Plan |
 //! |---|---|
 //! | venue not executable, S3 due on the market | `S3Probe` (simulate `sol_settle`; send if it settles) |
+//! | venue executable, the post-change warm-up running (`ema_warm > 0` after the roll; M4R) | `Watch` (exits refuse `EmaWarmingUp`, `sol_settle` decides nothing: observe every second until the gate) |
 //! | not liquidatable, not armed | `Idle` / `Watch` (near a threshold: per-second coverage) |
 //! | armed and not liquidatable | `SolSettle` (it keeps the clock or disarms on box evidence; duty 4) |
 //! | liquidatable, completed bucket stale | `Observe` (observe this second, act the next) |
@@ -49,6 +50,10 @@ pub struct Projection {
     pub obs: Box<Observation>,
     /// `s3_no_route` now (ARCH §5.3).
     pub s3_no_route: bool,
+    /// `pool_fail` now (ARCH §2.6 rule 3: the Raydium fast path's own predicate, venue-side
+    /// evidence only); the projected market's `pool_fail_since` is the chain after this
+    /// second's observation.
+    pub pool_fail: bool,
 }
 
 /// Runs the program's market prologue on a copy of `mv` at `clock` ([module docs](self)).
@@ -75,6 +80,7 @@ pub fn project(
         obs: market.observation(),
         market,
         s3_no_route: pro.s3_no_route,
+        pool_fail: pro.pool_fail,
     })
 }
 
@@ -161,7 +167,24 @@ pub struct MarketNeeds {
     /// the S3 timer of every liquidatable or expired position) starts at the outage, not up to
     /// `no_route_interval_s` later.
     pub start_chain: bool,
+    /// A Raydium market without open positions inside its listing window (M4V-5): observe
+    /// every `listing_interval_s`, so the EMA the first open after the window reads follows the
+    /// pool and not the spot a listing or an adoption started it at.
+    pub listing: bool,
+    /// Once per second (M4V-5, M4R): a Raydium market without open positions in the last
+    /// [`LISTING_WARMUP_S`] seconds of its listing window, or after it while its post-change
+    /// warm-up runs (`ema_warm > 0`; opens refuse `EmaWarmingUp` until then).
+    pub warm_up: bool,
+    /// The post-change warm-up runs on an executable venue (`ema_warm > 0` after the roll; M4R):
+    /// with open positions the market is observed every second (duty 5) until `ema_warm == 0`,
+    /// and no liquidation or expiry is sent before.
+    pub warming: bool,
 }
+
+/// Seconds at the end of a listing window observed every second (M4V-5):
+/// `EMA_WARMUP_BUCKETS + 2`, so at the window's end the post-change warm-up of a listing or an
+/// adoption is over (8 integrations of the last seconds' honest buckets).
+pub const LISTING_WARMUP_S: i64 = shortwin_math::consts::EMA_WARMUP_BUCKETS as i64 + 2;
 
 fn s3_chain(m: &Market, kind: VenueKind, no_route_now: bool) -> S3Chain {
     let opt = |t: i64| (t != 0).then_some(t);
@@ -252,6 +275,8 @@ pub fn evaluate(
     let s3_due = s3_timer && (liquidatable || !st.executable);
 
     let mut max_in = None;
+    // M4R: the post-change warm-up gates keeper exits on an executable venue.
+    let warming = st.executable && m.ema_warm > 0;
     let plan = if !st.executable {
         if s3_timer {
             Plan::S3Probe
@@ -260,6 +285,8 @@ pub fn evaluate(
         } else {
             Plan::Idle
         }
+    } else if warming {
+        Plan::Watch
     } else if !liquidatable && !armed {
         if near_cr || near_deadline {
             Plan::Watch
@@ -308,7 +335,7 @@ pub fn evaluate(
     Ok(PositionEval {
         key: pv.key,
         plan,
-        near: near_cr || near_deadline || armed,
+        near: near_cr || near_deadline || armed || warming,
         expired,
         armed,
         cr_live_bps,
@@ -343,12 +370,14 @@ pub fn evaluate_all(
     out
 }
 
-/// The market's coverage needs (duties 1 and 5) from its evaluations.
+/// The market's coverage needs (duties 1 and 5; the listing window of a Raydium market without
+/// positions, M4V-5) from its evaluations; `list_window_s` is `pool_list_window_s`.
 pub fn market_needs(
     mv: &MarketView,
     proj: &Projection,
     evals: &[PositionEval],
     cov: &CoverageConfig,
+    list_window_s: u32,
 ) -> MarketNeeds {
     let open = !mv.positions.is_empty() || proj.market.open_positions > 0;
     let ema_deviates = match (mv.state.price(), proj.obs.ema.price) {
@@ -363,12 +392,30 @@ pub fn market_needs(
     // Only a venue that can execute records observations (A64): a halted one is kept on the
     // no-route cadence (duty 5), never per second.
     let executable = mv.state.executable;
+    // M4R: the post-change warm-up (a listing, an adoption) on an executable venue.
+    let warming = executable && proj.market.ema_warm > 0;
+    // M4V-5: a Raydium market without positions, in its listing window or not yet warmed up.
+    let (listing, warm_up) = if mv.kind.is_raydium() && !open && executable {
+        let m = &proj.market;
+        let end = m.pool_seen_at.saturating_add(i64::from(list_window_s));
+        let warm = m.ema_warm == 0;
+        let inside = proj.now < end;
+        (
+            inside,
+            proj.now >= end.saturating_sub(LISTING_WARMUP_S) && (inside || !warm),
+        )
+    } else {
+        (false, false)
+    };
     MarketNeeds {
-        per_second: executable && (open && (near || ema_deviates) || s3_due_executable),
+        per_second: executable && (open && (near || ema_deviates || warming) || s3_due_executable),
         no_route: proj.s3_no_route && open,
         start_chain: proj.s3_no_route && open && mv.market.no_route_since == 0,
         open_positions: open,
         s3_due_executable,
         ema_deviates,
+        listing,
+        warm_up,
+        warming,
     }
 }

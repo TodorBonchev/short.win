@@ -1,6 +1,6 @@
 # short.win — Economic & Risk Model
 
-*Design document • v0.4.1 (fourth review round; see the changelog) • 2026-09-27 • baseline: [`docs/SPEC.md`](../SPEC.md) v0.3 incl. owner decisions D1–D4 (owner-approved, not modified here)*
+*Design document • v0.4.1 (fourth review round; see the changelog) • 2026-09-27; Raydium pool rules synced to the program as built after M4 on 2026-09-28 (changelog #91–#95); post-change confirmation of the observation state after a venue switch PROPOSED on 2026-09-28 (#96, M4R) • baseline: [`docs/SPEC.md`](../SPEC.md) v0.3 incl. owner decisions D1–D4 (owner-approved, not modified here)*
 *Simulation: [`sim/shortwin_sim.py`](sim/shortwin_sim.py) v0.4.1 (venues, positions, observation/EMA layer, settlement box, exits, scenarios, Monte Carlo, exit fuzz), [`sim/pool_model.py`](sim/pool_model.py) v0.4.1 (lender-pool accounting, property tests, liveness check), the attack scripts in [`sim/attacks/`](sim/attacks/), the parameter gate [`sim/config_check.py`](sim/config_check.py) and the keeper cost model [`sim/keeper_cost.py`](sim/keeper_cost.py). The frozen v0.3 model in `sim/legacy/v0_3/` is used only for "v0.3" comparison rows; "v0.4" comparison rows use the analysis switches of the v0.4.1 sim (`box_obs`, `pprime_raw`, `ref_cap_lo = False`, `liq_reserve = "rent+penalty"`). Standard library only; every run is deterministic (fixed seeds). Every table in this document was regenerated with the v0.4.1 defaults; the generated outputs are in `sim/out/`.*
 
 This document turns the economics of SPEC §2, §4, §5 and §6 into formulas an Anchor program can implement: units, fixed-point types, rounding direction, closed forms, state updates and payout orders. It reports what the simulations say about lenders, borrowers and attackers. `ARCHITECTURE.md` aligns to this version; where the two disagree, this document is the economic source of truth, and `sim/shortwin_sim.py` + `sim/pool_model.py` v0.4.1 are the normative reference implementation for the math crate (they implement the program's formulas exactly, R3A-3; the analysis-only switches are listed in each sim's header).
@@ -12,7 +12,7 @@ This document turns the economics of SPEC §2, §4, §5 and §6 into formulas an
 - **ADOPTED**: a default the owner adopted from the first-pass questions (Q4–Q24). Still a configurable parameter (§15).
 - **PROPOSED**: a new rule or parameter. Every PROPOSED parameter is configurable, has a default and compiled hard bounds (§15), and sits behind the SPEC §11 timelock.
 - **UNVERIFIED**: a claim I could not check against a primary source.
-- Finding IDs: `C0-n` / `C1-n` (first review), `V1-n` / `V2-n` (second review), `R3A-n` / `R3B-n` (third review), `R4A-n` / `R4B-n` (fourth review, 2026-09-27). Appendix A lists the economic side of every round-3 finding; the v0.4.1 changelog below lists the round-4 changes; `ARCHITECTURE.md` Appendix A records the outcome of every finding of every round.
+- Finding IDs: `C0-n` / `C1-n` (first review), `V1-n` / `V2-n` (second review), `R3A-n` / `R3B-n` (third review), `R4A-n` / `R4B-n` (fourth review, 2026-09-27); `M4-SEC-n` (the M4 security review of the built program), `M4V-n` and `DOC-n` (its verification, 2026-09-28), `M4R-n` (its re-verification, 2026-09-28: the state a venue switch leaves behind). Appendix A lists the economic side of every round-3 finding; the v0.4.1 changelog below lists the round-4 changes; `ARCHITECTURE.md` Appendix A records the outcome of every finding of every round.
 
 ---
 
@@ -39,8 +39,19 @@ The fourth review (findings `R4A-1` … `R4A-10`, `R4B-1` … `R4B-10`, 2026-09-
 | 88 | Keeper batches are **v1 transactions** (a v0 transaction with the protocol ALT fits 4 PumpSwap / CPMM or 5 curve cranks, not 6); `keeper_cost.py` shows the v0 fallback (k = 4: +50 % base fees per market-day) | R4B-9 | §5.8 |
 | 89 | Text fixes: the keeper floor formula of #63 (`⌊π·split⌋ + min(max(0, K_s − ⌊π·split⌋), remainder)`), the S3 condition in §10.3 ("liquidatable **or expired**", global hard cap), R3A-8 (a) "resolved pending O15" | R4A-10 | #63, §10.3, Appendix A |
 | 90 | **Doc sync after M0b** (no economic change; from the `shortwin-math` README's documentation items): **one source of parameter validation** — `shortwin_sim.validate_params` now also checks the penalty split's protocol and keeper parts (≤ 5,000) and every per-tier bound (`cr_open_bps ≤ 100,000`, penalty, duration, impacts, S2 slippage, rates, minimum rent), so the program's `params::validate` is that function exactly; `params::validate_econ` keeps only the bounds of parameters the sim does not model (§15; before, the sim accepted configurations the program refused). §2.2's overflow table adds σ's numerator, the impact caps' `X²·(10⁴ + ι)` and the tier threshold; §4 states the D4 margin with an undefined EMA quote (the spot quote alone, as the sim); §5.6 "sustained" uptrend; §6.1 the integer cap forms; §8.6, §14, §17 O15 as recorded (S2 and S3, SPEC §5.3); §9.4 the vest end after a governance decrease of `lump_vest_s` | M0b notes | §2.2, §4, §5.6, §6.1, §8.6, §9.4, §14, §15, §17 |
+| 91 | **Raydium eligibility as built after M4** (doc sync; owner item O18): no clause reads `λ_now` or the live SOL reserve any more. A listing, a zero-position adoption and a list-only market's adoption need the **locked-depth floor** `⌊⌊D·isqrt(P_ref)/10⁹⌋·10⁴/λ_min⌋ ≥ pool_min_real_sol`; an adoption that carries open positions — a collection window's candidate, on a Raydium market or on a list-only market with positions — needs the **window floor**, its locked SOL itself, `⌊D·isqrt(P_ref)/10⁹⌋ ≥ pool_min_real_sol`, when a proposal opens or improves the window and again at the execution. `P_ref` is the market's `P_ema`, or the candidate's spot on a market without a price. v0.4.1's `λ_now ≥ λ_min` let a standing unlocked deposit keep every alternate pool ineligible, so a halted market's positions stayed frozen at the pre-halt `P_ema` until S3; its live `R ≥ pool_min_real_sol` moved with a swap inside one transaction; the `/λ_min` floor alone moved open positions onto fully locked pools of 12.5–25 SOL without any manipulation (M4V-1). A pool with `λ < λ_min` is eligible when its locked SOL clears the floor; sizing stays bounded by `D/λ_min` | M4-SEC-1, M4-SEC-3, M4V-1 | §1.3, §2.1, §6.2, §10.3, §14, §15 |
+| 92 | *(Superseded by #96: its written sample was a forcing path, M4R-1.)* **Adoption liquidity as built**: an adoption writes `L_new` into `L_ema` and every ring entry — `min(L_rec, L_live, ⌊D·10⁴/λ_min⌋)` for a collection window's adoption (`L_rec` the candidate's `√(X·Y)` at the proposal that recorded it, `L_live` at the execution), `min(L_live, L_ema, ⌊D·10⁴/λ_min⌋)` otherwise — and `L_slow = min(L_slow, D)` (v0.4.1: `min(√(X·Y)_new, current)` for both, from the adopting instruction's own sample). `venue_switch.py` (b), (c): a deeper candidate's box is narrow from the first second (v0.4.1: wide for 18 s after the switch); a deposit around either sampling instruction changes nothing (the M4 review's record-only rule `min(L_rec, cap)`: `L_ema` 1.995× the pool's depth, box wide 24 s); a withdrawal around either pushes `L_new` down to `D` at most (`1 − λ`; box wide 0 s at λ 99.78 %, 25 s at λ 25 %), a delay; the exit is the same in every row | M4-SEC-5, M4-SEC-6, M4V-2 | §2.1, §5.2, §10.1 |
+| 93 | *(The adoption part is superseded by #96: the warm-up seed reaches such a pool's depth at the gate, and M4's written cap was also a forced-liquidation band, §12.12.)* **Eligible pools with `λ < λ_min` re-checked** (ARCH §4.4's L-push bound `1 − λ ≤ 50 %` holds only for `λ ≥ λ_min`): an honest fast path onto one writes the cap `D/λ_min`, below its depth, so the box stays wide in `L` for 20 s after the switch (exits unchanged). An LP-wrapped sample reaches `D`, a push of `1 − λ` (75 % at λ 25 %, 90 % at λ 10 %); an attacker-only second moves `L_ema` by at most −8.3 % (the clamp), and the box medians need 4–5 of 8 seconds, as for the price. Sizing on `D/λ_min` makes the lowest state any push reaches — every unlocked LP withdrawn — no worse relative to sizing than at λ = 50 % (CR after the full drain 2.01 / 1.99 / 1.98 at λ 50 / 25 / 10 %; S2 at ×125.9 / ×124.7 / ×124.7): **no liquidation, S1 or S2 can be forced**. Delay: a contrary LP observation every second (no swap fee) holds the S2/S3 amount spread at ≈ `(1 − λ)·Q/X_D` — 113–196 bps at λ 25–10 % on 25 bps pools (λ 50 %: 75–109), 253–672 bps on 1 % pools — above `fv_dev_bps`, so an S3 on an executable venue waits while it is repeated; §5.6's "moves `L` too little to matter" is corrected | M4V-3, DOC-3 | §5.6, §10.5 |
+| 94 | Text: λ = 50 % is `λ_min`, no longer "the worst pool the market can adopt" (§1.3, §11.1); the λ = 50 % drain rows stay the worst case relative to sizing up to the open's own price impact (§11.2, §11.7); `pool_lock_min_bps` is the divisor of the locked depth (eligibility floor, sizing cap, adoption cap), not a required lock share, and `pool_min_real_sol` is a floor on locked SOL (§14 N11, §15); §5.1 lists `execute_pool_switch` among the instructions that observe | DOC-3 | §1.3, §5.1, §11, §14, §15 |
+| 95 | *(Folded into #96's post-change confirmation: the same 8-bucket warm-up, now a countdown that also re-seeds `P_ema`.)* **First-open warm-up after a price-starting adoption** (PROPOSED): a Raydium market whose price state a Raydium listing or a list-only market's first adoption started at the candidate's own spot opens only once the EMA has integrated more than `EMA_WARMUP_BUCKETS` = `RING_LEN` (8) buckets since that start, so at least 8 recorded after `pool_seen_at` (`EmaWarmingUp`); the reference keeper observes such a market every second at the end of its listing window. Without it, `[buy, propose_pool, sell]` started `P_ema` at a pushed spot (6.39× the true price on the reproducer), and an hour later, with no crank in between, `[buy, open_short, sell]` opened a short on the captured sub-floor pool and pinned the market to it | M4V-5 | §5.8, §6.2, §14, §15, §17 |
+| 96 | **Post-change confirmation of the observation state** (PROPOSED, M4R; owner item O18; replaces #92's adoption liquidity and folds #95's first-open warm-up into one mechanism). As built after M4, a fast-path adoption seeded the exits from single-instruction samples — `L_new = min(L_rec, L_live, D/λ_min)` — and a `P_ema` frozen during the halt: an unlocked LP of the candidate withdraws around a sampling instruction (`L_new = D`), then holds `L_ema` there with one withdraw-wrapped crank per second (directional aggregation freezes an EMA that has an observation on its own side every second), and **liquidates positions within ≈ `q/x` of `cr_liq` that are healthy on the pool as it trades** (M4R-1; the LiteSVM reproducer 24–26 s after the adoption, the sim 21–41 s); and the window floor judged at the stale `P_ema` admits, after a dump, a pool with only `floor·√(P_live/P_ema)` of real locked SOL (M4R-2). **The rule:** (1) every Raydium adoption reads **no sample** of the new pool: `L_ema` and every ring entry's `l`, `llo`, `lhi` := the anchor `⌊D·10⁴/λ_min⌋`, `L_slow = min(L_slow, D)`, `P_ema` and the ring prices carried, and the state is marked unconfirmed (`ema_warm = EMA_WARMUP_BUCKETS` = 8, `ema_guard = 1`; a Raydium price start is marked the same way); (2) each of the next 8 integrations re-seeds, over the post-change entries only, `P_ema = min` of their bucket lows (since #97 also of the largest v0.4.1 step from the previous `P_ema`) and `L_ema = min(max lhi, ⌊lomed(lhi)·(10⁴ + C)/10⁴⌋)` — no blend, `L_slow` untouched; (3) while `ema_warm > 0` on an executable venue `liquidate` and `expire` fail (`EmaWarmingUp`), `sol_settle` evaluates nothing and Raydium opens wait; a halted venue is never gated; (4) while `ema_guard = 1` the exit reference reads `L_b = max(L_live, min(L_ema, L_mlo), L_slow)` (and since #97 `L_slow` integrates `min(lobs, L_mlo)`), cleared at the first integration after the warm-up with `L_ema ≤ 1.01·L_mlo` (at the gate on an honest pool); (5) a proposal that opens or improves a window judges the window floor at `min(P_ema, P_cand)`. `attacks/switch_warmup.py`: in the M4R-1 grid (q 0.40 / 0.74 %, four wrap variants) no forced exit (as built: every withdraw-wrapped row from 1.98× / 1.97× up to the honest threshold 2.01×, liquidated +21 to +41 s after the adoption); 1,200 targeted random runs: 0 forced (as built 30 of 615 honest-open runs); `λ < λ_min` candidates: no forced band (as built forced at 2.00–2.03×); `L_ema` = the pool's depth at the gate for λ 10–99.78 % and the box narrow from then on (as built wide 20–26 s at λ < λ_min: M4V-3, M4-SEC-6 resolved); a per-second capital deposit freeze no longer blocks the reference (RA → 630 SOL: liquidation at +61 s, lender +0.834 SOL; without the guard S1 at +123 s, −17.785 SOL); after a mild dip during the halt the stale `P_ema` no longer forces a liquidation at +2 s; an honest dump before the window opens keeps a thin pool out (M4R-2; one inside the window is adopted at `P_ema`, #97). Exits resume at adoption + 9 s with the keeper cranking every second, usually earlier than as built (2.2×: +9 vs +13 s; 3× S1: +49 vs +61 s). New state: two header bytes of `Market` (`ema_warm`, `ema_guard`, zero on existing accounts); `fp_lambda_bps` retired; no new parameter, error or event; `REF_GUARD_TOL_BPS` = 100 compiled. Residuals: §12.12 | M4R-1, M4R-2, M4V-3, M4-SEC-6 | §2.1, §5.2, §5.4–§5.6, §5.8, §6.2, §8.2, §10.1, §10.3, §10.5, §12.12, §14, §15, §17 |
+| 97 | **The M4R verification's resolutions** (PROPOSED with #96; owner item O18). **M4X-1:** the warm-up price seed read the lowest post-change bucket low with no step bound, so 8 attacker-only warm-up seconds (7 when the attacker executes the switch and cranks in its second) of `[buy, crank_price, sell]` seeded `P_ema` at the pump, and a `[buy, liquidate, sell]` at the gate liquidated a position at **any** threshold while the pool traded flat (the LiteSVM reproducer: a ≈ 3× threshold at a true 1.00×, on CPMM and AMM v4 candidates). The seed is now `min(min lo, the largest v0.4.1 step from the previous P_ema)`, `×(τ + dt·(1 + C))/(τ + dt)` (9/7 at `dt = 2`, 7/6 at `dt = 1`; `observe::price_up_bound`): attacker-only warm-up seconds force exactly the thresholds the same seconds force in steady state and forced under M4 as built, never earlier (`switch_warmup.py` part 8d), and a genuine move during the halt is still tracked by the gate (2.38× at the 5th integration; every genuine exit of §12.12 (7) unchanged, +9 s). **M4X-2:** the reference guard capped only the `L_ema` term of `L_b`; under a held capital deposit freeze every integration fed the frozen `L_ema` into `L_slow`, which `L_b` reads unguarded, and after 10–30 min (1.4–2.6× the pool's depth) the reference was blocked again: a genuine pump ended in S1 (lenders −12.6 to −13.8 SOL in the sim, −10.06 SOL and the borrower zeroed on the fork) instead of a liquidation. While the guard is set `L_slow` now integrates `min(lobs, L_mlo)` (§5.2): liquidated after any length of freeze (part 4c). **M4X-3** (text): the window floor at `min(P_ema, P_cand)` is judged by the proposals only; a genuine dump inside the 60-s window is adopted at `P_ema` (never looser than as built) — disclosed with residual 4, together with why the execution does not re-read the candidate's spot (a revert would hold every other proposal, M4V-4; a cancel would let a dump-wrapped execution cancel windows until S3). **M4X-4** (text): ARCH's `arch/layout.py` names bytes 22–23 and 1,170–1,171 as the program does. No new state, parameter, error or event; no vector changes (the crate's `trace_attacks_3.json` and every other generated vector regenerate byte-identical) | M4X-1, M4X-2, M4X-3, M4X-4 | §2.1, §5.2, §6.2, §8.2, §12.12, §13, §14, §15, §17 |
 
 **Changed in v0.4.1 — for `shortwin-math`** (the exact delete / change / add list is ARCH §9 M0b): `RingEntry` stores the bucket's `(lo, hi, llo, lhi)` instead of `(obs, lobs)`; the box's medians (lower of the lows, upper of the highs); FV's `p'` per evaluated state; `max_in` split into a liquidation form without reserve and the expiry form with rent and fee; the liquidation reference's `lo_x·(1 + κ_eff)` cap; the S2/S3 lump `x − min(x, ⌊Q·P_ema/WAD⌋ + R_due)`; in `pool`, the lock expiry calendar, `max_release`, floored lock terms, the value-weighted vest end and the post-wipe deposit gate; the risk quote above the fee hard cap charges one combined fee at the cap (the sims' form).
+
+**Changed after M4 — for `shortwin-math`** (#91–#95; as built): `pool_select::{locked_floor_ok, position_floor_ok, adoption_liquidity}`, `observe::VenueChange::RaydiumLocked { slow_cap: D }`, and the PROPOSED `consts::EMA_WARMUP_BUCKETS` with `caps::price_warmed_up`. The sim's counterparts are `locked_floor_ok`, `position_floor_ok` and `Market.adopt_pool`.
+
+**Changed by M4R — for `shortwin-math`** (#96; PROPOSED): `observe::{Ema.warm, Ema.guard (Ema._pad[0..2]), mark_restart, warmed, Observation::new_raydium}` and the warm-up branch and guard check of `integrate`; `bounds::ref_liquidity(l_live, &Ema, &Ring)`; `SettleInputs.warmed` (`settle::evaluate` a no-op while warming on an executable venue); `consts::{EMA_WARMUP_BUCKETS: u8, REF_GUARD_TOL_BPS}`; `caps::price_warmed_up` and `pool_select::adoption_liquidity` removed. The sim's counterparts are `Market.{adopt_pool, _integrate_warmup, _guard_check, mark_restart, gated, exit_reference}`, `window_floor_ok`, `EMA_WARMUP_BUCKETS` and `REF_GUARD_TOL_BPS`; `Market.fast_switch` keeps the v0.4.1 rewrite for the crate's differential vectors (`VenueChange::Raydium`) only, and `FAST_SCENARIOS` replays `adopt_pool`. Regenerated vectors: `settle/trace_attacks_3.json` (the `venue_switch/RA` trace: its adoption is the op `rewrite t R l_new slow_cap`, then 8 warm-up rolls) and `risk/exits.json` (rows sampled from `FAST_SCENARIOS`).
 
 ## Changelog v0.3 → v0.4 (third review round)
 
@@ -147,8 +158,8 @@ The economic model uses a generic constant-product pool with configurable fees o
 
 - **CPMM** (`raydium-io/raydium-cp-swap@59fb845a`): the trade fee is charged on the **input** amount, `trade_fee = ⌈input·rate/10⁶⌉`; exact-out swaps gross the input up with `⌈post_fee·10⁶/(10⁶ − rate)⌉`; the curve rounds exact-out input up (`checked_ceil_div`) [R1]. Pricing reserves are the vault balances **minus accrued protocol, fund and creator fees** [R2]; the counters can be large (one pool: 792.6 SOL in the vault, 547.1 SOL of reserves) [R-RAY §2.4]. Fee rates come from the pool's `AmmConfig`: all 21 live configs have trade fees from 0.005 % to 4 % and carve protocol 12 % and fund 4 % out of the trade fee (these only move the excluded counters, not the trader's cost). The creator fee (0.05 %–1.495 % by config) applies only if the pool enabled it at creation (launchpads such as LaunchLab), on the input or the output side [R-RAY §2.5, §3.3]. No virtual reserves.
 - **AMM v4** (`raydium-io/raydium-amm@d26944bf`): the trader pays `swap_fee_numerator/denominator` of the input, read per pool (25/10⁴ on every sampled pool); the whole fee stays in the vault, and the protocol later removes 12/100 of the constant-product growth through `withdrawpnl`, which only moves `need_take_pnl`; pricing reserves are `vault − need_take_pnl`; exact-out input is grossed up with a ceiling division [R3; R-RAY §2.2–2.3]. No creator or fund fee; SPL-Token mints only.
-- **LP is withdrawable** on both unless burned; the main pools of the D2 target coins have 92–99.8 % of their LP permanently burned [R-RAY §6.4]. Drain scenarios apply to the unlocked part; the architecture's pool rule requires ≥ 50 % locked LP (ARCH §2.6).
-- Simulation defaults (examples, not facts about any pool): AMM v4 25 bps with 12 % of the fee leaving the reserves (a slight overstatement of the between-withdrawals state, in which the whole fee stays); CPMM 25 bps with 16 % leaving (protocol 12 % + fund 4 %, the value of every live config). v0.4: the example pools have a permanently locked LP share λ = 50 %, the worst pool the market can adopt at `pool_lock_min_bps`; the sim tracks LP units, so unlocked LP can be withdrawn only down to the locked part (drains beyond it are labelled model cases).
+- **LP is withdrawable** on both unless burned; the main pools of the D2 target coins have 92–99.8 % of their LP permanently burned [R-RAY §6.4]. Drain scenarios apply to the unlocked part. Since M4 no pool rule reads the locked share `λ` itself (#91): eligibility is a floor on the pool's locked SOL at `P_ema` (§6.2) and sizing is bounded by the locked depth over `λ_min` (§6.1), so a pool with `λ < 50 %` can be adopted, and a full drain still leaves at least `λ_min` of the depth any position opened on it was sized on (§10.5).
+- Simulation defaults (examples, not facts about any pool): AMM v4 25 bps with 12 % of the fee leaving the reserves (a slight overstatement of the between-withdrawals state, in which the whole fee stays); CPMM 25 bps with 16 % leaving (protocol 12 % + fund 4 %, the value of every live config). The example pools have a permanently locked LP share λ = 50 % = `λ_min` (v0.4: the worst pool the market could adopt). An eligible pool may now have a lower λ; it is sized on the same `D/λ_min`, so its full drain lands at the same depth relative to sizing and the λ = 50 % rows remain the worst case up to the open's own price impact (CR after a full drain 2.01 at λ 50 %, 1.99 at 25 %, 1.98 at 10 %; §10.5); only the settlement box's `L` side sees the difference (§10.1, §10.5). The sim tracks LP units, so unlocked LP can be withdrawn only down to the locked part (drains beyond it are labelled model cases).
 
 ### 1.4 What the model takes from this
 
@@ -184,6 +195,10 @@ Every quantity that must match the sims bit for bit. "Floor"/"ceil" are the roun
 | `λ` locked LP share | u32 | bps | `⌊(lp_counter − lp_supply)·10⁴/lp_counter⌋` |
 | `D` locked depth | u128 | √ | `⌊λ_bps·isqrt(X·Y)/10⁴⌋` |
 | locked SOL, `R_eff` term | u64 | lamports | `⌊D·isqrt(P_ema)/10⁹⌋`; `⌊locked·10⁴/λ_min_bps⌋` |
+| eligibility floors (§6.2; M4) | — | lamports | `locked = ⌊D·isqrt(P_ref)/10⁹⌋`; locked-depth floor (listing, zero-position, list-only adoption) `pool_min_real_sol·λ_min_bps ≤ locked·10⁴`, i.e. `⌊locked·10⁴/λ_min_bps⌋ ≥ pool_min_real_sol`; window floor (an adoption that carries open positions) `locked ≥ pool_min_real_sol`, at a proposal with `P_ref = min(P_ema, P_cand)` (M4R-2, #96), `P_cand = ⌊Y·WAD/X⌋` of the candidate's pre-trade state |
+| adoption anchor (§5.2; M4R) | u128 | √ | `cap = ⌊D·10⁴/λ_min_bps⌋` into `L_ema` and every ring entry's `l`, `llo`, `lhi`; `L_slow ← min(L_slow, D)`; a Raydium price start `L = min(√(X·Y), cap)` (#96; M4 as built wrote `min(L_rec, L_live, cap)`, #92) |
+| warm-up seed (§5.2; M4R) | u128 | as `P_ema`, `L_ema` | over the `n = k + 1 ≤ 8` post-change entries (this bucket and the `k = 8 − ema_warm` newest ring entries): `P_ema = min(min lo, ⌊(P_ema·τ + ⌊P_ema·(10⁴ + C)/10⁴⌋·dt)/(τ + dt)⌋)` (the largest v0.4.1 step from the previous `P_ema`, M4X-1; `observe::price_up_bound`); `H` = their `lhi` ascending, `L_ema = min(H[n−1], ⌊H[⌊(n−1)/2⌋]·(10⁴ + C)/10⁴⌋)` (a `mul_div` that saturates at `u128::MAX`, then the `min`); `ema_warm`, `ema_guard` u8 |
+| reference guard (§8.2; M4R) | — | — | clears iff `L_ema·10⁴ ≤ L_mlo·(10⁴ + REF_GUARD_TOL_BPS)` (exact integers, `REF_GUARD_TOL_BPS` = 100) at an integration with `ema_warm = 0` after it; while it is set the steady step feeds `L_slow` with `min(lobs, L_mlo)` (M4X-2), `L_mlo` over the ring after the push |
 | conservative token reserve for caps | u64 | raw | curve `vT`; AMMs `min(X_now, ⌊L_slow·10⁹/isqrt⁺(P_ema)⌋)`; Raydium also `⌊D·10⁹·10⁴/(λ_min_bps·isqrt⁺(P_ema))⌋` |
 | `K_s`, `K_e` | u64 | lamports | `min(fixed + ⌊V·bps/10⁴⌋, cap, V)`; `min(fixed + ⌊B̂_ref·bps/10⁴⌋, cap, remainder)` |
 | penalty split | u64 | lamports | keeper `⌊π·3,000/10⁴⌋`, protocol `⌊π·2,000/10⁴⌋`, lenders the rest |
@@ -363,7 +378,7 @@ SPEC §4 says borrowers post "about 2 % more" than the initial-margin column. Un
 
 ### 5.1 Observation buckets — PROPOSED (unchanged)
 
-Every instruction that carries the market's venue accounts (open, close, liquidate, expire, sol_settle, crank_price, propose_pool) runs a prologue **before any CPI trade**. `deposit` and `withdraw` roll a completed bucket but record no observation; `claim_sol`, `cover_deficit`, `sync_lender` and `add_margin` do not touch market state.
+Every instruction that carries the market's venue accounts (open, close, liquidate, expire, sol_settle, crank_price, propose_pool, execute_pool_switch) runs a prologue **before any CPI trade**. `deposit` and `withdraw` roll a completed bucket but record no observation; `claim_sol`, `cover_deficit`, `sync_lender` and `add_margin` do not touch market state.
 
 ```
 observe(now):
@@ -379,20 +394,60 @@ Every instruction of the second records (there is no one-per-slot limit). A venu
 
 ```
 integrate(now):                                           # at most once per second
+    if ema_warm > 0: integrate_warmup(now); return        # M4R (PROPOSED, #96): the 8 integrations after a restart
     obs  = clamp(P_ema, b_lo, b_hi), then clamp to [P_ema/(1 + C), P_ema·(1 + C)]      # C = 100 %
     lobs = same for liquidity (L_ema, b_llo, b_lhi)
     dt   = min(now − ema_ts, dt_max)                      # dt_max = 2 s
     P_ema = (P_ema·τ + obs·dt)/(τ + dt);  L_ema likewise  # τ = 5 s
-    L_slow = (L_slow·3,600 + lobs·dts)/(3,600 + dts), dts = min(now − slow_ts, 60)
     ring.push(now, P_ema, L_ema, x, y = reprice(L_ema, P_ema), b_lo, b_hi, b_llo, b_lhi)  # v0.4.1: bucket extremes
+    sin  = min(lobs, L_mlo) if ema_guard = 1 else lobs    # M4X-2: L_mlo = lower median of llo after the push
+    L_slow = (L_slow·3,600 + sin·dts)/(3,600 + dts), dts = min(now − slow_ts, 60)
+    guard_check()
     lb_lo, lb_hi, lb_sec = bucket; clear the bucket
+
+integrate_warmup(now):                                    # M4R post-change confirmation (PROPOSED, #96)
+    k = 8 − ema_warm                                      # post-change entries already in the ring (0..7)
+    E = this bucket and the k newest ring entries         # n = k + 1 ≤ 8; never an entry from before the restart
+    dt = min(now − ema_ts, dt_max)
+    P_ema = min(min over E of lo,                         # fresh, on the side no push can force an exit from,
+                (P_ema·τ + P_ema·(1 + C)·dt)/(τ + dt))    # rising by at most the largest v0.4.1 step (M4X-1)
+    H = the lhi of E, ascending
+    L_ema = min(H[n−1], ⌊H[⌊(n−1)/2⌋]·(10⁴ + C)/10⁴⌋)     # the highest bucket high, bounded by (1 + C) × the lower median
+    ring.push(now, P_ema, L_ema, x, y = reprice(L_ema, P_ema), b_lo, b_hi, b_llo, b_lhi)
+    ema_ts = now; ema_count += 1; ema_warm −= 1           # no blend; L_slow and slow_ts unchanged
+    guard_check()
+    lb_lo, lb_hi, lb_sec = bucket; clear the bucket
+
+guard_check():                                            # M4R reference guard (§8.2)
+    if ema_guard = 1 and ema_warm = 0 and L_ema·10⁴ ≤ L_mlo·(10⁴ + 100):  ema_guard = 0     # L_mlo = lower median of llo
 ```
 
 - **One-second lag.** The EMA an instruction uses never contains that instruction's own observation, so `[pump → liquidate → dump]` cannot feed its own trigger.
 - **Directional aggregation.** The EMA moves up only if every observation of a second was above it, down only if every one was below it. Self-test: single integration after an atomic 3x bundle alone in its second: EMA +16.67% (bound +16.7% at dt=1, +28.6% at dt=2, tau=5s); with an honest observation in the same second: +0.00%
 - **Step bounds** (τ = 5 s, C = 100 %): +16.7 % / −8.3 % per 1 s step, +28.6 % / −14.3 % at `dt = 2 s`.
 - **The freeze cuts both ways** (V1-2): one contrary observation per second freezes the EMA or fails the robust-spot leg; §12.9 prices this veto.
-- **Initialisation and venue changes** (v0.4, R3B-7 a, R3A-11 d). At creation `P_ema = P_spot`, `L_ema = L_slow = √(X·Y)`. At graduation `P_ema` carries over and both liquidity EMAs reset to the new pool; at a Raydium fast-path switch they reset to `min(√(X·Y)_new, current)`. In both cases **every ring entry's `l`, `llo` and `lhi` are rewritten to the reset `L_ema`** (and `(x, y)` recomputed), and the open bucket is cleared. Without the rewrite, the ring medians would still carry the old venue's liquidity and the settlement box would stay more than 1 % wide in `L` for 3 s (v0.4.1's bucket-extremes box: 4 s) after each change (§10.1, `attacks/venue_switch.py`).
+- **Initialisation and venue changes** (v0.4, R3B-7 a, R3A-11 d; Raydium: the post-change confirmation, PROPOSED, M4R, #96). At creation `P_ema = P_spot`, `L_ema = L_slow = √(X·Y)`. At graduation `P_ema` carries over and both liquidity EMAs reset to the new pool. At every Raydium adoption (listing-window replacement, zero-position adoption, fast path, a list-only market's window) the adoption **reads no sample of the new pool**. With `D` its locked depth and `cap = ⌊D·10⁴/λ_min⌋` the most depth sizing ever credits it with (§6.1):
+
+  ```
+  L_ema = cap;  every ring entry's l, llo, lhi = cap, (x, y) recomputed;  the open bucket cleared   (the anchor)
+  L_slow = min(L_slow, D)                  never a sample, never raised
+  P_ema and the ring prices carry over     (stale after a halt: the warm-up replaces them)
+  ema_warm = EMA_WARMUP_BUCKETS (8), ema_guard = 1                                                 (mark_restart)
+  ```
+
+  A **Raydium price start** — a Raydium listing, or a list-only market's first adoption, which starts the pool's price state as a creation does — writes `P_ema = P_spot`, `L_ema = L_slow = min(√(X·Y), cap)` and is marked the same way. The next 8 integrations re-seed `P_ema` and `L_ema` from the new pool's own post-change buckets (`integrate_warmup` above). While `ema_warm > 0` on an executable venue no keeper exit runs and no Raydium open (§5.5, §5.6, §6.2); while `ema_guard = 1` the exit reference reads `min(L_ema, L_mlo)` (§8.2). A market that never changes venue keeps `ema_warm = ema_guard = 0` and runs exactly the v0.4.1 integration.
+
+  *Why.* v0.4.1 set both liquidity EMAs to `min(√(X·Y)_new, current)` from the adopting instruction's own sample: an unlocked LP of the candidate could withdraw around it and write only `D` into the ring (M4-SEC-5), and a deeper candidate kept the old, thinner `L_ema` (box wide 18 s, M4-SEC-6). M4 as built wrote `min(L_rec, L_live, cap)`, the smaller of two samples taken in two transactions (#92): a deposit could no longer push it up, but a withdrawal around either sample still wrote `D`. The M4 re-verification (M4R-1) showed that this is not a delay: after the adoption the unlocked LP holds `L_ema` at `D` with one withdraw-wrapped crank per second — directional aggregation freezes an EMA that has one observation on its own side every second — and a position within ≈ `q/x` of `cr_liq`, healthy on the pool as it trades, becomes liquidatable on the EMA leg and on a withdraw-wrapped spot leg (the LiteSVM reproducer: liquidated 24–26 s after the adoption, never without the wrap; §12.12). The carried `P_ema`, frozen while the incumbent could not execute, added a second forced path: after a mild dip during the halt the stale-high `P_ema` let the candidate's LP holder liquidate a healthy position 2 s after an honest adoption (§12.12). The anchor reads nothing any party can wrap, and the warm-up seed reads only bucket **highs** for `L` and bucket **lows** for `P`, the sides on which a wrapped sample cannot force an exit. A bucket low is a wrapped sample too when nobody else observed that second: the M4R verification (M4X-1) found that 8 attacker-only warm-up seconds of `[buy, crank_price, sell]` seeded `P_ema` at the pump at once, and a `[buy, liquidate, sell]` at the gate then liquidated a position at any threshold while the pool traded flat (§12.12 (8)). The price seed therefore also rises by at most the largest step the v0.4.1 integration can take, `×(τ + dt·(1 + C))/(τ + dt)` (9/7 at `dt = 2`, 7/6 at `dt = 1`): attacker-only warm-up seconds reach no higher than the same seconds in steady state (where a pump of `(1 + C)×` in each gives exactly that step), and a genuine move during the halt is still tracked by the gate (2.38× at the 5th integration). Its properties (proptested; ARCH §8.1):
+
+  - **(P1)** If any warm-up bucket holds an honest observation `(p*, H)`, then `P_ema ≤ p*`. A withdraw-wrapped sample in a bucket that also holds an honest observation lowers only that bucket's `llo`, which the seed never reads.
+  - **(P2)** If at least one warm-up bucket is honest, `L_ema ≥ min(H_honest, (1 + C)·D)`, because every sample's `√(X·Y) ≥ D`: for `λ ≥ 1/(1 + C)` (50 % at the defaults) `L_ema ≥ H_honest` unless every warm-up bucket is attacker-only.
+  - **(P3)** If at most 4 of the 8 buckets carry a sample above `H_max`, `L_ema ≤ ⌊H_max·(10⁴ + C)/10⁴⌋`.
+  - **(P4)** Constant honest buckets give exactly `L_ema = H` and `P_ema = min(p*, the step bound chained from the carried P_ema)` — `p*` whenever `p*` is at most (7/6)⁸ ≈ 3.4× the carried `P_ema` (and always after a fall).
+  - **(P5)** No warm-up integration raises `P_ema` by more than the largest v0.4.1 step from the previous one (M4X-1), whatever the samples.
+
+  While the reference guard is set (§8.2), `L_slow` integrates `min(lobs, L_mlo)` instead of `lobs` (M4X-2): the guard caps only the `L_ema` term of the reference, and under the capital deposit freeze of §12.12 (4) the frozen, pushed `L_ema` would otherwise climb into `L_slow` — `+1/τ_slow` of the gap per second, 1.4–2.6× the pool's depth after 10–30 min — which the reference reads unguarded (a later genuine pump then ended in S1 with a lender loss instead of a liquidation). With the guard clear, and on every market that never switched, the step is v0.4.1's.
+
+  An honest warm-up therefore ends with `L_ema` equal to the pool's depth for every λ (1.000 at the gate for λ 10–99.78 %, the box narrow from then on; §10.1 (b), (c)) and `P_ema` equal to its price, and the ring holds only post-change buckets. The rewrite to the anchor still runs, and the ring's `L` is read during the warm-up only where nothing is gated: on a venue that cannot execute (a new pool that halts within the warm-up; S3 then reads the partly anchored ring, §12.12). Without any rewrite the ring medians would still carry the old venue's liquidity, which left the settlement box more than 1 % wide in `L` for 3 s (v0.4.1's bucket-extremes box: 4 s) after a graduation (§10.1, `attacks/venue_switch.py`).
 
 ### 5.3 EMA reprojection
 
@@ -400,7 +455,7 @@ The EMA state prices the venue **at the EMA price with EMA liquidity**, `B̂_ema
 
 ### 5.4 History ring and robust spot
 
-- **Ring:** the last 8 integrations `(ts, P_ema, L_ema, x, y, lo, hi, llo, lhi)`. The liquidation EMA leg, the expiry reference, the sustained-growth estimate and the settlement box (via the medians of the bucket extremes, v0.4.1) read it.
+- **Ring:** the last 8 integrations `(ts, P_ema, L_ema, x, y, lo, hi, llo, lhi)`. The liquidation EMA leg, the expiry reference, the sustained-growth estimate and the settlement box (via the medians of the bucket extremes, v0.4.1) read it. After a Raydium venue change or price start (M4R, #96) the 8 warm-up entries hold the **seeds** of §5.2 (`p`, `l` the running seed, `x, y` their reprojection) next to their buckets' true extremes; after the 8th the ring holds no entry from before the change, so every reader sees only the new pool's buckets. During the warm-up nothing on an executable venue reads them (§5.5).
 - **Robust spot:** `P_rs = min(P_live, lb_lo)`, valid only if `lb_sec ≥ now − ref_max_age_s` (2 s). Without a fresh completed bucket the spot leg cannot be confirmed (the keeper cranks one second and acts the next).
 - **Sustained EMA growth** `g` and `κ_eff`: §2.1. A single held second produces one step; a genuine trend produces three.
 
@@ -410,7 +465,10 @@ The EMA state prices the venue **at the EMA price with EMA liquidity**, `B̂_ema
 spot leg:  venue executable ? CR(V_eff, B̂(Q; reprice(L_live, P_rs))) < L : true         (P_rs fresh; SPEC: CR_spot := 0)
 EMA leg:   the newest liq_persist_n (= 3) ring entries all have CR(V_eff, B̂(Q; x_i, y_i)) < L       (v0.4: no seconds condition)
 liquidatable ⇔ (spot leg ∧ EMA leg) ∨ now ≥ deadline
+gate (M4R, #96): while ema_warm > 0 on an executable venue, liquidate and expire fail (EmaWarmingUp) before either leg is read
 ```
+
+**The post-change gate** (PROPOSED, M4R, #96). For the `EMA_WARMUP_BUCKETS` = 8 integrations after a Raydium venue change or price start (§5.2) the exits wait: `liquidate` and `expire` fail with `EmaWarmingUp` (after the venue is found executable, before the fresh-bucket check), `sol_settle` evaluates nothing (§5.6) and Raydium opens are refused (§6.2). A venue that cannot execute is never gated, so a new pool that halts within the warm-up reaches S3 as before. With the keeper cranking every second from the adoption on, the 8th warm-up integration lands at adoption + 9 s, and every exit that is due then executes in that second (§10.3, §12.12); positions have already waited ≥ 3 min for the fast path (`pool_fast_route_s + pool_fast_window_s`), so the extra seconds are cheap. The gate does not change the legs (`persist::liq_ema_leg` is unchanged): it only keeps them from being read while the ring still holds anchors and stale prices.
 
 The ring integrates at most once per second, so 3 entries always span ≥ 2 s; the separate `liq_persist_s` added nothing (decision 2). The route-broken flag and the fee hard cap never make the spot leg true (V2-1); every CR here is a risk quote (§3.1). `L` is the position's locked liquidation CR.
 
@@ -449,6 +507,7 @@ normal buyback allowed ⇔ B̂_live(execution fee) + ert ≤ V − K_s  ∧  σ_
 - Evaluations more than `settle_arm_gap_s` (10 s) apart re-arm it.
 - Settlement executes when the S1 or S2 legs hold now and `ema_count − s_count ≥ settle_persist_n` (40 updates, hence ≥ 39 s; `settle_persist_s` is gone). The kind is chosen then: **S1 if the S1 legs hold** (box included), else S2; an S2 whose amount is not box-consistent waits (no state change).
 - S3 (no route, §10.3) needs no arming; its amount obeys the same box check.
+- **While warming** (M4R, #96): on an executable venue with `ema_warm > 0` (§5.2, §5.5) `sol_settle` evaluates nothing — no arming or disarming, no clock update, no S1/S2/S3 — and returns `Ok` after its prologue, whose observation stands. S3 cannot be due then, because the adoption cleared the no-route chain (and a price start has no position). A venue that cannot execute is never gated.
 
 **What the rule closes and what it leaves.** The corner choice keeps honest liveness where it matters: in a sustained uptrend `P_ema ≤ P_mlo` (the EMA lags more than the median of the last 8 bucket lows), so the S1 corner is `P_ema` itself and S1 timing is unchanged (in a ramp's first ≈ 8–11 s, after a step that fills 4 of the 8 entries, or in a steady ramp of ≈ 9.5–16.7 %/s, where the EMA's steady lag `(1 + g)/(1 + 6g)` is smaller than the median's `(1 + g)⁻⁴`, the S1 corner is `P_mlo`, which delays S1 but never makes it easier); in a genuine reversal `P_ema ≥ P_mhi`, so refutation reads `P_ema` itself. **`p'` on the box (R4A-3).** FV prices an expired position with the expiry fee only if it is not CR-liquidatable; v0.4 read that from the raw "CR-liquidatable" flag, whose robust-spot leg one contrary low observation (the V1-2 primitive, not an attacker-only second) fails, and both box corners then used the manipulated `p'`. v0.4.1 decides `p'` at each evaluated state: a disagreement between corners shows up as an amount difference and the settlement waits. Evidence (§12.10, §12.11):
 
@@ -456,7 +515,7 @@ normal buyback allowed ⇔ B̂_live(execution fee) + ert ≤ V − K_s  ∧  σ_
 - *Refutation push* (R3A-6 a, R4B-2): a borrower's one-second dump before maturity, or a dump plus 4 frozen seconds repeated every cycle, delays S1 by at most 8 s (v0.3, and v0.4 under push-then-freeze: no S1 within 600 s at 3 % beyond the boundary).
 - *Amount push* (V2-9): a one-second push up or down moves an S2/S3 amount by at most `fv_dev_bps` (±1 %); on the realistic case — Emergency flag set, healthy position expires, S3 capped hard — +0.70 SOL for a lender push instead of +10.48 SOL without the box. A contrary observation before an S3 no longer changes `p'` (v0.4: −2.9 % to −7.3 % for lenders).
 - *Residual — consecutive attacker-only seconds* (R4A-9): **5 of 8 in either direction** move a median; on the drained-RA model cases 5 consecutive attacker-only seconds flip a capped S2 into S1 (+2.37 to +5.58 SOL for 1.1–2.0 SOL of fees), none of 6 with one honest second in between. Only a censored or absent keeper (degraded mode, §5.8) leaves 5 consecutive seconds to an attacker.
-- *Residual — deferral by widening* (v0.4.1): a contrary observation in every second (a paid round trip; on Raydium an LP add and remove costs no swap fee but moves `L` too little to matter) keeps the box wide on one side. It cannot flip a decision, but it defers S1 (like the robust-spot veto of §12.9) and an S3 amount on an executable venue for as long as it is paid: indefinitely at a 1 % round trip per second, which costs 0.002 SOL/s (RC) to 0.21 SOL/s (A); a 3 % round trip every second delays an S1 2 % beyond its boundary from 60 s to 225 s on Tier A at 0.81 SOL/s (`refute_push.py` (d)). A pushed EMA alone defers an S2/S3 by ≈ 13 s per attacker-only second (§12.11). A deferred S3 on an executable venue can still be expired or liquidated normally when the route works for short.win.
+- *Residual — deferral by widening* (v0.4.1): a contrary observation in every second (a paid round trip; on Raydium also an unlocked LP holder's `[withdraw, crank, re-deposit]`, which costs no swap fee and holds the box's low `L` at the locked depth `D`: an S2/S3 amount spread of ≈ `(1 − λ)·Q/X_D`, 75–109 bps at λ 50 % and 113–196 bps at λ 25–10 % on 25 bps pools, 253–672 bps on 1 % pools, §10.5 — corrected after M4: v0.4.1 said it "moves `L` too little to matter") keeps the box wide on one side. It cannot flip a decision, but it defers S1 (like the robust-spot veto of §12.9) and an S3 amount on an executable venue for as long as it is paid: indefinitely at a 1 % round trip per second, which costs 0.002 SOL/s (RC) to 0.21 SOL/s (A); a 3 % round trip every second delays an S1 2 % beyond its boundary from 60 s to 225 s on Tier A at 0.81 SOL/s (`refute_push.py` (d)). A pushed EMA alone defers an S2/S3 by ≈ 13 s per attacker-only second (§12.11). A deferred S3 on an executable venue can still be expired or liquidated normally when the route works for short.win.
 
 The literal "lender-adverse corner for everything" reading of the brief was tested and rejected: for refutation it is the corner that makes refutation *easiest* (a borrower push would disarm), and for the amount it lets a borrower's one-second push lower FV by up to 8 %. "The same decision on the whole box" is the one rule that closes both directions.
 
@@ -581,6 +640,8 @@ Defaults (PROPOSED, all tiers): **τ = 5 s (constant), dt_max = 2 s, C = 10,000 
 5. Observe every market without a route at least every 30 s (continuous S3 chain, §10.3); on Raydium, run the fast path (§10.3).
 6. Call pump `migrate_v2` top-level as soon as a curve completes (ADOPTED Q16); `claim_venue_rewards` and `sweep_trader` right after a full wipe (so pre-wipe cashback reaches the wiped epoch's lenders, §9.5; since v0.4.1 deposits also wait for this sweep, R4A-7).
 7. While an S3 on an executable venue is due, observe that market **once per second** (not per slot): the settlement box of v0.4.1 (§5.6) takes the medians of bucket lows and highs, so several honest observations at different prices within one second widen it for no benefit.
+8. (M4V-5, with the PROPOSED warm-up of §6.2) Observe a Raydium market without positions inside its listing window every 60 s, and **every second** in its last `EMA_WARMUP_BUCKETS + 2` seconds and after it until the price state has warmed up (`ema_warm = 0`), so the first open after a listing or a list-only adoption reads `P_ema` from honest buckets rather than the spot the adoption started it at (about 70 cranks per listing).
+9. (M4R, #96) After a `PoolSwitched`, and on any market with `ema_warm > 0` and open positions, observe **every second** until `ema_warm = 0` — 8 integrations, adoption + 9 s — and send no `liquidate` or `expire` before then (they fail `EmaWarmingUp`; `sol_settle` is harmless). One honest observation in a warm-up bucket keeps that bucket's low and high honest, which is all the seed needs (§5.2 (P1)–(P3)); a warm-up without any honest bucket is the degraded mode of §12.12.
 
 `sol_settle`, `liquidate`, `expire` and `close_short` carry the venue accounts, so each of them **is** that second's observation; the keeper never sends a separate crank in a second in which it already acts. Several markets' `crank_price` instructions share one transaction (one signature). A `crank_price` keeps its per-market accounts inline (6 keys on PumpSwap / CPMM, 5 on the curve, ARCH §6.4), so a v0 transaction with the protocol ALT fits only 4 PumpSwap / CPMM cranks or 5 curve cranks in 1,232 B, not the 6 v0.4 assumed (R4B-9). **Keeper batches are v1 transactions** (4,096 B, 64 inline addresses, no ALT; live since slot 447,120,000): about 6 shared keys plus 6 per market, so up to 9 cranks; the cost model uses 6 and shows the v0 fallback (UNVERIFIED until T-SIZE):
 
@@ -634,7 +695,7 @@ Reading: covering every market every second costs 0.43 SOL per market-day unbatc
 
 1. **Opens pause.** New opens are paused on a market whose coverage SLO (duties 1–2) the keeper cannot meet, with reason code `KeeperCoverage`; the market page shows it, and the pause lifts when coverage returns. SPEC §11 gives the pause power to a multisig; for the keeper to do this automatically, ARCH would add a narrower role that can only pause and unpause *opens* (it moves no funds) — an owner decision taken with O17. Closes, liquidations, settlements, withdrawals and claims are never paused.
 2. **On-chain signal.** Each integration that follows a gap of more than 30 s on a market with open positions emits `CoverageGap{market, gap_s, open_positions}`; indexers and the UI show coverage per market.
-3. **Existing positions** keep their locked rules (A26); their exposure during degraded mode is disclosed as the held-model bounds of §12.6.
+3. **Existing positions** keep their locked rules (A26); their exposure during degraded mode is disclosed as the held-model bounds of §12.6, and, right after a venue switch whose 8 warm-up seconds the keeper misses entirely, as §12.12's degraded mode (the attacker can then seed `L_ema = D`).
 4. **Not adopted: raising persistence in degraded mode.** Persistence is a locked per-position term, so a raise could reach only new positions, which degraded mode pauses anyway; and 5 updates already break Tier C liveness (§5.7).
 
 ---
@@ -705,7 +766,18 @@ Inputs: `R_eff = min(R_now, R_slow)` with `R_slow = Y(reprice(L_slow, P_ema)) �
 
 **Age from listing (O13, extended, R3B-12).** A token that graduated to PumpSwap months ago, or a CPMM pool whose `open_time` is before `T_CLAMP`, but is listed today gets `graduated_at` = listing time: it is Tier C for 24 h and at most Tier B until day 7 — higher margins, lower caps and shorter durations than SPEC §4's criteria would give it. This is conservative and applies equally to AMM v4 (unusable `pool_open_time`), PumpSwap and pre-`T_CLAMP` CPMM pools; markets created before graduation observe the transition live and are unaffected. The UI's "tier and why" shows it; owner item O13 now covers all three.
 
-**Raydium pool selection (economic side, decision 7).** A market adopts a different Raydium pool without a failure only while it has **no open position** (with the 25 % depth margin, 5 % inside the listing window); the one-hour pending switch (`pool_switch_delay_s`) is gone. Open positions therefore see a pool change only through the fast path on incumbent failure (§10.3), and every such change rewrites the ring's liquidity (§5.2).
+**Raydium pool selection (economic side, decision 7; as built after M4, #91–#95; the M4R rules PROPOSED, #96).** A market adopts a different Raydium pool without a failure only while it has **no open position** (with the 25 % depth margin, 5 % inside the listing window); the one-hour pending switch (`pool_switch_delay_s`) is gone. Open positions therefore see a pool change only through a collection window — the fast path on incumbent failure (§10.3), or a list-only market with positions — and every change rewrites the ring's liquidity to the anchor and restarts the observation state (§5.2).
+
+**Eligibility** reads neither `λ_now` nor the live SOL reserve (M4-SEC-1, M4-SEC-3). Besides `venue_executable` and the fee cap, with `locked = ⌊D·isqrt(P_ref)/10⁹⌋` the pool's locked SOL at `P_ref` = the market's `P_ema` (the candidate's own spot on a market without a price):
+
+```
+listing, zero-position or list-only adoption (no position moves):  ⌊locked·10⁴/λ_min⌋ ≥ pool_min_real_sol   (locked-depth floor)
+collection window's candidate (its adoption moves open positions): locked ≥ pool_min_real_sol              (window floor, M4V-1)
+```
+
+The locked-depth floor is exactly the `D` term of `R_eff` above, so a pool it admits can also be opened on; it keeps v0.4.1's lasting guarantee (at least `λ_min` of the floor stays locked whatever the unlocked LPs do) and also admits fully locked pools of 12.5–25 SOL and pools with `λ < λ_min` whose locked SOL is large enough. The window floor is checked when a proposal opens or improves a window and again at the execution (the `/λ_min` form moved open positions onto fully locked 13–20 SOL pools without any manipulation, M4V-1). **Where it is judged (M4R-2, PROPOSED, #96).** `P_ema` does not move while the incumbent cannot execute, so a floor judged at `P_ema` alone — M4 as built, at the proposal and at the execution — admits, after a dump during the halt, a pool whose real locked SOL at the live price is only `floor·√(P_live/P_ema)`: 50 % of the floor after a 4× dump, 25 % after 16× (the M4R re-verification; ARCH's "slightly under a floor" understated it). A proposal that opens or improves a window therefore judges the window floor at `p_win = min(P_ema, P_cand)`, `P_cand` the candidate's pre-trade `⌊Y·WAD/X⌋` in the proposing instruction; the execution keeps `P_ema`, and every failure there cancels as before. After an honest dump the proposal is refused (`PoolTooThin`) and no window opens (`switch_warmup.py` (6): the 15.0- and 7.5-SOL pools of a 4× / 16× dump refused; as built adopted); after a pump `P_ema` is the lower price and nothing changes. **Residual (disclosed, §12.12):** a swap by the proposer moves only its own `P_cand`, so a dump wrap can only hurt its own proposal, but the thin pool's backer can pump-wrap its window-opening proposal back to the frozen price (0.03–0.04 SOL in the sim), which restores the M4 judgment at `P_ema` — never looser; the warm-up then re-seeds `P_ema` at the live price (§5.2), so opens, tiers and `R_eff` see the pool as it is. So open positions move only onto a pool whose locked SOL alone reached `pool_min_real_sol` at `min(P_ema, P_cand)` when the proposal that opened or last improved the window ran, unless the pool's backer paid for that wrap, and at `P_ema` at the execution. A genuine dump **inside** the 60-s window, after that proposal, is judged only at `P_ema` and adopted (M4X-3, disclosed with §12.12 residual 4; never looser than M4 as built): the execution does not re-read the candidate's spot, because that one-instruction sample would let a dump-wrapped execution either hold every other proposal (a revert, the M4V-4 freeze) or cancel windows until S3 (a cancel). Neither floor moves with an unlocked deposit or withdrawal, and on a market with a price the listing floor and the execution's floor do not move inside one transaction; a standing unlocked deposit can no longer keep every alternate pool ineligible (v0.4.1's `λ_now ≥ λ_min` clause froze a halted market's positions at the pre-halt `P_ema` until S3, M4-SEC-1). Sizing is unchanged: every open is bounded by `D/λ_min` (§6.1 and `R_eff` above), whatever `λ` is.
+
+**First open after a price start** (PROPOSED, M4V-5, unified with the post-change confirmation by M4R, #96; `EMA_WARMUP_BUCKETS`, §15). On a market without a price — a Raydium listing, or a list-only market's first adoption — the floor is judged at the candidate's own spot, which `[buy, create_market or propose_pool, sell]` can push, and the listing or adoption starts `P_ema` there. Such a market has no position; the start marks its observation state unconfirmed (§5.2), and its first open waits until `ema_warm = 0` — `EMA_WARMUP_BUCKETS` = `RING_LEN` (8) integrations since the start, every one of a bucket recorded after it — as well as the listing window; the reference keeper observes it every second at the end of its listing window. The warm-up re-seeds `P_ema` to the lowest post-start bucket low, so a start price pushed **up** is gone as soon as one warm-up bucket holds an honest observation (§5.2 (P1); before M4R the 8 buckets moved `P_ema` only 77–93 % of the way); one pushed down recovers by at most the largest v0.4.1 step per integration (§5.2 (P5): ×7/6 to ×9/7 each, the rest over the listing window's observations) — the safe side, where the spot/EMA check and `R_eff` refuse opens — and the rest of the listing window integrates normally. The first open therefore no longer reads a price the adopting transaction chose: a capturer has to fill all 8 warm-up buckets with attacker-only seconds and then hold the pushed price against every observation of the listing window (a round trip in each second the keeper observes, §5.2's freeze) instead of pushing it once.
 
 ### 6.3 USD thresholds (ADOPTED Q8)
 
@@ -751,7 +823,8 @@ Preconditions: a route exists and `B̂_live + R + ert ≤ V`. `max_in = min(max_
 Applies to `liquidate` and `expire`. Requires a fresh completed bucket (`lb_sec ≥ now − 2 s`).
 
 ```
-L_b   = max(L_live, L_ema, L_slow)                                   # deepest liquidity -> lowest reference cost
+L_b   = max(L_live, L_ema', L_slow)                                  # deepest liquidity -> lowest reference cost
+        L_ema' = min(L_ema, L_mlo) while ema_guard = 1, else L_ema     # M4R reference guard (PROPOSED, #96); L_mlo = lower median of llo
 lo_x  = lb_lo·(1 + g·(now − lb_sec))
 liquidation:  P_ref = min( max(P_ema, lo_x), P_ema·(1 + κ_eff), lo_x·(1 + κ_eff) );   δ = δ_liq = 2 %   (last term v0.4.1)
 expiry (not CR-liquidatable):  P_ref = min(P_ema, min_i p_i, lb_lo);  δ = δ_exp = 1 %
@@ -774,6 +847,7 @@ execute iff B̂_live (execution quote) ≤ max_in;  otherwise the position waits
 
 The liquidation bound is now the complement of S1 exactly: every liquidatable, buyback-allowed position with a fresh reference executes as soon as `B̂_live ≤ B̂_ref·(1 + δ)` (I-E11). What it costs: in the last few percent before S1, where the vault cannot cover the whole waterfall anyway, a sandwiching keeper can take rent and penalty up to the bound's slack (I-E3), and a held-model attacker can buy the vault down to `V − K_s − ert` (§12.6). An expiry is never urgent — if the price keeps rising it becomes a liquidation — so it keeps rent and the expiry fee senior; no battery row changes with any expiry reserve rule.
 - **`V − K_s − ert`** keeps the buyback region disjoint from S1 (§5.6).
+- **The reference guard after a venue change** (PROPOSED, M4R, #96). `L_b` takes the deepest liquidity so that quiet-second LP withdrawals cannot lower the reference (V2-14). Right after a venue change that direction is the risky one: a capital holder who deposits around one crank every second from the adoption on (a deposit freeze: no swap fee, about the pool's size in both assets) holds a pushed `L_ema` up, and a reference at the pushed depth stays below the live cost, so `B̂_live ≤ max_in` never holds and the position gaps into S1 (the M4R study on RA → 630 SOL at λ 99.78 %, a 3×/120 s pump: S1 at +123 s, lenders −17.785 SOL, without the guard). While `ema_guard = 1` — set by every Raydium venue change or price start, cleared at the first integration after the warm-up with `L_ema ≤ 1.01·L_mlo`, i.e. at the gate on an honest pool — the EMA term is capped at `L_mlo`, the lower median of the ring's bucket liquidity lows, which a deposit cannot raise while the keeper's honest observations sit in the buckets. The guard also covers the `L_slow` term through its input: while it is set, `L_slow` integrates `min(lobs, L_mlo)` (§5.2; M4X-2). The M4R verification found that the guard on the `L_ema` term alone was not enough: under the freeze every integration fed the frozen `L_ema` into `L_slow`, which `L_b` reads unguarded, and after 10–30 min `L_b = L_slow` sat at 1.4–2.6× the pool's depth — the same block, reached slowly and kept for about an hour after the freeze stopped (`τ_slow` = 1 h): a genuine pump after 30 min of freeze ended in S1 with lenders −12.6 SOL (RA → 314 SOL) and on the fork −10.06 SOL with the borrower zeroed, where it is now a liquidation (§12.12 (4)). The same freeze then liquidates at +61 s at 1.734× (lenders +0.834 SOL; §12.12), and after any length of freeze the genuine pump is liquidated. A market that never changes venue never sets the guard, and after an honest switch it is clear before the first exit, so steady state is exactly the rule above. What it leaves: a withdraw contest while the guard is set (§12.12).
 - **Invariant I-E1:** measured spend `B ≤ max_in`, and the venue part `≤ B̂_ref·(1 + δ)`. **I-E11 (v0.4.1):** a liquidatable, buyback-allowed position with a fresh completed bucket never waits while `B̂_live ≤ ⌊B̂_ref·(10⁴ + δ_liq)/10⁴⌋`.
 
 v1.1 Jupiter routes are held to the same `max_in`.
@@ -1157,7 +1231,7 @@ The curve completes when price reaches `(vt/279.9 M)²` times the current price 
 
 Positions opened at 80–90 % progress are liquidated on the completing buy or by the boost push that follows (D@90 %: at 2.34×, 302 s after completion), lenders made whole (+5.3 %); at 97 % the position survives graduation and is liquidated only if the price keeps rising; positions opened at ≤ 50 % progress go to S1 on the completing buy.
 
-**Ring liquidity across venue changes (R3B-7 a).** The curve's `√(vT·vQ)` at completion (≈ 5.7·10¹²) is ≈ 1.35× the new pool's (≈ 4.2·10¹²); a Raydium fast path may land on a pool with a quarter of the depth. v0.4 rewrites every ring entry's `l` and `lobs` at the change (v0.4.1: `l`, `llo`, `lhi`; §5.2):
+**Ring liquidity across venue changes (R3B-7 a).** The curve's `√(vT·vQ)` at completion (≈ 5.7·10¹²) is ≈ 1.35× the new pool's (≈ 4.2·10¹²); a Raydium fast path may land on a pool with a quarter of the depth. v0.4 rewrites every ring entry's `l` and `lobs` at the change (v0.4.1: `l`, `llo`, `lhi`; M4R: on Raydium to the anchor `⌊D·10⁴/λ_min⌋`, then the 8-bucket warm-up; §5.2). The Raydium rows replay `FAST_SCENARIOS`, whose switch is the program's rule (`Market.adopt_pool`); a cell `n (g in the gate)` counts `g` of the `n` wide seconds inside the warm-up gate, during which the box decides nothing:
 
 | market | scenario | ring at the venue change | outcome | exit vs event | price at exit | lender P&L | seconds with the settlement box wider than 1 % in L (first 60 s after the change) |
 |---|---|---|---|---|---|---|---|
@@ -1167,14 +1241,77 @@ Positions opened at 80–90 % progress are liquidated on the completing buy or b
 | D@90% | graduation, then +3x on AMM over 60s | rewritten (v0.4.1) | liquidation | +52s | 2.74x | +5.3% | 0 |
 | D@97% | graduation, then +2x on AMM over 60s | carried over (v0.3 ARCH) | liquidation | +87s | 2.60x | +5.3% | 4 |
 | D@97% | graduation, then +2x on AMM over 60s | rewritten (v0.4.1) | liquidation | +87s | 2.60x | +5.3% | 0 |
-| RA | halt -> fast path to a 25% pool, then pump 2x/120s | carried over (v0.3 ARCH) | liquidation | +388s | 1.66x | +2.2% | 4 |
-| RA | halt -> fast path to a 25% pool, then pump 2x/120s | rewritten (v0.4.1) | liquidation | +388s | 1.66x | +2.2% | 0 |
-| RB | halt -> fast path to a 25% pool, then pump 2x/120s | carried over (v0.3 ARCH) | liquidation | +413s | 1.92x | +3.5% | 4 |
-| RB | halt -> fast path to a 25% pool, then pump 2x/120s | rewritten (v0.4.1) | liquidation | +413s | 1.92x | +3.5% | 0 |
-| RC | halt -> fast path to a 25% pool, then pump 2x/120s | carried over (v0.3 ARCH) | liquidation | +426s | 2.00x | +4.2% | 4 |
-| RC | halt -> fast path to a 25% pool, then pump 2x/120s | rewritten (v0.4.1) | liquidation | +426s | 2.00x | +4.2% | 0 |
+| RA | halt -> fast path to a 25% pool, then pump 2x/120s | carried over (v0.3 ARCH) | liquidation | +388s | 1.66x | +2.2% | 4 (4 in the gate) |
+| RA | halt -> fast path to a 25% pool, then pump 2x/120s | rewritten to the anchor (M4R) | liquidation | +388s | 1.66x | +2.2% | 4 (4 in the gate) |
+| RB | halt -> fast path to a 25% pool, then pump 2x/120s | carried over (v0.3 ARCH) | liquidation | +413s | 1.92x | +3.5% | 4 (4 in the gate) |
+| RB | halt -> fast path to a 25% pool, then pump 2x/120s | rewritten to the anchor (M4R) | liquidation | +413s | 1.92x | +3.5% | 4 (4 in the gate) |
+| RC | halt -> fast path to a 25% pool, then pump 2x/120s | carried over (v0.3 ARCH) | liquidation | +426s | 2.00x | +4.2% | 4 (4 in the gate) |
+| RC | halt -> fast path to a 25% pool, then pump 2x/120s | rewritten to the anchor (M4R) | liquidation | +426s | 2.00x | +4.2% | 4 (4 in the gate) |
 
-The outcomes of these genuine moves do not depend on it, but carry-over leaves the settlement box more than 1 % wide in `L` for the first 4 seconds after every change (3 with v0.4's median of the clamped observations) — long enough to block or defer an S2/S3 amount that depends on it.
+At graduation the outcomes of these genuine moves do not depend on it, but carry-over leaves the settlement box more than 1 % wide in `L` for the first 4 seconds after every change (3 with v0.4's median of the clamped observations) — long enough to block or defer an S2/S3 amount that depends on it. After a Raydium switch (M4R) the warm-up re-seeds and replaces the whole ring before the gate opens, so the 4 wide seconds lie inside the gate with or without the rewrite, and the exits are the ones v0.4.1 had (v0.4.1's rewrite to `min(√(X·Y)_new, L_ema)`: 0 wide seconds, the same exits).
+
+**Raydium adoptions: M4 as built and M4R** (#92, #93, #96; `attacks/venue_switch.py` (b), (c)). M4 as built rewrote the ring to the adopted pool's bounded depth `L_new = min(L_rec, L_live, D/λ_min)`; M4R rewrites it to the anchor `D/λ_min` and lets the 8-bucket warm-up re-seed it (§5.2). (b) is an honest fast path — the incumbent halts, the window opens at +120 s and adopts at +180 s, then a 2×/120 s pump from +300 s — onto thinner, deeper and `λ < λ_min` candidates, under v0.4.1's rule, M4 as built and M4R. The candidate column gives its `√(X·Y)` relative to the incumbent's, its `λ`, and its `D` relative to `pool_d`; eligible under v0.4.1 means real SOL ≥ 25 SOL and λ ≥ 50 %, under M4 and M4R the window floor (locked SOL ≥ 25 SOL at `P_ema`, and at `min(P_ema, P_cand)` for an M4R proposal, the same here since the candidate trades at `P_ema`; §6.2). M4R's `L_ema` column gives the anchor at the switch and the seed at the gate, 8 integrations later:
+
+| market | candidate: √(X·Y) / λ / D vs `pool_d` | real / locked SOL | eligible v0.4.1 / M4, M4R | rewrite | `L_ema` / √(X·Y) at the switch | outcome | exit vs event | price at exit | lender P&L | seconds with the box wider than 1 % in L (first 60 s) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| RA | 25% / 90% / 45% | 625.0 / 562.4 | yes / yes | v0.4.1: min(√(X·Y)_live, L_ema) | 1.000 | liquidation | +388s | 1.66x | +2.2% | 0 |
+| RA | 25% / 90% / 45% | 625.0 / 562.4 | yes / yes | M4 as built: min(L_rec, L_live, cap) | 1.000 | liquidation | +388s | 1.66x | +2.2% | 0 |
+| RA | 25% / 90% / 45% | 625.0 / 562.4 | yes / yes | M4R: cap + 8-bucket warm-up (proposed) | 1.800 → 1.000 | liquidation | +388s | 1.66x | +2.2% | 4 (4 in the gate) |
+| RA | 150% / 90% / 270% | 3750.0 / 3374.6 | yes / yes | v0.4.1: min(√(X·Y)_live, L_ema) | 0.667 | liquidation | +394s | 1.72x | +2.2% | 18 |
+| RA | 150% / 90% / 270% | 3750.0 / 3374.6 | yes / yes | M4 as built: min(L_rec, L_live, cap) | 1.000 | liquidation | +394s | 1.72x | +2.2% | 0 |
+| RA | 150% / 90% / 270% | 3750.0 / 3374.6 | yes / yes | M4R: cap + 8-bucket warm-up (proposed) | 1.800 → 1.000 | liquidation | +394s | 1.72x | +2.2% | 4 (4 in the gate) |
+| RA | 100% / 25% / 50% | 2500.0 / 624.7 | no / yes | v0.4.1: min(√(X·Y)_live, L_ema) | 1.000 | liquidation | +393s | 1.71x | +2.2% | 0 |
+| RA | 100% / 25% / 50% | 2500.0 / 624.7 | no / yes | M4 as built: min(L_rec, L_live, cap) | 0.500 | liquidation | +393s | 1.71x | +2.2% | 20 |
+| RA | 100% / 25% / 50% | 2500.0 / 624.7 | no / yes | M4R: cap + 8-bucket warm-up (proposed) | 0.500 → 1.000 | liquidation | +393s | 1.71x | +2.2% | 4 (4 in the gate) |
+| RA | 200% / 25% / 100% | 5000.0 / 1249.5 | no / yes | v0.4.1: min(√(X·Y)_live, L_ema) | 0.500 | liquidation | +394s | 1.72x | +2.2% | 20 |
+| RA | 200% / 25% / 100% | 5000.0 / 1249.5 | no / yes | M4 as built: min(L_rec, L_live, cap) | 0.500 | liquidation | +394s | 1.72x | +2.2% | 20 |
+| RA | 200% / 25% / 100% | 5000.0 / 1249.5 | no / yes | M4R: cap + 8-bucket warm-up (proposed) | 0.500 → 1.000 | liquidation | +394s | 1.72x | +2.2% | 4 (4 in the gate) |
+| RB | 25% / 90% / 45% | 250.0 / 225.0 | yes / yes | v0.4.1: min(√(X·Y)_live, L_ema) | 1.000 | liquidation | +413s | 1.92x | +3.5% | 0 |
+| RB | 25% / 90% / 45% | 250.0 / 225.0 | yes / yes | M4 as built: min(L_rec, L_live, cap) | 1.000 | liquidation | +413s | 1.92x | +3.5% | 0 |
+| RB | 25% / 90% / 45% | 250.0 / 225.0 | yes / yes | M4R: cap + 8-bucket warm-up (proposed) | 1.800 → 1.000 | liquidation | +413s | 1.92x | +3.5% | 4 (4 in the gate) |
+| RB | 150% / 90% / 270% | 1500.0 / 1349.8 | yes / yes | v0.4.1: min(√(X·Y)_live, L_ema) | 0.667 | liquidation | +419s | 1.99x | +3.5% | 18 |
+| RB | 150% / 90% / 270% | 1500.0 / 1349.8 | yes / yes | M4 as built: min(L_rec, L_live, cap) | 1.000 | liquidation | +419s | 1.99x | +3.5% | 0 |
+| RB | 150% / 90% / 270% | 1500.0 / 1349.8 | yes / yes | M4R: cap + 8-bucket warm-up (proposed) | 1.800 → 1.000 | liquidation | +419s | 1.99x | +3.5% | 4 (4 in the gate) |
+| RB | 100% / 25% / 50% | 1000.0 / 249.9 | no / yes | v0.4.1: min(√(X·Y)_live, L_ema) | 1.000 | liquidation | +418s | 1.98x | +3.5% | 0 |
+| RB | 100% / 25% / 50% | 1000.0 / 249.9 | no / yes | M4 as built: min(L_rec, L_live, cap) | 0.500 | liquidation | +418s | 1.98x | +3.5% | 20 |
+| RB | 100% / 25% / 50% | 1000.0 / 249.9 | no / yes | M4R: cap + 8-bucket warm-up (proposed) | 0.500 → 1.000 | liquidation | +418s | 1.98x | +3.5% | 4 (4 in the gate) |
+| RB | 200% / 25% / 100% | 2000.0 / 499.8 | no / yes | v0.4.1: min(√(X·Y)_live, L_ema) | 0.500 | liquidation | +419s | 1.99x | +3.5% | 20 |
+| RB | 200% / 25% / 100% | 2000.0 / 499.8 | no / yes | M4 as built: min(L_rec, L_live, cap) | 0.500 | liquidation | +419s | 1.99x | +3.5% | 20 |
+| RB | 200% / 25% / 100% | 2000.0 / 499.8 | no / yes | M4R: cap + 8-bucket warm-up (proposed) | 0.500 → 1.000 | liquidation | +419s | 1.99x | +3.5% | 4 (4 in the gate) |
+| RC | 25% / 90% / 45% | 21.2 / 19.1 | no / no | v0.4.1: min(√(X·Y)_live, L_ema) | 1.000 | liquidation | +426s | 2.00x | +4.2% | 0 |
+| RC | 25% / 90% / 45% | 21.2 / 19.1 | no / no | M4 as built: min(L_rec, L_live, cap) | no adoption (window floor) | open | +1500s | 1.00x | +0.0% | n/a |
+| RC | 25% / 90% / 45% | 21.2 / 19.1 | no / no | M4R: cap + 8-bucket warm-up (proposed) | no adoption (window floor) | open | +1500s | 1.00x | +0.0% | n/a |
+| RC | 150% / 90% / 270% | 127.5 / 114.7 | yes / yes | v0.4.1: min(√(X·Y)_live, L_ema) | 0.667 | open | +1500s | 2.00x | +0.0% | 18 |
+| RC | 150% / 90% / 270% | 127.5 / 114.7 | yes / yes | M4 as built: min(L_rec, L_live, cap) | 1.000 | open | +1500s | 2.00x | +0.0% | 0 |
+| RC | 150% / 90% / 270% | 127.5 / 114.7 | yes / yes | M4R: cap + 8-bucket warm-up (proposed) | 1.800 → 1.000 | open | +1500s | 2.00x | +0.0% | 4 (4 in the gate) |
+| RC | 100% / 25% / 50% | 85.0 / 21.2 | no / no | v0.4.1: min(√(X·Y)_live, L_ema) | 1.000 | open | +1500s | 2.00x | +0.0% | 0 |
+| RC | 100% / 25% / 50% | 85.0 / 21.2 | no / no | M4 as built: min(L_rec, L_live, cap) | no adoption (window floor) | open | +1500s | 1.00x | +0.0% | n/a |
+| RC | 100% / 25% / 50% | 85.0 / 21.2 | no / no | M4R: cap + 8-bucket warm-up (proposed) | no adoption (window floor) | open | +1500s | 1.00x | +0.0% | n/a |
+| RC | 200% / 25% / 100% | 170.0 / 42.5 | no / yes | v0.4.1: min(√(X·Y)_live, L_ema) | 0.500 | open | +1500s | 2.00x | +0.0% | 20 |
+| RC | 200% / 25% / 100% | 170.0 / 42.5 | no / yes | M4 as built: min(L_rec, L_live, cap) | 0.500 | open | +1500s | 2.00x | +0.0% | 20 |
+| RC | 200% / 25% / 100% | 170.0 / 42.5 | no / yes | M4R: cap + 8-bucket warm-up (proposed) | 0.500 → 1.000 | open | +1500s | 2.00x | +0.0% | 4 (4 in the gate) |
+
+- **Thinner** candidates with `λ ≥ λ_min` got the same `L_ema` under v0.4.1 and M4 (their `√(X·Y)` lies below the old `L_ema` and below the cap); M4R anchors them at `D/λ_min` (1.8× their depth at λ 90 %) and the warm-up brings `L_ema` to their depth (1.000) at the gate; the 4 wide seconds lie inside the gate. The exits are the same under every rule. The §10.3 table replays `FAST_SCENARIOS`, whose switch is now M4R's (`Market.adopt_pool`): every row is identical in every column to the v0.4.1 `fast_switch` table it replaces (`fast_path_events` applies no floor, so RC's "25 % pool", below the window floor under M4 and M4R, shows the mechanics of the switch only; last bullet).
+- A **deeper** candidate kept the old, thinner `L_ema` under v0.4.1, and the first honest buckets of the new pool left the box wide for 18 s (M4-SEC-6); M4 as built started the ring at the pool's own depth; M4R reaches it at the gate, with the box narrow from then on.
+- An eligible candidate with **`λ < λ_min`** was written at the cap `D/λ_min` under M4 (half its depth at λ = 25 %), which left the box wide for 20 s (M4V-3). M4R starts at the same anchor, but the warm-up seed reads the pool's own bucket highs and reaches its depth (1.000) at the gate: the box is narrow from then on, and M4V-3's delay is gone. (M4's written cap was also the start of a forced-liquidation band on such pools, §12.12.)
+- RC's 25 % candidate (21.2 SOL real, 19.1 SOL locked) is below the floor under M4 and M4R, so the RC "25 % pool" rows of §10.3 show the mechanics of the switch only; no window opens and the halted market keeps its position until an eligible pool appears (the λ = 25 % candidate with RC's own reserves, 21.2 SOL locked, likewise).
+
+(c) LP moves around the two samples M4's window adoption read (RA; the round trip costs no swap fee): "deposit" adds as much again as the pool's LP counter around the instruction (λ halves, `D` stays), "withdraw" removes every unlocked LP around it (`√(X·Y)` falls to `D`). Cells: `L_ema` / `√(X·Y)` at the switch (M4R: → at the gate), seconds with the box wider than 1 % in `L` (first 60 s; M4R: of which inside the gate):
+
+| candidate: √(X·Y) / λ | LP move | v0.4.1: min(√(X·Y)_live, L_ema) | M4 review fix: min(L_rec, cap) | M4 as built: min(L_rec, L_live, cap) | M4R: cap + 8-bucket warm-up (proposed) | exit (every rule) |
+|---|---|---|---|---|---|---|
+| 150% / 99.78% | none | 0.667, 18 s | 1.000, 0 s | 1.000, 0 s | 1.995 → 1.000, 4 s (4 in the gate) | liquidation, +394s, 1.72x, +2.2% |
+| 150% / 99.78% | deposit around the recording proposal (M4V-2) | 0.667, 18 s | 1.995, 24 s | 1.000, 0 s | 1.995 → 1.000, 4 s (4 in the gate) | liquidation, +394s, 1.72x, +2.2% |
+| 150% / 99.78% | deposit around the execution (M4-SEC-5) | 0.667, 18 s | 1.000, 0 s | 1.000, 0 s | 1.995 → 1.000, 4 s (4 in the gate) | liquidation, +394s, 1.72x, +2.2% |
+| 150% / 99.78% | withdraw around the recording proposal | 0.667, 18 s | 0.998, 0 s | 0.998, 0 s | 1.995 → 1.000, 4 s (4 in the gate) | liquidation, +394s, 1.72x, +2.2% |
+| 150% / 99.78% | withdraw around the execution (M4-SEC-5) | 0.667, 18 s | 1.000, 0 s | 0.998, 0 s | 1.995 → 1.000, 4 s (4 in the gate) | liquidation, +394s, 1.72x, +2.2% |
+| 200% / 25.00% | none | 0.500, 20 s | 0.500, 20 s | 0.500, 20 s | 0.500 → 1.000, 4 s (4 in the gate) | liquidation, +394s, 1.72x, +2.2% |
+| 200% / 25.00% | deposit around the recording proposal (M4V-2) | 0.500, 20 s | 0.500, 20 s | 0.500, 20 s | 0.500 → 1.000, 4 s (4 in the gate) | liquidation, +394s, 1.72x, +2.2% |
+| 200% / 25.00% | deposit around the execution (M4-SEC-5) | 0.500, 20 s | 0.500, 20 s | 0.500, 20 s | 0.500 → 1.000, 4 s (4 in the gate) | liquidation, +394s, 1.72x, +2.2% |
+| 200% / 25.00% | withdraw around the recording proposal | 0.500, 20 s | 0.250, 25 s | 0.250, 25 s | 0.500 → 1.000, 4 s (4 in the gate) | liquidation, +394s, 1.72x, +2.2% |
+| 200% / 25.00% | withdraw around the execution (M4-SEC-5) | 0.250, 25 s | 0.500, 20 s | 0.250, 25 s | 0.500 → 1.000, 4 s (4 in the gate) | liquidation, +394s, 1.72x, +2.2% |
+
+Under M4 a deposit — anyone with capital can make one, and the round trip costs nothing but capital — raised only the sample it wrapped: under the M4 review's record-only rule a deposit around the recording proposal wrote 1.995× the pool's depth into the ring and left the box wide for 24 s (the program reproducer: 1.996×, 24 of 30 s; M4V-2); as built, the execution's own sample bounded it. A withdrawal by an unlocked LP of the candidate lowered either sample to `D`, `1 − λ` below the pool: 0.2 % at λ 99.78 %, 75 % at λ 25 % (box wide 25 s) — and that written `D` was not only a delay: held with a withdraw-wrapped crank every second, it forced the liquidation of near-threshold positions (M4R-1, §12.12). M4R reads neither sample, so its column is the same in every row, and the exit is the same in every row under every rule.
 
 ### 10.2 Buyback larger than `real_token_reserves`
 
@@ -1195,7 +1332,7 @@ Without a straddle quote the position looks unquotable and settles S1 (the "no s
 - While Migrating, liquidations and closes pause; rent accrues; the EMA keeps integrating the completed curve's (final) price. After `max_migration_pause_s = 3,600 s` a stuck migration counts as no route.
 - **Halted venues (V2-5).** While a pool cannot execute, no observation is recorded; liquidatable positions reach S3 after the continuous chain, healthy positions stay frozen until the route returns or their deadline (owner item O14). The settlement box of such a market is the EMA point (nothing can be pushed).
 - **Continuous S3 chain:** every observation records `s3_no_route = !venue_executable ∨ route_broken ∨ φ_live > venue_fee_hard_cap_bps`, with the **global** hard cap (a market-level predicate; ARCH §5.3, A26); `no_route_since` restarts if consecutive no-route observations are more than 60 s apart. S3 is allowed iff the position is liquidatable **or expired**, `s3_no_route` holds now (global cap), the chain is unbroken, and `now ≥ max(no_route_since, graduated_at + grad_grace_s, migration_seen_at + max_migration_pause_s·[migrating]) + s3_wait_s`, the three timers at the position's snapshot values (defaults 600, 3,600 and 600 s). A no-route caused only by the flag or the fee cap still needs the position to be liquidatable with the spot leg evaluated normally, or expired. S3 on an executable venue (flag or fee above the hard cap) is simulated (§8.6).
-- **Raydium fast path on its own predicate (R3A-4, R3B-8).** `pool_fail = !venue_executable ∨ φ_live > venue_fee_hard_cap_bps` — venue-side evidence only, never the Emergency flag — drives a separate chain `pool_fail_since` / `last_pool_fail_obs` with the same 60 s gap rule. After `pool_fast_route_s` (120 s) of continuous failure plus the 60 s collection window, the deepest eligible candidate is adopted; with the ring rewrite, positions continue normally on the new pool:
+- **Raydium fast path on its own predicate (R3A-4, R3B-8).** `pool_fail = !venue_executable ∨ φ_live > venue_fee_hard_cap_bps` — venue-side evidence only, never the Emergency flag — drives a separate chain `pool_fail_since` / `last_pool_fail_obs` with the same 60 s gap rule. After `pool_fast_route_s` (120 s) of continuous failure, the first proposal of an eligible candidate with `D ≥ pool_fast_min_bps·pool_d` (25 %) that passes the window floor at `min(P_ema, P_cand)` (§6.2; M4R-2, PROPOSED, #96) opens a 60 s collection window and records its keys and `D` (M4 also recorded its `λ`; M4R does not); a strictly deeper one, judged the same way, replaces it. `execute_pool_switch` then adopts the window's candidate if it is still eligible and passes the window floor at `P_ema`, and the chain that armed the window is unbroken (`pool_fail` now and `pool_fail_since + pool_fast_route_s ≤ fp_t0`, M4-SEC-2); otherwise it cancels the window. A window whose candidate's own Raydium program has been flagged since is cancelled too (M4V-4), so that while the chain holds a proposal on the other program can open a new window at once. The adoption writes the anchor and restarts the observation state (§5.2); **exits resume after the warm-up** — at adoption + `EMA_WARMUP_BUCKETS` + 1 = +9 s with the keeper cranking every second (§5.5, §5.8 duty 9) — and positions then continue normally on the new pool, their `P_ema` and `L_ema` seeded from its own buckets. The rows below replay M4R on candidates at λ = 90 %; they are identical to v0.4.1's rewrite in every column (the exits land hundreds of seconds after the gate); RC's "25 % pool" is below the window floor under M4 and M4R (§10.1 (b)):
 
 | market | scenario | outcome | exit vs event | price at exit / terminal | CR spot/EMA at exit | value of Q at terminal price (SOL) | borrower P&L (SOL) | lender gets | lender P&L vs holding at terminal price (SOL, % of Q value) | keeper SOL |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -1217,13 +1354,97 @@ S3 with observation-gap rule 60 s: first S3 1020 s after the first outage (route
 
 Non-SOL quote curves and mayhem-mode curves are rejected at market creation (ADOPTED Q6); legacy SPL-Token pump coins are allowed. Venue fees, virtual reserves and the boost parameters are admin-changeable on pump's side: they are read on every quote, and opens are refused after a venue program upgrade until re-validated (ADOPTED Q13).
 
+### 10.5 Raydium pools with `λ < λ_min`: the `L` push, drains and deferral (M4; #93; M4R #96)
+
+From M4 on, eligibility does not read `λ` (§6.2), so a market can adopt a pool whose unlocked LP is most of its depth. The v0.4.1 argument for the settlement box's `L` side — `√(X·Y) ≥ D`, so any `L` push is bounded at `1 − λ ≤ 50 %` (ARCH §4.4) — held only for `λ ≥ λ_min`. Re-checked with `attacks/venue_switch.py` (d1)–(d4) on pools with the examples' locked depth `D` at λ = 50, 25 and 10 % (reserves scaled by `λ_min/λ`, so the sizing and the fully drained pool are the examples'):
+
+**The push bound.**
+
+- One instruction wrapped in an unlocked LP withdrawal reads `√(X·Y)` as low as `D`: a push of `1 − λ` (75 % at λ 25 %, 90 % at λ 10 %; no bound as λ → 0 other than the floor on locked SOL). A deposit pushes a sample up without bound, as before. Since M4R (#96) an adoption reads no sample at all, and the warm-up seed reads bucket highs for `L` (§5.2), so a withdraw-wrapped sample reaches `L_ema` only in a warm-up whose every bucket is attacker-only (§12.12); M4 as built read the smaller of two samples, which the downward push reached (§10.1 (c)).
+- An integrated second moves `L_ema` no further than the price: the observation is clamped to `[L_ema/(1 + C), L_ema·(1 + C)]` (C = 100 %), so an attacker-only second lowers `L_ema` by at most 8.3 % whatever λ is; `D` stops the fall sooner the higher λ is: at λ = 50 % from the second attacker-only second on, at a lower λ only once `L_ema` has fallen below `2·D`. After 5 consecutive attacker-only seconds `L_ema` is 0.701 of the pool at λ 50 % and 0.647 at λ ≤ 25 %; after 8, 0.616 and 0.499; it reaches `D` only after tens of seconds.
+- The box medians move as for the price: 4 of the 8 entries with one low observation each widen the low side (a contrary observation suffices), 5 attacker-only seconds lower the high side ((d2): `L_lo` reaches `D` at k = 4, `L_hi` follows `L_ema` from k = 5).
+
+**No settlement can be forced** (near-threshold *liquidations* are another matter: right after a switch M4 as built forced them, §12.12, and in steady state a genuinely reached low `L_ema` frozen by withdraw-wrapped cranks still can, §12.12's pre-existing residual). Every open is sized on at most `D/λ_min` (§6.1), and no instruction or observation reads an `L` below `D`, so the lowest state any push reaches — every unlocked LP withdrawn and held out — keeps at least `λ_min` of the depth a position opened on the pool was sized on, for every λ (a position carried over by the fast path keeps at least `pool_fast_min_bps·λ_min` = 12.5 % of its basis, since the candidate's `D` is at least 25 % of `pool_d` — as in v0.4.1). At λ < λ_min the pool was deeper than that basis when the position opened, so the only difference from the λ = 50 % rows is the open's own smaller price impact (a slightly smaller `V`):
+
+| market | pool | λ | Q (raw) | scenario | outcome | exit vs event | price at exit | CR spot/EMA at exit | lender P&L |
+|---|---|---|---|---|---|---|---|---|---|
+| RA | opened on it | 50% | 1,124,774,998,898 | drain all unlocked LP | open | +600s | 1.00x | 2.01/2.01 | +0.0% |
+| RA | opened on it | 50% | 1,124,774,998,898 | drain all unlocked LP + x1.5 | open | +600s | 1.50x | 1.34/1.34 | +0.0% |
+| RA | opened on it | 50% | 1,124,774,998,898 | drain all unlocked LP + pump 2x/120s | liquidation | +151s | 1.69x | 1.19/1.23 | +2.1% |
+| RA | opened on it | 25% | 1,124,549,998,898 | drain all unlocked LP | open | +600s | 1.00x | 1.99/1.99 | +0.0% |
+| RA | opened on it | 25% | 1,124,549,998,898 | drain all unlocked LP + x1.5 | open | +600s | 1.50x | 1.32/1.32 | +0.0% |
+| RA | opened on it | 25% | 1,124,549,998,898 | drain all unlocked LP + pump 2x/120s | liquidation | +149s | 1.67x | 1.19/1.23 | +2.1% |
+| RA | opened on it | 10% | 1,123,874,998,899 | drain all unlocked LP | open | +600s | 1.00x | 1.98/1.98 | +0.0% |
+| RA | opened on it | 10% | 1,123,874,998,899 | drain all unlocked LP + x1.5 | open | +600s | 1.50x | 1.31/1.31 | +0.0% |
+| RA | opened on it | 10% | 1,123,874,998,899 | drain all unlocked LP + pump 2x/120s | liquidation | +148s | 1.66x | 1.19/1.23 | +2.1% |
+| RC | opened on it | 50% | 1,551,439,631,523 | drain all unlocked LP | open | +600s | 1.00x | 3.02/3.02 | +0.0% |
+| RC | opened on it | 50% | 1,551,439,631,523 | drain all unlocked LP + x1.5 | open | +600s | 1.50x | 2.01/2.01 | +0.0% |
+| RC | opened on it | 50% | 1,551,439,631,523 | drain all unlocked LP + pump 2x/120s | open | +900s | 2.00x | 1.50/1.50 | +0.0% |
+| RC | opened on it | 25% | 1,551,129,281,526 | drain all unlocked LP | open | +600s | 1.00x | 2.99/2.99 | +0.0% |
+| RC | opened on it | 25% | 1,551,129,281,526 | drain all unlocked LP + x1.5 | open | +600s | 1.50x | 1.99/1.99 | +0.0% |
+| RC | opened on it | 25% | 1,551,129,281,526 | drain all unlocked LP + pump 2x/120s | liquidation | +190s | 2.00x | 1.48/1.49 | +4.0% |
+| RC | opened on it | 10% | 1,550,198,231,537 | drain all unlocked LP | open | +600s | 1.00x | 2.97/2.97 | +0.0% |
+| RC | opened on it | 10% | 1,550,198,231,537 | drain all unlocked LP + x1.5 | open | +600s | 1.50x | 1.97/1.97 | +0.0% |
+| RC | opened on it | 10% | 1,550,198,231,537 | drain all unlocked LP + pump 2x/120s | liquidation | +187s | 2.00x | 1.47/1.49 | +4.0% |
+| RA | carried: fast path at +180 s onto 25% √(X·Y), drained at +400 s | 50% | 1,124,774,998,898 | drain all unlocked LP | open | +1500s | 1.00x | 1.92/1.92 | +0.0% |
+| RA | carried: fast path at +180 s onto 25% √(X·Y), drained at +400 s | 50% | 1,124,774,998,898 | drain all unlocked LP + x1.5 | open | +1500s | 1.50x | 1.26/1.26 | +0.0% |
+| RA | carried: fast path at +180 s onto 25% √(X·Y), drained at +400 s | 50% | 1,124,774,998,898 | drain all unlocked LP + pump 2x/120s | liquidation | +541s | 1.60x | 1.18/1.23 | +2.2% |
+| RA | carried: fast path at +180 s onto 50% √(X·Y), drained at +400 s | 25% | 1,124,774,998,898 | drain all unlocked LP | open | +1500s | 1.00x | 1.92/1.92 | +0.0% |
+| RA | carried: fast path at +180 s onto 50% √(X·Y), drained at +400 s | 25% | 1,124,774,998,898 | drain all unlocked LP + x1.5 | open | +1500s | 1.50x | 1.26/1.26 | +0.0% |
+| RA | carried: fast path at +180 s onto 50% √(X·Y), drained at +400 s | 25% | 1,124,774,998,898 | drain all unlocked LP + pump 2x/120s | liquidation | +541s | 1.60x | 1.18/1.23 | +2.1% |
+
+At a flat price and at ×1.5 nothing happens on any pool; a genuine 2×/120 s pump liquidates normally with lenders made whole (RC at λ ≤ 25 % is liquidated at 2.00× where the λ = 50 % pool stays open at CR 1.50 = its liquidation CR: the same genuine price, a CR 0.01–0.02 lower). A position carried by the fast path onto a candidate with `D` = 25 % of `pool_d` (the `pool_fast_min_bps` minimum) gives the same rows at λ 50 % and 25 %: the drained state depends on `D` alone, as in v0.4.1. S2 stays out of reach after the full drain ((d4): RA S1 at ×2.01 / ×1.97 / ×1.97 and S2 at ×125.9 / ×124.7 / ×124.7 at λ 50 / 25 / 10 %; RC S1 at ×2.96 / ×2.93 / ×2.90, S2 at the same multiples as RA; §8.6). Consecutive attacker-only seconds in which every observation is withdraw-wrapped, with the evaluating instruction wrapped too so that its live legs read `D`, leave RA's capped position at a flat price never liquidatable, with no S1 or S2 leg, and refuted:
+
+| λ | k | `L_ema` | `L_lo` | `L_hi` | CR spot at D / EMA | liquidatable | S1 legs | S2 legs | refuted |
+|---|---|---|---|---|---|---|---|---|---|
+| 50% | 1 | 0.917 | 0.917 | 1.000 | 2.01 / 2.03 | no | no | no | yes |
+| 50% | 3 | 0.789 | 0.789 | 1.000 | 2.01 / 2.03 | no | no | no | yes |
+| 50% | 4 | 0.741 | 0.500 | 1.000 | 2.01 / 2.02 | no | no | no | yes |
+| 50% | 5 | 0.701 | 0.500 | 0.701 | 2.01 / 2.02 | no | no | no | yes |
+| 50% | 8 | 0.616 | 0.500 | 0.616 | 2.01 / 2.02 | no | no | no | yes |
+| 50% | 40 | 0.500 | 0.500 | 0.500 | 2.01 / 2.01 | no | no | no | yes |
+| 25% | 1 | 0.917 | 0.917 | 1.000 | 1.99 / 2.01 | no | no | no | yes |
+| 25% | 3 | 0.770 | 0.770 | 1.000 | 1.99 / 2.01 | no | no | no | yes |
+| 25% | 4 | 0.706 | 0.250 | 1.000 | 1.99 / 2.01 | no | no | no | yes |
+| 25% | 5 | 0.647 | 0.250 | 0.647 | 1.99 / 2.01 | no | no | no | yes |
+| 25% | 8 | 0.499 | 0.250 | 0.499 | 1.99 / 2.01 | no | no | no | yes |
+| 25% | 40 | 0.251 | 0.250 | 0.251 | 1.99 / 1.99 | no | no | no | yes |
+| 10% | 1 | 0.917 | 0.917 | 1.000 | 1.98 / 2.01 | no | no | no | yes |
+| 10% | 3 | 0.770 | 0.770 | 1.000 | 1.98 / 2.00 | no | no | no | yes |
+| 10% | 4 | 0.706 | 0.100 | 1.000 | 1.98 / 2.00 | no | no | no | yes |
+| 10% | 5 | 0.647 | 0.100 | 0.647 | 1.98 / 2.00 | no | no | no | yes |
+| 10% | 8 | 0.499 | 0.100 | 0.499 | 1.98 / 2.00 | no | no | no | yes |
+| 10% | 40 | 0.102 | 0.100 | 0.102 | 1.98 / 1.98 | no | no | no | yes |
+
+(`L` values relative to the pool's `√(X·Y)`.)
+
+**Delay only.** What a push can do is widen the box's `L` side, which defers every decision that must agree across it (§5.6):
+
+- after an adoption: nothing beyond the warm-up gate since M4R — the seed reaches the pool's depth at the gate for λ down to 10 % and the box is narrow from then on (§10.1 (b)); M4 as built left it wide 20 s for an honest `λ < λ_min` candidate written at the cap and 25 s after a withdrawal around one of its two samples (§10.1 (b), (c));
+- a **contrary LP observation every second** — an unlocked LP holder's `[withdraw, crank, re-deposit]` next to the keeper's honest crank, which costs no swap fee — holds `L_lo` at `D` while `L_hi` stays honest. The S2/S3 amount then spreads across the box by ≈ `(1 − λ)·Q/X_D`, with `X_D` the token reserve at depth `D` and `Q/X_D ≤ min(3·φ, √(1 + ι_pos) − 1)/λ_min` at the size caps (bps; settles only at ≤ `fv_dev_bps` = 100; capped position, expired at a flat price or liquidatable after a pump):
+
+| market | fee | state | λ 50% | λ 33% | λ 25% | λ 10% |
+|---|---|---|---|---|---|---|
+| RA | 0.25% | expired, flat | 75 | 100 | 113 | 136 |
+| RA | 0.25% | liquidatable (x1.6) | 97 | 129 | 145 | 174 |
+| RA | 1.00% | expired, flat | 253 | 340 | 384 | 464 |
+| RA | 1.00% | liquidatable (x1.6) | 325 | 437 | 493 | 596 |
+| RC | 0.25% | expired, flat | 75 | 100 | 113 | 136 |
+| RC | 0.25% | liquidatable (x2.0) | 109 | 145 | 163 | 196 |
+| RC | 1.00% | expired, flat | 253 | 340 | 384 | 464 |
+| RC | 1.00% | liquidatable (x2.0) | 366 | 492 | 556 | 672 |
+
+On a 25 bps pool an expired position at a flat price stays within `fv_dev_bps` for λ ≥ 33 %, but not at λ 25 % or 10 % (113, 136 bps), and a liquidatable one on RC exceeds it already at λ 50 % (109 bps); on a 1 % pool the spread is 253–672 bps at every λ. The §5.6 remark that an LP round trip "moves `L` too little to matter" therefore held only for low-fee pools with a high λ, and is corrected there. The deferral lasts while the round trip is repeated in every second — transaction fees only, but it needs most of the unlocked LP: withdrawing a share `s` of it lowers `L_lo` only to `√(X·Y)·(1 − s·(1 − λ))`. It concerns S3 on an executable venue (the Emergency flag or a fee above the hard cap; S2 is unreachable at capped sizes, §8.6), and the deferred position can still be liquidated or expired normally while the route works for short.win (§5.6). Disclosed with owner item O18 (§17).
+
+**While the post-change reference guard is set** (M4R, §8.2) a low-λ pool's unlocked LP holder has one more lever, an extraction rather than a delay: withdraw-wrapping at least 4 of the 8 warm-up seconds and at least 4 of every 8 after them keeps `L_mlo` at `D`, so the guard stays set, and a withdraw-wrapped liquidation of a genuinely liquidatable position then prices its reference at `max(D, L_slow ≤ D)` instead of the pool's depth. The borrower overpays by at most `cost(D)/cost(H) − 1 ≈ (1/λ − 1)·q/x` of `B` — ≈ 0 on λ ≈ 1 pools, +4.04 % (1.24 SOL) in `switch_warmup.py` (5) at λ 50 % with `q` 3 % of the candidate's `X` — and M4 as built allowed the same +4.04 % through its `D` seed. It never forces an exit (§12.12).
+
 ---
 
 ## 11. Simulation
 
 ### 11.1 Method
 
-Venues: exact integer math of §1/§3 with the live pump fee schedules; Raydium with the generic fee-on-input model and tracked LP units (λ = 50 %). Example markets:
+Venues: exact integer math of §1/§3 with the live pump fee schedules; Raydium with the generic fee-on-input model and tracked LP units (λ = 50 % = `λ_min`; pools with a lower λ are eligible since M4 and are covered in §10.5). Example markets:
 
 | Key | Venue |
 |---|---|
@@ -1233,7 +1454,7 @@ Venues: exact integer math of §1/§3 with the live pump fee schedules; Raydium 
 | D@x | pump curve at x % progress (125 bps) |
 | RA / RB / RC | Raydium AMM v4 150 M / 2,500 SOL; CPMM 200 M / 1,000 SOL; CPMM 206.9 M / 84.99 SOL (all 25 bps; λ = 50 %) |
 
-Positions at the per-position cap, 80 % utilisation, event 1 h after open. The in-house keeper observes every second near thresholds (§5.8) and acts 1 s after a position becomes actionable, retrying every second. Borrower P&L = payout − M − open fee. **Lender P&L vs holding** = SOL received − value of the tokens not returned, at the scenario's **terminal** price. Tables come from `python3 docs/design/sim/shortwin_sim.py --mc 400 --fuzz 1000` (output `sim/out/full.txt`); the drain scenarios are limited to the unlocked half of the LP (an adopted pool cannot lose more), and the Emergency-flag rows set the route-broken flag one second before the move.
+Positions at the per-position cap, 80 % utilisation, event 1 h after open. The in-house keeper observes every second near thresholds (§5.8) and acts 1 s after a position becomes actionable, retrying every second. Borrower P&L = payout − M − open fee. **Lender P&L vs holding** = SOL received − value of the tokens not returned, at the scenario's **terminal** price. Tables come from `python3 docs/design/sim/shortwin_sim.py --mc 400 --fuzz 1000` (output `sim/out/full.txt`); the drain scenarios withdraw the unlocked half of the LP — all of it on these λ = 50 % pools; at a lower λ a full drain removes more of the pool but ends at the same depth relative to sizing (§10.5) — and the Emergency-flag rows set the route-broken flag one second before the move.
 
 ### 11.2 Deterministic scenarios
 
@@ -1342,7 +1563,7 @@ Positions at the per-position cap, 80 % utilisation, event 1 h after open. The i
 | RC | dump -50%, close | close | +3600s | 0.50x / 0.50x | 6.10/6.10 | 0.314 | +0.3128 (+24% of M) | 100% + 0.0002 SOL | +0.0002 (+0.1%) | 0.0000 |
 | RC | flat to expiry | expiry | +604801s | 1.00x / 1.00x | 3.01/3.01 | 0.628 | -0.0432 (-3% of M) | 100% + 0.0332 SOL | +0.0332 (+5.3%) | 0.0016 |
 
-What changed against v0.3: every genuine outcome is unchanged (the fixed 2 % bound executes at the same second as v0.3's 1 % Dutch start; §12.2), except RA/RC figures that move in the last digit (conservative token reserve and `ert = 0` on Raydium). The 90–98 % drain rows are gone: an adopted pool keeps ≥ 50 % of its LP locked, so "drain all unlocked LP (50 %)" is the realistic worst case, and it liquidates nothing on its own; 50 % drains followed by a pump liquidate normally (RA 1.69×, RB 1.95×; RC stays open at 2×). The Emergency flag leaves every liquidation unchanged (the flag is S3 evidence only, V2-1).
+What changed against v0.3: every genuine outcome is unchanged (the fixed 2 % bound executes at the same second as v0.3's 1 % Dutch start; §12.2), except RA/RC figures that move in the last digit (conservative token reserve and `ert = 0` on Raydium). The 90–98 % drain rows are gone: a full drain of an adopted pool leaves at least `λ_min` of the depth the positions opened on it were sized on (sizing ≤ `D/λ_min`; since M4 also on pools with `λ < λ_min`, which may lose more than half of their depth, §10.5), so "drain all unlocked LP (50 %)" is the realistic worst case up to the open's own price impact (CR after the drain 2.01 at λ 50 %, 1.98 at λ 10 %), and it liquidates nothing on its own; 50 % drains followed by a pump liquidate normally (RA 1.69×, RB 1.95×; RC stays open at 2×). The Emergency flag leaves every liquidation unchanged (the flag is S3 evidence only, V2-1).
 
 ### 11.3 Keeper latency
 
@@ -1435,7 +1656,7 @@ Calm regime: −13.6 % to +0.9 % of `N_open`, every cell within two standard err
 2. **Short spikes never liquidate**, and an atomic spike cannot move the EMA.
 3. **Gaps larger than the cushion become S1 losses** shared pro-rata by lenders; the keeper must act within 1–2 s for Tier C/D fast pumps.
 4. **Tier A lenders are the most exposed per unit of move** (cushion 1.6×).
-5. **LP drains on adoptable pools do not liquidate** on their own; S2 is unreachable at capped sizes; the D3 cap matters for S3 (flag, fee hike, stuck migration).
+5. **LP drains on adoptable pools do not liquidate** on their own, at any λ (§10.5); S2 is unreachable at capped sizes; the D3 cap matters for S3 (flag, fee hike, stuck migration), whose amount an unlocked LP holder's zero-fee round trip every second can defer on low-λ or high-fee pools (§10.5).
 6. **Graduation includes the boost:** positions opened at 80–90 % curve progress are liquidated on the completing buy or by the +45.66 % push that follows, lenders made whole.
 7. **Lender economics** still hinge on uncalibrated gap frequencies (OWNER).
 
@@ -2327,6 +2548,276 @@ A position sits in S1 a few percent beyond the S1 boundary after a genuine gap; 
 - **The rejected reading.** Evaluating every decision "on the lender-adverse side" (refutation and amount at `(P_lo, L_hi)`, no amount check) closes the lender's push but hands the borrower both the refutation push (§12.10: no S1 within 600 s) and a one-second FV cut of 5.23 SOL (8.4 %) on Tier A.
 - **Deferral (residual).** A party that owns an attacker-only second can keep the box wider than 1 % and defer an S2/S3 amount by ≈ 13 s per push; repeated every time the settlement becomes due, it blocks S2/S3 for as long as it pays (A: 43 pushes in 600 s). It needs a whole second without an honest observation each time, which keeper duty 2 denies after the first. v0.4.1 adds a cheaper form: a contrary observation in every second, even one that also holds the keeper's, widens one side of the box and defers an S3 on an executable venue for 0.002 SOL/s (RC) to 0.21 SOL/s (A) at a 1 % round trip (`refute_push.py` (d), §5.6). A push-then-freeze on the S3 amount now only defers it the same way: re-running the reviewer's `ptf.py` on v0.4.1, no S3 settles while the freeze lasts (200 s, 1.5–600 SOL of bundles) and the honest amount follows when it stops (v0.4: the frozen box let the pushed amount through, +3.14 to +10.48 SOL for a lender push or −5.22 SOL for a borrower push on Tier A, unprofitable at 17.7–54 SOL of bundles). An expired position deferred this way can still be expired normally when short.win's route works.
 
+
+### 12.12 Right after a venue switch (`switch_warmup.py`, `venue_switch.py`; M4R-1, M4R-2; PROPOSED, #96)
+
+The M4 re-verification (M4R) asked what a Raydium venue switch leaves behind for the positions it carries. As built after M4, the adoption seeded `L_ema` and the ring from single-instruction samples, `min(L_rec, L_live, D/λ_min)`, and carried a `P_ema` frozen while the incumbent could not execute. Both are forcing paths, not delays: an unlocked LP of the candidate withdraws around a sampling instruction (`L_new = D`) and then holds `L_ema` at `D` with one withdraw-wrapped crank per second — directional aggregation freezes an EMA that has one observation on its own side every second — so a position within ≈ `q/x` of `cr_liq` that is healthy on the pool as it trades becomes liquidatable on the EMA leg and on a withdraw-wrapped spot leg (**M4R-1**; the LiteSVM reproducer `m4r_it::m4r_explore_liquidation_grid`: liquidated 24–26 s after the adoption when wrapped, never in 90 s when not); and the window floor judged at the stale `P_ema` admits, after a dump during the halt, a pool with only `floor·√(P_live/P_ema)` of real locked SOL (**M4R-2**). The post-change confirmation of §5.2 (anchor, 8-bucket warm-up, gate, reference guard; the floor at `min(P_ema, P_cand)`, §6.2) replaces that rule. `attacks/switch_warmup.py` compares "M4 as built" (`venue_switch.BuiltM4`) with "M4R" (the sim's `Market`) on three run engines ported from the redesign's harnesses (the M4R-1 reproducer's markets; the R100 / RA / RC incumbents with attacker `a2`, whose every sample is withdraw-wrapped and whose wrapped liquidation lands first in each second; a 60-s pre-halt variant); the self-test: an honest switch reaches `L_ema/√(X·Y)` = 1.000 at the gate for λ 50, 99.78 and 25 %, the box is narrow after it, the guard clears at the gate, and a genuinely liquidatable position is liquidated at +9 s.
+
+**(1) M4R-1 — no forced liquidation.** A λ 50 % candidate (52 SOL at the pre-halt price) whose every unlocked LP unit the attacker holds; the position carried from a 100-SOL fully locked AMM v4 (Tier C, `cr_liq` 1.5); the candidate trades at `m`× the pre-halt price, flat after the adoption; every second the keeper's crank and liquidation attempt, and the attacker's `[withdraw all, crank, deposit]` and `[withdraw all, liquidate, deposit]`. "withdraw-wrapped" = the execution, the recording proposal or both wrapped (the three give identical cells); cells: outcome, keeper (`k`) or attacker (`a`), seconds after the adoption (borrower SOL, or equity if open), 120 s:
+
+| q | m | honest: M4 as built | honest: M4R | withdraw-wrapped: M4 as built | withdraw-wrapped: M4R |
+|---|---|---|---|---|---|
+| 0.40 % | 1.96 | open (0.419) | open (0.419) | open (0.419) | open (0.419) |
+| 0.40 % | 1.97 | open (0.415) | open (0.415) | open (0.415) | open (0.415) |
+| 0.40 % | 1.98 | open (0.411) | open (0.411) | liquidation a +41s (0.335) | open (0.411) |
+| 0.40 % | 1.99 | open (0.407) | open (0.407) | liquidation a +27s (0.331) | open (0.407) |
+| 0.40 % | 2.00 | open (0.403) | open (0.403) | liquidation a +24s (0.326) | open (0.403) |
+| 0.40 % | 2.01 | liquidation k +28s (0.331) | liquidation k +9s (0.331) | liquidation k +22s (0.331) | liquidation k +9s (0.331) |
+| 0.40 % | 2.02 | liquidation k +24s (0.327) | liquidation k +9s (0.327) | liquidation k +20s (0.327) | liquidation k +9s (0.327) |
+| 0.40 % | 2.05 | liquidation k +20s (0.314) | liquidation k +9s (0.314) | liquidation k +18s (0.314) | liquidation k +9s (0.314) |
+| 0.74 % | 1.96 | open (0.779) | open (0.779) | open (0.779) | open (0.779) |
+| 0.74 % | 1.97 | open (0.772) | open (0.772) | liquidation a +29s (0.622) | open (0.772) |
+| 0.74 % | 1.98 | open (0.764) | open (0.764) | liquidation a +25s (0.613) | open (0.764) |
+| 0.74 % | 1.99 | open (0.757) | open (0.757) | liquidation a +22s (0.605) | open (0.757) |
+| 0.74 % | 2.00 | open (0.749) | open (0.749) | liquidation a +21s (0.596) | open (0.749) |
+| 0.74 % | 2.01 | liquidation k +30s (0.622) | liquidation k +9s (0.622) | liquidation k +19s (0.622) | liquidation k +9s (0.622) |
+| 0.74 % | 2.02 | liquidation k +25s (0.614) | liquidation k +9s (0.614) | liquidation k +18s (0.614) | liquidation k +9s (0.614) |
+| 0.74 % | 2.05 | liquidation k +20s (0.589) | liquidation k +9s (0.589) | liquidation k +16s (0.589) | liquidation k +9s (0.589) |
+
+As built, every wrapped row between 1.98× (1.97× at q 0.74 %) and the honest threshold 2.01× is a forced liquidation, 21–41 s after the adoption; M4R never liquidates below the threshold, and liquidates the genuinely liquidatable position at +9 s (as built +16 to +30 s). Without the per-second freeze the wrapped execution alone forces nothing under either rule (the control rows).
+
+**(2) Candidates with `λ < λ_min`.** M4 wrote such a pool's ring at `D/λ_min`, below its depth, even honestly; with the M4R-1 attacker (q 0.74 %, flat at `m`):
+
+| candidate | m | honest (M4R) | M4 as built | M4R |
+|---|---|---|---|---|
+| 240 SOL, 25 % | 1.99 | open (0.780) | open (0.780) | open (0.780) |
+| 240 SOL, 25 % | 2.00 | open (0.773) | open (0.773) | open (0.773) |
+| 240 SOL, 25 % | 2.01 | open (0.765) | liquidation a +37s (0.626) | open (0.765) |
+| 240 SOL, 25 % | 2.02 | open (0.758) | liquidation a +27s (0.618) | open (0.758) |
+| 240 SOL, 25 % | 2.03 | open (0.751) | liquidation a +24s (0.610) | open (0.751) |
+| 240 SOL, 25 % | 2.05 | liquidation k +9s (0.615) | liquidation k +20s (0.615) | liquidation k +9s (0.615) |
+| 400 SOL, 10 % | 1.99 | open (0.783) | open (0.783) | open (0.783) |
+| 400 SOL, 10 % | 2.00 | open (0.775) | liquidation a +28s (0.620) | open (0.775) |
+| 400 SOL, 10 % | 2.01 | open (0.768) | liquidation a +24s (0.612) | open (0.768) |
+| 400 SOL, 10 % | 2.02 | open (0.761) | liquidation a +22s (0.603) | open (0.761) |
+| 400 SOL, 10 % | 2.03 | open (0.753) | liquidation a +21s (0.595) | open (0.753) |
+| 400 SOL, 10 % | 2.05 | liquidation k +9s (0.618) | liquidation k +19s (0.618) | liquidation k +9s (0.618) |
+
+and on the fine grid of a 104-SOL λ 25 % candidate (position at the size cap; honest vs `a2`):
+
+| rule | m | honest only | a2 attacked | L_ema / √(X·Y) at the switch (a2) |
+|---|---|---|---|---|
+| M4 as built | 2.00 | open (120 s) | liquidation +21 s by attacker @2.001x | 0.250 |
+| M4 as built | 2.01 | open (120 s) | liquidation +19 s by attacker @2.011x | 0.250 |
+| M4 as built | 2.02 | open (120 s) | liquidation +18 s by attacker @2.021x | 0.250 |
+| M4 as built | 2.03 | liquidation +30 s @2.031x | liquidation +18 s by attacker @2.031x | 0.250 |
+| M4 as built | 2.04 | liquidation +25 s @2.041x | liquidation +17 s by attacker @2.041x | 0.250 |
+| M4R | 2.00 | open (120 s) | open (120 s) | 0.500 |
+| M4R | 2.01 | open (120 s) | open (120 s) | 0.500 |
+| M4R | 2.02 | open (120 s) | open (120 s) | 0.500 |
+| M4R | 2.03 | liquidation +9 s @2.031x | liquidation +9 s by attacker @2.031x | 0.500 |
+| M4R | 2.04 | liquidation +9 s @2.041x | liquidation +9 s by attacker @2.041x | 0.500 |
+
+As built forces the band 2.00–2.03× (+18 to +37 s); M4R has none: the seed reads the pool's own bucket highs (0.500 is the anchor at the switch; the seed is the pool's depth at the gate). The redesign's "credited depth" alternative forced 2.01–2.02× here and was rejected.
+
+**(3) Honest depth and box** (a 2.3×/120 s pump from +30 s, q 0.40 %): `L_ema/√(X·Y)` at the adoption and at the gate, box wide (seconds) in the warm-up / after it:
+
+| candidate (SOL at the pre-halt price, lambda) | rule | L at adoption | L at the gate | box wide: warm-up / after | exit in the pump | guard cleared |
+|---|---|---|---|---|---|---|
+| 30 SOL, 99.78 % | M4 as built | 1.000 | - | 0 / 0 | liquidation k +137s (0.286) | - |
+| 30 SOL, 99.78 % | M4R | 1.995 | 1.000 | 4 / 0 | liquidation k +137s (0.286) | +9 s |
+| 52 SOL, 50.00 % | M4 as built | 1.000 | - | 0 / 0 | liquidation k +138s (0.287) | - |
+| 52 SOL, 50.00 % | M4R | 1.000 | 1.000 | 0 / 0 | liquidation k +138s (0.287) | +9 s |
+| 150 SOL, 90.00 % | M4 as built | 1.000 | - | 0 / 0 | liquidation k +139s (0.287) | - |
+| 150 SOL, 90.00 % | M4R | 1.800 | 1.000 | 4 / 0 | liquidation k +139s (0.287) | +9 s |
+| 150 SOL, 99.78 % | M4 as built | 1.000 | - | 0 / 0 | liquidation k +139s (0.287) | - |
+| 150 SOL, 99.78 % | M4R | 1.995 | 1.000 | 4 / 0 | liquidation k +139s (0.287) | +9 s |
+| 120 SOL, 25.00 % | M4 as built | 0.500 | - | 0 / 20 | liquidation k +139s (0.286) | - |
+| 120 SOL, 25.00 % | M4R | 0.500 | 1.000 | 4 / 0 | liquidation k +139s (0.286) | +9 s |
+| 240 SOL, 25.00 % | M4 as built | 0.500 | - | 0 / 20 | liquidation k +140s (0.282) | - |
+| 240 SOL, 25.00 % | M4R | 0.500 | 1.000 | 4 / 0 | liquidation k +140s (0.282) | +9 s |
+| 400 SOL, 10.00 % | M4 as built | 0.200 | - | 0 / 26 | liquidation k +140s (0.283) | - |
+| 400 SOL, 10.00 % | M4R | 0.200 | 1.000 | 4 / 0 | liquidation k +140s (0.283) | +9 s |
+
+M4V-3 (λ < λ_min: box wide 20–26 s) and M4-SEC-6 (a deeper pool's box) are resolved: the anchor sits above a λ > λ_min pool's depth (1.8–1.995×) or below a λ < λ_min pool's (0.2–0.5×) only inside the gate, and the seed is exact at the gate for every λ.
+
+**(4) Capital deposit freeze.** Anyone with capital about the pool's size deposits around sampling instructions and around one crank every second from the adoption (no swap fee). Up-pushed `L` delays the EMA leg; M4 as built needed both samples wrapped to seed it, but once seeded (or under M4R's anchor without the guard) the frozen `L_ema` also lifts the exit reference, whose `B̂_ref` then stays below the live cost until S1. RA → 630 SOL at λ 99.78 % (q 3 % of the candidate's `X`), a genuine 3×/120 s pump from the adoption; cells: `L_ema/√(X·Y)` at the switch; box wide (s, first 60); outcome:
+
+| LP move | M4 as built | M4R | M4R without the guard (analysis) |
+|---|---|---|---|
+| none | 1.000; 0 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 | 1.995; 4 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 | 1.995; 4 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 |
+| deposit around the recording proposal (M4V-2) | 1.000; 0 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 | 1.995; 4 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 | 1.995; 4 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 |
+| deposit around the execution | 1.000; 0 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 | 1.995; 4 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 | 1.995; 4 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 |
+| deposit around both | 1.995; 24 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 | 1.995; 4 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 | 1.995; 4 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 |
+| deposit freeze after the adoption only | 1.000; 54 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 | 1.995; 56 s; liquidation +61 s @1.732x, lender +0.834, borrower 2.847 | 1.995; 56 s; S1 +123 s @3.000x, lender -17.785, borrower 0.000 |
+| both + deposit freeze after | 1.995; 56 s; S1 +123 s @3.000x, lender -17.785, borrower 0.000 | 1.995; 56 s; liquidation +61 s @1.732x, lender +0.834, borrower 2.847 | 1.995; 56 s; S1 +123 s @3.000x, lender -17.785, borrower 0.000 |
+
+(RA → 314 SOL, q 6 %: the same pattern — as built S1 at +120 s, −17.281 SOL with both samples wrapped; M4R liquidation at +59 s at 1.701×, lenders +0.853; without the guard S1, −17.281.) With the guard the freeze delays the liquidation by 2–4 s (2–4 % of price) instead of blocking it. Near the threshold and on the big carried position (1 % fees, q 12–15 % of the candidate's `X`), engine W:
+
+| attack | m | M4 as built | M4R |
+|---|---|---|---|
+| deposit-wrapped crank every second (up-freeze) | 2.01 | liquidation k +28s @2.01x (0.331 / 0.032) | open (0.399) |
+| deposit-wrapped crank every second (up-freeze) | 2.02 | liquidation k +24s @2.02x (0.327 / 0.033) | liquidation k +9s @2.02x (0.327 / 0.033) |
+| deposit-wrapped crank every second (up-freeze) | 2.03 | liquidation k +22s @2.03x (0.323 / 0.033) | liquidation k +9s @2.03x (0.323 / 0.033) |
+| deposit-wrapped crank every second (up-freeze) | 2.05 | liquidation k +20s @2.05x (0.314 / 0.033) | liquidation k +9s @2.05x (0.314 / 0.033) |
+| deposit-wrapped crank every second + deposit-wrapped execute | 2.05 | liquidation k +20s @2.05x (0.314 / 0.033) | liquidation k +9s @2.05x (0.314 / 0.033) |
+| deposit-wrapped crank + withdraw-wrapped liquidation every second | 1.99 | open (0.407) | open (0.407) |
+| big carried position, no attacker | 2.00 | liquidation k +14s @2.00x (3.462 / 0.448) | liquidation k +9s @2.00x (3.462 / 0.448) |
+| big carried position, deposit-wrapped crank every second (capital = the pool) | 2.00 | liquidation k +14s @2.00x (3.462 / 0.448) | open (4.356) |
+| big carried position, deposit-wrapped crank every second (capital = the pool) | 2.50 | liquidation k +8s @2.51x (0.142 / 0.571) | liquidation k +9s @2.51x (0.142 / 0.571) |
+| big carried position, deposit-wrapped crank every second (capital = the pool) | 3.00 | S1 k +60s @3.01x (0.000 / 15.375) | S1 k +49s @3.01x (0.000 / 15.375) |
+
+A freeze keeps `L_ema` up only while it is repeated every second with the pool's size in capital; it delays the liquidation trigger by at most ≈ `(1 − H/L)·q/x` in price (2.01× and the big position at 2.0× stay open while it lasts, where M4 as built liquidated at +28 s / +14 s) and cannot block the reference — for as long as it is held, since the guard also covers `L_slow`'s input (§5.2, §8.2). The M4R verification (M4X-2) held the freeze for 10–30 min before the pump: with the guard on the `L_ema` term alone, `L_slow` integrated the frozen `L_ema` (`+1/τ_slow` of the gap per second, plus a first 60-s-weighted step after the gate) and the unguarded `L_slow` term of `L_b` blocked the reference again (engine P, `switch_warmup.py` part 4c; cells: outcome; `L_slow/√(X·Y)` at the end):
+
+| candidate | freeze | W (s) | M4R | M4R with `L_slow` unguarded (before M4X-2) |
+|---|---|---|---|---|
+| RA → 314 SOL, λ 99.78 % | dep | 600 | liquidation +643 s @1.717x, lender +0.862, borrower 1.710; 0.998 | liquidation +643 s @1.717x, lender +0.852, borrower 1.730; 1.173 |
+| RA → 314 SOL, λ 99.78 % | dep | 1800 | liquidation +1843 s @1.717x, lender +0.862, borrower 1.710; 0.998 | S1 +1903 s @2.717x, lender -12.553, borrower 0.000; 1.416 |
+| RA → 314 SOL, λ 99.78 % | dep3 | 600 | liquidation +645 s @1.750x, lender +0.879, borrower 0.978; 0.998 | S1 +706 s @2.767x, lender -13.476, borrower 0.000; 1.565 |
+| RA → 630 SOL, λ 99.78 % | dep3 | 600 | liquidation +646 s @1.767x, lender +0.852, borrower 2.132; 0.998 | liquidation +646 s @1.767x, lender +0.840, borrower 2.155; 1.525 |
+| RA → 630 SOL, λ 99.78 % | dep3 | 1800 | liquidation +1846 s @1.767x, lender +0.852, borrower 2.131; 0.998 | S1 +1907 s @2.783x, lender -13.784, borrower 0.000; 2.255 |
+
+(`dep` = capital of the pool's size, `dep3` = three times; the pump is 3×/120 s after W s flat.) On the fork (`m4r_it::m4x2_a_held_deposit_freeze_no_longer_lifts_l_slow`: a 320-SOL λ 99.78 % candidate, the position at the size cap, 7× the pool deposited around a crank every second for 900 s, then a genuine 4× ramp) the rule before M4X-2 reached `L_slow/√(X·Y)` 2.621 and S1 at +1,025 s (lenders 29.946 SOL for `q` worth 40.002, the borrower 0); now `L_slow` stays at 0.998 with the guard still set and the position is liquidated at +948 s (2.419×) with `q` bought back and 5.216 SOL to the borrower. `L_slow` held at the lows is the conservative side for the other readers too: the size cap and `R_eff` (§6.1, §6.2) no longer grow with the freeze.
+
+**(5) Withdraw contest while the guard is set.** RA → 625 SOL, λ 50 % (q 3 % of the candidate's `X`), candidate at 1.60× (the position is liquidatable on it):
+
+| attacker | rule | outcome | B (SOL) | borrower overpay vs honest |
+|---|---|---|---|---|
+| none (honest) | M4 as built | liquidation +20 s @1.601x, lender +0.771, borrower 5.542 | 30.7884 | +0.00 % |
+| withdraw-wrapped liquidation only, lands first | M4 as built | liquidation +20 s @1.601x, lender +0.771, borrower 5.542 | 30.7884 | +0.00 % |
+| deposit freeze + both samples deposit-wrapped (blocker) | M4 as built | liquidation +20 s @1.601x, lender +0.771, borrower 5.542 | 30.7884 | +0.00 % |
+| combined: every sample both ways, withdraw-wrapped liquidation first | M4 as built | liquidation +13 s by attacker @1.601x, lender +0.802, borrower 4.236 | 32.0321 | +4.04 % |
+| none (honest) | M4R | liquidation +9 s @1.601x, lender +0.771, borrower 5.542 | 30.7884 | +0.00 % |
+| withdraw-wrapped liquidation only, lands first | M4R | liquidation +9 s by attacker @1.601x, lender +0.802, borrower 4.236 | 32.0321 | +4.04 % |
+| deposit freeze + both samples deposit-wrapped (blocker) | M4R | open (120 s) | - | - |
+| combined: every sample both ways, withdraw-wrapped liquidation first | M4R | open (120 s) | - | - |
+
+The unlocked LP holder's withdraw-wrapped liquidation, landing first, prices the reference at `D` while the guard is set: the borrower pays +4.04 % (1.24 SOL) more than in the honest liquidation — `(1/λ − 1)·q/x` at most, ≈ 0 on λ ≈ 1 pools — which M4 as built also allowed, through its `D` seed. It never forces an exit. The "blocker" rows are (4)'s freeze at a flat price: the position waits for as long as the freeze is paid (as built: +20 s, its cap binding at λ = λ_min).
+
+**(6) M4R-2.** The token dumps `f`× during the halt (or, in the M4X-3 rows, 5 s into the collection window, after the proposal that opened it); the only candidate has 30 SOL of locked SOL at the pre-halt price (λ 99.78 %), i.e. `30/√f` SOL at the live price:
+
+| f | attacker | M4 as built | M4R |
+|---|---|---|---|
+| 4x | none | adopted; P_ema/P 3.99; 15.0 SOL locked; cost 0.00 SOL | not adopted (refused 310, cancelled 0); cost 0.00 SOL |
+| 4x | pump-wrapped recording proposal | adopted; P_ema/P 3.99; 15.0 SOL locked; cost 0.04 SOL | adopted; P_ema/P 3.99 -> 1.00; 15.0 SOL locked; cost 0.04 SOL |
+| 4x | none; the dump comes 5 s into the window (M4X-3) | adopted; P_ema/P 3.99; 15.0 SOL locked; cost 0.00 SOL | adopted; P_ema/P 3.99 -> 1.00; 15.0 SOL locked; cost 0.00 SOL |
+| 16x | none | adopted; P_ema/P 15.97; 7.5 SOL locked; cost 0.00 SOL | not adopted (refused 310, cancelled 0); cost 0.00 SOL |
+| 16x | pump-wrapped recording proposal | adopted; P_ema/P 15.97; 7.5 SOL locked; cost 0.03 SOL | adopted; P_ema/P 15.97 -> 1.00; 7.5 SOL locked; cost 0.03 SOL |
+| 16x | none; the dump comes 5 s into the window (M4X-3) | adopted; P_ema/P 15.97; 7.5 SOL locked; cost 0.00 SOL | adopted; P_ema/P 15.97 -> 1.00; 7.5 SOL locked; cost 0.00 SOL |
+
+An honest dump before the window-opening proposal is refused (no window; M4 as built adopted the 15- and 7.5-SOL pools); the thin pool's backer can pump-wrap its window-opening proposal (0.03–0.04 SOL) and restore M4's judgment at `P_ema`, never looser, and the warm-up then re-seeds `P_ema` at the live price, so opens and tiers see the pool as it is. The execution judges the floor at `P_ema` only, so an honest dump **inside** the 60-s window, after the proposal that opened it, is adopted at `P_ema` in the same way (M4X-3; `m4r_it::m4x3_a_dump_inside_the_window_is_adopted_at_p_ema_then_re_seeded`: 29.99 SOL locked at `P_ema`, 14.94 live, adopted; after the warm-up `P_ema` is the live price and a new open is refused `PoolTooThin`). A re-check at the execution against the candidate's own spot was rejected: that spot is one instruction's sample, so an execution that failed on it would either revert — holding `PoolWindowClosed` for every other proposal while the pool stays thin, the freeze M4V-4 removed — or cancel, and then a dump-wrapped execution (a round trip, ≈ 0.1 SOL) could cancel every window until S3, a forced exit. A halted market whose only candidate is thin at the live price stays halted — its positions frozen until the incumbent returns, a deeper pool appears or S3 — which is the v0.4.1 behaviour for an ineligible pool (O14).
+
+**(7) Genuine moves** (honest keeper, no attacker; engine W, q 0.40 %; outcome, seconds after the adoption, price at the exit, borrower / lender SOL):
+
+| scenario | M4 as built | M4R |
+|---|---|---|
+| pump during the halt: candidate at 2.2x, flat | liquidation k +13s @2.20x (0.250 / 0.036) | liquidation k +9s @2.20x (0.250 / 0.036) |
+| pump during the halt: 3x, flat | S1 k +61s @3.00x (0.000 / 1.186) | S1 k +49s @3.00x (0.000 / 1.186) |
+| pump during the halt: 5x, flat | S1 k +48s @5.01x (0.000 / 1.186) | S1 k +49s @5.01x (0.000 / 1.186) |
+| pump during the halt: 16x, flat | S1 k +48s @16.03x (0.000 / 1.186) | S1 k +49s @16.03x (0.000 / 1.186) |
+| step 2.2x at +1 s | liquidation k +13s @2.20x (0.251 / 0.035) | liquidation k +9s @2.20x (0.251 / 0.035) |
+| step 5x at +1 s | S1 k +48s @5.00x (0.000 / 1.186) | S1 k +49s @5.00x (0.000 / 1.186) |
+| ramp 2.2x/60 s from +1 s | liquidation k +62s @2.20x (0.251 / 0.035) | liquidation k +62s @2.20x (0.251 / 0.035) |
+| ramp 5x/60 s from +1 s | liquidation k +35s @2.49x (0.125 / 0.040) | liquidation k +35s @2.49x (0.125 / 0.040) |
+| ramp 2.2x/120 s from +300 s | liquidation k +414s @2.11x (0.287 / 0.034) | liquidation k +414s @2.11x (0.287 / 0.034) |
+| dump 4x during the halt, then 10x/60 s from +1 s | liquidation k +63s @2.50x (0.120 / 0.040) | no adoption (window floor) |
+| lambda 99.78 % 30-SOL candidate: pump during the halt 2.0x, flat | liquidation k +26s @2.00x (0.329 / 0.033) | liquidation k +9s @2.00x (0.329 / 0.033) |
+| lambda 99.78 % 30-SOL candidate: pump during the halt 3x, flat | S1 k +59s @3.00x (0.000 / 1.186) | S1 k +49s @3.00x (0.000 / 1.186) |
+| lambda 99.78 % 30-SOL candidate: step 2x at +1 s | liquidation k +26s @2.00x (0.329 / 0.033) | liquidation k +9s @2.00x (0.329 / 0.033) |
+
+and engine M (a 60-s pre-halt period, λ 99.78 % incumbent):
+
+| candidate price | M4 as built | M4R |
+|---|---|---|
+| 2.1x | liquidation by keeper +16 s | liquidation by keeper +9 s |
+| 2.5x | liquidation by keeper +9 s | liquidation by keeper +9 s |
+| 3.0x | S1 by keeper +61 s | S1 by keeper +49 s |
+| 5.0x | S1 by keeper +48 s | S1 by keeper +49 s |
+
+Exits resume at adoption + 9 s and are usually earlier than as built, because the warm-up seeds a fresh `P_ema` instead of blending up from the stale one (2.2×: +9 vs +13 s; 3× S1: +49 vs +61 s; λ 99.78 % at 2×: +9 vs +26 s; the big position +9 vs +14 s); they are later only where as built was already right (5× / 16× S1: +49 vs +48 s; the big position at 2.5×: +9 vs +8 s); ramps are identical. Engine P's 21 moves on R100 / RA / RC give the same outcomes and, to 0.001 SOL, the same amounts under both rules (where S1 follows a move during the halt or a step right after the adoption, M4R reaches it at +49 s where as built took +46 to +66 s). The dump row is (6): M4R's proposal judges the candidate at its live price and opens no window.
+
+**(8) Degraded mode — no honest observer during the warm-up** (engine W, m 1.99, healthy on the pool as it trades):
+
+| case | M4 as built | M4R |
+|---|---|---|
+| (a) keeper absent s < 2 | liquidation a +27s (0.331) | open (0.407) |
+| (a) keeper absent s < 4 | liquidation a +27s (0.331) | open (0.407) |
+| (a) keeper absent s < 8 | liquidation a +27s (0.331) | open (0.407) |
+| (a) keeper absent s < 9 | liquidation a +27s (0.331) | liquidation a +9s (0.331) |
+| (a) keeper absent s < 13 | liquidation a +27s (0.331) | liquidation a +9s (0.331) |
+| (a) keeper absent s < 31 | liquidation a +27s (0.331) | liquidation a +9s (0.331) |
+| (b) no observation for 600 s, then the keeper (2.2x) | liquidation k +612s (0.250) | liquidation k +608s (0.250) |
+| (c) the new pool halts at +3 s (2.2x), 1,500 s | open | open |
+| (d) held withdrawal s in [1, 4), then withdraw-wrapped freeze | open (0.407) | open (0.407) |
+| (d) held withdrawal s in [1, 9), then withdraw-wrapped freeze | liquidation a +33s (0.331) | liquidation a +9s (0.331) |
+| (d) held withdrawal s in [1, 21), then withdraw-wrapped freeze | liquidation a +28s (0.331) | liquidation k +9s (0.331) |
+| (d) held withdrawal s in [1, 41), then withdraw-wrapped freeze | liquidation k +28s (0.331) | liquidation k +9s (0.331) |
+| (e) the attacker holds the pool at 1.2x for s in [1, 9) (every observation sees it), withdraw-wrapped liquidation every second | liquidation a +10s @2.00x (0.329 / 0.032) | liquidation a +9s @2.00x (0.329 / 0.033) |
+| (f) as (e), the keeper absent for s in [1, 9) | open (0.405) | open (0.405) |
+
+The seed reads only bucket highs and lows, so it needs **all 8** warm-up buckets attacker-only (the keeper absent for s < 9) or an 8-s genuine held drain before the M4R-1 band applies at +9 s; 7 attacker-only buckets leave it honest. (M4 as built was forced whatever the keeper did.) Row (f) is open because its attacker holds the pool (every observation sees the push) and withdraw-wraps its liquidation; an attacker who instead **pump-wraps** its cranks and its liquidation in attacker-only seconds (atomic `[buy, crank_price, sell]` and `[buy, liquidate, sell]` bundles, no keeper to observe the true price) writes bucket lows at its pump. Before the M4R verification (M4X-1) the warm-up seed read that low at once: 8 attacker-only warm-up seconds — 7 when the attacker executes the switch and cranks in its second — forced the liquidation of a position at **any** threshold at +9 s while the pool traded flat (the LiteSVM reproducer: a ≈ 3× threshold liquidated at a true 1.00×). The seed now rises by at most the largest v0.4.1 step (§5.2 (P5)), so those seconds reach exactly what they reach in steady state and as built (`switch_warmup.py` part 8d; engine W's market, the position's vault raised by `add_margin` to put its threshold at 2–4×; the attacker's best crank pump `kc` and liquidation pump `kl`; cells: the earliest forced liquidation after the adoption (kc, kl), or open in 30 s):
+
+| margin | threshold | rule | keeper absent s ≤ 7 | s ≤ 8 | s ≤ 9 | s ≤ 10 | s ≤ 12 |
+|---|---|---|---|---|---|---|---|
+| +0 % | 2.05x | M4 as built | +7 s (4, 2.05) | +7 s (4, 2.05) | +7 s (4, 2.05) | +7 s (4, 2.05) | +7 s (4, 2.05) |
+| +0 % | 2.05x | M4R before M4X-1 (no step bound) | open | +9 s (2.5, 2.05) | +9 s (2.5, 2.05) | +9 s (2.5, 2.05) | +9 s (2.5, 2.05) |
+| +0 % | 2.05x | M4R | open | +9 s (2.5, 2.05) | +9 s (2.5, 2.05) | +9 s (2.5, 2.05) | +9 s (2.5, 2.05) |
+| +25 % | 2.50x | M4 as built | open | +9 s (4, 2.50) | +9 s (4, 2.50) | +9 s (4, 2.50) | +9 s (4, 2.50) |
+| +25 % | 2.50x | M4R before M4X-1 (no step bound) | open | +9 s (2.5, 2.50) | +9 s (2.5, 2.50) | +9 s (2.5, 2.50) | +9 s (2.5, 2.50) |
+| +25 % | 2.50x | M4R | open | +9 s (2.5, 2.50) | +9 s (2.5, 2.50) | +9 s (2.5, 2.50) | +9 s (2.5, 2.50) |
+| +50 % | 3.00x | M4 as built | open | open | +10 s (6, 3.00) | +10 s (6, 3.00) | +10 s (6, 3.00) |
+| +50 % | 3.00x | M4R before M4X-1 (no step bound) | open | +9 s (3, 3.00) | +9 s (3, 3.00) | +9 s (3, 3.00) | +9 s (3, 3.00) |
+| +50 % | 3.00x | M4R | open | open | +10 s (3, 3.00) | +10 s (3, 3.00) | +10 s (3, 3.00) |
+| +100 % | 4.00x | M4 as built | open | open | open | open | +12 s (6, 4.00) |
+| +100 % | 4.00x | M4R before M4X-1 (no step bound) | open | +9 s (4, 4.00) | +9 s (4, 4.00) | +9 s (4, 4.00) | +9 s (4, 4.00) |
+| +100 % | 4.00x | M4R | open | open | open | open | +12 s (6, 4.00) |
+
+With the bound, attacker-only seconds after a switch force exactly the thresholds they force in steady state and under M4 as built (whose `P_ema` obeys the same per-integration bound), never earlier (the gate; as built reached the 2.05× position at +7 s with 7 absent seconds); the attacker's crank pumps are smaller (its seed takes the whole step with a pump just above it, where the v0.4.1 step needs a `(1 + C)×` pump), which changes the fee cost, not the reach. That remaining exposure is §12.6's degraded mode: `N` attacker-only seconds move `P_ema` by at most `×(τ + dt·(1 + C))/(τ + dt)` each — 9/7·(7/6)⁵ ≈ 2.8× at the oldest of the EMA leg's three entries by the gate — and the keeper's duty 1 (§5.8) is what bounds it.
+
+A held price push through the warm-up — every observation of each second, the keeper's included, sees it — is the §12.6 held model: (e) liquidated at +9 s (as built +10 s); without a keeper to confirm the pushed spot leg nothing happens (f). With no keeper in the window nor after, a held 3× push through the warm-up and a sandwich (engine M):
+
+| rule | result |
+|---|---|
+| M4 as built | P/P 1.000; x3.0 for 8 s, net -0.2667 SOL |
+| M4R | P/P 1.000; x3.0 for 9 s, net -0.3825 SOL |
+
+— the §12.6 held-model class, 1 s later and 0.12 SOL costlier than as built for this held 3× push on a near-threshold position (atomic bundles in attacker-only seconds reach further; the table above and residual 1). For comparison, steady state (no switch; the same under both rules, pre-existing):
+
+| m | variant | k = 0 | k = 3 | k = 5 | k = 8 | k = 12 | k = 20 | k = 40 |
+|---|---|---|---|---|---|---|---|---|
+| 1.99 | held withdrawal k s, then freeze | open, 1.00 | open, 0.79 | open, 0.70 | open, 0.62 | open, 0.56 | open, 0.51 | open, 0.50 |
+| 1.99 | k attacker-only seconds, then freeze | open, 1.00 | open, 0.79 | open, 0.70 | open, 0.62 | open, 0.56 | open, 0.51 | open, 0.50 |
+| 2.00 | held withdrawal k s, then freeze | open, 1.00 | open, 0.79 | open, 0.70 | open, 0.62 | open, 0.56 | open, 0.51 | open, 0.50 |
+| 2.00 | k attacker-only seconds, then freeze | open, 1.00 | open, 0.79 | open, 0.70 | open, 0.62 | open, 0.56 | open, 0.51 | open, 0.50 |
+| 2.01 | held withdrawal k s, then freeze | open, 1.00 | attacker +5s, 0.79 | attacker +5s, 0.70 | keeper +5s, 1.40 | keeper +5s, 1.40 | keeper +5s, 1.40 | keeper +5s, 1.40 |
+| 2.01 | k attacker-only seconds, then freeze | open, 1.00 | attacker +5s, 0.79 | attacker +5s, 0.70 | attacker +5s, 0.70 | attacker +5s, 0.70 | attacker +5s, 0.70 | attacker +5s, 0.70 |
+
+In steady state 3 attacker-only seconds, or a 3-s genuine held drain, followed by the freeze force the same band on a position just below its threshold (2.01× against 2.02×): a genuinely reached low `L_ema` can be frozen by free withdraw-wrapped cranks. That needs a steady-state change (for example, the EMA leg at `max(L_i, upper median of lhi)`) and is a follow-up (O18).
+
+**(9) Stale-high `P_ema` after a mild dip** (engine M): the incumbent's price rises to `pre`× the open spot (EMA converged), the incumbent halts, the candidate trades at `m`×; after the adoption the LP holder sends a withdraw-wrapped crank and liquidation every second. CR = the position's CR on the candidate at its depth / at `D` (`cr_liq` 15,000):
+
+| pre -> m | CR | M4 as built | M4R |
+|---|---|---|---|
+| 2.0->1.98 | 15158/14993 | P/P 1.010 open [-0.4004 / +0.0000 / 0.0000] | P/P 1.010 open [-0.4004 / +0.0000 / 0.0000] |
+| 2.005->1.98 | 15158/14993 | P/P 1.013 open [-0.4004 / +0.0000 / 0.0000] | P/P 1.013 open [-0.4004 / +0.0000 / 0.0000] |
+| 2.01->1.98 | 15158/14993 | P/P 1.015 liquidation by attacker +2 s [-0.4759 / +0.0319 / 0.0221] | P/P 1.015 open [-0.4004 / +0.0000 / 0.0000] |
+| 2.01->1.985 | 15120/14955 | P/P 1.013 liquidation by attacker +2 s [-0.4781 / +0.0320 / 0.0221] | P/P 1.013 open [-0.4024 / +0.0000 / 0.0000] |
+| 2.01->1.99 | 15081/14917 | P/P 1.010 liquidation by attacker +2 s [-0.4802 / +0.0321 / 0.0221] | P/P 1.010 open [-0.4045 / +0.0000 / 0.0000] |
+| 2.01->1.95 | 15393/15226 | P/P 1.031 open [-0.3883 / +0.0000 / 0.0000] | P/P 1.031 open [-0.3883 / +0.0000 / 0.0000] |
+
+As built, the carried stale-high `P_ema` puts the EMA leg below `L` from the first seconds, and the wrapped spot leg liquidates a position whose CR at the pool's depth is 1.508–1.516 at +2 s; M4R's fresh seed keeps it open.
+
+**(10) Targeted random search** (engine W; 1,200 runs, seed 23; λ 10–99.78 %, 52–300 SOL, `m` drawn around the threshold, one of five per-second LP schedules; forced = the attacked run exits while the honest run of the same rule stays open 90 s):
+
+| rule | adopted | honest-open | FORCED | first forced cases (lambda, SOL, m, q bps, attacker, exit, s, by) |
+|---|---|---|---|---|
+| M4 as built | 955/1200 | 615 | 30 | (1000, 300, 2.009, 40, {'rec_move': 'dep', 'exec_move': 'wd', 'att_crank': 'wd', 'att_liq': 'wd'}, 'liquidation', 23, 'attacker'); (5000, 80, 1.999, 40, {'rec_move': 'dep', 'exec_move': 'wd', 'att_crank': 'wd', 'att_liq': 'wd'}, 'liquidation', 32, 'attacker'); (7500, 80, 2.004, 40, {'exec_move': 'wd', 'att_crank': 'wd', 'att_liq': 'wd', 'att_price': ('pump', 1.5)}, 'liquidation', 47, 'attacker') |
+| M4R | 955/1200 | 615 | 0 | - |
+
+**Residuals (disclosed; owner item O18).**
+
+1. **Degraded mode.** If every one of the 8 warm-up buckets is attacker-only (keeper absent or censored for the whole warm-up; 7 keeper-absent seconds when the attacker executes the switch itself and cranks in its second), the attacker can seed `L_ema = D` with withdraw-wrapped cranks; an 8-s genuine held drain does the same; the M4R-1 band then applies at +9 s ((8)). On pools with `λ < 1/(1 + C)` (50 % at the defaults) 4 attacker-only warm-up buckets suffice, because the seed falls to `(1 + C)·D < H` ((P2)–(P3) of §5.2). Steady state needs 3 attacker-only seconds for the same band ((8), residual 10). On the price side, pump-wrapped cranks and a pump-wrapped liquidation in those seconds raise the seed by at most the largest v0.4.1 step per integration (M4X-1, (P5)): a position whose threshold is within ≈ 2.8× of the carried `P_ema` can be liquidated at the gate at the attacker's pumped price while the pool trades below it — exactly what the same attacker-only seconds force in steady state and forced under M4 as built (part 8d: the same thresholds, never earlier), not a new class. Before M4X-1 the seed read the pump itself, and 8 such seconds forced any threshold ((8)).
+2. **Capital deposit freeze.** One deposit-wrapped warm-up crank, then deposit-wrapped cranks every second, hold `L_ema ≤ (1 + C)·H`, higher only if ≥ 5 of the 8 warm-up buckets are pushed; it needs about the pool's size in both assets re-deposited every second, and pays no fee. The EMA leg is delayed by at most ≈ `(1 − H/L)·q/x` in price, and at a flat price for as long as the freeze lasts ((4): 2.01× open where as built liquidated at +28 s; the big position open at 2.0× where as built liquidated at +14 s; (5): open at a flat 1.60× for 120 s, as built +20 s); the box stays wide, so S2/S3 amounts wait (the §10.5 class). **The reference is not blocked** (the guard, on the `L_ema` term and on `L_slow`'s input): RA → 630 SOL liquidates at +61 s at 1.732× (as built with both samples wrapped: S1, −17.785 SOL), and after a freeze held 10–30 min the genuine pump is still liquidated (M4X-2; before it `L_slow` crept to 1.4–2.6× the depth and the pump ended in S1, lenders −12.6 to −13.8 SOL; (4)).
+3. **Withdraw contest while the guard is set.** An unlocked-LP holder who withdraw-wraps ≥ 4 of the 8 warm-up seconds and ≥ 4 of every 8 after, then withdraw-wraps a liquidation of a genuinely liquidatable position, prices its reference at `max(D, L_slow ≤ D)`: the borrower overpays by at most `cost(D)/cost(H) − 1 ≈ (1/λ − 1)·q/x` of `B` (≈ 0 on λ ≈ 1 pools; (5): +4.04 %, 1.24 SOL, as built the same through its `D` seed). It never forces an exit.
+4. **M4R-2 is closed only for honest dumps before the window opens.** One pump-wrapped window-opening proposal by the thin pool's backer (0.03–0.04 SOL) restores M4's `P_ema` judgment, never looser ((6)). A genuine dump **inside** the 60-s collection window, after the proposal that opened it, is judged by the execution at `P_ema` alone and adopted (M4X-3; 15 SOL of locked SOL at the live price against the 25-SOL floor after a 4× dump, as under M4 as built); the warm-up then re-seeds `P_ema` at the live price, so tiers and opens see the pool as it is (a new open is refused `PoolTooThin`) and the carried shorts are `√f`× further from liquidation. A re-check at the execution against the candidate's spot was not adopted: that spot is one instruction's sample, and a failing execution must either revert (holding every other proposal, the M4V-4 freeze) or cancel (a dump-wrapped execution then cancels windows until S3). A tracked-EMA execution floor (the redesign's alternative, 2.0–2.4 SOL of per-window freeze to beat) needs a window-observation path and was not adopted; a follow-up option is a `pool_fail` clause for an incumbent below the floor at the confirmed `P_ema`.
+5. **Held push during the warm-up.** Holding the pool pumped for all 8 warm-up seconds (every observation, the keeper's included, sees the push) seeds `P_ema` high, by at most the largest v0.4.1 step per integration: the steady-state held class of §12.6 ((8) (e): liquidated at +9 s where as built took +10 s; with no keeper at all, for a held 3× push on a near-threshold position, a 9-s push and −0.3825 SOL for the attacker, as built 8 s and −0.2667). Atomic bundles in attacker-only seconds, which need no held price, are residual 1.
+6. **Paid down-push of the price seed.** One dump-wrapped warm-up crank lowers the seed without bound; after the gate `P_ema` recovers at ≤ +16.7 %/s, a delay of about `ln k/ln(7/6)` seconds for a `k`× dump. It is paid, the §12.9 class.
+7. **Exit latency.** Adoption + 9 s with the keeper cranking every second, usually earlier than as built ((7)); later only where as built was already right (5× / 16× S1: +49 vs +48 s).
+8. **A new pool that halts inside the warm-up.** Nothing is gated on a venue that cannot execute: positions are frozen until S3 or the next fast path, as built, and S3 reads the partly anchored ring ((8): the 2.2× position stays open under both rules). The price seed stays where the step bound left it (M4X-1), so after a genuine move during the halt larger than the seed reached before the new pool halted (≈ 1.9× for a halt at +3 s), an S3 that needs the position liquidatable waits for its deadline, as with M4 as built's carried `P_ema` (on the fork a halt at +6 s, the seed at the pool's 2.5×, settles S3 after `s3_wait_s`: `switch_confirm_it::a_new_pool_that_halts_in_the_warm_up_is_not_gated`).
+9. **Rent during the warm-up** accrues on the running-minimum `P_ema` for ≤ 8 s: lender-unfavourable, negligible.
+10. **Pre-existing, not fixed here.** In steady state a genuinely reached low `L_ema` can be frozen by free withdraw-wrapped cranks: 3–5 s of held drain or attacker-only seconds, then the freeze, force the band ((8), steady state). A steady-state change is a follow-up.
+11. **Evidence.** The sims (`switch_warmup.py`) and, since the build, the LiteSVM regressions on the mainnet fork (`m4r_it`, `switch_confirm_it`, `m4v_it`, `m4_sec_it`; ARCH §8.2 ★T-SWITCH-CONFIRM), including the M4R verification's reproducers M4X-1–3; CU measured in `m3_cu` (ARCH §6.1). Engine P records a failed attacker liquidation's observation (an upper bound on the attacker: on chain it bundles a wrapped `crank_price`).
+
 ---
 
 ## 13. Economic invariants
@@ -2341,11 +2832,12 @@ Asserted in `shortwin_sim.py` (every exit, every settlement, the exit fuzz) and 
 | I-E4 | Waterfall legs are non-negative and sum to `V` (including the keeper top-up). |
 | I-E5 | S1: lenders' take `= V − K_s`, and the S1 EMA leg holds at the box corner `(P_lo, L_hi)`; S2/S3: take `= min(V − K_s, FV(P_ema, L_ema))`, it lies within `[x(P_lo, L_hi), x(P_hi, L_lo)]` (±2 lamports of `reprice` rounding), and `x(P_hi, L_lo) − x(P_lo, L_hi) ≤ fv_dev_bps·x(P_lo, L_hi)/10⁴`, each corner with its own `p'` (v0.4.1). |
 | I-E6 | The venue charge lies in `[B̂ − 5, B̂]` (quotes are upper bounds; `reprice` gives `Y/X ≥ P`). |
-| I-E7 | EMA: at most one integration per second; single step within `[−C/(1+C), +C]·dt/(τ + dt)`; an instruction's own observation is never in the EMA it reads. |
+| I-E7 | EMA: at most one integration per second; single step within `[−C/(1+C), +C]·dt/(τ + dt)` (a post-change warm-up integration re-seeds instead: its rise within the same `+C·dt/(τ + dt)`, its fall free, I-E12); an instruction's own observation is never in the EMA it reads. |
 | I-E8 | S1/S2 execute only after `settle_persist_n` EMA updates of one eligibility clock that only box-robust evidence resets; liquidation only with the EMA leg on the newest `liq_persist_n` ring entries. |
 | I-E9 | S3 only after a continuous no-route chain (gaps ≤ 60 s) of ≥ `s3_wait_s`. |
 | I-E10 | A liquidation that leaves the borrower equity pays the keeper at least `K_s` (v0.4). |
 | I-E11 | **Liveness (v0.4.1, R4B-1):** a liquidatable, buyback-allowed position with a fresh completed bucket never waits while `B̂_live ≤ ⌊B̂_ref·(10⁴ + δ_liq)/10⁴⌋` (the liquidation bound has no other term below `V − K_s − ert`). The exit fuzz counts the waits an expiry's reserve causes. |
+| I-E12 | **Post-change confirmation (PROPOSED, M4R, #96):** no liquidation, expiry or S1/S2/S3 settlement while `ema_warm > 0` on an executable venue; a warm-up integration sets `P_ema` = min of the post-change bucket lows and of the largest v0.4.1 step from the previous `P_ema` (M4X-1) and `L_ema` = `min(max lhi, ⌊lomed(lhi)·(10⁴ + C)/10⁴⌋)`, leaving `L_slow` alone; while `ema_guard = 1` the exit reference reads `min(L_ema, L_mlo)` and `L_slow` integrates `min(lobs, L_mlo)` (M4X-2). ARCH I18 checks it after every instruction; the sim implements it in `Market` and `attacks/switch_warmup.py` exercises it. |
 | I-P1 | Σ token claims `≤ T + ΣB_Q`; Σ shares `≤ S`. |
 | I-P2 | Claim side, strict per lender: `Σ(real − claimed) + unmatched + vest_bal ≤ lender_sol`, `claimed ≤ real`, and each lender's own allocation `real − claimed ≤ max(pending, 0)` after a touch; entitlement side, signed aggregate: `Σ pending ≤ lender_sol − vest_bal + receivable`; no lender with `pending < 0` reduces its shares. |
 | I-P3 | `S + VS ≤ R_MAX·(T + ΣB_Q + VA)` (or `S = 0`); `S < 2¹²⁸`. |
@@ -2407,7 +2899,7 @@ Fuzz results. `pool_model.py`: 60,000 operations per configuration (continuous r
 | N8 | §11 | Venue upgrade | Auto-refuse opens after a venue program upgrade (event-driven latch, ARCH) | ADOPTED Q13 |
 | N9 | §3 | Boost window | Opens blocked while boost vault > 0.05 SOL and < 900 s after graduation | ADOPTED Q15 |
 | N10 | §4 caps, §5.3 | Venue fee caps | Opens refused above 150 bps one-way; above 500 bps the route counts as broken (S3 evidence) and every risk quote and FV use at most that fee | PROPOSED (**OWNER** visibility) |
-| N11 | §3 | Raydium reference pool | Locked depth `λ·√(X·Y)`, ≥ 50 % locked LP, ≥ 25 SOL real reserve; non-fast adoption only with no open position (25 % margin; 5 % inside the listing window); fast path on `pool_fail` (120 s + 60 s window) | PROPOSED (**OWNER**; v0.4, decision 7) |
+| N11 | §3 | Raydium reference pool | Locked depth `λ·√(X·Y)`; eligibility on the locked SOL at `P_ema`, `⌊locked·10⁴/λ_min⌋ ≥ 25 SOL` for a listing or a zero-position adoption and `locked ≥ 25 SOL` for a collection window's candidate — at `min(P_ema, P_cand)` when a proposal opens or improves the window (M4R-2, #96), at `P_ema` at the execution (M4: no `λ_now` or live-reserve clause); non-fast adoption only with no open position (25 % margin; 5 % inside the listing window); fast path on `pool_fail` (120 s + 60 s window; adopted only while the arming chain holds); an adoption reads no sample: it writes the anchor `⌊D·10⁴/λ_min⌋` into the ring, `L_slow ≤ D`, and restarts the observation state (8-bucket warm-up, exits gated, reference guard; M4R, #96; M4 as built wrote `min(L_rec, L_live, D/λ_min)`, #92) | PROPOSED (**OWNER**; v0.4, decision 7; as built after M4, #91–#92; the M4R rules #96; O18) |
 | N12 | §6.1 | Rent implementation | Three basis indices, per-position locked rate curve and protocol share (§7) | PROPOSED (v0.4) |
 | N13 | §4 | Pool age and tier inputs | Precise `R`, `R_slow`, CPMM `open_time` bound; oracle ages | ADOPTED Q8/Q18/Q19 |
 | N15 | §5.3 | Settlement decisions | One rule: the settlement box (§5.6) for arming, refutation, kind and amount | PROPOSED (v0.4; replaces N15/N16 of v0.3) |
@@ -2421,12 +2913,13 @@ Fuzz results. `pool_model.py`: 60,000 operations per configuration (continuous r
 | N24 | §11 | Keeper degraded mode | Opens paused on markets the keeper cannot cover (reason `KeeperCoverage`); `CoverageGap` event | PROPOSED (v0.4, R3B-5) |
 | N25 | §9 | Keeper operating budget | Per-market daily budget, priority ceiling, coverage list | **OWNER** (O17) |
 | N26 | §15 | Governance CI gate | `config_check.py` (liveness battery + corners) must pass for every parameter proposal | PROPOSED (v0.4, R3B-6) |
+| N27 | §4, §5 | Post-change confirmation (first open after a price start; exits after a venue switch) | Every Raydium venue change or price start marks the observation state unconfirmed (`ema_warm` = `EMA_WARMUP_BUCKETS` = 8, `ema_guard` = 1); the next 8 integrations re-seed `P_ema` = min of the post-change bucket lows, rising by at most the largest v0.4.1 step per integration, and `L_ema` = min(max of their highs, (1 + C) × their lower median); while `ema_warm > 0` on an executable venue no keeper exit and no Raydium open; while `ema_guard = 1` the exit reference reads `min(L_ema, L_mlo)` and `L_slow` integrates at most `L_mlo`; the keeper observes every second through the warm-up and at the end of a listing window | PROPOSED (M4V-5, #95; M4R, #96; O18) |
 
 ---
 
 ## 15. Parameter registry
 
-Scope: G = global config, T = per tier, P = snapshot per position at open, M = market-level (params-version rule), C = compile-time constant. Every value is configurable within the compiled **hard bounds**, which v0.4 tightened to the simulated-safe region (R3B-6) and v0.4.1 re-derived on the 1,655-run battery for every parameter with a liveness effect (R4A-4, §5.7), and timelocked (SPEC §11). ARCH §2.3.3 carries the same table. **Bold** = changed in v0.4 or v0.4.1.
+Scope: G = global config, T = per tier, P = snapshot per position at open, M = market-level (params-version rule), C = compile-time constant. Every value is configurable within the compiled **hard bounds**, which v0.4 tightened to the simulated-safe region (R3B-6) and v0.4.1 re-derived on the 1,655-run battery for every parameter with a liveness effect (R4A-4, §5.7), and timelocked (SPEC §11). ARCH §2.3.3 carries the same table. **Bold** = changed in v0.4 or v0.4.1, or added after M4 (#91–#96).
 
 | Parameter | Default | Hard bounds | Unit | Scope | Status |
 |---|---|---|---|---|---|
@@ -2453,6 +2946,8 @@ Scope: G = global config, T = per tier, P = snapshot per position at open, M = m
 | `ema_dtmax_s` / `ema_clamp_bps` | 2 / 10,000 | **[1, 2] / [5,000, 10,000]** | s / bps | M | PROPOSED (clamp 1,000 loses 10 battery rows) |
 | `ema_force_delay_s` | 604,800 | [86,400, 2,592,000] | s | G | PROPOSED |
 | `ring_len` | 8 | – | entries | C | PROPOSED |
+| **`EMA_WARMUP_BUCKETS`** | **8** (= `RING_LEN`; u8) | – (compile-time constant; `≥ liq_persist_n`'s compiled maximum and `= RING_LEN`, compile-time asserted) | integrated buckets | C | PROPOSED (M4V-5, #95; scope widened by M4R, #96): the length of the post-change warm-up (`ema_warm`) that every Raydium venue change and every Raydium price start (a listing, a list-only market's first adoption) begins: the warm-up integrations re-seed `P_ema` and `L_ema` from the post-change buckets (§5.2), and while it runs on an executable venue `liquidate` / `expire` fail and Raydium opens are refused (`EmaWarmingUp`) and `sol_settle` evaluates nothing (§5.5, §5.6). `= RING_LEN` makes the whole ring post-change when the gate opens. Replaces #95's `ema_count > EMA_WARMUP_BUCKETS` |
+| **`REF_GUARD_TOL_BPS`** | **100** (= `fv_dev_bps`'s default) | – (compile-time constant) | bps | C | PROPOSED (M4R, #96): the post-change reference guard (`ema_guard`) clears at the first integration after the warm-up with `L_ema·10⁴ ≤ L_mlo·(10⁴ + REF_GUARD_TOL_BPS)`; while it is set the exit reference reads `min(L_ema, L_mlo)` (§8.2) |
 | `ref_max_age_s` | 2 | **[1, 3]** | s | G→P | PROPOSED |
 | `liq_persist_n` | 3 | **[2, 3]** (v0.4.1: 4 loses 58 battery runs) | ring entries | G→P | PROPOSED (`liq_persist_s` **removed**) |
 | `settle_persist_n` / `settle_arm_gap_s` | 40 / 10 | **[40, 600]** / [2, 60] | EMA updates / s | G→P | PROPOSED (`settle_persist_s` **removed**) |
@@ -2475,8 +2970,8 @@ Scope: G = global config, T = per tier, P = snapshot per position at open, M = m
 | `oracle_max_conf_bps` / `oracle_max_step_bps` | 200 / 2,000 | [10, 1,000] / [500, 5,000] | bps | G | PROPOSED |
 | `venue_fee_cap_bps` | 150 | [25, 300] | bps, one-way | G | PROPOSED (N10) |
 | `venue_fee_hard_cap_bps` | 500 | [300, 2,000] | bps | G→P | PROPOSED (N10) |
-| `pool_min_real_sol` | 25,000,000,000 | [10⁹, 10¹³] | lamports | G | PROPOSED (N11) |
-| `pool_lock_min_bps` (λ_min) | 5,000 | [2,000, 10,000] | bps of LP permanently locked | G | PROPOSED (N11; S2 stays unreachable at capped sizes even at 2,000) |
+| `pool_min_real_sol` | 25,000,000,000 | [10⁹, 10¹³] | lamports of locked SOL at `P_ema` | G | PROPOSED (N11; since M4 a floor on the pool's locked SOL `⌊D·isqrt(P_ref)/10⁹⌋`, not its live reserve: `⌊locked·10⁴/λ_min⌋ ≥` it for a listing, a zero-position or a list-only adoption and for opens (`R_eff`), `locked ≥` it for a collection window's candidate, whose adoption moves open positions; #91) |
+| `pool_lock_min_bps` (λ_min) | 5,000 | [2,000, 10,000] | bps, the divisor of the locked depth `D` | G | PROPOSED (N11; since M4 not a lock share any pool must have: it scales the locked-depth floor, the sizing bound `D/λ_min` and the adoption cap `⌊D·10⁴/λ_min⌋`, and a pool with `λ < λ_min` is eligible (#91, #93); a full drain of any eligible pool keeps at least `λ_min` of the depth its positions were sized on, §10.5; S2 stays unreachable at capped sizes even at 2,000) |
 | `pool_switch_margin_bps` / `pool_list_window_s` / `pool_list_margin_bps` | 2,500 / 3,600 / 500 | [500, 10,000] / [0, 86,400] / [0, 2,500] | bps / s / bps | G | PROPOSED (N11); `pool_switch_delay_s` **removed** |
 | `pool_fast_route_s` / `pool_fast_min_bps` / `pool_fast_window_s` | 120 / 2,500 / 60 | **[30, 420]** / [1,000, 10,000] / **[10, 120]** | s / bps / s | G | PROPOSED (N11; R3A-11 a, b) |
 | `T_CLAMP` | 1,717,200,000 | – | unix s | C | PROPOSED |
@@ -2491,6 +2986,8 @@ Scope: G = global config, T = per tier, P = snapshot per position at open, M = m
 | `min_rent_s` | 3,600 (D 14,400) | [0, 86,400] | s | T→P | SPEC |
 
 **Removed in v0.4:** `ema_tau_s` as a parameter (now the constant `EMA_TAU_S`), `delta_liq_min_bps`, `delta_liq_slope_bps`, `delta_liq_max_bps`, `liq_persist_s`, `settle_persist_s`, `fv_liq`, `settle_s2_first`, `margin_ema_own_sale`, `ref_lo_k`, `pool_switch_delay_s` (and, ARCH-only, `venue_sync_max_age_slots` with the A7 mirror, decision 4). `fv_cap` is not a parameter (SPEC). The liquidation keeper floor, the expiry reserve and (v0.4.1) the absence of a liquidation reserve are rules, not parameters.
+
+**M4R (#96):** no new tunable parameter. `pool_fast_*` and `pool_fast_route_s + pool_fast_window_s ≤ 540` are unchanged (M4R defers nothing); `C = ema_clamp_bps` also sets the warm-up seed's up-bounds: `(10⁴ + C)/10⁴` × the lower median of the highs for `L`, and for `P` the largest v0.4.1 step `(τ + dt·(1 + C))/(τ + dt)` from the previous `P_ema` (M4X-1, #97); the new constant is `REF_GUARD_TOL_BPS`. The state field `Market.fp_lambda_bps` (M4's recorded `λ`, #92) is retired with `adoption_liquidity`.
 
 **Relational checks in `validate_params()`** (v0.4 additions in bold):
 
@@ -2556,6 +3053,7 @@ Scope: G = global config, T = per tier, P = snapshot per position at open, M = m
 - **O13 (extended):** accept that markets listed after graduation start at Tier C for 24 h and Tier B until day 7, on AMM v4, PumpSwap and pre-`T_CLAMP` CPMM pools (§6.2).
 - **N22:** accept the liquidation keeper floor (a borrower-paid top-up of at most `K_s − 0.3·π`), or cap `K_s` instead (a SPEC §6.3 change) (§8.5).
 - No-route liveness (O14): accept the freeze of healthy positions during a venue halt, or add a borrower-initiated SOL close.
+- **O18 (Raydium pool rules as built after M4, and M4R):** confirm #91 — two floors on the pool's locked SOL and no `λ_now` clause (§6.2) — and **adopt the PROPOSED post-change confirmation (#96, replacing #92's `L_new = min(L_rec, L_live, D/λ_min)`, whose single-sample seed forced liquidations, M4R-1)**: an adoption reads no sample (anchor `D/λ_min`, `L_slow ≤ D`), an 8-bucket warm-up re-seeds `P_ema` (rising by at most the largest v0.4.1 step per integration, #97) and `L_ema` from the new pool's own buckets and gates keeper exits and Raydium opens, a one-byte guard keeps the exit reference at `min(L_ema, L_mlo)` and `L_slow`'s input at most `L_mlo` (#97) until the seed is confirmed, and a proposal judges the window floor at `min(P_ema, P_cand)` (M4R-2); accept its residuals (§12.12): degraded mode (all 8 warm-up buckets attacker-only seed `L = D`, 4 on pools with `λ < 50 %`; pump-wrapped bundles in those seconds force what the same attacker-only seconds force in steady state, positions within ≈ 2.8× of the carried `P_ema`); a capital deposit freeze delays the liquidation trigger by ≈ `(1 − H/L)·q/x` in price and the S2/S3 amount while it is paid, but no longer blocks the reference, however long it is held; a withdraw contest while the guard is set overpays by ≤ `(1/λ − 1)·q/x` of `B` (+4.04 % in the sim, as M4 allowed); M4R-2 is closed only for honest dumps before the window opens (a 0.03–0.04 SOL pump-wrapped proposal restores the `P_ema` judgment, never looser; a genuine dump inside the window is adopted at `P_ema`, M4X-3); a held push through the warm-up is §12.6's held class; a paid down-push of the price seed delays; exits at adoption + 9 s; a pool that halts inside the warm-up is frozen as before; rent on the running-minimum `P_ema` for ≤ 8 s; the steady-state variant of M4R-1 (a genuinely reached low `L_ema` frozen by withdraw-wrapped cranks, pre-existing) is left as a follow-up; the evidence is the sims and the M4R LiteSVM regressions (`m4r_it`, `switch_confirm_it`). The remaining M4 residual, a delay: an unlocked LP holder's zero-fee round trip every second defers an S2/S3 amount on pools with a low λ or a high fee (§10.5). And adopt the PROPOSED first-open warm-up `EMA_WARMUP_BUCKETS` with the keeper's listing-window observations as the answer to a list-only capture (M4V-5, #95; since #96 the same mechanism as the post-change confirmation).
 - Accept the fee-scaled caps (N2) and their effect on Raydium position sizes, or trade them for a lower `κ_max`.
 - Accept the residual run advantage of §9.3 or fund a withdrawal queue (O10).
 - Accept the residuals of §12.6: the held-model share of a liquidated borrower's remainder (Tier A +5.66 SOL) and the penalty and rent the bought-down vault no longer covers (Tier A −2.06 SOL fresh, −8.02 SOL aged 25 days at 90 %), or buy back the aged-position rent with the rent-only reserve at the cost of one extra S1 in 1,655 battery runs (§8.2); the borrower's paid veto; the ±1 % settlement-amount push; the settlement deferral, including the paid per-second widening of v0.4.1; 5 consecutive attacker-only seconds in degraded mode (O19).

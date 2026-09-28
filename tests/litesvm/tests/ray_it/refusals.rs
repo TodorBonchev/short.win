@@ -34,7 +34,8 @@ fn try_open_min(env: &mut Env, rm: &RayMarket, q: u64, min_proceeds: u64) -> TxR
     env.send(&[ix], &[&kp])
 }
 
-/// ARCH §2.6 rule 1: opens wait `pool_list_window_s` (1 h) after the listing, to the second.
+/// ARCH §2.6 rule 1: opens wait `pool_list_window_s` (1 h) after the listing, to the second
+/// (the price state warmed up by per-second observations before the window ends, M4V-5).
 #[test]
 fn listing_window() {
     for fixture in [FART, USELESS] {
@@ -53,10 +54,16 @@ fn listing_window() {
         let window = i64::from(env.config().params.pool_list_window_s);
         assert_err(&try_open(&mut env, &rm, q), E::PoolListWindow);
         let slot = env.clock().slot;
-        env.set_clock(seen + window - 1, slot + 10_000);
+        env.set_clock(
+            seen + window - 1 - raydium::PRICE_WARMUP_CRANKS,
+            slot + 10_000,
+        );
+        env.warm_up_price(&rm);
         env.crank(&rm);
+        assert_eq!(env.now(), seen + window - 1);
         assert_err(&try_open(&mut env, &rm, q), E::PoolListWindow);
-        env.set_clock(seen + window, slot + 10_003);
+        let slot = env.clock().slot;
+        env.set_clock(seen + window, slot + 3);
         ok(try_open(&mut env, &rm, q));
     }
 }

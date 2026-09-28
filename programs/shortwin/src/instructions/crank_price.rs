@@ -5,8 +5,9 @@
 //!
 //! **Accounts:** `config`, `market` (mut), `mint`, `oracle_cache` (read), event accounts.
 //! **Remaining:** the venue's `ReadSet`; for a list-only (`None`) market the detection set
-//! `[bonding_curve, canonical_pool]` (key-checked; the pump re-detection of ARCH §2.5 arrives
-//! with M5, until then a `None` market stays `None`).
+//! `[bonding_curve, canonical_pool]` (key-checked). ARCH §2.5's `None` row: the pump
+//! re-detection (a pump venue found → that venue) arrives with the pump adapters (M5 / M6); a
+//! Raydium pool is adopted through `propose_pool` (M4), never here.
 //!
 //! **Never reverts on a venue-state account that no longer parses** (A63, V1-8): a correctly
 //! keyed account whose owner, discriminator or layout changed makes the venue "not

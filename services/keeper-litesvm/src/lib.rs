@@ -17,7 +17,8 @@
 //!
 //! A violation panics with the transaction's logs. Knobs for the scenarios: refuse v1
 //! transactions ([`LiteSvmChain::set_v1`], to exercise the v0 fallback) and the recent
-//! priority fees the backend reports ([`LiteSvmChain::set_priority_fees`]).
+//! priority fees the backend reports ([`LiteSvmChain::set_priority_fees`]); every backend call
+//! is logged ([`LiteSvmChain::rpc_log`], M4-SEC-7: the keeper's RPC work per tick).
 //!
 //! [`Harness`] couples the environment, a funded keeper and the clock: one keeper tick per
 //! slot or per second.
@@ -53,6 +54,28 @@ pub struct LiteSvmChain {
     v1: Cell<bool>,
     fees: RefCell<Vec<u64>>,
     sent: RefCell<Vec<SentTx>>,
+    rpc: RefCell<Vec<Rpc>>,
+}
+
+/// One backend call, as a JSON-RPC backend would make it (M4-SEC-7's measurements).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Rpc {
+    /// `getMultipleAccounts` of these keys (a JSON-RPC backend splits them into calls of 100).
+    Accounts(Vec<Pubkey>),
+    /// `getProgramAccounts`.
+    ProgramAccounts,
+    /// `sendTransaction` of a transaction naming these short.win instruction count.
+    Send { instructions: usize },
+}
+
+impl Rpc {
+    /// The JSON-RPC calls this stands for (`getMultipleAccounts` takes 100 keys a call).
+    pub fn calls(&self) -> usize {
+        match self {
+            Self::Accounts(keys) => keys.len().div_ceil(100).max(1),
+            Self::ProgramAccounts | Self::Send { .. } => 1,
+        }
+    }
 }
 
 /// A transaction the keeper sent (for assertions).
@@ -74,7 +97,13 @@ impl LiteSvmChain {
             v1: Cell::new(true),
             fees: RefCell::new(Vec::new()),
             sent: RefCell::new(Vec::new()),
+            rpc: RefCell::new(Vec::new()),
         }
+    }
+
+    /// Every backend call so far, in order (M4-SEC-7).
+    pub fn rpc_log(&self) -> Vec<Rpc> {
+        self.rpc.borrow().clone()
     }
 
     /// Accept (or refuse, as a cluster without SIMD-0385) v1 transactions.
@@ -275,6 +304,7 @@ impl Chain for LiteSvmChain {
     }
 
     async fn accounts(&self, keys: &[Pubkey]) -> anyhow::Result<Vec<Option<AccountData>>> {
+        self.rpc.borrow_mut().push(Rpc::Accounts(keys.to_vec()));
         let env = self.env.borrow();
         Ok(keys
             .iter()
@@ -294,6 +324,7 @@ impl Chain for LiteSvmChain {
         program: &Pubkey,
         filters: &[Memcmp],
     ) -> anyhow::Result<Vec<(Pubkey, AccountData)>> {
+        self.rpc.borrow_mut().push(Rpc::ProgramAccounts);
         let env = self.env.borrow();
         Ok(env
             .svm
@@ -360,6 +391,9 @@ impl Chain for LiteSvmChain {
             ),
         };
         let ixs = tx::decompile(tx, &alts).unwrap_or_default();
+        self.rpc.borrow_mut().push(Rpc::Send {
+            instructions: ixs.iter().filter(|i| i.program_id == shortwin::ID).count(),
+        });
         self.sent.borrow_mut().push(SentTx {
             format: tx::format_of(tx),
             bytes: tx::size(tx),

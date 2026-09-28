@@ -200,10 +200,13 @@ proptest! {
         }
         for r in probes {
             let r = u128::from(r);
-            // A point below the crossing and one above it.
-            let lo = p0 + (p_liq - p0) * r / u128::from(u64::MAX);
+            // A point below the crossing and one above it. `(p_liq − p0)·r` exceeds u128 once
+            // the crossing lies ≳ 1.8·10¹⁹ (18 SOL per raw unit, WAD) above `p0`, so the offset
+            // is taken with the 256-bit fallback (it is ≤ `p_liq − p0`, as r ≤ u64::MAX).
+            let lo = p0 + mul_div(p_liq - p0, r, u128::from(u64::MAX), Rounding::Floor)
+                .expect("≤ p_liq − p0");
             prop_assert!(lo == p_liq || !below(lo), "predicate holds at {lo} < {p_liq}");
-            let hi = p_liq.saturating_add(p_liq / 1_000_000 * (r % 1_000_000_000));
+            let hi = p_liq.saturating_add((p_liq / 1_000_000).saturating_mul(r % 1_000_000_000));
             prop_assert!(below(hi), "predicate fails at {hi} > {p_liq}");
         }
     }

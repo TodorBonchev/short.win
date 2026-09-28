@@ -5,9 +5,13 @@
 //! - **Cadence** ([`MarketTrack::observation_due`]): every slot during a deviation burst
 //!   (duty 2; never while an S3 on an executable venue is due, duty 5); once per second when
 //!   the market needs it (duty 1: a near position or `|P_spot/P_ema − 1| > 2 %`; duty 5: S3 due
-//!   on an executable venue); at once when the route is gone and no S3 chain runs yet, then
+//!   on an executable venue, or the post-change warm-up of a market with open positions after a
+//!   `PoolSwitched`, until `ema_warm == 0`, M4R); at once when the route is gone and no S3 chain runs yet, then
 //!   every `no_route_interval_s` (the chain restarts after `S3_OBS_GAP_S`); every
-//!   `idle_interval_s` with open positions.
+//!   `idle_interval_s` with open positions; a Raydium market without positions every
+//!   `listing_interval_s` inside its listing window and every second at its end until its
+//!   post-change warm-up is over (M4V-5, M4R: the first open after the window reads an honest
+//!   `P_ema`).
 //! - **Bursts** ([`MarketTrack::check_foreign`]): the keeper remembers the spot prices it read
 //!   in each second; an observation in a bucket (the open one, or the last completed one) that
 //!   deviates from that second's view by more than `burst_dev_bps` was not the keeper's — an
@@ -48,6 +52,9 @@ pub enum Due {
     NoRoute,
     /// Open positions: the idle cadence (duty 1).
     Idle,
+    /// A Raydium market without positions inside its listing window: the listing cadence
+    /// (M4V-5).
+    Listing,
 }
 
 /// The degraded-mode state machine.
@@ -192,6 +199,12 @@ impl MarketTrack {
         }
         if needs.open_positions && since(cov.idle_interval_s) {
             return Some(Due::Idle);
+        }
+        if needs.warm_up && this_second {
+            return Some(Due::Second);
+        }
+        if needs.listing && since(cov.listing_interval_s) {
+            return Some(Due::Listing);
         }
         None
     }
@@ -422,6 +435,33 @@ mod tests {
         assert_eq!(
             t.observation_due(&MarketNeeds::default(), 1_000, 9_000, &c),
             None
+        );
+        // M4V-5: a Raydium market without positions in its listing window, on the listing
+        // cadence; at the window's end (and until its price state warmed up) every second.
+        let listing = MarketNeeds {
+            listing: true,
+            ..MarketNeeds::default()
+        };
+        let mut t = MarketTrack::default();
+        assert_eq!(
+            t.observation_due(&listing, 1_000, 9_000, &c),
+            Some(Due::Listing)
+        );
+        t.landed(1_000, 9_000);
+        assert_eq!(t.observation_due(&listing, 1_059, 9_100, &c), None);
+        assert_eq!(
+            t.observation_due(&listing, 1_060, 9_200, &c),
+            Some(Due::Listing)
+        );
+        let warm_up = MarketNeeds {
+            listing: true,
+            warm_up: true,
+            ..MarketNeeds::default()
+        };
+        assert_eq!(t.observation_due(&warm_up, 1_000, 9_001, &c), None);
+        assert_eq!(
+            t.observation_due(&warm_up, 1_001, 9_002, &c),
+            Some(Due::Second)
         );
     }
 

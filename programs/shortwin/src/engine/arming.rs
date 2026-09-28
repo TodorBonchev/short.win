@@ -16,7 +16,8 @@
 //! - [`RiskQuotes`]: `B̂(Q; reprice(L, P))` and σ at `φ_risk = min(φ_live,
 //!   venue_fee_hard_cap_bps_pos)` (ARCH §4.3 "two fee views"; the venue's
 //!   `crate::venues::risk_pricing`, which also prices a venue that cannot execute).
-//! - [`inputs`]: `R_due`, `K_s`, `V_eff`, the spot leg (`risk::spot_leg` on the robust spot
+//! - [`inputs`]: whether the post-change warm-up is over (M4R: `settle::evaluate` decides nothing
+//!   while it is not, on an executable venue), `R_due`, `K_s`, `V_eff`, the spot leg (`risk::spot_leg` on the robust spot
 //!   `P_rs = min(P_live, lb_lo)`, true without evaluation only when the venue cannot execute:
 //!   the route-broken flag and the fee hard cap never make it true, V2-1), the EMA leg
 //!   (`persist::liq_ema_leg` on the newest `liq_persist_n` ring entries' cached `(x, y)`), the
@@ -194,6 +195,7 @@ pub fn inputs(
         cr_liquidatable: spot_leg && ema_leg,
         ema_leg,
         executable,
+        warmed: shortwin_math::observe::warmed(&obs.ema),
         p_rs,
         l_live,
         b_live,

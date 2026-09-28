@@ -402,10 +402,12 @@ pub fn list_checked(env: &mut Env, pool: &AnyPool) -> MarketCreated {
         "O13: an AMM v4 pool's age starts at listing"
     );
     assert_eq!(m.tier, Tier::C as u8);
+    let cap = pool_select::depth_at_lambda(d, u64::from(env.config().params.pool_lock_min_bps));
     assert_eq!(
         *m.observation(),
-        Observation::new(now, price, liq).unwrap(),
-        "the observation state starts at the pool's spot and √(X·Y)"
+        Observation::new_raydium(now, price, liq, cap).unwrap(),
+        "the observation state starts at the pool's spot and min(√(X·Y), D/λ_min), marked for \
+         the post-change warm-up (M4R)"
     );
     ev
 }
@@ -1167,7 +1169,7 @@ pub fn predict(v: &View) -> Predicted {
     .unwrap();
     let newest = obs.ring.newest().copied().unwrap_or_default();
     let cr_ema_bps = risk::cr_bps(v_eff, quote_at(newest.x, newest.y)).unwrap_or(u64::MAX);
-    let l_b = bounds::ref_liquidity(l_live, &obs.ema);
+    let l_b = bounds::ref_liquidity(l_live, &obs.ema, &obs.ring).unwrap();
     let prm = pos.exit_params();
     let liq_p = bounds::liq_reference(&obs.ema, &obs.ring, &obs.last, now, &prm).unwrap();
     let liq_b = liq_p.and_then(|p| risky.buy_repriced(q, l_b, p).map(|b| b.cost));
@@ -1269,6 +1271,9 @@ impl Predicted {
         if !self.view.executable() {
             return Err(E::NoRoute);
         }
+        if self.view.market().ema_warm != 0 {
+            return Err(E::EmaWarmingUp);
+        }
         if !self.fresh {
             return Err(E::ReferenceStale);
         }
@@ -1288,6 +1293,9 @@ impl Predicted {
     pub fn expiry(&self) -> Result<Plan, E> {
         if !self.view.executable() {
             return Err(E::NoRoute);
+        }
+        if self.view.market().ema_warm != 0 {
+            return Err(E::EmaWarmingUp);
         }
         if !self.expired {
             return Err(E::NotExpired);
@@ -1848,6 +1856,7 @@ pub fn predict_settle(v: &View) -> SettlePrediction {
         cr_liquidatable: spot_leg && ema_leg,
         ema_leg,
         executable: exec,
+        warmed: shortwin_math::observe::warmed(&obs.ema),
         p_rs,
         l_live,
         b_live,
@@ -2076,7 +2085,10 @@ impl Fart {
         );
         deposit_checked(&mut env, &rm, &kp, &account, lend);
         let window = i64::from(env.config().params.pool_list_window_s);
-        env.warp(window);
+        // The keeper's observations at the end of the listing window warm the price state up
+        // (M4V-5) before the first open.
+        env.warp(window - raydium::PRICE_WARMUP_CRANKS);
+        env.warm_up_price(&rm);
         crank_checked(&mut env, &rm);
         let keeper = env.funded_keypair();
         let whale = actor(&mut env, &rm, 60_000 * SOL, 40_000_000_000_000);

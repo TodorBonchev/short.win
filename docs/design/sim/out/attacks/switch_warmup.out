@@ -1,0 +1,432 @@
+## selftest
+
+honest switch onto 52 SOL at lambda 50.00 %: L_ema/sqrt(XY) 1.000 at the adoption, 1.000 at the gate (+9 s); P_ema/P 1.000; box wide 0 s in the warm-up, 0 s after; guard cleared at +9 s
+honest switch onto 150 SOL at lambda 99.78 %: L_ema/sqrt(XY) 1.995 at the adoption, 1.000 at the gate (+9 s); P_ema/P 1.000; box wide 4 s in the warm-up, 0 s after; guard cleared at +9 s
+honest switch onto 240 SOL at lambda 25.00 %: L_ema/sqrt(XY) 0.500 at the adoption, 1.000 at the gate (+9 s); P_ema/P 1.000; box wide 4 s in the warm-up, 0 s after; guard cleared at +9 s
+gate: a genuinely liquidatable position (2.2x) is liquidated at +9 s (the 8th warm-up integration lands at +9 s)
+
+## 1. M4R-1: a lambda 50 % candidate (52 SOL at the pre-halt price) whose every unlocked LP unit the
+attacker holds; the position carried from a 100-SOL fully locked AMM v4 (Tier C, cr_liq 1.5).  The
+candidate trades at m x the pre-halt price, flat after the adoption.  Every second after the adoption:
+the keeper's honest crank and plain liquidation attempt; the attacker's [withdraw all, crank, deposit]
+and [withdraw all, liquidate, deposit].  Cells: outcome, k = keeper / a = attacker, seconds after the
+adoption, (borrower SOL at the exit, or equity if open).  120 s.  The honest threshold is m 2.01 (the
+'none' rows): every earlier exit in a wrapped row is forced.
+
+### q = 0.40 % of the incumbent's X
+
+| m | LP wraps of the two samples | M4 as built | M4R |
+|---|---|---|---|
+| 1.96 | none | open (0.419) | open (0.419) |
+| 1.96 | withdraw around execute | open (0.419) | open (0.419) |
+| 1.96 | withdraw around proposal | open (0.419) | open (0.419) |
+| 1.96 | withdraw around both | open (0.419) | open (0.419) |
+| 1.97 | none | open (0.415) | open (0.415) |
+| 1.97 | withdraw around execute | open (0.415) | open (0.415) |
+| 1.97 | withdraw around proposal | open (0.415) | open (0.415) |
+| 1.97 | withdraw around both | open (0.415) | open (0.415) |
+| 1.98 | none | open (0.411) | open (0.411) |
+| 1.98 | withdraw around execute | liquidation a +41s (0.335) | open (0.411) |
+| 1.98 | withdraw around proposal | liquidation a +41s (0.335) | open (0.411) |
+| 1.98 | withdraw around both | liquidation a +41s (0.335) | open (0.411) |
+| 1.99 | none | open (0.407) | open (0.407) |
+| 1.99 | withdraw around execute | liquidation a +27s (0.331) | open (0.407) |
+| 1.99 | withdraw around proposal | liquidation a +27s (0.331) | open (0.407) |
+| 1.99 | withdraw around both | liquidation a +27s (0.331) | open (0.407) |
+| 2.00 | none | open (0.403) | open (0.403) |
+| 2.00 | withdraw around execute | liquidation a +24s (0.326) | open (0.403) |
+| 2.00 | withdraw around proposal | liquidation a +24s (0.326) | open (0.403) |
+| 2.00 | withdraw around both | liquidation a +24s (0.326) | open (0.403) |
+| 2.01 | none | liquidation k +28s (0.331) | liquidation k +9s (0.331) |
+| 2.01 | withdraw around execute | liquidation k +22s (0.331) | liquidation k +9s (0.331) |
+| 2.01 | withdraw around proposal | liquidation k +22s (0.331) | liquidation k +9s (0.331) |
+| 2.01 | withdraw around both | liquidation k +22s (0.331) | liquidation k +9s (0.331) |
+| 2.02 | none | liquidation k +24s (0.327) | liquidation k +9s (0.327) |
+| 2.02 | withdraw around execute | liquidation k +20s (0.327) | liquidation k +9s (0.327) |
+| 2.02 | withdraw around proposal | liquidation k +20s (0.327) | liquidation k +9s (0.327) |
+| 2.02 | withdraw around both | liquidation k +20s (0.327) | liquidation k +9s (0.327) |
+| 2.05 | none | liquidation k +20s (0.314) | liquidation k +9s (0.314) |
+| 2.05 | withdraw around execute | liquidation k +18s (0.314) | liquidation k +9s (0.314) |
+| 2.05 | withdraw around proposal | liquidation k +18s (0.314) | liquidation k +9s (0.314) |
+| 2.05 | withdraw around both | liquidation k +18s (0.314) | liquidation k +9s (0.314) |
+
+### q = 0.74 % of the incumbent's X
+
+| m | LP wraps of the two samples | M4 as built | M4R |
+|---|---|---|---|
+| 1.96 | none | open (0.779) | open (0.779) |
+| 1.96 | withdraw around execute | open (0.779) | open (0.779) |
+| 1.96 | withdraw around proposal | open (0.779) | open (0.779) |
+| 1.96 | withdraw around both | open (0.779) | open (0.779) |
+| 1.97 | none | open (0.772) | open (0.772) |
+| 1.97 | withdraw around execute | liquidation a +29s (0.622) | open (0.772) |
+| 1.97 | withdraw around proposal | liquidation a +29s (0.622) | open (0.772) |
+| 1.97 | withdraw around both | liquidation a +29s (0.622) | open (0.772) |
+| 1.98 | none | open (0.764) | open (0.764) |
+| 1.98 | withdraw around execute | liquidation a +25s (0.613) | open (0.764) |
+| 1.98 | withdraw around proposal | liquidation a +25s (0.613) | open (0.764) |
+| 1.98 | withdraw around both | liquidation a +25s (0.613) | open (0.764) |
+| 1.99 | none | open (0.757) | open (0.757) |
+| 1.99 | withdraw around execute | liquidation a +22s (0.605) | open (0.757) |
+| 1.99 | withdraw around proposal | liquidation a +22s (0.605) | open (0.757) |
+| 1.99 | withdraw around both | liquidation a +22s (0.605) | open (0.757) |
+| 2.00 | none | open (0.749) | open (0.749) |
+| 2.00 | withdraw around execute | liquidation a +21s (0.596) | open (0.749) |
+| 2.00 | withdraw around proposal | liquidation a +21s (0.596) | open (0.749) |
+| 2.00 | withdraw around both | liquidation a +21s (0.596) | open (0.749) |
+| 2.01 | none | liquidation k +30s (0.622) | liquidation k +9s (0.622) |
+| 2.01 | withdraw around execute | liquidation k +19s (0.622) | liquidation k +9s (0.622) |
+| 2.01 | withdraw around proposal | liquidation k +19s (0.622) | liquidation k +9s (0.622) |
+| 2.01 | withdraw around both | liquidation k +19s (0.622) | liquidation k +9s (0.622) |
+| 2.02 | none | liquidation k +25s (0.614) | liquidation k +9s (0.614) |
+| 2.02 | withdraw around execute | liquidation k +18s (0.614) | liquidation k +9s (0.614) |
+| 2.02 | withdraw around proposal | liquidation k +18s (0.614) | liquidation k +9s (0.614) |
+| 2.02 | withdraw around both | liquidation k +18s (0.614) | liquidation k +9s (0.614) |
+| 2.05 | none | liquidation k +20s (0.589) | liquidation k +9s (0.589) |
+| 2.05 | withdraw around execute | liquidation k +16s (0.589) | liquidation k +9s (0.589) |
+| 2.05 | withdraw around proposal | liquidation k +16s (0.589) | liquidation k +9s (0.589) |
+| 2.05 | withdraw around both | liquidation k +16s (0.589) | liquidation k +9s (0.589) |
+
+Control (q 0.40 %, withdraw around execute, NO per-second wrapped crank; the attacker still tries a
+withdraw-wrapped liquidation every second):
+
+| m | M4 as built | M4R |
+|---|---|---|
+| 1.98 | open (0.411) | open (0.411) |
+| 1.99 | open (0.407) | open (0.407) |
+| 2.00 | open (0.403) | open (0.403) |
+
+## 2. lambda < lambda_min candidates under the M4R-1 attacker
+
+### 2a. 240 SOL at 25 % / 400 SOL at 10 % (engine W; withdraw-wrapped execute, per-second withdraw-
+wrapped crank and liquidation), q 0.74 %, flat at m.  Honest: liquidatable at 2.05, not at 2.03.
+
+| candidate | m | honest (M4R) | M4 as built | M4R |
+|---|---|---|---|---|
+| 240 SOL, 25 % | 1.99 | open (0.780) | open (0.780) | open (0.780) |
+| 240 SOL, 25 % | 2.00 | open (0.773) | open (0.773) | open (0.773) |
+| 240 SOL, 25 % | 2.01 | open (0.765) | liquidation a +37s (0.626) | open (0.765) |
+| 240 SOL, 25 % | 2.02 | open (0.758) | liquidation a +27s (0.618) | open (0.758) |
+| 240 SOL, 25 % | 2.03 | open (0.751) | liquidation a +24s (0.610) | open (0.751) |
+| 240 SOL, 25 % | 2.05 | liquidation k +9s (0.615) | liquidation k +20s (0.615) | liquidation k +9s (0.615) |
+| 400 SOL, 10 % | 1.99 | open (0.783) | open (0.783) | open (0.783) |
+| 400 SOL, 10 % | 2.00 | open (0.775) | liquidation a +28s (0.620) | open (0.775) |
+| 400 SOL, 10 % | 2.01 | open (0.768) | liquidation a +24s (0.612) | open (0.768) |
+| 400 SOL, 10 % | 2.02 | open (0.761) | liquidation a +22s (0.603) | open (0.761) |
+| 400 SOL, 10 % | 2.03 | open (0.753) | liquidation a +21s (0.595) | open (0.753) |
+| 400 SOL, 10 % | 2.05 | liquidation k +9s (0.618) | liquidation k +19s (0.618) | liquidation k +9s (0.618) |
+
+### 2b. The fine grid of a 104-SOL lambda 25 % candidate (engine P, R100, position at the size cap):
+honest vs attacker a2 (every sample withdraw-wrapped, its wrapped liquidation first in each second).
+
+| rule | m | honest only | a2 attacked | L_ema / √(X·Y) at the switch (a2) |
+|---|---|---|---|---|
+| M4 as built | 2.00 | open (120 s) | liquidation +21 s by attacker @2.001x | 0.250 |
+| M4 as built | 2.01 | open (120 s) | liquidation +19 s by attacker @2.011x | 0.250 |
+| M4 as built | 2.02 | open (120 s) | liquidation +18 s by attacker @2.021x | 0.250 |
+| M4 as built | 2.03 | liquidation +30 s @2.031x | liquidation +18 s by attacker @2.031x | 0.250 |
+| M4 as built | 2.04 | liquidation +25 s @2.041x | liquidation +17 s by attacker @2.041x | 0.250 |
+| M4R | 2.00 | open (120 s) | open (120 s) | 0.500 |
+| M4R | 2.01 | open (120 s) | open (120 s) | 0.500 |
+| M4R | 2.02 | open (120 s) | open (120 s) | 0.500 |
+| M4R | 2.03 | liquidation +9 s @2.031x | liquidation +9 s by attacker @2.031x | 0.500 |
+| M4R | 2.04 | liquidation +9 s @2.041x | liquidation +9 s by attacker @2.041x | 0.500 |
+
+## 3. Honest fast path onto thinner / deeper (M4-SEC-6) / lambda < lambda_min (M4V-3) candidates;
+incumbent 100 SOL fully locked; honest keeper; then a 2.3x/120 s pump from +30 s (q 0.40 %).  Columns:
+L_ema / √(X·Y) right after the adoption and at the gate (M4R), seconds the box is wider than 1 % in L
+during the warm-up / in the 60 s after it (M4 as built: the first 60 s), the exit in the pump, and the
+second the guard cleared (M4R).
+
+| candidate (SOL at the pre-halt price, lambda) | rule | L at adoption | L at the gate | box wide: warm-up / after | exit in the pump | guard cleared |
+|---|---|---|---|---|---|---|
+| 30 SOL, 99.78 % | M4 as built | 1.000 | - | 0 / 0 | liquidation k +137s (0.286) | - |
+| 30 SOL, 99.78 % | M4R | 1.995 | 1.000 | 4 / 0 | liquidation k +137s (0.286) | +9 s |
+| 52 SOL, 50.00 % | M4 as built | 1.000 | - | 0 / 0 | liquidation k +138s (0.287) | - |
+| 52 SOL, 50.00 % | M4R | 1.000 | 1.000 | 0 / 0 | liquidation k +138s (0.287) | +9 s |
+| 150 SOL, 90.00 % | M4 as built | 1.000 | - | 0 / 0 | liquidation k +139s (0.287) | - |
+| 150 SOL, 90.00 % | M4R | 1.800 | 1.000 | 4 / 0 | liquidation k +139s (0.287) | +9 s |
+| 150 SOL, 99.78 % | M4 as built | 1.000 | - | 0 / 0 | liquidation k +139s (0.287) | - |
+| 150 SOL, 99.78 % | M4R | 1.995 | 1.000 | 4 / 0 | liquidation k +139s (0.287) | +9 s |
+| 120 SOL, 25.00 % | M4 as built | 0.500 | - | 0 / 20 | liquidation k +139s (0.286) | - |
+| 120 SOL, 25.00 % | M4R | 0.500 | 1.000 | 4 / 0 | liquidation k +139s (0.286) | +9 s |
+| 240 SOL, 25.00 % | M4 as built | 0.500 | - | 0 / 20 | liquidation k +140s (0.282) | - |
+| 240 SOL, 25.00 % | M4R | 0.500 | 1.000 | 4 / 0 | liquidation k +140s (0.282) | +9 s |
+| 400 SOL, 10.00 % | M4 as built | 0.200 | - | 0 / 26 | liquidation k +140s (0.283) | - |
+| 400 SOL, 10.00 % | M4R | 0.200 | 1.000 | 4 / 0 | liquidation k +140s (0.283) | +9 s |
+
+## 4. Capital deposit freeze: the attacker deposits as much again as the pool's LP counter around
+sampling instructions (capital only, no swap fee) and around one crank every second from the adoption
+(up-freeze).  'M4R without the guard' is an analysis row: the exit reference would read the frozen L_ema.
+
+### 4a. RA -> 630 SOL, lambda 99.78 % (D = 50 % of pool_d; q = 3.0 % of the candidate's X); genuine pump 3x/120 s from the adoption (engine P).  Cells: L_ema / √(X·Y) at the
+switch; seconds with the box > 1 % wide in L (first 60 s); outcome (time after the adoption, price vs
+pre-halt, lender P&L at the exit price, borrower remainder).
+
+| LP move | M4 as built | M4R | M4R without the guard (analysis) |
+|---|---|---|---|
+| none | 1.000; 0 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 | 1.995; 4 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 | 1.995; 4 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 |
+| deposit around the recording proposal (M4V-2) | 1.000; 0 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 | 1.995; 4 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 | 1.995; 4 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 |
+| deposit around the execution | 1.000; 0 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 | 1.995; 4 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 | 1.995; 4 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 |
+| deposit around both | 1.995; 24 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 | 1.995; 4 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 | 1.995; 4 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 |
+| deposit freeze after the adoption only | 1.000; 54 s; liquidation +59 s @1.701x, lender +0.819, borrower 3.495 | 1.995; 56 s; liquidation +61 s @1.732x, lender +0.834, borrower 2.847 | 1.995; 56 s; S1 +123 s @3.000x, lender -17.785, borrower 0.000 |
+| both + deposit freeze after | 1.995; 56 s; S1 +123 s @3.000x, lender -17.785, borrower 0.000 | 1.995; 56 s; liquidation +61 s @1.732x, lender +0.834, borrower 2.847 | 1.995; 56 s; S1 +123 s @3.000x, lender -17.785, borrower 0.000 |
+
+### 4a. RA -> 314 SOL, lambda 99.78 % (D = 25 % of pool_d, the fast-path minimum; q = 6.0 %); genuine pump 3x/120 s from the adoption (engine P).  Cells: L_ema / √(X·Y) at the
+switch; seconds with the box > 1 % wide in L (first 60 s); outcome (time after the adoption, price vs
+pre-halt, lender P&L at the exit price, borrower remainder).
+
+| LP move | M4 as built | M4R | M4R without the guard (analysis) |
+|---|---|---|---|
+| none | 1.000; 0 s; liquidation +55 s @1.639x, lender +0.821, borrower 3.402 | 1.995; 4 s; liquidation +55 s @1.639x, lender +0.821, borrower 3.402 | 1.995; 4 s; liquidation +55 s @1.639x, lender +0.821, borrower 3.402 |
+| deposit around the recording proposal (M4V-2) | 1.000; 0 s; liquidation +55 s @1.639x, lender +0.821, borrower 3.402 | 1.995; 4 s; liquidation +55 s @1.639x, lender +0.821, borrower 3.402 | 1.995; 4 s; liquidation +55 s @1.639x, lender +0.821, borrower 3.402 |
+| deposit around the execution | 1.000; 0 s; liquidation +55 s @1.639x, lender +0.821, borrower 3.402 | 1.995; 4 s; liquidation +55 s @1.639x, lender +0.821, borrower 3.402 | 1.995; 4 s; liquidation +55 s @1.639x, lender +0.821, borrower 3.402 |
+| deposit around both | 1.995; 24 s; liquidation +55 s @1.639x, lender +0.821, borrower 3.402 | 1.995; 4 s; liquidation +55 s @1.639x, lender +0.821, borrower 3.402 | 1.995; 4 s; liquidation +55 s @1.639x, lender +0.821, borrower 3.402 |
+| deposit freeze after the adoption only | 1.000; 50 s; liquidation +55 s @1.639x, lender +0.821, borrower 3.402 | 1.995; 54 s; liquidation +59 s @1.701x, lender +0.853, borrower 2.063 | 1.995; 56 s; S1 +120 s @2.973x, lender -17.281, borrower 0.000 |
+| both + deposit freeze after | 1.995; 56 s; S1 +120 s @2.973x, lender -17.281, borrower 0.000 | 1.995; 54 s; liquidation +59 s @1.701x, lender +0.853, borrower 2.063 | 1.995; 56 s; S1 +120 s @2.973x, lender -17.281, borrower 0.000 |
+
+### 4b. Engine W (honest keeper every second): near-threshold rows and the big carried position (1 %-fee
+incumbent of 200 SOL at lambda 100 %, q at the size cap, onto a 50-SOL lambda 99.78 % 1 %-fee candidate,
+D = 25 % of pool_d).  Cells: outcome, seconds after the adoption (borrower / lender SOL, or equity if
+open).  Honest threshold of the q 0.40 % position: m 2.01.
+
+| attack | m | M4 as built | M4R |
+|---|---|---|---|
+| deposit-wrapped crank every second (up-freeze) | 2.01 | liquidation k +28s @2.01x (0.331 / 0.032) | open (0.399) |
+| deposit-wrapped crank every second (up-freeze) | 2.02 | liquidation k +24s @2.02x (0.327 / 0.033) | liquidation k +9s @2.02x (0.327 / 0.033) |
+| deposit-wrapped crank every second (up-freeze) | 2.03 | liquidation k +22s @2.03x (0.323 / 0.033) | liquidation k +9s @2.03x (0.323 / 0.033) |
+| deposit-wrapped crank every second (up-freeze) | 2.05 | liquidation k +20s @2.05x (0.314 / 0.033) | liquidation k +9s @2.05x (0.314 / 0.033) |
+| deposit-wrapped crank every second + deposit-wrapped execute | 2.05 | liquidation k +20s @2.05x (0.314 / 0.033) | liquidation k +9s @2.05x (0.314 / 0.033) |
+| deposit-wrapped crank + withdraw-wrapped liquidation every second | 1.99 | open (0.407) | open (0.407) |
+| big carried position, no attacker | 2.00 | liquidation k +14s @2.00x (3.462 / 0.448) | liquidation k +9s @2.00x (3.462 / 0.448) |
+| big carried position, deposit-wrapped crank every second (capital = the pool) | 2.00 | liquidation k +14s @2.00x (3.462 / 0.448) | open (4.356) |
+| big carried position, deposit-wrapped crank every second (capital = the pool) | 2.50 | liquidation k +8s @2.51x (0.142 / 0.571) | liquidation k +9s @2.51x (0.142 / 0.571) |
+| big carried position, deposit-wrapped crank every second (capital = the pool) | 3.00 | S1 k +60s @3.01x (0.000 / 15.375) | S1 k +49s @3.01x (0.000 / 15.375) |
+
+### 4c. The freeze held (M4X-2): the deposit freeze runs from the adoption for W seconds at a flat price,
+then the part-4 genuine pump 3x/120 s (engine P; the freeze goes on).  dep = capital of the pool's size,
+dep3 = three times.  Before M4X-2, L_slow integrated the frozen L_ema (lobs) while the guard was set --
++1/tau_slow per second -- and L_b = max(L_live, min(L_ema, L_mlo), L_slow) took it unguarded: the
+reference blocked again after 10-30 min and the pump ended in S1.  Cells: outcome; L_slow / sqrt(X*Y) at
+the end.
+
+| candidate | freeze | W (s) | M4R | M4R with L_slow unguarded (analysis; before M4X-2) |
+|---|---|---|---|---|
+| RA -> 314 SOL, lambda 99.78 % | dep | 600 | liquidation +643 s @1.717x, lender +0.862, borrower 1.710; 0.998 | liquidation +643 s @1.717x, lender +0.852, borrower 1.730; 1.173 |
+| RA -> 314 SOL, lambda 99.78 % | dep | 1800 | liquidation +1843 s @1.717x, lender +0.862, borrower 1.710; 0.998 | S1 +1903 s @2.717x, lender -12.553, borrower 0.000; 1.416 |
+| RA -> 314 SOL, lambda 99.78 % | dep3 | 600 | liquidation +645 s @1.750x, lender +0.879, borrower 0.978; 0.998 | S1 +706 s @2.767x, lender -13.476, borrower 0.000; 1.565 |
+| RA -> 630 SOL, lambda 99.78 % | dep3 | 600 | liquidation +646 s @1.767x, lender +0.852, borrower 2.132; 0.998 | liquidation +646 s @1.767x, lender +0.840, borrower 2.155; 1.525 |
+| RA -> 630 SOL, lambda 99.78 % | dep3 | 1800 | liquidation +1846 s @1.767x, lender +0.852, borrower 2.131; 0.998 | S1 +1907 s @2.783x, lender -13.784, borrower 0.000; 2.255 |
+
+## 5. Withdraw contest while the guard is set: RA -> 625 SOL, lambda 50 % (D = 25 % of pool_d; q = 3 % of
+the candidate's X); candidate at 1.60x the pre-halt price (the position is liquidatable on it).  The
+attacker holds the candidate's unlocked LP and capital (engine P).  Cells: outcome and the buyback B paid;
+the overpay is the borrower's, against the honest liquidation of the same rule.
+
+| attacker | rule | outcome | B (SOL) | borrower overpay vs honest |
+|---|---|---|---|---|
+| none (honest) | M4 as built | liquidation +20 s @1.601x, lender +0.771, borrower 5.542 | 30.7884 | +0.00 % |
+| withdraw-wrapped liquidation only, lands first | M4 as built | liquidation +20 s @1.601x, lender +0.771, borrower 5.542 | 30.7884 | +0.00 % |
+| deposit freeze + both samples deposit-wrapped (blocker) | M4 as built | liquidation +20 s @1.601x, lender +0.771, borrower 5.542 | 30.7884 | +0.00 % |
+| combined: every sample both ways, withdraw-wrapped liquidation first | M4 as built | liquidation +13 s by attacker @1.601x, lender +0.802, borrower 4.236 | 32.0321 | +4.04 % |
+| none (honest) | M4R | liquidation +9 s @1.601x, lender +0.771, borrower 5.542 | 30.7884 | +0.00 % |
+| withdraw-wrapped liquidation only, lands first | M4R | liquidation +9 s by attacker @1.601x, lender +0.802, borrower 4.236 | 32.0321 | +4.04 % |
+| deposit freeze + both samples deposit-wrapped (blocker) | M4R | open (120 s) | - | - |
+| combined: every sample both ways, withdraw-wrapped liquidation first | M4R | open (120 s) | - | - |
+
+## 6. M4R-2: the token dumps f x during the halt; the only candidate has 30 SOL of locked SOL at the
+pre-halt price (lambda 99.78 %, D = 30 % of pool_d), i.e. 30/sqrt(f) SOL at the live price (window floor
+25 SOL).  Attacker: none / the thin pool's backer pump-wraps the recording proposal back to the frozen
+price; or no dump during the halt but a genuine one 5 s into the collection window.  Cells: adopted?; P_ema
+vs the candidate's price at the switch (M4R: -> at the gate); real locked SOL at the live price; the
+attacker's round-trip cost (engine P).
+
+| f | attacker | M4 as built | M4R |
+|---|---|---|---|
+| 4x | none | adopted; P_ema/P 3.99; 15.0 SOL locked; cost 0.00 SOL | not adopted (refused 310, cancelled 0); cost 0.00 SOL |
+| 4x | pump-wrapped recording proposal | adopted; P_ema/P 3.99; 15.0 SOL locked; cost 0.04 SOL | adopted; P_ema/P 3.99 -> 1.00; 15.0 SOL locked; cost 0.04 SOL |
+| 4x | none; the dump comes 5 s INTO the window (M4X-3) | adopted; P_ema/P 3.99; 15.0 SOL locked; cost 0.00 SOL | adopted; P_ema/P 3.99 -> 1.00; 15.0 SOL locked; cost 0.00 SOL |
+| 16x | none | adopted; P_ema/P 15.97; 7.5 SOL locked; cost 0.00 SOL | not adopted (refused 310, cancelled 0); cost 0.00 SOL |
+| 16x | pump-wrapped recording proposal | adopted; P_ema/P 15.97; 7.5 SOL locked; cost 0.03 SOL | adopted; P_ema/P 15.97 -> 1.00; 7.5 SOL locked; cost 0.03 SOL |
+| 16x | none; the dump comes 5 s INTO the window (M4X-3) | adopted; P_ema/P 15.97; 7.5 SOL locked; cost 0.00 SOL | adopted; P_ema/P 15.97 -> 1.00; 7.5 SOL locked; cost 0.00 SOL |
+
+A dump inside the 60-s window (after the proposal that opened it) is judged only by the execution, at
+P_ema (M4X-3): adopted under both rules; the warm-up then re-seeds P_ema at the live price (opens and
+tiers see the pool as it is).  A re-check at the execution against P_cand would either revert (and hold
+every other proposal, M4V-4) or cancel (and let a dump-wrapped execution cancel windows until S3).
+
+## 7. Genuine moves (no attacker; honest keeper every second): exits must still happen.
+
+### 7a. Engine W, q 0.40 %.  Cells: outcome, seconds after the adoption, price vs pre-halt at the exit,
+(borrower / lender SOL).  The dump row: the M4R proposal judges the 52-SOL lambda 50 % candidate at its
+live price (13 SOL locked < 25 SOL, M4R-2) and opens no window.
+
+| scenario | M4 as built | M4R |
+|---|---|---|
+| pump during the halt: candidate at 2.2x, flat | liquidation k +13s @2.20x (0.250 / 0.036) | liquidation k +9s @2.20x (0.250 / 0.036) |
+| pump during the halt: 3x, flat | S1 k +61s @3.00x (0.000 / 1.186) | S1 k +49s @3.00x (0.000 / 1.186) |
+| pump during the halt: 5x, flat | S1 k +48s @5.01x (0.000 / 1.186) | S1 k +49s @5.01x (0.000 / 1.186) |
+| pump during the halt: 16x, flat | S1 k +48s @16.03x (0.000 / 1.186) | S1 k +49s @16.03x (0.000 / 1.186) |
+| step 2.2x at +1 s | liquidation k +13s @2.20x (0.251 / 0.035) | liquidation k +9s @2.20x (0.251 / 0.035) |
+| step 5x at +1 s | S1 k +48s @5.00x (0.000 / 1.186) | S1 k +49s @5.00x (0.000 / 1.186) |
+| ramp 2.2x/60 s from +1 s | liquidation k +62s @2.20x (0.251 / 0.035) | liquidation k +62s @2.20x (0.251 / 0.035) |
+| ramp 5x/60 s from +1 s | liquidation k +35s @2.49x (0.125 / 0.040) | liquidation k +35s @2.49x (0.125 / 0.040) |
+| ramp 2.2x/120 s from +300 s | liquidation k +414s @2.11x (0.287 / 0.034) | liquidation k +414s @2.11x (0.287 / 0.034) |
+| dump 4x during the halt, then 10x/60 s from +1 s | liquidation k +63s @2.50x (0.120 / 0.040) | no adoption (window floor) |
+| lambda 99.78 % 30-SOL candidate: pump during the halt 2.0x, flat | liquidation k +26s @2.00x (0.329 / 0.033) | liquidation k +9s @2.00x (0.329 / 0.033) |
+| lambda 99.78 % 30-SOL candidate: pump during the halt 3x, flat | S1 k +59s @3.00x (0.000 / 1.186) | S1 k +49s @3.00x (0.000 / 1.186) |
+| lambda 99.78 % 30-SOL candidate: step 2x at +1 s | liquidation k +26s @2.00x (0.329 / 0.033) | liquidation k +9s @2.00x (0.329 / 0.033) |
+
+### 7b. The big carried position (part 4b's markets), pump during the halt to m, flat (engine W).
+
+| m | q / x_cand | M4 as built | M4R |
+|---|---|---|---|
+| 1.6 | 12.34 % | open (6.748) | open (6.748) |
+| 1.8 | 13.09 % | open (5.560) | open (5.560) |
+| 2.0 | 13.80 % | liquidation k +14s @2.00x (3.462 / 0.448) | liquidation k +9s @2.00x (3.462 / 0.448) |
+| 2.5 | 15.43 % | liquidation k +8s @2.51x (0.142 / 0.571) | liquidation k +9s @2.51x (0.142 / 0.571) |
+
+### 7c. Engine P: candidate at 50 % of the incumbent's reserves (R100: 50 SOL), lambda 90 %; 'during the
+halt' = the candidate trades at m x the pre-halt price when the window opens; 'after' = the adopted pool
+moves from the adoption on.  Cells: outcome (time after the adoption, price vs pre-halt, lender P&L at
+the exit price, borrower remainder).
+
+| market | move | M4 as built | M4R |
+|---|---|---|---|
+| R100 | during the halt: x2 | open (300 s) | open (300 s) |
+| R100 | during the halt: x5 | S1 +48 s @5.006x, lender -1.459, borrower 0.000 | S1 +49 s @5.006x, lender -1.459, borrower 0.000 |
+| R100 | during the halt: x0.5, then flat | open (300 s) | open (300 s) |
+| R100 | after: step x2 at +1 s | open (300 s) | open (300 s) |
+| R100 | after: step x5 at +1 s | S1 +48 s @5.000x, lender -1.454, borrower 0.000 | S1 +49 s @5.000x, lender -1.454, borrower 0.000 |
+| R100 | after: ramp x2 over 30 s | open (300 s) | open (300 s) |
+| R100 | after: ramp x5 over 60 s | liquidation +35 s @2.489x, lender +0.076, borrower 0.234 | liquidation +35 s @2.489x, lender +0.076, borrower 0.233 |
+| RA | during the halt: x2 | S1 +65 s @2.001x, lender +0.659, borrower 0.000 | S1 +49 s @2.001x, lender +0.659, borrower 0.000 |
+| RA | during the halt: x5 | S1 +46 s @5.006x, lender -54.835, borrower 0.000 | S1 +49 s @5.006x, lender -54.835, borrower 0.000 |
+| RA | during the halt: x0.5, then flat | open (300 s) | open (300 s) |
+| RA | after: step x2 at +1 s | S1 +66 s @2.000x, lender +0.683, borrower 0.000 | S1 +49 s @2.000x, lender +0.683, borrower 0.000 |
+| RA | after: step x5 at +1 s | S1 +46 s @5.000x, lender -54.723, borrower 0.000 | S1 +49 s @5.000x, lender -54.723, borrower 0.000 |
+| RA | after: ramp x2 over 30 s | liquidation +30 s @1.954x, lender +0.462, borrower 0.000 | liquidation +30 s @1.954x, lender +0.462, borrower 0.000 |
+| RA | after: ramp x5 over 60 s | S1 +73 s @5.000x, lender -54.723, borrower 0.000 | S1 +73 s @5.000x, lender -54.723, borrower 0.000 |
+| RC | during the halt: x2 | open (300 s) | open (300 s) |
+| RC | during the halt: x5 | S1 +48 s @5.006x, lender -1.241, borrower 0.000 | S1 +49 s @5.006x, lender -1.241, borrower 0.000 |
+| RC | during the halt: x0.5, then flat | open (300 s) | open (300 s) |
+| RC | after: step x2 at +1 s | open (300 s) | open (300 s) |
+| RC | after: step x5 at +1 s | S1 +48 s @5.000x, lender -1.237, borrower 0.000 | S1 +49 s @5.000x, lender -1.237, borrower 0.000 |
+| RC | after: ramp x2 over 30 s | open (300 s) | open (300 s) |
+| RC | after: ramp x5 over 60 s | liquidation +35 s @2.489x, lender +0.064, borrower 0.199 | liquidation +35 s @2.489x, lender +0.064, borrower 0.199 |
+
+### 7d. Engine M: a genuine pump during the halt, flat after (honest keeper only).
+
+| candidate price | M4 as built | M4R |
+|---|---|---|
+| 2.1x | liquidation by keeper +16 s | liquidation by keeper +9 s |
+| 2.5x | liquidation by keeper +9 s | liquidation by keeper +9 s |
+| 3.0x | S1 by keeper +61 s | S1 by keeper +49 s |
+| 5.0x | S1 by keeper +48 s | S1 by keeper +49 s |
+
+## 8. Degraded mode: no honest observer during the warm-up.
+
+### 8a. Engine W, m 1.99 (healthy on the pool as it trades; honest threshold 2.01).  (a) The keeper is
+absent for the first k seconds after the adoption; the M4R-1 attacker is present every second
+(withdraw-wrapped execute, cranks and liquidation attempts).  (b) Nobody observes for 600 s after the
+adoption, then the keeper; genuinely liquidatable at 2.2x.  (c) The adopted pool halts at +3 s (warm-up
+incomplete), 2.2x; keeper cranks every second.  (d) A genuine held withdrawal of every unlocked LP unit
+for s in [1, k), re-deposited at k, then the per-second withdraw-wrapped freeze and liquidation.  (e), (f)
+A held price push through the warm-up (the §12.6 held model).
+
+| case | M4 as built | M4R |
+|---|---|---|
+| (a) keeper absent s < 2 | liquidation a +27s (0.331) | open (0.407) |
+| (a) keeper absent s < 4 | liquidation a +27s (0.331) | open (0.407) |
+| (a) keeper absent s < 8 | liquidation a +27s (0.331) | open (0.407) |
+| (a) keeper absent s < 9 | liquidation a +27s (0.331) | liquidation a +9s (0.331) |
+| (a) keeper absent s < 13 | liquidation a +27s (0.331) | liquidation a +9s (0.331) |
+| (a) keeper absent s < 31 | liquidation a +27s (0.331) | liquidation a +9s (0.331) |
+| (b) no observation for 600 s, then the keeper (2.2x) | liquidation k +612s (0.250) | liquidation k +608s (0.250) |
+| (c) the new pool halts at +3 s (2.2x), 1,500 s | open | open |
+| (d) held withdrawal s in [1, 4), then withdraw-wrapped freeze | open (0.407) | open (0.407) |
+| (d) held withdrawal s in [1, 9), then withdraw-wrapped freeze | liquidation a +33s (0.331) | liquidation a +9s (0.331) |
+| (d) held withdrawal s in [1, 21), then withdraw-wrapped freeze | liquidation a +28s (0.331) | liquidation k +9s (0.331) |
+| (d) held withdrawal s in [1, 41), then withdraw-wrapped freeze | liquidation k +28s (0.331) | liquidation k +9s (0.331) |
+| (e) the attacker holds the pool at 1.2x for s in [1, 9) (every observation sees it), withdraw-wrapped liquidation every second | liquidation a +10s @2.00x (0.329 / 0.032) | liquidation a +9s @2.00x (0.329 / 0.033) |
+| (f) as (e), the keeper absent for s in [1, 9) | open (0.405) | open (0.405) |
+
+### 8b. Engine M: no keeper in the window nor after; the recording proposal is pump-wrapped (3x) and the
+attacker holds the adopted pool at mult x the true price every second (held model: every observation
+of the second is pushed) until the position would be liquidatable, then sandwiches the liquidation.
+Cells: P_ema / P at the switch; the best mult, the seconds held, the attacker's net (SOL).
+
+| rule | result |
+|---|---|
+| M4 as built | P/P 1.000; x3.0 for 8 s, net -0.2667 SOL |
+| M4R | P/P 1.000; x3.0 for 9 s, net -0.3825 SOL |
+
+### 8c. Steady state for comparison (no switch; the same under both rules; pre-existing).  The position is
+opened on a lambda 50 % 52-SOL CPMM pool; the price walks to m x over 60 s (EMA converged).  At T0 the
+attacker withdraws every unlocked LP unit for k seconds (a GENUINE withdrawal: the keeper's cranks see D),
+re-deposits, then holds L_ema with a withdraw-wrapped crank every second and tries a withdraw-wrapped
+liquidation every second; or k attacker-only seconds (keeper absent, the attacker's cranks withdraw-
+wrapped).  Cells: outcome, seconds after T0, L_ema / √(X·Y) at the end.
+
+| m | variant | k = 0 | k = 3 | k = 5 | k = 8 | k = 12 | k = 20 | k = 40 |
+|---|---|---|---|---|---|---|---|---|
+| 1.99 | held withdrawal k s, then freeze | open, 1.00 | open, 0.79 | open, 0.70 | open, 0.62 | open, 0.56 | open, 0.51 | open, 0.50 |
+| 1.99 | k attacker-only seconds, then freeze | open, 1.00 | open, 0.79 | open, 0.70 | open, 0.62 | open, 0.56 | open, 0.51 | open, 0.50 |
+| 2.00 | held withdrawal k s, then freeze | open, 1.00 | open, 0.79 | open, 0.70 | open, 0.62 | open, 0.56 | open, 0.51 | open, 0.50 |
+| 2.00 | k attacker-only seconds, then freeze | open, 1.00 | open, 0.79 | open, 0.70 | open, 0.62 | open, 0.56 | open, 0.51 | open, 0.50 |
+| 2.01 | held withdrawal k s, then freeze | open, 1.00 | attacker +5s, 0.79 | attacker +5s, 0.70 | keeper +5s, 1.40 | keeper +5s, 1.40 | keeper +5s, 1.40 | keeper +5s, 1.40 |
+| 2.01 | k attacker-only seconds, then freeze | open, 1.00 | attacker +5s, 0.79 | attacker +5s, 0.70 | attacker +5s, 0.70 | attacker +5s, 0.70 | attacker +5s, 0.70 | attacker +5s, 0.70 |
+
+Reference (no attack, 60 s): m 2.00 healthy; m 2.01 healthy; m 2.02 liquidated.
+
+### 8d. Atomic price bundles in attacker-only seconds (M4X-1).  Engine W's market; the position's vault
+raised by add_margin (+0 / +25 / +50 / +100 % of V) so its honest threshold is about 2-4x the pre-halt
+price; the candidate trades FLAT at 1.00x after the adoption.  The keeper is absent for s <= k after the
+adoption (degraded mode); every second the attacker sends [buy kc, crank_price, sell] and [buy kl, liquidate,
+sell], with its best kc in {1.5 ... 12} and kl in {1.0, 1.1, 1.25, 1.5} x the threshold (the pumped buyback
+must still fit V - K_s).  Cells: the earliest forced liquidation, seconds after the adoption (kc, kl), or
+open (30 s).  Before M4X-1 the warm-up seed read the pumped low directly: 8 attacker-only seconds forced ANY
+threshold at +9 s.  With the step bound the reach is exactly as built's (whose P_ema moves at most
+x(tau + dt*(1 + C))/(tau + dt) per integration, the same bound), and never earlier (the gate).
+
+| margin | threshold | rule | keeper absent s <= 7 | keeper absent s <= 8 | keeper absent s <= 9 | keeper absent s <= 10 | keeper absent s <= 12 |
+|---|---|---|---|---|---|---|---|
+| +0 % | 2.05x | M4 as built | +7 s (4, 2.05) | +7 s (4, 2.05) | +7 s (4, 2.05) | +7 s (4, 2.05) | +7 s (4, 2.05) |
+| +0 % | 2.05x | M4R without the step bound (analysis; before M4X-1) | open | +9 s (2.5, 2.05) | +9 s (2.5, 2.05) | +9 s (2.5, 2.05) | +9 s (2.5, 2.05) |
+| +0 % | 2.05x | M4R | open | +9 s (2.5, 2.05) | +9 s (2.5, 2.05) | +9 s (2.5, 2.05) | +9 s (2.5, 2.05) |
+| +25 % | 2.50x | M4 as built | open | +9 s (4, 2.50) | +9 s (4, 2.50) | +9 s (4, 2.50) | +9 s (4, 2.50) |
+| +25 % | 2.50x | M4R without the step bound (analysis; before M4X-1) | open | +9 s (2.5, 2.50) | +9 s (2.5, 2.50) | +9 s (2.5, 2.50) | +9 s (2.5, 2.50) |
+| +25 % | 2.50x | M4R | open | +9 s (2.5, 2.50) | +9 s (2.5, 2.50) | +9 s (2.5, 2.50) | +9 s (2.5, 2.50) |
+| +50 % | 3.00x | M4 as built | open | open | +10 s (6, 3.00) | +10 s (6, 3.00) | +10 s (6, 3.00) |
+| +50 % | 3.00x | M4R without the step bound (analysis; before M4X-1) | open | +9 s (3, 3.00) | +9 s (3, 3.00) | +9 s (3, 3.00) | +9 s (3, 3.00) |
+| +50 % | 3.00x | M4R | open | open | +10 s (3, 3.00) | +10 s (3, 3.00) | +10 s (3, 3.00) |
+| +100 % | 4.00x | M4 as built | open | open | open | open | +12 s (6, 4.00) |
+| +100 % | 4.00x | M4R without the step bound (analysis; before M4X-1) | open | +9 s (4, 4.00) | +9 s (4, 4.00) | +9 s (4, 4.00) | +9 s (4, 4.00) |
+| +100 % | 4.00x | M4R | open | open | open | open | +12 s (6, 4.00) |
+
+## 9. Stale-high P_ema after a mild dip (engine M): the incumbent's price rises to pre x the open spot
+(EMA converged there), the incumbent halts, the candidate trades at m x (a mild dip); after the adoption
+the LP holder sends a withdraw-wrapped crank and a withdraw-wrapped liquidation every second after the
+keeper.  CR = the position's CR on the candidate at its true depth / at D (cr_liq 15,000).  Cells: P_ema /
+P at the switch; outcome in 90 s [borrower / lender / attacker's keeper reward, SOL].
+
+| pre -> m | CR | M4 as built | M4R |
+|---|---|---|---|
+| 2.0->1.98 | 15158/14993 | P/P 1.010 open [-0.4004 / +0.0000 / 0.0000] | P/P 1.010 open [-0.4004 / +0.0000 / 0.0000] |
+| 2.005->1.98 | 15158/14993 | P/P 1.013 open [-0.4004 / +0.0000 / 0.0000] | P/P 1.013 open [-0.4004 / +0.0000 / 0.0000] |
+| 2.01->1.98 | 15158/14993 | P/P 1.015 liquidation by attacker +2 s [-0.4759 / +0.0319 / 0.0221] | P/P 1.015 open [-0.4004 / +0.0000 / 0.0000] |
+| 2.01->1.985 | 15120/14955 | P/P 1.013 liquidation by attacker +2 s [-0.4781 / +0.0320 / 0.0221] | P/P 1.013 open [-0.4024 / +0.0000 / 0.0000] |
+| 2.01->1.99 | 15081/14917 | P/P 1.010 liquidation by attacker +2 s [-0.4802 / +0.0321 / 0.0221] | P/P 1.010 open [-0.4045 / +0.0000 / 0.0000] |
+| 2.01->1.95 | 15393/15226 | P/P 1.031 open [-0.3883 / +0.0000 / 0.0000] | P/P 1.031 open [-0.3883 / +0.0000 / 0.0000] |
+
+## 10. Targeted random search (engine W): 1,200 runs, seed 23.  Candidate lambda 10-99.78 %, 52-300 SOL,
+m drawn in [1.93, 2.06] around the position's threshold, q 0.20 / 0.40 / 0.74 %; attacker = one of five
+per-second LP schedules (withdraw or deposit around the samples, withdraw-wrapped cranks and liquidations,
+atomic 1.5x price bundles).  FORCED = the attacked run exits while the honest-only run of the same rule
+stays open for 90 s.
+
+| rule | adopted | honest-open | FORCED | first forced cases (lambda, SOL, m, q bps, attacker, exit, s, by) |
+|---|---|---|---|---|
+| M4 as built | 955/1200 | 615 | 30 | (1000, 300, 2.009, 40, {'rec_move': 'dep', 'exec_move': 'wd', 'att_crank': 'wd', 'att_liq': 'wd'}, 'liquidation', 23, 'attacker'); (5000, 80, 1.999, 40, {'rec_move': 'dep', 'exec_move': 'wd', 'att_crank': 'wd', 'att_liq': 'wd'}, 'liquidation', 32, 'attacker'); (7500, 80, 2.004, 40, {'exec_move': 'wd', 'att_crank': 'wd', 'att_liq': 'wd', 'att_price': ('pump', 1.5)}, 'liquidation', 47, 'attacker') |
+| M4R | 955/1200 | 615 | 0 | - |
+

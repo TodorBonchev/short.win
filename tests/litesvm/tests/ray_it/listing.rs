@@ -131,12 +131,13 @@ fn lists_every_eligible_pool_exactly() {
 }
 
 /// `WSOL_T1` (`3Cv9uPpa…`: WSOL is token 1, config 10, creator fee on WSOL) has only the 100 LP
-/// locked at creation (λ = 0): `PoolLockTooLow`; once its LP is burned (the scenario builder
-/// lowers the LP mint's supply) it lists with WSOL on the token-1 side.
+/// locked at creation (λ = 0, so its locked depth `D` is 0): under the eligibility floor
+/// (`PoolTooThin`, M4-SEC-1 / -3); once its LP is burned (the scenario builder lowers the LP
+/// mint's supply) it lists with WSOL on the token-1 side.
 #[test]
 fn wsol_as_token_1_after_an_lp_burn() {
     let (mut env, pool) = fork_with(WSOL_T1);
-    assert_err(&list(&mut env, &pool, WSOL_T1), E::PoolLockTooLow);
+    assert_err(&list(&mut env, &pool, WSOL_T1), E::PoolTooThin);
     set_mint_supply(&mut env.svm, &lp_mint(&pool), 0);
     let meta = ok(list(&mut env, &pool, WSOL_T1));
     assert_listed(&env, &pool, WSOL_T1, &meta);
@@ -338,27 +339,54 @@ fn amm_v4_verification_refusals() {
     assert_err(&r, E::PoolIneligible);
 }
 
+/// The eligibility floor on locked depth at a listing (M4-SEC-1 / M4-SEC-3; ARCH §2.6 as
+/// amended): `⌊⌊D·isqrt(P)/10⁹⌋·10⁴/λ_min⌋ ≥ pool_min_real_sol` at the pool's own spot.
 #[test]
 fn amm_v4_eligibility_refusals() {
-    // The reversed Fartcoin pool: 1.77 SOL of real reserve (λ 31 bps too): too thin first.
+    use shortwin_litesvm_tests::pool_select::passes_floor;
+    // The reversed Fartcoin pool: 1.77 SOL of real reserve (λ 31 bps too): too thin.
     let (mut env, pool) = fork_with(FART_REV);
     assert_err(&list(&mut env, &pool, FART_REV), E::PoolTooThin);
-    // Fartcoin with its locked LP share just below λ_min = 50 %, then exactly at it.
-    let r = list_after(FART, |env, p| {
-        let supply = supply_for_lambda(lp_counter(&env.svm, p), 4_999);
-        set_mint_supply(&mut env.svm, &lp_mint(p), supply);
-    });
-    assert_err(&r, E::PoolLockTooLow);
-    ok(list_after(FART, |env, p| {
-        let supply = supply_for_lambda(lp_counter(&env.svm, p), 5_000);
-        set_mint_supply(&mut env.svm, &lp_mint(p), supply);
-    }));
-    // The real SOL at the minimum passes, one lamport below does not.
-    let min = Env::ray_fork().config().params.pool_min_real_sol;
-    for (sol, want) in [(min, None), (min - 1, Some(E::PoolTooThin))] {
+    // λ below λ_min is no refusal by itself: Fartcoin at λ = 49.99 % lists (its locked depth
+    // is far above the floor), and so it does at 5 bps (≈ 38 SOL of locked SOL over λ_min);
+    // at 3 bps (≈ 23 SOL) it is under the floor.
+    for (lam, want) in [(4_999u64, None), (5, None), (3, Some(E::PoolTooThin))] {
         let r = list_after(FART, |env, p| {
-            let p = v4(p);
-            fork::set_token_amount(&mut env.svm, &p.coin_vault, sol);
+            let supply = supply_for_lambda(lp_counter(&env.svm, p), lam);
+            set_mint_supply(&mut env.svm, &lp_mint(p), supply);
+        });
+        match want {
+            None => {
+                ok(r);
+            }
+            Some(e) => assert_err(&r, e),
+        }
+    }
+    // The floor's boundary, exact: with the LP burned to λ = 50 % the locked SOL over λ_min is
+    // the real SOL less the floors' rounding; the smallest reserve that passes lists, one
+    // lamport less does not.
+    let min = Env::ray_fork().config().params.pool_min_real_sol;
+    let (mut env, pool) = fork_with(FART);
+    let supply = supply_for_lambda(lp_counter(&env.svm, &pool), 5_000);
+    set_mint_supply(&mut env.svm, &lp_mint(&pool), supply);
+    let coin = v4(&pool).coin_vault;
+    let mut sol = min;
+    loop {
+        fork::set_token_amount(&mut env.svm, &coin, sol);
+        if passes_floor(&env, &pool, None) {
+            break;
+        }
+        sol += 1;
+    }
+    assert!(
+        sol - min < 1_000,
+        "the boundary {sol} is the floor plus rounding"
+    );
+    for (sol, want) in [(sol, None), (sol - 1, Some(E::PoolTooThin))] {
+        let r = list_after(FART, |env, p| {
+            let supply = supply_for_lambda(lp_counter(&env.svm, p), 5_000);
+            set_mint_supply(&mut env.svm, &lp_mint(p), supply);
+            fork::set_token_amount(&mut env.svm, &v4(p).coin_vault, sol);
         });
         match want {
             None => {

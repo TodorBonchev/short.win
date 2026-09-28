@@ -24,9 +24,12 @@
 //!    programs, R4B-7); the venue is executable (`NoRoute`); `!s3_no_route` — with the flags
 //!    already refused, that is the fee against the global hard cap — and the one-way fee `φ ≤
 //!    venue_fee_cap_bps·100` (`VenueFeeTooHigh`); Raydium: `now ≥ pool_seen_at +
-//!    pool_list_window_s` (`PoolListWindow`) and `R_eff ≥ pool_min_real_sol` (`PoolTooThin`;
-//!    `R_eff` bounded by the locked depth over `λ_min`, ARCH §2.6 rule 5). (PumpSwap's
-//!    `disable_flags` and boost gate arrive with M6.)
+//!    pool_list_window_s` (`PoolListWindow`), the post-change warm-up over — `ema_warm == 0`
+//!    after the roll: every listing and adoption restarts the observation state and the next
+//!    `EMA_WARMUP_BUCKETS` integrations re-seed it from the pool (`EmaWarmingUp`; M4R / M4V-5,
+//!    **PROPOSED**: no open on a `P_ema` one transaction chose) —
+//!    and `R_eff ≥ pool_min_real_sol` (`PoolTooThin`; `R_eff` bounded by the locked depth over
+//!    `λ_min`, ARCH §2.6 rule 5). (PumpSwap's `disable_flags` and boost gate arrive with M6.)
 //! 4. Open guards: `now ≥ created_at + market_warmup_s` (`MarketWarmingUp`); `|P_spot/P_ema − 1|
 //!    ≤ open_ema_dev_bps` (`PriceDeviatesFromEma`); `P_ema ≤ P_OPEN_MAX` (`PriceAboveOpenMax`).
 //! 5. Tier (`engine::tier::assign`), cached on the market.
@@ -252,13 +255,16 @@ pub fn handler<'info>(
         );
         if kind.is_raydium() {
             // Raydium (ARCH §2.6 rules 1 and 5): opens wait out the listing window after an
-            // adoption, and the pool's effective real SOL — bounded by its locked depth over
-            // `λ_min` — must reach `pool_min_real_sol`.
+            // adoption and the price warm-up after a start, and the pool's effective real SOL —
+            // bounded by its locked depth over `λ_min` — must reach `pool_min_real_sol`.
             let window_end = market
                 .pool_seen_at
                 .checked_add(i64::from(config.params.pool_list_window_s))
                 .or_math()?;
             require_gte!(now, window_end, ShortwinError::PoolListWindow);
+            // M4R (M4V-5 unified): a restarted observation state — a listing, an adoption —
+            // must first finish its post-change warm-up (post-roll `ema_warm == 0`).
+            require!(market.ema_warm == 0, ShortwinError::EmaWarmingUp);
             let r_eff = engine_tier::r_eff(&config, &market, &state, now)
                 .ok_or(ShortwinError::PoolTooThin)?;
             require_gte!(

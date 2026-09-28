@@ -28,6 +28,9 @@
 //! - [`raydium`]: Raydium **markets** on the fork (M3): [`Env::ray_fork`], [`Env::ray_market`]
 //!   (`create_market(RaydiumV4 | RaydiumCpmm)`, lender, listing window), [`raydium::RayMarket`]
 //!   (implements [`engine::VenueMarket`], so the M2 builders trade it), pump-detection fixtures.
+//! - [`pool_select`]: Raydium pool selection on the fork (M4): `propose_pool` /
+//!   `execute_pool_switch` builders, list-only listings, planted candidate pools
+//!   ([`pool_select::plant_v4`], [`pool_select::plant_cpmm`]) that the dumped ELFs trade.
 //!
 //! Agave line: LiteSVM 0.16.0 on the 4.2.2 runtime crates, pinned in the workspace lockfile
 //! (C1-14; `Cargo.toml` of this crate).
@@ -48,6 +51,7 @@ pub mod invariants;
 pub mod ix;
 pub mod mock;
 pub mod pda;
+pub mod pool_select;
 pub mod raydium;
 pub mod read;
 pub mod tokens;

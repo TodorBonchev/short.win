@@ -14,7 +14,7 @@
 use crate::consts::EMA_TAU_S;
 use crate::error::MathError;
 use crate::num::{BPS, Rounding, mul_bps_u64, mul_div};
-use crate::observe::{Ema, LastBucket, Ring, sustained_growth};
+use crate::observe::{Ema, LastBucket, Ring, ring_liq_lower_median, sustained_growth};
 
 /// Exit-bound terms, locked per position (ARCH §2.3.3, §2.3.5 "locked exit-bound and
 /// persistence terms"; ECON §8.2, §15).
@@ -54,12 +54,27 @@ impl Default for ExitParams {
     }
 }
 
-/// Reference liquidity `L_b = max(L_live, L_ema, L_slow)` (ECON §8.2, V2-14): the
+/// Reference liquidity `L_b = max(L_live, L_ema', L_slow)` (ECON §8.2, V2-14): the
 /// deepest of the three gives the lowest reference cost, so an LP pull in a quiet second
 /// cannot loosen the bound. `L_live` is the venue's `√(X·Y)` (`L_ema` when the venue has
 /// no price, as the sim).
-pub fn ref_liquidity(l_live: u128, ema: &Ema) -> u128 {
-    l_live.max(ema.liq).max(ema.liq_slow)
+///
+/// `L_ema' = L_ema`, except while the post-change reference guard is set (`ema.guard = 1`;
+/// M4R, **PROPOSED**, owner item O18): then `L_ema' = min(L_ema, L_mlo)`, `L_mlo` the lower
+/// median of the ring's bucket liquidity lows ([`ring_liq_lower_median`]). A restart's warm-up
+/// seeds `L_ema` from the buckets' **highs** (`observe::integrate`), which capital pushes up
+/// with a deposit around each crank; the guard keeps such a push from raising the reference
+/// liquidity, and so from blocking the exit bound, until `L_ema` agrees with the lows within
+/// `REF_GUARD_TOL_BPS` (an honest switch: at the end of the warm-up).
+///
+/// Errors: `InvalidInput` for a corrupted ring while the guard is set.
+pub fn ref_liquidity(l_live: u128, ema: &Ema, ring: &Ring) -> Result<u128, MathError> {
+    let l_ema = if ema.guard != 0 {
+        ema.liq.min(ring_liq_lower_median(ring)?)
+    } else {
+        ema.liq
+    };
+    Ok(l_live.max(l_ema).max(ema.liq_slow))
 }
 
 /// `κ_eff = min(κ_max, κ_base + (EMA_TAU_S + 1)·g)` in bps, `g` the sustained growth in
@@ -260,7 +275,9 @@ mod tests {
             ts,
             slow_ts: ts,
             count: 3,
-            _pad: [0; 8],
+            warm: 0,
+            guard: 0,
+            _pad: [0; 6],
         };
         let last = LastBucket {
             lo: lb.1,
@@ -363,6 +380,32 @@ mod tests {
         assert_eq!(max_in_exp(1_000, 500, 10, 1_060, 0, 20, pi, 0), Some(1_020));
         assert_eq!(max_in_exp(1_000, 100, 10, 100, 200, 0, 0, 0), None);
         assert_eq!(pi_ref(1_001, 200), Ok(21));
+    }
+
+    /// `L_b` with and without the post-change reference guard (M4R).
+    #[test]
+    fn reference_liquidity_under_the_guard() {
+        let (mut ema, mut ring, _) = state(&[(0, WAD), (1, WAD), (2, WAD)], (2, WAD));
+        // Bucket lows 300, 200, 100 (lower median 200); L_ema 900, L_slow 150.
+        for (e, llo) in ring.entries.iter_mut().zip([300u128, 200, 100]) {
+            e.llo = llo;
+        }
+        ema.liq = 900;
+        ema.liq_slow = 150;
+        assert_eq!(ref_liquidity(50, &ema, &ring), Ok(900));
+        ema.guard = 1;
+        assert_eq!(ref_liquidity(50, &ema, &ring), Ok(200));
+        assert_eq!(ref_liquidity(250, &ema, &ring), Ok(250));
+        ema.liq_slow = 400;
+        assert_eq!(ref_liquidity(250, &ema, &ring), Ok(400));
+        // L_ema below the lows: the guard changes nothing.
+        ema.liq = 120;
+        ema.liq_slow = 1;
+        assert_eq!(ref_liquidity(50, &ema, &ring), Ok(120));
+        ring.head = 9;
+        assert_eq!(ref_liquidity(50, &ema, &ring), Err(MathError::InvalidInput));
+        ema.guard = 0;
+        assert_eq!(ref_liquidity(50, &ema, &ring), Ok(120));
     }
 
     #[test]

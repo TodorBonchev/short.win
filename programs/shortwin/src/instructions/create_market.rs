@@ -24,14 +24,18 @@
 //! only): the listing reads the candidate with the compiled readers and fixes the pool, its SOL
 //! side and `graduated_at` for good, so it waits for the Emergency review of an upgrade of
 //! either Raydium program, as opens do. A list-only (`Auto`) listing fixes nothing venue-side
-//! and is never latched. Then the candidate is verified and must be `eligible()`
-//! (`PoolIneligible`, `PoolTooThin`, `PoolLockTooLow`, `VenueAccountMismatch`). The market is
+//! and is never latched. Then the candidate is verified and must be `eligible()` at its own
+//! spot (a new market has no `P_ema`: executable, fee, and the locked-depth floor —
+//! M4-SEC-1 / M4-SEC-3; `PoolIneligible`, `PoolTooThin`, `VenueAccountMismatch`). The market is
 //! created on that venue with the pool's keys in its pool cache, the SOL side flag, the locked
-//! depth `pool_d`, the price state of the pool (as for any venue with a price), `graduated_at`
+//! depth `pool_d`, the price state of the pool (at its spot, `L = min(√(X·Y), ⌊D·10⁴/λ_min⌋)`,
+//! marked for the post-change warm-up, M4R: opens wait for `ema_warm == 0`), `graduated_at`
 //! per O13 (AMM v4: the listing time; CPMM: `min(now, open_time)` when `open_time ≥ T_CLAMP`,
 //! else the listing time) and
 //! `pool_seen_at = now` (opens wait `pool_list_window_s`). Pool *selection* after the listing
-//! (`propose_pool`, the fast path) is M4; a `None` market moves to Raydium only through it.
+//! is `propose_pool` / `execute_pool_switch` (M4, `crate::engine::pool_select`): a listing-window
+//! replacement, a zero-position adoption, the fast path; a `None` market moves to Raydium only
+//! through `propose_pool`.
 //!
 //! **Order** (ARCH §3.2 checks 1–3):
 //!
@@ -359,11 +363,15 @@ pub fn handler(ctx: Context<CreateMarket>, venue_hint: u8, max_creation_fee: u64
             require!(!class.pump_venue(), ShortwinError::PumpVenuePrecedence);
             graduated_elsewhere = class == PumpClass::GraduatedElsewhere;
             // The latch (M3-SEC-2): the listing verifies the candidate with the compiled readers
-            // and fixes the pool, its SOL side and `graduated_at` for good (M3 has no
-            // re-adoption), so none happens while an upgrade of either Raydium program awaits
-            // review — the mask `open_short` uses on these markets (R4B-7).
+            // and fixes the pool, its SOL side and `graduated_at`, so none happens while an
+            // upgrade of either Raydium program awaits review — the mask `open_short` uses on
+            // these markets (R4B-7). (`propose_pool` / `execute_pool_switch` latch on the
+            // candidate's own program only, M4-SEC-8: the fast path must not wait for the review
+            // of the incumbent's program; a listing is never urgent.)
             guard::latch(&*accs.venue_guard.load()?, VenueKind::RaydiumV4)?;
             let config = accs.config.load()?;
+            // Eligibility at the candidate's own spot: a new market has no price yet (the
+            // listing starts `P_ema` there; opens wait `pool_list_window_s`).
             let adoption = if venue_hint == VENUE_HINT_RAYDIUM_V4 {
                 raydium_v4::verify(
                     hint_accounts,
@@ -371,6 +379,7 @@ pub fn handler(ctx: Context<CreateMarket>, venue_hint: u8, max_creation_fee: u64
                     &token_program,
                     &config.params,
                     now,
+                    None,
                 )?
             } else {
                 raydium_cpmm::verify(
@@ -379,6 +388,7 @@ pub fn handler(ctx: Context<CreateMarket>, venue_hint: u8, max_creation_fee: u64
                     &token_program,
                     &config.params,
                     now,
+                    None,
                 )?
             };
             (adoption.kind, Some(adoption))
@@ -446,11 +456,16 @@ pub fn handler(ctx: Context<CreateMarket>, venue_hint: u8, max_creation_fee: u64
         if let Some(a) = adoption.as_ref() {
             // ARCH §3.2 "Effects" for a Raydium pool (module docs): the pool cache, the SOL
             // side, `pool_d`, `graduated_at` (O13), `pool_seen_at`, and the price state
-            // `P_ema = P_spot`, `L_ema = L_slow = √(X·Y)`, one ring entry, an empty bucket. The
-            // tier stays the conservative C until the first open or crank reads the oracle
+            // `P_ema = P_spot`, `L_ema = L_slow = min(√(X·Y), ⌊D·10⁴/λ_min⌋)`, one ring entry,
+            // an empty bucket, marked for the post-change warm-up (M4R: `ema_warm`, `ema_guard`).
+            // The tier stays the conservative C until the first open or crank reads the oracle
             // (`create_market` does not carry `oracle_cache`).
             a.apply(&mut m, now)?;
-            let obs = crate::engine::observe::initial(now, &a.state)?;
+            let cap = shortwin_math::pool_select::depth_at_lambda(
+                a.state.locked_depth,
+                u64::from(config.params.pool_lock_min_bps),
+            );
+            let obs = crate::engine::observe::initial_raydium(now, &a.state, cap)?;
             m.set_observation(&obs);
             m.set_flag(MARKET_FLAG_GRADUATED_ELSEWHERE, graduated_elsewhere);
         }
