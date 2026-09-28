@@ -29,16 +29,22 @@
 //! field at load and store (ARCH §2.2 "math types are not account layouts").
 
 use anchor_lang::prelude::*;
+use shortwin_math::observe::{
+    Bucket, Ema, EmaParams, LastBucket, Observation, Ring, RingEntry as MathRingEntry, RING_LEN,
+};
 use shortwin_math::pool::{Pool, WIPE_REWARDS_CLAIMED, WIPE_TRADER_SWEPT};
 use shortwin_math::rent::{Aggr, Basis};
 
-use crate::constants::{GUARD_MASK_PUMP_CURVE, GUARD_MASK_PUMP_SWAP, GUARD_MASK_RAYDIUM};
+use crate::constants::{
+    GUARD_MASK_PUMP_CURVE, GUARD_MASK_PUMP_SWAP, GUARD_MASK_RAYDIUM, VENUE_BIT_PUMP_CURVE,
+    VENUE_BIT_PUMP_SWAP, VENUE_BIT_RAYDIUM_CPMM, VENUE_BIT_RAYDIUM_V4,
+};
 use crate::state::pod::{get_all, set_all, PodI128, PodU128};
 
 /// Venue state of a market (ARCH §2.5, A1). `None` = list-only: deposits and withdrawals
-/// only, never terminal.
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq)]
-#[borsh(use_discriminant = true)]
+/// only, never terminal. Stored as `Market.venue` (`u8`); never serialized as an enum (so a
+/// `test-venue` build can add [`VenueKind::Mock`] without changing the IDL).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum VenueKind {
     /// List-only (no eligible constant-product SOL pool, CLMM/DLMM-only tokens, …).
@@ -53,6 +59,11 @@ pub enum VenueKind {
     RaydiumV4 = 4,
     /// Adopted Raydium CPMM SOL pool.
     RaydiumCpmm = 5,
+    /// TEST-ONLY: a pool of the mock venue `tests/mock_cpamm` (feature `test-venue`; A49).
+    /// A CPMM stand-in: fee on the input, WSOL side under SPL Token, delegate sells from the
+    /// pool vault and direct-to-vault buys (ARCH §2.4.1 Raydium row); no venue-side rent.
+    #[cfg(feature = "test-venue")]
+    Mock = 6,
 }
 
 impl VenueKind {
@@ -65,18 +76,69 @@ impl VenueKind {
             3 => Some(Self::PumpSwap),
             4 => Some(Self::RaydiumV4),
             5 => Some(Self::RaydiumCpmm),
+            #[cfg(feature = "test-venue")]
+            6 => Some(Self::Mock),
             _ => None,
         }
     }
 
     /// The `VenueGuard.upgraded` mask that blocks opens on this venue (ARCH §3.1; I17), 0 for
-    /// venues that take no opens.
+    /// venues that take no opens. The mock is a CPMM stand-in and uses the Raydium mask, so
+    /// a flagged CPMM ProgramData blocks mock opens in the tests (I17 on the mock).
     pub const fn guard_mask(self) -> u32 {
         match self {
             Self::PumpCurve => GUARD_MASK_PUMP_CURVE,
             Self::PumpSwap => GUARD_MASK_PUMP_SWAP,
             Self::RaydiumV4 | Self::RaydiumCpmm => GUARD_MASK_RAYDIUM,
+            #[cfg(feature = "test-venue")]
+            Self::Mock => GUARD_MASK_RAYDIUM,
             Self::None | Self::PumpMigrating => 0,
+        }
+    }
+
+    /// The `GlobalConfig.venue_enabled` / `venue_route_broken` bit of this venue (ARCH
+    /// §2.3.2), 0 for venues without one (`None`, `PumpMigrating`: no opens).
+    pub const fn venue_bit(self) -> u32 {
+        match self {
+            Self::PumpCurve => VENUE_BIT_PUMP_CURVE,
+            Self::PumpSwap => VENUE_BIT_PUMP_SWAP,
+            Self::RaydiumV4 => VENUE_BIT_RAYDIUM_V4,
+            Self::RaydiumCpmm => VENUE_BIT_RAYDIUM_CPMM,
+            #[cfg(feature = "test-venue")]
+            Self::Mock => crate::constants::VENUE_BIT_MOCK,
+            Self::None | Self::PumpMigrating => 0,
+        }
+    }
+
+    /// Whether the venue has a CPI adapter (opens and buybacks): every kind but `None` and
+    /// `PumpMigrating` (ARCH §3.4 step 1, §3.5 step 2).
+    pub const fn trades(self) -> bool {
+        !matches!(self, Self::None | Self::PumpMigrating)
+    }
+
+    /// Whether the venue runs the Raydium fast-path chain `pool_fail` (ARCH §2.6 rule 3, §3.0
+    /// step 8): the Raydium kinds, and the mock as their stand-in.
+    pub const fn has_pool_fail_chain(self) -> bool {
+        match self {
+            Self::RaydiumV4 | Self::RaydiumCpmm => true,
+            #[cfg(feature = "test-venue")]
+            Self::Mock => true,
+            _ => false,
+        }
+    }
+
+    /// The seed byte of this venue's `VenueExtras` account (`["venue_extras", venue]`), or
+    /// `None` for a venue without venue CPIs. `initialize_config` creates the four of
+    /// [`VenueKind::WITH_EXTRAS`]; a `test-venue` build's `Mock` account (seed 6) is installed
+    /// by the test harness.
+    pub const fn extras_seed(self) -> Option<u8> {
+        match self {
+            Self::PumpCurve | Self::PumpSwap | Self::RaydiumV4 | Self::RaydiumCpmm => {
+                Some(self as u8)
+            }
+            #[cfg(feature = "test-venue")]
+            Self::Mock => Some(self as u8),
+            Self::None | Self::PumpMigrating => None,
         }
     }
 
@@ -390,6 +452,114 @@ impl Market {
     /// Stores the rent aggregate.
     pub fn set_aggr(&mut self, a: &Aggr) {
         set_all(&mut self.rent_aggr, &a.a);
+    }
+
+    /// The market-level EMA parameters (ARCH §2.3.4 "market-level params"; τ is the constant
+    /// `EMA_TAU_S`).
+    pub fn ema_params(&self) -> EmaParams {
+        EmaParams::new(
+            self.ema_dtmax_s,
+            self.ema_clamp_bps,
+            self.liq_slow_tau_s,
+            self.liq_slow_dtmax_s,
+        )
+    }
+
+    /// The observation state (bucket, last completed bucket, EMA, ring) as
+    /// `shortwin_math::observe::Observation`, on the heap (1,376 B). Field by field; the ring
+    /// keeps its slot order (`ring_head`, `ring_count`).
+    pub fn observation(&self) -> Box<Observation> {
+        let mut o = Box::<Observation>::default();
+        o.bucket = Bucket {
+            lo: self.b_lo.get(),
+            hi: self.b_hi.get(),
+            llo: self.b_llo.get(),
+            lhi: self.b_lhi.get(),
+            sec: self.b_sec,
+            _pad: [0; 8],
+        };
+        o.last = LastBucket {
+            lo: self.lb_lo.get(),
+            hi: self.lb_hi.get(),
+            sec: self.lb_sec,
+            _pad: [0; 8],
+        };
+        o.ema = Ema {
+            price: self.ema_price.get(),
+            liq: self.ema_liq.get(),
+            liq_slow: self.liq_slow.get(),
+            ts: self.ema_ts,
+            slow_ts: self.slow_ts,
+            count: self.ema_count,
+            _pad: [0; 8],
+        };
+        o.ring = self.ring_math();
+        o
+    }
+
+    /// The ring alone (`shortwin_math::observe::Ring`).
+    pub fn ring_math(&self) -> Ring {
+        let mut r = Ring::default();
+        for (m, e) in r.entries.iter_mut().zip(self.ring.iter()) {
+            *m = MathRingEntry {
+                p: e.p.get(),
+                l: e.l.get(),
+                x: e.x.get(),
+                y: e.y.get(),
+                lo: e.lo.get(),
+                hi: e.hi.get(),
+                llo: e.llo.get(),
+                lhi: e.lhi.get(),
+                ts: e.ts,
+                _pad: [0; 8],
+            };
+        }
+        r.head = self.ring_head;
+        r.len = self.ring_count;
+        r
+    }
+
+    /// Stores the observation state back (the inverse of [`Market::observation`]).
+    pub fn set_observation(&mut self, o: &Observation) {
+        self.b_lo.set(o.bucket.lo);
+        self.b_hi.set(o.bucket.hi);
+        self.b_llo.set(o.bucket.llo);
+        self.b_lhi.set(o.bucket.lhi);
+        self.b_sec = o.bucket.sec;
+        self.lb_lo.set(o.last.lo);
+        self.lb_hi.set(o.last.hi);
+        self.lb_sec = o.last.sec;
+        self.ema_price.set(o.ema.price);
+        self.ema_liq.set(o.ema.liq);
+        self.liq_slow.set(o.ema.liq_slow);
+        self.ema_ts = o.ema.ts;
+        self.slow_ts = o.ema.slow_ts;
+        self.ema_count = o.ema.count;
+        for (e, m) in self.ring.iter_mut().zip(o.ring.entries.iter()) {
+            e.p.set(m.p);
+            e.l.set(m.l);
+            e.x.set(m.x);
+            e.y.set(m.y);
+            e.lo.set(m.lo);
+            e.hi.set(m.hi);
+            e.llo.set(m.llo);
+            e.lhi.set(m.lhi);
+            e.ts = m.ts;
+        }
+        self.ring_head = o.ring.head;
+        self.ring_count = o.ring.len;
+    }
+
+    /// The newest ring entry's cached reprojection `(x, y)` (ARCH §3.4 step 9, the D4 EMA
+    /// leg), `(0, 0)` without an entry (a quote on `x = 0` is undefined).
+    pub fn newest_ring_xy(&self) -> (u128, u128) {
+        let n = usize::from(self.ring_count).min(RING_LEN);
+        if n == 0 {
+            return (0, 0);
+        }
+        self.ring
+            .get(usize::from(self.ring_head))
+            .map_or((0, 0), |e| (e.x.get(), e.y.get()))
     }
 }
 

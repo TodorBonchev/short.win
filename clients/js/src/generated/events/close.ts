@@ -49,6 +49,8 @@ export type CloseEvent = {
   rent: bigint;
   rentProtocol: bigint;
   borrowerPayout: bigint;
+  bLive: bigint;
+  tokenSurplus: bigint;
 };
 
 export type CloseEventArgs = {
@@ -62,6 +64,8 @@ export type CloseEventArgs = {
   rent: number | bigint;
   rentProtocol: number | bigint;
   borrowerPayout: number | bigint;
+  bLive: number | bigint;
+  tokenSurplus: number | bigint;
 };
 
 /** Gets the encoder for {@link CloseEventArgs} event data. */
@@ -78,6 +82,8 @@ export function getCloseEventEncoder(): FixedSizeEncoder<CloseEventArgs> {
       ["rent", getU64Encoder()],
       ["rentProtocol", getU64Encoder()],
       ["borrowerPayout", getU64Encoder()],
+      ["bLive", getU64Encoder()],
+      ["tokenSurplus", getU64Encoder()],
     ]),
     [getConstantEncoder(CLOSE_EVENT_DISCRIMINATOR)],
   );
@@ -97,6 +103,8 @@ export function getCloseEventDecoder(): FixedSizeDecoder<CloseEvent> {
       ["rent", getU64Decoder()],
       ["rentProtocol", getU64Decoder()],
       ["borrowerPayout", getU64Decoder()],
+      ["bLive", getU64Decoder()],
+      ["tokenSurplus", getU64Decoder()],
     ]),
     [getConstantDecoder(CLOSE_EVENT_DISCRIMINATOR)],
   );

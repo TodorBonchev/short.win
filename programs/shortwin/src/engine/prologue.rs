@@ -2,20 +2,25 @@
 //!
 //! Every instruction that loads a `Market` for writing runs, in order: (1) load `config` and
 //! `market`, check versions (the Accounts constraints); (2) params-version sync
-//! ([`sync_market_params`]: EMA fields when `open_positions == 0` or `now ≥
-//! ema_params.force_at`; the kink only when `open_positions == 0`; A17, A59, R3A-9); (3) the
-//! mint guard ([`crate::engine::guard::mint_guard`]); (4) accrue ([`accrue`]: vest release
-//! (`pool::release`) then rent (`rent::accrue` on `P_ema` before the roll, `U` from the
-//! pre-instruction counters; lender credit to `acc` and `receivable`)); (5) observation roll
-//! (`observe::integrate`, `CoverageGap`); (6)–(8) venue sync, observation record and route
-//! chains (M2+); then the body; (10) post-conditions; (11) one `emit_cpi!`.
+//! ([`sync_market_params`]: the EMA fields when `open_positions == 0` or `now ≥
+//! ema_params.force_at`; the kink only when `open_positions == 0`, a forced EMA adoption never
+//! touches it; A17, A59, R3A-9); (3) the mint guard ([`crate::engine::guard::mint_guard`],
+//! the caller's: it needs the mint account and the instruction's path); (4) accrue
+//! ([`accrue`]: the vest release (`pool::release`) then rent (`rent::accrue` on `P_ema`
+//! **before** the roll, `U` from the pre-instruction counters; the lender credit to `acc` and
+//! `receivable`)); (5) the observation roll ([`crate::engine::observe::roll`]: integrate a
+//! completed bucket with the cached reprojection, `CoverageGap`); (6) the venue state from the
+//! ReadSet (the caller parses it, `crate::venues::parse`; reader failures of correctly keyed
+//! accounts are "not executable", A63) and `sync_venue` (a no-op for the venues of this build:
+//! the mock and Raydium stay; the pump transitions of ARCH §2.5 arrive with M5/M6); (7) the
+//! observation record, only while the venue is executable (A64); (8) the route chains (the S3
+//! chain; on Raydium markets and the mock also `pool_fail`). [`run`] does steps 2 and 4–8;
+//! then the body; (10) post-conditions; (11) one `emit_cpi!`.
 //!
-//! **M1 subset.** A16: `deposit` and `withdraw` run steps 1–5 and 10–11 (no venue accounts, no
-//! observation); `claim_sol`, `cover_deficit`, `sync_lender` do not write `Market` at all. Step
-//! 5 is M2's: no M1 instruction records an observation, so the bucket is never open
-//! (`Market.b_lo == 0`) and the roll has nothing to integrate; M2 adds it between [`accrue`]
-//! and the body. On a list-only (`None`) market there is no price, so rent is 0 and only the
-//! vest is released.
+//! A16: `deposit` and `withdraw` run steps 1–5 and 10–11 (no venue accounts, no observation):
+//! [`sync_market_params`], [`accrue`] and — since M2 — [`roll_only`]. `claim_sol`,
+//! `cover_deficit`, `sync_lender` and `add_margin` do not write `Market` at all. On a
+//! list-only (`None`) market there is no price, so rent is 0 and only the vest is released.
 //!
 //! Every step runs at [`market_now`], never before the market's last accrual.
 
@@ -23,8 +28,10 @@ use anchor_lang::prelude::*;
 use shortwin_math::pool::{self, Pool, Vault};
 use shortwin_math::rent;
 
+use crate::engine::{observe, route};
 use crate::errors::MathResultExt;
 use crate::state::{GlobalConfig, Market};
+use crate::venues::VenueState;
 
 /// The time a `Market`-writing instruction runs at: the clock, never before the market's
 /// last accrual. `Clock::unix_timestamp` is not guaranteed to be monotonic, and the vest
@@ -80,6 +87,96 @@ pub fn accrue(market: &mut Market, pool: &mut Pool, vault: &mut Vault, now: i64)
     market.set_basis(&basis);
     market.last_accrual_ts = market.last_accrual_ts.max(now);
     Ok(credit)
+}
+
+/// What the prologue saw (ARCH §3.0 steps 1–8).
+#[derive(Clone, Debug)]
+pub struct Prologue {
+    /// [`market_now`].
+    pub now: i64,
+    /// The lender pool after the accrual (the body continues from it and stores it).
+    pub pool: Pool,
+    /// The venue's pre-trade state (`None` for an instruction without a ReadSet).
+    pub state: Option<VenueState>,
+    /// `s3_no_route` now (ARCH §5.3); `true` without a ReadSet.
+    pub s3_no_route: bool,
+    /// `pool_fail` now; `true` without a ReadSet.
+    pub pool_fail: bool,
+    /// The pre-roll EMA gap if a bucket was integrated.
+    pub rolled: Option<i64>,
+    /// This instruction recorded its pre-trade observation.
+    pub recorded: bool,
+    /// A route chain started or cleared.
+    pub chains_changed: bool,
+    /// The rent credited to lenders by the accrual.
+    pub lender_credit: u64,
+}
+
+/// ARCH §3.0 steps 2 and 4–8 on a loaded market (module docs), with the venue state the caller
+/// read from its key-checked ReadSet (`None`: no ReadSet, no record, no chains). The market's
+/// params versions, rent basis, lender-pool fields, observation state and route chains are
+/// written back; the vault math state `vault` is updated in place (the caller stores it, or,
+/// on an instruction without `MarketVault`, checks it did not change).
+pub fn run(
+    config: &GlobalConfig,
+    market_key: &Pubkey,
+    market: &mut Market,
+    vault: &mut Vault,
+    state: Option<VenueState>,
+    clock_now: i64,
+    slot: u64,
+) -> Result<Prologue> {
+    let now = market_now(market, clock_now);
+    sync_market_params(config, market, now);
+    let mut pool = market.pool();
+    let lender_credit = accrue(market, &mut pool, vault, now)?;
+    let mut obs = market.observation();
+    let rolled = observe::roll(
+        market_key,
+        &mut obs,
+        &market.ema_params(),
+        market.open_positions,
+        now,
+        slot,
+    )?;
+    let (mut recorded, mut s3, mut pf, mut changed) = (false, true, true, false);
+    if let Some(st) = state.as_ref() {
+        recorded = observe::record(&mut obs, now, st)?;
+        let chains = route::observe_chains(config, market, st, now);
+        (s3, pf, changed) = (chains.s3_no_route, chains.pool_fail, chains.changed);
+    }
+    market.set_observation(&obs);
+    market.set_pool(&pool);
+    Ok(Prologue {
+        now,
+        pool,
+        state,
+        s3_no_route: s3,
+        pool_fail: pf,
+        rolled,
+        recorded,
+        chains_changed: changed,
+        lender_credit,
+    })
+}
+
+/// A16's step 5 for the lender instructions (`deposit`, `withdraw`): rolls a completed
+/// bucket (integration, ring push, `CoverageGap`) without recording anything.
+pub fn roll_only(market_key: &Pubkey, market: &mut Market, now: i64, slot: u64) -> Result<()> {
+    if market.b_lo.get() == 0 {
+        return Ok(());
+    }
+    let mut obs = market.observation();
+    observe::roll(
+        market_key,
+        &mut obs,
+        &market.ema_params(),
+        market.open_positions,
+        now,
+        slot,
+    )?;
+    market.set_observation(&obs);
+    Ok(())
 }
 
 #[cfg(test)]

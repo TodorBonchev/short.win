@@ -1,0 +1,203 @@
+//! The chain-client abstraction (ARCHITECTURE §7.1 "Stack"): everything the keeper reads from
+//! and sends to a cluster, behind one trait with two backends — [`crate::rpc::RpcChain`] for a
+//! real cluster (JSON-RPC) and the in-process LiteSVM backend of the scenario tests
+//! (`services/keeper-litesvm`, TEST-ONLY).
+//!
+//! The trait is deliberately small and backend-neutral: raw accounts in, versioned transactions
+//! out. Transaction *failures* are values ([`TxOutcome::err`]); only transport problems are
+//! `Err`. A backend reports the `emit_cpi!` inner instructions of every top-level instruction
+//! ([`TxOutcome::inner`]) so the keeper can decode events from a simulation exactly as from a
+//! landed transaction.
+
+use solana_hash::Hash;
+use solana_pubkey::Pubkey;
+use solana_signature::Signature;
+use solana_transaction::versioned::VersionedTransaction;
+use solana_transaction_error::TransactionError;
+
+/// A fetched account.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AccountData {
+    pub lamports: u64,
+    pub owner: Pubkey,
+    pub executable: bool,
+    pub data: Vec<u8>,
+}
+
+/// The cluster clock the next transaction executes at (slot and `Clock::unix_timestamp`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ChainClock {
+    pub slot: u64,
+    pub unix_timestamp: i64,
+}
+
+/// A `getProgramAccounts` byte filter: `data[offset..offset + bytes.len()] == bytes`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Memcmp {
+    pub offset: usize,
+    pub bytes: Vec<u8>,
+}
+
+/// Why a transaction failed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TxError {
+    /// Top-level instruction `index` failed with custom program error `code`.
+    Custom { index: u8, code: u32 },
+    /// Top-level instruction `index` failed with another instruction error (its debug text).
+    Instruction { index: u8, detail: String },
+    /// Any other execution error (its debug text).
+    Execution(String),
+    /// The cluster refused the transaction before executing it (unsupported version, too
+    /// large, sanitize failure, blockhash): nothing ran. The v1 → v0 fallback keys on this.
+    Rejected(String),
+    /// Sent, but not seen confirmed before the backend's timeout (dropped, or not landed in
+    /// time): the keeper treats the attempt as a miss and retries with an escalated price.
+    Dropped(String),
+}
+
+impl TxError {
+    /// Maps a runtime `TransactionError`: instruction errors keep their index; errors raised
+    /// before anything ran (blockhash, sanitize, version, locks) are [`TxError::Rejected`].
+    pub fn from_transaction_error(err: TransactionError) -> Self {
+        use solana_instruction::error::InstructionError;
+        match err {
+            TransactionError::InstructionError(index, InstructionError::Custom(code)) => {
+                Self::Custom { index, code }
+            }
+            TransactionError::InstructionError(index, other) => Self::Instruction {
+                index,
+                detail: format!("{other:?}"),
+            },
+            TransactionError::BlockhashNotFound
+            | TransactionError::AlreadyProcessed
+            | TransactionError::SanitizeFailure
+            | TransactionError::UnsupportedVersion
+            | TransactionError::TooManyAccountLocks
+            | TransactionError::AccountLoadedTwice => Self::Rejected(format!("{err:?}")),
+            other => Self::Execution(format!("{other:?}")),
+        }
+    }
+
+    /// The custom error code, if the failure was one.
+    pub fn custom_code(&self) -> Option<u32> {
+        match self {
+            Self::Custom { code, .. } => Some(*code),
+            _ => None,
+        }
+    }
+
+    /// The failing top-level instruction, if the failure was an instruction's.
+    pub fn instruction(&self) -> Option<usize> {
+        match self {
+            Self::Custom { index, .. } | Self::Instruction { index, .. } => {
+                Some(usize::from(*index))
+            }
+            _ => None,
+        }
+    }
+}
+
+/// One inner instruction (a CPI at any depth) of a top-level instruction.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct InnerIx {
+    pub program_id: Pubkey,
+    pub data: Vec<u8>,
+}
+
+/// The result of a simulation or of a landed transaction.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TxOutcome {
+    /// The transaction's signature (default for a simulation).
+    pub signature: Signature,
+    /// `None` on success.
+    pub err: Option<TxError>,
+    pub logs: Vec<String>,
+    /// Compute units the whole transaction consumed.
+    pub units_consumed: u64,
+    /// Lamports the fee payer paid (0 for a simulation when the backend does not report it).
+    pub fee: u64,
+    /// The inner instructions of each top-level instruction, in order (index = top-level
+    /// instruction index; empty lists where there were none).
+    pub inner: Vec<Vec<InnerIx>>,
+}
+
+impl TxOutcome {
+    /// `true` if the transaction succeeded.
+    pub fn ok(&self) -> bool {
+        self.err.is_none()
+    }
+}
+
+/// What the keeper needs from a cluster (module docs).
+///
+/// `async fn` in a trait: the keeper is generic over its backend and runs on one task, so the
+/// futures need not be `Send` (the LiteSVM backend is single-threaded).
+#[allow(async_fn_in_trait)]
+pub trait Chain {
+    /// The clock the next transaction executes at.
+    async fn clock(&self) -> anyhow::Result<ChainClock>;
+
+    /// The accounts at `keys`, in order (`None` for a missing account).
+    async fn accounts(&self, keys: &[Pubkey]) -> anyhow::Result<Vec<Option<AccountData>>>;
+
+    /// Every account of `program` matching all `filters`.
+    async fn program_accounts(
+        &self,
+        program: &Pubkey,
+        filters: &[Memcmp],
+    ) -> anyhow::Result<Vec<(Pubkey, AccountData)>>;
+
+    /// A recent blockhash for new transactions.
+    async fn latest_blockhash(&self) -> anyhow::Result<Hash>;
+
+    /// Simulates `tx` against the current state (signatures are not verified).
+    async fn simulate(&self, tx: &VersionedTransaction) -> anyhow::Result<TxOutcome>;
+
+    /// Sends `tx` and waits until it landed (or failed, or was refused).
+    async fn send(&self, tx: &VersionedTransaction) -> anyhow::Result<TxOutcome>;
+
+    /// Recent prioritization fees (micro-lamports per CU) of transactions that write-locked
+    /// any of `writable` (ARCH §7.1 duty 14); empty if the backend has none.
+    async fn recent_priority_fees(&self, writable: &[Pubkey]) -> anyhow::Result<Vec<u64>>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use solana_instruction::error::InstructionError;
+
+    #[test]
+    fn transaction_errors_map_to_their_kind() {
+        let e = TxError::from_transaction_error(TransactionError::InstructionError(
+            2,
+            InstructionError::Custom(6_071),
+        ));
+        assert_eq!(
+            e,
+            TxError::Custom {
+                index: 2,
+                code: 6_071
+            }
+        );
+        assert_eq!((e.custom_code(), e.instruction()), (Some(6_071), Some(2)));
+        let e = TxError::from_transaction_error(TransactionError::InstructionError(
+            1,
+            InstructionError::InvalidAccountData,
+        ));
+        assert_eq!((e.custom_code(), e.instruction()), (None, Some(1)));
+        for pre in [
+            TransactionError::BlockhashNotFound,
+            TransactionError::UnsupportedVersion,
+            TransactionError::SanitizeFailure,
+        ] {
+            assert!(matches!(
+                TxError::from_transaction_error(pre),
+                TxError::Rejected(_)
+            ));
+        }
+        assert!(matches!(
+            TxError::from_transaction_error(TransactionError::InsufficientFundsForFee),
+            TxError::Execution(_)
+        ));
+    }
+}

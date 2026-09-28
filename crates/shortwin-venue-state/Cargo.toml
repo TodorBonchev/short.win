@@ -10,3 +10,8 @@ publish = false
 # Zero runtime dependencies, by design (ARCHITECTURE §1.2, §4.1): the program, the keeper and
 # the WASM frontend read venue accounts with the same bytes-in, values-out functions.
 [dependencies]
+
+[features]
+default = []
+# TEST-ONLY: the mock venue reader (`mock_cpamm`) for short.win's `test-venue` build (A49).
+test-venue = []

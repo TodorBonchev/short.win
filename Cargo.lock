@@ -1861,6 +1861,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "mock-cpamm"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "bytemuck",
+ "proptest",
+ "shortwin-math",
+]
+
+[[package]]
 name = "num"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2578,6 +2589,8 @@ dependencies = [
  "bytemuck",
  "litesvm",
  "litesvm-token",
+ "mock-cpamm",
+ "proptest",
  "serde_json",
  "shortwin",
  "shortwin-math",

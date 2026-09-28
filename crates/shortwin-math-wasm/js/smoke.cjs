@@ -86,14 +86,16 @@ assert.equal(m.maxInExp(1_000n, 100, 10, 1_100n, 0n, 1_000n, piRef, 0n), 1_001n)
 
 // Settlement box: medians of the bucket extremes widened to the EMA point.
 const o = new m.OracleState(2n * WAD, 1_000n, 10n);
-assert.throws(() => o.settleBox(10n), /invalid input/);
+assert.throws(() => o.settleBox(10n, true), /invalid input/);
 for (const [ts, lo, hi] of [[8n, 1n, 3n], [9n, 2n, 5n], [10n, 1n, 4n]]) {
   o.push(ts, 2n * WAD, 1_000n, 0n, 0n, lo * WAD, hi * WAD, 900n, 1_100n);
 }
-const box = o.settleBox(11n);
+const box = o.settleBox(11n, true);
 assert.deepEqual([box.pLo, box.pHi, box.lLo, box.lHi], [WAD, 4n * WAD, 900n, 1_100n]);
 assert.equal(box.isPoint, false);
-assert.equal(o.settleBox(10n + BigInt(m.ringLen()) + 1n).isPoint, true);
+// Stale for more than RING_LEN seconds: the EMA point only if the venue cannot execute (M2-SEC-1).
+assert.equal(o.settleBox(10n + BigInt(m.ringLen()) + 1n, false).isPoint, true);
+assert.equal(o.settleBox(10n + BigInt(m.ringLen()) + 1n, true).isPoint, false);
 assert.equal(m.pprime(true, 1_250n, 1_000n, 12_500, 500, 200), 200);
 assert.equal(m.amountOk(10_000n, 10_101n, 100), false);
 

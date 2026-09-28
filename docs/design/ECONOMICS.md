@@ -423,8 +423,10 @@ The ring integrates at most once per second, so 3 entries always span ≥ 2 s; t
 ```
 P_mlo = lower median of the ring's bucket lows,  P_mhi = upper median of the bucket highs  (L_mlo, L_mhi likewise)
 P_lo = min(P_ema, P_mlo),  P_hi = max(P_ema, P_mhi),  L_lo = min(L_ema, L_mlo),  L_hi = max(L_ema, L_mhi)
-(the box is the EMA point alone if nothing has been integrated for more than ring_len seconds: a venue
- that records no observations cannot have been pushed since, and a halted venue's S3 must not be blocked)
+(the box is the EMA point alone if nothing has been integrated for more than ring_len seconds and the venue
+ cannot execute now: a venue that records no observations cannot have been pushed since, and a halted venue's
+ S3 must not be blocked; on an executable venue the program's lender instructions integrate a pushed bucket
+ without recording, so there the medians always apply — M2-SEC-1)
 ```
 
 and requires the decision to come out the same everywhere in it. Because B̂ and σ increase with `P` and decrease with `L` (§2.1), "everywhere in the box" means "at the box corner least favourable to the decision":

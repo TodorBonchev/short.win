@@ -7,8 +7,15 @@
 //! (ARCH §3.11), `lamports` (checked direct lamport moves), `mint_filter` (the allowlist
 //! filter). All arithmetic is `shortwin-math`'s; the program never re-implements a formula.
 //!
-//! M1 (ARCH §9): the instruction set below. `set_coverage_pause` waits for O17;
-//! `set_route_broken` and `set_venue_extras` (O6) and every position instruction are M2.
+//! M1 (ARCH §9): admin, config, latch, markets, lenders, the oracle. M2: the position engine
+//! (`engine::*`, `venues::*`), `open_short`, `close_short`, `add_margin`, `liquidate`, `expire`,
+//! `sol_settle`, `crank_price` and the O6 Emergency powers `set_route_broken` /
+//! `set_venue_extras`. `set_coverage_pause` waits for O17.
+//!
+//! Feature `test-venue` (TEST-ONLY, A49): `VenueKind::Mock`, the adapter of the mock venue
+//! `tests/mock_cpamm`, for the LiteSVM engine tests. Release builds never enable it
+//! (`scripts/build-test-venue.sh` builds it into its own target directory; CI checks the
+//! release `shortwin.so`).
 
 #![deny(
     clippy::arithmetic_side_effects,
@@ -27,6 +34,7 @@ pub mod instructions;
 pub mod lamports;
 pub mod mint_filter;
 pub mod state;
+pub mod venues;
 
 pub use instructions::*;
 pub use state::*;
@@ -153,5 +161,99 @@ pub mod shortwin {
     /// Anyone refreshes the cached SOL/USD price.
     pub fn crank_sol_usd(ctx: Context<CrankSolUsd>) -> Result<()> {
         instructions::crank_sol_usd::handler(ctx)
+    }
+
+    // ---- positions (ARCH §3.4–§3.8) ----
+
+    /// A borrower opens a short of `q` tokens (borrow, sell, lock proceeds and D4 margin).
+    #[allow(clippy::too_many_arguments)]
+    pub fn open_short<'info>(
+        ctx: Context<'info, OpenShort<'info>>,
+        nonce: u64,
+        q: u64,
+        min_proceeds: u64,
+        max_margin: u64,
+        max_open_fee: u64,
+        extras: venues::ExtrasSel,
+    ) -> Result<()> {
+        instructions::open_short::handler(
+            ctx,
+            nonce,
+            q,
+            min_proceeds,
+            max_margin,
+            max_open_fee,
+            extras,
+        )
+    }
+
+    /// The borrower buys back and closes its position.
+    pub fn close_short<'info>(
+        ctx: Context<'info, CloseShort<'info>>,
+        max_buyback_cost: u64,
+        extras: venues::ExtrasSel,
+    ) -> Result<()> {
+        instructions::close_short::handler(ctx, max_buyback_cost, extras)
+    }
+
+    /// The borrower adds SOL margin to its position (it only raises CR).
+    pub fn add_margin(ctx: Context<AddMargin>, amount: u64) -> Result<()> {
+        instructions::add_margin::handler(ctx, amount)
+    }
+
+    /// A keeper liquidates a CR-liquidatable position within the fixed exit bound (ARCH §3.6).
+    pub fn liquidate<'info>(
+        ctx: Context<'info, Liquidate<'info>>,
+        extras: venues::ExtrasSel,
+    ) -> Result<()> {
+        instructions::liquidate::handler(ctx, extras)
+    }
+
+    /// A keeper exits an expired, not CR-liquidatable position (ARCH §3.7).
+    pub fn expire<'info>(
+        ctx: Context<'info, Expire<'info>>,
+        extras: venues::ExtrasSel,
+    ) -> Result<()> {
+        instructions::expire::handler(ctx, extras)
+    }
+
+    /// A keeper settles a position in SOL on the settlement box (S1/S2/S3; ARCH §3.8).
+    pub fn sol_settle<'info>(ctx: Context<'info, SolSettle<'info>>) -> Result<()> {
+        instructions::sol_settle::handler(ctx)
+    }
+
+    // ---- cranks (ARCH §3.9) ----
+
+    /// Anyone runs a market's prologue (observation, chains) and refreshes its tier.
+    pub fn crank_price<'info>(ctx: Context<'info, CrankPrice<'info>>) -> Result<()> {
+        instructions::crank_price::handler(ctx)
+    }
+
+    /// Anyone sweeps SOL left on a market's trader side to lenders; after a full wipe it
+    /// credits the wipe record and sets `wipe_trader_swept` (ARCH §3.9; M2-SEC-4).
+    pub fn sweep_trader<'info>(ctx: Context<'info, SweepTrader<'info>>) -> Result<()> {
+        instructions::sweep_trader::handler(ctx)
+    }
+
+    // ---- O6 Emergency powers (ARCH §3.1; SPEC §11) ----
+
+    /// The Emergency vault flags or clears a broken route (opens and S3 evidence only).
+    pub fn set_route_broken(
+        ctx: Context<SetRouteBroken>,
+        scope: PauseScope,
+        venue_bit: u8,
+        broken: bool,
+    ) -> Result<()> {
+        instructions::set_route_broken::handler(ctx, scope, venue_bit, broken)
+    }
+
+    /// The Emergency vault publishes a venue's bounded trailing accounts.
+    pub fn set_venue_extras(
+        ctx: Context<SetVenueExtras>,
+        venue: u8,
+        ix: u8,
+        entries: Vec<ExtraEntryArg>,
+    ) -> Result<()> {
+        instructions::set_venue_extras::handler(ctx, venue, ix, entries)
     }
 }

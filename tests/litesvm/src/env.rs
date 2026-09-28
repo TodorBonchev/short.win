@@ -43,6 +43,19 @@ pub fn program_so_path() -> PathBuf {
     )
 }
 
+/// Path of the TEST-ONLY `test-venue` build (`VenueKind::Mock`; A49):
+/// `$SHORTWIN_TEST_VENUE_SO`, else `target/test-venue/deploy/shortwin.so` (the output of
+/// `scripts/build-test-venue.sh`). The release build never carries the mock adapter.
+pub fn test_venue_so_path() -> PathBuf {
+    std::env::var_os("SHORTWIN_TEST_VENUE_SO").map_or_else(
+        || {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../target/test-venue/deploy/shortwin.so")
+        },
+        PathBuf::from,
+    )
+}
+
 /// A LiteSVM environment with short.win deployed.
 pub struct Env {
     /// The VM. Tests may drive it directly; transactions that should run the invariant hooks
@@ -79,11 +92,26 @@ impl Env {
     /// [`Env::upgrade_authority`] its upgrade authority, funds the harness keys and sets the
     /// clock to [`START_TS`] / [`START_SLOT`]. The config is **not** initialized.
     pub fn new() -> Self {
-        let path = program_so_path();
-        let so = std::fs::read(&path).unwrap_or_else(|e| {
+        Self::with_program(
+            &program_so_path(),
+            "`anchor build --tools-version v1.57 --arch v3` (or set SHORTWIN_SO)",
+        )
+    }
+
+    /// [`Env::new`] with short.win's **test-venue** build ([`test_venue_so_path`]): the release
+    /// program plus `VenueKind::Mock`. The config is not initialized; see
+    /// [`Env::test_venue`] for the ready-to-trade environment.
+    pub fn new_test_venue_program() -> Self {
+        Self::with_program(
+            &test_venue_so_path(),
+            "`scripts/build-test-venue.sh` (or set SHORTWIN_TEST_VENUE_SO)",
+        )
+    }
+
+    fn with_program(path: &std::path::Path, how: &str) -> Self {
+        let so = std::fs::read(path).unwrap_or_else(|e| {
             panic!(
-                "cannot read {}: {e}. Build the program first: \
-                 `anchor build --tools-version v1.57 --arch v3` (or set SHORTWIN_SO)",
+                "cannot read {}: {e}. Build the program first: {how}",
                 path.display()
             )
         });
@@ -239,7 +267,7 @@ impl Env {
                 });
                 let last = ixs.len().saturating_sub(1);
                 if let Some(ix) = ixs.get(last) {
-                    let ev = invariants::IxEvents::of(meta, last);
+                    let ev = invariants::IxEvents::of_instruction(meta, last, ix);
                     let admin = invariants::is_admin_signed(ix, &admins);
                     if let Err(v) = invariants::check_ix(&self.svm, &pre, admin, &ev) {
                         panic!(
@@ -319,7 +347,7 @@ impl Env {
                     meta.pretty_logs()
                 )
             };
-            let ev = invariants::IxEvents::of(&meta, k - 1);
+            let ev = invariants::IxEvents::of_instruction(&meta, k - 1, &ixs[k - 1]);
             let admin = invariants::is_admin_signed(&ixs[k - 1], admins);
             if let Err(v) = invariants::check_ix(&svm, &pre, admin, &ev) {
                 fail(v);

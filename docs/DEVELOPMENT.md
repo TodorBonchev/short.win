@@ -73,6 +73,39 @@ Verifiable builds (M10) use solana-verify 0.5.2 with the same pins; the `=` form
 option is required:
 `solana-verify build --library-name shortwin --arch v3 --cargo-build-sbf-args="--tools-version v1.57"`.
 
+`anchor build` builds both programs of the Anchor workspace: `shortwin` and the TEST-ONLY mock
+venue `tests/mock_cpamm` (`target/deploy/mock_cpamm.so`, below). **Deploy by name**
+(`anchor deploy -p shortwin`, or the verified-build path): a bare `anchor deploy` would also
+deploy the mock.
+
+### The test-venue build (M2; A49)
+
+The position engine is tested against a TEST-ONLY constant-product venue, `tests/mock_cpamm`
+(program id `BPAZFPkmVtYEWEZHCzFUns7oybh1VWfAvmu3ofM2mQi7`; its interface, byte offsets and
+the reader contract are in [`tests/mock_cpamm/INTERFACE.md`](../tests/mock_cpamm/INTERFACE.md)).
+short.win reaches it only through `VenueKind::Mock`, which exists only with the Cargo feature
+`test-venue`. That feature goes into a **separate build** that never replaces the release
+artifact:
+
+```sh
+anchor build --tools-version v1.57 --arch v3   # release: target/deploy/shortwin.so (no test-venue), mock_cpamm.so
+scripts/build-test-venue.sh                    # TEST-ONLY: target/test-venue/deploy/shortwin.so
+```
+
+The script runs `anchor build --tools-version v1.57 --arch v3 --ignore-keys --no-idl -p shortwin
+-- --features test-venue` in its own target directory (`target/test-venue`, or
+`SHORTWIN_TV_TARGET`), checks SBPF v3 and that the build carries the marker
+`shortwin:test-venue:mock-cpamm`. CI checks the other direction: the release `shortwin.so`
+contains neither that marker nor the mock's program id (as raw bytes, as its four 8-byte
+words, or as the four `lddw` immediates it compiles to), and `mock_cpamm.so` and the
+test-venue build do. The mock's keypair (`tests/mock_cpamm/keys/`) is gitignored like every
+program keypair.
+
+Because `tests/litesvm` enables `shortwin/test-venue`, a workspace-wide `cargo test` or
+`cargo clippy` compiles the program **with** the feature (Cargo unifies features); run
+`cargo clippy -p shortwin --all-targets` and `cargo test -p shortwin` on their own to cover the
+release feature set (CI does both).
+
 ## Everyday commands
 
 ```sh
@@ -89,7 +122,9 @@ cargo audit --deny warnings --ignore RUSTSEC-2025-0141 --ignore RUSTSEC-2021-013
   --ignore RUSTSEC-2024-0388 --ignore RUSTSEC-2024-0436 --ignore RUSTSEC-2025-0161
 ```
 
-The ignored advisories are the ones in `deny.toml`: all "unmaintained", none a vulnerability;
+(The `test` job runs `shortwin-math` at `PROPTEST_CASES=2000`; the M2 gate also runs the
+whole workspace at that count.) The ignored advisories are the ones in `deny.toml`: all
+"unmaintained", none a vulnerability;
 bincode comes with anchor-lang 1.2.0, the other four only with the LiteSVM test harness.
 
 Test vectors from the normative sims: `python3 crates/shortwin-math/tests/vectors/<track>/gen_<topic>.py`.
@@ -102,14 +137,18 @@ about 6 GB.
 
 The program tests (ARCHITECTURE §8.2, §8.3) are the crate `tests/litesvm`
 (`shortwin-litesvm-tests`, LiteSVM 0.16.0 on the Agave 4.2.2 runtime crates pinned in the
-workspace `Cargo.lock`, C1-14). They load the SBF build, so build it first:
+workspace `Cargo.lock`, C1-14). They load the SBF builds, so build them first:
 
 ```sh
-anchor build --tools-version v1.57 --arch v3          # target/deploy/shortwin.so
-cargo test -p shortwin-litesvm-tests                  # every binary below, ~1–2 min (debug)
-SHORTWIN_SO=/path/to/shortwin.so cargo test -p shortwin-litesvm-tests   # another build
+anchor build --tools-version v1.57 --arch v3          # target/deploy/shortwin.so and mock_cpamm.so
+scripts/build-test-venue.sh                           # target/test-venue/deploy/shortwin.so (M2 tests)
+cargo test -p shortwin-litesvm-tests                  # every binary below, ~3–4 min (debug)
 cargo test -p shortwin -p shortwin-venue-state        # host unit tests of the program and readers
 ```
+
+Other builds: `SHORTWIN_SO` (the release program, M1 binaries), `SHORTWIN_TEST_VENUE_SO` (the
+test-venue program, M2 binaries), `MOCK_CPAMM_SO` (the mock venue). `Env::test_venue()` loads the
+test-venue program and the mock; `Env::new()` the release program only.
 
 | Binary | Covers |
 |---|---|
@@ -118,12 +157,27 @@ cargo test -p shortwin -p shortwin-venue-state        # host unit tests of the p
 | `--test mint_filter_extensions` | the SPEC §3 allowlist filter: one fixture per Token-2022 extension, program vs byte-level filter |
 | `--test lender_it` | the six lender-pool instructions, T-POT, the lender adversarial cases (C0-6, C0-9, C0-13, R3A-2, R3A-10, R3B-1, R3B-2, V2-2, V2-12), `pool_model` trace replays |
 | `--test oracle_crank` | `crank_sol_usd` on the committed mainnet `PriceUpdateV2` dump (`tests/fixtures/`, checked by `sha256sum -c SHA256SUMS` there) |
+| `--test security` | the M1 security review's findings as regressions and its refutation tests |
+| `--test mock_cpamm` | the mock venue itself: execution equals `shortwin-math`'s `quote::cpmm` exactly (a differential proptest, `MOCK_CPAMM_CASES`, default 96), the layout at its documented offsets, every knob (disable, fee, layout change, over-delivery, required extras), delegate-aware sources, Token-2022 bases |
+| `--test engine_it` | M2 engine: `open_short` / `close_short` flows and every refusal reachable on the mock, the prologue, trader normalisation and griefing, over-delivery, sandwiches around opens and closes, the O6 powers and T-REPLAY-PDA, T-TRACE / CU, the structural I14 test, the hooks' own mutants, and the seeded random walk (`ENGINE_FUZZ_SEEDS`, default 4, and `ENGINE_FUZZ_STEPS`, default 120) over opens, closes, top-ups, keeper exits, shocks, deadlines and I10's pause-and-flag action |
+| `--test add_margin_it` | `add_margin` (every gate ignored, snapshots unchanged, I14 on its accounts, a random walk: `ADD_MARGIN_WALK_SEEDS`) |
+| `--test crank_price_it` | `crank_price`: `CoverageGap`, same-second floods, the ring rewrite, forced EMA adoption |
+| `--test liquidate_it`, `--test expire_it` | the keeper exits against an oracle recomputed from `shortwin-math` alone: every waterfall branch, every refusal, what exits ignore (I10), donations, over-delivery, extras, I14, liveness (I-E11), T-TRACE / CU, hook mutants |
+| `--test attacks_exit_it` | ECON §12's exit attacks on ECON's `RA` market, to the lamport: `sandwich.py`, `fixed_delta.py`, `block_spot.py`, `ema_atomic.py`, `ema_near.py`, `ema_atomic_multi.py` (the OI-cap basket: atomic, held, and S1 forcing), `ptf_sandwich.py`, `fvcap.py` (the RA rows), `cascade.py` |
+| `--test settle_it` | `sol_settle`: arming, S1 / S2 / S3, epoch records, T-BOX (seeded push / freeze / dump runs) |
+| `--test route_it` | T-S3-BROKEN (the flag, a fee above the hard cap, a disabled venue, a layout change; liquidations and closes equal the unflagged run; the Emergency-flag S3 raced against an honest expiry) |
+| `--test extras_it` | T-REPLAY-PDA end to end (a per-mint PDA extra recovered with a template; a hostile `current` bypassed) |
+| `--test attacks_settle_it` | ECON §12.10–§12.11 on an `RC`-like pool: `arming.py`, `refute_push.py`, `fv_push.py` (incl. the S2 → S1 flip and its limit) |
+| `--test invariants_m2_hooks` | the M2 hooks fire on deliberately broken states (I2, I3, A26, I5–I7, I9–I13, I16) |
 
-Every instruction goes through `Env::send`, which runs the invariant hooks — I1, I2, I8 on every
-market a transaction names or creates, I4 and I17 (and the lender transaction bounds) against a
-pre-transaction snapshot — after the transaction and, for a transaction of several
-instructions, after each instruction (prefixes replayed on a clone of the VM). A violation
-panics with the logs. Details and conventions: [`tests/litesvm/README.md`](../tests/litesvm/README.md).
+Every instruction goes through `Env::send`, which runs the invariant hooks — I1, I2, I6, I7,
+I8, I13 (state part) on every market a transaction names or creates; I3, I4, I5, I7, I9–I13,
+I16, I17, A26 (snapshot rules) and the lender transaction bounds against a pre-instruction
+snapshot — after the transaction and, for a transaction of several instructions, after each
+instruction (prefixes replayed on a clone of the VM). I14 is structural (account lists). A
+violation panics with the logs. Only a test that plants an impossible state on purpose (the
+hooks' own mutant tests, a copied account, an overflowed field) turns them off. Details and
+conventions: [`tests/litesvm/README.md`](../tests/litesvm/README.md).
 
 The quick run replays a subset of the `pool_model` traces. All of them (the 40 stranding seeds,
 the lock-heavy mix, both ECON §9.6 fuzz runs; about 4 minutes):
@@ -134,8 +188,8 @@ SHORTWIN_TRACES=full cargo test --release -p shortwin-litesvm-tests --test lende
 
 ## Benches
 
-Two standalone Cargo workspaces with their own lockfiles keep Mollusk 0.15.1 out of the
-on-chain lockfile (both hold the Agave runtime line at 4.2.2, C1-14):
+Three standalone Cargo workspaces with their own lockfiles keep Mollusk 0.15.1 out of the
+on-chain lockfile (all hold the Agave runtime line at 4.2.2, C1-14):
 
 ```sh
 # T-CU-MATH (M0b): per-primitive CU of shortwin-math, budget = ARCH §6.1 + 20 %
@@ -146,13 +200,54 @@ cargo test --manifest-path tests/bench/cu_math/Cargo.toml --release      # CU_MA
 # M1 CU baseline: every M1 instruction on Mollusk, cross-checked on LiteSVM, within its budget
 anchor build --tools-version v1.57 --arch v3
 cargo test --manifest-path tests/bench/m1_cu/Cargo.toml -- --nocapture   # M1_CU_WRITE=1 rewrites results.md
+
+# M2 CU bench and T-TRACE: every M2 instruction on the test-venue build against the mock
+scripts/build-test-venue.sh
+cargo test --manifest-path tests/bench/m2_cu/Cargo.toml -- --nocapture
+# M2_CU_WRITE=1 rewrites results.md, M2_TRACE_WRITE=1 rewrites trace.md
 ```
 
 (The `cu_math` bench program is a separate crate, so its build command names its manifest;
 the no-bare-`cargo build-sbf` rule is about the short.win program.) The figures are in each
 bench's `results.md`; commit them when they change. See
-[`tests/bench/cu_math/README.md`](../tests/bench/cu_math/README.md) and
-[`tests/bench/m1_cu/README.md`](../tests/bench/m1_cu/README.md).
+[`tests/bench/cu_math/README.md`](../tests/bench/cu_math/README.md),
+[`tests/bench/m1_cu/README.md`](../tests/bench/m1_cu/README.md) and
+[`tests/bench/m2_cu/README.md`](../tests/bench/m2_cu/README.md).
+
+## Services and the keeper (M2: keeper v0)
+
+`services/` is a separate **host** workspace with its own `Cargo.lock` (ARCHITECTURE §1.2,
+§7.1): `common` (the chain client: JSON-RPC backend, v1 / v0 transaction building),
+`keeper` (keeper v0: duties 1–4, batching, degraded mode, priority fees; the `shortwin-keeper`
+binary) and the TEST-ONLY `keeper-litesvm` (an in-process LiteSVM backend that runs the
+program-test hooks after every instruction of every keeper transaction, and the scenario
+tests). Its lockfile holds the same Agave 4.2.2 line as the harness it links.
+
+```sh
+anchor build --tools-version v1.57 --arch v3 && scripts/build-test-venue.sh
+cargo test --manifest-path services/Cargo.toml --workspace          # unit tests + LiteSVM scenarios
+cargo clippy --manifest-path services/Cargo.toml --workspace --all-targets -- -D warnings
+cargo clippy --manifest-path services/Cargo.toml -p shortwin-keeper --all-targets -- -D warnings  # without test-venue
+cargo deny --manifest-path services/Cargo.toml check                # services/deny.toml
+cargo audit -f services/Cargo.lock --deny warnings <the ignore list above>
+
+# the RPC backend against a live local validator (ignored by default)
+solana-test-validator --reset --quiet &
+SHORTWIN_RPC_URL=http://127.0.0.1:8899 \
+  cargo test --manifest-path services/Cargo.toml -p shortwin-services-common --test rpc_local -- --ignored
+
+# run the keeper
+cargo build --manifest-path services/Cargo.toml -p shortwin-keeper --release
+services/target/release/shortwin-keeper --rpc <url> --keypair keeper.json \
+  --config services/keeper/keeper.example.toml --metrics 127.0.0.1:9464   # --once, --tick-ms
+```
+
+The scenarios load the same builds as the program tests (`SHORTWIN_TEST_VENUE_SO`,
+`MOCK_CPAMM_SO`). Keeper v0 knows only the TEST-ONLY mock venue (feature `test-venue` of its
+scenario crate); the release keeper binary must not contain the mock's id (CI checks it). What
+each duty does and what v0 leaves out: [`services/README.md`](../services/README.md). Do not share
+one `CARGO_TARGET_DIR` between two checkouts of the repository: Cargo keys path crates the same
+way in both and mixes their artifacts.
 
 ## Codama client
 
@@ -194,10 +289,12 @@ model (`params::validate_econ`) are listed, not simulated; the program checks th
   `programs/shortwin` and the program tests `tests/litesvm` (which share this lockfile so the
   Agave line LiteSVM resolves is pinned next to the program's, C1-14). The release profile
   keeps `overflow-checks = true` (Anchor refuses to build without it), `lto = "fat"` and
-  `codegen-units = 1`. Host-only crates (keeper, indexer, Agave 4.3 clients) go into a
-  separate workspace under `services/` with their own lockfile (ARCHITECTURE §1.2).
-- **Cargo, benches**: `tests/bench/cu_math` and `tests/bench/m1_cu`, standalone workspaces
-  with their own lockfiles (Mollusk 0.15.1).
+  `codegen-units = 1`. The workspace also holds the TEST-ONLY mock venue `tests/mock_cpamm`
+  (an Anchor program, also a member of `Anchor.toml [workspace]`; never deployed, A49).
+- **Cargo, services** (`services/Cargo.toml`, own `Cargo.lock`): host-only crates — the keeper
+  and its chain client today, the indexer later (ARCHITECTURE §1.2, §7).
+- **Cargo, benches**: `tests/bench/cu_math`, `tests/bench/m1_cu` and `tests/bench/m2_cu`,
+  standalone workspaces with their own lockfiles (Mollusk 0.15.1).
 - **`shortwin-math`** (ARCHITECTURE §2.2): `#![no_std]`, zero runtime dependencies,
   `#![deny(clippy::arithmetic_side_effects, clippy::cast_possible_truncation,
   clippy::cast_sign_loss, clippy::unwrap_used)]` (also on the program and
@@ -228,13 +325,15 @@ throwaway keypair to `target/deploy/`. The built program is unaffected (the id c
 | Job | Runs |
 |---|---|
 | `fmt` | `cargo fmt --all --check` (workspace and the `cu_math` bench) |
-| `clippy` | guard that `shortwin-math` keeps `#![no_std]`, the §2.2 denies and zero runtime deps; clippy `-D warnings` on `shortwin-math` and on the workspace |
+| `clippy` | guard that `shortwin-math` keeps `#![no_std]`, the §2.2 denies and zero runtime deps; clippy `-D warnings` on `shortwin-math`, on the workspace, and on `shortwin` alone (the release feature set, without `test-venue`) |
 | `test` | `cargo test -p shortwin-math -p shortwin-math-wasm` with `PROPTEST_CASES=2000` |
 | `vectors` | re-runs every `tests/vectors/*/gen_*.py` with Python 3.14 and fails on any diff; T-CONFIG host part: `config_check.py` prints `OK` for the defaults, and `scripts/test_config_gate.py` |
-| `deny` | `cargo deny check` (`deny.toml`) and `cargo audit` on the workspace and both bench lockfiles |
+| `deny` | `cargo deny check` (`deny.toml`) and `cargo audit` on the workspace and the three bench lockfiles |
 | `wasm` | wasm32 release build of `shortwin-math` and `shortwin-math-wasm` |
 | `cu-math` | T-CU-MATH bench (`tests/bench/cu_math`) |
-| `anchor-build` | Agave 4.1.2 + Anchor CLI 1.2.0, `anchor build --tools-version v1.57 --arch v3 --ignore-keys`, asserts SBPF v3, uploads the `.so`, IDL and TS types |
-| `program-tests` | on the `anchor-build` artifact: fixture checksums, `cargo check -p shortwin --target wasm32-unknown-unknown` (T-LAYOUT), `cargo test -p shortwin -p shortwin-venue-state -p shortwin-litesvm-tests` |
+| `anchor-build` | Agave 4.1.2 + Anchor CLI 1.2.0, `anchor build --tools-version v1.57 --arch v3 --ignore-keys` (shortwin and the mock) and `scripts/build-test-venue.sh`; asserts SBPF v3 on all three; A49: the release `shortwin.so` carries neither the test-venue marker nor the mock id, the test-venue build and `mock_cpamm.so` do; uploads the `.so` files, IDL and TS types |
+| `program-tests` | on the `anchor-build` artifact: fixture checksums, `cargo check -p shortwin --target wasm32-unknown-unknown` (T-LAYOUT), `cargo test -p shortwin` on the release feature set, `cargo test -p shortwin -p shortwin-venue-state -p shortwin-litesvm-tests` |
 | `codama` | IDL copy and generated client are current; `tsc`; `node --test` (T-LAYOUT Codama leg) |
 | `m1-cu` | M1 CU baseline bench (`tests/bench/m1_cu`) within budget |
+| `m2-cu` | M2 CU bench and T-TRACE (`tests/bench/m2_cu`) within budget and 64 trace entries |
+| `services` | the services workspace: fmt, clippy (also the keeper without `test-venue`), cargo-deny, cargo-audit, unit tests and the LiteSVM scenarios on the `anchor-build` artifacts, and the A49 check on the release keeper binary |

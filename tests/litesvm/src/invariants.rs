@@ -14,25 +14,31 @@
 //!   latch set by an earlier instruction of the same transaction counts for a later open, and a
 //!   lender's own withdrawal is not blamed on an admin who signed another instruction.
 //!
-//! Status (M1): each check implements what can be checked on the stored state; the lender pool
-//! (I1 token claims in both directions, the whole of I8 on the state the program sees, the
-//! instruction-level allowance, claim, conservation and lock bounds) is [`lender`]; the parts marked `TRACK:` are M2's (positions in
-//! I2/I4, opens in I17). Every check here works on **stored** values, which is sound where
-//! noted: an untouched lender's stored `real` only lags its true value, so a stored-value
-//! upper bound implies the true one.
+//! Status (M2 foundation): each check implements what can be checked on the stored state; the
+//! lender pool (I1 token claims in both directions, the whole of I8 on the state the program
+//! sees, the instruction-level allowance, claim, conservation and lock bounds) is [`lender`];
+//! the position engine's I3, I5–I7, I9, I10, I13, I16 are [`positions`] (I11, I12: the
+//! liquidation / expiry / settlement tracks; I14: a structural test). Positions are in I2 and
+//! I4, opens in I17. Every check here works on **stored** values, which is sound where noted:
+//! an untouched lender's stored `real` only lags its true value, so a stored-value upper bound
+//! implies the true one.
 
 use anchor_lang::AccountDeserialize;
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::Instruction;
 use litesvm::LiteSVM;
 use litesvm::types::TransactionMetadata;
-use shortwin::events::{ClaimSol, DeficitCovered, Deposit, LenderSynced, Open, Withdraw};
+use shortwin::events::{
+    ClaimSol, Close, DeficitCovered, Deposit, Expire, LenderSynced, Liquidate, Open, SolSettle,
+    Withdraw,
+};
 use shortwin::state::{LenderPosition, Market, MarketVault, ShortPosition, VenueGuard, VenueKind};
 use shortwin_math::pool::{R_MAX, VIRTUAL_ASSETS, VIRTUAL_SHARES};
 
 use crate::{events, pda, read};
 
 pub mod lender;
+pub mod positions;
 
 /// A failed invariant.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -49,11 +55,11 @@ impl core::fmt::Display for Violation {
     }
 }
 
-fn fail(invariant: &'static str, detail: String) -> Result<(), Violation> {
+pub(crate) fn fail(invariant: &'static str, detail: String) -> Result<(), Violation> {
     Err(Violation { invariant, detail })
 }
 
-fn ensure(
+pub(crate) fn ensure(
     ok: bool,
     invariant: &'static str,
     detail: impl FnOnce() -> String,
@@ -103,6 +109,7 @@ pub fn check_all(svm: &LiteSVM, market: &Pubkey) -> Result<(), Violation> {
     i2_vault_lamports(svm, market, &m, &v)?;
     i8_lender_pool(svm, market, &m, &v)?;
     lender::check_market(svm, market, &m, &v)?;
+    positions::check_market(svm, market, &m)?;
     Ok(())
 }
 
@@ -248,6 +255,8 @@ pub struct TxSnapshot {
     pub fee_recipient: Option<(Pubkey, u64)>,
     /// The lender-pool state of the tracked markets ([`lender::check_ix`]).
     pub lender: lender::LenderSnapshot,
+    /// The position-side state of the tracked markets ([`positions::check_ix`]).
+    pub positions: positions::PositionsSnapshot,
 }
 
 /// Snapshots `markets` (and the latch and the fee recipient) before an instruction.
@@ -275,10 +284,12 @@ pub fn snapshot(svm: &LiteSVM, markets: &[Pubkey]) -> TxSnapshot {
         guard: read::zc::<VenueGuard>(svm, &pda::venue_guard()),
         fee_recipient: config.map(|c| (c.fee_recipient, read::lamports(svm, &c.fee_recipient))),
         lender: lender::snapshot(svm, markets),
+        positions: positions::snapshot(svm, markets),
     }
 }
 
-/// The events of one top-level instruction that the instruction-level checks read.
+/// The events of one top-level instruction that the instruction-level checks read (and, for
+/// I10, its account keys).
 #[derive(Default)]
 pub struct IxEvents {
     pub withdraws: Vec<Withdraw>,
@@ -287,6 +298,12 @@ pub struct IxEvents {
     pub covers: Vec<DeficitCovered>,
     pub syncs: Vec<LenderSynced>,
     pub opens: Vec<Open>,
+    pub closes: Vec<Close>,
+    pub liquidations: Vec<Liquidate>,
+    pub expiries: Vec<Expire>,
+    pub settlements: Vec<SolSettle>,
+    /// The instruction's account keys (empty when unknown).
+    pub accounts: Vec<Pubkey>,
 }
 
 impl IxEvents {
@@ -299,6 +316,34 @@ impl IxEvents {
             covers: events::of_ix(meta, ix),
             syncs: events::of_ix(meta, ix),
             opens: events::of_ix(meta, ix),
+            closes: events::of_ix(meta, ix),
+            liquidations: events::of_ix(meta, ix),
+            expiries: events::of_ix(meta, ix),
+            settlements: events::of_ix(meta, ix),
+            accounts: Vec::new(),
+        }
+    }
+
+    /// [`IxEvents::of`] with the instruction itself (its account keys, for I10).
+    pub fn of_instruction(
+        meta: &TransactionMetadata,
+        ix: usize,
+        instruction: &Instruction,
+    ) -> Self {
+        Self {
+            accounts: instruction.accounts.iter().map(|m| m.pubkey).collect(),
+            ..Self::of(meta, ix)
+        }
+    }
+
+    fn position_facts(&self) -> positions::IxFacts<'_> {
+        positions::IxFacts {
+            opens: &self.opens,
+            closes: &self.closes,
+            liquidations: &self.liquidations,
+            expiries: &self.expiries,
+            settlements: &self.settlements,
+            accounts: &self.accounts,
         }
     }
 }
@@ -326,6 +371,7 @@ pub fn check_ix(
         i4_admin_moves_no_funds(svm, pre)?;
     }
     i17_no_open_on_flagged_venue(pre, &ev.opens)?;
+    positions::check_ix(svm, &pre.positions, &ev.position_facts())?;
     lender::check_ix(svm, &pre.lender, ev)
 }
 
@@ -379,11 +425,25 @@ pub fn i4_admin_moves_no_funds(svm: &LiteSVM, pre: &TxSnapshot) -> Result<(), Vi
 /// checked against the flagged latch, and `[revalidate_venue, open_short]` against the cleared
 /// one; M1-FID-3); vacuous until `open_short` exists (M2).
 pub fn i17_no_open_on_flagged_venue(pre: &TxSnapshot, opens: &[Open]) -> Result<(), Violation> {
-    // M2: cross-check the market's post-state venue as well.
     let Some(guard) = pre.guard else {
         return Ok(());
     };
     for open in opens {
+        // The event's venue, and the market's venue just before the open (they must agree).
+        let before = pre
+            .positions
+            .markets
+            .iter()
+            .find(|m| m.market == open.market)
+            .map(|m| m.state.venue);
+        if let Some(v) = before {
+            ensure(v == open.venue, "I17", || {
+                format!(
+                    "open {} reports venue {} on a market whose venue was {v}",
+                    open.position, open.venue
+                )
+            })?;
+        }
         let mask = VenueKind::from_u8(open.venue).map_or(0, VenueKind::guard_mask);
         ensure(!guard.blocks(mask), "I17", || {
             format!(

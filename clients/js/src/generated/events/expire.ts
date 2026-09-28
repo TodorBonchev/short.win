@@ -54,6 +54,9 @@ export type ExpireEvent = {
   expiryFee: bigint;
   keeperReward: bigint;
   borrowerPayout: bigint;
+  bLiveRisk: bigint;
+  maxIn: bigint;
+  tokenSurplus: bigint;
 };
 
 export type ExpireEventArgs = {
@@ -70,6 +73,9 @@ export type ExpireEventArgs = {
   expiryFee: number | bigint;
   keeperReward: number | bigint;
   borrowerPayout: number | bigint;
+  bLiveRisk: number | bigint;
+  maxIn: number | bigint;
+  tokenSurplus: number | bigint;
 };
 
 /** Gets the encoder for {@link ExpireEventArgs} event data. */
@@ -89,6 +95,9 @@ export function getExpireEventEncoder(): FixedSizeEncoder<ExpireEventArgs> {
       ["expiryFee", getU64Encoder()],
       ["keeperReward", getU64Encoder()],
       ["borrowerPayout", getU64Encoder()],
+      ["bLiveRisk", getU64Encoder()],
+      ["maxIn", getU64Encoder()],
+      ["tokenSurplus", getU64Encoder()],
     ]),
     [getConstantEncoder(EXPIRE_EVENT_DISCRIMINATOR)],
   );
@@ -111,6 +120,9 @@ export function getExpireEventDecoder(): FixedSizeDecoder<ExpireEvent> {
       ["expiryFee", getU64Decoder()],
       ["keeperReward", getU64Decoder()],
       ["borrowerPayout", getU64Decoder()],
+      ["bLiveRisk", getU64Decoder()],
+      ["maxIn", getU64Decoder()],
+      ["tokenSurplus", getU64Decoder()],
     ]),
     [getConstantDecoder(EXPIRE_EVENT_DISCRIMINATOR)],
   );

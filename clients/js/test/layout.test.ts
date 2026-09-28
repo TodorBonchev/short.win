@@ -19,9 +19,11 @@ import * as client from '../src/index.ts';
 
 const LAYOUT_ASSERTS = new URL('../../../programs/shortwin/src/state/layout_asserts.rs', import.meta.url);
 
-/** Types `layout_asserts.rs` sizes that are not in the IDL yet: no M1 instruction names them
- * (they appear with their first named use; see the M1 foundation notes). */
-const NOT_IN_IDL_YET = new Set(['ShortPosition', 'ShareEpoch', 'WalletExposure']);
+/** Types `layout_asserts.rs` sizes that are not in the IDL yet: no instruction names them as an
+ * account (they appear with their first named use). `ShortPosition` and `WalletExposure` arrived
+ * with M2's `open_short`; `ShareEpoch` arrives with `sol_settle`'s record (today a remaining
+ * account or an unchecked one). */
+const NOT_IN_IDL_YET = new Set(['ShareEpoch']);
 
 type Layout = { kind: 'acct' | 'nested'; name: string; size: number; fields: Array<[string, number]> };
 type Codec = {

@@ -7,8 +7,7 @@
 //! (new version, `force_at`), `Kink` (new kink version), `Authorities`, `Timelock`,
 //! `EnableVenues`, `OracleFeed`; none changes a venue program id or PDA (C0-8).
 //!
-//! **After the M1 review** (deviations from ARCH §3.1's `config (mut)` account list and its
-//! `now ≥ not_before` check; recorded in the review notes for the ARCH sync):
+//! **After the M1 review** (ARCH §3.1 as synced after M1):
 //! - a pending change lapses `CONFIG_APPLY_WINDOW_S` after `not_before`
 //!   (`PendingChangeExpired`; governance proposes it again), so a forgotten proposal cannot be
 //!   applied at a moment that suits whoever finds it (M1-SEC-9);

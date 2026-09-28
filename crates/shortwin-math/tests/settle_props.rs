@@ -78,20 +78,21 @@ proptest! {
 
     /// The box (ECON §5.6): contains `(P_ema, L_ema)`, is spanned by it and the ring's
     /// medians, and is the EMA point once more than `RING_LEN` seconds passed without an
-    /// integration.
+    /// integration **on a venue that cannot execute** (never on an executable one: M2-SEC-1).
     #[test]
     fn box_holds_the_ema_point(entries in prop::collection::vec((1u128..10u128.pow(20), 1u128..10u128.pow(20),
                                                                   1u128..10u128.pow(12), 1u128..10u128.pow(12)), 1..=8),
-                               p in 1u128..10u128.pow(20), l in 1u128..10u128.pow(12), age in -3i64..20) {
+                               p in 1u128..10u128.pow(20), l in 1u128..10u128.pow(12), age in -3i64..20,
+                               exec in any::<bool>()) {
         let mut ring = Ring::default();
         for (i, &(a, b, c, d)) in entries.iter().enumerate() {
             ring.push(RingEntry { lo: a.min(b), hi: a.max(b), llo: c.min(d), lhi: c.max(d), ts: i as i64,
                                   ..RingEntry::default() }).unwrap();
         }
         let ema = Ema { price: p, liq: l, liq_slow: l, ts: 100, slow_ts: 100, count: 7, _pad: [0; 8] };
-        let bx = box_of(&ema, &ring, 100 + age).unwrap();
+        let bx = box_of(&ema, &ring, 100 + age, exec).unwrap();
         prop_assert!(bx.contains(p, l));
-        if age > 8 {
+        if age > 8 && !exec {
             prop_assert_eq!(bx, SettleBox::point(p, l));
         } else {
             let (pm, ph, lm, lh) = shortwin_math::observe::ring_medians(&ring).unwrap();
@@ -435,7 +436,7 @@ proptest! {
         l in 1_000_000_000u128..1_000_000_000_000_000,
     ) {
         let (o, now) = run_path(p0, l, &ramp(p0, flat, ramp_s, g_bps, obs));
-        let bx = box_of(&o.ema, &o.ring, now).unwrap();
+        let bx = box_of(&o.ema, &o.ring, now, true).unwrap();
         prop_assert_eq!(bx.p_lo, o.ema.price);
         prop_assert!(!bx.is_point());
     }
@@ -461,14 +462,14 @@ fn uptrend_claim_needs_a_sustained_ramp() {
     ];
     for (name, path) in cases {
         let (o, now) = run_path(p0, l, &path);
-        let bx = box_of(&o.ema, &o.ring, now).unwrap();
+        let bx = box_of(&o.ema, &o.ring, now, true).unwrap();
         assert!(bx.p_lo < o.ema.price, "{name}: {bx:?} vs {}", o.ema.price);
     }
     // A 5 %/s ramp after 16 s, and a 25 %/s ramp (clamped EMA): the EMA lags the median.
     for (g, secs) in [(500, 16), (2_500, 30)] {
         let (o, now) = run_path(p0, l, &ramp(p0, 20, secs, g, 1));
         assert_eq!(
-            box_of(&o.ema, &o.ring, now).unwrap().p_lo,
+            box_of(&o.ema, &o.ring, now, true).unwrap().p_lo,
             o.ema.price,
             "{g} bps/s"
         );

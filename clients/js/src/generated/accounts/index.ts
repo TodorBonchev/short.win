@@ -11,5 +11,7 @@ export * from "./lenderPosition.ts";
 export * from "./market.ts";
 export * from "./marketVault.ts";
 export * from "./oracleCache.ts";
+export * from "./shortPosition.ts";
 export * from "./venueExtras.ts";
 export * from "./venueGuard.ts";
+export * from "./walletExposure.ts";

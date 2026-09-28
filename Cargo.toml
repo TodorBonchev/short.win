@@ -10,6 +10,8 @@ members = [
     "crates/shortwin-venue-state",
     "programs/shortwin",
     "tests/litesvm",
+    # TEST-ONLY venue program for M2 (A49); built by `anchor build`, never deployed.
+    "tests/mock_cpamm",
 ]
 
 # solana-verify picks its build image from this (ARCHITECTURE §1.1).

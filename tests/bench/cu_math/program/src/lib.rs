@@ -252,7 +252,8 @@ fn ring_ops(id: u8, n: u32) -> u128 {
         let ring = black_box(&ring);
         let v = match id {
             id::RING_MEDIANS => ring_medians(ring).map_or(0, |m| m.0 ^ m.3),
-            id::BOX_OF => box_of(&ema, ring, now).map_or(0, |b| b.p_lo ^ b.l_hi),
+            // An executable venue (M2-SEC-1): the medians path, never the collapsed point.
+            id::BOX_OF => box_of(&ema, ring, now, true).map_or(0, |b| b.p_lo ^ b.l_hi),
             id::LIQ_EMA_LEG => {
                 let below = |x: u128, y: u128| {
                     let r = sol_leg::buy_exact_out(Q, x, y, false, &FEES);
@@ -351,7 +352,7 @@ mod tests {
         assert_eq!(quote::liquidity(X, Y), Ok(L));
         let (ema, ring) = full_ring();
         assert_eq!(ring.len(), 8);
-        assert!(!box_of(&ema, &ring, ema.ts).expect("box").is_point());
+        assert!(!box_of(&ema, &ring, ema.ts, true).expect("box").is_point());
         assert!(sustained_growth(&ring, 3).expect("growth") > 0);
         assert!(sol_leg::buy_exact_out(Q, X, Y, false, &FEES).is_some());
         let below = |x: u128, y: u128| {

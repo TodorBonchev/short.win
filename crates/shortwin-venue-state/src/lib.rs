@@ -17,6 +17,8 @@
 //! | [`program_data`] | BPF upgradeable loader `ProgramData` header (tag, deploy slot, authority) | M1 (foundation): the venue-upgrade latch (A7) |
 //! | [`pyth`] | Pyth `PriceUpdateV2` and the `crank_sol_usd` acceptance rules | M1 (oracle track) |
 //! | [`mint`] | SPL / Token-2022 mint base fields and the byte-level allowlist filter (`check`) | M1 (market track): differential-tested against the program's `check_mint_safety` |
+//! | [`token_account`] | SPL / Token-2022 token accounts (mint, owner, amount, delegate, close authority) | M2: venue vaults, the pool vault's delta and delegate, `trader_wsol` |
+//! | `mock_cpamm` | TEST-ONLY mock venue pool (feature `test-venue`; never in a release build, A49) | M2 |
 //!
 //! Venue readers (pump `BondingCurve`/`Global`, pump-fees `FeeConfig`, PumpSwap
 //! `Pool`/`GlobalConfig`, Raydium `AmmInfo`, CPMM `PoolState`/`AmmConfig`, token accounts)
@@ -32,8 +34,11 @@
 
 pub mod bytes;
 pub mod mint;
+#[cfg(feature = "test-venue")]
+pub mod mock_cpamm;
 pub mod program_data;
 pub mod pyth;
+pub mod token_account;
 
 /// A 32-byte account key (no dependency on a `Pubkey` type).
 pub type Key = [u8; 32];

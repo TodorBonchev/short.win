@@ -25,7 +25,12 @@ pub fn venue_guard() -> Pubkey {
 
 /// `["venue_extras", venue]`.
 pub fn venue_extras(kind: VenueKind) -> Pubkey {
-    pda(&[VenueExtras::SEED, &[kind as u8]]).0
+    venue_extras_seed(kind as u8)
+}
+
+/// `["venue_extras", seed]` for a raw venue byte.
+pub fn venue_extras_seed(seed: u8) -> Pubkey {
+    pda(&[VenueExtras::SEED, &[seed]]).0
 }
 
 /// `["sol_usd"]`.

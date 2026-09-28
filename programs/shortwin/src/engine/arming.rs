@@ -1,0 +1,330 @@
+//! SOL settlement on the settlement box: the inputs of one `sol_settle` evaluation, the risk
+//! quotes the box predicates read, and the grief-proof creation of the `ShareEpoch` record a
+//! settlement may roll (ARCH §2.1 `engine/settle.rs` — built as this module; §2.4.1, §3.8,
+//! §4.5, §5.3; ECON §5.6, §8.6, §10.3; A65).
+//!
+//! **Every decision is `shortwin_math::settle`'s**: [`settle::box_of`] (the box on the ring's
+//! bucket extremes), [`settle::evaluate`] (ARCH §3.8 steps 2–4 in the sim's order: "not
+//! liquidatable" disarms only on the box, refutation on the box, the S1 / S2 legs on the live
+//! state, the robust spot and the box corner, one arming clock, the kind chosen at execution,
+//! S3 on the market's chain), [`settle::settlement`] (S1 `V − K_s`, never capped; S2 / S3
+//! `x(P_ema, L_ema)` only if the corners agree within `fv_dev_bps`, each corner with its own
+//! `p'`). This module only assembles what they read, from the state the prologue left
+//! (ARCH §3.0: the post-roll EMA, ring and last bucket, which never contain this instruction's
+//! own observation):
+//!
+//! - [`RiskQuotes`]: `B̂(Q; reprice(L, P))` and σ at `φ_risk = min(φ_live,
+//!   venue_fee_hard_cap_bps_pos)` (ARCH §4.3 "two fee views"; the venue's
+//!   `crate::venues::risk_pricing`, which also prices a venue that cannot execute).
+//! - [`inputs`]: `R_due`, `K_s`, `V_eff`, the spot leg (`risk::spot_leg` on the robust spot
+//!   `P_rs = min(P_live, lb_lo)`, true without evaluation only when the venue cannot execute:
+//!   the route-broken flag and the fee hard cap never make it true, V2-1), the EMA leg
+//!   (`persist::liq_ema_leg` on the newest `liq_persist_n` ring entries' cached `(x, y)`), the
+//!   live risk quote and σ, the box, the S3 chain.
+//! - [`terms`]: the position's locked settlement terms (A26).
+//! - [`create_pda_account`]: the grief-proof PDA creation of ARCH §2.4.1.
+//!
+//! The Emergency route-broken flag enters **only** through `s3_no_route` (the S3 chain the
+//! prologue ran and "no route now"): never a quote, a leg, the box or the arming clock (I10,
+//! I16; T-S3-BROKEN).
+
+use anchor_lang::prelude::*;
+use anchor_lang::system_program::{self, Allocate, Assign, Transfer};
+use shortwin_math::observe::{robust_spot, Observation};
+use shortwin_math::persist;
+use shortwin_math::quote::{reprice, Pricing};
+use shortwin_math::rent;
+use shortwin_math::risk::{self, Budget};
+use shortwin_math::settle::{self, BoxQuotes, S3Chain, SettleInputs, SettleTerms};
+use shortwin_math::MathError;
+
+use crate::errors::{CheckedExt, MathResultExt, ShortwinError};
+use crate::lamports;
+use crate::state::{Market, ShortPosition, VenueKind};
+use crate::venues::VenueState;
+
+/// The position's risk quotes (ARCH §4.3, §4.5): every quote at the capped fee view the caller
+/// resolved (`crate::venues::risk_pricing`), for the position's `q`. The box predicates call
+/// [`BoxQuotes`] on `(P, L)` states; the EMA leg and the live leg call [`RiskQuotes::cost_xy`]
+/// on `(x, y)` states.
+#[derive(Clone, Copy, Debug)]
+pub struct RiskQuotes {
+    pricing: Pricing,
+    q: u64,
+}
+
+impl RiskQuotes {
+    /// Risk quotes of `q` tokens at `pricing` (already capped at the position's hard cap).
+    pub const fn new(pricing: Pricing, q: u64) -> Self {
+        Self { pricing, q }
+    }
+
+    /// `B̂(q; x, y)`: `None` (`+∞`) if undefined, including `x = 0` (a ring entry without a
+    /// reprojection).
+    pub fn cost_xy(&self, x: u128, y: u128) -> Option<u64> {
+        if x == 0 {
+            return None;
+        }
+        self.pricing.buy(self.q, x, y).map(|b| b.cost)
+    }
+
+    /// σ on `(x, y)` (`risk::sigma_xy` of the quote's fee-free input): `u64::MAX` (`+∞`) when
+    /// the quote or the state's price is undefined.
+    pub fn sigma_on(&self, x: u128, y: u128) -> core::result::Result<u64, MathError> {
+        if x == 0 || y == 0 {
+            return Ok(u64::MAX);
+        }
+        let n = self.pricing.buy(self.q, x, y).map(|b| b.net);
+        match risk::sigma_xy(n, self.q, x, y) {
+            Err(MathError::DivByZero) => Ok(u64::MAX),
+            r => r,
+        }
+    }
+}
+
+impl BoxQuotes for RiskQuotes {
+    fn cost(&mut self, p: u128, l: u128) -> core::result::Result<Option<u64>, MathError> {
+        Ok(reprice(l, p).and_then(|(x, y)| self.cost_xy(x, y)))
+    }
+
+    fn sigma(&mut self, p: u128, l: u128) -> core::result::Result<u64, MathError> {
+        match reprice(l, p) {
+            Some((x, y)) => self.sigma_on(x, y),
+            None => Ok(u64::MAX),
+        }
+    }
+}
+
+/// The position's locked settlement terms (ARCH §2.3.5; A26).
+pub fn terms(pos: &ShortPosition) -> SettleTerms {
+    SettleTerms {
+        cr_liq_bps: pos.cr_liq_bps,
+        sigma_max_bps: u32::from(pos.max_liq_slip_bps),
+        penalty_bps: u32::from(pos.penalty_bps),
+        expiry_fee_bps: u32::from(pos.expiry_fee_bps),
+        fv_dev_bps: u32::from(pos.fv_dev_bps),
+        persist_n: pos.settle_persist_n,
+        arm_gap_s: pos.settle_arm_gap_s,
+        s3: pos.s3_terms(),
+    }
+}
+
+/// What the `SolSettle` event reports besides the settlement itself.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Facts {
+    /// The risk quote on the live reserves (`None` when the venue cannot execute).
+    pub b_live: Option<u64>,
+    /// The risk quote at the robust spot `reprice(L_live, P_rs)`.
+    pub b_rs: Option<u64>,
+    /// The spot leg (CR at the robust spot below `L`, or no route).
+    pub spot_leg: bool,
+}
+
+fn nonzero(t: i64) -> Option<i64> {
+    (t != 0).then_some(t)
+}
+
+/// The market's S3 chain as the prologue left it (ARCH §3.0 step 8, §5.3), with
+/// `s3_no_route` of this instruction's observation (the **global** hard cap, R3A-4 c).
+pub fn s3_chain(market: &Market, s3_no_route: bool) -> S3Chain {
+    S3Chain {
+        no_route_now: s3_no_route,
+        no_route_since: nonzero(market.no_route_since),
+        graduated_at: nonzero(market.graduated_at),
+        migrating: market.venue_kind() == Some(VenueKind::PumpMigrating),
+        migration_seen_at: nonzero(market.migration_seen_at),
+    }
+}
+
+/// ARCH §3.8 step 1 after the prologue: `R_due`, `V_eff`, `K_s`, the legs of §4.5 and the
+/// box, as `settle::evaluate` reads them (module docs). `obs` is the market's post-roll
+/// observation state, `state` the venue's pre-trade state this instruction observed, `now` the
+/// prologue's time.
+pub fn inputs(
+    pos: &ShortPosition,
+    market: &Market,
+    obs: &Observation,
+    state: &VenueState,
+    quotes: &mut RiskQuotes,
+    s3_no_route: bool,
+    now: i64,
+) -> Result<(SettleInputs, Facts)> {
+    let r_due = rent::due(&pos.pos_rent(), &market.basis()).math()?;
+    let k_s = risk::k_s(pos.v, &pos.settle_keeper_terms()).math()?;
+    let v_eff = risk::v_eff(pos.v, r_due);
+    let executable = state.executable;
+    let l_live = state.liquidity().unwrap_or(obs.ema.liq);
+    let p_rs = state
+        .price()
+        .and_then(|p| robust_spot(p, &obs.last, now, pos.ref_max_age_s));
+    let fresh = obs.last.is_fresh(now, pos.ref_max_age_s);
+    let (b_live, sigma_live) = if executable {
+        let (x, y) = (u128::from(state.x), u128::from(state.y));
+        (quotes.cost_xy(x, y), quotes.sigma_on(x, y).math()?)
+    } else {
+        (None, u64::MAX)
+    };
+    let b_rs = match p_rs {
+        Some(p) => quotes.cost(p, l_live).math()?,
+        None => None,
+    };
+    let spot_leg = risk::spot_leg(executable, fresh, v_eff, b_rs, pos.cr_liq_bps).math()?;
+    let ema_leg = {
+        let q = *quotes;
+        let below = risk::ring_below(v_eff, pos.cr_liq_bps, |x, y| q.cost_xy(x, y));
+        persist::liq_ema_leg(&obs.ring, below, pos.liq_persist_n).math()?
+    };
+    // The box collapses to the EMA point only on a venue that cannot execute now (M2-SEC-1):
+    // on an executable venue `deposit` / `withdraw` roll a pushed bucket without recording
+    // (A16), so an aged EMA is no evidence that nothing was pushed.
+    let bx = settle::box_of(&obs.ema, &obs.ring, now, executable).math()?;
+    let inp = SettleInputs {
+        now,
+        deadline: pos.deadline,
+        ema_count: obs.ema.count,
+        p_ema: obs.ema.price,
+        l_ema: obs.ema.liq,
+        bx,
+        budget: Budget {
+            v: pos.v,
+            k_s,
+            ert: pos.ert,
+        },
+        r_due,
+        cr_liquidatable: spot_leg && ema_leg,
+        ema_leg,
+        executable,
+        p_rs,
+        l_live,
+        b_live,
+        sigma_live,
+        s3: s3_chain(market, s3_no_route),
+    };
+    Ok((
+        inp,
+        Facts {
+            b_live,
+            b_rs,
+            spot_leg,
+        },
+    ))
+}
+
+/// Grief-proof creation of a short.win-owned PDA account (ARCH §2.4.1 "The ephemeral WSOL
+/// account", C0-3; used for `ShareEpoch` records, A39). A third party can pre-fund the address
+/// (a System transfer checks only its source), which makes `create_account` fail with
+/// `AccountAlreadyInUse`, but it cannot allocate or assign it (only short.win can sign for the
+/// PDA). So: (1) any pre-funded lamports are swept to `sweep_to` (the PDA signs a System
+/// transfer), (2) `payer` funds exactly the rent-exempt minimum of `space`, (3) `allocate(space)`
+/// and `assign(owner)` signed with `seeds` (the PDA's seeds with its bump). Returns the swept
+/// lamports, which the caller books.
+///
+/// Errors: `AccountMismatch` if the account is not System-owned with no data (it already
+/// exists).
+pub fn create_pda_account<'info>(
+    payer: &AccountInfo<'info>,
+    account: &AccountInfo<'info>,
+    sweep_to: &AccountInfo<'info>,
+    system_program: &AccountInfo<'info>,
+    seeds: &[&[u8]],
+    space: usize,
+    owner: &Pubkey,
+) -> Result<u64> {
+    require!(
+        *account.owner == System::id() && account.data_is_empty(),
+        ShortwinError::AccountMismatch
+    );
+    let swept = account.lamports();
+    if swept > 0 {
+        system_program::transfer(
+            CpiContext::new_with_signer(
+                system_program.key(),
+                Transfer {
+                    from: account.clone(),
+                    to: sweep_to.clone(),
+                },
+                &[seeds],
+            ),
+            swept,
+        )?;
+    }
+    system_program::transfer(
+        CpiContext::new(
+            system_program.key(),
+            Transfer {
+                from: payer.clone(),
+                to: account.clone(),
+            },
+        ),
+        lamports::rent_min(space)?,
+    )?;
+    let space_u64 = u64::try_from(space).ok().or_math()?;
+    system_program::allocate(
+        CpiContext::new_with_signer(
+            system_program.key(),
+            Allocate {
+                account_to_allocate: account.clone(),
+            },
+            &[seeds],
+        ),
+        space_u64,
+    )?;
+    system_program::assign(
+        CpiContext::new_with_signer(
+            system_program.key(),
+            Assign {
+                account_to_assign: account.clone(),
+            },
+            &[seeds],
+        ),
+        owner,
+    )?;
+    Ok(swept)
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::arithmetic_side_effects)]
+mod tests {
+    use super::*;
+    use shortwin_math::fees::CpmmFees;
+    use shortwin_math::num::WAD;
+
+    fn cpmm(fee_ppm: u64) -> Pricing {
+        let f = CpmmFees {
+            trade: fee_ppm,
+            creator: 0,
+            creator_on_input: false,
+            protocol: 120_000,
+            fund: 0,
+        };
+        Pricing::Cpmm { buy: f, sell: f }
+    }
+
+    /// The box predicates' quotes are the repriced risk quotes, and an undefined state reads
+    /// as `+∞` (cost `None`, σ `u64::MAX`), never an error.
+    #[test]
+    fn risk_quotes_on_repriced_states() {
+        let mut q = RiskQuotes::new(cpmm(2_500), 1_000_000);
+        let (l, p) = (10u128.pow(12), WAD / 1_000);
+        let (x, y) = reprice(l, p).unwrap();
+        assert_eq!(q.cost(p, l).unwrap(), q.cost_xy(x, y));
+        assert_eq!(
+            q.cost_xy(x, y),
+            cpmm(2_500).buy_repriced(1_000_000, l, p).map(|b| b.cost)
+        );
+        let s = q.sigma(p, l).unwrap();
+        assert!(s < 10, "a tiny trade has almost no premium: {s}");
+        // More liquidity at the same price: cheaper and less slippage (B̂ and σ fall with L),
+        // for a trade of 3 % of the token reserve.
+        let mut big = RiskQuotes::new(cpmm(2_500), 1_000_000_000_000);
+        assert!(big.cost(p, l * 4).unwrap() < big.cost(p, l).unwrap());
+        assert!(big.sigma(p, l * 4).unwrap() < big.sigma(p, l).unwrap());
+        // Undefined: no tokens to buy, or no reprojection.
+        let mut huge = RiskQuotes::new(cpmm(2_500), u64::MAX);
+        assert_eq!(huge.cost(p, 1_000).unwrap(), None);
+        assert_eq!(huge.sigma(p, 1_000).unwrap(), u64::MAX);
+        assert_eq!(q.cost_xy(0, 1), None);
+        assert_eq!(q.sigma_on(0, 1).unwrap(), u64::MAX);
+        assert_eq!(q.sigma(0, l).unwrap(), u64::MAX);
+    }
+}

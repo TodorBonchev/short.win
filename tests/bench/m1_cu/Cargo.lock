@@ -1998,6 +1998,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "mock-cpamm"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "bytemuck",
+]
+
+[[package]]
 name = "mollusk-svm"
 version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2718,6 +2727,7 @@ dependencies = [
  "bytemuck",
  "litesvm",
  "litesvm-token",
+ "mock-cpamm",
  "serde_json",
  "shortwin",
  "shortwin-math",

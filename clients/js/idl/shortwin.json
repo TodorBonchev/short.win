@@ -8,6 +8,61 @@
   },
   "instructions": [
     {
+      "name": "add_margin",
+      "docs": [
+        "The borrower adds SOL margin to its position (it only raises CR)."
+      ],
+      "discriminator": [
+        211,
+        238,
+        238,
+        90,
+        223,
+        228,
+        228,
+        76
+      ],
+      "accounts": [
+        {
+          "name": "borrower",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "market",
+          "docs": [
+            "Read only (C0-17); bound to its PDA with the stored bump."
+          ],
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "apply_config",
       "docs": [
         "Anyone applies the pending change once its timelock has run."
@@ -241,6 +296,221 @@
       "args": []
     },
     {
+      "name": "close_short",
+      "docs": [
+        "The borrower buys back and closes its position."
+      ],
+      "discriminator": [
+        159,
+        16,
+        29,
+        141,
+        209,
+        68,
+        25,
+        0
+      ],
+      "accounts": [
+        {
+          "name": "borrower",
+          "docs": [
+            "The position's borrower; receives the position's remainder and rent (A18)."
+          ],
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          },
+          "relations": [
+            "position",
+            "exposure"
+          ]
+        },
+        {
+          "name": "position",
+          "docs": [
+            "Bound to its PDA `[\"position\", market, borrower, nonce]` with the stored bump."
+          ],
+          "writable": true
+        },
+        {
+          "name": "exposure",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  120,
+                  112,
+                  111,
+                  115,
+                  117,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "borrower"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "pool_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          },
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "market_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          },
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "trader",
+          "writable": true,
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "token_program",
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "max_buyback_cost",
+          "type": "u64"
+        },
+        {
+          "name": "extras",
+          "type": {
+            "defined": {
+              "name": "ExtrasSel"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "cover_deficit",
       "docs": [
         "A lender covers a negative SOL balance."
@@ -353,6 +623,101 @@
           "type": "u64"
         }
       ]
+    },
+    {
+      "name": "crank_price",
+      "docs": [
+        "Anyone runs a market's prologue (observation, chains) and refreshes its tier."
+      ],
+      "discriminator": [
+        8,
+        89,
+        67,
+        221,
+        50,
+        129,
+        35,
+        48
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "docs": [
+            "in the handler); read for nothing else in this build (PumpSwap fee tiers read its",
+            "supply, M6)."
+          ],
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "oracle_cache",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  111,
+                  108,
+                  95,
+                  117,
+                  115,
+                  100
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": []
     },
     {
       "name": "crank_sol_usd",
@@ -866,6 +1231,218 @@
       ]
     },
     {
+      "name": "expire",
+      "docs": [
+        "A keeper exits an expired, not CR-liquidatable position (ARCH §3.7)."
+      ],
+      "discriminator": [
+        243,
+        83,
+        205,
+        58,
+        57,
+        201,
+        247,
+        146
+      ],
+      "accounts": [
+        {
+          "name": "keeper",
+          "docs": [
+            "The keeper (anyone)."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "borrower",
+          "writable": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          },
+          "relations": [
+            "position",
+            "exposure"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true
+        },
+        {
+          "name": "exposure",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  120,
+                  112,
+                  111,
+                  115,
+                  117,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "borrower"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "pool_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          },
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "market_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          },
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "trader",
+          "writable": true,
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "token_program",
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "extras",
+          "type": {
+            "defined": {
+              "name": "ExtrasSel"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "flag_unsafe_mint",
       "docs": [
         "Anyone flags a market whose mint fails the safety filter."
@@ -1296,6 +1873,519 @@
       ]
     },
     {
+      "name": "liquidate",
+      "docs": [
+        "A keeper liquidates a CR-liquidatable position within the fixed exit bound (ARCH §3.6)."
+      ],
+      "discriminator": [
+        223,
+        179,
+        226,
+        125,
+        48,
+        46,
+        39,
+        74
+      ],
+      "accounts": [
+        {
+          "name": "keeper",
+          "docs": [
+            "The keeper (anyone)."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "borrower",
+          "writable": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          },
+          "relations": [
+            "position",
+            "exposure"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true
+        },
+        {
+          "name": "exposure",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  120,
+                  112,
+                  111,
+                  115,
+                  117,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "borrower"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "pool_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          },
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "market_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          },
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "trader",
+          "writable": true,
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "token_program",
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "extras",
+          "type": {
+            "defined": {
+              "name": "ExtrasSel"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "open_short",
+      "docs": [
+        "A borrower opens a short of `q` tokens (borrow, sell, lock proceeds and D4 margin)."
+      ],
+      "discriminator": [
+        66,
+        191,
+        209,
+        162,
+        3,
+        36,
+        159,
+        99
+      ],
+      "accounts": [
+        {
+          "name": "borrower",
+          "docs": [
+            "The borrower: pays for the position, the exposure record, the margin and the open fee."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "venue_guard",
+          "docs": [
+            "The venue-upgrade latch (A7): read only by opens."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  110,
+                  117,
+                  101,
+                  95,
+                  103,
+                  117,
+                  97,
+                  114,
+                  100
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "oracle_cache",
+          "docs": [
+            "The cached SOL/USD price for the tier (ARCH §4.7)."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  111,
+                  108,
+                  95,
+                  117,
+                  115,
+                  100
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "borrower"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "exposure",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  120,
+                  112,
+                  111,
+                  115,
+                  117,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "borrower"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "pool_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          },
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "market_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          },
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "trader",
+          "docs": [
+            "normalisation."
+          ],
+          "writable": true,
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "token_program",
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u64"
+        },
+        {
+          "name": "q",
+          "type": "u64"
+        },
+        {
+          "name": "min_proceeds",
+          "type": "u64"
+        },
+        {
+          "name": "max_margin",
+          "type": "u64"
+        },
+        {
+          "name": "max_open_fee",
+          "type": "u64"
+        },
+        {
+          "name": "extras",
+          "type": {
+            "defined": {
+              "name": "ExtrasSel"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "propose_config",
       "docs": [
         "Governance proposes a timelocked config change."
@@ -1512,6 +2602,323 @@
       ]
     },
     {
+      "name": "set_route_broken",
+      "docs": [
+        "The Emergency vault flags or clears a broken route (opens and S3 evidence only)."
+      ],
+      "discriminator": [
+        177,
+        160,
+        0,
+        3,
+        36,
+        20,
+        215,
+        230
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "docs": [
+            "`pause_authority` or `governance`."
+          ],
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "docs": [
+            "The market, for `PauseScope::Market` only; bound to its PDA `[\"market\", mint]` with",
+            "the stored bump (`Market::is_pda`)."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "scope",
+          "type": {
+            "defined": {
+              "name": "PauseScope"
+            }
+          }
+        },
+        {
+          "name": "venue_bit",
+          "type": "u8"
+        },
+        {
+          "name": "broken",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "set_venue_extras",
+      "docs": [
+        "The Emergency vault publishes a venue's bounded trailing accounts."
+      ],
+      "discriminator": [
+        28,
+        35,
+        237,
+        216,
+        131,
+        255,
+        50,
+        94
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "docs": [
+            "`pause_authority` or `governance`."
+          ],
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "venue_extras",
+          "writable": true
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "venue",
+          "type": "u8"
+        },
+        {
+          "name": "ix",
+          "type": "u8"
+        },
+        {
+          "name": "entries",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "ExtraEntryArg"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "sol_settle",
+      "docs": [
+        "A keeper settles a position in SOL on the settlement box (S1/S2/S3; ARCH §3.8)."
+      ],
+      "discriminator": [
+        155,
+        7,
+        196,
+        156,
+        51,
+        120,
+        51,
+        2
+      ],
+      "accounts": [
+        {
+          "name": "keeper",
+          "docs": [
+            "The keeper (anyone); pays for a new `ShareEpoch` record."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          },
+          "relations": [
+            "position",
+            "exposure"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true
+        },
+        {
+          "name": "borrower",
+          "writable": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "exposure",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  120,
+                  112,
+                  111,
+                  115,
+                  117,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "borrower"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          },
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "share_epoch_rec",
+          "docs": [
+            "market.share_epoch])`; created with the grief-proof helper only when the epoch rolls."
+          ],
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "sweep_protocol_fees",
       "docs": [
         "Anyone moves a market's protocol fees to the configured recipient."
@@ -1587,6 +2994,122 @@
         {
           "name": "fee_recipient",
           "writable": true
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "sweep_trader",
+      "docs": [
+        "Anyone sweeps SOL left on a market's trader side to lenders; after a full wipe it",
+        "credits the wipe record and sets `wipe_trader_swept` (ARCH §3.9; M2-SEC-4)."
+      ],
+      "discriminator": [
+        244,
+        159,
+        222,
+        169,
+        87,
+        76,
+        64,
+        94
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "docs": [
+            "Bound to its PDA `[\"market\", mint]` with the stored bump (`Market::is_pda`; no mint is",
+            "passed)."
+          ],
+          "writable": true
+        },
+        {
+          "name": "market_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          },
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "trader",
+          "docs": [
+            "normalisation)."
+          ],
+          "writable": true,
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "trader_wsol",
+          "docs": [
+            "instructions (checked by the normalisation)."
+          ],
+          "writable": true,
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "trader_wsol_ata",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         },
         {
           "name": "event_authority"
@@ -1981,6 +3504,19 @@
       ]
     },
     {
+      "name": "ShortPosition",
+      "discriminator": [
+        110,
+        216,
+        100,
+        57,
+        75,
+        53,
+        168,
+        59
+      ]
+    },
+    {
       "name": "VenueExtras",
       "discriminator": [
         206,
@@ -2004,6 +3540,19 @@
         120,
         140,
         146
+      ]
+    },
+    {
+      "name": "WalletExposure",
+      "discriminator": [
+        96,
+        91,
+        128,
+        118,
+        104,
+        144,
+        64,
+        198
       ]
     }
   ],
@@ -2972,6 +4521,11 @@
       "code": 6098,
       "name": "EmergencyCannotCancel",
       "msg": "Only governance may cancel an authorities or timelock change"
+    },
+    {
+      "code": 6099,
+      "name": "UseLiquidate",
+      "msg": "Position is expired and CR-liquidatable; use liquidate"
     }
   ],
   "types": [
@@ -3065,7 +4619,9 @@
     {
       "name": "Close",
       "docs": [
-        "`close_short`."
+        "`close_short`. `b_live` (the execution quote the leg was bounded by, I13) and",
+        "`token_surplus` (tokens a venue delivered beyond `q`, kept in the pool vault as a",
+        "donation, A62, V2-10) are M2 additions to ARCH §3.10's field list."
       ],
       "type": {
         "kind": "struct",
@@ -3108,6 +4664,14 @@
           },
           {
             "name": "borrower_payout",
+            "type": "u64"
+          },
+          {
+            "name": "b_live",
+            "type": "u64"
+          },
+          {
+            "name": "token_surplus",
             "type": "u64"
           }
         ]
@@ -3727,7 +5291,9 @@
     {
       "name": "Expire",
       "docs": [
-        "`expire`."
+        "`expire`. `b_live` is the execution quote the leg was bounded by (I13). `b_live_risk` (the",
+        "fee base with `b_ref`), `max_in` (I11) and `token_surplus` (tokens a venue delivered beyond",
+        "`q`, A62, V2-10) are M2 additions to ARCH §3.10's field list."
       ],
       "type": {
         "kind": "struct",
@@ -3782,6 +5348,18 @@
           },
           {
             "name": "borrower_payout",
+            "type": "u64"
+          },
+          {
+            "name": "b_live_risk",
+            "type": "u64"
+          },
+          {
+            "name": "max_in",
+            "type": "u64"
+          },
+          {
+            "name": "token_surplus",
             "type": "u64"
           }
         ]
@@ -3845,6 +5423,68 @@
                     "name": "SeedPart"
                   }
                 },
+                4
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ExtraEntryArg",
+      "docs": [
+        "One trailing account, as the argument encoding of [`ExtraEntry`]: `kind` 1 = a fixed `key`,",
+        "2 = a template derived under program `key` from `seeds`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "kind",
+            "type": "u8"
+          },
+          {
+            "name": "writable",
+            "type": "bool"
+          },
+          {
+            "name": "key",
+            "type": "pubkey"
+          },
+          {
+            "name": "seeds",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "SeedPartArg"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ExtrasSel",
+      "docs": [
+        "The extras set a trading instruction selects (ARCH §3.0 \"Bounded extras\", A41): `set`",
+        "([`EXTRAS_SET_NONE`], [`EXTRAS_SET_CURRENT`], [`EXTRAS_SET_PREVIOUS`],",
+        "[`EXTRAS_SET_STABLE`]) and, for each",
+        "template entry `i`, the canonical bump `bumps[i]` of the account it derives (fixed entries",
+        "ignore theirs; a non-canonical bump is `BadExtras`, M2-SEC-3)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "set",
+            "type": "u8"
+          },
+          {
+            "name": "bumps",
+            "type": {
+              "array": [
+                "u8",
                 4
               ]
             }
@@ -4198,7 +5838,7 @@
     {
       "name": "IxExtras",
       "docs": [
-        "The two selectable sets of one instruction kind (1,424 B)."
+        "The selectable sets of one instruction kind (2,144 B)."
       ],
       "serialization": "bytemuck",
       "repr": {
@@ -4217,11 +5857,34 @@
           },
           {
             "name": "previous",
+            "docs": [
+              "The set the last write displaced."
+            ],
             "type": {
               "defined": {
                 "name": "ExtrasSet"
               }
             }
+          },
+          {
+            "name": "stable",
+            "docs": [
+              "The newest set that stood as `current` for `EXTRAS_STABLE_S` before being displaced,",
+              "or Governance's last publication (M2-SEC-2; module docs)."
+            ],
+            "type": {
+              "defined": {
+                "name": "ExtrasSet"
+              }
+            }
+          },
+          {
+            "name": "current_since",
+            "docs": [
+              "When `current` was written (unix seconds; 0: never, the empty set of",
+              "`initialize_config`)."
+            ],
+            "type": "i64"
           }
         ]
       }
@@ -4456,7 +6119,11 @@
     {
       "name": "Liquidate",
       "docs": [
-        "`liquidate`."
+        "`liquidate`. `cr_spot_bps` is the robust spot leg's CR (`CR(V_eff, B̂(Q; reprice(L_live,",
+        "P_rs)))` at the risk fee), `cr_ema_bps` the newest ring entry's (its cached `(x, y)`);",
+        "`b_live` is the execution quote the leg was bounded by (I13). `b_live_risk` (the live",
+        "quote at the risk fee, the penalty's base with `b_ref`) and `max_in` (I11: `B ≤ max_in +",
+        "ert`) are M2 additions to ARCH §3.10's field list."
       ],
       "type": {
         "kind": "struct",
@@ -4546,6 +6213,14 @@
           },
           {
             "name": "token_surplus",
+            "type": "u64"
+          },
+          {
+            "name": "b_live_risk",
+            "type": "u64"
+          },
+          {
+            "name": "max_in",
             "type": "u64"
           }
         ]
@@ -6325,6 +8000,35 @@
       }
     },
     {
+      "name": "SeedPartArg",
+      "docs": [
+        "One seed of a template, as the argument encoding of [`SeedPart`]: `kind` 1 = constant",
+        "(`len` bytes of `bytes`), 2 = placeholder (`len` = the placeholder id, `bytes` zero)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "kind",
+            "type": "u8"
+          },
+          {
+            "name": "len",
+            "type": "u8"
+          },
+          {
+            "name": "bytes",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "SettleArmed",
       "docs": [
         "`sol_settle` armed the clock."
@@ -6401,6 +8105,293 @@
               "[`SETTLE_REASON_REFUTED`] or [`SETTLE_REASON_NOT_LIQUIDATABLE`]."
             ],
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ShortPosition",
+      "docs": [
+        "A short position (ARCH §2.3.5)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "borrower",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "docs": [
+              "Chosen by the client; `init` fails if reused."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "[`POSITION_OPEN`] (1 = ExitInProgress reserved for v1.1)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "tier",
+            "type": "u8"
+          },
+          {
+            "name": "venue_at_open",
+            "type": "u8"
+          },
+          {
+            "name": "q",
+            "docs": [
+              "Tokens owed (constant: no partial close in the MVP)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "s",
+            "docs": [
+              "Sale proceeds."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "m",
+            "docs": [
+              "Margin."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "v",
+            "docs": [
+              "Tracked vault lamports (changes only through `add_margin`)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "n_open",
+            "type": "u64"
+          },
+          {
+            "name": "fee_open",
+            "type": "u64"
+          },
+          {
+            "name": "entry_price",
+            "docs": [
+              "`S·WAD/Q`."
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "j_open",
+            "docs": [
+              "Rent basis indices at open."
+            ],
+            "type": {
+              "array": [
+                "u128",
+                3
+              ]
+            }
+          },
+          {
+            "name": "r_min",
+            "docs": [
+              "Minimum rent, fixed at open."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "t_open",
+            "type": "i64"
+          },
+          {
+            "name": "deadline",
+            "docs": [
+              "`t_open + max_duration_s[tier]`."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "cr_liq_bps",
+            "type": "u32"
+          },
+          {
+            "name": "penalty_bps",
+            "type": "u16"
+          },
+          {
+            "name": "max_liq_slip_bps",
+            "type": "u16"
+          },
+          {
+            "name": "expiry_fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "rate_base_bps",
+            "type": "u32"
+          },
+          {
+            "name": "rate_slope1_bps",
+            "type": "u32"
+          },
+          {
+            "name": "rate_slope2_bps",
+            "type": "u32"
+          },
+          {
+            "name": "penalty_split",
+            "docs": [
+              "Lender / protocol / keeper."
+            ],
+            "type": {
+              "array": [
+                "u16",
+                3
+              ]
+            }
+          },
+          {
+            "name": "rent_protocol_bps",
+            "type": "u16"
+          },
+          {
+            "name": "settle_keeper_fixed",
+            "type": "u64"
+          },
+          {
+            "name": "settle_keeper_bps",
+            "type": "u16"
+          },
+          {
+            "name": "settle_keeper_cap",
+            "type": "u64"
+          },
+          {
+            "name": "expiry_keeper_fixed",
+            "type": "u64"
+          },
+          {
+            "name": "expiry_keeper_bps",
+            "type": "u16"
+          },
+          {
+            "name": "expiry_keeper_cap",
+            "type": "u64"
+          },
+          {
+            "name": "delta_liq_bps",
+            "type": "u16"
+          },
+          {
+            "name": "delta_exp_bps",
+            "type": "u16"
+          },
+          {
+            "name": "kappa_liq_bps",
+            "type": "u16"
+          },
+          {
+            "name": "kappa_base_bps",
+            "type": "u16"
+          },
+          {
+            "name": "kappa_growth_n",
+            "type": "u8"
+          },
+          {
+            "name": "liq_persist_n",
+            "type": "u8"
+          },
+          {
+            "name": "settle_persist_n",
+            "type": "u16"
+          },
+          {
+            "name": "settle_arm_gap_s",
+            "type": "u16"
+          },
+          {
+            "name": "exec_tol_bps",
+            "docs": [
+              "ε of the expiry bound."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "ert",
+            "docs": [
+              "Effective `exec_rent_tol` (0 on Raydium)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "ref_max_age_s",
+            "type": "u8"
+          },
+          {
+            "name": "fv_dev_bps",
+            "type": "u16"
+          },
+          {
+            "name": "venue_fee_hard_cap_bps",
+            "type": "u16"
+          },
+          {
+            "name": "s3_wait_s",
+            "type": "u32"
+          },
+          {
+            "name": "grad_grace_s",
+            "type": "u32"
+          },
+          {
+            "name": "max_migration_pause_s",
+            "type": "u32"
+          },
+          {
+            "name": "s_armed",
+            "type": "u8"
+          },
+          {
+            "name": "s_count",
+            "docs": [
+              "`ema_count` at arm."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "s_since",
+            "type": "i64"
+          },
+          {
+            "name": "s_last",
+            "type": "i64"
+          },
+          {
+            "name": "_reserved",
+            "docs": [
+              "Room for the O1/O2 terms if the owner ever signs them off (not built, R3A-8 c)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           }
         ]
       }
@@ -6768,6 +8759,14 @@
                 4
               ]
             }
+          },
+          {
+            "name": "stable_version",
+            "docs": [
+              "The version of the kind's `stable` set after the write (M2-SEC-2): it changes when the",
+              "displaced `current` had stood for `EXTRAS_STABLE_S` or Governance wrote."
+            ],
+            "type": "u32"
           }
         ]
       }
@@ -7027,6 +9026,33 @@
           {
             "name": "flagged_at",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WalletExposure",
+      "docs": [
+        "A borrower's open quantity in one market (the per-wallet cap, SPEC §4)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "q_open",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
           }
         ]
       }

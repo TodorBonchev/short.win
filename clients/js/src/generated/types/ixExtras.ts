@@ -8,6 +8,8 @@
 
 import {
   combineCodec,
+  getI64Decoder,
+  getI64Encoder,
   getStructDecoder,
   getStructEncoder,
   type FixedSizeCodec,
@@ -21,15 +23,45 @@ import {
   type ExtrasSetArgs,
 } from "./index.ts";
 
-/** The two selectable sets of one instruction kind (1,424 B). */
-export type IxExtras = { current: ExtrasSet; previous: ExtrasSet };
+/** The selectable sets of one instruction kind (2,144 B). */
+export type IxExtras = {
+  current: ExtrasSet;
+  /** The set the last write displaced. */
+  previous: ExtrasSet;
+  /**
+   * The newest set that stood as `current` for `EXTRAS_STABLE_S` before being displaced,
+   * or Governance's last publication (M2-SEC-2; module docs).
+   */
+  stable: ExtrasSet;
+  /**
+   * When `current` was written (unix seconds; 0: never, the empty set of
+   * `initialize_config`).
+   */
+  currentSince: bigint;
+};
 
-export type IxExtrasArgs = { current: ExtrasSetArgs; previous: ExtrasSetArgs };
+export type IxExtrasArgs = {
+  current: ExtrasSetArgs;
+  /** The set the last write displaced. */
+  previous: ExtrasSetArgs;
+  /**
+   * The newest set that stood as `current` for `EXTRAS_STABLE_S` before being displaced,
+   * or Governance's last publication (M2-SEC-2; module docs).
+   */
+  stable: ExtrasSetArgs;
+  /**
+   * When `current` was written (unix seconds; 0: never, the empty set of
+   * `initialize_config`).
+   */
+  currentSince: number | bigint;
+};
 
 export function getIxExtrasEncoder(): FixedSizeEncoder<IxExtrasArgs> {
   return getStructEncoder([
     ["current", getExtrasSetEncoder()],
     ["previous", getExtrasSetEncoder()],
+    ["stable", getExtrasSetEncoder()],
+    ["currentSince", getI64Encoder()],
   ]);
 }
 
@@ -37,6 +69,8 @@ export function getIxExtrasDecoder(): FixedSizeDecoder<IxExtras> {
   return getStructDecoder([
     ["current", getExtrasSetDecoder()],
     ["previous", getExtrasSetDecoder()],
+    ["stable", getExtrasSetDecoder()],
+    ["currentSince", getI64Decoder()],
   ]);
 }
 

@@ -4,8 +4,9 @@
 //! **Codes are stable.** Anchor numbers the variants from 6000 in declaration order, so the
 //! groups below follow ARCH §3.11 exactly and new codes are appended at the end (the M1
 //! foundation's temporary `NotImplemented` = 6091 was removed with the last M1 stub before any
-//! deployment; the M1 review's codes 6091–6097 follow, each naming its ARCH §3.11 group).
-//! `tests::codes_are_stable` pins every code.
+//! deployment; the M1 review's codes 6091–6098 follow, each naming its ARCH §3.11 group; M2's
+//! temporary `NotImplemented` = 6099 was likewise removed when the last M2 track landed, before
+//! any deployment, and M2's `UseLiquidate` took 6099). `tests::codes_are_stable` pins every code.
 
 use anchor_lang::prelude::*;
 use shortwin_math::MathError;
@@ -214,7 +215,7 @@ pub enum ShortwinError {
     #[msg("Oracle update is not fully verified")]
     OracleVerification,
 
-    // ---- Appended after the M1 review (6091–6097); ARCH §3.11 groups in brackets ----
+    // ---- Appended after the M1 review (6091–6098); ARCH §3.11 groups in brackets ----
     /// [Lenders] `withdraw`: the SOL part is below the caller's `min_sol` (M1-SEC-2).
     #[msg("SOL paid below the minimum")]
     SolBelowMin,
@@ -243,6 +244,13 @@ pub enum ShortwinError {
     /// `Timelock` change (owner decision on M1-SEC-1, SPEC §11).
     #[msg("Only governance may cancel an authorities or timelock change")]
     EmergencyCannotCancel,
+
+    // ---- Appended in M2 (6099; group in brackets) ----
+    /// [Exits] `expire` on a position that is expired **and** CR-liquidatable: the penalty
+    /// applies, so the keeper must call `liquidate` (ECON §8.4; ARCH §3.6 step 5, §3.7). The
+    /// mirror of `UseExpire`.
+    #[msg("Position is expired and CR-liquidatable; use liquidate")]
+    UseLiquidate,
 }
 
 impl From<MathError> for ShortwinError {
@@ -331,6 +339,7 @@ mod tests {
             (ShortwinError::CreationFeeAboveMax, 6096),
             (ShortwinError::OracleFutureDated, 6097),
             (ShortwinError::EmergencyCannotCancel, 6098),
+            (ShortwinError::UseLiquidate, 6099),
         ];
         for (e, c) in pins {
             assert_eq!(code(e), c, "{e:?}");

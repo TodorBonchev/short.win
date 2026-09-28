@@ -1,4 +1,4 @@
-//! `VenueExtras` (zero-copy, seeds `["venue_extras", venue u8]`, 4,352 B): bounded trailing
+//! `VenueExtras` (zero-copy, seeds `["venue_extras", venue u8]`, 6,512 B): bounded trailing
 //! accounts for a venue's CPIs (ARCH §2.3.2, §3.0, A41, A55; V2-6; **gated by O6**).
 //!
 //! `initialize_config` creates one per CPI venue kind (`PumpCurve`, `PumpSwap`, `RaydiumV4`,
@@ -6,18 +6,26 @@
 //! (`set_venue_extras`) and the trading-side parser belong to M2 (O6 is recorded in SPEC §14
 //! but the powers are built with the position engine); nothing reads these accounts in M1.
 //!
-//! Per venue: for each instruction kind (sell, buy, claim) a `current` and a `previous` set of
-//! up to 4 entries with a `version` each. An entry is a fixed key or a derivation template
-//! `{program, seeds: [SeedPart; ≤ 4], writable}`; a `SeedPart` is constant bytes (≤ 32) or a
-//! placeholder among `{mint, pool, trader, bonding_curve, coin_creator}`. Callers select `none`,
-//! `current` or `previous`, so one hostile or wrong Emergency write can never brick exits.
+//! Per venue: for each instruction kind (sell, buy, claim) a `current`, a `previous` and a
+//! `stable` set of up to 4 entries with a `version` each, and the time `current` was written.
+//! An entry is a fixed key or a derivation template `{program, seeds: [SeedPart; ≤ 4],
+//! writable}`; a `SeedPart` is constant bytes (≤ 32) or a placeholder among `{mint, pool,
+//! trader, bonding_curve, coin_creator}`. Callers select `none`, `current`, `previous` or
+//! `stable`:
 //!
-//! **Layout note (ARCH §2.3.2 says ≈ 3,500 B).** The exact encoding below is this module's
-//! (the ARCH table gives the content, not the bytes): `SeedPart` 34 B, `ExtraEntry` 176 B,
-//! `ExtrasSet` 712 B, `IxExtras` 1,424 B, the account 4,352 B (rent ≈ 0.0228 SOL × 4). M2 may
-//! re-cut it before the first deployment. M1 review (M1-FID-13): the deviation is recorded for
-//! the ARCH sync — either M2 shrinks `SeedPart` / `ExtraEntry` (the 32-byte constant part and
-//! the 4-seed template dominate) or ARCH §2.3.1 adopts 4,352 B; no M1 path reads the account.
+//! - `previous` is the set the last write displaced, so one hostile or wrong write can never
+//!   brick exits (ARCH §2.3.2, SPEC §11);
+//! - `stable` (M2-SEC-2) is the newest set that stood as `current` for at least
+//!   [`crate::constants::EXTRAS_STABLE_S`] before a write displaced it, or the set Governance
+//!   published last. Two quick writes shift a working set out of `previous`; they cannot shift
+//!   it out of `stable`: that takes a set the attacker keeps `current`, unchallenged, for
+//!   `EXTRAS_STABLE_S` (7 days) — longer than Governance needs to re-publish (48 h Squads time
+//!   lock) or to rotate the Emergency key through a timelocked `Authorities` change.
+//!
+//! **Layout** (ARCH §2.3.1 / §2.3.2 as synced after M1, M1-FID-13, **grown by M2-SEC-2**):
+//! `SeedPart` 34 B, `ExtraEntry` 176 B, `ExtrasSet` 712 B, `IxExtras` 2,144 B (was 1,424 B:
+//! `stable` and `current_since` added), the account 6,512 B (was 4,352 B; rent ≈ 0.0337 SOL ×
+//! 4). M2's extras parser (`venues::parse`) and `set_venue_extras` read and write it.
 
 use anchor_lang::prelude::*;
 
@@ -96,12 +104,19 @@ pub struct ExtrasSet {
     pub entries: [ExtraEntry; 4],
 }
 
-/// The two selectable sets of one instruction kind (1,424 B).
+/// The selectable sets of one instruction kind (2,144 B).
 #[zero_copy]
 #[derive(PartialEq, Eq)]
 pub struct IxExtras {
     pub current: ExtrasSet,
+    /// The set the last write displaced.
     pub previous: ExtrasSet,
+    /// The newest set that stood as `current` for `EXTRAS_STABLE_S` before being displaced,
+    /// or Governance's last publication (M2-SEC-2; module docs).
+    pub stable: ExtrasSet,
+    /// When `current` was written (unix seconds; 0: never, the empty set of
+    /// `initialize_config`).
+    pub current_since: i64,
 }
 
 /// Bounded venue extras of one venue kind.

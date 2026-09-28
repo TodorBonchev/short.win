@@ -12,10 +12,13 @@ resolution = true
 skip-lint = false
 
 [workspace]
-members = ["programs/shortwin"]
+# tests/mock_cpamm: the TEST-ONLY mock venue of M2 (ARCH §9, A49). It is built next to the
+# program so the LiteSVM tests can load target/deploy/mock_cpamm.so; it is never deployed.
+members = ["programs/shortwin", "tests/mock_cpamm"]
 
 [programs.localnet]
 shortwin = "5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK"
+mock_cpamm = "BPAZFPkmVtYEWEZHCzFUns7oybh1VWfAvmu3ofM2mQi7"
 
 [provider]
 cluster = "localnet"

@@ -1,0 +1,56 @@
+# shortwin-keeper configuration (ARCHITECTURE §7.1). Every key is optional: the values below are
+# the defaults (ECON §5.8 duties; owner item O17 sets the budget, the ceiling and the markets).
+#
+#   shortwin-keeper --rpc https://… --keypair keeper.json --config keeper.toml --metrics 127.0.0.1:9464
+
+# Markets covered (O17): "all", or { only = ["<market pubkey>", …] }.
+markets = "all"
+
+# Batch format (duty 7): "auto" (v1 while the cluster accepts it, v0 after a refusal, re-probed
+# after v1_reprobe_s), "v1" or "v0".
+tx_format = "auto"
+batch_v1 = 6
+batch_v0 = 4
+v1_reprobe_s = 3600
+
+# The protocol ALT(s) of A28 for v0 transactions (base58). Empty: all keys inline.
+lookup_tables = []
+
+# Simulate only, never send.
+dry_run = false
+
+[coverage]
+# Duty 1: every 30 s on a market with open positions and nothing near a threshold.
+idle_interval_s = 30
+# Duty 5: every 30 s on a market without a route (the S3 chain restarts after 60 s).
+no_route_interval_s = 30
+# Duty 1: a position is "near" below 1.3·L (bps of L), or within 60 s of its deadline, or armed.
+near_cr_bps = 13000
+deadline_window_s = 60
+# Duty 1: per-second coverage while |P_spot/P_ema − 1| > 2 %.
+ema_dev_bps = 200
+# Duty 2: a foreign observation 2 % away from the keeper's own view starts 60 s of per-slot
+# observations.
+burst_dev_bps = 200
+burst_s = 60
+# Duty 9: 3 consecutive seconds without a required observation make the market degraded; 10
+# minutes of restored coverage lift it.
+degraded_after_misses = 3
+recovery_s = 600
+# Positions of a market whose S3 is due are probed (simulated sol_settle) this often.
+s3_probe_interval_s = 10
+# Seconds between getProgramAccounts discoveries of new markets.
+discovery_interval_s = 10
+
+[budget]
+# O17: lamports per market per UTC day for observations (unset: unlimited). Exits are never
+# throttled.
+# per_market_daily_lamports = 30000000
+# O17: priority-price ceilings, micro-lamports per CU (observations / exits).
+priority_ceiling = 10000
+exit_priority_ceiling = 100000
+priority_floor = 0
+# Start from the p75 of the recent per-account fees on the transaction's markets; ×1.5 per
+# consecutive missed second.
+priority_percentile_bps = 7500
+escalate_bps = 5000

@@ -104,16 +104,18 @@ layout!(acct VenueGuard, 224, {
     flagged_at @ 112, _reserved @ 160,
 });
 
-// ---- VenueExtras (4,352 B) ----
-layout!(acct VenueExtras, 4_352, {
-    version @ 8, bump @ 10, venue @ 11, _pad0 @ 12, sets @ 16, _reserved @ 4_288,
+// ---- VenueExtras (6,512 B; 4,352 B before M2-SEC-2 added `stable` and `current_since`) ----
+layout!(acct VenueExtras, 6_512, {
+    version @ 8, bump @ 10, venue @ 11, _pad0 @ 12, sets @ 16, _reserved @ 6_448,
 });
 layout!(nested SeedPart, 34, { kind @ 0, len @ 1, bytes @ 2 });
 layout!(nested ExtraEntry, 176, {
     kind @ 0, writable @ 1, n_seeds @ 2, _pad @ 3, key @ 8, seeds @ 40,
 });
 layout!(nested ExtrasSet, 712, { version @ 0, count @ 4, _pad @ 5, entries @ 8 });
-layout!(nested IxExtras, 1_424, { current @ 0, previous @ 712 });
+layout!(nested IxExtras, 2_144, {
+    current @ 0, previous @ 712, stable @ 1_424, current_since @ 2_136,
+});
 
 // ---- Market (3,104 B; ARCH §2.3.4) ----
 layout!(acct Market, 3_104, {
@@ -180,7 +182,7 @@ const _: () = {
     assert!(OracleCache::SPACE == 45);
     assert!(GlobalConfig::SPACE == 1_448);
     assert!(VenueGuard::SPACE == 224);
-    assert!(VenueExtras::SPACE == 4_352);
+    assert!(VenueExtras::SPACE == 6_512);
     assert!(Market::SPACE == 3_104);
     assert!(MarketVault::SPACE == 2_200);
 };

@@ -49,9 +49,9 @@ is relative to this package, because `pnpm run generate` runs the Codama CLI fro
   For every field of every zero-copy type, it checks that the generated encoder puts the field
   at the asserted offset: it encodes the zero value, changes only that field, and asserts that
   the first changed byte is the offset. It also checks every asserted size. A field added to
-  that file is covered without editing the test. `ShortPosition`, `ShareEpoch` and
-  `WalletExposure` are not in the IDL yet (no M1 instruction names them), so the test lists them
-  as expected absences.
+  that file is covered without editing the test. `ShareEpoch` is not in the IDL yet (no
+  instruction names it as a typed account), so the test lists it as an expected absence;
+  `ShortPosition` and `WalletExposure` are in it since M2's `open_short`.
 - `helpers.test.ts` checks the hand-written `src/helpers.ts` (the `ShareEpoch` codec, PDA
   and remaining-account metas the IDL cannot describe before M2, and the `PodU128` / `PodI128`
   ↔ `bigint` conversions) against the Rust structs, and the Borsh `LenderPosition` decoder's

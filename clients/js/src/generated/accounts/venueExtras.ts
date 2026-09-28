@@ -173,5 +173,5 @@ export async function fetchAllMaybeVenueExtras(
 }
 
 export function getVenueExtrasSize(): number {
-  return 4352;
+  return 6512;
 }

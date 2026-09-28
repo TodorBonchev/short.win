@@ -20,6 +20,11 @@ idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 anchor-debug = []
 custom-heap = []
 custom-panic = []
+# TEST-ONLY (A49; ARCH §8.2, §9 M2): `VenueKind::Mock`, the adapter of the mock venue
+# `tests/mock_cpamm`. Built only by `scripts/build-test-venue.sh` into its own target
+# directory for the LiteSVM tests; the release artifact never enables it (CI checks the
+# release `shortwin.so` for the mock id and the test-venue marker).
+test-venue = ["shortwin-venue-state/test-venue"]
 
 [dependencies]
 # event-cpi: every event goes through `emit_cpi!` (ARCH §3.10); init-if-needed: `deposit`

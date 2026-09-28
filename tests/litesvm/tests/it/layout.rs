@@ -17,7 +17,7 @@ use shortwin_venue_state::bytes::{i64_at, key_at, u8_at, u16_at, u32_at, u64_at}
 fn documented_sizes() {
     assert_eq!(GlobalConfig::SPACE, 1_448);
     assert_eq!(VenueGuard::SPACE, 224);
-    assert_eq!(VenueExtras::SPACE, 4_352);
+    assert_eq!(VenueExtras::SPACE, 6_512); // 4,352 before M2-SEC-2 (`stable`, `current_since`)
     assert_eq!(OracleCache::SPACE, 45);
     assert_eq!(Market::SPACE, 3_104);
     assert_eq!(MarketVault::SPACE, 2_200);
@@ -40,11 +40,10 @@ fn accounts_created_on_chain_have_the_documented_sizes() {
         let e: VenueExtras = read::zc(&env.svm, &key).unwrap();
         assert_eq!(e.venue, kind as u8);
         assert_eq!(e.version, shortwin::constants::VENUE_EXTRAS_VERSION);
-        assert!(
-            e.sets
-                .iter()
-                .all(|s| s.current.count == 0 && s.previous.count == 0)
-        );
+        assert!(e.sets.iter().all(|s| s.current.count == 0
+            && s.previous.count == 0
+            && s.stable.count == 0
+            && s.current_since == 0));
     }
     // Every created account is rent-exempt at its size.
     for key in [pda::config(), pda::venue_guard(), pda::oracle_cache()] {

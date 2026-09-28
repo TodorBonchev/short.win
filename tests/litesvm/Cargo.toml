@@ -13,9 +13,15 @@ publish = false
 # (`anchor build --tools-version v1.57 --arch v3`); the `shortwin` crate is linked on the
 # host only for its instruction and account types.
 [dependencies]
-shortwin = { path = "../../programs/shortwin", features = ["no-entrypoint"] }
+# `test-venue` (A49): the harness speaks `VenueKind::Mock` and the mock reader; the SBF build it
+# loads for the engine tests is `scripts/build-test-venue.sh`'s (`Env::test_venue`). The host
+# feature does not reach any SBF artifact.
+shortwin = { path = "../../programs/shortwin", features = ["no-entrypoint", "test-venue"] }
 shortwin-math = { path = "../../crates/shortwin-math" }
 shortwin-venue-state = { path = "../../crates/shortwin-venue-state" }
+# The TEST-ONLY mock venue (tests/mock_cpamm, M2; A49): its id, instruction data and pool
+# layout for `src/mock.rs`; the SBF build target/deploy/mock_cpamm.so is what runs.
+mock-cpamm = { path = "../mock_cpamm", features = ["no-entrypoint"] }
 anchor-lang = "=1.2.0"
 anchor-spl = { version = "=1.2.0", default-features = false, features = ["token", "token_2022", "associated_token"] }
 bytemuck = "1.25"
@@ -64,6 +70,10 @@ solana-svm-timings = "~4.2.2"
 solana-syscalls = "~4.2.2"
 solana-system-program = "~4.2.2"
 solana-transaction-context = "~4.2.2"
+
+[dev-dependencies]
+# tests/mock_cpamm.rs: the mock's execution against `quote::cpmm` on generated pools and trades.
+proptest = "1.11.0"
 
 [[test]]
 name = "it"

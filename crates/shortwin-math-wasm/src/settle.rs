@@ -126,10 +126,14 @@ impl OracleState {
 
     /// The settlement box at `now` (`settle::box_of`): the EMA point widened to the ring's
     /// lower medians of the bucket lows and upper medians of the highs, or the EMA point
-    /// alone after `RING_LEN` seconds without an integration. Throws on an empty ring.
+    /// alone after `RING_LEN` seconds without an integration **if the venue cannot execute**
+    /// (`executable = false`; an executable venue always keeps the medians, M2-SEC-1).
+    /// Throws on an empty ring.
     #[wasm_bindgen(js_name = settleBox)]
-    pub fn settle_box(&self, now: i64) -> Result<SettleBox, JsError> {
-        Ok(SettleBox(msettle::box_of(&self.ema, &self.ring, now)?))
+    pub fn settle_box(&self, now: i64, executable: bool) -> Result<SettleBox, JsError> {
+        Ok(SettleBox(msettle::box_of(
+            &self.ema, &self.ring, now, executable,
+        )?))
     }
 
     /// The ring's medians `(P_mlo, P_mhi, L_mlo, L_mhi)` as a box (`observe::ring_medians`).
@@ -277,15 +281,17 @@ mod tests {
         assert_eq!(o.len(), 3);
         let m = o.ring_medians().unwrap();
         assert_eq!((m.p_lo(), m.p_hi()), (WAD, 4 * WAD));
-        let b = o.settle_box(11).unwrap();
+        let b = o.settle_box(11, true).unwrap();
         assert_eq!(
             (b.p_lo(), b.p_hi(), b.l_lo(), b.l_hi()),
             (WAD, 4 * WAD, 900, 1_100)
         );
         assert!(b.contains(2 * WAD, 1_000) && !b.is_point());
-        // No integration for more than RING_LEN seconds: the EMA point.
+        // No integration for more than RING_LEN seconds: the EMA point on a venue that
+        // cannot execute, the medians on one that can (M2-SEC-1).
         let far = 10 + i64::try_from(ring_len()).unwrap() + 1;
-        assert!(o.settle_box(far).unwrap().is_point());
+        assert!(o.settle_box(far, false).unwrap().is_point());
+        assert!(!o.settle_box(far, true).unwrap().is_point());
     }
 
     #[test]

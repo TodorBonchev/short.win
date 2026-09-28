@@ -68,15 +68,20 @@ impl SettleBox {
 /// P_lo = min(P_ema, P_mlo), P_hi = max(P_ema, P_mhi), L_lo = min(L_ema, L_mlo), L_hi = max(L_ema, L_mhi)
 /// ```
 ///
-/// or the EMA point `(P_ema, L_ema)` alone if `now − ema_ts > RING_LEN` seconds: a venue
+/// or the EMA point `(P_ema, L_ema)` alone if `now − ema_ts > RING_LEN` seconds **and the
+/// venue cannot execute now** (`!executable`, this instruction's `venue_executable`): a venue
 /// that records no observations cannot have been pushed since, and a halted venue's S3 must
-/// not be blocked. `ema` and `ring` are the post-roll state (ARCH §3.0).
+/// not be blocked. On an executable venue the medians always apply (M2-SEC-1): a stale
+/// integration proves nothing there, because a lender instruction's roll (ARCH §3.0 A16)
+/// integrates a pushed bucket without recording, so one attacker-only second followed by
+/// `RING_LEN + 1` quiet seconds would otherwise collapse the box onto the pushed EMA. `ema`
+/// and `ring` are the post-roll state (ARCH §3.0).
 ///
 /// Errors: `InvalidInput` for a corrupted or empty ring.
-pub fn box_of(ema: &Ema, ring: &Ring, now: i64) -> Result<SettleBox, MathError> {
+pub fn box_of(ema: &Ema, ring: &Ring, now: i64, executable: bool) -> Result<SettleBox, MathError> {
     let age = i128::from(now).saturating_sub(i128::from(ema.ts));
     let ring_len = i128::try_from(RING_LEN).map_err(|_| MathError::Overflow)?;
-    if age > ring_len {
+    if !executable && age > ring_len {
         return Ok(SettleBox::point(ema.price, ema.liq));
     }
     let (p_mlo, p_mhi, l_mlo, l_mhi) = ring_medians(ring)?;
@@ -655,6 +660,41 @@ pub fn settlement<Q: BoxQuotes>(
 
 const _: () = assert!(core::mem::size_of::<ArmState>() == 32);
 
+// ---- route predicates and chains (ARCH §3.0 step 8, §5.3; ECON §10.3) -------------------
+
+/// `s3_no_route = !venue_executable ∨ route-broken flag ∨ φ_live > hard cap` (ARCH §5.3;
+/// sim `Market.s3_no_route`), with the **global** `venue_fee_hard_cap_bps` (R3A-4 c). It
+/// feeds only the S3 chain, `sol_settle`'s "no route now" and the open gate (V2-1).
+pub fn s3_no_route(executable: bool, route_broken: bool, phi_ppm: u32, hard_cap_bps: u64) -> bool {
+    !executable || route_broken || crate::fees::exceeds_cap(phi_ppm, hard_cap_bps)
+}
+
+/// `pool_fail = !venue_executable ∨ φ_live > hard cap` (ARCH §2.6 rule 3, §5.3; sim
+/// `Market.pool_fail`): venue-side evidence only. It never reads the route-broken flag
+/// (V1-7, T-S3-BROKEN) and feeds only the fast-path chain.
+pub fn pool_fail(executable: bool, phi_ppm: u32, hard_cap_bps: u64) -> bool {
+    !executable || crate::fees::exceeds_cap(phi_ppm, hard_cap_bps)
+}
+
+/// One observation of a continuous route chain (ARCH §3.0 step 8, §5.3; ECON §10.3; C0-16;
+/// sim `Market._chain`): `(since, last)` with 0 for "unset" (the program's encoding of the
+/// sim's `None`).
+///
+/// ```text
+/// hit:   since = now if since == 0 or last == 0 or now − last > S3_OBS_GAP_S; last = now
+/// miss:  since = last = 0          (an observation with a route clears the chain)
+/// ```
+///
+/// Returns the new `(since, last)`. Observations further apart than `S3_OBS_GAP_S` restart
+/// the chain, so separate outages never add up (ECON §10.3 self-test).
+pub fn chain_step(since: i64, last: i64, now: i64, hit: bool) -> (i64, i64) {
+    if !hit {
+        return (0, 0);
+    }
+    let restart = since == 0 || last == 0 || now.saturating_sub(last) > crate::consts::S3_OBS_GAP_S;
+    (if restart { now } else { since }, now)
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::arithmetic_side_effects)]
 mod tests {
@@ -747,22 +787,56 @@ mod tests {
             o.roll(t + 1, &prm).unwrap();
             assert_eq!(o.ema.price, pushed, "frozen");
         }
-        let bx = box_of(&o.ema, &o.ring, 14).unwrap();
+        let bx = box_of(&o.ema, &o.ring, 14, true).unwrap();
         // The lower median of the lows stays at the honest price: 1 push + 4 frozen seconds
         // move the lows of one entry only.
         assert_eq!(bx.p_lo, 100 * WAD);
         assert_eq!(bx.p_hi, pushed + 1);
         assert!(bx.contains(o.ema.price, o.ema.liq));
-        // After more than RING_LEN seconds without an integration: the EMA point.
-        let far = box_of(&o.ema, &o.ring, o.ema.ts + 9).unwrap();
+        assert_eq!(box_of(&o.ema, &o.ring, 14, false).unwrap(), bx);
+        // After more than RING_LEN seconds without an integration, on a venue that cannot
+        // execute: the EMA point.
+        let far = box_of(&o.ema, &o.ring, o.ema.ts + 9, false).unwrap();
         assert!(far.is_point() && far.p_lo == pushed);
-        assert_eq!(box_of(&o.ema, &o.ring, o.ema.ts + 8).unwrap(), bx);
+        assert_eq!(box_of(&o.ema, &o.ring, o.ema.ts + 8, false).unwrap(), bx);
+        // On an executable venue a stale integration never collapses it (M2-SEC-1).
+        for age in [8, 9, 100, 1_000_000] {
+            assert_eq!(box_of(&o.ema, &o.ring, o.ema.ts + age, true).unwrap(), bx);
+        }
         let mut empty = o;
         empty.ring = Ring::default();
-        assert_eq!(
-            box_of(&empty.ema, &empty.ring, 14),
-            Err(MathError::InvalidInput)
-        );
+        for exec in [false, true] {
+            assert_eq!(
+                box_of(&empty.ema, &empty.ring, 14, exec),
+                Err(MathError::InvalidInput)
+            );
+        }
+    }
+
+    /// M2-SEC-1 on the observation module alone: one attacker-only pushed second, integrated
+    /// by a roll without a record (what a lender instruction's A16 roll does), then more than
+    /// `RING_LEN` quiet seconds. On an executable venue the box keeps the honest medians of
+    /// the ring (the pushed entry is one of 8), so the pushed EMA alone decides nothing; only
+    /// a venue that cannot execute collapses to the EMA point.
+    #[test]
+    fn a_rolled_push_does_not_collapse_the_box_on_an_executable_venue() {
+        let prm = EmaParams::DEFAULT;
+        let mut o = Observation::new(0, 100 * WAD, 1_000).unwrap();
+        for t in 1..=8 {
+            o.record(t, 100 * WAD, 1_000).unwrap();
+            o.roll(t + 1, &prm).unwrap();
+        }
+        // The push at t = 9 is rolled at t = 11 (dt = 2: up to +28.6 %), then silence.
+        o.record(9, 300 * WAD, 1_000).unwrap();
+        o.roll(11, &prm).unwrap();
+        let pushed = o.ema.price;
+        assert!(pushed > 125 * WAD, "{pushed}");
+        let now = o.ema.ts + 9;
+        let collapsed = box_of(&o.ema, &o.ring, now, false).unwrap();
+        assert!(collapsed.is_point() && collapsed.p_lo == pushed);
+        let bx = box_of(&o.ema, &o.ring, now, true).unwrap();
+        assert_eq!((bx.p_lo, bx.p_hi), (100 * WAD, pushed));
+        assert!(!bx.is_point());
     }
 
     #[test]
@@ -940,6 +1014,25 @@ mod tests {
             evaluate(&mut bad, &inp, &TERMS, &mut q),
             Err(MathError::Underflow)
         );
+    }
+
+    #[test]
+    fn route_predicates_and_chain_step() {
+        // s3_no_route reads the flag; pool_fail never does (V1-7).
+        assert!(!s3_no_route(true, false, 2_500, 500));
+        assert!(s3_no_route(false, false, 2_500, 500));
+        assert!(s3_no_route(true, true, 2_500, 500));
+        assert!(s3_no_route(true, false, 50_001, 500));
+        assert!(!s3_no_route(true, false, 50_000, 500));
+        assert!(!pool_fail(true, 50_000, 500));
+        assert!(pool_fail(true, 50_001, 500));
+        assert!(pool_fail(false, 0, 500));
+        // The chain (sim `_chain`): start, continue within the gap, restart after it, clear.
+        assert_eq!(chain_step(0, 0, 100, true), (100, 100));
+        assert_eq!(chain_step(100, 100, 160, true), (100, 160));
+        assert_eq!(chain_step(100, 160, 221, true), (221, 221));
+        assert_eq!(chain_step(100, 160, 170, false), (0, 0));
+        assert_eq!(chain_step(0, 0, 170, false), (0, 0));
     }
 
     #[test]

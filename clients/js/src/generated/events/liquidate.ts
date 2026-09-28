@@ -69,6 +69,8 @@ export type LiquidateEvent = {
   borrowerPayout: bigint;
   expired: boolean;
   tokenSurplus: bigint;
+  bLiveRisk: bigint;
+  maxIn: bigint;
 };
 
 export type LiquidateEventArgs = {
@@ -94,6 +96,8 @@ export type LiquidateEventArgs = {
   borrowerPayout: number | bigint;
   expired: boolean;
   tokenSurplus: number | bigint;
+  bLiveRisk: number | bigint;
+  maxIn: number | bigint;
 };
 
 /** Gets the encoder for {@link LiquidateEventArgs} event data. */
@@ -121,6 +125,8 @@ export function getLiquidateEventEncoder(): FixedSizeEncoder<LiquidateEventArgs>
       ["borrowerPayout", getU64Encoder()],
       ["expired", getBooleanEncoder()],
       ["tokenSurplus", getU64Encoder()],
+      ["bLiveRisk", getU64Encoder()],
+      ["maxIn", getU64Encoder()],
     ]),
     [getConstantEncoder(LIQUIDATE_EVENT_DISCRIMINATOR)],
   );
@@ -151,6 +157,8 @@ export function getLiquidateEventDecoder(): FixedSizeDecoder<LiquidateEvent> {
       ["borrowerPayout", getU64Decoder()],
       ["expired", getBooleanDecoder()],
       ["tokenSurplus", getU64Decoder()],
+      ["bLiveRisk", getU64Decoder()],
+      ["maxIn", getU64Decoder()],
     ]),
     [getConstantDecoder(LIQUIDATE_EVENT_DISCRIMINATOR)],
   );

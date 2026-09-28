@@ -8,7 +8,7 @@
 
 use anchor_lang::prelude::Pubkey;
 use litesvm::LiteSVM;
-use litesvm_token::{CreateAccount, CreateMint, MintTo};
+use litesvm_token::{CreateAccount, CreateAssociatedTokenAccount, CreateMint, MintTo};
 use shortwin::constants::{TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID};
 use solana_keypair::Keypair;
 use solana_signer::Signer;
@@ -85,6 +85,23 @@ pub fn create_token_account(
         .token_program_id(&id)
         .send()
         .unwrap_or_else(|e| panic!("create_token_account: {:?}", e.err))
+}
+
+/// Creates `ATA(owner, mint, program)` (anyone can: the ATA program checks only the address).
+/// Returns its key.
+pub fn create_ata(
+    svm: &mut LiteSVM,
+    payer: &Keypair,
+    owner: &Pubkey,
+    mint: &Pubkey,
+    program: TokenProgram,
+) -> Pubkey {
+    let id = program.id();
+    CreateAssociatedTokenAccount::new(svm, payer, mint)
+        .owner(owner)
+        .token_program_id(&id)
+        .send()
+        .unwrap_or_else(|e| panic!("create_ata: {:?}", e.err))
 }
 
 /// Mints `amount` raw units of `mint` to `destination` (`authority` signs).

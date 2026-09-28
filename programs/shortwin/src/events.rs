@@ -1,6 +1,7 @@
 //! Events (ARCH §3.10): one `emit_cpi!` per instruction (merging what v0.1 emitted separately,
-//! to save instruction-trace entries); `CoverageGap` is the one `emit!` log event (advisory,
-//! no CPI, no trace entry).
+//! to save instruction-trace entries). Two `emit!` log events (advisory, no CPI, no trace
+//! entry): `CoverageGap`, and `MintSafetyTripped` on an exit path (an exit never fails on the
+//! mint guard; `flag_unsafe_mint` emits it with `emit_cpi!`).
 //!
 //! Every event carries the common fields `market`, `slot`, `ts` (`market = Pubkey::default()`
 //! for the global admin events). `initialize_config` emits nothing (no §3.10 event; its account
@@ -109,7 +110,9 @@ pub struct Open {
     pub venue_rent: u64,
 }
 
-/// `close_short`.
+/// `close_short`. `b_live` (the execution quote the leg was bounded by, I13) and
+/// `token_surplus` (tokens a venue delivered beyond `q`, kept in the pool vault as a
+/// donation, A62, V2-10) are M2 additions to ARCH §3.10's field list.
 #[event]
 pub struct Close {
     pub market: Pubkey,
@@ -122,9 +125,15 @@ pub struct Close {
     pub rent: u64,
     pub rent_protocol: u64,
     pub borrower_payout: u64,
+    pub b_live: u64,
+    pub token_surplus: u64,
 }
 
-/// `liquidate`.
+/// `liquidate`. `cr_spot_bps` is the robust spot leg's CR (`CR(V_eff, B̂(Q; reprice(L_live,
+/// P_rs)))` at the risk fee), `cr_ema_bps` the newest ring entry's (its cached `(x, y)`);
+/// `b_live` is the execution quote the leg was bounded by (I13). `b_live_risk` (the live
+/// quote at the risk fee, the penalty's base with `b_ref`) and `max_in` (I11: `B ≤ max_in +
+/// ert`) are M2 additions to ARCH §3.10's field list.
 #[event]
 pub struct Liquidate {
     pub market: Pubkey,
@@ -149,9 +158,13 @@ pub struct Liquidate {
     pub borrower_payout: u64,
     pub expired: bool,
     pub token_surplus: u64,
+    pub b_live_risk: u64,
+    pub max_in: u64,
 }
 
-/// `expire`.
+/// `expire`. `b_live` is the execution quote the leg was bounded by (I13). `b_live_risk` (the
+/// fee base with `b_ref`), `max_in` (I11) and `token_surplus` (tokens a venue delivered beyond
+/// `q`, A62, V2-10) are M2 additions to ARCH §3.10's field list.
 #[event]
 pub struct Expire {
     pub market: Pubkey,
@@ -167,6 +180,9 @@ pub struct Expire {
     pub expiry_fee: u64,
     pub keeper_reward: u64,
     pub borrower_payout: u64,
+    pub b_live_risk: u64,
+    pub max_in: u64,
+    pub token_surplus: u64,
 }
 
 /// `sol_settle` (an executing settlement).
@@ -521,4 +537,7 @@ pub struct VenueExtrasSet {
     pub ix: u8,
     pub version: u32,
     pub keys: [Pubkey; 4],
+    /// The version of the kind's `stable` set after the write (M2-SEC-2): it changes when the
+    /// displaced `current` had stood for `EXTRAS_STABLE_S` or Governance wrote.
+    pub stable_version: u32,
 }

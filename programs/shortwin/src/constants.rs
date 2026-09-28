@@ -28,7 +28,7 @@ pub const CONFIG_VERSION: u16 = 1;
 /// `VenueGuard.version`.
 pub const VENUE_GUARD_VERSION: u16 = 1;
 /// `VenueExtras.version`.
-pub const VENUE_EXTRAS_VERSION: u16 = 1;
+pub const VENUE_EXTRAS_VERSION: u16 = 2;
 /// `Market.version` (ARCH §2.3.4).
 pub const MARKET_VERSION: u16 = 1;
 
@@ -40,13 +40,22 @@ pub const MIN_TIMELOCK_S: u32 = 86_400;
 pub const DEFAULT_TIMELOCK_S: u32 = 172_800;
 /// Compiled ceiling of `GlobalConfig.timelock_s`: 30 days. A unit slip (48 h in milliseconds)
 /// or a hostile `Timelock` change could otherwise freeze every later change, key rotations
-/// included, for years (M1-SEC-4; not in ARCH §2.3.2 yet, see the M1 review notes).
+/// included, for years (M1-SEC-4; ARCH §2.3.2, §2.3.3).
 pub const MAX_TIMELOCK_S: u32 = 2_592_000;
 /// How long after `not_before` a pending change may still be applied: 14 days. Later,
 /// `apply_config` refuses (`PendingChangeExpired`) and governance proposes it again, so a
-/// forgotten proposal cannot be applied long after users stopped watching it (M1-SEC-9; not
-/// in ARCH §3.1 yet).
+/// forgotten proposal cannot be applied long after users stopped watching it (M1-SEC-9;
+/// ARCH §2.3.2, §3.1).
 pub const CONFIG_APPLY_WINDOW_S: i64 = 1_209_600;
+/// How long an extras set must stand as `current` before the write that displaces it also
+/// makes it the `stable` escape set of its instruction kind: 7 days (M2-SEC-2; ARCH §2.3.2
+/// `VenueExtras`). Longer than Governance needs to re-publish a set (its 48 h Squads time
+/// lock) or to rotate the Emergency key through a timelocked `Authorities` change (≥ 24 h,
+/// 48 h by default, plus the Squads lock), so a compromised or twice-mistaken Emergency key
+/// cannot push a working set out of every selectable slot before Governance can act.
+/// **PROPOSED** (owner decision with O6): a compile-time constant, like the other timing bounds
+/// of the Emergency powers.
+pub const EXTRAS_STABLE_S: i64 = 604_800;
 
 /// CPMM `open_time` clamp cut-off, 2024-06-01T00:00Z (ARCH §2.3.3, §4.7; R-RAY §7).
 pub const T_CLAMP: i64 = 1_717_200_000;
@@ -63,8 +72,18 @@ pub const VENUE_BIT_RAYDIUM_V4: u32 = 1 << 2;
 pub const VENUE_BIT_RAYDIUM_CPMM: u32 = 1 << 3;
 /// Jupiter (v1.1).
 pub const VENUE_BIT_JUPITER: u32 = 1 << 4;
-/// Every bit `venue_enabled` may hold.
-pub const VENUE_BITS_KNOWN: u32 = VENUE_BIT_PUMP_CURVE
+/// TEST-ONLY: the mock venue (`VenueKind::Mock`, feature `test-venue`; A49).
+#[cfg(feature = "test-venue")]
+pub const VENUE_BIT_MOCK: u32 = 1 << 5;
+/// Every bit `venue_enabled` may hold (the release set; a `test-venue` build adds
+/// `VENUE_BIT_MOCK`).
+#[cfg(not(feature = "test-venue"))]
+pub const VENUE_BITS_KNOWN: u32 = VENUE_BITS_RELEASE;
+/// Every bit `venue_enabled` may hold (the release set plus `VENUE_BIT_MOCK`).
+#[cfg(feature = "test-venue")]
+pub const VENUE_BITS_KNOWN: u32 = VENUE_BITS_RELEASE | VENUE_BIT_MOCK;
+/// The venue bits of the release build.
+pub const VENUE_BITS_RELEASE: u32 = VENUE_BIT_PUMP_CURVE
     | VENUE_BIT_PUMP_SWAP
     | VENUE_BIT_RAYDIUM_V4
     | VENUE_BIT_RAYDIUM_CPMM
@@ -198,6 +217,20 @@ pub const WSOL_2022_MINT: Pubkey = pubkey!("9pan9bMn5HatX4EJdBwg9VgCa7Uz5HL8N1m5
 /// account that requires incoming-transfer memos (ARCH §3.3; R-MINT §8.4; T-MEMO, U17).
 pub const MEMO_PROGRAM_ID: Pubkey = pubkey!("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
 
+// ---- TEST-ONLY mock venue (feature `test-venue`; A49; tests/mock_cpamm/INTERFACE.md) -------
+
+/// The mock constant-product venue `tests/mock_cpamm` (never deployed).
+#[cfg(feature = "test-venue")]
+pub const MOCK_CPAMM_PROGRAM_ID: Pubkey = pubkey!("BPAZFPkmVtYEWEZHCzFUns7oybh1VWfAvmu3ofM2mQi7");
+/// The mock's global vault authority `PDA(mock, ["authority"])`.
+#[cfg(feature = "test-venue")]
+pub const MOCK_CPAMM_AUTHORITY: Pubkey = pubkey!("FchvTASEWCcGETHi6QMLW7v64Jzn66W8Z3yqZjY9iqLA");
+/// Marker string a `test-venue` build logs when it adopts a mock pool: CI's A49 check requires
+/// it (and the mock id) **absent** from the release `shortwin.so` and present in the
+/// test-venue build.
+#[cfg(feature = "test-venue")]
+pub const TEST_VENUE_MARKER: &str = "shortwin:test-venue:mock-cpamm";
+
 // ---- oracle (ARCH §4.7, A10, A29; R-VEN §5) ------------------------------------------------
 
 /// Pyth Solana receiver: owner of every `PriceUpdateV2`.
@@ -274,6 +307,19 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "test-venue")]
+    #[test]
+    fn mock_venue_constants_rederive() {
+        assert_eq!(
+            MOCK_CPAMM_PROGRAM_ID.to_bytes(),
+            shortwin_venue_state::mock_cpamm::PROGRAM
+        );
+        assert_eq!(
+            pda(&MOCK_CPAMM_PROGRAM_ID, &[b"authority"]),
+            MOCK_CPAMM_AUTHORITY
+        );
+    }
+
     #[test]
     fn venue_state_constants_agree() {
         assert_eq!(
@@ -297,7 +343,11 @@ mod tests {
         assert_eq!(GUARD_MASK_PUMP_CURVE, 0b00111);
         assert_eq!(GUARD_MASK_PUMP_SWAP, 0b00110);
         assert_eq!(GUARD_MASK_RAYDIUM, 0b11000);
+        assert_eq!(VENUE_BITS_RELEASE, 0b11111);
+        #[cfg(not(feature = "test-venue"))]
         assert_eq!(VENUE_BITS_KNOWN, 0b11111);
+        #[cfg(feature = "test-venue")]
+        assert_eq!(VENUE_BITS_KNOWN, 0b111111);
         assert_eq!(T_CLAMP, 1_717_200_000);
         const { assert!(MIN_TIMELOCK_S <= DEFAULT_TIMELOCK_S) };
         const { assert!(DEFAULT_TIMELOCK_S <= MAX_TIMELOCK_S) };

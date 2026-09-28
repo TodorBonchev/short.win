@@ -7,8 +7,8 @@
 //!
 //! Effects, in order (ARCH §3.0 A16: prologue steps 1–5, then 10–11):
 //! 1. the prologue (`engine::prologue`): the Accounts constraints; params-version sync; the
-//!    mint guard; accrue (vest release, rent); no observation roll in M1 (no bucket can be
-//!    open);
+//!    mint guard; accrue (vest release, rent); the observation roll (a completed bucket is
+//!    integrated; nothing is recorded, A16);
 //! 2. a `LenderPosition` created by this instruction starts at the pool's current `acc`,
 //!    `acc_r` and epoch (`pool::Lender::new`);
 //! 3. `pool::deposit` (release, touch with the `ShareEpoch` records, mint `⌊amount·(S + VS)/(T +
@@ -121,6 +121,8 @@ pub fn handler<'info>(
         let mut pool = market.pool();
         let mut vault = vault_acc.vault();
         prologue::accrue(&mut market, &mut pool, &mut vault, now)?;
+        // A16 step 5: roll a completed bucket (no ReadSet, so no record and no chains).
+        prologue::roll_only(&market_key, &mut market, now, clock.slot)?;
 
         let records = lender::load_records(&market_key, ctx.remaining_accounts, usize::MAX)?;
         let position = &mut ctx.accounts.lender;

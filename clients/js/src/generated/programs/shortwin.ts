@@ -39,8 +39,10 @@ import {
   getMarketCodec,
   getMarketVaultCodec,
   getOracleCacheCodec,
+  getShortPositionCodec,
   getVenueExtrasCodec,
   getVenueGuardCodec,
+  getWalletExposureCodec,
   type GlobalConfig,
   type GlobalConfigArgs,
   type LenderPosition,
@@ -51,88 +53,134 @@ import {
   type MarketVaultArgs,
   type OracleCache,
   type OracleCacheArgs,
+  type ShortPosition,
+  type ShortPositionArgs,
   type VenueExtras,
   type VenueExtrasArgs,
   type VenueGuard,
   type VenueGuardArgs,
+  type WalletExposure,
+  type WalletExposureArgs,
 } from "../accounts/index.ts";
 import {
+  getAddMarginInstruction,
   getApplyConfigInstructionAsync,
   getCancelConfigInstructionAsync,
   getClaimSolInstructionAsync,
+  getCloseShortInstructionAsync,
   getCoverDeficitInstructionAsync,
+  getCrankPriceInstructionAsync,
   getCrankSolUsdInstructionAsync,
   getCreateMarketInstructionAsync,
   getDepositInstructionAsync,
   getDisableVenueInstructionAsync,
+  getExpireInstructionAsync,
   getFlagUnsafeMintInstructionAsync,
   getFlagVenueUpgradedInstructionAsync,
   getInitializeConfigInstructionAsync,
+  getLiquidateInstructionAsync,
+  getOpenShortInstructionAsync,
   getProposeConfigInstructionAsync,
   getRevalidateVenueInstructionAsync,
   getSetPauseInstructionAsync,
+  getSetRouteBrokenInstructionAsync,
+  getSetVenueExtrasInstructionAsync,
+  getSolSettleInstructionAsync,
   getSweepProtocolFeesInstructionAsync,
+  getSweepTraderInstructionAsync,
   getSyncLenderInstructionAsync,
   getWithdrawInstructionAsync,
+  parseAddMarginInstruction,
   parseApplyConfigInstruction,
   parseCancelConfigInstruction,
   parseClaimSolInstruction,
+  parseCloseShortInstruction,
   parseCoverDeficitInstruction,
+  parseCrankPriceInstruction,
   parseCrankSolUsdInstruction,
   parseCreateMarketInstruction,
   parseDepositInstruction,
   parseDisableVenueInstruction,
+  parseExpireInstruction,
   parseFlagUnsafeMintInstruction,
   parseFlagVenueUpgradedInstruction,
   parseInitializeConfigInstruction,
+  parseLiquidateInstruction,
+  parseOpenShortInstruction,
   parseProposeConfigInstruction,
   parseRevalidateVenueInstruction,
   parseSetPauseInstruction,
+  parseSetRouteBrokenInstruction,
+  parseSetVenueExtrasInstruction,
+  parseSolSettleInstruction,
   parseSweepProtocolFeesInstruction,
+  parseSweepTraderInstruction,
   parseSyncLenderInstruction,
   parseWithdrawInstruction,
+  type AddMarginInput,
   type ApplyConfigAsyncInput,
   type CancelConfigAsyncInput,
   type ClaimSolAsyncInput,
+  type CloseShortAsyncInput,
   type CoverDeficitAsyncInput,
+  type CrankPriceAsyncInput,
   type CrankSolUsdAsyncInput,
   type CreateMarketAsyncInput,
   type DepositAsyncInput,
   type DisableVenueAsyncInput,
+  type ExpireAsyncInput,
   type FlagUnsafeMintAsyncInput,
   type FlagVenueUpgradedAsyncInput,
   type InitializeConfigAsyncInput,
+  type LiquidateAsyncInput,
+  type OpenShortAsyncInput,
+  type ParsedAddMarginInstruction,
   type ParsedApplyConfigInstruction,
   type ParsedCancelConfigInstruction,
   type ParsedClaimSolInstruction,
+  type ParsedCloseShortInstruction,
   type ParsedCoverDeficitInstruction,
+  type ParsedCrankPriceInstruction,
   type ParsedCrankSolUsdInstruction,
   type ParsedCreateMarketInstruction,
   type ParsedDepositInstruction,
   type ParsedDisableVenueInstruction,
+  type ParsedExpireInstruction,
   type ParsedFlagUnsafeMintInstruction,
   type ParsedFlagVenueUpgradedInstruction,
   type ParsedInitializeConfigInstruction,
+  type ParsedLiquidateInstruction,
+  type ParsedOpenShortInstruction,
   type ParsedProposeConfigInstruction,
   type ParsedRevalidateVenueInstruction,
   type ParsedSetPauseInstruction,
+  type ParsedSetRouteBrokenInstruction,
+  type ParsedSetVenueExtrasInstruction,
+  type ParsedSolSettleInstruction,
   type ParsedSweepProtocolFeesInstruction,
+  type ParsedSweepTraderInstruction,
   type ParsedSyncLenderInstruction,
   type ParsedWithdrawInstruction,
   type ProposeConfigAsyncInput,
   type RevalidateVenueAsyncInput,
   type SetPauseAsyncInput,
+  type SetRouteBrokenAsyncInput,
+  type SetVenueExtrasAsyncInput,
+  type SolSettleAsyncInput,
   type SweepProtocolFeesAsyncInput,
+  type SweepTraderAsyncInput,
   type SyncLenderAsyncInput,
   type WithdrawAsyncInput,
 } from "../instructions/index.ts";
 import {
   findConfigPda,
+  findExposurePda,
   findLenderPda,
   findMarketPda,
   findMarketVaultPda,
   findOracleCachePda,
   findPoolVaultPda,
+  findPositionPda,
   findTraderPda,
   findVenueExtrasPumpCurvePda,
   findVenueExtrasPumpSwapPda,
@@ -150,15 +198,19 @@ export const ShortwinAccount = {
   2: "Market",
   3: "MarketVault",
   4: "OracleCache",
-  5: "VenueExtras",
-  6: "VenueGuard",
+  5: "ShortPosition",
+  6: "VenueExtras",
+  7: "VenueGuard",
+  8: "WalletExposure",
   GlobalConfig: 0,
   LenderPosition: 1,
   Market: 2,
   MarketVault: 3,
   OracleCache: 4,
-  VenueExtras: 5,
-  VenueGuard: 6,
+  ShortPosition: 5,
+  VenueExtras: 6,
+  VenueGuard: 7,
+  WalletExposure: 8,
 } as const;
 
 export type ShortwinAccount = (typeof ShortwinAccount)[Exclude<
@@ -229,6 +281,17 @@ export function identifyShortwinAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([110, 216, 100, 57, 75, 53, 168, 59]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinAccount.ShortPosition;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([206, 206, 44, 22, 14, 20, 114, 102]),
       ),
       0,
@@ -246,6 +309,17 @@ export function identifyShortwinAccount(
     )
   ) {
     return ShortwinAccount.VenueGuard;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([96, 91, 128, 118, 104, 144, 64, 198]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinAccount.WalletExposure;
   }
   throw new SolanaError(
     SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
@@ -739,40 +813,60 @@ export function identifyShortwinEvent(
 }
 
 export const ShortwinInstruction = {
-  0: "ApplyConfig",
-  1: "CancelConfig",
-  2: "ClaimSol",
-  3: "CoverDeficit",
-  4: "CrankSolUsd",
-  5: "CreateMarket",
-  6: "Deposit",
-  7: "DisableVenue",
-  8: "FlagUnsafeMint",
-  9: "FlagVenueUpgraded",
-  10: "InitializeConfig",
-  11: "ProposeConfig",
-  12: "RevalidateVenue",
-  13: "SetPause",
-  14: "SweepProtocolFees",
-  15: "SyncLender",
-  16: "Withdraw",
-  ApplyConfig: 0,
-  CancelConfig: 1,
-  ClaimSol: 2,
-  CoverDeficit: 3,
-  CrankSolUsd: 4,
-  CreateMarket: 5,
-  Deposit: 6,
-  DisableVenue: 7,
-  FlagUnsafeMint: 8,
-  FlagVenueUpgraded: 9,
-  InitializeConfig: 10,
-  ProposeConfig: 11,
-  RevalidateVenue: 12,
-  SetPause: 13,
-  SweepProtocolFees: 14,
-  SyncLender: 15,
-  Withdraw: 16,
+  0: "AddMargin",
+  1: "ApplyConfig",
+  2: "CancelConfig",
+  3: "ClaimSol",
+  4: "CloseShort",
+  5: "CoverDeficit",
+  6: "CrankPrice",
+  7: "CrankSolUsd",
+  8: "CreateMarket",
+  9: "Deposit",
+  10: "DisableVenue",
+  11: "Expire",
+  12: "FlagUnsafeMint",
+  13: "FlagVenueUpgraded",
+  14: "InitializeConfig",
+  15: "Liquidate",
+  16: "OpenShort",
+  17: "ProposeConfig",
+  18: "RevalidateVenue",
+  19: "SetPause",
+  20: "SetRouteBroken",
+  21: "SetVenueExtras",
+  22: "SolSettle",
+  23: "SweepProtocolFees",
+  24: "SweepTrader",
+  25: "SyncLender",
+  26: "Withdraw",
+  AddMargin: 0,
+  ApplyConfig: 1,
+  CancelConfig: 2,
+  ClaimSol: 3,
+  CloseShort: 4,
+  CoverDeficit: 5,
+  CrankPrice: 6,
+  CrankSolUsd: 7,
+  CreateMarket: 8,
+  Deposit: 9,
+  DisableVenue: 10,
+  Expire: 11,
+  FlagUnsafeMint: 12,
+  FlagVenueUpgraded: 13,
+  InitializeConfig: 14,
+  Liquidate: 15,
+  OpenShort: 16,
+  ProposeConfig: 17,
+  RevalidateVenue: 18,
+  SetPause: 19,
+  SetRouteBroken: 20,
+  SetVenueExtras: 21,
+  SolSettle: 22,
+  SweepProtocolFees: 23,
+  SweepTrader: 24,
+  SyncLender: 25,
+  Withdraw: 26,
 } as const;
 
 export type ShortwinInstruction = (typeof ShortwinInstruction)[Exclude<
@@ -784,6 +878,17 @@ export function identifyShortwinInstruction(
   instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): ShortwinInstruction {
   const data = "data" in instruction ? instruction.data : instruction;
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([211, 238, 238, 90, 223, 228, 228, 76]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinInstruction.AddMargin;
+  }
   if (
     containsBytes(
       data,
@@ -821,12 +926,34 @@ export function identifyShortwinInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([159, 16, 29, 141, 209, 68, 25, 0]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinInstruction.CloseShort;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([111, 47, 68, 186, 165, 82, 169, 88]),
       ),
       0,
     )
   ) {
     return ShortwinInstruction.CoverDeficit;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([8, 89, 67, 221, 50, 129, 35, 48]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinInstruction.CrankPrice;
   }
   if (
     containsBytes(
@@ -876,6 +1003,17 @@ export function identifyShortwinInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([243, 83, 205, 58, 57, 201, 247, 146]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinInstruction.Expire;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([65, 65, 54, 154, 190, 218, 0, 169]),
       ),
       0,
@@ -904,6 +1042,28 @@ export function identifyShortwinInstruction(
     )
   ) {
     return ShortwinInstruction.InitializeConfig;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([223, 179, 226, 125, 48, 46, 39, 74]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinInstruction.Liquidate;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([66, 191, 209, 162, 3, 36, 159, 99]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinInstruction.OpenShort;
   }
   if (
     containsBytes(
@@ -942,12 +1102,56 @@ export function identifyShortwinInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([177, 160, 0, 3, 36, 20, 215, 230]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinInstruction.SetRouteBroken;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([28, 35, 237, 216, 131, 255, 50, 94]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinInstruction.SetVenueExtras;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([155, 7, 196, 156, 51, 120, 51, 2]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinInstruction.SolSettle;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([117, 225, 240, 75, 71, 195, 44, 43]),
       ),
       0,
     )
   ) {
     return ShortwinInstruction.SweepProtocolFees;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([244, 159, 222, 169, 87, 76, 64, 94]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinInstruction.SweepTrader;
   }
   if (
     containsBytes(
@@ -981,6 +1185,9 @@ export type ParsedShortwinInstruction<
   TProgram extends string = "5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK",
 > =
   | ({
+      instructionType: typeof ShortwinInstruction.AddMargin;
+    } & ParsedAddMarginInstruction<TProgram>)
+  | ({
       instructionType: typeof ShortwinInstruction.ApplyConfig;
     } & ParsedApplyConfigInstruction<TProgram>)
   | ({
@@ -990,8 +1197,14 @@ export type ParsedShortwinInstruction<
       instructionType: typeof ShortwinInstruction.ClaimSol;
     } & ParsedClaimSolInstruction<TProgram>)
   | ({
+      instructionType: typeof ShortwinInstruction.CloseShort;
+    } & ParsedCloseShortInstruction<TProgram>)
+  | ({
       instructionType: typeof ShortwinInstruction.CoverDeficit;
     } & ParsedCoverDeficitInstruction<TProgram>)
+  | ({
+      instructionType: typeof ShortwinInstruction.CrankPrice;
+    } & ParsedCrankPriceInstruction<TProgram>)
   | ({
       instructionType: typeof ShortwinInstruction.CrankSolUsd;
     } & ParsedCrankSolUsdInstruction<TProgram>)
@@ -1005,6 +1218,9 @@ export type ParsedShortwinInstruction<
       instructionType: typeof ShortwinInstruction.DisableVenue;
     } & ParsedDisableVenueInstruction<TProgram>)
   | ({
+      instructionType: typeof ShortwinInstruction.Expire;
+    } & ParsedExpireInstruction<TProgram>)
+  | ({
       instructionType: typeof ShortwinInstruction.FlagUnsafeMint;
     } & ParsedFlagUnsafeMintInstruction<TProgram>)
   | ({
@@ -1013,6 +1229,12 @@ export type ParsedShortwinInstruction<
   | ({
       instructionType: typeof ShortwinInstruction.InitializeConfig;
     } & ParsedInitializeConfigInstruction<TProgram>)
+  | ({
+      instructionType: typeof ShortwinInstruction.Liquidate;
+    } & ParsedLiquidateInstruction<TProgram>)
+  | ({
+      instructionType: typeof ShortwinInstruction.OpenShort;
+    } & ParsedOpenShortInstruction<TProgram>)
   | ({
       instructionType: typeof ShortwinInstruction.ProposeConfig;
     } & ParsedProposeConfigInstruction<TProgram>)
@@ -1023,8 +1245,20 @@ export type ParsedShortwinInstruction<
       instructionType: typeof ShortwinInstruction.SetPause;
     } & ParsedSetPauseInstruction<TProgram>)
   | ({
+      instructionType: typeof ShortwinInstruction.SetRouteBroken;
+    } & ParsedSetRouteBrokenInstruction<TProgram>)
+  | ({
+      instructionType: typeof ShortwinInstruction.SetVenueExtras;
+    } & ParsedSetVenueExtrasInstruction<TProgram>)
+  | ({
+      instructionType: typeof ShortwinInstruction.SolSettle;
+    } & ParsedSolSettleInstruction<TProgram>)
+  | ({
       instructionType: typeof ShortwinInstruction.SweepProtocolFees;
     } & ParsedSweepProtocolFeesInstruction<TProgram>)
+  | ({
+      instructionType: typeof ShortwinInstruction.SweepTrader;
+    } & ParsedSweepTraderInstruction<TProgram>)
   | ({
       instructionType: typeof ShortwinInstruction.SyncLender;
     } & ParsedSyncLenderInstruction<TProgram>)
@@ -1037,6 +1271,13 @@ export function parseShortwinInstruction<TProgram extends string>(
 ): ParsedShortwinInstruction<TProgram> {
   const instructionType = identifyShortwinInstruction(instruction);
   switch (instructionType) {
+    case ShortwinInstruction.AddMargin: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: ShortwinInstruction.AddMargin,
+        ...parseAddMarginInstruction(instruction),
+      };
+    }
     case ShortwinInstruction.ApplyConfig: {
       assertIsInstructionWithAccounts(instruction);
       return {
@@ -1058,11 +1299,25 @@ export function parseShortwinInstruction<TProgram extends string>(
         ...parseClaimSolInstruction(instruction),
       };
     }
+    case ShortwinInstruction.CloseShort: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: ShortwinInstruction.CloseShort,
+        ...parseCloseShortInstruction(instruction),
+      };
+    }
     case ShortwinInstruction.CoverDeficit: {
       assertIsInstructionWithAccounts(instruction);
       return {
         instructionType: ShortwinInstruction.CoverDeficit,
         ...parseCoverDeficitInstruction(instruction),
+      };
+    }
+    case ShortwinInstruction.CrankPrice: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: ShortwinInstruction.CrankPrice,
+        ...parseCrankPriceInstruction(instruction),
       };
     }
     case ShortwinInstruction.CrankSolUsd: {
@@ -1093,6 +1348,13 @@ export function parseShortwinInstruction<TProgram extends string>(
         ...parseDisableVenueInstruction(instruction),
       };
     }
+    case ShortwinInstruction.Expire: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: ShortwinInstruction.Expire,
+        ...parseExpireInstruction(instruction),
+      };
+    }
     case ShortwinInstruction.FlagUnsafeMint: {
       assertIsInstructionWithAccounts(instruction);
       return {
@@ -1112,6 +1374,20 @@ export function parseShortwinInstruction<TProgram extends string>(
       return {
         instructionType: ShortwinInstruction.InitializeConfig,
         ...parseInitializeConfigInstruction(instruction),
+      };
+    }
+    case ShortwinInstruction.Liquidate: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: ShortwinInstruction.Liquidate,
+        ...parseLiquidateInstruction(instruction),
+      };
+    }
+    case ShortwinInstruction.OpenShort: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: ShortwinInstruction.OpenShort,
+        ...parseOpenShortInstruction(instruction),
       };
     }
     case ShortwinInstruction.ProposeConfig: {
@@ -1135,11 +1411,39 @@ export function parseShortwinInstruction<TProgram extends string>(
         ...parseSetPauseInstruction(instruction),
       };
     }
+    case ShortwinInstruction.SetRouteBroken: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: ShortwinInstruction.SetRouteBroken,
+        ...parseSetRouteBrokenInstruction(instruction),
+      };
+    }
+    case ShortwinInstruction.SetVenueExtras: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: ShortwinInstruction.SetVenueExtras,
+        ...parseSetVenueExtrasInstruction(instruction),
+      };
+    }
+    case ShortwinInstruction.SolSettle: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: ShortwinInstruction.SolSettle,
+        ...parseSolSettleInstruction(instruction),
+      };
+    }
     case ShortwinInstruction.SweepProtocolFees: {
       assertIsInstructionWithAccounts(instruction);
       return {
         instructionType: ShortwinInstruction.SweepProtocolFees,
         ...parseSweepProtocolFeesInstruction(instruction),
+      };
+    }
+    case ShortwinInstruction.SweepTrader: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: ShortwinInstruction.SweepTrader,
+        ...parseSweepTraderInstruction(instruction),
       };
     }
     case ShortwinInstruction.SyncLender: {
@@ -1184,13 +1488,20 @@ export type ShortwinPluginAccounts = {
     SelfFetchFunctions<MarketVaultArgs, MarketVault>;
   oracleCache: ReturnType<typeof getOracleCacheCodec> &
     SelfFetchFunctions<OracleCacheArgs, OracleCache>;
+  shortPosition: ReturnType<typeof getShortPositionCodec> &
+    SelfFetchFunctions<ShortPositionArgs, ShortPosition>;
   venueExtras: ReturnType<typeof getVenueExtrasCodec> &
     SelfFetchFunctions<VenueExtrasArgs, VenueExtras>;
   venueGuard: ReturnType<typeof getVenueGuardCodec> &
     SelfFetchFunctions<VenueGuardArgs, VenueGuard>;
+  walletExposure: ReturnType<typeof getWalletExposureCodec> &
+    SelfFetchFunctions<WalletExposureArgs, WalletExposure>;
 };
 
 export type ShortwinPluginInstructions = {
+  addMargin: (
+    input: AddMarginInput,
+  ) => ReturnType<typeof getAddMarginInstruction> & SelfPlanAndSendFunctions;
   applyConfig: (
     input: ApplyConfigAsyncInput,
   ) => ReturnType<typeof getApplyConfigInstructionAsync> &
@@ -1203,9 +1514,17 @@ export type ShortwinPluginInstructions = {
     input: ClaimSolAsyncInput,
   ) => ReturnType<typeof getClaimSolInstructionAsync> &
     SelfPlanAndSendFunctions;
+  closeShort: (
+    input: CloseShortAsyncInput,
+  ) => ReturnType<typeof getCloseShortInstructionAsync> &
+    SelfPlanAndSendFunctions;
   coverDeficit: (
     input: CoverDeficitAsyncInput,
   ) => ReturnType<typeof getCoverDeficitInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  crankPrice: (
+    input: CrankPriceAsyncInput,
+  ) => ReturnType<typeof getCrankPriceInstructionAsync> &
     SelfPlanAndSendFunctions;
   crankSolUsd: (
     input: CrankSolUsdAsyncInput,
@@ -1222,6 +1541,9 @@ export type ShortwinPluginInstructions = {
     input: DisableVenueAsyncInput,
   ) => ReturnType<typeof getDisableVenueInstructionAsync> &
     SelfPlanAndSendFunctions;
+  expire: (
+    input: ExpireAsyncInput,
+  ) => ReturnType<typeof getExpireInstructionAsync> & SelfPlanAndSendFunctions;
   flagUnsafeMint: (
     input: FlagUnsafeMintAsyncInput,
   ) => ReturnType<typeof getFlagUnsafeMintInstructionAsync> &
@@ -1233,6 +1555,14 @@ export type ShortwinPluginInstructions = {
   initializeConfig: (
     input: InitializeConfigAsyncInput,
   ) => ReturnType<typeof getInitializeConfigInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  liquidate: (
+    input: LiquidateAsyncInput,
+  ) => ReturnType<typeof getLiquidateInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  openShort: (
+    input: OpenShortAsyncInput,
+  ) => ReturnType<typeof getOpenShortInstructionAsync> &
     SelfPlanAndSendFunctions;
   proposeConfig: (
     input: ProposeConfigAsyncInput,
@@ -1246,9 +1576,25 @@ export type ShortwinPluginInstructions = {
     input: SetPauseAsyncInput,
   ) => ReturnType<typeof getSetPauseInstructionAsync> &
     SelfPlanAndSendFunctions;
+  setRouteBroken: (
+    input: SetRouteBrokenAsyncInput,
+  ) => ReturnType<typeof getSetRouteBrokenInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  setVenueExtras: (
+    input: SetVenueExtrasAsyncInput,
+  ) => ReturnType<typeof getSetVenueExtrasInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  solSettle: (
+    input: SolSettleAsyncInput,
+  ) => ReturnType<typeof getSolSettleInstructionAsync> &
+    SelfPlanAndSendFunctions;
   sweepProtocolFees: (
     input: SweepProtocolFeesAsyncInput,
   ) => ReturnType<typeof getSweepProtocolFeesInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  sweepTrader: (
+    input: SweepTraderAsyncInput,
+  ) => ReturnType<typeof getSweepTraderInstructionAsync> &
     SelfPlanAndSendFunctions;
   syncLender: (
     input: SyncLenderAsyncInput,
@@ -1266,6 +1612,7 @@ export type ShortwinPluginPdas = {
   lender: typeof findLenderPda;
   marketVault: typeof findMarketVaultPda;
   market: typeof findMarketPda;
+  exposure: typeof findExposurePda;
   poolVault: typeof findPoolVaultPda;
   trader: typeof findTraderPda;
   venueGuard: typeof findVenueGuardPda;
@@ -1273,6 +1620,7 @@ export type ShortwinPluginPdas = {
   venueExtrasPumpSwap: typeof findVenueExtrasPumpSwapPda;
   venueExtrasRaydiumV4: typeof findVenueExtrasRaydiumV4Pda;
   venueExtrasRaydiumCpmm: typeof findVenueExtrasRaydiumCpmmPda;
+  position: typeof findPositionPda;
 };
 
 export type ShortwinPluginRequirements = ClientWithRpc<
@@ -1296,10 +1644,17 @@ export function shortwinProgram() {
           market: addSelfFetchFunctions(client, getMarketCodec()),
           marketVault: addSelfFetchFunctions(client, getMarketVaultCodec()),
           oracleCache: addSelfFetchFunctions(client, getOracleCacheCodec()),
+          shortPosition: addSelfFetchFunctions(client, getShortPositionCodec()),
           venueExtras: addSelfFetchFunctions(client, getVenueExtrasCodec()),
           venueGuard: addSelfFetchFunctions(client, getVenueGuardCodec()),
+          walletExposure: addSelfFetchFunctions(
+            client,
+            getWalletExposureCodec(),
+          ),
         },
         instructions: {
+          addMargin: (input) =>
+            addSelfPlanAndSendFunctions(client, getAddMarginInstruction(input)),
           applyConfig: (input) =>
             addSelfPlanAndSendFunctions(
               client,
@@ -1315,10 +1670,20 @@ export function shortwinProgram() {
               client,
               getClaimSolInstructionAsync(input),
             ),
+          closeShort: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getCloseShortInstructionAsync(input),
+            ),
           coverDeficit: (input) =>
             addSelfPlanAndSendFunctions(
               client,
               getCoverDeficitInstructionAsync(input),
+            ),
+          crankPrice: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getCrankPriceInstructionAsync(input),
             ),
           crankSolUsd: (input) =>
             addSelfPlanAndSendFunctions(
@@ -1340,6 +1705,11 @@ export function shortwinProgram() {
               client,
               getDisableVenueInstructionAsync(input),
             ),
+          expire: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getExpireInstructionAsync(input),
+            ),
           flagUnsafeMint: (input) =>
             addSelfPlanAndSendFunctions(
               client,
@@ -1354,6 +1724,16 @@ export function shortwinProgram() {
             addSelfPlanAndSendFunctions(
               client,
               getInitializeConfigInstructionAsync(input),
+            ),
+          liquidate: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getLiquidateInstructionAsync(input),
+            ),
+          openShort: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getOpenShortInstructionAsync(input),
             ),
           proposeConfig: (input) =>
             addSelfPlanAndSendFunctions(
@@ -1370,10 +1750,30 @@ export function shortwinProgram() {
               client,
               getSetPauseInstructionAsync(input),
             ),
+          setRouteBroken: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSetRouteBrokenInstructionAsync(input),
+            ),
+          setVenueExtras: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSetVenueExtrasInstructionAsync(input),
+            ),
+          solSettle: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSolSettleInstructionAsync(input),
+            ),
           sweepProtocolFees: (input) =>
             addSelfPlanAndSendFunctions(
               client,
               getSweepProtocolFeesInstructionAsync(input),
+            ),
+          sweepTrader: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSweepTraderInstructionAsync(input),
             ),
           syncLender: (input) =>
             addSelfPlanAndSendFunctions(
@@ -1392,6 +1792,7 @@ export function shortwinProgram() {
           lender: findLenderPda,
           marketVault: findMarketVaultPda,
           market: findMarketPda,
+          exposure: findExposurePda,
           poolVault: findPoolVaultPda,
           trader: findTraderPda,
           venueGuard: findVenueGuardPda,
@@ -1399,6 +1800,7 @@ export function shortwinProgram() {
           venueExtrasPumpSwap: findVenueExtrasPumpSwapPda,
           venueExtrasRaydiumV4: findVenueExtrasRaydiumV4Pda,
           venueExtrasRaydiumCpmm: findVenueExtrasRaydiumCpmmPda,
+          position: findPositionPda,
         },
         identifyAccount: identifyShortwinAccount,
         identifyInstruction: identifyShortwinInstruction,

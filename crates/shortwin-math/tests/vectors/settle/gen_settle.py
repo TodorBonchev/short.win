@@ -7,7 +7,9 @@ scripts of sim/attacks/.
 The sim files are never modified: Market is instrumented in THIS process (every wrapper only
 reads state and calls pure sim functions) and the sim then runs its own code:
 
-* units_settle.json   the sim's settle_box and _s3_due on synthetic states;
+* units_settle.json   the sim's settle_box and _s3_due on synthetic states (settle_box on a
+                      venue that cannot execute, `box`, and on an executable one, `box_exec`:
+                      only the former collapses to the EMA point, M2-SEC-1);
   units_evaluate_*.json  try_exit(settle_only=True) on synthetic states (stubbed venue quotes drawn around every decision
                       boundary: the S1 budget, sigma_max, the liquidation CR, fv_dev_bps, the
                       arm gap and settle_persist_n, a migrating venue's FV pool).
@@ -815,10 +817,13 @@ def bare():
     return m
 
 
-def unit_box(rng, n):
+def unit_box(rng, n, executable=False):
+    """settle_box on synthetic rings, on a venue that can execute now or not (M2-SEC-1: only a
+    venue that cannot execute collapses the box to the EMA point after ring_len seconds)."""
     cases = []
     for _ in range(n):
         m = bare()
+        m.venue = FakeVenue(executable, False, 1, None)
         size = rng.randrange(1, 9)
         t = rng.randrange(0, 10**6)
         ring = []
@@ -1034,7 +1039,9 @@ def main():
     rng = random.Random(SEED)
     sizes = {}
     MODE["full"], MODE["sample"] = False, None      # units: every evaluation
-    units = {"box": unit_box(rng, 300), "s3": unit_s3(rng, 400)}
+    units = {"box": unit_box(rng, 300), "s3": unit_s3(rng, 400),
+             # its own stream, so the other files keep theirs (M2-SEC-1)
+             "box_exec": unit_box(random.Random(SEED + 1), 300, executable=True)}
     sizes["units_settle.json"] = dump("units_settle.json", units)
     sizes.update(dump_split("units_evaluate", unit_evaluate(rng, 1500)))
     MODE["full"] = True

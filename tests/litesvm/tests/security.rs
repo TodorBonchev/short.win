@@ -1,5 +1,6 @@
 //! M1 security review regressions (`M1-SEC-n`): each finding's reproducer, rewritten to assert
-//! the fixed behaviour (or, for M1-SEC-1, the ARCH behaviour the owner has yet to rule on),
+//! the fixed behaviour (for M1-SEC-1, the owner's decision: the Emergency vault cancels
+//! parameter changes only),
 //! and the review's refutation tests for attacks the program withstands (`ok_*`). The lender
 //! side of M1-SEC-2 / M1-SEC-3 is `tests/lender_it/security.rs`.
 //!

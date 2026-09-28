@@ -14,6 +14,14 @@
 //!   each instruction of a multi-instruction transaction too.
 //! - [`events`], [`errors`], [`read`], [`pda`]: event decoding, error assertions, account
 //!   readers, PDAs.
+//! - [`mock`]: the TEST-ONLY mock venue `mock_cpamm` (M2; `tests/mock_cpamm/INTERFACE.md`):
+//!   [`Env::load_mock_cpamm`], pools on SPL / Token-2022 base mints, liquidity, knobs,
+//!   reserves, swap builders and short.win's `quote::cpmm` view of a pool.
+//! - [`engine`]: the position engine on the mock (M2): [`Env::test_venue`] (short.win's
+//!   test-venue build, `scripts/build-test-venue.sh`), mock markets through real instructions,
+//!   borrowers, builders of every M2 instruction.
+//! - [`drive`]: time and price drivers (actors trading the mock, per-second cranks, price
+//!   pushes); [`attack`]: atomic bundles and sandwiches in one transaction.
 //!
 //! Agave line: LiteSVM 0.16.0 on the 4.2.2 runtime crates, pinned in the workspace lockfile
 //! (C1-14; `Cargo.toml` of this crate).
@@ -22,14 +30,18 @@
 // logs); boxing it would only make every call site unwrap one more layer.
 #![allow(clippy::result_large_err)]
 
+pub mod attack;
+pub mod drive;
+pub mod engine;
 pub mod env;
 pub mod errors;
 pub mod events;
 pub mod fixtures;
 pub mod invariants;
 pub mod ix;
+pub mod mock;
 pub mod pda;
 pub mod read;
 pub mod tokens;
 
-pub use env::{Env, START_SLOT, START_TS, TxResult};
+pub use env::{Env, START_SLOT, START_TS, TxResult, test_venue_so_path};

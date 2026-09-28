@@ -1096,10 +1096,13 @@ class Market:
 
     def settle_box(self, t: int):
         """(P_lo, P_hi, L_lo, L_hi) spanned by the EMA state and the ring's bucket extremes
-        (ECON §5.6 v0.4.1).  If nothing has been integrated for more than ring_len seconds (a
-        venue that records no observations: nothing in the box can have been pushed since),
-        the box is the EMA point alone."""
-        if t - self.ema_t > self.P.ring_len:
+        (ECON §5.6 v0.4.1).  If nothing has been integrated for more than ring_len seconds and
+        the venue cannot execute now (a venue that records no observations: nothing in the box
+        can have been pushed since), the box is the EMA point alone.  On an executable venue a
+        stale integration proves nothing -- the program's lender instructions roll a pushed
+        bucket without recording (ARCH A16), so the pushed EMA can age past ring_len with no
+        honest observation after it -- and the ring medians always apply (M2-SEC-1)."""
+        if t - self.ema_t > self.P.ring_len and not self.venue.has_route():
             return self.ema, self.ema, self.liq, self.liq
         if self.P.box_obs:                     # v0.4 comparison rows: lower medians of the clamped obs / lobs
             pm, lm = lower_median([e[9] for e in self.ring]), lower_median([e[10] for e in self.ring])

@@ -145,6 +145,9 @@ impl Lab {
 
     /// A lab on an already initialized environment (e.g. after a config change).
     pub fn on(mut env: Env, program: TokenProgram, util_cap_bps: u32) -> Self {
+        // The lab injects the borrower side without `ShortPosition` accounts (module docs), so
+        // the M2 position-accounting part of I6 cannot match it; every other check runs.
+        shortwin_litesvm_tests::invariants::positions::allow_injected_borrower_side(true);
         let base = (env.now() / D + 1) * D;
         let slot = env.clock().slot + 100;
         env.set_clock(base, slot);

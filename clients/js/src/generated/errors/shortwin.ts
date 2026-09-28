@@ -212,6 +212,8 @@ export const SHORTWIN_ERROR__CREATION_FEE_ABOVE_MAX = 0x17d0; // 6096
 export const SHORTWIN_ERROR__ORACLE_FUTURE_DATED = 0x17d1; // 6097
 /** EmergencyCannotCancel: Only governance may cancel an authorities or timelock change */
 export const SHORTWIN_ERROR__EMERGENCY_CANNOT_CANCEL = 0x17d2; // 6098
+/** UseLiquidate: Position is expired and CR-liquidatable; use liquidate */
+export const SHORTWIN_ERROR__USE_LIQUIDATE = 0x17d3; // 6099
 
 export type ShortwinError =
   | typeof SHORTWIN_ERROR__ABOVE_PRO_RATA_ALLOWANCE
@@ -300,6 +302,7 @@ export type ShortwinError =
   | typeof SHORTWIN_ERROR__TRADER_STATE_INVALID
   | typeof SHORTWIN_ERROR__UNAUTHORIZED
   | typeof SHORTWIN_ERROR__USE_EXPIRE
+  | typeof SHORTWIN_ERROR__USE_LIQUIDATE
   | typeof SHORTWIN_ERROR__USE_SOL_SETTLE
   | typeof SHORTWIN_ERROR__VENUE_ACCOUNT_MISMATCH
   | typeof SHORTWIN_ERROR__VENUE_DISABLED
@@ -403,6 +406,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [SHORTWIN_ERROR__TRADER_STATE_INVALID]: `Trader state is invalid`,
     [SHORTWIN_ERROR__UNAUTHORIZED]: `Signer is not the authority this instruction requires`,
     [SHORTWIN_ERROR__USE_EXPIRE]: `Position is expired but not CR-liquidatable; use expire`,
+    [SHORTWIN_ERROR__USE_LIQUIDATE]: `Position is expired and CR-liquidatable; use liquidate`,
     [SHORTWIN_ERROR__USE_SOL_SETTLE]: `Normal buyback not allowed; use sol_settle`,
     [SHORTWIN_ERROR__VENUE_ACCOUNT_MISMATCH]: `A venue account does not match its compile-time, cached or re-derived key`,
     [SHORTWIN_ERROR__VENUE_DISABLED]: `Venue is disabled for opens`,

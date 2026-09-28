@@ -53,6 +53,11 @@ export type VenueExtrasSetEvent = {
   ix: number;
   version: number;
   keys: Array<Address>;
+  /**
+   * The version of the kind's `stable` set after the write (M2-SEC-2): it changes when the
+   * displaced `current` had stood for `EXTRAS_STABLE_S` or Governance wrote.
+   */
+  stableVersion: number;
 };
 
 export type VenueExtrasSetEventArgs = {
@@ -63,6 +68,11 @@ export type VenueExtrasSetEventArgs = {
   ix: number;
   version: number;
   keys: Array<Address>;
+  /**
+   * The version of the kind's `stable` set after the write (M2-SEC-2): it changes when the
+   * displaced `current` had stood for `EXTRAS_STABLE_S` or Governance wrote.
+   */
+  stableVersion: number;
 };
 
 /** Gets the encoder for {@link VenueExtrasSetEventArgs} event data. */
@@ -76,6 +86,7 @@ export function getVenueExtrasSetEventEncoder(): FixedSizeEncoder<VenueExtrasSet
       ["ix", getU8Encoder()],
       ["version", getU32Encoder()],
       ["keys", getArrayEncoder(getAddressEncoder(), { size: 4 })],
+      ["stableVersion", getU32Encoder()],
     ]),
     [getConstantEncoder(VENUE_EXTRAS_SET_EVENT_DISCRIMINATOR)],
   );
@@ -92,6 +103,7 @@ export function getVenueExtrasSetEventDecoder(): FixedSizeDecoder<VenueExtrasSet
       ["ix", getU8Decoder()],
       ["version", getU32Decoder()],
       ["keys", getArrayDecoder(getAddressDecoder(), { size: 4 })],
+      ["stableVersion", getU32Decoder()],
     ]),
     [getConstantDecoder(VENUE_EXTRAS_SET_EVENT_DISCRIMINATOR)],
   );

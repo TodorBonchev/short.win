@@ -22,7 +22,7 @@ Per-call compute units of `shortwin-math` on SBF v3 (platform-tools v1.57, Mollu
 | `sigma_xy` | 1473 | 1201 | 1768 |
 | EMA-leg entry, v0.4 (cached `(x, y)` + quote + CR) | 1468 | 951 | 1762 |
 | repriced quote + CR (v0.3 EMA-leg entry; a box corner) | 2289 | 1910 | 2747 |
-| `settle::box_of` (full ring) | — | 3589 | 4307 |
+| `settle::box_of` (full ring) | — | 3575 | 4307 |
 | `persist::liq_ema_leg(3)`, every entry below `L` (PumpSwap quote + CR each) | — | 2908 | 3490 |
 | `sustained_growth(3)` (full ring, a pump) | — | 1475 | 1770 |
 | `pool::cal_advance` (one day elapsed) | — | 261 | 314 |

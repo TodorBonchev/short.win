@@ -635,14 +635,14 @@ impl Replay {
                 "EMA state at the evaluation, {ctx}"
             );
             assert_eq!(
-                box_of(&o.ema, &o.ring, now),
+                box_of(&o.ema, &o.ring, now, exec),
                 Ok(bx),
                 "settlement box, {ctx}"
             );
             assert_eq!(self.chk.get(&pid), Some(&(now, ema_leg)), "EMA leg, {ctx}");
             let tracked = self.arms.get(&pid).copied().unwrap_or_default();
             assert_eq!(tracked, before, "arm state before, {ctx}");
-        } else if now - ema_ts > 8 {
+        } else if now - ema_ts > 8 && !exec {
             assert!(
                 bx.is_point() && bx.p_lo == p_ema && bx.l_lo == l_ema,
                 "{ctx}"
@@ -856,33 +856,47 @@ struct UnitsSettle {
     generator: String,
     #[serde(rename = "box")]
     box_: Vec<String>,
+    box_exec: Vec<String>,
     s3: Vec<String>,
 }
 
-/// `Market.settle_box` on synthetic rings: the medians of the bucket extremes and the
-/// EMA point after `RING_LEN` seconds without an integration.
+/// `Market.settle_box` on synthetic rings: the medians of the bucket extremes and, on a
+/// venue that cannot execute (`box`), the EMA point after `RING_LEN` seconds without an
+/// integration; on an executable venue (`box_exec`) never the EMA point alone (M2-SEC-1).
 #[test]
 fn settle_box_matches_sim() {
     let f: UnitsSettle = common::load_vectors("settle", "units_settle.json");
     assert_eq!(f.generator, "gen_settle.py");
-    assert!(f.box_.len() >= 200);
-    let (mut points, mut wide) = (0, 0);
-    for (i, line) in f.box_.iter().enumerate() {
-        let ctx = format!("box case {i}: {line}");
-        let mut t = Toks::new(line);
-        let now: i64 = t.v();
-        let mut o = Observation::default();
-        o.ema.price = t.v();
-        o.ema.liq = t.v();
-        o.ema.ts = t.v();
-        let want = parse_box(&mut t);
-        o.ring = parse_ring(&mut t);
-        t.done();
-        assert_eq!(box_of(&o.ema, &o.ring, now), Ok(want), "{ctx}");
-        points += usize::from(want.is_point());
-        wide += usize::from(!want.is_point());
+    assert!(f.box_.len() >= 200 && f.box_exec.len() >= 200);
+    for (exec, lines) in [(false, &f.box_), (true, &f.box_exec)] {
+        let (mut points, mut wide, mut stale_wide) = (0, 0, 0);
+        for (i, line) in lines.iter().enumerate() {
+            let ctx = format!("box case {i} (executable {exec}): {line}");
+            let mut t = Toks::new(line);
+            let now: i64 = t.v();
+            let mut o = Observation::default();
+            o.ema.price = t.v();
+            o.ema.liq = t.v();
+            o.ema.ts = t.v();
+            let want = parse_box(&mut t);
+            o.ring = parse_ring(&mut t);
+            t.done();
+            assert_eq!(box_of(&o.ema, &o.ring, now, exec), Ok(want), "{ctx}");
+            points += usize::from(want.is_point());
+            wide += usize::from(!want.is_point());
+            stale_wide += usize::from(now - o.ema.ts > 8 && !want.is_point());
+        }
+        if exec {
+            // The M2-SEC-1 branch: stale integrations on an executable venue keep the medians.
+            assert!(
+                stale_wide >= 60 && wide >= 200,
+                "{wide} boxes, {stale_wide} stale"
+            );
+        } else {
+            assert!(points >= 30 && wide >= 100, "{points} points, {wide} boxes");
+            assert_eq!(stale_wide, 0);
+        }
     }
-    assert!(points >= 30 && wide >= 100, "{points} points, {wide} boxes");
 }
 
 /// `Market._s3_due` on synthetic chains (graduation grace, migration pause, a broken or

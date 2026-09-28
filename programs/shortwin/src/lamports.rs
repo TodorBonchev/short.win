@@ -57,6 +57,33 @@ pub fn move_lamports_above(
     Ok(())
 }
 
+/// Moves `amount` lamports from the program-owned `from` to `to` **without** the rent floor
+/// on `from` (only `from ≥ 0`): the funding debit of a buy leg (ARCH §2.4 rule 3). The source
+/// is the `ShortPosition`, capped at its total lamports; "rent state is checked once per
+/// transaction [V4], so briefly using the position's rent reserve is safe": the leg returns
+/// every unspent lamport to the position in the same instruction, and every later debit of it
+/// ([`move_lamports`]) and the instruction's post-conditions keep it at or above its floor
+/// (or close it).
+///
+/// Errors: as [`move_lamports_above`], with `MathOverflow` only if `from` has fewer than
+/// `amount` lamports.
+pub fn move_lamports_in_leg(from: &AccountInfo, to: &AccountInfo, amount: u64) -> Result<()> {
+    require_keys_eq!(*from.owner, crate::ID, ShortwinError::AccountMismatch);
+    require!(
+        from.is_writable && to.is_writable,
+        ShortwinError::AccountMismatch
+    );
+    require_keys_neq!(from.key(), to.key(), ShortwinError::AccountMismatch);
+    if amount == 0 {
+        return Ok(());
+    }
+    let from_after = from.lamports().checked_sub(amount).or_math()?;
+    let to_after = to.lamports().checked_add(amount).or_math()?;
+    **from.try_borrow_mut_lamports()? = from_after;
+    **to.try_borrow_mut_lamports()? = to_after;
+    Ok(())
+}
+
 /// Lamports of `account` above its rent-exempt minimum (0 if below).
 pub fn excess_over_rent(account: &AccountInfo) -> Result<u64> {
     Ok(account

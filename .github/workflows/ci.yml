@@ -59,6 +59,10 @@ jobs:
           [ -z "$deps" ] || { echo "::error::shortwin-math must have no runtime dependencies, found: $deps"; exit 1; }
       - run: cargo clippy -p shortwin-math --all-targets --locked -- -D warnings
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      # The workspace build unifies features: tests/litesvm enables shortwin's TEST-ONLY
+      # `test-venue` (A49), so lint the release feature set of the program on its own too.
+      - name: shortwin without test-venue (the release feature set)
+        run: cargo clippy -p shortwin --all-targets --locked -- -D warnings
 
   test:
     runs-on: ubuntu-24.04
@@ -117,7 +121,7 @@ jobs:
       - name: cargo audit (workspace and the standalone bench lockfiles)
         run: |
           ignore="--ignore RUSTSEC-2025-0141 --ignore RUSTSEC-2021-0139 --ignore RUSTSEC-2024-0388 --ignore RUSTSEC-2024-0436 --ignore RUSTSEC-2025-0161"
-          for lock in Cargo.lock tests/bench/cu_math/Cargo.lock tests/bench/m1_cu/Cargo.lock; do
+          for lock in Cargo.lock tests/bench/cu_math/Cargo.lock tests/bench/m1_cu/Cargo.lock tests/bench/m2_cu/Cargo.lock; do
             echo "::group::$lock"; cargo audit -f "$lock" --deny warnings $ignore; echo "::endgroup::"
           done
 
@@ -212,11 +216,79 @@ jobs:
           flags=$(od -An -t x4 -j 48 -N 4 target/deploy/shortwin.so | tr -d ' ')
           [ "$flags" = "00000003" ] || { echo "::error::e_flags=$flags, expected SBPF v3 (00000003)"; exit 1; }
           sha256sum target/deploy/shortwin.so
+      # A49: the release artifact knows nothing of the TEST-ONLY mock venue (tests/mock_cpamm,
+      # built alongside for the LiteSVM tests and never deployed): its program id must not
+      # occur in shortwin.so, neither as 32 bytes of data nor as the four 64-bit `lddw`
+      # immediates the compiler turns a constant key into. `VenueKind::Mock` (feature
+      # `test-venue`) would embed it. The search must find the id in mock_cpamm.so itself.
+      - name: Release artifact has no mock venue (A49)
+        run: |
+          python3 - <<'PY'
+          import re, sys
+          src = open("tests/mock_cpamm/src/lib.rs").read()
+          pid = re.search(r'declare_id!\("([1-9A-HJ-NP-Za-km-z]{32,44})"\)', src).group(1)
+          alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+          n = 0
+          for c in pid:
+              n = n * 58 + alphabet.index(c)
+          key = n.to_bytes(32, "big")
+          words = [key[i:i + 8] for i in range(0, 32, 8)]
+          def embeds(path):
+              elf = open(path, "rb").read()
+              return (key in elf
+                      or all(w in elf for w in words)
+                      or all(w[:4] + bytes(4) + w[4:] in elf for w in words))
+          if not embeds("target/deploy/mock_cpamm.so"):
+              print("::error::the search does not find the mock id in mock_cpamm.so itself"); sys.exit(1)
+          if embeds("target/deploy/shortwin.so"):
+              print(f"::error::target/deploy/shortwin.so embeds the mock venue id {pid} (test-venue build?)"); sys.exit(1)
+          print(f"ok: mock venue id {pid} absent from the release shortwin.so")
+          PY
+          flags=$(od -An -t x4 -j 48 -N 4 target/deploy/mock_cpamm.so | tr -d ' ')
+          [ "$flags" = "00000003" ] || { echo "::error::mock_cpamm.so e_flags=$flags, expected SBPF v3"; exit 1; }
+      # A49, M2: the test-venue variant (`VenueKind::Mock`) is built by its own script into its
+      # own target directory (target/test-venue), never into target/deploy. The release
+      # artifact must carry neither the test-venue marker string (logged by the mock adapter)
+      # nor the mock id (checked above); the test-venue build must carry both, which proves
+      # the checks can see them.
+      - name: Test-venue build (scripts/build-test-venue.sh)
+        run: scripts/build-test-venue.sh
+      - name: Release artifact has no test-venue code path (A49)
+        run: |
+          marker="shortwin:test-venue:mock-cpamm"
+          if LC_ALL=C grep -aq "$marker" target/deploy/shortwin.so; then
+            echo "::error::target/deploy/shortwin.so contains the test-venue marker: the release build enabled test-venue"; exit 1
+          fi
+          LC_ALL=C grep -aq "$marker" target/test-venue/deploy/shortwin.so || { echo "::error::the test-venue build lacks its marker"; exit 1; }
+          if cmp -s target/deploy/shortwin.so target/test-venue/deploy/shortwin.so; then
+            echo "::error::the release and test-venue builds are identical"; exit 1
+          fi
+          python3 - <<'PY'
+          import re, sys
+          src = open("tests/mock_cpamm/src/lib.rs").read()
+          pid = re.search(r'declare_id!\("([1-9A-HJ-NP-Za-km-z]{32,44})"\)', src).group(1)
+          alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+          n = 0
+          for c in pid:
+              n = n * 58 + alphabet.index(c)
+          key = n.to_bytes(32, "big")
+          words = [key[i:i + 8] for i in range(0, 32, 8)]
+          elf = open("target/test-venue/deploy/shortwin.so", "rb").read()
+          if not (key in elf or all(w in elf for w in words) or all(w[:4] + bytes(4) + w[4:] in elf for w in words)):
+              print("::error::the mock id search does not find the id in the test-venue shortwin.so"); sys.exit(1)
+          print("ok: the test-venue build embeds the mock id; the release build does not")
+          PY
+          sha256sum target/deploy/shortwin.so target/test-venue/deploy/shortwin.so
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: shortwin-program
+          # mock_cpamm.so: the TEST-ONLY mock venue the M2 LiteSVM tests load (never deployed);
+          # test-venue/deploy/shortwin.so: short.win's TEST-ONLY build with `VenueKind::Mock`
+          # (the engine tests, `Env::test_venue`; never deployed).
           path: |
             target/deploy/shortwin.so
+            target/deploy/mock_cpamm.so
+            target/test-venue/deploy/shortwin.so
             target/idl/shortwin.json
             target/types/shortwin.ts
           if-no-files-found: error
@@ -243,6 +315,10 @@ jobs:
         run: cd tests/fixtures && sha256sum -c SHA256SUMS
       - name: T-LAYOUT wasm32 leg
         run: cargo check -p shortwin --target wasm32-unknown-unknown --locked
+      # Selected with the harness, shortwin's unit tests build with `test-venue` (feature
+      # unification); run them once more on the release feature set.
+      - name: shortwin unit tests without test-venue
+        run: cargo test -p shortwin --locked
       - run: cargo test -p shortwin -p shortwin-venue-state -p shortwin-litesvm-tests --locked
 
   t-pot:
@@ -324,3 +400,100 @@ jobs:
         run: M1_CU_WRITE=1 cargo test --manifest-path tests/bench/m1_cu/Cargo.toml --locked -- --nocapture
       - name: results.md is current (informational)
         run: git diff --exit-code -- tests/bench/m1_cu/results.md || echo "::warning::M1 CU figures changed; commit tests/bench/m1_cu/results.md"
+
+  m2-cu:
+    # M2 CU bench and T-TRACE (ARCH §6.1, §6.2, §8.2 T-CU / T-TRACE, §9 M2): every M2
+    # instruction on Mollusk 0.15.1 against the TEST-ONLY mock venue within its budget,
+    # cross-checked on LiteSVM; the worst-case M2 transactions within 64 trace entries
+    # (tests/bench/m2_cu, a standalone workspace with its own lockfile; README.md there). It
+    # loads the test-venue shortwin.so and mock_cpamm.so from the anchor-build artifact.
+    # Every M2 handler has landed: a case or transaction that does not execute fails the job.
+    needs: anchor-build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: m2-cu
+          workspaces: tests/bench/m2_cu
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: shortwin-program
+          path: target
+      - run: cargo fmt --manifest-path tests/bench/m2_cu/Cargo.toml -p m2-cu-bench --check
+      - run: cargo clippy --manifest-path tests/bench/m2_cu/Cargo.toml --all-targets --locked -- -D warnings
+      - name: Budgets and T-TRACE (fails above a budget, above 64 trace entries, or on a failed case)
+        run: M2_CU_WRITE=1 M2_TRACE_WRITE=1 cargo test --manifest-path tests/bench/m2_cu/Cargo.toml --locked -- --nocapture
+      - name: results.md and trace.md are current (informational)
+        run: git diff --exit-code -- tests/bench/m2_cu/results.md tests/bench/m2_cu/trace.md || echo "::warning::M2 CU or trace figures changed; commit tests/bench/m2_cu/results.md and trace.md"
+
+  services:
+    # The off-chain services workspace (services/, its own Cargo.lock; ARCH §1.2, §7.1): fmt,
+    # clippy (the workspace, and the keeper alone on its release feature set, without the
+    # TEST-ONLY `test-venue`), cargo-deny and cargo-audit on its lockfile, the keeper's unit
+    # tests and its LiteSVM scenarios (duties 1–4, batching, degraded mode; every keeper
+    # transaction under the invariant hooks) against the anchor-build artifacts, and the A49
+    # check that the keeper binary carries no mock-venue code.
+    needs: anchor-build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: services
+          workspaces: services
+      - uses: taiki-e/install-action@4cef1412cce204788f482e778a0b9187f9626a29 # v2.87.21
+        with:
+          tool: cargo-deny@${{ env.CARGO_DENY_VERSION }},cargo-audit@${{ env.CARGO_AUDIT_VERSION }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: shortwin-program
+          path: target
+      - run: cargo fmt --manifest-path services/Cargo.toml -p shortwin-services-common -p shortwin-keeper -p shortwin-keeper-litesvm --check
+      - run: cargo clippy --manifest-path services/Cargo.toml --workspace --all-targets --locked -- -D warnings
+      - name: The keeper on its release feature set (no test-venue)
+        run: cargo clippy --manifest-path services/Cargo.toml -p shortwin-keeper --all-targets --locked -- -D warnings
+      - name: cargo deny (services/deny.toml)
+        run: cargo deny --manifest-path services/Cargo.toml check
+      - name: cargo audit (services lockfile; the root deny.toml's exceptions)
+        run: >-
+          cargo audit -f services/Cargo.lock --deny warnings
+          --ignore RUSTSEC-2025-0141 --ignore RUSTSEC-2021-0139 --ignore RUSTSEC-2024-0388
+          --ignore RUSTSEC-2024-0436 --ignore RUSTSEC-2025-0161
+      - name: Keeper unit tests and LiteSVM scenarios
+        env:
+          SHORTWIN_TEST_VENUE_SO: ${{ github.workspace }}/target/test-venue/deploy/shortwin.so
+          MOCK_CPAMM_SO: ${{ github.workspace }}/target/deploy/mock_cpamm.so
+          SHORTWIN_SO: ${{ github.workspace }}/target/deploy/shortwin.so
+        run: cargo test --manifest-path services/Cargo.toml --workspace --locked -- --nocapture
+      # A49 for the keeper: the release binary is built without `test-venue`, so it must not
+      # embed the mock venue's program id; the scenario test binary (built with it) must.
+      - name: The keeper binary has no mock venue (A49)
+        run: |
+          cargo build --manifest-path services/Cargo.toml -p shortwin-keeper --release --locked
+          cargo test --manifest-path services/Cargo.toml -p shortwin-keeper-litesvm --test scenarios --no-run --locked
+          python3 - <<'PY'
+          import glob, os, re, sys
+          src = open("tests/mock_cpamm/src/lib.rs").read()
+          pid = re.search(r'declare_id!\("([1-9A-HJ-NP-Za-km-z]{32,44})"\)', src).group(1)
+          alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+          n = 0
+          for c in pid:
+              n = n * 58 + alphabet.index(c)
+          key = n.to_bytes(32, "big")
+          words = [key[i:i + 8] for i in range(0, 32, 8)]
+          def embeds(path):
+              elf = open(path, "rb").read()
+              return key in elf or all(w in elf for w in words)
+          tests = [p for p in glob.glob("services/target/debug/deps/scenarios-*")
+                   if os.access(p, os.X_OK) and not p.endswith(".d")]
+          if not tests or not embeds(max(tests, key=os.path.getmtime)):
+              print("::error::the search does not find the mock id in the keeper's scenario binary"); sys.exit(1)
+          if embeds("services/target/release/shortwin-keeper"):
+              print(f"::error::the release keeper embeds the mock venue id {pid} (test-venue enabled?)"); sys.exit(1)
+          print(f"ok: mock venue id {pid} absent from the release keeper")
+          PY

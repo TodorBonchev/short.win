@@ -1,6 +1,8 @@
-//! Guards (ARCH §2.1 `engine/guard.rs`): the mint guard of ARCH §3.0 step 3 (M1); M2 adds the
-//! open guards (global / market pauses, `paused_coverage`, `mint_unsafe`, route-broken flags,
-//! venue enabled, the `VenueGuard` mask, I17).
+//! Guards (ARCH §2.1 `engine/guard.rs`): the mint guard of ARCH §3.0 step 3 (M1) and the open
+//! guards of ARCH §3.4 steps 1 and 3 (M2: global / market pauses, `paused_coverage`, the
+//! route-broken flags, venue enabled, the `VenueGuard` mask, I17). **Exits never call the open
+//! guards** (I10): closes, liquidations, expiries and settlements read no pause flag, no
+//! route-broken flag, no latch and no oracle.
 //!
 //! The mint guard is shared by `create_market` / `deposit` / `open_short` (entry paths:
 //! `check_mint_safety` must pass, and a market flagged `mint_unsafe` refuses) and by
@@ -11,7 +13,10 @@ use anchor_lang::prelude::*;
 
 use crate::errors::ShortwinError;
 use crate::mint_filter::check_mint_safety;
-use crate::state::{Market, MARKET_FLAG_MINT_UNSAFE};
+use crate::state::{
+    GlobalConfig, Market, VenueGuard, VenueKind, MARKET_FLAG_MINT_UNSAFE,
+    MARKET_FLAG_PAUSED_COVERAGE, MARKET_FLAG_PAUSED_OPENS,
+};
 
 /// Which side of the mint guard an instruction is on (ARCH §3.0 step 3).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -56,6 +61,47 @@ pub fn mint_guard(
         }
         MintPath::Exit => Ok(check_mint_safety(mint).is_ok()),
     }
+}
+
+/// ARCH §3.4 step 1, the static open guards (in this order): opens paused globally or on the
+/// market (`OpensPaused`, SPEC §11); paused for keeper coverage (`CoveragePaused`, A69); the
+/// route-broken flag of the market or of its venue (`RouteBroken`, A40); a venue that takes
+/// opens (`NoSupportedVenue` for `None`, `VenueMigrating` while `PumpMigrating`) and is enabled
+/// (`VenueDisabled`). The mint guard (entry path, `MintUnsafeFlagged` first) is
+/// [`mint_guard`]'s.
+pub fn open_static(config: &GlobalConfig, market: &Market, kind: VenueKind) -> Result<()> {
+    require!(
+        !config.paused_opens() && !market.has_flag(MARKET_FLAG_PAUSED_OPENS),
+        ShortwinError::OpensPaused
+    );
+    require!(
+        !market.has_flag(MARKET_FLAG_PAUSED_COVERAGE),
+        ShortwinError::CoveragePaused
+    );
+    require!(
+        !crate::engine::route::route_broken(config, market, kind),
+        ShortwinError::RouteBroken
+    );
+    match kind {
+        VenueKind::None => return err!(ShortwinError::NoSupportedVenue),
+        VenueKind::PumpMigrating => return err!(ShortwinError::VenueMigrating),
+        _ => {}
+    }
+    require!(
+        kind.venue_bit() != 0 && config.venue_enabled & kind.venue_bit() != 0,
+        ShortwinError::VenueDisabled
+    );
+    Ok(())
+}
+
+/// ARCH §3.4 step 3, the venue-upgrade latch (A7; masks v0.4.1, R4B-7; I17): no open while a
+/// bit of the venue's mask is set in `VenueGuard.upgraded` (`VenueUpgraded`).
+pub fn latch(guard: &VenueGuard, kind: VenueKind) -> Result<()> {
+    require!(
+        !guard.blocks(kind.guard_mask()),
+        ShortwinError::VenueUpgraded
+    );
+    Ok(())
 }
 
 #[cfg(test)]

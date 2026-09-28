@@ -174,6 +174,8 @@ pub fn handler<'info>(
         let mut pool = market.pool();
         let mut vault = vault_acc.vault();
         prologue::accrue(&mut market, &mut pool, &mut vault, now)?;
+        // A16 step 5: roll a completed bucket (no ReadSet, so no record and no chains).
+        prologue::roll_only(&market_key, &mut market, now, clock.slot)?;
 
         let records = lender::load_records(&market_key, ctx.remaining_accounts, usize::MAX)?;
         let position = &mut ctx.accounts.lender;

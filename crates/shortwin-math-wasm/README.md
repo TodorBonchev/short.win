@@ -24,7 +24,7 @@ the program will; the frontend never re-implements protocol math.
 | CR and liquidation | `vEff`, `crBps`, `crBelow`, `Venue.liquidationPrice`, `sigma`, `sigmaXy` | `risk` |
 | Opening | `marginD4`, `openFee` | `risk::{margin_d4, open_fee}` |
 | Exit bounds | `maxInLiq` (no reserve), `maxInExp` (rent and fee senior), `piRef` | `bounds::{max_in_liq, max_in_exp, pi_ref}` |
-| Settlement | `OracleState` (`push` ring entries, `settleBox(now)`, `ringMedians`, `sustainedGrowth`), `SettleBox` (`pLo`, `pHi`, `lLo`, `lHi`, `isPoint`, `contains`), `ringLen`, `pprime`, `amountOk`, `fairValue`, `fvRateBps`, `settleKeeperReward`, `expiryKeeperReward` | `settle::{box_of, pprime, amount_ok}`, `observe::{ring_medians, sustained_growth}`, `risk` |
+| Settlement | `OracleState` (`push` ring entries, `settleBox(now, executable)`, `ringMedians`, `sustainedGrowth`), `SettleBox` (`pLo`, `pHi`, `lLo`, `lHi`, `isPoint`, `contains`), `ringLen`, `pprime`, `amountOk`, `fairValue`, `fvRateBps`, `settleKeeperReward`, `expiryKeeperReward` | `settle::{box_of, pprime, amount_ok}`, `observe::{ring_medians, sustained_growth}`, `risk` |
 | Rent | `utilizationBps`, `rateBps` (display: each slope term floored), `minRent`, `RentBasis` (`accrue` preview, `P_ACC_MAX` clamp), `PositionRent` (with its `rent_protocol_bps`; `accrued`, `due`) | `rent` |
 | Waterfall previews | `previewClose`, `previewLiquidation` (keeper floor at `K_s`), `previewExpiry`, `previewSettlement` (vesting lump) → `Payout` (`keeperTopup`, `lump`) | `waterfall` |
 | Caps | `maxQPosition`, `maxTotalQ`, `feeSizeCap`, `feeOiCap`, `oiCap` (φ in ppm), `utilOk`, `curveGammaOk`, `curveGammaMaxQ`, `walletOk`, `notionalOk`, `conservativeX0` | `caps` |

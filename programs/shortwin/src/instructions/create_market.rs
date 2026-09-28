@@ -1,6 +1,6 @@
 //! `create_market(venue_hint, max_creation_fee)` (ARCH §3.2): anyone lists a mint.
 //!
-//! `max_creation_fee` (added after the M1 review, M1-SEC-11; ARCH §3.2 has only `venue_hint`)
+//! `max_creation_fee` (added after the M1 review, M1-SEC-11; ARCH §3.2 check 4)
 //! bounds the `market_creation_fee` the creator pays: the fee is read from `config` at
 //! execution, and a timelocked change (≤ 0.1 SOL) could land between signing and execution
 //! (`CreationFeeAboveMax`), as `open_short`'s `max_open_fee` does for the open fee.
@@ -8,7 +8,8 @@
 //! **M1 scope** (ARCH §9 M1): any SPL Token / Token-2022 mint that passes the filter is listed
 //! as venue `None` (list-only: deposits and withdrawals; `None` is never terminal, ARCH §2.5).
 //! Pump detection (`classify_pump`, M5/M6) and Raydium adoption (`venue_hint`, M3) come later;
-//! until then `venue_hint` must be [`VENUE_HINT_AUTO`] (else `NoSupportedVenue`).
+//! until then `venue_hint` must be [`VENUE_HINT_AUTO`] (else `NoSupportedVenue`), except in a
+//! TEST-ONLY `test-venue` build, which also accepts the mock venue's hint (M2, A49).
 //!
 //! **Order** (ARCH §3.2 checks 1–3):
 //!
@@ -61,6 +62,11 @@ use crate::state::{
 
 /// `venue_hint` for "detect": the only value M1 accepts (Raydium hints arrive in M3).
 pub const VENUE_HINT_AUTO: u8 = 0;
+/// TEST-ONLY `venue_hint`: adopt the mock venue's pool of the mint (feature `test-venue`;
+/// A49). The remaining accounts are the detection set followed by the mock ReadSet
+/// `[pool, base_vault, quote_vault]` (`venues::mock::adopt`).
+#[cfg(feature = "test-venue")]
+pub const VENUE_HINT_MOCK: u8 = crate::state::VenueKind::Mock as u8;
 
 /// Number of remaining accounts of a list-only market: the detection set.
 pub const DETECTION_SET_LEN: usize = 2;
@@ -263,6 +269,15 @@ fn create_pool_vault(accs: &CreateMarket, market: &Pubkey, bump: u8) -> Result<(
     ))
 }
 
+/// The pool adopted at listing, for `MarketCreated.ray_pool` (`Pubkey::default()` for a
+/// list-only market).
+fn ray_pool_of(venue: VenueKind, hint_accounts: &[AccountInfo]) -> Pubkey {
+    match venue {
+        VenueKind::None => Pubkey::default(),
+        _ => hint_accounts.first().map_or(Pubkey::default(), |a| a.key()),
+    }
+}
+
 pub fn handler(ctx: Context<CreateMarket>, venue_hint: u8, max_creation_fee: u64) -> Result<()> {
     let accs = &ctx.accounts;
     let mint_key = accs.mint.key();
@@ -283,14 +298,25 @@ pub fn handler(ctx: Context<CreateMarket>, venue_hint: u8, max_creation_fee: u64
             .map_err(|_| error!(ShortwinError::MintMalformed))?
             .decimals
     };
-    // 3. Venue: list-only in M1; the detection keys are always derived and checked (C0-15).
-    require!(
-        venue_hint == VENUE_HINT_AUTO,
-        ShortwinError::NoSupportedVenue
-    );
+    // 3. Venue: list-only (and, in a test-venue build, the mock); the detection keys are
+    //    always derived and checked (C0-15).
     let bonding_curve = bonding_curve_key(&mint_key);
     let canonical_pool = canonical_pool_key(&mint_key);
-    check_detection_set(ctx.remaining_accounts, &bonding_curve, &canonical_pool)?;
+    let detection_len = DETECTION_SET_LEN.min(ctx.remaining_accounts.len());
+    let (detection, hint_accounts) = ctx.remaining_accounts.split_at(detection_len);
+    check_detection_set(detection, &bonding_curve, &canonical_pool)?;
+    let venue = match venue_hint {
+        VENUE_HINT_AUTO => {
+            require!(
+                hint_accounts.is_empty(),
+                ShortwinError::BadRemainingAccounts
+            );
+            VenueKind::None
+        }
+        #[cfg(feature = "test-venue")]
+        VENUE_HINT_MOCK => VenueKind::Mock,
+        _ => return err!(ShortwinError::NoSupportedVenue),
+    };
     // 4. The creation fee the creator agreed to (M1-SEC-11).
     let fee = accs.config.load()?.params.market_creation_fee;
     require_gte!(max_creation_fee, fee, ShortwinError::CreationFeeAboveMax);
@@ -325,7 +351,7 @@ pub fn handler(ctx: Context<CreateMarket>, venue_hint: u8, max_creation_fee: u64
         m.market_vault_bump = ctx.bumps.market_vault;
         m.trader_bump = ctx.bumps.trader;
         m.trader_wsol_bump = trader_wsol_bump;
-        m.venue = VenueKind::None as u8;
+        m.venue = venue as u8;
         // A list-only market takes no opens; C is the conservative placeholder until a venue
         // appears and `tier::assign` runs (ARCH §4.7).
         m.tier = Tier::C as u8;
@@ -345,6 +371,21 @@ pub fn handler(ctx: Context<CreateMarket>, venue_hint: u8, max_creation_fee: u64
         // bits set (nothing to sweep before the first deposit).
         m.set_pool(&Pool::new());
         m.last_accrual_ts = now;
+        #[cfg(feature = "test-venue")]
+        if venue == VenueKind::Mock {
+            // ARCH §3.2 "Effects" for a venue with a price: the adopted pool's keys, the price
+            // state `P_ema = P_spot`, `L_ema = L_slow = √(X·Y)`, one ring entry, an empty
+            // bucket; age from listing (O13's conservative reading); opens wait for the
+            // warm-up. The tier stays the conservative C until the first open or crank reads
+            // the oracle (`create_market` does not carry `oracle_cache`).
+            let state =
+                crate::venues::mock::adopt(&mut m, hint_accounts, &mint_key, &token_program)?;
+            let obs = crate::engine::observe::initial(now, &state)?;
+            m.set_observation(&obs);
+            m.graduated_at = now;
+            m.pool_seen_at = now;
+            m.venue = VenueKind::Mock as u8;
+        }
         m.ema_params_version = config.ema_params.version;
         m.ema_dtmax_s = config.ema_params.ema_dtmax_s;
         m.ema_clamp_bps = config.ema_params.ema_clamp_bps;
@@ -366,11 +407,11 @@ pub fn handler(ctx: Context<CreateMarket>, venue_hint: u8, max_creation_fee: u64
         ts: now,
         mint: mint_key,
         token_program,
-        venue: VenueKind::None as u8,
+        venue: venue as u8,
         creator: accs.creator.key(),
         bonding_curve,
         canonical_pool,
-        ray_pool: Pubkey::default(),
+        ray_pool: ray_pool_of(venue, hint_accounts),
         tier: Tier::C as u8,
         creation_fee: fee,
     });

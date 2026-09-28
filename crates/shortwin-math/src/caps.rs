@@ -263,10 +263,36 @@ pub fn conservative_x0(
     to_u64(x)
 }
 
+/// Open guard `|P_spot/P_ema − 1| ≤ open_ema_dev_bps` (ECON §4 "Open guards"; ARCH §3.4
+/// step 4), evaluated exactly as `|P_spot − P_ema|·10⁴ ≤ dev_bps·P_ema` (no division, no
+/// rounding). `P_spot` is the live pre-trade spot, `P_ema` the post-roll EMA. `false` for a
+/// zero `P_ema` (no price: no open).
+pub fn spot_near_ema(p_spot: u128, p_ema: u128, dev_bps: u32) -> bool {
+    if p_ema == 0 {
+        return false;
+    }
+    let diff = p_spot.abs_diff(p_ema);
+    mul_le(diff, BPS_U128, u128::from(dev_bps), p_ema)
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::arithmetic_side_effects)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn spot_near_ema_is_exact() {
+        let e = 1_000_000_000_000_000_000u128;
+        assert!(spot_near_ema(e, e, 0));
+        assert!(spot_near_ema(e * 11 / 10, e, 1_000));
+        assert!(!spot_near_ema(e * 11 / 10 + 1, e, 1_000));
+        assert!(spot_near_ema(e * 9 / 10, e, 1_000));
+        assert!(!spot_near_ema(e * 9 / 10 - 1, e, 1_000));
+        assert!(!spot_near_ema(e, 0, 1_000));
+        // No overflow at the extremes (the 256-bit fallback of mul_le).
+        assert!(spot_near_ema(u128::MAX, u128::MAX, 0));
+        assert!(!spot_near_ema(u128::MAX, 1, 5_000));
+    }
 
     #[test]
     fn econ_closed_forms() {

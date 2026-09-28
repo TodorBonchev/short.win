@@ -971,8 +971,9 @@ mod tests {
                 timelock_s: crate::constants::MAX_TIMELOCK_S
             })
             .is_ok());
+        // Bit 6 is unknown in every build (a `test-venue` build knows bit 5, the mock's).
         assert!(c
-            .check_change(&ConfigChange::EnableVenues { bits: 1 << 5 })
+            .check_change(&ConfigChange::EnableVenues { bits: 1 << 6 })
             .is_err());
         assert!(c
             .check_change(&ConfigChange::EnableVenues { bits: 0 })
