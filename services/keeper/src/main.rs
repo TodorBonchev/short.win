@@ -1,4 +1,4 @@
-//! `shortwin-keeper`: keeper v0 against a JSON-RPC cluster (ARCHITECTURE §7.1).
+//! `shortwin-keeper`: the keeper against a JSON-RPC cluster (ARCHITECTURE §7.1).
 //!
 //! ```text
 //! shortwin-keeper --rpc <url> --keypair <file> [--config keeper.toml] [--tick-ms 400]
@@ -107,7 +107,7 @@ async fn main() -> anyhow::Result<()> {
         .map_err(|e| anyhow::anyhow!("reading {}: {e}", args.keypair))?;
     let chain = RpcChain::new(args.rpc.clone());
     let mut keeper = Keeper::new(chain, payer, cfg)?;
-    tracing::info!(payer = %keeper.payer(), rpc = %args.rpc, "keeper v0 starting");
+    tracing::info!(payer = %keeper.payer(), rpc = %args.rpc, "keeper starting");
 
     let text = Arc::new(Mutex::new(String::new()));
     if let Some(addr) = args.metrics.clone() {

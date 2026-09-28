@@ -135,6 +135,27 @@ impl Default for BudgetConfig {
     }
 }
 
+/// The venue drift monitor (ARCH §7.1 duty 10; [`crate::monitor`]).
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, deny_unknown_fields)]
+pub struct VenueWatchConfig {
+    /// Watch the six venue ProgramData accounts (and Token-2022's, alert only) and call
+    /// `flag_venue_upgraded` in the slot after an upgrade: true.
+    pub flag_upgrades: bool,
+    /// Report admin actions on every covered market's pool and CPMM config (Raydium
+    /// `SetParams`, `update_pool_status`, `update_amm_config`): true.
+    pub pool_admin: bool,
+}
+
+impl Default for VenueWatchConfig {
+    fn default() -> Self {
+        Self {
+            flag_upgrades: true,
+            pool_admin: true,
+        }
+    }
+}
+
 /// The keeper's configuration.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, deny_unknown_fields)]
@@ -143,9 +164,10 @@ pub struct KeeperConfig {
     pub markets: MarketSelection,
     /// Batch format policy.
     pub tx_format: TxFormatPolicy,
-    /// Cranks per v1 batch (ARCH §7.1 duty 7: 6).
+    /// Cranks per v1 batch at most (ARCH §7.1 duty 7: 6); a batch is also cut where its
+    /// transaction would exceed the format's size or account limit.
     pub batch_v1: usize,
-    /// Cranks per v0 batch (4 with the protocol ALT).
+    /// Cranks per v0 batch at most (4 with the protocol ALT; T-SIZE), cut the same way.
     pub batch_v0: usize,
     /// Seconds before a v1 rejection is re-probed.
     pub v1_reprobe_s: i64,
@@ -155,6 +177,7 @@ pub struct KeeperConfig {
     pub dry_run: bool,
     pub coverage: CoverageConfig,
     pub budget: BudgetConfig,
+    pub venue_watch: VenueWatchConfig,
 }
 
 impl Default for KeeperConfig {
@@ -169,6 +192,7 @@ impl Default for KeeperConfig {
             dry_run: false,
             coverage: CoverageConfig::default(),
             budget: BudgetConfig::default(),
+            venue_watch: VenueWatchConfig::default(),
         }
     }
 }
@@ -258,6 +282,8 @@ mod tests {
             [budget]
             per_market_daily_lamports = 30000000
             priority_ceiling = 5000
+            [venue_watch]
+            pool_admin = false
             "#
         ))
         .unwrap();
@@ -268,6 +294,7 @@ mod tests {
         assert_eq!(cfg.coverage.burst_s, 60);
         assert_eq!(cfg.budget.per_market_daily_lamports, Some(30_000_000));
         assert_eq!(cfg.budget.priority_ceiling, 5_000);
+        assert!(!cfg.venue_watch.pool_admin && cfg.venue_watch.flag_upgrades);
     }
 
     #[test]

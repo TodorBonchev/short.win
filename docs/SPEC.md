@@ -110,6 +110,8 @@ Tiers are computed on-chain from venue state and liquidity. Collateral ratio **C
 
 *"Price rise to liquidation" ≈ Opening CR ÷ Liquidation CR, ignoring rent accrual.*
 
+**Pool age ✅ Owner (v0.3, O13).** A graduated pool's age (the "graduated < 24h ago" and "age ≥ 7 days" criteria) is measured from the moment short.win first observes it: the real graduation time for markets listed before their token graduated, otherwise the market's listing time. Raydium AMM v4 and PumpSwap pools (and CPMM pools created before mid-2024) store no provable creation time, so an old pool listed today starts in Tier C for 24 h and is at most Tier B until day 7. This errs on the conservative side; the UI explains the tier. A Raydium CPMM pool created after mid-2024 does record a provable creation time (`open_time`), and its age is counted from that. ✅ Owner (2026-09-28): accepted knowing a pool can be created early and listed later to start older, because a pool's tier liquidity is bounded by its locked depth.
+
 **Margin rule ✅ Owner (v0.3).** The program enforces the **Opening CR** column: margin `M` is whatever makes (M + S) ÷ executable buyback cost ≥ Opening CR, checked at both the spot and the EMA price. The "Initial margin" column is the approximate result before venue fees; borrowers post about 2% more than it once fees (~1.25% each way) are included.
 
 ### Size caps (all tiers)
@@ -312,6 +314,8 @@ Lendable inventory; utilization; unique lenders/borrowers; OI; rental fees; prot
 | O15 | Fair value for expired positions in S2/S3 | 2% expiry fee, not the liquidation penalty (§5.3) | ✅ Owner (v0.3, 2026-09-27) |
 | N22 | Liquidation keeper pay on small positions | Floor at the SOL-settlement keeper reward, topped up from the borrower remainder (§6.3) | ✅ Owner (v0.3, 2026-09-27) |
 | M1-SEC-1 | Emergency veto over pending governance changes | Parameter changes only; authorities and timelock changes can be cancelled only by governance (§11) | ✅ Owner (v0.3, 2026-09-27) |
+| O13 | Pool age for tier criteria when the pool's creation time is not provable | Counted from short.win's first observation (graduation or listing) (§4) | ✅ Owner (v0.3, 2026-09-28) |
+| O13b | Age of CPMM pools with a provable `open_time` (after mid-2024) | Counted from `open_time`, not first observation (§4; M3-SEC-4) | ✅ Owner (v0.3, 2026-09-28) |
 | 17 | Who executes the short? | short.win, atomically at open | ✅ Owner |
 | — | Sale proceeds kept in position vault | Yes | ✅ Owner (v0.3, 2026-09-27) |
 | 18 | Fee split | §6.3 | ✅ Delegated, proposed |

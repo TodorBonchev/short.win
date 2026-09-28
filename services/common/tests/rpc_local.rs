@@ -6,8 +6,8 @@
 //!   cargo test --manifest-path services/Cargo.toml -p shortwin-services-common --test rpc_local -- --ignored
 //! ```
 //!
-//! Clock, accounts, program accounts, recent fees, and a system transfer simulated and sent in
-//! both formats: v1 where the cluster accepts it (else the refusal must come back as
+//! Clock, accounts, account headers (`dataSlice`), the finalized slot, program accounts, recent
+//! fees, and a system transfer simulated and sent in both formats: v1 where the cluster accepts it (else the refusal must come back as
 //! `TxError::Rejected`, which the keeper's v0 fallback keys on), and v0.
 
 use std::time::Duration;
@@ -109,4 +109,27 @@ async fn the_rpc_backend_reads_simulates_and_sends() {
         .unwrap();
     assert!(none.is_empty());
     chain.recent_priority_fees(&[to]).await.unwrap();
+
+    // Account headers (`dataSlice`): the first bytes of each account, as a whole read has them.
+    let clock_sysvar: Pubkey = "SysvarC1ock11111111111111111111111111111111"
+        .parse()
+        .unwrap();
+    let missing = Keypair::new().pubkey();
+    let keys = [clock_sysvar, to, missing];
+    let full = chain.accounts(&keys).await.unwrap();
+    let heads = chain.account_headers(&keys, 12).await.unwrap();
+    let whole = full[0].as_ref().unwrap();
+    let head = heads[0].as_ref().unwrap();
+    assert_eq!(head.data.len(), 12);
+    assert!(whole.data.len() > 12);
+    assert_eq!(head.owner, whole.owner);
+    // The Clock's slot (the first 8 bytes) may have moved between the two reads; the owner and
+    // the empty data of a System account may not.
+    assert_eq!(heads[1].as_ref().map(|a| a.data.len()), Some(0));
+    assert_eq!(
+        heads[1].as_ref().map(|a| a.owner),
+        full[1].as_ref().map(|a| a.owner)
+    );
+    assert!(heads[2].is_none());
+    assert!(chain.finalized_slot().await.unwrap() <= chain.clock().await.unwrap().slot);
 }

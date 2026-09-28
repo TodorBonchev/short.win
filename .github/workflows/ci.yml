@@ -121,7 +121,7 @@ jobs:
       - name: cargo audit (workspace and the standalone bench lockfiles)
         run: |
           ignore="--ignore RUSTSEC-2025-0141 --ignore RUSTSEC-2021-0139 --ignore RUSTSEC-2024-0388 --ignore RUSTSEC-2024-0436 --ignore RUSTSEC-2025-0161"
-          for lock in Cargo.lock tests/bench/cu_math/Cargo.lock tests/bench/m1_cu/Cargo.lock tests/bench/m2_cu/Cargo.lock; do
+          for lock in Cargo.lock tests/bench/cu_math/Cargo.lock tests/bench/m1_cu/Cargo.lock tests/bench/m2_cu/Cargo.lock tests/bench/m3_cu/Cargo.lock; do
             echo "::group::$lock"; cargo audit -f "$lock" --deny warnings $ignore; echo "::endgroup::"
           done
 
@@ -295,9 +295,12 @@ jobs:
 
   program-tests:
     # Program tests on LiteSVM 0.16 (ARCH §8.2, §8.3) against the anchor-build artifact, incl.
-    # crank_sol_usd on the committed mainnet PriceUpdateV2 dump (tests/litesvm/tests/oracle_*.rs);
-    # the fixtures' checksums; the unit tests of the program and the venue-state readers; and
-    # the T-LAYOUT wasm32 leg (the layout asserts compiled for wasm32).
+    # crank_sol_usd on the committed mainnet PriceUpdateV2 dump (tests/litesvm/tests/oracle_*.rs)
+    # and, from M3, the Raydium mainnet fork (the dumped AMM v4 / CPMM programs and pools:
+    # ray_math_it, ray_it, raydium_v4_e2e / raydium_v4_attacks, raydium_cpmm_e2e,
+    # latch_raydium_it, trace_raydium_it, tx_size_raydium); the fixtures' checksums; the unit
+    # tests of the program and the venue-state readers; and the T-LAYOUT wasm32 leg (the layout
+    # asserts compiled for wasm32).
     needs: anchor-build
     runs-on: ubuntu-24.04
     steps:
@@ -311,8 +314,16 @@ jobs:
         with:
           name: shortwin-program
           path: target
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      # SHA256SUMS covers every fixture file; scripts/dump-fixtures.py check (offline) also
+      # checks the Raydium entries of manifest.json against their files and each other (the
+      # ProgramData reconstructions, the cross-references of pools, vaults, mints and configs).
       - name: Mainnet fixtures match their recorded checksums (tests/fixtures/manifest.json)
-        run: cd tests/fixtures && sha256sum -c SHA256SUMS
+        run: |
+          (cd tests/fixtures && sha256sum -c --quiet SHA256SUMS)
+          python3 scripts/dump-fixtures.py check
       - name: T-LAYOUT wasm32 leg
         run: cargo check -p shortwin --target wasm32-unknown-unknown --locked
       # Selected with the harness, shortwin's unit tests build with `test-venue` (feature
@@ -429,6 +440,55 @@ jobs:
       - name: results.md and trace.md are current (informational)
         run: git diff --exit-code -- tests/bench/m2_cu/results.md tests/bench/m2_cu/trace.md || echo "::warning::M2 CU or trace figures changed; commit tests/bench/m2_cu/results.md and trace.md"
 
+  m3-cu:
+    # M3 CU bench, T-TRACE and stack depth on Raydium (ARCH §6.1–§6.4, §8.2 T-RAY-CU / T-RAY-TRACE /
+    # T-CU / T-TRACE, §9 M3): every Raydium-path instruction of the release build on the dumped
+    # AMM v4 / CPMM programs on Mollusk 0.15.1 within its budget, cross-checked on LiteSVM; the
+    # worst-case Raydium transactions at their exact trace counts (≤ 64); every path through 0–3
+    # levels of the TEST-ONLY CPI wrapper (tests/bench/m3_cu, a standalone workspace with its own
+    # lockfile; README.md there). Loads the release shortwin.so from the anchor-build artifact.
+    needs: anchor-build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: m3-cu-${{ env.PLATFORM_TOOLS }}
+          workspaces: tests/bench/m3_cu
+      - name: Cache Agave and platform-tools
+        id: tools
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.local/share/solana/install
+            ~/.cache/solana/${{ env.PLATFORM_TOOLS }}
+          key: sbf-tools-agave-${{ env.AGAVE_VERSION }}-${{ env.PLATFORM_TOOLS }}-${{ runner.os }}
+      - name: Install Agave ${{ env.AGAVE_VERSION }}
+        if: steps.tools.outputs.cache-hit != 'true'
+        run: sh -c "$(curl -sSfL https://release.anza.xyz/v${AGAVE_VERSION}/install)"
+      - name: Select Agave ${{ env.AGAVE_VERSION }}
+        run: |
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/share/solana/install/active_release/bin/agave-install" init "$AGAVE_VERSION"
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: shortwin-program
+          path: target
+      - name: Build the TEST-ONLY CPI wrapper (platform-tools v1.57, SBPF v3; never deployed)
+        run: |
+          cargo-build-sbf --tools-version "$PLATFORM_TOOLS" --arch "$SBPF_ARCH" \
+            --manifest-path tests/bench/m3_cu/wrapper/Cargo.toml --sbf-out-dir tests/bench/m3_cu/target/deploy -- --locked
+          flags=$(od -An -t x4 -j 48 -N 4 tests/bench/m3_cu/target/deploy/m3_cpi_wrapper.so | tr -d ' ')
+          [ "$flags" = "00000003" ] || { echo "::error::e_flags=$flags, expected SBPF v3 (00000003)"; exit 1; }
+      - run: cargo fmt --manifest-path tests/bench/m3_cu/Cargo.toml --all --check
+      - run: cargo clippy --manifest-path tests/bench/m3_cu/Cargo.toml --workspace --all-targets --locked -- -D warnings
+      - name: Budgets, T-TRACE and depth (fails above a budget, off the expected trace or depth, above 64 entries, or on a failed case)
+        run: M3_CU_WRITE=1 M3_TRACE_WRITE=1 M3_DEPTH_WRITE=1 cargo test --manifest-path tests/bench/m3_cu/Cargo.toml --locked -- --nocapture
+      - name: results.md, trace.md and depth.md are current (informational)
+        run: git diff --exit-code -- tests/bench/m3_cu/results.md tests/bench/m3_cu/trace.md tests/bench/m3_cu/depth.md || echo "::warning::M3 CU, trace or depth figures changed; commit tests/bench/m3_cu/{results,trace,depth}.md"
+
   services:
     # The off-chain services workspace (services/, its own Cargo.lock; ARCH §1.2, §7.1): fmt,
     # clippy (the workspace, and the keeper alone on its release feature set, without the
@@ -497,3 +557,40 @@ jobs:
               print(f"::error::the release keeper embeds the mock venue id {pid} (test-venue enabled?)"); sys.exit(1)
           print(f"ok: mock venue id {pid} absent from the release keeper")
           PY
+
+  t-size:
+    # T-SIZE on Raydium (ARCH §6.4, §8.2; §9 M3): every Raydium transaction — open_short,
+    # close_short, liquidate, expire, sol_settle and crank batches — in its worst case (compute
+    # budget, a separate fee payer, a first-time borrower, the largest extras set) fits 1,232 B and
+    # 64 accounts as a v0 transaction through the protocol ALT (A28 as enumerated, and the table
+    # scripts/build-alt.sh builds), and executes that way on the mainnet fork under the invariant
+    # hooks (tests/litesvm/tests/tx_size_raydium.rs; the size table is printed). Also the protocol
+    # ALT's static part as scripts/build-alt.sh builds it, uploaded for review with the live
+    # recipients added at `create` time. (program-tests and services run the same tests; this job
+    # keeps the size table and the address list in one log.)
+    needs: anchor-build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: t-size
+          workspaces: |
+            .
+            services
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: shortwin-program
+          path: target
+      - name: T-SIZE, Raydium (v0 through the protocol ALT, executed on the fork)
+        env:
+          SHORTWIN_SO: ${{ github.workspace }}/target/deploy/shortwin.so
+        run: cargo test --locked -p shortwin-litesvm-tests --test tx_size_raydium -- --nocapture
+      - name: The protocol ALT's static part (scripts/build-alt.sh print)
+        run: scripts/build-alt.sh print | tee protocol-alt-static.txt
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: protocol-alt
+          path: protocol-alt-static.txt

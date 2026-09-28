@@ -140,6 +140,22 @@ pub trait Chain {
     /// The accounts at `keys`, in order (`None` for a missing account).
     async fn accounts(&self, keys: &[Pubkey]) -> anyhow::Result<Vec<Option<AccountData>>>;
 
+    /// The accounts at `keys` with only their first `len` data bytes (`None` for a missing
+    /// account): the venue ProgramData headers of the upgrade watcher (ARCH §7.1 duty 10), whose
+    /// accounts are up to 10 MiB. The default reads whole accounts and truncates; a backend
+    /// that can slice server-side (JSON-RPC `dataSlice`) overrides it.
+    async fn account_headers(
+        &self,
+        keys: &[Pubkey],
+        len: usize,
+    ) -> anyhow::Result<Vec<Option<AccountData>>> {
+        let mut out = self.accounts(keys).await?;
+        for a in out.iter_mut().flatten() {
+            a.data.truncate(len);
+        }
+        Ok(out)
+    }
+
     /// Every account of `program` matching all `filters`.
     async fn program_accounts(
         &self,

@@ -70,6 +70,15 @@ impl RpcChain {
         &self.client
     }
 
+    /// The latest finalized slot: a slot every bank's `SlotHashes` still holds for the next
+    /// ~512 slots (the `recent_slot` of an address-lookup-table creation).
+    pub async fn finalized_slot(&self) -> anyhow::Result<u64> {
+        self.client
+            .get_slot_with_commitment(CommitmentConfig::finalized())
+            .await
+            .context("getSlot (finalized)")
+    }
+
     fn account_of(ui: solana_account_decoder_client_types::UiAccount) -> Option<AccountData> {
         let data = ui.data.decode()?;
         let owner = ui.owner.parse().ok()?;
@@ -162,6 +171,32 @@ impl Chain for RpcChain {
                     data: a.data,
                 })
             }));
+        }
+        Ok(out)
+    }
+
+    async fn account_headers(
+        &self,
+        keys: &[Pubkey],
+        len: usize,
+    ) -> anyhow::Result<Vec<Option<AccountData>>> {
+        let config = RpcAccountInfoConfig {
+            encoding: Some(UiAccountEncoding::Base64),
+            data_slice: Some(solana_account_decoder_client_types::UiDataSliceConfig {
+                offset: 0,
+                length: len,
+            }),
+            commitment: Some(self.commitment),
+            min_context_slot: None,
+        };
+        let mut out = Vec::with_capacity(keys.len());
+        for chunk in keys.chunks(MULTIPLE_ACCOUNTS_MAX) {
+            let res = self
+                .client
+                .get_multiple_ui_accounts_with_config(chunk, config.clone())
+                .await
+                .context("getMultipleAccounts (dataSlice)")?;
+            out.extend(res.value.into_iter().map(|a| a.and_then(Self::account_of)));
         }
         Ok(out)
     }

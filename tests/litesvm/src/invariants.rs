@@ -19,7 +19,7 @@
 //! sees, the instruction-level allowance, claim, conservation and lock bounds) is [`lender`];
 //! the position engine's I3, I5–I7, I9, I10, I13, I16 are [`positions`] (I11, I12: the
 //! liquidation / expiry / settlement tracks; I14: a structural test). Positions are in I2 and
-//! I4, opens in I17. Every check here works on **stored** values, which is sound where noted:
+//! I4, opens in I17 (and, since M3-SEC-2, listings on a venue with a latch mask). Every check here works on **stored** values, which is sound where noted:
 //! an untouched lender's stored `real` only lags its true value, so a stored-value upper bound
 //! implies the true one.
 
@@ -29,8 +29,8 @@ use anchor_lang::solana_program::instruction::Instruction;
 use litesvm::LiteSVM;
 use litesvm::types::TransactionMetadata;
 use shortwin::events::{
-    ClaimSol, Close, DeficitCovered, Deposit, Expire, LenderSynced, Liquidate, Open, SolSettle,
-    Withdraw,
+    ClaimSol, Close, DeficitCovered, Deposit, Expire, LenderSynced, Liquidate, MarketCreated, Open,
+    SolSettle, Withdraw,
 };
 use shortwin::state::{LenderPosition, Market, MarketVault, ShortPosition, VenueGuard, VenueKind};
 use shortwin_math::pool::{R_MAX, VIRTUAL_ASSETS, VIRTUAL_SHARES};
@@ -39,6 +39,7 @@ use crate::{events, pda, read};
 
 pub mod lender;
 pub mod positions;
+pub mod venue_view;
 
 /// A failed invariant.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -302,6 +303,8 @@ pub struct IxEvents {
     pub liquidations: Vec<Liquidate>,
     pub expiries: Vec<Expire>,
     pub settlements: Vec<SolSettle>,
+    /// Listings (I17's M3-SEC-2 extension).
+    pub created: Vec<MarketCreated>,
     /// The instruction's account keys (empty when unknown).
     pub accounts: Vec<Pubkey>,
 }
@@ -320,6 +323,7 @@ impl IxEvents {
             liquidations: events::of_ix(meta, ix),
             expiries: events::of_ix(meta, ix),
             settlements: events::of_ix(meta, ix),
+            created: events::of_ix(meta, ix),
             accounts: Vec::new(),
         }
     }
@@ -371,6 +375,7 @@ pub fn check_ix(
         i4_admin_moves_no_funds(svm, pre)?;
     }
     i17_no_open_on_flagged_venue(pre, &ev.opens)?;
+    i17_no_listing_on_flagged_venue(pre, &ev.created)?;
     positions::check_ix(svm, &pre.positions, &ev.position_facts())?;
     lender::check_ix(svm, &pre.lender, ev)
 }
@@ -449,6 +454,29 @@ pub fn i17_no_open_on_flagged_venue(pre: &TxSnapshot, opens: &[Open]) -> Result<
             format!(
                 "open {} accepted on venue {} while VenueGuard.upgraded = {:#b}",
                 open.position, open.venue, guard.upgraded
+            )
+        })?;
+    }
+    Ok(())
+}
+
+/// I17, extended by M3-SEC-2 (beyond ARCH §8.3's wording, which names opens only): no market is
+/// listed on a venue whose mask is flagged in `venue_guard.upgraded` just before the listing's
+/// instruction — a Raydium listing fixes its pool, SOL side and `graduated_at` with the
+/// compiled readers. A list-only (`None`) listing has an empty mask and is never latched.
+pub fn i17_no_listing_on_flagged_venue(
+    pre: &TxSnapshot,
+    created: &[MarketCreated],
+) -> Result<(), Violation> {
+    let Some(guard) = pre.guard else {
+        return Ok(());
+    };
+    for c in created {
+        let mask = VenueKind::from_u8(c.venue).map_or(0, VenueKind::guard_mask);
+        ensure(!guard.blocks(mask), "I17", || {
+            format!(
+                "market {} listed on venue {} while VenueGuard.upgraded = {:#b}",
+                c.market, c.venue, guard.upgraded
             )
         })?;
     }

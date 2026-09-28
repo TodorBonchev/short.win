@@ -24,16 +24,11 @@ fn build(
     }
 }
 
-fn read_set(mv: &MarketView, writable: bool) -> Vec<AccountMeta> {
+/// The ReadSet of `crank_price` and `sol_settle`: every slot read-only.
+fn read_only(mv: &MarketView) -> Vec<AccountMeta> {
     mv.read_keys
         .iter()
-        .map(|k| {
-            if writable {
-                AccountMeta::new(*k, false)
-            } else {
-                AccountMeta::new_readonly(*k, false)
-            }
-        })
+        .map(|k| AccountMeta::new_readonly(*k, false))
         .collect()
 }
 
@@ -49,15 +44,35 @@ pub fn crank_price(mv: &MarketView) -> Instruction {
             program: shortwin::ID,
         },
         shortwin::instruction::CrankPrice {},
-        read_set(mv, false),
+        read_only(mv),
     )
 }
 
+/// `ReadSet ++ TradeExtras ++ Extras` of a trading exit: the ReadSet writable per the venue's
+/// trade marks ([`venue::read_writable`]).
 fn trade_remaining(mv: &MarketView, extras: &ExtrasChoice) -> anyhow::Result<Vec<AccountMeta>> {
-    let mut v = read_set(mv, true);
+    let mut v = venue::read_metas(mv.kind, &mv.read_keys, true)?;
     v.extend(venue::trade_extras(mv.kind, &mv.market)?);
     v.extend(extras.metas.iter().cloned());
     Ok(v)
+}
+
+/// `flag_venue_upgraded(venue)` (ARCH §3.1, §3.9; A7): anyone records a venue program upgrade
+/// in the `VenueGuard` latch; `venue` is a `VenueGuard` index, and the ProgramData account the
+/// compile-time constant for it.
+pub fn flag_venue_upgraded(venue: u8) -> anyhow::Result<Instruction> {
+    let program_data = shortwin::constants::venue_program_data(venue)
+        .ok_or_else(|| anyhow::anyhow!("venue index {venue} out of range"))?;
+    Ok(build(
+        shortwin::accounts::FlagVenueUpgraded {
+            venue_guard: pda::venue_guard(),
+            program_data,
+            event_authority: pda::event_authority(),
+            program: shortwin::ID,
+        },
+        shortwin::instruction::FlagVenueUpgraded { venue },
+        Vec::new(),
+    ))
 }
 
 /// `liquidate(extras)` of `pos` by `keeper` (ARCH §3.6).
@@ -140,6 +155,6 @@ pub fn sol_settle(keeper: &Pubkey, mv: &MarketView, pos: &PositionView) -> Instr
             program: shortwin::ID,
         },
         shortwin::instruction::SolSettle {},
-        read_set(mv, false),
+        read_only(mv),
     )
 }

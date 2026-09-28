@@ -5,11 +5,33 @@
 //! execution, and a timelocked change (≤ 0.1 SOL) could land between signing and execution
 //! (`CreationFeeAboveMax`), as `open_short`'s `max_open_fee` does for the open fee.
 //!
-//! **M1 scope** (ARCH §9 M1): any SPL Token / Token-2022 mint that passes the filter is listed
-//! as venue `None` (list-only: deposits and withdrawals; `None` is never terminal, ARCH §2.5).
-//! Pump detection (`classify_pump`, M5/M6) and Raydium adoption (`venue_hint`, M3) come later;
-//! until then `venue_hint` must be [`VENUE_HINT_AUTO`] (else `NoSupportedVenue`), except in a
-//! TEST-ONLY `test-venue` build, which also accepts the mock venue's hint (M2, A49).
+//! **Scope** (ARCH §9 M1, M3): `venue_hint` is [`VENUE_HINT_AUTO`] — any SPL Token / Token-2022
+//! mint that passes the filter is listed as venue `None` (list-only: deposits and withdrawals;
+//! `None` is never terminal, ARCH §2.5; pump detection for `Auto` arrives with M5/M6) — or, since
+//! M3, [`VENUE_HINT_RAYDIUM_V4`] / [`VENUE_HINT_RAYDIUM_CPMM`] with a candidate pool (below).
+//! Any other hint is `NoSupportedVenue`, except in a TEST-ONLY `test-venue` build, which also
+//! accepts the mock venue's hint (M2, A49).
+//!
+//! **Raydium listing** (ARCH §2.5 `create_market(venue_hint)`, §2.6, §3.2; D1, D2, O13):
+//! `remaining_accounts = [bonding_curve, canonical_pool] ++ ReadSet(candidate)` (AMM v4: pool,
+//! coin vault, pc vault, LP mint; CPMM: pool, config, token 0 vault, token 1 vault, LP mint —
+//! `venues::raydium_v4::verify`, `venues::raydium_cpmm::verify`). First `classify_pump`
+//! (`venues::detect`): a live curve, a migrating curve or a valid canonical PumpSwap pool takes
+//! precedence (`PumpVenuePrecedence`, D1); a curve that graduated elsewhere (zeroed reserves, no
+//! canonical pool) or no pump curve at all proceeds, and the first sets the market's
+//! `graduated_elsewhere` flag. The venue-upgrade latch then must not block the Raydium mask
+//! (`VenueUpgraded`; M3-SEC-2, a deviation from ARCH §3.2, which checks the latch on opens
+//! only): the listing reads the candidate with the compiled readers and fixes the pool, its SOL
+//! side and `graduated_at` for good, so it waits for the Emergency review of an upgrade of
+//! either Raydium program, as opens do. A list-only (`Auto`) listing fixes nothing venue-side
+//! and is never latched. Then the candidate is verified and must be `eligible()`
+//! (`PoolIneligible`, `PoolTooThin`, `PoolLockTooLow`, `VenueAccountMismatch`). The market is
+//! created on that venue with the pool's keys in its pool cache, the SOL side flag, the locked
+//! depth `pool_d`, the price state of the pool (as for any venue with a price), `graduated_at`
+//! per O13 (AMM v4: the listing time; CPMM: `min(now, open_time)` when `open_time ≥ T_CLAMP`,
+//! else the listing time) and
+//! `pool_seen_at = now` (opens wait `pool_list_window_s`). Pool *selection* after the listing
+//! (`propose_pool`, the fast path) is M4; a `None` market moves to Raydium only through it.
 //!
 //! **Order** (ARCH §3.2 checks 1–3):
 //!
@@ -53,15 +75,23 @@ use shortwin_math::tier::Tier;
 use crate::constants::{
     CONFIG_VERSION, MARKET_VERSION, PUMP_AMM_PROGRAM_ID, PUMP_PROGRAM_ID, WSOL_MINT,
 };
+use crate::engine::guard;
 use crate::errors::{CheckedExt, ShortwinError};
 use crate::events::MarketCreated;
 use crate::mint_filter::check_mint_safety;
 use crate::state::{
-    GlobalConfig, Market, MarketVault, VenueKind, POOL_VAULT_SEED, TRADER_SEED, TRADER_WSOL_SEED,
+    GlobalConfig, Market, MarketVault, VenueGuard, VenueKind, MARKET_FLAG_GRADUATED_ELSEWHERE,
+    POOL_VAULT_SEED, TRADER_SEED, TRADER_WSOL_SEED,
 };
+use crate::venues::detect::{self, PumpClass};
+use crate::venues::{raydium_cpmm, raydium_v4};
 
-/// `venue_hint` for "detect": the only value M1 accepts (Raydium hints arrive in M3).
+/// `venue_hint` for "detect": a list-only market until the pump venues arrive (M5/M6).
 pub const VENUE_HINT_AUTO: u8 = 0;
+/// `venue_hint`: adopt the Raydium AMM v4 pool whose ReadSet follows the detection set.
+pub const VENUE_HINT_RAYDIUM_V4: u8 = VenueKind::RaydiumV4 as u8;
+/// `venue_hint`: adopt the Raydium CPMM pool whose ReadSet follows the detection set.
+pub const VENUE_HINT_RAYDIUM_CPMM: u8 = VenueKind::RaydiumCpmm as u8;
 /// TEST-ONLY `venue_hint`: adopt the mock venue's pool of the mint (feature `test-venue`;
 /// A49). The remaining accounts are the detection set followed by the mock ReadSet
 /// `[pool, base_vault, quote_vault]` (`venues::mock::adopt`).
@@ -125,6 +155,10 @@ pub struct CreateMarket<'info> {
         constraint = config.load()?.version == CONFIG_VERSION @ ShortwinError::ConfigVersion
     )]
     pub config: AccountLoader<'info, GlobalConfig>,
+    /// The venue-upgrade latch (A7; M3-SEC-2): a Raydium listing is refused while a bit of the
+    /// Raydium mask is set (`VenueUpgraded`), as opens are. Read only.
+    #[account(seeds = [VenueGuard::SEED], bump = venue_guard.load()?.bump)]
+    pub venue_guard: AccountLoader<'info, VenueGuard>,
     /// One market per mint, whatever its token program.
     #[account(
         init,
@@ -298,23 +332,63 @@ pub fn handler(ctx: Context<CreateMarket>, venue_hint: u8, max_creation_fee: u64
             .map_err(|_| error!(ShortwinError::MintMalformed))?
             .decimals
     };
-    // 3. Venue: list-only (and, in a test-venue build, the mock); the detection keys are
-    //    always derived and checked (C0-15).
+    // 3. Venue: list-only, a verified and eligible Raydium pool (after the D1 precedence
+    //    check), or, in a test-venue build, the mock; the detection keys are always derived and
+    //    checked (C0-15).
     let bonding_curve = bonding_curve_key(&mint_key);
     let canonical_pool = canonical_pool_key(&mint_key);
     let detection_len = DETECTION_SET_LEN.min(ctx.remaining_accounts.len());
     let (detection, hint_accounts) = ctx.remaining_accounts.split_at(detection_len);
     check_detection_set(detection, &bonding_curve, &canonical_pool)?;
-    let venue = match venue_hint {
+    let clock = Clock::get()?;
+    let now = clock.unix_timestamp;
+    let mut graduated_elsewhere = false;
+    let (venue, adoption) = match venue_hint {
         VENUE_HINT_AUTO => {
             require!(
                 hint_accounts.is_empty(),
                 ShortwinError::BadRemainingAccounts
             );
-            VenueKind::None
+            (VenueKind::None, None)
+        }
+        VENUE_HINT_RAYDIUM_V4 | VENUE_HINT_RAYDIUM_CPMM => {
+            let [bc, cp] = detection else {
+                return err!(ShortwinError::BadRemainingAccounts);
+            };
+            let class = detect::classify_pump(bc, cp, &mint_key)?;
+            require!(!class.pump_venue(), ShortwinError::PumpVenuePrecedence);
+            graduated_elsewhere = class == PumpClass::GraduatedElsewhere;
+            // The latch (M3-SEC-2): the listing verifies the candidate with the compiled readers
+            // and fixes the pool, its SOL side and `graduated_at` for good (M3 has no
+            // re-adoption), so none happens while an upgrade of either Raydium program awaits
+            // review — the mask `open_short` uses on these markets (R4B-7).
+            guard::latch(&*accs.venue_guard.load()?, VenueKind::RaydiumV4)?;
+            let config = accs.config.load()?;
+            let adoption = if venue_hint == VENUE_HINT_RAYDIUM_V4 {
+                raydium_v4::verify(
+                    hint_accounts,
+                    &mint_key,
+                    &token_program,
+                    &config.params,
+                    now,
+                )?
+            } else {
+                raydium_cpmm::verify(
+                    hint_accounts,
+                    &mint_key,
+                    &token_program,
+                    &config.params,
+                    now,
+                )?
+            };
+            (adoption.kind, Some(adoption))
         }
         #[cfg(feature = "test-venue")]
-        VENUE_HINT_MOCK => VenueKind::Mock,
+        VENUE_HINT_MOCK => {
+            // The mock carries the Raydium latch mask (A49): the same rule as a Raydium listing.
+            guard::latch(&*accs.venue_guard.load()?, VenueKind::Mock)?;
+            (VenueKind::Mock, None)
+        }
         _ => return err!(ShortwinError::NoSupportedVenue),
     };
     // 4. The creation fee the creator agreed to (M1-SEC-11).
@@ -337,8 +411,6 @@ pub fn handler(ctx: Context<CreateMarket>, venue_hint: u8, max_creation_fee: u64
         )?;
     }
 
-    let clock = Clock::get()?;
-    let now = clock.unix_timestamp;
     let (trader_wsol, trader_wsol_bump) =
         Pubkey::find_program_address(&[TRADER_WSOL_SEED, market_key.as_ref()], &crate::ID);
     let trader = accs.trader.key();
@@ -371,6 +443,17 @@ pub fn handler(ctx: Context<CreateMarket>, venue_hint: u8, max_creation_fee: u64
         // bits set (nothing to sweep before the first deposit).
         m.set_pool(&Pool::new());
         m.last_accrual_ts = now;
+        if let Some(a) = adoption.as_ref() {
+            // ARCH §3.2 "Effects" for a Raydium pool (module docs): the pool cache, the SOL
+            // side, `pool_d`, `graduated_at` (O13), `pool_seen_at`, and the price state
+            // `P_ema = P_spot`, `L_ema = L_slow = √(X·Y)`, one ring entry, an empty bucket. The
+            // tier stays the conservative C until the first open or crank reads the oracle
+            // (`create_market` does not carry `oracle_cache`).
+            a.apply(&mut m, now)?;
+            let obs = crate::engine::observe::initial(now, &a.state)?;
+            m.set_observation(&obs);
+            m.set_flag(MARKET_FLAG_GRADUATED_ELSEWHERE, graduated_elsewhere);
+        }
         #[cfg(feature = "test-venue")]
         if venue == VenueKind::Mock {
             // ARCH §3.2 "Effects" for a venue with a price: the adopted pool's keys, the price

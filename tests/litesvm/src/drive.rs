@@ -18,7 +18,7 @@ use shortwin_math::num::WAD;
 use solana_keypair::Keypair;
 use solana_signer::Signer;
 
-use crate::engine::MockMarket;
+use crate::engine::{MockMarket, VenueMarket};
 use crate::mock::{self, Dir, Leg};
 use crate::{Env, TxResult, tokens};
 
@@ -142,7 +142,7 @@ impl Env {
     }
 
     /// `secs` seconds of the in-house keeper: each second, advance the clock by one and crank.
-    pub fn tick(&mut self, mm: &MockMarket, secs: u32) {
+    pub fn tick(&mut self, mm: &impl VenueMarket, secs: u32) {
         for _ in 0..secs {
             self.warp(1);
             self.crank(mm);

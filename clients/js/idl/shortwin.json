@@ -826,6 +826,33 @@
           }
         },
         {
+          "name": "venue_guard",
+          "docs": [
+            "The venue-upgrade latch (A7; M3-SEC-2): a Raydium listing is refused while a bit of the",
+            "Raydium mask is set (`VenueUpgraded`), as opens are. Read only."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  110,
+                  117,
+                  101,
+                  95,
+                  103,
+                  117,
+                  97,
+                  114,
+                  100
+                ]
+              }
+            ]
+          }
+        },
+        {
           "name": "market",
           "docs": [
             "One market per mint, whatever its token program."

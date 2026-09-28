@@ -174,9 +174,10 @@ fn venue_kinds_without_opens() {
         m.venue = VenueKind::PumpMigrating as u8
     });
     assert_err(&try_open_q(&mut env, &mm, Q), E::VenueMigrating);
-    // A real venue without an adapter in this build: its bit is enabled, its parser is not.
+    // A real venue without an adapter in this build (PumpSwap until M6): its bit is enabled,
+    // its parser is not.
     edit_market(&mut env, &mm.market(), |m| {
-        m.venue = VenueKind::RaydiumCpmm as u8
+        m.venue = VenueKind::PumpSwap as u8
     });
     assert_err(&try_open_q(&mut env, &mm, Q), E::NoSupportedVenue);
 }

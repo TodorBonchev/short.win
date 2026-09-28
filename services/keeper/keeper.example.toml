@@ -7,13 +7,15 @@
 markets = "all"
 
 # Batch format (duty 7): "auto" (v1 while the cluster accepts it, v0 after a refusal, re-probed
-# after v1_reprobe_s), "v1" or "v0".
+# after v1_reprobe_s), "v1" or "v0". The batch sizes are maxima: a batch is also cut where its
+# transaction would exceed the format's size (4,096 / 1,232 B) or 64 accounts.
 tx_format = "auto"
 batch_v1 = 6
 batch_v0 = 4
 v1_reprobe_s = 3600
 
-# The protocol ALT(s) of A28 for v0 transactions (base58). Empty: all keys inline.
+# The protocol ALT(s) of A28 for v0 transactions (base58; `scripts/build-alt.sh` builds and
+# checks it). Empty: all keys inline.
 lookup_tables = []
 
 # Simulate only, never send.
@@ -54,3 +56,11 @@ priority_floor = 0
 # consecutive missed second.
 priority_percentile_bps = 7500
 escalate_bps = 5000
+
+[venue_watch]
+# Duty 10: watch the venue ProgramData accounts (pump, pAMM, pfee, AMM v4, CPMM, Jupiter; and
+# Token-2022, alert only) and call flag_venue_upgraded in the slot after an upgrade.
+flag_upgrades = true
+# Duty 10: report admin actions on each covered market's pool and CPMM config (Raydium SetParams,
+# update_pool_status, update_amm_config): route lost / restored, status, open time, fee vs caps.
+pool_admin = true

@@ -12,9 +12,9 @@
 //! | I10 | `check_ix` | an exit (`Close`, `Liquidate`, `Expire`, `SolSettle`) names neither `oracle_cache` nor `venue_guard` among its accounts |
 //! | I11 | `check_ix` (event part) | a liquidation's spend `≤ ⌊B̂_ref·(10⁴ + δ_liq)/10⁴⌋` with the position's locked δ, an expiry's `≤ ⌊B̂_ref·(10⁴ + δ_exp)/10⁴⌋`; `B ≤ max_in + ert` and `max_in ≤` that fixed bound; penalty / expiry fee `≤ ⌈rate·min(B̂_live,risk, B̂_ref)/10⁴⌉`; an expiry's `π_ref = ⌈fee·B̂_ref/10⁴⌉`, its `K_e = min(fixed + ⌊bps·B̂_ref/10⁴⌋, cap, V − B − r − e)`, and its rent (`R_due` on the post-accrual basis) and fee paid in full whenever `V − R − π_ref − ert ≥ ⌊B̂_ref·(10⁴ + ε)/10⁴⌋`. The liveness clause (I-E11) is a scenario test (`tests/liquidate_it.rs`, `tests/attacks_exit_it.rs`) |
 //! | I12 | `check_ix` (event part and the state around it) | S1 take `= V − K_s`; an S2/S3 take inside `[x_lo, x_hi]` (±2) with the corners within `fv_dev_bps`; `K_s` = the locked terms' reward; a liquidation that leaves the borrower equity pays the keeper `≥ K_s`; S1/S2 only on a live clock (armed, last evaluation within `settle_arm_gap_s`) that has run `settle_persist_n` EMA updates (the position's `s_count` before, the market's `ema_count` after); S3 only on a continuous no-route chain observed now and at least `s3_wait_s` (and the graduation / migration timers) long, with the position's locked terms; `p'` per corner: the penalty on both corners of a position not expired, and on an expired one the expiry fee at the dearer corner `(P_hi, L_lo)` only if the cheaper corner has it too |
-//! | I13 | `check_all` + `check_ix` | every ring entry's `(x, y) = reprice(l, p)`; the newest ring entry is the EMA state (`ts = ema_ts`, `p = P_ema`, `l = L_ema`); no decision state holds the current second (`lb_sec <` now, `b_sec ≤` now, `ema_ts ≤` now, with now = `max(clock, last_accrual_ts)`: the one-second lag); a venue charge ∈ `[B̂ − 5, B̂]` for `Close`, `Liquidate`, `Expire`; on the mock, an `Open`'s proceeds ∈ `[S_exp, S_exp + 5]` and a `Close`'s `b_live` = `B̂_live(q)`, both re-quoted with `quote::cpmm` on the pool just before the instruction; one EMA integration moves `P_ema` and `L_ema` within their single-step bounds |
+//! | I13 | `check_all` + `check_ix` | every ring entry's `(x, y) = reprice(l, p)`; the newest ring entry is the EMA state (`ts = ema_ts`, `p = P_ema`, `l = L_ema`); no decision state holds the current second (`lb_sec <` now, `b_sec ≤` now, `ema_ts ≤` now, with now = `max(clock, last_accrual_ts)`: the one-second lag); a venue charge ∈ `[B̂ − 5, B̂]` for `Close`, `Liquidate`, `Expire`; on the mock and the Raydium venues, an `Open`'s proceeds ∈ `[S_exp, S_exp + 5]` and a `Close`'s `b_live` = `B̂_live(q)`, both re-quoted (`quote::cpmm` / `quote::ray_v4` on the readers' reserves, `venue_view`) on the pool just before the instruction; one EMA integration moves `P_ema` and `L_ema` within their single-step bounds |
 //! | I14 | structural tests (`tests/engine_it/structure.rs`; `tests/add_margin_it.rs`; `tests/liquidate_it.rs` `remaining_accounts_are_strict` / `named_accounts_are_checked`; `tests/settle_it.rs` account checks) | every ReadSet / TradeExtras slot is mandatory and key-checked on `open_short`, `close_short`, `crank_price`, `liquidate`, `expire` and `sol_settle` (omitted, replaced, swapped, appended); the named accounts of every M2 instruction |
-//! | I16 | `check_ix` | no observation is recorded while the (mock) venue is not executable; the route chains are sound (A40, V2-1, R3A-4): a hit of the S3 chain only when `s3_no_route` held on the state just before the instruction, a clear only when it did not; a hit of the `pool_fail` chain only when `pool_fail` held (not executable or fee above the **global** hard cap — never because of the route-broken flag), a clear only when it did not; the risk-quote part (every CR leg, box corner, `B̂_ref` and FV at `min(φ_live, venue_fee_hard_cap_bps_pos)`) is checked by scenario: `tests/route_it.rs` `fee_hike` (FV exactly at the locked cap under a 6 % live fee), `tests/expire_it.rs` `a_fee_far_above_the_hard_cap_holds_expiries_for_s3`, `tests/liquidate_it.rs` `liquidations_ignore_…_fee_cap_…` (the oracle prices at the capped fee) |
+//! | I16 | `check_ix` | no observation is recorded while the (mock or Raydium) venue is not executable; the route chains are sound (A40, V2-1, R3A-4): a hit of the S3 chain only when `s3_no_route` held on the state just before the instruction, a clear only when it did not; a hit of the `pool_fail` chain only when `pool_fail` held (not executable or fee above the **global** hard cap — never because of the route-broken flag), a clear only when it did not; the risk-quote part (every CR leg, box corner, `B̂_ref` and FV at `min(φ_live, venue_fee_hard_cap_bps_pos)`) is checked by scenario: `tests/route_it.rs` `fee_hike` (FV exactly at the locked cap under a 6 % live fee), `tests/expire_it.rs` `a_fee_far_above_the_hard_cap_holds_expiries_for_s3`, `tests/liquidate_it.rs` `liquidations_ignore_…_fee_cap_…` (the oracle prices at the capped fee) |
 //!
 //! Every check reads the state the program sees, before and after the instruction.
 
@@ -28,11 +28,12 @@ use shortwin::state::{
     GlobalConfig, MARKET_FLAG_ROUTE_BROKEN, Market, ShortPosition, VenueKind, WalletExposure,
 };
 use shortwin_math::observe::RingEntry as MathRingEntry;
-use shortwin_math::quote::{cpmm, reprice};
+use shortwin_math::quote::reprice;
 use shortwin_math::rent::{self, Aggr};
 use shortwin_math::settle;
 use solana_clock::Clock;
 
+use super::venue_view::{self, VenueView};
 use super::{Violation, ensure, fail, positions_of};
 use crate::{pda, read};
 
@@ -59,49 +60,9 @@ pub struct MarketPositions {
     pub market: Pubkey,
     pub state: Market,
     pub positions: Vec<(Pubkey, ShortPosition, u64)>,
-    /// `Some(executable)` for a mock market (I16), `None` otherwise.
-    pub mock_executable: Option<bool>,
-    /// The mock pool as short.win's reader sees it (I13 re-quotes, I16 route predicates);
-    /// `None` for other venues.
-    pub mock: Option<MockView>,
-}
-
-/// A mock pool as short.win's adapter sees it (INTERFACE.md "Reader contract"): executable,
-/// pricing reserves `(X, Y)` and the fee on the input.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct MockView {
-    /// The venue predicate (the pool parses, is not disabled, both reserves positive).
-    pub executable: bool,
-    /// Pricing reserves `(X, Y)` when executable.
-    pub reserves: Option<(u64, u64)>,
-    /// `fee_ppm` (0 when the pool does not parse).
-    pub fee_ppm: u32,
-}
-
-impl MockView {
-    /// `B̂_live(q)`: short.win's `quote::cpmm` buy of `q` tokens on this state.
-    pub fn buy(&self, q: u64) -> Option<u64> {
-        let (x, y) = self.reserves?;
-        cpmm::buy_exact_out(
-            q,
-            u128::from(y),
-            u128::from(x),
-            &crate::mock::cpmm_fees(self.fee_ppm),
-        )
-        .map(|b| b.cost)
-    }
-
-    /// `S_exp(q)`: short.win's `quote::cpmm` sale of `q` tokens on this state.
-    pub fn sell(&self, q: u64) -> Option<u64> {
-        let (x, y) = self.reserves?;
-        cpmm::sell_exact_in(
-            q,
-            u128::from(x),
-            u128::from(y),
-            &crate::mock::cpmm_fees(self.fee_ppm),
-        )
-        .map(|s| s.proceeds)
-    }
+    /// The venue as short.win's adapter sees it (I13 re-quotes, I16 route predicates and
+    /// records): the mock and the Raydium venues ([`VenueView`]); `None` for other venues.
+    pub venue: Option<VenueView>,
 }
 
 /// The position-side state of the tracked markets before an instruction.
@@ -121,47 +82,17 @@ pub fn snapshot(svm: &LiteSVM, markets: &[Pubkey]) -> PositionsSnapshot {
                     market: *k,
                     state: m,
                     positions: positions_of(svm, k),
-                    mock_executable: mock_executable(svm, &m),
-                    mock: mock_view(svm, &m),
+                    venue: venue_view::view(svm, &m),
                 })
             })
             .collect(),
     }
 }
 
-/// Whether a mock market's venue is executable now (the adapter's venue predicate, INTERFACE.md
-/// "Reader contract"); `None` for other venues.
-pub fn mock_executable(svm: &LiteSVM, m: &Market) -> Option<bool> {
-    mock_view(svm, m).map(|v| v.executable)
-}
-
-/// A mock market's pool as short.win's reader sees it now ([`MockView`]); `None` for other
-/// venues.
-pub fn mock_view(svm: &LiteSVM, m: &Market) -> Option<MockView> {
-    if m.venue_kind() != Some(VenueKind::Mock) {
-        return None;
-    }
-    use shortwin_venue_state::mock_cpamm;
-    let dead = MockView {
-        executable: false,
-        reserves: None,
-        fee_ppm: 0,
-    };
-    let pool = m.pool_cache[shortwin::state::raydium_cache::RAY_POOL];
-    let Some(acc) = svm.get_account(&pool) else {
-        return Some(dead);
-    };
-    let Ok(p) = mock_cpamm::read(&acc.owner.to_bytes(), &acc.data) else {
-        return Some(dead);
-    };
-    let base = read::token_amount(svm, &Pubkey::new_from_array(p.base_vault)).unwrap_or(0);
-    let quote = read::token_amount(svm, &Pubkey::new_from_array(p.quote_vault)).unwrap_or(0);
-    let reserves = mock_cpamm::reserves(&p, base, quote);
-    Some(MockView {
-        executable: reserves.is_some(),
-        reserves,
-        fee_ppm: p.fee_ppm,
-    })
+/// Whether a market's venue is executable now (the adapter's venue predicate; the mock and
+/// Raydium, [`venue_view`]); `None` for other venues.
+pub fn venue_executable(svm: &LiteSVM, m: &Market) -> Option<bool> {
+    venue_view::view(svm, m).map(|v| v.executable)
 }
 
 /// The per-market position invariants (I6, I7's `pool_vault` delegate and `trader_base_ata`,
@@ -497,11 +428,11 @@ pub fn check_ix(svm: &LiteSVM, pre: &PositionsSnapshot, ix: &IxFacts<'_>) -> Res
                         )
                     },
                 )?;
-                // I13 (mock): the event's quote is B̂_live(q) on the pool just before.
-                if let Some(want) = mp.mock.and_then(|v| v.buy(p.q)) {
+                // I13 (mock, Raydium): the event's quote is B̂_live(q) on the pool just before.
+                if let Some(want) = mp.venue.and_then(|v| v.buy(p.q)) {
                     ensure(c.b_live == want, "I13", || {
                         format!(
-                            "close of {pk}: b_live {} but quote::cpmm on the pre-state gives {want}",
+                            "close of {pk}: b_live {} but the venue's quote on the pre-state gives {want}",
                             c.b_live
                         )
                     })?;
@@ -632,12 +563,12 @@ pub fn check_ix(svm: &LiteSVM, pre: &PositionsSnapshot, ix: &IxFacts<'_>) -> Res
                     o.position
                 )
             })?;
-            // I13 (mock): the sale's proceeds within [S_exp, S_exp + 5] of the quote on the
-            // pool just before (quotes are lower bounds on proceeds).
-            if let Some(want) = mp.mock.and_then(|v| v.sell(o.q)) {
+            // I13 (mock, Raydium): the sale's proceeds within [S_exp, S_exp + 5] of the quote on
+            // the pool just before (quotes are lower bounds on proceeds).
+            if let Some(want) = mp.venue.and_then(|v| v.sell(o.q)) {
                 ensure(o.s >= want && o.s - want <= 5, "I13", || {
                     format!(
-                        "open {}: proceeds {} against quote::cpmm {want} on the pre-state",
+                        "open {}: proceeds {} against the venue's quote {want} on the pre-state",
                         o.position, o.s
                     )
                 })?;
@@ -668,7 +599,8 @@ pub fn check_ix(svm: &LiteSVM, pre: &PositionsSnapshot, ix: &IxFacts<'_>) -> Res
             }
         }
         // I16: no observation is recorded while the venue cannot execute.
-        if let (Some(false), Some(false)) = (mp.mock_executable, mock_executable(svm, &post)) {
+        let pre_exec = mp.venue.map(|v| v.executable);
+        if let (Some(false), Some(false)) = (pre_exec, venue_executable(svm, &post)) {
             let bucket = |m: &Market| {
                 (
                     m.b_sec,
@@ -724,7 +656,7 @@ fn surviving_position(
 }
 
 /// I16 (route rules, ARCH §5.3; A40, V2-1, R3A-4): on a market whose venue view the harness has
-/// (the mock; a list-only market is never executable), a route chain that was stepped by this
+/// (the mock, Raydium; a list-only market is never executable), a route chain that was stepped by this
 /// instruction with a hit (`last_*_obs` moved to a non-zero second) had its predicate true on
 /// the state just before, and one that was cleared had it false. `s3_no_route = ¬executable ∨
 /// route_broken(market or venue bit) ∨ φ > global hard cap`; `pool_fail = ¬executable ∨ φ >
@@ -736,13 +668,9 @@ fn route_chains(
 ) -> Result<(), Violation> {
     let pre = &mp.state;
     let kind = pre.venue_kind();
-    let view = match (kind, mp.mock) {
-        (Some(VenueKind::Mock), Some(v)) => v,
-        (Some(VenueKind::None), _) => MockView {
-            executable: false,
-            reserves: None,
-            fee_ppm: 0,
-        },
+    let view = match (kind, mp.venue) {
+        (Some(_), Some(v)) => v,
+        (Some(VenueKind::None), None) => VenueView::DEAD,
         _ => return Ok(()),
     };
     let cap = u64::from(config.params.venue_fee_hard_cap_bps);

@@ -31,7 +31,7 @@ use shortwin::venues::ExtrasSel;
 pub use shortwin_litesvm_tests::drive::Actor;
 pub use shortwin_litesvm_tests::engine::{Borrower, MarketSpec, MockMarket, crank_price_ix};
 pub use shortwin_litesvm_tests::errors::{assert_err, custom_code, ok};
-use shortwin_litesvm_tests::invariants::positions::mock_executable;
+use shortwin_litesvm_tests::invariants::positions::venue_executable;
 pub use shortwin_litesvm_tests::mock::{self, Dir};
 pub use shortwin_litesvm_tests::{Env, TxResult, events, fixtures, pda, read};
 use shortwin_math::bounds;
@@ -274,7 +274,7 @@ pub fn views(env: &mut Env, mm: &MockMarket, positions: &[(Pubkey, u64)]) -> Vec
 /// The [`View`] of the state as it is (no crank): valid right after a crank in this second.
 pub fn read_view(env: &Env, mm: &MockMarket, borrower: &Pubkey, nonce: u64) -> View {
     let market = env.market(&mm.market());
-    let executable = mock_executable(&env.svm, &market).unwrap_or(false);
+    let executable = venue_executable(&env.svm, &market).unwrap_or(false);
     let (x, y) = if executable {
         let r = mock::reserves(&env.svm, mm.mock());
         (r.base, r.quote)

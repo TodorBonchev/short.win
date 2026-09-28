@@ -4,9 +4,16 @@
 //! successfully").
 //!
 //! The program key-checks every slot; this module only produces the same lists from the
-//! market's caches. Venues without an adapter in this build (the MVP venues arrive with M3–M6)
-//! are skipped with a reason. `VenueKind::Mock` exists only with the TEST-ONLY `test-venue`
-//! feature (A49).
+//! market's caches — for Raydium through the adapters' own key functions
+//! (`shortwin::venues::raydium_v4::{read_keys, trade_keys}`, the same in `raydium_cpmm`), so the
+//! keeper's lists are the program's by construction. What the program does not state as data
+//! is the **writability** of each slot in a trade (ARCH §3.12's "W" marks), which this module
+//! adds: a slot the venue writes must be writable in the transaction (the CPI cannot escalate
+//! it), and a slot it only reads stays read-only — a CPMM `AmmConfig` is shared by every pool
+//! on that config, so write-locking it would contend with all of them (ARCH §6.6).
+//!
+//! Venues without an adapter in this build (the pump venues arrive with M5–M6) are skipped with
+//! a reason. `VenueKind::Mock` exists only with the TEST-ONLY `test-venue` feature (A49).
 
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::AccountMeta;
@@ -16,11 +23,32 @@ use shortwin::state::{
     PLACEHOLDER_BONDING_CURVE, PLACEHOLDER_MINT, PLACEHOLDER_POOL, PLACEHOLDER_TRADER, SEED_CONST,
     SEED_PLACEHOLDER, VenueExtras, VenueKind,
 };
-use shortwin::venues::{EXTRAS_SET_CURRENT, EXTRAS_SET_PREVIOUS, EXTRAS_SET_STABLE, ExtrasSel};
+use shortwin::venues::{
+    EXTRAS_SET_CURRENT, EXTRAS_SET_PREVIOUS, EXTRAS_SET_STABLE, ExtrasSel, raydium_cpmm, raydium_v4,
+};
+
+/// Which ReadSet slots are writable in a trade (ARCH §3.12), in the parser's order:
+/// AMM v4 `[pool W, coin_vault W, pc_vault W, lp_mint]`, CPMM `[pool W, amm_config,
+/// token_0_vault W, token_1_vault W, lp_mint]`, the mock `[pool W, base vault W, WSOL vault W]`.
+/// `crank_price` and `sol_settle` pass every slot read-only.
+pub fn read_writable(kind: VenueKind) -> anyhow::Result<&'static [bool]> {
+    const V4: [bool; raydium_v4::READ_LEN] = [true, true, true, false];
+    const CPMM: [bool; raydium_cpmm::READ_LEN] = [true, false, true, true, false];
+    match kind {
+        VenueKind::RaydiumV4 => Ok(&V4),
+        VenueKind::RaydiumCpmm => Ok(&CPMM),
+        #[cfg(feature = "test-venue")]
+        VenueKind::Mock => Ok(&[true, true, true]),
+        VenueKind::None => bail!("list-only market (no venue)"),
+        other => bail!("venue {other:?} has no adapter in this build (M5–M6)"),
+    }
+}
 
 /// The ReadSet keys of a market on `kind`, in the parser's order.
 pub fn read_set(kind: VenueKind, market: &Market) -> anyhow::Result<Vec<Pubkey>> {
     match kind {
+        VenueKind::RaydiumV4 => Ok(raydium_v4::read_keys(market).to_vec()),
+        VenueKind::RaydiumCpmm => Ok(raydium_cpmm::read_keys(market).to_vec()),
         #[cfg(feature = "test-venue")]
         VenueKind::Mock => {
             use shortwin::state::raydium_cache::{RAY_POOL, RAY_VAULT_SOL, RAY_VAULT_TOK};
@@ -33,14 +61,64 @@ pub fn read_set(kind: VenueKind, market: &Market) -> anyhow::Result<Vec<Pubkey>>
         VenueKind::None => bail!("list-only market (no venue)"),
         other => {
             let _ = market;
-            bail!("venue {other:?} has no adapter in this build (M3–M6)")
+            bail!("venue {other:?} has no adapter in this build (M5–M6)")
         }
     }
 }
 
+/// The ReadSet metas of `keys` (a market's [`read_set`]) on `kind`: writable per
+/// [`read_writable`] when `trading`, all read-only otherwise.
+pub fn read_metas(
+    kind: VenueKind,
+    keys: &[Pubkey],
+    trading: bool,
+) -> anyhow::Result<Vec<AccountMeta>> {
+    let writable = read_writable(kind)?;
+    if writable.len() != keys.len() {
+        bail!(
+            "venue {kind:?}: {} ReadSet keys, the adapter takes {}",
+            keys.len(),
+            writable.len()
+        );
+    }
+    Ok(keys
+        .iter()
+        .zip(writable)
+        .map(|(k, w)| {
+            if trading && *w {
+                AccountMeta::new(*k, false)
+            } else {
+                AccountMeta::new_readonly(*k, false)
+            }
+        })
+        .collect())
+}
+
 /// The TradeExtras metas of a market on `kind` (after the ReadSet in `liquidate` / `expire`).
 pub fn trade_extras(kind: VenueKind, market: &Market) -> anyhow::Result<Vec<AccountMeta>> {
+    let metas = |keys: &[Pubkey], writable: &[usize]| {
+        keys.iter()
+            .enumerate()
+            .map(|(i, k)| {
+                if writable.contains(&i) {
+                    AccountMeta::new(*k, false)
+                } else {
+                    AccountMeta::new_readonly(*k, false)
+                }
+            })
+            .collect::<Vec<_>>()
+    };
     match kind {
+        // X5 `trader_wsol` (W).
+        VenueKind::RaydiumV4 => Ok(metas(
+            &raydium_v4::trade_keys(market),
+            &[raydium_v4::X_TRADER_WSOL],
+        )),
+        // X2 `observation` (W), X7 `trader_wsol` (W).
+        VenueKind::RaydiumCpmm => Ok(metas(
+            &raydium_cpmm::trade_keys(market),
+            &[raydium_cpmm::X_OBSERVATION, raydium_cpmm::X_TRADER_WSOL],
+        )),
         #[cfg(feature = "test-venue")]
         VenueKind::Mock => {
             use shortwin::constants::{
@@ -56,7 +134,7 @@ pub fn trade_extras(kind: VenueKind, market: &Market) -> anyhow::Result<Vec<Acco
         }
         other => {
             let _ = market;
-            bail!("venue {other:?} has no adapter in this build (M3–M6)")
+            bail!("venue {other:?} has no adapter in this build (M5–M6)")
         }
     }
 }
@@ -176,4 +254,119 @@ pub fn extras_candidates(
         out.push(c);
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use shortwin::state::raydium_cache::{
+        RAY_AMM_CONFIG, RAY_LP_MINT, RAY_OBSERVATION, RAY_POOL, RAY_VAULT_SOL, RAY_VAULT_TOK,
+    };
+
+    fn market(sol_first: bool, token_program: Pubkey) -> Market {
+        let mut m: Market = bytemuck::Zeroable::zeroed();
+        for i in [
+            RAY_POOL,
+            RAY_VAULT_SOL,
+            RAY_VAULT_TOK,
+            RAY_AMM_CONFIG,
+            RAY_OBSERVATION,
+            RAY_LP_MINT,
+        ] {
+            m.pool_cache[i] = Pubkey::new_unique();
+        }
+        m.trader_wsol = Pubkey::new_unique();
+        m.token_program = token_program;
+        if sol_first {
+            m.flags |= shortwin::state::MARKET_FLAG_SOL_IS_TOKEN0_OR_COIN;
+        }
+        m
+    }
+
+    fn flags(metas: &[AccountMeta]) -> Vec<bool> {
+        metas.iter().map(|m| m.is_writable).collect()
+    }
+
+    /// ARCH §3.12: the keeper's lists are the adapters' own keys, with the "W" marks of the
+    /// table, and no signer anywhere.
+    #[test]
+    fn raydium_lists_are_the_adapters_with_archs_writability() {
+        use shortwin::constants::{TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID};
+        for sol_first in [false, true] {
+            for program in [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID] {
+                let m = market(sol_first, program);
+                // AMM v4: pool, coin vault, pc vault (WSOL side per the flag), LP mint.
+                let keys = read_set(VenueKind::RaydiumV4, &m).unwrap();
+                assert_eq!(keys, raydium_v4::read_keys(&m).to_vec());
+                let (sol, tok) = (m.pool_cache[RAY_VAULT_SOL], m.pool_cache[RAY_VAULT_TOK]);
+                let (coin, pc) = if sol_first { (sol, tok) } else { (tok, sol) };
+                assert_eq!(
+                    keys,
+                    vec![m.pool_cache[RAY_POOL], coin, pc, m.pool_cache[RAY_LP_MINT]]
+                );
+                let trade = read_metas(VenueKind::RaydiumV4, &keys, true).unwrap();
+                assert_eq!(flags(&trade), [true, true, true, false]);
+                let crank = read_metas(VenueKind::RaydiumV4, &keys, false).unwrap();
+                assert!(crank.iter().all(|m| !m.is_writable));
+                let x = trade_extras(VenueKind::RaydiumV4, &m).unwrap();
+                assert_eq!(
+                    x.iter().map(|m| m.pubkey).collect::<Vec<_>>(),
+                    raydium_v4::trade_keys(&m).to_vec()
+                );
+                assert_eq!(flags(&x), [false, false, false, false, false, true]);
+                assert_eq!(x[raydium_v4::X_TRADER_WSOL].pubkey, m.trader_wsol);
+
+                // CPMM: pool, config, token 0 vault, token 1 vault, LP mint.
+                let keys = read_set(VenueKind::RaydiumCpmm, &m).unwrap();
+                assert_eq!(keys, raydium_cpmm::read_keys(&m).to_vec());
+                let (v0, v1) = if sol_first { (sol, tok) } else { (tok, sol) };
+                assert_eq!(
+                    keys,
+                    vec![
+                        m.pool_cache[RAY_POOL],
+                        m.pool_cache[RAY_AMM_CONFIG],
+                        v0,
+                        v1,
+                        m.pool_cache[RAY_LP_MINT]
+                    ]
+                );
+                let trade = read_metas(VenueKind::RaydiumCpmm, &keys, true).unwrap();
+                assert_eq!(flags(&trade), [true, false, true, true, false]);
+                let x = trade_extras(VenueKind::RaydiumCpmm, &m).unwrap();
+                assert_eq!(
+                    x.iter().map(|m| m.pubkey).collect::<Vec<_>>(),
+                    raydium_cpmm::trade_keys(&m).to_vec()
+                );
+                assert_eq!(
+                    flags(&x),
+                    [false, false, true, false, false, false, false, true]
+                );
+                assert_eq!(
+                    x[raydium_cpmm::X_OBSERVATION].pubkey,
+                    m.pool_cache[RAY_OBSERVATION]
+                );
+                assert_eq!(x[raydium_cpmm::X_TOKEN_SIDE_PROGRAM].pubkey, program);
+                for meta in trade.iter().chain(&x) {
+                    assert!(!meta.is_signer);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn venues_without_an_adapter_are_skipped_with_a_reason() {
+        let m = market(false, Pubkey::new_unique());
+        for kind in [
+            VenueKind::None,
+            VenueKind::PumpCurve,
+            VenueKind::PumpSwap,
+            VenueKind::PumpMigrating,
+        ] {
+            assert!(read_set(kind, &m).is_err(), "{kind:?}");
+            assert!(read_writable(kind).is_err(), "{kind:?}");
+        }
+        assert!(trade_extras(VenueKind::PumpSwap, &m).is_err());
+        // A ReadSet of the wrong length is refused, never padded.
+        assert!(read_metas(VenueKind::RaydiumV4, &[Pubkey::new_unique()], true).is_err());
+    }
 }

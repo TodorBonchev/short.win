@@ -32,11 +32,15 @@
 //! *Where the `VenueExtras` account travels is this module's choice* (ARCH names the sets,
 //! not the slot): first in the extras segment, only when a set is selected.
 //!
-//! Venue kinds with an adapter in this build: [`VenueKind::Mock`] (TEST-ONLY, feature
-//! `test-venue`, [`mock`]). The MVP venues arrive with their milestones (M3 Raydium AMM v4 /
-//! CPMM, M5 pump curve, M6 PumpSwap): each adds its arm to the `match`es below and its own
-//! module; until then their markets refuse trades with `NoSupportedVenue` (no market can be
-//! on them yet: `create_market` lists only `None` and, in a test build, the mock).
+//! Venue kinds with an adapter in this build: [`VenueKind::RaydiumV4`] ([`raydium_v4`]) and
+//! [`VenueKind::RaydiumCpmm`] ([`raydium_cpmm`]) since M3, sharing [`raydium`] (the delegate
+//! sell out of the lending vault, the direct-to-vault buy, eligibility, adoption), and
+//! [`VenueKind::Mock`] (TEST-ONLY, feature `test-venue`, [`mock`]). The pump venues arrive
+//! with their milestones (M5 pump curve, M6 PumpSwap): each adds its arm to the `match`es
+//! below and its own module; until then their markets refuse trades with `NoSupportedVenue`
+//! (no market can be on them yet: `create_market` lists `None`, a verified Raydium pool and,
+//! in a test build, the mock). [`detect`] is the part of the pump detection a Raydium listing
+//! needs today (D1 precedence).
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::instruction::AccountMeta;
@@ -53,8 +57,12 @@ use crate::state::{
     SEED_PLACEHOLDER,
 };
 
+pub mod detect;
 #[cfg(feature = "test-venue")]
 pub mod mock;
+pub mod raydium;
+pub mod raydium_cpmm;
+pub mod raydium_v4;
 
 // ---- extras selection ------------------------------------------------------------------
 
@@ -333,6 +341,10 @@ pub struct VenueState {
     pub pricing: Option<Pricing>,
     /// One-way live fee φ in ppm (ARCH §4.2), 0 when unknown.
     pub fee_ppm: u32,
+    /// Raydium: the pool's locked constant-product depth `D = ⌊λ_bps·isqrt(X·Y)/10⁴⌋` on the
+    /// pricing reserves (ARCH §2.6; `pool_select::locked_depth`); 0 on other venues and when
+    /// not executable.
+    pub locked_depth: u128,
 }
 
 impl VenueState {
@@ -347,6 +359,7 @@ impl VenueState {
             r: 0,
             pricing: None,
             fee_ppm: 0,
+            locked_depth: 0,
         }
     }
 
@@ -405,6 +418,8 @@ impl VenueState {
 /// adapter in this build.
 pub fn read_len(kind: VenueKind) -> Result<usize> {
     match kind {
+        VenueKind::RaydiumV4 => Ok(raydium_v4::READ_LEN),
+        VenueKind::RaydiumCpmm => Ok(raydium_cpmm::READ_LEN),
         #[cfg(feature = "test-venue")]
         VenueKind::Mock => Ok(mock::READ_LEN),
         _ => err!(ShortwinError::NoSupportedVenue),
@@ -414,6 +429,8 @@ pub fn read_len(kind: VenueKind) -> Result<usize> {
 /// Length of the venue's TradeExtras (ARCH §3.12).
 pub fn trade_len(kind: VenueKind) -> Result<usize> {
     match kind {
+        VenueKind::RaydiumV4 => Ok(raydium_v4::TRADE_LEN),
+        VenueKind::RaydiumCpmm => Ok(raydium_cpmm::TRADE_LEN),
         #[cfg(feature = "test-venue")]
         VenueKind::Mock => Ok(mock::TRADE_LEN),
         _ => err!(ShortwinError::NoSupportedVenue),
@@ -423,6 +440,8 @@ pub fn trade_len(kind: VenueKind) -> Result<usize> {
 /// Key-checks the ReadSet against the market's cache (`VenueAccountMismatch`).
 pub fn check_read(market: &Market, kind: VenueKind, read: &[AccountInfo]) -> Result<()> {
     match kind {
+        VenueKind::RaydiumV4 => raydium_v4::check_read(market, read),
+        VenueKind::RaydiumCpmm => raydium_cpmm::check_read(market, read),
         #[cfg(feature = "test-venue")]
         VenueKind::Mock => mock::check_read(market, read),
         _ => {
@@ -435,6 +454,8 @@ pub fn check_read(market: &Market, kind: VenueKind, read: &[AccountInfo]) -> Res
 /// Key-checks the TradeExtras (`VenueAccountMismatch`).
 pub fn check_trade(market: &Market, kind: VenueKind, trade: &[AccountInfo]) -> Result<()> {
     match kind {
+        VenueKind::RaydiumV4 => raydium_v4::check_trade(market, trade),
+        VenueKind::RaydiumCpmm => raydium_cpmm::check_trade(market, trade),
         #[cfg(feature = "test-venue")]
         VenueKind::Mock => mock::check_trade(market, trade),
         _ => {
@@ -444,14 +465,18 @@ pub fn check_trade(market: &Market, kind: VenueKind, trade: &[AccountInfo]) -> R
     }
 }
 
-/// Reads the venue state from a key-checked ReadSet. Never fails: a reader failure is "not
-/// executable" (A63).
-pub fn read_state(kind: VenueKind, read: &[AccountInfo]) -> VenueState {
+/// Reads the venue state from `market`'s key-checked ReadSet at clock time `now` (the
+/// cluster's `unix_timestamp`: the venues' own time gates — AMM v4 `pool_open_time` while
+/// `status == 7`, CPMM `open_time` — compare against it). Never fails: a reader failure is
+/// "not executable" (A63).
+pub fn read_state(market: &Market, kind: VenueKind, read: &[AccountInfo], now: i64) -> VenueState {
     match kind {
+        VenueKind::RaydiumV4 => raydium_v4::read_state(market, read, now),
+        VenueKind::RaydiumCpmm => raydium_cpmm::read_state(market, read, now),
         #[cfg(feature = "test-venue")]
         VenueKind::Mock => mock::read_state(read),
         _ => {
-            let _ = read;
+            let _ = (market, read, now);
             VenueState::not_executable(kind)
         }
     }
@@ -470,16 +495,23 @@ pub fn read_state(kind: VenueKind, read: &[AccountInfo]) -> VenueState {
 ///   such a venue still has a fair value (ARCH §5.3 "FV is priced at the last pre-halt
 ///   `P_ema`") instead of an uncapped take.
 ///
-/// `None` for a venue without an adapter in this build (M3–M6 add their arms).
-pub fn risk_pricing(state: &VenueState, read: &[AccountInfo], cap_bps: u64) -> Option<Pricing> {
+/// `None` for a venue without an adapter in this build (M5–M6 add their arms).
+pub fn risk_pricing(
+    market: &Market,
+    state: &VenueState,
+    read: &[AccountInfo],
+    cap_bps: u64,
+) -> Option<Pricing> {
     if let Some(p) = state.pricing {
         return Some(p.capped(cap_bps));
     }
     match state.kind {
+        VenueKind::RaydiumV4 => Some(raydium_v4::fee_view(read, cap_bps)),
+        VenueKind::RaydiumCpmm => Some(raydium_cpmm::fee_view(market, read, cap_bps)),
         #[cfg(feature = "test-venue")]
         VenueKind::Mock => Some(mock::fee_view(read, cap_bps)),
         _ => {
-            let _ = read;
+            let _ = (market, read);
             None
         }
     }
@@ -580,6 +612,9 @@ pub struct Leg<'info> {
     pub mint: AccountInfo<'info>,
     pub decimals: u8,
     pub token_program: AccountInfo<'info>,
+    /// Raydium: WSOL is the AMM v4 coin / the CPMM token 0 (`Market.flags` bit 3; the CPMM
+    /// swap names its input and output vaults by side). Unused by the mock.
+    pub sol_first: bool,
     pub trader: TraderAccounts<'info>,
     pub read: &'info [AccountInfo<'info>],
     pub trade: &'info [AccountInfo<'info>],
@@ -607,39 +642,38 @@ pub fn trader_accounts<'info>(
     system_program: AccountInfo<'info>,
     trade: &'info [AccountInfo<'info>],
 ) -> Result<TraderAccounts<'info>> {
-    match kind {
+    let at = |i: usize| -> Result<AccountInfo<'info>> {
+        trade
+            .get(i)
+            .cloned()
+            .ok_or_else(|| error!(ShortwinError::BadRemainingAccounts))
+    };
+    let (wsol, wsol_mint, wsol_program) = match kind {
+        VenueKind::RaydiumV4 => (
+            raydium_v4::X_TRADER_WSOL,
+            raydium_v4::X_WSOL_MINT,
+            raydium_v4::X_TOKEN_PROGRAM,
+        ),
+        VenueKind::RaydiumCpmm => (
+            raydium_cpmm::X_TRADER_WSOL,
+            raydium_cpmm::X_WSOL_MINT,
+            raydium_cpmm::X_WSOL_PROGRAM,
+        ),
         #[cfg(feature = "test-venue")]
-        VenueKind::Mock => {
-            let at = |i: usize| -> Result<AccountInfo<'info>> {
-                trade
-                    .get(i)
-                    .cloned()
-                    .ok_or_else(|| error!(ShortwinError::BadRemainingAccounts))
-            };
-            Ok(TraderAccounts {
-                market: market_key,
-                trader,
-                trader_bump: market.trader_bump,
-                trader_wsol: at(mock::T_TRADER_WSOL)?,
-                trader_wsol_bump: market.trader_wsol_bump,
-                market_vault,
-                system_program,
-                wsol_mint: at(mock::T_WSOL_MINT)?,
-                wsol_token_program: at(mock::T_WSOL_PROGRAM)?,
-            })
-        }
-        _ => {
-            let _ = (
-                market_key,
-                market,
-                trader,
-                market_vault,
-                system_program,
-                trade,
-            );
-            err!(ShortwinError::NoSupportedVenue)
-        }
-    }
+        VenueKind::Mock => (mock::T_TRADER_WSOL, mock::T_WSOL_MINT, mock::T_WSOL_PROGRAM),
+        _ => return err!(ShortwinError::NoSupportedVenue),
+    };
+    Ok(TraderAccounts {
+        market: market_key,
+        trader,
+        trader_bump: market.trader_bump,
+        trader_wsol: at(wsol)?,
+        trader_wsol_bump: market.trader_wsol_bump,
+        market_vault,
+        system_program,
+        wsol_mint: at(wsol_mint)?,
+        wsol_token_program: at(wsol_program)?,
+    })
 }
 
 /// What the position refunds the borrower after a sell leg: the ephemeral WSOL account's rent
@@ -678,6 +712,8 @@ pub fn sell<'info>(
     min_out: u64,
 ) -> Result<u64> {
     match leg.kind {
+        VenueKind::RaydiumV4 => raydium_v4::sell(leg, borrower, position, q, min_out),
+        VenueKind::RaydiumCpmm => raydium_cpmm::sell(leg, borrower, position, q, min_out),
         #[cfg(feature = "test-venue")]
         VenueKind::Mock => mock::sell(leg, borrower, position, q, min_out),
         _ => {
@@ -696,6 +732,8 @@ pub fn buy<'info>(
     max_in: u64,
 ) -> Result<BuyOut> {
     match leg.kind {
+        VenueKind::RaydiumV4 => raydium_v4::buy(leg, position, q, max_in),
+        VenueKind::RaydiumCpmm => raydium_cpmm::buy(leg, position, q, max_in),
         #[cfg(feature = "test-venue")]
         VenueKind::Mock => mock::buy(leg, position, q, max_in),
         _ => {

@@ -216,6 +216,12 @@ mod tests {
         };
         assert_eq!(sell_exact_in(5, 10, 10, &zero_out).unwrap().proceeds, 3);
         assert_eq!(buy_exact_out(1, 10, 10, &zero_out).unwrap().cost, 2);
+        // M3-SEC-1: the execution quote stays undefined (the venue reverts), the risk view of
+        // the same fee is the fee-free quote (`CpmmFees::capped`).
+        let risk = zero.capped(500);
+        assert_eq!(risk, zero_out);
+        assert_eq!(buy_exact_out(1, 10, 10, &risk).unwrap().cost, 2);
+        assert_eq!(sell_exact_in(5, 10, 10, &risk).unwrap().proceeds, 3);
         let full = CpmmFees {
             trade: 1_000_000,
             ..CFG0

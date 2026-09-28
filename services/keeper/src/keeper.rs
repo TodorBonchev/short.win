@@ -19,9 +19,19 @@
 //! 4. closes the previous second's coverage accounting (misses → degraded mode; `CoverageGap`
 //!    events from the program → degraded mode; duty 9) and the metrics (duty 8).
 //!
+//! Before the markets, the venue drift monitor (duty 10, [`crate::monitor`]): the venue
+//! ProgramData headers against the `VenueGuard` latch — an upgrade is flagged with
+//! `flag_venue_upgraded` in the slot the keeper sees it, at the exit priority ceiling — and
+//! every covered market's pool and CPMM config against the last tick (Raydium admin actions:
+//! route lost or restored, status, open time, fee against the opens and hard caps), as alerts.
+//!
+//! Batches are **packed by size**: a batch takes up to `batch_v1` / `batch_v0` cranks and is cut
+//! where its transaction would exceed the format's size or account limit, so any mix of venue
+//! account sets (the mock's 3 ReadSet keys, AMM v4's 4, CPMM's 5) is batched as densely as fits.
+//!
 //! Every transaction: simulated first, compute-unit limit `⌈simulated × 1.1⌉`, priority price
 //! from recent per-account fees, escalated after misses, capped at the O17 ceiling (duty 14).
-//! The Jito bundle path of duty 3 is not built in v0 (see the crate README).
+//! The Jito bundle path of duty 3 is not built yet (see the crate README).
 
 use std::collections::{BTreeMap, HashSet, VecDeque};
 
@@ -30,7 +40,7 @@ use anchor_lang::solana_program::instruction::Instruction;
 use anyhow::anyhow;
 use shortwin::errors::ShortwinError;
 use shortwin::events::{CoverageGap, SolSettle};
-use shortwin::state::EXTRAS_IX_BUY;
+use shortwin::state::{EXTRAS_IX_BUY, VenueGuard};
 use shortwin::venues::ExtrasSel;
 use shortwin_services_common::tx::{self, ComputeBudget, TxFormat};
 use shortwin_services_common::{Chain, ChainClock, TxError, TxOutcome};
@@ -46,6 +56,8 @@ use crate::events;
 use crate::fees;
 use crate::ixs;
 use crate::metrics::Metrics;
+use crate::monitor::{self, FeeCaps, LatchAction, PoolWatch};
+use crate::pda;
 use crate::venue;
 use crate::view::{self, ChainView, MarketView, PositionView};
 
@@ -149,6 +161,8 @@ pub struct TickReport {
     pub needs: BTreeMap<Pubkey, MarketNeeds>,
     /// Foreign deviating observations detected: (market, second).
     pub bursts: Vec<(Pubkey, i64)>,
+    /// `flag_venue_upgraded` calls that landed this tick: (venue, deploy slot) (duty 10).
+    pub flagged: Vec<(u8, u64)>,
     pub skipped: Vec<(Pubkey, String)>,
     pub errors: Vec<String>,
 }
@@ -222,6 +236,16 @@ pub struct Keeper<C: Chain> {
     lookup_tables: Vec<AddressLookupTableAccount>,
     lookup_loaded: bool,
     alerts: Vec<Alert>,
+    /// Duty 10: each covered market's pool as last seen.
+    pools: BTreeMap<Pubkey, PoolWatch>,
+    /// Duty 10: each watched ProgramData's deploy slot as last seen (`None`: unreadable).
+    program_slots: BTreeMap<Pubkey, Option<u64>>,
+    /// Upgrades already alerted (venue, deploy slot), and flag failures already alerted.
+    upgrades_alerted: HashSet<(u8, u64)>,
+    flag_failures_alerted: HashSet<(u8, u64)>,
+    /// The second of the last `flag_venue_upgraded` attempt per (venue, deploy slot): at most
+    /// one a second for the same upgrade; a new deploy slot is attempted at once.
+    flag_tried: BTreeMap<(u8, u64), i64>,
     /// Counters (duty 8).
     pub metrics: Metrics,
 }
@@ -242,6 +266,11 @@ impl<C: Chain> Keeper<C> {
             lookup_tables: Vec::new(),
             lookup_loaded: false,
             alerts: Vec::new(),
+            pools: BTreeMap::new(),
+            program_slots: BTreeMap::new(),
+            upgrades_alerted: HashSet::new(),
+            flag_failures_alerted: HashSet::new(),
+            flag_tried: BTreeMap::new(),
             metrics: Metrics::default(),
         })
     }
@@ -279,6 +308,11 @@ impl<C: Chain> Keeper<C> {
     /// The covered markets as of the last discovery.
     pub fn markets(&self) -> &[Pubkey] {
         &self.markets
+    }
+
+    /// The lookup tables v0 transactions use (loaded at the first tick).
+    pub fn lookup_tables(&self) -> &[AddressLookupTableAccount] {
+        &self.lookup_tables
     }
 
     fn format(&self, now: i64) -> TxFormat {
@@ -322,6 +356,24 @@ impl<C: Chain> Keeper<C> {
                     tx::parse_lookup_table(*k, &a.owner, &a.data)
                 })
                 .collect::<anyhow::Result<Vec<_>>>()?;
+            // A28: the protocol table should hold every static key (`shortwin-build-alt`); a
+            // missing one only costs bytes, so this is a warning, not an error.
+            let have: HashSet<Pubkey> = self
+                .lookup_tables
+                .iter()
+                .flat_map(|t| t.addresses.iter().copied())
+                .collect();
+            let missing: Vec<String> = crate::alt::static_entries()
+                .into_iter()
+                .filter(|e| !have.contains(&e.key))
+                .map(|e| format!("{} ({})", e.key, e.label))
+                .collect();
+            if !missing.is_empty() {
+                tracing::warn!(
+                    missing = ?missing,
+                    "the lookup tables lack protocol ALT keys (scripts/build-alt.sh extend)"
+                );
+            }
         }
         self.lookup_loaded = true;
         Ok(())
@@ -513,6 +565,15 @@ impl<C: Chain> Keeper<C> {
             {
                 self.metrics.market(*key).misses += 1;
             }
+        }
+
+        // Duty 10: the latch first (an upgrade is flagged in the slot it is seen), then the
+        // markets' pools.
+        if self.cfg.venue_watch.flag_upgrades {
+            self.watch_programs(now, &mut report).await;
+        }
+        if self.cfg.venue_watch.pool_admin {
+            self.watch_pools(&view);
         }
 
         let mut crank_queue: Vec<(Pubkey, Due)> = Vec::new();
@@ -858,6 +919,171 @@ impl<C: Chain> Keeper<C> {
         }
     }
 
+    /// How many of `ixs` (a prefix) fit one transaction of `format`, with the compute-budget
+    /// and priority-price overhead a send carries (duty 7's size packing).
+    fn fitting(&self, format: TxFormat, ixs: &[Instruction]) -> usize {
+        let budget = ComputeBudget {
+            unit_limit: tx::MAX_COMPUTE_UNITS,
+            unit_price: 1,
+        };
+        let alts: &[AddressLookupTableAccount] = match format {
+            TxFormat::V0 => &self.lookup_tables,
+            TxFormat::V1 => &[],
+        };
+        let hash = solana_hash::Hash::default();
+        (1..=ixs.len())
+            .rev()
+            .find(|&k| {
+                tx::build(format, &self.payer, &[], &ixs[..k], &budget, hash, alts)
+                    .is_ok_and(|t| tx::fits(format, &t))
+            })
+            .unwrap_or(0)
+    }
+
+    /// Duty 10, upgrades ([`crate::monitor`]): reads the latch and the watched ProgramData
+    /// headers in one call; flags every upgrade the program would accept
+    /// (`flag_venue_upgraded`, simulated first, at the exit priority ceiling) and alerts once
+    /// per upgrade; Token-2022's changes are alerted only. The same upgrade is attempted at most
+    /// once a second (an unflagged one is retried every second); a new deploy slot is attempted
+    /// at once.
+    async fn watch_programs(&mut self, now: i64, report: &mut TickReport) {
+        let watched = monitor::watched_programs();
+        let guard_key = pda::venue_guard();
+        // One read: the latch whole, the ProgramData accounts sliced to (at least) their header.
+        let mut keys = vec![guard_key];
+        keys.extend(watched.iter().map(|w| w.program_data));
+        let len = monitor::HEADER_LEN.max(VenueGuard::SPACE);
+        let accs = match self.chain.account_headers(&keys, len).await {
+            Ok(a) => a,
+            Err(e) => {
+                report
+                    .errors
+                    .push(format!("venue guard / ProgramData: {e:#}"));
+                return;
+            }
+        };
+        let Some(guard) = accs
+            .first()
+            .and_then(Option::as_ref)
+            .and_then(view::decode_zc::<VenueGuard>)
+        else {
+            report.errors.push("VenueGuard not found".into());
+            return;
+        };
+        let headers = accs.get(1..).unwrap_or(&[]);
+        for (w, acc) in watched.iter().zip(headers.iter()) {
+            let slot = monitor::deploy_slot(acc.as_ref());
+            let prev = self.program_slots.insert(w.program_data, slot);
+            let Some(slot) = slot else {
+                match prev {
+                    // It was readable: a program closed or re-owned is worth a page.
+                    Some(Some(_)) => self
+                        .alerts
+                        .push(Alert::ProgramDataUnreadable { program: w.program }),
+                    None => tracing::warn!(program = %w.program, "ProgramData not readable"),
+                    Some(None) => {}
+                }
+                continue;
+            };
+            let Some(venue) = w.guard else {
+                if let Some(Some(p)) = prev
+                    && p != slot
+                {
+                    self.alerts.push(Alert::ProgramUpgraded {
+                        program: w.program,
+                        previous_slot: p,
+                        deploy_slot: slot,
+                    });
+                }
+                continue;
+            };
+            let action = monitor::latch_action(&guard, venue, slot);
+            let i = usize::from(venue);
+            let known = match action {
+                LatchAction::Nothing => continue,
+                LatchAction::Flag => guard.guard_slot.get(i).copied().unwrap_or(0),
+                LatchAction::Refresh => guard.flagged_slot.get(i).copied().unwrap_or(0),
+            };
+            if self.upgrades_alerted.insert((venue, slot)) {
+                self.alerts.push(Alert::VenueUpgraded {
+                    venue,
+                    program: w.program,
+                    known_slot: known,
+                    deploy_slot: slot,
+                });
+            }
+            if self.flag_tried.get(&(venue, slot)) == Some(&now) {
+                continue;
+            }
+            self.flag_tried.retain(|(v, _), _| *v != venue);
+            self.flag_tried.insert((venue, slot), now);
+            let ix = match ixs::flag_venue_upgraded(venue) {
+                Ok(ix) => ix,
+                Err(e) => {
+                    report
+                        .errors
+                        .push(format!("flag_venue_upgraded({venue}): {e:#}"));
+                    continue;
+                }
+            };
+            let failure = match self.send_ixs(&[ix], &[guard_key], true, now).await {
+                Ok(Sent::Landed { .. }) => {
+                    self.metrics.venue_flags += 1;
+                    report.flagged.push((venue, slot));
+                    self.alerts.push(Alert::VenueUpgradeFlagged {
+                        venue,
+                        deploy_slot: slot,
+                    });
+                    None
+                }
+                // Someone flagged it first (the latch already records this slot).
+                Ok(Sent::SimFailed { out, .. })
+                    if is(
+                        out.err.as_ref().and_then(TxError::custom_code),
+                        ShortwinError::VenueNotUpgraded,
+                    ) =>
+                {
+                    None
+                }
+                Ok(Sent::DryRun { .. }) => None,
+                Ok(Sent::SimFailed { out, .. }) | Ok(Sent::Failed { out }) => {
+                    Some(format!("{:?}", out.err))
+                }
+                Ok(Sent::TooLarge) => Some("transaction too large".into()),
+                Err(e) => Some(format!("{e:#}")),
+            };
+            if let Some(detail) = failure
+                && self.flag_failures_alerted.insert((venue, slot))
+            {
+                self.alerts.push(Alert::VenueFlagFailed { venue, detail });
+            }
+        }
+    }
+
+    /// Duty 10, pool admin actions ([`crate::monitor`]): every covered market's pool against
+    /// the last tick; each change is an alert.
+    fn watch_pools(&mut self, view: &ChainView) {
+        let caps = FeeCaps::of(&view.config);
+        for mv in &view.markets {
+            let snap = monitor::snapshot(mv);
+            let changes = self
+                .pools
+                .entry(mv.key)
+                .or_default()
+                .observe(mv.kind, snap, caps);
+            let pool = mv.read_keys.first().copied().unwrap_or_default();
+            for change in changes {
+                self.metrics.market(mv.key).venue_admin_changes += 1;
+                self.alerts.push(Alert::VenueAdmin {
+                    market: mv.key,
+                    venue: mv.kind,
+                    pool,
+                    change,
+                });
+            }
+        }
+    }
+
     /// Sends the queued cranks in batches (module docs).
     async fn send_cranks(
         &mut self,
@@ -896,6 +1122,17 @@ impl<C: Chain> Keeper<C> {
             if n == 0 {
                 break;
             }
+            // Cut the batch where its transaction would stop fitting the format (duty 7).
+            let candidates: Vec<Instruction> = pending
+                .iter()
+                .take(n)
+                .filter_map(|k| view.market(k).map(ixs::crank_price))
+                .collect();
+            let n = if candidates.len() == n {
+                self.fitting(self.format(now), &candidates).max(1)
+            } else {
+                n
+            };
             let batch: Vec<Pubkey> = pending.drain(..n).collect();
             let ixs: Vec<Instruction> = batch
                 .iter()

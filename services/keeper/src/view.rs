@@ -54,6 +54,9 @@ pub struct MarketView {
     pub kind: VenueKind,
     /// The ReadSet keys, in order.
     pub read_keys: Vec<Pubkey>,
+    /// The ReadSet accounts as fetched (`None`: missing), for the admin monitor
+    /// ([`crate::monitor`]), which reads the venue's status and fee fields from them.
+    pub read_accounts: Vec<Option<AccountData>>,
     /// The venue state the program's reader computes from them.
     pub state: VenueState,
     /// Open positions, oldest nonce first.
@@ -83,9 +86,11 @@ impl ChainView {
 /// `AccountInfo`s built from the fetched accounts; a missing account reads as an empty
 /// System-owned one, which no reader accepts: "not executable", A63).
 pub fn venue_state(
+    market: &Market,
     kind: VenueKind,
     keys: &[Pubkey],
     accounts: &[Option<AccountData>],
+    now: i64,
 ) -> VenueState {
     let system = anchor_lang::system_program::ID;
     let mut lamports: Vec<u64> = accounts
@@ -112,7 +117,7 @@ pub fn venue_state(
         .zip(execs.iter())
         .map(|((((k, l), d), o), e)| AccountInfo::new(k, false, false, l, d.as_mut_slice(), o, *e))
         .collect();
-    shortwin::venues::read_state(kind, &infos)
+    shortwin::venues::read_state(market, kind, &infos, now)
 }
 
 /// Every `Market` of the program (`getProgramAccounts` on its discriminator).
@@ -238,7 +243,7 @@ pub async fn load<C: Chain>(chain: &C, markets: &[Pubkey]) -> anyhow::Result<Cha
         let len = p.read_keys.len();
         let slice = venue_accs.get(at..at + len).unwrap_or(&[]);
         at += len;
-        let state = venue_state(p.kind, &p.read_keys, slice);
+        let state = venue_state(&p.market, p.kind, &p.read_keys, slice, clock.unix_timestamp);
         let extras = venue_accs
             .get(n_venue + i)
             .and_then(|a| a.as_ref())
@@ -251,6 +256,7 @@ pub async fn load<C: Chain>(chain: &C, markets: &[Pubkey]) -> anyhow::Result<Cha
             vault: p.vault,
             kind: p.kind,
             read_keys: p.read_keys,
+            read_accounts: slice.to_vec(),
             state,
             extras,
         });

@@ -20,18 +20,21 @@
 //!    4; M1-SEC-3).
 //! 2. The prologue (`engine::prologue::run`): the observation recorded is the **pre-trade**
 //!    state; the EMA the body reads is the post-roll one (the one-second lag).
-//! 3. Venue guards: the latch (`VenueUpgraded`, I17); the venue is executable (`NoRoute`);
-//!    `!s3_no_route` — with the flags already refused, that is the fee against the global hard
-//!    cap — and the one-way fee `φ ≤ venue_fee_cap_bps·100` (`VenueFeeTooHigh`).
-//!    (PumpSwap's `disable_flags` and boost gate, and Raydium's listing window and `R_eff`,
-//!    arrive with their venues.)
+//! 3. Venue guards: the latch (`VenueUpgraded`, I17; on Raydium the mask of **both** Raydium
+//!    programs, R4B-7); the venue is executable (`NoRoute`); `!s3_no_route` — with the flags
+//!    already refused, that is the fee against the global hard cap — and the one-way fee `φ ≤
+//!    venue_fee_cap_bps·100` (`VenueFeeTooHigh`); Raydium: `now ≥ pool_seen_at +
+//!    pool_list_window_s` (`PoolListWindow`) and `R_eff ≥ pool_min_real_sol` (`PoolTooThin`;
+//!    `R_eff` bounded by the locked depth over `λ_min`, ARCH §2.6 rule 5). (PumpSwap's
+//!    `disable_flags` and boost gate arrive with M6.)
 //! 4. Open guards: `now ≥ created_at + market_warmup_s` (`MarketWarmingUp`); `|P_spot/P_ema − 1|
 //!    ≤ open_ema_dev_bps` (`PriceDeviatesFromEma`); `P_ema ≤ P_OPEN_MAX` (`PriceAboveOpenMax`).
 //! 5. Tier (`engine::tier::assign`), cached on the market.
-//! 6. Caps (`engine::caps::check_open`): position impact and fee-scaled size
-//!    (`CapPositionImpact`), market OI and fee-scaled OI (`CapMarketOi`), utilisation
-//!    (`CapUtilization`), Tier D gamma (`CapCurveGamma`), wallet (`CapWallet`), `q ≤ T`
-//!    (`InsufficientInventory`).
+//! 6. Caps (`engine::caps::check_open`; on Raydium the conservative reserve `X₀` is also
+//!    bounded by the locked depth `pool_d` over `λ_min`, ARCH §4.6): position impact and
+//!    fee-scaled size (`CapPositionImpact`), market OI and fee-scaled OI (`CapMarketOi`),
+//!    utilisation (`CapUtilization`), Tier D gamma (`CapCurveGamma`), wallet (`CapWallet`),
+//!    `q ≤ T` (`InsufficientInventory`).
 //! 7. `S_exp = quote_sell(q)` on the live state.
 //! 8. The sell leg (`crate::venues::sell`) after the trader normalisation, with `min_out =
 //!    max(min_proceeds, ⌊S_exp·(10⁴ − exec_tol_bps)/10⁴⌋)`; `S` measured (`ProceedsBelowMin`
@@ -226,7 +229,7 @@ pub fn handler<'info>(
             },
             &deny,
         )?;
-        let state = venues::read_state(kind, rem.read);
+        let state = venues::read_state(&market, kind, rem.read, clock.unix_timestamp);
         let mut vault = ctx.accounts.market_vault.load()?.vault();
         let pro = prologue::run(
             &config,
@@ -247,6 +250,23 @@ pub fn handler<'info>(
             !fees::exceeds_cap(state.fee_ppm, u64::from(config.params.venue_fee_cap_bps)),
             ShortwinError::VenueFeeTooHigh
         );
+        if kind.is_raydium() {
+            // Raydium (ARCH §2.6 rules 1 and 5): opens wait out the listing window after an
+            // adoption, and the pool's effective real SOL — bounded by its locked depth over
+            // `λ_min` — must reach `pool_min_real_sol`.
+            let window_end = market
+                .pool_seen_at
+                .checked_add(i64::from(config.params.pool_list_window_s))
+                .or_math()?;
+            require_gte!(now, window_end, ShortwinError::PoolListWindow);
+            let r_eff = engine_tier::r_eff(&config, &market, &state, now)
+                .ok_or(ShortwinError::PoolTooThin)?;
+            require_gte!(
+                r_eff,
+                u128::from(config.params.pool_min_real_sol),
+                ShortwinError::PoolTooThin
+            );
+        }
 
         // Step 4: open guards (the post-roll EMA; the pre-trade spot).
         let warm = market
@@ -279,7 +299,9 @@ pub fn handler<'info>(
                 x_now: state.x,
                 l_slow: market.liq_slow.get(),
                 p_ema,
-                raydium_lock: None,
+                raydium_lock: kind
+                    .is_raydium()
+                    .then(|| (market.pool_d.get(), config.params.pool_lock_min_bps)),
                 phi_ppm: state.fee_ppm,
                 tokens_free: pro.pool.tokens_free,
                 borrowed_q: pro.pool.borrowed_q,
@@ -339,9 +361,9 @@ pub fn handler<'info>(
 
     // ---- phase 2: step 8, the sell leg ---------------------------------------------------
     let accs = &ctx.accounts;
-    let trader = {
+    let (trader, sol_first) = {
         let m = accs.market.load()?;
-        venues::trader_accounts(
+        let t = venues::trader_accounts(
             kind,
             market_key,
             &m,
@@ -349,7 +371,8 @@ pub fn handler<'info>(
             accs.market_vault.to_account_info(),
             accs.system_program.to_account_info(),
             rem.trade,
-        )?
+        )?;
+        (t, venues::raydium::sol_first(&m))
     };
     let swept = trader.normalise()?;
     if swept > 0 {
@@ -381,6 +404,7 @@ pub fn handler<'info>(
         mint: accs.mint.to_account_info(),
         decimals: accs.mint.decimals,
         token_program: accs.token_program.to_account_info(),
+        sol_first,
         trader,
         read: rem.read,
         trade: rem.trade,
@@ -393,7 +417,10 @@ pub fn handler<'info>(
     require_gte!(s, min_out, ShortwinError::ProceedsBelowMin);
 
     // ---- step 9: the post-open state, notional ---------------------------------------------
-    let post = venues::read_state(kind, rem.read);
+    let post = {
+        let m = accs.market.load()?;
+        venues::read_state(&m, kind, rem.read, clock.unix_timestamp)
+    };
     let n_open = post.buy(q).ok_or(ShortwinError::VenueResultMismatch)?.cost;
     let b_ema = post.buy_at(q, ema_xy.0, ema_xy.1).map(|b| b.cost);
     require_gte!(

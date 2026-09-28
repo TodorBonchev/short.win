@@ -32,6 +32,8 @@ pub struct MarketMetrics {
     pub bursts: u64,
     /// `CoverageGap` events seen.
     pub coverage_gaps: u64,
+    /// Admin actions seen on the market's pool or CPMM config (duty 10).
+    pub venue_admin_changes: u64,
     /// Degraded (1) or not (0).
     pub degraded: bool,
     /// The last second covered.
@@ -60,6 +62,8 @@ pub struct Metrics {
     pub batches_v1: u64,
     pub batches_v0: u64,
     pub v1_rejections: u64,
+    /// `flag_venue_upgraded` calls landed (duty 10).
+    pub venue_flags: u64,
 }
 
 impl Metrics {
@@ -122,8 +126,14 @@ impl Metrics {
             "v1 transactions the cluster refused.",
             self.v1_rejections,
         );
+        g(
+            &mut s,
+            "shortwin_keeper_venue_flags_total",
+            "flag_venue_upgraded calls landed.",
+            self.venue_flags,
+        );
         type Row = (&'static str, &'static str, fn(&MarketMetrics) -> u64);
-        let rows: [Row; 13] = [
+        let rows: [Row; 14] = [
             (
                 "covered_seconds",
                 "Seconds with a keeper observation.",
@@ -150,6 +160,11 @@ impl Metrics {
             ("coverage_gaps", "CoverageGap events seen.", |m| {
                 m.coverage_gaps
             }),
+            (
+                "venue_admin_changes",
+                "Admin actions seen on the market's pool or CPMM config.",
+                |m| m.venue_admin_changes,
+            ),
             ("degraded", "1 while the market is in degraded mode.", |m| {
                 u64::from(m.degraded)
             }),

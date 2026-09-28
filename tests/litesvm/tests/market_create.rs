@@ -441,12 +441,24 @@ fn detection_keys_are_derived_on_chain_and_checked() {
     assert_eq!(m.canonical_pool, pda::canonical_pool(&mint));
 }
 
+/// `venue_hint`: `Auto` lists as `None`; since M3 the Raydium hints (4, 5) adopt a candidate
+/// pool, which they need (without its ReadSet: `BadRemainingAccounts`; the Raydium listing
+/// itself is `tests/ray_it/listing.rs`); every other hint — the pump kinds until M5/M6, the
+/// test-only mock on the release build, unknown values — is `NoSupportedVenue`.
 #[test]
-fn only_auto_venue_hint_in_m1() {
+fn venue_hints() {
     let mut env = Env::initialized();
     let (mint, _) = mint_for(&mut env, TokenProgram::Spl);
     let creator = env.funded_keypair();
-    for hint in [1u8, 2, 3, 4, 5, 6, 255] {
+    for (hint, want) in [
+        (1u8, ShortwinError::NoSupportedVenue),
+        (2, ShortwinError::NoSupportedVenue),
+        (3, ShortwinError::NoSupportedVenue),
+        (4, ShortwinError::BadRemainingAccounts),
+        (5, ShortwinError::BadRemainingAccounts),
+        (6, ShortwinError::NoSupportedVenue),
+        (255, ShortwinError::NoSupportedVenue),
+    ] {
         let ix = ix::create_market(
             &creator.pubkey(),
             &mint,
@@ -454,10 +466,7 @@ fn only_auto_venue_hint_in_m1() {
             hint,
             &pda::canonical_pool(&mint),
         );
-        assert_err(
-            &env.send(&[ix], &[&creator]),
-            ShortwinError::NoSupportedVenue,
-        );
+        assert_err(&env.send(&[ix], &[&creator]), want);
     }
 }
 
@@ -482,15 +491,15 @@ fn account_constraints_bite() {
         ix.accounts[i].pubkey = key;
         ix
     };
-    // Account order: creator, config, market, market_vault, pool_vault, mint, trader,
-    // trader_base_ata, token_program, associated_token_program, system_program,
+    // Account order: creator, config, venue_guard (M3-SEC-2), market, market_vault, pool_vault,
+    // mint, trader, trader_base_ata, token_program, associated_token_program, system_program,
     // event_authority, program.
     let other_market = pda::market(&other_mint).0;
     let seeds = [
-        (2, other_market),
-        (3, pda::market_vault(&other_market).0),
-        (4, pda::pool_vault(&other_market).0),
-        (6, pda::trader(&other_market).0),
+        (3, other_market),
+        (4, pda::market_vault(&other_market).0),
+        (5, pda::pool_vault(&other_market).0),
+        (7, pda::trader(&other_market).0),
     ];
     for (i, key) in seeds {
         assert_anchor_err(
@@ -501,13 +510,13 @@ fn account_constraints_bite() {
     // The pool vault must be the PDA, not the market's ATA (R-MINT §8.2).
     let market = pda::market(&mint).0;
     assert_anchor_err(
-        &env.send(&[with(4, pda::ata(&market, &mint, &spl))], &[&creator]),
+        &env.send(&[with(5, pda::ata(&market, &mint, &spl))], &[&creator]),
         AnchorErrorCode::ConstraintSeeds,
     );
     assert_err(
         &env.send(
             &[with(
-                7,
+                8,
                 pda::ata(&pda::trader(&other_market).0, &mint, &spl),
             )],
             &[&creator],
@@ -528,8 +537,8 @@ fn account_constraints_bite() {
         ShortwinError::AccountMismatch,
     );
     // …and be a token program at all.
-    wrong_program.accounts[8].pubkey = anchor_lang::system_program::ID;
-    wrong_program.accounts[7].pubkey = pda::ata(
+    wrong_program.accounts[9].pubkey = anchor_lang::system_program::ID;
+    wrong_program.accounts[8].pubkey = pda::ata(
         &pda::trader(&market).0,
         &mint,
         &anchor_lang::system_program::ID,
@@ -544,6 +553,14 @@ fn account_constraints_bite() {
     env.svm.set_account(fake_config, data).unwrap();
     assert_anchor_err(
         &env.send(&[with(1, fake_config)], &[&creator]),
+        AnchorErrorCode::ConstraintSeeds,
+    );
+    // A venue guard at another address (M3-SEC-2: the latch is key-checked like the config).
+    let fake_guard = Pubkey::new_unique();
+    let data = env.svm.get_account(&pda::venue_guard()).unwrap();
+    env.svm.set_account(fake_guard, data).unwrap();
+    assert_anchor_err(
+        &env.send(&[with(2, fake_guard)], &[&creator]),
         AnchorErrorCode::ConstraintSeeds,
     );
     // Nothing was created by any of the failures.

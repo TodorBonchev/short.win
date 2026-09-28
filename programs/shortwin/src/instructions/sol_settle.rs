@@ -179,9 +179,14 @@ pub fn handler<'info>(ctx: Context<'info, SolSettle<'info>>) -> Result<()> {
             MintPath::Exit,
         )?;
         let rem = venues::parse(&market, kind, ctx.remaining_accounts, Carry::ReadSet, &[])?;
-        let state = venues::read_state(kind, rem.read);
-        let risk = venues::risk_pricing(&state, rem.read, u64::from(pos.venue_fee_hard_cap_bps))
-            .ok_or(ShortwinError::NoSupportedVenue)?;
+        let state = venues::read_state(&market, kind, rem.read, clock.unix_timestamp);
+        let risk = venues::risk_pricing(
+            &market,
+            &state,
+            rem.read,
+            u64::from(pos.venue_fee_hard_cap_bps),
+        )
+        .ok_or(ShortwinError::NoSupportedVenue)?;
         let mut vault = ctx.accounts.market_vault.load()?.vault();
         let tracked_before = (vault.lender_sol, vault.unmatched, vault.protocol_fees);
         let pro = prologue::run(

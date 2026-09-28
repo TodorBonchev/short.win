@@ -22,6 +22,12 @@
 //!   borrowers, builders of every M2 instruction.
 //! - [`drive`]: time and price drivers (actors trading the mock, per-second cranks, price
 //!   pushes); [`attack`]: atomic bundles and sandwiches in one transaction.
+//! - [`fork`]: the Raydium mainnet fork (M3): the dumped AMM v4 / CPMM programs and pools
+//!   (`tests/fixtures/`), [`Env::fork_raydium_v4`] / [`Env::fork_cpmm`], users and direct
+//!   swaps, byte-level and real admin actions, `ray_log` / `SwapEvent` decoding.
+//! - [`raydium`]: Raydium **markets** on the fork (M3): [`Env::ray_fork`], [`Env::ray_market`]
+//!   (`create_market(RaydiumV4 | RaydiumCpmm)`, lender, listing window), [`raydium::RayMarket`]
+//!   (implements [`engine::VenueMarket`], so the M2 builders trade it), pump-detection fixtures.
 //!
 //! Agave line: LiteSVM 0.16.0 on the 4.2.2 runtime crates, pinned in the workspace lockfile
 //! (C1-14; `Cargo.toml` of this crate).
@@ -37,10 +43,12 @@ pub mod env;
 pub mod errors;
 pub mod events;
 pub mod fixtures;
+pub mod fork;
 pub mod invariants;
 pub mod ix;
 pub mod mock;
 pub mod pda;
+pub mod raydium;
 pub mod read;
 pub mod tokens;
 

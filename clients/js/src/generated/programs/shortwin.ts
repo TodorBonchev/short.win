@@ -1614,8 +1614,8 @@ export type ShortwinPluginPdas = {
   market: typeof findMarketPda;
   exposure: typeof findExposurePda;
   poolVault: typeof findPoolVaultPda;
-  trader: typeof findTraderPda;
   venueGuard: typeof findVenueGuardPda;
+  trader: typeof findTraderPda;
   venueExtrasPumpCurve: typeof findVenueExtrasPumpCurvePda;
   venueExtrasPumpSwap: typeof findVenueExtrasPumpSwapPda;
   venueExtrasRaydiumV4: typeof findVenueExtrasRaydiumV4Pda;
@@ -1794,8 +1794,8 @@ export function shortwinProgram() {
           market: findMarketPda,
           exposure: findExposurePda,
           poolVault: findPoolVaultPda,
-          trader: findTraderPda,
           venueGuard: findVenueGuardPda,
+          trader: findTraderPda,
           venueExtrasPumpCurve: findVenueExtrasPumpCurvePda,
           venueExtrasPumpSwap: findVenueExtrasPumpSwapPda,
           venueExtrasRaydiumV4: findVenueExtrasRaydiumV4Pda,

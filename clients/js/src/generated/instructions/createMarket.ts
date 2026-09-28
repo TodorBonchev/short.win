@@ -50,6 +50,7 @@ import {
   findMarketVaultPda,
   findPoolVaultPda,
   findTraderPda,
+  findVenueGuardPda,
 } from "../pdas/index.ts";
 import { SHORTWIN_PROGRAM_ADDRESS } from "../programs/index.ts";
 
@@ -67,6 +68,7 @@ export type CreateMarketInstruction<
   TProgram extends string = typeof SHORTWIN_PROGRAM_ADDRESS,
   TAccountCreator extends string | AccountMeta<string> = string,
   TAccountConfig extends string | AccountMeta<string> = string,
+  TAccountVenueGuard extends string | AccountMeta<string> = string,
   TAccountMarket extends string | AccountMeta<string> = string,
   TAccountMarketVault extends string | AccountMeta<string> = string,
   TAccountPoolVault extends string | AccountMeta<string> = string,
@@ -93,6 +95,9 @@ export type CreateMarketInstruction<
       TAccountConfig extends string
         ? ReadonlyAccount<TAccountConfig>
         : TAccountConfig,
+      TAccountVenueGuard extends string
+        ? ReadonlyAccount<TAccountVenueGuard>
+        : TAccountVenueGuard,
       TAccountMarket extends string
         ? WritableAccount<TAccountMarket>
         : TAccountMarket,
@@ -173,6 +178,7 @@ export function getCreateMarketInstructionDataCodec(): FixedSizeCodec<
 export type CreateMarketAsyncInput<
   TAccountCreator extends InstructionSignerInput = InstructionSignerInput,
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
+  TAccountVenueGuard extends InstructionAccountInput = InstructionAccountInput,
   TAccountMarket extends InstructionAccountInput = InstructionAccountInput,
   TAccountMarketVault extends InstructionAccountInput = InstructionAccountInput,
   TAccountPoolVault extends InstructionAccountInput = InstructionAccountInput,
@@ -196,6 +202,11 @@ export type CreateMarketAsyncInput<
    */
   creator: TAccountCreator;
   config?: TAccountConfig;
+  /**
+   * The venue-upgrade latch (A7; M3-SEC-2): a Raydium listing is refused while a bit of the
+   * Raydium mask is set (`VenueUpgraded`), as opens are. Read only.
+   */
+  venueGuard?: TAccountVenueGuard;
   /** One market per mint, whatever its token program. */
   market?: TAccountMarket;
   marketVault?: TAccountMarketVault;
@@ -233,6 +244,7 @@ export type CreateMarketAsyncInput<
 export async function getCreateMarketInstructionAsync<
   TAccountCreator extends InstructionSignerInput,
   TAccountConfig extends InstructionAccountInput,
+  TAccountVenueGuard extends InstructionAccountInput,
   TAccountMarket extends InstructionAccountInput,
   TAccountMarketVault extends InstructionAccountInput,
   TAccountPoolVault extends InstructionAccountInput,
@@ -249,6 +261,7 @@ export async function getCreateMarketInstructionAsync<
   input: CreateMarketAsyncInput<
     TAccountCreator,
     TAccountConfig,
+    TAccountVenueGuard,
     TAccountMarket,
     TAccountMarketVault,
     TAccountPoolVault,
@@ -272,6 +285,10 @@ export async function getCreateMarketInstructionAsync<
     ResolvedInstructionAccountMeta<
       TAccountConfig,
       InstructionAccountInputAddress<TAccountConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountVenueGuard,
+      InstructionAccountInputAddress<TAccountVenueGuard>
     >,
     ResolvedInstructionAccountMeta<
       TAccountMarket,
@@ -329,6 +346,11 @@ export async function getCreateMarketInstructionAsync<
   const originalAccounts = {
     creator: { value: input.creator ?? null, isSigner: true, isWritable: true },
     config: { value: input.config ?? null, isSigner: false, isWritable: false },
+    venueGuard: {
+      value: input.venueGuard ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     market: { value: input.market ?? null, isSigner: false, isWritable: true },
     marketVault: {
       value: input.marketVault ?? null,
@@ -384,6 +406,9 @@ export async function getCreateMarketInstructionAsync<
   // Resolve default values.
   if (!accounts.config.value) {
     accounts.config.value = await findConfigPda({ programAddress });
+  }
+  if (!accounts.venueGuard.value) {
+    accounts.venueGuard.value = await findVenueGuardPda({ programAddress });
   }
   if (!accounts.market.value) {
     accounts.market.value = await findMarketPda(
@@ -446,6 +471,7 @@ export async function getCreateMarketInstructionAsync<
     accounts: [
       getAccountMeta("creator", accounts.creator),
       getAccountMeta("config", accounts.config),
+      getAccountMeta("venueGuard", accounts.venueGuard),
       getAccountMeta("market", accounts.market),
       getAccountMeta("marketVault", accounts.marketVault),
       getAccountMeta("poolVault", accounts.poolVault),
@@ -471,6 +497,10 @@ export async function getCreateMarketInstructionAsync<
     ResolvedInstructionAccountMeta<
       TAccountConfig,
       InstructionAccountInputAddress<TAccountConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountVenueGuard,
+      InstructionAccountInputAddress<TAccountVenueGuard>
     >,
     ResolvedInstructionAccountMeta<
       TAccountMarket,
@@ -522,6 +552,7 @@ export async function getCreateMarketInstructionAsync<
 export type CreateMarketInput<
   TAccountCreator extends InstructionSignerInput = InstructionSignerInput,
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
+  TAccountVenueGuard extends InstructionAccountInput = InstructionAccountInput,
   TAccountMarket extends InstructionAccountInput = InstructionAccountInput,
   TAccountMarketVault extends InstructionAccountInput = InstructionAccountInput,
   TAccountPoolVault extends InstructionAccountInput = InstructionAccountInput,
@@ -545,6 +576,11 @@ export type CreateMarketInput<
    */
   creator: TAccountCreator;
   config: TAccountConfig;
+  /**
+   * The venue-upgrade latch (A7; M3-SEC-2): a Raydium listing is refused while a bit of the
+   * Raydium mask is set (`VenueUpgraded`), as opens are. Read only.
+   */
+  venueGuard: TAccountVenueGuard;
   /** One market per mint, whatever its token program. */
   market: TAccountMarket;
   marketVault: TAccountMarketVault;
@@ -582,6 +618,7 @@ export type CreateMarketInput<
 export function getCreateMarketInstruction<
   TAccountCreator extends InstructionSignerInput,
   TAccountConfig extends InstructionAccountInput,
+  TAccountVenueGuard extends InstructionAccountInput,
   TAccountMarket extends InstructionAccountInput,
   TAccountMarketVault extends InstructionAccountInput,
   TAccountPoolVault extends InstructionAccountInput,
@@ -598,6 +635,7 @@ export function getCreateMarketInstruction<
   input: CreateMarketInput<
     TAccountCreator,
     TAccountConfig,
+    TAccountVenueGuard,
     TAccountMarket,
     TAccountMarketVault,
     TAccountPoolVault,
@@ -620,6 +658,10 @@ export function getCreateMarketInstruction<
   ResolvedInstructionAccountMeta<
     TAccountConfig,
     InstructionAccountInputAddress<TAccountConfig>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountVenueGuard,
+    InstructionAccountInputAddress<TAccountVenueGuard>
   >,
   ResolvedInstructionAccountMeta<
     TAccountMarket,
@@ -676,6 +718,11 @@ export function getCreateMarketInstruction<
   const originalAccounts = {
     creator: { value: input.creator ?? null, isSigner: true, isWritable: true },
     config: { value: input.config ?? null, isSigner: false, isWritable: false },
+    venueGuard: {
+      value: input.venueGuard ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     market: { value: input.market ?? null, isSigner: false, isWritable: true },
     marketVault: {
       value: input.marketVault ?? null,
@@ -746,6 +793,7 @@ export function getCreateMarketInstruction<
     accounts: [
       getAccountMeta("creator", accounts.creator),
       getAccountMeta("config", accounts.config),
+      getAccountMeta("venueGuard", accounts.venueGuard),
       getAccountMeta("market", accounts.market),
       getAccountMeta("marketVault", accounts.marketVault),
       getAccountMeta("poolVault", accounts.poolVault),
@@ -771,6 +819,10 @@ export function getCreateMarketInstruction<
     ResolvedInstructionAccountMeta<
       TAccountConfig,
       InstructionAccountInputAddress<TAccountConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountVenueGuard,
+      InstructionAccountInputAddress<TAccountVenueGuard>
     >,
     ResolvedInstructionAccountMeta<
       TAccountMarket,
@@ -831,36 +883,41 @@ export type ParsedCreateMarketInstruction<
      */
     creator: TAccountMetas[0];
     config: TAccountMetas[1];
+    /**
+     * The venue-upgrade latch (A7; M3-SEC-2): a Raydium listing is refused while a bit of the
+     * Raydium mask is set (`VenueUpgraded`), as opens are. Read only.
+     */
+    venueGuard: TAccountMetas[2];
     /** One market per mint, whatever its token program. */
-    market: TAccountMetas[2];
-    marketVault: TAccountMetas[3];
+    market: TAccountMetas[3];
+    marketVault: TAccountMetas[4];
     /**
      * The PDA-addressed pool vault: a token account of `mint` owned by `token_program`,
      * authority = the market PDA. Not an ATA: a pre-created ATA would block the listing
      * forever (R-MINT §8.2).
      */
-    poolVault: TAccountMetas[4];
+    poolVault: TAccountMetas[5];
     /**
      * The listed mint: owned by SPL Token or Token-2022 (and by `token_program`), not a
      * native mint, well-formed, no freeze authority, allowlisted extensions only.
      */
-    mint: TAccountMetas[5];
+    mint: TAccountMetas[6];
     /**
      * The market's `trader` PDA (`["trader", market]`): system-owned, zero data, never
      * allocated (ARCH §2.4).
      */
-    trader: TAccountMetas[6];
+    trader: TAccountMetas[7];
     /**
      * `ATA(trader, mint, token_program)`: created with `create_idempotent` and then
      * validated on pump venues (M5, which marks it `mut` again). Read-only while no M1 path
      * writes it, so a list-only listing write-locks nothing it does not use (M1-FID-15).
      */
-    traderBaseAta: TAccountMetas[7];
-    tokenProgram: TAccountMetas[8];
-    associatedTokenProgram: TAccountMetas[9];
-    systemProgram: TAccountMetas[10];
-    eventAuthority: TAccountMetas[11];
-    program: TAccountMetas[12];
+    traderBaseAta: TAccountMetas[8];
+    tokenProgram: TAccountMetas[9];
+    associatedTokenProgram: TAccountMetas[10];
+    systemProgram: TAccountMetas[11];
+    eventAuthority: TAccountMetas[12];
+    program: TAccountMetas[13];
   };
   data: CreateMarketInstructionData;
 };
@@ -873,12 +930,12 @@ export function parseCreateMarketInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedCreateMarketInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 13) {
+  if (instruction.accounts.length < 14) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 13,
+        expectedAccountMetas: 14,
       },
     );
   }
@@ -893,6 +950,7 @@ export function parseCreateMarketInstruction<
     accounts: {
       creator: getNextAccount(),
       config: getNextAccount(),
+      venueGuard: getNextAccount(),
       market: getNextAccount(),
       marketVault: getNextAccount(),
       poolVault: getNextAccount(),

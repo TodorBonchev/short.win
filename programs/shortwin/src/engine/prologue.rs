@@ -14,7 +14,8 @@
 //! accounts are "not executable", A63) and `sync_venue` (a no-op for the venues of this build:
 //! the mock and Raydium stay; the pump transitions of ARCH §2.5 arrive with M5/M6); (7) the
 //! observation record, only while the venue is executable (A64); (8) the route chains (the S3
-//! chain; on Raydium markets and the mock also `pool_fail`). [`run`] does steps 2 and 4–8;
+//! chain; on Raydium markets and the mock also `pool_fail`), and on Raydium the refresh of the
+//! incumbent's locked depth `pool_d` while it is executable. [`run`] does steps 2 and 4–8;
 //! then the body; (10) post-conditions; (11) one `emit_cpi!`.
 //!
 //! A16: `deposit` and `withdraw` run steps 1–5 and 10–11 (no venue accounts, no observation):
@@ -144,6 +145,7 @@ pub fn run(
         recorded = observe::record(&mut obs, now, st)?;
         let chains = route::observe_chains(config, market, st, now);
         (s3, pf, changed) = (chains.s3_no_route, chains.pool_fail, chains.changed);
+        refresh_locked_depth(market, st);
     }
     market.set_observation(&obs);
     market.set_pool(&pool);
@@ -158,6 +160,18 @@ pub fn run(
         chains_changed: changed,
         lender_credit,
     })
+}
+
+/// Raydium: the incumbent's locked depth `pool_d` is refreshed at every executable
+/// observation of the pool (ARCH §2.3.4: "refreshed by `crank_price` and `propose_pool` while
+/// the incumbent is executable"; here every instruction that reads the ReadSet refreshes it,
+/// so `pool_d` is "the incumbent's locked depth at its last executable observation", which the
+/// fast path's threshold names, ARCH §2.6 rule 3). The tier and the open caps read it (§4.6,
+/// §4.7). A pool that cannot execute keeps the last value.
+fn refresh_locked_depth(market: &mut Market, st: &VenueState) {
+    if st.kind.is_raydium() && st.executable {
+        market.pool_d.set(st.locked_depth);
+    }
 }
 
 /// A16's step 5 for the lender instructions (`deposit`, `withdraw`): rolls a completed

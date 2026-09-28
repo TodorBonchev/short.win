@@ -355,18 +355,28 @@ impl CpmmFees {
     /// trade rate is kept first and the creator rate takes the rest, so
     /// `t + c = cap_bps·100` and a fee on the input grosses up at `min(rate, cap)` (the
     /// sims' `RaydiumPool._gross`). The side of the creator fee and the protocol/fund
-    /// shares are unchanged.
+    /// shares are unchanged, except for a **zero** total fee (M3-SEC-1): it has no creator
+    /// part to split, so it is carried on the output and the risk quote is the fee-free one.
+    /// The venue fails a swap whose creator fee is on the input at `t + c = 0`
+    /// (`split_creator_fee` divides by it), which the execution quote keeps (`None`); a risk
+    /// quote — a CR leg, the settlement box, `B̂_ref`, FV — must stay defined, because the
+    /// fee view never makes a quote infinite (ARCH §4.3).
     pub fn capped(&self, cap_bps: u64) -> Self {
-        if !above_cap(self.ppm(), cap_bps) {
-            return *self;
+        let mut out = if above_cap(self.ppm(), cap_bps) {
+            let cap_ppm = cap_bps.saturating_mul(PPM_PER_BPS);
+            let trade = self.trade.min(cap_ppm);
+            Self {
+                trade,
+                creator: self.creator.min(cap_ppm.saturating_sub(trade)),
+                ..*self
+            }
+        } else {
+            *self
+        };
+        if out.trade == 0 && out.creator == 0 {
+            out.creator_on_input = false;
         }
-        let cap_ppm = cap_bps.saturating_mul(PPM_PER_BPS);
-        let trade = self.trade.min(cap_ppm);
-        Self {
-            trade,
-            creator: self.creator.min(cap_ppm.saturating_sub(trade)),
-            ..*self
-        }
+        out
     }
 }
 
@@ -611,6 +621,35 @@ mod tests {
         assert_eq!((c.trade, c.creator, c.oneway_bps()), (40_000, 10_000, 500));
         let c = big.capped(300);
         assert_eq!((c.trade, c.creator), (30_000, 0));
+
+        // M3-SEC-1: a zero total fee is carried on the output in the risk view, whatever the
+        // cap; any non-zero fee keeps its side.
+        let zero = CpmmFees {
+            trade: 0,
+            creator: 0,
+            ..cp
+        };
+        for cap in [0u64, 1, 500, u64::MAX] {
+            assert_eq!(
+                zero.capped(cap),
+                CpmmFees {
+                    creator_on_input: false,
+                    ..zero
+                },
+                "cap {cap}"
+            );
+        }
+        assert_eq!(
+            CpmmFees { trade: 1, ..zero }.capped(500),
+            CpmmFees { trade: 1, ..zero }
+        );
+        assert_eq!(
+            CpmmFees { creator: 1, ..zero }.capped(500),
+            CpmmFees { creator: 1, ..zero }
+        );
+        // A cap of 0 caps every fee to zero: fee-free, on the output.
+        let c = cp.capped(0);
+        assert_eq!((c.trade, c.creator, c.creator_on_input), (0, 0, false));
     }
 
     #[test]

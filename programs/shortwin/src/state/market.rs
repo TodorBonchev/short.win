@@ -116,6 +116,12 @@ impl VenueKind {
         !matches!(self, Self::None | Self::PumpMigrating)
     }
 
+    /// One of the two Raydium kinds (AMM v4, CPMM): pool adopted by verification and
+    /// eligibility (ARCH §2.6), locked depth `D`, the listing window, the Raydium latch mask.
+    pub const fn is_raydium(self) -> bool {
+        matches!(self, Self::RaydiumV4 | Self::RaydiumCpmm)
+    }
+
     /// Whether the venue runs the Raydium fast-path chain `pool_fail` (ARCH §2.6 rule 3, §3.0
     /// step 8): the Raydium kinds, and the mock as their stand-in.
     pub const fn has_pool_fail_chain(self) -> bool {

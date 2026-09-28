@@ -26,21 +26,20 @@ pub fn tier_venue(config: &GlobalConfig, market: &Market, kind: VenueKind) -> Op
     }
 }
 
-/// `tier::assign` for `market` now (ARCH §4.7): `R_now` the venue's real SOL, `Y(reprice(L_slow,
-/// P_ema))` for `R_slow`, VQR 0 (the PumpSwap reader supplies it in M6), age from
-/// `graduated_at`, the cached oracle (a stale or empty cache tiers as C, ADOPTED Q8). `None`
-/// for a list-only market (no opens).
-pub fn assign(
+/// The `tier::assign` inputs of `market` now (ARCH §4.7): `R_now` the venue's real SOL,
+/// `Y(reprice(L_slow, P_ema))` for `R_slow`, VQR 0 (the PumpSwap reader supplies it in M6),
+/// age from `graduated_at`, the cached oracle. `None` for a list-only market (no opens).
+fn inputs(
     config: &GlobalConfig,
     market: &Market,
     state: &VenueState,
-    oracle: &OracleCache,
+    oracle: OraclePrice,
     now: i64,
-) -> Option<Tier> {
+) -> Option<TierInputs> {
     let venue = tier_venue(config, market, state.kind)?;
     let p_ema = market.ema_price.get();
     let y_slow = reprice(market.liq_slow.get(), p_ema).map_or(0, |(_, y)| y);
-    Some(tier::assign(&TierInputs {
+    Some(TierInputs {
         venue,
         r_now: state.r,
         y_slow,
@@ -48,13 +47,40 @@ pub fn assign(
         p_ema,
         now,
         graduated_at: market.graduated_at,
-        oracle: OraclePrice {
-            price: oracle.price,
-            expo: oracle.expo,
-            publish_time: oracle.publish_time,
-        },
+        oracle,
         oracle_stale_s: config.params.oracle_stale_s,
         theta_a_usd_e6: config.params.theta_a_usd_e6,
         theta_b_usd_e6: config.params.theta_b_usd_e6,
-    }))
+    })
+}
+
+/// `tier::assign` for `market` now (ARCH §4.7, on the inputs above); a stale or empty oracle
+/// cache tiers as C (ADOPTED Q8). `None` for a list-only market (no opens).
+pub fn assign(
+    config: &GlobalConfig,
+    market: &Market,
+    state: &VenueState,
+    oracle: &OracleCache,
+    now: i64,
+) -> Option<Tier> {
+    let oracle = OraclePrice {
+        price: oracle.price,
+        expo: oracle.expo,
+        publish_time: oracle.publish_time,
+    };
+    inputs(config, market, state, oracle, now).map(|i| tier::assign(&i))
+}
+
+/// `R_eff` of ARCH §4.7 in lamports: `min(R_now, R_slow)`, and on Raydium also
+/// `≤ ⌊⌊D·isqrt(P_ema)/10⁹⌋·10⁴/λ_min_bps⌋` (locked SOL over `λ_min`, V2-8) — half of the tier
+/// liquidity `Λ = 2·R_eff` (`tier::liquidity_lamports`, which floors each term exactly as the
+/// tier does). The open gate `R_eff ≥ pool_min_real_sol` of a Raydium market (ARCH §2.6 rule
+/// 5, §3.4 step 3). `None` for a list-only market or the curve (no pool liquidity), or if the
+/// terms cannot be computed (`λ_min = 0`, which the compiled bounds exclude).
+pub fn r_eff(config: &GlobalConfig, market: &Market, state: &VenueState, now: i64) -> Option<u128> {
+    let inp = inputs(config, market, state, OraclePrice::default(), now)?;
+    tier::liquidity_lamports(&inp)
+        .ok()
+        .flatten()
+        .and_then(|l| l.checked_div(2))
 }

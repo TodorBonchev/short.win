@@ -19,10 +19,13 @@
 //! | [`mint`] | SPL / Token-2022 mint base fields and the byte-level allowlist filter (`check`) | M1 (market track): differential-tested against the program's `check_mint_safety` |
 //! | [`token_account`] | SPL / Token-2022 token accounts (mint, owner, amount, delegate, close authority) | M2: venue vaults, the pool vault's delta and delegate, `trader_wsol` |
 //! | `mock_cpamm` | TEST-ONLY mock venue pool (feature `test-venue`; never in a release build, A49) | M2 |
+//! | [`raydium_v4`] | Raydium AMM v4 `AmmInfo`: reserves, the route predicate, the fee in ppm, λ | M3 |
+//! | [`raydium_cpmm`] | Raydium CPMM `PoolState` / `AmmConfig`: reserves, the route predicate, fees, λ, the `T_CLAMP` age | M3 |
+//! | [`pump`] | pump `BondingCurve` (the detection subset of `classify_pump`: D1 precedence at a Raydium listing) | M3; the curve adapter's fields with M5 |
+//! | [`pump_amm`] | PumpSwap `Pool` (the canonical-pool test of `classify_pump`) | M3; the PumpSwap adapter's fields with M6 |
 //!
-//! Venue readers (pump `BondingCurve`/`Global`, pump-fees `FeeConfig`, PumpSwap
-//! `Pool`/`GlobalConfig`, Raydium `AmmInfo`, CPMM `PoolState`/`AmmConfig`, token accounts)
-//! arrive with their venue milestones (ARCH §9 M3–M6).
+//! The other pump readers (pump `Global`, pump-fees `FeeConfig`, PumpSwap `GlobalConfig`)
+//! arrive with their venue milestones (ARCH §9 M5–M6).
 #![no_std]
 #![forbid(unsafe_code)]
 #![deny(
@@ -37,7 +40,11 @@ pub mod mint;
 #[cfg(feature = "test-venue")]
 pub mod mock_cpamm;
 pub mod program_data;
+pub mod pump;
+pub mod pump_amm;
 pub mod pyth;
+pub mod raydium_cpmm;
+pub mod raydium_v4;
 pub mod token_account;
 
 /// A 32-byte account key (no dependency on a `Pubkey` type).

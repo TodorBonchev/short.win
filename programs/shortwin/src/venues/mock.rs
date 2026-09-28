@@ -165,6 +165,7 @@ fn state_of(read: &[AccountInfo]) -> Option<VenueState> {
         r: y,
         pricing: Some(Pricing::Cpmm { buy: f, sell: f }),
         fee_ppm: pool.fee_ppm,
+        locked_depth: 0,
     })
 }
 

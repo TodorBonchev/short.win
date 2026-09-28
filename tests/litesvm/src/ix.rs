@@ -252,6 +252,7 @@ pub fn create_market_max_fee(
         shortwin::accounts::CreateMarket {
             creator: *creator,
             config: pda::config(),
+            venue_guard: pda::venue_guard(),
             market,
             market_vault: pda::market_vault(&market).0,
             pool_vault: pda::pool_vault(&market).0,

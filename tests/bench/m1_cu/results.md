@@ -15,10 +15,10 @@ Compute units of every M1 instruction (ARCH §9 M1) on the SBF program (`anchor 
 | `flag_venue_upgraded` | pump, 10 MiB ProgramData (U5) | 6032 | 6032 | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` |
 | `revalidate_venue` | pump, 109 B mock ProgramData | 8440 | 8440 | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` |
 | `revalidate_venue` | pump, 10 MiB ProgramData (U5) | 8440 | 8440 | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` |
-| `create_market` | SPL Token mint, `None` venue | 46362 | 46362 | 250000 | §6.1 `create_market` |
-| `create_market` | Token-2022 mint, `None` venue | 44707 | 44707 | 250000 | §6.1 `create_market` |
+| `create_market` | SPL Token mint, `None` venue | 54386 | 54386 | 250000 | §6.1 `create_market` |
+| `create_market` | Token-2022 mint, `None` venue | 57231 | 57231 | 250000 | §6.1 `create_market` |
 | `flag_unsafe_mint` | freeze authority set | 6425 | 6425 | 60000 | no §6.1 row; crank class (§6.1 `crank_price`) |
-| `deposit` | first deposit, SPL Token | 36273 | 36273 | 100000 | §6.1 `deposit` / `withdraw` |
+| `deposit` | first deposit, SPL Token | 34773 | 34773 | 100000 | §6.1 `deposit` / `withdraw` |
 | `deposit` | first deposit, Token-2022 | 37978 | 37978 | 100000 | §6.1 `deposit` / `withdraw` |
 | `deposit` | second deposit, SPL Token | 29471 | 29471 | 100000 | §6.1 `deposit` / `withdraw` |
 | `withdraw` | half the shares, SPL Token | 31373 | 31373 | 100000 | §6.1 `deposit` / `withdraw` |

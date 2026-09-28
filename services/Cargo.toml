@@ -52,3 +52,6 @@ solana-signature = "3.4"
 solana-signer = "3.0.1"
 solana-transaction = "4.1.5"
 solana-transaction-error = "~3.3.1"
+# The address-lookup-table program's instruction builders and table layout (the protocol ALT of
+# ARCH §6.4 A28, `shortwin-build-alt`); already in this lockfile through LiteSVM.
+solana-address-lookup-table-interface = { version = "3.1", features = ["bincode"] }

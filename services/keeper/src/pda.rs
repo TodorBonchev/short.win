@@ -3,7 +3,8 @@
 
 use anchor_lang::prelude::Pubkey;
 use shortwin::state::{
-    GlobalConfig, MarketVault, OracleCache, ShareEpoch, ShortPosition, VenueExtras, WalletExposure,
+    GlobalConfig, MarketVault, OracleCache, ShareEpoch, ShortPosition, VenueExtras, VenueGuard,
+    WalletExposure,
 };
 
 fn pda(seeds: &[&[u8]]) -> Pubkey {
@@ -13,6 +14,11 @@ fn pda(seeds: &[&[u8]]) -> Pubkey {
 /// `["config"]`.
 pub fn config() -> Pubkey {
     pda(&[GlobalConfig::SEED])
+}
+
+/// `["venue_guard"]` (the venue-upgrade latch, A7).
+pub fn venue_guard() -> Pubkey {
+    pda(&[VenueGuard::SEED])
 }
 
 /// `["sol_usd"]`.

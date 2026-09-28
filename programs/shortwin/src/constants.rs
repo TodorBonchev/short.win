@@ -330,6 +330,22 @@ mod tests {
             shortwin_venue_state::pyth::RECEIVER,
             PYTH_RECEIVER_ID.to_bytes()
         );
+        // The venue readers' program ids and authorities (M3: Raydium, pump detection).
+        use shortwin_venue_state::{mint, pump, pump_amm, raydium_cpmm, raydium_v4};
+        assert_eq!(raydium_v4::PROGRAM, RAYDIUM_V4_PROGRAM_ID.to_bytes());
+        assert_eq!(raydium_v4::AUTHORITY, RAYDIUM_V4_AUTHORITY.to_bytes());
+        assert_eq!(
+            raydium_v4::AUTHORITY_NONCE,
+            u64::from(RAYDIUM_V4_AUTHORITY_NONCE)
+        );
+        assert_eq!(raydium_cpmm::PROGRAM, RAYDIUM_CPMM_PROGRAM_ID.to_bytes());
+        assert_eq!(raydium_cpmm::AUTHORITY, RAYDIUM_CPMM_AUTHORITY.to_bytes());
+        assert_eq!(raydium_cpmm::T_CLAMP, T_CLAMP);
+        assert_eq!(pump::PROGRAM, PUMP_PROGRAM_ID.to_bytes());
+        assert_eq!(pump_amm::PROGRAM, PUMP_AMM_PROGRAM_ID.to_bytes());
+        assert_eq!(mint::NATIVE_MINT, WSOL_MINT.to_bytes());
+        assert_eq!(mint::TOKEN_PROGRAM, TOKEN_PROGRAM_ID.to_bytes());
+        assert_eq!(mint::TOKEN_2022_PROGRAM, TOKEN_2022_PROGRAM_ID.to_bytes());
     }
 
     #[test]

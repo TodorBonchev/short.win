@@ -4,26 +4,26 @@ Compute units of every M2 instruction (ARCH §9 M2) on short.win's **test-venue*
 
 | Instruction | Case | Mollusk CU | LiteSVM CU | Budget | Budget source | Trace | ARCH §6.2 (Raydium) |
 |---|---|---|---|---|---|---|---|
-| `open_short` | first open of a wallet, SPL Token base (position + exposure created) | 102664 | 102664 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) |
-| `open_short` | first open of a wallet, Token-2022 base | 104553 | 104553 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) |
-| `open_short` | second position of a wallet (exposure exists), SPL | 97364 | 97364 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 14 | 13 (≤ 15) |
-| `open_short` | with normalisation (trader and trader_wsol donated to), SPL | 113149 | 113149 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 18 | 13 (≤ 15) |
-| `close_short` | SPL Token base | 69474 | 69474 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) |
-| `close_short` | Token-2022 base | 71600 | 71600 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) |
-| `close_short` | with normalisation, SPL | 75459 | 75459 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 12 | 9 (≤ 11) |
+| `open_short` | first open of a wallet, SPL Token base (position + exposure created) | 99774 | 99774 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) |
+| `open_short` | first open of a wallet, Token-2022 base | 103163 | 103163 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) |
+| `open_short` | second position of a wallet (exposure exists), SPL | 101956 | 101956 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 14 | 13 (≤ 15) |
+| `open_short` | with normalisation (trader and trader_wsol donated to), SPL | 107259 | 107259 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 18 | 13 (≤ 15) |
+| `close_short` | SPL Token base | 69523 | 69523 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) |
+| `close_short` | Token-2022 base | 71630 | 71630 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) |
+| `close_short` | with normalisation, SPL | 75526 | 75526 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 12 | 9 (≤ 11) |
 | `add_margin` | 1 SOL to an open position | 13459 | 13459 | 60000 | no §6.1 row; §6.1 `claim_sol` / `cover_deficit` / `sync_lender` class | 3 | — |
-| `liquidate` | price ×2.3 held 40 s: both legs, fresh reference, within the fixed bound | 94486 | 94486 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) |
-| `expire` | past the deadline, not CR-liquidatable, within the expiry bound | 89698 | 89698 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) |
-| `sol_settle` | healthy position: the no-change call (a keeper's per-second crank) | 38153 | 38153 | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) |
-| `sol_settle` | S3: expired, route flagged, chain unbroken for s3_wait_s | 57942 | 57942 | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) |
-| `crank_price` | roll + record (first crank of a second), SPL | 24301 | 24301 | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) |
-| `crank_price` | record only (same second again) | 19472 | 19472 | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) |
-| `crank_price` | roll + record, Token-2022 base | 24303 | 24303 | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) |
-| `crank_price` | venue halted: roll, no record, both chains start (+ RouteChainChanged) | 24762 | 24762 | 60000 | §6.1 `crank_price` | 3 | 2 (≤ 2) |
-| `crank_price` | list-only (`None`) market, detection set | 17390 | 17390 | 60000 | §6.1 `crank_price` | 3 | 2 (≤ 2) |
+| `liquidate` | price ×2.3 held 40 s: both legs, fresh reference, within the fixed bound | 94591 | 94591 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) |
+| `expire` | past the deadline, not CR-liquidatable, within the expiry bound | 89789 | 89789 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) |
+| `sol_settle` | healthy position: the no-change call (a keeper's per-second crank) | 38193 | 38193 | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) |
+| `sol_settle` | S3: expired, route flagged, chain unbroken for s3_wait_s | 57982 | 57982 | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) |
+| `crank_price` | roll + record (first crank of a second), SPL | 24321 | 24321 | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) |
+| `crank_price` | record only (same second again) | 19492 | 19492 | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) |
+| `crank_price` | roll + record, Token-2022 base | 24323 | 24323 | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) |
+| `crank_price` | venue halted: roll, no record, both chains start (+ RouteChainChanged) | 24782 | 24782 | 60000 | §6.1 `crank_price` | 3 | 2 (≤ 2) |
+| `crank_price` | list-only (`None`) market, detection set | 17402 | 17402 | 60000 | §6.1 `crank_price` | 3 | 2 (≤ 2) |
 | `set_route_broken` | one market | 7808 | 7808 | 60000 | no §6.1 row; admin flag class (M1 bench) | 2 | — |
 | `set_route_broken` | venue bit (global) | 5837 | 5837 | 60000 | no §6.1 row; admin flag class (M1 bench) | 2 | — |
 | `set_venue_extras` | 4 templates × 4 seeds (the largest set) | 13192 | 13192 | 200000 | no §6.1 row; admin class (M1 bench) | 2 | — |
 | `set_venue_extras` | rotate current → previous, 4 × 4 | 13172 | 13172 | 200000 | no §6.1 row; admin class (M1 bench) | 2 | — |
 | `set_venue_extras` | rotate a week-old current → stable and previous, 4 × 4 (M2-SEC-2) | 13190 | 13190 | 200000 | no §6.1 row; admin class (M1 bench) | 2 | — |
-| `sweep_trader` | trader, trader_wsol and ATA(trader, WSOL) donated to; S > 0 (vests) (M2-SEC-4) | 27722 | 27722 | 60000 | no §6.1 row (§3.9, M2-SEC-4); §6.1 `claim_sol` / `cover_deficit` / `sync_lender` class | 5 | — |
+| `sweep_trader` | trader, trader_wsol and ATA(trader, WSOL) donated to; S > 0 (vests) (M2-SEC-4) | 30722 | 30722 | 60000 | no §6.1 row (§3.9, M2-SEC-4); §6.1 `claim_sol` / `cover_deficit` / `sync_lender` class | 5 | — |

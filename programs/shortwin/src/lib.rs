@@ -10,7 +10,10 @@
 //! M1 (ARCH §9): admin, config, latch, markets, lenders, the oracle. M2: the position engine
 //! (`engine::*`, `venues::*`), `open_short`, `close_short`, `add_margin`, `liquidate`, `expire`,
 //! `sol_settle`, `crank_price` and the O6 Emergency powers `set_route_broken` /
-//! `set_venue_extras`. `set_coverage_pause` waits for O17.
+//! `set_venue_extras`. `set_coverage_pause` waits for O17. M3: the Raydium AMM v4 and CPMM
+//! adapters (`venues::raydium_v4`, `venues::raydium_cpmm`, `venues::raydium`) and the Raydium
+//! listing `create_market(venue_hint = RaydiumV4 | RaydiumCpmm)` with the D1 precedence check
+//! (`venues::detect`).
 //!
 //! Feature `test-venue` (TEST-ONLY, A49): `VenueKind::Mock`, the adapter of the mock venue
 //! `tests/mock_cpamm`, for the LiteSVM engine tests. Release builds never enable it

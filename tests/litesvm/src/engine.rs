@@ -188,6 +188,57 @@ impl MockMarket {
     }
 }
 
+/// A market the instruction builders and [`Env::open`] / [`Env::close`] can trade: its keys and
+/// its venue's remaining-account lists (ARCH §3.0: `ReadSet ++ TradeExtras ++ Extras`). The mock
+/// markets of this module and the Raydium markets of [`crate::raydium`] implement it.
+pub trait VenueMarket {
+    /// The market's keys.
+    fn keys(&self) -> &MarketKeys;
+    /// The venue's ReadSet (writable in trades).
+    fn read_set(&self, writable: bool) -> Vec<AccountMeta>;
+    /// The venue's TradeExtras.
+    fn trade_extras(&self) -> Vec<AccountMeta>;
+    /// The market.
+    fn market(&self) -> Pubkey {
+        self.keys().market
+    }
+    /// The mint.
+    fn mint(&self) -> Pubkey {
+        self.keys().mint
+    }
+    /// The trading remaining accounts: `ReadSet ++ TradeExtras ++ extras`.
+    fn trade_remaining(&self, extras: &[AccountMeta]) -> Vec<AccountMeta> {
+        let mut v = self.read_set(true);
+        v.extend(self.trade_extras());
+        v.extend_from_slice(extras);
+        v
+    }
+}
+
+impl<T: VenueMarket + ?Sized> VenueMarket for &T {
+    fn keys(&self) -> &MarketKeys {
+        (**self).keys()
+    }
+    fn read_set(&self, writable: bool) -> Vec<AccountMeta> {
+        (**self).read_set(writable)
+    }
+    fn trade_extras(&self) -> Vec<AccountMeta> {
+        (**self).trade_extras()
+    }
+}
+
+impl VenueMarket for MockMarket {
+    fn keys(&self) -> &MarketKeys {
+        &self.keys
+    }
+    fn read_set(&self, writable: bool) -> Vec<AccountMeta> {
+        MockMarket::read_set(self, writable)
+    }
+    fn trade_extras(&self) -> Vec<AccountMeta> {
+        MockMarket::trade_extras(self)
+    }
+}
+
 /// `create_market(Mock, u64::MAX)` for `pool`'s base mint: the detection set, then the mock
 /// ReadSet.
 pub fn create_mock_market_ix(creator: &Pubkey, pool: &MockPool) -> Instruction {
@@ -263,7 +314,7 @@ impl Env {
     }
 
     /// `crank_price` on `mm` (must succeed).
-    pub fn crank(&mut self, mm: &MockMarket) {
+    pub fn crank(&mut self, mm: &impl VenueMarket) {
         errors::ok(self.send(&[crank_price_ix(mm)], &[]));
     }
 }
@@ -274,7 +325,7 @@ impl Env {
 /// `ReadSet ++ TradeExtras ++ extras`.
 #[allow(clippy::too_many_arguments)]
 pub fn open_short_ix(
-    mm: &MockMarket,
+    mm: &impl VenueMarket,
     borrower: &Pubkey,
     nonce: u64,
     q: u64,
@@ -295,10 +346,10 @@ pub fn open_short_ix(
             position: pda::position(&market, borrower, nonce).0,
             exposure: pda::exposure(&market, borrower).0,
             mint: mm.mint(),
-            pool_vault: mm.keys.pool_vault,
-            market_vault: mm.keys.market_vault,
-            trader: mm.keys.trader,
-            token_program: mm.keys.token_program,
+            pool_vault: mm.keys().pool_vault,
+            market_vault: mm.keys().market_vault,
+            trader: mm.keys().trader,
+            token_program: mm.keys().token_program,
             system_program: system_program(),
             event_authority: pda::event_authority(),
             program: shortwin::ID,
@@ -317,7 +368,7 @@ pub fn open_short_ix(
 
 /// `close_short(max_buyback_cost, sel)` of `borrower`'s position `nonce`.
 pub fn close_short_ix(
-    mm: &MockMarket,
+    mm: &impl VenueMarket,
     borrower: &Pubkey,
     nonce: u64,
     max_buyback_cost: u64,
@@ -333,10 +384,10 @@ pub fn close_short_ix(
             position: pda::position(&market, borrower, nonce).0,
             exposure: pda::exposure(&market, borrower).0,
             mint: mm.mint(),
-            pool_vault: mm.keys.pool_vault,
-            market_vault: mm.keys.market_vault,
-            trader: mm.keys.trader,
-            token_program: mm.keys.token_program,
+            pool_vault: mm.keys().pool_vault,
+            market_vault: mm.keys().market_vault,
+            trader: mm.keys().trader,
+            token_program: mm.keys().token_program,
             system_program: system_program(),
             event_authority: pda::event_authority(),
             program: shortwin::ID,
@@ -349,8 +400,8 @@ pub fn close_short_ix(
     ix::with_remaining(ix, &mm.trade_remaining(extras))
 }
 
-/// `crank_price()` with the mock ReadSet (read-only).
-pub fn crank_price_ix(mm: &MockMarket) -> Instruction {
+/// `crank_price()` with the market's venue ReadSet (read-only).
+pub fn crank_price_ix(mm: &impl VenueMarket) -> Instruction {
     let ix = build(
         shortwin::accounts::CrankPrice {
             config: pda::config(),
@@ -413,7 +464,12 @@ pub fn set_venue_extras_ix(
 }
 
 /// `add_margin(amount)` (the account list; the body is its track's).
-pub fn add_margin_ix(mm: &MockMarket, borrower: &Pubkey, nonce: u64, amount: u64) -> Instruction {
+pub fn add_margin_ix(
+    mm: &impl VenueMarket,
+    borrower: &Pubkey,
+    nonce: u64,
+    amount: u64,
+) -> Instruction {
     let market = mm.market();
     build(
         shortwin::accounts::AddMargin {
@@ -430,7 +486,7 @@ pub fn add_margin_ix(mm: &MockMarket, borrower: &Pubkey, nonce: u64, amount: u64
 
 /// `liquidate(sel)` by `keeper` (the account list; the body is its track's).
 pub fn liquidate_ix(
-    mm: &MockMarket,
+    mm: &impl VenueMarket,
     keeper: &Pubkey,
     borrower: &Pubkey,
     nonce: u64,
@@ -445,10 +501,10 @@ pub fn liquidate_ix(
             position: pda::position(&market, borrower, nonce).0,
             exposure: pda::exposure(&market, borrower).0,
             mint: mm.mint(),
-            pool_vault: mm.keys.pool_vault,
-            market_vault: mm.keys.market_vault,
-            trader: mm.keys.trader,
-            token_program: mm.keys.token_program,
+            pool_vault: mm.keys().pool_vault,
+            market_vault: mm.keys().market_vault,
+            trader: mm.keys().trader,
+            token_program: mm.keys().token_program,
             system_program: system_program(),
             event_authority: pda::event_authority(),
             program: shortwin::ID,
@@ -461,7 +517,12 @@ pub fn liquidate_ix(
 }
 
 /// `expire(sel)` by `keeper` (the account list; the body is its track's).
-pub fn expire_ix(mm: &MockMarket, keeper: &Pubkey, borrower: &Pubkey, nonce: u64) -> Instruction {
+pub fn expire_ix(
+    mm: &impl VenueMarket,
+    keeper: &Pubkey,
+    borrower: &Pubkey,
+    nonce: u64,
+) -> Instruction {
     let market = mm.market();
     let ix = build(
         shortwin::accounts::Expire {
@@ -472,10 +533,10 @@ pub fn expire_ix(mm: &MockMarket, keeper: &Pubkey, borrower: &Pubkey, nonce: u64
             position: pda::position(&market, borrower, nonce).0,
             exposure: pda::exposure(&market, borrower).0,
             mint: mm.mint(),
-            pool_vault: mm.keys.pool_vault,
-            market_vault: mm.keys.market_vault,
-            trader: mm.keys.trader,
-            token_program: mm.keys.token_program,
+            pool_vault: mm.keys().pool_vault,
+            market_vault: mm.keys().market_vault,
+            trader: mm.keys().trader,
+            token_program: mm.keys().token_program,
             system_program: system_program(),
             event_authority: pda::event_authority(),
             program: shortwin::ID,
@@ -490,7 +551,7 @@ pub fn expire_ix(mm: &MockMarket, keeper: &Pubkey, borrower: &Pubkey, nonce: u64
 /// `sol_settle()` by `keeper` (the account list; the body is its track's).
 pub fn sol_settle_ix(
     env: &Env,
-    mm: &MockMarket,
+    mm: &impl VenueMarket,
     keeper: &Pubkey,
     borrower: &Pubkey,
     nonce: u64,
@@ -505,7 +566,7 @@ pub fn sol_settle_ix(
             position: pda::position(&market, borrower, nonce).0,
             borrower: *borrower,
             exposure: pda::exposure(&market, borrower).0,
-            market_vault: mm.keys.market_vault,
+            market_vault: mm.keys().market_vault,
             mint: mm.mint(),
             share_epoch_rec: pda::share_epoch(&market, epoch).0,
             system_program: system_program(),
@@ -592,7 +653,7 @@ impl Env {
     /// `open_short` of `q` with no bounds of its own (min proceeds 0, max margin and fee
     /// `u64::MAX`), extras `none`. Returns the result and the nonce used (the nonce advances
     /// only on success).
-    pub fn open(&mut self, mm: &MockMarket, b: &mut Borrower, q: u64) -> (TxResult, u64) {
+    pub fn open(&mut self, mm: &impl VenueMarket, b: &mut Borrower, q: u64) -> (TxResult, u64) {
         let nonce = b.next_nonce;
         let ix = open_short_ix(
             mm,
@@ -615,14 +676,14 @@ impl Env {
 
     /// `close_short` of `b`'s position `nonce` with `max_buyback_cost = u64::MAX`, extras
     /// `none`.
-    pub fn close(&mut self, mm: &MockMarket, b: &Borrower, nonce: u64) -> TxResult {
+    pub fn close(&mut self, mm: &impl VenueMarket, b: &Borrower, nonce: u64) -> TxResult {
         let ix = close_short_ix(mm, &b.key(), nonce, u64::MAX, ExtrasSel::NONE, &[]);
         let kp = b.kp.insecure_clone();
         self.send(&[ix], &[&kp])
     }
 
     /// A position (panics if missing).
-    pub fn position(&self, mm: &MockMarket, borrower: &Pubkey, nonce: u64) -> ShortPosition {
+    pub fn position(&self, mm: &impl VenueMarket, borrower: &Pubkey, nonce: u64) -> ShortPosition {
         read::borsh(&self.svm, &pda::position(&mm.market(), borrower, nonce).0)
             .unwrap_or_else(|| panic!("no position {borrower}/{nonce}"))
     }

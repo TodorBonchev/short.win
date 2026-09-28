@@ -522,7 +522,7 @@ pub(crate) fn keeper_exit<'info>(
             },
             &deny,
         )?;
-        let state = venues::read_state(kind, rem.read);
+        let state = venues::read_state(&market, kind, rem.read, clock.unix_timestamp);
         let mut vault = accs.market_vault.load()?.vault();
         let pro = prologue::run(
             &config,
@@ -548,9 +548,9 @@ pub(crate) fn keeper_exit<'info>(
     };
 
     // ---- phase 2: normalisation and the buy leg -------------------------------------------
-    let trader = {
+    let (trader, sol_first) = {
         let m = accs.market.load()?;
-        venues::trader_accounts(
+        let t = venues::trader_accounts(
             kind,
             market_key,
             &m,
@@ -558,7 +558,8 @@ pub(crate) fn keeper_exit<'info>(
             accs.market_vault.to_account_info(),
             accs.system_program.clone(),
             rem.trade,
-        )?
+        )?;
+        (t, venues::raydium::sol_first(&m))
     };
     let swept = trader.normalise()?;
     if swept > 0 {
@@ -581,6 +582,7 @@ pub(crate) fn keeper_exit<'info>(
         mint: accs.mint.clone(),
         decimals: accs.decimals,
         token_program: accs.token_program.clone(),
+        sol_first,
         trader,
         read: rem.read,
         trade: rem.trade,

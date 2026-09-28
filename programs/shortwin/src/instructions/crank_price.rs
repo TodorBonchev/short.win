@@ -86,7 +86,7 @@ pub fn handler<'info>(ctx: Context<'info, CrankPrice<'info>>) -> Result<()> {
         VenueState::not_executable(kind)
     } else {
         let rem = venues::parse(&market, kind, ctx.remaining_accounts, Carry::ReadSet, &[])?;
-        venues::read_state(kind, rem.read)
+        venues::read_state(&market, kind, rem.read, clock.unix_timestamp)
     };
 
     let mut scratch = Box::new(Vault::new());
