@@ -1,4 +1,4 @@
-"""ARCH v0.4.1 account layouts (as built through M4): explicit, no implicit padding, every field align <= 8 (PodU128/PodI128 = [u8;16])."""
+"""ARCH v0.4.1 account layouts (as built through M4; #99 max_q_hwm and #100 min_open_fee_ppm PROPOSED): explicit, no implicit padding, every field align <= 8 (PodU128/PodI128 = [u8;16])."""
 import sys
 SZ = {"u8":1,"u16":2,"u32":4,"u64":8,"i64":8,"Pubkey":32,"PodU128":16,"PodI128":16}
 AL = {"u8":1,"u16":2,"u32":4,"u64":8,"i64":8,"Pubkey":1,"PodU128":1,"PodI128":1}
@@ -59,8 +59,10 @@ g("observation", ("b_sec","i64"),("b_lo","PodU128"),("b_hi","PodU128"),("b_llo",
   ("ema_price","PodU128"),("ema_liq","PodU128"),("liq_slow","PodU128"),("ema_ts","i64"),("slow_ts","i64"),("ema_count","u64"),("ring",arr("RingEntry",8)))
 g("market-level params", ("ema_params_version","u32"),("kink_version","u32"),("ema_clamp_bps","u32"),("util_kink_bps","u32"),("liq_slow_tau_s","u32"),("liq_slow_dtmax_s","u32"),
   ("ema_dtmax_s","u16"),("_pad3",arr("u8",6)))
-g("OI", ("open_positions","u32"),("_pad4",arr("u8",4)),("total_notional_open","u64"))
-g("misc", ("_reserved",arr("u8",256)))
+g("OI", ("open_positions","u32"),("_pad4",arr("u8",4)),("total_notional_open","u64"),
+  ("max_q_hwm","u64"),   # #99: high-water mark of q since open_positions last returned to 0, from _reserved (size unchanged)
+  ("min_open_fee_ppm","u32"),("_pad5",arr("u8",4)))   # #100 (FIT-2): low-water mark of the open fee, from _reserved
+g("misc", ("_reserved",arr("u8",240)))
 rows, end = layout("Market", M, disc=8)
 
 # v0.4.1 (R4A-2 / R4B-3): MarketVault becomes zero-copy and carries the lock expiry calendar

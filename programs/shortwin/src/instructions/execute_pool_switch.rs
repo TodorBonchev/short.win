@@ -11,10 +11,10 @@
 //! listing-window replacements and zero-position adoptions happen inside `propose_pool`.
 //!
 //! **Accounts:** as `propose_pool` — `config`, `venue_guard` (read), `market` (mut), `mint`,
-//! event accounts. **Remaining:** the incumbent's ReadSet (the market's pool cache; on a
-//! list-only market its detection set `[bonding_curve, canonical_pool]`), then the window
-//! candidate's ReadSet, key-checked slot by slot against `fp_keys` (its adapter's order,
-//! `fp_venue` its kind).
+//! `oracle_cache` (read: the tier of the window's candidate, step 4), event accounts.
+//! **Remaining:** the incumbent's ReadSet (the market's pool cache; on a list-only market its
+//! detection set `[bonding_curve, canonical_pool]`), then the window candidate's ReadSet,
+//! key-checked slot by slot against `fp_keys` (its adapter's order, `fp_venue` its kind).
 //!
 //! **Order:**
 //!
@@ -29,8 +29,19 @@
 //!    and never the Emergency route-broken flag (`pool_fail` does not read it, V1-7).
 //! 4. The candidate verified again (`eligible()` now at the market's `P_ema`, the same pool the
 //!    window recorded: its `window_keys` equal `fp_keys`) and the window floor (its locked SOL at
-//!    `P_ema` alone `≥ pool_min_real_sol`, `pool_select::window_floor_ok`; M4V-1). Any failure
-//!    is "no longer eligible", never a revert: the window is then cancelled.
+//!    `P_ema` alone `≥ pool_min_real_sol`, `pool_select::window_floor_ok`; M4V-1), and **switch
+//!    only if all fit** (owner decision of 2026-09-29; `pool_select::carried_fit`): every open
+//!    position, bounded by `min(max_q_hwm, ΣB_Q)`, fits the candidate's per-position impact and
+//!    fee-scaled size caps on its conservative locked-depth `X₀`, and `ΣB_Q` its per-market caps
+//!    (the fee-scaled caps at `min(min_open_fee_ppm, φ_cand, CARRIED_FEE_CAP_PPM)`; FIT-2,
+//!    FITS-1), on the tier the market
+//!    would have on it, at `min(P_ema, P_cand)` and at `P_ema` — judged
+//!    on the terms no transaction can move (`FitAt::Execution`: `X₀` without the candidate's live
+//!    token reserve, which an unlocked LP's withdrawal or a buy wrapped around this instruction
+//!    would lower; M4-SEC-1 / M4-SEC-3's principle), and only for a window that may still be
+//!    adopted. Any failure is "no longer eligible", never a revert: the window is then cancelled
+//!    (with no candidate that fits, the positions exit on the failed pool through the S3 chain at
+//!    fair value).
 //! 5. Adopt if the candidate is adoptable now — eligible (step 4), the arming chain unbroken on a
 //!    Raydium market (M4-SEC-2), no pump venue on a list-only market (D1), and its program not
 //!    latched (M4V-4) — through `pool_select::adopt`: the ring rewritten to the anchor
@@ -57,12 +68,14 @@ use shortwin_math::pool::Vault;
 
 use crate::constants::{CONFIG_VERSION, MARKET_VERSION};
 use crate::engine::guard;
-use crate::engine::pool_select::{self, SelectParams, Situation};
+use crate::engine::pool_select::{self, FitAt, SelectParams, Situation};
 use crate::engine::prologue;
 use crate::errors::ShortwinError;
 use crate::events::{PoolSwitchCancelled, PoolSwitched, POOL_KIND_FAST};
 use crate::instructions::propose_pool::incumbent;
-use crate::state::{GlobalConfig, Market, VenueGuard, VenueKind, MARKET_FLAG_GRADUATED_ELSEWHERE};
+use crate::state::{
+    GlobalConfig, Market, OracleCache, VenueGuard, VenueKind, MARKET_FLAG_GRADUATED_ELSEWHERE,
+};
 use crate::venues;
 
 #[event_cpi]
@@ -89,6 +102,11 @@ pub struct ExecutePoolSwitch<'info> {
     /// CHECK: `== market.mint` (`has_one`) and owned by the market's token program (checked in
     /// the handler).
     pub mint: UncheckedAccount<'info>,
+    /// The cached SOL/USD price: the tier the market would have on the window's candidate, whose
+    /// opening caps its open positions must fit ("switch only if all fit"; module docs step 4).
+    /// Read only.
+    #[account(seeds = [OracleCache::SEED], bump = oracle_cache.bump)]
+    pub oracle_cache: Box<Account<'info, OracleCache>>,
 }
 
 pub fn handler<'info>(ctx: Context<'info, ExecutePoolSwitch<'info>>) -> Result<()> {
@@ -143,8 +161,14 @@ pub fn handler<'info>(ctx: Context<'info, ExecutePoolSwitch<'info>>) -> Result<(
         ShortwinError::MathOverflow
     );
 
-    // Step 4: still eligible, still the recorded pool, still above the window floor (M4V-1).
+    // Step 4: still eligible, still the recorded pool, still above the window floor (M4V-1), and
+    // every open position still fits its opening caps (switch only if all fit).
     let p_ref = pool_select::reference_price(&market);
+    let fit = pool_select::FitContext::of(&config, &ctx.accounts.oracle_cache, pro.now);
+    let situation = Situation::of(&market, kind, pro.now, pro.pool_fail);
+    // M4V-4: a latched candidate program is "not adoptable now" — a cancellation, not a revert.
+    let latched = guard::candidate_latched(&*ctx.accounts.venue_guard.load()?, cand_kind);
+    let adoptable = !inc.pump_venue && !latched && pool_select::window_adoptable(&situation, &p);
     let adoption = pool_select::verify_candidate(
         cand_kind,
         candidate,
@@ -156,14 +180,16 @@ pub fn handler<'info>(ctx: Context<'info, ExecutePoolSwitch<'info>>) -> Result<(
     )
     .ok()
     .filter(|a| a.window_keys() == market.fp_keys)
-    .filter(|a| pool_select::window_floor_ok(a, &config.params, p_ref));
+    .filter(|a| pool_select::window_floor_ok(a, &config.params, p_ref))
+    // The fit last, and only for a window that may still be adopted (its CU).
+    .filter(|a| {
+        adoptable
+            && pool_select::carried_fit(&market, a, &fit, p_ref, FitAt::Execution)
+                .is_ok_and(|f| f.fits())
+    });
     let d_inc = market.pool_d.get();
     let best = market.fp_keys.first().copied().unwrap_or_default();
     let d_best = market.fp_d.get();
-    let situation = Situation::of(&market, kind, pro.now, pro.pool_fail);
-    // M4V-4: a latched candidate program is "not adoptable now" — a cancellation, not a revert.
-    let latched = guard::candidate_latched(&*ctx.accounts.venue_guard.load()?, cand_kind);
-    let adoptable = !inc.pump_venue && !latched && pool_select::window_adoptable(&situation, &p);
 
     // Step 5: adopt or cancel.
     match adoption {

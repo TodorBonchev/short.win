@@ -96,6 +96,14 @@ pub fn execute_ok(
     }
 }
 
+/// `q` capped at 90 % of the per-position cap for the market of `cand`'s mint to carry its
+/// positions onto `cand` (switch only if all fit, owner decision of 2026-09-29;
+/// `pool_select::carried_caps` on the market as stored): the size of a position a test moves onto
+/// `cand` through a collection window.
+pub fn fit_q(env: &Env, cand: &AnyPool, q: u64) -> u64 {
+    q.min(pool_select::carried_caps(env, cand).0 / 10 * 9)
+}
+
 /// Halts `pool` (AMM v4 status 2 = disabled; CPMM swap bit).
 pub fn halt(env: &mut Env, pool: &AnyPool) {
     match pool {

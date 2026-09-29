@@ -1354,6 +1354,30 @@
           ]
         },
         {
+          "name": "oracle_cache",
+          "docs": [
+            "The cached SOL/USD price: the tier the market would have on the window's candidate, whose",
+            "opening caps its open positions must fit (\"switch only if all fit\"; module docs step 4).",
+            "Read only."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  111,
+                  108,
+                  95,
+                  117,
+                  115,
+                  100
+                ]
+              }
+            ]
+          }
+        },
+        {
           "name": "event_authority"
         },
         {
@@ -2669,6 +2693,30 @@
           "relations": [
             "market"
           ]
+        },
+        {
+          "name": "oracle_cache",
+          "docs": [
+            "The cached SOL/USD price: the tier the market would have on a window candidate, whose",
+            "opening caps its open positions must fit (\"switch only if all fit\"; module docs step 6).",
+            "Read only."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  111,
+                  108,
+                  95,
+                  117,
+                  115,
+                  100
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "event_authority"
@@ -4778,6 +4826,16 @@
       "code": 6101,
       "name": "EmaWarmingUp",
       "msg": "The price state is warming up after a venue change; opens and keeper exits wait"
+    },
+    {
+      "code": 6102,
+      "name": "CarriedPositionsTooLarge",
+      "msg": "An open position or the market's OI does not fit the candidate pool's opening caps"
+    },
+    {
+      "code": 6103,
+      "name": "ReservedScanOutOfOrder",
+      "msg": "Reserved (6103): unused"
     }
   ],
   "types": [
@@ -6371,8 +6429,9 @@
     {
       "name": "Liquidate",
       "docs": [
-        "`liquidate`. `cr_spot_bps` is the robust spot leg's CR (`CR(V_eff, B̂(Q; reprice(L_live,",
-        "P_rs)))` at the risk fee), `cr_ema_bps` the newest ring entry's (its cached `(x, y)`);",
+        "`liquidate`. `cr_spot_bps` is the robust spot leg's CR (`CR(V_eff, B̂(Q; reprice(max(L_live,",
+        "L_ema'), P_rs)))` at the risk fee; FITS-2), `cr_ema_bps` the newest ring entry's (its cached",
+        "`(x, y)`);",
         "`b_live` is the execution quote the leg was bounded by (I13). `b_live_risk` (the live",
         "quote at the risk fee, the penalty's base with `b_ref`) and `max_in` (I11: `B ≤ max_in +",
         "ert`) are M2 additions to ARCH §3.10's field list."
@@ -7091,11 +7150,48 @@
             "type": "u64"
           },
           {
+            "name": "max_q_hwm",
+            "docs": [
+              "High-water mark of `q` over the positions opened since `open_positions` last returned to 0",
+              "(was `_reserved[0..8]`; owner decision of 2026-09-29, \"switch only if all fit\"): raised by",
+              "every open (`engine::waterfall::add_position`), reset to 0 by the exit that takes",
+              "`open_positions` to 0 (`remove_position`), so it is at least every open position's `q` —",
+              "conservative by design (a position that has closed may have set it). A pool adoption that",
+              "carries open positions checks `min(max_q_hwm, ΣB_Q)` against the candidate's per-position",
+              "caps in O(1) (`shortwin_math::caps::carried_fit`; `engine::pool_select::carried_fit`)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "min_open_fee_ppm",
+            "docs": [
+              "Low-water mark of the one-way venue fee φ (ppm) the opens since `open_positions` last",
+              "returned to 0 paid — the fee their caps were computed at and their margin posted at (was",
+              "`_reserved[8..12]`; FIT-2): set by the first open after the market emptied, lowered by every",
+              "later one (`engine::waterfall::add_position`, `shortwin_math::caps::open_fee_mark`), reset",
+              "to 0 with `max_q_hwm` (`remove_position`). The carried fit's fee-scaled caps take",
+              "`min(min_open_fee_ppm, φ_cand, CARRIED_FEE_CAP_PPM)` (`shortwin_math::caps::carried_phi`;",
+              "`engine::pool_select::carried_caps`; FITS-1: 25 bps), so a position carried onto a",
+              "higher-fee pool stays in the size class of the fee it was margined at, and none above the",
+              "25-bps class."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "_pad5",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          },
+          {
             "name": "_reserved",
             "type": {
               "array": [
                 "u8",
-                256
+                240
               ]
             }
           }

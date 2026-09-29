@@ -13,13 +13,18 @@
 //! over (`EmaWarmingUp`, `liquidate`'s precondition 1b; M4R); `now ≥ deadline`
 //! (`NotExpired`); a fresh completed bucket (`ReferenceStale`); **not** CR-liquidatable
 //! (`UseLiquidate`: an expired position whose spot and EMA legs hold pays the penalty through
-//! `liquidate`, ECON §8.4); normal buyback allowed (`UseSolSettle`); the expiry reference
+//! `liquidate`, ECON §8.4; `liquidate`'s own `assess`, the spot leg judged at `max(L_live,
+//! L_ema')`, FITS-2 (a): a keeper cannot drain `L_live` inside its transaction to turn an expiry
+//! into a penalised liquidation — a low `L_ema` reached by a genuine held withdrawal and frozen by
+//! withdraw-wrapped cranks can, wherever it could force the liquidation: FITX-1, ECON §12.12
+//! residual 10); normal buyback allowed (`UseSolSettle`); the expiry reference
 //!
 //! ```text
 //! P_ref  = min(P_ema, min over the ring of p_i, lb_lo)          (nothing is urgent at expiry)
-//! B̂_ref  = B̂(Q; reprice(max(L_live, L_ema', L_slow), P_ref))     (risk quote; L_ema' =
-//!                                                                  min(L_ema, L_mlo) while the
-//!                                                                  post-change guard is set, M4R)
+//! B̂_ref  = B̂(Q; reprice(max(L_live, min(max(L_ema', L_slow), cap)), P_ref))
+//!                                            (risk quote; L_ema' = min(L_ema, L_mlo) while the
+//!                                             post-change guard is set, M4R; cap =
+//!                                             ⌊pool_d·10⁴/λ_min⌋ on Raydium, none elsewhere, M4F-1)
 //! π_ref  = ⌈expiry_fee_bps·B̂_ref/10⁴⌉
 //! max_in = min(⌊B̂_ref·(10⁴ + δ_exp)/10⁴⌋, V − K_s − ert, max(V − R − π_ref − ert, ⌊B̂_ref·(10⁴ + ε)/10⁴⌋))
 //! ```

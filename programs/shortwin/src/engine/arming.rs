@@ -17,11 +17,26 @@
 //!   venue_fee_hard_cap_bps_pos)` (ARCH §4.3 "two fee views"; the venue's
 //!   `crate::venues::risk_pricing`, which also prices a venue that cannot execute).
 //! - [`inputs`]: whether the post-change warm-up is over (M4R: `settle::evaluate` decides nothing
-//!   while it is not, on an executable venue), `R_due`, `K_s`, `V_eff`, the spot leg (`risk::spot_leg` on the robust spot
-//!   `P_rs = min(P_live, lb_lo)`, true without evaluation only when the venue cannot execute:
-//!   the route-broken flag and the fee hard cap never make it true, V2-1), the EMA leg
-//!   (`persist::liq_ema_leg` on the newest `liq_persist_n` ring entries' cached `(x, y)`), the
-//!   live risk quote and σ, the box, the S3 chain.
+//!   while it is not, on an executable venue), `R_due`, `K_s`, `V_eff`, the spot leg
+//!   (`risk::spot_leg` on the robust spot `P_rs = min(P_live, lb_lo)` at the liquidity
+//!   `max(L_live, L_ema')` — `liquidate`'s, `shortwin_math::bounds::spot_liquidity`, FITS-2 (a) —
+//!   true without evaluation only when the venue cannot execute: the route-broken flag and the
+//!   fee hard cap never make it true, V2-1), the EMA leg (`persist::liq_ema_leg` on the newest
+//!   `liq_persist_n` ring entries' cached `(x, y)`), the live risk quote and σ, the box, the S3
+//!   chain.
+//!
+//! **Which live-liquidity inputs take the EMA floor (FITS-2 (a)).** Only the spot leg of
+//! "CR-liquidatable" — the gate of `settle::evaluate`'s step 2 (not CR-liquidatable and not
+//! expired: no S1/S2 evaluation) and the "liquidatable" of the S3 timer — is judged at
+//! `max(L_live, L_ema')`: it is what `liquidate` and `expire` decide on, and a withdrawal inside a
+//! `[withdraw, sol_settle, deposit]` bundle must not open a gate the honest state keeps shut (an
+//! S2 at fair value pays the penalty in `p'` like a liquidation). The rest keeps `L_live`, and
+//! needs no floor: the S1 / S2 legs are conjunctions with the box corner `(P_lo, L_hi)` — the
+//! corner least favourable to them, on the post-roll EMA and ring medians no transaction moves —
+//! so a drained `L_live` cannot make them hold alone; the refutation reads `min(L_live, L_lo)`
+//! against deposits (a withdrawal only makes it harder, and an unrefuted clock still needs the
+//! corner's S1 / S2 legs to execute); "not liquidatable" (the disarm) reads only the box corner
+//! `(P_hi, L_lo)` and the EMA leg.
 //! - [`terms`]: the position's locked settlement terms (A26).
 //! - [`create_pda_account`]: the grief-proof PDA creation of ARCH §2.4.1.
 //!
@@ -115,7 +130,8 @@ pub fn terms(pos: &ShortPosition) -> SettleTerms {
 pub struct Facts {
     /// The risk quote on the live reserves (`None` when the venue cannot execute).
     pub b_live: Option<u64>,
-    /// The risk quote at the robust spot `reprice(L_live, P_rs)`.
+    /// The spot leg's risk quote at the robust spot, `reprice(max(L_live, L_ema'), P_rs)`
+    /// (FITS-2 (a)).
     pub b_rs: Option<u64>,
     /// The spot leg (CR at the robust spot below `L`, or no route).
     pub spot_leg: bool,
@@ -165,8 +181,12 @@ pub fn inputs(
     } else {
         (None, u64::MAX)
     };
+    // The spot leg at `max(L_live, L_ema')` (FITS-2 (a); `liquidate`'s): the gate of step 2 (and
+    // of the S3 timer's "liquidatable") cannot be opened by a withdrawal inside the transaction.
+    // The S1 / S2 legs and the refutation keep `L_live` (module docs).
+    let l_spot = shortwin_math::bounds::spot_liquidity(l_live, &obs.ema, &obs.ring).math()?;
     let b_rs = match p_rs {
-        Some(p) => quotes.cost(p, l_live).math()?,
+        Some(p) => quotes.cost(p, l_spot).math()?,
         None => None,
     };
     let spot_leg = risk::spot_leg(executable, fresh, v_eff, b_rs, pos.cr_liq_bps).math()?;

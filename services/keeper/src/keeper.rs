@@ -4,8 +4,9 @@
 //!
 //! 1. reads the clock, re-discovers markets every `discovery_interval_s`, and loads every
 //!    covered market ([`crate::view::load`]);
-//! 2. per market: records its own spot view and checks the buckets for a foreign deviating
-//!    observation (duty 2); projects the prologue at the clock and evaluates every open
+//! 2. per market: records its own spot and depth view and checks the buckets for a foreign
+//!    deviating observation (duty 2: a price starts a per-slot burst; on a market with open
+//!    positions a liquidity starts `liq_cover_s` of per-second coverage, FITS-2 (b)); projects the prologue at the clock and evaluates every open
 //!    position ([`crate::decide`]); sends the exits the projection allows — `liquidate` at the
 //!    first second its bound is met (duty 3), `expire` when the expiry bound is met, and
 //!    `sol_settle` at most once per second for armed positions and positions without a normal
@@ -49,12 +50,13 @@ use std::collections::{BTreeMap, HashSet, VecDeque};
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::Instruction;
 use anyhow::anyhow;
-use shortwin::engine::pool_select::{self, Proposal, SelectParams, Situation};
+use shortwin::engine::pool_select::{self, FitContext, Proposal, SelectParams, Situation};
 use shortwin::engine::{guard, prologue};
 use shortwin::errors::ShortwinError;
 use shortwin::events::{CoverageGap, SolSettle};
 use shortwin::state::{EXTRAS_IX_BUY, Market, VenueGuard, VenueKind};
 use shortwin::venues::ExtrasSel;
+use shortwin_math::tier::OraclePrice;
 use shortwin_services_common::tx::{self, ComputeBudget, TxFormat};
 use shortwin_services_common::{Chain, ChainClock, TxError, TxOutcome};
 use solana_keypair::Keypair;
@@ -246,8 +248,12 @@ pub struct TickReport {
     pub alerts: Vec<Alert>,
     pub evaluations: BTreeMap<Pubkey, Vec<PositionEval>>,
     pub needs: BTreeMap<Pubkey, MarketNeeds>,
-    /// Foreign deviating observations detected: (market, second).
+    /// Foreign deviating price observations detected (per-slot bursts, duty 2): (market,
+    /// second).
     pub bursts: Vec<(Pubkey, i64)>,
+    /// Foreign deviating bucket liquidity detected on markets with open positions (per-second
+    /// coverage started or extended, FITS-2 (b)): (market, second).
+    pub liq_covers: Vec<(Pubkey, i64)>,
     /// `flag_venue_upgraded` calls that landed this tick: (venue, deploy slot) (duty 10).
     pub flagged: Vec<(u8, u64)>,
     /// Pool selection (duty 5's fast path, duty 12): the plan of every market whose candidates
@@ -741,11 +747,24 @@ impl<C: Chain> Keeper<C> {
         let cov = self.cfg.coverage.clone();
         {
             let mv = &view.markets[idx];
+            let open = !mv.positions.is_empty() || mv.market.open_positions > 0;
             let track = self.tracks.entry(key).or_default();
-            track.record_view(now, mv.state.price());
-            if let Some(sec) = track.check_foreign(&mv.market, &cov) {
+            track.record_view(
+                now,
+                mv.state.price(),
+                mv.state.liquidity(),
+                (mv.market.venue, mv.market.pool_cache[0]),
+            );
+            let found = track.check_foreign(&mv.market, &cov, open);
+            if let Some(sec) = found.price {
                 report.bursts.push((key, sec));
                 self.metrics.market(key).bursts += 1;
+            }
+            if let Some(sec) = found.liquidity {
+                report.liq_covers.push((key, sec));
+                if found.liq_started {
+                    self.metrics.market(key).liq_covers += 1;
+                }
             }
         }
 
@@ -771,6 +790,7 @@ impl<C: Chain> Keeper<C> {
                 &evals,
                 &cov,
                 view.config.params.pool_list_window_s,
+                self.tracks[&key].liq_covered(now),
             );
             if due_before.is_none() {
                 let due = self.tracks[&key].observation_due(&needs, now, slot, &cov);
@@ -1274,17 +1294,26 @@ impl<C: Chain> Keeper<C> {
             };
             let mut at = 0usize;
             let mut evaluated = Vec::with_capacity(cands.len());
+            // Switch only if all fit: the program's check on the market as the next instruction
+            // sees it, with the cached oracle (the tier the market would have on a candidate).
+            let fit = FitContext {
+                params: &view.config.params,
+                tiers: &view.config.tiers,
+                oracle: view
+                    .oracle
+                    .as_ref()
+                    .map_or(OraclePrice::default(), |o| OraclePrice {
+                        price: o.price,
+                        expo: o.expo,
+                        publish_time: o.publish_time,
+                    }),
+                now: s.now,
+            };
             for c in &cands {
                 let n = c.read_keys.len();
                 let slice = accs.get(at..at.saturating_add(n)).unwrap_or(&[]);
                 at = at.saturating_add(n);
-                evaluated.push(pool_monitor::evaluate(
-                    &market,
-                    &view.config.params,
-                    now,
-                    c,
-                    slice,
-                ));
+                evaluated.push(pool_monitor::evaluate(&market, &fit, now, c, slice));
             }
             // M4-SEC-8 / M4V-4: the program refuses a proposal of a candidate whose own program
             // is latched, so the plan ranks only the others — after a latched window candidate is

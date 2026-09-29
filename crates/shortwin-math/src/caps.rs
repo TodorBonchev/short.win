@@ -12,6 +12,7 @@
 //! scaled `u128` root in the one case, `max_q_position` at `X₀` within 5 % of `2⁶⁴`,
 //! where the radicand exceeds `u128`).
 
+use crate::consts::CARRIED_FEE_CAP_PPM;
 use crate::error::MathError;
 use crate::num::{
     BPS, Rounding, SQRT_WAD, U256, mul_div, mul_le, overflow_to_max, saturating_u64, sqrt_u128,
@@ -275,6 +276,130 @@ pub fn spot_near_ema(p_spot: u128, p_ema: u128, dev_bps: u32) -> bool {
     mul_le(diff, BPS_U128, u128::from(dev_bps), p_ema)
 }
 
+/// The binding per-position cap on `X₀`: `min(max_q_position(X₀, ι_pos), fee_size_cap(X₀, φ,
+/// fee_size_cap_x100))` (the fee-scaled cap only when on), `φ` in ppm — exactly the two
+/// per-position checks of an open ([`max_q_position`], [`fee_size_cap`]; ECON §6.1; ARCH §4.6).
+///
+/// Errors: as [`max_q_position`] and [`fee_size_cap`].
+pub fn position_cap(
+    x0: u64,
+    impact_pos_bps: u32,
+    phi_ppm: u32,
+    fee_size_cap_x100: u32,
+) -> Result<u64, MathError> {
+    let cap = max_q_position(x0, impact_pos_bps)?;
+    Ok(match fee_size_cap(x0, phi_ppm, fee_size_cap_x100)? {
+        Some(f) => cap.min(f),
+        None => cap,
+    })
+}
+
+/// The O(1) upper bound on every open position's `q` that the carried-position fit
+/// ([`carried_fit`]) checks: `min(max_q_hwm, ΣQ)` — `Market.max_q_hwm` is the high-water mark of
+/// `q` over the positions opened since `open_positions` last returned to 0 (so at least every
+/// open `q`), and `ΣQ = ΣB_Q` is their sum (I6, so at least each of them too). A zero
+/// high-water mark with positions open (a market written before the field existed) bounds
+/// nothing: then `ΣQ` alone. Conservative by design: a position that closed may have set the
+/// mark.
+pub fn carried_q_bound(max_q_hwm: u64, sum_q: u64) -> u64 {
+    if max_q_hwm == 0 {
+        sum_q
+    } else {
+        max_q_hwm.min(sum_q)
+    }
+}
+
+/// `Market.min_open_fee_ppm` after an open at the one-way venue fee `phi_ppm` (the fee the open's
+/// caps were computed at): `phi_ppm` for the first open after the market emptied (`mark = 0`),
+/// else `min(mark, phi_ppm)` — the low-water mark of the fee the open positions posted their
+/// margin at (FIT-2; reset to 0 with `max_q_hwm` when `open_positions` returns to 0).
+pub fn open_fee_mark(mark: u32, phi_ppm: u32) -> u32 {
+    if mark == 0 {
+        phi_ppm
+    } else {
+        mark.min(phi_ppm)
+    }
+}
+
+/// The fee φ the carried fit's fee-scaled caps ([`fee_size_cap`], [`fee_oi_cap`]) take (FIT-2,
+/// FITS-1): `min(φ_inc, φ_cand, CARRIED_FEE_CAP_PPM)`, `φ_inc = Market.min_open_fee_ppm`
+/// ([`open_fee_mark`]: the lowest one-way venue fee an open paid since `open_positions` last
+/// returned to 0 — the fee the open positions posted their margin at), `φ_cand` the candidate's
+/// one-way fee and [`CARRIED_FEE_CAP_PPM`] (**PROPOSED**, 25 bps) the ceiling. A position carried
+/// onto a higher-fee pool stays in the size class of the fee it was margined at (0.75 % of `X₀`
+/// at 25 bps, not 2.47 % at 1 %); a lower-fee candidate's own fee binds; and whatever both fees,
+/// no carried position is above the 25-bps class (0.75 % of `X₀`) — a 1 % → 1 % switch no longer
+/// carries positions up to the candidate's impact cap (FITS-1). A zero mark with positions open
+/// (an account written before the field existed) bounds nothing: `min(φ_cand, CARRIED_FEE_CAP_PPM)`,
+/// as [`carried_q_bound`]'s zero mark. The impact caps do not read φ.
+pub fn carried_phi(min_open_fee_ppm: u32, phi_cand_ppm: u32) -> u32 {
+    let phi = if min_open_fee_ppm == 0 {
+        phi_cand_ppm
+    } else {
+        min_open_fee_ppm.min(phi_cand_ppm)
+    };
+    phi.min(CARRIED_FEE_CAP_PPM)
+}
+
+/// The candidate's opening caps of the carried-position fit ([`carried_fit`]): its conservative
+/// pre-trade token reserve `X₀` ([`conservative_x0`] on the candidate), the impact caps of the
+/// tier the market would have on it, the fee φ (ppm) of the fee-scaled caps — [`carried_phi`] of
+/// the market's `min_open_fee_ppm` and the candidate's one-way fee — and the fee-scaled cap
+/// multipliers.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct CarriedCaps {
+    pub x0: u64,
+    pub impact_pos_bps: u32,
+    pub impact_mkt_bps: u32,
+    pub phi_ppm: u32,
+    pub fee_size_cap_x100: u32,
+    pub fee_oi_cap_x100: u32,
+}
+
+/// The outcome of [`carried_fit`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum CarriedFit {
+    /// Every open position fits the per-position caps and `ΣQ` the per-market caps.
+    Fits,
+    /// The position bound exceeds the per-position impact cap or the fee-scaled size cap.
+    Position,
+    /// `ΣQ` exceeds the per-market OI cap `min(SPEC impact cap, fee-scaled OI cap)`.
+    Market,
+}
+
+impl CarriedFit {
+    /// `true` for [`CarriedFit::Fits`].
+    pub const fn fits(self) -> bool {
+        matches!(self, Self::Fits)
+    }
+}
+
+/// "Switch only if all fit" (owner decision of 2026-09-29; ARCH §2.6, ECON §6.1): a pool
+/// adoption that carries open positions — a collection window's — is allowed only if every open
+/// position fits the **candidate's normal opening caps**, evaluated as an open would be on it at
+/// adoption time (ARCH §4.6; ECON §6.1):
+///
+/// - per position: `q_max ≤ min(max_q_position(X₀, ι_pos), fee_size_cap(X₀, φ))`
+///   ([`position_cap`]), with `q_max` an upper bound on every open `q` ([`carried_q_bound`]);
+/// - per market: `ΣQ ≤ oi_cap(X₀, ι_mkt, φ, fee_oi_cap_x100)` ([`oi_cap`]) — an open's
+///   `ΣB_Q + q ≤ OI_cap(X₀ + q)` at `q = 0`: the carried tokens were sold into the old pool, so
+///   the candidate's reserve holds none of them and a buyback of `ΣQ` comes out of `X₀` itself.
+///
+/// The per-position check comes first. Exact integers, no rounding beyond the caps' own.
+///
+/// Errors: as [`position_cap`] and [`oi_cap`] (none in practice).
+pub fn carried_fit(q_max: u64, sum_q: u64, c: &CarriedCaps) -> Result<CarriedFit, MathError> {
+    let pos = position_cap(c.x0, c.impact_pos_bps, c.phi_ppm, c.fee_size_cap_x100)?;
+    if q_max > pos {
+        return Ok(CarriedFit::Position);
+    }
+    let oi = oi_cap(c.x0, c.impact_mkt_bps, c.phi_ppm, c.fee_oi_cap_x100)?;
+    if sum_q > oi {
+        return Ok(CarriedFit::Market);
+    }
+    Ok(CarriedFit::Fits)
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::arithmetic_side_effects)]
 mod tests {
@@ -392,6 +517,160 @@ mod tests {
         assert!(!notional_ok(99, 0, 100, 0));
         assert!(notional_ok(100, 900, 100, 1_000));
         assert!(!notional_ok(100, 901, 100, 1_000));
+    }
+
+    /// "Switch only if all fit": the per-position caps on the bound of every open `q`, then the
+    /// per-market caps on `ΣQ` at `X₁ = X₀`, each exactly at its boundary.
+    #[test]
+    fn carried_positions_fit_the_candidates_opening_caps() {
+        let x0 = 150_000_000_000_000u64;
+        // 1 % fee (10,000 ppm): the fee-scaled caps are 3 % / 7.5 % of X₀, so the impact cap
+        // binds per position (2.470 % < 3 %) and the fee-scaled cap per market (7.5 % < 8.713 %).
+        let c = CarriedCaps {
+            x0,
+            impact_pos_bps: 500,
+            impact_mkt_bps: 2_000,
+            phi_ppm: 10_000,
+            fee_size_cap_x100: 300,
+            fee_oi_cap_x100: 750,
+        };
+        let pos = max_q_position(x0, 500).unwrap();
+        let oi = oi_cap(x0, 2_000, 10_000, 750).unwrap();
+        assert_eq!(position_cap(x0, 500, 10_000, 300), Ok(pos));
+        assert_eq!(oi, max_total_q(x0, 2_000).unwrap().min(x0 * 75 / 1_000));
+        assert_eq!(carried_fit(pos, pos, &c), Ok(CarriedFit::Fits));
+        assert_eq!(carried_fit(pos + 1, pos + 1, &c), Ok(CarriedFit::Position));
+        assert_eq!(carried_fit(pos, oi, &c), Ok(CarriedFit::Fits));
+        assert_eq!(carried_fit(pos, oi + 1, &c), Ok(CarriedFit::Market));
+        // The position check comes first.
+        assert_eq!(carried_fit(pos + 1, oi + 1, &c), Ok(CarriedFit::Position));
+        // A 25 bps pool: the fee-scaled caps bind (0.75 % of X₀ per position, 1.875 % OI).
+        let thin = CarriedCaps {
+            phi_ppm: 2_500,
+            ..c
+        };
+        let f = x0 * 75 / 10_000;
+        assert_eq!(position_cap(x0, 500, 2_500, 300), Ok(f));
+        assert_eq!(carried_fit(f, f, &thin), Ok(CarriedFit::Fits));
+        assert_eq!(carried_fit(f + 1, f + 1, &thin), Ok(CarriedFit::Position));
+        let foi = x0 * 1_875 / 100_000;
+        assert_eq!(carried_fit(f, foi, &thin), Ok(CarriedFit::Fits));
+        assert_eq!(carried_fit(f, foi + 1, &thin), Ok(CarriedFit::Market));
+        // The fee-scaled caps off: the impact caps alone.
+        let off = CarriedCaps {
+            fee_size_cap_x100: 0,
+            fee_oi_cap_x100: 0,
+            ..thin
+        };
+        assert_eq!(position_cap(x0, 500, 2_500, 0), Ok(pos));
+        assert_eq!(
+            carried_fit(pos, max_total_q(x0, 2_000).unwrap(), &off),
+            Ok(CarriedFit::Fits)
+        );
+        // Tier D's 3 % / 10 %.
+        let d = CarriedCaps {
+            impact_pos_bps: 300,
+            impact_mkt_bps: 1_000,
+            ..off
+        };
+        let pd = max_q_position(x0, 300).unwrap();
+        assert_eq!(carried_fit(pd + 1, pd + 1, &d), Ok(CarriedFit::Position));
+        assert_eq!(
+            carried_fit(pd, max_total_q(x0, 1_000).unwrap() + 1, &d),
+            Ok(CarriedFit::Market)
+        );
+        // No position: nothing to carry, always fits (even on an empty reserve).
+        let empty = CarriedCaps { x0: 0, ..c };
+        assert_eq!(carried_fit(0, 0, &empty), Ok(CarriedFit::Fits));
+        assert_eq!(carried_fit(1, 1, &empty), Ok(CarriedFit::Position));
+        assert!(CarriedFit::Fits.fits() && !CarriedFit::Market.fits());
+    }
+
+    /// The position bound is `min(max_q_hwm, ΣQ)`; a zero mark with positions open bounds nothing.
+    #[test]
+    fn the_carried_bound_is_the_mark_capped_at_the_sum() {
+        assert_eq!(carried_q_bound(0, 0), 0);
+        assert_eq!(carried_q_bound(0, 700), 700, "no mark: ΣQ");
+        assert_eq!(carried_q_bound(500, 700), 500);
+        assert_eq!(carried_q_bound(900, 700), 700, "the large position closed");
+        assert_eq!(carried_q_bound(u64::MAX, u64::MAX), u64::MAX);
+    }
+
+    /// FIT-2 / FITS-1: the open-fee mark is the lowest fee an open paid since the market emptied
+    /// (the first open sets it); the carried fit's fee-scaled caps take `min(mark, φ_cand,
+    /// CARRIED_FEE_CAP_PPM)`, `min(φ_cand, CARRIED_FEE_CAP_PPM)` for a zero mark. At `X₀` =
+    /// 150·10¹² a position margined on a 25 bps pool and carried onto a 1 % candidate keeps the
+    /// 0.75 % size class (not the impact cap's 2.47 %), and so does one margined at 1 % (FITS-1).
+    #[test]
+    fn the_carried_fee_is_the_lower_of_the_open_fee_mark_and_the_candidates() {
+        assert_eq!(open_fee_mark(0, 2_500), 2_500, "the first open sets it");
+        assert_eq!(open_fee_mark(2_500, 10_000), 2_500);
+        assert_eq!(open_fee_mark(10_000, 2_500), 2_500);
+        assert_eq!(open_fee_mark(2_500, 0), 0);
+        assert_eq!(carried_phi(2_500, 10_000), 2_500, "a higher-fee candidate");
+        assert_eq!(carried_phi(10_000, 2_500), 2_500, "a lower-fee candidate");
+        assert_eq!(
+            carried_phi(1_000, 10_000),
+            1_000,
+            "a mark under the ceiling"
+        );
+        assert_eq!(
+            carried_phi(10_000, 1_000),
+            1_000,
+            "a candidate under the ceiling"
+        );
+        // FITS-1: the ceiling binds whatever both fees are (a 1 % → 1 % switch).
+        assert_eq!(
+            carried_phi(10_000, 10_000),
+            CARRIED_FEE_CAP_PPM,
+            "1 % → 1 %"
+        );
+        assert_eq!(
+            carried_phi(0, 10_000),
+            CARRIED_FEE_CAP_PPM,
+            "no mark: min(φ_cand, ceiling)"
+        );
+        assert_eq!(
+            carried_phi(0, 1_000),
+            1_000,
+            "no mark: the candidate's under the ceiling"
+        );
+        assert_eq!(carried_phi(u32::MAX, u32::MAX), CARRIED_FEE_CAP_PPM);
+        let x0 = 150_000_000_000_000u64;
+        let c = CarriedCaps {
+            x0,
+            impact_pos_bps: 500,
+            impact_mkt_bps: 2_000,
+            phi_ppm: carried_phi(2_500, 10_000),
+            fee_size_cap_x100: 300,
+            fee_oi_cap_x100: 750,
+        };
+        let f = x0 * 75 / 10_000;
+        let impact = max_q_position(x0, 500).unwrap();
+        assert!(f < impact);
+        assert_eq!(carried_fit(f, f, &c), Ok(CarriedFit::Fits));
+        assert_eq!(carried_fit(f + 1, f + 1, &c), Ok(CarriedFit::Position));
+        let at_cand = CarriedCaps {
+            phi_ppm: 10_000,
+            ..c
+        };
+        assert_eq!(carried_fit(impact, impact, &at_cand), Ok(CarriedFit::Fits));
+        assert_eq!(carried_fit(impact, impact, &c), Ok(CarriedFit::Position));
+        // FITS-1: margined at 1 % and carried onto a 1 % candidate, the same 0.75 % class.
+        let equal = CarriedCaps {
+            phi_ppm: carried_phi(10_000, 10_000),
+            ..c
+        };
+        assert_eq!(carried_fit(f, f, &equal), Ok(CarriedFit::Fits));
+        assert_eq!(carried_fit(f + 1, f + 1, &equal), Ok(CarriedFit::Position));
+        assert_eq!(
+            carried_fit(impact, impact, &equal),
+            Ok(CarriedFit::Position)
+        );
+        // The OI cap follows too: 1.875 % of X₀ at 25 bps, not 7.5 % at 1 %.
+        let foi = x0 * 1_875 / 100_000;
+        assert_eq!(carried_fit(f, foi, &c), Ok(CarriedFit::Fits));
+        assert_eq!(carried_fit(f, foi + 1, &c), Ok(CarriedFit::Market));
     }
 
     #[test]

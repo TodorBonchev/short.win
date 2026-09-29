@@ -21,8 +21,8 @@
 //! | rent | 1,424 | 104 |
 //! | observation | 1,528 | 1,272 |
 //! | market-level params | 2,800 | 32 |
-//! | OI | 2,832 | 16 |
-//! | `_reserved` | 2,848 | 256 |
+//! | OI (`max_q_hwm` @2,848 and `min_open_fee_ppm` @2,856, from `_reserved`) | 2,832 | 32 |
+//! | `_reserved` | 2,864 | 240 |
 //!
 //! The math crate's state types (`pool::Pool`, `rent::{Basis, Aggr}`, `observe::*`) hold native
 //! `u128`/`i128`; the conversions below ([`Market::pool`], [`Market::set_pool`], …) copy field by
@@ -346,12 +346,31 @@ pub struct Market {
     pub liq_slow_dtmax_s: u32,
     pub ema_dtmax_s: u16,
     pub _pad3: [u8; 6],
-    // ---- OI @2832 (16) ----
+    // ---- OI @2832 (32) ----
     pub open_positions: u32,
     pub _pad4: [u8; 4],
     pub total_notional_open: u64,
-    // ---- misc @2848 (256) ----
-    pub _reserved: [u8; 256],
+    /// High-water mark of `q` over the positions opened since `open_positions` last returned to 0
+    /// (was `_reserved[0..8]`; owner decision of 2026-09-29, "switch only if all fit"): raised by
+    /// every open (`engine::waterfall::add_position`), reset to 0 by the exit that takes
+    /// `open_positions` to 0 (`remove_position`), so it is at least every open position's `q` —
+    /// conservative by design (a position that has closed may have set it). A pool adoption that
+    /// carries open positions checks `min(max_q_hwm, ΣB_Q)` against the candidate's per-position
+    /// caps in O(1) (`shortwin_math::caps::carried_fit`; `engine::pool_select::carried_fit`).
+    pub max_q_hwm: u64,
+    /// Low-water mark of the one-way venue fee φ (ppm) the opens since `open_positions` last
+    /// returned to 0 paid — the fee their caps were computed at and their margin posted at (was
+    /// `_reserved[8..12]`; FIT-2): set by the first open after the market emptied, lowered by every
+    /// later one (`engine::waterfall::add_position`, `shortwin_math::caps::open_fee_mark`), reset
+    /// to 0 with `max_q_hwm` (`remove_position`). The carried fit's fee-scaled caps take
+    /// `min(min_open_fee_ppm, φ_cand, CARRIED_FEE_CAP_PPM)` (`shortwin_math::caps::carried_phi`;
+    /// `engine::pool_select::carried_caps`; FITS-1: 25 bps), so a position carried onto a
+    /// higher-fee pool stays in the size class of the fee it was margined at, and none above the
+    /// 25-bps class.
+    pub min_open_fee_ppm: u32,
+    pub _pad5: [u8; 4],
+    // ---- misc @2864 (240) ----
+    pub _reserved: [u8; 240],
 }
 
 impl Market {

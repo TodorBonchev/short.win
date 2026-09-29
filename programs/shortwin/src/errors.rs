@@ -6,7 +6,11 @@
 //! foundation's temporary `NotImplemented` = 6091 was removed with the last M1 stub before any
 //! deployment; the M1 review's codes 6091–6098 follow, each naming its ARCH §3.11 group; M2's
 //! temporary `NotImplemented` = 6099 was likewise removed when the last M2 track landed, before
-//! any deployment, and M2's `UseLiquidate` took 6099; M4 appended `PoolWindowClosed` = 6100).
+//! any deployment, and M2's `UseLiquidate` took 6099; M4 appended `PoolWindowClosed` = 6100, M4R
+//! `EmaWarmingUp` = 6101, "switch only if all fit" `CarriedPositionsTooLarge` = 6102, and FIT-3's
+//! `PositionScanOutOfOrder` = 6103, which is **reserved** since its instruction `refresh_max_q`
+//! was removed with the keeper's refresh duty, before any deployment: `ReservedScanOutOfOrder`
+//! keeps the slot so no later code moves, and nothing returns it).
 //! `tests::codes_are_stable` pins every code.
 
 use anchor_lang::prelude::*;
@@ -271,6 +275,27 @@ pub enum ShortwinError {
     /// ARCH §2.6 rule 4, §3.4 step 3, §3.6 precondition 1b, §3.7; `shortwin_math::observe::warmed`).
     #[msg("The price state is warming up after a venue change; opens and keeper exits wait")]
     EmaWarmingUp,
+
+    // ---- Appended after M4 (6102; group in brackets) ----
+    /// [Pool selection] "Switch only if all fit" (owner decision of 2026-09-29; ARCH §2.6, ECON
+    /// §6.1): `propose_pool` of a collection window's candidate — its adoption carries the
+    /// market's open positions — whose normal opening caps some open position or the market's OI
+    /// would not fit (the per-position impact and fee-scaled size caps on the candidate's
+    /// conservative `X₀`, bounded by `min(max_q_hwm, ΣB_Q)`; the per-market impact and
+    /// fee-scaled OI caps on `ΣB_Q`; the tier the market would have on the candidate;
+    /// `engine::pool_select::carried_fit`). `execute_pool_switch` cancels a window whose candidate
+    /// no longer fits; with no candidate that fits, the positions exit on the failed pool through
+    /// the S3 chain at fair value.
+    #[msg("An open position or the market's OI does not fit the candidate pool's opening caps")]
+    CarriedPositionsTooLarge,
+
+    // ---- Appended after M4 (6103; reserved) ----
+    /// **Reserved, never returned.** Was FIT-3's `PositionScanOutOfOrder` of `refresh_max_q`,
+    /// which was removed with the keeper's refresh duty before any deployment (the mark
+    /// `max_q_hwm` is again lowered only when `open_positions` returns to 0; ECON §6.1 discloses
+    /// the residual). The variant keeps 6103 so no later code is renumbered.
+    #[msg("Reserved (6103): unused")]
+    ReservedScanOutOfOrder,
 }
 
 impl From<MathError> for ShortwinError {
@@ -362,6 +387,8 @@ mod tests {
             (ShortwinError::UseLiquidate, 6099),
             (ShortwinError::PoolWindowClosed, 6100),
             (ShortwinError::EmaWarmingUp, 6101),
+            (ShortwinError::CarriedPositionsTooLarge, 6102),
+            (ShortwinError::ReservedScanOutOfOrder, 6103),
         ];
         for (e, c) in pins {
             assert_eq!(code(e), c, "{e:?}");

@@ -71,6 +71,12 @@ pub struct CoverageConfig {
     pub burst_dev_bps: u32,
     /// Length of a deviation burst (every slot), seconds: 60.
     pub burst_s: i64,
+    /// FITS-2 (b): on a market with open positions, a foreign bucket liquidity (`llo` / `lhi`)
+    /// more than `burst_dev_bps` off the keeper's own `√(X·Y)` of that second starts this many
+    /// seconds of **per-second** observations from that second, extended by every recurrence
+    /// (an LP-wrapped crank buys at most this many keeper observations; while an attacker keeps
+    /// wrapping, one per second: 1:1); 0 disables it: 10.
+    pub liq_cover_s: i64,
     /// Consecutive seconds of missed required observations that make a market degraded
     /// (duty 9): 3.
     pub degraded_after_misses: u32,
@@ -99,6 +105,7 @@ impl Default for CoverageConfig {
             ema_dev_bps: 200,
             burst_dev_bps: 200,
             burst_s: 60,
+            liq_cover_s: 10,
             degraded_after_misses: 3,
             recovery_s: 600,
             s3_probe_interval_s: 10,
@@ -291,7 +298,7 @@ impl KeeperConfig {
                 shortwin_math::consts::COVERAGE_GAP_S
             );
         }
-        if c.burst_s < 0 || c.recovery_s < 0 || c.s3_probe_interval_s <= 0 {
+        if c.burst_s < 0 || c.liq_cover_s < 0 || c.recovery_s < 0 || c.s3_probe_interval_s <= 0 {
             bail!("coverage intervals must be non-negative");
         }
         if c.listing_interval_s <= 0 {
@@ -378,6 +385,7 @@ mod tests {
         assert_eq!(cfg.batch_v0, 3);
         assert_eq!(cfg.coverage.idle_interval_s, 20);
         assert_eq!(cfg.coverage.burst_s, 60);
+        assert_eq!(cfg.coverage.liq_cover_s, 10);
         assert_eq!(cfg.budget.per_market_daily_lamports, Some(30_000_000));
         assert_eq!(cfg.budget.priority_ceiling, 5_000);
         assert!(!cfg.venue_watch.pool_admin && cfg.venue_watch.flag_upgrades);
@@ -392,6 +400,7 @@ mod tests {
         for bad in [
             "[coverage]\nno_route_interval_s = 60",
             "[coverage]\nidle_interval_s = 31",
+            "[coverage]\nliq_cover_s = -1",
             "batch_v1 = 0",
             "[budget]\npriority_floor = 20000",
             "unknown = 1",

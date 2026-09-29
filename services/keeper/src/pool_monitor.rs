@@ -34,7 +34,11 @@
 //! spot on a market without a price: M4-SEC-1 / M4-SEC-3) — on host-side `AccountInfo`s, so a
 //! candidate the keeper ranks is exactly one the program would verify, and its locked depth
 //! `D = λ·√(X·Y)` is the program's number. A list-only market's D1 check is the program's
-//! `classify_pump` on its detection set ([`classify`]).
+//! `classify_pump` on its detection set ([`classify`]). On a market with open positions the
+//! evaluation also runs the program's **"switch only if all fit"** check
+//! (`shortwin::engine::pool_select::carried_fit`, owner decision of 2026-09-29) on the market as
+//! the next instruction sees it, with the cached oracle: whether every open position fits the
+//! candidate's normal opening caps, which a collection window's candidate needs.
 //!
 //! **Plan** ([`plan`]), on the market as the next instruction sees it (the prologue projected
 //! to the cluster clock, [`crate::decide::project`]: `pool_d` refreshed, the `pool_fail` chain
@@ -43,7 +47,7 @@
 //! | Situation | Action |
 //! |---|---|
 //! | a collection window has run (`now ≥ fp_t0 + pool_fast_window_s`; a Raydium market's fast path, or a list-only market with positions, M4-SEC-4) | `execute_pool_switch` on the window's candidate (`fp_keys`) |
-//! | otherwise | `propose_pool` of the deepest eligible candidate (not the incumbent, not the window's own) **iff `shortwin::engine::pool_select::decide` accepts it**: a list-only market adopts it (with positions open: opens or improves a window); a Raydium market with no open position adopts it at the 5 % margin inside the listing window, 25 % after; a fast path armed (`pool_fail` for `pool_fast_route_s`) opens a window with it; a running window takes it if it is deeper than `fp_d` and the chain that armed it holds (M4-SEC-2) — a window only with a candidate above the window floor (its locked SOL at `P_ema` alone, M4V-1; else nothing, `PoolTooThin`), and never a candidate whose own program the latch holds (the keeper ranks the others, M4V-4) |
+//! | otherwise | `propose_pool` of the deepest eligible candidate (not the incumbent, not the window's own) **iff `shortwin::engine::pool_select::decide` accepts it**: a list-only market adopts it (with positions open: opens or improves a window); a Raydium market with no open position adopts it at the 5 % margin inside the listing window, 25 % after; a fast path armed (`pool_fail` for `pool_fast_route_s`) opens a window with it; a running window takes it if it is deeper than `fp_d` and the chain that armed it holds (M4-SEC-2) — a window only with a candidate above the window floor (its locked SOL at `P_ema` alone, M4V-1; else nothing, `PoolTooThin`) and **whose opening caps every open position fits** (switch only if all fit: the deepest candidate that fits and that `decide` still takes for the window; none: nothing, `CarriedPositionsTooLarge` — the positions then exit on the failed pool through the S3 chain), and never a candidate whose own program the latch holds (the keeper ranks the others, M4V-4) |
 //!
 //! The decision is the program's own function on the program's own numbers, so the keeper
 //! proposes at the first second the program accepts, and never otherwise (a market whose
@@ -67,9 +71,9 @@
 
 use anchor_lang::prelude::Pubkey;
 use shortwin::constants::{RAYDIUM_CPMM_PROGRAM_ID, RAYDIUM_V4_PROGRAM_ID, WSOL_MINT};
-use shortwin::engine::pool_select::{self, Proposal, SelectParams, Situation};
+use shortwin::engine::pool_select::{self, FitAt, FitContext, Proposal, SelectParams, Situation};
 use shortwin::errors::ShortwinError;
-use shortwin::state::{Market, Params, VenueKind, raydium_cache};
+use shortwin::state::{Market, VenueKind, raydium_cache};
 use shortwin::venues::detect::{self, PumpClass};
 use shortwin_math::pool_select::{dominates, fast_path_qualifies, lambda_bps};
 use shortwin_services_common::{AccountData, Chain, Memcmp};
@@ -281,14 +285,17 @@ pub async fn discover<C: Chain>(chain: &C, mint: &Pubkey) -> anyhow::Result<Vec<
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Verdict {
     /// Verified and eligible (ARCH §2.6): its locked depth `D`, real SOL reserve `R` and one-way
-    /// fee φ (ppm), as the program computes them, and whether it passes the window floor of a
+    /// fee φ (ppm), as the program computes them, whether it passes the window floor of a
     /// collection window's candidate (its locked SOL at the market's `P_ema` alone reaches
-    /// `pool_min_real_sol`; `pool_select::window_floor_ok`, M4V-1).
+    /// `pool_min_real_sol`; `pool_select::window_floor_ok`, M4V-1), and whether the market's open
+    /// positions fit its opening caps (`pool_select::carried_fit`, switch only if all fit; `true`
+    /// without an open position).
     Eligible {
         d: u128,
         real_sol: u64,
         fee_ppm: u32,
         window_floor: bool,
+        fits: bool,
     },
     /// Refused (`code`: the program's custom error — `PoolIneligible`, `PoolTooThin`,
     /// `VenueAccountMismatch`, …).
@@ -323,18 +330,27 @@ impl Evaluated {
             }
         )
     }
+
+    /// An eligible candidate whose opening caps the market's open positions fit (switch only if
+    /// all fit).
+    pub fn fits(&self) -> bool {
+        matches!(self.verdict, Verdict::Eligible { fits: true, .. })
+    }
 }
 
 /// Runs the program's verifier (`pool_select::verify_candidate`: the adapter's `verify` and
 /// `eligible()`) on `cand`'s freshly fetched ReadSet `accounts` for `market`'s mint and token
-/// program at `now` (module docs).
+/// program at `now` (module docs), then the program's window floor and "switch only if all fit"
+/// (`pool_select::carried_fit` with `fit`: the parameters, the tier table, the cached oracle and
+/// the market time the next instruction sees).
 pub fn evaluate(
     market: &Market,
-    params: &Params,
+    fit: &FitContext,
     now: i64,
     cand: &CandidatePool,
     accounts: &[Option<AccountData>],
 ) -> Evaluated {
+    let params = fit.params;
     let p_ref = pool_select::reference_price(market);
     let verdict = with_account_infos(&cand.read_keys, accounts, |infos| {
         pool_select::verify_candidate(
@@ -353,6 +369,8 @@ pub fn evaluate(
             real_sol: a.state.r,
             fee_ppm: a.state.fee_ppm,
             window_floor: pool_select::window_floor_ok(&a, params, p_ref),
+            fits: pool_select::carried_fit(market, &a, fit, p_ref, FitAt::Proposal)
+                .is_ok_and(|f| f.fits()),
         },
         Err(e) => Verdict::Refused {
             code: code_of(&e),
@@ -496,14 +514,15 @@ pub fn plan(
     }
     let incumbent = incumbent_pool(market);
     let window_pool = (s.fp_t0 != 0).then(|| market.fp_keys[0]);
-    let best = candidates
+    let mut ranked: Vec<(u128, &Evaluated)> = candidates
         .iter()
         .filter(|c| c.pool != incumbent && Some(c.pool) != window_pool)
         .filter_map(|c| c.d().map(|d| (d, c)))
-        // The deepest; among equals the lowest key (deterministic).
-        .max_by(|a, b| a.0.cmp(&b.0).then_with(|| b.1.pool.cmp(&a.1.pool)));
+        .collect();
+    // The deepest first; among equals the lowest key (deterministic).
+    ranked.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.pool.cmp(&b.1.pool)));
     let mut out = PoolPlan::default();
-    let Some((d, c)) = best else {
+    let Some(&(d, c)) = ranked.first() else {
         return out;
     };
     out.best = Some((c.pool, d));
@@ -513,6 +532,35 @@ pub fn plan(
     match pool_select::decide(s, d, p) {
         Ok(Proposal::OpenWindow | Proposal::ImproveWindow) if !window_floor => {
             out.blocked = Some(u32::from(ShortwinError::PoolTooThin));
+        }
+        // Switch only if all fit: the window takes the deepest candidate whose opening caps every
+        // open position fits (not monotone in `D`: the fee, the reserve and the tier count too)
+        // and that `decide` still takes for the window; with none, the positions exit on the
+        // failed pool through the S3 chain.
+        Ok(Proposal::OpenWindow | Proposal::ImproveWindow) if !c.fits() => {
+            let fitting = ranked.iter().find_map(|&(d, c)| {
+                if !(c.fits() && c.window_floor()) {
+                    return None;
+                }
+                match pool_select::decide(s, d, p) {
+                    Ok(expect @ (Proposal::OpenWindow | Proposal::ImproveWindow)) => {
+                        Some((d, c, expect))
+                    }
+                    _ => None,
+                }
+            });
+            match fitting {
+                Some((d, c, expect)) => {
+                    out.action = Some(Action::Propose {
+                        kind: c.kind,
+                        pool: c.pool,
+                        candidate: c.read_keys.clone(),
+                        d,
+                        expect,
+                    });
+                }
+                None => out.blocked = Some(u32::from(ShortwinError::CarriedPositionsTooLarge)),
+            }
         }
         Ok(expect) => {
             out.action = Some(Action::Propose {
@@ -717,8 +765,19 @@ mod tests {
                 real_sol: 25_000_000_000,
                 fee_ppm: 2_500,
                 window_floor: true,
+                fits: true,
             },
         }
+    }
+
+    /// An eligible candidate whose opening caps the market's open positions do not fit (switch
+    /// only if all fit).
+    fn too_small(pool: Pubkey, d: u128) -> Evaluated {
+        let mut e = eligible(pool, d);
+        if let Verdict::Eligible { fits, .. } = &mut e.verdict {
+            *fits = false;
+        }
+        e
     }
 
     /// An eligible candidate under the window floor (M4V-1: its locked SOL alone is below
@@ -895,8 +954,15 @@ mod tests {
             lp_counter: 0,
             plausible: true,
         };
-        let params: Params = Zeroable::zeroed();
-        let e = evaluate(&m, &params, 1, &cand, &[]);
+        let params: shortwin::state::Params = Zeroable::zeroed();
+        let tiers = shortwin::state::TierParams::defaults();
+        let fit = FitContext {
+            params: &params,
+            tiers: &tiers,
+            oracle: Default::default(),
+            now: 1,
+        };
+        let e = evaluate(&m, &fit, 1, &cand, &[]);
         assert_eq!(e.d(), None);
         assert!(
             matches!(&e.verdict, Verdict::Refused { code, .. } if is(*code, ShortwinError::PoolIneligible)),
@@ -1168,6 +1234,81 @@ mod tests {
                 cand,
                 Proposal::Adopt(shortwin::events::POOL_KIND_ZERO_POSITION)
             ))
+        );
+    }
+
+    /// Switch only if all fit: a window takes only a candidate whose opening caps every open
+    /// position fits — the deepest such one that the window still takes; none: nothing
+    /// (`CarriedPositionsTooLarge`), the positions exit on the failed pool through the S3 chain.
+    /// Zero-position adoptions do not ask.
+    #[test]
+    fn a_window_takes_only_a_candidate_the_carried_positions_fit() {
+        let inc = Pubkey::new_unique();
+        let (mut m, s) = market(inc);
+        let armed = Situation {
+            open_positions: 3,
+            pool_fail: true,
+            pool_fail_since: 10_000 - 120,
+            ..s
+        };
+        let (big, mid, small, tiny) = (
+            Pubkey::new_unique(),
+            Pubkey::new_unique(),
+            Pubkey::new_unique(),
+            Pubkey::new_unique(),
+        );
+        // The deepest does not fit: the next deepest that fits opens the window.
+        let cands = [
+            too_small(big, 9_000),
+            eligible(mid, 6_000),
+            eligible(small, 3_000),
+            eligible(tiny, 2_000),
+        ];
+        let pl = plan(&armed, &P, &m, &cands);
+        assert_eq!(proposed(&pl), Some((mid, Proposal::OpenWindow)));
+        assert_eq!(pl.best, Some((big, 9_000)));
+        // Only candidates below the fast-path minimum fit: nothing (the window would refuse them).
+        let pl = plan(
+            &armed,
+            &P,
+            &m,
+            &[too_small(big, 9_000), eligible(tiny, 2_000)],
+        );
+        assert_eq!(pl.action, None);
+        assert_eq!(pl.blocked, code(ShortwinError::CarriedPositionsTooLarge));
+        // None fits.
+        let none = [too_small(big, 9_000), too_small(mid, 6_000)];
+        let pl = plan(&armed, &P, &m, &none);
+        assert_eq!(pl.action, None);
+        assert_eq!(pl.blocked, code(ShortwinError::CarriedPositionsTooLarge));
+        // A running window on `small`: a fitting deeper candidate improves it, one that is not
+        // deeper than the window's does not.
+        m.fp_t0 = 9_990;
+        m.fp_d.set(3_000);
+        m.fp_venue = VenueKind::RaydiumCpmm as u8;
+        m.fp_keys[0] = small;
+        let win = Situation {
+            fp_t0: 9_990,
+            fp_d: 3_000,
+            pool_fail_since: 9_000,
+            ..armed
+        };
+        let pl = plan(&win, &P, &m, &cands);
+        assert_eq!(proposed(&pl), Some((mid, Proposal::ImproveWindow)));
+        let pl = plan(
+            &win,
+            &P,
+            &m,
+            &[too_small(big, 9_000), eligible(tiny, 2_000)],
+        );
+        assert_eq!(pl.blocked, code(ShortwinError::CarriedPositionsTooLarge));
+        // No position open: a dominant candidate is adopted whatever `fits` says (it is `true`
+        // there anyway: nothing to carry).
+        let (m0, s0) = market(inc);
+        let pl = plan(&s0, &P, &m0, &[too_small(big, 12_500)]);
+        assert_eq!(
+            proposed(&pl),
+            Some((big, Proposal::Adopt(POOL_KIND_ZERO_POSITION)))
         );
     }
 

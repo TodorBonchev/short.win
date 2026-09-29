@@ -31,10 +31,14 @@ near_cr_bps = 13000
 deadline_window_s = 60
 # Duty 1: per-second coverage while |P_spot/P_ema − 1| > 2 %.
 ema_dev_bps = 200
-# Duty 2: a foreign observation 2 % away from the keeper's own view starts 60 s of per-slot
-# observations.
+# Duty 2: a foreign observation whose price is 2 % away from the keeper's own view starts 60 s
+# of per-slot observations.
 burst_dev_bps = 200
 burst_s = 60
+# Duty 2 (FITS-2): on a market with open positions, a foreign bucket liquidity 2 % away from the
+# keeper's own sqrt(X*Y) (an LP-wrapped crank) starts 10 s of per-second observations, extended
+# while it recurs; never on a market without positions. 0 disables it.
+liq_cover_s = 10
 # Duty 9: 3 consecutive seconds without a required observation make the market degraded; 10
 # minutes of restored coverage lift it.
 degraded_after_misses = 3

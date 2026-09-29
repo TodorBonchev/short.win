@@ -6,30 +6,30 @@ Sizes (T-SIZE preview, ARCH §6.4): the legacy wire size (no lookup table) and t
 
 | Transaction | Entries | Expected | Peak height | CU | Legacy B / accounts | v0 + ALT B / accounts | ARCH §6.2 |
 |---|---|---|---|---|---|---|---|
-| AMM v4, SPL (Fartcoin): ComputeBudget ×2 + open_short, first open, normalising | 20 | 20 | 3 | 106885 | 1067 / 25 | 824 / 25 | 2 + ≤ 15 (§6.2 Raydium `open_short` max) |
-| AMM v4, SPL (Fartcoin): ComputeBudget ×2 + close_short, normalising | 14 | 14 | 3 | 74562 | 969 / 23 | 788 / 23 | 2 + ≤ 11 (§6.2 Raydium exit max) |
-| AMM v4, SPL (Fartcoin): ComputeBudget ×2 + [venue swap, open_short normalising, venue swap] | 26 | 26 | 3 | 136531 | **1283** / 28 | 1071 / 28 | no row (atomic sandwich bundle, §8.2) |
-| CPMM, SPL (USELESS): ComputeBudget ×2 + open_short, first open, normalising | 20 | 20 | 3 | 122663 | 1134 / 27 | 860 / 27 | 2 + ≤ 15 (§6.2 Raydium `open_short` max) |
-| CPMM, SPL (USELESS): ComputeBudget ×2 + close_short, normalising | 14 | 14 | 3 | 85999 | 1036 / 25 | 824 / 25 | 2 + ≤ 11 (§6.2 Raydium exit max) |
-| CPMM, SPL (USELESS): ComputeBudget ×2 + [venue swap, open_short normalising, venue swap] | 26 | 26 | 3 | 171506 | **1374** / 30 | 1131 / 30 | no row (atomic sandwich bundle, §8.2) |
-| CPMM, Token-2022 base: ComputeBudget ×2 + open_short, first open, normalising | 20 | 20 | 3 | 130861 | 1166 / 28 | 861 / 28 | 2 + ≤ 15 (§6.2 Raydium `open_short` max) |
-| CPMM, Token-2022 base: ComputeBudget ×2 + close_short, normalising | 14 | 14 | 3 | 89546 | 1068 / 26 | 825 / 26 | 2 + ≤ 11 (§6.2 Raydium exit max) |
-| CPMM, Token-2022 base: ComputeBudget ×2 + [venue swap, open_short normalising, venue swap] | 26 | 26 | 3 | 184780 | **1406** / 31 | 1132 / 31 | no row (atomic sandwich bundle, §8.2) |
-| AMM v4, SPL (Fartcoin): ComputeBudget ×2 + four opens of one wallet (the most that fit: 2 + 15 + 3·14) | 59 | 59 | 3 | 394599 | **1406** / 28 | 1163 / 28 | no row |
-| CPMM, Token-2022 base: ComputeBudget ×2 + four opens of one wallet (the most that fit: 2 + 15 + 3·14) | 59 | 59 | 3 | 474538 | **1514** / 31 | 1209 / 31 | no row |
+| AMM v4, SPL (Fartcoin): ComputeBudget ×2 + open_short, first open, normalising | 20 | 20 | 3 | 106896 | 1067 / 25 | 824 / 25 | 2 + ≤ 15 (§6.2 Raydium `open_short` max) |
+| AMM v4, SPL (Fartcoin): ComputeBudget ×2 + close_short, normalising | 14 | 14 | 3 | 74566 | 969 / 23 | 788 / 23 | 2 + ≤ 11 (§6.2 Raydium exit max) |
+| AMM v4, SPL (Fartcoin): ComputeBudget ×2 + [venue swap, open_short normalising, venue swap] | 26 | 26 | 3 | 136542 | **1283** / 28 | 1071 / 28 | no row (atomic sandwich bundle, §8.2) |
+| CPMM, SPL (USELESS): ComputeBudget ×2 + open_short, first open, normalising | 20 | 20 | 3 | 122674 | 1134 / 27 | 860 / 27 | 2 + ≤ 15 (§6.2 Raydium `open_short` max) |
+| CPMM, SPL (USELESS): ComputeBudget ×2 + close_short, normalising | 14 | 14 | 3 | 86003 | 1036 / 25 | 824 / 25 | 2 + ≤ 11 (§6.2 Raydium exit max) |
+| CPMM, SPL (USELESS): ComputeBudget ×2 + [venue swap, open_short normalising, venue swap] | 26 | 26 | 3 | 171517 | **1374** / 30 | 1131 / 30 | no row (atomic sandwich bundle, §8.2) |
+| CPMM, Token-2022 base: ComputeBudget ×2 + open_short, first open, normalising | 20 | 20 | 3 | 130872 | 1166 / 28 | 861 / 28 | 2 + ≤ 15 (§6.2 Raydium `open_short` max) |
+| CPMM, Token-2022 base: ComputeBudget ×2 + close_short, normalising | 14 | 14 | 3 | 89550 | 1068 / 26 | 825 / 26 | 2 + ≤ 11 (§6.2 Raydium exit max) |
+| CPMM, Token-2022 base: ComputeBudget ×2 + [venue swap, open_short normalising, venue swap] | 26 | 26 | 3 | 184791 | **1406** / 31 | 1132 / 31 | no row (atomic sandwich bundle, §8.2) |
+| AMM v4, SPL (Fartcoin): ComputeBudget ×2 + four opens of one wallet (the most that fit: 2 + 15 + 3·14) | 59 | 59 | 3 | 394643 | **1406** / 28 | 1163 / 28 | no row |
+| CPMM, Token-2022 base: ComputeBudget ×2 + four opens of one wallet (the most that fit: 2 + 15 + 3·14) | 59 | 59 | 3 | 474582 | **1514** / 31 | 1209 / 31 | no row |
 | ComputeBudget ×2 + crank_price ×4 on four Raydium markets, every pool just halted (the most a v0 + ALT transaction holds) | 14 | 14 | 2 | 105595 | 1201 / 31 | 1113 / 31 | 2 + 2k = 10 (§6.2, k = 4) |
 | ComputeBudget ×2 + crank_price ×6 on six Raydium markets, every pool just halted (a v1 keeper batch) | 20 | 20 | 2 | 158535 | **1661** / 44 | **1542** / 44 | 2 + 2k = 14 (§6.2, k = 6) |
-| AMM v4, SPL (Fartcoin): ComputeBudget ×2 + crank_price + liquidate (keeper) | 13 | 13 | 3 | 118724 | 1047 / 25 | 835 / 25 | 2 + 2 + 11 on Raydium (§6.2) |
-| AMM v4, SPL (Fartcoin): ComputeBudget ×2 + crank_price + expire (keeper) | 13 | 13 | 3 | 113934 | 1047 / 25 | 835 / 25 | 2 + 2 + 11 on Raydium (§6.2) |
-| AMM v4, SPL (Fartcoin): ComputeBudget ×2 + crank_price + sol_settle S3 (keeper, halted pool) | 6 | 6 | 2 | 67639 | 842 / 19 | 754 / 19 | 2 + 2 + 2 (§6.2) |
-| CPMM, SPL (USELESS): ComputeBudget ×2 + crank_price + liquidate (keeper) | 13 | 13 | 3 | 135483 | 1115 / 27 | 872 / 27 | 2 + 2 + 11 on Raydium (§6.2) |
-| CPMM, SPL (USELESS): ComputeBudget ×2 + crank_price + expire (keeper) | 13 | 13 | 3 | 128990 | 1115 / 27 | 872 / 27 | 2 + 2 + 11 on Raydium (§6.2) |
-| CPMM, SPL (USELESS): ComputeBudget ×2 + crank_price + sol_settle S3 (keeper, halted pool) | 6 | 6 | 2 | 73657 | 876 / 20 | 757 / 20 | 2 + 2 + 2 (§6.2) |
-| CPMM, Token-2022 base: ComputeBudget ×2 + crank_price + liquidate (keeper) | 13 | 13 | 3 | 139899 | 1147 / 28 | 873 / 28 | 2 + 2 + 11 on Raydium (§6.2) |
-| CPMM, Token-2022 base: ComputeBudget ×2 + crank_price + expire (keeper) | 13 | 13 | 3 | 132525 | 1147 / 28 | 873 / 28 | 2 + 2 + 11 on Raydium (§6.2) |
-| CPMM, Token-2022 base: ComputeBudget ×2 + crank_price + sol_settle S3 (keeper, halted pool) | 6 | 6 | 2 | 73984 | 876 / 20 | 757 / 20 | 2 + 2 + 2 (§6.2) |
+| AMM v4, SPL (Fartcoin): ComputeBudget ×2 + crank_price + liquidate (keeper) | 13 | 13 | 3 | 119108 | 1047 / 25 | 835 / 25 | 2 + 2 + 11 on Raydium (§6.2) |
+| AMM v4, SPL (Fartcoin): ComputeBudget ×2 + crank_price + expire (keeper) | 13 | 13 | 3 | 114322 | 1047 / 25 | 835 / 25 | 2 + 2 + 11 on Raydium (§6.2) |
+| AMM v4, SPL (Fartcoin): ComputeBudget ×2 + crank_price + sol_settle S3 (keeper, halted pool) | 6 | 6 | 2 | 67682 | 842 / 19 | 754 / 19 | 2 + 2 + 2 (§6.2) |
+| CPMM, SPL (USELESS): ComputeBudget ×2 + crank_price + liquidate (keeper) | 13 | 13 | 3 | 135867 | 1115 / 27 | 872 / 27 | 2 + 2 + 11 on Raydium (§6.2) |
+| CPMM, SPL (USELESS): ComputeBudget ×2 + crank_price + expire (keeper) | 13 | 13 | 3 | 129378 | 1115 / 27 | 872 / 27 | 2 + 2 + 11 on Raydium (§6.2) |
+| CPMM, SPL (USELESS): ComputeBudget ×2 + crank_price + sol_settle S3 (keeper, halted pool) | 6 | 6 | 2 | 73700 | 876 / 20 | 757 / 20 | 2 + 2 + 2 (§6.2) |
+| CPMM, Token-2022 base: ComputeBudget ×2 + crank_price + liquidate (keeper) | 13 | 13 | 3 | 140283 | 1147 / 28 | 873 / 28 | 2 + 2 + 11 on Raydium (§6.2) |
+| CPMM, Token-2022 base: ComputeBudget ×2 + crank_price + expire (keeper) | 13 | 13 | 3 | 132913 | 1147 / 28 | 873 / 28 | 2 + 2 + 11 on Raydium (§6.2) |
+| CPMM, Token-2022 base: ComputeBudget ×2 + crank_price + sol_settle S3 (keeper, halted pool) | 6 | 6 | 2 | 74027 | 876 / 20 | 757 / 20 | 2 + 2 + 2 (§6.2) |
 | ComputeBudget ×2 + flag_venue_upgraded ×2 (both Raydium programs, the dumped ProgramData) | 6 | 6 | 2 | 12352 | 378 / 7 | 352 / 7 | 2 + 2 + 2 (§6.2) |
-| AMM v4, SPL (Fartcoin): ComputeBudget ×2 + propose_pool (zero-position adoption, ring rewritten) | 4 | 4 | 2 | 40667 | 693 / 17 | 605 / 17 | 2 + 2 (§6.2 `propose_pool`) |
-| AMM v4, SPL (Fartcoin): ComputeBudget ×2 + execute_pool_switch (fast adoption, a position open) | 4 | 4 | 2 | 34710 | 692 / 17 | 604 / 17 | 2 + 2 (no row; as `propose_pool`) |
-| CPMM, Token-2022 base: ComputeBudget ×2 + propose_pool (zero-position adoption, ring rewritten) | 4 | 4 | 2 | 41047 | 694 / 17 | 606 / 17 | 2 + 2 (§6.2 `propose_pool`) |
-| CPMM, Token-2022 base: ComputeBudget ×2 + execute_pool_switch (fast adoption, a position open) | 4 | 4 | 2 | 35163 | 693 / 17 | 605 / 17 | 2 + 2 (no row; as `propose_pool`) |
+| AMM v4, SPL (Fartcoin): ComputeBudget ×2 + propose_pool (zero-position adoption, ring rewritten) | 4 | 4 | 2 | 42644 | 726 / 18 | 607 / 18 | 2 + 2 (§6.2 `propose_pool`) |
+| AMM v4, SPL (Fartcoin): ComputeBudget ×2 + execute_pool_switch (fast adoption, a position open) | 4 | 4 | 2 | 48154 | 725 / 18 | 606 / 18 | 2 + 2 (no row; as `propose_pool`) |
+| CPMM, Token-2022 base: ComputeBudget ×2 + propose_pool (zero-position adoption, ring rewritten) | 4 | 4 | 2 | 43024 | 727 / 18 | 608 / 18 | 2 + 2 (§6.2 `propose_pool`) |
+| CPMM, Token-2022 base: ComputeBudget ×2 + execute_pool_switch (fast adoption, a position open) | 4 | 4 | 2 | 49115 | 726 / 18 | 607 / 18 | 2 + 2 (no row; as `propose_pool`) |

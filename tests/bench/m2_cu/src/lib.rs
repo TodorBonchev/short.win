@@ -412,7 +412,7 @@ pub fn liquidatable() -> (Env, MockMarket, Borrower, u64) {
     let p_ref = bounds::liq_reference(&obs.ema, &obs.ring, &obs.last, now, &p.exit_params())
         .unwrap()
         .expect("P_ref");
-    let l_b = bounds::ref_liquidity(liquidity(x, y).unwrap(), &obs.ema, &obs.ring).unwrap();
+    let l_b = bounds::ref_liquidity(liquidity(x, y).unwrap(), &obs.ema, &obs.ring, None).unwrap();
     let (rx, ry) = reprice(l_b, p_ref).expect("reprice");
     let b_ref = buy_on(p.q, rx, ry, risk_fee).expect("B̂_ref");
     let k_s = k_s_of(&p);
@@ -458,7 +458,7 @@ pub fn expired() -> (Env, MockMarket, Borrower, u64) {
     let p_ref = bounds::expiry_reference(&obs.ema, &obs.ring, &obs.last, now, &p.exit_params())
         .unwrap()
         .expect("fresh reference");
-    let l_b = bounds::ref_liquidity(liquidity(x, y).unwrap(), &obs.ema, &obs.ring).unwrap();
+    let l_b = bounds::ref_liquidity(liquidity(x, y).unwrap(), &obs.ema, &obs.ring, None).unwrap();
     let (rx, ry) = reprice(l_b, p_ref).expect("reprice");
     let risk_fee = fee.min(u32::from(p.venue_fee_hard_cap_bps) * 100);
     let b_ref = buy_on(p.q, rx, ry, risk_fee).expect("B̂_ref");

@@ -14,7 +14,8 @@ use std::collections::HashMap;
 use anchor_lang::prelude::{AccountInfo, Pubkey};
 use anchor_lang::{AccountDeserialize, Discriminator, ZeroCopy};
 use shortwin::state::{
-    GlobalConfig, Market, MarketVault, POSITION_OPEN, ShortPosition, VenueExtras, VenueKind,
+    GlobalConfig, Market, MarketVault, OracleCache, POSITION_OPEN, ShortPosition, VenueExtras,
+    VenueKind,
 };
 use shortwin::venues::VenueState;
 use shortwin_math::pool::Vault;
@@ -81,6 +82,10 @@ pub struct ListOnlyView {
 pub struct ChainView {
     pub clock: ChainClock,
     pub config: Box<GlobalConfig>,
+    /// The cached SOL/USD price (`None`: not initialized): the tier a market would have on a
+    /// window candidate, whose opening caps its open positions must fit ("switch only if all
+    /// fit", [`crate::pool_monitor::evaluate`]).
+    pub oracle: Option<Box<OracleCache>>,
     pub markets: Vec<MarketView>,
     /// The covered list-only markets (also in `skipped`: the coverage duties skip them; the
     /// pool monitor does not).
@@ -194,12 +199,14 @@ pub async fn open_positions<C: Chain>(
     Ok(out)
 }
 
-/// Loads the config and `markets` (with their vaults, ReadSets, extras and open positions).
+/// Loads the config, the oracle cache and `markets` (with their vaults, ReadSets, extras and open
+/// positions).
 pub async fn load<C: Chain>(chain: &C, markets: &[Pubkey]) -> anyhow::Result<ChainView> {
     let clock = chain.clock().await?;
     let mut keys = vec![pda::config()];
     keys.extend(markets.iter().copied());
     keys.extend(markets.iter().map(pda::market_vault));
+    keys.push(pda::oracle_cache());
     let accs = chain.accounts(&keys).await?;
     let config: GlobalConfig = accs
         .first()
@@ -207,6 +214,11 @@ pub async fn load<C: Chain>(chain: &C, markets: &[Pubkey]) -> anyhow::Result<Cha
         .and_then(decode_zc)
         .ok_or_else(|| anyhow::anyhow!("GlobalConfig not found"))?;
     let n = markets.len();
+    let oracle = accs
+        .get(1 + 2 * n)
+        .and_then(|a| a.as_ref())
+        .and_then(decode_borsh::<OracleCache>)
+        .map(Box::new);
     let mut skipped = Vec::new();
     let mut list_only = Vec::new();
     // First pass: the markets and their ReadSet keys.
@@ -296,6 +308,7 @@ pub async fn load<C: Chain>(chain: &C, markets: &[Pubkey]) -> anyhow::Result<Cha
     Ok(ChainView {
         clock,
         config: Box::new(config),
+        oracle,
         markets: out,
         list_only,
         skipped,

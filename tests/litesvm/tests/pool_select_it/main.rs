@@ -13,7 +13,8 @@
 //! | `fast_path` | the `pool_fail` chain (halt, fee above the hard cap; never the Emergency flag), 120 s, the 60 s collection window keeping the deepest candidate (not the first, V2-7), the execution after the window with open positions (locked terms, EMA continuity, the ring rewrite and a ≤ 1 % box from the first second, exits on the new pool), cancellations |
 //! | `refusals` | every `propose_pool` / `execute_pool_switch` refusal: account checks, candidate kinds, eligibility (the locked-depth floor — locker-LP, thin —, fee, halted, other mint; λ under λ_min no refusal, M4-SEC-1), the incumbent itself, the latch (the candidate's program, M4-SEC-8), margins, windows |
 //! | `attacks` | T-RAY-SWITCH's attacks: a fake deep pool of unlocked liquidity, an LP pull, proposal spam, an atomic price push around a proposal |
-//! | `hooks` | the I15 hook (and I17's M4 part) fire on violating states |
+//! | `carried_fit` | switch only if all fit (owner decision of 2026-09-29): a proposal whose candidate an open position (per position) or the positions' sum (per market) does not fit is refused `CarriedPositionsTooLarge`, on both programs, 1 % either side of each boundary; a window whose candidate no longer fits is cancelled at the execution (Raydium and list-only markets); the fit at `P_ema` as well (a dump around the proposal does not loosen it); the execution judged without the live `X_cand` (a withdrawal wrapped around it does not cancel an honest window); the mark `max_q_hwm` conservative and reset at 0; ECON #100: FIT-1's documented residual (`fit1_*`: a dump-wrapped proposal carries at most the execution's cap) and FIT-3's disclosed residual (`fit3_*`: a closed large position keeps the switch refused, and the positions settle S3 at fair value at `max(deadline, no_route_since + s3_wait_s)`) |
+//! | `hooks` | the I15 hook (and I17's M4 part) fire on violating states (the carried fit, the marks `max_q_hwm` and `min_open_fee_ppm`) |
 //! | `trace_cu` | T-TRACE / T-CU: every path of both instructions makes only its event CPI (2 trace entries) within ARCH §6.1's 100 k CU (`-- --nocapture` prints the figures) |
 
 // `TxResult` is LiteSVM's own `TransactionResult` (as in the harness library).
@@ -24,6 +25,7 @@
 mod common;
 
 mod attacks;
+mod carried_fit;
 mod fast_path;
 mod hooks;
 mod listing;

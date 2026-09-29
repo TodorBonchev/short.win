@@ -193,16 +193,30 @@ S3 with observation-gap rule 60 s: first S3 1020 s after the first outage (route
 | RC | dump -50%, close | close | +3600s | 0.50x / 0.50x | 6.10/6.10 | 0.314 | +0.3128 (+24% of M) | 100% + 0.0002 SOL | +0.0002 (+0.1%) | 0.0000 |
 | RC | flat to expiry | expiry | +604801s | 1.00x / 1.00x | 3.01/3.01 | 0.628 | -0.0432 (-3% of M) | 100% + 0.0332 SOL | +0.0332 (+5.3%) | 0.0016 |
 
-### Raydium incumbent halted, fast-path switch to a thinner pool (R3B-7a; ring L rewritten)
+### Raydium incumbent halted, fast-path switch to a thinner pool (R3B-7a; ring L rewritten; #99: only onto a pool on which the position fits the opening caps -- 'open' at 1.00x = no window, frozen on the halted pool)
 
 | market | scenario | outcome | exit vs event | price at exit / terminal | CR spot/EMA at exit | value of Q at terminal price (SOL) | borrower P&L (SOL) | lender gets | lender P&L vs holding at terminal price (SOL, % of Q value) | keeper SOL |
 |---|---|---|---|---|---|---|---|---|---|---|
-| RA | halt -> fast path to a 50% pool, then pump 2x/120s | liquidation | +391s | 1.69x / 2.00x | 1.19/1.23 | 36.937 | -15.0202 (-78% of M) | 100% + 0.7990 SOL | +0.7990 (+2.2%) | 0.4788 |
-| RA | halt -> fast path to a 25% pool, then pump 2x/120s | liquidation | +388s | 1.66x / 2.00x | 1.18/1.23 | 36.937 | -15.0960 (-78% of M) | 100% + 0.8008 SOL | +0.8008 (+2.2%) | 0.4799 |
-| RB | halt -> fast path to a 50% pool, then pump 2x/120s | liquidation | +416s | 1.95x / 2.00x | 1.28/1.33 | 14.778 | -8.4124 (-73% of M) | 100% + 0.5180 SOL | +0.5180 (+3.5%) | 0.3103 |
-| RB | halt -> fast path to a 25% pool, then pump 2x/120s | liquidation | +413s | 1.92x / 2.00x | 1.28/1.32 | 14.778 | -8.4722 (-74% of M) | 100% + 0.5199 SOL | +0.5199 (+3.5%) | 0.3115 |
-| RC | halt -> fast path to a 50% pool, then pump 2x/120s | open | +1500s | 2.00x / 2.00x | 1.50/1.50 | 1.256 | -0.6568 (-51% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
-| RC | halt -> fast path to a 25% pool, then pump 2x/120s | liquidation | +426s | 2.00x / 2.00x | 1.47/1.49 | 1.256 | -0.7901 (-61% of M) | 100% + 0.0527 SOL | +0.0527 (+4.2%) | 0.0315 |
+| RA | halt -> fast path to a 50% pool, then pump 2x/120s | open | +1500s | 1.00x / 2.00x | 0.00/2.03 | 36.937 | - | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| RA | halt -> fast path to a 120% pool, then pump 2x/120s | liquidation | +393s | 1.71x / 2.00x | 1.19/1.23 | 36.937 | -15.0253 (-78% of M) | 100% + 0.7991 SOL | +0.7991 (+2.2%) | 0.4789 |
+| RA | halt -> fast path to a 25% pool, then pump 2x/120s | open | +1500s | 1.00x / 2.00x | 0.00/2.03 | 36.937 | - | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| RB | halt -> fast path to a 50% pool, then pump 2x/120s | open | +1500s | 1.00x / 2.00x | 0.00/2.54 | 14.778 | - | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| RB | halt -> fast path to a 120% pool, then pump 2x/120s | liquidation | +418s | 1.98x / 2.00x | 1.28/1.33 | 14.778 | -8.4011 (-73% of M) | 100% + 0.5176 SOL | +0.5176 (+3.5%) | 0.3101 |
+| RB | halt -> fast path to a 25% pool, then pump 2x/120s | open | +1500s | 1.00x / 2.00x | 0.00/2.54 | 14.778 | - | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| RC | halt -> fast path to a 50% pool, then pump 2x/120s | open | +1500s | 1.00x / 2.00x | 0.00/3.04 | 1.256 | - | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| RC | halt -> fast path to a 120% pool, then pump 2x/120s | open | +1500s | 2.00x / 2.00x | 1.52/1.52 | 1.256 | -0.6409 (-49% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+| RC | halt -> fast path to a 25% pool, then pump 2x/120s | open | +1500s | 1.00x / 2.00x | 0.00/3.04 | 1.256 | - | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
+
+#### #99: the positions no candidate fits, continued to their deadline (keeper crank every 30 s on the halted pool; S3 at fair value, the box at the EMA point)
+
+| market | scenario | exit | at (after the halt) | lender gets (SOL) | value of Q at the frozen P_ema (SOL) | lender P&L vs the frozen P_ema | lender P&L vs the terminal price (2.00x) | borrower (SOL) | keeper (SOL) |
+|---|---|---|---|---|---|---|---|---|---|
+| RA | halt -> fast path to a 50% pool, then pump 2x/120s | S3 | +29.96 d (deadline +29.96 d) | 19.7858 | 18.4686 | +1.3172 (+7.1%) | -17.1514 (-46.4%) | 17.8346 | 0.2500 |
+| RA | halt -> fast path to a 25% pool, then pump 2x/120s | S3 | +29.96 d (deadline +29.96 d) | 19.7858 | 18.4686 | +1.3172 (+7.1%) | -17.1514 (-46.4%) | 17.8346 | 0.2500 |
+| RB | halt -> fast path to a 50% pool, then pump 2x/120s | S3 | +13.96 d (deadline +13.96 d) | 7.8957 | 7.3889 | +0.5067 (+6.9%) | -6.8822 (-46.6%) | 10.8440 | 0.1994 |
+| RB | halt -> fast path to a 25% pool, then pump 2x/120s | S3 | +13.96 d (deadline +13.96 d) | 7.8957 | 7.3889 | +0.5067 (+6.9%) | -6.8822 (-46.6%) | 10.8440 | 0.1994 |
+| RC | halt -> fast path to a 50% pool, then pump 2x/120s | S3 | +6.96 d (deadline +6.96 d) | 0.6709 | 0.6279 | +0.0431 (+6.9%) | -0.5848 (-46.6%) | 1.2309 | 0.0293 |
+| RC | halt -> fast path to a 25% pool, then pump 2x/120s | S3 | +6.96 d (deadline +6.96 d) | 0.6709 | 0.6279 | +0.0431 (+6.9%) | -0.5848 (-46.6%) | 1.2309 | 0.0293 |
 
 ### Graduation mid-position (Tier D; event at t = 1 h; migration 2 s after completion; boost 20.69 % spent over 6 min)
 

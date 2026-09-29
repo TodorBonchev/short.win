@@ -1,7 +1,8 @@
 //! Waterfalls and position accounting (ARCH §2.1 `engine/waterfall.rs`, §3.4 steps 12–13,
 //! §3.5 steps 6–7, §5.2): applies the pure `shortwin_math::waterfall` payouts as lamport moves
 //! and lender-pool calls, and keeps the market's position aggregates (`ΣB_Q` by tier,
-//! `A_j`, `open_positions`, `total_notional_open`; I6).
+//! `A_j`, `open_positions`, `total_notional_open`; I6), the high-water mark `max_q_hwm` and the
+//! low-water mark `min_open_fee_ppm` ("switch only if all fit" reads both).
 //!
 //! The math crate decides every amount (`waterfall::{close, liquidate, expire, settle}`: legs
 //! non-negative, summing to `V`, I9); this module only moves them:
@@ -14,6 +15,7 @@
 //! - the borrower leg stays on the position, which is closed to the borrower (A18).
 
 use anchor_lang::prelude::*;
+use shortwin_math::caps;
 use shortwin_math::pool::{self, Pool, Resolution, Vault};
 use shortwin_math::rent::{self, Aggr, Basis};
 use shortwin_math::waterfall::Payout;
@@ -23,9 +25,20 @@ use crate::lamports;
 use crate::state::{Market, ShortPosition};
 
 /// ARCH §3.4 step 13 (open): `ΣB_Q` by tier, `A_j += q·coef_j·(10⁴ − p)` with the position's
-/// snapshot share (R3A-5), `open_positions += 1`, `total_notional_open += n_open`. `pool::borrow`
-/// (`T`, `ΣB_Q`, `max_release`) is the caller's.
-pub fn add_position(market: &mut Market, aggr: &mut Aggr, pos: &ShortPosition) -> Result<()> {
+/// snapshot share (R3A-5), `open_positions += 1`, `total_notional_open += n_open`,
+/// `max_q_hwm = max(max_q_hwm, q)` (the high-water mark "switch only if all fit" bounds every
+/// open `q` with; owner decision of 2026-09-29) and `min_open_fee_ppm` lowered to `phi_ppm`, the
+/// venue's one-way fee the open's caps were computed at (set to it by the first open after the
+/// market emptied; `shortwin_math::caps::open_fee_mark`): the fee the open positions posted
+/// their margin at, which the carried fit's fee-scaled caps take when it is below the candidate's
+/// (FIT-2; `shortwin_math::caps::carried_phi`). `pool::borrow` (`T`, `ΣB_Q`, `max_release`) is
+/// the caller's.
+pub fn add_position(
+    market: &mut Market,
+    aggr: &mut Aggr,
+    pos: &ShortPosition,
+    phi_ppm: u32,
+) -> Result<()> {
     aggr.add(pos.q, &pos.rent_terms(), u32::from(pos.rent_protocol_bps))
         .math()?;
     let t = market
@@ -38,10 +51,15 @@ pub fn add_position(market: &mut Market, aggr: &mut Aggr, pos: &ShortPosition) -
         .total_notional_open
         .checked_add(pos.n_open)
         .or_math()?;
+    market.max_q_hwm = market.max_q_hwm.max(pos.q);
+    market.min_open_fee_ppm = caps::open_fee_mark(market.min_open_fee_ppm, phi_ppm);
     Ok(())
 }
 
-/// The inverse of [`add_position`] at every exit (ARCH §3.5 step 7, §3.8 "Effects").
+/// The inverse of [`add_position`] at every exit (ARCH §3.5 step 7, §3.8 "Effects"): the exit
+/// that takes `open_positions` to 0 also resets `max_q_hwm` and `min_open_fee_ppm` to 0 (the marks
+/// change nowhere else, so `max_q_hwm` stays at or above every open `q` and `min_open_fee_ppm`
+/// at or below every open position's open fee).
 pub fn remove_position(market: &mut Market, aggr: &mut Aggr, pos: &ShortPosition) -> Result<()> {
     aggr.sub(pos.q, &pos.rent_terms(), u32::from(pos.rent_protocol_bps))
         .math()?;
@@ -55,6 +73,10 @@ pub fn remove_position(market: &mut Market, aggr: &mut Aggr, pos: &ShortPosition
         .total_notional_open
         .checked_sub(pos.n_open)
         .or_math()?;
+    if market.open_positions == 0 {
+        market.max_q_hwm = 0;
+        market.min_open_fee_ppm = 0;
+    }
     Ok(())
 }
 

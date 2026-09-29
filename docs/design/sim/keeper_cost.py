@@ -16,13 +16,22 @@ Inputs (primary sources where available, else labelled estimates):
     k <= 9; the tables use k = 6 (v1) and show k = 4 (v0 fallback).
   * revenue: SPEC §6.1 rent at 80 % utilisation on the beta cap of 25 SOL open notional per
     market (ADOPTED Q21); protocol share 15 %.
+  * liquidity-anomaly coverage (duty 2, #101, FITS-2 (b)): on a market with open positions a foreign
+    bucket whose liquidity (llo / lhi) deviates from the keeper's own sqrt(X*Y) by more than
+    burst_dev_bps starts per-SECOND coverage of the next liq_cover_s (10) seconds, extended while
+    deviations recur; the attacker's trigger is one LP-wrapped crank, [deposit, crank_price, withdraw]
+    (~150 k CU, the M4G-2 reproducer's estimate).  Sustained wrapping costs both sides one transaction
+    a second; an isolated trigger buys liq_cover_s keeper cranks.  M4F-1's reverted liquidity bursts
+    (a 60-s per-SLOT burst, 150 cranks, on any market) are shown for comparison (M4G-2).
 
     python3 keeper_cost.py
 """
 DAY = 86_400
 BASE = 5_000
 LAMPORTS = 10**9
-CU = {"crank_price": 35_000, "sol_settle": 90_000, "liquidate": 220_000}
+CU = {"crank_price": 35_000, "sol_settle": 90_000, "liquidate": 220_000, "lp_wrap": 150_000}
+LIQ_COVER_S = 10       # duty 2 (#101): per-second coverage after a foreign liquidity deviation (liq_cover_s)
+BURST_SLOTS = 150      # M4F-1's reverted liquidity burst: every slot for 60 s
 PRICES = (0, 1_000, 10_000, 100_000)
 RATE80 = {"A": 5_000, "B": 10_000, "C": 20_000, "D": 40_000}   # APR bps at 80 % utilisation
 
@@ -81,6 +90,37 @@ def main():
         rows.append([f"{price:,}", f"{armed / LAMPORTS:.5f}", f"{burst / LAMPORTS:.5f}", f"{liq / LAMPORTS:.5f}"])
     print(table(["priority price (uL/CU)", "one armed position (45 x sol_settle)", "one deviation burst (150 slots x crank)",
                  "one liquidation (+0.001 SOL tip)"], rows))
+
+    print("\n### Liquidity-anomaly coverage (duty 2, #101): the keeper's cost against the attacker's (SOL; a market with "
+          "open positions; per-second coverage for liq_cover_s = 10 s after a foreign bucket liquidity deviation, "
+          "extended while they recur)\n")
+    rows = []
+    for price in (0, 1_000, 10_000, 100_000):
+        att = tx_cost(1, CU["lp_wrap"], price)                       # one [deposit, crank_price, withdraw]
+        k1 = tx_cost(1, CU["crank_price"], price)                     # one keeper crank, unbatched
+        k6 = per_market_second(price, 6)                              # batched k = 6 (v1)
+        old = BURST_SLOTS * k1                                        # M4F-1's per-slot burst per trigger
+        rows.append([f"{price:,}", f"{att / LAMPORTS:.7f}", f"{LIQ_COVER_S * k1 / LAMPORTS:.6f}",
+                     f"{LIQ_COVER_S * k1 / att:.1f}x / {LIQ_COVER_S * k6 / att:.1f}x",
+                     f"{k1 / att:.2f}x / {k6 / att:.2f}x", f"{old / LAMPORTS:.5f} ({old / att:.0f}x)"])
+    print(table(["priority price (uL/CU)", "attacker: one LP-wrapped crank", "keeper: one isolated trigger (10 cranks)",
+                 "isolated trigger, keeper / attacker (unbatched / k = 6)",
+                 "sustained, per second, keeper / attacker (unbatched / k = 6)",
+                 "M4F-1's reverted per-slot burst per trigger (keeper / attacker)"], rows))
+    print("\n### The same per market-day: an attacker that keeps the keeper busiest per transaction (one trigger every "
+          "liq_cover_s + 1 s, the window lapsing in between), one a minute, and one every second (unbatched keeper; "
+          "SOL per market per day, keeper / attacker)\n")
+    rows = []
+    for price in (0, 10_000, 100_000):
+        att = tx_cost(1, CU["lp_wrap"], price)
+        k1 = tx_cost(1, CU["crank_price"], price)
+        cells = [f"{price:,}"]
+        for n_trig, secs in ((DAY // (LIQ_COVER_S + 1), LIQ_COVER_S), (DAY // 60, LIQ_COVER_S), (DAY, 1)):
+            cells.append(f"{n_trig * secs * k1 / LAMPORTS:.4f} / {n_trig * att / LAMPORTS:.4f}")
+        cells.append(f"{DAY // 60 * BURST_SLOTS * k1 / LAMPORTS:.4f} / {DAY // 60 * att / LAMPORTS:.4f}")
+        rows.append(cells)
+    print(table(["priority price (uL/CU)", "every 11 s", "every 60 s", "every second (sustained, 1:1)",
+                 "M4F-1's burst, one trigger a minute"], rows))
 
     print("\n### Revenue of a market at the beta cap (25 SOL open notional, 80 % utilisation; SOL per day)\n")
     rows = []

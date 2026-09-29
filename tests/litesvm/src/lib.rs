@@ -31,6 +31,8 @@
 //! - [`pool_select`]: Raydium pool selection on the fork (M4): `propose_pool` /
 //!   `execute_pool_switch` builders, list-only listings, planted candidate pools
 //!   ([`pool_select::plant_v4`], [`pool_select::plant_cpmm`]) that the dumped ELFs trade.
+//! - [`lp`]: a liquidity provider on a CPMM pool of the fork (the dumped program's own
+//!   `deposit` / `withdraw`; M4F-1's deposit-wrapped cranks).
 //!
 //! Agave line: LiteSVM 0.16.0 on the 4.2.2 runtime crates, pinned in the workspace lockfile
 //! (C1-14; `Cargo.toml` of this crate).
@@ -49,6 +51,7 @@ pub mod fixtures;
 pub mod fork;
 pub mod invariants;
 pub mod ix;
+pub mod lp;
 pub mod mock;
 pub mod pda;
 pub mod pool_select;

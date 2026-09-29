@@ -316,6 +316,11 @@ Lendable inventory; utilization; unique lenders/borrowers; OI; rental fees; prot
 | M1-SEC-1 | Emergency veto over pending governance changes | Parameter changes only; authorities and timelock changes can be cancelled only by governance (§11) | ✅ Owner (v0.3, 2026-09-27) |
 | O13 | Pool age for tier criteria when the pool's creation time is not provable | Counted from short.win's first observation (graduation or listing) (§4) | ✅ Owner (v0.3, 2026-09-28) |
 | O13b | Age of CPMM pools with a provable `open_time` (after mid-2024) | Counted from `open_time`, not first observation (§4; M3-SEC-4) | ✅ Owner (v0.3, 2026-09-28) |
+| M4R-1 | Exits right after a Raydium pool switch | Redesigned before M5: the switch reads no single-transaction sample; exits wait for 8 s of the new pool's own observations ("post-change confirmation") | ✅ Owner (v0.3, 2026-09-28) |
+| #99 | Pool switches that carry open positions | Only onto a pool whose normal opening caps every open position fits; otherwise positions exit through S3 at fair value | ✅ Owner (v0.3, 2026-09-29) |
+| FITS-2 | Liquidity pushes by unlocked-LP holders on Raydium | Liquidation's spot check reads max(live, smoothed) liquidity; keeper observes every second while liquidity anomalies recur on markets with positions | ✅ Owner (v0.3, 2026-09-29) |
+| FITX-1 | A genuine short withdrawal whose low reading is then frozen | Accepted as a bounded residual: it forces only the liquidation the same LP gets by withdrawing for good (same second, same price, borrower no worse off) | ✅ Owner (v0.3, 2026-09-29) |
+| M4F-1 | Pool switch that would carry open positions (Raydium fast path; a list-only market with positions) | Switch only if every open position fits the new pool's normal opening size caps (§4); if no pool fits, positions stay on the failed pool and exit through S3 at fair value (§5.3) | ✅ Owner (v0.3, 2026-09-29) |
 | 17 | Who executes the short? | short.win, atomically at open | ✅ Owner |
 | — | Sale proceeds kept in position vault | Yes | ✅ Owner (v0.3, 2026-09-27) |
 | 18 | Fee split | §6.3 | ✅ Delegated, proposed |

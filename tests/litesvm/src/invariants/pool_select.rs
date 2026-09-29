@@ -10,6 +10,7 @@
 //! | who may adopt | `listing`: the market was list-only **with no open position** (M4-SEC-4); `listing window`: no open position, inside the window, `D ≥ (1 + pool_list_margin_bps)·D_inc`; `zero-position`: no open position, after the window, `D ≥ (1 + pool_switch_margin_bps)·D_inc`; `fast`: a collection window ran its `pool_fast_window_s` and recorded this pool, and — on a Raydium market — the incumbent failed `pool_fail` on the state just before (never the route-broken flag) **and the chain that armed the window held** (the chain after this observation started `≥ pool_fast_route_s` before `fp_t0`, M4-SEC-2); a list-only market's window (positions open) needs no chain. `D_inc` is the incumbent's `D` on that state if it was executable, else its stored `pool_d` |
 //! | the adoption's effects (A72, T-VENUE-SWITCH; M4R, **PROPOSED**) | on a market with a price `L_ema` and every ring entry's `l = llo = lhi` are the anchor `⌊D·10⁴/λ_min⌋` with `(x, y) = reprice(l, p)` recomputed (no sample of the pool), `L_slow ≤ D` (exactly `min(L_slow, D)` when the instruction integrated nothing), `ema_warm = 8`, `ema_guard = 1`, the ring's prices and price extremes kept (bar the entry this instruction integrated); a list-only market that never had a price: `L_ema = L_slow = min(√(X·Y), ⌊D·10⁴/λ_min⌋)`, marked; the bucket, both route chains and the window cleared; `graduated_at` kept (a list-only market: the pool's age start, O13); `pool_seen_at` kept inside a listing window, else now; the event's `window_ends` is the listing window's end. A Raydium listing starts the same marked price state |
 //! | the collection window | `PoolProposed` records its candidate in `fp_*`; on a Raydium market it opens only on an armed fast path (`pool_fail` just before, the chain `≥ pool_fast_route_s` old after) with `D ≥ pool_fast_min_bps·pool_d`, and is improved only inside the window, while its arming chain holds, by a strictly deeper candidate other than its own; on a list-only market only with open positions, improved inside the window by a strictly deeper candidate; the window's candidate is eligible at `P_ema` and passes the window floor (M4V-1) at `min(P_ema, P_cand)` (M4R-2); `fp_*` changes only with one of the three events; a `PoolSwitchCancelled` resolves a window that ran out |
+//! | switch only if all fit (owner decision of 2026-09-29) | an adoption that carries open positions (kind fast) happened, and a window proposal on a market with open positions was accepted, only if **every open position** (its own `q`, not the program's bound) fits the candidate's per-position impact cap and fee-scaled size cap on its conservative locked-depth `X₀ = min(X, L_slow'/√P, D/(λ_min·√P))` (`L_slow'` what the adoption leaves: `min(L_slow, D)`, or the pool's `min(√(X·Y), D/λ_min)` without a price), and `ΣQ` its per-market impact and fee-scaled OI caps at `X₀`, with the impact caps of the tier the market would have on the candidate and the fee-scaled caps at `φ = min(min_open_fee_ppm, φ_cand, CARRIED_FEE_CAP_PPM)` (FIT-2, FITS-1; `min(φ_cand, CARRIED_FEE_CAP_PPM)` for a zero mark) (the harness's own `tier::assign` on the candidate's `D`, `R`, `L_slow'`, the market's age — a list-only market's: the candidate's — and the cached oracle), at `P = min(P_ema, P_cand)` and at `P_ema` — a proposal's `X₀` with the candidate's live `X` (as an open), an adoption's without it (`execute_pool_switch` judges on the terms no transaction can move); `max_q_hwm` is at or above every open position's `q`, and both marks are 0 with none open (state part, `check_hwm`); `max_q_hwm` falls only at the exit that empties the market, and `min_open_fee_ppm` changes only at an open — to `open_fee_mark(mark, φ)`, `φ` the venue's fee on the pre-trade state — and at that exit (FIT-2) |
 //! | opens sized on locked depth (V2-8) | an `Open` on a Raydium market happened after the listing window and the post-change warm-up (`ema_warm == 0` after the roll, M4R / M4V-5), with the fee ≤ `venue_fee_cap_bps`, `R_eff = min(R_now, R_slow, D·√P_ema/λ_min) ≥ pool_min_real_sol`, `pool_d` the pool's `D` on the pre-trade state, and `q` within the per-position impact cap on `X₀ = min(X_now, L_slow/√P_ema, D/(λ_min·√P_ema))` |
 //!
 //! I17's M4 part (no adoption and no window candidate while **the candidate's own** Raydium
@@ -24,7 +25,8 @@ use shortwin::events::{
     POOL_KIND_ZERO_POSITION, PoolProposed, PoolSwitchCancelled, PoolSwitched,
 };
 use shortwin::state::{
-    GlobalConfig, MARKET_FLAG_SOL_IS_TOKEN0_OR_COIN, Market, VenueKind, raydium_cache,
+    GlobalConfig, MARKET_FLAG_SOL_IS_TOKEN0_OR_COIN, Market, OracleCache, ShortPosition, VenueKind,
+    raydium_cache,
 };
 use shortwin_math::consts::EMA_WARMUP_BUCKETS;
 use shortwin_math::fees::exceeds_cap;
@@ -196,6 +198,248 @@ fn window_floor(p: &PoolRead, config: &GlobalConfig, p_ref: u128) -> Result<(), 
     }
 }
 
+/// The candidate's opening caps at one price (switch only if all fit): `X₀`, the per-position cap
+/// `min(max_q_position(X₀, ι_pos), fee_size_cap(X₀, φ))`, the per-market cap `oi_cap(X₀, ι_mkt,
+/// φ)`, and the tier they come from.
+#[derive(Clone, Copy, Debug)]
+pub struct FitCaps {
+    pub x0: u64,
+    pub pos: u64,
+    pub oi: u64,
+    pub tier: tier::Tier,
+}
+
+/// [`FitCaps`] of the candidate `p` at `price` (module docs): `X₀ = conservative_x0(X, l_slow,
+/// P, (D, λ_min))` — at an execution (`live = false`) without the live `X`, the terms no
+/// transaction can move —, the tier the market would have on the candidate (`tier::assign`: its
+/// `D`, `R = Y`, `Y(reprice(l_slow, P))`, `graduated_at`, the cached oracle), the caps of that
+/// tier; the fee-scaled caps at `φ = min(fee_mark, φ_cand, CARRIED_FEE_CAP_PPM)` (FIT-2:
+/// `fee_mark` the market's `min_open_fee_ppm`, whose moves I15 checks at every open and exit, 0
+/// bounds nothing; FITS-1: the 25-bps ceiling).
+#[allow(clippy::too_many_arguments)]
+fn fit_caps(
+    svm: &LiteSVM,
+    config: &GlobalConfig,
+    p: &PoolRead,
+    l_slow: u128,
+    graduated_at: i64,
+    price: u128,
+    t: i64,
+    live: bool,
+    fee_mark: u32,
+) -> Result<FitCaps, String> {
+    let params = &config.params;
+    let Some((x, y)) = p.view.reserves else {
+        return Err("the candidate has no reserves".into());
+    };
+    let d = p.depth();
+    let lambda_min = params.pool_lock_min_bps;
+    let oracle = read::borsh::<OracleCache>(svm, &crate::pda::oracle_cache()).map_or(
+        OraclePrice::default(),
+        |o| OraclePrice {
+            price: o.price,
+            expo: o.expo,
+            publish_time: o.publish_time,
+        },
+    );
+    let x_now = if live { x } else { u64::MAX };
+    let x0 = shortwin_math::caps::conservative_x0(x_now, l_slow, price, Some((d, lambda_min)))
+        .map_err(|e| format!("X₀ at P {price}: {e:?}"))?;
+    let t_ = tier::assign(&TierInputs {
+        venue: TierVenue::Raydium {
+            locked_depth: d,
+            lambda_min_bps: lambda_min,
+        },
+        r_now: y,
+        y_slow: reprice(l_slow, price).map_or(0, |(_, y)| y),
+        vqr: 0,
+        p_ema: price,
+        now: t,
+        graduated_at,
+        oracle,
+        oracle_stale_s: params.oracle_stale_s,
+        theta_a_usd_e6: params.theta_a_usd_e6,
+        theta_b_usd_e6: params.theta_b_usd_e6,
+    });
+    let tp = config.tiers[t_.index()];
+    let phi = if fee_mark == 0 {
+        p.view.fee_ppm
+    } else {
+        fee_mark.min(p.view.fee_ppm)
+    }
+    .min(shortwin_math::consts::CARRIED_FEE_CAP_PPM);
+    let impact = shortwin_math::caps::max_q_position(x0, tp.impact_pos_bps).unwrap_or(0);
+    let fee = shortwin_math::caps::fee_size_cap(x0, phi, params.fee_size_cap_x100)
+        .ok()
+        .flatten()
+        .unwrap_or(u64::MAX);
+    let oi = shortwin_math::caps::oi_cap(x0, tp.impact_mkt_bps, phi, params.fee_oi_cap_x100)
+        .unwrap_or(0);
+    Ok(FitCaps {
+        x0,
+        pos: impact.min(fee),
+        oi,
+        tier: t_,
+    })
+}
+
+/// "Switch only if all fit" (owner decision of 2026-09-29; module docs), recomputed from the
+/// candidate `p`'s own accounts and **every open position's own `q`**: at each price of `prices`
+/// ([`fit_caps`]; `live`: a proposal's `X₀` with the live `X`; `fee_mark`: the market's
+/// `min_open_fee_ppm`), every `q` within the per-position cap and `ΣQ` within the per-market cap.
+#[allow(clippy::too_many_arguments)]
+fn carried_fit(
+    svm: &LiteSVM,
+    config: &GlobalConfig,
+    positions: &[(Pubkey, ShortPosition, u64)],
+    p: &PoolRead,
+    l_slow: u128,
+    graduated_at: i64,
+    prices: &[u128],
+    t: i64,
+    live: bool,
+    fee_mark: u32,
+) -> Result<(), String> {
+    if positions.is_empty() {
+        return Ok(());
+    }
+    let sum: u128 = positions.iter().map(|(_, pos, _)| u128::from(pos.q)).sum();
+    for &price in prices {
+        let c = fit_caps(
+            svm,
+            config,
+            p,
+            l_slow,
+            graduated_at,
+            price,
+            t,
+            live,
+            fee_mark,
+        )?;
+        for (pk, pos, _) in positions {
+            if pos.q > c.pos {
+                return Err(format!(
+                    "position {pk}: q {} above the candidate's per-position cap {} on X₀ {} at P \
+                     {price}, tier {:?}",
+                    pos.q, c.pos, c.x0, c.tier
+                ));
+            }
+        }
+        if sum > u128::from(c.oi) {
+            return Err(format!(
+                "ΣQ {sum} above the candidate's OI cap {} on X₀ {} at P {price}, tier {:?}",
+                c.oi, c.x0, c.tier
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// The candidate's caps for the market `m` (as stored) to carry its positions onto the pool `pool`
+/// of kind `kind` — `L_slow' = min(L_slow, D)` (the pool's `min(√(X·Y), D/λ_min)` on a market
+/// without a price), the market's age (a list-only market's: the candidate's), at
+/// `min(P_ema, P_cand)` and at `P_ema` — as `(per-position cap, per-market cap)`, the smaller at
+/// either price. `None` if the pool does not read. For tests that size a position to fit (or not
+/// fit) a planned candidate; the program's own check runs on the state after the proposing
+/// instruction's prologue.
+pub fn carried_caps(
+    svm: &LiteSVM,
+    m: &Market,
+    kind: VenueKind,
+    pool: &Pubkey,
+) -> Option<(u64, u64)> {
+    let config = read::zc::<GlobalConfig>(svm, &crate::pda::config())?;
+    let read = read_pool(svm, &market_on(svm, m, kind, pool)?)?;
+    let d = read.depth();
+    let p_ema = m.ema_price.get();
+    let priced = m.ring_count > 0 && p_ema > 0;
+    let l_slow = if priced {
+        m.liq_slow.get().min(d)
+    } else {
+        let (x, y) = read.view.reserves?;
+        liquidity(u128::from(x), u128::from(y))
+            .ok()?
+            .min(depth_at_lambda(
+                d,
+                u64::from(config.params.pool_lock_min_bps),
+            ))
+    };
+    let age = if m.venue_kind() == Some(VenueKind::None) {
+        match kind {
+            VenueKind::RaydiumCpmm => {
+                let acc = svm.get_account(pool)?;
+                raydium_cpmm::read_pool(&acc.owner.to_bytes(), &acc.data)
+                    .ok()?
+                    .age_start(now(svm))
+            }
+            _ => now(svm),
+        }
+    } else {
+        m.graduated_at
+    };
+    let t = market_now(svm, m);
+    let mut out: Option<(u64, u64)> = None;
+    for price in fit_prices(priced.then_some(p_ema), spot_of(&read)) {
+        let c = fit_caps(
+            svm,
+            &config,
+            &read,
+            l_slow,
+            age,
+            price,
+            t,
+            true,
+            m.min_open_fee_ppm,
+        )
+        .ok()?;
+        out = Some(out.map_or((c.pos, c.oi), |(p, o)| (p.min(c.pos), o.min(c.oi))));
+    }
+    out
+}
+
+/// The prices "switch only if all fit" is judged at: `min(P_ema, P_cand)` and `P_ema` on a market
+/// with a price, `P_cand` alone without one.
+fn fit_prices(p_ema: Option<u128>, p_cand: u128) -> Vec<u128> {
+    match p_ema {
+        Some(e) => vec![e.min(p_cand), e],
+        None => vec![p_cand],
+    }
+}
+
+/// The candidate's spot `⌊Y·WAD/X⌋` (0 without reserves).
+fn spot_of(p: &PoolRead) -> u128 {
+    p.view.reserves.map_or(0, |(x, y)| {
+        shortwin_math::risk::price_wad(u128::from(x), u128::from(y)).unwrap_or(0)
+    })
+}
+
+/// I15, state part (switch only if all fit): `max_q_hwm` is at or above every open position's
+/// `q`; with no position open it and `min_open_fee_ppm` (FIT-2) are 0.
+pub fn check_hwm(
+    key: &Pubkey,
+    m: &Market,
+    positions: &[(Pubkey, ShortPosition, u64)],
+) -> Result<(), Violation> {
+    if m.open_positions == 0 {
+        return ensure(m.max_q_hwm == 0 && m.min_open_fee_ppm == 0, "I15", || {
+            format!(
+                "market {key}: max_q_hwm {} / min_open_fee_ppm {} with no open position (reset \
+                 at 0)",
+                m.max_q_hwm, m.min_open_fee_ppm
+            )
+        });
+    }
+    for (pk, pos, _) in positions {
+        ensure(m.max_q_hwm >= pos.q, "I15", || {
+            format!(
+                "market {key}: max_q_hwm {} below open position {pk}'s q {}",
+                m.max_q_hwm, pos.q
+            )
+        })?;
+    }
+    Ok(())
+}
+
 /// The `pool_fail` chain as the program's prologue leaves it after an observation of the
 /// incumbent at `t` failing (`failed`) or not, from the state just before (`settle::chain_step`).
 fn chain_after(pre: &Market, t: i64, failed: bool) -> i64 {
@@ -273,8 +517,58 @@ pub fn check_ix(
         for o in ix.opens.iter().filter(|o| o.market == mp.market) {
             open_sized_on_locked_depth(svm, &config, mp, &post, o)?;
         }
+        marks_move_only_at_opens_and_the_last_exit(mp, &post, ix.opens)?;
     }
     Ok(())
+}
+
+/// I15, the marks (switch only if all fit; FIT-2): `max_q_hwm` falls only at the exit that
+/// empties the market (to 0); `min_open_fee_ppm` changes only at an open — to
+/// `open_fee_mark(mark, φ)`, `φ` the venue's one-way fee on the pre-trade state the open's caps
+/// read (`caps::open_fee_mark`: the first open after the market emptied sets it) — and at that
+/// exit (to 0).
+fn marks_move_only_at_opens_and_the_last_exit(
+    mp: &MarketPositions,
+    post: &Market,
+    opens: &[Open],
+) -> Result<(), Violation> {
+    let key = mp.market;
+    let pre = &mp.state;
+    ensure(
+        post.max_q_hwm >= pre.max_q_hwm || post.open_positions == 0,
+        "I15",
+        || {
+            format!(
+                "market {key}: max_q_hwm fell {} → {} with {} position(s) open",
+                pre.max_q_hwm, post.max_q_hwm, post.open_positions
+            )
+        },
+    )?;
+    let n_opens = opens.iter().filter(|o| o.market == key).count();
+    let want = if n_opens > 0 {
+        // The pump venues have no view here (none is live in M4): their opens are not checked.
+        let Some(v) = mp.venue else {
+            return Ok(());
+        };
+        (0..n_opens).fold(pre.min_open_fee_ppm, |m, _| {
+            shortwin_math::caps::open_fee_mark(m, v.fee_ppm)
+        })
+    } else if post.open_positions == 0 {
+        0
+    } else {
+        pre.min_open_fee_ppm
+    };
+    ensure(post.min_open_fee_ppm == want, "I15", || {
+        format!(
+            "market {key}: min_open_fee_ppm {} → {} ({n_opens} open(s), venue fee {:?}, {} → {} \
+             position(s) open), want {want}",
+            pre.min_open_fee_ppm,
+            post.min_open_fee_ppm,
+            mp.venue.map(|v| v.fee_ppm),
+            pre.open_positions,
+            post.open_positions
+        )
+    })
 }
 
 /// A Raydium listing (`create_market(venue_hint)`, ARCH §2.6 rule 1, §3.2): the listed pool is
@@ -447,6 +741,33 @@ fn adoption(
             format!(
                 "market {market}: a window adopted {} carrying open positions: {why}",
                 e.candidate
+            ),
+        );
+    }
+    // Switch only if all fit: the adoption's `L_slow` (`min(L_slow, D)`, or the pool's start) and
+    // age are the market's after it; `P_ema` carries over (a market without a price: the
+    // candidate's spot alone). An execution judges `X₀` without the live `X` (the terms no
+    // transaction can move).
+    let was_priced = pre.ring_count > 0 && pre.ema_price.get() > 0;
+    let prices = fit_prices(was_priced.then(|| post.ema_price.get()), spot_of(&p));
+    if let Err(why) = carried_fit(
+        svm,
+        config,
+        &mp.positions,
+        &p,
+        post.liq_slow.get(),
+        post.graduated_at,
+        &prices,
+        market_now(svm, pre),
+        e.kind != POOL_KIND_FAST,
+        pre.min_open_fee_ppm,
+    ) {
+        return fail(
+            "I15",
+            format!(
+                "market {market}: adopted {} (kind {}) with open positions that do not fit its \
+                 opening caps: {why}",
+                e.candidate, e.kind
             ),
         );
     }
@@ -745,6 +1066,52 @@ fn window(
             )
         })?;
         let list_only = pre.venue_kind() == Some(VenueKind::None);
+        // Switch only if all fit, as the adoption would leave the market: `L_slow' = min(L_slow,
+        // D)` (a market without a price: the pool's `min(√(X·Y), D/λ_min)`); the age kept (a
+        // list-only market: the candidate's age start, O13).
+        let d = read.depth();
+        let priced = post.ring_count > 0 && p_ema > 0;
+        let l_slow = if priced {
+            post.liq_slow.get().min(d)
+        } else {
+            let (x, y) = read.view.reserves.unwrap_or((0, 0));
+            liquidity(u128::from(x), u128::from(y))
+                .unwrap_or(0)
+                .min(depth_at_lambda(d, u64::from(params.pool_lock_min_bps)))
+        };
+        let age = if list_only {
+            match kind {
+                Some(VenueKind::RaydiumCpmm) => {
+                    let acc = svm.get_account(&e.candidate).expect("pool");
+                    raydium_cpmm::read_pool(&acc.owner.to_bytes(), &acc.data)
+                        .map_or(i64::MIN, |s| s.age_start(now(svm)))
+                }
+                _ => now(svm),
+            }
+        } else {
+            post.graduated_at
+        };
+        if let Err(why) = carried_fit(
+            svm,
+            config,
+            &mp.positions,
+            &read,
+            l_slow,
+            age,
+            &fit_prices(priced.then_some(p_ema), p_cand),
+            t,
+            true,
+            mp.state.min_open_fee_ppm,
+        ) {
+            return fail(
+                "I15",
+                format!(
+                    "market {market}: window candidate {} accepted with open positions that do \
+                     not fit its opening caps: {why}",
+                    e.candidate
+                ),
+            );
+        }
         let qualifies = fast_path_qualifies(
             e.d_cand,
             post.pool_d.get(),

@@ -6,9 +6,11 @@ carried every ring entry's L and lobs over; v0.4 (like the sims) rewrites them t
 liquidity.  Compared here: outcome of genuine moves after the change, and the number of seconds
 after it during which the settlement box is wider than fv_dev_bps in L (which blocks any S2/S3
 amount that depends on it).  The graduation rows are unchanged from v0.4.1; the Raydium rows replay
-FAST_SCENARIOS, whose switch is the program's rule (Market.adopt_pool, M4R: the ring is rewritten to
+FAST_SCENARIOS[1], whose switch is the program's rule (Market.adopt_pool, M4R: the ring is rewritten to
 the anchor floor(D*1e4/lambda_min) and the 8-bucket warm-up re-seeds it; the cell gives the wide
 seconds and how many of them fall inside the warm-up gate, during which the box decides nothing).
+Since #99 that replay is the 120 % candidate (lambda 90 %): a position at the incumbent's size cap fits only
+a candidate whose locked depth covers the incumbent's L_slow (a quarter of the depth no longer carries it).
 
 (b)-(d) The Raydium pool rules (ECON §5.2, §6.2, §10.1, §10.3; changelog #91-#96; M4-SEC-1/-3/-5/-6,
 M4V-1/-2/-3, M4R-1/-2):
@@ -19,6 +21,14 @@ M4V-1/-2/-3, M4R-1/-2):
   * M4R (the program's rule, Market.adopt_pool): the adoption reads no sample; L_ema and every ring
     entry := cap = floor(D*1e4/lambda_min), L_slow = min(L_slow, D), then the 8-bucket warm-up
     re-seeds P_ema / L_ema from the new pool's post-change buckets and gates the keeper exits;
+  * #99 (owner decision 2026-09-29, the program's rule): a window whose adoption carries open positions
+    opens and executes only if every open position fits the candidate's opening caps on its locked-depth
+    X0 as an open right after the adoption computes it (Market.carried_fit: min(X_now, min(L_slow, D),
+    D/lambda_min) over sqrt(P) at min(P_ema, P_cand) and at P_ema; the execution without X_now); the
+    capped positions of these examples move only onto a candidate whose locked depth covers the
+    incumbent's L_slow: no more onto the 25 %-depth or lambda 25 % candidates of (b) nor onto (d1)'s
+    pool_fast_min_bps candidates ("no adoption (#99 ...)": frozen on the halted pool, S3 at fair
+    value at the deadline); the comparison rules have no such check;
   * comparison rows: v0.4.1 (min(sqrt(X*Y)_live, current) from the adopting instruction's own sample,
     Market.fast_switch), the M4 review's record-only fix min(L_rec, cap), and M4 as built
     (L_new = min(L_rec, L_live, cap), L_rec the candidate's sqrt(X*Y) at the proposal that recorded it,
@@ -27,6 +37,10 @@ M4V-1/-2/-3, M4R-1/-2):
 sampling instructions of the M4 rules; (d) the L push on pools with lambda < lambda_min: held drains
 to D (the lowest sample any instruction can read), consecutive attacker-only seconds, a contrary LP
 observation every second (the S2/S3 amount spread it opens), and S2 reachability after the full drain.
+The Market rows read the exit reference with M4F-1's cap (Market.ref_depth_cap): after a drain of a pool
+with lambda < lambda_min the reference credits at most D/lambda_min (d1's two RC pump rows at lambda <= 25 %);
+BuiltM4 keeps the uncapped L_b = max(L_live, L_ema, L_slow) of M4 as built, and its liquidation spot leg at L_live
+(the Market rows read it at max(L_live, L_ema') since #101, FITS-2; no row here changes).
 attacks/switch_warmup.py has the M4R attack tables (M4R-1, M4R-2, freezes, degraded mode).
 Deterministic; standard library only.
 """
@@ -55,7 +69,15 @@ def adoption_liquidity_m4(l_live, l_rec, l_ema, D, P=DEFAULT):
 
 class BuiltM4(Market):
     """The Raydium adoption as built after M4 (comparison rows only): L_ema = adoption_liquidity_m4(...),
-    L_slow = min(L_slow, D), ring L rewritten, P_ema carried; no warm-up, no gate, no guard."""
+    L_slow = min(L_slow, D), ring L rewritten, P_ema carried; no warm-up, no gate, no guard, no cap on the
+    exit reference liquidity (M4F-1): L_b = max(L_live, L_ema, L_slow), and the liquidation spot leg at L_live
+    (before FITS-2 (a), #101)."""
+
+    def ref_depth_cap(self):
+        return None
+
+    def spot_liquidity(self, L_live):
+        return L_live
 
     def adopt_pool(self, pool, t, l_rec=0, l_live=None):
         D = pool.locked_depth()
@@ -163,8 +185,10 @@ def m4_fast_path_events(t0, cand_bps, lock_bps, rule, rec_move=None, exec_move=N
         if c is None or m.pool_fail_since is None:
             return
         if m._fp_rec is None and m.t >= m.pool_fail_since + P.pool_fast_route_s:
-            if rule == "m4r":
+            if rule == "m4r":                        # #99: and every open position fits the candidate's caps
                 ok = window_floor_ok(c.locked_depth(), m.ema, c.spot_wad())
+                if ok and not m.carried_fit(c):
+                    ok, m._refused = False, "#99: the position does not fit"
             else:
                 ok = rule == "v041" or position_floor_ok(c.locked_depth(), m.ema)
             if not ok:
@@ -186,8 +210,8 @@ def m4_fast_path_events(t0, cand_bps, lock_bps, rule, rec_move=None, exec_move=N
                 m.adopt_pool(c, m.t, l_rec=m._fp_rec, l_live=INF)
             elif rule == "built":                    # M4 as built (superseded by M4R)
                 m.adopt_pool(c, m.t, l_rec=m._fp_rec, l_live=live)
-            else:                                    # M4R: no sample; the floor at P_ema
-                if position_floor_ok(c.locked_depth(), m.ema):
+            else:                                    # M4R: no sample; the floor and the fit (#99) at P_ema
+                if position_floor_ok(c.locked_depth(), m.ema) and m.carried_fit(c, execution=True):
                     m.adopt_pool(c, m.t)
             m._fp = None
     return ((t0, halt),) + tuple((t0 + i, tick) for i in range(1, horizon))
@@ -233,7 +257,10 @@ def table_b():
           "from +300 s) onto thinner, deeper and lambda < lambda_min candidates.  Window floor: locked SOL at "
           "P_ema >= 25 SOL (M4R: at min(P_ema, P_cand) at the proposal, the same here; v0.4.1: real SOL >= 25 and "
           "lambda >= 50 %).  M4R: L_ema / √(X·Y) at the switch -> at the gate (8 integrations later); the wide "
-          "seconds inside the warm-up gate decide nothing.")
+          "seconds inside the warm-up gate decide nothing.  #99: M4R also needs the capped position to fit the "
+          "candidate's opening caps as an open right after the adoption (X0 <= min(L_slow, D)/sqrt(P)): a "
+          "candidate whose locked depth D is below the incumbent's L_slow does not carry it: no window, the "
+          "position frozen on the halted pool.")
     print()
     print("| market | candidate: √(X·Y) / λ / D vs `pool_d` | real / locked SOL | eligible v0.4.1 / M4, M4R | "
           "rewrite | `L_ema` / √(X·Y) at the switch | outcome | exit vs event | price at exit | lender P&L | "
@@ -243,8 +270,8 @@ def table_b():
         for cb, lb in ((2500, 9000), (15000, 9000), (10000, 2500), (20000, 2500)):
             k, lam, dr, y, ls, e41, eb = cand_facts(key, cb, lb)
             for rule in ("v041", "built", "m4r"):
-                s, ratio, wide, _ = m4_case(key, cb, lb, rule)
-                rt = "no adoption (window floor)" if ratio is None else ratio
+                s, ratio, wide, m2 = m4_case(key, cb, lb, rule)
+                rt = f"no adoption ({getattr(m2, '_refused', 'window floor')})" if ratio is None else ratio
                 print(f"| {key} | {k * 100:.0f}% / {lam / 100:.0f}% / {dr * 100:.0f}% | {y / 1e9:.1f} / {ls / 1e9:.1f} | "
                       f"{'yes' if e41 else 'no'} / {'yes' if eb else 'no'} | {RULES[rule]} | {rt} | "
                       f"{fmt_exit(s)} | {wide if ratio is None else wide_cell(wide)} |")
@@ -268,8 +295,11 @@ def table_c():
         for name, rm, em in moves:
             cells, exits = [], set()
             for rule in ("v041", "record", "built", "m4r"):
-                s, ratio, wide, _ = m4_case("RA", cb, lb, rule, rm, em)
-                cells.append(f"{ratio}, {wide_cell(wide, ' s')}")
+                s, ratio, wide, m2 = m4_case("RA", cb, lb, rule, rm, em)
+                if ratio is None:                    # #99: the capped position does not fit this candidate
+                    cells.append(f"no adoption ({getattr(m2, '_refused', 'window floor')})")
+                else:
+                    cells.append(f"{ratio}, {wide_cell(wide, ' s')}")
                 exits.add(fmt_exit(s).replace(" | ", ", "))
             ex = exits.pop() if len(exits) == 1 else " / ".join(sorted(exits))
             print(f"| {cb / 100:.0f}% / {lb / 100:.2f}% | {name} | " + " | ".join(cells) + f" | {ex} |")
@@ -287,11 +317,21 @@ def drain_all(m):
     m.venue.remove_liquidity(unlocked_bps(m.venue))
 
 
+def drain_adopted(m):
+    """drain_all on the carried position's new pool; nothing if no candidate was adopted (#99: the incumbent stays
+    halted and the position frozen)."""
+    if m.venue.has_route():
+        drain_all(m)
+
+
 def table_d1():
     print("(d1) Held drain of every unlocked LP (the lowest L any instruction or observation can read is D) on "
           "pools of the same locked depth D at lambda 50 / 25 / 10 %; capped position opened on the pool, and "
-          "a position carried by the fast path onto a candidate with D = 25 % of pool_d (pool_fast_min_bps) "
-          "whose unlocked LP is then drained.")
+          "RA's capped position carried by the fast path onto a candidate whose unlocked LP is then drained.  "
+          "#99: a candidate with D = 25 % of pool_d (pool_fast_min_bps) no longer carries it (an open on it right "
+          "after the adoption is sized on min(L_slow, D) = D, an eighth of the incumbent's depth): refused, the "
+          "position stays frozen on the halted pool (1.00x; S3 at fair value at its deadline); the thinnest "
+          "candidate that carries it has D = the incumbent's whole depth (twice pool_d at lambda 50 %).")
     print()
     print("| market | pool | λ | Q (raw) | scenario | outcome | exit vs event | price at exit | CR spot/EMA at exit | "
           "lender P&L |")
@@ -310,17 +350,22 @@ def table_d1():
                 print(f"| {key} | opened on it | {lam / 100:.0f}% | {pos.Q:,} | {name} | {s['kind']} | "
                       f"{s['t'] - TE:+d}s | {s['mult']:.2f}x | {s['cr_s']:.2f}/{s['cr_e']:.2f} | "
                       f"{s['lender_pnl_pct']:+.1f}% |")
-    for cb, lb in ((2500, 5000), (5000, 2500)):
+    for cb, lb in ((2500, 5000), (5000, 2500), (20000, 5000), (40000, 2500)):
         for name, path in (("drain all unlocked LP", lambda t: None),
                            ("drain all unlocked LP + x1.5", step_path(TE + 401, 1.5)),
                            ("drain all unlocked LP + pump 2x/120s", ramp_path(TE + 460, 2.0, 120))):
-            ev = m4_fast_path_events(TE, cb, lb, "m4r") + ((TE + 400, drain_all),)
+            ev = m4_fast_path_events(TE, cb, lb, "m4r") + ((TE + 400, drain_adopted),)
             m = new_market("RA")
+            pool_d = m.venue.locked_depth()
             pos, r, P1 = run(m, 1.0, Scenario(name, path, events=ev, window=1500))
             s = summarize(pos, r, P1)
-            print(f"| RA | carried: fast path at +180 s onto {cb / 100:.0f}% √(X·Y), drained at +400 s | "
-                  f"{lb / 100:.0f}% | {pos.Q:,} | {name} | {s['kind']} | {s['t'] - TE:+d}s | {s['mult']:.2f}x | "
-                  f"{s['cr_s']:.2f}/{s['cr_e']:.2f} | {s['lender_pnl_pct']:+.1f}% |")
+            d_share = cand_pool(new_market("RA").venue, cb, lb).locked_depth() * 100 / pool_d
+            if m.venue.has_route():
+                where = f"carried: fast path at +180 s onto {cb / 100:.0f}% √(X·Y) (D {d_share:.0f}% of pool_d), drained at +400 s"
+            else:
+                where = f"#99: {cb / 100:.0f}% √(X·Y) (D {d_share:.0f}% of pool_d) refused, frozen on the halted pool"
+            print(f"| RA | {where} | {lb / 100:.0f}% | {pos.Q:,} | {name} | {s['kind']} | {s['t'] - TE:+d}s | "
+                  f"{s['mult']:.2f}x | {s['cr_s']:.2f}/{s['cr_e']:.2f} | {s['lender_pnl_pct']:+.1f}% |")
 
 
 def drained(v):

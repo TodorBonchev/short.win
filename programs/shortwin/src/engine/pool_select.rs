@@ -53,6 +53,48 @@
 //! a pool far under the floor passed), `PoolTooThin`; the execution judges it again at `P_ema`
 //! (else cancelled).
 //!
+//! **Switch only if all fit** ([`carried_fit`]; owner decision of 2026-09-29; ARCH §2.6, §4.6, ECON
+//! §6.1): an adoption that carries open positions — a Raydium market's collection window, and a
+//! list-only market's window (it has positions) — is allowed only if every open position fits the
+//! **candidate's normal opening caps**, evaluated as an open would be on it right after the
+//! adoption: the per-position impact cap and the fee-scaled size cap on the candidate's
+//! conservative locked-depth reserve `X₀ = conservative_x0(X_cand, L_slow', P, (D, λ_min))` (with
+//! `L_slow' = min(L_slow, D)`, what [`adopt`] leaves), checked against `min(max_q_hwm, ΣB_Q)` — an
+//! O(1) bound at or above every open `q`, `Market.max_q_hwm` (the high-water mark of `q` since
+//! `open_positions` was last 0) —; the per-market impact cap and the fee-scaled OI cap on `ΣB_Q`
+//! at `X₁ = X₀` (the carried tokens were sold into the old pool); the impact caps of the tier the
+//! market would have on the candidate (`tier::assign` on its locked depth, real SOL, `L_slow'`,
+//! age and the cached oracle); the fee-scaled caps take `φ = min(φ_inc, φ_cand,
+//! CARRIED_FEE_CAP_PPM)` (`shortwin_math::caps::carried_phi`; FIT-2, ECON #100; FITS-1),
+//! `φ_cand` the candidate's one-way fee, `φ_inc = Market.min_open_fee_ppm`, the lowest one-way
+//! venue fee an open paid since `open_positions` last returned to 0 — the fee the open positions
+//! posted their margin at — and `shortwin_math::consts::CARRIED_FEE_CAP_PPM` (**PROPOSED**,
+//! 25 bps) the ceiling: a position carried onto a higher-fee pool must be proportionally smaller
+//! (its own fee's size class: 0.75 % of `X₀` at 25 bps, not the impact cap's 2.47 % at 1 %), and
+//! no carried position is above the 25-bps class whatever both fees are (a 1 % → 1 % switch
+//! carries at most 0.75 % of `X₀`; larger positions stay on the failed pool and settle in S3 at
+//! fair value); the impact caps are the candidate's tier's. `P` is the M4R-2 floor's reference `P_ref =
+//! min(P_ema, P_cand)` ([`window_price`]) **and** `P_ema` ([`reference_price`]): a lower price
+//! loosens `X₀`'s depth terms (a token reserve, `∝ 1/√P`), and `P_cand` is the candidate's spot
+//! inside the instruction, which a dump wrapped around it lowers — the second evaluation keeps an
+//! in-transaction dump from loosening the depth terms (never looser than the rule at `P_ref`
+//! alone; the tier's caps come from each price's own tier). The proposal's live `X_cand` is **not**
+//! protected (FIT-1, ECON #100): it binds when the candidate trades above `P_ema`, and a dump
+//! wrapped around the proposal lifts it; it binds the honest flow only. The guarantee is the
+//! execution's `X₀` ([`FitAt::Execution`]), up to `λ·√(P_cand/P_ema)` × a native open's cap. A
+//! proposal of a candidate that does not fit is refused (`CarriedPositionsTooLarge`);
+//! `execute_pool_switch` cancels a window whose candidate no longer fits, judged on the terms no
+//! transaction can move ([`FitAt::Execution`]: `X₀` without the live `X_cand`, so an unlocked LP's
+//! withdrawal or a buy wrapped around the execution cannot cancel an honest window — the
+//! M4-SEC-1 / M4-SEC-3 principle; a genuine pump inside the 60-s window after the proposal is
+//! judged by the proposal only, as M4X-3's dump). With no candidate that fits, the positions stay
+//! on the failed pool and exit through the S3 chain at fair value (D3, O15). Zero-position
+//! adoptions and listings are not affected. `max_q_hwm` falls only when `open_positions` returns
+//! to 0: a position that has closed keeps the mark up while others stay open, so one borrower's
+//! large position can keep a later switch from being adopted for everyone (FIT-3, a disclosed
+//! residual: those positions then exit on the failed pool through the S3 chain at fair value, at
+//! `max(deadline, no_route_since + s3_wait_s)` for one that stays healthy).
+//!
 //! **Every adoption** ([`adopt`]; ARCH §2.6 rule 4 as amended by M4R, **PROPOSED**, owner item
 //! O18): the venue kind may change between AMM v4 and CPMM; the pool itself
 //! ([`Adoption::write_pool`]: venue, pool cache, SOL side, `pool_d`); `P_ema` and the ring's prices
@@ -82,13 +124,16 @@
 //! `propose_pool`"); the latch reads the candidate program's bit only (§3.9 names none).
 
 use anchor_lang::prelude::*;
+use shortwin_math::caps::{self, CarriedCaps, CarriedFit};
 use shortwin_math::observe::VenueChange;
 use shortwin_math::pool_select::{depth_at_lambda, dominates, fast_path_qualifies};
+use shortwin_math::quote::reprice;
+use shortwin_math::tier::{self as math_tier, OraclePrice, Tier, TierInputs, TierVenue};
 
 use crate::engine::observe;
-use crate::errors::{CheckedExt, ShortwinError};
+use crate::errors::{CheckedExt, MathResultExt, ShortwinError};
 use crate::events::{POOL_KIND_LISTING, POOL_KIND_LISTING_WINDOW, POOL_KIND_ZERO_POSITION};
-use crate::state::{Market, Params, VenueKind};
+use crate::state::{GlobalConfig, Market, OracleCache, Params, TierParams, VenueKind};
 use crate::venues::raydium::Adoption;
 use crate::venues::{raydium, raydium_cpmm, raydium_v4};
 
@@ -333,6 +378,174 @@ pub fn window_price(p_ref: Option<u128>, a: &Adoption) -> Option<u128> {
     }
 }
 
+/// What the carried-position fit ([`carried_fit`]) reads besides the market and the candidate:
+/// the parameters (fee-scaled caps, `λ_min`, the tier thresholds), the tier table, the cached
+/// SOL/USD price and the market time.
+#[derive(Clone, Copy)]
+pub struct FitContext<'a> {
+    pub params: &'a Params,
+    pub tiers: &'a [TierParams; 4],
+    pub oracle: OraclePrice,
+    pub now: i64,
+}
+
+impl<'a> FitContext<'a> {
+    /// The context of `config` and the oracle cache `oracle` at the market time `now`.
+    pub fn of(config: &'a GlobalConfig, oracle: &OracleCache, now: i64) -> Self {
+        Self {
+            params: &config.params,
+            tiers: &config.tiers,
+            oracle: OraclePrice {
+                price: oracle.price,
+                expo: oracle.expo,
+                publish_time: oracle.publish_time,
+            },
+            now,
+        }
+    }
+}
+
+/// `L_slow` as [`adopt`] leaves it for candidate `a`: `min(L_slow, D)` on a market with a price;
+/// a market that never had one starts at the pool's `min(√(X·Y), ⌊D·10⁴/λ_min⌋)`.
+fn adopted_l_slow(market: &Market, a: &Adoption, lambda_min_bps: u32) -> u128 {
+    let d = a.state.locked_depth;
+    if market.ring_count > 0 && market.ema_price.get() > 0 {
+        market.liq_slow.get().min(d)
+    } else {
+        let cap = depth_at_lambda(d, u64::from(lambda_min_bps));
+        a.state.liquidity().unwrap_or(0).min(cap)
+    }
+}
+
+/// The tier the market would have on candidate `a` at the price `p` (ARCH §4.7, as `open_short`'s
+/// step 5 computes it right after the adoption, `P_ema` replaced by `p`): Raydium, bounded by the
+/// candidate's locked depth over `λ_min`; `R_now` its real SOL; `R_slow` from `l_slow` (the adopted
+/// `L_slow`) at `p`; the market's age (a list-only market: the candidate's `age_start`, O13); the
+/// cached oracle (stale or empty: C).
+pub fn candidate_tier(
+    market: &Market,
+    a: &Adoption,
+    ctx: &FitContext,
+    l_slow: u128,
+    p: u128,
+) -> Tier {
+    let graduated_at = if market.venue_kind() == Some(VenueKind::None) {
+        a.age_start
+    } else {
+        market.graduated_at
+    };
+    let params = ctx.params;
+    math_tier::assign(&TierInputs {
+        venue: TierVenue::Raydium {
+            locked_depth: a.state.locked_depth,
+            lambda_min_bps: params.pool_lock_min_bps,
+        },
+        r_now: a.state.r,
+        y_slow: reprice(l_slow, p).map_or(0, |(_, y)| y),
+        vqr: 0,
+        p_ema: p,
+        now: ctx.now,
+        graduated_at,
+        oracle: ctx.oracle,
+        oracle_stale_s: params.oracle_stale_s,
+        theta_a_usd_e6: params.theta_a_usd_e6,
+        theta_b_usd_e6: params.theta_b_usd_e6,
+    })
+}
+
+/// Which instruction judges the carried-position fit ([`carried_fit`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FitAt {
+    /// `propose_pool` (and the keeper's plan of one): `X₀` as an open computes it, with the
+    /// candidate's live token reserve `X_cand`. It binds every honest proposal, but it is no
+    /// guarantee: a dump wrapped around the proposal lifts `X_cand` inside the transaction (FIT-1;
+    /// the guarantee is [`FitAt::Execution`]'s).
+    Proposal,
+    /// `execute_pool_switch`: `X₀` on the terms no transaction can move — `L_slow'` and `D` over
+    /// `√P` — without `X_cand`, which an unlocked LP's withdrawal or a buy wrapped around the
+    /// execution would lower to cancel an honest window (the atomic griefing M4-SEC-1 / M4-SEC-3
+    /// removed from eligibility).
+    Execution,
+}
+
+/// The candidate's opening caps at the price `p` ([`carried_fit`]): `X₀ =
+/// conservative_x0(X_cand, L_slow', p, (D, λ_min))` (at the execution without `X_cand`,
+/// [`FitAt::Execution`]), the impact caps of [`candidate_tier`] at `p`, the fee-scaled caps'
+/// `φ = carried_phi(min_open_fee_ppm, φ_cand)` (`min(φ_inc, φ_cand, CARRIED_FEE_CAP_PPM)`, FIT-2,
+/// FITS-1) and their multipliers.
+///
+/// Errors: `MathOverflow` for `p = 0`; `InvalidParams` for a tier outside the table.
+pub fn carried_caps(
+    market: &Market,
+    a: &Adoption,
+    ctx: &FitContext,
+    p: u128,
+    at: FitAt,
+) -> Result<CarriedCaps> {
+    let lambda_min = ctx.params.pool_lock_min_bps;
+    let l_slow = adopted_l_slow(market, a, lambda_min);
+    let x_now = match at {
+        FitAt::Proposal => a.state.x,
+        FitAt::Execution => u64::MAX,
+    };
+    let x0 =
+        caps::conservative_x0(x_now, l_slow, p, Some((a.state.locked_depth, lambda_min))).math()?;
+    let tier = candidate_tier(market, a, ctx, l_slow, p);
+    let tp = ctx
+        .tiers
+        .get(tier.index())
+        .ok_or(ShortwinError::InvalidParams)?;
+    Ok(CarriedCaps {
+        x0,
+        impact_pos_bps: tp.impact_pos_bps,
+        impact_mkt_bps: tp.impact_mkt_bps,
+        phi_ppm: caps::carried_phi(market.min_open_fee_ppm, a.state.fee_ppm),
+        fee_size_cap_x100: ctx.params.fee_size_cap_x100,
+        fee_oi_cap_x100: ctx.params.fee_oi_cap_x100,
+    })
+}
+
+/// "Switch only if all fit" (module docs; owner decision of 2026-09-29): whether the market's open
+/// positions fit candidate `a`'s normal opening caps. [`CarriedFit::Fits`] at once without an open
+/// position; otherwise `shortwin_math::caps::carried_fit` of `min(max_q_hwm, ΣB_Q)` and `ΣB_Q`
+/// against [`carried_caps`] (at `at`) at `P_ref = min(P_ema, P_cand)` ([`window_price`]) and at
+/// `P_ema` (`p_ref`, [`reference_price`]), the first refusal returned. A market with positions but
+/// no price at all shows nothing fits ([`CarriedFit::Position`]).
+///
+/// Errors: as [`carried_caps`] (none for an eligible candidate on a market with a price).
+pub fn carried_fit(
+    market: &Market,
+    a: &Adoption,
+    ctx: &FitContext,
+    p_ref: Option<u128>,
+    at: FitAt,
+) -> Result<CarriedFit> {
+    if market.open_positions == 0 {
+        return Ok(CarriedFit::Fits);
+    }
+    let sum_q = market.borrowed_q;
+    let q_max = caps::carried_q_bound(market.max_q_hwm, sum_q);
+    let mut judged = false;
+    let first = window_price(p_ref, a);
+    // `P_ema` again only when it differs from `min(P_ema, P_cand)` (a candidate spot at or above
+    // `P_ema`: one evaluation).
+    for p in [first, p_ref.filter(|e| Some(*e) != first)]
+        .into_iter()
+        .flatten()
+    {
+        judged = true;
+        let fit = caps::carried_fit(q_max, sum_q, &carried_caps(market, a, ctx, p, at)?).math()?;
+        if !fit.fits() {
+            return Ok(fit);
+        }
+    }
+    Ok(if judged {
+        CarriedFit::Fits
+    } else {
+        CarriedFit::Position
+    })
+}
+
 /// Clears the fast-path collection window.
 pub fn clear_window(market: &mut Market) {
     market.fp_keys = [Pubkey::default(); 6];
@@ -407,6 +620,7 @@ pub fn adopt(
 #[allow(clippy::unwrap_used, clippy::arithmetic_side_effects)]
 mod tests {
     use super::*;
+    use crate::state::TierParams;
     use crate::venues::VenueState;
     use bytemuck::Zeroable;
     use shortwin_math::num::WAD;
@@ -920,6 +1134,304 @@ mod tests {
         assert!(!window_floor_ok(&a, &params, window_price(Some(WAD), &a)));
         params.pool_min_real_sol = 5_000_000_000;
         assert!(window_floor_ok(&a, &params, window_price(Some(WAD), &a)));
+    }
+
+    /// A priced Raydium market with `n` open positions, `ΣB_Q = sum`, the mark `hwm`, `P_ema =
+    /// p_ema` and a deep `L_slow`.
+    fn carrying(n: u32, sum: u64, hwm: u64, p_ema: u128) -> Market {
+        let mut m = Market::zeroed();
+        m.venue = VenueKind::RaydiumV4 as u8;
+        m.ring_count = 1;
+        m.ema_price.set(p_ema);
+        m.liq_slow.set(u128::MAX / 4);
+        m.graduated_at = 1;
+        m.open_positions = n;
+        m.borrowed_q = sum;
+        m.max_q_hwm = hwm;
+        m
+    }
+
+    /// Switch only if all fit (owner decision of 2026-09-29): the per-position caps on
+    /// `min(max_q_hwm, ΣB_Q)` and the OI caps on `ΣB_Q`, on the candidate's conservative
+    /// locked-depth `X₀` at `min(P_ema, P_cand)` and at `P_ema`, with the tier it would have.
+    #[test]
+    fn carried_positions_must_fit_the_candidates_opening_caps() {
+        let params = Params::defaults();
+        let tiers = TierParams::defaults();
+        let ctx = FitContext {
+            params: &params,
+            tiers: &tiers,
+            oracle: OraclePrice::default(),
+            now: 1_000_000,
+        };
+        // A 1,000-SOL CPMM candidate at P = WAD/4 (isqrt 5·10⁸), λ 99.78 %, fee 2,500 ppm.
+        let (x, y) = (4_000_000_000_000u64, 1_000_000_000_000u64);
+        let d = 9_978 * 2_000_000_000_000u128 / 10_000;
+        let a = adoption(VenueKind::RaydiumCpmm, x, y, d, 1);
+        // X₀ = ⌊L_slow'·10⁹/isqrt(P)⌋ with L_slow' = D: 2·D; the fee-scaled caps bind at 25 bps.
+        let x0 = u64::try_from(2 * d).unwrap();
+        let caps_at = carried_caps(
+            &carrying(1, 1, 1, WAD / 4),
+            &a,
+            &ctx,
+            WAD / 4,
+            FitAt::Proposal,
+        )
+        .unwrap();
+        assert_eq!(caps_at.x0, x0);
+        assert_eq!(caps_at.phi_ppm, 2_500);
+        let pos = caps::position_cap(x0, 500, 2_500, params.fee_size_cap_x100).unwrap();
+        let oi = caps::oi_cap(x0, 2_000, 2_500, params.fee_oi_cap_x100).unwrap();
+        assert_eq!(pos, x0 * 75 / 10_000);
+        assert_eq!(oi, x0 * 1_875 / 100_000);
+        let fit = |m: &Market, p_ref: Option<u128>| {
+            carried_fit(m, &a, &ctx, p_ref, FitAt::Proposal).unwrap()
+        };
+        let e = Some(WAD / 4);
+        // Per position, exactly at the cap.
+        assert_eq!(fit(&carrying(1, pos, pos, WAD / 4), e), CarriedFit::Fits);
+        assert_eq!(
+            fit(&carrying(1, pos + 1, pos + 1, WAD / 4), e),
+            CarriedFit::Position
+        );
+        // The mark is conservative: a closed large position still counts (while ΣQ allows).
+        assert_eq!(
+            fit(&carrying(2, pos + 10, pos + 1, WAD / 4), e),
+            CarriedFit::Position
+        );
+        // ... and ΣQ caps the mark.
+        assert_eq!(
+            fit(&carrying(1, pos, pos * 3, WAD / 4), e),
+            CarriedFit::Fits
+        );
+        // A market written before the mark existed (0 with positions open): ΣQ bounds every q.
+        assert_eq!(
+            fit(&carrying(3, pos + 1, 0, WAD / 4), e),
+            CarriedFit::Position
+        );
+        // Per market: three positions within the per-position cap whose ΣQ passes the OI cap.
+        assert_eq!(fit(&carrying(3, oi, pos, WAD / 4), e), CarriedFit::Fits);
+        assert_eq!(
+            fit(&carrying(3, oi + 1, pos, WAD / 4), e),
+            CarriedFit::Market
+        );
+        // No open position: nothing to carry.
+        assert_eq!(fit(&carrying(0, 0, 0, WAD / 4), e), CarriedFit::Fits);
+        // P_ema 4× the candidate's spot (a dump during the halt, or a dump wrapped around the
+        // instruction): X₀ at P_ema is half of X₀ at min(P_ema, P_cand) — the fit is judged at
+        // both, so a position that fits only at the candidate's spot is refused.
+        let half = pos / 2 + 1;
+        let stale = carrying(1, half, half, WAD);
+        assert_eq!(
+            caps::carried_fit(
+                half,
+                half,
+                &carried_caps(&stale, &a, &ctx, WAD / 4, FitAt::Proposal).unwrap()
+            ),
+            Ok(CarriedFit::Fits)
+        );
+        assert_eq!(fit(&stale, Some(WAD)), CarriedFit::Position);
+        assert_eq!(
+            fit(&carrying(1, half - 1, half - 1, WAD), Some(WAD)),
+            CarriedFit::Fits
+        );
+        // P_ema below the spot: min(P_ema, P_cand) = P_ema, one price; there the candidate's live
+        // token reserve X_now = 4·10¹² binds X₀ (the L terms give 4·D and 8·D).
+        let low = carrying(1, 1, 1, WAD / 16);
+        assert_eq!(
+            carried_caps(&low, &a, &ctx, WAD / 16, FitAt::Proposal)
+                .unwrap()
+                .x0,
+            x
+        );
+        let at_x = x / 10_000 * 75;
+        assert_eq!(
+            fit(&carrying(1, at_x, at_x, WAD / 16), Some(WAD / 16)),
+            CarriedFit::Fits
+        );
+        assert_eq!(
+            fit(&carrying(1, at_x + 1, at_x + 1, WAD / 16), Some(WAD / 16)),
+            CarriedFit::Position
+        );
+        // No price at all shows nothing fits.
+        let mut blind = a;
+        blind.state.executable = false;
+        assert_eq!(
+            carried_fit(
+                &carrying(1, 1, 1, WAD / 4),
+                &blind,
+                &ctx,
+                None,
+                FitAt::Proposal
+            )
+            .unwrap(),
+            CarriedFit::Position
+        );
+        // L_slow' = min(L_slow, D): a shallow L_slow bounds X₀.
+        let mut shallow = carrying(1, 1, 1, WAD / 4);
+        shallow.liq_slow.set(d / 2);
+        assert_eq!(
+            carried_caps(&shallow, &a, &ctx, WAD / 4, FitAt::Proposal)
+                .unwrap()
+                .x0,
+            u64::try_from(d).unwrap()
+        );
+        // The execution judges without the live X_cand (FitAt::Execution): there X₀ is the
+        // L terms alone — 4·D at WAD/16 — so a withdrawal or a buy wrapped around the execution
+        // (which only lowers X_cand) cannot cancel the window; a position that fits only
+        // because X_cand is not read at the execution is refused by the proposal.
+        let exec = carried_caps(&low, &a, &ctx, WAD / 16, FitAt::Execution).unwrap();
+        assert_eq!(exec.x0, u64::try_from(4 * d).unwrap());
+        let big = carrying(1, at_x + 1, at_x + 1, WAD / 16);
+        assert_eq!(
+            carried_fit(&big, &a, &ctx, Some(WAD / 16), FitAt::Execution).unwrap(),
+            CarriedFit::Fits
+        );
+        let mut withdrawn = a;
+        withdrawn.state.x = x / 2;
+        withdrawn.state.y = y / 2;
+        let ok_q = carrying(1, pos, pos, WAD / 4);
+        assert_eq!(
+            carried_fit(&ok_q, &withdrawn, &ctx, e, FitAt::Proposal).unwrap(),
+            CarriedFit::Position,
+            "the proposer's own withdrawal only refuses its own proposal"
+        );
+        assert_eq!(
+            carried_fit(&ok_q, &withdrawn, &ctx, e, FitAt::Execution).unwrap(),
+            CarriedFit::Fits,
+            "a withdrawal wrapped around the execution cancels nothing"
+        );
+    }
+
+    /// FIT-2 / FITS-1: the fee-scaled caps take `min(min_open_fee_ppm, φ_cand,
+    /// CARRIED_FEE_CAP_PPM)`. Positions opened on a 25 bps pool and carried onto a 1 % candidate
+    /// keep the 25 bps size class (0.75 % of `X₀`), not the candidate's own (its impact cap,
+    /// 2.47 %, binds at 1 %); so do positions margined at 1 % (FITS-1: the ceiling); a lower-fee
+    /// candidate's own fee binds; a zero mark (an account written before the field) is the
+    /// candidate's fee under the ceiling.
+    #[test]
+    fn the_fee_scaled_caps_take_the_lower_of_the_open_fee_and_the_candidates() {
+        let params = Params::defaults();
+        let tiers = TierParams::defaults();
+        let ctx = FitContext {
+            params: &params,
+            tiers: &tiers,
+            oracle: OraclePrice::default(),
+            now: 1_000_000,
+        };
+        let (x, y) = (4_000_000_000_000u64, 1_000_000_000_000u64);
+        let d = 9_978 * 2_000_000_000_000u128 / 10_000;
+        let mut a = adoption(VenueKind::RaydiumCpmm, x, y, d, 1);
+        a.state.fee_ppm = 10_000;
+        let x0 = u64::try_from(2 * d).unwrap();
+        let impact = caps::max_q_position(x0, 500).unwrap();
+        let at_25 = x0 * 75 / 10_000;
+        assert!(at_25 < impact);
+        let e = Some(WAD / 4);
+        let with = |fee: u32, q: u64| {
+            let mut m = carrying(1, q, q, WAD / 4);
+            m.min_open_fee_ppm = fee;
+            m
+        };
+        let phi = |m: &Market, a: &Adoption| {
+            carried_caps(m, a, &ctx, WAD / 4, FitAt::Proposal)
+                .unwrap()
+                .phi_ppm
+        };
+        assert_eq!(phi(&with(2_500, 1), &a), 2_500);
+        assert_eq!(
+            phi(&with(0, 1), &a),
+            2_500,
+            "no mark: the candidate's, under the ceiling"
+        );
+        assert_eq!(
+            phi(&with(10_000, 1), &a),
+            2_500,
+            "1 % → 1 %: the ceiling (FITS-1)"
+        );
+        assert_eq!(phi(&with(1_000, 1), &a), 1_000);
+        let fit = |m: &Market, a: &Adoption, at: FitAt| carried_fit(m, a, &ctx, e, at).unwrap();
+        for at in [FitAt::Proposal, FitAt::Execution] {
+            // Margined at 25 bps: the 25 bps class on the 1 % candidate.
+            assert_eq!(fit(&with(2_500, at_25), &a, at), CarriedFit::Fits);
+            assert_eq!(fit(&with(2_500, at_25 + 1), &a, at), CarriedFit::Position);
+            assert_eq!(fit(&with(2_500, impact), &a, at), CarriedFit::Position);
+            // Margined at 1 % (FITS-1): the 25 bps class too, not the candidate's impact cap.
+            assert_eq!(fit(&with(10_000, at_25), &a, at), CarriedFit::Fits);
+            assert_eq!(fit(&with(10_000, at_25 + 1), &a, at), CarriedFit::Position);
+            assert_eq!(fit(&with(10_000, impact), &a, at), CarriedFit::Position);
+        }
+        // A 25 bps candidate for positions margined at 1 %: its own fee binds.
+        let mut low = a;
+        low.state.fee_ppm = 2_500;
+        assert_eq!(phi(&with(10_000, 1), &low), 2_500);
+        assert_eq!(
+            fit(&with(10_000, at_25 + 1), &low, FitAt::Proposal),
+            CarriedFit::Position
+        );
+        // The per-market fee-scaled cap follows: 1.875 % of X₀ at 25 bps, not 7.5 % at 1 %.
+        let foi = x0 * 1_875 / 100_000;
+        let mut m = carrying(3, foi, at_25, WAD / 4);
+        m.min_open_fee_ppm = 2_500;
+        assert_eq!(fit(&m, &a, FitAt::Proposal), CarriedFit::Fits);
+        m.borrowed_q = foi + 1;
+        assert_eq!(fit(&m, &a, FitAt::Proposal), CarriedFit::Market);
+    }
+
+    /// The caps are those of the tier the market would have on the candidate: a stale oracle
+    /// tiers C; a fresh one with the candidate's liquidity and the market's age another tier,
+    /// whose caps then apply; a list-only market takes the candidate's age.
+    #[test]
+    fn the_fit_uses_the_tier_the_market_would_have_on_the_candidate() {
+        let params = Params::defaults();
+        let mut tiers = TierParams::defaults();
+        // Tier C with a 0.1 % per-position impact cap; A and B keep 5 %.
+        tiers[Tier::C.index()].impact_pos_bps = 10;
+        let now = 2_000_000_000i64;
+        let (x, y) = (4_000_000_000_000u64, 1_000_000_000_000u64);
+        let d = 9_978 * 2_000_000_000_000u128 / 10_000;
+        let a = adoption(VenueKind::RaydiumCpmm, x, y, d, now - 1);
+        let mut m = carrying(1, 0, 0, WAD / 4);
+        m.graduated_at = now - 30 * 86_400;
+        let x0 = u64::try_from(2 * d).unwrap();
+        let q = caps::max_q_position(x0, 10).unwrap() + 1;
+        m.borrowed_q = q;
+        m.max_q_hwm = q;
+        let stale = FitContext {
+            params: &params,
+            tiers: &tiers,
+            oracle: OraclePrice::default(),
+            now,
+        };
+        let l_slow = d;
+        assert_eq!(candidate_tier(&m, &a, &stale, l_slow, WAD / 4), Tier::C);
+        assert_eq!(
+            carried_fit(&m, &a, &stale, Some(WAD / 4), FitAt::Proposal).unwrap(),
+            CarriedFit::Position
+        );
+        // $1,000 per SOL, fresh: Λ ≈ 1,996 SOL ≈ $2 M on a 30-day-old market is not C.
+        let fresh = FitContext {
+            oracle: OraclePrice {
+                price: 100_000_000_000,
+                expo: -8,
+                publish_time: now,
+            },
+            ..stale
+        };
+        let t = candidate_tier(&m, &a, &fresh, l_slow, WAD / 4);
+        assert_ne!(t, Tier::C);
+        assert_eq!(
+            carried_fit(&m, &a, &fresh, Some(WAD / 4), FitAt::Proposal).unwrap(),
+            CarriedFit::Fits
+        );
+        // A list-only market takes the candidate's age (1 s old: C, the tier with the 0.1 % cap).
+        let mut none = m;
+        none.venue = VenueKind::None as u8;
+        assert_eq!(candidate_tier(&none, &a, &fresh, l_slow, WAD / 4), Tier::C);
+        assert_eq!(
+            carried_fit(&none, &a, &fresh, Some(WAD / 4), FitAt::Proposal).unwrap(),
+            CarriedFit::Position
+        );
     }
 
     #[test]

@@ -10,6 +10,7 @@ publish.workspace = true
 shortwin.workspace = true
 shortwin-math.workspace = true
 shortwin-services-common.workspace = true
+shortwin-venue-state.workspace = true
 # The mock venue's account lists (A49): only this test crate turns the feature on.
 shortwin-keeper = { workspace = true, features = ["test-venue"] }
 # The program-test harness (tests/litesvm): Env, the mock market builders, the invariant hooks.

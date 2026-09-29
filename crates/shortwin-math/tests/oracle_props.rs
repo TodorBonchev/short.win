@@ -2,7 +2,8 @@
 //! "own observation never read" (I-E7), directional aggregation, the ring's bucket
 //! extremes and medians, the venue-change rewrite, the liquidation EMA leg (I-E8), exit
 //! references and `max_in` incl. the rent-and-fee seniority of an expiry (I-E2), the
-//! liquidation liveness invariant I-E11, and M4R's post-change warm-up seed P1–P4).
+//! liquidation liveness invariant I-E11, M4R's post-change warm-up seed P1–P4, and M4F-1's
+//! depth cap on the reference liquidity).
 #![allow(clippy::unwrap_used, clippy::arithmetic_side_effects)]
 
 mod common;
@@ -11,6 +12,7 @@ use num_bigint::BigUint;
 use proptest::prelude::*;
 use shortwin_math::bounds::{
     ExitParams, expiry_reference, kappa_eff, liq_reference, max_in_exp, max_in_liq, pi_ref,
+    ref_depth_cap, ref_liquidity,
 };
 use shortwin_math::consts::EMA_TAU_S;
 use shortwin_math::consts::EMA_WARMUP_BUCKETS;
@@ -548,6 +550,104 @@ proptest! {
         prop_assert_eq!(e.is_some(), fresh);
         if let Some(e) = e {
             prop_assert!(e <= o.ema.price && e <= lo && o.ring.iter().all(|x| e <= x.p));
+        }
+    }
+
+    /// Reference liquidity (ECON §8.2, V2-14, M4R, M4F-1): `L_b = max(L_live, min(max(L_ema',
+    /// L_slow), cap))` exactly; never below the live depth; without a cap the M4R form; with one,
+    /// never above `max(L_live, cap)` nor the uncapped value, equal to it while the EMA terms fit
+    /// under the cap, and monotone in the cap; the guard still bounds the EMA term by `L_mlo`.
+    #[test]
+    fn reference_liquidity_properties(l_live in 1u128..10u128.pow(20), l_ema in 1u128..10u128.pow(20),
+                                      l_slow in 1u128..10u128.pow(20), guard in any::<bool>(),
+                                      lows in prop::collection::vec(1u128..10u128.pow(20), 1..=8),
+                                      cap in prop_oneof![1 => Just(0u128), 1 => Just(u128::MAX),
+                                                         6 => 1u128..10u128.pow(20)],
+                                      more in 0u128..10u128.pow(20)) {
+        let mut o = Observation::new(0, 1_000, 1).unwrap();
+        o.ring = Ring::default();
+        for (i, &llo) in lows.iter().enumerate() {
+            o.ring.push(entry(i as i64, 1_000, 1_000, 1_000, llo, llo)).unwrap();
+        }
+        o.ema.liq = l_ema;
+        o.ema.liq_slow = l_slow;
+        o.ema.guard = u8::from(guard);
+        let l_mlo = ring_liq_lower_median(&o.ring).unwrap();
+        let l_e = if guard { l_ema.min(l_mlo) } else { l_ema };
+        let uncapped = ref_liquidity(l_live, &o.ema, &o.ring, None).unwrap();
+        prop_assert_eq!(uncapped, l_live.max(l_e).max(l_slow));
+        let got = ref_liquidity(l_live, &o.ema, &o.ring, Some(cap)).unwrap();
+        prop_assert_eq!(got, l_live.max(l_e.max(l_slow).min(cap)));
+        prop_assert!(got >= l_live && got <= uncapped && got <= l_live.max(cap));
+        if l_e.max(l_slow) <= cap {
+            prop_assert_eq!(got, uncapped);
+        }
+        if guard {
+            prop_assert!(got <= l_live.max(l_mlo).max(l_slow));
+        }
+        let wider = ref_liquidity(l_live, &o.ema, &o.ring, Some(cap.saturating_add(more))).unwrap();
+        prop_assert!(wider >= got);
+    }
+
+    /// M4F-1: on a Raydium pool of depth `H = isqrt(X·Y)` and locked share `λ` (`D` its locked
+    /// depth), EMA terms pushed to any depth — a deposit of `k` times the pool wrapped around
+    /// attacker-only cranks, frozen afterwards — lift the reference by at most `max(1, λ/λ_min)`
+    /// over the live depth: `L_b ≤ max(H, ⌊λ·H/λ_min⌋)`. The cap moves by at most the whole-bps
+    /// floor of `λ` when the same deposit (or a withdrawal of unlocked LP) wraps the exit itself,
+    /// and an honest pool at `λ ≥ λ_min` (EMA terms at `H`) keeps its reference.
+    #[test]
+    fn the_depth_cap_bounds_deposit_inflation(x in 10u64.pow(9)..10u64.pow(16), y in 10u64.pow(9)..10u64.pow(15),
+                                              counter in 10u64.pow(6)..10u64.pow(12), lam in 0u64..=10_000,
+                                              lam_min in 2_000u32..=10_000, k in 1u64..=15,
+                                              push in 1u128..=16, guard in any::<bool>(),
+                                              w_bps in 0u64..=10_000) {
+        let h = (u128::from(x) * u128::from(y)).isqrt();
+        let supply = counter - counter * lam / 10_000;
+        let lam_bps = shortwin_math::pool_select::lambda_bps(counter, supply);
+        let d = shortwin_math::pool_select::locked_depth(counter, supply, x, y).unwrap();
+        let cap = ref_depth_cap(d, lam_min);
+        // The attacker's EMA terms: up to `push`·(1 + k)·H, lows as pushed (the guard cleared by
+        // attacker-only seconds) or honest.
+        let pushed = h * (1 + u128::from(k)) * push;
+        let mut o = Observation::new(0, 1_000, h).unwrap();
+        o.ring = Ring::default();
+        for i in 0..8 {
+            let llo = if guard { h } else { pushed };
+            o.ring.push(entry(i, 1_000, 1_000, 1_000, llo, pushed)).unwrap();
+        }
+        o.ema.liq = pushed;
+        // While the guard is set `L_slow` integrates no more than the lows (M4X-2).
+        o.ema.liq_slow = if guard { h } else { pushed };
+        o.ema.guard = u8::from(guard);
+        let l_b = ref_liquidity(h, &o.ema, &o.ring, Some(cap)).unwrap();
+        let bound = h.max(u128::from(lam_bps) * h / u128::from(lam_min));
+        prop_assert!(l_b <= bound, "L_b {} > max(H, λ·H/λ_min) {} (H {}, λ {}, λ_min {})", l_b, bound, h, lam_bps, lam_min);
+        if guard {
+            prop_assert_eq!(l_b, h, "the guard holds the reference at the lows");
+        }
+        // The same deposit around the exit: D (hence the cap) moves by at most 1 bp of the
+        // depth plus the floors.
+        let (kc, ks) = (counter * k, counter * k);
+        let d_dep = shortwin_math::pool_select::locked_depth(counter + kc, supply + ks, x * (1 + k), y * (1 + k)).unwrap();
+        let h_dep = h * u128::from(1 + k);
+        prop_assert!(d_dep <= d + h_dep / 10_000 + 2, "deposit: D {} -> {}", d, d_dep);
+        // An unlocked LP's withdrawal of `w_bps` of the unlocked (circulating) LP.
+        let w = supply * w_bps / 10_000;
+        if w < counter {
+            let (xw, yw) = (x - (u128::from(x) * u128::from(w) / u128::from(counter)) as u64,
+                            y - (u128::from(y) * u128::from(w) / u128::from(counter)) as u64);
+            let d_wd = shortwin_math::pool_select::locked_depth(counter - w, supply - w, xw, yw).unwrap();
+            prop_assert!(d_wd <= d + h / 10_000 + 2, "withdraw: D {} -> {}", d, d_wd);
+        }
+        // Honest EMA terms at H on a pool at or above λ_min: the cap does not bind.
+        if lam_bps >= lam_min {
+            let mut honest = o;
+            honest.ema.liq = h;
+            honest.ema.liq_slow = h;
+            honest.ema.guard = 0;
+            let slack = h / 10_000 + 1;
+            prop_assert!(cap + slack >= h, "cap {} under H {}", cap, h);
+            prop_assert!(ref_liquidity(h, &honest.ema, &honest.ring, Some(cap)).unwrap() == h);
         }
     }
 

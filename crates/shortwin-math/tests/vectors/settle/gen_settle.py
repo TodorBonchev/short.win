@@ -54,7 +54,10 @@ recorded; tests/settle_vectors.rs documents each layout next to its parser):
   chk     t pid flags leg p_live p_rs lo_ok g P_mlo P_mhi L_mlo L_mhi
                                            (flags: EMA-leg predicate on each ring entry's
                                             cached (x, y), newest first)
-  ref     t pid is_liq l_live L_b P_ref
+  ref     t pid is_liq l_live L_b P_ref cap
+                                           (cap: Market.ref_depth_cap, floor(D*1e4/lambda_min) on a Raydium
+                                            venue, "-" elsewhere; M4F-1: L_b = max(L_live, min(max(L_ema',
+                                            L_slow), cap)))
   maxin   liq b_ref delta V K_s ert max_in | exp b_ref delta eps fee V K_s R ert pi max_in
   settle  t pid path deadline | ema_count P_ema L_ema ema_ts | P_lo P_hi L_lo L_hi
           | R cr_liq ema_leg exec p_rs L_live b_live sigma_live
@@ -321,7 +324,7 @@ def p_exit_ref(self, pos, st, t, is_liq):
         assert r[2] == pref
     self._last_ref = r
     if MODE["full"]:
-        emit(self, line("ref", t, pos.t_open, is_liq, st["L_live"], lb, pref))
+        emit(self, line("ref", t, pos.t_open, is_liq, st["L_live"], lb, pref, self.ref_depth_cap()))
     return r
 
 

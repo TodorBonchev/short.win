@@ -7,7 +7,9 @@
 //! | (a) restart | only an instruction that emits `PoolSwitched` for the market, or a Raydium `create_market`, raises `ema_warm` (to `EMA_WARMUP_BUCKETS`) or sets `ema_guard`; after such an instruction both are `(8, 1)`; a market created on another venue starts `(0, 0)` |
 //! | (b) countdown and seed | across any other instruction `ema_warm` falls by the number of integrations (0 or 1) while it is positive and stays 0 otherwise; a warm-up integration leaves the newest ring entry and the EMA at the §4.1 seed over the newest `8 − ema_warm_after` entries, `p = min(min lo, the largest v0.4.1 step from the pre-instruction P_ema)` (M4X-1: `observe::price_up_bound`, `dt = min(ts − ema_ts, ema_dtmax_s)`), `l = min(max lhi, ⌊lomed(lhi)·(10⁴ + C)/10⁴⌋)` (recomputed here), with `L_slow` and `slow_ts` unchanged |
 //! | (c) gate | no `Liquidate` or `Expire` event, no `SolSettle` of S1/S2 and no `SettleArmed` / `SettleDisarmed` on a market whose post-instruction `ema_warm ≠ 0` while its venue is executable; no Raydium `Open` with `ema_warm ≠ 0` |
-//! | (d) guard | `ema_guard` goes 1 → 0 only at an integration with `ema_warm = 0` after it and `L_ema·10⁴ ≤ L_mlo·10,100` (and does so at every such integration); an integration after the warm-up with the guard set never lifts `L_slow` above `max(L_slow before, L_mlo after)` (M4X-2: `L_slow` integrates `min(lobs, L_mlo)`); on a Raydium market, and on any market while the guard is set, `Liquidate.b_ref` / `Expire.b_ref` are the risk quote at `reprice(max(L_live, L_ema', L_slow), P_ref)`, `L_ema' = min(L_ema, L_mlo)` while the guard is set, else `L_ema` (V2-14). On the mock, which never restarts, the guard-clear case is the exit predictors' (`liquidate_support`), and the hook tests' synthetic exits there carry arbitrary references |
+//! | (d) guard | `ema_guard` goes 1 → 0 only at an integration with `ema_warm = 0` after it and `L_ema·10⁴ ≤ L_mlo·10,100` (and does so at every such integration); an integration after the warm-up with the guard set never lifts `L_slow` above `max(L_slow before, L_mlo after)` (M4X-2: `L_slow` integrates `min(lobs, L_mlo)`); on a Raydium market, and on any market while the guard is set, `Liquidate.b_ref` / `Expire.b_ref` are the risk quote at `reprice(max(L_live, min(max(L_ema', L_slow), cap)), P_ref)`, `L_ema' = min(L_ema, L_mlo)` while the guard is set, else `L_ema` (V2-14), `cap = ⌊pool_d·10⁴/λ_min⌋` on Raydium, none elsewhere (M4F-1). On the mock, which never restarts, the guard-clear case is the exit predictors' (`liquidate_support`), and the hook tests' synthetic exits there carry arbitrary references |
+//!
+//! | (e) spot leg | FITS-2 (a): every `Liquidate` on an executable Raydium venue is CR-liquidatable, and its spot leg is judged at `max(L_live, L_ema')` — `Liquidate.cr_spot_bps` is `⌊V_eff·10⁴/B̂⌋` of the risk quote `B̂ = B̂(Q; reprice(max(L_live, L_ema'), P_rs))` (recomputed here: `L_live` the pre-trade venue's `√(X·Y)`, `L_ema' = min(L_ema, L_mlo)` while the guard is set, else `L_ema`, `P_rs = min(P_live, lb_lo)` fresh within `ref_max_age_s`, `V_eff = V − R_due`) and it is below the position's `L` — so no liquidation lands on a spot leg that only a drained `L_live` makes true. On the mock the exit predictors (`liquidate_support`, the same rule) check it, and the hook tests' synthetic exits there carry arbitrary figures |
 //!
 //! `L_mlo` is the lower median of the ring's bucket liquidity lows. A market that never saw a
 //! restart has `ema_warm = ema_guard = 0` throughout and integrates exactly as before M4R.
@@ -16,12 +18,13 @@ use litesvm::LiteSVM;
 use shortwin::events::{
     Expire, Liquidate, MarketCreated, Open, PoolSwitched, SettleArmed, SettleDisarmed, SolSettle,
 };
-use shortwin::state::{Market, ShortPosition, VenueKind};
+use shortwin::state::{GlobalConfig, Market, ShortPosition, VenueKind};
 use shortwin_math::bounds;
 use shortwin_math::consts::{EMA_WARMUP_BUCKETS, REF_GUARD_TOL_BPS};
 use shortwin_math::num::{Rounding, mul_div};
-use shortwin_math::observe::{Observation, price_up_bound, ring_medians};
+use shortwin_math::observe::{self, Observation, price_up_bound, ring_medians};
 use shortwin_math::quote::liquidity;
+use shortwin_math::rent;
 use solana_clock::Clock;
 
 use super::positions::{MarketPositions, PositionsSnapshot};
@@ -72,6 +75,7 @@ pub fn check_ix(
         }
         gate(mp, &post, ix)?;
         references(svm, mp, &post, ix)?;
+        spot_legs(svm, mp, &post, ix)?;
     }
     Ok(())
 }
@@ -264,9 +268,80 @@ fn gate(mp: &MarketPositions, post: &Market, ix: &ConfirmFacts<'_>) -> Result<()
     })
 }
 
-/// `B̂_ref` of `pos` at `p_ref` with the (guarded) reference liquidity of `post` and the
-/// pre-trade venue `v` (V2-14, M4R).
-fn b_ref_of(pos: &ShortPosition, obs: &Observation, v: &VenueView, p_ref: u128) -> Option<u64> {
+/// (e) FITS-2 (a): a liquidation's spot leg holds at `max(L_live, L_ema')` (module docs).
+fn spot_legs(
+    svm: &LiteSVM,
+    mp: &MarketPositions,
+    post: &Market,
+    ix: &ConfirmFacts<'_>,
+) -> Result<(), Violation> {
+    let market = mp.market;
+    // On the mock the exit predictors (`liquidate_support`) check the spot leg, and the hook
+    // tests' synthetic exits there carry arbitrary figures.
+    if !post.venue_kind().is_some_and(VenueKind::is_raydium) {
+        return Ok(());
+    }
+    let Some(v) = mp.venue.filter(|v| v.executable) else {
+        return Ok(());
+    };
+    let (Some((x, y)), Some(pricing)) = (v.reserves, v.pricing) else {
+        return Ok(());
+    };
+    let obs = post.observation();
+    let now = svm
+        .get_sysvar::<Clock>()
+        .unix_timestamp
+        .max(mp.state.last_accrual_ts);
+    let (x, y) = (u128::from(x), u128::from(y));
+    let l_live = liquidity(x, y).ok();
+    let p_live = shortwin_math::risk::price_wad(x, y).ok();
+    let l_ema = if obs.ema.guard != 0 {
+        obs.ema
+            .liq
+            .min(lomed(obs.ring.iter().map(|e| e.llo).collect()))
+    } else {
+        obs.ema.liq
+    };
+    for e in ix.liquidations.iter().filter(|e| e.market == market) {
+        let Some((_, pos, _)) = mp.positions.iter().find(|(pk, _, _)| *pk == e.position) else {
+            continue;
+        };
+        let l_spot = l_live.map(|l| l.max(l_ema));
+        let p_rs = p_live.and_then(|p| observe::robust_spot(p, &obs.last, now, pos.ref_max_age_s));
+        let b = match (l_spot, p_rs) {
+            (Some(l), Some(p)) => pricing
+                .capped(u64::from(pos.venue_fee_hard_cap_bps))
+                .buy_repriced(pos.q, l, p)
+                .map(|b| b.cost),
+            _ => None,
+        };
+        let r_due = rent::due(&pos.pos_rent(), &post.basis()).unwrap_or(u64::MAX);
+        let v_eff = shortwin_math::risk::v_eff(pos.v, r_due);
+        let want = shortwin_math::risk::cr_bps(v_eff, b).unwrap_or(u64::MAX);
+        ensure(
+            e.cr_spot_bps == want && u128::from(want) < u128::from(pos.cr_liq_bps),
+            "I18",
+            || {
+                format!(
+                    "market {market}: Liquidate {} cr_spot_bps {}, want {want} < L {} at                      max(L_live {l_live:?}, L_ema' {l_ema}) and P_rs {p_rs:?} (FITS-2)",
+                    e.position, e.cr_spot_bps, pos.cr_liq_bps
+                )
+            },
+        )?;
+    }
+    Ok(())
+}
+
+/// `B̂_ref` of `pos` at `p_ref` with the (guarded, on Raydium capped) reference liquidity of
+/// `post` and the pre-trade venue `v` (V2-14, M4R, M4F-1). `cap` is `⌊pool_d·10⁴/λ_min⌋` on a
+/// Raydium market (recomputed here from the market's `pool_d` and the config), `None` elsewhere.
+fn b_ref_of(
+    pos: &ShortPosition,
+    obs: &Observation,
+    v: &VenueView,
+    p_ref: u128,
+    cap: Option<u128>,
+) -> Option<u64> {
     let (x, y) = v.reserves?;
     let l_live = liquidity(u128::from(x), u128::from(y)).ok()?;
     let l_ema = if obs.ema.guard != 0 {
@@ -274,9 +349,10 @@ fn b_ref_of(pos: &ShortPosition, obs: &Observation, v: &VenueView, p_ref: u128) 
     } else {
         obs.ema.liq
     };
-    let l_b = l_live.max(l_ema).max(obs.ema.liq_slow);
+    let credited = l_ema.max(obs.ema.liq_slow);
+    let l_b = l_live.max(cap.map_or(credited, |c| credited.min(c)));
     // The program's own function agrees with the recomputation above.
-    if bounds::ref_liquidity(l_live, &obs.ema, &obs.ring).ok()? != l_b {
+    if bounds::ref_liquidity(l_live, &obs.ema, &obs.ring, cap).ok()? != l_b {
         return None;
     }
     v.pricing?
@@ -304,6 +380,21 @@ fn references(
         .get_sysvar::<Clock>()
         .unix_timestamp
         .max(mp.state.last_accrual_ts);
+    // M4F-1: on Raydium the EMA terms are capped at ⌊D·10⁴/λ_min⌋, D the locked depth the
+    // exit's prologue refreshed (`pool_d`).
+    let cap = if post.venue_kind().is_some_and(VenueKind::is_raydium) {
+        let Some(config) = read::zc::<GlobalConfig>(svm, &crate::pda::config()) else {
+            return fail("I18", format!("market {market}: no config"));
+        };
+        let lam = u128::from(config.params.pool_lock_min_bps);
+        Some(if lam == 0 {
+            0
+        } else {
+            mul_div(post.pool_d.get(), 10_000, lam, Rounding::Floor).unwrap_or(u128::MAX)
+        })
+    } else {
+        None
+    };
     let pos_of = |k: &anchor_lang::prelude::Pubkey| {
         mp.positions
             .iter()
@@ -314,7 +405,7 @@ fn references(
         let Some(pos) = pos_of(&e.position) else {
             continue;
         };
-        let want = b_ref_of(&pos, &obs, &v, e.p_ref);
+        let want = b_ref_of(&pos, &obs, &v, e.p_ref, cap);
         ensure(want == Some(e.b_ref), "I18", || {
             format!(
                 "market {market}: Liquidate {} b_ref {} at p_ref {}, want {want:?} (guard {}, \
@@ -331,7 +422,7 @@ fn references(
             bounds::expiry_reference(&obs.ema, &obs.ring, &obs.last, now, &pos.exit_params())
                 .ok()
                 .flatten();
-        let want = p_ref.and_then(|p| b_ref_of(&pos, &obs, &v, p));
+        let want = p_ref.and_then(|p| b_ref_of(&pos, &obs, &v, p, cap));
         ensure(want == Some(e.b_ref), "I18", || {
             format!(
                 "market {market}: Expire {} b_ref {}, want {want:?} at P_ref {p_ref:?} (guard {})",

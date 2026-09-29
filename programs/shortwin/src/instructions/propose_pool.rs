@@ -9,8 +9,9 @@
 //! collection window (improvements only while the chain that armed it holds, M4-SEC-2), which
 //! `execute_pool_switch` resolves.
 //!
-//! **Accounts:** `config`, `venue_guard` (read; below), `market` (mut), `mint`, event accounts.
-//! No signer: anyone may call it (the transaction's fee payer pays).
+//! **Accounts:** `config`, `venue_guard` (read; below), `market` (mut), `mint`, `oracle_cache`
+//! (read: the tier of a window candidate, step 6), event accounts. No signer: anyone may call it
+//! (the transaction's fee payer pays).
 //!
 //! **Remaining** (every slot mandatory and key-checked, ARCH §3.0):
 //!
@@ -64,24 +65,35 @@
 //!    pools. A proposal judges it at `min(P_ema, P_cand)` (`pool_select::window_price`, M4R-2,
 //!    **PROPOSED**: `P_ema` is frozen while the incumbent cannot execute, and after a dump a
 //!    pool far under the floor passed at it); the execution again at `P_ema`. A proposer's dump
-//!    around its own proposal only hurts that proposal.
+//!    around its own proposal only hurts that proposal. And **switch only if all fit** (owner
+//!    decision of 2026-09-29; `pool_select::carried_fit`): every open position — bounded in O(1)
+//!    by `min(max_q_hwm, ΣB_Q)` — fits the candidate's per-position impact and fee-scaled size caps
+//!    on its conservative locked-depth `X₀`, and `ΣB_Q` its per-market impact and fee-scaled OI
+//!    caps (the fee-scaled caps at `min(min_open_fee_ppm, φ_cand, CARRIED_FEE_CAP_PPM)`, the fee
+//!    the positions were margined at if lower, and never above 25 bps; FIT-2, FITS-1), on the
+//!    tier the market would have on it, at `min(P_ema,
+//!    P_cand)` and at `P_ema` (a
+//!    dump around the proposal lowers `P_cand` and would loosen `X₀`), with the candidate's live
+//!    token reserve as an open reads it (`FitAt::Proposal`: the proposer's own transaction), else
+//!    `CarriedPositionsTooLarge` (a window with no open position fits trivially).
 //!
 //! **Errors:** `AccountMismatch`, `BadRemainingAccounts`, `VenueAccountMismatch`,
 //! `NoSupportedVenue`, `PumpVenuePrecedence` (and `classify_pump`'s `CurveMayhemUnsupported`,
 //! `CurveQuoteNotSol`, `CurveNeedsExtend`), `VenueUpgraded`, `PoolIneligible`, `PoolTooThin`,
-//! `PoolNotDominant`, `PositionsOpen`, `PoolWindowClosed`.
+//! `PoolNotDominant`, `PositionsOpen`, `PoolWindowClosed`, `CarriedPositionsTooLarge`.
 
 use anchor_lang::prelude::*;
 use shortwin_math::pool::Vault;
 
 use crate::constants::{CONFIG_VERSION, MARKET_VERSION};
 use crate::engine::guard;
-use crate::engine::pool_select::{self, Proposal, SelectParams, Situation};
+use crate::engine::pool_select::{self, FitAt, Proposal, SelectParams, Situation};
 use crate::engine::prologue;
 use crate::errors::ShortwinError;
 use crate::events::{PoolProposed, PoolSwitched, POOL_KIND_FAST};
 use crate::state::{
-    raydium_cache, GlobalConfig, Market, VenueGuard, VenueKind, MARKET_FLAG_GRADUATED_ELSEWHERE,
+    raydium_cache, GlobalConfig, Market, OracleCache, VenueGuard, VenueKind,
+    MARKET_FLAG_GRADUATED_ELSEWHERE,
 };
 use crate::venues::detect::{self, PumpClass};
 use crate::venues::{self, VenueState};
@@ -110,6 +122,11 @@ pub struct ProposePool<'info> {
     /// CHECK: `== market.mint` (`has_one`) and owned by the market's token program (checked in
     /// the handler); the candidate's token side must be this mint under that program.
     pub mint: UncheckedAccount<'info>,
+    /// The cached SOL/USD price: the tier the market would have on a window candidate, whose
+    /// opening caps its open positions must fit ("switch only if all fit"; module docs step 6).
+    /// Read only.
+    #[account(seeds = [OracleCache::SEED], bump = oracle_cache.bump)]
+    pub oracle_cache: Box<Account<'info, OracleCache>>,
 }
 
 /// The candidate kind of `propose_pool`'s argument: AMM v4 or CPMM (`NoSupportedVenue`
@@ -289,6 +306,14 @@ pub fn handler<'info>(ctx: Context<'info, ProposePool<'info>>, candidate_kind: u
                     pool_select::window_price(p_ref, &adoption)
                 ),
                 ShortwinError::PoolTooThin
+            );
+            // Switch only if all fit (owner decision of 2026-09-29): every open position and the
+            // market's OI fit the candidate's normal opening caps, at `min(P_ema, P_cand)` and at
+            // `P_ema`, on the tier the market would have on it.
+            let fit = pool_select::FitContext::of(&config, &ctx.accounts.oracle_cache, pro.now);
+            require!(
+                pool_select::carried_fit(&market, &adoption, &fit, p_ref, FitAt::Proposal)?.fits(),
+                ShortwinError::CarriedPositionsTooLarge
             );
             pool_select::record_window(&mut market, &adoption, pro.now, open);
             let event = PoolProposed {

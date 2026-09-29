@@ -371,4 +371,85 @@ proptest! {
         }
         prop_assert!(!caps::curve_gamma_ok(sq, m + 1, rt, g).unwrap());
     }
+
+    /// "Switch only if all fit" (`caps::carried_fit`): with the O(1) bound
+    /// `carried_q_bound(max_q_hwm, ΣQ)` of a high-water mark at or above every open `q`, a fit
+    /// is sound — every open `q` passes both per-position checks of an open on `X₀`
+    /// (`max_q_position`, `fee_size_cap`, each against its big-integer form) and `ΣQ` the OI cap
+    /// at `X₁ = X₀` — and with the mark at the largest open `q` it is exact. A larger `X₀` never
+    /// turns a fit into a refusal.
+    #[test]
+    fn carried_fit_is_sound_and_exact_at_the_mark(
+        qs in proptest::collection::vec(1u64..10u64.pow(13), 1..8),
+        over in prop_oneof![Just(0u64), 1u64..10u64.pow(13)],
+        x0 in prop_oneof![0u64..10u64.pow(15), any::<u64>()],
+        grow in 0u64..10u64.pow(14),
+        ip in 0u32..=1_000, im in 0u32..=5_000, phi in 0u32..=200_000,
+        fs in prop_oneof![Just(0u32), 100u32..=500], fo in prop_oneof![Just(0u32), 300u32..=1_000],
+    ) {
+        let sum: u64 = qs.iter().sum();
+        let max = *qs.iter().max().unwrap();
+        let c = caps::CarriedCaps { x0, impact_pos_bps: ip, impact_mkt_bps: im, phi_ppm: phi,
+                                    fee_size_cap_x100: fs, fee_oi_cap_x100: fo };
+        let hwm = max.saturating_add(over);
+        let bound = caps::carried_q_bound(hwm, sum);
+        prop_assert!(bound >= max && bound <= sum);
+        let fit = caps::carried_fit(bound, sum, &c).unwrap();
+        let root = (b(x0) * b(x0) * (10_000u64 + u64::from(ip)) / 10_000u32).sqrt();
+        let pos_ref = (root - b(x0)).min(b(u64::MAX));
+        let fee_ref = (fs > 0).then(|| (b(x0) * b(phi) * fs / 100_000_000u32).min(b(u64::MAX)));
+        let oi = caps::oi_cap(x0, im, phi, fo).unwrap();
+        let q_ok = |q: u64| b(q) <= pos_ref && fee_ref.as_ref().is_none_or(|f| b(q) <= *f);
+        if fit.fits() {
+            prop_assert!(qs.iter().all(|&q| q_ok(q)));
+            prop_assert!(sum <= oi);
+        }
+        let exact = caps::carried_fit(caps::carried_q_bound(max, sum), sum, &c).unwrap();
+        let want = if !q_ok(max) {
+            caps::CarriedFit::Position
+        } else if sum > oi {
+            caps::CarriedFit::Market
+        } else {
+            caps::CarriedFit::Fits
+        };
+        prop_assert_eq!(exact, want);
+        if exact.fits() {
+            let bigger = caps::CarriedCaps { x0: x0.saturating_add(grow), ..c };
+            prop_assert!(caps::carried_fit(max, sum, &bigger).unwrap().fits());
+        }
+    }
+
+    /// FIT-2 / FITS-1 (`caps::open_fee_mark`, `caps::carried_phi`): folded over the opens since the
+    /// market emptied, the open-fee mark is the lowest fee an open paid (0 only if an open paid 0);
+    /// the carried fit's fee is at most the candidate's, at most every open's and at most
+    /// `CARRIED_FEE_CAP_PPM`, so a fit at it is a fit at the candidate's own fee, at the fee each
+    /// open position posted its margin at and at the 25-bps ceiling (the fee-scaled caps grow with
+    /// φ; the impact caps do not read it).
+    #[test]
+    fn the_carried_fee_is_never_above_an_open_fee_nor_the_candidates(
+        fees in proptest::collection::vec(1u32..=100_000, 1..8),
+        cand in 0u32..=100_000,
+        qs in proptest::collection::vec(1u64..10u64.pow(13), 1..8),
+        x0 in prop_oneof![0u64..10u64.pow(15), any::<u64>()],
+        ip in 0u32..=1_000, im in 0u32..=5_000,
+        fs in prop_oneof![Just(0u32), 100u32..=500], fo in prop_oneof![Just(0u32), 300u32..=1_000],
+    ) {
+        let mark = fees.iter().fold(0u32, |m, &f| caps::open_fee_mark(m, f));
+        prop_assert_eq!(mark, *fees.iter().min().unwrap());
+        let ceiling = shortwin_math::consts::CARRIED_FEE_CAP_PPM;
+        let phi = caps::carried_phi(mark, cand);
+        prop_assert_eq!(phi, mark.min(cand).min(ceiling));
+        prop_assert_eq!(caps::carried_phi(0, cand), cand.min(ceiling));
+        let sum: u64 = qs.iter().sum();
+        let max = *qs.iter().max().unwrap();
+        let at = |phi_ppm: u32| caps::CarriedCaps { x0, impact_pos_bps: ip, impact_mkt_bps: im,
+                                                    phi_ppm, fee_size_cap_x100: fs, fee_oi_cap_x100: fo };
+        if caps::carried_fit(max, sum, &at(phi)).unwrap().fits() {
+            prop_assert!(caps::carried_fit(max, sum, &at(cand)).unwrap().fits());
+            prop_assert!(caps::carried_fit(max, sum, &at(ceiling)).unwrap().fits());
+            for &f in &fees {
+                prop_assert!(caps::carried_fit(max, sum, &at(f)).unwrap().fits());
+            }
+        }
+    }
 }

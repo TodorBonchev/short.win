@@ -55,9 +55,10 @@
 //!     r_min` (`rent::min_rent` at the post-roll `P_ema` and the pre-open utilisation),
 //!     `t_open, deadline`, every locked term (`ShortPosition::lock_terms`), arming 0.
 //! 13. The market: `pool::borrow(q, release_at)`, the position aggregates
-//!     (`engine::waterfall::add_position`), `exposure.q_open += q`. Post-conditions: the leg's
-//!     trader state (I7), `pool_vault.amount ≥ T`, the vault floor (I2), utilisation ≤ cap
-//!     (I5).
+//!     (`engine::waterfall::add_position`: `ΣB_Q`, `A_j`, the counts, the high-water mark of `q`
+//!     and the low-water mark of the step-6 fee φ, `min_open_fee_ppm`), `exposure.q_open += q`.
+//!     Post-conditions: the leg's trader state (I7), `pool_vault.amount ≥ T`, the vault floor
+//!     (I2), utilisation ≤ cap (I5).
 //! 14. Event `Open` (and `TraderSwept` if the normalisation moved anything).
 //!
 //! The position's bump is Anchor's canonical one (`bump` in the `init` constraint): ARCH §3.4
@@ -176,6 +177,9 @@ struct Staged {
     kink: u32,
     ema_xy: (u128, u128),
     market_bump: u8,
+    /// The venue's one-way fee φ the caps were computed at (step 6): the market's
+    /// `min_open_fee_ppm` low-water mark takes it (step 13; FIT-2).
+    phi_ppm: u32,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -345,6 +349,7 @@ pub fn handler<'info>(
                 kink: market.util_kink_bps,
                 ema_xy: market.newest_ring_xy(),
                 market_bump: market.bump,
+                phi_ppm: state.fee_ppm,
             },
             rem,
         )
@@ -363,6 +368,7 @@ pub fn handler<'info>(
         kink,
         ema_xy,
         market_bump,
+        phi_ppm,
     } = st;
 
     // ---- phase 2: step 8, the sell leg ---------------------------------------------------
@@ -529,7 +535,7 @@ pub fn handler<'info>(
     let (t_after, tracked) = {
         let mut market = ctx.accounts.market.load_mut()?;
         let mut aggr = market.aggr();
-        waterfall::add_position(&mut market, &mut aggr, &pos_snapshot)?;
+        waterfall::add_position(&mut market, &mut aggr, &pos_snapshot, phi_ppm)?;
         market.set_aggr(&aggr);
         market.set_pool(&pool);
         let mut va = ctx.accounts.market_vault.load_mut()?;

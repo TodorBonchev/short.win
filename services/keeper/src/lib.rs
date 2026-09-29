@@ -4,10 +4,17 @@
 //!
 //! 1. **Observation coverage** ([`coverage`]): one observation per second on every market with
 //!    a position near a threshold (live CR below 1.3·L, deadline within 60 s, armed) or with
-//!    `|P_spot/P_ema − 1| > 2 %`; otherwise every 30 s for markets with open positions; every
-//!    30 s without a route (the continuous S3 chain; duty 5).
+//!    `|P_spot/P_ema − 1| > 2 %`, or, after a pool switch, through the post-change warm-up and
+//!    for as long as the reference guard is set (`ema_guard == 1`, M4F-1); otherwise every 30 s
+//!    for markets with open positions; every 30 s without a route (the continuous S3 chain;
+//!    duty 5).
 //! 2. **Deviation bursts**: after a foreign observation deviating from the keeper's own view
-//!    by more than 2 %, one observation every slot for 60 s.
+//!    by more than 2 % in price, one observation every slot for 60 s (M4F-1's per-slot liquidity
+//!    bursts stay reverted: M4G-2). **Liquidity coverage** (FITS-2 (b)): on a market with open
+//!    positions, a foreign bucket liquidity more than 2 % off the keeper's own `√(X·Y)` (an
+//!    LP-wrapped crank) starts one observation **per second** for `liq_cover_s` (10 s), extended
+//!    while it recurs — no attacker-only second while an attacker keeps wrapping, at one keeper
+//!    transaction per attacker transaction; never on a market without positions.
 //! 3. **Liquidate** at the first executable second (the fixed δ bound, retried each second on
 //!    `ExitBoundNotMet`); **expire** when the expiry bound is met. Always simulated first.
 //! 4. **`sol_settle`** every second for armed positions and positions without a normal

@@ -8,7 +8,7 @@
 //! | Test | Finding and what is asserted now |
 //! |---|---|
 //! | `m4v_1_*` | the listing floor admitted fully locked pools of 12.5–25 SOL, so the fast path moved an open position onto a 20- or 13-SOL pool with no manipulation. A window's candidate now needs its **locked SOL alone** at `P_ema` to reach `pool_min_real_sol` (the window floor): both are refused `PoolTooThin`, a 26-SOL one is adopted; a list-only market with no position still adopts the 20-SOL pool (the listing floor keeps its `/λ_min`) |
-//! | `m4v_2_*` | a deposit around the recording proposal halved the recorded `λ` and doubled `L_ema` and the ring of a λ 99.78 % pool. Since M4R an adoption reads no sample: deposits around the proposal, the execution or both change nothing — `L_ema` is the anchor at the adoption and the pool's depth after the warm-up, the box narrow from the gate on; the underwater position is liquidated at adoption + 9 s with and without the pushes (`m4v_2b`); a deposit-wrapped crank every second (a capital freeze of `L_ema`) does not block the liquidation of a big position — the reference guard keeps `B̂_ref` on the ring's lows (`m4v_2c`) |
+//! | `m4v_2_*` | a deposit around the recording proposal halved the recorded `λ` and doubled `L_ema` and the ring of a λ 99.78 % pool. Since M4R an adoption reads no sample: deposits around the proposal, the execution or both change nothing — `L_ema` is the anchor at the adoption and the pool's depth after the warm-up, the box narrow from the gate on; the underwater position is liquidated at adoption + 9 s with and without the pushes (`m4v_2b`); a deposit-wrapped crank every second (a capital freeze of `L_ema`) does not block the liquidation of the largest position the candidate takes (switch only if all fit, owner decision of 2026-09-29: 95 % of its per-position cap; as built the incumbent's size cap, ≈ 1.9 % of the candidate's `X`, was carried) — the reference guard keeps `B̂_ref` on the ring's lows (`m4v_2c`) |
 //! | `m4v_3_*` | an honest fast path onto a candidate with `λ < λ_min` wrote `D/λ_min` (half its depth at λ 25 %) and left the box wide for about 20 s. Since M4R the warm-up seeds its depth: `L_ema = √(X·Y)` ±1 % at the gate and the box ≤ 1 % from then on, for λ 99.78 %, 50 % and 25 %; no exit lands during the warm-up (`EmaWarmingUp`, `sol_settle` a no-op); an attacker withdraw-wrapping cranks and liquidations every second on the λ 25 % pool liquidates nothing |
 //! | `m4v_4_*` | a flag on the window candidate's program cancels the window instead of reverting; the chain stays armed, a proposal on the other program opens a new window at once and is adopted well before the S3 wait |
 //! | `m4v_5_*` | a list-only market captured through `[buy, propose, sell]` starts its price state at the pushed spot, marked (M4R); the first open (plain or `[buy, open, sell]`) is refused `EmaWarmingUp` until the post-change warm-up is over (`ema_warm == 0`: 8 integrations after the adoption, which re-seed `P_ema` from the honest bucket lows), and then the pushed open is refused on `R_eff` / the spot-EMA check; the main pool then replaces the capture (no pin) |
@@ -518,8 +518,12 @@ fn m4v_2b_the_wrapped_record_only_delays_the_liquidation() {
 }
 
 /// A planted, fully locked AMM v4 incumbent of 100 SOL at Fartcoin's price with one position of
-/// the largest size that opens (up to 0.74 % of its reserve), then halted.
-fn small_market_with_big_position() -> (
+/// the largest size that opens (up to 0.74 % of its reserve) **and fits the candidate** `cand`
+/// (switch only if all fit: at most 95 % of its per-position cap; `cand` is planted and moved by
+/// the caller's `plant` before the open), then halted.
+fn small_market_with_big_position(
+    plant_cand: impl FnOnce(&mut common::Env, &common::AnyPool) -> common::AnyPool,
+) -> (
     common::Env,
     common::RayMarket,
     common::Borrower,
@@ -541,10 +545,12 @@ fn small_market_with_big_position() -> (
     let (x_inc, _) = inc
         .io_reserves(&env.svm, shortwin_math::fees::Direction::Sell)
         .unwrap();
+    let cand = plant_cand(&mut env, &base);
+    let cap = shortwin_litesvm_tests::pool_select::carried_caps(&env, &cand).0 / 100 * 95;
     let mut b = env.borrower();
     let mut opened = None;
     for bps in [74u64, 72, 70, 65, 60, 50, 40, 25] {
-        let q = (u128::from(x_inc) * u128::from(bps) / 10_000) as u64;
+        let q = ((u128::from(x_inc) * u128::from(bps) / 10_000) as u64).min(cap);
         let (res, nonce) = env.open(&rm, &mut b, q);
         if res.is_ok() {
             opened = Some(nonce);
@@ -554,18 +560,22 @@ fn small_market_with_big_position() -> (
     let nonce = opened.expect("an open");
     crank_every(&mut env, &rm, 1, 3);
     halt(&mut env, &rm.pool);
-    (env, rm, b, nonce, base)
+    (env, rm, b, nonce, cand)
 }
 
 /// **M4V-2 (c)** (M4R: the capital freeze and the reference guard, O18 residual 2). The largest
-/// position the open caps allow on a 100-SOL incumbent (≈ 1.3 % of the candidate's token reserve
-/// before the pump, ≈ 1.9 % after it: a fast-path candidate holds at least 25 % of the incumbent's
-/// depth) moves onto a fully locked 30-SOL candidate on which the token doubled during the halt; from the adoption on, an attacker with capital wraps a crank in
+/// position a fully locked 30-SOL candidate on which the token doubled during the halt takes
+/// (switch only if all fit: 95 % of its per-position cap, ≈ 0.5 % of its token reserve after the
+/// pump; as built the largest the 100-SOL incumbent's caps allowed, ≈ 1.9 %, was carried) moves
+/// onto it; from the adoption on, an attacker with capital wraps a crank in
 /// `[deposit as much LP as the pool holds, crank, withdraw]` every second (the keeper cranks every
 /// second too). The warm-up seeds `L_ema` from the pushed highs (≈ 2× the pool's depth) and the
 /// guard stays set (the lows are honest); the position is liquidated nevertheless — no S1 — and
 /// its `Liquidate.b_ref` is the risk quote at `L_b = max(L_live, min(L_ema, L_mlo), L_slow)`, not at
 /// the pushed `L_ema` (which, without the guard, would have made the reference cheaper).
+/// The candidate's price during the halt, bps of the pre-halt spot (M4V-2c).
+const PUMP_BPS: u128 = 20_000;
+
 #[test]
 fn m4v_2c_a_deposit_freeze_does_not_block_the_liquidation() {
     use shortwin::events::{Liquidate, SolSettle};
@@ -577,8 +587,12 @@ fn m4v_2c_a_deposit_freeze_does_not_block_the_liquidation() {
     use crate::helpers::*;
     use crate::support::*;
 
-    let (mut env, rm, b, nonce, base) = small_market_with_big_position();
-    let cand = sized(&mut env, Plant::Cpmm, &base, 10_000, 30_000_000_000);
+    let (mut env, rm, b, nonce, cand) = small_market_with_big_position(|env, base| {
+        let cand = sized(env, Plant::Cpmm, base, 10_000, 30_000_000_000);
+        let c0 = helpers::spot(env, &cand);
+        pump_to(env, &cand, c0, PUMP_BPS);
+        cand
+    });
     let AnyPool::Cpmm(cp) = cand else {
         unreachable!()
     };
@@ -600,11 +614,9 @@ fn m4v_2c_a_deposit_freeze_does_not_block_the_liquidation() {
     .and_then(|v| v.pricing)
     .expect("the candidate's fees");
     println!(
-        "M4V-2c: q = {:.2} % of the candidate's token reserve",
+        "M4V-2c: q = {:.2} % of the candidate's token reserve (after the pump)",
         q as f64 * 100.0 / x_c as f64
     );
-    let c0 = helpers::spot(&env, &cand);
-    pump_to(&mut env, &cand, c0, 20_000);
     crank_every(&mut env, &rm, 30, 5);
     window_ok(&mut env, &rm.pool, &cand);
     crank_every(&mut env, &rm, 30, 2);
@@ -666,7 +678,13 @@ fn m4v_2c_a_deposit_freeze_does_not_block_the_liquidation() {
                     .buy_repriced(pos.q, l_b, e.p_ref)
                     .map(|b| b.cost)
             };
-            let guarded = l_live.max(obs.ema.liq.min(l_mlo)).max(obs.ema.liq_slow);
+            // M4F-1: the EMA terms capped at ⌊D·10⁴/λ_min⌋ on Raydium.
+            let m_now = env.market(&rm.market());
+            let cap = shortwin_math::bounds::ref_depth_cap(
+                m_now.pool_d.get(),
+                env.config().params.pool_lock_min_bps,
+            );
+            let guarded = l_live.max(obs.ema.liq.min(l_mlo).max(obs.ema.liq_slow).min(cap));
             let pushed = l_live.max(obs.ema.liq).max(obs.ema.liq_slow);
             assert_eq!(
                 quote_at(guarded),

@@ -129,8 +129,9 @@ pub struct Close {
     pub token_surplus: u64,
 }
 
-/// `liquidate`. `cr_spot_bps` is the robust spot leg's CR (`CR(V_eff, B̂(Q; reprice(L_live,
-/// P_rs)))` at the risk fee), `cr_ema_bps` the newest ring entry's (its cached `(x, y)`);
+/// `liquidate`. `cr_spot_bps` is the robust spot leg's CR (`CR(V_eff, B̂(Q; reprice(max(L_live,
+/// L_ema'), P_rs)))` at the risk fee; FITS-2), `cr_ema_bps` the newest ring entry's (its cached
+/// `(x, y)`);
 /// `b_live` is the execution quote the leg was bounded by (I13). `b_live_risk` (the live
 /// quote at the risk fee, the penalty's base with `b_ref`) and `max_in` (I11: `B ≤ max_in +
 /// ert`) are M2 additions to ARCH §3.10's field list.

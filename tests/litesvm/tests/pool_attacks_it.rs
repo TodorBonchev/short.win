@@ -20,7 +20,7 @@
 //! | `griefing` | a standing minimum position pinning the pool (R4B-10, disclosed) | `PositionsOpen` across an atomic expire-and-reopen at the deadline; the Emergency pause of opens is the remedy: the market drains and the dominant pool is adopted at `open_positions == 0` |
 //! | `sides` | base/quote-swapped and non-WSOL candidates | the SOL side is derived from the verified mint fields (all four orders adopted, `P_ema` = every pool's spot, a round trip on the last); look-alike quotes (a fake WSOL, a stablecoin, the Token-2022 native mint, the token itself, WSOL twice), WSOL under Token-2022, vault fields that disagree with the mint fields and a WSOL vault the pool authority does not own are refused |
 //! | `latched` | candidates while a Raydium upgrade is flagged | `VenueUpgraded` for every adoption and window candidate on the flagged program, none on the other (M4-SEC-8), `[flag, propose]` refused whole and `[propose, flag]` not; a cancellation and an exit are not latched, and a window whose candidate's program is flagged is cancelled with the chain still armed (M4V-4); adoption after `revalidate_venue` |
-//! | `mid_position` | switching under open positions | `venue_switch.py`'s fast-path rows (RA, RB, RC: halt → fast path to a 25 % pool → a 2× pump over 120 s) on pools of ≈ 38,000, 3,800 and 380 SOL: liquidation, lenders whole; the settlement box ≤ 1 % wide in `L` in every one of the 60 s after the change, against 5 s for the v0.3 carry-over replayed on the same ring; no atomic liquidation or settlement through a mispriced adopted pool, and none before `liq_persist_n` / `settle_persist_n` of a held price; locked terms and EMA continuity across two fast paths |
+//! | `mid_position` | switching under open positions | `venue_switch.py`'s fast-path rows (RA, RB, RC: halt → fast path to a 25 % pool → a 2× pump over 120 s) on pools of ≈ 38,000, 3,800 and 380 SOL: liquidation, lenders whole (switch only if all fit: on RC the default size is above the 25 % pool's per-position cap, so the row carries 90 % of that cap); the settlement box ≤ 1 % wide in `L` in every one of the 60 s after the change, against 5 s for the v0.3 carry-over replayed on the same ring; no atomic liquidation or settlement through a mispriced adopted pool, and none before `liq_persist_n` / `settle_persist_n` of a held price; locked terms and EMA continuity across two fast paths |
 //!
 //! `-- --nocapture` prints the measured figures (the capture's donation, the tripwires, the
 //! wash-trading cost, the box widths and exits of the three rows, the held-price timeline).
@@ -584,17 +584,20 @@ mod lambda_games {
     /// which a swap does not move (`D` grows by the fee only), so the candidate is adopted. A
     /// proposal made inside such a round trip judges the window floor at `min(P_ema, P_cand)`
     /// (M4R-2): the dump only hurts that proposal (`PoolTooThin`); the keeper's plain proposal
-    /// opens the window.
+    /// opens the window. The position is sized to fit the candidate (switch only if all fit: the
+    /// default size, 0.25 % of the incumbent's `X`, is above a 30 % pool's cap), and the
+    /// execution judges the fit on the terms the round trip cannot move.
     #[test]
     fn a_round_trip_under_the_sol_floor_no_longer_cancels_the_fast_path() {
         use shortwin::events::{PoolProposed, PoolSwitched};
         let (mut env, rm, q) = row_market(100);
+        let lam = lambda_of(&env, &rm.pool);
+        let cand = plant(&mut env, &rm.pool, Plant::Cpmm, true, (30, 100), lam);
         let mut b = env.borrower();
+        let q = fit_q(&env, &cand, q);
         open_ok(&mut env, &rm, &mut b, q);
         crank_every(&mut env, &rm, 1, 3);
         halt(&mut env, &rm.pool);
-        let lam = lambda_of(&env, &rm.pool);
-        let cand = plant(&mut env, &rm.pool, Plant::Cpmm, true, (30, 100), lam);
         crank_every(&mut env, &rm, 30, 5);
         let min = env.config().params.pool_min_real_sol;
         let (_, y) = cand.io_reserves(&env.svm, Direction::Sell).unwrap();
@@ -1523,12 +1526,22 @@ mod mid_position {
     fn fast_path_row(row: &str, scale: u64) {
         let (mut env, rm, q) = row_market(scale);
         crank_every(&mut env, &rm, 1, 10);
+        let lam = lambda_of(&env, &rm.pool);
+        let cand = plant(&mut env, &rm.pool, Plant::Cpmm, true, (2_501, 10_000), lam);
+        // Switch only if all fit: the default size (min(X/400, 2 SOL)) fits a 25 % pool on RA and
+        // RB; on RC (≈ 380 SOL) 0.25 % of the incumbent's X is above the candidate's cap (0.75 %
+        // of its conservative X₀), so the row carries 90 % of that cap.
+        let q_row = fit_q(&env, &cand, q);
+        println!(
+            "{row}: default q {q}, carried q {q_row} ({:.0} % of the default)",
+            q_row as f64 * 100.0 / q as f64
+        );
+        assert_eq!(q_row < q, row == "RC", "{row}");
+        let q = q_row;
         let mut b = env.borrower();
         let (open, nonce, _) = open_ok(&mut env, &rm, &mut b, q);
         crank_every(&mut env, &rm, 1, 10);
-        let lam = lambda_of(&env, &rm.pool);
         let pool_d = env.market(&rm.market()).pool_d.get();
-        let cand = plant(&mut env, &rm.pool, Plant::Cpmm, true, (2_501, 10_000), lam);
         assert!(fast_path_qualifies(d_of(&env, &cand), pool_d, 2_500));
         assert!(
             !fast_path_qualifies(d_of(&env, &cand), pool_d, 2_510),

@@ -21,7 +21,8 @@ use serde::Deserialize;
 use shortwin_math::MathError;
 use shortwin_math::U256;
 use shortwin_math::bounds::{
-    ExitParams, expiry_reference, liq_reference, max_in_exp, max_in_liq, pi_ref, ref_liquidity,
+    ExitParams, expiry_reference, liq_reference, max_in_exp, max_in_liq, pi_ref, ref_depth_cap,
+    ref_liquidity,
 };
 use shortwin_math::observe::{
     Bucket, EmaParams, LastBucket, Observation, Ring, RingEntry, VenueChange, integrate,
@@ -383,7 +384,12 @@ fn references_match_sim() {
             "overflow" => assert_eq!(got, Err(MathError::Overflow), "{ctx}"),
             "ok" => {
                 assert_eq!(got, Ok(pref), "{ctx}");
-                assert_eq!(ref_liquidity(l_live, &o.ema, &o.ring).ok(), lb, "{ctx}");
+                // Not a Raydium venue (the generator's `FakeVenue`): no depth cap.
+                assert_eq!(
+                    ref_liquidity(l_live, &o.ema, &o.ring, None).ok(),
+                    lb,
+                    "{ctx}"
+                );
             }
             k => panic!("unknown result kind {k}"),
         }
@@ -427,4 +433,52 @@ fn max_in_matches_sim() {
         none += usize::from(want.is_none());
     }
     assert!(none >= 20, "negative budgets: {none}");
+}
+
+#[derive(Deserialize)]
+struct UnitsRef {
+    ref_liquidity: Vec<String>,
+}
+
+/// `L_b` of `Market.exit_reference` alone (M4F-1): the post-change guard on or off and, on a
+/// Raydium venue, the cap `Market.ref_depth_cap = ⌊D·10⁴/λ_min⌋` on the EMA terms (binding or
+/// not; `L_live` never capped), against `bounds::{ref_depth_cap, ref_liquidity}`.
+///
+/// `l_live L_ema L_slow guard λ_min D L_b | ring` (`λ_min`, `D` `-` off Raydium).
+#[test]
+fn reference_liquidity_matches_sim() {
+    let f: UnitsRef = common::load_vectors("oracle", "units_ref.json");
+    assert!(f.ref_liquidity.len() >= 500);
+    let (mut capped, mut guarded, mut live) = (0, 0, 0);
+    for (i, line) in f.ref_liquidity.iter().enumerate() {
+        let ctx = format!("ref_liquidity case {i}: {line}");
+        let mut t = Toks::new(line);
+        let l_live: u128 = t.v();
+        let mut o = Observation::default();
+        o.ema.liq = t.v();
+        o.ema.liq_slow = t.v();
+        o.ema.guard = u8::from(t.b());
+        let lam: Option<u32> = t.opt();
+        let d: Option<u128> = t.opt();
+        let want: u128 = t.v();
+        assert_eq!(t.s(), "|", "{ctx}");
+        o.ring = parse_ring(&mut t);
+        t.done();
+        assert_eq!(lam.is_some(), d.is_some(), "{ctx}");
+        let cap = lam.zip(d).map(|(lam, d)| ref_depth_cap(d, lam));
+        assert_eq!(
+            ref_liquidity(l_live, &o.ema, &o.ring, cap),
+            Ok(want),
+            "{ctx}"
+        );
+        // Coverage: the cap binds, the guard binds, the live depth is the maximum.
+        let uncapped = ref_liquidity(l_live, &o.ema, &o.ring, None).unwrap();
+        capped += usize::from(uncapped != want);
+        guarded += usize::from(o.ema.guard != 0 && o.ema.liq > want.max(o.ema.liq_slow));
+        live += usize::from(want == l_live);
+    }
+    assert!(
+        capped >= 50 && guarded >= 20 && live >= 50,
+        "coverage: capped {capped}, guarded {guarded}, live {live}"
+    );
 }

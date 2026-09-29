@@ -30,6 +30,8 @@ pub struct MarketMetrics {
     pub misses: u64,
     /// Deviation bursts started.
     pub bursts: u64,
+    /// Liquidity-triggered per-second coverage windows started (FITS-2 (b)).
+    pub liq_covers: u64,
     /// `CoverageGap` events seen.
     pub coverage_gaps: u64,
     /// Admin actions seen on the market's pool or CPMM config (duty 10).
@@ -147,7 +149,7 @@ impl Metrics {
             self.pool_discoveries,
         );
         type Row = (&'static str, &'static str, fn(&MarketMetrics) -> u64);
-        let rows: [Row; 17] = [
+        let rows: [Row; 18] = [
             (
                 "covered_seconds",
                 "Seconds with a keeper observation.",
@@ -171,6 +173,11 @@ impl Metrics {
                 |m| m.misses,
             ),
             ("bursts", "Deviation bursts started.", |m| m.bursts),
+            (
+                "liq_covers",
+                "Liquidity-triggered per-second coverage windows started.",
+                |m| m.liq_covers,
+            ),
             ("coverage_gaps", "CoverageGap events seen.", |m| {
                 m.coverage_gaps
             }),

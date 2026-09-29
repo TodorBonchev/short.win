@@ -194,6 +194,29 @@ export type Market = {
   openPositions: number;
   pad4: ReadonlyUint8Array;
   totalNotionalOpen: bigint;
+  /**
+   * High-water mark of `q` over the positions opened since `open_positions` last returned to 0
+   * (was `_reserved[0..8]`; owner decision of 2026-09-29, "switch only if all fit"): raised by
+   * every open (`engine::waterfall::add_position`), reset to 0 by the exit that takes
+   * `open_positions` to 0 (`remove_position`), so it is at least every open position's `q` —
+   * conservative by design (a position that has closed may have set it). A pool adoption that
+   * carries open positions checks `min(max_q_hwm, ΣB_Q)` against the candidate's per-position
+   * caps in O(1) (`shortwin_math::caps::carried_fit`; `engine::pool_select::carried_fit`).
+   */
+  maxQHwm: bigint;
+  /**
+   * Low-water mark of the one-way venue fee φ (ppm) the opens since `open_positions` last
+   * returned to 0 paid — the fee their caps were computed at and their margin posted at (was
+   * `_reserved[8..12]`; FIT-2): set by the first open after the market emptied, lowered by every
+   * later one (`engine::waterfall::add_position`, `shortwin_math::caps::open_fee_mark`), reset
+   * to 0 with `max_q_hwm` (`remove_position`). The carried fit's fee-scaled caps take
+   * `min(min_open_fee_ppm, φ_cand, CARRIED_FEE_CAP_PPM)` (`shortwin_math::caps::carried_phi`;
+   * `engine::pool_select::carried_caps`; FITS-1: 25 bps), so a position carried onto a
+   * higher-fee pool stays in the size class of the fee it was margined at, and none above the
+   * 25-bps class.
+   */
+  minOpenFeePpm: number;
+  pad5: ReadonlyUint8Array;
   reserved: ReadonlyUint8Array;
 };
 
@@ -321,6 +344,29 @@ export type MarketArgs = {
   openPositions: number;
   pad4: ReadonlyUint8Array;
   totalNotionalOpen: number | bigint;
+  /**
+   * High-water mark of `q` over the positions opened since `open_positions` last returned to 0
+   * (was `_reserved[0..8]`; owner decision of 2026-09-29, "switch only if all fit"): raised by
+   * every open (`engine::waterfall::add_position`), reset to 0 by the exit that takes
+   * `open_positions` to 0 (`remove_position`), so it is at least every open position's `q` —
+   * conservative by design (a position that has closed may have set it). A pool adoption that
+   * carries open positions checks `min(max_q_hwm, ΣB_Q)` against the candidate's per-position
+   * caps in O(1) (`shortwin_math::caps::carried_fit`; `engine::pool_select::carried_fit`).
+   */
+  maxQHwm: number | bigint;
+  /**
+   * Low-water mark of the one-way venue fee φ (ppm) the opens since `open_positions` last
+   * returned to 0 paid — the fee their caps were computed at and their margin posted at (was
+   * `_reserved[8..12]`; FIT-2): set by the first open after the market emptied, lowered by every
+   * later one (`engine::waterfall::add_position`, `shortwin_math::caps::open_fee_mark`), reset
+   * to 0 with `max_q_hwm` (`remove_position`). The carried fit's fee-scaled caps take
+   * `min(min_open_fee_ppm, φ_cand, CARRIED_FEE_CAP_PPM)` (`shortwin_math::caps::carried_phi`;
+   * `engine::pool_select::carried_caps`; FITS-1: 25 bps), so a position carried onto a
+   * higher-fee pool stays in the size class of the fee it was margined at, and none above the
+   * 25-bps class.
+   */
+  minOpenFeePpm: number;
+  pad5: ReadonlyUint8Array;
   reserved: ReadonlyUint8Array;
 };
 
@@ -424,7 +470,10 @@ export function getMarketEncoder(): FixedSizeEncoder<MarketArgs> {
       ["openPositions", getU32Encoder()],
       ["pad4", fixEncoderSize(getBytesEncoder(), 4)],
       ["totalNotionalOpen", getU64Encoder()],
-      ["reserved", fixEncoderSize(getBytesEncoder(), 256)],
+      ["maxQHwm", getU64Encoder()],
+      ["minOpenFeePpm", getU32Encoder()],
+      ["pad5", fixEncoderSize(getBytesEncoder(), 4)],
+      ["reserved", fixEncoderSize(getBytesEncoder(), 240)],
     ]),
     (value) => ({ ...value, discriminator: MARKET_DISCRIMINATOR }),
   );
@@ -529,7 +578,10 @@ export function getMarketDecoder(): FixedSizeDecoder<Market> {
     ["openPositions", getU32Decoder()],
     ["pad4", fixDecoderSize(getBytesDecoder(), 4)],
     ["totalNotionalOpen", getU64Decoder()],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 256)],
+    ["maxQHwm", getU64Decoder()],
+    ["minOpenFeePpm", getU32Decoder()],
+    ["pad5", fixDecoderSize(getBytesDecoder(), 4)],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 240)],
   ]);
 }
 

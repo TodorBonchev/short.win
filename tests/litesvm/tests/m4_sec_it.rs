@@ -632,9 +632,12 @@ fn m4_sec_3_eligibility_is_not_movable_inside_a_transaction() {
 /// `pool_fast_window_s` and `execute_pool_switch` adopts the deepest (the same rule as the fast
 /// path; `I15`: a non-fast adoption only at zero positions). Host part: `decide` itself. Fork
 /// part (the M5 transition simulated by rewriting the venue byte of a market with an open
-/// position to `None`): an attacker's 26-SOL pool opens the window, Fartcoin's main pool (1,470
-/// times deeper) replaces it, the execution adopts the main pool and the position closes on it;
-/// with a live pump curve planted during the window, the execution cancels (D1).
+/// position to `None`): an attacker's 26-SOL pool is refused outright (switch only if all fit,
+/// owner decision of 2026-09-29: the position, 2 SOL of notional, is above its per-position cap
+/// — `CarriedPositionsTooLarge`, no window); a 400-SOL pool the position fits opens the window,
+/// Fartcoin's main pool (≈ 95 times deeper) replaces it, the execution adopts the main pool and
+/// the position closes on it; with a live pump curve planted during the window, the execution
+/// cancels (D1).
 #[test]
 fn m4_sec_4_a_list_only_market_with_positions_collects_the_deepest_pool() {
     use shortwin::engine::pool_select::{Proposal, SelectParams, Situation, decide};
@@ -682,22 +685,29 @@ fn m4_sec_4_a_list_only_market_with_positions_collects_the_deepest_pool() {
         let (mut env, rm, b, nonce, _q) = with_position();
         let lam = lambda_of(&env, &rm.pool);
         let s = spec_like(&env.svm, &rm.pool, true, lam);
-        let sol = 26_000_000_000u64;
-        let thin = plant_spec(
-            &mut env,
-            Plant::Cpmm,
-            PlantSpec {
-                sol,
-                tokens: (u128::from(s.tokens) * u128::from(sol) / u128::from(s.sol)) as u64,
-                ..s
-            },
-        );
+        let sized = |env: &mut Env, sol: u64| {
+            plant_spec(
+                env,
+                Plant::Cpmm,
+                PlantSpec {
+                    sol,
+                    tokens: (u128::from(s.tokens) * u128::from(sol) / u128::from(s.sol)) as u64,
+                    ..s
+                },
+            )
+        };
+        let tiny = sized(&mut env, 26_000_000_000);
+        let sol = 400_000_000_000u64;
+        let thin = sized(&mut env, sol);
         let mut m = env.market(&rm.market());
         m.venue = VenueKind::None as u8;
         // As a curve market that graduated elsewhere would be: no Raydium pool, no locked depth.
         m.pool_cache = [Pubkey::default(); 10];
         m.pool_d.set(0);
         set_zc(&mut env.svm, &rm.market(), &m, 0);
+        // Switch only if all fit: the 26-SOL pool cannot even open the window.
+        assert_err(&env.propose(None, &tiny), E::CarriedPositionsTooLarge);
+        assert_eq!(env.market(&rm.market()).fp_t0, 0, "no window");
         let meta = ok(env.propose(None, &thin));
         assert!(
             events::of::<PoolSwitched>(&meta).is_empty(),

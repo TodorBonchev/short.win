@@ -35,6 +35,23 @@
 | 10,000 | 0.00027 | 0.00080 | 0.00101 |
 | 100,000 | 0.00063 | 0.00128 | 0.00103 |
 
+### Liquidity-anomaly coverage (duty 2, #101): the keeper's cost against the attacker's (SOL; a market with open positions; per-second coverage for liq_cover_s = 10 s after a foreign bucket liquidity deviation, extended while they recur)
+
+| priority price (uL/CU) | attacker: one LP-wrapped crank | keeper: one isolated trigger (10 cranks) | isolated trigger, keeper / attacker (unbatched / k = 6) | sustained, per second, keeper / attacker (unbatched / k = 6) | M4F-1's reverted per-slot burst per trigger (keeper / attacker) |
+|---|---|---|---|---|---|
+| 0 | 0.0000050 | 0.000050 | 10.0x / 1.7x | 1.00x / 0.17x | 0.00075 (150x) |
+| 1,000 | 0.0000051 | 0.000050 | 9.8x / 1.7x | 0.98x / 0.17x | 0.00076 (147x) |
+| 10,000 | 0.0000065 | 0.000053 | 8.2x / 1.8x | 0.82x / 0.18x | 0.00080 (123x) |
+| 100,000 | 0.0000200 | 0.000085 | 4.2x / 2.2x | 0.42x / 0.22x | 0.00128 (64x) |
+
+### The same per market-day: an attacker that keeps the keeper busiest per transaction (one trigger every liq_cover_s + 1 s, the window lapsing in between), one a minute, and one every second (unbatched keeper; SOL per market per day, keeper / attacker)
+
+| priority price (uL/CU) | every 11 s | every 60 s | every second (sustained, 1:1) | M4F-1's burst, one trigger a minute |
+|---|---|---|---|---|
+| 0 | 0.3927 / 0.0393 | 0.0720 / 0.0072 | 0.4320 / 0.4320 | 1.0800 / 0.0072 |
+| 10,000 | 0.4202 / 0.0511 | 0.0770 / 0.0094 | 0.4622 / 0.5616 | 1.1556 / 0.0094 |
+| 100,000 | 0.6676 / 0.1571 | 0.1224 / 0.0288 | 0.7344 / 1.7280 | 1.8360 / 0.0288 |
+
 ### Revenue of a market at the beta cap (25 SOL open notional, 80 % utilisation; SOL per day)
 
 | tier | rent APR at 80 % | rent (all) | protocol share (15 %) | lender share (85 %) |

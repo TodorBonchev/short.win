@@ -229,8 +229,10 @@ where
 /// Liquidation spot leg (ECON §5.5; ARCH §4.5):
 /// `venue_executable ? (fresh ∧ CR(V_eff, B̂_rs) < L) : true`.
 ///
-/// `b_rs` is the risk quote `B̂(Q; reprice(L_live, P_rs))` at the robust spot
-/// `P_rs = min(P_live, lb_lo)`; `fresh` is `lb_sec ≥ now − ref_max_age_s` (without a
+/// `b_rs` is the risk quote `B̂(Q; reprice(max(L_live, L_ema'), P_rs))` at the robust spot
+/// `P_rs = min(P_live, lb_lo)` and the liquidity [`crate::bounds::spot_liquidity`] (FITS-2: a
+/// withdrawal inside the transaction cannot take it below the guarded EMA's depth);
+/// `fresh` is `lb_sec ≥ now − ref_max_age_s` (without a
 /// fresh completed bucket the leg cannot be confirmed). `executable` is
 /// `venue_executable` only: the route-broken flag and the fee hard cap never make the
 /// leg true (V2-1).

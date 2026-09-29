@@ -40,6 +40,7 @@ import {
 import {
   findConfigPda,
   findMarketPda,
+  findOracleCachePda,
   findVenueGuardPda,
 } from "../pdas/index.ts";
 import { SHORTWIN_PROGRAM_ADDRESS } from "../programs/index.ts";
@@ -59,6 +60,7 @@ export type ExecutePoolSwitchInstruction<
   TAccountVenueGuard extends string | AccountMeta<string> = string,
   TAccountMarket extends string | AccountMeta<string> = string,
   TAccountMint extends string | AccountMeta<string> = string,
+  TAccountOracleCache extends string | AccountMeta<string> = string,
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -78,6 +80,9 @@ export type ExecutePoolSwitchInstruction<
       TAccountMint extends string
         ? ReadonlyAccount<TAccountMint>
         : TAccountMint,
+      TAccountOracleCache extends string
+        ? ReadonlyAccount<TAccountOracleCache>
+        : TAccountOracleCache,
       TAccountEventAuthority extends string
         ? ReadonlyAccount<TAccountEventAuthority>
         : TAccountEventAuthority,
@@ -122,6 +127,7 @@ export type ExecutePoolSwitchAsyncInput<
   TAccountVenueGuard extends InstructionAccountInput = InstructionAccountInput,
   TAccountMarket extends InstructionAccountInput = InstructionAccountInput,
   TAccountMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountOracleCache extends InstructionAccountInput = InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
@@ -135,6 +141,12 @@ export type ExecutePoolSwitchAsyncInput<
   market?: TAccountMarket;
   /** the handler). */
   mint: TAccountMint;
+  /**
+   * The cached SOL/USD price: the tier the market would have on the window's candidate, whose
+   * opening caps its open positions must fit ("switch only if all fit"; module docs step 4).
+   * Read only.
+   */
+  oracleCache?: TAccountOracleCache;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
 };
@@ -144,6 +156,7 @@ export async function getExecutePoolSwitchInstructionAsync<
   TAccountVenueGuard extends InstructionAccountInput,
   TAccountMarket extends InstructionAccountInput,
   TAccountMint extends InstructionAccountInput,
+  TAccountOracleCache extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof SHORTWIN_PROGRAM_ADDRESS,
@@ -153,6 +166,7 @@ export async function getExecutePoolSwitchInstructionAsync<
     TAccountVenueGuard,
     TAccountMarket,
     TAccountMint,
+    TAccountOracleCache,
     TAccountEventAuthority,
     TAccountProgram
   >,
@@ -175,6 +189,10 @@ export async function getExecutePoolSwitchInstructionAsync<
     ResolvedInstructionAccountMeta<
       TAccountMint,
       InstructionAccountInputAddress<TAccountMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountOracleCache,
+      InstructionAccountInputAddress<TAccountOracleCache>
     >,
     ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
@@ -202,6 +220,11 @@ export async function getExecutePoolSwitchInstructionAsync<
     },
     market: { value: input.market ?? null, isSigner: false, isWritable: true },
     mint: { value: input.mint ?? null, isSigner: false, isWritable: false },
+    oracleCache: {
+      value: input.oracleCache ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     eventAuthority: {
       value: input.eventAuthority ?? null,
       isSigner: false,
@@ -236,6 +259,9 @@ export async function getExecutePoolSwitchInstructionAsync<
       { programAddress },
     );
   }
+  if (!accounts.oracleCache.value) {
+    accounts.oracleCache.value = await findOracleCachePda({ programAddress });
+  }
 
   return Object.freeze({
     accounts: [
@@ -243,6 +269,7 @@ export async function getExecutePoolSwitchInstructionAsync<
       getAccountMeta("venueGuard", accounts.venueGuard),
       getAccountMeta("market", accounts.market),
       getAccountMeta("mint", accounts.mint),
+      getAccountMeta("oracleCache", accounts.oracleCache),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
@@ -267,6 +294,10 @@ export async function getExecutePoolSwitchInstructionAsync<
       InstructionAccountInputAddress<TAccountMint>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountOracleCache,
+      InstructionAccountInputAddress<TAccountOracleCache>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
       InstructionAccountInputAddress<TAccountEventAuthority>
     >,
@@ -282,6 +313,7 @@ export type ExecutePoolSwitchInput<
   TAccountVenueGuard extends InstructionAccountInput = InstructionAccountInput,
   TAccountMarket extends InstructionAccountInput = InstructionAccountInput,
   TAccountMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountOracleCache extends InstructionAccountInput = InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
@@ -295,6 +327,12 @@ export type ExecutePoolSwitchInput<
   market: TAccountMarket;
   /** the handler). */
   mint: TAccountMint;
+  /**
+   * The cached SOL/USD price: the tier the market would have on the window's candidate, whose
+   * opening caps its open positions must fit ("switch only if all fit"; module docs step 4).
+   * Read only.
+   */
+  oracleCache: TAccountOracleCache;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
 };
@@ -304,6 +342,7 @@ export function getExecutePoolSwitchInstruction<
   TAccountVenueGuard extends InstructionAccountInput,
   TAccountMarket extends InstructionAccountInput,
   TAccountMint extends InstructionAccountInput,
+  TAccountOracleCache extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof SHORTWIN_PROGRAM_ADDRESS,
@@ -313,6 +352,7 @@ export function getExecutePoolSwitchInstruction<
     TAccountVenueGuard,
     TAccountMarket,
     TAccountMint,
+    TAccountOracleCache,
     TAccountEventAuthority,
     TAccountProgram
   >,
@@ -334,6 +374,10 @@ export function getExecutePoolSwitchInstruction<
   ResolvedInstructionAccountMeta<
     TAccountMint,
     InstructionAccountInputAddress<TAccountMint>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountOracleCache,
+    InstructionAccountInputAddress<TAccountOracleCache>
   >,
   ResolvedInstructionAccountMeta<
     TAccountEventAuthority,
@@ -360,6 +404,11 @@ export function getExecutePoolSwitchInstruction<
     },
     market: { value: input.market ?? null, isSigner: false, isWritable: true },
     mint: { value: input.mint ?? null, isSigner: false, isWritable: false },
+    oracleCache: {
+      value: input.oracleCache ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     eventAuthority: {
       value: input.eventAuthority ?? null,
       isSigner: false,
@@ -382,6 +431,7 @@ export function getExecutePoolSwitchInstruction<
       getAccountMeta("venueGuard", accounts.venueGuard),
       getAccountMeta("market", accounts.market),
       getAccountMeta("mint", accounts.mint),
+      getAccountMeta("oracleCache", accounts.oracleCache),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
@@ -404,6 +454,10 @@ export function getExecutePoolSwitchInstruction<
     ResolvedInstructionAccountMeta<
       TAccountMint,
       InstructionAccountInputAddress<TAccountMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountOracleCache,
+      InstructionAccountInputAddress<TAccountOracleCache>
     >,
     ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
@@ -431,8 +485,14 @@ export type ParsedExecutePoolSwitchInstruction<
     market: TAccountMetas[2];
     /** the handler). */
     mint: TAccountMetas[3];
-    eventAuthority: TAccountMetas[4];
-    program: TAccountMetas[5];
+    /**
+     * The cached SOL/USD price: the tier the market would have on the window's candidate, whose
+     * opening caps its open positions must fit ("switch only if all fit"; module docs step 4).
+     * Read only.
+     */
+    oracleCache: TAccountMetas[4];
+    eventAuthority: TAccountMetas[5];
+    program: TAccountMetas[6];
   };
   data: ExecutePoolSwitchInstructionData;
 };
@@ -445,12 +505,12 @@ export function parseExecutePoolSwitchInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedExecutePoolSwitchInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 6) {
+  if (instruction.accounts.length < 7) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 6,
+        expectedAccountMetas: 7,
       },
     );
   }
@@ -467,6 +527,7 @@ export function parseExecutePoolSwitchInstruction<
       venueGuard: getNextAccount(),
       market: getNextAccount(),
       mint: getNextAccount(),
+      oracleCache: getNextAccount(),
       eventAuthority: getNextAccount(),
       program: getNextAccount(),
     },

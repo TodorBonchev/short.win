@@ -28,15 +28,22 @@
 //! 2. A fresh completed bucket, `lb_sec ≥ now − ref_max_age_s` (locked), else
 //!    `ReferenceStale` (the keeper cranks one second and acts the next, ECON §5.4).
 //! 3. `liquidatable := (spot leg ∧ EMA leg) ∨ now ≥ deadline`, else `NotLiquidatable`: the
-//!    spot leg `CR(V_eff, B̂(Q; reprice(L_live, P_rs))) < L` at the robust spot `P_rs =
-//!    min(P_live, lb_lo)`; the EMA leg on the newest `liq_persist_n` ring entries' cached
-//!    `(x, y)` (decision 2), both through `shortwin_math::{risk, persist}`.
+//!    spot leg `CR(V_eff, B̂(Q; reprice(max(L_live, L_ema'), P_rs))) < L` at the robust spot
+//!    `P_rs = min(P_live, lb_lo)` — the live depth floored at the guarded EMA liquidity `L_ema'`
+//!    (`min(L_ema, L_mlo)` while the post-change guard is set, else `L_ema`; FITS-2 (a),
+//!    `shortwin_math::bounds::spot_liquidity`), so an LP's withdrawal in the same transaction
+//!    cannot make it true (a low `L_ema` reached by a genuine held withdrawal, then frozen by
+//!    withdraw-wrapped cranks, is read like any other: FITX-1, ECON §12.12 residual 10); the EMA
+//!    leg on the newest `liq_persist_n` entries' cached `(x, y)` (decision 2), both through
+//!    `shortwin_math::{risk, persist}`. [`assess`] also decides `expire`'s `UseLiquidate`: an
+//!    expired position passes exactly one exit, and no withdrawal inside the transaction steers it.
 //! 4. Normal buyback allowed, `B̂_live + ert ≤ V − K_s ∧ σ_live ≤ σ_max`, else `UseSolSettle`.
 //! 5. Expired but not CR-liquidatable: `UseExpire` (expired **and** CR-liquidatable pays the
 //!    penalty, ECON §8.4; the event says `expired`).
 //! 6. The reference bound (v0.4.1, no reserve; `engine::bounds::{liq_reference,
 //!    max_in_liq}`; `L_b` reads `min(L_ema, L_mlo)` while the post-change reference guard is set,
-//!    M4R): `max_in = min(⌊B̂_ref·(10⁴ + δ_liq)/10⁴⌋, V − K_s − ert)`; `B̂_live ≤
+//!    M4R, and on Raydium caps its EMA terms at `⌊pool_d·10⁴/λ_min⌋`, M4F-1): `max_in =
+//!    min(⌊B̂_ref·(10⁴ + δ_liq)/10⁴⌋, V − K_s − ert)`; `B̂_live ≤
 //!    max_in`, else `ExitBoundNotMet` (the position waits; an undefined reference quote waits
 //!    too). Liveness (I11, I-E11): nothing else can refuse a liquidatable, buyback-allowed
 //!    position with a fresh bucket once `B̂_live ≤ ⌊B̂_ref·(10⁴ + δ)/10⁴⌋`.
@@ -269,8 +276,8 @@ pub(crate) struct Assessment {
     pub b_live_risk: Option<u64>,
     /// σ of the live buyback (`u64::MAX` if undefined).
     pub sigma_live: u64,
-    /// The robust-spot risk quote `B̂(Q; reprice(L_live, P_rs))` (`None`: undefined or no
-    /// fresh bucket).
+    /// The spot leg's risk quote `B̂(Q; reprice(max(L_live, L_ema'), P_rs))` at the robust spot
+    /// (`shortwin_math::bounds::spot_liquidity`, FITS-2; `None`: undefined or no fresh bucket).
     pub b_rs: Option<u64>,
     /// The liquidation spot leg.
     pub spot_leg: bool,
@@ -335,12 +342,14 @@ pub(crate) fn assess(
         risky?.buy(q, x, y).map(|b| b.cost)
     };
 
-    // Spot leg (ECON §5.5): the robust spot on the live liquidity, valid only while fresh.
+    // Spot leg (ECON §5.5): the robust spot, valid only while fresh, on `max(L_live, L_ema')`
+    // (FITS-2 (a): a withdrawal inside the transaction cannot drain it below the EMA's depth).
     let l_live = state.liquidity().unwrap_or(obs.ema.liq);
+    let l_spot = shortwin_math::bounds::spot_liquidity(l_live, &obs.ema, &obs.ring).math()?;
     let p_rs = state
         .price()
         .and_then(|p| math_observe::robust_spot(p, &obs.last, now, pos.ref_max_age_s));
-    let b_rs = p_rs.and_then(|p| risky?.buy_repriced(q, l_live, p).map(|b| b.cost));
+    let b_rs = p_rs.and_then(|p| risky?.buy_repriced(q, l_spot, p).map(|b| b.cost));
     let spot_leg = risk::spot_leg(state.executable, fresh, v_eff, b_rs, l_bps).math()?;
     // EMA leg (decision 2): the newest `liq_persist_n` entries' cached `(x, y)`.
     let ema_leg = persist::liq_ema_leg(
@@ -411,6 +420,7 @@ pub(crate) fn plan(
     market: &Market,
     state: &VenueState,
     now: i64,
+    depth_cap: Option<u128>,
 ) -> Result<ExitPlan> {
     let obs = market.observation();
     let a = assess(pos, market, &obs, state, now)?;
@@ -420,7 +430,7 @@ pub(crate) fn plan(
             require!(a.liquidatable(), ShortwinError::NotLiquidatable);
             require!(a.buyback_allowed, ShortwinError::UseSolSettle);
             require!(a.cr_liquidatable() || !a.expired, ShortwinError::UseExpire);
-            let bound = bounds::liq_reference(pos, &obs, state, now)?
+            let bound = bounds::liq_reference(pos, &obs, state, now, depth_cap)?
                 .ok_or(ShortwinError::ReferenceStale)?;
             let b_ref = bound.b_ref.ok_or(ShortwinError::ExitBoundNotMet)?;
             let max_in =
@@ -432,7 +442,7 @@ pub(crate) fn plan(
             require!(a.fresh, ShortwinError::ReferenceStale);
             require!(!a.cr_liquidatable(), ShortwinError::UseLiquidate);
             require!(a.buyback_allowed, ShortwinError::UseSolSettle);
-            let bound = bounds::expiry_reference(pos, &obs, state, now)?
+            let bound = bounds::expiry_reference(pos, &obs, state, now, depth_cap)?
                 .ok_or(ShortwinError::ReferenceStale)?;
             let b_ref = bound.b_ref.ok_or(ShortwinError::ExitBoundNotMet)?;
             let max_in = bounds::max_in_exp(pos, b_ref, a.k_s, a.r_due)?
@@ -543,7 +553,10 @@ pub(crate) fn keeper_exit<'info>(
         // Precondition 1b (M4R): no keeper exit while the observation state is in its
         // post-change warm-up on this (executable) venue.
         require!(market.ema_warm == 0, ShortwinError::EmaWarmingUp);
-        let plan = plan(which, pos, &market, &state, pro.now)?;
+        // M4F-1: on Raydium the reference credits no more depth than sizing (`pool_d` just
+        // refreshed by the prologue over `λ_min`).
+        let depth_cap = bounds::ref_depth_cap(&config, &market, kind);
+        let plan = plan(which, pos, &market, &state, pro.now, depth_cap)?;
         (
             kind,
             pro.now,

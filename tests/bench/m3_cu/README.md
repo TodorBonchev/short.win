@@ -111,13 +111,15 @@ library on the host.
 
 - **Mollusk and LiteSVM agree to the unit on all 67 cases** (46 M3, 21 M4 / M4R).
 - **CU, all within ARCH §6.1:**
-  - `open_short`: 98.7–130.5 k (limit 150 k). The venue CPI is 15.4 k (AMM v4) and 25.1 k /
+  - `open_short`: 98.7–130.6 k (limit 150 k). The venue CPI is 15.4 k (AMM v4) and 25.1 k /
     28.0 k (CPMM SPL / Token-2022), as R-RAY §4.3 measured, but short.win's own part is
     ≈ 83–102 k against §6.1's estimate of 44–59 k: the worst case (a normalising first open on
-    Token-2022 CPMM) leaves 19.5 k of headroom.
-  - `close_short` 68.3–89.2 k, `liquidate` 90.5–111.1 k, `expire` 86.1–104.5 k (limit 200 k;
-    §6.1 estimated 70–107 k for the keeper exits).
-  - `sol_settle` 38.4–42.0 k as a no-op, 47.4–53.1 k for S3 (limit 150 k).
+    Token-2022 CPMM) leaves 19.4 k of headroom. (The marks "switch only if all fit" reads,
+    `max_q_hwm` and FIT-2's `min_open_fee_ppm`, cost ≈ 8 CU an open.)
+  - `close_short` 68.3–89.3 k, `liquidate` 91.0–111.6 k, `expire` 86.6–105.1 k (limit 200 k;
+    §6.1 estimated 70–107 k for the keeper exits; M4F-1's reference cap included; FITS-2 (a)'s
+    spot leg at `max(L_live, L_ema')` ≈ +80 CU).
+  - `sol_settle` 39.4–43.0 k as a no-op, 47.4–53.1 k for S3 (limit 150 k; FITS-2 (a) ≈ +37 CU).
   - `crank_price` 22.9–27.9 k (limit 60 k; §6.1 estimated 18–23 k); the last post-change
     warm-up integration (M4R: the seed over 8 post-change entries, its step bound — M4X-1,
     +0.9 k — and the guard check) 27.0 k, below a steady roll.
@@ -131,15 +133,21 @@ library on the host.
 - **M4, pool selection** (budget 100 k, ARCH §6.1's estimate 25–35 k; since M4R an adoption
   writes the anchor `D/λ_min` and the restart marks, reading no liquidity of the pool — ≈ 1.1 k
   less than M4V's two-sample minimum — and a window proposal also prices the candidate for the
-  floor at `min(P_ema, P_cand)`, ≈ 0.5 k more): `propose_pool` 25.1–26.4 k without an adoption's
-  rewrite (a list-only market's first pool, whose price state starts fresh and marked; a window
-  opened or improved), 40.3–43.6 k for an adoption that rewrites a full ring (zero position;
-  listing window); `execute_pool_switch` 34.4–34.9 k for the fast adoption (a position open,
-  ring rewritten), 27.8–28.0 k for a cancellation. So an adoption that
-  rewrites a full ring is ≈ 5 k above §6.1's estimate, with 60 k of headroom. Every path makes
-  exactly one CPI (its `emit_cpi!` event): 2 trace entries, peak height 2, three wrapper levels
-  fit; with both ComputeBudget instructions a pool-selection transaction is 4 entries, ≤ 694 B
-  legacy and ≤ 606 B as v0 + ALT (17 accounts: CPMM incumbent and CPMM candidate).
+  floor at `min(P_ema, P_cand)`, ≈ 0.5 k more; since "switch only if all fit", owner decision of
+  2026-09-29, both instructions read the oracle cache, ≈ 2.0 k, and a window with a position open
+  evaluates the fit — the candidate's conservative `X₀`, its tier, the per-position and OI caps —
+  at `min(P_ema, P_cand)` and at `P_ema`, ≈ 6.8 k each, its fee-scaled caps at FIT-2's
+  `min(min_open_fee_ppm, φ_cand)`, ≈ 8 CU each, and FITS-1's 25-bps ceiling, ≈ 4 CU): `propose_pool`
+  27.1–27.4 k for a list-only market's first pool (its price state starts fresh and marked),
+  39.2–40.3 k for a window opened
+  or improved with a position open, 42.3–45.6 k for an adoption that rewrites a full ring (zero
+  position; listing window); `execute_pool_switch` 47.9–48.8 k for the fast adoption (a position
+  open, the fit judged, ring rewritten), 29.8–30.0 k for a cancellation (the fit not evaluated).
+  So the fast adoption is ≈ 14 k above §6.1's estimate, with 51 k of headroom.
+  Every path makes exactly one CPI (its `emit_cpi!` event): 2 trace entries, peak height 2,
+  three wrapper levels fit; with both ComputeBudget instructions a pool-selection transaction is
+  4 entries, ≤ 727 B legacy and ≤ 608 B as v0 + ALT (18 accounts with the oracle cache: CPMM
+  incumbent and CPMM candidate).
 - **Trace:** a wallet's first open is 15 entries, a repeat borrower's 14, a normalising open 18;
   every exit is 9 (12 normalising); a crank is 2, or 3 when the pool just halted
   (`RouteChainChanged`); S3 is 2, the no-op `sol_settle` 1; `create_market` 7; the latch

@@ -366,6 +366,7 @@ pub fn propose_pool_raw(
             venue_guard: pda::venue_guard(),
             market: pda::market(mint).0,
             mint: *mint,
+            oracle_cache: pda::oracle_cache(),
             event_authority: pda::event_authority(),
             program: shortwin::ID,
         },
@@ -396,6 +397,7 @@ pub fn execute_pool_switch_raw(mint: &Pubkey, remaining: &[AccountMeta]) -> Inst
             venue_guard: pda::venue_guard(),
             market: pda::market(mint).0,
             mint: *mint,
+            oracle_cache: pda::oracle_cache(),
             event_authority: pda::event_authority(),
             program: shortwin::ID,
         },
@@ -519,6 +521,19 @@ pub fn passes_window_floor(env: &Env, pool: &AnyPool, p_ref: Option<u128>) -> bo
         p_ref.unwrap_or(spot),
         params.pool_min_real_sol,
     )
+}
+
+/// "Switch only if all fit" (owner decision of 2026-09-29): the caps `(per position, per market)`
+/// for the market of `pool`'s mint, as stored, to carry its open positions onto `pool` — the
+/// smaller at `min(P_ema, P_cand)` and at `P_ema`, on the tier the market would have on it
+/// ([`crate::invariants::pool_select::carried_caps`]). Sizes a test's position to fit (or not) a
+/// planned candidate.
+pub fn carried_caps(env: &Env, pool: &AnyPool) -> (u64, u64) {
+    let (mint, _) = pool.token();
+    let m = env.market(&pda::market(&mint).0);
+    let kind = VenueKind::from_u8(kind_of(pool)).expect("a Raydium kind");
+    crate::invariants::pool_select::carried_caps(&env.svm, &m, kind, &pool_key(pool))
+        .expect("the candidate reads")
 }
 
 /// Tops the WSOL vault of the AMM v4 `pool` (WSOL the pc) up to at least `sol` of real SOL

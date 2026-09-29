@@ -341,6 +341,8 @@ struct Coverage {
     rewrites: HashMap<&'static str, usize>,
     maxin: HashMap<&'static str, usize>,
     stale_refs: usize,
+    /// References on a Raydium venue (the M4F-1 depth cap in `L_b`).
+    capped_refs: usize,
     legs: [usize; 4],
 }
 
@@ -507,11 +509,14 @@ impl Replay {
                 "chk"
             }
             // ref t pid is_liq l_live L_b P_ref
+            // ref t pid is_liq l_live L_b P_ref cap (cap: `⌊D·10⁴/λ_min⌋` on Raydium, M4F-1)
             "ref" => {
                 let (now, _pid): (i64, i64) = (t.v(), t.v());
                 let is_liq = t.b();
                 let (l_live, l_b, p_ref): (u128, Option<u128>, Option<u128>) =
                     (t.v(), t.opt(), t.opt());
+                let cap: Option<u128> = t.opt();
+                cov.capped_refs += usize::from(cap.is_some());
                 let o = &self.obs;
                 let got = if is_liq {
                     liq_reference(&o.ema, &o.ring, &o.last, now, &self.exit)
@@ -521,7 +526,11 @@ impl Replay {
                 assert_eq!(got, Ok(p_ref), "P_ref, {ctx}");
                 match l_b {
                     Some(l) => {
-                        assert_eq!(ref_liquidity(l_live, &o.ema, &o.ring), Ok(l), "L_b, {ctx}")
+                        assert_eq!(
+                            ref_liquidity(l_live, &o.ema, &o.ring, cap),
+                            Ok(l),
+                            "L_b, {ctx}"
+                        )
                     }
                     None => cov.stale_refs += 1,
                 }
@@ -988,6 +997,8 @@ fn attack_traces_match_sim() {
     assert!(c.rewrites.len() == 2, "{:?}", c.rewrites);
     assert!(c.maxin.get("liq").copied().unwrap_or(0) >= 5, "{c:?}");
     assert!(c.ops.get("state").copied().unwrap_or(0) >= 100, "{c:?}");
+    // M4F-1: references on Raydium markets carry the depth cap.
+    assert!(c.capped_refs >= 5, "{c:?}");
 }
 
 /// ECON §11.2 scenarios (gaps, a fast pump, a drain then a pump, a spike, a disabled pool,
@@ -1007,6 +1018,7 @@ fn scenario_traces_match_sim() {
     }
     assert!(c.point_boxes >= 100 && c.rolls >= 2_000, "{c:?}");
     assert!(c.maxin.get("exp").copied().unwrap_or(0) >= 2, "{c:?}");
+    assert!(c.capped_refs >= 2, "{c:?}");
 }
 
 /// The first six runs of ECON §13's exit fuzz, replayed whole (attacker bundles, blockers,

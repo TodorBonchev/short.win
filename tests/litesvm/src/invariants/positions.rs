@@ -107,6 +107,8 @@ pub fn check_market(svm: &LiteSVM, key: &Pubkey, m: &Market) -> Result<(), Viola
     if injected_borrower_side() && positions.is_empty() {
         return Ok(());
     }
+    // I15's state part (switch only if all fit): the high-water mark bounds every open `q`.
+    super::pool_select::check_hwm(key, m, &positions)?;
     let mut sum_q: u128 = 0;
     let mut by_tier = [0u128; 4];
     let mut notional: u128 = 0;

@@ -42,6 +42,18 @@ pub const EMA_WARMUP_BUCKETS: u8 = RING_LEN as u8;
 /// bucket liquidity lows (an honest switch: at the gate).
 pub const REF_GUARD_TOL_BPS: u32 = 100;
 
+/// **PROPOSED** (FITS-1; owner decision of 2026-09-29, ECON §6.1, O18): the ceiling, ppm, on the
+/// one-way fee φ the carried-position fit's fee-scaled caps take (`caps::carried_phi`: `φ =
+/// min(φ_inc, φ_cand, CARRIED_FEE_CAP_PPM)`). 2,500 ppm = 25 bps puts every position a pool
+/// switch carries in the ≤ 0.75 %-of-`X₀` size class (`fee_size_cap_x100` 300 at 25 bps) that
+/// the sims and the fork validated under the switch's pushes, whatever fee it was margined at
+/// and whatever the candidate charges: at `min(φ_inc, φ_cand)` alone a 1 % → 1 % switch carried
+/// positions up to the candidate's impact cap (2.47 % of `X₀`), whose margin — posted on the
+/// incumbent's deeper cost — the pushes turned into S1 at 60–100 % of that limit. A position
+/// larger than the carried cap is not adopted: it settles in S3 at fair value on the failed pool
+/// (the accepted fallback).
+pub const CARRIED_FEE_CAP_PPM: u32 = 2_500;
+
 /// Rent accrual clamps the price at `P̃ = min(P_ema, P_ACC_MAX)` (WAD, a price of 100 SOL
 /// per raw unit), which keeps the rent basis indices below 2¹²⁸ for 100 years (ECON §2.2).
 pub const P_ACC_MAX: u128 = 100_000_000_000_000_000_000_000_000_000;
@@ -105,6 +117,7 @@ mod tests {
         assert_eq!(P_OPEN_MAX, 10u128.pow(27));
         assert_eq!((EMA_TAU_S, RING_LEN, COVERAGE_GAP_S), (5, 8, 30));
         assert_eq!((EMA_WARMUP_BUCKETS, REF_GUARD_TOL_BPS), (8, 100));
+        assert_eq!(CARRIED_FEE_CAP_PPM, 2_500);
         assert_eq!(
             (S3_OBS_GAP_S, LOCK_BUCKET_S, LOCK_BUCKETS),
             (60, 86_400, 128)

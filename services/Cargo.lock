@@ -3293,6 +3293,7 @@ dependencies = [
  "shortwin-litesvm-tests",
  "shortwin-math",
  "shortwin-services-common",
+ "shortwin-venue-state",
  "solana-account 4.3.2",
  "solana-hash",
  "solana-keypair",

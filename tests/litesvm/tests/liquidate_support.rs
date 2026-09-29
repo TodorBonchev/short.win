@@ -376,7 +376,8 @@ pub fn predict(v: &View) -> Predicted {
         (None, obs.ema.liq)
     };
     let p_rs = p_live.and_then(|p| observe::robust_spot(p, &obs.last, now, pos.ref_max_age_s));
-    let b_rs = p_rs.and_then(|p| risky.buy_repriced(q, l_live, p).map(|b| b.cost));
+    let l_spot = spot_liquidity_of(l_live, &obs);
+    let b_rs = p_rs.and_then(|p| risky.buy_repriced(q, l_spot, p).map(|b| b.cost));
     let l_bps = pos.cr_liq_bps;
     let spot_leg = risk::spot_leg(v.executable, fresh, v_eff, b_rs, l_bps).unwrap();
     let quote_at = |x: u128, y: u128| {
@@ -406,7 +407,8 @@ pub fn predict(v: &View) -> Predicted {
     .unwrap();
     let newest = obs.ring.newest().copied().unwrap_or_default();
     let cr_ema_bps = risk::cr_bps(v_eff, quote_at(newest.x, newest.y)).unwrap_or(u64::MAX);
-    let l_b = bounds::ref_liquidity(l_live, &obs.ema, &obs.ring).unwrap();
+    // The mock venue: no locked depth, no M4F-1 cap.
+    let l_b = bounds::ref_liquidity(l_live, &obs.ema, &obs.ring, None).unwrap();
     let prm = pos.exit_params();
     let liq_p = bounds::liq_reference(&obs.ema, &obs.ring, &obs.last, now, &prm).unwrap();
     let liq_b = liq_p.and_then(|p| risky.buy_repriced(q, l_b, p).map(|b| b.cost));
@@ -1139,4 +1141,18 @@ pub const W: u128 = WAD;
 /// `⌊x·num/den⌋` for prices.
 pub fn scale(x: u128, num: u128, den: u128) -> u128 {
     x * num / den
+}
+
+/// The liquidity the liquidation spot leg is judged at (FITS-2 (a); an independent spelling of
+/// `shortwin_math::bounds::spot_liquidity`): `max(L_live, L_ema')`, `L_ema' = min(L_ema, L_mlo)`
+/// while the post-change guard is set, else `L_ema`.
+pub fn spot_liquidity_of(l_live: u128, obs: &shortwin_math::observe::Observation) -> u128 {
+    let l_ema = if obs.ema.guard != 0 {
+        let mut lows: Vec<u128> = obs.ring.iter().map(|e| e.llo).collect();
+        lows.sort_unstable();
+        obs.ema.liq.min(lows[(lows.len() - 1) / 2])
+    } else {
+        obs.ema.liq
+    };
+    l_live.max(l_ema)
 }

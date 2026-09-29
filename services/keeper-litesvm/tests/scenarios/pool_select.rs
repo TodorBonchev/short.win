@@ -822,6 +822,155 @@ fn a_halted_pool_without_positions_takes_the_fast_path() {
     );
 }
 
+/// **FIT-3 through the keeper, a disclosed residual** (ECON §6.1, §12.12; ARCH §7.1 duty 5; the
+/// owner-accepted fallback). `max_q_hwm` falls only when `open_positions` returns to 0, so a
+/// position opened at the incumbent's size cap and closed a second later leaves it above what a
+/// thinner candidate lets a position be, and "switch only if all fit" refuses the candidate for
+/// everyone while the other positions stay open. A planted ≈ 1 % Fartcoin AMM v4 incumbent (the
+/// real pool halted) with two honest positions that fit a 40 % CPMM sibling; the attacker opens the
+/// largest position the incumbent takes and closes it (the mark pinned above the sibling's cap).
+/// The incumbent halts 900 s before the honest positions' deadline: the keeper keeps the chains,
+/// its plan for the sibling is blocked `CarriedPositionsTooLarge` at every evaluation, it proposes
+/// nothing and no window opens; it settles each position S3 at fair value (the lenders get FV in
+/// full) at its due second `max(deadline, no_route_since + s3_wait_s, graduated_at +
+/// grad_grace_s)` — here the deadline.
+#[test]
+fn a_mark_left_by_a_closed_position_blocks_the_fast_path_and_the_positions_settle_in_s3() {
+    use shortwin::events::SolSettle;
+    use shortwin_keeper::events;
+    use shortwin_math::fees::Direction;
+    let mut env = Env::ray_fork();
+    let base = env.load_ray_pool(FART);
+    let lam = lambda_of(&env, &base);
+    let inc = plant(&mut env, &base, Plant::V4, true, (1, 100), lam);
+    ok(env.list_ray(&inc, raydium::VENUE_HINT_RAYDIUM_V4));
+    let (x, _) = inc
+        .io_reserves(&env.svm, Direction::Sell)
+        .expect("reserves");
+    let rm = env.ray_market_listed(raydium::RaySpec::new(FART, x / 5), inc);
+    let key = rm.market();
+    env.crank(&rm);
+    for _ in 0..5 {
+        env.warp(1);
+        env.crank(&rm);
+    }
+    let cand = plant(&mut env, &inc, Plant::Cpmm, true, (40, 100), lam);
+    halt(&mut env, &base);
+    let c = ps::carried_caps(&env, &cand).0;
+    let honest = c / 10 * 6;
+    let mut open = Vec::new();
+    for _ in 0..2 {
+        let mut b = env.borrower();
+        let (res, nonce) = env.open(&rm, &mut b, honest);
+        ok(res);
+        open.push((b, nonce));
+    }
+    env.warp(1);
+    env.crank(&rm);
+    // The attacker: the largest position the incumbent takes, closed a second later.
+    let mut a = env.borrower();
+    let mut q = x / 100;
+    let nonce = loop {
+        let (res, nonce) = env.open(&rm, &mut a, q);
+        if res.is_ok() {
+            break nonce;
+        }
+        q = q / 100 * 97;
+    };
+    env.warp(1);
+    env.crank(&rm);
+    ok(env.close(&rm, &a, nonce));
+    let m = env.market(&key);
+    assert_eq!((m.open_positions, m.max_q_hwm), (2, q));
+    assert!(
+        q > c,
+        "the mark ({q}) is above the sibling's per-position cap {c}"
+    );
+    let pos: Vec<ShortPosition> = open
+        .iter()
+        .map(|(b, n)| env.position(&rm, &b.key(), *n))
+        .collect();
+    let deadline = pos.iter().map(|p| p.deadline).min().expect("positions");
+    let mut h = Harness::new(env, KeeperConfig::default());
+    let wait = deadline - 900 - h.now();
+    h.idle(wait);
+    h.seconds(3);
+    h.with_env(|env| halt(env, &inc));
+    let halted_at = h.now();
+    let too_large = code(ShortwinError::CarriedPositionsTooLarge);
+    let keys: Vec<Pubkey> = open
+        .iter()
+        .map(|(b, n)| pda::position(&key, &b.key(), *n).0)
+        .collect();
+    let mut blocked = 0u32;
+    let mut settled: Vec<Option<(i64, i64, SolSettle)>> = keys.iter().map(|_| None).collect();
+    for s in 1..=1_200i64 {
+        let r = h.second().clone();
+        assert!(r.errors.is_empty(), "+{s} s: {:?}", r.errors);
+        let m = market(&h, &key);
+        for (i, k) in keys.iter().enumerate() {
+            let s3 = r
+                .exits
+                .iter()
+                .filter(|e| e.position == *k && e.kind == ExitKind::SolSettle)
+                .find_map(|e| e.result.landed())
+                .and_then(|out| events::of::<SolSettle>(out).into_iter().next());
+            if let Some(e) = s3 {
+                settled[i] = Some((s, h.now(), e));
+            }
+        }
+        if settled.iter().all(Option::is_some) {
+            break;
+        }
+        // Until every honest position is settled, nothing is proposed and no window opens.
+        assert!(r.pool_actions.is_empty(), "+{s} s: {:?}", r.pool_actions);
+        assert_eq!(m.fp_t0, 0, "+{s} s: no window");
+        if r.pool_plans
+            .get(&key)
+            .is_some_and(|p| p.blocked == too_large)
+        {
+            blocked += 1;
+        }
+    }
+    let m = market(&h, &key);
+    let p_ema = m.ema_price.get();
+    for (i, (st, p)) in settled.iter().zip(&pos).enumerate() {
+        let (s, at, e) = st
+            .as_ref()
+            .expect("an S3 settlement of every honest position");
+        assert!(m.no_route_since >= halted_at, "the S3 chain since the halt");
+        let due = p
+            .deadline
+            .max(m.no_route_since + i64::from(p.s3_wait_s))
+            .max(m.graduated_at + i64::from(p.grad_grace_s));
+        let owed = u128::from(p.q) * p_ema / shortwin_math::num::WAD;
+        println!(
+            "FIT-3 keeper residual, position {i}: attacker q {q} ({:.2} × the sibling's cap {c}); \
+             {blocked} plans blocked CarriedPositionsTooLarge, no proposal; S{} at +{s} s after \
+             the halt ({} s after the due second; deadline +{} s): lenders {:.4} SOL (FV {:.4}; q \
+             at P_ema {:.4}), borrower {:.4} SOL",
+            q as f64 / c as f64,
+            e.condition,
+            at - due,
+            p.deadline - halted_at,
+            e.lender_amount as f64 / 1e9,
+            e.fv as f64 / 1e9,
+            owed as f64 / 1e9,
+            e.borrower_amount as f64 / 1e9
+        );
+        assert_eq!(e.condition, 3, "S3");
+        assert!(*at >= p.deadline, "not before the deadline");
+        assert!(*at - due <= 2, "the keeper settles at the due second");
+        assert!(
+            e.fv > 0 && e.lender_amount == e.fv,
+            "the lenders get FV in full"
+        );
+        assert!(u128::from(e.lender_amount) >= owed, "at least q at P_ema");
+        assert!(e.borrower_amount > 0);
+    }
+    assert!(blocked > 0, "the keeper's plan reports the refusal");
+}
+
 /// ARCH §9 M4 "adoption refused while positions are open" and §7.1 duty 12: with a position open
 /// and a healthy incumbent the keeper proposes nothing, however deep the sibling (twice the
 /// locked depth); the market is reported pinned once (R4B-10, after `pinned_alert_s`). The

@@ -96,6 +96,45 @@ What it models (integer math wherever the on-chain program uses integers):
     M4V-5 first-open gate) is not modelled: every Market is created unmarked.  Market.fast_switch keeps the v0.4.1
     rewrite for the math crate's differential vectors only; FAST_SCENARIOS replays adopt_pool;
     attacks/switch_warmup.py compares the rule with the M4 rule as built.
+  * Reference cap (M4F-1, ECONOMICS.md changelog #98; PROPOSED with #96): on a Raydium venue exit_reference
+    caps the EMA terms of the reference liquidity at the depth sizing credits the pool with,
+    L_b = max(L_live, min(max(L_ema', L_slow), floor(D*1e4/lambda_min))) (Market.ref_depth_cap; L_live is never
+    capped; the pump venues have no D and no cap).  It binds only when the EMA terms exceed D/lambda_min: a
+    deposit push (at most lambda/lambda_min over the live depth then reaches the reference), or a genuine drain
+    of a pool with lambda < lambda_min (venue_switch.py (d1)).  The guard and M4X-2's input guard read L_mlo, so
+    they hold only while the keeper's observations fill the buckets (ECON §5.8 duty 9;
+    attacks/switch_warmup.py part 4d).
+  * Switch only if all fit (owner decision 2026-09-29, ECONOMICS.md changelog #99; ARCH §2.6 rule 3): an adoption
+    that carries open positions -- a fast-path window's, or a list-only market's window with positions -- is
+    allowed only if every open position fits the candidate's normal opening caps, evaluated as an open on it right
+    after the adoption would be (carried_fit_ok: per-position impact and fee-scaled caps on carried_q_bound =
+    min(max_q_hwm, sum_q), market OI and fee-scaled caps on the outstanding sum_q, on the candidate's conservative
+    X0 = carried_x0 = min(X_now, min(L_slow, D)/sqrt(p), D/(lambda_min*sqrt(p))) <= D/sqrt(p), its locked token
+    reserve), judged at p = min(P_ema, P_cand) and at p = P_ema, the stricter binding (Market.carried_fit).  The
+    fee-scaled caps take phi = min(phi_inc, phi_cand, CARRIED_FEE_CAP_PPM) (FIT-2, changelog #100; the compiled
+    cap of 2,500 ppm since FITS-1, #101): phi_inc = Market.min_open_fee_ppm, the lowest one-way venue fee paid by
+    the opens since open_positions last returned to 0 -- the fee the open positions' caps and margin were computed
+    at -- so a position carried onto a higher-fee pool stays in its own fee's size class, and every carried position
+    is in the <= 0.75 %-of-X0 class the sims and the fork validated, whatever the two fees (a 1 % -> 1 % switch
+    included); the impact caps are the candidate's.  A proposal reads the candidate's live X_now; the
+    execution does not, so no LP round trip or buy around it can cancel a window (the guarantee is the execution's
+    X0, FIT-1).  A proposal whose candidate does not fit opens no window (CarriedPositionsTooLarge); an execution
+    whose candidate does not fit cancels.  Market.max_q_hwm is the high-water mark of q over the positions opened
+    since open_positions last returned to 0 (Market.open; reset only when the last open position exits,
+    Market.try_exit), sum_q the outstanding Q.  If no candidate fits, the positions stay on the halted pool and exit
+    through S3 at fair value.  fast_path_events applies both checks; a position at the incumbent's size cap fits
+    only a candidate whose locked depth covers the incumbent's L_slow: FAST_SCENARIOS' 50 % and 25 % candidates no
+    longer carry it and its 120 % candidate does.  Zero-position adoptions and listings are unaffected.
+  * The liquidation spot leg at the guarded EMA liquidity (FITS-2 (a), ECONOMICS.md changelog #101; PROPOSED, owner
+    item O18): the CR-liquidatability spot leg is judged at L_spot = max(L_live, L_ema') (Market.spot_liquidity;
+    L_ema' = min(L_ema, L_mlo) while ema_guard = 1, else L_ema; uncapped), so an LP withdrawal in the same
+    transaction cannot make it true -- a withdraw-wrapped liquidation or expiry of a position healthy at the pool's
+    depth needs L_ema itself dragged down first, which the keeper's per-second liquidity-anomaly coverage denies to
+    attacker-only seconds (ECON §5.8 duty 2; attacks/switch_warmup.py part 5b) -- not to a genuine held withdrawal:
+    the coverage holds the low it reached and a freeze of withdraw-wrapped cranks keeps it, forcing what the same
+    LP's withdrawal for good forces (FITX-1, changelog #102, part 5b (vii)).  It is the one CR-liquidatability leg of liquidate, expire
+    (UseLiquidate / UseExpire) and sol_settle (arming, "not liquidatable" gating, S3 due): Market.status.  The exit
+    bound's L_b (exit_reference), the S1 / S2 legs and the refutation keep reading L_live as before.
   * Scenario library, EMA / exit-bound lag study, loss-given-gap curves,
     break-even gap frequencies, an ILLUSTRATIVE (uncalibrated) jump-diffusion
     Monte Carlo, and a randomised exit fuzz with attacker bundles, attacker-only
@@ -810,6 +849,67 @@ def window_floor_ok(D: int, p_ema: Optional[int], p_cand: int, floor: int = POOL
     return position_floor_ok(D, p_win, floor)
 
 
+def carried_x0(D: int, l_slow: int, p: int, x_now: Optional[int] = None, P: Params = DEFAULT) -> int:
+    """#99: the candidate's conservative X0 as an open on it right after the adoption computes it (conservative_x
+    on the candidate at price p; caps::conservative_x0):
+        X0 = min(X_now, floor(L_slow'*1e9/isqrt_ceil(p)), floor(D*1e9*1e4/(lambda_min*isqrt_ceil(p))))
+    with L_slow' = min(L_slow, D) -- what adopt_pool leaves (an adoption never raises L_slow) -- so X0 <= D/sqrt(p),
+    the candidate's locked token reserve.  X_now, its live token reserve, is read by a proposal only; the execution
+    passes None, so no unlocked LP's withdrawal or buy wrapped around the execution can cancel a window."""
+    sp = isqrt_ceil(p)
+    x = min(min(l_slow, D) * SQRT_WAD // sp, D * SQRT_WAD * BPS // (P.pool_lock_min_bps * sp))
+    return x if x_now is None else min(x, x_now)
+
+
+def carried_q_bound(max_q_hwm: int, sum_q: int) -> int:
+    """#99: the O(1) bound on every open position's q the fit checks: min(max_q_hwm, sum_q) -- the high-water mark
+    of q since open_positions last returned to 0 (>= every open q) and the outstanding Q (>= each open q too); a
+    zero mark with positions open (an account written before the field existed) bounds nothing, so sum_q alone."""
+    return sum_q if max_q_hwm == 0 else min(max_q_hwm, sum_q)
+
+
+# FITS-1 (#101; PROPOSED, compiled, u32 ppm; caps::CARRIED_FEE_CAP_PPM): the carried fit's fee-scaled caps never take
+# a fee above 25 bps, so every carried position is in the <= 0.75 %-of-X0 class (fee_size_cap_x100 = 300 at 2,500
+# ppm) that the switch sims and the fork validated under every push; larger positions stay on the halted pool and
+# settle S3 at fair value (the accepted fallback, residual 12).
+CARRIED_FEE_CAP_PPM = 2_500
+
+
+def carried_phi(min_open_fee_ppm: int, phi_cand: int) -> int:
+    """FIT-2 (#100), FITS-1 (#101): the fee the carried fit's fee-scaled caps take,
+    min(phi_inc, phi_cand, CARRIED_FEE_CAP_PPM) (ppm).  phi_inc = Market.min_open_fee_ppm, the low-water mark of the
+    one-way venue fee paid by the opens since open_positions last returned to 0 -- the fee at which the open
+    positions' caps and margin were computed, i.e. the incumbent's fee unless it changed or a position was carried
+    from an earlier pool; a zero mark (no open counted it: an account written before the field existed) bounds
+    nothing, so min(phi_cand, CARRIED_FEE_CAP_PPM).  A position carried onto a higher-fee pool therefore stays in the
+    size class of the fee it was margined at (0.75 % of X0 at 25 bps), not the candidate's (2.47 % at 1 %); and since
+    FITS-1 a switch between two high-fee pools (1 % -> 1 %: min(phi_inc, phi_cand) = 1 %) carries no more than the
+    25-bps class either: its margin was posted on the deeper incumbent's cost, and at the 2.47 % impact cap the
+    pushes ended a 4x/30 s pump in S1 (#100's residual 15).  The impact caps do not read phi."""
+    phi = phi_cand if min_open_fee_ppm == 0 else min(min_open_fee_ppm, phi_cand)
+    return min(phi, CARRIED_FEE_CAP_PPM)
+
+
+def carried_fit_ok(x0: int, phi_ppm: int, tier: Tier, q_max: int, sum_q: int, P: Params = DEFAULT) -> bool:
+    """#99 'switch only if all fit' (owner decision 2026-09-29; ECON §6.1, §6.2; ARCH §2.6 rule 3, §4.6;
+    shortwin_math caps::carried_fit): every open position fits the candidate's normal opening caps on its X0
+    (carried_x0):
+        q_max <= min(max_q_impact(X0, iota_pos), floor(fee_size_cap_x100*phi*X0/(100*1e6)))      per position
+        sum_q <= min(max_total_q_market(X0, iota_mkt), floor(fee_oi_cap_x100*phi*X0/(100*1e6)))  per market
+    q_max = carried_q_bound(max_q_hwm, sum_q) >= every open q.  The market caps take X1 = X0 (nothing is sold into the
+    candidate: an open's sum B_Q + q <= OI_cap(X0 + q) at q = 0); phi = carried_phi(min_open_fee_ppm, the
+    candidate's one-way fee) = min(phi_inc, phi_cand, CARRIED_FEE_CAP_PPM) (ppm; FIT-2, #100; FITS-1, #101), so
+    only the fee-scaled caps change with it; the tier is the one the market would have on the candidate (the sim
+    takes the market's: A, B and C share the impact caps at the defaults)."""
+    cap = max_q_impact(x0, tier.impact_pos_bps)
+    if P.fee_size_cap_x100:
+        cap = min(cap, x0 * phi_ppm * P.fee_size_cap_x100 // (100 * PPM))
+    oi = max_total_q_market(x0, tier.impact_mkt_bps)
+    if P.fee_oi_cap_x100:
+        oi = min(oi, x0 * phi_ppm * P.fee_oi_cap_x100 // (100 * PPM))
+    return q_max <= cap and sum_q <= oi
+
+
 # ----------------------------------------------------------------------------
 # Post-change confirmation (M4R, ECON §5.2, changelog #96; PROPOSED, owner item O18)
 # ----------------------------------------------------------------------------
@@ -819,7 +919,12 @@ def window_floor_ok(D: int, p_ema: Optional[int], p_cand: int, floor: int = POOL
 # extremes on the side that cannot force an exit (Market._integrate); while ema_warm > 0 on an executable venue
 # the keeper exits wait (Market.gated); while ema_guard = 1 the exit reference reads min(L_ema, L_mlo)
 # (Market.exit_reference).  A market that never switches pools keeps ema_warm = ema_guard = 0 and runs exactly
-# the v0.4.1 code paths.
+# the v0.4.1 code paths, except that on Raydium the exit reference's EMA terms are capped at
+# floor(D*1e4/lambda_min) (M4F-1, Market.ref_depth_cap).  The guard reads L_mlo, the lower median of the ring's
+# bucket liquidity lows: it holds only while at most 4 of the 8 newest buckets are attacker-only, which the
+# keeper's per-second coverage while the guard is set provides (ECON §5.8 duty 9).  After the guard clears, a push
+# only delays the exit of a carried position, because every carried position fits the new pool's opening caps
+# (#99, carried_fit_ok; attacks/switch_warmup.py part 11).
 EMA_WARMUP_BUCKETS = 8          # = RING_LEN (compiled; u8); >= liq_persist_n's compiled maximum (3)
 REF_GUARD_TOL_BPS = 100         # compiled; = fv_dev_bps's default: the guard clears once L_ema <= L_mlo*(1 + 1 %)
 
@@ -830,11 +935,12 @@ REF_GUARD_TOL_BPS = 100         # compiled; = fv_dev_bps's default: the guard cl
 class Position:
     __slots__ = ("Q", "S", "M", "V", "fee_open", "J_open", "coef", "p_rent", "ert", "R_min", "t_open",
                  "deadline", "B_open", "B_margin", "B_ema_open", "spot_pre", "spot_post", "L", "pen_bps",
-                 "slip_max", "s_kind", "s_count", "s_t", "s_last")
+                 "slip_max", "s_kind", "s_count", "s_t", "s_last", "live")
 
     def __init__(self, **kw):
         self.s_kind = None
         self.s_count = self.s_t = self.s_last = 0
+        self.live = False                      # registered in its Market's aggregates (Market.open) until it exits
         for k, v in kw.items():
             setattr(self, k, v)
 
@@ -858,6 +964,10 @@ class Market:
     # observation -- keeps its honest low and high).
     warm = 0            # M4R ema_warm / ema_guard defaults (also for states built without __init__, e.g. the
     guard = False       # math crate's vector generators): a market that never switches has both at 0
+    open_positions = 0  # #99 aggregates (Market.open_positions, borrowed_q, max_q_hwm; same defaults): the open
+    sum_q = 0           # positions registered by Market.open, their outstanding Q, and the high-water mark of q
+    max_q_hwm = 0       # since open_positions last returned to 0 (carried_fit)
+    min_open_fee_ppm = 0  # FIT-2 (#100): the lowest one-way fee (ppm) an open paid since open_positions last was 0
 
     def __init__(self, venue: Venue, tier: Tier, P: Params = DEFAULT, util_bps: int = 8000, t0: int = 0):
         self.venue, self.tier, self.P = venue, tier, P
@@ -886,6 +996,10 @@ class Market:
         self.pending_target: Optional[int] = None
         self.warm = 0                             # Market.ema_warm: integrations left in the post-change warm-up
         self.guard = False                        # Market.ema_guard: the post-change reference guard (M4R)
+        self.open_positions = 0                   # #99: Market.open_positions, borrowed_q (sum_q) and max_q_hwm
+        self.sum_q = 0
+        self.max_q_hwm = 0
+        self.min_open_fee_ppm = 0                 # FIT-2 (#100): Market.min_open_fee_ppm (carried_phi)
         self._q_hint = 0                          # sim helper: size of the position under test
 
     @staticmethod
@@ -1237,12 +1351,63 @@ class Market:
         U, k = self.util_bps, P.util_kink_bps
         r_scaled = T.rate_base_bps * BPS + T.rate_s1_bps * min(U, k) + T.rate_s2_bps * max(U - k, 0)
         R_min = cdiv(Q * self.ema * r_scaled * T.min_rent_s, BPS * BPS * YEAR_S * WAD)
+        # #99: open_short counts the position and raises the high-water mark of q (Market.max_q_hwm); FIT-2 (#100):
+        # and lowers the low-water mark of the one-way fee its caps and margin were computed at (min_open_fee_ppm)
+        self.open_positions += 1
+        self.sum_q += Q
+        self.max_q_hwm = max(self.max_q_hwm, Q)
+        phi = v.fee_oneway_ppm()
+        self.min_open_fee_ppm = phi if self.min_open_fee_ppm == 0 else min(self.min_open_fee_ppm, phi)
         return Position(Q=Q, S=S, M=M, V=S + M, fee_open=fee_open, J_open=tuple(self.J),
                         coef=(T.rate_base_bps, T.rate_s1_bps, T.rate_s2_bps), p_rent=P.rent_protocol_bps,
                         ert=P.exec_rent_tol if v.pump else 0, R_min=R_min, t_open=t,
                         deadline=t + T.max_dur_s, B_open=qs[1], B_margin=B_margin,
                         B_ema_open=qe[1] if qe else 0, spot_pre=spot_pre, spot_post=v.spot_wad(),
-                        L=T.cr_liq_bps, pen_bps=T.penalty_bps, slip_max=T.max_liq_slip_bps)
+                        L=T.cr_liq_bps, pen_bps=T.penalty_bps, slip_max=T.max_liq_slip_bps, live=True)
+
+    def _release(self, pos: Position) -> None:
+        """#99: a registered position exited (close, liquidation, expiry, S1 / S2 / S3): the aggregates drop it, and
+        the high-water mark of q resets when the last open position is gone (it is never lowered otherwise, so it
+        stays >= every open position's q: conservative by design; a closed large position keeps it until the market
+        empties, FIT-3, residual 14); so does the fee's low-water mark (FIT-2, #100; never raised otherwise, so it
+        stays <= the fee every open position was margined at)."""
+        if not getattr(pos, "live", False):
+            return
+        pos.live = False
+        self.open_positions -= 1
+        self.sum_q -= pos.Q
+        if self.open_positions == 0:
+            self.max_q_hwm = 0
+            self.min_open_fee_ppm = 0
+
+    def carried_fit(self, pool: Venue, execution: bool = False) -> bool:
+        """#99 'switch only if all fit' for an adoption that would carry this market's open positions onto pool (a
+        proposal that opens or improves a window; the execution with execution=True): carried_fit_ok on the market
+        aggregates (carried_q_bound(max_q_hwm, sum_q), sum_q) against the candidate's X0 = carried_x0(D, L_slow, p,
+        X_now) at p = min(P_ema, P_cand) -- the M4R-2 floor's reference, P_cand the candidate's spot in this
+        instruction -- AND at p = P_ema, the first refusal winning: a lower price loosens X0's depth terms (a token
+        reserve, ~ 1/sqrt(p)), so the second evaluation keeps a dump wrapped around the instruction from loosening
+        them.  The proposal's X_now is not protected (FIT-1, #100): after a genuine pump of the candidate it binds, and
+        a dump wrapped around the proposal lifts it inside the transaction; the execution drops X_now (carried_x0),
+        which is the guarantee (up to lambda*sqrt(P_cand/P_ema) x a native open's cap).  True without open positions:
+        zero-position adoptions and listings are unaffected (engine::pool_select::carried_fit).  The fee-scaled caps
+        take phi = carried_fee(pool) (FIT-2, #100; FITS-1, #101)."""
+        if self.open_positions == 0:
+            return True
+        D = pool.locked_depth()
+        qb = carried_q_bound(self.max_q_hwm, self.sum_q)
+        x_now = None if execution else pool.eff()[0]
+        phi = self.carried_fee(pool)
+        for p in (min(self.ema, pool.spot_wad()), self.ema):
+            x0 = carried_x0(D, self.liq_slow, p, x_now, self.P)
+            if not carried_fit_ok(x0, phi, self.tier, qb, self.sum_q, self.P):
+                return False
+        return True
+
+    def carried_fee(self, pool: Venue) -> int:
+        """The fee (ppm) the carried fit's fee-scaled caps take on candidate pool: carried_phi(min_open_fee_ppm, the
+        candidate's one-way fee) = min(phi_inc, phi_cand, CARRIED_FEE_CAP_PPM) (FIT-2, #100; FITS-1, #101)."""
+        return carried_phi(self.min_open_fee_ppm, pool.fee_oneway_ppm())
 
     def settle_reward(self, V: int) -> int:
         P = self.P
@@ -1291,7 +1456,10 @@ class Market:
         lo_ok = self.lb_sec is not None and t - self.lb_sec <= P.ref_max_age_s
         p_rs = min(p_live, self.lb_lo) if (lo_ok and p_live is not None) else None
         L_live = v.sqrt_k() if v.has_price() else self.liq
-        qrs = self.quote_repriced(pos.Q, p_rs, L_live) if p_rs is not None else None
+        # FITS-2 (#101): the spot leg reads the robust spot on L_spot = max(L_live, L_ema'), never below the guarded
+        # EMA liquidity, so an LP withdrawal wrapped around this instruction cannot make it true
+        L_spot = self.spot_liquidity(L_live)
+        qrs = self.quote_repriced(pos.Q, p_rs, L_spot) if p_rs is not None else None
         qe = self.quote_ema(pos.Q)
 
         def cr(q):
@@ -1312,9 +1480,31 @@ class Market:
         # for a keeper exit; try_exit returns before any evaluation (no arm change)
         gated = self.gated()
         return dict(R=R, Veff=Veff, qs=qs, qs_r=qs_r, qrs=qrs, qe=qe, p_live=p_live, p_rs=p_rs, lo_ok=lo_ok,
-                    L_live=L_live, cr_s=cr(qs), cr_rs=cr(qrs) if qrs else None, cr_e=cr(qe),
+                    L_live=L_live, L_spot=L_spot, cr_s=cr(qs), cr_rs=cr(qrs) if qrs else None, cr_e=cr(qe),
                     liq=spot_leg and ema_leg and not gated, ema_leg=ema_leg, spot_leg=spot_leg, ema_run=run,
                     expired=t >= pos.deadline, gated=gated)
+
+    def ema_liquidity(self) -> int:
+        """L_ema', the guarded EMA liquidity (M4R, #96; bounds::ref_liquidity's EMA term): min(L_ema, L_mlo) while
+        the post-change reference guard is set (L_mlo the lower median of the ring's bucket liquidity lows), else
+        L_ema."""
+        return min(self.liq, self.ring_medians()[2]) if self.guard else self.liq
+
+    def spot_liquidity(self, L_live: int) -> int:
+        """FITS-2 (a) (#101; PROPOSED; ECON §5.5, §8.2; ARCH §3.6-§3.8): the liquidity the CR-liquidatability spot
+        leg is judged at, L_spot = max(L_live, L_ema') -- the robust spot P_rs repriced on the deeper of the live pool
+        and the guarded EMA liquidity (uncapped: the reference cap binds L_b's EMA terms only).  An LP withdrawal in
+        the same transaction lowers L_live but not L_ema', so it cannot make the spot leg true; the leg then needs the
+        EMA liquidity itself to have fallen -- genuinely (after a held withdrawal each integrated second closes 1/6 of
+        the gap L_ema - L_live, tau = 5 s at dt = 1, the clamp at most halving L_ema: if the spot leg binds, the
+        liquidation waits until the gap is small enough) or by attacker-only seconds, which the keeper's per-second
+        liquidity-anomaly coverage denies after the first (ECON §5.8 duty 2).  The coverage holds L_ema but cannot lift
+        it: a low reached by a genuine held withdrawal and then frozen by withdraw-wrapped cranks stays in the leg and
+        forces what the same LP's withdrawal for good forces (FITX-1, #102; switch_warmup.py part 5b (vii); ECON §12.12
+        residual 10).  A deposit can raise L_ema' and so delay
+        the leg by at most the position's own depth effect, ~ (1 - L_live/L_ema')*q/x in price.  The EMA leg (the
+        ring's cached reprojections at L_ema) and L_b are unchanged."""
+        return max(L_live, self.ema_liquidity())
 
     def ema_growth_bps(self) -> int:
         """Sustained EMA growth g: the MINIMUM per-second growth (bps/s, floor) over the
@@ -1337,6 +1527,17 @@ class Market:
             return P.kappa_liq_bps
         return min(P.kappa_liq_bps, P.kappa_base_bps + (self.tier.ema_tau_s + 1) * self.ema_growth_bps())
 
+    def ref_depth_cap(self) -> Optional[int]:
+        """M4F-1 (ECON §8.2; bounds::ref_liquidity): on a Raydium venue the EMA terms of the exit reference
+        liquidity are capped at floor(D*1e4/lambda_min), D the pool's locked depth now -- the most depth sizing
+        ever credits the pool with (conservative_x, the adoption anchor).  L_b = max(L_live, min(max(L_ema',
+        L_slow), cap)): a deposit-inflated L_ema / L_slow lifts the reference by at most lambda/lambda_min over the
+        live depth, and L_live itself is never capped.  None (no cap) on the pump venues, which have no D."""
+        v = self.venue
+        if v.kind != "ray":
+            return None
+        return depth_at_lambda(v.locked_depth(), self.P.pool_lock_min_bps)
+
     def exit_reference(self, pos: Position, st: dict, t: int, is_liq: bool):
         """(risk quote at the reference, delta_bps, P_ref) bounding a keeper-initiated
         buyback, or None if no fresh bucket is available (crank first)."""
@@ -1345,9 +1546,14 @@ class Market:
             return None
         lo = self.lb_lo
         # deepest liquidity -> lowest reference cost; M4R: while the post-change guard is set, the EMA term is
-        # min(L_ema, L_mlo) (bounds::ref_liquidity), so a pushed-up L_ema cannot lift the reference
+        # min(L_ema, L_mlo) (bounds::ref_liquidity), so a pushed-up L_ema cannot lift the reference; M4F-1: on
+        # Raydium the EMA terms never credit the pool with more depth than sizing does (ref_depth_cap)
         l_e = min(self.liq, self.ring_medians()[2]) if self.guard else self.liq
-        L_b = max(st["L_live"], l_e, self.liq_slow)
+        l_ref = max(l_e, self.liq_slow)
+        cap = self.ref_depth_cap()
+        if cap is not None:
+            l_ref = min(l_ref, cap)
+        L_b = max(st["L_live"], l_ref)
         if is_liq:
             if P.exit_ref == "ema":
                 pref = self.ema
@@ -1459,7 +1665,15 @@ class Market:
                  settle_only: bool = False):
         """Keeper liquidation / expiry / settlement, or borrower close, at time t.
         Returns a result dict, or None if nothing executes now.
-        settle_only=True models a standalone sol_settle call (no buyback attempted)."""
+        settle_only=True models a standalone sol_settle call (no buyback attempted).
+        Every result is terminal: the position leaves the market aggregates (#99, _release)."""
+        r = self._try_exit(pos, t, borrower_close, borrower_limit, settle_only)
+        if r is not None:
+            self._release(pos)
+        return r
+
+    def _try_exit(self, pos: Position, t: int, borrower_close: bool = False, borrower_limit: Optional[int] = None,
+                  settle_only: bool = False):
         self.advance(t)
         self.observe(t)
         P = self.P
@@ -1908,15 +2122,20 @@ def flag_route(m: Market):
 
 
 def fast_path_events(t0: int, cand_frac_bps: int, horizon: int = 900):
-    """Raydium incumbent halted at t0; the keeper proposes the deepest eligible candidate
-    (cand_frac_bps of the incumbent depth, same price) once pool_fail has held for
-    pool_fast_route_s, and executes the switch after the collection window (Market.adopt_pool:
-    the M4R post-change confirmation; exits resume after the 8-bucket warm-up).  (Per-market
-    state lives on the Market object, so the scenario can be reused.)"""
+    """Raydium incumbent halted at t0; the keeper's candidate is the pool at cand_frac_bps of the incumbent's reserves
+    (lambda 90 %), trading at the market price.  Once pool_fail has held for pool_fast_route_s the keeper proposes it:
+    the window opens if it passes the window floor at min(P_ema, P_cand) and every open position fits its opening
+    caps (#99, Market.carried_fit at min(P_ema, P_cand)); otherwise the proposal is refused and re-tried every second.
+    pool_fast_window_s after the window opened, execute_pool_switch adopts it (Market.adopt_pool: the M4R post-change
+    confirmation; exits resume after the 8-bucket warm-up) if the chain that armed the window holds, the window floor
+    passes at P_ema and the positions still fit at P_ema; otherwise the window is cancelled.  A candidate that never
+    fits leaves the positions on the halted pool: healthy ones frozen until their deadline, then S3 at fair value.
+    (Per-market state lives on the Market object, so the scenario can be reused.)"""
     def halt(m: Market):
         v = m.venue
         m._fp = RaydiumPool(v.X * cand_frac_bps // BPS, v.Y * cand_frac_bps // BPS, fee_ppm=v.fee_ppm,
                             out_share_ppm=v.out_share_ppm, name=v.name + "'", lock_bps=9000)
+        m._fp_t0 = None
         v.disabled = True
 
     def maybe_switch(m: Market):
@@ -1924,10 +2143,20 @@ def fast_path_events(t0: int, cand_frac_bps: int, horizon: int = 900):
         c = getattr(m, "_fp", None)
         if c is None or m.pool_fail_since is None:
             return
-        if m.t >= m.pool_fail_since + P.pool_fast_route_s + P.pool_fast_window_s:
-            c.move_to_price(m.ema)                   # candidate trades at the market price
-            m.adopt_pool(c, m.t)                     # M4R: anchor cap, warm-up, guard (v0.4.1: fast_switch)
-            m._fp = None
+        if m._fp_t0 is None:
+            if m.t >= m.pool_fail_since + P.pool_fast_route_s:
+                c.move_to_price(m.ema)               # candidate trades at the market price
+                p_cand = c.spot_wad()
+                if window_floor_ok(c.locked_depth(), m.ema, p_cand) and m.carried_fit(c):
+                    m._fp_t0 = m.t                   # the window opens (else refused: PoolTooThin /
+            return                                   # CarriedPositionsTooLarge; the keeper re-proposes)
+        if m.t >= m._fp_t0 + P.pool_fast_window_s:
+            chain = m.pool_fail() and m.pool_fail_since + P.pool_fast_route_s <= m._fp_t0
+            if chain and position_floor_ok(c.locked_depth(), m.ema) and m.carried_fit(c, execution=True):
+                m.adopt_pool(c, m.t)                 # M4R: anchor cap, warm-up, guard (v0.4.1: fast_switch)
+                m._fp = None
+            else:
+                m._fp_t0 = None                      # cancelled; the chain stays armed
     return ((t0, halt),) + tuple((t0 + i, maybe_switch) for i in range(1, horizon))
 
 
@@ -1949,9 +2178,17 @@ SCENARIOS = [
     Scenario("flat to expiry", lambda t: None, t_event=10**9, window=0, horizon=10**9),
 ]
 SC = {s.name: s for s in SCENARIOS}
+# #99: a position at the incumbent's size cap (q 0.75 % of X on RA / RB / RC, lambda 50 %) fits a candidate only if
+# the X0 an open would have on it right after the adoption -- min(X, min(L_slow, D)/sqrt(P_ema), D/(lambda_min*
+# sqrt(P_ema))) -- reaches the incumbent's, i.e. the candidate's locked depth D covers the incumbent's L_slow (its
+# whole depth): the 120 % pool at lambda 90 % (D = 1.08 L_slow) carries it; the 50 % (0.45) and 25 % (0.225) pools
+# are refused and the position stays on the halted pool (frozen until its deadline, then S3 at fair value).  Index 1
+# is the adopting replay the math crate's vectors trace (gen_settle, venue_switch.py (a)).
 FAST_SCENARIOS = [
     Scenario("halt -> fast path to a 50% pool, then pump 2x/120s", ramp_path(TE + 300, 2.0, 120),
              events=fast_path_events(TE, 5000), window=1500),
+    Scenario("halt -> fast path to a 120% pool, then pump 2x/120s", ramp_path(TE + 300, 2.0, 120),
+             events=fast_path_events(TE, 12000), window=1500),
     Scenario("halt -> fast path to a 25% pool, then pump 2x/120s", ramp_path(TE + 300, 2.0, 120),
              events=fast_path_events(TE, 2500), window=1500),
 ]
@@ -2254,6 +2491,38 @@ SCEN_HEADERS = ["market", "scenario", "outcome", "exit vs event", "price at exit
                 "lender gets", "lender P&L vs holding at terminal price (SOL, % of Q value)", "keeper SOL"]
 
 
+def frozen_s3_rows():
+    """#99: FAST_SCENARIOS rows whose candidate the position does not fit: after the scenario's horizon the keeper
+    keeps the S3 chain alive (duty 5: a crank every 30 s on the halted pool) and settles at the deadline; the
+    healthy position is never liquidatable at the frozen P_ema, so S3 comes with the expiry, at fair value (D3; the
+    expiry fee as p', O15)."""
+    rows = []
+    for key in ("RA", "RB", "RC"):
+        for sc in FAST_SCENARIOS:
+            m = new_market(key)
+            pos, r, P1 = run(m, 1.0, sc)
+            if r["kind"] != "open" or m.venue.has_route():
+                continue
+            t = r["t"]
+            res = None
+            while res is None and t < pos.deadline + 3600:
+                t += 30
+                m.step_to(t)
+                if t >= pos.deadline:
+                    res = m.try_exit(pos, t)
+            if res is None:
+                rows.append([key, sc.name, "open", "-", "-", "-", "-", "-", "-", "-"])
+                continue
+            v_frozen = pos.Q * m.ema // WAD
+            v_term = pos.Q * int(P1 * 2.0) // WAD
+            rows.append([key, sc.name, res["kind"], f"+{(t - TE) / 86400:.2f} d (deadline +{(pos.deadline - TE) / 86400:.2f} d)",
+                         f"{sol(res['lender_sol']):.4f}", f"{sol(v_frozen):.4f}",
+                         f"{sol(res['lender_sol'] - v_frozen):+.4f} ({100 * (res['lender_sol'] - v_frozen) / v_frozen:+.1f}%)",
+                         f"{sol(res['lender_sol'] - v_term):+.4f} ({100 * (res['lender_sol'] - v_term) / v_term:+.1f}%)",
+                         f"{sol(res['borrower']):.4f}", f"{sol(res['keeper']):.4f}"])
+    return rows
+
+
 def grad_extra(sc: Scenario, P: Params) -> Params:
     if "stuck" in sc.name:
         return replace(P, migration_delay_s=10**9)
@@ -2265,9 +2534,17 @@ def scenario_tables():
     out.append("### Deterministic scenarios, size at the per-position cap (event at t = 1 h after open)\n")
     rows = scenario_rows(["A", "B", "C", "D@0%", "D@50%", "D@90%", "RA", "RB", "RC"], SCENARIOS)
     out.append(table(SCEN_HEADERS, rows))
-    out.append("\n### Raydium incumbent halted, fast-path switch to a thinner pool (R3B-7a; ring L rewritten)\n")
+    out.append("\n### Raydium incumbent halted, fast-path switch to a thinner pool (R3B-7a; ring L rewritten; #99: only "
+               "onto a pool on which the position fits the opening caps -- 'open' at 1.00x = no window, frozen on the "
+               "halted pool)\n")
     rows = scenario_rows(["RA", "RB", "RC"], FAST_SCENARIOS)
     out.append(table(SCEN_HEADERS, rows))
+    out.append("\n#### #99: the positions no candidate fits, continued to their deadline (keeper crank every 30 s on the "
+               "halted pool; S3 at fair value, the box at the EMA point)\n")
+    out.append(table(["market", "scenario", "exit", "at (after the halt)", "lender gets (SOL)",
+                      "value of Q at the frozen P_ema (SOL)", "lender P&L vs the frozen P_ema",
+                      "lender P&L vs the terminal price (2.00x)", "borrower (SOL)", "keeper (SOL)"],
+                     frozen_s3_rows()))
     out.append("\n### Graduation mid-position (Tier D; event at t = 1 h; migration 2 s after completion; "
                "boost 20.69 % spent over 6 min)\n")
     rows = scenario_rows(["D@50%", "D@80%", "D@90%", "D@97%"], GRAD_SCENARIOS, extra=grad_extra)

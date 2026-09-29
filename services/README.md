@@ -32,11 +32,30 @@ What it does, per tick (one per slot; `keeper/src/keeper.rs`):
   and `ema_warm > 0` on an executable venue; M4R, duty 5) every second until the warm-up is over:
   the program refuses keeper exits until then, so the positions' plan is `Watch` and no
   `liquidate` / `expire` is sent; the first second the projection shows `ema_warm == 0` (adoption
-  + 9 s with per-second observations) the exits go out as usual.
-- **Duty 2, bursts**: an observation in the open or last completed bucket that deviates by more
-  than 2 % from the spot prices the keeper itself read in that second was not the keeper's (an
-  atomic `[pump, crank, dump]` leaves exactly that): one observation every slot for 60 s
-  (never while an S3 on an executable venue is due: once per second there, duty 5).
+  + 9 s with per-second observations) the exits go out as usual. The per-second cadence then
+  lasts for as long as the post-change reference guard is set (`ema_guard == 1`,
+  `MarketNeeds::guarded`; M4F-1): every second keeps its honest bucket low, so deposit-wrapped
+  cranks in otherwise idle seconds cannot lift the ring's liquidity lows and clear the guard.
+- **Duty 2, bursts**: an observation in the open or last completed bucket whose **price**
+  deviates by more than 2 % from what the keeper itself read in that second was not the keeper's
+  (an atomic `[pump, crank, dump]` leaves exactly that): one observation every slot for 60 s from
+  that second (never while an S3 on an executable venue is due: once per second there, duty 5).
+  The per-slot liquidity bursts M4F-1 added stay reverted (M4G-2: an atomic `[deposit,
+  crank_price, withdraw]` bought a 60-s per-slot burst, 25–150× its cost in the keeper's).
+- **Duty 2, liquidity coverage** (FITS-2 (b), owner decision of 2026-09-29): on a market **with
+  open positions**, an observation in the open or last completed bucket whose **liquidity**
+  extremes (`llo` / `lhi`; the last completed bucket's from the ring entry that integrated it)
+  deviate by more than 2 % (`burst_dev_bps`) from the `√(X·Y)` the keeper itself read in that
+  second — an LP-wrapped `[withdraw, crank_price, deposit]` (the withdraw drag of `L_ema` /
+  `L_slow`) or `[deposit, crank_price, withdraw]` (the freeze) — starts one observation **per
+  second** (never per slot) for `liq_cover_s` (10 s) from that second, extended by every
+  recurrence (`MarketNeeds::liq_covered`). While the attacker keeps wrapping, every second carries
+  the keeper's honest bucket extreme — no attacker-only second — at one keeper crank per attacker
+  transaction (1:1); an isolated wrap buys at most 10 keeper observations. It holds `L_ema`, it
+  cannot lift a low reached genuinely before the wrapping started (an LP withdrawn for real for a
+  few seconds: nothing foreign then) — FITX-1, ECON §12.12 residual 10, owner item O18. A market without open
+  positions never gets liquidity-triggered coverage (nothing there reads the liquidity EMA);
+  `liq_cover_s = 0` disables it. A venue change drops the depths viewed before it.
 - **Duty 3, exits**: `liquidate` at the first second the program accepts it (the fixed-δ bound;
   retried every second on `ExitBoundNotMet`), `expire` when the expiry bound is met. Trading
   exits try the extras sets `current`, `none`, `previous`, `stable` and keep the first that
@@ -130,6 +149,13 @@ What it does, per tick (one per slot; `keeper/src/keeper.rs`):
     does not observe, is observed by the monitor (at once, then every 30 s) while a candidate is
     deep enough for the fast path, so its `pool_fail` chain arms. Sends are simulated first, at
     the exit priority ceiling, outside the O17 observation budget.
+  - **The marks** (ECON #100). The plan runs the program's own `carried_fit` on the market as
+    its view holds it: `max_q_hwm` (falls only when `open_positions` returns to 0) and
+    `min_open_fee_ppm` (the lowest fee an open paid since then; the fee-scaled caps take
+    `min(min_open_fee_ppm, φ_cand)`, FIT-2). The keeper has no duty to lower the mark: a large
+    position that has closed while others stay open keeps a thinner candidate refused
+    (`CarriedPositionsTooLarge`) and the positions exit on the failed pool through the S3 chain
+    at fair value (FIT-3, a disclosed residual; `pool_select`'s scenario below).
   - **Reports.** The decoded `PoolProposed` / `PoolSwitched` / `PoolSwitchCancelled` of the
     keeper's transactions; `Alert::PoolSwitched`, `PoolWindow`, `PoolSwitchCancelled` for the
     keeper's actions and for anyone else's seen on chain; `Alert::PoolPinned` when a candidate
@@ -263,7 +289,64 @@ Raydium scenarios (`raydium*.rs`, the dumped AMM v4 and CPMM programs and pools)
   `PoolPinned` alert, the adoption in the tick the position closed; proposals held by a flagged
   Raydium upgrade until `revalidate_venue`; M4V-5's listing-window observations (60 observations
   60 s apart and 10 in the last 10 s, the first open after the window lands; a window nobody
-  observed is warmed up in the 8 s after it, the open refused `EmaWarmingUp` until then).
+  observed is warmed up in the 8 s after it, the open refused `EmaWarmingUp` until then); FIT-3
+  (#100, a disclosed residual): a position opened at the incumbent's size cap and closed at once
+  leaves `max_q_hwm` above a 40 % sibling's cap while two fitting positions stay open — at the
+  halt (900 s before their deadline) the keeper's plan is blocked `CarriedPositionsTooLarge`, it
+  proposes nothing, and it settles both in S3 at fair value at their due second
+  `max(deadline, no_route_since + s3_wait_s)` (lenders `FV` in full).
+- `freeze` (M4F-1, M4G-1, M4G-3 after "switch only if all fit"; the M4X-2 shape: a 2,500-SOL λ 50 %
+  AMM v4 incumbent halts with a position open, a 320-SOL λ 99.78 % CPMM sibling is the candidate):
+  a position at the incumbent's size cap (≈ 3.1 % of the sibling's `X`, above its cap) is **not**
+  adopted — the keeper's plan reports `CarriedPositionsTooLarge` and it proposes nothing (neither
+  the CPMM sibling nor a 400-SOL AMM v4 one), a direct proposal is refused before and after an
+  LP's held 7× deposit in the sibling, and the keeper settles the position in S3 at fair value at
+  its deadline (lenders `FV` in full); a position that fits the sibling (95 % of its cap) is
+  adopted and, under an attacker's `[deposit 7·LP, crank_price, withdraw]` after the keeper in
+  every second, then a genuine 4× ramp: from the adoption the keeper observes every second for as
+  long as the guard is set (the lows stay the pool's depth); from +40 s, after the honest guard
+  clear, nothing starts a per-slot burst but the foreign liquidity keeps the keeper per second from
+  the first wrap (FITS-2 (b)); with keeper misses at +60 / +80 / +100 s (M4G-1) and with a real
+  deposit held 600 s and pulled at the pump (M4G-3) too — every run is liquidated at the
+  control's second relative to the ramp (the pushes only delay; here by 0 s). #100: at a **1 %**
+  sibling's fit limit taken at its own fee (`q` at 76 % of its impact cap, 1.87 % of `X`) the same
+  held deposit, freeze and misses with a 4×/30 s ramp ended in S1 (FIT-2); the carried fit's
+  fee-scaled caps take `min(min_open_fee_ppm, φ_cand, CARRIED_FEE_CAP_PPM)`, so that position is
+  **not adopted** (the plan blocked, a direct proposal refused, no window) and settles in S3 at
+  fair value at its due second, and a position at the new fit limit (95 % of the 25-bps class,
+  0.75 % of `X₀`) is adopted and liquidated under every push (`fit2_*`; knobs `FIT_FEE`,
+  `FIT_PM`, `FIT_RAMP`, `FIT_W`, `FIT_K`, `FIT_ATTACK`, `FIT_SLACK`); FITS-1: a **1 % → 1 %**
+  switch (both pools on one 1 % config) at 60 % of the old fit limit (1.48 % of `X`, S1 under the
+  pushes before the 25-bps ceiling) is not adopted and settles in S3 at fair value, and one at
+  95 % of the 25-bps carried cap is liquidated under every push (`fits1_*`; `FITS_PM`); a position
+  carried through a dump-wrapped proposal (FIT-1) is liquidated under them too (`fit1_*`);
+  FITV-2 / FITS-2, the withdraw contest (an unlocked LP of 100 % of the counter on a 160-SOL
+  λ 99.78 % 1 % pool, λ ≈ 49.9 %): the program-level sweep — around the honest threshold a
+  `[withdraw all, liquidate, deposit]` is accepted only where the honest `liquidate` is (refused
+  `NotLiquidatable` in the retreat's band; on a build with the spot leg at `L_live` it was
+  accepted there), and the I18 spot-leg hook fires on a mutated event; the verifier's
+  small-position contest (500 ‰ of the cap, 2.025×) and 25-minute drag (the cap, 1,500 s, 2.05×),
+  each in the reproducer's timing and the adversarial one (the attacker after the keeper, from a
+  second its idle cadence skips): no forced liquidation, the keeper per second through the drag at
+  one crank per wrapped crank (1,859 for 1,859 over the 1,500-s drag); the residual, pinned: in
+  the adversarial timing the first wrap's second is the attacker's (`L_ema` 0.917 × `√(X·Y)`,
+  then clamped), which leaves a band of ≈ 0.1 % of price under the honest threshold (forced at a
+  2.038× top, the honest keeper liquidating at 2.040×); a genuine withdrawal of the LP's half of
+  the depth 10 s before, at and 40 s into a pump, and 90 s into a flat 2.03× hold, is liquidated at
+  the old rule's second (0 s delay at 500 ‰: the EMA leg's own lag binds; at the cap the exit
+  bound, not the spot leg, waits: `L_b`'s `L_slow` credit) (`fits2_*`, `fitv2_*`; knobs `FITV_*`,
+  `FITS_*`); FITX-1 (ECON #102), the pinned residual of those drags: the coverage holds `L_ema`
+  but cannot lift it, so an LP that first withdraws for real for 20 s (nothing foreign: the keeper
+  reads the same depth), re-deposits and then withdraw-wraps a crank every second forces the
+  500 ‰ position at 2.025× (+71 s), the 25-bps position at its open cap at 2.010× (+76 s) and the
+  cap after a 25-minute freeze at 2.05× (+67 s), where the honest keeper leaves them open — each
+  exactly the liquidation the honest keeper makes when the same LP withdraws for good at +1 s (the
+  same second, price and buyback cost) (`fitx1_*`; knobs `FITX_HELD`, `FITX_GONE`); and M4G-2 /
+  FITS-2 (b), the keeper's cost: one `[deposit 5 %, crank_price,
+  withdraw]` buys 8 per-second keeper observations (≤ 10), one every 59 s for an hour 7.9 each
+  (603 cranks against the quiet hour's 120; the example 0.03 SOL budget unspent), none on a market
+  without positions, and no per-slot burst, while the price-wrapped control still starts bursts
+  (`m4g2_*`).
 
 The JSON-RPC backend has its own check against a live local cluster (`common/tests/rpc_local.rs`,
 ignored by default): clock, accounts, program accounts, recent fees, and a transfer simulated and

@@ -291,6 +291,186 @@ fn i15_fast_adoption_needs_the_arming_chain() {
     assert_eq!(i15(&env, &pre, &ev), Ok(()));
 }
 
+/// Switch only if all fit (owner decision of 2026-09-29) in the hook: a real window proposal and
+/// its execution with a position that fits pass; the same instructions with the position's own
+/// `q` (in the state before) above the candidate's per-position cap — or two such positions
+/// whose sum is above its OI cap — fail I15. The state part: a mark `max_q_hwm` below an open
+/// position's `q`, or non-zero with no position open, fails I15.
+#[test]
+fn i15_switch_only_if_all_fit() {
+    let (mut env, rm, q) = setup(FART);
+    let mut b = env.borrower();
+    open_ok(&mut env, &rm, &mut b, q);
+    halt(&mut env, &rm.pool);
+    let lam = lambda_of(&env, &rm.pool);
+    let cand = plant(&mut env, &rm.pool, Plant::V4, true, (50, 100), lam);
+    crank_every(&mut env, &rm, 30, 5);
+    let (cap, oi) = shortwin_litesvm_tests::pool_select::carried_caps(&env, &cand);
+    assert!(q <= cap);
+    let pre = invariants::snapshot(&env.svm, &[rm.market()]);
+    let meta = ok(env.propose(Some(&rm.pool), &cand));
+    let ev = IxEvents::of(&meta, 0);
+    assert_eq!(i15(&env, &pre, &ev), Ok(()), "the real proposal");
+    let with_q = |pre: &TxSnapshot, qs: &[u64]| {
+        let mut m = pre.clone();
+        let (k, p, l) = m.positions.markets[0].positions[0].clone();
+        m.positions.markets[0].positions = qs
+            .iter()
+            .map(|&q| {
+                let mut p = p.clone();
+                p.q = q;
+                (k, p, l)
+            })
+            .collect();
+        m
+    };
+    assert_eq!(i15(&env, &with_q(&pre, &[cap]), &ev), Ok(()), "at the cap");
+    assert_eq!(
+        i15(&env, &with_q(&pre, &[cap + 1]), &ev),
+        Err("I15"),
+        "a window candidate the position does not fit"
+    );
+    assert_eq!(
+        i15(&env, &with_q(&pre, &[oi / 2 + 1, oi / 2 + 1]), &ev),
+        Err("I15"),
+        "positions whose sum is above its OI cap"
+    );
+    crank_every(&mut env, &rm, 30, 2);
+    let pre = invariants::snapshot(&env.svm, &[rm.market()]);
+    let meta = ok(env.execute_switch(&rm.pool, &cand));
+    let ev = IxEvents::of(&meta, 0);
+    assert_eq!(ev.switched.len(), 1);
+    assert_eq!(i15(&env, &pre, &ev), Ok(()), "the real adoption");
+    assert_eq!(
+        i15(&env, &with_q(&pre, &[cap.saturating_mul(3)]), &ev),
+        Err("I15"),
+        "an adoption carrying a position that does not fit"
+    );
+    // The state part.
+    let market = rm.market();
+    let m = env.market(&market);
+    assert_eq!(m.max_q_hwm, q);
+    assert_eq!(
+        invariants::check_all(&env.svm, &market).map_err(|v| v.invariant),
+        Ok(())
+    );
+    let mut low = m;
+    low.max_q_hwm = q - 1;
+    shortwin_litesvm_tests::fixtures::set_zc(&mut env.svm, &market, &low, 0);
+    assert_eq!(
+        invariants::check_all(&env.svm, &market).map_err(|v| v.invariant),
+        Err("I15"),
+        "a mark below an open q"
+    );
+    shortwin_litesvm_tests::fixtures::set_zc(&mut env.svm, &market, &m, 0);
+    assert_eq!(
+        invariants::check_all(&env.svm, &market).map_err(|v| v.invariant),
+        Ok(())
+    );
+}
+
+/// FIT-2, the carried fee and the marks: a real open leaves `min_open_fee_ppm` at the venue's fee
+/// (a post-state with another value, or with `max_q_hwm` lowered while the position is open, fails
+/// I15); the last exit resets both marks, and a non-zero fee mark with no position open fails I15
+/// (state part); a real window proposal passes, and the same proposal judged on a market whose
+/// positions were margined at a (mutated) 1-ppm fee fails I15 (the fee-scaled caps take
+/// `min(mark, φ_cand)`).
+#[test]
+fn i15_the_carried_fee_and_the_marks() {
+    use shortwin::state::Market;
+    let (mut env, rm, q) = setup(FART);
+    let market = rm.market();
+    let set = |env: &mut Env, m: &Market| {
+        shortwin_litesvm_tests::fixtures::set_zc(&mut env.svm, &market, m, 0);
+    };
+    let check = |env: &Env| invariants::check_all(&env.svm, &market).map_err(|v| v.invariant);
+    let pre = invariants::snapshot(&env.svm, &[market]);
+    let mut b = env.borrower();
+    let (_, nonce, meta) = open_ok(&mut env, &rm, &mut b, q);
+    let ev = IxEvents::of(&meta, 0);
+    let fee = pre.positions.markets[0].venue.expect("a view").fee_ppm;
+    let m = env.market(&market);
+    assert_eq!((m.min_open_fee_ppm, m.max_q_hwm), (fee, q));
+    assert_eq!(i15(&env, &pre, &ev), Ok(()), "the real open");
+    set(
+        &mut env,
+        &Market {
+            min_open_fee_ppm: fee - 1,
+            ..m
+        },
+    );
+    assert_eq!(
+        i15(&env, &pre, &ev),
+        Err("I15"),
+        "a fee mark other than the open's fee"
+    );
+    set(&mut env, &m);
+    // Any other instruction (a crank) leaves both marks: one that lowered `max_q_hwm` (from a
+    // mutated q + 5 before) or moved the fee mark with the position open fails I15.
+    env.warp(1);
+    let pre = invariants::snapshot(&env.svm, &[market]);
+    let meta = ok(env.send(&[crank_price_ix(&rm)], &[]));
+    let ev = IxEvents::of(&meta, 0);
+    assert_eq!(i15(&env, &pre, &ev), Ok(()), "the real crank");
+    let mut high = pre.clone();
+    high.positions.markets[0].state.max_q_hwm = q + 5;
+    assert_eq!(
+        i15(&env, &high, &ev),
+        Err("I15"),
+        "max_q_hwm lowered with a position open"
+    );
+    let mut other = pre.clone();
+    other.positions.markets[0].state.min_open_fee_ppm = fee + 1;
+    assert_eq!(
+        i15(&env, &other, &ev),
+        Err("I15"),
+        "the fee mark moved without an open or the last exit"
+    );
+    // The last exit resets both marks; a fee mark left on an empty market fails the state part.
+    env.warp(1);
+    env.crank(&rm);
+    close_ok(&mut env, &rm, &b, nonce);
+    let empty = env.market(&market);
+    assert_eq!(
+        (
+            empty.open_positions,
+            empty.max_q_hwm,
+            empty.min_open_fee_ppm
+        ),
+        (0, 0, 0)
+    );
+    assert_eq!(check(&env), Ok(()));
+    set(
+        &mut env,
+        &Market {
+            min_open_fee_ppm: fee,
+            ..empty
+        },
+    );
+    assert_eq!(check(&env), Err("I15"), "a fee mark with no position open");
+    set(&mut env, &empty);
+    // A window proposal on the halted incumbent: real, then judged at a 1-ppm open fee.
+    env.warp(1);
+    env.crank(&rm);
+    open_ok(&mut env, &rm, &mut b, q);
+    halt(&mut env, &rm.pool);
+    let lam = lambda_of(&env, &rm.pool);
+    let cand = plant(&mut env, &rm.pool, Plant::V4, true, (50, 100), lam);
+    crank_every(&mut env, &rm, 30, 5);
+    let pre = invariants::snapshot(&env.svm, &[market]);
+    let meta = ok(env.propose(Some(&rm.pool), &cand));
+    let ev = IxEvents::of(&meta, 0);
+    assert_eq!(ev.proposed.len(), 1);
+    assert_eq!(i15(&env, &pre, &ev), Ok(()), "the real proposal");
+    let mut cheap = pre.clone();
+    cheap.positions.markets[0].state.min_open_fee_ppm = 1;
+    assert_eq!(
+        i15(&env, &cheap, &ev),
+        Err("I15"),
+        "positions margined at 1 ppm do not fit the candidate's fee-scaled caps"
+    );
+}
+
 /// Opens sized on locked depth: an `Open` whose `q` exceeds the impact cap on the locked-depth
 /// `X₀` fails I15; the real one passes.
 #[test]

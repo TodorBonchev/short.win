@@ -25,6 +25,11 @@ extremes, adversarial ring shapes, stale buckets, the reference caps):
     max_in     the max_in lines of Market._buyback_exit (liquidation: liq_reserve =
                "none"; expiry: exp_reserve = "rent+fee"), transcribed; the settle track's
                traces assert the transcription against every exit the sim executes.
+* units_ref.json
+    ref_liquidity  Market.exit_reference's L_b alone (M4F-1): the guard on or off and, on a
+               Raydium venue, Market.ref_depth_cap = floor(D*1e4/lambda_min) binding or not
+               (none on another venue); drawn after units_bounds, so the other files keep
+               their random stream.
 
 Ranges. (x, y) is compared exactly, so every reprojection in these vectors lies where the
 u128 forms of ECON §2.1 are exact for any correct implementation: L*10^9 <= u128::MAX and
@@ -374,6 +379,62 @@ def max_in_liq(b_ref, delta, V, K, ert):
     return min(b_ref * (BPS + delta) // BPS, V - K - ert)
 
 
+class FakeRay(FakeVenue):
+    """A Raydium venue as Market.ref_depth_cap reads it (M4F-1): its locked depth D."""
+    kind = "ray"
+
+    def __init__(self, p, l, d):
+        super().__init__(p, l)
+        self.d = d
+
+    def locked_depth(self):
+        return self.d
+
+
+def unit_ref_liquidity(rng, n):
+    """L_b of Market.exit_reference (expiry; the reference quote replaced by a capture) with the
+    post-change guard on or off and, on a Raydium venue, the M4F-1 cap floor(D*1e4/lambda_min)
+    around the EMA terms (so it binds about half the time); lambda_min over its compiled range.
+
+      ref_liquidity  l_live L_ema L_slow guard lambda_min D L_b | ring      (lambda_min, D "-" off Raydium)"""
+    cases = []
+    for _ in range(n):
+        ring = rnd_ring(rng, rng.randrange(1, 9))
+        lam = rng.choice([5_000, 5_000, 2_000, 10_000, rng.randrange(2_000, 10_001)])
+        m = bare(P=replace(sim.DEFAULT, pool_lock_min_bps=lam))
+        m.ring = ring
+        m.ema = ring[-1][1]
+        m.liq, m.liq_slow = rnd_liq(rng), rnd_liq(rng)
+        if rng.random() < 0.3:                       # the M4F-1 shape: pushed EMA terms over a thin pool
+            m.liq = m.liq * rng.randrange(2, 17)
+        m.guard = rng.random() < 0.4
+        l_e = min(m.liq, M.ring_medians(m)[2]) if m.guard else m.liq
+        top = max(l_e, m.liq_slow)
+        ll = rnd_liq(rng) if rng.random() < 0.6 else max(1, top * rng.randrange(2_000, 12_000) // 10_000)
+        ray = rng.random() < 0.75
+        if ray:
+            pick = rng.random()
+            if pick < 0.6:                           # cap = D*1e4/lambda_min around the EMA terms
+                d = max(0, top * rng.randrange(3_000, 16_000) // 10_000 * lam // BPS)
+            elif pick < 0.8:
+                d = rnd_liq(rng)
+            else:
+                d = rng.choice([0, 1, top * lam // BPS, U128 // BPS + 1, U128])
+            m.venue = FakeRay(10**18, ll, d)
+        else:
+            d = None
+            m.venue = FakeVenue(10**18, ll)
+        now = ring[-1][0]
+        m.lb_sec, m.lb_lo = now, ring[-1][1]
+        cap = []
+        m.quote_repriced = lambda Q, pp, L, c=cap: (c.append((pp, L)) or (0, 1))
+        r = M.exit_reference(m, sim.Position(Q=1), {"lo_ok": True, "L_live": ll}, now, False)
+        assert r is not None and len(cap) == 1
+        cases.append(line(ll, m.liq, m.liq_slow, m.guard, lam if ray else None, d, cap[0][1], "|",
+                          *ring_tokens(ring)))
+    return cases
+
+
 def max_in_exp(b_ref, delta, eps, fee_bps, V, K, R, ert):
     """Transcription of Market._buyback_exit, exp_reserve = "rent+fee"."""
     senior = R + sim.cdiv(fee_bps * b_ref, BPS)
@@ -419,6 +480,7 @@ def main():
         "units_persist.json": dump("units_persist.json", {"persist": unit_persist(rng, 600)}),
         "units_bounds.json": dump("units_bounds.json", {
             "reference": unit_reference(rng, 600), "max_in": unit_max_in(rng, 500)}),
+        "units_ref.json": dump("units_ref.json", {"ref_liquidity": unit_ref_liquidity(rng, 500)}),
     }
     for k, v in sizes.items():
         print(f"{k}: {v:,} bytes")

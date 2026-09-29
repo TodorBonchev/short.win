@@ -1,8 +1,16 @@
 //! M4R regressions: the post-change confirmation of the observation state (owner item O18,
 //! **PROPOSED**; ARCH §2.6 rule 4 as amended, §3.6 precondition 1b, §4.4; ECON §5.2, §12.12) on
 //! the mainnet fork. Every instruction goes through `Env::send`, so the invariant hooks (I15 with
-//! the anchor and the proposal window floor, I18 with the countdown, the seed, the gate and the
-//! guard) run after each one.
+//! the anchor, the proposal window floor and "switch only if all fit", I18 with the countdown,
+//! the seed, the gate and the guard) run after each one.
+//!
+//! **Switch only if all fit** (owner decision of 2026-09-29): a collection window adopts only a
+//! candidate whose opening caps every carried position fits, so every scenario that moves a
+//! position through a window sizes it to fit the planned candidate (planted before the open; at
+//! most 90–95 % of its per-position cap, `pool_select::carried_caps`). As built at M4R they
+//! carried the largest position the incumbent's caps allowed (1.3–6 % of the candidate's `X`);
+//! the M4R-1 thresholds (healthy at 1.97× / 1.975×, liquidated at 2.05×) and the M4X-1 ones hold
+//! at the fitting size too.
 //!
 //! | Test | Finding and what is asserted now |
 //! |---|---|
@@ -14,8 +22,11 @@
 //! | `t_switch_confirm_*` (★T-SWITCH-CONFIRM) | a genuine 2.2× pump during the halt: liquidated at adoption + 9 s; no observer for 600 s after the adoption, then the keeper: liquidated 8–9 s after it returns |
 //! | `m4r_explore_liquidation_grid` (ignored) | the M4R-1 exploration grid with its knobs `M4R_GRID`, `M4R_SECS`, `M4R_SOL` |
 //! | `m4x1_attacker_only_price_bundles_reach_no_further_than_steady_state` | M4X-1: the warm-up price seed read the lowest post-change bucket low with no step bound, so 8 attacker-only `[buy, crank_price, sell]` bundles seeded `P_ema` at the pump and a `[buy, liquidate, sell]` at the gate liquidated a position at any threshold (margin +50 %: threshold ≈ 3×) while the pool traded flat at 1.00× (+9 s, CPMM and AMM v4 candidates). Now every warm-up step rises by at most the largest v0.4.1 step (`observe::price_up_bound`, checked here step by step: ≈ 2.78× at the 6th integration, 3.24× at the 7th) and the same run stays open for 20 s; the near-threshold run (2.5× bundles, threshold ≈ 2.05×) is steady state's degraded-mode class (O18 residual 1; M4 as built reached it at +7 s): it is still liquidated at the gate, the seed within the bound |
-//! | `m4x2_a_held_deposit_freeze_no_longer_lifts_l_slow` | M4X-2: under the capital deposit freeze (`[deposit 7·LP, crank_price, withdraw]` every second from the adoption) `L_slow` integrated the frozen `L_ema` while the guard was set, reached 2.62× the pool's depth after 900 s, and the unguarded `L_slow` term of `L_b` turned a genuine 4× pump into S1 (lenders −10.056 SOL, borrower 0) instead of a liquidation. Now `L_slow` integrates `min(lobs, L_mlo)` while the guard is set: ≤ 1.0× at the ramp, liquidated with the lenders' `q` bought back; an `L_slow` lifted above the lows is an I18 violation |
+//! | `m4x2_a_held_deposit_freeze_no_longer_lifts_l_slow` | M4X-2: under the capital deposit freeze (`[deposit 7·LP, crank_price, withdraw]` every second from the adoption) `L_slow` integrated the frozen `L_ema` while the guard was set, reached 2.62× the pool's depth after 900 s, and the unguarded `L_slow` term of `L_b` turned a genuine 4× pump into S1 (lenders −10.056 SOL, borrower 0) instead of a liquidation. Now `L_slow` integrates `min(lobs, L_mlo)` while the guard is set: ≤ 1.0× at the ramp, and the position — the largest the candidate takes (switch only if all fit: q/x ≈ 0.71 %, the size cap's 3.1 % no longer carried) — liquidated with the lenders' `q` bought back; an `L_slow` lifted above the lows is an I18 violation |
 //! | `m4x3_a_dump_inside_the_window_is_adopted_at_p_ema_then_re_seeded` | M4X-3 (a documentation finding): a genuine 4× dump 5 s into the collection window, after the proposal that opened it, is judged only by the execution at `P_ema` and adopted (the docs had claimed any honest dump is refused; disclosed with O18 residual 4); the warm-up then re-seeds `P_ema` at the live price and a new open is refused `PoolTooThin` |
+//! | `m4f1_a_deposit_freeze_on_a_fitting_carried_position_only_delays_the_liquidation` | M4F-1 (keeper), restated by "switch only if all fit" (owner decision of 2026-09-29): as found, attacker-only `[deposit 7·LP, crank_price, withdraw]` seconds in the keeper's idle cadence cleared the guard, froze `L_ema` at 8× the depth and turned the genuine 4× pump into S1 (lenders −10.056 SOL) on a position of ≈ 3.1 % of the new pool's `X`, which is no longer carried. A position that fits the 320-SOL candidate (95 % of its per-position cap, q/x ≈ 0.71 %) is liquidated in every run — the freeze from the adoption with the shipped keeper (`KeeperModel`: per second while the guard is set; per-slot bursts on prices only, the M4F-1 liquidity bursts reverted; per-second coverage for 10 s after a foreign liquidity on a market with positions, FITS-2 (b)), from +40 s (no burst; the foreign liquidity keeps the keeper per second from the first wrap, so only that one second is the attacker's; `L_b` within the depth cap), and under the finding's cadence — at the control's second (+0 s: the pushes only delay, and here not measurably) |
+//! | `m4f1_the_depth_cap_bounds_the_frozen_reference_at_lambda_over_lambda_min` | M4F-1 (on chain, defense in depth, kept): under the finding's keeper cadence (`L_ema` = `L_mlo` = 8× the depth, the guard cleared) the reference liquidity is capped at `⌊D·10⁴/λ_min⌋`: ≈ 2.0 on the λ 99.78 % candidate, 1.0 on a λ 50 % one; with the carried position within the candidate's caps both pumps are liquidated |
+//! | `m4f1_an_oversized_carried_position_is_not_adopted_and_settles_in_s3` | M4F-1 / M4G-3, restated by "switch only if all fit": the finding's market (a position at the 2,500-SOL incumbent's size cap, 3.12 % of the 320-SOL candidate's `X`, its cap 0.75 %) halts 900 s before the deadline; every proposal of the CPMM candidate and of a 400-SOL AMM v4 sibling is refused `CarriedPositionsTooLarge`, also after an LP's real 7× deposit held in the candidate (`D` does not move); no window opens; at the deadline `sol_settle` settles S3 at fair value on the failed pool: the lenders get `FV(P_ema, L_ema)` in full (10.327 SOL for `q` worth 9.937 at `P_ema`), the borrower the rest; the mark resets at 0 |
 
 #![allow(clippy::result_large_err)]
 
@@ -249,10 +260,11 @@ struct LiqRun {
     att_codes: std::collections::BTreeSet<Option<u32>>,
 }
 
-/// One run: an incumbent AMM v4 pool (fully locked, 100 SOL) with one position of the largest
-/// size that opens; the incumbent halts; a CPMM candidate (λ 50 %, `cand_sol` SOL, the same
-/// price) whose unlocked half the attacker holds; the candidate's price is moved to `mult_bps` of
-/// the pre-halt spot; the window runs and is executed plainly or inside the attacker's
+/// One run: an incumbent AMM v4 pool (fully locked, 100 SOL) with one position of 95 % of the
+/// largest size the candidate takes (switch only if all fit: a CPMM candidate, λ 50 %, `cand_sol`
+/// SOL, the same price, whose unlocked half the attacker holds, planted and moved to `mult_bps`
+/// of the pre-halt spot before the open); the incumbent halts; the window runs and is executed
+/// plainly or inside the attacker's
 /// `[withdraw all LP, execute_pool_switch, deposit]`. Then, for `secs` seconds, every second: the
 /// keeper's honest crank and plain liquidation attempt (unless absent), and the attacker's
 /// `[withdraw, crank, deposit]` and `[withdraw, liquidate, deposit]`.
@@ -275,19 +287,6 @@ fn liq_run(r: Run) -> LiqRun {
     let (x_inc, _) = inc
         .io_reserves(&env.svm, shortwin_math::fees::Direction::Sell)
         .unwrap();
-    let mut b = env.borrower();
-    let mut opened = None;
-    for bps in [74u64, 72, 70, 65, 60, 50, 40, 25] {
-        let q = (u128::from(x_inc) * u128::from(bps) / 10_000) as u64;
-        let (res, nonce) = env.open(&rm, &mut b, q);
-        if res.is_ok() {
-            opened = Some((nonce, bps));
-            break;
-        }
-    }
-    let (nonce, q_bps) = opened.expect("an open");
-    crank_every(&mut env, &rm, 1, 3);
-    halt(&mut env, &rm.pool);
     let cand = sized(&mut env, Plant::Cpmm, &base, 5_000, r.cand_sol);
     let AnyPool::Cpmm(cp) = cand else {
         unreachable!()
@@ -300,6 +299,13 @@ fn liq_run(r: Run) -> LiqRun {
     let signer = who.owner.insecure_clone();
     let p0 = helpers::spot(&env, &cand);
     helpers::move_to(&mut env, &cand, p0, r.mult_bps);
+    let (cap, _) = shortwin_litesvm_tests::pool_select::carried_caps(&env, &cand);
+    let q = cap / 100 * 95;
+    let q_bps = (u128::from(q) * 10_000 / u128::from(x_inc)) as u64;
+    let mut b = env.borrower();
+    let (_, nonce, _) = open_ok(&mut env, &rm, &mut b, q);
+    crank_every(&mut env, &rm, 1, 3);
+    halt(&mut env, &rm.pool);
     crank_every(&mut env, &rm, 30, 5);
     window_ok(&mut env, &rm.pool, &cand);
     crank_every(&mut env, &rm, 30, 2);
@@ -544,7 +550,9 @@ fn m4r_explore_liquidation_grid() {
 
 /// A market on a planted, fully locked AMM v4 incumbent of 100 SOL at Fartcoin's price with
 /// one open position, halted, and a fully locked CPMM candidate holding `sol` of real SOL at the
-/// same price (30 % of the incumbent's depth for 30 SOL: it qualifies for the fast path).
+/// same price (30 % of the incumbent's depth for 30 SOL: it qualifies for the fast path). The
+/// position is the default size, at most 90 % of the candidate's per-position cap (switch only if
+/// all fit: the candidate is planted first and the position sized to be carried onto it).
 fn halted_with_candidate(
     sol: u64,
 ) -> (
@@ -566,11 +574,13 @@ fn halted_with_candidate(
     let rm = env.ray_market_listed(RaySpec::new(FART, q.saturating_mul(40)), inc);
     env.crank(&rm);
     crank_every(&mut env, &rm, 1, 5);
+    let cand = sized(&mut env, Plant::Cpmm, &base, 10_000, sol);
+    let (cap, _) = shortwin_litesvm_tests::pool_select::carried_caps(&env, &cand);
+    let q = q.min(cap / 10 * 9);
     let mut b = env.borrower();
     let (_, nonce, _) = open_ok(&mut env, &rm, &mut b, q);
     crank_every(&mut env, &rm, 1, 3);
     halt(&mut env, &rm.pool);
-    let cand = sized(&mut env, Plant::Cpmm, &base, 10_000, sol);
     (env, rm, b, nonce, cand)
 }
 
@@ -777,9 +787,10 @@ struct Bundles {
     over_bound: Option<(i64, u128, u128)>,
 }
 
-/// A 100-SOL fully locked AMM v4 incumbent with the largest position that opens (its vault then
-/// raised by `margin_bps` of `V`), halted; an honest window and execution adopt a 52-SOL λ 99.78 %
-/// candidate that trades FLAT at the pre-halt price. The keeper is absent for `s ≤ absent`, then
+/// A 100-SOL fully locked AMM v4 incumbent with the largest position the candidate takes (switch
+/// only if all fit: 95 % of its per-position cap; its vault then raised by `margin_bps` of `V`),
+/// halted; an honest window and execution adopt a 52-SOL λ 99.78 % candidate that trades FLAT at
+/// the pre-halt price. The keeper is absent for `s ≤ absent`, then
 /// cranks and tries to liquidate every second; every second the attacker sends `[buy kl×,
 /// liquidate, sell]` and `[buy kc×, crank_price, sell]`. Every warm-up integration is checked
 /// against the largest v0.4.1 step from the previous `P_ema` (M4X-1).
@@ -804,18 +815,10 @@ fn price_bundles(
     let rm = env.ray_market_listed(RaySpec::new(FART, q0.saturating_mul(60)), inc);
     env.crank(&rm);
     crank_every(&mut env, &rm, 1, 5);
-    let (x_inc, _) = inc
-        .io_reserves(&env.svm, shortwin_math::fees::Direction::Sell)
-        .unwrap();
+    let cand = sized(&mut env, kind, &base, 9_978, 52_000_000_000);
+    let (cap, _) = shortwin_litesvm_tests::pool_select::carried_caps(&env, &cand);
     let mut b = env.borrower();
-    let nonce = [74u64, 72, 70, 65, 60, 50, 40, 25]
-        .into_iter()
-        .find_map(|bps| {
-            let q = (u128::from(x_inc) * u128::from(bps) / 10_000) as u64;
-            let (res, nonce) = env.open(&rm, &mut b, q);
-            res.is_ok().then_some(nonce)
-        })
-        .expect("an open");
+    let (_, nonce, _) = open_ok(&mut env, &rm, &mut b, cap / 100 * 95);
     if margin_bps > 0 {
         let v = env.position(&rm, &b.key(), nonce).v;
         let kp = b.kp.insecure_clone();
@@ -826,7 +829,6 @@ fn price_bundles(
     }
     crank_every(&mut env, &rm, 1, 3);
     halt(&mut env, &rm.pool);
-    let cand = sized(&mut env, kind, &base, 9_978, 52_000_000_000);
     crank_every(&mut env, &rm, 30, 5);
     window_ok(&mut env, &rm.pool, &cand);
     crank_every(&mut env, &rm, 30, 2);
@@ -932,6 +934,10 @@ fn m4x1_attacker_only_price_bundles_reach_no_further_than_steady_state() {
     assert_eq!(r.over_bound, None);
 }
 
+/// The sizes tried for a position on the 2,500-SOL incumbent, bps of its token reserve (the first
+/// that opens; capped by the planned candidate's per-position cap).
+const OPEN_BPS: [u64; 11] = [100, 90, 80, 74, 72, 70, 65, 60, 50, 40, 25];
+
 /// The SOL and tokens a CPMM deposit of `lp` LP needs (rounded up, plus one).
 fn lp_needed(env: &common::Env, p: &shortwin_litesvm_tests::fork::CpmmPool, lp: u64) -> (u64, u64) {
     use common::*;
@@ -944,14 +950,16 @@ fn lp_needed(env: &common::Env, p: &shortwin_litesvm_tests::fork::CpmmPool, lp: 
 }
 
 /// **M4X-2**: the capital deposit freeze held for 900 s. A 2,500-SOL λ 50 % AMM v4 incumbent
-/// (Tier A) with a position at the size cap, halted; an honest window adopts a 320-SOL λ 99.78 %
-/// CPMM candidate (q ≈ 3.1 % of its `X`). From the adoption the attacker sends `[deposit 7·LP
-/// counter, crank_price, withdraw]` every second and the keeper cranks every second; the price is
-/// flat for 900 s, then genuinely ramps 4×/120 s while the keeper tries `liquidate` and
-/// `sol_settle` every second. Before M4X-2: `L_slow`/√(X·Y) 2.621 at the ramp, S1 at +1,025 s
-/// (lenders 29.946 SOL for `q` worth 40.002, the borrower 0). Now `L_slow` stays at the honest
-/// lows (the guard still set), the liquidation lands in the ramp and the lenders get `q` back;
-/// and I18 flags an `L_slow` lifted above them.
+/// (Tier A) with a position, halted; an honest window adopts a 320-SOL λ 99.78 % CPMM candidate.
+/// From the adoption the attacker sends `[deposit 7·LP counter, crank_price, withdraw]` every
+/// second and the keeper cranks every second; the price is flat for 900 s, then genuinely ramps
+/// 4×/120 s while the keeper tries `liquidate` and `sol_settle` every second. Before M4X-2, on the
+/// incumbent's size cap (q ≈ 3.1 % of the candidate's `X`): `L_slow`/√(X·Y) 2.621 at the ramp, S1
+/// at +1,025 s (lenders 29.946 SOL for `q` worth 40.002, the borrower 0). Now `L_slow` stays at
+/// the honest lows (the guard still set) and I18 flags an `L_slow` lifted above them; the position
+/// is the largest the candidate takes (switch only if all fit: 95 % of its per-position cap,
+/// q ≈ 0.71 %; the size cap is no longer carried, `m4f1_an_oversized_…`), and its liquidation
+/// lands in the ramp with the lenders' `q` back.
 #[test]
 fn m4x2_a_held_deposit_freeze_no_longer_lifts_l_slow() {
     use common::*;
@@ -969,24 +977,28 @@ fn m4x2_a_held_deposit_freeze_no_longer_lifts_l_slow() {
     let rm = env.ray_market_listed(RaySpec::new(FART, q0.saturating_mul(60)), inc);
     env.crank(&rm);
     crank_every(&mut env, &rm, 1, 5);
+    let cand = sized(&mut env, Plant::Cpmm, &base, 9_978, 320_000_000_000);
+    let AnyPool::Cpmm(cp) = cand else {
+        unreachable!()
+    };
+    // Switch only if all fit: the position is 95 % of the candidate's per-position cap (the size
+    // cap of the incumbent, ≈ 3.1 % of the candidate's X, is refused `CarriedPositionsTooLarge`:
+    // `m4f1_an_oversized_carried_position_is_not_adopted_and_settles_in_s3`).
+    let fit_q = shortwin_litesvm_tests::pool_select::carried_caps(&env, &cand).0 / 100 * 95;
     let (x_inc, _) = inc
         .io_reserves(&env.svm, shortwin_math::fees::Direction::Sell)
         .unwrap();
     let mut b = env.borrower();
-    let nonce = [100u64, 90, 80, 74, 72, 70, 65, 60, 50, 40, 25]
+    let nonce = OPEN_BPS
         .into_iter()
         .find_map(|bps| {
             let q = (u128::from(x_inc) * u128::from(bps) / 10_000) as u64;
-            let (res, nonce) = env.open(&rm, &mut b, q);
+            let (res, nonce) = env.open(&rm, &mut b, q.min(fit_q));
             res.is_ok().then_some(nonce)
         })
         .expect("an open");
     crank_every(&mut env, &rm, 1, 3);
     halt(&mut env, &rm.pool);
-    let cand = sized(&mut env, Plant::Cpmm, &base, 9_978, 320_000_000_000);
-    let AnyPool::Cpmm(cp) = cand else {
-        unreachable!()
-    };
     let q = env.position(&rm, &b.key(), nonce).q;
     crank_every(&mut env, &rm, 30, 5);
     window_ok(&mut env, &rm.pool, &cand);
@@ -1151,4 +1163,613 @@ fn m4x3_a_dump_inside_the_window_is_adopted_at_p_ema_then_re_seeded() {
     let q = q_of(&env, &cand);
     let (res, _) = env.open(&rm2, &mut b2, q);
     assert_err(&res, E::PoolTooThin);
+}
+
+// ================================================================================================
+// M4F-1: the capital deposit freeze under the keeper's own cadence
+// ================================================================================================
+
+/// The keeper's coverage rules (`services/keeper`: `coverage::MarketTrack`, `decide::market_needs`),
+/// modelled second by second for the M4F-1 regressions. Each second the keeper reads the pool first
+/// (its own view of the spot and the depth), checks the market's open and last completed buckets
+/// for a foreign observation (duty 2: a price deviation starts a per-slot burst; on a market with
+/// open positions a liquidity deviation starts 10 s of per-second coverage, FITS-2 (b)), then
+/// observes if due; the attacker's bundle lands after it in the same second.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Cadence {
+    /// As shipped: per second while the post-change warm-up runs **or the reference guard is set**
+    /// (market with positions, M4F-1); duty 2's per-slot bursts on the **price** alone (M4F-1's
+    /// liquidity bursts reverted: M4G-2's keeper-cost DoS) and, on a market with open positions,
+    /// **per-second** coverage for 10 s after a foreign bucket liquidity off the keeper's own
+    /// `√(X·Y)`, extended while it recurs (FITS-2 (b), `liq_cover_s`).
+    Shipped,
+    /// The keeper before M4F-1 (the finding's model): per second only while `ema_warm > 0`.
+    PreM4f,
+}
+
+/// A range `(lo, hi)`.
+type Range = (u128, u128);
+
+struct KeeperModel {
+    cadence: Cadence,
+    /// Own views per second: the price and the depth range read in it.
+    views: std::collections::HashMap<i64, (Range, Range)>,
+    seen: std::collections::HashSet<i64>,
+    burst_until: i64,
+    last_obs: Option<i64>,
+    bursts: Vec<i64>,
+    /// FITS-2 (b): the liquidity-triggered per-second window and its trigger seconds.
+    liq_seen: std::collections::HashSet<i64>,
+    liq_until: i64,
+    liq_covers: Vec<i64>,
+}
+
+impl KeeperModel {
+    fn new(cadence: Cadence) -> Self {
+        Self {
+            cadence,
+            views: Default::default(),
+            seen: Default::default(),
+            burst_until: i64::MIN,
+            last_obs: None,
+            bursts: Vec::new(),
+            liq_seen: Default::default(),
+            liq_until: i64::MIN,
+            liq_covers: Vec::new(),
+        }
+    }
+
+    /// The keeper's read of second `now`: its own view, then duty 2 on the market as read.
+    fn read(&mut self, now: i64, m: &shortwin::state::Market, spot: u128, depth: u128) {
+        let v = self
+            .views
+            .entry(now)
+            .or_insert(((spot, spot), (depth, depth)));
+        v.0 = (v.0.0.min(spot), v.0.1.max(spot));
+        v.1 = (v.1.0.min(depth), v.1.1.max(depth));
+        let out = |lo: u128, hi: u128, (vlo, vhi): (u128, u128)| {
+            lo * 10_000 < vlo * 9_800 || hi * 10_000 > vhi * 10_200
+        };
+        let o = m.observation();
+        // The last completed bucket's liquidity extremes: the ring entry that integrated it.
+        let lb_liq = o
+            .ring
+            .newest()
+            .filter(|e| e.ts > o.last.sec && e.lo == o.last.lo && e.hi == o.last.hi)
+            .map(|e| (e.llo, e.lhi));
+        let buckets = [
+            (
+                o.bucket.sec,
+                (o.bucket.lo, o.bucket.hi),
+                Some((o.bucket.llo, o.bucket.lhi)),
+            ),
+            (o.last.sec, (o.last.lo, o.last.hi), lb_liq),
+        ];
+        let open = m.open_positions > 0;
+        for (sec, (lo, hi), liq) in buckets {
+            if lo == 0 {
+                continue;
+            }
+            let Some(&(vp, vl)) = self.views.get(&sec) else {
+                continue;
+            };
+            if !self.seen.contains(&sec) && out(lo, hi, vp) {
+                self.seen.insert(sec);
+                self.burst_until = self.burst_until.max(sec + 60);
+                self.bursts.push(sec);
+            }
+            let shipped = self.cadence == Cadence::Shipped;
+            if let Some((llo, lhi)) = liq.filter(|(llo, _)| *llo != 0)
+                && shipped
+                && open
+                && !self.liq_seen.contains(&sec)
+                && out(llo, lhi, vl)
+            {
+                self.liq_seen.insert(sec);
+                self.liq_until = self.liq_until.max(sec + 10);
+                self.liq_covers.push(sec);
+            }
+        }
+    }
+
+    /// Whether the keeper observes at `now` (`near`: a position near its threshold, here the
+    /// genuine ramp), on the market's state as the next instruction's prologue will see it.
+    fn due(&self, now: i64, m: &shortwin::state::Market, spot: u128, near: bool) -> bool {
+        let mut o = *m.observation();
+        o.roll(now, &m.ema_params()).unwrap();
+        let ema_dev = spot.abs_diff(o.ema.price) * 10_000 > o.ema.price * 200;
+        let per_second = o.ema.warm > 0
+            || (self.cadence == Cadence::Shipped && o.ema.guard != 0)
+            || ema_dev
+            || near;
+        now < self.burst_until
+            || per_second
+            || now < self.liq_until
+            || self.last_obs.is_none_or(|t| now - t >= 30)
+    }
+}
+
+/// One M4F-1 run and what it printed.
+#[derive(Debug)]
+struct FreezeRun {
+    report: String,
+    /// (second after the adoption, borrower payout) of the liquidation.
+    liquidated: Option<(i64, u64)>,
+    /// A settlement instead (S1 / S2).
+    settled: Option<i64>,
+    /// Seconds whose reference liquidity the Raydium depth cap lowered (`bounds::ref_liquidity`
+    /// with and without it on the pool's depth after the second).
+    capped_seconds: usize,
+    /// The first second with `ema_warm = 0` and the guard clear.
+    guard_clear: Option<i64>,
+    /// Seconds whose foreign observation started a burst.
+    bursts: Vec<i64>,
+    /// Seconds whose foreign liquidity started or extended the per-second coverage (FITS-2 (b)).
+    liq_covers: Vec<i64>,
+    /// Seconds after the adoption the keeper observed.
+    observed: Vec<i64>,
+    /// At the ramp start, over the pool's `√(X·Y)`: `L_ema`, `L_mlo`, `L_b` (the reference
+    /// liquidity as `bounds::ref_liquidity` computes it with the market's Raydium depth cap),
+    /// and the cap itself; the guard.
+    at_ramp: (f64, f64, f64, f64, u8),
+}
+
+/// The M4F-1 scenario (the M4X-2 setup): a 2,500-SOL λ 50 % AMM v4 incumbent (Tier A) with a
+/// position at the size cap, halted; an honest window adopts a CPMM candidate of `cand_sol` SOL at
+/// locked share `cand_lam`. From the adoption the keeper follows `cadence` ([`KeeperModel`]) and,
+/// from second `from`, the attacker sends `[deposit k·LP counter, crank_price, withdraw]` every
+/// second after it; the price is flat until `w`, then genuinely ramps 4×/120 s, the keeper
+/// observing every second (a near position) and trying `liquidate` and `sol_settle` every second.
+fn cadence_freeze_run(
+    cand_sol: u64,
+    cand_lam: u64,
+    w: i64,
+    k: u64,
+    from: Option<i64>,
+    cadence: Cadence,
+) -> FreezeRun {
+    use common::*;
+    use shortwin::events::{Liquidate, SolSettle};
+    use shortwin_litesvm_tests::engine::{crank_price_ix, liquidate_ix, sol_settle_ix};
+    use support::*;
+
+    let mut env = Env::ray_fork();
+    let base = env.load_ray_pool(FART);
+    let inc = sized(&mut env, Plant::V4, &base, 5_000, 2_500_000_000_000);
+    ok(env.list_ray(&inc, VENUE_HINT_V4));
+    let q0 = q_of(&env, &inc);
+    let rm = env.ray_market_listed(RaySpec::new(FART, q0.saturating_mul(60)), inc);
+    env.crank(&rm);
+    crank_every(&mut env, &rm, 1, 5);
+    let cand = sized(
+        &mut env,
+        Plant::Cpmm,
+        &base,
+        cand_lam,
+        cand_sol * 1_000_000_000,
+    );
+    let AnyPool::Cpmm(cp) = cand else {
+        unreachable!()
+    };
+    // Switch only if all fit: 95 % of the candidate's per-position cap.
+    let fit_q = shortwin_litesvm_tests::pool_select::carried_caps(&env, &cand).0 / 100 * 95;
+    let (x_inc, _) = inc
+        .io_reserves(&env.svm, shortwin_math::fees::Direction::Sell)
+        .unwrap();
+    let mut b = env.borrower();
+    let nonce = OPEN_BPS
+        .into_iter()
+        .find_map(|bps| {
+            let q = (u128::from(x_inc) * u128::from(bps) / 10_000) as u64;
+            let (res, nonce) = env.open(&rm, &mut b, q.min(fit_q));
+            res.is_ok().then_some(nonce)
+        })
+        .expect("an open");
+    crank_every(&mut env, &rm, 1, 3);
+    halt(&mut env, &rm.pool);
+    let (x_c, _) = cand
+        .io_reserves(&env.svm, shortwin_math::fees::Direction::Sell)
+        .unwrap();
+    let q = env.position(&rm, &b.key(), nonce).q;
+    crank_every(&mut env, &rm, 30, 5);
+    window_ok(&mut env, &rm.pool, &cand);
+    crank_every(&mut env, &rm, 30, 2);
+    execute_ok(&mut env, &rm.pool, &cand).unwrap_or_else(|_| panic!("cancelled"));
+    let market = rm.market();
+    let rm2 = rm.on_pool(&env.svm, cand);
+    let keeper = env.funded_keypair();
+    let (sol, tok) = lp_needed(&env, &cp, k * cp.state(&env.svm).lp_supply);
+    let who = lp::provider(&mut env, &cp, 6 * sol, 6 * tok, 0);
+    let signer = who.owner.insecure_clone();
+    let lam_min = env.config().params.pool_lock_min_bps;
+    let p0 = helpers::spot(&env, &cand);
+    let adopted_at = env.now();
+    let mut model = KeeperModel::new(cadence);
+    let mut run = FreezeRun {
+        report: format!("q/x {:.2} %", q as f64 * 100.0 / x_c as f64),
+        liquidated: None,
+        settled: None,
+        capped_seconds: 0,
+        guard_clear: None,
+        bursts: Vec::new(),
+        liq_covers: Vec::new(),
+        observed: Vec::new(),
+        at_ramp: (0.0, 0.0, 0.0, 0.0, 0),
+    };
+    for s in 1..=(w + 400) {
+        env.warp(1);
+        let now = env.now();
+        if s > w {
+            let g = 10_000 + 30_000 * u128::try_from((s - w).min(120)).unwrap() / 120;
+            if helpers::spot(&env, &cand) * 10_000 < p0 * g * 9_999 / 10_000 {
+                helpers::move_to(&mut env, &cand, p0, g);
+            }
+        }
+        // The keeper: its read, duty 2, then its observation if due.
+        let (spot, root) = (helpers::spot(&env, &cand), helpers::root_xy(&env, &cand));
+        model.read(now, &env.market(&market), spot, root);
+        if model.due(now, &env.market(&market), spot, s > w) {
+            env.crank(&rm2);
+            model.last_obs = Some(now);
+            run.observed.push(s);
+        }
+        // The attacker, after the keeper in the same second.
+        if from.is_some_and(|f| s >= f) {
+            let add = k * cp.state(&env.svm).lp_supply;
+            ok(env.send(
+                &[
+                    lp::deposit_ix(&cp, &who, add),
+                    crank_price_ix(&rm2),
+                    lp::withdraw_ix(&cp, &who, add),
+                ],
+                &[&signer],
+            ));
+        }
+        let m = env.market(&market);
+        {
+            let o = m.observation();
+            let root = helpers::root_xy(&env, &cand);
+            let cap = shortwin_math::bounds::ref_depth_cap(m.pool_d.get(), lam_min);
+            let l_b = |c| shortwin_math::bounds::ref_liquidity(root, &o.ema, &o.ring, c).unwrap();
+            run.capped_seconds += usize::from(l_b(Some(cap)) != l_b(None));
+        }
+        if run.guard_clear.is_none() && m.ema_warm == 0 && m.ema_guard == 0 {
+            run.guard_clear = Some(s);
+        }
+        if s == w {
+            let o = m.observation();
+            let root = helpers::root_xy(&env, &cand);
+            let l_mlo = shortwin_math::observe::ring_liq_lower_median(&o.ring).unwrap();
+            let cap = shortwin_math::bounds::ref_depth_cap(m.pool_d.get(), lam_min);
+            let l_b =
+                shortwin_math::bounds::ref_liquidity(root, &o.ema, &o.ring, Some(cap)).unwrap();
+            let r = |x: u128| x as f64 / root as f64;
+            run.at_ramp = (r(o.ema.liq), r(l_mlo), r(l_b), r(cap), o.ema.guard);
+            run.report += &format!(
+                "; guard clear at +{:?} s; at the ramp L_ema {:.3}, L_mlo {:.3}, L_slow {:.3}, L_b {:.3} \
+                 (cap {:.3}) × √(X·Y), guard {}",
+                run.guard_clear,
+                r(o.ema.liq),
+                r(l_mlo),
+                r(o.ema.liq_slow),
+                r(l_b),
+                r(cap),
+                o.ema.guard
+            );
+        }
+        if s <= w || m.ema_warm > 0 {
+            continue;
+        }
+        let res = env.send(
+            &[liquidate_ix(&rm2, &keeper.pubkey(), &b.key(), nonce)],
+            &[&keeper],
+        );
+        if let Ok(meta) = res {
+            let e: Liquidate = events::one(&meta);
+            run.liquidated = Some((s, e.borrower_payout));
+            run.report += &format!(
+                "; LIQUIDATED at +{s} s ({:.3}×), buyback {:.3} SOL, borrower {:.3} SOL",
+                helpers::spot(&env, &cand) as f64 / p0 as f64,
+                e.buyback_cost as f64 / 1e9,
+                e.borrower_payout as f64 / 1e9
+            );
+            break;
+        }
+        let settle = sol_settle_ix(&env, &rm2, &keeper.pubkey(), &b.key(), nonce);
+        if let Ok(meta) = env.send(&[settle], &[&keeper])
+            && let Some(e) = events::of::<SolSettle>(&meta).first()
+        {
+            let owed = u128::from(q) * helpers::spot(&env, &cand) / shortwin_math::num::WAD;
+            run.settled = Some(s);
+            run.report += &format!(
+                "; S{} at +{s} s ({:.3}×): lenders {:.3} SOL for q worth {:.3} SOL, borrower {:.3} SOL",
+                e.condition,
+                helpers::spot(&env, &cand) as f64 / p0 as f64,
+                e.lender_amount as f64 / 1e9,
+                owed as f64 / 1e9,
+                e.borrower_amount as f64 / 1e9
+            );
+            break;
+        }
+    }
+    run.bursts = model.bursts.iter().map(|t| t - adopted_at).collect();
+    run.liq_covers = model.liq_covers.iter().map(|t| t - adopted_at).collect();
+    run.report += &format!(
+        "; {} burst second(s) from +{:?} s; {} liquidity-coverage trigger(s) from +{:?} s; the \
+         keeper observed {} s; the depth cap bound in {} s",
+        run.bursts.len(),
+        run.bursts.first(),
+        run.liq_covers.len(),
+        run.liq_covers.first(),
+        run.observed.len(),
+        run.capped_seconds
+    );
+    run
+}
+
+/// **M4F-1**, restated by "switch only if all fit" (owner decision of 2026-09-29; keeper duties 2
+/// and 5). As found, after a switch's warm-up the keeper dropped a healthy carried position to the
+/// 30-s idle cadence, and an attacker filled the idle seconds with `[deposit 7·LP counter,
+/// crank_price, withdraw]`: the guard cleared at ≈ +15 s, `L_ema` froze at 8× the pool's depth and
+/// the genuine 4× pump ended in S1 (lenders −10.056 SOL) — on a position of ≈ 3.1 % of the new
+/// pool's `X`, which the fit rule no longer carries
+/// (`m4f1_an_oversized_carried_position_is_not_adopted_and_settles_in_s3`). A position that fits
+/// the candidate's caps (here 95 % of its per-position cap) is liquidated whatever the freeze:
+///
+/// - with the shipped keeper ([`Cadence::Shipped`]: per second while the guard is set, per-slot
+///   bursts on prices only, per-second coverage after a foreign liquidity on a market with
+///   positions), the freeze from the adoption keeps the guard set and the reference at the lows;
+///   from +40 s (after the honest clear) nothing starts a per-slot burst, but the foreign
+///   liquidity starts per-second coverage (FITS-2 (b)): after the first attacker-only second
+///   every second carries the keeper's honest extreme, so `L_ema` stays where that one second
+///   left it, bounded on chain by the depth cap `⌊D·10⁴/λ_min⌋`;
+/// - under the finding's cadence ([`Cadence::PreM4f`]) too.
+///
+/// Every run is liquidated with the lenders' `q` bought back; the pushes only delay the exit
+/// (printed: the seconds after the control's liquidation).
+#[test]
+fn m4f1_a_deposit_freeze_on_a_fitting_carried_position_only_delays_the_liquidation() {
+    const W: i64 = 120;
+    let control = cadence_freeze_run(320, 9_978, W, 7, None, Cadence::Shipped);
+    println!("M4F-1 control (no freeze): {}", control.report);
+    let (c_at, _) = control.liquidated.expect("control liquidated");
+    assert!(control.bursts.is_empty(), "{}", control.report);
+    // An honest switch: the depth cap never lowers the reference (the exits are unchanged).
+    assert_eq!(control.capped_seconds, 0, "{}", control.report);
+
+    let early = cadence_freeze_run(320, 9_978, W, 7, Some(1), Cadence::Shipped);
+    println!(
+        "M4F-1 freeze from the adoption, shipped keeper: {}",
+        early.report
+    );
+    let (_, _, l_b, _, guard) = early.at_ramp;
+    assert_eq!(guard, 1, "the guard is still set: {}", early.report);
+    assert!(l_b <= 1.01, "the reference at the lows: {}", early.report);
+
+    let late = cadence_freeze_run(320, 9_978, W, 7, Some(40), Cadence::Shipped);
+    println!("M4F-1 freeze from +40 s, shipped keeper: {}", late.report);
+    // The honest warm-up cleared the guard; no burst: only a price deviation starts one. The
+    // foreign liquidity starts per-second coverage (FITS-2 (b)), kept while the freeze recurs.
+    assert!(late.guard_clear.is_some_and(|t| t < 40), "{}", late.report);
+    let first = *late.liq_covers.first().expect("liquidity coverage");
+    assert!((40..=41).contains(&first), "{}", late.report);
+    assert!(
+        (first + 1..=W).all(|s| late.observed.contains(&s)),
+        "per second from the trigger: {}",
+        late.report
+    );
+    assert!(
+        control.liq_covers.is_empty() && early.liq_covers.iter().all(|&t| t >= 1),
+        "honest depths start nothing"
+    );
+    let (_, _, l_b, cap, _) = late.at_ramp;
+    assert!(
+        l_b <= cap * 1.001,
+        "L_b within the depth cap: {}",
+        late.report
+    );
+
+    let found = cadence_freeze_run(320, 9_978, W, 7, Some(1), Cadence::PreM4f);
+    println!(
+        "M4F-1 freeze from the adoption, the finding's cadence: {}",
+        found.report
+    );
+
+    for (tag, run) in [("early", &early), ("late", &late), ("found", &found)] {
+        assert!(run.bursts.is_empty(), "{tag}: no burst: {}", run.report);
+        assert!(
+            run.settled.is_none(),
+            "{tag}: no settlement: {}",
+            run.report
+        );
+        let (at, payout) = run
+            .liquidated
+            .unwrap_or_else(|| panic!("{tag}: {}", run.report));
+        assert!(
+            payout > 0,
+            "{tag}: the borrower keeps equity: {}",
+            run.report
+        );
+        println!("M4F-1 {tag}: liquidated +{} s after the control", at - c_at);
+        assert!(
+            at >= c_at && at - c_at <= 30,
+            "{tag}: a delay only: {}",
+            run.report
+        );
+    }
+}
+
+/// **M4F-1** (on-chain defense in depth, `bounds::ref_liquidity`): the reference liquidity's EMA
+/// terms are capped at `⌊D·10⁴/λ_min⌋`, the most depth sizing credits the pool with, so under the
+/// keeper cadence of the finding ([`Cadence::PreM4f`]: the guard cleared by attacker-only
+/// seconds, `L_ema` frozen at 8× the pool's depth) the reference credits at most `λ/λ_min` of it:
+/// ≈ 2.0 on the λ 99.78 % candidate, 1.0 — the freeze neutralised — on a λ 50 % one. With the
+/// carried position within the candidate's caps (switch only if all fit) both pumps are
+/// liquidated. (The I18 hook checks every liquidation's `b_ref` at the capped `L_b`.)
+#[test]
+fn m4f1_the_depth_cap_bounds_the_frozen_reference_at_lambda_over_lambda_min() {
+    const W: i64 = 120;
+    for (sol, lam) in [(320u64, 9_978u64), (640, 5_000)] {
+        let bound = lam as f64 / 5_000.0;
+        let run = cadence_freeze_run(sol, lam, W, 7, Some(1), Cadence::PreM4f);
+        println!(
+            "M4F-1 finding's cadence, candidate {sol} SOL λ {lam}: {}",
+            run.report
+        );
+        let (l_ema, l_mlo, l_b, cap, guard) = run.at_ramp;
+        assert_eq!(
+            guard, 0,
+            "attacker-only seconds cleared the guard: {}",
+            run.report
+        );
+        assert!(
+            run.bursts.is_empty(),
+            "price-only bursts see nothing: {}",
+            run.report
+        );
+        assert!(
+            l_ema > 7.9 && l_mlo > 7.9,
+            "the freeze as found: {}",
+            run.report
+        );
+        assert!(
+            cap <= bound * 1.001 && l_b <= bound * 1.001,
+            "L_b ≤ λ/λ_min: {}",
+            run.report
+        );
+        if lam == 5_000 {
+            assert!(l_b <= 1.001, "{}", run.report);
+        }
+        assert!(run.liquidated.is_some(), "{}", run.report);
+    }
+}
+
+/// **M4F-1 / M4G-3**, restated by "switch only if all fit" (owner decision of 2026-09-29): the
+/// finding's market — a 2,500-SOL λ 50 % AMM v4 incumbent (Tier A) with a position at its size
+/// cap, ≈ 3.1 % of the 320-SOL λ 99.78 % CPMM candidate's `X` — is never adopted. The incumbent
+/// halts 900 s before the position's deadline; once the fast path is armed every proposal of the
+/// candidate, and of a 400-SOL AMM v4 sibling, is refused `CarriedPositionsTooLarge`; an LP's real
+/// 7× deposit held in the candidate (M4G-3) changes nothing (its locked depth `D`, which bounds
+/// `X₀`, does not move); no window opens. The keeper keeps the S3 chain (a crank every 30 s), and at
+/// the deadline `sol_settle` settles the position in S3 at fair value on the failed pool: the
+/// lenders get `FV(P_ema, L_ema)` in full (below `V − K_s`, so uncapped: at least `q·P_ema` plus
+/// the expiry fee and the rent), the borrower the rest.
+#[test]
+fn m4f1_an_oversized_carried_position_is_not_adopted_and_settles_in_s3() {
+    use common::*;
+    use shortwin::events::SolSettle;
+    use shortwin_litesvm_tests::engine::sol_settle_ix;
+    use support::*;
+
+    let mut env = Env::ray_fork();
+    let base = env.load_ray_pool(FART);
+    let inc = sized(&mut env, Plant::V4, &base, 5_000, 2_500_000_000_000);
+    ok(env.list_ray(&inc, VENUE_HINT_V4));
+    let q0 = q_of(&env, &inc);
+    let rm = env.ray_market_listed(RaySpec::new(FART, q0.saturating_mul(60)), inc);
+    env.crank(&rm);
+    crank_every(&mut env, &rm, 1, 5);
+    let (x_inc, _) = inc
+        .io_reserves(&env.svm, shortwin_math::fees::Direction::Sell)
+        .unwrap();
+    let mut b = env.borrower();
+    let nonce = OPEN_BPS
+        .into_iter()
+        .find_map(|bps| {
+            let q = (u128::from(x_inc) * u128::from(bps) / 10_000) as u64;
+            let (res, nonce) = env.open(&rm, &mut b, q);
+            res.is_ok().then_some(nonce)
+        })
+        .expect("an open at the size cap");
+    crank_every(&mut env, &rm, 1, 3);
+    let pos = env.position(&rm, &b.key(), nonce);
+    assert_eq!(env.market(&rm.market()).max_q_hwm, pos.q, "the mark");
+    // Idle until 900 s before the deadline, then the incumbent halts.
+    let wait = pos.deadline - 900 - env.now();
+    env.warp(wait);
+    env.crank(&rm);
+    crank_every(&mut env, &rm, 1, 3);
+    halt(&mut env, &rm.pool);
+    let cand = sized(&mut env, Plant::Cpmm, &base, 9_978, 320_000_000_000);
+    let AnyPool::Cpmm(cp) = cand else {
+        unreachable!()
+    };
+    let v4 = sized(&mut env, Plant::V4, &base, 9_978, 400_000_000_000);
+    let (x_c, _) = cand
+        .io_reserves(&env.svm, shortwin_math::fees::Direction::Sell)
+        .unwrap();
+    let (cap, _) = shortwin_litesvm_tests::pool_select::carried_caps(&env, &cand);
+    println!(
+        "M4F-1 oversized: q {:.2} % of the candidate's X, its per-position cap {:.2} %",
+        pos.q as f64 * 100.0 / x_c as f64,
+        cap as f64 * 100.0 / x_c as f64
+    );
+    assert!(pos.q > cap);
+    let market = rm.market();
+    let halted_at = env.now();
+    let keeper = env.funded_keypair();
+    let mut refused = 0u32;
+    let mut settled = None;
+    for s in 1..=1_400i64 {
+        env.warp(1);
+        if s % 30 == 0 {
+            env.crank(&rm);
+        }
+        if s == 150 || s == 300 {
+            // The fast path is armed (the chain ≥ 120 s): the candidates are refused.
+            for c in [&cand, &v4] {
+                assert_err(&env.propose(Some(&rm.pool), c), E::CarriedPositionsTooLarge);
+                refused += 1;
+            }
+        }
+        if s == 200 {
+            // M4G-3: an LP's real deposit of 7× the counter, held.
+            let add = 7 * cp.state(&env.svm).lp_supply;
+            let (sol, tok) = lp_needed(&env, &cp, add);
+            let who = lp::provider(&mut env, &cp, sol, tok, 0);
+            ok(env.send(&[lp::deposit_ix(&cp, &who, add)], &[&who.owner]));
+        }
+        let m = env.market(&market);
+        assert_eq!(m.fp_t0, 0, "+{s} s: no window");
+        assert_eq!(
+            m.pool_cache[0],
+            shortwin_litesvm_tests::pool_select::pool_key(&rm.pool),
+            "+{s} s: not adopted"
+        );
+        if env.now() >= pos.deadline && s % 30 == 1 {
+            let settle = sol_settle_ix(&env, &rm, &keeper.pubkey(), &b.key(), nonce);
+            let meta = ok(env.send(&[settle], &[&keeper]));
+            if let Some(e) = events::of::<SolSettle>(&meta).into_iter().next() {
+                settled = Some((s, e));
+                break;
+            }
+        }
+    }
+    let (s, e) = settled.expect("an S3 settlement at the deadline");
+    let p_ema = env.market(&market).ema_price.get();
+    let owed = u128::from(pos.q) * p_ema / shortwin_math::num::WAD;
+    println!(
+        "M4F-1 oversized: {refused} proposals refused; S{} at +{s} s after the halt (deadline \
+         +{} s): lenders {:.3} SOL (FV {:.3}; q at P_ema {:.3}), borrower {:.3} SOL",
+        e.condition,
+        pos.deadline - halted_at,
+        e.lender_amount as f64 / 1e9,
+        e.fv as f64 / 1e9,
+        owed as f64 / 1e9,
+        e.borrower_amount as f64 / 1e9
+    );
+    assert_eq!(e.condition, 3, "S3");
+    assert!(
+        e.fv > 0 && e.lender_amount == e.fv,
+        "the lenders get FV in full"
+    );
+    assert!(u128::from(e.lender_amount) >= owed, "at least q at P_ema");
+    assert!(e.borrower_amount > 0);
+    assert_eq!(e.lender_amount + e.borrower_amount + e.k_s, pos.v);
+    let m = env.market(&market);
+    assert_eq!(
+        (m.open_positions, m.max_q_hwm),
+        (0, 0),
+        "the mark reset at 0"
+    );
 }

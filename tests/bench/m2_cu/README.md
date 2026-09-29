@@ -41,7 +41,8 @@ Their pre-states are **self-checked with `shortwin-math`**, so they measure the 
 - `liquidate`: the price ×2.3 held for 40 cranked seconds — the spot leg and the EMA leg (the
   newest `liq_persist_n` ring entries at the capped fee) are below `cr_liq`, the reference is
   fresh, the buyback is allowed (`B̂_live + ert ≤ V − K_s`, `σ ≤ σ_max`) and `B̂_live ≤
-  max_in_liq` (`bounds::liq_reference` on `L_b = max(L_live, L_ema, L_slow)`).
+  max_in_liq` (`bounds::liq_reference` on `L_b = max(L_live, L_ema, L_slow)`; the mock has no
+  Raydium depth cap).
 - `expire`: past the deadline, not CR-liquidatable, a fresh reference, `B̂_live ≤
   ⌊B̂_ref·(1 + δ_exp)⌋` (`bounds::expiry_reference`).
 - `sol_settle`: the no-change call on a healthy position (the keeper's per-second crank), and

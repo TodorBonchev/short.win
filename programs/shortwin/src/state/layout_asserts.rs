@@ -159,9 +159,10 @@ layout!(acct Market, 3_104, {
     util_kink_bps @ 2_812, liq_slow_tau_s @ 2_816, liq_slow_dtmax_s @ 2_820,
     ema_dtmax_s @ 2_824, _pad3 @ 2_826,
     // OI
-    open_positions @ 2_832, _pad4 @ 2_836, total_notional_open @ 2_840,
+    open_positions @ 2_832, _pad4 @ 2_836, total_notional_open @ 2_840, max_q_hwm @ 2_848,
+    min_open_fee_ppm @ 2_856, _pad5 @ 2_860,
     // misc
-    _reserved @ 2_848,
+    _reserved @ 2_864,
 });
 layout!(nested RingEntry, 136, {
     ts @ 0, p @ 8, l @ 24, x @ 40, y @ 56, lo @ 72, hi @ 88, llo @ 104, lhi @ 120,

@@ -6,7 +6,8 @@
 //! (`shortwin::engine::prologue::run`: params sync, accrual, the observation roll, the
 //! record, the route chains) on a copy of the market at the cluster's clock; the legs, the
 //! references and the bounds are the math crate's and the program engine's
-//! (`risk::{spot_leg, liquidatable, buyback_allowed}`, `persist::liq_ema_leg`,
+//! (`risk::{spot_leg, liquidatable, buyback_allowed}` — the spot leg at `max(L_live, L_ema')`,
+//! `bounds::spot_liquidity`, FITS-2 (a) —, `persist::liq_ema_leg`,
 //! `engine::bounds::{liq_reference, max_in_liq, expiry_reference, max_in_exp}`,
 //! `settle::s3_due`), with the position's locked terms and the risk fee
 //! `min(φ_live, venue_fee_hard_cap_bps_pos)` (V2-1). The keeper therefore acts at the first
@@ -31,6 +32,7 @@ use anchor_lang::prelude::Pubkey;
 use anyhow::anyhow;
 use shortwin::engine::{bounds, prologue};
 use shortwin::state::{GlobalConfig, Market, VenueKind};
+use shortwin_math::bounds as bounds_math;
 use shortwin_math::observe::{self, Observation};
 use shortwin_math::risk::{self, Budget};
 use shortwin_math::settle::{self, S3Chain};
@@ -54,6 +56,10 @@ pub struct Projection {
     /// evidence only); the projected market's `pool_fail_since` is the chain after this
     /// second's observation.
     pub pool_fail: bool,
+    /// The cap on the exit reference liquidity's EMA terms (M4F-1:
+    /// `engine::bounds::ref_depth_cap`, `⌊pool_d·10⁴/λ_min⌋` on Raydium, `None` elsewhere) on the
+    /// projected market.
+    pub depth_cap: Option<u128>,
 }
 
 /// Runs the program's market prologue on a copy of `mv` at `clock` ([module docs](self)).
@@ -78,6 +84,7 @@ pub fn project(
         now: pro.now,
         slot: clock.slot,
         obs: market.observation(),
+        depth_cap: bounds::ref_depth_cap(config, &market, mv.kind),
         market,
         s3_no_route: pro.s3_no_route,
         pool_fail: pro.pool_fail,
@@ -149,7 +156,7 @@ pub struct PositionEval {
     pub s3_due: bool,
 }
 
-/// The market-level coverage needs (duties 1, 2, 5).
+/// The market-level coverage needs (duties 1, 2, 5; M4F-1's guard coverage).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct MarketNeeds {
     /// At least one observation this second (duty 1: a near position, or
@@ -179,6 +186,19 @@ pub struct MarketNeeds {
     /// with open positions the market is observed every second (duty 5) until `ema_warm == 0`,
     /// and no liquidation or expiry is sent before.
     pub warming: bool,
+    /// The post-change reference guard is set on an executable venue (`ema_guard == 1` after
+    /// the roll; M4F-1): with open positions the market stays on the per-second cadence after
+    /// the warm-up too, until the guard clears. The guard holds the exit reference at the
+    /// ring's liquidity lows and clears once `L_ema` agrees with them; an honest bucket low in
+    /// every second keeps a deposit-wrapped crank in the idle seconds from lifting the lows
+    /// (`L_mlo`) and clearing it. Exits are sent as usual (the guard gates nothing).
+    pub guarded: bool,
+    /// Liquidity-triggered coverage runs (FITS-2 (b); `coverage::MarketTrack::liq_covered`): a
+    /// foreign bucket liquidity off the keeper's own `√(X·Y)` in the last `liq_cover_s` seconds
+    /// on this market with open positions — an LP-wrapped crank (the withdraw drag, the deposit
+    /// freeze) — keeps it on the per-second cadence (never per slot), so every second carries an
+    /// honest bucket extreme. Only on an executable venue with open positions.
+    pub liq_covered: bool,
 }
 
 /// Seconds at the end of a listing window observed every second (M4V-5):
@@ -233,13 +253,15 @@ pub fn evaluate(
         < u128::from(l_bps).saturating_mul(u128::from(cov.near_cr_bps));
     let near_deadline = pos.deadline.saturating_sub(now) <= cov.deadline_window_s;
 
-    // The legs (ARCH §4.5), on the projection.
+    // The legs (ARCH §4.5), on the projection. The spot leg at `max(L_live, L_ema')` (FITS-2 (a),
+    // the program's `assess`: a withdrawal inside a transaction cannot make it true).
     let fresh = obs.last.is_fresh(now, pos.ref_max_age_s);
     let p_live = st.price();
-    let l_live = st.liquidity();
+    let l_live = st.liquidity().unwrap_or(obs.ema.liq);
+    let l_spot = bounds_math::spot_liquidity(l_live, &obs.ema, &obs.ring).map_err(math)?;
     let p_rs = p_live.and_then(|p| observe::robust_spot(p, &obs.last, now, pos.ref_max_age_s));
-    let b_rs = match (risk_pricing, p_rs, l_live) {
-        (Some(pr), Some(p), Some(l)) => pr.buy_repriced(q, l, p).map(|b| b.cost),
+    let b_rs = match (risk_pricing, p_rs) {
+        (Some(pr), Some(p)) => pr.buy_repriced(q, l_spot, p).map(|b| b.cost),
         _ => None,
     };
     let spot_leg =
@@ -305,7 +327,8 @@ pub fn evaluate(
     } else if buyback_allowed {
         let b = b_live.unwrap_or(u64::MAX);
         let (bound, ok, wait) = if expired && !cr_liquidatable {
-            let r = bounds::expiry_reference(pos, obs, st, now).map_err(|e| anyhow!("{e}"))?;
+            let r = bounds::expiry_reference(pos, obs, st, now, proj.depth_cap)
+                .map_err(|e| anyhow!("{e}"))?;
             let mi = match r.and_then(|r| r.b_ref) {
                 Some(b_ref) => {
                     bounds::max_in_exp(pos, b_ref, k_s, r_due).map_err(|e| anyhow!("{e}"))?
@@ -314,7 +337,8 @@ pub fn evaluate(
             };
             (mi, Plan::Expire, Plan::ExpireWait)
         } else {
-            let r = bounds::liq_reference(pos, obs, st, now).map_err(|e| anyhow!("{e}"))?;
+            let r = bounds::liq_reference(pos, obs, st, now, proj.depth_cap)
+                .map_err(|e| anyhow!("{e}"))?;
             let mi = r
                 .and_then(|r| r.b_ref)
                 .and_then(|b_ref| bounds::max_in_liq(pos, b_ref, k_s));
@@ -371,13 +395,17 @@ pub fn evaluate_all(
 }
 
 /// The market's coverage needs (duties 1 and 5; the listing window of a Raydium market without
-/// positions, M4V-5) from its evaluations; `list_window_s` is `pool_list_window_s`.
+/// positions, M4V-5; the post-change warm-up and reference guard of a market with positions,
+/// M4R / M4F-1; duty 2's liquidity-triggered coverage, FITS-2 (b)) from its evaluations;
+/// `list_window_s` is `pool_list_window_s`, `liq_covered` whether the market's liquidity-triggered
+/// coverage window runs now (`coverage::MarketTrack::liq_covered`).
 pub fn market_needs(
     mv: &MarketView,
     proj: &Projection,
     evals: &[PositionEval],
     cov: &CoverageConfig,
     list_window_s: u32,
+    liq_covered: bool,
 ) -> MarketNeeds {
     let open = !mv.positions.is_empty() || proj.market.open_positions > 0;
     let ema_deviates = match (mv.state.price(), proj.obs.ema.price) {
@@ -392,8 +420,12 @@ pub fn market_needs(
     // Only a venue that can execute records observations (A64): a halted one is kept on the
     // no-route cadence (duty 5), never per second.
     let executable = mv.state.executable;
-    // M4R: the post-change warm-up (a listing, an adoption) on an executable venue.
+    // M4R: the post-change warm-up (a listing, an adoption) on an executable venue; M4F-1: the
+    // reference guard it sets, until it clears.
     let warming = executable && proj.market.ema_warm > 0;
+    let guarded = executable && proj.market.ema_guard != 0;
+    // FITS-2 (b): the liquidity-triggered window, on an executable venue with open positions.
+    let liq_covered = executable && open && liq_covered;
     // M4V-5: a Raydium market without positions, in its listing window or not yet warmed up.
     let (listing, warm_up) = if mv.kind.is_raydium() && !open && executable {
         let m = &proj.market;
@@ -408,7 +440,9 @@ pub fn market_needs(
         (false, false)
     };
     MarketNeeds {
-        per_second: executable && (open && (near || ema_deviates || warming) || s3_due_executable),
+        per_second: executable
+            && (open && (near || ema_deviates || warming || guarded || liq_covered)
+                || s3_due_executable),
         no_route: proj.s3_no_route && open,
         start_chain: proj.s3_no_route && open && mv.market.no_route_since == 0,
         open_positions: open,
@@ -417,5 +451,7 @@ pub fn market_needs(
         listing,
         warm_up,
         warming,
+        guarded,
+        liq_covered,
     }
 }

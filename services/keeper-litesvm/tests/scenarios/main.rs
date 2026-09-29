@@ -2,8 +2,15 @@
 //! venue (§9 M2), v1 on Raydium (§9 M3: the `raydium*` modules — the duties on the dumped AMM
 //! v4 and CPMM programs and pools, duty 10's admin-action monitor and upgrade latch, the
 //! protocol ALT built on chain), and Raydium pool selection (§9 M4: `pool_select` — duty 12's
-//! pool monitor and duty 5's fast path on planted sibling pools). Every keeper transaction runs the harness's invariant hooks
-//! after every instruction (`shortwin_keeper_litesvm`).
+//! pool monitor and duty 5's fast path on planted sibling pools), and `freeze` (M4F-1 and its
+//! follow-ups on the fork: the keeper's per-second coverage while the post-change guard is set;
+//! duty 2's liquidity-triggered **per-second** coverage on markets with open positions, FITS-2
+//! (b) — the per-slot liquidity bursts M4F-1 added stay reverted, M4G-2, so duty-2 bursts are
+//! price-only — against LP-wrapped cranks after a switch and in steady state; the carried fit of
+//! FIT-2 / FITS-1; FITV-2 / FITS-2's withdraw contest and FITX-1's pinned residual, a genuinely
+//! reached low frozen by withdraw-wrapped cranks; the keeper's cost of an LP-wrapped crank).
+//! Every keeper transaction runs the harness's invariant hooks after every instruction
+//! (`shortwin_keeper_litesvm`).
 //!
 //! Loads short.win's **test-venue** build (`scripts/build-test-venue.sh`, or
 //! `SHORTWIN_TEST_VENUE_SO`) and the mock venue (`target/deploy/mock_cpamm.so`, or
@@ -20,6 +27,7 @@ mod common;
 mod degraded;
 mod expire;
 mod extras;
+mod freeze;
 mod liquidate;
 mod pool_select;
 mod priority;

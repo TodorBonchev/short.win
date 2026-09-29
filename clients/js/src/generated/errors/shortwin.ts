@@ -218,6 +218,10 @@ export const SHORTWIN_ERROR__USE_LIQUIDATE = 0x17d3; // 6099
 export const SHORTWIN_ERROR__POOL_WINDOW_CLOSED = 0x17d4; // 6100
 /** EmaWarmingUp: The price state is warming up after a venue change; opens and keeper exits wait */
 export const SHORTWIN_ERROR__EMA_WARMING_UP = 0x17d5; // 6101
+/** CarriedPositionsTooLarge: An open position or the market's OI does not fit the candidate pool's opening caps */
+export const SHORTWIN_ERROR__CARRIED_POSITIONS_TOO_LARGE = 0x17d6; // 6102
+/** ReservedScanOutOfOrder: Reserved (6103): unused */
+export const SHORTWIN_ERROR__RESERVED_SCAN_OUT_OF_ORDER = 0x17d7; // 6103
 
 export type ShortwinError =
   | typeof SHORTWIN_ERROR__ABOVE_PRO_RATA_ALLOWANCE
@@ -233,6 +237,7 @@ export type ShortwinError =
   | typeof SHORTWIN_ERROR__CAP_POSITION_IMPACT
   | typeof SHORTWIN_ERROR__CAP_UTILIZATION
   | typeof SHORTWIN_ERROR__CAP_WALLET
+  | typeof SHORTWIN_ERROR__CARRIED_POSITIONS_TOO_LARGE
   | typeof SHORTWIN_ERROR__CONFIG_VERSION
   | typeof SHORTWIN_ERROR__COVERAGE_AUTHORITY_DISABLED
   | typeof SHORTWIN_ERROR__COVERAGE_PAUSED
@@ -296,6 +301,7 @@ export type ShortwinError =
   | typeof SHORTWIN_ERROR__PROCEEDS_BELOW_MIN
   | typeof SHORTWIN_ERROR__PUMP_VENUE_PRECEDENCE
   | typeof SHORTWIN_ERROR__REFERENCE_STALE
+  | typeof SHORTWIN_ERROR__RESERVED_SCAN_OUT_OF_ORDER
   | typeof SHORTWIN_ERROR__ROUTE_BROKEN
   | typeof SHORTWIN_ERROR__S3_TIMER_RUNNING
   | typeof SHORTWIN_ERROR__SETTLEMENT_NOT_ALLOWED
@@ -339,6 +345,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [SHORTWIN_ERROR__CAP_POSITION_IMPACT]: `Position impact cap exceeded`,
     [SHORTWIN_ERROR__CAP_UTILIZATION]: `Utilisation cap exceeded`,
     [SHORTWIN_ERROR__CAP_WALLET]: `Wallet cap exceeded`,
+    [SHORTWIN_ERROR__CARRIED_POSITIONS_TOO_LARGE]: `An open position or the market's OI does not fit the candidate pool's opening caps`,
     [SHORTWIN_ERROR__CONFIG_VERSION]: `Account layout version is not the one this program expects`,
     [SHORTWIN_ERROR__COVERAGE_AUTHORITY_DISABLED]: `The coverage authority is disabled`,
     [SHORTWIN_ERROR__COVERAGE_PAUSED]: `Opens are paused for keeper coverage`,
@@ -402,6 +409,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [SHORTWIN_ERROR__PROCEEDS_BELOW_MIN]: `Sale proceeds below the minimum`,
     [SHORTWIN_ERROR__PUMP_VENUE_PRECEDENCE]: `Pump venues take precedence for this mint`,
     [SHORTWIN_ERROR__REFERENCE_STALE]: `No fresh completed observation bucket`,
+    [SHORTWIN_ERROR__RESERVED_SCAN_OUT_OF_ORDER]: `Reserved (6103): unused`,
     [SHORTWIN_ERROR__ROUTE_BROKEN]: `Route is flagged broken`,
     [SHORTWIN_ERROR__S3_TIMER_RUNNING]: `S3 timer is still running`,
     [SHORTWIN_ERROR__SETTLEMENT_NOT_ALLOWED]: `SOL settlement is not allowed`,

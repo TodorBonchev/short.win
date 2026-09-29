@@ -142,7 +142,8 @@ pub const CREATE: Budget = Budget {
     cu: 250_000,
     source: "§6.1 `create_market`",
 };
-/// ARCH §6.1 `propose_pool` / `execute_pool_switch` (M4; est. 25–35 k).
+/// ARCH §6.1 `propose_pool` / `execute_pool_switch` (M4; est. 25–35 k; measured up to ≈ 49 k with
+/// the carried-position fit).
 pub const POOL: Budget = Budget {
     cu: 100_000,
     source: "§6.1 `propose_pool` / `execute_pool_switch`",
