@@ -81,7 +81,7 @@ fn reference(
 ) -> Result<ExitBound> {
     let l_live = state.liquidity().unwrap_or(obs.ema.liq);
     let l_b = bounds::ref_liquidity(l_live, &obs.ema, &obs.ring, depth_cap).math()?;
-    let b_ref = state.pricing.and_then(|pr| {
+    let b_ref = state.quoter().and_then(|pr| {
         pr.capped(u64::from(pos.venue_fee_hard_cap_bps))
             .buy_repriced(pos.q, l_b, p_ref)
             .map(|b| b.cost)

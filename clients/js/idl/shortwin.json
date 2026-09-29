@@ -976,9 +976,9 @@
           "name": "trader_base_ata",
           "docs": [
             "`ATA(trader, mint, token_program)`: created with `create_idempotent` and then",
-            "validated on pump venues (M5, which marks it `mut` again). Read-only while no M1 path",
-            "writes it, so a list-only listing write-locks nothing it does not use (M1-FID-15)."
-          ]
+            "validated on the pump venues (M5)."
+          ],
+          "writable": true
         },
         {
           "name": "token_program"
@@ -7187,11 +7187,29 @@
             }
           },
           {
+            "name": "trader_wsol_ata",
+            "docs": [
+              "`ATA(trader, WSOL)` under SPL Token (the pump curve's TradeExtras T11, `sweep_trader`'s",
+              "stray-ATA slot): derived once at listing instead of on every trade. The trader is the",
+              "market's PDA, so a coin's creator who grinds the mint can give this ATA a low bump, and",
+              "`find_program_address` charges 1,500 CU per bump it tries (M5-SEC-6)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "pump_pool_authority",
+            "docs": [
+              "`PDA(pump, [\"pool-authority\", mint])`, the canonical PumpSwap pool's `creator`, which",
+              "`canonical_pool_valid` compares (ARCH §2.5); derived once at listing for the same reason."
+            ],
+            "type": "pubkey"
+          },
+          {
             "name": "_reserved",
             "type": {
               "array": [
                 "u8",
-                240
+                176
               ]
             }
           }

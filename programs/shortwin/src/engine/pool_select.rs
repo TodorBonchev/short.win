@@ -952,6 +952,7 @@ mod tests {
                 pricing: None,
                 fee_ppm: 2_500,
                 locked_depth: d,
+                curve: None,
             },
             age_start,
         }
@@ -1079,9 +1080,9 @@ mod tests {
                 x,
                 y,
                 r: y,
-                ..honest.state
+                ..honest.state.clone()
             },
-            ..honest
+            ..honest.clone()
         };
         let withdrawn = with_reserves(900_000, 225_000);
         let deposit = with_reserves(100_000_000, 25_000_000);
@@ -1254,7 +1255,7 @@ mod tests {
             CarriedFit::Position
         );
         // No price at all shows nothing fits.
-        let mut blind = a;
+        let mut blind = a.clone();
         blind.state.executable = false;
         assert_eq!(
             carried_fit(
@@ -1362,7 +1363,7 @@ mod tests {
             assert_eq!(fit(&with(10_000, impact), &a, at), CarriedFit::Position);
         }
         // A 25 bps candidate for positions margined at 1 %: its own fee binds.
-        let mut low = a;
+        let mut low = a.clone();
         low.state.fee_ppm = 2_500;
         assert_eq!(phi(&with(10_000, 1), &low), 2_500);
         assert_eq!(

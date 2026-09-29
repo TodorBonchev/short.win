@@ -11,6 +11,13 @@
 //! - A cluster that refuses a transaction before running it (e.g. a v1 transaction on a
 //!   cluster without SIMD-0385, an oversized transaction) is reported as
 //!   [`TxError::Rejected`], which the keeper's v1 → v0 fallback keys on.
+//! - `send_bundle` (the straddle, ARCH §5.4; U22) goes to a **Jito block engine** when one is
+//!   configured ([`RpcChain::with_block_engine`]): `sendBundle` with the base64 transactions
+//!   (docs.jito.wtf, "sendBundle": `POST <engine>/api/v1/bundles`, params `[[tx…], {"encoding":
+//!   "base64"}]`, result the bundle id). Whether it landed is read from the **cluster**, not the
+//!   engine: every transaction's signature confirmed (a bundle is all-or-nothing) or, at the
+//!   confirmation timeout, none — so the engine's status endpoints are not relied on.
+//!   **UNVERIFIED** against a live block engine (T-STRADDLE runs the bundle in-process).
 
 use std::time::Duration;
 
@@ -26,16 +33,24 @@ use solana_rpc_client_api::config::{
     RpcSimulateTransactionConfig, RpcTransactionConfig,
 };
 use solana_rpc_client_api::filter::{Memcmp as RpcMemcmp, RpcFilterType};
-use solana_rpc_client_api::request::RpcError;
+use solana_rpc_client_api::request::{RpcError, RpcRequest};
 use solana_transaction::versioned::VersionedTransaction;
 use solana_transaction_status_client_types::{
     UiInnerInstructions, UiInstruction, UiTransactionEncoding,
 };
 
-use crate::chain::{AccountData, Chain, ChainClock, InnerIx, Memcmp, TxError, TxOutcome};
+use crate::chain::{
+    AccountData, BundleOutcome, Chain, ChainClock, InnerIx, Memcmp, TxError, TxOutcome,
+};
 
 /// Largest `getMultipleAccounts` request.
 const MULTIPLE_ACCOUNTS_MAX: usize = 100;
+
+/// The path of a Jito block engine's `sendBundle` endpoint (docs.jito.wtf).
+pub const JITO_BUNDLES_PATH: &str = "/api/v1/bundles";
+
+/// Most transactions one Jito bundle holds (U22).
+pub const JITO_BUNDLE_MAX_TXS: usize = 5;
 
 /// A JSON-RPC cluster (module docs).
 pub struct RpcChain {
@@ -43,6 +58,34 @@ pub struct RpcChain {
     commitment: CommitmentConfig,
     confirm_timeout: Duration,
     poll_interval: Duration,
+    /// The Jito block engine bundles go to (`None`: no bundles).
+    block_engine: Option<RpcClient>,
+}
+
+/// A block engine URL with the `sendBundle` path: a bare engine URL (no `/api/` in it) gets
+/// [`JITO_BUNDLES_PATH`]; a full endpoint is kept.
+pub fn bundle_endpoint(url: &str) -> String {
+    if url.contains("/api/") {
+        url.to_string()
+    } else {
+        format!("{}{JITO_BUNDLES_PATH}", url.trim_end_matches('/'))
+    }
+}
+
+/// `sendBundle`'s params: `[[base64(tx), …], {"encoding": "base64"}]` (the wire bytes of each
+/// transaction, in bundle order).
+pub fn send_bundle_params(txs: &[VersionedTransaction]) -> anyhow::Result<serde_json::Value> {
+    use base64::Engine;
+    let engine = base64::engine::general_purpose::STANDARD;
+    let encoded = txs
+        .iter()
+        .map(|t| {
+            wincode::serialize(t)
+                .map(|b| engine.encode(b))
+                .map_err(|e| anyhow!("serializing a bundle transaction: {e:?}"))
+        })
+        .collect::<anyhow::Result<Vec<String>>>()?;
+    Ok(serde_json::json!([encoded, { "encoding": "base64" }]))
 }
 
 impl RpcChain {
@@ -56,7 +99,23 @@ impl RpcChain {
             // with an escalated priority price next tick rather than waited for.
             confirm_timeout: Duration::from_secs(8),
             poll_interval: Duration::from_millis(400),
+            block_engine: None,
         }
+    }
+
+    /// Sends bundles to the Jito block engine at `url` (a bare engine URL such as
+    /// `https://mainnet.block-engine.jito.wtf`, or its full `sendBundle` endpoint).
+    pub fn with_block_engine(mut self, url: &str) -> Self {
+        self.block_engine = Some(RpcClient::new_with_commitment(
+            bundle_endpoint(url),
+            self.commitment,
+        ));
+        self
+    }
+
+    /// Whether bundles can be sent.
+    pub fn has_block_engine(&self) -> bool {
+        self.block_engine.is_some()
     }
 
     /// Overrides the confirmation timeout.
@@ -326,54 +385,8 @@ impl Chain for RpcChain {
             }
         };
         let deadline = tokio::time::Instant::now() + self.confirm_timeout;
-        let status = loop {
-            let st = self
-                .client
-                .get_signature_statuses(&[signature])
-                .await
-                .context("getSignatureStatuses")?;
-            if let Some(Some(s)) = st.value.into_iter().next()
-                && s.satisfies_commitment(self.commitment)
-            {
-                break s;
-            }
-            if tokio::time::Instant::now() >= deadline {
-                return Ok(TxOutcome {
-                    signature,
-                    err: Some(TxError::Dropped("not confirmed before the timeout".into())),
-                    ..TxOutcome::default()
-                });
-            }
-            tokio::time::sleep(self.poll_interval).await;
-        };
-        let mut outcome = TxOutcome {
-            signature,
-            err: status.err.map(TxError::from_transaction_error),
-            ..TxOutcome::default()
-        };
-        let cfg = RpcTransactionConfig {
-            encoding: Some(UiTransactionEncoding::Base64),
-            commitment: Some(self.commitment),
-            max_supported_transaction_version: Some(1),
-        };
-        if let Ok(landed) = self
-            .client
-            .get_transaction_with_config(&signature, cfg)
-            .await
-            && let Some(meta) = landed.transaction.meta
-        {
-            let keys = tx.message.static_account_keys().to_vec();
-            let n_top = tx.message.instructions().len();
-            outcome.fee = meta.fee;
-            outcome.logs = Option::<Vec<String>>::from(meta.log_messages).unwrap_or_default();
-            outcome.units_consumed = Option::<u64>::from(meta.compute_units_consumed).unwrap_or(0);
-            outcome.inner = inner_of(
-                Option::<Vec<UiInnerInstructions>>::from(meta.inner_instructions),
-                &keys,
-                n_top,
-            );
-        }
-        Ok(outcome)
+        let mut out = self.await_landed(&[(signature, tx)], deadline).await?;
+        Ok(out.pop().unwrap_or_default())
     }
 
     async fn recent_priority_fees(&self, writable: &[Pubkey]) -> anyhow::Result<Vec<u64>> {
@@ -383,6 +396,130 @@ impl Chain for RpcChain {
             .await
             .context("getRecentPrioritizationFees")?;
         Ok(fees.into_iter().map(|f| f.prioritization_fee).collect())
+    }
+
+    async fn send_bundle(&self, txs: &[VersionedTransaction]) -> anyhow::Result<BundleOutcome> {
+        let Some(engine) = &self.block_engine else {
+            anyhow::bail!("no block engine configured (--block-engine): bundles cannot be sent");
+        };
+        if txs.is_empty() || txs.len() > JITO_BUNDLE_MAX_TXS {
+            anyhow::bail!(
+                "a bundle holds 1 to {JITO_BUNDLE_MAX_TXS} transactions, not {}",
+                txs.len()
+            );
+        }
+        let params = send_bundle_params(txs)?;
+        let id: String = match engine
+            .send(
+                RpcRequest::Custom {
+                    method: "sendBundle",
+                },
+                params,
+            )
+            .await
+        {
+            Ok(id) => id,
+            Err(e) => {
+                return Ok(BundleOutcome {
+                    detail: format!("sendBundle refused: {e}"),
+                    ..BundleOutcome::default()
+                });
+            }
+        };
+        let deadline = tokio::time::Instant::now() + self.confirm_timeout;
+        let pairs: Vec<(solana_signature::Signature, &VersionedTransaction)> = txs
+            .iter()
+            .map(|t| (t.signatures.first().copied().unwrap_or_default(), t))
+            .collect();
+        let outs = self.await_landed(&pairs, deadline).await?;
+        let landed = outs.iter().all(TxOutcome::ok);
+        let detail = if landed {
+            String::new()
+        } else {
+            outs.iter()
+                .enumerate()
+                .find_map(|(i, o)| o.err.as_ref().map(|e| format!("tx{}: {e:?}", i + 1)))
+                .unwrap_or_default()
+        };
+        Ok(BundleOutcome {
+            id,
+            landed,
+            txs: if landed { outs } else { Vec::new() },
+            detail,
+        })
+    }
+}
+
+impl RpcChain {
+    /// Polls the signatures of `txs` until every one is confirmed at the chain's commitment or
+    /// `deadline` passes (the ones still missing are `Dropped`), then fetches each confirmed
+    /// transaction's meta (logs, fee, compute units, inner instructions).
+    async fn await_landed(
+        &self,
+        txs: &[(solana_signature::Signature, &VersionedTransaction)],
+        deadline: tokio::time::Instant,
+    ) -> anyhow::Result<Vec<TxOutcome>> {
+        let sigs: Vec<solana_signature::Signature> = txs.iter().map(|(s, _)| *s).collect();
+        let mut statuses = vec![None; sigs.len()];
+        loop {
+            let st = self
+                .client
+                .get_signature_statuses(&sigs)
+                .await
+                .context("getSignatureStatuses")?;
+            for (slot, s) in statuses.iter_mut().zip(st.value) {
+                if let Some(s) = s
+                    && s.satisfies_commitment(self.commitment)
+                {
+                    *slot = Some(s);
+                }
+            }
+            if statuses.iter().all(Option::is_some) || tokio::time::Instant::now() >= deadline {
+                break;
+            }
+            tokio::time::sleep(self.poll_interval).await;
+        }
+        let mut out = Vec::with_capacity(txs.len());
+        for ((signature, tx), status) in txs.iter().zip(statuses) {
+            let Some(status) = status else {
+                out.push(TxOutcome {
+                    signature: *signature,
+                    err: Some(TxError::Dropped("not confirmed before the timeout".into())),
+                    ..TxOutcome::default()
+                });
+                continue;
+            };
+            let mut outcome = TxOutcome {
+                signature: *signature,
+                err: status.err.map(TxError::from_transaction_error),
+                ..TxOutcome::default()
+            };
+            let cfg = RpcTransactionConfig {
+                encoding: Some(UiTransactionEncoding::Base64),
+                commitment: Some(self.commitment),
+                max_supported_transaction_version: Some(1),
+            };
+            if let Ok(landed) = self
+                .client
+                .get_transaction_with_config(signature, cfg)
+                .await
+                && let Some(meta) = landed.transaction.meta
+            {
+                let keys = tx.message.static_account_keys().to_vec();
+                let n_top = tx.message.instructions().len();
+                outcome.fee = meta.fee;
+                outcome.logs = Option::<Vec<String>>::from(meta.log_messages).unwrap_or_default();
+                outcome.units_consumed =
+                    Option::<u64>::from(meta.compute_units_consumed).unwrap_or(0);
+                outcome.inner = inner_of(
+                    Option::<Vec<UiInnerInstructions>>::from(meta.inner_instructions),
+                    &keys,
+                    n_top,
+                );
+            }
+            out.push(outcome);
+        }
+        Ok(out)
     }
 }
 
@@ -419,5 +556,55 @@ mod tests {
             }]
         );
         assert_eq!(inner_of(None, &keys, 1), vec![Vec::new()]);
+    }
+
+    /// `sendBundle`'s params are `[[base64(wire bytes)…], {"encoding": "base64"}]`, in bundle
+    /// order, and a bare engine URL gets the bundles path.
+    #[test]
+    fn send_bundle_params_are_jitos() {
+        use base64::Engine;
+        use solana_hash::Hash;
+        use solana_keypair::Keypair;
+        use solana_signer::Signer;
+        let kp = Keypair::new();
+        let mk = |lamports: u64| {
+            let ix = solana_instruction::Instruction {
+                program_id: Pubkey::new_unique(),
+                accounts: vec![solana_instruction::AccountMeta::new(kp.pubkey(), true)],
+                data: lamports.to_le_bytes().to_vec(),
+            };
+            crate::tx::build(
+                crate::tx::TxFormat::V0,
+                &kp,
+                &[],
+                &[ix],
+                &crate::tx::ComputeBudget::SIMULATION,
+                Hash::default(),
+                &[],
+            )
+            .unwrap()
+        };
+        let txs = [mk(1), mk(2)];
+        let p = send_bundle_params(&txs).unwrap();
+        let arr = p.as_array().unwrap();
+        assert_eq!(arr.len(), 2);
+        assert_eq!(arr[1], serde_json::json!({ "encoding": "base64" }));
+        let list = arr[0].as_array().unwrap();
+        assert_eq!(list.len(), 2);
+        for (enc, tx) in list.iter().zip(&txs) {
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(enc.as_str().unwrap())
+                .unwrap();
+            assert_eq!(bytes.len(), crate::tx::size(tx));
+            assert_eq!(bytes, wincode::serialize(tx).unwrap());
+        }
+        assert_eq!(
+            bundle_endpoint("https://mainnet.block-engine.jito.wtf/"),
+            "https://mainnet.block-engine.jito.wtf/api/v1/bundles"
+        );
+        assert_eq!(
+            bundle_endpoint("https://ny.mainnet.block-engine.jito.wtf/api/v1/bundles"),
+            "https://ny.mainnet.block-engine.jito.wtf/api/v1/bundles"
+        );
     }
 }

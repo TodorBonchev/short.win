@@ -32,23 +32,37 @@
 //! *Where the `VenueExtras` account travels is this module's choice* (ARCH names the sets,
 //! not the slot): first in the extras segment, only when a set is selected.
 //!
-//! Venue kinds with an adapter in this build: [`VenueKind::RaydiumV4`] ([`raydium_v4`]) and
-//! [`VenueKind::RaydiumCpmm`] ([`raydium_cpmm`]) since M3, sharing [`raydium`] (the delegate
-//! sell out of the lending vault, the direct-to-vault buy, eligibility, adoption), and
-//! [`VenueKind::Mock`] (TEST-ONLY, feature `test-venue`, [`mock`]). The pump venues arrive
-//! with their milestones (M5 pump curve, M6 PumpSwap): each adds its arm to the `match`es
-//! below and its own module; until then their markets refuse trades with `NoSupportedVenue`
-//! (no market can be on them yet: `create_market` lists `None`, a verified Raydium pool and,
-//! in a test build, the mock). [`detect`] is the part of the pump detection a Raydium listing
-//! and a list-only market's `propose_pool` need today (D1 precedence).
+//! Venue kinds with an adapter in this build: [`VenueKind::PumpCurve`] ([`pump_curve`]) since M5
+//! — whose ReadSet also serves a `PumpMigrating` market (the completed curve is final and still
+//! observed; exits pause, S3 after the migration pause) — [`VenueKind::RaydiumV4`]
+//! ([`raydium_v4`]) and [`VenueKind::RaydiumCpmm`] ([`raydium_cpmm`]) since M3, sharing
+//! [`raydium`] (the delegate sell out of the lending vault, the direct-to-vault buy, eligibility,
+//! adoption), and [`VenueKind::Mock`] (TEST-ONLY, feature `test-venue`, [`mock`]). A list-only
+//! (`None`) market's "ReadSet" is its detection set `[bonding_curve, canonical_pool]` (key-checked;
+//! `crank_price` re-detects a pump venue on it, `sol_settle` runs its S3 on it, M2-SEC-5).
+//! PumpSwap arrives with M6: until then its markets refuse trades with `NoSupportedVenue` (none can
+//! exist yet: `create_market(Auto)` lists a graduated pump coin as `None`, and a curve market whose
+//! canonical pool appears stays `PumpMigrating` until M6's transition). [`detect`] is the pump
+//! detection (`classify_pump`, D1 precedence).
+//!
+//! **Quotes** ([`Quoter`]): the constant-product venues price on `(X, Y)` with a resolved
+//! [`Pricing`]; the curve on a [`CurveState`] with `shortwin_math::quote::CurvePricing` (the
+//! straddle `B̂_str` above `rT`, whose post-migration pool fee tier needs the PumpSwap tier list:
+//! [`CurveVenue`] carries it, which is why [`VenueState`] is `Clone` but not `Copy`).
+
+use std::rc::Rc;
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::instruction::AccountMeta;
-use shortwin_math::quote::{BuyQuote, Pricing, SellQuote};
+use shortwin_math::fees::{self as math_fees, FeeBps, FeeTier, PammFeeSchedule};
+use shortwin_math::quote::{
+    self as math_quote, BuyQuote, CurveOffsets, CurvePricing, CurveState, MigrationParams, Pricing,
+    SellQuote,
+};
 use shortwin_math::risk::price_wad;
 
 use crate::constants::VENUE_EXTRAS_VERSION;
-use crate::engine::trader::TraderAccounts;
+use crate::engine::trader::{BaseSide, TraderAccounts, WsolSide};
 use crate::errors::ShortwinError;
 use crate::state::{
     Market, VenueExtras, VenueKind, ENTRY_FIXED, ENTRY_NONE, ENTRY_TEMPLATE, EXTRAS_IX_KINDS,
@@ -60,6 +74,7 @@ use crate::state::{
 pub mod detect;
 #[cfg(feature = "test-venue")]
 pub mod mock;
+pub mod pump_curve;
 pub mod raydium;
 pub mod raydium_cpmm;
 pub mod raydium_v4;
@@ -323,7 +338,7 @@ pub fn is_empty_entry(entry: &crate::state::ExtraEntry) -> bool {
 
 /// The live state of a market's venue (ARCH §4.1 `VenueState { X, Y, R, P, L, fee }`), read
 /// from its ReadSet in the prologue (step 6).
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct VenueState {
     /// The market's venue.
     pub kind: VenueKind,
@@ -331,20 +346,215 @@ pub struct VenueState {
     /// account parses (A63). Only this drives `B̂_live`, closes, observation recording and the
     /// "no route ⇒ spot leg true" rule; the route-broken flag never enters it (V2-1).
     pub executable: bool,
-    /// Pricing reserves `X` (token) and `Y` (SOL); 0 when the venue is not executable.
+    /// Pricing reserves `X` (token) and `Y` (SOL); 0 when the venue is not executable (the
+    /// curve: `(vT, vQ)`, also while it is migrating — the completed curve is still observed).
     pub x: u64,
     pub y: u64,
-    /// Real SOL `R` (tiers, pool eligibility); `Y` on the mock and Raydium.
+    /// Real SOL `R` (tiers, pool eligibility); `Y` on the mock and Raydium, `rQ` on the curve.
     pub r: u64,
-    /// The venue's fees resolved on the live state (execution quotes); `None` when not
-    /// executable.
+    /// The constant-product venues' fees resolved on the live state (execution quotes); `None`
+    /// when not executable and on the curve (whose quotes are [`VenueState::curve`]'s).
     pub pricing: Option<Pricing>,
-    /// One-way live fee φ in ppm (ARCH §4.2), 0 when unknown.
+    /// One-way live fee φ in ppm (ARCH §4.2), 0 when not executable.
     pub fee_ppm: u32,
     /// Raydium: the pool's locked constant-product depth `D = ⌊λ_bps·isqrt(X·Y)/10⁴⌋` on the
     /// pricing reserves (ARCH §2.6; `pool_select::locked_depth`); 0 on other venues and when
     /// not executable.
     pub locked_depth: u128,
+    /// The pump curve (a `PumpCurve` or `PumpMigrating` ReadSet whose curve account parses):
+    /// its state, its detection facts and its pricing inputs. `None` elsewhere.
+    pub curve: Option<CurveVenue>,
+}
+
+/// `migrate_v2`'s token seed on a standard curve: 206.9 M tokens (R-PUMP §7.4; the EMA leg's
+/// deterministic `X_p`, ARCH §4.3; `shortwin_sim.PUMP_POOL_TOKENS`).
+pub const STANDARD_POOL_TOKENS: u128 = 206_900_000_000_000;
+
+/// A pump curve as a venue (ARCH §3.12 PumpCurve ReadSet, §4.1–§4.3).
+#[derive(Clone, Debug)]
+pub struct CurveVenue {
+    /// The curve as read now (C0): `(vT, vQ, rT, rQ, complete)`.
+    pub live: CurveState,
+    /// The canonical PumpSwap pool (C3): absent, valid (ARCH §2.5 `canonical_pool_valid`) or
+    /// there but unreadable (M5-SEC-5; `detect::canonical_pool`); read only when the curve is
+    /// complete (`Absent` otherwise).
+    pub canonical_pool: detect::CanonicalPool,
+    /// The curve's pricing inputs; `None` when an account the quotes read no longer parses (a
+    /// venue upgrade, A63) or the curve has migrated (`vT = 0`: no curve fee tier).
+    pub pricing: Option<CurvePricingInputs>,
+}
+
+impl CurveVenue {
+    /// Complete with `vT > 0`: the curve is final and `migrate_v2` has not run (ARCH §2.5).
+    pub fn migrating(&self) -> bool {
+        self.live.complete && self.live.vt > 0
+    }
+
+    /// The canonical PumpSwap pool is valid (ARCH §2.5 `canonical_pool_valid`).
+    pub fn canonical_pool_valid(&self) -> bool {
+        self.canonical_pool == detect::CanonicalPool::Valid
+    }
+}
+
+/// What the curve's quotes read (ARCH §4.2, §4.3): the live curve fees, the constant offsets, the
+/// live leg's `X_p`, `Global.pool_migration_fee`, and the PumpSwap fee schedule of the
+/// post-migration pool (`B̂_str`; the tier resolved at that pool's own market cap).
+#[derive(Clone, Debug)]
+pub struct CurvePricingInputs {
+    /// `fees::pump_curve` on the live `(vT, vQ)` with the pump `FeeConfig` tiers,
+    /// `Global.creator_fee_configurable`, the curve's `creator_fee_bps` and creator.
+    pub fees: FeeBps,
+    /// `vT − rT`, `vQ − rQ` of the live curve.
+    pub offsets: CurveOffsets,
+    /// The live leg's `X_p = curve_base_ata.amount − rT` (C4; ARCH §4.3).
+    pub live_pool_tokens: u128,
+    /// `Global.pool_migration_fee` (@146).
+    pub migration_fee: u64,
+    /// PumpSwap `FeeConfig.fee_tiers` (C5), in account order.
+    pub pool_tiers: Rc<[FeeTier]>,
+    /// PumpSwap `GlobalConfig.creator_fee_configurable` (C6 @940).
+    pub pool_creator_fee_configurable: bool,
+    /// The curve's creator is the default key: the new pool's coin creator is too, and PumpSwap
+    /// charges no creator fee.
+    pub coin_creator_is_default: bool,
+}
+
+impl CurvePricingInputs {
+    /// `CurvePricing` at the live fee, with the deterministic migration of the EMA leg (the
+    /// standard `X_p`, ARCH §4.3) and the post-migration pool's schedule: `base_supply` 10¹⁵
+    /// (`fees::PammFeeSchedule`: a coin that has not graduated yet; `shortwin_sim.CPPool
+    /// .graduate`), a new pool's own `creator_fee_bps` 0.
+    pub fn curve_pricing(&self) -> CurvePricing<'_> {
+        CurvePricing {
+            fees: self.fees,
+            offsets: self.offsets,
+            migration: MigrationParams {
+                migration_fee: self.migration_fee,
+                pool_tokens: STANDARD_POOL_TOKENS,
+            },
+            pool: PammFeeSchedule {
+                tiers: &self.pool_tiers,
+                base_supply: u64::try_from(math_fees::PUMP_CURVE_MCAP_SUPPLY).unwrap_or(u64::MAX),
+                creator_fee_configurable: self.pool_creator_fee_configurable,
+                pool_creator_fee_bps: 0,
+                coin_creator_is_default: self.coin_creator_is_default,
+                cap_bps: None,
+            },
+        }
+    }
+}
+
+/// A curve state `(vT, vQ) = (x, y)` with the live offsets: a ring entry's cached reprojection is
+/// the curve at that price (ARCH §4.4: `curve_reprice` keeps the offsets; the second half of
+/// `quote::curve_reprice`).
+pub fn curve_at(x: u128, y: u128, offsets: CurveOffsets) -> CurveState {
+    CurveState {
+        vt: x,
+        vq: y,
+        rt: x.saturating_sub(offsets.token),
+        rq: y.saturating_sub(offsets.quote),
+        complete: false,
+    }
+}
+
+/// The curve's quotes at one fee view (the live fee, or capped for risk quotes).
+#[derive(Clone, Copy, Debug)]
+pub struct CurveQuoter<'a> {
+    /// The fees, offsets, the deterministic (EMA-leg) migration and the pool schedule.
+    pub pricing: CurvePricing<'a>,
+    /// The live curve.
+    pub live: CurveState,
+    /// The live leg's `X_p` (`curve_base_ata.amount − rT`).
+    pub live_pool_tokens: u128,
+    /// A `PumpMigrating` market: FV prices the deterministic post-migration pool (ARCH §4.5).
+    pub migrating: bool,
+}
+
+/// A venue's quotes at one fee view (ARCH §4.3 "two fee views"): the live fee for execution
+/// quotes, [`Quoter::capped`] for risk quotes (V2-1). Every quote is `None` (`+∞`) when undefined.
+#[derive(Clone, Copy, Debug)]
+pub enum Quoter<'a> {
+    /// A constant-product pool on `(X, Y)`.
+    Pool(Pricing),
+    /// The pump curve (the straddle above `rT`).
+    Curve(CurveQuoter<'a>),
+}
+
+impl Quoter<'_> {
+    /// The risk view `min(φ_live, cap_bps)` (ARCH §4.3, V2-1).
+    pub fn capped(self, cap_bps: u64) -> Self {
+        match self {
+            Self::Pool(p) => Self::Pool(p.capped(cap_bps)),
+            Self::Curve(mut c) => {
+                c.pricing = c.pricing.capped(cap_bps);
+                Self::Curve(c)
+            }
+        }
+    }
+
+    /// One-way fee φ of a buy in ppm.
+    pub fn oneway_ppm(&self) -> u32 {
+        match self {
+            Self::Pool(p) => p.oneway_ppm(),
+            Self::Curve(c) => c.pricing.oneway_ppm(),
+        }
+    }
+
+    /// `B̂(q)` on the **live** state: a pool on `(x, y)`; the curve on its live state with the live
+    /// leg's `X_p = curve_base_ata.amount − rT` (ARCH §4.3; `None` on a complete curve).
+    pub fn buy_live(&self, q: u64, x: u128, y: u128) -> Option<BuyQuote> {
+        match self {
+            Self::Pool(p) => {
+                if x == 0 {
+                    return None;
+                }
+                p.buy(q, x, y)
+            }
+            Self::Curve(c) => {
+                let mut pricing = c.pricing;
+                pricing.migration.pool_tokens = c.live_pool_tokens;
+                pricing.buy(q, &c.live)
+            }
+        }
+    }
+
+    /// `B̂(q; x, y)` on a hypothetical state — a ring entry's cached reprojection (the EMA leg, the
+    /// D4 margin): a pool on `(x, y)`; the curve at `(vT, vQ) = (x, y)` with the live offsets and
+    /// the deterministic migration (the straddle above that state's `rT`). `None` for `x = 0`.
+    pub fn buy_xy(&self, q: u64, x: u128, y: u128) -> Option<BuyQuote> {
+        if x == 0 {
+            return None;
+        }
+        match self {
+            Self::Pool(p) => p.buy(q, x, y),
+            Self::Curve(c) => c.pricing.buy(q, &curve_at(x, y, c.pricing.offsets)),
+        }
+    }
+
+    /// `B̂(q; reprice(L, P))` (the curve: `curve_reprice`, ARCH §4.3 EMA leg): the spot leg, the
+    /// box corners, `B̂_ref`.
+    pub fn buy_repriced(&self, q: u64, l: u128, p: u128) -> Option<BuyQuote> {
+        match self {
+            Self::Pool(pr) => pr.buy_repriced(q, l, p),
+            Self::Curve(c) => c.pricing.buy_repriced(q, l, p),
+        }
+    }
+
+    /// `B̂_FV(P, L)` (ARCH §4.5): [`Quoter::buy_repriced`], except on a stuck migration (a
+    /// `PumpMigrating` market), where it prices the deterministic post-migration pool at `P` —
+    /// `reprice(√(X_p·Y_p), P)` at the pool's own PumpSwap tier (`shortwin_sim.Market.fv_parts`).
+    pub fn fv_repriced(&self, q: u64, l: u128, p: u128) -> Option<BuyQuote> {
+        match self {
+            Self::Curve(c) if c.migrating => {
+                let (xp, yp) = math_quote::migrated_pool(&c.live, &c.pricing.migration)?;
+                let fees = math_fees::pump_amm(yp, xp, &c.pricing.pool).ok()?;
+                let l_pool = math_quote::liquidity(xp, yp).ok()?;
+                let (x, y) = math_quote::reprice(l_pool, p)?;
+                math_quote::sol_leg::buy_exact_out(q, x, y, false, &fees)
+            }
+            _ => self.buy_repriced(q, l, p),
+        }
+    }
 }
 
 impl VenueState {
@@ -360,12 +570,19 @@ impl VenueState {
             pricing: None,
             fee_ppm: 0,
             locked_depth: 0,
+            curve: None,
         }
     }
 
-    /// Spot `P = ⌊Y·WAD/X⌋` of an executable venue with both reserves non-zero.
+    /// Observed by the prologue's record (ARCH §3.0 step 7, A64): an executable venue, or a
+    /// migrating curve (its completed state is final, so it is still recorded).
+    pub fn observed(&self) -> bool {
+        self.executable || self.curve.as_ref().is_some_and(CurveVenue::migrating)
+    }
+
+    /// Spot `P = ⌊Y·WAD/X⌋` of an observed venue with both reserves non-zero.
     pub fn price(&self) -> Option<u128> {
-        if !self.executable || self.x == 0 || self.y == 0 {
+        if !self.observed() || self.x == 0 || self.y == 0 {
             return None;
         }
         price_wad(u128::from(self.x), u128::from(self.y))
@@ -373,9 +590,9 @@ impl VenueState {
             .filter(|p| *p > 0)
     }
 
-    /// `L = √(X·Y)` of an executable venue.
+    /// `L = √(X·Y)` of an observed venue (the curve's `isqrt(vT·vQ)`).
     pub fn liquidity(&self) -> Option<u128> {
-        if !self.executable {
+        if !self.observed() {
             return None;
         }
         shortwin_math::quote::liquidity(u128::from(self.x), u128::from(self.y))
@@ -383,52 +600,84 @@ impl VenueState {
             .filter(|l| *l > 0)
     }
 
+    /// The venue's quotes at the **live** fee: a pool's resolved pricing, or the curve's inputs
+    /// (also while it is migrating). `None` when neither is available.
+    pub fn quoter(&self) -> Option<Quoter<'_>> {
+        if let Some(p) = self.pricing {
+            return Some(Quoter::Pool(p));
+        }
+        let c = self.curve.as_ref()?;
+        let inputs = c.pricing.as_ref()?;
+        Some(Quoter::Curve(CurveQuoter {
+            pricing: inputs.curve_pricing(),
+            live: c.live,
+            live_pool_tokens: inputs.live_pool_tokens,
+            migrating: c.migrating(),
+        }))
+    }
+
     /// Execution quote `B̂_live(q)` at the live fee (ARCH §4.3 "two fee views"); `None` (`+∞`)
-    /// when undefined or the venue is not executable.
+    /// when undefined or the venue is not executable. On the curve `B̂_str` above `rT`.
     pub fn buy(&self, q: u64) -> Option<BuyQuote> {
-        self.pricing?.buy(q, u128::from(self.x), u128::from(self.y))
+        if !self.executable {
+            return None;
+        }
+        self.quoter()?
+            .buy_live(q, u128::from(self.x), u128::from(self.y))
     }
 
     /// Risk quote at `min(φ_live, cap_bps)` (V2-1).
     pub fn buy_risk(&self, q: u64, cap_bps: u64) -> Option<BuyQuote> {
-        self.pricing?
+        if !self.executable {
+            return None;
+        }
+        self.quoter()?
             .capped(cap_bps)
-            .buy(q, u128::from(self.x), u128::from(self.y))
+            .buy_live(q, u128::from(self.x), u128::from(self.y))
     }
 
     /// Exact-in sale of `q` tokens at the live fee (`S_exp`, ARCH §3.4 step 7).
     pub fn sell(&self, q: u64) -> Option<SellQuote> {
-        self.pricing?
-            .sell(q, u128::from(self.x), u128::from(self.y), self.r)
+        if !self.executable {
+            return None;
+        }
+        match self.quoter()? {
+            Quoter::Pool(p) => p.sell(q, u128::from(self.x), u128::from(self.y), self.r),
+            Quoter::Curve(c) => c.pricing.sell(q, &c.live),
+        }
     }
 
     /// A quote at the live fee on a hypothetical state `(x, y)` (a ring entry's cached
     /// reprojection: the D4 margin's EMA leg, ARCH §3.4 step 9).
     pub fn buy_at(&self, q: u64, x: u128, y: u128) -> Option<BuyQuote> {
-        if x == 0 {
-            return None;
-        }
-        self.pricing?.buy(q, x, y)
+        self.quoter()?.buy_xy(q, x, y)
     }
 }
 
 // ---- per-venue dispatch ------------------------------------------------------------------
 
 /// Length of the venue's ReadSet (ARCH §3.12). `NoSupportedVenue` for a venue without an
-/// adapter in this build.
+/// adapter in this build. A `PumpMigrating` market reads its curve's ReadSet; a list-only market
+/// its detection set `[bonding_curve, canonical_pool]` (`crank_price`, `sol_settle`).
 pub fn read_len(kind: VenueKind) -> Result<usize> {
     match kind {
+        VenueKind::None => Ok(DETECTION_LEN),
+        VenueKind::PumpCurve | VenueKind::PumpMigrating => Ok(pump_curve::READ_LEN),
         VenueKind::RaydiumV4 => Ok(raydium_v4::READ_LEN),
         VenueKind::RaydiumCpmm => Ok(raydium_cpmm::READ_LEN),
         #[cfg(feature = "test-venue")]
         VenueKind::Mock => Ok(mock::READ_LEN),
-        _ => err!(ShortwinError::NoSupportedVenue),
+        VenueKind::PumpSwap => err!(ShortwinError::NoSupportedVenue),
     }
 }
+
+/// Length of a list-only market's "ReadSet": its detection set.
+pub const DETECTION_LEN: usize = 2;
 
 /// Length of the venue's TradeExtras (ARCH §3.12).
 pub fn trade_len(kind: VenueKind) -> Result<usize> {
     match kind {
+        VenueKind::PumpCurve => Ok(pump_curve::TRADE_LEN),
         VenueKind::RaydiumV4 => Ok(raydium_v4::TRADE_LEN),
         VenueKind::RaydiumCpmm => Ok(raydium_cpmm::TRADE_LEN),
         #[cfg(feature = "test-venue")]
@@ -440,26 +689,47 @@ pub fn trade_len(kind: VenueKind) -> Result<usize> {
 /// Key-checks the ReadSet against the market's cache (`VenueAccountMismatch`).
 pub fn check_read(market: &Market, kind: VenueKind, read: &[AccountInfo]) -> Result<()> {
     match kind {
+        VenueKind::None => {
+            let [bc, cp] = read else {
+                return err!(ShortwinError::BadRemainingAccounts);
+            };
+            require_keys_eq!(
+                bc.key(),
+                market.bonding_curve,
+                ShortwinError::VenueAccountMismatch
+            );
+            require_keys_eq!(
+                cp.key(),
+                market.canonical_pool,
+                ShortwinError::VenueAccountMismatch
+            );
+            Ok(())
+        }
+        VenueKind::PumpCurve | VenueKind::PumpMigrating => pump_curve::check_read(market, read),
         VenueKind::RaydiumV4 => raydium_v4::check_read(market, read),
         VenueKind::RaydiumCpmm => raydium_cpmm::check_read(market, read),
         #[cfg(feature = "test-venue")]
         VenueKind::Mock => mock::check_read(market, read),
-        _ => {
-            let _ = (market, read);
-            err!(ShortwinError::NoSupportedVenue)
-        }
+        VenueKind::PumpSwap => err!(ShortwinError::NoSupportedVenue),
     }
 }
 
-/// Key-checks the TradeExtras (`VenueAccountMismatch`).
-pub fn check_trade(market: &Market, kind: VenueKind, trade: &[AccountInfo]) -> Result<()> {
+/// Key-checks the TradeExtras (`VenueAccountMismatch`). The curve's recipients and creator
+/// vault are checked against the live `Global` and curve of the (already key-checked) ReadSet.
+pub fn check_trade(
+    market: &Market,
+    kind: VenueKind,
+    read: &[AccountInfo],
+    trade: &[AccountInfo],
+) -> Result<()> {
     match kind {
+        VenueKind::PumpCurve => pump_curve::check_trade(market, read, trade),
         VenueKind::RaydiumV4 => raydium_v4::check_trade(market, trade),
         VenueKind::RaydiumCpmm => raydium_cpmm::check_trade(market, trade),
         #[cfg(feature = "test-venue")]
         VenueKind::Mock => mock::check_trade(market, trade),
         _ => {
-            let _ = (market, trade);
+            let _ = (market, read, trade);
             err!(ShortwinError::NoSupportedVenue)
         }
     }
@@ -471,6 +741,9 @@ pub fn check_trade(market: &Market, kind: VenueKind, trade: &[AccountInfo]) -> R
 /// "not executable" (A63).
 pub fn read_state(market: &Market, kind: VenueKind, read: &[AccountInfo], now: i64) -> VenueState {
     match kind {
+        VenueKind::PumpCurve | VenueKind::PumpMigrating => {
+            pump_curve::read_state(market, kind, read)
+        }
         VenueKind::RaydiumV4 => raydium_v4::read_state(market, read, now),
         VenueKind::RaydiumCpmm => raydium_cpmm::read_state(market, read, now),
         #[cfg(feature = "test-venue")]
@@ -482,39 +755,62 @@ pub fn read_state(market: &Market, kind: VenueKind, read: &[AccountInfo], now: i
     }
 }
 
-/// The fee view of the **risk** quotes on hypothetical states — the EMA leg on the ring's
-/// cached `(x, y)`, the settlement-box corners, the refutation, FV (ARCH §4.3 "two fee
-/// views", §4.5) — which `sol_settle` evaluates whether or not the venue can execute:
-/// `min(φ_live, cap_bps)`, the position's locked hard cap (V2-1, A43).
+/// [`read_state`] on the heap: the handlers keep only a pointer on their stack frame (SBF
+/// frames are 4 KiB; the curve's state makes `VenueState` a few hundred bytes).
+#[inline(never)]
+pub fn read_state_boxed(
+    market: &Market,
+    kind: VenueKind,
+    read: &[AccountInfo],
+    now: i64,
+) -> Box<VenueState> {
+    Box::new(read_state(market, kind, read, now))
+}
+
+/// The quotes of the **risk** view on hypothetical states — the EMA leg on the ring's cached
+/// `(x, y)`, the settlement-box corners, the refutation, FV (ARCH §4.3 "two fee views", §4.5) —
+/// which `sol_settle` evaluates whether or not the venue can execute: `min(φ_live, cap_bps)`,
+/// the position's locked hard cap (V2-1, A43).
 ///
-/// - While the venue executes: its live pricing, capped.
+/// - While the venue executes (or, on the curve, while its pricing accounts parse: a migrating
+///   curve too): its live quotes, capped.
 /// - A halted venue whose fee-bearing accounts still parse (a disabled pool) keeps the fee it
 ///   carries: the venue's own adapter reads it (the mock's `fee_view`).
 /// - A venue whose fee-bearing accounts no longer parse (a layout change, A63) has no readable
 ///   `φ_live`, so the cap itself is used (`min(unknown, cap) = cap`, FV's ceiling): an S3 on
 ///   such a venue still has a fair value (ARCH §5.3 "FV is priced at the last pre-halt
-///   `P_ema`") instead of an uncapped take.
+///   `P_ema`") instead of an uncapped take. **PROPOSED (M5):** the same cap-only
+///   constant-product view prices a pump market whose curve no longer parses or has migrated
+///   (`vT = 0`, no curve fee tier) and a list-only market (`None`: a curve that graduated
+///   elsewhere with positions open, M2-SEC-5): `B̂ = n + ⌈n·cap/10⁴⌉` on `reprice(L, P)`, the
+///   curve's own reserves without its real-reserve bound (ARCH names no FV for these).
 ///
-/// `None` for a venue without an adapter in this build (M5–M6 add their arms).
-pub fn risk_pricing(
+/// `None` only for a venue without an adapter in this build (PumpSwap until M6).
+pub fn risk_quoter<'a>(
     market: &Market,
-    state: &VenueState,
+    state: &'a VenueState,
     read: &[AccountInfo],
     cap_bps: u64,
-) -> Option<Pricing> {
-    if let Some(p) = state.pricing {
-        return Some(p.capped(cap_bps));
+) -> Option<Quoter<'a>> {
+    if let Some(q) = state.quoter() {
+        return Some(q.capped(cap_bps));
     }
     match state.kind {
-        VenueKind::RaydiumV4 => Some(raydium_v4::fee_view(read, cap_bps)),
-        VenueKind::RaydiumCpmm => Some(raydium_cpmm::fee_view(market, read, cap_bps)),
+        VenueKind::RaydiumV4 => Some(Quoter::Pool(raydium_v4::fee_view(read, cap_bps))),
+        VenueKind::RaydiumCpmm => Some(Quoter::Pool(raydium_cpmm::fee_view(market, read, cap_bps))),
         #[cfg(feature = "test-venue")]
-        VenueKind::Mock => Some(mock::fee_view(read, cap_bps)),
-        _ => {
-            let _ = (market, read);
-            None
+        VenueKind::Mock => Some(Quoter::Pool(mock::fee_view(read, cap_bps))),
+        VenueKind::None | VenueKind::PumpCurve | VenueKind::PumpMigrating => {
+            Some(cap_only(cap_bps))
         }
+        VenueKind::PumpSwap => None,
     }
+}
+
+/// The cap-only constant-product risk view (`risk_quoter`'s fallback): one combined fee at
+/// `cap_bps` on the SOL leg, no `ε₁`.
+pub fn cap_only(cap_bps: u64) -> Quoter<'static> {
+    Quoter::Pool(Pricing::PumpSwap(FeeBps::new(0, cap_bps, 0)))
 }
 
 /// The market's pool for the `pool` placeholder of extras templates.
@@ -580,7 +876,7 @@ pub fn parse<'info>(
             let tl = trade_len(kind)?;
             require!(rest.len() >= tl, ShortwinError::BadRemainingAccounts);
             let (trade, extras) = rest.split_at(tl);
-            check_trade(market, kind, trade)?;
+            check_trade(market, kind, read, trade)?;
             let ph = Placeholders {
                 mint: market.mint,
                 pool: pool_key(market, kind),
@@ -613,8 +909,11 @@ pub struct Leg<'info> {
     pub decimals: u8,
     pub token_program: AccountInfo<'info>,
     /// Raydium: WSOL is the AMM v4 coin / the CPMM token 0 (`Market.flags` bit 3; the CPMM
-    /// swap names its input and output vaults by side). Unused by the mock.
+    /// swap names its input and output vaults by side). Unused by the mock and the curve.
     pub sol_first: bool,
+    /// The leg's venue-side rent tolerance `ert` (ARCH §2.4 rule 3): `exec_rent_tol` on an open
+    /// of a pump venue, the position's locked value on an exit; 0 on Raydium and the mock.
+    pub ert: u64,
     pub trader: TraderAccounts<'info>,
     pub read: &'info [AccountInfo<'info>],
     pub trade: &'info [AccountInfo<'info>],
@@ -631,16 +930,28 @@ pub struct BuyOut {
     pub received: u64,
 }
 
+/// The accounts of a leg that the instruction names besides `trader` and `market_vault`: System,
+/// and the token side — the pool vault, the base mint (with its decimals) and its token program.
+pub struct Named<'info> {
+    pub system_program: AccountInfo<'info>,
+    pub pool_vault: AccountInfo<'info>,
+    pub mint: AccountInfo<'info>,
+    pub decimals: u8,
+    pub token_program: AccountInfo<'info>,
+}
+
 /// The trader-side accounts of a trading instruction on `kind`: the named `trader` and
-/// `market_vault`, the WSOL mint, SPL Token and `trader_wsol` from the venue's TradeExtras.
+/// `market_vault`; on the WSOL venues the WSOL mint, SPL Token and `trader_wsol` from the venue's
+/// TradeExtras; on the curve `trader_base_ata` (TradeExtras T18) with the named pool vault, mint
+/// and token program (ARCH §2.4 rule 2).
 pub fn trader_accounts<'info>(
     kind: VenueKind,
     market_key: Pubkey,
     market: &Market,
     trader: AccountInfo<'info>,
     market_vault: AccountInfo<'info>,
-    system_program: AccountInfo<'info>,
     trade: &'info [AccountInfo<'info>],
+    named: Named<'info>,
 ) -> Result<TraderAccounts<'info>> {
     let at = |i: usize| -> Result<AccountInfo<'info>> {
         trade
@@ -648,36 +959,54 @@ pub fn trader_accounts<'info>(
             .cloned()
             .ok_or_else(|| error!(ShortwinError::BadRemainingAccounts))
     };
-    let (wsol, wsol_mint, wsol_program) = match kind {
-        VenueKind::RaydiumV4 => (
+    let wsol_slots = match kind {
+        VenueKind::PumpCurve => None,
+        VenueKind::RaydiumV4 => Some((
             raydium_v4::X_TRADER_WSOL,
             raydium_v4::X_WSOL_MINT,
             raydium_v4::X_TOKEN_PROGRAM,
-        ),
-        VenueKind::RaydiumCpmm => (
+        )),
+        VenueKind::RaydiumCpmm => Some((
             raydium_cpmm::X_TRADER_WSOL,
             raydium_cpmm::X_WSOL_MINT,
             raydium_cpmm::X_WSOL_PROGRAM,
-        ),
+        )),
         #[cfg(feature = "test-venue")]
-        VenueKind::Mock => (mock::T_TRADER_WSOL, mock::T_WSOL_MINT, mock::T_WSOL_PROGRAM),
+        VenueKind::Mock => Some((mock::T_TRADER_WSOL, mock::T_WSOL_MINT, mock::T_WSOL_PROGRAM)),
         _ => return err!(ShortwinError::NoSupportedVenue),
+    };
+    let wsol = match wsol_slots {
+        Some((w, m, p)) => Some(WsolSide {
+            trader_wsol: at(w)?,
+            trader_wsol_bump: market.trader_wsol_bump,
+            wsol_mint: at(m)?,
+            wsol_token_program: at(p)?,
+        }),
+        None => None,
+    };
+    let base = match kind {
+        VenueKind::PumpCurve => Some(BaseSide {
+            trader_base_ata: at(pump_curve::T_TRADER_BASE_ATA)?,
+            pool_vault: named.pool_vault,
+            mint: named.mint,
+            decimals: named.decimals,
+            token_program: named.token_program,
+        }),
+        _ => None,
     };
     Ok(TraderAccounts {
         market: market_key,
         trader,
         trader_bump: market.trader_bump,
-        trader_wsol: at(wsol)?,
-        trader_wsol_bump: market.trader_wsol_bump,
         market_vault,
-        system_program,
-        wsol_mint: at(wsol_mint)?,
-        wsol_token_program: at(wsol_program)?,
+        system_program: named.system_program,
+        wsol,
+        base,
     })
 }
 
 /// What the position refunds the borrower after a sell leg: the ephemeral WSOL account's rent
-/// on the WSOL venues (PumpSwap, Raydium, the mock), 0 on the curve.
+/// on the WSOL venues (PumpSwap, Raydium, the mock), 0 on the curve (its leg refunds `ert` itself).
 pub fn sell_refund(kind: VenueKind) -> Result<u64> {
     match kind {
         #[cfg(feature = "test-venue")]
@@ -703,7 +1032,8 @@ pub fn effective_ert(kind: VenueKind, exec_rent_tol: u64) -> u64 {
 /// the ephemeral account's rent afterwards (`TraderAccounts::wsol_rent`), which the borrower
 /// paid: the caller refunds it by a direct lamport move **after its last CPI that names the
 /// position or the borrower** (a direct move is visible to the runtime's per-CPI balance check
-/// only when both accounts are in that CPI).
+/// only when both accounts are in that CPI). The curve funds the trader with `ert` from the
+/// borrower and refunds it inside the leg (`pump_curve::sell`).
 pub fn sell<'info>(
     leg: &Leg<'info>,
     borrower: &AccountInfo<'info>,
@@ -712,6 +1042,7 @@ pub fn sell<'info>(
     min_out: u64,
 ) -> Result<u64> {
     match leg.kind {
+        VenueKind::PumpCurve => pump_curve::sell(leg, borrower, position, q, min_out),
         VenueKind::RaydiumV4 => raydium_v4::sell(leg, borrower, position, q, min_out),
         VenueKind::RaydiumCpmm => raydium_cpmm::sell(leg, borrower, position, q, min_out),
         #[cfg(feature = "test-venue")]
@@ -732,6 +1063,7 @@ pub fn buy<'info>(
     max_in: u64,
 ) -> Result<BuyOut> {
     match leg.kind {
+        VenueKind::PumpCurve => pump_curve::buy(leg, position, q, max_in),
         VenueKind::RaydiumV4 => raydium_v4::buy(leg, position, q, max_in),
         VenueKind::RaydiumCpmm => raydium_cpmm::buy(leg, position, q, max_in),
         #[cfg(feature = "test-venue")]

@@ -1,0 +1,775 @@
+//! The M5 security review's findings on the pump-curve venue as regressions (M5-SEC-1, -3, -4,
+//! -5, -6), on ECON's curve markets (`pump_curve_support.rs`): the release short.win on the
+//! dumped pump / pump-fees / PumpSwap ELFs. Every instruction goes through `Env::send` (invariant
+//! hooks after each one). Each test reproduced its finding on the pre-fix build (the audit's
+//! reproducers, `m5_sec_*` of the same names before the fix); after the fix:
+//!
+//! - **M5-SEC-1** — a full wipe on a live curve no longer locks deposits: `sweep_trader` sets the
+//!   venue-reward bit when the trader's pump UVA holds no claimable cashback, and a cashback
+//!   coin's lenders get the pre-wipe cashback through `[pump claim_cashback(user = trader),
+//!   sweep_trader]` (T-CASHBACK, pump part: `claim_cashback` needs no signature of the trader).
+//! - **M5-SEC-3** — the curve caps read the curve at `P_ema` when it holds fewer tokens than the
+//!   live one: a sale in the same transaction lifts neither the Tier D guard's `rT` nor `X₀`.
+//! - **M5-SEC-4** — this build cannot enable the curve venue (`initialize_config`,
+//!   `propose_config(EnableVenues)`): every curve open is refused `VenueDisabled` in any
+//!   deployment of it. The M5 mechanics' freeze after an atomic complete + migrate stays as a
+//!   tripwire for M6 (the harness enables the curve the way M6 will, test-only).
+//! - **M5-SEC-5** — a canonical-pool account that does not read as a valid pool is not "graduated
+//!   elsewhere": the migrated market stays `PumpMigrating` (the list-only D1 side is in
+//!   `ray_it::listing` and `pool_select_it::listing`).
+//! - **M5-SEC-6** — a mint ground for a low `ATA(trader, WSOL)` bump costs no more per trade.
+
+#![allow(clippy::result_large_err, dead_code, unused_imports)]
+
+#[path = "pump_curve_support.rs"]
+mod support;
+
+use shortwin::constants::{
+    ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID, VENUE_BIT_PUMP_CURVE, VENUE_BITS_UNFINISHED,
+    WSOL_MINT,
+};
+use shortwin::events::TraderSwept;
+use shortwin::state::{
+    ConfigChange, MARKET_FLAG_GRADUATED_ELSEWHERE, MARKET_FLAG_WIPE_LIVE,
+    MARKET_FLAG_WIPE_TRADER_SWEPT,
+};
+use shortwin_litesvm_tests::fork::PumpV2;
+use shortwin_litesvm_tests::ix::LenderKeys;
+use shortwin_math::pool::{WIPE_REWARDS_CLAIMED, WIPE_TRADER_SWEPT};
+use support::*;
+
+/// ECON's `D@50%` position (`max_open_q()`).
+const D50_Q: u64 = 10_071_769_920_663;
+/// ECON's `D@80%` market and position.
+const D80_SOLD: u64 = 634_480_000_000_000;
+const D80_Q: u64 = 6_529_192_912_424;
+
+/// The seeding lender withdraws free tokens down to `keep` (security_m2's helper, on a pump
+/// market).
+fn withdraw_down_to(s: &mut Sim, keep: u64) {
+    let m = s.env.market(&s.pm.market());
+    let pool = m.pool();
+    let want = m.tokens_free - keep;
+    let lender = s
+        .env
+        .lender(&s.pm.market(), &s.pm.lender.pubkey())
+        .expect("lender");
+    let (mut lo, mut hi) = (0u128, lender.shares);
+    while lo < hi {
+        let mid = lo + (hi - lo).div_ceil(2);
+        if shortwin_math::pool::tokens_for_shares(&pool, mid).unwrap() <= u128::from(want) {
+            lo = mid;
+        } else {
+            hi = mid - 1;
+        }
+    }
+    let kp = s.pm.lender.insecure_clone();
+    ok(s.env
+        .send(&[ix::withdraw(&s.pm.lender_keys(), lo, want)], &[&kp]));
+    assert_eq!(s.env.market(&s.pm.market()).tokens_free, keep);
+}
+
+/// A new lender with `amount` real tokens bought on the curve.
+fn new_lender(s: &mut Sim, amount: u64) -> (CurveUser, LenderKeys) {
+    let whale = CurveUser::new(&mut s.env, &s.pm.curve);
+    ok(whale.buy(&mut s.env, &s.pm.curve, amount, u64::MAX));
+    let k = LenderKeys {
+        owner: whale.kp.pubkey(),
+        mint: s.pm.keys.mint,
+        token_program: s.pm.keys.token_program,
+        owner_token_account: whale.ata,
+    };
+    (whale, k)
+}
+
+/// `deposit(amount)` of `k` with the share-epoch records it may need.
+fn deposit_ix(env: &Env, pm: &PumpMarket, k: &LenderKeys, amount: u64) -> Instruction {
+    let market = pm.market();
+    let m = env.market(&market);
+    let recs = ix::epoch_records(&market, 0, m.share_epoch);
+    ix::with_remaining(ix::deposit(k, amount, 0), &recs)
+}
+
+/// ECON's `D@50%` market, one capped position, the only lender takes out every free token and a
+/// 5x gap settles the position S1: a full wipe on a live curve.
+fn full_wipe_on_a_live_curve(s: &mut Sim) {
+    let p = s.open(D50_Q);
+    withdraw_down_to(s, 0);
+    let r = s.run(&p, &Scenario::gap(5.0));
+    let Outcome::Settled(ev) = &r.outcome else {
+        panic!("expected S1, got {}", r.outcome.kind())
+    };
+    assert_eq!(ev.condition, 1, "S1");
+    let m = s.env.market(&s.pm.market());
+    assert_eq!(
+        m.venue_kind(),
+        Some(VenueKind::PumpCurve),
+        "the curve is live"
+    );
+    assert_eq!(m.total_shares.get(), 0);
+    assert!(m.has_flag(MARKET_FLAG_WIPE_LIVE), "a full wipe");
+}
+
+/// The cashback pump's `claim_cashback` pays `user` now: its pump UVA's lamports above the
+/// account's rent-exempt minimum (pump's `PUMP_CASHBACK_README`).
+fn claimable_cashback(env: &Env, user: &Pubkey) -> u64 {
+    let uva = fork::pump_user_volume_accumulator(user);
+    let acc = env.svm.get_account(&uva).expect("the trader's pump UVA");
+    acc.lamports - env.svm.minimum_balance_for_rent_exemption(acc.data.len())
+}
+
+// ---- M5-SEC-1: a full wipe on a live curve --------------------------------------------------
+
+/// M5-SEC-1. A deposit into a live full-wipe record on a `PumpCurve` market waits for
+/// `wipe_rewards_claimed` (R4A-7), which only M6's `claim_venue_rewards` was to set: an organic
+/// full wipe on a live curve (the only lender withdraws every free token, the last position
+/// settles S1 on a 5x gap, ECON §11.2 `D@50% gap 5x`) left the market — the only one its mint
+/// can have — without deposits, and hence opens, for good (pre-fix: `WipeSweepPending` after 30
+/// days of sweeps and cranks; opens 6060). Now the permissionless sweep sets both post-wipe bits
+/// when the trader's pump UVA holds no claimable cashback: a new lender deposits, and the market
+/// opens again.
+#[test]
+fn m5_sec_1_a_full_wipe_on_a_live_curve_reopens_after_the_sweep() {
+    let mut s = Sim::d_market(SOLD_D50, lend_for_80(D50_Q));
+    full_wipe_on_a_live_curve(&mut s);
+    let market = s.pm.market();
+    assert_eq!(
+        claimable_cashback(&s.env, &s.pm.trader()),
+        0,
+        "not a cashback coin"
+    );
+
+    // Before the sweep: the deposit waits (R4A-7, unchanged).
+    let amount = 5_000_000_000_000u64;
+    let (whale, k) = new_lender(&mut s, amount);
+    let d0 = deposit_ix(&s.env, &s.pm, &k, amount);
+    assert_err(
+        &s.env.send(std::slice::from_ref(&d0), &[&whale.kp]),
+        E::WipeSweepPending,
+    );
+
+    // The permissionless sweep (with the token leg and the UVA) sets both bits.
+    let meta = ok(s
+        .env
+        .send(&[pump::sweep_trader_pump_ix(&s.env, &s.pm)], &[]));
+    let ev: TraderSwept = events::one(&meta);
+    assert_eq!(
+        ev.wipe_bits & (WIPE_TRADER_SWEPT | WIPE_REWARDS_CLAIMED),
+        WIPE_TRADER_SWEPT | WIPE_REWARDS_CLAIMED
+    );
+    assert!(
+        s.env
+            .market(&market)
+            .has_flag(MARKET_FLAG_WIPE_TRADER_SWEPT)
+    );
+
+    // The new lender deposits; the wipe record is final; opens resume.
+    let d1 = deposit_ix(&s.env, &s.pm, &k, amount);
+    ok(s.env.send(std::slice::from_ref(&d1), &[&whale.kp]));
+    let m = s.env.market(&market);
+    assert!(!m.has_flag(MARKET_FLAG_WIPE_LIVE));
+    assert!(m.total_shares.get() > 0);
+    for _ in 0..10 {
+        s.env.warp(1);
+        s.crank();
+    }
+    let mut b = s.env.borrower();
+    let q = amount / 5;
+    let (res, _) = s.env.open(&s.pm, &mut b, q);
+    let open: Open = events::one(&ok(res));
+    assert_eq!(open.q, q);
+}
+
+/// M5-SEC-1 on a legacy cashback coin (pump routes the creator fee of the trader's own trades to
+/// its UVA as cashback): after the full wipe the sweep alone leaves the venue-reward bit clear —
+/// the UVA still holds the pre-wipe cashback — so the deposit waits; `[pump claim_cashback(user =
+/// trader), sweep_trader]`, signed by neither the trader nor anyone short.win knows (T-CASHBACK,
+/// pump part, on the dumped ELF: `user` is not a signer), pays the cashback to the trader, the
+/// sweep credits it to the wiped epoch's record (R4A-7) and sets both bits, and the deposit lands.
+#[test]
+fn m5_sec_1_pre_wipe_cashback_reaches_the_wiped_lenders() {
+    let mut s = Sim::d_market(SOLD_D50, lend_for_80(D50_Q));
+    // The fixture curve made a legacy cashback coin (pump's `is_cashback_coin` @82).
+    fork::patch(&mut s.env.svm, &s.pm.curve.curve, |d| {
+        d[vpump_off_is_cashback()] = 1
+    });
+    assert!(s.pm.curve.state(&s.env.svm).is_cashback_coin);
+    full_wipe_on_a_live_curve(&mut s);
+    let market = s.pm.market();
+    let trader = s.pm.trader();
+    let cashback = claimable_cashback(&s.env, &trader);
+    assert!(
+        cashback > 0,
+        "the open's sale paid cashback into the trader's UVA"
+    );
+
+    // The sweep alone: the trader bit, not the venue-reward bit; the deposit waits.
+    let meta = ok(s
+        .env
+        .send(&[pump::sweep_trader_pump_ix(&s.env, &s.pm)], &[]));
+    let ev: TraderSwept = events::one(&meta);
+    assert_eq!(ev.wipe_bits & WIPE_TRADER_SWEPT, WIPE_TRADER_SWEPT);
+    assert_eq!(
+        ev.wipe_bits & WIPE_REWARDS_CLAIMED,
+        0,
+        "cashback outstanding"
+    );
+    let amount = 1_000_000_000_000u64;
+    let (whale, k) = new_lender(&mut s, amount);
+    let d0 = deposit_ix(&s.env, &s.pm, &k, amount);
+    assert_err(
+        &s.env.send(std::slice::from_ref(&d0), &[&whale.kp]),
+        E::WipeSweepPending,
+    );
+
+    // The unlocking bundle, signed by the fee payer only.
+    let claim = pump::claim_cashback_ix(&trader);
+    assert!(claim.accounts.iter().all(|a| !a.is_signer));
+    let lender_sol0 = s.env.market_vault(&market).lender_sol;
+    let meta = ok(s
+        .env
+        .send(&[claim, pump::sweep_trader_pump_ix(&s.env, &s.pm)], &[]));
+    let ev: TraderSwept = events::one(&meta);
+    assert_eq!(
+        ev.lamports, cashback,
+        "the whole cashback, through the trader"
+    );
+    assert_eq!(
+        ev.wipe_bits & (WIPE_TRADER_SWEPT | WIPE_REWARDS_CLAIMED),
+        WIPE_TRADER_SWEPT | WIPE_REWARDS_CLAIMED
+    );
+    assert_eq!(claimable_cashback(&s.env, &trader), 0);
+    assert_eq!(
+        s.env.market_vault(&market).lender_sol - lender_sol0,
+        cashback,
+        "credited to the wiped epoch's record"
+    );
+    let d1 = deposit_ix(&s.env, &s.pm, &k, amount);
+    ok(s.env.send(std::slice::from_ref(&d1), &[&whale.kp]));
+    assert!(!s.env.market(&market).has_flag(MARKET_FLAG_WIPE_LIVE));
+}
+
+/// `is_cashback_coin`'s offset in a `BondingCurve`.
+fn vpump_off_is_cashback() -> usize {
+    shortwin_venue_state::pump::OFF_IS_CASHBACK_COIN
+}
+
+// ---- M5-SEC-3: the Tier D graduation guard and X₀ against a same-transaction sale ----------
+
+/// A `buy_v2` / `sell_v2` instruction of a curve user.
+fn v2(s: &Sim, u: &CurveUser, kind: PumpV2, q: u64, bound: u64) -> Instruction {
+    let fr = fork::pump_fee_recipient(&s.env.svm, 2);
+    let bb = fork::pump_buyback_fee_recipient(&s.env.svm, 2);
+    s.pm.curve
+        .v2_ix(&s.env.svm, kind, &u.kp.pubkey(), &u.ata, &fr, &bb, q, bound)
+}
+
+/// `[sell_v2(δ), open_short(q), buy_v2(δ)]` by `attacker` in one transaction.
+fn sandwiched_open(s: &mut Sim, attacker: &CurveUser, nonce: u64, q: u64, delta: u64) -> TxResult {
+    let open = open_short_ix(
+        &s.pm,
+        &attacker.kp.pubkey(),
+        nonce,
+        q,
+        0,
+        u64::MAX,
+        u64::MAX,
+        ExtrasSel::NONE,
+        &[],
+    );
+    let ixs = [
+        pump::cu_limit_ix(1_000_000),
+        v2(s, attacker, PumpV2::Sell, delta, 0),
+        open,
+        v2(s, attacker, PumpV2::Buy, delta, u64::MAX),
+    ];
+    let kp = attacker.kp.insecure_clone();
+    s.env.send(&ixs, &[&kp])
+}
+
+/// M5-SEC-3. ARCH §4.6's Tier D graduation guard `ΣQ + q ≤ γ·(rT + q)` read the curve's live
+/// `rT`, which the opener moves in the same transaction: `[sell_v2(δ), open_short(q),
+/// buy_v2(δ)]` raised it by `δ` for the open only (the 10 % spot–EMA guard lets `δ` reach ≈ 5 %
+/// of `vT`, the whole `rT` near completion). Pre-fix the bundle opened what the guard refuses
+/// honestly and left `ΣQ/rT` 0.89 against γ = 0.50 (every position a straddle at once). Now the
+/// guard reads `min(rT, rT` of the curve at `P_ema)`, which the sale does not move: the bundle is
+/// refused `CapCurveGamma` like the honest open.
+#[test]
+fn m5_sec_3_the_curve_gamma_guard_holds_against_a_same_transaction_sale() {
+    const D90_Q: u64 = 5_348_333_909_677;
+    let mut s = Sim::d_market(SOLD_D90, 40_000_000_000_000);
+    let attacker = CurveUser::new(&mut s.env, &s.pm.curve);
+    let delta = 12_000_000_000_000u64;
+    ok(attacker.buy(&mut s.env, &s.pm.curve, delta, u64::MAX));
+    for _ in 0..120 {
+        s.env.warp(1);
+        s.crank();
+    }
+    let max_q = |s: &Sim| {
+        let vt = u64::try_from(curve(&s.env, &s.pm).vt).unwrap();
+        shortwin_math::caps::max_q_position(vt, 300).unwrap()
+    };
+    let qa = max_q(&s);
+    let _a = s.open(qa);
+    // The EMA follows the open's own sale down (a curve cap is read at `P_ema` while the EMA is
+    // above the spot, M5-SEC-3): the next capped open waits for it.
+    for _ in 0..300 {
+        s.env.warp(1);
+        s.crank();
+    }
+    let qb = max_q(&s);
+    let _b = s.open(qb);
+    for _ in 0..30 {
+        let rt = u64::try_from(curve(&s.env, &s.pm).rt).unwrap();
+        let target = 12_000_000_000_000u64;
+        if rt <= target {
+            break;
+        }
+        s.crowd_buy((rt - target).min(3_000_000_000_000));
+        for _ in 0..30 {
+            s.env.warp(1);
+            s.crank();
+        }
+    }
+    for _ in 0..300 {
+        s.env.warp(1);
+        s.crank();
+    }
+    let sum_q0 = s.env.market(&s.pm.market()).borrowed_q;
+    let c = curve(&s.env, &s.pm);
+    eprintln!(
+        "ΣQ {} rT {} vT {} (ΣQ/rT {:.2})",
+        sum_q0,
+        c.rt,
+        c.vt,
+        sum_q0 as f64 / c.rt as f64
+    );
+    let q = 2_500_000_000_000u64;
+    let mut borrower = Borrower {
+        kp: attacker.kp.insecure_clone(),
+        next_nonce: 0,
+    };
+    let (res, _) = s.env.open(&s.pm, &mut borrower, q);
+    assert_err(&res, E::CapCurveGamma);
+    // The bundle is refused the same way now (pre-fix: it opened).
+    let res = sandwiched_open(&mut s, &attacker, borrower.next_nonce, q, delta);
+    assert_err(&res, E::CapCurveGamma);
+    assert_eq!(s.env.market(&s.pm.market()).borrowed_q, sum_q0);
+    // A genuine sale the EMA has followed is real `rT`: the same size fits once it is there.
+    ok(s.crowd_sell(delta));
+    for _ in 0..60 {
+        s.env.warp(1);
+        s.crank();
+    }
+    let (res, _) = s.env.open(&s.pm, &mut borrower, q);
+    let open: Open = events::one(&ok(res));
+    assert_eq!(open.q, q);
+}
+
+/// M5-SEC-3, the size caps: `X₀ = vT` was the live reserve, which the same sale lifts by `δ` for
+/// the open. At ECON's `D@50%` (the EMA at the spot) an open at the per-position cap on `vT`
+/// opens honestly, one raw unit more is refused, and the bundle `[sell_v2(δ), open(cap + Δ),
+/// buy_v2(δ)]` is refused `CapPositionImpact` too (pre-fix the sale's larger `vT` admitted it).
+#[test]
+fn m5_sec_3_a_same_transaction_sale_does_not_lift_the_size_cap() {
+    let mut s = Sim::d_market(SOLD_D50, lend_for_80(4 * D50_Q));
+    let attacker = CurveUser::new(&mut s.env, &s.pm.curve);
+    let delta = 20_000_000_000_000u64;
+    ok(attacker.buy(&mut s.env, &s.pm.curve, delta, u64::MAX));
+    for _ in 0..120 {
+        s.env.warp(1);
+        s.crank();
+    }
+    let vt = u64::try_from(curve(&s.env, &s.pm).vt).unwrap();
+    let cap = shortwin_math::caps::max_q_position(vt, 300).unwrap();
+    let cap_after_sale = shortwin_math::caps::max_q_position(vt + delta, 300).unwrap();
+    assert!(cap_after_sale > cap + 100_000_000_000);
+    let mut b = s.env.borrower();
+    let (res, _) = s.env.open(&s.pm, &mut b, cap + 1);
+    assert_err(&res, E::CapPositionImpact);
+    let res = sandwiched_open(&mut s, &attacker, 0, (cap + cap_after_sale) / 2, delta);
+    assert_err(&res, E::CapPositionImpact);
+    let (res, _) = s.env.open(&s.pm, &mut b, cap);
+    ok(res);
+}
+
+// ---- M5-SEC-4: the curve venue cannot be enabled in this build -----------------------------
+
+/// M5-SEC-4 (the gate). Without M6's `→ PumpSwap` transition a curve market whose curve
+/// completes and migrates stays `PumpMigrating` for good (the tripwire below), and anyone can
+/// complete and migrate a curve in one transaction. This build therefore refuses to enable the
+/// curve venue: `initialize_config` and `propose_config(EnableVenues)` refuse its bit
+/// (`InvalidParams`), so in any deployment of it a curve market lists, lends and cranks, and
+/// every open on it is refused `VenueDisabled`.
+#[test]
+fn m5_sec_4_this_build_cannot_enable_the_curve_venue() {
+    let mut env = Env::new();
+    let mut args = env.default_init_args();
+    assert_ne!(args.venue_enabled & VENUE_BIT_PUMP_CURVE, 0);
+    assert_err(
+        &env.initialize_config_as_sent(args.clone()),
+        E::InvalidParams,
+    );
+    args.venue_enabled &= !VENUE_BITS_UNFINISHED;
+    ok(env.initialize_config_as_sent(args));
+    assert_eq!(env.config().venue_enabled & VENUE_BIT_PUMP_CURVE, 0);
+    // Governance cannot enable it either, alone or with other bits.
+    let gov = env.governance.insecure_clone();
+    for bits in [
+        VENUE_BIT_PUMP_CURVE,
+        VENUE_BIT_PUMP_CURVE | shortwin::constants::VENUE_BIT_RAYDIUM_V4,
+    ] {
+        let res = env.send(
+            &[ix::propose_config(
+                &gov.pubkey(),
+                ConfigChange::EnableVenues { bits },
+            )],
+            &[&gov],
+        );
+        assert_err(&res, E::InvalidParams);
+    }
+    // A curve market lists and lends; its opens are refused.
+    env.load_pump_programs();
+    env.load_pump_statics();
+    let c = env.load_pump_coin(PumpCoin::T22_115);
+    env.set_pump_rent();
+    env.set_pump_clock();
+    ok(env.list_pump(&c));
+    let q = c.state(&env.svm).virtual_token_reserves / 200;
+    let pm = env.pump_market_listed(PumpSpec::new(PumpCoin::T22_115, 40 * q), c);
+    assert_eq!(venue(&env, &pm), VenueKind::PumpCurve);
+    ok(env.send(&[crank_price_ix(&pm)], &[]));
+    let mut b = env.borrower();
+    let (res, _) = env.open(&pm, &mut b, q);
+    assert_err(&res, E::VenueDisabled);
+}
+
+/// Tripwire for M6 (M5-SEC-4; escalates the recorded exposure of `pump_curve_e2e.rs`
+/// `a_fast_migrate_v2_freezes_the_ema_before_the_completion_is_priced`), on a curve market the
+/// harness enabled the way M6 will (test-only; this build refuses the bit, above). Anyone — the
+/// borrower itself — can complete a curve and run `migrate_v2` in **one transaction**
+/// (`buy_v2(rT)` + `migrate_v2`: 58 inner instructions, ≈ 412k CU). short.win never observes the
+/// completed curve: the next crank moves the market `PumpCurve → PumpMigrating` with the EMA at
+/// the pre-completion price, and without M6's `→ PumpSwap` it stays there: no close, no
+/// liquidation (`VenueMigrating`), no observation of the pool, S3 only on the frozen EMA or at
+/// the deadline, FV at the frozen EMA — here the pool trades at ≥ 1.5× (×3.79 on the fork) the
+/// frozen EMA while the position is "not liquidatable". **M6 must invert this test**: the
+/// transition observes the pool, and the position becomes liquidatable on it.
+#[test]
+fn m5_sec_4_tripwire_an_atomic_complete_and_migrate_freezes_an_m5_market() {
+    let mut s = Sim::d_market(D80_SOLD, lend_for_80(D80_Q));
+    let a = s.open(D80_Q);
+    for _ in 0..60 {
+        s.env.warp(1);
+        s.crank();
+    }
+    let p_ema0 = s.env.market(&s.pm.market()).ema_price.get();
+    let attacker = CurveUser::new(&mut s.env, &s.pm.curve);
+    let rt = u64::try_from(curve(&s.env, &s.pm).rt).unwrap();
+    s.env.warp(1);
+    let buy = v2(&s, &attacker, PumpV2::Buy, rt, u64::MAX);
+    let mig = pump::migrate_v2_ix(&s.env.svm, &attacker.kp.pubkey(), &s.pm.curve);
+    let meta = ok(s
+        .env
+        .send(&[pump::cu_limit_ix(1_400_000), buy, mig], &[&attacker.kp]));
+    eprintln!(
+        "complete + migrate in one tx: {} inner instructions, {} CU",
+        meta.inner_instructions.iter().map(Vec::len).sum::<usize>(),
+        meta.compute_units_consumed,
+    );
+    let c = curve(&s.env, &s.pm);
+    assert_eq!((c.vt, c.rt), (0, 0), "migrated in the same transaction");
+    let kp = s.keeper.insecure_clone();
+    let liq = liquidate_ix(&s.pm, &kp.pubkey(), &a.key(), a.nonce);
+    assert_err(
+        &s.env.send(&[pump::cu_limit_ix(300_000), liq], &[&kp]),
+        E::VenueMigrating,
+    );
+    let meta = s.crank();
+    let ev: VenueStateChanged = events::one(&meta);
+    assert_eq!(
+        (ev.from, ev.to),
+        (VenueKind::PumpCurve as u8, VenueKind::PumpMigrating as u8)
+    );
+    let p1 = s.env.market(&s.pm.market()).ema_price.get();
+    assert!(
+        p1.abs_diff(p_ema0) * 10_000 < p_ema0,
+        "the completed curve was never observed ({p1} vs {p_ema0})"
+    );
+    let p_ema0 = p1;
+    // The pool trades on (a buyer pushes it ×1.5, the size of the boost's buy-and-burn).
+    let np = pump::NewPool::of(&s.pm.curve);
+    let r0 = np.reserves(&s.env.svm).unwrap();
+    let buyer = s.env.funded_keypair();
+    let payer = s.env.payer.pubkey();
+    let program = s.pm.curve.token_program.id();
+    ok(s.env.send(
+        &[fork::create_ata_idempotent_ix(
+            &payer,
+            &buyer.pubkey(),
+            &s.pm.keys.mint,
+            &program,
+        )],
+        &[],
+    ));
+    let buyer_base = pda::ata(&buyer.pubkey(), &s.pm.keys.mint, &program);
+    let wsol = fork::fund_wsol(&mut s.env, &buyer.pubkey(), 200 * SOL);
+    let push = u64::try_from(u128::from(r0.base) - u128::from(r0.base) * 1000 / 1225).unwrap();
+    ok(s.env.send(
+        &[
+            pump::pamm_extend_account_ix(&buyer.pubkey(), &np.pool),
+            pump::pamm_buy_ix(
+                &s.env.svm,
+                &np,
+                &buyer.pubkey(),
+                &buyer_base,
+                &wsol,
+                push,
+                200 * SOL,
+            ),
+        ],
+        &[&buyer],
+    ));
+    let r1 = np.reserves(&s.env.svm).unwrap();
+    let p_pool = r1.effective_quote * W / u128::from(r1.base);
+    for _ in 0..20 {
+        s.env.warp(30);
+        s.crank();
+    }
+    let m = s.env.market(&s.pm.market());
+    assert_eq!(
+        m.ema_price.get(),
+        p_ema0,
+        "the pool is never observed (M6: it is)"
+    );
+    assert_eq!(venue(&s.env, &s.pm), VenueKind::PumpMigrating);
+    assert!(
+        p_pool * 10 > p_ema0 * 15,
+        "the pool trades ≥ 1.5× the frozen EMA"
+    );
+    let st = s.status(&a);
+    assert!(
+        !st.cr_liq(),
+        "not liquidatable on the frozen EMA (M6: liquidatable)"
+    );
+    assert_err(&s.env.close(&s.pm, &a.b, a.nonce), E::VenueMigrating);
+}
+
+// ---- M5-SEC-5: an unreadable canonical pool is not "graduated elsewhere" --------------------
+
+/// M5-SEC-5. A63: a correctly keyed venue-state account that no longer parses makes the venue
+/// "not executable" and changes nothing else. Pre-fix `pump_curve::sync` read a migrated curve
+/// (`vT = 0`) whose canonical pool did not parse as **graduated elsewhere** (`PumpMigrating →
+/// None`, `graduated_elsewhere` set, the migration pause dropped from the S3 timer, the list-only
+/// market open to a Raydium adoption against D1) and never came back. Now every way the pool
+/// account can stop reading as a valid pool — a changed discriminator (a PumpSwap upgrade), a bool
+/// byte other than 0/1, a shifted layout (the creator no longer where it was) — leaves the market
+/// `PumpMigrating` (no transition, no flag, `migration_seen_at` kept), and so does the pool
+/// reading again.
+#[test]
+fn m5_sec_5_an_unreadable_canonical_pool_is_not_graduated_elsewhere() {
+    let mut s = Sim::d_market(D80_SOLD, lend_for_80(D80_Q));
+    let _a = s.open(D80_Q);
+    for _ in 0..10 {
+        s.env.warp(1);
+        s.crank();
+    }
+    let rt = u64::try_from(curve(&s.env, &s.pm).rt).unwrap();
+    s.crowd_buy(rt);
+    let migrator = s.env.funded_keypair();
+    let mig = pump::migrate_v2_ix(&s.env.svm, &migrator.pubkey(), &s.pm.curve);
+    ok(s.env.send(&[pump::cu_limit_ix(600_000), mig], &[&migrator]));
+    s.env.warp(1);
+    s.crank();
+    assert_eq!(venue(&s.env, &s.pm), VenueKind::PumpMigrating);
+    let market = s.pm.market();
+    let seen = s.env.market(&market).migration_seen_at;
+    let np = pump::NewPool::of(&s.pm.curve);
+    let orig = s.env.svm.get_account(&np.pool).unwrap();
+    type Change<'a> = (&'a str, &'a dyn Fn(&mut Vec<u8>));
+    let changes: [Change; 3] = [
+        ("discriminator", &|d| d[0] ^= 0xff),
+        ("a bool byte 2", &|d| {
+            d[shortwin_venue_state::pump_amm::OFF_IS_MAYHEM_MODE] = 2
+        }),
+        ("a shifted layout", &|d| {
+            d[shortwin_venue_state::pump_amm::OFF_CREATOR] ^= 1
+        }),
+    ];
+    for (what, change) in changes {
+        let mut acc = orig.clone();
+        change(&mut acc.data);
+        s.env.svm.set_account(np.pool, acc).unwrap();
+        s.env.warp(1);
+        let meta = s.crank();
+        no_venue_change(&meta);
+        let m = s.env.market(&market);
+        assert_eq!(m.venue_kind(), Some(VenueKind::PumpMigrating), "{what}");
+        assert!(!m.has_flag(MARKET_FLAG_GRADUATED_ELSEWHERE), "{what}");
+        assert_eq!(m.migration_seen_at, seen, "{what}: the pause is kept");
+    }
+    s.env.svm.set_account(np.pool, orig).unwrap();
+    s.env.warp(1);
+    no_venue_change(&s.crank());
+    assert_eq!(venue(&s.env, &s.pm), VenueKind::PumpMigrating);
+    // A migrated curve whose canonical address holds nothing is still graduated elsewhere.
+    s.env
+        .svm
+        .set_account(np.pool, solana_account::Account::default())
+        .unwrap();
+    s.env.warp(1);
+    let meta = s.crank();
+    venue_changed(&meta, VenueKind::PumpMigrating, VenueKind::None);
+    assert!(
+        s.env
+            .market(&market)
+            .has_flag(MARKET_FLAG_GRADUATED_ELSEWHERE)
+    );
+}
+
+// ---- M5-SEC-6: a low-bump market pays no more per trade ------------------------------------
+
+/// `ATA(trader(market(mint)), WSOL)`'s bump.
+fn trader_wsol_ata_bump(mint: &Pubkey) -> u8 {
+    let market = pda::market(mint).0;
+    let trader = pda::trader(&market).0;
+    Pubkey::find_program_address(
+        &[
+            trader.as_ref(),
+            TOKEN_PROGRAM_ID.as_ref(),
+            WSOL_MINT.as_ref(),
+        ],
+        &ASSOCIATED_TOKEN_PROGRAM_ID,
+    )
+    .1
+}
+
+/// Every occurrence of `from` in `d` replaced by `to`.
+fn swap_key(d: &mut [u8], from: &Pubkey, to: &Pubkey) {
+    let (f, t) = (from.to_bytes(), to.to_bytes());
+    let mut i = 0;
+    while i + 32 <= d.len() {
+        if d[i..i + 32] == f {
+            d[i..i + 32].copy_from_slice(&t);
+            i += 32;
+        } else {
+            i += 1;
+        }
+    }
+}
+
+/// `from`'s coin copied under the mint `mint`: the mint account, the curve at `mint`'s curve
+/// PDA and its base ATA (mint and owner rewritten). Same creator, same reserves.
+fn relocate(env: &mut Env, from: &PumpCurve, mint: Pubkey) -> PumpCurve {
+    let program = from.token_program.id();
+    let curve = pda::bonding_curve(&mint);
+    let base = pda::ata(&curve, &mint, &program);
+    let mut m = env.svm.get_account(&from.mint).unwrap();
+    swap_key(&mut m.data, &from.mint, &mint);
+    env.svm.set_account(mint, m).unwrap();
+    let c = env.svm.get_account(&from.curve).unwrap();
+    env.svm.set_account(curve, c).unwrap();
+    let mut a = env.svm.get_account(&from.curve_base_ata).unwrap();
+    swap_key(&mut a.data, &from.mint, &mint);
+    swap_key(&mut a.data, &from.curve, &curve);
+    env.svm.set_account(base, a).unwrap();
+    PumpCurve {
+        mint,
+        curve,
+        curve_base_ata: base,
+        ..*from
+    }
+}
+
+/// M5-SEC-6. Every curve trade derived `ATA(trader, WSOL)` (T11) with `find_program_address`,
+/// which charges 1,500 CU per bump it tries; the trader is the market's PDA, so a coin's
+/// creator who grinds the mint (2^10 candidates here) gives it a low bump and adds
+/// `1,500·(255 − bump)` CU to every open, close, liquidation and expiry of that market (pre-fix:
+/// +13.5k CU and more on this pair; 25–30 extra bumps ≈ 37–45k, past ARCH §6.1's PROPOSED 250k
+/// budget). Now the key is derived once at listing (`Market::trader_wsol_ata`) and the recipient
+/// ATAs come from a table: the same open on the fixture coin and on its copy under a ground mint
+/// costs the same.
+#[test]
+fn m5_sec_6_a_low_bump_market_costs_no_more_per_trade() {
+    // A live curve with real SOL (the fresh fixture has 1 lamport: no sale fits).
+    let (mut env, fresh) = Env::fork_pump_coin(PumpCoin::T22_115);
+    let mut n = 0u32;
+    let ground = loop {
+        n += 1;
+        let k = Pubkey::new_unique();
+        if trader_wsol_ata_bump(&k) <= 245 {
+            break k;
+        }
+    };
+    let (b_fresh, b_ground) = (
+        trader_wsol_ata_bump(&fresh.mint),
+        trader_wsol_ata_bump(&ground),
+    );
+    eprintln!("trader WSOL ATA bumps: fixture {b_fresh}, ground {b_ground} ({n} candidates)");
+    let low = relocate(&mut env, &fresh, ground);
+    // The shared creator vault holds its rent already, so neither first trade tops it up.
+    let vault = fresh.creator_vault(&env.svm);
+    let rent0 = env.svm.minimum_balance_for_rent_exemption(0);
+    env.fund(&vault, rent0);
+    ok(env.list_pump(&fresh));
+    ok(env.list_pump(&low));
+    let q = fresh.state(&env.svm).virtual_token_reserves / 200;
+    let pm_fresh = env.pump_market_listed(PumpSpec::new(PumpCoin::T22_115, 40 * q), fresh);
+    let pm_low = env.pump_market_listed(PumpSpec::new(PumpCoin::T22_115, 40 * q), low);
+    assert_eq!(
+        env.market(&pm_low.market()).trader_wsol_ata,
+        pump::wsol_ata(&pm_low.trader()),
+        "cached at listing"
+    );
+    ok(env.send(&[crank_price_ix(&pm_fresh), crank_price_ix(&pm_low)], &[]));
+    env.warp(1);
+    // short.win's own CU of each open: its frame less pump's (pump derives its own PDAs of the
+    // mint — the curve, its ATA, the trader's UVA — so its CU moves with the mint too, which
+    // short.win cannot change; the residual is recorded in the review's design notes).
+    let mut own = Vec::new();
+    for pm in [&pm_fresh, &pm_low] {
+        // The borrower's own PDAs (position, exposure) are derived at the open too; a borrower
+        // whose both have bump 255 keeps that (its own) cost equal on both markets.
+        let mut b = loop {
+            let b = env.borrower();
+            let (_, pb) = pda::position(&pm.market(), &b.key(), 0);
+            let (_, eb) = pda::exposure(&pm.market(), &b.key());
+            if pb == 255 && eb == 255 {
+                break b;
+            }
+        };
+        let (res, _) = env.open(pm, &mut b, q);
+        let meta = ok(res);
+        // The outermost frame of each program reports the most (its CPIs included).
+        let sw = consumed(&meta, &shortwin::ID).into_iter().max().unwrap();
+        let pumped = consumed(&meta, &shortwin::constants::PUMP_PROGRAM_ID)
+            .into_iter()
+            .max()
+            .unwrap();
+        eprintln!(
+            "open: total {} CU, short.win {sw} CU of which pump {pumped} CU",
+            meta.compute_units_consumed
+        );
+        assert!(
+            meta.compute_units_consumed <= 250_000,
+            "ARCH §6.1's PROPOSED open budget"
+        );
+        own.push(sw - pumped);
+    }
+    assert!(
+        own[0].abs_diff(own[1]) < 1_500,
+        "a trade no longer derives the trader's WSOL ATA ({} vs {} CU of short.win's own)",
+        own[0],
+        own[1]
+    );
+}
+
+/// The CU each top-level or CPI frame of `program` reported consuming, in log order.
+fn consumed(meta: &TransactionMetadata, program: &Pubkey) -> Vec<u64> {
+    let head = format!("Program {program} consumed ");
+    meta.logs
+        .iter()
+        .filter_map(|l| l.strip_prefix(&head))
+        .filter_map(|r| r.split(' ').next()?.parse().ok())
+        .collect()
+}

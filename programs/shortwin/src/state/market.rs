@@ -22,7 +22,8 @@
 //! | observation | 1,528 | 1,272 |
 //! | market-level params | 2,800 | 32 |
 //! | OI (`max_q_hwm` @2,848 and `min_open_fee_ppm` @2,856, from `_reserved`) | 2,832 | 32 |
-//! | `_reserved` | 2,864 | 240 |
+//! | derived keys (`trader_wsol_ata` @2,864, `pump_pool_authority` @2,896; M5-SEC-6, from `_reserved`) | 2,864 | 64 |
+//! | `_reserved` | 2,928 | 176 |
 //!
 //! The math crate's state types (`pool::Pool`, `rent::{Basis, Aggr}`, `observe::*`) hold native
 //! `u128`/`i128`; the conversions below ([`Market::pool`], [`Market::set_pool`], …) copy field by
@@ -369,8 +370,17 @@ pub struct Market {
     /// 25-bps class.
     pub min_open_fee_ppm: u32,
     pub _pad5: [u8; 4],
-    // ---- misc @2864 (240) ----
-    pub _reserved: [u8; 240],
+    // ---- derived keys @2864 (64; M5-SEC-6, from `_reserved`): written at listing ----
+    /// `ATA(trader, WSOL)` under SPL Token (the pump curve's TradeExtras T11, `sweep_trader`'s
+    /// stray-ATA slot): derived once at listing instead of on every trade. The trader is the
+    /// market's PDA, so a coin's creator who grinds the mint can give this ATA a low bump, and
+    /// `find_program_address` charges 1,500 CU per bump it tries (M5-SEC-6).
+    pub trader_wsol_ata: Pubkey,
+    /// `PDA(pump, ["pool-authority", mint])`, the canonical PumpSwap pool's `creator`, which
+    /// `canonical_pool_valid` compares (ARCH §2.5); derived once at listing for the same reason.
+    pub pump_pool_authority: Pubkey,
+    // ---- misc @2928 (176) ----
+    pub _reserved: [u8; 176],
 }
 
 impl Market {

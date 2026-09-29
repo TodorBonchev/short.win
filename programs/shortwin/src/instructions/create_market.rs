@@ -5,12 +5,30 @@
 //! execution, and a timelocked change (≤ 0.1 SOL) could land between signing and execution
 //! (`CreationFeeAboveMax`), as `open_short`'s `max_open_fee` does for the open fee.
 //!
-//! **Scope** (ARCH §9 M1, M3): `venue_hint` is [`VENUE_HINT_AUTO`] — any SPL Token / Token-2022
-//! mint that passes the filter is listed as venue `None` (list-only: deposits and withdrawals;
-//! `None` is never terminal, ARCH §2.5; pump detection for `Auto` arrives with M5/M6) — or, since
-//! M3, [`VENUE_HINT_RAYDIUM_V4`] / [`VENUE_HINT_RAYDIUM_CPMM`] with a candidate pool (below).
-//! Any other hint is `NoSupportedVenue`, except in a TEST-ONLY `test-venue` build, which also
-//! accepts the mock venue's hint (M2, A49).
+//! **Scope** (ARCH §9 M1, M3, M5): `venue_hint` is [`VENUE_HINT_AUTO`] — `classify_pump` on the
+//! detection set decides (below): a pump coin on its live or migrating curve is listed on that
+//! venue, anything else (no pump curve, a curve that graduated elsewhere, and — until M6's
+//! PumpSwap adapter — a coin on its canonical PumpSwap pool) as `None` (list-only: deposits and
+//! withdrawals; never terminal, ARCH §2.5) — or, since M3, [`VENUE_HINT_RAYDIUM_V4`] /
+//! [`VENUE_HINT_RAYDIUM_CPMM`] with a candidate pool (below). Any other hint is
+//! `NoSupportedVenue`, except in a TEST-ONLY `test-venue` build, which also accepts the mock
+//! venue's hint (M2, A49).
+//!
+//! **Pump listing** (`Auto`, M5; ARCH §2.5, §3.2): `remaining_accounts = [bonding_curve,
+//! canonical_pool] ++ [pump program, the trader's pump UVA, pump event authority]` (the init set
+//! of `init_user_volume_accumulator`, key-checked). `classify_pump` refuses a mayhem curve
+//! (`CurveMayhemUnsupported`) and a non-SOL quote (`CurveQuoteNotSol`; ADOPTED Q6), a curve under
+//! 115 bytes (`CurveNeedsExtend`: the client prepends pump's `extend_account`), and a pump-owned
+//! curve account that does not parse (`PumpVenuePrecedence`: fail closed). A live curve lists as
+//! `PumpCurve`, a completed one that has not migrated as `PumpMigrating` (`migration_seen_at =
+//! now`). Effects on top of a list-only listing: `trader_base_ata = ATA(trader, mint)` created
+//! (`create_idempotent`, payer the creator) and validated (mint, owner `trader`, program); the
+//! trader's pump UVA created (`init_user_volume_accumulator`, payer the creator, user `trader`;
+//! skipped if it exists — a griefer's is harmless, it is keyed to `trader`); the curve venue
+//! cache (`venues::pump_curve::write_cache`: the curve's base and WSOL ATAs, the fee-sharing
+//! config, the UVA and its WSOL ATA, the creator, its vault and the vault's WSOL ATA); the price
+//! state at the curve's spot (`P_ema = vQ·WAD/vT`, `L = isqrt(vT·vQ)`; pump venues are never
+//! marked for the warm-up); tier D. Pump listings are never latched (ARCH §3.2 check 5).
 //!
 //! **Raydium listing** (ARCH §2.5 `create_market(venue_hint)`, §2.6, §3.2; D1, D2, O13):
 //! `remaining_accounts = [bonding_curve, canonical_pool] ++ ReadSet(candidate)` (AMM v4: pool,
@@ -71,7 +89,9 @@
 
 use anchor_lang::prelude::*;
 use anchor_lang::system_program::{self, Allocate, Assign, CreateAccount, Transfer};
-use anchor_spl::associated_token::{get_associated_token_address_with_program_id, AssociatedToken};
+use anchor_spl::associated_token::{
+    self as ata, get_associated_token_address_with_program_id, AssociatedToken,
+};
 use anchor_spl::token_interface::{self, InitializeAccount3, TokenInterface};
 use shortwin_math::pool::{Pool, Vault};
 use shortwin_math::tier::Tier;
@@ -88,7 +108,7 @@ use crate::state::{
     POOL_VAULT_SEED, TRADER_SEED, TRADER_WSOL_SEED,
 };
 use crate::venues::detect::{self, PumpClass};
-use crate::venues::{raydium_cpmm, raydium_v4};
+use crate::venues::{pump_curve, raydium_cpmm, raydium_v4};
 
 /// `venue_hint` for "detect": a list-only market until the pump venues arrive (M5/M6).
 pub const VENUE_HINT_AUTO: u8 = 0;
@@ -130,9 +150,11 @@ pub fn bonding_curve_key(mint: &Pubkey) -> Pubkey {
 /// The canonical PumpSwap pool of `mint` (R-VEN §1.3): created by pump's `pool-authority` PDA
 /// at index 0, quoted in WSOL. The address alone makes it unspoofable.
 pub fn canonical_pool_key(mint: &Pubkey) -> Pubkey {
-    let authority =
-        Pubkey::find_program_address(&[PUMP_POOL_AUTHORITY_SEED, mint.as_ref()], &PUMP_PROGRAM_ID)
-            .0;
+    canonical_pool_key_of(mint, &crate::venues::detect::pool_authority(mint))
+}
+
+/// [`canonical_pool_key`] with the pool authority `PDA(pump, ["pool-authority", mint])` given.
+pub fn canonical_pool_key_of(mint: &Pubkey, authority: &Pubkey) -> Pubkey {
     Pubkey::find_program_address(
         &[
             PUMP_AMM_POOL_SEED,
@@ -197,9 +219,9 @@ pub struct CreateMarket<'info> {
     pub trader: UncheckedAccount<'info>,
     /// CHECK: key-checked; on a list-only market only its key is stored.
     /// `ATA(trader, mint, token_program)`: created with `create_idempotent` and then
-    /// validated on pump venues (M5, which marks it `mut` again). Read-only while no M1 path
-    /// writes it, so a list-only listing write-locks nothing it does not use (M1-FID-15).
+    /// validated on the pump venues (M5).
     #[account(
+        mut,
         address = get_associated_token_address_with_program_id(
             &trader.key(),
             &mint.key(),
@@ -311,12 +333,81 @@ fn create_pool_vault(accs: &CreateMarket, market: &Pubkey, bump: u8) -> Result<(
 /// list-only market).
 fn ray_pool_of(venue: VenueKind, hint_accounts: &[AccountInfo]) -> Pubkey {
     match venue {
-        VenueKind::None => Pubkey::default(),
+        VenueKind::None | VenueKind::PumpCurve | VenueKind::PumpMigrating => Pubkey::default(),
         _ => hint_accounts.first().map_or(Pubkey::default(), |a| a.key()),
     }
 }
 
-pub fn handler(ctx: Context<CreateMarket>, venue_hint: u8, max_creation_fee: u64) -> Result<()> {
+/// A pump venue's market state (module docs): the curve cache, the price state at the curve's
+/// spot, tier D; a migrating curve starts the migration pause now. Its own frame: the observation
+/// state is 1.4 KB.
+#[inline(never)]
+fn init_pump_market(
+    market: &mut Market,
+    bc: &AccountInfo,
+    venue: VenueKind,
+    now: i64,
+) -> Result<()> {
+    let c = pump_curve::parse_curve(bc).ok_or(ShortwinError::PumpVenuePrecedence)?;
+    pump_curve::write_cache(market, &Pubkey::new_from_array(c.creator));
+    let (p, l) = pump_curve::spot(&c).ok_or(ShortwinError::NoRoute)?;
+    let obs = Box::new(
+        shortwin_math::observe::Observation::new(now, p, l)
+            .map_err(|_| error!(ShortwinError::MathOverflow))?,
+    );
+    market.set_observation(&obs);
+    market.tier = Tier::D as u8;
+    if venue == VenueKind::PumpMigrating {
+        market.migration_seen_at = now;
+    }
+    Ok(())
+}
+
+/// The pump listing's CPIs (module docs, ARCH §3.2 "Effects"): `create_idempotent(trader_base_ata)`
+/// paid by the creator, then its validation (a token account of the mint under its program, owned
+/// by `trader`, no delegate, no close authority: `TraderStateInvalid`), then the trader's pump UVA
+/// (`pump_curve::init_uva`, skipped if it exists) from `init_accounts` = `[pump program, the UVA,
+/// pump event authority]` (key-checked).
+fn pump_listing<'info>(
+    accs: &CreateMarket<'info>,
+    init_accounts: &[AccountInfo<'info>],
+) -> Result<()> {
+    ata::create_idempotent(CpiContext::new(
+        accs.associated_token_program.key(),
+        ata::Create {
+            payer: accs.creator.to_account_info(),
+            associated_token: accs.trader_base_ata.to_account_info(),
+            authority: accs.trader.to_account_info(),
+            mint: accs.mint.to_account_info(),
+            system_program: accs.system_program.to_account_info(),
+            token_program: accs.token_program.to_account_info(),
+        },
+    ))?;
+    crate::engine::trader::base_ata_state(
+        &accs.trader.to_account_info(),
+        &crate::engine::trader::BaseSide {
+            trader_base_ata: accs.trader_base_ata.to_account_info(),
+            pool_vault: accs.pool_vault.to_account_info(),
+            mint: accs.mint.to_account_info(),
+            decimals: 0,
+            token_program: accs.token_program.to_account_info(),
+        },
+    )?;
+    let uva = pump_curve::user_volume_accumulator(&accs.trader.key());
+    pump_curve::init_uva(
+        &accs.creator.to_account_info(),
+        &accs.trader.to_account_info(),
+        &accs.system_program.to_account_info(),
+        init_accounts,
+        &uva,
+    )
+}
+
+pub fn handler<'info>(
+    ctx: Context<'info, CreateMarket<'info>>,
+    venue_hint: u8,
+    max_creation_fee: u64,
+) -> Result<()> {
     let accs = &ctx.accounts;
     let mint_key = accs.mint.key();
     let token_program = accs.token_program.key();
@@ -340,7 +431,8 @@ pub fn handler(ctx: Context<CreateMarket>, venue_hint: u8, max_creation_fee: u64
     //    check), or, in a test-venue build, the mock; the detection keys are always derived and
     //    checked (C0-15).
     let bonding_curve = bonding_curve_key(&mint_key);
-    let canonical_pool = canonical_pool_key(&mint_key);
+    let pool_authority = detect::pool_authority(&mint_key);
+    let canonical_pool = canonical_pool_key_of(&mint_key, &pool_authority);
     let detection_len = DETECTION_SET_LEN.min(ctx.remaining_accounts.len());
     let (detection, hint_accounts) = ctx.remaining_accounts.split_at(detection_len);
     check_detection_set(detection, &bonding_curve, &canonical_pool)?;
@@ -349,17 +441,38 @@ pub fn handler(ctx: Context<CreateMarket>, venue_hint: u8, max_creation_fee: u64
     let mut graduated_elsewhere = false;
     let (venue, adoption) = match venue_hint {
         VENUE_HINT_AUTO => {
-            require!(
-                hint_accounts.is_empty(),
-                ShortwinError::BadRemainingAccounts
-            );
-            (VenueKind::None, None)
+            let [bc, cp] = detection else {
+                return err!(ShortwinError::BadRemainingAccounts);
+            };
+            let class = detect::classify_pump_with(bc, cp, &mint_key, &pool_authority)?;
+            let venue = match class {
+                PumpClass::PumpCurve => VenueKind::PumpCurve,
+                PumpClass::PumpMigrating => VenueKind::PumpMigrating,
+                // M6: the PumpSwap adapter; until then a graduated pump coin is list-only. A
+                // canonical-pool account that does not read as a valid pool (M5-SEC-5) is a
+                // pump venue short.win cannot trade now: list-only, and never "graduated
+                // elsewhere" (D1 keeps Raydium out).
+                PumpClass::PumpSwap | PumpClass::PumpPoolUnreadable | PumpClass::NotPump => {
+                    VenueKind::None
+                }
+                PumpClass::GraduatedElsewhere => {
+                    graduated_elsewhere = true;
+                    VenueKind::None
+                }
+            };
+            if venue == VenueKind::None {
+                require!(
+                    hint_accounts.is_empty(),
+                    ShortwinError::BadRemainingAccounts
+                );
+            }
+            (venue, None)
         }
         VENUE_HINT_RAYDIUM_V4 | VENUE_HINT_RAYDIUM_CPMM => {
             let [bc, cp] = detection else {
                 return err!(ShortwinError::BadRemainingAccounts);
             };
-            let class = detect::classify_pump(bc, cp, &mint_key)?;
+            let class = detect::classify_pump_with(bc, cp, &mint_key, &pool_authority)?;
             require!(!class.pump_venue(), ShortwinError::PumpVenuePrecedence);
             graduated_elsewhere = class == PumpClass::GraduatedElsewhere;
             // The latch (M3-SEC-2): the listing verifies the candidate with the compiled readers
@@ -421,6 +534,12 @@ pub fn handler(ctx: Context<CreateMarket>, venue_hint: u8, max_creation_fee: u64
         )?;
     }
 
+    // The pump venues' trader accounts (ARCH §3.2 "Effects"): the base ATA and the pump UVA,
+    // both paid by the creator, so no leg ever pays their rent.
+    let pump = matches!(venue, VenueKind::PumpCurve | VenueKind::PumpMigrating);
+    if pump {
+        pump_listing(accs, hint_accounts)?;
+    }
     let (trader_wsol, trader_wsol_bump) =
         Pubkey::find_program_address(&[TRADER_WSOL_SEED, market_key.as_ref()], &crate::ID);
     let trader = accs.trader.key();
@@ -449,6 +568,17 @@ pub fn handler(ctx: Context<CreateMarket>, venue_hint: u8, max_creation_fee: u64
         m.trader_wsol = trader_wsol;
         m.bonding_curve = bonding_curve;
         m.canonical_pool = canonical_pool;
+        // Derived once here, never on a trade (M5-SEC-6): `ATA(trader, WSOL)` and pump's pool
+        // authority of the mint.
+        m.trader_wsol_ata = pump_curve::wsol_ata(&trader);
+        m.pump_pool_authority = pool_authority;
+        m.set_flag(MARKET_FLAG_GRADUATED_ELSEWHERE, graduated_elsewhere);
+        if pump {
+            let [bc, _] = detection else {
+                return err!(ShortwinError::BadRemainingAccounts);
+            };
+            init_pump_market(&mut m, bc, venue, now)?;
+        }
         // The lender pool of a new market (`pool_model.Pool()`): no shares, both post-wipe
         // bits set (nothing to sweep before the first deposit).
         m.set_pool(&Pool::new());
@@ -510,7 +640,7 @@ pub fn handler(ctx: Context<CreateMarket>, venue_hint: u8, max_creation_fee: u64
         bonding_curve,
         canonical_pool,
         ray_pool: ray_pool_of(venue, hint_accounts),
-        tier: Tier::C as u8,
+        tier: if pump { Tier::D as u8 } else { Tier::C as u8 },
         creation_fee: fee,
     });
     Ok(())

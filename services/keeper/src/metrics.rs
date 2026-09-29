@@ -42,6 +42,10 @@ pub struct MarketMetrics {
     pub pool_executions: u64,
     /// Pool adoptions seen (the keeper's or anyone's).
     pub pool_switches: u64,
+    /// pump `migrate_v2` calls of the keeper landed (duty 6).
+    pub migrations: u64,
+    /// Straddle bundles of the keeper landed (duty 6; ARCH §5.4).
+    pub straddles: u64,
     /// Degraded (1) or not (0).
     pub degraded: bool,
     /// The last second covered.
@@ -149,7 +153,7 @@ impl Metrics {
             self.pool_discoveries,
         );
         type Row = (&'static str, &'static str, fn(&MarketMetrics) -> u64);
-        let rows: [Row; 18] = [
+        let rows: [Row; 20] = [
             (
                 "covered_seconds",
                 "Seconds with a keeper observation.",
@@ -195,6 +199,10 @@ impl Metrics {
                 |m| m.pool_executions,
             ),
             ("pool_switches", "Pool adoptions seen.", |m| m.pool_switches),
+            ("migrations", "pump migrate_v2 calls landed.", |m| {
+                m.migrations
+            }),
+            ("straddles", "Straddle bundles landed.", |m| m.straddles),
             ("degraded", "1 while the market is in degraded mode.", |m| {
                 u64::from(m.degraded)
             }),

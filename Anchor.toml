@@ -14,11 +14,14 @@ skip-lint = false
 [workspace]
 # tests/mock_cpamm: the TEST-ONLY mock venue of M2 (ARCH §9, A49). It is built next to the
 # program so the LiteSVM tests can load target/deploy/mock_cpamm.so; it is never deployed.
-members = ["programs/shortwin", "tests/mock_cpamm"]
+# programs/complete_curve: the stateless straddle helper `complete_curve` (ARCH §5.4, A66), deployed
+# next to short.win (deploy by name: `anchor deploy -p shortwin`, `-p complete_curve`).
+members = ["programs/shortwin", "programs/complete_curve", "tests/mock_cpamm"]
 
 [programs.localnet]
 shortwin = "5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK"
 mock_cpamm = "BPAZFPkmVtYEWEZHCzFUns7oybh1VWfAvmu3ofM2mQi7"
+complete_curve = "4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ"
 
 [provider]
 cluster = "localnet"

@@ -227,6 +227,76 @@ impl PoolSelectConfig {
     }
 }
 
+/// Graduation duties on the pump curve (ARCH §5.1, §5.4, §7.1 duty 6; [`crate::graduation`]).
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, deny_unknown_fields)]
+pub struct GraduationConfig {
+    /// Call pump `migrate_v2` top-level as soon as a covered market's curve completes (ADOPTED
+    /// Q16). **Suspended in M5 (M5-SEC-4): false.** Without M6's `→ PumpSwap` transition a
+    /// migrated curve's market stays `PumpMigrating` and is no longer observed (the EMA freezes
+    /// at the last curve price, exits pause for good), whereas an unmigrated completed curve is
+    /// still observed and its stuck-migration S3 prices the post-migration pool; the program
+    /// refuses to enable the curve venue in this build, and M6 turns this back on.
+    pub migrate: bool,
+    /// Send the straddle bundle (tx1 `complete_curve`, tx2 `migrate_v2`, tx3 the exit on the
+    /// new pool) for a liquidatable position whose `Q` exceeds the curve's `rT`: true. Needs a
+    /// block engine (`--block-engine`).
+    pub straddle: bool,
+    /// Send the bundle **without** its exit transaction (tx1 + tx2: ARCH §5.4's keeper
+    /// fallback) when there is none. M5 has no tx3 (the PumpSwap exit is M6's) and keeps a
+    /// migrated curve `PumpMigrating` (exits pause, S3 after the migration pause), so this
+    /// completes and migrates the curve without exiting the position: false.
+    pub send_without_exit: bool,
+    /// `max_sol_cost` of `complete_curve` above the keeper's quote of buying the `rT` it read, in
+    /// bps (a curve sale between the read and the bundle raises the cost; beyond this pump
+    /// reverts tx1 and the bundle): 500.
+    pub complete_slippage_bps: u32,
+    /// The most the keeper spends completing one curve, lamports (it keeps the `rT` tokens it
+    /// buys; ECON §10.1): 20 SOL.
+    pub max_complete_lamports: u64,
+    /// The Jito tip the bundle's last transaction pays, lamports: 100,000.
+    pub tip_lamports: u64,
+    /// The Jito tip accounts (base58), used in turn: the eight mainnet ones.
+    pub tip_accounts: Vec<String>,
+    /// The Jito block engine bundles go to (e.g. `https://mainnet.block-engine.jito.wtf`); empty:
+    /// none (the binary's `--block-engine` overrides it).
+    pub block_engine: String,
+}
+
+impl Default for GraduationConfig {
+    fn default() -> Self {
+        Self {
+            migrate: false,
+            straddle: true,
+            send_without_exit: false,
+            complete_slippage_bps: 500,
+            max_complete_lamports: 20_000_000_000,
+            tip_lamports: 100_000,
+            tip_accounts: crate::graduation::JITO_TIP_ACCOUNTS
+                .iter()
+                .map(|s| (*s).to_string())
+                .collect(),
+            block_engine: String::new(),
+        }
+    }
+}
+
+impl GraduationConfig {
+    /// The tip accounts.
+    pub fn tip_keys(&self) -> anyhow::Result<Vec<Pubkey>> {
+        self.tip_accounts
+            .iter()
+            .map(|s| Pubkey::from_str(s).with_context(|| format!("tip account {s}")))
+            .collect()
+    }
+
+    /// The block engine, if one is set.
+    pub fn block_engine(&self) -> Option<&str> {
+        let s = self.block_engine.trim();
+        (!s.is_empty()).then_some(s)
+    }
+}
+
 /// The keeper's configuration.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, deny_unknown_fields)]
@@ -250,6 +320,7 @@ pub struct KeeperConfig {
     pub budget: BudgetConfig,
     pub venue_watch: VenueWatchConfig,
     pub pool_select: PoolSelectConfig,
+    pub graduation: GraduationConfig,
 }
 
 impl Default for KeeperConfig {
@@ -266,6 +337,7 @@ impl Default for KeeperConfig {
             budget: BudgetConfig::default(),
             venue_watch: VenueWatchConfig::default(),
             pool_select: PoolSelectConfig::default(),
+            graduation: GraduationConfig::default(),
         }
     }
 }
@@ -325,6 +397,13 @@ impl KeeperConfig {
         if p.max_candidates == 0 || p.rank_keys_per_tick < 2 {
             bail!("pool_select.max_candidates must be positive and rank_keys_per_tick at least 2");
         }
+        let g = &self.graduation;
+        if g.complete_slippage_bps > 10_000 {
+            bail!("graduation.complete_slippage_bps above 10,000");
+        }
+        if g.straddle && (g.tip_lamports == 0 || g.tip_keys()?.is_empty()) {
+            bail!("graduation: a bundle needs a tip (tip_lamports > 0 and a tip account)");
+        }
         self.markets.keys()?;
         for t in &self.lookup_tables {
             Pubkey::from_str(t).with_context(|| format!("lookup table {t}"))?;
@@ -377,6 +456,10 @@ mod tests {
             [pool_select]
             eval_interval_s = 5
             discovery_rpc = "https://gpa.example"
+            [graduation]
+            migrate = true
+            send_without_exit = true
+            block_engine = "https://mainnet.block-engine.jito.wtf"
             "#
         ))
         .unwrap();
@@ -393,6 +476,18 @@ mod tests {
         assert_eq!(cfg.pool_select.discovery_rpc(), Some("https://gpa.example"));
         assert!(cfg.pool_select.enabled);
         assert_eq!(KeeperConfig::default().pool_select.discovery_rpc(), None);
+        assert!(cfg.graduation.send_without_exit && cfg.graduation.migrate);
+        // M5-SEC-4: the migrate_v2 duty is off by default until M6.
+        assert!(!KeeperConfig::default().graduation.migrate);
+        assert_eq!(
+            cfg.graduation.block_engine(),
+            Some("https://mainnet.block-engine.jito.wtf")
+        );
+        assert_eq!(KeeperConfig::default().graduation.block_engine(), None);
+        assert_eq!(
+            KeeperConfig::default().graduation.tip_keys().unwrap().len(),
+            8
+        );
     }
 
     #[test]
@@ -408,6 +503,11 @@ mod tests {
             "[pool_select]\neval_interval_s = 0",
             "[pool_select]\nfast_discovery_interval_s = 600",
             "[pool_select]\nunknown = 1",
+            "[graduation]\ncomplete_slippage_bps = 10001",
+            "[graduation]\ntip_lamports = 0",
+            "[graduation]\ntip_accounts = []",
+            "[graduation]\ntip_accounts = [\"nope\"]",
+            "[graduation]\nunknown = 1",
         ] {
             assert!(KeeperConfig::from_toml(bad).is_err(), "{bad}");
         }

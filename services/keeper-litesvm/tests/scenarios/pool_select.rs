@@ -303,9 +303,13 @@ fn a_list_only_market_is_moved_onto_its_deepest_eligible_pool() {
 
     let r = h.second().clone();
     assert!(r.errors.is_empty(), "{:?}", r.errors);
+    // Since M5 a list-only market is covered with its detection set as ReadSet (a curve that
+    // graduated elsewhere with positions open needs its S3 chain); without positions nothing is
+    // due.
+    assert!(!r.skipped.iter().any(|(k, _)| *k == key));
     assert!(
-        r.skipped.iter().any(|(k, _)| *k == key),
-        "a list-only market has no coverage duty"
+        !r.cranked.contains(&key),
+        "no coverage duty without positions"
     );
     let track = h.keeper.pool_track(&key).expect("tracked");
     let verdict = |p: &AnyPool| {
@@ -351,12 +355,17 @@ fn a_list_only_market_is_moved_onto_its_deepest_eligible_pool() {
 
 /// D1 (ARCH §2.5 "Precedence"): a list-only market of a coin whose pump curve is live keeps its
 /// pump venue — the keeper runs the program's `classify_pump` on the detection set and never
-/// proposes the (eligible) Raydium pool.
+/// proposes the (eligible) Raydium pool; since M5 it also cranks the market onto the curve in the
+/// same tick (`crank_price`'s `None → PumpCurve` re-detection, ARCH §2.5 `None` row), after which
+/// the market is no longer list-only and the pool monitor leaves it.
 #[test]
 fn a_pump_coin_keeps_its_pump_venue() {
     let mut env = Env::ray_fork();
     let deep = env.load_ray_pool(FART);
     let (mint, program) = deep.token();
+    // Since M5 `create_market(Auto)` lists a live curve as `PumpCurve` (with the pump init
+    // set): the list-only market here is listed first, then its mint's curve appears.
+    ok(env.list_auto(&mint, program));
     plant_curve(
         &mut env.svm,
         &mint,
@@ -370,10 +379,24 @@ fn a_pump_coin_keeps_its_pump_venue() {
             ..CurveSpec::default()
         }),
     );
-    ok(env.list_auto(&mint, program));
     let key = pda::market(&mint).0;
     let mut h = Harness::new(env, KeeperConfig::default());
-    for s in 0..40 {
+    // The first tick: the re-detection crank, and the pool monitor's evaluation on the list-only
+    // view of that tick, which D1 blocks.
+    let r = h.second().clone();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert!(r.pool_actions.is_empty(), "{:?}", r.pool_actions);
+    assert!(r.cranked.contains(&key), "the re-detection crank");
+    let p = r.pool_plans.get(&key).expect("evaluated as list-only");
+    assert_eq!(p.best.map(|b| b.0), Some(ps::pool_key(&deep)));
+    assert_eq!(p.blocked, code(ShortwinError::PumpVenuePrecedence));
+    assert!(
+        h.keeper
+            .pool_track(&key)
+            .is_some_and(|t| t.last_eval.is_some())
+    );
+    assert_eq!(market(&h, &key).venue_kind(), Some(VenueKind::PumpCurve));
+    for s in 1..40 {
         let r = h.second().clone();
         assert!(r.errors.is_empty(), "{:?}", r.errors);
         assert!(
@@ -381,17 +404,9 @@ fn a_pump_coin_keeps_its_pump_venue() {
             "second {s}: {:?}",
             r.pool_actions
         );
-        if let Some(p) = r.pool_plans.get(&key) {
-            assert_eq!(p.best.map(|b| b.0), Some(ps::pool_key(&deep)));
-            assert_eq!(p.blocked, code(ShortwinError::PumpVenuePrecedence));
-        }
+        assert!(!r.pool_plans.contains_key(&key), "no longer list-only");
     }
-    assert!(
-        h.keeper
-            .pool_track(&key)
-            .is_some_and(|t| t.last_eval.is_some())
-    );
-    assert_eq!(market(&h, &key).venue_kind(), Some(VenueKind::None));
+    assert_eq!(market(&h, &key).venue_kind(), Some(VenueKind::PumpCurve));
 }
 
 /// A Fartcoin market with two open positions, and two planted siblings: an AMM v4 pool at 40 %

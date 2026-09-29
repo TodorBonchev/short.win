@@ -114,7 +114,7 @@ export type CreateMarketInstruction<
         ? ReadonlyAccount<TAccountTrader>
         : TAccountTrader,
       TAccountTraderBaseAta extends string
-        ? ReadonlyAccount<TAccountTraderBaseAta>
+        ? WritableAccount<TAccountTraderBaseAta>
         : TAccountTraderBaseAta,
       TAccountTokenProgram extends string
         ? ReadonlyAccount<TAccountTokenProgram>
@@ -228,8 +228,7 @@ export type CreateMarketAsyncInput<
   trader?: TAccountTrader;
   /**
    * `ATA(trader, mint, token_program)`: created with `create_idempotent` and then
-   * validated on pump venues (M5, which marks it `mut` again). Read-only while no M1 path
-   * writes it, so a list-only listing write-locks nothing it does not use (M1-FID-15).
+   * validated on the pump venues (M5).
    */
   traderBaseAta: TAccountTraderBaseAta;
   tokenProgram?: TAccountTokenProgram;
@@ -367,7 +366,7 @@ export async function getCreateMarketInstructionAsync<
     traderBaseAta: {
       value: input.traderBaseAta ?? null,
       isSigner: false,
-      isWritable: false,
+      isWritable: true,
     },
     tokenProgram: {
       value: input.tokenProgram ?? null,
@@ -602,8 +601,7 @@ export type CreateMarketInput<
   trader: TAccountTrader;
   /**
    * `ATA(trader, mint, token_program)`: created with `create_idempotent` and then
-   * validated on pump venues (M5, which marks it `mut` again). Read-only while no M1 path
-   * writes it, so a list-only listing write-locks nothing it does not use (M1-FID-15).
+   * validated on the pump venues (M5).
    */
   traderBaseAta: TAccountTraderBaseAta;
   tokenProgram?: TAccountTokenProgram;
@@ -739,7 +737,7 @@ export function getCreateMarketInstruction<
     traderBaseAta: {
       value: input.traderBaseAta ?? null,
       isSigner: false,
-      isWritable: false,
+      isWritable: true,
     },
     tokenProgram: {
       value: input.tokenProgram ?? null,
@@ -909,8 +907,7 @@ export type ParsedCreateMarketInstruction<
     trader: TAccountMetas[7];
     /**
      * `ATA(trader, mint, token_program)`: created with `create_idempotent` and then
-     * validated on pump venues (M5, which marks it `mut` again). Read-only while no M1 path
-     * writes it, so a list-only listing write-locks nothing it does not use (M1-FID-15).
+     * validated on the pump venues (M5).
      */
     traderBaseAta: TAccountMetas[8];
     tokenProgram: TAccountMetas[9];

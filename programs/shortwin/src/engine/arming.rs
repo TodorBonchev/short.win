@@ -48,7 +48,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::system_program::{self, Allocate, Assign, Transfer};
 use shortwin_math::observe::{robust_spot, Observation};
 use shortwin_math::persist;
-use shortwin_math::quote::{reprice, Pricing};
+use shortwin_math::quote::reprice;
 use shortwin_math::rent;
 use shortwin_math::risk::{self, Budget};
 use shortwin_math::settle::{self, BoxQuotes, S3Chain, SettleInputs, SettleTerms};
@@ -57,57 +57,75 @@ use shortwin_math::MathError;
 use crate::errors::{CheckedExt, MathResultExt, ShortwinError};
 use crate::lamports;
 use crate::state::{Market, ShortPosition, VenueKind};
-use crate::venues::VenueState;
+use crate::venues::{Quoter, VenueState};
 
 /// The position's risk quotes (ARCH §4.3, §4.5): every quote at the capped fee view the caller
-/// resolved (`crate::venues::risk_pricing`), for the position's `q`. The box predicates call
-/// [`BoxQuotes`] on `(P, L)` states; the EMA leg and the live leg call [`RiskQuotes::cost_xy`]
-/// on `(x, y)` states.
+/// resolved (`crate::venues::risk_quoter`), for the position's `q`. The box predicates call
+/// [`BoxQuotes`] on `(P, L)` states; the EMA leg calls [`RiskQuotes::cost_xy`] on `(x, y)`
+/// states (a ring entry's cached reprojection: on the curve the virtual reserves with the live
+/// offsets), the live leg [`RiskQuotes::live`].
 #[derive(Clone, Copy, Debug)]
-pub struct RiskQuotes {
-    pricing: Pricing,
+pub struct RiskQuotes<'a> {
+    quoter: Quoter<'a>,
     q: u64,
 }
 
-impl RiskQuotes {
-    /// Risk quotes of `q` tokens at `pricing` (already capped at the position's hard cap).
-    pub const fn new(pricing: Pricing, q: u64) -> Self {
-        Self { pricing, q }
+impl<'a> RiskQuotes<'a> {
+    /// Risk quotes of `q` tokens at `quoter` (already capped at the position's hard cap).
+    pub const fn new(quoter: Quoter<'a>, q: u64) -> Self {
+        Self { quoter, q }
     }
 
     /// `B̂(q; x, y)`: `None` (`+∞`) if undefined, including `x = 0` (a ring entry without a
     /// reprojection).
     pub fn cost_xy(&self, x: u128, y: u128) -> Option<u64> {
-        if x == 0 {
-            return None;
-        }
-        self.pricing.buy(self.q, x, y).map(|b| b.cost)
+        self.quoter.buy_xy(self.q, x, y).map(|b| b.cost)
     }
 
-    /// σ on `(x, y)` (`risk::sigma_xy` of the quote's fee-free input): `u64::MAX` (`+∞`) when
-    /// the quote or the state's price is undefined.
-    pub fn sigma_on(&self, x: u128, y: u128) -> core::result::Result<u64, MathError> {
+    /// σ of a quote on the state `(x, y)` (`risk::sigma_xy` of its fee-free input; for `B̂_str`
+    /// the pool's `n` over the curve's price, ARCH §4.3): `u64::MAX` (`+∞`) when the quote or the
+    /// state's price is undefined.
+    fn sigma_of(&self, n: Option<u64>, x: u128, y: u128) -> core::result::Result<u64, MathError> {
         if x == 0 || y == 0 {
             return Ok(u64::MAX);
         }
-        let n = self.pricing.buy(self.q, x, y).map(|b| b.net);
         match risk::sigma_xy(n, self.q, x, y) {
             Err(MathError::DivByZero) => Ok(u64::MAX),
             r => r,
         }
     }
+
+    /// σ on `(x, y)` (`risk::sigma_xy` of the quote's fee-free input): `u64::MAX` (`+∞`) when
+    /// the quote or the state's price is undefined.
+    pub fn sigma_on(&self, x: u128, y: u128) -> core::result::Result<u64, MathError> {
+        let n = self.quoter.buy_xy(self.q, x, y).map(|b| b.net);
+        self.sigma_of(n, x, y)
+    }
+
+    /// The live leg's risk quote and σ on the venue's live reserves `(x, y)` (the curve: its
+    /// live state and the live `X_p` of `B̂_str`, ARCH §4.3).
+    pub fn live(&self, x: u128, y: u128) -> core::result::Result<(Option<u64>, u64), MathError> {
+        let b = self.quoter.buy_live(self.q, x, y);
+        Ok((b.map(|b| b.cost), self.sigma_of(b.map(|b| b.net), x, y)?))
+    }
 }
 
-impl BoxQuotes for RiskQuotes {
+impl BoxQuotes for RiskQuotes<'_> {
     fn cost(&mut self, p: u128, l: u128) -> core::result::Result<Option<u64>, MathError> {
-        Ok(reprice(l, p).and_then(|(x, y)| self.cost_xy(x, y)))
+        Ok(self.quoter.buy_repriced(self.q, l, p).map(|b| b.cost))
     }
 
     fn sigma(&mut self, p: u128, l: u128) -> core::result::Result<u64, MathError> {
+        // `reprice(L, P)` is the curve at `P` too (`curve_reprice` keeps the offsets, which
+        // `Quoter::buy_xy` applies): the sims' `slip_repriced`.
         match reprice(l, p) {
             Some((x, y)) => self.sigma_on(x, y),
             None => Ok(u64::MAX),
         }
+    }
+
+    fn fv_cost(&mut self, p: u128, l: u128) -> core::result::Result<Option<u64>, MathError> {
+        Ok(self.quoter.fv_repriced(self.q, l, p).map(|b| b.cost))
     }
 }
 
@@ -162,7 +180,7 @@ pub fn inputs(
     market: &Market,
     obs: &Observation,
     state: &VenueState,
-    quotes: &mut RiskQuotes,
+    quotes: &mut RiskQuotes<'_>,
     s3_no_route: bool,
     now: i64,
 ) -> Result<(SettleInputs, Facts)> {
@@ -176,8 +194,9 @@ pub fn inputs(
         .and_then(|p| robust_spot(p, &obs.last, now, pos.ref_max_age_s));
     let fresh = obs.last.is_fresh(now, pos.ref_max_age_s);
     let (b_live, sigma_live) = if executable {
-        let (x, y) = (u128::from(state.x), u128::from(state.y));
-        (quotes.cost_xy(x, y), quotes.sigma_on(x, y).math()?)
+        quotes
+            .live(u128::from(state.x), u128::from(state.y))
+            .math()?
     } else {
         (None, u64::MAX)
     };
@@ -310,6 +329,7 @@ mod tests {
     use super::*;
     use shortwin_math::fees::CpmmFees;
     use shortwin_math::num::WAD;
+    use shortwin_math::quote::Pricing;
 
     fn cpmm(fee_ppm: u64) -> Pricing {
         let f = CpmmFees {
@@ -326,7 +346,7 @@ mod tests {
     /// as `+∞` (cost `None`, σ `u64::MAX`), never an error.
     #[test]
     fn risk_quotes_on_repriced_states() {
-        let mut q = RiskQuotes::new(cpmm(2_500), 1_000_000);
+        let mut q = RiskQuotes::new(Quoter::Pool(cpmm(2_500)), 1_000_000);
         let (l, p) = (10u128.pow(12), WAD / 1_000);
         let (x, y) = reprice(l, p).unwrap();
         assert_eq!(q.cost(p, l).unwrap(), q.cost_xy(x, y));
@@ -338,11 +358,11 @@ mod tests {
         assert!(s < 10, "a tiny trade has almost no premium: {s}");
         // More liquidity at the same price: cheaper and less slippage (B̂ and σ fall with L),
         // for a trade of 3 % of the token reserve.
-        let mut big = RiskQuotes::new(cpmm(2_500), 1_000_000_000_000);
+        let mut big = RiskQuotes::new(Quoter::Pool(cpmm(2_500)), 1_000_000_000_000);
         assert!(big.cost(p, l * 4).unwrap() < big.cost(p, l).unwrap());
         assert!(big.sigma(p, l * 4).unwrap() < big.sigma(p, l).unwrap());
         // Undefined: no tokens to buy, or no reprojection.
-        let mut huge = RiskQuotes::new(cpmm(2_500), u64::MAX);
+        let mut huge = RiskQuotes::new(Quoter::Pool(cpmm(2_500)), u64::MAX);
         assert_eq!(huge.cost(p, 1_000).unwrap(), None);
         assert_eq!(huge.sigma(p, 1_000).unwrap(), u64::MAX);
         assert_eq!(q.cost_xy(0, 1), None);

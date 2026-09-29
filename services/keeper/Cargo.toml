@@ -19,6 +19,8 @@ shortwin-math.workspace = true
 # ProgramData headers): the admin monitor reads exactly the bytes the adapters read.
 shortwin-venue-state.workspace = true
 shortwin-services-common.workspace = true
+# The straddle helper's Anchor types (`complete_curve`, tx1 of the straddle bundle; ARCH §5.4).
+complete-curve.workspace = true
 anchor-lang.workspace = true
 bytemuck.workspace = true
 anyhow.workspace = true
@@ -33,6 +35,10 @@ solana-keypair.workspace = true
 solana-message.workspace = true
 solana-pubkey.workspace = true
 solana-signer.workspace = true
+
+[dev-dependencies]
+# The discriminator checks of the unit tests (the version the program uses).
+solana-sha256-hasher = "3"
 
 [[bin]]
 name = "shortwin-keeper"

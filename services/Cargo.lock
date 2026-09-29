@@ -998,6 +998,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "complete-curve"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "shortwin-venue-state",
+]
+
+[[package]]
 name = "compression-codecs"
 version = "0.4.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3264,6 +3272,7 @@ dependencies = [
  "anchor-lang",
  "anyhow",
  "bytemuck",
+ "complete-curve",
  "serde",
  "shortwin",
  "shortwin-math",
@@ -3274,6 +3283,7 @@ dependencies = [
  "solana-keypair",
  "solana-message",
  "solana-pubkey 4.2.1",
+ "solana-sha256-hasher",
  "solana-signer",
  "tokio",
  "toml",
@@ -3287,6 +3297,7 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "anyhow",
+ "complete-curve",
  "litesvm",
  "shortwin",
  "shortwin-keeper",
@@ -3358,7 +3369,9 @@ name = "shortwin-services-common"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "bs58",
+ "serde_json",
  "solana-account-decoder-client-types",
  "solana-commitment-config",
  "solana-compute-budget-interface",

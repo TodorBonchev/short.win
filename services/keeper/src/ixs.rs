@@ -54,7 +54,7 @@ pub fn crank_price(mv: &MarketView) -> Instruction {
 /// trade marks ([`venue::read_writable`]).
 fn trade_remaining(mv: &MarketView, extras: &ExtrasChoice) -> anyhow::Result<Vec<AccountMeta>> {
     let mut v = venue::read_metas(mv.kind, &mv.read_keys, true)?;
-    v.extend(venue::trade_extras(mv.kind, &mv.market)?);
+    v.extend(venue::trade_extras(mv.kind, &mv.market, &mv.read_accounts)?);
     v.extend(extras.metas.iter().cloned());
     Ok(v)
 }

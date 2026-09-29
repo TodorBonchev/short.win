@@ -32,6 +32,24 @@
 //!   leaves exactly what the admin's own instruction leaves.
 //! - **Logs.** [`ray_logs`] decodes AMM v4's `ray_log` (the reserves the venue priced on) and
 //!   [`cpmm_swap_events`] CPMM's `SwapEvent` (`emit!`, "Program data:").
+//!
+//! **The pump fork (M5, appended below the Raydium part).** Groups `pump_programs` and
+//! `pump_state` of the same manifest: the pump, pump-fees and PumpSwap ELFs (deployed from their
+//! dumped ProgramData, sha256-checked like the Raydium ones, so the latch reads the real deploy
+//! slots 449,734,335 / 446,465,969 / 446,462,733), and pump's statics and one set of accounts
+//! per coin **role** ([`PumpCoin`]) at one mainnet slot, loaded on first use apart from the
+//! Raydium fixtures. [`Env::fork_pump`] / [`Env::fork_pump_coin`], or piecewise
+//! [`Env::load_pump_programs`], [`Env::load_pump_statics`], [`Env::load_pump_coin`],
+//! [`Env::set_pump_rent`] (mainnet's Rent sysvar, dumped with the state) and
+//! [`Env::set_pump_clock`]; [`PumpCurve`] reads a curve with the `shortwin-venue-state` readers,
+//! resolves its fees from the live `FeeConfig` / `Global` with `shortwin_math::fees::pump_curve`,
+//! quotes with `quote::sol_leg`, and builds pump's own `buy_v2` / `sell_v2` /
+//! `buy_exact_quote_in_v2` in the IDL's exact account order (R-PUMP §3.5); [`PumpPool`] is the
+//! graduated coin's canonical PumpSwap pool with its boost vault; [`pump_trade_events`] decodes
+//! pump's `TradeEvent`; byte-level scenario builders rewrite curves (reserves, completion,
+//! creator, per-coin fee), `Global.creator_fee_configurable` and a `FeeConfig`'s tiers. Accounts
+//! the dump found absent (the event authorities, a closed boost vault, a creator vault that never
+//! existed) are simply not loaded ([`is_absent`]).
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -44,13 +62,21 @@ use litesvm::LiteSVM;
 use litesvm::types::TransactionMetadata;
 use litesvm_token::{CreateAccount, SyncNative};
 use shortwin::constants::{
-    RAYDIUM_CPMM_AUTHORITY, RAYDIUM_CPMM_PROGRAM_ID, RAYDIUM_V4_AUTHORITY, RAYDIUM_V4_PROGRAM_ID,
+    ASSOCIATED_TOKEN_PROGRAM_ID, GUARD_PUMP, GUARD_PUMP_AMM, GUARD_PUMP_FEES, PUMP_AMM_PROGRAM_ID,
+    PUMP_EVENT_AUTHORITY, PUMP_FEE_CONFIG, PUMP_FEES_PROGRAM_ID, PUMP_GLOBAL,
+    PUMP_GLOBAL_VOLUME_ACCUMULATOR, PUMP_PROGRAM_ID, RAYDIUM_CPMM_AUTHORITY,
+    RAYDIUM_CPMM_PROGRAM_ID, RAYDIUM_V4_AUTHORITY, RAYDIUM_V4_PROGRAM_ID, TOKEN_2022_PROGRAM_ID,
     TOKEN_PROGRAM_ID, WSOL_MINT,
 };
 use shortwin::state::Market;
-use shortwin_math::fees::{self as mfees, CpmmConfig, CpmmFees, CpmmPoolFees, Direction};
-use shortwin_math::quote::{BuyQuote, SellQuote, cpmm as qcpmm, ray_v4 as qv4};
-use shortwin_venue_state::{raydium_cpmm, raydium_v4, token_account};
+use shortwin_math::fees::{
+    self as mfees, CpmmConfig, CpmmFees, CpmmPoolFees, CurveFeeSchedule, Direction, FeeBps,
+    FeeTier as MathFeeTier,
+};
+use shortwin_math::quote::{
+    BuyQuote, CurveState, SellQuote, cpmm as qcpmm, ray_v4 as qv4, sol_leg,
+};
+use shortwin_venue_state::{pump, pump_amm, raydium_cpmm, raydium_v4, token_account};
 use solana_account::Account;
 use solana_keypair::Keypair;
 use solana_message::Message;
@@ -70,12 +96,18 @@ pub fn fixtures_dir() -> PathBuf {
     )
 }
 
-/// One manifest entry of the Raydium groups, with its account rebuilt and checked.
+/// The manifest groups of the Raydium fork (loaded, and sha256-checked, on first use).
+pub const RAYDIUM_GROUPS: [&str; 2] = ["raydium_programs", "raydium_state"];
+/// The manifest groups of the pump fork (loaded separately, on first use of a pump fixture, so
+/// the Raydium tests never rebuild the two 10 MiB pump ProgramData accounts).
+pub const PUMP_GROUPS: [&str; 2] = ["pump_programs", "pump_state"];
+
+/// One manifest entry of the managed groups, with its account rebuilt and checked.
 #[derive(Clone, Debug)]
 pub struct Fixture {
     /// The manifest name (e.g. `ray_v4_fartcoin_pool`).
     pub name: String,
-    /// `raydium_programs` or `raydium_state`.
+    /// One of [`RAYDIUM_GROUPS`] or [`PUMP_GROUPS`].
     pub group: String,
     pub address: Pubkey,
     /// The mainnet slot the account was read at.
@@ -84,6 +116,8 @@ pub struct Fixture {
     pub account: Account,
     /// ProgramData only: the length of the ELF after the 45-byte header (the rest is zeros).
     pub elf_len: Option<usize>,
+    /// `pump_state` only: the coin role the account belongs to (`None` for the statics).
+    pub role: Option<String>,
 }
 
 /// The snapshot a group was read at.
@@ -94,10 +128,16 @@ pub struct Snapshot {
     pub block_time: i64,
 }
 
+/// The fixtures of one fork (its manifest groups).
 struct Fixtures {
     by_name: HashMap<String, Fixture>,
     by_address: HashMap<Pubkey, String>,
+    /// Accounts the dump recorded as absent (`"absent": true`; pump groups only).
+    absent: std::collections::HashSet<Pubkey>,
+    /// The state group's snapshot.
     state: Snapshot,
+    /// `pump_state`'s coin roles: role → mint (empty for the Raydium fork).
+    coins: HashMap<String, Pubkey>,
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -109,7 +149,9 @@ fn read_fixture_file(rel: &str) -> Vec<u8> {
     std::fs::read(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()))
 }
 
-fn load_fixtures() -> Fixtures {
+/// Loads the entries of `groups` and the snapshot of `state_group`, rebuilding and
+/// sha256-checking every account.
+fn load_fixtures(groups: &[&str], state_group: &str) -> Fixtures {
     let path = fixtures_dir().join("manifest.json");
     let text =
         std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
@@ -125,12 +167,17 @@ fn load_fixtures() -> Fixtures {
     };
     let mut by_name = HashMap::new();
     let mut by_address = HashMap::new();
+    let mut absent = std::collections::HashSet::new();
     for e in m["accounts"].as_array().expect("accounts") {
         let group = e["group"].as_str().unwrap_or_default();
-        if group != "raydium_programs" && group != "raydium_state" {
+        if !groups.contains(&group) {
             continue;
         }
         let name = str_of(e, "name");
+        if e["absent"].as_bool() == Some(true) {
+            absent.insert(Pubkey::from_str(&str_of(e, "address")).expect("address"));
+            continue;
+        }
         let space = usize::try_from(u64_of(e, "space")).expect("space");
         let mut elf_len = None;
         let data = if let Some(file) = e["file"].as_str() {
@@ -167,6 +214,7 @@ fn load_fixtures() -> Fixtures {
                 rent_epoch: u64_of(e, "rent_epoch"),
             },
             elf_len,
+            role: e["role"].as_str().map(str::to_owned),
         };
         by_address.insert(address, name.clone());
         by_name.insert(name, fixture);
@@ -175,40 +223,72 @@ fn load_fixtures() -> Fixtures {
         .as_array()
         .expect("snapshots")
         .iter()
-        .find(|s| s["group"] == "raydium_state")
-        .expect("the raydium_state snapshot");
+        .find(|s| s["group"] == state_group)
+        .unwrap_or_else(|| panic!("no `{state_group}` snapshot (scripts/dump-fixtures.py fetch)"));
+    let coins = snap["coins"]
+        .as_object()
+        .map(|coins| {
+            coins
+                .iter()
+                .map(|(role, mint)| {
+                    let mint = Pubkey::from_str(mint.as_str().expect("mint")).expect("mint");
+                    (role.clone(), mint)
+                })
+                .collect()
+        })
+        .unwrap_or_default();
     Fixtures {
         by_name,
         by_address,
+        absent,
         state: Snapshot {
             slot: snap["slot"].as_u64().expect("slot"),
             block_time: snap["block_time"].as_i64().expect("block_time"),
         },
+        coins,
     }
 }
 
+/// The Raydium fork's fixtures.
 fn fixtures() -> &'static Fixtures {
     static F: OnceLock<Fixtures> = OnceLock::new();
-    F.get_or_init(load_fixtures)
+    F.get_or_init(|| load_fixtures(&RAYDIUM_GROUPS, "raydium_state"))
 }
 
-/// The fixture named `name` (panics if the manifest has no such Raydium entry).
+/// The pump fork's fixtures.
+fn pump_fixtures() -> &'static Fixtures {
+    static F: OnceLock<Fixtures> = OnceLock::new();
+    F.get_or_init(|| load_fixtures(&PUMP_GROUPS, "pump_state"))
+}
+
+/// The fixture named `name`, Raydium or pump (panics if the manifest has no such entry).
 pub fn fixture(name: &str) -> &'static Fixture {
     fixtures()
         .by_name
         .get(name)
-        .unwrap_or_else(|| panic!("no Raydium fixture `{name}` in manifest.json"))
+        .or_else(|| pump_fixtures().by_name.get(name))
+        .unwrap_or_else(|| panic!("no fixture `{name}` in manifest.json"))
 }
 
-/// The fixture at `address`, if the Raydium groups hold one.
+/// The fixture at `address`: the Raydium fork's if it holds one, else the pump fork's (an
+/// address in both, e.g. the WSOL mint, resolves to the Raydium entry; the pump fork's own
+/// loaders use [`pump_fixture_at`]).
 pub fn fixture_at(address: &Pubkey) -> Option<&'static Fixture> {
     let f = fixtures();
-    f.by_address.get(address).map(|n| &f.by_name[n])
+    f.by_address
+        .get(address)
+        .map(|n| &f.by_name[n])
+        .or_else(|| pump_fixture_at(address))
 }
 
 /// Every Raydium fixture (both groups).
 pub fn all_fixtures() -> impl Iterator<Item = &'static Fixture> {
     fixtures().by_name.values()
+}
+
+/// Every pump fixture (both groups).
+pub fn all_pump_fixtures() -> impl Iterator<Item = &'static Fixture> {
+    pump_fixtures().by_name.values()
 }
 
 /// The slot and block time every venue-state fixture was read at.
@@ -1641,6 +1721,996 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
 /// Lowercase hex of `sha256(data)`.
 pub fn sha256_hex(data: &[u8]) -> String {
     hex(&sha256(data))
+}
+
+// ---- the pump fork (M5) ------------------------------------------------------------------------
+
+/// The slot and block time every pump venue-state fixture was read at (group `pump_state`).
+pub fn pump_snapshot() -> Snapshot {
+    pump_fixtures().state
+}
+
+/// Whether the dump found the pump-group account at `address` absent (recorded as
+/// `"absent": true`: a creator vault that never received a fee, a closed boost vault, an event
+/// authority, ...). Such an account is not loaded.
+pub fn is_absent(address: &Pubkey) -> bool {
+    pump_fixtures().absent.contains(address)
+}
+
+/// The pump-group fixture at `address`, if the pump groups hold one.
+pub fn pump_fixture_at(address: &Pubkey) -> Option<&'static Fixture> {
+    let f = pump_fixtures();
+    f.by_address.get(address).map(|n| &f.by_name[n])
+}
+
+/// Writes the pump-group fixture at `address` into the VM if the dump holds one (else nothing:
+/// absent on mainnet at the snapshot). Returns whether it wrote one.
+pub fn load_pump_at(svm: &mut LiteSVM, address: &Pubkey) -> bool {
+    match pump_fixture_at(address) {
+        Some(f) => {
+            load(svm, &f.name);
+            true
+        }
+        None => false,
+    }
+}
+
+/// The three pump programs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PumpProgram {
+    /// The bonding curve `6EF8rr…`.
+    Pump,
+    /// pump-fees `pfeeUx…` (`get_fees_with_quote_mint`, the `FeeConfig`s).
+    Fees,
+    /// PumpSwap `pAMMBa…`.
+    Amm,
+}
+
+impl PumpProgram {
+    pub const ALL: [Self; 3] = [Self::Pump, Self::Fees, Self::Amm];
+
+    fn prefix(self) -> &'static str {
+        match self {
+            Self::Pump => "pump",
+            Self::Fees => "pump_fees",
+            Self::Amm => "pump_amm",
+        }
+    }
+
+    /// The program id.
+    pub fn id(self) -> Pubkey {
+        match self {
+            Self::Pump => PUMP_PROGRAM_ID,
+            Self::Fees => PUMP_FEES_PROGRAM_ID,
+            Self::Amm => PUMP_AMM_PROGRAM_ID,
+        }
+    }
+
+    /// Its `VenueGuard` index (the venue-upgrade latch, A7).
+    pub fn guard(self) -> u8 {
+        match self {
+            Self::Pump => GUARD_PUMP,
+            Self::Fees => GUARD_PUMP_FEES,
+            Self::Amm => GUARD_PUMP_AMM,
+        }
+    }
+
+    /// The fixture of its ProgramData account.
+    pub fn program_data(self) -> &'static Fixture {
+        fixture(&format!("{}_program_data", self.prefix()))
+    }
+
+    /// The fixture of its program account.
+    pub fn program(self) -> &'static Fixture {
+        fixture(&format!("{}_program", self.prefix()))
+    }
+
+    /// The dumped ELF (the ProgramData after its 45-byte header, up to the ELF's own end).
+    pub fn elf(self) -> &'static [u8] {
+        let pd = self.program_data();
+        let start = shortwin_venue_state::program_data::HEADER_LEN;
+        let len = pd.elf_len.expect("a ProgramData fixture");
+        &pd.account.data[start..start + len]
+    }
+}
+
+/// Deploys pump program `program` at its mainnet address from the dumped ProgramData (header ‖
+/// ELF ‖ zeros, sha256-checked against the mainnet account when first read), then the program
+/// account, which makes LiteSVM compile the ELF.
+pub fn load_pump_program(svm: &mut LiteSVM, program: PumpProgram) {
+    load(svm, &program.program_data().name);
+    load(svm, &program.program().name);
+}
+
+/// Rewrites the deploy slot in `program`'s ProgramData header (a latch "upgrade"; the program
+/// keeps running the dumped ELF).
+pub fn set_pump_deploy_slot(svm: &mut LiteSVM, program: PumpProgram, slot: u64) {
+    patch(svm, &program.program_data().address, |d| {
+        d[4..12].copy_from_slice(&slot.to_le_bytes());
+    });
+}
+
+/// The pump coin roles of the dump (`scripts/dump-fixtures.py` `PUMP_COINS`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PumpCoin {
+    /// A live Token-2022 curve minutes old (125 bytes, the `create_v2` allocation at the dump).
+    Fresh,
+    /// A live curve near completion (151 bytes, `rT ≤ 100 M` tokens): 6021 beyond `rT`, the
+    /// completing buy, the straddle.
+    Near,
+    /// A live Token-2022 curve of 115 bytes.
+    T22_115,
+    /// A live legacy SPL-Token curve of 115 bytes without a creator (creator fee 0).
+    Legacy115,
+    /// A live legacy SPL-Token curve in the 2024 layout (49 bytes): the first v2 trade grows it
+    /// to 125.
+    Legacy49,
+    /// A migrated curve with its canonical PumpSwap pool and an active boost vault.
+    Graduated,
+    /// A live mayhem-mode curve (refused by short.win, Q6).
+    Mayhem,
+    /// A live USDC-quoted curve (refused by short.win, Q6).
+    Usdc,
+    /// A legacy SPL-Token curve extended to 150 bytes, graduated to PumpSwap.
+    Legacy150,
+    /// Fartcoin: graduated to Raydium before PumpSwap (no canonical pool).
+    Fartcoin,
+}
+
+impl PumpCoin {
+    pub const ALL: [Self; 10] = [
+        Self::Fresh,
+        Self::Near,
+        Self::T22_115,
+        Self::Legacy115,
+        Self::Legacy49,
+        Self::Graduated,
+        Self::Mayhem,
+        Self::Usdc,
+        Self::Legacy150,
+        Self::Fartcoin,
+    ];
+
+    /// The live SOL curves a normal user trades.
+    pub const LIVE_SOL: [Self; 5] = [
+        Self::Fresh,
+        Self::Near,
+        Self::T22_115,
+        Self::Legacy115,
+        Self::Legacy49,
+    ];
+
+    /// The manifest role.
+    pub fn role(self) -> &'static str {
+        match self {
+            Self::Fresh => "fresh",
+            Self::Near => "near",
+            Self::T22_115 => "t22_115",
+            Self::Legacy115 => "legacy115",
+            Self::Legacy49 => "legacy49",
+            Self::Graduated => "graduated",
+            Self::Mayhem => "mayhem",
+            Self::Usdc => "usdc",
+            Self::Legacy150 => "legacy150",
+            Self::Fartcoin => "fartcoin",
+        }
+    }
+
+    /// The role's mint (the `pump_state` snapshot's `coins`).
+    pub fn mint(self) -> Pubkey {
+        *pump_fixtures()
+            .coins
+            .get(self.role())
+            .unwrap_or_else(|| panic!("no pump coin role `{}` in the snapshot", self.role()))
+    }
+}
+
+/// Mainnet's Rent sysvar at the pump snapshot (the `sysvar_rent` fixture: `lamports_per_byte`
+/// u64, the deprecated `exemption_threshold` bytes, `burn_percent`).
+pub fn pump_rent() -> solana_rent::Rent {
+    let d = &fixture("sysvar_rent").account.data;
+    assert_eq!(d.len(), 17, "Rent sysvar");
+    #[allow(deprecated)]
+    solana_rent::Rent {
+        lamports_per_byte: u64::from_le_bytes(d[..8].try_into().expect("u64")),
+        exemption_threshold: d[8..16].try_into().expect("8 bytes"),
+        burn_percent: d[16],
+    }
+}
+
+/// pump `Global` bytes in the VM (panics if not loaded).
+fn global_data(svm: &LiteSVM) -> Vec<u8> {
+    svm.get_account(&PUMP_GLOBAL)
+        .expect("pump Global (Env::load_pump_statics)")
+        .data
+}
+
+/// Normal fee recipient `i` (0–7) of the live `Global`.
+pub fn pump_fee_recipient(svm: &LiteSVM, i: usize) -> Pubkey {
+    let d = global_data(svm);
+    let g = pump::read_global(&pump::PROGRAM, &d).expect("Global");
+    Pubkey::new_from_array(g.fee_recipients()[i])
+}
+
+/// Buyback fee recipient `i` (0–7) of the live `Global`.
+pub fn pump_buyback_fee_recipient(svm: &LiteSVM, i: usize) -> Pubkey {
+    let d = global_data(svm);
+    let g = pump::read_global(&pump::PROGRAM, &d).expect("Global");
+    Pubkey::new_from_array(g.buyback_fee_recipients()[i])
+}
+
+/// `buyback_basis_points` of the live `Global`.
+pub fn pump_buyback_bps(svm: &LiteSVM) -> u64 {
+    let d = global_data(svm);
+    pump::read_global(&pump::PROGRAM, &d)
+        .expect("Global")
+        .buyback_basis_points()
+}
+
+/// `PDA(pump, ["user_volume_accumulator", user])`.
+pub fn pump_user_volume_accumulator(user: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(
+        &[pump::USER_VOLUME_ACCUMULATOR_SEED, user.as_ref()],
+        &PUMP_PROGRAM_ID,
+    )
+    .0
+}
+
+/// `PDA(pump, ["creator-vault", creator])`.
+pub fn pump_creator_vault(creator: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(
+        &[pump::CREATOR_VAULT_SEED, creator.as_ref()],
+        &PUMP_PROGRAM_ID,
+    )
+    .0
+}
+
+/// `sha256("global:buy_v2")[..8]`.
+pub const PUMP_BUY_V2: [u8; 8] = [0xb8, 0x17, 0xee, 0x61, 0x67, 0xc5, 0xd3, 0x3d];
+/// `sha256("global:sell_v2")[..8]`.
+pub const PUMP_SELL_V2: [u8; 8] = [0x5d, 0xf6, 0x82, 0x3c, 0xe7, 0xe9, 0x40, 0xb2];
+/// `sha256("global:buy_exact_quote_in_v2")[..8]`.
+pub const PUMP_BUY_EXACT_QUOTE_IN_V2: [u8; 8] = [0xc2, 0xab, 0x1c, 0x46, 0x68, 0x4d, 0x5b, 0x2f];
+/// `sha256("global:init_user_volume_accumulator")[..8]`.
+pub const PUMP_INIT_USER_VOLUME_ACCUMULATOR: [u8; 8] =
+    [0x5e, 0x06, 0xca, 0x73, 0xff, 0x60, 0xe8, 0xb7];
+/// `sha256("event:TradeEvent")[..8]`.
+pub const PUMP_TRADE_EVENT: [u8; 8] = [0xbd, 0xdb, 0x7f, 0xd3, 0x4e, 0xe6, 0x61, 0xee];
+
+/// pump `TooMuchSolRequired` (a buy above `max_sol_cost`).
+pub const PUMP_ERR_TOO_MUCH_SOL_REQUIRED: u32 = 6002;
+/// pump `TooLittleSolReceived` (a sale below `min_sol_output`).
+pub const PUMP_ERR_TOO_LITTLE_SOL_RECEIVED: u32 = 6003;
+/// pump `BondingCurveComplete` (every trade after `complete`).
+pub const PUMP_ERR_BONDING_CURVE_COMPLETE: u32 = 6005;
+/// pump `BuyZeroAmount`.
+pub const PUMP_ERR_BUY_ZERO_AMOUNT: u32 = 6020;
+/// pump `NotEnoughTokensToBuy` (a buy above `rT`: no cap, no partial fill).
+pub const PUMP_ERR_NOT_ENOUGH_TOKENS_TO_BUY: u32 = 6021;
+/// pump `BuySlippageBelowMinTokensOut` (`buy_exact_quote_in_v2` below `min_tokens_out`).
+pub const PUMP_ERR_BUY_SLIPPAGE_BELOW_MIN_TOKENS_OUT: u32 = 6042;
+/// pump `NotAuthorized` (e.g. a fee recipient outside the live list).
+pub const PUMP_ERR_NOT_AUTHORIZED: u32 = 6000;
+/// pump `BuybackFeeRecipientNotAuthorized`.
+pub const PUMP_ERR_BUYBACK_FEE_RECIPIENT_NOT_AUTHORIZED: u32 = 6057;
+
+/// Which v2 trade instruction (R-PUMP §3.5).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PumpV2 {
+    /// `buy_v2(amount, max_sol_cost)`: exact tokens out (27 accounts).
+    Buy,
+    /// `sell_v2(amount, min_sol_output)`: exact tokens in (26 accounts).
+    Sell,
+    /// `buy_exact_quote_in_v2(spendable_quote_in, min_tokens_out)` (27 accounts, `buy_v2`'s).
+    BuyExactQuoteIn,
+}
+
+/// What `buy_exact_quote_in_v2` does with `spendable` on `(vT, vQ)` at `fees` (R-PUMP §4 "Exact
+/// SOL in", verified against mainnet there): `net = ⌊spendable·10⁴/(10⁴ + p + c)⌋`, lowered by
+/// any excess of `net + ⌈net·p/10⁴⌉ + ⌈net·c/10⁴⌉` over `spendable`, then
+/// `tokens = ⌊(net − 1)·vT/(vQ + net − 1)⌋`; the curve is credited `net`.
+///
+/// **Test-side reference, not `shortwin-math`:** short.win never trades exact-quote-in (the
+/// protocol owes exactly `Q`, R-PUMP §9.4), so the math crate has no such function. The ELF is
+/// checked against this formula, and the formula against `shortwin-math`'s exact-out charge:
+/// `curve_charge_exact_out(tokens).net ≤ net ≤ curve_charge_exact_out(tokens + 1).net`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ExactQuoteIn {
+    /// Lamports credited to the curve (`TradeEvent.sol_amount`).
+    pub net: u64,
+    /// Protocol fee.
+    pub protocol_fee: u64,
+    /// Creator fee.
+    pub creator_fee: u64,
+    /// Tokens bought.
+    pub tokens: u64,
+}
+
+impl ExactQuoteIn {
+    /// Lamports the buyer pays: `net + protocol_fee + creator_fee`.
+    pub fn cost(&self) -> u64 {
+        self.net + self.protocol_fee + self.creator_fee
+    }
+}
+
+/// [`ExactQuoteIn`] (see there); `None` if `net ≤ 1` (no tokens are priced) or `vQ + net − 1`
+/// is zero.
+pub fn pump_exact_quote_in(
+    spendable: u64,
+    vt: u64,
+    vq: u64,
+    fees: &FeeBps,
+) -> Option<ExactQuoteIn> {
+    let bps = 10_000u128;
+    let fee = |n: u64, b: u64| -> u64 {
+        u64::try_from((u128::from(n) * u128::from(b)).div_ceil(bps)).expect("fee")
+    };
+    let mut net = u64::try_from(
+        u128::from(spendable) * bps / (bps + u128::from(fees.protocol) + u128::from(fees.creator)),
+    )
+    .ok()?;
+    let total = net + fee(net, fees.protocol) + fee(net, fees.creator);
+    if total > spendable {
+        net -= total - spendable;
+    }
+    if net <= 1 {
+        return None;
+    }
+    let tokens = u128::from(net - 1) * u128::from(vt) / (u128::from(vq) + u128::from(net - 1));
+    Some(ExactQuoteIn {
+        net,
+        protocol_fee: fee(net, fees.protocol),
+        creator_fee: fee(net, fees.creator),
+        tokens: u64::try_from(tokens).ok()?,
+    })
+}
+
+/// A pump coin's curve accounts (keys; the live state is read on demand).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PumpCurve {
+    pub coin: PumpCoin,
+    pub mint: Pubkey,
+    /// `PDA(pump, ["bonding-curve", mint])`.
+    pub curve: Pubkey,
+    /// `ATA(curve, mint, token_program)` (`associated_bonding_curve`).
+    pub curve_base_ata: Pubkey,
+    /// The mint's program.
+    pub token_program: TokenProgram,
+    /// The v2 instructions' `quote_mint` account: WSOL for a SOL curve, else the curve's quote.
+    pub quote_mint: Pubkey,
+}
+
+impl PumpCurve {
+    /// The curve of `coin`'s mint (keys only; nothing is loaded).
+    pub fn of(coin: PumpCoin) -> Self {
+        let mint = coin.mint();
+        let f = fixture(&format!("pump_{}_mint", coin.role()));
+        let token_program = if f.account.owner == TOKEN_2022_PROGRAM_ID {
+            TokenProgram::Token2022
+        } else {
+            TokenProgram::Spl
+        };
+        let curve = crate::pda::bonding_curve(&mint);
+        let c = pump::read_curve(
+            &pump::PROGRAM,
+            &fixture(&format!("pump_{}_curve", coin.role())).account.data,
+        )
+        .expect("fixture curve");
+        let quote_mint = if c.is_sol_quote() {
+            WSOL_MINT
+        } else {
+            Pubkey::new_from_array(c.quote_mint)
+        };
+        Self {
+            coin,
+            mint,
+            curve,
+            curve_base_ata: crate::pda::ata(&curve, &mint, &token_program.id()),
+            token_program,
+            quote_mint,
+        }
+    }
+
+    /// The curve as the reader sees it now.
+    pub fn state(&self, svm: &LiteSVM) -> pump::BondingCurve {
+        let acc = svm.get_account(&self.curve).expect("curve");
+        pump::read_curve(&acc.owner.to_bytes(), &acc.data).expect("BondingCurve")
+    }
+
+    /// The curve account's data length now.
+    pub fn data_len(&self, svm: &LiteSVM) -> usize {
+        svm.get_account(&self.curve).expect("curve").data.len()
+    }
+
+    /// `(vT, vQ, rT, rQ, complete)` as `shortwin-math`'s `CurveState`.
+    pub fn curve_state(&self, svm: &LiteSVM) -> CurveState {
+        let c = self.state(svm);
+        CurveState {
+            vt: u128::from(c.virtual_token_reserves),
+            vq: u128::from(c.virtual_quote_reserves),
+            rt: u128::from(c.real_token_reserves),
+            rq: u128::from(c.real_quote_reserves),
+            complete: c.complete,
+        }
+    }
+
+    /// The live fees (ARCH §4.2): `fees::pump_curve` on the curve's `(vT, vQ)` with the live
+    /// pump `FeeConfig.fee_tiers` and `Global.creator_fee_configurable` (readers), the curve's
+    /// own `creator_fee_bps` and creator. `None` on a migrated curve (`vT = 0`).
+    pub fn fees(&self, svm: &LiteSVM) -> Option<FeeBps> {
+        let c = self.state(svm);
+        let fc = svm.get_account(&PUMP_FEE_CONFIG).expect("pump FeeConfig");
+        let config = pump::read_fee_config(&fc.owner.to_bytes(), &fc.data).expect("FeeConfig");
+        let tiers: Vec<MathFeeTier> = config
+            .fee_tiers
+            .iter()
+            .map(|t| MathFeeTier {
+                threshold: t.threshold,
+                fees: FeeBps::new(t.fees.lp, t.fees.protocol, t.fees.creator),
+            })
+            .collect();
+        let g = global_data(svm);
+        let global = pump::read_global(&pump::PROGRAM, &g).expect("Global");
+        mfees::pump_curve(
+            u128::from(c.virtual_token_reserves),
+            u128::from(c.virtual_quote_reserves),
+            &CurveFeeSchedule {
+                tiers: &tiers,
+                creator_fee_configurable: global.creator_fee_configurable(),
+                curve_creator_fee_bps: c.creator_fee_bps,
+                creator_is_default: c.creator_is_default(),
+                cap_bps: None,
+            },
+        )
+        .ok()
+    }
+
+    /// What pump charges for an exact-out buy of `q` (`sol_leg::curve_charge_exact_out`,
+    /// `n = ⌊q·vQ/(vT − q)⌋ + 1` plus each fee rounded up, R-PUMP §4): `None` on a complete
+    /// curve (6005), above `rT` (6021) or where the formula is undefined.
+    pub fn charge_buy(&self, svm: &LiteSVM, q: u64) -> Option<BuyQuote> {
+        let s = self.curve_state(svm);
+        if s.complete || u128::from(q) > s.rt {
+            return None;
+        }
+        sol_leg::curve_charge_exact_out(q, s.vt, s.vq, &self.fees(svm)?)
+    }
+
+    /// short.win's own quote of the same buy (`sol_leg::buy_exact_out` with ε₁ = 1, ECON §3.1:
+    /// at most `1 + #fees` lamports above [`PumpCurve::charge_buy`]).
+    pub fn quote_buy(&self, svm: &LiteSVM, q: u64) -> Option<BuyQuote> {
+        let s = self.curve_state(svm);
+        if s.complete || u128::from(q) > s.rt {
+            return None;
+        }
+        sol_leg::buy_exact_out(q, s.vt, s.vq, true, &self.fees(svm)?)
+    }
+
+    /// An exact-in sale of `q` (`sol_leg::sell_exact_in` on `(vT, vQ)`, capped by `rQ`): `None`
+    /// on a complete curve (6005) or where the formula is undefined.
+    pub fn quote_sell(&self, svm: &LiteSVM, q: u64) -> Option<SellQuote> {
+        let s = self.curve_state(svm);
+        if s.complete {
+            return None;
+        }
+        let cap = u64::try_from(s.rq).unwrap_or(u64::MAX);
+        sol_leg::sell_exact_in(q, s.vt, s.vq, &self.fees(svm)?, cap)
+    }
+
+    /// [`pump_exact_quote_in`] on the live state: `None` on a complete curve (6005), above
+    /// `rT` (6021) or where it is undefined.
+    pub fn quote_exact_quote_in(&self, svm: &LiteSVM, spendable: u64) -> Option<ExactQuoteIn> {
+        let c = self.state(svm);
+        if c.complete {
+            return None;
+        }
+        let r = pump_exact_quote_in(
+            spendable,
+            c.virtual_token_reserves,
+            c.virtual_quote_reserves,
+            &self.fees(svm)?,
+        )?;
+        (r.tokens <= c.real_token_reserves).then_some(r)
+    }
+
+    /// `PDA(pump, ["creator-vault", curve.creator])`, re-derived from the live curve.
+    pub fn creator_vault(&self, svm: &LiteSVM) -> Pubkey {
+        pump_creator_vault(&Pubkey::new_from_array(self.state(svm).creator))
+    }
+
+    /// The quote side's token program (Tokenkeg for WSOL and USDC).
+    pub fn quote_token_program(&self) -> Pubkey {
+        TOKEN_PROGRAM_ID
+    }
+
+    /// The v2 trade accounts in the IDL's exact order and flags (R-PUMP §3.5; `idl/pump.json`
+    /// at `pump-public-docs@81091419`): 27 for the buys, 26 for `sell_v2` (no
+    /// `global_volume_accumulator`). `user` signs; `user_base_ata` receives (buys) or supplies
+    /// (sells) the tokens. Every quote-side ATA is only seed-checked for a SOL curve.
+    pub fn v2_accounts(
+        &self,
+        svm: &LiteSVM,
+        kind: PumpV2,
+        user: &Pubkey,
+        user_base_ata: &Pubkey,
+        fee_recipient: &Pubkey,
+        buyback_fee_recipient: &Pubkey,
+    ) -> Vec<AccountMeta> {
+        let qp = self.quote_token_program();
+        let q = self.quote_mint;
+        let ata = |owner: &Pubkey| crate::pda::ata(owner, &q, &qp);
+        let creator_vault = self.creator_vault(svm);
+        let uva = pump_user_volume_accumulator(user);
+        let sharing_config = Pubkey::find_program_address(
+            &[pump::SHARING_CONFIG_SEED, self.mint.as_ref()],
+            &PUMP_FEES_PROGRAM_ID,
+        )
+        .0;
+        let mut v = vec![
+            AccountMeta::new_readonly(PUMP_GLOBAL, false),
+            AccountMeta::new_readonly(self.mint, false),
+            AccountMeta::new_readonly(q, false),
+            AccountMeta::new_readonly(self.token_program.id(), false),
+            AccountMeta::new_readonly(qp, false),
+            AccountMeta::new_readonly(ASSOCIATED_TOKEN_PROGRAM_ID, false),
+            AccountMeta::new(*fee_recipient, false),
+            AccountMeta::new(ata(fee_recipient), false),
+            AccountMeta::new(*buyback_fee_recipient, false),
+            AccountMeta::new(ata(buyback_fee_recipient), false),
+            AccountMeta::new(self.curve, false),
+            AccountMeta::new(self.curve_base_ata, false),
+            AccountMeta::new(ata(&self.curve), false),
+            AccountMeta::new(*user, true),
+            AccountMeta::new(*user_base_ata, false),
+            AccountMeta::new(ata(user), false),
+            AccountMeta::new(creator_vault, false),
+            AccountMeta::new(ata(&creator_vault), false),
+            AccountMeta::new_readonly(sharing_config, false),
+        ];
+        if kind != PumpV2::Sell {
+            v.push(AccountMeta::new_readonly(
+                PUMP_GLOBAL_VOLUME_ACCUMULATOR,
+                false,
+            ));
+        }
+        v.extend([
+            AccountMeta::new(uva, false),
+            AccountMeta::new(ata(&uva), false),
+            AccountMeta::new_readonly(PUMP_FEE_CONFIG, false),
+            AccountMeta::new_readonly(PUMP_FEES_PROGRAM_ID, false),
+            AccountMeta::new_readonly(anchor_lang::system_program::ID, false),
+            AccountMeta::new_readonly(PUMP_EVENT_AUTHORITY, false),
+            AccountMeta::new_readonly(PUMP_PROGRAM_ID, false),
+        ]);
+        v
+    }
+
+    /// A v2 trade instruction: `(disc | a u64 | b u64)` with `a, b` =
+    /// `(amount, max_sol_cost)` / `(amount, min_sol_output)` / `(spendable_quote_in,
+    /// min_tokens_out)`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn v2_ix(
+        &self,
+        svm: &LiteSVM,
+        kind: PumpV2,
+        user: &Pubkey,
+        user_base_ata: &Pubkey,
+        fee_recipient: &Pubkey,
+        buyback_fee_recipient: &Pubkey,
+        a: u64,
+        b: u64,
+    ) -> Instruction {
+        let disc = match kind {
+            PumpV2::Buy => PUMP_BUY_V2,
+            PumpV2::Sell => PUMP_SELL_V2,
+            PumpV2::BuyExactQuoteIn => PUMP_BUY_EXACT_QUOTE_IN_V2,
+        };
+        let mut data = disc.to_vec();
+        data.extend_from_slice(&a.to_le_bytes());
+        data.extend_from_slice(&b.to_le_bytes());
+        Instruction {
+            program_id: PUMP_PROGRAM_ID,
+            accounts: self.v2_accounts(
+                svm,
+                kind,
+                user,
+                user_base_ata,
+                fee_recipient,
+                buyback_fee_recipient,
+            ),
+            data,
+        }
+    }
+}
+
+/// `init_user_volume_accumulator` (`[payer S W, user, uva W, system, event_authority,
+/// program]`, R-PUMP §3.6): anyone can pre-create a user's UVA.
+pub fn pump_init_uva_ix(payer: &Pubkey, user: &Pubkey) -> Instruction {
+    Instruction {
+        program_id: PUMP_PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(*payer, true),
+            AccountMeta::new_readonly(*user, false),
+            AccountMeta::new(pump_user_volume_accumulator(user), false),
+            AccountMeta::new_readonly(anchor_lang::system_program::ID, false),
+            AccountMeta::new_readonly(PUMP_EVENT_AUTHORITY, false),
+            AccountMeta::new_readonly(PUMP_PROGRAM_ID, false),
+        ],
+        data: PUMP_INIT_USER_VOLUME_ACCUMULATOR.to_vec(),
+    }
+}
+
+/// `create_associated_token_account_idempotent(payer, owner, mint, program)`.
+pub fn create_ata_idempotent_ix(
+    payer: &Pubkey,
+    owner: &Pubkey,
+    mint: &Pubkey,
+    program: &Pubkey,
+) -> Instruction {
+    Instruction {
+        program_id: ASSOCIATED_TOKEN_PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(*payer, true),
+            AccountMeta::new(crate::pda::ata(owner, mint, program), false),
+            AccountMeta::new_readonly(*owner, false),
+            AccountMeta::new_readonly(*mint, false),
+            AccountMeta::new_readonly(anchor_lang::system_program::ID, false),
+            AccountMeta::new_readonly(*program, false),
+        ],
+        data: vec![1],
+    }
+}
+
+/// The graduated coin's canonical PumpSwap pool (keys; state read on demand).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PumpPool {
+    pub coin: PumpCoin,
+    pub mint: Pubkey,
+    pub pool: Pubkey,
+    pub base_vault: Pubkey,
+    pub quote_vault: Pubkey,
+    pub lp_mint: Pubkey,
+    /// `PDA(pAMM, ["boost_vault", pool])`.
+    pub boost_vault: Pubkey,
+    /// `ATA(boost_vault, WSOL)` (ARCH §3.12 P5; may be missing).
+    pub boost_vault_ata: Pubkey,
+}
+
+impl PumpPool {
+    /// The canonical pool of `coin` (keys from the pool fixture).
+    pub fn of(coin: PumpCoin) -> Self {
+        let mint = coin.mint();
+        let pool = crate::pda::canonical_pool(&mint);
+        let f = fixture(&format!("pump_{}_pool", coin.role()));
+        assert_eq!(f.address, pool, "the fixture pool is the canonical pool");
+        let p = pump_amm::read_pool(&pump_amm::PROGRAM, &f.account.data).expect("Pool");
+        let boost_vault = Pubkey::find_program_address(
+            &[pump_amm::BOOST_VAULT_SEED, pool.as_ref()],
+            &PUMP_AMM_PROGRAM_ID,
+        )
+        .0;
+        Self {
+            coin,
+            mint,
+            pool,
+            base_vault: Pubkey::new_from_array(p.pool_base_token_account),
+            quote_vault: Pubkey::new_from_array(p.pool_quote_token_account),
+            lp_mint: Pubkey::new_from_array(p.lp_mint),
+            boost_vault,
+            boost_vault_ata: crate::pda::ata(&boost_vault, &WSOL_MINT, &TOKEN_PROGRAM_ID),
+        }
+    }
+
+    /// The pool as the reader sees it now.
+    pub fn state(&self, svm: &LiteSVM) -> pump_amm::Pool {
+        let acc = svm.get_account(&self.pool).expect("pool");
+        pump_amm::read_pool(&acc.owner.to_bytes(), &acc.data).expect("Pool")
+    }
+
+    /// PumpSwap's pricing reserves now (vaults + VQR).
+    pub fn reserves(&self, svm: &LiteSVM) -> Option<pump_amm::PoolReserves> {
+        self.state(svm).reserves(
+            vault_amount(svm, &self.base_vault),
+            vault_amount(svm, &self.quote_vault),
+        )
+    }
+
+    /// The boost vault's WSOL balance as the boost gate reads it (0 if the ATA is missing).
+    pub fn boost_amount(&self, svm: &LiteSVM) -> u64 {
+        let (owner, data) = svm
+            .get_account(&self.boost_vault_ata)
+            .map_or(([0u8; 32], Vec::new()), |a| (a.owner.to_bytes(), a.data));
+        pump_amm::boost_vault_amount(&owner, &data, &self.boost_vault.to_bytes())
+            .expect("boost vault ATA")
+    }
+}
+
+impl Env {
+    /// Deploys pump, pump-fees and PumpSwap from their dumped ProgramData
+    /// ([`load_pump_program`]).
+    pub fn load_pump_programs(&mut self) {
+        for p in PumpProgram::ALL {
+            load_pump_program(&mut self.svm, p);
+        }
+    }
+
+    /// Loads every pump-state account that belongs to no coin role: pump's `Global`, both
+    /// `FeeConfig`s, PumpSwap's `GlobalConfig`, the volume accumulators, the fee, buyback and
+    /// withdraw authorities, WSOL and USDC, PumpSwap's protocol-fee and buyback WSOL ATAs (the
+    /// event authorities were absent at the snapshot and stay so). The dumped Rent sysvar is
+    /// installed by [`Env::set_pump_rent`], not here.
+    pub fn load_pump_statics(&mut self) {
+        let names: Vec<String> = all_pump_fixtures()
+            .filter(|f| f.group == "pump_state" && f.role.is_none() && f.name != "sysvar_rent")
+            .map(|f| f.name.clone())
+            .collect();
+        for name in names {
+            load(&mut self.svm, &name);
+        }
+    }
+
+    /// Installs mainnet's Rent sysvar as dumped with the pump state (`sysvar_rent`: 5,080
+    /// lamports per byte, `minimum_balance(0)` = 650,240; LiteSVM's default is 6,960 / 890,880),
+    /// so the rent pump charges a user — the creator-vault top-up to `minimum_balance(0)`, a UVA
+    /// at `minimum_balance(137)`, a curve's growth to 125 bytes — is mainnet's (T-RENT).
+    pub fn set_pump_rent(&mut self) {
+        self.svm.set_sysvar(&pump_rent());
+    }
+
+    /// Loads every account of `coin`'s role (mint, curve, its token ATA, creator vault, and for
+    /// a graduated coin its pool, vaults, LP mint and boost vault), plus the live creator's
+    /// vault if another role holds it. Returns the curve's keys.
+    pub fn load_pump_coin(&mut self, coin: PumpCoin) -> PumpCurve {
+        let names: Vec<String> = all_pump_fixtures()
+            .filter(|f| f.group == "pump_state" && f.role.as_deref() == Some(coin.role()))
+            .map(|f| f.name.clone())
+            .collect();
+        for name in names {
+            load(&mut self.svm, &name);
+        }
+        let c = PumpCurve::of(coin);
+        let vault = c.creator_vault(&self.svm);
+        load_pump_at(&mut self.svm, &vault);
+        c
+    }
+
+    /// Sets the clock to the pump snapshot's slot and block time.
+    pub fn set_pump_clock(&mut self) {
+        let s = pump_snapshot();
+        self.set_clock(s.block_time, s.slot);
+    }
+
+    /// [`Env::initialized`] (release short.win at the harness's default config, whose venue
+    /// deploy slots are the dumped ones), the three pump programs, the pump statics, `coin`'s
+    /// accounts, mainnet's Rent ([`Env::set_pump_rent`]) and the clock at the pump snapshot.
+    pub fn fork_pump_coin(coin: PumpCoin) -> (Self, PumpCurve) {
+        let mut env = Self::initialized();
+        env.load_pump_programs();
+        env.load_pump_statics();
+        let c = env.load_pump_coin(coin);
+        env.set_pump_rent();
+        env.set_pump_clock();
+        (env, c)
+    }
+
+    /// [`Env::fork_pump_coin`] on the fresh curve.
+    pub fn fork_pump() -> (Self, PumpCurve) {
+        Self::fork_pump_coin(PumpCoin::Fresh)
+    }
+}
+
+// ---- pump scenario builders (byte-level; ARCH §8.2) --------------------------------------------
+
+/// Rewrites a curve's `(vT, vQ, rT, rQ)` (gaps, drains, near-completion states). The curve's
+/// lamports are not adjusted.
+pub fn set_curve_reserves(svm: &mut LiteSVM, curve: &Pubkey, vt: u64, vq: u64, rt: u64, rq: u64) {
+    patch(svm, curve, |d| {
+        put_u64(d, pump::OFF_VIRTUAL_TOKEN_RESERVES, vt);
+        put_u64(d, pump::OFF_VIRTUAL_QUOTE_RESERVES, vq);
+        put_u64(d, pump::OFF_REAL_TOKEN_RESERVES, rt);
+        put_u64(d, pump::OFF_REAL_QUOTE_RESERVES, rq);
+    });
+}
+
+/// Rewrites a curve's `complete` flag.
+pub fn set_curve_complete(svm: &mut LiteSVM, curve: &Pubkey, complete: bool) {
+    patch(svm, curve, |d| d[pump::OFF_COMPLETE] = u8::from(complete));
+}
+
+/// Rewrites a curve's `creator` (pump's `set_creator` / `admin_cto`; the creator vault moves).
+pub fn set_curve_creator(svm: &mut LiteSVM, curve: &Pubkey, creator: &Pubkey) {
+    patch(svm, curve, |d| {
+        d[pump::OFF_CREATOR..pump::OFF_CREATOR + 32].copy_from_slice(creator.as_ref());
+    });
+}
+
+/// Rewrites a curve's per-coin `creator_fee_bps` (a curve of at least 123 bytes).
+pub fn set_curve_creator_fee_bps(svm: &mut LiteSVM, curve: &Pubkey, bps: u64) {
+    patch(svm, curve, |d| put_u64(d, pump::OFF_CREATOR_FEE_BPS, bps));
+}
+
+/// Rewrites pump `Global.creator_fee_configurable`.
+pub fn set_global_creator_fee_configurable(svm: &mut LiteSVM, on: bool) {
+    patch(svm, &PUMP_GLOBAL, |d| {
+        d[pump::OFF_GLOBAL_CREATOR_FEE_CONFIGURABLE] = u8::from(on);
+    });
+}
+
+/// A pump-fees tier `(threshold, [lp, protocol, creator])`.
+pub type TierSpec = (u128, [u64; 3]);
+
+/// Rewrites a pump-fees `FeeConfig` (pump's `8Wf5Ti…` or PumpSwap's `5PHirr…`) as the admin's
+/// `update_fee_config` / `upsert_fee_tiers` would leave it: `flat_fees`, `fee_tiers`,
+/// `stable_fee_tiers`, `exotic_flat_fees` (Borsh), the bump and admin kept, zero-padded to the
+/// allocation.
+pub fn set_fee_config(
+    svm: &mut LiteSVM,
+    key: &Pubkey,
+    flat: [u64; 3],
+    tiers: &[TierSpec],
+    stable: &[TierSpec],
+    exotic: [u64; 3],
+) {
+    patch(svm, key, |d| {
+        let len = d.len();
+        let mut out = d[..pump::OFF_FEE_CONFIG_FLAT_FEES].to_vec();
+        let fees = |out: &mut Vec<u8>, f: [u64; 3]| {
+            for v in f {
+                out.extend_from_slice(&v.to_le_bytes());
+            }
+        };
+        fees(&mut out, flat);
+        for list in [tiers, stable] {
+            out.extend_from_slice(&u32::try_from(list.len()).expect("tiers").to_le_bytes());
+            for (t, f) in list {
+                out.extend_from_slice(&t.to_le_bytes());
+                fees(&mut out, *f);
+            }
+        }
+        fees(&mut out, exotic);
+        assert!(
+            out.len() <= len,
+            "FeeConfig: {} tiers do not fit",
+            tiers.len()
+        );
+        out.resize(len, 0);
+        *d = out;
+    });
+}
+
+/// The tiers of a pump-fees `FeeConfig` in the VM, as [`TierSpec`]s: `(flat, tiers, stable,
+/// exotic)`.
+pub fn fee_config_specs(
+    svm: &LiteSVM,
+    key: &Pubkey,
+) -> ([u64; 3], Vec<TierSpec>, Vec<TierSpec>, [u64; 3]) {
+    let acc = svm.get_account(key).expect("FeeConfig");
+    let c = pump::read_fee_config(&acc.owner.to_bytes(), &acc.data).expect("FeeConfig");
+    let f = |x: pump::Fees| [x.lp, x.protocol, x.creator];
+    let t = |ts: pump::FeeTiers<'_>| ts.iter().map(|t| (t.threshold, f(t.fees))).collect();
+    (
+        f(c.flat_fees),
+        t(c.fee_tiers),
+        t(c.stable_fee_tiers),
+        f(c.exotic_flat_fees),
+    )
+}
+
+/// pump's `TradeEvent` (the fields short.win's tests read; `emit_cpi!`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PumpTradeEvent {
+    pub mint: Pubkey,
+    /// Lamports credited to / debited from the curve (`n` of a buy, `g` of a sale).
+    pub sol_amount: u64,
+    pub token_amount: u64,
+    pub is_buy: bool,
+    pub user: Pubkey,
+    pub timestamp: i64,
+    /// The post-trade `vQ`, `vT`, `rQ`, `rT`.
+    pub virtual_sol_reserves: u64,
+    pub virtual_token_reserves: u64,
+    pub real_sol_reserves: u64,
+    pub real_token_reserves: u64,
+    pub fee_recipient: Pubkey,
+    pub fee_basis_points: u64,
+    /// The protocol fee (including the buyback share).
+    pub fee: u64,
+    pub creator: Pubkey,
+    pub creator_fee_basis_points: u64,
+    pub creator_fee: u64,
+    pub ix_name: String,
+    pub mayhem_mode: bool,
+    pub buyback_fee_basis_points: u64,
+    pub buyback_fee: u64,
+}
+
+/// A Borsh reader over an event body.
+struct Cursor<'a> {
+    b: &'a [u8],
+    o: usize,
+}
+
+impl<'a> Cursor<'a> {
+    fn take(&mut self, n: usize) -> &'a [u8] {
+        let b: &'a [u8] = self.b;
+        let s = &b[self.o..self.o + n];
+        self.o += n;
+        s
+    }
+    fn key(&mut self) -> Pubkey {
+        Pubkey::new_from_array(self.take(32).try_into().expect("key"))
+    }
+    fn u64(&mut self) -> u64 {
+        u64::from_le_bytes(self.take(8).try_into().expect("u64"))
+    }
+    fn i64(&mut self) -> i64 {
+        i64::from_le_bytes(self.take(8).try_into().expect("i64"))
+    }
+    fn bool(&mut self) -> bool {
+        self.take(1)[0] != 0
+    }
+    fn string(&mut self) -> String {
+        let n = u32::from_le_bytes(self.take(4).try_into().expect("len")) as usize;
+        String::from_utf8_lossy(self.take(n)).into_owned()
+    }
+}
+
+/// Every pump `TradeEvent` a transaction emitted (`emit_cpi!`: Borsh after `EVENT_IX_TAG ‖
+/// discriminator`; field order per `idl/pump.json` `types.TradeEvent`).
+pub fn pump_trade_events(meta: &TransactionMetadata) -> Vec<PumpTradeEvent> {
+    crate::events::raw(meta)
+        .iter()
+        .filter_map(|p| p.strip_prefix(&PUMP_TRADE_EVENT[..]))
+        .map(|b| {
+            let mut c = Cursor { b, o: 0 };
+            let mint = c.key();
+            let sol_amount = c.u64();
+            let token_amount = c.u64();
+            let is_buy = c.bool();
+            let user = c.key();
+            let timestamp = c.i64();
+            let virtual_sol_reserves = c.u64();
+            let virtual_token_reserves = c.u64();
+            let real_sol_reserves = c.u64();
+            let real_token_reserves = c.u64();
+            let fee_recipient = c.key();
+            let fee_basis_points = c.u64();
+            let fee = c.u64();
+            let creator = c.key();
+            let creator_fee_basis_points = c.u64();
+            let creator_fee = c.u64();
+            // track_volume, total_unclaimed_tokens, total_claimed_tokens, current_sol_volume,
+            // last_update_timestamp
+            c.take(1 + 8 * 4);
+            let ix_name = c.string();
+            let mayhem_mode = c.bool();
+            c.take(8 * 2); // cashback_fee_basis_points, cashback
+            let buyback_fee_basis_points = c.u64();
+            let buyback_fee = c.u64();
+            PumpTradeEvent {
+                mint,
+                sol_amount,
+                token_amount,
+                is_buy,
+                user,
+                timestamp,
+                virtual_sol_reserves,
+                virtual_token_reserves,
+                real_sol_reserves,
+                real_token_reserves,
+                fee_recipient,
+                fee_basis_points,
+                fee,
+                creator,
+                creator_fee_basis_points,
+                creator_fee,
+                ix_name,
+                mayhem_mode,
+                buyback_fee_basis_points,
+                buyback_fee,
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]

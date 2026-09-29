@@ -30,18 +30,25 @@
 //!    **PROPOSED**: no open on a `P_ema` one transaction chose) —
 //!    and `R_eff ≥ pool_min_real_sol` (`PoolTooThin`; `R_eff` bounded by the locked depth over
 //!    `λ_min`, ARCH §2.6 rule 5). (PumpSwap's `disable_flags` and boost gate arrive with M6.)
+//!    A curve that completed since the last observation moves the market to `PumpMigrating` in
+//!    the prologue's venue sync (ARCH §2.5): the open refuses `VenueMigrating` (`NoRoute` if it
+//!    went `None`), and nothing of it is kept.
 //! 4. Open guards: `now ≥ created_at + market_warmup_s` (`MarketWarmingUp`); `|P_spot/P_ema − 1|
 //!    ≤ open_ema_dev_bps` (`PriceDeviatesFromEma`); `P_ema ≤ P_OPEN_MAX` (`PriceAboveOpenMax`).
 //! 5. Tier (`engine::tier::assign`), cached on the market.
 //! 6. Caps (`engine::caps::check_open`; on Raydium the conservative reserve `X₀` is also
-//!    bounded by the locked depth `pool_d` over `λ_min`, ARCH §4.6): position impact and
+//!    bounded by the locked depth `pool_d` over `λ_min`; on the curve `X₀` and the Tier D
+//!    guard's `rT` are the live ones bounded by the curve at `P_ema`, M5-SEC-3 — ARCH §4.6 said
+//!    the live `vT` and `rT`, which a sale in the same transaction lifts):
+//!    position impact and
 //!    fee-scaled size (`CapPositionImpact`), market OI and fee-scaled OI (`CapMarketOi`),
 //!    utilisation (`CapUtilization`), Tier D gamma (`CapCurveGamma`), wallet (`CapWallet`),
 //!    `q ≤ T` (`InsufficientInventory`).
 //! 7. `S_exp = quote_sell(q)` on the live state.
 //! 8. The sell leg (`crate::venues::sell`) after the trader normalisation, with `min_out =
 //!    max(min_proceeds, ⌊S_exp·(10⁴ − exec_tol_bps)/10⁴⌋)`; `S` measured (`ProceedsBelowMin`
-//!    below it).
+//!    below it). On the curve the leg funds the trader with `ert = exec_rent_tol` from the
+//!    borrower and refunds it: `S` is net of any venue-side rent (ARCH §2.4 rule 3, T-RENT).
 //! 9. The venue state reloaded: `N_open = B̂_spot(q)` on the post-open reserves; `B̂_ema = B̂(q;
 //!    x, y)` of the newest ring entry (post-roll). `N_open ≥ min_notional`
 //!    (`BelowMinNotional`); `total_notional_open + N_open ≤ market_max_notional`
@@ -236,18 +243,26 @@ pub fn handler<'info>(
             },
             &deny,
         )?;
-        let state = venues::read_state(&market, kind, rem.read, clock.unix_timestamp);
+        let state = venues::read_state_boxed(&market, kind, rem.read, clock.unix_timestamp);
         let mut vault = ctx.accounts.market_vault.load()?.vault();
         let pro = prologue::run(
             &config,
             &market_key,
             &mut market,
             &mut vault,
-            Some(state),
+            Some(&*state),
             clock.unix_timestamp,
             clock.slot,
         )?;
         let now = pro.now;
+        // The venue sync moved the market off its venue (a curve that completed): no open.
+        if let Some(t) = pro.transition {
+            return if t.to == VenueKind::PumpMigrating {
+                err!(ShortwinError::VenueMigrating)
+            } else {
+                err!(ShortwinError::NoRoute)
+            };
+        }
 
         // Step 3: venue guards.
         guard::latch(&*ctx.accounts.venue_guard.load()?, kind)?;
@@ -316,7 +331,7 @@ pub fn handler<'info>(
                 tokens_free: pro.pool.tokens_free,
                 borrowed_q: pro.pool.borrowed_q,
                 wallet_q: ctx.accounts.exposure.q_open,
-                curve: None,
+                curve: curve_cap(&state, p_spot)?,
             },
             &tp,
             &config.params,
@@ -381,33 +396,42 @@ pub fn handler<'info>(
             &m,
             accs.trader.to_account_info(),
             accs.market_vault.to_account_info(),
-            accs.system_program.to_account_info(),
             rem.trade,
+            venues::Named {
+                system_program: accs.system_program.to_account_info(),
+                pool_vault: accs.pool_vault.to_account_info(),
+                mint: accs.mint.to_account_info(),
+                decimals: accs.mint.decimals,
+                token_program: accs.token_program.to_account_info(),
+            },
         )?;
         (t, venues::raydium::sol_first(&m))
     };
     let swept = trader.normalise()?;
-    if swept > 0 {
-        pool::sweep(
-            &mut pool,
-            &mut vault,
-            None,
-            now,
-            config.params.lump_vest_s,
-            swept,
-            SweepSource::Trader,
-        )
-        .math()?;
+    if swept.any() {
+        if swept.lamports > 0 {
+            pool::sweep(
+                &mut pool,
+                &mut vault,
+                None,
+                now,
+                config.params.lump_vest_s,
+                swept.lamports,
+                SweepSource::Trader,
+            )
+            .math()?;
+        }
         emit_cpi!(TraderSwept {
             market: market_key,
             slot: clock.slot,
             ts: clock.unix_timestamp,
-            lamports: swept,
-            tokens: 0,
+            lamports: swept.lamports,
+            tokens: swept.tokens,
             to: SWEEP_TO_VEST,
             wipe_bits: 0,
         });
     }
+    let ert = venues::effective_ert(kind, config.params.exec_rent_tol);
     let leg = Leg {
         kind,
         market: accs.market.to_account_info(),
@@ -417,6 +441,7 @@ pub fn handler<'info>(
         decimals: accs.mint.decimals,
         token_program: accs.token_program.to_account_info(),
         sol_first,
+        ert,
         trader,
         read: rem.read,
         trade: rem.trade,
@@ -431,7 +456,7 @@ pub fn handler<'info>(
     // ---- step 9: the post-open state, notional ---------------------------------------------
     let post = {
         let m = accs.market.load()?;
-        venues::read_state(&m, kind, rem.read, clock.unix_timestamp)
+        venues::read_state_boxed(&m, kind, rem.read, clock.unix_timestamp)
     };
     let n_open = post.buy(q).ok_or(ShortwinError::VenueResultMismatch)?.cost;
     let b_ema = post.buy_at(q, ema_xy.0, ema_xy.1).map(|b| b.cost);
@@ -497,7 +522,6 @@ pub fn handler<'info>(
     };
     let r_min =
         rent::min_rent(q, p_ema, &tp.to_math().rate, util_pre, kink, tp.min_rent_s).math()?;
-    let ert = venues::effective_ert(kind, config.params.exec_rent_tol);
     let position_bump = ctx.bumps.position;
     let exposure_bump = ctx.bumps.exposure;
     let pos = &mut ctx.accounts.position;
@@ -593,4 +617,20 @@ pub fn handler<'info>(
         venue_rent: 0,
     });
     Ok(())
+}
+
+/// The curve caps' input (ARCH §4.6; M5-SEC-3, `engine::caps::curve_reserves`): the live curve
+/// before the open and its spot; `None` off the curve.
+fn curve_cap(state: &venues::VenueState, p_spot: u128) -> Result<Option<engine_caps::CurveCap>> {
+    let to_u64 = |v: u128| u64::try_from(v).map_err(|_| error!(ShortwinError::MathOverflow));
+    match (state.kind, state.curve.as_ref()) {
+        (VenueKind::PumpCurve, Some(c)) => Ok(Some(engine_caps::CurveCap {
+            vt: to_u64(c.live.vt)?,
+            vq: to_u64(c.live.vq)?,
+            rt: to_u64(c.live.rt)?,
+            p_spot,
+        })),
+        (VenueKind::PumpCurve, None) => err!(ShortwinError::NoRoute),
+        _ => Ok(None),
+    }
 }

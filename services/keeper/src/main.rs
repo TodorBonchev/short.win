@@ -2,8 +2,13 @@
 //!
 //! ```text
 //! shortwin-keeper --rpc <url> --keypair <file> [--config keeper.toml] [--tick-ms 400]
-//!                 [--metrics 127.0.0.1:9464] [--discovery-rpc <url>] [--once]
+//!                 [--metrics 127.0.0.1:9464] [--discovery-rpc <url>] [--block-engine <url>]
+//!                 [--once]
 //! ```
+//!
+//! `--block-engine` (or `graduation.block_engine`) sends the straddle bundles (duty 6, ARCH §5.4)
+//! to a Jito block engine, e.g. `https://mainnet.block-engine.jito.wtf`; without one they are not
+//! sent (the keeper alerts and calls `sol_settle` instead).
 //!
 //! `--discovery-rpc` (or `pool_select.discovery_rpc` in the configuration) sends the Raydium
 //! pool discovery's `getProgramAccounts` calls to another endpoint (duty 12).
@@ -28,12 +33,13 @@ struct Args {
     tick_ms: u64,
     metrics: Option<String>,
     discovery_rpc: Option<String>,
+    block_engine: Option<String>,
     once: bool,
 }
 
 fn usage() -> &'static str {
     "usage: shortwin-keeper --rpc <url> --keypair <file> [--config keeper.toml] [--tick-ms 400] \
-     [--metrics 127.0.0.1:9464] [--discovery-rpc <url>] [--once]"
+     [--metrics 127.0.0.1:9464] [--discovery-rpc <url>] [--block-engine <url>] [--once]"
 }
 
 fn parse_args() -> anyhow::Result<Args> {
@@ -43,6 +49,7 @@ fn parse_args() -> anyhow::Result<Args> {
     let mut tick_ms = 400;
     let mut metrics = None;
     let mut discovery_rpc = None;
+    let mut block_engine = None;
     let mut once = false;
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
@@ -57,6 +64,7 @@ fn parse_args() -> anyhow::Result<Args> {
             "--tick-ms" => tick_ms = val()?.parse().context("--tick-ms")?,
             "--metrics" => metrics = Some(val()?),
             "--discovery-rpc" => discovery_rpc = Some(val()?),
+            "--block-engine" => block_engine = Some(val()?),
             "--once" => once = true,
             "-h" | "--help" => bail!("{}", usage()),
             other => bail!("unknown argument {other}\n{}", usage()),
@@ -69,6 +77,7 @@ fn parse_args() -> anyhow::Result<Args> {
         tick_ms,
         metrics,
         discovery_rpc,
+        block_engine,
         once,
     })
 }
@@ -112,7 +121,15 @@ async fn main() -> anyhow::Result<()> {
     };
     let payer = read_keypair_file(&args.keypair)
         .map_err(|e| anyhow::anyhow!("reading {}: {e}", args.keypair))?;
-    let chain = RpcChain::new(args.rpc.clone());
+    let mut chain = RpcChain::new(args.rpc.clone());
+    let engine = args
+        .block_engine
+        .clone()
+        .or_else(|| cfg.graduation.block_engine().map(str::to_string));
+    if let Some(url) = &engine {
+        tracing::info!(%url, "Jito block engine (straddle bundles)");
+        chain = chain.with_block_engine(url);
+    }
     let discovery = args
         .discovery_rpc
         .clone()

@@ -8,6 +8,9 @@ publish.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+# Jito `sendBundle` (the straddle bundle, ARCH §5.4): base64 transactions in a JSON-RPC body.
+base64.workspace = true
+serde_json.workspace = true
 bs58.workspace = true
 tokio.workspace = true
 solana-rpc-client.workspace = true

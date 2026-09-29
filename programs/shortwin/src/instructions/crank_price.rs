@@ -5,9 +5,22 @@
 //!
 //! **Accounts:** `config`, `market` (mut), `mint`, `oracle_cache` (read), event accounts.
 //! **Remaining:** the venue's `ReadSet`; for a list-only (`None`) market the detection set
-//! `[bonding_curve, canonical_pool]` (key-checked). ARCH §2.5's `None` row: the pump
-//! re-detection (a pump venue found → that venue) arrives with the pump adapters (M5 / M6); a
-//! Raydium pool is adopted through `propose_pool` (M4), never here.
+//! `[bonding_curve, canonical_pool]` (key-checked); a `PumpMigrating` market its curve's ReadSet.
+//!
+//! **Venue transitions** (ARCH §2.5): the prologue's venue sync moves a curve market to
+//! `PumpMigrating` when its curve completes and to `None` when it completed with zeroed reserves
+//! and no canonical pool (`venues::pump_curve::sync`); on a list-only market this instruction
+//! re-runs `classify_pump` on the detection set and moves it onto a pump venue it finds (M5: a
+//! live curve → `PumpCurve`, a migrating one → `PumpMigrating`; a canonical pool → `PumpSwap`
+//! is M6's, the market stays `None` until then): the curve cache is derived, the price state
+//! starts at the curve's spot (or, on a market that already has one, its liquidity is rewritten
+//! to the curve's, A72), the route chains restart, the tier is D, and a Raydium collection window
+//! is cleared (`fp_*`; M4's carry-over: pump venues take precedence, D1). A detection that cannot
+//! classify (a mayhem or non-SOL curve, a curve account that does not parse) leaves the market
+//! as it is: a crank never reverts on venue state. The trader's pump UVA and `trader_base_ata`
+//! are not created here (no payer): opens refuse `VenueAccountMismatch` / `TraderStateInvalid`
+//! until someone creates them (both are permissionless). A Raydium pool is adopted through
+//! `propose_pool` (M4), never here.
 //!
 //! **Never reverts on a venue-state account that no longer parses** (A63, V1-8): a correctly
 //! keyed account whose owner, discriminator or layout changed makes the venue "not
@@ -21,18 +34,21 @@
 //! `open_short`'s `S > 0` rule), so the rent credit is 0; the vest never runs with `S = 0`
 //! (`pool::release` refuses it as an invariant break).
 //!
-//! **Events:** `PriceCranked`, plus `RouteChainChanged` when a chain started or cleared.
+//! **Events:** `PriceCranked`, plus `RouteChainChanged` when a chain started or cleared and
+//! `VenueStateChanged` on a venue transition.
 
 use anchor_lang::prelude::*;
 use shortwin_math::pool::Vault;
 use shortwin_math::rent;
 
 use crate::constants::{CONFIG_VERSION, MARKET_VERSION};
-use crate::engine::{prologue, tier as engine_tier};
+use crate::engine::{observe, pool_select, prologue, tier as engine_tier};
 use crate::errors::{MathResultExt, ShortwinError};
 use crate::events::{PriceCranked, RouteChainChanged};
 use crate::state::{GlobalConfig, Market, OracleCache, VenueKind};
-use crate::venues::{self, Carry, VenueState};
+use crate::venues::detect::{self, PumpClass};
+use crate::venues::pump_curve::{self, Transition};
+use crate::venues::{self, Carry};
 
 #[event_cpi]
 #[derive(Accounts)]
@@ -70,25 +86,8 @@ pub fn handler<'info>(ctx: Context<'info, CrankPrice<'info>>) -> Result<()> {
         ShortwinError::AccountMismatch
     );
     let kind = market.venue_kind().ok_or(ShortwinError::NoSupportedVenue)?;
-    let state = if kind == VenueKind::None {
-        let [bc, cp] = ctx.remaining_accounts else {
-            return err!(ShortwinError::BadRemainingAccounts);
-        };
-        require_keys_eq!(
-            bc.key(),
-            market.bonding_curve,
-            ShortwinError::VenueAccountMismatch
-        );
-        require_keys_eq!(
-            cp.key(),
-            market.canonical_pool,
-            ShortwinError::VenueAccountMismatch
-        );
-        VenueState::not_executable(kind)
-    } else {
-        let rem = venues::parse(&market, kind, ctx.remaining_accounts, Carry::ReadSet, &[])?;
-        venues::read_state(&market, kind, rem.read, clock.unix_timestamp)
-    };
+    let rem = venues::parse(&market, kind, ctx.remaining_accounts, Carry::ReadSet, &[])?;
+    let state = venues::read_state_boxed(&market, kind, rem.read, clock.unix_timestamp);
 
     let mut scratch = Box::new(Vault::new());
     let pro = prologue::run(
@@ -96,7 +95,7 @@ pub fn handler<'info>(ctx: Context<'info, CrankPrice<'info>>) -> Result<()> {
         &market_key,
         &mut market,
         &mut scratch,
-        Some(state),
+        Some(&*state),
         clock.unix_timestamp,
         clock.slot,
     )?;
@@ -104,6 +103,12 @@ pub fn handler<'info>(ctx: Context<'info, CrankPrice<'info>>) -> Result<()> {
         scratch.lender_sol == 0 && scratch.protocol_fees == 0 && scratch.unmatched == 0,
         ShortwinError::MathOverflow
     );
+    let mut transition = pro.transition;
+    if kind == VenueKind::None {
+        if let [bc, cp] = rem.read {
+            transition = redetect(&mut market, bc, cp, pro.now)?.or(transition);
+        }
+    }
 
     if let Some(tier) = engine_tier::assign(
         &config,
@@ -143,11 +148,72 @@ pub fn handler<'info>(ctx: Context<'info, CrankPrice<'info>>) -> Result<()> {
         pool_fail_since: market.pool_fail_since,
         last_pool_fail_obs: market.last_pool_fail_obs,
     };
+    let changed = transition.map(|t| pump_curve::transition_event(&market, t, market_key, &clock));
     drop(market);
     drop(config);
+    if let Some(ev) = changed {
+        emit_cpi!(ev);
+    }
     emit_cpi!(event);
     if pro.chains_changed {
         emit_cpi!(chains);
     }
     Ok(())
+}
+
+/// ARCH §2.5 `None` row, M5 part (module docs): `classify_pump` on the key-checked detection set
+/// and, for a live or migrating curve, the move onto it. Returns the transition, if any; a
+/// detection that cannot classify changes nothing (never a revert).
+#[inline(never)]
+fn redetect(
+    market: &mut Market,
+    bc: &AccountInfo,
+    cp: &AccountInfo,
+    now: i64,
+) -> Result<Option<Transition>> {
+    let authority = detect::pool_authority_of(market);
+    let Ok(class) = detect::classify_pump_with(bc, cp, &market.mint, &authority) else {
+        return Ok(None);
+    };
+    let to = match class {
+        PumpClass::PumpCurve => VenueKind::PumpCurve,
+        PumpClass::PumpMigrating => VenueKind::PumpMigrating,
+        // M6 (the PumpSwap adapter); nothing to move onto. A canonical-pool account that does
+        // not read as a valid pool (M5-SEC-5) is a pump venue short.win cannot read: the market
+        // stays list-only, and `propose_pool` / `execute_pool_switch` keep Raydium out (D1).
+        PumpClass::PumpSwap
+        | PumpClass::PumpPoolUnreadable
+        | PumpClass::GraduatedElsewhere
+        | PumpClass::NotPump => return Ok(None),
+    };
+    let Some(curve) = pump_curve::parse_curve(bc) else {
+        return Ok(None);
+    };
+    let Some((p, l)) = pump_curve::spot(&curve) else {
+        return Ok(None);
+    };
+    pump_curve::write_cache(market, &Pubkey::new_from_array(curve.creator));
+    let priced = market.ring_count > 0 && market.ema_price.get() > 0;
+    let mut obs = market.observation();
+    if priced {
+        observe::rewrite_liquidity(&mut obs, l, shortwin_math::observe::VenueChange::Graduation)?;
+    } else {
+        *obs = shortwin_math::observe::Observation::new(now, p, l).math()?;
+    }
+    market.set_observation(&obs);
+    market.venue = to as u8;
+    if to == VenueKind::PumpMigrating {
+        market.migration_seen_at = now;
+    }
+    market.tier = shortwin_math::tier::Tier::D as u8;
+    market.tier_computed_at = now;
+    market.no_route_since = 0;
+    market.last_no_route_obs = 0;
+    market.pool_fail_since = 0;
+    market.last_pool_fail_obs = 0;
+    pool_select::clear_window(market);
+    Ok(Some(Transition {
+        from: VenueKind::None,
+        to,
+    }))
 }

@@ -14,7 +14,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::bpf_loader_upgradeable;
 
 use crate::constants::{
-    CONFIG_VERSION, VENUE_BITS_KNOWN, VENUE_EXTRAS_VERSION, VENUE_GUARD_VERSION,
+    CONFIG_VERSION, VENUE_BITS_ENABLEABLE, VENUE_EXTRAS_VERSION, VENUE_GUARD_VERSION,
 };
 use crate::errors::ShortwinError;
 use crate::state::{
@@ -110,8 +110,10 @@ pub fn handler(ctx: Context<InitializeConfig>, args: InitConfigArgs) -> Result<(
         Pubkey::default(),
         ShortwinError::InvalidParams
     );
+    // Known bits only, and none whose lifecycle this build cannot finish (M5-SEC-4: the pump
+    // curve until M6's `→ PumpSwap` transition; `constants::VENUE_BITS_UNFINISHED`).
     require!(
-        args.venue_enabled & !VENUE_BITS_KNOWN == 0,
+        args.venue_enabled & !VENUE_BITS_ENABLEABLE == 0,
         ShortwinError::InvalidParams
     );
     validate_param_set(&param_set(

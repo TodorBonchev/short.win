@@ -33,6 +33,10 @@
 //!   ([`pool_select::plant_v4`], [`pool_select::plant_cpmm`]) that the dumped ELFs trade.
 //! - [`lp`]: a liquidity provider on a CPMM pool of the fork (the dumped program's own
 //!   `deposit` / `withdraw`; M4F-1's deposit-wrapped cranks).
+//! - [`pump`]: pump-curve **markets** on the fork (M5): [`Env::pump_market`]
+//!   (`create_market(Auto)` on a dumped live curve, lender, warm-up), [`pump::PumpMarket`]
+//!   (implements [`engine::VenueMarket`]: the curve ReadSet C0–C6 and TradeExtras T0–T19),
+//!   curve users, `sweep_trader`'s token leg.
 //!
 //! Agave line: LiteSVM 0.16.0 on the 4.2.2 runtime crates, pinned in the workspace lockfile
 //! (C1-14; `Cargo.toml` of this crate).
@@ -55,6 +59,7 @@ pub mod lp;
 pub mod mock;
 pub mod pda;
 pub mod pool_select;
+pub mod pump;
 pub mod raydium;
 pub mod read;
 pub mod tokens;

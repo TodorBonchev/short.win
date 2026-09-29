@@ -21,11 +21,8 @@
 //! | `mock_cpamm` | TEST-ONLY mock venue pool (feature `test-venue`; never in a release build, A49) | M2 |
 //! | [`raydium_v4`] | Raydium AMM v4 `AmmInfo`: reserves, the route predicate, the fee in ppm, λ | M3 |
 //! | [`raydium_cpmm`] | Raydium CPMM `PoolState` / `AmmConfig`: reserves, the route predicate, fees, λ, the `T_CLAMP` age | M3 |
-//! | [`pump`] | pump `BondingCurve` (the detection subset of `classify_pump`: D1 precedence at a Raydium listing) | M3; the curve adapter's fields with M5 |
-//! | [`pump_amm`] | PumpSwap `Pool` (the canonical-pool test of `classify_pump`) | M3; the PumpSwap adapter's fields with M6 |
-//!
-//! The other pump readers (pump `Global`, pump-fees `FeeConfig`, PumpSwap `GlobalConfig`)
-//! arrive with their venue milestones (ARCH §9 M5–M6).
+//! | [`pump`] | pump `BondingCurve` (every layout: 49, 115, 125, 150 and 151 bytes; the lifecycle helpers), pump `Global` (a borrowed view: the fee and buyback recipient lists, `pool_migration_fee`, `creator_fee_configurable`), pump-fees `FeeConfig` (`FeeTiers::select`, differentially equal to `fees::fee_tier`; also PumpSwap's), the user volume accumulator | M3 (the detection subset of `classify_pump`); full readers M5 (the curve adapter) |
+//! | [`pump_amm`] | PumpSwap `Pool` (the canonical-pool test of `classify_pump`; `reserves` with a **signed** `virtual_quote_reserves`, effective = vault + VQR in `[0, u64::MAX]`, from 2026-09-30), PumpSwap `GlobalConfig` (a borrowed view; `disable_flags` raw), the boost vault's amount | M3 (detection); M5 (`B̂_str`'s post-migration pool schedule); the PumpSwap adapter's use with M6 |
 #![no_std]
 #![forbid(unsafe_code)]
 #![deny(

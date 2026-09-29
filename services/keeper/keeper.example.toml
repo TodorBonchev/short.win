@@ -94,3 +94,35 @@ discovery_rpc = ""
 # a tick) and evaluates only the best max_candidates each tick.
 max_candidates = 8
 rank_keys_per_tick = 200
+
+[graduation]
+# Duty 6 (ARCH §5.1, §5.4, §7.1): call pump migrate_v2 top-level as soon as a covered market's curve
+# completes (ADOPTED Q16), alone in its transaction. Suspended until M6 (M5-SEC-4): without the
+# -> PumpSwap transition a migrated curve's market is no longer observed and its exits pause for good.
+migrate = false
+# The straddle bundle for a liquidatable position whose Q exceeds the curve's real tokens rT:
+# tx1 complete_curve (the complete-curve helper reads rT at execution), tx2 migrate_v2, tx3 the exit
+# on the new pool (M6). Needs a Jito block engine.
+straddle = true
+# Send tx1 + tx2 without an exit transaction (ARCH §5.4's keeper fallback). M5 has no tx3 and keeps
+# a migrated curve PumpMigrating (exits pause, S3 after the migration pause): off until M6.
+send_without_exit = false
+# complete_curve's max_sol_cost above the keeper's quote of the rT it read (bps), and the most the
+# keeper spends completing one curve (lamports; it keeps the tokens it buys).
+complete_slippage_bps = 500
+max_complete_lamports = 20000000000
+# The Jito tip the bundle's last transaction pays (lamports), to these accounts in turn.
+tip_lamports = 100000
+tip_accounts = [
+  "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+  "HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe",
+  "Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY",
+  "ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49",
+  "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+  "ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt",
+  "DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL",
+  "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT",
+]
+# The block engine bundles go to (e.g. "https://mainnet.block-engine.jito.wtf"); empty: none. The
+# binary's --block-engine overrides it.
+block_engine = ""

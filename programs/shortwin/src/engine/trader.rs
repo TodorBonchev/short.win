@@ -23,6 +23,12 @@
 //!   lamports − rent` (no `SyncNative`).
 //! - `ATA(trader, WSOL)` is never used by a leg; `sweep_trader` closes it ([`close_trader_ata`];
 //!   built in M2 instead of M6, M2-SEC-4).
+//! - **Pump venues** (M5: the curve) trade through `trader_base_ata = ATA(trader, mint)` instead of
+//!   `trader_wsol` (ARCH §2.4.1 PumpCurve row: the curve pays and credits native lamports). Anyone
+//!   can send tokens to it, so the normalisation also moves every token it holds to `pool_vault`
+//!   (a donation: `T` is unchanged, I1 tolerates it) after checking that only the trader could have
+//!   set its owner, delegate and close authority ([`BaseSide`]; `sweep_trader`'s token leg is
+//!   [`sweep_base_ata`]).
 //! - Post-conditions assert **deltas and authorities**, never that an account a third party can
 //!   create does not exist ([`TraderAccounts::post_conditions`], I7).
 
@@ -30,7 +36,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::instruction::AccountMeta;
 use anchor_lang::solana_program::program::invoke_signed;
 use anchor_lang::system_program::{self, Allocate, Assign, Transfer};
-use anchor_spl::token_interface::{self, CloseAccount, InitializeAccount3};
+use anchor_spl::token_interface::{self, CloseAccount, InitializeAccount3, TransferChecked};
 use shortwin_venue_state::token_account::{self, TokenAccount};
 
 use crate::constants::TOKEN_PROGRAM_ID;
@@ -49,22 +55,59 @@ pub enum Funding<'a, 'info> {
     Position(&'a AccountInfo<'info>),
 }
 
-/// The trader-side accounts of a venue leg.
+/// The WSOL side of a leg (PumpSwap, Raydium, the mock): the ephemeral `trader_wsol` address,
+/// the WSOL mint and SPL Token.
 #[derive(Clone)]
-pub struct TraderAccounts<'info> {
-    /// The market PDA the two trader PDAs derive from.
-    pub market: Pubkey,
-    pub trader: AccountInfo<'info>,
-    pub trader_bump: u8,
+pub struct WsolSide<'info> {
     pub trader_wsol: AccountInfo<'info>,
     pub trader_wsol_bump: u8,
-    /// Receives swept lamports.
-    pub market_vault: AccountInfo<'info>,
-    pub system_program: AccountInfo<'info>,
     /// The SPL Token native mint (WSOL).
     pub wsol_mint: AccountInfo<'info>,
     /// SPL Token (`Tokenkeg`), the WSOL side's program.
     pub wsol_token_program: AccountInfo<'info>,
+}
+
+/// The token side of a pump-venue leg (ARCH §2.4 rule 2, pump venues): `trader_base_ata =
+/// ATA(trader, mint, market.token_program)` (key-checked against the market by the adapter), the
+/// pool vault that receives what it holds, the base mint and its program.
+#[derive(Clone)]
+pub struct BaseSide<'info> {
+    pub trader_base_ata: AccountInfo<'info>,
+    pub pool_vault: AccountInfo<'info>,
+    pub mint: AccountInfo<'info>,
+    pub decimals: u8,
+    pub token_program: AccountInfo<'info>,
+}
+
+/// The trader-side accounts of a venue leg.
+#[derive(Clone)]
+pub struct TraderAccounts<'info> {
+    /// The market PDA the trader PDAs derive from.
+    pub market: Pubkey,
+    pub trader: AccountInfo<'info>,
+    pub trader_bump: u8,
+    /// Receives swept lamports.
+    pub market_vault: AccountInfo<'info>,
+    pub system_program: AccountInfo<'info>,
+    /// The WSOL side (PumpSwap, Raydium, the mock); `None` on the curve.
+    pub wsol: Option<WsolSide<'info>>,
+    /// The token side of the pump venues (`trader_base_ata`); `None` on Raydium and the mock.
+    pub base: Option<BaseSide<'info>>,
+}
+
+/// What a leg's normalisation moved (ARCH §2.4 rule 2): lamports into `market_vault` (a lender
+/// lump) and tokens of `trader_base_ata` into `pool_vault` (a donation).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Swept {
+    pub lamports: u64,
+    pub tokens: u64,
+}
+
+impl Swept {
+    /// Whether anything moved (the caller emits `TraderSwept` then).
+    pub const fn any(&self) -> bool {
+        self.lamports > 0 || self.tokens > 0
+    }
 }
 
 /// A token account's fields (`AccountMismatch` if it does not parse).
@@ -177,25 +220,139 @@ pub fn close_trader_ata<'info>(
     Ok(lamports)
 }
 
+/// ARCH §2.4 rule 2 for a pump venue's token side (and `sweep_trader`'s token leg, ARCH §3.9):
+/// `trader_base_ata` must be a token account of the market's mint under its program, owned by
+/// `trader`, with no delegate and no close authority (only the trader could set them), else
+/// `TraderStateInvalid`; every token it holds moves to `pool_vault` (`transfer_checked`, the
+/// trader signing). Returns the tokens moved. A base ATA that does not exist yet is
+/// `TraderStateInvalid` too: the pump venues create it at listing (or the keeper at a transition)
+/// and a leg cannot run without it.
+pub fn sweep_base_ata<'info>(
+    market: &Pubkey,
+    trader: &AccountInfo<'info>,
+    trader_bump: u8,
+    base: &BaseSide<'info>,
+) -> Result<u64> {
+    let t = base_ata_state(trader, base)?;
+    if t.amount == 0 {
+        return Ok(0);
+    }
+    let bump = [trader_bump];
+    let seeds: &[&[u8]] = &[TRADER_SEED, market.as_ref(), &bump];
+    token_interface::transfer_checked(
+        CpiContext::new_with_signer(
+            base.token_program.key(),
+            TransferChecked {
+                from: base.trader_base_ata.clone(),
+                mint: base.mint.clone(),
+                to: base.pool_vault.clone(),
+                authority: trader.clone(),
+            },
+            &[seeds],
+        ),
+        t.amount,
+        base.decimals,
+    )?;
+    Ok(t.amount)
+}
+
+/// The fields of `trader_base_ata`, checked as [`sweep_base_ata`] says (`TraderStateInvalid`).
+pub fn base_ata_state(trader: &AccountInfo, base: &BaseSide) -> Result<TokenAccount> {
+    require_keys_eq!(
+        *base.trader_base_ata.owner,
+        base.token_program.key(),
+        ShortwinError::TraderStateInvalid
+    );
+    let t = token_state(&base.trader_base_ata)
+        .map_err(|_| error!(ShortwinError::TraderStateInvalid))?;
+    require!(
+        t.mint == base.mint.key.to_bytes()
+            && t.owner == trader.key.to_bytes()
+            && t.delegate.is_none()
+            && t.close_authority.is_none()
+            && !t.frozen,
+        ShortwinError::TraderStateInvalid
+    );
+    Ok(t)
+}
+
+/// Moves every lamport of the System-owned, data-less `trader` to `market_vault` (the trader
+/// signs; `TraderStateInvalid` if it carries data or is not System-owned). Returns the lamports.
+fn sweep_trader_lamports<'info>(
+    market: &Pubkey,
+    trader: &AccountInfo<'info>,
+    trader_bump: u8,
+    market_vault: &AccountInfo<'info>,
+    system_program: &AccountInfo<'info>,
+) -> Result<u64> {
+    require!(is_system_empty(trader), ShortwinError::TraderStateInvalid);
+    let from_trader = trader.lamports();
+    if from_trader > 0 {
+        let bump = [trader_bump];
+        let seeds: &[&[u8]] = &[TRADER_SEED, market.as_ref(), &bump];
+        system_program::transfer(
+            CpiContext::new_with_signer(
+                system_program.key(),
+                Transfer {
+                    from: trader.clone(),
+                    to: market_vault.clone(),
+                },
+                &[seeds],
+            ),
+            from_trader,
+        )?;
+    }
+    Ok(from_trader)
+}
+
 impl<'info> TraderAccounts<'info> {
     /// The rent-exempt minimum of a WSOL account.
     pub fn wsol_rent() -> Result<u64> {
         lamports::rent_min(WSOL_ACCOUNT_LEN)
     }
 
-    /// ARCH §2.4 rule 2, the normalisation (C0-3, C1-3): [`normalise_pdas`] on this leg's
-    /// trader PDAs. Returns the lamports moved; the caller books them as a lender lump and
-    /// emits `TraderSwept`.
-    pub fn normalise(&self) -> Result<u64> {
-        normalise_pdas(&TraderPdas {
-            market: self.market,
-            trader: self.trader.clone(),
-            trader_bump: self.trader_bump,
-            trader_wsol: self.trader_wsol.clone(),
-            trader_wsol_bump: self.trader_wsol_bump,
-            market_vault: self.market_vault.clone(),
-            system_program: self.system_program.clone(),
-        })
+    /// The WSOL side (`BadRemainingAccounts` on a venue without one: a programming error, the
+    /// adapters of the WSOL venues always build it).
+    pub fn wsol(&self) -> Result<&WsolSide<'info>> {
+        self.wsol
+            .as_ref()
+            .ok_or_else(|| error!(ShortwinError::BadRemainingAccounts))
+    }
+
+    /// The ephemeral `trader_wsol` (WSOL venues).
+    pub fn trader_wsol(&self) -> Result<&AccountInfo<'info>> {
+        Ok(&self.wsol()?.trader_wsol)
+    }
+
+    /// ARCH §2.4 rule 2, the normalisation (C0-3, C1-3), before any funding: the WSOL venues'
+    /// [`normalise_pdas`] (the `trader` and `trader_wsol` lamports into `market_vault`); the pump
+    /// venues' `trader` lamports into `market_vault` and `trader_base_ata`'s tokens into
+    /// `pool_vault` ([`sweep_base_ata`]). The caller books the lamports as a lender lump (the
+    /// tokens are a donation: `T` unchanged) and emits `TraderSwept`.
+    pub fn normalise(&self) -> Result<Swept> {
+        let lamports = match &self.wsol {
+            Some(w) => normalise_pdas(&TraderPdas {
+                market: self.market,
+                trader: self.trader.clone(),
+                trader_bump: self.trader_bump,
+                trader_wsol: w.trader_wsol.clone(),
+                trader_wsol_bump: w.trader_wsol_bump,
+                market_vault: self.market_vault.clone(),
+                system_program: self.system_program.clone(),
+            })?,
+            None => sweep_trader_lamports(
+                &self.market,
+                &self.trader,
+                self.trader_bump,
+                &self.market_vault,
+                &self.system_program,
+            )?,
+        };
+        let tokens = match &self.base {
+            Some(b) => sweep_base_ata(&self.market, &self.trader, self.trader_bump, b)?,
+            None => 0,
+        };
+        Ok(Swept { lamports, tokens })
     }
 
     /// Creates `trader_wsol` holding `amount` wrapped lamports (A5; grief-proof, module docs):
@@ -203,12 +360,13 @@ impl<'info> TraderAccounts<'info> {
     /// then `InitializeAccount3(WSOL, owner = trader)`. Must follow [`Self::normalise`] in the
     /// same instruction (the address then holds 0 lamports).
     pub fn open_wsol(&self, funding: Funding<'_, 'info>, amount: u64) -> Result<()> {
+        let w = self.wsol()?;
         require!(
-            is_system_empty(&self.trader_wsol) && self.trader_wsol.lamports() == 0,
+            is_system_empty(&w.trader_wsol) && w.trader_wsol.lamports() == 0,
             ShortwinError::TraderStateInvalid
         );
         let lamports_needed = Self::wsol_rent()?.checked_add(amount).or_math()?;
-        let bump = [self.trader_wsol_bump];
+        let bump = [w.trader_wsol_bump];
         let seeds: &[&[u8]] = &[TRADER_WSOL_SEED, self.market.as_ref(), &bump];
         let space =
             u64::try_from(WSOL_ACCOUNT_LEN).map_err(|_| error!(ShortwinError::MathOverflow))?;
@@ -219,7 +377,7 @@ impl<'info> TraderAccounts<'info> {
                         self.system_program.key(),
                         Transfer {
                             from: payer.clone(),
-                            to: self.trader_wsol.clone(),
+                            to: w.trader_wsol.clone(),
                         },
                     ),
                     lamports_needed,
@@ -228,7 +386,7 @@ impl<'info> TraderAccounts<'info> {
                     CpiContext::new_with_signer(
                         self.system_program.key(),
                         Allocate {
-                            account_to_allocate: self.trader_wsol.clone(),
+                            account_to_allocate: w.trader_wsol.clone(),
                         },
                         &[seeds],
                     ),
@@ -236,7 +394,7 @@ impl<'info> TraderAccounts<'info> {
                 )?;
             }
             Funding::Position(position) => {
-                lamports::move_lamports_in_leg(position, &self.trader_wsol, lamports_needed)?;
+                lamports::move_lamports_in_leg(position, &w.trader_wsol, lamports_needed)?;
                 // A direct lamport move is visible to the runtime only once both accounts are
                 // part of a CPI: the next CPI's push checks that the caller's accounts still sum
                 // to their original lamports, and it sees the credited `trader_wsol` but not
@@ -244,18 +402,18 @@ impl<'info> TraderAccounts<'info> {
                 // program's `allocate` reads only its first account, so the position rides
                 // along as a trailing writable account (never a signer).
                 let mut ix = anchor_lang::solana_program::system_instruction::allocate(
-                    self.trader_wsol.key,
+                    w.trader_wsol.key,
                     space,
                 );
                 ix.accounts.push(AccountMeta::new(position.key(), false));
-                invoke_signed(&ix, &[self.trader_wsol.clone(), position.clone()], &[seeds])?;
+                invoke_signed(&ix, &[w.trader_wsol.clone(), position.clone()], &[seeds])?;
             }
         }
         system_program::assign(
             CpiContext::new_with_signer(
                 self.system_program.key(),
                 Assign {
-                    account_to_assign: self.trader_wsol.clone(),
+                    account_to_assign: w.trader_wsol.clone(),
                 },
                 &[seeds],
             ),
@@ -264,8 +422,8 @@ impl<'info> TraderAccounts<'info> {
         token_interface::initialize_account3(CpiContext::new(
             TOKEN_PROGRAM_ID,
             InitializeAccount3 {
-                account: self.trader_wsol.clone(),
-                mint: self.wsol_mint.clone(),
+                account: w.trader_wsol.clone(),
+                mint: w.wsol_mint.clone(),
                 authority: self.trader.clone(),
             },
         ))
@@ -274,10 +432,11 @@ impl<'info> TraderAccounts<'info> {
     /// The wrapped amount in `trader_wsol` (`VenueResultMismatch` if it is not the WSOL
     /// account of `trader`).
     pub fn wsol_amount(&self) -> Result<u64> {
-        let t = token_state(&self.trader_wsol)
-            .map_err(|_| error!(ShortwinError::VenueResultMismatch))?;
+        let w = self.wsol()?;
+        let t =
+            token_state(&w.trader_wsol).map_err(|_| error!(ShortwinError::VenueResultMismatch))?;
         require!(
-            t.mint == self.wsol_mint.key.to_bytes() && t.owner == self.trader.key.to_bytes(),
+            t.mint == w.wsol_mint.key.to_bytes() && t.owner == self.trader.key.to_bytes(),
             ShortwinError::VenueResultMismatch
         );
         Ok(t.amount)
@@ -286,12 +445,13 @@ impl<'info> TraderAccounts<'info> {
     /// `CloseAccount(trader_wsol → destination)`, `trader` signing: every lamport (rent and
     /// the wrapped amount) goes to `destination` (A5: it can be the program-owned position).
     pub fn close_wsol(&self, destination: &AccountInfo<'info>) -> Result<()> {
+        let w = self.wsol()?;
         let bump = [self.trader_bump];
         let seeds: &[&[u8]] = &[TRADER_SEED, self.market.as_ref(), &bump];
         token_interface::close_account(CpiContext::new_with_signer(
             TOKEN_PROGRAM_ID,
             CloseAccount {
-                account: self.trader_wsol.clone(),
+                account: w.trader_wsol.clone(),
                 destination: destination.clone(),
                 authority: self.trader.clone(),
             },
@@ -299,18 +459,45 @@ impl<'info> TraderAccounts<'info> {
         ))
     }
 
+    /// `trader` signs a System transfer of `lamports` to `to` (0 is allowed: it puts both accounts
+    /// into one CPI, which makes a direct lamport move between them visible to the runtime's
+    /// per-CPI balance check, see `open_wsol`).
+    pub fn pay_from_trader(&self, to: &AccountInfo<'info>, lamports: u64) -> Result<()> {
+        let bump = [self.trader_bump];
+        let seeds: &[&[u8]] = &[TRADER_SEED, self.market.as_ref(), &bump];
+        system_program::transfer(
+            CpiContext::new_with_signer(
+                self.system_program.key(),
+                Transfer {
+                    from: self.trader.clone(),
+                    to: to.clone(),
+                },
+                &[seeds],
+            ),
+            lamports,
+        )
+    }
+
     /// ARCH §2.4 rule 5 (I7), after a leg: `trader` holds 0 lamports and is System-owned with
-    /// no data; `trader_wsol` is closed (0 lamports, no data); the pool vault has no delegate
-    /// (`DelegateNotCleared`; a sell leg's allowance clears itself at 0 [V12]).
+    /// no data; `trader_wsol` is closed (0 lamports, no data) on the WSOL venues;
+    /// `trader_base_ata` holds 0 tokens with its owner, delegate and close authority unchanged on
+    /// the pump venues; the pool vault has no delegate (`DelegateNotCleared`; a sell leg's
+    /// allowance clears itself at 0 [V12]).
     pub fn post_conditions(&self, pool_vault: &AccountInfo) -> Result<()> {
         require!(
             is_system_empty(&self.trader) && self.trader.lamports() == 0,
             ShortwinError::TraderStateInvalid
         );
-        require!(
-            self.trader_wsol.lamports() == 0 && self.trader_wsol.data_is_empty(),
-            ShortwinError::TraderStateInvalid
-        );
+        if let Some(w) = &self.wsol {
+            require!(
+                w.trader_wsol.lamports() == 0 && w.trader_wsol.data_is_empty(),
+                ShortwinError::TraderStateInvalid
+            );
+        }
+        if let Some(b) = &self.base {
+            let t = base_ata_state(&self.trader, b)?;
+            require!(t.amount == 0, ShortwinError::TraderStateInvalid);
+        }
         let pv = token_state(pool_vault)?;
         require!(pv.delegate.is_none(), ShortwinError::DelegateNotCleared);
         Ok(())

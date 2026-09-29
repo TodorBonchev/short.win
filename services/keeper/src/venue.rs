@@ -12,35 +12,58 @@
 //! it), and a slot it only reads stays read-only — a CPMM `AmmConfig` is shared by every pool
 //! on that config, so write-locking it would contend with all of them (ARCH §6.6).
 //!
-//! Venues without an adapter in this build (the pump venues arrive with M5–M6) are skipped with
-//! a reason. `VenueKind::Mock` exists only with the TEST-ONLY `test-venue` feature (A49).
+//! **Pump curve** (M5): a `PumpCurve` or `PumpMigrating` market's ReadSet is the curve adapter's
+//! own (`shortwin::venues::pump_curve::read_keys`: C0 curve W, C1 `Global`, C2 pump `FeeConfig`,
+//! C3 the canonical pool, C4 the curve's base ATA W, C5 / C6 PumpSwap's fee and global configs),
+//! and a `PumpCurve` trade's TradeExtras T0–T19 ([`trade_extras`]) come from the adapter's key
+//! functions and the market's curve cache, with the three slots the program checks against the
+//! **live** state read from this tick's ReadSet accounts: T6 / T8 a fee and a buyback recipient of
+//! the live `Global` (one per market, spread by the mint's first byte so the keeper's exits do not
+//! all write-lock the same recipient), T12 / T13 the creator vault of the live `curve.creator`
+//! (R-PUMP §8). A `PumpMigrating` market has no trade (exits pause, `VenueMigrating`).
+//!
+//! **List-only** (`None`, M5): the program's "ReadSet" of a list-only market is its detection set
+//! `[bonding_curve, canonical_pool]` (`crank_price`, which re-runs `classify_pump` on it, and
+//! `sol_settle`, which runs the S3 of a curve that graduated elsewhere with positions open on it:
+//! M2-SEC-5), read-only; a list-only market has no trade.
+//!
+//! Venues without an adapter in this build (PumpSwap arrives with M6) are skipped with a reason.
+//! `VenueKind::Mock` exists only with the TEST-ONLY `test-venue` feature (A49).
 
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::AccountMeta;
-use anyhow::bail;
+use anyhow::{Context, anyhow, bail};
 use shortwin::state::{
     ENTRY_FIXED, ENTRY_TEMPLATE, EXTRAS_MAX_SEEDS, ExtraEntry, ExtrasSet, Market,
     PLACEHOLDER_BONDING_CURVE, PLACEHOLDER_MINT, PLACEHOLDER_POOL, PLACEHOLDER_TRADER, SEED_CONST,
     SEED_PLACEHOLDER, VenueExtras, VenueKind,
 };
 use shortwin::venues::{
-    EXTRAS_SET_CURRENT, EXTRAS_SET_PREVIOUS, EXTRAS_SET_STABLE, ExtrasSel, raydium_cpmm, raydium_v4,
+    EXTRAS_SET_CURRENT, EXTRAS_SET_PREVIOUS, EXTRAS_SET_STABLE, ExtrasSel, pump_curve,
+    raydium_cpmm, raydium_v4,
 };
+use shortwin_services_common::AccountData;
+use shortwin_venue_state::pump;
 
 /// Which ReadSet slots are writable in a trade (ARCH §3.12), in the parser's order:
 /// AMM v4 `[pool W, coin_vault W, pc_vault W, lp_mint]`, CPMM `[pool W, amm_config,
-/// token_0_vault W, token_1_vault W, lp_mint]`, the mock `[pool W, base vault W, WSOL vault W]`.
-/// `crank_price` and `sol_settle` pass every slot read-only.
+/// token_0_vault W, token_1_vault W, lp_mint]`, the pump curve `[curve W, Global, FeeConfig,
+/// canonical pool, curve_base_ata W, PumpSwap FeeConfig, PumpSwap GlobalConfig]`, the mock
+/// `[pool W, base vault W, WSOL vault W]`. `crank_price` and `sol_settle` pass every slot
+/// read-only.
 pub fn read_writable(kind: VenueKind) -> anyhow::Result<&'static [bool]> {
     const V4: [bool; raydium_v4::READ_LEN] = [true, true, true, false];
     const CPMM: [bool; raydium_cpmm::READ_LEN] = [true, false, true, true, false];
+    const CURVE: [bool; pump_curve::READ_LEN] = [true, false, false, false, true, false, false];
     match kind {
         VenueKind::RaydiumV4 => Ok(&V4),
         VenueKind::RaydiumCpmm => Ok(&CPMM),
+        VenueKind::PumpCurve | VenueKind::PumpMigrating => Ok(&CURVE),
         #[cfg(feature = "test-venue")]
         VenueKind::Mock => Ok(&[true, true, true]),
-        VenueKind::None => bail!("list-only market (no venue)"),
-        other => bail!("venue {other:?} has no adapter in this build (M5–M6)"),
+        // The detection set: read only (a list-only market never trades).
+        VenueKind::None => Ok(&[false, false]),
+        other => bail!("venue {other:?} has no adapter in this build (M6)"),
     }
 }
 
@@ -49,6 +72,10 @@ pub fn read_set(kind: VenueKind, market: &Market) -> anyhow::Result<Vec<Pubkey>>
     match kind {
         VenueKind::RaydiumV4 => Ok(raydium_v4::read_keys(market).to_vec()),
         VenueKind::RaydiumCpmm => Ok(raydium_cpmm::read_keys(market).to_vec()),
+        // A migrating market reads its curve's ReadSet (ARCH §3.12).
+        VenueKind::PumpCurve | VenueKind::PumpMigrating => {
+            Ok(pump_curve::read_keys(market).to_vec())
+        }
         #[cfg(feature = "test-venue")]
         VenueKind::Mock => {
             use shortwin::state::raydium_cache::{RAY_POOL, RAY_VAULT_SOL, RAY_VAULT_TOK};
@@ -58,10 +85,11 @@ pub fn read_set(kind: VenueKind, market: &Market) -> anyhow::Result<Vec<Pubkey>>
                 market.pool_cache[RAY_VAULT_SOL],
             ])
         }
-        VenueKind::None => bail!("list-only market (no venue)"),
+        // The detection set (`crank_price`, `sol_settle`; module docs).
+        VenueKind::None => Ok(vec![market.bonding_curve, market.canonical_pool]),
         other => {
             let _ = market;
-            bail!("venue {other:?} has no adapter in this build (M5–M6)")
+            bail!("venue {other:?} has no adapter in this build (M6)")
         }
     }
 }
@@ -94,8 +122,14 @@ pub fn read_metas(
         .collect())
 }
 
-/// The TradeExtras metas of a market on `kind` (after the ReadSet in `liquidate` / `expire`).
-pub fn trade_extras(kind: VenueKind, market: &Market) -> anyhow::Result<Vec<AccountMeta>> {
+/// The TradeExtras metas of a market on `kind` (after the ReadSet in `liquidate` / `expire`);
+/// `read` is this tick's ReadSet accounts (in [`read_set`]'s order), which the pump curve's
+/// live-checked slots come from.
+pub fn trade_extras(
+    kind: VenueKind,
+    market: &Market,
+    read: &[Option<AccountData>],
+) -> anyhow::Result<Vec<AccountMeta>> {
     let metas = |keys: &[Pubkey], writable: &[usize]| {
         keys.iter()
             .enumerate()
@@ -132,11 +166,102 @@ pub fn trade_extras(kind: VenueKind, market: &Market) -> anyhow::Result<Vec<Acco
                 AccountMeta::new(market.trader_wsol, false),
             ])
         }
+        VenueKind::PumpCurve => pump_trade_extras(market, read),
+        VenueKind::PumpMigrating => bail!("a migrating curve has no trade (VenueMigrating)"),
+        VenueKind::None => bail!("a list-only market has no trade (NoRoute)"),
         other => {
-            let _ = market;
-            bail!("venue {other:?} has no adapter in this build (M5–M6)")
+            let _ = (market, read);
+            bail!("venue {other:?} has no adapter in this build (M6)")
         }
     }
+}
+
+/// The live pump `Global` and curve of a curve market's ReadSet accounts.
+fn live_curve_accounts(
+    read: &[Option<AccountData>],
+) -> anyhow::Result<(&AccountData, pump::BondingCurve)> {
+    let acc = |i: usize| read.get(i).and_then(Option::as_ref);
+    let global = acc(pump_curve::C_GLOBAL).context("pump Global not read")?;
+    let curve_acc = acc(pump_curve::C_CURVE).context("bonding curve not read")?;
+    let curve = pump::read_curve(&curve_acc.owner.to_bytes(), &curve_acc.data)
+        .map_err(|e| anyhow!("bonding curve: {e:?}"))?;
+    Ok((global, curve))
+}
+
+/// A recipient of a live `Global` list for `market`: the first non-default entry from the
+/// mint's first byte on (every entry is one pump accepts, C0-14).
+fn recipient(list: [[u8; 32]; pump::RECIPIENTS], market: &Market) -> anyhow::Result<Pubkey> {
+    let start = usize::from(market.mint.to_bytes()[0]);
+    (0..pump::RECIPIENTS)
+        .map(|k| list[(start + k) % pump::RECIPIENTS])
+        .find(|r| *r != [0u8; 32])
+        .map(Pubkey::new_from_array)
+        .context("the live Global lists no recipient")
+}
+
+/// A live fee recipient and buyback recipient of the curve market's `Global`.
+pub fn pump_recipients(
+    market: &Market,
+    read: &[Option<AccountData>],
+) -> anyhow::Result<(Pubkey, Pubkey)> {
+    let (global, _) = live_curve_accounts(read)?;
+    let g = pump::read_global(&global.owner.to_bytes(), &global.data)
+        .map_err(|e| anyhow!("pump Global: {e:?}"))?;
+    Ok((
+        recipient(g.fee_recipients(), market)?,
+        recipient(g.buyback_fee_recipients(), market)?,
+    ))
+}
+
+/// A `PumpCurve` trade's TradeExtras T0–T19 (ARCH §3.12; module docs): W at T6–T13, T16–T18.
+fn pump_trade_extras(
+    market: &Market,
+    read: &[Option<AccountData>],
+) -> anyhow::Result<Vec<AccountMeta>> {
+    use shortwin::constants::{
+        ASSOCIATED_TOKEN_PROGRAM_ID, PUMP_EVENT_AUTHORITY, PUMP_FEES_PROGRAM_ID,
+        PUMP_GLOBAL_VOLUME_ACCUMULATOR, PUMP_PROGRAM_ID, TOKEN_PROGRAM_ID, WSOL_MINT,
+    };
+    let (fee_recipient, buyback) = pump_recipients(market, read)?;
+    let (_, curve) = live_curve_accounts(read)?;
+    let creator = Pubkey::new_from_array(curve.creator);
+    let vault = if creator == market.cached_creator {
+        market.cached_creator_vault
+    } else {
+        pump_curve::creator_vault(&creator)
+    };
+    let keys: [(Pubkey, bool); pump_curve::TRADE_LEN] = [
+        (PUMP_PROGRAM_ID, false),
+        (PUMP_EVENT_AUTHORITY, false),
+        (PUMP_FEES_PROGRAM_ID, false),
+        (WSOL_MINT, false),
+        (TOKEN_PROGRAM_ID, false),
+        (ASSOCIATED_TOKEN_PROGRAM_ID, false),
+        (fee_recipient, true),
+        (pump_curve::wsol_ata(&fee_recipient), true),
+        (buyback, true),
+        (pump_curve::wsol_ata(&buyback), true),
+        (market.curve_quote_ata, true),
+        (pump_curve::wsol_ata(&market.trader), true),
+        (vault, true),
+        (pump_curve::wsol_ata(&vault), true),
+        (market.sharing_config, false),
+        (PUMP_GLOBAL_VOLUME_ACCUMULATOR, false),
+        (market.pump_uva, true),
+        (market.pump_uva_quote_ata, true),
+        (market.trader_base_ata, true),
+        (anchor_lang::system_program::ID, false),
+    ];
+    Ok(keys
+        .into_iter()
+        .map(|(k, w)| {
+            if w {
+                AccountMeta::new(k, false)
+            } else {
+                AccountMeta::new_readonly(k, false)
+            }
+        })
+        .collect())
 }
 
 /// The pool a template's `pool` placeholder stands for (`venues::pool_key`).
@@ -308,7 +433,7 @@ mod tests {
                 assert_eq!(flags(&trade), [true, true, true, false]);
                 let crank = read_metas(VenueKind::RaydiumV4, &keys, false).unwrap();
                 assert!(crank.iter().all(|m| !m.is_writable));
-                let x = trade_extras(VenueKind::RaydiumV4, &m).unwrap();
+                let x = trade_extras(VenueKind::RaydiumV4, &m, &[]).unwrap();
                 assert_eq!(
                     x.iter().map(|m| m.pubkey).collect::<Vec<_>>(),
                     raydium_v4::trade_keys(&m).to_vec()
@@ -332,7 +457,7 @@ mod tests {
                 );
                 let trade = read_metas(VenueKind::RaydiumCpmm, &keys, true).unwrap();
                 assert_eq!(flags(&trade), [true, false, true, true, false]);
-                let x = trade_extras(VenueKind::RaydiumCpmm, &m).unwrap();
+                let x = trade_extras(VenueKind::RaydiumCpmm, &m, &[]).unwrap();
                 assert_eq!(
                     x.iter().map(|m| m.pubkey).collect::<Vec<_>>(),
                     raydium_cpmm::trade_keys(&m).to_vec()
@@ -356,17 +481,138 @@ mod tests {
     #[test]
     fn venues_without_an_adapter_are_skipped_with_a_reason() {
         let m = market(false, Pubkey::new_unique());
-        for kind in [
-            VenueKind::None,
-            VenueKind::PumpCurve,
-            VenueKind::PumpSwap,
-            VenueKind::PumpMigrating,
-        ] {
-            assert!(read_set(kind, &m).is_err(), "{kind:?}");
-            assert!(read_writable(kind).is_err(), "{kind:?}");
-        }
-        assert!(trade_extras(VenueKind::PumpSwap, &m).is_err());
+        assert!(read_set(VenueKind::PumpSwap, &m).is_err());
+        assert!(read_writable(VenueKind::PumpSwap).is_err());
+        assert!(trade_extras(VenueKind::PumpSwap, &m, &[]).is_err());
+        assert!(trade_extras(VenueKind::PumpMigrating, &m, &[]).is_err());
+        assert!(trade_extras(VenueKind::None, &m, &[]).is_err());
         // A ReadSet of the wrong length is refused, never padded.
         assert!(read_metas(VenueKind::RaydiumV4, &[Pubkey::new_unique()], true).is_err());
+    }
+
+    /// A list-only market's ReadSet is its detection set, read-only even in a trade's position
+    /// (the program's `crank_price` / `sol_settle` on a `None` market, M2-SEC-5).
+    #[test]
+    fn a_list_only_market_reads_its_detection_set() {
+        let mut m = market(false, Pubkey::new_unique());
+        m.bonding_curve = Pubkey::new_unique();
+        m.canonical_pool = Pubkey::new_unique();
+        let keys = read_set(VenueKind::None, &m).unwrap();
+        assert_eq!(keys, vec![m.bonding_curve, m.canonical_pool]);
+        assert_eq!(keys.len(), shortwin::venues::DETECTION_LEN);
+        for trading in [false, true] {
+            let metas = read_metas(VenueKind::None, &keys, trading).unwrap();
+            assert!(metas.iter().all(|a| !a.is_writable && !a.is_signer));
+        }
+    }
+
+    /// A pump `Global` of 1,087 bytes with `fee` / `buyback` as its recipient lists (the
+    /// reader's offsets: `fee_recipient` @41, `fee_recipients[7]` @162, buyback @741).
+    fn global(fee: [Pubkey; 8], buyback: [Pubkey; 8]) -> AccountData {
+        let mut d = vec![0u8; 1_087];
+        d[..8].copy_from_slice(&[0xa7, 0xe8, 0xe8, 0xb1, 0xc8, 0x6c, 0x72, 0x7f]);
+        d[41..73].copy_from_slice(fee[0].as_ref());
+        for (i, k) in fee[1..].iter().enumerate() {
+            d[162 + 32 * i..194 + 32 * i].copy_from_slice(k.as_ref());
+        }
+        for (i, k) in buyback.iter().enumerate() {
+            d[741 + 32 * i..773 + 32 * i].copy_from_slice(k.as_ref());
+        }
+        AccountData {
+            lamports: 1,
+            owner: shortwin::constants::PUMP_PROGRAM_ID,
+            executable: false,
+            data: d,
+        }
+    }
+
+    /// A live 151-byte curve with `creator`.
+    fn curve(creator: Pubkey) -> AccountData {
+        let mut d = vec![0u8; 151];
+        d[..8].copy_from_slice(&pump::BONDING_CURVE_DISCRIMINATOR);
+        d[8..16].copy_from_slice(&1_000_000u64.to_le_bytes());
+        d[16..24].copy_from_slice(&1_000u64.to_le_bytes());
+        d[24..32].copy_from_slice(&500_000u64.to_le_bytes());
+        d[49..81].copy_from_slice(creator.as_ref());
+        AccountData {
+            lamports: 1,
+            owner: shortwin::constants::PUMP_PROGRAM_ID,
+            executable: false,
+            data: d,
+        }
+    }
+
+    /// ARCH §3.12 PumpCurve: the ReadSet is the adapter's, C0 and C4 writable in trades; the
+    /// TradeExtras are T0–T19 with the live `Global`'s recipients, the live creator's vault
+    /// (the cache's when it is the cached creator) and the cached curve keys, writable at
+    /// T6–T13 and T16–T18.
+    #[test]
+    fn pump_curve_lists_are_the_adapters_with_the_live_recipients() {
+        use shortwin::constants::PUMP_PROGRAM_ID;
+        let mut m = market(false, Pubkey::new_unique());
+        m.bonding_curve = Pubkey::new_unique();
+        m.canonical_pool = Pubkey::new_unique();
+        m.trader = Pubkey::new_unique();
+        m.trader_base_ata = Pubkey::new_unique();
+        m.mint = Pubkey::new_from_array([3u8; 32]);
+        let cached = Pubkey::new_unique();
+        pump_curve::write_cache(&mut m, &cached);
+        for kind in [VenueKind::PumpCurve, VenueKind::PumpMigrating] {
+            assert_eq!(
+                read_set(kind, &m).unwrap(),
+                pump_curve::read_keys(&m).to_vec()
+            );
+            let metas = read_metas(kind, &read_set(kind, &m).unwrap(), true).unwrap();
+            assert_eq!(
+                flags(&metas),
+                [true, false, false, false, true, false, false]
+            );
+        }
+        let fee: [Pubkey; 8] = core::array::from_fn(|_| Pubkey::new_unique());
+        let bb: [Pubkey; 8] = core::array::from_fn(|_| Pubkey::new_unique());
+        for (creator, vault) in [
+            (cached, m.cached_creator_vault),
+            (Pubkey::new_unique(), Pubkey::default()),
+        ] {
+            let mut read: Vec<Option<AccountData>> = vec![None; pump_curve::READ_LEN];
+            read[pump_curve::C_CURVE] = Some(curve(creator));
+            read[pump_curve::C_GLOBAL] = Some(global(fee, bb));
+            let x = trade_extras(VenueKind::PumpCurve, &m, &read).unwrap();
+            assert_eq!(x.len(), pump_curve::TRADE_LEN);
+            assert_eq!(x[pump_curve::T_PROGRAM].pubkey, PUMP_PROGRAM_ID);
+            // The mint's first byte (3) picks entry 3 of each list.
+            assert_eq!(x[pump_curve::T_FEE_RECIPIENT].pubkey, fee[3]);
+            assert_eq!(x[pump_curve::T_BUYBACK_RECIPIENT].pubkey, bb[3]);
+            assert_eq!(
+                x[pump_curve::T_FEE_RECIPIENT_ATA].pubkey,
+                pump_curve::wsol_ata(&fee[3])
+            );
+            let want = if vault == Pubkey::default() {
+                pump_curve::creator_vault(&creator)
+            } else {
+                vault
+            };
+            assert_eq!(x[pump_curve::T_CREATOR_VAULT].pubkey, want);
+            assert_eq!(
+                x[pump_curve::T_CREATOR_VAULT_ATA].pubkey,
+                pump_curve::wsol_ata(&want)
+            );
+            assert_eq!(x[pump_curve::T_UVA].pubkey, m.pump_uva);
+            assert_eq!(x[pump_curve::T_TRADER_BASE_ATA].pubkey, m.trader_base_ata);
+            assert_eq!(
+                x[pump_curve::T_TRADER_WSOL_ATA].pubkey,
+                pump_curve::wsol_ata(&m.trader)
+            );
+            let w: Vec<usize> = x
+                .iter()
+                .enumerate()
+                .filter(|(_, a)| a.is_writable)
+                .map(|(i, _)| i)
+                .collect();
+            assert_eq!(w, [6, 7, 8, 9, 10, 11, 12, 13, 16, 17, 18]);
+            assert!(x.iter().all(|a| !a.is_signer));
+        }
+        // No Global read: no trade.
+        assert!(trade_extras(VenueKind::PumpCurve, &m, &[]).is_err());
     }
 }

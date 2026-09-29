@@ -10,7 +10,9 @@
 //! (mut; used — and then key-checked against `PDA(["share_epoch", market, epoch])` of the epoch
 //! the roll closes, `EpochRecordMismatch` — only when the settlement rolls the epoch), System,
 //! event accounts. **Remaining:** the venue's `ReadSet` only (C0-2): no venue CPI, no token
-//! movement.
+//! movement. A `PumpMigrating` market passes its curve's ReadSet; a list-only (`None`) market —
+//! a curve that graduated elsewhere with positions open — its detection set `[bonding_curve,
+//! canonical_pool]` (M2-SEC-5, M5: S3 is the only settlement on both, ARCH §3.8 step 4, §5.3).
 //!
 //! **Exits never read the latch, the oracle, a pause flag or the route-broken flag as a gate**
 //! (I10): none of those accounts is passed. The Emergency flag reaches this instruction only
@@ -154,12 +156,139 @@ struct Evaluated {
     now: i64,
     ev: Evaluation,
     arm: settle::ArmState,
+    /// The prologue's venue sync moved a curve market (`VenueStateChanged`).
+    transition: Option<crate::events::VenueStateChanged>,
     facts: Facts,
     bx: settle::SettleBox,
     ema_age_s: i64,
     b_ema: Option<u64>,
     mint_ok: bool,
     booked: Option<Booked>,
+}
+
+/// ARCH §3.8 steps 1–4 (phase 1: the prologue and the evaluation; module docs). Its own frame:
+/// the handler's would exceed SBF's 4 KiB.
+#[inline(never)]
+fn evaluate<'info>(
+    ctx: &Context<'info, SolSettle<'info>>,
+    clock: &Clock,
+    pos: &ShortPosition,
+    market_key: Pubkey,
+) -> Result<Box<Evaluated>> {
+    let config = ctx.accounts.config.load()?;
+    let mut market = ctx.accounts.market.load_mut()?;
+    let kind = market.venue_kind().ok_or(ShortwinError::NoSupportedVenue)?;
+    let token_program = market.token_program;
+    let mint_ok = mint_guard(
+        &market,
+        &ctx.accounts.mint.to_account_info(),
+        &token_program,
+        MintPath::Exit,
+    )?;
+    let rem = venues::parse(&market, kind, ctx.remaining_accounts, Carry::ReadSet, &[])?;
+    let state = venues::read_state_boxed(&market, kind, rem.read, clock.unix_timestamp);
+    let risk = venues::risk_quoter(
+        &market,
+        &state,
+        rem.read,
+        u64::from(pos.venue_fee_hard_cap_bps),
+    )
+    .ok_or(ShortwinError::NoSupportedVenue)?;
+    let mut vault = ctx.accounts.market_vault.load()?.vault();
+    let tracked_before = (vault.lender_sol, vault.unmatched, vault.protocol_fees);
+    let pro = prologue::run(
+        &config,
+        &market_key,
+        &mut market,
+        &mut vault,
+        Some(&*state),
+        clock.unix_timestamp,
+        clock.slot,
+    )?;
+    let now = pro.now;
+    let transition = pro
+        .transition
+        .map(|t| venues::pump_curve::transition_event(&market, t, market_key, clock));
+    let obs = market.observation();
+    let mut quotes = RiskQuotes::new(risk, pos.q);
+    let (inp, facts) = arming::inputs(
+        pos,
+        &market,
+        &obs,
+        &state,
+        &mut quotes,
+        pro.s3_no_route,
+        now,
+    )?;
+    let mut arm = pos.arm_state();
+    let ev = settle::evaluate(&mut arm, &inp, &arming::terms(pos), &mut quotes).math()?;
+
+    let booked = match ev.settlement {
+        None => {
+            // A no-op keeps the prologue. Its accrual touches the vault only while `S = 0`,
+            // which an open position excludes (M1-SEC-3); stored if it did anyway.
+            if (vault.lender_sol, vault.unmatched, vault.protocol_fees) != tracked_before {
+                ctx.accounts.market_vault.load_mut()?.set_vault(&vault);
+            }
+            None
+        }
+        Some(s) => {
+            let payout = waterfall::settle(pos.v, s.kind, s.k_s, s.fv, pos.q, inp.p_ema, inp.r_due)
+                .math()?;
+            require!(
+                payout.keeper == s.k_s
+                    && payout.lenders == s.lenders
+                    && payout.borrower == s.borrower,
+                ShortwinError::MathOverflow
+            );
+            let credited = rent::credited_for(&pos.pos_rent(), &market.basis()).math()?;
+            let mut pool = pro.pool;
+            let vest_before = pool.vest_bal;
+            let rec = pool::settle(
+                &mut pool,
+                &mut vault,
+                now,
+                config.params.lump_vest_s,
+                &Resolution {
+                    q: pos.q,
+                    credited,
+                    lump: payout.lump,
+                },
+                payout.lenders,
+            )
+            .math()?;
+            let mut aggr = market.aggr();
+            engine_waterfall::remove_position(&mut market, &mut aggr, pos)?;
+            market.set_aggr(&aggr);
+            market.set_pool(&pool);
+            Some(Booked {
+                settlement: s,
+                payout,
+                pool,
+                vault,
+                rec,
+                vest_before,
+                lump_vest_s: config.params.lump_vest_s,
+            })
+        }
+    };
+    let b_ema = if booked.is_some() {
+        quotes.cost(inp.p_ema, inp.l_ema).math()?
+    } else {
+        None
+    };
+    Ok(Box::new(Evaluated {
+        now,
+        ev,
+        arm,
+        transition,
+        facts,
+        bx: inp.bx,
+        ema_age_s: now.saturating_sub(obs.ema.ts),
+        b_ema,
+        mint_ok,
+        booked,
+    }))
 }
 
 pub fn handler<'info>(ctx: Context<'info, SolSettle<'info>>) -> Result<()> {
@@ -170,120 +299,10 @@ pub fn handler<'info>(ctx: Context<'info, SolSettle<'info>>) -> Result<()> {
     let pos = (**ctx.accounts.position).clone();
 
     // ---- phase 1: steps 1–4 ----------------------------------------------------------------
-    let e = {
-        let config = ctx.accounts.config.load()?;
-        let mut market = ctx.accounts.market.load_mut()?;
-        let kind = market.venue_kind().ok_or(ShortwinError::NoSupportedVenue)?;
-        let token_program = market.token_program;
-        let mint_ok = mint_guard(
-            &market,
-            &ctx.accounts.mint.to_account_info(),
-            &token_program,
-            MintPath::Exit,
-        )?;
-        let rem = venues::parse(&market, kind, ctx.remaining_accounts, Carry::ReadSet, &[])?;
-        let state = venues::read_state(&market, kind, rem.read, clock.unix_timestamp);
-        let risk = venues::risk_pricing(
-            &market,
-            &state,
-            rem.read,
-            u64::from(pos.venue_fee_hard_cap_bps),
-        )
-        .ok_or(ShortwinError::NoSupportedVenue)?;
-        let mut vault = ctx.accounts.market_vault.load()?.vault();
-        let tracked_before = (vault.lender_sol, vault.unmatched, vault.protocol_fees);
-        let pro = prologue::run(
-            &config,
-            &market_key,
-            &mut market,
-            &mut vault,
-            Some(state),
-            clock.unix_timestamp,
-            clock.slot,
-        )?;
-        let now = pro.now;
-        let obs = market.observation();
-        let mut quotes = RiskQuotes::new(risk, pos.q);
-        let (inp, facts) = arming::inputs(
-            &pos,
-            &market,
-            &obs,
-            &state,
-            &mut quotes,
-            pro.s3_no_route,
-            now,
-        )?;
-        let mut arm = pos.arm_state();
-        let ev = settle::evaluate(&mut arm, &inp, &arming::terms(&pos), &mut quotes).math()?;
-
-        let booked = match ev.settlement {
-            None => {
-                // A no-op keeps the prologue. Its accrual touches the vault only while `S = 0`,
-                // which an open position excludes (M1-SEC-3); stored if it did anyway.
-                if (vault.lender_sol, vault.unmatched, vault.protocol_fees) != tracked_before {
-                    ctx.accounts.market_vault.load_mut()?.set_vault(&vault);
-                }
-                None
-            }
-            Some(s) => {
-                let payout =
-                    waterfall::settle(pos.v, s.kind, s.k_s, s.fv, pos.q, inp.p_ema, inp.r_due)
-                        .math()?;
-                require!(
-                    payout.keeper == s.k_s
-                        && payout.lenders == s.lenders
-                        && payout.borrower == s.borrower,
-                    ShortwinError::MathOverflow
-                );
-                let credited = rent::credited_for(&pos.pos_rent(), &market.basis()).math()?;
-                let mut pool = pro.pool;
-                let vest_before = pool.vest_bal;
-                let rec = pool::settle(
-                    &mut pool,
-                    &mut vault,
-                    now,
-                    config.params.lump_vest_s,
-                    &Resolution {
-                        q: pos.q,
-                        credited,
-                        lump: payout.lump,
-                    },
-                    payout.lenders,
-                )
-                .math()?;
-                let mut aggr = market.aggr();
-                engine_waterfall::remove_position(&mut market, &mut aggr, &pos)?;
-                market.set_aggr(&aggr);
-                market.set_pool(&pool);
-                Some(Booked {
-                    settlement: s,
-                    payout,
-                    pool,
-                    vault,
-                    rec,
-                    vest_before,
-                    lump_vest_s: config.params.lump_vest_s,
-                })
-            }
-        };
-        let b_ema = if booked.is_some() {
-            quotes.cost(inp.p_ema, inp.l_ema).math()?
-        } else {
-            None
-        };
-        Evaluated {
-            now,
-            ev,
-            arm,
-            facts,
-            bx: inp.bx,
-            ema_age_s: now.saturating_sub(obs.ema.ts),
-            b_ema,
-            mint_ok,
-            booked,
-        }
-    };
-
+    let mut e = evaluate(&ctx, &clock, &pos, market_key)?;
+    if let Some(ev) = e.transition.take() {
+        emit_cpi!(ev);
+    }
     if !e.mint_ok {
         emit!(MintSafetyTripped {
             market: market_key,

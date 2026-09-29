@@ -5,8 +5,13 @@
 //! host-side `AccountInfo`s, [`with_account_infos`]), so the keeper's view of a venue is the
 //! program's bit for bit (R-TOOL §4.3: "the same crates as the program").
 //!
-//! List-only (`None`) markets have no venue and no ReadSet: the coverage duties skip them, and
-//! [`ChainView::list_only`] hands them to the pool monitor (duty 12, [`crate::pool_monitor`]),
+//! List-only (`None`) markets have no venue; their "ReadSet" is the detection set
+//! `[bonding_curve, canonical_pool]` (the program's `crank_price` re-runs `classify_pump` on it,
+//! and `sol_settle` runs a graduated-elsewhere market's S3 on it: M5, M2-SEC-5), so they are
+//! covered markets too — a list-only market with positions open (a curve that graduated elsewhere)
+//! is kept on the no-route cadence and its positions are settled in S3 when due (duty 5), and one
+//! whose detection set shows a pump venue again is cranked onto it ([`crate::keeper`]).
+//! [`ChainView::list_only`] also hands them to the pool monitor (duty 12, [`crate::pool_monitor`]),
 //! which moves them onto an eligible Raydium pool with `propose_pool` (ARCH §2.5 `None`).
 
 use std::collections::HashMap;
@@ -70,7 +75,8 @@ pub struct MarketView {
     pub extras: Option<Box<VenueExtras>>,
 }
 
-/// A covered list-only (`None`) market: no venue, no ReadSet (module docs).
+/// A covered list-only (`None`) market as the pool monitor sees it (module docs; the same
+/// market is also in [`ChainView::markets`] with its detection set as ReadSet).
 #[derive(Clone)]
 pub struct ListOnlyView {
     pub key: Pubkey,
@@ -87,8 +93,8 @@ pub struct ChainView {
     /// fit", [`crate::pool_monitor::evaluate`]).
     pub oracle: Option<Box<OracleCache>>,
     pub markets: Vec<MarketView>,
-    /// The covered list-only markets (also in `skipped`: the coverage duties skip them; the
-    /// pool monitor does not).
+    /// The covered list-only markets, for the pool monitor (they are also in `markets`, with
+    /// their detection set as ReadSet, for the coverage duties).
     pub list_only: Vec<ListOnlyView>,
     /// Markets skipped this tick, with why (unsupported venue, unreadable account).
     pub skipped: Vec<(Pubkey, String)>,

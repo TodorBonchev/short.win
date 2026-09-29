@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Dump the Raydium mainnet fixtures of the program tests (ARCHITECTURE §1.2, §8.2; M3).
+"""Dump the Raydium (M3) and pump (M5) mainnet fixtures of the program tests (ARCHITECTURE
+§1.2, §8.2).
 
 Writes, under ``tests/fixtures/``:
 
@@ -12,6 +13,18 @@ Writes, under ``tests/fixtures/``:
   token 0; a Token-2022 pool; a creator-fee pool with WSOL as token 1; a pool charging the
   creator fee on both tokens), their vaults, mints, LP mints and observations, both vault
   authorities, the AMM v4 ``AmmConfig`` and every CPMM ``AmmConfig``;
+- ``programs/pump.so``, ``programs/pump_fees.so``, ``programs/pump_amm.so`` and
+  ``accounts/pump/*.bin`` (M5; groups ``pump_programs`` and ``pump_state``): the pump,
+  pump-fees and PumpSwap ELFs with their program accounts and ProgramData headers; pump's
+  ``Global``, both pump-fees ``FeeConfig`` accounts, PumpSwap's ``GlobalConfig``, both event
+  authorities and volume accumulators, pump's fee, buyback and withdraw authorities, PumpSwap's
+  protocol-fee and buyback WSOL ATAs; and one set of accounts per pump coin **role** (``PUMP_COINS``:
+  a fresh curve, a curve near completion, a 115-byte Token-2022 curve, legacy SPL-Token curves of
+  115 and 49 bytes, a graduated coin with its canonical PumpSwap pool and boost vault, a
+  mayhem-mode and a USDC-quoted curve that short.win must refuse, a 150-byte legacy curve and
+  Fartcoin's graduated-elsewhere curve). Accounts that may legitimately not exist (a creator
+  vault, a ``sharing-config``, a closed boost vault, the event authorities) are recorded as
+  ``"absent": true`` entries without a file;
 - ``manifest.json``: one entry per account (address, owner, lamports, executable, rent epoch,
   space, **slot**, sha256, purpose, decoded fields) and one snapshot record per fetch;
 - ``SHA256SUMS``: every fixture file (CI: ``cd tests/fixtures && sha256sum -c SHA256SUMS``).
@@ -28,11 +41,21 @@ Usage (Python 3.14, standard library only)::
                                         #   fixture set is left byte-for-byte unchanged)
     scripts/dump-fixtures.py fetch --refresh   # re-dump everything at a new slot
     scripts/dump-fixtures.py fetch --rpc URL   # default: api.mainnet-beta, then publicnode
+    scripts/dump-fixtures.py fetch --refresh --group pump_state \
+        --coin fresh=MINT --coin graduated=MINT     # re-dump one group; replace a coin role
+    scripts/dump-fixtures.py candidates        # mainnet: newest creates, latest migrations,
+                                               #   (--near) live curves nearest completion
+
+The pump coin roles are pinned mints (``PUMP_COINS``). A curve moves on: at a refresh each role's
+expectation is re-checked (e.g. "near" must still be live with ``rT`` at most ``NEAR_RT_MAX``,
+"graduated" must have its canonical pool) and a role that no longer holds stops the fetch with a
+message; ``candidates`` lists replacements and ``--coin role=MINT`` pins one.
 
 Entries of the manifest this script does not manage (e.g. the Pyth dump) are kept verbatim.
 A refresh replaces the pinned bytes: the reader unit tests
-(``crates/shortwin-venue-state/src/raydium_{v4,cpmm}.rs``) assert the decoded values of this
-dump and move with it (the manifest's ``decoded`` fields list the new ones).
+(``crates/shortwin-venue-state/src/{raydium_v4,raydium_cpmm,pump,pump_amm}.rs``) assert the
+decoded values of this dump and move with it (the manifest's ``decoded`` fields list the new
+ones).
 Exit status: 0 ok, 1 a check failed; an RPC or consistency error while fetching exits with its
 message.
 """
@@ -54,6 +77,7 @@ FIXTURES = os.path.normpath(os.path.join(HERE, "..", "tests", "fixtures"))
 MANIFEST = os.path.join(FIXTURES, "manifest.json")
 SUMS = os.path.join(FIXTURES, "SHA256SUMS")
 ACCOUNT_DIR = "accounts/raydium"
+PUMP_ACCOUNT_DIR = "accounts/pump"
 PROGRAM_DIR = "programs"
 
 RPCS = ["https://api.mainnet-beta.solana.com", "https://solana-rpc.publicnode.com"]
@@ -74,19 +98,22 @@ CPMM_POOL_DISC = bytes.fromhex("f7ede3f5d7c3de46")
 CPMM_CONFIG_DISC = bytes.fromhex("daf42168cbcb2b6f")
 CPMM_OBSERVATION_LEN = 4075
 
-# (name, program, ProgramData, sha256 of the ELF with trailing zeros trimmed per R-RAY §1.3)
+# (name, program, ProgramData, sha256 of the ELF with trailing zeros trimmed per R-RAY §1.3,
+# expected deploy slot or None)
 PROGRAMS = [
     (
         "raydium_amm_v4",
         AMM_V4,
         "A7ZG7ByDi8DpzT9Ab7CiXhvgYTJQmaDPJkMDoPitaCQV",
         "d4cee0cd4f78f69d05f5d645fc6d120dff830f231162d35cf2b2dae1df7b2c9f",
+        None,
     ),
     (
         "raydium_cpmm",
         CPMM,
         "DMawCQzbgNTmbzaESc7o6pvL1KAeetY8zA7jNpzntHhU",
         "bdaff73e7ed9fc75f091d732987d36476d7378d32c47495fe9eef0a930dbf8cc",
+        None,
     ),
 ]
 
@@ -353,6 +380,673 @@ def elf_len(elf):
     return end
 
 
+# ---- pump (M5; R-PUMP §1–§3, §7; R-VEN §1–§2; ARCH §3.12, §4.1, §8.2) ------------------------
+
+PUMP = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+PUMP_AMM = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
+PUMP_FEES = "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ"
+ATA_PROGRAM = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+PUMP_GLOBAL = "4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf"
+PUMP_FEE_CONFIG = "8Wf5TiAheLUqBrKXeYg2JtAFFMWtKdG2BSFgqUcPVwTt"
+PUMP_EVENT_AUTHORITY = "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1"
+PUMP_GVA = "Hq2wp8uJ9jCPsYgNHex8RtqdvMPfVGoYwjvF1ATiwn2Y"
+PAMM_GLOBAL_CONFIG = "ADyA8hdefvWN2dbGGWFotbzWxrAvLW83WG6QCVXvJKqw"
+PAMM_FEE_CONFIG = "5PHirr8joyTMp9JMm6nW7hNDVyEYdkzDqazxPD7RaTjx"
+PAMM_EVENT_AUTHORITY = "GS4CU59F31iL7aR2Q8zVS8DRrcRnXX1yjQ66TqNVQnaR"
+PAMM_GVA = "C2aFPdENg4A2HQsmrd5rTw5TaYBX5Ku887cWjbFKtZpw"
+RENT_SYSVAR = "SysvarRent111111111111111111111111111111111"
+CURVE_DISC = bytes.fromhex("17b7f83760d8ac60")
+PUMP_GLOBAL_DISC = bytes.fromhex("a7e8e8b1c86c727f")
+FEE_CONFIG_DISC = bytes.fromhex("8f3492bbdb7b4c9b")
+PAMM_POOL_DISC = bytes.fromhex("f19a6d0411b16dbc")
+PAMM_GLOBAL_CONFIG_DISC = bytes.fromhex("95089ccaa0fcb0d9")
+PUMP_MIGRATE_V2 = bytes.fromhex("bbcb121fceedfe29")
+PUMP_EVENT_IX = bytes.fromhex("e445a52e51cb9a1d")
+PUMP_CREATE_EVENT = bytes.fromhex("1b72a94ddeeb6376")
+PUMP_TRADE_EVENT = bytes.fromhex("bddb7fd34ee661ee")
+
+# The three pump programs; the deploy slots are ARCH §8.2's (= VENUE_GUARD_SLOTS_2026_09_27).
+PUMP_PROGRAMS = [
+    ("pump", PUMP, "B5MvUwXdiW1NMM6QFFD3ssPKBujD4zMohncbM73Z2BQu", None, 449_734_335),
+    ("pump_fees", PUMP_FEES, "75Uu23mqWBb8LM8vDppqC1mQAnCcBuLXhVaDezVMQLRw", None, 446_465_969),
+    ("pump_amm", PUMP_AMM, "6naEzKeUuFh1Jeeu51NXQgr5qkXgXtc9WKNct4xynVJc", None, 446_462_733),
+]
+
+# "Near completion": at most this many raw tokens left on the curve (100 M of the 793.1 M a
+# standard curve sells), so a buy of a few % of the supply straddles the graduation.
+NEAR_RT_MAX = 100_000_000_000_000
+
+# (role, mint, expectation, purpose). The expectation is re-checked on every fetch (a curve
+# moves on: replace the role with `--coin role=MINT`, see `candidates`).
+PUMP_COINS = [
+    (
+        "fresh",
+        "4mNDC2YAJRWsnbC1mS4KkiLbUorVwLJ7PBsJX7Vzpump",
+        "live_sol",
+        "a fresh curve (early): a Token-2022 create_v2 coin (125 bytes) minutes old; the curve "
+        "adapter's default T-PUMP-MATH / fork venue",
+    ),
+    (
+        "near",
+        "E5Xyf3YypbrKX3UqSXN3kQkEaNTYD8GnL4tbye4xpump",
+        "near",
+        "a curve near completion (rT <= NEAR_RT_MAX): buys beyond rT (6021), the completing buy, "
+        "B^_str and the straddle (ARCH §4.3, §5.4)",
+    ),
+    (
+        "t22_115",
+        "4bfGcxadHUJ9r1G3LHxGooKoMy29QR5nQhUJnnAYpump",
+        "live_sol_115",
+        "a live Token-2022 curve of 115 bytes (the length buy_v2/sell_v2 top a shorter curve up "
+        "to; 1.8 M live curves have it)",
+    ),
+    (
+        "legacy115",
+        "8FxewF272LJ7Usov6PZk2gu1JKoR5Dq1v4sDqavJpump",
+        "live_sol_legacy_115",
+        "a live legacy SPL-Token (Tokenkeg) curve of 115 bytes without a creator (creator fee 0)",
+    ),
+    (
+        "legacy49",
+        "7XVFCatyjXN2g42Tiwq4PWTA2nWu7wvbBdnBw9Hipump",
+        "live_sol_legacy_49",
+        "a live legacy SPL-Token curve in the 2024 layout (49 bytes, created at slot "
+        "300,000,011): every later field reads as zero; the first v2 trade grows it to 125",
+    ),
+    (
+        "graduated",
+        "7UfcTJD2RSRg9AJ4k2V2rs71Ew8Zy2avaU5roc8bpump",
+        "graduated_pumpswap",
+        "a completed, migrated curve with its canonical PumpSwap pool (vaults, LP mint, coin "
+        "creator vault) and its boost vault, dumped minutes after migrate_v2",
+    ),
+    (
+        "mayhem",
+        "ABuH3Mh1Zds4b877ADY45M6NVc92C5qRvmNt5AEzpump",
+        "mayhem",
+        "a live mayhem-mode curve (2 B supply): short.win must refuse it (ADOPTED Q6, "
+        "CurveMayhemUnsupported)",
+    ),
+    (
+        "usdc",
+        "C2c6VZ3VYeRA86x8gcDB1RMBpa9Ke5c65yFfkSbRSA4a",
+        "usdc",
+        "a live USDC-quoted curve (125 bytes): short.win must refuse it (ADOPTED Q6, "
+        "CurveQuoteNotSol)",
+    ),
+    (
+        "legacy150",
+        "Coyj3LtKn1BNSgWc9HsGK5SKoGfEoDaymig4wrN6pump",
+        "legacy_150",
+        "a legacy SPL-Token coin whose curve was extended to 150 bytes (R-PUMP §2.1, §5)",
+    ),
+    (
+        "fartcoin",
+        "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump",
+        "graduated_elsewhere",
+        "Fartcoin: complete, every reserve 0, no canonical PumpSwap pool: graduated to Raydium "
+        "before PumpSwap (ARCH §2.5 GraduatedElsewhere, [V3])",
+    ),
+]
+
+# ---- ed25519 PDAs (the ATA and program-derived addresses the fixtures must match) ------------
+
+_P = 2**255 - 19
+_D = (-121665 * pow(121666, _P - 2, _P)) % _P
+
+
+def _on_curve(b):
+    """Whether 32 bytes decode to an ed25519 point (RFC 8032 §5.1.3)."""
+    y = int.from_bytes(b, "little") & ((1 << 255) - 1)
+    if y >= _P:
+        return False
+    y2 = y * y % _P
+    u, v = (y2 - 1) % _P, (_D * y2 + 1) % _P
+    x2 = u * pow(v, _P - 2, _P) % _P
+    if x2 == 0:
+        return True
+    x = pow(x2, (_P + 3) // 8, _P)
+    if (x * x - x2) % _P:
+        x = x * pow(2, (_P - 1) // 4, _P) % _P
+    return (x * x - x2) % _P == 0
+
+
+def pda(seeds, program):
+    """`find_program_address(seeds, program)` -> base58 address."""
+    for bump in range(255, -1, -1):
+        h = hashlib.sha256()
+        for sd in seeds:
+            h.update(sd if isinstance(sd, bytes) else b58decode(sd))
+        h.update(bytes([bump]))
+        h.update(b58decode(program))
+        h.update(b"ProgramDerivedAddress")
+        d = h.digest()
+        if not _on_curve(d):
+            return b58encode(d)
+    raise SystemExit(f"no PDA for {seeds} under {program}")
+
+
+def ata(owner, mint, token_program):
+    return pda([owner, token_program, mint], ATA_PROGRAM)
+
+
+def curve_of(mint):
+    return pda([b"bonding-curve", mint], PUMP)
+
+
+def canonical_pool_of(mint, quote=WSOL):
+    authority = pda([b"pool-authority", mint], PUMP)
+    return pda([b"pool", (0).to_bytes(2, "little"), authority, mint, quote], PUMP_AMM), authority
+
+
+# ---- pump decoders ------------------------------------------------------------------------------
+
+
+def _pad(d, n):
+    return d + bytes(max(0, n - len(d)))
+
+
+def decode_curve(d):
+    """`BondingCurve` (R-PUMP §2.1; missing trailing fields read as zero, as pump reads them)."""
+    p = _pad(d, 151)
+    vt, vq, rt, rq, supply = struct.unpack_from("<QQQQQ", p, 8)
+    return {
+        "len": len(d),
+        "virtual_token_reserves": vt,
+        "virtual_quote_reserves": vq,
+        "real_token_reserves": rt,
+        "real_quote_reserves": rq,
+        "token_total_supply": supply,
+        "complete": p[48],
+        "creator": key_at(p, 49),
+        "is_mayhem_mode": p[81],
+        "is_cashback_coin": p[82],
+        "quote_mint": key_at(p, 83),
+        "creator_fee_bps": u64_at(p, 115),
+        "can_edit_creator_fee": p[123],
+        "is_holder_reward": p[124],
+    }
+
+
+def _keys(d, off, n):
+    return [key_at(d, off + 32 * i) for i in range(n)]
+
+
+def decode_pump_global(d):
+    """pump `Global` (R-PUMP §2.2; IDL offsets)."""
+    return {
+        "authority": key_at(d, 9),
+        "fee_recipients": [key_at(d, 41)] + _keys(d, 162, 7),
+        "initial_virtual_token_reserves": u64_at(d, 73),
+        "initial_virtual_sol_reserves": u64_at(d, 81),
+        "initial_real_token_reserves": u64_at(d, 89),
+        "token_total_supply": u64_at(d, 97),
+        "fee_basis_points": u64_at(d, 105),
+        "withdraw_authority": key_at(d, 113),
+        "pool_migration_fee": u64_at(d, 146),
+        "creator_fee_basis_points": u64_at(d, 154),
+        "reserved_fee_recipients": [key_at(d, 483)] + _keys(d, 516, 7),
+        "buyback_fee_recipients": _keys(d, 741, 8),
+        "buyback_basis_points": u64_at(d, 997),
+        "whitelisted_quote_mint": key_at(d, 1013),
+        "creator_fee_configurable": d[1045],
+        "max_configurable_creator_fee_bps": u64_at(d, 1046),
+    }
+
+
+def _tiers(d, off):
+    n = struct.unpack_from("<I", d, off)[0]
+    out, off = [], off + 4
+    for _ in range(n):
+        lo, hi = struct.unpack_from("<QQ", d, off)
+        lp, pr, cr = struct.unpack_from("<QQQ", d, off + 16)
+        out.append({"threshold": lo | hi << 64, "lp": lp, "protocol": pr, "creator": cr})
+        off += 40
+    return out, off
+
+
+def decode_fee_config(d):
+    """pump-fees `FeeConfig` (R-PUMP §2.3; R-VEN §2.3)."""
+    tiers, off = _tiers(d, 65)
+    stable, off = _tiers(d, off)
+    fees = lambda o: dict(zip(("lp", "protocol", "creator"), struct.unpack_from("<QQQ", d, o)))
+    return {
+        "bump": d[8],
+        "admin": key_at(d, 9),
+        "flat_fees": fees(41),
+        "fee_tiers": tiers,
+        "stable_fee_tiers": stable,
+        "exotic_flat_fees": fees(off),
+    }
+
+
+def decode_pamm_pool(d):
+    """PumpSwap `Pool` (R-VEN §1.2)."""
+    p = _pad(d, 301)
+    return {
+        "len": len(d),
+        "pool_bump": p[8],
+        "index": u16_at(p, 9),
+        "creator": key_at(p, 11),
+        "base_mint": key_at(p, 43),
+        "quote_mint": key_at(p, 75),
+        "lp_mint": key_at(p, 107),
+        "pool_base_token_account": key_at(p, 139),
+        "pool_quote_token_account": key_at(p, 171),
+        "lp_supply": u64_at(p, 203),
+        "coin_creator": key_at(p, 211),
+        "is_mayhem_mode": p[243],
+        "is_cashback_coin": p[244],
+        "virtual_quote_reserves": int.from_bytes(p[245:261], "little", signed=True),
+        "creator_fee_bps": u64_at(p, 261),
+        "can_edit_creator_fee": p[269],
+        "is_holder_reward": p[270],
+    }
+
+
+def decode_global_config(d):
+    """PumpSwap `GlobalConfig` (R-VEN §2.2–§2.3; IDL offsets)."""
+    return {
+        "admin": key_at(d, 8),
+        "lp_fee_basis_points": u64_at(d, 40),
+        "protocol_fee_basis_points": u64_at(d, 48),
+        "disable_flags": d[56],
+        "protocol_fee_recipients": _keys(d, 57, 8),
+        "coin_creator_fee_basis_points": u64_at(d, 313),
+        "reserved_fee_recipients": [key_at(d, 385)] + _keys(d, 418, 7),
+        "buyback_fee_recipients": _keys(d, 643, 8),
+        "buyback_basis_points": u64_at(d, 899),
+        "boost_authority": key_at(d, 907),
+        "boost_enabled": d[939],
+        "creator_fee_configurable": d[940],
+        "max_configurable_creator_fee_bps": u64_at(d, 941),
+    }
+
+
+def decode_pump_account(owner, d):
+    """The manifest's `decoded` fields of a pump-group account, or None."""
+    if owner == PUMP and d[:8] == CURVE_DISC:
+        return decode_curve(d)
+    if owner == PUMP and d[:8] == PUMP_GLOBAL_DISC:
+        return decode_pump_global(d)
+    if owner == PUMP_FEES and d[:8] == FEE_CONFIG_DISC:
+        return decode_fee_config(d)
+    if owner == PUMP_AMM and d[:8] == PAMM_POOL_DISC:
+        return decode_pamm_pool(d)
+    if owner == PUMP_AMM and d[:8] == PAMM_GLOBAL_CONFIG_DISC:
+        return decode_global_config(d)
+    if owner == "Sysvar1111111111111111111111111111111111111" and len(d) == 17:
+        per_byte_year, threshold = struct.unpack_from("<Qd", d, 0)
+        return {"lamports_per_byte_year": per_byte_year, "exemption_threshold": threshold,
+                "burn_percent": d[16],
+                "minimum_balance_0": int((128 * per_byte_year) * threshold)}
+    if (owner in (TOKEN, TOKEN_2022) and len(d) == 82) or (
+        owner == TOKEN_2022 and len(d) > 165 and d[165] == 1
+    ):
+        return decode_mint(d, owner)
+    if owner in (TOKEN, TOKEN_2022) and len(d) >= 165:
+        return decode_token_account(d)
+    return None
+
+
+# ---- pump roles -------------------------------------------------------------------------------
+
+
+def role_problem(expect, curve, mint_owner, pool_valid):
+    """Why a coin no longer fits its role (None if it does). `curve` is `decode_curve`'s dict."""
+    live = not curve["complete"]
+    sol = curve["quote_mint"] == SYSTEM
+    normal = sol and not curve["is_mayhem_mode"]
+    checks = {
+        "live_sol": live and normal and mint_owner == TOKEN_2022 and curve["len"] >= 115,
+        "near": live and normal and curve["len"] >= 115
+        and curve["real_token_reserves"] <= NEAR_RT_MAX,
+        "live_sol_115": live and normal and curve["len"] == 115 and mint_owner == TOKEN_2022,
+        "live_sol_legacy_115": live and normal and curve["len"] == 115 and mint_owner == TOKEN,
+        "live_sol_legacy_49": live and normal and curve["len"] == 49 and mint_owner == TOKEN,
+        "graduated_pumpswap": curve["complete"] and curve["virtual_token_reserves"] == 0
+        and normal and pool_valid,
+        "mayhem": curve["is_mayhem_mode"] == 1 and live,
+        "usdc": curve["quote_mint"] == USDC and live,
+        "legacy_150": curve["len"] == 150 and mint_owner == TOKEN,
+        "graduated_elsewhere": curve["complete"] and curve["virtual_token_reserves"] == 0
+        and not pool_valid,
+    }
+    if expect not in checks:
+        return f"unknown expectation {expect}"
+    return None if checks[expect] else f"no longer `{expect}`: {curve}"
+
+
+def pool_valid_for(mint, pool_addr, owner, d):
+    """ARCH §2.5 `canonical_pool_valid` (the pool sits at the canonical address)."""
+    if owner != PUMP_AMM or d is None or d[:8] != PAMM_POOL_DISC:
+        return False
+    p = decode_pamm_pool(d)
+    authority = pda([b"pool-authority", mint], PUMP)
+    return (p["index"] == 0 and p["creator"] == authority and p["base_mint"] == mint
+            and p["quote_mint"] == WSOL and not p["is_mayhem_mode"])
+
+
+def fetch_pump_state(rpc, coins):
+    """Every pump venue-state account in one getMultipleAccounts call (one slot)."""
+    # 1. What the derived keys depend on: Global / GlobalConfig (recipient lists), the mints
+    #    (token program), the curves (creator), the canonical pools (vaults, coin creator).
+    roots = [PUMP_GLOBAL, PAMM_GLOBAL_CONFIG]
+    for _, mint, _, _ in coins:
+        roots += [mint, curve_of(mint), canonical_pool_of(mint)[0]]
+    _, vals = rpc.multiple(roots)
+    if vals[0] is None or vals[1] is None:
+        raise SystemExit("pump Global or PumpSwap GlobalConfig missing")
+    g = decode_pump_global(decode_value(vals[0])["data"])
+    gc = decode_global_config(decode_value(vals[1])["data"])
+    derived = {}
+    for i, (role, mint, expect, _) in enumerate(coins):
+        vm, vc, vp = vals[2 + 3 * i: 5 + 3 * i]
+        if vm is None or vc is None:
+            raise SystemExit(f"{role}: mint {mint} or its curve does not exist")
+        c = decode_curve(decode_value(vc)["data"])
+        pool_d = decode_value(vp)["data"] if vp else None
+        valid = pool_valid_for(mint, canonical_pool_of(mint)[0], vp and vp["owner"], pool_d)
+        why = role_problem(expect, c, vm["owner"], valid)
+        if why:
+            raise SystemExit(f"role {role} ({mint}): {why}; pick another (`candidates`) and pass "
+                             f"--coin {role}=MINT")
+        derived[role] = {"token_program": vm["owner"], "creator": c["creator"],
+                         "pool": decode_pamm_pool(pool_d) if valid else None}
+
+    # 2. The account list, with names and purposes (first name wins for shared accounts).
+    plan, seen = [], {}
+
+    def add(name, addr, purpose, role=None, may_be_absent=False):
+        if addr in seen:
+            return
+        seen[addr] = name
+        plan.append((name, addr, purpose, role, may_be_absent))
+
+    add("pump_global", PUMP_GLOBAL, "pump Global (R-PUMP §2.2): fee / buyback / reserved recipient "
+        "lists, pool_migration_fee, creator_fee_configurable")
+    add("pump_fee_config", PUMP_FEE_CONFIG, "pump-fees FeeConfig of pump (R-PUMP §2.3): the curve's "
+        "market-cap fee tiers, read by pump through get_fees_with_quote_mint on every trade")
+    add("pump_event_authority", PUMP_EVENT_AUTHORITY, "pump's emit_cpi authority "
+        "PDA(pump, [\"__event_authority\"])", may_be_absent=True)
+    add("pump_global_volume_accumulator", PUMP_GVA, "pump GlobalVolumeAccumulator (buy_v2 account 19)")
+    add("pump_withdraw_authority", g["withdraw_authority"], "Global.withdraw_authority "
+        "(migrate_v2 account 1, writable, not a signer)", may_be_absent=True)
+    for i, k in enumerate(g["fee_recipients"]):
+        add(f"pump_fee_recipient_{i}", k, f"pump normal fee recipient #{i} (Global list; a trade's "
+            "fee_recipient must be one, R-PUMP §3.1)", may_be_absent=True)
+    for i, k in enumerate(g["buyback_fee_recipients"]):
+        add(f"pump_buyback_fee_recipient_{i}", k, f"pump buyback fee recipient #{i} (Global list, "
+            "error 6057 otherwise)", may_be_absent=True)
+    add("pump_mint_wsol", WSOL, "WSOL: every SOL coin's `quote_mint` account in the v2 "
+        "instructions, the PumpSwap pools' quote")
+    add("pump_mint_usdc", USDC, "USDC: the quote of the USDC coin role")
+    add("sysvar_rent", RENT_SYSVAR, "the Rent sysvar at the snapshot: pump tops a creator vault "
+        "up to Rent.minimum_balance(0) and creates UVAs at Rent.minimum_balance(137); fork.rs "
+        "installs it so venue-side rent is mainnet's (T-RENT)")
+    add("pamm_global_config", PAMM_GLOBAL_CONFIG, "PumpSwap GlobalConfig (R-VEN §2.2–§2.3): "
+        "disable_flags, protocol / buyback recipient lists, creator_fee_configurable")
+    add("pamm_fee_config", PAMM_FEE_CONFIG, "pump-fees FeeConfig of PumpSwap (R-VEN §2.3): the "
+        "canonical pools' market-cap tiers")
+    add("pamm_event_authority", PAMM_EVENT_AUTHORITY, "PumpSwap's emit_cpi authority",
+        may_be_absent=True)
+    add("pamm_global_volume_accumulator", PAMM_GVA, "PumpSwap GlobalVolumeAccumulator (buy)")
+    for i, k in enumerate(gc["protocol_fee_recipients"]):
+        add(f"pamm_protocol_fee_recipient_{i}_wsol_ata", ata(k, WSOL, TOKEN),
+            f"WSOL ATA of PumpSwap protocol fee recipient #{i} {k} (must exist, ARCH §3.12 T10)",
+            may_be_absent=True)
+    for i, k in enumerate(gc["buyback_fee_recipients"]):
+        add(f"pamm_buyback_fee_recipient_{i}_wsol_ata", ata(k, WSOL, TOKEN),
+            f"WSOL ATA of PumpSwap buyback fee recipient #{i} {k} (must exist, ARCH §3.12 T17)",
+            may_be_absent=True)
+    for role, mint, expect, purpose in coins:
+        dv = derived[role]
+        tp, curve = dv["token_program"], curve_of(mint)
+        pre = f"pump_{role}"
+        add(f"{pre}_mint", mint, f"mint of the `{role}` coin: {purpose}", role)
+        add(f"{pre}_curve", curve, f"BondingCurve of the `{role}` coin: {purpose}", role)
+        add(f"{pre}_curve_base_ata", ata(curve, mint, tp), f"the `{role}` curve's token ATA "
+            "(associated_bonding_curve)", role, may_be_absent=expect == "graduated_elsewhere")
+        if expect not in ("graduated_elsewhere", "legacy_150"):
+            add(f"{pre}_creator_vault", pda([b"creator-vault", dv["creator"]], PUMP),
+                f"pump creator vault of the `{role}` curve's creator", role, may_be_absent=True)
+            sharing = pda([b"sharing-config", mint], PUMP_FEES)
+            if dv["creator"] == sharing:
+                # Only a coin whose creator fee is shared names its sharing config as the
+                # creator (R-PUMP §2.4); otherwise pump only checks it is empty.
+                add(f"{pre}_sharing_config", sharing, f"pump-fees sharing-config of the `{role}` "
+                    "mint (the curve's creator)", role, may_be_absent=True)
+        if expect == "usdc":
+            add(f"{pre}_curve_quote_ata", ata(curve, USDC, TOKEN), "the USDC curve's quote ATA",
+                role)
+        if dv["pool"]:
+            pool, authority = canonical_pool_of(mint)
+            p = dv["pool"]
+            boost = pda([b"boost_vault", pool], PUMP_AMM)
+            ccva = pda([b"creator_vault", p["coin_creator"]], PUMP_AMM)
+            add(f"{pre}_pool", pool, f"the `{role}` coin's canonical PumpSwap Pool", role)
+            add(f"{pre}_pool_base_vault", p["pool_base_token_account"], "the pool's base vault", role)
+            add(f"{pre}_pool_quote_vault", p["pool_quote_token_account"], "the pool's WSOL vault",
+                role)
+            add(f"{pre}_lp_mint", p["lp_mint"], "the pool's LP mint", role)
+            add(f"{pre}_pool_authority", authority, "pump PDA [\"pool-authority\", mint] (the "
+                "pool's creator)", role, may_be_absent=True)
+            add(f"{pre}_boost_vault", boost, "PumpSwap PDA [\"boost_vault\", pool]", role,
+                may_be_absent=True)
+            add(f"{pre}_boost_vault_ata", ata(boost, WSOL, TOKEN), "the boost vault's WSOL ATA "
+                "(ARCH §3.12 P5; the boost gate, A13): absent once the boost has run", role,
+                may_be_absent=True)
+            add(f"{pre}_coin_creator_vault_authority", ccva, "PumpSwap PDA [\"creator_vault\", "
+                "pool.coin_creator]", role, may_be_absent=True)
+            add(f"{pre}_coin_creator_vault_ata", ata(ccva, WSOL, TOKEN), "its WSOL ATA (T11)", role,
+                may_be_absent=True)
+    if len(plan) > 100:
+        raise SystemExit(f"{len(plan)} accounts do not fit one getMultipleAccounts call")
+
+    # 3. One call, one slot.
+    slot, vals = rpc.multiple([a for _, a, _, _, _ in plan])
+    block_time = None
+    try:
+        block_time = rpc.call("getBlockTime", [slot])
+    except SystemExit as e:
+        print(f"WARNING: getBlockTime({slot}): {e}", file=sys.stderr)
+    entries, files = [], []
+    by_addr = {}
+    for (name, addr, purpose, role, may_be_absent), v in zip(plan, vals):
+        e = {"name": name, "group": "pump_state"}
+        if role:
+            e["role"] = role
+        e.update({"purpose": purpose, "address": addr, "slot": slot})
+        if v is None:
+            if not may_be_absent:
+                raise SystemExit(f"{name} {addr} does not exist at slot {slot}")
+            e["absent"] = True
+            entries.append(e)
+            continue
+        a = decode_value(v)
+        d = a["data"]
+        rel = f"{PUMP_ACCOUNT_DIR}/{name}.bin"
+        write_file(rel, d)
+        files.append(rel)
+        e.update({
+            "owner": a["owner"],
+            "lamports": a["lamports"],
+            "executable": a["executable"],
+            "rent_epoch": a["rent_epoch"],
+            "space": len(d),
+            "sha256": sha256(d),
+            "file": rel,
+        })
+        decoded = decode_pump_account(a["owner"], d)
+        if decoded is not None:
+            e["decoded"] = decoded
+        entries.append(e)
+        by_addr[addr] = (a["owner"], d)
+    # 4. The dumped state must still fit every role and name what step 1 derived.
+    for role, mint, expect, _ in coins:
+        owner, cd = by_addr[curve_of(mint)]
+        c = decode_curve(cd)
+        pool, _ = canonical_pool_of(mint)
+        po, pd_ = by_addr.get(pool, (None, None))
+        why = role_problem(expect, c, by_addr[mint][0], pool_valid_for(mint, pool, po, pd_))
+        if why:
+            raise SystemExit(f"role {role} changed between the two reads: {why}")
+        if c["creator"] != derived[role]["creator"]:
+            raise SystemExit(f"role {role}: the curve's creator changed between the two reads")
+    snapshot = {
+        "group": "pump_state",
+        "slot": slot,
+        "block_time": block_time,
+        "block_time_utc": dt.datetime.fromtimestamp(block_time, dt.UTC).strftime(
+            "%Y-%m-%dT%H:%M:%SZ") if block_time else None,
+        "fetched_at": now_utc(),
+        "rpc": rpc.used,
+        "method": "one getMultipleAccounts call (base64) over every account below (absent ones "
+        "recorded as such), so all of them are the mainnet state at `slot`; a first call read "
+        "Global, GlobalConfig, the mints, curves and canonical pools to derive the rest",
+        "coins": {role: mint for role, mint, _, _ in coins},
+    }
+    return entries, files, snapshot
+
+
+def check_pump(m):
+    """Offline cross-checks of the pump groups; returns a list of problems."""
+    problems = []
+    entries = [e for e in m["accounts"] if e.get("group") in PUMP_GROUPS]
+    state = [e for e in entries if e["group"] == "pump_state"]
+    by_addr = {e["address"]: e for e in state}
+    by_name = {e["name"]: e for e in entries}
+    slots = {e["slot"] for e in state}
+    if len(slots) > 1:
+        problems.append(f"pump_state spans several slots: {sorted(slots)}")
+    for name, program, _, _, slot in PUMP_PROGRAMS:
+        pd_ = by_name.get(f"{name}_program_data")
+        if pd_ is None:
+            problems.append(f"{name}: no ProgramData fixture")
+        elif pd_["decoded"]["deploy_slot"] != slot:
+            problems.append(f"{name}: deploy slot {pd_['decoded']['deploy_slot']} != {slot}")
+    for k in (PUMP_GLOBAL, PUMP_FEE_CONFIG, PAMM_GLOBAL_CONFIG, PAMM_FEE_CONFIG, PUMP_GVA, PAMM_GVA,
+              RENT_SYSVAR):
+        if k not in by_addr or by_addr[k].get("absent"):
+            problems.append(f"static pump account {k} is not a fixture")
+    snap = next((sn for sn in m.get("snapshots", []) if sn["group"] == "pump_state"), None)
+    coins = snap["coins"] if snap else {}
+    expect_of = {r: x for r, _, x, _ in PUMP_COINS}
+    pinned = {r: mint for r, mint, _, _ in PUMP_COINS}
+    if coins != pinned:
+        problems.append(f"pump_state was dumped with coins {coins}, but PUMP_COINS pins {pinned}: "
+                        "pin the dumped mints (a `--coin` override is for the fetch only)")
+    for role, mint in coins.items():
+        me, ce = by_addr.get(mint), by_addr.get(curve_of(mint))
+        if not me or not ce or me.get("absent") or ce.get("absent"):
+            problems.append(f"{role}: mint or curve missing")
+            continue
+        c = decode_curve(read_file(ce["file"]))
+        pool, _ = canonical_pool_of(mint)
+        pe = by_addr.get(pool)
+        pvalid = bool(pe and not pe.get("absent")
+                      and pool_valid_for(mint, pool, pe["owner"], read_file(pe["file"])))
+        why = role_problem(expect_of.get(role, "?"), c, me["owner"], pvalid)
+        if why:
+            problems.append(f"{role}: {why}")
+        base = by_addr.get(ata(curve_of(mint), mint, me["owner"]))
+        if base and not base.get("absent"):
+            dec = base.get("decoded", {})
+            if dec.get("mint") != mint or dec.get("owner") != curve_of(mint):
+                problems.append(f"{role}: curve base ATA mint/owner mismatch")
+        elif expect_of.get(role) != "graduated_elsewhere":
+            problems.append(f"{role}: no curve base ATA fixture")
+        if pvalid:
+            p = decode_pamm_pool(read_file(pe["file"]))
+            for k, mk in (("pool_base_token_account", "base_mint"),
+                          ("pool_quote_token_account", "quote_mint")):
+                v = by_addr.get(p[k], {}).get("decoded", {})
+                if v.get("mint") != p[mk] or v.get("owner") != pool:
+                    problems.append(f"{role}: pool vault {k} mint/owner mismatch")
+    return problems
+
+
+# ---- candidates (mainnet: replacements for the coin roles) --------------------------------------
+
+
+def _events_in_block(rpc, slot):
+    b = rpc.call("getBlock", [slot, {"encoding": "json", "maxSupportedTransactionVersion": 1,
+                                     "transactionDetails": "full", "rewards": False}])
+    out = []
+    for tx in b["transactions"]:
+        meta = tx["meta"]
+        if meta is None or meta.get("err") is not None:
+            continue
+        la = meta.get("loadedAddresses") or {}
+        keys = tx["transaction"]["message"]["accountKeys"] + la.get("writable", []) + la.get(
+            "readonly", [])
+        if PUMP not in keys:
+            continue
+        for inner in meta.get("innerInstructions") or []:
+            for ix in inner["instructions"]:
+                if keys[ix["programIdIndex"]] != PUMP:
+                    continue
+                d = b58decode(ix["data"])
+                if d[:8] != PUMP_EVENT_IX:
+                    continue
+                body = d[16:]
+                if d[8:16] == PUMP_CREATE_EVENT:
+                    o = 0
+                    for _ in range(3):
+                        o += 4 + struct.unpack_from("<I", body, o)[0]
+                    out.append(("create", key_at(body, o), body))
+                elif d[8:16] == PUMP_TRADE_EVENT:
+                    out.append(("trade", key_at(body, 0), body))
+    return out
+
+
+def cmd_candidates(args):
+    rpc = Rpc([args.rpc] if args.rpc else RPCS)
+    slot = rpc.call("getSlot", [{"commitment": "finalized"}])
+    creates = []
+    for s in range(slot, slot - args.blocks, -1):
+        try:
+            for kind, mint, _ in _events_in_block(rpc, s):
+                if kind == "create":
+                    creates.append((s, mint))
+        except SystemExit as e:
+            print(f"skip block {s}: {e}", file=sys.stderr)
+    print("newest creates (fresh):")
+    for s, mint in creates[:10]:
+        print(f"  slot {s}  {mint}")
+    print("latest migrations (graduated):")
+    sigs = rpc.call("getSignaturesForAddress",
+                    ["39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg", {"limit": 10}])
+    for sg in sigs:
+        if sg["err"]:
+            continue
+        tx = rpc.call("getTransaction", [sg["signature"], {"encoding": "json",
+                                                           "maxSupportedTransactionVersion": 1}])
+        msg = tx["transaction"]["message"]
+        la = tx["meta"].get("loadedAddresses") or {}
+        keys = msg["accountKeys"] + la.get("writable", []) + la.get("readonly", [])
+        for ix in msg["instructions"]:
+            if keys[ix["programIdIndex"]] == PUMP and b58decode(ix["data"])[:8] == PUMP_MIGRATE_V2:
+                acc = [keys[i] for i in ix["accounts"]]
+                print(f"  slot {sg['slot']}  {acc[2]}  quote {acc[3]}  pool {acc[10]}")
+                break
+    if args.near:
+        print("live SOL non-mayhem curves nearest completion (getProgramAccounts, slow):")
+        rows = []
+        for size in (115, 125, 150, 151):
+            res = rpc.call("getProgramAccounts", [PUMP, {
+                "encoding": "base64", "dataSlice": {"offset": 24, "length": 8},
+                "filters": [{"dataSize": size}, {"memcmp": {"offset": 48, "bytes": "1"}},
+                            {"memcmp": {"offset": 83, "bytes": SYSTEM}},
+                            {"memcmp": {"offset": 81, "bytes": "1"}}]}])
+            rows += [(u64_at(base64.b64decode(a["account"]["data"][0]), 0), size, a["pubkey"])
+                     for a in res]
+        for rt, size, curve in sorted(rows)[:10]:
+            print(f"  rT {rt:>20,}  {size} B  curve {curve} (mint: getTokenAccountsByOwner)")
+    return 0
+
+
 # ---- manifest -------------------------------------------------------------------------------
 
 
@@ -361,8 +1055,20 @@ def load_manifest():
         return json.load(f)
 
 
+RAYDIUM_GROUPS = ("raydium_programs", "raydium_state")
+PUMP_GROUPS = ("pump_programs", "pump_state")
+GROUPS = RAYDIUM_GROUPS + PUMP_GROUPS
+
+
 def managed(entry):
-    return entry.get("group") in ("raydium_programs", "raydium_state")
+    return entry.get("group") in GROUPS
+
+
+def entry_files(e):
+    """The fixture files of a manifest entry (none for an absent account)."""
+    if e.get("absent"):
+        return []
+    return [e["file"]] if "file" in e else list(e["files"].values())
 
 
 def write_manifest(m):
@@ -378,7 +1084,7 @@ def write_sums(paths):
         with open(SUMS) as f:
             for line in f:
                 p = line.rstrip("\n").split("  ", 1)[-1]
-                if not (p.startswith(ACCOUNT_DIR + "/") or p.startswith(PROGRAM_DIR + "/")):
+                if not p.startswith((ACCOUNT_DIR + "/", PUMP_ACCOUNT_DIR + "/", PROGRAM_DIR + "/")):
                     keep.append(line.rstrip("\n"))
     lines = keep + [f"{sha256(read_file(p))}  {p}" for p in sorted(paths)]
     with open(SUMS, "w") as f:
@@ -404,11 +1110,14 @@ def now_utc():
 # ---- fetch ----------------------------------------------------------------------------------
 
 
-def fetch_programs(rpc):
-    """Program accounts, ProgramData headers and ELFs; returns (entries, files, snapshot)."""
+def fetch_programs(rpc, programs=None, group="raydium_programs", account_dir=ACCOUNT_DIR):
+    """Program accounts, ProgramData headers and ELFs; returns (entries, files, snapshot).
+
+    ``programs``: ``(name, program, ProgramData, trimmed-ELF sha256 or None, expected deploy
+    slot or None)`` tuples (default: the Raydium programs)."""
     entries, files = [], []
     slot_before = rpc.call("getSlot", [])
-    for name, program, program_data, trimmed_expected in PROGRAMS:
+    for name, program, program_data, trimmed_expected, slot_expected in programs or PROGRAMS:
         res = rpc.call("getAccountInfo", [program, {"encoding": "base64"}])
         prog = decode_value(res["value"])
         pd_res = rpc.call("getAccountInfo", [program_data, {"encoding": "base64"}])
@@ -427,8 +1136,8 @@ def fetch_programs(rpc):
         trimmed = elf.rstrip(b"\0")
         deploy_slot = u64_at(d, 4)
         authority = key_at(d, 13) if d[12] == 1 else None
-        prog_file = f"{ACCOUNT_DIR}/{name}_program.bin"
-        header_file = f"{ACCOUNT_DIR}/{name}_program_data_header.bin"
+        prog_file = f"{account_dir}/{name}_program.bin"
+        header_file = f"{account_dir}/{name}_program_data_header.bin"
         elf_file = f"{PROGRAM_DIR}/{name}.so"
         write_file(prog_file, prog["data"])
         write_file(header_file, d[:45])
@@ -437,7 +1146,7 @@ def fetch_programs(rpc):
         entries.append(
             {
                 "name": f"{name}_program",
-                "group": "raydium_programs",
+                "group": group,
                 "purpose": f"the {name} program account (upgradeable loader; names its ProgramData). "
                 "tests/litesvm/src/fork.rs deploys the ELF at the mainnet address with it",
                 "address": program,
@@ -452,12 +1161,13 @@ def fetch_programs(rpc):
                 "decoded": {"program_data": program_data},
             }
         )
+        tests = "T-RAY-*" if group == "raydium_programs" else "T-PUMP-MATH, M5 / M6"
         entries.append(
             {
                 "name": f"{name}_program_data",
-                "group": "raydium_programs",
-                "purpose": f"{name} ProgramData: the deployed ELF (T-RAY-*) and the header the "
-                "venue-upgrade latch reads (T-LATCH on the dumped ProgramData, ARCH §8.2, §9 M3). "
+                "group": group,
+                "purpose": f"{name} ProgramData: the deployed ELF ({tests}) and the header the "
+                "venue-upgrade latch reads (T-LATCH on the dumped ProgramData, ARCH §8.2, §9). "
                 "Stored as header ‖ ELF; the account is header ‖ ELF ‖ zeros up to `space`, whose "
                 "sha256 is `sha256` (fork.rs rebuilds and checks it)",
                 "address": program_data,
@@ -473,7 +1183,8 @@ def fetch_programs(rpc):
                 "elf_sha256": sha256(elf[:n]),
                 "elf_trimmed_len": len(trimmed),
                 "elf_trimmed_sha256": sha256(trimmed),
-                "elf_trimmed_sha256_expected": trimmed_expected,
+                **({"elf_trimmed_sha256_expected": trimmed_expected} if trimmed_expected else {}),
+                **({"deploy_slot_expected": slot_expected} if slot_expected else {}),
                 "decoded": {
                     "deploy_slot": deploy_slot,
                     "upgrade_authority": authority,
@@ -481,14 +1192,19 @@ def fetch_programs(rpc):
                 },
             }
         )
-        if sha256(trimmed) != trimmed_expected:
+        if slot_expected and deploy_slot != slot_expected:
+            raise SystemExit(
+                f"{name}: deploy slot {deploy_slot} != {slot_expected} (ARCH §8.2 / "
+                "VENUE_GUARD_SLOTS_2026_09_27): the program was upgraded; update both deliberately"
+            )
+        if trimmed_expected and sha256(trimmed) != trimmed_expected:
             print(
                 f"WARNING: {name}: trimmed ELF sha256 {sha256(trimmed)} differs from R-RAY §1.3 "
                 f"{trimmed_expected} (upgraded since the research?)",
                 file=sys.stderr,
             )
     snapshot = {
-        "group": "raydium_programs",
+        "group": group,
         "slot": slot_before,
         "fetched_at": now_utc(),
         "rpc": rpc.used,
@@ -648,17 +1364,33 @@ def fetch_state(rpc):
     return entries, files, snapshot
 
 
+def pump_coins(overrides):
+    """`PUMP_COINS` with `role=MINT` overrides applied."""
+    over = dict(o.split("=", 1) for o in overrides or [])
+    unknown = set(over) - {r for r, _, _, _ in PUMP_COINS}
+    if unknown:
+        raise SystemExit(f"unknown coin roles: {sorted(unknown)}")
+    return [(r, over.get(r, mint), x, p) for r, mint, x, p in PUMP_COINS]
+
+
 def cmd_fetch(args):
     m = load_manifest()
     have = {s["group"] for s in m.get("snapshots", [])}
-    groups = ["raydium_programs", "raydium_state"]
+    groups = [g for g in GROUPS if not args.group or g in args.group]
     todo = [g for g in groups if args.refresh or g not in have or check(m, only=g)]
     if not todo:
         print("fixtures complete and valid; nothing to fetch (use --refresh to re-dump)")
         return 0
     rpc = Rpc([args.rpc] if args.rpc else RPCS)
     for g in todo:
-        entries, files, snap = fetch_programs(rpc) if g == "raydium_programs" else fetch_state(rpc)
+        if g == "raydium_programs":
+            entries, files, snap = fetch_programs(rpc)
+        elif g == "raydium_state":
+            entries, files, snap = fetch_state(rpc)
+        elif g == "pump_programs":
+            entries, files, snap = fetch_programs(rpc, PUMP_PROGRAMS, g, PUMP_ACCOUNT_DIR)
+        else:
+            entries, files, snap = fetch_pump_state(rpc, pump_coins(args.coin))
         m["accounts"] = [e for e in m["accounts"] if e.get("group") != g] + entries
         m["snapshots"] = [s for s in m.get("snapshots", []) if s["group"] != g] + [snap]
         print(f"{g}: {len(entries)} accounts at slot {snap['slot']}")
@@ -666,15 +1398,21 @@ def cmd_fetch(args):
         "Mainnet accounts, programs and transactions dumped for the program tests (ARCHITECTURE "
         "§1.2, §8.2). Each entry records how it was fetched; SHA256SUMS pins the bytes (CI: cd "
         "tests/fixtures && sha256sum -c SHA256SUMS). The Raydium entries (groups raydium_programs "
-        "and raydium_state) are written by scripts/dump-fixtures.py; `snapshots` records the "
-        "slot and RPC of each group."
+        "and raydium_state) and the pump entries (groups pump_programs and pump_state) are "
+        "written by scripts/dump-fixtures.py; `snapshots` records the slot and RPC of each group."
     )
     write_manifest(m)
     managed_files = []
     for e in m["accounts"]:
         if managed(e):
-            managed_files += [e["file"]] if "file" in e else list(e["files"].values())
+            managed_files += entry_files(e)
     write_sums(managed_files)
+    # A role whose account was present at an earlier dump and is absent now leaves a stale file.
+    pump_dir = os.path.join(FIXTURES, PUMP_ACCOUNT_DIR)
+    if os.path.isdir(pump_dir):
+        for f in os.listdir(pump_dir):
+            if f"{PUMP_ACCOUNT_DIR}/{f}" not in managed_files:
+                os.remove(os.path.join(pump_dir, f))
     problems = check(load_manifest())
     for p in problems:
         print("FAIL:", p, file=sys.stderr)
@@ -689,7 +1427,10 @@ def check(m, only=None):
     problems = []
     entries = [e for e in m["accounts"] if managed(e) and (only is None or e["group"] == only)]
     if not entries:
-        return [f"no entries for {only or 'the Raydium groups'}"]
+        return [f"no entries for {only or 'the managed groups'}"]
+    if only is None:
+        have = {e["group"] for e in entries}
+        problems += [f"no entries for {g}" for g in GROUPS if g not in have]
     by_addr = {e["address"]: e for e in m["accounts"] if managed(e)}
     sums = {}
     if os.path.exists(SUMS):
@@ -698,6 +1439,10 @@ def check(m, only=None):
                 h, p = line.rstrip("\n").split("  ", 1)
                 sums[p] = h
     for e in entries:
+        if e.get("absent"):
+            if "file" in e or "sha256" in e:
+                problems.append(f"{e['name']}: an absent account with a file")
+            continue
         try:
             if "file" in e:
                 d = read_file(e["file"])
@@ -713,8 +1458,12 @@ def check(m, only=None):
                     problems.append(f"{e['name']}: header ‖ ELF ‖ zeros != the mainnet account")
                 if sha256(elf) != e["elf_sha256"] or len(elf) != e["elf_len"]:
                     problems.append(f"{e['files']['elf']}: ELF differs from the manifest")
-                if sha256(elf.rstrip(b"\0")) != e["elf_trimmed_sha256_expected"]:
+                if ("elf_trimmed_sha256_expected" in e
+                        and sha256(elf.rstrip(b"\0")) != e["elf_trimmed_sha256_expected"]):
                     problems.append(f"{e['name']}: trimmed ELF hash != R-RAY §1.3")
+                if ("deploy_slot_expected" in e
+                        and u64_at(header, 4) != e["deploy_slot_expected"]):
+                    problems.append(f"{e['name']}: deploy slot != ARCH §8.2's")
                 if u64_at(header, 4) != e["decoded"]["deploy_slot"]:
                     problems.append(f"{e['name']}: deploy slot differs from the header")
                 for p in e["files"].values():
@@ -727,7 +1476,7 @@ def check(m, only=None):
         # owner the swap requires.
         for e in entries:
             dec = e.get("decoded") or {}
-            if e["owner"] == AMM_V4 and "coin_vault" in dec:
+            if e.get("owner") == AMM_V4 and "coin_vault" in dec:
                 for k in ("coin_vault", "pc_vault", "coin_vault_mint", "pc_vault_mint", "lp_mint"):
                     if dec[k] not in by_addr:
                         problems.append(f"{e['name']}: {k} {dec[k]} is not a fixture")
@@ -735,7 +1484,7 @@ def check(m, only=None):
                     v = by_addr.get(dec[k], {}).get("decoded", {})
                     if v.get("mint") != dec[mk] or v.get("owner") != AMM_V4_AUTHORITY:
                         problems.append(f"{e['name']}: {k} mint/authority mismatch")
-            if e["owner"] == CPMM and "token_0_vault" in dec:
+            if e.get("owner") == CPMM and "token_0_vault" in dec:
                 for k in ("amm_config", "token_0_vault", "token_1_vault", "token_0_mint",
                           "token_1_mint", "lp_mint", "observation_key"):
                     if dec[k] not in by_addr:
@@ -749,6 +1498,8 @@ def check(m, only=None):
         slots = {e["slot"] for e in entries if e["group"] == "raydium_state"}
         if len(slots) > 1:
             problems.append(f"raydium_state spans several slots: {sorted(slots)}")
+    if only in (None, "pump_state") and any(e["group"] == "pump_state" for e in entries):
+        problems += check_pump(m)
     return problems
 
 
@@ -758,7 +1509,8 @@ def cmd_check(_args):
         print("FAIL:", p, file=sys.stderr)
     if not problems:
         n = sum(1 for e in load_manifest()["accounts"] if managed(e))
-        print(f"ok: {n} Raydium fixture entries match their files, SHA256SUMS and each other")
+        print(f"ok: {n} Raydium and pump fixture entries match their files, SHA256SUMS and "
+              "each other")
     return 1 if problems else 0
 
 
@@ -769,9 +1521,20 @@ def main():
     f = sub.add_parser("fetch", help="dump from mainnet what is missing or invalid")
     f.add_argument("--refresh", action="store_true", help="re-dump every group at a new slot")
     f.add_argument("--rpc", help="JSON-RPC endpoint (default: mainnet-beta, then publicnode)")
+    f.add_argument("--group", action="append", choices=GROUPS,
+                   help="only this group (repeatable; default: all)")
+    f.add_argument("--coin", action="append", metavar="ROLE=MINT",
+                   help="replace a pump coin role's mint (pump_state; repeatable)")
+    c = sub.add_parser("candidates", help="mainnet: replacements for the pump coin roles")
+    c.add_argument("--blocks", type=int, default=10, help="recent blocks to scan for creates")
+    c.add_argument("--near", action="store_true",
+                   help="also list live curves nearest completion (getProgramAccounts; slow)")
+    c.add_argument("--rpc", help="JSON-RPC endpoint (default: mainnet-beta, then publicnode)")
     args = ap.parse_args()
     if args.cmd == "fetch":
         return cmd_fetch(args)
+    if args.cmd == "candidates":
+        return cmd_candidates(args)
     return cmd_check(args)
 
 

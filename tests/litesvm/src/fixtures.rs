@@ -14,7 +14,7 @@ use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::bpf_loader_upgradeable;
 use bytemuck::Zeroable;
 use litesvm::LiteSVM;
-use shortwin::constants::MARKET_VERSION;
+use shortwin::constants::{MARKET_VERSION, TOKEN_PROGRAM_ID, WSOL_MINT};
 use shortwin::state::{
     GlobalConfig, MARKET_FLAG_WIPE_REWARDS_CLAIMED, MARKET_FLAG_WIPE_TRADER_SWEPT, Market,
     MarketVault, PodU128, VenueKind,
@@ -189,6 +189,9 @@ pub fn install_market(
     m.trader_wsol = trader_wsol;
     m.bonding_curve = pda::bonding_curve(mint);
     m.canonical_pool = pda::canonical_pool(mint);
+    // The derived keys `create_market` caches (M5-SEC-6).
+    m.trader_wsol_ata = pda::ata(&trader, &WSOL_MINT, &TOKEN_PROGRAM_ID);
+    m.pump_pool_authority = pda::pump_pool_authority(mint);
     m.last_accrual_ts = now;
     m.ema_params_version = config.ema_params.version;
     m.ema_dtmax_s = config.ema_params.ema_dtmax_s;

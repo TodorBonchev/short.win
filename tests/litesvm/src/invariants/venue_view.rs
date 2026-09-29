@@ -14,6 +14,14 @@
 //!   `quote::ray_v4` / `quote::cpmm` (per direction) on `vault − need_take_pnl` / `vault −
 //!   counters`.
 //!
+//! - **Pump curve** (M5; ARCH §3.12 PumpCurve, §4.1–§4.3, §5.3): the curve parses (owner,
+//!   discriminator, bools), is SOL-quoted, not mayhem, at least 115 bytes and not complete, and
+//!   pump's `Global` and `FeeConfig`, the curve's base ATA (holding at least `rT`) and PumpSwap's
+//!   `FeeConfig` and `GlobalConfig` parse; pricing `(vT, vQ)` with `fees::pump_curve` on the
+//!   live tier; the quotes `quote::sol_leg` (ε₁ = 1) up to `rT` (the straddle above it is not
+//!   re-quoted here), the sale capped by `rQ`. A migrating curve (complete, `vT > 0`) is not
+//!   executable but still **observed** (ARCH §3.0 step 7).
+//!
 //! A venue that cannot execute has no reserves and `fee_ppm` 0, as the program's
 //! `VenueState::not_executable` (the route predicates then hold whatever the fee).
 
@@ -21,9 +29,9 @@ use anchor_lang::prelude::Pubkey;
 use litesvm::LiteSVM;
 use shortwin::constants::{RAYDIUM_V4_AUTHORITY_NONCE, TOKEN_PROGRAM_ID};
 use shortwin::state::{MARKET_FLAG_SOL_IS_TOKEN0_OR_COIN, Market, VenueKind, raydium_cache};
-use shortwin_math::fees::{self, CpmmConfig, CpmmPoolFees, Direction};
-use shortwin_math::quote::Pricing;
-use shortwin_venue_state::{mint, raydium_cpmm, raydium_v4, token_account};
+use shortwin_math::fees::{self, CpmmConfig, CpmmPoolFees, CurveFeeSchedule, Direction, FeeBps};
+use shortwin_math::quote::{CurveState, Pricing, sol_leg};
+use shortwin_venue_state::{mint, pump, pump_amm, raydium_cpmm, raydium_v4, token_account};
 use solana_clock::Clock;
 
 use crate::read;
@@ -33,25 +41,42 @@ use crate::read;
 pub struct VenueView {
     /// `venue_executable` (ARCH §5.3).
     pub executable: bool,
+    /// Observed by the prologue's record: executable, or a migrating curve (ARCH §3.0 step 7).
+    pub observed: bool,
     /// Pricing reserves `(X, Y)` (token, SOL) when executable.
     pub reserves: Option<(u64, u64)>,
     /// One-way fee φ in ppm (0 when not executable).
     pub fee_ppm: u32,
-    /// The resolved fees (execution quotes) when executable.
+    /// The resolved fees (execution quotes) when executable (constant-product venues).
     pub pricing: Option<Pricing>,
+    /// The pump curve's live state and resolved fees when executable.
+    pub curve: Option<(CurveState, FeeBps)>,
+    /// The venue-side rent a trade on this state takes from `user` (the trader) besides its
+    /// charge: pump's creator-vault top-up to `Rent.minimum_balance(0)` when the curve charges a
+    /// creator fee and the vault holds less (R-PUMP U6, Update 2026-09-29; T-RENT). 0 elsewhere.
+    pub venue_rent: u64,
 }
 
 impl VenueView {
     /// A venue that cannot execute.
     pub const DEAD: Self = Self {
         executable: false,
+        observed: false,
         reserves: None,
         fee_ppm: 0,
         pricing: None,
+        curve: None,
+        venue_rent: 0,
     };
 
-    /// `B̂_live(q)`: the exact-out buy of `q` tokens on this state.
+    /// `B̂_live(q)`: the exact-out buy of `q` tokens on this state (the curve: up to `rT`).
     pub fn buy(&self, q: u64) -> Option<u64> {
+        if let Some((c, f)) = self.curve {
+            if u128::from(q) > c.rt {
+                return None;
+            }
+            return sol_leg::buy_exact_out(q, c.vt, c.vq, true, &f).map(|b| b.cost);
+        }
         let (x, y) = self.reserves?;
         self.pricing?
             .buy(q, u128::from(x), u128::from(y))
@@ -60,6 +85,10 @@ impl VenueView {
 
     /// `S_exp(q)`: the exact-in sale of `q` tokens on this state.
     pub fn sell(&self, q: u64) -> Option<u64> {
+        if let Some((c, f)) = self.curve {
+            let cap = u64::try_from(c.rq).unwrap_or(u64::MAX);
+            return sol_leg::sell_exact_in(q, c.vt, c.vq, &f, cap).map(|s| s.proceeds);
+        }
         let (x, y) = self.reserves?;
         self.pricing?
             .sell(q, u128::from(x), u128::from(y), y)
@@ -68,13 +97,112 @@ impl VenueView {
 }
 
 /// The view of `m`'s venue now, `None` for a venue the harness has no view of (list-only,
-/// the pump venues until their milestones).
+/// PumpSwap until M6).
 pub fn view(svm: &LiteSVM, m: &Market) -> Option<VenueView> {
     match m.venue_kind()? {
         VenueKind::Mock => Some(mock(svm, m)),
         VenueKind::RaydiumV4 => Some(ray_v4(svm, m).unwrap_or(VenueView::DEAD)),
         VenueKind::RaydiumCpmm => Some(ray_cpmm(svm, m).unwrap_or(VenueView::DEAD)),
+        VenueKind::PumpCurve | VenueKind::PumpMigrating => Some(pump_curve(svm, m)),
         _ => None,
+    }
+}
+
+/// The pump curve's view (module docs).
+fn pump_curve(svm: &LiteSVM, m: &Market) -> VenueView {
+    let Some(acc) = svm.get_account(&m.bonding_curve) else {
+        return VenueView::DEAD;
+    };
+    let Ok(c) = pump::read_curve(&acc.owner.to_bytes(), &acc.data) else {
+        return VenueView::DEAD;
+    };
+    let listable = acc.data.len() >= pump::CURVE_MIN_LEN && c.is_sol_quote() && !c.is_mayhem_mode;
+    let state = CurveState {
+        vt: u128::from(c.virtual_token_reserves),
+        vq: u128::from(c.virtual_quote_reserves),
+        rt: u128::from(c.real_token_reserves),
+        rq: u128::from(c.real_quote_reserves),
+        complete: c.complete,
+    };
+    let reserves = c.virtual_token_reserves > 0 && c.virtual_quote_reserves > 0;
+    let observed = listable && reserves && c.complete;
+    let dead = VenueView {
+        observed,
+        ..VenueView::DEAD
+    };
+    if !listable || !reserves || c.complete {
+        return dead;
+    }
+    let read = |k: &Pubkey| svm.get_account(k);
+    let (Some(g), Some(fc), Some(pfc), Some(gc)) = (
+        read(&shortwin::constants::PUMP_GLOBAL),
+        read(&shortwin::constants::PUMP_FEE_CONFIG),
+        read(&shortwin::constants::PUMP_AMM_FEE_CONFIG),
+        read(&shortwin::constants::PUMP_AMM_GLOBAL_CONFIG),
+    ) else {
+        return dead;
+    };
+    let Ok(global) = pump::read_global(&g.owner.to_bytes(), &g.data) else {
+        return dead;
+    };
+    let Ok(config) = pump::read_fee_config(&fc.owner.to_bytes(), &fc.data) else {
+        return dead;
+    };
+    if pump::read_fee_config(&pfc.owner.to_bytes(), &pfc.data).is_err()
+        || pump_amm::read_global_config(&gc.owner.to_bytes(), &gc.data).is_err()
+    {
+        return dead;
+    }
+    let Some(base) = token(svm, &m.curve_base_ata, &m.token_program) else {
+        return dead;
+    };
+    if base.mint != m.mint.to_bytes()
+        || base.owner != m.bonding_curve.to_bytes()
+        || base.amount < c.real_token_reserves
+    {
+        return dead;
+    }
+    let tiers: Vec<fees::FeeTier> = config
+        .fee_tiers
+        .iter()
+        .map(|t| fees::FeeTier {
+            threshold: t.threshold,
+            fees: FeeBps::new(t.fees.lp, t.fees.protocol, t.fees.creator),
+        })
+        .collect();
+    let Ok(f) = fees::pump_curve(
+        state.vt,
+        state.vq,
+        &CurveFeeSchedule {
+            tiers: &tiers,
+            creator_fee_configurable: global.creator_fee_configurable(),
+            curve_creator_fee_bps: c.creator_fee_bps,
+            creator_is_default: c.creator_is_default(),
+            cap_bps: None,
+        },
+    ) else {
+        return dead;
+    };
+    let vault = Pubkey::find_program_address(
+        &[b"creator-vault", &c.creator],
+        &shortwin::constants::PUMP_PROGRAM_ID,
+    )
+    .0;
+    let held = svm.get_account(&vault).map_or(0, |a| a.lamports);
+    let min0 = svm.minimum_balance_for_rent_exemption(0);
+    let venue_rent = if f.creator > 0 {
+        min0.saturating_sub(held)
+    } else {
+        0
+    };
+    VenueView {
+        executable: true,
+        observed: true,
+        reserves: Some((c.virtual_token_reserves, c.virtual_quote_reserves)),
+        fee_ppm: f.oneway_ppm(),
+        pricing: None,
+        curve: Some((state, f)),
+        venue_rent,
     }
 }
 
@@ -93,9 +221,12 @@ fn mock(svm: &LiteSVM, m: &Market) -> VenueView {
     let f = crate::mock::cpmm_fees(p.fee_ppm);
     VenueView {
         executable: reserves.is_some(),
+        observed: reserves.is_some(),
         reserves,
         fee_ppm: p.fee_ppm,
         pricing: Some(Pricing::Cpmm { buy: f, sell: f }),
+        curve: None,
+        venue_rent: 0,
     }
 }
 
@@ -172,9 +303,12 @@ fn ray_v4(svm: &LiteSVM, m: &Market) -> Option<VenueView> {
     let (c, p) = info.reserves(coin.amount, pc.amount)?;
     Some(VenueView {
         executable: true,
+        observed: true,
         reserves: Some(if sol_is_coin { (p, c) } else { (c, p) }),
         fee_ppm: fee.oneway_ppm(),
         pricing: Some(Pricing::RayV4(fee)),
+        curve: None,
+        venue_rent: 0,
     })
 }
 
@@ -252,8 +386,11 @@ fn ray_cpmm(svm: &LiteSVM, m: &Market) -> Option<VenueView> {
     let (r0, r1) = pool.reserves(v0.amount, v1.amount)?;
     Some(VenueView {
         executable: true,
+        observed: true,
         reserves: Some(if sol0 { (r1, r0) } else { (r0, r1) }),
         fee_ppm,
         pricing: Some(Pricing::Cpmm { buy, sell }),
+        curve: None,
+        venue_rent: 0,
     })
 }

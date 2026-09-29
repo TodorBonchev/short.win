@@ -9,7 +9,8 @@ use litesvm::LiteSVM;
 use litesvm::types::{FailedTransactionMetadata, TransactionMetadata};
 use shortwin::constants::{
     PYTH_SOL_USD_ACCOUNT, PYTH_SOL_USD_FEED_ID, VENUE_BIT_PUMP_CURVE, VENUE_BIT_PUMP_SWAP,
-    VENUE_BIT_RAYDIUM_CPMM, VENUE_BIT_RAYDIUM_V4, VENUE_GUARD_SLOTS_2026_09_27, VENUE_PROGRAM_DATA,
+    VENUE_BIT_RAYDIUM_CPMM, VENUE_BIT_RAYDIUM_V4, VENUE_BITS_UNFINISHED,
+    VENUE_GUARD_SLOTS_2026_09_27, VENUE_PROGRAM_DATA,
 };
 use shortwin::state::{
     EmaParamsArgs, GlobalConfig, InitConfigArgs, LenderPosition, Market, MarketVault, OracleCache,
@@ -33,6 +34,8 @@ pub const START_TS: i64 = 1_790_000_000;
 pub const START_SLOT: u64 = 450_000_000;
 /// Lamports every harness key starts with.
 pub const FUNDING: u64 = 1_000_000_000_000;
+/// `GlobalConfig.venue_enabled`'s offset (discriminator included; `state::config` layout).
+pub const CONFIG_VENUE_ENABLED_OFFSET: usize = 12;
 
 /// Path of the program under test: `$SHORTWIN_SO`, else `target/deploy/shortwin.so` (the
 /// output of `anchor build --tools-version v1.57 --arch v3`).
@@ -171,7 +174,8 @@ impl Env {
     }
 
     /// ECON §15 defaults, the harness authorities, the sponsored Pyth feed, every MVP venue
-    /// enabled, the 48 h timelock and the v0.4.1 venue deploy slots.
+    /// enabled (the pump curve through [`Env::initialize_config`]'s test-only write, M5-SEC-4),
+    /// the 48 h timelock and the v0.4.1 venue deploy slots.
     pub fn default_init_args(&self) -> InitConfigArgs {
         InitConfigArgs {
             governance: self.governance.pubkey(),
@@ -202,11 +206,49 @@ impl Env {
         )
     }
 
-    /// `initialize_config(args)` signed by the upgrade authority.
+    /// `initialize_config(args)` signed by the upgrade authority — with the venue bits this
+    /// build refuses to enable (`shortwin::constants::VENUE_BITS_UNFINISHED`, M5-SEC-4: the pump
+    /// curve until M6's `→ PumpSwap` transition) removed from what is sent and, once the
+    /// instruction succeeded, written into `GlobalConfig.venue_enabled` directly
+    /// ([`Env::force_venue_bits`]). **TEST-ONLY:** no instruction can set them in this build, so
+    /// a deployment never takes curve opens; the harness exercises the curve venue as M6 will
+    /// enable it. [`Env::initialize_config_as_sent`] sends `args` unchanged (the gate itself).
     pub fn initialize_config(&mut self, args: InitConfigArgs) -> TxResult {
+        let unfinished = args.venue_enabled & VENUE_BITS_UNFINISHED;
+        let mut sent = args;
+        sent.venue_enabled &= !unfinished;
+        let res = self.initialize_config_as_sent(sent);
+        if res.is_ok() && unfinished != 0 {
+            self.force_venue_bits(unfinished);
+        }
+        res
+    }
+
+    /// `initialize_config(args)` exactly as given, signed by the upgrade authority.
+    pub fn initialize_config_as_sent(&mut self, args: InitConfigArgs) -> TxResult {
         let authority = self.upgrade_authority.insecure_clone();
         let ix = crate::ix::initialize_config(&authority.pubkey(), args);
         self.send(&[ix], &[&authority])
+    }
+
+    /// **TEST-ONLY** (M5-SEC-4): ORs `bits` into `GlobalConfig.venue_enabled` by rewriting the
+    /// account (`venue_enabled` @12), bypassing the program's refusal of the venue bits this
+    /// build cannot finish ([`Env::initialize_config`]).
+    pub fn force_venue_bits(&mut self, bits: u32) {
+        let key = pda::config();
+        let mut acc = self
+            .svm
+            .get_account(&key)
+            .unwrap_or_else(|| panic!("no GlobalConfig at {key}"));
+        let at = CONFIG_VENUE_ENABLED_OFFSET;
+        let mut cur = [0u8; 4];
+        cur.copy_from_slice(&acc.data[at..at + 4]);
+        let v = u32::from_le_bytes(cur) | bits;
+        acc.data[at..at + 4].copy_from_slice(&v.to_le_bytes());
+        self.svm
+            .set_account(key, acc)
+            .unwrap_or_else(|e| panic!("set GlobalConfig: {e:?}"));
+        assert_eq!(self.config().venue_enabled & bits, bits);
     }
 
     /// Sends `ixs` with [`Env::payer`] as fee payer and `signers`, with the invariant hooks

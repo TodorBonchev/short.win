@@ -14,28 +14,55 @@
 //! **Accounts** (ARCH §3.9, less the pump venues' token leg): `config` (read), `market` (mut,
 //! bound to its PDA with the stored bump), `market_vault` (mut), `trader` (mut) and
 //! `trader_wsol` (mut) at the market's stored keys, `trader_wsol_ata` (mut) =
-//! `ATA(trader, WSOL)` under SPL Token (passed whether or not it exists, ARCH §3.0), SPL Token,
-//! System, event accounts. **Remaining:** the latest `ShareEpoch` record
-//! (`["share_epoch", market, share_epoch − 1]`, key-checked with its stored bump) exactly while
-//! a full-wipe record is live (`S = 0 ∧ wipe_live`), nothing otherwise
-//! (`BadRemainingAccounts`). The pump venues' `trader_base_ata` → `pool_vault` token sweep
-//! arrives with those venues (M5/M6); the mock and Raydium markets have no trader base ATA.
+//! `ATA(trader, WSOL)` under SPL Token (the key cached at listing, M5-SEC-6; passed whether or
+//! not it exists, ARCH §3.0), SPL Token, System, event accounts. **Remaining:** on a pump-venue
+//! market (`PumpCurve`, `PumpMigrating`, `PumpSwap`) first its token leg `[trader_base_ata (W),
+//! pool_vault (W), mint, the mint's token program, the trader's pump UVA]` (M5; ARCH §3.9 "the
+//! pump venues add `trader_base_ata` and `pool_vault`"; the UVA since M5-SEC-1; each key-checked
+//! against the market), then the latest `ShareEpoch` record (`["share_epoch", market,
+//! share_epoch − 1]`, key-checked with its stored bump) exactly while a full-wipe record is live
+//! (`S = 0 ∧ wipe_live`), nothing otherwise (`BadRemainingAccounts`). The mock and Raydium
+//! markets have no trader base ATA and pass no token leg.
+//!
+//! **The venue-reward bit on the curve (M5-SEC-1; a deviation from ARCH §3.3 / §3.9, flagged).**
+//! A deposit into a live full-wipe record of a `PumpCurve` market waits for
+//! `wipe_rewards_claimed` as well (R4A-7: pre-wipe pump cashback must reach the wiped epoch's
+//! lenders), which ARCH has `claim_venue_rewards` set — an M6 instruction. Without it an organic
+//! full wipe on a live curve locked the market's deposits, and hence its opens, for as long as
+//! the curve stayed live. On the curve kinds (`PumpCurve`, `PumpMigrating`) this instruction
+//! therefore also sets `wipe_rewards_claimed` (through `SweepSource::VenueRewards`, 0 lamports)
+//! **when the trader's pump UVA holds no claimable cashback** — its lamports above its
+//! rent-exempt minimum, which is exactly what pump's `claim_cashback` pays out (pump's
+//! `PUMP_CASHBACK_README`; an account pump does not own holds none). Cashback accrues only on the
+//! trader's own trades (legacy cashback coins), none of which can run once `S = 0`, so "nothing
+//! claimable now" means every pre-wipe cashback lamport has already reached `market_vault`
+//! through the trader (earlier normalisations, or this sweep). With cashback outstanding the bit
+//! stays clear; pump's `claim_cashback` is permissionless (`user` does not sign; T-CASHBACK, pump
+//! part, verified on the dumped ELF by `m5_sec_curve_it`), so anyone unlocks the market with
+//! `[pump claim_cashback(user = trader), sweep_trader]` in one transaction: the claim pays the
+//! trader, this sweep credits the wipe record and sets both bits. No pump CPI here, so neither a
+//! change of pump's claim interface nor a venue that cannot execute can lock deposits (the TODO
+//! of `engine::lender::rewards_required`). PumpSwap's cashback (pAMM's UVA WSOL ATA) is M6's.
 //!
 //! **Effects, in order:**
 //! 1. `CloseAccount(ATA(trader, WSOL) → trader)` if it is an initialised token account
 //!    (`engine::trader::close_trader_ata`), then the §2.4 normalisation: every lamport of
 //!    `trader` and of the `trader_wsol` address moves to `market_vault`
 //!    (`engine::trader::normalise_pdas`; `TraderStateInvalid` if either is not an empty System
-//!    account).
+//!    account); on a pump venue every token of `trader_base_ata` moves to `pool_vault` (a
+//!    donation: `T` is unchanged; `engine::trader::sweep_base_ata`, which requires the account
+//!    to be the trader's, with no delegate and no close authority, `TraderStateInvalid`).
 //! 2. The market prologue of a lender instruction (ARCH §3.0 steps 1–5, A16: params-version
 //!    sync, accrue with the vest release, roll a completed bucket; no ReadSet, so no record).
 //! 3. `pool::sweep(…, SweepSource::Trader)`: `lender_sol += swept`; while a full-wipe record is
 //!    live `wipe_trader_swept` is set **even when nothing moved** and the SOL tops up the
 //!    record; with `S > 0` it vests over `lump_vest_s`; with `S = 0` and no live wipe it goes
-//!    to `protocol_fees` (R3A-10).
+//!    to `protocol_fees` (R3A-10). On the curve kinds, while a full-wipe record is live and the
+//!    trader's pump UVA holds no claimable cashback, `pool::sweep(…, 0,
+//!    SweepSource::VenueRewards)` also sets `wipe_rewards_claimed` (M5-SEC-1, above).
 //! 4. Post-conditions (step 10): `trader` and `trader_wsol` hold 0 lamports; `market_vault`
 //!    holds rent + `lender_sol + protocol_fees` (I2).
-//! 5. Event `TraderSwept{lamports, tokens: 0, to, wipe_bits}` (`wipe_bits`: the math crate's
+//! 5. Event `TraderSwept{lamports, tokens, to, wipe_bits}` (`wipe_bits`: the math crate's
 //!    `wipe_swept` bits, `WIPE_TRADER_SWEPT` = 1, `WIPE_REWARDS_CLAIMED` = 2, plus 0x80 while
 //!    `wipe_live`).
 //!
@@ -44,15 +71,32 @@
 
 use anchor_lang::prelude::*;
 use anchor_lang::AccountDeserialize;
-use anchor_spl::associated_token::get_associated_token_address;
 use shortwin_math::pool::{self, SweepSource};
 
-use crate::constants::{CONFIG_VERSION, MARKET_VERSION, TOKEN_PROGRAM_ID, WSOL_MINT};
-use crate::engine::trader::{close_trader_ata, normalise_pdas, TraderPdas};
+use crate::constants::{CONFIG_VERSION, MARKET_VERSION, PUMP_PROGRAM_ID, TOKEN_PROGRAM_ID};
+use crate::engine::trader::{
+    close_trader_ata, normalise_pdas, sweep_base_ata, BaseSide, TraderPdas,
+};
 use crate::engine::{lender, prologue};
 use crate::errors::{MathResultExt, ShortwinError};
 use crate::events::{TraderSwept, SWEEP_TO_PROTOCOL, SWEEP_TO_VEST, SWEEP_TO_WIPE_RECORD};
-use crate::state::{GlobalConfig, Market, MarketVault, ShareEpoch};
+use crate::state::{GlobalConfig, Market, MarketVault, ShareEpoch, VenueKind};
+use crate::venues::pump_curve;
+
+/// Length of a pump market's token leg in the remaining accounts: `trader_base_ata`,
+/// `pool_vault`, the mint, its token program and the trader's pump UVA.
+pub const TOKEN_LEG_LEN: usize = 5;
+
+/// The cashback pump's `claim_cashback` would pay the trader now (module docs, M5-SEC-1): the
+/// lamports of its pump UVA above the account's rent-exempt minimum; 0 for an account pump does
+/// not own (never created: nothing accrued).
+fn pump_cashback_claimable(uva: &AccountInfo) -> Result<u64> {
+    if *uva.owner != PUMP_PROGRAM_ID {
+        return Ok(0);
+    }
+    let floor = Rent::get()?.minimum_balance(uva.data_len());
+    Ok(uva.lamports().saturating_sub(floor))
+}
 
 /// `TraderSwept.wipe_bits` flag: a full-wipe record is live after the sweep.
 pub const WIPE_BITS_LIVE: u8 = 0x80;
@@ -104,15 +148,55 @@ pub struct SweepTrader<'info> {
 pub fn handler<'info>(ctx: Context<'info, SweepTrader<'info>>) -> Result<()> {
     let clock = Clock::get()?;
     let market_key = ctx.accounts.market.key();
-    let (trader_bump, trader_wsol_bump) = {
+    let (trader_bump, trader_wsol_bump, pump, curve, token_keys, decimals, wsol_ata) = {
         let m = ctx.accounts.market.load()?;
-        (m.trader_bump, m.trader_wsol_bump)
+        let kind = m.venue_kind();
+        let pump = matches!(
+            kind,
+            Some(VenueKind::PumpCurve | VenueKind::PumpMigrating | VenueKind::PumpSwap)
+        );
+        let curve = matches!(kind, Some(VenueKind::PumpCurve | VenueKind::PumpMigrating));
+        (
+            m.trader_bump,
+            m.trader_wsol_bump,
+            pump,
+            curve,
+            [
+                m.trader_base_ata,
+                m.pool_vault,
+                m.mint,
+                m.token_program,
+                m.pump_uva,
+            ],
+            m.decimals,
+            pump_curve::trader_wsol_ata(&m),
+        )
+    };
+    // A pump market's token leg comes first in the remaining accounts (module docs).
+    let (token_leg, rem) = if pump {
+        require!(
+            ctx.remaining_accounts.len() >= TOKEN_LEG_LEN,
+            ShortwinError::BadRemainingAccounts
+        );
+        let (leg, rest) = ctx.remaining_accounts.split_at(TOKEN_LEG_LEN);
+        for (info, key) in leg.iter().zip(token_keys.iter()) {
+            require_keys_eq!(info.key(), *key, ShortwinError::AccountMismatch);
+        }
+        (Some(leg), rest)
+    } else {
+        (None, ctx.remaining_accounts)
     };
     require_keys_eq!(
         ctx.accounts.trader_wsol_ata.key(),
-        get_associated_token_address(&ctx.accounts.trader.key(), &WSOL_MINT),
+        wsol_ata,
         ShortwinError::AccountMismatch
     );
+    // M5-SEC-1: on the curve kinds, whether the trader's pump UVA holds no claimable cashback
+    // (read before anything moves; nothing below touches the UVA).
+    let rewards_clear = match token_leg {
+        Some([.., uva]) if curve => pump_cashback_claimable(uva)? == 0,
+        _ => false,
+    };
 
     // ---- 1. the trader side's lamports into `market_vault` (untracked until booked) --------
     let accs = &ctx.accounts;
@@ -133,6 +217,21 @@ pub fn handler<'info>(ctx: Context<'info, SweepTrader<'info>>) -> Result<()> {
         system_program: accs.system_program.to_account_info(),
     })?;
     require_gte!(swept, from_ata, ShortwinError::TraderStateInvalid);
+    let tokens = match token_leg {
+        Some([ata, pool_vault, mint, program, _]) => sweep_base_ata(
+            &market_key,
+            &accs.trader.to_account_info(),
+            trader_bump,
+            &BaseSide {
+                trader_base_ata: ata.clone(),
+                pool_vault: pool_vault.clone(),
+                mint: mint.clone(),
+                decimals,
+                token_program: program.clone(),
+            },
+        )?,
+        _ => 0,
+    };
 
     // ---- 2.–3. the prologue and the booking ------------------------------------------------
     let (to, wipe_bits, tracked) = {
@@ -154,7 +253,6 @@ pub fn handler<'info>(ctx: Context<'info, SweepTrader<'info>>) -> Result<()> {
         } else {
             SWEEP_TO_PROTOCOL
         };
-        let rem = ctx.remaining_accounts;
         if wipe_live {
             // The live full-wipe record: the latest one (the epoch the wipe closed).
             require!(rem.len() == 1, ShortwinError::BadRemainingAccounts);
@@ -174,6 +272,20 @@ pub fn handler<'info>(ctx: Context<'info, SweepTrader<'info>>) -> Result<()> {
                 SweepSource::Trader,
             )
             .math()?;
+            if rewards_clear {
+                // M5-SEC-1: no pre-wipe cashback left to claim — the venue-reward sweep of
+                // nothing (ARCH §3.9: "even if nothing was claimable").
+                pool::sweep(
+                    &mut pool,
+                    &mut vault,
+                    Some(&mut rec),
+                    now,
+                    config.params.lump_vest_s,
+                    0,
+                    SweepSource::VenueRewards,
+                )
+                .math()?;
+            }
             let info = rem.first().ok_or(ShortwinError::EpochRecordMismatch)?;
             require!(info.is_writable, ShortwinError::EpochRecordMismatch);
             let mut account = {
@@ -220,7 +332,7 @@ pub fn handler<'info>(ctx: Context<'info, SweepTrader<'info>>) -> Result<()> {
         slot: clock.slot,
         ts: clock.unix_timestamp,
         lamports: swept,
-        tokens: 0,
+        tokens,
         to,
         wipe_bits,
     });

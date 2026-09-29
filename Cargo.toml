@@ -9,6 +9,8 @@ members = [
     "crates/shortwin-math-wasm",
     "crates/shortwin-venue-state",
     "programs/shortwin",
+    # The stateless straddle helper (ARCH §5.4, A66).
+    "programs/complete_curve",
     "tests/litesvm",
     # TEST-ONLY venue program for M2 (A49); built by `anchor build`, never deployed.
     "tests/mock_cpamm",

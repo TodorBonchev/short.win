@@ -21,6 +21,7 @@ fn i15(env: &Env, pre: &TxSnapshot, ev: &IxEvents) -> Result<(), &'static str> {
             switched: &ev.switched,
             proposed: &ev.proposed,
             cancelled: &ev.cancelled,
+            venue_changed: &ev.venue_changed,
         },
     )
     .map_err(|v| v.invariant)

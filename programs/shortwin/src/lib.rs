@@ -104,8 +104,8 @@ pub mod shortwin {
     // ---- markets (ARCH §3.2, §3.9) ----
 
     /// Anyone lists a mint, paying at most `max_creation_fee`.
-    pub fn create_market(
-        ctx: Context<CreateMarket>,
+    pub fn create_market<'info>(
+        ctx: Context<'info, CreateMarket<'info>>,
         venue_hint: u8,
         max_creation_fee: u64,
     ) -> Result<()> {

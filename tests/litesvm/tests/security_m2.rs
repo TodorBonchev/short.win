@@ -12,11 +12,12 @@
 //! - M2-SEC-3: extras templates accepted any off-curve bump. Fixed: the canonical bump only.
 //! - M2-SEC-4: after a full wipe no instruction set `wipe_trader_swept`, so no deposit could
 //!   ever land. Fixed: `sweep_trader` (ARCH §3.9) is built in M2.
-//! - M2-SEC-5 (latent, deferred to M5 by the finding itself): `sol_settle` has no path for a
-//!   `None` / `PumpMigrating` market. A tripwire pins today's behaviour on a planted state.
+//! - M2-SEC-5 (latent, deferred to M5 by the finding itself): `sol_settle` had no path for a
+//!   `None` / `PumpMigrating` market. Fixed in M5: their ReadSets (the detection set, the
+//!   curve's) are accepted and S3 settles after the chain; M2's tripwire is inverted here.
 //!
 //! Every instruction goes through `Env::send`, so the invariant hooks run after each one,
-//! except in the M2-SEC-5 tripwire, which plants a state M2 cannot reach (said so there).
+//! except in the M2-SEC-5 test, which plants a state the mock venue cannot reach (said so there).
 
 #![allow(clippy::result_large_err, dead_code)]
 
@@ -800,24 +801,33 @@ mod full_wipe {
     }
 }
 
-// ---- M2-SEC-5 (latent; deferred to M5): `sol_settle` on a `None` market ---------------------
+// ---- M2-SEC-5 (fixed in M5): `sol_settle` on a `None` market ---------------------------------
 
 mod none_venue {
     use super::*;
     use shortwin::state::{Market, VenueKind};
+    use shortwin_math::fees::FeeBps;
+    use shortwin_math::quote::Pricing;
+    use shortwin_math::rent;
 
-    /// M2-SEC-5 tripwire. ARCH §2.5 / §5.3 require S3 to be reachable on a market whose venue
-    /// became `None` (a curve that completed with no canonical pool) or `PumpMigrating`;
-    /// `sol_settle` has no path for them yet (`venues::parse` → `NoSupportedVenue`), while
-    /// `crank_price` does run the S3 chain on `None`. No M2 transition leads there (the mock
-    /// never leaves `Mock`), so the state is **planted** — `Market.venue = None` with the
-    /// scenario's position open — and the invariant hooks are off for it. The finding
-    /// schedules the fix with the M5 adapters; when it lands this test must be inverted to
-    /// assert S3 after the chain (the finding's T-S3 test for `None`).
+    /// M2-SEC-5, inverted in M5 (the finding's T-S3 test for `None`; ARCH §2.5, §3.8 step 4,
+    /// §5.3): `sol_settle` takes a list-only market's detection set `[bonding_curve,
+    /// canonical_pool]` as its ReadSet, and an expired position on a `None` market settles S3
+    /// once the market's continuous chain has run `s3_wait_s` — never before. The box is the
+    /// frozen EMA point; with no venue fee to read, FV is priced by the cap-only risk view (one
+    /// combined fee at the position's `venue_fee_hard_cap_bps` on the SOL leg,
+    /// `venues::cap_only`) with the expiry fee (O15).
+    ///
+    /// The mock market is **planted** to `None` (M2's venue never leaves `Mock`), so the
+    /// invariant hooks are off from the plant on; the same S3 on a real `None` transition — a
+    /// pump curve that completes and graduates elsewhere with the position open — runs with
+    /// the hooks on in `pump_it::graduation`.
     #[test]
-    fn m2_sec_5_sol_settle_has_no_none_path_yet() {
+    fn m2_sec_5_sol_settle_reaches_s3_on_a_none_market() {
         let mut sc = Sc::default_market();
         sc.env.tick(&sc.mm, 5);
+        sc.warp_to_deadline(1);
+        let pos = sc.pos();
         sc.env.check_invariants = false;
         let key = sc.mm.market();
         let mut acc = read::account(&sc.env.svm, &key).unwrap();
@@ -825,35 +835,90 @@ mod none_venue {
         m.venue = VenueKind::None as u8;
         acc.data[8..8 + core::mem::size_of::<Market>()].copy_from_slice(bytemuck::bytes_of(&m));
         sc.env.svm.set_account(key, acc).unwrap();
-        sc.env.warp(1);
         let detection = [
             AccountMeta::new_readonly(m.bonding_curve, false),
             AccountMeta::new_readonly(m.canonical_pool, false),
         ];
-        let crank = ix::with_remaining(
-            {
-                let mut c = crank_price_ix(&sc.mm);
-                c.accounts.truncate(c.accounts.len() - 3);
-                c
-            },
-            &detection,
-        );
-        ok(sc.env.send(&[crank], &[]));
-        assert_ne!(
-            sc.market().no_route_since,
-            0,
-            "crank_price runs the S3 chain on None"
-        );
-        let mut settle = shortwin_litesvm_tests::engine::sol_settle_ix(
-            &sc.env,
-            &sc.mm,
-            &sc.keeper.pubkey(),
-            &sc.b.key(),
-            sc.nonce,
-        );
-        settle.accounts.truncate(settle.accounts.len() - 3);
-        settle.accounts.extend(detection);
+        let crank = {
+            let mut c = crank_price_ix(&sc.mm);
+            c.accounts.truncate(c.accounts.len() - 3);
+            ix::with_remaining(c, &detection)
+        };
+        let settle = |sc: &Sc| {
+            let mut ix = shortwin_litesvm_tests::engine::sol_settle_ix(
+                &sc.env,
+                &sc.mm,
+                &sc.keeper.pubkey(),
+                &sc.b.key(),
+                sc.nonce,
+            );
+            ix.accounts.truncate(ix.accounts.len() - 3);
+            ix.accounts.extend(detection.clone());
+            ix
+        };
         let kp = sc.keeper.insecure_clone();
-        assert_err(&sc.env.send(&[settle], &[&kp]), E::NoSupportedVenue);
+        // The mock's ReadSet is refused on `None`: the detection set is the ReadSet.
+        let wrong = sc.settle_ix();
+        assert_err(&sc.env.send(&[wrong], &[&kp]), E::VenueAccountMismatch);
+        sc.env.warp(1);
+        let first = settle(&sc);
+        let out = Outcome::of(&ok(sc.env.send(&[first], &[&kp])));
+        assert!(out.settled.is_none(), "the chain only starts");
+        let since = sc.market().no_route_since;
+        assert_eq!(
+            since,
+            sc.env.now(),
+            "sol_settle starts the S3 chain on None"
+        );
+        assert_eq!(sc.market().b_lo.get(), 0, "nothing is observed on None");
+        let m0 = sc.market();
+        // The keeper's ≤ 30 s duty keeps the chain continuous; S3 is not due before
+        // `since + s3_wait_s`.
+        let mut settled = None;
+        for _ in 0..40 {
+            sc.env.warp(30);
+            ok(sc.env.send(std::slice::from_ref(&crank), &[]));
+            let ix = settle(&sc);
+            let out = Outcome::of(&ok(sc.env.send(&[ix], &[&kp])));
+            if let Some(ev) = out.settled {
+                settled = Some(ev);
+                break;
+            }
+            assert!(
+                sc.env.now() < since + i64::from(pos.s3_wait_s),
+                "S3 only when due"
+            );
+        }
+        let ev = settled.expect("S3 on None");
+        assert_eq!(ev.condition, 3);
+        assert!(sc.env.now() >= since + i64::from(pos.s3_wait_s));
+        assert!(sc.env.now() < since + i64::from(pos.s3_wait_s) + 30);
+        let m = sc.market();
+        let (p, l) = (m0.ema_price.get(), m0.ema_liq.get());
+        assert_eq!(
+            (m.ema_price.get(), m.ema_liq.get()),
+            (p, l),
+            "the EMA is frozen while nothing is observed"
+        );
+        assert_eq!(
+            (ev.p_lo, ev.p_hi, ev.l_lo, ev.l_hi),
+            (p, p, l, l),
+            "the EMA point"
+        );
+        assert_eq!(
+            (ev.pprime_lo, ev.pprime_hi),
+            (pos.expiry_fee_bps, pos.expiry_fee_bps),
+            "an expired position pays the expiry fee (O15)"
+        );
+        let r_due = rent::due(&pos.pos_rent(), &m.basis()).unwrap();
+        let cap = Pricing::PumpSwap(FeeBps::new(0, u64::from(pos.venue_fee_hard_cap_bps), 0));
+        let b = cap.buy_repriced(pos.q, l, p).expect("FV quote").cost;
+        let fv =
+            b + (u128::from(b) * u128::from(pos.expiry_fee_bps)).div_ceil(10_000) as u64 + r_due;
+        assert_eq!(ev.fv, fv, "FV at the cap-only risk view");
+        let take = pos.v - k_s(&pos);
+        assert_eq!(ev.lender_amount, fv.min(take));
+        assert_eq!(ev.borrower_amount, take - ev.lender_amount);
+        assert!(sc.pos_opt().is_none(), "the position is closed");
     }
 }

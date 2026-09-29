@@ -247,6 +247,7 @@ fn state_of(p: &Parsed, now: i64) -> Option<VenueState> {
         pricing: Some(Pricing::Cpmm { buy, sell }),
         fee_ppm,
         locked_depth,
+        curve: None,
     })
 }
 
@@ -511,7 +512,7 @@ pub fn sell<'info>(
     let (sol_vault, tok_vault) = leg_vaults(leg)?;
     let sides = Sides {
         input: &leg.pool_vault,
-        output: &leg.trader.trader_wsol,
+        output: leg.trader.trader_wsol()?,
         input_vault: tok_vault,
         output_vault: sol_vault,
         input_program: &leg.token_program,
@@ -534,7 +535,7 @@ pub fn buy<'info>(
 ) -> Result<BuyOut> {
     let (sol_vault, tok_vault) = leg_vaults(leg)?;
     let sides = Sides {
-        input: &leg.trader.trader_wsol,
+        input: leg.trader.trader_wsol()?,
         output: &leg.pool_vault,
         input_vault: sol_vault,
         output_vault: tok_vault,

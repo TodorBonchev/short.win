@@ -234,7 +234,9 @@ fn ok(res: shortwin_litesvm_tests::TxResult) {
 
 fn initialize_config() -> Prepared {
     let env = Env::new();
-    let args = env.default_init_args();
+    let mut args = env.default_init_args();
+    // A config this build accepts (M5-SEC-4: the pump curve cannot be enabled before M6).
+    args.venue_enabled &= !shortwin::constants::VENUE_BITS_UNFINISHED;
     let authority = env.upgrade_authority.insecure_clone();
     let ix = ix::initialize_config(&authority.pubkey(), args);
     prepared(env, ix, &[&authority])

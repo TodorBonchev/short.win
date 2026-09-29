@@ -30,7 +30,7 @@ use shortwin_math::params::{self as mparams, ParamSet};
 use shortwin_math::rent::RentTerms;
 use shortwin_math::tier::TierParams as MathTierParams;
 
-use crate::constants::{MAX_TIMELOCK_S, MIN_TIMELOCK_S, VENUE_BITS_KNOWN};
+use crate::constants::{MAX_TIMELOCK_S, MIN_TIMELOCK_S, VENUE_BITS_ENABLEABLE};
 use crate::errors::ShortwinError;
 
 /// `GlobalConfig.flags` bit 0: new opens paused on every market (SPEC §11).
@@ -708,8 +708,10 @@ impl ConfigChange {
             } => check_authorities(governance, pause_authority, fee_recipient),
             Self::Timelock { timelock_s } => check_timelock(*timelock_s),
             Self::EnableVenues { bits } => {
+                // Known bits only, and none this build cannot finish (M5-SEC-4:
+                // `constants::VENUE_BITS_UNFINISHED`, the pump curve until M6).
                 require!(
-                    *bits != 0 && bits & !VENUE_BITS_KNOWN == 0,
+                    *bits != 0 && bits & !VENUE_BITS_ENABLEABLE == 0,
                     ShortwinError::InvalidParams
                 );
                 Ok(())
@@ -866,7 +868,7 @@ mod tests {
                 fee_recipient: Pubkey::new_from_array([3; 32]),
             },
             ConfigChange::Timelock { timelock_s: 90_000 },
-            ConfigChange::EnableVenues { bits: 0b0101 },
+            ConfigChange::EnableVenues { bits: 0b1100 },
             ConfigChange::OracleFeed {
                 account: Pubkey::new_from_array([4; 32]),
                 feed_id: [5; 32],
@@ -948,7 +950,7 @@ mod tests {
         assert_eq!((c.kink.util_kink_bps, c.kink.version), (7_500, 2));
         assert_eq!(c.governance, Pubkey::new_from_array([1; 32]));
         assert_eq!(c.timelock_s, 90_000);
-        assert_eq!(c.venue_enabled, 0b0101);
+        assert_eq!(c.venue_enabled, 0b1100);
         assert_eq!(c.pyth_feed_id, [5; 32]);
     }
 
@@ -978,6 +980,22 @@ mod tests {
         assert!(c
             .check_change(&ConfigChange::EnableVenues { bits: 0 })
             .is_err());
+        // M5-SEC-4: the pump curve cannot be enabled before M6's `→ PumpSwap` transition,
+        // alone or with other bits; every other release bit can.
+        for bits in [
+            crate::constants::VENUE_BIT_PUMP_CURVE,
+            crate::constants::VENUE_BIT_PUMP_CURVE | crate::constants::VENUE_BIT_RAYDIUM_V4,
+        ] {
+            assert!(c
+                .check_change(&ConfigChange::EnableVenues { bits })
+                .is_err());
+        }
+        assert!(c
+            .check_change(&ConfigChange::EnableVenues {
+                bits: crate::constants::VENUE_BITS_RELEASE
+                    & !crate::constants::VENUE_BIT_PUMP_CURVE
+            })
+            .is_ok());
         assert!(c
             .check_change(&ConfigChange::Authorities {
                 governance: Pubkey::default(),

@@ -11,9 +11,12 @@
 //! `receivable`)); (5) the observation roll ([`crate::engine::observe::roll`]: integrate a
 //! completed bucket with the cached reprojection, `CoverageGap`); (6) the venue state from the
 //! ReadSet (the caller parses it, `crate::venues::parse`; reader failures of correctly keyed
-//! accounts are "not executable", A63) and `sync_venue` (a no-op for the venues of this build:
-//! the mock and Raydium stay; the pump transitions of ARCH §2.5 arrive with M5/M6); (7) the
-//! observation record, only while the venue is executable (A64); (8) the route chains (the S3
+//! accounts are "not executable", A63) and `sync_venue` (the mock and Raydium stay; a curve
+//! market moves to `PumpMigrating` when its curve completes, or to `None` when it completed
+//! with zeroed reserves and no canonical pool — `crate::venues::pump_curve::sync`, M5; the
+//! `→ PumpSwap` transition is M6's); (7) the observation record, only while the venue is
+//! executable — or migrating: the completed curve is final and still recorded (A64,
+//! `VenueState::observed`); (8) the route chains (the S3
 //! chain; on Raydium markets and the mock also `pool_fail`), and on Raydium the refresh of the
 //! incumbent's locked depth `pool_d` while it is executable. [`run`] does steps 2 and 4–8;
 //! then the body; (10) post-conditions; (11) one `emit_cpi!`.
@@ -32,6 +35,7 @@ use shortwin_math::rent;
 use crate::engine::{observe, route};
 use crate::errors::MathResultExt;
 use crate::state::{GlobalConfig, Market};
+use crate::venues::pump_curve::{self, Transition};
 use crate::venues::VenueState;
 
 /// The time a `Market`-writing instruction runs at: the clock, never before the market's
@@ -97,8 +101,9 @@ pub struct Prologue {
     pub now: i64,
     /// The lender pool after the accrual (the body continues from it and stores it).
     pub pool: Pool,
-    /// The venue's pre-trade state (`None` for an instruction without a ReadSet).
-    pub state: Option<VenueState>,
+    /// The venue transition of step 6's `sync_venue` (ARCH §2.5), if any: the market's `venue`
+    /// already holds `to` (the caller emits `VenueStateChanged`, or refuses a trade on it).
+    pub transition: Option<Transition>,
     /// `s3_no_route` now (ARCH §5.3); `true` without a ReadSet.
     pub s3_no_route: bool,
     /// `pool_fail` now; `true` without a ReadSet.
@@ -115,15 +120,15 @@ pub struct Prologue {
 
 /// ARCH §3.0 steps 2 and 4–8 on a loaded market (module docs), with the venue state the caller
 /// read from its key-checked ReadSet (`None`: no ReadSet, no record, no chains). The market's
-/// params versions, rent basis, lender-pool fields, observation state and route chains are
-/// written back; the vault math state `vault` is updated in place (the caller stores it, or,
-/// on an instruction without `MarketVault`, checks it did not change).
+/// params versions, rent basis, lender-pool fields, observation state, venue (step 6's sync)
+/// and route chains are written back; the vault math state `vault` is updated in place (the
+/// caller stores it, or, on an instruction without `MarketVault`, checks it did not change).
 pub fn run(
     config: &GlobalConfig,
     market_key: &Pubkey,
     market: &mut Market,
     vault: &mut Vault,
-    state: Option<VenueState>,
+    state: Option<&VenueState>,
     clock_now: i64,
     slot: u64,
 ) -> Result<Prologue> {
@@ -141,7 +146,9 @@ pub fn run(
         slot,
     )?;
     let (mut recorded, mut s3, mut pf, mut changed) = (false, true, true, false);
-    if let Some(st) = state.as_ref() {
+    let mut transition = None;
+    if let Some(st) = state {
+        transition = pump_curve::sync(market, st, now);
         recorded = observe::record(&mut obs, now, st)?;
         let chains = route::observe_chains(config, market, st, now);
         (s3, pf, changed) = (chains.s3_no_route, chains.pool_fail, chains.changed);
@@ -152,7 +159,7 @@ pub fn run(
     Ok(Prologue {
         now,
         pool,
-        state,
+        transition,
         s3_no_route: s3,
         pool_fail: pf,
         rolled,

@@ -53,6 +53,9 @@ pub struct PoolFacts<'a> {
     pub switched: &'a [PoolSwitched],
     pub proposed: &'a [PoolProposed],
     pub cancelled: &'a [PoolSwitchCancelled],
+    /// Venue transitions (M5): `crank_price`'s `None →` pump re-detection clears a collection
+    /// window (D1; ARCH §2.5, M4's carry-over).
+    pub venue_changed: &'a [shortwin::events::VenueStateChanged],
 }
 
 /// A Raydium pool as the harness reads it from its own accounts: the view (executable,
@@ -996,9 +999,30 @@ fn window(
     let proposed: Vec<&PoolProposed> = ix.proposed.iter().filter(|e| e.market == market).collect();
     let cancelled = ix.cancelled.iter().filter(|e| e.market == market).count();
     let fp = |m: &Market| (m.fp_keys, m.fp_d.get(), m.fp_t0, m.fp_venue, m._pad1a);
+    // A list-only market moved onto a pump venue (M5): the window is cleared, D1.
+    let to_pump = ix.venue_changed.iter().any(|e| {
+        e.market == market
+            && e.from == VenueKind::None as u8
+            && matches!(
+                VenueKind::from_u8(e.to),
+                Some(VenueKind::PumpCurve | VenueKind::PumpMigrating | VenueKind::PumpSwap)
+            )
+    });
+    if to_pump {
+        ensure(
+            post.fp_t0 == 0 && post.fp_d.get() == 0 && post.fp_keys == [Pubkey::default(); 6],
+            "I15",
+            || {
+                format!(
+                    "market {market}: a None → pump transition left the window {:?}",
+                    fp(post)
+                )
+            },
+        )?;
+    }
     if fp(pre) != fp(post) {
         ensure(
-            switched || proposed.len() == 1 || cancelled == 1,
+            switched || proposed.len() == 1 || cancelled == 1 || to_pump,
             "I15",
             || format!("market {market}: the fast-path window changed without a pool event"),
         )?;

@@ -161,8 +161,10 @@ layout!(acct Market, 3_104, {
     // OI
     open_positions @ 2_832, _pad4 @ 2_836, total_notional_open @ 2_840, max_q_hwm @ 2_848,
     min_open_fee_ppm @ 2_856, _pad5 @ 2_860,
+    // derived keys (M5-SEC-6)
+    trader_wsol_ata @ 2_864, pump_pool_authority @ 2_896,
     // misc
-    _reserved @ 2_864,
+    _reserved @ 2_928,
 });
 layout!(nested RingEntry, 136, {
     ts @ 0, p @ 8, l @ 24, x @ 40, y @ 56, lo @ 72, hi @ 88, llo @ 104, lhi @ 120,

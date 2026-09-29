@@ -213,6 +213,12 @@ pub trait VenueMarket {
         v.extend_from_slice(extras);
         v
     }
+    /// The compute-unit limit a client requests for this venue's opens and closes (ARCH §6.1,
+    /// PROPOSED: 250 k on the pump venues); `None` = the runtime's 200 k default, which
+    /// [`Env::open`] / [`Env::close`] then leave alone.
+    fn cu_limit(&self) -> Option<u32> {
+        None
+    }
 }
 
 impl<T: VenueMarket + ?Sized> VenueMarket for &T {
@@ -224,6 +230,9 @@ impl<T: VenueMarket + ?Sized> VenueMarket for &T {
     }
     fn trade_extras(&self) -> Vec<AccountMeta> {
         (**self).trade_extras()
+    }
+    fn cu_limit(&self) -> Option<u32> {
+        (**self).cu_limit()
     }
 }
 
@@ -626,6 +635,15 @@ pub fn sweep_trader_ix_for(env: &Env, market: &Pubkey) -> Instruction {
     sweep_trader_ix(market, rec)
 }
 
+/// `ix` preceded by `SetComputeUnitLimit(mm.cu_limit())` when the venue asks for one
+/// ([`VenueMarket::cu_limit`]; the hooks check the last instruction of a transaction).
+pub fn with_cu_limit(mm: &impl VenueMarket, ix: Instruction) -> Vec<Instruction> {
+    match mm.cu_limit() {
+        Some(units) => vec![crate::pump::cu_limit_ix(units), ix],
+        None => vec![ix],
+    }
+}
+
 // ---- borrowers ----------------------------------------------------------------------------
 
 /// A funded borrower and the nonce of its next position.
@@ -667,7 +685,7 @@ impl Env {
             &[],
         );
         let kp = b.kp.insecure_clone();
-        let res = self.send(&[ix], &[&kp]);
+        let res = self.send(&with_cu_limit(mm, ix), &[&kp]);
         if res.is_ok() {
             b.next_nonce += 1;
         }
@@ -679,7 +697,7 @@ impl Env {
     pub fn close(&mut self, mm: &impl VenueMarket, b: &Borrower, nonce: u64) -> TxResult {
         let ix = close_short_ix(mm, &b.key(), nonce, u64::MAX, ExtrasSel::NONE, &[]);
         let kp = b.kp.insecure_clone();
-        self.send(&[ix], &[&kp])
+        self.send(&with_cu_limit(mm, ix), &[&kp])
     }
 
     /// A position (panics if missing).

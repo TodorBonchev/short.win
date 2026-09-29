@@ -1,4 +1,4 @@
-//! short.win keeper v1 (ARCHITECTURE §7.1; ECON §5.8): duties 1–5 with batching, degraded mode,
+//! short.win keeper v1 (ARCHITECTURE §7.1; ECON §5.8): duties 1–6 with batching, degraded mode,
 //! duty 10's venue drift monitor and duty 12's Raydium pool monitor (with duty 5's fast path,
 //! M4), on the Raydium venues and the TEST-ONLY mock:
 //!
@@ -26,6 +26,13 @@
 //!    `pool_fast_route_s`, propose the deepest eligible candidate (opening the collection
 //!    window, or improving someone else's), and `execute_pool_switch` at the first second after
 //!    the window; a failing market without positions is observed to keep its chain.
+//! 6. **Graduation** ([`graduation`]; M5): pump `migrate_v2` top-level as soon as a covered
+//!    market's curve completes (ADOPTED Q16), then an observation of the market; the straddle
+//!    bundle of ARCH §5.4 for a liquidatable position whose `Q` exceeds its live curve's `rT`
+//!    (tx1 `complete_curve` of the `complete-curve` helper, tx2 `migrate_v2`, tx3 the exit on the
+//!    new pool — M6's), sent through a Jito block engine; until M6 there is no tx3, so the
+//!    two-transaction bundle goes out only with `graduation.send_without_exit` and the keeper
+//!    otherwise calls `sol_settle` for the position.
 //! 10. **Venue drift monitor** ([`monitor`]): the six venue ProgramData deploy slots against the
 //!     `VenueGuard` latch — an upgrade is flagged with `flag_venue_upgraded` in the slot it is
 //!     seen, once, and refreshed when a second upgrade lands during review; Token-2022's upgrade
@@ -55,8 +62,10 @@
 //!
 //! The chain is pluggable ([`shortwin_services_common::Chain`]): JSON-RPC for a real cluster
 //! (the binary), an in-process LiteSVM backend for tests (`services/keeper-litesvm`).
-//! Venue kinds ([`venue`]): Raydium AMM v4 and CPMM (M3); the TEST-ONLY mock (`test-venue`
-//! feature); the pump venues arrive with M5–M6.
+//! Venue kinds ([`venue`]): Raydium AMM v4 and CPMM (M3); the pump curve and a migrating curve
+//! (M5: the curve adapter's ReadSet and TradeExtras, the risk view through the program's own
+//! quoter, `B̂_str` above `rT`); the TEST-ONLY mock (`test-venue` feature); PumpSwap arrives with
+//! M6.
 
 pub mod alerts;
 pub mod alt;
@@ -65,6 +74,7 @@ pub mod coverage;
 pub mod decide;
 pub mod events;
 pub mod fees;
+pub mod graduation;
 pub mod ixs;
 pub mod keeper;
 pub mod metrics;

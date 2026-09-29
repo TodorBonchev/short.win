@@ -14,8 +14,11 @@
 //!
 //! 1. The prologue; the mint guard on the exit path (never reverts on the filter: a mint that
 //!    fails it now is reported with a `MintSafetyTripped` log event, M1-SEC-11).
-//! 2. The venue trades (`NoRoute` for `None`, `VenueMigrating` while `PumpMigrating`) and is
-//!    executable (`NoRoute`). (The curve's `CurveStraddle` arrives with M5.)
+//! 2. The venue trades (`NoRoute` for `None`, `VenueMigrating` while `PumpMigrating` — also when
+//!    this instruction's venue sync just moved a curve market there) and is executable
+//!    (`NoRoute`). On a live curve with `q > rT`, `CurveStraddle`: pump refuses a buy above `rT`
+//!    (6021), so the client uses the bundle of ARCH §5.4 (complete the curve, `migrate_v2`, then
+//!    close on PumpSwap, M6).
 //! 3. `R = rent::due(position, basis)`.
 //! 4. `B̂ = B̂_live(q)` at the **live** fee; `B̂ + R + ert ≤ V`, else `InsufficientVault` (an
 //!    undefined quote too).
@@ -28,7 +31,10 @@
 //!    the remainder stays on the position).
 //! 7. The market: `pool::repay(R, 0)` (token return, rent true-up, `resolve(q)`), the
 //!    position aggregates, `exposure.q_open −= q`. Post-conditions (I2, I7, `pool_vault ≥ T`).
-//! 8. Event `Close` (and `TraderSwept` if the normalisation moved anything).
+//!    A buyback that completed the curve (`q == rT`) moves the market to `PumpMigrating` after
+//!    the leg (ARCH §3.5 step 7, §5.4 case 1; `migration_seen_at = now`).
+//! 8. Event `Close` (and `TraderSwept` if the normalisation moved anything, `VenueStateChanged`
+//!    if the buyback completed the curve).
 
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
@@ -156,18 +162,18 @@ pub fn handler<'info>(
             },
             &deny,
         )?;
-        let state = venues::read_state(&market, kind, rem.read, clock.unix_timestamp);
+        let state = venues::read_state_boxed(&market, kind, rem.read, clock.unix_timestamp);
         let mut vault = ctx.accounts.market_vault.load()?.vault();
         let pro = prologue::run(
             &config,
             &market_key,
             &mut market,
             &mut vault,
-            Some(state),
+            Some(&*state),
             clock.unix_timestamp,
             clock.slot,
         )?;
-        require!(state.executable, ShortwinError::NoRoute);
+        venues::pump_curve::exit_venue_checks(&pro, &state, pos.q)?;
         let r_due = rent::due(&pos.pos_rent(), &market.basis()).math()?;
         let b_hat = state
             .buy(pos.q)
@@ -205,29 +211,37 @@ pub fn handler<'info>(
             &m,
             accs.trader.to_account_info(),
             accs.market_vault.to_account_info(),
-            accs.system_program.to_account_info(),
             rem.trade,
+            venues::Named {
+                system_program: accs.system_program.to_account_info(),
+                pool_vault: accs.pool_vault.to_account_info(),
+                mint: accs.mint.to_account_info(),
+                decimals: accs.mint.decimals,
+                token_program: accs.token_program.to_account_info(),
+            },
         )?;
         (t, venues::raydium::sol_first(&m))
     };
     let swept = trader.normalise()?;
-    if swept > 0 {
-        pool::sweep(
-            &mut pool,
-            &mut vault,
-            None,
-            now,
-            config.params.lump_vest_s,
-            swept,
-            SweepSource::Trader,
-        )
-        .math()?;
+    if swept.any() {
+        if swept.lamports > 0 {
+            pool::sweep(
+                &mut pool,
+                &mut vault,
+                None,
+                now,
+                config.params.lump_vest_s,
+                swept.lamports,
+                SweepSource::Trader,
+            )
+            .math()?;
+        }
         emit_cpi!(TraderSwept {
             market: market_key,
             slot: clock.slot,
             ts: clock.unix_timestamp,
-            lamports: swept,
-            tokens: 0,
+            lamports: swept.lamports,
+            tokens: swept.tokens,
             to: SWEEP_TO_VEST,
             wipe_bits: 0,
         });
@@ -241,6 +255,7 @@ pub fn handler<'info>(
         decimals: accs.mint.decimals,
         token_program: accs.token_program.to_account_info(),
         sol_first,
+        ert: pos.ert,
         trader,
         read: rem.read,
         trade: rem.trade,
@@ -281,6 +296,12 @@ pub fn handler<'info>(
         va.set_vault(&vault);
         (pool.tokens_free, lender::tracked(&vault)?)
     };
+    // A buyback that completed the curve: the market is migrating from now on (ARCH §3.5 step 7).
+    let completed = {
+        let mut m = accs.market.load_mut()?;
+        venues::pump_curve::sync_after_leg(&mut m, kind, rem.read, now)
+            .map(|t| venues::pump_curve::transition_event(&m, t, market_key, &clock))
+    };
     leg.trader
         .post_conditions(&accs.pool_vault.to_account_info())?;
     let pv = crate::engine::trader::token_state(&accs.pool_vault.to_account_info())?;
@@ -301,6 +322,9 @@ pub fn handler<'info>(
             ts: clock.unix_timestamp,
             mint: ctx.accounts.mint.key(),
         });
+    }
+    if let Some(ev) = completed {
+        emit_cpi!(ev);
     }
     emit_cpi!(Close {
         market: market_key,

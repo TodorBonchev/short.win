@@ -8,6 +8,10 @@
 //! `Err`. A backend reports the `emit_cpi!` inner instructions of every top-level instruction
 //! ([`TxOutcome::inner`]) so the keeper can decode events from a simulation exactly as from a
 //! landed transaction.
+//!
+//! Bundles (ARCH §5.4, the straddle; U22): [`Chain::send_bundle`] and
+//! [`Chain::simulate_bundle`] have refusing defaults; the JSON-RPC backend sends through a Jito
+//! block engine when one is configured, the in-process backend executes them atomically.
 
 use solana_hash::Hash;
 use solana_pubkey::Pubkey;
@@ -128,6 +132,24 @@ impl TxOutcome {
     }
 }
 
+/// What became of a bundle ([`Chain::send_bundle`]; ARCH §5.4, U22): a Jito bundle executes its
+/// transactions in order and all-or-nothing, so either every transaction landed or none did.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct BundleOutcome {
+    /// The block engine's bundle id (empty for an in-process backend).
+    pub id: String,
+    /// Every transaction landed, in order.
+    pub landed: bool,
+    /// Each transaction's outcome, in order: the landed transactions' metas when `landed`;
+    /// otherwise what is known — an in-process backend reports the transactions up to and
+    /// including the failing one, a block engine nothing (the bundle was dropped or refused:
+    /// [`BundleOutcome::detail`]).
+    pub txs: Vec<TxOutcome>,
+    /// Why the bundle did not land (the failing transaction's index and error, a refusal, a
+    /// timeout); empty when it landed.
+    pub detail: String,
+}
+
 /// What the keeper needs from a cluster (module docs).
 ///
 /// `async fn` in a trait: the keeper is generic over its backend and runs on one task, so the
@@ -192,6 +214,28 @@ pub trait Chain {
     /// Recent prioritization fees (micro-lamports per CU) of transactions that write-locked
     /// any of `writable` (ARCH §7.1 duty 14); empty if the backend has none.
     async fn recent_priority_fees(&self, writable: &[Pubkey]) -> anyhow::Result<Vec<u64>>;
+
+    /// Sends `txs` as one **Jito bundle** (ARCH §5.4, U22: at most 5 transactions, executed in
+    /// order and all-or-nothing, a tip to a Jito tip account in one of them) and waits until it
+    /// landed or is known not to have. The default refuses: the backend has no block engine.
+    async fn send_bundle(&self, txs: &[VersionedTransaction]) -> anyhow::Result<BundleOutcome> {
+        let _ = txs;
+        anyhow::bail!("this chain backend sends no bundles (no block engine configured)")
+    }
+
+    /// Simulates `txs` in order, each on the state the ones before it left (a bundle's
+    /// pre-flight); stops at the first failure. The default refuses: a plain JSON-RPC node
+    /// simulates one transaction at a time, so a bundle whose later transactions depend on the
+    /// earlier ones (the straddle's `migrate_v2` on the curve tx1 completes) cannot be
+    /// pre-flighted there — the keeper then simulates the first transaction alone and relies
+    /// on the bundle's all-or-nothing execution.
+    async fn simulate_bundle(
+        &self,
+        txs: &[VersionedTransaction],
+    ) -> anyhow::Result<Vec<TxOutcome>> {
+        let _ = txs;
+        anyhow::bail!("this chain backend cannot simulate a bundle")
+    }
 }
 
 #[cfg(test)]

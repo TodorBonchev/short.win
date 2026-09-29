@@ -119,7 +119,7 @@ pub struct Expire<'info> {
 pub fn handler<'info>(ctx: Context<'info, Expire<'info>>, extras: ExtrasSel) -> Result<()> {
     let clock = Clock::get()?;
     let pos = (**ctx.accounts.position).clone();
-    let out = {
+    let mut out = {
         let a = &ctx.accounts;
         let accs = ExitAccounts {
             keeper: a.keeper.to_account_info(),
@@ -156,16 +156,19 @@ pub fn handler<'info>(ctx: Context<'info, Expire<'info>>, extras: ExtrasSel) -> 
             mint: ctx.accounts.mint.key(),
         });
     }
-    if out.swept > 0 {
+    if out.swept.any() {
         emit_cpi!(TraderSwept {
             market: market_key,
             slot: clock.slot,
             ts: clock.unix_timestamp,
-            lamports: out.swept,
-            tokens: 0,
+            lamports: out.swept.lamports,
+            tokens: out.swept.tokens,
             to: SWEEP_TO_VEST,
             wipe_bits: 0,
         });
+    }
+    if let Some(ev) = out.completed.take() {
+        emit_cpi!(ev);
     }
     let p = &out.payout;
     emit_cpi!(ExpireEvent {

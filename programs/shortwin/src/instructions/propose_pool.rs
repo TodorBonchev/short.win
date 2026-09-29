@@ -37,8 +37,9 @@
 //!    kind (`NoSupportedVenue`).
 //! 2. The market's venue: a pump venue refuses (`PumpVenuePrecedence`, D1: ARCH §2.5 "create_market
 //!    and propose_pool reject Raydium candidates for such markets"); a list-only market runs
-//!    `classify_pump` on its detection set and refuses a live curve, a migrating curve or a
-//!    valid canonical PumpSwap pool the same way (a `None` market of a pump coin moves to its
+//!    `classify_pump` on its detection set and refuses a live curve, a migrating curve, a
+//!    valid canonical PumpSwap pool or an account at the canonical-pool address that does not
+//!    read as a valid pool (M5-SEC-5: fail closed) the same way (a `None` market of a pump coin moves to its
 //!    pump venue through `crank_price`'s re-detection, M5); a curve that graduated elsewhere
 //!    proceeds and sets `graduated_elsewhere`. The test-venue mock refuses (`NoSupportedVenue`).
 //! 3. The venue-upgrade latch (`VenueUpgraded`): no proposal of a candidate while an upgrade of
@@ -177,7 +178,12 @@ pub(crate) fn incumbent<'a, 'info>(
                 market.canonical_pool,
                 ShortwinError::VenueAccountMismatch
             );
-            let class = detect::classify_pump(bc, cp, &market.mint)?;
+            let class = detect::classify_pump_with(
+                bc,
+                cp,
+                &market.mint,
+                &detect::pool_authority_of(market),
+            )?;
             Ok(Incumbent {
                 state: VenueState::not_executable(VenueKind::None),
                 candidate,
@@ -233,7 +239,7 @@ pub fn handler<'info>(ctx: Context<'info, ProposePool<'info>>, candidate_kind: u
         &market_key,
         &mut market,
         &mut scratch,
-        Some(inc.state),
+        Some(&inc.state),
         clock.unix_timestamp,
         clock.slot,
     )?;

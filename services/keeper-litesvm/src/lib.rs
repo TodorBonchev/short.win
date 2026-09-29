@@ -20,6 +20,13 @@
 //! priority fees the backend reports ([`LiteSvmChain::set_priority_fees`]); every backend call
 //! is logged ([`LiteSvmChain::rpc_log`], M4-SEC-7: the keeper's RPC work per tick).
 //!
+//! **Bundles** (the straddle, ARCH §5.4; U22): [`LiteSvmChain`] executes a bundle as Jito does —
+//! its transactions in order, in one slot (the blockhash is the one the bundle was built with,
+//! checked once), all-or-nothing (the VM is restored when one fails) — each through
+//! [`send_with_hooks`]; `simulate_bundle` runs them in order on a clone. A test can refuse bundles
+//! ([`LiteSvmChain::set_bundles`]: a chain without a block engine). [`load_complete_curve`]
+//! deploys the straddle helper (`target/deploy/complete_curve.so`, or `$COMPLETE_CURVE_SO`).
+//!
 //! [`Harness`] couples the environment, a funded keeper and the clock: one keeper tick per
 //! slot or per second.
 
@@ -36,7 +43,7 @@ use shortwin_keeper::{Keeper, KeeperConfig, TickReport};
 use shortwin_litesvm_tests::{Env, invariants, read};
 use shortwin_services_common::tx::{self, TxFormat};
 use shortwin_services_common::{
-    AccountData, Chain, ChainClock, InnerIx, Memcmp, TxError, TxOutcome,
+    AccountData, BundleOutcome, Chain, ChainClock, InnerIx, Memcmp, TxError, TxOutcome,
 };
 use solana_hash::Hash;
 use solana_keypair::Keypair;
@@ -55,6 +62,28 @@ pub struct LiteSvmChain {
     fees: RefCell<Vec<u64>>,
     sent: RefCell<Vec<SentTx>>,
     rpc: RefCell<Vec<Rpc>>,
+    bundles: Cell<bool>,
+    bundles_sent: RefCell<Vec<SentBundle>>,
+    before_bundle: RefCell<Option<BeforeBundle>>,
+}
+
+/// What runs when the next bundle reaches the chain, before it executes (a trade landing between
+/// the keeper's read and its bundle).
+type BeforeBundle = Box<dyn FnOnce(&mut Env)>;
+
+/// A bundle the keeper sent (for assertions).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SentBundle {
+    /// Each transaction as sent.
+    pub txs: Vec<SentTx>,
+    /// Top-level instructions of each transaction (ComputeBudget included).
+    pub top: Vec<usize>,
+    /// Instruction-trace entries of each transaction that ran (top-level instructions, ComputeBudget
+    /// included, plus every inner instruction; ARCH §6.2).
+    pub trace: Vec<usize>,
+    /// Compute units of each transaction that ran.
+    pub units: Vec<u64>,
+    pub landed: bool,
 }
 
 /// One backend call, as a JSON-RPC backend would make it (M4-SEC-7's measurements).
@@ -66,6 +95,8 @@ pub enum Rpc {
     ProgramAccounts,
     /// `sendTransaction` of a transaction naming these short.win instruction count.
     Send { instructions: usize },
+    /// `sendBundle` of this many transactions (a block engine call).
+    SendBundle { txs: usize },
 }
 
 impl Rpc {
@@ -73,7 +104,7 @@ impl Rpc {
     pub fn calls(&self) -> usize {
         match self {
             Self::Accounts(keys) => keys.len().div_ceil(100).max(1),
-            Self::ProgramAccounts | Self::Send { .. } => 1,
+            Self::ProgramAccounts | Self::Send { .. } | Self::SendBundle { .. } => 1,
         }
     }
 }
@@ -98,7 +129,27 @@ impl LiteSvmChain {
             fees: RefCell::new(Vec::new()),
             sent: RefCell::new(Vec::new()),
             rpc: RefCell::new(Vec::new()),
+            bundles: Cell::new(true),
+            bundles_sent: RefCell::new(Vec::new()),
+            before_bundle: RefCell::new(None),
         }
+    }
+
+    /// Runs `f` on the environment when the next bundle reaches the chain — after the keeper's
+    /// read and pre-flight, before the bundle executes: T-STRADDLE's "a curve trade lands between
+    /// the keeper's read and the bundle". The bundle's blockhash stays the one it was built with.
+    pub fn before_next_bundle(&self, f: impl FnOnce(&mut Env) + 'static) {
+        *self.before_bundle.borrow_mut() = Some(Box::new(f));
+    }
+
+    /// Accept (or refuse, as a chain without a block engine) bundles.
+    pub fn set_bundles(&self, accepted: bool) {
+        self.bundles.set(accepted);
+    }
+
+    /// Every bundle sent so far.
+    pub fn bundles_sent(&self) -> Vec<SentBundle> {
+        self.bundles_sent.borrow().clone()
     }
 
     /// Every backend call so far, in order (M4-SEC-7).
@@ -407,6 +458,168 @@ impl Chain for LiteSvmChain {
     async fn recent_priority_fees(&self, _writable: &[Pubkey]) -> anyhow::Result<Vec<u64>> {
         Ok(self.fees.borrow().clone())
     }
+
+    async fn send_bundle(&self, txs: &[VersionedTransaction]) -> anyhow::Result<BundleOutcome> {
+        if !self.bundles.get() {
+            anyhow::bail!("no block engine configured: bundles cannot be sent");
+        }
+        if txs.is_empty() || txs.len() > 5 {
+            anyhow::bail!("a bundle holds 1 to 5 transactions, not {}", txs.len());
+        }
+        self.rpc
+            .borrow_mut()
+            .push(Rpc::SendBundle { txs: txs.len() });
+        let mut env = self.env.borrow_mut();
+        // One slot: every transaction must carry the blockhash the chain had when the bundle
+        // arrived; each then runs with the blockhash check off (the harness expires the
+        // blockhash after every send).
+        let latest = env.svm.latest_blockhash();
+        if let Some(f) = self.before_bundle.borrow_mut().take() {
+            f(&mut env);
+        }
+        if let Some(i) = txs
+            .iter()
+            .position(|t| *t.message.recent_blockhash() != latest)
+        {
+            return Ok(BundleOutcome {
+                detail: format!("tx{}: BlockhashNotFound", i + 1),
+                ..BundleOutcome::default()
+            });
+        }
+        let before = env.svm.clone();
+        env.svm = before.clone().with_blockhash_check(false);
+        let mut outs = Vec::with_capacity(txs.len());
+        let mut record = SentBundle {
+            txs: Vec::new(),
+            top: Vec::new(),
+            trace: Vec::new(),
+            units: Vec::new(),
+            landed: false,
+        };
+        let mut failed: Option<usize> = None;
+        for (i, tx) in txs.iter().enumerate() {
+            let alts = lookup_tables(&env, tx);
+            let res = send_with_hooks(&mut env, tx);
+            let (out, trace) = match &res {
+                Ok(meta) => (
+                    outcome(tx, &alts, meta, None),
+                    tx.message.instructions().len()
+                        + meta.inner_instructions.iter().map(Vec::len).sum::<usize>(),
+                ),
+                Err(f) => (
+                    outcome(
+                        tx,
+                        &alts,
+                        &f.meta,
+                        Some(TxError::from_transaction_error(f.err.clone())),
+                    ),
+                    0,
+                ),
+            };
+            let ixs = tx::decompile(tx, &alts).unwrap_or_default();
+            record.txs.push(SentTx {
+                format: tx::format_of(tx),
+                bytes: tx::size(tx),
+                accounts: tx::account_count(tx),
+                instructions: ixs.iter().filter(|i| i.program_id == shortwin::ID).count(),
+                ok: out.ok(),
+            });
+            record.top.push(tx.message.instructions().len());
+            record.trace.push(trace);
+            record.units.push(out.units_consumed);
+            let ok = out.ok();
+            outs.push(out);
+            if !ok {
+                failed = Some(i);
+                break;
+            }
+        }
+        let landed = failed.is_none();
+        if landed {
+            // The harness's VM checks blockhashes (`LiteSVM::new`); restore that.
+            env.svm = std::mem::replace(&mut env.svm, before).with_blockhash_check(true);
+            env.svm.expire_blockhash();
+        } else {
+            // All-or-nothing: nothing of the bundle is committed.
+            env.svm = before;
+        }
+        record.landed = landed;
+        self.bundles_sent.borrow_mut().push(record);
+        let detail = failed
+            .and_then(|i| outs.get(i).map(|o| format!("tx{}: {:?}", i + 1, o.err)))
+            .unwrap_or_default();
+        Ok(BundleOutcome {
+            id: format!("litesvm-bundle-{}", self.bundles_sent.borrow().len()),
+            landed,
+            txs: outs,
+            detail,
+        })
+    }
+
+    async fn simulate_bundle(
+        &self,
+        txs: &[VersionedTransaction],
+    ) -> anyhow::Result<Vec<TxOutcome>> {
+        if !self.bundles.get() {
+            anyhow::bail!("no bundle simulation on this chain");
+        }
+        let env = self.env.borrow();
+        let mut svm = env
+            .svm
+            .clone()
+            .with_sigverify(false)
+            .with_blockhash_check(false);
+        let mut outs = Vec::with_capacity(txs.len());
+        for tx in txs {
+            if let Some(r) = self.refused(tx) {
+                outs.push(r);
+                break;
+            }
+            let alts = lookup_tables(&env, tx);
+            let out = match svm.send_transaction(tx.clone()) {
+                Ok(meta) => outcome(tx, &alts, &meta, None),
+                Err(f) => outcome(
+                    tx,
+                    &alts,
+                    &f.meta,
+                    Some(TxError::from_transaction_error(f.err)),
+                ),
+            };
+            let ok = out.ok();
+            outs.push(out);
+            if !ok {
+                break;
+            }
+        }
+        Ok(outs)
+    }
+}
+
+/// Path of the straddle helper's SBF build: `$COMPLETE_CURVE_SO`, else
+/// `target/deploy/complete_curve.so` (`anchor build --tools-version v1.57 --arch v3`).
+pub fn complete_curve_so() -> std::path::PathBuf {
+    std::env::var_os("COMPLETE_CURVE_SO").map_or_else(
+        || {
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../target/deploy/complete_curve.so")
+        },
+        std::path::PathBuf::from,
+    )
+}
+
+/// Deploys the `complete-curve` helper (ARCH §5.4, A66) into `env` at its program id.
+pub fn load_complete_curve(env: &mut Env) {
+    let path = complete_curve_so();
+    let so = std::fs::read(&path).unwrap_or_else(|e| {
+        panic!(
+            "cannot read {}: {e}. Build it first: `anchor build --tools-version v1.57 --arch v3` \
+             (or set COMPLETE_CURVE_SO)",
+            path.display()
+        )
+    });
+    env.svm
+        .add_program(complete_curve::ID, &so)
+        .unwrap_or_else(|e| panic!("add_program(complete_curve): {e:?}"));
 }
 
 /// Writes an active address lookup table holding `addresses` at `key` (as the ALT program

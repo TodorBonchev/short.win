@@ -18,8 +18,10 @@
 //! 1. The prologue (ARCH §3.0; its observation is the pre-trade state, the decisions read the
 //!    post-roll EMA, ring and last bucket: the one-second lag); the exit-path mint guard (a
 //!    mint that fails the filter now is reported with `MintSafetyTripped`, never a revert).
-//!    The venue trades (`NoRoute` for `None`, `VenueMigrating` while `PumpMigrating`) and is
-//!    `venue_executable` (`NoRoute`). The curve's `CurveStraddle` arrives with M5.
+//!    The venue trades (`NoRoute` for `None`, `VenueMigrating` while `PumpMigrating` — also when
+//!    the prologue's venue sync just moved a curve market there) and is `venue_executable`
+//!    (`NoRoute`). On a live curve with `q > rT`, `CurveStraddle` (the bundle of ARCH §5.4: the
+//!    risk quotes below price that path, `B̂_str`, but the buy cannot run on the curve).
 //!    **1b** (M4R, **PROPOSED**, owner item O18): the post-change warm-up is over, `ema_warm ==
 //!    0` after the roll (`EmaWarmingUp`): a restart — a Raydium adoption, a listing — wrote an
 //!    anchor, and the next `EMA_WARMUP_BUCKETS` integrations re-seed the EMA from the new pool;
@@ -152,7 +154,7 @@ pub struct Liquidate<'info> {
 pub fn handler<'info>(ctx: Context<'info, Liquidate<'info>>, extras: ExtrasSel) -> Result<()> {
     let clock = Clock::get()?;
     let pos = (**ctx.accounts.position).clone();
-    let out = {
+    let mut out = {
         let a = &ctx.accounts;
         let accs = ExitAccounts {
             keeper: a.keeper.to_account_info(),
@@ -189,16 +191,19 @@ pub fn handler<'info>(ctx: Context<'info, Liquidate<'info>>, extras: ExtrasSel) 
             mint: ctx.accounts.mint.key(),
         });
     }
-    if out.swept > 0 {
+    if out.swept.any() {
         emit_cpi!(TraderSwept {
             market: market_key,
             slot: clock.slot,
             ts: clock.unix_timestamp,
-            lamports: out.swept,
-            tokens: 0,
+            lamports: out.swept.lamports,
+            tokens: out.swept.tokens,
             to: SWEEP_TO_VEST,
             wipe_bits: 0,
         });
+    }
+    if let Some(ev) = out.completed.take() {
+        emit_cpi!(ev);
     }
     let p = &out.payout;
     emit_cpi!(LiquidateEvent {
@@ -334,13 +339,9 @@ pub(crate) fn assess(
         }
         _ => u64::MAX,
     };
-    let risky = state.pricing.map(|p| p.capped(cap));
-    let quote_at = move |x: u128, y: u128| -> Option<u64> {
-        if x == 0 {
-            return None;
-        }
-        risky?.buy(q, x, y).map(|b| b.cost)
-    };
+    let risky = state.quoter().map(|p| p.capped(cap));
+    let quote_at =
+        move |x: u128, y: u128| -> Option<u64> { risky?.buy_xy(q, x, y).map(|b| b.cost) };
 
     // Spot leg (ECON §5.5): the robust spot, valid only while fresh, on `max(L_live, L_ema')`
     // (FITS-2 (a): a withdrawal inside the transaction cannot drain it below the EMA's depth).
@@ -469,8 +470,11 @@ pub(crate) fn plan(
 pub(crate) struct ExitOutcome {
     /// The mint passes the safety filter now (else the exit path's `MintSafetyTripped`).
     pub mint_ok: bool,
-    /// Lamports the trader normalisation swept to lenders (`TraderSwept`).
-    pub swept: u64,
+    /// What the trader normalisation swept (`TraderSwept`): lamports to lenders, tokens of a
+    /// pump venue's `trader_base_ata` to the pool vault.
+    pub swept: crate::engine::trader::Swept,
+    /// The buyback completed the curve: the market moved to `PumpMigrating` (`VenueStateChanged`).
+    pub completed: Option<crate::events::VenueStateChanged>,
     pub assessment: Assessment,
     pub bound: ExitBound,
     pub b_ref: u64,
@@ -538,18 +542,18 @@ pub(crate) fn keeper_exit<'info>(
             },
             &deny,
         )?;
-        let state = venues::read_state(&market, kind, rem.read, clock.unix_timestamp);
+        let state = venues::read_state_boxed(&market, kind, rem.read, clock.unix_timestamp);
         let mut vault = accs.market_vault.load()?.vault();
         let pro = prologue::run(
             &config,
             &market_key,
             &mut market,
             &mut vault,
-            Some(state),
+            Some(&*state),
             clock.unix_timestamp,
             clock.slot,
         )?;
-        require!(state.executable, ShortwinError::NoRoute);
+        venues::pump_curve::exit_venue_checks(&pro, &state, pos.q)?;
         // Precondition 1b (M4R): no keeper exit while the observation state is in its
         // post-change warm-up on this (executable) venue.
         require!(market.ema_warm == 0, ShortwinError::EmaWarmingUp);
@@ -578,20 +582,26 @@ pub(crate) fn keeper_exit<'info>(
             &m,
             accs.trader.clone(),
             accs.market_vault.to_account_info(),
-            accs.system_program.clone(),
             rem.trade,
+            venues::Named {
+                system_program: accs.system_program.clone(),
+                pool_vault: accs.pool_vault.clone(),
+                mint: accs.mint.clone(),
+                decimals: accs.decimals,
+                token_program: accs.token_program.clone(),
+            },
         )?;
         (t, venues::raydium::sol_first(&m))
     };
     let swept = trader.normalise()?;
-    if swept > 0 {
+    if swept.lamports > 0 {
         pool::sweep(
             &mut pool,
             &mut vault,
             None,
             now,
             config.params.lump_vest_s,
-            swept,
+            swept.lamports,
             SweepSource::Trader,
         )
         .math()?;
@@ -605,6 +615,7 @@ pub(crate) fn keeper_exit<'info>(
         decimals: accs.decimals,
         token_program: accs.token_program.clone(),
         sol_first,
+        ert: pos.ert,
         trader,
         read: rem.read,
         trade: rem.trade,
@@ -664,6 +675,12 @@ pub(crate) fn keeper_exit<'info>(
         va.set_vault(&vault);
         (pool.tokens_free, lender::tracked(&vault)?)
     };
+    // A buyback that completed the curve: the market is migrating from now on (ARCH §5.4 case 1).
+    let completed = {
+        let mut m = accs.market.load_mut()?;
+        venues::pump_curve::sync_after_leg(&mut m, kind, rem.read, now)
+            .map(|t| venues::pump_curve::transition_event(&m, t, market_key, clock))
+    };
     leg.trader.post_conditions(&accs.pool_vault)?;
     let pv = crate::engine::trader::token_state(&accs.pool_vault)?;
     require_gte!(pv.amount, t_after, ShortwinError::AccountMismatch);
@@ -672,6 +689,7 @@ pub(crate) fn keeper_exit<'info>(
     Ok(Box::new(ExitOutcome {
         mint_ok,
         swept,
+        completed,
         assessment: plan.assessment,
         bound: plan.bound,
         b_ref: plan.b_ref,

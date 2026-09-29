@@ -714,3 +714,107 @@ These apply the first-pass review findings that target this note. Each was re-ch
    - Also corrected §3.6 and §8.10: keyless `/swap/v2/build` works at 0.5 RPS (`jupiter-cpi.md` §2.1).
 
 No review finding against this note was rejected.
+
+---
+
+## Update 2026-09-29 (M5 re-verification)
+
+*Re-verified for milestone M5 against mainnet on 2026-09-29 (slots ≈ 451,665,000–451,673,000, 14:10–14:50 UTC) and against PPD HEAD `cb188ce08b5069196eef1f3e4a0c43b70099793b`. The sections above are not edited; where an item here supersedes a statement above, it says so. The pump-curve side, the Squads authority and the migration census are in `pumpfun-bonding-curve.md`, Update 2026-09-29 (U1, U8). The throwaway scripts and raw data live outside the repo, in `~/.cache/shortwin-work/m5/research/`.*
+
+### G1. Deploys, IDLs, configuration
+
+- **Programs.** No upgrade since the research.
+  - PumpSwap's last deploy is still slot 446,462,733 (2026-09-12 15:23:56, `3kTQq7ETwHfaq6mfRAYy2NZmiD9Qm7EJ6moPcoU2Wt18tTX9zUFYZ55daC1okHBueQWXqNx9gZxwYGom3N3SQvTD`).
+  - pump-fees is still at slot 446,465,969 (2026-09-12 15:41:00, `647tW2A7fgG6PMvg2VuQJjXMgVeQgKvrEKnELpyMV9vQeU4KKs1LwFbosjLRsdJ3e5uVCr7PcewAwtbjg5doFcv9`).
+  - The upgrade authority `7gZuf…` is the vault-0 PDA of Squads v4 multisig `2yMoQqQrtbhq3nQ3wFoQQawWS65qcqUXcwHEYha4rshW`: **3 of 4, time_lock 0**. This resolves the §9 item "whether the upgrade authority `7gZuf…` is a multisig".
+- **IDLs.**
+  - PPD `idl/pump_amm.json` and `idl/pump_fees.json` are unchanged since `e0687ae9`.
+  - The **on-chain** PumpSwap IDL (`5fLnXNNoZcZt9Qku6HARM3un3Ttm2cGsR7gN9Zp1R7h3`) and pump-fees IDL (`6hgWp61YgGzJ9QmvxyFtLnGfA8MYgx93Hby6fdq8gG31`) were last written 2026-05-14.
+  - The on-chain PumpSwap IDL lacks the boost instructions, `admin_cto_pool`, `update_creator_fee_config` and 19 errors, and has pre-VQR `Pool`/event layouts. Keep using PPD.
+- **Live configuration.** Unchanged from §2.3.
+  - `GlobalConfig` (949 B, slot 451,666,038): admin `FFWtrEQ4…`, `disable_flags` 0, `buyback_basis_points` 5000, `boost_authority` `HTVZ…`, `boost_enabled` true, `creator_fee_configurable` true with a maximum of 300 bps. The 8 protocol recipients (with `JCRGumoE…`) and the 8 buyback recipients are as before.
+  - `FeeConfig` `5PHirr…` (slot 451,665,972): flat fees 25/5/0; the same 25 `fee_tiers` from 0 → 2/93/30 up to 98,240 SOL → 20/5/5; the same 25 `stable_fee_tiers`; exotic flat fees 20/5/5.
+
+### G2. Negative `virtual_quote_reserves` from "September 30" (PPD `cb188ce0`)
+
+**What the notice says.** PPD `README.md` and the new `docs/NEGATIVE_VIRTUAL_QUOTE_RESERVES.md` (committed 2026-09-29 11:50:38 UTC):
+
+- "Starting **September 30**, `Pool::virtual_quote_reserves` on PumpSwap pools can be **negative**."
+- The field stays `i128` and must be decoded as signed from `Pool`, `BuyEvent` and `SellEvent`.
+- "`effective_quote_reserves` itself is **never negative**: the program never lets `virtual_quote_reserves` drop further below zero than the vault balance can cover".
+- Pump "guarantee[s] that `pool_quote_token_account.amount + virtual_quote_reserves` will never overflow and will never be negative … always fit in a `u64`".
+- "The pricing formula is unchanged": buys and sells price on `effective = quote vault + VQR`, and base reserves stay the raw vault amount.
+
+**Not announced.** The notice does not say *what* makes VQR negative, whether it needs a program upgrade, or whether migration and the boost change. All three are **UNVERIFIED**. The PumpSwap program was not upgraded before the notice (G1). If shipping it needs a deploy on or after 09-30, short.win's `VenueGuard` latch will see it.
+
+**State today:**
+- None of the 131 sampled PumpSwap trades (G3) had a negative VQR. 44 had a non-zero VQR, all positive.
+- On 150 random boosted pools from the pump-note U8 census, live VQR still equals the `InitBoostEvent` value on 149. One pool moved *down* by 2 lamports 29.6 h after migration (`8ewuF2o8ACro7fqWepZ3tKhkbBjndZU4Ldk9scRPw83d`: 17,584,505,652 → 17,584,505,650; migration `3J3MY992mf1JuSKy5ocW7cwHzekzFcLuo7yoZr8iGqLbFaafNEZSnKXFSggwRZy3AMBf1457AhYzWj59Di3pRVNk`).
+- §1.4 had only upward drift. VQR therefore moves in both directions today, still for an **UNVERIFIED** reason.
+
+**What this supersedes above:**
+- **§1.4 "Sells are capped by real reserves … a token has a pricing floor of `VQR / base_reserves`".** Both hold only while VQR ≥ 0.
+  - With VQR < 0, the effective reserve is *below* the real vault.
+  - So the real-reserve cap (`InsufficientRealQuoteReserves`: real ≥ `g − lp_fee`) cannot bind, and there is no floor.
+  - Real SOL then *overstates* the SOL that prices trades.
+- **§5 "For tiering, count real quote reserves only: exclude `virtual_quote_reserves`".** This was written for VQR ≥ 0.
+  - With VQR < 0, the executable depth is `quote vault + VQR` < real.
+  - So "real only" overstates depth, and `min(real, effective)` is the conservative reading.
+- **§8.2–§8.3.** "VQR at offset 245 (i128)" stays; any reader that rejects or saturates a negative VQR must be changed (design notes).
+
+### G3. PumpSwap swap math: reproduced again
+
+**Sample.** Every 6th successful PumpSwap transaction over two rounds: **131 trade instructions** (`buy` 31, `buy_exact_quote_in` 25, `sell` 75), slots 451,670,031–451,670,205 (2026-09-29 14:34:11–14:34:57 UTC). The event's `pool_*_token_reserves` are the pre-trade reserves.
+
+**Result: 131 of 131 match the §2.4 formulas exactly.**
+- The sample spans canonical pools at nine fee tiers (2/93/30, and 20/5/x for x from 5 to 95), non-canonical flat-fee pools (25/5/0) and custom-quote pools (20/5/100).
+- Examples on WSOL canonical pools with VQR > 0:
+  - `buy`: `d7NF8Q6HbwQ2pZabvB98SWbEWCyYRm9CUwAzJeBeoidUvnapw981R4U7k5oPGhQWqeMFAvhgQ5ugd5SRU3hPjUP`, `2uuAo8tgrRvur3ekWRyaDuGZLvAJEAKTf2tP2aqnykf8MwNT8uurSWpqSA72oGvw8GRF8WFx2jFo8PEpd25W8Moi`, `469VGx4JvM6DMBaEkgs8k3wxsQyQ7msfiaLvoCCUmwkXJFfcvBx89oNdFHUDxWoXU1jSeNDnHj3Lwn6cytVeQCiJ`;
+  - `sell`: `3XzoTxbW86M1FZdaRUAcuGb642WkvfojMic8tjrZLzmU8BdDKmP8SrTSfo9ujegtSU1LBS2kmRFkP7w4Z9QN8Wmp`, `3e58XqWh6GP1rc3zL2ohFXuAJbuj2bmJjfTERrzDK1HrafpLQaTB8kfBuhDFE64GiFdvzjgGuxHW2k1QJByyGcw7`, `a5ynJN73fcmiQ686ypJUHGymCLmTsUhuWBUeMQuhQK2MVsZT1961Z4ptaV6mzk9hgPoqABJ4piqudm33M7TmkpW`;
+  - `buy_exact_quote_in`: `3jDjso2UoEdcZAK3MxPkoUP1X28Tpeq4PvhHn37YwDAU8uuCJHNw7AJEqSgMGnvYE2tH4mnkPHjYifU4Esx8etUi`, `bSVgXpHg6Jae331yUJPEYzuCWcvPYDoQ1xwUzHiwoKiNsTYPhqmPBcWgqcyWcT3hohudUNv5cUH83L9Qij54nTK`, `1n2XSKCQGtTpgjwyQSKHSgiRUsfytwy4qhFvw9jijYasBaKzUEaUZnNwVKggcr9JZ4XoSwatkqNGgLy1bdyayeS`.
+
+**Reproduced with shortwin-math itself.**
+- Method: the repo's `quote::sol_leg::buy_exact_out(…, eps1 = false)` / `sell_exact_in` with the real-reserve cap, and `fees::pump_amm` on the live 25 tiers with the event's `base_supply`.
+- Quotes: 34 of 34 WSOL `buy`/`sell` identical.
+- Tier resolution: 33 of 33 canonical trades identical. The 34th trade is on a non-canonical 25/5/0 pool.
+
+**Event-field note for `buy_exact_quote_in`.** In its `BuyEvent`, `quote_amount_in` is the *spendable* argument, and `user_quote_amount_in` is the net `e` that enters the pool. `base_amount_out` = ⌊B·(e − 1)/(Qe + e − 1)⌋ as §2.4 says.
+
+**Account counts are unchanged.** `buy` and `buy_exact_quote_in` have 25 accounts, or 26 with the `pool-v2` marker; `sell` has 23, or 24. None carried extra trailing accounts, so there is still no evidence either way on U24 for PumpSwap.
+
+### G4. Fresh pools: size, boost, trading
+
+- **The boost rule holds on every fresh graduate.**
+  - Census (pump note U8): 2,102 pool-creating migrations from 2026-09-27 18:13 to 09-29 14:27 UTC.
+  - All 1,610 non-mayhem pools (1,455 SOL, 94 USDC, 61 custom quote) got VQR = ⌊`quote_amount_in`·2069/10⁴⌋ exactly. None of the 492 mayhem pools was boosted. §1.4's rule is confirmed on about 12× the earlier sample.
+- **SIM of completion and migration in one transaction.**
+  - `buy_v2(rT)` then `migrate_v2` on the live curve `G5yt7iw9…` created a pool with effective quote = rQ + n(rT) − 15,000,001 exactly, and base = 206.9·10¹².
+  - This equals shortwin-math `migrated_pool` (Y_p +1 lamport, by design).
+  - `B̂_str`'s post-migration pool is therefore exactly what `migrate_v2` builds today.
+- **New pools are 271 bytes, and trade at 271 bytes.**
+  - `create_pool` allocates 271 B (rent 2,026,920). Examples: `5QvPCCGK5rEPPtt3MqU2RwGiFji9sQCveKo5Wb5nYxGZSm22sx6ucxoqHAFspuzUJhFUJJ15h3Sh92TvkXVF8yjs` and the SIM above. 271 bytes ends exactly after `is_holder_reward` (@270).
+  - The first trade on that pool, `47G9kQKc33RbRviKTiuCArcShJH8dT2rhkBfPFeXjdtHRgMuSXgaSSAuuWr3phqhFz4GJ2L5S1wCGFzqi28utWH1` (`buy_exact_quote_in`, same slot as the migration), ran on 271 bytes without `extend_account`.
+  - 14 sampled trades on six 271-byte non-canonical pools did the same.
+  - A client prepended `extend_account` 7 slots later (`2BoLeZtrcjtDNMMjKGLe97dbrdzAavWGb6dqsoKPcqzj4MfP658465aC3xVArchvi4Ggm4U5XpHcmvZ9EdJgQhnB`), taking the pool to 301 B (rent 2,179,320). All 150 sampled boosted pools are now 301 B.
+  - **Corrects §1.2** ("Pools shorter than 300 bytes need a permissionless `extend_account` before trading"). 271-byte pools trade; the 300-byte threshold is the SDK's `POOL_ACCOUNT_NEW_SIZE`, not a program requirement.
+- **Boost lifecycle.**
+  - For `3mqeWNwuiCY6uEaMuYujdTQQNwM2qGfvhktXUDJB6oL9`, migrated at slot 451,668,597 (≈ 14:17 UTC), the boost vault's WSOL ATA `FQJWVKog…` no longer existed at slot 451,673,077 (≈ 14:47 UTC).
+  - The boost authority `HTVZ…` transacted about every 12 s at that time.
+  - Consistent with §1.4 item 5; the exact end time was not measured.
+- **`migrate_v2` can be CPI'd.**
+  - 117 pool-creating calls ran from six third-party programs at height 2 and peaked at stack height 5. All 204 top-level calls checked peak at 4.
+  - This refines §3.1: a wrapped migration works at exactly the maximum depth.
+
+### G5. Still UNVERIFIED after this pass
+
+- The mechanism behind negative VQR from September 30, its effect on `migrate_v2` / `init_boost`, and whether it ships with a PumpSwap upgrade.
+- What moves VQR after the boost, now in both directions (§1.4; G2).
+- U24 for PumpSwap: no trade in the sample carried extra trailing accounts.
+- A PumpSwap `buy` with a third-party PDA `user` (T-PDA-USER, pAMM part), and ATA creation by the venue (T-ATA, T-DEPTH): no new evidence.
+
+### G6. Found by the M5 build on the dumped ELFs (2026-09-29)
+
+*Executing the dumped PumpSwap ELF (deploy slot 446,462,733, G1) in LiteSVM with the pool `migrate_v2` creates (pump note Update U10):*
+
+- **A fresh canonical pool is 271 bytes; PumpSwap `extend_account` takes it to 301 bytes**, not 300 (G4's mainnet observation, reproduced on the ELF). `tests/litesvm/tests/pump_it/straddle.rs`, `straddle_it.rs`.
+- **`buy(Q)` on the new pool right after the migration (and `extend_account`) cost exactly short.win's `B̂_str`**: 604,827,436 lamports on the `near` fixture, both after the keeper's read and after a curve buy landed between the read and the bundle — the pool `migrate_v2` builds is the one `quote::migrated_pool` predicts (G4) and does not depend on the curve's path before completion. The tests assert `spent ≤ B̂_str` within 4–8 lamports (`B̂_str`'s rounding is conservative by design); the runs are exact. `pump_it::straddle::b_str_prices_the_executed_bundle`, `straddle_it::a_straddled_position_prices_the_bundle_it_waits_for`.

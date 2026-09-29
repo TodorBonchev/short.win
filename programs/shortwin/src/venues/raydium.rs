@@ -102,7 +102,7 @@ pub fn lp_supply(info: &AccountInfo) -> Option<u64> {
 }
 
 /// A verified candidate pool (ARCH §2.6), ready to be adopted by `create_market`.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct Adoption {
     pub kind: VenueKind,
     pub pool: Pubkey,

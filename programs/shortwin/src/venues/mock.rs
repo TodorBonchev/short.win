@@ -166,6 +166,7 @@ fn state_of(read: &[AccountInfo]) -> Option<VenueState> {
         pricing: Some(Pricing::Cpmm { buy: f, sell: f }),
         fee_ppm: pool.fee_ppm,
         locked_depth: 0,
+        curve: None,
     })
 }
 
@@ -343,7 +344,7 @@ pub fn sell<'info>(
     )?;
     leg.trader.open_wsol(Funding::Signer(borrower), 0)?;
     let before = token_state(&leg.pool_vault)?.amount;
-    let wsol = &leg.trader.trader_wsol;
+    let wsol = leg.trader.trader_wsol()?;
     swap(
         leg,
         IX_SWAP_EXACT_IN,
@@ -386,7 +387,7 @@ pub fn buy<'info>(
     let lamports_before = position.lamports();
     leg.trader.open_wsol(Funding::Position(position), max_in)?;
     let before = token_state(&leg.pool_vault)?.amount;
-    let wsol = &leg.trader.trader_wsol;
+    let wsol = leg.trader.trader_wsol()?;
     swap(
         leg,
         IX_SWAP_EXACT_OUT,

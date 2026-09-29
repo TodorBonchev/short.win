@@ -194,11 +194,14 @@ fn pump_coins_keep_their_pump_venue() {
         let mut env = Env::ray_fork();
         let pool = env.load_ray_pool(FART);
         let (mint, _) = pool.token();
+        // Since M5 `create_market(Auto)` lists a live or migrating curve as its pump venue
+        // (and refuses mayhem, non-SOL and short curves): the list-only market here is listed
+        // first, then its mint's curve (and pool) appear.
+        list_auto(&mut env, &pool);
         plant_curve(&mut env.svm, &mint, curve_bytes(&spec));
         if canonical {
             plant_canonical_pool(&mut env.svm, &mint, &wsol);
         }
-        list_auto(&mut env, &pool);
         let res = env.propose(None, &pool);
         assert_eq!(custom_code(&res), Some(code(err)), "{what}");
         assert_eq!(
@@ -207,6 +210,64 @@ fn pump_coins_keep_their_pump_venue() {
             "{what}"
         );
     }
+}
+
+/// M5-SEC-5 (D1, fail closed): a list-only market of a pump coin whose migrated curve's
+/// canonical-pool address holds an account that does not read as a valid pool — a changed
+/// discriminator (a PumpSwap upgrade), a pool whose fields a shifted layout moved (planted here
+/// with a non-WSOL quote), a bool byte other than 0/1 — refuses every Raydium candidate
+/// (`PumpVenuePrecedence`): only an address holding nothing is "graduated elsewhere". Pre-fix
+/// each was `GraduatedElsewhere` and a Raydium pool was adopted against D1. The same address
+/// holding nothing: the proposal proceeds (adopted).
+#[test]
+fn an_unreadable_canonical_pool_keeps_the_pump_venue() {
+    let migrated = CurveSpec {
+        complete: true,
+        len: 151,
+        ..CurveSpec::default()
+    };
+    type Plant = fn(&mut litesvm::LiteSVM, &Pubkey);
+    let cases: [(&str, Plant); 3] = [
+        ("another quote", |svm, mint| {
+            plant_canonical_pool(svm, mint, &Pubkey::new_unique())
+        }),
+        ("discriminator", |svm, mint| {
+            plant_canonical_pool(svm, mint, &shortwin::constants::WSOL_MINT);
+            fork::patch(svm, &pda::canonical_pool(mint), |d| d[0] ^= 0xff);
+        }),
+        ("a bool byte 2", |svm, mint| {
+            plant_canonical_pool(svm, mint, &shortwin::constants::WSOL_MINT);
+            fork::patch(svm, &pda::canonical_pool(mint), |d| {
+                d[shortwin_venue_state::pump_amm::OFF_IS_CASHBACK_COIN] = 2
+            });
+        }),
+    ];
+    for (what, plant) in cases {
+        let mut env = Env::ray_fork();
+        let pool = env.load_ray_pool(FART);
+        let (mint, _) = pool.token();
+        list_auto(&mut env, &pool);
+        plant_curve(&mut env.svm, &mint, curve_bytes(&migrated));
+        plant(&mut env.svm, &mint);
+        let res = env.propose(None, &pool);
+        assert_eq!(
+            custom_code(&res),
+            Some(code(E::PumpVenuePrecedence)),
+            "{what}"
+        );
+        assert_eq!(
+            market_of(&env, &pool).venue_kind(),
+            Some(VenueKind::None),
+            "{what}"
+        );
+    }
+    // Nothing at the address: graduated elsewhere, the candidate is adopted.
+    let mut env = Env::ray_fork();
+    let pool = env.load_ray_pool(FART);
+    let (mint, _) = pool.token();
+    list_auto(&mut env, &pool);
+    plant_curve(&mut env.svm, &mint, curve_bytes(&migrated));
+    adopt_ok(&mut env, None, &pool);
 }
 
 /// Base/quote order (ARCH §2.6 "Verification", rule 4): the reversed Fartcoin pool (WSOL is

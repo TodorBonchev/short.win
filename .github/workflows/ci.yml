@@ -121,7 +121,7 @@ jobs:
       - name: cargo audit (workspace and the standalone bench lockfiles)
         run: |
           ignore="--ignore RUSTSEC-2025-0141 --ignore RUSTSEC-2021-0139 --ignore RUSTSEC-2024-0388 --ignore RUSTSEC-2024-0436 --ignore RUSTSEC-2025-0161"
-          for lock in Cargo.lock tests/bench/cu_math/Cargo.lock tests/bench/m1_cu/Cargo.lock tests/bench/m2_cu/Cargo.lock tests/bench/m3_cu/Cargo.lock; do
+          for lock in Cargo.lock tests/bench/cu_math/Cargo.lock tests/bench/m1_cu/Cargo.lock tests/bench/m2_cu/Cargo.lock tests/bench/m3_cu/Cargo.lock tests/bench/m5_cu/Cargo.lock; do
             echo "::group::$lock"; cargo audit -f "$lock" --deny warnings $ignore; echo "::endgroup::"
           done
 
@@ -211,11 +211,15 @@ jobs:
       # --ignore-keys: the program-id keypair is never committed, so a CI checkout gets a
       # throwaway one; the program id itself comes from declare_id! in the source.
       - run: anchor build --tools-version "$PLATFORM_TOOLS" --arch "$SBPF_ARCH" --ignore-keys
-      - name: Artifact is SBPF v3
+      # shortwin.so and, since M5, the stateless straddle helper complete_curve.so (ARCH §5.4, A66;
+      # programs/complete_curve), both deployed.
+      - name: Artifacts are SBPF v3
         run: |
-          flags=$(od -An -t x4 -j 48 -N 4 target/deploy/shortwin.so | tr -d ' ')
-          [ "$flags" = "00000003" ] || { echo "::error::e_flags=$flags, expected SBPF v3 (00000003)"; exit 1; }
-          sha256sum target/deploy/shortwin.so
+          for so in target/deploy/shortwin.so target/deploy/complete_curve.so; do
+            flags=$(od -An -t x4 -j 48 -N 4 "$so" | tr -d ' ')
+            [ "$flags" = "00000003" ] || { echo "::error::$so e_flags=$flags, expected SBPF v3 (00000003)"; exit 1; }
+          done
+          sha256sum target/deploy/shortwin.so target/deploy/complete_curve.so
       # A49: the release artifact knows nothing of the TEST-ONLY mock venue (tests/mock_cpamm,
       # built alongside for the LiteSVM tests and never deployed): its program id must not
       # occur in shortwin.so, neither as 32 bytes of data nor as the four 64-bit `lddw`
@@ -240,9 +244,10 @@ jobs:
                       or all(w[:4] + bytes(4) + w[4:] in elf for w in words))
           if not embeds("target/deploy/mock_cpamm.so"):
               print("::error::the search does not find the mock id in mock_cpamm.so itself"); sys.exit(1)
-          if embeds("target/deploy/shortwin.so"):
-              print(f"::error::target/deploy/shortwin.so embeds the mock venue id {pid} (test-venue build?)"); sys.exit(1)
-          print(f"ok: mock venue id {pid} absent from the release shortwin.so")
+          for so in ("target/deploy/shortwin.so", "target/deploy/complete_curve.so"):
+              if embeds(so):
+                  print(f"::error::{so} embeds the mock venue id {pid} (test-venue build?)"); sys.exit(1)
+          print(f"ok: mock venue id {pid} absent from the release shortwin.so and complete_curve.so")
           PY
           flags=$(od -An -t x4 -j 48 -N 4 target/deploy/mock_cpamm.so | tr -d ' ')
           [ "$flags" = "00000003" ] || { echo "::error::mock_cpamm.so e_flags=$flags, expected SBPF v3"; exit 1; }
@@ -284,12 +289,16 @@ jobs:
           name: shortwin-program
           # mock_cpamm.so: the TEST-ONLY mock venue the M2 LiteSVM tests load (never deployed);
           # test-venue/deploy/shortwin.so: short.win's TEST-ONLY build with `VenueKind::Mock`
-          # (the engine tests, `Env::test_venue`; never deployed).
+          # (the engine tests, `Env::test_venue`; never deployed); complete_curve.so: the straddle
+          # helper (M5; straddle_it, the m5-cu bench and the keeper's graduation scenarios load it
+          # from target/deploy, or $COMPLETE_CURVE_SO).
           path: |
             target/deploy/shortwin.so
             target/deploy/mock_cpamm.so
+            target/deploy/complete_curve.so
             target/test-venue/deploy/shortwin.so
             target/idl/shortwin.json
+            target/idl/complete_curve.json
             target/types/shortwin.ts
           if-no-files-found: error
 
@@ -298,9 +307,12 @@ jobs:
     # crank_sol_usd on the committed mainnet PriceUpdateV2 dump (tests/litesvm/tests/oracle_*.rs)
     # and, from M3, the Raydium mainnet fork (the dumped AMM v4 / CPMM programs and pools:
     # ray_math_it, ray_it, raydium_v4_e2e / raydium_v4_attacks, raydium_cpmm_e2e,
-    # latch_raydium_it, trace_raydium_it, tx_size_raydium); the fixtures' checksums; the unit
-    # tests of the program and the venue-state readers; and the T-LAYOUT wasm32 leg (the layout
-    # asserts compiled for wasm32).
+    # latch_raydium_it, trace_raydium_it, tx_size_raydium) and, from M5, the pump fork (the dumped
+    # pump / pump-fees / PumpSwap programs and coins: pump_math_it, pump_it, straddle_it with the
+    # complete_curve helper, pump_curve_scenarios / pump_curve_attacks / pump_curve_e2e,
+    # trace_pump_it, tx_size_pump_it, latch_pump_it); the fixtures' checksums; the unit tests of
+    # the program and the venue-state readers; and the T-LAYOUT wasm32 leg (the layout asserts
+    # compiled for wasm32).
     needs: anchor-build
     runs-on: ubuntu-24.04
     steps:
@@ -331,6 +343,13 @@ jobs:
       - name: shortwin unit tests without test-venue
         run: cargo test -p shortwin --locked
       - run: cargo test -p shortwin -p shortwin-venue-state -p shortwin-litesvm-tests --locked
+        env:
+          # The defaults resolve to the same files (the artifact is downloaded to target/); named
+          # for the reader.
+          SHORTWIN_SO: ${{ github.workspace }}/target/deploy/shortwin.so
+          SHORTWIN_TEST_VENUE_SO: ${{ github.workspace }}/target/test-venue/deploy/shortwin.so
+          MOCK_CPAMM_SO: ${{ github.workspace }}/target/deploy/mock_cpamm.so
+          COMPLETE_CURVE_SO: ${{ github.workspace }}/target/deploy/complete_curve.so
 
   t-pot:
     # T-POT gate (ARCH §8.2, §9 M1 exit criteria; M1-FID-2): every `pool_model` v0.4.1 trace
@@ -490,13 +509,66 @@ jobs:
       - name: results.md, trace.md and depth.md are current (informational)
         run: git diff --exit-code -- tests/bench/m3_cu/results.md tests/bench/m3_cu/trace.md tests/bench/m3_cu/depth.md || echo "::warning::M3 CU, trace or depth figures changed; commit tests/bench/m3_cu/{results,trace,depth}.md"
 
+  m5-cu:
+    # M5 CU bench, T-TRACE, T-SIZE preview, T-STRADDLE (curve part) and stack depth on the pump
+    # curve (ARCH §5.4, §6.1–§6.4, §8.2, §9 M5): every curve-path instruction of the release build
+    # on the dumped pump / pump-fees / PumpSwap programs on Mollusk 0.15.1 within its budget,
+    # cross-checked on LiteSVM; the worst-case curve transactions at their exact trace counts
+    # (≤ 64) and v0 + ALT sizes, the straddle bundle's tx1 (the complete_curve helper, incl. the
+    # trade-before-bundle and already-completed cases) and tx2 (migrate_v2); every path through
+    # 0–3 levels of the TEST-ONLY CPI wrapper (tests/bench/m5_cu, a standalone workspace with its
+    # own lockfile; README.md there). Loads the release shortwin.so and complete_curve.so from the
+    # anchor-build artifact.
+    needs: anchor-build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: m5-cu-${{ env.PLATFORM_TOOLS }}
+          workspaces: tests/bench/m5_cu
+      - name: Cache Agave and platform-tools
+        id: tools
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.local/share/solana/install
+            ~/.cache/solana/${{ env.PLATFORM_TOOLS }}
+          key: sbf-tools-agave-${{ env.AGAVE_VERSION }}-${{ env.PLATFORM_TOOLS }}-${{ runner.os }}
+      - name: Install Agave ${{ env.AGAVE_VERSION }}
+        if: steps.tools.outputs.cache-hit != 'true'
+        run: sh -c "$(curl -sSfL https://release.anza.xyz/v${AGAVE_VERSION}/install)"
+      - name: Select Agave ${{ env.AGAVE_VERSION }}
+        run: |
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/share/solana/install/active_release/bin/agave-install" init "$AGAVE_VERSION"
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: shortwin-program
+          path: target
+      - name: Build the TEST-ONLY CPI wrapper (platform-tools v1.57, SBPF v3; never deployed)
+        run: |
+          cargo-build-sbf --tools-version "$PLATFORM_TOOLS" --arch "$SBPF_ARCH" \
+            --manifest-path tests/bench/m5_cu/wrapper/Cargo.toml --sbf-out-dir tests/bench/m5_cu/target/deploy -- --locked
+          flags=$(od -An -t x4 -j 48 -N 4 tests/bench/m5_cu/target/deploy/m5_cpi_wrapper.so | tr -d ' ')
+          [ "$flags" = "00000003" ] || { echo "::error::e_flags=$flags, expected SBPF v3 (00000003)"; exit 1; }
+      - run: cargo fmt --manifest-path tests/bench/m5_cu/Cargo.toml --all --check
+      - run: cargo clippy --manifest-path tests/bench/m5_cu/Cargo.toml --workspace --all-targets --locked -- -D warnings
+      - name: Budgets, T-TRACE, sizes and depth (fails above a budget or CU limit, off the expected trace, peak or depth, above 64 entries or 1,232 B v0, or on a failed case)
+        run: M5_CU_WRITE=1 M5_TRACE_WRITE=1 M5_DEPTH_WRITE=1 cargo test --manifest-path tests/bench/m5_cu/Cargo.toml --locked -- --nocapture
+      - name: results.md, trace.md and depth.md are current (informational)
+        run: git diff --exit-code -- tests/bench/m5_cu/results.md tests/bench/m5_cu/trace.md tests/bench/m5_cu/depth.md || echo "::warning::M5 CU, trace or depth figures changed; commit tests/bench/m5_cu/{results,trace,depth}.md"
+
   services:
     # The off-chain services workspace (services/, its own Cargo.lock; ARCH §1.2, §7.1): fmt,
     # clippy (the workspace, and the keeper alone on its release feature set, without the
     # TEST-ONLY `test-venue`), cargo-deny and cargo-audit on its lockfile, the keeper's unit
     # tests and its LiteSVM scenarios (duties 1–4, batching, degraded mode, duty 10's venue
-    # monitor, M4's duty 5 Raydium fast path and duty 12 pool monitor; every keeper transaction
-    # under the invariant hooks) against the anchor-build artifacts, and the A49
+    # monitor, M4's duty 5 Raydium fast path and duty 12 pool monitor, M5's duty 6 on the pump
+    # curve — migrate_v2 and the straddle bundle with the complete_curve helper; every keeper
+    # transaction under the invariant hooks) against the anchor-build artifacts, and the A49
     # check that the keeper binary carries no mock-venue code.
     needs: anchor-build
     runs-on: ubuntu-24.04
@@ -531,6 +603,7 @@ jobs:
           SHORTWIN_TEST_VENUE_SO: ${{ github.workspace }}/target/test-venue/deploy/shortwin.so
           MOCK_CPAMM_SO: ${{ github.workspace }}/target/deploy/mock_cpamm.so
           SHORTWIN_SO: ${{ github.workspace }}/target/deploy/shortwin.so
+          COMPLETE_CURVE_SO: ${{ github.workspace }}/target/deploy/complete_curve.so
         run: cargo test --manifest-path services/Cargo.toml --workspace --locked -- --nocapture
       # A49 for the keeper: the release binary is built without `test-venue`, so it must not
       # embed the mock venue's program id; the scenario test binary (built with it) must.
@@ -566,7 +639,11 @@ jobs:
     # budget, a separate fee payer, a first-time borrower, the largest extras set) fits 1,232 B and
     # 64 accounts as a v0 transaction through the protocol ALT (A28 as enumerated, and the table
     # scripts/build-alt.sh builds), and executes that way on the mainnet fork under the invariant
-    # hooks (tests/litesvm/tests/tx_size_raydium.rs; the size table is printed). Also the protocol
+    # hooks (tests/litesvm/tests/tx_size_raydium.rs; the size table is printed); from M5 the same
+    # for every pump-curve transaction on the dumped pump programs and coins
+    # (tests/litesvm/tests/tx_size_pump_it.rs: the largest extras set, the keeper's composite, crank
+    # batches of 5; a tipped liquidation with the largest extras set is measured as not fitting v0,
+    # ARCH §6.4). Also the protocol
     # ALT's static part as scripts/build-alt.sh builds it, uploaded for review with the live
     # recipients added at `create` time. (program-tests and services run the same tests; this job
     # keeps the size table and the address list in one log.)
@@ -590,6 +667,10 @@ jobs:
         env:
           SHORTWIN_SO: ${{ github.workspace }}/target/deploy/shortwin.so
         run: cargo test --locked -p shortwin-litesvm-tests --test tx_size_raydium -- --nocapture
+      - name: T-SIZE, the pump curve (v0 through the protocol ALT, executed on the fork)
+        env:
+          SHORTWIN_SO: ${{ github.workspace }}/target/deploy/shortwin.so
+        run: cargo test --locked -p shortwin-litesvm-tests --test tx_size_pump_it -- --nocapture
       - name: The protocol ALT's static part (scripts/build-alt.sh print)
         run: scripts/build-alt.sh print | tee protocol-alt-static.txt
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

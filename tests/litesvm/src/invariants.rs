@@ -34,7 +34,7 @@ use litesvm::types::TransactionMetadata;
 use shortwin::events::{
     ClaimSol, Close, DeficitCovered, Deposit, Expire, LenderSynced, Liquidate, MarketCreated, Open,
     PoolProposed, PoolSwitchCancelled, PoolSwitched, SettleArmed, SettleDisarmed, SolSettle,
-    Withdraw,
+    VenueStateChanged, Withdraw,
 };
 use shortwin::state::{LenderPosition, Market, MarketVault, ShortPosition, VenueGuard, VenueKind};
 use shortwin_math::pool::{R_MAX, VIRTUAL_ASSETS, VIRTUAL_SHARES};
@@ -319,6 +319,9 @@ pub struct IxEvents {
     pub switched: Vec<PoolSwitched>,
     pub proposed: Vec<PoolProposed>,
     pub cancelled: Vec<PoolSwitchCancelled>,
+    /// Venue transitions (M5: a curve's completion, graduation elsewhere, `crank_price`'s
+    /// `None →` pump re-detection, which clears a collection window, I15).
+    pub venue_changed: Vec<VenueStateChanged>,
     /// The instruction's account keys (empty when unknown).
     pub accounts: Vec<Pubkey>,
 }
@@ -343,6 +346,7 @@ impl IxEvents {
             switched: events::of_ix(meta, ix),
             proposed: events::of_ix(meta, ix),
             cancelled: events::of_ix(meta, ix),
+            venue_changed: events::of_ix(meta, ix),
             accounts: Vec::new(),
         }
     }
@@ -367,6 +371,7 @@ impl IxEvents {
             expiries: &self.expiries,
             settlements: &self.settlements,
             switched: &self.switched,
+            venue_changed: &self.venue_changed,
             accounts: &self.accounts,
         }
     }
@@ -391,6 +396,7 @@ impl IxEvents {
             switched: &self.switched,
             proposed: &self.proposed,
             cancelled: &self.cancelled,
+            venue_changed: &self.venue_changed,
         }
     }
 }

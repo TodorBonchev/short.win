@@ -189,6 +189,7 @@ fn state_of(p: &Parsed, now: i64) -> Option<VenueState> {
         pricing: Some(Pricing::RayV4(fee)),
         fee_ppm: fee.oneway_ppm(),
         locked_depth,
+        curve: None,
     })
 }
 
@@ -391,7 +392,7 @@ pub fn sell<'info>(
             q,
             min_out,
             &leg.pool_vault,
-            &leg.trader.trader_wsol,
+            leg.trader.trader_wsol()?,
         )
     })
 }
@@ -410,7 +411,7 @@ pub fn buy<'info>(
             TAG_SWAP_BASE_OUT_V2,
             max_in,
             q,
-            &leg.trader.trader_wsol,
+            leg.trader.trader_wsol()?,
             &leg.pool_vault,
         )
     })

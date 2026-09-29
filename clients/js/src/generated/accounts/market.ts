@@ -217,6 +217,18 @@ export type Market = {
    */
   minOpenFeePpm: number;
   pad5: ReadonlyUint8Array;
+  /**
+   * `ATA(trader, WSOL)` under SPL Token (the pump curve's TradeExtras T11, `sweep_trader`'s
+   * stray-ATA slot): derived once at listing instead of on every trade. The trader is the
+   * market's PDA, so a coin's creator who grinds the mint can give this ATA a low bump, and
+   * `find_program_address` charges 1,500 CU per bump it tries (M5-SEC-6).
+   */
+  traderWsolAta: Address;
+  /**
+   * `PDA(pump, ["pool-authority", mint])`, the canonical PumpSwap pool's `creator`, which
+   * `canonical_pool_valid` compares (ARCH §2.5); derived once at listing for the same reason.
+   */
+  pumpPoolAuthority: Address;
   reserved: ReadonlyUint8Array;
 };
 
@@ -367,6 +379,18 @@ export type MarketArgs = {
    */
   minOpenFeePpm: number;
   pad5: ReadonlyUint8Array;
+  /**
+   * `ATA(trader, WSOL)` under SPL Token (the pump curve's TradeExtras T11, `sweep_trader`'s
+   * stray-ATA slot): derived once at listing instead of on every trade. The trader is the
+   * market's PDA, so a coin's creator who grinds the mint can give this ATA a low bump, and
+   * `find_program_address` charges 1,500 CU per bump it tries (M5-SEC-6).
+   */
+  traderWsolAta: Address;
+  /**
+   * `PDA(pump, ["pool-authority", mint])`, the canonical PumpSwap pool's `creator`, which
+   * `canonical_pool_valid` compares (ARCH §2.5); derived once at listing for the same reason.
+   */
+  pumpPoolAuthority: Address;
   reserved: ReadonlyUint8Array;
 };
 
@@ -473,7 +497,9 @@ export function getMarketEncoder(): FixedSizeEncoder<MarketArgs> {
       ["maxQHwm", getU64Encoder()],
       ["minOpenFeePpm", getU32Encoder()],
       ["pad5", fixEncoderSize(getBytesEncoder(), 4)],
-      ["reserved", fixEncoderSize(getBytesEncoder(), 240)],
+      ["traderWsolAta", getAddressEncoder()],
+      ["pumpPoolAuthority", getAddressEncoder()],
+      ["reserved", fixEncoderSize(getBytesEncoder(), 176)],
     ]),
     (value) => ({ ...value, discriminator: MARKET_DISCRIMINATOR }),
   );
@@ -581,7 +607,9 @@ export function getMarketDecoder(): FixedSizeDecoder<Market> {
     ["maxQHwm", getU64Decoder()],
     ["minOpenFeePpm", getU32Decoder()],
     ["pad5", fixDecoderSize(getBytesDecoder(), 4)],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 240)],
+    ["traderWsolAta", getAddressDecoder()],
+    ["pumpPoolAuthority", getAddressDecoder()],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 176)],
   ]);
 }
 

@@ -8,7 +8,11 @@
 //! (b) — the per-slot liquidity bursts M4F-1 added stay reverted, M4G-2, so duty-2 bursts are
 //! price-only — against LP-wrapped cranks after a switch and in steady state; the carried fit of
 //! FIT-2 / FITS-1; FITV-2 / FITS-2's withdraw contest and FITX-1's pinned residual, a genuinely
-//! reached low frozen by withdraw-wrapped cranks; the keeper's cost of an LP-wrapped crank).
+//! reached low frozen by withdraw-wrapped cranks; the keeper's cost of an LP-wrapped crank), and
+//! `graduation` (M5, duty 6 on the pump-curve fork: `migrate_v2` as soon as a curve completes, the
+//! straddle bundle with the `complete-curve` helper, a curve trade between the keeper's read and its
+//! bundle; a curve that graduated elsewhere settled in S3 on its detection set, duty 5; a
+//! list-only market re-detected on its curve and its trader accounts created).
 //! Every keeper transaction runs the harness's invariant hooks after every instruction
 //! (`shortwin_keeper_litesvm`).
 //!
@@ -16,7 +20,8 @@
 //! `SHORTWIN_TEST_VENUE_SO`) and the mock venue (`target/deploy/mock_cpamm.so`, or
 //! `MOCK_CPAMM_SO`) for the mock scenarios, and the **release** build
 //! (`target/deploy/shortwin.so`, or `SHORTWIN_SO`) with the committed mainnet fixtures for the
-//! Raydium ones, as the program tests do.
+//! Raydium and pump ones, as the program tests do; `graduation` also loads the straddle helper
+//! (`target/deploy/complete_curve.so`, or `COMPLETE_CURVE_SO`).
 
 #![allow(clippy::result_large_err)]
 
@@ -28,6 +33,7 @@ mod degraded;
 mod expire;
 mod extras;
 mod freeze;
+mod graduation;
 mod liquidate;
 mod pool_select;
 mod priority;

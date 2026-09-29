@@ -1,4 +1,4 @@
-//! Alerts (ARCHITECTURE §7.1 "Keys and ops", duties 5, 9, 10 and 12): what the keeper pages
+//! Alerts (ARCHITECTURE §7.1 "Keys and ops", duties 5, 6, 9, 10 and 12): what the keeper pages
 //! about. The keeper returns them in each [`crate::keeper::TickReport`] and logs them; the
 //! binary forwards them to its log (a pager integration is an ops choice).
 
@@ -134,6 +134,19 @@ pub enum Alert {
         code: Option<u32>,
         detail: String,
     },
+    /// Duty 6: the keeper's `migrate_v2` of `market`'s completed curve failed in simulation or
+    /// on chain (retried every second while the curve stays unmigrated); alerted once per
+    /// market and detail. Positions pause (`VenueMigrating`) until someone migrates.
+    MigrateFailed { market: Pubkey, detail: String },
+    /// Duty 6: a liquidatable position's `Q` exceeds its live curve's `rT` (ARCH §5.4) and the
+    /// straddle bundle is not sent (`reason`: no exit transaction before M6, no block engine,
+    /// the completion above `max_complete_lamports`, a failed pre-flight); the keeper calls
+    /// `sol_settle` for it instead. Alerted once per position and reason.
+    StraddleWaiting {
+        market: Pubkey,
+        position: Pubkey,
+        reason: String,
+    },
 }
 
 impl Alert {
@@ -153,6 +166,9 @@ impl Alert {
                 tracing::error!(alert = ?self, "venue admin action");
             }
             Self::PoolPinned { .. } => tracing::error!(alert = ?self, "pool selection alert"),
+            Self::MigrateFailed { .. } | Self::StraddleWaiting { .. } => {
+                tracing::error!(alert = ?self, "graduation alert");
+            }
             Self::PoolSwitched { .. }
             | Self::PoolWindow { .. }
             | Self::PoolSwitchCancelled { .. }

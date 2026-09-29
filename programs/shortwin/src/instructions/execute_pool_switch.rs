@@ -152,7 +152,7 @@ pub fn handler<'info>(ctx: Context<'info, ExecutePoolSwitch<'info>>) -> Result<(
         &market_key,
         &mut market,
         &mut scratch,
-        Some(inc.state),
+        Some(&inc.state),
         clock.unix_timestamp,
         clock.slot,
     )?;

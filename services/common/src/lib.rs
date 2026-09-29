@@ -1,7 +1,8 @@
 //! short.win services, shared parts (ARCHITECTURE §1.2 `services/common`, §7.1 "Stack"):
 //!
 //! - [`chain`]: the chain-client abstraction the keeper is generic over ([`Chain`]): clock,
-//!   accounts, program accounts, blockhash, simulate, send, recent priority fees.
+//!   accounts, program accounts, blockhash, simulate, send, recent priority fees, and Jito
+//!   bundles (send, pre-flight).
 //! - [`rpc`]: its JSON-RPC backend for a real cluster ([`rpc::RpcChain`]). The in-process
 //!   LiteSVM backend is TEST-ONLY and lives in `services/keeper-litesvm`.
 //! - [`tx`]: transaction building — v1 (SIMD-0385) with a v0 fallback, the compute budget
@@ -14,5 +15,7 @@ pub mod chain;
 pub mod rpc;
 pub mod tx;
 
-pub use chain::{AccountData, Chain, ChainClock, InnerIx, Memcmp, TxError, TxOutcome};
+pub use chain::{
+    AccountData, BundleOutcome, Chain, ChainClock, InnerIx, Memcmp, TxError, TxOutcome,
+};
 pub use tx::{ComputeBudget, TxFormat};

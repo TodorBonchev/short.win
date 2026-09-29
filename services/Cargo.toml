@@ -25,6 +25,9 @@ shortwin-math = { path = "../crates/shortwin-math" }
 shortwin-venue-state = { path = "../crates/shortwin-venue-state" }
 shortwin-services-common = { path = "common" }
 shortwin-keeper = { path = "keeper" }
+# The stateless straddle helper (ARCH §5.4, A66): its Anchor account and instruction types for the
+# keeper's `complete_curve` (tx1 of the straddle bundle).
+complete-curve = { path = "../programs/complete_curve", features = ["no-entrypoint"] }
 anchor-lang = "=1.2.0"
 bytemuck = "1.25"
 anyhow = "1"
@@ -35,6 +38,9 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 bs58 = "0.5"
 wincode = "0.5.5"
+# Jito `sendBundle` params (services/common; both already in this lockfile through the RPC client).
+base64 = "0.22"
+serde_json = "1"
 
 # The Agave 4.2.2 client line (C1-14: the root lockfile's line; see the workspace comment).
 solana-rpc-client = { version = "~4.2.2", default-features = false }

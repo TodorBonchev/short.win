@@ -116,6 +116,16 @@ pub fn bonding_curve(mint: &Pubkey) -> Pubkey {
     .0
 }
 
+/// pump's `["pool-authority", mint]`, the canonical pool's `creator` (cached by `create_market`
+/// as `Market::pump_pool_authority`, M5-SEC-6).
+pub fn pump_pool_authority(mint: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(
+        &[b"pool-authority", mint.as_ref()],
+        &shortwin::constants::PUMP_PROGRAM_ID,
+    )
+    .0
+}
+
 /// The canonical PumpSwap pool of `mint` (R-VEN §1.3): `PDA(pAMM, ["pool", 0u16 LE,
 /// PDA(pump, ["pool-authority", mint]), mint, WSOL])`.
 pub fn canonical_pool(mint: &Pubkey) -> Pubkey {

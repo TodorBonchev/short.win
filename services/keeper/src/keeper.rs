@@ -37,13 +37,28 @@
 //! every covered market's pool and CPMM config against the last tick (Raydium admin actions:
 //! route lost or restored, status, open time, fee against the opens and hard caps), as alerts.
 //!
+//! **List-only markets** (M5): covered like any market with their detection set as ReadSet — one
+//! with positions open (a curve that graduated elsewhere) is observed on the no-route cadence and
+//! its positions are settled in S3 when due (duty 5, `sol_settle` on the detection set,
+//! M2-SEC-5); one whose detection set shows a pump curve again is cranked onto it, and the
+//! trader's curve accounts are then created ([`crate::graduation::redetection_due`]).
+//!
+//! **Graduation** (duty 6, [`crate::graduation`]; M5): before a curve market's exits, pump
+//! `migrate_v2` top-level as soon as its curve is complete and unmigrated (then the market is
+//! observed in the same second); a liquidatable position whose `Q` exceeds its live curve's `rT`
+//! (`Plan::Straddle`) gets the straddle bundle (`complete_curve`, `migrate_v2`, the exit on the new
+//! pool: M6) through the chain's block engine — until M6 there is no exit transaction, so the
+//! bundle goes out only with `graduation.send_without_exit`, and otherwise the keeper calls
+//! `sol_settle` for the position.
+//!
 //! Batches are **packed by size**: a batch takes up to `batch_v1` / `batch_v0` cranks and is cut
 //! where its transaction would exceed the format's size or account limit, so any mix of venue
 //! account sets (the mock's 3 ReadSet keys, AMM v4's 4, CPMM's 5) is batched as densely as fits.
 //!
 //! Every transaction: simulated first, compute-unit limit `⌈simulated × 1.1⌉`, priority price
 //! from recent per-account fees, escalated after misses, capped at the O17 ceiling (duty 14).
-//! The Jito bundle path of duty 3 is not built yet (see the crate README).
+//! Duty 3's Jito bundle path for ordinary exits is not built yet (see the crate README); the
+//! straddle's bundle is duty 6's.
 
 use std::collections::{BTreeMap, HashSet, VecDeque};
 
@@ -69,6 +84,7 @@ use crate::coverage::{Due, MarketTrack};
 use crate::decide::{self, MarketNeeds, Plan, PositionEval};
 use crate::events::{self, PoolEvent, PoolEventKind};
 use crate::fees;
+use crate::graduation::{self, MigrateRecord, StraddlePlan, StraddleRecord, StraddleResult};
 use crate::ixs;
 use crate::metrics::Metrics;
 use crate::monitor::{self, FeeCaps, LatchAction, PoolWatch};
@@ -263,6 +279,13 @@ pub struct TickReport {
     pub pool_actions: Vec<PoolActionRecord>,
     /// The pool events of the keeper's landed pool-selection transactions.
     pub pool_events: Vec<PoolEvent>,
+    /// Duty 6: the keeper's `migrate_v2` attempts.
+    pub migrations: Vec<MigrateRecord>,
+    /// Duty 6 (M5): the trader accounts the keeper created on a curve market (after a `None →`
+    /// pump re-detection), with the result.
+    pub curve_accounts: Vec<(Pubkey, ExitResult)>,
+    /// Duty 6: the straddle bundles (sent, refused in pre-flight, or waiting).
+    pub straddles: Vec<StraddleRecord>,
     pub skipped: Vec<(Pubkey, String)>,
     pub errors: Vec<String>,
 }
@@ -350,6 +373,19 @@ pub struct Keeper<C: Chain> {
     pool_tracks: BTreeMap<Pubkey, PoolTrack>,
     /// The chain the pool discovery's `getProgramAccounts` calls go to (`None`: `chain`).
     discovery: Option<C>,
+    /// Duty 6: the second of the last `migrate_v2` attempt per market (one a second).
+    migrate_tried: BTreeMap<Pubkey, i64>,
+    /// Duty 6: the second of the last straddle attempt per market (one bundle a second: it
+    /// completes the curve for every position of the market).
+    straddle_tried: BTreeMap<Pubkey, i64>,
+    /// Duty 6: graduation alerts already raised, per (market or position, detail).
+    graduation_alerted: HashSet<(Pubkey, String)>,
+    /// Duty 6 (M5): curve markets whose trader accounts (`trader_base_ata`, the pump UVA) the
+    /// keeper found present; the second of the last attempt to create them per market.
+    curve_ready: HashSet<Pubkey>,
+    curve_prepare_tried: BTreeMap<Pubkey, i64>,
+    /// The next Jito tip account to use (in turn).
+    tip_next: usize,
     /// Counters (duty 8).
     pub metrics: Metrics,
 }
@@ -377,6 +413,12 @@ impl<C: Chain> Keeper<C> {
             flag_tried: BTreeMap::new(),
             pool_tracks: BTreeMap::new(),
             discovery: None,
+            migrate_tried: BTreeMap::new(),
+            straddle_tried: BTreeMap::new(),
+            graduation_alerted: HashSet::new(),
+            curve_ready: HashSet::new(),
+            curve_prepare_tried: BTreeMap::new(),
+            tip_next: 0,
             metrics: Metrics::default(),
         })
     }
@@ -768,7 +810,25 @@ impl<C: Chain> Keeper<C> {
             }
         }
 
+        // Duty 6 (M5): a list-only market whose detection set shows a pump curve again is cranked
+        // onto it (`crank_price`'s re-detection, ARCH §2.5 `None` row); a curve market's trader
+        // accounts, which the re-detection does not create, are created when missing.
+        let mut force_crank = graduation::redetection_due(&view.markets[idx]);
+        if view.markets[idx].kind == VenueKind::PumpCurve && !self.curve_ready.contains(&key) {
+            self.prepare_curve_trader(view, idx, now, report).await?;
+        }
+
+        // Duty 6: `migrate_v2` as soon as the curve is complete (before the exits: a migrating
+        // market's exits pause until then). The market is observed this second afterwards.
+        if self.cfg.graduation.migrate
+            && graduation::migration_due(&view.markets[idx])
+            && self.migrate(view, idx, now, report).await?
+        {
+            force_crank = true;
+        }
+
         let mut attempted: HashSet<(Pubkey, ExitKind)> = HashSet::new();
+        let mut straddled = false;
         let mut observed = false;
         let mut due_before: Option<Option<Due>> = None;
         loop {
@@ -810,7 +870,9 @@ impl<C: Chain> Keeper<C> {
                 let kind = match e.plan {
                     Plan::Liquidate => ExitKind::Liquidate,
                     Plan::Expire => ExitKind::Expire,
-                    Plan::SolSettle | Plan::S3Probe => ExitKind::SolSettle,
+                    // A straddle whose bundle does not go out falls back to `sol_settle` (the
+                    // decision tree's last branch).
+                    Plan::SolSettle | Plan::S3Probe | Plan::Straddle => ExitKind::SolSettle,
                     _ => return None,
                 };
                 (!attempted.contains(&(e.key, kind))).then_some((e.clone(), kind))
@@ -820,6 +882,20 @@ impl<C: Chain> Keeper<C> {
             let Some(pv) = mv.positions.iter().find(|p| p.key == ev.key).cloned() else {
                 continue;
             };
+            // Duty 6: one straddle bundle per market and tick (it completes the curve for every
+            // position of the market).
+            if ev.plan == Plan::Straddle && !straddled {
+                straddled = true;
+                if let Some(with_exit) = self.straddle(&mv, &pv, now, report).await {
+                    observed |= with_exit;
+                    force_crank = true;
+                    let fresh = view::load(&self.chain, &[key]).await?;
+                    if let Some(m) = fresh.markets.into_iter().next() {
+                        view.markets[idx] = m;
+                    }
+                    continue;
+                }
+            }
             if kind == ExitKind::SolSettle {
                 let track = self.tracks.entry(key).or_default();
                 if track.settle_sent.get(&pv.key) == Some(&now) {
@@ -867,10 +943,323 @@ impl<C: Chain> Keeper<C> {
         let due = due_before.flatten();
         if observed {
             report.observed.push((key, due));
-        } else if let Some(d) = due {
+        } else if let Some(d) = due.or(force_crank.then_some(Due::Second)) {
             crank_queue.push((key, d));
         }
         Ok(())
+    }
+
+    /// Duty 6 (M5; module docs): the trader's base ATA and pump UVA of `view.markets[idx]`'s curve
+    /// market ([`graduation::trader_account_keys`]) are read once; the missing ones are created
+    /// (at most one attempt a second), and the market is marked ready when both exist.
+    async fn prepare_curve_trader(
+        &mut self,
+        view: &ChainView,
+        idx: usize,
+        now: i64,
+        report: &mut TickReport,
+    ) -> anyhow::Result<()> {
+        let mv = &view.markets[idx];
+        let key = mv.key;
+        let keys = graduation::trader_account_keys(&mv.market);
+        let accs = self.chain.accounts(&keys).await?;
+        let missing = [
+            accs.first().is_none_or(Option::is_none),
+            accs.get(1).is_none_or(Option::is_none),
+        ];
+        if missing == [false, false] {
+            self.curve_ready.insert(key);
+            return Ok(());
+        }
+        if self.curve_prepare_tried.get(&key) == Some(&now) {
+            return Ok(());
+        }
+        self.curve_prepare_tried.insert(key, now);
+        let ixs = graduation::trader_account_ixs(&self.payer.pubkey(), &mv.market, missing);
+        let result = self.send_exit(&ixs, key, ExtrasSel::NONE, now).await;
+        if result.landed().is_some() {
+            self.curve_ready.insert(key);
+        }
+        report.curve_accounts.push((key, result));
+        Ok(())
+    }
+
+    /// Raises a graduation alert once per (`key`, detail).
+    fn graduation_alert(&mut self, key: Pubkey, detail: &str, alert: Alert) {
+        if self.graduation_alerted.insert((key, detail.to_string())) {
+            self.alerts.push(alert);
+        }
+    }
+
+    /// Duty 6: pump `migrate_v2` of `view.markets[idx]`'s completed curve, top-level and alone
+    /// ([`graduation::migrate_v2_ix`]), at most once a second; the market is re-read after it
+    /// lands. Returns whether it landed.
+    async fn migrate(
+        &mut self,
+        view: &mut ChainView,
+        idx: usize,
+        now: i64,
+        report: &mut TickReport,
+    ) -> anyhow::Result<bool> {
+        let mv = view.markets[idx].clone();
+        let key = mv.key;
+        if self.migrate_tried.get(&key) == Some(&now) {
+            return Ok(false);
+        }
+        self.migrate_tried.insert(key, now);
+        let result =
+            match graduation::migrate_v2_ix(&self.payer.pubkey(), &mv.market, &mv.read_accounts) {
+                Ok(ix) => self.send_exit(&[ix], key, ExtrasSel::NONE, now).await,
+                Err(e) => ExitResult::Error(format!("{e:#}")),
+            };
+        let landed = result.landed().is_some();
+        match &result {
+            ExitResult::Landed { .. } => self.metrics.market(key).migrations += 1,
+            ExitResult::DryRun { .. } | ExitResult::NoOp => {}
+            other => {
+                let detail = match other {
+                    ExitResult::Refused { outcome, .. } | ExitResult::Failed { outcome } => {
+                        format!("{:?}", outcome.err)
+                    }
+                    ExitResult::Error(e) => e.clone(),
+                    _ => String::new(),
+                };
+                self.graduation_alert(
+                    key,
+                    &format!("migrate: {detail}"),
+                    Alert::MigrateFailed {
+                        market: key,
+                        detail: detail.clone(),
+                    },
+                );
+            }
+        }
+        report.migrations.push(MigrateRecord {
+            market: key,
+            result,
+        });
+        if landed {
+            let fresh = view::load(&self.chain, &[key]).await?;
+            if let Some(m) = fresh.markets.into_iter().next() {
+                view.markets[idx] = m;
+            }
+        }
+        Ok(landed)
+    }
+
+    /// Duty 6: the straddle bundle for `pv` ([`graduation::plan_straddle`]; ARCH §5.4), at most
+    /// once a second per market. `Some(with_exit)` when the bundle landed (`with_exit`: it
+    /// carried the exit, tx3); `None` when it was not sent or did not land — the caller then
+    /// calls `sol_settle` for the position.
+    async fn straddle(
+        &mut self,
+        mv: &MarketView,
+        pv: &PositionView,
+        now: i64,
+        report: &mut TickReport,
+    ) -> Option<bool> {
+        let g = self.cfg.graduation.clone();
+        if !g.straddle || self.straddle_tried.get(&mv.key) == Some(&now) {
+            return None;
+        }
+        self.straddle_tried.insert(mv.key, now);
+        let keeper = self.payer.pubkey();
+        let (plan, result) =
+            match graduation::plan_straddle(&keeper, mv, pv, g.complete_slippage_bps) {
+                Ok(plan) => {
+                    let result = self.run_straddle(mv, &plan).await;
+                    (Some(plan), result)
+                }
+                Err(e) => (None, StraddleResult::Error(format!("{e:#}"))),
+            };
+        let landed = match &result {
+            StraddleResult::Landed { with_exit, .. } => {
+                self.metrics.market(mv.key).straddles += 1;
+                Some(*with_exit)
+            }
+            _ => None,
+        };
+        let reason = match &result {
+            StraddleResult::Waiting { reason } => Some(reason.clone()),
+            StraddleResult::Refused { tx, outcome } => Some(format!(
+                "tx{} refused in pre-flight: {:?}",
+                tx + 1,
+                outcome.err
+            )),
+            StraddleResult::Failed { outcome } => {
+                Some(format!("bundle did not land: {}", outcome.detail))
+            }
+            StraddleResult::Error(e) => Some(e.clone()),
+            StraddleResult::Landed { .. } | StraddleResult::DryRun { .. } => None,
+        };
+        if let Some(reason) = reason {
+            self.graduation_alert(
+                pv.key,
+                &reason,
+                Alert::StraddleWaiting {
+                    market: mv.key,
+                    position: pv.key,
+                    reason: reason.clone(),
+                },
+            );
+        }
+        report.straddles.push(StraddleRecord {
+            market: mv.key,
+            position: pv.key,
+            rt_read: plan.as_ref().map_or(0, |p| p.rt_read),
+            quote: plan.as_ref().map_or(0, |p| p.quote),
+            max_sol_cost: plan.as_ref().map_or(0, |p| p.max_sol_cost),
+            txs: match &result {
+                StraddleResult::Landed { outcome, .. } | StraddleResult::Failed { outcome } => {
+                    outcome.txs.len()
+                }
+                _ => 0,
+            },
+            result,
+        });
+        landed
+    }
+
+    /// Builds, pre-flights and sends `plan`'s bundle (v0 transactions, the keeper paying and
+    /// signing; the tip on the last one): `simulate_bundle` where the chain can, else tx1 alone
+    /// (tx2 cannot run before tx1 has completed the curve) with `migrate_v2`'s fixed limit; when
+    /// tx3's pre-flight fails with a fallback code (V1-9) the bundle goes out as tx1 + tx2.
+    async fn run_straddle(&mut self, mv: &MarketView, plan: &StraddlePlan) -> StraddleResult {
+        let g = self.cfg.graduation.clone();
+        if plan.quote > g.max_complete_lamports {
+            return StraddleResult::Waiting {
+                reason: format!(
+                    "completing the curve costs {} lamports, above max_complete_lamports {}",
+                    plan.quote, g.max_complete_lamports
+                ),
+            };
+        }
+        let mut with_exit = plan.tx3.is_some();
+        if !with_exit && !g.send_without_exit {
+            return StraddleResult::Waiting {
+                reason: "no exit transaction on the post-migration pool before M6 (the \
+                         PumpSwap adapter); graduation.send_without_exit is off"
+                    .into(),
+            };
+        }
+        let tips = match g.tip_keys() {
+            Ok(t) if !t.is_empty() => t,
+            _ => return StraddleResult::Error("no tip account".into()),
+        };
+        let tip_to = tips[self.tip_next % tips.len()];
+        self.tip_next = self.tip_next.wrapping_add(1);
+        let price = self.priority_price(&[mv.key], true).await;
+        loop {
+            let mut txs: Vec<Vec<Instruction>> = vec![plan.tx1.clone(), plan.tx2.clone()];
+            if with_exit && let Some(t3) = &plan.tx3 {
+                txs.push(t3.clone());
+            }
+            if let Some(last) = txs.last_mut() {
+                last.push(graduation::tip_ix(
+                    &self.payer.pubkey(),
+                    &tip_to,
+                    g.tip_lamports,
+                ));
+            }
+            let bh = match self.chain.latest_blockhash().await {
+                Ok(h) => h,
+                Err(e) => return StraddleResult::Error(format!("{e:#}")),
+            };
+            let build = |ixs: &[Instruction], limit: u32| {
+                tx::build(
+                    TxFormat::V0,
+                    &self.payer,
+                    &[],
+                    ixs,
+                    &ComputeBudget {
+                        unit_limit: limit,
+                        unit_price: price,
+                    },
+                    bh,
+                    &self.lookup_tables,
+                )
+            };
+            let sims = match txs
+                .iter()
+                .map(|ixs| build(ixs, tx::MAX_COMPUTE_UNITS))
+                .collect::<anyhow::Result<Vec<_>>>()
+            {
+                Ok(v) => v,
+                Err(e) => return StraddleResult::Error(format!("{e:#}")),
+            };
+            if let Some(i) = sims.iter().position(|t| !tx::fits(TxFormat::V0, t)) {
+                return StraddleResult::Error(format!("bundle tx{} too large", i + 1));
+            }
+            // Pre-flight.
+            self.metrics.simulations += 1;
+            let mut pre: Vec<TxOutcome> = Vec::new();
+            let limits: Vec<u32> = match self.chain.simulate_bundle(&sims).await {
+                Ok(outs) => {
+                    if let Some((i, o)) = outs.iter().enumerate().find(|(_, o)| !o.ok()) {
+                        self.metrics.simulation_failures += 1;
+                        let code = o.err.as_ref().and_then(TxError::custom_code);
+                        if i == 2 && with_exit && graduation::falls_back(code) {
+                            // V1-9: the exit would fail; complete and migrate only.
+                            with_exit = false;
+                            continue;
+                        }
+                        return StraddleResult::Refused {
+                            tx: i,
+                            outcome: o.clone(),
+                        };
+                    }
+                    if outs.len() < sims.len() {
+                        return StraddleResult::Error("the bundle simulation stopped early".into());
+                    }
+                    let l = outs
+                        .iter()
+                        .map(|o| tx::cu_limit(o.units_consumed))
+                        .collect();
+                    pre = outs;
+                    l
+                }
+                Err(_) => match self.chain.simulate(&sims[0]).await {
+                    Ok(o) if o.ok() => {
+                        let mut l = vec![tx::cu_limit(o.units_consumed), graduation::MIGRATE_CU];
+                        pre.push(o);
+                        if with_exit {
+                            l.push(graduation::UNSIMULATED_CU);
+                        }
+                        l
+                    }
+                    Ok(o) => {
+                        self.metrics.simulation_failures += 1;
+                        return StraddleResult::Refused { tx: 0, outcome: o };
+                    }
+                    Err(e) => return StraddleResult::Error(format!("{e:#}")),
+                },
+            };
+            if self.cfg.dry_run {
+                return StraddleResult::DryRun { outcomes: pre };
+            }
+            let signed = match txs
+                .iter()
+                .zip(&limits)
+                .map(|(ixs, l)| build(ixs, *l))
+                .collect::<anyhow::Result<Vec<_>>>()
+            {
+                Ok(v) => v,
+                Err(e) => return StraddleResult::Error(format!("{e:#}")),
+            };
+            return match self.chain.send_bundle(&signed).await {
+                Ok(outcome) if outcome.landed => {
+                    self.metrics.tx_landed += outcome.txs.len() as u64;
+                    StraddleResult::Landed { outcome, with_exit }
+                }
+                Ok(outcome) => {
+                    self.metrics.tx_failed += 1;
+                    StraddleResult::Failed { outcome }
+                }
+                Err(e) => StraddleResult::Waiting {
+                    reason: format!("{e:#}"),
+                },
+            };
+        }
     }
 
     /// Books an exit attempt; returns whether it landed (an observation of the market).
@@ -1212,7 +1601,13 @@ impl<C: Chain> Keeper<C> {
             // to the clock (`pool_d` refreshed, the `pool_fail` chain stepped); a list-only
             // market as stored.
             let (market, s, mv): (Box<Market>, Situation, Option<MarketView>) =
-                match view.markets.iter().find(|m| m.key == key) {
+                // (A list-only market is in `view.markets` too, with its detection set as ReadSet:
+                // the list-only branch below is its pool-selection view.)
+                match view
+                    .markets
+                    .iter()
+                    .find(|m| m.key == key && m.kind != VenueKind::None)
+                {
                     Some(mv) if mv.kind.is_raydium() => {
                         let proj = decide::project(&view.config, mv, clock)?;
                         let s = Situation::of(&proj.market, mv.kind, proj.now, proj.pool_fail);
@@ -1715,6 +2110,14 @@ impl<C: Chain> Keeper<C> {
     fn watch_pools(&mut self, view: &ChainView) {
         let caps = FeeCaps::of(&view.config);
         for mv in &view.markets {
+            // The pump curve has no pool admin: its fee tier moves with its market cap and its
+            // end is graduation (duty 6), not a lost route. A list-only market has no pool.
+            if matches!(
+                mv.kind,
+                VenueKind::PumpCurve | VenueKind::PumpMigrating | VenueKind::None
+            ) {
+                continue;
+            }
             let snap = monitor::snapshot(mv);
             let pool = mv.read_keys.first().copied().unwrap_or_default();
             let watch = self.pools.entry(mv.key).or_default();

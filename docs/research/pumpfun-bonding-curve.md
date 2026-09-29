@@ -719,3 +719,297 @@ These apply the first-pass review findings that target this note. Each was re-ch
 8. **Research part of C0-3 / C1-3: trader-state griefing (§9.2).** Anyone can credit the trader PDA (System transfer checks only `from`; agave `system_processor.rs` L222–227) and create ATAs for it (the ATA program checks only seeds). Adapters must normalise that state before measuring.
 
 No review finding against this note was rejected.
+
+---
+
+## Update 2026-09-29 (M5 re-verification)
+
+*Re-verified for milestone M5 against mainnet on 2026-09-29 (slots ≈ 451,665,000–451,673,000, 14:10–14:50 UTC) and against the sources listed below. The sections above are not edited; where an item here supersedes a statement above, it says so. SIM runs are as in the header (`sigVerify:false`, `replaceRecentBlockhash:true`, commitment `processed`), built as v0 transactions over pump's ALT `Hyif6eWb…`. The throwaway scripts and raw data live outside the repo, in `~/.cache/shortwin-work/m5/research/`.*
+
+### U1. Program deploys: none since the research
+
+| Program | ProgramData | Last deploy (slot, UTC) | Upgrade tx | Changed since 2026-09-27? |
+|---|---|---|---|---|
+| pump | `B5MvUwXdiW1NMM6QFFD3ssPKBujD4zMohncbM73Z2BQu` | 449,734,335, 2026-09-23 14:45:19 | `4WRMFG9YnYqbouLzayMGUjJTN3rKdEcApaxdekf5mAxBsx4NdfgKVXTuQZhmWvEa5uLJCVQ9DcSarEmvfQF133kq` | no |
+| PumpSwap | `6naEzKeUuFh1Jeeu51NXQgr5qkXgXtc9WKNct4xynVJc` | 446,462,733, 2026-09-12 15:23:56 | `3kTQq7ETwHfaq6mfRAYy2NZmiD9Qm7EJ6moPcoU2Wt18tTX9zUFYZ55daC1okHBueQWXqNx9gZxwYGom3N3SQvTD` | no |
+| pump-fees | `75Uu23mqWBb8LM8vDppqC1mQAnCcBuLXhVaDezVMQLRw` | 446,465,969, 2026-09-12 15:41:00 | `647tW2A7fgG6PMvg2VuQJjXMgVeQgKvrEKnELpyMV9vQeU4KKs1LwFbosjLRsdJ3e5uVCr7PcewAwtbjg5doFcv9` | no |
+
+- **Slots.** The deploy slots come from the ProgramData headers read at slot ≈ 451,665,300.
+- **September upgrade list.** Every September upgrade is a Squads `VaultTransactionExecute` whose log reads "Upgraded program …":
+  - pump: 09-09 19:30:47 (`5bD2JZEjvh8BhrJWbQy6QwhSSDRVJvqkeJNxajCdK84o35bnKL8G7KDkAJo7ahFGSdzrpUvdFFUdzhPZeL9fnjZv`), 09-12 15:24:04 (`SgEwKjomLvZgYWZVHkqLZAzB7LHtyQo7hWu5VgYKoVb82jqtz3fum7sAaCB7yzL2GNks5BwRB5wvpuyy4CKFbQV`), 09-15 10:34:32 (`5mfXpjh9SFxVq61V6z31nv3Mvp6UopTpjHdNvqimcWioFHQKrhW5apJxn5UFNSjBRAEixdi3bjotprVAgEPhYGmY`) and 09-23 14:45:19 (above);
+  - PumpSwap and pump-fees: only 09-12 (above).
+- **A fourth program shares the authority.** On 09-12 15:24:13 the same authority also upgraded `6Vo3245eszAb5wuqEMw8mGdbfRUdKbHhDHP5LcaGuTAB` (`B9oiWctojE3cSfJaNVYQ6vWUyFp1Q5f1shbNWyr5RPLDXjRX24jnNtmo48VMQjjyDhhM1u2N62fNrbg7ANMXDvB`). That program is one of the §6.1 CPI callers.
+- **The 09-28 activity on the PumpSwap and pump-fees ProgramData accounts is not an upgrade.** Their signature lists show dozens of transactions on 09-28. These are MEV-bot transactions that list the ProgramData accounts read-only, e.g. `4yFJZCpFrJoKYJ3zKPaVCVGVMMyU8fPEhDdE2GUfdu8retvWNJLhMwAe5AYNHia2qmYNoULrrC7Po7onNbPgdhoh` (`MEVteoCR…` "ExecuteTwoLegFixed") and `62j8WMuhE48GAZhJ1sagNmtwGxRXtyYac2sTM5KPqvhQVHoKYq5w3xrLhdaUWxX5k58S6LarvZscxRfrY3GVdwWc` (`Prism8hs…`). The deploy slots are unchanged.
+- **The upgrade authority is now identified** (§1 said "a Squads v4 multisig vault"; `graduated-venues.md` §9 had it UNVERIFIED).
+  - `7gZuf…` = PDA(`SQDS4ep6…`, `["multisig", 2yMoQqQrtbhq3nQ3wFoQQawWS65qcqUXcwHEYha4rshW, "vault", 0u8]`). The derivation was reproduced (bump 254).
+  - The multisig account (495 B) holds threshold **3 of 4 members, time_lock 0 s**, transaction_index 140 and stale_transaction_index 96.
+  - The last transaction on the multisig is the 09-23 upgrade (checked at 14:13 UTC today). No vault transaction has been created since, so nothing was pending on-chain then.
+  - Creating, approving and executing a proposal takes minutes. On 09-23, for example, the multisig saw activity at 07:15 and 14:35 UTC and executed the upgrade at 14:45.
+
+### U2. Sources since `81091419`
+
+**pump-public-docs: one new commit.**
+- `cb188ce08b5069196eef1f3e4a0c43b70099793b`, 2026-09-29 11:50:38 UTC, "docs: negative virtual quote reserves on PumpSwap pools". It adds a README banner and a new `docs/NEGATIVE_VIRTUAL_QUOTE_RESERVES.md`.
+- **From "September 30", PumpSwap `Pool::virtual_quote_reserves` can be negative.** Pump "guarantee[s] that `pool_quote_token_account.amount + virtual_quote_reserves` will never overflow and will never be negative", and says the sum fits a u64. The pricing formula is unchanged.
+- The commit touches no IDL file, no pump-curve instruction and no account list. There is no other breaking-change notice. Details and design impact are in `graduated-venues.md`, Update 2026-09-29.
+- Two open third-party PRs change nothing here: #47 (webpack/CodeQL) and #49 (GitHub social-fee wording).
+
+**IDLs.**
+- `idl/*.json` is unchanged since `e0687ae9`.
+- The on-chain pump IDL `AYgC53tU…` (last written 2026-09-12 18:02:23) is still identical to GitHub `idl/pump.json`: 47 instructions, 7 accounts, 42 types, 94 errors and 28 events (docs strings excluded).
+- **The on-chain PumpSwap IDL `5fLnXNNoZcZt9Qku6HARM3un3Ttm2cGsR7gN9Zp1R7h3` and pump-fees IDL `6hgWp61YgGzJ9QmvxyFtLnGfA8MYgx93Hby6fdq8gG31` are stale.** Both were last written 2026-05-14.
+  - The PumpSwap one lacks `init_boost`, `boost_buy_and_burn`, `toggle_boost`, `set_boost_authority`, `admin_cto_pool` and `update_creator_fee_config`, and 19 errors, among them `InsufficientRealQuoteReserves` and `PoolCannotBoost`.
+  - It also carries old `Pool`, `BuyEvent`, `SellEvent` and `GlobalConfig` layouts.
+  - Use GitHub for both programs.
+
+**SDKs:** no new release. pump-sdk is still 2.0.0 (2026-09-13), pump-swap-sdk 1.20.0 (2026-09-10) and pump-rust-client 0.1.13 (2026-09-09).
+
+### U3. Live configuration: unchanged
+
+- **`Global`** (slot 451,665,934): every §2.2 value is unchanged. That includes:
+  - fees: `fee_basis_points` 95, `creator_fee_basis_points` 5, `buyback_basis_points` 5000;
+  - migration: `pool_migration_fee` 15,000,001, `withdraw_authority` `39azU…`;
+  - all recipient lists;
+  - flags: `create_v2_enabled`, `mayhem_mode_enabled`, `is_cashback_enabled` and `is_holder_reward_enabled` are all true; `creator_fee_configurable` true with a maximum of 300 bps;
+  - `whitelisted_quote_mints = [USDC]`.
+- **pump `FeeConfig` `8Wf5Ti…`** (slot 451,665,971): flat, stable and exotic fees are all {0, 95, 30}. `fee_tiers` and `stable_fee_tiers` each hold one tier, threshold 0 → {0, 95, 30}.
+- **Rent** (`getMinimumBalanceForRentExemption`):
+
+  | Size | Lamports | Size | Lamports |
+  |---:|---:|---:|---:|
+  | 0 B | 650,240 | 151 B | 1,417,320 |
+  | 125 B | 1,285,240 | 165 B | 1,488,440 |
+  | 137 B | 1,346,200 | 170 B | 1,513,840 |
+
+### U4. Trades reproduced to the lamport
+
+**Sample.** I took 12 rounds of `getSignaturesForAddress(pump)` and fetched every 2nd–4th successful transaction: **1,485 transactions with 1,488 trade instructions**, slots 451,666,275–451,668,225 (2026-09-29 14:17:23–14:26:07 UTC). The pre-trade state is the `TradeEvent` post-state minus or plus the trade. The whitelisted mayhem agent's 294 trades are excluded here and covered below.
+
+| Instruction | Reproduced / non-whitelisted | SOL-quoted: non-mayhem top-level / non-mayhem CPI / mayhem | Examples (SOL, not mayhem) |
+|---|---|---|---|
+| `buy_v2` | 55 / 55 | 42 (32 / 2 / 8); 13 non-SOL | `5uUka8Lbn3m6TMur4SgxCxeTdyARJUQu4MYrtsPfVEiPQMNsrh7xD1ggv7KeXU2gNTFS54HfZRrEGL5YTTVQ9N2e` (with its `create_v2`), `4g4VQkAELQotSRiYQA6wob8Tm5Q7zM2BuCywKYzMFswMVP3S5bXB65oLAyYF5VLDfDeTTkUPjARkLQRCcDHSXGd7`, `mtBsHC52cU5h5v4uiZgKULhCs4y5uzNwuJvxq371HmpPrhFFG9mDojDb3vdhT6dUgGg4Py7higfu4FYMgSHcnuJ` |
+| `sell_v2` | 246 / 246 | 203 (49 / 129 / 25); 43 non-SOL | `5n9GTsdnKVZE27NoeNZWsBdH2gsU8ga33Gmc5iB3ZTCwJFaVVycDc5BkELaWShPW1s19F4t2zNLJUZ42yBveNQRk`, `Karixm2B3wWMyAM26zh81gQzqMCzFsBqVEy51ufEAwDhiHE79HPe8kbayLaoen4Pdwe9sYGXMX8FdaWhbPCthVe`, `2JdYuYRPG8ZdfLXtwxoey2rMjMyr3n8Jn2kpFJHxLzJUiPg8efM56BcBrC3pZS4Wv3pJ56NQqz11FGNBRbnWJXte` |
+| `buy_exact_quote_in_v2` | 223 / 223 | 201 (54 / 118 / 29); 22 non-SOL | `4cd3Ziy6by2ULWNQc3fofUK6SaN4u7f2eAgAQe7LBasdMfSC3jecWLmigDw59QzTw9j5wD1ezDeHPc3fobcUqDbT`, `Fz3BytiEtwqvae8E3ju5EhcC7WK1ij4X8VCud4SXs4iigAspXHQjbtJkixsQWB6PdLmaySSnMaxzkraKd6xqskr`, `5uYGKb5TNmqsfps7qbs4PjjJw5zJ6RtdMfUUxCWHnGaVTyT9R7n1rovsePoUABc2WAkmpoJyhHbJ2KNE9yhse6nu` |
+| `buy` | 233 / 233 | 233 (66 / 148 / 19) | `5t4yqb7VTngFMFT6w14ssPHwcZ8jpU91nhVquU9NH1ygVUJ2tvo923utBkkkRDFSJqma9LiaE1B5vSuC5owhY1wv`, `2BWaCCph3MAKui8mfBUwPLnXaVXuLKbG2ywvE3J7RU1f6NfjaKjbbyGGZirbu1CxAG1C7j4PZdbUsBQoYRZctgNf`, `5sTCR5pF7o6YDecW5gYoH2X55F1QungRyeEw7AnGNa2BTKLmFVhvpXoae9EkJEDp3whGEkrEaLvYsM2ebeh9s87Y` |
+| `sell` | 314 / 314 | 314 (134 / 156 / 24) | `67TmdLT1PtqCiHHJvtaP8nRdFNNfcEiz3Wk5km2eesu8JAXcs8FXttd9zjt8x9AP6wXZhgyXnfr97Fys8foh9dC2`, `2hdqxNASDZfQPDsYwS9Y4FNrk59q3h7sMTnpPQDEdRX2g5aAcs82mRYqBynhUcyJ7kndCANwqJg5PgB7H3BB1W3e`, `4RBKHrHd26RcGhArdQuVobrWKYboBgMJQ3eCyyx98NArQnAokoLxVUuAPwHYi4P4bbTvCAFiaTbvG5AXu8BttXap` |
+| `buy_exact_sol_in` | 123 / 123 | 123 (87 / 13 / 23) | `2vihxd7yFgstkUBXDb4nVELcmm4L8vimESZG2SbqRJKiRwc4VhCPh1vAARgrtrLAP9qqjbg7vFEroNtiZ3SheUd`, `GdAUNE78LMEpzsfe8HTHMeEqA8xHGSKRDi3h92pkMKbqRhicUo85pXHZqKvtZ8ZFDVPzFovLqPP8fRQCZPDbV4a`, `kDcZD3bU1hfFu7aNeoSy9JiMQkajqm9Z3xw3K2BKQHHX8LfrxRVh3wFDxY4Zj7MTeQ3gV8u86UqRtMko8mDCNZX` |
+
+**Reproduced with shortwin-math itself.**
+- Method: a throwaway crate linked by path to the repo at `eb647fc`, using `fees::pump_curve` on the live tier plus `quote::sol_leg::curve_charge_exact_out` / `sell_exact_in`.
+- Input: all **792 SOL exact-out buys and exact-in sells**, i.e. `buy` 233, `buy_v2` 42, `sell` 314 and `sell_v2` 203.
+- **791 are identical** in `n`, cost or proceeds, and post-trade reserves.
+- The one other trade is a legacy cashback coin (`4fKRy4yC6Xg1RomSPBYTejvb6mx7eCZGoCmTnoPZirh6UWpmjb2vPz9hWV7gZhYTta2AfgcEjSY6TnQgLM696zAF`). Its 30 bps go to the seller's UVA as `cashback` (UVA +329,238), not to a creator. The total deducted from the seller equals shortwin-math's 95 + 30 bps quote; only the event field differs.
+- The exact-in instructions were reproduced with the §4 formula. shortwin-math has no exact-in quote because short.win does not use one.
+
+**Rules re-confirmed on this sample:**
+- **Default creator.** `creator == Pubkey::default()` means a creator fee of 0, although the event still says 30 bps. On exact-in buys the program then divides by 10,000 + protocol bps only. Six trades show it, e.g. `5HKeKS5VDnJ8m3D8qEA25jkZ8nrPz68nhbW3vkNPGcDDLxDGfo32qRuMS1MymwSdZDf6YmoHYFHb66ANH4fpx3jt` and `r1JFdMb1KFvYfbQxU3WVBTRRFvNRyjJTWAT555KVSMeG2Sxcw2QkrXjsXJuP3H2ADPo9CqthxRK9rCdXMuyhKQ4`.
+- **Exact-in fee base.** Exact-in fees are computed on the net *before* the §4 step-3 adjustment. Example `4EQcs1DvrcxbnwXfsvwsRGqrxgmsV9ZF1gvF3LDCjGm38U1xDsMiuAw35N92WwJQ2GnA3HYYstNnzz4wpCEkCQzN`:
+  - fee 388,648 = ⌈40,910,211·95/10⁴⌉, while the curve is credited 40,910,210;
+  - the total paid equals `spendable` exactly.
+- **Holder-reward coins** (178 trades) use the same math. The `TradeEvent` repeats the creator fee as `holder_rewards`.
+- **Per-coin creator fees** of 100, 125, 200, 250 and 300 bps on custom-quote curves apply as in §4 step 4.
+- **Mayhem coins traded by normal users** (95/30 bps, reserved recipients) follow the formula: 128 trades.
+
+**New: the whitelisted mayhem agent trades off the curve.**
+- All 294 trades by `BwWK17…` (`buy` 125, `sell` 164, `sell_v2` 5) are fee-free. Each executes at exactly the caller's bound: `sol_amount == max_sol_cost` for buys, `== min_sol_output` for sells (294 of 294).
+- Only 6 of them match the constant-product price implied by the event post-state. The median deviation is 16 %; the largest is 87 % (`2o55E7wyQPudQGMrbQDt9SFJb6CXB114wNQ6mha1gk6LKH2Eiz31byo9NXyjZ69UdDKWqULxXfSw6zGutmphgZAB`).
+- So pump's agent sets mayhem-coin prices directly. This adds a reason for Q6's rejection of mayhem coins; nothing needs to be built.
+
+**Account lists.**
+- **The v2 lists are unchanged.** Every `buy_v2` and `buy_exact_quote_in_v2` in the sample has at least 27 accounts and every `sell_v2` at least 26. The fixed accounts sit at their §3.5 positions in all 524 v2 instructions: global, ATA program, GVA, `fee_config`, `fee_program`, System, event authority and program.
+- **Pump accepts unexpected trailing accounts** (U24 / A41, pump side). 34 successful trade instructions carry 1–7 accounts beyond their list:
+  - `buy_exact_quote_in_v2` with 28 accounts (13) or 29 (1), `sell_v2` with 27 (12), `buy_v2` with 28 (4);
+  - legacy `buy`/`sell` with `jitodontfront111111111111111111nopainnogain` appended: `3EYS4zN5b8aLvocZ5MiCA3sZS2HsVgeKpqUXeXN1TbsMvRXhVAM3ERkNKCkyGFUDKJZEfSrGXKNMf5LYNMbDQRxY`, `2ENw2GpvL7Sq49TcqAjRL1thbhzsVZTW478Ru56dJqgQxKTmLT4jZqb3AHQMS3GCCQZ7oBo5BwCxZdSkbnf94mXM`;
+  - a legacy `sell` with the 7 other buyback recipients appended: `3YMkWEPFM2Nmob8T68MR8jJtdju293GuytP7DtMpaVHvgqsnvhXXz4bL2pVR3EezisMHdYoAwgTZ4zBVVJFWdQdz`.
+
+**Instruction data.** Buy instructions accept one undocumented trailing byte; see U7.
+
+**Compute units.** The mainnet figures are for top-level calls and cover the whole pump instruction including its CPIs, read from the logs:
+
+| Instruction | Median CU | Range | Sample |
+|---|---:|---|---:|
+| `buy_v2` | 97,155 | 79,038–170,959 | 40 |
+| `sell_v2` | 75,628 | 66,935–137,817 | 57 |
+| `buy_exact_quote_in_v2` | 91,063 | 77,549–141,015 | 56 |
+| legacy `buy` | 69,493 | 60,894–100,852 | 71 |
+| legacy `sell` | 53,762 | 43,125–67,804 | 149 |
+| `buy_exact_sol_in` | 72,147 | 61,776–103,023 | 105 |
+
+- The upper tails include create or extension work in the same instruction.
+- SIM: `buy_v2` 83,447 CU when the UVA exists, 86,371 when the buy creates it, and 93,506 for a completing buy.
+
+### U5. Coin creation (create_v2, Token-2022, mayhem, cashback, holder rewards)
+
+- **`create_v2` allocates a 125-byte `BondingCurve`** (createAccount space 125, 1,285,240 lamports, owner pump). This holds for all 27 creates in the fetched transactions, e.g. `45hW4FoAJLheqL98hRB1mNEyzJtZj12qYiCz4mw4GGmoR81Xkkv8KdwbkZFBUBsxQcYqfBBtWp7PGzTh6Knzppwk` (curve of `GB1gk9vU…`), `2hWAQWSjag8yoXKPdn3yVSQYWtFKWXmjnUAwc3uBsNmri4TovwZAkE799cxfBzQQme1quZ6m1FKQHAeHhVwTCuW8`, and the mayhem create `VonMspwLnixrMLWLcyBeSTV4eiwMBtgMXNpkmvPCAwZxyP8sTFGAVwJbD94THcVtAXoXoaqEGWwwz1zaD6FGp7r`.
+  - 125 bytes ends exactly after `is_holder_reward` (@124); the layout is unchanged.
+  - 151-byte curves are extended ones. Clients prepend `extend_account` (125 → 151), e.g. FLASHX's `47PMcc17XhEgQt8FCTFizjAP6crbb6EAThLqHWc9KtPYQbWGqcpSgXcEtSX8Qac3f3AUsjMdX44G5pLD1yurwaB`.
+  - **Corrects §2.1** "Allocation is 151 bytes (new coins)".
+- **Both v2 and legacy trade 125-byte curves without extension.**
+  - SIM: `buy_v2` on `AP6aC5om…` and `GB1gk9vU…`.
+  - SIM: legacy `buy` on `GB1gk9vU…` succeeds both with and without a prepended `extend_account`. Without it the curve stays at 125 bytes.
+  - So §2.1's "the legacy path requires `extend_account` when the account is shorter than 150 bytes" no longer holds for 125-byte curves.
+- **Mints (29 fresh creates).** All are Token-2022 with decimals 6 and mint and freeze authority None. Their only extensions are MetadataPointer (18) and TokenMetadata (19). Supply is 10¹⁵ for the 21 normal coins and 2·10¹⁵ for the 8 mayhem coins. The SPEC §3 filter result is unchanged.
+- **Create flags** (27 creates):
+  - none set `is_cashback_enabled`, so cashback remains legacy-only;
+  - holder-reward and mayhem creates occur;
+  - custom-quote creates with `creator_fee_bps` 100 or 300 occur;
+  - the trailing optional args (`creator_fee_bps`, `is_holder_reward`) are often omitted.
+
+### U6. T-PDA-USER and T-RENT on the curve
+
+**Mainnet, new:**
+
+- **Buys by a non-whitelisted, off-curve, system-owned PDA under CPI now appear on mainnet.**
+  - The OKX DEX router `proVF4pMXVaYqmy4NjniPh4pqKNfMmsihgd4wdkCX3u` uses PDA `ARu4n5mFdZogZAravu7CcizaojWnS6oqka37gdLT5SZn` as `user` of legacy `buy_exact_sol_in` at stack height 2. The PDA is off-curve, System-owned, has 0 data, holds a buffer of about 0.869 SOL and is not a transaction signer.
+  - Examples: `kDcZD3bU1hfFu7aNeoSy9JiMQkajqm9Z3xw3K2BKQHHX8LfrxRVh3wFDxY4Zj7MTeQ3gV8u86UqRtMko8mDCNZX`, `4WSTpmMb6enyup9EUC3tbPUzhfXvBYuLYSwxtdKwDd6U3MWwAei1CPc1cb4NYer8yF9S8RrGyGQoNjJ6v8CQ4EdA`, `5EkZvuhSkrxSdMaXfzeEDodDLb1hJSW7obq1QnR675Ld1jnmuwjRXp41kq7yWjLpvaaxLZimqWnkrCE1C9jdRqaM`, `3msnKdQs4WuEjSVhTGPkRGPGvm4rs1tbhG3SaKAkTBghS9A6qpd8pxbGEEquaDMohMuZjPS2Uf69fTLJC4M7T5BA`, `42FtxVj9QDT158GCENTff9et5iY8NFCpir2FZsZcuRK5KK7DWZcFGviZbegjuwAEQLabMxiD2y7d9SsH7ZycrNQ9`, `5BWDKvBCbFDRFBHGpRKDTB3dSCJnSA4uFpJ6xwHGxjpEXNKAk8dNeuRVUtxFcGrRgnqJPreeCJj498BEwoxo7kC`.
+  - Pump System-transfers from the PDA at height 3. In `kDcZD3bU…`: 137,580,246 to the curve, 412,741 to the creator vault, 653,507 to the fee recipient and 653,506 to the buyback recipient.
+  - The router funds the PDA before the buy and sweeps it afterwards (pre = post = 868,910,230).
+  - The same PDA also calls `buy_exact_quote_in_v2` and `sell_v2` on non-SOL coins (`3AWoyYGuxQqoCrwJeGGeqrtuDd27BsxQw1fSwftqhXvxio6iW8uZHPVJSw3ULEgxcLeQQm2e2wgsLFVx5ee4KGei`).
+  - **Still not observed:** a SOL-coin `buy_v2` by a PDA, and UVA creation paid by a CPI PDA. This PDA's UVA `2DYcto5G…` already existed.
+- **A program-owned PDA can be the `sell_v2` user.** This resolves the first §10 UNVERIFIED item.
+  - In `5Hs2eAs1JtYXX4wUMgnLAuWrFcVF7nYyqLntFNQ97XHQg2yv79GpgGrGoteVep4sAw5dFxzHFDKEzaeNaJFNUfox` the `user` `D5YqVMoS…` is owned by `T1TANpTe…`, carries 9 bytes of data and sits at height 2.
+  - Pump credited the proceeds to it, and the caller then moved them on.
+- **A 0-lamport PDA seller at height 3:** `2NcTDgnghCL3sBdyeHn6vCuR3hbYBg8gY9pSpa6ffsvgh61CDGV4bFDbYZfCQJ6tKYqADfGJ77oRxcpcKMqPYj4x` (user `6zQ6Ee7T…`, which does not exist before or after; called via `6Vo3245e…`).
+
+**SIM setup.** The trader is PDA(short.win, `["trader", mint]`), which is off-curve and does not exist beforehand. The funder `9rPYy…` pays and signs (sigVerify is off). Tokens for sells come from a same-transaction buy or from a holder's transfer.
+
+**SIM, funded creator vault** (`G5yt7iw9…`, 151 B; `AP6aC5om…`, 125 B):
+
+| # | Case | Result |
+|---|---|---|
+| A | `buy_v2`, fresh PDA with no UVA, funded B̂ + 2,000,000 | ok. The UVA is created with the PDA as payer; the PDA ends at 653,800 = 2,000,000 − 1,346,200 |
+| B | UVA pre-created (`init_user_volume_accumulator`, payer = funder), funded exactly B̂ | ok; the PDA ends at 0 |
+| C | as B, funded B̂ − 1 | System error 0x1, "insufficient lamports 5905350, need 5905351" (the last fee transfer) |
+| C2 | as B, `max_sol_cost` = B̂ − 1 | 6002 `TooMuchSolRequired` (`buy_v2.rs:463`): the bound covers the fees |
+| F | `amount` = rT + 1 | 6021 (`buy_v2.rs:355`) |
+| R | one tx: B (the PDA ends at 0), then `sell_v2` of the same Q from the 0-lamport PDA with `min_sol_output` = the exact §4 proceeds | ok; the PDA ends with exactly the proceeds, 1,227,691,446 |
+| E | `sell_v2` from a 0-lamport PDA with no UVA | fails before any other step: "insufficient lamports 0, need 1346200". `sell_v2` creates the UVA from `user` before crediting proceeds |
+
+**SIM, empty creator vault:**
+
+| # | Case | Result |
+|---|---|---|
+| V1 | `buy_v2` on `GB1gk9vU…`, whose creator vault `9deZCXjK…` does not exist, funded exactly B̂ | fails. Pump System-transfers the creator fee **plus 650,240** (rent of a 0-byte account) from `user` to the vault before the curve transfer ("insufficient lamports 27600694, need 27985075"). Legacy `buy` does the same |
+| V2 | as V1, fresh PDA funded B̂ + 2,000,000 | `InsufficientFundsForRent` on the PDA, which is left with 3,560 after UVA 1,346,200 and top-up 650,240 |
+| V3 | `sell_v2` from a 0-lamport PDA (UVA pre-created), right after `create_fee_sharing_config` in the same tx moved the curve's creator to a sharing-config PDA whose vault is empty (`4JsVFApe…`) | fails, "insufficient lamports 0, need 650240": the top-up is taken from `user` **before** the proceeds are credited |
+| V4 | as V3, PDA pre-funded with 650,240 | ok. The PDA ends at exactly the control run's proceeds (858,221,919), so the venue-side rent r = 650,240 |
+
+**Mainnet counterpart of V3.**
+- `sell_v2` `42oStfUiWwAW5UJjjiGZn4TYxGp86SYEpUqky1nTyZRkPEZRp6bFQMbGDpVu5GZQ2dQW6RpQ3is2HFFSztLwuuJw` transfers 650,240 from the seller to creator vault `3mm1brw2…` at height 2.
+- It was the first trade after fee-sharing migration `376EbQQcK3USikDTyDtMqSHWLirLu95PLxcPdRQ1Vy8FaxNSqZHeXKkvvXRaxkyHU9Pptxr13Jw83Zzvt5ftt7fm` left that vault at 0.
+
+**When is a creator vault empty?**
+- After a fee-sharing migration, and for creators who were never paid.
+- `collect_creator_fee(_v2)` and `distribute_creator_fees` leave the vault at 650,240 in 51 of 53 sampled calls. One `distribute_creator_fees` left 0.
+- All 72 creator vaults of the live curves in the sample were funded.
+
+**Consequence.** Once the trader's UVA exists, venue-side rent on a curve leg is at most **650,240 per leg** (a creator-vault top-up), on buys and on sells alike. That holds for curves ≥ 115 bytes; every `create_v2` in today's sample allocated 125 bytes. A missing UVA adds 1,346,200. `exec_rent_tol` = 6,500,000 covers both.
+
+**Stack depth.** Under the OKX router, pump sits at height 2 and its System and Token CPIs at height 3. So pump's CPIs remain one level below pump.
+
+### U7. Oversized buys and the undocumented cap flag
+
+**Default behaviour is unchanged.** An amount above `real_token_reserves` reverts with 6021 on every buy instruction. SIM confirmed this for `buy_v2`, `buy_exact_quote_in_v2` and `buy_exact_sol_in`, at 1.1× to 100× the needed SOL and with `rT` from 0.26·10¹² to 79·10¹².
+
+**New: a trailing bool caps the fill at `rT`.** One extra byte after the documented args (on legacy `buy` / `buy_exact_sol_in`, after `track_volume`) changes the behaviour:
+
+- value **1**: pump fills **exactly `rT` at the exact-out price** and completes the curve;
+- value 0, or no byte: 6021, as before;
+- value 2: 102 `InstructionDidNotDeserialize`, so the byte is parsed as a bool.
+
+SIM on `8xSiWmXU…` (rT 78.58·10¹²) completed the curve with the byte set to 1 in all four buys:
+
+- `buy_v2(rT + 10¹², …, 0x01)`;
+- `buy_exact_quote_in_v2(3·n, 1, 0x01)`;
+- legacy `buy(rT + 10¹², …, 0x00, 0x01)`;
+- `buy_exact_sol_in(3·n, 1, 0x00, 0x01)`.
+
+In each case the curve's vQ rose by 25,209,732,182 = ⌊rT·vQ/(vT − rT)⌋ + 1.
+
+The flag is in neither the IDL nor the docs.
+
+**Mainnet use.**
+- 2 of 20 sampled graduating buys used it. The first is `2FaaS3BXh5D7gF75Z9e4LnrbE13cim5akRvi4vCgquJZeBWNTrpGLc2aVZz8db9TuUxnhdpPH5RnGLwwK5vLC1m6` via Jupiter: it offered 1.218 SOL, and the curve took 105,830,393 lamports for the last 257,807,207,879 atoms. The second is `26WGe8F2En3unBm5f51ST4gXWiHHUPJuJEHsJjzvLECPxJ7GX9ALUtVv35iy14vsTPpZFSuHMafnCcfmQMtFaoAP`: it offered 11.09 SOL and the curve took 9.555 SOL.
+- In the U4 trade sample the byte is set on 48 of 223 `buy_exact_quote_in_v2`, 9 legacy `buy` (`0x01 0x01`) and 1 `buy_v2` (`0x01 0x01`).
+
+**Corrects §0 item 4 and §7.3** ("no cap, no partial fill") for callers that set the byte.
+
+### U8. Graduation
+
+**Migrations since the research.**
+- Of the 4,028 successful transactions on `39azU…` since 2026-09-27 00:08 UTC, I decoded 2,942. They span 2026-09-27 18:13:09 to 09-29 14:27:49.
+- They hold 2,826 migrate instructions: 2,102 create a pool (2,102 distinct mints, about 48 an hour) and 724 are no-ops.
+
+**The boost rule holds on every fresh pool.**
+- All 1,610 non-mayhem migrations (1,455 SOL-, 94 USDC- and 61 custom-quote) emitted an `InitBoostEvent` with VQR = ⌊`quote_amount_in`·2069/10⁴⌋ exactly: 1,610 of 1,610.
+- None of the 492 mayhem migrations (473 SOL, 19 USDC) was boosted.
+- `base_amount_in` = 206,900,000,000,000 in all 2,102.
+
+**Instruction forms:**
+- `migrate_v2` with 29 accounts (27 + boost-vault PDA + its WSOL ATA): 2,502;
+- `migrate_v2` with 27 accounts: 35, all mayhem or no-op;
+- legacy `migrate` with 25 accounts: 288, of which 150 created mayhem pools;
+- legacy `migrate` with the 2 boost accounts: 1, which was boosted (`5DGxpWSf3zBmDofyjw3oeKL4J32gzedz5iXb9Mms9x8pN73AFe9tzzymey42r6qbCzUgJZ2fU2cjhkjdePQrYC6B`).
+
+**Permissionless, and CPI works at exactly depth 5.**
+- 117 pool-creating `migrate_v2` calls ran at height 2 from six programs: `AdBMsmwr…` 54, `4RoVsR9z…` 39, `QECRnxRg…` 18, `AJHKxaUH…` 9, `5kZmvKba…` 3, `J7iAnje8…` 1. Example: `2dLArKYWP17mKkTkRdBnwKZNWcVtx56H72aRsKrUQpZrv1Sjwb6DggxjHXTZykoaUmRAcEXAdEdsxG8QkcPCs5TT`.
+- All 117 reach stack height 5; all 204 top-level migrations checked reach 4.
+- So a CPI'd `migrate_v2` hits the maximum of 5 and succeeds. **Refines Corrections item 3**: the call is possible but leaves no headroom, and the 64-entry trace remains the binding constraint.
+
+**Completion → migration**, on 20 random boosted migrations:
+
+| Slot gap | Count |
+|---:|---:|
+| 0 | 9 |
+| 1 | 2 |
+| 2 | 2 |
+| 3 | 6 |
+| 14 | 1 |
+
+The completing instruction was legacy `buy` in 12 cases, `buy_v2` in 6 and `buy_exact_quote_in_v2` in 2 (both with the U7 flag).
+
+**SIM of the straddle core.**
+- Setup: `G5yt7iw9…` (rT 75.88·10¹²), one transaction of ComputeBudget, transfer, `buy_v2(rT)` by a wallet that has its ATA and UVA, and `migrate_v2` with 27 + 2 accounts.
+- Result: ok, with 62 trace entries, 423,227 CU (the completing `buy_v2` 93,506) and a 1,202-byte transaction (v0 over pump's ALT).
+- **The new pool matches shortwin-math:**
+  - It is 271 bytes.
+  - The base vault holds 206,900,000,000,000 = curve base ATA − rT.
+  - Quote vault 67,405,854,966 + VQR 17,584,505,601 = 84,990,360,567 = rQ + n(rT) − 15,000,001, exactly.
+  - VQR = ⌊0.2069 × 84,990,360,567⌋, and the boost ATA holds VQR.
+  - shortwin-math `quote::migrated_pool` (linked Rust) gives X_p = 206.9·10¹² and Y_p = 84,990,360,568. That is +1 lamport, from its intended ⌈⌉ + 1.
+
+**New pools are 271 bytes on mainnet too.**
+- `5QvPCCGK5rEPPtt3MqU2RwGiFji9sQCveKo5Wb5nYxGZSm22sx6ucxoqHAFspuzUJhFUJJ15h3Sh92TvkXVF8yjs` creates its pool with space 271.
+- The first trade on it, `47G9kQKc33RbRviKTiuCArcShJH8dT2rhkBfPFeXjdtHRgMuSXgaSSAuuWr3phqhFz4GJ2L5S1wCGFzqi28utWH1` (same slot), ran on 271 bytes.
+- Seven slots later a client prepended PumpSwap `extend_account` (`2BoLeZtrcjtDNMMjKGLe97dbrdzAavWGb6dqsoKPcqzj4MfP658465aC3xVArchvi4Ggm4U5XpHcmvZ9EdJgQhnB`), taking it to 301 bytes.
+- All 150 sampled boosted pools are now 301 bytes.
+- Details are in `graduated-venues.md`, Update 2026-09-29.
+
+### U9. Still UNVERIFIED after this pass
+
+- A SOL-coin `buy_v2` by a PDA under CPI on mainnet (only legacy `buy_exact_sol_in` is observed), and UVA creation paid by a CPI PDA (SIM covers it only at top level). The fork test stays (T-PDA-USER).
+- The name and intended semantics of the trailing cap flag, and whether pump keeps it: it is undocumented.
+- How the whitelisted mayhem agent's price is set (U4).
+- What pump will ship on "September 30" for negative VQR, and whether it touches migration or the boost (`graduated-venues.md` Update 2026-09-29).
+- The Jito straddle bundle itself is still not simulated. Its tx2 core (completing buy plus `migrate_v2`) now is (U8).
+
+### U10. Found by the M5 build on the dumped ELFs (2026-09-29)
+
+*What the M5 build found by executing the **dumped** mainnet programs in LiteSVM (`tests/fixtures/`, group `pump_programs` at slot 451,672,911: pump deploy slot 449,734,335, pump-fees 446,465,969, PumpSwap 446,462,733 — the U1 slots; coins and statics from group `pump_state` at slot 451,675,432). Each item names the test that pins it; none needs a mainnet transaction.*
+
+- **The curve's fee tier uses the mint's live supply.** The program resolves the curve's `fee_tiers` at `mcap = ⌊vQ·mint.supply/vT⌋` with the base mint's **live** supply, not a fixed 10¹⁵. **Corrects §4 step 1.** The two differ only for a coin whose supply was burned (the `near` fixture: 999,978,034,493,483) and only when a tier threshold lies in `[mcap_live, mcap_10¹⁵)`; with today's single tier (threshold 0, U3) no quote differs. `tests/litesvm/tests/pump_math_it.rs` `tripwire_the_curve_tier_market_cap_uses_the_live_mint_supply` (a threshold at the fixed-supply mcap is not selected by the ELF).
+- **A curve shorter than 125 bytes grows to 125 on its first v2 trade** (`buy_v2`, `sell_v2`, `buy_exact_quote_in_v2`), not to 115; `user` tops the curve's rent reserve (`lamports − rQ`) up to `Rent.minimum_balance(125)` = 1,285,240. That was 53,320 lamports on the 2024 49-byte fixture (reserve 1,231,920) and 0 on every 115-byte fixture (reserve 1,691,280). **Corrects §2.1**'s "115" top-up. `pump_math_it` `legacy_spl_49_byte_curve_grows_to_125`, `curve_growth`.
+- **The creator-vault top-up (U6) applies to every buy form**, `buy_exact_quote_in_v2` included (there on top of `spendable`), as well as to `sell_v2` (before the proceeds are credited): `pump_math_it` `an_empty_creator_vault_is_topped_up_by_the_user`; through short.win's legs (T-RENT) `tests/litesvm/tests/pump_it/rent.rs`.
+- **Fee rules confirmed on the ELF** (`pump_math_it`): the buyback share is `⌊protocol·buyback_basis_points/10⁴⌋` (§4 only inferred it); an LP component in a curve tier is ignored; the per-coin `creator_fee_bps` applies to SOL curves while `Global.creator_fee_configurable` is set; a default creator pays no creator fee; exact-in fees are charged on the pre-adjustment net (as U4).
+- **Recipient checks:** a reserved (mayhem) or unlisted `fee_recipient` fails with 6000, a wrong `buyback_fee_recipient` with 6057 (`pump_math_it`).
+- **The cap byte (U7) on the ELF:** a trailing `1` fills exactly `rT` at the exact-out charge; `0` or no byte fails 6021; `2` fails 102 (`pump_math_it`).
+- **Accounts:** pump's eight buyback recipients are 208-byte accounts owned by pump-fees, not System accounts; neither pump's nor PumpSwap's `event_authority` has an account on mainnet; pump's fee-recipient list includes `CebN5WGQ…`, PumpSwap's `JCRGumoE…` (`scripts/dump-fixtures.py`, `tests/fixtures/manifest.json`).
+- **Trace under CPI** (short.win at height 1, pump at 2; `tests/litesvm/tests/trace_pump_it.rs`):
+  - `sell_v2`: pump, pump-fees, the token transfer `user → curve_base_ata`, pump's event = **4** entries; an empty creator vault adds pump's System top-up from `user` after the token transfer (**5**). The proceeds are direct lamport moves (no entry).
+  - `buy_v2`: pump, pump-fees, the token transfer `curve_base_ata → user`, three System transfers from `user` (curve, protocol fee, buyback fee) plus one for the creator fee on a curve with a creator, pump's event = **7** (no creator) or **8**; the top-up adds 1, a completing buy adds pump's completion event (1).
+  - Every pump CPI (pump-fees, Token, System, its event) sits exactly one level below pump.
+- **Compute units on the ELF** (pump's outermost frames, its CPIs included; `tests/bench/m5_cu/results.md`): `sell_v2` 69.6–85.4 k, `buy_v2` 80.4–97.9 k under short.win (the upper ends after a creator change into an empty vault).
+- **Graduation on the ELF** (`tests/litesvm/tests/straddle_it.rs`, `pump_it/graduation.rs`, `tests/bench/m5_cu/trace.md`):
+  - `migrate_v2` top-level with the two boost accounts: 329.3–329.8 k CU, 50 inner instructions (51 entries; 53 with ComputeBudget ×2), peak stack height 4; the pool it creates is **271 bytes** and PumpSwap `extend_account` takes it to **301** (not 300);
+  - on a curve that is not complete it fails with 6006; on a curve that has already migrated it is a no-op (4 entries, 56,725 CU);
+  - a completing `buy_v2(rT)` under a CPI helper (`complete_curve`, A66) is 9 entries (pump's completion event included), 12 with the helper and ComputeBudget ×2.

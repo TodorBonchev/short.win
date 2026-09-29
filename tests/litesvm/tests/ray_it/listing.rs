@@ -658,10 +658,15 @@ fn pump_venues_take_precedence() {
         };
         let (_, _, r) = list_with_curve(fixture, curve_bytes(&migrated), Some(WSOL_MINT));
         assert_err(&r, E::PumpVenuePrecedence);
-        // A canonical-address pool that is not valid (quoted in another mint) does not count:
-        // the curve graduated elsewhere, the Raydium listing proceeds and records it.
-        let (env, pool, r) =
+        // An account at the canonical address that is not a valid pool (here quoted in another
+        // mint: a PumpSwap layout change could make the real pool read so) is a pool short.win
+        // cannot read, not the absence of one (M5-SEC-5): D1 holds, fail closed.
+        let (_, _, r) =
             list_with_curve(fixture, curve_bytes(&migrated), Some(Pubkey::new_unique()));
+        assert_err(&r, E::PumpVenuePrecedence);
+        // Nothing at the canonical address: the curve graduated elsewhere, the Raydium listing
+        // proceeds and records it.
+        let (env, pool, r) = list_with_curve(fixture, curve_bytes(&migrated), None);
         ok(r);
         let m = env.market(&pda::market(&pool.token().0).0);
         assert!(m.has_flag(MARKET_FLAG_GRADUATED_ELSEWHERE));

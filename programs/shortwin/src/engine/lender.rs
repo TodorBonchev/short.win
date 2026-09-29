@@ -93,18 +93,23 @@ pub fn init_if_new(
     true
 }
 
-/// Whether a deposit into a live full-wipe record also waits for `claim_venue_rewards`
+/// Whether a deposit into a live full-wipe record also waits for `wipe_rewards_claimed`
 /// (R4A-7; ARCH §3.3 `deposit`): on the pump venues, which pay venue cashback. The trader
 /// sweep is always required. ARCH exempts a pump venue that cannot execute; telling that needs
-/// the venue's ReadSet, which `deposit` does not carry before M5/M6, so M1 requires the claim
-/// on every pump venue (no M1 market has one).
+/// the venue's ReadSet, which `deposit` does not carry, so the bit is required on every
+/// `PumpCurve` and `PumpSwap` market.
 ///
-/// TODO(M5/M6, M1-FID-12): this approximation must not ship with the pump venues. On a pump
-/// market whose venue cannot execute (halted, broken route), `claim_venue_rewards` cannot
-/// succeed either, so a deposit into a live wipe record would wait for ever. Either pass
-/// executability from the venue ReadSet (`deposit` then carries it), or let
-/// `claim_venue_rewards` set `wipe_rewards_claimed` without a CPI when the venue is not
-/// executable (ARCH §3.9 already sets it "even if nothing was claimable").
+/// **Curve (M5-SEC-1).** ARCH has `claim_venue_rewards` (M6) set the bit; on the curve kinds
+/// `sweep_trader` sets it whenever the trader's pump UVA holds no claimable cashback, and pump's
+/// permissionless `claim_cashback` bundled before it empties the UVA into the trader
+/// (`instructions::sweep_trader` module docs). Neither needs the venue to execute nor a pump
+/// CPI, so the requirement can always be met — the M1-FID-12 deadlock (a deposit waiting for
+/// ever on a venue that cannot execute) does not arise on the curve.
+///
+/// TODO(M6, M1-FID-12): PumpSwap's cashback sits in pAMM's UVA WSOL ATA, which `sweep_trader`
+/// does not read; until M6 sets the bit for it (`claim_venue_rewards`, or the same UVA reading
+/// on the pAMM side) with no dependency on the venue executing, a full wipe on a PumpSwap market
+/// would lock its deposits. No M5 market can be `PumpSwap`.
 pub fn rewards_required(market: &Market) -> bool {
     matches!(
         market.venue_kind(),

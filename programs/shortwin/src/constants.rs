@@ -89,6 +89,22 @@ pub const VENUE_BITS_RELEASE: u32 = VENUE_BIT_PUMP_CURVE
     | VENUE_BIT_RAYDIUM_CPMM
     | VENUE_BIT_JUPITER;
 
+/// Venue bits this build cannot let Governance enable (M5-SEC-4, a hard gate): a venue whose
+/// markets this build can open positions on, but whose lifecycle it cannot finish. The pump
+/// curve is one until M6: a curve completes and migrates to PumpSwap (anyone can do both in one
+/// transaction, `migrate_v2` being permissionless), and without M6's `→ PumpSwap` transition
+/// (the ring rewrite, observing the pool, PumpSwap exits) such a market stays `PumpMigrating`
+/// for good — exits and liquidations refused, the EMA frozen at the last curve price while the
+/// pool trades on, S3 only at a deadline or on the frozen EMA, FV at that frozen price. A
+/// deployment of this build must therefore never take curve opens: `initialize_config` and
+/// `propose_config(EnableVenues)` refuse these bits (`InvalidParams`), so `venue_enabled`
+/// cannot hold them and every curve open fails `VenueDisabled`. Listing, lending and cranking a
+/// curve market stay available. M6 empties this set with the transition.
+pub const VENUE_BITS_UNFINISHED: u32 = VENUE_BIT_PUMP_CURVE;
+
+/// Every bit Governance may enable in this build: the known bits less the unfinished ones.
+pub const VENUE_BITS_ENABLEABLE: u32 = VENUE_BITS_KNOWN & !VENUE_BITS_UNFINISHED;
+
 // ---- venue programs (VenueGuard indices, ARCH §2.3.2) ------------------------------------
 
 /// Venue programs the upgrade latch watches, in `VenueGuard` bit / slot order.
@@ -364,6 +380,13 @@ mod tests {
         assert_eq!(VENUE_BITS_KNOWN, 0b11111);
         #[cfg(feature = "test-venue")]
         assert_eq!(VENUE_BITS_KNOWN, 0b111111);
+        // M5-SEC-4: the pump curve cannot be enabled before M6; everything else known can.
+        assert_eq!(VENUE_BITS_UNFINISHED, VENUE_BIT_PUMP_CURVE);
+        assert_eq!(VENUE_BITS_ENABLEABLE & VENUE_BIT_PUMP_CURVE, 0);
+        assert_eq!(
+            VENUE_BITS_ENABLEABLE | VENUE_BIT_PUMP_CURVE,
+            VENUE_BITS_KNOWN
+        );
         assert_eq!(T_CLAMP, 1_717_200_000);
         const { assert!(MIN_TIMELOCK_S <= DEFAULT_TIMELOCK_S) };
         const { assert!(DEFAULT_TIMELOCK_S <= MAX_TIMELOCK_S) };

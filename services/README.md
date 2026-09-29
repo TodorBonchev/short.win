@@ -6,9 +6,9 @@ workspace's lockfile.
 
 | Crate | What |
 |---|---|
-| `common/` (`shortwin-services-common`) | The chain-client abstraction (`Chain`: clock, accounts, account headers, program accounts — also by exact size, a `dataSize` filter on JSON-RPC —, blockhash, simulate, send, recent priority fees), its JSON-RPC backend (`RpcChain`), transaction building: v1 (SIMD-0385) with a v0 fallback (ComputeBudget instructions, optional lookup tables), `⌈simulated × 1.1⌉` compute units, sizes, decompilation |
+| `common/` (`shortwin-services-common`) | The chain-client abstraction (`Chain`: clock, accounts, account headers, program accounts — also by exact size, a `dataSize` filter on JSON-RPC —, blockhash, simulate, send, recent priority fees, Jito bundles: send and pre-flight), its JSON-RPC backend (`RpcChain`; bundles through a Jito block engine's `sendBundle`, **UNVERIFIED** against a live engine), transaction building: v1 (SIMD-0385) with a v0 fallback (ComputeBudget instructions, optional lookup tables), `⌈simulated × 1.1⌉` compute units, sizes, decompilation |
 | `keeper/` (`shortwin-keeper`) | Keeper v1 (ARCH §7.1 duties 1–5, 7–10, 12, 14 on Raydium AMM v4 and CPMM, with duty 5's Raydium fast path) and its binary; `shortwin-build-alt`, the protocol address lookup table of A28 (`scripts/build-alt.sh`) |
-| `keeper-litesvm/` (`shortwin-keeper-litesvm`) | TEST-ONLY: the in-process LiteSVM backend (the program-test harness's invariant hooks after every instruction of every keeper transaction) and the keeper's scenario tests on the mock venue and on the Raydium mainnet fork |
+| `keeper-litesvm/` (`shortwin-keeper-litesvm`) | TEST-ONLY: the in-process LiteSVM backend (the program-test harness's invariant hooks after every instruction of every keeper transaction; bundles executed in order and all-or-nothing) and the keeper's scenario tests on the mock venue and on the Raydium and pump mainnet forks |
 
 ## Keeper
 
@@ -77,6 +77,38 @@ What it does, per tick (one per slot; `keeper/src/keeper.rs`):
   priority price = p75 of the recent per-account fees on the transaction's markets, ×1.5 per
   consecutive missed second, capped at the O17 ceiling (a separate ceiling for exits); the O17
   per-market daily observation budget (exits are never throttled).
+- **Duty 6, graduation on the pump curve** (`graduation.rs`, config `[graduation]`; M5, ARCH §5.1,
+  §5.4, §7.1): the keeper covers `PumpCurve` and `PumpMigrating` markets with the curve adapter's
+  own ReadSet and, for a curve exit, its TradeExtras T0–T19 (a fee and a buyback recipient of the
+  live `Global`, the live creator's vault); its risk view is the program's own quoter
+  (`VenueState::quoter`: `B̂_str` above `rT`).
+  - **`migrate_v2` as soon as a curve completes** (ADOPTED Q16): a covered market whose curve is
+    complete with `vT > 0` and whose canonical PumpSwap pool does not exist gets pump's
+    `migrate_v2` — top-level, alone with its compute budget (A15), its 27 IDL accounts and the
+    two boost accounts — at most once a second, then an observation of the market in the same
+    second (M5 records `→ PumpMigrating`; M6's `→ PumpSwap` and the new pool's first-trade duties
+    follow). A failure raises `Alert::MigrateFailed` once and is retried every second.
+  - **The straddle** (`Plan::Straddle`): a liquidatable position whose `Q` exceeds its live
+    curve's `rT` cannot exit on the curve (pump reverts 6021, `CurveStraddle`). The keeper builds
+    ARCH §5.4's Jito bundle — tx1: its base ATA and `complete_curve(max_sol_cost)` of the
+    `complete-curve` helper (`programs/complete_curve`: it reads `rT` at execution, so a curve
+    trade between the keeper's read and the bundle cannot break it; `max_sol_cost` = the keeper's
+    quote + `complete_slippage_bps` + a rent allowance); tx2: `migrate_v2`; tx3: the exit on the
+    new pool (**M6**); the tip on the last — pre-flights it (`simulate_bundle` where the chain can,
+    else tx1 alone) and sends it through the block engine (`--block-engine`). Until M6 there is no
+    tx3 and a migrated curve stays `PumpMigrating`, so the two-transaction bundle goes out only
+    with `send_without_exit` (off by default); otherwise, and without a block engine, the keeper
+    raises `Alert::StraddleWaiting` once and calls `sol_settle` for the position each second (it
+    arms, keeps the clock or settles S1 / S2). The keeper keeps the tokens it buys
+    (`max_complete_lamports` caps the spend).
+  - **List-only markets** (M5): a list-only (`None`) market is covered with its detection set
+    `[bonding_curve, canonical_pool]` as ReadSet (the program's own for `crank_price` and
+    `sol_settle`). One with positions open — a curve that graduated elsewhere — is observed on the
+    no-route cadence and its positions are settled in S3 when due (duty 5; M2-SEC-5), and the pool
+    monitor collects its Raydium pool in a window (duty 12). One whose detection set shows a live
+    or migrating curve again (the program's `classify_pump`) is cranked, which moves it onto the
+    curve; the keeper then creates the trader's base ATA and pump UVA the curve legs require
+    (`crank_price` has no payer and creates neither), checked once per curve market.
 - **Duty 9, degraded mode** (`alerts.rs`): three consecutive seconds with a required observation
   and none landed (budget, outage, contested blocks), or a `CoverageGap` event from the program,
   raise `Alert::Degraded` — page the Emergency multisig to `set_pause(market)` with reason
@@ -164,7 +196,8 @@ What it does, per tick (one per slot; `keeper/src/keeper.rs`):
     `Alert::PoolSelectRefused` for an unexpected refusal. After an adoption the duty-10 admin
     watch starts afresh on the new pool.
 - Per-market metrics (coverage seconds, observations, exits, settlements, CU, lamports, misses,
-  bursts, gaps, venue admin changes, pool proposals / executions / switches, degraded) and
+  bursts, gaps, venue admin changes, pool proposals / executions / switches, migrations,
+  straddles, degraded) and
   `venue_flags`, `pool_discoveries` in the Prometheus text format (`--metrics`).
 
 **The program's own code decides.** The keeper links the `shortwin` crate (account types,
@@ -177,12 +210,13 @@ the cluster's clock. Every send is still simulated first, and the simulation is 
 (a program refusal is reported, never retried blindly).
 
 Not yet (later milestones, ARCH §7.1): Jito bundles with tips for liquidations (the priority-fee
-RPC path is built; T-SIZE shows a tip transfer fits the worst Raydium exit); Yellowstone gRPC
-subscriptions (the keeper polls `getMultipleAccounts` / `getProgramAccounts`, and watches admin
-actions through the accounts they write rather than the admin's transactions; it sees other
-parties' pool selection through the market's state, not their transactions); duty 6's
-graduation work and the pump venues' lists (M5/M6), including `crank_price` on list-only
-markets (their pump re-detection); duties 11 and 13 (`crank_sol_usd`, lender pot).
+RPC path is built; T-SIZE shows a tip transfer fits the worst Raydium exit; the straddle's bundle
+is built, duty 6); Yellowstone gRPC subscriptions (the keeper polls `getMultipleAccounts` /
+`getProgramAccounts`, and watches admin actions through the accounts they write rather than the
+admin's transactions; it sees other parties' pool selection through the market's state, not their
+transactions); M6's PumpSwap venue — the straddle's tx3, the `→ PumpSwap` transition's duties
+(`trader_base_ata`, the PumpSwap UVA, `extend_account`), `claim_venue_rewards` —; selling the
+tokens a straddle leaves the keeper; duties 11 and 13 (`crank_sol_usd`, lender pot).
 
 ### Run
 
@@ -191,6 +225,7 @@ cargo build --manifest-path services/Cargo.toml -p shortwin-keeper --release
 services/target/release/shortwin-keeper --rpc https://… --keypair keeper.json \
   --config services/keeper/keeper.example.toml --metrics 127.0.0.1:9464 \
   [--discovery-rpc https://…]   # getProgramAccounts for the pool discovery (default: --rpc)
+  [--block-engine https://mainnet.block-engine.jito.wtf]   # the straddle's bundles (duty 6)
 ```
 
 The keypair is a hot fee payer with no protocol authority. `keeper.example.toml` documents every
@@ -239,8 +274,11 @@ The scenario tests (`keeper-litesvm/tests/scenarios`) load the same builds as th
 short.win's test-venue build (`scripts/build-test-venue.sh`, or `SHORTWIN_TEST_VENUE_SO`) and the
 mock venue (`anchor build --tools-version v1.57 --arch v3` → `target/deploy/mock_cpamm.so`, or
 `MOCK_CPAMM_SO`) for the mock scenarios, and the release build (`target/deploy/shortwin.so`, or
-`SHORTWIN_SO`) with the committed mainnet fixtures (`tests/fixtures`) for the Raydium ones. Every
-keeper transaction runs the harness's invariant hooks after every instruction.
+`SHORTWIN_SO`) with the committed mainnet fixtures (`tests/fixtures`) for the Raydium and pump
+ones; `graduation` also loads the straddle helper (`target/deploy/complete_curve.so`, or
+`COMPLETE_CURVE_SO`). Every keeper transaction — each transaction of a bundle too — runs the
+harness's invariant hooks after every instruction; a bundle executes in order and all-or-nothing
+(the in-process backend restores the VM when one of its transactions fails).
 
 Mock scenarios: cadence (30 s idle, per second near a threshold), batching (v1 6 + 1, v0 4 + 3
 after a v1 refusal, the protocol ALT, a failing crank dropped and sent alone), bursts (an atomic
@@ -252,6 +290,23 @@ first second an outside oracle's simulation accepts, a spike above the bound wai
 mock pool (continuous chain; an expired position settles, a healthy one stays frozen), S1 after
 arming with one `sol_settle` per second, and extras (a published template, a hostile `current`
 bypassed with `previous`).
+
+Pump-curve scenarios (`graduation.rs`, M5 duty 6; the dumped pump, pump-fees and PumpSwap programs
+and the near-complete curve): an outside buy completes a covered market's curve and the keeper
+migrates it at its next tick (its `migrate_v2` is the harness's own derivation) and observes the
+market in the same second (`→ PumpMigrating`), once; an expired position with `Q > rT` waits for
+M6's exit transaction by default (one alert, `sol_settle` each second, the curve untouched); with
+`send_without_exit` the two-transaction bundle lands atomically (the keeper holds the curve's last
+tokens and paid the tip; tx2 is 2 + 51 + 1 = 54 trace entries) and the position's exits pause
+(`VenueMigrating`); ★ a curve buy between the keeper's pre-flight and its bundle does not break
+it, and a sale that lifts the completion above `max_sol_cost` reverts the whole bundle (pump
+6002, nothing committed) before the next second's bundle lands; without a block engine the
+straddle waits; below the straddle (`Q ≤ rT`) the keeper expires a curve position on the curve
+with the adapter's own account lists; a curve migrated elsewhere with an expired position open goes
+`→ None` at the keeper's first crank, which keeps the S3 chain on the no-route cadence and settles
+the position in S3 exactly when the chain has run `s3_wait_s` (on the detection set); a list-only
+market whose curve becomes readable is cranked onto it, its trader accounts are created once, and
+an open lands.
 
 Raydium scenarios (`raydium*.rs`, the dumped AMM v4 and CPMM programs and pools):
 
@@ -275,7 +330,8 @@ Raydium scenarios (`raydium*.rs`, the dumped AMM v4 and CPMM programs and pools)
   dumped ELFs): a thin eligible listing (Fartcoin's reversed pool) replaced by the main pool in
   the keeper's first tick, inside the listing window; a list-only market moved onto its deepest
   eligible pool (Fartcoin's real curve: D1 and `graduated_elsewhere`; a thinner CPMM sibling and
-  the too-thin reversed pool passed over), a pump coin's list-only market left alone; an
+  the too-thin reversed pool passed over), a pump coin's list-only market never moved onto a
+  Raydium pool (D1; since M5 the keeper cranks it onto its live curve instead); an
   incumbent halted with two positions open — the window opened on the deepest sibling at the
   first armed second (`pool_fail` for 120 s), executed at the first second after it, positions
   byte for byte unchanged, `P_ema` carried at the adoption, the ring's liquidity the new pool's
