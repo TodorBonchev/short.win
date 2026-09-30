@@ -48,11 +48,14 @@ fn peak(meta: &TransactionMetadata) -> u8 {
         .unwrap_or(1)
 }
 
+/// 1 % of the base reserve, a notional of at most ≈ 8 SOL (10 SOL until M6R-1: on the `mature`
+/// pool, whose third-party LP puts its locked depth at 92.98 % of `√k`, `X₀` is `0.93·X`, and a
+/// wallet's two 10-SOL opens exceed its wallet cap, 25 % of the fee-scaled OI cap).
 fn q_for(env: &Env, p: &PammPool) -> u64 {
     let r = p.reserves(&env.svm).expect("reserves");
     let base = u128::from(r.base);
     let y = r.effective_quote.max(1);
-    let q = (base / 100).min(base * u128::from(10 * SOL) / y);
+    let q = (base / 100).min(base * u128::from(8 * SOL) / y);
     u64::try_from(q).expect("u64")
 }
 

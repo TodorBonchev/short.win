@@ -19,6 +19,16 @@
 //! their WSOL ATAs) where the `VenueExtras` account stays inline; **(b)** the table
 //! `scripts/build-alt.sh` builds (`shortwin_keeper::alt`: (a) plus the four `VenueExtras` PDAs).
 //!
+//! **M6R-1 (owner decision of 2026-09-30; ARCH §6.4 row 56, changelog 56):** every PumpSwap ReadSet
+//! carries the pool's LP mint (P6, a per-pool key inline: +33 B). Two worst cases no longer fit
+//! 1,232 B through (a): the open with the largest (4-entry) extras set and the keeper's `[crank,
+//! liquidate]` with it — an owner trade-off with its fallbacks (a v1 transaction, a per-market
+//! table, or fewer extras; the keeper sends the liquidation alone). Both are pinned here: over by
+//! at most [`P6_OVER_MAX`] B through (a), fitting — and the open **executing** — through (a) plus
+//! a per-market lookup table ([`market_table`]); the open with 3 extras fits (a) alone. v0 crank
+//! batches hold [`KEEPER_BATCH_V0`] = 3 PumpSwap cranks (4 until M6R-1; the 4-crank batch is
+//! pinned over the limit).
+//!
 //! Run with `-- --nocapture` for the table.
 
 // `TxResult` is LiteSVM's own `TransactionResult` (as in the harness library).
@@ -58,8 +68,12 @@ use solana_transaction::versioned::VersionedTransaction;
 
 const TX_MAX: usize = 1_232;
 const ACCOUNTS_MAX: usize = 64;
-/// The keeper's v0 crank batch (ARCH §7.1 duty 7).
-const KEEPER_BATCH_V0: usize = 4;
+/// The keeper's v0 crank batch of PumpSwap markets (ARCH §7.1 duty 7): 3 since M6R-1's LP mint
+/// (4 before; the keeper cuts its batches where a transaction stops fitting).
+const KEEPER_BATCH_V0: usize = 3;
+/// The most M6R-1's LP mint pushes a worst-case PumpSwap transaction over 1,232 B through A28
+/// (ARCH §6.4 row 56 estimates 6–7 B for the 4-extras open, ≈ 20 B for the keeper's composite).
+const P6_OVER_MAX: usize = 24;
 const SOL: u64 = 1_000_000_000;
 
 const MATURE: PammCoin = PammCoin::Mature;
@@ -200,13 +214,20 @@ fn v0_tx(
     alt: &Alt,
     blockhash: Hash,
 ) -> VersionedTransaction {
-    let msg = v0::Message::try_compile(
-        &payer.pubkey(),
-        ixs,
-        std::slice::from_ref(&alt.table),
-        blockhash,
-    )
-    .expect("compile v0");
+    v0_tx_with(payer, signers, ixs, &[alt], blockhash)
+}
+
+/// [`v0_tx`] through several lookup tables (A28 and a per-market table, M6R-1's fallback).
+fn v0_tx_with(
+    payer: &Keypair,
+    signers: &[&Keypair],
+    ixs: &[Instruction],
+    alts: &[&Alt],
+    blockhash: Hash,
+) -> VersionedTransaction {
+    let tables: Vec<AddressLookupTableAccount> = alts.iter().map(|a| a.table.clone()).collect();
+    let msg =
+        v0::Message::try_compile(&payer.pubkey(), ixs, &tables, blockhash).expect("compile v0");
     let mut all: Vec<&Keypair> = vec![payer];
     all.extend(
         signers
@@ -250,6 +271,84 @@ fn assert_fits(what: &str, env: &Env, signer: &Keypair, ixs: &[Instruction]) -> 
     out
 }
 
+/// M6R-1 (module docs): `ixs` (with the compute budget) is over 1,232 B through (a) by at most
+/// [`P6_OVER_MAX`] B — the LP mint P6's cost, an owner trade-off — and fits through (a) plus the
+/// market's own table `mt`, separate payer and self-paid; returns the separate-payer sizes through
+/// (a), (b) and (a) + `mt`.
+fn assert_p6_over(
+    what: &str,
+    env: &Env,
+    signer: &Keypair,
+    ixs: &[Instruction],
+    mt: &Alt,
+) -> [usize; 3] {
+    let all = with_budget(ixs);
+    let bh = env.svm.latest_blockhash();
+    let t = tables(&env.svm);
+    let mut out = [0; 3];
+    for (i, alts) in [vec![&t[0]], vec![&t[1]], vec![&t[0], mt]]
+        .iter()
+        .enumerate()
+    {
+        let (sep, sep_keys) = measure(&v0_tx_with(&env.payer, &[signer], &all, alts, bh));
+        let (own, _) = measure(&v0_tx_with(signer, &[], &all, alts, bh));
+        let name: Vec<&str> = alts.iter().map(|a| a.name).collect();
+        println!(
+            "  {what:<48} {:<16} {sep:>5} B / {sep_keys:>2} accounts (self-paid {own:>5} B); margin {} B",
+            name.join(" + "),
+            TX_MAX as i64 - sep as i64
+        );
+        assert!(sep_keys <= ACCOUNTS_MAX, "{what}: {sep_keys} accounts");
+        out[i] = sep;
+    }
+    assert!(
+        out[0] > TX_MAX && out[0] <= TX_MAX + P6_OVER_MAX,
+        "{what} through A28: {} B (M6R-1 pins it just over the limit)",
+        out[0]
+    );
+    assert!(
+        out[2] <= TX_MAX,
+        "{what} through A28 + the market's table: {} B",
+        out[2]
+    );
+    out
+}
+
+/// A per-market lookup table (ARCH §6.4's fallback for what M6R-1's LP mint pushes over v0): the
+/// market's own accounts and its pool's, which A28 leaves inline.
+fn market_table(env: &mut Env, pm: &PammMarket) -> Alt {
+    let market = pm.market();
+    let k = pm.keys();
+    let addresses = vec![
+        market,
+        k.market_vault,
+        k.pool_vault,
+        k.trader,
+        k.mint,
+        pda::trader_wsol(&market).0,
+        pm.trader_base_ata,
+        pm.pool.pool,
+        pm.pool.base_vault,
+        pm.pool.quote_vault,
+        pm.pool.boost_vault_ata,
+        pm.pool.lp_mint,
+        pm.trader_uva(),
+        pm.cashback_ata(),
+        pm.creator_vault().0,
+        pm.creator_vault().1,
+        pamm::pool_v2(&k.mint),
+    ];
+    let alt = Alt {
+        name: "per-market",
+        table: AddressLookupTableAccount {
+            key: Pubkey::new_unique(),
+            addresses,
+        },
+    };
+    install_alt(&mut env.svm, &alt.table.key, &alt.table.addresses);
+    alt
+}
+
 /// Measures `ixs` for instructions nobody but the fee payer signs (`crank_price`, `sweep_trader`,
 /// the transition crank); asserts it fits.
 fn assert_fits_unsigned(what: &str, env: &Env, ixs: &[Instruction]) {
@@ -270,6 +369,16 @@ fn assert_fits_unsigned(what: &str, env: &Env, ixs: &[Instruction]) {
 /// Sends `ixs` (with the compute budget) as a v0 transaction through `alt`, with the invariant
 /// hooks after **every** instruction (as `tx_size_pump_it::send_v0_hooked`).
 fn send_v0_hooked(env: &mut Env, ixs: &[Instruction], signers: &[&Keypair], alt: &Alt) -> TxResult {
+    send_v0_hooked_with(env, ixs, signers, &[alt])
+}
+
+/// [`send_v0_hooked`] through several lookup tables.
+fn send_v0_hooked_with(
+    env: &mut Env,
+    ixs: &[Instruction],
+    signers: &[&Keypair],
+    alts: &[&Alt],
+) -> TxResult {
     let all = with_budget(ixs);
     for ix in &all {
         for m in &ix.accounts {
@@ -310,7 +419,7 @@ fn send_v0_hooked(env: &mut Env, ixs: &[Instruction], signers: &[&Keypair], alt:
         }
         pre = invariants::snapshot(&svm, env.tracked_markets());
     }
-    let tx = v0_tx(&payer, signers, &all, alt, env.svm.latest_blockhash());
+    let tx = v0_tx_with(&payer, signers, &all, alts, env.svm.latest_blockhash());
     let (size, _) = measure(&tx);
     assert!(size <= TX_MAX, "{} B", size);
     let res = env.svm.send_transaction(tx);
@@ -557,19 +666,30 @@ fn every_pumpswap_transaction_fits_and_executes_through_the_protocol_alt() {
         let (sel, extras) = worst_extras(&mut env);
         let keeper = env.funded_keypair();
 
+        let mt = market_table(&mut env, &pm);
         let mut b1 = env.borrower();
         let mut b2 = env.borrower();
-        assert_fits(
+        // M6R-1: the largest extras set pushes the open over v0 through A28 (the LP mint P6);
+        // through A28 plus the market's own table it fits and executes, and with 3 extras it fits
+        // A28 alone.
+        assert_p6_over(
             "open_short (new borrower, 4 extras)",
             &env,
             &b1.kp,
             &[open_x(&pm, &b1, q, sel, &extras)],
+            &mt,
         );
-        let meta = ok(send_v0_hooked(
+        assert_fits(
+            "open_short (new borrower, 3 extras)",
+            &env,
+            &b1.kp,
+            &[open_x(&pm, &b1, q, sel, &extras[..extras.len() - 1])],
+        );
+        let meta = ok(send_v0_hooked_with(
             &mut env,
             &[open_x(&pm, &b1, q, sel, &extras)],
             &[&b1.kp],
-            &a,
+            &[&a, &mt],
         ));
         let ev: Open = one(&meta);
         assert_eq!(ev.q, q);
@@ -577,11 +697,11 @@ fn every_pumpswap_transaction_fits_and_executes_through_the_protocol_alt() {
         b1.next_nonce += 1;
         env.warp(1);
         ok(env.send(&[crank_price_ix(&pm)], &[]));
-        let meta = ok(send_v0_hooked(
+        let meta = ok(send_v0_hooked_with(
             &mut env,
             &[open_x(&pm, &b2, q, sel, &extras)],
             &[&b2.kp],
-            &b,
+            &[&b, &mt],
         ));
         let _: Open = one(&meta);
         let n2 = b2.next_nonce;
@@ -629,11 +749,11 @@ fn every_pumpswap_transaction_fits_and_executes_through_the_protocol_alt() {
         let mut b3 = env.borrower();
         env.warp(1);
         ok(env.send(&[crank_price_ix(&pm)], &[]));
-        ok(send_v0_hooked(
+        ok(send_v0_hooked_with(
             &mut env,
             &[open_x(&pm, &b3, q, sel, &extras)],
             &[&b3.kp],
-            &a,
+            &[&a, &mt],
         ));
         let n3 = b3.next_nonce;
         b3.next_nonce += 1;
@@ -644,22 +764,15 @@ fn every_pumpswap_transaction_fits_and_executes_through_the_protocol_alt() {
             &keeper,
             std::slice::from_ref(&liq),
         );
-        let composite = {
-            let all = with_budget(&[crank_price_ix(&pm), liq.clone()]);
-            let bh = env.svm.latest_blockhash();
-            let t = tables(&env.svm);
-            [
-                measure(&v0_tx(&env.payer, &[&keeper], &all, &t[0], bh)),
-                measure(&v0_tx(&env.payer, &[&keeper], &all, &t[1], bh)),
-            ]
-        };
-        println!(
-            "  {:<48} A28 {} B / {} accounts; build-alt {} B / {} accounts",
+        // M6R-1: the keeper's composite with the largest extras set no longer fits through A28
+        // (the keeper then sends the liquidation alone, whose prologue is the second's
+        // observation anyway: ARCH §7.1 item 7).
+        assert_p6_over(
             "crank_price + liquidate (4 extras; keeper composite)",
-            composite[0].0,
-            composite[0].1,
-            composite[1].0,
-            composite[1].1
+            &env,
+            &keeper,
+            &[crank_price_ix(&pm), liq.clone()],
+            &mt,
         );
         // Without extras (the keeper's normal case) the composite and a tip both fit.
         let plain = liquidate_x(&pm, &keeper.pubkey(), &b3.key(), n3, ExtrasSel::NONE, &[]);
@@ -798,8 +911,10 @@ fn the_graduation_transition_and_tx3_fit_and_execute_through_the_protocol_alt() 
     let _ = b;
 }
 
-/// Crank batches (ARCH §6.4, §7.1 duty 7): PumpSwap markets. Every batch of 1–4 cranks fits v0
-/// through both tables, and the keeper's batch of 4 executes as one transaction.
+/// Crank batches (ARCH §6.4, §7.1 duty 7): PumpSwap markets. Every batch of 1–3 cranks fits v0
+/// through both tables, and the keeper's batch of 3 executes as one transaction; since M6R-1's LP
+/// mint (+33 B per crank) a batch of 4 no longer fits (1,251 B through A28 when measured; 1,119 B
+/// before), so the keeper's size cut sends 3.
 #[test]
 fn crank_batches_fit_through_the_protocol_alt() {
     let (mut env, p) = Env::fork_pamm_coin(MATURE);
@@ -821,7 +936,15 @@ fn crank_batches_fit_through_the_protocol_alt() {
                 "  crank batch k = {k} (PumpSwap) {:<9} {size:>5} B / {keys:>2} accounts",
                 alt.name
             );
-            assert!(size <= TX_MAX && keys <= ACCOUNTS_MAX, "{k} cranks");
+            assert!(keys <= ACCOUNTS_MAX, "{k} cranks");
+            if k <= KEEPER_BATCH_V0 {
+                assert!(size <= TX_MAX, "{k} cranks: {size} B");
+            } else {
+                assert!(
+                    size > TX_MAX,
+                    "{k} cranks fit: the keeper's batch is too small"
+                );
+            }
         }
     }
     let meta = ok(send_v0_hooked(

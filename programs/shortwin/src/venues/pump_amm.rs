@@ -10,7 +10,10 @@
 //!
 //! - ReadSet ([`read_keys`]): P0 the canonical pool (W), P1 its base vault (W), P2 its WSOL vault
 //!   (W), P3 `GlobalConfig` (`disable_flags`, the recipient lists, `creator_fee_configurable`), P4
-//!   the PumpSwap `FeeConfig` (pump-fees), P5 `ATA(boost_vault, WSOL)` (may not exist; read as 0).
+//!   the PumpSwap `FeeConfig` (pump-fees), P5 `ATA(boost_vault, WSOL)` (may not exist; read as 0),
+//!   P6 the pool's LP mint (M6R-1, owner decision of 2026-09-30; ARCH §3.12, changelog 56):
+//!   key-checked against the live `pool.lp_mint` ([`check_read`]; no cache slot, no derivation on
+//!   chain), an SPL Token or Token-2022 mint whose `supply` gives the pool's locked depth.
 //! - TradeExtras ([`check_trade`]): T0 pAMM, T1 pAMM `event_authority`, T2 pump-fees, T3 WSOL,
 //!   T4 Tokenkeg, T5 the ATA program, T6 System, T7 `trader_base_ata` (W), T8 `trader_wsol` (W),
 //!   T9 `protocol_fee_recipient` (the live list), T10 its WSOL ATA (W), T11
@@ -56,11 +59,24 @@
 //! market cap), `FeeConfig.fee_tiers`, `creator_fee_configurable` and the pool's own creator
 //! override, resolved on every read.
 //!
-//! **Venue predicate** (`venue_executable`, ARCH §5.3): every ReadSet account parses (A63), the
-//! pool is the mint's valid canonical pool (`canonical_pool_valid`) whose vaults are the cached
-//! ones, both reserves are non-zero, and **`disable_flags & DISABLE_BUY_BIT == 0`** — the buy bit
-//! T-DISABLE resolved on the dumped ELF (bit 3; the hard gate C0-10). Any other non-zero value
-//! (bits 0–2, 4–7) blocks opens (`VenueFlagged`, A24) and is **not** S3 evidence.
+//! **Locked depth** (M6R-1, owner decision of 2026-09-30; ARCH §2.5, §2.6, changelog 56; ECON
+//! #105): canonical pools take third-party LP (R-VEN Update H11), so a PumpSwap pool gets the
+//! Raydium depth bound on its **burned** creation LP: `D = pool_select::locked_depth(Pool.lp_supply,
+//! lp_mint.supply, X, Y + VQR) = ⌊λ_bps·isqrt(X·(Y + VQR))/10⁴⌋`, `λ_bps = ⌊(lp_supply −
+//! supply)·10⁴/lp_supply⌋` — `Pool.lp_supply` counts every LP unit minted less every unit
+//! `withdraw` redeemed (burns are not subtracted) and `migrate_v2` burns the whole creation LP, so
+//! the difference is the burned LP; a deposit or withdrawal scales `X`, `Y + VQR` and `lp_supply`
+//! together and leaves `D` unchanged (up to λ's whole-bps floor). `VenueState.locked_depth` while
+//! executable; the prologue writes it into `pool_d` and caps `L_slow` at it during a warm-up; the
+//! size cap, the tier and the exit reference read `pool_d` over `λ_min` as on Raydium.
+//!
+//! **Venue predicate** (`venue_executable`, ARCH §5.3): every ReadSet account parses (A63; the LP
+//! mint P6 included since M6R-1), the pool is the mint's valid canonical pool
+//! (`canonical_pool_valid`) whose vaults are the cached ones, both reserves are non-zero, and
+//! **`disable_flags & DISABLE_BUY_BIT == 0`** — the buy bit T-DISABLE resolved on the dumped ELF
+//! (bit 3; the hard gate C0-10). Any other non-zero value (bits 0–2, 4–7) blocks PumpSwap opens
+//! (`VenueFlagged`, A24) and is **not** S3 evidence; bit 0 (`create_pool`) also blocks curve opens
+//! (`GraduationHalted`, M6-SEC-3: [`PAMM_CREATE_POOL_DISABLED_BIT`], read from the curve's C6).
 //!
 //! **Graduation** ([`graduate`]; ARCH §2.5 "On → PumpSwap", M5-SEC-4): a curve market whose
 //! canonical pool is valid moves onto it in the prologue's venue sync: the pool cache (the vault
@@ -71,11 +87,15 @@
 //! `ema_warm = 8`, `ema_guard = 1`), with the pool's `lp_supply` as the anchor — the pool's
 //! constant-product depth `√(X·Y)` at its creation, read from the canonical-pool account the
 //! curve's ReadSet already carries (no vault is sampled; a deposit around the transition can only
-//! raise it, and `L_slow` never rises above the curve's own). `P_ema` carries over and the next
-//! eight integrations re-seed it from the pool's own buckets (by at most the largest v0.4.1 step
-//! each, M4X-1), so an atomic, self-financed `[buy_v2(rT), migrate_v2]` with the pool pushed
-//! before any observation forces no exit before honest buckets exist: `liquidate` / `expire` fail
-//! `EmaWarmingUp` and `sol_settle` evaluates nothing until `ema_warm == 0`, and opens wait too.
+//! raise it, and `L_slow` never rises above the curve's own; since M6R-1 the first executable
+//! PumpSwap observation caps `L_slow` at the pool's locked depth `D`, which undoes such a deposit
+//! before any decision reads `L_slow`). `pool_d` is 0 from the transition (it reads no LP mint)
+//! until that observation. `P_ema` carries over and the next eight integrations re-seed it from
+//! the pool's own buckets (by at most the largest v0.4.1 step each way, M4X-1 up, M6-SEC-1 down),
+//! so an atomic, self-financed `[buy_v2(rT), migrate_v2]` with the pool pushed before any
+//! observation forces no exit before honest buckets exist: `liquidate` / `expire` fail
+//! `EmaWarmingUp` and `sol_settle` evaluates nothing until `ema_warm == 0`, and opens wait too (the
+//! 8–12 s exit delay after a graduation, accepted by the owner on 2026-09-30, OWNER-M6R-4).
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
@@ -85,22 +105,23 @@ use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use anchor_spl::token_interface::{self, TransferChecked};
 use shortwin_math::fees::{self, FeeBps, FeeTier, PammFeeSchedule};
 use shortwin_math::observe::{Observation, VenueChange};
+use shortwin_math::pool_select;
 use shortwin_math::quote::Pricing;
-use shortwin_venue_state::{pump, pump_amm, token_account};
+use shortwin_venue_state::{mint, pump, pump_amm, token_account};
 
 use super::{raydium, BuyOut, Leg, SellOut, VenueState};
 use crate::constants::{
     ASSOCIATED_TOKEN_PROGRAM_ID, PUMP_AMM_EVENT_AUTHORITY, PUMP_AMM_FEE_CONFIG,
     PUMP_AMM_GLOBAL_CONFIG, PUMP_AMM_GLOBAL_VOLUME_ACCUMULATOR, PUMP_AMM_PROGRAM_ID,
-    PUMP_FEES_PROGRAM_ID, TOKEN_PROGRAM_ID, WSOL_MINT,
+    PUMP_FEES_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID, WSOL_MINT,
 };
 use crate::engine::trader::{base_ata_state, token_state, Funding, TraderAccounts};
 use crate::errors::{CheckedExt, MathResultExt, ShortwinError};
 use crate::lamports;
 use crate::state::{pump_swap_cache as cache, Market, Params, VenueKind};
 
-/// ReadSet length.
-pub const READ_LEN: usize = 6;
+/// ReadSet length (7 since M6R-1: the LP mint P6).
+pub const READ_LEN: usize = 7;
 /// TradeExtras length.
 pub const TRADE_LEN: usize = 19;
 
@@ -111,6 +132,8 @@ pub const P_QUOTE_VAULT: usize = 2;
 pub const P_GLOBAL_CONFIG: usize = 3;
 pub const P_FEE_CONFIG: usize = 4;
 pub const P_BOOST_VAULT_ATA: usize = 5;
+/// The pool's LP mint (M6R-1): key-checked against `pool.lp_mint`, read for its `supply`.
+pub const P_LP_MINT: usize = 6;
 
 /// TradeExtras slots.
 pub const T_PROGRAM: usize = 0;
@@ -150,6 +173,12 @@ pub const SELL_DATA_LEN: usize = 24;
 /// T-DISABLE (the hard gate, C0-10; R-VEN Update 2026-09-30 H4): the `GlobalConfig.disable_flags`
 /// bit that halts every buy — ARCH §5.3's `PAMM_BUY_DISABLED_BIT`, the only bit an exit depends on.
 pub const PAMM_BUY_DISABLED_BIT: u8 = pump_amm::DISABLE_BUY_BIT;
+
+/// T-DISABLE: the `GlobalConfig.disable_flags` bit that halts `create_pool` — and with it pump's
+/// `migrate_v2` (6017), so a curve that completes under it stays `PumpMigrating` until S3. Curve
+/// opens refuse `GraduationHalted` while it is set (M6-SEC-3, owner decision of 2026-09-30; the
+/// curve's ReadSet carries the PumpSwap `GlobalConfig` as C6, so no account is added).
+pub const PAMM_CREATE_POOL_DISABLED_BIT: u8 = pump_amm::DISABLE_CREATE_POOL_BIT;
 
 /// PumpSwap's protocol-fee recipient that pump's curve does not list (the live `GlobalConfig`,
 /// slot 451,784,607; R-VEN §2.2 "`JCRGum…` and not `CebN5W…`"), with its WSOL ATA: with
@@ -200,6 +229,17 @@ pub fn boost_vault(pool: &Pubkey) -> Pubkey {
 pub fn user_volume_accumulator(user: &Pubkey) -> Pubkey {
     Pubkey::find_program_address(
         &[pump_amm::USER_VOLUME_ACCUMULATOR_SEED, user.as_ref()],
+        &PUMP_AMM_PROGRAM_ID,
+    )
+    .0
+}
+
+/// `PDA(pAMM, ["pool_lp_mint", pool])`: the LP mint `create_pool` creates (every canonical
+/// pool's `pool.lp_mint`). Off-chain helper for [`read_keys`]'s P6; the program key-checks P6
+/// against the live `pool.lp_mint` instead ([`check_read`]).
+pub fn lp_mint(pool: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(
+        &[pump_amm::LP_MINT_SEED, pool.as_ref()],
         &PUMP_AMM_PROGRAM_ID,
     )
     .0
@@ -329,8 +369,8 @@ pub fn write_cache(market: &mut Market, pool: &pump_amm::Pool) -> Result<()> {
     Ok(())
 }
 
-/// The ReadSet keys of `market` in order (module docs).
-pub fn read_keys(market: &Market) -> [Pubkey; READ_LEN] {
+/// P0–P5 of the ReadSet of `market` (the keys the constants and the market's cache fix).
+fn fixed_read_keys(market: &Market) -> [Pubkey; P_LP_MINT] {
     [
         market.canonical_pool,
         cached(market, cache::POOL_BASE_VAULT),
@@ -341,9 +381,43 @@ pub fn read_keys(market: &Market) -> [Pubkey; READ_LEN] {
     ]
 }
 
-/// Key-checks the ReadSet against the constants and the market's cache.
+/// The ReadSet keys of `market` in order (module docs), P6 derived as `create_pool` derives it
+/// ([`lp_mint`]; off-chain builders — the program checks P6 against the live pool).
+pub fn read_keys(market: &Market) -> [Pubkey; READ_LEN] {
+    let [p0, p1, p2, p3, p4, p5] = fixed_read_keys(market);
+    [p0, p1, p2, p3, p4, p5, lp_mint(&market.canonical_pool)]
+}
+
+/// Key-checks the ReadSet (`BadRemainingAccounts` for a wrong count, `VenueAccountMismatch` for a
+/// wrong key): P0–P5 against the constants and the market's cache, P6 against the live pool's
+/// `lp_mint` (M6R-1; the pool P0 is the market's canonical pool). A pool that does not parse leaves
+/// P6 unchecked: the venue is then not executable and nothing reads P6 (A63).
 pub fn check_read(market: &Market, read: &[AccountInfo]) -> Result<()> {
-    raydium::check_keys(read, &read_keys(market))
+    require!(read.len() == READ_LEN, ShortwinError::BadRemainingAccounts);
+    let fixed = read
+        .get(..P_LP_MINT)
+        .ok_or(ShortwinError::BadRemainingAccounts)?;
+    raydium::check_keys(fixed, &fixed_read_keys(market))?;
+    if let Some(pool) = read.get(P_POOL).and_then(parse_pool) {
+        require_keys_eq!(
+            raydium::at(read, P_LP_MINT)?.key(),
+            Pubkey::new_from_array(pool.lp_mint),
+            ShortwinError::VenueAccountMismatch
+        );
+    }
+    Ok(())
+}
+
+/// The circulating supply of the pool's LP mint (P6; SPL Token or Token-2022, `supply` @36);
+/// `None` if it is not a mint of either program (A63: the venue is then not executable).
+fn lp_mint_supply(info: &AccountInfo) -> Option<u64> {
+    if *info.owner != TOKEN_2022_PROGRAM_ID && *info.owner != TOKEN_PROGRAM_ID {
+        return None;
+    }
+    let data = info.try_borrow_data().ok()?;
+    mint::read_base(&info.owner.to_bytes(), &data)
+        .ok()
+        .map(|m| m.supply)
 }
 
 /// The TradeExtras slots whose keys are fixed by a constant or the market's cache.
@@ -547,13 +621,22 @@ pub fn read_state(market: &Market, read: &[AccountInfo], supply: Option<u64>) ->
         && pool.base_mint == market.mint.to_bytes()
         && pool.quote_mint == WSOL_MINT.to_bytes()
         && !pool.is_mayhem_mode;
-    let (Some(base_info), Some(quote_info), Some(gc_info), Some(fc_info), Some(boost_info)) = (
+    let (
+        Some(base_info),
+        Some(quote_info),
+        Some(gc_info),
+        Some(fc_info),
+        Some(boost_info),
+        Some(lp_info),
+    ) = (
         read.get(P_BASE_VAULT),
         read.get(P_QUOTE_VAULT),
         read.get(P_GLOBAL_CONFIG),
         read.get(P_FEE_CONFIG),
         read.get(P_BOOST_VAULT_ATA),
-    ) else {
+        read.get(P_LP_MINT),
+    )
+    else {
         return st;
     };
     let vaults_match = pool.pool_base_token_account == base_info.key.to_bytes()
@@ -623,12 +706,22 @@ pub fn read_state(market: &Market, read: &[AccountInfo], supply: Option<u64>) ->
     let Ok(effective) = u64::try_from(reserves.effective_quote) else {
         return st;
     };
+    // M6R-1: the burned creation LP's depth on the pricing reserves (module docs). The LP mint
+    // is P6, key-checked against `pool.lp_mint` by `check_read`; one that does not parse makes
+    // the venue not executable (A63).
+    let locked_depth = (lp_info.key.to_bytes() == pool.lp_mint)
+        .then(|| lp_mint_supply(lp_info))
+        .flatten()
+        .and_then(|supply| {
+            pool_select::locked_depth(pool.lp_supply, supply, reserves.base, effective).ok()
+        });
     st.executable = reserves.base > 0
         && effective > 0
         && fee.is_some()
+        && locked_depth.is_some()
         && disable_flags & PAMM_BUY_DISABLED_BIT == 0;
     if st.executable {
-        if let Some(f) = fee {
+        if let (Some(f), Some(d)) = (fee, locked_depth) {
             st.x = reserves.base;
             st.y = effective;
             // ECON §6.2 (#103, delegated PROPOSED; built in M6): the real SOL is the smaller of
@@ -637,6 +730,7 @@ pub fn read_state(market: &Market, read: &[AccountInfo], supply: Option<u64>) ->
             st.r = reserves.real_quote.min(effective);
             st.pricing = Some(Pricing::PumpSwap(f));
             st.fee_ppm = f.oneway_ppm();
+            st.locked_depth = d;
         }
     }
     st
@@ -690,13 +784,17 @@ pub fn graduation_anchor(pool: &pump_amm::Pool) -> Option<u128> {
 
 /// The venue-side effects of `→ PumpSwap` on a market with the valid canonical `pool` (ARCH §2.5;
 /// module docs): the PumpSwap cache, `venue = PumpSwap`, `graduated_at = now` (the first
-/// observation; conservative, O13), both route chains and a collection window cleared (the new
-/// pool is observed afresh), the tier C until the next crank or open recomputes it. The
-/// observation state is [`restart_observation`]'s (the prologue's copy).
+/// observation; conservative, O13), `pool_d = 0` (M6R-1: no LP mint is read here), both route
+/// chains and a collection window cleared (the new pool is observed afresh), the tier C until the
+/// next crank or open recomputes it. The observation state is [`restart_observation`]'s (the
+/// prologue's copy).
 pub fn graduate(market: &mut Market, pool: &pump_amm::Pool, now: i64) -> Result<()> {
     write_cache(market, pool)?;
     market.venue = VenueKind::PumpSwap as u8;
     market.graduated_at = now;
+    // M6R-1: the transition reads no LP mint; the pool's first executable observation writes
+    // its locked depth (the prologue's `refresh_locked_depth`).
+    market.pool_d.set(0);
     market.no_route_since = 0;
     market.last_no_route_obs = 0;
     market.pool_fail_since = 0;
@@ -733,18 +831,31 @@ pub fn priced(obs: &Observation) -> bool {
 
 /// A PumpSwap market without a price state starts it at its first executable observation
 /// (a PumpSwap listing, a `None →` PumpSwap re-detection: neither carries the pool's vaults, ARCH
-/// §3.2's init set): `P_ema = P_spot`, `L_ema = L_slow = √(X·Y)`, one ring entry, **marked for the
-/// post-change warm-up** (as a Raydium price start is: a pushed spot seeds nothing an open reads
-/// before eight integrations of the pool's own buckets). Returns whether it started.
-pub fn start_price(obs: &mut Observation, state: &VenueState, now: i64) -> Result<bool> {
+/// §3.2's init set) exactly as a Raydium price start does (since M6R-1, owner decision of
+/// 2026-09-30): `Observation::new_raydium(now, P_spot, √(X·(Y + VQR)), ⌊D·10⁴/λ_min⌋)` —
+/// `P_ema = P_spot`, `L_ema = L_slow = min(√(X·(Y + VQR)), ⌊D·10⁴/λ_min⌋)` with `D` the pool's
+/// locked depth (a deposit wrapped around the start credits at most `D/λ_min`), one ring entry,
+/// **marked for the post-change warm-up** (a pushed spot seeds nothing an open reads before eight
+/// integrations of the pool's own buckets). A pool without locked depth (`D = 0`: no burned LP
+/// left, which a canonical pool never has) starts nothing: the market stays unpriced, so it takes
+/// no open. `lambda_min_bps` is `pool_lock_min_bps`. Returns whether it started.
+pub fn start_price(
+    obs: &mut Observation,
+    state: &VenueState,
+    now: i64,
+    lambda_min_bps: u32,
+) -> Result<bool> {
     if priced(obs) || state.kind != VenueKind::PumpSwap || !state.executable {
         return Ok(false);
     }
     let (Some(p), Some(l)) = (state.price(), state.liquidity()) else {
         return Ok(false);
     };
-    *obs = Observation::new(now, p, l).math()?;
-    obs.mark_restart();
+    let cap = pool_select::depth_at_lambda(state.locked_depth, u64::from(lambda_min_bps));
+    if cap == 0 {
+        return Ok(false);
+    }
+    *obs = Observation::new_raydium(now, p, l, cap).math()?;
     Ok(true)
 }
 
@@ -1066,9 +1177,11 @@ mod tests {
         assert_eq!(disc("claim_cashback"), IX_CLAIM_CASHBACK);
         assert_eq!(BUY_DATA_LEN, 8 + 8 + 8 + 1);
         assert_eq!(SELL_DATA_LEN, 8 + 8 + 8);
-        assert_eq!(READ_LEN, P_BOOST_VAULT_ATA + 1);
+        assert_eq!(READ_LEN, P_LP_MINT + 1);
+        assert_eq!(P_LP_MINT, P_BOOST_VAULT_ATA + 1);
         assert_eq!(TRADE_LEN, T_CASHBACK_ATA + 1);
         assert_eq!(PAMM_BUY_DISABLED_BIT, 1 << 3);
+        assert_eq!(PAMM_CREATE_POOL_DISABLED_BIT, 1);
     }
 
     /// Every recipient table entry is the WSOL ATA of its recipient; an unknown one is derived.
@@ -1100,6 +1213,7 @@ mod tests {
             coin_creator_vault_authority(&k),
             pda(&[b"creator_vault", k.as_ref()])
         );
+        assert_eq!(lp_mint(&k), pda(&[b"pool_lp_mint", k.as_ref()]));
     }
 
     /// The precomputed cache of a curve market: the vaults are ATAs of the canonical pool, the

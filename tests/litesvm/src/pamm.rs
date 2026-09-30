@@ -9,7 +9,8 @@
 //!   statics, PumpSwap's statics, the role's accounts, mainnet's Rent, the `pamm_state` clock);
 //!   [`Env::plant_negative_vqr`] replaces the `mature` pool with its synthetic negative-VQR copy.
 //! - [`PammMarket`]: a market's keys and its venue's account lists in ARCH §3.12's order (ReadSet
-//!   P0–P5, TradeExtras T0–T18), built from the fixture's or the live pool's keys and the
+//!   P0–P6 — the LP mint P6 since M6R-1 —, TradeExtras T0–T18), built from the fixture's or the
+//!   live pool's keys and the
 //!   harness's own derivations, never from the program's key functions; it implements
 //!   [`VenueMarket`], so every builder of [`crate::engine`] works on it. [`PammMarket::graduated`]
 //!   is a curve market's after its `→ PumpSwap` transition.
@@ -18,7 +19,9 @@
 //! - PumpSwap's own instructions for the tests: [`pamm_trade_ix`] (`buy` / `sell` with R-VEN §2.2's
 //!   exact account order), [`PammUser`] (a normal trader), [`pamm_init_uva_ix`],
 //!   [`pamm_claim_cashback_ix`] (no signature of `user`, T-CASHBACK), [`pamm_liquidity_ix`]
-//!   (`deposit` / `withdraw`, H11), [`set_disable_flags`] (T-DISABLE), [`sweep_trader_pamm_ix`].
+//!   (`deposit` / `withdraw`, H11) and [`PammLp`] (a third-party liquidity provider, M6R-1),
+//!   [`set_disable_flags`] (T-DISABLE), [`sweep_trader_pamm_ix`]; [`PammPool::locked_depth`]
+//!   recomputes the pool's burned-LP depth `D` (M6R-1).
 //!
 //! Every instruction goes through [`Env::send`] (the invariant hooks, which see PumpSwap markets
 //! through `invariants::venue_view`).
@@ -301,6 +304,30 @@ impl PammPool {
         }
     }
 
+    /// The LP mint's circulating supply (P6; Token-2022 on every canonical pool).
+    pub fn lp_mint_supply(&self, svm: &LiteSVM) -> u64 {
+        let acc = svm.get_account(&self.lp_mint).expect("LP mint");
+        shortwin_venue_state::mint::read_base(&acc.owner.to_bytes(), &acc.data)
+            .expect("LP mint")
+            .supply
+    }
+
+    /// The pool's burned-LP share and locked depth (M6R-1, ECON #105), recomputed here: `λ_bps =
+    /// ⌊(Pool.lp_supply − lp_mint.supply)·10⁴/lp_supply⌋` and `D = ⌊λ_bps·isqrt(X·(Y +
+    /// VQR))/10⁴⌋` on the pricing reserves.
+    pub fn locked_depth(&self, svm: &LiteSVM) -> (u128, u128) {
+        let counter = u128::from(self.state(svm).lp_supply);
+        let supply = u128::from(self.lp_mint_supply(svm));
+        let lam = if counter == 0 || supply > counter {
+            0
+        } else {
+            (counter - supply) * 10_000 / counter
+        };
+        let r = self.reserves(svm).expect("reserves");
+        let root = (u128::from(r.base) * r.effective_quote).isqrt();
+        (lam, lam * root / 10_000)
+    }
+
     /// Spot `⌊(quote + VQR)·WAD/base⌋`.
     pub fn spot_wad(&self, svm: &LiteSVM) -> u128 {
         let r = self.reserves(svm).expect("reserves");
@@ -495,6 +522,113 @@ pub fn pamm_liquidity_ix(
     }
 }
 
+/// A third-party liquidity provider on a canonical PumpSwap pool (R-VEN Update H11: anyone can
+/// deposit into a canonical pool and withdraw again; M6R-1's attacker, ECON #105): its base ATA,
+/// a WSOL account and its LP ATA under Token-2022; deposits and withdrawals through pAMM's own
+/// `deposit` / `withdraw` ([`pamm_liquidity_ix`]), which scale both vaults, VQR and `lp_supply`.
+pub struct PammLp {
+    pub kp: Keypair,
+    pub base: Pubkey,
+    pub wsol: Pubkey,
+    pub lp: Pubkey,
+}
+
+impl PammLp {
+    /// A new provider of `p` holding `base` tokens and `sol` wrapped lamports.
+    pub fn new(env: &mut Env, p: &PammPool, base: u64, sol: u64) -> Self {
+        let kp = env.funded_keypair();
+        let payer = env.payer.pubkey();
+        let ixs = [
+            fork::create_ata_idempotent_ix(&payer, &kp.pubkey(), &p.mint, &p.base_program),
+            fork::create_ata_idempotent_ix(
+                &payer,
+                &kp.pubkey(),
+                &p.lp_mint,
+                &TOKEN_2022_PROGRAM_ID,
+            ),
+        ];
+        errors::ok(env.send(&ixs, &[]));
+        let b = pda::ata(&kp.pubkey(), &p.mint, &p.base_program);
+        if base > 0 {
+            fork::set_token_amount(&mut env.svm, &b, base);
+        }
+        let w = fork::fund_wsol(env, &kp.pubkey(), sol);
+        Self {
+            base: b,
+            wsol: w,
+            lp: pda::ata(&kp.pubkey(), &p.lp_mint, &TOKEN_2022_PROGRAM_ID),
+            kp,
+        }
+    }
+
+    /// A provider funded for deposits of up to `k_bps/10⁴ ×` the pool as it is now (both vaults,
+    /// with half as much again to spare: its later deposits may meet a pool that trades moved).
+    pub fn funded_for(env: &mut Env, p: &PammPool, k_bps: u64) -> Self {
+        let r = p.reserves(&env.svm).expect("reserves");
+        let scale = |v: u64| {
+            u64::try_from(u128::from(v) * u128::from(k_bps) * 150 / 1_000_000).expect("u64")
+        };
+        let (base, sol) = (scale(r.base), scale(r.real_quote));
+        Self::new(env, p, base, sol.max(1))
+    }
+
+    /// The LP a deposit of `k_bps/10⁴ ×` the pool mints: `⌊Pool.lp_supply·k/10⁴⌋`.
+    pub fn lp_for(svm: &LiteSVM, p: &PammPool, k_bps: u64) -> u64 {
+        u64::try_from(u128::from(p.state(svm).lp_supply) * u128::from(k_bps) / 10_000).expect("u64")
+    }
+
+    /// `deposit(lp_out, u64::MAX, u64::MAX)`.
+    pub fn deposit_ix(&self, p: &PammPool, lp_out: u64) -> Instruction {
+        pamm_liquidity_ix(
+            p,
+            true,
+            &self.kp.pubkey(),
+            &self.base,
+            &self.wsol,
+            &self.lp,
+            lp_out,
+            u64::MAX,
+            u64::MAX,
+        )
+    }
+
+    /// `withdraw(lp_in, 0, 0)`.
+    pub fn withdraw_ix(&self, p: &PammPool, lp_in: u64) -> Instruction {
+        pamm_liquidity_ix(
+            p,
+            false,
+            &self.kp.pubkey(),
+            &self.base,
+            &self.wsol,
+            &self.lp,
+            lp_in,
+            0,
+            0,
+        )
+    }
+
+    /// The provider's LP balance.
+    pub fn lp_balance(&self, svm: &LiteSVM) -> u64 {
+        read::token_amount(svm, &self.lp).unwrap_or(0)
+    }
+
+    /// A deposit of `k_bps/10⁴ ×` the pool, sent alone; returns the LP minted.
+    pub fn deposit(&self, env: &mut Env, p: &PammPool, k_bps: u64) -> u64 {
+        let before = self.lp_balance(&env.svm);
+        let lp = Self::lp_for(&env.svm, p, k_bps);
+        let kp = self.kp.insecure_clone();
+        errors::ok(env.send(&[self.deposit_ix(p, lp)], &[&kp]));
+        self.lp_balance(&env.svm) - before
+    }
+
+    /// Every LP unit the provider holds withdrawn, sent alone.
+    pub fn withdraw_all(&self, env: &mut Env, p: &PammPool) {
+        let lp = self.lp_balance(&env.svm);
+        let kp = self.kp.insecure_clone();
+        errors::ok(env.send(&[self.withdraw_ix(p, lp)], &[&kp]));
+    }
+}
+
 /// A normal PumpSwap trader: a funded keypair with its base ATA, a WSOL account and its pAMM UVA
 /// (created through `Env::send` before any trade).
 pub struct PammUser {
@@ -682,7 +816,8 @@ impl VenueMarket for PammMarket {
     }
 
     /// P0 the pool (W), P1 its base vault (W), P2 its WSOL vault (W), P3 `GlobalConfig`, P4
-    /// `FeeConfig`, P5 the boost vault's WSOL ATA.
+    /// `FeeConfig`, P5 the boost vault's WSOL ATA, P6 the pool's LP mint (M6R-1: its supply gives
+    /// the burned LP's locked depth).
     fn read_set(&self, writable: bool) -> Vec<AccountMeta> {
         vec![
             m(self.pool.pool, writable),
@@ -691,6 +826,7 @@ impl VenueMarket for PammMarket {
             m(PUMP_AMM_GLOBAL_CONFIG, false),
             m(PUMP_AMM_FEE_CONFIG, false),
             m(self.pool.boost_vault_ata, false),
+            m(self.pool.lp_mint, false),
         ]
     }
 
@@ -864,7 +1000,19 @@ impl Env {
     /// [`Env::initialized`], the pump programs and statics, PumpSwap's statics, `coin`'s accounts,
     /// mainnet's Rent and the `pamm_state` clock.
     pub fn fork_pamm_coin(coin: PammCoin) -> (Self, PammPool) {
-        let mut env = Self::initialized();
+        Self::fork_pamm_coin_with(coin, |_| {})
+    }
+
+    /// [`Env::fork_pamm_coin`] with the config's initial arguments changed by `f` first (within
+    /// the compiled bounds, e.g. the per-market notional limit).
+    pub fn fork_pamm_coin_with(
+        coin: PammCoin,
+        f: impl FnOnce(&mut shortwin::state::InitConfigArgs),
+    ) -> (Self, PammPool) {
+        let mut env = Self::new();
+        let mut args = env.default_init_args();
+        f(&mut args);
+        errors::ok(env.initialize_config(args));
         env.load_pump_programs();
         env.load_pump_statics();
         env.load_pamm_statics();

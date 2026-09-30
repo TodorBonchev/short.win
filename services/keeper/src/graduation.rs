@@ -560,8 +560,8 @@ pub fn pamm_account_ixs(
 
 /// The PumpSwap ReadSet of a curve market's canonical pool before the transition wrote the
 /// market's cache (`pump_amm::read_keys` on the cache the curve listing precomputed; the pool's
-/// vaults are ATAs of the pool, `migrate_v2` creates them so — [`MigrationKeys`]; the program
-/// key-checks every slot).
+/// vaults are ATAs of the pool, `migrate_v2` creates them so — [`MigrationKeys`]; the LP mint P6 is
+/// the pool's derived `pool_lp_mint`, M6R-1; the program key-checks every slot).
 pub fn pamm_read_keys_of(market: &Market) -> [Pubkey; pump_amm::READ_LEN] {
     let k = MigrationKeys::of(&market.mint, &market.token_program);
     let mut keys = pump_amm::read_keys(market);
@@ -797,6 +797,8 @@ mod tests {
                 PUMP_AMM_GLOBAL_CONFIG,
                 PUMP_AMM_FEE_CONFIG,
                 k.boost_vault_ata,
+                // M6R-1: the LP mint `create_pool` derives for the pool.
+                pump_amm::lp_mint(&k.pool),
             ];
             assert_eq!(pamm_read_keys_of(&m), want, "empty cache: derived");
             pump_amm::precompute(&mut m, &Pubkey::new_unique()).unwrap();

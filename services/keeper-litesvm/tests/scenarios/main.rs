@@ -17,7 +17,9 @@
 //! and the exit at the warm-up's gate, a graduation with a position liquidated on the pool, the
 //! V1-9 fallback), `pamm` (M6: the keeper on PumpSwap — a listing warmed up and a pump liquidated
 //! with the keeper's PumpSwap lists, `disable_flags` reported, the existence requirement's accounts
-//! created) and `wipe` (M6: duty 6's post-wipe transaction on PumpSwap and the curve with the venue
+//! created), `pamm_lp` (M6R-1, the owner's decision of 2026-09-30: duty 2's per-second
+//! liquidity-anomaly coverage against a withdraw drag on a PumpSwap pool with third-party LP, and
+//! none on a market without positions) and `wipe` (M6: duty 6's post-wipe transaction on PumpSwap and the curve with the venue
 //! cashback claims, the market reopening; duty 13's `sweep_trader` and weekly cashback claim).
 //! Every keeper transaction runs the harness's invariant hooks after every instruction
 //! (`shortwin_keeper_litesvm`).
@@ -42,6 +44,7 @@ mod freeze;
 mod graduation;
 mod liquidate;
 mod pamm;
+mod pamm_lp;
 mod pool_select;
 mod priority;
 mod raydium;

@@ -1,0 +1,166 @@
+## 1. M6-SEC-1: one low in a graduation's warm-up second
+
+ECON §10.1's graduation rows (migration 2 s after the completion, the keeper cranking every second): in the
+k-th second after the transition (k = 1: the first post-change bucket) the attacker sends [sell to f x the
+pool's spot, crank_price, buy back] next to the keeper's crank, so that bucket's low is f x the price.  As built
+the warm-up seed is the lowest post-change bucket low (bounded upward only), so one such low sets P_ema for the
+rest of the warm-up and the EMA leg then climbs back at most one v0.4.1 step (x7/6) a second; with M6-SEC-1
+the seed also falls by at most one step (x11/12) per integration.  Cells: the exit (seconds after the
+completion, price), lenders' tokens back + SOL; the attacker's round trip (SOL, fees at the pool's tier).
+
+| market | scenario | attack | M6 as built (#104) | #105 | attacker round trip (SOL) |
+|---|---|---|---|---|---|
+| D@80% | graduation gap (1 buy completes curve) | none (honest) | liquidation +12s @2.58x; 100% + 0.1434 | liquidation +12s @2.58x; 100% + 0.1434 | - |
+| D@80% | graduation gap (1 buy completes curve) | low at 0.5x in second 1 | liquidation +23s @2.61x; 100% + 0.1463 | liquidation +23s @2.61x; 100% + 0.1463 | 0.628 |
+| D@80% | graduation gap (1 buy completes curve) | low at 0.5x in second 4 | liquidation +23s @2.61x; 100% + 0.1463 | liquidation +22s @2.61x; 100% + 0.1463 | 0.628 |
+| D@80% | graduation gap (1 buy completes curve) | low at 0.5x in second 8 | liquidation +23s @2.61x; 100% + 0.1463 | liquidation +14s @2.58x; 100% + 0.1449 | 0.628 |
+| D@80% | graduation gap (1 buy completes curve) | low at 0.25x in second 1 | liquidation +28s @2.61x; 100% + 0.1463 | liquidation +28s @2.61x; 100% + 0.1463 | 1.077 |
+| D@80% | graduation gap (1 buy completes curve) | low at 0.25x in second 4 | liquidation +28s @2.61x; 100% + 0.1463 | liquidation +22s @2.61x; 100% + 0.1463 | 1.077 |
+| D@80% | graduation gap (1 buy completes curve) | low at 0.25x in second 8 | liquidation +28s @2.61x; 100% + 0.1463 | liquidation +14s @2.58x; 100% + 0.1449 | 1.077 |
+| D@90% | graduation, then +3x on AMM over 60s | none (honest) | liquidation +52s @2.74x; 100% + 0.1878 | liquidation +52s @2.74x; 100% + 0.1878 | - |
+| D@90% | graduation, then +3x on AMM over 60s | low at 0.5x in second 1 | liquidation +52s @2.74x; 100% + 0.1879 | liquidation +52s @2.74x; 100% + 0.1879 | 0.628 |
+| D@90% | graduation, then +3x on AMM over 60s | low at 0.5x in second 4 | liquidation +52s @2.74x; 100% + 0.1879 | liquidation +52s @2.74x; 100% + 0.1879 | 0.628 |
+| D@90% | graduation, then +3x on AMM over 60s | low at 0.5x in second 8 | liquidation +52s @2.74x; 100% + 0.1879 | liquidation +52s @2.74x; 100% + 0.1879 | 0.628 |
+| D@90% | graduation, then +3x on AMM over 60s | low at 0.25x in second 1 | liquidation +52s @2.74x; 100% + 0.1879 | liquidation +52s @2.74x; 100% + 0.1879 | 1.077 |
+| D@90% | graduation, then +3x on AMM over 60s | low at 0.25x in second 4 | liquidation +52s @2.74x; 100% + 0.1879 | liquidation +52s @2.74x; 100% + 0.1879 | 1.077 |
+| D@90% | graduation, then +3x on AMM over 60s | low at 0.25x in second 8 | liquidation +52s @2.74x; 100% + 0.1879 | liquidation +52s @2.74x; 100% + 0.1879 | 1.077 |
+| D@97% | graduation, then +2x on AMM over 60s | none (honest) | liquidation +87s @2.60x; 100% + 0.2104 | liquidation +87s @2.60x; 100% + 0.2104 | - |
+| D@97% | graduation, then +2x on AMM over 60s | low at 0.5x in second 1 | liquidation +87s @2.60x; 100% + 0.2104 | liquidation +87s @2.60x; 100% + 0.2104 | 0.628 |
+| D@97% | graduation, then +2x on AMM over 60s | low at 0.5x in second 4 | liquidation +87s @2.60x; 100% + 0.2104 | liquidation +87s @2.60x; 100% + 0.2104 | 0.628 |
+| D@97% | graduation, then +2x on AMM over 60s | low at 0.5x in second 8 | liquidation +87s @2.60x; 100% + 0.2104 | liquidation +87s @2.60x; 100% + 0.2104 | 0.628 |
+| D@97% | graduation, then +2x on AMM over 60s | low at 0.25x in second 1 | liquidation +87s @2.60x; 100% + 0.2104 | liquidation +87s @2.60x; 100% + 0.2104 | 1.077 |
+| D@97% | graduation, then +2x on AMM over 60s | low at 0.25x in second 4 | liquidation +87s @2.60x; 100% + 0.2104 | liquidation +87s @2.60x; 100% + 0.2104 | 1.077 |
+| D@97% | graduation, then +2x on AMM over 60s | low at 0.25x in second 8 | liquidation +87s @2.60x; 100% + 0.2104 | liquidation +87s @2.60x; 100% + 0.2104 | 1.077 |
+
+The seed at the gate (P_ema / the pool's spot at the 8th warm-up integration; no position exit), a low of f x
+in the first post-change second, and a genuine dump of the pool to f x (held) right after the transition:
+
+| market | move | M6 as built (#104) | #105 |
+|---|---|---|---|
+| D@80% | low at 0.5x in second 1 | 0.500 (gate +9 s) | 0.500 (gate +9 s) |
+| D@80% | low at 0.25x in second 1 | 0.250 (gate +9 s) | 0.256 (gate +9 s) |
+| D@80% | low at 0.1x in second 1 | 0.100 (gate +9 s) | 0.256 (gate +9 s) |
+| D@80% | genuine dump to 0.5x from second 1 | 1.000 (gate +9 s) | 1.000 (gate +9 s) |
+| D@80% | genuine dump to 0.25x from second 1 | 1.000 (gate +9 s) | 1.034 (gate +9 s) |
+| D@97% | low at 0.5x in second 1 | 0.500 (gate +9 s) | 0.500 (gate +9 s) |
+| D@97% | low at 0.25x in second 1 | 0.250 (gate +9 s) | 0.413 (gate +9 s) |
+| D@97% | low at 0.1x in second 1 | 0.100 (gate +9 s) | 0.413 (gate +9 s) |
+| D@97% | genuine dump to 0.5x from second 1 | 1.000 (gate +9 s) | 1.000 (gate +9 s) |
+| D@97% | genuine dump to 0.25x from second 1 | 1.000 (gate +9 s) | 1.670 (gate +9 s) |
+
+The genuine dump, positions at the cap held on (nothing may be forced: the spot leg reads the live price):
+
+| market | move | M6 as built (#104) | #105 |
+|---|---|---|---|
+| D@80% | completion, then a genuine dump to 0.5x from the first post-change second | open; P_ema/P at the end 1.000 | open; P_ema/P at the end 1.000 |
+| D@80% | completion, then a genuine dump to 0.25x from the first post-change second | open; P_ema/P at the end 1.000 | open; P_ema/P at the end 1.000 |
+| D@97% | completion, then a genuine dump to 0.5x from the first post-change second | open; P_ema/P at the end 1.000 | open; P_ema/P at the end 1.000 |
+| D@97% | completion, then a genuine dump to 0.25x from the first post-change second | open; P_ema/P at the end 1.000 | open; P_ema/P at the end 1.000 |
+
+## 2. M6R-1 at the graduation: a deposit between migrate_v2 and the transition
+
+The attacker sends [migrate_v2, deposit k x the new pool, crank_price] (the transition reads the inflated
+lp_supply as its anchor: L_slow = min(the curve's L_slow, anchor)), then withdraws.  As built L_slow keeps the
+curve's value, ~1.35x the pool's depth, and decays at tau_slow = 1 h; with M6R-1 the first PumpSwap observation
+caps it at the pool's locked depth D (the burned creation LP).  Cells: L_slow / sqrt(X*(Y + VQR)) at the
+transition second, 1 s, 9 s (the gate), 900 s and 3600 s after it; the cap q/X of an open 900 s after the
+transition (the boost window; the boost is spent by then).
+
+| market | move | rule | L_slow / depth at +0 / +1 / +9 / +900 / +3600 s | open cap q/X at +900 s |
+|---|---|---|---|---|
+| D@80% | none (honest) | M6 as built (#104) | 1.000 / 1.000 / 1.000 / 1.000 / 1.000 | 1.489 % |
+| D@80% | none (honest) | #105 | 1.000 / 1.000 / 1.000 / 1.000 / 1.000 | 1.489 % |
+| D@80% | deposit 1x, withdrawn in the same second | M6 as built (#104) | 1.353 / 1.353 / 1.352 / 1.275 / 1.130 | 1.489 % |
+| D@80% | deposit 1x, withdrawn in the same second | #105 | 1.000 / 1.000 / 1.000 / 1.000 / 1.000 | 1.489 % |
+| D@80% | deposit 3x, withdrawn in the same second | M6 as built (#104) | 1.353 / 1.353 / 1.352 / 1.275 / 1.130 | 1.489 % |
+| D@80% | deposit 3x, withdrawn in the same second | #105 | 1.000 / 1.000 / 1.000 / 1.000 / 1.000 | 1.489 % |
+| D@80% | deposit 3x, held 60 s | M6 as built (#104) | 0.338 / 0.338 / 0.340 / 1.331 / 1.157 | 1.489 % |
+| D@80% | deposit 3x, held 60 s | #105 | 0.250 / 0.250 / 0.252 / 1.056 / 1.026 | 1.489 % |
+
+The carried positions' exits under the same deposit (ECON §10.1 rows; the keeper cranking every second):
+
+| market | scenario | move | M6 as built (#104) | #105 |
+|---|---|---|---|---|
+| D@80% | graduation gap (1 buy completes curve) | none (honest) | liquidation +12s @2.58x; 100% + 0.1434 | liquidation +12s @2.58x; 100% + 0.1434 |
+| D@80% | graduation gap (1 buy completes curve) | deposit 3x, withdrawn in the same second | liquidation +11s @2.55x; 100% + 0.1410 | liquidation +11s @2.55x; 100% + 0.1421 |
+| D@90% | graduation, then +2x on AMM over 60s | none (honest) | liquidation +60s @2.60x; 100% + 0.1780 | liquidation +60s @2.60x; 100% + 0.1780 |
+| D@90% | graduation, then +2x on AMM over 60s | deposit 3x, withdrawn in the same second | liquidation +60s @2.60x; 100% + 0.1767 | liquidation +60s @2.60x; 100% + 0.1780 |
+| D@97% | graduation, then +2x on AMM over 60s | none (honest) | liquidation +87s @2.60x; 100% + 0.2104 | liquidation +87s @2.60x; 100% + 0.2104 |
+| D@97% | graduation, then +2x on AMM over 60s | deposit 3x, withdrawn in the same second | liquidation +87s @2.60x; 100% + 0.2089 | liquidation +87s @2.60x; 100% + 0.2104 |
+
+## 3. M6R-1 in steady state on a PumpSwap pool (market C: the fresh graduate after its boost, Tier C)
+
+(a) A deposit of k x the pool held for H and pulled in the second a genuine 3x/120 s pump starts (the keeper on
+its coverage duties, #101 keeper).  L_ema and L_slow follow the deeper pool while it is held; the exit reference
+L_b = max(L_live, min(max(L_ema', L_slow), cap)) then credits the pulled depth unless the cap floor(D*1e4/
+lambda_min) binds.  Cells: the exit (seconds after the pump starts, price); L_b / the pool's depth at the pump's
+first second.
+
+| deposit | held | M6 as built (#104) | #105 |
+|---|---|---|---|
+| none | 600 s | liquidation +73 s @2.22x; L_b/depth 1.00 | liquidation +73 s @2.22x; L_b/depth 1.00 |
+| 1x the pool | 600 s | liquidation +73 s @2.22x; L_b/depth 2.00 | liquidation +73 s @2.22x; L_b/depth 2.00 |
+| 1x the pool | 3600 s | liquidation +73 s @2.22x; L_b/depth 2.00 | liquidation +73 s @2.22x; L_b/depth 2.00 |
+| 3x the pool | 600 s | liquidation +73 s @2.22x; L_b/depth 3.99 | liquidation +73 s @2.22x; L_b/depth 2.00 |
+| 3x the pool | 3600 s | open; L_b/depth 4.00 | liquidation +73 s @2.22x; L_b/depth 2.00 |
+| 7x the pool | 3600 s | open; L_b/depth 8.00 | liquidation +73 s @2.22x; L_b/depth 2.00 |
+
+(b), (c) An open at the cap after the deposit was held for H (still in during the open), or wrapped around the
+open alone; every third-party LP unit then leaves.  Cells: the position's q / X of the pool after the
+withdrawal (the honest open: 1x); a deposit wrapped around the open inflates nothing (the minimum drops X_now,
+and L_slow, D and the ring's EMA state do not move within the transaction), a held one pushes L_slow, which
+the D term bounds at lambda/lambda_min of the burned LP's depth:
+
+| deposit | held / wrapped | M6 as built (#104) | #105 |
+|---|---|---|---|
+| 3x the pool | wrapped around the open | 2.470 % (1.00x) | 2.470 % (1.00x) |
+| 1x the pool | held 3600 s | 4.019 % (1.63x) | 4.019 % (1.63x) |
+| 3x the pool | held 3600 s | 7.087 % (2.87x) | 4.939 % (2.00x) |
+| 7x the pool | held 3600 s | 13.137 % (5.32x) | 4.939 % (2.00x) |
+| 3x the pool | held 14400 s | 9.737 % (3.94x) | 4.939 % (2.00x) |
+| 7x the pool | held 14400 s | 19.422 % (7.86x) | 4.939 % (2.00x) |
+
+(d) FITS-2 on PumpSwap: C's pool with as much third-party LP again (lambda 50 %), which the attacker holds; a
+position at a fraction of the cap; flat 30 s, then a genuine pump to a hold level just below the honest
+threshold (healthy at the pool's depth).  From its first second the attacker sends [withdraw all, crank_price,
+deposit] (the withdraw drag: its attacker-only seconds pull L_ema to D) and [withdraw all, liquidate, deposit]
+every second.  The liquidation spot leg at L_live (#100) or at max(L_live, L_ema') (FITS-2 (a), #101), each
+with the #99 keeper (per second only near a threshold, else every 30 s) or the #101 keeper (FITS-2 (b): per
+second for 10 s after a foreign bucket liquidity, extended while it recurs); every column with #105's D rules.
+Cells: the attacked outcome at each hold level (the honest keeper leaves every one of them open):
+
+| size (of the cap) | honest threshold | hold | spot leg at L_live, #99 keeper (#100) | spot leg at max(L_live, L_ema'), #99 keeper | spot leg at L_live, #101 keeper | spot leg at max(L_live, L_ema'), #101 keeper (as adopted) |
+|---|---|---|---|---|---|---|
+| 0.5 | 2.040x | 2.035x | liquidation +69 s by the attacker @2.035x | liquidation +69 s by the attacker @2.035x | open | open |
+| 0.5 | 2.040x | 2.030x | liquidation +70 s by the attacker @2.030x | liquidation +70 s by the attacker @2.030x | open | open |
+| 0.5 | 2.040x | 2.020x | liquidation +73 s by the attacker @2.020x | liquidation +73 s by the attacker @2.020x | open | open |
+| 0.5 | 2.040x | 2.000x | open | open | open | open |
+| 0.25 | 2.022x | 2.017x | liquidation +73 s by the attacker @2.017x | liquidation +73 s by the attacker @2.017x | open | open |
+| 0.25 | 2.022x | 2.012x | liquidation +75 s by the attacker @2.012x | liquidation +75 s by the attacker @2.012x | open | open |
+| 0.25 | 2.022x | 2.002x | liquidation +107 s by the attacker @2.002x | liquidation +107 s by the attacker @2.002x | open | open |
+| 0.25 | 2.022x | 1.982x | open | open | open | open |
+
+(e) M6D-1: (b)'s held deposit sizes the open, then leaves at a genuine pump.  An LP deposits k x the pool
+and holds it 1 h (a crank every 30 s); a position of `size` x the cap is opened on the deepened pool (sized
+on the held deposit: X0's D term allows lambda/lambda_min of the burned LP's depth, 2x at lambda_min 50 %);
+in the next second a genuine pump to top x over 120 s starts and the LP withdraws every third-party unit in
+its first second (or keeps it: the control).  L_slow (tau 1 h) still credits the deposit, so the reference
+L_b stays at the cap floor(D*1e4/lambda_min) while the pool is back at D; the #101 keeper tries every
+covered second.  Cells: the exit (seconds after the pump starts, price); q / the honest cap; the lenders'
+P&L against Q's value at the exit's spot; the borrower's share of V.
+
+| deposit (third-party share) | held, then | pump | size (of the cap) | M6 as built (#104) | #105 | sizing at D on PumpSwap (OWNER-M6D-1 (a), analysis) |
+|---|---|---|---|---|---|---|
+| none | - | 5x / 120 s | 0.95 | liquidation +41 s @2.37x; q 0.95x; lenders +4.2 % of Q; borrower 18 % of V | liquidation +41 s @2.37x; q 0.95x; lenders +4.2 % of Q; borrower 18 % of V | liquidation +41 s @2.37x; q 0.95x; lenders +4.2 % of Q; borrower 18 % of V |
+| 3x the pool (75 %) | kept (control) | 5x / 120 s | 0.95 | liquidation +40 s @2.33x; q 2.73x; lenders +4.2 % of Q; borrower 18 % of V | liquidation +40 s @2.33x; q 1.90x; lenders +4.1 % of Q; borrower 17 % of V | liquidation +39 s @2.30x; q 0.95x; lenders +4.1 % of Q; borrower 18 % of V |
+| 3x the pool (75 %) | pulled at the pump | 3x / 120 s | 0.95 | S1 +153 s @3.00x; q 2.73x; lenders +5.3 % of Q; borrower 0 % of V | S1 +157 s @3.00x; q 1.90x; lenders +3.7 % of Q; borrower 0 % of V | liquidation +67 s @2.12x; q 0.95x; lenders +4.1 % of Q; borrower 23 % of V |
+| 3x the pool (75 %) | pulled at the pump | 5x / 120 s | 0.95 | S1 +100 s @4.33x; q 2.73x; lenders -27.1 % of Q; borrower 0 % of V | S1 +102 s @4.40x; q 1.90x; lenders -29.3 % of Q; borrower 0 % of V | liquidation +38 s @2.27x; q 0.95x; lenders +4.1 % of Q; borrower 17 % of V |
+| 3x the pool (75 %) | pulled at the pump | 10x / 120 s | 0.95 | S1 +70 s @6.25x; q 2.73x; lenders -49.5 % of Q; borrower 0 % of V | S1 +71 s @6.33x; q 1.90x; lenders -50.8 % of Q; borrower 0 % of V | liquidation +21 s @2.58x; q 0.95x; lenders +4.2 % of Q; borrower 5 % of V |
+| 3x the pool (75 %) | pulled at the pump | 5x / 120 s | 0.75 | S1 +101 s @4.37x; q 2.15x; lenders -28.4 % of Q; borrower 0 % of V | S1 +102 s @4.40x; q 1.50x; lenders -29.8 % of Q; borrower 0 % of V | liquidation +38 s @2.27x; q 0.75x; lenders +4.1 % of Q; borrower 17 % of V |
+| 3x the pool (75 %) | pulled at the pump | 5x / 120 s | 0.5 | S1 +102 s @4.40x; q 1.43x; lenders -29.9 % of Q; borrower 0 % of V | liquidation +38 s @2.27x; q 1.00x; lenders +4.1 % of Q; borrower 17 % of V | liquidation +38 s @2.27x; q 0.50x; lenders +4.1 % of Q; borrower 18 % of V |
+| 7x the pool (88 %) | pulled at the pump | 5x / 120 s | 0.95 | S1 +76 s @3.53x; q 5.05x; lenders -10.5 % of Q; borrower 0 % of V | S1 +100 s @4.33x; q 1.90x; lenders -29.5 % of Q; borrower 0 % of V | liquidation +37 s @2.23x; q 0.95x; lenders +4.1 % of Q; borrower 18 % of V |
+| 1x the pool (50 %) | pulled at the pump | 5x / 120 s | 0.95 | S1 +105 s @4.50x; q 1.55x; lenders -29.3 % of Q; borrower 0 % of V | S1 +105 s @4.50x; q 1.55x; lenders -29.3 % of Q; borrower 0 % of V | liquidation +39 s @2.30x; q 0.95x; lenders +4.2 % of Q; borrower 17 % of V |
+| 0.5x the pool (33 %) | pulled at the pump | 5x / 120 s | 0.95 | liquidation +40 s @2.33x; q 1.25x; lenders +4.2 % of Q; borrower 17 % of V | liquidation +40 s @2.33x; q 1.25x; lenders +4.2 % of Q; borrower 17 % of V | liquidation +39 s @2.30x; q 0.95x; lenders +4.2 % of Q; borrower 18 % of V |
+| 0.25x the pool (20 %) | pulled at the pump | 5x / 120 s | 0.95 | liquidation +40 s @2.33x; q 1.10x; lenders +4.2 % of Q; borrower 18 % of V | liquidation +40 s @2.33x; q 1.10x; lenders +4.2 % of Q; borrower 18 % of V | liquidation +40 s @2.33x; q 0.95x; lenders +4.2 % of Q; borrower 18 % of V |
+| 0.075x the pool (7 %) | pulled at the pump | 5x / 120 s | 0.95 | liquidation +41 s @2.37x; q 0.99x; lenders +4.2 % of Q; borrower 17 % of V | liquidation +41 s @2.37x; q 0.99x; lenders +4.2 % of Q; borrower 17 % of V | liquidation +40 s @2.33x; q 0.95x; lenders +4.2 % of Q; borrower 18 % of V |
+

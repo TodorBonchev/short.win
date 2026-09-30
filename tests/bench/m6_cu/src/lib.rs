@@ -496,13 +496,14 @@ pub fn borrower(env: &mut Env, n: u8) -> Borrower {
 }
 
 /// A position size inside every default cap on `p` now: 1 % of the base reserve, capped at
-/// ≈ 10 SOL of notional (`market_max_notional` = 25 SOL), at least ≈ 0.2 SOL (the `pamm_it`
-/// size).
+/// ≈ 8 SOL of notional (`market_max_notional` = 25 SOL), at least ≈ 0.2 SOL. (10 SOL until M6R-1:
+/// on the `mature` pool, whose third-party LP puts its locked depth at 92.98 % of `√k`, `X₀` is
+/// `0.93·X`, and a wallet's two 10-SOL positions exceed its wallet cap.)
 pub fn q_for(env: &Env, p: &PammPool) -> u64 {
     let r = p.reserves(&env.svm).expect("reserves");
     let base = u128::from(r.base);
     let y = r.effective_quote.max(1);
-    let by_notional = base * u128::from(10 * SOL) / y;
+    let by_notional = base * u128::from(8 * SOL) / y;
     let q = (base / 100).min(by_notional);
     u64::try_from(q).expect("u64")
 }

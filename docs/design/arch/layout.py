@@ -1,4 +1,8 @@
-"""ARCH v0.4.1 account layouts (as built through M5; #99 max_q_hwm and #100 min_open_fee_ppm PROPOSED; M5-SEC-6 derived keys): explicit, no implicit padding, every field align <= 8 (PodU128/PodI128 = [u8;16])."""
+"""ARCH v0.4.1 account layouts (as built through M6; #99 max_q_hwm and #100 min_open_fee_ppm PROPOSED; M5-SEC-6 derived keys): explicit, no implicit padding, every field align <= 8 (PodU128/PodI128 = [u8;16]).
+
+M6 and the owner's decisions of 2026-09-30 (ARCH changelog 56, ECON #105) change no layout: `pool_d` holds a
+Raydium pool's locked depth and, on PumpSwap, the canonical pool's burned-LP depth `D` (refreshed by every
+executable observation from the LP mint's supply; 0 at the transition); M6-SEC-1, M6-SEC-3 and M6R-4 add no field."""
 import sys
 SZ = {"u8":1,"u16":2,"u32":4,"u64":8,"i64":8,"Pubkey":32,"PodU128":16,"PodI128":16}
 AL = {"u8":1,"u16":2,"u32":4,"u64":8,"i64":8,"Pubkey":1,"PodU128":1,"PodI128":1}

@@ -31,17 +31,21 @@
 //!    and `R_eff ≥ pool_min_real_sol` (`PoolTooThin`; `R_eff` bounded by the locked depth over
 //!    `λ_min`, ARCH §2.6 rule 5). PumpSwap (M6): `disable_flags == 0` (`VenueFlagged`; A24 —
 //!    the T-DISABLE buy bit already made the venue not executable, `NoRoute`) and the warm-up
-//!    after a graduation or a price start over (`EmaWarmingUp`; the Raydium rule, flagged: ARCH
-//!    §3.4 names it for Raydium). A curve that completed (or migrated) since the last observation
-//!    moves the market in the prologue's venue sync (ARCH §2.5): the open refuses
-//!    `VenueMigrating` (`NoRoute` if it went `None`), and nothing of it is kept.
+//!    after a graduation or a price start over (`EmaWarmingUp`; the Raydium rule, kept by the
+//!    owner on 2026-09-30, OWNER-M6R-2). The curve (M6-SEC-3, owner decision of 2026-09-30):
+//!    PumpSwap's `disable_flags` bit 0 (`create_pool`, hence `migrate_v2`) clear
+//!    (`GraduationHalted`; C6 of its ReadSet, no extra account). A curve that completed (or
+//!    migrated) since the last observation moves the market in the prologue's venue sync (ARCH
+//!    §2.5): the open refuses `VenueMigrating` (`NoRoute` if it went `None`), and nothing of it is
+//!    kept.
 //! 4. Open guards: `now ≥ created_at + market_warmup_s` (`MarketWarmingUp`); `|P_spot/P_ema − 1|
 //!    ≤ open_ema_dev_bps` (`PriceDeviatesFromEma`); `P_ema ≤ P_OPEN_MAX` (`PriceAboveOpenMax`);
 //!    PumpSwap's boost gate (`BoostInProgress`: the boost vault above `boost_dust_lamports`
 //!    before `graduated_at + boost_window_s`; A13).
 //! 5. Tier (`engine::tier::assign`), cached on the market.
-//! 6. Caps (`engine::caps::check_open`; on Raydium the conservative reserve `X₀` is also
-//!    bounded by the locked depth `pool_d` over `λ_min`; on the curve `X₀` and the Tier D
+//! 6. Caps (`engine::caps::check_open`; on Raydium and — since M6R-1, owner decision of
+//!    2026-09-30 — PumpSwap the conservative reserve `X₀` is also bounded by the locked depth
+//!    `pool_d` over `λ_min` (PumpSwap: the burned LP's depth); on the curve `X₀` and the Tier D
 //!    guard's `rT` are the live ones bounded by the curve at `P_ema`, M5-SEC-3 — ARCH §4.6 said
 //!    the live `vT` and `rT`, which a sale in the same transaction lifts):
 //!    position impact and
@@ -310,6 +314,23 @@ pub fn handler<'info>(
             require!(pool.disable_flags == 0, ShortwinError::VenueFlagged);
             require!(market.ema_warm == 0, ShortwinError::EmaWarmingUp);
         }
+        if kind == VenueKind::PumpCurve {
+            // M6-SEC-3 (owner decision of 2026-09-30; ARCH §3.4 step 3): no curve open while
+            // PumpSwap's `create_pool` is halted (`disable_flags` bit 0, T-DISABLE; C6 of the
+            // curve's ReadSet): pump's `migrate_v2` creates the canonical pool through it, so a
+            // curve that completes under it cannot graduate. Positions already open are
+            // unaffected (no exit reads the bit). An executable curve always has its pricing
+            // inputs (C6 parsed), so a missing view here refuses as not executable.
+            let pricing = state
+                .curve
+                .as_ref()
+                .and_then(|c| c.pricing.as_ref())
+                .ok_or(ShortwinError::NoRoute)?;
+            require!(
+                pricing.pool_disable_flags & venues::pump_amm::PAMM_CREATE_POOL_DISABLED_BIT == 0,
+                ShortwinError::GraduationHalted
+            );
+        }
 
         // Step 4: open guards (the post-roll EMA; the pre-trade spot).
         let warm = market
@@ -351,7 +372,7 @@ pub fn handler<'info>(
                 l_slow: market.liq_slow.get(),
                 p_ema,
                 raydium_lock: kind
-                    .is_raydium()
+                    .has_locked_depth()
                     .then(|| (market.pool_d.get(), config.params.pool_lock_min_bps)),
                 phi_ppm: state.fee_ppm,
                 tokens_free: pro.pool.tokens_free,

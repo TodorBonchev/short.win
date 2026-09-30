@@ -634,16 +634,21 @@ attacker's round-trip cost (engine P).
 | f | attacker | M4 as built | M4R |
 |---|---|---|---|
 | 4x | none | adopted; P_ema/P 3.99; 15.0 SOL locked; cost 0.00 SOL | not adopted (refused 310, cancelled 0); cost 0.00 SOL |
-| 4x | pump-wrapped recording proposal | adopted; P_ema/P 3.99; 15.0 SOL locked; cost 0.04 SOL | adopted; P_ema/P 3.99 -> 1.00; 15.0 SOL locked; cost 0.04 SOL |
-| 4x | none; the dump comes 5 s INTO the window (M4X-3) | adopted; P_ema/P 3.99; 15.0 SOL locked; cost 0.00 SOL | adopted; P_ema/P 3.99 -> 1.00; 15.0 SOL locked; cost 0.00 SOL |
+| 4x | pump-wrapped recording proposal | adopted; P_ema/P 3.99; 15.0 SOL locked; cost 0.04 SOL | adopted; P_ema/P 3.99 -> 1.86; 15.0 SOL locked; cost 0.04 SOL |
+| 4x | none; the dump comes 5 s INTO the window (M4X-3) | adopted; P_ema/P 3.99; 15.0 SOL locked; cost 0.00 SOL | adopted; P_ema/P 3.99 -> 1.86; 15.0 SOL locked; cost 0.00 SOL |
 | 16x | none | adopted; P_ema/P 15.97; 7.5 SOL locked; cost 0.00 SOL | not adopted (refused 310, cancelled 0); cost 0.00 SOL |
-| 16x | pump-wrapped recording proposal | adopted; P_ema/P 15.97; 7.5 SOL locked; cost 0.03 SOL | adopted; P_ema/P 15.97 -> 1.00; 7.5 SOL locked; cost 0.03 SOL |
-| 16x | none; the dump comes 5 s INTO the window (M4X-3) | adopted; P_ema/P 15.97; 7.5 SOL locked; cost 0.00 SOL | adopted; P_ema/P 15.97 -> 1.00; 7.5 SOL locked; cost 0.00 SOL |
+| 16x | pump-wrapped recording proposal | adopted; P_ema/P 15.97; 7.5 SOL locked; cost 0.03 SOL | adopted; P_ema/P 15.97 -> 7.44; 7.5 SOL locked; cost 0.03 SOL |
+| 16x | none; the dump comes 5 s INTO the window (M4X-3) | adopted; P_ema/P 15.97; 7.5 SOL locked; cost 0.00 SOL | adopted; P_ema/P 15.97 -> 7.44; 7.5 SOL locked; cost 0.00 SOL |
 
 A dump inside the 60-s window (after the proposal that opened it) is judged only by the execution, at
-P_ema (M4X-3): adopted under both rules; the warm-up then re-seeds P_ema at the live price (opens and
-tiers see the pool as it is).  A re-check at the execution against P_cand would either revert (and hold
-every other proposal, M4V-4) or cancel (and let a dump-wrapped execution cancel windows until S3).
+P_ema (M4X-3): adopted under both rules.  The warm-up then lowers P_ema towards the live price -- since
+M6-SEC-1 (#105) by at most one v0.4.1 step per integration, so at the gate P_ema is still 1.86x / 7.44x
+the pool after a 4x / 16x dump (the M4R column; 1.00x before #105), and the steady-state EMA follows
+after it.  That is the safe side: no exit is forced (the spot leg reads the live price), and opens wait
+out the adopted pool's listing window (PoolListWindow), by which time P_ema is on the pool, and are then
+refused PoolTooThin (tiers and R_eff see the pool as it is).  A re-check at the execution against P_cand
+would either revert (and hold every other proposal, M4V-4) or cancel (and let a dump-wrapped execution
+cancel windows until S3).
 
 ## 7. Genuine moves (no attacker; honest keeper every second): exits must still happen.
 

@@ -437,9 +437,9 @@ impl Replay {
                 }
                 "obs"
             }
-            // rewrite t g|r l_new
-            // rewrite t g|r l_new | rewrite t R l_new slow_cap (M4R: the anchor, then the
-            // restart marks)
+            // rewrite t g|r l_new | rewrite t R l_new slow_cap (a restart: the anchor, then the
+            // marks — M4R's Raydium adoption, `l_new = ⌊D·10⁴/λ_min⌋ > slow_cap = D`, and since
+            // M6 / ECON #105 the `→ PumpSwap` graduation as built, `l_new = slow_cap = lp_supply`)
             "rewrite" => {
                 let _now: i64 = t.v();
                 let kind = t.s();
@@ -447,10 +447,15 @@ impl Replay {
                 let (k, name) = match kind {
                     "g" => (VenueChange::Graduation, "graduation"),
                     "r" => (VenueChange::Raydium, "raydium"),
-                    "R" => (
-                        VenueChange::RaydiumLocked { slow_cap: t.v() },
-                        "raydium_restart",
-                    ),
+                    "R" => {
+                        let slow_cap: u128 = t.v();
+                        let name = if slow_cap == l_new {
+                            "graduation_restart"
+                        } else {
+                            "raydium_restart"
+                        };
+                        (VenueChange::RaydiumLocked { slow_cap }, name)
+                    }
                     k => panic!("unknown venue change {k}"),
                 };
                 self.obs.rewrite_liquidity(l_new, k).unwrap();
@@ -994,7 +999,15 @@ fn attack_traces_match_sim() {
     assert!(c.waits_s3 >= 20 && c.wide_boxes >= 1_000, "{c:?}");
     assert!(arms(&c, ArmChange::Armed) >= 15, "{c:?}");
     assert!(c.pprime_fee >= 2, "{c:?}");
-    assert!(c.rewrites.len() == 2, "{:?}", c.rewrites);
+    // The venue-change rewrites (A72): the Raydium adoption's restart (M4R) and, since M6 / ECON
+    // #105, the graduation's restart as built (v0.4.1's `g` rewrite no trace emits any more).
+    assert!(
+        c.rewrites.len() == 2
+            && c.rewrites.contains_key("raydium_restart")
+            && c.rewrites.contains_key("graduation_restart"),
+        "{:?}",
+        c.rewrites
+    );
     assert!(c.maxin.get("liq").copied().unwrap_or(0) >= 5, "{c:?}");
     assert!(c.ops.get("state").copied().unwrap_or(0) >= 100, "{c:?}");
     // M4F-1: references on Raydium markets carry the depth cap.

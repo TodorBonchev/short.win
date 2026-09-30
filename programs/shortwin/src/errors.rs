@@ -10,7 +10,8 @@
 //! `EmaWarmingUp` = 6101, "switch only if all fit" `CarriedPositionsTooLarge` = 6102, and FIT-3's
 //! `PositionScanOutOfOrder` = 6103, which is **reserved** since its instruction `refresh_max_q`
 //! was removed with the keeper's refresh duty, before any deployment: `ReservedScanOutOfOrder`
-//! keeps the slot so no later code moves, and nothing returns it).
+//! keeps the slot so no later code moves, and nothing returns it; the owner's M6-SEC-3 decision
+//! of 2026-09-30 appended `GraduationHalted` = 6104).
 //! `tests::codes_are_stable` pins every code.
 
 use anchor_lang::prelude::*;
@@ -296,6 +297,18 @@ pub enum ShortwinError {
     /// the residual). The variant keeps 6103 so no later code is renumbered.
     #[msg("Reserved (6103): unused")]
     ReservedScanOutOfOrder,
+
+    // ---- Appended by M6-SEC-3 (6104; group in brackets) ----
+    /// [Opens] `open_short` on a `PumpCurve` market while PumpSwap's `GlobalConfig.disable_flags`
+    /// bit 0 (`create_pool`) is set, read from the curve ReadSet's C6 (owner decision of
+    /// 2026-09-30, M6-SEC-3; ARCH §3.4 step 3, §3.11, §5.5): the bit halts pAMM `create_pool` and
+    /// with it pump's `migrate_v2` (6017), so a curve that completes while it is set cannot
+    /// graduate and stays `PumpMigrating` (S3). New curve positions are refused until it is
+    /// re-enabled; open positions are unaffected (their exits and settlements never read it).
+    #[msg(
+        "PumpSwap pool creation is disabled (GlobalConfig.disable_flags bit 0), so this curve cannot graduate: new curve positions are refused until it is re-enabled; open positions are unaffected"
+    )]
+    GraduationHalted,
 }
 
 impl From<MathError> for ShortwinError {
@@ -389,6 +402,7 @@ mod tests {
             (ShortwinError::EmaWarmingUp, 6101),
             (ShortwinError::CarriedPositionsTooLarge, 6102),
             (ShortwinError::ReservedScanOutOfOrder, 6103),
+            (ShortwinError::GraduationHalted, 6104),
         ];
         for (e, c) in pins {
             assert_eq!(code(e), c, "{e:?}");

@@ -9,19 +9,24 @@ use shortwin_math::tier::{self, OraclePrice, Tier, TierInputs, TierVenue};
 use crate::state::{GlobalConfig, Market, OracleCache, VenueKind};
 use crate::venues::VenueState;
 
-/// The tier venue of a market (ARCH §4.7): the curve kinds are Tier D; PumpSwap and the mock
-/// (a CPMM stand-in without pool selection, so without a locked-depth bound) price on
-/// `min(R_now, R_slow)`; Raydium adds the locked-depth bound `D / λ_min` (V2-8).
+/// The tier venue of a market (ARCH §4.7): the curve kinds are Tier D; Raydium adds the
+/// locked-depth bound `D / λ_min` to `min(R_now, R_slow)` (V2-8), and PumpSwap — since the
+/// owner's decision of 2026-09-30 (M6R-1; ECON #105) — the same bound on its burned LP's locked
+/// SOL less `max(VQR, 0)` (`D = pool_d`); the mock (a CPMM stand-in without pool selection or LP
+/// accounting, so without a locked depth) prices on `min(R_now, R_slow)` alone.
 pub fn tier_venue(config: &GlobalConfig, market: &Market, kind: VenueKind) -> Option<TierVenue> {
     match kind {
         VenueKind::PumpCurve | VenueKind::PumpMigrating => Some(TierVenue::PumpCurve),
-        VenueKind::PumpSwap => Some(TierVenue::PumpSwap),
+        VenueKind::PumpSwap => Some(TierVenue::PumpSwap {
+            locked_depth: market.pool_d.get(),
+            lambda_min_bps: config.params.pool_lock_min_bps,
+        }),
         VenueKind::RaydiumV4 | VenueKind::RaydiumCpmm => Some(TierVenue::Raydium {
             locked_depth: market.pool_d.get(),
             lambda_min_bps: config.params.pool_lock_min_bps,
         }),
         #[cfg(feature = "test-venue")]
-        VenueKind::Mock => Some(TierVenue::PumpSwap),
+        VenueKind::Mock => Some(TierVenue::Unlocked),
         VenueKind::None => None,
     }
 }
@@ -80,7 +85,8 @@ pub fn assign(
 }
 
 /// `R_eff` of ARCH §4.7 in lamports: `min(R_now, R_slow)`, and on Raydium also
-/// `≤ ⌊⌊D·isqrt(P_ema)/10⁹⌋·10⁴/λ_min_bps⌋` (locked SOL over `λ_min`, V2-8) — half of the tier
+/// `≤ ⌊⌊D·isqrt(P_ema)/10⁹⌋·10⁴/λ_min_bps⌋` (locked SOL over `λ_min`, V2-8; on PumpSwap the
+/// locked SOL less `max(VQR, 0)`, M6R-1) — half of the tier
 /// liquidity `Λ = 2·R_eff` (`tier::liquidity_lamports`, which floors each term exactly as the
 /// tier does). The open gate `R_eff ≥ pool_min_real_sol` of a Raydium market (ARCH §2.6 rule
 /// 5, §3.4 step 3). `None` for a list-only market or the curve (no pool liquidity), or if the

@@ -13,8 +13,9 @@ window_floor_ok):
   * the adoption reads no sample: L_ema and every ring entry's L := the anchor cap = floor(D*1e4/lambda_min),
     L_slow = min(L_slow, D), P_ema and the ring prices carried; ema_warm := 8, ema_guard := 1;
   * each of the next 8 integrations re-seeds, over the post-change entries only, P_ema = min of the bucket
-    price lows and of the largest v0.4.1 step from the previous P_ema (M4X-1: the seed rises no faster than the
-    v0.4.1 EMA can) and L_ema = min(max lhi, floor(lomed(lhi)*(1e4 + C)/1e4)) -- no blend, L_slow untouched;
+    price lows and of the largest v0.4.1 step up from the previous P_ema (M4X-1: the seed rises no faster than
+    the v0.4.1 EMA can), floored at the largest v0.4.1 step down from it (M6-SEC-1, #105: nor falls faster), and
+    L_ema = min(max lhi, floor(lomed(lhi)*(1e4 + C)/1e4)) -- no blend, L_slow untouched;
   * while ema_warm > 0 on an executable venue liquidate / expire fail (EmaWarmingUp), sol_settle evaluates
     nothing and Raydium opens are refused; a halted venue is never gated;
   * while ema_guard = 1 the exit reference reads L_b = max(L_live, min(L_ema, L_mlo), L_slow) and L_slow
@@ -2245,9 +2246,14 @@ def part6():
         row(cells)
     print()
     print("A dump inside the 60-s window (after the proposal that opened it) is judged only by the execution, at")
-    print("P_ema (M4X-3): adopted under both rules; the warm-up then re-seeds P_ema at the live price (opens and")
-    print("tiers see the pool as it is).  A re-check at the execution against P_cand would either revert (and hold")
-    print("every other proposal, M4V-4) or cancel (and let a dump-wrapped execution cancel windows until S3).")
+    print("P_ema (M4X-3): adopted under both rules.  The warm-up then lowers P_ema towards the live price -- since")
+    print("M6-SEC-1 (#105) by at most one v0.4.1 step per integration, so at the gate P_ema is still 1.86x / 7.44x")
+    print("the pool after a 4x / 16x dump (the M4R column; 1.00x before #105), and the steady-state EMA follows")
+    print("after it.  That is the safe side: no exit is forced (the spot leg reads the live price), and opens wait")
+    print("out the adopted pool's listing window (PoolListWindow), by which time P_ema is on the pool, and are then")
+    print("refused PoolTooThin (tiers and R_eff see the pool as it is).  A re-check at the execution against P_cand")
+    print("would either revert (and hold every other proposal, M4V-4) or cancel (and let a dump-wrapped execution")
+    print("cancel windows until S3).")
     print()
 
 

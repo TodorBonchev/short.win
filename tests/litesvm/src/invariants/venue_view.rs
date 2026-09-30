@@ -26,8 +26,10 @@
 //!   (owner, discriminator, bools), is the mint's valid canonical pool (index 0, created by pump's
 //!   pool authority, the market's mint against WSOL, not mayhem) with the vaults the market's
 //!   cache names (base under the mint's program, WSOL under SPL Token, both owned by the pool),
-//!   `GlobalConfig`, `FeeConfig` and the boost vault's ATA parse, `vault + VQR` is a `u64`, both
-//!   reserves non-zero and **`disable_flags` bit 3 clear** (T-DISABLE); pricing `(base vault,
+//!   `GlobalConfig`, `FeeConfig`, the boost vault's ATA and — since M6R-1 — the pool's LP mint
+//!   (SPL Token or Token-2022) parse, `vault + VQR` is a `u64`, both reserves non-zero and
+//!   **`disable_flags` bit 3 clear** (T-DISABLE); the locked depth `D` from `lp_supply` and the LP
+//!   mint's supply on `(base vault, vault + VQR)` (recomputed with integer square roots); pricing `(base vault,
 //!   WSOL vault + VQR)` with `fees::pump_amm` at the mint's live supply; the quotes
 //!   `quote::sol_leg` (ε₁ = 0). `venue_rent`: a pool under 271 bytes grows to 271 on the trade and
 //!   tops its rent up to `minimum_balance(271)` from the trader (R-VEN Update H8).
@@ -65,6 +67,10 @@ pub struct VenueView {
     /// charge: pump's creator-vault top-up to `Rent.minimum_balance(0)` when the curve charges a
     /// creator fee and the vault holds less (R-PUMP U6, Update 2026-09-29; T-RENT). 0 elsewhere.
     pub venue_rent: u64,
+    /// PumpSwap (M6R-1, owner decision of 2026-09-30): the canonical pool's locked depth `D =
+    /// ⌊λ_bps·isqrt(X·(Y + VQR))/10⁴⌋`, `λ_bps = ⌊(Pool.lp_supply − lp_mint.supply)·10⁴/lp_supply⌋`
+    /// (recomputed here from the pool and its LP mint) when executable; `None` elsewhere.
+    pub locked_depth: Option<u128>,
 }
 
 impl VenueView {
@@ -77,6 +83,7 @@ impl VenueView {
         pricing: None,
         curve: None,
         venue_rent: 0,
+        locked_depth: None,
     };
 
     /// `B̂_live(q)`: the exact-out buy of `q` tokens on this state (the curve: up to `rT`).
@@ -156,8 +163,25 @@ fn pump_swap(svm: &LiteSVM, m: &Market) -> Option<VenueView> {
         .get_account(&cache(m, pc::BOOST_VAULT_ATA))
         .map_or(([0u8; 32], Vec::new()), |a| (a.owner.to_bytes(), a.data));
     pump_amm::boost_vault_amount(&bo, &bd, &boost_vault.to_bytes()).ok()?;
+    let lp_acc = svm.get_account(&Pubkey::new_from_array(p.lp_mint))?;
+    if lp_acc.owner != TOKEN_PROGRAM_ID
+        && lp_acc.owner != shortwin::constants::TOKEN_2022_PROGRAM_ID
+    {
+        return None;
+    }
+    let lp_supply = mint::read_base(&lp_acc.owner.to_bytes(), &lp_acc.data)
+        .ok()?
+        .supply;
     let r = p.reserves(base.amount, quote.amount)?;
     let effective = u64::try_from(r.effective_quote).ok()?;
+    // M6R-1: λ_bps and D on the pricing reserves, recomputed (not the program's function).
+    let lam = if p.lp_supply == 0 || lp_supply > p.lp_supply {
+        0
+    } else {
+        u128::from(p.lp_supply - lp_supply) * 10_000 / u128::from(p.lp_supply)
+    };
+    let root = (u128::from(r.base) * u128::from(effective)).isqrt();
+    let locked_depth = lam * root / 10_000;
     let mint_acc = svm.get_account(&m.mint)?;
     let supply = mint::read_base(&mint_acc.owner.to_bytes(), &mint_acc.data)
         .ok()?
@@ -200,6 +224,7 @@ fn pump_swap(svm: &LiteSVM, m: &Market) -> Option<VenueView> {
         pricing: Some(Pricing::PumpSwap(f)),
         curve: None,
         venue_rent,
+        locked_depth: Some(locked_depth),
     })
 }
 
@@ -298,6 +323,7 @@ fn pump_curve(svm: &LiteSVM, m: &Market) -> VenueView {
         pricing: None,
         curve: Some((state, f)),
         venue_rent,
+        locked_depth: None,
     }
 }
 
@@ -322,6 +348,7 @@ fn mock(svm: &LiteSVM, m: &Market) -> VenueView {
         pricing: Some(Pricing::Cpmm { buy: f, sell: f }),
         curve: None,
         venue_rent: 0,
+        locked_depth: None,
     }
 }
 
@@ -404,6 +431,7 @@ fn ray_v4(svm: &LiteSVM, m: &Market) -> Option<VenueView> {
         pricing: Some(Pricing::RayV4(fee)),
         curve: None,
         venue_rent: 0,
+        locked_depth: None,
     })
 }
 
@@ -487,5 +515,6 @@ fn ray_cpmm(svm: &LiteSVM, m: &Market) -> Option<VenueView> {
         pricing: Some(Pricing::Cpmm { buy, sell }),
         curve: None,
         venue_rent: 0,
+        locked_depth: None,
     })
 }

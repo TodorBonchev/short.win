@@ -75,4 +75,4 @@ battery for the scan: 695 runs per value (core, noise +-0.3/1 %, aged)
 | `rate_s2_bps` | 0 | 2 liveness / 32 lender -1 %: A aged pump 3x/60s noise 0.3% s1 U90 -> liquidation; A aged pump 3x/60s noise 0.3% s2 U90 -> liquidation; A aged pump 3x/60s noise 0.3% s3 U90 -> liquidation (+31 more) |
 | `rate_s2_bps` | 1000000 | none |
 | `cr_open_bps` | 0 | (rejected by validate_params: tier A: cr_open >= 20,000 and cr_liq >= 12,500 (SPEC minima)) |
-| `cr_open_bps` | 100000 | 0 liveness / 231 lender -1 %: A gap 2x -> open; A pump 3x/60s -> open; A pump 2x/20s -> open (+228 more) |
+| `cr_open_bps` | 100000 | 13 liveness / 231 lender -1 %: A gap 2x -> open; A pump 3x/60s -> open; A pump 2x/20s -> open (+241 more) |

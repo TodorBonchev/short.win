@@ -139,10 +139,22 @@ fn up(pe: u128, dt: u128, c_bps: u32) -> u128 {
     (pe * 5 + pe * (10_000 + u128::from(c_bps)) / 10_000 * dt) / (5 + dt)
 }
 
-/// The §4.1 seed over bucket extremes `(lo, lhi)`, the price also bounded by `bound` (the
-/// largest v0.4.1 step from the previous `P_ema`, M4X-1).
-fn seed_of(buckets: &[(u128, u128)], c_bps: u32, bound: u128) -> (u128, u128) {
-    let p = buckets.iter().map(|b| b.0).min().unwrap().min(bound);
+/// The largest v0.4.1 price fall (the observation at the lower clamp), recomputed (M6-SEC-1):
+/// `⌊(P·τ + ⌊P·10⁴/(10⁴ + C)⌋·dt)/(τ + dt)⌋`.
+fn down(pe: u128, dt: u128, c_bps: u32) -> u128 {
+    (pe * 5 + pe * 10_000 / (10_000 + u128::from(c_bps)) * dt) / (5 + dt)
+}
+
+/// The §4.1 seed over bucket extremes `(lo, lhi)`, the price clamped to `[lower, bound]` (the
+/// largest v0.4.1 fall and step from the previous `P_ema`, M6-SEC-1 and M4X-1).
+fn seed_of(buckets: &[(u128, u128)], c_bps: u32, lower: u128, bound: u128) -> (u128, u128) {
+    let p = buckets
+        .iter()
+        .map(|b| b.0)
+        .min()
+        .unwrap()
+        .min(bound)
+        .max(lower);
     let mut hs: Vec<u128> = buckets.iter().map(|b| b.1).collect();
     hs.sort_unstable();
     let lomed = hs[(hs.len() - 1) / 2];
@@ -377,18 +389,21 @@ proptest! {
         }
     }
 
-    /// M4R §4.1 (P1–P5): the post-change warm-up seed over random schedules of 8 observed
+    /// M4R §4.1 (P1–P6): the post-change warm-up seed over random schedules of 8 observed
     /// seconds, each with or without an honest observation and with withdraw-, deposit-, pump-
     /// and dump-wrapped samples, after a `P_ema` carried at ¼–4× the pool's price. At every step
-    /// the seed is the §4.1 formula over the post-change buckets, the price bounded by the
-    /// largest v0.4.1 step; (P1) one honest bucket bounds `P_ema ≤ p*`, and a withdraw-wrapped
-    /// sample in a bucket with an honest one changes nothing; (P2) `L_ema ≥ min(H, ⌊D·(10⁴ +
-    /// C)/10⁴⌋)` with one honest bucket; (P3) at most 4 buckets above `H` bound `L_ema ≤ ⌊H·(10⁴
-    /// + C)/10⁴⌋`; (P4) constant honest buckets give `L_ema = H` and `P_ema = min(p*, the bound
-    /// chained 8 times from the carried P_ema)` exactly, and clear the guard at the gate; (P5,
-    /// M4X-1) no step raises `P_ema` above the largest v0.4.1 step from the previous one, so
-    /// the seed stays below the chained bound whatever the samples. `warm` counts down, `L_slow`
-    /// never moves, the guard is never set.
+    /// the seed is the §4.1 formula over the post-change buckets, the price clamped by the
+    /// largest v0.4.1 fall and step; (P1) one honest bucket bounds `P_ema ≤ max(p*, the fall
+    /// chained from the `P_ema` it was integrated on)` from then on (≤ `p*` itself before
+    /// M6-SEC-1), and a withdraw-wrapped sample in a bucket with an honest one changes nothing;
+    /// (P2) `L_ema ≥ min(H, ⌊D·(10⁴ + C)/10⁴⌋)` with one honest bucket; (P3) at most 4 buckets above `H` bound `L_ema ≤ ⌊H·(10⁴ + C)/10⁴⌋`; (P4) constant
+    /// honest buckets give `L_ema = H` and `P_ema` = `p*` clamped step by step between the
+    /// chained fall and step exactly, and clear the guard at the gate; (P5, M4X-1) no step
+    /// raises `P_ema` above the largest v0.4.1 step from the previous one, so the seed stays
+    /// below the chained bound whatever the samples; (P6, M6-SEC-1) no step lowers it below the
+    /// largest v0.4.1 fall, so the seed stays above the chained fall whatever the samples (a
+    /// recorded low moves it one steady step a second). `warm` counts down, `L_slow` never
+    /// moves, the guard is never set.
     #[test]
     fn warm_up_seed_properties(p in 10u128.pow(9)..10u128.pow(27), h in 10u128.pow(6)..10u128.pow(18),
                                pre_bps in 2_500u128..=40_000,
@@ -401,18 +416,32 @@ proptest! {
         let slow = states[0].ema.liq_slow;
         prop_assert!(slow <= d);
         let mut seen = Vec::new();
-        let (mut prev, mut chain) = (p_pre, p_pre);
+        let (mut prev, mut chain, mut chain_down, mut honest_p) = (p_pre, p_pre, p_pre, p_pre);
+        let mut first_honest: Option<u128> = None;
         for (i, o) in states.iter().enumerate() {
             let e = o.ring.newest().unwrap();
             seen.push((e.lo, e.lhi));
             // The first warm-up roll comes 95 s after the last one (dt = Δt_max = 2), then 1 s.
             let dt = if i == 0 { 2 } else { 1 };
-            let bound = up(prev, dt, c_bps);
-            prop_assert_eq!((o.ema.price, o.ema.liq), seed_of(&seen, c_bps, bound), "step {}", i + 1);
+            let (lower, bound) = (down(prev, dt, c_bps), up(prev, dt, c_bps));
+            prop_assert_eq!((o.ema.price, o.ema.liq), seed_of(&seen, c_bps, lower, bound), "step {}", i + 1);
             prop_assert_eq!((e.p, e.l), (o.ema.price, o.ema.liq));
-            // P5.
+            // P5 and P6.
             chain = up(chain, dt, c_bps);
+            chain_down = down(chain_down, dt, c_bps);
             prop_assert!(o.ema.price <= bound && o.ema.price <= chain, "step {}", i + 1);
+            prop_assert!(o.ema.price >= lower && o.ema.price >= chain_down, "step {}", i + 1);
+            honest_p = p.min(up(honest_p, dt, c_bps)).max(down(honest_p, dt, c_bps));
+            // P1: from the first honest bucket on, the fall chained from the P_ema it was
+            // integrated on, or p*, bounds the seed.
+            let (hon, att) = &secs[i];
+            if first_honest.is_none() && (*hon || att.is_empty()) {
+                first_honest = Some(prev);
+            }
+            if let Some(f) = first_honest.as_mut() {
+                *f = down(*f, dt, c_bps);
+                prop_assert!(o.ema.price <= p.max(*f), "P1 at step {}", i + 1);
+            }
             prev = o.ema.price;
             prop_assert_eq!(o.ema.warm, EMA_WARMUP_BUCKETS - 1 - i as u8);
             prop_assert_eq!(o.ema.liq_slow, slow);
@@ -425,7 +454,7 @@ proptest! {
         let c = u128::from(c_bps);
         if honest_any {
             // P1 and P2.
-            prop_assert!(end.ema.price <= p);
+            prop_assert!(end.ema.price <= p.max(first_honest.unwrap()));
             prop_assert!(end.ema.liq >= h.min(d * (10_000 + c) / 10_000));
             let stripped: Vec<(bool, Vec<Sample>)> = secs.iter().map(|(hon, att)| {
                 if *hon || att.is_empty() {
@@ -444,7 +473,7 @@ proptest! {
         }
         // P4.
         if secs.iter().all(|(_, att)| att.is_empty()) {
-            prop_assert_eq!((end.ema.price, end.ema.liq), (p.min(chain), h));
+            prop_assert_eq!((end.ema.price, end.ema.liq), (honest_p, h));
             prop_assert_eq!((end.ema.warm, end.ema.guard), (0, 0));
             prop_assert_eq!(ring_liq_lower_median(&end.ring).unwrap(), h);
         }

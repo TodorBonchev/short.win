@@ -123,6 +123,16 @@ impl VenueKind {
         matches!(self, Self::RaydiumV4 | Self::RaydiumCpmm)
     }
 
+    /// Whether the venue has a locked depth `D` (`Market.pool_d`, refreshed at every executable
+    /// observation) that bounds the size cap's `X₀`, the tier's `R_eff` and the exit reference's
+    /// EMA terms at `D/λ_min` (ARCH §2.6, §3.6, §4.6, §4.7): the Raydium kinds (V2-8, M4F-1) and
+    /// — since the owner's decision of 2026-09-30 (M6R-1, ARCH changelog 56, ECON #105) —
+    /// PumpSwap, whose `D` is the depth of its burned creation LP. Not the curve (no LP) nor the
+    /// mock (no LP accounting).
+    pub const fn has_locked_depth(self) -> bool {
+        matches!(self, Self::RaydiumV4 | Self::RaydiumCpmm | Self::PumpSwap)
+    }
+
     /// Whether the venue runs the Raydium fast-path chain `pool_fail` (ARCH §2.6 rule 3, §3.0
     /// step 8): the Raydium kinds, and the mock as their stand-in.
     pub const fn has_pool_fail_chain(self) -> bool {

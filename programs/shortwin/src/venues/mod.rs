@@ -357,9 +357,10 @@ pub struct VenueState {
     pub pricing: Option<Pricing>,
     /// One-way live fee φ in ppm (ARCH §4.2), 0 when not executable.
     pub fee_ppm: u32,
-    /// Raydium: the pool's locked constant-product depth `D = ⌊λ_bps·isqrt(X·Y)/10⁴⌋` on the
-    /// pricing reserves (ARCH §2.6; `pool_select::locked_depth`); 0 on other venues and when
-    /// not executable.
+    /// Raydium and — since the owner's decision of 2026-09-30 (M6R-1) — PumpSwap: the pool's
+    /// locked constant-product depth `D = ⌊λ_bps·isqrt(X·Y)/10⁴⌋` on the pricing reserves (ARCH
+    /// §2.6; `pool_select::locked_depth`; on PumpSwap `λ_bps` from `Pool.lp_supply` and the LP
+    /// mint P6, `Y` effective: `Y + VQR`); 0 on other venues and when not executable.
     pub locked_depth: u128,
     /// The pump curve (a `PumpCurve` or `PumpMigrating` ReadSet whose curve account parses):
     /// its state, its detection facts and its pricing inputs. `None` elsewhere.
@@ -422,6 +423,10 @@ pub struct CurvePricingInputs {
     pub pool_tiers: Rc<[FeeTier]>,
     /// PumpSwap `GlobalConfig.creator_fee_configurable` (C6 @940).
     pub pool_creator_fee_configurable: bool,
+    /// PumpSwap `GlobalConfig.disable_flags` (C6 @56): bit 0 halts `create_pool` and with it
+    /// pump's `migrate_v2` (T-DISABLE), so curve opens refuse `GraduationHalted` while it is set
+    /// (M6-SEC-3, owner decision of 2026-09-30; `pump_amm::PAMM_CREATE_POOL_DISABLED_BIT`).
+    pub pool_disable_flags: u8,
     /// The curve's creator is the default key: the new pool's coin creator is too, and PumpSwap
     /// charges no creator fee.
     pub coin_creator_is_default: bool,

@@ -222,6 +222,8 @@ export const SHORTWIN_ERROR__EMA_WARMING_UP = 0x17d5; // 6101
 export const SHORTWIN_ERROR__CARRIED_POSITIONS_TOO_LARGE = 0x17d6; // 6102
 /** ReservedScanOutOfOrder: Reserved (6103): unused */
 export const SHORTWIN_ERROR__RESERVED_SCAN_OUT_OF_ORDER = 0x17d7; // 6103
+/** GraduationHalted: PumpSwap pool creation is disabled (GlobalConfig.disable_flags bit 0), so this curve cannot graduate: new curve positions are refused until it is re-enabled; open positions are unaffected */
+export const SHORTWIN_ERROR__GRADUATION_HALTED = 0x17d8; // 6104
 
 export type ShortwinError =
   | typeof SHORTWIN_ERROR__ABOVE_PRO_RATA_ALLOWANCE
@@ -252,6 +254,7 @@ export type ShortwinError =
   | typeof SHORTWIN_ERROR__EMERGENCY_CANNOT_CANCEL
   | typeof SHORTWIN_ERROR__EPOCH_RECORD_MISMATCH
   | typeof SHORTWIN_ERROR__EXIT_BOUND_NOT_MET
+  | typeof SHORTWIN_ERROR__GRADUATION_HALTED
   | typeof SHORTWIN_ERROR__INSUFFICIENT_FREE_INVENTORY
   | typeof SHORTWIN_ERROR__INSUFFICIENT_INVENTORY
   | typeof SHORTWIN_ERROR__INSUFFICIENT_SHARES
@@ -360,6 +363,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [SHORTWIN_ERROR__EMERGENCY_CANNOT_CANCEL]: `Only governance may cancel an authorities or timelock change`,
     [SHORTWIN_ERROR__EPOCH_RECORD_MISMATCH]: `A ShareEpoch record does not match the market or epoch`,
     [SHORTWIN_ERROR__EXIT_BOUND_NOT_MET]: `Live buyback cost exceeds the exit bound`,
+    [SHORTWIN_ERROR__GRADUATION_HALTED]: `PumpSwap pool creation is disabled (GlobalConfig.disable_flags bit 0), so this curve cannot graduate: new curve positions are refused until it is re-enabled; open positions are unaffected`,
     [SHORTWIN_ERROR__INSUFFICIENT_FREE_INVENTORY]: `Insufficient free (unborrowed) inventory`,
     [SHORTWIN_ERROR__INSUFFICIENT_INVENTORY]: `Insufficient pool inventory`,
     [SHORTWIN_ERROR__INSUFFICIENT_SHARES]: `Insufficient shares`,

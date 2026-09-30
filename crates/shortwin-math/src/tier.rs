@@ -162,8 +162,17 @@ impl TierParams {
 pub enum TierVenue {
     /// Pump bonding curve, live or migrating: always Tier D.
     PumpCurve,
-    /// PumpSwap canonical pool.
-    PumpSwap,
+    /// PumpSwap canonical pool, bounded by the locked depth of its burned LP (M6R-1, owner
+    /// decision of 2026-09-30; ECON #105, ARCH §4.7): `D = ⌊λ_bps·isqrt(X·(Y + VQR))/10⁴⌋` with
+    /// `λ_bps` from `Pool.lp_supply` and the LP mint's supply
+    /// ([`pool_select::locked_depth`](crate::pool_select::locked_depth)), less the virtual reserve
+    /// (`R_eff ≤ ⌊max(⌊D·isqrt(P_ema)/10⁹⌋ − max(VQR, 0), 0)·10⁴/λ_min⌋`: real SOL only, Q19).
+    PumpSwap {
+        /// The canonical pool's locked depth `D` (`Market.pool_d`).
+        locked_depth: u128,
+        /// `pool_lock_min_bps` (λ_min).
+        lambda_min_bps: u32,
+    },
     /// Adopted Raydium AMM v4 / CPMM pool, bounded by its locked depth (V2-8):
     /// `D = λ·√(X·Y)` and `pool_lock_min_bps`.
     Raydium {
@@ -172,6 +181,10 @@ pub enum TierVenue {
         /// `pool_lock_min_bps` (λ_min).
         lambda_min_bps: u32,
     },
+    /// A constant-product pool without LP accounting, priced on `min(R_now, R_slow)` alone: the
+    /// program's TEST-ONLY mock venue (a CPMM stand-in without pool selection or a locked depth;
+    /// PumpSwap's tier before M6R-1).
+    Unlocked,
 }
 
 /// The cached Pyth SOL/USD price (`OracleCache`; ADOPTED Q8): USD per SOL is
@@ -198,9 +211,10 @@ pub struct TierInputs {
     /// EMA price, lamports (effective, i.e. incl. VQR on PumpSwap), from
     /// [`quote::reprice`](crate::quote::reprice()) (v0.4.1: `⌈L·isqrt⁺(P)/10⁹⌉`).
     pub y_slow: u128,
-    /// Live `virtual_quote_reserves` (0 on Raydium), lamports.
+    /// Live `max(virtual_quote_reserves, 0)` (0 on Raydium), lamports: subtracted from `R_slow`
+    /// and, on PumpSwap, from the locked SOL (ECON §6.2, #103, #105).
     pub vqr: u64,
-    /// `P_ema`, WAD (for the Raydium locked-depth bound).
+    /// `P_ema`, WAD (for the Raydium and PumpSwap locked-depth bounds).
     pub p_ema: u128,
     /// Current unix time.
     pub now: i64,
@@ -230,29 +244,38 @@ pub fn locked_sol(locked_depth: u128, p_ema: u128) -> u128 {
 /// `R_slow = Y(reprice(L_slow, P_ema)) − VQR` (≥ 0), and on Raydium also
 /// `R_eff ≤ ⌊locked·10⁴/λ_min_bps⌋` with `locked = ⌊D·isqrt(P_ema)/10⁹⌋` ([`locked_sol`];
 /// locked SOL over `λ_min`, V2-8), each term floored separately (ECON §2.1; ARCH §4.7;
-/// v0.3 floored the product once) (ADOPTED Q19; ECON §6.2). `None` for the curve, which
-/// is tiered by venue.
+/// v0.3 floored the product once) (ADOPTED Q19; ECON §6.2). On PumpSwap (M6R-1, ECON #105) the
+/// same bound on the burned LP's locked SOL less the virtual reserve,
+/// `R_eff ≤ ⌊max(locked − VQR, 0)·10⁴/λ_min_bps⌋` (`inp.vqr` is `max(VQR, 0)`): only real SOL
+/// counts (Q19), and a deposit held to push `L_slow` credits at most `λ/λ_min` of `D`. `None` for
+/// the curve, which is tiered by venue.
 ///
 /// Errors: `DivByZero` if `λ_min = 0`.
 pub fn liquidity_lamports(inp: &TierInputs) -> Result<Option<u128>, MathError> {
     let r_slow = inp.y_slow.saturating_sub(u128::from(inp.vqr));
     let mut r_eff = u128::from(inp.r_now).min(r_slow);
-    match inp.venue {
+    let (locked, lambda_min_bps) = match inp.venue {
         TierVenue::PumpCurve => return Ok(None),
-        TierVenue::PumpSwap => {}
+        TierVenue::Unlocked => return Ok(Some(r_eff.saturating_mul(2))),
+        TierVenue::PumpSwap {
+            locked_depth,
+            lambda_min_bps,
+        } => (
+            locked_sol(locked_depth, inp.p_ema).saturating_sub(u128::from(inp.vqr)),
+            lambda_min_bps,
+        ),
         TierVenue::Raydium {
             locked_depth,
             lambda_min_bps,
-        } => {
-            let bound = overflow_to_max(mul_div(
-                locked_sol(locked_depth, inp.p_ema),
-                u128::from(BPS),
-                u128::from(lambda_min_bps),
-                Rounding::Floor,
-            ))?;
-            r_eff = r_eff.min(bound);
-        }
-    }
+        } => (locked_sol(locked_depth, inp.p_ema), lambda_min_bps),
+    };
+    let bound = overflow_to_max(mul_div(
+        locked,
+        u128::from(BPS),
+        u128::from(lambda_min_bps),
+        Rounding::Floor,
+    ))?;
+    r_eff = r_eff.min(bound);
     Ok(Some(r_eff.saturating_mul(2)))
 }
 
@@ -357,7 +380,7 @@ mod tests {
     fn inputs(real_sol: u64, age: i64) -> TierInputs {
         let now = 1_800_000_000;
         TierInputs {
-            venue: TierVenue::PumpSwap,
+            venue: TierVenue::Unlocked,
             r_now: real_sol * SOL,
             y_slow: u128::from(real_sol * SOL),
             vqr: 0,
@@ -443,6 +466,64 @@ mod tests {
         assert_eq!(locked_sol(1_999_999_999, p - 1), 1_999_999_999);
         assert_eq!(locked_sol(u128::MAX, u128::MAX), u128::MAX);
         assert_eq!(locked_sol(5, 0), 0);
+    }
+
+    /// M6R-1 (ECON #105): a PumpSwap pool's tier liquidity is bounded by its burned LP's locked
+    /// SOL less `max(VQR, 0)`, over `λ_min`, each term floored first; a bound past u128
+    /// saturates and never binds; `λ_min = 0` tiers as C.
+    #[test]
+    fn pumpswap_locked_depth_bounds_liquidity() {
+        let mut i = inputs(38_100, AGE_A_S);
+        i.vqr = 100 * SOL;
+        i.y_slow = u128::from(38_200 * SOL);
+        // Locked depth worth 1,100 SOL at P = 1 WAD, less VQR 100 SOL, λ_min 50 % → 2,000 SOL.
+        i.venue = TierVenue::PumpSwap {
+            locked_depth: u128::from(1_100 * SOL),
+            lambda_min_bps: 5_000,
+        };
+        assert_eq!(liquidity_lamports(&i), Ok(Some(u128::from(4_000 * SOL))));
+        assert_eq!(assign(&i), Tier::B);
+        // The same depth on Raydium ignores VQR (0 there anyway): 2,200 SOL.
+        i.venue = TierVenue::Raydium {
+            locked_depth: u128::from(1_100 * SOL),
+            lambda_min_bps: 5_000,
+        };
+        assert_eq!(liquidity_lamports(&i), Ok(Some(u128::from(4_400 * SOL))));
+        // Locked SOL below VQR: no real SOL is locked, Λ = 0 (C).
+        i.venue = TierVenue::PumpSwap {
+            locked_depth: u128::from(99 * SOL),
+            lambda_min_bps: 5_000,
+        };
+        assert_eq!(liquidity_lamports(&i), Ok(Some(0)));
+        assert_eq!(assign(&i), Tier::C);
+        // Idle: a depth far above R_now leaves min(R_now, R_slow).
+        i.venue = TierVenue::PumpSwap {
+            locked_depth: u128::MAX,
+            lambda_min_bps: 2_000,
+        };
+        assert_eq!(
+            liquidity_lamports(&i),
+            Ok(Some(u128::from(2 * 38_100 * SOL)))
+        );
+        i.venue = TierVenue::Unlocked;
+        assert_eq!(
+            liquidity_lamports(&i),
+            Ok(Some(u128::from(2 * 38_100 * SOL)))
+        );
+        i.venue = TierVenue::PumpSwap {
+            locked_depth: 1,
+            lambda_min_bps: 0,
+        };
+        assert_eq!(assign(&i), Tier::C);
+        // Floors: ⌊D·isqrt(P)/10⁹⌋ = 2·10⁹, less VQR 10⁹, then ⌊10⁹·10⁴/3,000⌋.
+        let p = 1_000_000_001u128 * 1_000_000_001;
+        i.p_ema = p;
+        i.vqr = SOL;
+        i.venue = TierVenue::PumpSwap {
+            locked_depth: 1_999_999_999,
+            lambda_min_bps: 3_000,
+        };
+        assert_eq!(liquidity_lamports(&i), Ok(Some(2 * 3_333_333_333)));
     }
 
     /// M0B-S-4 (review): the u128 fast path of the threshold comparison is bit-identical

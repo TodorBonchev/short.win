@@ -10,36 +10,34 @@
 //! pool `×2` / `×3` over 60 s from `TE + 30` with real PumpSwap buys (`amm_ramp_events`), and the
 //! keeper's exits run on the pool. The invariant hooks run after every instruction.
 //!
-//! **To the lamport — against the sim with M6 as built.** ECON §10.1's table predates M6; three
-//! modelled differences separate the program on the fork from the published rows, all of which a
-//! sim run with the program's rules removes exactly (a scratch run, not committed: every constant
-//! below is its output, and the fork reproduces each one — the exit second, the keeper's number of
-//! cranks, the pool's spot at the exit, `B`, `B̂_ref`, `max_in`, the rent, the penalty and its
-//! split, the S1 take, the CRs):
+//! **To the lamport — against the normative sim.** Since ECON #105 (the owner's decisions of
+//! 2026-09-30) `docs/design/sim/shortwin_sim.py` models the graduation as built, and ECON §10.1 is
+//! its as-built table; every constant below is that sim's output, and the fork reproduces each one
+//! — the exit second, the keeper's number of cranks, the pool's spot at the exit, `B`, `B̂_ref`,
+//! `max_in`, the rent, the penalty and its split, the S1 take, the CRs — up to one modelled
+//! difference:
 //!
-//! 1. **The graduation rule** (ARCH §2.5 as built, `venues::pump_amm::graduate`): the sim's
-//!    `_switch_to_pool` carries `P_ema` over with the ring rewritten to the pool's `√(X·Y)` and no
-//!    restart; the program rewrites the ring to the pool's `lp_supply` (the same `√(X·Y)` at
-//!    creation: 4,193,388,282,654 on the D@x pools, equal to the sim's), `L_slow = min(L_slow,
-//!    anchor)`, clears the chains, **marks the post-change restart** (`ema_warm = 8`, `ema_guard =
-//!    1`: keeper exits and settlements wait for eight integrations of the pool's own buckets, the
-//!    warm-up re-seeding `P_ema`), and the transitioning crank records no observation of the pool —
-//!    after the roll of the curve's last bucket (the prologue's order: accrue, roll, sync). Effect:
-//!    D@80 % is liquidated at **+12 s** instead of ECON's +15 s (the warm-up seed reaches the pool's
-//!    price faster than the carried EMA's blend), D@50 % settles S1 at **+52 s** instead of +50 s
-//!    (no settlement is evaluated during the warm-up), D@90 %'s gap row at **+303 s** instead of
-//!    +302 s; every other row's exit second is ECON's.
-//! 2. **`R_min`** (M5's documented difference, `pump_curve_support.rs`): the sim prices a position's
-//!    minimum rent at 80 % utilisation, the program at the pre-open 0 % (`r_min` 323,528 / 499,066 /
-//!    609,255 / 720,630 instead of 1,294,111 / 1,996,263 / 2,437,017 / 2,882,519); where the rent due
-//!    is `R_min` the legs below it move by the difference.
-//! 3. **The boost's rounding on the ELF** (new, [`the_elf_prices_a_boost_chunk_at_one_lamport_less`]):
-//!    `boost_buy_and_burn(b)` moves `b` lamports into the WSOL vault but burns `⌊X·(b − 1)/(Y + b −
-//!    1)⌋` tokens, the sim's `CPPool.boost_tick` `⌊X·b/(Y + b)⌋` (≈ 2,400 tokens more per chunk).
-//!    It moves the pool's spot at the exit by ≤ 7·10⁻⁸ and one row's `B` by 1 lamport. A doc issue
-//!    for the sim (docs not edited).
+//! - **`R_min`** (M5's documented difference, `pump_curve_support.rs`): the sim prices a position's
+//!   minimum rent at 80 % utilisation, the program at the pre-open 0 % (`r_min` 323,528 / 499,066 /
+//!   609,255 / 720,630 instead of 1,294,111 / 1,996,263 / 2,437,017 / 2,882,519); where the rent due
+//!   is `R_min` the legs below it move by the difference.
 //!
-//! | ECON §10.1 row (published) | M6 on the fork (this binary) | Test |
+//! The two differences this binary documented before #105 are gone from the sim: **the graduation
+//! rule** (ARCH §2.5, `venues::pump_amm::graduate`; the sim's `Market._graduate`: the ring rewritten
+//! to the pool's `lp_supply` — 4,193,388,282,654 on the D@x pools —, `L_slow = min(L_slow,
+//! anchor)`, the chains cleared, the post-change restart `(8, 1)`, the transitioning crank
+//! recording nothing, after the roll of the curve's last bucket: D@80 % liquidated at **+12 s**
+//! instead of v0.4.1's +15 s, D@50 % settling S1 at **+52 s** instead of +50 s, D@90 %'s gap row at
+//! **+303 s** instead of +302 s) and **the boost's rounding on the ELF**
+//! ([`the_elf_prices_a_boost_chunk_at_one_lamport_less`]: `boost_buy_and_burn(b)` moves `b` lamports
+//! into the WSOL vault but burns `⌊X·(b − 1)/(Y + b − 1)⌋` tokens, now the sim's `CPPool.boost_tick`
+//! too). The M6R-1 rules (the pool's locked depth from its burned LP: nothing binds on these pools,
+//! whose creation LP is all burned) and M6-SEC-1's fall bound (the seed rises here) change no row;
+//! ★T-SEED-FALL's rows ([`t_seed_fall_a_recorded_low_in_the_warm_up_delays_the_exit_by_the_fall_bound`],
+//! [`t_seed_fall_a_genuine_dump_after_the_graduation_forces_nothing`]) reproduce
+//! `attacks/pumpswap_lp.py` part 1 (+14 / +22 / +28 s).
+//!
+//! | ECON §10.1 row (v0.4.1; the as-built column since #105) | M6 on the fork (this binary) | Test |
 //! |---|---|---|
 //! | D@50% graduation gap — S1 +50 s, 6.39×, lenders 0 % + 2.8738, keeper 0.0391 | S1 **+52 s**, 6.39×, lenders 0 % + 2.8738, keeper 0.0391 | [`d50_graduation_gap_settles_s1`] |
 //! | D@50% then +2x on AMM — S1 +50 s at 8.14× | S1 **+52 s** at **8.33×** (two more ramp seconds), same amounts | [`d50_graduation_then_2x_settles_s1`] |
@@ -583,11 +581,12 @@ fn d97_graduation_then_3x_is_liquidated_on_the_pool() {
 
 // ---- the boost on the ELF -------------------------------------------------------------------
 
-/// The third modelled difference (module docs), on the pool a real `migrate_v2` created from ECON's
+/// The boost's rounding on the ELF (module docs; a modelled difference until ECON #105, the
+/// normative sim's `CPPool.boost_tick` since), on the pool a real `migrate_v2` created from ECON's
 /// D@80 % curve: the pool is the sim's `CPPool.graduate(rQ − pool_migration_fee)` to the lamport
 /// (206.9·10¹² tokens, the WSOL vault `migrated − VQR`, VQR = boost vault = `⌊migrated·2069/10⁴⌋`,
 /// `lp_supply` = the sim's `√(X·Y)`), and each `boost_buy_and_burn(b)` adds `b` to the vault but
-/// burns `⌊X·(b − 1)/(Y + b − 1)⌋` tokens (the sim: `⌊X·b/(Y + b)⌋`), for the sim's chunk
+/// burns `⌊X·(b − 1)/(Y + b − 1)⌋` tokens (v0.4.1's sim: `⌊X·b/(Y + b)⌋`), for the sim's chunk
 /// `⌈vault/40⌉`, an odd size, and dust down to 2 lamports; VQR is constant (R-VEN H9).
 #[test]
 fn the_elf_prices_a_boost_chunk_at_one_lamport_less() {
@@ -633,7 +632,7 @@ fn the_elf_prices_a_boost_chunk_at_one_lamport_less() {
         assert_eq!(burned, x * (bb - 1) / (y + bb - 1), "the ELF: b − 1 priced");
         assert!(
             burned <= x * bb / (y + bb),
-            "the sim burns at least as much"
+            "v0.4.1's sim formula burns at least as much"
         );
         assert_eq!(r1.real_quote - r0.real_quote, b, "b into the vault");
         assert_eq!(
@@ -641,5 +640,82 @@ fn the_elf_prices_a_boost_chunk_at_one_lamport_less() {
             i128::from(vqr),
             "VQR constant"
         );
+    }
+}
+
+// ---- ★T-SEED-FALL (M6-SEC-1, owner decision of 2026-09-30) --------------------------------------
+
+/// ★T-SEED-FALL (ARCH §8.2; ECON §12.12 (12) (a); `attacks/pumpswap_lp.py` part 1): on ECON's D@80 %
+/// gap row an attacker records a low of 0.25× the pool's price in one warm-up second — `[sell,
+/// crank_price, buy back]` next to the keeper's crank — and the warm-up price seed falls by at most
+/// one v0.4.1 step per integration (M6-SEC-1; as built it took the low at once and kept it until the
+/// gate). The carried position is still liquidated on the pool with the lenders whole (their tokens
+/// back plus SOL): a low in the 8th post-change second delays the exit from +12 s to +14 s and in
+/// the 4th to +22 s (as built +28 s either way); in the 1st second the carried seed already lies at
+/// 0.55× the new pool, so the low is reached anyway (+28 s: the disclosed residual, ECON §12.12
+/// residual 17). The attacker's round trip is printed.
+#[test]
+fn t_seed_fall_a_recorded_low_in_the_warm_up_delays_the_exit_by_the_fall_bound() {
+    for (k, want) in SEED_FALL_ROWS {
+        let (mut g, p) = open(&D80);
+        let run = g.run(
+            &p,
+            &GradScenario {
+                low: Some((k, 2_500)),
+                ..GradScenario::gap()
+            },
+        );
+        let Outcome::Liquidated(ev) = &run.r.outcome else {
+            panic!("low in second {k}: {}", run.r.outcome.kind());
+        };
+        eprintln!(
+            "T-SEED-FALL: D@80 % low 0.25x in post-change second {k}: liquidation +{} s @ spot {:?} \
+             (honest +12 s), lenders' SOL {}",
+            run.r.t - TE,
+            run.r.status.spot,
+            ev.penalty_lender + ev.rent
+        );
+        assert_eq!(run.t_grad, Some(T_GRAD));
+        assert_eq!(run.r.t - TE, want, "low in second {k}");
+        assert!(ev.borrower_payout > 0 && ev.penalty_lender > 0);
+    }
+}
+
+/// `(post-change second of the low, the liquidation's second after the completion)` on the fork
+/// (`attacks/pumpswap_lp.py` part 1, #105: +14 / +22 / +28 s).
+const SEED_FALL_ROWS: [(i64, i64); 3] = [(8, 14), (4, 22), (1, 28)];
+
+/// ★T-SEED-FALL, the other side (`attacks/pumpswap_lp.py` part 1, "the genuine dump"): other users
+/// dump the pool to 0.25× in the first post-change second and hold it there. The price seed falls
+/// by one v0.4.1 step per integration, so it lags the dump — and forces nothing: the spot leg reads
+/// the live price, so the carried D@80 % and D@97 % positions (short, and now deep in profit) stay
+/// open, and the steady EMA meets the pool once the boost (360 s) has stopped pushing it.
+#[test]
+fn t_seed_fall_a_genuine_dump_after_the_graduation_forces_nothing() {
+    for mkt in [&D80, &D97] {
+        let (mut g, p) = open(mkt);
+        let run = g.run(
+            &p,
+            &GradScenario {
+                dump: Some(2_500),
+                window: 600,
+                ..GradScenario::gap()
+            },
+        );
+        assert!(
+            matches!(run.r.outcome, Outcome::Open),
+            "{}: {} after a genuine dump",
+            mkt.name,
+            run.r.outcome.kind()
+        );
+        let m = market(&g.s.env, &g.s.pm);
+        let spot = pool_spot(&g.s.env, &g.pam().pool);
+        let ratio = m.ema_price.get() as f64 / spot as f64;
+        eprintln!(
+            "T-SEED-FALL: {} genuine dump to 0.25x: open; P_ema/P at +{} s {ratio:.4}",
+            mkt.name,
+            run.r.t - TE
+        );
+        assert!((0.99..=1.01).contains(&ratio), "{ratio}");
     }
 }

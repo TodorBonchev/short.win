@@ -4,12 +4,13 @@
 //!
 //! | Part | What is checked |
 //! |---|---|
-//! | (a) restart | only an instruction that emits `PoolSwitched` for the market, a Raydium `create_market`, a `→ PumpSwap` graduation of a market with a price (`VenueStateChanged`, M6) or a PumpSwap market's price start (its first observation, M6) raises `ema_warm` (to `EMA_WARMUP_BUCKETS`) or sets `ema_guard`; after such an instruction both are `(8, 1)`; a market created on another venue starts `(0, 0)` |
-//! | (b) countdown and seed | across any other instruction `ema_warm` falls by the number of integrations (0 or 1) while it is positive and stays 0 otherwise; a warm-up integration leaves the newest ring entry and the EMA at the §4.1 seed over the newest `8 − ema_warm_after` entries, `p = min(min lo, the largest v0.4.1 step from the pre-instruction P_ema)` (M4X-1: `observe::price_up_bound`, `dt = min(ts − ema_ts, ema_dtmax_s)`), `l = min(max lhi, ⌊lomed(lhi)·(10⁴ + C)/10⁴⌋)` (recomputed here), with `L_slow` and `slow_ts` unchanged |
+//! | (a) restart | only an instruction that emits `PoolSwitched` for the market, a Raydium `create_market`, a `→ PumpSwap` graduation of a market with a price (`VenueStateChanged`, M6) or a PumpSwap market's price start (its first observation, M6) raises `ema_warm` (to `EMA_WARMUP_BUCKETS`) or sets `ema_guard`; after such an instruction both are `(8, 1)`; a market created on another venue starts `(0, 0)`; a PumpSwap price start writes `L_ema = min(√(X·(Y + VQR)), ⌊D·10⁴/λ_min⌋)` and `L_slow = min(L_ema, D)` on the pre-trade pool, `D` its locked depth (M6R-1, recomputed here) |
+//! | (b) countdown and seed | across any other instruction `ema_warm` falls by the number of integrations (0 or 1) while it is positive and stays 0 otherwise; a warm-up integration leaves the newest ring entry and the EMA at the §4.1 seed over the newest `8 − ema_warm_after` entries, `p = max(min(min lo, the largest v0.4.1 step from the pre-instruction P_ema), the largest v0.4.1 fall from it)` (M4X-1: `observe::price_up_bound`; M6-SEC-1: `observe::price_down_bound`, recomputed here too; `dt = min(ts − ema_ts, ema_dtmax_s)`), `l = min(max lhi, ⌊lomed(lhi)·(10⁴ + C)/10⁴⌋)` (recomputed here), with `slow_ts` unchanged and `L_slow` unchanged — on PumpSwap, or `min(L_slow, pool_d)` (M6R-1) |
+//! | (f) PumpSwap warm-up depth | M6R-1: on a PumpSwap market whose post-instruction `ema_warm > 0` and `pool_d > 0`, `L_slow ≤ pool_d` (every executable observation during the warm-up caps `L_slow` at the locked depth it writes into `pool_d`; the transition writes `pool_d = 0`); across a warm-up instruction `L_slow` only falls, and only to `pool_d` |
 //! | (c) gate | no `Liquidate` or `Expire` event, no `SolSettle` of S1/S2 and no `SettleArmed` / `SettleDisarmed` on a market whose post-instruction `ema_warm ≠ 0` while its venue is executable; no Raydium or PumpSwap `Open` with `ema_warm ≠ 0` |
-//! | (d) guard | `ema_guard` goes 1 → 0 only at an integration with `ema_warm = 0` after it and `L_ema·10⁴ ≤ L_mlo·10,100` (and does so at every such integration); an integration after the warm-up with the guard set never lifts `L_slow` above `max(L_slow before, L_mlo after)` (M4X-2: `L_slow` integrates `min(lobs, L_mlo)`); on a Raydium market, and on any market while the guard is set, `Liquidate.b_ref` / `Expire.b_ref` are the risk quote at `reprice(max(L_live, min(max(L_ema', L_slow), cap)), P_ref)`, `L_ema' = min(L_ema, L_mlo)` while the guard is set, else `L_ema` (V2-14), `cap = ⌊pool_d·10⁴/λ_min⌋` on Raydium, none elsewhere (M4F-1). On the mock, which never restarts, the guard-clear case is the exit predictors' (`liquidate_support`), and the hook tests' synthetic exits there carry arbitrary references |
+//! | (d) guard | `ema_guard` goes 1 → 0 only at an integration with `ema_warm = 0` after it and `L_ema·10⁴ ≤ L_mlo·10,100` (and does so at every such integration); an integration after the warm-up with the guard set never lifts `L_slow` above `max(L_slow before, L_mlo after)` (M4X-2: `L_slow` integrates `min(lobs, L_mlo)`); on a Raydium or PumpSwap market, and on any market while the guard is set, `Liquidate.b_ref` / `Expire.b_ref` are the risk quote at `reprice(max(L_live, min(max(L_ema', L_slow), cap)), P_ref)`, `L_ema' = min(L_ema, L_mlo)` while the guard is set, else `L_ema` (V2-14), `cap = ⌊pool_d·10⁴/λ_min⌋` on Raydium (M4F-1) and — since the owner's decision of 2026-09-30, M6R-1 — PumpSwap, none elsewhere. On the mock, which never restarts, the guard-clear case is the exit predictors' (`liquidate_support`), and the hook tests' synthetic exits there carry arbitrary references |
 //!
-//! | (e) spot leg | FITS-2 (a): every `Liquidate` on an executable Raydium venue is CR-liquidatable, and its spot leg is judged at `max(L_live, L_ema')` — `Liquidate.cr_spot_bps` is `⌊V_eff·10⁴/B̂⌋` of the risk quote `B̂ = B̂(Q; reprice(max(L_live, L_ema'), P_rs))` (recomputed here: `L_live` the pre-trade venue's `√(X·Y)`, `L_ema' = min(L_ema, L_mlo)` while the guard is set, else `L_ema`, `P_rs = min(P_live, lb_lo)` fresh within `ref_max_age_s`, `V_eff = V − R_due`) and it is below the position's `L` — so no liquidation lands on a spot leg that only a drained `L_live` makes true. On the mock the exit predictors (`liquidate_support`, the same rule) check it, and the hook tests' synthetic exits there carry arbitrary figures |
+//! | (e) spot leg | FITS-2 (a): every `Liquidate` on an executable Raydium or (M6R-1) PumpSwap venue is CR-liquidatable, and its spot leg is judged at `max(L_live, L_ema')` — `Liquidate.cr_spot_bps` is `⌊V_eff·10⁴/B̂⌋` of the risk quote `B̂ = B̂(Q; reprice(max(L_live, L_ema'), P_rs))` (recomputed here: `L_live` the pre-trade venue's `√(X·Y)`, `L_ema' = min(L_ema, L_mlo)` while the guard is set, else `L_ema`, `P_rs = min(P_live, lb_lo)` fresh within `ref_max_age_s`, `V_eff = V − R_due`) and it is below the position's `L` — so no liquidation lands on a spot leg that only a drained `L_live` makes true. On the mock the exit predictors (`liquidate_support`, the same rule) check it, and the hook tests' synthetic exits there carry arbitrary figures |
 //!
 //! `L_mlo` is the lower median of the ring's bucket liquidity lows. A market that never saw a
 //! restart has `ema_warm = ema_guard = 0` throughout and integrates exactly as before M4R.
@@ -22,7 +23,7 @@ use shortwin::state::{GlobalConfig, Market, ShortPosition, VenueKind};
 use shortwin_math::bounds;
 use shortwin_math::consts::{EMA_WARMUP_BUCKETS, REF_GUARD_TOL_BPS};
 use shortwin_math::num::{Rounding, mul_div};
-use shortwin_math::observe::{self, Observation, price_up_bound, ring_medians};
+use shortwin_math::observe::{self, Observation, price_down_bound, price_up_bound, ring_medians};
 use shortwin_math::quote::liquidity;
 use shortwin_math::rent;
 use solana_clock::Clock;
@@ -83,10 +84,14 @@ pub fn check_ix(
                     )
                 },
             )?;
+            if started {
+                price_start(svm, mp, &post)?;
+            }
         } else {
             countdown_and_seed(mp, &post)?;
             guard_transition(mp, &post)?;
         }
+        warm_up_depth(mp, &post)?;
         gate(mp, &post, ix)?;
         references(svm, mp, &post, ix)?;
         spot_legs(svm, mp, &post, ix)?;
@@ -111,6 +116,84 @@ fn created(svm: &LiteSVM, c: &MarketCreated) -> Result<(), Violation> {
             c.market, c.venue, m.ema_warm, m.ema_guard
         )
     })
+}
+
+/// `⌊d·10⁴/λ_min⌋` with the config's `pool_lock_min_bps` (0 at `λ_min = 0`), `None` without a
+/// config.
+fn depth_cap(svm: &LiteSVM, d: u128) -> Option<u128> {
+    let config = read::zc::<GlobalConfig>(svm, &crate::pda::config())?;
+    let lam = u128::from(config.params.pool_lock_min_bps);
+    Some(if lam == 0 {
+        0
+    } else {
+        mul_div(d, 10_000, lam, Rounding::Floor).unwrap_or(u128::MAX)
+    })
+}
+
+/// (a) M6R-1: a PumpSwap price start writes `L_ema = min(√(X·(Y + VQR)), ⌊D·10⁴/λ_min⌋)` and — the
+/// warm-up's depth cap in the same prologue — `L_slow = min(L_ema, D)`, on the pool as the
+/// instruction found it (`D` recomputed by the venue view).
+fn price_start(svm: &LiteSVM, mp: &MarketPositions, post: &Market) -> Result<(), Violation> {
+    let market = mp.market;
+    let Some(v) = mp.venue.filter(|v| v.executable) else {
+        return fail(
+            "I18",
+            format!("market {market}: a PumpSwap price start on a pool that cannot execute"),
+        );
+    };
+    let (Some((x, y)), Some(d)) = (v.reserves, v.locked_depth) else {
+        return fail(
+            "I18",
+            format!("market {market}: a PumpSwap price start without reserves or a locked depth"),
+        );
+    };
+    let root = liquidity(u128::from(x), u128::from(y)).unwrap_or(0);
+    let Some(cap) = depth_cap(svm, d) else {
+        return fail("I18", format!("market {market}: no config"));
+    };
+    let l = root.min(cap);
+    ensure(
+        post.ema_liq.get() == l && post.liq_slow.get() == l.min(d) && post.pool_d.get() == d,
+        "I18",
+        || {
+            format!(
+                "market {market}: PumpSwap price start L_ema {} / L_slow {} / pool_d {}, want \
+                 min(√k {root}, ⌊D·10⁴/λ_min⌋ {cap}) = {l} / min(that, D {d}) / D (M6R-1)",
+                post.ema_liq.get(),
+                post.liq_slow.get(),
+                post.pool_d.get()
+            )
+        },
+    )
+}
+
+/// (f) M6R-1: during a PumpSwap warm-up `L_slow` never exceeds a refreshed locked depth, and a
+/// warm-up instruction moves `L_slow` only down to `pool_d`.
+fn warm_up_depth(mp: &MarketPositions, post: &Market) -> Result<(), Violation> {
+    let market = mp.market;
+    let pre = &mp.state;
+    let pumpswap = |m: &Market| m.venue_kind() == Some(VenueKind::PumpSwap);
+    if !pumpswap(post) {
+        return Ok(());
+    }
+    let (slow, d) = (post.liq_slow.get(), post.pool_d.get());
+    ensure(post.ema_warm == 0 || d == 0 || slow <= d, "I18", || {
+        format!(
+            "market {market}: PumpSwap warm-up (ema_warm {}) with L_slow {slow} above the locked \
+             depth pool_d {d} (M6R-1)",
+            post.ema_warm
+        )
+    })?;
+    if pumpswap(pre) && pre.ema_warm > 0 && post.ema_count == pre.ema_count {
+        let before = pre.liq_slow.get();
+        ensure(slow == before || slow == before.min(d), "I18", || {
+            format!(
+                "market {market}: L_slow {before} -> {slow} in a PumpSwap warm-up without an \
+                 integration, want unchanged or min(L_slow, pool_d {d}) (M6R-1)"
+            )
+        })?;
+    }
+    Ok(())
 }
 
 /// The lower median of `vals` (index `⌊(n − 1)/2⌋` of the sorted values).
@@ -157,8 +240,9 @@ fn countdown_and_seed(mp: &MarketPositions, post: &Market) -> Result<(), Violati
             format!("market {market}: a warm-up step left no ring entry"),
         );
     };
-    // M4X-1: the price seed rises no faster than the largest v0.4.1 step from the
-    // pre-instruction P_ema.
+    // M4X-1 / M6-SEC-1: the price seed rises and falls no faster than the largest v0.4.1 step
+    // from the pre-instruction P_ema (both bounds recomputed here as ECON §5.2 states them, and
+    // compared with the math crate's functions).
     let dt = u128::try_from(
         newest
             .ts
@@ -166,8 +250,38 @@ fn countdown_and_seed(mp: &MarketPositions, post: &Market) -> Result<(), Violati
             .clamp(0, i64::from(post.ema_dtmax_s)),
     )
     .unwrap_or(0);
-    let bound = price_up_bound(pre.ema_price.get(), dt, post.ema_clamp_bps).unwrap_or(u128::MAX);
-    let p = ents.iter().map(|e| e.lo).min().unwrap_or(0).min(bound);
+    let (p0, c) = (pre.ema_price.get(), u128::from(post.ema_clamp_bps));
+    let step = |obs: Option<u128>| {
+        obs.and_then(|o| {
+            p0.checked_mul(5)?
+                .checked_add(o.checked_mul(dt)?)?
+                .checked_div(5 + dt)
+        })
+    };
+    let bound = price_up_bound(p0, dt, post.ema_clamp_bps).unwrap_or(u128::MAX);
+    let floor = price_down_bound(p0, dt, post.ema_clamp_bps).unwrap_or(0);
+    let (up_re, down_re) = (
+        step(mul_div(p0, 10_000 + c, 10_000, Rounding::Floor).ok()),
+        step(mul_div(p0, 10_000, 10_000 + c, Rounding::Floor).ok()),
+    );
+    ensure(
+        up_re.is_none_or(|u| u == bound) && down_re.is_none_or(|d| d == floor),
+        "I18",
+        || {
+            format!(
+                "market {market}: the warm-up price bounds from P_ema {p0} over dt {dt}: \
+                 price_up_bound {bound} / price_down_bound {floor}, recomputed {up_re:?} / \
+                 {down_re:?}"
+            )
+        },
+    )?;
+    let p = ents
+        .iter()
+        .map(|e| e.lo)
+        .min()
+        .unwrap_or(0)
+        .min(bound)
+        .max(floor);
     let highs: Vec<u128> = ents.iter().map(|e| e.lhi).collect();
     let max = highs.iter().copied().max().unwrap_or(0);
     let up = mul_div(
@@ -178,11 +292,16 @@ fn countdown_and_seed(mp: &MarketPositions, post: &Market) -> Result<(), Violati
     )
     .unwrap_or(u128::MAX);
     let l = max.min(up);
+    // M6R-1: on PumpSwap the prologue also caps L_slow at the locked depth it refreshed.
+    let slow_ok = post.liq_slow.get() == pre.liq_slow.get()
+        || (post.venue_kind() == Some(VenueKind::PumpSwap)
+            && post.liq_slow.get() == pre.liq_slow.get().min(post.pool_d.get()));
     ensure(
         ents.len() == k
             && (newest.p, newest.l) == (p, l)
             && (obs.ema.price, obs.ema.liq) == (p, l)
-            && (post.liq_slow.get(), post.slow_ts) == (pre.liq_slow.get(), pre.slow_ts),
+            && slow_ok
+            && post.slow_ts == pre.slow_ts,
         "I18",
         || {
             format!(
@@ -294,8 +413,8 @@ fn spot_legs(
 ) -> Result<(), Violation> {
     let market = mp.market;
     // On the mock the exit predictors (`liquidate_support`) check the spot leg, and the hook
-    // tests' synthetic exits there carry arbitrary figures.
-    if !post.venue_kind().is_some_and(VenueKind::is_raydium) {
+    // tests' synthetic exits there carry arbitrary figures. Raydium and (M6R-1) PumpSwap.
+    if !post.venue_kind().is_some_and(VenueKind::has_locked_depth) {
         return Ok(());
     }
     let Some(v) = mp.venue.filter(|v| v.executable) else {
@@ -349,9 +468,10 @@ fn spot_legs(
     Ok(())
 }
 
-/// `B̂_ref` of `pos` at `p_ref` with the (guarded, on Raydium capped) reference liquidity of
-/// `post` and the pre-trade venue `v` (V2-14, M4R, M4F-1). `cap` is `⌊pool_d·10⁴/λ_min⌋` on a
-/// Raydium market (recomputed here from the market's `pool_d` and the config), `None` elsewhere.
+/// `B̂_ref` of `pos` at `p_ref` with the (guarded, on Raydium and PumpSwap capped) reference
+/// liquidity of `post` and the pre-trade venue `v` (V2-14, M4R, M4F-1, M6R-1). `cap` is
+/// `⌊pool_d·10⁴/λ_min⌋` on a Raydium or PumpSwap market (recomputed here from the market's
+/// `pool_d` and the config), `None` elsewhere.
 fn b_ref_of(
     pos: &ShortPosition,
     obs: &Observation,
@@ -389,7 +509,8 @@ fn references(
     let Some(v) = mp.venue.filter(|v| v.executable) else {
         return Ok(());
     };
-    if post.ema_guard == 0 && !post.venue_kind().is_some_and(VenueKind::is_raydium) {
+    let locked = post.venue_kind().is_some_and(VenueKind::has_locked_depth);
+    if post.ema_guard == 0 && !locked {
         return Ok(());
     }
     let obs = post.observation();
@@ -397,18 +518,13 @@ fn references(
         .get_sysvar::<Clock>()
         .unix_timestamp
         .max(mp.state.last_accrual_ts);
-    // M4F-1: on Raydium the EMA terms are capped at ⌊D·10⁴/λ_min⌋, D the locked depth the
-    // exit's prologue refreshed (`pool_d`).
-    let cap = if post.venue_kind().is_some_and(VenueKind::is_raydium) {
-        let Some(config) = read::zc::<GlobalConfig>(svm, &crate::pda::config()) else {
+    // M4F-1 (Raydium), M6R-1 (PumpSwap): the EMA terms are capped at ⌊D·10⁴/λ_min⌋, D the
+    // locked depth the exit's prologue refreshed (`pool_d`).
+    let cap = if locked {
+        let Some(c) = depth_cap(svm, post.pool_d.get()) else {
             return fail("I18", format!("market {market}: no config"));
         };
-        let lam = u128::from(config.params.pool_lock_min_bps);
-        Some(if lam == 0 {
-            0
-        } else {
-            mul_div(post.pool_d.get(), 10_000, lam, Rounding::Floor).unwrap_or(u128::MAX)
-        })
+        Some(c)
     } else {
         None
     };

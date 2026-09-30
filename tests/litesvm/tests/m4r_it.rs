@@ -23,7 +23,7 @@
 //! | `m4r_explore_liquidation_grid` (ignored) | the M4R-1 exploration grid with its knobs `M4R_GRID`, `M4R_SECS`, `M4R_SOL` |
 //! | `m4x1_attacker_only_price_bundles_reach_no_further_than_steady_state` | M4X-1: the warm-up price seed read the lowest post-change bucket low with no step bound, so 8 attacker-only `[buy, crank_price, sell]` bundles seeded `P_ema` at the pump and a `[buy, liquidate, sell]` at the gate liquidated a position at any threshold (margin +50 %: threshold ≈ 3×) while the pool traded flat at 1.00× (+9 s, CPMM and AMM v4 candidates). Now every warm-up step rises by at most the largest v0.4.1 step (`observe::price_up_bound`, checked here step by step: ≈ 2.78× at the 6th integration, 3.24× at the 7th) and the same run stays open for 20 s; the near-threshold run (2.5× bundles, threshold ≈ 2.05×) is steady state's degraded-mode class (O18 residual 1; M4 as built reached it at +7 s): it is still liquidated at the gate, the seed within the bound |
 //! | `m4x2_a_held_deposit_freeze_no_longer_lifts_l_slow` | M4X-2: under the capital deposit freeze (`[deposit 7·LP, crank_price, withdraw]` every second from the adoption) `L_slow` integrated the frozen `L_ema` while the guard was set, reached 2.62× the pool's depth after 900 s, and the unguarded `L_slow` term of `L_b` turned a genuine 4× pump into S1 (lenders −10.056 SOL, borrower 0) instead of a liquidation. Now `L_slow` integrates `min(lobs, L_mlo)` while the guard is set: ≤ 1.0× at the ramp, and the position — the largest the candidate takes (switch only if all fit: q/x ≈ 0.71 %, the size cap's 3.1 % no longer carried) — liquidated with the lenders' `q` bought back; an `L_slow` lifted above the lows is an I18 violation |
-//! | `m4x3_a_dump_inside_the_window_is_adopted_at_p_ema_then_re_seeded` | M4X-3 (a documentation finding): a genuine 4× dump 5 s into the collection window, after the proposal that opened it, is judged only by the execution at `P_ema` and adopted (the docs had claimed any honest dump is refused; disclosed with O18 residual 4); the warm-up then re-seeds `P_ema` at the live price and a new open is refused `PoolTooThin` |
+//! | `m4x3_a_dump_inside_the_window_is_adopted_at_p_ema_then_re_seeded` | M4X-3 (a documentation finding): a genuine 4× dump 5 s into the collection window, after the proposal that opened it, is judged only by the execution at `P_ema` and adopted (the docs had claimed any honest dump is refused; disclosed with O18 residual 4); the warm-up then lowers `P_ema` towards the live price — since M6-SEC-1 by at most one v0.4.1 step per integration, ≈ 1.7× the pool at the gate, on it a minute later —, an open meanwhile waits out the adopted pool's listing window (`PoolListWindow`), and after it a new open is refused `PoolTooThin` |
 //! | `m4f1_a_deposit_freeze_on_a_fitting_carried_position_only_delays_the_liquidation` | M4F-1 (keeper), restated by "switch only if all fit" (owner decision of 2026-09-29): as found, attacker-only `[deposit 7·LP, crank_price, withdraw]` seconds in the keeper's idle cadence cleared the guard, froze `L_ema` at 8× the depth and turned the genuine 4× pump into S1 (lenders −10.056 SOL) on a position of ≈ 3.1 % of the new pool's `X`, which is no longer carried. A position that fits the 320-SOL candidate (95 % of its per-position cap, q/x ≈ 0.71 %) is liquidated in every run — the freeze from the adoption with the shipped keeper (`KeeperModel`: per second while the guard is set; per-slot bursts on prices only, the M4F-1 liquidity bursts reverted; per-second coverage for 10 s after a foreign liquidity on a market with positions, FITS-2 (b)), from +40 s (no burst; the foreign liquidity keeps the keeper per second from the first wrap, so only that one second is the attacker's; `L_b` within the depth cap), and under the finding's cadence — at the control's second (+0 s: the pushes only delay, and here not measurably) |
 //! | `m4f1_the_depth_cap_bounds_the_frozen_reference_at_lambda_over_lambda_min` | M4F-1 (on chain, defense in depth, kept): under the finding's keeper cadence (`L_ema` = `L_mlo` = 8× the depth, the guard cleared) the reference liquidity is capped at `⌊D·10⁴/λ_min⌋`: ≈ 2.0 on the λ 99.78 % candidate, 1.0 on a λ 50 % one; with the carried position within the candidate's caps both pumps are liquidated |
 //! | `m4f1_an_oversized_carried_position_is_not_adopted_and_settles_in_s3` | M4F-1 / M4G-3, restated by "switch only if all fit": the finding's market (a position at the 2,500-SOL incumbent's size cap, 3.12 % of the 320-SOL candidate's `X`, its cap 0.75 %) halts 900 s before the deadline; every proposal of the CPMM candidate and of a 400-SOL AMM v4 sibling is refused `CarriedPositionsTooLarge`, also after an LP's real 7× deposit held in the candidate (`D` does not move); no window opens; at the deadline `sol_settle` settles S3 at fair value on the failed pool: the lenders get `FV(P_ema, L_ema)` in full (10.327 SOL for `q` worth 9.937 at `P_ema`), the borrower the rest; the mark resets at 0 |
@@ -1116,9 +1116,14 @@ fn m4x2_a_held_deposit_freeze_no_longer_lifts_l_slow() {
 /// by the proposals only. A genuine 4× dump 5 s into the collection window — after the keeper's
 /// proposal opened it at the honest price — is judged by the execution at the stale `P_ema` and
 /// adopted: the positions move onto a pool with ≈ 15 SOL of locked SOL at its live price (floor
-/// 25), never looser than M4 as built. The warm-up then re-seeds `P_ema` at the live price, so the
-/// pool is seen as it is: once the new pool's listing window has run, a new open is refused
-/// `PoolTooThin`.
+/// 25), never looser than M4 as built. The warm-up then re-seeds `P_ema` towards the live price —
+/// since M6-SEC-1 (owner decision of 2026-09-30) by at most one v0.4.1 step per integration, so at
+/// the gate the carried `P_ema` still lies above the dumped pool (≈ 1.7×: `(6/7)·(11/12)⁷` of the
+/// carried 4×, then one steady step; as built it read the live price at once) — the safe side: no
+/// exit is forced (the spot leg reads the live price) and the market takes no open: an open at the
+/// gate is refused `PoolListWindow` (the adopted pool's listing window). A minute of steady
+/// integrations then brings `P_ema` onto the pool, so the pool is seen as it is: once the new
+/// pool's listing window has run, a new open is refused `PoolTooThin`.
 #[test]
 fn m4x3_a_dump_inside_the_window_is_adopted_at_p_ema_then_re_seeded() {
     use common::*;
@@ -1152,11 +1157,29 @@ fn m4x3_a_dump_inside_the_window_is_adopted_at_p_ema_then_re_seeded() {
     assert!(!passes_window_floor(&env, &cand, Some(p_ema.min(p_cand))));
     execute_ok(&mut env, &rm.pool, &cand).unwrap_or_else(|_| panic!("cancelled"));
     let rm2 = rm.on_pool(&env.svm, cand);
+    let carried = env.market(&rm.market()).ema_price.get();
     crank_every(&mut env, &rm2, 1, 10);
     let m = env.market(&rm.market());
     assert_eq!(m.ema_warm, 0);
     let ratio = m.ema_price.get() as f64 / p_cand as f64;
-    println!("M4X-3: adopted at P_ema; after the warm-up P_ema/P_live {ratio:.3}");
+    println!(
+        "M4X-3: adopted at P_ema ({:.3}× the pool); after the warm-up P_ema/P_live {ratio:.3}",
+        carried as f64 / p_cand as f64
+    );
+    // M6-SEC-1: eight warm-up integrations fall by at most ×(6/7)·(11/12)⁷ ≈ 0.466 of the carried
+    // P_ema, and the one steady step after the gate by at most ×11/12 more.
+    let fell = m.ema_price.get() as f64 / carried as f64;
+    assert!((0.42..0.47).contains(&fell), "{fell}");
+    assert!(ratio > 1.5, "{ratio}: the seed lags the dump");
+    // An open meanwhile waits out the adopted pool's listing window (`PoolListWindow`, checked
+    // before the spot/EMA deviation the lagging seed would also fail).
+    let mut b1 = env.borrower();
+    let q = q_of(&env, &cand);
+    let (res, _) = env.open(&rm2, &mut b1, q);
+    assert_err(&res, E::PoolListWindow);
+    crank_every(&mut env, &rm2, 1, 60);
+    let ratio = env.market(&rm.market()).ema_price.get() as f64 / p_cand as f64;
+    println!("M4X-3: a minute later P_ema/P_live {ratio:.3}");
     assert!((0.99..=1.01).contains(&ratio), "{ratio}");
     // The listing window of the adopted pool (opens wait `pool_list_window_s`), observed.
     crank_every(&mut env, &rm2, 60, 61);

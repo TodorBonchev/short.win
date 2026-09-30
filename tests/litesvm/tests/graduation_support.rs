@@ -342,6 +342,14 @@ pub struct GradScenario {
     pub ramp: Option<(i64, f64, i64)>,
     pub t_event: i64,
     pub window: i64,
+    /// M6-SEC-1 (`attacks/pumpswap_lp.py` part 1): in the `k`-th second after the transition (`k =
+    /// 1`: the first post-change bucket) an attacker sends `[sell to f_bps/10⁴ × the pool's spot,
+    /// crank_price, buy back]` next to the keeper's crank, so that bucket's low is `f ×` the
+    /// price: `(k, f_bps)`.
+    pub low: Option<(i64, u128)>,
+    /// A genuine dump: other users sell the pool to `f_bps/10⁴ ×` its spot in the first
+    /// post-change second (before the keeper's crank) and it stays there.
+    pub dump: Option<u128>,
 }
 
 impl GradScenario {
@@ -353,6 +361,8 @@ impl GradScenario {
             ramp: None,
             t_event: TE,
             window: 1_800,
+            low: None,
+            dump: None,
         }
     }
 
@@ -517,6 +527,45 @@ impl Grad {
         }
     }
 
+    /// Other users sell the pool (`sell` only, capped as [`Grad::pool_move_to_price`] caps it) to
+    /// `target`; returns the base sold.
+    pub fn pool_sell_to_price(&mut self, target: u128) -> u64 {
+        let pam = self.pam.as_ref().expect("graduated");
+        let p = pam.pool;
+        let (x, y) = pool_xy(&self.s.env, &p);
+        let tx = target_base(x, y, target);
+        if tx <= x {
+            return 0;
+        }
+        let r = p.reserves(&self.s.env.svm).expect("reserves");
+        let vqr = p.state(&self.s.env.svm).virtual_quote_reserves;
+        let mut b = tx - x;
+        if vqr > 0 {
+            b = b.min(x * u128::from(r.real_quote) / vqr.unsigned_abs() * 99 / 100);
+        }
+        let b = u64::try_from(b).expect("u64");
+        let crowd = self.pool_crowd.as_ref().expect("pool crowd");
+        if b > 0 {
+            ok(crowd.sell(&mut self.s.env, &p, b, 0));
+        }
+        b
+    }
+
+    /// M6-SEC-1's attack (`attacks/pumpswap_lp.py` part 1): `[sell to f_bps/10⁴ × the pool's spot,
+    /// crank_price, buy back]` — a low recorded in this second's bucket, the pool restored (up to
+    /// the round trip's fees). Returns the attacker's round-trip cost in lamports.
+    pub fn recorded_low(&mut self, f_bps: u128) -> u64 {
+        let (pool, crank) = (self.pam().pool, crank_price_ix(self.pam()));
+        let spot = pool_spot(&self.s.env, &pool);
+        let crowd = self.pool_crowd.as_ref().expect("pool crowd");
+        let wsol0 = read::token_amount(&self.s.env.svm, &crowd.wsol).unwrap_or(0);
+        let sold = self.pool_sell_to_price(spot * f_bps / 10_000);
+        ok(self.s.env.send(&[crank], &[]));
+        let crowd = self.pool_crowd.as_ref().expect("pool crowd");
+        ok(crowd.buy(&mut self.s.env, &pool, sold, u64::MAX));
+        wsol0.saturating_sub(read::token_amount(&self.s.env.svm, &crowd.wsol).unwrap_or(0))
+    }
+
     /// The post-change warm-up gate (ARCH §3.6 precondition 1b; the sim's `Market.gated`): on an
     /// executable venue with `ema_warm > 0` nothing is liquidatable for a keeper exit.
     pub fn gated(&self, st: &Status) -> bool {
@@ -639,8 +688,19 @@ impl Grad {
             {
                 self.migrate();
             }
+            // The post-change second of the pool (1 = the first bucket after the transition).
+            let k = self.t_grad.map(|g| self.s.env.now() - g);
+            if let (Some(f), Some(1)) = (sc.dump, k) {
+                let spot = pool_spot(&self.s.env, &self.pam().pool);
+                self.pool_sell_to_price(spot * f / 10_000);
+            }
             self.tick_boost();
             self.crank();
+            if let Some((sec, f)) = sc.low
+                && k == Some(sec)
+            {
+                self.recorded_low(f);
+            }
             steps.push(t);
             let st = self.status(p);
             near = self.s.keeper_near(p, &st);

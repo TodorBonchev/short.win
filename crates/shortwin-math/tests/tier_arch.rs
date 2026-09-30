@@ -1,8 +1,10 @@
 //! `tier` against `tests/vectors/quotes/caps.json` (`gen_caps.py`'s `tiers`: an ARCH §4.7
 //! / ECON §6.2–§6.3 v0.4.1 transcription — the sims have no tier function — with
-//! `R_slow = Y(reprice(L_slow, P_ema)) − VQR` from the v0.4.1 sim's own `reprice` and the
-//! Raydium term `⌊⌊D·isqrt(P_ema)/10⁹⌋·10⁴/λ_min_bps⌋`, ECON §2.1), plus properties: the
-//! locked-SOL terms are floored separately, and tiers are monotone in liquidity and age.
+//! `R_slow = Y(reprice(L_slow, P_ema)) − VQR` from the v0.4.1 sim's own `reprice`, the
+//! Raydium term `⌊⌊D·isqrt(P_ema)/10⁹⌋·10⁴/λ_min_bps⌋`, ECON §2.1, and since ECON #105 (M6R-1)
+//! the PumpSwap term `⌊max(⌊D·isqrt(P_ema)/10⁹⌋ − max(VQR, 0), 0)·10⁴/λ_min_bps⌋`), plus
+//! properties: the locked-SOL terms are floored separately, and tiers are monotone in liquidity
+//! and age.
 
 mod common;
 
@@ -43,7 +45,14 @@ struct TierCase {
 fn tier_inputs(c: &TierCase) -> TierInputs {
     let venue = match c.venue.as_str() {
         "curve" => TierVenue::PumpCurve,
-        "pumpswap" => TierVenue::PumpSwap,
+        "pumpswap" => {
+            // M6R-1 (ECON #105): the canonical pool's burned-LP depth.
+            let (d, l) = c.lock.as_ref().expect("pumpswap lock");
+            TierVenue::PumpSwap {
+                locked_depth: d.0,
+                lambda_min_bps: l.0,
+            }
+        }
         "raydium" => {
             let (d, l) = c.lock.as_ref().expect("raydium lock");
             TierVenue::Raydium {
@@ -76,7 +85,7 @@ fn tier_inputs(c: &TierCase) -> TierInputs {
 fn tiers_match_arch() {
     let f: File = common::load_vectors("quotes", "caps.json");
     assert_eq!(f.generator, "gen_caps.py");
-    let mut locked_binds = 0;
+    let (mut locked_binds, mut pumpswap_binds) = (0, 0);
     for (i, c) in f.tiers.iter().enumerate() {
         // R_slow's reserve is the v0.4.1 reprojection of (L_slow, P_ema).
         assert_eq!(
@@ -101,10 +110,13 @@ fn tiers_match_arch() {
             let r = u128::from(c.r_now.0).min(c.y_slow.0.saturating_sub(c.vqr.0.into()));
             if l.0 < 2 * r {
                 locked_binds += 1;
+                pumpswap_binds += usize::from(c.venue == "pumpswap");
             }
         }
     }
     assert!(locked_binds >= 50, "{locked_binds}");
+    // M6R-1: the PumpSwap bound binds on its own rows too.
+    assert!(pumpswap_binds >= 20, "{pumpswap_binds}");
 }
 
 #[test]
@@ -159,6 +171,36 @@ proptest! {
         prop_assert_eq!(BigUint::from(got), (r * 2u8).min(BigUint::from(u128::MAX)));
     }
 
+    /// PumpSwap (M6R-1, ECON #105): `R_eff = min(R_now, R_slow − VQR⁺, ⌊max(⌊D·isqrt(P)/10⁹⌋ −
+    /// VQR⁺, 0)·10⁴/λ_min⌋)` exactly (`VQR⁺` the input `vqr`).
+    #[test]
+    fn pumpswap_liquidity_is_the_econ_form(r_now: u64, y_slow: u128, vqr: u64, d: u128, p: u128,
+                                           lam in 1u32..=10_000) {
+        let inp = TierInputs {
+            venue: TierVenue::PumpSwap { locked_depth: d, lambda_min_bps: lam },
+            r_now,
+            y_slow,
+            vqr,
+            p_ema: p,
+            now: 0,
+            graduated_at: 0,
+            oracle: OraclePrice::default(),
+            oracle_stale_s: 0,
+            theta_a_usd_e6: 0,
+            theta_b_usd_e6: 0,
+        };
+        let v = BigUint::from(vqr);
+        let locked = BigUint::from(d) * BigUint::from(p).sqrt() / 1_000_000_000u32;
+        let locked = locked.min(BigUint::from(u128::MAX));
+        let locked = if locked > v { locked - &v } else { BigUint::from(0u8) };
+        let bound = (locked * 10_000u32 / lam).min(BigUint::from(u128::MAX));
+        let y = BigUint::from(y_slow);
+        let r_slow = if y > v { y - &v } else { BigUint::from(0u8) };
+        let r = BigUint::from(r_now).min(r_slow).min(bound);
+        let got = tier::liquidity_lamports(&inp).unwrap().unwrap();
+        prop_assert_eq!(BigUint::from(got), (r * 2u8).min(BigUint::from(u128::MAX)));
+    }
+
     /// More liquidity or more age never gives a riskier tier (A < B < C), and a stale
     /// oracle always gives C.
     #[test]
@@ -166,7 +208,7 @@ proptest! {
                      more in 0i64..10_000_000, price in 1i64..10i64.pow(12), stale: bool) {
         let now = 1_800_000_000i64;
         let mk = |r: u64, age: i64| TierInputs {
-            venue: TierVenue::PumpSwap,
+            venue: TierVenue::Unlocked,
             r_now: r,
             y_slow: u128::from(r),
             vqr: 0,

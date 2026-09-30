@@ -5,8 +5,11 @@ v0.4.1, default switches (ARCHITECTURE §4.6, §4.7, §9 M0b; ECONOMICS §2.1, �
 Caps (exact, no tolerance): `max_q_impact`, `max_total_q_market` (the sims' integer form
 `X − isqrt(⌊X²·10⁴/(10⁴ + ι)⌋)`, normative since v0.4.1), `Market.oi_cap_q` and the
 fee-scaled caps with the one-way fee in ppm (`⌊x100·φ_ppm·X/(100·10⁶)⌋`),
-`Market.conservative_x` (`isqrt⁺(P_ema)` in both denominators, the Raydium locked-depth
-bound; on the curve the cap reserves at the EMA price, ECONOMICS changelog #103), and
+`Market.conservative_x` (`isqrt⁺(P_ema)` in both denominators, the locked-depth bound on
+Raydium and -- since ECONOMICS changelog #105, M6R-1 -- on a canonical PumpSwap pool, whose `D`
+is its burned LP's depth; the field `raydium_lock` keeps its name and carries `(D, λ_min)`
+wherever `Market.locked_depth_venue()` holds; on the curve the cap reserves at the EMA price,
+ECONOMICS changelog #103), and
 `Market.max_open_q` on every example market of the sim, fresh and after an EMA-lagging price
 path (so `L_slow ≠ L_live`, `P_ema ≠ P_live`). Utilisation is
 `pool_model.Pool.borrow`'s check; the curve-gamma, wallet and notional predicates are
@@ -15,7 +18,10 @@ ECON §6.1 / ARCH §4.6 transcriptions (the sim has no function for them).
 Tiers: the sim has no tier function; `assign` below transcribes ARCHITECTURE §4.7 /
 ECONOMICS §6.2–§6.3 (v0.4.1): `R_slow = Y(reprice(L_slow, P_ema)) − VQR` with the sim's
 own `reprice`, and on Raydium `R_eff ≤ ⌊⌊D·isqrt(P_ema)/10⁹⌋·10⁴/λ_min_bps⌋` (ECON §2.1:
-locked SOL floored first), thresholds compared exactly against the cached SOL/USD price.
+locked SOL floored first); since #105 (M6R-1) on PumpSwap `R_eff ≤ ⌊max(⌊D·isqrt(P_ema)/10⁹⌋ −
+VQR⁺, 0)·10⁴/λ_min_bps⌋` (`VQR⁺ = max(VQR, 0)`: the locked SOL less the virtual reserve, real SOL
+only; the PumpSwap rows' `lock` is drawn from a stream of its own, so every other row keeps its
+draws); thresholds compared exactly against the cached SOL/USD price.
 
 Writes caps.json next to itself.
 """
@@ -119,8 +125,10 @@ def gen_preds(rng):
 
 
 def lock_of(m):
+    """(D, lambda_min) wherever the sim's caps read the locked depth: Raydium and, since #105 (M6R-1), a canonical
+    PumpSwap pool (Market.locked_depth_venue); None on the curve."""
     v = m.venue
-    return [S(v.locked_depth()), S(m.P.pool_lock_min_bps)] if v.kind == "ray" else None
+    return [S(v.locked_depth()), S(m.P.pool_lock_min_bps)] if m.locked_depth_venue() else None
 
 
 def gen_conservative(rng):
@@ -214,11 +222,13 @@ def assign(c):
         return "D", None
     r_slow = max(c["y_slow"] - c["vqr"], 0)
     r_eff = min(c["r_now"], r_slow)
-    if c["venue"] == "raydium":
+    if c["venue"] in ("raydium", "pumpswap"):
         d, lam_min = c["lock"]
         if lam_min == 0:
             return "C", None
         locked = d * math.isqrt(c["p_ema"]) // sim.SQRT_WAD          # ECON §2.1: floor first
+        if c["venue"] == "pumpswap":
+            locked = max(locked - max(c["vqr"], 0), 0)              # #105: less VQR+ (real SOL only, Q19)
         r_eff = min(r_eff, locked * BPS // lam_min)
     lam = 2 * r_eff
     stale = c["now"] - c["publish_time"] > c["oracle_stale_s"]
@@ -273,6 +283,18 @@ def gen_tiers(rng):
             num, den = rng.choice([(1, 2), (9, 10), (1, 1), (1, 1), (2, 1)])
             c["lock"][0] = r_now * lam_min * sim.SQRT_WAD * num // (den * BPS * max(math.isqrt(p_ema), 1)) \
                 + rng.choice([0, 1, 7])
+        if venue == "pumpswap":
+            # #105 (M6R-1): a canonical pool's locked depth, from a stream of its own (the other rows keep their
+            # draws); its locked SOL less VQR over lambda_min around R_now, or far above (the bound idle)
+            lr = random.Random(f"pumpswap-lock-{i}")
+            lam_min = lr.choice([5_000, 2_000, 10_000, 3_000])
+            if lr.random() < 0.7:
+                num, den = lr.choice([(1, 2), (9, 10), (1, 1), (1, 1), (2, 1)])
+                locked = r_now * lam_min * num // (den * BPS) + vqr
+                d = locked * sim.SQRT_WAD // max(math.isqrt(p_ema), 1) + lr.choice([0, 1, 7])
+            else:
+                d = lr.choice([0, lr.randrange(0, 10**16), 2**100])
+            c["lock"] = [d, lam_min]
         tier, lam = assign(c)
         row = {k: (S(v) if isinstance(v, int) and not isinstance(v, bool) else v) for k, v in c.items()}
         if c["lock"] is not None:

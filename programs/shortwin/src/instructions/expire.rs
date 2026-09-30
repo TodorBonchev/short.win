@@ -24,7 +24,8 @@
 //! B̂_ref  = B̂(Q; reprice(max(L_live, min(max(L_ema', L_slow), cap)), P_ref))
 //!                                            (risk quote; L_ema' = min(L_ema, L_mlo) while the
 //!                                             post-change guard is set, M4R; cap =
-//!                                             ⌊pool_d·10⁴/λ_min⌋ on Raydium, none elsewhere, M4F-1)
+//!                                             ⌊pool_d·10⁴/λ_min⌋ on Raydium and PumpSwap,
+//!                                             none elsewhere, M4F-1, M6R-1)
 //! π_ref  = ⌈expiry_fee_bps·B̂_ref/10⁴⌉
 //! max_in = min(⌊B̂_ref·(10⁴ + δ_exp)/10⁴⌋, V − K_s − ert, max(V − R − π_ref − ert, ⌊B̂_ref·(10⁴ + ε)/10⁴⌋))
 //! ```

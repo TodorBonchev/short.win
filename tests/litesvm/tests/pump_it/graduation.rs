@@ -12,8 +12,9 @@
 //! (switch only if all fit; the deepest candidate; the position carried and closed on the new
 //! pool), and the `None →` pump re-detection clears a running window (`fp_*`) and the route chains.
 //! The M6 security review's curve-side findings: M6-SEC-5 (a full wipe settled during the
-//! migration pause waits for the curve-era cashback) and M6-SEC-3 (a curve open under PumpSwap's
-//! `create_pool` halt, pinned as built: an owner item).
+//! migration pause waits for the curve-era cashback) and M6-SEC-3 (decided by the owner on
+//! 2026-09-30: curve opens refuse `GraduationHalted` exactly while PumpSwap's `create_pool` halt is
+//! set; a position opened before it keeps the stalled-graduation path to S3).
 //!
 //! Every instruction goes through `Env::send`: the invariant hooks run after each one. The only
 //! planted state is the venue's (pump's curve account: reserves zeroed as by a migration to
@@ -891,25 +892,61 @@ fn m6_sec_5_without_cashback_the_sweep_alone_unlocks_a_migrating_market() {
     ok(env.send(&[d], &[&lender2]));
 }
 
-/// M6-SEC-3 (OWNER item; pinned as built). PumpSwap's `disable_flags` bit 0 halts `create_pool`
-/// and with it pump's `migrate_v2` (T-DISABLE, R-VEN Update H4). A curve open does not read the
-/// flag, although the curve's ReadSet carries PumpSwap's `GlobalConfig` (C6): with bit 0 set a curve
-/// position still opens, and once the curve completes the market stays `PumpMigrating` — every
-/// `migrate_v2` fails 6017 `DisabledCreatePool`, exits refuse `VenueMigrating`. S3 needs the
-/// position liquidatable or expired (ARCH §5.3): a healthy position is frozen past the 70-min pause
-/// until its deadline, then settles S3 after `s3_wait_s`, paying the lenders FV in SOL instead of
-/// the tokens. PumpSwap opens, by contrast, refuse any non-zero flag (`VenueFlagged`). Whether curve
-/// opens should refuse while bit 0 is set (the check costs no account) or the exposure is disclosed
-/// is the owner's (ARCH §3.4 / §5.5): if the owner adopts the refusal, the open below must fail
-/// `VenueFlagged`.
+/// M6-SEC-3 (owner decision of 2026-09-30; ARCH §3.4 step 3, §3.11, §5.5; SPEC §14): PumpSwap's
+/// `disable_flags` bit 0 halts `create_pool` and with it pump's `migrate_v2` (T-DISABLE, R-VEN
+/// Update H4), so a curve that completes under it cannot graduate. Curve opens read the flag from
+/// the curve ReadSet's C6 (no extra account) and refuse `GraduationHalted` (6104) **exactly while
+/// bit 0 is set**: every other bit leaves them alone (they halt PumpSwap's own instructions, not
+/// the curve), clearing the bit re-enables them, and nothing of a refused open is kept. Positions
+/// already open are unaffected: a close runs under the halt (exits never read the bit). As built
+/// before the decision the open landed (q 1,444,060,820,237, S 0.5476 SOL) and then stalled until
+/// S3 (below).
 #[test]
-fn m6_sec_3_a_curve_open_under_the_create_pool_halt_stalls_until_s3() {
+fn m6_sec_3_curve_opens_are_refused_exactly_while_create_pool_is_halted() {
     let (mut env, pm, q) = setup(PumpCoin::Near);
+    let mut b = env.borrower();
+    for flags in [0x01u8, 0x03, 0x09, 0x19, 0xff] {
+        pamm::set_disable_flags(&mut env.svm, flags);
+        let before = market(&env, &pm);
+        let (res, _) = env.open(&pm, &mut b, q);
+        assert_err(&res, E::GraduationHalted);
+        let after = market(&env, &pm);
+        assert_eq!(
+            (after.open_positions, after.borrowed_q, after.tokens_free),
+            (before.open_positions, before.borrowed_q, before.tokens_free),
+            "flags {flags:#04x}: nothing of the refused open is kept"
+        );
+        env.warp(1);
+    }
+    // Every other bit: the curve open lands (and exits under bit 0 run).
+    pamm::set_disable_flags(&mut env.svm, 0xfe);
+    let (_, nonce, _) = open_ok(&mut env, &pm, &mut b, q);
+    env.warp(1);
     pamm::set_disable_flags(&mut env.svm, 0x01);
-    // As built: the curve open ignores the halt.
+    assert_err(&env.open(&pm, &mut b, q).0, E::GraduationHalted);
+    close_ok(&mut env, &pm, &b, nonce);
+    env.warp(1);
+    // Cleared: opens resume.
+    pamm::set_disable_flags(&mut env.svm, 0x00);
+    let (open, _, _) = open_ok(&mut env, &pm, &mut b, q);
+    assert_eq!(open.venue, VenueKind::PumpCurve as u8);
+    assert_eq!(code(E::GraduationHalted), 6104);
+}
+
+/// M6-SEC-3's remaining exposure (disclosed, ARCH §5.5): a position opened **before** PumpSwap's
+/// `create_pool` halt keeps the stalled-graduation path. Once the curve completes under bit 0 the
+/// market stays `PumpMigrating` — every `migrate_v2` fails 6017 `DisabledCreatePool`, exits refuse
+/// `VenueMigrating`. S3 needs the position liquidatable or expired (ARCH §5.3): a healthy position
+/// is frozen past the 70-min pause until its deadline, then settles S3 after `s3_wait_s`, paying the
+/// lenders FV in SOL instead of the tokens.
+#[test]
+fn m6_sec_3_a_position_opened_before_the_create_pool_halt_stalls_until_s3() {
+    let (mut env, pm, q) = setup(PumpCoin::Near);
     let mut b = env.borrower();
     let (open, nonce, _) = open_ok(&mut env, &pm, &mut b, q);
     env.warp(1);
+    pamm::set_disable_flags(&mut env.svm, 0x01);
+    assert_err(&env.open(&pm, &mut b, q).0, E::GraduationHalted);
     buy_down_to(&mut env, &pm, 0);
     env.warp(1);
     venue_changed(
@@ -951,9 +988,9 @@ fn m6_sec_3_a_curve_open_under_the_create_pool_halt_stalls_until_s3() {
     assert!(at < pos.deadline + i64::from(pos.s3_wait_s) + 60);
     assert_eq!(venue(&env, &pm), VenueKind::PumpMigrating);
     eprintln!(
-        "M6-SEC-3: open q {} (S {} lamports) under the create_pool halt; the curve completed at t0; \
-         migrate_v2 6017 throughout; healthy and frozen through the 70-min pause; S3 at t0 + {} s \
-         (deadline + s3_wait): FV {} lamports, lenders {} lamports in SOL, no tokens back",
+        "M6-SEC-3: open q {} (S {} lamports) before the create_pool halt; the curve completed at \
+         t0; migrate_v2 6017 throughout; healthy and frozen through the 70-min pause; S3 at t0 + \
+         {} s (deadline + s3_wait): FV {} lamports, lenders {} lamports in SOL, no tokens back",
         open.q,
         open.s,
         at - t0,

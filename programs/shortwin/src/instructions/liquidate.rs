@@ -23,10 +23,12 @@
 //!    (`NoRoute`). On a live curve with `q > rT`, `CurveStraddle` (the bundle of ARCH §5.4: the
 //!    risk quotes below price that path, `B̂_str`, but the buy cannot run on the curve).
 //!    **1b** (M4R, **PROPOSED**, owner item O18): the post-change warm-up is over, `ema_warm ==
-//!    0` after the roll (`EmaWarmingUp`): a restart — a Raydium adoption, a listing — wrote an
-//!    anchor, and the next `EMA_WARMUP_BUCKETS` integrations re-seed the EMA from the new pool;
-//!    no exit rests on the anchor or a partial seed. With a keeper cranking every second, exits
-//!    resume at adoption + 9 s.
+//!    0` after the roll (`EmaWarmingUp`): a restart — a Raydium adoption, a listing, a `→
+//!    PumpSwap` graduation or a PumpSwap price start — wrote an anchor, and the next
+//!    `EMA_WARMUP_BUCKETS` integrations re-seed the EMA from the new pool; no exit rests on the
+//!    anchor or a partial seed. With a keeper cranking every second, exits resume at adoption +
+//!    9 s (after a graduation 8–12 s after the migration, accepted by the owner on 2026-09-30,
+//!    OWNER-M6R-4).
 //! 2. A fresh completed bucket, `lb_sec ≥ now − ref_max_age_s` (locked), else
 //!    `ReferenceStale` (the keeper cranks one second and acts the next, ECON §5.4).
 //! 3. `liquidatable := (spot leg ∧ EMA leg) ∨ now ≥ deadline`, else `NotLiquidatable`: the
@@ -44,7 +46,8 @@
 //!    penalty, ECON §8.4; the event says `expired`).
 //! 6. The reference bound (v0.4.1, no reserve; `engine::bounds::{liq_reference,
 //!    max_in_liq}`; `L_b` reads `min(L_ema, L_mlo)` while the post-change reference guard is set,
-//!    M4R, and on Raydium caps its EMA terms at `⌊pool_d·10⁴/λ_min⌋`, M4F-1): `max_in =
+//!    M4R, and on Raydium and PumpSwap caps its EMA terms at `⌊pool_d·10⁴/λ_min⌋`, M4F-1,
+//!    M6R-1): `max_in =
 //!    min(⌊B̂_ref·(10⁴ + δ_liq)/10⁴⌋, V − K_s − ert)`; `B̂_live ≤
 //!    max_in`, else `ExitBoundNotMet` (the position waits; an undefined reference quote waits
 //!    too). Liveness (I11, I-E11): nothing else can refuse a liquidatable, buyback-allowed
@@ -563,8 +566,8 @@ pub(crate) fn keeper_exit<'info>(
         // Precondition 1b (M4R): no keeper exit while the observation state is in its
         // post-change warm-up on this (executable) venue.
         require!(market.ema_warm == 0, ShortwinError::EmaWarmingUp);
-        // M4F-1: on Raydium the reference credits no more depth than sizing (`pool_d` just
-        // refreshed by the prologue over `λ_min`).
+        // M4F-1 (Raydium), M6R-1 (PumpSwap): the reference credits no more depth than sizing
+        // (`pool_d` just refreshed by the prologue over `λ_min`).
         let depth_cap = bounds::ref_depth_cap(&config, &market, kind);
         let plan = plan(which, pos, &market, &state, pro.now, depth_cap)?;
         (

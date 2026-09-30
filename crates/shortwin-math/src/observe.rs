@@ -21,9 +21,10 @@
 //! EMA_WARMUP_BUCKETS`, `Ema.guard = 1`); the next [`EMA_WARMUP_BUCKETS`] integrations re-seed
 //! the EMA from the post-change buckets only, on the side that cannot force an exit
 //! ([`integrate`]'s warm-up branch; the price seed rises no faster than the v0.4.1 EMA can,
-//! M4X-1), and the guard clears once `L_ema` agrees with the ring's liquidity lows; while it is
-//! set, `L_slow` integrates no more than those lows (M4X-2). A state that was never marked
-//! (`warm = guard = 0`) integrates exactly as v0.4.1.
+//! M4X-1, and since the owner's decision of 2026-09-30 falls no faster either, M6-SEC-1), and
+//! the guard clears once `L_ema` agrees with the ring's liquidity lows; while it is set, `L_slow`
+//! integrates no more than those lows (M4X-2). A state that was never marked (`warm = guard =
+//! 0`) integrates exactly as v0.4.1.
 
 use crate::consts::{COVERAGE_GAP_S, EMA_TAU_S, EMA_WARMUP_BUCKETS, REF_GUARD_TOL_BPS};
 use crate::error::MathError;
@@ -491,18 +492,26 @@ pub fn record(bucket: &mut Bucket, now: i64, p: u128, l: u128) -> Result<(), Mat
 /// warm-up integrations pushed — with no blend:
 ///
 /// ```text
-/// P_ema = min(min lo, price_up_bound(P_ema, dt))          (the fresh price, the safe side; M4X-1)
+/// P_ema = max(min(min lo, price_up_bound(P_ema, dt)),    (the fresh price, at most one
+///             price_down_bound(P_ema, dt))                 v0.4.1 step either way; M4X-1,
+///                                                          M6-SEC-1)
 /// L_ema = min(max lhi, ⌊lomed(lhi)·(10⁴+C)/10⁴⌋)          lomed = index ⌊(n−1)/2⌋ of the sorted highs
 /// ring.push(now, P_ema, L_ema, reprice(L_ema, P_ema), b_lo, b_hi, b_llo, b_lhi)
 /// ema_ts = now, count += 1, warm −= 1                     (L_slow and slow_ts unchanged)
 /// ```
 ///
-/// The price seed falls freely but rises per integration by no more than the v0.4.1 step can
-/// ([`price_up_bound`]): attacker-only warm-up seconds reach no higher than the same seconds do in
-/// steady state with a large enough pump, while a genuine move during the halt is tracked at that
-/// rate (M4X-1). A withdraw-wrapped sample lowers only its bucket's `llo`, which the seed never reads;
-/// one honest bucket among them bounds `P_ema` by its low and `L_ema` from below by `min(H, (1 +
-/// C)·D)`; pushing `L_ema` above `(1 + C)·H` needs 5 of the 8 buckets. After either branch, a
+/// The price seed moves per integration by no more than the v0.4.1 step can, up
+/// ([`price_up_bound`]; M4X-1) and down ([`price_down_bound`]; M6-SEC-1, owner decision of
+/// 2026-09-30): attacker-only warm-up seconds reach no higher than the same seconds do in steady
+/// state with a large enough pump, and one deliberately recorded low (a pool pushed down and
+/// restored inside one transaction) pulls the seed down by at most one steady step per remaining
+/// warm-up integration (×11/12 at `dt = 1`, ×6/7 at `dt = 2`, C = 100 %; the low stays in the
+/// running minimum until the gate, ≥ ×0.4986 over 8 integrations) instead of to the low at once;
+/// a genuine move during the halt is tracked at that rate either way. A seed that lags a genuine
+/// fall forces no exit: the spot leg reads the live price. A withdraw-wrapped sample lowers only
+/// its bucket's `llo`, which the seed never reads; one honest bucket among them bounds `L_ema`
+/// from below by `min(H, (1 + C)·D)`, and `P_ema` from above by its low once the seed has fallen
+/// to it; pushing `L_ema` above `(1 + C)·H` needs 5 of the 8 buckets. After either branch, a
 /// set guard with `warm = 0` clears iff `L_ema·10⁴ ≤ L_mlo·(10⁴ + REF_GUARD_TOL_BPS)`, `L_mlo`
 /// the lower median of the ring's bucket liquidity lows after the push (the same value as
 /// [`ring_liq_lower_median`] then); nothing else sets or clears it. While the guard is set, the
@@ -581,6 +590,20 @@ pub fn price_up_bound(p_ema: u128, dt: u128, clamp_bps: u32) -> Result<u128, Mat
     weighted(p_ema, u128::from(EMA_TAU_S), obs, dt)
 }
 
+/// The largest v0.4.1 price **fall** from `p_ema` over `dt` (capped) seconds (M6-SEC-1, owner
+/// decision of 2026-09-30; the mirror of [`price_up_bound`]): the step of [`integrate`] with its
+/// observation at the lower clamp, `⌊(p_ema·τ + ⌊p_ema·10⁴/(10⁴ + C)⌋·dt)/(τ + dt)⌋` — 11/12 at
+/// `dt = 1` and 6/7 at `dt = 2` with C = 100 %. No integration of a confirmed state moves `P_ema`
+/// below it; the warm-up bounds its price seed by it.
+pub fn price_down_bound(p_ema: u128, dt: u128, clamp_bps: u32) -> Result<u128, MathError> {
+    let bps = u128::from(BPS);
+    let den = bps
+        .checked_add(u128::from(clamp_bps))
+        .ok_or(MathError::Overflow)?;
+    let obs = mul_div(p_ema, bps, den, Rounding::Floor)?;
+    weighted(p_ema, u128::from(EMA_TAU_S), obs, dt)
+}
+
 /// The v0.4.1 step of a confirmed state ([`integrate`]): the next EMA and the entry to push.
 /// `l_mlo` is `Some` (the ring's liquidity-low median after the push) iff the guard is set:
 /// `L_slow` then integrates `min(lobs, L_mlo)` (M4X-2).
@@ -621,7 +644,7 @@ fn steady_step(
 
 /// The warm-up step of an unconfirmed state ([`integrate`]; M4R): the seed over this bucket and
 /// the `EMA_WARMUP_BUCKETS − warm` newest (post-change) ring entries, the price bounded by the
-/// largest v0.4.1 step from the current `P_ema` (M4X-1).
+/// largest v0.4.1 step up (M4X-1) and down (M6-SEC-1) from the current `P_ema`.
 fn warm_step(
     ema: &Ema,
     ring: &Ring,
@@ -645,8 +668,11 @@ fn warm_step(
             .get_mut(i.checked_add(1).ok_or(MathError::Overflow)?)
             .ok_or(MathError::InvalidInput)? = e.lhi;
     }
-    // M4X-1: never above the largest v0.4.1 step (a fall is free).
-    let p = p.min(price_up_bound(ema.price, dt, params.clamp_bps)?);
+    // M4X-1: never above the largest v0.4.1 step; M6-SEC-1: never below the largest v0.4.1 fall
+    // (`down ≤ P_ema ≤ up`, so the clamp is well formed).
+    let p = p
+        .min(price_up_bound(ema.price, dt, params.clamp_bps)?)
+        .max(price_down_bound(ema.price, dt, params.clamp_bps)?);
     let n = k.checked_add(1).ok_or(MathError::Overflow)?;
     let highs = highs.get_mut(..n).ok_or(MathError::InvalidInput)?;
     highs.sort_unstable();
@@ -1199,10 +1225,22 @@ mod tests {
         (p * 5 + p * (10_000 + c_bps) / 10_000 * dt) / (5 + dt)
     }
 
-    /// The §4.1 seed over the post-change buckets `(lo, lhi)` at C = `c_bps`, the price bounded
-    /// by `bound`, the largest v0.4.1 step from the current `P_ema` (M4X-1).
-    fn seed(buckets: &[(u128, u128)], c_bps: u128, bound: u128) -> (u128, u128) {
-        let p = buckets.iter().map(|b| b.0).min().unwrap().min(bound);
+    /// The largest v0.4.1 fall (the observation at the lower clamp), recomputed (M6-SEC-1).
+    fn down(p: u128, dt: u128, c_bps: u128) -> u128 {
+        (p * 5 + p * 10_000 / (10_000 + c_bps) * dt) / (5 + dt)
+    }
+
+    /// The §4.1 seed over the post-change buckets `(lo, lhi)` at C = `c_bps`, the price clamped
+    /// to `[lower, bound]`: the largest v0.4.1 fall and step from the current `P_ema` (M6-SEC-1,
+    /// M4X-1).
+    fn seed(buckets: &[(u128, u128)], c_bps: u128, lower: u128, bound: u128) -> (u128, u128) {
+        let p = buckets
+            .iter()
+            .map(|b| b.0)
+            .min()
+            .unwrap()
+            .min(bound)
+            .max(lower);
         let mut h: std::vec::Vec<u128> = buckets.iter().map(|b| b.1).collect();
         h.sort_unstable();
         let lomed = h[(h.len() - 1) / 2];
@@ -1240,9 +1278,10 @@ mod tests {
         assert_eq!((o.ema.warm, o.ema.guard), (0, 0));
     }
 
-    /// The warm-up seed for n = 1..8 post-change buckets: `P_ema = min(min lo, the largest v0.4.1
-    /// step)`, `L_ema = min(max lhi, ⌊lomed(lhi)·(10⁴ + C)/10⁴⌋)`, no blend; `warm` and `count`
-    /// step, `L_slow` and `slow_ts` stay; the ring's `(p, l, x, y)` of the new entry is the seed.
+    /// The warm-up seed for n = 1..8 post-change buckets: `P_ema = max(min(min lo, the largest
+    /// v0.4.1 step), the largest v0.4.1 fall)` (M4X-1, M6-SEC-1), `L_ema = min(max lhi,
+    /// ⌊lomed(lhi)·(10⁴ + C)/10⁴⌋)`, no blend; `warm` and `count` step, `L_slow` and `slow_ts`
+    /// stay; the ring's `(p, l, x, y)` of the new entry is the seed.
     #[test]
     fn warm_up_seeds_from_the_post_change_buckets() {
         let buckets: [(u128, u128, u128, u128); 8] = [
@@ -1260,7 +1299,7 @@ mod tests {
         let (slow, slow_ts, count0) = (o.ema.liq_slow, o.ema.slow_ts, o.ema.count);
         assert_eq!(slow, 800);
         let mut seen = std::vec::Vec::new();
-        let mut bound = 0;
+        let (mut bound, mut floor) = (0, 0);
         for (i, &(lo, hi, llo, lhi)) in buckets.iter().enumerate() {
             let t = 10 + i64::try_from(i).unwrap();
             o.record(t, lo, llo).unwrap();
@@ -1268,9 +1307,12 @@ mod tests {
             let (ts0, p0) = (o.ema.ts, o.ema.price);
             assert_eq!(o.roll(t + 1, &prm).unwrap(), Some(t + 1 - ts0));
             seen.push((lo, lhi));
-            let cap = up(p0, u128::try_from(t + 1 - ts0).unwrap().min(2), 7_000);
-            bound += usize::from(cap < seen.iter().map(|b| b.0).min().unwrap());
-            let (p, l) = seed(&seen, 7_000, cap);
+            let dt = u128::try_from(t + 1 - ts0).unwrap().min(2);
+            let (lower, cap) = (down(p0, dt, 7_000), up(p0, dt, 7_000));
+            let low = seen.iter().map(|b| b.0).min().unwrap();
+            bound += usize::from(cap < low);
+            floor += usize::from(lower > low);
+            let (p, l) = seed(&seen, 7_000, lower, cap);
             assert_eq!((o.ema.price, o.ema.liq), (p, l), "n = {}", i + 1);
             assert_eq!(o.ema.warm, 7 - u8::try_from(i).unwrap());
             assert_eq!(o.ema.count, count0 + 1 + u64::try_from(i).unwrap());
@@ -1284,11 +1326,14 @@ mod tests {
             assert_eq!((e.x, e.y), reprice(l, p).unwrap());
         }
         // Checks of the table: n = 4 reads the 9,000 high only up to ⌊1,000·1.7⌋; the 400 low
-        // (a withdrawal) is never read; at n = 8 five highs are above 1,100. The lows bind the
-        // price (the carried 4.5·WAD is above them): the bound is never reached here.
-        assert_eq!(seed(&seen[..4], 7_000, u128::MAX), (4 * WAD, 1_700));
+        // (a withdrawal) is never read; at n = 8 five highs are above 1,100. The up-bound is never
+        // reached here; the fall bound (M6-SEC-1) holds the seed above the 4·WAD and 3·WAD lows
+        // (≈ ×0.93 per second at C = 70 %).
+        assert_eq!(seed(&seen[..4], 7_000, 0, u128::MAX), (4 * WAD, 1_700));
         assert_eq!(o.ema.liq, 1_050 * 17_000 / 10_000);
         assert_eq!(bound, 0);
+        assert!(floor > 0);
+        assert!(o.ema.price > 3 * WAD);
         // After the warm-up the v0.4.1 step resumes (a blend from the seed).
         let before = o.ema;
         o.record(18, 5 * WAD, 1_000).unwrap();
@@ -1333,8 +1378,9 @@ mod tests {
     /// Eight attacker-only buckets pumped 2.5× (the keeper absent): the seed climbs ×9/7 (the
     /// first roll, `dt = 2`) then ×7/6 until the pump, where the old seed read 2.5× at once; the
     /// v0.4.1 EMA under the attacker's best steady-state pumps (each at `+C` of its `P_ema`)
-    /// reaches at least as high at every step. A lower bucket pulls the seed down at once (a fall
-    /// is free), and the running minimum keeps it for the rest of the warm-up.
+    /// reaches at least as high at every step. M6-SEC-1: a lower bucket pulls the seed down by at
+    /// most the largest v0.4.1 fall per integration (as built it fell to the low at once), and the
+    /// running minimum keeps pulling it until the gate.
     #[test]
     fn warm_up_price_seed_rises_no_faster_than_the_v041_ema() {
         let prm = EmaParams::DEFAULT;
@@ -1364,26 +1410,79 @@ mod tests {
         }
         assert!(p < 5 * WAD / 2 && up(p, 1, 10_000) >= 5 * WAD / 2);
         assert_eq!(o.ema.price, 5 * WAD / 2);
-        // A dump in the warm-up: free fall to the low, kept by the running minimum; after the
-        // gate the v0.4.1 step.
+        // A dump in the warm-up (M6-SEC-1): the seed falls by at most the largest v0.4.1 step
+        // (×6/7 on the first roll, `dt = 2`) and then, the running minimum still reading the dumped
+        // bucket, by ×11/12 a second until it reaches the low; after the gate the v0.4.1 step.
         let mut o = Observation::new(0, 4 * WAD, 1_000).unwrap();
         o.rewrite_liquidity(2_000, VenueChange::RaydiumLocked { slow_cap: 900 })
             .unwrap();
         o.mark_restart();
         o.record(1, WAD, 1_000).unwrap();
         o.roll(2, &prm).unwrap();
-        assert_eq!(o.ema.price, WAD);
+        let mut want = down(4 * WAD, 2, 10_000);
+        assert_eq!(o.ema.price, want);
+        assert_eq!(want, 4 * WAD * 6 / 7);
         for t in 2..9i64 {
             o.record(t, 3 * WAD, 1_000).unwrap();
             o.roll(t + 1, &prm).unwrap();
-            assert_eq!(o.ema.price, WAD);
+            want = down(want, 1, 10_000).max(WAD);
+            assert_eq!(o.ema.price, want, "t = {t}");
         }
         assert_eq!(o.ema.warm, 0);
+        // 4·(6/7)·(11/12)⁷ ≈ 1.87 > 1: the seed never reached the dumped low.
+        assert!(o.ema.price > WAD);
+        let p8 = o.ema.price;
         o.record(9, 3 * WAD, 1_000).unwrap();
         o.roll(10, &prm).unwrap();
-        assert_eq!(o.ema.price, v041(WAD, 3 * WAD, 3 * WAD, 1, 10_000));
+        assert_eq!(o.ema.price, v041(p8, 3 * WAD, 3 * WAD, 1, 10_000));
         assert_eq!(price_up_bound(WAD, 1, 10_000), Ok(WAD * 7 / 6));
         assert_eq!(price_up_bound(7 * WAD, 2, 10_000), Ok(9 * WAD));
+        assert_eq!(price_down_bound(12 * WAD, 1, 10_000), Ok(11 * WAD));
+        assert_eq!(price_down_bound(7 * WAD, 2, 10_000), Ok(6 * WAD));
+    }
+
+    /// M6-SEC-1 (the review's reproducer, on the math): one warm-up second whose bucket holds a low
+    /// far below the pool (a pool pushed down and restored inside one transaction) among honest
+    /// buckets at the pool's price. As built the seed took the low and kept it for the rest of the
+    /// warm-up (the running minimum), and after the gate climbed back by at most ×7/6 a second;
+    /// now it falls by one steady step and ends the warm-up within one fall step of the honest
+    /// seed.
+    #[test]
+    fn a_recorded_low_in_the_warm_up_moves_the_seed_by_one_steady_step() {
+        let prm = EmaParams::DEFAULT;
+        let run = |low_at: Option<i64>| -> Observation {
+            let mut o = Observation::new(0, 2 * WAD, 1_000).unwrap();
+            o.rewrite_liquidity(2_000, VenueChange::RaydiumLocked { slow_cap: 900 })
+                .unwrap();
+            o.mark_restart();
+            for t in 1..9i64 {
+                o.record(t, 2 * WAD, 1_000).unwrap();
+                if low_at == Some(t) {
+                    o.record(t, 2 * WAD / 4, 1_000).unwrap();
+                }
+                o.roll(t + 1, &prm).unwrap();
+            }
+            o
+        };
+        let honest = run(None);
+        assert_eq!((honest.ema.price, honest.ema.warm), (2 * WAD, 0));
+        for at in 1..9i64 {
+            let pushed = run(Some(at));
+            assert_eq!(pushed.ema.warm, 0);
+            // The low bucket stays in the running minimum until the gate, so the seed falls one
+            // step a second from it on, never to the low itself.
+            let dt = if at == 1 { 2 } else { 1 };
+            let mut want = down(2 * WAD, dt, 10_000);
+            for _ in at + 1..9 {
+                want = down(want, 1, 10_000);
+            }
+            assert_eq!(pushed.ema.price, want.max(2 * WAD / 4), "low at {at}");
+            assert!(pushed.ema.price > 2 * WAD / 4, "low at {at}");
+        }
+        // The worst case (the low in the first warm-up second): ×(6/7)·(11/12)⁷ ≈ 0.47 of the
+        // pool's price, where the as-built seed read 0.25.
+        let worst = run(Some(1)).ema.price;
+        assert!(worst * 100 > 2 * WAD * 46 && worst * 100 < 2 * WAD * 48);
     }
 
     /// M4X-2: while the guard is set, `L_slow` integrates `min(lobs, L_mlo)`: a deposit freeze

@@ -113,10 +113,12 @@ fn lifecycle_on_a_negative_vqr_pool() {
     let r = p.reserves(&env.svm).unwrap();
     assert!(st.virtual_quote_reserves < 0, "the synthetic pool");
     assert_eq!(r.effective_quote * 2, u128::from(r.real_quote));
-    // q: 1 % of the base, a notional of at most 5 SOL.
+    // q: 1 % of the base, a notional of at most 4 SOL (5 SOL until M6R-1: the pool's third-party
+    // LP, λ 92.98 %, now bounds `L_slow` and `X₀` at its locked depth, and a 5-SOL open exceeds the
+    // wallet cap on `0.93·X`).
     let q = u64::try_from(
         (u128::from(r.base) / 100)
-            .min(u128::from(r.base) * u128::from(5 * SOL) / r.effective_quote),
+            .min(u128::from(r.base) * u128::from(4 * SOL) / r.effective_quote),
     )
     .unwrap();
 

@@ -3,10 +3,10 @@
 |---|---|---|---|---|
 | latency 1 s | v0.3 fixed 1 % | 72 | 0 | 0 |
 | latency 1 s | v0.3 fixed 2 % | 72 | 0 | 0 |
-| latency 1 s | v0.4.1 (fixed 2 %) | 72 | 0 | 0 |
+| latency 1 s | v0.4.1 (fixed 2 %) | 72 | 1 | 0 |
 | latency 2 s | v0.3 fixed 1 % | 72 | 0 | 0 |
 | latency 2 s | v0.3 fixed 2 % | 72 | 0 | 0 |
-| latency 2 s | v0.4.1 (fixed 2 %) | 72 | 0 | 0 |
+| latency 2 s | v0.4.1 (fixed 2 %) | 72 | 1 | 0 |
 
 === (b) reviewer's dutch2.py: gaps near the liquidation band and 30 s ramps ===
 | keeper latency | variant | runs | cells different | of which worse for lenders |

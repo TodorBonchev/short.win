@@ -12,6 +12,7 @@
 //! | [`lifecycle_through_a_real_graduation`] | two lenders; A at 80 % (ECON's D@80 % position), C and B at 90 %; another user completes the curve → `PumpMigrating` (exits and opens `VenueMigrating`) → `migrate_v2` → `→ PumpSwap` (the pool cache, `graduated_at`, the ring at `lp_supply`, `(8, 1)`, tier C) → the warm-up: keeper liquidations `EmaWarmingUp`, `sol_settle` evaluates nothing, opens `EmaWarmingUp`, B's borrower closes on the pool at its quote → A liquidated on the pool at the gate, leg by leg against the pool's quote → opens `BoostInProgress` → the boost's push liquidates C (ECON §10.1) → the boost vault empties (its ATA closed), opens resume: D opens on the pool, is held to its deadline with hourly cranks and expired there → both lenders exit: tokens back, SOL income pro rata |
 //! | [`t_venue_switch_the_graduation_rewrites_the_ring_and_the_box_is_narrow_from_the_gate`] | ★T-VENUE-SWITCH (graduation): every ring entry's `l`, `llo`, `lhi` = the pool's `lp_supply`, `(x, y) = reprice(lp_supply, p)`, prices and times kept, `L_slow ≤` the anchor, the bucket and both chains cleared; with the boost running and the keeper cranking every second, `L_ema` at the gate = the pool's `√(X·Y)` within 1 % and every second with the settlement box wider than 1 % in `L` lies inside the gate |
 //! | [`the_atomic_self_financed_complete_and_migrate_is_liquidated_on_the_pool`] | M5-SEC-4's attack, end to end: on ECON's D@80 % market a borrower long `q` tokens (bought before its short) and short `q/2` sends `[buy_v2(rT), migrate_v2]` in one transaction (self-financed: it keeps the `rT` tokens); other users push the pool to ≥ 3.5× the last curve EMA before any observation; the keeper's first crank moves the market onto the pool with `P_ema` carried over, its liquidations wait for the eight integrations, and the position is liquidated on the pool at the pool's price — the lenders get `Q` back plus SOL (in M5 the market froze and S3 paid FV at the frozen EMA). The attacker's net is printed |
+//! | [`m6_sec_1_a_low_recorded_in_the_warm_up_after_the_atomic_attack_is_bounded`] | M6-SEC-1, the security review's reproducer (★T-SEED-FALL; the owner's decision of 2026-09-30): the same attack, and in post-change second 1 / 4 / 8 another `[sell to 0.1× the pool, crank_price, buy back]` next to the keeper's crank; the warm-up seed falls at most one v0.4.1 step per integration (at the gate exactly the fall bound from the low's second, 0.128× / 0.312× / 0.819× the pool, above the low; as built the low itself, 0.100×), and the position is still liquidated on the pool, the lenders' `Q` back plus SOL, 23 / 17 / 12 s after the transition (undisturbed 9 s; as built, by the review's estimate `ln(P_pool/P_low)/ln(7/6)` s more, ≈ 24 s each) |
 //! | [`a_borrowers_self_made_straddle_is_liquidated_after_the_keepers_bundle`] | M5-SEC-4's second vector: the D@80 % borrower buys `rT − q + 1` itself; close and liquidation refuse `CurveStraddle`; the keeper's bundle with ARCH §5.4's tx3 `[crank, liquidate]` fails at tx3 (`EmaWarmingUp`, OWNER-M6R-4) and reverts whole; the keeper's fallback (tx1 `complete_curve` + tx2 `migrate_v2`) lands, and the position is liquidated on the pool once the warm-up has run; the keeper's completion is self-financing after the boost (ECON §10.1: it sells its `rT` tokens above their cost) |
 //! | [`econ_10_2_the_borrowers_own_bundle_closes_a_straddle`] | ECON §10.2 "rt → Q/2, borrower closes 30 s later" (D@97 %): the curve is bought down to `rT = Q/2`, the close refuses `CurveStraddle`, the borrower's client sends the ≥ 3-transaction bundle — tx1 `complete_curve` (its own SOL), tx2 `migrate_v2`, tx3 the venue accounts + `crank_price` (`→ PumpSwap`) + `close_short` in one transaction — and the close buys `Q` on the new pool for exactly the sim's 1,922,674,204 lamports (ECON 1.9227 SOL; 1 lamport under `B̂_str` as the keeper's view priced it before the bundle), the borrower paid `V − B − R_min` to the lamport; the completion's charge is the sim's `keeper_straddle_cost` |
 //! | [`a_completing_close_then_the_graduation_carries_the_other_position`] | ECON §10.2 `q = rt` (D@97 %): other users buy the curve down to one borrower's `q`, its close buys exactly `rT` at pump's charge and completes the curve (`VenueStateChanged → PumpMigrating` in the close itself, ARCH §5.4 case 1), the other position's close pauses (`VenueMigrating`); `migrate_v2`, the transition, and the other position closes on the pool during the warm-up at the pool's quote; every lent token back |
@@ -84,11 +85,43 @@ fn quote_sell_now(g: &Grad, q: u64) -> u64 {
 /// `NotLiquidatable` while not CR-liquidatable); the liquidation is checked leg by leg against the
 /// pool's quote. Returns the seconds waited and the event.
 fn liquidate_on_pool_within(g: &mut Grad, p: &Pos, max_s: i64) -> (i64, Liquidate) {
+    let (sec, ev, _) = liquidate_on_pool_within_low(g, p, max_s, None);
+    (sec, ev)
+}
+
+/// What [`liquidate_on_pool_within_low`] saw of the warm-up seed: `P_ema` after the keeper's crank
+/// in the low's second, and at the gate (the crank that left `ema_warm = 0`).
+#[derive(Clone, Copy, Debug, Default)]
+struct Seed {
+    at_low: u128,
+    at_gate: u128,
+}
+
+/// [`liquidate_on_pool_within`] with, optionally, M6-SEC-1's attack in second `k` after the
+/// transition — `[sell to f_bps/10⁴ × the pool's spot, crank_price, buy back]` right after the
+/// keeper's crank (`Grad::recorded_low`) — and the warm-up seed it saw.
+fn liquidate_on_pool_within_low(
+    g: &mut Grad,
+    p: &Pos,
+    max_s: i64,
+    low: Option<(i64, u128)>,
+) -> (i64, Liquidate, Seed) {
     let pos = g.s.position(p);
+    let mut seed = Seed::default();
     for sec in 1..=max_s {
         g.s.env.warp(1);
         g.tick_boost();
         g.crank();
+        let m = market(&g.s.env, &g.s.pm);
+        if m.ema_warm == 0 && seed.at_gate == 0 {
+            seed.at_gate = m.ema_price.get();
+        }
+        if let Some((k, f)) = low
+            && sec == k
+        {
+            seed.at_low = m.ema_price.get();
+            g.recorded_low(f);
+        }
         let st = g.status(p);
         let warm = market(&g.s.env, &g.s.pm).ema_warm;
         let b_exec = st.b_live;
@@ -112,7 +145,7 @@ fn liquidate_on_pool_within(g: &mut Grad, p: &Pos, max_s: i64) -> (i64, Liquidat
         let ev: Liquidate = events::one(&meta);
         let back = tokens(&g.s.env, &g.s.pm.keys.pool_vault) - vault0;
         check_pool_liquidation(&ev, &pos, b_exec.expect("a quote"), back);
-        return (sec, ev);
+        return (sec, ev, seed);
     }
     panic!("not liquidated on the pool within {max_s} s");
 }
@@ -497,6 +530,25 @@ fn t_venue_switch_the_graduation_rewrites_the_ring_and_the_box_is_narrow_from_th
 /// M5-SEC-4's first vector end to end (module docs): the attack no longer freezes the market.
 #[test]
 fn the_atomic_self_financed_complete_and_migrate_is_liquidated_on_the_pool() {
+    atomic_complete_and_migrate(None);
+}
+
+/// What [`atomic_complete_and_migrate`] measured: the seconds from the transition to the
+/// liquidation, the lenders' SOL, the pool over the carried `P_ema` before any observation, and
+/// the warm-up seed.
+#[derive(Clone, Copy, Debug)]
+struct Atomic {
+    waited: i64,
+    lender_sol: u64,
+    pool_over_ema: f64,
+    p_pool: u128,
+    seed: Seed,
+}
+
+/// The atomic, self-financed `[buy_v2(rT), migrate_v2]` on ECON's D@80 % market, end to end
+/// ([`the_atomic_self_financed_complete_and_migrate_is_liquidated_on_the_pool`]), optionally with
+/// M6-SEC-1's recorded low in a warm-up second (`low`, as [`liquidate_on_pool_within_low`]).
+fn atomic_complete_and_migrate(low: Option<(i64, u128)>) -> Atomic {
     let mut g = Grad::d_market(D80_SOLD, lend_for_80(D80_Q));
     // The attacker: long `q` bought on the curve before its short (the M5 exploit's hedge).
     let attacker = CurveUser::new(&mut g.s.env, &g.s.pm.curve);
@@ -607,7 +659,7 @@ fn the_atomic_self_financed_complete_and_migrate_is_liquidated_on_the_pool() {
 
     // Liquidated on the pool once the warm-up has run; the lenders get Q back.
     let t_grad = g.s.env.now();
-    let (_, ev) = liquidate_on_pool_within(&mut g, &p, 120);
+    let (_, ev, seed) = liquidate_on_pool_within_low(&mut g, &p, 120, low);
     let waited = g.s.env.now() - t_grad;
     assert!(waited >= 8, "never before the eight integrations");
     assert_eq!(
@@ -641,6 +693,81 @@ fn the_atomic_self_financed_complete_and_migrate_is_liquidated_on_the_pool() {
         sol4(net),
         lender_sol as f64 / 1e9
     );
+    Atomic {
+        waited,
+        lender_sol,
+        pool_over_ema: p_pool as f64 / p_ema0 as f64,
+        p_pool,
+        seed,
+    }
+}
+
+/// M6-SEC-1, the review's reproducer (ARCH §8.2 ★T-SEED-FALL; ECON §12.12 (12); the owner's decision
+/// of 2026-09-30): the atomic, self-financed attack above, and in one warm-up second after the
+/// transition another `[sell to 0.1× the pool, crank_price, buy back]` records a low far below the
+/// pool next to the keeper's crank (the pool restored). As built the warm-up seed took that low
+/// and kept it until the gate (the running minimum, bounded upward only), then climbed back at
+/// most ×7/6 a second; now it falls by at most one v0.4.1 step per integration (×11/12 at `dt =
+/// 1`): at the gate `P_ema ≥ P(the low's second)·(11/12)^(9 − k)` and above the low itself. No
+/// exit is forced by the lagging seed and none is lost: the position is still liquidated on the
+/// pool, the lenders get `Q` back plus SOL, within a few seconds of the undisturbed run. The
+/// carried seed lies far below this pool (the attack pushed it ≈ 3.6× before any observation), so
+/// the low reaches the seed only where it is deeper than the seed's own fall (the residual,
+/// ECON §12.12 residual 17).
+#[test]
+fn m6_sec_1_a_low_recorded_in_the_warm_up_after_the_atomic_attack_is_bounded() {
+    use shortwin_math::observe::price_down_bound;
+    let base = atomic_complete_and_migrate(None);
+    eprintln!(
+        "M6-SEC-1 baseline: liquidated {} s after the transition, lenders Q back + {:.4} SOL \
+         (pool {:.2}× the carried EMA; P_ema at the gate {:.3}× the pool)",
+        base.waited,
+        base.lender_sol as f64 / 1e9,
+        base.pool_over_ema,
+        base.seed.at_gate as f64 / base.p_pool as f64
+    );
+    // (post-change second of the low, the liquidation's seconds after the transition): the
+    // undisturbed run is 9 s; as built each low set the seed to 0.1× the pool until the gate, and
+    // its climb back at ×7/6 a second took ≈ 15 s more.
+    for (k, want) in [(1i64, 23i64), (4, 17), (8, 12)] {
+        let a = atomic_complete_and_migrate(Some((k, 1_000)));
+        // The low's bucket is integrated in second k + 1 and stays in the warm-up's running minimum
+        // through the gate's integration in second 9: 9 − k integrations, the first with `dt = 2`
+        // when k = 1 (the transition's roll was the last one; the first post-change crank only
+        // records), else 1.
+        let mut bound = a.seed.at_low;
+        for i in k..9 {
+            let dt = if i == 1 { 2 } else { 1 };
+            bound = price_down_bound(bound, dt, 10_000).expect("down");
+        }
+        let low = a.p_pool / 10;
+        eprintln!(
+            "M6-SEC-1: a 0.1× low in post-change second {k}: P_ema at the low's second {:.3}×, at \
+             the gate {:.3}× the pool (the fall bound {:.3}×; as built the low, 0.100×); \
+             liquidated after {} s (baseline {}), lenders Q back + {:.4} SOL",
+            a.seed.at_low as f64 / a.p_pool as f64,
+            a.seed.at_gate as f64 / a.p_pool as f64,
+            bound as f64 / a.p_pool as f64,
+            a.waited,
+            base.waited,
+            a.lender_sol as f64 / 1e9
+        );
+        assert!(
+            a.seed.at_gate >= bound,
+            "second {k}: fell faster than the bound"
+        );
+        assert!(
+            a.seed.at_gate > low,
+            "second {k}: the seed stays above the recorded low"
+        );
+        assert!(a.lender_sol > 0, "the lenders whole");
+        assert!(
+            a.waited >= base.waited,
+            "no exit earlier than the undisturbed run"
+        );
+        assert_eq!(a.waited, want, "second {k}");
+    }
+    assert_eq!(base.waited, 9);
 }
 
 // ---- M5-SEC-4: the self-made straddle -----------------------------------------------------------

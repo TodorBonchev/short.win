@@ -195,8 +195,9 @@ pub fn notional_ok(
     )
 }
 
-/// Conservative cap reserve `X₀` (ARCH §4.6); pass `lockedDepth` (and `λ_min`) on
-/// Raydium, `undefined` on PumpSwap.
+/// Conservative cap reserve `X₀` (ARCH §4.6); pass `lockedDepth` (and `λ_min`) on Raydium and,
+/// since M6R-1 (ECON #105), on PumpSwap (the canonical pool's burned-LP depth `Market.pool_d`);
+/// `undefined` elsewhere.
 #[wasm_bindgen(js_name = conservativeX0)]
 pub fn conservative_x0(
     x_now: u64,
@@ -210,16 +211,17 @@ pub fn conservative_x0(
 }
 
 /// Inputs of the tier function (`tier::TierInputs`; ARCH §4.7). `venue`: 0 = pump
-/// curve, 1 = PumpSwap, 2 = Raydium (with `lockedDepth` and `lambdaMinBps`).
+/// curve, 1 = PumpSwap, 2 = Raydium (both with `lockedDepth` and `lambdaMinBps`; PumpSwap since
+/// M6R-1, ECON #105), 3 = a pool without a locked depth (the program's test-venue mock).
 #[wasm_bindgen]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TierInputs {
-    /// 0 = pump curve, 1 = PumpSwap, 2 = Raydium.
+    /// 0 = pump curve, 1 = PumpSwap, 2 = Raydium, 3 = unlocked pool.
     pub venue: u8,
-    /// Raydium locked depth `D`.
+    /// The locked depth `D` (`Market.pool_d`; Raydium and PumpSwap).
     #[wasm_bindgen(js_name = lockedDepth)]
     pub locked_depth: u128,
-    /// Raydium `pool_lock_min_bps` (λ_min).
+    /// `pool_lock_min_bps` (λ_min; Raydium and PumpSwap).
     #[wasm_bindgen(js_name = lambdaMinBps)]
     pub lambda_min_bps: u32,
     /// `R_now`: the pool's real SOL, lamports.
@@ -262,11 +264,15 @@ impl TierInputs {
     fn inputs(&self) -> Result<tier::TierInputs, MathError> {
         let venue = match self.venue {
             0 => TierVenue::PumpCurve,
-            1 => TierVenue::PumpSwap,
+            1 => TierVenue::PumpSwap {
+                locked_depth: self.locked_depth,
+                lambda_min_bps: self.lambda_min_bps,
+            },
             2 => TierVenue::Raydium {
                 locked_depth: self.locked_depth,
                 lambda_min_bps: self.lambda_min_bps,
             },
+            3 => TierVenue::Unlocked,
             _ => return Err(MathError::InvalidInput),
         };
         Ok(tier::TierInputs {
@@ -444,8 +450,19 @@ mod tests {
         t.oracle_stale_s = 120;
         t.theta_a_usd_e6 = 500_000_000_000;
         t.theta_b_usd_e6 = 100_000_000_000;
+        // PumpSwap (M6R-1): a burned-LP depth worth 40,000 SOL at P = 1 WAD over λ_min 100 %.
+        t.p_ema = 1_000_000_000_000_000_000;
+        t.locked_depth = 40_000_000_000_000;
+        t.lambda_min_bps = 10_000;
         assert_eq!(t.tier().unwrap(), 0);
         assert_eq!(t.liquidity_lamports(), Some(80_000_000_000_000));
+        // 2,000 SOL locked: Λ = 4,000 SOL, under θ_A's 4,132 SOL at $121 (B).
+        t.locked_depth = 2_000_000_000_000;
+        assert_eq!(t.liquidity_lamports(), Some(4_000_000_000_000));
+        assert_eq!(t.tier().unwrap(), 1);
+        t.venue = 3;
+        assert_eq!(t.liquidity_lamports(), Some(80_000_000_000_000));
+        assert_eq!(t.tier().unwrap(), 0);
         let d = tier_params(3).unwrap();
         assert_eq!((d.cr_open_bps(), d.max_duration_s()), (40_000, 259_200));
     }

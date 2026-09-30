@@ -63,7 +63,9 @@ pub struct CapInputs {
     /// `L_slow` and `P_ema` after this instruction's roll.
     pub l_slow: u128,
     pub p_ema: u128,
-    /// Raydium: `(D, pool_lock_min_bps)` (locked depth over `λ_min`, V2-8); `None` elsewhere.
+    /// Raydium and — since M6R-1 (owner decision of 2026-09-30) — PumpSwap: `(D,
+    /// pool_lock_min_bps)` (locked depth over `λ_min`, V2-8; on PumpSwap the burned LP's depth);
+    /// `None` elsewhere. (The name predates PumpSwap's lock.)
     pub raydium_lock: Option<(u128, u32)>,
     /// The live one-way venue fee φ, ppm.
     pub phi_ppm: u32,

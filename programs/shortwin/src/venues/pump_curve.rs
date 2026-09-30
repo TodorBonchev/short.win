@@ -10,7 +10,9 @@
 //! - ReadSet ([`read_keys`]): C0 `bonding_curve` (W), C1 pump `Global`, C2 pump `FeeConfig`
 //!   (pump-fees), C3 the canonical PumpSwap pool (derived; may not exist; detection only), C4
 //!   `curve_base_ata` (W; `B̂_str`'s live `X_p`), C5 PumpSwap `FeeConfig` and C6 PumpSwap
-//!   `GlobalConfig` (the post-migration pool's fees: `B̂_str` is always defined, C0-2). A
+//!   `GlobalConfig` (the post-migration pool's fees: `B̂_str` is always defined, C0-2; and its
+//!   `disable_flags`: bit 0 halts `create_pool`, hence `migrate_v2`, so curve opens refuse
+//!   `GraduationHalted` while it is set — M6-SEC-3, owner decision of 2026-09-30). A
 //!   `PumpMigrating` market reads the same set.
 //! - TradeExtras ([`check_trade`]): T0 pump, T1 pump `event_authority`, T2 pump-fees, T3 WSOL,
 //!   T4 Tokenkeg, T5 the ATA program, T6 `fee_recipient` (W; one of the live `Global`'s 8 normal
@@ -492,6 +494,7 @@ fn pricing_inputs(
         migration_fee: global.pool_migration_fee(),
         pool_tiers: Rc::from(math_tiers(pfc.fee_tiers)),
         pool_creator_fee_configurable: gc.creator_fee_configurable(),
+        pool_disable_flags: gc.disable_flags(),
         coin_creator_is_default: curve.creator_is_default(),
     })
 }

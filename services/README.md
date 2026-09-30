@@ -58,7 +58,10 @@ What it does, per tick (one per slot; `keeper/src/keeper.rs`):
   cannot lift a low reached genuinely before the wrapping started (an LP withdrawn for real for a
   few seconds: nothing foreign then) — FITX-1, ECON §12.12 residual 10, owner item O18. A market without open
   positions never gets liquidity-triggered coverage (nothing there reads the liquidity EMA);
-  `liq_cover_s = 0` disables it. A venue change drops the depths viewed before it.
+  `liq_cover_s = 0` disables it. A venue change drops the depths viewed before it. The rule is
+  venue-independent: since the owner's decision of 2026-09-30 (M6R-1; canonical PumpSwap pools
+  take third-party LP) it runs on PumpSwap markets as on Raydium, the depth being the keeper's own
+  `√(X·(Y + VQR))` (scenarios `pamm_lp.rs`).
 - **Duty 3, exits**: `liquidate` at the first second the program accepts it (the fixed-δ bound;
   retried every second on `ExitBoundNotMet`), `expire` when the expiry bound is met. Trading
   exits try the extras sets `current`, `none`, `previous`, `stable` and keep the first that
@@ -364,6 +367,15 @@ second the program accepts it; `disable_flags` bit 0 is reported (severe; opens 
 listed without the trader's cashback ATA gets it created once; a graduated coin listed list-only is
 cranked onto its pool (`None → PumpSwap`), its trader base ATA and pAMM UVA are created once, and
 an open lands.
+
+PumpSwap third-party LP (`pamm_lp.rs`, M6R-1, the owner's decision of 2026-09-30; the `legacy261`
+pool with as much third-party LP again, λ 50 %, pAMM's own `deposit` / `withdraw`): duty 2's
+liquidity coverage against a withdraw drag (`[withdraw all, crank_price, deposit]` after each
+keeper tick, from the first second its idle cadence skips) on a market with a position — the
+first wrap is the only attacker-only second, `L_ema` holds at 0.905 × `√k` (the drag's one step),
+the keeper observing every later second at one crank per wrap (119 for 119); with
+`liq_cover_s = 0` the same drag pulls `L_ema` to the locked depth (0.500) — and none on a market
+without positions (no trigger, the idle cadence kept).
 
 Trader-side scenarios (`wipe.rs`, M6): a full wipe on a PumpSwap cashback coin — the keeper's S1,
 then (with the duty on) `[create_idempotent ATA(trader, WSOL), pAMM claim_cashback, sweep_trader]`

@@ -24,7 +24,9 @@
 //!
 //! **PumpSwap** (M6): the ReadSet is the adapter's own (`shortwin::venues::pump_amm::read_keys`: P0
 //! the canonical pool W, P1 its base vault W, P2 its WSOL vault W, P3 `GlobalConfig`, P4 the
-//! PumpSwap `FeeConfig`, P5 the boost vault's WSOL ATA), and a trade's TradeExtras T0–T18
+//! PumpSwap `FeeConfig`, P5 the boost vault's WSOL ATA, P6 the pool's LP mint — M6R-1, owner
+//! decision of 2026-09-30: `PDA(pAMM, ["pool_lp_mint", pool])`, which the program key-checks
+//! against the live `pool.lp_mint`), and a trade's TradeExtras T0–T18
 //! ([`trade_extras`]) come from the adapter's constants and the market's PumpSwap cache, with the
 //! slots the program checks against the **live** state read from this tick's ReadSet accounts: T9
 //! / T16 a protocol-fee and a buyback recipient of the live `GlobalConfig` (one per market, spread
@@ -61,14 +63,15 @@ use shortwin_venue_state::{pump, pump_amm as pamm_state};
 /// AMM v4 `[pool W, coin_vault W, pc_vault W, lp_mint]`, CPMM `[pool W, amm_config,
 /// token_0_vault W, token_1_vault W, lp_mint]`, the pump curve `[curve W, Global, FeeConfig,
 /// canonical pool, curve_base_ata W, PumpSwap FeeConfig, PumpSwap GlobalConfig]`, PumpSwap
-/// `[pool W, base vault W, WSOL vault W, GlobalConfig, FeeConfig, boost vault ATA]`, the mock
+/// `[pool W, base vault W, WSOL vault W, GlobalConfig, FeeConfig, boost vault ATA, LP mint]` (the
+/// LP mint P6 since M6R-1, owner decision of 2026-09-30), the mock
 /// `[pool W, base vault W, WSOL vault W]`. `crank_price` and `sol_settle` pass every slot
 /// read-only.
 pub fn read_writable(kind: VenueKind) -> anyhow::Result<&'static [bool]> {
     const V4: [bool; raydium_v4::READ_LEN] = [true, true, true, false];
     const CPMM: [bool; raydium_cpmm::READ_LEN] = [true, false, true, true, false];
     const CURVE: [bool; pump_curve::READ_LEN] = [true, false, false, false, true, false, false];
-    const PAMM: [bool; pump_amm::READ_LEN] = [true, true, true, false, false, false];
+    const PAMM: [bool; pump_amm::READ_LEN] = [true, true, true, false, false, false, false];
     match kind {
         VenueKind::RaydiumV4 => Ok(&V4),
         VenueKind::RaydiumCpmm => Ok(&CPMM),
@@ -775,8 +778,15 @@ mod tests {
         let keys = read_set(VenueKind::PumpSwap, &m).unwrap();
         assert_eq!(keys, pump_amm::read_keys(&m).to_vec());
         assert_eq!(keys[pump_amm::P_POOL], m.canonical_pool);
+        assert_eq!(
+            keys[pump_amm::P_LP_MINT],
+            pump_amm::lp_mint(&m.canonical_pool)
+        );
         let metas = read_metas(VenueKind::PumpSwap, &keys, true).unwrap();
-        assert_eq!(flags(&metas), [true, true, true, false, false, false]);
+        assert_eq!(
+            flags(&metas),
+            [true, true, true, false, false, false, false]
+        );
         let protocol: [Pubkey; 8] = core::array::from_fn(|_| Pubkey::new_unique());
         let buyback: [Pubkey; 8] = core::array::from_fn(|_| Pubkey::new_unique());
         for (creator, cashback) in [(cached_creator, false), (Pubkey::new_unique(), true)] {

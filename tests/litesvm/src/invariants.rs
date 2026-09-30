@@ -259,6 +259,9 @@ pub struct MarketSnapshot {
 pub struct TxSnapshot {
     pub markets: Vec<MarketSnapshot>,
     pub guard: Option<VenueGuard>,
+    /// PumpSwap `GlobalConfig.disable_flags` just before the instruction, if the account exists
+    /// and parses (I17's M6-SEC-3 part: no curve open while bit 0, `create_pool`, is set).
+    pub pamm_disable_flags: Option<u8>,
     pub fee_recipient: Option<(Pubkey, u64)>,
     /// The lender-pool state of the tracked markets ([`lender::check_ix`]).
     pub lender: lender::LenderSnapshot,
@@ -289,6 +292,13 @@ pub fn snapshot(svm: &LiteSVM, markets: &[Pubkey]) -> TxSnapshot {
     TxSnapshot {
         markets: snaps,
         guard: read::zc::<VenueGuard>(svm, &pda::venue_guard()),
+        pamm_disable_flags: svm
+            .get_account(&shortwin::constants::PUMP_AMM_GLOBAL_CONFIG)
+            .and_then(|a| {
+                shortwin_venue_state::pump_amm::read_global_config(&a.owner.to_bytes(), &a.data)
+                    .ok()
+                    .map(|g| g.disable_flags())
+            }),
         fee_recipient: config.map(|c| (c.fee_recipient, read::lamports(svm, &c.fee_recipient))),
         lender: lender::snapshot(svm, markets),
         positions: positions::snapshot(svm, markets),
@@ -425,6 +435,7 @@ pub fn check_ix(
         i4_admin_moves_no_funds(svm, pre)?;
     }
     i17_no_open_on_flagged_venue(pre, &ev.opens)?;
+    i17_no_curve_open_while_graduation_halted(pre, &ev.opens)?;
     i17_no_listing_on_flagged_venue(pre, &ev.created)?;
     i17_no_adoption_on_flagged_venue(svm, pre, &ev.switched, &ev.proposed)?;
     positions::check_ix(svm, &pre.positions, &ev.position_facts())?;
@@ -509,6 +520,35 @@ pub fn i17_no_open_on_flagged_venue(pre: &TxSnapshot, opens: &[Open]) -> Result<
                 open.position, open.venue, guard.upgraded
             )
         })?;
+    }
+    Ok(())
+}
+
+/// I17, extended by M6-SEC-3 (owner decision of 2026-09-30; ARCH §3.4 step 3): no open on a
+/// pump curve (`Open.venue == PumpCurve`) while PumpSwap's `GlobalConfig.disable_flags` bit 0
+/// (`create_pool`, and with it pump's `migrate_v2`) is set just before the instruction — the
+/// curve could not graduate (`GraduationHalted`). Vacuous where the `GlobalConfig` is absent (no
+/// pump fork).
+pub fn i17_no_curve_open_while_graduation_halted(
+    pre: &TxSnapshot,
+    opens: &[Open],
+) -> Result<(), Violation> {
+    let Some(flags) = pre.pamm_disable_flags else {
+        return Ok(());
+    };
+    let halted = flags & shortwin::venues::pump_amm::PAMM_CREATE_POOL_DISABLED_BIT != 0;
+    for open in opens {
+        ensure(
+            !(halted && open.venue == VenueKind::PumpCurve as u8),
+            "I17",
+            || {
+                format!(
+                    "curve open {} accepted while PumpSwap's disable_flags = {flags:#010b} halts \
+                     create_pool (M6-SEC-3)",
+                    open.position
+                )
+            },
+        )?;
     }
     Ok(())
 }

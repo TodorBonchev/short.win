@@ -700,7 +700,10 @@ jobs:
     # batches of 5; a tipped liquidation with the largest extras set is measured as not fitting v0,
     # ARCH §6.4) and from M6 for every PumpSwap transaction on the dumped canonical pools
     # (tests/litesvm/tests/tx_size_pumpswap_it.rs: the largest extras set, a first-time borrower, a
-    # separate fee payer, the keeper's composite, crank batches of 4). Also the protocol
+    # separate fee payer, the keeper's composite, crank batches of 3 — since M6R-1's LP mint the
+    # open with the largest extras set and the keeper's composite with it are pinned 6–24 B over
+    # 1,232 B through A28 and fitting through the build-alt table, the owner's T-SIZE trade-off,
+    # ARCH §6.4). Also the protocol
     # ALT's static part as scripts/build-alt.sh builds it, uploaded for review with the live
     # recipients added at `create` time. (program-tests and services run the same tests; this job
     # keeps the size table and the address list in one log.)

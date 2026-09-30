@@ -57,6 +57,16 @@ than the expected one (above 3 for an instruction), a transaction above its §6.
 or keeper transaction above 1,232 B as v0 + ALT, or a wrapper level that does not reach exactly
 `direct + levels` fails the bench.
 
+**M6R-1 (the owner's decision of 2026-09-30; ARCH changelog 56).** Every PumpSwap ReadSet carries
+the pool's LP mint (P6), which the adapter key-checks against `pool.lp_mint` and reads for the
+pool's locked depth `D` (the burned creation LP's; the prologue writes it into `pool_d` and, during
+a warm-up, caps `L_slow` at it): every PumpSwap-ReadSet transaction is 33 B longer (the key inline,
+its index) and its instruction ≈ 2.1–2.9 k CU dearer (the parse of the pool for P6's check, the
+mint, `λ` and `D`; ≈ 4.7 k on an open, which reads the venue before and after its sale), all within
+§6.1's limits. The position size is ≈ 8 SOL of notional (10 SOL before: on the `mature` pool, whose
+third-party LP puts `D` at 92.98 % of `√k`, a wallet's second 10-SOL position is over its wallet
+cap on `X₀ = 0.93·X`).
+
 ## Pre-states
 
 - Every PumpSwap trade case lists its pool with the real `create_market(Auto)` and its pAMM init

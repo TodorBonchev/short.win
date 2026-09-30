@@ -42,14 +42,21 @@ recorded; tests/settle_vectors.rs documents each layout next to its parser):
           ref_max_age | liq_n eps expiry_fee | settle_n arm_gap fv_dev | s3_wait grace pause
   init    t p l
   obs     t gap [p l]                      (gap: pre-roll gap, "-" if nothing rolled)
-  rewrite t g|r l_new                      (graduation | Raydium fast path, v0.4.1 rule: fast_switch)
-  rewrite t R l_new slow_cap               (Raydium adoption, M4R post-change confirmation: Market.adopt_pool =
-                                            rewrite_liquidity(l_new = floor(D*1e4/lambda_min),
-                                            RaydiumLocked { slow_cap: D }), then observe::mark_restart
-                                            (ema_warm = 8, ema_guard = 1); the next 8 rolls are warm-up
-                                            integrations; chk's leg is the pure EMA-leg predicate, the gate
-                                            is try_exit's: no ref / maxin / settle line while ema_warm > 0 on
-                                            an executable venue)
+  rewrite t g|r l_new                      (graduation | Raydium fast path, v0.4.1 rules: _switch_to_pool, fast_switch;
+                                            no trace emits "g" since M6, #105)
+  rewrite t R l_new slow_cap               (a restart: rewrite_liquidity(l_new, RaydiumLocked { slow_cap }), then
+                                            observe::mark_restart (ema_warm = 8, ema_guard = 1); the next 8 rolls
+                                            are warm-up integrations (their seed bounded both ways, M6-SEC-1); chk's
+                                            leg is the pure EMA-leg predicate, the gate is try_exit's: no ref /
+                                            maxin / settle line while ema_warm > 0 on an executable venue.  Emitted
+                                            by the Raydium adoption (M4R: Market.adopt_pool, l_new =
+                                            floor(D*1e4/lambda_min), slow_cap = D) and by the -> PumpSwap graduation
+                                            as built (M6, ECON #104, #105: Market._graduate, l_new = slow_cap = the
+                                            pool's lp_supply): inside a prologue it follows that second's "obs t gap"
+                                            (the roll; the transitioning instruction records nothing); the straddle
+                                            bundle's tx3 emits it alone, then the pool's first "obs".  M6R-1's cap
+                                            of L_slow at D during a PumpSwap warm-up never binds in these traces
+                                            (asserted: Market._warmup_slow_cap), so it has no op)
   pos     pid Q V K_s ert L penalty slip_max
   chk     t pid flags leg p_live p_rs lo_ok g P_mlo P_mhi L_mlo L_mhi
                                            (flags: EMA-leg predicate on each ring entry's
@@ -103,9 +110,9 @@ ECON_13_EXIT_FUZZ = {'runs': 1000, 'exits': 709, 'sandwich_attempts': 8191, 'bun
                      'max_settle_box_bps': 95, 'reserve_waits_liq': 0, 'reserve_waits_exp': 0,
                      'kinds': {'liquidation': 213, 'expiry': 286, 'S1': 174, 'S2': 8, 'S3': 28}}
 ORIG = {name: getattr(M, name) for name in (
-    "__init__", "observe", "_integrate", "_switch_to_pool", "fast_switch", "adopt_pool", "reset_ema_to_spot",
-    "open", "status", "exit_reference", "_buyback_exit", "try_exit", "settle_box", "_settlement", "_not_liq_box",
-    "_refuted", "_legs", "_settle", "quote_repriced")}
+    "__init__", "observe", "_integrate", "_switch_to_pool", "_graduate", "_warmup_slow_cap", "fast_switch",
+    "adopt_pool", "reset_ema_to_spot", "open", "status", "exit_reference", "_buyback_exit", "try_exit", "settle_box",
+    "_settlement", "_not_liq_box", "_refuted", "_legs", "_settle", "quote_repriced")}
 MODE = {"full": True, "sample": None, "copies": False}
 CAPTURE = []
 ROOTS = []
@@ -239,8 +246,18 @@ def p_integrate(self, t):
 
 def p_observe(self, t):
     self._gap = None
-    ORIG["observe"](self, t)
+    self._sync_op = None
+    self._in_observe = True
+    try:
+        ORIG["observe"](self, t)
+    finally:
+        self._in_observe = False
     if not MODE["full"]:
+        return
+    if self._sync_op is not None:
+        # M6 (#104, #105): the prologue rolled, then moved the market -> PumpSwap (Market._graduate); it records nothing
+        emit(self, line("obs", t, self._gap))
+        emit(self, self._sync_op)
         return
     v = self.venue
     rec = v.has_price() and (v.has_route() or self.migrating())
@@ -256,6 +273,24 @@ def p_switch(self, pool, t):
     ORIG["_switch_to_pool"](self, pool, t)
     if MODE["full"]:
         emit(self, line("rewrite", t, "g", pool.sqrt_k()))
+
+
+def p_graduate(self, pool, t):
+    ORIG["_graduate"](self, pool, t)
+    if MODE["full"]:
+        op = line("rewrite", t, "R", self.liq, self.liq)     # the anchor = lp_supply, slow_cap = the anchor
+        if getattr(self, "_in_observe", False):
+            self._sync_op = op                               # after the prologue's roll (p_observe)
+        else:
+            emit(self, op)                                   # the straddle bundle's tx3
+
+
+def p_warmup_slow_cap(self):
+    before = self.liq_slow
+    ORIG["_warmup_slow_cap"](self)
+    # M6R-1's warm-up cap of L_slow at D binds only after a deposit around the transition, which no trace has;
+    # a binding cap would need an op of its own
+    assert self.liq_slow == before, ("the PumpSwap warm-up's L_slow cap bound in a trace", before, self.liq_slow)
 
 
 def p_fast(self, pool, t):
@@ -510,8 +545,9 @@ def p_try_exit(self, pos, t, borrower_close=False, borrower_limit=None, settle_o
 
 
 PATCHES = {"__init__": p_init, "observe": p_observe, "_integrate": p_integrate, "_switch_to_pool": p_switch,
-           "fast_switch": p_fast, "adopt_pool": p_adopt, "reset_ema_to_spot": p_reset, "open": p_open,
-           "status": p_status, "exit_reference": p_exit_ref, "_buyback_exit": p_buyback, "try_exit": p_try_exit,
+           "_graduate": p_graduate, "_warmup_slow_cap": p_warmup_slow_cap, "fast_switch": p_fast,
+           "adopt_pool": p_adopt, "reset_ema_to_spot": p_reset, "open": p_open, "status": p_status,
+           "exit_reference": p_exit_ref, "_buyback_exit": p_buyback, "try_exit": p_try_exit,
            "settle_box": p_settle_box, "_settlement": p_settlement, "_not_liq_box": p_not_liq,
            "_refuted": p_refuted, "_legs": p_legs, "_settle": p_settle, "quote_repriced": p_quote_repriced,
            "__deepcopy__": m_deepcopy}

@@ -87,7 +87,8 @@ What it models (integer math wherever the on-chain program uses integers):
     Market.adopt_pool reads no sample of the adopted pool -- L_ema and the ring's L := the anchor
     floor(D*1e4/lambda_min), L_slow = min(L_slow, D) -- and marks the state unconfirmed (warm = 8,
     guard = 1); _integrate_warmup re-seeds P_ema = min(min of the post-change bucket lows, the largest v0.4.1
-    step from the previous P_ema) (M4X-1: the seed rises no faster than the v0.4.1 EMA can) and
+    step from the previous P_ema) (M4X-1: the seed rises no faster than the v0.4.1 EMA can; since M6-SEC-1, #105,
+    it falls no faster either) and
     L_ema = min(max lhi, lomed(lhi)*(1 + C)) over the post-change entries; gated() (liquidate / expire /
     sol_settle wait while warm > 0 on an executable venue; Raydium opens refused); exit_reference's guard
     min(L_ema, L_mlo), and while the guard is set L_slow integrates min(lobs, L_mlo) (M4X-2); window_floor_ok
@@ -141,6 +142,39 @@ What it models (integer math wherever the on-chain program uses integers):
     P_ema > P_spot, the live (vT, rT) otherwise (Market.curve_cap_reserves): a sale wrapped around the open no
     longer lifts either.  Consecutive capped curve opens wait for the EMA to follow each open's own sale, as on
     PumpSwap (attacks/ema_atomic_multi.py's basket fill uses the same reserves on the curve).
+  * M6 as built and the owner's decisions of 2026-09-30 (ECONOMICS.md changelog #104, #105; ARCH §2.5, §3.4, §5.4;
+    SPEC §14 M6R-1, M6-SEC-1, M6-SEC-3, M6R-4):
+      - the graduation (Market._graduate; venues::pump_amm::graduate): pump's migrate_v2 (migration_delay_s after
+        the completion) creates the canonical pool and starts its boost, other traders trade it from then on
+        (Market.exo_venue), and the market moves onto it in the prologue of its next instruction, after the roll of
+        the curve's last bucket and with no sample of the pool: the ring and L_ema rewritten to the pool's
+        lp_supply (its isqrt(X*(Y + VQR)) at creation), L_slow = min(L_slow, anchor), both route chains cleared,
+        the observation state restarted (ema_warm = 8, ema_guard = 1, as a Raydium adoption), nothing recorded in
+        that instruction; an open or keeper exit whose own prologue would transition is refused (VenueMigrating).
+        Keeper exits and settlements wait for the 8 warm-up integrations (gated), PumpSwap opens too (OWNER-M6R-2,
+        kept); the keeper's exit on a graduated position lands 8-12 s after the migration (OWNER-M6R-4, accepted).
+        Market._switch_to_pool keeps v0.4.1's rule for the math crate's unit vectors only;
+      - the straddle bundle (V1-9; Market._straddle_to_pool): tx1 the completion, tx2 migrate_v2, tx3 the
+        transition and the pool's first bucket; the keeper's tx3 carries no exit (the warm-up gates it: the keeper
+        exits on the pool at the gate), a borrower's own tx3 carries its close_short, which the warm-up does not
+        gate (Market._buy_back);
+      - the boost on the ELF (CPPool.boost_tick): a chunk of b lamports burns floor(X*(b - 1)/(Y + b - 1)) tokens;
+      - M6-SEC-1: the warm-up price seed falls, like it rises, by at most the largest v0.4.1 step per integration
+        (Market._integrate_warmup: x11/12 at dt = 1, x6/7 at dt = 2), so one low recorded in a warm-up second no
+        longer sets P_ema at once;
+      - M6R-1: canonical PumpSwap pools take third-party LP (R-VEN Update H11; CPPool.add_liquidity /
+        remove_liquidity scale both vaults, VQR and lp_supply; the burned creation LP stays); their locked depth is
+        the Raydium one on the burned LP, D = floor(lambda_bps*isqrt(X*(Y + VQR))/1e4), lambda_bps =
+        floor((lp_supply - lp_mint.supply)*1e4/lp_supply) (CPPool.lock_bps / locked_depth; = sqrt_k() while no third
+        party holds LP), and the Raydium rules that read D apply (Market.locked_depth_venue): the sizing term
+        D/(lambda_min*sqrt(P_ema)) (conservative_x) and the reference cap floor(D*1e4/lambda_min) (ref_depth_cap);
+        during a PumpSwap warm-up L_slow is capped at D (observe), which undoes a deposit that raised the
+        graduation's lp_supply anchor.  The spot leg at max(L_live, L_ema') (FITS-2 (a)) and the guard already
+        applied to every venue; the keeper's per-second liquidity-anomaly coverage (FITS-2 (b)) is keeper-side
+        (attacks/pumpswap_lp.py).  The example pools A / B / C carry no third-party LP (lambda = 1, D = sqrt_k), so
+        no rule reading D binds on them; a CPPool marked non-canonical (attacks/fvcap.py) keeps the old reading;
+      - M6-SEC-3: PumpCurve.create_pool_halted (PumpSwap's disable bit 0) stalls migrate_v2 and refuses curve opens
+        (GraduationHalted).
   * Scenario library, EMA / exit-bound lag study, loss-given-gap curves,
     break-even gap frequencies, an ILLUSTRATIVE (uncalibrated) jump-diffusion
     Monte Carlo, and a randomised exit fuzz with attacker bundles, attacker-only
@@ -341,6 +375,10 @@ class PumpCurve(Venue):
     kind = "curve"
     plus_one = 1
     pump = True
+    # PumpSwap GlobalConfig.disable_flags bit 0 (create_pool; R-VEN Update H4): pump's migrate_v2 fails (6017), so a
+    # completed curve stays migrating (the stuck-migration path, ECON §10.3), and since M6-SEC-3 (owner decision
+    # 2026-09-30, #105) opens on a live curve are refused (GraduationHalted); read from the curve's ReadSet (C6)
+    create_pool_halted = False
 
     def __init__(self, vt: int, vs: int, rt: int, rs: int, sched: FeeSchedule = PUMP_CURVE_FEES):
         self.vt, self.vs, self.rt, self.rs = vt, vs, rt, rs
@@ -441,8 +479,16 @@ class CPPool(Venue):
                  boost_vault: int = 0, canonical: bool = True):
         self.X, self.Y, self.sched, self.supply, self.vq = X, Y, sched, supply, vq
         self.disabled = False
-        self.canonical = canonical          # canonical pools: LP burned, boost pools reject deposit/withdraw
+        self.canonical = canonical          # created by migrate_v2: the only PumpSwap pools short.win lists
+        # lp_mutable: the scenario library's drain model (a pool marked non-canonical: the "LP lock violated" model
+        # case of attacks/fvcap.py); canonical pools take third-party LP (R-VEN Update H11) through add_liquidity /
+        # remove_liquidity below, but their creation LP is burned, and the example pools A / B / C carry none
         self.lp_mutable = not canonical
+        # LP accounting (M6R-1, ECONOMICS.md #105; R-VEN Update H11): lp_units = Pool.lp_supply (@203, the pool's own
+        # counter: isqrt(X*(Y + VQR)) at creation, the graduation anchor), lp_locked = the burned LP
+        # (Pool.lp_supply - lp_mint.supply): all of it on a canonical pool until a third party deposits
+        self.lp_units = math.isqrt(X * (Y + vq))
+        self.lp_locked = self.lp_units if canonical else 0
         self.boost_vault = boost_vault
         self.boost_next: Optional[int] = None
         self.boost_chunk = 0
@@ -462,11 +508,14 @@ class CPPool(Venue):
             self.boost_next = t + 1
 
     def boost_tick(self, t: int) -> None:
-        """Pump's boost authority: zero-fee buy with boost-vault SOL, tokens burned."""
+        """Pump's boost authority: zero-fee buy with boost-vault SOL, tokens burned.  The ELF's rounding (M6 as built,
+        ECONOMICS.md #104 (3), #105; graduation_scenarios::the_elf_prices_a_boost_chunk_at_one_lamport_less): a chunk of
+        b lamports moves b into the WSOL vault and burns floor(X*(b - 1)/(Y + b - 1)) tokens on the effective reserves
+        (v0.4.1: floor(X*b/(Y + b))); VQR is unchanged."""
         while self.boost_next is not None and t >= self.boost_next and self.boost_vault > 0:
             b = min(self.boost_chunk, self.boost_vault)
             X, Y = self.eff()
-            out = X * b // (Y + b)
+            out = X * (b - 1) // (Y + b - 1)
             self.X -= out
             self.Y += b
             self.supply -= out
@@ -492,8 +541,27 @@ class CPPool(Venue):
     def has_route(self):
         return not self.disabled and self.X > 0 and self.Y > 0
 
+    def lock_bps(self) -> int:
+        """lambda_bps = floor((Pool.lp_supply - lp_mint.supply)*1e4/Pool.lp_supply) (M6R-1, #105): the Raydium formula
+        of ARCH §2.6 on the canonical pool's own LP counter and its LP mint; 10,000 while no third party holds LP."""
+        return self.lp_locked * BPS // self.lp_units if self.lp_units else 0
+
     def locked_depth(self) -> int:
-        return self.sqrt_k()                  # canonical: 100 % of LP burned
+        """D = floor(lambda_bps*isqrt(X*(Y + VQR))/1e4) (M6R-1, #105; ARCH §2.6's metric on the pricing reserves): the
+        depth of the burned LP.  A third-party deposit or withdrawal scales X, Y, VQR and lp_supply together (R-VEN
+        Update H11), so it leaves D unchanged up to the whole-bps floor of lambda; a swap moves it only by the LP fee
+        the pool keeps, the boost not at all (up to rounding in the pool's favour).  = sqrt_k() while every LP unit is
+        burned (the pre-#105 reading of a canonical pool)."""
+        return self.lock_bps() * self.sqrt_k() // BPS
+
+    def add_liquidity(self, frac_bps: int) -> None:
+        """A third-party PumpSwap deposit of frac_bps of the pool (R-VEN Update H11: accepted on canonical pools, boost
+        vault funded or not): both vaults, VQR (floor(VQR*base_in/base)) and lp_supply scale; the minted LP circulates
+        (unlocked)."""
+        self.X += self.X * frac_bps // BPS
+        self.Y += self.Y * frac_bps // BPS
+        self.vq += self.vq * frac_bps // BPS
+        self.lp_units += self.lp_units * frac_bps // BPS
 
     def buy(self, b: int) -> int:
         X, Y = self.eff()
@@ -532,10 +600,21 @@ class CPPool(Venue):
                 self.sell(b)
 
     def remove_liquidity(self, frac_bps: int, force: bool = False) -> None:
-        if not self.lp_mutable:
-            raise ValueError("canonical pool: LP burned / BoostPoolLiquidityUnsupported")
+        """A withdrawal of frac_bps of the pool's LP.  A pool marked non-canonical (lp_mutable: the scenario library's
+        drains, attacks/fvcap.py's "LP lock violated" model case) keeps the v0.4.1 model: both reserves fall by
+        frac_bps, nothing else is tracked.  A canonical pool (R-VEN Update H11): only unlocked (third-party) LP can be
+        withdrawn -- both vaults, VQR and lp_supply scale down; the burned creation LP stays."""
+        if self.lp_mutable:
+            self.X -= self.X * frac_bps // BPS
+            self.Y -= self.Y * frac_bps // BPS
+            return
+        burn = self.lp_units * frac_bps // BPS
+        if self.lp_units - burn < self.lp_locked:
+            raise ValueError("canonical pool: the burned creation LP cannot be withdrawn")
         self.X -= self.X * frac_bps // BPS
         self.Y -= self.Y * frac_bps // BPS
+        self.vq -= self.vq * frac_bps // BPS
+        self.lp_units -= burn
 
 
 class RaydiumPool(Venue):
@@ -974,6 +1053,8 @@ class Market:
     sum_q = 0           # positions registered by Market.open, their outstanding Q, and the high-water mark of q
     max_q_hwm = 0       # since open_positions last returned to 0 (carried_fit)
     min_open_fee_ppm = 0  # FIT-2 (#100): the lowest one-way fee (ppm) an open paid since open_positions last was 0
+    migrated_pool = None  # M6 (#105): the canonical pool pump's migrate_v2 created, until the prologue's venue sync
+    synced_at = None      # M6 (#105): the second of the last -> PumpSwap transition (that instruction records nothing)
 
     def __init__(self, venue: Venue, tier: Tier, P: Params = DEFAULT, util_bps: int = 8000, t0: int = 0):
         self.venue, self.tier, self.P = venue, tier, P
@@ -1006,6 +1087,8 @@ class Market:
         self.sum_q = 0
         self.max_q_hwm = 0
         self.min_open_fee_ppm = 0                 # FIT-2 (#100): Market.min_open_fee_ppm (carried_phi)
+        self.migrated_pool: Optional[CPPool] = None  # M6 (#105): migrate_v2's pool, until the prologue's venue sync
+        self.synced_at: Optional[int] = None      # M6 (#105): the second of the last -> PumpSwap transition
         self._q_hint = 0                          # sim helper: size of the position under test
 
     @staticmethod
@@ -1033,20 +1116,30 @@ class Market:
 
     def advance(self, t: int) -> None:
         """Exogenous state up to t: graduation state machine, boost, rent accrual,
-        continuation of exogenous price moves across migration."""
+        continuation of exogenous price moves across migration.  M6 as built (ECONOMICS.md #104, #105; ARCH §2.5):
+        pump's migrate_v2 (migration_delay_s after the completion; never while PumpSwap's create_pool is disabled)
+        creates the canonical pool and starts its boost, other traders trade it from then on (exo_venue), and the
+        market itself moves onto it in the prologue of its next instruction (observe: the roll, then the venue sync,
+        _graduate)."""
         if self.migrating():
             if self.complete_t is None:
                 self.complete_t = t
-            if t >= self.complete_t + self.P.migration_delay_s:
-                self._switch_to_pool(self.venue.migrate(), t)
-        v = self.venue
+            if (self.migrated_pool is None and not self.venue.create_pool_halted
+                    and t >= self.complete_t + self.P.migration_delay_s):
+                self.migrated_pool = self.venue.migrate()
+                self.migrated_pool.start_boost(t)
+        v = self.exo_venue()
         if isinstance(v, CPPool):
             v.boost_tick(t)
         self.accrue(t)
         self.t = max(self.t, t)
-        if self.pending_target is not None and self.venue.has_route():
+        if self.pending_target is not None and self.exo_venue().has_route():
             tgt, self.pending_target = self.pending_target, None
             self.exo_move(tgt)
+
+    def exo_venue(self) -> Venue:
+        """The venue other traders trade: the pool migrate_v2 created, from then until the market's venue sync."""
+        return self.migrated_pool if self.migrated_pool is not None else self.venue
 
     def s3_no_route(self) -> bool:
         """ARCH §5.3: !venue_executable v route_broken v fee above the hard cap."""
@@ -1072,11 +1165,20 @@ class Market:
         """Prologue of every instruction that carries the venue accounts: roll the
         completed bucket, update the S3 and fast-path chains, then add this
         instruction's pre-trade spot to the current bucket (only if the venue can
-        execute, or is a migrating curve whose final state is still recorded)."""
+        execute, or is a migrating curve whose final state is still recorded).
+        M6 as built (#104, #105): if migrate_v2 has created the canonical pool, the venue sync moves the market onto
+        it after the roll (_graduate) and the instruction does nothing else here; on a canonical PumpSwap pool in
+        its warm-up, L_slow is capped at the pool's locked depth D (M6R-1)."""
         P = self.P
         if self.b_sec is not None and t > self.b_sec:
             self._integrate(t)
+        if self.migrated_pool is not None:
+            # M6 as built (#104, #105; ARCH §2.5, prologue step 6): the venue sync moves the market onto the canonical
+            # pool after the roll; the transitioning instruction runs no route chain and records no observation
+            self._graduate(self.migrated_pool, t)
+            return
         v = self.venue
+        self._warmup_slow_cap()
         self.no_route_since, self.last_no_route_obs = self._chain(
             self.no_route_since, self.last_no_route_obs, self.s3_no_route(), t, P.s3_obs_gap_s)
         if v.kind == "ray":
@@ -1089,6 +1191,18 @@ class Market:
             else:
                 self.b_lo, self.b_hi = min(self.b_lo, p), max(self.b_hi, p)
                 self.b_llo, self.b_lhi = min(self.b_llo, lq), max(self.b_lhi, lq)
+
+    def _warmup_slow_cap(self) -> None:
+        """M6R-1 (owner decision 2026-09-30, ECONOMICS.md #105; ARCH §2.5, prologue step 6): during a PumpSwap warm-up
+        (after the graduation or a PumpSwap price start) every executable observation caps L_slow at the pool's locked
+        depth D -- the Raydium adoption's L_slow = min(L_slow, D), taken at the first instruction that reads D (the
+        transition itself reads no LP mint).  L_slow does not integrate during the warm-up and D moves only by the LP
+        fee the pool keeps, so the first cap is the one that binds; on an honest graduation it never does (D >= the
+        lp_supply anchor >= L_slow), and it undoes a deposit that raised the anchor between migrate_v2 and the
+        transition."""
+        v = self.venue
+        if isinstance(v, CPPool) and v.canonical and self.warm > 0 and v.has_route():
+            self.liq_slow = min(self.liq_slow, v.locked_depth())
 
     def _integrate(self, t: int) -> None:
         """Integrate the completed bucket (C0-5): the observation is the EMA clamped
@@ -1129,26 +1243,34 @@ class Market:
         """M4R warm-up integration (ECON §5.2; shortwin_math::observe::integrate, ema.warm > 0).  With
         k = EMA_WARMUP_BUCKETS - ema_warm post-change entries already in the ring and E = this bucket plus
         those k entries (n = k + 1 <= 8):
-            P_ema = min(min over E of the bucket price lows,                (fresh, the safe side)
-                        floor((P_ema*tau + floor(P_ema*(1e4 + C)/1e4)*dt)/(tau + dt)))
-                                                                            the largest v0.4.1 step (M4X-1)
+            P_ema = max(min(min over E of the bucket price lows,            (fresh, the safe side)
+                            floor((P_ema*tau + floor(P_ema*(1e4 + C)/1e4)*dt)/(tau + dt))),
+                                                                            the largest v0.4.1 step up (M4X-1)
+                        floor((P_ema*tau + floor(P_ema*1e4/(1e4 + C))*dt)/(tau + dt)))
+                                                                            the largest v0.4.1 step down (M6-SEC-1)
             L_ema = min(max H, floor(lomed(H)*(1e4 + C)/1e4))               H = the bucket liquidity highs of E,
                                                                             lomed = H[(n-1)//2] ascending
         with dt as in _integrate; no liquidity blend; the ring entry is pushed with the bucket's extremes and the
-        reprojection of the seed; L_slow and slow_ts unchanged; ema_warm -= 1.  The price seed falls freely but
-        rises per integration by no more than the v0.4.1 EMA can (x(tau + dt*(1 + C))/(tau + dt): 9/7 at dt = 2,
-        7/6 at dt = 1): attacker-only warm-up seconds reach no higher than the same seconds in steady state with a
-        large enough pump (M4X-1), while a genuine move is tracked at that rate (2.2x by the gate).  A
-        withdraw-wrapped sample lowers only its bucket's llo, which the seed never reads; a deposit-wrapped one
-        raises one bucket's lhi, bounded by the lower median unless >= 5 of 8 buckets are pushed.  The dt <= 0
-        path is as in _integrate: no step."""
+        reprojection of the seed; L_slow and slow_ts unchanged; ema_warm -= 1.  The price seed moves per integration
+        by no more than the v0.4.1 EMA can, up (x(tau + dt*(1 + C))/(tau + dt): 9/7 at dt = 2, 7/6 at dt = 1;
+        observe::price_up_bound) and, since M6-SEC-1 (owner decision 2026-09-30, ECONOMICS.md #105), down
+        (x(tau + dt/(1 + C))/(tau + dt): 6/7 at dt = 2, 11/12 at dt = 1; observe::price_down_bound): attacker-only
+        warm-up seconds reach no higher than the same seconds in steady state with a large enough pump (M4X-1), a
+        genuine move is tracked at that rate either way (up 2.2x, down 0.50x by the gate), and one low recorded in a
+        warm-up second -- a sell-wrapped crank next to the keeper's -- pulls the seed down by at most one v0.4.1
+        step per remaining warm-up integration ((11/12)^k), no longer to the low at once (the low stays in E, so it
+        keeps pulling until the gate: at most x0.4986 over the 8 integrations).  A seed that lags a fall forces no
+        exit: the spot leg reads the live price (§5.5).  A withdraw-wrapped sample lowers only its bucket's llo,
+        which the seed never reads; a deposit-wrapped one raises one bucket's lhi, bounded by the lower median
+        unless >= 5 of 8 buckets are pushed.  The dt <= 0 path is as in _integrate: no step."""
         if t > self.ema_t:
             T = self.tier
             k = EMA_WARMUP_BUCKETS - self.warm
             ents = self.ring[len(self.ring) - k:] if k else []
             dt = min(t - self.ema_t, T.ema_dtmax_s)
             up = (self.ema * T.ema_tau_s + self.ema * (BPS + T.ema_clamp_bps) // BPS * dt) // (T.ema_tau_s + dt)
-            p = min([e[5] for e in ents] + [self.b_lo, up])
+            down = (self.ema * T.ema_tau_s + self.ema * BPS // (BPS + T.ema_clamp_bps) * dt) // (T.ema_tau_s + dt)
+            p = max(min([e[5] for e in ents] + [self.b_lo, up]), down)
             H = sorted([e[8] for e in ents] + [self.b_lhi])
             n = len(H)
             l = min(H[n - 1], H[(n - 1) // 2] * (BPS + self.tier.ema_clamp_bps) // BPS)
@@ -1171,15 +1293,17 @@ class Market:
             self.guard = False
 
     def mark_restart(self) -> None:
-        """observe::mark_restart: the observation state was (re)started by a Raydium venue change or a Raydium
-        price start; it is unconfirmed until EMA_WARMUP_BUCKETS integrations have re-seeded it."""
+        """observe::mark_restart: the observation state was (re)started by a Raydium venue change, a Raydium or
+        PumpSwap price start or the -> PumpSwap graduation (M6, #104, #105); it is unconfirmed until
+        EMA_WARMUP_BUCKETS integrations have re-seeded it."""
         self.warm = EMA_WARMUP_BUCKETS
         self.guard = True
 
     def gated(self) -> bool:
         """M4R gate (ARCH §3.6-§3.8): while ema_warm > 0 on an EXECUTABLE venue, liquidate / expire fail with
         EmaWarmingUp and sol_settle evaluates nothing (no arm change, no settlement).  A venue that cannot execute
-        is never gated, so S3 is never deadlocked."""
+        is never gated, so S3 is never deadlocked.  (Opens: refused while ema_warm > 0 on Raydium and -- M6, kept by
+        the owner on 2026-09-30, OWNER-M6R-2 -- on PumpSwap, Market.open.)"""
         return self.warm > 0 and self.venue.has_route()
 
     def step_to(self, t: int) -> None:
@@ -1205,13 +1329,44 @@ class Market:
         self.b_sec = None                          # the open bucket is cleared (ARCH §4.4)
 
     def _switch_to_pool(self, pool: CPPool, t: int) -> None:
-        """Graduation: P_ema carries over; liquidity EMAs reset to the new pool."""
+        """Graduation, v0.4.1 rule: P_ema carries over; liquidity EMAs reset to the new pool (observe::VenueChange::
+        Graduation).  Kept unchanged ONLY for the math crate's unit vectors (gen_oracle.py unit_rewrite); the
+        program's rule is _graduate (M6 as built, ECONOMICS.md #104, #105), which every scenario runs."""
         self.venue = pool
         self.graduated_t = t
         pool.start_boost(t)
         self.liq = pool.sqrt_k()
         self.liq_slow = self.liq
         self._rewrite_ring_liq(self.liq)
+
+    def _restart_on(self, pool: Venue, l_new: int, slow_cap: int) -> None:
+        """observe::rewrite_liquidity(l_new, RaydiumLocked { slow_cap }) then mark_restart (engine::pool_select::adopt,
+        venues::pump_amm::graduate): L_ema and every ring entry's l / llo / lhi := l_new ((x, y) recomputed), L_slow =
+        min(L_slow, slow_cap), never raised; the open bucket and both route chains cleared; P_ema, the ring prices and
+        the age kept; ema_warm = 8, ema_guard = 1."""
+        self.venue = pool
+        self.liq = l_new
+        self.liq_slow = min(self.liq_slow, slow_cap)
+        self._rewrite_ring_liq(l_new)
+        self.pool_fail_since = self.last_pool_fail_obs = None
+        self.no_route_since = self.last_no_route_obs = None
+        self.mark_restart()
+
+    def _graduate(self, pool: CPPool, t: int) -> None:
+        """PumpCurve / PumpMigrating -> PumpSwap as built (M6, ECONOMICS.md #104; ARCH §2.5; venues::pump_amm::graduate;
+        kept by the owner on 2026-09-30, #105: OWNER-M6R-2 the warm-up, OWNER-M6R-4 the exit delay): the prologue's
+        venue sync, after the roll of the curve's last bucket, reads no sample of the pool -- the anchor is the pool's
+        lp_supply (its isqrt(X*(Y + VQR)) at creation, which no trade moves; a deposit between migrate_v2 and the
+        transition raises it, which the warm-up's L_slow cap at D undoes, observe) -- and restarts the observation
+        state on it: _restart_on(pool, anchor, anchor) (L_slow = min(L_slow, anchor)), graduated_at = now.  The
+        transitioning instruction records nothing; the 8 warm-up integrations re-seed P_ema and L_ema from the pool's
+        own buckets, and keeper exits, settlements and PumpSwap opens wait for them (gated, Market.open): the keeper's
+        exit on a graduated position lands 8-12 s after the migration."""
+        anchor = pool.lp_units
+        self.graduated_t = t
+        self.migrated_pool = None
+        self._restart_on(pool, anchor, anchor)
+        self.synced_at = t
 
     def fast_switch(self, pool: Venue, t: int) -> None:
         """Raydium fast path (incumbent failure), v0.4.1 rule: L_ema and L_slow reset to
@@ -1244,8 +1399,9 @@ class Market:
         self.mark_restart()
 
     def exo_move(self, p_wad: int) -> None:
-        """Other market participants trade the venue toward price p_wad."""
-        v = self.venue
+        """Other market participants trade the venue toward price p_wad (the migrated pool from migrate_v2 on, before
+        the market's own venue sync)."""
+        v = self.exo_venue()
         if not v.has_route():
             self.pending_target = p_wad
             return
@@ -1315,17 +1471,28 @@ class Market:
         x_ema = v.sqrt_k() * SQRT_WAD // isqrt_ceil(self.ema)
         return min(v.vt, x_ema), min(v.rt, max(0, x_ema - (v.vt - v.rt)))
 
+    def locked_depth_venue(self) -> bool:
+        """Whether the venue has a locked depth D the caps and the reference read (conservative_x, ref_depth_cap):
+        Raydium, and since M6R-1 (owner decision 2026-09-30, ECONOMICS.md #105) a canonical PumpSwap pool, D from its
+        burned LP (CPPool.lock_bps / locked_depth: Pool.lp_supply and the LP mint's supply).  A CPPool marked
+        non-canonical is the scenario library's model of a violated lock (lp_mutable, attacks/fvcap.py): no D, as
+        before #105.  The curve has none (its L is virtual; no LP exists)."""
+        v = self.venue
+        return v.kind == "ray" or (isinstance(v, CPPool) and v.canonical)
+
     def conservative_x(self) -> int:
         """R3A-3 ii: token reserve for caps: curve min(vT, x_ema) (#103, curve_cap_reserves; vT while
-        P_ema <= P_spot); PumpSwap min(X_now, L_slow/sqrt(P_ema)); Raydium additionally
-        <= D/(lambda_min*sqrt(P_ema))."""
+        P_ema <= P_spot); PumpSwap min(X_now, L_slow/sqrt(P_ema)); Raydium and (since M6R-1, #105) a canonical
+        PumpSwap pool additionally <= D/(lambda_min*sqrt(P_ema)).  A deposit wrapped around the open lifts neither
+        L_slow nor D (only X_now, which the minimum drops), and a deposit held long enough to push L_slow is bounded
+        at lambda/lambda_min of the pool's own depth."""
         v = self.venue
         X_now = v.eff()[0]
         if v.kind == "curve":
             return self.curve_cap_reserves()[0]
         sp = isqrt_ceil(self.ema)
         x = min(X_now, self.liq_slow * SQRT_WAD // sp)
-        if v.kind == "ray":
+        if self.locked_depth_venue():
             x = min(x, v.locked_depth() * SQRT_WAD * BPS // (self.P.pool_lock_min_bps * sp))
         return x
 
@@ -1351,12 +1518,20 @@ class Market:
 
     def open(self, Q: int, t: int) -> Position:
         self.advance(t)
+        if self.migrated_pool is not None:
+            # M6 as built (ARCH §2.5): an open whose own prologue would move the market onto the pool is refused
+            # (VenueMigrating) and the transition reverts with it; the next crank performs it
+            raise ValueError("VenueMigrating")
         self.observe(t)
         v, T, P = self.venue, self.tier, self.P
         if self.ema > P_OPEN_MAX:
             raise ValueError("price above P_OPEN_MAX")
-        if self.warm > 0 and v.kind == "ray":      # M4R: opens wait for ema_warm == 0 on Raydium (EmaWarmingUp)
+        if self.warm > 0 and v.kind in ("ray", "amm"):
+            # M4R / M6 (OWNER-M6R-2 kept, #105): opens wait for ema_warm == 0 on Raydium and PumpSwap (EmaWarmingUp)
             raise ValueError("EmaWarmingUp")
+        if v.kind == "curve" and v.create_pool_halted:
+            # M6-SEC-3 (owner decision 2026-09-30, #105): no open on a curve whose graduation PumpSwap has halted
+            raise ValueError("GraduationHalted")
         spot_pre = v.spot_wad()
         e = self.ring[-1]                       # EMA state after this instruction's roll (R3A-12)
         S = v.sell(Q)
@@ -1550,13 +1725,15 @@ class Market:
         return min(P.kappa_liq_bps, P.kappa_base_bps + (self.tier.ema_tau_s + 1) * self.ema_growth_bps())
 
     def ref_depth_cap(self) -> Optional[int]:
-        """M4F-1 (ECON §8.2; bounds::ref_liquidity): on a Raydium venue the EMA terms of the exit reference
+        """M4F-1 (ECON §8.2; bounds::ref_liquidity): on a Raydium venue -- and since M6R-1 (owner decision 2026-09-30,
+        ECONOMICS.md #105) on a canonical PumpSwap pool, D from its burned LP -- the EMA terms of the exit reference
         liquidity are capped at floor(D*1e4/lambda_min), D the pool's locked depth now -- the most depth sizing
         ever credits the pool with (conservative_x, the adoption anchor).  L_b = max(L_live, min(max(L_ema',
         L_slow), cap)): a deposit-inflated L_ema / L_slow lifts the reference by at most lambda/lambda_min over the
-        live depth, and L_live itself is never capped.  None (no cap) on the pump venues, which have no D."""
+        live depth, and L_live itself is never capped.  None (no cap) on the curve, which has no D, and on a
+        non-canonical model pool (locked_depth_venue)."""
         v = self.venue
-        if v.kind != "ray":
+        if not self.locked_depth_venue():
             return None
         return depth_at_lambda(v.locked_depth(), self.P.pool_lock_min_bps)
 
@@ -1697,7 +1874,14 @@ class Market:
     def _try_exit(self, pos: Position, t: int, borrower_close: bool = False, borrower_limit: Optional[int] = None,
                   settle_only: bool = False):
         self.advance(t)
+        if self.migrated_pool is not None and not settle_only:
+            # M6 as built (ARCH §2.5): a close, liquidate or expire whose own prologue would move the market onto the
+            # pool refuses VenueMigrating and the transition reverts with it (the second's crank performs it)
+            return None
+        synced = self.synced_at
         self.observe(t)
+        if self.synced_at != synced:
+            return None                             # a sol_settle that moved the market evaluates nothing (ARCH §2.5)
         P = self.P
         v = self.venue
         spot_before = v.spot_wad() if v.has_price() else self.ema
@@ -1734,6 +1918,15 @@ class Market:
                     pos.disarm()
                 else:
                     pos.s_last = t
+            return None
+
+        if P.two_leg and not settle_only and v_is_straddle(v, Q):
+            # M6 as built (ARCH §5.4 tx3; services/keeper decide Plan::Straddle; OWNER-M6R-4, accepted 2026-09-30,
+            # #105): the keeper's straddle bundle is tx1 its own completion of the curve, tx2 migrate_v2 and tx3 the
+            # transition (a crank on the curve's ReadSet) plus a crank on the pool's (its first bucket).  tx3 carries
+            # no exit -- the transition starts the post-change warm-up, so a keeper liquidate / expire would revert
+            # the bundle (EmaWarmingUp) -- and the keeper exits on the pool once the warm-up has passed
+            self._straddle_to_pool(t)
             return None
 
         if v.has_route() and not settle_only:
@@ -1901,16 +2094,34 @@ class Market:
                 and res["keeper"] < K:                                    # I-E10 (R3B-10)
             raise InvariantError(("liquidation keeper below K_s with borrower equity left", res))
 
+    def _straddle_to_pool(self, t: int) -> CPPool:
+        """The straddle bundle's first three transactions (V1-9; M6 as built, ECONOMICS.md #104, #105; ARCH §5.4):
+        tx1 the completer (the keeper, or the borrower's client) buys the curve's rT with its own SOL and keeps the
+        tokens (keeper_straddle_cost), tx2 migrate_v2 creates the canonical pool and starts its boost, tx3's crank on
+        the curve's ReadSet moves the market onto it (_graduate; this second's bucket was cleared by the rewrite) and
+        the next instruction in tx3 -- the keeper's crank on the pool's ReadSet, or the borrower's close_short --
+        records the pool's first bucket at t in its prologue."""
+        v = self.venue
+        self.keeper_straddle_cost = v.buy(v.rt) if v.rt else 0
+        pool = v.migrate()
+        pool.start_boost(t)
+        self._graduate(pool, t)
+        self.observe(t)
+        return pool
+
     def _buy_back(self, Q: int, t: int) -> int:
         v = self.venue
-        if v.kind == "curve" and Q > v.rt:
-            # >= 3-transaction bundle: tx1 the keeper completes the curve with its own SOL
-            # (it keeps the tokens), tx2 migrate_v2, tx3 the position buys all of Q on the new pool.
-            self.keeper_straddle_cost = v.buy(v.rt) if v.rt else 0
-            pool = v.migrate()
-            self._switch_to_pool(pool, t)
-            return pool.buy(Q)
+        if v_is_straddle(v, Q):
+            # the borrower's own >= 3-transaction bundle (a close; ECON §10.2): tx3 = the pool's accounts, the
+            # transition crank and its close_short, which the warm-up does not gate: the position buys all of Q on
+            # the new pool at once (B = B_str)
+            return self._straddle_to_pool(t).buy(Q)
         return v.buy(Q)
+
+
+def v_is_straddle(v: Venue, Q: int) -> bool:
+    """A buyback of Q on a live curve with Q > rT, which pump refuses (6021): only the straddle bundle executes it."""
+    return v.kind == "curve" and not v.complete and Q > v.rt
 
 
 # ----------------------------------------------------------------------------
@@ -2461,6 +2672,7 @@ def price_rise_to_liq(key: str, size_frac: float, rent_days):
         m.advance(t + 1)
         if m.migrating():
             m.advance(t + 1 + m.P.migration_delay_s)
+            m.observe(t + 1 + m.P.migration_delay_s)      # M6 (#105): the next prologue moves the market onto the pool
             m.exo_move(int(pos.spot_post * k))
         qs = m.quote_spot(pos.Q)
         R = m.rent_due(pos)

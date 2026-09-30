@@ -4,8 +4,9 @@
 //! `min(φ_live, venue_fee_hard_cap_bps_pos)` (V2-1). A borrower's close has no reference: its
 //! bound is `min(max_buyback_cost, V − R − ert)` ([`close_max_in`]).
 //!
-//! The reference liquidity of a Raydium market is capped at the depth its sizing credits
-//! (M4F-1, [`ref_depth_cap`]).
+//! The reference liquidity of a Raydium market — and since the owner's decision of 2026-09-30
+//! (M6R-1) of a PumpSwap market — is capped at the depth its sizing credits (M4F-1,
+//! [`ref_depth_cap`]).
 //!
 //! Used by `close_short` (M2 foundation) and by the `liquidate` / `expire` tracks.
 
@@ -24,7 +25,7 @@ pub struct ExitBound {
     pub p_ref: u128,
     /// `L_b = max(L_live, min(max(L_ema', L_slow), cap))` (V2-14), `L_ema' = min(L_ema, L_mlo)`
     /// while the post-change reference guard is set (M4R), `cap` = [`ref_depth_cap`] on Raydium
-    /// (M4F-1).
+    /// (M4F-1) and PumpSwap (M6R-1).
     pub l_b: u128,
     /// `B̂_ref = B̂(Q; reprice(L_b, P_ref))` at the risk fee; `None` if undefined.
     pub b_ref: Option<u64>,
@@ -34,10 +35,12 @@ pub struct ExitBound {
 /// `⌊D·10⁴/λ_min⌋` (`shortwin_math::bounds::ref_depth_cap`) with `D = pool_d` — the locked depth
 /// at the last executable observation, which the exit's own prologue has just refreshed — and
 /// `λ_min = pool_lock_min_bps`: never more depth than the open caps, the tier and the adoption
-/// anchor credit the pool with (V2-8). `None` on the other venues (the pump venues and the mock
-/// have no locked depth and no pool selection, hence no switch and no post-change guard).
+/// anchor credit the pool with (V2-8). Since the owner's decision of 2026-09-30 (M6R-1, ARCH §3.6,
+/// changelog 56; ECON #105) the same on a PumpSwap market, `D` the canonical pool's burned-LP
+/// depth: a deposit-inflated `L_ema` / `L_slow` lifts the reference by at most `λ/λ_min` over the
+/// live depth. `None` on the curve and the mock (no locked depth; `VenueKind::has_locked_depth`).
 pub fn ref_depth_cap(config: &GlobalConfig, market: &Market, kind: VenueKind) -> Option<u128> {
-    kind.is_raydium()
+    kind.has_locked_depth()
         .then(|| bounds::ref_depth_cap(market.pool_d.get(), config.params.pool_lock_min_bps))
 }
 

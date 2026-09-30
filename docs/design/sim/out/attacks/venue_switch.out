@@ -1,11 +1,11 @@
 | market | scenario | ring at the venue change | outcome | exit vs event | price at exit | lender P&L | seconds with the settlement box wider than 1 % in L (first 60 s after the change) |
 |---|---|---|---|---|---|---|---|
-| D@90% | graduation, then +2x on AMM over 60s | carried over (v0.3 ARCH) | liquidation | +60s | 2.60x | +5.3% | 4 |
-| D@90% | graduation, then +2x on AMM over 60s | rewritten (v0.4.1) | liquidation | +60s | 2.60x | +5.3% | 0 |
-| D@90% | graduation, then +3x on AMM over 60s | carried over (v0.3 ARCH) | liquidation | +52s | 2.74x | +5.3% | 4 |
-| D@90% | graduation, then +3x on AMM over 60s | rewritten (v0.4.1) | liquidation | +52s | 2.74x | +5.3% | 0 |
-| D@97% | graduation, then +2x on AMM over 60s | carried over (v0.3 ARCH) | liquidation | +87s | 2.60x | +5.3% | 4 |
-| D@97% | graduation, then +2x on AMM over 60s | rewritten (v0.4.1) | liquidation | +87s | 2.60x | +5.3% | 0 |
+| D@90% | graduation, then +2x on AMM over 60s | carried over (v0.3 ARCH) | liquidation | +60s | 2.60x | +5.3% | 5 (5 in the gate) |
+| D@90% | graduation, then +2x on AMM over 60s | rewritten to lp_supply (M6) | liquidation | +60s | 2.60x | +5.3% | 0 |
+| D@90% | graduation, then +3x on AMM over 60s | carried over (v0.3 ARCH) | liquidation | +52s | 2.74x | +5.3% | 5 (5 in the gate) |
+| D@90% | graduation, then +3x on AMM over 60s | rewritten to lp_supply (M6) | liquidation | +52s | 2.74x | +5.3% | 0 |
+| D@97% | graduation, then +2x on AMM over 60s | carried over (v0.3 ARCH) | liquidation | +87s | 2.60x | +5.3% | 5 (5 in the gate) |
+| D@97% | graduation, then +2x on AMM over 60s | rewritten to lp_supply (M6) | liquidation | +87s | 2.60x | +5.3% | 0 |
 | RA | halt -> fast path to a 120% pool, then pump 2x/120s | carried over (v0.3 ARCH) | liquidation | +393s | 1.71x | +2.2% | 4 (4 in the gate) |
 | RA | halt -> fast path to a 120% pool, then pump 2x/120s | rewritten to the anchor (M4R) | liquidation | +393s | 1.71x | +2.2% | 4 (4 in the gate) |
 | RB | halt -> fast path to a 120% pool, then pump 2x/120s | carried over (v0.3 ARCH) | liquidation | +418s | 1.98x | +3.5% | 4 (4 in the gate) |

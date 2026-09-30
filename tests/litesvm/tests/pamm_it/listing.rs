@@ -84,7 +84,11 @@ fn a_pumpswap_class_coin_lists_on_its_canonical_pool() {
 }
 
 /// The price starts at the first PumpSwap observation, marked (`ema_warm = 8`, `ema_guard = 1`),
-/// at the pool's spot and depth; eight integrations of the pool's own buckets confirm it.
+/// at the pool's spot and depth; eight integrations of the pool's own buckets confirm it. Since
+/// M6R-1 (owner decision of 2026-09-30) as a Raydium start: `L_ema = min(√(X·(Y + VQR)),
+/// ⌊D·10⁴/λ_min⌋)` and — the warm-up's depth cap in the same prologue — `L_slow = min(L_ema, D)`,
+/// `D` the burned LP's locked depth, written into `pool_d`. On e/acc's `mature` pool (third-party
+/// LP, λ 92.98 %) `L_ema` is the pool's `√k` and `L_slow` its locked depth.
 #[test]
 fn the_first_pumpswap_observation_starts_the_price_marked_for_the_warm_up() {
     let (mut env, p) = list_and_check(PammCoin::Mature);
@@ -92,15 +96,28 @@ fn the_first_pumpswap_observation_starts_the_price_marked_for_the_warm_up() {
     let pm = PammMarket::new(&env.svm, &p.mint, lender, Pubkey::default());
     env.warp(1);
     let r = p.reserves(&env.svm).unwrap();
+    let (lam, d) = p.locked_depth(&env.svm);
+    assert_eq!(lam, 9_298, "e/acc's burned share (R-VEN Update H11)");
     crank(&mut env, &pm);
     let m = market(&env, &pm);
     let spot = r.effective_quote * shortwin_math::num::WAD / u128::from(r.base);
     let l = shortwin_math::quote::liquidity(u128::from(r.base), r.effective_quote).unwrap();
     assert_eq!(m.ema_price.get(), spot);
-    assert_eq!((m.ema_liq.get(), m.liq_slow.get()), (l, l));
+    // λ_min 50 %: the cap ⌊D·10⁴/λ_min⌋ = 1.86·√k does not bind; L_slow is the depth.
+    assert!(d * 2 > l && d < l);
+    assert_eq!(
+        (m.ema_liq.get(), m.liq_slow.get(), m.pool_d.get()),
+        (l, d, d)
+    );
     assert_eq!((m.ema_warm, m.ema_guard, m.ring_count), (8, 1, 1));
     crank_secs(&mut env, &pm, 8);
-    assert_eq!(market(&env, &pm).ema_warm, 0);
+    let m = market(&env, &pm);
+    assert_eq!(m.ema_warm, 0);
+    assert_eq!(
+        m.liq_slow.get(),
+        d,
+        "no integration of L_slow in the warm-up"
+    );
 }
 
 /// The pAMM init set is key-checked (`VenueAccountMismatch`): pump's init set in its place, or

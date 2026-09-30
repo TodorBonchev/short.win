@@ -893,8 +893,11 @@ fn m4v_4_a_latched_window_candidate_cancels_and_the_fast_path_goes_on() {
 /// - with no observation after the capture, a plain open and every `[buy, open, sell]` size are
 ///   refused `EmaWarmingUp` (the marked price state has integrated nothing since its start);
 /// - once honest observations exist (the keeper's listing-window cranks: the post-change warm-up
-///   of `EMA_WARMUP_BUCKETS` integrations re-seeds `P_ema` from the honest bucket lows, M4R), the
-///   pushed open is refused on `R_eff` or the spot/EMA check, and a plain open `PoolTooThin`;
+///   of `EMA_WARMUP_BUCKETS` integrations re-seeds `P_ema` from the honest bucket lows, M4R — since
+///   M6-SEC-1 (the owner's decision of 2026-09-30) falling at most one v0.4.1 step per
+///   integration, so at the gate the pushed start still lies ≈ 2.7× above the pool, the safe side,
+///   and the steady EMA meets the pool within a minute), the pushed open is refused on `R_eff` or
+///   the spot/EMA check, and a plain open `PoolTooThin`;
 /// - nothing was opened, so Fartcoin's main pool replaces the capture (zero-position rule).
 #[test]
 fn m4v_5_a_captured_list_only_market_opens_nothing_on_its_pushed_price() {
@@ -997,12 +1000,62 @@ fn m4v_5_a_captured_list_only_market_opens_nothing_on_its_pushed_price() {
     );
     assert_eq!(m.ema_warm, 0, "confirmed");
     let p_now = spot(&env, &thin);
+    // M6-SEC-1: the seed fell by at most one v0.4.1 step per integration (×(6/7)·(11/12)⁷ from the
+    // pushed start over the warm-up), so it still lies above the honest pool at the gate.
     assert!(
-        m.ema_price.get() <= p_now && m.ema_price.get() * 1_000 >= p_now * 999,
-        "P_ema re-seeded at the honest lows ({} vs spot {p_now})",
+        m.ema_price.get() > p_now,
+        "P_ema above the pool at the gate ({} vs spot {p_now})",
         m.ema_price.get()
     );
-    for div in sizes {
+    for pass in 0..2 {
+        if pass == 1 {
+            // A minute of honest steady integrations: P_ema meets the pool.
+            for _ in 0..60 {
+                env.warp(1);
+                env.crank(&rm);
+            }
+            let m = env.market(&rm.market());
+            let p_now = spot(&env, &thin);
+            println!(
+                "M4V-5: a minute later P_ema/true spot {:.4}",
+                m.ema_price.get() as f64 / p_now as f64
+            );
+            assert!(
+                m.ema_price.get().abs_diff(p_now) * 1_000 <= p_now,
+                "P_ema at the honest pool ({} vs spot {p_now})",
+                m.ema_price.get()
+            );
+        }
+        pushed_opens_refused(&mut env, &rm, &b, &bk, &owner, q, &sizes, &wrap);
+    }
+    let (plain, _) = env.open(&rm, &mut b, q);
+    assert_err(&plain, E::PoolTooThin);
+    env.warp(1);
+    let e = adopt_ok(&mut env, Some(&thin), &base);
+    assert_eq!(e.kind, POOL_KIND_ZERO_POSITION);
+    println!(
+        "M4V-5: after honest observations the pushed open is refused on R_eff / the spot-EMA check; the main pool replaces the capture"
+    );
+}
+
+/// M4V-5's pushed opens `[buy, open q·div/16, sell]`, each refused `PoolTooThin` or
+/// `PriceDeviatesFromEma`.
+#[allow(clippy::too_many_arguments)]
+fn pushed_opens_refused(
+    env: &mut common::Env,
+    rm: &common::RayMarket,
+    b: &common::Borrower,
+    bk: &solana_keypair::Keypair,
+    owner: &solana_keypair::Keypair,
+    q: u64,
+    sizes: &[u64],
+    wrap: &dyn Fn(&common::Env, common::Instruction) -> Vec<common::Instruction>,
+) {
+    use shortwin::venues::ExtrasSel;
+    use shortwin_litesvm_tests::engine::open_short_ix;
+
+    use crate::common::*;
+    for &div in sizes {
         let open = open_short_ix(
             &rm,
             &b.key(),
@@ -1014,20 +1067,12 @@ fn m4v_5_a_captured_list_only_market_opens_nothing_on_its_pushed_price() {
             ExtrasSel::NONE,
             &[],
         );
-        let ixs = wrap(&env, open);
-        let r = env.send(&ixs, &[&owner, &bk]);
+        let ixs = wrap(env, open);
+        let r = env.send(&ixs, &[owner, bk]);
         let c = custom_code(&r);
         assert!(
             c == Some(code(E::PoolTooThin)) || c == Some(code(E::PriceDeviatesFromEma)),
             "[buy, open {div}/16 q, sell] after honest observations: {c:?}"
         );
     }
-    let (plain, _) = env.open(&rm, &mut b, q);
-    assert_err(&plain, E::PoolTooThin);
-    env.warp(1);
-    let e = adopt_ok(&mut env, Some(&thin), &base);
-    assert_eq!(e.kind, POOL_KIND_ZERO_POSITION);
-    println!(
-        "M4V-5: after honest observations the pushed open is refused on R_eff / the spot-EMA check; the main pool replaces the capture"
-    );
 }

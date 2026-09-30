@@ -5,10 +5,12 @@ a Raydium fast-path switch may land on a pool with a quarter of the depth.  v0.3
 carried every ring entry's L and lobs over; v0.4 (like the sims) rewrites them to the reset
 liquidity.  Compared here: outcome of genuine moves after the change, and the number of seconds
 after it during which the settlement box is wider than fv_dev_bps in L (which blocks any S2/S3
-amount that depends on it).  The graduation rows are unchanged from v0.4.1; the Raydium rows replay
+amount that depends on it).  The graduation rows run the program's rule since M6 (ECONOMICS.md #104, #105;
+Market._graduate: the ring rewritten to the pool's lp_supply, then the 8-bucket warm-up, as a Raydium adoption;
+the carried-over variant keeps the ring's L through the same restart); the Raydium rows replay
 FAST_SCENARIOS[1], whose switch is the program's rule (Market.adopt_pool, M4R: the ring is rewritten to
-the anchor floor(D*1e4/lambda_min) and the 8-bucket warm-up re-seeds it; the cell gives the wide
-seconds and how many of them fall inside the warm-up gate, during which the box decides nothing).
+the anchor floor(D*1e4/lambda_min) and the 8-bucket warm-up re-seeds it); the cell gives the wide
+seconds and how many of them fall inside the warm-up gate, during which the box decides nothing.
 Since #99 that replay is the 120 % candidate (lambda 90 %): a position at the incumbent's size cap fits only
 a candidate whose locked depth covers the incumbent's L_slow (a quarter of the depth no longer carries it).
 
@@ -524,7 +526,7 @@ if __name__ == "__main__":
                     changed = t
             wide = wide_cell(box_wide_split(m2, changed + 1, changed + 61)) if changed else "n/a"
             ring = ("carried over (v0.3 ARCH)" if carry else
-                    "rewritten to the anchor (M4R)" if key.startswith("R") else "rewritten (v0.4.1)")
+                    "rewritten to the anchor (M4R)" if key.startswith("R") else "rewritten to lp_supply (M6)")
             print(f"| {key} | {sc.name} | {ring} | {s['kind']} | "
                   f"{s['t'] - sc.t_event:+d}s | {s['mult']:.2f}x | {s['lender_pnl_pct']:+.1f}% | {wide} |")
     for part in (table_b, table_c, table_d1, table_d2, table_d3, table_d4):

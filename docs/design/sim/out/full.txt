@@ -134,7 +134,7 @@ S3 with observation-gap rule 60 s: first S3 1020 s after the first outage (route
 | D@0% | flat to expiry | expiry | +259201s | 1.00x / 1.00x | 4.09/4.09 | 0.434 | -0.0367 (-3% of M) | 100% + 0.0210 SOL | +0.0210 (+4.8%) | 0.0014 |
 | D@50% | gap 2x | open | +3600s | 2.00x / 2.00x | 2.05/2.05 | 1.376 | -0.7361 (-33% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
 | D@50% | gap 5x | S1 | +51s | 5.00x / 5.00x | 0.81/0.81 | 3.439 | -2.2253 (-100% of M) | 0% + 2.8738 SOL | -0.5657 (-16.4%) | 0.0391 |
-| D@50% | gap 10x | S1 | +50s | 10.00x / 10.00x | 0.39/0.39 | 6.879 | -2.2253 (-100% of M) | 0% + 2.8738 SOL | -4.0051 (-58.2%) | 0.0391 |
+| D@50% | gap 10x | S1 | +52s | 10.00x / 10.00x | 0.39/0.39 | 6.879 | -2.2253 (-100% of M) | 0% + 2.8738 SOL | -4.0051 (-58.2%) | 0.0391 |
 | D@50% | pump 10x/60s | liquidation | +31s | 3.29x / 10.00x | 1.24/1.53 | 6.879 | -1.8999 (-85% of M) | 100% + 0.1186 SOL | +0.1186 (+1.7%) | 0.0705 |
 | D@50% | pump 10x/10min | liquidation | +230s | 2.42x / 10.00x | 1.69/1.73 | 6.879 | -1.2088 (-54% of M) | 100% + 0.0872 SOL | +0.0872 (+1.3%) | 0.0517 |
 | D@50% | pump 3x/1h | liquidation | +2789s | 2.34x / 3.00x | 1.74/1.75 | 2.064 | -1.1494 (-52% of M) | 100% + 0.0845 SOL | +0.0845 (+4.1%) | 0.0501 |
@@ -143,8 +143,8 @@ S3 with observation-gap rule 60 s: first S3 1020 s after the first outage (route
 | D@50% | flat to expiry | expiry | +259201s | 1.00x / 1.00x | 4.09/4.09 | 0.688 | -0.0577 (-3% of M) | 100% + 0.0334 SOL | +0.0334 (+4.8%) | 0.0017 |
 | D@90% | gap 2x | open | +3600s | 2.00x / 2.00x | 2.03/2.03 | 2.591 | -1.4051 (-34% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
 | D@90% | gap 5x | S1 | +52s | 5.00x / 5.00x | 0.80/0.80 | 6.477 | -4.1905 (-100% of M) | 0% + 5.4206 SOL | -1.0564 (-16.3%) | 0.0649 |
-| D@90% | gap 10x | S1 | +50s | 10.00x / 10.00x | 0.39/0.39 | 12.954 | -4.1905 (-100% of M) | 0% + 5.4206 SOL | -7.5334 (-58.2%) | 0.0649 |
-| D@90% | pump 10x/60s | liquidation | +31s | 3.29x / 10.00x | 1.23/1.52 | 12.954 | -3.6226 (-87% of M) | 100% + 0.2253 SOL | +0.2253 (+1.7%) | 0.1339 |
+| D@90% | gap 10x | S1 | +52s | 10.00x / 10.00x | 0.39/0.39 | 12.954 | -4.1905 (-100% of M) | 0% + 5.4206 SOL | -7.5334 (-58.2%) | 0.0649 |
+| D@90% | pump 10x/60s | liquidation | +32s | 3.41x / 10.00x | 1.18/1.49 | 12.954 | -3.8167 (-91% of M) | 100% + 0.2332 SOL | +0.2332 (+1.8%) | 0.1387 |
 | D@90% | pump 10x/10min | liquidation | +228s | 2.40x / 10.00x | 1.69/1.73 | 12.954 | -2.2762 (-54% of M) | 100% + 0.1642 SOL | +0.1642 (+1.3%) | 0.0973 |
 | D@90% | pump 3x/1h | liquidation | +2764s | 2.32x / 3.00x | 1.74/1.75 | 3.886 | -2.1641 (-52% of M) | 100% + 0.1592 SOL | +0.1592 (+4.1%) | 0.0943 |
 | D@90% | spike 10x/5s | open | +600s | 1.00x / 1.00x | 4.10/4.10 | 1.295 | -0.0456 (-1% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
@@ -222,13 +222,13 @@ S3 with observation-gap rule 60 s: first S3 1020 s after the first outage (route
 
 | market | scenario | outcome | exit vs event | price at exit / terminal | CR spot/EMA at exit | value of Q at terminal price (SOL) | borrower P&L (SOL) | lender gets | lender P&L vs holding at terminal price (SOL, % of Q value) | keeper SOL |
 |---|---|---|---|---|---|---|---|---|---|---|
-| D@50% | graduation gap (1 buy completes curve) | S1 | +50s | 6.39x / 6.39x | 0.62/0.63 | 4.398 | -2.2253 (-100% of M) | 0% + 2.8738 SOL | -1.5243 (-34.7%) | 0.0391 |
-| D@50% | graduation, then +2x on AMM over 60s | S1 | +50s | 8.14x / 8.14x | 0.48/0.52 | 5.598 | -2.2253 (-100% of M) | 0% + 2.8738 SOL | -2.7238 (-48.7%) | 0.0391 |
-| D@50% | graduation, then +3x on AMM over 60s | S1 | +50s | 9.37x / 9.37x | 0.42/0.47 | 6.446 | -2.2253 (-100% of M) | 0% + 2.8738 SOL | -3.5724 (-55.4%) | 0.0391 |
+| D@50% | graduation gap (1 buy completes curve) | S1 | +52s | 6.39x / 6.39x | 0.62/0.63 | 4.398 | -2.2253 (-100% of M) | 0% + 2.8738 SOL | -1.5243 (-34.7%) | 0.0391 |
+| D@50% | graduation, then +2x on AMM over 60s | S1 | +52s | 8.33x / 8.33x | 0.47/0.51 | 5.729 | -2.2253 (-100% of M) | 0% + 2.8738 SOL | -2.8548 (-49.8%) | 0.0391 |
+| D@50% | graduation, then +3x on AMM over 60s | S1 | +52s | 9.72x / 9.72x | 0.40/0.45 | 6.687 | -2.2253 (-100% of M) | 0% + 2.8738 SOL | -3.8131 (-57.0%) | 0.0391 |
 | D@50% | graduation, migration stuck | S3 | +4200s | 6.02x / 6.02x | 0.00/0.66 | 4.138 | -2.2253 (-100% of M) | 0% + 2.8738 SOL | -1.2645 (-30.6%) | 0.0391 |
-| D@80% | graduation gap (1 buy completes curve) | liquidation | +15s | 2.58x / 2.58x | 1.57/1.66 | 2.738 | -2.0910 (-61% of M) | 100% + 0.1449 SOL | +0.1449 (+5.3%) | 0.0859 |
-| D@80% | graduation, then +2x on AMM over 60s | liquidation | +15s | 2.58x / 2.58x | 1.57/1.66 | 2.738 | -2.0910 (-61% of M) | 100% + 0.1449 SOL | +0.1449 (+5.3%) | 0.0859 |
-| D@80% | graduation, then +3x on AMM over 60s | liquidation | +15s | 2.58x / 2.58x | 1.57/1.66 | 2.738 | -2.0910 (-61% of M) | 100% + 0.1449 SOL | +0.1449 (+5.3%) | 0.0859 |
+| D@80% | graduation gap (1 buy completes curve) | liquidation | +12s | 2.58x / 2.58x | 1.57/1.58 | 2.738 | -2.0880 (-61% of M) | 100% + 0.1434 SOL | +0.1434 (+5.2%) | 0.0850 |
+| D@80% | graduation, then +2x on AMM over 60s | liquidation | +12s | 2.58x / 2.58x | 1.57/1.58 | 2.738 | -2.0880 (-61% of M) | 100% + 0.1434 SOL | +0.1434 (+5.2%) | 0.0850 |
+| D@80% | graduation, then +3x on AMM over 60s | liquidation | +12s | 2.58x / 2.58x | 1.57/1.58 | 2.738 | -2.0880 (-61% of M) | 100% + 0.1434 SOL | +0.1434 (+5.2%) | 0.0850 |
 | D@80% | graduation, migration stuck | S3 | +4200s | 2.53x / 2.53x | 0.00/1.60 | 2.683 | -2.0814 (-61% of M) | 0% + 3.0872 SOL | +0.4045 (+15.1%) | 0.0549 |
 | D@90% | graduation gap (1 buy completes curve) | liquidation | +302s | 2.34x / 2.34x | 1.73/1.74 | 3.038 | -2.1934 (-52% of M) | 100% + 0.1598 SOL | +0.1598 (+5.3%) | 0.0946 |
 | D@90% | graduation, then +2x on AMM over 60s | liquidation | +60s | 2.60x / 2.60x | 1.56/1.68 | 3.365 | -2.5777 (-62% of M) | 100% + 0.1780 SOL | +0.1780 (+5.3%) | 0.1056 |
@@ -384,14 +384,14 @@ price = GBM(sigma) x Poisson up/down gaps with Pareto(alpha, 1.5x) multiples (<=
 | calm | A | sigma=1.5, up/dn gaps 0.002/d, alpha=2 | 400 | S1 7%, expiry 86%, liquidation 6% | -2.10% +/- 2.14% | 5.0% | -6.4% |
 | calm | B | sigma=2.5, up/dn gaps 0.005/d, alpha=2 | 400 | S1 4%, expiry 89%, liquidation 6% | -0.08% +/- 1.84% | 3.2% | -7.2% |
 | calm | C | sigma=4, up/dn gaps 0.02/d, alpha=2 | 400 | S1 4%, expiry 89%, liquidation 7% | -13.57% +/- 8.62% | 3.8% | -4.5% |
-| calm | D@0% | sigma=6, up/dn gaps 0.05/d, alpha=2 | 400 | S1 2%, expiry 90%, liquidation 8% | -0.70% +/- 3.10% | 2.0% | -5.6% |
-| calm | D@50% | sigma=6, up/dn gaps 0.05/d, alpha=2 | 400 | S1 5%, expiry 86%, liquidation 9% | -3.83% +/- 2.79% | 4.0% | -10.6% |
+| calm | D@0% | sigma=6, up/dn gaps 0.05/d, alpha=2 | 400 | S1 2%, expiry 90%, liquidation 8% | -0.71% +/- 3.12% | 2.0% | -5.6% |
+| calm | D@50% | sigma=6, up/dn gaps 0.05/d, alpha=2 | 400 | S1 5%, expiry 86%, liquidation 9% | -3.82% +/- 2.79% | 4.0% | -10.6% |
 | calm | RA | sigma=1.5, up/dn gaps 0.002/d, alpha=2 | 400 | S1 6%, expiry 88%, liquidation 6% | +0.89% +/- 1.02% | 5.5% | -5.1% |
 | stressed | A | sigma=1.5, up/dn gaps 0.02/d, alpha=1.5 | 400 | S1 26%, expiry 62%, liquidation 12% | -71.60% +/- 14.53% | 23.5% | -20.0% |
 | stressed | B | sigma=2.5, up/dn gaps 0.05/d, alpha=1.5 | 400 | S1 24%, expiry 64%, liquidation 12% | -99.63% +/- 19.02% | 21.5% | -23.0% |
 | stressed | C | sigma=4, up/dn gaps 0.2/d, alpha=1.5 | 400 | S1 24%, expiry 55%, liquidation 21% | -121.25% +/- 22.16% | 21.5% | -30.2% |
-| stressed | D@0% | sigma=6, up/dn gaps 1/d, alpha=1.5 | 400 | S1 28%, expiry 40%, liquidation 32% | -188.28% +/- 37.44% | 26.5% | -44.3% |
-| stressed | D@50% | sigma=6, up/dn gaps 1/d, alpha=1.5 | 400 | S1 30%, expiry 39%, liquidation 31% | -155.77% +/- 27.02% | 25.8% | -46.0% |
+| stressed | D@0% | sigma=6, up/dn gaps 1/d, alpha=1.5 | 400 | S1 28%, expiry 40%, liquidation 32% | -188.01% +/- 37.36% | 26.5% | -44.3% |
+| stressed | D@50% | sigma=6, up/dn gaps 1/d, alpha=1.5 | 400 | S1 30%, expiry 39%, liquidation 31% | -155.48% +/- 26.96% | 25.8% | -46.0% |
 | stressed | RA | sigma=1.5, up/dn gaps 0.02/d, alpha=1.5 | 400 | S1 24%, expiry 66%, liquidation 9% | -107.47% +/- 25.84% | 21.5% | -11.8% |
 
 ### Exit fuzz (attacker bundles, attacker-only seconds, sandwiches; invariants asserted)

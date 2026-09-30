@@ -19,10 +19,15 @@
 //! canonical pool; `crate::venues::pump_curve::sync`); (7) the observation record, only while the
 //! venue is executable — or migrating: the completed curve is final and still recorded (A64,
 //! `VenueState::observed`); a PumpSwap market without a price starts it here, marked for the
-//! warm-up (`venues::pump_amm::start_price`, M6); (8) the route chains (the S3
-//! chain; on Raydium markets and the mock also `pool_fail`), and on Raydium the refresh of the
-//! incumbent's locked depth `pool_d` while it is executable. [`run`] does steps 2 and 4–8;
-//! then the body; (10) post-conditions; (11) one `emit_cpi!`.
+//! warm-up, at `min(√(X·(Y + VQR)), ⌊D·10⁴/λ_min⌋)` as a Raydium start (`venues::pump_amm::
+//! start_price`, M6; the cap M6R-1); (8) the route chains (the S3 chain; on Raydium markets and
+//! the mock also `pool_fail`), and on Raydium and — since M6R-1 (owner decision of 2026-09-30,
+//! ARCH §2.5, changelog 56) — PumpSwap the refresh of the locked depth `pool_d` while the venue
+//! is executable; on PumpSwap while the post-change warm-up runs (`ema_warm > 0` after the roll)
+//! also `L_slow = min(L_slow, D)` — the Raydium adoption's `L_slow ≤ D`, taken at the first
+//! instruction that reads `D` after a graduation (the transition reads no LP mint), which undoes
+//! a deposit between `migrate_v2` and the transition that raised the `lp_supply` anchor.
+//! [`run`] does steps 2 and 4–8; then the body; (10) post-conditions; (11) one `emit_cpi!`.
 //!
 //! A16: `deposit` and `withdraw` run steps 1–5 and 10–11 (no venue accounts, no observation):
 //! [`sync_market_params`], [`accrue`] and — since M2 — [`roll_only`]. `claim_sol`,
@@ -32,6 +37,7 @@
 //! Every step runs at [`market_now`], never before the market's last accrual.
 
 use anchor_lang::prelude::*;
+use shortwin_math::observe::Observation;
 use shortwin_math::pool::{self, Pool, Vault};
 use shortwin_math::rent;
 
@@ -161,14 +167,15 @@ pub fn run(
             changed = true;
         } else {
             // A PumpSwap market without a price starts it at its first executable observation,
-            // marked for the warm-up (a PumpSwap listing or re-detection, M6).
+            // marked for the warm-up (a PumpSwap listing or re-detection, M6), its liquidity
+            // capped at the pool's locked depth over `λ_min` (M6R-1).
             if market.venue_kind() == Some(VenueKind::PumpSwap) {
-                pump_amm::start_price(&mut obs, st, now)?;
+                pump_amm::start_price(&mut obs, st, now, config.params.pool_lock_min_bps)?;
             }
             recorded = observe::record(&mut obs, now, st)?;
             let chains = route::observe_chains(config, market, st, now);
             (s3, pf, changed) = (chains.s3_no_route, chains.pool_fail, chains.changed);
-            refresh_locked_depth(market, st);
+            refresh_locked_depth(market, &mut obs, st);
         }
     }
     market.set_observation(&obs);
@@ -186,15 +193,28 @@ pub fn run(
     })
 }
 
-/// Raydium: the incumbent's locked depth `pool_d` is refreshed at every executable
-/// observation of the pool (ARCH §2.3.4: "refreshed by `crank_price` and `propose_pool` while
-/// the incumbent is executable"; here every instruction that reads the ReadSet refreshes it,
-/// so `pool_d` is "the incumbent's locked depth at its last executable observation", which the
-/// fast path's threshold names, ARCH §2.6 rule 3). The tier and the open caps read it (§4.6,
-/// §4.7). A pool that cannot execute keeps the last value.
-fn refresh_locked_depth(market: &mut Market, st: &VenueState) {
-    if st.kind.is_raydium() && st.executable {
-        market.pool_d.set(st.locked_depth);
+/// Raydium and PumpSwap (`VenueKind::has_locked_depth`): the locked depth `pool_d` is refreshed
+/// at every executable observation of the pool (ARCH §2.3.4: "refreshed by `crank_price` and
+/// `propose_pool` while the incumbent is executable"; here every instruction that reads the
+/// ReadSet refreshes it, so `pool_d` is "the incumbent's locked depth at its last executable
+/// observation", which the fast path's threshold names, ARCH §2.6 rule 3). The tier, the open
+/// caps and the exit reference read it (§3.6, §4.6, §4.7). A pool that cannot execute keeps the
+/// last value.
+///
+/// PumpSwap during the post-change warm-up (`ema_warm > 0` after the roll: a graduation or a
+/// price start; M6R-1, owner decision of 2026-09-30, ARCH §2.5, ECON #105): `L_slow = min(L_slow,
+/// D)` — the Raydium adoption's `L_slow ≤ D` at the first instruction that reads `D`. `L_slow`
+/// does not integrate during the warm-up and `D` moves only by the fee the pool keeps, so the
+/// first cap is the one that binds; on an honest graduation it never does (`D ≥` the `lp_supply`
+/// anchor `≥ L_slow`), and it undoes a third-party deposit between `migrate_v2` and the
+/// transition that raised the anchor (`Market._warmup_slow_cap` of the normative sim).
+fn refresh_locked_depth(market: &mut Market, obs: &mut Observation, st: &VenueState) {
+    if !st.kind.has_locked_depth() || !st.executable {
+        return;
+    }
+    market.pool_d.set(st.locked_depth);
+    if st.kind == VenueKind::PumpSwap && obs.ema.warm > 0 {
+        obs.ema.liq_slow = obs.ema.liq_slow.min(st.locked_depth);
     }
 }
 
