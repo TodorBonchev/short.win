@@ -174,12 +174,12 @@ fn venue_kinds_without_opens() {
         m.venue = VenueKind::PumpMigrating as u8
     });
     assert_err(&try_open_q(&mut env, &mm, Q), E::VenueMigrating);
-    // A real venue without an adapter in this build (PumpSwap until M6): its bit is enabled,
-    // its parser is not.
+    // PumpSwap has an adapter since M6: its bit is enabled, and its strict parser refuses the
+    // mock's accounts (the ReadSet is keyed by the market's canonical pool and PumpSwap cache).
     edit_market(&mut env, &mm.market(), |m| {
         m.venue = VenueKind::PumpSwap as u8
     });
-    assert_err(&try_open_q(&mut env, &mm, Q), E::NoSupportedVenue);
+    assert_err(&try_open_q(&mut env, &mm, Q), E::VenueAccountMismatch);
 }
 
 #[test]

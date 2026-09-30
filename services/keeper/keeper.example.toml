@@ -96,17 +96,19 @@ max_candidates = 8
 rank_keys_per_tick = 200
 
 [graduation]
-# Duty 6 (ARCH §5.1, §5.4, §7.1): call pump migrate_v2 top-level as soon as a covered market's curve
-# completes (ADOPTED Q16), alone in its transaction. Suspended until M6 (M5-SEC-4): without the
-# -> PumpSwap transition a migrated curve's market is no longer observed and its exits pause for good.
-migrate = false
+# Duty 6 (ARCH §2.5, §5.1, §5.4, §7.1): call pump migrate_v2 top-level as soon as a covered market's
+# curve completes (ADOPTED Q16), alone in its transaction, then the -> PumpSwap transition (the pool's
+# missing accounts, crank_price onto the pool and its first observation) in the same second. On
+# again in M6 (M5-SEC-4 suspended it).
+migrate = true
 # The straddle bundle for a liquidatable position whose Q exceeds the curve's real tokens rT:
-# tx1 complete_curve (the complete-curve helper reads rT at execution), tx2 migrate_v2, tx3 the exit
-# on the new pool (M6). Needs a Jito block engine.
+# tx1 complete_curve (the complete-curve helper reads rT at execution), tx2 migrate_v2, tx3 the
+# transition onto the new pool; the exit follows at the post-change warm-up's gate. Needs a Jito
+# block engine.
 straddle = true
-# Send tx1 + tx2 without an exit transaction (ARCH §5.4's keeper fallback). M5 has no tx3 and keeps
-# a migrated curve PumpMigrating (exits pause, S3 after the migration pause): off until M6.
-send_without_exit = false
+# Send tx1 + tx2 alone when tx3 cannot be built or fails its pre-flight (ARCH §5.4's keeper
+# fallback): the next second's crank makes the transition.
+send_without_exit = true
 # complete_curve's max_sol_cost above the keeper's quote of the rT it read (bps), and the most the
 # keeper spends completing one curve (lamports; it keeps the tokens it buys).
 complete_slippage_bps = 500
@@ -126,3 +128,17 @@ tip_accounts = [
 # The block engine bundles go to (e.g. "https://mainnet.block-engine.jito.wtf"); empty: none. The
 # binary's --block-engine overrides it.
 block_engine = ""
+
+[sweep]
+# Duties 6 and 13 (ARCH §7.1; R4A-7): right after a full wipe, the venue cashback claims the trader
+# needs (pump claim_cashback; PumpSwap claim_cashback into ATA(trader, WSOL)) and sweep_trader, so a
+# deposit (and hence an open) is possible again.
+post_wipe = true
+# sweep_trader when ATA(trader, WSOL) exists, the trader PDAs hold lamports or a pump venue's trader
+# base ATA holds tokens; the trader side is read every check_interval_s seconds.
+sweep = true
+check_interval_s = 60
+# The venue cashback claim (with a sweep) on cashback coins: at most every cashback_interval_s
+# (weekly), once the claimable cashback reaches cashback_min_lamports (lamports).
+cashback_interval_s = 604800
+cashback_min_lamports = 10000000

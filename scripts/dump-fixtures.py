@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Dump the Raydium (M3) and pump (M5) mainnet fixtures of the program tests (ARCHITECTURE
-§1.2, §8.2).
+"""Dump the Raydium (M3), pump (M5) and PumpSwap (M6) mainnet fixtures of the program tests
+(ARCHITECTURE §1.2, §8.2).
 
 Writes, under ``tests/fixtures/``:
 
@@ -25,6 +25,13 @@ Writes, under ``tests/fixtures/``:
   Fartcoin's graduated-elsewhere curve). Accounts that may legitimately not exist (a creator
   vault, a ``sharing-config``, a closed boost vault, the event authorities) are recorded as
   ``"absent": true`` entries without a file;
+- ``accounts/pamm/*.bin`` (M6; group ``pamm_state``): PumpSwap's statics (``GlobalConfig``, its
+  ``FeeConfig``, the global volume accumulator, WSOL, Rent, the 16 recipient WSOL ATAs) and one
+  set of accounts per canonical-pool **role** (``PAMM_POOLS``: a fresh graduate with its boost
+  running, a mature 301-byte pool, a cashback coin, pools of 211 and 261 bytes); group
+  ``pamm_synthetic``: pools **derived offline** from ``pamm_state`` bytes (``PAMM_SYNTHETIC``: the
+  mature pool with a negative ``virtual_quote_reserves``), each marked ``"synthetic": true`` with
+  its ``derived_from`` source and the ``patch`` applied;
 - ``manifest.json``: one entry per account (address, owner, lamports, executable, rent epoch,
   space, **slot**, sha256, purpose, decoded fields) and one snapshot record per fetch;
 - ``SHA256SUMS``: every fixture file (CI: ``cd tests/fixtures && sha256sum -c SHA256SUMS``).
@@ -45,6 +52,9 @@ Usage (Python 3.14, standard library only)::
         --coin fresh=MINT --coin graduated=MINT     # re-dump one group; replace a coin role
     scripts/dump-fixtures.py candidates        # mainnet: newest creates, latest migrations,
                                                #   (--near) live curves nearest completion
+    scripts/dump-fixtures.py fetch --refresh --group pamm_state --pool fresh=latest
+                                        # re-dump the PumpSwap pools (the fresh role must be
+                                        #   minutes old; pamm_synthetic is re-derived with it)
 
 The pump coin roles are pinned mints (``PUMP_COINS``). A curve moves on: at a refresh each role's
 expectation is re-checked (e.g. "near" must still be live with ``rT`` at most ``NEAR_RT_MAX``,
@@ -967,6 +977,385 @@ def check_pump(m):
     return problems
 
 
+# ---- PumpSwap pools (M6; R-VEN Update 2026-09-30; ARCH §3.12 PumpSwap, §8.2) --------------------
+#
+# Group `pamm_state`: one getMultipleAccounts call over PumpSwap's statics (GlobalConfig, its
+# FeeConfig, the global volume accumulator, WSOL, Rent, the 16 recipient WSOL ATAs) and one set of
+# accounts per canonical-pool **role** (`PAMM_POOLS`), so M6's PumpSwap tests trade pools that
+# exist on mainnet in every shape the adapter meets: a fresh graduate with its boost
+# running, a mature 301-byte pool, a cashback coin, and two older lengths the program grows to 271
+# bytes on their next trade. Group `pamm_synthetic`: pools **derived** from `pamm_state` bytes
+# (no RPC): the mature pool with a negative `virtual_quote_reserves` (PPD `cb188ce0`; none existed
+# on mainnet when this was written, R-VEN Update 2026-09-30 H3). A `negative_vqr` role for a real
+# pool can be added with `--pool negative_vqr=MINT` once one exists.
+
+PAMM_ACCOUNT_DIR = "accounts/pamm"
+PUMP_WITHDRAW_AUTHORITY = "39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg"
+PUMP_CREATE_POOL = bytes.fromhex("e992d18ecf6840bc")
+
+# (role, mint, expectation, purpose). The pool is the mint's canonical PumpSwap pool (R-VEN §1.3).
+PAMM_POOLS = [
+    (
+        "fresh",
+        "6Rs3yJGQapP2FCgBv2Z6eiH99VJSGSGBvqmPCm13pump",
+        "pamm_fresh",
+        "a canonical pool minutes after migrate_v2 (271 bytes at creation; clients usually "
+        "extend it to 301 within seconds), VQR = floor(0.2069 x migrated quote), the boost vault "
+        "still holding SOL (the A13 boost gate, straddle tx3, T-VENUE-SWITCH on a real pool)",
+    ),
+    (
+        "mature",
+        "CbcyNo7m1amFWqEQm2m4PLv1UNvpcL3C1Ujm6AkzpKoU",
+        "pamm_mature",
+        "e/acc's canonical pool (R-VEN §1.4 `4JAnKF…`): 301 bytes, boost long over (vault "
+        "closed), deep, with third-party LP (LP mint supply 7 % of lp_supply: deposits scale VQR, "
+        "which is why it sits above its InitBoostEvent value, R-VEN Update 2026-09-30 H3, H11); "
+        "the source of the synthetic negative-VQR pool",
+    ),
+    (
+        "cashback",
+        "34Bkw9UMYRQNFC4BB7E2fPR9U7GTx6oFZZFgP5wYTMAh",
+        "pamm_cashback",
+        "a canonical cashback-coin pool (is_cashback_coin): the ELF requires the cashback "
+        "remaining accounts on buys and sells (6061 / 6060 without them) and accrues WSOL in "
+        "ATA(pAMM UVA, WSOL); T-CASHBACK (pAMM), ARCH §3.12 T18",
+    ),
+    (
+        "legacy211",
+        "G8ZmGTbaM1xRioCR2g3EfSxiLiaGFMYuEWqQbTBPpump",
+        "pamm_len_211",
+        "an early (2025) canonical pool of 211 bytes (no coin_creator: creator fee 0): the next "
+        "trade grows it to 271 bytes, the user topping its rent up to minimum_balance(271)",
+    ),
+    (
+        "legacy261",
+        "Ch89LLQzvdxuMtGJ4iJES8CwPumhAkDazB88auTgpump",
+        "pamm_len_261",
+        "a boosted canonical pool never extended: 261 bytes (VQR present, creator_fee_bps and the "
+        "bools past the end read as 0); the next trade grows it to 271 bytes",
+    ),
+]
+
+# (name, source role, rule, purpose). VQR := rule(quote vault amount); PPD `cb188ce0` only
+# guarantees 0 <= vault + VQR <= u64::MAX, so any such value is a valid state.
+PAMM_SYNTHETIC = [
+    (
+        "pamm_mature_pool_negative_vqr",
+        "mature",
+        "-(quote_vault_amount // 2)",
+        "SYNTHETIC (not a mainnet account): the `mature` pool with virtual_quote_reserves set to "
+        "-(quote vault // 2), so the effective quote reserve is half the real vault. The deployed "
+        "PumpSwap ELF prices it exactly as effective = vault + VQR (buy, sell, "
+        "buy_exact_quote_in, fee tier on the effective market cap) and fails 6023 Overflow once "
+        "the sum leaves [0, u64::MAX] (R-VEN Update 2026-09-30 H3). Every other byte is the "
+        "`mature` fixture's",
+    ),
+]
+
+PAMM_NEGATIVE_VQR_RULES = {"-(quote_vault_amount // 2)": lambda vault: -(vault // 2)}
+
+
+def pamm_pool_problem(expect, mint, pool_addr, pool_owner, d, boost_amount):
+    """Why a canonical pool no longer fits its role (None if it does)."""
+    if not pool_valid_for(mint, pool_addr, pool_owner, d):
+        return "the canonical pool is missing or not valid (ARCH §2.5 canonical_pool_valid)"
+    p = decode_pamm_pool(d)
+    checks = {
+        "pamm_fresh": p["len"] in (271, 301) and not p["is_cashback_coin"]
+        and p["virtual_quote_reserves"] > 0 and (boost_amount or 0) > 0,
+        "pamm_mature": p["len"] == 301 and not p["is_cashback_coin"] and boost_amount is None
+        and p["virtual_quote_reserves"] >= 0,
+        "pamm_cashback": p["is_cashback_coin"] == 1,
+        "pamm_len_211": p["len"] == 211,
+        "pamm_len_261": p["len"] == 261,
+        "pamm_negative_vqr": p["virtual_quote_reserves"] < 0,
+    }
+    if expect not in checks:
+        return f"unknown expectation {expect}"
+    return None if checks[expect] else f"no longer `{expect}`: len {p['len']}, VQR " \
+        f"{p['virtual_quote_reserves']}, cashback {p['is_cashback_coin']}, boost {boost_amount}"
+
+
+def latest_fresh_mint(rpc):
+    """The mint of the newest non-mayhem, SOL-quoted, boosted `migrate_v2` (for `--pool
+    fresh=latest`)."""
+    sigs = rpc.call("getSignaturesForAddress", [PUMP_WITHDRAW_AUTHORITY, {"limit": 40}])
+    for sg in sigs:
+        if sg["err"]:
+            continue
+        tx = rpc.call("getTransaction", [sg["signature"], {"encoding": "json",
+                                                           "maxSupportedTransactionVersion": 1}])
+        if not tx:
+            continue
+        msg = tx["transaction"]["message"]
+        la = tx["meta"].get("loadedAddresses") or {}
+        keys = msg["accountKeys"] + la.get("writable", []) + la.get("readonly", [])
+        for grp in tx["meta"].get("innerInstructions") or []:
+            for ix in grp["instructions"]:
+                if keys[ix["programIdIndex"]] != PUMP_AMM:
+                    continue
+                d = b58decode(ix["data"])
+                if d[:8] == PUMP_CREATE_POOL and len(d) > 58 and d[58] == 0:
+                    acc = [keys[i] for i in ix["accounts"]]
+                    if acc[4] == WSOL:
+                        return acc[3]
+    raise SystemExit("no recent boosted SOL migration found; pass --pool fresh=MINT")
+
+
+def pamm_pools(overrides, rpc=None):
+    """`PAMM_POOLS` with `role=MINT` overrides (`fresh=latest`: the newest boosted migration);
+    `negative_vqr=MINT` adds that role."""
+    over = dict(o.split("=", 1) for o in overrides or [])
+    known = {r for r, _, _, _ in PAMM_POOLS} | {"negative_vqr"}
+    unknown = set(over) - known
+    if unknown:
+        raise SystemExit(f"unknown PumpSwap pool roles: {sorted(unknown)}")
+    if over.get("fresh") == "latest":
+        over["fresh"] = latest_fresh_mint(rpc)
+        print(f"fresh = {over['fresh']} (the newest boosted migration)")
+    out = [(r, over.get(r, mint), x, p) for r, mint, x, p in PAMM_POOLS]
+    if "negative_vqr" in over:
+        out.append(("negative_vqr", over["negative_vqr"], "pamm_negative_vqr",
+                    "a real canonical pool with a negative virtual_quote_reserves (PPD cb188ce0)"))
+    return out
+
+
+def fetch_pamm_state(rpc, pools):
+    """PumpSwap statics and every role's accounts in one getMultipleAccounts call (one slot)."""
+    roots = [PAMM_GLOBAL_CONFIG]
+    for _, mint, _, _ in pools:
+        roots += [mint, canonical_pool_of(mint)[0]]
+    _, vals = rpc.multiple(roots)
+    if vals[0] is None:
+        raise SystemExit("PumpSwap GlobalConfig missing")
+    gc = decode_global_config(decode_value(vals[0])["data"])
+    derived = {}
+    for i, (role, mint, _, _) in enumerate(pools):
+        vm, vp = vals[1 + 2 * i: 3 + 2 * i]
+        if vm is None or vp is None:
+            raise SystemExit(f"{role}: mint {mint} or its canonical pool does not exist")
+        derived[role] = {"token_program": vm["owner"],
+                         "pool": decode_pamm_pool(decode_value(vp)["data"])}
+
+    plan, seen = [], {}
+
+    def add(name, addr, purpose, role=None, may_be_absent=False):
+        if addr in seen:
+            return
+        seen[addr] = name
+        plan.append((name, addr, purpose, role, may_be_absent))
+
+    add("pamm_state_global_config", PAMM_GLOBAL_CONFIG, "PumpSwap GlobalConfig at this group's "
+        "slot (disable_flags @56: bit 0 create_pool, 1 deposit, 2 withdraw, 3 buy, 4 sell — "
+        "T-DISABLE on the ELF, R-VEN Update 2026-09-30 H4; recipient lists; "
+        "creator_fee_configurable)")
+    add("pamm_state_fee_config", PAMM_FEE_CONFIG, "pump-fees FeeConfig of PumpSwap (the 25 "
+        "market-cap tiers of canonical SOL pools, flat fees of the others)")
+    add("pamm_state_global_volume_accumulator", PAMM_GVA, "PumpSwap GlobalVolumeAccumulator (buy)")
+    add("pamm_state_mint_wsol", WSOL, "WSOL: the pools' quote mint")
+    add("pamm_state_sysvar_rent", RENT_SYSVAR, "the Rent sysvar at this slot (5,080 lamports "
+        "per byte): the pAMM UVA (137 B), fee ATAs (165 B) and a short pool's growth to 271 B "
+        "are charged at it (T-RENT, pAMM)")
+    for i, k in enumerate(gc["protocol_fee_recipients"]):
+        add(f"pamm_state_protocol_fee_recipient_{i}_wsol_ata", ata(k, WSOL, TOKEN),
+            f"WSOL ATA of PumpSwap protocol fee recipient #{i} {k} (T10: must exist)",
+            may_be_absent=True)
+    for i, k in enumerate(gc["buyback_fee_recipients"]):
+        add(f"pamm_state_buyback_fee_recipient_{i}_wsol_ata", ata(k, WSOL, TOKEN),
+            f"WSOL ATA of PumpSwap buyback fee recipient #{i} {k} (T17: must exist)",
+            may_be_absent=True)
+    for role, mint, _, purpose in pools:
+        p = derived[role]["pool"]
+        pool, authority = canonical_pool_of(mint)
+        boost = pda([b"boost_vault", pool], PUMP_AMM)
+        ccva = pda([b"creator_vault", p["coin_creator"]], PUMP_AMM)
+        pre = f"pamm_{role}"
+        add(f"{pre}_pool", pool, f"the `{role}` canonical PumpSwap Pool: {purpose}", role)
+        add(f"{pre}_mint", mint, f"base mint of the `{role}` pool", role)
+        add(f"{pre}_pool_base_vault", p["pool_base_token_account"], "the pool's base vault", role)
+        add(f"{pre}_pool_quote_vault", p["pool_quote_token_account"], "the pool's WSOL vault",
+            role)
+        add(f"{pre}_lp_mint", p["lp_mint"], "the pool's LP mint", role)
+        add(f"{pre}_coin_creator_vault_authority", ccva, "PumpSwap PDA [\"creator_vault\", "
+            "pool.coin_creator] (T12)", role, may_be_absent=True)
+        add(f"{pre}_coin_creator_vault_ata", ata(ccva, WSOL, TOKEN), "its WSOL ATA (T11: must "
+            "exist)", role, may_be_absent=True)
+        add(f"{pre}_boost_vault", boost, "PumpSwap PDA [\"boost_vault\", pool]", role,
+            may_be_absent=True)
+        add(f"{pre}_boost_vault_ata", ata(boost, WSOL, TOKEN), "the boost vault's WSOL ATA (P5; "
+            "boost_buy_and_burn closes it when it spends the last lamport)", role,
+            may_be_absent=True)
+        add(f"{pre}_pool_authority", authority, "pump PDA [\"pool-authority\", mint] (the "
+            "pool's creator)", role, may_be_absent=True)
+        add(f"{pre}_curve", curve_of(mint), "the coin's pump BondingCurve (migrated: complete, "
+            "reserves 0): classify_pump's detection key", role, may_be_absent=True)
+    if len(plan) > 100:
+        raise SystemExit(f"{len(plan)} accounts do not fit one getMultipleAccounts call")
+
+    slot, vals = rpc.multiple([a for _, a, _, _, _ in plan])
+    block_time = None
+    try:
+        block_time = rpc.call("getBlockTime", [slot])
+    except SystemExit as e:
+        print(f"WARNING: getBlockTime({slot}): {e}", file=sys.stderr)
+    entries, files, by_addr = [], [], {}
+    for (name, addr, purpose, role, may_be_absent), v in zip(plan, vals):
+        e = {"name": name, "group": "pamm_state"}
+        if role:
+            e["role"] = role
+        e.update({"purpose": purpose, "address": addr, "slot": slot})
+        if v is None:
+            if not may_be_absent:
+                raise SystemExit(f"{name} {addr} does not exist at slot {slot}")
+            e["absent"] = True
+            entries.append(e)
+            continue
+        a = decode_value(v)
+        d = a["data"]
+        rel = f"{PAMM_ACCOUNT_DIR}/{name}.bin"
+        write_file(rel, d)
+        files.append(rel)
+        e.update({"owner": a["owner"], "lamports": a["lamports"], "executable": a["executable"],
+                  "rent_epoch": a["rent_epoch"], "space": len(d), "sha256": sha256(d),
+                  "file": rel})
+        decoded = decode_pump_account(a["owner"], d)
+        if decoded is not None:
+            e["decoded"] = decoded
+        entries.append(e)
+        by_addr[addr] = (a["owner"], d)
+    for role, mint, expect, _ in pools:
+        pool, _ = canonical_pool_of(mint)
+        owner, d = by_addr.get(pool, (None, None))
+        why = pamm_pool_problem(expect, mint, pool, owner, d, _boost_amount(by_addr, pool))
+        if why:
+            raise SystemExit(f"PumpSwap role {role} ({mint}): {why}; pick another and pass "
+                             f"--pool {role}=MINT")
+    snapshot = {
+        "group": "pamm_state",
+        "slot": slot,
+        "block_time": block_time,
+        "block_time_utc": dt.datetime.fromtimestamp(block_time, dt.UTC).strftime(
+            "%Y-%m-%dT%H:%M:%SZ") if block_time else None,
+        "fetched_at": now_utc(),
+        "rpc": rpc.used,
+        "method": "one getMultipleAccounts call (base64) over every account below (absent ones "
+        "recorded as such), so all of them are the mainnet state at `slot`; a first call read "
+        "GlobalConfig, the mints and the canonical pools to derive the rest",
+        "pools": {role: mint for role, mint, _, _ in pools},
+    }
+    return entries, files, snapshot
+
+
+def _boost_amount(by_addr, pool):
+    """The boost vault ATA's WSOL amount, or None if the account does not exist."""
+    boost_ata = ata(pda([b"boost_vault", pool], PUMP_AMM), WSOL, TOKEN)
+    if boost_ata not in by_addr:
+        return None
+    return decode_token_account(by_addr[boost_ata][1])["amount"]
+
+
+def synthesize_pamm(m):
+    """The `pamm_synthetic` entries, rebuilt from the `pamm_state` fixture bytes (no RPC)."""
+    state = {e["name"]: e for e in m["accounts"] if e.get("group") == "pamm_state"}
+    entries, files = [], []
+    for name, role, rule, purpose in PAMM_SYNTHETIC:
+        src = state.get(f"pamm_{role}_pool")
+        vault = state.get(f"pamm_{role}_pool_quote_vault")
+        if not src or not vault or src.get("absent") or vault.get("absent"):
+            raise SystemExit(f"{name}: pamm_state has no `{role}` pool (fetch pamm_state first)")
+        d = bytearray(read_file(src["file"]))
+        if len(d) < 261:
+            raise SystemExit(f"{name}: the source pool is shorter than 261 bytes")
+        amount = decode_token_account(read_file(vault["file"]))["amount"]
+        vqr = PAMM_NEGATIVE_VQR_RULES[rule](amount)
+        d[245:261] = vqr.to_bytes(16, "little", signed=True)
+        d = bytes(d)
+        rel = f"{PAMM_ACCOUNT_DIR}/{name}.bin"
+        write_file(rel, d)
+        files.append(rel)
+        e = {k: src[k] for k in ("address", "owner", "lamports", "executable", "rent_epoch",
+                                 "slot")}
+        e.update({
+            "name": name, "group": "pamm_synthetic", "role": role, "synthetic": True,
+            "purpose": purpose, "derived_from": src["name"],
+            "patch": {"offset": 245, "length": 16, "field": "virtual_quote_reserves (i128 LE)",
+                      "rule": rule, "quote_vault_amount": amount, "value": vqr,
+                      "effective_quote": amount + vqr},
+            "space": len(d), "sha256": sha256(d), "file": rel,
+            "decoded": decode_pamm_pool(d),
+        })
+        entries.append({k: e[k] for k in ("name", "group", "role", "synthetic", "purpose",
+                                          "derived_from", "patch", "address", "owner",
+                                          "lamports", "executable", "rent_epoch", "space",
+                                          "slot", "sha256", "file", "decoded")})
+    snapshot = {
+        "group": "pamm_synthetic",
+        "slot": state[f"pamm_{PAMM_SYNTHETIC[0][1]}_pool"]["slot"],
+        "fetched_at": now_utc(),
+        "rpc": None,
+        "method": "derived offline from the pamm_state fixture bytes by scripts/dump-fixtures.py "
+        "(synthesize_pamm): only `patch` differs from the source account",
+    }
+    return entries, files, snapshot
+
+
+def check_pamm(m, only=None):
+    """Offline cross-checks of the PumpSwap groups; returns a list of problems."""
+    problems = []
+    state = [e for e in m["accounts"] if e.get("group") == "pamm_state"]
+    synth = [e for e in m["accounts"] if e.get("group") == "pamm_synthetic"]
+    if only in (None, "pamm_state") and state:
+        by_addr = {e["address"]: e for e in state if not e.get("absent")}
+        slots = {e["slot"] for e in state}
+        if len(slots) > 1:
+            problems.append(f"pamm_state spans several slots: {sorted(slots)}")
+        snap = next((s for s in m.get("snapshots", []) if s["group"] == "pamm_state"), None)
+        expect = {r: x for r, _, x, _ in PAMM_POOLS}
+        expect["negative_vqr"] = "pamm_negative_vqr"
+        pinned = {r: mint for r, mint, _, _ in PAMM_POOLS}
+        dumped = snap["pools"] if snap else {}
+        if {r: v for r, v in dumped.items() if r in pinned} != pinned:
+            problems.append(f"pamm_state was dumped with pools {dumped}, but PAMM_POOLS pins "
+                            f"{pinned}: pin the dumped mints")
+        files = {a: (e["owner"], read_file(e["file"])) for a, e in by_addr.items()}
+        for role, mint in dumped.items():
+            pool, _ = canonical_pool_of(mint)
+            owner, d = files.get(pool, (None, None))
+            why = pamm_pool_problem(expect.get(role, "?"), mint, pool, owner, d,
+                                    _boost_amount(files, pool))
+            if why:
+                problems.append(f"pamm_state {role}: {why}")
+                continue
+            p = decode_pamm_pool(d)
+            for k, mk in (("pool_base_token_account", "base_mint"),
+                          ("pool_quote_token_account", "quote_mint")):
+                v = by_addr.get(p[k], {}).get("decoded", {})
+                if v.get("mint") != p[mk] or v.get("owner") != pool:
+                    problems.append(f"pamm_state {role}: pool vault {k} mint/owner mismatch")
+    if only in (None, "pamm_synthetic") and synth:
+        state_by_name = {e["name"]: e for e in state}
+        for e in synth:
+            src = state_by_name.get(e.get("derived_from"))
+            if not src or src.get("absent"):
+                problems.append(f"{e['name']}: source {e.get('derived_from')} is not a fixture")
+                continue
+            want = bytearray(read_file(src["file"]))
+            want[245:261] = e["patch"]["value"].to_bytes(16, "little", signed=True)
+            got = read_file(e["file"])
+            if bytes(want) != got:
+                problems.append(f"{e['name']}: bytes are not the source with its patch")
+            vault = state_by_name.get(f"pamm_{e['role']}_pool_quote_vault")
+            amount = decode_token_account(read_file(vault["file"]))["amount"] if vault else None
+            if amount != e["patch"]["quote_vault_amount"]:
+                problems.append(f"{e['name']}: quote vault amount differs from the patch record")
+            eff = (amount or 0) + e["patch"]["value"]
+            if not (e["patch"]["value"] < 0 and 0 <= eff <= 2**64 - 1):
+                problems.append(f"{e['name']}: VQR is not negative with vault + VQR in [0, u64]")
+            if e["address"] != src["address"] or e["slot"] != src["slot"]:
+                problems.append(f"{e['name']}: address or slot differs from its source")
+    return problems
+
+
 # ---- candidates (mainnet: replacements for the coin roles) --------------------------------------
 
 
@@ -1057,7 +1446,9 @@ def load_manifest():
 
 RAYDIUM_GROUPS = ("raydium_programs", "raydium_state")
 PUMP_GROUPS = ("pump_programs", "pump_state")
-GROUPS = RAYDIUM_GROUPS + PUMP_GROUPS
+# `pamm_synthetic` is derived from `pamm_state` and must follow it.
+PAMM_GROUPS = ("pamm_state", "pamm_synthetic")
+GROUPS = RAYDIUM_GROUPS + PUMP_GROUPS + PAMM_GROUPS
 
 
 def managed(entry):
@@ -1084,7 +1475,8 @@ def write_sums(paths):
         with open(SUMS) as f:
             for line in f:
                 p = line.rstrip("\n").split("  ", 1)[-1]
-                if not p.startswith((ACCOUNT_DIR + "/", PUMP_ACCOUNT_DIR + "/", PROGRAM_DIR + "/")):
+                dirs = (ACCOUNT_DIR, PUMP_ACCOUNT_DIR, PAMM_ACCOUNT_DIR, PROGRAM_DIR)
+                if not p.startswith(tuple(d + "/" for d in dirs)):
                     keep.append(line.rstrip("\n"))
     lines = keep + [f"{sha256(read_file(p))}  {p}" for p in sorted(paths)]
     with open(SUMS, "w") as f:
@@ -1378,6 +1770,8 @@ def cmd_fetch(args):
     have = {s["group"] for s in m.get("snapshots", [])}
     groups = [g for g in GROUPS if not args.group or g in args.group]
     todo = [g for g in groups if args.refresh or g not in have or check(m, only=g)]
+    if "pamm_state" in todo and "pamm_synthetic" not in todo:
+        todo.append("pamm_synthetic")  # derived from pamm_state's bytes
     if not todo:
         print("fixtures complete and valid; nothing to fetch (use --refresh to re-dump)")
         return 0
@@ -1389,8 +1783,12 @@ def cmd_fetch(args):
             entries, files, snap = fetch_state(rpc)
         elif g == "pump_programs":
             entries, files, snap = fetch_programs(rpc, PUMP_PROGRAMS, g, PUMP_ACCOUNT_DIR)
-        else:
+        elif g == "pump_state":
             entries, files, snap = fetch_pump_state(rpc, pump_coins(args.coin))
+        elif g == "pamm_state":
+            entries, files, snap = fetch_pamm_state(rpc, pamm_pools(args.pool, rpc))
+        else:
+            entries, files, snap = synthesize_pamm(m)
         m["accounts"] = [e for e in m["accounts"] if e.get("group") != g] + entries
         m["snapshots"] = [s for s in m.get("snapshots", []) if s["group"] != g] + [snap]
         print(f"{g}: {len(entries)} accounts at slot {snap['slot']}")
@@ -1398,8 +1796,10 @@ def cmd_fetch(args):
         "Mainnet accounts, programs and transactions dumped for the program tests (ARCHITECTURE "
         "§1.2, §8.2). Each entry records how it was fetched; SHA256SUMS pins the bytes (CI: cd "
         "tests/fixtures && sha256sum -c SHA256SUMS). The Raydium entries (groups raydium_programs "
-        "and raydium_state) and the pump entries (groups pump_programs and pump_state) are "
-        "written by scripts/dump-fixtures.py; `snapshots` records the slot and RPC of each group."
+        "and raydium_state), the pump entries (groups pump_programs and pump_state) and the "
+        "PumpSwap entries (group pamm_state, and pamm_synthetic: pools derived offline from "
+        "pamm_state bytes, marked `synthetic`) are written by scripts/dump-fixtures.py; "
+        "`snapshots` records the slot and RPC of each group."
     )
     write_manifest(m)
     managed_files = []
@@ -1408,11 +1808,12 @@ def cmd_fetch(args):
             managed_files += entry_files(e)
     write_sums(managed_files)
     # A role whose account was present at an earlier dump and is absent now leaves a stale file.
-    pump_dir = os.path.join(FIXTURES, PUMP_ACCOUNT_DIR)
-    if os.path.isdir(pump_dir):
-        for f in os.listdir(pump_dir):
-            if f"{PUMP_ACCOUNT_DIR}/{f}" not in managed_files:
-                os.remove(os.path.join(pump_dir, f))
+    for rel_dir in (PUMP_ACCOUNT_DIR, PAMM_ACCOUNT_DIR):
+        full = os.path.join(FIXTURES, rel_dir)
+        if os.path.isdir(full):
+            for f in os.listdir(full):
+                if f"{rel_dir}/{f}" not in managed_files:
+                    os.remove(os.path.join(full, f))
     problems = check(load_manifest())
     for p in problems:
         print("FAIL:", p, file=sys.stderr)
@@ -1500,6 +1901,9 @@ def check(m, only=None):
             problems.append(f"raydium_state spans several slots: {sorted(slots)}")
     if only in (None, "pump_state") and any(e["group"] == "pump_state" for e in entries):
         problems += check_pump(m)
+    if only in (None, "pamm_state", "pamm_synthetic") and any(
+            e["group"] in PAMM_GROUPS for e in entries):
+        problems += check_pamm(m, only)
     return problems
 
 
@@ -1509,7 +1913,8 @@ def cmd_check(_args):
         print("FAIL:", p, file=sys.stderr)
     if not problems:
         n = sum(1 for e in load_manifest()["accounts"] if managed(e))
-        print(f"ok: {n} Raydium and pump fixture entries match their files, SHA256SUMS and "
+        print(f"ok: {n} Raydium, pump and PumpSwap fixture entries match their files, "
+              "SHA256SUMS and "
               "each other")
     return 1 if problems else 0
 
@@ -1523,6 +1928,9 @@ def main():
     f.add_argument("--rpc", help="JSON-RPC endpoint (default: mainnet-beta, then publicnode)")
     f.add_argument("--group", action="append", choices=GROUPS,
                    help="only this group (repeatable; default: all)")
+    f.add_argument("--pool", action="append", metavar="ROLE=MINT",
+                   help="replace a PumpSwap pool role's mint (pamm_state; `fresh=latest` takes "
+                   "the newest boosted migration; `negative_vqr=MINT` adds that role)")
     f.add_argument("--coin", action="append", metavar="ROLE=MINT",
                    help="replace a pump coin role's mint (pump_state; repeatable)")
     c = sub.add_parser("candidates", help="mainnet: replacements for the pump coin roles")

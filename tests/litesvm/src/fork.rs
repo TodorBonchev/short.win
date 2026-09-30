@@ -101,6 +101,11 @@ pub const RAYDIUM_GROUPS: [&str; 2] = ["raydium_programs", "raydium_state"];
 /// The manifest groups of the pump fork (loaded separately, on first use of a pump fixture, so
 /// the Raydium tests never rebuild the two 10 MiB pump ProgramData accounts).
 pub const PUMP_GROUPS: [&str; 2] = ["pump_programs", "pump_state"];
+/// The manifest groups of the PumpSwap state (M6; R-VEN Update 2026-09-30 H10): `pamm_state` (one
+/// `getMultipleAccounts` at slot 451,784,607: PumpSwap's statics and five canonical-pool roles)
+/// and `pamm_synthetic` (pools derived offline from `pamm_state` bytes, marked `synthetic`: the
+/// negative-VQR pool). The programs are `pump_programs`' (unchanged deploys, H1).
+pub const PAMM_GROUPS: [&str; 2] = ["pamm_state", "pamm_synthetic"];
 
 /// One manifest entry of the managed groups, with its account rebuilt and checked.
 #[derive(Clone, Debug)]
@@ -227,6 +232,7 @@ fn load_fixtures(groups: &[&str], state_group: &str) -> Fixtures {
         .unwrap_or_else(|| panic!("no `{state_group}` snapshot (scripts/dump-fixtures.py fetch)"));
     let coins = snap["coins"]
         .as_object()
+        .or_else(|| snap["pools"].as_object())
         .map(|coins| {
             coins
                 .iter()
@@ -261,12 +267,24 @@ fn pump_fixtures() -> &'static Fixtures {
     F.get_or_init(|| load_fixtures(&PUMP_GROUPS, "pump_state"))
 }
 
-/// The fixture named `name`, Raydium or pump (panics if the manifest has no such entry).
+/// The PumpSwap state's fixtures (M6).
+fn pamm_fixtures() -> &'static Fixtures {
+    static F: OnceLock<Fixtures> = OnceLock::new();
+    F.get_or_init(|| load_fixtures(&PAMM_GROUPS, "pamm_state"))
+}
+
+/// The fixture named `name`, Raydium, pump or PumpSwap (panics if the manifest has no such
+/// entry).
 pub fn fixture(name: &str) -> &'static Fixture {
     fixtures()
         .by_name
         .get(name)
         .or_else(|| pump_fixtures().by_name.get(name))
+        .or_else(|| {
+            name.starts_with("pamm_")
+                .then(|| pamm_fixtures().by_name.get(name))
+                .flatten()
+        })
         .unwrap_or_else(|| panic!("no fixture `{name}` in manifest.json"))
 }
 
@@ -1728,6 +1746,29 @@ pub fn sha256_hex(data: &[u8]) -> String {
 /// The slot and block time every pump venue-state fixture was read at (group `pump_state`).
 pub fn pump_snapshot() -> Snapshot {
     pump_fixtures().state
+}
+
+/// The slot and block time the PumpSwap state was read at (group `pamm_state`, M6).
+pub fn pamm_snapshot() -> Snapshot {
+    pamm_fixtures().state
+}
+
+/// The mint of PumpSwap pool role `role` (the `pamm_state` snapshot's `pools`).
+pub fn pamm_role_mint(role: &str) -> Pubkey {
+    *pamm_fixtures()
+        .coins
+        .get(role)
+        .unwrap_or_else(|| panic!("no PumpSwap pool role `{role}` in the snapshot"))
+}
+
+/// Every PumpSwap-state fixture (`pamm_state` and `pamm_synthetic`).
+pub fn all_pamm_fixtures() -> impl Iterator<Item = &'static Fixture> {
+    pamm_fixtures().by_name.values()
+}
+
+/// Whether the PumpSwap dump found the account at `address` absent.
+pub fn is_pamm_absent(address: &Pubkey) -> bool {
+    pamm_fixtures().absent.contains(address)
 }
 
 /// Whether the dump found the pump-group account at `address` absent (recorded as

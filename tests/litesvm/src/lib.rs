@@ -57,6 +57,7 @@ pub mod invariants;
 pub mod ix;
 pub mod lp;
 pub mod mock;
+pub mod pamm;
 pub mod pda;
 pub mod pool_select;
 pub mod pump;

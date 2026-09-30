@@ -24,8 +24,10 @@
 //! its transactions in order, in one slot (the blockhash is the one the bundle was built with,
 //! checked once), all-or-nothing (the VM is restored when one fails) — each through
 //! [`send_with_hooks`]; `simulate_bundle` runs them in order on a clone. A test can refuse bundles
-//! ([`LiteSvmChain::set_bundles`]: a chain without a block engine). [`load_complete_curve`]
-//! deploys the straddle helper (`target/deploy/complete_curve.so`, or `$COMPLETE_CURVE_SO`).
+//! ([`LiteSvmChain::set_bundles`]: a chain without a block engine) and make the next bundle
+//! pre-flight report one transaction as failed ([`LiteSvmChain::fail_next_bundle_simulation`]:
+//! the keeper's V1-9 fallback). [`load_complete_curve`] deploys the straddle helper
+//! (`target/deploy/complete_curve.so`, or `$COMPLETE_CURVE_SO`).
 //!
 //! [`Harness`] couples the environment, a funded keeper and the clock: one keeper tick per
 //! slot or per second.
@@ -65,6 +67,7 @@ pub struct LiteSvmChain {
     bundles: Cell<bool>,
     bundles_sent: RefCell<Vec<SentBundle>>,
     before_bundle: RefCell<Option<BeforeBundle>>,
+    fail_bundle_sim: Cell<Option<(usize, u32)>>,
 }
 
 /// What runs when the next bundle reaches the chain, before it executes (a trade landing between
@@ -132,7 +135,15 @@ impl LiteSvmChain {
             bundles: Cell::new(true),
             bundles_sent: RefCell::new(Vec::new()),
             before_bundle: RefCell::new(None),
+            fail_bundle_sim: Cell::new(None),
         }
+    }
+
+    /// The next `simulate_bundle` reports transaction `tx` (0-based) as failed with custom error
+    /// `code` (its later transactions not run), once: a pre-flight failure the keeper's V1-9
+    /// fallback must handle (the bundle then goes out without it). The chain itself is unchanged.
+    pub fn fail_next_bundle_simulation(&self, tx: usize, code: u32) {
+        self.fail_bundle_sim.set(Some((tx, code)));
     }
 
     /// Runs `f` on the environment when the next bundle reaches the chain — after the keeper's
@@ -262,6 +273,7 @@ pub fn send_with_hooks(
     let admins = env.admin_keys();
     let mut pre = invariants::snapshot(&env.svm, env.tracked_markets());
     let mut prefix_ok = true;
+    let mut prefix_failure = String::new();
     for k in 1..ixs.len() {
         let prefix = &ixs[..k];
         let mut svm = env.svm.clone().with_sigverify(false);
@@ -271,9 +283,17 @@ pub fn send_with_hooks(
             signatures: vec![Signature::default(); n_sig],
             message: VersionedMessage::Legacy(msg),
         };
-        let Ok(meta) = svm.send_transaction(prefix_tx) else {
-            prefix_ok = false;
-            break;
+        let meta = match svm.send_transaction(prefix_tx) {
+            Ok(meta) => meta,
+            Err(f) => {
+                prefix_ok = false;
+                prefix_failure = format!(
+                    "prefix of {k} instructions: {:?}\n{}",
+                    f.err,
+                    f.meta.pretty_logs()
+                );
+                break;
+            }
         };
         let fail = |v: invariants::Violation| -> ! {
             panic!(
@@ -322,7 +342,7 @@ pub fn send_with_hooks(
             assert!(
                 prefix_ok,
                 "a prefix of the keeper's transaction failed on the clone but the transaction \
-                 succeeded\nlogs:\n{}",
+                 succeeded\n{prefix_failure}\nlogs:\n{}",
                 meta.pretty_logs()
             );
             let last = ixs.len().saturating_sub(1);
@@ -570,9 +590,19 @@ impl Chain for LiteSvmChain {
             .with_sigverify(false)
             .with_blockhash_check(false);
         let mut outs = Vec::with_capacity(txs.len());
-        for tx in txs {
+        let fail = self.fail_bundle_sim.take();
+        for (i, tx) in txs.iter().enumerate() {
             if let Some(r) = self.refused(tx) {
                 outs.push(r);
+                break;
+            }
+            if let Some((at, code)) = fail
+                && at == i
+            {
+                outs.push(TxOutcome {
+                    err: Some(TxError::Custom { index: 0, code }),
+                    ..TxOutcome::default()
+                });
                 break;
             }
             let alts = lookup_tables(&env, tx);

@@ -2358,6 +2358,7 @@ fn fits2_a_a_withdrawal_inside_the_liquidation_cannot_make_the_spot_leg_true() {
                 settlements: &ev.settlements,
                 armed: &ev.armed,
                 disarmed: &ev.disarmed,
+                venue_changed: &ev.venue_changed,
             },
         )
         .map_err(|v| v.invariant)

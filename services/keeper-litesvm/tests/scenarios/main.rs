@@ -12,7 +12,13 @@
 //! `graduation` (M5, duty 6 on the pump-curve fork: `migrate_v2` as soon as a curve completes, the
 //! straddle bundle with the `complete-curve` helper, a curve trade between the keeper's read and its
 //! bundle; a curve that graduated elsewhere settled in S3 on its detection set, duty 5; a
-//! list-only market re-detected on its curve and its trader accounts created).
+//! list-only market re-detected on its curve and its trader accounts created; M6: the `→ PumpSwap`
+//! transition after the keeper's `migrate_v2`, the three-transaction bundle with tx3 the transition
+//! and the exit at the warm-up's gate, a graduation with a position liquidated on the pool, the
+//! V1-9 fallback), `pamm` (M6: the keeper on PumpSwap — a listing warmed up and a pump liquidated
+//! with the keeper's PumpSwap lists, `disable_flags` reported, the existence requirement's accounts
+//! created) and `wipe` (M6: duty 6's post-wipe transaction on PumpSwap and the curve with the venue
+//! cashback claims, the market reopening; duty 13's `sweep_trader` and weekly cashback claim).
 //! Every keeper transaction runs the harness's invariant hooks after every instruction
 //! (`shortwin_keeper_litesvm`).
 //!
@@ -35,6 +41,7 @@ mod extras;
 mod freeze;
 mod graduation;
 mod liquidate;
+mod pamm;
 mod pool_select;
 mod priority;
 mod raydium;
@@ -44,3 +51,4 @@ mod s3;
 mod selection;
 mod settle;
 mod smoke;
+mod wipe;

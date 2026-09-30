@@ -1,38 +1,64 @@
-//! Graduation duties on the pump curve (ARCHITECTURE §5.1, §5.4, §7.1 duty 6; ADOPTED Q14, Q16;
-//! A14, A15, A66; M5 part): what the keeper sends when a curve completes, and the straddle
-//! bundle for a position whose `Q` exceeds the curve's remaining real tokens `rT`.
+//! Graduation duties (ARCHITECTURE §2.5 "On → PumpSwap", §5.1, §5.4, §7.1 duty 6; ADOPTED Q14,
+//! Q16; A14, A15, A66; M5, M6): what the keeper sends when a curve completes, when its canonical
+//! PumpSwap pool appears, and the straddle bundle for a position whose `Q` exceeds the curve's
+//! remaining real tokens `rT`.
 //!
-//! **`migrate_v2` as soon as a curve completes** ([`migration_due`], [`migrate_v2_ix`]): a
-//! covered `PumpCurve` or `PumpMigrating` market whose curve is complete with `vT > 0` and whose
-//! canonical PumpSwap pool does not exist yet. pump's `migrate_v2` is permissionless and
-//! idempotent (R-PUMP §7.4); it is sent **top-level, alone with its compute budget** (A15: a CPI
-//! from short.win would reach stack height 5; its 51 trace entries leave 13 of the 64, ARCH §5.4 —
-//! `straddle_it` measures the completion and the migration merged at exactly 64 with a tip, one
-//! over the limit when pump also has to create the completer's UVA), with its 27 IDL accounts plus
-//! the two boost accounts mainnet passes (R-PUMP §3.6).
-//! The keeper then observes the market in the same second, so the prologue records the
-//! transition (M5: `→ PumpMigrating`; M6 adds `→ PumpSwap` with the ring rewrite and the pool's
-//! first-trade duties — `trader_base_ata`, the PumpSwap UVA, `extend_account` of the new 271-byte
-//! pool to 301 bytes).
+//! **`migrate_v2` as soon as a curve completes** ([`migration_due`], [`migrate_v2_ix`]; on by
+//! default again in M6, `graduation.migrate`): a covered `PumpCurve` or `PumpMigrating` market
+//! whose curve is complete with `vT > 0` and whose canonical PumpSwap pool does not exist yet.
+//! pump's `migrate_v2` is permissionless and idempotent (R-PUMP §7.4); it is sent **top-level,
+//! alone with its compute budget** (A15: a CPI from short.win would reach stack height 5; its 51
+//! trace entries leave 13 of the 64, ARCH §5.4 — `straddle_it` measures the completion and the
+//! migration merged at exactly 64 with a tip, one over the limit when pump also has to create the
+//! completer's UVA), with its 27 IDL accounts plus the two boost accounts mainnet passes (R-PUMP
+//! §3.6).
 //!
-//! **A list-only market back on a pump curve, and the trader's curve accounts** ([`redetection_due`],
+//! **The `→ PumpSwap` transition** ([`transition_due`], [`transition_ixs`]; M6): as soon as a
+//! curve market's canonical pool is valid (the keeper's own `migrate_v2`, or anyone's), the keeper
+//! sends one transaction: the accounts the pool's trades require that do not exist yet (ARCH
+//! §3.12's existence requirement, [`crate::venue::pamm_account_keys`]: the trader's pAMM UVA —
+//! PumpSwap `init_user_volume_accumulator(payer = keeper, user = trader)` —, the coin-creator
+//! vault's WSOL ATA, the two recipients' WSOL ATAs, on a cashback coin the trader's cashback ATA;
+//! `crank_price` creates nothing), then `crank_price` on the curve's ReadSet (the program's
+//! prologue moves the market onto the pool: the ring rewritten to the pool's `lp_supply`, the
+//! post-change warm-up `ema_warm = 8`, `ema_guard = 1`; this instruction records no observation),
+//! then `crank_price` on the **PumpSwap** ReadSet: the pool's first observation, in the same
+//! transaction — the first bucket of the warm-up is the keeper's own read of the pool as
+//! `migrate_v2` left it (in the straddle bundle nobody can trade between them), and the warm-up
+//! ends one second earlier. No `extend_account`: a fresh 271-byte pool trades as it is (R-VEN
+//! Update G4), and the adapter reads it. A market that is already `PumpSwap` (someone else cranked
+//! the transition, or a PumpSwap listing) gets the missing accounts alone ([`pamm_account_ixs`]).
+//!
+//! **A list-only market back on a pump venue, and the trader's accounts** ([`redetection_due`],
 //! [`trader_account_ixs`]; ARCH §2.5 `None` row): a list-only market whose detection set shows a
-//! live or migrating curve (the program's own `classify_pump`) is cranked, which moves it onto the
-//! curve; `crank_price` has no payer and creates no account, so the keeper then creates the
-//! trader's base ATA and pump UVA the curve legs require (T16, T18: an open refuses
-//! `VenueAccountMismatch` / `TraderStateInvalid` without them) — checked once per curve market
-//! (`create_market` creates both, so a market listed on its curve needs nothing).
+//! live or migrating curve or a valid canonical pool (the program's own `classify_pump`) is
+//! cranked, which moves it onto that venue; `crank_price` has no payer and creates no account, so
+//! the keeper then creates the trader accounts the legs require — on the curve its base ATA and
+//! pump UVA (T16, T18), on PumpSwap the pAMM accounts above.
 //!
 //! **The straddle bundle** ([`plan_straddle`]; ARCH §5.4 case 2): pump rejects any buy above `rT`
 //! (6021) and never fills partially, so a liquidatable position with `Q > rT` on a live curve
-//! (`decide::Plan::Straddle`) exits through a Jito bundle of at least three transactions
-//! (sequential, all-or-nothing, a tip; U22):
+//! (`decide::Plan::Straddle`) exits through a Jito bundle of three transactions (sequential,
+//! all-or-nothing, a tip; U22):
 //!
-//! | tx | instructions | M5 |
-//! |---|---|---|
-//! | tx1 | ComputeBudget ×2 + the keeper's base ATA (`create_idempotent`) + `complete_curve(max_sol_cost)` of the `complete-curve` helper (A66: it reads `rT` **at execution** and buys it with the keeper as pump's `user`; a no-op on a complete curve) | built ([`complete_curve_ix`]) |
-//! | tx2 | ComputeBudget ×2 + `migrate_v2` top-level (+ the tip when last) | built ([`migrate_v2_ix`]) |
-//! | tx3 | ComputeBudget ×2 + PumpSwap UVA / `extend_account` if needed + `crank_price` (→ PumpSwap) + `liquidate` / `expire` on PumpSwap (+ the tip) | **M6** ([`exit_tx`] returns `None`: the PumpSwap adapter, its ReadSet and TradeExtras and the `→ PumpSwap` transition are M6's) |
+//! | tx | instructions |
+//! |---|---|
+//! | tx1 | ComputeBudget ×2 + the keeper's base ATA (`create_idempotent`) + `complete_curve(max_sol_cost)` of the `complete-curve` helper (A66: it reads `rT` **at execution** and buys it with the keeper as pump's `user`; a no-op on a complete curve) ([`complete_curve_ix`]) |
+//! | tx2 | ComputeBudget ×2 + `migrate_v2` top-level ([`migrate_v2_ix`]) |
+//! | tx3 | ComputeBudget ×2 + the pool's missing accounts + `crank_price` (→ PumpSwap) + `crank_price` (the pool's first observation) + the tip ([`transition_ixs`]) |
+//!
+//! **When the exit lands (M6 as built; flagged, OWNER-M6R-4).** ARCH §5.4 puts the position's
+//! `liquidate` / `expire` in tx3. The program as built marks the graduation for the post-change
+//! warm-up exactly as a Raydium adoption (M4R): `liquidate` and `expire` fail `EmaWarmingUp` until
+//! eight post-transition buckets are integrated (`sol_settle` evaluates nothing), so a keeper exit
+//! in tx3 would revert the whole bundle. tx3 therefore carries the transition and the pool's first
+//! bucket (second `T`); the keeper then observes the market every second (duty 5: `ema_warm > 0`
+//! with open positions) and its `liquidate` / `expire` is the observation of the first second
+//! whose roll integrates the eighth bucket: **`T + 8`** at the earliest (buckets `T` … `T + 7`,
+//! every second observed; `T + 9` without tx3's own bucket), and only then if the position is
+//! still liquidatable on the pool's own buckets and its bound holds. The borrower's own
+//! `close_short` is not gated: a borrower's client can put it in its tx3 after the transition
+//! crank (`straddle_it`).
 //!
 //! `max_sol_cost` is the keeper's own quote of buying `rT` on the live curve (`sol_leg::
 //! buy_exact_out` at the live curve fees) plus `complete_slippage_bps` and a rent allowance (the
@@ -41,15 +67,12 @@
 //! (a sale); beyond it pump reverts tx1 (6002) and the whole bundle, and the keeper rebuilds it the
 //! next second (T-STRADDLE, `tests/litesvm/tests/straddle_it.rs`).
 //!
-//! **Keeper fallback** (V1-9): when tx3 would fail (its simulation returns `UseSolSettle`,
-//! `ExitBoundNotMet` or `InsufficientVault`: [`FALLBACK_CODES`]) the keeper sends tx1 + tx2 only
-//! and treats the position as an ordinary PumpSwap position in the following seconds. **In M5
-//! there is no tx3 and no PumpSwap position**: a migrated curve stays `PumpMigrating` (exits
-//! pause, S3 after the migration pause), so sending tx1 + tx2 would freeze the market's positions
-//! instead of exiting them. The M5 keeper therefore sends the two-transaction bundle only when
-//! `graduation.send_without_exit` is set (off by default; the scenario tests set it); otherwise
-//! it reports the straddle as waiting and calls `sol_settle` for the position (the decision
-//! tree's last branch: it arms, keeps the clock, or settles S1 / S2).
+//! **Keeper fallback** (V1-9): ARCH's fallback sends tx1 + tx2 when tx3 would fail (its simulation
+//! returning `UseSolSettle`, `ExitBoundNotMet` or `InsufficientVault`: [`FALLBACK_CODES`]). tx3
+//! now holds no exit, so the keeper falls back on **any** tx3 pre-flight failure when
+//! `graduation.send_without_exit` is on (M6's default); right after the two-transaction bundle
+//! lands it sends the transition as its own transaction (retried every second), and the position
+//! is an ordinary PumpSwap position from then on.
 
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
@@ -64,12 +87,12 @@ use shortwin::constants::{
 use shortwin::errors::ShortwinError;
 use shortwin::state::{Market, VenueKind};
 use shortwin::venues::detect::PumpClass;
-use shortwin::venues::pump_curve;
+use shortwin::venues::{pump_amm, pump_curve};
 use shortwin_math::quote::sol_leg;
 use shortwin_services_common::{AccountData, BundleOutcome, TxOutcome};
-use shortwin_venue_state::{pump, pump_amm};
+use shortwin_venue_state::{pump, pump_amm as pamm_state};
 
-use crate::venue;
+use crate::venue::{self, PammAccount};
 use crate::view::{MarketView, PositionView};
 
 /// pump `migrate_v2`'s discriminator (`idl/pump.json`, R-PUMP §3.6).
@@ -85,8 +108,10 @@ pub const SYSVAR_RENT: Pubkey =
 pub const MIGRATE_CU: u32 = 400_000;
 
 /// The compute-unit limit of a bundle transaction nothing could simulate (M6's tx3 on a node
-/// without bundle simulation): ARCH §6.1's PROPOSED keeper-exit limit.
-pub const UNSIMULATED_CU: u32 = 300_000;
+/// without bundle simulation: up to five account creations and two cranks, measured ≤ 250 k CU
+/// in the keeper scenarios): the transaction maximum is not needed, ARCH §6.1's PROPOSED
+/// keeper-exit limit is not enough with every account created.
+pub const UNSIMULATED_CU: u32 = 400_000;
 
 /// Lamports `max_sol_cost` carries on top of the quote for rent pump may charge the completer
 /// before the curve transfer (the creator-vault top-up to `Rent.minimum_balance(0)`, 650,240 at
@@ -105,7 +130,8 @@ pub const JITO_TIP_ACCOUNTS: [&str; 8] = [
     "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT",
 ];
 
-/// The tx3 simulation failures after which the keeper sends tx1 + tx2 only (V1-9, ARCH §5.4).
+/// The tx3 simulation failures after which ARCH's keeper sends tx1 + tx2 only (V1-9, ARCH §5.4;
+/// as built tx3 holds no exit and any failure falls back, module docs).
 pub const FALLBACK_CODES: [ShortwinError; 3] = [
     ShortwinError::UseSolSettle,
     ShortwinError::ExitBoundNotMet,
@@ -168,7 +194,7 @@ impl MigrationKeys {
         let lp_mint =
             Pubkey::find_program_address(&[b"pool_lp_mint", pool.as_ref()], &PUMP_AMM_PROGRAM_ID).0;
         let boost_vault = Pubkey::find_program_address(
-            &[pump_amm::BOOST_VAULT_SEED, pool.as_ref()],
+            &[pamm_state::BOOST_VAULT_SEED, pool.as_ref()],
             &PUMP_AMM_PROGRAM_ID,
         )
         .0;
@@ -406,14 +432,15 @@ pub fn migration_due(mv: &MarketView) -> bool {
             .is_some_and(|c| c.migrating() && !c.canonical_pool_valid())
 }
 
-/// A list-only market whose detection set shows a live or migrating pump curve (the program's
-/// `classify_pump` on this tick's accounts, [`crate::pool_monitor::classify`]): `crank_price`
-/// moves it onto that venue (ARCH §2.5 `None` row; M5), so the keeper cranks it.
+/// A list-only market whose detection set shows a live or migrating pump curve or a valid
+/// canonical PumpSwap pool (the program's `classify_pump` on this tick's accounts,
+/// [`crate::pool_monitor::classify`]): `crank_price` moves it onto that venue (ARCH §2.5 `None`
+/// row; M5, M6's `None → PumpSwap`), so the keeper cranks it.
 pub fn redetection_due(mv: &MarketView) -> bool {
     mv.kind == VenueKind::None
         && matches!(
             crate::pool_monitor::classify(&mv.market, &mv.read_accounts),
-            Ok(PumpClass::PumpCurve | PumpClass::PumpMigrating)
+            Ok(PumpClass::PumpCurve | PumpClass::PumpMigrating | PumpClass::PumpSwap)
         )
 }
 
@@ -442,14 +469,139 @@ pub fn max_sol_cost(quote: u64, slippage_bps: u32) -> u64 {
         .saturating_add(RENT_ALLOWANCE)
 }
 
-/// tx3 of the straddle bundle for `pv` (ARCH §5.4): `crank_price` (→ PumpSwap) and `liquidate`
-/// / `expire` on the new pool, with the PumpSwap UVA and `extend_account` when needed. **M5:
-/// `None`** — the PumpSwap adapter (its ReadSet and TradeExtras), the `→ PumpSwap` transition
-/// that tx3's crank must make, and therefore any short.win instruction on the pool the bundle
-/// creates, are M6's. M6 builds it here from the post-migration pool's derived keys
-/// ([`MigrationKeys`]) and the program's `pump_swap` key functions.
-pub fn exit_tx(_mv: &MarketView, _pv: &PositionView) -> Option<Vec<Instruction>> {
-    None
+/// The `→ PumpSwap` transition is due on `mv` (module docs; ARCH §7.1 duty 6 "on the canonical
+/// pool's appearance"): a `PumpCurve` or `PumpMigrating` market whose canonical pool is valid.
+/// Its next prologue moves it onto the pool; until then its exits refuse (`VenueMigrating`).
+pub fn transition_due(mv: &MarketView) -> bool {
+    matches!(mv.kind, VenueKind::PumpCurve | VenueKind::PumpMigrating)
+        && mv
+            .state
+            .curve
+            .as_ref()
+            .is_some_and(shortwin::venues::CurveVenue::canonical_pool_valid)
+}
+
+/// The accounts `mv`'s PumpSwap trades require ([`venue::pamm_account_keys`]): on a PumpSwap
+/// market from its live pool (P0: the coin creator, the cashback flag) and `GlobalConfig` (P3); on
+/// a curve market about to graduate from the valid canonical pool if its ReadSet shows one, else
+/// from the live curve (`migrate_v2` gives the pool the curve's creator and cashback flag), and
+/// PumpSwap's `GlobalConfig` in the curve's ReadSet (C6).
+pub fn pamm_accounts_of(mv: &MarketView) -> anyhow::Result<Vec<(Pubkey, PammAccount)>> {
+    let m = &mv.market;
+    let acc = |i: usize| mv.read_accounts.get(i).and_then(Option::as_ref);
+    match mv.kind {
+        VenueKind::PumpSwap => {
+            let pool = venue::pamm_pool(&mv.read_accounts)?;
+            let recipients = venue::pamm_recipients(m, acc(pump_amm::P_GLOBAL_CONFIG))?;
+            Ok(venue::pamm_account_keys(
+                m,
+                &Pubkey::new_from_array(pool.coin_creator),
+                recipients,
+                pool.is_cashback_coin,
+            ))
+        }
+        VenueKind::PumpCurve | VenueKind::PumpMigrating => {
+            let recipients = venue::pamm_recipients(m, acc(pump_curve::C_PAMM_GLOBAL_CONFIG))?;
+            let (creator, cashback) = match mv.state.curve.as_ref().and_then(|c| c.pool.as_ref()) {
+                Some(pool) => (pool.coin_creator, pool.is_cashback_coin),
+                None => {
+                    let c = acc(pump_curve::C_CURVE).context("bonding curve not read")?;
+                    let curve = pump::read_curve(&c.owner.to_bytes(), &c.data)
+                        .map_err(|e| anyhow!("bonding curve: {e:?}"))?;
+                    (curve.creator, curve.is_cashback_coin)
+                }
+            };
+            Ok(venue::pamm_account_keys(
+                m,
+                &Pubkey::new_from_array(creator),
+                recipients,
+                cashback,
+            ))
+        }
+        other => bail!("venue {other:?} has no PumpSwap accounts"),
+    }
+}
+
+/// PumpSwap `init_user_volume_accumulator(payer, user)` (R-VEN Update H6: any payer, `user`
+/// unsigned): `[payer S W, user, user_volume_accumulator W, system, event_authority, program]`.
+pub fn pamm_init_uva_ix(payer: &Pubkey, user: &Pubkey) -> Instruction {
+    Instruction {
+        program_id: PUMP_AMM_PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(*payer, true),
+            r(*user),
+            w(pump_amm::user_volume_accumulator(user)),
+            r(anchor_lang::system_program::ID),
+            r(PUMP_AMM_EVENT_AUTHORITY),
+            r(PUMP_AMM_PROGRAM_ID),
+        ],
+        data: pump_amm::IX_INIT_USER_VOLUME_ACCUMULATOR.to_vec(),
+    }
+}
+
+/// The instructions that create `missing` (of [`pamm_accounts_of`]) for `market`, paid by `payer`.
+pub fn pamm_account_ixs(
+    payer: &Pubkey,
+    market: &Market,
+    missing: &[(Pubkey, PammAccount)],
+) -> Vec<Instruction> {
+    missing
+        .iter()
+        .map(|(_, what)| match what {
+            PammAccount::Uva => pamm_init_uva_ix(payer, &market.trader),
+            PammAccount::Ata {
+                owner,
+                mint,
+                token_program,
+            } => create_ata_idempotent_ix(payer, owner, mint, token_program),
+        })
+        .collect()
+}
+
+/// The PumpSwap ReadSet of a curve market's canonical pool before the transition wrote the
+/// market's cache (`pump_amm::read_keys` on the cache the curve listing precomputed; the pool's
+/// vaults are ATAs of the pool, `migrate_v2` creates them so — [`MigrationKeys`]; the program
+/// key-checks every slot).
+pub fn pamm_read_keys_of(market: &Market) -> [Pubkey; pump_amm::READ_LEN] {
+    let k = MigrationKeys::of(&market.mint, &market.token_program);
+    let mut keys = pump_amm::read_keys(market);
+    for (slot, derived) in [
+        (pump_amm::P_POOL, k.pool),
+        (pump_amm::P_BASE_VAULT, k.base_vault),
+        (pump_amm::P_QUOTE_VAULT, k.quote_vault),
+        (pump_amm::P_BOOST_VAULT_ATA, k.boost_vault_ata),
+    ] {
+        if let Some(key) = keys.get_mut(slot)
+            && *key == Pubkey::default()
+        {
+            *key = derived;
+        }
+    }
+    keys
+}
+
+/// The transition transaction's instructions for `mv`'s curve market (module docs): the
+/// `missing` pool accounts, `crank_price` on the curve's ReadSet (`→ PumpSwap`), then
+/// `crank_price` on the PumpSwap ReadSet (the pool's first observation). The straddle bundle's
+/// tx3 and the keeper's own transition after a `migrate_v2` are this transaction.
+pub fn transition_ixs(
+    payer: &Pubkey,
+    mv: &MarketView,
+    missing: &[(Pubkey, PammAccount)],
+) -> Vec<Instruction> {
+    let m = &mv.market;
+    let mut v = pamm_account_ixs(payer, m, missing);
+    v.push(crate::ixs::crank_price_with(
+        &mv.key,
+        &m.mint,
+        &pump_curve::read_keys(m),
+    ));
+    v.push(crate::ixs::crank_price_with(
+        &mv.key,
+        &m.mint,
+        &pamm_read_keys_of(m),
+    ));
+    v
 }
 
 /// A straddle bundle for one position (module docs).
@@ -465,19 +617,24 @@ pub struct StraddlePlan {
     pub tx1: Vec<Instruction>,
     /// tx2: `migrate_v2`.
     pub tx2: Vec<Instruction>,
-    /// tx3: the exit on the new pool (M6; [`exit_tx`]).
+    /// tx3: the transition onto the new pool ([`transition_ixs`]; module docs: the exit follows
+    /// at the warm-up's gate). `None` when it cannot be built (PumpSwap's `GlobalConfig` not
+    /// read).
     pub tx3: Option<Vec<Instruction>>,
 }
 
 /// The straddle bundle of `pv` on `mv` with `keeper` as the completer (tips not included: the
-/// sender appends the tip to the bundle's last transaction). Errors when the curve is not live
-/// or an input does not parse.
+/// sender appends the tip to the bundle's last transaction); `missing` are the pool accounts tx3
+/// creates (`None`: tx3 cannot be built). Errors when the curve is not live or an input does not
+/// parse.
 pub fn plan_straddle(
     keeper: &Pubkey,
     mv: &MarketView,
     pv: &PositionView,
     slippage_bps: u32,
+    missing: Option<&[(Pubkey, PammAccount)]>,
 ) -> anyhow::Result<StraddlePlan> {
+    let _ = pv;
     let (rt_read, quote) = completion_quote(mv).context("no live curve to complete")?;
     let max = max_sol_cost(quote, slippage_bps);
     let m = &mv.market;
@@ -492,7 +649,7 @@ pub fn plan_straddle(
         max_sol_cost: max,
         tx1,
         tx2,
-        tx3: exit_tx(mv, pv),
+        tx3: missing.map(|miss| transition_ixs(keeper, mv, miss)),
     })
 }
 
@@ -501,10 +658,11 @@ pub fn plan_straddle(
 /// What became of a straddle.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum StraddleResult {
-    /// The bundle landed; `with_exit`: it carried tx3 (M6).
+    /// The bundle landed; `with_tx3`: it carried tx3, the transition (else tx1 + tx2: the
+    /// fallback; the next second's crank makes the transition).
     Landed {
         outcome: BundleOutcome,
-        with_exit: bool,
+        with_tx3: bool,
     },
     /// Sent, and the bundle did not land (dropped, refused by the engine, or a transaction failed).
     Failed { outcome: BundleOutcome },
@@ -513,9 +671,9 @@ pub enum StraddleResult {
     Refused { tx: usize, outcome: TxOutcome },
     /// Dry run: simulated only.
     DryRun { outcomes: Vec<TxOutcome> },
-    /// Not sent (the keeper calls `sol_settle` for the position instead): no exit transaction
-    /// before M6 and `send_without_exit` is off, no block engine, or the completion costs more
-    /// than `max_complete_lamports`.
+    /// Not sent (the keeper calls `sol_settle` for the position instead): no tx3 and
+    /// `send_without_exit` is off, no block engine, or the completion costs more than
+    /// `max_complete_lamports`.
     Waiting { reason: String },
     /// A transport or building error.
     Error(String),
@@ -616,5 +774,111 @@ mod tests {
         // A market whose cached pool is not the derived one is refused.
         m.canonical_pool = Pubkey::new_unique();
         assert!(migrate_v2_ix(&user, &m, &read).is_err());
+    }
+
+    /// The PumpSwap ReadSet tx3's second crank names before the transition wrote the cache: the
+    /// curve listing's precomputed cache (`pump_amm::precompute`) — the same keys `migrate_v2`
+    /// creates ([`MigrationKeys`]) — and, on a market whose cache is empty, the derivation itself.
+    #[test]
+    fn the_pool_read_set_before_the_transition_is_the_migrations() {
+        use shortwin::constants::{PUMP_AMM_FEE_CONFIG, PUMP_AMM_GLOBAL_CONFIG};
+        for program in [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID] {
+            let mint = Pubkey::new_unique();
+            let k = MigrationKeys::of(&mint, &program);
+            let mut m: Market = bytemuck::Zeroable::zeroed();
+            m.mint = mint;
+            m.token_program = program;
+            m.canonical_pool = k.pool;
+            m.trader = Pubkey::new_unique();
+            let want = [
+                k.pool,
+                k.base_vault,
+                k.quote_vault,
+                PUMP_AMM_GLOBAL_CONFIG,
+                PUMP_AMM_FEE_CONFIG,
+                k.boost_vault_ata,
+            ];
+            assert_eq!(pamm_read_keys_of(&m), want, "empty cache: derived");
+            pump_amm::precompute(&mut m, &Pubkey::new_unique()).unwrap();
+            assert_eq!(pump_amm::read_keys(&m), want, "the listing's precompute");
+            assert_eq!(pamm_read_keys_of(&m), want);
+        }
+    }
+
+    /// tx3 / the transition transaction: the missing accounts (PumpSwap's UVA init with the keeper
+    /// paying and the trader unsigned; `create_idempotent` of each WSOL ATA), then `crank_price`
+    /// on the curve's ReadSet, then on the pool's; nothing signs but the payer.
+    #[test]
+    fn the_transition_creates_the_missing_accounts_then_cranks_twice() {
+        let mint = Pubkey::new_unique();
+        let k = MigrationKeys::of(&mint, &TOKEN_PROGRAM_ID);
+        let mut m: Market = bytemuck::Zeroable::zeroed();
+        m.mint = mint;
+        m.token_program = TOKEN_PROGRAM_ID;
+        m.canonical_pool = k.pool;
+        m.trader = Pubkey::new_unique();
+        m.bonding_curve = Pubkey::new_unique();
+        m.curve_base_ata = Pubkey::new_unique();
+        let owner = Pubkey::new_unique();
+        let mv = MarketView {
+            key: Pubkey::new_unique(),
+            market: Box::new(m),
+            vault: Box::new(shortwin_math::pool::Vault::new()),
+            kind: VenueKind::PumpCurve,
+            read_keys: pump_curve::read_keys(&m).to_vec(),
+            read_accounts: vec![None; pump_curve::READ_LEN],
+            state: shortwin::venues::VenueState::not_executable(VenueKind::PumpCurve),
+            positions: Vec::new(),
+            extras: None,
+            supply: None,
+        };
+        let payer = Pubkey::new_unique();
+        let uva = pump_amm::user_volume_accumulator(&m.trader);
+        let missing = [
+            (uva, PammAccount::Uva),
+            (
+                pump_curve::wsol_ata(&owner),
+                PammAccount::Ata {
+                    owner,
+                    mint: WSOL_MINT,
+                    token_program: TOKEN_PROGRAM_ID,
+                },
+            ),
+        ];
+        let v = transition_ixs(&payer, &mv, &missing);
+        assert_eq!(v.len(), 4);
+        assert_eq!(v[0].program_id, PUMP_AMM_PROGRAM_ID);
+        assert_eq!(v[0].data, pump_amm::IX_INIT_USER_VOLUME_ACCUMULATOR);
+        assert_eq!(v[0].accounts[1].pubkey, m.trader);
+        assert!(!v[0].accounts[1].is_signer);
+        assert_eq!(v[0].accounts[2].pubkey, uva);
+        assert_eq!(v[1].program_id, ASSOCIATED_TOKEN_PROGRAM_ID);
+        assert_eq!(v[1].accounts[1].pubkey, pump_curve::wsol_ata(&owner));
+        let tail = |ix: &Instruction| {
+            ix.accounts[ix.accounts.len() - 7..]
+                .iter()
+                .map(|a| a.pubkey)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(v[2].program_id, shortwin::ID);
+        assert_eq!(tail(&v[2]), pump_curve::read_keys(&m).to_vec());
+        assert_eq!(v[3].program_id, shortwin::ID);
+        let pool_keys = pamm_read_keys_of(&m);
+        assert_eq!(
+            v[3].accounts[v[3].accounts.len() - pump_amm::READ_LEN..]
+                .iter()
+                .map(|a| a.pubkey)
+                .collect::<Vec<_>>(),
+            pool_keys.to_vec()
+        );
+        for ix in &v {
+            assert!(
+                ix.accounts
+                    .iter()
+                    .all(|a| !a.is_signer || a.pubkey == payer)
+            );
+        }
+        // Nothing missing: the two cranks alone.
+        assert_eq!(transition_ixs(&payer, &mv, &[]).len(), 2);
     }
 }

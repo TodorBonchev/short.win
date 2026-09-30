@@ -12,11 +12,14 @@
 //! completed bucket with the cached reprojection, `CoverageGap`); (6) the venue state from the
 //! ReadSet (the caller parses it, `crate::venues::parse`; reader failures of correctly keyed
 //! accounts are "not executable", A63) and `sync_venue` (the mock and Raydium stay; a curve
-//! market moves to `PumpMigrating` when its curve completes, or to `None` when it completed
-//! with zeroed reserves and no canonical pool — `crate::venues::pump_curve::sync`, M5; the
-//! `→ PumpSwap` transition is M6's); (7) the observation record, only while the venue is
-//! executable — or migrating: the completed curve is final and still recorded (A64,
-//! `VenueState::observed`); (8) the route chains (the S3
+//! market moves to `PumpMigrating` when its curve completes, to `PumpSwap` when its canonical
+//! pool is valid — M6: the observation state rewritten to the pool and restarted,
+//! `venues::pump_amm::restart_observation`, and this instruction neither records nor observes a
+//! route on the curve's ReadSet — or to `None` when it completed with zeroed reserves and no
+//! canonical pool; `crate::venues::pump_curve::sync`); (7) the observation record, only while the
+//! venue is executable — or migrating: the completed curve is final and still recorded (A64,
+//! `VenueState::observed`); a PumpSwap market without a price starts it here, marked for the
+//! warm-up (`venues::pump_amm::start_price`, M6); (8) the route chains (the S3
 //! chain; on Raydium markets and the mock also `pool_fail`), and on Raydium the refresh of the
 //! incumbent's locked depth `pool_d` while it is executable. [`run`] does steps 2 and 4–8;
 //! then the body; (10) post-conditions; (11) one `emit_cpi!`.
@@ -34,9 +37,9 @@ use shortwin_math::rent;
 
 use crate::engine::{observe, route};
 use crate::errors::MathResultExt;
-use crate::state::{GlobalConfig, Market};
+use crate::state::{GlobalConfig, Market, VenueKind};
 use crate::venues::pump_curve::{self, Transition};
-use crate::venues::VenueState;
+use crate::venues::{pump_amm, VenueState};
 
 /// The time a `Market`-writing instruction runs at: the clock, never before the market's
 /// last accrual. `Clock::unix_timestamp` is not guaranteed to be monotonic, and the vest
@@ -148,11 +151,25 @@ pub fn run(
     let (mut recorded, mut s3, mut pf, mut changed) = (false, true, true, false);
     let mut transition = None;
     if let Some(st) = state {
-        transition = pump_curve::sync(market, st, now);
-        recorded = observe::record(&mut obs, now, st)?;
-        let chains = route::observe_chains(config, market, st, now);
-        (s3, pf, changed) = (chains.s3_no_route, chains.pool_fail, chains.changed);
-        refresh_locked_depth(market, st);
+        transition = pump_curve::sync(market, st, now)?;
+        if transition.is_some_and(|t| t.to == VenueKind::PumpSwap) {
+            // `→ PumpSwap` (M6; ARCH §2.5): the observation state is rewritten to the new pool
+            // and restarted (the post-change warm-up), and this instruction's ReadSet — the
+            // curve's — is neither recorded nor a route observation of the new venue: the
+            // chains the transition cleared start afresh at its first observation.
+            pump_amm::restart_observation(&mut obs, pump_curve::graduation_anchor(st))?;
+            changed = true;
+        } else {
+            // A PumpSwap market without a price starts it at its first executable observation,
+            // marked for the warm-up (a PumpSwap listing or re-detection, M6).
+            if market.venue_kind() == Some(VenueKind::PumpSwap) {
+                pump_amm::start_price(&mut obs, st, now)?;
+            }
+            recorded = observe::record(&mut obs, now, st)?;
+            let chains = route::observe_chains(config, market, st, now);
+            (s3, pf, changed) = (chains.s3_no_route, chains.pool_fail, chains.changed);
+            refresh_locked_depth(market, st);
+        }
     }
     market.set_observation(&obs);
     market.set_pool(&pool);

@@ -177,17 +177,32 @@ pub const MARKET_FLAG_WIPE_TRADER_SWEPT: u16 = 1 << 7;
 /// Bit 8: `claim_venue_rewards` ran since the last full wipe (R4A-7).
 pub const MARKET_FLAG_WIPE_REWARDS_CLAIMED: u16 = 1 << 8;
 
-/// Indices into `Market.pool_cache` while the venue is `PumpSwap` (ARCH §2.3.4).
+/// Indices into `Market.pool_cache` while the venue is `PumpSwap` (ARCH §2.3.4). Since M6 a
+/// **pump-curve** market also holds them (derived once at listing, `venues::pump_amm::precompute`),
+/// so its `→ PumpSwap` transition derives nothing; nothing reads them before that transition. (A
+/// market `crank_price` re-detects onto the curve derives them at its transition instead.)
 pub mod pump_swap_cache {
+    /// The canonical pool's base vault (`Pool` @139; an ATA of the pool).
     pub const POOL_BASE_VAULT: usize = 0;
+    /// Its WSOL vault (`Pool` @171).
     pub const POOL_QUOTE_VAULT: usize = 1;
+    /// `PDA(pAMM, ["pool-v2", mint])` (T15; a marker that need not exist).
     pub const POOL_V2_MARKER: usize = 2;
+    /// `ATA(boost_vault, WSOL)` (P5; may not exist).
     pub const BOOST_VAULT_ATA: usize = 3;
+    /// The trader's pAMM UVA `PDA(pAMM, ["user_volume_accumulator", trader])` (T14).
     pub const PAMM_UVA: usize = 4;
+    /// `ATA(pAMM UVA, WSOL)`: where PumpSwap accrues the trader's cashback (T18).
     pub const PAMM_UVA_QUOTE_ATA: usize = 5;
+    /// The pool's `coin_creator` the two keys below derive from.
     pub const CACHED_COIN_CREATOR: usize = 6;
+    /// `PDA(pAMM, ["creator_vault", coin_creator])` (T12; underscore).
     pub const CACHED_COIN_CREATOR_VAULT_AUTH: usize = 7;
+    /// `ATA(T12, WSOL)` (T11).
     pub const CACHED_COIN_CREATOR_VAULT_ATA: usize = 8;
+    /// `PDA(pAMM, ["boost_vault", pool])`, the token owner the boost gate's reader checks (M6: the
+    /// tenth slot of the union, so the gate derives nothing on a trade; ARCH §2.3.4 lists nine).
+    pub const BOOST_VAULT: usize = 9;
 }
 
 /// Indices into `Market.pool_cache` while the venue is `RaydiumV4` / `RaydiumCpmm`.

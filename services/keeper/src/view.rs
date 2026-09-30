@@ -13,6 +13,11 @@
 //! whose detection set shows a pump venue again is cranked onto it ([`crate::keeper`]).
 //! [`ChainView::list_only`] also hands them to the pool monitor (duty 12, [`crate::pool_monitor`]),
 //! which moves them onto an eligible Raydium pool with `propose_pool` (ARCH §2.5 `None`).
+//!
+//! **PumpSwap** (M6): the fee tier is chosen on the market cap `effective_quote·supply/base`
+//! (ARCH §4.2), so the keeper also reads the market's **mint** and hands its live supply to the
+//! program's reader (`venues::read_state_with`, as the program's prologue does with the named
+//! mint); without it a PumpSwap market would read as not executable.
 
 use std::collections::HashMap;
 
@@ -73,6 +78,8 @@ pub struct MarketView {
     pub positions: Vec<PositionView>,
     /// The venue's `VenueExtras` account (extras sets for trading exits), if any.
     pub extras: Option<Box<VenueExtras>>,
+    /// The mint's live supply (read for PumpSwap markets only: the fee tier's market cap).
+    pub supply: Option<u64>,
 }
 
 /// A covered list-only (`None`) market as the pool monitor sees it (module docs; the same
@@ -141,19 +148,30 @@ pub fn with_account_infos<R>(
     f(&infos)
 }
 
-/// The venue state the program computes from a ReadSet (`venues::read_state` on host-side
-/// `AccountInfo`s built from the fetched accounts; a missing account reads as an empty
-/// System-owned one, which no reader accepts: "not executable", A63).
+/// The venue state the program computes from a ReadSet (`venues::read_state_with` on host-side
+/// `AccountInfo`s built from the fetched accounts, with the mint's `supply` — PumpSwap's fee tier;
+/// a missing account reads as an empty System-owned one, which no reader accepts: "not
+/// executable", A63).
 pub fn venue_state(
     market: &Market,
     kind: VenueKind,
     keys: &[Pubkey],
     accounts: &[Option<AccountData>],
     now: i64,
+    supply: Option<u64>,
 ) -> VenueState {
     with_account_infos(keys, accounts, |infos| {
-        shortwin::venues::read_state(market, kind, infos, now)
+        shortwin::venues::read_state_with(market, kind, infos, now, supply)
     })
+}
+
+/// The supply of a fetched mint account (`supply` @36; SPL Token or Token-2022; the program's
+/// `venues::mint_supply`), `None` if it does not parse.
+pub fn mint_supply(acc: Option<&AccountData>) -> Option<u64> {
+    let a = acc?;
+    shortwin_venue_state::mint::read_base(&a.owner.to_bytes(), &a.data)
+        .ok()
+        .map(|m| m.supply)
 }
 
 /// Every `Market` of the program (`getProgramAccounts` on its discriminator).
@@ -270,10 +288,17 @@ pub async fn load<C: Chain>(chain: &C, markets: &[Pubkey]) -> anyhow::Result<Cha
             Err(e) => skipped.push((*key, e.to_string())),
         }
     }
-    // Second pass: the venue accounts and the extras accounts.
+    // Second pass: the venue accounts (a PumpSwap market's mint after its ReadSet: the supply)
+    // and the extras accounts.
+    let with_mint = |p: &Partial| p.kind == VenueKind::PumpSwap;
     let mut venue_keys: Vec<Pubkey> = partial
         .iter()
-        .flat_map(|p| p.read_keys.iter().copied())
+        .flat_map(|p| {
+            p.read_keys
+                .iter()
+                .copied()
+                .chain(with_mint(p).then_some(p.market.mint))
+        })
         .collect();
     let extras_keys: Vec<Pubkey> = partial
         .iter()
@@ -293,7 +318,21 @@ pub async fn load<C: Chain>(chain: &C, markets: &[Pubkey]) -> anyhow::Result<Cha
         let len = p.read_keys.len();
         let slice = venue_accs.get(at..at + len).unwrap_or(&[]);
         at += len;
-        let state = venue_state(&p.market, p.kind, &p.read_keys, slice, clock.unix_timestamp);
+        let supply = if with_mint(&p) {
+            let s = mint_supply(venue_accs.get(at).and_then(Option::as_ref));
+            at += 1;
+            s
+        } else {
+            None
+        };
+        let state = venue_state(
+            &p.market,
+            p.kind,
+            &p.read_keys,
+            slice,
+            clock.unix_timestamp,
+            supply,
+        );
         let extras = venue_accs
             .get(n_venue + i)
             .and_then(|a| a.as_ref())
@@ -309,6 +348,7 @@ pub async fn load<C: Chain>(chain: &C, markets: &[Pubkey]) -> anyhow::Result<Cha
             read_accounts: slice.to_vec(),
             state,
             extras,
+            supply,
         });
     }
     Ok(ChainView {

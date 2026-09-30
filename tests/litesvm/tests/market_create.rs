@@ -443,8 +443,8 @@ fn detection_keys_are_derived_on_chain_and_checked() {
 
 /// `venue_hint`: `Auto` lists as `None`; since M3 the Raydium hints (4, 5) adopt a candidate
 /// pool, which they need (without its ReadSet: `BadRemainingAccounts`; the Raydium listing
-/// itself is `tests/ray_it/listing.rs`); every other hint — the pump kinds until M5/M6, the
-/// test-only mock on the release build, unknown values — is `NoSupportedVenue`.
+/// itself is `tests/ray_it/listing.rs`); every other hint — the pump kinds on a mint pump did
+/// not create, the test-only mock on the release build, unknown values — is `NoSupportedVenue`.
 #[test]
 fn venue_hints() {
     let mut env = Env::initialized();

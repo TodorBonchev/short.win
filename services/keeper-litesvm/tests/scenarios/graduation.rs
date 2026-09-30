@@ -1,23 +1,34 @@
-//! Keeper duty 6 on the pump curve (M5; ARCH §5.1, §5.4, §7.1 duty 6; ADOPTED Q14, Q16; A66):
-//! the **release** short.win, the **dumped** pump, pump-fees and PumpSwap ELFs and the
-//! `complete-curve` helper's own SBF build on the mainnet fork of the program tests
-//! (`shortwin_litesvm_tests::pump`), driven by the keeper. Every keeper transaction — each
-//! transaction of a bundle too — runs the invariant hooks after every instruction.
+//! Keeper duty 6 through the graduation (M5, M6; ARCH §2.5 "On → PumpSwap", §5.1, §5.4, §7.1
+//! duty 6; ADOPTED Q14, Q16; A66): the **release** short.win, the **dumped** pump, pump-fees and
+//! PumpSwap ELFs and the `complete-curve` helper's own SBF build on the mainnet fork of the program
+//! tests (`shortwin_litesvm_tests::pump`, `::pamm`), driven by the keeper with its **default**
+//! configuration unless a test says otherwise. Every keeper transaction — each transaction of a
+//! bundle too — runs the invariant hooks after every instruction.
 //!
-//! - **`migrate_v2` as soon as a curve completes**: an outside buy completes the curve of a
-//!   covered market; at its next tick the keeper migrates it (its account list is the harness's
-//!   own derivation's) and observes the market in the same second (M5: `→ PumpMigrating`), once.
-//! - **The straddle, M5 default**: an expired position with `Q > rT` on a live curve is
-//!   `Plan::Straddle`; there is no exit transaction before M6 and `send_without_exit` is off, so
-//!   the keeper sends no bundle, alerts once, and calls `sol_settle` for the position each second.
-//! - **The straddle bundle** (`send_without_exit`): tx1 (the keeper's base ATA, `complete_curve`)
-//!   and tx2 (`migrate_v2`, the Jito tip) land atomically; the keeper holds the curve's last
-//!   tokens, the market records the migration in the same second, and its exits pause
-//!   (`VenueMigrating`) — the exit itself is M6's tx3. Trace, CU and size of each transaction.
+//! - **`migrate_v2` and the transition as soon as a curve completes** (M6 default): an outside buy
+//!   completes the curve of a covered market; at its next tick the keeper migrates it (its account
+//!   list is the harness's own derivation's), then — in the same second — sends the transition
+//!   (the pool accounts the trades require, `crank_price` onto the pool, the pool's first
+//!   observation): the market is `PumpSwap`, its pAMM accounts exist, the warm-up is marked, and
+//!   the keeper observes it every second until the warm-up is over (no positions: M6's keeper
+//!   warm-up), once. With `migrate` off, someone else's migration is still moved onto the pool.
+//! - **A graduation with positions**: a curve position survives an outside completion; the keeper
+//!   migrates and transitions; the pool is pumped; the keeper sends no exit during the warm-up and
+//!   liquidates the position **on the pool** in the first second the program accepts it (an outside
+//!   key's simulation refused every second before), with the PumpSwap TradeExtras.
+//! - **The straddle bundle** (tx1 `complete_curve`, tx2 `migrate_v2`, tx3 the transition + tip):
+//!   an expired position with `Q > rT` — the curve bought down by an outsider, or by the borrower
+//!   itself (`rT − q + 1`, M5-SEC-4's self-made straddle) — lands as one bundle; the market is on
+//!   its pool with tx3's own bucket; the keeper observes every second and expires the position at
+//!   **`T + 8`** (the warm-up's gate: an outside key's `expire` is refused `EmaWarmingUp` at every
+//!   second before). Trace, CU and size of each transaction.
+//! - **V1-9 fallback**: tx3's pre-flight fails → tx1 + tx2 alone (tip on tx2); the next second the
+//!   keeper's own transition moves the market onto the pool, and the position is expired at that
+//!   transition's gate.
 //! - ★ **A curve trade between the keeper's read and its bundle**: a buy lands after the keeper's
-//!   pre-flight — the bundle still lands (the helper reads `rT` at execution); a large sale
-//!   pushes the completion above the keeper's `max_sol_cost` — pump reverts tx1, nothing of the
-//!   bundle is committed, and the keeper's bundle of the next second lands.
+//!   pre-flight — the three-transaction bundle still lands (the helper reads `rT` at execution); a
+//!   large sale pushes the completion above the keeper's `max_sol_cost` — pump reverts tx1, nothing
+//!   of the bundle is committed, and the keeper's bundle of the next second lands.
 //! - **No block engine**: the bundle cannot go out; the keeper alerts and settles meanwhile.
 //! - **Below the straddle** (`Q ≤ rT`): the keeper expires a curve position on the curve with the
 //!   adapter's own account lists (the live recipients, the live creator's vault).
@@ -30,18 +41,20 @@
 //!   re-detection does not create, once; an open lands on the curve.
 
 use anchor_lang::prelude::Pubkey;
+use anchor_lang::solana_program::instruction::Instruction;
 use shortwin::errors::ShortwinError;
 use shortwin::state::VenueKind;
 use shortwin_keeper::config::GraduationConfig;
-use shortwin_keeper::decide::Plan;
 use shortwin_keeper::graduation::{self, StraddleResult};
 use shortwin_keeper_litesvm::load_complete_curve;
 use shortwin_litesvm_tests::engine::{Borrower, VenueMarket};
-use shortwin_litesvm_tests::errors::assert_err;
 use shortwin_litesvm_tests::fork::{self, PumpCoin, PumpCurve};
+use shortwin_litesvm_tests::pamm::{PammMarket, PammUser};
 use shortwin_litesvm_tests::pump::{self, CurveUser, PumpMarket, PumpSpec};
 use shortwin_litesvm_tests::{pda, read};
 use shortwin_services_common::AccountData;
+use solana_signer::Signer;
+use solana_transaction::Transaction;
 
 use crate::common::*;
 
@@ -69,23 +82,11 @@ fn pump_setup(cfg: KeeperConfig) -> (Harness, PumpMarket, u64) {
     (h, pm, q)
 }
 
-/// A keeper configuration with the `migrate_v2` duty on (ADOPTED Q16; M6's default — suspended
-/// in M5 by M5-SEC-4).
-fn with_migrate() -> KeeperConfig {
+/// A keeper configuration with the `migrate_v2` duty off (the transition stays on).
+fn without_migrate() -> KeeperConfig {
     KeeperConfig {
         graduation: GraduationConfig {
-            migrate: true,
-            ..GraduationConfig::default()
-        },
-        ..KeeperConfig::default()
-    }
-}
-
-/// A keeper configuration that sends the two-transaction bundle (ARCH §5.4's fallback).
-fn without_exit() -> KeeperConfig {
-    KeeperConfig {
-        graduation: GraduationConfig {
-            send_without_exit: true,
+            migrate: false,
             ..GraduationConfig::default()
         },
         ..KeeperConfig::default()
@@ -100,9 +101,22 @@ fn buy_down_to(env: &mut Env, c: &PumpCurve, rt_left: u64) {
     assert_eq!(c.state(&env.svm).real_token_reserves, rt_left);
 }
 
-/// Opens `q` for a new borrower, pushes the curve to `rT = q/2` (a straddle: `q > rT`) and warps
-/// past the position's deadline (expired: liquidatable).
+/// Who makes the position a straddle.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Straddler {
+    /// An outside buyer takes the curve to `rT = q/2`.
+    Outsider,
+    /// The borrower's own wallet buys `rT − q + 1` (M5-SEC-4's self-made straddle).
+    Borrower,
+}
+
+/// Opens `q` for a new borrower, makes it a straddle (`q > rT`) and warps past the position's
+/// deadline (expired: liquidatable).
 fn straddled_position(h: &Harness, pm: &PumpMarket, q: u64) -> (Borrower, u64) {
+    straddled_by(h, pm, q, Straddler::Outsider)
+}
+
+fn straddled_by(h: &Harness, pm: &PumpMarket, q: u64, who: Straddler) -> (Borrower, u64) {
     h.with_env(|env| {
         env.crank(pm);
         env.warp(1);
@@ -110,7 +124,40 @@ fn straddled_position(h: &Harness, pm: &PumpMarket, q: u64) -> (Borrower, u64) {
         let (res, nonce) = env.open(pm, &mut b, q);
         ok(res);
         env.warp(2);
-        buy_down_to(env, &pm.curve, q / 2);
+        match who {
+            Straddler::Outsider => buy_down_to(env, &pm.curve, q / 2),
+            Straddler::Borrower => {
+                // The borrower's own wallet (its base ATA and pump UVA first).
+                let c = pm.curve;
+                let payer = env.payer.pubkey();
+                let kp = b.kp.insecure_clone();
+                let program = c.token_program.id();
+                ok(env.send(
+                    &[
+                        fork::create_ata_idempotent_ix(&payer, &kp.pubkey(), &c.mint, &program),
+                        fork::pump_init_uva_ix(&payer, &kp.pubkey()),
+                    ],
+                    &[],
+                ));
+                let rt = c.state(&env.svm).real_token_reserves;
+                assert!(rt > q, "the position fits the curve");
+                let ata = pda::ata(&kp.pubkey(), &c.mint, &program);
+                let fr = fork::pump_fee_recipient(&env.svm, 0);
+                let bb = fork::pump_buyback_fee_recipient(&env.svm, 0);
+                let ix = c.v2_ix(
+                    &env.svm,
+                    fork::PumpV2::Buy,
+                    &kp.pubkey(),
+                    &ata,
+                    &fr,
+                    &bb,
+                    rt - q + 1,
+                    u64::MAX,
+                );
+                ok(env.send(&[pump::cu_limit_ix(400_000), ix], &[&kp]));
+                assert_eq!(c.state(&env.svm).real_token_reserves, q - 1);
+            }
+        }
         let deadline = env.position(pm, &b.key(), nonce).deadline;
         let now = env.now();
         env.warp(deadline - now + 1);
@@ -152,15 +199,52 @@ fn keeper_ata(h: &Harness, pm: &PumpMarket) -> Pubkey {
     pda::ata(&h.keeper.payer(), &pm.keys.mint, &pm.keys.token_program)
 }
 
-/// Duty 6 (ADOPTED Q16), with `graduation.migrate` on (M6's default; M5 suspends it,
-/// M5-SEC-4): an outside buy completes a covered market's curve; at its next tick the keeper
-/// sends `migrate_v2` — top-level, alone, with exactly the accounts the harness derives
-/// (`pump::migrate_v2_ix`: the 27 IDL accounts and the two boost accounts) — the canonical pool
-/// appears, and the market is observed in the same second (M5: `PumpCurve → PumpMigrating`).
-/// Once: the next ticks send nothing more.
+/// Whether `ixs` (signed by a funded outside key, with a compute budget) would be accepted by the
+/// program now: `Ok`, or its custom error. The "first second the program accepts it" oracle.
+fn accepts(h: &Harness, kp: &solana_keypair::Keypair, ix: Instruction) -> Result<(), Option<u32>> {
+    h.with_env(|env| {
+        let tx = Transaction::new_signed_with_payer(
+            &[pump::cu_limit_ix(600_000), ix],
+            Some(&kp.pubkey()),
+            &[kp],
+            env.svm.latest_blockhash(),
+        );
+        match env.svm.simulate_transaction(tx) {
+            Ok(_) => Ok(()),
+            Err(f) => Err(shortwin_litesvm_tests::errors::custom_code(&Err(f))),
+        }
+    })
+}
+
+/// The market as the VM holds it.
+fn stored(h: &Harness, pm: &PumpMarket) -> shortwin::state::Market {
+    h.with_env(|env| env.market(&pm.market()))
+}
+
+/// Every pool account a PumpSwap trade of `pam` requires exists (ARCH §3.12's existence
+/// requirement: T14 the trader's pAMM UVA, T11 the coin-creator vault's WSOL ATA; the recipients'
+/// are the fork's statics).
+fn pool_accounts_exist(h: &Harness, pam: &PammMarket) -> bool {
+    let (_, auth_ata) = pam.creator_vault();
+    h.with_env(|env| {
+        [pam.trader_uva(), auth_ata]
+            .iter()
+            .all(|k| env.svm.get_account(k).is_some_and(|a| !a.data.is_empty()))
+    })
+}
+
+/// Duty 6 (ADOPTED Q16) with the **default** configuration (M6: `migrate` on again): an outside buy
+/// completes a covered market's curve; at its next tick the keeper sends `migrate_v2` — top-level,
+/// alone, with exactly the accounts the harness derives (`pump::migrate_v2_ix`: the 27 IDL accounts
+/// and the two boost accounts) — then, in the same second, the transition: the pool accounts the
+/// trades require (created: they did not exist), `crank_price` on the curve's ReadSet
+/// (`VenueStateChanged PumpCurve → PumpSwap`) and on the pool (its first bucket). The market is on
+/// its pool with the warm-up marked; the keeper observes it every second until the warm-up is over
+/// (no positions: the first open must find a confirmed `P_ema`), then leaves it alone; once.
 #[test]
-fn the_keeper_migrates_a_completed_curve() {
-    let (mut h, pm, _q) = pump_setup(with_migrate());
+fn the_keeper_migrates_and_moves_a_completed_curve_onto_its_pool() {
+    let (mut h, pm, _q) = pump_setup(KeeperConfig::default());
+    assert!(KeeperConfig::default().graduation.migrate, "M6's default");
     h.second();
     assert_eq!(market_kind(&h, &pm), Some(VenueKind::PumpCurve));
     h.with_env(|env| buy_down_to(env, &pm.curve, 0));
@@ -177,205 +261,413 @@ fn the_keeper_migrates_a_completed_curve() {
     assert_eq!(mine.accounts, theirs.accounts);
 
     let r = h.second().clone();
+    let t = h.now();
     assert!(r.errors.is_empty(), "{:?}", r.errors);
     assert_eq!(r.migrations.len(), 1, "{:?}", r.migrations);
     let out = r.migrations[0].result.landed().expect("migrate_v2 landed");
-    let pump_top: Vec<_> = out.inner.iter().map(Vec::len).collect();
-    eprintln!("migrate_v2: {} CU, inner {pump_top:?}", out.units_consumed);
+    eprintln!("migrate_v2: {} CU", out.units_consumed);
     assert_eq!(curve(&h, &pm).virtual_token_reserves, 0, "migrated");
-    let np = pump::NewPool::of(&pm.curve);
-    assert!(
-        h.with_env(|env| np.state(&env.svm)).is_some(),
-        "the canonical pool"
-    );
-    assert!(
-        r.cranked.contains(&pm.market()),
-        "observed in the same second"
-    );
+    // The transition, in the same second.
+    assert_eq!(r.transitions.len(), 1, "{:?}", r.transitions);
+    let tr = &r.transitions[0];
+    assert!(!tr.bundled);
+    assert!(tr.created >= 1, "the trader's pAMM UVA at least");
+    let out = tr.result.landed().expect("the transition landed");
     assert_eq!(
-        market_kind(&h, &pm),
-        Some(VenueKind::PumpMigrating),
-        "M5 records the migration (M6: → PumpSwap)"
+        tr.venue_changes,
+        [(VenueKind::PumpCurve as u8, VenueKind::PumpSwap as u8)]
     );
-    for _ in 0..3 {
+    eprintln!(
+        "transition: {} accounts created, {} CU",
+        tr.created, out.units_consumed
+    );
+    assert!(
+        r.observed(&pm.market()),
+        "the market's observation this second"
+    );
+    assert!(!r.cranked.contains(&pm.market()), "no second crank");
+    assert_eq!(market_kind(&h, &pm), Some(VenueKind::PumpSwap));
+    let m = stored(&h, &pm);
+    assert_eq!((m.ema_warm, m.ema_guard), (8, 1));
+    assert_eq!(m.graduated_at, t);
+    assert!(m.b_lo.get() != 0, "the pool's first bucket");
+    let pam = h.with_env(|env| PammMarket::graduated(&env.svm, &pm));
+    assert!(pool_accounts_exist(&h, &pam));
+
+    // The warm-up, observed every second (no positions: M6's keeper warm-up) while the next
+    // instruction would still find it running: buckets T … T + 7, the eighth integrated by
+    // whatever instruction comes next (an open's own prologue); then nothing.
+    for sec in 1..=10 {
         let r = h.second().clone();
-        assert!(r.migrations.is_empty(), "once");
         assert!(r.errors.is_empty(), "{:?}", r.errors);
+        assert!(r.migrations.is_empty() && r.transitions.is_empty(), "once");
+        assert!(r.pamm_accounts.is_empty(), "nothing left to create");
+        assert_eq!(
+            r.observed(&pm.market()),
+            sec <= 7,
+            "+{sec} s: warm {} needs {:?}",
+            stored(&h, &pm).ema_warm,
+            r.needs.get(&pm.market())
+        );
     }
+    assert_eq!(stored(&h, &pm).ema_warm, 1, "the eighth bucket is pending");
+    h.with_env(|env| env.crank(&pam));
+    assert_eq!(
+        stored(&h, &pm).ema_warm,
+        0,
+        "the next instruction ends the warm-up"
+    );
 }
 
-/// M5-SEC-4: M5's default keeper leaves a completed curve unmigrated. Without M6's `→ PumpSwap`
-/// transition a migrated curve's market is no longer observed (its EMA freezes at the last curve
-/// price and its exits pause for good), while the completed, unmigrated curve is still observed
-/// and its stuck-migration S3 prices the post-migration pool: the keeper sends no `migrate_v2`.
+/// With `graduation.migrate` off the keeper sends no `migrate_v2`, but once someone else migrates
+/// the curve the transition is still the keeper's (ARCH §7.1 duty 6 "on the canonical pool's
+/// appearance"): the market moves onto its pool and its pool accounts are created.
 #[test]
-fn m5_sec_4_the_keeper_does_not_migrate_by_default() {
-    let (mut h, pm, _q) = pump_setup(KeeperConfig::default());
-    assert!(!KeeperConfig::default().graduation.migrate);
+fn with_migrate_off_a_third_party_migration_is_still_moved_onto_the_pool() {
+    let (mut h, pm, _q) = pump_setup(without_migrate());
     h.second();
     h.with_env(|env| buy_down_to(env, &pm.curve, 0));
-    for _ in 0..3 {
+    for _ in 0..2 {
         let r = h.second().clone();
         assert!(r.errors.is_empty(), "{:?}", r.errors);
-        assert!(r.migrations.is_empty(), "no migrate_v2 in M5");
+        assert!(r.migrations.is_empty(), "migrate off");
+        assert!(r.transitions.is_empty());
     }
-    let c = curve(&h, &pm);
-    assert!(
-        c.complete && c.virtual_token_reserves > 0,
-        "still migrating"
-    );
+    h.with_env(|env| {
+        let m = env.funded_keypair();
+        let ix = pump::migrate_v2_ix(&env.svm, &m.pubkey(), &pm.curve);
+        ok(env.send(&[pump::cu_limit_ix(600_000), ix], &[&m]));
+    });
+    let r = h.second().clone();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert_eq!(r.transitions.len(), 1);
+    assert!(r.transitions[0].result.landed().is_some());
+    assert_eq!(market_kind(&h, &pm), Some(VenueKind::PumpSwap));
+    let pam = h.with_env(|env| PammMarket::graduated(&env.svm, &pm));
+    assert!(pool_accounts_exist(&h, &pam));
 }
 
-/// M5's default (ARCH §5.4, keeper fallback with no exit transaction before M6): an expired
-/// position with `Q > rT` on a live curve is `Plan::Straddle`; the keeper sends no bundle — tx3
-/// (the exit on the new pool) is M6's and `send_without_exit` is off —, alerts once, and calls
-/// `sol_settle` for the position (the tree's last branch) every second meanwhile. The curve is
-/// left live.
+/// Who moves the market onto its pool in [`a_graduation_with_a_position_is_liquidated_on_the_pool_after_the_warm_up`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Transition {
+    /// The keeper: its `migrate_v2`, then its transition with the pool's first bucket (`T`).
+    Keeper,
+    /// A third party migrates and cranks the market onto the pool (the transition records no
+    /// bucket) before the keeper's tick: the warm-up's buckets are the keeper's from `T + 1`.
+    ThirdParty,
+}
+
+/// A graduation with a position open (ARCH §2.5, §5.3; ECON §10): a curve position (`Q ≤ rT`)
+/// survives an outside buy that completes the curve; the market is moved onto its pool — by the
+/// keeper (`migrate_v2` and its transition with the pool's first bucket, in the same second), or by
+/// a third party's migration and crank (no bucket; the keeper then creates the pool accounts) —; a
+/// whale pumps the pool ×3 right after. During the warm-up the keeper observes every second and
+/// sends **no exit** (an outside key's `liquidate` is refused `EmaWarmingUp`, then
+/// `NotLiquidatable` while the EMA catches up); the keeper's `liquidate` — with the PumpSwap
+/// ReadSet and TradeExtras — lands in the **first** second the outside key's simulation passes,
+/// buying `Q` on the pool. No exit of the keeper is refused on the way. The two variants measure
+/// what the keeper's own first bucket (the graduation price, before the pump) costs a genuine
+/// pump: the warm-up seeds `P_ema` at the lowest bucket low (M4R), so with it the EMA starts at
+/// the graduation price and climbs at the steady step after the gate.
 #[test]
-fn m5_waits_for_the_exit_transaction_and_settles_meanwhile() {
+fn a_graduation_with_a_position_is_liquidated_on_the_pool_after_the_warm_up() {
+    let mut measured = Vec::new();
+    for variant in [Transition::Keeper, Transition::ThirdParty] {
+        let (mut h, pm, q) = pump_setup(KeeperConfig::default());
+        let (b, nonce) = h.with_env(|env| {
+            env.crank(&pm);
+            env.warp(1);
+            let mut b = env.borrower();
+            let (res, nonce) = env.open(&pm, &mut b, q);
+            ok(res);
+            (b, nonce)
+        });
+        let position = pda::position(&pm.market(), &b.key(), nonce).0;
+        h.second();
+        h.idle(1);
+        h.with_env(|env| buy_down_to(env, &pm.curve, 0));
+        let t = h.now();
+        match variant {
+            Transition::Keeper => {
+                let r = h.tick().clone();
+                assert!(r.errors.is_empty(), "{:?}", r.errors);
+                assert!(r.migrations[0].result.landed().is_some());
+                assert!(r.transitions[0].result.landed().is_some());
+            }
+            Transition::ThirdParty => h.with_env(|env| {
+                let m = env.funded_keypair();
+                let ix = pump::migrate_v2_ix(&env.svm, &m.pubkey(), &pm.curve);
+                ok(env.send(&[pump::cu_limit_ix(600_000), ix], &[&m]));
+                env.crank(&pm);
+                assert_eq!(
+                    env.market(&pm.market()).venue_kind(),
+                    Some(VenueKind::PumpSwap)
+                );
+                assert_eq!(env.market(&pm.market()).b_lo.get(), 0, "no bucket yet");
+            }),
+        }
+        let pam = h.with_env(|env| PammMarket::graduated(&env.svm, &pm));
+        // The pool pumped ×3 right after the transition.
+        h.with_env(|env| {
+            let whale = PammUser::new(env, &pam.pool, 20_000 * 1_000_000_000);
+            ok(whale.push_price(env, &pam.pool, 3, 1));
+        });
+        let outsider = h.with_env(|env| env.funded_keypair());
+        let liq = |h: &Harness| {
+            let ix = shortwin_litesvm_tests::engine::liquidate_ix(
+                &pam,
+                &outsider.pubkey(),
+                &b.key(),
+                nonce,
+            );
+            accepts(h, &outsider, ix)
+        };
+        let mut liquidated_at = None;
+        for _ in 0..300 {
+            h.idle(1);
+            let before = liq(&h);
+            let warm = stored(&h, &pm).ema_warm;
+            let r = h.tick().clone();
+            assert!(r.errors.is_empty(), "{:?}", r.errors);
+            assert!(
+                !r.alerts
+                    .iter()
+                    .any(|a| matches!(a, Alert::ExitRefused { .. })),
+                "{:?}",
+                r.alerts
+            );
+            let landed = r.exits.iter().any(|e| {
+                e.position == position
+                    && e.kind == ExitKind::Liquidate
+                    && e.result.landed().is_some()
+            });
+            if landed {
+                assert_eq!(before, Ok(()), "the program accepted it this second");
+                liquidated_at = Some(h.now());
+                break;
+            }
+            // The keeper sent nothing the program would have taken.
+            assert_ne!(before, Ok(()), "+{} s: the keeper missed it", h.now() - t);
+            if warm > 0 {
+                assert!(
+                    r.exits.iter().all(|e| e.kind == ExitKind::SolSettle),
+                    "no liquidation during the warm-up"
+                );
+            }
+            assert!(r.observed(&pm.market()), "every second");
+        }
+        assert!(pool_accounts_exist(&h, &pam), "the keeper's duty");
+        let at = liquidated_at.expect("liquidated on the pool");
+        eprintln!(
+            "graduation with a position ({variant:?}): transition at {t}, liquidated on the pool \
+             at +{} s",
+            at - t
+        );
+        assert!(at - t >= 8, "not before the warm-up's gate");
+        assert!(
+            h.with_env(|env| read::borsh::<shortwin::state::ShortPosition>(&env.svm, &position))
+                .is_none()
+        );
+        assert_eq!(market_kind(&h, &pm), Some(VenueKind::PumpSwap));
+        measured.push(at - t);
+    }
+    eprintln!(
+        "×3 pump right after the graduation: liquidated at +{} s with the keeper's first bucket, \
+         +{} s without",
+        measured[0], measured[1]
+    );
+    assert!(measured[0] >= measured[1]);
+}
+
+/// The straddle bundle (ARCH §5.4 case 2; M6) with the keeper's default configuration, for a
+/// straddle made by an outside buyer and for M5-SEC-4's **self-made** straddle (the borrower buys
+/// `rT − q + 1` itself): the expired position is `Plan::Straddle`; the keeper's bundle — tx1
+/// (ComputeBudget ×2, its base ATA, `complete_curve`), tx2 (ComputeBudget ×2, `migrate_v2`), tx3
+/// (ComputeBudget ×2, the pool accounts, `crank_price` onto the pool, `crank_price` on the pool,
+/// the Jito tip) — lands atomically: the keeper holds the curve's last `rT` tokens and paid the
+/// tip, the market is `PumpSwap` with tx3's own bucket and the warm-up marked, and tx3 is the
+/// market's observation for the second. The keeper then observes every second and expires the
+/// position on the pool at **`T + 8`**, the warm-up's gate; an outside key's `expire` is refused
+/// `EmaWarmingUp` in every second before. Per-transaction trace, CU and size.
+#[test]
+fn the_straddle_bundle_moves_the_market_onto_its_pool_and_the_exit_lands_at_the_gate() {
+    for who in [Straddler::Outsider, Straddler::Borrower] {
+        let (mut h, pm, q) = pump_setup(KeeperConfig::default());
+        let (b, nonce) = straddled_by(&h, &pm, q, who);
+        let position = pda::position(&pm.market(), &b.key(), nonce).0;
+        let rt = curve(&h, &pm).real_token_reserves;
+        let tip0: u64 = graduation::JITO_TIP_ACCOUNTS
+            .iter()
+            .map(|k| h.with_env(|env| read::lamports(&env.svm, &k.parse().unwrap())))
+            .sum();
+        let r = h.second().clone();
+        let t = h.now();
+        assert!(r.errors.is_empty(), "{who:?}: {:?}", r.errors);
+        assert_eq!(r.straddles.len(), 1, "Plan::Straddle");
+        let rec = &r.straddles[0];
+        assert_eq!(rec.position, position);
+        assert!(
+            matches!(rec.result, StraddleResult::Landed { with_tx3: true, .. }),
+            "{who:?}: {:?}",
+            rec.result
+        );
+        assert_eq!(rec.rt_read, rt);
+        assert_eq!(rec.txs, 3);
+        let c = curve(&h, &pm);
+        assert!(
+            c.complete && c.virtual_token_reserves == 0,
+            "completed and migrated"
+        );
+        assert_eq!(tokens(&h, &keeper_ata(&h, &pm)), rt, "the keeper holds rT");
+        let tip1: u64 = graduation::JITO_TIP_ACCOUNTS
+            .iter()
+            .map(|k| h.with_env(|env| read::lamports(&env.svm, &k.parse().unwrap())))
+            .sum();
+        assert_eq!(tip1 - tip0, GraduationConfig::default().tip_lamports);
+        assert_eq!(r.transitions.len(), 1);
+        assert!(r.transitions[0].bundled);
+        assert_eq!(
+            r.transitions[0].venue_changes,
+            [(VenueKind::PumpCurve as u8, VenueKind::PumpSwap as u8)]
+        );
+        assert!(r.observed(&pm.market()), "tx3 is the observation");
+        assert_eq!(market_kind(&h, &pm), Some(VenueKind::PumpSwap));
+        let m = stored(&h, &pm);
+        assert_eq!((m.ema_warm, m.ema_guard), (8, 1));
+        assert!(m.b_lo.get() != 0, "tx3's own bucket");
+        let pam = h.with_env(|env| PammMarket::graduated(&env.svm, &pm));
+        assert!(pool_accounts_exist(&h, &pam));
+
+        let sent = h.chain().bundles_sent();
+        assert_eq!(sent.len(), 1);
+        let bundle = &sent[0];
+        assert!(bundle.landed);
+        eprintln!("{who:?}: | tx | top-level | trace | CU | bytes | accounts |");
+        for (i, tx) in bundle.txs.iter().enumerate() {
+            eprintln!(
+                "| tx{} | {} | {} | {} | {} | {} |",
+                i + 1,
+                bundle.top[i],
+                bundle.trace[i],
+                bundle.units[i],
+                tx.bytes,
+                tx.accounts
+            );
+            assert!(tx.bytes <= 1_232 && tx.accounts <= 64, "v0, T-SIZE: {tx:?}");
+            assert!(bundle.trace[i] <= 64);
+        }
+        assert_eq!(
+            bundle.top[1], 3,
+            "tx2: ComputeBudget ×2, migrate_v2, nothing else"
+        );
+        assert_eq!(bundle.trace[1], 2 + 51, "migrate_v2 alone with the budget");
+        assert!(
+            bundle.top[2] >= 5,
+            "tx3: ComputeBudget ×2, the cranks, the tip"
+        );
+        // tx3: every crank is 1 + its `emit_cpi!` self-CPI; the created accounts add theirs.
+        assert!(bundle.trace[2] <= 64);
+
+        // The warm-up: observed every second, no exit before the gate; the expiry at T + 8.
+        let outsider = h.with_env(|env| env.funded_keypair());
+        let mut expired_at = None;
+        for _ in 0..20 {
+            h.idle(1);
+            let ix = shortwin_litesvm_tests::engine::expire_ix(
+                &pam,
+                &outsider.pubkey(),
+                &b.key(),
+                nonce,
+            );
+            let before = accepts(&h, &outsider, ix);
+            let r = h.tick().clone();
+            assert!(r.errors.is_empty(), "{:?}", r.errors);
+            let landed = r.exits.iter().any(|e| {
+                e.position == position && e.kind == ExitKind::Expire && e.result.landed().is_some()
+            });
+            if landed {
+                assert_eq!(before, Ok(()));
+                expired_at = Some(h.now() - t);
+                break;
+            }
+            assert_eq!(
+                before,
+                Err(Some(u32::from(ShortwinError::EmaWarmingUp))),
+                "+{} s",
+                h.now() - t
+            );
+            assert!(r.observed(&pm.market()), "every second of the warm-up");
+            assert!(r.straddles.is_empty(), "the curve is gone");
+        }
+        assert_eq!(expired_at, Some(8), "{who:?}: at the warm-up's gate, T + 8");
+        assert!(
+            h.with_env(|env| read::borsh::<shortwin::state::ShortPosition>(&env.svm, &position))
+                .is_none()
+        );
+    }
+}
+
+/// V1-9, the keeper's fallback (ARCH §5.4): tx3's pre-flight fails — the keeper sends tx1 + tx2
+/// alone, the tip on tx2 (`with_tx3: false`); the curve is completed and migrated, and right after
+/// the bundle — in the same second — the keeper's own transition moves the market onto its pool
+/// (the pool accounts, the cranks); the position is expired on the pool at that gate (`T + 8`).
+#[test]
+fn when_tx3_fails_its_preflight_the_keeper_sends_tx1_and_tx2() {
     let (mut h, pm, q) = pump_setup(KeeperConfig::default());
     let (b, nonce) = straddled_position(&h, &pm, q);
     let position = pda::position(&pm.market(), &b.key(), nonce).0;
-    let mut alerts = 0;
-    for s in 0..3 {
-        let r = h.second().clone();
-        assert!(r.errors.is_empty(), "{:?}", r.errors);
-        let ev = r.evaluations[&pm.market()]
-            .iter()
-            .find(|e| e.key == position)
-            .unwrap();
-        assert_eq!(ev.plan, Plan::Straddle, "second {s}: {ev:?}");
-        assert!(ev.straddle && ev.expired);
-        assert_eq!(r.straddles.len(), 1);
-        let StraddleResult::Waiting { reason } = &r.straddles[0].result else {
-            panic!("{:?}", r.straddles[0].result);
-        };
-        assert!(reason.contains("M6"), "{reason}");
-        assert_eq!(r.straddles[0].rt_read, q / 2);
-        assert!(
-            r.exits.iter().any(|e| e.position == position
-                && e.kind == ExitKind::SolSettle
-                && e.plan == Plan::Straddle
-                && e.result.landed().is_some()),
-            "sol_settle meanwhile: {:?}",
-            r.exits
-        );
-        alerts += r
-            .alerts
-            .iter()
-            .filter(|a| matches!(a, Alert::StraddleWaiting { position: p, .. } if *p == position))
-            .count();
-    }
-    assert_eq!(alerts, 1, "alerted once");
-    assert!(h.chain().bundles_sent().is_empty());
-    let c = curve(&h, &pm);
-    assert!(
-        !c.complete && c.real_token_reserves == q / 2,
-        "the curve is untouched"
-    );
-    assert_eq!(market_kind(&h, &pm), Some(VenueKind::PumpCurve));
-}
-
-/// With `send_without_exit` (ARCH §5.4's two-transaction fallback): the keeper's bundle — tx1
-/// (ComputeBudget ×2, its base ATA, `complete_curve`), tx2 (ComputeBudget ×2, `migrate_v2`, the
-/// Jito tip) — lands atomically: the keeper holds the curve's last `rT` tokens and paid the tip,
-/// the curve is complete and migrated, the market is observed in the same second (M5:
-/// `PumpMigrating`) and the position's exits pause (`VenueMigrating`: its exit is M6's tx3).
-/// The per-transaction trace, CU and size: tx2 is 2 + 51 + 1 = 54 entries.
-#[test]
-fn the_bundle_completes_and_migrates_the_curve() {
-    let (mut h, pm, q) = pump_setup(without_exit());
-    let (b, nonce) = straddled_position(&h, &pm, q);
-    let tip0: u64 = graduation::JITO_TIP_ACCOUNTS
-        .iter()
-        .map(|k| h.with_env(|env| read::lamports(&env.svm, &k.parse().unwrap())))
-        .sum();
+    h.chain()
+        .fail_next_bundle_simulation(2, u32::from(ShortwinError::VenueAccountMismatch));
     let r = h.second().clone();
     assert!(r.errors.is_empty(), "{:?}", r.errors);
-    assert_eq!(r.straddles.len(), 1);
-    let rec = &r.straddles[0];
     assert!(
         matches!(
-            rec.result,
+            r.straddles[0].result,
             StraddleResult::Landed {
-                with_exit: false,
+                with_tx3: false,
                 ..
             }
         ),
         "{:?}",
-        rec.result
+        r.straddles[0].result
     );
-    assert_eq!(rec.rt_read, q / 2);
-    assert!(rec.max_sol_cost > rec.quote);
-    let c = curve(&h, &pm);
-    assert!(
-        c.complete && c.virtual_token_reserves == 0,
-        "completed and migrated"
-    );
-    assert_eq!(
-        tokens(&h, &keeper_ata(&h, &pm)),
-        q / 2,
-        "the keeper holds rT"
-    );
-    let tip1: u64 = graduation::JITO_TIP_ACCOUNTS
-        .iter()
-        .map(|k| h.with_env(|env| read::lamports(&env.svm, &k.parse().unwrap())))
-        .sum();
-    assert_eq!(tip1 - tip0, GraduationConfig::default().tip_lamports);
-    assert!(
-        r.cranked.contains(&pm.market()),
-        "observed in the same second"
-    );
-    assert_eq!(market_kind(&h, &pm), Some(VenueKind::PumpMigrating));
-    h.with_env(|env| assert_err(&env.close(&pm, &b, nonce), ShortwinError::VenueMigrating));
-
+    assert_eq!(r.straddles[0].txs, 2);
     let sent = h.chain().bundles_sent();
-    assert_eq!(sent.len(), 1);
-    let bundle = &sent[0];
-    assert!(bundle.landed);
-    eprintln!("| tx | top-level | trace | CU | bytes | accounts |");
-    for (i, t) in bundle.txs.iter().enumerate() {
-        eprintln!(
-            "| tx{} | {} | {} | {} | {} | {} |",
-            i + 1,
-            bundle.top[i],
-            bundle.trace[i],
-            bundle.units[i],
-            t.bytes,
-            t.accounts
-        );
-        assert!(t.bytes <= 1_232 && t.accounts <= 64, "v0, T-SIZE: {t:?}");
-        assert!(bundle.trace[i] <= 64);
-    }
-    // tx1: ComputeBudget ×2, the keeper's ATA (created: 1 + 4 CPIs), complete_curve (1 + the
-    // completing buy_v2's 9, + 1 when pump creates the keeper's UVA).
-    assert_eq!(bundle.top[0], 4);
-    assert!(bundle.trace[0] <= 4 + 4 + 9 + 1, "{:?}", bundle.trace);
-    // tx2: ComputeBudget ×2, migrate_v2 (1 + 50 CPIs), the tip.
-    assert_eq!(bundle.top[1], 4);
-    assert_eq!(
-        bundle.trace[1],
-        2 + 51 + 1,
-        "migrate_v2 alone with the budget and the tip"
-    );
-    // The next seconds: nothing more to complete or migrate.
-    for _ in 0..3 {
+    assert_eq!(sent[0].txs.len(), 2);
+    assert_eq!(sent[0].trace[1], 2 + 51 + 1, "the tip on tx2");
+    assert!(curve(&h, &pm).virtual_token_reserves == 0, "migrated");
+    // The keeper's own transition right after the bundle, in the same second.
+    let t = h.now();
+    assert_eq!(r.transitions.len(), 1);
+    assert!(!r.transitions[0].bundled && r.transitions[0].result.landed().is_some());
+    assert_eq!(market_kind(&h, &pm), Some(VenueKind::PumpSwap));
+    let pam = h.with_env(|env| PammMarket::graduated(&env.svm, &pm));
+    assert!(pool_accounts_exist(&h, &pam));
+    let mut expired_at = None;
+    for _ in 0..20 {
         let r = h.second().clone();
-        assert!(r.straddles.is_empty() && r.migrations.is_empty());
         assert!(r.errors.is_empty(), "{:?}", r.errors);
+        if r.exits.iter().any(|e| {
+            e.position == position && e.kind == ExitKind::Expire && e.result.landed().is_some()
+        }) {
+            expired_at = Some(h.now() - t);
+            break;
+        }
     }
+    assert_eq!(expired_at, Some(8));
 }
 
-/// ★ T-STRADDLE at the keeper: a curve trade lands between the keeper's read (and pre-flight)
-/// and its bundle. A buy of a third of `rT`: the bundle still lands — `complete_curve` buys the
-/// `rT` live when it runs, which is what the keeper ends up holding. A sale large enough to lift
-/// the completion above the keeper's `max_sol_cost`: pump reverts tx1 (6002), the bundle commits
-/// nothing (the curve is as the sale left it, the keeper holds nothing), the keeper alerts, and its
-/// bundle of the next second — built on a fresh read — lands.
+/// ★ T-STRADDLE at the keeper, the whole bundle (M6): a curve trade lands between the keeper's read
+/// (and pre-flight) and its bundle. A buy of a third of `rT`: the three-transaction bundle still
+/// lands — `complete_curve` buys the `rT` live when it runs, which is what the keeper ends up
+/// holding, and tx3 moves the market onto its pool. A sale large enough to lift the completion
+/// above the keeper's `max_sol_cost`: pump reverts tx1 (6002), the bundle commits nothing (the
+/// curve is as the sale left it, the keeper holds nothing, the market is still on the curve), the
+/// keeper alerts, and its bundle of the next second — built on a fresh read — lands.
 #[test]
 fn a_curve_trade_between_the_keepers_read_and_its_bundle() {
     // A buy.
-    let (mut h, pm, q) = pump_setup(without_exit());
+    let (mut h, pm, q) = pump_setup(KeeperConfig::default());
     straddled_position(&h, &pm, q);
     let c = pm.curve;
     h.chain().before_next_bundle(move |env| {
@@ -384,7 +676,10 @@ fn a_curve_trade_between_the_keepers_read_and_its_bundle() {
     });
     let r = h.second().clone();
     assert!(
-        r.straddles[0].result.landed(),
+        matches!(
+            r.straddles[0].result,
+            StraddleResult::Landed { with_tx3: true, .. }
+        ),
         "{:?}",
         r.straddles[0].result
     );
@@ -395,9 +690,10 @@ fn a_curve_trade_between_the_keepers_read_and_its_bundle() {
         "bought the rT live at execution"
     );
     assert_eq!(curve(&h, &pm).virtual_token_reserves, 0);
+    assert_eq!(market_kind(&h, &pm), Some(VenueKind::PumpSwap));
 
     // A sale beyond the bound (and still a straddle: rT = 3q/4 < q).
-    let (mut h, pm, q) = pump_setup(without_exit());
+    let (mut h, pm, q) = pump_setup(KeeperConfig::default());
     straddled_position(&h, &pm, q);
     let c = pm.curve;
     let sale = q / 4;
@@ -423,6 +719,8 @@ fn a_curve_trade_between_the_keepers_read_and_its_bundle() {
         "only the sale landed"
     );
     assert_eq!(tokens(&h, &keeper_ata(&h, &pm)), 0, "nothing of the bundle");
+    assert_eq!(market_kind(&h, &pm), Some(VenueKind::PumpCurve));
+    assert!(r.transitions.is_empty());
     assert!(r.alerts.iter().any(
         |a| matches!(a, Alert::StraddleWaiting { reason, .. } if reason.contains("did not land"))
     ));
@@ -435,12 +733,9 @@ fn a_curve_trade_between_the_keepers_read_and_its_bundle() {
     assert_eq!(r.straddles[0].rt_read, q / 2 + sale, "a fresh read");
     assert_eq!(tokens(&h, &keeper_ata(&h, &pm)), q / 2 + sale);
     assert_eq!(curve(&h, &pm).virtual_token_reserves, 0);
+    assert_eq!(market_kind(&h, &pm), Some(VenueKind::PumpSwap));
 }
 
-/// Below the straddle (`Q ≤ rT`), a curve position exits **on the curve**: the keeper's venue
-/// lists for a `PumpCurve` exit (the adapter's ReadSet, TradeExtras T0–T19 with the live
-/// recipients and creator vault) are the ones the program key-checks, and an expired position is
-/// expired at its deadline (`buy_v2` by the trader PDA), with no straddle and no migration.
 #[test]
 fn below_rt_the_keeper_expires_on_the_curve() {
     let (mut h, pm, q) = pump_setup(KeeperConfig::default());
@@ -481,7 +776,7 @@ fn below_rt_the_keeper_expires_on_the_curve() {
 /// `sol_settle` for the position meanwhile; nothing touches the curve.
 #[test]
 fn without_a_block_engine_the_straddle_waits() {
-    let (mut h, pm, q) = pump_setup(without_exit());
+    let (mut h, pm, q) = pump_setup(KeeperConfig::default());
     h.chain().set_bundles(false);
     let (b, nonce) = straddled_position(&h, &pm, q);
     let position = pda::position(&pm.market(), &b.key(), nonce).0;

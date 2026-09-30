@@ -1,7 +1,8 @@
 //! `create_market(Auto)` on pump coins (ARCH §2.5 `classify_pump`, §3.2; D1, ADOPTED Q6; M5):
 //! the exact state of a curve listing (the curve venue cache, the trader's base ATA and pump UVA,
 //! the price state at the curve's spot, tier D), a migrating curve's listing, the list-only
-//! outcomes (a graduated coin until M6, a coin that graduated elsewhere), and every refusal:
+//! outcomes (a graduated coin lists on its canonical pool since M6, a coin that graduated
+//! elsewhere lists as `None`), and every refusal:
 //! mayhem and non-SOL curves (Q6), a curve under 115 bytes (`CurveNeedsExtend`), a pump curve that
 //! does not parse (fail closed), a Raydium hint on a live curve (D1), a missing or wrong init set.
 
@@ -127,11 +128,13 @@ fn a_migrating_curve_lists_as_pump_migrating() {
     );
 }
 
-/// A pump coin on its canonical PumpSwap pool lists as `None` until M6's adapter; a coin that
-/// graduated elsewhere (Fartcoin: zeroed curve, no canonical pool) as `None` with the
-/// `graduated_elsewhere` flag. Neither takes the init set.
+/// A pump coin on its canonical PumpSwap pool lists on that pool (M6: `PumpSwap`, with the pAMM
+/// init set; no price until its first PumpSwap observation — `pamm_it::listing` checks the rest);
+/// without the init set the listing is refused (`BadRemainingAccounts`). A coin that graduated
+/// elsewhere (Fartcoin: zeroed curve, no canonical pool) lists as `None` with the
+/// `graduated_elsewhere` flag and takes no init set.
 #[test]
-fn graduated_coins_list_as_none() {
+fn graduated_coins_list_on_their_pool_or_as_none() {
     for (coin, elsewhere) in [
         (PumpCoin::Graduated, false),
         (PumpCoin::Legacy150, false),
@@ -146,9 +149,25 @@ fn graduated_coins_list_as_none() {
             VENUE_HINT_AUTO,
             &pda::canonical_pool(&c.mint),
         );
-        ok(env.send(&[plain], &[&creator]));
+        if elsewhere {
+            ok(env.send(&[plain], &[&creator]));
+        } else {
+            assert_err(
+                &env.send(std::slice::from_ref(&plain), &[&creator]),
+                E::BadRemainingAccounts,
+            );
+            let market = pda::market(&c.mint).0;
+            let with =
+                ix::with_remaining(plain, &shortwin_litesvm_tests::pamm::pamm_init_set(&market));
+            ok(env.send(&[with], &[&creator]));
+        }
         let m = listed(&env, &c);
-        assert_eq!(m.venue, VenueKind::None as u8, "{coin:?}");
+        let want = if elsewhere {
+            VenueKind::None
+        } else {
+            VenueKind::PumpSwap
+        };
+        assert_eq!(m.venue, want as u8, "{coin:?}");
         assert_eq!(
             m.has_flag(MARKET_FLAG_GRADUATED_ELSEWHERE),
             elsewhere,

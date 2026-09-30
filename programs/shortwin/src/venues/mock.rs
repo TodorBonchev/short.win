@@ -167,6 +167,7 @@ fn state_of(read: &[AccountInfo]) -> Option<VenueState> {
         fee_ppm: pool.fee_ppm,
         locked_depth: 0,
         curve: None,
+        pool: None,
     })
 }
 

@@ -512,6 +512,7 @@ fn i18(env: &Env, pre: &TxSnapshot, ev: &IxEvents) -> Result<(), &'static str> {
         &invariants::confirm::ConfirmFacts {
             created: &ev.created,
             switched: &ev.switched,
+            venue_changed: &ev.venue_changed,
             opens: &ev.opens,
             liquidations: &ev.liquidations,
             expiries: &ev.expiries,

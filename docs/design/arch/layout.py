@@ -1,4 +1,4 @@
-"""ARCH v0.4.1 account layouts (as built through M4; #99 max_q_hwm and #100 min_open_fee_ppm PROPOSED): explicit, no implicit padding, every field align <= 8 (PodU128/PodI128 = [u8;16])."""
+"""ARCH v0.4.1 account layouts (as built through M5; #99 max_q_hwm and #100 min_open_fee_ppm PROPOSED; M5-SEC-6 derived keys): explicit, no implicit padding, every field align <= 8 (PodU128/PodI128 = [u8;16])."""
 import sys
 SZ = {"u8":1,"u16":2,"u32":4,"u64":8,"i64":8,"Pubkey":32,"PodU128":16,"PodI128":16}
 AL = {"u8":1,"u16":2,"u32":4,"u64":8,"i64":8,"Pubkey":1,"PodU128":1,"PodI128":1}
@@ -62,7 +62,9 @@ g("market-level params", ("ema_params_version","u32"),("kink_version","u32"),("e
 g("OI", ("open_positions","u32"),("_pad4",arr("u8",4)),("total_notional_open","u64"),
   ("max_q_hwm","u64"),   # #99: high-water mark of q since open_positions last returned to 0, from _reserved (size unchanged)
   ("min_open_fee_ppm","u32"),("_pad5",arr("u8",4)))   # #100 (FIT-2): low-water mark of the open fee, from _reserved
-g("misc", ("_reserved",arr("u8",240)))
+g("derived keys", ("trader_wsol_ata","Pubkey"),   # M5-SEC-6: ATA(trader, WSOL) under SPL Token, derived once at listing, from _reserved
+  ("pump_pool_authority","Pubkey"))                # M5-SEC-6: PDA(pump, ["pool-authority", mint]), the canonical pool's creator, likewise
+g("misc", ("_reserved",arr("u8",176)))
 rows, end = layout("Market", M, disc=8)
 
 # v0.4.1 (R4A-2 / R4B-3): MarketVault becomes zero-copy and carries the lock expiry calendar

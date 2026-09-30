@@ -110,8 +110,8 @@ pub fn handler(ctx: Context<InitializeConfig>, args: InitConfigArgs) -> Result<(
         Pubkey::default(),
         ShortwinError::InvalidParams
     );
-    // Known bits only, and none whose lifecycle this build cannot finish (M5-SEC-4: the pump
-    // curve until M6's `→ PumpSwap` transition; `constants::VENUE_BITS_UNFINISHED`).
+    // Known bits only, and none whose lifecycle this build cannot finish (M5-SEC-4:
+    // `constants::VENUE_BITS_UNFINISHED`; the pump curve in M5, empty since M6's `→ PumpSwap`).
     require!(
         args.venue_enabled & !VENUE_BITS_ENABLEABLE == 0,
         ShortwinError::InvalidParams

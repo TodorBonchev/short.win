@@ -59,6 +59,7 @@ pub use shortwin_litesvm_tests::engine::{
 pub use shortwin_litesvm_tests::errors::{assert_err, custom_code, ok};
 pub use shortwin_litesvm_tests::fork::{self, PumpCoin, PumpCurve};
 pub use shortwin_litesvm_tests::invariants::venue_view;
+pub use shortwin_litesvm_tests::pamm::{self, PammMarket};
 pub use shortwin_litesvm_tests::pump::{self, CurveUser, PumpMarket, PumpSpec};
 pub use shortwin_litesvm_tests::tokens::TokenProgram;
 pub use shortwin_litesvm_tests::{Env, TxResult, events, ix, pda, read};

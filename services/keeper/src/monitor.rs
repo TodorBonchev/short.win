@@ -33,6 +33,15 @@
 //! fee and a pool that stops parsing (a layout change, "not executable" per A63) is reported as
 //! such. The duties themselves need no extra action: the program's route predicates already
 //! put a halted market on duty 5's no-route cadence and its S3 chain ([`crate::decide`]).
+//!
+//! **PumpSwap** (M6; ARCH §5.3, §5.5; A24). PumpSwap's `GlobalConfig.admin` halts every pool at
+//! once with `disable` (`GlobalConfig.disable_flags`, no timelock). The buy bit
+//! (`PAMM_BUY_DISABLED_BIT`, bit 3; T-DISABLE) makes the venue not executable — a lost route,
+//! S3 evidence; **any other non-zero value** blocks opens only (`VenueFlagged`) and is not S3
+//! evidence, and ARCH has the keeper alert it: every change of the flags is reported
+//! ([`AdminChange::PammFlags`], severe while non-zero). The pool's fee moves with its market-cap
+//! tier (like the curve's), so a PumpSwap fee is reported only when it crosses the opens cap or
+//! the hard cap.
 
 use anchor_lang::prelude::Pubkey;
 use shortwin::constants::{
@@ -194,6 +203,20 @@ pub fn snapshot(mv: &MarketView) -> PoolSnapshot {
             },
             None => PoolSnapshot::unreadable(executable),
         },
+        // PumpSwap: `status` carries `GlobalConfig.disable_flags`; the fee is the one resolved on
+        // the live pool, also while a halt makes it not executable.
+        VenueKind::PumpSwap => match mv.state.pool {
+            Some(p) => PoolSnapshot {
+                executable,
+                parses: true,
+                status: Some(u64::from(p.disable_flags)),
+                open_time: None,
+                fee_ppm: p.fees.map(|f| f.oneway_ppm()),
+                config: None,
+                buy_fee_splits: None,
+            },
+            None => PoolSnapshot::unreadable(executable),
+        },
         _ => PoolSnapshot {
             executable,
             parses: true,
@@ -274,6 +297,15 @@ pub enum AdminChange {
     /// The pool account no longer parses under the reader (a layout change): not executable
     /// (A63).
     Unreadable,
+    /// PumpSwap's `GlobalConfig.disable_flags` changed (`from` `None` at first sight of a
+    /// non-zero value; the admin's `disable`, every pool at once). Any non-zero value blocks opens
+    /// (`VenueFlagged`, A24); `buys_halted`: the buy bit (T-DISABLE bit 3) is set — no route, S3
+    /// evidence.
+    PammFlags {
+        from: Option<u8>,
+        to: u8,
+        buys_halted: bool,
+    },
 }
 
 impl AdminChange {
@@ -281,6 +313,7 @@ impl AdminChange {
     pub fn is_severe(&self) -> bool {
         match self {
             Self::RouteLost { .. } | Self::Unreadable => true,
+            Self::PammFlags { to, .. } => *to != 0,
             Self::FeeChanged {
                 above_open_cap,
                 above_hard_cap,
@@ -303,7 +336,32 @@ fn fee_via(kind: VenueKind) -> &'static str {
     match kind {
         VenueKind::RaydiumV4 => "AMM v4 SetParams (param 2, fees)",
         VenueKind::RaydiumCpmm => "CPMM update_amm_config (every pool on the config)",
+        VenueKind::PumpSwap => {
+            "the pool's market-cap fee tier (pump-fees FeeConfig, the pool's creator fee)"
+        }
         _ => "venue admin",
+    }
+}
+
+/// `GlobalConfig.disable_flags` of a PumpSwap snapshot.
+fn pamm_flags(s: &PoolSnapshot) -> Option<u8> {
+    s.status.and_then(|v| u8::try_from(v).ok())
+}
+
+fn pamm_flags_change(from: Option<u8>, to: u8) -> AdminChange {
+    AdminChange::PammFlags {
+        from,
+        to,
+        buys_halted: to & shortwin::venues::pump_amm::PAMM_BUY_DISABLED_BIT != 0,
+    }
+}
+
+/// 0 below the opens cap, 1 above it, 2 above the hard cap.
+fn fee_level(fee_ppm: Option<u32>, caps: FeeCaps) -> u8 {
+    match fee_ppm.map(u64::from) {
+        Some(f) if f > caps.hard_ppm => 2,
+        Some(f) if f > caps.open_ppm => 1,
+        _ => 0,
     }
 }
 
@@ -313,6 +371,16 @@ fn route_detail(kind: VenueKind, s: &PoolSnapshot) -> String {
         return "the pool account no longer parses (layout change, A63)".into();
     }
     match (kind, s.status) {
+        (VenueKind::PumpSwap, Some(f)) => format!(
+            "PumpSwap GlobalConfig.disable_flags {f:#010b}{}",
+            if f & u64::from(shortwin::venues::pump_amm::PAMM_BUY_DISABLED_BIT) != 0 {
+                " (bit 3: every buy halts — no route, S3 evidence)"
+            } else if f != 0 {
+                " (opens blocked, VenueFlagged; not S3 evidence)"
+            } else {
+                ""
+            }
+        ),
         (VenueKind::RaydiumV4, Some(st)) => {
             let name = match st {
                 raydium_v4::STATUS_INITIALIZED => "1 Initialized",
@@ -362,8 +430,19 @@ fn fee_change(kind: VenueKind, from_ppm: Option<u32>, to_ppm: u32, caps: FeeCaps
 /// above the opens cap).
 pub fn first_sight(kind: VenueKind, new: &PoolSnapshot, caps: FeeCaps) -> Vec<AdminChange> {
     let mut out = Vec::new();
-    if !new.parses && matches!(kind, VenueKind::RaydiumV4 | VenueKind::RaydiumCpmm) {
+    if !new.parses
+        && matches!(
+            kind,
+            VenueKind::RaydiumV4 | VenueKind::RaydiumCpmm | VenueKind::PumpSwap
+        )
+    {
         out.push(AdminChange::Unreadable);
+    }
+    if kind == VenueKind::PumpSwap
+        && let Some(f) = pamm_flags(new)
+        && f != 0
+    {
+        out.push(pamm_flags_change(None, f));
     }
     if !new.executable {
         out.push(AdminChange::RouteLost {
@@ -388,8 +467,9 @@ pub fn diff(
     caps: FeeCaps,
 ) -> Vec<AdminChange> {
     let mut out = Vec::new();
+    let pamm = kind == VenueKind::PumpSwap;
     let raydium = matches!(kind, VenueKind::RaydiumV4 | VenueKind::RaydiumCpmm);
-    if raydium && old.parses && !new.parses {
+    if (raydium || pamm) && old.parses && !new.parses {
         out.push(AdminChange::Unreadable);
     }
     if old.executable && !new.executable {
@@ -400,6 +480,22 @@ pub fn diff(
         out.push(AdminChange::RouteRestored {
             detail: route_detail(kind, new),
         });
+    }
+    if pamm {
+        if new.parses
+            && let Some(to) = pamm_flags(new)
+            && pamm_flags(old) != Some(to)
+            && (old.parses || to != 0)
+        {
+            out.push(pamm_flags_change(pamm_flags(old), to));
+        }
+        // The fee moves with the pool's market-cap tier: reported when it crosses a cap.
+        if let Some(f) = new.fee_ppm
+            && fee_level(new.fee_ppm, caps) != fee_level(last_fee, caps)
+        {
+            out.push(fee_change(kind, last_fee, f, caps));
+        }
+        return out;
     }
     if new.parses && old.parses && old.status != new.status {
         out.push(AdminChange::StatusChanged {

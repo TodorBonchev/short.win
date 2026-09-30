@@ -135,6 +135,12 @@ What it models (integer math wherever the on-chain program uses integers):
     LP's withdrawal for good forces (FITX-1, changelog #102, part 5b (vii)).  It is the one CR-liquidatability leg of liquidate, expire
     (UseLiquidate / UseExpire) and sol_settle (arming, "not liquidatable" gating, S3 due): Market.status.  The exit
     bound's L_b (exit_reference), the S1 / S2 legs and the refutation keep reading L_live as before.
+  * The curve's cap reserves (M5-SEC-3, ECONOMICS.md changelog #103; ARCH §4.6; the program's
+    engine::caps::curve_reserves): a curve open is sized on X0 = min(vT, x_ema) and the Tier D guard reads
+    rT_guard = min(rT, max(0, x_ema - (vT - rT))), x_ema = floor(isqrt(vT*vQ)*1e9/isqrt_ceil(P_ema)), whenever
+    P_ema > P_spot, the live (vT, rT) otherwise (Market.curve_cap_reserves): a sale wrapped around the open no
+    longer lifts either.  Consecutive capped curve opens wait for the EMA to follow each open's own sale, as on
+    PumpSwap (attacks/ema_atomic_multi.py's basket fill uses the same reserves on the curve).
   * Scenario library, EMA / exit-bound lag study, loss-given-gap curves,
     break-even gap frequencies, an ILLUSTRATIVE (uncalibrated) jump-diffusion
     Monte Carlo, and a randomised exit fuzz with attacker bundles, attacker-only
@@ -1294,13 +1300,29 @@ class Market:
     def rent_due(self, pos: Position) -> int:
         return max(self.rent_accrued(pos), pos.R_min)
 
+    def curve_cap_reserves(self):
+        """#103 (M5-SEC-3; ARCH §4.6; the program's engine::caps::curve_reserves): the curve's cap reserves
+        (X0, rT_guard) -- the curve as it stands at the EMA price whenever that is the smaller one:
+            P_ema <= P_spot:  (vT, rT)                                    the live values, unrounded
+            else:             x_ema = floor(isqrt(vT*vQ)*1e9/isqrt_ceil(P_ema))
+                              (min(vT, x_ema), min(rT, max(0, x_ema - (vT - rT))))
+        The curve's own L = isqrt(vT*vQ) is not moved by a curve trade (§2.3), so a sale of delta wrapped
+        around the open -- [sell(delta), open, buy(delta)], which lifts the live vT and rT by delta for the
+        open only -- no longer lifts X0 or the Tier D guard's rT (v0.4.1 read the live vT and rT)."""
+        v = self.venue
+        if self.ema <= v.spot_wad():
+            return v.vt, v.rt
+        x_ema = v.sqrt_k() * SQRT_WAD // isqrt_ceil(self.ema)
+        return min(v.vt, x_ema), min(v.rt, max(0, x_ema - (v.vt - v.rt)))
+
     def conservative_x(self) -> int:
-        """R3A-3 ii: token reserve for caps: curve vT; PumpSwap min(X_now, L_slow/sqrt(P_ema));
-        Raydium additionally <= D/(lambda_min*sqrt(P_ema))."""
+        """R3A-3 ii: token reserve for caps: curve min(vT, x_ema) (#103, curve_cap_reserves; vT while
+        P_ema <= P_spot); PumpSwap min(X_now, L_slow/sqrt(P_ema)); Raydium additionally
+        <= D/(lambda_min*sqrt(P_ema))."""
         v = self.venue
         X_now = v.eff()[0]
         if v.kind == "curve":
-            return X_now
+            return self.curve_cap_reserves()[0]
         sp = isqrt_ceil(self.ema)
         x = min(X_now, self.liq_slow * SQRT_WAD // sp)
         if v.kind == "ray":
@@ -1320,9 +1342,9 @@ class Market:
         X0 = self.conservative_x()
         q = max_q_impact(X0, self.tier.impact_pos_bps)
         q = min(q, self.oi_cap_q(X0 + q))
-        if v.kind == "curve":   # Tier D graduation guard: Q <= gamma*(rt+Q)
+        if v.kind == "curve":   # Tier D graduation guard: Q <= gamma*(rT_guard+Q) (#103: rT_guard, curve_cap_reserves)
             g = self.P.curve_oi_gamma_bps
-            q = min(q, v.rt * g // (BPS - g))
+            q = min(q, self.curve_cap_reserves()[1] * g // (BPS - g))
         if self.P.fee_size_cap_x100:
             q = min(q, X0 * v.fee_oneway_ppm() * self.P.fee_size_cap_x100 // (100 * PPM))
         return q

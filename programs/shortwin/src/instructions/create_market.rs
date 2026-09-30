@@ -5,11 +5,11 @@
 //! execution, and a timelocked change (≤ 0.1 SOL) could land between signing and execution
 //! (`CreationFeeAboveMax`), as `open_short`'s `max_open_fee` does for the open fee.
 //!
-//! **Scope** (ARCH §9 M1, M3, M5): `venue_hint` is [`VENUE_HINT_AUTO`] — `classify_pump` on the
-//! detection set decides (below): a pump coin on its live or migrating curve is listed on that
-//! venue, anything else (no pump curve, a curve that graduated elsewhere, and — until M6's
-//! PumpSwap adapter — a coin on its canonical PumpSwap pool) as `None` (list-only: deposits and
-//! withdrawals; never terminal, ARCH §2.5) — or, since M3, [`VENUE_HINT_RAYDIUM_V4`] /
+//! **Scope** (ARCH §9 M1, M3, M5, M6): `venue_hint` is [`VENUE_HINT_AUTO`] — `classify_pump` on
+//! the detection set decides (below): a pump coin on its live or migrating curve or (M6) on its
+//! valid canonical PumpSwap pool is listed on that venue, anything else (no pump curve, a curve
+//! that graduated elsewhere, a canonical pool that does not read as one) as `None` (list-only:
+//! deposits and withdrawals; never terminal, ARCH §2.5) — or, since M3, [`VENUE_HINT_RAYDIUM_V4`] /
 //! [`VENUE_HINT_RAYDIUM_CPMM`] with a candidate pool (below). Any other hint is
 //! `NoSupportedVenue`, except in a TEST-ONLY `test-venue` build, which also accepts the mock
 //! venue's hint (M2, A49).
@@ -29,6 +29,17 @@
 //! config, the UVA and its WSOL ATA, the creator, its vault and the vault's WSOL ATA); the price
 //! state at the curve's spot (`P_ema = vQ·WAD/vT`, `L = isqrt(vT·vQ)`; pump venues are never
 //! marked for the warm-up); tier D. Pump listings are never latched (ARCH §3.2 check 5).
+//!
+//! **PumpSwap listing** (`Auto`, M6; ARCH §3.2): a coin on its valid canonical pool;
+//! `remaining_accounts = [bonding_curve, canonical_pool] ++ [pAMM program, the trader's pAMM UVA,
+//! pAMM event authority]`. The trader's base ATA is created and validated as above, the trader's
+//! pAMM UVA created (`init_user_volume_accumulator` with the creator paying for an unsigned
+//! `trader`, R-VEN Update H6; skipped if it exists); the PumpSwap cache (`pump_amm::graduate`: the
+//! pool's vaults, the `pool-v2` marker, the boost vault and its ATA, the pAMM UVA and its ATA, the
+//! coin-creator vault), `graduated_at = now` (age from listing, O13), tier C. **No price at
+//! listing (flagged):** ARCH §3.2's init set carries no vault, so the market's first observation
+//! with the PumpSwap ReadSet starts the price state, marked for the post-change warm-up
+//! (`pump_amm::start_price`: `ema_warm = 8`) — ARCH §3.2 starts it at listing, unmarked.
 //!
 //! **Raydium listing** (ARCH §2.5 `create_market(venue_hint)`, §2.6, §3.2; D1, D2, O13):
 //! `remaining_accounts = [bonding_curve, canonical_pool] ++ ReadSet(candidate)` (AMM v4: pool,
@@ -333,7 +344,9 @@ fn create_pool_vault(accs: &CreateMarket, market: &Pubkey, bump: u8) -> Result<(
 /// list-only market).
 fn ray_pool_of(venue: VenueKind, hint_accounts: &[AccountInfo]) -> Pubkey {
     match venue {
-        VenueKind::None | VenueKind::PumpCurve | VenueKind::PumpMigrating => Pubkey::default(),
+        VenueKind::None | VenueKind::PumpCurve | VenueKind::PumpMigrating | VenueKind::PumpSwap => {
+            Pubkey::default()
+        }
         _ => hint_accounts.first().map_or(Pubkey::default(), |a| a.key()),
     }
 }
@@ -349,7 +362,7 @@ fn init_pump_market(
     now: i64,
 ) -> Result<()> {
     let c = pump_curve::parse_curve(bc).ok_or(ShortwinError::PumpVenuePrecedence)?;
-    pump_curve::write_cache(market, &Pubkey::new_from_array(c.creator));
+    pump_curve::write_caches(market, &Pubkey::new_from_array(c.creator))?;
     let (p, l) = pump_curve::spot(&c).ok_or(ShortwinError::NoRoute)?;
     let obs = Box::new(
         shortwin_math::observe::Observation::new(now, p, l)
@@ -363,14 +376,52 @@ fn init_pump_market(
     Ok(())
 }
 
+/// A PumpSwap listing's market state (module docs; M6): the PumpSwap cache from the valid
+/// canonical pool (`pump_amm::graduate`: `graduated_at = now`, age from listing, O13), tier C, and
+/// no price yet — the listing carries no vault (ARCH §3.2's init set), so the first PumpSwap
+/// observation starts the price state, marked for the warm-up (`pump_amm::start_price`).
+#[inline(never)]
+fn init_pamm_market(market: &mut Market, cp: &AccountInfo, now: i64) -> Result<()> {
+    let authority = market.pump_pool_authority;
+    let (_, pool) = detect::canonical_pool_read(cp, &market.mint, &authority);
+    let pool = pool.ok_or(ShortwinError::PumpVenuePrecedence)?;
+    crate::venues::pump_amm::graduate(market, &pool, now)
+}
+
+/// ARCH §3.2 "Effects" for the TEST-ONLY mock venue (a venue with a price): the adopted pool's
+/// keys, the price state `P_ema = P_spot`, `L_ema = L_slow = √(X·Y)`, one ring entry, an empty
+/// bucket; age from listing (O13's conservative reading); opens wait for the warm-up. The tier
+/// stays the conservative C until the first open or crank reads the oracle (`create_market` does
+/// not carry `oracle_cache`). Its own frame (SBF frames are 4 KiB).
+#[cfg(feature = "test-venue")]
+#[inline(never)]
+fn init_mock_market(
+    m: &mut Market,
+    hint_accounts: &[AccountInfo],
+    mint_key: &Pubkey,
+    token_program: &Pubkey,
+    now: i64,
+) -> Result<()> {
+    let state = crate::venues::mock::adopt(m, hint_accounts, mint_key, token_program)?;
+    let obs = crate::engine::observe::initial(now, &state)?;
+    m.set_observation(&obs);
+    m.graduated_at = now;
+    m.pool_seen_at = now;
+    m.venue = VenueKind::Mock as u8;
+    Ok(())
+}
+
 /// The pump listing's CPIs (module docs, ARCH §3.2 "Effects"): `create_idempotent(trader_base_ata)`
 /// paid by the creator, then its validation (a token account of the mint under its program, owned
-/// by `trader`, no delegate, no close authority: `TraderStateInvalid`), then the trader's pump UVA
-/// (`pump_curve::init_uva`, skipped if it exists) from `init_accounts` = `[pump program, the UVA,
-/// pump event authority]` (key-checked).
+/// by `trader`, no delegate, no close authority: `TraderStateInvalid`), then the trader's UVA of the
+/// listed venue — pump's (`pump_curve::init_uva`) on a curve, PumpSwap's (`pump_amm::init_uva`, M6)
+/// on the canonical pool; skipped if it exists — from `init_accounts` = `[the venue's program, the
+/// UVA, its event authority]` (key-checked). Its own frame (SBF frames are 4 KiB).
+#[inline(never)]
 fn pump_listing<'info>(
     accs: &CreateMarket<'info>,
     init_accounts: &[AccountInfo<'info>],
+    venue: VenueKind,
 ) -> Result<()> {
     ata::create_idempotent(CpiContext::new(
         accs.associated_token_program.key(),
@@ -393,6 +444,16 @@ fn pump_listing<'info>(
             token_program: accs.token_program.to_account_info(),
         },
     )?;
+    if venue == VenueKind::PumpSwap {
+        let uva = crate::venues::pump_amm::user_volume_accumulator(&accs.trader.key());
+        return crate::venues::pump_amm::init_uva(
+            &accs.creator.to_account_info(),
+            &accs.trader.to_account_info(),
+            &accs.system_program.to_account_info(),
+            init_accounts,
+            &uva,
+        );
+    }
     let uva = pump_curve::user_volume_accumulator(&accs.trader.key());
     pump_curve::init_uva(
         &accs.creator.to_account_info(),
@@ -448,13 +509,12 @@ pub fn handler<'info>(
             let venue = match class {
                 PumpClass::PumpCurve => VenueKind::PumpCurve,
                 PumpClass::PumpMigrating => VenueKind::PumpMigrating,
-                // M6: the PumpSwap adapter; until then a graduated pump coin is list-only. A
-                // canonical-pool account that does not read as a valid pool (M5-SEC-5) is a
+                // M6: a graduated pump coin lists on its canonical PumpSwap pool.
+                PumpClass::PumpSwap => VenueKind::PumpSwap,
+                // A canonical-pool account that does not read as a valid pool (M5-SEC-5) is a
                 // pump venue short.win cannot trade now: list-only, and never "graduated
                 // elsewhere" (D1 keeps Raydium out).
-                PumpClass::PumpSwap | PumpClass::PumpPoolUnreadable | PumpClass::NotPump => {
-                    VenueKind::None
-                }
+                PumpClass::PumpPoolUnreadable | PumpClass::NotPump => VenueKind::None,
                 PumpClass::GraduatedElsewhere => {
                     graduated_elsewhere = true;
                     VenueKind::None
@@ -537,8 +597,9 @@ pub fn handler<'info>(
     // The pump venues' trader accounts (ARCH §3.2 "Effects"): the base ATA and the pump UVA,
     // both paid by the creator, so no leg ever pays their rent.
     let pump = matches!(venue, VenueKind::PumpCurve | VenueKind::PumpMigrating);
-    if pump {
-        pump_listing(accs, hint_accounts)?;
+    let pamm = venue == VenueKind::PumpSwap;
+    if pump || pamm {
+        pump_listing(accs, hint_accounts, venue)?;
     }
     let (trader_wsol, trader_wsol_bump) =
         Pubkey::find_program_address(&[TRADER_WSOL_SEED, market_key.as_ref()], &crate::ID);
@@ -579,6 +640,12 @@ pub fn handler<'info>(
             };
             init_pump_market(&mut m, bc, venue, now)?;
         }
+        if pamm {
+            let [_, cp] = detection else {
+                return err!(ShortwinError::BadRemainingAccounts);
+            };
+            init_pamm_market(&mut m, cp, now)?;
+        }
         // The lender pool of a new market (`pool_model.Pool()`): no shares, both post-wipe
         // bits set (nothing to sweep before the first deposit).
         m.set_pool(&Pool::new());
@@ -601,18 +668,7 @@ pub fn handler<'info>(
         }
         #[cfg(feature = "test-venue")]
         if venue == VenueKind::Mock {
-            // ARCH §3.2 "Effects" for a venue with a price: the adopted pool's keys, the price
-            // state `P_ema = P_spot`, `L_ema = L_slow = √(X·Y)`, one ring entry, an empty
-            // bucket; age from listing (O13's conservative reading); opens wait for the
-            // warm-up. The tier stays the conservative C until the first open or crank reads
-            // the oracle (`create_market` does not carry `oracle_cache`).
-            let state =
-                crate::venues::mock::adopt(&mut m, hint_accounts, &mint_key, &token_program)?;
-            let obs = crate::engine::observe::initial(now, &state)?;
-            m.set_observation(&obs);
-            m.graduated_at = now;
-            m.pool_seen_at = now;
-            m.venue = VenueKind::Mock as u8;
+            init_mock_market(&mut m, hint_accounts, &mint_key, &token_program, now)?;
         }
         m.ema_params_version = config.ema_params.version;
         m.ema_dtmax_s = config.ema_params.ema_dtmax_s;

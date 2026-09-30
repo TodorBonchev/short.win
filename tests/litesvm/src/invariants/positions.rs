@@ -375,6 +375,14 @@ impl IxFacts<'_> {
         self.switched.iter().any(|e| e.market == *market)
     }
 
+    /// `market` moved onto its canonical PumpSwap pool in this instruction (M6: a curve market's
+    /// graduation, or a list-only market's re-detection).
+    fn graduated(&self, market: &Pubkey) -> bool {
+        self.venue_changed
+            .iter()
+            .any(|e| e.market == *market && e.to == VenueKind::PumpSwap as u8)
+    }
+
     /// `market` moved from `None` onto a pump venue in this instruction (the re-detection).
     fn redetected(&self, market: &Pubkey) -> bool {
         self.venue_changed.iter().any(|e| {
@@ -616,9 +624,11 @@ pub fn check_ix(svm: &LiteSVM, pre: &PositionsSnapshot, ix: &IxFacts<'_>) -> Res
             if let Some(v) = mp.venue
                 && let Some(want) = v.sell(o.q)
             {
-                let r = if v.curve.is_some() { v.venue_rent } else { 0 };
+                // The venue-side rent (the curve's creator-vault top-up; PumpSwap's growth of a
+                // pool under 271 bytes, M6); 0 on the mock and Raydium.
+                let r = v.venue_rent;
                 let ert = read::borsh::<ShortPosition>(svm, &o.position).map_or(0, |p| p.ert);
-                ensure(r <= ert || v.curve.is_none(), "I13", || {
+                ensure(r <= ert, "I13", || {
                     format!("open {}: venue-side rent {r} above ert {ert}", o.position)
                 })?;
                 ensure(o.s + r >= want && o.s + r <= want + 5, "I13", || {
@@ -627,6 +637,15 @@ pub fn check_ix(svm: &LiteSVM, pre: &PositionsSnapshot, ix: &IxFacts<'_>) -> Res
                         o.position, o.s
                     )
                 })?;
+                // PumpSwap reports the rent it netted out of `S` (ARCH §2.4 rule 3).
+                if post.venue_kind() == Some(VenueKind::PumpSwap) {
+                    ensure(o.venue_rent == r, "I13", || {
+                        format!(
+                            "open {}: Open.venue_rent {} against the pool's growth rent {r}",
+                            o.position, o.venue_rent
+                        )
+                    })?;
+                }
             }
         }
         // I13: one EMA integration moves P_ema and L_ema within their single-step bounds
@@ -639,7 +658,13 @@ pub fn check_ix(svm: &LiteSVM, pre: &PositionsSnapshot, ix: &IxFacts<'_>) -> Res
         // curve's `isqrt(vT·vQ)` (ARCH §2.5, A72: the graduation rewrite): `L_ema` is that value,
         // not a step.
         let redetected = ix.redetected(&market);
-        if redetected && mp.state.ema_liq.get() != 0 {
+        // `→ PumpSwap` (M6): the observation state is rewritten to the pool's anchor and
+        // restarted (`graduation`, below, checks it); `L_ema` is not a step.
+        let graduated = ix.graduated(&market);
+        if graduated {
+            graduation(svm, mp, &post)?;
+        }
+        if redetected && !graduated && mp.state.ema_liq.get() != 0 {
             let l_new = svm
                 .get_account(&post.bonding_curve)
                 .and_then(|a| {
@@ -668,7 +693,7 @@ pub fn check_ix(svm: &LiteSVM, pre: &PositionsSnapshot, ix: &IxFacts<'_>) -> Res
                 ("P_ema", mp.state.ema_price.get(), post.ema_price.get()),
                 ("L_ema", mp.state.ema_liq.get(), post.ema_liq.get()),
             ] {
-                if old == 0 || ((switched || redetected) && what == "L_ema") {
+                if old == 0 || ((switched || redetected || graduated) && what == "L_ema") {
                     continue;
                 }
                 // new ≤ (E·τ + E·(1 + C)·dt)/(τ + dt) and ≥ (E·τ + E/(1 + C)·dt)/(τ + dt).
@@ -706,14 +731,14 @@ pub fn check_ix(svm: &LiteSVM, pre: &PositionsSnapshot, ix: &IxFacts<'_>) -> Res
         // I16: the route chains are sound; `pool_fail` never reads the route-broken flag. An
         // adoption clears both chains (the new pool is observed afresh; I15). A `None →` pump
         // re-detection restarts both chains on the pump venue (ARCH §2.5): both are cleared.
-        if redetected {
+        if redetected || graduated {
             ensure(
                 (post.no_route_since, post.last_no_route_obs) == (0, 0)
                     && (post.pool_fail_since, post.last_pool_fail_obs) == (0, 0),
                 "I16",
                 || {
                     format!(
-                        "market {market}: a None → pump re-detection left a route chain \
+                        "market {market}: a None → pump re-detection or a graduation left a route chain \
                          (no_route {}, {}; pool_fail {}, {})",
                         post.no_route_since,
                         post.last_no_route_obs,
@@ -757,6 +782,89 @@ fn surviving_position(
     ensure(expect == *p, "A26", || {
         format!("position {pk}: a snapshot field changed: {p:?} -> {now_p:?}")
     })
+}
+
+/// T-VENUE-SWITCH (graduation; ARCH §2.5 "On → PumpSwap", M6) after an instruction whose venue
+/// sync moved `mp`'s market onto its canonical PumpSwap pool, recomputed from the pool account:
+/// the market is `PumpSwap` with `graduated_at` = now; its PumpSwap cache names the pool's vaults
+/// (@139, @171) and the boost vault's WSOL ATA; on a market that had a price the observation state
+/// is the Raydium restart — `L_ema` and every ring entry's `l = llo = lhi` the pool's `lp_supply`,
+/// `(x, y) = reprice(l, p)`, `L_slow ≤` it (never raised), the ring's prices kept, the bucket
+/// empty, `ema_warm = 8`, `ema_guard = 1`; one without a price keeps none (its first PumpSwap
+/// observation starts it).
+fn graduation(svm: &LiteSVM, mp: &MarketPositions, post: &Market) -> Result<(), Violation> {
+    use shortwin::state::pump_swap_cache as pc;
+    let market = mp.market;
+    let now = svm
+        .get_sysvar::<solana_clock::Clock>()
+        .unix_timestamp
+        .max(mp.state.last_accrual_ts);
+    let Some(pool) = svm
+        .get_account(&post.canonical_pool)
+        .and_then(|a| shortwin_venue_state::pump_amm::read_pool(&a.owner.to_bytes(), &a.data).ok())
+    else {
+        return fail(
+            "T-VENUE-SWITCH",
+            format!("market {market}: graduated onto a pool that does not read"),
+        );
+    };
+    let boost_vault = Pubkey::find_program_address(
+        &[b"boost_vault", post.canonical_pool.as_ref()],
+        &shortwin::constants::PUMP_AMM_PROGRAM_ID,
+    )
+    .0;
+    let boost_ata = crate::pda::ata(
+        &boost_vault,
+        &shortwin::constants::WSOL_MINT,
+        &shortwin::constants::TOKEN_PROGRAM_ID,
+    );
+    ensure(
+        post.venue_kind() == Some(VenueKind::PumpSwap)
+            && post.graduated_at == now
+            && post.pool_cache[pc::POOL_BASE_VAULT].to_bytes() == pool.pool_base_token_account
+            && post.pool_cache[pc::POOL_QUOTE_VAULT].to_bytes() == pool.pool_quote_token_account
+            && post.pool_cache[pc::BOOST_VAULT_ATA] == boost_ata,
+        "T-VENUE-SWITCH",
+        || {
+            format!(
+                "market {market}: after → PumpSwap venue {:?}, graduated_at {} (now {now}), \
+                 cache {:?}",
+                post.venue_kind(),
+                post.graduated_at,
+                &post.pool_cache[..4]
+            )
+        },
+    )?;
+    if mp.state.ring_count == 0 || mp.state.ema_price.get() == 0 {
+        return ensure(post.ring_count == 0, "T-VENUE-SWITCH", || {
+            format!("market {market}: a graduation without a price started one")
+        });
+    }
+    let anchor = u128::from(pool.lp_supply);
+    let obs = post.observation();
+    let rewritten = obs.ring.iter().all(|e| {
+        (e.l, e.llo, e.lhi) == (anchor, anchor, anchor)
+            && shortwin_math::quote::reprice(anchor, e.p).is_some_and(|xy| (e.x, e.y) == xy)
+    });
+    ensure(
+        obs.ema.liq == anchor
+            && obs.ema.liq_slow <= anchor
+            && rewritten
+            && post.b_lo.get() == 0
+            && (post.ema_warm, post.ema_guard) == (shortwin_math::consts::EMA_WARMUP_BUCKETS, 1),
+        "T-VENUE-SWITCH",
+        || {
+            format!(
+                "market {market}: after → PumpSwap L_ema {} (anchor lp_supply {anchor}), L_slow {}, \
+                 ring rewritten {rewritten}, bucket low {}, warm/guard ({}, {})",
+                obs.ema.liq,
+                obs.ema.liq_slow,
+                post.b_lo.get(),
+                post.ema_warm,
+                post.ema_guard
+            )
+        },
+    )
 }
 
 /// I16 (route rules, ARCH §5.3; A40, V2-1, R3A-4): on a market whose venue view the harness has

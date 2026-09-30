@@ -8,11 +8,13 @@
 //! `[bonding_curve, canonical_pool]` (key-checked); a `PumpMigrating` market its curve's ReadSet.
 //!
 //! **Venue transitions** (ARCH §2.5): the prologue's venue sync moves a curve market to
-//! `PumpMigrating` when its curve completes and to `None` when it completed with zeroed reserves
-//! and no canonical pool (`venues::pump_curve::sync`); on a list-only market this instruction
+//! `PumpMigrating` when its curve completes, to `PumpSwap` when its canonical pool is valid (M6:
+//! the ring rewrite and the post-change warm-up, `venues::pump_amm::graduate`) and to `None` when
+//! it completed with zeroed reserves and no canonical pool (`venues::pump_curve::sync`); on a
+//! list-only market this instruction
 //! re-runs `classify_pump` on the detection set and moves it onto a pump venue it finds (M5: a
-//! live curve → `PumpCurve`, a migrating one → `PumpMigrating`; a canonical pool → `PumpSwap`
-//! is M6's, the market stays `None` until then): the curve cache is derived, the price state
+//! live curve → `PumpCurve`, a migrating one → `PumpMigrating`; M6: a valid canonical pool →
+//! `PumpSwap`, `redetect_pool`): the curve cache is derived, the price state
 //! starts at the curve's spot (or, on a market that already has one, its liquidity is rewritten
 //! to the curve's, A72), the route chains restart, the tier is D, and a Raydium collection window
 //! is cleared (`fp_*`; M4's carry-over: pump venues take precedence, D1). A detection that cannot
@@ -27,6 +29,10 @@
 //! executable" — no observation is recorded and the S3 chain runs. Only a wrong or missing key
 //! reverts (`VenueAccountMismatch`, `BadRemainingAccounts`), so a batch of cranks fails only on
 //! wrong keys.
+//!
+//! **The PumpSwap coin-creator cache** (M6-SEC-4): on a `PumpSwap` market whose pool names another
+//! coin creator than the market's cache (anyone can change it through pAMM), the cache is rewritten
+//! to it (`venues::pump_amm::refresh_coin_creator`), so trades stop re-deriving the creator vault.
 //!
 //! **No `MarketVault`** (ARCH §3.9's list): the accrual's vault side is run on a scratch copy
 //! and must leave it untouched. It always does: the accrual touches the vault only to send a
@@ -68,8 +74,7 @@ pub struct CrankPrice<'info> {
     )]
     pub market: AccountLoader<'info, Market>,
     /// CHECK: `== market.mint` (`has_one`) and owned by the market's token program (checked
-    /// in the handler); read for nothing else in this build (PumpSwap fee tiers read its
-    /// supply, M6).
+    /// in the handler); PumpSwap's fee tier reads its supply (M6).
     pub mint: UncheckedAccount<'info>,
     #[account(seeds = [OracleCache::SEED], bump = oracle_cache.bump)]
     pub oracle_cache: Box<Account<'info, OracleCache>>,
@@ -87,7 +92,13 @@ pub fn handler<'info>(ctx: Context<'info, CrankPrice<'info>>) -> Result<()> {
     );
     let kind = market.venue_kind().ok_or(ShortwinError::NoSupportedVenue)?;
     let rem = venues::parse(&market, kind, ctx.remaining_accounts, Carry::ReadSet, &[])?;
-    let state = venues::read_state_boxed(&market, kind, rem.read, clock.unix_timestamp);
+    let state = venues::read_state_boxed(
+        &market,
+        kind,
+        rem.read,
+        clock.unix_timestamp,
+        venues::mint_supply(&ctx.accounts.mint.to_account_info()),
+    );
 
     let mut scratch = Box::new(Vault::new());
     let pro = prologue::run(
@@ -108,6 +119,11 @@ pub fn handler<'info>(ctx: Context<'info, CrankPrice<'info>>) -> Result<()> {
         if let [bc, cp] = rem.read {
             transition = redetect(&mut market, bc, cp, pro.now)?.or(transition);
         }
+    }
+    // M6-SEC-4: anyone can change a PumpSwap pool's coin creator (pAMM `set_coin_creator`,
+    // `migrate_pool_coin_creator`); the cache follows it here, so trades stop re-deriving T11 / T12.
+    if kind == VenueKind::PumpSwap && market.venue_kind() == Some(VenueKind::PumpSwap) {
+        venues::pump_amm::refresh_coin_creator(&mut market, rem.read)?;
     }
 
     if let Some(tier) = engine_tier::assign(
@@ -178,13 +194,13 @@ fn redetect(
     let to = match class {
         PumpClass::PumpCurve => VenueKind::PumpCurve,
         PumpClass::PumpMigrating => VenueKind::PumpMigrating,
-        // M6 (the PumpSwap adapter); nothing to move onto. A canonical-pool account that does
-        // not read as a valid pool (M5-SEC-5) is a pump venue short.win cannot read: the market
-        // stays list-only, and `propose_pool` / `execute_pool_switch` keep Raydium out (D1).
-        PumpClass::PumpSwap
-        | PumpClass::PumpPoolUnreadable
-        | PumpClass::GraduatedElsewhere
-        | PumpClass::NotPump => return Ok(None),
+        PumpClass::PumpSwap => return redetect_pool(market, cp, now),
+        // A canonical-pool account that does not read as a valid pool (M5-SEC-5) is a pump
+        // venue short.win cannot read: the market stays list-only, and `propose_pool` /
+        // `execute_pool_switch` keep Raydium out (D1).
+        PumpClass::PumpPoolUnreadable | PumpClass::GraduatedElsewhere | PumpClass::NotPump => {
+            return Ok(None)
+        }
     };
     let Some(curve) = pump_curve::parse_curve(bc) else {
         return Ok(None);
@@ -192,6 +208,10 @@ fn redetect(
     let Some((p, l)) = pump_curve::spot(&curve) else {
         return Ok(None);
     };
+    // The curve cache only (M5): the PumpSwap cache a curve listing precomputes is left to this
+    // market's `→ PumpSwap` transition (`pump_amm::graduate` derives what is still empty), so the
+    // re-detection stays inside ARCH §6.1's `crank_price` limit (with the precompute: 82,942 of
+    // 60,000 CU on the `m5_cu` bench's re-detection).
     pump_curve::write_cache(market, &Pubkey::new_from_array(curve.creator));
     let priced = market.ring_count > 0 && market.ema_price.get() > 0;
     let mut obs = market.observation();
@@ -215,5 +235,28 @@ fn redetect(
     Ok(Some(Transition {
         from: VenueKind::None,
         to,
+    }))
+}
+
+/// ARCH §2.5 `None` row, M6 part: a list-only market whose canonical PumpSwap pool is valid moves
+/// onto it — the pool's cache (`pump_amm::graduate`: `graduated_at = now`, both route chains and
+/// a collection window cleared, the tier C). A market without a price starts it at its first
+/// PumpSwap observation (marked for the warm-up, `pump_amm::start_price`: the detection set
+/// carries no vault); one with a price has its observation state rewritten to the pool's
+/// `lp_supply` anchor and restarted, as a graduation does. The trader's base ATA and pAMM UVA are
+/// not created here (no payer): trades refuse until someone creates them (both permissionless).
+#[inline(never)]
+fn redetect_pool(market: &mut Market, cp: &AccountInfo, now: i64) -> Result<Option<Transition>> {
+    let authority = detect::pool_authority_of(market);
+    let (_, Some(pool)) = detect::canonical_pool_read(cp, &market.mint, &authority) else {
+        return Ok(None);
+    };
+    venues::pump_amm::graduate(market, &pool, now)?;
+    let mut obs = market.observation();
+    venues::pump_amm::restart_observation(&mut obs, venues::pump_amm::graduation_anchor(&pool))?;
+    market.set_observation(&obs);
+    Ok(Some(Transition {
+        from: VenueKind::None,
+        to: VenueKind::PumpSwap,
     }))
 }

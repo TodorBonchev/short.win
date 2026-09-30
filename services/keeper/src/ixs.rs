@@ -28,25 +28,28 @@ fn build(
 
 /// The ReadSet of `crank_price` and `sol_settle`: every slot read-only.
 fn read_only(mv: &MarketView) -> Vec<AccountMeta> {
-    mv.read_keys
-        .iter()
-        .map(|k| AccountMeta::new_readonly(*k, false))
-        .collect()
+    read_only_keys(&mv.read_keys)
 }
 
 /// `crank_price()` with the market's ReadSet (read-only).
 pub fn crank_price(mv: &MarketView) -> Instruction {
+    crank_price_with(&mv.key, &mv.market.mint, &mv.read_keys)
+}
+
+/// `crank_price()` of `market` with the ReadSet `keys` (read-only): a curve market's transition
+/// transaction names the curve's ReadSet, then the pool's (`crate::graduation::transition_ixs`).
+pub fn crank_price_with(market: &Pubkey, mint: &Pubkey, keys: &[Pubkey]) -> Instruction {
     build(
         shortwin::accounts::CrankPrice {
             config: pda::config(),
-            market: mv.key,
-            mint: mv.market.mint,
+            market: *market,
+            mint: *mint,
             oracle_cache: pda::oracle_cache(),
             event_authority: pda::event_authority(),
             program: shortwin::ID,
         },
         shortwin::instruction::CrankPrice {},
-        read_only(mv),
+        read_only_keys(keys),
     )
 }
 

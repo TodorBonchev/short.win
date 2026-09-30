@@ -1013,3 +1013,49 @@ The completing instruction was legacy `buy` in 12 cases, `buy_v2` in 6 and `buy_
   - `migrate_v2` top-level with the two boost accounts: 329.3–329.8 k CU, 50 inner instructions (51 entries; 53 with ComputeBudget ×2), peak stack height 4; the pool it creates is **271 bytes** and PumpSwap `extend_account` takes it to **301** (not 300);
   - on a curve that is not complete it fails with 6006; on a curve that has already migrated it is a no-op (4 entries, 56,725 CU);
   - a completing `buy_v2(rT)` under a CPI helper (`complete_curve`, A66) is 9 entries (pump's completion event included), 12 with the helper and ComputeBudget ×2.
+
+---
+
+## Update 2026-09-30 (M6 re-verification)
+
+*Re-verified for milestone M6 on 2026-09-29 22:14 UTC – 2026-09-30 00:07 UTC (slots ≈ 451,773,000–451,798,083). The sections above are not edited. The PumpSwap side — T-DISABLE, negative VQR, cashback, pool sizes, the fixtures added — is in `graduated-venues.md`, Update 2026-09-30 (H1–H12); this part covers the curve program and graduation. "Candidate" means the unreleased ELFs inside `pump-rust-client` 0.2.0 (K2), run in LiteSVM in place of the deployed ones; the throwaway crate and raw outputs are in `~/.cache/shortwin-work/m6/research/`.*
+
+### K1. Deploys and configuration: unchanged
+
+- **No pump, pump-fees or PumpSwap upgrade** up to 2026-09-30 00:07 UTC: deploy slots 449,734,335 / 446,465,969 / 446,462,733, as in U1; the Squads multisig's `transaction_index` is still 140 (the 09-23 upgrade), so nothing is queued (`graduated-venues.md` H1).
+- **`Global` and pump's `FeeConfig` are byte-identical** to the `pump_state` fixtures (read at slot 451,785,107): fees 95 + 30 bps in one tier, `pool_migration_fee` 15,000,001, the recipient lists.
+- **Sources.** PPD: no commit after `cb188ce0`. The on-chain pump IDL is still the 2026-09-12 one. npm `@pump-fun/pump-sdk` is still 2.0.0. **`pump-rust-client` 0.2.0** (crates.io, 2026-09-29 16:36:53 UTC) is new: K2.
+
+### K2. `pump-rust-client` 0.2.0: the next pump release, visible before it ships (UNVERIFIED as the deployment)
+
+The client that PPD's `CPI_README.md` recommends for CPI now ships IDLs, math and ELF artifacts (`pump.so` sha256 `36dfc0a0…`, 1,769,160 B; the deployed ELF is `742f3c81…`, 1,664,408 B) of a pump program with, compared with PPD's `idl/pump.json`:
+
+- **The U7 cap byte has a name: `partial_fill: OptionBool`**, appended to `buy`, `buy_v2`, `buy_exact_quote_in_v2` and `buy_exact_sol_in`. The client's README: "A buy that would take more than a curve's remaining tokens fills only the remainder and completes the curve (the v2 and v3 builders request `partial_fill`)". Default (absent / false): no partial fill.
+- **v3 trades with fee buckets:** `buy_v3` (`07051dc4…`), `sell_v3` (`1c92de77…`), `buy_exact_quote_in_v3`, 17 accounts each (`global`, both mints, both token programs, the curve and its two ATAs, `user` S, the user's two ATAs, UVA, `fee_config`, `buyback_fee_recipient` W, System, event authority, program: no fee recipient, no creator vault, no pump-fees CPI). The buyback slice is paid in the trade; the rest of the protocol fee and the creator fee stay in the curve, counted in **`BondingCurve.creator_fee` @125 and `protocol_fees` @133** (u64 each; the account grows to 141 bytes). Cashback coins stay on v2. Permissionless `sweep_creator_fee` / `sweep_protocol_fee` (13 accounts) pay them out; `distribute_creator_fees*`, `update_fee_shares*` and `admin_cto` fail 6095 `CreatorFeesNotSwept` until the creator bucket is swept (client README).
+- **Also new:** `set_quote_control_mint_reserves` / `set_quote_control_reserves_admin` (a quote-control admin sets a custom quote mint's initial virtual reserves) and errors 6094–6097. `migrate_v2`'s 27 accounts are unchanged.
+- The PumpSwap half of the same release (v2 pool trades, fee buckets in the pool, negative VQR as the bucket offset, 287-byte pools) is `graduated-venues.md` H2.
+
+### K3. The candidate curve in LiteSVM (with the deployed and with the candidate PumpSwap)
+
+On the `near` fixture (`tcand2.txt`, `tcand4.txt`):
+
+- **short.win's `buy_v2` is unaffected:** with 24 bytes of data (no `partial_fill`) a buy of `rT + 1` still fails 6021; with the byte set to 1 it fills exactly `rT` and completes the curve (U7, now under its name). After a v2 completion the curve holds exactly its rent above `rQ` (1,417,320 on 151 bytes): v2 still pays every fee out in the trade.
+- **v3 leaves fees in the curve:** a `buy_v3` of 10¹² tokens left `creator_fee` 1,161,764 and `protocol_fees` 1,839,459 in the curve (3,001,223 lamports above `rQ` + rent); the 151-byte curve did not grow (it already holds @125–@141).
+- **Graduation is unaffected by buckets:** a completing `buy_v2(rT)` and `migrate_v2` after that v3 trade succeed (329.7 k CU; 330.1 k with the candidate PumpSwap); the pool gets the same reserves as without it — quote vault 67,405,853,922, VQR 17,584,505,328, boost vault 17,584,505,328, as on the deployed programs (M5 U8) — so `B̂_str` is unchanged. The buckets stay in the migrated curve account (4,418,543 lamports = rent + buckets) for a later sweep. With the candidate PumpSwap the new pool is **287 bytes** (271 with the deployed one).
+- The migrated quote does not depend on the curve's path before completion (the curve's reserves at `rT = 0` are fixed by `k`), so v3 trades before a completion cannot move `B̂_str` either.
+
+### K4. Graduation today
+
+- **Census, 2026-09-29 20:30–22:47 UTC** (slots 451,749,681–451,780,329; the last 250 successful transactions on `39azU…`): **195 pool-creating migrations**, all creating a **271-byte** pool with `base_amount_in` 206.9·10¹²; **147 non-mayhem** (142 SOL, 1 USDC, 4 custom quote) got VQR = ⌊`quote_amount_in`·2069/10⁴⌋ exactly; **48 mayhem** got no boost. U8's rule holds.
+- **A PumpSwap `disable_flags` create_pool bit halts graduation.** With bit 0 set, `migrate_v2` fails 6017 `DisabledCreatePool` (from PumpSwap's `create_pool`, `create_pool.rs:193`), so a completed curve stays migrating until the flag is cleared; bits 1–5, each set alone, do not stop it (bit 3 leaves `init_boost` working and halts only the later `boost_buy_and_burn`) (`tmigrate.txt`; `graduated-venues.md` H4).
+- **The pool `migrate_v2` builds on the ELF** (unchanged): 271 B, VQR 17,584,505,328, quote vault 67,405,853,922, base vault 206.9·10¹², boost ATA 17,584,505,328 on the `near` fixture; 329,458 CU.
+
+### K5. What this changes for the curve adapter (M5, as built)
+
+- Nothing breaks: `buy_v2` / `sell_v2` keep their accounts and data, 24-byte buys still revert above `rT`, fees are still paid out in v2 trades, and `migrate_v2` builds the pool `B̂_str` prices.
+- The curve account's lamports can now exceed `rQ` + rent by the v3 fee buckets; short.win reads `rQ` from the curve data and never the curve's lamports, so no reader changes. How the candidate's rent-reserve top-up (U10) treats the buckets was not tested.
+
+### K6. Still UNVERIFIED after this pass
+
+- Whether and when the K2 programs are deployed, and whether they equal the 0.2.0 artifacts.
+- Whether `partial_fill` stays an optional trailing byte on `buy_v2` in the deployed release (its default is "no partial fill" in the candidate).

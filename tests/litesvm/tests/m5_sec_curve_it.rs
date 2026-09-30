@@ -10,10 +10,10 @@
 //!   sweep_trader]` (T-CASHBACK, pump part: `claim_cashback` needs no signature of the trader).
 //! - **M5-SEC-3** — the curve caps read the curve at `P_ema` when it holds fewer tokens than the
 //!   live one: a sale in the same transaction lifts neither the Tier D guard's `rT` nor `X₀`.
-//! - **M5-SEC-4** — this build cannot enable the curve venue (`initialize_config`,
-//!   `propose_config(EnableVenues)`): every curve open is refused `VenueDisabled` in any
-//!   deployment of it. The M5 mechanics' freeze after an atomic complete + migrate stays as a
-//!   tripwire for M6 (the harness enables the curve the way M6 will, test-only).
+//! - **M5-SEC-4** — M5 could not enable the curve venue; M6 empties that gate: the curve bit is
+//!   enableable, and the atomic complete + migrate that froze an M5 market now graduates it onto
+//!   its pool (`→ PumpSwap`, the ring rewrite, the post-change warm-up) and the position is
+//!   liquidated there (the M5 tripwire, inverted).
 //! - **M5-SEC-5** — a canonical-pool account that does not read as a valid pool is not "graduated
 //!   elsewhere": the migrated market stays `PumpMigrating` (the list-only D1 side is in
 //!   `ray_it::listing` and `pool_select_it::listing`).
@@ -393,42 +393,35 @@ fn m5_sec_3_a_same_transaction_sale_does_not_lift_the_size_cap() {
     ok(res);
 }
 
-// ---- M5-SEC-4: the curve venue cannot be enabled in this build -----------------------------
+// ---- M5-SEC-4: the curve venue is enableable again (M6), and an atomic completion graduates ---
 
-/// M5-SEC-4 (the gate). Without M6's `→ PumpSwap` transition a curve market whose curve
-/// completes and migrates stays `PumpMigrating` for good (the tripwire below), and anyone can
-/// complete and migrate a curve in one transaction. This build therefore refuses to enable the
-/// curve venue: `initialize_config` and `propose_config(EnableVenues)` refuse its bit
-/// (`InvalidParams`), so in any deployment of it a curve market lists, lends and cranks, and
-/// every open on it is refused `VenueDisabled`.
+/// M5-SEC-4's gate, emptied by M6. The M5 build refused to enable the curve venue
+/// (`VENUE_BITS_UNFINISHED` = the curve bit): without the `→ PumpSwap` transition a curve that
+/// completed and migrated froze its market. M6 has the transition, so `initialize_config` and
+/// `propose_config(EnableVenues)` accept the curve bit (alone or with others), and a curve market
+/// opens positions in a deployment of this build.
 #[test]
-fn m5_sec_4_this_build_cannot_enable_the_curve_venue() {
+fn m5_sec_4_m6_can_enable_the_curve_venue() {
     let mut env = Env::new();
-    let mut args = env.default_init_args();
+    let args = env.default_init_args();
     assert_ne!(args.venue_enabled & VENUE_BIT_PUMP_CURVE, 0);
-    assert_err(
-        &env.initialize_config_as_sent(args.clone()),
-        E::InvalidParams,
-    );
-    args.venue_enabled &= !VENUE_BITS_UNFINISHED;
+    assert_eq!(VENUE_BITS_UNFINISHED, 0, "M6 empties the set");
     ok(env.initialize_config_as_sent(args));
-    assert_eq!(env.config().venue_enabled & VENUE_BIT_PUMP_CURVE, 0);
-    // Governance cannot enable it either, alone or with other bits.
+    assert_ne!(env.config().venue_enabled & VENUE_BIT_PUMP_CURVE, 0);
     let gov = env.governance.insecure_clone();
     for bits in [
         VENUE_BIT_PUMP_CURVE,
         VENUE_BIT_PUMP_CURVE | shortwin::constants::VENUE_BIT_RAYDIUM_V4,
     ] {
-        let res = env.send(
+        ok(env.send(
             &[ix::propose_config(
                 &gov.pubkey(),
                 ConfigChange::EnableVenues { bits },
             )],
             &[&gov],
-        );
-        assert_err(&res, E::InvalidParams);
+        ));
     }
-    // A curve market lists and lends; its opens are refused.
+    // A curve market lists, lends and opens.
     env.load_pump_programs();
     env.load_pump_statics();
     let c = env.load_pump_coin(PumpCoin::T22_115);
@@ -441,22 +434,23 @@ fn m5_sec_4_this_build_cannot_enable_the_curve_venue() {
     ok(env.send(&[crank_price_ix(&pm)], &[]));
     let mut b = env.borrower();
     let (res, _) = env.open(&pm, &mut b, q);
-    assert_err(&res, E::VenueDisabled);
+    ok(res);
 }
 
-/// Tripwire for M6 (M5-SEC-4; escalates the recorded exposure of `pump_curve_e2e.rs`
-/// `a_fast_migrate_v2_freezes_the_ema_before_the_completion_is_priced`), on a curve market the
-/// harness enabled the way M6 will (test-only; this build refuses the bit, above). Anyone — the
-/// borrower itself — can complete a curve and run `migrate_v2` in **one transaction**
-/// (`buy_v2(rT)` + `migrate_v2`: 58 inner instructions, ≈ 412k CU). short.win never observes the
-/// completed curve: the next crank moves the market `PumpCurve → PumpMigrating` with the EMA at
-/// the pre-completion price, and without M6's `→ PumpSwap` it stays there: no close, no
-/// liquidation (`VenueMigrating`), no observation of the pool, S3 only on the frozen EMA or at
-/// the deadline, FV at the frozen EMA — here the pool trades at ≥ 1.5× (×3.79 on the fork) the
-/// frozen EMA while the position is "not liquidatable". **M6 must invert this test**: the
-/// transition observes the pool, and the position becomes liquidatable on it.
+/// M5-SEC-4, **inverted by M6** (it was the tripwire
+/// `m5_sec_4_tripwire_an_atomic_complete_and_migrate_freezes_an_m5_market`). Anyone — the borrower itself — completes a curve and runs
+/// `migrate_v2` in **one transaction** (`buy_v2(rT)` + `migrate_v2`: ≈ 412k CU, self-financing),
+/// so short.win never observes the completed curve, and the pool then trades at a multiple of
+/// the last curve EMA (a buyer pushes it ×1.5 on top of the completion: ×3.79 the frozen EMA on
+/// the fork). In M5 the market stayed `PumpMigrating` with that EMA for good. Now the next crank
+/// moves it `PumpCurve → PumpSwap` (the curve's ReadSet shows the valid canonical pool): the ring
+/// is rewritten to the pool's `lp_supply` and the state restarted (`ema_warm = 8`, `ema_guard =
+/// 1`), `P_ema` carrying over. Every keeper exit fails `EmaWarmingUp` until eight integrations of
+/// the pool's own buckets have re-seeded the EMA — by at most the largest v0.4.1 step each
+/// (M4X-1), so the completion forces nothing before honest buckets exist — and the position,
+/// underwater at the pool's price, is then liquidated **on the pool**.
 #[test]
-fn m5_sec_4_tripwire_an_atomic_complete_and_migrate_freezes_an_m5_market() {
+fn m5_sec_4_an_atomic_complete_and_migrate_graduates_the_market_onto_its_pool() {
     let mut s = Sim::d_market(D80_SOLD, lend_for_80(D80_Q));
     let a = s.open(D80_Q);
     for _ in 0..60 {
@@ -479,24 +473,13 @@ fn m5_sec_4_tripwire_an_atomic_complete_and_migrate_freezes_an_m5_market() {
     );
     let c = curve(&s.env, &s.pm);
     assert_eq!((c.vt, c.rt), (0, 0), "migrated in the same transaction");
+    // An exit on the curve's accounts refuses: its own prologue sees the graduation.
     let kp = s.keeper.insecure_clone();
     let liq = liquidate_ix(&s.pm, &kp.pubkey(), &a.key(), a.nonce);
     assert_err(
         &s.env.send(&[pump::cu_limit_ix(300_000), liq], &[&kp]),
         E::VenueMigrating,
     );
-    let meta = s.crank();
-    let ev: VenueStateChanged = events::one(&meta);
-    assert_eq!(
-        (ev.from, ev.to),
-        (VenueKind::PumpCurve as u8, VenueKind::PumpMigrating as u8)
-    );
-    let p1 = s.env.market(&s.pm.market()).ema_price.get();
-    assert!(
-        p1.abs_diff(p_ema0) * 10_000 < p_ema0,
-        "the completed curve was never observed ({p1} vs {p_ema0})"
-    );
-    let p_ema0 = p1;
     // The pool trades on (a buyer pushes it ×1.5, the size of the boost's buy-and-burn).
     let np = pump::NewPool::of(&s.pm.curve);
     let r0 = np.reserves(&s.env.svm).unwrap();
@@ -516,58 +499,73 @@ fn m5_sec_4_tripwire_an_atomic_complete_and_migrate_freezes_an_m5_market() {
     let wsol = fork::fund_wsol(&mut s.env, &buyer.pubkey(), 200 * SOL);
     let push = u64::try_from(u128::from(r0.base) - u128::from(r0.base) * 1000 / 1225).unwrap();
     ok(s.env.send(
-        &[
-            pump::pamm_extend_account_ix(&buyer.pubkey(), &np.pool),
-            pump::pamm_buy_ix(
-                &s.env.svm,
-                &np,
-                &buyer.pubkey(),
-                &buyer_base,
-                &wsol,
-                push,
-                200 * SOL,
-            ),
-        ],
+        &[pump::pamm_buy_ix(
+            &s.env.svm,
+            &np,
+            &buyer.pubkey(),
+            &buyer_base,
+            &wsol,
+            push,
+            200 * SOL,
+        )],
         &[&buyer],
     ));
     let r1 = np.reserves(&s.env.svm).unwrap();
     let p_pool = r1.effective_quote * W / u128::from(r1.base);
-    for _ in 0..20 {
-        s.env.warp(30);
-        s.crank();
-    }
+    assert!(
+        p_pool * 10 > p_ema0 * 35,
+        "the pool at ≥ 3.5× the last curve EMA"
+    );
+    eprintln!("pool / frozen EMA = {:.2}", p_pool as f64 / p_ema0 as f64);
+
+    // The next crank (the curve's ReadSet) graduates the market; P_ema carries over.
+    s.env.warp(1);
+    let meta = s.crank();
+    venue_changed(&meta, VenueKind::PumpCurve, VenueKind::PumpSwap);
     let m = s.env.market(&s.pm.market());
-    assert_eq!(
-        m.ema_price.get(),
-        p_ema0,
-        "the pool is never observed (M6: it is)"
-    );
-    assert_eq!(venue(&s.env, &s.pm), VenueKind::PumpMigrating);
+    assert_eq!((m.ema_warm, m.ema_guard), (8, 1));
     assert!(
-        p_pool * 10 > p_ema0 * 15,
-        "the pool trades ≥ 1.5× the frozen EMA"
+        m.ema_price.get().abs_diff(p_ema0) * 10_000 < p_ema0,
+        "the completed curve was never observed: P_ema carries over"
     );
-    let st = s.status(&a);
-    assert!(
-        !st.cr_liq(),
-        "not liquidatable on the frozen EMA (M6: liquidatable)"
+    let pam = shortwin_litesvm_tests::pamm::PammMarket::graduated(&s.env.svm, &s.pm);
+    let ixs = shortwin_litesvm_tests::pamm::venue_account_ixs(&s.env.svm, &payer, &pam);
+    ok(s.env.send(&ixs, &[]));
+
+    // The keeper cranks the pool every second and tries the liquidation: refused while warming
+    // up, executed on the pool once the EMA — rising at most one v0.4.1 step per second — shows
+    // the position underwater.
+    let mut liquidated = None;
+    for sec in 1..=90 {
+        s.env.warp(1);
+        ok(s.env.send(&[crank_price_ix(&pam)], &[]));
+        let warm = s.env.market(&s.pm.market()).ema_warm;
+        let liq = liquidate_ix(&pam, &kp.pubkey(), &a.key(), a.nonce);
+        let res = s.env.send(&[pump::cu_limit_ix(400_000), liq], &[&kp]);
+        if warm > 0 {
+            assert_err(&res, E::EmaWarmingUp);
+            continue;
+        }
+        if let Ok(meta) = res {
+            liquidated = Some((sec, events::one::<Liquidate>(&meta)));
+            break;
+        }
+    }
+    let (sec, ev) = liquidated.expect("liquidated on the pool");
+    eprintln!(
+        "liquidated on the pool {sec} s after the graduation: buyback {} lamports",
+        ev.buyback_cost
     );
-    assert_err(&s.env.close(&s.pm, &a.b, a.nonce), E::VenueMigrating);
+    assert!(sec >= 8, "never before the warm-up's eight integrations");
+    assert_eq!(s.env.market(&s.pm.market()).open_positions, 0);
 }
 
 // ---- M5-SEC-5: an unreadable canonical pool is not "graduated elsewhere" --------------------
 
-/// M5-SEC-5. A63: a correctly keyed venue-state account that no longer parses makes the venue
-/// "not executable" and changes nothing else. Pre-fix `pump_curve::sync` read a migrated curve
-/// (`vT = 0`) whose canonical pool did not parse as **graduated elsewhere** (`PumpMigrating →
-/// None`, `graduated_elsewhere` set, the migration pause dropped from the S3 timer, the list-only
-/// market open to a Raydium adoption against D1) and never came back. Now every way the pool
-/// account can stop reading as a valid pool — a changed discriminator (a PumpSwap upgrade), a bool
-/// byte other than 0/1, a shifted layout (the creator no longer where it was) — leaves the market
-/// `PumpMigrating` (no transition, no flag, `migration_seen_at` kept), and so does the pool
-/// reading again.
-#[test]
-fn m5_sec_5_an_unreadable_canonical_pool_is_not_graduated_elsewhere() {
+/// A `D80` market with a position open whose curve completed (`→ PumpMigrating` at the next
+/// crank) and then migrated for real, not cranked since: the canonical pool, its account as
+/// `migrate_v2` wrote it, and the market's `migration_seen_at`.
+fn completed_and_migrated() -> (Sim, Pubkey, solana_account::Account, i64) {
     let mut s = Sim::d_market(D80_SOLD, lend_for_80(D80_Q));
     let _a = s.open(D80_Q);
     for _ in 0..10 {
@@ -576,16 +574,31 @@ fn m5_sec_5_an_unreadable_canonical_pool_is_not_graduated_elsewhere() {
     }
     let rt = u64::try_from(curve(&s.env, &s.pm).rt).unwrap();
     s.crowd_buy(rt);
+    s.env.warp(1);
+    venue_changed(&s.crank(), VenueKind::PumpCurve, VenueKind::PumpMigrating);
+    let seen = s.env.market(&s.pm.market()).migration_seen_at;
+    assert!(seen > 0);
     let migrator = s.env.funded_keypair();
     let mig = pump::migrate_v2_ix(&s.env.svm, &migrator.pubkey(), &s.pm.curve);
     ok(s.env.send(&[pump::cu_limit_ix(600_000), mig], &[&migrator]));
-    s.env.warp(1);
-    s.crank();
-    assert_eq!(venue(&s.env, &s.pm), VenueKind::PumpMigrating);
-    let market = s.pm.market();
-    let seen = s.env.market(&market).migration_seen_at;
     let np = pump::NewPool::of(&s.pm.curve);
     let orig = s.env.svm.get_account(&np.pool).unwrap();
+    (s, np.pool, orig, seen)
+}
+
+/// M5-SEC-5. A63: a correctly keyed venue-state account that no longer parses makes the venue
+/// "not executable" and changes nothing else. Pre-fix `pump_curve::sync` read a migrated curve
+/// (`vT = 0`) whose canonical pool did not parse as **graduated elsewhere** (`PumpMigrating →
+/// None`, `graduated_elsewhere` set, the migration pause dropped from the S3 timer, the list-only
+/// market open to a Raydium adoption against D1) and never came back. Now every way the pool
+/// account can stop reading as a valid pool — a changed discriminator (a PumpSwap upgrade), a bool
+/// byte other than 0/1, a shifted layout (the creator no longer where it was) — leaves the market
+/// `PumpMigrating` (no transition, no flag, `migration_seen_at` kept); the pool reading again
+/// moves it onto the pool (M6's `PumpMigrating → PumpSwap`; M5 kept it `PumpMigrating`).
+#[test]
+fn m5_sec_5_an_unreadable_canonical_pool_is_not_graduated_elsewhere() {
+    let (mut s, pool, orig, seen) = completed_and_migrated();
+    let market = s.pm.market();
     type Change<'a> = (&'a str, &'a dyn Fn(&mut Vec<u8>));
     let changes: [Change; 3] = [
         ("discriminator", &|d| d[0] ^= 0xff),
@@ -599,7 +612,7 @@ fn m5_sec_5_an_unreadable_canonical_pool_is_not_graduated_elsewhere() {
     for (what, change) in changes {
         let mut acc = orig.clone();
         change(&mut acc.data);
-        s.env.svm.set_account(np.pool, acc).unwrap();
+        s.env.svm.set_account(pool, acc).unwrap();
         s.env.warp(1);
         let meta = s.crank();
         no_venue_change(&meta);
@@ -608,21 +621,39 @@ fn m5_sec_5_an_unreadable_canonical_pool_is_not_graduated_elsewhere() {
         assert!(!m.has_flag(MARKET_FLAG_GRADUATED_ELSEWHERE), "{what}");
         assert_eq!(m.migration_seen_at, seen, "{what}: the pause is kept");
     }
-    s.env.svm.set_account(np.pool, orig).unwrap();
+    s.env.svm.set_account(pool, orig).unwrap();
     s.env.warp(1);
-    no_venue_change(&s.crank());
-    assert_eq!(venue(&s.env, &s.pm), VenueKind::PumpMigrating);
-    // A migrated curve whose canonical address holds nothing is still graduated elsewhere.
+    venue_changed(&s.crank(), VenueKind::PumpMigrating, VenueKind::PumpSwap);
+    let m = s.env.market(&market);
+    assert!(!m.has_flag(MARKET_FLAG_GRADUATED_ELSEWHERE));
+    assert_eq!(
+        m.pool_cache[shortwin::state::pump_swap_cache::POOL_BASE_VAULT],
+        {
+            let p = shortwin_venue_state::pump_amm::read_pool(
+                &shortwin_venue_state::pump_amm::PROGRAM,
+                &s.env.svm.get_account(&pool).unwrap().data,
+            )
+            .unwrap();
+            Pubkey::new_from_array(p.pool_base_token_account)
+        }
+    );
+}
+
+/// M5-SEC-5's other side: a migrated curve whose canonical address holds nothing is still
+/// graduated elsewhere (`PumpMigrating → None`, `graduated_elsewhere` set).
+#[test]
+fn m5_sec_5_an_empty_canonical_address_is_graduated_elsewhere() {
+    let (mut s, pool, _, _) = completed_and_migrated();
     s.env
         .svm
-        .set_account(np.pool, solana_account::Account::default())
+        .set_account(pool, solana_account::Account::default())
         .unwrap();
     s.env.warp(1);
     let meta = s.crank();
     venue_changed(&meta, VenueKind::PumpMigrating, VenueKind::None);
     assert!(
         s.env
-            .market(&market)
+            .market(&s.pm.market())
             .has_flag(MARKET_FLAG_GRADUATED_ELSEWHERE)
     );
 }

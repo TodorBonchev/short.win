@@ -5,7 +5,8 @@
 //!
 //! - **Per instruction**: the exact instruction-trace entries (the instruction plus every CPI at
 //!   any depth) and the exact call shape — which program at which stack height — of
-//!   `create_market(Auto)` (a curve listing with the init set; a list-only listing),
+//!   `create_market(Auto)` (a curve listing with the init set; a PumpSwap listing with the pAMM
+//!   init set; a list-only listing),
 //!   `crank_price` (roll and record; `PumpCurve → PumpMigrating`, `PumpMigrating → None`,
 //!   `None → PumpCurve`), `open_short` (a wallet's first open, a repeat borrower, with
 //!   normalisation, with the creator-vault top-up), `close_short` (plain, normalising, the top-up
@@ -99,6 +100,8 @@ enum P {
     Pfee,
     /// The ATA program (the listing's `create_idempotent`).
     Ata,
+    /// PumpSwap (`pAMMBay6…`), and its event self-CPI.
+    Pamm,
     Other,
 }
 
@@ -125,6 +128,8 @@ fn shape(env: &Env, ixs: &[Instruction], meta: &TransactionMetadata, index: usiz
                         P::Pfee
                     } else if p == ASSOCIATED_TOKEN_PROGRAM_ID {
                         P::Ata
+                    } else if p == shortwin::constants::PUMP_AMM_PROGRAM_ID {
+                        P::Pamm
                     } else {
                         P::Other
                     };
@@ -256,14 +261,14 @@ fn shown(
     s
 }
 
-/// Every shape is short.win's own CPIs at height 2 and the venue's at 2 (pump, the ATA program)
-/// with theirs at 3; returns the number of pump CPIs short.win made.
+/// Every shape is short.win's own CPIs at height 2 and the venue's at 2 (pump, PumpSwap, the ATA
+/// program) with theirs at 3; returns the number of pump CPIs short.win made.
 fn pump_calls(s: &[(P, u8)]) -> usize {
     assert!(
         s.iter().all(|&(p, h)| match p {
             P::Own => h == 2,
             P::System | P::Token => h == 2 || h == 3,
-            P::Pump | P::Ata => h == 2 || h == 3,
+            P::Pump | P::Pamm | P::Ata => h == 2 || h == 3,
             P::Pfee => h == 3,
             P::Other => false,
         }),
@@ -542,8 +547,9 @@ fn has_creator(env: &Env, pm: &PumpMarket) -> bool {
 /// (creation and `InitializeAccount3`), the creation fee, the trader's base ATA through the ATA
 /// program (its size query, creation, immutable owner and initialisation one level down), the
 /// trader's pump UVA through pump's `init_user_volume_accumulator` (its creation and event one
-/// level down), the event: 15 entries, peak 3. A list-only listing (a graduated coin): 7, peak
-/// 2.
+/// level down), the event: 15 entries, peak 3. A coin on its canonical PumpSwap pool (M6) has the
+/// same shape with pAMM's `init_user_volume_accumulator` in pump's place: 15, peak 3. A list-only
+/// listing (a coin graduated elsewhere): 7, peak 2.
 #[test]
 fn create_market() {
     for coin in VARIANTS {
@@ -574,7 +580,46 @@ fn create_market() {
         );
         assert_eq!((entries(&meta, 0), peak(&meta)), (15, 3));
     }
-    for coin in [PumpCoin::Graduated, PumpCoin::Fartcoin] {
+    {
+        let (mut env, c) = Env::fork_pump_coin(PumpCoin::Graduated);
+        let creator = env.funded_keypair();
+        let plain = ix::create_market(
+            &creator.pubkey(),
+            &c.mint,
+            &c.token_program.id(),
+            shortwin::instructions::create_market::VENUE_HINT_AUTO,
+            &pda::canonical_pool(&c.mint),
+        );
+        let market = pda::market(&c.mint).0;
+        let ixs = [ix::with_remaining(
+            plain,
+            &shortwin_litesvm_tests::pamm::pamm_init_set(&market),
+        )];
+        let meta = send(&mut env, &ixs, &[&creator]);
+        let s = shown(&env, "Graduated create_market (PumpSwap)", &ixs, &meta, 0);
+        assert_eq!(
+            s,
+            [
+                (P::System, 2),
+                (P::System, 2),
+                (P::System, 2),
+                (P::Token, 2),
+                (P::System, 2),
+                (P::Ata, 2),
+                (P::Token, 3),
+                (P::System, 3),
+                (P::Token, 3),
+                (P::Token, 3),
+                (P::Pamm, 2),
+                (P::System, 3),
+                (P::Pamm, 3),
+                (P::Own, 2),
+            ]
+        );
+        assert_eq!((entries(&meta, 0), peak(&meta)), (15, 3));
+    }
+    {
+        let coin = PumpCoin::Fartcoin;
         let (mut env, c) = Env::fork_pump_coin(coin);
         let creator = env.funded_keypair();
         let ixs = [ix::create_market(

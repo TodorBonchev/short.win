@@ -42,9 +42,14 @@
 //!   [`d0_the_sims_position_cannot_open_on_a_real_curve`];
 //! - `D@50%` gap 10x and spike 10x/5s, every `D@90%` gap / pump / spike row and ECON §10.1's
 //!   graduation-gap and "+2x / +3x on AMM" rows: the path completes the curve (at 5.84× from
-//!   50 %, 1.65× from 90 %) and the sim continues on the migrated PumpSwap pool, which is M6's
-//!   `→ PumpSwap` transition. `pump_curve_e2e.rs` runs M5's side of a completion with open
-//!   positions (the pause, S3 at 70 min, the `→ None` transition).
+//!   50 %, 1.65× from 90 %) and the sim continues on the migrated PumpSwap pool. The program's
+//!   `→ PumpSwap` transition is built (M6: `pamm_it::graduation`, `pump_curve_e2e.rs` with open
+//!   positions, the pause, S3 at 70 min, `→ PumpSwap` and `→ None`). **ECON §10.1's twelve
+//!   graduation rows run in `graduation_scenarios.rs`** (through a real `migrate_v2` and the
+//!   `→ PumpSwap` transition, to the lamport against the sim with M6's graduation rule; its module
+//!   docs list the three modelled differences from ECON's published table), so they are not
+//!   duplicated here. Still not replayed on the fork: §11.2's `D@50%` gap 10x / spike 10x/5s and
+//!   the `D@90%` gap / pump / spike rows (`graduation_support::Grad::run` can drive them).
 
 #![allow(clippy::result_large_err)]
 

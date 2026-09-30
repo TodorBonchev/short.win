@@ -186,7 +186,13 @@ fn evaluate<'info>(
         MintPath::Exit,
     )?;
     let rem = venues::parse(&market, kind, ctx.remaining_accounts, Carry::ReadSet, &[])?;
-    let state = venues::read_state_boxed(&market, kind, rem.read, clock.unix_timestamp);
+    let state = venues::read_state_boxed(
+        &market,
+        kind,
+        rem.read,
+        clock.unix_timestamp,
+        venues::mint_supply(&ctx.accounts.mint.to_account_info()),
+    );
     let risk = venues::risk_quoter(
         &market,
         &state,
@@ -221,7 +227,17 @@ fn evaluate<'info>(
         now,
     )?;
     let mut arm = pos.arm_state();
-    let ev = settle::evaluate(&mut arm, &inp, &arming::terms(pos), &mut quotes).math()?;
+    // `→ PumpSwap` in this prologue (M6): the ReadSet is the curve's and the observation state
+    // was just restarted onto the pool — nothing is evaluated on it (the post-change warm-up's
+    // no-op, ARCH §3.8 step 1b); the next call reads the pool.
+    let graduated = pro
+        .transition
+        .is_some_and(|t| t.to == crate::state::VenueKind::PumpSwap);
+    let ev = if graduated {
+        Evaluation::default()
+    } else {
+        settle::evaluate(&mut arm, &inp, &arming::terms(pos), &mut quotes).math()?
+    };
 
     let booked = match ev.settlement {
         None => {

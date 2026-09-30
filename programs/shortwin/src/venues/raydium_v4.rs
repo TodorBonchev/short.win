@@ -190,6 +190,7 @@ fn state_of(p: &Parsed, now: i64) -> Option<VenueState> {
         fee_ppm: fee.oneway_ppm(),
         locked_depth,
         curve: None,
+        pool: None,
     })
 }
 

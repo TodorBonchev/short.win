@@ -139,13 +139,26 @@ pub enum Alert {
     /// market and detail. Positions pause (`VenueMigrating`) until someone migrates.
     MigrateFailed { market: Pubkey, detail: String },
     /// Duty 6: a liquidatable position's `Q` exceeds its live curve's `rT` (ARCH §5.4) and the
-    /// straddle bundle is not sent (`reason`: no exit transaction before M6, no block engine,
-    /// the completion above `max_complete_lamports`, a failed pre-flight); the keeper calls
+    /// straddle bundle is not sent or did not land (`reason`: no block engine, the completion
+    /// above `max_complete_lamports`, a failed pre-flight, a dropped bundle); the keeper calls
     /// `sol_settle` for it instead. Alerted once per position and reason.
     StraddleWaiting {
         market: Pubkey,
         position: Pubkey,
         reason: String,
+    },
+    /// Duty 6 (M6): the keeper's `→ PumpSwap` transition of `market` (the pool's accounts, the
+    /// crank onto the pool) or the creation of the pool accounts its trades require failed; the
+    /// market's exits refuse (`VenueMigrating` before the transition, `VenueAccountMismatch`
+    /// without the accounts) until it lands. Retried every second; alerted once per detail.
+    TransitionFailed { market: Pubkey, detail: String },
+    /// Duties 6 and 13: a `sweep_trader` (with the venue cashback claims) failed. After a full
+    /// wipe the market takes no deposit — and hence no open — until it lands (R4A-7). Alerted once
+    /// per market and detail.
+    SweepFailed {
+        market: Pubkey,
+        post_wipe: bool,
+        detail: String,
     },
 }
 
@@ -166,8 +179,15 @@ impl Alert {
                 tracing::error!(alert = ?self, "venue admin action");
             }
             Self::PoolPinned { .. } => tracing::error!(alert = ?self, "pool selection alert"),
-            Self::MigrateFailed { .. } | Self::StraddleWaiting { .. } => {
+            Self::MigrateFailed { .. }
+            | Self::StraddleWaiting { .. }
+            | Self::TransitionFailed { .. } => {
                 tracing::error!(alert = ?self, "graduation alert");
+            }
+            Self::SweepFailed {
+                post_wipe: true, ..
+            } => {
+                tracing::error!(alert = ?self, "post-wipe sweep alert");
             }
             Self::PoolSwitched { .. }
             | Self::PoolWindow { .. }

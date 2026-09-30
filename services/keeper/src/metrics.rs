@@ -46,6 +46,13 @@ pub struct MarketMetrics {
     pub migrations: u64,
     /// Straddle bundles of the keeper landed (duty 6; ARCH §5.4).
     pub straddles: u64,
+    /// `→ PumpSwap` transitions the keeper landed (duty 6, M6: its own transaction or a
+    /// straddle bundle's tx3).
+    pub transitions: u64,
+    /// `sweep_trader` calls of the keeper landed (duties 6 and 13), with the venue cashback claims
+    /// among them.
+    pub sweeps: u64,
+    pub cashback_claims: u64,
     /// Degraded (1) or not (0).
     pub degraded: bool,
     /// The last second covered.
@@ -153,7 +160,7 @@ impl Metrics {
             self.pool_discoveries,
         );
         type Row = (&'static str, &'static str, fn(&MarketMetrics) -> u64);
-        let rows: [Row; 20] = [
+        let rows: [Row; 23] = [
             (
                 "covered_seconds",
                 "Seconds with a keeper observation.",
@@ -203,6 +210,17 @@ impl Metrics {
                 m.migrations
             }),
             ("straddles", "Straddle bundles landed.", |m| m.straddles),
+            (
+                "transitions",
+                "Transitions onto the canonical PumpSwap pool landed.",
+                |m| m.transitions,
+            ),
+            ("sweeps", "sweep_trader calls landed.", |m| m.sweeps),
+            (
+                "cashback_claims",
+                "Venue cashback claims landed (with a sweep).",
+                |m| m.cashback_claims,
+            ),
             ("degraded", "1 while the market is in degraded mode.", |m| {
                 u64::from(m.degraded)
             }),

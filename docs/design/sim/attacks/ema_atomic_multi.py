@@ -17,12 +17,15 @@ def fill(m):
     while True:
         q = m.max_open_q()
         X0 = m.venue.eff()[0]
+        rt = m.venue.rt if m.venue.kind == "curve" else 0
+        if m.venue.kind == "curve":     # #103 (M5-SEC-3): the curve's caps read its reserves at the EMA price
+            X0, rt = m.curve_cap_reserves()
         tot = sum(p.Q for p in poss)
         cap = m.oi_cap_q(X0 + q)
         q = min(q, cap - tot)
         if m.venue.kind == "curve":
             g = m.P.curve_oi_gamma_bps
-            q = min(q, (g * (m.venue.rt + q) // BPS) - tot)
+            q = min(q, (g * (rt + q) // BPS) - tot)
         if q <= q // 1000 + 1 or len(poss) > 40:
             break
         if q * m.venue.spot_wad() // WAD < 100_000_000:     # ADOPTED Q11: min notional 0.1 SOL

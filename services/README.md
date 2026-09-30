@@ -18,8 +18,11 @@ What it does, per tick (one per slot; `keeper/src/keeper.rs`):
   functions (`shortwin::venues::raydium_v4::{read_keys, trade_keys}`, the same in
   `raydium_cpmm`) with ARCH §3.12's writability in trades (pool and vaults writable; the LP mint
   and the CPMM `AmmConfig` read-only — a config is shared by every pool on it; `trader_wsol` and
-  the CPMM observation writable); and the TEST-ONLY mock (feature `test-venue`). Pump markets are
-  skipped with a reason until M5–M6.
+  the CPMM observation writable); the pump curve (M5) and PumpSwap (M6: the adapter's ReadSet
+  P0–P5 with the pool and its vaults writable, TradeExtras T0–T18 with a protocol-fee and a
+  buyback recipient of the live `GlobalConfig` and the live coin creator's vault; the mint's
+  supply is read with the ReadSet, since PumpSwap's fee tier is its market cap); and the
+  TEST-ONLY mock (feature `test-venue`).
 - **Duty 1, coverage** (`coverage.rs`, `decide.rs`): one observation per second on a market with a
   position near a threshold (live CR below 1.3·L, deadline within 60 s, armed) or with
   `|P_spot/P_ema − 1| > 2 %`; every 30 s on markets with open positions; every 30 s on markets
@@ -59,7 +62,10 @@ What it does, per tick (one per slot; `keeper/src/keeper.rs`):
 - **Duty 3, exits**: `liquidate` at the first second the program accepts it (the fixed-δ bound;
   retried every second on `ExitBoundNotMet`), `expire` when the expiry bound is met. Trading
   exits try the extras sets `current`, `none`, `previous`, `stable` and keep the first that
-  simulates (duty 10's rule; `stable` is M2-SEC-2's set).
+  simulates (duty 10's rule; `stable` is M2-SEC-2's set). On PumpSwap, when the pool's live coin
+  creator is not the market's cached one (anyone can change it through pAMM; the next
+  `crank_price` re-caches it), the exit's transaction starts with `create_idempotent` of the new
+  creator vault's WSOL ATA (T11), which the program's existence requirement needs (M6-SEC-4).
 - **Duty 4, `sol_settle`**: at most once per second for armed positions and for liquidatable
   positions without a normal buyback (it arms, keeps the clock, disarms on box evidence, or
   settles), and for positions whose S3 is due (on a halted venue: probed by simulation, sent
@@ -77,38 +83,73 @@ What it does, per tick (one per slot; `keeper/src/keeper.rs`):
   priority price = p75 of the recent per-account fees on the transaction's markets, ×1.5 per
   consecutive missed second, capped at the O17 ceiling (a separate ceiling for exits); the O17
   per-market daily observation budget (exits are never throttled).
-- **Duty 6, graduation on the pump curve** (`graduation.rs`, config `[graduation]`; M5, ARCH §5.1,
-  §5.4, §7.1): the keeper covers `PumpCurve` and `PumpMigrating` markets with the curve adapter's
-  own ReadSet and, for a curve exit, its TradeExtras T0–T19 (a fee and a buyback recipient of the
-  live `Global`, the live creator's vault); its risk view is the program's own quoter
+- **Duty 6, graduation** (`graduation.rs`, config `[graduation]`; M5, M6; ARCH §2.5, §5.1, §5.4,
+  §7.1): the keeper covers `PumpCurve` and `PumpMigrating` markets with the curve adapter's own
+  ReadSet and, for a curve exit, its TradeExtras T0–T19 (a fee and a buyback recipient of the live
+  `Global`, the live creator's vault); its risk view is the program's own quoter
   (`VenueState::quoter`: `B̂_str` above `rT`).
-  - **`migrate_v2` as soon as a curve completes** (ADOPTED Q16): a covered market whose curve is
-    complete with `vT > 0` and whose canonical PumpSwap pool does not exist gets pump's
-    `migrate_v2` — top-level, alone with its compute budget (A15), its 27 IDL accounts and the
-    two boost accounts — at most once a second, then an observation of the market in the same
-    second (M5 records `→ PumpMigrating`; M6's `→ PumpSwap` and the new pool's first-trade duties
-    follow). A failure raises `Alert::MigrateFailed` once and is retried every second.
+  - **`migrate_v2` as soon as a curve completes** (ADOPTED Q16; on by default again in M6): a
+    covered market whose curve is complete with `vT > 0` and whose canonical PumpSwap pool does
+    not exist gets pump's `migrate_v2` — top-level, alone with its compute budget (A15), its 27
+    IDL accounts and the two boost accounts — at most once a second. A failure raises
+    `Alert::MigrateFailed` once and is retried every second.
+  - **The `→ PumpSwap` transition** (M6): as soon as a curve market's canonical pool is valid
+    (after the keeper's `migrate_v2` or anyone's; with `migrate` off too) the keeper sends one
+    transaction: the accounts the pool's trades require that do not exist (ARCH §3.12's existence
+    requirement: the trader's pAMM UVA — `init_user_volume_accumulator(payer = keeper, user =
+    trader)` —, the coin-creator vault's WSOL ATA, the recipients' WSOL ATAs, on a cashback coin
+    the trader's cashback ATA), `crank_price` on the curve's ReadSet (the program moves the market
+    onto the pool: the ring rewrite, the post-change warm-up) and `crank_price` on the pool (its
+    first observation). No `extend_account`: a fresh 271-byte pool trades as it is. A PumpSwap
+    market whose accounts are missing (a listing, someone else's transition) gets them created;
+    `Alert::TransitionFailed` on a failure.
   - **The straddle** (`Plan::Straddle`): a liquidatable position whose `Q` exceeds its live
     curve's `rT` cannot exit on the curve (pump reverts 6021, `CurveStraddle`). The keeper builds
     ARCH §5.4's Jito bundle — tx1: its base ATA and `complete_curve(max_sol_cost)` of the
     `complete-curve` helper (`programs/complete_curve`: it reads `rT` at execution, so a curve
     trade between the keeper's read and the bundle cannot break it; `max_sol_cost` = the keeper's
-    quote + `complete_slippage_bps` + a rent allowance); tx2: `migrate_v2`; tx3: the exit on the
-    new pool (**M6**); the tip on the last — pre-flights it (`simulate_bundle` where the chain can,
-    else tx1 alone) and sends it through the block engine (`--block-engine`). Until M6 there is no
-    tx3 and a migrated curve stays `PumpMigrating`, so the two-transaction bundle goes out only
-    with `send_without_exit` (off by default); otherwise, and without a block engine, the keeper
-    raises `Alert::StraddleWaiting` once and calls `sol_settle` for the position each second (it
-    arms, keeps the clock or settles S1 / S2). The keeper keeps the tokens it buys
-    (`max_complete_lamports` caps the spend).
-  - **List-only markets** (M5): a list-only (`None`) market is covered with its detection set
+    quote + `complete_slippage_bps` + a rent allowance); tx2: `migrate_v2`; tx3: the transition
+    above; the tip on tx3 — pre-flights it (`simulate_bundle` where the chain can, else tx1 alone)
+    and sends it through the block engine (`--block-engine`). **The exit is not in tx3** (as built;
+    ARCH §5.4 puts it there): the transition marks the post-change warm-up and a keeper
+    `liquidate` / `expire` fails `EmaWarmingUp` until the eighth post-transition bucket is
+    integrated, so it would revert the bundle; the keeper observes every second after the bundle
+    and exits at the first second the program accepts — `T + 8` at the earliest, with tx3's own
+    bucket (OWNER-M6R-4). When tx3's pre-flight fails the bundle goes out as tx1 + tx2
+    (`send_without_exit`, on by default: V1-9) and the keeper's transition follows at once. Without
+    a block engine the keeper raises `Alert::StraddleWaiting` once and calls `sol_settle` for the
+    position each second (it arms, keeps the clock or settles S1 / S2). The keeper keeps the
+    tokens it buys (`max_complete_lamports` caps the spend).
+  - **List-only markets** (M5, M6): a list-only (`None`) market is covered with its detection set
     `[bonding_curve, canonical_pool]` as ReadSet (the program's own for `crank_price` and
     `sol_settle`). One with positions open — a curve that graduated elsewhere — is observed on the
     no-route cadence and its positions are settled in S3 when due (duty 5; M2-SEC-5), and the pool
     monitor collects its Raydium pool in a window (duty 12). One whose detection set shows a live
-    or migrating curve again (the program's `classify_pump`) is cranked, which moves it onto the
-    curve; the keeper then creates the trader's base ATA and pump UVA the curve legs require
-    (`crank_price` has no payer and creates neither), checked once per curve market.
+    or migrating curve or a valid canonical pool again (the program's `classify_pump`) is cranked,
+    which moves it onto that venue; the keeper then creates the trader accounts the legs require
+    (`crank_price` has no payer and creates none): the base ATA and pump UVA on the curve, the pool
+    accounts above on PumpSwap.
+  - **PumpSwap warm-up without positions** (M6, a keeper choice): a PumpSwap market with no open
+    position is observed every second while its warm-up runs (after a graduation, and from the
+    price start of a PumpSwap listing, which starts at its first observation), so the first open
+    finds a `P_ema` the pool's own honest buckets seeded — M4V-5's listing-window duty on
+    Raydium, for PumpSwap.
+- **Duties 6 and 13, the trader side** (`sweep.rs`, config `[sweep]`; M6; ARCH §3.9, §7.1;
+  R4A-7): right after a full wipe (a live wipe record, the post-wipe bits not both set) the keeper
+  sends, in the same second, the venue cashback claims the trader needs and `sweep_trader` in one
+  transaction — pump `claim_cashback(user = trader)` when the trader's pump UVA holds lamports
+  above its rent; on PumpSwap `create_idempotent ATA(trader, WSOL)` and pAMM
+  `claim_cashback(user = trader, user_wsol = ATA(trader, WSOL))` when `ATA(pAMM UVA(trader), WSOL)`
+  holds any, preceded by PumpSwap `init_user_volume_accumulator(payer = keeper, user = trader)`
+  when the trader's pAMM UVA does not exist (M6-SEC-2: anyone can fund that ATA of a UVA never
+  created, and the claim fails 3012 without it) — so the deposit, and hence the open, that waits
+  for both bits can land (no signature but the keeper's; M5-SEC-1's UVA-reading `sweep_trader`, no
+  `claim_venue_rewards`; on `PumpMigrating` too, M6-SEC-5). Every
+  `check_interval_s` (60 s) it reads the trader side and sends `sweep_trader` when
+  `ATA(trader, WSOL)` exists, the trader PDAs hold lamports or a pump venue's trader base ATA holds
+  tokens; on a cashback coin whose claimable cashback reaches `cashback_min_lamports` the claim
+  goes with the sweep, at most every `cashback_interval_s` (a week). `Alert::SweepFailed` on a
+  failure (severe after a wipe: deposits wait).
 - **Duty 9, degraded mode** (`alerts.rs`): three consecutive seconds with a required observation
   and none landed (budget, outage, contested blocks), or a `CoverageGap` event from the program,
   raise `Alert::Degraded` — page the Emergency multisig to `set_pause(market)` with reason
@@ -197,7 +238,7 @@ What it does, per tick (one per slot; `keeper/src/keeper.rs`):
     watch starts afresh on the new pool.
 - Per-market metrics (coverage seconds, observations, exits, settlements, CU, lamports, misses,
   bursts, gaps, venue admin changes, pool proposals / executions / switches, migrations,
-  straddles, degraded) and
+  straddles, transitions, sweeps, cashback claims, degraded) and
   `venue_flags`, `pool_discoveries` in the Prometheus text format (`--metrics`).
 
 **The program's own code decides.** The keeper links the `shortwin` crate (account types,
@@ -214,9 +255,10 @@ RPC path is built; T-SIZE shows a tip transfer fits the worst Raydium exit; the 
 is built, duty 6); Yellowstone gRPC subscriptions (the keeper polls `getMultipleAccounts` /
 `getProgramAccounts`, and watches admin actions through the accounts they write rather than the
 admin's transactions; it sees other parties' pool selection through the market's state, not their
-transactions); M6's PumpSwap venue — the straddle's tx3, the `→ PumpSwap` transition's duties
-(`trader_base_ata`, the PumpSwap UVA, `extend_account`), `claim_venue_rewards` —; selling the
-tokens a straddle leaves the keeper; duties 11 and 13 (`crank_sol_usd`, lender pot).
+transactions); bundle pre-flight of tx2 / tx3 on a plain RPC node (which cannot simulate them
+before tx1 lands: the keeper then gives them fixed limits, `MIGRATE_CU` / `UNSIMULATED_CU`) and a
+policy for bundles the block engine keeps dropping; selling the tokens a straddle leaves the
+keeper; duties 11 and 13's lender pot (`crank_sol_usd`, `sync_lender`, `sweep_protocol_fees`).
 
 ### Run
 
@@ -291,22 +333,49 @@ mock pool (continuous chain; an expired position settles, a healthy one stays fr
 arming with one `sol_settle` per second, and extras (a published template, a hostile `current`
 bypassed with `previous`).
 
-Pump-curve scenarios (`graduation.rs`, M5 duty 6; the dumped pump, pump-fees and PumpSwap programs
-and the near-complete curve): an outside buy completes a covered market's curve and the keeper
-migrates it at its next tick (its `migrate_v2` is the harness's own derivation) and observes the
-market in the same second (`→ PumpMigrating`), once; an expired position with `Q > rT` waits for
-M6's exit transaction by default (one alert, `sol_settle` each second, the curve untouched); with
-`send_without_exit` the two-transaction bundle lands atomically (the keeper holds the curve's last
-tokens and paid the tip; tx2 is 2 + 51 + 1 = 54 trace entries) and the position's exits pause
-(`VenueMigrating`); ★ a curve buy between the keeper's pre-flight and its bundle does not break
-it, and a sale that lifts the completion above `max_sol_cost` reverts the whole bundle (pump
-6002, nothing committed) before the next second's bundle lands; without a block engine the
-straddle waits; below the straddle (`Q ≤ rT`) the keeper expires a curve position on the curve
-with the adapter's own account lists; a curve migrated elsewhere with an expired position open goes
-`→ None` at the keeper's first crank, which keeps the S3 chain on the no-route cadence and settles
+Pump-curve and graduation scenarios (`graduation.rs`, duty 6, M5 and M6; the dumped pump,
+pump-fees and PumpSwap programs and the near-complete curve): an outside buy completes a covered
+market's curve and the keeper migrates it at its next tick (its `migrate_v2` is the harness's own
+derivation) and moves the market onto its pool in the same second (the pool accounts created,
+`→ PumpSwap`, the pool's first bucket), then observes its warm-up every second (no positions), once;
+with `migrate` off a third party's migration is still moved onto the pool; a graduation with a
+position open: the keeper sends no exit during the warm-up and liquidates the position on the
+pool in the first second an outside key's simulation passes (+16 s after a ×3 pump right after the
+transition); ★ the straddle bundle — the curve bought down by an outsider, or by the borrower
+itself (`rT − q + 1`, M5-SEC-4) — lands as three transactions (tx1 18 entries, tx2 53, tx3 17
+with the tip; ≤ 1,143 B each), the market is on its pool, and the keeper expires the position at
+`T + 8` exactly, an outside key's `expire` refused `EmaWarmingUp` at every second before; V1-9: a
+tx3 that fails its pre-flight leaves tx1 + tx2 (tip on tx2) and the keeper's own transition
+follows at once; ★ a curve buy between the keeper's pre-flight and its bundle does not break it,
+and a sale that lifts the completion above `max_sol_cost` reverts the whole bundle (pump 6002,
+nothing committed) before the next second's bundle lands; without a block engine the straddle
+waits; below the straddle (`Q ≤ rT`) the keeper expires a curve position on the curve with the
+adapter's own account lists; a curve migrated elsewhere with an expired position open goes `→
+None` at the keeper's first crank, which keeps the S3 chain on the no-route cadence and settles
 the position in S3 exactly when the chain has run `s3_wait_s` (on the detection set); a list-only
 market whose curve becomes readable is cranked onto it, its trader accounts are created once, and
 an open lands.
+
+PumpSwap scenarios (`pamm.rs`, M6; the `pamm_state` pools): a listing nobody observes has its
+price started and its warm-up observed by the keeper (eight seconds), the keeper's PumpSwap lists
+are the harness's for the same recipients, and a ×3 pump is liquidated on the pool in the first
+second the program accepts it; `disable_flags` bit 0 is reported (severe; opens refuse
+`VenueFlagged`), the buy bit as a lost route as well, clearing both as restored; a cashback coin
+listed without the trader's cashback ATA gets it created once; a graduated coin listed list-only is
+cranked onto its pool (`None → PumpSwap`), its trader base ATA and pAMM UVA are created once, and
+an open lands.
+
+Trader-side scenarios (`wipe.rs`, M6): a full wipe on a PumpSwap cashback coin — the keeper's S1,
+then (with the duty on) `[create_idempotent ATA(trader, WSOL), pAMM claim_cashback, sweep_trader]`
+in the same second: the cashback and the ATA's rent reach the wiped epoch's record, both bits, the
+deposit refused before lands, and an open lands; a non-cashback PumpSwap market's post-wipe
+transaction is `sweep_trader` alone; a legacy cashback curve's is `[pump claim_cashback,
+sweep_trader]`; on the mock a donated `ATA(trader, WSOL)` and lamports on the trader PDA are swept
+within the check interval, once; the weekly PumpSwap cashback claim runs once per interval;
+M6-SEC-2: on a curve market graduated by third parties only (no pAMM UVA), fully wiped, whose
+`ATA(UVA, WSOL)` a stranger funded, the pre-fix transaction fails 3012 and, with PumpSwap's
+`GlobalConfig` unreadable (no account preparation), the keeper's post-wipe transaction creates the
+UVA itself and lands.
 
 Raydium scenarios (`raydium*.rs`, the dumped AMM v4 and CPMM programs and pools):
 

@@ -40,8 +40,13 @@
 //! u8 @56, `protocol_fee_recipients[8]` @57, `reserved_fee_recipient` @385 plus
 //! `reserved_fee_recipients[7]` @418, `buyback_fee_recipients[8]` @643, `buyback_basis_points`
 //! @899, `boost_authority` @907, `boost_enabled` @939, `creator_fee_configurable` @940. The bit
-//! meaning of `disable_flags` is **UNVERIFIED** (U3; the docs say "Currently, it is not used"):
-//! this reader exposes the raw byte, and M6's T-DISABLE hard gate sets the constants.
+//! meaning of `disable_flags` is **resolved by T-DISABLE** (M6's hard gate, C0-10; R-VEN Update
+//! 2026-09-30 H4, run on the dumped ELF with every bit set): bit 0 halts `create_pool` (and pump
+//! `migrate_v2` through it), bit 1 `deposit`, bit 2 `withdraw`, **bit 3 every buy**
+//! ([`DISABLE_BUY_BIT`]: `buy`, `buy_exact_quote_in`, `boost_buy_and_burn`), **bit 4 `sell`**
+//! ([`DISABLE_SELL_BIT`]); bits 5–7 do nothing (the admin's `disable` cannot set them). This
+//! reader exposes the raw byte; the adapter's route predicate reads the buy bit and its open gate
+//! refuses any non-zero value (A24).
 //!
 //! # Boost vault
 //!
@@ -246,7 +251,7 @@ pub const OFF_GC_ADMIN: usize = 8;
 pub const OFF_GC_LP_FEE_BASIS_POINTS: usize = 40;
 /// `protocol_fee_basis_points` (u64; fallback).
 pub const OFF_GC_PROTOCOL_FEE_BASIS_POINTS: usize = 48;
-/// `disable_flags` (u8; bit meaning UNVERIFIED, U3).
+/// `disable_flags` (u8; bits resolved by T-DISABLE: [`DISABLE_BUY_BIT`], [`DISABLE_SELL_BIT`]).
 pub const OFF_GC_DISABLE_FLAGS: usize = 56;
 /// `protocol_fee_recipients[8]`.
 pub const OFF_GC_PROTOCOL_FEE_RECIPIENTS: usize = 57;
@@ -326,7 +331,7 @@ impl GlobalConfig<'_> {
         key_at(self.data, OFF_GC_ADMIN)
     }
 
-    /// `disable_flags`, raw (bit meaning UNVERIFIED, U3; M6's T-DISABLE decides).
+    /// `disable_flags`, raw ([`DISABLE_BUY_BIT`], [`DISABLE_SELL_BIT`]; T-DISABLE).
     pub fn disable_flags(&self) -> u8 {
         u8_at(self.data, OFF_GC_DISABLE_FLAGS)
     }
@@ -406,6 +411,39 @@ impl GlobalConfig<'_> {
     pub fn is_cashback_enabled(&self) -> bool {
         self.flag(OFF_GC_IS_CASHBACK_ENABLED)
     }
+}
+
+// ---- disable_flags (T-DISABLE) ------------------------------------------------------------------
+
+/// `GlobalConfig.disable_flags` bit 3: every buy fails 6020 `DisabledBuy` (`buy`,
+/// `buy_exact_quote_in`, `boost_buy_and_burn`). T-DISABLE on the dumped ELF (R-VEN Update
+/// 2026-09-30 H4): the only bit an exit (a buy) depends on, so ARCH §5.3's PumpSwap venue
+/// predicate is `disable_flags & DISABLE_BUY_BIT == 0` (`PAMM_BUY_DISABLED_BIT`).
+pub const DISABLE_BUY_BIT: u8 = 1 << 3;
+/// `GlobalConfig.disable_flags` bit 4: `sell` fails 6021 `DisabledSell` (T-DISABLE, H4). Opens sell;
+/// they refuse any non-zero `disable_flags` anyway (A24).
+pub const DISABLE_SELL_BIT: u8 = 1 << 4;
+/// Bit 0: `create_pool` fails 6017, and with it pump's `migrate_v2` (a stuck migration, ARCH §5.3).
+pub const DISABLE_CREATE_POOL_BIT: u8 = 1 << 0;
+/// Bit 1: `deposit` fails 6018.
+pub const DISABLE_DEPOSIT_BIT: u8 = 1 << 1;
+/// Bit 2: `withdraw` fails 6019.
+pub const DISABLE_WITHDRAW_BIT: u8 = 1 << 2;
+
+// ---- UserVolumeAccumulator ----------------------------------------------------------------------
+
+/// Reads a **PumpSwap** `UserVolumeAccumulator` (owner [`PROGRAM`]; the same Anchor account as
+/// pump's — discriminator, 137 bytes, `user` @8, `cashback_earned` @74 — `crate::pump`'s layout):
+/// the trader's pAMM UVA must exist before a PumpSwap buy (ARCH §3.12 T14; a missing one costs
+/// the user 1,346,200, R-VEN Update H6).
+pub fn read_user_volume_accumulator(
+    owner: &Key,
+    data: &[u8],
+) -> Result<crate::pump::UserVolumeAccumulator, ReadError> {
+    if *owner != PROGRAM {
+        return Err(ReadError::WrongOwner);
+    }
+    crate::pump::read_user_volume_accumulator(&crate::pump::PROGRAM, data)
 }
 
 // ---- boost vault --------------------------------------------------------------------------------
@@ -737,6 +775,31 @@ mod tests {
         assert_eq!(g.max_configurable_creator_fee_bps(), 300);
         assert_eq!(g.fallback_fees_bps(), (20, 5, 5));
         assert!(g.mayhem_mode_enabled() && g.is_cashback_enabled());
+    }
+
+    /// The pAMM UVA reader: pAMM's owner, pump's layout.
+    #[test]
+    fn reads_a_pamm_user_volume_accumulator() {
+        let mut d = [0u8; crate::pump::USER_VOLUME_ACCUMULATOR_LEN];
+        put(
+            &mut d,
+            0,
+            &crate::pump::USER_VOLUME_ACCUMULATOR_DISCRIMINATOR,
+        );
+        put(&mut d, crate::pump::OFF_UVA_USER, &[4; 32]);
+        let u = read_user_volume_accumulator(&PROGRAM, &d).unwrap();
+        assert_eq!(u.user, [4; 32]);
+        assert_eq!(
+            read_user_volume_accumulator(&crate::pump::PROGRAM, &d),
+            Err(ReadError::WrongOwner)
+        );
+        d[0] ^= 1;
+        assert_eq!(
+            read_user_volume_accumulator(&PROGRAM, &d),
+            Err(ReadError::WrongTag)
+        );
+        assert_eq!(DISABLE_BUY_BIT, 0x08);
+        assert_eq!(DISABLE_SELL_BIT, 0x10);
     }
 
     #[test]

@@ -22,6 +22,16 @@
 //!   re-quoted here), the sale capped by `rQ`. A migrating curve (complete, `vT > 0`) is not
 //!   executable but still **observed** (ARCH §3.0 step 7).
 //!
+//! - **PumpSwap** (M6; ARCH §3.12 PumpSwap, §4.1–§4.2, §5.3): the market's canonical pool parses
+//!   (owner, discriminator, bools), is the mint's valid canonical pool (index 0, created by pump's
+//!   pool authority, the market's mint against WSOL, not mayhem) with the vaults the market's
+//!   cache names (base under the mint's program, WSOL under SPL Token, both owned by the pool),
+//!   `GlobalConfig`, `FeeConfig` and the boost vault's ATA parse, `vault + VQR` is a `u64`, both
+//!   reserves non-zero and **`disable_flags` bit 3 clear** (T-DISABLE); pricing `(base vault,
+//!   WSOL vault + VQR)` with `fees::pump_amm` at the mint's live supply; the quotes
+//!   `quote::sol_leg` (ε₁ = 0). `venue_rent`: a pool under 271 bytes grows to 271 on the trade and
+//!   tops its rent up to `minimum_balance(271)` from the trader (R-VEN Update H8).
+//!
 //! A venue that cannot execute has no reserves and `fee_ppm` 0, as the program's
 //! `VenueState::not_executable` (the route predicates then hold whatever the fee).
 
@@ -96,16 +106,101 @@ impl VenueView {
     }
 }
 
-/// The view of `m`'s venue now, `None` for a venue the harness has no view of (list-only,
-/// PumpSwap until M6).
+/// The view of `m`'s venue now, `None` for a venue the harness has no view of (list-only).
 pub fn view(svm: &LiteSVM, m: &Market) -> Option<VenueView> {
     match m.venue_kind()? {
         VenueKind::Mock => Some(mock(svm, m)),
         VenueKind::RaydiumV4 => Some(ray_v4(svm, m).unwrap_or(VenueView::DEAD)),
         VenueKind::RaydiumCpmm => Some(ray_cpmm(svm, m).unwrap_or(VenueView::DEAD)),
         VenueKind::PumpCurve | VenueKind::PumpMigrating => Some(pump_curve(svm, m)),
+        VenueKind::PumpSwap => Some(pump_swap(svm, m).unwrap_or(VenueView::DEAD)),
         _ => None,
     }
+}
+
+/// The PumpSwap view (module docs).
+fn pump_swap(svm: &LiteSVM, m: &Market) -> Option<VenueView> {
+    use shortwin::state::pump_swap_cache as pc;
+    let pool_acc = svm.get_account(&m.canonical_pool)?;
+    let p = pump_amm::read_pool(&pool_acc.owner.to_bytes(), &pool_acc.data).ok()?;
+    let authority = crate::pda::pump_pool_authority(&m.mint);
+    if p.index != 0
+        || p.creator != authority.to_bytes()
+        || p.base_mint != m.mint.to_bytes()
+        || p.quote_mint != shortwin::constants::WSOL_MINT.to_bytes()
+        || p.is_mayhem_mode
+        || p.pool_base_token_account != cache(m, pc::POOL_BASE_VAULT).to_bytes()
+        || p.pool_quote_token_account != cache(m, pc::POOL_QUOTE_VAULT).to_bytes()
+    {
+        return None;
+    }
+    let base = token(svm, &cache(m, pc::POOL_BASE_VAULT), &m.token_program)?;
+    let quote = token(svm, &cache(m, pc::POOL_QUOTE_VAULT), &TOKEN_PROGRAM_ID)?;
+    if base.mint != m.mint.to_bytes()
+        || base.owner != m.canonical_pool.to_bytes()
+        || quote.mint != shortwin::constants::WSOL_MINT.to_bytes()
+        || quote.owner != m.canonical_pool.to_bytes()
+    {
+        return None;
+    }
+    let gc_acc = svm.get_account(&shortwin::constants::PUMP_AMM_GLOBAL_CONFIG)?;
+    let gc = pump_amm::read_global_config(&gc_acc.owner.to_bytes(), &gc_acc.data).ok()?;
+    let fc_acc = svm.get_account(&shortwin::constants::PUMP_AMM_FEE_CONFIG)?;
+    let fc = pump::read_fee_config(&fc_acc.owner.to_bytes(), &fc_acc.data).ok()?;
+    let boost_vault = Pubkey::find_program_address(
+        &[b"boost_vault", m.canonical_pool.as_ref()],
+        &shortwin::constants::PUMP_AMM_PROGRAM_ID,
+    )
+    .0;
+    let (bo, bd) = svm
+        .get_account(&cache(m, pc::BOOST_VAULT_ATA))
+        .map_or(([0u8; 32], Vec::new()), |a| (a.owner.to_bytes(), a.data));
+    pump_amm::boost_vault_amount(&bo, &bd, &boost_vault.to_bytes()).ok()?;
+    let r = p.reserves(base.amount, quote.amount)?;
+    let effective = u64::try_from(r.effective_quote).ok()?;
+    let mint_acc = svm.get_account(&m.mint)?;
+    let supply = mint::read_base(&mint_acc.owner.to_bytes(), &mint_acc.data)
+        .ok()?
+        .supply;
+    let tiers: Vec<fees::FeeTier> = fc
+        .fee_tiers
+        .iter()
+        .map(|t| fees::FeeTier {
+            threshold: t.threshold,
+            fees: FeeBps::new(t.fees.lp, t.fees.protocol, t.fees.creator),
+        })
+        .collect();
+    let f = fees::pump_amm(
+        r.effective_quote,
+        u128::from(r.base),
+        &fees::PammFeeSchedule {
+            tiers: &tiers,
+            base_supply: supply,
+            creator_fee_configurable: gc.creator_fee_configurable(),
+            pool_creator_fee_bps: p.creator_fee_bps,
+            coin_creator_is_default: p.coin_creator_is_default(),
+            cap_bps: None,
+        },
+    )
+    .ok()?;
+    if r.base == 0 || effective == 0 || gc.disable_flags() & (1 << 3) != 0 {
+        return None;
+    }
+    let venue_rent = if pool_acc.data.len() < pump_amm::POOL_LEN_CREATE {
+        svm.minimum_balance_for_rent_exemption(pump_amm::POOL_LEN_CREATE)
+            .saturating_sub(pool_acc.lamports)
+    } else {
+        0
+    };
+    Some(VenueView {
+        executable: true,
+        observed: true,
+        reserves: Some((r.base, effective)),
+        fee_ppm: f.oneway_ppm(),
+        pricing: Some(Pricing::PumpSwap(f)),
+        curve: None,
+        venue_rent,
+    })
 }
 
 /// The pump curve's view (module docs).

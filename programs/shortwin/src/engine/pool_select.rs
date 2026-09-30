@@ -953,6 +953,7 @@ mod tests {
                 fee_ppm: 2_500,
                 locked_depth: d,
                 curve: None,
+                pool: None,
             },
             age_start,
         }

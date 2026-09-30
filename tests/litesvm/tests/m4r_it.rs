@@ -1055,6 +1055,7 @@ fn m4x2_a_held_deposit_freeze_no_longer_lifts_l_slow() {
                     &invariants::confirm::ConfirmFacts {
                         created: &ev.created,
                         switched: &ev.switched,
+                        venue_changed: &ev.venue_changed,
                         opens: &ev.opens,
                         liquidations: &ev.liquidations,
                         expiries: &ev.expiries,

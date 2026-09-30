@@ -97,7 +97,13 @@ pub fn init_if_new(
 /// (R4A-7; ARCH §3.3 `deposit`): on the pump venues, which pay venue cashback. The trader
 /// sweep is always required. ARCH exempts a pump venue that cannot execute; telling that needs
 /// the venue's ReadSet, which `deposit` does not carry, so the bit is required on every
-/// `PumpCurve` and `PumpSwap` market.
+/// `PumpCurve`, `PumpMigrating` and `PumpSwap` market.
+///
+/// **`PumpMigrating` (M6-SEC-5).** A full wipe can settle during the migration pause (S3 is the
+/// only settlement there, ARCH §5.3), with the trader's curve-era pump cashback still in its pump
+/// UVA; without the requirement a deposit ended that wipe record at once and the cashback went to
+/// the next epoch's lenders. `sweep_trader` treats `PumpMigrating` as a curve kind (the 5-account
+/// token leg with the pump UVA), so the bit is set there exactly as on the curve — no deadlock.
 ///
 /// **Curve (M5-SEC-1).** ARCH has `claim_venue_rewards` (M6) set the bit; on the curve kinds
 /// `sweep_trader` sets it whenever the trader's pump UVA holds no claimable cashback, and pump's
@@ -106,14 +112,16 @@ pub fn init_if_new(
 /// CPI, so the requirement can always be met — the M1-FID-12 deadlock (a deposit waiting for
 /// ever on a venue that cannot execute) does not arise on the curve.
 ///
-/// TODO(M6, M1-FID-12): PumpSwap's cashback sits in pAMM's UVA WSOL ATA, which `sweep_trader`
-/// does not read; until M6 sets the bit for it (`claim_venue_rewards`, or the same UVA reading
-/// on the pAMM side) with no dependency on the venue executing, a full wipe on a PumpSwap market
-/// would lock its deposits. No M5 market can be `PumpSwap`.
+/// **PumpSwap (M6; the M1-FID-12 remainder).** PumpSwap's cashback sits in pAMM's UVA WSOL ATA:
+/// `sweep_trader`'s PumpSwap token leg reads it and sets the bit when it is missing or empty (and
+/// the trader's pump UVA holds nothing claimable), and pAMM's permissionless `claim_cashback`
+/// bundled before it moves any balance into `ATA(trader, WSOL)`, which the sweep closes and
+/// credits (`instructions::sweep_trader` module docs). No PumpSwap CPI either, so the requirement
+/// can always be met, whether or not the venue executes.
 pub fn rewards_required(market: &Market) -> bool {
     matches!(
         market.venue_kind(),
-        Some(VenueKind::PumpCurve | VenueKind::PumpSwap)
+        Some(VenueKind::PumpCurve | VenueKind::PumpMigrating | VenueKind::PumpSwap)
     )
 }
 
@@ -203,7 +211,8 @@ mod tests {
         for (venue, want) in [
             (VenueKind::None, false),
             (VenueKind::PumpCurve, true),
-            (VenueKind::PumpMigrating, false),
+            // M6-SEC-5: a wipe settled during the migration pause waits for the curve cashback.
+            (VenueKind::PumpMigrating, true),
             (VenueKind::PumpSwap, true),
             (VenueKind::RaydiumV4, false),
             (VenueKind::RaydiumCpmm, false),

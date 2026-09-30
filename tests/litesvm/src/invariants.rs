@@ -380,6 +380,7 @@ impl IxEvents {
         confirm::ConfirmFacts {
             created: &self.created,
             switched: &self.switched,
+            venue_changed: &self.venue_changed,
             opens: &self.opens,
             liquidations: &self.liquidations,
             expiries: &self.expiries,

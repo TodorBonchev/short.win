@@ -277,6 +277,16 @@ pub fn write_cache(market: &mut Market, curve_creator: &Pubkey) {
     }
 }
 
+/// [`write_cache`] and the PumpSwap cache the market's `→ PumpSwap` transition needs, derived now
+/// (`pump_amm::precompute`, M6: no derivation on a transition crank or a trade, M5-SEC-6). The
+/// listing's cache write. (`crank_price`'s `None →` curve re-detection writes the curve cache only,
+/// [`write_cache`], to stay inside the crank's CU limit; that market's transition derives the
+/// PumpSwap cache instead, `pump_amm::graduate`.)
+pub fn write_caches(market: &mut Market, curve_creator: &Pubkey) -> Result<()> {
+    write_cache(market, curve_creator);
+    super::pump_amm::precompute(market, curve_creator)
+}
+
 /// The ReadSet keys of `market` in order (module docs).
 pub fn read_keys(market: &Market) -> [Pubkey; READ_LEN] {
     [
@@ -499,14 +509,15 @@ pub fn read_state(market: &Market, kind: VenueKind, read: &[AccountInfo]) -> Ven
     };
     let live = curve_state(&curve);
     // Only a complete curve reads its canonical pool; an account there that does not read as a
-    // valid pool is `Unreadable`, never "no pool" (M5-SEC-5, A63).
-    let canonical_pool = match read.get(C_CANONICAL_POOL) {
-        Some(cp) if curve.complete => super::detect::canonical_pool(
+    // valid pool is `Unreadable`, never "no pool" (M5-SEC-5, A63). A valid one is kept for the
+    // `→ PumpSwap` transition (M6).
+    let (canonical_pool, pool) = match read.get(C_CANONICAL_POOL) {
+        Some(cp) if curve.complete => super::detect::canonical_pool_read(
             cp,
             &market.mint,
             &super::detect::pool_authority_of(market),
         ),
-        _ => CanonicalPool::Absent,
+        _ => (CanonicalPool::Absent, None),
     };
     let pricing = if live.vt > 0 {
         pricing_inputs(market, read, &curve, &live)
@@ -521,6 +532,7 @@ pub fn read_state(market: &Market, kind: VenueKind, read: &[AccountInfo]) -> Ven
     let venue = CurveVenue {
         live,
         canonical_pool,
+        pool,
         pricing,
     };
     st.executable = listable && reserves && !live.complete && venue.pricing.is_some();
@@ -546,16 +558,18 @@ pub struct Transition {
 /// ARCH §2.5 `sync_venue` for the curve kinds, on the state this instruction read:
 ///
 /// ```text
-/// PumpCurve     : complete ? (cp valid ? PumpSwap [M6] : (vT > 0 ? PumpMigrating : None*)) : stay
-/// PumpMigrating : cp valid ? PumpSwap [M6] : (vT == 0 ? None* : stay)
+/// PumpCurve     : complete ? (cp Valid ? PumpSwap : (cp Absent ∧ vT == 0 ? None* : PumpMigrating)) : stay
+/// PumpMigrating : cp Valid ? PumpSwap : (cp Absent ∧ vT == 0 ? None* : stay)
 /// ```
 ///
-/// **M5**: the `→ PumpSwap` transition (pool caches, the ring rewrite, `graduated_at`, A72) is
-/// M6's, with its adapter; until then a curve whose canonical pool exists is (or stays)
-/// `PumpMigrating`: exits pause (`VenueMigrating`) and S3 runs after the migration pause (ARCH
-/// §5.3, §5.4). `→ PumpMigrating` sets `migration_seen_at = now`; `→ None` (a curve that
-/// completed with zeroed reserves and no canonical pool: pump changed its migration target) sets
-/// the `graduated_elsewhere` flag — the market then has no route, its S3 chain runs, and a Raydium
+/// `→ PumpSwap` (M6; `pump_amm::graduate`): the canonical pool is valid — `migrate_v2` ran, in
+/// this very slot perhaps, a completion and a migration in one transaction included (M5-SEC-4) —
+/// so the market moves onto it: the pool cache, `graduated_at = now`, the route chains and a
+/// collection window cleared, the tier C until the next crank. The observation state's rewrite
+/// and restart are the prologue's (`pump_amm::restart_observation` on its copy of the state).
+/// `→ PumpMigrating` sets `migration_seen_at = now`; `→ None` (a curve that completed with zeroed
+/// reserves and no canonical pool: pump changed its migration target) sets the
+/// `graduated_elsewhere` flag — the market then has no route, its S3 chain runs, and a Raydium
 /// pool can be adopted through M4's collection window (`propose_pool`, §2.5 `None` row). A curve
 /// that does not parse changes nothing (not executable, A63), and neither does a canonical-pool
 /// account that does not read as a valid pool (`CanonicalPool::Unreadable`, M5-SEC-5): it is a
@@ -563,14 +577,25 @@ pub struct Transition {
 /// market stays on its pump kind (not executable, the migration pause intact), and only a
 /// System-owned address (nothing there) reads as "no canonical pool". Returns the transition, if
 /// any.
-pub fn sync(market: &mut Market, state: &VenueState, now: i64) -> Option<Transition> {
-    let from = market.venue_kind()?;
+pub fn sync(market: &mut Market, state: &VenueState, now: i64) -> Result<Option<Transition>> {
+    let Some(from) = market.venue_kind() else {
+        return Ok(None);
+    };
     if !matches!(from, VenueKind::PumpCurve | VenueKind::PumpMigrating) {
-        return None;
+        return Ok(None);
     }
-    let c = state.curve.as_ref()?;
+    let Some(c) = state.curve.as_ref() else {
+        return Ok(None);
+    };
     if from == VenueKind::PumpCurve && !c.live.complete {
-        return None;
+        return Ok(None);
+    }
+    if let (CanonicalPool::Valid, Some(pool)) = (c.canonical_pool, c.pool.as_ref()) {
+        super::pump_amm::graduate(market, pool, now)?;
+        return Ok(Some(Transition {
+            from,
+            to: VenueKind::PumpSwap,
+        }));
     }
     let to = if c.canonical_pool.exists() || c.live.vt > 0 {
         VenueKind::PumpMigrating
@@ -578,14 +603,24 @@ pub fn sync(market: &mut Market, state: &VenueState, now: i64) -> Option<Transit
         VenueKind::None
     };
     if to == from {
-        return None;
+        return Ok(None);
     }
     market.venue = to as u8;
     match to {
         VenueKind::PumpMigrating => market.migration_seen_at = now,
         _ => market.set_flag(MARKET_FLAG_GRADUATED_ELSEWHERE, true),
     }
-    Some(Transition { from, to })
+    Ok(Some(Transition { from, to }))
+}
+
+/// The liquidity anchor of a `→ PumpSwap` transition this state carries (`pump_amm::
+/// graduation_anchor` of the valid canonical pool the curve's ReadSet read).
+pub fn graduation_anchor(state: &VenueState) -> Option<u128> {
+    state
+        .curve
+        .as_ref()
+        .and_then(|c| c.pool.as_ref())
+        .and_then(super::pump_amm::graduation_anchor)
 }
 
 /// A curve market's venue checks of an exit after its prologue (ARCH §3.5 step 2, §3.6
@@ -599,17 +634,24 @@ pub fn exit_venue_checks(
     q: u64,
 ) -> Result<()> {
     if let Some(t) = pro.transition {
-        return if t.to == VenueKind::PumpMigrating {
-            err!(ShortwinError::VenueMigrating)
-        } else {
-            err!(ShortwinError::NoRoute)
-        };
+        return transition_refusal(t);
     }
     require!(state.executable, ShortwinError::NoRoute);
     if let (VenueKind::PumpCurve, Some(c)) = (state.kind, state.curve.as_ref()) {
         require!(u128::from(q) <= c.live.rt, ShortwinError::CurveStraddle);
     }
     Ok(())
+}
+
+/// The refusal of a trade whose own prologue moved the market off its venue: `VenueMigrating`
+/// onto `PumpMigrating` or `PumpSwap` (the ReadSet it carried is the old venue's; the transition
+/// reverts with it and the next crank persists it), `NoRoute` onto `None`.
+pub fn transition_refusal<T>(t: Transition) -> Result<T> {
+    if matches!(t.to, VenueKind::PumpMigrating | VenueKind::PumpSwap) {
+        err!(ShortwinError::VenueMigrating)
+    } else {
+        err!(ShortwinError::NoRoute)
+    }
 }
 
 /// After a buy leg on the curve (ARCH §3.5 step 7, §5.4 case 1): a buyback of exactly `rT`
@@ -630,9 +672,10 @@ pub fn sync_after_leg(
     st.curve = Some(CurveVenue {
         live: curve_state(&c),
         canonical_pool: CanonicalPool::Absent,
+        pool: None,
         pricing: None,
     });
-    sync(market, &st, now)
+    sync(market, &st, now).ok().flatten()
 }
 
 /// The `VenueStateChanged` event of a transition (ARCH §3.10): the canonical pool (the curve

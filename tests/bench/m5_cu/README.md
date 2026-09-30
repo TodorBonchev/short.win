@@ -87,8 +87,9 @@ fails the bench.
 - The coins: `legacy115` (SPL Token, 115 B, no creator — its buys make one System transfer less),
   `t22_115` (Token-2022, 115 B, a creator), `fresh` (Token-2022, 125 B), `near` (Token-2022,
   151 B, `rT` ≈ 8.9·10¹² — the completing buyback, the migration and the straddle), and the
-  graduated coins for the list-only listings (`graduated`, a PumpSwap-class coin; `fartcoin`,
-  graduated elsewhere).
+  graduated coins (`graduated`, a PumpSwap-class coin, listed on its canonical pool with the pAMM
+  init set since M6 — `tests/bench/m6_cu` measures every PumpSwap listing; `fartcoin`, graduated
+  elsewhere, the list-only listing).
 - **The costliest paths** (`costliest_legs`): the curve's creator changed after the listing to a
   fixed key whose creator vault is **empty** — the adapter re-derives both creator-vault slots
   (T12, T13) from the live creator, and pump tops the new vault up to `Rent.minimum_balance(0)`

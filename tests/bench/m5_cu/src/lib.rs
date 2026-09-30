@@ -56,6 +56,7 @@ use shortwin_litesvm_tests::engine::{
 };
 use shortwin_litesvm_tests::fixtures::MarketKeys;
 use shortwin_litesvm_tests::fork::{self, PumpCoin, PumpCurve, PumpProgram, PumpV2};
+use shortwin_litesvm_tests::pamm;
 use shortwin_litesvm_tests::pump::{self, CurveUser, PumpMarket, PumpSpec};
 use shortwin_litesvm_tests::{Env, TxResult, events, ix, pda};
 use shortwin_venue_state::{pump as vpump, pump_amm as vamm};
@@ -803,8 +804,10 @@ fn create_migrating() -> Prepared {
     prepared(env, ix, &[&creator])
 }
 
-/// `create_market(Auto)` of a graduated coin (the detection set only): a PumpSwap-class coin
-/// lists as `None` until M6; Fartcoin, graduated elsewhere, as `None` with the flag.
+/// `create_market(Auto)` of a graduated coin: a PumpSwap-class coin lists on its canonical pool
+/// with the pAMM init set (M6; the trader's pAMM UVA created by CPI; `pamm::pamm_init_set`) —
+/// the M6 bench `tests/bench/m6_cu` measures every PumpSwap listing —; Fartcoin, graduated
+/// elsewhere, as a list-only `None` with the flag (the detection set only).
 fn create_none(coin: PumpCoin) -> Prepared {
     let (mut env, c) = Env::fork_pump_coin(coin);
     let creator = fixed(&mut env, CREATOR);
@@ -815,6 +818,12 @@ fn create_none(coin: PumpCoin) -> Prepared {
         shortwin::instructions::create_market::VENUE_HINT_AUTO,
         &pda::canonical_pool(&c.mint),
     );
+    let ix = if coin == PumpCoin::Graduated {
+        let market = pda::market(&c.mint).0;
+        ix::with_remaining(ix, &pamm::pamm_init_set(&market))
+    } else {
+        ix
+    };
     prepared(env, ix, &[&creator])
 }
 
@@ -1146,15 +1155,26 @@ pub fn cases() -> Vec<Case> {
         None,
         Box::new(create_migrating),
     );
-    for c in [PumpCoin::Graduated, PumpCoin::Fartcoin] {
-        add(
-            "create_market",
-            format!("Auto, {}: list-only `None` (detection set only)", label(c)),
-            CREATE,
-            None,
-            Box::new(move || create_none(c)),
-        );
-    }
+    add(
+        "create_market",
+        format!(
+            "Auto, {}: `PumpSwap` on its canonical pool, the pAMM init set (M6)",
+            label(PumpCoin::Graduated)
+        ),
+        CREATE,
+        None,
+        Box::new(|| create_none(PumpCoin::Graduated)),
+    );
+    add(
+        "create_market",
+        format!(
+            "Auto, {}: list-only `None` (detection set only)",
+            label(PumpCoin::Fartcoin)
+        ),
+        CREATE,
+        None,
+        Box::new(|| create_none(PumpCoin::Fartcoin)),
+    );
     for c in CURVES {
         add(
             "open_short",

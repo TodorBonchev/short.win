@@ -684,8 +684,7 @@
         {
           "name": "mint",
           "docs": [
-            "in the handler); read for nothing else in this build (PumpSwap fee tiers read its",
-            "supply, M6)."
+            "in the handler); PumpSwap's fee tier reads its supply (M6)."
           ],
           "relations": [
             "market"

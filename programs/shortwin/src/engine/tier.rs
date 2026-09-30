@@ -26,9 +26,12 @@ pub fn tier_venue(config: &GlobalConfig, market: &Market, kind: VenueKind) -> Op
     }
 }
 
-/// The `tier::assign` inputs of `market` now (ARCH §4.7): `R_now` the venue's real SOL,
-/// `Y(reprice(L_slow, P_ema))` for `R_slow`, VQR 0 (the PumpSwap reader supplies it in M6),
-/// age from `graduated_at`, the cached oracle. `None` for a list-only market (no opens).
+/// The `tier::assign` inputs of `market` now (ARCH §4.7): `R_now` the venue's real SOL (on
+/// PumpSwap `min(WSOL vault, WSOL vault + VQR)`, the reader's `R`), `Y(reprice(L_slow, P_ema))`
+/// for `R_slow` less `max(VQR, 0)` (PumpSwap; 0 elsewhere) — under a negative VQR each input the
+/// smaller of its real and effective SOL (ECON §6.2, #103: the delegated PROPOSED reading, built
+/// in M6; exactly ADOPTED Q19 while `VQR ≥ 0`) —, age from `graduated_at`, the cached oracle.
+/// `None` for a list-only market (no opens).
 fn inputs(
     config: &GlobalConfig,
     market: &Market,
@@ -39,11 +42,16 @@ fn inputs(
     let venue = tier_venue(config, market, state.kind)?;
     let p_ema = market.ema_price.get();
     let y_slow = reprice(market.liq_slow.get(), p_ema).map_or(0, |(_, y)| y);
+    // `max(VQR, 0)`: a positive VQR is not liquidity (Q19); a negative one is already out of
+    // the effective reserve `Y(reprice(L_slow, P_ema))` prices on (ECON §6.2, #103).
+    let vqr = state
+        .pool
+        .map_or(0, |p| u64::try_from(p.vqr.max(0)).unwrap_or(u64::MAX));
     Some(TierInputs {
         venue,
         r_now: state.r,
         y_slow,
-        vqr: 0,
+        vqr,
         p_ema,
         now,
         graduated_at: market.graduated_at,

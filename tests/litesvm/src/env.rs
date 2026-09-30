@@ -206,13 +206,12 @@ impl Env {
         )
     }
 
-    /// `initialize_config(args)` signed by the upgrade authority — with the venue bits this
-    /// build refuses to enable (`shortwin::constants::VENUE_BITS_UNFINISHED`, M5-SEC-4: the pump
-    /// curve until M6's `→ PumpSwap` transition) removed from what is sent and, once the
-    /// instruction succeeded, written into `GlobalConfig.venue_enabled` directly
-    /// ([`Env::force_venue_bits`]). **TEST-ONLY:** no instruction can set them in this build, so
-    /// a deployment never takes curve opens; the harness exercises the curve venue as M6 will
-    /// enable it. [`Env::initialize_config_as_sent`] sends `args` unchanged (the gate itself).
+    /// `initialize_config(args)` signed by the upgrade authority — with the venue bits a build
+    /// refuses to enable (`shortwin::constants::VENUE_BITS_UNFINISHED`: empty since M6; M5's
+    /// was the pump curve, M5-SEC-4) removed from what is sent and, once the instruction
+    /// succeeded, written into `GlobalConfig.venue_enabled` directly ([`Env::force_venue_bits`]).
+    /// **TEST-ONLY**, and inert while the set is empty: `args` go out unchanged.
+    /// [`Env::initialize_config_as_sent`] sends `args` unchanged (the gate itself).
     pub fn initialize_config(&mut self, args: InitConfigArgs) -> TxResult {
         let unfinished = args.venue_enabled & VENUE_BITS_UNFINISHED;
         let mut sent = args;

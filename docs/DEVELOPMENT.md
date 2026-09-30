@@ -158,9 +158,19 @@ release and a test-venue build of the tree before M4R, for `switch_confirm_it`'s
 differentials only. `Env::test_venue()` loads the test-venue program and the mock; `Env::new()` the release
 program only; `Env::ray_fork()` the release program and the dumped Raydium programs (below);
 `Env::fork_pump_coin(coin)` the release program, the dumped pump, pump-fees and PumpSwap programs,
-pump's statics, one coin's accounts, mainnet's Rent and the pump snapshot's clock (M5). A
+pump's statics, one coin's accounts, mainnet's Rent and the pump snapshot's clock (M5);
+`Env::fork_pamm_coin(coin)` (M6) the same with PumpSwap's statics and one canonical pool role of
+the `pamm_state` dump (`Env::plant_negative_vqr` swaps in the synthetic negative-VQR pool). A
 stale `target/deploy/shortwin.so` fails the Raydium and pump binaries in confusing ways: rebuild
 after any program change (or point `SHORTWIN_SO` at a private build).
+
+**The curve venue bit in tests (M5-SEC-4).** The M5 build refuses to enable the pump-curve venue
+(`constants::VENUE_BITS_UNFINISHED`; `initialize_config` and `EnableVenues` fail `InvalidParams`),
+so no deployment of it takes curve opens before M6's `→ PumpSwap` transition. The harness's
+`Env::initialize_config` therefore sends its arguments without that bit and then writes it into
+`GlobalConfig.venue_enabled` directly (`Env::force_venue_bits`, TEST-ONLY), so the curve suites run
+the venue as M6 will enable it; `Env::initialize_config_as_sent` sends the arguments unchanged
+(the gate's own test). **M6 emptied the set** (`VENUE_BITS_UNFINISHED = 0`): the forcing is now inert and `initialize_config` sends its arguments unchanged; the mechanism stays for a later unfinished venue.
 
 | Binary | Covers |
 |---|---|
@@ -197,12 +207,21 @@ after any program change (or point `SHORTWIN_SO` at a private build).
 | `--test switch_confirm_it` | M4R's gate and guard: `liquidate` / `expire` fail `EmaWarmingUp` and `sol_settle` evaluates nothing during the warm-up on an executable venue, and only there (a new pool that halts in the warm-up reaches S3); the guard clears at the gate on an honest pool; a market without a switch is never marked; the ignored `lockstep_*` differentials send every instruction of a 90-s scenario to the pre-M4R build too and compare the accounts byte for byte (they run when `SHORTWIN_PRE_M4R_SO` / `SHORTWIN_PRE_M4R_TEST_VENUE_SO` name the pre-M4R release and test-venue builds; `-- --ignored lockstep`) |
 | `--test tx_size_raydium` | M3, T-SIZE: every Raydium transaction in its worst case (both ComputeBudget instructions, a separate fee payer, a first-time borrower, the largest extras set) fits 1,232 B and 64 accounts as v0 through the protocol ALT (A28 as enumerated, and the table `scripts/build-alt.sh` builds) and executes that way; crank batches (4 per v0 transaction); the keeper's composite and a Jito tip; M4's `propose_pool` / `execute_pool_switch` in their largest shapes (CPMM incumbent + CPMM candidate, a list-only market's detection set), executed through the table (`-- --nocapture` prints the table) |
 | `--test pump_math_it` | M5, T-PUMP-MATH (execution half) on the pump fork: a normal user's `buy_v2` / `sell_v2` / `buy_exact_quote_in_v2` on every live SOL curve of the dump (125-, 151-, 115- and 49-byte layouts, SPL Token and Token-2022) over grids and seeded sequences equal `fees::pump_curve` and `quote::sol_leg` on the readers' state to the lamport — every account delta and the `TradeEvent` —, the exact bound passing and one unit tighter failing; the live and synthetic fee tiers, the creator override, a default creator; 6021 above `rT`, the completing buy, 6005 after completion; the undocumented cap byte; the creator-vault top-up; recipient refusals; the tripwire on the live-supply fee tier (R-PUMP Update U10) |
-| `--test pump_it` | M5, the pump-curve adapter on the fork (release build, dumped pump / pump-fees / PumpSwap programs and coins): `listing` (`create_market(Auto)`: curve cache, trader base ATA and pump UVA, the list-only outcomes, every refusal), `flows` (open → close to the lamport on every curve layout), `refusals`, `structure` (I14), `rent` (T-RENT: the creator-vault top-up on sales and buys), `pda` (T-PDA-USER: the trader PDA as pump's `user` under CPI), `straddle` (`CurveStraddle`; `B̂_str` against the executed completion + `migrate_v2` + PumpSwap `buy`), `graduation` (`→ PumpMigrating`, the migration pause and S3 at 70 min, a real `migrate_v2`, `→ None` and S3 on the detection set, `None → PumpCurve` re-detection; M4's carry-overs: a graduated-elsewhere market with a position adopts its Raydium pool through the collection window, and the re-detection clears a running window), `exits` (expiry, liquidation, `sweep_trader`'s token leg, the pump latch bits) |
-| `--test straddle_it` | M5, T-STRADDLE (curve part) with the `complete_curve` helper (`COMPLETE_CURVE_SO`): tx1 completes at the `rT` it reads, is a no-op on a completed or migrated curve; ★ a buy, a sale, a third-party completion or migration between the keeper's read and the bundle; v0.3's stale tx1 reverting the bundle; `max_sol_cost`; a straddled short.win position (`CurveStraddle`, `B̂_str` stable, the next crank `→ PumpMigrating`, tx3's venue leg at `B̂_str`); every live SOL curve; the helper's own checks; trace / CU / size per transaction (`-- --nocapture`) |
-| `--test pump_curve_scenarios`, `--test pump_curve_attacks`, `--test pump_curve_e2e` | M5 fork E2E on the curve (shared `pump_curve_support.rs`, no tests of its own; ≈ 2.5 / 1.5 / 1.3 min debug): ECON §11.2 and §10.1 curve rows replayed second by second against `shortwin_sim` to the lamport (D@50 % / D@80 % / D@90 %, stuck migrations with S3 at +4,200 s; D@0 % refused, `ProceedsBelowMin`); ECON §12 on the curve (expiry and liquidation sandwiches, atomic and held pushes, the OI-cap basket); the lifecycle on a live curve (listing, lenders, opens, a close, liquidations, an expiry, the lenders' exit), completion with positions open (`→ PumpMigrating` → `None`, S3), a curve migrated elsewhere between two reads, a real `migrate_v2`, and a fast `migrate_v2` freezing the EMA (the M5-only exposure) (`-- --nocapture` prints the figures) |
+| `--test pump_it` | M5, the pump-curve adapter on the fork (release build, dumped pump / pump-fees / PumpSwap programs and coins): `listing` (`create_market(Auto)`: curve cache, trader base ATA and pump UVA, the list-only outcomes, every refusal), `flows` (open → close to the lamport on every curve layout), `refusals`, `structure` (I14), `rent` (T-RENT: the creator-vault top-up on sales and buys), `pda` (T-PDA-USER: the trader PDA as pump's `user` under CPI), `straddle` (`CurveStraddle`; `B̂_str` against the executed completion + `migrate_v2` + PumpSwap `buy`), `graduation` (`→ PumpMigrating`, the migration pause and S3 at 70 min, a real `migrate_v2`, `→ None` and S3 on the detection set, `None → PumpCurve` re-detection; M4's carry-overs: a graduated-elsewhere market with a position adopts its Raydium pool through the collection window, and the re-detection clears a running window; since M6 a migrated market moves `→ PumpSwap` and a graduated coin lists on its pool), `exits` (expiry, liquidation, `sweep_trader`'s token leg, the pump latch bits) |
+| `--test straddle_it` | M5, T-STRADDLE (curve part) with the `complete_curve` helper (`COMPLETE_CURVE_SO`): tx1 completes at the `rT` it reads, is a no-op on a completed or migrated curve; ★ a buy, a sale, a third-party completion or migration between the keeper's read and the bundle; v0.3's stale tx1 reverting the bundle; `max_sol_cost`; a straddled short.win position (`CurveStraddle`, `B̂_str` stable); every live SOL curve; the helper's own checks; trace / CU / size per transaction (`-- --nocapture`). **M6:** tx3 as built — the keeper's (the transition plus the pool's first bucket; its exit at T + 8, T + 9 without that bucket; a tx3 carrying the exit reverts the bundle `EmaWarmingUp`), the three-transaction bundle against a curve trade before it, the borrower's own tx3 with `close_short` at `B̂_str`, a borrower's self-made straddle (`rT − q + 1`) |
+| `--test pump_curve_scenarios`, `--test pump_curve_attacks`, `--test pump_curve_e2e` | M5 fork E2E on the curve (shared `pump_curve_support.rs`, no tests of its own; ≈ 2.5 / 1.5 / 1.3 min debug): ECON §11.2 and §10.1 curve rows replayed second by second against `shortwin_sim` to the lamport (D@50 % / D@80 % / D@90 %, stuck migrations with S3 at +4,200 s; D@0 % refused, `ProceedsBelowMin`); ECON §12 on the curve (expiry and liquidation sandwiches, atomic and held pushes, the OI-cap basket); the lifecycle on a live curve (listing, lenders, opens, a close, liquidations, an expiry, the lenders' exit), completion with positions open (`→ PumpMigrating` → `None`, S3), a curve migrated elsewhere between two reads, a real `migrate_v2` moving the market onto the pool (M6), and a fast `migrate_v2` priced on the pool (M6; the M5-only EMA freeze is gone); §10.1's graduation rows are `graduation_scenarios`' (`-- --nocapture` prints the figures) |
 | `--test trace_pump_it` | M5, T-TRACE on the curve: the exact call shape (program and stack height of every CPI) and entries of every curve-path instruction (listing, cranks incl. the venue transitions, opens, closes incl. a completing buyback, liquidate, expire, `sol_settle` on `PumpMigrating` and `None`, `sweep_trader`, the latch), peak height 3; the worst-case transactions ≤ 64 and the runtime's refusal of one open more |
 | `--test tx_size_pump_it` | M5, T-SIZE on the curve: every curve transaction in its worst case (the largest extras set, a separate fee payer, a first-time borrower) as v0 through both tables (A28 with its pump part, and `scripts/build-alt.sh`'s), executed that way; crank batches (5 per v0 transaction); the keeper's composite; a tipped liquidation with the largest extras set measured as **not** fitting v0 (`-- --nocapture` prints the table) |
 | `--test latch_pump_it` | M5, T-LATCH on the dumped pump / pump-fees / PumpSwap ProgramData: real loader upgrades, opens refused on curve markets while cranks, top-ups, `sol_settle`, `sweep_trader`, closes, liquidations and expiries keep working; revalidation only at the loader's slot; all three bits must clear; U5 on the 10 MiB accounts |
+| `--test m5_sec_curve_it` | the M5 security review's findings on the curve as regressions (release build, pump fork; shares `pump_curve_support.rs`; the audit's reproducers, converted): M5-SEC-1 (a full wipe on a live curve reopens once `sweep_trader` has set the venue-reward bit, the trader's pump UVA holding no claimable cashback; a cashback coin's `[pump claim_cashback(user = trader), sweep_trader]` credits the wiped epoch — T-CASHBACK's pump part), M5-SEC-3 (a sale wrapped around the open no longer lifts the Tier D guard or `X₀`: the curve caps read the reserves at `P_ema`), M5-SEC-4 **inverted by M6** (`m5_sec_4_m6_can_enable_the_curve_venue`; `m5_sec_4_an_atomic_complete_and_migrate_graduates_the_market_onto_its_pool`: the atomic `[buy_v2(rT), migrate_v2]` with the pool pushed ≥ 3.5× the last curve EMA moves the market onto the pool, which liquidates only after the 8-integration warm-up), M5-SEC-5 (an unreadable canonical pool keeps the market `PumpMigrating` and fails Raydium adoptions closed; an empty address is graduated elsewhere), M5-SEC-6 (a low-bump market costs short.win no extra CU) |
+| `--test pamm_it` | M6, the PumpSwap adapter on the fork (release build, the dumped pAMM / pump / pump-fees programs and the `pamm_state` pools): `listing` (a PumpSwap-class coin lists on its canonical pool with the pAMM init set — Token-2022 301 B, SPL 261 B, 211 B after `extend_account` —; the first observation starts the price marked for the warm-up; the init set key-checked; `None → PumpSwap` re-detection), `graduation` (completion → `PumpMigrating` → a real `migrate_v2` → `PumpSwap`: the cache, `graduated_at`, the ring at `lp_supply`, `(8, 1)`, exits and opens refused `EmaWarmingUp` until 8 integrations, the borrower's close on the pool), `flows` (open → close to the lamport on every pool role, expiry and liquidation after a ×2.8 pump, `sol_settle` no-op and S1 after a held ×10), `refusals` (the warm-up, every `disable_flags` bit, the boost gate, the pAMM / pump-fees latch, the existence requirement, every trade slot substituted), `gates` (T-DISABLE on the ELF, T-ATA / T-PDA-USER, T-RENT, T-CASHBACK pAMM part), `negvqr` (the synthetic pool prices on `vault + VQR`; the tier inputs) |
+| `--test graduation_scenarios`, `--test graduation_e2e` | M6 fork E2E through a real graduation (shared `graduation_support.rs`, no tests of its own, which includes `pump_curve_support.rs`; ≈ 19 / 14 s debug): ECON §10.1's twelve graduation rows through completion, `migrate_v2`, the `→ PumpSwap` transition, pump's real `boost_buy_and_burn` on the sim's schedule and PumpSwap ramps, to the lamport against the sim with M6's graduation rule (the module docs list the three differences from ECON's published table); a lifecycle through a real graduation, T-VENUE-SWITCH (graduation), the M5-SEC-4 atomic attack and a borrower's self-made straddle, ECON §10.2's borrower bundle, a completing close, the boost gate (`-- --nocapture` prints ECON-format rows) |
+| `--test pumpswap_negvqr_e2e` | M6, a lifecycle on the **synthetic** negative-VQR pool (`pamm_synthetic`): opens, a close, liquidations after a ×3 pump, an expiry, S1 after a ×10 gap, the lenders' exit; every quote on `vault + VQR`, the tier input `min(vault, vault + VQR)` |
+| `--test graduation_surfpool` | M6, the Surfpool E2E through a real graduation on **live mainnet** (`#[ignore]`d; needs Surfpool 1.6 and network: `scripts/surfpool-e2e.sh`, below) |
+| `--test trace_pumpswap_it` | M6, T-TRACE on PumpSwap: the exact call shape and entries of every PumpSwap-path instruction (open 22–23, normalising 26; close 16–17; liquidate / expire 17; crank 2; the `→ PumpSwap` transition 4; the listing 15; `sweep_trader`'s token leg 4), peak height 3 |
+| `--test tx_size_pumpswap_it` | M6, T-SIZE on PumpSwap: every transaction in its worst case (the largest extras set, a separate fee payer, a first-time borrower) as v0 through both tables, executed that way; the listing; the transition and tx3; 4 cranks per v0 batch (`-- --nocapture` prints the table) |
+| `--test latch_pumpswap_it` | M6, T-LATCH on the dumped pAMM / pump-fees ProgramData: a real loader upgrade refuses PumpSwap opens while exits, cranks, `sweep_trader` and `sol_settle` keep working; the PumpSwap mask is pAMM + pump-fees only; U5 |
+| `--test replay_0428_it` | M6, T-REPLAY-0428 on the test-venue build (`SHORTWIN_TEST_VENUE_SO`, `MOCK_CPAMM_SO`): pump's 2026-04-28 added-account change, modelled on the mock's `required_extras` knob (the deployed ELFs only accept trailing accounts), recovered through the extras sets (`current`, `previous`, a pinned `stable`, `none`) |
 
 Every instruction goes through `Env::send`, which runs the invariant hooks — I1, I2, I6, I7,
 I8, I13 (state part) on every market a transaction names or creates; I3, I4, I5, I7, I9–I13,
@@ -238,6 +257,8 @@ for T-LATCH), rebuilt to the mainnet account's sha256; every fixture file is che
 | `accounts/raydium/*.bin` | both program accounts and ProgramData headers; AMM v4: Fartcoin `Bzc9NZfM…` and its reversed-order sibling `9GWMrDgH…`, the `AmmConfig` and authority; CPMM: USELESS `Q2sPHPdU…`, the creator-fee pools `FQd8z3…` (WSOL token 0), `3Cv9uPpa…` (WSOL token 1) and `FrZnJAFt…` (both tokens), the Token-2022 pool `7ZRtFcgf…`, each with vaults, mints, LP mint and observation; the authority and all 21 `AmmConfig`s |
 | `programs/pump.so`, `programs/pump_fees.so`, `programs/pump_amm.so` (M5, group `pump_programs`, slot 451,672,911) | the deployed pump, pump-fees and PumpSwap ELFs (deploy slots 449,734,335 / 446,465,969 / 446,462,733, `VENUE_GUARD_SLOTS_2026_09_27`) |
 | `accounts/pump/*.bin` (M5, group `pump_state`: one `getMultipleAccounts` at slot 451,675,432, 100 entries — the call's cap —, 13 recorded `"absent": true`) | the three program accounts and ProgramData headers; pump's `Global`, both pump-fees `FeeConfig`s, PumpSwap's `GlobalConfig`, both volume accumulators, the fee / buyback / withdraw authorities, WSOL, USDC, PumpSwap's protocol-fee and buyback WSOL ATAs, the Rent sysvar; ten pinned coin **roles**: `fresh` (125 B), `near` (151 B, near completion), `t22_115`, `legacy115` (SPL Token, no creator), `legacy49` (2024 layout), `graduated` (canonical 301-B pool and boost vault), `mayhem`, `usdc`, `legacy150`, `fartcoin` (graduated elsewhere) |
+| `accounts/pamm/*.bin` (M6, group `pamm_state`: slot 451,784,607, 76 entries, 18 absent) | PumpSwap's `GlobalConfig`, `FeeConfig`, global volume accumulator, WSOL, Rent, the 16 recipient WSOL ATAs; per pool **role** the pool, mint, vaults, LP mint, coin-creator vault authority and ATA, boost vault and ATA, pool authority and migrated curve: `fresh` (301 B, boost vault 13.98 SOL), `mature` (boost spent, 7 % third-party LP), `cashback`, `legacy211`, `legacy261` |
+| `accounts/pamm/pamm_mature_pool_negative_vqr.bin` (M6, group `pamm_synthetic`) | **synthetic**: the `mature` pool with VQR = −⌊vault/2⌋ (no negative-VQR pool exists on mainnet yet), at the same address — load one or the other; `check` verifies it equals its source but for that patch |
 | `manifest.json` | per account: address, owner, lamports, executable, rent epoch, space, slot, sha256, purpose, decoded fields; one snapshot record per group |
 | `SHA256SUMS` | every fixture file |
 
@@ -254,6 +275,9 @@ python3 scripts/dump-fixtures.py fetch --refresh --group pump_state --coin gradu
                                                  # re-dump one group (repeatable), a pump coin role
                                                  #   replaced (its expectation is checked at fetch)
 python3 scripts/dump-fixtures.py candidates      # live mints that fit each pump coin role
+python3 scripts/dump-fixtures.py fetch --group pamm_state --pool negative_vqr=MINT
+                                                 # M6: add a PumpSwap pool role (e.g. a real
+                                                 #   negative-VQR pool once one exists)
 ```
 
 A `--refresh` re-pins every byte: the reader unit tests (`crates/shortwin-venue-state/src/
@@ -286,7 +310,7 @@ pump's accounts.
 
 ## Benches
 
-Five standalone Cargo workspaces with their own lockfiles keep Mollusk 0.15.1 out of the
+Six standalone Cargo workspaces with their own lockfiles keep Mollusk 0.15.1 out of the
 on-chain lockfile (all hold the Agave runtime line at 4.2.2, C1-14):
 
 ```sh
@@ -326,20 +350,34 @@ cargo-build-sbf --tools-version v1.57 --arch v3 --manifest-path tests/bench/m5_c
 cargo test --manifest-path tests/bench/m5_cu/Cargo.toml --locked -- --nocapture
 # M5_CU_WRITE=1 rewrites results.md, M5_TRACE_WRITE=1 trace.md, M5_DEPTH_WRITE=1 depth.md;
 # SHORTWIN_SO / COMPLETE_CURVE_SO / M5_WRAPPER_SO override the ELFs
+# (since M6 its graduated coin lists on PumpSwap with the pAMM init set; Fartcoin stays list-only)
+
+# M6 CU bench, T-TRACE, T-SIZE, T-DEPTH and the graduation transition on PumpSwap: the release
+# build on the dumped pAMM / pump / pump-fees programs and the pamm_state pools (Mollusk,
+# cross-checked on LiteSVM), the worst-case PumpSwap transactions with their v0 + ALT sizes (the
+# transition crank, the straddle's tx3, the post-wipe claim bundle), every path through 0–3
+# levels of its own TEST-ONLY CPI wrapper
+anchor build --tools-version v1.57 --arch v3
+cargo-build-sbf --tools-version v1.57 --arch v3 --manifest-path tests/bench/m6_cu/wrapper/Cargo.toml \
+  --sbf-out-dir tests/bench/m6_cu/target/deploy -- --locked       # the wrapper (t_depth)
+cargo test --manifest-path tests/bench/m6_cu/Cargo.toml --locked -- --nocapture
+# M6_CU_WRITE=1 rewrites results.md, M6_TRACE_WRITE=1 trace.md, M6_DEPTH_WRITE=1 depth.md;
+# SHORTWIN_SO / M6_WRAPPER_SO override the ELFs
 ```
 
-(The `cu_math` bench program and the `m3_cu` / `m5_cu` wrappers are separate crates, so their
+(The `cu_math` bench program and the `m3_cu` / `m5_cu` / `m6_cu` wrappers are separate crates, so their
 build commands name their manifests; the no-bare-`cargo build-sbf` rule is about the short.win
 program.) The figures are in each bench's `results.md` (and `trace.md`, `depth.md`); commit them
-when they change. The M3 and M5 benches use fixed borrower, keeper and attacker keys (M3 also
+when they change. The M3, M5 and M6 benches use fixed borrower, keeper and attacker keys (M3 also
 draws the keys of its planted M4 pools in a fixed order), so their reports are byte-identical
 across runs (the M1 and M2 benches use random keys: their PDA bump searches move the figures by
 ≈ 1.5 k CU per iteration from run to run). See
 [`tests/bench/cu_math/README.md`](../tests/bench/cu_math/README.md),
 [`tests/bench/m1_cu/README.md`](../tests/bench/m1_cu/README.md),
 [`tests/bench/m2_cu/README.md`](../tests/bench/m2_cu/README.md),
-[`tests/bench/m3_cu/README.md`](../tests/bench/m3_cu/README.md) and
-[`tests/bench/m5_cu/README.md`](../tests/bench/m5_cu/README.md).
+[`tests/bench/m3_cu/README.md`](../tests/bench/m3_cu/README.md),
+[`tests/bench/m5_cu/README.md`](../tests/bench/m5_cu/README.md) and
+[`tests/bench/m6_cu/README.md`](../tests/bench/m6_cu/README.md).
 
 ## Services and the keeper (keeper v1, M3; pool selection, M4)
 
@@ -362,7 +400,10 @@ CPMM and list-only markets; M4-SEC-7: discovered pools ranked by locked SOL, at 
 after the tick's exits and crank batch; config `[pool_select]` in `keeper.example.toml`; since M5
 duty 6 on the pump curve — `migrate_v2` as soon as a covered curve completes, the straddle bundle
 with the `complete_curve` helper through a Jito block engine (`--block-engine`, config
-`[graduation]`; until M6 adds its exit transaction it is sent only with `send_without_exit`) —,
+`[graduation]`; since M6 its tx3 is the move onto the pool, `send_without_exit` and `migrate` default
+to true, and the keeper's exit lands at the warm-up gate) —, since M6 PumpSwap exits and account
+preparation, the move onto the pool after anyone's migration, the post-wipe claim bundle and duty
+13's `sweep_trader` (config `[sweep]`), `disable_flags` in duty 10 —,
 curve exits with the adapter's own account lists, and list-only markets covered with their
 detection set: a curve that graduated elsewhere with positions open is kept on the no-route
 cadence and settled in S3, and a list-only market whose curve appears is cranked onto it and its
@@ -395,7 +436,8 @@ services/target/release/shortwin-keeper --rpc <url> --keypair keeper.json \
 The scenarios load the same builds as the program tests: the mock scenarios the test-venue
 build and the mock (`SHORTWIN_TEST_VENUE_SO`, `MOCK_CPAMM_SO`), the Raydium scenarios
 (`raydium*.rs`, and M4's `pool_select.rs` with its planted sibling pools) and M5's pump-curve
-scenarios (`graduation.rs`, also the helper: `COMPLETE_CURVE_SO`) the release build
+scenarios (`graduation.rs`, also the helper: `COMPLETE_CURVE_SO`) and M6's PumpSwap and post-wipe
+scenarios (`pamm.rs`, `wipe.rs`) the release build
 (`SHORTWIN_SO`) with the committed fork fixtures. The keeper
 knows the Raydium venues through the adapters' own account lists and the TEST-ONLY mock venue
 only with the feature `test-venue` of its scenario crate; the release keeper binary must not
@@ -403,6 +445,29 @@ contain the mock's id (CI checks it). What each duty does and what v1 leaves out
 [`services/README.md`](../services/README.md). Do not share one `CARGO_TARGET_DIR` between two
 checkouts of the repository: Cargo keys path crates the same way in both and mixes their
 artifacts.
+
+### The Surfpool E2E (M6; `scripts/surfpool-e2e.sh`)
+
+`tests/litesvm/tests/graduation_surfpool.rs` runs a real graduation on a **Surfpool 1.6 fork of live
+mainnet** (ARCHITECTURE §8.4): only short.win, the harness keys, the protocol ALT and one fixture coin
+are planted; pump, pump-fees, PumpSwap and every venue account are mainnet's. It is `#[ignore]`d in
+the normal suites (it needs Surfpool and network access; not in CI). The public RPCs refuse Surfpool's
+batched `getMultipleAccounts` (HTTP 403 on 2026-09-30), so the script starts a retrying forwarder
+first:
+
+```sh
+anchor build --tools-version v1.57 --arch v3                 # the release shortwin.so it plants
+SURFPOOL=/path/to/surfpool scripts/surfpool-e2e.sh            # forwarder :18999, Surfpool :18899, the test
+# or by hand:
+python3 scripts/surfpool-rpc-forwarder.py 18999 &           # retries publicnode / api.mainnet-beta
+surfpool start --rpc-url http://127.0.0.1:18999 --no-tui --no-studio --no-deploy \
+  --port 18899 --ws-port 18900 --airdrop-amount 0
+SURFPOOL_RPC=127.0.0.1:18899 cargo test -p shortwin-litesvm-tests --test graduation_surfpool \
+  -- --ignored --nocapture                                  # SURFPOOL_TRACE=1: every transaction
+```
+
+Tested with the v1.6.0 release binary (`surfpool-linux-x64.tar.gz`, sha256 `cb471b00…`); a run takes
+≈ 30 s once built.
 
 ### The protocol ALT (A28; `scripts/build-alt.sh`)
 

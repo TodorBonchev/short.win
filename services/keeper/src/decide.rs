@@ -24,7 +24,7 @@
 //! | venue executable, the post-change warm-up running (`ema_warm > 0` after the roll; M4R) | `Watch` (exits refuse `EmaWarmingUp`, `sol_settle` decides nothing: observe every second until the gate) |
 //! | not liquidatable, not armed | `Idle` / `Watch` (near a threshold: per-second coverage) |
 //! | armed and not liquidatable | `SolSettle` (it keeps the clock or disarms on box evidence; duty 4) |
-//! | liquidatable on a live pump curve with `Q > rT` (M5; ARCH §5.1 "straddle") | `Straddle` (the ≥ 3-transaction bundle of §5.4, [`crate::graduation`]; until M6 adds its exit transaction the keeper falls back to `sol_settle`) |
+//! | liquidatable on a live pump curve with `Q > rT` (M5; ARCH §5.1 "straddle") | `Straddle` (the 3-transaction bundle of §5.4, [`crate::graduation`]: complete, migrate, the transition onto the pool; the exit follows at the warm-up's gate, M6; while the bundle does not go out the keeper calls `sol_settle`) |
 //! | liquidatable, completed bucket stale | `Observe` (observe this second, act the next) |
 //! | liquidatable, normal buyback allowed, expired and not CR-liquidatable | `Expire` / `ExpireWait` |
 //! | liquidatable, normal buyback allowed | `Liquidate` / `LiquidateWait` (fixed δ; retry next second) |
@@ -109,7 +109,8 @@ pub enum Plan {
     /// A liquidatable position on a live pump curve whose `Q` exceeds the curve's `rT` (ARCH
     /// §5.1, §5.4): pump reverts any buy above `rT`, so no exit can run on the curve; the
     /// keeper's straddle bundle ([`crate::graduation`]) completes the curve (`complete_curve`),
-    /// migrates it (`migrate_v2`) and exits on the new pool (M6's transaction).
+    /// migrates it (`migrate_v2`) and moves the market onto the new pool (tx3, M6); the exit on the
+    /// pool follows at the post-change warm-up's gate.
     Straddle,
 }
 
@@ -193,7 +194,11 @@ pub struct MarketNeeds {
     pub listing: bool,
     /// Once per second (M4V-5, M4R): a Raydium market without open positions in the last
     /// [`LISTING_WARMUP_S`] seconds of its listing window, or after it while its post-change
-    /// warm-up runs (`ema_warm > 0`; opens refuse `EmaWarmingUp` until then).
+    /// warm-up runs (`ema_warm > 0`; opens refuse `EmaWarmingUp` until then). M6 (a keeper
+    /// choice, flagged): a PumpSwap market without open positions while its warm-up runs — after
+    /// a graduation, or from the price start of a PumpSwap listing (its first observation starts
+    /// the price, marked for the warm-up) — so the first open reads a `P_ema` the pool's own
+    /// honest buckets seeded.
     pub warm_up: bool,
     /// The post-change warm-up runs on an executable venue (`ema_warm > 0` after the roll; M4R):
     /// with open positions the market is observed every second (duty 5) until `ema_warm == 0`,
@@ -455,6 +460,8 @@ pub fn market_needs(
     // FITS-2 (b): the liquidity-triggered window, on an executable venue with open positions.
     let liq_covered = executable && open && liq_covered;
     // M4V-5: a Raydium market without positions, in its listing window or not yet warmed up.
+    // M6: a PumpSwap market without positions while its warm-up runs (the projection has started
+    // the price of a PumpSwap market that had none).
     let (listing, warm_up) = if mv.kind.is_raydium() && !open && executable {
         let m = &proj.market;
         let end = m.pool_seen_at.saturating_add(i64::from(list_window_s));
@@ -464,6 +471,8 @@ pub fn market_needs(
             inside,
             proj.now >= end.saturating_sub(LISTING_WARMUP_S) && (inside || !warm),
         )
+    } else if mv.kind == VenueKind::PumpSwap && !open && executable {
+        (false, proj.market.ema_warm > 0)
     } else {
         (false, false)
     };

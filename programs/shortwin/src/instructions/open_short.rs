@@ -29,12 +29,16 @@
 //!    `EMA_WARMUP_BUCKETS` integrations re-seed it from the pool (`EmaWarmingUp`; M4R / M4V-5,
 //!    **PROPOSED**: no open on a `P_ema` one transaction chose) —
 //!    and `R_eff ≥ pool_min_real_sol` (`PoolTooThin`; `R_eff` bounded by the locked depth over
-//!    `λ_min`, ARCH §2.6 rule 5). (PumpSwap's `disable_flags` and boost gate arrive with M6.)
-//!    A curve that completed since the last observation moves the market to `PumpMigrating` in
-//!    the prologue's venue sync (ARCH §2.5): the open refuses `VenueMigrating` (`NoRoute` if it
-//!    went `None`), and nothing of it is kept.
+//!    `λ_min`, ARCH §2.6 rule 5). PumpSwap (M6): `disable_flags == 0` (`VenueFlagged`; A24 —
+//!    the T-DISABLE buy bit already made the venue not executable, `NoRoute`) and the warm-up
+//!    after a graduation or a price start over (`EmaWarmingUp`; the Raydium rule, flagged: ARCH
+//!    §3.4 names it for Raydium). A curve that completed (or migrated) since the last observation
+//!    moves the market in the prologue's venue sync (ARCH §2.5): the open refuses
+//!    `VenueMigrating` (`NoRoute` if it went `None`), and nothing of it is kept.
 //! 4. Open guards: `now ≥ created_at + market_warmup_s` (`MarketWarmingUp`); `|P_spot/P_ema − 1|
-//!    ≤ open_ema_dev_bps` (`PriceDeviatesFromEma`); `P_ema ≤ P_OPEN_MAX` (`PriceAboveOpenMax`).
+//!    ≤ open_ema_dev_bps` (`PriceDeviatesFromEma`); `P_ema ≤ P_OPEN_MAX` (`PriceAboveOpenMax`);
+//!    PumpSwap's boost gate (`BoostInProgress`: the boost vault above `boost_dust_lamports`
+//!    before `graduated_at + boost_window_s`; A13).
 //! 5. Tier (`engine::tier::assign`), cached on the market.
 //! 6. Caps (`engine::caps::check_open`; on Raydium the conservative reserve `X₀` is also
 //!    bounded by the locked depth `pool_d` over `λ_min`; on the curve `X₀` and the Tier D
@@ -47,8 +51,9 @@
 //! 7. `S_exp = quote_sell(q)` on the live state.
 //! 8. The sell leg (`crate::venues::sell`) after the trader normalisation, with `min_out =
 //!    max(min_proceeds, ⌊S_exp·(10⁴ − exec_tol_bps)/10⁴⌋)`; `S` measured (`ProceedsBelowMin`
-//!    below it). On the curve the leg funds the trader with `ert = exec_rent_tol` from the
-//!    borrower and refunds it: `S` is net of any venue-side rent (ARCH §2.4 rule 3, T-RENT).
+//!    below it). On the pump venues the leg funds the trader with `ert = exec_rent_tol` from the
+//!    borrower and refunds it: `S` is net of any venue-side rent (ARCH §2.4 rule 3, T-RENT; on
+//!    PumpSwap `Open.venue_rent` reports it).
 //! 9. The venue state reloaded: `N_open = B̂_spot(q)` on the post-open reserves; `B̂_ema = B̂(q;
 //!    x, y)` of the newest ring entry (post-roll). `N_open ≥ min_notional`
 //!    (`BelowMinNotional`); `total_notional_open + N_open ≤ market_max_notional`
@@ -243,7 +248,13 @@ pub fn handler<'info>(
             },
             &deny,
         )?;
-        let state = venues::read_state_boxed(&market, kind, rem.read, clock.unix_timestamp);
+        let state = venues::read_state_boxed(
+            &market,
+            kind,
+            rem.read,
+            clock.unix_timestamp,
+            Some(ctx.accounts.mint.supply),
+        );
         let mut vault = ctx.accounts.market_vault.load()?.vault();
         let pro = prologue::run(
             &config,
@@ -255,13 +266,10 @@ pub fn handler<'info>(
             clock.slot,
         )?;
         let now = pro.now;
-        // The venue sync moved the market off its venue (a curve that completed): no open.
+        // The venue sync moved the market off its venue (a curve that completed, or migrated
+        // onto its canonical pool): no open.
         if let Some(t) = pro.transition {
-            return if t.to == VenueKind::PumpMigrating {
-                err!(ShortwinError::VenueMigrating)
-            } else {
-                err!(ShortwinError::NoRoute)
-            };
+            return venues::pump_curve::transition_refusal(t);
         }
 
         // Step 3: venue guards.
@@ -292,6 +300,16 @@ pub fn handler<'info>(
                 ShortwinError::PoolTooThin
             );
         }
+        if kind == VenueKind::PumpSwap {
+            // PumpSwap (ARCH §3.4 step 3; A24, C0-10): any non-zero `disable_flags` blocks opens
+            // (`VenueFlagged`; the buy bit already made the venue not executable, `NoRoute`,
+            // T-DISABLE), and — the post-change confirmation a graduation or a price start marks,
+            // as on Raydium (M4R; M6, flagged: ARCH §3.4 names it for Raydium) — the warm-up must
+            // be over (`EmaWarmingUp`).
+            let pool = state.pool.as_ref().ok_or(ShortwinError::NoRoute)?;
+            require!(pool.disable_flags == 0, ShortwinError::VenueFlagged);
+            require!(market.ema_warm == 0, ShortwinError::EmaWarmingUp);
+        }
 
         // Step 4: open guards (the post-roll EMA; the pre-trade spot).
         let warm = market
@@ -306,6 +324,14 @@ pub fn handler<'info>(
             ShortwinError::PriceDeviatesFromEma
         );
         require!(p_ema <= P_OPEN_MAX, ShortwinError::PriceAboveOpenMax);
+        // PumpSwap boost gate (ARCH §3.4 step 4; A13, ADOPTED Q15, C1-2): no open while the
+        // boost vault holds more than dust inside the window after graduation.
+        if let Some(pool) = state.pool.as_ref() {
+            require!(
+                !venues::pump_amm::boost_blocks(pool, &config.params, market.graduated_at, now),
+                ShortwinError::BoostInProgress
+            );
+        }
 
         // Step 5: tier.
         let tier = engine_tier::assign(&config, &market, &state, &ctx.accounts.oracle_cache, now)
@@ -450,13 +476,20 @@ pub fn handler<'info>(
     };
     let borrower_info = accs.borrower.to_account_info();
     let position_info = accs.position.to_account_info();
-    let s = venues::sell(&leg, &borrower_info, &position_info, q, min_out)?;
+    let sold = venues::sell(&leg, &borrower_info, &position_info, q, min_out)?;
+    let s = sold.s;
     require_gte!(s, min_out, ShortwinError::ProceedsBelowMin);
 
     // ---- step 9: the post-open state, notional ---------------------------------------------
     let post = {
         let m = accs.market.load()?;
-        venues::read_state_boxed(&m, kind, rem.read, clock.unix_timestamp)
+        venues::read_state_boxed(
+            &m,
+            kind,
+            rem.read,
+            clock.unix_timestamp,
+            Some(accs.mint.supply),
+        )
     };
     let n_open = post.buy(q).ok_or(ShortwinError::VenueResultMismatch)?.cost;
     let b_ema = post.buy_at(q, ema_xy.0, ema_xy.1).map(|b| b.cost);
@@ -584,13 +617,13 @@ pub fn handler<'info>(
         ShortwinError::CapUtilization
     );
 
-    // The sell leg's WSOL rent goes back to the borrower. A direct move, so after the last CPI
-    // that names the position or the borrower (the event CPI names neither).
-    let refund = venues::sell_refund(kind)?;
+    // The sell leg's WSOL rent (and on PumpSwap the venue-side rent netted out of `S`) goes back
+    // to the borrower. A direct move, so after the last CPI that names the position or the
+    // borrower (the event CPI names neither).
     crate::lamports::move_lamports(
         &ctx.accounts.position.to_account_info(),
         &ctx.accounts.borrower.to_account_info(),
-        refund,
+        sold.refund,
     )?;
 
     emit_cpi!(Open {
@@ -614,7 +647,7 @@ pub fn handler<'info>(
         b_ema: b_ema.unwrap_or(0),
         deadline,
         venue: kind as u8,
-        venue_rent: 0,
+        venue_rent: sold.venue_rent,
     });
     Ok(())
 }

@@ -542,7 +542,13 @@ pub(crate) fn keeper_exit<'info>(
             },
             &deny,
         )?;
-        let state = venues::read_state_boxed(&market, kind, rem.read, clock.unix_timestamp);
+        let state = venues::read_state_boxed(
+            &market,
+            kind,
+            rem.read,
+            clock.unix_timestamp,
+            venues::mint_supply(&accs.mint),
+        );
         let mut vault = accs.market_vault.load()?.vault();
         let pro = prologue::run(
             &config,

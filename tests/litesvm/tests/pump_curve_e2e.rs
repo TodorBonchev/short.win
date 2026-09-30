@@ -11,6 +11,8 @@
 //! | [`lifecycle_on_a_live_curve`] | a live Token-2022 curve of the dump: `create_market(Auto)` (PumpCurve, Tier D, the trader's base ATA and pump UVA) → two lenders' deposits → an open refused in the warm-up → opens (`S`, `N_open`, the D4 margin and the fee recomputed) → other users' real sales, a crank every second → a profitable close at pump's charge → other users' real buys pump ×3 → two liquidations by normal buyback (every refusal before them is the one the keeper's view predicts) → an open held to its deadline with hourly cranks: `liquidate` refuses `UseExpire`, `expire` executes → an open and a close → both lenders exit with their tokens and their pro-rata SOL income |
 //! | [`a_completion_with_positions_open_pauses_then_graduates_elsewhere`] | ECON's D@80% market: one position opened at 80 %, other users buy to 90 %, a second position there; another user's buy completes the curve → `PumpMigrating` (the next crank), pump refuses every curve trade, short.win's exits and opens pause (`VenueMigrating`); the keeper's crank and `sol_settle` every 30 s: the position the completion made liquidatable settles S3 exactly at `migration_seen_at + max_migration_pause_s + s3_wait_s` (70 min) at FV on the deterministic post-migration pool; the healthy one waits; then pump migrates the curve to another venue (no canonical pool): `PumpMigrating → None`, `graduated_elsewhere`, the detection set is the ReadSet; the healthy position stays frozen (no route) with the keeper cranking every 30 s until its deadline, then settles S3 at FV with the expiry fee; the lender takes back its tokens and the SOL |
 //! | [`a_curve_seen_migrated_elsewhere_settles_its_liquidatable_position_in_s3`] | ECON's D@50% market: a position pumped past its liquidation threshold that nobody liquidates, a second opened at the new price; the curve completes and migrates elsewhere between two reads: `PumpCurve → None` directly; exits `NoRoute`; the liquidatable position settles S3 once the chain has run `s3_wait_s` (FV at the frozen EMA with the penalty), the healthy one is not settled; lenders can still withdraw from the list-only market |
+//! | [`a_real_migrate_v2_moves_the_market_onto_its_pool_and_a_is_liquidated_there`] | M6: ECON's D@80% market with positions at 80 % and 90 %, the completion observed for 10 s, a real `migrate_v2`: the next crank moves the market onto its canonical pool (`PumpMigrating → PumpSwap`, the ring at the pool's `lp_supply`, the warm-up); keeper liquidations fail `EmaWarmingUp` for eight integrations, then the position the completion made liquidatable is liquidated on the pool and the healthy one closes there (M5 froze the market and settled S3 at 70 min) |
+//! | [`a_fast_migrate_v2_is_priced_on_the_pool`] | M6: the same with `migrate_v2` the second after the completion: the EMA follows the pool (not the frozen pre-completion price of M5) and the position is liquidated on the pool, the lenders' tokens back |
 //!
 //! The only planted venue state is pump's own at graduation elsewhere (the curve's reserves
 //! zeroed, as a migration to another venue leaves them, `fork::set_curve_reserves`; ARCH §8.2
@@ -755,13 +757,16 @@ fn a_curve_seen_migrated_elsewhere_settles_its_liquidatable_position_in_s3() {
     );
 }
 
-// ---- a real migrate_v2 in an M5 build (the → PumpSwap transition is M6's) -----------------------
+// ---- a real migrate_v2 (M6: the → PumpSwap transition) -------------------------------------------
 
 /// ECON's D@80% market with A at 80 % and B at 90 %, the curve completed by another user and
 /// observed by the keeper's crank every second for `observed_s` seconds, then `migrate_v2` on the
-/// real pump ELF (anyone may call it): the canonical PumpSwap pool exists and trades. Returns
-/// the market, A, B and the second the migration was seen.
-fn migrated_after(observed_s: i64) -> (Sim, Pos, Pos, i64) {
+/// real pump ELF (anyone may call it): the canonical PumpSwap pool exists and trades, and the next
+/// crank moves the market onto it (`PumpMigrating → PumpSwap`, M6: the ring rewritten to the
+/// pool's `lp_supply`, the post-change warm-up). Returns the market, A, B, the second the
+/// migration was seen and the market on its pool (the existence requirement's accounts created,
+/// ARCH §5.4 tx3).
+fn migrated_after(observed_s: i64) -> (Sim, Pos, Pos, i64, PammMarket) {
     let mut s = Sim::d_market(D80_SOLD, lend_for_80(D80_Q + 5_400_000_000_000));
     let a = open_checked(&mut s, D80_Q);
     for _ in 0..30 {
@@ -794,164 +799,87 @@ fn migrated_after(observed_s: i64) -> (Sim, Pos, Pos, i64) {
     ok(s.env.send(&[pump::cu_limit_ix(600_000), ix], &[&migrator]));
     let c = curve(&s.env, &s.pm);
     assert_eq!((c.vt, c.vq, c.rt, c.rq), (0, 0, 0, 0), "migrated");
-    let np = pump::NewPool::of(&s.pm.curve);
-    assert!(
-        np.reserves(&s.env.svm).is_some(),
-        "the canonical pool exists"
-    );
     s.env.warp(1);
     let meta = s.crank();
-    no_venue_change(&meta);
-    assert_eq!(
-        venue(&s.env, &s.pm),
-        VenueKind::PumpMigrating,
-        "M5: the market stays PumpMigrating (→ PumpSwap is M6's)"
-    );
-    (s, a, b, t_mig)
+    venue_changed(&meta, VenueKind::PumpMigrating, VenueKind::PumpSwap);
+    let m = market(&s.env, &s.pm);
+    assert_eq!((m.ema_warm, m.ema_guard), (8, 1), "the post-change warm-up");
+    let pam = PammMarket::graduated(&s.env.svm, &s.pm);
+    let payer = s.env.payer.pubkey();
+    let ixs = pamm::venue_account_ixs(&s.env.svm, &payer, &pam);
+    ok(s.env.send(&ixs, &[]));
+    (s, a, b, t_mig, pam)
+}
+
+/// The keeper's cranks on the pool every second until `pos` is liquidated there (at most
+/// `max_s` seconds): every liquidation before the warm-up ends fails `EmaWarmingUp`. Returns
+/// the second after the graduation and the event.
+fn liquidate_on_the_pool(s: &mut Sim, pam: &PammMarket, pos: &Pos, max_s: i64) -> (i64, Liquidate) {
+    let t0 = s.env.now();
+    let kp = s.keeper.insecure_clone();
+    loop {
+        s.env.warp(1);
+        ok(s.env.send(&[crank_price_ix(pam)], &[]));
+        let warm = market(&s.env, &s.pm).ema_warm;
+        let ix = liquidate_ix(pam, &kp.pubkey(), &pos.key(), pos.nonce);
+        let res = s.env.send(&[pump::cu_limit_ix(400_000), ix], &[&kp]);
+        if warm > 0 {
+            assert_err(&res, ShortwinError::EmaWarmingUp);
+        } else if let Ok(meta) = res {
+            return (s.env.now() - t0, events::one(&meta));
+        }
+        assert!(
+            s.env.now() - t0 < max_s,
+            "liquidated on the pool within {max_s} s"
+        );
+    }
 }
 
 /// `migrate_v2` 10 s after the completion (the keeper observed the completed curve meanwhile):
-/// the migrated curve is no longer observed, so the EMA stays at the completed price; A — made
-/// liquidatable by the completion — settles S3 at `migration_seen_at + 70 min`, its FV priced on
-/// the program's cap-only view at the frozen EMA point (the curve has no fee tier after the
-/// migration: the adapter's PROPOSED fallback, ARCH §4.5's "deterministic post-migration pool"
-/// needs a curve with `vT > 0`); B, healthy, is not settled. Exits refuse `VenueMigrating`
-/// throughout, although the canonical pool trades.
+/// the next crank moves the market onto its pool (M6; in M5 it stayed `PumpMigrating` with a
+/// frozen EMA and settled A S3 at 70 min on the cap-only view). A — made liquidatable by the
+/// completion — is liquidated **on the pool** once the warm-up is over; B, healthy, closes there.
 #[test]
-fn a_real_migrate_v2_keeps_the_market_migrating_and_s3_settles_at_70_min() {
-    let (mut s, a, b, t_mig) = migrated_after(10);
-    let frozen = {
-        let m = market(&s.env, &s.pm);
-        (m.ema_price.get(), m.ema_liq.get())
-    };
-    assert!(s.status(&a).cr_liq(), "A liquidatable on the frozen EMA");
-    assert!(!s.status(&b).cr_liq(), "B healthy");
-    assert_err(&s.env.close(&s.pm, &b.b, b.nonce), E::VenueMigrating);
-    // The pool trades (another user buys on PumpSwap), short.win does not follow it in M5.
-    let pos_a = s.position(&a);
-    let due = t_mig + i64::from(pos_a.max_migration_pause_s) + i64::from(pos_a.s3_wait_s);
-    let ev = loop {
-        s.env.warp(30);
-        s.crank();
-        let m = market(&s.env, &s.pm);
-        assert_eq!(
-            (m.ema_price.get(), m.ema_liq.get()),
-            frozen,
-            "the migrated curve is not observed"
-        );
-        let r_due = rent_due(&s.env, &s.pm, &pos_a);
-        let fv = fair_value(
-            &pos_a,
-            s.env.now(),
-            r_due,
-            b_fv_none(&pos_a, frozen.1, frozen.0),
-        );
-        if let Some(ev) = settle(&mut s, false, &a) {
-            assert_eq!(
-                (ev.pprime_lo, ev.pprime_hi),
-                (pos_a.penalty_bps, pos_a.penalty_bps)
-            );
-            assert_s3(&s, &ev, &pos_a, r_due, fv);
-            break ev;
-        }
-        assert!(s.env.now() < due, "S3 at 70 min");
-        assert!(settle(&mut s, false, &b).is_none());
-    };
-    assert!(s.env.now() >= due && s.env.now() < due + 30);
+fn a_real_migrate_v2_moves_the_market_onto_its_pool_and_a_is_liquidated_there() {
+    let (mut s, a, b, _t_mig, pam) = migrated_after(10);
+    let (sec, ev) = liquidate_on_the_pool(&mut s, &pam, &a, 120);
+    assert!(sec >= 8, "never before the warm-up's eight integrations");
     eprintln!(
-        "migrate_v2 after 10 s: A settled S3 at +{} s, FV {:.4} SOL (cap-only view), lenders {:.4}",
-        s.env.now() - t_mig,
-        ev.fv as f64 / 1e9,
-        ev.lender_amount as f64 / 1e9
+        "migrate_v2 after 10 s: A liquidated on the pool at +{sec} s (buyback {:.4} SOL, penalty {:.4})",
+        ev.buyback_cost as f64 / 1e9,
+        ev.penalty as f64 / 1e9
     );
+    s.env.warp(1);
+    ok(s.env.send(&[crank_price_ix(&pam)], &[]));
+    ok(s.env.close(&pam, &b.b, b.nonce));
+    assert_eq!(market(&s.env, &s.pm).open_positions, 0);
 }
 
 /// `migrate_v2` right after the completion (mainnet's usual 0–6 slots; here the keeper's first
-/// crank saw the completed curve and the migration landed the next second): the EMA had one
-/// integration toward the completed price when the curve stopped being observed. In an M5-only
-/// build A — which the completion put below its liquidation CR (ECON §10.1 D@80%: CR_EMA 1.60)
-/// — is **not** liquidatable on the frozen EMA, so no S3 comes at 70 min: it stays frozen until
-/// its deadline (the keeper cranking every 30 s), where it settles S3 as an expired, healthy
-/// position at FV on the frozen EMA with the expiry fee: the lenders receive less than `Q` is
-/// worth at the pool's price and the borrower keeps a remainder — the recorded M5 exposure
-/// until M6's `→ PumpSwap` transition (ring rewrite, observing the pool) prices the graduation.
+/// crank saw the completed curve and the migration landed the next second): in M5 the EMA froze
+/// one integration into the completion, A was not liquidatable on it and settled S3 only at its
+/// deadline, the lenders paid at the frozen pre-completion price (the recorded M5 exposure). M6's
+/// transition observes the pool: the EMA follows the pool's price (by at most one v0.4.1 step per
+/// second, re-seeded from the pool's own buckets during the warm-up), A becomes liquidatable on
+/// it and is liquidated on the pool — the lenders get `Q` back.
 #[test]
-fn a_fast_migrate_v2_freezes_the_ema_before_the_completion_is_priced() {
-    let (mut s, a, b, t_mig) = migrated_after(0);
-    let st = s.status(&a);
-    assert!(
-        !st.cr_liq(),
-        "A is not liquidatable on the frozen EMA (CR_EMA {})",
-        st.cr_e
-    );
-    let pos_a = s.position(&a);
-    let due = t_mig + i64::from(pos_a.max_migration_pause_s) + i64::from(pos_a.s3_wait_s);
-    while s.env.now() < due + 3_600 {
-        s.env.warp(30);
-        s.crank();
-        assert!(
-            settle(&mut s, false, &a).is_none(),
-            "no S3 for a position not liquidatable"
-        );
-    }
-    assert!(settle(&mut s, false, &b).is_none());
-    // What the pool says meanwhile: A's buyback there (at the pool's live price) against the
-    // frozen EMA's view.
-    let np = pump::NewPool::of(&s.pm.curve);
-    let r = np.reserves(&s.env.svm).unwrap();
-    let p_pool = r.effective_quote * W / u128::from(r.base);
+fn a_fast_migrate_v2_is_priced_on_the_pool() {
+    let (mut s, a, _b, _t_mig, pam) = migrated_after(0);
+    let pool_before = shortwin_litesvm_tests::pamm::PammPool::of(&s.env.svm, &s.pm.keys.mint);
+    let p_pool = pool_before.spot_wad(&s.env.svm);
+    let tokens_free = market(&s.env, &s.pm).tokens_free;
+    let q_a = s.position(&a).q;
+    let (sec, ev) = liquidate_on_the_pool(&mut s, &pam, &a, 120);
     let p_ema = market(&s.env, &s.pm).ema_price.get();
     eprintln!(
-        "fast migrate_v2: A frozen at CR_EMA {:.2} (P_ema / P_pool = {:.3}); S3 only at its deadline",
-        st.cr_e as f64 / 1e4,
+        "fast migrate_v2: A liquidated on the pool at +{sec} s; P_ema / P_pool = {:.3}",
         p_ema as f64 / p_pool as f64
     );
-    assert!(
-        p_ema * 10 < p_pool * 9,
-        "the frozen EMA is well below the pool's price"
+    assert!(p_ema * 10 > p_pool * 7, "the EMA followed the pool");
+    assert_eq!(
+        market(&s.env, &s.pm).tokens_free,
+        tokens_free + q_a,
+        "the lenders' tokens are back"
     );
-
-    // A stays frozen until its deadline (the keeper keeps the chain alive every 30 s), then
-    // settles S3 as expired at FV on the frozen EMA with the expiry fee (it is healthy there).
-    let frozen = {
-        let m = market(&s.env, &s.pm);
-        (m.ema_price.get(), m.ema_liq.get())
-    };
-    let ev = loop {
-        s.env.warp(30);
-        s.crank();
-        if s.env.now() < pos_a.deadline {
-            continue;
-        }
-        let r_due = rent_due(&s.env, &s.pm, &pos_a);
-        let fv = fair_value(
-            &pos_a,
-            s.env.now(),
-            r_due,
-            b_fv_none(&pos_a, frozen.1, frozen.0),
-        );
-        let ev = settle(&mut s, false, &a).expect("S3 at A's deadline");
-        assert_eq!(
-            (ev.pprime_lo, ev.pprime_hi),
-            (pos_a.expiry_fee_bps, pos_a.expiry_fee_bps),
-            "expired and healthy on the frozen EMA: the expiry fee"
-        );
-        assert_s3(&s, &ev, &pos_a, r_due, fv);
-        break ev;
-    };
-    let value_at_pool = u64::try_from(u128::from(pos_a.q) * p_pool / W).unwrap();
-    eprintln!(
-        "fast migrate_v2: A settled S3 at its deadline: lenders {:.4} SOL for Q worth {:.4} SOL at          the pool's price (borrower {:.4})",
-        ev.lender_amount as f64 / 1e9,
-        value_at_pool as f64 / 1e9,
-        ev.borrower_amount as f64 / 1e9
-    );
-    assert!(
-        ev.lender_amount < value_at_pool,
-        "the recorded M5 exposure: lenders are paid at the frozen pre-completion price"
-    );
-    assert!(
-        ev.borrower_amount > 0,
-        "and the underwater borrower keeps a remainder"
-    );
+    assert!(ev.buyback_cost > 0);
 }

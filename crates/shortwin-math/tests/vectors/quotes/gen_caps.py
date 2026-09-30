@@ -6,8 +6,9 @@ Caps (exact, no tolerance): `max_q_impact`, `max_total_q_market` (the sims' inte
 `X − isqrt(⌊X²·10⁴/(10⁴ + ι)⌋)`, normative since v0.4.1), `Market.oi_cap_q` and the
 fee-scaled caps with the one-way fee in ppm (`⌊x100·φ_ppm·X/(100·10⁶)⌋`),
 `Market.conservative_x` (`isqrt⁺(P_ema)` in both denominators, the Raydium locked-depth
-bound), and `Market.max_open_q` on every example market of the sim, fresh and after an
-EMA-lagging price path (so `L_slow ≠ L_live`, `P_ema ≠ P_live`). Utilisation is
+bound; on the curve the cap reserves at the EMA price, ECONOMICS changelog #103), and
+`Market.max_open_q` on every example market of the sim, fresh and after an EMA-lagging price
+path (so `L_slow ≠ L_live`, `P_ema ≠ P_live`). Utilisation is
 `pool_model.Pool.borrow`'s check; the curve-gamma, wallet and notional predicates are
 ECON §6.1 / ARCH §4.6 transcriptions (the sim has no function for them).
 
@@ -168,7 +169,10 @@ def lagging(m, rng):
 
 
 def gen_markets(rng):
-    """Every example market of the sim: the pieces of Market.max_open_q."""
+    """Every example market of the sim: the pieces of Market.max_open_q.  A curve market also records its
+    virtual SOL reserve vQ, so the Rust side recomputes the curve's cap reserves (ECON #103, M5-SEC-3; ARCH
+    §4.6; Market.curve_cap_reserves): X0 = min(vT, x_ema) and the Tier D guard's rT_guard whenever
+    P_ema > P_spot, the live (vT, rT) otherwise."""
     out = []
     for key in sim.MARKETS:
         for lag in (False, True, True):
@@ -188,7 +192,8 @@ def gen_markets(rng):
                             fee_size_cap=S(X0 * phi * m.P.fee_size_cap_x100 // (100 * PPM)),
                             fee_size_cap_x100=S(m.P.fee_size_cap_x100), fee_oi_cap_x100=S(m.P.fee_oi_cap_x100),
                             gamma_bps=S(m.P.curve_oi_gamma_bps),
-                            max_open_q=S(m.max_open_q()), rt=S(v.rt) if v.kind == "curve" else None))
+                            max_open_q=S(m.max_open_q()), rt=S(v.rt) if v.kind == "curve" else None,
+                            vq=S(v.vs) if v.kind == "curve" else None))
     assert len(out) >= 30
     return out
 
@@ -284,7 +289,7 @@ def main() -> None:
     out = {
         "generator": Path(__file__).name,
         "source": "docs/design/sim/shortwin_sim.py v0.4.1 (max_q_impact, max_total_q_market, Market.oi_cap_q, "
-                  "Market.max_open_q, Market.conservative_x, reprice), pool_model.py v0.4.1 (Pool.borrow "
+                  "Market.max_open_q, Market.conservative_x, Market.curve_cap_reserves (#103), reprice), pool_model.py v0.4.1 (Pool.borrow "
                   "utilisation check), ECONOMICS.md v0.4.1 §2.1, §6 and ARCHITECTURE.md v0.4.1 §4.6-§4.7 "
                   "(transcribed where the sims have no function)",
         "impact": gen_impact(rng),

@@ -4,9 +4,9 @@
 //!
 //! | Part | What is checked |
 //! |---|---|
-//! | (a) restart | only an instruction that emits `PoolSwitched` for the market, or a Raydium `create_market`, raises `ema_warm` (to `EMA_WARMUP_BUCKETS`) or sets `ema_guard`; after such an instruction both are `(8, 1)`; a market created on another venue starts `(0, 0)` |
+//! | (a) restart | only an instruction that emits `PoolSwitched` for the market, a Raydium `create_market`, a `→ PumpSwap` graduation of a market with a price (`VenueStateChanged`, M6) or a PumpSwap market's price start (its first observation, M6) raises `ema_warm` (to `EMA_WARMUP_BUCKETS`) or sets `ema_guard`; after such an instruction both are `(8, 1)`; a market created on another venue starts `(0, 0)` |
 //! | (b) countdown and seed | across any other instruction `ema_warm` falls by the number of integrations (0 or 1) while it is positive and stays 0 otherwise; a warm-up integration leaves the newest ring entry and the EMA at the §4.1 seed over the newest `8 − ema_warm_after` entries, `p = min(min lo, the largest v0.4.1 step from the pre-instruction P_ema)` (M4X-1: `observe::price_up_bound`, `dt = min(ts − ema_ts, ema_dtmax_s)`), `l = min(max lhi, ⌊lomed(lhi)·(10⁴ + C)/10⁴⌋)` (recomputed here), with `L_slow` and `slow_ts` unchanged |
-//! | (c) gate | no `Liquidate` or `Expire` event, no `SolSettle` of S1/S2 and no `SettleArmed` / `SettleDisarmed` on a market whose post-instruction `ema_warm ≠ 0` while its venue is executable; no Raydium `Open` with `ema_warm ≠ 0` |
+//! | (c) gate | no `Liquidate` or `Expire` event, no `SolSettle` of S1/S2 and no `SettleArmed` / `SettleDisarmed` on a market whose post-instruction `ema_warm ≠ 0` while its venue is executable; no Raydium or PumpSwap `Open` with `ema_warm ≠ 0` |
 //! | (d) guard | `ema_guard` goes 1 → 0 only at an integration with `ema_warm = 0` after it and `L_ema·10⁴ ≤ L_mlo·10,100` (and does so at every such integration); an integration after the warm-up with the guard set never lifts `L_slow` above `max(L_slow before, L_mlo after)` (M4X-2: `L_slow` integrates `min(lobs, L_mlo)`); on a Raydium market, and on any market while the guard is set, `Liquidate.b_ref` / `Expire.b_ref` are the risk quote at `reprice(max(L_live, min(max(L_ema', L_slow), cap)), P_ref)`, `L_ema' = min(L_ema, L_mlo)` while the guard is set, else `L_ema` (V2-14), `cap = ⌊pool_d·10⁴/λ_min⌋` on Raydium, none elsewhere (M4F-1). On the mock, which never restarts, the guard-clear case is the exit predictors' (`liquidate_support`), and the hook tests' synthetic exits there carry arbitrary references |
 //!
 //! | (e) spot leg | FITS-2 (a): every `Liquidate` on an executable Raydium venue is CR-liquidatable, and its spot leg is judged at `max(L_live, L_ema')` — `Liquidate.cr_spot_bps` is `⌊V_eff·10⁴/B̂⌋` of the risk quote `B̂ = B̂(Q; reprice(max(L_live, L_ema'), P_rs))` (recomputed here: `L_live` the pre-trade venue's `√(X·Y)`, `L_ema' = min(L_ema, L_mlo)` while the guard is set, else `L_ema`, `P_rs = min(P_live, lb_lo)` fresh within `ref_max_age_s`, `V_eff = V − R_due`) and it is below the position's `L` — so no liquidation lands on a spot leg that only a drained `L_live` makes true. On the mock the exit predictors (`liquidate_support`, the same rule) check it, and the hook tests' synthetic exits there carry arbitrary figures |
@@ -36,6 +36,9 @@ use crate::read;
 pub struct ConfirmFacts<'a> {
     pub created: &'a [MarketCreated],
     pub switched: &'a [PoolSwitched],
+    /// Venue transitions: a `→ PumpSwap` graduation restarts the observation state of a market
+    /// with a price exactly as an adoption does (M6).
+    pub venue_changed: &'a [shortwin::events::VenueStateChanged],
     pub opens: &'a [Open],
     pub liquidations: &'a [Liquidate],
     pub expiries: &'a [Expire],
@@ -58,13 +61,24 @@ pub fn check_ix(
             continue;
         };
         let switched = ix.switched.iter().any(|e| e.market == mp.market);
-        if switched {
+        // M6: a `→ PumpSwap` graduation of a market with a price, and a PumpSwap market's price
+        // start (its first observation after a listing or a re-detection), restart the state.
+        let priced = |m: &Market| m.ring_count > 0 && m.ema_price.get() > 0;
+        let graduated = ix
+            .venue_changed
+            .iter()
+            .any(|e| e.market == mp.market && e.to == VenueKind::PumpSwap as u8)
+            && priced(&mp.state);
+        let started =
+            post.venue_kind() == Some(VenueKind::PumpSwap) && !priced(&mp.state) && priced(&post);
+        if switched || graduated || started {
             ensure(
                 (post.ema_warm, post.ema_guard) == (EMA_WARMUP_BUCKETS, 1),
                 "I18",
                 || {
                     format!(
-                        "market {}: ema_warm {} / ema_guard {} after PoolSwitched, want {} / 1",
+                        "market {}: ema_warm {} / ema_guard {} after a restart (PoolSwitched, \
+                         → PumpSwap, a PumpSwap price start), want {} / 1",
                         mp.market, post.ema_warm, post.ema_guard, EMA_WARMUP_BUCKETS
                     )
                 },
@@ -235,11 +249,14 @@ fn gate(mp: &MarketPositions, post: &Market, ix: &ConfirmFacts<'_>) -> Result<()
     }
     let market = mp.market;
     let executable = mp.venue.is_some_and(|v| v.executable);
-    let raydium = post.venue_kind().is_some_and(VenueKind::is_raydium);
+    // Raydium (M4R) and PumpSwap (M6: the graduation's and the price start's warm-up) opens wait.
+    let gated = post
+        .venue_kind()
+        .is_some_and(|k| k.is_raydium() || k == VenueKind::PumpSwap);
     let opens = ix.opens.iter().filter(|e| e.market == market).count();
-    ensure(!raydium || opens == 0, "I18", || {
+    ensure(!gated || opens == 0, "I18", || {
         format!(
-            "market {market}: {opens} Raydium open(s) with ema_warm {}",
+            "market {market}: {opens} Raydium / PumpSwap open(s) with ema_warm {}",
             post.ema_warm
         )
     })?;

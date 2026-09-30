@@ -98,6 +98,8 @@ struct Market {
     gamma_bps: Dec<u32>,
     max_open_q: Dec<u64>,
     rt: Option<Dec<u64>>,
+    /// The curve's virtual SOL reserve `vQ` (curve markets only; `None` elsewhere).
+    vq: Option<Dec<u64>>,
 }
 
 fn load() -> File {
@@ -213,19 +215,44 @@ fn conservative_x0_matches_sim() {
     assert!(slow >= 30 && locked >= 30, "{slow} {locked}");
 }
 
+/// The curve's cap reserves `(X₀, rT_guard)` (ECON changelog #103, M5-SEC-3; ARCH §4.6; the sim's
+/// `Market.curve_cap_reserves`, the program's `engine::caps::curve_reserves`): the live `(vT, rT)`
+/// while `P_ema ≤ P_spot = ⌊vQ·WAD/vT⌋`, else with `x_ema = ⌊isqrt(vT·vQ)·10⁹/isqrt⁺(P_ema)⌋`
+/// `(min(vT, x_ema), min(rT, max(0, x_ema − (vT − rT))))`.
+fn curve_cap_reserves(vt: u64, vq: u64, rt: u64, p_ema: u128) -> (u64, u64) {
+    let p_spot = u128::from(vq) * 1_000_000_000_000_000_000 / u128::from(vt);
+    if p_ema <= p_spot {
+        return (vt, rt);
+    }
+    let l = quote::liquidity(vt.into(), vq.into()).unwrap();
+    let x_ema = quote::reprice_token(l, p_ema).unwrap();
+    let x0 = u128::from(vt).min(x_ema);
+    let guard = u128::from(rt).min(x_ema.saturating_sub(u128::from(vt - rt)));
+    (x0.try_into().unwrap(), guard.try_into().unwrap())
+}
+
 /// Every example market of the sim, fresh and after an EMA-lagging path:
 /// `Market.max_open_q = min(max_q_position(X₀), oi_cap(X₀ + that), fee_size_cap(X₀),
-/// curve gamma)` on the conservative `X₀`.
+/// curve gamma)` on the conservative `X₀` (on the curve the cap reserves at the EMA price, #103,
+/// with the Tier D guard on `rT_guard`).
 #[test]
 fn example_markets_match_sim() {
     let f = load();
     assert!(f.markets.len() >= 30);
+    let mut ema_bound = 0;
     for m in &f.markets {
         let k = &m.key;
-        let x0 = if m.kind == "curve" {
-            m.x_now.0
+        let (x0, rt_guard) = if m.kind == "curve" {
+            let (rt, vq) = (m.rt.as_ref().unwrap().0, m.vq.as_ref().unwrap().0);
+            let (x0, guard) = curve_cap_reserves(m.x_now.0, vq, rt, m.p_ema.0);
+            if x0 < m.x_now.0 {
+                ema_bound += 1;
+            }
+            (x0, Some(guard))
         } else {
-            caps::conservative_x0(m.x_now.0, m.l_slow.0, m.p_ema.0, lock(&m.raydium_lock)).unwrap()
+            let x0 = caps::conservative_x0(m.x_now.0, m.l_slow.0, m.p_ema.0, lock(&m.raydium_lock))
+                .unwrap();
+            (x0, None)
         };
         assert_eq!(x0, m.x0.0, "{k}");
         let pos = caps::max_q_position(x0, m.impact_pos_bps.0).unwrap();
@@ -244,11 +271,13 @@ fn example_markets_match_sim() {
             .unwrap();
         assert_eq!(size, m.fee_size_cap.0, "{k}");
         let mut want = pos.min(size).min(oi);
-        if let Some(rt) = &m.rt {
-            want = want.min(caps::curve_gamma_max_q(0, rt.0, m.gamma_bps.0).unwrap());
+        if let Some(rt) = rt_guard {
+            want = want.min(caps::curve_gamma_max_q(0, rt, m.gamma_bps.0).unwrap());
         }
         assert_eq!(want, m.max_open_q.0, "{k}");
     }
+    // At least one lagging curve market sits above its EMA price, so the #103 rule binds.
+    assert!(ema_bound >= 1, "{ema_bound}");
 }
 
 /// Review F-A4: a gamma cap above `u64::MAX` (a non-standard curve, `rT` = 3·10¹⁸)

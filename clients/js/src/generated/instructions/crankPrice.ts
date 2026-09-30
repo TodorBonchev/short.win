@@ -125,10 +125,7 @@ export type CrankPriceAsyncInput<
 > = {
   config?: TAccountConfig;
   market?: TAccountMarket;
-  /**
-   * in the handler); read for nothing else in this build (PumpSwap fee tiers read its
-   * supply, M6).
-   */
+  /** in the handler); PumpSwap's fee tier reads its supply (M6). */
   mint: TAccountMint;
   oracleCache?: TAccountOracleCache;
   eventAuthority: TAccountEventAuthority;
@@ -284,10 +281,7 @@ export type CrankPriceInput<
 > = {
   config: TAccountConfig;
   market: TAccountMarket;
-  /**
-   * in the handler); read for nothing else in this build (PumpSwap fee tiers read its
-   * supply, M6).
-   */
+  /** in the handler); PumpSwap's fee tier reads its supply (M6). */
   mint: TAccountMint;
   oracleCache: TAccountOracleCache;
   eventAuthority: TAccountEventAuthority;
@@ -419,10 +413,7 @@ export type ParsedCrankPriceInstruction<
   accounts: {
     config: TAccountMetas[0];
     market: TAccountMetas[1];
-    /**
-     * in the handler); read for nothing else in this build (PumpSwap fee tiers read its
-     * supply, M6).
-     */
+    /** in the handler); PumpSwap's fee tier reads its supply (M6). */
     mint: TAccountMetas[2];
     oracleCache: TAccountMetas[3];
     eventAuthority: TAccountMetas[4];

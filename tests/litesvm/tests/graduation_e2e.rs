@@ -1,0 +1,1145 @@
+//! Fork E2E through a **real graduation** (M6; ARCH §2.5 "On → PumpSwap", §5.3, §5.4, §8.2
+//! T-VENUE-SWITCH / T-STRADDLE, §8.4 "fork E2E", §9 M6 row; ECON §10.1–§10.3): the release
+//! short.win on the **dumped** pump, pump-fees and PumpSwap ELFs, a curve market listed with
+//! `create_market(Auto)` on ECON's fresh fixture curve (`Sim::d_market`), taken through the
+//! curve's completion, pump's own `migrate_v2`, the keeper's crank moving it `→ PumpSwap`, the
+//! post-change warm-up, pump's boost (the real `boost_buy_and_burn`, the boost authority's
+//! signature forged: `graduation_support.rs`) and the keeper's exits on the pool — driven only by
+//! real instructions, with the invariant hooks after every one (`Env::send`).
+//!
+//! | Test | Path |
+//! |---|---|
+//! | [`lifecycle_through_a_real_graduation`] | two lenders; A at 80 % (ECON's D@80 % position), C and B at 90 %; another user completes the curve → `PumpMigrating` (exits and opens `VenueMigrating`) → `migrate_v2` → `→ PumpSwap` (the pool cache, `graduated_at`, the ring at `lp_supply`, `(8, 1)`, tier C) → the warm-up: keeper liquidations `EmaWarmingUp`, `sol_settle` evaluates nothing, opens `EmaWarmingUp`, B's borrower closes on the pool at its quote → A liquidated on the pool at the gate, leg by leg against the pool's quote → opens `BoostInProgress` → the boost's push liquidates C (ECON §10.1) → the boost vault empties (its ATA closed), opens resume: D opens on the pool, is held to its deadline with hourly cranks and expired there → both lenders exit: tokens back, SOL income pro rata |
+//! | [`t_venue_switch_the_graduation_rewrites_the_ring_and_the_box_is_narrow_from_the_gate`] | ★T-VENUE-SWITCH (graduation): every ring entry's `l`, `llo`, `lhi` = the pool's `lp_supply`, `(x, y) = reprice(lp_supply, p)`, prices and times kept, `L_slow ≤` the anchor, the bucket and both chains cleared; with the boost running and the keeper cranking every second, `L_ema` at the gate = the pool's `√(X·Y)` within 1 % and every second with the settlement box wider than 1 % in `L` lies inside the gate |
+//! | [`the_atomic_self_financed_complete_and_migrate_is_liquidated_on_the_pool`] | M5-SEC-4's attack, end to end: on ECON's D@80 % market a borrower long `q` tokens (bought before its short) and short `q/2` sends `[buy_v2(rT), migrate_v2]` in one transaction (self-financed: it keeps the `rT` tokens); other users push the pool to ≥ 3.5× the last curve EMA before any observation; the keeper's first crank moves the market onto the pool with `P_ema` carried over, its liquidations wait for the eight integrations, and the position is liquidated on the pool at the pool's price — the lenders get `Q` back plus SOL (in M5 the market froze and S3 paid FV at the frozen EMA). The attacker's net is printed |
+//! | [`a_borrowers_self_made_straddle_is_liquidated_after_the_keepers_bundle`] | M5-SEC-4's second vector: the D@80 % borrower buys `rT − q + 1` itself; close and liquidation refuse `CurveStraddle`; the keeper's bundle with ARCH §5.4's tx3 `[crank, liquidate]` fails at tx3 (`EmaWarmingUp`, OWNER-M6R-4) and reverts whole; the keeper's fallback (tx1 `complete_curve` + tx2 `migrate_v2`) lands, and the position is liquidated on the pool once the warm-up has run; the keeper's completion is self-financing after the boost (ECON §10.1: it sells its `rT` tokens above their cost) |
+//! | [`econ_10_2_the_borrowers_own_bundle_closes_a_straddle`] | ECON §10.2 "rt → Q/2, borrower closes 30 s later" (D@97 %): the curve is bought down to `rT = Q/2`, the close refuses `CurveStraddle`, the borrower's client sends the ≥ 3-transaction bundle — tx1 `complete_curve` (its own SOL), tx2 `migrate_v2`, tx3 the venue accounts + `crank_price` (`→ PumpSwap`) + `close_short` in one transaction — and the close buys `Q` on the new pool for exactly the sim's 1,922,674,204 lamports (ECON 1.9227 SOL; 1 lamport under `B̂_str` as the keeper's view priced it before the bundle), the borrower paid `V − B − R_min` to the lamport; the completion's charge is the sim's `keeper_straddle_cost` |
+//! | [`a_completing_close_then_the_graduation_carries_the_other_position`] | ECON §10.2 `q = rt` (D@97 %): other users buy the curve down to one borrower's `q`, its close buys exactly `rT` at pump's charge and completes the curve (`VenueStateChanged → PumpMigrating` in the close itself, ARCH §5.4 case 1), the other position's close pauses (`VenueMigrating`); `migrate_v2`, the transition, and the other position closes on the pool during the warm-up at the pool's quote; every lent token back |
+//! | [`the_boost_gate_on_a_real_graduation`] | ARCH §5.4 case 3 (A13) on a pool `migrate_v2` just created: the whole boost (the sim's 40 chunks every 9 s) moves the price ×(1 + 0.2069)² = ×1.4566 exactly as ECON §10.1 says; opens refuse `BoostInProgress` while the vault holds more than `boost_dust_lamports` (343 refusals), resume once the last chunk has closed the vault's ATA (and the EMA has followed the push); a donor who re-creates the ATA and parks 1 SOL there blocks opens only until `graduated_at + boost_window_s` |
+
+#![allow(clippy::result_large_err)]
+
+#[path = "graduation_support.rs"]
+mod support;
+
+use shortwin_math::{quote, risk, settle};
+use support::*;
+
+const D80_SOLD: u64 = 634_480_000_000_000;
+const D80_Q: u64 = 6_529_192_912_424;
+const D90_Q: u64 = 5_348_333_909_677;
+const D97_SOLD: u64 = 769_307_000_000_000;
+const D97_Q: u64 = 4_521_732_607_755;
+
+// ---- helpers --------------------------------------------------------------------------------------
+
+/// `n` seconds, each: the boost chunks due, then the keeper's crank.
+fn crank_secs(g: &mut Grad, n: i64) {
+    for _ in 0..n {
+        g.s.env.warp(1);
+        g.tick_boost();
+        g.crank();
+    }
+}
+
+/// The keeper's liquidation of `p` on the market's current venue.
+fn liquidate(g: &mut Grad, p: &Pos) -> TxResult {
+    let kp = g.s.keeper.insecure_clone();
+    let ix = match &g.pam {
+        Some(pam) => liquidate_ix(pam, &kp.pubkey(), &p.key(), p.nonce),
+        None => liquidate_ix(&g.s.pm, &kp.pubkey(), &p.key(), p.nonce),
+    };
+    g.s.env
+        .send(&[pump::cu_limit_ix(POOL_KEEPER_EXIT_CU), ix], &[&kp])
+}
+
+/// The keeper's `sol_settle` of `p` on the pool: the `SolSettle` event if it settled.
+fn settle_on_pool(g: &mut Grad, p: &Pos) -> Option<SolSettle> {
+    let kp = g.s.keeper.insecure_clone();
+    let ix = sol_settle_ix(&g.s.env, g.pam(), &kp.pubkey(), &p.key(), p.nonce);
+    let meta = ok(g.s.env.send(&[ix], &[&kp]));
+    events::of::<SolSettle>(&meta).pop()
+}
+
+/// The execution quote `B̂_live(q)` of the market's venue now (the harness's own view).
+fn quote_buy_now(g: &Grad, q: u64) -> u64 {
+    let m = market(&g.s.env, &g.s.pm);
+    venue_view::view(&g.s.env.svm, &m)
+        .expect("a view")
+        .buy(q)
+        .expect("a quote")
+}
+
+/// The exact-in sale quote `S(q)` of the market's venue now.
+fn quote_sell_now(g: &Grad, q: u64) -> u64 {
+    let m = market(&g.s.env, &g.s.pm);
+    venue_view::view(&g.s.env.svm, &m)
+        .expect("a view")
+        .sell(q)
+        .expect("a quote")
+}
+
+/// Liquidates `p` on the pool within `max_s` seconds of per-second cranks: every refusal before
+/// it is the one the keeper's view predicts (`EmaWarmingUp` while warming up, else
+/// `NotLiquidatable` while not CR-liquidatable); the liquidation is checked leg by leg against the
+/// pool's quote. Returns the seconds waited and the event.
+fn liquidate_on_pool_within(g: &mut Grad, p: &Pos, max_s: i64) -> (i64, Liquidate) {
+    let pos = g.s.position(p);
+    for sec in 1..=max_s {
+        g.s.env.warp(1);
+        g.tick_boost();
+        g.crank();
+        let st = g.status(p);
+        let warm = market(&g.s.env, &g.s.pm).ema_warm;
+        let b_exec = st.b_live;
+        let vault0 = tokens(&g.s.env, &g.s.pm.keys.pool_vault);
+        let res = liquidate(g, p);
+        if warm > 0 {
+            assert_err(&res, E::EmaWarmingUp);
+            continue;
+        }
+        if !st.cr_liq() {
+            assert_err(&res, E::NotLiquidatable);
+            continue;
+        }
+        if res.is_err() {
+            // The fixed δ over the lagging reference: the live cost is above the bound while
+            // the pool runs ahead of `P_ref` (the boost's push); the keeper retries next second.
+            assert_err(&res, E::ExitBoundNotMet);
+            continue;
+        }
+        let meta = ok(res);
+        let ev: Liquidate = events::one(&meta);
+        let back = tokens(&g.s.env, &g.s.pm.keys.pool_vault) - vault0;
+        check_pool_liquidation(&ev, &pos, b_exec.expect("a quote"), back);
+        return (sec, ev);
+    }
+    panic!("not liquidated on the pool within {max_s} s");
+}
+
+/// A second lender holding `amount` tokens deposits them.
+fn second_lender(g: &mut Grad, amount: u64) -> (Keypair, ix::LenderKeys) {
+    let l2 = g.s.env.funded_keypair();
+    let acc = fork::fund_token(
+        &mut g.s.env,
+        &l2.pubkey(),
+        &g.s.pm.keys.mint,
+        g.s.pm.curve.token_program,
+        amount,
+    );
+    let keys = ix::LenderKeys {
+        owner: l2.pubkey(),
+        mint: g.s.pm.keys.mint,
+        token_program: g.s.pm.keys.token_program,
+        owner_token_account: acc,
+    };
+    ok(g.s.env.send(&[ix::deposit(&keys, amount, 0)], &[&l2]));
+    (l2, keys)
+}
+
+/// A new borrower's open of `q` on the market's current venue.
+fn try_open(g: &mut Grad, q: u64) -> TxResult {
+    let mut b = g.s.env.borrower();
+    match &g.pam {
+        Some(pam) => g.s.env.open(pam, &mut b, q).0,
+        None => g.s.env.open(&g.s.pm, &mut b, q).0,
+    }
+}
+
+/// An open on the pool that must succeed.
+fn open_on_pool(g: &mut Grad, q: u64) -> Pos {
+    let mut b = g.s.env.borrower();
+    let s_exp = quote_sell_now(g, q);
+    let (res, nonce) = g.s.env.open(g.pam.as_ref().expect("graduated"), &mut b, q);
+    let meta = ok(res);
+    let open: Open = events::one(&meta);
+    assert_eq!(open.venue, VenueKind::PumpSwap as u8);
+    assert_eq!(open.s, s_exp, "S = the pool's sale quote");
+    Pos { b, nonce, open }
+}
+
+/// The market state right before the transition crank and the pool's `lp_supply` after it.
+struct Transition {
+    before: Market,
+    after: Market,
+    anchor: u128,
+}
+
+/// `migrate_v2` by a third party and the keeper's crank that moves the market `→ PumpSwap`
+/// (checked: the event, `graduated_at`, the pool cache, the restart, the chains, tier C).
+fn migrate_and_transition(g: &mut Grad) -> Transition {
+    g.migrate();
+    let before = market(&g.s.env, &g.s.pm);
+    let meta = g.crank();
+    let from = before.venue_kind().expect("venue");
+    venue_changed(&meta, from, VenueKind::PumpSwap);
+    let after = market(&g.s.env, &g.s.pm);
+    let pool = PammPool::of(&g.s.env.svm, &g.s.pm.keys.mint);
+    let anchor = u128::from(pool.state(&g.s.env.svm).lp_supply);
+    assert_eq!(
+        after.graduated_at,
+        g.s.env.now(),
+        "graduated_at = now (O13)"
+    );
+    assert_eq!(
+        (after.ema_warm, after.ema_guard),
+        (8, 1),
+        "the post-change restart"
+    );
+    assert_eq!(after.ema_liq.get(), anchor, "L_ema = lp_supply");
+    assert_eq!(
+        after.liq_slow.get(),
+        before.liq_slow.get().min(anchor),
+        "L_slow = min(L_slow, anchor)"
+    );
+    assert_eq!(
+        (after.no_route_since, after.pool_fail_since),
+        (0, 0),
+        "the chains cleared"
+    );
+    assert_eq!(
+        after.tier,
+        shortwin_math::tier::Tier::C as u8,
+        "tier C until the next crank"
+    );
+    assert!(
+        after.pool_cache.contains(&pool.base_vault) && after.pool_cache.contains(&pool.quote_vault),
+        "the pool cache names the vaults"
+    );
+    Transition {
+        before,
+        after,
+        anchor,
+    }
+}
+
+// ---- the lifecycle ------------------------------------------------------------------------------
+
+/// The lifecycle through a real graduation (module docs).
+#[test]
+fn lifecycle_through_a_real_graduation() {
+    let lend1 = 20_000_000_000_000u64;
+    let mut g = Grad::d_market(D80_SOLD, lend1);
+    let (l2, l2_keys) = second_lender(&mut g, lend1 / 4);
+
+    // ---- positions on the curve: A at 80 %, C and B at 90 % ----
+    let a = g.s.open(D80_Q);
+    assert_eq!(a.open.venue, VenueKind::PumpCurve as u8);
+    crank_secs(&mut g, 30);
+    g.s.crowd_buy(SOLD_D90 - D80_SOLD);
+    crank_secs(&mut g, 30);
+    let c = g.s.open(D90_Q);
+    let b = g.s.open(D90_Q / 4);
+    crank_secs(&mut g, 10);
+    assert!(!g.status(&a).cr_liq(), "A is healthy at 90 %");
+
+    // ---- another user completes the curve: PumpMigrating, exits and opens pause ----
+    g.s.env.warp(1);
+    g.complete_curve();
+    let meta = g.crank();
+    venue_changed(&meta, VenueKind::PumpCurve, VenueKind::PumpMigrating);
+    assert_err(&g.s.env.close(&g.s.pm, &b.b, b.nonce), E::VenueMigrating);
+    assert_err(&liquidate(&mut g, &a), E::VenueMigrating);
+    assert_err(&try_open(&mut g, D90_Q / 10), E::VenueMigrating);
+    crank_secs(&mut g, 1);
+
+    // ---- migrate_v2 two seconds after the completion, the keeper's crank → PumpSwap ----
+    g.s.env.warp(1);
+    let tr = migrate_and_transition(&mut g);
+    assert!(g.graduated(), "the driver follows the market onto its pool");
+    let t_grad = g.s.env.now();
+    eprintln!(
+        "→ PumpSwap: anchor lp_supply {} (curve L_ema was {})",
+        tr.anchor,
+        tr.before.ema_liq.get()
+    );
+
+    // ---- the warm-up: keeper exits and settlements wait, opens wait, B's borrower closes ----
+    let mut b_closed = None;
+    while market(&g.s.env, &g.s.pm).ema_warm > 0 {
+        g.s.env.warp(1);
+        g.tick_boost();
+        g.crank();
+        if market(&g.s.env, &g.s.pm).ema_warm == 0 {
+            break;
+        }
+        assert_err(&liquidate(&mut g, &a), E::EmaWarmingUp);
+        assert!(settle_on_pool(&mut g, &a).is_none(), "nothing evaluated");
+        assert_err(&try_open(&mut g, D90_Q / 10), E::EmaWarmingUp);
+        if b_closed.is_none() {
+            let b_exp = quote_buy_now(&g, b.open.q);
+            let meta = ok(g
+                .s
+                .env
+                .close(g.pam.as_ref().expect("graduated"), &b.b, b.nonce));
+            let close: Close = events::one(&meta);
+            assert_eq!(
+                close.buyback_cost, b_exp,
+                "B's close buys on the pool at its quote"
+            );
+            b_closed = Some(close);
+        }
+    }
+    let close_b = b_closed.expect("B closed during the warm-up");
+    assert!(
+        g.s.env.now() - t_grad <= 9,
+        "the gate opens with the eighth integration"
+    );
+    eprintln!(
+        "B closed on the pool during the warm-up: B {:.4} SOL, payout {:.4}",
+        close_b.buyback_cost as f64 / 1e9,
+        close_b.borrower_payout as f64 / 1e9
+    );
+
+    // ---- A (the completion made it liquidatable) is liquidated on the pool at the gate ----
+    let tokens_free0 = market(&g.s.env, &g.s.pm).tokens_free;
+    let (sec, liq_a) = liquidate_on_pool_within(&mut g, &a, 30);
+    eprintln!(
+        "A liquidated on the pool {} s after the transition: B {:.4}, penalty {:.4}",
+        g.s.env.now() - t_grad,
+        liq_a.buyback_cost as f64 / 1e9,
+        liq_a.penalty as f64 / 1e9
+    );
+    assert!(sec <= 5, "A goes at the gate");
+    assert_eq!(
+        market(&g.s.env, &g.s.pm).tokens_free,
+        tokens_free0 + D80_Q,
+        "A's tokens back to the lenders"
+    );
+
+    // ---- the boost is running: opens refuse BoostInProgress; its push liquidates C ----
+    assert!(g.pam().pool.boost_amount(&g.s.env.svm) > g.s.env.config().params.boost_dust_lamports);
+    assert_err(&try_open(&mut g, D90_Q / 10), E::BoostInProgress);
+    let (_, liq_c) = liquidate_on_pool_within(&mut g, &c, 600);
+    let t_c = g.s.env.now() - t_grad;
+    eprintln!(
+        "C liquidated by the boost push {t_c} s after the transition ({} boost calls so far)",
+        g.boost.expect("boost").calls
+    );
+    assert!(t_c > 60, "C survived the completion and the gate");
+
+    // ---- the boost ends: its vault's ATA is closed and opens resume ----
+    while g.pam().pool.boost_amount(&g.s.env.svm) > 0 {
+        crank_secs(&mut g, 1);
+    }
+    let boost_ata = g.pam().pool.boost_vault_ata;
+    assert!(
+        read::account(&g.s.env.svm, &boost_ata).is_none(),
+        "the last chunk closes the boost vault's ATA"
+    );
+    assert!(
+        g.s.env.now() < t_grad + i64::from(g.s.env.config().params.boost_window_s),
+        "before the window's end"
+    );
+    crank_secs(&mut g, 60);
+    let q_d = {
+        let (x, y) = pool_xy(&g.s.env, &g.pam().pool);
+        u64::try_from((x / 100).min(x * u128::from(5 * SOL) / y)).unwrap()
+    };
+    let d = open_on_pool(&mut g, q_d);
+    eprintln!(
+        "D opens on the pool {} s after the transition: tier {}, q {q_d}",
+        g.s.env.now() - t_grad,
+        d.open.tier
+    );
+
+    // ---- D is held to its deadline (hourly cranks) and expired on the pool ----
+    let deadline = g.s.position(&d).deadline;
+    while g.s.env.now() + 3_600 < deadline - 60 {
+        g.s.env.warp(3_600);
+        g.crank();
+    }
+    let rest = deadline - 60 - g.s.env.now();
+    g.s.env.warp(rest);
+    while g.s.env.now() < deadline {
+        crank_secs(&mut g, 1);
+    }
+    let st = g.status(&d);
+    assert!(st.expired && !st.cr_liq(), "expired, not CR-liquidatable");
+    assert_err(&liquidate(&mut g, &d), E::UseExpire);
+    let pos_d = g.s.position(&d);
+    let b_exec = quote_buy_now(&g, pos_d.q);
+    let kp = g.s.keeper.insecure_clone();
+    let ix = expire_ix(g.pam(), &kp.pubkey(), &d.key(), d.nonce);
+    let meta = ok(g
+        .s
+        .env
+        .send(&[pump::cu_limit_ix(POOL_KEEPER_EXIT_CU), ix], &[&kp]));
+    let e: Expire = events::one(&meta);
+    assert_eq!(e.buyback_cost, b_exec, "B = the pool's quote");
+    assert_eq!(e.rent, st.r_due, "the whole term's rent");
+    let base = e.b_live_risk.min(e.b_ref);
+    let left = pos_d.v - e.buyback_cost - e.rent;
+    let fee = ((u128::from(base) * u128::from(g.s.env.config().params.expiry_fee_bps))
+        .div_ceil(10_000) as u64)
+        .min(left);
+    assert_eq!(
+        e.expiry_fee, fee,
+        "the expiry fee on min(B̂_live,risk, B̂_ref)"
+    );
+    let k_e = risk::k_e(e.b_ref, &pos_d.expiry_keeper_terms()).unwrap();
+    assert_eq!(e.keeper_reward, k_e.min(left - fee));
+    assert_eq!(e.borrower_payout, left - fee - e.keeper_reward);
+    let m = market(&g.s.env, &g.s.pm);
+    assert_eq!((m.open_positions, m.borrowed_q), (0, 0), "nothing borrowed");
+
+    // ---- both lenders exit once everything vested: tokens back, SOL income pro rata ----
+    let params = g.s.env.config().params;
+    g.s.env
+        .warp(i64::from(params.lock_grace_s).max(i64::from(params.lump_vest_s)) + 86_400);
+    g.crank();
+    let market_key = g.s.pm.market();
+    let l1 = g.s.pm.lender.insecure_clone();
+    let l1_keys = g.s.pm.lender_keys();
+    let (t1, sol1) = withdraw_all(&mut g.s.env, &market_key, &l1_keys, &l1);
+    let (t2, sol2) = withdraw_all(&mut g.s.env, &market_key, &l2_keys, &l2);
+    assert!(
+        t1 + 2 >= lend1 && t2 + 2 >= lend1 / 4,
+        "the tokens come back (dust aside): {t1} {t2}"
+    );
+    let income = liq_a.penalty_lender + liq_c.penalty_lender + e.expiry_fee;
+    assert!(
+        sol1 + sol2 > income,
+        "rent, penalties and the expiry fee reach the lenders"
+    );
+    let ratio = sol1 as f64 / sol2 as f64;
+    assert!((ratio - 4.0).abs() < 0.01, "pro rata to shares: {ratio}");
+    eprintln!(
+        "lenders: {t1} + {t2} tokens back, {:.6} + {:.6} SOL of income",
+        sol1 as f64 / 1e9,
+        sol2 as f64 / 1e9
+    );
+}
+
+// ---- T-VENUE-SWITCH (graduation) ------------------------------------------------------------
+
+/// ★T-VENUE-SWITCH (ARCH §8.2) for the graduation, as built (module docs).
+#[test]
+fn t_venue_switch_the_graduation_rewrites_the_ring_and_the_box_is_narrow_from_the_gate() {
+    let mut g = Grad::d_market(D80_SOLD, lend_for_80(D80_Q));
+    let _a = g.s.open(D80_Q);
+    crank_secs(&mut g, 30);
+    g.s.env.warp(1);
+    g.complete_curve();
+    g.crank();
+    crank_secs(&mut g, 1);
+    g.s.env.warp(1);
+    let tr = migrate_and_transition(&mut g);
+    let (before, after, anchor) = (tr.before.observation(), tr.after.observation(), tr.anchor);
+    // The transitioning crank rolled the curve's last bucket first (the prologue's order), then
+    // rewrote every entry.
+    assert_eq!(after.ring.len(), (before.ring.len() + 1).min(8));
+    let old: Vec<_> = before.ring.iter().copied().collect();
+    for (i, e) in after.ring.iter().enumerate() {
+        assert_eq!(
+            (e.l, e.llo, e.lhi),
+            (anchor, anchor, anchor),
+            "entry {i}: the liquidity rewritten to the anchor"
+        );
+        assert_eq!(
+            (e.x, e.y),
+            quote::reprice(anchor, e.p).unwrap_or((0, 0)),
+            "entry {i}: (x, y) = reprice(anchor, p)"
+        );
+        if i > 0 {
+            let o = &old[i - 1];
+            assert_eq!(
+                (e.ts, e.p, e.lo, e.hi),
+                (o.ts, o.p, o.lo, o.hi),
+                "entry {i}: price, bucket extremes and time kept"
+            );
+        }
+    }
+    assert_eq!(tr.after.b_sec, 0, "the open bucket cleared");
+    assert_eq!(
+        tr.after.ema_price.get(),
+        after.ring.newest().unwrap().p,
+        "P_ema carried over"
+    );
+
+    // The pool trades on (the boost), the keeper cranks every second.
+    let t_grad = g.s.env.now();
+    let mut gate_at = None;
+    let mut wide_in_gate = 0;
+    for sec in 1..=60 {
+        crank_secs(&mut g, 1);
+        let m = market(&g.s.env, &g.s.pm);
+        let o = m.observation();
+        let bx = settle::box_of(&o.ema, &o.ring, g.s.env.now(), true).unwrap();
+        let wide = (bx.l_hi - bx.l_lo) * 10_000 > 100 * bx.l_lo;
+        if gate_at.is_none() {
+            if m.ema_warm == 0 {
+                gate_at = Some(sec);
+                let (x, y) = pool_xy(&g.s.env, &g.pam().pool);
+                let l_pool = quote::liquidity(x, y).unwrap();
+                let l = m.ema_liq.get();
+                assert!(
+                    l.abs_diff(l_pool) * 100 <= l_pool,
+                    "L_ema at the gate = the pool's √(X·Y) within 1 %: {l} vs {l_pool}"
+                );
+            } else {
+                wide_in_gate += u32::from(wide);
+            }
+        }
+        if gate_at.is_some() {
+            assert!(!wide, "+{sec} s: the box ≤ 1 % wide in L from the gate on");
+        }
+    }
+    let gate_at = gate_at.expect("the gate opened");
+    assert!(gate_at <= 9, "the gate at the eighth integration");
+    eprintln!(
+        "T-VENUE-SWITCH graduation: gate at +{gate_at} s (transition at {t_grad}), {wide_in_gate} wide second(s), all inside the gate"
+    );
+}
+
+// ---- M5-SEC-4: the atomic, self-financed complete + migrate ----------------------------------------
+
+/// M5-SEC-4's first vector end to end (module docs): the attack no longer freezes the market.
+#[test]
+fn the_atomic_self_financed_complete_and_migrate_is_liquidated_on_the_pool() {
+    let mut g = Grad::d_market(D80_SOLD, lend_for_80(D80_Q));
+    // The attacker: long `q` bought on the curve before its short (the M5 exploit's hedge).
+    let attacker = CurveUser::new(&mut g.s.env, &g.s.pm.curve);
+    let sol0 = lamports(&g.s.env, &attacker.kp.pubkey());
+    ok(attacker.buy(&mut g.s.env, &g.s.pm.curve, D80_Q, u64::MAX));
+    // Its short: ECON's D@80 % position, from the same wallet.
+    let mut short = Borrower {
+        kp: attacker.kp.insecure_clone(),
+        next_nonce: 0,
+    };
+    crank_secs(&mut g, 60);
+    let (res, nonce) = g.s.env.open(&g.s.pm, &mut short, D80_Q / 2);
+    let open: Open = events::one(&ok(res));
+    let p = Pos {
+        b: short,
+        nonce,
+        open,
+    };
+    crank_secs(&mut g, 60);
+    let p_ema0 = market(&g.s.env, &g.s.pm).ema_price.get();
+    let lenders_free0 = market(&g.s.env, &g.s.pm).tokens_free;
+
+    // One transaction: buy_v2(rT) + migrate_v2 by the attacker (it keeps the rT tokens).
+    let rt = u64::try_from(curve(&g.s.env, &g.s.pm).rt).unwrap();
+    g.s.env.warp(1);
+    let fr = fork::pump_fee_recipient(&g.s.env.svm, 1);
+    let bb = fork::pump_buyback_fee_recipient(&g.s.env.svm, 1);
+    let buy = g.s.pm.curve.v2_ix(
+        &g.s.env.svm,
+        fork::PumpV2::Buy,
+        &attacker.kp.pubkey(),
+        &attacker.ata,
+        &fr,
+        &bb,
+        rt,
+        u64::MAX,
+    );
+    let mig = pump::migrate_v2_ix(&g.s.env.svm, &attacker.kp.pubkey(), &g.s.pm.curve);
+    let meta = ok(g
+        .s
+        .env
+        .send(&[pump::cu_limit_ix(1_400_000), buy, mig], &[&attacker.kp]));
+    assert!(g.migrated(), "completed and migrated in one transaction");
+    eprintln!(
+        "attacker's complete + migrate: {} CU, {} inner instructions",
+        meta.compute_units_consumed,
+        meta.inner_instructions.iter().map(Vec::len).sum::<usize>()
+    );
+    assert_eq!(
+        venue(&g.s.env, &g.s.pm),
+        VenueKind::PumpCurve,
+        "short.win never saw the completed curve"
+    );
+
+    // Other users push the pool before any observation (the boost's size of buy-and-burn).
+    let np = pump::NewPool::of(&g.s.pm.curve);
+    let r0 = np.reserves(&g.s.env.svm).unwrap();
+    let buyer = g.s.env.funded_keypair();
+    let payer = g.s.env.payer.pubkey();
+    let program = g.s.pm.curve.token_program.id();
+    ok(g.s.env.send(
+        &[fork::create_ata_idempotent_ix(
+            &payer,
+            &buyer.pubkey(),
+            &g.s.pm.keys.mint,
+            &program,
+        )],
+        &[],
+    ));
+    let buyer_base = pda::ata(&buyer.pubkey(), &g.s.pm.keys.mint, &program);
+    let wsol = fork::fund_wsol(&mut g.s.env, &buyer.pubkey(), 200 * SOL);
+    let push = u64::try_from(u128::from(r0.base) - u128::from(r0.base) * 1000 / 1225).unwrap();
+    ok(g.s.env.send(
+        &[pump::pamm_buy_ix(
+            &g.s.env.svm,
+            &np,
+            &buyer.pubkey(),
+            &buyer_base,
+            &wsol,
+            push,
+            200 * SOL,
+        )],
+        &[&buyer],
+    ));
+    let r1 = np.reserves(&g.s.env.svm).unwrap();
+    let p_pool = r1.effective_quote * W / u128::from(r1.base);
+    eprintln!(
+        "pool / last curve EMA before any observation: {:.2}",
+        p_pool as f64 / p_ema0 as f64
+    );
+    assert!(p_pool * 10 >= p_ema0 * 35, "≥ 3.5× the last curve EMA");
+
+    // The keeper's next crank (the curve's ReadSet) moves the market onto the pool.
+    g.s.env.warp(1);
+    let meta = g.crank();
+    venue_changed(&meta, VenueKind::PumpCurve, VenueKind::PumpSwap);
+    let m = market(&g.s.env, &g.s.pm);
+    assert_eq!(
+        m.ema_price.get(),
+        m.observation().ring.newest().unwrap().p,
+        "P_ema: the roll of the last curve bucket, then carried over"
+    );
+    assert!(
+        m.ema_price.get().abs_diff(p_ema0) * 10_000 < p_ema0,
+        "the completed curve was never observed"
+    );
+    assert_eq!((m.ema_warm, m.ema_guard), (8, 1));
+
+    // Liquidated on the pool once the warm-up has run; the lenders get Q back.
+    let t_grad = g.s.env.now();
+    let (_, ev) = liquidate_on_pool_within(&mut g, &p, 120);
+    let waited = g.s.env.now() - t_grad;
+    assert!(waited >= 8, "never before the eight integrations");
+    assert_eq!(
+        market(&g.s.env, &g.s.pm).tokens_free,
+        lenders_free0 + p.open.q,
+        "the lenders' tokens back"
+    );
+    let lender_sol = ev.rent
+        - ev.rent * u64::from(g.s.env.config().params.rent_protocol_bps) / 10_000
+        + ev.penalty_lender;
+    assert!(lender_sol > 0, "and SOL on top");
+    // The buyback is priced at the pool, not at the frozen pre-completion EMA.
+    let frozen_value = u128::from(p.open.q) * p_ema0 / W;
+    assert!(
+        u128::from(ev.buyback_cost) > frozen_value * 2,
+        "B ({}) is at the pool's price, above twice Q at the frozen EMA ({frozen_value})",
+        ev.buyback_cost
+    );
+
+    // The attacker's books: it holds its long q plus the rT it completed with; what selling them
+    // into the pool pays now (the pool's own sale quote), against everything it spent.
+    let held = tokens(&g.s.env, &attacker.ata);
+    let sale = quote_sell_now(&g, held);
+    let sol_now = lamports(&g.s.env, &attacker.kp.pubkey());
+    let net = i128::from(sol_now) + i128::from(sale) - i128::from(sol0);
+    eprintln!(
+        "attacker: its short liquidated after {waited} s (B {:.4} SOL, penalty {:.4}); it holds {held} tokens that sell for {:.4} SOL now; net {} SOL (the lenders: Q back + {:.4} SOL)",
+        ev.buyback_cost as f64 / 1e9,
+        ev.penalty as f64 / 1e9,
+        sale as f64 / 1e9,
+        sol4(net),
+        lender_sol as f64 / 1e9
+    );
+}
+
+// ---- M5-SEC-4: the self-made straddle -----------------------------------------------------------
+
+/// A Jito bundle (U22): the transactions in order through `Env::send`, all-or-nothing (the VM
+/// restored if one fails). `Err((index, error code))`.
+fn bundle(
+    env: &mut Env,
+    txs: &[(Vec<Instruction>, &Keypair)],
+) -> Result<Vec<TransactionMetadata>, (usize, Option<u32>)> {
+    let before = env.svm.clone();
+    let mut metas = Vec::new();
+    for (i, (ixs, kp)) in txs.iter().enumerate() {
+        let res = env.send(ixs, &[*kp]);
+        match res {
+            Ok(m) => metas.push(m),
+            Err(_) => {
+                let code = custom_code(&res);
+                env.svm = before;
+                return Err((i, code));
+            }
+        }
+    }
+    Ok(metas)
+}
+
+/// The completer of the curve in the straddle bundle (ARCH §5.4 tx1): a funded keypair with its
+/// base ATA and pump UVA.
+fn completer(g: &mut Grad) -> CurveUser {
+    CurveUser::new(&mut g.s.env, &g.s.pm.curve)
+}
+
+/// tx1: `complete_curve(max_sol_cost)` (the helper reads `rT` at execution).
+fn tx1(g: &Grad, who: &CurveUser, max: u64) -> Vec<Instruction> {
+    vec![
+        pump::cu_limit_ix(200_000),
+        pump::complete_curve_ix(
+            &g.s.env.svm,
+            &g.s.pm.curve,
+            &who.kp.pubkey(),
+            &who.ata,
+            2,
+            max,
+        ),
+    ]
+}
+
+/// tx2: `migrate_v2` top-level.
+fn tx2(g: &Grad, who: &CurveUser) -> Vec<Instruction> {
+    vec![
+        pump::cu_limit_ix(450_000),
+        pump::migrate_v2_ix(&g.s.env.svm, &who.kp.pubkey(), &g.s.pm.curve),
+    ]
+}
+
+/// The PumpSwap market the bundle's tx3 trades (derived before the pool exists).
+fn pam_to_be(g: &Grad) -> PammMarket {
+    let np = pump::NewPool::of(&g.s.pm.curve);
+    let pool = PammPool {
+        mint: np.mint,
+        base_program: np.base_program,
+        pool: np.pool,
+        base_vault: np.base_vault,
+        quote_vault: np.quote_vault,
+        lp_mint: np.lp_mint,
+        boost_vault: np.boost_vault,
+        boost_vault_ata: np.boost_vault_ata,
+    };
+    let svm = &g.s.env.svm;
+    PammMarket {
+        keys: g.s.pm.keys,
+        pool,
+        trader_base_ata: g.s.pm.trader_base_ata,
+        protocol_recipient: pamm::protocol_fee_recipient(svm, 0),
+        buyback_recipient: pamm::buyback_fee_recipient(svm, 0),
+        // The pool's coin creator is the curve's (migrate_v2 copies it).
+        coin_creator: Pubkey::new_from_array(g.s.pm.curve.state(svm).creator),
+        lender: g.s.pm.lender.insecure_clone(),
+        lender_account: g.s.pm.lender_account,
+    }
+}
+
+/// ARCH §5.4 tx3 as the design names it: the existence requirement's accounts, `crank_price`
+/// (`→ PumpSwap`, the curve's ReadSet) and the exit on the pool.
+fn tx3(g: &Grad, exit: Instruction) -> Vec<Instruction> {
+    let pam = pam_to_be(g);
+    let payer = g.s.env.payer.pubkey();
+    let mut v = vec![pump::cu_limit_ix(1_000_000)];
+    v.push(pamm::pamm_init_uva_ix(&payer, &pam.trader()));
+    let (auth, _) = pam.creator_vault();
+    for owner in [auth, pam.protocol_recipient, pam.buyback_recipient] {
+        v.push(fork::create_ata_idempotent_ix(
+            &payer,
+            &owner,
+            &WSOL_MINT,
+            &TOKEN_PROGRAM_ID,
+        ));
+    }
+    v.push(crank_price_ix(&g.s.pm));
+    v.push(exit);
+    v
+}
+
+/// M5-SEC-4's second vector (module docs).
+#[test]
+fn a_borrowers_self_made_straddle_is_liquidated_after_the_keepers_bundle() {
+    let mut g = Grad::d_market(D80_SOLD, lend_for_80(D80_Q));
+    pump::load_complete_curve(&mut g.s.env);
+    let p = g.s.open(D80_Q);
+    crank_secs(&mut g, 30);
+    // The borrower's own buy of rT − q + 1: rT = q − 1 < q.
+    let rt = u64::try_from(curve(&g.s.env, &g.s.pm).rt).unwrap();
+    let own = CurveUser::new(&mut g.s.env, &g.s.pm.curve);
+    g.s.env.warp(1);
+    ok(own.buy(&mut g.s.env, &g.s.pm.curve, rt - D80_Q + 1, u64::MAX));
+    assert_eq!(curve(&g.s.env, &g.s.pm).rt, u128::from(D80_Q - 1));
+    // The keeper watches: the position prices the bundle's path (B̂_str) and is liquidatable, but
+    // no exit can run on the curve.
+    let mut liquidatable_at = None;
+    for sec in 0..60 {
+        crank_secs(&mut g, 1);
+        assert_err(&g.s.env.close(&g.s.pm, &p.b, p.nonce), E::CurveStraddle);
+        let st = g.status(&p);
+        if st.cr_liq() {
+            assert_err(&liquidate(&mut g, &p), E::CurveStraddle);
+            liquidatable_at = Some(sec);
+            break;
+        }
+    }
+    let sec = liquidatable_at.expect("the straddle is liquidatable on B̂_str");
+    eprintln!("self-made straddle: liquidatable on B̂_str {sec} s after the borrower's buy");
+
+    // The keeper's bundle as ARCH §5.4 names it: tx3 = [crank → PumpSwap, liquidate] fails on the
+    // post-change warm-up (OWNER-M6R-4), and the bundle reverts whole.
+    let keeper = completer(&mut g);
+    let kp = g.s.keeper.insecure_clone();
+    let (x_sol0, x_tok0) = (
+        lamports(&g.s.env, &keeper.kp.pubkey()),
+        tokens(&g.s.env, &keeper.ata),
+    );
+    g.s.env.warp(1);
+    let t1 = tx1(&g, &keeper, 10 * SOL);
+    let t2 = tx2(&g, &keeper);
+    let liq = liquidate_ix(&pam_to_be(&g), &kp.pubkey(), &p.key(), p.nonce);
+    let t3 = tx3(&g, liq);
+    let res = bundle(
+        &mut g.s.env,
+        &[
+            (t1.clone(), &keeper.kp),
+            (t2.clone(), &keeper.kp),
+            (t3, &kp),
+        ],
+    );
+    assert_eq!(
+        res.err(),
+        Some((2, Some(u32::from(E::EmaWarmingUp)))),
+        "tx3's liquidation waits for the warm-up; the bundle reverts"
+    );
+    assert!(!g.migrated(), "nothing committed");
+
+    // The keeper's fallback (ARCH §5.4, V1-9): tx1 + tx2, then an ordinary PumpSwap position.
+    let metas = bundle(&mut g.s.env, &[(t1, &keeper.kp), (t2, &keeper.kp)]).expect("tx1 + tx2");
+    assert_eq!(metas.len(), 2);
+    assert!(g.migrated());
+    let completion_cost = x_sol0 - lamports(&g.s.env, &keeper.kp.pubkey());
+    let completed_tokens = tokens(&g.s.env, &keeper.ata) - x_tok0;
+    assert_eq!(
+        completed_tokens,
+        D80_Q - 1,
+        "the keeper holds the rT it bought"
+    );
+    let meta = g.crank();
+    venue_changed(&meta, VenueKind::PumpCurve, VenueKind::PumpSwap);
+    let (_, ev) = liquidate_on_pool_within(&mut g, &p, 120);
+    eprintln!(
+        "self-made straddle liquidated on the pool {} s after tx1 + tx2: B {:.4} SOL",
+        g.s.env.now() - g.t_grad.unwrap(),
+        ev.buyback_cost as f64 / 1e9
+    );
+
+    // ECON §10.1: the keeper's completion is self-financing once the boost has pushed the pool —
+    // it sells the rT tokens on the pool for more than tx1 + tx2 cost it.
+    while g.pam().pool.boost_amount(&g.s.env.svm) > 0 {
+        crank_secs(&mut g, 1);
+    }
+    let pool = g.pam().pool;
+    let proceeds_quote = {
+        let m = market(&g.s.env, &g.s.pm);
+        venue_view::view(&g.s.env.svm, &m)
+            .unwrap()
+            .sell(completed_tokens)
+            .unwrap()
+    };
+    let wsol = fork::fund_wsol(&mut g.s.env, &keeper.kp.pubkey(), 0);
+    let ix = pamm::pamm_trade_ix(
+        &g.s.env.svm,
+        &pool,
+        PammTrade::Sell,
+        &keeper.kp.pubkey(),
+        &keeper.ata,
+        &wsol,
+        completed_tokens,
+        0,
+    );
+    ok(g.s.env.send(
+        &[pamm::pamm_init_uva_ix(
+            &g.s.env.payer.pubkey(),
+            &keeper.kp.pubkey(),
+        )],
+        &[],
+    ));
+    ok(g.s.env.send(&[ix], &[&keeper.kp]));
+    let proceeds = tokens(&g.s.env, &wsol);
+    assert_eq!(proceeds, proceeds_quote, "the sale at the pool's quote");
+    eprintln!(
+        "keeper: completion + migration cost {:.4} SOL, rT sold after the boost for {:.4} SOL",
+        completion_cost as f64 / 1e9,
+        proceeds as f64 / 1e9
+    );
+    assert!(
+        proceeds > completion_cost,
+        "the keeper's completion is self-financing after the boost"
+    );
+}
+
+// ---- ECON §10.2: the borrower's own bundle ---------------------------------------------------
+
+/// The sim's `D@97%` close through the bundle path (`Market._buy_back`: `pool.buy(Q)` right
+/// after `migrate()`), rent at the program's `r_min` (4 h at 0 %).
+const D97_STR_B: u64 = 1_922_674_204;
+const D97_STR_RENT: u64 = 720_630;
+const D97_V: u64 = 6_488_229_940;
+/// The sim's `V − B − R` (borrower P&L −0.3917 SOL at the program's `r_min`; ECON −0.3939 at 80 %).
+const D97_STR_PAYOUT: u64 = 4_564_835_106;
+/// The sim's completion cost of `rT = Q/2` (`keeper_straddle_cost`).
+const D97_STR_COMPLETION: u64 = 933_020_555;
+
+/// ECON §10.2 (module docs): the borrower's own ≥ 3-transaction bundle closes its straddled
+/// position on the new pool for exactly the sim's buyback cost.
+#[test]
+fn econ_10_2_the_borrowers_own_bundle_closes_a_straddle() {
+    let mut g = Grad::d_market(D97_SOLD, lend_for_80(D97_Q));
+    pump::load_complete_curve(&mut g.s.env);
+    let p = g.s.open(D97_Q);
+    assert_eq!(p.open.v, D97_V);
+    // Cranks up to TE as the sim's keeper (every 30 s, then every second from TE − 5).
+    let mut t = 0;
+    while t < TE - 5 {
+        t = (t + 30).min(TE - 5);
+        g.s.step_to(t);
+    }
+    while t < TE {
+        t += 1;
+        g.s.step_to(t);
+    }
+    // At TE other users buy the curve down to rT = Q/2 (`leave_real_reserves(0.5)`).
+    let rt = u64::try_from(curve(&g.s.env, &g.s.pm).rt).unwrap();
+    g.s.crowd_buy(rt - D97_Q / 2);
+    let rt = u64::try_from(curve(&g.s.env, &g.s.pm).rt).unwrap();
+    assert_eq!(rt, D97_Q / 2);
+    while t < TE + 30 {
+        t += 1;
+        g.s.step_to(t);
+        assert!(
+            !g.status(&p).cr_liq(),
+            "+{} s: the straddle quote keeps it healthy",
+            t - TE
+        );
+    }
+    // At TE + 30 the borrower closes: on the curve pump would reject the buy (q > rT).
+    assert_err(&g.s.env.close(&g.s.pm, &p.b, p.nonce), E::CurveStraddle);
+    let b_str = g.status(&p).b_live.expect("B̂_str");
+    let pos = g.s.position(&p);
+
+    // The borrower's client sends the bundle; the borrower completes the curve itself.
+    let who = CurveUser {
+        kp: p.b.kp.insecure_clone(),
+        ata: pda::ata(
+            &p.key(),
+            &g.s.pm.keys.mint,
+            &g.s.pm.curve.token_program.id(),
+        ),
+    };
+    let payer = g.s.env.payer.pubkey();
+    ok(g.s.env.send(
+        &[
+            fork::create_ata_idempotent_ix(
+                &payer,
+                &who.kp.pubkey(),
+                &g.s.pm.keys.mint,
+                &g.s.pm.curve.token_program.id(),
+            ),
+            fork::pump_init_uva_ix(&payer, &who.kp.pubkey()),
+        ],
+        &[],
+    ));
+    let charge =
+        g.s.pm
+            .curve
+            .charge_buy(&g.s.env.svm, rt)
+            .expect("a live curve")
+            .cost;
+    assert_eq!(
+        charge, D97_STR_COMPLETION,
+        "pump's charge for rT = the sim's keeper_straddle_cost"
+    );
+    let sol0 = lamports(&g.s.env, &p.key());
+    let t1 = tx1(&g, &who, 2 * SOL);
+    let t2 = tx2(&g, &who);
+    let close = close_short_ix(
+        &pam_to_be(&g),
+        &p.key(),
+        p.nonce,
+        b_str,
+        ExtrasSel::NONE,
+        &[],
+    );
+    let t3 = tx3(&g, close);
+    let metas = bundle(&mut g.s.env, &[(t1, &who.kp), (t2, &who.kp), (t3, &who.kp)])
+        .unwrap_or_else(|e| panic!("the bundle: {e:?}"));
+    g.on_graduated();
+    let ev: Close = events::one(&metas[2]);
+    let vs: VenueStateChanged = events::one(&metas[2]);
+    assert_eq!(
+        (vs.from, vs.to),
+        (VenueKind::PumpCurve as u8, VenueKind::PumpSwap as u8),
+        "tx3's crank moved the market onto the pool"
+    );
+    assert_eq!(
+        ev.buyback_cost, D97_STR_B,
+        "the sim's pool.buy(Q) after migrate()"
+    );
+    // B̂_str as the keeper's view priced it before the bundle (`shortwin-math`'s straddle quote on
+    // the live curve) bounds the executed buy, within straddle_it's 8 lamports (1 here).
+    assert!(
+        ev.buyback_cost <= b_str && b_str - ev.buyback_cost <= 8,
+        "B {} within B̂_str {b_str}",
+        ev.buyback_cost
+    );
+    // The pool the bundle created is the sim's `CPPool.graduate` of the completed curve (the same
+    // for every completion of a standard curve).
+    let pool = g.pam().pool;
+    let st = pool.state(&g.s.env.svm);
+    assert_eq!(
+        (st.virtual_quote_reserves, st.lp_supply),
+        (17_584_505_289, 4_193_388_282_654),
+        "VQR and lp_supply of CPPool.graduate(85,005,359,059 − 15,000,001)"
+    );
+    assert_eq!(ev.rent, D97_STR_RENT, "R_min (4 h at the pre-open 0 %)");
+    assert_eq!(ev.borrower_payout, pos.v - ev.buyback_cost - ev.rent);
+    assert_eq!(ev.borrower_payout, D97_STR_PAYOUT, "the sim's V − B − R");
+    // The borrower paid the completion itself and keeps the rT tokens (in the sim the keeper
+    // does, ECON §10.2 counts it outside the borrower's P&L).
+    let wallet = i128::from(lamports(&g.s.env, &p.key())) - i128::from(sol0);
+    assert_eq!(tokens(&g.s.env, &who.ata), rt, "the completer keeps rT");
+    eprintln!(
+        "ECON §10.2 via the borrower's bundle: close +30 s, B {:.4} SOL (ECON 1.9227), payout {:.4} SOL (borrower P&L {} vs ECON −0.3939 at 80 % R_min), completion charge {:.4} SOL (= the sim's), the wallet over the bundle {} SOL (payout − completion − migrate_v2's net)",
+        ev.buyback_cost as f64 / 1e9,
+        ev.borrower_payout as f64 / 1e9,
+        sol4(i128::from(ev.borrower_payout) - i128::from(pos.m) - i128::from(pos.fee_open)),
+        charge as f64 / 1e9,
+        sol4(wallet)
+    );
+    assert_eq!(market(&g.s.env, &g.s.pm).open_positions, 0);
+}
+
+// ---- the boost gate -------------------------------------------------------------------------------
+
+/// ARCH §5.4 case 3 on a real graduation (module docs).
+#[test]
+fn the_boost_gate_on_a_real_graduation() {
+    let mut g = Grad::d_market(D80_SOLD, lend_for_80(D80_Q));
+    g.s.env.warp(1);
+    g.crank();
+    g.complete_curve();
+    g.crank();
+    crank_secs(&mut g, 1);
+    g.s.env.warp(1);
+    migrate_and_transition(&mut g);
+    let pool = g.pam().pool;
+    let t_grad = g.s.env.now();
+    let p0 = pool_spot(&g.s.env, &pool);
+    let params = g.s.env.config().params;
+    // Through the warm-up and the whole boost (40 chunks, one every 9 s).
+    let mut refused = 0;
+    while pool.boost_amount(&g.s.env.svm) > 0 {
+        crank_secs(&mut g, 1);
+        if market(&g.s.env, &g.s.pm).ema_warm == 0
+            && pool.boost_amount(&g.s.env.svm) > params.boost_dust_lamports
+        {
+            assert_err(&try_open(&mut g, D80_Q / 10), E::BoostInProgress);
+            refused += 1;
+        }
+    }
+    let p1 = pool_spot(&g.s.env, &pool);
+    let push = p1 as f64 / p0 as f64;
+    eprintln!(
+        "the boost: {} calls over {} s, price ×{push:.4} (ECON ×1.4566), {refused} opens refused BoostInProgress",
+        g.boost.unwrap().calls,
+        g.s.env.now() - t_grad
+    );
+    assert_eq!(g.boost.unwrap().calls, 40);
+    assert!((push - 1.2069f64.powi(2)).abs() < 1e-4, "×(1 + 0.2069)²");
+    assert!(read::account(&g.s.env.svm, &pool.boost_vault_ata).is_none());
+    // The vault is empty: opens resume once the EMA has caught up with the push.
+    crank_secs(&mut g, 60);
+    let q = D80_Q / 10;
+    let d = open_on_pool(&mut g, q);
+    assert!(g.s.env.now() < t_grad + i64::from(params.boost_window_s));
+    eprintln!(
+        "an open {} s after the graduation (tier {})",
+        g.s.env.now() - t_grad,
+        d.open.tier
+    );
+
+    // A donor re-creates the closed ATA and parks 1 SOL there (anyone can; R-VEN §1.4 item 5):
+    // opens refuse again, but only until graduated_at + boost_window_s. (Whether pump's boost
+    // bot would spend a donation is UNVERIFIED, R-VEN §1.4; here nobody does.)
+    g.run_boost = false;
+    let donor = g.s.env.funded_keypair();
+    ok(g.s.env.send(
+        &[fork::create_ata_idempotent_ix(
+            &donor.pubkey(),
+            &pool.boost_vault,
+            &WSOL_MINT,
+            &TOKEN_PROGRAM_ID,
+        )],
+        &[&donor],
+    ));
+    fork::wrap(&mut g.s.env, &pool.boost_vault_ata, SOL);
+    assert_eq!(pool.boost_amount(&g.s.env.svm), SOL);
+    crank_secs(&mut g, 1);
+    assert_err(&try_open(&mut g, q), E::BoostInProgress);
+    let end = t_grad + i64::from(params.boost_window_s);
+    while g.s.env.now() < end - 1 {
+        g.s.env.warp(30.min(end - 1 - g.s.env.now()).max(1));
+        g.crank();
+    }
+    assert_err(&try_open(&mut g, q), E::BoostInProgress);
+    crank_secs(&mut g, 1);
+    assert_eq!(g.s.env.now(), end);
+    let e = open_on_pool(&mut g, q);
+    assert_eq!(e.open.q, q, "the window bounds the grief");
+}
+
+// ---- a completing buyback, then the graduation ----------------------------------------------------
+
+/// ECON §10.2 `q = rt` then the graduation: a borrower's close that buys exactly the curve's `rT`
+/// completes it (the market `PumpMigrating` after the leg, ARCH §5.4 case 1); `migrate_v2` and the
+/// keeper's crank move the market onto its pool with the other position open, and that one closes
+/// there during the warm-up at the pool's quote; every lent token is back.
+#[test]
+fn a_completing_close_then_the_graduation_carries_the_other_position() {
+    let q1 = D97_Q / 2;
+    let q2 = D97_Q / 4;
+    let mut g = Grad::d_market(D97_SOLD, lend_for_80(q1 + q2));
+    let lent = market(&g.s.env, &g.s.pm).tokens_free;
+    let p2 = g.s.open(q2);
+    let p1 = g.s.open(q1);
+    crank_secs(&mut g, 30);
+    // Other users buy the curve down to rT = q1.
+    let rt = u64::try_from(curve(&g.s.env, &g.s.pm).rt).unwrap();
+    g.s.crowd_buy(rt - q1);
+    crank_secs(&mut g, 1);
+    let charge =
+        g.s.pm
+            .curve
+            .charge_buy(&g.s.env.svm, q1)
+            .expect("q1 ≤ rT")
+            .cost;
+    let meta = ok(g.s.env.close(&g.s.pm, &p1.b, p1.nonce));
+    let close1: Close = events::one(&meta);
+    assert_eq!(
+        close1.buyback_cost, charge,
+        "pump's charge for the whole rT"
+    );
+    venue_changed(&meta, VenueKind::PumpCurve, VenueKind::PumpMigrating);
+    let c = curve(&g.s.env, &g.s.pm);
+    assert!(c.complete && c.rt == 0, "the close completed the curve");
+    assert_err(&g.s.env.close(&g.s.pm, &p2.b, p2.nonce), E::VenueMigrating);
+    crank_secs(&mut g, 1);
+    g.s.env.warp(1);
+    migrate_and_transition(&mut g);
+    crank_secs(&mut g, 2);
+    assert!(market(&g.s.env, &g.s.pm).ema_warm > 0, "still warming up");
+    let b_exp = quote_buy_now(&g, q2);
+    let close2: Close = events::one(&ok(g.s.env.close(
+        g.pam.as_ref().expect("graduated"),
+        &p2.b,
+        p2.nonce,
+    )));
+    assert_eq!(
+        close2.buyback_cost, b_exp,
+        "the other position closes on the pool"
+    );
+    let m = market(&g.s.env, &g.s.pm);
+    assert_eq!(
+        (m.open_positions, m.tokens_free),
+        (0, lent),
+        "every lent token back"
+    );
+}

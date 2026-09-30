@@ -162,7 +162,13 @@ pub fn handler<'info>(
             },
             &deny,
         )?;
-        let state = venues::read_state_boxed(&market, kind, rem.read, clock.unix_timestamp);
+        let state = venues::read_state_boxed(
+            &market,
+            kind,
+            rem.read,
+            clock.unix_timestamp,
+            Some(ctx.accounts.mint.supply),
+        );
         let mut vault = ctx.accounts.market_vault.load()?.vault();
         let pro = prologue::run(
             &config,

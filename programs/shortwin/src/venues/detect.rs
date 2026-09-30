@@ -39,7 +39,7 @@
 //! **Scope.** The Raydium adoptions run it for the precedence check (the Raydium hints of
 //! `create_market`, `propose_pool` and `execute_pool_switch` on a list-only market, M3/M4); since
 //! M5 the `Auto` listing and `crank_price`'s re-detection of a `None` market also adopt a live or
-//! migrating curve (a canonical PumpSwap pool is M6's adapter). A pump-owned account at the curve
+//! migrating curve, and since M6 a valid canonical PumpSwap pool. A pump-owned account at the curve
 //! address that carries the discriminator but does not parse cannot be classified, so it is
 //! refused as `PumpVenuePrecedence` (a Raydium adoption needs the proof that no pump venue
 //! applies); an account at the canonical-pool address that is not a valid pool is
@@ -125,17 +125,27 @@ pub fn pool_authority_of(market: &crate::state::Market) -> Pubkey {
 /// The state of the canonical pool account `cp` of `mint` (module docs), `authority` its
 /// `pool_authority(mint)`. `cp` is already key-checked as the mint's canonical pool address.
 pub fn canonical_pool(cp: &AccountInfo, mint: &Pubkey, authority: &Pubkey) -> CanonicalPool {
+    canonical_pool_read(cp, mint, authority).0
+}
+
+/// [`canonical_pool`] with the pool as read when it is `Valid` (the `→ PumpSwap` transition and a
+/// PumpSwap listing write it into the market, M6).
+pub fn canonical_pool_read(
+    cp: &AccountInfo,
+    mint: &Pubkey,
+    authority: &Pubkey,
+) -> (CanonicalPool, Option<pump_amm::Pool>) {
     if *cp.owner == anchor_lang::system_program::ID {
-        return CanonicalPool::Absent;
+        return (CanonicalPool::Absent, None);
     }
     if *cp.owner != PUMP_AMM_PROGRAM_ID {
-        return CanonicalPool::Unreadable;
+        return (CanonicalPool::Unreadable, None);
     }
     let Ok(data) = cp.try_borrow_data() else {
-        return CanonicalPool::Unreadable;
+        return (CanonicalPool::Unreadable, None);
     };
     let Ok(pool) = pump_amm::read_pool(&cp.owner.to_bytes(), &data) else {
-        return CanonicalPool::Unreadable;
+        return (CanonicalPool::Unreadable, None);
     };
     let valid = pool.index == pump_amm::CANONICAL_POOL_INDEX
         && pool.creator == authority.to_bytes()
@@ -143,9 +153,9 @@ pub fn canonical_pool(cp: &AccountInfo, mint: &Pubkey, authority: &Pubkey) -> Ca
         && pool.quote_mint == WSOL_MINT.to_bytes()
         && !pool.is_mayhem_mode;
     if valid {
-        CanonicalPool::Valid
+        (CanonicalPool::Valid, Some(pool))
     } else {
-        CanonicalPool::Unreadable
+        (CanonicalPool::Unreadable, None)
     }
 }
 

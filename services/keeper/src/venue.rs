@@ -22,48 +22,62 @@
 //! all write-lock the same recipient), T12 / T13 the creator vault of the live `curve.creator`
 //! (R-PUMP §8). A `PumpMigrating` market has no trade (exits pause, `VenueMigrating`).
 //!
+//! **PumpSwap** (M6): the ReadSet is the adapter's own (`shortwin::venues::pump_amm::read_keys`: P0
+//! the canonical pool W, P1 its base vault W, P2 its WSOL vault W, P3 `GlobalConfig`, P4 the
+//! PumpSwap `FeeConfig`, P5 the boost vault's WSOL ATA), and a trade's TradeExtras T0–T18
+//! ([`trade_extras`]) come from the adapter's constants and the market's PumpSwap cache, with the
+//! slots the program checks against the **live** state read from this tick's ReadSet accounts: T9
+//! / T16 a protocol-fee and a buyback recipient of the live `GlobalConfig` (one per market, spread
+//! by the mint's first byte as on the curve), T10 / T17 their WSOL ATAs
+//! (`pump_amm::recipient_wsol_ata`: the tables, else derived), T11 / T12 the coin-creator vault of
+//! the live `pool.coin_creator` (the cache's when it is the cached creator, ARCH §5.4 case 4). The
+//! existence requirement (T10, T11, T14, T17 and on a cashback coin T18 initialised) is the
+//! keeper's duty 6 ([`pamm_account_keys`]; `crate::graduation`).
+//!
 //! **List-only** (`None`, M5): the program's "ReadSet" of a list-only market is its detection set
 //! `[bonding_curve, canonical_pool]` (`crank_price`, which re-runs `classify_pump` on it, and
 //! `sol_settle`, which runs the S3 of a curve that graduated elsewhere with positions open on it:
 //! M2-SEC-5), read-only; a list-only market has no trade.
 //!
-//! Venues without an adapter in this build (PumpSwap arrives with M6) are skipped with a reason.
 //! `VenueKind::Mock` exists only with the TEST-ONLY `test-venue` feature (A49).
 
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::AccountMeta;
 use anyhow::{Context, anyhow, bail};
+use shortwin::state::pump_swap_cache;
 use shortwin::state::{
     ENTRY_FIXED, ENTRY_TEMPLATE, EXTRAS_MAX_SEEDS, ExtraEntry, ExtrasSet, Market,
     PLACEHOLDER_BONDING_CURVE, PLACEHOLDER_MINT, PLACEHOLDER_POOL, PLACEHOLDER_TRADER, SEED_CONST,
     SEED_PLACEHOLDER, VenueExtras, VenueKind,
 };
 use shortwin::venues::{
-    EXTRAS_SET_CURRENT, EXTRAS_SET_PREVIOUS, EXTRAS_SET_STABLE, ExtrasSel, pump_curve,
+    EXTRAS_SET_CURRENT, EXTRAS_SET_PREVIOUS, EXTRAS_SET_STABLE, ExtrasSel, pump_amm, pump_curve,
     raydium_cpmm, raydium_v4,
 };
 use shortwin_services_common::AccountData;
-use shortwin_venue_state::pump;
+use shortwin_venue_state::{pump, pump_amm as pamm_state};
 
 /// Which ReadSet slots are writable in a trade (ARCH §3.12), in the parser's order:
 /// AMM v4 `[pool W, coin_vault W, pc_vault W, lp_mint]`, CPMM `[pool W, amm_config,
 /// token_0_vault W, token_1_vault W, lp_mint]`, the pump curve `[curve W, Global, FeeConfig,
-/// canonical pool, curve_base_ata W, PumpSwap FeeConfig, PumpSwap GlobalConfig]`, the mock
+/// canonical pool, curve_base_ata W, PumpSwap FeeConfig, PumpSwap GlobalConfig]`, PumpSwap
+/// `[pool W, base vault W, WSOL vault W, GlobalConfig, FeeConfig, boost vault ATA]`, the mock
 /// `[pool W, base vault W, WSOL vault W]`. `crank_price` and `sol_settle` pass every slot
 /// read-only.
 pub fn read_writable(kind: VenueKind) -> anyhow::Result<&'static [bool]> {
     const V4: [bool; raydium_v4::READ_LEN] = [true, true, true, false];
     const CPMM: [bool; raydium_cpmm::READ_LEN] = [true, false, true, true, false];
     const CURVE: [bool; pump_curve::READ_LEN] = [true, false, false, false, true, false, false];
+    const PAMM: [bool; pump_amm::READ_LEN] = [true, true, true, false, false, false];
     match kind {
         VenueKind::RaydiumV4 => Ok(&V4),
         VenueKind::RaydiumCpmm => Ok(&CPMM),
         VenueKind::PumpCurve | VenueKind::PumpMigrating => Ok(&CURVE),
+        VenueKind::PumpSwap => Ok(&PAMM),
         #[cfg(feature = "test-venue")]
         VenueKind::Mock => Ok(&[true, true, true]),
         // The detection set: read only (a list-only market never trades).
         VenueKind::None => Ok(&[false, false]),
-        other => bail!("venue {other:?} has no adapter in this build (M6)"),
     }
 }
 
@@ -76,6 +90,7 @@ pub fn read_set(kind: VenueKind, market: &Market) -> anyhow::Result<Vec<Pubkey>>
         VenueKind::PumpCurve | VenueKind::PumpMigrating => {
             Ok(pump_curve::read_keys(market).to_vec())
         }
+        VenueKind::PumpSwap => Ok(pump_amm::read_keys(market).to_vec()),
         #[cfg(feature = "test-venue")]
         VenueKind::Mock => {
             use shortwin::state::raydium_cache::{RAY_POOL, RAY_VAULT_SOL, RAY_VAULT_TOK};
@@ -87,10 +102,6 @@ pub fn read_set(kind: VenueKind, market: &Market) -> anyhow::Result<Vec<Pubkey>>
         }
         // The detection set (`crank_price`, `sol_settle`; module docs).
         VenueKind::None => Ok(vec![market.bonding_curve, market.canonical_pool]),
-        other => {
-            let _ = market;
-            bail!("venue {other:?} has no adapter in this build (M6)")
-        }
     }
 }
 
@@ -167,12 +178,9 @@ pub fn trade_extras(
             ])
         }
         VenueKind::PumpCurve => pump_trade_extras(market, read),
+        VenueKind::PumpSwap => pamm_trade_extras(market, read),
         VenueKind::PumpMigrating => bail!("a migrating curve has no trade (VenueMigrating)"),
         VenueKind::None => bail!("a list-only market has no trade (NoRoute)"),
-        other => {
-            let _ = (market, read);
-            bail!("venue {other:?} has no adapter in this build (M6)")
-        }
     }
 }
 
@@ -188,15 +196,16 @@ fn live_curve_accounts(
     Ok((global, curve))
 }
 
-/// A recipient of a live `Global` list for `market`: the first non-default entry from the
-/// mint's first byte on (every entry is one pump accepts, C0-14).
-fn recipient(list: [[u8; 32]; pump::RECIPIENTS], market: &Market) -> anyhow::Result<Pubkey> {
+/// A recipient of a live `Global` / `GlobalConfig` list for `market`: the first non-default
+/// entry from the mint's first byte on (every entry is one the venue accepts, C0-14).
+fn recipient(list: &[[u8; 32]], market: &Market) -> anyhow::Result<Pubkey> {
+    let n = list.len();
     let start = usize::from(market.mint.to_bytes()[0]);
-    (0..pump::RECIPIENTS)
-        .map(|k| list[(start + k) % pump::RECIPIENTS])
-        .find(|r| *r != [0u8; 32])
-        .map(Pubkey::new_from_array)
-        .context("the live Global lists no recipient")
+    (0..n)
+        .filter_map(|k| list.get((start + k) % n.max(1)))
+        .find(|r| **r != [0u8; 32])
+        .map(|r| Pubkey::new_from_array(*r))
+        .context("the live list names no recipient")
 }
 
 /// A live fee recipient and buyback recipient of the curve market's `Global`.
@@ -208,9 +217,224 @@ pub fn pump_recipients(
     let g = pump::read_global(&global.owner.to_bytes(), &global.data)
         .map_err(|e| anyhow!("pump Global: {e:?}"))?;
     Ok((
-        recipient(g.fee_recipients(), market)?,
-        recipient(g.buyback_fee_recipients(), market)?,
+        recipient(&g.fee_recipients(), market)?,
+        recipient(&g.buyback_fee_recipients(), market)?,
     ))
+}
+
+/// A protocol-fee recipient and a buyback recipient of PumpSwap's live `GlobalConfig` for
+/// `market` (T9 / T16; the entry from the mint's first byte on, as on the curve). `gc` is the
+/// `GlobalConfig` account as read (a PumpSwap ReadSet's P3, a curve ReadSet's C6).
+pub fn pamm_recipients(
+    market: &Market,
+    gc: Option<&AccountData>,
+) -> anyhow::Result<(Pubkey, Pubkey)> {
+    let gc = gc.context("PumpSwap GlobalConfig not read")?;
+    let g = pamm_state::read_global_config(&gc.owner.to_bytes(), &gc.data)
+        .map_err(|e| anyhow!("PumpSwap GlobalConfig: {e:?}"))?;
+    Ok((
+        recipient(&g.protocol_fee_recipients(), market)?,
+        recipient(&g.buyback_fee_recipients(), market)?,
+    ))
+}
+
+/// The coin-creator vault authority (T12) and its WSOL ATA (T11) of `coin_creator`: the market's
+/// PumpSwap cache when it is the cached creator, else derived (the program's
+/// `pump_amm::check_trade` accepts exactly these; ARCH §5.4 case 4).
+pub fn pamm_creator_accounts(market: &Market, coin_creator: &Pubkey) -> (Pubkey, Pubkey) {
+    let cached = |i: usize| pump_amm::cached(market, i);
+    if *coin_creator == cached(pump_swap_cache::CACHED_COIN_CREATOR)
+        && cached(pump_swap_cache::CACHED_COIN_CREATOR_VAULT_AUTH) != Pubkey::default()
+    {
+        (
+            cached(pump_swap_cache::CACHED_COIN_CREATOR_VAULT_AUTH),
+            cached(pump_swap_cache::CACHED_COIN_CREATOR_VAULT_ATA),
+        )
+    } else {
+        let a = pump_amm::coin_creator_vault_authority(coin_creator);
+        (a, pump_curve::wsol_ata(&a))
+    }
+}
+
+/// M6-SEC-4: anyone can change a PumpSwap pool's coin creator (pAMM `set_coin_creator`,
+/// `migrate_pool_coin_creator`: no signer), and the program's existence requirement refuses a trade
+/// while the live creator's vault WSOL ATA (T11) is missing. When the live creator is not the
+/// market's cached one (the change came after the market's last crank, which re-caches it), the
+/// keeper's exit carries `create_idempotent(T11)` paid by `payer` in its own transaction, so it
+/// does not depend on account preparation landing first. `None` off PumpSwap, for the cached
+/// creator, or when the pool does not parse.
+pub fn pamm_creator_vault_prep(
+    payer: &Pubkey,
+    market: &Market,
+    kind: VenueKind,
+    read: &[Option<AccountData>],
+) -> Option<anchor_lang::solana_program::instruction::Instruction> {
+    if kind != VenueKind::PumpSwap {
+        return None;
+    }
+    let pool = pamm_pool(read).ok()?;
+    let live = Pubkey::new_from_array(pool.coin_creator);
+    if live == pump_amm::cached(market, pump_swap_cache::CACHED_COIN_CREATOR) {
+        return None;
+    }
+    let (auth, _) = pamm_creator_accounts(market, &live);
+    Some(crate::graduation::create_ata_idempotent_ix(
+        payer,
+        &auth,
+        &shortwin::constants::WSOL_MINT,
+        &shortwin::constants::TOKEN_PROGRAM_ID,
+    ))
+}
+
+/// The live canonical pool of a PumpSwap market's ReadSet accounts (P0), parsed.
+pub fn pamm_pool(read: &[Option<AccountData>]) -> anyhow::Result<pamm_state::Pool> {
+    let acc = read
+        .get(pump_amm::P_POOL)
+        .and_then(Option::as_ref)
+        .context("PumpSwap pool not read")?;
+    pamm_state::read_pool(&acc.owner.to_bytes(), &acc.data)
+        .map_err(|e| anyhow!("PumpSwap pool: {e:?}"))
+}
+
+/// What a PumpSwap market's trades need to exist (the program refuses `VenueAccountMismatch` /
+/// `TraderStateInvalid` otherwise): `(key, what)` for T7 the trader's base ATA (a pump listing
+/// creates it; a list-only listing re-detected onto its pool does not), then ARCH §3.12's
+/// existence requirement — T14 the trader's pAMM UVA, T11 the coin-creator vault's WSOL ATA of
+/// `coin_creator`, T10 / T17 the WSOL ATAs of the recipients the keeper names, and on a cashback
+/// coin T18 `ATA(pAMM UVA(trader), WSOL)`. `create_market` of a PumpSwap listing creates the base
+/// ATA and the UVA; nothing creates the others for the trader, and a graduation creates none
+/// (duty 6).
+pub fn pamm_account_keys(
+    market: &Market,
+    coin_creator: &Pubkey,
+    recipients: (Pubkey, Pubkey),
+    cashback: bool,
+) -> Vec<(Pubkey, PammAccount)> {
+    use shortwin::constants::{TOKEN_PROGRAM_ID, WSOL_MINT};
+    let (auth, auth_ata) = pamm_creator_accounts(market, coin_creator);
+    let uva = uva_of(market);
+    let wsol = |owner: Pubkey| PammAccount::Ata {
+        owner,
+        mint: WSOL_MINT,
+        token_program: TOKEN_PROGRAM_ID,
+    };
+    let mut v = vec![
+        (
+            market.trader_base_ata,
+            PammAccount::Ata {
+                owner: market.trader,
+                mint: market.mint,
+                token_program: market.token_program,
+            },
+        ),
+        (uva, PammAccount::Uva),
+        (auth_ata, wsol(auth)),
+        (
+            pump_amm::recipient_wsol_ata(&recipients.0),
+            wsol(recipients.0),
+        ),
+        (
+            pump_amm::recipient_wsol_ata(&recipients.1),
+            wsol(recipients.1),
+        ),
+    ];
+    if cashback {
+        v.push((pump_curve::wsol_ata(&uva), wsol(uva)));
+    }
+    v
+}
+
+/// The trader's pAMM UVA of `market` (T14): the PumpSwap cache, else derived.
+pub fn uva_of(market: &Market) -> Pubkey {
+    let c = pump_amm::cached(market, pump_swap_cache::PAMM_UVA);
+    if c == Pubkey::default() {
+        pump_amm::user_volume_accumulator(&market.trader)
+    } else {
+        c
+    }
+}
+
+/// One account of [`pamm_account_keys`] and how it is created.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PammAccount {
+    /// PumpSwap `init_user_volume_accumulator(payer, user = trader)`; owned by PumpSwap.
+    Uva,
+    /// `create_idempotent(payer, owner, mint)` under `token_program`, which owns it.
+    Ata {
+        owner: Pubkey,
+        mint: Pubkey,
+        token_program: Pubkey,
+    },
+}
+
+impl PammAccount {
+    /// The program that owns the account once it exists.
+    pub fn owner_program(&self) -> Pubkey {
+        match self {
+            Self::Uva => shortwin::constants::PUMP_AMM_PROGRAM_ID,
+            Self::Ata { token_program, .. } => *token_program,
+        }
+    }
+}
+
+/// A `PumpSwap` trade's TradeExtras T0–T18 (ARCH §3.12; module docs): W at T7, T8, T10, T11,
+/// T14, T17, T18.
+fn pamm_trade_extras(
+    market: &Market,
+    read: &[Option<AccountData>],
+) -> anyhow::Result<Vec<AccountMeta>> {
+    use shortwin::constants::{
+        ASSOCIATED_TOKEN_PROGRAM_ID, PUMP_AMM_EVENT_AUTHORITY, PUMP_AMM_GLOBAL_VOLUME_ACCUMULATOR,
+        PUMP_AMM_PROGRAM_ID, PUMP_FEES_PROGRAM_ID, TOKEN_PROGRAM_ID, WSOL_MINT,
+    };
+    let pool = pamm_pool(read)?;
+    let (protocol, buyback) = pamm_recipients(
+        market,
+        read.get(pump_amm::P_GLOBAL_CONFIG).and_then(Option::as_ref),
+    )?;
+    let (auth, auth_ata) =
+        pamm_creator_accounts(market, &Pubkey::new_from_array(pool.coin_creator));
+    let uva = uva_of(market);
+    let cached = |i: usize| pump_amm::cached(market, i);
+    let marker = match cached(pump_swap_cache::POOL_V2_MARKER) {
+        k if k == Pubkey::default() => pump_amm::pool_v2(&market.mint),
+        k => k,
+    };
+    let cashback_ata = match cached(pump_swap_cache::PAMM_UVA_QUOTE_ATA) {
+        k if k == Pubkey::default() => pump_curve::wsol_ata(&uva),
+        k => k,
+    };
+    let keys: [(Pubkey, bool); pump_amm::TRADE_LEN] = [
+        (PUMP_AMM_PROGRAM_ID, false),
+        (PUMP_AMM_EVENT_AUTHORITY, false),
+        (PUMP_FEES_PROGRAM_ID, false),
+        (WSOL_MINT, false),
+        (TOKEN_PROGRAM_ID, false),
+        (ASSOCIATED_TOKEN_PROGRAM_ID, false),
+        (anchor_lang::system_program::ID, false),
+        (market.trader_base_ata, true),
+        (market.trader_wsol, true),
+        (protocol, false),
+        (pump_amm::recipient_wsol_ata(&protocol), true),
+        (auth_ata, true),
+        (auth, false),
+        (PUMP_AMM_GLOBAL_VOLUME_ACCUMULATOR, false),
+        (uva, true),
+        (marker, false),
+        (buyback, false),
+        (pump_amm::recipient_wsol_ata(&buyback), true),
+        (cashback_ata, true),
+    ];
+    Ok(keys
+        .into_iter()
+        .map(|(k, w)| {
+            if w {
+                AccountMeta::new(k, false)
+            } else {
+                AccountMeta::new_readonly(k, false)
+            }
+        })
+        .collect())
 }
 
 /// A `PumpCurve` trade's TradeExtras T0–T19 (ARCH §3.12; module docs): W at T6–T13, T16–T18.
@@ -479,15 +703,151 @@ mod tests {
     }
 
     #[test]
-    fn venues_without_an_adapter_are_skipped_with_a_reason() {
+    fn venues_without_a_trade_are_refused_with_a_reason() {
         let m = market(false, Pubkey::new_unique());
-        assert!(read_set(VenueKind::PumpSwap, &m).is_err());
-        assert!(read_writable(VenueKind::PumpSwap).is_err());
+        // A PumpSwap trade needs the live pool and GlobalConfig (the recipients, the creator).
         assert!(trade_extras(VenueKind::PumpSwap, &m, &[]).is_err());
         assert!(trade_extras(VenueKind::PumpMigrating, &m, &[]).is_err());
         assert!(trade_extras(VenueKind::None, &m, &[]).is_err());
         // A ReadSet of the wrong length is refused, never padded.
         assert!(read_metas(VenueKind::RaydiumV4, &[Pubkey::new_unique()], true).is_err());
+        assert!(read_metas(VenueKind::PumpSwap, &[Pubkey::new_unique()], true).is_err());
+    }
+
+    /// A PumpSwap `GlobalConfig` of 949 bytes with `protocol` / `buyback` as its recipient lists
+    /// (the reader's offsets @57 and @643).
+    fn pamm_global_config(protocol: [Pubkey; 8], buyback: [Pubkey; 8]) -> AccountData {
+        let mut d = vec![0u8; pamm_state::GLOBAL_CONFIG_LEN];
+        d[..8].copy_from_slice(&pamm_state::GLOBAL_CONFIG_DISCRIMINATOR);
+        for (i, k) in protocol.iter().enumerate() {
+            let o = pamm_state::OFF_GC_PROTOCOL_FEE_RECIPIENTS + 32 * i;
+            d[o..o + 32].copy_from_slice(k.as_ref());
+        }
+        for (i, k) in buyback.iter().enumerate() {
+            let o = pamm_state::OFF_GC_BUYBACK_FEE_RECIPIENTS + 32 * i;
+            d[o..o + 32].copy_from_slice(k.as_ref());
+        }
+        AccountData {
+            lamports: 1,
+            owner: shortwin::constants::PUMP_AMM_PROGRAM_ID,
+            executable: false,
+            data: d,
+        }
+    }
+
+    /// A canonical 301-byte PumpSwap pool of `mint` with `coin_creator` and the cashback flag.
+    fn pamm_pool_account(mint: &Pubkey, coin_creator: &Pubkey, cashback: bool) -> AccountData {
+        let mut d = vec![0u8; pamm_state::POOL_LEN];
+        d[..8].copy_from_slice(&pamm_state::POOL_DISCRIMINATOR);
+        d[pamm_state::OFF_BASE_MINT..pamm_state::OFF_BASE_MINT + 32].copy_from_slice(mint.as_ref());
+        d[pamm_state::OFF_QUOTE_MINT..pamm_state::OFF_QUOTE_MINT + 32]
+            .copy_from_slice(shortwin::constants::WSOL_MINT.as_ref());
+        d[pamm_state::OFF_COIN_CREATOR..pamm_state::OFF_COIN_CREATOR + 32]
+            .copy_from_slice(coin_creator.as_ref());
+        d[pamm_state::OFF_IS_CASHBACK_COIN] = u8::from(cashback);
+        AccountData {
+            lamports: 1,
+            owner: shortwin::constants::PUMP_AMM_PROGRAM_ID,
+            executable: false,
+            data: d,
+        }
+    }
+
+    /// ARCH §3.12 PumpSwap: the ReadSet is the adapter's (`pump_amm::read_keys`), P0–P2 writable
+    /// in trades; the TradeExtras are T0–T18 with the live `GlobalConfig`'s recipients (the
+    /// mint's first byte picks the entry), their WSOL ATAs (the adapter's table or derived), the
+    /// live coin creator's vault (the cache's when it is the cached creator), the cached UVA,
+    /// marker and cashback ATA, writable at T7, T8, T10, T11, T14, T17, T18; the existence
+    /// requirement's list names T14, T11, T10, T17 and on a cashback coin T18.
+    #[test]
+    fn pump_swap_lists_are_the_adapters_with_the_live_recipients() {
+        use shortwin::constants::{PUMP_AMM_PROGRAM_ID, TOKEN_PROGRAM_ID};
+        // The pool cache is a union: a PumpSwap market's holds only PumpSwap entries.
+        let mut m: Market = bytemuck::Zeroable::zeroed();
+        m.token_program = TOKEN_PROGRAM_ID;
+        m.trader_wsol = Pubkey::new_unique();
+        m.mint = Pubkey::new_from_array([5u8; 32]);
+        m.canonical_pool = Pubkey::new_unique();
+        m.trader = Pubkey::new_unique();
+        m.trader_base_ata = Pubkey::new_unique();
+        let cached_creator = Pubkey::new_unique();
+        pump_amm::precompute(&mut m, &cached_creator).unwrap();
+        let keys = read_set(VenueKind::PumpSwap, &m).unwrap();
+        assert_eq!(keys, pump_amm::read_keys(&m).to_vec());
+        assert_eq!(keys[pump_amm::P_POOL], m.canonical_pool);
+        let metas = read_metas(VenueKind::PumpSwap, &keys, true).unwrap();
+        assert_eq!(flags(&metas), [true, true, true, false, false, false]);
+        let protocol: [Pubkey; 8] = core::array::from_fn(|_| Pubkey::new_unique());
+        let buyback: [Pubkey; 8] = core::array::from_fn(|_| Pubkey::new_unique());
+        for (creator, cashback) in [(cached_creator, false), (Pubkey::new_unique(), true)] {
+            let mut read: Vec<Option<AccountData>> = vec![None; pump_amm::READ_LEN];
+            read[pump_amm::P_POOL] = Some(pamm_pool_account(&m.mint, &creator, cashback));
+            read[pump_amm::P_GLOBAL_CONFIG] = Some(pamm_global_config(protocol, buyback));
+            let x = trade_extras(VenueKind::PumpSwap, &m, &read).unwrap();
+            assert_eq!(x.len(), pump_amm::TRADE_LEN);
+            assert_eq!(x[pump_amm::T_PROGRAM].pubkey, PUMP_AMM_PROGRAM_ID);
+            // The mint's first byte (5) picks entry 5 of each list.
+            assert_eq!(x[pump_amm::T_PROTOCOL_FEE_RECIPIENT].pubkey, protocol[5]);
+            assert_eq!(x[pump_amm::T_BUYBACK_RECIPIENT].pubkey, buyback[5]);
+            assert_eq!(
+                x[pump_amm::T_PROTOCOL_FEE_RECIPIENT_ATA].pubkey,
+                pump_amm::recipient_wsol_ata(&protocol[5])
+            );
+            assert_eq!(
+                x[pump_amm::T_BUYBACK_RECIPIENT_ATA].pubkey,
+                pump_amm::recipient_wsol_ata(&buyback[5])
+            );
+            let auth = pump_amm::coin_creator_vault_authority(&creator);
+            assert_eq!(x[pump_amm::T_COIN_CREATOR_VAULT_AUTHORITY].pubkey, auth);
+            assert_eq!(
+                x[pump_amm::T_COIN_CREATOR_VAULT_ATA].pubkey,
+                pump_curve::wsol_ata(&auth)
+            );
+            let uva = pump_amm::user_volume_accumulator(&m.trader);
+            assert_eq!(x[pump_amm::T_UVA].pubkey, uva);
+            assert_eq!(
+                x[pump_amm::T_CASHBACK_ATA].pubkey,
+                pump_curve::wsol_ata(&uva)
+            );
+            assert_eq!(x[pump_amm::T_POOL_V2].pubkey, pump_amm::pool_v2(&m.mint));
+            assert_eq!(x[pump_amm::T_TRADER_BASE_ATA].pubkey, m.trader_base_ata);
+            assert_eq!(x[pump_amm::T_TRADER_WSOL].pubkey, m.trader_wsol);
+            let w: Vec<usize> = x
+                .iter()
+                .enumerate()
+                .filter(|(_, a)| a.is_writable)
+                .map(|(i, _)| i)
+                .collect();
+            assert_eq!(w, [7, 8, 10, 11, 14, 17, 18]);
+            assert!(x.iter().all(|a| !a.is_signer));
+            // The existence requirement's accounts.
+            let need = pamm_account_keys(&m, &creator, (protocol[5], buyback[5]), cashback);
+            let need_keys: Vec<Pubkey> = need.iter().map(|(k, _)| *k).collect();
+            let mut want = vec![
+                x[pump_amm::T_TRADER_BASE_ATA].pubkey,
+                x[pump_amm::T_UVA].pubkey,
+                x[pump_amm::T_COIN_CREATOR_VAULT_ATA].pubkey,
+                x[pump_amm::T_PROTOCOL_FEE_RECIPIENT_ATA].pubkey,
+                x[pump_amm::T_BUYBACK_RECIPIENT_ATA].pubkey,
+            ];
+            if cashback {
+                want.push(x[pump_amm::T_CASHBACK_ATA].pubkey);
+            }
+            assert_eq!(need_keys, want);
+            assert_eq!(need[1].1, PammAccount::Uva);
+            assert_eq!(
+                need[2].1,
+                PammAccount::Ata {
+                    owner: auth,
+                    mint: shortwin::constants::WSOL_MINT,
+                    token_program: TOKEN_PROGRAM_ID
+                }
+            );
+        }
+        // No GlobalConfig read: no trade.
+        let mut read: Vec<Option<AccountData>> = vec![None; pump_amm::READ_LEN];
+        read[pump_amm::P_POOL] = Some(pamm_pool_account(&m.mint, &cached_creator, false));
+        assert!(trade_extras(VenueKind::PumpSwap, &m, &read).is_err());
     }
 
     /// A list-only market's ReadSet is its detection set, read-only even in a trade's position
@@ -614,5 +974,55 @@ mod tests {
         }
         // No Global read: no trade.
         assert!(trade_extras(VenueKind::PumpCurve, &m, &[]).is_err());
+    }
+
+    /// M6-SEC-4: the exit's `create_idempotent(T11)` goes out only on a PumpSwap market whose live
+    /// pool names another coin creator than the cache, for the live creator's vault authority.
+    #[test]
+    fn a_changed_coin_creator_gets_its_vault_ata_in_the_exit() {
+        use shortwin_venue_state::pump_amm as vamm;
+        let mut m: Market = bytemuck::Zeroable::zeroed();
+        let cached_creator = Pubkey::new_unique();
+        let a = pump_amm::coin_creator_vault_authority(&cached_creator);
+        m.pool_cache[pump_swap_cache::CACHED_COIN_CREATOR] = cached_creator;
+        m.pool_cache[pump_swap_cache::CACHED_COIN_CREATOR_VAULT_AUTH] = a;
+        m.pool_cache[pump_swap_cache::CACHED_COIN_CREATOR_VAULT_ATA] = pump_curve::wsol_ata(&a);
+        let pool_with = |creator: &Pubkey| {
+            let mut d = vec![0u8; vamm::POOL_LEN];
+            d[..8].copy_from_slice(&vamm::POOL_DISCRIMINATOR);
+            d[vamm::OFF_COIN_CREATOR..vamm::OFF_COIN_CREATOR + 32]
+                .copy_from_slice(creator.as_ref());
+            vec![Some(AccountData {
+                lamports: 1,
+                owner: shortwin::constants::PUMP_AMM_PROGRAM_ID,
+                executable: false,
+                data: d,
+            })]
+        };
+        let payer = Pubkey::new_unique();
+        assert!(
+            pamm_creator_vault_prep(&payer, &m, VenueKind::PumpSwap, &pool_with(&cached_creator))
+                .is_none()
+        );
+        let live = Pubkey::new_unique();
+        let ix = pamm_creator_vault_prep(&payer, &m, VenueKind::PumpSwap, &pool_with(&live))
+            .expect("a changed creator");
+        let auth = pump_amm::coin_creator_vault_authority(&live);
+        assert_eq!(
+            ix.program_id,
+            shortwin::constants::ASSOCIATED_TOKEN_PROGRAM_ID
+        );
+        assert_eq!(ix.data, vec![1], "create_idempotent");
+        assert_eq!(ix.accounts[1].pubkey, pump_curve::wsol_ata(&auth));
+        assert_eq!(ix.accounts[2].pubkey, auth);
+        assert!(
+            ix.accounts
+                .iter()
+                .all(|a| !a.is_signer || a.pubkey == payer)
+        );
+        assert!(
+            pamm_creator_vault_prep(&payer, &m, VenueKind::PumpCurve, &pool_with(&live)).is_none()
+        );
+        assert!(pamm_creator_vault_prep(&payer, &m, VenueKind::PumpSwap, &[None]).is_none());
     }
 }

@@ -709,7 +709,7 @@ impl ConfigChange {
             Self::Timelock { timelock_s } => check_timelock(*timelock_s),
             Self::EnableVenues { bits } => {
                 // Known bits only, and none this build cannot finish (M5-SEC-4:
-                // `constants::VENUE_BITS_UNFINISHED`, the pump curve until M6).
+                // `constants::VENUE_BITS_UNFINISHED`; the pump curve in M5, empty since M6).
                 require!(
                     *bits != 0 && bits & !VENUE_BITS_ENABLEABLE == 0,
                     ShortwinError::InvalidParams
@@ -980,22 +980,15 @@ mod tests {
         assert!(c
             .check_change(&ConfigChange::EnableVenues { bits: 0 })
             .is_err());
-        // M5-SEC-4: the pump curve cannot be enabled before M6's `→ PumpSwap` transition,
-        // alone or with other bits; every other release bit can.
+        // M5-SEC-4's gate, emptied by M6 (the `→ PumpSwap` transition): the pump curve can be
+        // enabled, alone or with other bits, and so can every release bit.
         for bits in [
             crate::constants::VENUE_BIT_PUMP_CURVE,
             crate::constants::VENUE_BIT_PUMP_CURVE | crate::constants::VENUE_BIT_RAYDIUM_V4,
+            crate::constants::VENUE_BITS_RELEASE,
         ] {
-            assert!(c
-                .check_change(&ConfigChange::EnableVenues { bits })
-                .is_err());
+            assert!(c.check_change(&ConfigChange::EnableVenues { bits }).is_ok());
         }
-        assert!(c
-            .check_change(&ConfigChange::EnableVenues {
-                bits: crate::constants::VENUE_BITS_RELEASE
-                    & !crate::constants::VENUE_BIT_PUMP_CURVE
-            })
-            .is_ok());
         assert!(c
             .check_change(&ConfigChange::Authorities {
                 governance: Pubkey::default(),

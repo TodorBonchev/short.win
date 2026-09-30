@@ -26,13 +26,15 @@
 //!    `pool_fast_route_s`, propose the deepest eligible candidate (opening the collection
 //!    window, or improving someone else's), and `execute_pool_switch` at the first second after
 //!    the window; a failing market without positions is observed to keep its chain.
-//! 6. **Graduation** ([`graduation`]; M5): pump `migrate_v2` top-level as soon as a covered
-//!    market's curve completes (ADOPTED Q16), then an observation of the market; the straddle
-//!    bundle of ARCH §5.4 for a liquidatable position whose `Q` exceeds its live curve's `rT`
-//!    (tx1 `complete_curve` of the `complete-curve` helper, tx2 `migrate_v2`, tx3 the exit on the
-//!    new pool — M6's), sent through a Jito block engine; until M6 there is no tx3, so the
-//!    two-transaction bundle goes out only with `graduation.send_without_exit` and the keeper
-//!    otherwise calls `sol_settle` for the position.
+//! 6. **Graduation** ([`graduation`]; M5, M6): pump `migrate_v2` top-level as soon as a covered
+//!    market's curve completes (ADOPTED Q16), then — as soon as the canonical pool is valid — the
+//!    `→ PumpSwap` transition in one transaction (the pool accounts the trades require,
+//!    `crank_price` onto the pool, the pool's first observation); the straddle bundle of ARCH §5.4
+//!    for a liquidatable position whose `Q` exceeds its live curve's `rT` (tx1 `complete_curve` of
+//!    the `complete-curve` helper, tx2 `migrate_v2`, tx3 the transition), sent through a Jito
+//!    block engine — the exit on the pool follows at the post-change warm-up's gate (`T + 8`);
+//!    **right after a full wipe** the venue cashback claims and `sweep_trader` ([`sweep`]), so the
+//!    market takes deposits and opens again.
 //! 10. **Venue drift monitor** ([`monitor`]): the six venue ProgramData deploy slots against the
 //!     `VenueGuard` latch — an upgrade is flagged with `flag_venue_upgraded` in the slot it is
 //!     seen, once, and refreshed when a second upgrade lands during review; Token-2022's upgrade
@@ -46,6 +48,9 @@
 //!     first pool (after D1's `classify_pump`), a listing-window replacement (5 %), a
 //!     zero-position adoption (25 %, in the tick the last position closes); a market pinned by
 //!     open positions to a much thinner pool is alerted (R4B-10); pool events are reported.
+//! 13. **The trader side** ([`sweep`]; M6): `sweep_trader` when the trader side holds anything
+//!     (a donated `ATA(trader, WSOL)`, lamports on the trader PDAs, tokens on a pump venue's trader
+//!     base ATA), and the weekly venue cashback claim on cashback coins.
 //!
 //! Operations: several markets' cranks per transaction ([`keeper`]: v1 batches of up to 6, v0
 //! batches of up to 4 where v1 is refused, each cut where its transaction would exceed the
@@ -64,8 +69,9 @@
 //! (the binary), an in-process LiteSVM backend for tests (`services/keeper-litesvm`).
 //! Venue kinds ([`venue`]): Raydium AMM v4 and CPMM (M3); the pump curve and a migrating curve
 //! (M5: the curve adapter's ReadSet and TradeExtras, the risk view through the program's own
-//! quoter, `B̂_str` above `rT`); the TEST-ONLY mock (`test-venue` feature); PumpSwap arrives with
-//! M6.
+//! quoter, `B̂_str` above `rT`); PumpSwap (M6: the adapter's ReadSet and TradeExtras, the mint's
+//! supply read for the fee tier, `disable_flags` watched by duty 10); the TEST-ONLY mock
+//! (`test-venue` feature).
 
 pub mod alerts;
 pub mod alt;
@@ -81,6 +87,7 @@ pub mod metrics;
 pub mod monitor;
 pub mod pda;
 pub mod pool_monitor;
+pub mod sweep;
 pub mod venue;
 pub mod view;
 

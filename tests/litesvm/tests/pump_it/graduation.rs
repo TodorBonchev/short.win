@@ -2,14 +2,18 @@
 //! state machine `PumpCurve → PumpMigrating` (a completing buyback, an external completion seen
 //! by a crank), the migration pause (exits refuse with `VenueMigrating`, S3 only after
 //! `max_migration_pause_s + s3_wait_s` — the stuck migration at 70 min, FV on the deterministic
-//! post-migration pool), a real `migrate_v2` that leaves the market `PumpMigrating` until M6's
-//! `→ PumpSwap`, a curve that graduated elsewhere (`→ None`, the `graduated_elsewhere` flag, the
+//! post-migration pool), a real `migrate_v2` after which the next crank moves the market onto its
+//! canonical pool (M6's `→ PumpSwap`; `pamm_it::graduation` runs the exits there), a curve that
+//! graduated elsewhere (`→ None`, the `graduated_elsewhere` flag, the
 //! detection set as ReadSet, S3 after the chain: M2-SEC-5 on a real transition), and the
 //! `None → PumpCurve` re-detection by `crank_price` (the curve cache, the price start, the
 //! collection window cleared). M4's two carry-overs (ARCH §9 M4 → M5): a curve that graduated
 //! elsewhere **with a position open** adopts its Raydium pool only through M4's collection window
 //! (switch only if all fit; the deepest candidate; the position carried and closed on the new
 //! pool), and the `None →` pump re-detection clears a running window (`fp_*`) and the route chains.
+//! The M6 security review's curve-side findings: M6-SEC-5 (a full wipe settled during the
+//! migration pause waits for the curve-era cashback) and M6-SEC-3 (a curve open under PumpSwap's
+//! `create_pool` halt, pinned as built: an owner item).
 //!
 //! Every instruction goes through `Env::send`: the invariant hooks run after each one. The only
 //! planted state is the venue's (pump's curve account: reserves zeroed as by a migration to
@@ -17,9 +21,15 @@
 //! curve made live again, the one state a re-detection with a window open needs; Raydium CPMM
 //! pools of the pump mint planted from the dumped USELESS pool, `pool_select::plant_cpmm`).
 
-use shortwin::state::{MARKET_FLAG_GRADUATED_ELSEWHERE, Market};
+use shortwin::events::TraderSwept;
+use shortwin::state::{
+    MARKET_FLAG_GRADUATED_ELSEWHERE, MARKET_FLAG_WIPE_LIVE, MARKET_FLAG_WIPE_REWARDS_CLAIMED,
+    MARKET_FLAG_WIPE_TRADER_SWEPT, Market,
+};
 use shortwin_litesvm_tests::engine::expire_ix;
+use shortwin_litesvm_tests::{ix, pamm};
 use shortwin_math::fees::{self, FeeBps, PammFeeSchedule};
+use shortwin_math::pool::{WIPE_REWARDS_CLAIMED, WIPE_TRADER_SWEPT};
 use shortwin_math::quote::{self as mq, MigrationParams, sol_leg};
 use shortwin_math::rent;
 use shortwin_venue_state::{pump as vpump, pump_amm as vamm};
@@ -223,11 +233,12 @@ fn a_stuck_migration_pauses_exits_and_settles_s3_after_the_pause() {
 /// pool appears with exactly the deterministic reserves short.win prices on a complete curve
 /// (`X_p` = the curve's 206.9 M pool tokens, effective quote `Y_p = rQ − pool_migration_fee`)
 /// and the boost of `⌊0.2069·Y⌋`; the curve's reserves are zeroed. (Priced before the
-/// completion, `Y_p` is one lamport above: `straddle::b_str_prices_the_executed_bundle`.) In M5 the market stays
-/// `PumpMigrating` (the `→ PumpSwap` transition is M6's): cranks change nothing, exits still
-/// refuse.
+/// completion, `Y_p` is one lamport above: `straddle::b_str_prices_the_executed_bundle`.) The next
+/// crank moves the market onto the pool (M6: `PumpMigrating → PumpSwap`, the ring rewritten to the
+/// pool's `lp_supply`, the post-change warm-up; in M5 it stayed `PumpMigrating`); the curve's
+/// account lists no longer fit the market (`VenueAccountMismatch`).
 #[test]
-fn migrate_v2_on_the_real_elf_keeps_the_market_migrating() {
+fn migrate_v2_on_the_real_elf_graduates_the_market_onto_its_pool() {
     let (mut env, pm, q) = setup(PumpCoin::Near);
     let mut b = env.borrower();
     let (_, nonce, _) = open_ok(&mut env, &pm, &mut b, q);
@@ -287,10 +298,17 @@ fn migrate_v2_on_the_real_elf_keeps_the_market_migrating() {
         "migrated"
     );
     env.warp(1);
-    no_venue_change(&crank(&mut env, &pm));
-    assert_eq!(venue(&env, &pm), VenueKind::PumpMigrating, "M6 moves it on");
+    venue_changed(
+        &crank(&mut env, &pm),
+        VenueKind::PumpMigrating,
+        VenueKind::PumpSwap,
+    );
+    assert_eq!(venue(&env, &pm), VenueKind::PumpSwap, "M6 moves it on");
+    let m = market(&env, &pm);
+    assert_eq!((m.ema_warm, m.ema_guard), (8, 1));
+    assert_eq!(m.ema_liq.get(), u128::from(st.lp_supply));
     env.warp(1);
-    assert_err(&env.close(&pm, &b, nonce), E::VenueMigrating);
+    assert_err(&env.close(&pm, &b, nonce), E::VenueAccountMismatch);
 }
 
 /// A curve that completed and then migrated **elsewhere** (reserves zeroed, no canonical pool;
@@ -650,4 +668,296 @@ fn a_none_to_pump_redetection_clears_the_collection_window() {
     crank(&mut env, &pm);
     let (c, _) = close_ok(&mut env, &pm, &b, nonce);
     assert_eq!(c.q, q);
+}
+
+// ---- the M6 security review (curve side) --------------------------------------------------------
+
+/// The seeding lender withdraws every free token (every share whose tokens `T` covers).
+fn withdraw_all_free(env: &mut Env, pm: &PumpMarket) {
+    let m = market(env, pm);
+    let pool = m.pool();
+    let want = m.tokens_free;
+    let lender = env
+        .lender(&pm.market(), &pm.lender.pubkey())
+        .expect("lender");
+    let (mut lo, mut hi) = (0u128, lender.shares);
+    while lo < hi {
+        let mid = lo + (hi - lo).div_ceil(2);
+        if shortwin_math::pool::tokens_for_shares(&pool, mid).unwrap() <= u128::from(want) {
+            lo = mid;
+        } else {
+            hi = mid - 1;
+        }
+    }
+    let kp = pm.lender.insecure_clone();
+    ok(env.send(&[ix::withdraw(&pm.lender_keys(), lo, want)], &[&kp]));
+    assert_eq!(market(env, pm).tokens_free, 0);
+}
+
+/// The cashback pump's `claim_cashback` pays `user` now: its pump UVA's lamports above the
+/// account's rent-exempt minimum (pump's `PUMP_CASHBACK_README`).
+fn claimable_cashback(env: &Env, user: &Pubkey) -> u64 {
+    let uva = fork::pump_user_volume_accumulator(user);
+    let acc = env.svm.get_account(&uva).expect("the trader's pump UVA");
+    acc.lamports - env.svm.minimum_balance_for_rent_exemption(acc.data.len())
+}
+
+/// The keeper's chain through a stuck migration (ARCH §5.3): a crank and a `sol_settle` every
+/// 30 s until the position settles; returns the event and the second it settled at.
+fn settle_through_the_pause(
+    env: &mut Env,
+    pm: &PumpMarket,
+    kp: &solana_keypair::Keypair,
+    b: &Pubkey,
+    nonce: u64,
+    mut each: impl FnMut(&mut Env),
+) -> (shortwin::events::SolSettle, i64) {
+    for _ in 0..200 {
+        env.warp(30);
+        crank(env, pm);
+        each(env);
+        let meta = ok(settle(env, pm, kp, b, nonce));
+        if let Some(ev) = settled(&meta) {
+            return (ev, env.now());
+        }
+    }
+    panic!("never settled");
+}
+
+/// ★ M6-SEC-5. `engine::lender::rewards_required` left out `PumpMigrating`, so a full wipe that
+/// settled during the migration pause (S3 is the only settlement there) let a deposit end the wipe
+/// record without `wipe_rewards_claimed`: a legacy cashback curve's pre-wipe cashback, still in the
+/// trader's pump UVA, then went to the next epoch's lenders (R4A-7). Reproduced on the pre-fix build:
+/// the deposit below landed right after the S3 wipe, with the cashback unclaimed. Now the deposit
+/// waits (`WipeSweepPending`) while the market is `PumpMigrating` too; `sweep_trader` alone sets the
+/// trader bit only (cashback outstanding); `[pump claim_cashback(user = trader), sweep_trader]` —
+/// no signature but the fee payer's — credits the cashback to the wiped epoch's record and sets
+/// both bits (no deadlock: the curve kinds' sweep sets the bit once nothing is claimable), and the
+/// deposit lands.
+#[test]
+fn m6_sec_5_a_full_wipe_during_the_migration_pause_waits_for_the_curve_cashback() {
+    let (mut env, pm, q) = setup(PumpCoin::Near);
+    let market_key = pm.market();
+    fork::patch(&mut env.svm, &pm.curve.curve, |d| {
+        d[vpump::OFF_IS_CASHBACK_COIN] = 1
+    });
+    assert!(pm.curve.state(&env.svm).is_cashback_coin);
+    let mut b = env.borrower();
+    let (_, nonce, _) = open_ok(&mut env, &pm, &mut b, q);
+    let trader = pm.trader();
+    assert!(
+        claimable_cashback(&env, &trader) > 0,
+        "the open's sale paid cashback into the trader's pump UVA"
+    );
+    withdraw_all_free(&mut env, &pm);
+    // 30 min before the position's deadline an outside buy completes the curve and nobody
+    // migrates it: the market pauses, and the expired position settles S3 after the pause (ARCH
+    // §5.3; `a_stuck_migration_pauses_exits_and_settles_s3_after_the_pause`).
+    warp_to_deadline(&mut env, &pm, &b.key(), nonce, -1_800);
+    crank(&mut env, &pm);
+    env.warp(1);
+    buy_down_to(&mut env, &pm, 0);
+    env.warp(1);
+    venue_changed(
+        &crank(&mut env, &pm),
+        VenueKind::PumpCurve,
+        VenueKind::PumpMigrating,
+    );
+    let t0 = env.now();
+    let kp = keeper(&mut env);
+    let (ev, at) = settle_through_the_pause(&mut env, &pm, &kp, &b.key(), nonce, |_| {});
+    assert_eq!(ev.condition, 3, "S3 during the migration pause");
+    assert!(at >= t0 + 4_200, "after max_migration_pause_s + s3_wait_s");
+    let m = market(&env, &pm);
+    assert_eq!(venue(&env, &pm), VenueKind::PumpMigrating);
+    assert_eq!(m.total_shares.get(), 0);
+    assert!(m.has_flag(MARKET_FLAG_WIPE_LIVE), "a full wipe");
+    let cashback = claimable_cashback(&env, &trader);
+    assert!(cashback > 0, "the pre-wipe cashback is still in the UVA");
+
+    // A new lender (tokens from a balance planted in its own account: the curve cannot sell).
+    let amount = q;
+    let lender2 = env.funded_keypair();
+    let acc = fork::fund_token(
+        &mut env,
+        &lender2.pubkey(),
+        &pm.keys.mint,
+        pm.curve.token_program,
+        amount,
+    );
+    let k = ix::LenderKeys {
+        owner: lender2.pubkey(),
+        mint: pm.keys.mint,
+        token_program: pm.keys.token_program,
+        owner_token_account: acc,
+    };
+    let deposit = |env: &Env| {
+        let m = env.market(&market_key);
+        ix::with_remaining(
+            ix::deposit(&k, amount, 0),
+            &ix::epoch_records(&market_key, 0, m.share_epoch),
+        )
+    };
+    // The fix: the deposit waits for the venue-reward bit on `PumpMigrating` as well.
+    let d0 = deposit(&env);
+    assert_err(&env.send(&[d0], &[&lender2]), E::WipeSweepPending);
+
+    // The sweep alone: the trader bit, not the venue-reward bit; the deposit still waits.
+    let meta = ok(env.send(&[pump::sweep_trader_pump_ix(&env, &pm)], &[]));
+    let ev: TraderSwept = events::one(&meta);
+    assert_eq!(ev.wipe_bits & WIPE_TRADER_SWEPT, WIPE_TRADER_SWEPT);
+    assert_eq!(
+        ev.wipe_bits & WIPE_REWARDS_CLAIMED,
+        0,
+        "cashback outstanding"
+    );
+    assert!(market(&env, &pm).has_flag(MARKET_FLAG_WIPE_TRADER_SWEPT));
+    let d0 = deposit(&env);
+    assert_err(&env.send(&[d0], &[&lender2]), E::WipeSweepPending);
+
+    // The unlocking bundle, signed by the fee payer only.
+    let claim = pump::claim_cashback_ix(&trader);
+    assert!(claim.accounts.iter().all(|a| !a.is_signer));
+    let lender_sol0 = env.market_vault(&market_key).lender_sol;
+    let meta = ok(env.send(&[claim, pump::sweep_trader_pump_ix(&env, &pm)], &[]));
+    let ev: TraderSwept = events::one(&meta);
+    assert_eq!(
+        ev.lamports, cashback,
+        "the whole cashback, through the trader"
+    );
+    assert_eq!(
+        ev.wipe_bits & (WIPE_TRADER_SWEPT | WIPE_REWARDS_CLAIMED),
+        WIPE_TRADER_SWEPT | WIPE_REWARDS_CLAIMED
+    );
+    assert!(market(&env, &pm).has_flag(MARKET_FLAG_WIPE_REWARDS_CLAIMED));
+    assert_eq!(claimable_cashback(&env, &trader), 0);
+    assert_eq!(
+        env.market_vault(&market_key).lender_sol - lender_sol0,
+        cashback,
+        "credited to the wiped epoch's record"
+    );
+    let d1 = deposit(&env);
+    ok(env.send(&[d1], &[&lender2]));
+    assert!(!market(&env, &pm).has_flag(MARKET_FLAG_WIPE_LIVE));
+}
+
+/// M6-SEC-5, no deadlock: on a non-cashback curve the same S3 wipe during the migration pause is
+/// unlocked by `sweep_trader` alone (the pump UVA holds nothing claimable: both bits at once).
+#[test]
+fn m6_sec_5_without_cashback_the_sweep_alone_unlocks_a_migrating_market() {
+    let (mut env, pm, q) = setup(PumpCoin::Near);
+    let market_key = pm.market();
+    assert!(!pm.curve.state(&env.svm).is_cashback_coin);
+    let mut b = env.borrower();
+    let (_, nonce, _) = open_ok(&mut env, &pm, &mut b, q);
+    withdraw_all_free(&mut env, &pm);
+    warp_to_deadline(&mut env, &pm, &b.key(), nonce, -1_800);
+    crank(&mut env, &pm);
+    env.warp(1);
+    buy_down_to(&mut env, &pm, 0);
+    env.warp(1);
+    crank(&mut env, &pm);
+    let kp = keeper(&mut env);
+    let (ev, _) = settle_through_the_pause(&mut env, &pm, &kp, &b.key(), nonce, |_| {});
+    assert_eq!(ev.condition, 3);
+    assert_eq!(venue(&env, &pm), VenueKind::PumpMigrating);
+    assert!(market(&env, &pm).has_flag(MARKET_FLAG_WIPE_LIVE));
+    let meta = ok(env.send(&[pump::sweep_trader_pump_ix(&env, &pm)], &[]));
+    let ev: TraderSwept = events::one(&meta);
+    assert_eq!(
+        ev.wipe_bits & (WIPE_TRADER_SWEPT | WIPE_REWARDS_CLAIMED),
+        WIPE_TRADER_SWEPT | WIPE_REWARDS_CLAIMED
+    );
+    let amount = q;
+    let lender2 = env.funded_keypair();
+    let acc = fork::fund_token(
+        &mut env,
+        &lender2.pubkey(),
+        &pm.keys.mint,
+        pm.curve.token_program,
+        amount,
+    );
+    let k = ix::LenderKeys {
+        owner: lender2.pubkey(),
+        mint: pm.keys.mint,
+        token_program: pm.keys.token_program,
+        owner_token_account: acc,
+    };
+    let m = env.market(&market_key);
+    let d = ix::with_remaining(
+        ix::deposit(&k, amount, 0),
+        &ix::epoch_records(&market_key, 0, m.share_epoch),
+    );
+    ok(env.send(&[d], &[&lender2]));
+}
+
+/// M6-SEC-3 (OWNER item; pinned as built). PumpSwap's `disable_flags` bit 0 halts `create_pool`
+/// and with it pump's `migrate_v2` (T-DISABLE, R-VEN Update H4). A curve open does not read the
+/// flag, although the curve's ReadSet carries PumpSwap's `GlobalConfig` (C6): with bit 0 set a curve
+/// position still opens, and once the curve completes the market stays `PumpMigrating` — every
+/// `migrate_v2` fails 6017 `DisabledCreatePool`, exits refuse `VenueMigrating`. S3 needs the
+/// position liquidatable or expired (ARCH §5.3): a healthy position is frozen past the 70-min pause
+/// until its deadline, then settles S3 after `s3_wait_s`, paying the lenders FV in SOL instead of
+/// the tokens. PumpSwap opens, by contrast, refuse any non-zero flag (`VenueFlagged`). Whether curve
+/// opens should refuse while bit 0 is set (the check costs no account) or the exposure is disclosed
+/// is the owner's (ARCH §3.4 / §5.5): if the owner adopts the refusal, the open below must fail
+/// `VenueFlagged`.
+#[test]
+fn m6_sec_3_a_curve_open_under_the_create_pool_halt_stalls_until_s3() {
+    let (mut env, pm, q) = setup(PumpCoin::Near);
+    pamm::set_disable_flags(&mut env.svm, 0x01);
+    // As built: the curve open ignores the halt.
+    let mut b = env.borrower();
+    let (open, nonce, _) = open_ok(&mut env, &pm, &mut b, q);
+    env.warp(1);
+    buy_down_to(&mut env, &pm, 0);
+    env.warp(1);
+    venue_changed(
+        &crank(&mut env, &pm),
+        VenueKind::PumpCurve,
+        VenueKind::PumpMigrating,
+    );
+    let t0 = env.now();
+    let pos = env.position(&pm, &b.key(), nonce);
+    let migrate = |env: &mut Env| {
+        let migrator = env.funded_keypair();
+        let ix = pump::migrate_v2_ix(&env.svm, &migrator.pubkey(), &pm.curve);
+        let res = env.send(&[pump::cu_limit_ix(600_000), ix], &[&migrator]);
+        assert_eq!(custom_code(&res), Some(6017), "DisabledCreatePool");
+    };
+    migrate(&mut env);
+    env.warp(1);
+    assert_err(&env.close(&pm, &b, nonce), E::VenueMigrating);
+    // The keeper's chain through the pause and 20 min past it, `migrate_v2` retried every 30 s: the
+    // healthy position is not settled.
+    let kp = keeper(&mut env);
+    let pause_end = t0 + i64::from(pos.max_migration_pause_s) + i64::from(pos.s3_wait_s);
+    while env.now() < pause_end + 1_200 {
+        env.warp(30);
+        crank(&mut env, &pm);
+        migrate(&mut env);
+        let meta = ok(settle(&mut env, &pm, &kp, &b.key(), nonce));
+        assert!(settled(&meta).is_none(), "a healthy position stays frozen");
+    }
+    assert_err(&env.close(&pm, &b, nonce), E::VenueMigrating);
+    // At its deadline the position is expired: S3 after `s3_wait_s` of the chain.
+    warp_to_deadline(&mut env, &pm, &b.key(), nonce, 0);
+    let (ev, at) = settle_through_the_pause(&mut env, &pm, &kp, &b.key(), nonce, migrate);
+    assert_eq!(ev.condition, 3, "S3");
+    assert!(
+        at >= pos.deadline + i64::from(pos.s3_wait_s),
+        "S3 after the deadline's chain"
+    );
+    assert!(at < pos.deadline + i64::from(pos.s3_wait_s) + 60);
+    assert_eq!(venue(&env, &pm), VenueKind::PumpMigrating);
+    eprintln!(
+        "M6-SEC-3: open q {} (S {} lamports) under the create_pool halt; the curve completed at t0; \
+         migrate_v2 6017 throughout; healthy and frozen through the 70-min pause; S3 at t0 + {} s \
+         (deadline + s3_wait): FV {} lamports, lenders {} lamports in SOL, no tokens back",
+        open.q,
+        open.s,
+        at - t0,
+        ev.fv,
+        ev.lender_amount
+    );
 }

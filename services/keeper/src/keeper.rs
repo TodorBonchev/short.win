@@ -43,13 +43,21 @@
 //! M2-SEC-5); one whose detection set shows a pump curve again is cranked onto it, and the
 //! trader's curve accounts are then created ([`crate::graduation::redetection_due`]).
 //!
-//! **Graduation** (duty 6, [`crate::graduation`]; M5): before a curve market's exits, pump
-//! `migrate_v2` top-level as soon as its curve is complete and unmigrated (then the market is
-//! observed in the same second); a liquidatable position whose `Q` exceeds its live curve's `rT`
-//! (`Plan::Straddle`) gets the straddle bundle (`complete_curve`, `migrate_v2`, the exit on the new
-//! pool: M6) through the chain's block engine — until M6 there is no exit transaction, so the
-//! bundle goes out only with `graduation.send_without_exit`, and otherwise the keeper calls
-//! `sol_settle` for the position.
+//! **Graduation** (duty 6, [`crate::graduation`]; M5, M6): before a curve market's exits, pump
+//! `migrate_v2` top-level as soon as its curve is complete and unmigrated, then — as soon as its
+//! canonical pool is valid, whoever migrated — the `→ PumpSwap` transition (the pool accounts its
+//! trades require, `crank_price` onto the pool, the pool's first observation) in one transaction,
+//! which is the market's observation for the second; a PumpSwap market whose pool accounts are
+//! missing gets them created; a liquidatable position whose `Q` exceeds its live curve's `rT`
+//! (`Plan::Straddle`) gets the straddle bundle (`complete_curve`, `migrate_v2`, the transition)
+//! through the chain's block engine, and its exit on the pool follows at the post-change
+//! warm-up's gate (the keeper's ordinary PumpSwap duties). While the bundle does not go out, the
+//! keeper calls `sol_settle` for the position.
+//!
+//! **The trader side** (duties 6 and 13, [`crate::sweep`]): right after a full wipe, the venue
+//! cashback claims the trader needs and `sweep_trader` (a deposit, and hence an open, waits for
+//! both post-wipe bits); every `sweep.check_interval_s`, `sweep_trader` when the trader side holds
+//! anything, and the weekly cashback claim on cashback coins.
 //!
 //! Batches are **packed by size**: a batch takes up to `batch_v1` / `batch_v0` cranks and is cut
 //! where its transaction would exceed the format's size or account limit, so any mix of venue
@@ -90,7 +98,8 @@ use crate::metrics::Metrics;
 use crate::monitor::{self, FeeCaps, LatchAction, PoolWatch};
 use crate::pda;
 use crate::pool_monitor::{self, Action, PoolPlan, PoolTrack, Seen};
-use crate::venue;
+use crate::sweep::{self, SweepFacts, SweepKind, SweepRecord};
+use crate::venue::{self, PammAccount};
 use crate::view::{self, ChainView, MarketView, PositionView};
 
 /// Whether the cluster accepts v1 transactions.
@@ -284,8 +293,16 @@ pub struct TickReport {
     /// Duty 6 (M5): the trader accounts the keeper created on a curve market (after a `None →`
     /// pump re-detection), with the result.
     pub curve_accounts: Vec<(Pubkey, ExitResult)>,
+    /// Duty 6 (M6): the pool accounts the keeper created on a PumpSwap market (ARCH §3.12's
+    /// existence requirement), with the result.
+    pub pamm_accounts: Vec<(Pubkey, ExitResult)>,
+    /// Duty 6 (M6): the keeper's `→ PumpSwap` transitions (its own transaction, or a straddle
+    /// bundle's tx3).
+    pub transitions: Vec<TransitionRecord>,
     /// Duty 6: the straddle bundles (sent, refused in pre-flight, or waiting).
     pub straddles: Vec<StraddleRecord>,
+    /// Duties 6 and 13: the keeper's sweeps (post-wipe, trader side, cashback claims).
+    pub sweeps: Vec<SweepRecord>,
     pub skipped: Vec<(Pubkey, String)>,
     pub errors: Vec<String>,
 }
@@ -302,6 +319,27 @@ impl TickReport {
     pub fn observed(&self, market: &Pubkey) -> bool {
         self.observed.iter().any(|(m, _)| m == market)
     }
+}
+
+/// One `→ PumpSwap` transition of the keeper (duty 6, M6; [`crate::graduation::transition_ixs`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TransitionRecord {
+    pub market: Pubkey,
+    /// Pool accounts created in it.
+    pub created: usize,
+    /// Tx3 of a straddle bundle (else the keeper's own transaction).
+    pub bundled: bool,
+    /// The `VenueStateChanged` events of the transaction: `(from, to)` venue bytes.
+    pub venue_changes: Vec<(u8, u8)>,
+    pub result: ExitResult,
+}
+
+/// The `VenueStateChanged` events of `out`: `(from, to)`.
+fn venue_changes(out: &TxOutcome) -> Vec<(u8, u8)> {
+    events::of::<shortwin::events::VenueStateChanged>(out)
+        .iter()
+        .map(|e| (e.from, e.to))
+        .collect()
 }
 
 /// What a send attempt came to.
@@ -384,6 +422,17 @@ pub struct Keeper<C: Chain> {
     /// keeper found present; the second of the last attempt to create them per market.
     curve_ready: HashSet<Pubkey>,
     curve_prepare_tried: BTreeMap<Pubkey, i64>,
+    /// Duty 6 (M6): per PumpSwap market, the pool accounts found present (re-checked when the list
+    /// changes: a coin-creator change); the second of the last attempt to create them.
+    pamm_ready: BTreeMap<Pubkey, Vec<Pubkey>>,
+    pamm_prepare_tried: BTreeMap<Pubkey, i64>,
+    /// Duty 6 (M6): the second of the last transition attempt per market.
+    transition_tried: BTreeMap<Pubkey, i64>,
+    /// Duties 6 and 13: the second of the last trader-side read, post-wipe attempt and cashback
+    /// claim per market.
+    sweep_checked: BTreeMap<Pubkey, i64>,
+    post_wipe_tried: BTreeMap<Pubkey, i64>,
+    cashback_claimed: BTreeMap<Pubkey, i64>,
     /// The next Jito tip account to use (in turn).
     tip_next: usize,
     /// Counters (duty 8).
@@ -418,6 +467,12 @@ impl<C: Chain> Keeper<C> {
             graduation_alerted: HashSet::new(),
             curve_ready: HashSet::new(),
             curve_prepare_tried: BTreeMap::new(),
+            pamm_ready: BTreeMap::new(),
+            pamm_prepare_tried: BTreeMap::new(),
+            transition_tried: BTreeMap::new(),
+            sweep_checked: BTreeMap::new(),
+            post_wipe_tried: BTreeMap::new(),
+            cashback_claimed: BTreeMap::new(),
             tip_next: 0,
             metrics: Metrics::default(),
         })
@@ -810,26 +865,38 @@ impl<C: Chain> Keeper<C> {
             }
         }
 
-        // Duty 6 (M5): a list-only market whose detection set shows a pump curve again is cranked
-        // onto it (`crank_price`'s re-detection, ARCH §2.5 `None` row); a curve market's trader
-        // accounts, which the re-detection does not create, are created when missing.
+        // Duty 6 (M5, M6): a list-only market whose detection set shows a pump venue again is
+        // cranked onto it (`crank_price`'s re-detection, ARCH §2.5 `None` row); a curve or
+        // PumpSwap market's trader accounts, which the re-detection and the graduation do not
+        // create, are created when missing.
         let mut force_crank = graduation::redetection_due(&view.markets[idx]);
         if view.markets[idx].kind == VenueKind::PumpCurve && !self.curve_ready.contains(&key) {
             self.prepare_curve_trader(view, idx, now, report).await?;
         }
+        if view.markets[idx].kind == VenueKind::PumpSwap {
+            self.prepare_pamm_trader(view, idx, now, report).await?;
+        }
 
         // Duty 6: `migrate_v2` as soon as the curve is complete (before the exits: a migrating
-        // market's exits pause until then). The market is observed this second afterwards.
+        // market's exits pause until then).
+        let mut observed = false;
         if self.cfg.graduation.migrate
             && graduation::migration_due(&view.markets[idx])
             && self.migrate(view, idx, now, report).await?
         {
             force_crank = true;
         }
+        // Duty 6 (M6): the `→ PumpSwap` transition as soon as the canonical pool is valid (after
+        // the keeper's own `migrate_v2` or anyone's): the pool's accounts, the crank onto the pool
+        // and its first observation, which is the market's observation this second.
+        if graduation::transition_due(&view.markets[idx])
+            && self.transition(view, idx, now, slot, report).await?
+        {
+            observed = true;
+        }
 
         let mut attempted: HashSet<(Pubkey, ExitKind)> = HashSet::new();
         let mut straddled = false;
-        let mut observed = false;
         let mut due_before: Option<Option<Due>> = None;
         loop {
             let mv = view.markets[idx].clone();
@@ -886,12 +953,19 @@ impl<C: Chain> Keeper<C> {
             // position of the market).
             if ev.plan == Plan::Straddle && !straddled {
                 straddled = true;
-                if let Some(with_exit) = self.straddle(&mv, &pv, now, report).await {
-                    observed |= with_exit;
+                if let Some(with_tx3) = self.straddle(&mv, &pv, now, slot, report).await {
+                    observed |= with_tx3;
                     force_crank = true;
                     let fresh = view::load(&self.chain, &[key]).await?;
                     if let Some(m) = fresh.markets.into_iter().next() {
                         view.markets[idx] = m;
+                    }
+                    // V1-9's tx1 + tx2: the keeper's own transition right after the bundle.
+                    if !with_tx3
+                        && graduation::transition_due(&view.markets[idx])
+                        && self.transition(view, idx, now, slot, report).await?
+                    {
+                        observed = true;
                     }
                     continue;
                 }
@@ -946,6 +1020,10 @@ impl<C: Chain> Keeper<C> {
         } else if let Some(d) = due.or(force_crank.then_some(Due::Second)) {
             crank_queue.push((key, d));
         }
+
+        // Duties 6 and 13: the trader side, after this second's exits (a settlement that wiped the
+        // pool is followed by its post-wipe sweep in the same second).
+        self.sweep_duties(view, idx, now, report).await?;
         Ok(())
     }
 
@@ -981,6 +1059,237 @@ impl<C: Chain> Keeper<C> {
             self.curve_ready.insert(key);
         }
         report.curve_accounts.push((key, result));
+        Ok(())
+    }
+
+    /// The pool accounts of `accounts` (from [`graduation::pamm_accounts_of`]) that do not exist
+    /// yet: a UVA not owned by PumpSwap (or empty), a WSOL ATA that is not an SPL Token account.
+    async fn missing_pamm(
+        &self,
+        accounts: &[(Pubkey, PammAccount)],
+    ) -> anyhow::Result<Vec<(Pubkey, PammAccount)>> {
+        let keys: Vec<Pubkey> = accounts.iter().map(|(k, _)| *k).collect();
+        let accs = self.chain.accounts(&keys).await?;
+        Ok(accounts
+            .iter()
+            .zip(accs)
+            .filter(|((_, what), acc)| {
+                let owner = what.owner_program();
+                acc.as_ref()
+                    .is_none_or(|a| a.owner != owner || a.data.is_empty())
+            })
+            .map(|(a, _)| *a)
+            .collect())
+    }
+
+    /// Duty 6 (M6): the pool accounts `view.markets[idx]`'s PumpSwap trades require (the trader's
+    /// base ATA, and ARCH §3.12's existence requirement: the trader's pAMM UVA, the coin-creator
+    /// vault's WSOL ATA, the two recipients' WSOL ATAs, on a cashback coin the trader's cashback
+    /// ATA) are read once per list
+    /// (a coin-creator change makes a new list); the missing ones are created (at most one attempt
+    /// a second), and the list is marked ready when every account exists.
+    async fn prepare_pamm_trader(
+        &mut self,
+        view: &ChainView,
+        idx: usize,
+        now: i64,
+        report: &mut TickReport,
+    ) -> anyhow::Result<()> {
+        let mv = &view.markets[idx];
+        let key = mv.key;
+        // A pool that does not parse (a layout change, A63) has no trade to prepare for.
+        let Ok(accounts) = graduation::pamm_accounts_of(mv) else {
+            return Ok(());
+        };
+        let list: Vec<Pubkey> = accounts.iter().map(|(k, _)| *k).collect();
+        if self.pamm_ready.get(&key) == Some(&list) {
+            return Ok(());
+        }
+        let missing = self.missing_pamm(&accounts).await?;
+        if missing.is_empty() {
+            self.pamm_ready.insert(key, list);
+            return Ok(());
+        }
+        if self.pamm_prepare_tried.get(&key) == Some(&now) {
+            return Ok(());
+        }
+        self.pamm_prepare_tried.insert(key, now);
+        let ixs = graduation::pamm_account_ixs(&self.payer.pubkey(), &mv.market, &missing);
+        let result = self.send_exit(&ixs, key, ExtrasSel::NONE, now).await;
+        if result.landed().is_some() {
+            self.pamm_ready.insert(key, list);
+        } else if !matches!(result, ExitResult::DryRun { .. }) {
+            let detail = format!("pool accounts: {result:?}");
+            self.graduation_alert(
+                key,
+                &detail,
+                Alert::TransitionFailed {
+                    market: key,
+                    detail: detail.clone(),
+                },
+            );
+        }
+        report.pamm_accounts.push((key, result));
+        Ok(())
+    }
+
+    /// Duty 6 (M6; [`graduation::transition_ixs`]): the `→ PumpSwap` transition of
+    /// `view.markets[idx]` — its missing pool accounts, `crank_price` on the curve's ReadSet onto
+    /// the pool, `crank_price` on the pool (its first observation) — at most once a second, at
+    /// the exit priority; the market is re-read after it lands. Returns whether it landed (the
+    /// market's observation this second).
+    async fn transition(
+        &mut self,
+        view: &mut ChainView,
+        idx: usize,
+        now: i64,
+        slot: u64,
+        report: &mut TickReport,
+    ) -> anyhow::Result<bool> {
+        let mv = view.markets[idx].clone();
+        let key = mv.key;
+        if self.transition_tried.get(&key) == Some(&now) {
+            return Ok(false);
+        }
+        self.transition_tried.insert(key, now);
+        let missing = match graduation::pamm_accounts_of(&mv) {
+            Ok(a) => self.missing_pamm(&a).await?,
+            Err(e) => {
+                report
+                    .errors
+                    .push(format!("{key}: transition accounts: {e:#}"));
+                Vec::new()
+            }
+        };
+        let ixs = graduation::transition_ixs(&self.payer.pubkey(), &mv, &missing);
+        let result = self.send_exit(&ixs, key, ExtrasSel::NONE, now).await;
+        let landed = result.landed().cloned();
+        let changes = landed.as_ref().map(venue_changes).unwrap_or_default();
+        match &landed {
+            Some(out) => {
+                self.on_landed(key, out, now, slot, false);
+                self.metrics.market(key).transitions += 1;
+            }
+            None if !matches!(result, ExitResult::DryRun { .. }) => {
+                let detail = format!("transition: {result:?}");
+                self.graduation_alert(
+                    key,
+                    &detail,
+                    Alert::TransitionFailed {
+                        market: key,
+                        detail: detail.clone(),
+                    },
+                );
+            }
+            None => {}
+        }
+        report.transitions.push(TransitionRecord {
+            market: key,
+            created: missing.len(),
+            bundled: false,
+            venue_changes: changes,
+            result,
+        });
+        if landed.is_some() {
+            let fresh = view::load(&self.chain, &[key]).await?;
+            if let Some(m) = fresh.markets.into_iter().next() {
+                view.markets[idx] = m;
+            }
+        }
+        Ok(landed.is_some())
+    }
+
+    /// Duties 6 and 13 ([`crate::sweep`]): right after a full wipe (the program's post-wipe bits
+    /// still clear) the venue cashback claims the trader needs and `sweep_trader`, at most once a
+    /// second; every `sweep.check_interval_s` the trader side is read, and `sweep_trader` goes out
+    /// when it holds anything, with the venue cashback claims once the claimable cashback reaches
+    /// `sweep.cashback_min_lamports` (at most every `sweep.cashback_interval_s`).
+    async fn sweep_duties(
+        &mut self,
+        view: &ChainView,
+        idx: usize,
+        now: i64,
+        report: &mut TickReport,
+    ) -> anyhow::Result<()> {
+        let cfg = self.cfg.sweep.clone();
+        let mv = &view.markets[idx];
+        let key = mv.key;
+        let m = mv.market.as_ref();
+        let post_wipe =
+            cfg.post_wipe && sweep::wipe_pending(m) && self.post_wipe_tried.get(&key) != Some(&now);
+        let check = cfg.sweep
+            && self
+                .sweep_checked
+                .get(&key)
+                .is_none_or(|t| now.saturating_sub(*t) >= cfg.check_interval_s || now < *t);
+        if !post_wipe && !check {
+            return Ok(());
+        }
+        if check {
+            self.sweep_checked.insert(key, now);
+        }
+        let accs = self.chain.accounts(&sweep::fact_keys(m)).await?;
+        let facts = SweepFacts::of(m, &accs);
+        let payer = self.payer.pubkey();
+        let claim_due = facts.claimable() > 0
+            && facts.claimable() >= cfg.cashback_min_lamports
+            && self
+                .cashback_claimed
+                .get(&key)
+                .is_none_or(|t| now.saturating_sub(*t) >= cfg.cashback_interval_s || now < *t);
+        let (kind, ixs) = if post_wipe {
+            self.post_wipe_tried.insert(key, now);
+            (
+                SweepKind::PostWipe,
+                sweep::post_wipe_ixs(&payer, &key, m, &facts),
+            )
+        } else if check && claim_due {
+            self.cashback_claimed.insert(key, now);
+            (
+                SweepKind::Cashback,
+                sweep::post_wipe_ixs(&payer, &key, m, &facts),
+            )
+        } else if check && facts.sweep_due() {
+            (SweepKind::Sweep, vec![sweep::sweep_trader_ix(&key, m)])
+        } else {
+            return Ok(());
+        };
+        let result = self.send_exit(&ixs, key, ExtrasSel::NONE, now).await;
+        match &result {
+            ExitResult::Landed { .. } => {
+                let mm = self.metrics.market(key);
+                mm.sweeps += 1;
+                if facts.claimable() > 0 && kind != SweepKind::Sweep {
+                    mm.cashback_claims += 1;
+                }
+            }
+            ExitResult::DryRun { .. } | ExitResult::NoOp => {}
+            other => {
+                let detail = match other {
+                    ExitResult::Refused { outcome, .. } | ExitResult::Failed { outcome } => {
+                        format!("{:?}", outcome.err)
+                    }
+                    ExitResult::Error(e) => e.clone(),
+                    _ => String::new(),
+                };
+                self.graduation_alert(
+                    key,
+                    &format!("sweep {kind:?}: {detail}"),
+                    Alert::SweepFailed {
+                        market: key,
+                        post_wipe: kind == SweepKind::PostWipe,
+                        detail,
+                    },
+                );
+            }
+        }
+        report.sweeps.push(SweepRecord {
+            market: key,
+            kind,
+            facts,
+            instructions: ixs.len(),
+            result,
+        });
         Ok(())
     }
 
@@ -1048,14 +1357,16 @@ impl<C: Chain> Keeper<C> {
     }
 
     /// Duty 6: the straddle bundle for `pv` ([`graduation::plan_straddle`]; ARCH §5.4), at most
-    /// once a second per market. `Some(with_exit)` when the bundle landed (`with_exit`: it
-    /// carried the exit, tx3); `None` when it was not sent or did not land — the caller then
-    /// calls `sol_settle` for the position.
+    /// once a second per market. `Some(with_tx3)` when the bundle landed (`with_tx3`: it carried
+    /// the transition onto the pool, which is the market's observation this second — booked
+    /// here); `None` when it was not sent or did not land — the caller then calls `sol_settle`
+    /// for the position.
     async fn straddle(
         &mut self,
         mv: &MarketView,
         pv: &PositionView,
         now: i64,
+        slot: u64,
         report: &mut TickReport,
     ) -> Option<bool> {
         let g = self.cfg.graduation.clone();
@@ -1064,18 +1375,45 @@ impl<C: Chain> Keeper<C> {
         }
         self.straddle_tried.insert(mv.key, now);
         let keeper = self.payer.pubkey();
-        let (plan, result) =
-            match graduation::plan_straddle(&keeper, mv, pv, g.complete_slippage_bps) {
-                Ok(plan) => {
-                    let result = self.run_straddle(mv, &plan).await;
-                    (Some(plan), result)
-                }
-                Err(e) => (None, StraddleResult::Error(format!("{e:#}"))),
-            };
+        // tx3's pool accounts: the ones missing now (the bundle creates the pool, not these).
+        let missing = match graduation::pamm_accounts_of(mv) {
+            Ok(a) => self.missing_pamm(&a).await.ok(),
+            Err(_) => None,
+        };
+        let created = missing.as_ref().map_or(0, Vec::len);
+        let (plan, result) = match graduation::plan_straddle(
+            &keeper,
+            mv,
+            pv,
+            g.complete_slippage_bps,
+            missing.as_deref(),
+        ) {
+            Ok(plan) => {
+                let result = self.run_straddle(mv, &plan).await;
+                (Some(plan), result)
+            }
+            Err(e) => (None, StraddleResult::Error(format!("{e:#}"))),
+        };
         let landed = match &result {
-            StraddleResult::Landed { with_exit, .. } => {
+            StraddleResult::Landed { outcome, with_tx3 } => {
                 self.metrics.market(mv.key).straddles += 1;
-                Some(*with_exit)
+                if *with_tx3 && let Some(tx3) = outcome.txs.get(2) {
+                    // tx3 carried the transition and the pool's first observation.
+                    self.on_landed(mv.key, tx3, now, slot, false);
+                    self.metrics.market(mv.key).transitions += 1;
+                    report.transitions.push(TransitionRecord {
+                        market: mv.key,
+                        created,
+                        bundled: true,
+                        venue_changes: venue_changes(tx3),
+                        result: ExitResult::Landed {
+                            outcome: tx3.clone(),
+                            format: shortwin_services_common::tx::TxFormat::V0,
+                            extras: ExtrasSel::NONE,
+                        },
+                    });
+                }
+                Some(*with_tx3)
             }
             _ => None,
         };
@@ -1122,8 +1460,10 @@ impl<C: Chain> Keeper<C> {
 
     /// Builds, pre-flights and sends `plan`'s bundle (v0 transactions, the keeper paying and
     /// signing; the tip on the last one): `simulate_bundle` where the chain can, else tx1 alone
-    /// (tx2 cannot run before tx1 has completed the curve) with `migrate_v2`'s fixed limit; when
-    /// tx3's pre-flight fails with a fallback code (V1-9) the bundle goes out as tx1 + tx2.
+    /// (tx2 cannot run before tx1 has completed the curve) with `migrate_v2`'s fixed limit and
+    /// tx3's; when tx3 is missing or its pre-flight fails the bundle goes out as tx1 + tx2 if
+    /// `send_without_exit` (V1-9's fallback: tx3 holds no exit, the next second's crank makes the
+    /// transition), else it waits.
     async fn run_straddle(&mut self, mv: &MarketView, plan: &StraddlePlan) -> StraddleResult {
         let g = self.cfg.graduation.clone();
         if plan.quote > g.max_complete_lamports {
@@ -1134,11 +1474,11 @@ impl<C: Chain> Keeper<C> {
                 ),
             };
         }
-        let mut with_exit = plan.tx3.is_some();
-        if !with_exit && !g.send_without_exit {
+        let mut with_tx3 = plan.tx3.is_some();
+        if !with_tx3 && !g.send_without_exit {
             return StraddleResult::Waiting {
-                reason: "no exit transaction on the post-migration pool before M6 (the \
-                         PumpSwap adapter); graduation.send_without_exit is off"
+                reason: "no transition transaction (tx3) could be built; \
+                         graduation.send_without_exit is off"
                     .into(),
             };
         }
@@ -1151,7 +1491,7 @@ impl<C: Chain> Keeper<C> {
         let price = self.priority_price(&[mv.key], true).await;
         loop {
             let mut txs: Vec<Vec<Instruction>> = vec![plan.tx1.clone(), plan.tx2.clone()];
-            if with_exit && let Some(t3) = &plan.tx3 {
+            if with_tx3 && let Some(t3) = &plan.tx3 {
                 txs.push(t3.clone());
             }
             if let Some(last) = txs.last_mut() {
@@ -1197,10 +1537,10 @@ impl<C: Chain> Keeper<C> {
                 Ok(outs) => {
                     if let Some((i, o)) = outs.iter().enumerate().find(|(_, o)| !o.ok()) {
                         self.metrics.simulation_failures += 1;
-                        let code = o.err.as_ref().and_then(TxError::custom_code);
-                        if i == 2 && with_exit && graduation::falls_back(code) {
-                            // V1-9: the exit would fail; complete and migrate only.
-                            with_exit = false;
+                        if i == 2 && with_tx3 && g.send_without_exit {
+                            // V1-9 (module docs of `graduation`): tx3 would fail; complete and
+                            // migrate only, the next second's crank makes the transition.
+                            with_tx3 = false;
                             continue;
                         }
                         return StraddleResult::Refused {
@@ -1222,7 +1562,7 @@ impl<C: Chain> Keeper<C> {
                     Ok(o) if o.ok() => {
                         let mut l = vec![tx::cu_limit(o.units_consumed), graduation::MIGRATE_CU];
                         pre.push(o);
-                        if with_exit {
+                        if with_tx3 {
                             l.push(graduation::UNSIMULATED_CU);
                         }
                         l
@@ -1249,7 +1589,7 @@ impl<C: Chain> Keeper<C> {
             return match self.chain.send_bundle(&signed).await {
                 Ok(outcome) if outcome.landed => {
                     self.metrics.tx_landed += outcome.txs.len() as u64;
-                    StraddleResult::Landed { outcome, with_exit }
+                    StraddleResult::Landed { outcome, with_tx3 }
                 }
                 Ok(outcome) => {
                     self.metrics.tx_failed += 1;
@@ -1403,6 +1743,10 @@ impl<C: Chain> Keeper<C> {
                     mv.extras.as_deref(),
                 );
                 let mut last = ExitResult::Error("no extras set to try".into());
+                // M6-SEC-4: a coin creator changed since the market's last crank needs its vault
+                // ATA (T11) to exist; the exit creates it idempotently in its own transaction.
+                let prep =
+                    venue::pamm_creator_vault_prep(&keeper, &mv.market, mv.kind, &mv.read_accounts);
                 for c in choices {
                     let built = match kind {
                         ExitKind::Liquidate => ixs::liquidate(&keeper, mv, pv, &c),
@@ -1412,7 +1756,9 @@ impl<C: Chain> Keeper<C> {
                         Ok(ix) => ix,
                         Err(e) => return ExitResult::Error(format!("{e:#}")),
                     };
-                    let r = self.send_exit(&[ix], mv.key, c.sel, now).await;
+                    let mut exit: Vec<Instruction> = prep.iter().cloned().collect();
+                    exit.push(ix);
+                    let r = self.send_exit(&exit, mv.key, c.sel, now).await;
                     // Only a venue-side failure makes another extras set worth trying; the
                     // program's own refusals do not depend on the set.
                     let retry = match &r {

@@ -227,25 +227,22 @@ impl PoolSelectConfig {
     }
 }
 
-/// Graduation duties on the pump curve (ARCH §5.1, §5.4, §7.1 duty 6; [`crate::graduation`]).
+/// Graduation duties (ARCH §2.5, §5.1, §5.4, §7.1 duty 6; [`crate::graduation`]).
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, deny_unknown_fields)]
 pub struct GraduationConfig {
     /// Call pump `migrate_v2` top-level as soon as a covered market's curve completes (ADOPTED
-    /// Q16). **Suspended in M5 (M5-SEC-4): false.** Without M6's `→ PumpSwap` transition a
-    /// migrated curve's market stays `PumpMigrating` and is no longer observed (the EMA freezes
-    /// at the last curve price, exits pause for good), whereas an unmigrated completed curve is
-    /// still observed and its stuck-migration S3 prices the post-migration pool; the program
-    /// refuses to enable the curve venue in this build, and M6 turns this back on.
+    /// Q16), then the `→ PumpSwap` transition in the same second: true (M6; M5 suspended it,
+    /// M5-SEC-4, because a migrated curve's market could not reach its pool).
     pub migrate: bool,
-    /// Send the straddle bundle (tx1 `complete_curve`, tx2 `migrate_v2`, tx3 the exit on the
-    /// new pool) for a liquidatable position whose `Q` exceeds the curve's `rT`: true. Needs a
+    /// Send the straddle bundle (tx1 `complete_curve`, tx2 `migrate_v2`, tx3 the transition onto
+    /// the new pool) for a liquidatable position whose `Q` exceeds the curve's `rT`: true. Needs a
     /// block engine (`--block-engine`).
     pub straddle: bool,
-    /// Send the bundle **without** its exit transaction (tx1 + tx2: ARCH §5.4's keeper
-    /// fallback) when there is none. M5 has no tx3 (the PumpSwap exit is M6's) and keeps a
-    /// migrated curve `PumpMigrating` (exits pause, S3 after the migration pause), so this
-    /// completes and migrates the curve without exiting the position: false.
+    /// Send tx1 + tx2 alone when tx3 cannot be built or fails its pre-flight (ARCH §5.4's keeper
+    /// fallback, V1-9): true (M6: the keeper's own transition follows right after the bundle, and
+    /// the position is an ordinary PumpSwap position from then on; M5 had no transition and kept
+    /// it false).
     pub send_without_exit: bool,
     /// `max_sol_cost` of `complete_curve` above the keeper's quote of buying the `rT` it read, in
     /// bps (a curve sale between the read and the bundle raises the cost; beyond this pump
@@ -266,9 +263,9 @@ pub struct GraduationConfig {
 impl Default for GraduationConfig {
     fn default() -> Self {
         Self {
-            migrate: false,
+            migrate: true,
             straddle: true,
-            send_without_exit: false,
+            send_without_exit: true,
             complete_slippage_bps: 500,
             max_complete_lamports: 20_000_000_000,
             tip_lamports: 100_000,
@@ -297,6 +294,39 @@ impl GraduationConfig {
     }
 }
 
+/// The trader side's value and the venue cashback (ARCH §7.1 duty 6 "right after a full wipe",
+/// duty 13; [`crate::sweep`]). PROPOSED ops knobs (ECON §15 names none).
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, deny_unknown_fields)]
+pub struct SweepConfig {
+    /// Right after a full wipe, the claims the trader's venue cashback needs and `sweep_trader`
+    /// (a deposit waits for both post-wipe bits, R4A-7): true.
+    pub post_wipe: bool,
+    /// `sweep_trader` when the trader side holds anything (`ATA(trader, WSOL)`, lamports on the
+    /// `trader` / `trader_wsol` PDAs, tokens on a pump venue's trader base ATA): true.
+    pub sweep: bool,
+    /// Seconds between the reads of a market's trader side (duty 13): 60.
+    pub check_interval_s: i64,
+    /// Seconds between two cashback claims on one market (ARCH duty 13: weekly): 604,800.
+    pub cashback_interval_s: i64,
+    /// The claimable cashback a claim waits for, lamports (a PumpSwap claim costs the keeper the
+    /// rent of `ATA(trader, WSOL)`, 2,039,280 at the pre-2026 rent, which the sweep credits to the
+    /// lenders): 10,000,000. The post-wipe bundle claims whatever is claimable.
+    pub cashback_min_lamports: u64,
+}
+
+impl Default for SweepConfig {
+    fn default() -> Self {
+        Self {
+            post_wipe: true,
+            sweep: true,
+            check_interval_s: 60,
+            cashback_interval_s: 604_800,
+            cashback_min_lamports: 10_000_000,
+        }
+    }
+}
+
 /// The keeper's configuration.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, deny_unknown_fields)]
@@ -321,6 +351,7 @@ pub struct KeeperConfig {
     pub venue_watch: VenueWatchConfig,
     pub pool_select: PoolSelectConfig,
     pub graduation: GraduationConfig,
+    pub sweep: SweepConfig,
 }
 
 impl Default for KeeperConfig {
@@ -338,6 +369,7 @@ impl Default for KeeperConfig {
             venue_watch: VenueWatchConfig::default(),
             pool_select: PoolSelectConfig::default(),
             graduation: GraduationConfig::default(),
+            sweep: SweepConfig::default(),
         }
     }
 }
@@ -404,6 +436,10 @@ impl KeeperConfig {
         if g.straddle && (g.tip_lamports == 0 || g.tip_keys()?.is_empty()) {
             bail!("graduation: a bundle needs a tip (tip_lamports > 0 and a tip account)");
         }
+        let w = &self.sweep;
+        if w.check_interval_s <= 0 || w.cashback_interval_s <= 0 {
+            bail!("sweep intervals must be positive");
+        }
         self.markets.keys()?;
         for t in &self.lookup_tables {
             Pubkey::from_str(t).with_context(|| format!("lookup table {t}"))?;
@@ -457,9 +493,11 @@ mod tests {
             eval_interval_s = 5
             discovery_rpc = "https://gpa.example"
             [graduation]
-            migrate = true
-            send_without_exit = true
+            migrate = false
+            send_without_exit = false
             block_engine = "https://mainnet.block-engine.jito.wtf"
+            [sweep]
+            cashback_min_lamports = 1
             "#
         ))
         .unwrap();
@@ -476,9 +514,14 @@ mod tests {
         assert_eq!(cfg.pool_select.discovery_rpc(), Some("https://gpa.example"));
         assert!(cfg.pool_select.enabled);
         assert_eq!(KeeperConfig::default().pool_select.discovery_rpc(), None);
-        assert!(cfg.graduation.send_without_exit && cfg.graduation.migrate);
-        // M5-SEC-4: the migrate_v2 duty is off by default until M6.
-        assert!(!KeeperConfig::default().graduation.migrate);
+        assert!(!cfg.graduation.send_without_exit && !cfg.graduation.migrate);
+        // M6: the migrate_v2 duty (with the → PumpSwap transition) and ARCH §5.4's tx1 + tx2
+        // fallback are on by default again (M5-SEC-4 suspended them).
+        let d = KeeperConfig::default();
+        assert!(d.graduation.migrate && d.graduation.send_without_exit);
+        assert_eq!(cfg.sweep.cashback_min_lamports, 1);
+        assert!(cfg.sweep.post_wipe && cfg.sweep.sweep);
+        assert_eq!(d.sweep.cashback_interval_s, 7 * 86_400);
         assert_eq!(
             cfg.graduation.block_engine(),
             Some("https://mainnet.block-engine.jito.wtf")
@@ -508,6 +551,8 @@ mod tests {
             "[graduation]\ntip_accounts = []",
             "[graduation]\ntip_accounts = [\"nope\"]",
             "[graduation]\nunknown = 1",
+            "[sweep]\ncheck_interval_s = 0",
+            "[sweep]\nunknown = 1",
         ] {
             assert!(KeeperConfig::from_toml(bad).is_err(), "{bad}");
         }
