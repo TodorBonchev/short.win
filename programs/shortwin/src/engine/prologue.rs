@@ -168,9 +168,9 @@ pub fn run(
         } else {
             // A PumpSwap market without a price starts it at its first executable observation,
             // marked for the warm-up (a PumpSwap listing or re-detection, M6), its liquidity
-            // capped at the pool's locked depth over `λ_min` (M6R-1).
+            // capped at the pool's locked depth `D` (M6R-1; over `λ_min` = 100 %, OWNER-M6D-1).
             if market.venue_kind() == Some(VenueKind::PumpSwap) {
-                pump_amm::start_price(&mut obs, st, now, config.params.pool_lock_min_bps)?;
+                pump_amm::start_price(&mut obs, st, now)?;
             }
             recorded = observe::record(&mut obs, now, st)?;
             let chains = route::observe_chains(config, market, st, now);

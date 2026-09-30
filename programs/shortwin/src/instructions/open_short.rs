@@ -371,9 +371,11 @@ pub fn handler<'info>(
                 x_now: state.x,
                 l_slow: market.liq_slow.get(),
                 p_ema,
+                // `(D, λ_min)`: Raydium `pool_lock_min_bps`; PumpSwap `PUMPSWAP_LOCK_MIN_BPS`
+                // (100 %: sized on its burned LP only, OWNER-M6D-1; ARCH §4.6, row 57).
                 raydium_lock: kind
-                    .has_locked_depth()
-                    .then(|| (market.pool_d.get(), config.params.pool_lock_min_bps)),
+                    .lock_min_bps(config.params.pool_lock_min_bps)
+                    .map(|lambda_min| (market.pool_d.get(), lambda_min)),
                 phi_ppm: state.fee_ppm,
                 tokens_free: pro.pool.tokens_free,
                 borrowed_q: pro.pool.borrowed_q,

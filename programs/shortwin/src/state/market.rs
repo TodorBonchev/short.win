@@ -37,8 +37,8 @@ use shortwin_math::pool::{Pool, WIPE_REWARDS_CLAIMED, WIPE_TRADER_SWEPT};
 use shortwin_math::rent::{Aggr, Basis};
 
 use crate::constants::{
-    GUARD_MASK_PUMP_CURVE, GUARD_MASK_PUMP_SWAP, GUARD_MASK_RAYDIUM, VENUE_BIT_PUMP_CURVE,
-    VENUE_BIT_PUMP_SWAP, VENUE_BIT_RAYDIUM_CPMM, VENUE_BIT_RAYDIUM_V4,
+    GUARD_MASK_PUMP_CURVE, GUARD_MASK_PUMP_SWAP, GUARD_MASK_RAYDIUM, PUMPSWAP_LOCK_MIN_BPS,
+    VENUE_BIT_PUMP_CURVE, VENUE_BIT_PUMP_SWAP, VENUE_BIT_RAYDIUM_CPMM, VENUE_BIT_RAYDIUM_V4,
 };
 use crate::state::pod::{get_all, set_all, PodI128, PodU128};
 
@@ -125,12 +125,32 @@ impl VenueKind {
 
     /// Whether the venue has a locked depth `D` (`Market.pool_d`, refreshed at every executable
     /// observation) that bounds the size cap's `X₀`, the tier's `R_eff` and the exit reference's
-    /// EMA terms at `D/λ_min` (ARCH §2.6, §3.6, §4.6, §4.7): the Raydium kinds (V2-8, M4F-1) and
-    /// — since the owner's decision of 2026-09-30 (M6R-1, ARCH changelog 56, ECON #105) —
-    /// PumpSwap, whose `D` is the depth of its burned creation LP. Not the curve (no LP) nor the
-    /// mock (no LP accounting).
+    /// EMA terms at `D/λ_min` (ARCH §2.6, §3.6, §4.6, §4.7; `λ_min` = [`Self::lock_min_bps`]):
+    /// the Raydium kinds (V2-8, M4F-1) and — since the owner's decision of 2026-09-30 (M6R-1, ARCH
+    /// changelog 56, ECON #105) — PumpSwap, whose `D` is the depth of its burned creation LP
+    /// (credited at `λ_min` = 100 % since OWNER-M6D-1, ARCH changelog 57, ECON #106). Not the
+    /// curve (no LP) nor the mock (no LP accounting).
     pub const fn has_locked_depth(self) -> bool {
         matches!(self, Self::RaydiumV4 | Self::RaydiumCpmm | Self::PumpSwap)
+    }
+
+    /// The `λ_min` that divides this venue's locked depth `D` (`Market.pool_d`) wherever the
+    /// program credits it (ARCH §2.3.3, §2.5, §3.6, §4.6, §4.7): `X₀`'s `D` term and with it every
+    /// cap on `X₀ + q` (`open_short`), the tier's `R_eff` (`engine::tier`), the exit reference's
+    /// cap `⌊D·10⁴/λ_min⌋` (`engine::bounds::ref_depth_cap`) and a price start's anchor. Raydium:
+    /// the config's `pool_lock_min_bps`. PumpSwap: [`PUMPSWAP_LOCK_MIN_BPS`] = 10,000 (100 %)
+    /// whatever `pool_lock_min_bps` is — the owner's decision of 2026-09-30 (OWNER-M6D-1, option
+    /// (a); ARCH changelog 57, ECON #106): a canonical pool's lock is its burned creation LP, so
+    /// nothing a third party deposited is credited, to a size, a tier or an exit's reference (the
+    /// reference cap and the price start's anchor since M6E-1: a cap at `2D` let a deposit pulled
+    /// at the deadline hold up an expiry for up to an hour). `None` for a venue without a locked
+    /// depth ([`Self::has_locked_depth`]).
+    pub const fn lock_min_bps(self, pool_lock_min_bps: u32) -> Option<u32> {
+        match self {
+            Self::PumpSwap => Some(PUMPSWAP_LOCK_MIN_BPS),
+            Self::RaydiumV4 | Self::RaydiumCpmm => Some(pool_lock_min_bps),
+            _ => None,
+        }
     }
 
     /// Whether the venue runs the Raydium fast-path chain `pool_fail` (ARCH §2.6 rule 3, §3.0
@@ -643,6 +663,42 @@ impl Market {
 mod tests {
     use super::*;
     use bytemuck::Zeroable;
+
+    /// OWNER-M6D-1 / M6E-1 (ARCH changelog 57, ECON #106): PumpSwap credits its burned LP's `D`
+    /// at `λ_min` = 100 % whatever the governed `pool_lock_min_bps` is; Raydium divides `D` by
+    /// `pool_lock_min_bps`; venues without a locked depth have no `λ_min`.
+    #[test]
+    fn lock_min_bps_is_100_percent_on_pumpswap_pool_lock_min_bps_on_raydium() {
+        for lam in [2_000u32, 5_000, 10_000] {
+            assert_eq!(VenueKind::PumpSwap.lock_min_bps(lam), Some(10_000));
+            for k in [VenueKind::RaydiumV4, VenueKind::RaydiumCpmm] {
+                assert_eq!(k.lock_min_bps(lam), Some(lam));
+            }
+            for k in [
+                VenueKind::PumpCurve,
+                VenueKind::PumpMigrating,
+                VenueKind::None,
+            ] {
+                assert_eq!(k.lock_min_bps(lam), None);
+            }
+            #[cfg(feature = "test-venue")]
+            assert_eq!(VenueKind::Mock.lock_min_bps(lam), None);
+        }
+        for k in [
+            VenueKind::None,
+            VenueKind::PumpCurve,
+            VenueKind::PumpMigrating,
+            VenueKind::PumpSwap,
+            VenueKind::RaydiumV4,
+            VenueKind::RaydiumCpmm,
+        ] {
+            assert_eq!(
+                k.lock_min_bps(5_000).is_some(),
+                k.has_locked_depth(),
+                "{k:?}"
+            );
+        }
+    }
 
     /// `is_pda` re-derives `["market", mint]` with the stored bump: the real PDA passes, any
     /// other key or bump does not (M1-SEC-6).

@@ -12,6 +12,7 @@ use proptest::prelude::*;
 use serde::Deserialize;
 use shortwin_math::MathError;
 use shortwin_math::caps;
+use shortwin_math::consts::PUMPSWAP_LOCK_MIN_BPS;
 use shortwin_math::quote;
 
 #[derive(Deserialize)]
@@ -70,6 +71,7 @@ struct Preds {
 
 #[derive(Deserialize)]
 struct ConsX {
+    key: String,
     x_now: Dec<u64>,
     l_slow: Dec<u128>,
     p_ema: Dec<u128>,
@@ -195,12 +197,20 @@ fn predicates_match() {
     }
 }
 
-/// `Market.conservative_x`: `min(X_now, ⌊L_slow·10⁹/isqrt⁺(P_ema)⌋)`, Raydium also
-/// `⌊D·10⁹·10⁴/(λ_min·isqrt⁺(P_ema))⌋` (ECON §2.1).
+/// Whether the sim's example market `key` is a canonical PumpSwap pool (`A`, `B`, `C` and the
+/// graduated `D@…` markets, kind `amm`), not Raydium (`RA`, `RB`, `RC`).
+fn pumpswap_key(key: &str) -> bool {
+    !key.starts_with('R')
+}
+
+/// `Market.conservative_x`: `min(X_now, ⌊L_slow·10⁹/isqrt⁺(P_ema)⌋)`, Raydium and (M6R-1) a
+/// canonical PumpSwap pool also `⌊D·10⁹·10⁴/(λ_min·isqrt⁺(P_ema))⌋` (ECON §2.1) — on PumpSwap at
+/// `λ_min` = `PUMPSWAP_LOCK_MIN_BPS` since OWNER-M6D-1 (ECON #106; `Market.lock_min_bps`),
+/// the burned LP's own token reserve at `P_ema`, which binds on its rows too.
 #[test]
 fn conservative_x0_matches_sim() {
     let f = load();
-    let (mut slow, mut locked) = (0, 0);
+    let (mut slow, mut locked, mut pumpswap) = (0, 0, 0);
     for (i, c) in f.conservative_x0.iter().enumerate() {
         let got = caps::conservative_x0(c.x_now.0, c.l_slow.0, c.p_ema.0, lock(&c.raydium_lock));
         assert_eq!(got, Ok(c.expected.0), "conservative_x0 case {i}");
@@ -208,11 +218,25 @@ fn conservative_x0_matches_sim() {
         if u128::from(c.expected.0) == x_slow && x_slow < u128::from(c.x_now.0) {
             slow += 1;
         }
-        if c.raydium_lock.is_some() && u128::from(c.expected.0) < x_slow.min(c.x_now.0.into()) {
-            locked += 1;
+        if let Some((d, l)) = &c.raydium_lock {
+            if pumpswap_key(&c.key) {
+                assert_eq!(
+                    l.0, PUMPSWAP_LOCK_MIN_BPS,
+                    "case {i}: PumpSwap's λ_min (#106)"
+                );
+                // λ_min = 100 %: the D term is the burned depth's own reprojection at P_ema.
+                let x_d = quote::reprice_token(d.0, c.p_ema.0).unwrap_or(u128::MAX);
+                let want = x_d.min(x_slow).min(c.x_now.0.into());
+                assert_eq!(u128::from(c.expected.0), want, "case {i}");
+            }
+            if u128::from(c.expected.0) < x_slow.min(c.x_now.0.into()) {
+                locked += 1;
+                pumpswap += usize::from(pumpswap_key(&c.key));
+            }
         }
     }
     assert!(slow >= 30 && locked >= 30, "{slow} {locked}");
+    assert!(pumpswap >= 10, "{pumpswap}");
 }
 
 /// The curve's cap reserves `(X₀, rT_guard)` (ECON changelog #103, M5-SEC-3; ARCH §4.6; the sim's
@@ -250,6 +274,13 @@ fn example_markets_match_sim() {
             }
             (x0, Some(guard))
         } else {
+            // The sizing λ_min (`Market.lock_min_bps`): Raydium's `pool_lock_min_bps`, a
+            // canonical PumpSwap pool's `PUMPSWAP_LOCK_MIN_BPS` since #106 (OWNER-M6D-1).
+            let (_, l) = m.raydium_lock.as_ref().expect("a locked depth");
+            match m.kind.as_str() {
+                "amm" => assert_eq!(l.0, PUMPSWAP_LOCK_MIN_BPS, "{k}"),
+                _ => assert_eq!(l.0, 5_000, "{k}: pool_lock_min_bps"),
+            }
             let x0 = caps::conservative_x0(m.x_now.0, m.l_slow.0, m.p_ema.0, lock(&m.raydium_lock))
                 .unwrap();
             (x0, None)

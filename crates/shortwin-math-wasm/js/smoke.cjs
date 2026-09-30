@@ -59,7 +59,13 @@ assert.equal(m.crBelow(vEff, risk.buyRepriced(q, L, pLiq).cost, 12_500), true);
 assert.equal(m.crBelow(vEff, risk.buyRepriced(q, L, pLiq - 1n).cost, 12_500), false);
 assert.equal(m.crBps(vEff, undefined), 0n);
 assert.equal(m.marginD4(100n, 100n, 120n, 20_000), 140n);
-assert.throws(() => m.marginD4(100n, 100n, undefined, 20_000), /undefined/);
+// An undefined EMA quote prices the spot quote alone (`marginD4`'s and `risk::margin_d4`'s
+// documented `Option` semantics since the scaffold, as the sim and the program's open):
+// ⌈20,000·100/10⁴⌉ − 100. The old `assert.throws` here contradicted that and stopped the
+// script before the checks below (M6E-3).
+assert.equal(m.marginD4(100n, 100n, undefined, 20_000), 100n);
+assert.equal(m.marginD4(100n, 100n, 100n, 20_000), 100n);
+assert.equal(m.marginD4(100n, 90n, undefined, 20_000), 80n);
 
 // Rent due and waterfall previews.
 const open = new m.RentBasis(0n, 0n, 0n);
@@ -146,4 +152,21 @@ t.venue = 9;
 assert.throws(() => t.tier(), /invalid input/);
 assert.throws(() => t.liquidityLamports(), /invalid input/);
 assert.equal(m.tierParams(3).maxDurationS, 259_200);
+// OWNER-M6D-1 (ECON #106): PumpSwap sizes and tiers on its burned LP only (λ_min 100 %),
+// whatever pool_lock_min_bps says; Raydium divides D by it.
+assert.equal(m.pumpswapLockMinBps(), 10_000);
+assert.equal(m.conservativeX0(1, 9_000_000n, 8_000_000n, WAD, 1_000_000n, 5_000), 1_000_000n);
+assert.equal(m.conservativeX0(2, 9_000_000n, 8_000_000n, WAD, 1_000_000n, 5_000), 2_000_000n);
+assert.equal(m.conservativeX0(3, 9_000_000n, 8_000_000n, WAD, 1_000_000n, 5_000), 8_000_000n);
+assert.throws(() => m.conservativeX0(0, 1n, 1n, WAD, 1n, 5_000), /invalid input/);
+const pst = new m.TierInputs();
+pst.venue = 1;
+pst.rNow = 40_000_000_000_000n;
+pst.ySlow = 40_000_000_000_000n;
+pst.pEma = WAD;
+pst.lockedDepth = 2_000_000_000_000n;
+pst.lambdaMinBps = 5_000;
+assert.equal(pst.liquidityLamports(), 4_000_000_000_000n);
+pst.venue = 2;
+assert.equal(pst.liquidityLamports(), 8_000_000_000_000n);
 console.log("facade smoke test: ok");

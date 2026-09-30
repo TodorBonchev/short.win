@@ -4,11 +4,11 @@
 //!
 //! | Part | What is checked |
 //! |---|---|
-//! | (a) restart | only an instruction that emits `PoolSwitched` for the market, a Raydium `create_market`, a `→ PumpSwap` graduation of a market with a price (`VenueStateChanged`, M6) or a PumpSwap market's price start (its first observation, M6) raises `ema_warm` (to `EMA_WARMUP_BUCKETS`) or sets `ema_guard`; after such an instruction both are `(8, 1)`; a market created on another venue starts `(0, 0)`; a PumpSwap price start writes `L_ema = min(√(X·(Y + VQR)), ⌊D·10⁴/λ_min⌋)` and `L_slow = min(L_ema, D)` on the pre-trade pool, `D` its locked depth (M6R-1, recomputed here) |
+//! | (a) restart | only an instruction that emits `PoolSwitched` for the market, a Raydium `create_market`, a `→ PumpSwap` graduation of a market with a price (`VenueStateChanged`, M6) or a PumpSwap market's price start (its first observation, M6) raises `ema_warm` (to `EMA_WARMUP_BUCKETS`) or sets `ema_guard`; after such an instruction both are `(8, 1)`; a market created on another venue starts `(0, 0)`; a PumpSwap price start writes `L_ema = min(√(X·(Y + VQR)), D)` (the anchor at PumpSwap's `λ_min` = 100 %, OWNER-M6D-1 / M6E-1) and `L_slow = min(L_ema, D)` on the pre-trade pool, `D` its locked depth (M6R-1, recomputed here) |
 //! | (b) countdown and seed | across any other instruction `ema_warm` falls by the number of integrations (0 or 1) while it is positive and stays 0 otherwise; a warm-up integration leaves the newest ring entry and the EMA at the §4.1 seed over the newest `8 − ema_warm_after` entries, `p = max(min(min lo, the largest v0.4.1 step from the pre-instruction P_ema), the largest v0.4.1 fall from it)` (M4X-1: `observe::price_up_bound`; M6-SEC-1: `observe::price_down_bound`, recomputed here too; `dt = min(ts − ema_ts, ema_dtmax_s)`), `l = min(max lhi, ⌊lomed(lhi)·(10⁴ + C)/10⁴⌋)` (recomputed here), with `slow_ts` unchanged and `L_slow` unchanged — on PumpSwap, or `min(L_slow, pool_d)` (M6R-1) |
 //! | (f) PumpSwap warm-up depth | M6R-1: on a PumpSwap market whose post-instruction `ema_warm > 0` and `pool_d > 0`, `L_slow ≤ pool_d` (every executable observation during the warm-up caps `L_slow` at the locked depth it writes into `pool_d`; the transition writes `pool_d = 0`); across a warm-up instruction `L_slow` only falls, and only to `pool_d` |
 //! | (c) gate | no `Liquidate` or `Expire` event, no `SolSettle` of S1/S2 and no `SettleArmed` / `SettleDisarmed` on a market whose post-instruction `ema_warm ≠ 0` while its venue is executable; no Raydium or PumpSwap `Open` with `ema_warm ≠ 0` |
-//! | (d) guard | `ema_guard` goes 1 → 0 only at an integration with `ema_warm = 0` after it and `L_ema·10⁴ ≤ L_mlo·10,100` (and does so at every such integration); an integration after the warm-up with the guard set never lifts `L_slow` above `max(L_slow before, L_mlo after)` (M4X-2: `L_slow` integrates `min(lobs, L_mlo)`); on a Raydium or PumpSwap market, and on any market while the guard is set, `Liquidate.b_ref` / `Expire.b_ref` are the risk quote at `reprice(max(L_live, min(max(L_ema', L_slow), cap)), P_ref)`, `L_ema' = min(L_ema, L_mlo)` while the guard is set, else `L_ema` (V2-14), `cap = ⌊pool_d·10⁴/λ_min⌋` on Raydium (M4F-1) and — since the owner's decision of 2026-09-30, M6R-1 — PumpSwap, none elsewhere. On the mock, which never restarts, the guard-clear case is the exit predictors' (`liquidate_support`), and the hook tests' synthetic exits there carry arbitrary references |
+//! | (d) guard | `ema_guard` goes 1 → 0 only at an integration with `ema_warm = 0` after it and `L_ema·10⁴ ≤ L_mlo·10,100` (and does so at every such integration); an integration after the warm-up with the guard set never lifts `L_slow` above `max(L_slow before, L_mlo after)` (M4X-2: `L_slow` integrates `min(lobs, L_mlo)`); on a Raydium or PumpSwap market, and on any market while the guard is set, `Liquidate.b_ref` / `Expire.b_ref` are the risk quote at `reprice(max(L_live, min(max(L_ema', L_slow), cap)), P_ref)`, `L_ema' = min(L_ema, L_mlo)` while the guard is set, else `L_ema` (V2-14), `cap = ⌊pool_d·10⁴/λ_min⌋` on Raydium (M4F-1, `λ_min = pool_lock_min_bps`) and — since the owner's decision of 2026-09-30, M6R-1 — PumpSwap at `λ_min` = 100 % (OWNER-M6D-1 / M6E-1: `cap = pool_d`, so `L_b = L_live`), none elsewhere. On the mock, which never restarts, the guard-clear case is the exit predictors' (`liquidate_support`), and the hook tests' synthetic exits there carry arbitrary references |
 //!
 //! | (e) spot leg | FITS-2 (a): every `Liquidate` on an executable Raydium or (M6R-1) PumpSwap venue is CR-liquidatable, and its spot leg is judged at `max(L_live, L_ema')` — `Liquidate.cr_spot_bps` is `⌊V_eff·10⁴/B̂⌋` of the risk quote `B̂ = B̂(Q; reprice(max(L_live, L_ema'), P_rs))` (recomputed here: `L_live` the pre-trade venue's `√(X·Y)`, `L_ema' = min(L_ema, L_mlo)` while the guard is set, else `L_ema`, `P_rs = min(P_live, lb_lo)` fresh within `ref_max_age_s`, `V_eff = V − R_due`) and it is below the position's `L` — so no liquidation lands on a spot leg that only a drained `L_live` makes true. On the mock the exit predictors (`liquidate_support`, the same rule) check it, and the hook tests' synthetic exits there carry arbitrary figures |
 //!
@@ -118,9 +118,14 @@ fn created(svm: &LiteSVM, c: &MarketCreated) -> Result<(), Violation> {
     })
 }
 
-/// `⌊d·10⁴/λ_min⌋` with the config's `pool_lock_min_bps` (0 at `λ_min = 0`), `None` without a
-/// config.
-fn depth_cap(svm: &LiteSVM, d: u128) -> Option<u128> {
+/// `⌊d·10⁴/λ_min⌋` on `kind`: on Raydium `λ_min` is the config's `pool_lock_min_bps` (0 at
+/// `λ_min = 0`); on PumpSwap 100 % — the burned LP's `d` itself (OWNER-M6D-1, ECON #106; its exit
+/// reference and price start since M6E-1), written out here, not read from the program's
+/// `PUMPSWAP_LOCK_MIN_BPS` or `VenueKind::lock_min_bps`. `None` without a config.
+fn depth_cap(svm: &LiteSVM, d: u128, kind: Option<VenueKind>) -> Option<u128> {
+    if kind == Some(VenueKind::PumpSwap) {
+        return Some(d);
+    }
     let config = read::zc::<GlobalConfig>(svm, &crate::pda::config())?;
     let lam = u128::from(config.params.pool_lock_min_bps);
     Some(if lam == 0 {
@@ -130,7 +135,8 @@ fn depth_cap(svm: &LiteSVM, d: u128) -> Option<u128> {
     })
 }
 
-/// (a) M6R-1: a PumpSwap price start writes `L_ema = min(√(X·(Y + VQR)), ⌊D·10⁴/λ_min⌋)` and — the
+/// (a) M6R-1: a PumpSwap price start writes `L_ema = min(√(X·(Y + VQR)), D)` (the anchor at
+/// PumpSwap's `λ_min` = 100 %, OWNER-M6D-1 / M6E-1; `⌊D·10⁴/pool_lock_min_bps⌋` before) and — the
 /// warm-up's depth cap in the same prologue — `L_slow = min(L_ema, D)`, on the pool as the
 /// instruction found it (`D` recomputed by the venue view).
 fn price_start(svm: &LiteSVM, mp: &MarketPositions, post: &Market) -> Result<(), Violation> {
@@ -148,7 +154,7 @@ fn price_start(svm: &LiteSVM, mp: &MarketPositions, post: &Market) -> Result<(),
         );
     };
     let root = liquidity(u128::from(x), u128::from(y)).unwrap_or(0);
-    let Some(cap) = depth_cap(svm, d) else {
+    let Some(cap) = depth_cap(svm, d, Some(VenueKind::PumpSwap)) else {
         return fail("I18", format!("market {market}: no config"));
     };
     let l = root.min(cap);
@@ -158,7 +164,7 @@ fn price_start(svm: &LiteSVM, mp: &MarketPositions, post: &Market) -> Result<(),
         || {
             format!(
                 "market {market}: PumpSwap price start L_ema {} / L_slow {} / pool_d {}, want \
-                 min(√k {root}, ⌊D·10⁴/λ_min⌋ {cap}) = {l} / min(that, D {d}) / D (M6R-1)",
+                 min(√k {root}, D {cap}) = {l} / min(that, D {d}) / D (M6R-1, M6E-1)",
                 post.ema_liq.get(),
                 post.liq_slow.get(),
                 post.pool_d.get()
@@ -519,9 +525,10 @@ fn references(
         .unix_timestamp
         .max(mp.state.last_accrual_ts);
     // M4F-1 (Raydium), M6R-1 (PumpSwap): the EMA terms are capped at ⌊D·10⁴/λ_min⌋, D the
-    // locked depth the exit's prologue refreshed (`pool_d`).
+    // locked depth the exit's prologue refreshed (`pool_d`); on PumpSwap λ_min = 100 % (M6E-1):
+    // the cap is D, so L_b = L_live there.
     let cap = if locked {
-        let Some(c) = depth_cap(svm, post.pool_d.get()) else {
+        let Some(c) = depth_cap(svm, post.pool_d.get(), post.venue_kind()) else {
             return fail("I18", format!("market {market}: no config"));
         };
         Some(c)

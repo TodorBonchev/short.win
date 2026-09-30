@@ -87,8 +87,11 @@ fn a_pumpswap_class_coin_lists_on_its_canonical_pool() {
 /// at the pool's spot and depth; eight integrations of the pool's own buckets confirm it. Since
 /// M6R-1 (owner decision of 2026-09-30) as a Raydium start: `L_ema = min(√(X·(Y + VQR)),
 /// ⌊D·10⁴/λ_min⌋)` and — the warm-up's depth cap in the same prologue — `L_slow = min(L_ema, D)`,
-/// `D` the burned LP's locked depth, written into `pool_d`. On e/acc's `mature` pool (third-party
-/// LP, λ 92.98 %) `L_ema` is the pool's `√k` and `L_slow` its locked depth.
+/// `D` the burned LP's locked depth, written into `pool_d`; PumpSwap's `λ_min` is 100 %
+/// (OWNER-M6D-1; the anchor since M6E-1), so the anchor is `D` itself. On e/acc's `mature` pool
+/// (third-party LP, λ 92.98 %) `L_ema` and `L_slow` start at its locked depth, below the pool's
+/// `√k` (at row 56's `⌊D·10⁴/pool_lock_min_bps⌋` = 1.86·√k `L_ema` started at `√k`); the first
+/// warm-up integration re-seeds `L_ema` from the pool's own bucket, `√k`.
 #[test]
 fn the_first_pumpswap_observation_starts_the_price_marked_for_the_warm_up() {
     let (mut env, p) = list_and_check(PammCoin::Mature);
@@ -103,14 +106,18 @@ fn the_first_pumpswap_observation_starts_the_price_marked_for_the_warm_up() {
     let spot = r.effective_quote * shortwin_math::num::WAD / u128::from(r.base);
     let l = shortwin_math::quote::liquidity(u128::from(r.base), r.effective_quote).unwrap();
     assert_eq!(m.ema_price.get(), spot);
-    // λ_min 50 %: the cap ⌊D·10⁴/λ_min⌋ = 1.86·√k does not bind; L_slow is the depth.
-    assert!(d * 2 > l && d < l);
+    // λ_min 100 %: the anchor is D (< √k: the pool has third-party LP); L_slow is the depth.
+    assert!(d < l);
     assert_eq!(
         (m.ema_liq.get(), m.liq_slow.get(), m.pool_d.get()),
-        (l, d, d)
+        (d, d, d)
     );
     assert_eq!((m.ema_warm, m.ema_guard, m.ring_count), (8, 1, 1));
-    crank_secs(&mut env, &pm, 8);
+    // The first warm-up integration re-seeds L_ema from the pool's own bucket (its √k).
+    crank_secs(&mut env, &pm, 1);
+    let m = market(&env, &pm);
+    assert_eq!((m.ema_warm, m.ema_liq.get()), (7, l));
+    crank_secs(&mut env, &pm, 7);
     let m = market(&env, &pm);
     assert_eq!(m.ema_warm, 0);
     assert_eq!(

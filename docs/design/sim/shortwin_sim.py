@@ -167,14 +167,28 @@ What it models (integer math wherever the on-chain program uses integers):
         the Raydium one on the burned LP, D = floor(lambda_bps*isqrt(X*(Y + VQR))/1e4), lambda_bps =
         floor((lp_supply - lp_mint.supply)*1e4/lp_supply) (CPPool.lock_bps / locked_depth; = sqrt_k() while no third
         party holds LP), and the Raydium rules that read D apply (Market.locked_depth_venue): the sizing term
-        D/(lambda_min*sqrt(P_ema)) (conservative_x) and the reference cap floor(D*1e4/lambda_min) (ref_depth_cap);
-        during a PumpSwap warm-up L_slow is capped at D (observe), which undoes a deposit that raised the
-        graduation's lp_supply anchor.  The spot leg at max(L_live, L_ema') (FITS-2 (a)) and the guard already
-        applied to every venue; the keeper's per-second liquidity-anomaly coverage (FITS-2 (b)) is keeper-side
-        (attacks/pumpswap_lp.py).  The example pools A / B / C carry no third-party LP (lambda = 1, D = sqrt_k), so
-        no rule reading D binds on them; a CPPool marked non-canonical (attacks/fvcap.py) keeps the old reading;
+        D/(lambda_min*sqrt(P_ema)) (conservative_x) and the reference cap floor(D*1e4/lambda_min) (ref_depth_cap) --
+        lambda_min on PumpSwap 100 % since OWNER-M6D-1, #106: below; during a PumpSwap warm-up L_slow is capped at D
+        (observe), which undoes a deposit that raised the graduation's lp_supply anchor.  The spot leg at
+        max(L_live, L_ema') (FITS-2 (a)) and the guard already applied to every venue; the keeper's per-second
+        liquidity-anomaly coverage (FITS-2 (b)) is keeper-side (attacks/pumpswap_lp.py).  The example pools A / B / C
+        carry no third-party LP (lambda = 1, D = sqrt_k), so no rule reading D binds on them; a CPPool marked
+        non-canonical (attacks/fvcap.py) keeps the old reading;
       - M6-SEC-3: PumpCurve.create_pool_halted (PumpSwap's disable bit 0) stalls migrate_v2 and refuses curve opens
         (GraduationHalted).
+  * OWNER-M6D-1 (the owner's decision of 2026-09-30, ECONOMICS.md changelog #106; ARCH §2.3.3, §4.6, §4.7; SPEC §14
+    M6D-1): PumpSwap credits its burned LP only.  Every term that divides a canonical PumpSwap pool's D by lambda_min
+    takes PUMPSWAP_LOCK_MIN_BPS = 10,000 (lambda_min = 100 %) instead of pool_lock_min_bps (Market.lock_min_bps):
+    X0 = min(X_now, L_slow/sqrt(P_ema), D/sqrt(P_ema)) (conservative_x), and with it the per-position, market OI,
+    fee-scaled, wallet and utilisation caps (the margin stays priced on the pool as it is, attacks/pumpswap_lp.py
+    3 (f)); the program's tier bound R_eff <= max(floor(D*isqrt(P_ema)/1e9) - VQR+, 0) (the sim's tiers are fixed;
+    shortwin-math's tier vectors transcribe it); and the exit reference's cap floor(D*1e4/lambda_min) = D
+    (ref_depth_cap; the program's price start anchor too): on a canonical pool D <= L_live, so L_b = L_live there.
+    A position sized on a third-party deposit held for about an hour (up to lambda/lambda_min = 2x the burned
+    depth's cap before) gapped into S1 when the LP left at a genuine pump (M6D-1; attacks/pumpswap_lp.py part 3 (e));
+    a reference cap kept at 2D, as #106 was first written, let a deposit held into a position's deadline and pulled
+    there hold its expiry up for up to an hour (M6E-1, part 3 (f) (iv): the buyback on the drained pool 1.2 % above a
+    reference at twice its depth, over delta_exp = 1 %).  Raydium keeps pool_lock_min_bps.
   * Scenario library, EMA / exit-bound lag study, loss-given-gap curves,
     break-even gap frequencies, an ILLUSTRATIVE (uncalibrated) jump-diffusion
     Monte Carlo, and a randomised exit fuzz with attacker bundles, attacker-only
@@ -765,7 +779,8 @@ class Params:
     open_ema_dev_bps: int = 1000
     fee_size_cap_x100: int = 300           # per position q/X <= 3.00 x one-way venue fee
     fee_oi_cap_x100: int = 750             # market sum(Q)/X <= 7.50 x one-way venue fee
-    pool_lock_min_bps: int = 5000          # lambda_min: sizing on locked depth / lambda_min (Raydium)
+    pool_lock_min_bps: int = 5000          # lambda_min: sizing and the reference cap on locked depth / lambda_min
+                                           #   (Raydium; PumpSwap takes PUMPSWAP_LOCK_MIN_BPS in both, #106, M6E-1)
     venue_fee_cap_bps: int = 150           # opens refused above (not exercised by the sim's opens)
     venue_fee_hard_cap_bps: int = 500      # risk quotes and FV use at most this fee; above = S3 evidence
     # ---- D3 -------------------------------------------------------------------------
@@ -909,6 +924,14 @@ def depth_at_lambda(D: int, lam_bps: int) -> int:
     """floor(D*1e4/lambda): the sqrt(X*Y) a pool of locked depth D has at locked share lambda; 0 for lambda = 0.
     With lambda_min it is the most depth sizing ever credits the pool with (the adoption cap)."""
     return D * BPS // lam_bps if lam_bps else 0
+
+
+# OWNER-M6D-1 (the owner's decision of 2026-09-30, ECONOMICS.md changelog #106; compiled, u32 bps; ARCH §2.3.3
+# PUMPSWAP_LOCK_MIN_BPS): the lambda_min of every term that divides a canonical PumpSwap pool's D -- X0's D term
+# (Market.conservative_x), the program's tier bound and the exit reference's cap (Market.ref_depth_cap; since M6E-1)
+# -- is 100 %, so nothing a third party deposited is credited to a size, a tier or an exit's reference; Raydium keeps
+# pool_lock_min_bps (Market.lock_min_bps).
+PUMPSWAP_LOCK_MIN_BPS = 10_000
 
 
 def locked_floor_ok(D: int, p_ref: int, P: Params = DEFAULT, floor: int = POOL_MIN_REAL_SOL) -> bool:
@@ -1480,12 +1503,27 @@ class Market:
         v = self.venue
         return v.kind == "ray" or (isinstance(v, CPPool) and v.canonical)
 
+    def lock_min_bps(self) -> int:
+        """The lambda_min that divides D wherever it is credited (conservative_x; the program's tier bound;
+        ref_depth_cap; the program's VenueKind::lock_min_bps): Raydium pool_lock_min_bps; a canonical PumpSwap pool
+        PUMPSWAP_LOCK_MIN_BPS = 10,000 since OWNER-M6D-1 (owner decision 2026-09-30, ECONOMICS.md #106) -- a canonical
+        pool's lock is its burned creation LP, so D itself is credited, never a third party's deposit (under #105 a
+        deposit held ~1 h sized opens at up to lambda/lambda_min = 2x the burned depth's cap, and such a position gapped
+        into S1 when the LP left at a genuine pump, M6D-1; a reference cap at 2D held an expiry up after a deposit
+        pulled at the deadline, M6E-1)."""
+        v = self.venue
+        if isinstance(v, CPPool) and v.canonical:
+            return PUMPSWAP_LOCK_MIN_BPS
+        return self.P.pool_lock_min_bps
+
     def conservative_x(self) -> int:
         """R3A-3 ii: token reserve for caps: curve min(vT, x_ema) (#103, curve_cap_reserves; vT while
         P_ema <= P_spot); PumpSwap min(X_now, L_slow/sqrt(P_ema)); Raydium and (since M6R-1, #105) a canonical
-        PumpSwap pool additionally <= D/(lambda_min*sqrt(P_ema)).  A deposit wrapped around the open lifts neither
-        L_slow nor D (only X_now, which the minimum drops), and a deposit held long enough to push L_slow is bounded
-        at lambda/lambda_min of the pool's own depth."""
+        PumpSwap pool additionally <= D/(lambda_min*sqrt(P_ema)), lambda_min = lock_min_bps(): Raydium's
+        pool_lock_min_bps, PumpSwap's 100 % since OWNER-M6D-1 (#106), i.e. D/sqrt(P_ema), the burned LP's token
+        reserve at P_ema.  A deposit wrapped around the open lifts neither L_slow nor D (only X_now, which the minimum
+        drops); a deposit held long enough to push L_slow is bounded at lambda/lambda_min of the pool's own depth on
+        Raydium and adds nothing on PumpSwap."""
         v = self.venue
         X_now = v.eff()[0]
         if v.kind == "curve":
@@ -1493,7 +1531,7 @@ class Market:
         sp = isqrt_ceil(self.ema)
         x = min(X_now, self.liq_slow * SQRT_WAD // sp)
         if self.locked_depth_venue():
-            x = min(x, v.locked_depth() * SQRT_WAD * BPS // (self.P.pool_lock_min_bps * sp))
+            x = min(x, v.locked_depth() * SQRT_WAD * BPS // (self.lock_min_bps() * sp))
         return x
 
     def oi_cap_q(self, X_after: int) -> int:
@@ -1727,15 +1765,18 @@ class Market:
     def ref_depth_cap(self) -> Optional[int]:
         """M4F-1 (ECON §8.2; bounds::ref_liquidity): on a Raydium venue -- and since M6R-1 (owner decision 2026-09-30,
         ECONOMICS.md #105) on a canonical PumpSwap pool, D from its burned LP -- the EMA terms of the exit reference
-        liquidity are capped at floor(D*1e4/lambda_min), D the pool's locked depth now -- the most depth sizing
-        ever credits the pool with (conservative_x, the adoption anchor).  L_b = max(L_live, min(max(L_ema',
-        L_slow), cap)): a deposit-inflated L_ema / L_slow lifts the reference by at most lambda/lambda_min over the
-        live depth, and L_live itself is never capped.  None (no cap) on the curve, which has no D, and on a
-        non-canonical model pool (locked_depth_venue)."""
+        liquidity are capped at floor(D*1e4/lambda_min), D the pool's locked depth now and lambda_min = lock_min_bps():
+        the most depth sizing ever credits the pool with (conservative_x, the adoption anchor).  L_b = max(L_live,
+        min(max(L_ema', L_slow), cap)); L_live itself is never capped.  On Raydium (pool_lock_min_bps) a
+        deposit-inflated L_ema / L_slow lifts the reference by at most lambda/lambda_min over the live depth; on a
+        canonical PumpSwap pool lambda_min = 100 % (OWNER-M6D-1, #106; the cap too since M6E-1) and D <= L_live, so
+        L_b = L_live: no third-party deposit is credited to an exit (at 2D a deposit held into a deadline and pulled
+        there held a D-sized expiry up for up to an hour, attacks/pumpswap_lp.py 3 (f) (iv)).  None (no cap) on the
+        curve, which has no D, and on a non-canonical model pool (locked_depth_venue)."""
         v = self.venue
         if not self.locked_depth_venue():
             return None
-        return depth_at_lambda(v.locked_depth(), self.P.pool_lock_min_bps)
+        return depth_at_lambda(v.locked_depth(), self.lock_min_bps())
 
     def exit_reference(self, pos: Position, st: dict, t: int, is_liq: bool):
         """(risk quote at the reference, delta_bps, P_ref) bounding a keeper-initiated
@@ -1746,7 +1787,7 @@ class Market:
         lo = self.lb_lo
         # deepest liquidity -> lowest reference cost; M4R: while the post-change guard is set, the EMA term is
         # min(L_ema, L_mlo) (bounds::ref_liquidity), so a pushed-up L_ema cannot lift the reference; M4F-1: on
-        # Raydium the EMA terms never credit the pool with more depth than sizing does (ref_depth_cap)
+        # Raydium and PumpSwap the EMA terms never credit the pool with more depth than sizing does (ref_depth_cap)
         l_e = min(self.liq, self.ring_medians()[2]) if self.guard else self.liq
         l_ref = max(l_e, self.liq_slow)
         cap = self.ref_depth_cap()

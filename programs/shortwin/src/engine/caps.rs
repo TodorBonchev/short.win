@@ -63,8 +63,9 @@ pub struct CapInputs {
     /// `L_slow` and `P_ema` after this instruction's roll.
     pub l_slow: u128,
     pub p_ema: u128,
-    /// Raydium and — since M6R-1 (owner decision of 2026-09-30) — PumpSwap: `(D,
-    /// pool_lock_min_bps)` (locked depth over `λ_min`, V2-8; on PumpSwap the burned LP's depth);
+    /// Raydium and — since M6R-1 (owner decision of 2026-09-30) — PumpSwap: `(D, λ_min)`, the
+    /// locked depth over `VenueKind::lock_min_bps` (V2-8): Raydium's `pool_lock_min_bps`,
+    /// PumpSwap's burned-LP depth over `PUMPSWAP_LOCK_MIN_BPS` = 100 % (OWNER-M6D-1, ECON #106);
     /// `None` elsewhere. (The name predates PumpSwap's lock.)
     pub raydium_lock: Option<(u128, u32)>,
     /// The live one-way venue fee φ, ppm.
@@ -144,6 +145,8 @@ pub fn check_open(inp: &CapInputs, tier: &TierParams, params: &Params) -> Result
 #[allow(clippy::unwrap_used, clippy::arithmetic_side_effects)]
 mod tests {
     use super::*;
+    use crate::constants::PUMPSWAP_LOCK_MIN_BPS;
+    use crate::state::VenueKind;
     use shortwin_math::num::WAD;
 
     fn cap(vt: u64, vq: u64, rt: u64) -> CurveCap {
@@ -186,5 +189,34 @@ mod tests {
         // An EMA price above the completion price leaves no real tokens to count.
         let (_, rt_hi) = curve_reserves(&before, p_ema * 2).unwrap();
         assert_eq!(rt_hi, 0);
+    }
+
+    /// OWNER-M6D-1 (ARCH row 57, ECON #106): an open's `(D, λ_min)` on PumpSwap is the burned LP
+    /// at `λ_min` = 100 % whatever the governed `pool_lock_min_bps` is (`VenueKind::lock_min_bps`,
+    /// as `open_short` passes it), so `X₀`'s `D` term is the burned LP's own reserve at `P_ema`;
+    /// on Raydium it is `D/λ_min`.
+    #[test]
+    fn pumpswap_sizes_on_the_burned_lp_raydium_on_lambda_min() {
+        let mut params = Params::defaults();
+        let (d, p) = (4_204_936_085_629u128, 49_000_000_000_000u128);
+        for lam in [2_000u32, 5_000, 10_000] {
+            params.pool_lock_min_bps = lam;
+            let x0 = |k: VenueKind| {
+                let lock = k.lock_min_bps(params.pool_lock_min_bps).map(|l| (d, l));
+                caps::conservative_x0(u64::MAX, u128::MAX, p, lock).map(u128::from)
+            };
+            assert_eq!(x0(VenueKind::PumpSwap), reprice_token(d, p));
+            assert_eq!(
+                x0(VenueKind::PumpSwap),
+                caps::conservative_x0(u64::MAX, u128::MAX, p, Some((d, PUMPSWAP_LOCK_MIN_BPS)))
+                    .map(u128::from)
+            );
+            for k in [VenueKind::RaydiumV4, VenueKind::RaydiumCpmm] {
+                assert_eq!(
+                    x0(k),
+                    caps::conservative_x0(u64::MAX, u128::MAX, p, Some((d, lam))).map(u128::from)
+                );
+            }
+        }
     }
 }

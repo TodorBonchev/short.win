@@ -170,7 +170,9 @@ pub enum TierVenue {
     PumpSwap {
         /// The canonical pool's locked depth `D` (`Market.pool_d`).
         locked_depth: u128,
-        /// `pool_lock_min_bps` (λ_min).
+        /// λ_min: [`PUMPSWAP_LOCK_MIN_BPS`](crate::consts::PUMPSWAP_LOCK_MIN_BPS) (100 %) on the
+        /// program's path since OWNER-M6D-1 (ECON #106; as built at #105 `pool_lock_min_bps`),
+        /// so `R_eff ≤ max(⌊D·isqrt(P_ema)/10⁹⌋ − max(VQR, 0), 0)`: the burned LP's real SOL.
         lambda_min_bps: u32,
     },
     /// Adopted Raydium AMM v4 / CPMM pool, bounded by its locked depth (V2-8):
@@ -247,8 +249,10 @@ pub fn locked_sol(locked_depth: u128, p_ema: u128) -> u128 {
 /// v0.3 floored the product once) (ADOPTED Q19; ECON §6.2). On PumpSwap (M6R-1, ECON #105) the
 /// same bound on the burned LP's locked SOL less the virtual reserve,
 /// `R_eff ≤ ⌊max(locked − VQR, 0)·10⁴/λ_min_bps⌋` (`inp.vqr` is `max(VQR, 0)`): only real SOL
-/// counts (Q19), and a deposit held to push `L_slow` credits at most `λ/λ_min` of `D`. `None` for
-/// the curve, which is tiered by venue.
+/// counts (Q19); at the program's `λ_min` =
+/// [`PUMPSWAP_LOCK_MIN_BPS`](crate::consts::PUMPSWAP_LOCK_MIN_BPS) (100 %, OWNER-M6D-1, ECON
+/// #106) a deposit held to push `L_slow` credits nothing beyond `D` (at a `λ_min` of 50 % it
+/// credited up to `λ/λ_min` of `D`). `None` for the curve, which is tiered by venue.
 ///
 /// Errors: `DivByZero` if `λ_min = 0`.
 pub fn liquidity_lamports(inp: &TierInputs) -> Result<Option<u128>, MathError> {
@@ -515,6 +519,19 @@ mod tests {
             lambda_min_bps: 0,
         };
         assert_eq!(assign(&i), Tier::C);
+        // OWNER-M6D-1 (ECON #106): at the program's λ_min = PUMPSWAP_LOCK_MIN_BPS the bound is the
+        // burned LP's real SOL itself — 1,100 − 100 = 1,000 SOL, Λ 2,000 SOL (Tier B's floor at
+        // $121 is ≈ 826 SOL of Λ); with a held deposit L_slow and R_now above it change nothing.
+        i.p_ema = crate::num::WAD;
+        i.vqr = 100 * SOL;
+        i.venue = TierVenue::PumpSwap {
+            locked_depth: u128::from(1_100 * SOL),
+            lambda_min_bps: crate::consts::PUMPSWAP_LOCK_MIN_BPS,
+        };
+        assert_eq!(liquidity_lamports(&i), Ok(Some(u128::from(2_000 * SOL))));
+        i.y_slow = u128::from(3 * 38_200 * SOL);
+        assert_eq!(liquidity_lamports(&i), Ok(Some(u128::from(2_000 * SOL))));
+        i.y_slow = u128::from(38_200 * SOL);
         // Floors: ⌊D·isqrt(P)/10⁹⌋ = 2·10⁹, less VQR 10⁹, then ⌊10⁹·10⁴/3,000⌋.
         let p = 1_000_000_001u128 * 1_000_000_001;
         i.p_ema = p;

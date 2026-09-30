@@ -61,7 +61,8 @@ pub struct Projection {
     pub pool_fail: bool,
     /// The cap on the exit reference liquidity's EMA terms (M4F-1:
     /// `engine::bounds::ref_depth_cap`, `⌊pool_d·10⁴/λ_min⌋` on Raydium and — M6R-1 — PumpSwap,
-    /// `None` elsewhere) on the projected market.
+    /// whose `λ_min` is 100 % since OWNER-M6D-1 / M6E-1 (`pool_d` itself), `None` elsewhere) on the
+    /// projected market.
     pub depth_cap: Option<u128>,
 }
 

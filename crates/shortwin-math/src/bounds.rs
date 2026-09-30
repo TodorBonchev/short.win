@@ -75,12 +75,17 @@ impl Default for ExitParams {
 /// liquidity, and so from blocking the exit bound, until `L_ema` agrees with the lows within
 /// `REF_GUARD_TOL_BPS` (an honest switch: at the end of the warm-up).
 ///
-/// `depth_cap` (M4F-1, defense in depth) is `Some(⌊D·10⁴/λ_min⌋)` on a Raydium market
-/// ([`ref_depth_cap`]: the pool's locked depth over `λ_min`, the most depth sizing ever credits
-/// the pool with — `caps::conservative_x0`, `tier`'s `R_eff`, the adoption anchor) and `None` on
-/// the other venues. After a switch, attacker-only seconds of deposit-wrapped cranks can lift
-/// `L_ema` (and `L_slow`) to the deposit's depth once the guard has cleared; the cap keeps the
-/// EMA terms from crediting more than sizing does, so such a push lifts the reference by at
+/// `depth_cap` (M4F-1, defense in depth) is `Some(⌊D·10⁴/λ_min⌋)` ([`ref_depth_cap`]: the pool's
+/// locked depth over `λ_min`, the most depth sizing ever credits the pool with —
+/// `caps::conservative_x0`, `tier`'s `R_eff`, the adoption anchor) on a Raydium market, `λ_min` =
+/// `pool_lock_min_bps`, and — since M6R-1 (ECON #105) — on a canonical PumpSwap pool, whose
+/// `λ_min` is [`PUMPSWAP_LOCK_MIN_BPS`](crate::consts::PUMPSWAP_LOCK_MIN_BPS) = 100 % since
+/// OWNER-M6D-1 (ECON #106; the cap too since M6E-1): the cap is `D` itself, and as `D ≤ L_live`
+/// on a canonical pool, `L_b = L_live` there — a third-party deposit is credited to no exit, as to
+/// no size (at `2D` a deposit pulled at a deadline held a `D`-sized expiry up for up to an hour).
+/// `None` on the other venues. After a switch, attacker-only seconds of deposit-wrapped cranks can
+/// lift `L_ema` (and `L_slow`) to the deposit's depth once the guard has cleared; the cap keeps
+/// the EMA terms from crediting more than sizing does, so such a push lifts the reference by at
 /// most `λ/λ_min` over the pool's own depth (≤ 2× at the default `λ_min` of 50 %). `D` is
 /// deposit- and withdraw-invariant up to the whole-bps floor of `λ` (at most 1 bp of the pool's
 /// `√(X·Y)` in that instruction), so no capital-only bundle moves the cap materially. It
@@ -152,10 +157,12 @@ pub fn spot_liquidity(l_live: u128, ema: &Ema, ring: &Ring) -> Result<u128, Math
     Ok(l_live.max(guarded_ema_liquidity(ema, ring)?))
 }
 
-/// The Raydium cap of [`ref_liquidity`]'s EMA terms (M4F-1): `⌊D·10⁴/λ_min⌋`
-/// ([`depth_at_lambda`]), `D` the pool's locked depth (`Market.pool_d`, refreshed at every
-/// executable observation) and `λ_min` = `pool_lock_min_bps`; 0 for `λ_min = 0` (outside the
-/// compiled bounds [2,000, 10,000]), which leaves `L_b = L_live`.
+/// The Raydium (M4F-1) and PumpSwap (M6R-1) cap of [`ref_liquidity`]'s EMA terms:
+/// `⌊D·10⁴/λ_min⌋` ([`depth_at_lambda`]), `D` the pool's locked depth (`Market.pool_d`, refreshed
+/// at every executable observation) and `λ_min` the venue's: Raydium `pool_lock_min_bps`, PumpSwap
+/// [`PUMPSWAP_LOCK_MIN_BPS`](crate::consts::PUMPSWAP_LOCK_MIN_BPS) = 100 % (OWNER-M6D-1, ECON
+/// #106; M6E-1), i.e. `D` itself; 0 for `λ_min = 0` (outside the compiled bounds), which leaves
+/// `L_b = L_live`.
 pub fn ref_depth_cap(locked_depth: u128, lambda_min_bps: u32) -> u128 {
     depth_at_lambda(locked_depth, u64::from(lambda_min_bps))
 }
@@ -559,6 +566,21 @@ mod tests {
         assert_eq!(ref_liquidity(50, &ema, &ring, Some(0)), Ok(50));
         // A saturating cap never binds.
         assert_eq!(ref_depth_cap(u128::MAX, 2_000), u128::MAX);
+        // PumpSwap (OWNER-M6D-1, M6E-1): the cap at λ_min = 100 % is D itself, and with the live
+        // depth at or above D (a canonical pool) the reference is the live pool whatever the EMA
+        // terms credit.
+        let pumpswap = ref_depth_cap(250, crate::consts::PUMPSWAP_LOCK_MIN_BPS);
+        assert_eq!(pumpswap, 250);
+        ema.guard = 0;
+        ema.liq = 900;
+        ema.liq_slow = 800;
+        for l_live in [250u128, 251, 400, 1_000] {
+            assert_eq!(
+                ref_liquidity(l_live, &ema, &ring, Some(pumpswap)),
+                Ok(l_live)
+            );
+        }
+        ema.guard = 1;
         ring.head = 9;
         assert_eq!(
             ref_liquidity(50, &ema, &ring, Some(cap)),

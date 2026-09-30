@@ -12,6 +12,7 @@
 //! | the collection window | `PoolProposed` records its candidate in `fp_*`; on a Raydium market it opens only on an armed fast path (`pool_fail` just before, the chain `≥ pool_fast_route_s` old after) with `D ≥ pool_fast_min_bps·pool_d`, and is improved only inside the window, while its arming chain holds, by a strictly deeper candidate other than its own; on a list-only market only with open positions, improved inside the window by a strictly deeper candidate; the window's candidate is eligible at `P_ema` and passes the window floor (M4V-1) at `min(P_ema, P_cand)` (M4R-2); `fp_*` changes only with one of the three events; a `PoolSwitchCancelled` resolves a window that ran out |
 //! | switch only if all fit (owner decision of 2026-09-29) | an adoption that carries open positions (kind fast) happened, and a window proposal on a market with open positions was accepted, only if **every open position** (its own `q`, not the program's bound) fits the candidate's per-position impact cap and fee-scaled size cap on its conservative locked-depth `X₀ = min(X, L_slow'/√P, D/(λ_min·√P))` (`L_slow'` what the adoption leaves: `min(L_slow, D)`, or the pool's `min(√(X·Y), D/λ_min)` without a price), and `ΣQ` its per-market impact and fee-scaled OI caps at `X₀`, with the impact caps of the tier the market would have on the candidate and the fee-scaled caps at `φ = min(min_open_fee_ppm, φ_cand, CARRIED_FEE_CAP_PPM)` (FIT-2, FITS-1; `min(φ_cand, CARRIED_FEE_CAP_PPM)` for a zero mark) (the harness's own `tier::assign` on the candidate's `D`, `R`, `L_slow'`, the market's age — a list-only market's: the candidate's — and the cached oracle), at `P = min(P_ema, P_cand)` and at `P_ema` — a proposal's `X₀` with the candidate's live `X` (as an open), an adoption's without it (`execute_pool_switch` judges on the terms no transaction can move); `max_q_hwm` is at or above every open position's `q`, and both marks are 0 with none open (state part, `check_hwm`); `max_q_hwm` falls only at the exit that empties the market, and `min_open_fee_ppm` changes only at an open — to `open_fee_mark(mark, φ)`, `φ` the venue's fee on the pre-trade state — and at that exit (FIT-2) |
 //! | opens sized on locked depth (V2-8) | an `Open` on a Raydium market happened after the listing window and the post-change warm-up (`ema_warm == 0` after the roll, M4R / M4V-5), with the fee ≤ `venue_fee_cap_bps`, `R_eff = min(R_now, R_slow, D·√P_ema/λ_min) ≥ pool_min_real_sol`, `pool_d` the pool's `D` on the pre-trade state, and `q` within the per-position impact cap on `X₀ = min(X_now, L_slow/√P_ema, D/(λ_min·√P_ema))` |
+//! | PumpSwap opens sized on the burned LP (OWNER-M6D-1) | an `Open` on a PumpSwap market (ARCH row 57, A82; ECON #106): `pool_d` is the burned LP's `D` on the pre-trade state (the harness's own view of the pool and its LP mint), `q` within the per-position impact and fee-scaled caps and `ΣQ + q` within the per-market cap on `X₀ = min(X_now, L_slow/√P_ema, D/√P_ema)` — `λ_min` = 100 %, written out here, not the program's `PUMPSWAP_LOCK_MIN_BPS` — and the open's tier no better than the burned LP's real SOL `max(⌊D·isqrt(P_ema)/10⁹⌋ − max(VQR, 0), 0)` alone earns at the cached oracle |
 //!
 //! I17's M4 part (no adoption and no window candidate while **the candidate's own** Raydium
 //! program is flagged — its program's bit, not the whole Raydium mask, M4-SEC-8; a latched
@@ -519,6 +520,7 @@ pub fn check_ix(
         window(svm, &config, mp, &post, ix, !switched.is_empty())?;
         for o in ix.opens.iter().filter(|o| o.market == mp.market) {
             open_sized_on_locked_depth(svm, &config, mp, &post, o)?;
+            pumpswap_open_sized_on_burned_depth(svm, &config, mp, &post, o)?;
         }
         marks_move_only_at_opens_and_the_last_exit(mp, &post, ix.opens)?;
     }
@@ -1194,6 +1196,125 @@ fn window(
         }
     }
     Ok(())
+}
+
+/// OWNER-M6D-1 (module docs; ARCH row 57, A82; ECON #106): an open on a PumpSwap market is sized
+/// and tiered on its burned LP only. Recomputed here from the harness's own view of the pool and its
+/// LP mint on the pre-trade state (`venue_view`: `D = ⌊λ_bps·isqrt(X·(Y + VQR))/10⁴⌋`) and at
+/// `λ_min` = 100 % written out — the reprojection of `D` itself, not the program's constant —:
+/// `pool_d = D`; `q` within the per-position impact and fee-scaled caps on `X₀ = min(X_now,
+/// ⌊L_slow·10⁹/isqrt⁺(P_ema)⌋, ⌊D·10⁹/isqrt⁺(P_ema)⌋)`; `ΣQ + q` within the per-market cap on
+/// `X₀ + q`; and the open's tier no better than the one the burned LP's real SOL `max(⌊D·
+/// isqrt(P_ema)/10⁹⌋ − max(VQR, 0), 0)` alone earns at the cached oracle (the tier is monotone in
+/// liquidity, and `R_eff ≤` that bound). At `pool_lock_min_bps` (as built at row 56) a held
+/// third-party deposit sized opens at up to `λ/λ_min` of this `X₀` and could lift the tier (M6D-1).
+fn pumpswap_open_sized_on_burned_depth(
+    svm: &LiteSVM,
+    config: &GlobalConfig,
+    mp: &MarketPositions,
+    post: &Market,
+    o: &Open,
+) -> Result<(), Violation> {
+    let pre = &mp.state;
+    if pre.venue_kind() != Some(VenueKind::PumpSwap) {
+        return Ok(());
+    }
+    let market = mp.market;
+    let params = &config.params;
+    let Some((view, (x, _), d)) = mp
+        .venue
+        .filter(|v| v.executable)
+        .and_then(|v| Some((v, v.reserves?, v.locked_depth?)))
+    else {
+        return fail(
+            "I15",
+            format!(
+                "open {} on a PumpSwap pool that could not execute",
+                o.position
+            ),
+        );
+    };
+    ensure(post.pool_d.get() == d, "I15", || {
+        format!(
+            "open {}: pool_d {} is not the burned LP's D {d} on the pre-trade state",
+            o.position,
+            post.pool_d.get()
+        )
+    })?;
+    let p_ema = post.ema_price.get();
+    let at_ema = |l: u128| shortwin_math::quote::reprice_token(l, p_ema).unwrap_or(u128::MAX);
+    let x0 = u128::from(x)
+        .min(at_ema(post.liq_slow.get()))
+        .min(at_ema(d));
+    let x0 = u64::try_from(x0).unwrap_or(u64::MAX);
+    let Some(tp) = config.tiers.get(usize::from(o.tier)) else {
+        return fail("I15", format!("open {}: tier {}", o.position, o.tier));
+    };
+    let impact = shortwin_math::caps::max_q_position(x0, tp.impact_pos_bps).unwrap_or(0);
+    let fee = shortwin_math::caps::fee_size_cap(x0, view.fee_ppm, params.fee_size_cap_x100)
+        .ok()
+        .flatten()
+        .unwrap_or(u64::MAX);
+    ensure(o.q <= impact.min(fee), "I15", || {
+        format!(
+            "open {}: q {} above the per-position cap {} on the burned depth's X₀ {x0} (D {d}, \
+             OWNER-M6D-1)",
+            o.position,
+            o.q,
+            impact.min(fee)
+        )
+    })?;
+    let oi = shortwin_math::caps::oi_cap(
+        x0.saturating_add(o.q),
+        tp.impact_mkt_bps,
+        view.fee_ppm,
+        params.fee_oi_cap_x100,
+    )
+    .unwrap_or(0);
+    ensure(pre.borrowed_q.saturating_add(o.q) <= oi, "I15", || {
+        format!(
+            "open {}: ΣQ {} + q {} above the per-market cap {oi} on the burned depth's X₀ {x0} + q",
+            o.position, pre.borrowed_q, o.q
+        )
+    })?;
+    // The tier: `R_eff ≤ max(⌊D·isqrt(P_ema)/10⁹⌋ − VQR⁺, 0)`, the burned LP's real SOL.
+    let vqr = read::account(svm, &pre.canonical_pool)
+        .and_then(|a| {
+            shortwin_venue_state::pump_amm::read_pool(&a.owner.to_bytes(), &a.data)
+                .ok()
+                .map(|p| u128::try_from(p.virtual_quote_reserves.max(0)).unwrap_or(u128::MAX))
+        })
+        .unwrap_or(0);
+    let locked = d.saturating_mul(p_ema.isqrt()) / 1_000_000_000;
+    let bound = locked.saturating_sub(vqr);
+    let oracle = read::borsh::<OracleCache>(svm, &crate::pda::oracle_cache()).map_or(
+        OraclePrice::default(),
+        |c| OraclePrice {
+            price: c.price,
+            expo: c.expo,
+            publish_time: c.publish_time,
+        },
+    );
+    let best = tier::assign(&TierInputs {
+        venue: TierVenue::Unlocked,
+        r_now: u64::try_from(bound).unwrap_or(u64::MAX),
+        y_slow: bound,
+        vqr: 0,
+        p_ema,
+        now: market_now(svm, pre),
+        graduated_at: post.graduated_at,
+        oracle,
+        oracle_stale_s: params.oracle_stale_s,
+        theta_a_usd_e6: params.theta_a_usd_e6,
+        theta_b_usd_e6: params.theta_b_usd_e6,
+    });
+    ensure(usize::from(o.tier) >= best.index(), "I15", || {
+        format!(
+            "market {market}: open {} at tier {} better than the burned LP's real SOL {bound} \
+             earns ({best:?}; D {d}, VQR⁺ {vqr}, OWNER-M6D-1)",
+            o.position, o.tier
+        )
+    })
 }
 
 /// An open on a Raydium market is sized on locked depth (module docs; V2-8, ARCH §2.6 rule 5).

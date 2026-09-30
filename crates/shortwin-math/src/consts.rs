@@ -54,6 +54,28 @@ pub const REF_GUARD_TOL_BPS: u32 = 100;
 /// (the accepted fallback).
 pub const CARRIED_FEE_CAP_PPM: u32 = 2_500;
 
+/// **OWNER** (OWNER-M6D-1, the owner's decision of 2026-09-30, option (a); ARCH §2.3.3 row 57,
+/// A82; ECON #106; SPEC §14 M6D-1): the `λ_min` of every term that divides a canonical PumpSwap
+/// pool's locked depth `D` (its burned creation LP's depth, `Market.pool_d`), bps. 10,000 = 100 %:
+/// a PumpSwap open is sized on `D` itself — `caps::conservative_x0(X_now, L_slow, P_ema,
+/// Some((D, PUMPSWAP_LOCK_MIN_BPS)))`, i.e. `X₀ ≤ ⌊D·10⁹/isqrt⁺(P_ema)⌋`, and with it the
+/// per-position, market-OI, fee-scaled, wallet and utilisation caps on `X₀ + q` — and tiered on
+/// it — `tier::TierVenue::PumpSwap { lambda_min_bps: PUMPSWAP_LOCK_MIN_BPS }`, i.e. `R_eff ≤
+/// max(⌊D·isqrt(P_ema)/10⁹⌋ − max(VQR, 0), 0)` — and its exits' reference is capped at `D` —
+/// `bounds::ref_depth_cap(D, PUMPSWAP_LOCK_MIN_BPS)`, so `L_b = L_live` on a canonical pool (`D ≤
+/// L_live`) — as is a PumpSwap price start's anchor: a third-party deposit, however long it is
+/// held, credits a PumpSwap position, the market caps, the tier and an exit's reference with
+/// nothing. Under `pool_lock_min_bps` (50 %) a deposit held ≈ 1 h sized opens at up to `λ/λ_min` =
+/// 2× the burned depth's cap, and such a position gapped into S1 when the deposit left at a
+/// genuine pump (M6D-1; the sim's `attacks/pumpswap_lp.py` part 3 (e)); a reference cap kept at
+/// `2D` let a deposit held into a deadline and pulled there hold a `D`-sized expiry up for up to
+/// an hour (M6E-1, part 3 (f) (iv): the buyback on the drained pool ≈ 1.2 % above a reference at
+/// twice its depth, over `δ_exp` = 1 %). Compiled, not a parameter: a governed PumpSwap `λ_min`
+/// below 100 % would credit held deposits again. Raydium keeps `pool_lock_min_bps` everywhere.
+/// The sim's `shortwin_sim.PUMPSWAP_LOCK_MIN_BPS` (`Market.lock_min_bps`); the program's
+/// `VenueKind::lock_min_bps`.
+pub const PUMPSWAP_LOCK_MIN_BPS: u32 = 10_000;
+
 /// Rent accrual clamps the price at `P̃ = min(P_ema, P_ACC_MAX)` (WAD, a price of 100 SOL
 /// per raw unit), which keeps the rent basis indices below 2¹²⁸ for 100 years (ECON §2.2).
 pub const P_ACC_MAX: u128 = 100_000_000_000_000_000_000_000_000_000;
@@ -84,6 +106,9 @@ const _: () = assert!(
         && RING_LEN <= u8::MAX as usize
 );
 const _: () = assert!(P_OPEN_MAX < P_ACC_MAX);
+// OWNER-M6D-1: PumpSwap credits the burned depth itself — never more than `D` (a λ_min above
+// 100 % would credit less, one below would credit a third party's deposit again).
+const _: () = assert!(PUMPSWAP_LOCK_MIN_BPS as u64 == crate::num::BPS);
 // M4R: the warm-up refills the whole ring, and the EMA leg's `liq_persist_n` newest entries are
 // post-change entries once it ends.
 const _: () = assert!(
@@ -118,6 +143,8 @@ mod tests {
         assert_eq!((EMA_TAU_S, RING_LEN, COVERAGE_GAP_S), (5, 8, 30));
         assert_eq!((EMA_WARMUP_BUCKETS, REF_GUARD_TOL_BPS), (8, 100));
         assert_eq!(CARRIED_FEE_CAP_PPM, 2_500);
+        // OWNER-M6D-1 (ECON #106): the sim's PUMPSWAP_LOCK_MIN_BPS, λ_min = 100 %.
+        assert_eq!(PUMPSWAP_LOCK_MIN_BPS, 10_000);
         assert_eq!(
             (S3_OBS_GAP_S, LOCK_BUCKET_S, LOCK_BUCKETS),
             (60, 86_400, 128)

@@ -2,7 +2,8 @@
 //! / ECON §6.2–§6.3 v0.4.1 transcription — the sims have no tier function — with
 //! `R_slow = Y(reprice(L_slow, P_ema)) − VQR` from the v0.4.1 sim's own `reprice`, the
 //! Raydium term `⌊⌊D·isqrt(P_ema)/10⁹⌋·10⁴/λ_min_bps⌋`, ECON §2.1, and since ECON #105 (M6R-1)
-//! the PumpSwap term `⌊max(⌊D·isqrt(P_ema)/10⁹⌋ − max(VQR, 0), 0)·10⁴/λ_min_bps⌋`), plus
+//! the PumpSwap term `⌊max(⌊D·isqrt(P_ema)/10⁹⌋ − max(VQR, 0), 0)·10⁴/λ_min_bps⌋`, since #106
+//! (OWNER-M6D-1) at `λ_min_bps` = `PUMPSWAP_LOCK_MIN_BPS`: `max(⌊D·isqrt(P_ema)/10⁹⌋ − VQR⁺, 0)`), plus
 //! properties: the locked-SOL terms are floored separately, and tiers are monotone in liquidity
 //! and age.
 
@@ -12,6 +13,7 @@ use common::Dec;
 use num_bigint::BigUint;
 use proptest::prelude::*;
 use serde::Deserialize;
+use shortwin_math::consts::PUMPSWAP_LOCK_MIN_BPS;
 use shortwin_math::quote;
 use shortwin_math::tier::{self, OraclePrice, Tier, TierInputs, TierVenue};
 
@@ -46,8 +48,11 @@ fn tier_inputs(c: &TierCase) -> TierInputs {
     let venue = match c.venue.as_str() {
         "curve" => TierVenue::PumpCurve,
         "pumpswap" => {
-            // M6R-1 (ECON #105): the canonical pool's burned-LP depth.
+            // M6R-1 (ECON #105): the canonical pool's burned-LP depth; OWNER-M6D-1 (ECON #106):
+            // over the program's compiled λ_min = PUMPSWAP_LOCK_MIN_BPS (100 %), whatever
+            // `pool_lock_min_bps` is — every row carries it.
             let (d, l) = c.lock.as_ref().expect("pumpswap lock");
+            assert_eq!(l.0, PUMPSWAP_LOCK_MIN_BPS, "PumpSwap's sizing λ_min (#106)");
             TierVenue::PumpSwap {
                 locked_depth: d.0,
                 lambda_min_bps: l.0,

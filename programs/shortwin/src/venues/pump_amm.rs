@@ -111,9 +111,9 @@ use shortwin_venue_state::{mint, pump, pump_amm, token_account};
 
 use super::{raydium, BuyOut, Leg, SellOut, VenueState};
 use crate::constants::{
-    ASSOCIATED_TOKEN_PROGRAM_ID, PUMP_AMM_EVENT_AUTHORITY, PUMP_AMM_FEE_CONFIG,
-    PUMP_AMM_GLOBAL_CONFIG, PUMP_AMM_GLOBAL_VOLUME_ACCUMULATOR, PUMP_AMM_PROGRAM_ID,
-    PUMP_FEES_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID, WSOL_MINT,
+    ASSOCIATED_TOKEN_PROGRAM_ID, PUMPSWAP_LOCK_MIN_BPS, PUMP_AMM_EVENT_AUTHORITY,
+    PUMP_AMM_FEE_CONFIG, PUMP_AMM_GLOBAL_CONFIG, PUMP_AMM_GLOBAL_VOLUME_ACCUMULATOR,
+    PUMP_AMM_PROGRAM_ID, PUMP_FEES_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID, WSOL_MINT,
 };
 use crate::engine::trader::{base_ata_state, token_state, Funding, TraderAccounts};
 use crate::errors::{CheckedExt, MathResultExt, ShortwinError};
@@ -834,24 +834,24 @@ pub fn priced(obs: &Observation) -> bool {
 /// §3.2's init set) exactly as a Raydium price start does (since M6R-1, owner decision of
 /// 2026-09-30): `Observation::new_raydium(now, P_spot, √(X·(Y + VQR)), ⌊D·10⁴/λ_min⌋)` —
 /// `P_ema = P_spot`, `L_ema = L_slow = min(√(X·(Y + VQR)), ⌊D·10⁴/λ_min⌋)` with `D` the pool's
-/// locked depth (a deposit wrapped around the start credits at most `D/λ_min`), one ring entry,
-/// **marked for the post-change warm-up** (a pushed spot seeds nothing an open reads before eight
-/// integrations of the pool's own buckets). A pool without locked depth (`D = 0`: no burned LP
-/// left, which a canonical pool never has) starts nothing: the market stays unpriced, so it takes
-/// no open. `lambda_min_bps` is `pool_lock_min_bps`. Returns whether it started.
-pub fn start_price(
-    obs: &mut Observation,
-    state: &VenueState,
-    now: i64,
-    lambda_min_bps: u32,
-) -> Result<bool> {
+/// locked depth, one ring entry, **marked for the post-change warm-up** (a pushed spot seeds
+/// nothing an open reads before eight integrations of the pool's own buckets). `λ_min` is
+/// PumpSwap's, `PUMPSWAP_LOCK_MIN_BPS` = 100 % (`VenueKind::lock_min_bps`; OWNER-M6D-1, ARCH
+/// changelog 57, ECON #106; M6E-1), so the anchor is `D` itself (`≤ √(X·(Y + VQR))` on a canonical
+/// pool): a deposit wrapped around the start credits nothing, and `L_ema` starts at the depth
+/// every other PumpSwap term credits (the first warm-up integration re-seeds it from the pool's own
+/// bucket, and the warm-up gates every exit and open until the eighth). A pool without locked
+/// depth (`D = 0`: no burned LP left,
+/// which a canonical pool never has) starts nothing: the market stays unpriced, so it takes no
+/// open. Returns whether it started.
+pub fn start_price(obs: &mut Observation, state: &VenueState, now: i64) -> Result<bool> {
     if priced(obs) || state.kind != VenueKind::PumpSwap || !state.executable {
         return Ok(false);
     }
     let (Some(p), Some(l)) = (state.price(), state.liquidity()) else {
         return Ok(false);
     };
-    let cap = pool_select::depth_at_lambda(state.locked_depth, u64::from(lambda_min_bps));
+    let cap = pool_select::depth_at_lambda(state.locked_depth, u64::from(PUMPSWAP_LOCK_MIN_BPS));
     if cap == 0 {
         return Ok(false);
     }

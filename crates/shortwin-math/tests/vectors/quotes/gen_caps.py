@@ -8,8 +8,10 @@ fee-scaled caps with the one-way fee in ppm (`⌊x100·φ_ppm·X/(100·10⁶)⌋
 `Market.conservative_x` (`isqrt⁺(P_ema)` in both denominators, the locked-depth bound on
 Raydium and -- since ECONOMICS changelog #105, M6R-1 -- on a canonical PumpSwap pool, whose `D`
 is its burned LP's depth; the field `raydium_lock` keeps its name and carries `(D, λ_min)`
-wherever `Market.locked_depth_venue()` holds; on the curve the cap reserves at the EMA price,
-ECONOMICS changelog #103), and
+wherever `Market.locked_depth_venue()` holds, `λ_min` = `Market.lock_min_bps()`:
+`pool_lock_min_bps` on Raydium, `PUMPSWAP_LOCK_MIN_BPS` = 10,000 on PumpSwap since #106
+(OWNER-M6D-1: PumpSwap credited on its burned LP only); on the curve the cap reserves at the EMA
+price, ECONOMICS changelog #103), and
 `Market.max_open_q` on every example market of the sim, fresh and after an EMA-lagging price
 path (so `L_slow ≠ L_live`, `P_ema ≠ P_live`). Utilisation is
 `pool_model.Pool.borrow`'s check; the curve-gamma, wallet and notional predicates are
@@ -21,7 +23,9 @@ own `reprice`, and on Raydium `R_eff ≤ ⌊⌊D·isqrt(P_ema)/10⁹⌋·10⁴/�
 locked SOL floored first); since #105 (M6R-1) on PumpSwap `R_eff ≤ ⌊max(⌊D·isqrt(P_ema)/10⁹⌋ −
 VQR⁺, 0)·10⁴/λ_min_bps⌋` (`VQR⁺ = max(VQR, 0)`: the locked SOL less the virtual reserve, real SOL
 only; the PumpSwap rows' `lock` is drawn from a stream of its own, so every other row keeps its
-draws); thresholds compared exactly against the cached SOL/USD price.
+draws) with `λ_min_bps` = `PUMPSWAP_LOCK_MIN_BPS` = 10,000 since #106 (OWNER-M6D-1), i.e.
+`R_eff ≤ max(⌊D·isqrt(P_ema)/10⁹⌋ − VQR⁺, 0)`; thresholds compared exactly against the cached
+SOL/USD price.
 
 Writes caps.json next to itself.
 """
@@ -126,9 +130,10 @@ def gen_preds(rng):
 
 def lock_of(m):
     """(D, lambda_min) wherever the sim's caps read the locked depth: Raydium and, since #105 (M6R-1), a canonical
-    PumpSwap pool (Market.locked_depth_venue); None on the curve."""
+    PumpSwap pool (Market.locked_depth_venue); None on the curve.  lambda_min is the market's (Market.lock_min_bps):
+    pool_lock_min_bps on Raydium, PUMPSWAP_LOCK_MIN_BPS on PumpSwap since #106."""
     v = m.venue
-    return [S(v.locked_depth()), S(m.P.pool_lock_min_bps)] if m.locked_depth_venue() else None
+    return [S(v.locked_depth()), S(m.lock_min_bps())] if m.locked_depth_venue() else None
 
 
 def gen_conservative(rng):
@@ -285,9 +290,10 @@ def gen_tiers(rng):
                 + rng.choice([0, 1, 7])
         if venue == "pumpswap":
             # #105 (M6R-1): a canonical pool's locked depth, from a stream of its own (the other rows keep their
-            # draws); its locked SOL less VQR over lambda_min around R_now, or far above (the bound idle)
+            # draws); its locked SOL less VQR over lambda_min around R_now, or far above (the bound idle).  #106
+            # (OWNER-M6D-1): PumpSwap's lambda_min is PUMPSWAP_LOCK_MIN_BPS (100 %), whatever pool_lock_min_bps is
             lr = random.Random(f"pumpswap-lock-{i}")
-            lam_min = lr.choice([5_000, 2_000, 10_000, 3_000])
+            lam_min = sim.PUMPSWAP_LOCK_MIN_BPS
             if lr.random() < 0.7:
                 num, den = lr.choice([(1, 2), (9, 10), (1, 1), (1, 1), (2, 1)])
                 locked = r_now * lam_min * num // (den * BPS) + vqr

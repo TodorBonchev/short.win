@@ -5,15 +5,16 @@
 //! upgrade can** (C0-8). `tests::static_addresses_rederive` re-derives every PDA below.
 //!
 //! The protocol constants (`EMA_TAU_S`, `RING_LEN`, `S3_OBS_GAP_S`, `COVERAGE_GAP_S`,
-//! `P_ACC_MAX`, `P_OPEN_MAX`, the lock calendar) and the compiled parameter bounds live in
+//! `P_ACC_MAX`, `P_OPEN_MAX`, the lock calendar, PumpSwap's sizing `λ_min`
+//! `PUMPSWAP_LOCK_MIN_BPS`) and the compiled parameter bounds live in
 //! `shortwin-math` (one table, shared with the keeper and the frontend) and are re-exported
 //! here; the program never restates a bound.
 
 use anchor_lang::prelude::*;
 
 pub use shortwin_math::consts::{
-    COVERAGE_GAP_S, EMA_TAU_S, LOCK_BUCKETS, LOCK_BUCKET_S, MAX_RELEASE_SPAN_S, P_ACC_MAX,
-    P_OPEN_MAX, RING_LEN, S3_OBS_GAP_S,
+    COVERAGE_GAP_S, EMA_TAU_S, LOCK_BUCKETS, LOCK_BUCKET_S, MAX_RELEASE_SPAN_S,
+    PUMPSWAP_LOCK_MIN_BPS, P_ACC_MAX, P_OPEN_MAX, RING_LEN, S3_OBS_GAP_S,
 };
 /// The compiled hard bounds of every parameter (ARCH §2.3.3; ECON §15): `Rule::bounds()`.
 /// `params::validate` / `params::validate_econ` enforce them with the relational checks.

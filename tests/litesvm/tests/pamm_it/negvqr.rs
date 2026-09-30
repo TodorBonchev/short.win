@@ -86,8 +86,11 @@ fn a_negative_vqr_pool_prices_on_the_effective_reserve() {
 
 /// ECON §6.2's tier inputs under a negative VQR (#103): the program's `R_eff` is the smaller of
 /// its real and effective inputs — `R_now = min(vault, vault + VQR)`, `R_slow = Y(reprice(L_slow,
-/// P_ema)) − max(VQR, 0)` — recomputed here from the readers and `shortwin-math`; the vault alone
-/// would credit the pool with twice its pricing depth.
+/// P_ema)) − max(VQR, 0)` — and of the burned LP's real SOL `max(⌊D·isqrt(P_ema)/10⁹⌋ − max(VQR,
+/// 0), 0)` (M6R-1 at `λ_min` = 100 % since OWNER-M6D-1, ECON #106; the pool's own `D` from its LP
+/// mint), recomputed here from the readers and `shortwin-math`; the vault alone would credit the
+/// pool with twice its pricing depth. On this pool (e/acc's, λ 92.98 %) the burned LP's bound is
+/// the one that binds (at `λ_min` 50 % it did not).
 #[test]
 fn the_tier_inputs_are_the_smaller_of_real_and_effective_sol() {
     let (mut env, p) = Env::fork_pamm_coin(PammCoin::Mature);
@@ -102,8 +105,20 @@ fn the_tier_inputs_are_the_smaller_of_real_and_effective_sol() {
     let y_slow = shortwin_math::quote::reprice(m.liq_slow.get(), m.ema_price.get())
         .map(|(_, y)| y)
         .unwrap();
-    let want = u128::from(r.real_quote).min(r.effective_quote).min(y_slow);
+    let (_, d) = pm.pool.locked_depth(&env.svm);
+    assert_eq!(m.pool_d.get(), d);
+    let vqr = u128::try_from(p.state(&env.svm).virtual_quote_reserves.max(0)).unwrap();
+    assert_eq!(vqr, 0, "a negative VQR counts as 0");
+    let locked = d * m.ema_price.get().isqrt() / 1_000_000_000 - vqr;
+    let want = u128::from(r.real_quote)
+        .min(r.effective_quote)
+        .min(y_slow - vqr)
+        .min(locked);
     assert_eq!(r_eff, want);
+    assert!(
+        locked < y_slow.min(r.effective_quote),
+        "the burned LP's bound binds"
+    );
     assert!(
         r_eff < u128::from(r.real_quote) / 2 + 1_000_000_000,
         "not the vault"

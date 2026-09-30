@@ -3,6 +3,7 @@
 //! (`shortwin_math::{risk, bounds, caps, tier}`; ECON §3.3, §4, §6, §8; ARCH §3.6, §3.7,
 //! §4.5–§4.7).
 
+use shortwin_math::consts::PUMPSWAP_LOCK_MIN_BPS;
 use shortwin_math::risk::{self as mrisk, ExpiryKeeperTerms, SettleKeeperTerms};
 use shortwin_math::tier::{self, OraclePrice, Tier, TierVenue};
 use shortwin_math::{MathError, bounds, caps};
@@ -195,24 +196,55 @@ pub fn notional_ok(
     )
 }
 
-/// Conservative cap reserve `X₀` (ARCH §4.6); pass `lockedDepth` (and `λ_min`) on Raydium and,
-/// since M6R-1 (ECON #105), on PumpSwap (the canonical pool's burned-LP depth `Market.pool_d`);
-/// `undefined` elsewhere.
+/// The `λ_min` that divides the locked depth `D` of an open on `venue` (the [`TierInputs`]
+/// codes): Raydium (2) the config's `pool_lock_min_bps`; PumpSwap (1) `PUMPSWAP_LOCK_MIN_BPS` =
+/// 10,000 (100 %) whatever `pool_lock_min_bps` is — OWNER-M6D-1 (ECON #106, ARCH row 57):
+/// PumpSwap credits its burned LP only, as the program's `VenueKind::lock_min_bps` (its sizing,
+/// tier and exit reference); `None` on a pool without a locked depth (3). The curve (0) has no
+/// locked depth and its cap reserves are not `X₀`'s: `InvalidInput`.
+fn lock_min_bps(venue: u8, pool_lock_min_bps: u32) -> Result<Option<u32>, MathError> {
+    match venue {
+        1 => Ok(Some(PUMPSWAP_LOCK_MIN_BPS)),
+        2 => Ok(Some(pool_lock_min_bps)),
+        3 => Ok(None),
+        _ => Err(MathError::InvalidInput),
+    }
+}
+
+/// `PUMPSWAP_LOCK_MIN_BPS` (10,000; OWNER-M6D-1, ECON #106): PumpSwap's compiled `λ_min` (its
+/// sizing, tier and exit reference), which [`conservative_x0`] and [`TierInputs`] apply on venue 1
+/// themselves.
+#[wasm_bindgen(js_name = pumpswapLockMinBps)]
+pub fn pumpswap_lock_min_bps() -> u32 {
+    PUMPSWAP_LOCK_MIN_BPS
+}
+
+/// Conservative cap reserve `X₀` of an open on `venue` (ARCH §4.6; the [`TierInputs`] venue codes:
+/// 1 = PumpSwap, 2 = Raydium, 3 = a pool without a locked depth; the curve, 0, sizes on its cap
+/// reserves at the EMA price instead and throws `invalid input`): `min(X_now,
+/// ⌊L_slow·10⁹/isqrt⁺(P_ema)⌋)`, on Raydium also `≤ ⌊D·10⁹·10⁴/(λ_min·isqrt⁺(P_ema))⌋` with
+/// `λ_min = poolLockMinBps` (V2-8), on PumpSwap (M6R-1) `≤ ⌊D·10⁹/isqrt⁺(P_ema)⌋`, the burned LP's
+/// own reserve at `P_ema`: its `λ_min` is `PUMPSWAP_LOCK_MIN_BPS` (100 %, OWNER-M6D-1, ECON #106)
+/// whatever `poolLockMinBps` is. `lockedDepth` is `Market.pool_d` (ignored on venue 3);
+/// `poolLockMinBps` the config's `pool_lock_min_bps`.
 #[wasm_bindgen(js_name = conservativeX0)]
 pub fn conservative_x0(
+    venue: u8,
     x_now: u64,
     l_slow: u128,
     p_ema: u128,
-    locked_depth: Option<u128>,
-    lambda_min_bps: u32,
+    locked_depth: u128,
+    pool_lock_min_bps: u32,
 ) -> Result<u64, JsError> {
-    let lock = locked_depth.map(|d| (d, lambda_min_bps));
+    let lock = lock_min_bps(venue, pool_lock_min_bps)?.map(|l| (locked_depth, l));
     Ok(caps::conservative_x0(x_now, l_slow, p_ema, lock)?)
 }
 
 /// Inputs of the tier function (`tier::TierInputs`; ARCH §4.7). `venue`: 0 = pump
-/// curve, 1 = PumpSwap, 2 = Raydium (both with `lockedDepth` and `lambdaMinBps`; PumpSwap since
-/// M6R-1, ECON #105), 3 = a pool without a locked depth (the program's test-venue mock).
+/// curve, 1 = PumpSwap, 2 = Raydium (both with `lockedDepth`; PumpSwap since M6R-1, ECON #105),
+/// 3 = a pool without a locked depth (the program's test-venue mock). The locked-depth bound's
+/// `λ_min` is `lambdaMinBps` on Raydium and `PUMPSWAP_LOCK_MIN_BPS` (100 %) on PumpSwap
+/// (OWNER-M6D-1, ECON #106: `R_eff ≤ max(⌊D·isqrt(P_ema)/10⁹⌋ − max(VQR, 0), 0)`).
 #[wasm_bindgen]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TierInputs {
@@ -221,7 +253,8 @@ pub struct TierInputs {
     /// The locked depth `D` (`Market.pool_d`; Raydium and PumpSwap).
     #[wasm_bindgen(js_name = lockedDepth)]
     pub locked_depth: u128,
-    /// `pool_lock_min_bps` (λ_min; Raydium and PumpSwap).
+    /// The config's `pool_lock_min_bps` (λ_min), read on Raydium only: PumpSwap's is the compiled
+    /// `PUMPSWAP_LOCK_MIN_BPS` (OWNER-M6D-1).
     #[wasm_bindgen(js_name = lambdaMinBps)]
     pub lambda_min_bps: u32,
     /// `R_now`: the pool's real SOL, lamports.
@@ -266,7 +299,7 @@ impl TierInputs {
             0 => TierVenue::PumpCurve,
             1 => TierVenue::PumpSwap {
                 locked_depth: self.locked_depth,
-                lambda_min_bps: self.lambda_min_bps,
+                lambda_min_bps: PUMPSWAP_LOCK_MIN_BPS,
             },
             2 => TierVenue::Raydium {
                 locked_depth: self.locked_depth,
@@ -450,19 +483,46 @@ mod tests {
         t.oracle_stale_s = 120;
         t.theta_a_usd_e6 = 500_000_000_000;
         t.theta_b_usd_e6 = 100_000_000_000;
-        // PumpSwap (M6R-1): a burned-LP depth worth 40,000 SOL at P = 1 WAD over λ_min 100 %.
+        // PumpSwap (M6R-1): a burned-LP depth worth 40,000 SOL at P = 1 WAD over PumpSwap's
+        // λ_min, 100 % (OWNER-M6D-1) whatever the config's pool_lock_min_bps (50 %) says.
         t.p_ema = 1_000_000_000_000_000_000;
         t.locked_depth = 40_000_000_000_000;
-        t.lambda_min_bps = 10_000;
+        t.lambda_min_bps = 5_000;
         assert_eq!(t.tier().unwrap(), 0);
         assert_eq!(t.liquidity_lamports(), Some(80_000_000_000_000));
-        // 2,000 SOL locked: Λ = 4,000 SOL, under θ_A's 4,132 SOL at $121 (B).
+        // 2,000 SOL locked: Λ = 4,000 SOL, under θ_A's 4,132 SOL at $121 (B) — at λ_min 50 % it
+        // would credit 4,000 SOL of R_eff (Λ 8,000, A).
         t.locked_depth = 2_000_000_000_000;
         assert_eq!(t.liquidity_lamports(), Some(4_000_000_000_000));
         assert_eq!(t.tier().unwrap(), 1);
+        // Raydium reads pool_lock_min_bps: the same depth credits 2× (Λ 8,000 SOL, A).
+        t.venue = 2;
+        assert_eq!(t.liquidity_lamports(), Some(8_000_000_000_000));
+        assert_eq!(t.tier().unwrap(), 0);
         t.venue = 3;
         assert_eq!(t.liquidity_lamports(), Some(80_000_000_000_000));
         assert_eq!(t.tier().unwrap(), 0);
+        // X₀ (ARCH §4.6): D = 10⁶ at P = 1 WAD, X_now and L_slow above it — PumpSwap sizes on D
+        // itself, Raydium on D/λ_min, an unlocked pool on min(X_now, L_slow) alone.
+        let wad = 1_000_000_000_000_000_000u128;
+        assert_eq!(pumpswap_lock_min_bps(), 10_000);
+        assert_eq!(
+            conservative_x0(1, 9_000_000, 8_000_000, wad, 1_000_000, 5_000).ok(),
+            Some(1_000_000)
+        );
+        assert_eq!(
+            conservative_x0(1, 9_000_000, 8_000_000, wad, 1_000_000, 2_000).ok(),
+            Some(1_000_000)
+        );
+        assert_eq!(
+            conservative_x0(2, 9_000_000, 8_000_000, wad, 1_000_000, 5_000).ok(),
+            Some(2_000_000)
+        );
+        assert_eq!(
+            conservative_x0(3, 9_000_000, 8_000_000, wad, 1_000_000, 5_000).ok(),
+            Some(8_000_000)
+        );
+        assert_eq!(lock_min_bps(0, 5_000), Err(MathError::InvalidInput));
         let d = tier_params(3).unwrap();
         assert_eq!((d.cr_open_bps(), d.max_duration_s()), (40_000, 259_200));
     }

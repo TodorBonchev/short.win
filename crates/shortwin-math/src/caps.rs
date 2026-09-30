@@ -240,9 +240,13 @@ pub fn notional_ok(
 /// §6.1; ARCH §2.6 rule 5, §4.6; the sims' `Market.conservative_x`):
 /// `min(X_now, ⌊L_slow·10⁹/isqrt⁺(P_ema)⌋)` — the token side of
 /// `reprice(L_slow, P_ema)` ([`reprice_token`](crate::quote::reprice_token)) — and on
-/// Raydium also `≤ ⌊D·10⁹·10⁴/(λ_min_bps·isqrt⁺(P_ema))⌋`, the locked depth over
-/// `λ_min` (V2-8). `raydium_lock` is `(D, pool_lock_min_bps)`. The pump curve uses `vT`
-/// directly. A bound beyond `u128` does not bind.
+/// Raydium and (M6R-1, ECON #105) a canonical PumpSwap pool also
+/// `≤ ⌊D·10⁹·10⁴/(λ_min_bps·isqrt⁺(P_ema))⌋`, the locked depth over `λ_min` (V2-8).
+/// `raydium_lock` (the name predates PumpSwap's lock) is `(D, λ_min)`: on Raydium `(D,
+/// pool_lock_min_bps)`; on PumpSwap `(pool_d,`
+/// [`PUMPSWAP_LOCK_MIN_BPS`](crate::consts::PUMPSWAP_LOCK_MIN_BPS)`)` since OWNER-M6D-1 (ECON
+/// #106), which makes the term `⌊D·10⁹/isqrt⁺(P_ema)⌋`, the burned LP's token reserve at
+/// `P_ema`. The pump curve uses `vT` directly. A bound beyond `u128` does not bind.
 ///
 /// Errors: `DivByZero` if `P_ema = 0` or `λ_min = 0`.
 pub fn conservative_x0(

@@ -6,20 +6,24 @@
 use shortwin_math::quote::reprice;
 use shortwin_math::tier::{self, OraclePrice, Tier, TierInputs, TierVenue};
 
+use crate::constants::PUMPSWAP_LOCK_MIN_BPS;
 use crate::state::{GlobalConfig, Market, OracleCache, VenueKind};
 use crate::venues::VenueState;
 
 /// The tier venue of a market (ARCH §4.7): the curve kinds are Tier D; Raydium adds the
-/// locked-depth bound `D / λ_min` to `min(R_now, R_slow)` (V2-8), and PumpSwap — since the
-/// owner's decision of 2026-09-30 (M6R-1; ECON #105) — the same bound on its burned LP's locked
-/// SOL less `max(VQR, 0)` (`D = pool_d`); the mock (a CPMM stand-in without pool selection or LP
-/// accounting, so without a locked depth) prices on `min(R_now, R_slow)` alone.
+/// locked-depth bound `D / λ_min` (`pool_lock_min_bps`) to `min(R_now, R_slow)` (V2-8), and
+/// PumpSwap — since the owner's decision of 2026-09-30 (M6R-1; ECON #105) — a bound on its burned
+/// LP's locked SOL less `max(VQR, 0)` (`D = pool_d`) over `λ_min` = `PUMPSWAP_LOCK_MIN_BPS` (100 %,
+/// OWNER-M6D-1, ECON #106, ARCH row 57: `R_eff ≤ max(⌊D·isqrt(P_ema)/10⁹⌋ − max(VQR, 0), 0)`, so a
+/// held third-party deposit lifts no PumpSwap tier; `VenueKind::lock_min_bps`); the mock
+/// (a CPMM stand-in without pool selection or LP accounting, so without a locked depth) prices on
+/// `min(R_now, R_slow)` alone.
 pub fn tier_venue(config: &GlobalConfig, market: &Market, kind: VenueKind) -> Option<TierVenue> {
     match kind {
         VenueKind::PumpCurve | VenueKind::PumpMigrating => Some(TierVenue::PumpCurve),
         VenueKind::PumpSwap => Some(TierVenue::PumpSwap {
             locked_depth: market.pool_d.get(),
-            lambda_min_bps: config.params.pool_lock_min_bps,
+            lambda_min_bps: PUMPSWAP_LOCK_MIN_BPS,
         }),
         VenueKind::RaydiumV4 | VenueKind::RaydiumCpmm => Some(TierVenue::Raydium {
             locked_depth: market.pool_d.get(),
