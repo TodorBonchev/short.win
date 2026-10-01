@@ -15,7 +15,7 @@
 //! | `pda` | T-PDA-USER (curve): `buy_v2` / `sell_v2` with the trader PDA as `user` under CPI, read off the inner instructions |
 //! | `straddle` | `CurveStraddle` above `rT`; `B̂_str` against the executed bundle (completing buy, `migrate_v2`, PumpSwap `buy`) on the real ELFs |
 //! | `graduation` | `PumpCurve → PumpMigrating` (a completing buyback, an external completion), the migration pause and S3 at 70 min, `migrate_v2` (the next crank moves the market onto its canonical pool, M6's `→ PumpSwap`; `pamm_it` runs it with positions), `→ None` (graduated elsewhere) and S3 on its detection set, `None → PumpCurve` re-detection; M4's carry-overs: a graduated-elsewhere market with a position open adopts its Raydium pool through the collection window (switch only if all fit, the deepest candidate, the position closed on the new pool), and the re-detection clears a running window and the route chains |
-//! | `exits` | expiry and liquidation on the curve, `sweep_trader`'s token leg, token donations during a leg, the pump / pump-fees / PumpSwap latch bits |
+//! | `exits` | expiry and liquidation on the curve, `sweep_trader`'s token leg, token donations during a leg, a `trader_wsol` donation surviving curve legs until `sweep_trader` (FUZZ-M7-1), the pump / pump-fees / PumpSwap latch bits |
 //!
 //! Opens and closes are sent with ARCH §6.1's PROPOSED 250 k CU limit (`VenueMarket::cu_limit`),
 //! keeper exits with 300 k: curve opens measure 176–194 k CU, above the runtime's 200 k default

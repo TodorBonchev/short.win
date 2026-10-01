@@ -59,6 +59,10 @@ pub struct VenueView {
     pub reserves: Option<(u64, u64)>,
     /// One-way fee φ in ppm (0 when not executable).
     pub fee_ppm: u32,
+    /// The one-way fee the fee-scaled caps take (M7-SEC-5): on the pump venues `min(φ_live, φ at
+    /// the stored P_ema's market cap)` — recomputed here with `fees::pump_amm` / `pump_curve` at
+    /// `⌊P_ema·X/WAD⌋` of quote —, elsewhere `fee_ppm`.
+    pub cap_fee_ppm: u32,
     /// The resolved fees (execution quotes) when executable (constant-product venues).
     pub pricing: Option<Pricing>,
     /// The pump curve's live state and resolved fees when executable.
@@ -80,6 +84,7 @@ impl VenueView {
         observed: false,
         reserves: None,
         fee_ppm: 0,
+        cap_fee_ppm: 0,
         pricing: None,
         curve: None,
         venue_rent: 0,
@@ -194,19 +199,26 @@ fn pump_swap(svm: &LiteSVM, m: &Market) -> Option<VenueView> {
             fees: FeeBps::new(t.fees.lp, t.fees.protocol, t.fees.creator),
         })
         .collect();
-    let f = fees::pump_amm(
-        r.effective_quote,
-        u128::from(r.base),
-        &fees::PammFeeSchedule {
-            tiers: &tiers,
-            base_supply: supply,
-            creator_fee_configurable: gc.creator_fee_configurable(),
-            pool_creator_fee_bps: p.creator_fee_bps,
-            coin_creator_is_default: p.coin_creator_is_default(),
-            cap_bps: None,
-        },
-    )
-    .ok()?;
+    let sched = fees::PammFeeSchedule {
+        tiers: &tiers,
+        base_supply: supply,
+        creator_fee_configurable: gc.creator_fee_configurable(),
+        pool_creator_fee_bps: p.creator_fee_bps,
+        coin_creator_is_default: p.coin_creator_is_default(),
+        cap_bps: None,
+    };
+    let f = fees::pump_amm(r.effective_quote, u128::from(r.base), &sched).ok()?;
+    // M7-SEC-5: the tier at the stored P_ema's market cap (price·supply).
+    let p_ema = m.ema_price.get();
+    let at_ema = (p_ema > 0)
+        .then(|| {
+            p_ema
+                .checked_mul(u128::from(r.base))
+                .map(|v| v / 1_000_000_000_000_000_000)
+        })
+        .flatten()
+        .and_then(|q| fees::pump_amm(q, u128::from(r.base), &sched).ok())
+        .map_or(u32::MAX, |e| e.oneway_ppm());
     if r.base == 0 || effective == 0 || gc.disable_flags() & (1 << 3) != 0 {
         return None;
     }
@@ -221,6 +233,7 @@ fn pump_swap(svm: &LiteSVM, m: &Market) -> Option<VenueView> {
         observed: true,
         reserves: Some((r.base, effective)),
         fee_ppm: f.oneway_ppm(),
+        cap_fee_ppm: f.oneway_ppm().min(at_ema),
         pricing: Some(Pricing::PumpSwap(f)),
         curve: None,
         venue_rent,
@@ -290,19 +303,27 @@ fn pump_curve(svm: &LiteSVM, m: &Market) -> VenueView {
             fees: FeeBps::new(t.fees.lp, t.fees.protocol, t.fees.creator),
         })
         .collect();
-    let Ok(f) = fees::pump_curve(
-        state.vt,
-        state.vq,
-        &CurveFeeSchedule {
-            tiers: &tiers,
-            creator_fee_configurable: global.creator_fee_configurable(),
-            curve_creator_fee_bps: c.creator_fee_bps,
-            creator_is_default: c.creator_is_default(),
-            cap_bps: None,
-        },
-    ) else {
+    let sched = CurveFeeSchedule {
+        tiers: &tiers,
+        creator_fee_configurable: global.creator_fee_configurable(),
+        curve_creator_fee_bps: c.creator_fee_bps,
+        creator_is_default: c.creator_is_default(),
+        cap_bps: None,
+    };
+    let Ok(f) = fees::pump_curve(state.vt, state.vq, &sched) else {
         return dead;
     };
+    // M7-SEC-5: the tier at the stored P_ema's market cap.
+    let p_ema = m.ema_price.get();
+    let at_ema = (p_ema > 0)
+        .then(|| {
+            p_ema
+                .checked_mul(state.vt)
+                .map(|v| v / 1_000_000_000_000_000_000)
+        })
+        .flatten()
+        .and_then(|vq| fees::pump_curve(state.vt, vq, &sched).ok())
+        .map_or(u32::MAX, |e| e.oneway_ppm());
     let vault = Pubkey::find_program_address(
         &[b"creator-vault", &c.creator],
         &shortwin::constants::PUMP_PROGRAM_ID,
@@ -320,6 +341,7 @@ fn pump_curve(svm: &LiteSVM, m: &Market) -> VenueView {
         observed: true,
         reserves: Some((c.virtual_token_reserves, c.virtual_quote_reserves)),
         fee_ppm: f.oneway_ppm(),
+        cap_fee_ppm: f.oneway_ppm().min(at_ema),
         pricing: None,
         curve: Some((state, f)),
         venue_rent,
@@ -345,6 +367,7 @@ fn mock(svm: &LiteSVM, m: &Market) -> VenueView {
         observed: reserves.is_some(),
         reserves,
         fee_ppm: p.fee_ppm,
+        cap_fee_ppm: p.fee_ppm,
         pricing: Some(Pricing::Cpmm { buy: f, sell: f }),
         curve: None,
         venue_rent: 0,
@@ -428,6 +451,7 @@ fn ray_v4(svm: &LiteSVM, m: &Market) -> Option<VenueView> {
         observed: true,
         reserves: Some(if sol_is_coin { (p, c) } else { (c, p) }),
         fee_ppm: fee.oneway_ppm(),
+        cap_fee_ppm: fee.oneway_ppm(),
         pricing: Some(Pricing::RayV4(fee)),
         curve: None,
         venue_rent: 0,
@@ -512,6 +536,7 @@ fn ray_cpmm(svm: &LiteSVM, m: &Market) -> Option<VenueView> {
         observed: true,
         reserves: Some(if sol0 { (r1, r0) } else { (r0, r1) }),
         fee_ppm,
+        cap_fee_ppm: fee_ppm,
         pricing: Some(Pricing::Cpmm { buy, sell }),
         curve: None,
         venue_rent: 0,

@@ -2588,6 +2588,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "shortwin-fuzz"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "litesvm",
+ "serde_json",
+ "shortwin",
+ "shortwin-litesvm-tests",
+ "shortwin-math",
+ "shortwin-venue-state",
+ "solana-account",
+ "solana-instruction",
+ "solana-keypair",
+ "solana-signer",
+ "solana-transaction-error",
+]
+
+[[package]]
 name = "shortwin-litesvm-tests"
 version = "0.1.0"
 dependencies = [

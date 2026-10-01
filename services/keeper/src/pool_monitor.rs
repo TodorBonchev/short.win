@@ -263,11 +263,16 @@ pub fn rank(mut scored: Vec<(u128, CandidatePool)>, k: usize) -> Vec<CandidatePo
 /// Every Raydium SOL pool of `mint` on `chain` ([`discovery_queries`]), deduplicated, sorted by
 /// pool key.
 pub async fn discover<C: Chain>(chain: &C, mint: &Pubkey) -> anyhow::Result<Vec<CandidatePool>> {
+    let queries = discovery_queries(mint);
+    // M7-SEC-8: the four `getProgramAccounts` calls in parallel (one round trip, not four).
+    let results = futures::future::try_join_all(
+        queries
+            .iter()
+            .map(|q| chain.program_accounts_sized(&q.program, q.data_size, &q.filters)),
+    )
+    .await?;
     let mut out: Vec<CandidatePool> = Vec::new();
-    for q in discovery_queries(mint) {
-        let found = chain
-            .program_accounts_sized(&q.program, q.data_size, &q.filters)
-            .await?;
+    for (q, found) in queries.iter().zip(results) {
         for (key, acc) in found {
             if out.iter().any(|c| c.pool == key) {
                 continue;

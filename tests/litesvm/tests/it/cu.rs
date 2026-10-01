@@ -34,6 +34,33 @@ fn cu_baseline() {
     let meta = ok(env.send(&[ix::apply_config()], &[]));
     rows.push(("apply_config(Params)", meta.compute_units_consumed, 200_000));
 
+    // `set_coverage_pause` (O17) on a list-only market, the role installed by the timelocked
+    // `Authorities` change.
+    let authority = solana_keypair::Keypair::new();
+    let payer = env.payer.insecure_clone();
+    let mint = shortwin_litesvm_tests::tokens::create_mint(
+        &mut env.svm,
+        &payer,
+        &authority.pubkey(),
+        6,
+        shortwin_litesvm_tests::tokens::TokenProgram::Spl,
+    );
+    let creator = env.funded_keypair();
+    ok(env.send(
+        &[ix::create_market(
+            &creator.pubkey(),
+            &mint,
+            &shortwin_litesvm_tests::tokens::TokenProgram::Spl.id(),
+            0,
+            &shortwin_litesvm_tests::pda::canonical_pool(&mint),
+        )],
+        &[&creator],
+    ));
+    env.enable_coverage_authority();
+    let market = shortwin_litesvm_tests::pda::market(&mint).0;
+    let meta = ok(env.set_coverage_pause(&market, true));
+    rows.push(("set_coverage_pause", meta.compute_units_consumed, 60_000));
+
     let meta = ok(env.send(
         &[ix::set_pause(
             &pause.pubkey(),

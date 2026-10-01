@@ -1,6 +1,6 @@
-//! short.win keeper v1 (ARCHITECTURE §7.1; ECON §5.8): duties 1–6 with batching, degraded mode,
-//! duty 10's venue drift monitor and duty 12's Raydium pool monitor (with duty 5's fast path,
-//! M4), on the Raydium venues and the TEST-ONLY mock:
+//! short.win keeper v1 (ARCHITECTURE §7.1; ECON §5.8): duties 1–6 with batching, degraded mode
+//! with the O17 coverage pause, duty 10's venue drift monitor, duty 11's SOL/USD cache and duty
+//! 12's Raydium pool monitor (with duty 5's fast path, M4), on every venue and the TEST-ONLY mock:
 //!
 //! 1. **Observation coverage** ([`coverage`]): one observation per second on every market with
 //!    a position near a threshold (live CR below 1.3·L, deadline within 60 s, armed) or with
@@ -35,12 +35,21 @@
 //!    block engine — the exit on the pool follows at the post-change warm-up's gate (`T + 8`);
 //!    **right after a full wipe** the venue cashback claims and `sweep_trader` ([`sweep`]), so the
 //!    market takes deposits and opens again.
+//! 9. **Degraded mode** ([`coverage`], [`alerts`]; O17, M7): a market with open positions whose
+//!    coverage lapses — `degraded_after_misses` missed seconds in a row, the program's
+//!    `CoverageGap`, or its daily observation budget spent — is degraded; the designated pauser
+//!    (`[coverage_pause]`, holding the `coverage_authority` key) sends `set_coverage_pause(market,
+//!    true)` in the same tick (opens only; every exit continues) and `false` after `recovery_s` of
+//!    restored coverage; without the key or the role it alerts, and the page is the pause path.
 //! 10. **Venue drift monitor** ([`monitor`]): the six venue ProgramData deploy slots against the
 //!     `VenueGuard` latch — an upgrade is flagged with `flag_venue_upgraded` in the slot it is
 //!     seen, once, and refreshed when a second upgrade lands during review; Token-2022's upgrade
 //!     is alerted — and every covered market's pool and CPMM config (Raydium `SetParams`,
 //!     `update_pool_status`, `update_amm_config`, seen as the account changes they make):
 //!     route lost / restored, status, open time and fee against the opens and hard caps.
+//! 11. **The SOL/USD cache** (M7): `crank_sol_usd` of every newer Pyth update the program's rules
+//!     accept, read every ≤ 30 s (the USD tiers; a stale cache tiers every market C); refusals and
+//!     an aging cache alerted.
 //! 12. **Raydium pool monitor** ([`pool_monitor`]): every Raydium SOL pool of each covered mint
 //!     (`getProgramAccounts` on both programs, optionally through a separate endpoint), each
 //!     verified and ranked by locked depth `D` with the program's own verifier; `propose_pool`
@@ -55,9 +64,13 @@
 //! Operations: several markets' cranks per transaction ([`keeper`]: v1 batches of up to 6, v0
 //! batches of up to 4 where v1 is refused, each cut where its transaction would exceed the
 //! format's limits), `⌈simulated × 1.1⌉` compute units, a priority price from recent fees capped
-//! at the O17 ceiling ([`fees`]), the O17 daily budget, degraded-mode detection (misses, the
-//! program's `CoverageGap`; [`alerts`]), per-market metrics ([`metrics`]). The protocol address
-//! lookup table of A28 is built and checked by `shortwin-build-alt` ([`alt`]).
+//! at the O17 ceiling of 100,000 µlamports/CU ([`fees`]), the O17 per-market daily budget (the
+//! cranks exits depend on charged, never throttled), T-CASCADE's cap on the compute units of exits
+//! requested per market and per slot (`budget.market_cu_per_slot`, `payer_cu_per_slot`),
+//! per-market metrics and U28's `B̂_live/B̂_ref` histogram ([`metrics`]). The protocol address
+//! lookup table of A28 — and, on request, a market's own table — is built and checked by
+//! `shortwin-build-alt` ([`alt`]); `shortwin-v1-probe` checks whether a cluster takes v1
+//! transactions (U25).
 //!
 //! **Same code as the program** (ARCH §7.1 "Stack"): the keeper links the `shortwin` crate for
 //! its account types, its instruction builders, its venue reader and account lists (the Raydium
@@ -91,7 +104,7 @@ pub mod sweep;
 pub mod venue;
 pub mod view;
 
-pub use alerts::{Alert, DegradedReason};
+pub use alerts::{Alert, DegradedReason, PauseUnavailable};
 pub use config::KeeperConfig;
 pub use keeper::{
     ExitKind, ExitRecord, ExitResult, Keeper, PoolActionRecord, PoolResult, TickReport, V1Support,

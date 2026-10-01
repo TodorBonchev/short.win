@@ -60,6 +60,11 @@ fn an_outage_is_reported_through_coverage_gap_and_recovers_after_ten_minutes() {
     );
 }
 
+/// O17 (owner decision of 2026-09-30): an exhausted per-market budget on a market with open
+/// positions is degraded mode **at once** (`DegradedReason::Budget`, at the first observation the
+/// budget refuses) — before the M7 change it waited for `degraded_after_misses` (3) consecutive
+/// misses, which on the 30-s idle cadence took 90 s. The skipped observations still count as
+/// misses (and escalate the price for when the budget returns).
 #[test]
 fn an_exhausted_budget_misses_observations_and_degrades_the_market() {
     let mut cfg = KeeperConfig::default();
@@ -69,23 +74,45 @@ fn an_exhausted_budget_misses_observations_and_degrades_the_market() {
     let key = mms[0].market();
     let _ = open(&h, &mms[0], Q);
     let mut alerts = Vec::new();
-    for _ in 0..70 {
+    let mut degraded_at = None;
+    let mut exhausted_at = None;
+    for s in 0..70 {
         let r = h.second();
+        for a in &r.alerts {
+            match a {
+                Alert::BudgetExhausted { market, .. } if *market == key => {
+                    exhausted_at.get_or_insert(s);
+                }
+                Alert::Degraded { market, .. } if *market == key => {
+                    degraded_at.get_or_insert(s);
+                }
+                _ => {}
+            }
+        }
         alerts.extend(r.alerts.clone());
     }
+    assert!(exhausted_at.is_some(), "{alerts:?}");
     assert!(
-        alerts
-            .iter()
-            .any(|a| matches!(a, Alert::BudgetExhausted { market, .. } if *market == key)),
+        alerts.iter().any(|a| matches!(
+            a,
+            Alert::Degraded {
+                market,
+                reason: DegradedReason::Budget {
+                    spent: 10_000,
+                    budget: 10_000
+                }
+            } if *market == key
+        )),
         "{alerts:?}"
     );
-    assert!(
-        alerts.iter().any(|a| matches!(a, Alert::Degraded { market, reason: DegradedReason::Misses(3) } if *market == key)),
-        "{alerts:?}"
+    assert_eq!(
+        degraded_at, exhausted_at,
+        "degraded in the tick the budget ran out"
     );
     let m = &h.keeper.metrics.markets[&key];
     assert_eq!(m.cranks, 2);
-    assert!(m.misses >= 3 && m.degraded);
+    assert_eq!(m.budget_degraded, 1);
+    assert!(m.misses >= 1 && m.degraded);
     // Raising the budget restores coverage at once.
     h.keeper.config_mut().budget.per_market_daily_lamports = None;
     let r = h.second();

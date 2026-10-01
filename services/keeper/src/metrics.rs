@@ -34,6 +34,14 @@ pub struct MarketMetrics {
     pub liq_covers: u64,
     /// `CoverageGap` events seen.
     pub coverage_gaps: u64,
+    /// M7-SEC-1 (a): `CoverageGap` events at most `idle_interval_s + gap_tolerance_s` long
+    /// (landing jitter of the idle cadence), which did not degrade the market.
+    pub coverage_gaps_tolerated: u64,
+    /// M7-SEC-2: foreign prices off the keeper's view that its next read still showed (genuine
+    /// moves: no burst).
+    pub foreign_moves: u64,
+    /// M7-SEC-3: opens that landed while the keeper held the market degraded.
+    pub opens_while_degraded: u64,
     /// Admin actions seen on the market's pool or CPMM config (duty 10).
     pub venue_admin_changes: u64,
     /// `propose_pool` calls landed (duties 5 and 12).
@@ -53,6 +61,15 @@ pub struct MarketMetrics {
     /// among them.
     pub sweeps: u64,
     pub cashback_claims: u64,
+    /// T-CASCADE: exits held to the next slot by `budget.market_cu_per_slot`.
+    pub exits_deferred: u64,
+    /// O17: `set_coverage_pause(true)` / `(false)` calls of the keeper landed.
+    pub coverage_pauses: u64,
+    pub coverage_unpauses: u64,
+    /// O17: times the market's exhausted daily budget degraded it (with open positions).
+    pub budget_degraded: u64,
+    /// The market's `paused_coverage` flag as last read (1) or not (0).
+    pub paused_coverage: bool,
     /// Degraded (1) or not (0).
     pub degraded: bool,
     /// The last second covered.
@@ -66,6 +83,45 @@ impl MarketMetrics {
             self.last_covered = now;
             self.covered_seconds = self.covered_seconds.saturating_add(1);
         }
+    }
+}
+
+/// U28's bucket bounds (ARCH §12): `B̂_live/B̂_ref` in bps — ECON §5.7's battery assumes ±0.3 %
+/// and ±1 % between a live quote and the one-second-old reference.
+pub const B_RATIO_BUCKETS_BPS: [u64; 9] = [
+    9_700, 9_900, 9_970, 10_000, 10_030, 10_100, 10_300, 10_500, 11_000,
+];
+
+/// A histogram over [`B_RATIO_BUCKETS_BPS`] (Prometheus `histogram`; the last count is above the
+/// largest bound).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Histogram {
+    pub counts: [u64; 10],
+    pub sum: u64,
+    pub count: u64,
+}
+
+impl Histogram {
+    /// Records `v`.
+    pub fn record(&mut self, v: u64) {
+        let i = B_RATIO_BUCKETS_BPS
+            .iter()
+            .position(|b| v <= *b)
+            .unwrap_or(B_RATIO_BUCKETS_BPS.len());
+        self.counts[i] += 1;
+        self.sum = self.sum.saturating_add(v);
+        self.count += 1;
+    }
+
+    fn render(&self, s: &mut String, name: &str, label: &str) {
+        let mut cum = 0;
+        for (i, b) in B_RATIO_BUCKETS_BPS.iter().enumerate() {
+            cum += self.counts[i];
+            let _ = writeln!(s, "{name}_bucket{{{label},le=\"{b}\"}} {cum}");
+        }
+        let _ = writeln!(s, "{name}_bucket{{{label},le=\"+Inf\"}} {}", self.count);
+        let _ = writeln!(s, "{name}_sum{{{label}}} {}", self.sum);
+        let _ = writeln!(s, "{name}_count{{{label}}} {}", self.count);
     }
 }
 
@@ -85,6 +141,23 @@ pub struct Metrics {
     pub venue_flags: u64,
     /// Raydium pool discoveries run (duty 12; four `getProgramAccounts` calls each).
     pub pool_discoveries: u64,
+    /// O17: `set_coverage_pause` attempts refused or failed.
+    pub coverage_pause_failures: u64,
+    /// M7-SEC-8: market reads per tick — markets read in full this tick (with positions, or
+    /// something time-critical pending, or their cold poll due) and markets skipped as cold.
+    pub markets_read: u64,
+    pub markets_cold_skipped: u64,
+    /// Duty 11: `crank_sol_usd` calls landed, reads of the feed, refusals, and the lamports spent
+    /// (a global line: no market's budget pays it).
+    pub oracle_cranks: u64,
+    pub oracle_reads: u64,
+    pub oracle_refusals: u64,
+    pub oracle_lamports: u64,
+    /// U28 (ARCH §12): `B̂_live/B̂_ref` (bps) of the keeper's landed liquidations and expiries, at
+    /// its decision, and of the positions it evaluated waiting for their bound (`LiquidateWait`,
+    /// `ExpireWait`; once per position and tick).
+    pub b_ratio_landed: Histogram,
+    pub b_ratio_wait: Histogram,
 }
 
 impl Metrics {
@@ -159,8 +232,58 @@ impl Metrics {
             "Raydium pool discoveries run (four getProgramAccounts calls each).",
             self.pool_discoveries,
         );
+        g(
+            &mut s,
+            "shortwin_keeper_coverage_pause_failures_total",
+            "set_coverage_pause attempts refused or failed (O17).",
+            self.coverage_pause_failures,
+        );
+        g(
+            &mut s,
+            "shortwin_keeper_markets_read_total",
+            "Markets read in full by the ticks (M7-SEC-8).",
+            self.markets_read,
+        );
+        g(
+            &mut s,
+            "shortwin_keeper_markets_cold_skipped_total",
+            "Cold markets (no positions, nothing pending) not read by a tick (M7-SEC-8).",
+            self.markets_cold_skipped,
+        );
+        g(
+            &mut s,
+            "shortwin_keeper_oracle_cranks_total",
+            "crank_sol_usd calls landed (duty 11).",
+            self.oracle_cranks,
+        );
+        g(
+            &mut s,
+            "shortwin_keeper_oracle_reads_total",
+            "Reads of the Pyth PriceUpdateV2 (duty 11).",
+            self.oracle_reads,
+        );
+        g(
+            &mut s,
+            "shortwin_keeper_oracle_refusals_total",
+            "Newer oracle updates the program refuses (duty 11).",
+            self.oracle_refusals,
+        );
+        g(
+            &mut s,
+            "shortwin_keeper_oracle_lamports_total",
+            "Lamports spent on crank_sol_usd (duty 11).",
+            self.oracle_lamports,
+        );
+        let name = "shortwin_keeper_exit_b_live_over_ref_bps";
+        let _ = writeln!(
+            s,
+            "# HELP {name} B_live/B_ref (bps) at the keeper's exit decisions (U28).\n# TYPE {name} histogram"
+        );
+        self.b_ratio_landed
+            .render(&mut s, name, "outcome=\"landed\"");
+        self.b_ratio_wait.render(&mut s, name, "outcome=\"wait\"");
         type Row = (&'static str, &'static str, fn(&MarketMetrics) -> u64);
-        let rows: [Row; 23] = [
+        let rows: [Row; 31] = [
             (
                 "covered_seconds",
                 "Seconds with a keeper observation.",
@@ -193,6 +316,21 @@ impl Metrics {
                 m.coverage_gaps
             }),
             (
+                "coverage_gaps_tolerated",
+                "CoverageGap events within idle_interval_s + gap_tolerance_s (landing jitter).",
+                |m| m.coverage_gaps_tolerated,
+            ),
+            (
+                "foreign_moves",
+                "Foreign prices still there at the keeper's next read (genuine moves, no burst).",
+                |m| m.foreign_moves,
+            ),
+            (
+                "opens_while_degraded",
+                "Opens that landed while the keeper held the market degraded.",
+                |m| m.opens_while_degraded,
+            ),
+            (
                 "venue_admin_changes",
                 "Admin actions seen on the market's pool or CPMM config.",
                 |m| m.venue_admin_changes,
@@ -221,13 +359,38 @@ impl Metrics {
                 "Venue cashback claims landed (with a sweep).",
                 |m| m.cashback_claims,
             ),
+            (
+                "exits_deferred",
+                "Exits held to the next slot by the per-market CU cap (T-CASCADE).",
+                |m| m.exits_deferred,
+            ),
+            (
+                "coverage_pauses",
+                "set_coverage_pause(true) calls of the keeper landed (O17).",
+                |m| m.coverage_pauses,
+            ),
+            (
+                "coverage_unpauses",
+                "set_coverage_pause(false) calls of the keeper landed (O17).",
+                |m| m.coverage_unpauses,
+            ),
+            (
+                "budget_degraded",
+                "Times the exhausted daily budget degraded the market (O17).",
+                |m| m.budget_degraded,
+            ),
+            (
+                "paused_coverage",
+                "1 while the market's paused_coverage flag is set (O17).",
+                |m| u64::from(m.paused_coverage),
+            ),
             ("degraded", "1 while the market is in degraded mode.", |m| {
                 u64::from(m.degraded)
             }),
         ];
         for (name, help, get) in rows {
             let full = format!("shortwin_keeper_market_{name}");
-            let kind = if name == "degraded" {
+            let kind = if matches!(name, "degraded" | "paused_coverage") {
                 "gauge"
             } else {
                 "counter"
@@ -261,5 +424,27 @@ mod tests {
             "shortwin_keeper_market_lamports{{market=\"{k}\"}} 5000"
         )));
         assert!(out.contains("# TYPE shortwin_keeper_market_degraded gauge"));
+    }
+
+    /// U28's histogram: cumulative buckets, `+Inf`, sum and count, per outcome.
+    #[test]
+    fn renders_the_b_ratio_histogram() {
+        let mut m = Metrics::default();
+        for v in [9_990, 10_000, 10_020, 12_000] {
+            m.b_ratio_landed.record(v);
+        }
+        m.b_ratio_wait.record(10_400);
+        let out = m.render();
+        let n = "shortwin_keeper_exit_b_live_over_ref_bps";
+        assert!(out.contains(&format!("# TYPE {n} histogram")));
+        assert!(out.contains(&format!("{n}_bucket{{outcome=\"landed\",le=\"9970\"}} 0")));
+        assert!(out.contains(&format!("{n}_bucket{{outcome=\"landed\",le=\"10000\"}} 2")));
+        assert!(out.contains(&format!("{n}_bucket{{outcome=\"landed\",le=\"10030\"}} 3")));
+        assert!(out.contains(&format!("{n}_bucket{{outcome=\"landed\",le=\"11000\"}} 3")));
+        assert!(out.contains(&format!("{n}_bucket{{outcome=\"landed\",le=\"+Inf\"}} 4")));
+        assert!(out.contains(&format!("{n}_sum{{outcome=\"landed\"}} 42010")));
+        assert!(out.contains(&format!("{n}_count{{outcome=\"wait\"}} 1")));
+        assert!(out.contains(&format!("{n}_bucket{{outcome=\"wait\",le=\"10300\"}} 0")));
+        assert!(out.contains(&format!("{n}_bucket{{outcome=\"wait\",le=\"10500\"}} 1")));
     }
 }

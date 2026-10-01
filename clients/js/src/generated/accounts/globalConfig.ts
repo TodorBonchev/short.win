@@ -103,8 +103,9 @@ export type GlobalConfig = {
   /** Squads Emergency vault (time lock 0). */
   pauseAuthority: Address;
   /**
-   * Keeper key that may only set/clear a market's `paused_coverage` (A69). Default =
-   * disabled until O17.
+   * Keeper key that may only set/clear a market's `paused_coverage` (`set_coverage_pause`;
+   * A69, O17). `Pubkey::default()` = the role disabled (the `initialize_config` default);
+   * governance installs or rotates it with a timelocked `Authorities` change.
    */
   coverageAuthority: Address;
   /** Destination of `sweep_protocol_fees`. */
@@ -153,8 +154,9 @@ export type GlobalConfigArgs = {
   /** Squads Emergency vault (time lock 0). */
   pauseAuthority: Address;
   /**
-   * Keeper key that may only set/clear a market's `paused_coverage` (A69). Default =
-   * disabled until O17.
+   * Keeper key that may only set/clear a market's `paused_coverage` (`set_coverage_pause`;
+   * A69, O17). `Pubkey::default()` = the role disabled (the `initialize_config` default);
+   * governance installs or rotates it with a timelocked `Authorities` change.
    */
   coverageAuthority: Address;
   /** Destination of `sweep_protocol_fees`. */

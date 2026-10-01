@@ -23,7 +23,8 @@
 //! | market-level params | 2,800 | 32 |
 //! | OI (`max_q_hwm` @2,848 and `min_open_fee_ppm` @2,856, from `_reserved`) | 2,832 | 32 |
 //! | derived keys (`trader_wsol_ata` @2,864, `pump_pool_authority` @2,896; M5-SEC-6, from `_reserved`) | 2,864 | 64 |
-//! | `_reserved` | 2,928 | 176 |
+//! | `coverage_cleared_at` (M7-SEC-3, from `_reserved`) | 2,928 | 8 |
+//! | `_reserved` | 2,936 | 168 |
 //!
 //! The math crate's state types (`pool::Pool`, `rent::{Basis, Aggr}`, `observe::*`) hold native
 //! `u128`/`i128`; the conversions below ([`Market::pool`], [`Market::set_pool`], …) copy field by
@@ -425,7 +426,14 @@ pub struct Market {
     /// `canonical_pool_valid` compares (ARCH §2.5); derived once at listing for the same reason.
     pub pump_pool_authority: Pubkey,
     // ---- misc @2928 (176) ----
-    pub _reserved: [u8; 176],
+    /// M7-SEC-3 (was `_reserved[0..8]`): the unix second `set_coverage_pause(false)` last cleared
+    /// a set `paused_coverage` flag. `open_short` refuses until `COVERAGE_CLEAR_DELAY_S` after it
+    /// (`CoveragePaused`; `engine::guard::open_static`), so the `coverage_authority` key cannot
+    /// bracket an open on a coverage-paused market — `[clear, open_short, set]` in one
+    /// transaction or one second — and the flag stays visibly cleared for the keeper's reads
+    /// before any open can land. 0 on existing accounts (no delay).
+    pub coverage_cleared_at: i64,
+    pub _reserved: [u8; 168],
 }
 
 impl Market {

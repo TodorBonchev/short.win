@@ -555,6 +555,7 @@ pub fn expected_tier(env: &Env, m: &Market, venue: &VenueView, now: i64) -> Opti
         graduated_at: m.graduated_at,
         oracle: OraclePrice {
             price: o.price,
+            conf: o.conf,
             expo: o.expo,
             publish_time: o.publish_time,
         },

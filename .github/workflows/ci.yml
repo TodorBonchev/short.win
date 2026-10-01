@@ -8,12 +8,23 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      fuzz_duration:
+        description: "Run the fuzz-nightly job for this long per profile (e.g. 30m, 5h); empty: skip it"
+        required: false
+        default: ""
+  # M7: the invariant fuzzer's nightly run (fuzz-nightly). GitHub runs `schedule` on the default
+  # branch only. The nightly run builds the programs (anchor-build) and fuzzes; every other job
+  # carries `if: github.event_name != 'schedule'` (it already ran on the push that made main).
+  schedule:
+    - cron: "17 1 * * *"
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # The event is part of the group, so a push to main never cancels the nightly fuzz run.
+  group: ci-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 env:
@@ -29,6 +40,7 @@ env:
 
 jobs:
   fmt:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -39,6 +51,7 @@ jobs:
         run: cargo fmt --all --check --manifest-path tests/bench/cu_math/Cargo.toml
 
   clippy:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -65,6 +78,7 @@ jobs:
         run: cargo clippy -p shortwin --all-targets --locked -- -D warnings
 
   test:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     env:
       PROPTEST_CASES: "2000"
@@ -77,6 +91,7 @@ jobs:
 
   vectors:
     # Committed test vectors must be exactly what the normative sims generate today.
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -109,6 +124,7 @@ jobs:
         run: python3 scripts/test_config_gate.py -v
 
   deny:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -126,6 +142,7 @@ jobs:
           done
 
   wasm:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -137,6 +154,7 @@ jobs:
   cu-math:
     # T-CU-MATH (ARCH §6.1, §8.1, §9 M0b): per-primitive CU budgets of shortwin-math on SBF v3,
     # measured with Mollusk (tests/bench/cu_math, a standalone workspace with its own lockfile).
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -314,9 +332,12 @@ jobs:
     # graduation (the dumped canonical pools of the pamm_state / pamm_synthetic groups: pamm_it,
     # graduation_e2e / graduation_scenarios, pumpswap_negvqr_e2e, trace_pumpswap_it,
     # tx_size_pumpswap_it, latch_pumpswap_it, replay_0428_it on the test-venue build; the Surfpool
-    # E2E graduation_surfpool is #[ignore]d: it needs a live Surfpool, scripts/surfpool-e2e.sh);
-    # the fixtures' checksums; the unit tests of the program and the venue-state readers; and the
-    # T-LAYOUT wasm32 leg (the layout asserts compiled for wasm32).
+    # E2E graduation_surfpool is #[ignore]d: it needs a live Surfpool, scripts/surfpool-e2e.sh)
+    # and, from M7, T-COVERAGE's set_coverage_pause part, T-TIER, T-CAP and the launch guard
+    # (coverage_pause_it, tier_transition_it, caps_boundary_it, launch_guard_it; I4's coverage
+    # clause in the hooks); the fixtures' checksums; the unit tests of the program and the
+    # venue-state readers; and the T-LAYOUT wasm32 leg (the layout asserts compiled for wasm32).
+    if: github.event_name != 'schedule'
     needs: anchor-build
     runs-on: ubuntu-24.04
     steps:
@@ -362,6 +383,7 @@ jobs:
     # with the untouched-state I-P4, the extended profiles and both ECON §9.6 fuzz runs (60,000
     # operations each) — with the invariant hooks after every instruction and the I-P6 liveness
     # cap at the model's own figure. The `program-tests` job replays only a quick subset. ~4 min.
+    if: github.event_name != 'schedule'
     needs: anchor-build
     runs-on: ubuntu-24.04
     steps:
@@ -385,6 +407,7 @@ jobs:
     # the anchor-build IDL, the committed client is what Codama generates from it, and it
     # typechecks and passes its tests (incl. the T-LAYOUT Codama leg). Node and pnpm come from
     # mise.toml.
+    if: github.event_name != 'schedule'
     needs: anchor-build
     runs-on: ubuntu-24.04
     steps:
@@ -414,6 +437,7 @@ jobs:
     # M1 CU baseline (ARCH §6.1, §9 M1): every M1 instruction on Mollusk 0.15.1 within its
     # budget, cross-checked on LiteSVM (tests/bench/m1_cu, a standalone workspace with its own
     # lockfile; README.md there).
+    if: github.event_name != 'schedule'
     needs: anchor-build
     runs-on: ubuntu-24.04
     steps:
@@ -442,6 +466,7 @@ jobs:
     # (tests/bench/m2_cu, a standalone workspace with its own lockfile; README.md there). It
     # loads the test-venue shortwin.so and mock_cpamm.so from the anchor-build artifact.
     # Every M2 handler has landed: a case or transaction that does not execute fails the job.
+    if: github.event_name != 'schedule'
     needs: anchor-build
     runs-on: ubuntu-24.04
     steps:
@@ -471,6 +496,7 @@ jobs:
     # worst-case Raydium transactions at their exact trace counts (≤ 64); every path through 0–3
     # levels of the TEST-ONLY CPI wrapper (tests/bench/m3_cu, a standalone workspace with its own
     # lockfile; README.md there). Loads the release shortwin.so from the anchor-build artifact.
+    if: github.event_name != 'schedule'
     needs: anchor-build
     runs-on: ubuntu-24.04
     steps:
@@ -523,6 +549,7 @@ jobs:
     # 0–3 levels of the TEST-ONLY CPI wrapper (tests/bench/m5_cu, a standalone workspace with its
     # own lockfile; README.md there). Loads the release shortwin.so and complete_curve.so from the
     # anchor-build artifact.
+    if: github.event_name != 'schedule'
     needs: anchor-build
     runs-on: ubuntu-24.04
     steps:
@@ -573,6 +600,7 @@ jobs:
     # their exact trace counts (≤ 64) and v0 + ALT sizes; every path through 0–3 levels of the
     # TEST-ONLY CPI wrapper (tests/bench/m6_cu, a standalone workspace with its own lockfile;
     # README.md there). Loads the release shortwin.so from the anchor-build artifact.
+    if: github.event_name != 'schedule'
     needs: anchor-build
     runs-on: ubuntu-24.04
     steps:
@@ -622,9 +650,14 @@ jobs:
     # tests and its LiteSVM scenarios (duties 1–4, batching, degraded mode, duty 10's venue
     # monitor, M4's duty 5 Raydium fast path and duty 12 pool monitor, M5's duty 6 on the pump
     # curve — migrate_v2 and the straddle bundle with the complete_curve helper — and M6's move
-    # onto PumpSwap, PumpSwap exits, the post-wipe claims and duty 13's sweep_trader; every keeper
-    # transaction under the invariant hooks) against the anchor-build artifacts, and the A49
-    # check that the keeper binary carries no mock-venue code.
+    # onto PumpSwap, PumpSwap exits, the post-wipe claims and duty 13's sweep_trader; M7's
+    # degraded mode with the on-chain coverage pause — the drill, the budget, a restart, the role
+    # unset or rotated, two instances (coverage_pause) —, duty 11's crank_sol_usd (oracle) and the
+    # PumpSwap 4-extras T-SIZE through the keeper's tables (pamm_alt); every keeper transaction
+    # under the invariant hooks) against the anchor-build artifacts, and the A49 check that the
+    # keeper binary carries no mock-venue code. The M7 benches (m7_cost, cascade) are #[ignore]d
+    # here and run in release in m7-keeper-bench.
+    if: github.event_name != 'schedule'
     needs: anchor-build
     runs-on: ubuntu-24.04
     steps:
@@ -707,6 +740,7 @@ jobs:
     # ALT's static part as scripts/build-alt.sh builds it, uploaded for review with the live
     # recipients added at `create` time. (program-tests and services run the same tests; this job
     # keeps the size table and the address list in one log.)
+    if: github.event_name != 'schedule'
     needs: anchor-build
     runs-on: ubuntu-24.04
     steps:
@@ -741,3 +775,187 @@ jobs:
         with:
           name: protocol-alt
           path: protocol-alt-static.txt
+
+  fuzz-smoke:
+    # M7, the invariant fuzzer's per-push smoke (tests/fuzz, package shortwin-fuzz; ARCH §8.4):
+    # fixed seeds on every profile (mock, mixed, curve, PumpSwap, AMM v4, CPMM) through
+    # `Env::send`'s I1–I13, I15–I18 and A26 hooks plus the fuzzer's own oracles, the corpus replays
+    # (a reproducer marked fixed must pass: FUZZ-M7-1) and the harness's self-tests (replay
+    # determinism, tmin on an injected failure). Release without fat LTO, as fuzz-nightly.
+    if: github.event_name != 'schedule'
+    needs: anchor-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CARGO_PROFILE_RELEASE_LTO: "false"
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
+      SHORTWIN_SO: ${{ github.workspace }}/target/deploy/shortwin.so
+      SHORTWIN_TEST_VENUE_SO: ${{ github.workspace }}/target/test-venue/deploy/shortwin.so
+      MOCK_CPAMM_SO: ${{ github.workspace }}/target/deploy/mock_cpamm.so
+      COMPLETE_CURVE_SO: ${{ github.workspace }}/target/deploy/complete_curve.so
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: fuzz
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: shortwin-program
+          path: target
+      - name: Fuzz smoke, corpus replays, harness self-tests
+        run: cargo test --release --locked -p shortwin-fuzz -- --nocapture
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: fuzz-smoke-crashes
+          path: target/tmp/fuzz-smoke
+          if-no-files-found: ignore
+
+  m7-keeper-bench:
+    # M7 keeper economics (ARCH §6.6, §7.1, §8.2 T-CASCADE / T-SIZE; ECON §5.8): the real keeper
+    # on the mock venue and the Raydium, pump-curve and PumpSwap forks (services/keeper-litesvm, in
+    # release): the cost-model inputs (CU per instruction and venue, crank batches, cadence, cost
+    # per market-day, load at 50 / 200 markets; tests/bench/m7_keeper), the PumpSwap 4-extras
+    # T-SIZE through the keeper's tables (OWNER-M7-1) and T-CASCADE under the keeper's CU-per-slot
+    # policy (tests/bench/m7_cascade). The gates are the tests' own asserts; the regenerated
+    # figures are compared with the committed ones as a warning only (the load section's wall
+    # times and RPC capacity vary run to run).
+    if: github.event_name != 'schedule'
+    needs: anchor-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: m7-keeper-bench
+          workspaces: services
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: shortwin-program
+          path: target
+      - name: Keeper cost inputs, PumpSwap 4-extras T-SIZE, T-CASCADE (release)
+        env:
+          SHORTWIN_TEST_VENUE_SO: ${{ github.workspace }}/target/test-venue/deploy/shortwin.so
+          MOCK_CPAMM_SO: ${{ github.workspace }}/target/deploy/mock_cpamm.so
+          SHORTWIN_SO: ${{ github.workspace }}/target/deploy/shortwin.so
+          COMPLETE_CURVE_SO: ${{ github.workspace }}/target/deploy/complete_curve.so
+          M7_COST_WRITE: "1"
+          M7_CASCADE_WRITE: "1"
+        run: >-
+          cargo test --manifest-path services/Cargo.toml --release --locked
+          -p shortwin-keeper-litesvm --test scenarios -- --include-ignored --nocapture
+          m7_cost:: pamm_alt:: cascade::
+      - name: The committed figures are current (informational)
+        run: git diff --exit-code -- tests/bench/m7_keeper tests/bench/m7_cascade || echo "::warning::M7 keeper figures changed; commit tests/bench/m7_keeper and tests/bench/m7_cascade"
+
+  fuzz-nightly:
+    # M7 exit criterion "fuzz clean ≥ 24 h" (ARCH §8.4, §9): the invariant fuzzer (tests/fuzz,
+    # package shortwin-fuzz: seeded action sequences on LiteSVM 0.16 through `Env::send`, so the
+    # I1–I13, I15–I19 and A26 hooks run after every instruction, plus the fuzzer's own oracles).
+    # Every night, one shard per profile, each `shortwin-fuzz run` for 5 h on every core of its
+    # runner (6 shards ≈ 30 h of fuzzing, inside the 6 h hosted-job cap), failures minimised by
+    # `tmin` and uploaded as crash files (replay: `shortwin-fuzz replay FILE`); the job fails on
+    # any crash. Also on demand: workflow_dispatch with `fuzz_duration`. Release without fat LTO
+    # (the fuzzer needs speed, not the deploy profile's link time).
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.fuzz_duration != '')
+    needs: anchor-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [mock, mixed, curve, pumpswap, amm-v4, cpmm]
+    env:
+      CARGO_PROFILE_RELEASE_LTO: "false"
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
+      SHORTWIN_SO: ${{ github.workspace }}/target/deploy/shortwin.so
+      SHORTWIN_TEST_VENUE_SO: ${{ github.workspace }}/target/test-venue/deploy/shortwin.so
+      MOCK_CPAMM_SO: ${{ github.workspace }}/target/deploy/mock_cpamm.so
+      COMPLETE_CURVE_SO: ${{ github.workspace }}/target/deploy/complete_curve.so
+      FUZZ_DURATION: ${{ inputs.fuzz_duration || '5h' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: fuzz
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: shortwin-program
+          path: target
+      - run: cargo build --release --locked -p shortwin-fuzz
+      # Once per night: the fixed-seed smoke of every profile, the corpus replays (each known
+      # finding still fails with its signature, or passes once fixed) and the harness's self-tests.
+      - name: Fuzz smoke, corpus replays, harness self-tests
+        if: matrix.profile == 'mock'
+        run: cargo test --release --locked -p shortwin-fuzz -- --nocapture
+      - name: Fuzz ${{ matrix.profile }} for ${{ env.FUZZ_DURATION }}
+        run: >-
+          target/release/shortwin-fuzz run --profile ${{ matrix.profile }}
+          --duration "$FUZZ_DURATION" --jobs "$(nproc)" --actions 400
+          --seed ${{ github.run_id }} --out fuzz-out --minimize
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: fuzz-${{ matrix.profile }}
+          path: fuzz-out
+          if-no-files-found: ignore
+
+  mutants:
+    # M7-SEC-6: mutation testing of the open and coverage paths. scripts/mutants.sh builds this
+    # checkout's LiteSVM tests and fuzzer once (the oracle: the I1–I19 hooks recompute from
+    # shortwin-math and the harness's own venue views), then each of the M7 security review's seven
+    # one-line program mutants (D4 without its EMA leg, the fee-scaled size cap doubled, the wallet
+    # cap removed, Tier C as B, the coverage clear immediate, the curve caps on the live reserves,
+    # the pump caps at the live fee), and requires the mutant's named tests and a 3-minute fuzz of
+    # its profile to fail against it: a surviving mutant is a missing oracle and fails the job.
+    # Nightly with fuzz-nightly (the schedule trigger, main) and on demand (workflow_dispatch).
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    needs: anchor-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    env:
+      CARGO_PROFILE_RELEASE_LTO: "false"
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
+      SHORTWIN_SO: ${{ github.workspace }}/target/deploy/shortwin.so
+      SHORTWIN_TEST_VENUE_SO: ${{ github.workspace }}/target/test-venue/deploy/shortwin.so
+      MOCK_CPAMM_SO: ${{ github.workspace }}/target/deploy/mock_cpamm.so
+      COMPLETE_CURVE_SO: ${{ github.workspace }}/target/deploy/complete_curve.so
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: mutants
+      - name: Cache Agave, platform-tools and the Anchor CLI
+        id: tools
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.local/share/solana/install
+            ~/.cache/solana/${{ env.PLATFORM_TOOLS }}
+            ~/.cargo/bin/anchor
+          key: sbf-tools-agave-${{ env.AGAVE_VERSION }}-anchor-${{ env.ANCHOR_VERSION }}-${{ env.PLATFORM_TOOLS }}-${{ runner.os }}
+      - name: Install Agave ${{ env.AGAVE_VERSION }}
+        if: steps.tools.outputs.cache-hit != 'true'
+        run: sh -c "$(curl -sSfL https://release.anza.xyz/v${AGAVE_VERSION}/install)"
+      - name: Select Agave ${{ env.AGAVE_VERSION }}
+        run: |
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/share/solana/install/active_release/bin/agave-install" init "$AGAVE_VERSION"
+      - name: Install Anchor CLI ${{ env.ANCHOR_VERSION }}
+        if: steps.tools.outputs.cache-hit != 'true'
+        run: cargo install --git https://github.com/otter-sec/anchor --tag "v${ANCHOR_VERSION}" anchor-cli --locked
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: shortwin-program
+          path: target
+      - name: The review's mutants must be killed
+        run: MUTANTS_JOBS="$(nproc)" scripts/mutants.sh --fuzz 3m --work "$RUNNER_TEMP/mutants"

@@ -8,6 +8,8 @@
 //! shortwin-build-alt extend --rpc <url> --keypair <payer> --table <alt> [--authority <keypair>]
 //!                           [--priority-price <µlamports/CU>] [--static-only]
 //! shortwin-build-alt check  --rpc <url> --table <alt> [--static-only]
+//! shortwin-build-alt market --rpc <url> --market <market> [--table <protocol alt>]
+//!                           [--keypair <payer> [--authority <keypair>] [--priority-price <µlamports/CU>]]
 //! ```
 //!
 //! - `print`: the address list, one `index key label` line each. Without `--rpc` (or with
@@ -21,6 +23,14 @@
 //! - `check`: exit 0 if the table holds every address of the list and is active, 1 otherwise
 //!   (the missing ones are printed); also reports extra entries and the authority.
 //!
+//! - `market` (M7, OWNER-M7-1's fallback; ARCH §6.4): a market's own table
+//!   (`alt::market_entries`) — the per-market keys its trading transactions and cranks name that
+//!   the protocol table (`--table`, else the list `create` would build) leaves inline. Prints the
+//!   list and its rent; with `--keypair` also creates it, extendable (never frozen: a new extras
+//!   set or a pool switch adds keys; closing it after deactivation returns the rent). Put its
+//!   address in the keeper's `lookup_tables` and publish it to clients (the PumpSwap open with the
+//!   largest extras set, and v0 crank batches of more than 3 PumpSwap markets, use it).
+//!
 //! Every transaction is simulated first; compute units `⌈simulated × 1.1⌉`.
 
 use std::str::FromStr;
@@ -32,8 +42,8 @@ use solana_keypair::{Keypair, read_keypair_file};
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 
-const USAGE: &str = "usage: shortwin-build-alt <print|create|extend|check> [--rpc <url>] \
-     [--keypair <payer>] [--authority <keypair>] [--table <alt>] [--freeze] \
+const USAGE: &str = "usage: shortwin-build-alt <print|create|extend|check|market> [--rpc <url>] \
+     [--keypair <payer>] [--authority <keypair>] [--table <alt>] [--market <market>] [--freeze] \
      [--priority-price <µlamports/CU>] [--static-only]";
 
 #[derive(Default)]
@@ -43,6 +53,7 @@ struct Args {
     keypair: Option<String>,
     authority: Option<String>,
     table: Option<Pubkey>,
+    market: Option<Pubkey>,
     freeze: bool,
     price: u64,
     static_only: bool,
@@ -62,6 +73,7 @@ fn parse_args() -> anyhow::Result<Args> {
             "--keypair" => a.keypair = Some(val()?),
             "--authority" => a.authority = Some(val()?),
             "--table" => a.table = Some(Pubkey::from_str(&val()?).context("--table")?),
+            "--market" => a.market = Some(Pubkey::from_str(&val()?).context("--market")?),
             "--priority-price" => a.price = val()?.parse().context("--priority-price")?,
             "--freeze" => a.freeze = true,
             "--static-only" => a.static_only = true,
@@ -174,6 +186,42 @@ async fn main() -> anyhow::Result<()> {
                 std::process::exit(1);
             }
             println!("ok: every expected address is in the table");
+        }
+        "market" => {
+            let c = need_rpc()?;
+            let market = a.market.context("--market is required")?;
+            let protocol = match a.table {
+                Some(t) => alt::read_table(c, &t).await?.addresses,
+                None => alt::keys(&entries(Some(c), a.static_only).await?),
+            };
+            let view = shortwin_keeper::view::load(c, &[market]).await?;
+            let mv = view
+                .market(&market)
+                .with_context(|| format!("{market}: not a readable short.win market"))?;
+            let list = alt::market_entries(mv, &protocol)?;
+            print(&list);
+            println!(
+                "# rent {} lamports (recovered on close)",
+                alt::table_rent_lamports(list.len())
+            );
+            if a.keypair.is_some() {
+                let (payer, authority) = signers(&a)?;
+                let slot = c.finalized_slot().await?;
+                let table = alt::create(
+                    c,
+                    &payer,
+                    &authority,
+                    slot,
+                    &alt::keys(&list),
+                    false,
+                    a.price,
+                )
+                .await?;
+                println!(
+                    "created {table} for {market} (authority {}); usable from the next slot",
+                    authority.pubkey()
+                );
+            }
         }
         other => bail!("unknown command {other}\n{USAGE}"),
     }

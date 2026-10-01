@@ -10,11 +10,13 @@
 //! M1 (ARCH §9): admin, config, latch, markets, lenders, the oracle. M2: the position engine
 //! (`engine::*`, `venues::*`), `open_short`, `close_short`, `add_margin`, `liquidate`, `expire`,
 //! `sol_settle`, `crank_price` and the O6 Emergency powers `set_route_broken` /
-//! `set_venue_extras`. `set_coverage_pause` waits for O17. M3: the Raydium AMM v4 and CPMM
+//! `set_venue_extras`. M3: the Raydium AMM v4 and CPMM
 //! adapters (`venues::raydium_v4`, `venues::raydium_cpmm`, `venues::raydium`) and the Raydium
 //! listing `create_market(venue_hint = RaydiumV4 | RaydiumCpmm)` with the D1 precedence check
 //! (`venues::detect`). M4: Raydium pool selection (`propose_pool`, `execute_pool_switch`;
-//! `engine::pool_select`).
+//! `engine::pool_select`). M5–M6: the pump curve and PumpSwap venues. M7: `set_coverage_pause`,
+//! the keeper's pause-opens-only `coverage_authority` for degraded mode (O17, recorded in SPEC §14
+//! on 2026-09-30).
 //!
 //! Feature `test-venue` (TEST-ONLY, A49): `VenueKind::Mock`, the adapter of the mock venue
 //! `tests/mock_cpamm`, for the LiteSVM engine tests. Release builds never enable it
@@ -75,6 +77,16 @@ pub mod shortwin {
     /// Pauses or resumes new opens, globally or on one market.
     pub fn set_pause(ctx: Context<SetPause>, scope: PauseScope, paused: bool) -> Result<()> {
         instructions::set_pause::handler(ctx, scope, paused)
+    }
+
+    /// The keeper's `coverage_authority` pauses or resumes new opens on one market for lost
+    /// keeper coverage (degraded mode; O17). Opens only; moves nothing.
+    pub fn set_coverage_pause(
+        ctx: Context<SetCoveragePause>,
+        paused: bool,
+        reason: u8,
+    ) -> Result<()> {
+        instructions::set_coverage_pause::handler(ctx, paused, reason)
     }
 
     /// The Emergency vault disables a venue for opens.

@@ -4,70 +4,70 @@ Compute units of every Raydium-path instruction (ARCH §9 M3: T-RAY-CU, T-CU; M4
 
 | Instruction | Case | Mollusk CU | LiteSVM CU | Venue CPI CU | Budget | Budget source | Trace | ARCH §6.2 (Raydium) | Peak height |
 |---|---|---|---|---|---|---|---|---|---|
-| `create_market` | AMM v4, SPL (Fartcoin) | 67868 | 67868 | — | 250000 | §6.1 `create_market` | 7 | — | 2 |
-| `create_market` | CPMM, SPL (USELESS) | 65628 | 65628 | — | 250000 | §6.1 `create_market` | 7 | — | 2 |
-| `create_market` | CPMM, Token-2022 base | 76875 | 76875 | — | 250000 | §6.1 `create_market` | 7 | — | 2 |
-| `create_market` | CPMM, creator fee on the SOL side | 73138 | 73138 | — | 250000 | §6.1 `create_market` | 7 | — | 2 |
-| `create_market` | CPMM, WSOL as token 1 | 69707 | 69707 | — | 250000 | §6.1 `create_market` | 7 | — | 2 |
-| `open_short` | AMM v4, SPL (Fartcoin): first open of a wallet (position + exposure created) | 101225 | 101225 | 15420 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) | 3 |
-| `open_short` | CPMM, SPL (USELESS): first open of a wallet (position + exposure created) | 116993 | 116993 | 25086 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) | 3 |
-| `open_short` | CPMM, Token-2022 base: first open of a wallet (position + exposure created) | 125191 | 125191 | 28019 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) | 3 |
-| `open_short` | CPMM, creator fee on the SOL side: first open of a wallet (position + exposure created) | 116487 | 116487 | 25105 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) | 3 |
-| `open_short` | CPMM, WSOL as token 1: first open of a wallet (position + exposure created) | 119261 | 119261 | 25088 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) | 3 |
-| `open_short` | AMM v4, SPL (Fartcoin): second position of a wallet | 99333 | 99333 | 15420 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 14 | 13 (≤ 15) | 3 |
-| `open_short` | AMM v4, SPL (Fartcoin): first open, normalising (trader and trader_wsol donated to) | 107207 | 107207 | 15420 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 18 | 13 (≤ 15) | 3 |
-| `open_short` | CPMM, Token-2022 base: second position of a wallet | 119797 | 119797 | 28013 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 14 | 13 (≤ 15) | 3 |
-| `open_short` | CPMM, Token-2022 base: first open, normalising (trader and trader_wsol donated to) | 131173 | 131173 | 28019 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 18 | 13 (≤ 15) | 3 |
-| `close_short` | AMM v4, SPL (Fartcoin) | 68793 | 68793 | 15900 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
-| `close_short` | CPMM, SPL (USELESS) | 80226 | 80226 | 25178 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
-| `close_short` | CPMM, Token-2022 base | 83773 | 83773 | 28074 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
-| `close_short` | CPMM, creator fee on the SOL side | 80270 | 80270 | 25179 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
-| `close_short` | CPMM, WSOL as token 1 | 80280 | 80280 | 25182 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
-| `close_short` | AMM v4, SPL (Fartcoin): normalising | 74774 | 74774 | 15900 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 12 | 9 (≤ 11) | 3 |
-| `close_short` | CPMM, Token-2022 base: normalising | 89754 | 89754 | 28074 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 12 | 9 (≤ 11) | 3 |
-| `liquidate` | AMM v4, SPL (Fartcoin): after a real ≈ 2.2× pump, both legs, within the fixed bound | 91633 | 91633 | 16032 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
-| `liquidate` | CPMM, SPL (USELESS): after a real ≈ 2.2× pump, both legs, within the fixed bound | 108317 | 108317 | 25231 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
-| `liquidate` | CPMM, Token-2022 base: after a real ≈ 2.2× pump, both legs, within the fixed bound | 112299 | 112299 | 28141 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
-| `expire` | AMM v4, SPL (Fartcoin): past the deadline, healthy | 87308 | 87308 | 15900 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
-| `expire` | CPMM, SPL (USELESS): past the deadline, healthy | 102288 | 102288 | 25184 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
-| `expire` | CPMM, Token-2022 base: past the deadline, healthy | 105816 | 105816 | 28080 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
-| `sol_settle` | AMM v4, SPL (Fartcoin): healthy, the no-change call | 38989 | 38989 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
-| `sol_settle` | AMM v4, SPL (Fartcoin): S3 on a halted pool at the deadline, chain run s3_wait_s | 47830 | 47830 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
-| `sol_settle` | CPMM, SPL (USELESS): healthy, the no-change call | 41373 | 41373 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
-| `sol_settle` | CPMM, SPL (USELESS): S3 on a halted pool at the deadline, chain run s3_wait_s | 53179 | 53179 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
-| `sol_settle` | CPMM, Token-2022 base: healthy, the no-change call | 41722 | 41722 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
-| `sol_settle` | CPMM, Token-2022 base: S3 on a halted pool at the deadline, chain run s3_wait_s | 53525 | 53525 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
-| `crank_price` | AMM v4, SPL (Fartcoin): roll + record (first crank of a second) | 28033 | 28033 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |
-| `crank_price` | AMM v4, SPL (Fartcoin): pool halted by its admin: roll, no record, both chains start | 26850 | 26850 | — | 60000 | §6.1 `crank_price` | 3 | 2 (≤ 2) | 2 |
-| `crank_price` | CPMM, SPL (USELESS): roll + record (first crank of a second) | 28091 | 28091 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |
-| `crank_price` | CPMM, SPL (USELESS): pool halted by its admin: roll, no record, both chains start | 27505 | 27505 | — | 60000 | §6.1 `crank_price` | 3 | 2 (≤ 2) | 2 |
-| `crank_price` | CPMM, Token-2022 base: roll + record (first crank of a second) | 28102 | 28102 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |
-| `crank_price` | CPMM, Token-2022 base: pool halted by its admin: roll, no record, both chains start | 27514 | 27514 | — | 60000 | §6.1 `crank_price` | 3 | 2 (≤ 2) | 2 |
-| `crank_price` | AMM v4, SPL (Fartcoin): record only (same second again) | 23116 | 23116 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |
-| `flag_venue_upgraded` | AMM v4, the dumped 1,406,429-byte ProgramData | 6026 | 6026 | — | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` (U5) | 2 | 2 (≤ 2) | 2 |
-| `flag_venue_upgraded` | CPMM, the dumped 793,869-byte ProgramData | 6026 | 6026 | — | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` (U5) | 2 | 2 (≤ 2) | 2 |
-| `flag_venue_upgraded` | AMM v4, a second upgrade while flagged (refresh) | 6025 | 6025 | — | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` (U5) | 2 | 2 (≤ 2) | 2 |
-| `flag_venue_upgraded` | a 10,485,760-byte ProgramData (pump's size, synthetic): U5 | 6026 | 6026 | — | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` (U5) | 2 | 2 (≤ 2) | 2 |
-| `revalidate_venue` | AMM v4, the dumped ProgramData | 8438 | 8438 | — | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` (U5) | 2 | 2 (≤ 2) | 2 |
-| `revalidate_venue` | CPMM, the dumped ProgramData | 8438 | 8438 | — | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` (U5) | 2 | 2 (≤ 2) | 2 |
-| `propose_pool` | AMM v4, SPL (Fartcoin): list-only market adopts it (Fartcoin's real curve: D1 detection) | 27055 | 27055 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
-| `propose_pool` | CPMM, SPL (USELESS): list-only market adopts it | 27389 | 27389 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
-| `propose_pool` | AMM v4: listing-window replacement of the thin reversed Fartcoin pool by the main pool, ring rewritten | 45498 | 45498 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
-| `propose_pool` | AMM v4, SPL (Fartcoin): zero-position adoption of a planted CPMM pool 2× as deep, ring rewritten | 42254 | 42254 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
-| `propose_pool` | CPMM, SPL (USELESS): zero-position adoption of a planted CPMM pool 2× as deep, ring rewritten | 42581 | 42581 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
-| `propose_pool` | CPMM, Token-2022 base: zero-position adoption of a planted CPMM pool 2× as deep, ring rewritten | 42627 | 42627 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
-| `propose_pool` | AMM v4, SPL (Fartcoin): halted incumbent, a position open: fast-path window opened (CPMM candidate at 40 % of D) | 39471 | 39471 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
-| `propose_pool` | AMM v4, SPL (Fartcoin): fast-path window improved (60 % replaces 40 %) | 39082 | 39082 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
-| `propose_pool` | CPMM, SPL (USELESS): halted incumbent, a position open: fast-path window opened (CPMM candidate at 40 % of D) | 40173 | 40173 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
-| `propose_pool` | CPMM, SPL (USELESS): fast-path window improved (60 % replaces 40 %) | 39954 | 39954 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
-| `propose_pool` | CPMM, Token-2022 base: halted incumbent, a position open: fast-path window opened (CPMM candidate at 40 % of D) | 39812 | 39812 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
-| `propose_pool` | CPMM, Token-2022 base: fast-path window improved (60 % replaces 40 %) | 40061 | 40061 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
-| `execute_pool_switch` | AMM v4, SPL (Fartcoin): fast adoption after the window, a position open, ring rewritten | 47816 | 47816 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
-| `execute_pool_switch` | AMM v4, SPL (Fartcoin): window cancelled (the incumbent resumed) | 29958 | 29958 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
-| `execute_pool_switch` | CPMM, SPL (USELESS): fast adoption after the window, a position open, ring rewritten | 48691 | 48691 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
-| `execute_pool_switch` | CPMM, SPL (USELESS): window cancelled (the incumbent resumed) | 29829 | 29829 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
-| `execute_pool_switch` | CPMM, Token-2022 base: fast adoption after the window, a position open, ring rewritten | 48773 | 48773 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
-| `execute_pool_switch` | CPMM, Token-2022 base: window cancelled (the incumbent resumed) | 29815 | 29815 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
-| `crank_price` | AMM v4, SPL (Fartcoin): the last post-change warm-up integration (seed over 8 entries, guard cleared; M4R) | 28032 | 28032 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |
-| `crank_price` | CPMM, SPL (USELESS): the last post-change warm-up integration (seed over 8 entries, guard cleared; M4R) | 28027 | 28027 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |
-| `crank_price` | CPMM, Token-2022 base: the last post-change warm-up integration (seed over 8 entries, guard cleared; M4R) | 28038 | 28038 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |
+| `create_market` | AMM v4, SPL (Fartcoin) | 67870 | 67870 | — | 250000 | §6.1 `create_market` | 7 | — | 2 |
+| `create_market` | CPMM, SPL (USELESS) | 65630 | 65630 | — | 250000 | §6.1 `create_market` | 7 | — | 2 |
+| `create_market` | CPMM, Token-2022 base | 76877 | 76877 | — | 250000 | §6.1 `create_market` | 7 | — | 2 |
+| `create_market` | CPMM, creator fee on the SOL side | 73140 | 73140 | — | 250000 | §6.1 `create_market` | 7 | — | 2 |
+| `create_market` | CPMM, WSOL as token 1 | 69709 | 69709 | — | 250000 | §6.1 `create_market` | 7 | — | 2 |
+| `open_short` | AMM v4, SPL (Fartcoin): first open of a wallet (position + exposure created) | 101291 | 101291 | 15420 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) | 3 |
+| `open_short` | CPMM, SPL (USELESS): first open of a wallet (position + exposure created) | 117059 | 117059 | 25086 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) | 3 |
+| `open_short` | CPMM, Token-2022 base: first open of a wallet (position + exposure created) | 125257 | 125257 | 28019 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) | 3 |
+| `open_short` | CPMM, creator fee on the SOL side: first open of a wallet (position + exposure created) | 116553 | 116553 | 25105 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) | 3 |
+| `open_short` | CPMM, WSOL as token 1: first open of a wallet (position + exposure created) | 119327 | 119327 | 25088 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) | 3 |
+| `open_short` | AMM v4, SPL (Fartcoin): second position of a wallet | 99399 | 99399 | 15420 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 14 | 13 (≤ 15) | 3 |
+| `open_short` | AMM v4, SPL (Fartcoin): first open, normalising (trader and trader_wsol donated to) | 107275 | 107275 | 15420 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 18 | 13 (≤ 15) | 3 |
+| `open_short` | CPMM, Token-2022 base: second position of a wallet | 119863 | 119863 | 28013 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 14 | 13 (≤ 15) | 3 |
+| `open_short` | CPMM, Token-2022 base: first open, normalising (trader and trader_wsol donated to) | 131241 | 131241 | 28019 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 18 | 13 (≤ 15) | 3 |
+| `close_short` | AMM v4, SPL (Fartcoin) | 68797 | 68797 | 15900 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
+| `close_short` | CPMM, SPL (USELESS) | 80230 | 80230 | 25178 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
+| `close_short` | CPMM, Token-2022 base | 83777 | 83777 | 28074 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
+| `close_short` | CPMM, creator fee on the SOL side | 80274 | 80274 | 25179 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
+| `close_short` | CPMM, WSOL as token 1 | 80284 | 80284 | 25182 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
+| `close_short` | AMM v4, SPL (Fartcoin): normalising | 74780 | 74780 | 15900 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 12 | 9 (≤ 11) | 3 |
+| `close_short` | CPMM, Token-2022 base: normalising | 89760 | 89760 | 28074 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 12 | 9 (≤ 11) | 3 |
+| `liquidate` | AMM v4, SPL (Fartcoin): after a real ≈ 2.2× pump, both legs, within the fixed bound | 91635 | 91635 | 16032 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
+| `liquidate` | CPMM, SPL (USELESS): after a real ≈ 2.2× pump, both legs, within the fixed bound | 108319 | 108319 | 25231 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
+| `liquidate` | CPMM, Token-2022 base: after a real ≈ 2.2× pump, both legs, within the fixed bound | 112301 | 112301 | 28141 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
+| `expire` | AMM v4, SPL (Fartcoin): past the deadline, healthy | 87312 | 87312 | 15900 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
+| `expire` | CPMM, SPL (USELESS): past the deadline, healthy | 102292 | 102292 | 25184 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
+| `expire` | CPMM, Token-2022 base: past the deadline, healthy | 105820 | 105820 | 28080 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
+| `sol_settle` | AMM v4, SPL (Fartcoin): healthy, the no-change call | 38991 | 38991 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
+| `sol_settle` | AMM v4, SPL (Fartcoin): S3 on a halted pool at the deadline, chain run s3_wait_s | 47834 | 47834 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
+| `sol_settle` | CPMM, SPL (USELESS): healthy, the no-change call | 41375 | 41375 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
+| `sol_settle` | CPMM, SPL (USELESS): S3 on a halted pool at the deadline, chain run s3_wait_s | 53183 | 53183 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
+| `sol_settle` | CPMM, Token-2022 base: healthy, the no-change call | 41724 | 41724 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
+| `sol_settle` | CPMM, Token-2022 base: S3 on a halted pool at the deadline, chain run s3_wait_s | 53529 | 53529 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
+| `crank_price` | AMM v4, SPL (Fartcoin): roll + record (first crank of a second) | 28053 | 28053 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |
+| `crank_price` | AMM v4, SPL (Fartcoin): pool halted by its admin: roll, no record, both chains start | 26872 | 26872 | — | 60000 | §6.1 `crank_price` | 3 | 2 (≤ 2) | 2 |
+| `crank_price` | CPMM, SPL (USELESS): roll + record (first crank of a second) | 28111 | 28111 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |
+| `crank_price` | CPMM, SPL (USELESS): pool halted by its admin: roll, no record, both chains start | 27527 | 27527 | — | 60000 | §6.1 `crank_price` | 3 | 2 (≤ 2) | 2 |
+| `crank_price` | CPMM, Token-2022 base: roll + record (first crank of a second) | 28122 | 28122 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |
+| `crank_price` | CPMM, Token-2022 base: pool halted by its admin: roll, no record, both chains start | 27536 | 27536 | — | 60000 | §6.1 `crank_price` | 3 | 2 (≤ 2) | 2 |
+| `crank_price` | AMM v4, SPL (Fartcoin): record only (same second again) | 23136 | 23136 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |
+| `flag_venue_upgraded` | AMM v4, the dumped 1,406,429-byte ProgramData | 6028 | 6028 | — | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` (U5) | 2 | 2 (≤ 2) | 2 |
+| `flag_venue_upgraded` | CPMM, the dumped 793,869-byte ProgramData | 6028 | 6028 | — | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` (U5) | 2 | 2 (≤ 2) | 2 |
+| `flag_venue_upgraded` | AMM v4, a second upgrade while flagged (refresh) | 6027 | 6027 | — | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` (U5) | 2 | 2 (≤ 2) | 2 |
+| `flag_venue_upgraded` | a 10,485,760-byte ProgramData (pump's size, synthetic): U5 | 6028 | 6028 | — | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` (U5) | 2 | 2 (≤ 2) | 2 |
+| `revalidate_venue` | AMM v4, the dumped ProgramData | 8440 | 8440 | — | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` (U5) | 2 | 2 (≤ 2) | 2 |
+| `revalidate_venue` | CPMM, the dumped ProgramData | 8440 | 8440 | — | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` (U5) | 2 | 2 (≤ 2) | 2 |
+| `propose_pool` | AMM v4, SPL (Fartcoin): list-only market adopts it (Fartcoin's real curve: D1 detection) | 27057 | 27057 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
+| `propose_pool` | CPMM, SPL (USELESS): list-only market adopts it | 27391 | 27391 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
+| `propose_pool` | AMM v4: listing-window replacement of the thin reversed Fartcoin pool by the main pool, ring rewritten | 45501 | 45501 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
+| `propose_pool` | AMM v4, SPL (Fartcoin): zero-position adoption of a planted CPMM pool 2× as deep, ring rewritten | 42257 | 42257 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
+| `propose_pool` | CPMM, SPL (USELESS): zero-position adoption of a planted CPMM pool 2× as deep, ring rewritten | 42584 | 42584 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
+| `propose_pool` | CPMM, Token-2022 base: zero-position adoption of a planted CPMM pool 2× as deep, ring rewritten | 42630 | 42630 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
+| `propose_pool` | AMM v4, SPL (Fartcoin): halted incumbent, a position open: fast-path window opened (CPMM candidate at 40 % of D) | 39500 | 39500 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
+| `propose_pool` | AMM v4, SPL (Fartcoin): fast-path window improved (60 % replaces 40 %) | 39111 | 39111 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
+| `propose_pool` | CPMM, SPL (USELESS): halted incumbent, a position open: fast-path window opened (CPMM candidate at 40 % of D) | 40202 | 40202 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
+| `propose_pool` | CPMM, SPL (USELESS): fast-path window improved (60 % replaces 40 %) | 39983 | 39983 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
+| `propose_pool` | CPMM, Token-2022 base: halted incumbent, a position open: fast-path window opened (CPMM candidate at 40 % of D) | 39841 | 39841 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
+| `propose_pool` | CPMM, Token-2022 base: fast-path window improved (60 % replaces 40 %) | 40090 | 40090 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
+| `execute_pool_switch` | AMM v4, SPL (Fartcoin): fast adoption after the window, a position open, ring rewritten | 47845 | 47845 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
+| `execute_pool_switch` | AMM v4, SPL (Fartcoin): window cancelled (the incumbent resumed) | 29963 | 29963 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
+| `execute_pool_switch` | CPMM, SPL (USELESS): fast adoption after the window, a position open, ring rewritten | 48720 | 48720 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
+| `execute_pool_switch` | CPMM, SPL (USELESS): window cancelled (the incumbent resumed) | 29834 | 29834 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
+| `execute_pool_switch` | CPMM, Token-2022 base: fast adoption after the window, a position open, ring rewritten | 48802 | 48802 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
+| `execute_pool_switch` | CPMM, Token-2022 base: window cancelled (the incumbent resumed) | 29820 | 29820 | — | 100000 | §6.1 `propose_pool` / `execute_pool_switch` | 2 | 2 (≤ 2) | 2 |
+| `crank_price` | AMM v4, SPL (Fartcoin): the last post-change warm-up integration (seed over 8 entries, guard cleared; M4R) | 28052 | 28052 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |
+| `crank_price` | CPMM, SPL (USELESS): the last post-change warm-up integration (seed over 8 entries, guard cleared; M4R) | 28047 | 28047 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |
+| `crank_price` | CPMM, Token-2022 base: the last post-change warm-up integration (seed over 8 entries, guard cleared; M4R) | 28058 | 28058 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |

@@ -8,6 +8,8 @@
 //!   with a foreign account is refused;
 //! - tokens donated to `trader_base_ata` before a close are normalised into the lending vault
 //!   (never counted as the leg's delivery), and the close stays exact;
+//! - lamports donated to the `trader_wsol` address survive curve legs (the curve never names it)
+//!   until `sweep_trader` (FUZZ-M7-1);
 //! - the pump, pump-fees and PumpSwap latch bits each block curve opens (`VenueUpgraded`, the
 //!   curve's mask), while cranks, `sol_settle` and closes keep working (I10).
 //!
@@ -121,6 +123,31 @@ fn sweep_trader_recovers_the_token_leg() {
     let meta = ok(env.send(&[pump::sweep_trader_pump_ix(&env, &pm)], &[]));
     let ev: TraderSwept = events::one(&meta);
     assert_eq!((ev.tokens, ev.lamports), (0, 0));
+}
+
+/// FUZZ-M7-1 (the fuzzer's minimised reproducer `tests/fuzz/corpus/fuzz-m7-1-curve-trader-wsol.json`,
+/// `[donate trader_wsol, open]`, as a regression): lamports sent to a curve market's `trader_wsol`
+/// address survive the curve's legs — the curve trades native lamports and never names that
+/// address (ARCH §2.4 rule 2 normalises it on the WSOL venues only) — so I7's clause there is a
+/// delta (§2.4 rule 5): an open and a close land under the hooks, the donation where it was;
+/// `sweep_trader` then moves it to the lenders as a lump.
+#[test]
+fn a_donation_to_the_trader_wsol_address_survives_curve_legs_until_swept() {
+    let (mut env, pm, q) = setup(PumpCoin::Legacy115);
+    let wsol = pda::trader_wsol(&pm.market()).0;
+    let donated = 36_000_001;
+    env.fund(&wsol, donated);
+    let mut b = env.borrower();
+    let (_, nonce, _) = open_ok(&mut env, &pm, &mut b, q);
+    assert_eq!(lamports(&env, &wsol), donated, "the curve open left it");
+    env.warp(1);
+    close_ok(&mut env, &pm, &b, nonce);
+    assert_eq!(lamports(&env, &wsol), donated, "the curve close left it");
+    assert_trader_clean(&env, &pm);
+    let meta = ok(env.send(&[pump::sweep_trader_pump_ix(&env, &pm)], &[]));
+    let ev: TraderSwept = events::one(&meta);
+    assert_eq!((ev.tokens, ev.lamports), (0, donated));
+    assert_eq!(lamports(&env, &wsol), 0, "swept to the lenders");
 }
 
 /// Tokens donated to `trader_base_ata` before a close are moved to the lending vault by the

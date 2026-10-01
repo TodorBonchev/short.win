@@ -49,6 +49,7 @@ export type CoveragePauseSetEvent = {
   ts: bigint;
   paused: boolean;
   reason: number;
+  by: Address;
 };
 
 export type CoveragePauseSetEventArgs = {
@@ -57,6 +58,7 @@ export type CoveragePauseSetEventArgs = {
   ts: number | bigint;
   paused: boolean;
   reason: number;
+  by: Address;
 };
 
 /** Gets the encoder for {@link CoveragePauseSetEventArgs} event data. */
@@ -68,6 +70,7 @@ export function getCoveragePauseSetEventEncoder(): FixedSizeEncoder<CoveragePaus
       ["ts", getI64Encoder()],
       ["paused", getBooleanEncoder()],
       ["reason", getU8Encoder()],
+      ["by", getAddressEncoder()],
     ]),
     [getConstantEncoder(COVERAGE_PAUSE_SET_EVENT_DISCRIMINATOR)],
   );
@@ -82,6 +85,7 @@ export function getCoveragePauseSetEventDecoder(): FixedSizeDecoder<CoveragePaus
       ["ts", getI64Decoder()],
       ["paused", getBooleanDecoder()],
       ["reason", getU8Decoder()],
+      ["by", getAddressDecoder()],
     ]),
     [getConstantDecoder(COVERAGE_PAUSE_SET_EVENT_DISCRIMINATOR)],
   );

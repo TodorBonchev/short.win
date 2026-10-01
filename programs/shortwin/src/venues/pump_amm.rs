@@ -104,6 +104,7 @@ use anchor_lang::system_program::{self, Transfer};
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use anchor_spl::token_interface::{self, TransferChecked};
 use shortwin_math::fees::{self, FeeBps, FeeTier, PammFeeSchedule};
+use shortwin_math::num::{mul_div, Rounding, WAD};
 use shortwin_math::observe::{Observation, VenueChange};
 use shortwin_math::pool_select;
 use shortwin_math::quote::Pricing;
@@ -580,6 +581,9 @@ pub struct PoolVenue {
     /// The live fee resolved on the pool's state (execution quotes when executable; the risk
     /// view keeps it while a halt makes the venue not executable). `None` if it does not resolve.
     pub fees: Option<FeeBps>,
+    /// M7-SEC-5: the one-way fee (ppm) the schedule charges at the stored `P_ema`'s market cap;
+    /// `u32::MAX` without a price or when it does not resolve (`VenueState::cap_fee_ppm`).
+    pub fee_ppm_at_ema: u32,
 }
 
 /// A token account of `program` whose mint is `mint` and token owner `owner`, parsed.
@@ -606,8 +610,15 @@ fn math_tiers(tiers: pump::FeeTiers<'_>) -> Vec<FeeTier> {
 
 /// The venue state of a `PumpSwap` market from its key-checked ReadSet (module docs), with the
 /// mint's live `supply` (the fee tier's market cap; `None` makes the venue not executable). Never
-/// fails: whatever does not parse is "not executable" (A63).
-pub fn read_state(market: &Market, read: &[AccountInfo], supply: Option<u64>) -> VenueState {
+/// fails: whatever does not parse is "not executable" (A63). `ema_fee`: also resolve the fee at the
+/// stored `P_ema`'s market cap (`PoolVenue::fee_ppm_at_ema`, M7-SEC-5) — only `open_short`'s
+/// pre-trade read needs it, so no other instruction pays its compute.
+pub fn read_state(
+    market: &Market,
+    read: &[AccountInfo],
+    supply: Option<u64>,
+    ema_fee: bool,
+) -> VenueState {
     let mut st = VenueState::not_executable(VenueKind::PumpSwap);
     let Some(pool_info) = read.get(P_POOL) else {
         return st;
@@ -680,21 +691,28 @@ pub fn read_state(market: &Market, read: &[AccountInfo], supply: Option<u64>) ->
         return st;
     };
     let tiers = math_tiers(fc.fee_tiers);
-    let fee = supply.and_then(|s| {
-        fees::pump_amm(
-            reserves.effective_quote,
-            u128::from(reserves.base),
-            &PammFeeSchedule {
-                tiers: &tiers,
-                base_supply: s,
-                creator_fee_configurable: gc.creator_fee_configurable(),
-                pool_creator_fee_bps: pool.creator_fee_bps,
-                coin_creator_is_default: pool.coin_creator_is_default(),
-                cap_bps: None,
-            },
-        )
-        .ok()
+    let schedule = supply.map(|s| PammFeeSchedule {
+        tiers: &tiers,
+        base_supply: s,
+        creator_fee_configurable: gc.creator_fee_configurable(),
+        pool_creator_fee_bps: pool.creator_fee_bps,
+        coin_creator_is_default: pool.coin_creator_is_default(),
+        cap_bps: None,
     });
+    let fee = schedule.as_ref().and_then(|sch| {
+        fees::pump_amm(reserves.effective_quote, u128::from(reserves.base), sch).ok()
+    });
+    // M7-SEC-5: the fee at the stored `P_ema`'s market cap (the tier's market cap is
+    // `effective_quote·supply/base`, i.e. the price times the supply).
+    let p_ema = market.ema_price.get();
+    let fee_ema = schedule
+        .as_ref()
+        .filter(|_| ema_fee && p_ema > 0)
+        .and_then(|sch| {
+            let base = u128::from(reserves.base);
+            let quote = mul_div(p_ema, base, WAD, Rounding::Floor).ok()?;
+            fees::pump_amm(quote, base, sch).ok()
+        });
     let disable_flags = gc.disable_flags();
     st.pool = Some(PoolVenue {
         disable_flags,
@@ -702,6 +720,7 @@ pub fn read_state(market: &Market, read: &[AccountInfo], supply: Option<u64>) ->
         vqr: pool.virtual_quote_reserves,
         is_cashback: pool.is_cashback_coin,
         fees: fee,
+        fee_ppm_at_ema: fee_ema.map_or(u32::MAX, |e| e.oneway_ppm()),
     });
     let Ok(effective) = u64::try_from(reserves.effective_quote) else {
         return st;

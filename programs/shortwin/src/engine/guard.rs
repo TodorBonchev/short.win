@@ -11,7 +11,7 @@
 
 use anchor_lang::prelude::*;
 
-use crate::constants::{GUARD_RAYDIUM_CPMM, GUARD_RAYDIUM_V4};
+use crate::constants::{COVERAGE_CLEAR_DELAY_S, GUARD_RAYDIUM_CPMM, GUARD_RAYDIUM_V4};
 use crate::errors::ShortwinError;
 use crate::mint_filter::check_mint_safety;
 use crate::state::{
@@ -65,18 +65,28 @@ pub fn mint_guard(
 }
 
 /// ARCH §3.4 step 1, the static open guards (in this order): opens paused globally or on the
-/// market (`OpensPaused`, SPEC §11); paused for keeper coverage (`CoveragePaused`, A69); the
+/// market (`OpensPaused`, SPEC §11); paused for keeper coverage (`CoveragePaused`, A69), or
+/// cleared less than `COVERAGE_CLEAR_DELAY_S` ago (M7-SEC-3: `now` against
+/// `Market.coverage_cleared_at`); the
 /// route-broken flag of the market or of its venue (`RouteBroken`, A40); a venue that takes
 /// opens (`NoSupportedVenue` for `None`, `VenueMigrating` while `PumpMigrating`) and is enabled
 /// (`VenueDisabled`). The mint guard (entry path, `MintUnsafeFlagged` first) is
 /// [`mint_guard`]'s.
-pub fn open_static(config: &GlobalConfig, market: &Market, kind: VenueKind) -> Result<()> {
+pub fn open_static(
+    config: &GlobalConfig,
+    market: &Market,
+    kind: VenueKind,
+    now: i64,
+) -> Result<()> {
     require!(
         !config.paused_opens() && !market.has_flag(MARKET_FLAG_PAUSED_OPENS),
         ShortwinError::OpensPaused
     );
+    let clear_delay_ends = market
+        .coverage_cleared_at
+        .saturating_add(COVERAGE_CLEAR_DELAY_S);
     require!(
-        !market.has_flag(MARKET_FLAG_PAUSED_COVERAGE),
+        !market.has_flag(MARKET_FLAG_PAUSED_COVERAGE) && now >= clear_delay_ends,
         ShortwinError::CoveragePaused
     );
     require!(

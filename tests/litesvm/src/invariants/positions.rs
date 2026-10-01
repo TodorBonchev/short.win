@@ -7,7 +7,7 @@
 //! | A26 | `check_ix` | the snapshot rules: every field of a surviving position except `v`, `m` and the settlement arming state (`s_armed`, `s_count`, `s_since`, `s_last`) is unchanged — the locked terms, `deadline`, `r_min`, `j_open`, `q`, `s`, `n_open`, `fee_open`, `entry_price`, tier, venue, nonce, bump, status |
 //! | I5 | `check_ix` | after every `Open`: `ΣB_Q·10⁴ ≤ util_cap_bps·(T + ΣB_Q)` |
 //! | I6 | `check_all` | `ΣB_Q` = Σ open positions' `q` (and by tier); `open_positions`, `total_notional_open`, `rent_aggr` (`Σ q·coef_j·(10⁴ − p_pos)`) match the positions; `max_release ≥` every position's `release_at`; every `WalletExposure` of the market sits at its PDA with `q_open` = Σ `q` of its wallet's positions and `q_open > 0` (closed at 0), and every borrower with a position has one |
-//! | I7 | `check_ix` + `check_all` | after every instruction that ran a leg (`Open`, `Close`, `Liquidate`, `Expire`): `trader` 0 lamports, System-owned, no data; `trader_wsol` holds nothing; `pool_vault` has no delegate — the last also after **every** instruction (`check_all`: the delegate exists only inside a Raydium sell leg); a pump market's `trader_base_ata` holds 0 tokens, is owned by `trader`, with no delegate and no close authority |
+//! | I7 | `check_ix` + `check_all` | after every instruction that ran a leg (`Open`, `Close`, `Liquidate`, `Expire`): `trader` 0 lamports, System-owned, no data; `trader_wsol` System-owned with no data, holding nothing after a WSOL leg and unchanged lamports after a pump-curve leg (which never names it; FUZZ-M7-1); `pool_vault` has no delegate — the last also after **every** instruction (`check_all`: the delegate exists only inside a Raydium sell leg); a pump market's `trader_base_ata` holds 0 tokens, is owned by `trader`, with no delegate and no close authority |
 //! | I9 | `check_ix` | every waterfall conserves `V` (ECON I-E4), read off its event against the position's `V` just before: `Close` (`B + R + borrower`, and `rent_protocol = ⌊R·rent_protocol_bps_pos/10⁴⌋`), `Liquidate` (`B + r + π + top-up + borrower`), `Expire` (`B + r + e + K_e + borrower`), `SolSettle` (`K_s + lenders + borrower`) |
 //! | I10 | `check_ix` | an exit (`Close`, `Liquidate`, `Expire`, `SolSettle`) names neither `oracle_cache` nor `venue_guard` among its accounts |
 //! | I11 | `check_ix` (event part) | a liquidation's spend `≤ ⌊B̂_ref·(10⁴ + δ_liq)/10⁴⌋` with the position's locked δ, an expiry's `≤ ⌊B̂_ref·(10⁴ + δ_exp)/10⁴⌋`; `B ≤ max_in + ert` and `max_in ≤` that fixed bound; penalty / expiry fee `≤ ⌈rate·min(B̂_live,risk, B̂_ref)/10⁴⌉`; an expiry's `π_ref = ⌈fee·B̂_ref/10⁴⌉`, its `K_e = min(fixed + ⌊bps·B̂_ref/10⁴⌋, cap, V − B − r − e)`, and its rent (`R_due` on the post-accrual basis) and fee paid in full whenever `V − R − π_ref − ert ≥ ⌊B̂_ref·(10⁴ + ε)/10⁴⌋`. The liveness clause (I-E11) is a scenario test (`tests/liquidate_it.rs`, `tests/attacks_exit_it.rs`) |
@@ -63,6 +63,10 @@ pub struct MarketPositions {
     /// The venue as short.win's adapter sees it (I13 re-quotes, I16 route predicates and
     /// records): the mock and the Raydium venues ([`VenueView`]); `None` for other venues.
     pub venue: Option<VenueView>,
+    /// The lamports at the market's `trader_wsol` address (I7's curve clause: a pump-curve leg
+    /// never touches that address, so a third party's pre-funding stays until `sweep_trader` or
+    /// the first WSOL leg after the graduation normalises it; FUZZ-M7-1).
+    pub trader_wsol_lamports: u64,
 }
 
 /// The position-side state of the tracked markets before an instruction.
@@ -83,6 +87,7 @@ pub fn snapshot(svm: &LiteSVM, markets: &[Pubkey]) -> PositionsSnapshot {
                     state: m,
                     positions: positions_of(svm, k),
                     venue: venue_view::view(svm, &m),
+                    trader_wsol_lamports: read::lamports(svm, &m.trader_wsol),
                 })
             })
             .collect(),
@@ -594,10 +599,46 @@ pub fn check_ix(svm: &LiteSVM, pre: &PositionsSnapshot, ix: &IxFacts<'_>) -> Res
                     },
                 )?;
             }
-            let wsol = read::lamports(svm, &post.trader_wsol);
-            ensure(wsol == 0, "I7", || {
-                format!("market {market}: trader_wsol holds {wsol} lamports after a leg")
-            })?;
+            // `trader_wsol`: System-owned with no data after every leg (only short.win can
+            // sign `allocate` / `assign` for the address, and a WSOL leg closes what it opened).
+            // A WSOL leg (PumpSwap, Raydium, the mock) normalises the address before funding and
+            // closes it, so it holds nothing afterwards. A pump-curve leg trades native lamports
+            // and never names the address (ARCH §2.4 rule 2 normalises it on the WSOL venues
+            // only): there its lamports are unchanged by the leg — a third party's pre-funding
+            // waits for `sweep_trader` or the first WSOL leg after the graduation (FUZZ-M7-1;
+            // rule 2's "deltas and authorities, never that an account a third party can create
+            // does not exist").
+            let wsol_acc = read::account(svm, &post.trader_wsol);
+            if let Some(a) = &wsol_acc {
+                ensure(
+                    a.data.is_empty() && a.owner == anchor_lang::system_program::ID,
+                    "I7",
+                    || {
+                        format!(
+                            "market {market}: trader_wsol left open after a leg ({} bytes, owner {})",
+                            a.data.len(),
+                            a.owner
+                        )
+                    },
+                )?;
+            }
+            let wsol = wsol_acc.map_or(0, |a| a.lamports);
+            let curve_leg = matches!(
+                post.venue_kind(),
+                Some(VenueKind::PumpCurve | VenueKind::PumpMigrating)
+            );
+            if curve_leg {
+                let before = mp.trader_wsol_lamports;
+                ensure(wsol == before, "I7", || {
+                    format!(
+                        "market {market}: a curve leg moved trader_wsol's lamports {before} → {wsol}"
+                    )
+                })?;
+            } else {
+                ensure(wsol == 0, "I7", || {
+                    format!("market {market}: trader_wsol holds {wsol} lamports after a leg")
+                })?;
+            }
             ensure(
                 read::token_delegate(svm, &post.pool_vault).is_none(),
                 "I7",
@@ -606,6 +647,10 @@ pub fn check_ix(svm: &LiteSVM, pre: &PositionsSnapshot, ix: &IxFacts<'_>) -> Res
             trader_base_ata_clean(svm, &market, &post)?;
         }
         for o in ix.opens.iter().filter(|o| o.market == market) {
+            // I19 (M7-SEC-6): the open's terms, recomputed.
+            if let Some(c) = config.as_ref() {
+                super::open_terms::check_open(svm, c, mp, &post, o)?;
+            }
             // I5: utilisation within the cap after every open.
             let cap = config.map_or(0, |c| c.params.util_cap_bps);
             let b = u128::from(post.borrowed_q);

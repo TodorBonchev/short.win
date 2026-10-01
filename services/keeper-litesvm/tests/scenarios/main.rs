@@ -20,7 +20,17 @@
 //! created), `pamm_lp` (M6R-1, the owner's decision of 2026-09-30: duty 2's per-second
 //! liquidity-anomaly coverage against a withdraw drag on a PumpSwap pool with third-party LP, and
 //! none on a market without positions) and `wipe` (M6: duty 6's post-wipe transaction on PumpSwap and the curve with the venue
-//! cashback claims, the market reopening; duty 13's `sweep_trader` and weekly cashback claim).
+//! cashback claims, the market reopening; duty 13's `sweep_trader` and weekly cashback claim),
+//! `coverage_pause` (M7, O17: the T-COVERAGE drill — the designated pauser's `set_coverage_pause`
+//! on an outage and on an exhausted budget, exits continuing under the pause, the recovery, a
+//! restart, the role unset or rotated, two instances), `oracle` (M7, duty 11: `crank_sol_usd` within
+//! 30 s of every feed update, refusals and aging alerted), `cascade` (M7 T-CASCADE: a 25-SOL basket
+//! of `min_notional` positions liquidated under the per-account block budget), `m7_cost` (M7: the
+//! keeper cost-model inputs of ECON §5.8, T-SIZE batch sizes, load), `pamm_alt` (M7 OWNER-M7-1:
+//! the PumpSwap 4-extras transactions through the tables the keeper's `alt` module builds) and
+//! `m7_sec` (the M7 security review's keeper findings, fixed: landing latency and slow ticks —
+//! the CI latency scenario —, bursts only on reverted excursions, a coverage clear or an open
+//! the keeper did not expect alerted, junk list-only markets off the per-tick reads).
 //! Every keeper transaction runs the harness's invariant hooks after every instruction
 //! (`shortwin_keeper_litesvm`).
 //!
@@ -36,14 +46,20 @@
 mod batching;
 mod bursts;
 mod cadence;
+mod cascade;
 mod common;
+mod coverage_pause;
 mod degraded;
 mod expire;
 mod extras;
 mod freeze;
 mod graduation;
 mod liquidate;
+mod m7_cost;
+mod m7_sec;
+mod oracle;
 mod pamm;
+mod pamm_alt;
 mod pamm_lp;
 mod pool_select;
 mod priority;

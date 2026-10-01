@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { AccountRole, address, getAddressEncoder, getProgramDerivedAddress } from '@solana/kit';
+import { AccountRole, address, createNoopSigner, getAddressEncoder, getProgramDerivedAddress } from '@solana/kit';
 import { camelCase, pascalCase, snakeCase } from 'codama';
 
 import * as client from '../src/index.ts';
@@ -68,6 +68,45 @@ test('crank_sol_usd: PDA defaults, roles and data', async () => {
     );
     assert.deepEqual(ix.data, anchorDiscriminator('global:crank_sol_usd'));
     assert.equal(client.identifyShortwinInstruction(ix.data), client.ShortwinInstruction.CrankSolUsd);
+});
+
+test('set_coverage_pause (O17): the keeper key signs, the config PDA defaults, the market is writable', async () => {
+    const coverageAuthority = createNoopSigner(address('7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE'));
+    const market = address('So11111111111111111111111111111111111111112');
+    const pda = async (seed: string) =>
+        (await getProgramDerivedAddress({ programAddress: client.SHORTWIN_PROGRAM_ADDRESS, seeds: [seed] }))[0];
+    const eventAuthority = await pda('__event_authority');
+    const ix = await client.getSetCoveragePauseInstructionAsync({
+        coverageAuthority,
+        market,
+        eventAuthority,
+        program: client.SHORTWIN_PROGRAM_ADDRESS,
+        paused: true,
+        reason: 1,
+    });
+    assert.deepEqual(
+        ix.accounts.map((a) => [a.address, a.role]),
+        [
+            [coverageAuthority.address, AccountRole.READONLY_SIGNER],
+            [await pda('config'), AccountRole.READONLY],
+            [market, AccountRole.WRITABLE],
+            [eventAuthority, AccountRole.READONLY],
+            [client.SHORTWIN_PROGRAM_ADDRESS, AccountRole.READONLY],
+        ],
+    );
+    assert.deepEqual(ix.data, Uint8Array.from([...anchorDiscriminator('global:set_coverage_pause'), 1, 1]));
+    assert.equal(client.identifyShortwinInstruction(ix.data), client.ShortwinInstruction.SetCoveragePause);
+    const parsed = client.parseSetCoveragePauseInstruction(ix);
+    assert.deepEqual([parsed.data.paused, parsed.data.reason], [true, 1]);
+    // Inert while unset (ARCH §3.1): the existing Admin-group code.
+    assert.equal(client.SHORTWIN_ERROR__COVERAGE_AUTHORITY_DISABLED, 6015);
+    assert.deepEqual(client.COVERAGE_PAUSE_SET_EVENT_DISCRIMINATOR, anchorDiscriminator('event:CoveragePauseSet'));
+    // The event names its signer (`by`, as `PauseSet`).
+    const ev = { market, slot: 1n, ts: 2n, paused: true, reason: 1, by: coverageAuthority.address };
+    const bytes = client.getCoveragePauseSetEventEncoder().encode(ev);
+    assert.equal(bytes.length, 8 + 32 + 8 + 8 + 1 + 1 + 32);
+    assert.deepEqual(bytes.slice(0, 8), anchorDiscriminator('event:CoveragePauseSet'));
+    assert.deepEqual(client.getCoveragePauseSetEventDecoder().decode(bytes), ev);
 });
 
 test('OracleCache (Borsh, 45 B): price @8, conf @16, expo @24, publish_time @28, updated_slot @36, bump @44', () => {

@@ -229,6 +229,15 @@ export type Market = {
    * `canonical_pool_valid` compares (ARCH §2.5); derived once at listing for the same reason.
    */
   pumpPoolAuthority: Address;
+  /**
+   * M7-SEC-3 (was `_reserved[0..8]`): the unix second `set_coverage_pause(false)` last cleared
+   * a set `paused_coverage` flag. `open_short` refuses until `COVERAGE_CLEAR_DELAY_S` after it
+   * (`CoveragePaused`; `engine::guard::open_static`), so the `coverage_authority` key cannot
+   * bracket an open on a coverage-paused market — `[clear, open_short, set]` in one
+   * transaction or one second — and the flag stays visibly cleared for the keeper's reads
+   * before any open can land. 0 on existing accounts (no delay).
+   */
+  coverageClearedAt: bigint;
   reserved: ReadonlyUint8Array;
 };
 
@@ -391,6 +400,15 @@ export type MarketArgs = {
    * `canonical_pool_valid` compares (ARCH §2.5); derived once at listing for the same reason.
    */
   pumpPoolAuthority: Address;
+  /**
+   * M7-SEC-3 (was `_reserved[0..8]`): the unix second `set_coverage_pause(false)` last cleared
+   * a set `paused_coverage` flag. `open_short` refuses until `COVERAGE_CLEAR_DELAY_S` after it
+   * (`CoveragePaused`; `engine::guard::open_static`), so the `coverage_authority` key cannot
+   * bracket an open on a coverage-paused market — `[clear, open_short, set]` in one
+   * transaction or one second — and the flag stays visibly cleared for the keeper's reads
+   * before any open can land. 0 on existing accounts (no delay).
+   */
+  coverageClearedAt: number | bigint;
   reserved: ReadonlyUint8Array;
 };
 
@@ -499,7 +517,8 @@ export function getMarketEncoder(): FixedSizeEncoder<MarketArgs> {
       ["pad5", fixEncoderSize(getBytesEncoder(), 4)],
       ["traderWsolAta", getAddressEncoder()],
       ["pumpPoolAuthority", getAddressEncoder()],
-      ["reserved", fixEncoderSize(getBytesEncoder(), 176)],
+      ["coverageClearedAt", getI64Encoder()],
+      ["reserved", fixEncoderSize(getBytesEncoder(), 168)],
     ]),
     (value) => ({ ...value, discriminator: MARKET_DISCRIMINATOR }),
   );
@@ -609,7 +628,8 @@ export function getMarketDecoder(): FixedSizeDecoder<Market> {
     ["pad5", fixDecoderSize(getBytesDecoder(), 4)],
     ["traderWsolAta", getAddressDecoder()],
     ["pumpPoolAuthority", getAddressDecoder()],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 176)],
+    ["coverageClearedAt", getI64Decoder()],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 168)],
   ]);
 }
 

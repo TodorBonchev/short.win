@@ -14,6 +14,13 @@
 //! [`ChainView::list_only`] also hands them to the pool monitor (duty 12, [`crate::pool_monitor`]),
 //! which moves them onto an eligible Raydium pool with `propose_pool` (ARCH §2.5 `None`).
 //!
+//! **Which markets a tick reads** (M7-SEC-8): the open positions first (one `getProgramAccounts`),
+//! then in full — `Market`, `MarketVault`, ReadSet, extras — every market with positions or with
+//! something time-critical pending, and the other ("cold") markets every `cold_interval_s`,
+//! staggered ([`crate::keeper`]); as built at M7 every discovered market was read every tick,
+//! so permissionless junk listings (≈ 0.047 SOL each) added ≈ 0.05 sequential RPC calls to every
+//! tick each. `RpcChain` issues a read's `getMultipleAccounts` chunks in parallel.
+//!
 //! **PumpSwap** (M6): the fee tier is chosen on the market cap `effective_quote·supply/base`
 //! (ARCH §4.2), so the keeper also reads the market's **mint** and hands its live supply to the
 //! program's reader (`venues::read_state_with`, as the program's prologue does with the named
@@ -226,6 +233,17 @@ pub async fn open_positions<C: Chain>(
 /// Loads the config, the oracle cache and `markets` (with their vaults, ReadSets, extras and open
 /// positions).
 pub async fn load<C: Chain>(chain: &C, markets: &[Pubkey]) -> anyhow::Result<ChainView> {
+    let positions = open_positions(chain).await?;
+    load_with_positions(chain, markets, &positions).await
+}
+
+/// [`load`] with the open positions already read ([`open_positions`]): the tick reads them first
+/// to choose the markets it reads in full (M7-SEC-8, [`crate::keeper`]).
+pub async fn load_with_positions<C: Chain>(
+    chain: &C,
+    markets: &[Pubkey],
+    positions: &HashMap<Pubkey, Vec<PositionView>>,
+) -> anyhow::Result<ChainView> {
     let clock = chain.clock().await?;
     let mut keys = vec![pda::config()];
     keys.extend(markets.iter().copied());
@@ -311,7 +329,6 @@ pub async fn load<C: Chain>(chain: &C, markets: &[Pubkey]) -> anyhow::Result<Cha
     let n_venue = venue_keys.len();
     venue_keys.extend(extras_keys.iter().copied());
     let venue_accs = chain.accounts(&venue_keys).await?;
-    let positions = open_positions(chain).await?;
     let mut out = Vec::with_capacity(partial.len());
     let mut at = 0usize;
     for (i, p) in partial.into_iter().enumerate() {

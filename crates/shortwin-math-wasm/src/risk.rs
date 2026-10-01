@@ -282,6 +282,10 @@ pub struct TierInputs {
     /// Pyth publish time.
     #[wasm_bindgen(js_name = oraclePublishTime)]
     pub oracle_publish_time: i64,
+    /// Pyth confidence (same exponent): the tier converts the USD thresholds at
+    /// `oraclePrice − oracleConf` (M7-SEC-7).
+    #[wasm_bindgen(js_name = oracleConf)]
+    pub oracle_conf: u64,
     /// `oracle_stale_s`.
     #[wasm_bindgen(js_name = oracleStaleS)]
     pub oracle_stale_s: u32,
@@ -318,6 +322,7 @@ impl TierInputs {
             graduated_at: self.graduated_at,
             oracle: OraclePrice {
                 price: self.oracle_price,
+                conf: self.oracle_conf,
                 expo: self.oracle_expo,
                 publish_time: self.oracle_publish_time,
             },

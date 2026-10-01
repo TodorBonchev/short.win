@@ -82,6 +82,7 @@ pub fn assign(
 ) -> Option<Tier> {
     let oracle = OraclePrice {
         price: oracle.price,
+        conf: oracle.conf,
         expo: oracle.expo,
         publish_time: oracle.publish_time,
     };

@@ -30,7 +30,9 @@ cargo test --manifest-path tests/bench/m1_cu/Cargo.toml -- --nocapture
 ## Status
 
 Every M1 handler is implemented: the M1 merge deleted `ShortwinError::NotImplemented`, and the
-bench's stub handling went with it. All 24 cases are measured and within budget (`results.md`,
+bench's stub handling went with it. M7 adds `set_coverage_pause` (O17; the role installed through
+Governance's timelocked `Authorities` change, `Env::enable_coverage_authority`), an admin flag of
+ARCH §3.1 under the admin-flag class budget. All 25 cases are measured and within budget (`results.md`,
 regenerated at the merge). A case whose Mollusk or LiteSVM run fails, or whose Mollusk figure
 exceeds its budget, fails the test.
 

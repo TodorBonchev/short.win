@@ -48,7 +48,8 @@ use shortwin::constants::{
     RAYDIUM_CPMM_PROGRAM_ID, RAYDIUM_V4_AUTHORITY, RAYDIUM_V4_PROGRAM_ID, TOKEN_2022_PROGRAM_ID,
     TOKEN_PROGRAM_ID, WSOL_MINT,
 };
-use shortwin::state::VenueKind;
+use shortwin::state::{EXTRAS_IX_BUY, EXTRAS_IX_SELL, VenueKind};
+use shortwin::venues::EXTRAS_SET_CURRENT;
 use shortwin_services_common::tx::{self, ComputeBudget, TxFormat};
 use shortwin_services_common::{AccountData, Chain, TxOutcome};
 use solana_address_lookup_table_interface::{instruction as alt_ix, state::AddressLookupTable};
@@ -56,6 +57,8 @@ use solana_keypair::Keypair;
 use solana_message::AddressLookupTableAccount;
 
 use crate::pda;
+use crate::venue;
+use crate::view::MarketView;
 
 /// Addresses one table can hold.
 pub const MAX_ADDRESSES: usize =
@@ -277,6 +280,74 @@ pub async fn live_entries<C: Chain>(chain: &C) -> anyhow::Result<Vec<AltEntry>> 
         anyhow!("PumpSwap GlobalConfig {PUMP_AMM_GLOBAL_CONFIG} not found (use --static-only)")
     })?;
     protocol_entries(static_entries(), recipient_entries(g, c)?)
+}
+
+/// A market's own lookup table (ARCH §6.4's per-market fallback; M7 OWNER-M7-1): the per-market
+/// keys that the market's trading transactions (`open_short`, `close_short`, `add_margin`,
+/// `liquidate`, `expire`) and its cranks (`crank_price`, `sol_settle`) name and the protocol table
+/// (`protocol`: its addresses) leaves inline — the market, its mint, pool vault, market vault and
+/// trader, the venue's ReadSet, the trade extras (`trader_wsol`, the venue's per-market accounts:
+/// on PumpSwap the trader's user-volume accumulator, cashback ATA and coin-creator vault), and the
+/// keys the venue's published `current` extras sets resolve to for this market (buy and sell) —
+/// deduplicated, in that order. Position- and wallet-level keys (the position, the exposure, the
+/// borrower and its token accounts, the keeper) cannot be shared and stay inline; so do signers
+/// and invoked program ids (a v0 message loads neither from a table).
+///
+/// The table is extendable (not frozen) so the keeper can add the keys of a new extras set or of a
+/// pool switch; `shortwin-build-alt market` creates it. Rent: [`table_rent_lamports`].
+pub fn market_entries(mv: &MarketView, protocol: &[Pubkey]) -> anyhow::Result<Vec<AltEntry>> {
+    let m = &mv.market;
+    let mut out: Vec<AltEntry> = Vec::new();
+    let mut add = |key: Pubkey, label: String| {
+        if key != Pubkey::default()
+            && key != shortwin::ID
+            && !protocol.contains(&key)
+            && !out.iter().any(|x| x.key == key)
+        {
+            out.push(e(key, label));
+        }
+    };
+    add(mv.key, "market".into());
+    add(m.mint, "mint".into());
+    add(m.pool_vault, "pool_vault".into());
+    add(m.market_vault, "market_vault".into());
+    add(m.trader, "trader".into());
+    for (i, k) in mv.read_keys.iter().enumerate() {
+        add(*k, format!("ReadSet {i}"));
+    }
+    for (i, meta) in venue::trade_extras(mv.kind, m, &mv.read_accounts)?
+        .iter()
+        .enumerate()
+    {
+        add(meta.pubkey, format!("trade extra {i}"));
+    }
+    for ix in [EXTRAS_IX_BUY, EXTRAS_IX_SELL] {
+        let choices = venue::extras_candidates(mv.kind, ix, m, mv.extras.as_deref());
+        if let Some(c) = choices.iter().find(|c| c.sel.set == EXTRAS_SET_CURRENT) {
+            for (i, meta) in c.metas.iter().enumerate() {
+                add(meta.pubkey, format!("extras (ix {ix}) {i}"));
+            }
+        }
+    }
+    if out.len() > MAX_ADDRESSES {
+        bail!(
+            "{}: {} per-market addresses exceed one table",
+            mv.key,
+            out.len()
+        );
+    }
+    Ok(out)
+}
+
+/// Mainnet's rent-exempt price per byte (ARCH V5: the Rent sysvar's 5,080 lamports per byte-year
+/// at threshold 1.0; `getMinimumBalanceForRentExemption`).
+pub const MAINNET_LAMPORTS_PER_BYTE: u64 = 5_080;
+
+/// Rent-exempt lamports of a lookup table holding `n` addresses on mainnet: its 56-byte header and
+/// `32·n` bytes of addresses, plus the 128 bytes of account overhead, at
+/// [`MAINNET_LAMPORTS_PER_BYTE`]. Recovered when the table is deactivated and closed.
+pub fn table_rent_lamports(n: usize) -> u64 {
+    (128 + 56 + 32 * n as u64) * MAINNET_LAMPORTS_PER_BYTE
 }
 
 /// The keys of `entries`.
@@ -636,5 +707,15 @@ mod tests {
         data[21] = 0; // frozen
         let t = TableState::parse(key, &acc(tx::ALT_PROGRAM_ID, &data)).unwrap();
         assert_eq!(t.authority, None);
+    }
+
+    /// The rent of a table on mainnet: 17 addresses (the PumpSwap per-market table of
+    /// `tx_size_pumpswap_it`) cost 3,698,240 lamports (≈ 0.0037 SOL); the empty table 934,720;
+    /// 162,560 per address.
+    #[test]
+    fn table_rent_is_the_rent_exempt_minimum() {
+        assert_eq!(table_rent_lamports(0), 934_720);
+        assert_eq!(table_rent_lamports(17), 3_698_240);
+        assert_eq!(table_rent_lamports(1) - table_rent_lamports(0), 162_560);
     }
 }

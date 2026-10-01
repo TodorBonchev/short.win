@@ -219,7 +219,7 @@ pub fn handler<'info>(
     let (st, rem) = {
         let mut market = ctx.accounts.market.load_mut()?;
         let kind = market.venue_kind().ok_or(ShortwinError::NoSupportedVenue)?;
-        guard::open_static(&config, &market, kind)?;
+        guard::open_static(&config, &market, kind, clock.unix_timestamp)?;
         mint_guard(
             &market,
             &ctx.accounts.mint.to_account_info(),
@@ -252,7 +252,8 @@ pub fn handler<'info>(
             },
             &deny,
         )?;
-        let state = venues::read_state_boxed(
+        // M7-SEC-5: the pre-trade read also resolves the pump fee at `P_ema` (the caps' `φ`).
+        let state = venues::read_state_boxed_for_open(
             &market,
             kind,
             rem.read,
@@ -376,7 +377,9 @@ pub fn handler<'info>(
                 raydium_lock: kind
                     .lock_min_bps(config.params.pool_lock_min_bps)
                     .map(|lambda_min| (market.pool_d.get(), lambda_min)),
-                phi_ppm: state.fee_ppm,
+                // M7-SEC-5: `min(φ_live, φ at P_ema)` on the pump venues (a sale in this
+                // transaction cannot move the pool into a higher-fee tier for the caps).
+                phi_ppm: state.cap_fee_ppm(),
                 tokens_free: pro.pool.tokens_free,
                 borrowed_q: pro.pool.borrowed_q,
                 wallet_q: ctx.accounts.exposure.q_open,
@@ -413,7 +416,7 @@ pub fn handler<'info>(
                 kink: market.util_kink_bps,
                 ema_xy: market.newest_ring_xy(),
                 market_bump: market.bump,
-                phi_ppm: state.fee_ppm,
+                phi_ppm: state.cap_fee_ppm(),
             },
             rem,
         )

@@ -18,7 +18,12 @@
 //! A violation panics with the transaction's logs. Knobs for the scenarios: refuse v1
 //! transactions ([`LiteSvmChain::set_v1`], to exercise the v0 fallback) and the recent
 //! priority fees the backend reports ([`LiteSvmChain::set_priority_fees`]); every backend call
-//! is logged ([`LiteSvmChain::rpc_log`], M4-SEC-7: the keeper's RPC work per tick).
+//! is logged ([`LiteSvmChain::rpc_log`], M4-SEC-7: the keeper's RPC work per tick). **Timing**
+//! (M7-SEC-1, M7-SEC-6): the keeper's transactions can land seconds after the clock it read
+//! ([`LiteSvmChain::set_landing_delays`]), its clock can lag the chain's
+//! ([`LiteSvmChain::set_clock_lag`]), and a trade can land between its read and its transaction
+//! ([`LiteSvmChain::before_next_send`]); [`Harness::second_slow`] models a tick that waited for
+//! its confirmations (the next tick's clock a second later than the tick's own).
 //!
 //! **Bundles** (the straddle, ARCH §5.4; U22): [`LiteSvmChain`] executes a bundle as Jito does —
 //! its transactions in order, in one slot (the blockhash is the one the bundle was built with,
@@ -68,7 +73,21 @@ pub struct LiteSvmChain {
     bundles_sent: RefCell<Vec<SentBundle>>,
     before_bundle: RefCell<Option<BeforeBundle>>,
     fail_bundle_sim: Cell<Option<(usize, u32)>>,
+    /// Seconds the keeper's clock read lags the chain's (M7-SEC-1: a `confirmed` read on mainnet
+    /// is 1–2 slots behind the tip its transactions land at).
+    clock_lag: Cell<i64>,
+    /// Runs before the next `send` executes (a trade landing between the keeper's read and its
+    /// transaction; M7-SEC-2 (b)).
+    before_send: RefCell<Option<BeforeBundle>>,
+    /// Landing latency (M7-SEC-1, M7-SEC-6): before each `send` executes, the chain's clock
+    /// advances by the next value of this source (seconds; 0: the second the keeper read), so
+    /// the keeper's transaction lands later than the clock it read — as a `confirmed` read plus
+    /// 1–3 slots of send latency do on mainnet.
+    landing: RefCell<Option<LandingDelays>>,
 }
+
+/// A source of landing delays (seconds) for [`LiteSvmChain::set_landing_delays`].
+pub type LandingDelays = Box<dyn FnMut() -> i64>;
 
 /// What runs when the next bundle reaches the chain, before it executes (a trade landing between
 /// the keeper's read and its bundle).
@@ -121,6 +140,70 @@ pub struct SentTx {
     /// short.win instructions in it (ComputeBudget excluded).
     pub instructions: usize,
     pub ok: bool,
+    /// The slot it was sent in (T-CASCADE's per-slot accounting).
+    pub slot: u64,
+    /// Signatures (the fee payer, and the `coverage_authority` of a `set_coverage_pause`).
+    pub signatures: usize,
+    /// The compute-unit limit it requested (v1 config / v0 `SetComputeUnitLimit`; `None`:
+    /// the runtime default), which a leader charges against each writable account's block
+    /// budget (C0-17).
+    pub cu_limit: Option<u32>,
+    /// Compute units it consumed.
+    pub units: u64,
+    /// The accounts it write-locks.
+    pub writable: Vec<Pubkey>,
+}
+
+/// The compute-unit limit `tx` requests: a v1 message's config, a v0 or legacy message's
+/// `SetComputeUnitLimit` (ComputeBudget instruction 2, `u32` LE).
+pub fn requested_cu_limit(tx: &VersionedTransaction, ixs: &[Instruction]) -> Option<u32> {
+    if let VersionedMessage::V1(m) = &tx.message {
+        return m.config.compute_unit_limit;
+    }
+    let cb: Pubkey = "ComputeBudget111111111111111111111111111111"
+        .parse()
+        .expect("ComputeBudget id");
+    ixs.iter()
+        .filter(|ix| ix.program_id == cb && ix.data.first() == Some(&2) && ix.data.len() >= 5)
+        .find_map(|ix| ix.data[1..5].try_into().ok().map(u32::from_le_bytes))
+}
+
+/// The accounts `ixs` write-lock (every writable meta, the fee payer included).
+fn writable_keys(ixs: &[Instruction], payer: Pubkey) -> Vec<Pubkey> {
+    let mut v = vec![payer];
+    for m in ixs.iter().flat_map(|ix| ix.accounts.iter()) {
+        if m.is_writable && !v.contains(&m.pubkey) {
+            v.push(m.pubkey);
+        }
+    }
+    v
+}
+
+/// The record of `tx` (decompiled as `ixs`) with its outcome `out`, sent in `slot`.
+fn sent_record(
+    tx: &VersionedTransaction,
+    ixs: &[Instruction],
+    out: &TxOutcome,
+    slot: u64,
+) -> SentTx {
+    let payer = tx
+        .message
+        .static_account_keys()
+        .first()
+        .copied()
+        .unwrap_or_default();
+    SentTx {
+        format: tx::format_of(tx),
+        bytes: tx::size(tx),
+        accounts: tx::account_count(tx),
+        instructions: ixs.iter().filter(|i| i.program_id == shortwin::ID).count(),
+        ok: out.ok(),
+        slot,
+        signatures: tx.signatures.len(),
+        cu_limit: requested_cu_limit(tx, ixs),
+        units: out.units_consumed,
+        writable: writable_keys(ixs, payer),
+    }
 }
 
 impl LiteSvmChain {
@@ -136,7 +219,28 @@ impl LiteSvmChain {
             bundles_sent: RefCell::new(Vec::new()),
             before_bundle: RefCell::new(None),
             fail_bundle_sim: Cell::new(None),
+            clock_lag: Cell::new(0),
+            before_send: RefCell::new(None),
+            landing: RefCell::new(None),
         }
+    }
+
+    /// The keeper reads a clock `s` seconds behind the chain's (its transactions still land at
+    /// the chain's clock; M7-SEC-1).
+    pub fn set_clock_lag(&self, s: i64) {
+        self.clock_lag.set(s);
+    }
+
+    /// `f` runs on the chain right before the keeper's next `send` executes (M7-SEC-2 (b)).
+    pub fn before_next_send(&self, f: impl FnOnce(&mut Env) + 'static) {
+        *self.before_send.borrow_mut() = Some(Box::new(f));
+    }
+
+    /// Every `send` from now on lands `delays()` seconds after the clock the keeper read (the
+    /// chain's clock advances by that much, two and a half slots a second, before the
+    /// transaction executes); `None` turns it off. Bundles and simulations are unaffected.
+    pub fn set_landing_delays(&self, delays: Option<LandingDelays>) {
+        *self.landing.borrow_mut() = delays;
     }
 
     /// The next `simulate_bundle` reports transaction `tx` (0-based) as failed with custom error
@@ -370,7 +474,7 @@ impl Chain for LiteSvmChain {
         let c = self.env.borrow().clock();
         Ok(ChainClock {
             slot: c.slot,
-            unix_timestamp: c.unix_timestamp,
+            unix_timestamp: c.unix_timestamp - self.clock_lag.get(),
         })
     }
 
@@ -447,6 +551,13 @@ impl Chain for LiteSvmChain {
         if let Some(r) = self.refused(tx) {
             return Ok(r);
         }
+        let delay = self.landing.borrow_mut().as_mut().map_or(0, |f| f());
+        if delay > 0 {
+            self.env.borrow_mut().warp(delay);
+        }
+        if let Some(f) = self.before_send.borrow_mut().take() {
+            f(&mut self.env.borrow_mut());
+        }
         let (res, alts) = {
             let mut env = self.env.borrow_mut();
             let alts = lookup_tables(&env, tx);
@@ -465,13 +576,10 @@ impl Chain for LiteSvmChain {
         self.rpc.borrow_mut().push(Rpc::Send {
             instructions: ixs.iter().filter(|i| i.program_id == shortwin::ID).count(),
         });
-        self.sent.borrow_mut().push(SentTx {
-            format: tx::format_of(tx),
-            bytes: tx::size(tx),
-            accounts: tx::account_count(tx),
-            instructions: ixs.iter().filter(|i| i.program_id == shortwin::ID).count(),
-            ok: out.ok(),
-        });
+        let slot = self.env.borrow().clock().slot;
+        self.sent
+            .borrow_mut()
+            .push(sent_record(tx, &ixs, &out, slot));
         Ok(out)
     }
 
@@ -537,13 +645,8 @@ impl Chain for LiteSvmChain {
                 ),
             };
             let ixs = tx::decompile(tx, &alts).unwrap_or_default();
-            record.txs.push(SentTx {
-                format: tx::format_of(tx),
-                bytes: tx::size(tx),
-                accounts: tx::account_count(tx),
-                instructions: ixs.iter().filter(|i| i.program_id == shortwin::ID).count(),
-                ok: out.ok(),
-            });
+            let slot = env.clock().slot;
+            record.txs.push(sent_record(tx, &ixs, &out, slot));
             record.top.push(tx.message.instructions().len());
             record.trace.push(trace);
             record.units.push(out.units_consumed);
@@ -688,7 +791,15 @@ pub struct Harness {
 
 impl Harness {
     /// A keeper with `cfg` on `env`; its fee payer is funded with [`KEEPER_FUNDING`].
-    pub fn new(env: Env, cfg: KeeperConfig) -> Self {
+    ///
+    /// Duty 11 (`crank_sol_usd`, `cfg.oracle`) is turned off when `env` holds no account at the
+    /// configured Pyth feed address — most scenario environments plant none, and the keeper would
+    /// otherwise raise `Alert::OracleUnreadable` in their first tick. The `oracle` scenarios plant
+    /// the recorded `PriceUpdateV2` and turn the duty on ([`Keeper::config_mut`]).
+    pub fn new(env: Env, mut cfg: KeeperConfig) -> Self {
+        if env.svm.get_account(&env.config().pyth_sol_usd).is_none() {
+            cfg.oracle.enabled = false;
+        }
         let env = Rc::new(RefCell::new(env));
         let payer = Keypair::new();
         env.borrow_mut().fund(&payer.pubkey(), KEEPER_FUNDING);
@@ -699,6 +810,24 @@ impl Harness {
             keeper,
             reports: Vec::new(),
         }
+    }
+
+    /// Another keeper instance with `cfg` on the same chain (a restart, or a second region), with
+    /// its own fee payer funded with [`KEEPER_FUNDING`] and a fresh state.
+    pub fn another_keeper(&self, mut cfg: KeeperConfig) -> Keeper<LiteSvmChain> {
+        let feed = self.env.borrow().config().pyth_sol_usd;
+        if self.env.borrow().svm.get_account(&feed).is_none() {
+            cfg.oracle.enabled = false;
+        }
+        let payer = Keypair::new();
+        self.env.borrow_mut().fund(&payer.pubkey(), KEEPER_FUNDING);
+        Keeper::new(LiteSvmChain::new(self.env.clone()), payer, cfg).expect("keeper config")
+    }
+
+    /// Replaces the keeper by a fresh instance with `cfg` (a restart: new state and fee payer,
+    /// the same chain); the reports so far are kept.
+    pub fn restart(&mut self, cfg: KeeperConfig) {
+        self.keeper = self.another_keeper(cfg);
     }
 
     /// The keeper's backend.
@@ -732,6 +861,23 @@ impl Harness {
     pub fn second(&mut self) -> &TickReport {
         self.env.borrow_mut().warp(1);
         self.tick()
+    }
+
+    /// Advances one second, ticks, and — when the tick sent anything (a crank, an exit, a
+    /// coverage pause, a pool action, a sweep) — `extra` more seconds without a tick: on mainnet
+    /// a tick that sends waits for `confirmed` (≈ 1 s), so the next tick reads a later second
+    /// (M7-SEC-1 (b)). Returns the tick's report.
+    pub fn second_slow(&mut self, extra: i64) -> TickReport {
+        let r = self.second().clone();
+        let sent = !r.cranked.is_empty()
+            || !r.exits.is_empty()
+            || !r.coverage_pauses.is_empty()
+            || !r.sweeps.is_empty()
+            || !r.pool_actions.is_empty();
+        if sent && extra > 0 {
+            self.idle(extra);
+        }
+        r
     }
 
     /// `n` seconds, one tick each.

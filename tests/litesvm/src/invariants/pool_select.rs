@@ -242,6 +242,7 @@ fn fit_caps(
         OraclePrice::default(),
         |o| OraclePrice {
             price: o.price,
+            conf: o.conf,
             expo: o.expo,
             publish_time: o.publish_time,
         },
@@ -529,9 +530,10 @@ pub fn check_ix(
 
 /// I15, the marks (switch only if all fit; FIT-2): `max_q_hwm` falls only at the exit that
 /// empties the market (to 0); `min_open_fee_ppm` changes only at an open — to
-/// `open_fee_mark(mark, φ)`, `φ` the venue's one-way fee on the pre-trade state the open's caps
-/// read (`caps::open_fee_mark`: the first open after the market emptied sets it) — and at that
-/// exit (to 0).
+/// `open_fee_mark(mark, φ)`, `φ` the one-way fee the open's caps read on the pre-trade state,
+/// `min(φ_live, φ at P_ema)` on the pump venues (M7-SEC-5; `VenueView::cap_fee_ppm`)
+/// (`caps::open_fee_mark`: the first open after the market emptied sets it) — and at that exit
+/// (to 0).
 fn marks_move_only_at_opens_and_the_last_exit(
     mp: &MarketPositions,
     post: &Market,
@@ -555,8 +557,9 @@ fn marks_move_only_at_opens_and_the_last_exit(
         let Some(v) = mp.venue else {
             return Ok(());
         };
+        // M7-SEC-5: the fee the open's caps took, `min(φ_live, φ at P_ema)`.
         (0..n_opens).fold(pre.min_open_fee_ppm, |m, _| {
-            shortwin_math::caps::open_fee_mark(m, v.fee_ppm)
+            shortwin_math::caps::open_fee_mark(m, v.cap_fee_ppm)
         })
     } else if post.open_positions == 0 {
         0
@@ -569,7 +572,7 @@ fn marks_move_only_at_opens_and_the_last_exit(
              position(s) open), want {want}",
             pre.min_open_fee_ppm,
             post.min_open_fee_ppm,
-            mp.venue.map(|v| v.fee_ppm),
+            mp.venue.map(|v| (v.fee_ppm, v.cap_fee_ppm)),
             pre.open_positions,
             post.open_positions
         )
@@ -1251,7 +1254,7 @@ fn pumpswap_open_sized_on_burned_depth(
         return fail("I15", format!("open {}: tier {}", o.position, o.tier));
     };
     let impact = shortwin_math::caps::max_q_position(x0, tp.impact_pos_bps).unwrap_or(0);
-    let fee = shortwin_math::caps::fee_size_cap(x0, view.fee_ppm, params.fee_size_cap_x100)
+    let fee = shortwin_math::caps::fee_size_cap(x0, view.cap_fee_ppm, params.fee_size_cap_x100)
         .ok()
         .flatten()
         .unwrap_or(u64::MAX);
@@ -1267,7 +1270,7 @@ fn pumpswap_open_sized_on_burned_depth(
     let oi = shortwin_math::caps::oi_cap(
         x0.saturating_add(o.q),
         tp.impact_mkt_bps,
-        view.fee_ppm,
+        view.cap_fee_ppm,
         params.fee_oi_cap_x100,
     )
     .unwrap_or(0);
@@ -1291,6 +1294,7 @@ fn pumpswap_open_sized_on_burned_depth(
         OraclePrice::default(),
         |c| OraclePrice {
             price: c.price,
+            conf: c.conf,
             expo: c.expo,
             publish_time: c.publish_time,
         },

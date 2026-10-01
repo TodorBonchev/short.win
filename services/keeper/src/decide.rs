@@ -161,6 +161,9 @@ pub struct PositionEval {
     pub b_live: Option<u64>,
     /// The liquidation or expiry `max_in` of the plan, if computed.
     pub max_in: Option<u64>,
+    /// `B̂_ref` of that bound (the reference buyback at the risk fee), if computed — with
+    /// `b_live`, the U28 telemetry (`Metrics::b_ratio_*`).
+    pub b_ref: Option<u64>,
     /// `R_due`, `K_s`.
     pub r_due: u64,
     pub k_s: u64,
@@ -328,6 +331,7 @@ pub fn evaluate(
             .is_some_and(|c| !c.live.complete && u128::from(q) > c.live.rt);
 
     let mut max_in = None;
+    let mut b_ref_seen = None;
     // M4R: the post-change warm-up gates keeper exits on an executable venue.
     let warming = st.executable && m.ema_warm > 0;
     let plan = if !st.executable {
@@ -362,7 +366,8 @@ pub fn evaluate(
         let (bound, ok, wait) = if expired && !cr_liquidatable {
             let r = bounds::expiry_reference(pos, obs, st, now, proj.depth_cap)
                 .map_err(|e| anyhow!("{e}"))?;
-            let mi = match r.and_then(|r| r.b_ref) {
+            b_ref_seen = r.and_then(|r| r.b_ref);
+            let mi = match b_ref_seen {
                 Some(b_ref) => {
                     bounds::max_in_exp(pos, b_ref, k_s, r_due).map_err(|e| anyhow!("{e}"))?
                 }
@@ -372,9 +377,8 @@ pub fn evaluate(
         } else {
             let r = bounds::liq_reference(pos, obs, st, now, proj.depth_cap)
                 .map_err(|e| anyhow!("{e}"))?;
-            let mi = r
-                .and_then(|r| r.b_ref)
-                .and_then(|b_ref| bounds::max_in_liq(pos, b_ref, k_s));
+            b_ref_seen = r.and_then(|r| r.b_ref);
+            let mi = b_ref_seen.and_then(|b_ref| bounds::max_in_liq(pos, b_ref, k_s));
             (mi, Plan::Liquidate, Plan::LiquidateWait)
         };
         max_in = bound;
@@ -402,6 +406,7 @@ pub fn evaluate(
         buyback_allowed,
         b_live,
         max_in,
+        b_ref: b_ref_seen,
         r_due,
         k_s,
         s3_due,

@@ -2,8 +2,10 @@
 //!
 //! Each tick:
 //!
-//! 1. reads the clock, re-discovers markets every `discovery_interval_s`, and loads every
-//!    covered market ([`crate::view::load`]);
+//! 1. reads the clock, re-discovers markets every `discovery_interval_s`, reads the open
+//!    positions, and loads every covered market that has positions or anything time-critical
+//!    pending, and the others ("cold") every `cold_interval_s`, staggered (M7-SEC-8;
+//!    [`crate::view::load_with_positions`]);
 //! 2. per market: records its own spot and depth view and checks the buckets for a foreign
 //!    deviating observation (duty 2: a price starts a per-slot burst; on a market with open
 //!    positions a liquidity starts `liq_cover_s` of per-second coverage, FITS-2 (b)); projects the prologue at the clock and evaluates every open
@@ -69,6 +71,7 @@
 //! straddle's bundle is duty 6's.
 
 use std::collections::{BTreeMap, HashSet, VecDeque};
+use std::sync::Arc;
 
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::Instruction;
@@ -77,16 +80,16 @@ use shortwin::engine::pool_select::{self, FitContext, Proposal, SelectParams, Si
 use shortwin::engine::{guard, prologue};
 use shortwin::errors::ShortwinError;
 use shortwin::events::{CoverageGap, SolSettle};
-use shortwin::state::{EXTRAS_IX_BUY, Market, VenueGuard, VenueKind};
+use shortwin::state::{EXTRAS_IX_BUY, MARKET_FLAG_PAUSED_COVERAGE, Market, VenueGuard, VenueKind};
 use shortwin::venues::ExtrasSel;
 use shortwin_math::tier::OraclePrice;
 use shortwin_services_common::tx::{self, ComputeBudget, TxFormat};
-use shortwin_services_common::{Chain, ChainClock, TxError, TxOutcome};
+use shortwin_services_common::{AccountData, Chain, ChainClock, TxError, TxOutcome};
 use solana_keypair::Keypair;
 use solana_message::AddressLookupTableAccount;
 use solana_signer::Signer;
 
-use crate::alerts::Alert;
+use crate::alerts::{Alert, PauseUnavailable};
 use crate::config::{KeeperConfig, TxFormatPolicy};
 use crate::coverage::{Due, MarketTrack};
 use crate::decide::{self, MarketNeeds, Plan, PositionEval};
@@ -101,6 +104,14 @@ use crate::pool_monitor::{self, Action, PoolPlan, PoolTrack, Seen};
 use crate::sweep::{self, SweepFacts, SweepKind, SweepRecord};
 use crate::venue::{self, PammAccount};
 use crate::view::{self, ChainView, MarketView, PositionView};
+
+/// M7-SEC-8: a cold market's poll phase in `[0, every)` (from its key), so the cold markets'
+/// reads spread over the interval.
+fn cold_phase(key: &Pubkey, every: i64) -> i64 {
+    let b = key.to_bytes();
+    let h = u64::from_le_bytes([b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]]);
+    i64::try_from(h % u64::try_from(every.max(1)).unwrap_or(1)).unwrap_or(0)
+}
 
 /// Whether the cluster accepts v1 transactions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -124,11 +135,15 @@ pub enum ExitKind {
 /// What became of an exit attempt.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ExitResult {
-    /// Landed (the transaction's outcome, its format and the extras set used).
+    /// Landed (the transaction's outcome, its format, the extras set used, the compute-unit
+    /// limit it requested — `⌈simulated × 1.1⌉`, what a leader charges against the per-account
+    /// block budget, C0-17 — and its serialized size).
     Landed {
         outcome: TxOutcome,
         format: TxFormat,
         extras: ExtrasSel,
+        unit_limit: u32,
+        bytes: usize,
     },
     /// The program refused it in simulation (`code`: its custom error, if any).
     Refused {
@@ -141,6 +156,9 @@ pub enum ExitResult {
     DryRun { outcome: TxOutcome },
     /// An S3 probe whose simulation settles nothing: not sent.
     NoOp,
+    /// T-CASCADE: simulated, but its compute-unit limit would take the market's requests this
+    /// slot above `budget.market_cu_per_slot`; not sent (retried next slot).
+    Deferred { unit_limit: u32 },
     /// A transport or building error.
     Error(String),
 }
@@ -303,6 +321,13 @@ pub struct TickReport {
     pub straddles: Vec<StraddleRecord>,
     /// Duties 6 and 13: the keeper's sweeps (post-wipe, trader side, cashback claims).
     pub sweeps: Vec<SweepRecord>,
+    /// O17: the keeper's `set_coverage_pause` attempts (the designated pauser only).
+    pub coverage_pauses: Vec<CoveragePauseRecord>,
+    /// Duty 11: the keeper's `crank_sol_usd` attempt this tick (the update's publish time).
+    pub oracle: Option<(i64, ExitResult)>,
+    /// T-CASCADE: per market, the compute units the keeper's landed exits requested this tick's
+    /// slot (their `⌈simulated × 1.1⌉` limits, against `budget.market_cu_per_slot`).
+    pub exit_cu: BTreeMap<Pubkey, u64>,
     pub skipped: Vec<(Pubkey, String)>,
     pub errors: Vec<String>,
 }
@@ -319,6 +344,14 @@ impl TickReport {
     pub fn observed(&self, market: &Pubkey) -> bool {
         self.observed.iter().any(|(m, _)| m == market)
     }
+}
+
+/// One `set_coverage_pause` attempt of the keeper (O17; the designated pauser).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CoveragePauseRecord {
+    pub market: Pubkey,
+    pub paused: bool,
+    pub result: ExitResult,
 }
 
 /// One `→ PumpSwap` transition of the keeper (duty 6, M6; [`crate::graduation::transition_ixs`]).
@@ -363,6 +396,10 @@ enum Sent {
         out: TxOutcome,
     },
     TooLarge,
+    /// Simulated; its limit exceeds the room left (`send_ixs_within`). Not sent.
+    Deferred {
+        unit_limit: u32,
+    },
 }
 
 /// Custom errors that are the program's normal "not now" answers (no alert).
@@ -378,6 +415,12 @@ fn benign(code: u32) -> bool {
     ]
     .into_iter()
     .any(|e| u32::from(e) == code)
+}
+
+/// U28: `⌊B̂_live · 10⁴ / B̂_ref⌋` of an evaluation, when both are defined.
+fn b_ratio_bps(e: &PositionEval) -> Option<u64> {
+    let (live, r) = (e.b_live?, e.b_ref?);
+    (r > 0).then(|| u64::try_from(u128::from(live) * 10_000 / u128::from(r)).unwrap_or(u64::MAX))
 }
 
 fn is(code: Option<u32>, e: ShortwinError) -> bool {
@@ -435,6 +478,40 @@ pub struct Keeper<C: Chain> {
     cashback_claimed: BTreeMap<Pubkey, i64>,
     /// The next Jito tip account to use (in turn).
     tip_next: usize,
+    /// O17: the `coverage_authority` key of the designated pauser (`[coverage_pause]`).
+    coverage_authority: Option<Arc<Keypair>>,
+    /// O17: the second of the last `set_coverage_pause` attempt per market (one a second).
+    pause_tried: BTreeMap<Pubkey, i64>,
+    /// O17: the flag value the keeper is bringing a market to (until the flag matches).
+    pause_intent: BTreeMap<Pubkey, bool>,
+    /// O17: coverage-pause alerts already raised, per (market, detail); a market's entries are
+    /// cleared once its flag matches its coverage state.
+    pause_alerted: HashSet<(Pubkey, String)>,
+    /// T-CASCADE: (slot, compute units requested) of the keeper's exits per market.
+    slot_cu: BTreeMap<Pubkey, (u64, u64)>,
+    /// Duty 11: the second of the next read of the Pyth feed; the oracle alerts raised (cleared
+    /// when a crank lands); the second of the last aging alert.
+    oracle_next: i64,
+    oracle_alerted: HashSet<String>,
+    oracle_aging_alerted: Option<i64>,
+    /// The slot of the tick in progress.
+    tick_slot: u64,
+    /// O17: markets whose crank this tick is one exits depend on — a position near a threshold
+    /// (duty 1: live CR below `near_cr_bps`·L, deadline within the window, armed, the
+    /// post-change warm-up; without it `P_ema` stays where it was and no liquidation becomes
+    /// possible), a liquidatable or expired position waiting for a fresh reference or its bound,
+    /// the S3 chain: charged to the budget, never throttled by it ("exits continue").
+    exit_cranks: HashSet<Pubkey>,
+    /// M7-SEC-8: markets classified cold at their last full read (no open positions, nothing
+    /// time-critical pending: read every `coverage.cold_interval_s`, staggered), and the second
+    /// of each market's last full read.
+    cold: HashSet<Pubkey>,
+    last_read: BTreeMap<Pubkey, i64>,
+    /// M7-SEC-3: positions already alerted as opened while the keeper held their market degraded.
+    open_alerted: HashSet<Pubkey>,
+    /// M7-SEC-8: this tick's trader-side facts of the markets whose periodic sweep check is due,
+    /// read in one call before the markets ([`Self::prefetch_sweeps`]).
+    sweep_prefetch: BTreeMap<Pubkey, Vec<Option<AccountData>>>,
     /// Counters (duty 8).
     pub metrics: Metrics,
 }
@@ -474,8 +551,42 @@ impl<C: Chain> Keeper<C> {
             post_wipe_tried: BTreeMap::new(),
             cashback_claimed: BTreeMap::new(),
             tip_next: 0,
+            coverage_authority: None,
+            pause_tried: BTreeMap::new(),
+            pause_intent: BTreeMap::new(),
+            pause_alerted: HashSet::new(),
+            slot_cu: BTreeMap::new(),
+            oracle_next: 0,
+            oracle_alerted: HashSet::new(),
+            oracle_aging_alerted: None,
+            tick_slot: 0,
+            exit_cranks: HashSet::new(),
+            cold: HashSet::new(),
+            last_read: BTreeMap::new(),
+            open_alerted: HashSet::new(),
+            sweep_prefetch: BTreeMap::new(),
             metrics: Metrics::default(),
         })
+    }
+
+    /// O17: this instance holds the `coverage_authority` key `kp` (a separate key from its fee
+    /// payer). With `coverage_pause.enabled` it pauses opens on a degraded market with open
+    /// positions and resumes them after `recovery_s` of restored coverage
+    /// ([`crate::config::CoveragePauseConfig`]).
+    pub fn with_coverage_authority(mut self, kp: Keypair) -> Self {
+        self.coverage_authority = Some(Arc::new(kp));
+        self
+    }
+
+    /// Replaces (or, with `None`, drops) the `coverage_authority` key between ticks (a key
+    /// rotation; [`Self::with_coverage_authority`]).
+    pub fn set_coverage_authority(&mut self, kp: Option<Keypair>) {
+        self.coverage_authority = kp.map(Arc::new);
+    }
+
+    /// The `coverage_authority` key this instance holds, if any.
+    pub fn coverage_authority(&self) -> Option<Pubkey> {
+        self.coverage_authority.as_ref().map(|k| k.pubkey())
     }
 
     /// Sends the pool discovery's `getProgramAccounts` calls to `chain` instead of the
@@ -639,6 +750,17 @@ impl<C: Chain> Keeper<C> {
         now: i64,
         price: u64,
     ) -> anyhow::Result<(TxOutcome, TxFormat, solana_hash::Hash)> {
+        self.simulate_signed(ixs, &[], now, price).await
+    }
+
+    /// [`Self::simulate`] with `signers` besides the fee payer (the `coverage_authority`).
+    async fn simulate_signed(
+        &mut self,
+        ixs: &[Instruction],
+        signers: &[&Keypair],
+        now: i64,
+        price: u64,
+    ) -> anyhow::Result<(TxOutcome, TxFormat, solana_hash::Hash)> {
         for _ in 0..2 {
             let format = self.format(now);
             let alts = if format == TxFormat::V0 {
@@ -651,7 +773,7 @@ impl<C: Chain> Keeper<C> {
                 unit_price: price,
                 ..ComputeBudget::SIMULATION
             };
-            let t = tx::build(format, &self.payer, &[], ixs, &budget, bh, &alts)?;
+            let t = tx::build(format, &self.payer, signers, ixs, &budget, bh, &alts)?;
             if !tx::fits(format, &t) {
                 return Ok((
                     TxOutcome {
@@ -692,9 +814,25 @@ impl<C: Chain> Keeper<C> {
         exit: bool,
         now: i64,
     ) -> anyhow::Result<Sent> {
+        self.send_ixs_within(ixs, &[], markets, exit, now, None)
+            .await
+    }
+
+    /// [`Self::send_ixs`] with `signers` besides the fee payer, and — with `room` — not sent
+    /// ([`Sent::Deferred`]) when its compute-unit limit `⌈simulated × 1.1⌉` exceeds `room`
+    /// (T-CASCADE's per-market, per-slot cap).
+    async fn send_ixs_within(
+        &mut self,
+        ixs: &[Instruction],
+        signers: &[&Keypair],
+        markets: &[Pubkey],
+        exit: bool,
+        now: i64,
+        room: Option<u64>,
+    ) -> anyhow::Result<Sent> {
         for _ in 0..2 {
             let price = self.priority_price(markets, exit).await;
-            let (sim, format, bh) = self.simulate(ixs, now, price).await?;
+            let (sim, format, bh) = self.simulate_signed(ixs, signers, now, price).await?;
             if let Some(TxError::Rejected(r)) = &sim.err
                 && r.starts_with("too large")
             {
@@ -710,12 +848,19 @@ impl<C: Chain> Keeper<C> {
                 unit_limit: tx::cu_limit(sim.units_consumed),
                 unit_price: price,
             };
+            if let Some(room) = room
+                && u64::from(budget.unit_limit) > room
+            {
+                return Ok(Sent::Deferred {
+                    unit_limit: budget.unit_limit,
+                });
+            }
             let alts = if format == TxFormat::V0 {
                 self.lookup_tables.clone()
             } else {
                 Vec::new()
             };
-            let t = tx::build(format, &self.payer, &[], ixs, &budget, bh, &alts)?;
+            let t = tx::build(format, &self.payer, signers, ixs, &budget, bh, &alts)?;
             let (bytes, accounts) = (tx::size(&t), tx::account_count(&t));
             let out = self.chain.send(&t).await?;
             match &out.err {
@@ -770,9 +915,17 @@ impl<C: Chain> Keeper<C> {
     pub async fn tick(&mut self) -> anyhow::Result<TickReport> {
         self.load_lookup_tables().await?;
         let clock = self.chain.clock().await?;
+        self.tick_slot = clock.slot;
         self.discover(clock.unix_timestamp).await?;
-        let mut view = view::load(&self.chain, &self.markets).await?;
+        // M7-SEC-8: the open positions first (one `getProgramAccounts`), then in full only the
+        // markets with positions or something time-critical pending, and the cold ones on their
+        // staggered poll.
+        let positions = view::open_positions(&self.chain).await?;
+        let read = self.markets_to_read(clock.unix_timestamp, &positions);
+        let mut view = view::load_with_positions(&self.chain, &read, &positions).await?;
         let now = view.clock.unix_timestamp;
+        self.tick_slot = view.clock.slot;
+        self.exit_cranks.clear();
         let mut report = TickReport {
             clock: Some(view.clock),
             skipped: view.skipped.clone(),
@@ -785,6 +938,13 @@ impl<C: Chain> Keeper<C> {
             {
                 self.metrics.market(*key).misses += 1;
             }
+            // Seconds that required nothing are met too (a market whose positions closed while
+            // it was degraded; the seconds between idle observations); seconds the keeper did not
+            // run on a market with open positions are not.
+            let open = view
+                .market(key)
+                .is_some_and(|mv| !mv.positions.is_empty() || mv.market.open_positions > 0);
+            track.advance(*key, now, open, &self.cfg.coverage, &mut self.alerts);
         }
 
         // Duty 10: the latch first (an upgrade is flagged in the slot it is seen), then the
@@ -795,7 +955,13 @@ impl<C: Chain> Keeper<C> {
         if self.cfg.venue_watch.pool_admin {
             self.watch_pools(&view);
         }
+        // Duty 11: the SOL/USD cache the tiers read (before the markets: a crank this tick then
+        // tiers with it).
+        if self.cfg.oracle.enabled {
+            self.oracle_duty(&view, &mut report).await;
+        }
 
+        self.prefetch_sweeps(&view).await;
         let mut crank_queue: Vec<(Pubkey, Due)> = Vec::new();
         for idx in 0..view.markets.len() {
             if let Err(e) = self
@@ -821,14 +987,167 @@ impl<C: Chain> Keeper<C> {
             }
         }
 
+        // O17: the designated pauser brings each market's `paused_coverage` flag in line with its
+        // coverage state (after this second's observations, which may have ended a gap).
+        self.coverage_pauses(&view, &mut report).await;
+
         for (key, track) in &self.tracks {
             self.metrics.market(*key).degraded = track.state.is_degraded();
         }
+        self.classify_reads(&view, &report);
         for a in self.alerts.drain(..) {
             a.log();
             report.alerts.push(a);
         }
         Ok(report)
+    }
+
+    /// M7-SEC-8: the trader-side facts (`sweep::fact_keys`) of every market whose periodic sweep
+    /// check is due this tick, in one read (one round trip; as built each market's check was a
+    /// read of its own, so list-only junk markets added one sequential call a minute each). A
+    /// post-wipe sweep, or a market an exit landed on this tick, reads its facts fresh.
+    async fn prefetch_sweeps(&mut self, view: &ChainView) {
+        self.sweep_prefetch.clear();
+        let cfg = &self.cfg.sweep;
+        if !cfg.sweep {
+            return;
+        }
+        let now = view.clock.unix_timestamp;
+        let due: Vec<&MarketView> =
+            view.markets
+                .iter()
+                .filter(|mv| {
+                    !(cfg.post_wipe && sweep::wipe_pending(&mv.market))
+                        && self.sweep_checked.get(&mv.key).is_none_or(|t| {
+                            now.saturating_sub(*t) >= cfg.check_interval_s || now < *t
+                        })
+                })
+                .collect();
+        if due.is_empty() {
+            return;
+        }
+        let keys: Vec<Pubkey> = due
+            .iter()
+            .flat_map(|mv| sweep::fact_keys(&mv.market))
+            .collect();
+        let Ok(accs) = self.chain.accounts(&keys).await else {
+            return;
+        };
+        for (mv, chunk) in due.iter().zip(accs.chunks(sweep::FACT_KEYS_LEN)) {
+            self.sweep_prefetch.insert(mv.key, chunk.to_vec());
+        }
+    }
+
+    /// M7-SEC-8: the covered markets this tick reads in full — every market with open positions
+    /// (`positions`, read this tick), every market not classified cold at its last read (new
+    /// markets included), and each cold market on its poll: every `cold_interval_s`, at a phase
+    /// staggered by its key (and at once when a poll was skipped).
+    fn markets_to_read(
+        &mut self,
+        now: i64,
+        positions: &std::collections::HashMap<Pubkey, Vec<PositionView>>,
+    ) -> Vec<Pubkey> {
+        let every = self.cfg.coverage.cold_interval_s.max(1);
+        let mut out = Vec::with_capacity(self.markets.len());
+        let mut skipped = 0u64;
+        for k in &self.markets {
+            let hot = positions.contains_key(k) || !self.cold.contains(k);
+            let due = self.last_read.get(k).is_none_or(|t| {
+                now < *t
+                    || now.saturating_sub(*t) >= every
+                    || (now > *t && now.saturating_add(cold_phase(k, every)).rem_euclid(every) == 0)
+            });
+            if hot || due {
+                out.push(*k);
+            } else {
+                skipped += 1;
+            }
+        }
+        self.metrics.markets_read = self
+            .metrics
+            .markets_read
+            .saturating_add(u64::try_from(out.len()).unwrap_or(u64::MAX));
+        self.metrics.markets_cold_skipped =
+            self.metrics.markets_cold_skipped.saturating_add(skipped);
+        out
+    }
+
+    /// M7-SEC-8: after the tick, each market read is classified: **hot** (read every tick) while it
+    /// is a PumpSwap or Raydium market, a curve near completion ([`Self::hot`]), or has open
+    /// positions or anything time-critical pending — a per-second, no-route,
+    /// listing-window or warm-up need, a guard, a burst or liquidity window, degraded mode or the
+    /// coverage flag, a graduation step (a completed or migrating curve, a valid canonical pool,
+    /// a re-detection), a post-wipe sweep, a pool-selection window, chain or pending ranking —,
+    /// **cold** otherwise. A market whose needs this tick did not compute stays hot.
+    fn classify_reads(&mut self, view: &ChainView, report: &TickReport) {
+        let now = view.clock.unix_timestamp;
+        for mv in &view.markets {
+            self.last_read.insert(mv.key, now);
+            if self.hot(mv, report.needs.get(&mv.key), now) {
+                self.cold.remove(&mv.key);
+            } else {
+                self.cold.insert(mv.key);
+            }
+        }
+        let known: HashSet<Pubkey> = self.markets.iter().copied().collect();
+        self.cold.retain(|k| known.contains(k));
+        self.last_read.retain(|k, _| known.contains(k));
+    }
+
+    /// Whether `mv` must be read every tick ([`Self::classify_reads`]). Only a list-only market,
+    /// or a curve market that a buy of more than `coverage.hot_curve_completion_lamports` is still
+    /// away from completing, can be cold — the markets anyone can list for a fee and rent
+    /// (≈ 0.047 SOL; a pump coin ≈ 0.02 SOL more); a PumpSwap or Raydium market needs real
+    /// liquidity to exist and stays hot, so its venue-drift alerts come at once.
+    fn hot(&self, mv: &MarketView, needs: Option<&MarketNeeds>, now: i64) -> bool {
+        let Some(n) = needs else { return true };
+        let m = mv.market.as_ref();
+        let key = mv.key;
+        let cheap = match mv.kind {
+            VenueKind::None => true,
+            VenueKind::PumpCurve => graduation::completion_quote(mv)
+                .is_some_and(|(_, cost)| cost > self.cfg.coverage.hot_curve_completion_lamports),
+            _ => false,
+        };
+        if !cheap {
+            return true;
+        }
+        let open = !mv.positions.is_empty() || m.open_positions > 0;
+        let needs_now = n.per_second
+            || n.no_route
+            || n.start_chain
+            || n.listing
+            || n.warm_up
+            || n.warming
+            || n.guarded
+            || n.s3_due_executable
+            || n.liq_covered;
+        let track = self.tracks.get(&key).is_some_and(|t| {
+            t.in_burst(now)
+                || t.liq_covered(now)
+                || t.state.is_degraded()
+                || t.flag_seen == Some(true)
+        });
+        let graduation = mv.kind == VenueKind::PumpMigrating
+            || graduation::migration_due(mv)
+            || graduation::transition_due(mv)
+            || graduation::redetection_due(mv);
+        let pool = m.fp_t0 != 0
+            || m.pool_fail_since != 0
+            || m.no_route_since != 0
+            || self.pool_tracks.get(&key).is_some_and(|t| {
+                t.pinned.is_some()
+                    || !t.rank_queue.is_empty()
+                    || t.keep_chain
+                    || t.last_pool_fail == Some(true)
+            });
+        open || needs_now
+            || track
+            || self.pause_intent.contains_key(&key)
+            || m.has_flag(MARKET_FLAG_PAUSED_COVERAGE)
+            || graduation
+            || sweep::wipe_pending(m)
+            || pool
     }
 
     async fn process_market(
@@ -852,10 +1171,44 @@ impl<C: Chain> Keeper<C> {
                 mv.state.liquidity(),
                 (mv.market.venue, mv.market.pool_cache[0]),
             );
+            let unpausing = self.pause_intent.get(&key) == Some(&false);
+            let flag = mv.market.has_flag(MARKET_FLAG_PAUSED_COVERAGE);
+            // M7-SEC-3: while the keeper holds the market degraded, a flag found cleared that it did
+            // not clear, and a position that appeared while the flag was last seen set, were
+            // signed by the `coverage_authority` key outside this instance.
+            if let Some(since) = track.state.degraded_since()
+                && track.flag_seen == Some(true)
+            {
+                if !flag && !unpausing {
+                    self.alerts
+                        .push(Alert::CoveragePauseCleared { market: key });
+                }
+                for p in mv
+                    .positions
+                    .iter()
+                    .filter(|p| !track.knows_position(&p.key))
+                {
+                    if self.open_alerted.insert(p.key) {
+                        self.metrics.market(key).opens_while_degraded += 1;
+                        self.alerts.push(Alert::OpenWhileDegraded {
+                            market: key,
+                            position: p.key,
+                            degraded_since: since,
+                        });
+                    }
+                }
+            }
+            track.set_positions(mv.positions.iter().map(|p| p.key));
+            if track.sync_pause_flag(now, flag, unpausing) {
+                self.alerts.push(Alert::CoveragePauseFound { market: key });
+            }
             let found = track.check_foreign(&mv.market, &cov, open);
             if let Some(sec) = found.price {
                 report.bursts.push((key, sec));
                 self.metrics.market(key).bursts += 1;
+            }
+            if found.genuine.is_some() {
+                self.metrics.market(key).foreign_moves += 1;
             }
             if let Some(sec) = found.liquidity {
                 report.liq_covers.push((key, sec));
@@ -920,7 +1273,21 @@ impl<C: Chain> Keeper<C> {
                 self.tracks[&key].liq_covered(now),
             );
             if due_before.is_none() {
+                // U28: the positions waiting for their bound, once per tick.
+                for e in &evals {
+                    if matches!(e.plan, Plan::LiquidateWait | Plan::ExpireWait)
+                        && let Some(bps) = b_ratio_bps(e)
+                    {
+                        self.metrics.b_ratio_wait.record(bps);
+                    }
+                }
                 let due = self.tracks[&key].observation_due(&needs, now, slot, &cov);
+                if let Some(t) = self.tracks.get_mut(&key)
+                    && (needs.per_second || needs.warm_up || t.in_burst(now))
+                {
+                    // M7-SEC-1 (b): the seconds a slow tick skips after this one were required.
+                    t.note_every_second(now);
+                }
                 if let Some(d) = due {
                     if let Some(t) = self.tracks.get_mut(&key) {
                         t.required(now);
@@ -986,6 +1353,13 @@ impl<C: Chain> Keeper<C> {
                 }
             }
             let result = self.attempt(&mv, &pv, kind, ev.plan, now).await;
+            if matches!(result, ExitResult::Deferred { .. }) {
+                // T-CASCADE: the market's exit budget for this slot is spent; the rest (most
+                // under-collateralised first: `evaluate_all`'s order) goes out next slot.
+                self.metrics.market(key).exits_deferred += 1;
+                self.account_exit(&mv, &pv, kind, ev.plan, result, now, slot, report);
+                break;
+            }
             let mut chained: Option<ExitKind> = None;
             if let ExitResult::Refused { code, .. } = &result {
                 if is(*code, ShortwinError::UseSolSettle) {
@@ -994,7 +1368,13 @@ impl<C: Chain> Keeper<C> {
                     chained = Some(ExitKind::Expire);
                 }
             }
+            let exit_landed =
+                result.landed().is_some() && matches!(kind, ExitKind::Liquidate | ExitKind::Expire);
             let mut landed = self.account_exit(&mv, &pv, kind, ev.plan, result, now, slot, report);
+            // U28: `B̂_live/B̂_ref` at the keeper's decision of a landed liquidation or expiry.
+            if exit_landed && let Some(bps) = b_ratio_bps(&ev) {
+                self.metrics.b_ratio_landed.record(bps);
+            }
             // The program redirected the exit (`UseSolSettle`, `UseExpire`): follow it once.
             if !landed
                 && let Some(next_kind) = chained
@@ -1018,6 +1398,20 @@ impl<C: Chain> Keeper<C> {
         if observed {
             report.observed.push((key, due));
         } else if let Some(d) = due.or(force_crank.then_some(Due::Second)) {
+            // O17: a crank exits depend on is never throttled by the budget — a position near a
+            // threshold (the EMA leg must follow the price for a liquidation to become
+            // possible), a liquidatable or expired position waiting for a fresh reference
+            // (`Observe`) or its bound (`*Wait`), an armed position, the S3 chain.
+            let serves_exit = report.evaluations.get(&key).is_some_and(|evs| {
+                evs.iter()
+                    .any(|e| e.near || !matches!(e.plan, Plan::Idle | Plan::Watch))
+            }) || report
+                .needs
+                .get(&key)
+                .is_some_and(|n| n.no_route || n.start_chain || n.s3_due_executable);
+            if serves_exit {
+                self.exit_cranks.insert(key);
+            }
             crank_queue.push((key, d));
         }
 
@@ -1228,7 +1622,19 @@ impl<C: Chain> Keeper<C> {
         if check {
             self.sweep_checked.insert(key, now);
         }
-        let accs = self.chain.accounts(&sweep::fact_keys(m)).await?;
+        // M7-SEC-8: the tick's prefetched facts, unless this is a post-wipe sweep or an exit
+        // landed on the market this tick (the trader side may have moved).
+        let exited = report
+            .exits
+            .iter()
+            .any(|e| e.market == key && e.result.landed().is_some());
+        let prefetched = (!post_wipe && !exited)
+            .then(|| self.sweep_prefetch.remove(&key))
+            .flatten();
+        let accs = match prefetched {
+            Some(a) => a,
+            None => self.chain.accounts(&sweep::fact_keys(m)).await?,
+        };
         let facts = SweepFacts::of(m, &accs);
         let payer = self.payer.pubkey();
         let claim_due = facts.claimable() > 0
@@ -1263,7 +1669,7 @@ impl<C: Chain> Keeper<C> {
                     mm.cashback_claims += 1;
                 }
             }
-            ExitResult::DryRun { .. } | ExitResult::NoOp => {}
+            ExitResult::DryRun { .. } | ExitResult::NoOp | ExitResult::Deferred { .. } => {}
             other => {
                 let detail = match other {
                     ExitResult::Refused { outcome, .. } | ExitResult::Failed { outcome } => {
@@ -1324,7 +1730,7 @@ impl<C: Chain> Keeper<C> {
         let landed = result.landed().is_some();
         match &result {
             ExitResult::Landed { .. } => self.metrics.market(key).migrations += 1,
-            ExitResult::DryRun { .. } | ExitResult::NoOp => {}
+            ExitResult::DryRun { .. } | ExitResult::NoOp | ExitResult::Deferred { .. } => {}
             other => {
                 let detail = match other {
                     ExitResult::Refused { outcome, .. } | ExitResult::Failed { outcome } => {
@@ -1410,6 +1816,8 @@ impl<C: Chain> Keeper<C> {
                             outcome: tx3.clone(),
                             format: shortwin_services_common::tx::TxFormat::V0,
                             extras: ExtrasSel::NONE,
+                            unit_limit: 0,
+                            bytes: 0,
                         },
                     });
                 }
@@ -1618,8 +2026,13 @@ impl<C: Chain> Keeper<C> {
         let key = mv.key;
         let mut landed = false;
         match &result {
-            ExitResult::Landed { outcome, .. } => {
+            ExitResult::Landed {
+                outcome,
+                unit_limit,
+                ..
+            } => {
                 landed = true;
+                *report.exit_cu.entry(key).or_default() += u64::from(*unit_limit);
                 let settled = !events::of::<SolSettle>(outcome).is_empty();
                 self.on_landed(key, outcome, now, slot, false);
                 let m = self.metrics.market(key);
@@ -1660,7 +2073,7 @@ impl<C: Chain> Keeper<C> {
                 });
             }
             ExitResult::Error(e) => report.errors.push(format!("{key}/{}: {e}", pv.key)),
-            ExitResult::DryRun { .. } | ExitResult::NoOp => {}
+            ExitResult::DryRun { .. } | ExitResult::NoOp | ExitResult::Deferred { .. } => {}
         }
         report.exits.push(ExitRecord {
             market: key,
@@ -1687,9 +2100,18 @@ impl<C: Chain> Keeper<C> {
         self.note_gaps(out, now);
     }
 
+    /// `CoverageGap` events in the keeper's own transaction (A69): degraded mode, unless the gap
+    /// is landing jitter of the idle cadence — at most `idle_interval_s + gap_tolerance_s`
+    /// (M7-SEC-1 (a); [`crate::config::CoverageConfig::gap_degrades_above`]).
     fn note_gaps(&mut self, out: &TxOutcome, now: i64) {
+        let above = self.cfg.coverage.gap_degrades_above();
         for gap in events::logged::<CoverageGap>(out) {
-            self.metrics.market(gap.market).coverage_gaps += 1;
+            let m = self.metrics.market(gap.market);
+            m.coverage_gaps += 1;
+            if gap.gap_s <= above {
+                m.coverage_gaps_tolerated += 1;
+                continue;
+            }
             let track = self.tracks.entry(gap.market).or_default();
             track.on_coverage_gap(
                 gap.market,
@@ -1785,6 +2207,41 @@ impl<C: Chain> Keeper<C> {
         }
     }
 
+    /// T-CASCADE: the compute units the keeper may still request on exits of `market` in
+    /// `slot` — `budget.market_cu_per_slot` less its landed exits' limits, and
+    /// `budget.payer_cu_per_slot` less all of the slot's exits' limits, whichever is less; `None`:
+    /// no cap, or nothing sent yet this slot under either (the first exit always goes, whatever
+    /// its size).
+    fn exit_room(&self, market: &Pubkey, slot: u64) -> Option<u64> {
+        let used = |k: &Pubkey| {
+            self.slot_cu
+                .get(k)
+                .filter(|(s, _)| *s == slot)
+                .map_or(0, |(_, c)| *c)
+        };
+        let payer = self.payer.pubkey();
+        [
+            (self.cfg.budget.market_cu_per_slot, used(market)),
+            (self.cfg.budget.payer_cu_per_slot, used(&payer)),
+        ]
+        .into_iter()
+        .filter(|(cap, used)| *cap > 0 && *used > 0)
+        .map(|(cap, used)| cap.saturating_sub(used))
+        .min()
+    }
+
+    /// Books `unit_limit` requested by a landed exit of `market` in `slot`, on the market and on
+    /// the fee payer (T-CASCADE).
+    fn book_exit_cu(&mut self, market: Pubkey, slot: u64, unit_limit: u32) {
+        for k in [market, self.payer.pubkey()] {
+            let e = self.slot_cu.entry(k).or_insert((slot, 0));
+            if e.0 != slot {
+                *e = (slot, 0);
+            }
+            e.1 = e.1.saturating_add(u64::from(unit_limit));
+        }
+    }
+
     async fn send_exit(
         &mut self,
         ixs: &[Instruction],
@@ -1792,12 +2249,29 @@ impl<C: Chain> Keeper<C> {
         extras: ExtrasSel,
         now: i64,
     ) -> ExitResult {
-        match self.send_ixs(ixs, &[market], true, now).await {
-            Ok(Sent::Landed { out, format, .. }) => ExitResult::Landed {
-                outcome: out,
+        let slot = self.tick_slot;
+        let room = self.exit_room(&market, slot);
+        match self
+            .send_ixs_within(ixs, &[], &[market], true, now, room)
+            .await
+        {
+            Ok(Sent::Landed {
+                out,
                 format,
-                extras,
-            },
+                bytes,
+                unit_limit,
+                ..
+            }) => {
+                self.book_exit_cu(market, slot, unit_limit);
+                ExitResult::Landed {
+                    outcome: out,
+                    format,
+                    extras,
+                    unit_limit,
+                    bytes,
+                }
+            }
+            Ok(Sent::Deferred { unit_limit }) => ExitResult::Deferred { unit_limit },
             Ok(Sent::SimFailed { out, .. }) => ExitResult::Refused {
                 code: out.err.as_ref().and_then(TxError::custom_code),
                 outcome: out,
@@ -1850,16 +2324,70 @@ impl<C: Chain> Keeper<C> {
             .map(|m| m.key)
             .chain(view.list_only.iter().map(|l| l.key))
             .collect();
+        // M7-SEC-8: at most `discoveries_per_tick` discoveries (four `getProgramAccounts` calls
+        // each) this tick — the fast cadence first, then markets with open positions, then the
+        // longest waiting; the others keep their candidates and are discovered in a later tick.
+        let now = view.clock.unix_timestamp;
+        let pcfg = self.cfg.pool_select.clone();
+        let mut due: Vec<(u8, i64, Pubkey)> = Vec::new();
+        for key in &covered {
+            let stored = view
+                .markets
+                .iter()
+                .find(|m| m.key == *key)
+                .map(|m| (m.market.as_ref(), !m.positions.is_empty()))
+                .or_else(|| {
+                    view.list_only
+                        .iter()
+                        .find(|l| l.key == *key)
+                        .map(|l| (l.market.as_ref(), false))
+                });
+            let Some((m, with_positions)) = stored else {
+                continue;
+            };
+            let fast = m.pool_fail_since != 0 || m.fp_t0 != 0;
+            let track = self.pool_tracks.get(key);
+            if track.is_none_or(|t| t.discovery_due(now, fast, &pcfg)) {
+                let rank = if fast {
+                    0
+                } else if with_positions || m.open_positions > 0 {
+                    1
+                } else {
+                    2
+                };
+                let last = track.and_then(|t| t.last_discovery).unwrap_or(i64::MIN);
+                due.push((rank, last, *key));
+            }
+        }
+        due.sort();
+        let may_discover: HashSet<Pubkey> = due
+            .iter()
+            .take(pcfg.discoveries_per_tick.max(1))
+            .map(|(_, _, k)| *k)
+            .collect();
         let mut latched: Option<Option<VenueGuard>> = None;
         for key in &covered {
             if let Err(e) = self
-                .select_market(view, *key, &mut latched, report, crank_queue)
+                .select_market(
+                    view,
+                    *key,
+                    may_discover.contains(key),
+                    &mut latched,
+                    report,
+                    crank_queue,
+                )
                 .await
             {
                 report.errors.push(format!("{key}: pool selection: {e:#}"));
             }
         }
-        let keep: HashSet<Pubkey> = covered.into_iter().collect();
+        // Keep the tracks of the markets not read this tick (cold, M7-SEC-8): their venue is
+        // as last seen.
+        let read: HashSet<Pubkey> = view.markets.iter().map(|m| m.key).collect();
+        let keep: HashSet<Pubkey> = covered
+            .into_iter()
+            .chain(self.markets.iter().copied().filter(|k| !read.contains(k)))
+            .collect();
         self.pool_tracks.retain(|k, _| keep.contains(k));
     }
 
@@ -1934,6 +2462,7 @@ impl<C: Chain> Keeper<C> {
         &mut self,
         view: &mut ChainView,
         key: Pubkey,
+        may_discover: bool,
         latched: &mut Option<Option<VenueGuard>>,
         report: &mut TickReport,
         crank_queue: &mut Vec<(Pubkey, Due)>,
@@ -1976,10 +2505,11 @@ impl<C: Chain> Keeper<C> {
             // Discovery (the mint's Raydium SOL pools), then their ranking within this tick's
             // key budget (M4-SEC-7): only the best `max_candidates` are evaluated.
             let fast = s.pool_fail || s.fp_t0 != 0;
-            let discover = self
-                .pool_tracks
-                .get(&key)
-                .is_none_or(|t| t.discovery_due(now, fast, &pcfg));
+            let discover = may_discover
+                && self
+                    .pool_tracks
+                    .get(&key)
+                    .is_none_or(|t| t.discovery_due(now, fast, &pcfg));
             if discover {
                 let found = pool_monitor::discover(self.discovery_chain(), &market.mint).await;
                 self.metrics.pool_discoveries += 1;
@@ -2045,6 +2575,7 @@ impl<C: Chain> Keeper<C> {
                     .as_ref()
                     .map_or(OraclePrice::default(), |o| OraclePrice {
                         price: o.price,
+                        conf: o.conf,
                         expo: o.expo,
                         publish_time: o.publish_time,
                     }),
@@ -2173,6 +2704,7 @@ impl<C: Chain> Keeper<C> {
                 Ok(Sent::Failed { out }) => PoolResult::Failed { outcome: out },
                 Ok(Sent::DryRun { out }) => PoolResult::DryRun { outcome: out },
                 Ok(Sent::TooLarge) => PoolResult::Error("transaction too large".into()),
+                Ok(Sent::Deferred { .. }) => PoolResult::Error("deferred".into()),
                 Err(e) => PoolResult::Error(format!("{e:#}")),
             };
             let landed = self.account_pool_action(key, &market, &action, &result, now, report);
@@ -2441,6 +2973,7 @@ impl<C: Chain> Keeper<C> {
                     Some(format!("{:?}", out.err))
                 }
                 Ok(Sent::TooLarge) => Some("transaction too large".into()),
+                Ok(Sent::Deferred { .. }) => Some("deferred".into()),
                 Err(e) => Some(format!("{e:#}")),
             };
             if let Some(detail) = failure
@@ -2487,6 +3020,295 @@ impl<C: Chain> Keeper<C> {
         }
     }
 
+    /// Duty 11 (ARCH §7.1, §4.7; C1-12): every `oracle.interval_s` (≤ 30 s) the keeper reads the
+    /// configured Pyth `PriceUpdateV2`; an update newer than the `OracleCache` that the program's
+    /// own rules accept (`pyth::check` on the keeper's view: verification, feed, age, confidence,
+    /// step) is cranked at once — simulated first, at the observation ceiling, outside every
+    /// market's budget (a global line) — and a failed crank is retried every second. A newer
+    /// update the rules refuse raises `Alert::OracleRefused` (once per reason until a crank
+    /// lands); a cache older than `oracle.aging_alert_s` raises `Alert::OracleAging` (hourly).
+    async fn oracle_duty(&mut self, view: &ChainView, report: &mut TickReport) {
+        use shortwin_venue_state::pyth;
+        let now = view.clock.unix_timestamp;
+        let feed = view.config.pyth_sol_usd;
+        if feed == Pubkey::default() {
+            return;
+        }
+        let p = &view.config.params;
+        let cached = view
+            .oracle
+            .as_ref()
+            .map_or_else(pyth::Cached::default, |c| pyth::Cached {
+                price: c.price,
+                expo: c.expo,
+                publish_time: c.publish_time,
+            });
+        let age = now.saturating_sub(cached.publish_time);
+        if cached.publish_time > 0
+            && age > self.cfg.oracle.aging_alert_s
+            && self
+                .oracle_aging_alerted
+                .is_none_or(|t| now.saturating_sub(t) >= 3_600)
+        {
+            self.oracle_aging_alerted = Some(now);
+            self.alerts.push(Alert::OracleAging {
+                age_s: age,
+                publish_time: cached.publish_time,
+            });
+        }
+        if now < self.oracle_next {
+            return;
+        }
+        self.oracle_next = now.saturating_add(self.cfg.oracle.interval_s);
+        self.metrics.oracle_reads += 1;
+        let acc = match self.chain.accounts(&[feed]).await {
+            Ok(mut v) => v.pop().flatten(),
+            Err(e) => {
+                report.errors.push(format!("oracle feed {feed}: {e:#}"));
+                self.oracle_next = now.saturating_add(1);
+                return;
+            }
+        };
+        let update = match acc
+            .as_ref()
+            .map(|a| pyth::read(&a.owner.to_bytes(), &a.data))
+        {
+            Some(Ok(u)) => u,
+            other => {
+                let detail = match other {
+                    None => "missing".to_string(),
+                    Some(Err(e)) => format!("{e:?}"),
+                    Some(Ok(_)) => unreachable!(),
+                };
+                if self.oracle_alerted.insert(format!("unreadable {detail}")) {
+                    self.alerts.push(Alert::OracleUnreadable {
+                        account: feed,
+                        detail,
+                    });
+                }
+                return;
+            }
+        };
+        if update.publish_time <= cached.publish_time {
+            return;
+        }
+        let limits = pyth::Limits {
+            max_age_s: p.oracle_max_age_s,
+            stale_s: p.oracle_stale_s,
+            max_conf_bps: p.oracle_max_conf_bps,
+            max_step_bps: p.oracle_max_step_bps,
+        };
+        if let Err(r) = pyth::check(&update, &view.config.pyth_feed_id, &cached, now, &limits) {
+            self.metrics.oracle_refusals += 1;
+            if self.oracle_alerted.insert(format!("{r:?}")) {
+                self.alerts.push(Alert::OracleRefused {
+                    publish_time: update.publish_time,
+                    code: None,
+                    reason: format!("{r:?}"),
+                });
+            }
+            return;
+        }
+        let ix = ixs::crank_sol_usd(&feed);
+        let result = match self
+            .send_ixs(&[ix], &[pda::oracle_cache()], false, now)
+            .await
+        {
+            Ok(Sent::Landed {
+                out,
+                format,
+                bytes,
+                unit_limit,
+                ..
+            }) => {
+                self.metrics.oracle_cranks += 1;
+                self.metrics.oracle_lamports = self.metrics.oracle_lamports.saturating_add(out.fee);
+                self.oracle_alerted.clear();
+                ExitResult::Landed {
+                    outcome: out,
+                    format,
+                    extras: ExtrasSel::NONE,
+                    unit_limit,
+                    bytes,
+                }
+            }
+            Ok(Sent::SimFailed { out, .. }) => ExitResult::Refused {
+                code: out.err.as_ref().and_then(TxError::custom_code),
+                outcome: out,
+            },
+            Ok(Sent::Failed { out }) => ExitResult::Failed { outcome: out },
+            Ok(Sent::DryRun { out }) => ExitResult::DryRun { outcome: out },
+            Ok(Sent::TooLarge) => ExitResult::Error("transaction too large".into()),
+            Ok(Sent::Deferred { unit_limit }) => ExitResult::Deferred { unit_limit },
+            Err(e) => ExitResult::Error(format!("{e:#}")),
+        };
+        match &result {
+            ExitResult::Refused { code, outcome } => {
+                self.metrics.oracle_refusals += 1;
+                // "Not newer" after a race with another cranker is benign.
+                let benign = is(*code, ShortwinError::OracleStale);
+                if !benign && self.oracle_alerted.insert(format!("code {code:?}")) {
+                    self.alerts.push(Alert::OracleRefused {
+                        publish_time: update.publish_time,
+                        code: *code,
+                        reason: format!("{:?}", outcome.err),
+                    });
+                }
+                if !benign {
+                    self.oracle_next = now.saturating_add(1);
+                }
+            }
+            ExitResult::Failed { .. } | ExitResult::Error(_) => {
+                self.oracle_next = now.saturating_add(1);
+            }
+            _ => {}
+        }
+        report.oracle = Some((update.publish_time, result));
+    }
+
+    /// O17's automatic degraded mode (module docs; [`crate::config::CoveragePauseConfig`]): on
+    /// every covered market, the `paused_coverage` flag should be set while the market is
+    /// degraded or recovering and has open positions (or the flag is already set: it lifts only
+    /// with the recovery), and clear otherwise. The designated pauser sends
+    /// `set_coverage_pause(market, want)` — simulated first, at the exit priority ceiling,
+    /// outside the observation budget, at most once a second per market, retried every second
+    /// until the flag matches; others only alert (the `Degraded` alert pages the Emergency
+    /// multisig). A market without positions is never paused: its opens wait for its own
+    /// warm-up, and nothing rests on its coverage.
+    async fn coverage_pauses(&mut self, view: &ChainView, report: &mut TickReport) {
+        let now = view.clock.unix_timestamp;
+        for mv in &view.markets {
+            let key = mv.key;
+            let Some(track) = self.tracks.get(&key) else {
+                continue;
+            };
+            let flag = mv.market.has_flag(MARKET_FLAG_PAUSED_COVERAGE);
+            self.metrics.market(key).paused_coverage = flag;
+            let open = !mv.positions.is_empty() || mv.market.open_positions > 0;
+            let want = track.state.is_degraded() && (open || flag);
+            if want == flag {
+                self.pause_alerted.retain(|(k, _)| *k != key);
+                self.pause_intent.remove(&key);
+                continue;
+            }
+            if !self.cfg.coverage_pause.enabled {
+                continue;
+            }
+            let unavailable = match &self.coverage_authority {
+                None => Some(PauseUnavailable::NoKey),
+                Some(_) if view.config.coverage_authority == Pubkey::default() => {
+                    Some(PauseUnavailable::AuthorityUnset)
+                }
+                Some(kp) if kp.pubkey() != view.config.coverage_authority => {
+                    Some(PauseUnavailable::WrongKey {
+                        configured: view.config.coverage_authority,
+                        held: kp.pubkey(),
+                    })
+                }
+                Some(_) => None,
+            };
+            if let Some(reason) = unavailable {
+                if self
+                    .pause_alerted
+                    .insert((key, format!("{want}: {reason:?}")))
+                {
+                    self.alerts.push(Alert::CoveragePauseUnavailable {
+                        market: key,
+                        paused: want,
+                        reason,
+                    });
+                }
+                continue;
+            }
+            if self.pause_tried.get(&key) == Some(&now) {
+                continue;
+            }
+            self.pause_tried.insert(key, now);
+            self.pause_intent.insert(key, want);
+            let Some(kp) = self.coverage_authority.clone() else {
+                continue;
+            };
+            let ix = ixs::set_coverage_pause(&kp.pubkey(), &key, want);
+            let sent = self
+                .send_ixs_within(&[ix], &[kp.as_ref()], &[key], true, now, None)
+                .await;
+            let result = match sent {
+                Ok(Sent::Landed {
+                    out,
+                    format,
+                    bytes,
+                    unit_limit,
+                    ..
+                }) => {
+                    let m = self.metrics.market(key);
+                    m.lamports = m.lamports.saturating_add(out.fee);
+                    if want {
+                        m.coverage_pauses += 1;
+                    } else {
+                        m.coverage_unpauses += 1;
+                    }
+                    m.paused_coverage = want;
+                    // The flag is now `want` (M7-SEC-3: a later read that finds it otherwise, or
+                    // a position opened meanwhile, was someone else's doing).
+                    if let Some(t) = self.tracks.get_mut(&key) {
+                        t.flag_seen = Some(want);
+                    }
+                    self.pause_alerted.retain(|(k, _)| *k != key);
+                    self.alerts.push(Alert::CoveragePauseSent {
+                        market: key,
+                        paused: want,
+                    });
+                    ExitResult::Landed {
+                        outcome: out,
+                        format,
+                        extras: ExtrasSel::NONE,
+                        unit_limit,
+                        bytes,
+                    }
+                }
+                Ok(Sent::SimFailed { out, .. }) => ExitResult::Refused {
+                    code: out.err.as_ref().and_then(TxError::custom_code),
+                    outcome: out,
+                },
+                Ok(Sent::Failed { out }) => ExitResult::Failed { outcome: out },
+                Ok(Sent::DryRun { out }) => ExitResult::DryRun { outcome: out },
+                Ok(Sent::TooLarge) => ExitResult::Error("transaction too large".into()),
+                Ok(Sent::Deferred { unit_limit }) => ExitResult::Deferred { unit_limit },
+                Err(e) => ExitResult::Error(format!("{e:#}")),
+            };
+            let failure = match &result {
+                ExitResult::Refused { code, outcome } => {
+                    Some((*code, format!("{:?}", outcome.err)))
+                }
+                ExitResult::Failed { outcome } => Some((
+                    outcome.err.as_ref().and_then(TxError::custom_code),
+                    format!("failed on chain: {:?}", outcome.err),
+                )),
+                ExitResult::Error(e) => Some((None, e.clone())),
+                _ => None,
+            };
+            if let Some((code, detail)) = failure {
+                self.metrics.coverage_pause_failures += 1;
+                if self
+                    .pause_alerted
+                    .insert((key, format!("{want}: {code:?}")))
+                {
+                    self.alerts.push(Alert::CoveragePauseFailed {
+                        market: key,
+                        paused: want,
+                        code,
+                        detail,
+                    });
+                }
+            }
+            report.coverage_pauses.push(CoveragePauseRecord {
+                market: key,
+                paused: want,
+                result,
+            });
+        }
+    }
+
     /// Sends the queued cranks in batches (module docs).
     async fn send_cranks(
         &mut self,
@@ -2496,13 +3318,27 @@ impl<C: Chain> Keeper<C> {
     ) {
         let now = view.clock.unix_timestamp;
         let slot = view.clock.slot;
-        let budget = self.cfg.budget.per_market_daily_lamports;
+        // 0 (or `None`): no budget.
+        let budget = self.cfg.budget.per_market_daily_lamports.filter(|b| *b > 0);
         let mut ready: Vec<(Pubkey, Due)> = Vec::new();
         for (k, d) in queue {
+            let open = view
+                .market(&k)
+                .is_some_and(|mv| !mv.positions.is_empty() || mv.market.open_positions > 0);
+            let exempt = self.exit_cranks.contains(&k);
             let track = self.tracks.entry(k).or_default();
-            if track.can_spend(k, now, budget, &mut self.alerts) {
+            if exempt || track.can_spend(k, now, budget, &mut self.alerts) {
                 ready.push((k, d));
             } else {
+                // O17: an exhausted budget on a market with open positions is degraded mode at
+                // once (opens paused; exits, never budgeted, continue).
+                if open && let Some(b) = budget {
+                    let was = track.state.is_degraded();
+                    track.on_budget_exhausted(k, now, b, &mut self.alerts);
+                    if !was {
+                        self.metrics.market(k).budget_degraded += 1;
+                    }
+                }
                 report
                     .crank_failed
                     .push((k, "daily observation budget spent".into()));
@@ -2637,6 +3473,11 @@ impl<C: Chain> Keeper<C> {
                     }
                 }
                 Ok(Sent::DryRun { .. }) => {}
+                Ok(Sent::Deferred { .. }) => {
+                    for k in batch {
+                        report.crank_failed.push((k, "deferred".into()));
+                    }
+                }
                 Err(e) => {
                     for k in batch {
                         report.crank_failed.push((k, format!("{e:#}")));
@@ -2677,6 +3518,7 @@ impl<C: Chain> Keeper<C> {
                 Ok(Sent::TooLarge) => report
                     .crank_failed
                     .push((k, "transaction too large".into())),
+                Ok(Sent::Deferred { .. }) => report.crank_failed.push((k, "deferred".into())),
                 Ok(Sent::DryRun { .. }) => {}
                 Err(e) => report.crank_failed.push((k, format!("{e:#}"))),
             }

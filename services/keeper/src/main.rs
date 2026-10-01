@@ -3,8 +3,13 @@
 //! ```text
 //! shortwin-keeper --rpc <url> --keypair <file> [--config keeper.toml] [--tick-ms 400]
 //!                 [--metrics 127.0.0.1:9464] [--discovery-rpc <url>] [--block-engine <url>]
-//!                 [--once]
+//!                 [--coverage-keypair <file>] [--once]
 //! ```
+//!
+//! `--coverage-keypair` (or `coverage_pause.authority_keypair`) loads the `coverage_authority` key
+//! of the designated pauser (O17; a separate key from the fee payer, which can only pause and
+//! unpause opens per market); it is required with `coverage_pause.enabled = true`, and only one
+//! running instance should be enabled.
 //!
 //! `--block-engine` (or `graduation.block_engine`) sends the straddle bundles (duty 6, ARCH §5.4)
 //! to a Jito block engine, e.g. `https://mainnet.block-engine.jito.wtf`; without one they are not
@@ -34,12 +39,14 @@ struct Args {
     metrics: Option<String>,
     discovery_rpc: Option<String>,
     block_engine: Option<String>,
+    coverage_keypair: Option<String>,
     once: bool,
 }
 
 fn usage() -> &'static str {
     "usage: shortwin-keeper --rpc <url> --keypair <file> [--config keeper.toml] [--tick-ms 400] \
-     [--metrics 127.0.0.1:9464] [--discovery-rpc <url>] [--block-engine <url>] [--once]"
+     [--metrics 127.0.0.1:9464] [--discovery-rpc <url>] [--block-engine <url>] \
+     [--coverage-keypair <file>] [--once]"
 }
 
 fn parse_args() -> anyhow::Result<Args> {
@@ -50,6 +57,7 @@ fn parse_args() -> anyhow::Result<Args> {
     let mut metrics = None;
     let mut discovery_rpc = None;
     let mut block_engine = None;
+    let mut coverage_keypair = None;
     let mut once = false;
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
@@ -65,6 +73,7 @@ fn parse_args() -> anyhow::Result<Args> {
             "--metrics" => metrics = Some(val()?),
             "--discovery-rpc" => discovery_rpc = Some(val()?),
             "--block-engine" => block_engine = Some(val()?),
+            "--coverage-keypair" => coverage_keypair = Some(val()?),
             "--once" => once = true,
             "-h" | "--help" => bail!("{}", usage()),
             other => bail!("unknown argument {other}\n{}", usage()),
@@ -78,6 +87,7 @@ fn parse_args() -> anyhow::Result<Args> {
         metrics,
         discovery_rpc,
         block_engine,
+        coverage_keypair,
         once,
     })
 }
@@ -134,7 +144,35 @@ async fn main() -> anyhow::Result<()> {
         .discovery_rpc
         .clone()
         .or_else(|| cfg.pool_select.discovery_rpc().map(str::to_string));
+    let coverage_key = args
+        .coverage_keypair
+        .clone()
+        .or_else(|| cfg.coverage_pause.authority_keypair().map(str::to_string));
+    if cfg.coverage_pause.enabled && coverage_key.is_none() {
+        bail!(
+            "coverage_pause.enabled needs the coverage_authority keypair \
+             (--coverage-keypair or coverage_pause.authority_keypair)"
+        );
+    }
+    let coverage = match &coverage_key {
+        Some(p) => Some(read_keypair_file(p).map_err(|e| anyhow::anyhow!("reading {p}: {e}"))?),
+        None => None,
+    };
+    if let Some(k) = &coverage
+        && solana_signer::Signer::pubkey(k) == solana_signer::Signer::pubkey(&payer)
+    {
+        bail!("the coverage_authority key must not be the fee payer");
+    }
+    let enabled = cfg.coverage_pause.enabled;
     let mut keeper = Keeper::new(chain, payer, cfg)?;
+    if let Some(k) = coverage {
+        keeper = keeper.with_coverage_authority(k);
+        tracing::info!(
+            coverage_authority = ?keeper.coverage_authority(),
+            designated_pauser = enabled,
+            "coverage_authority key loaded (O17)"
+        );
+    }
     if let Some(url) = discovery {
         tracing::info!(%url, "pool discovery endpoint");
         keeper = keeper.with_discovery_chain(RpcChain::new(url));

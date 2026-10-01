@@ -65,8 +65,9 @@ pub struct GlobalConfig {
     pub governance: Pubkey,
     /// Squads Emergency vault (time lock 0).
     pub pause_authority: Pubkey,
-    /// Keeper key that may only set/clear a market's `paused_coverage` (A69). Default =
-    /// disabled until O17.
+    /// Keeper key that may only set/clear a market's `paused_coverage` (`set_coverage_pause`;
+    /// A69, O17). `Pubkey::default()` = the role disabled (the `initialize_config` default);
+    /// governance installs or rotates it with a timelocked `Authorities` change.
     pub coverage_authority: Pubkey,
     /// Destination of `sweep_protocol_fees`.
     pub fee_recipient: Pubkey,
@@ -101,6 +102,18 @@ impl GlobalConfig {
     /// `set_pause` / `cancel_config` signer check: the Emergency or the Governance vault.
     pub fn is_pause_or_governance(&self, key: &Pubkey) -> bool {
         *key == self.pause_authority || *key == self.governance
+    }
+
+    /// `true` once governance has installed a `coverage_authority` (A69; O17): until then
+    /// `set_coverage_pause` is inert (`CoverageAuthorityDisabled`).
+    pub fn coverage_enabled(&self) -> bool {
+        self.coverage_authority != Pubkey::default()
+    }
+
+    /// `set_coverage_pause` signer check: the configured `coverage_authority`, never the default
+    /// key (so an unset role matches no signer).
+    pub fn is_coverage_authority(&self, key: &Pubkey) -> bool {
+        self.coverage_enabled() && *key == self.coverage_authority
     }
 
     /// The whole parameter set as the math crate sees it (for validation and for readers).
@@ -887,6 +900,45 @@ mod tests {
         let ps = default_config().param_set().ok();
         assert_eq!(ps, Some(ParamSet::DEFAULT));
         assert!(validate_param_set(&ParamSet::DEFAULT).is_ok());
+    }
+
+    /// O17 (A69): an unset `coverage_authority` enables nothing and matches no signer — not the
+    /// default key, not Governance, not the Emergency vault; once installed only its own key
+    /// matches, and an `Authorities` change rotates or disables it.
+    #[test]
+    fn coverage_authority_is_inert_until_installed() {
+        let mut c = default_config();
+        c.governance = Pubkey::new_from_array([1; 32]);
+        c.pause_authority = Pubkey::new_from_array([2; 32]);
+        let keeper = Pubkey::new_from_array([7; 32]);
+        assert!(!c.coverage_enabled());
+        for k in [Pubkey::default(), c.governance, c.pause_authority, keeper] {
+            assert!(!c.is_coverage_authority(&k), "{k}");
+        }
+        let rotate = |c: &mut GlobalConfig, to: Pubkey| {
+            let change = ConfigChange::Authorities {
+                governance: c.governance,
+                pause_authority: c.pause_authority,
+                coverage_authority: to,
+                fee_recipient: Pubkey::new_from_array([3; 32]),
+            };
+            assert!(c.check_change(&change).is_ok());
+            assert!(c.apply(&change, 0).is_ok());
+        };
+        rotate(&mut c, keeper);
+        assert!(c.coverage_enabled());
+        assert!(c.is_coverage_authority(&keeper));
+        for k in [Pubkey::default(), c.governance, c.pause_authority] {
+            assert!(!c.is_coverage_authority(&k), "{k}");
+        }
+        let next = Pubkey::new_from_array([8; 32]);
+        rotate(&mut c, next);
+        assert!(!c.is_coverage_authority(&keeper));
+        assert!(c.is_coverage_authority(&next));
+        rotate(&mut c, Pubkey::default());
+        assert!(!c.coverage_enabled());
+        assert!(!c.is_coverage_authority(&Pubkey::default()));
+        assert!(!c.is_coverage_authority(&next));
     }
 
     #[test]

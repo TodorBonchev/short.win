@@ -41,6 +41,9 @@ wincode = "0.5.5"
 # Jito `sendBundle` params (services/common; both already in this lockfile through the RPC client).
 base64 = "0.22"
 serde_json = "1"
+# `getMultipleAccounts` chunks in parallel (services/common; M7-SEC-8; in this lockfile through the
+# RPC client).
+futures = "0.3"
 
 # The Agave 4.2.2 client line (C1-14: the root lockfile's line; see the workspace comment).
 solana-rpc-client = { version = "~4.2.2", default-features = false }

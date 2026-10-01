@@ -68,7 +68,8 @@ g("OI", ("open_positions","u32"),("_pad4",arr("u8",4)),("total_notional_open","u
   ("min_open_fee_ppm","u32"),("_pad5",arr("u8",4)))   # #100 (FIT-2): low-water mark of the open fee, from _reserved
 g("derived keys", ("trader_wsol_ata","Pubkey"),   # M5-SEC-6: ATA(trader, WSOL) under SPL Token, derived once at listing, from _reserved
   ("pump_pool_authority","Pubkey"))                # M5-SEC-6: PDA(pump, ["pool-authority", mint]), the canonical pool's creator, likewise
-g("misc", ("_reserved",arr("u8",176)))
+g("misc", ("coverage_cleared_at","i64"),   # M7-SEC-3: the second set_coverage_pause(false) last cleared a set flag; opens wait COVERAGE_CLEAR_DELAY_S after it, from _reserved
+  ("_reserved",arr("u8",168)))
 rows, end = layout("Market", M, disc=8)
 
 # v0.4.1 (R4A-2 / R4B-3): MarketVault becomes zero-copy and carries the lock expiry calendar

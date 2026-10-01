@@ -916,6 +916,36 @@ fn admin_instructions_never_move_funds() {
         ],
         &[&pause, &owner],
     ));
+    // The keeper's coverage key (O17), installed through the timelock: it pauses and clears
+    // the funded market's opens, alone and bundled with the lender's exit; the general I4 clause
+    // and its coverage clause (only bit 6 of the market's flags changes) run on each.
+    env.enable_coverage_authority();
+    let cov = env.coverage_authority.insecure_clone();
+    ok(env.set_coverage_pause(&market, true));
+    ok(env.send(
+        &[
+            ix::set_coverage_pause(
+                &cov.pubkey(),
+                &market,
+                false,
+                shortwin::events::COVERAGE_REASON_KEEPER,
+            ),
+            ix::withdraw(&lk, shares / 8, 0),
+        ],
+        &[&cov, &owner],
+    ));
+    ok(env.send(
+        &[
+            ix::claim_sol(&owner.pubkey(), &market),
+            ix::set_coverage_pause(
+                &cov.pubkey(),
+                &market,
+                true,
+                shortwin::events::COVERAGE_REASON_KEEPER,
+            ),
+        ],
+        &[&cov, &owner],
+    ));
     // The fee sweep is the one allowed outflow (to the configured recipient, ≤ the fees).
     let recipient = env.fee_recipient.pubkey();
     ok(env.send(

@@ -266,6 +266,7 @@ Lending is not staking and not risk-free.
 ## 11. Emergency controls
 
 - **Pause new opens** globally or per market (keeps closes and liquidations running).
+- **Keeper coverage pause ✅ Owner (v0.3, O17).** A separate keeper key, the `coverage_authority`, may pause and resume new opens on one market when the in-house keeper cannot keep that market covered (degraded mode: an outage, an exhausted per-market budget), with an alert. It moves no funds and never pauses closes, liquidations, settlements, withdrawals or claims; it is inert until governance installs the key with a timelocked authorities change, and only that key can set or clear its flag. A clear lets opens through only a few seconds later (5 s), so the key cannot slip an open past the pause within one transaction (M7-SEC-3).
 - **Never pause closes or liquidations** except during a detected venue migration (§5.3).
 - Pause authority is a multisig; fee/tier parameter changes are timelocked (suggest 48h).
 - **Venue-breakage powers ✅ Owner (v0.3, O6; amends §9's "emergency pause and fee parameters" list).** The emergency multisig may also, without timelock:
@@ -279,7 +280,7 @@ Lending is not staking and not risk-free.
 
 | # | Risk | Mitigation |
 |---|---|---|
-| R1 | **Creator self-dealing:** creator lends supply, shorts it from another wallet, sells into the curve — a disguised dump. If the token later pumps, they may get SOL settlement on their own lending. | Per-wallet caps; show creator-wallet deposits on the market page; per-market OI cap tied to liquidity. Can't be fully prevented in a permissionless design — disclose it. |
+| R1 | **Creator self-dealing:** creator lends supply, shorts it from another wallet, sells into the curve — a disguised dump. If the token later pumps, they may get SOL settlement on their own lending. | Show creator-wallet deposits on the market page; per-market OI and notional caps tied to liquidity (the bound the risk analysis relies on). Per-wallet caps are a UX limit only: they are per key, so one actor with four wallets fills a market's OI cap (M7-SEC-9). Can't be fully prevented in a permissionless design — disclose it. |
 | R2 | **Liquidation manipulation:** attacker pumps a thin token for one block to force liquidations. | EMA + executable-price dual check; liquidation slippage bounds. |
 | R3 | **Gap risk:** 5–10× moves in minutes on bonding-curve tokens. | Tier D margins, tiny caps, SOL settlement; lenders pre-accept. |
 | R4 | **Sandwiching opens/closes.** | Tight slippage, bundles. |

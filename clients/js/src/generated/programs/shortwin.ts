@@ -84,6 +84,7 @@ import {
   getProposeConfigInstructionAsync,
   getProposePoolInstructionAsync,
   getRevalidateVenueInstructionAsync,
+  getSetCoveragePauseInstructionAsync,
   getSetPauseInstructionAsync,
   getSetRouteBrokenInstructionAsync,
   getSetVenueExtrasInstructionAsync,
@@ -113,6 +114,7 @@ import {
   parseProposeConfigInstruction,
   parseProposePoolInstruction,
   parseRevalidateVenueInstruction,
+  parseSetCoveragePauseInstruction,
   parseSetPauseInstruction,
   parseSetRouteBrokenInstruction,
   parseSetVenueExtrasInstruction,
@@ -160,6 +162,7 @@ import {
   type ParsedProposeConfigInstruction,
   type ParsedProposePoolInstruction,
   type ParsedRevalidateVenueInstruction,
+  type ParsedSetCoveragePauseInstruction,
   type ParsedSetPauseInstruction,
   type ParsedSetRouteBrokenInstruction,
   type ParsedSetVenueExtrasInstruction,
@@ -171,6 +174,7 @@ import {
   type ProposeConfigAsyncInput,
   type ProposePoolAsyncInput,
   type RevalidateVenueAsyncInput,
+  type SetCoveragePauseAsyncInput,
   type SetPauseAsyncInput,
   type SetRouteBrokenAsyncInput,
   type SetVenueExtrasAsyncInput,
@@ -842,14 +846,15 @@ export const ShortwinInstruction = {
   18: "ProposeConfig",
   19: "ProposePool",
   20: "RevalidateVenue",
-  21: "SetPause",
-  22: "SetRouteBroken",
-  23: "SetVenueExtras",
-  24: "SolSettle",
-  25: "SweepProtocolFees",
-  26: "SweepTrader",
-  27: "SyncLender",
-  28: "Withdraw",
+  21: "SetCoveragePause",
+  22: "SetPause",
+  23: "SetRouteBroken",
+  24: "SetVenueExtras",
+  25: "SolSettle",
+  26: "SweepProtocolFees",
+  27: "SweepTrader",
+  28: "SyncLender",
+  29: "Withdraw",
   AddMargin: 0,
   ApplyConfig: 1,
   CancelConfig: 2,
@@ -871,14 +876,15 @@ export const ShortwinInstruction = {
   ProposeConfig: 18,
   ProposePool: 19,
   RevalidateVenue: 20,
-  SetPause: 21,
-  SetRouteBroken: 22,
-  SetVenueExtras: 23,
-  SolSettle: 24,
-  SweepProtocolFees: 25,
-  SweepTrader: 26,
-  SyncLender: 27,
-  Withdraw: 28,
+  SetCoveragePause: 21,
+  SetPause: 22,
+  SetRouteBroken: 23,
+  SetVenueExtras: 24,
+  SolSettle: 25,
+  SweepProtocolFees: 26,
+  SweepTrader: 27,
+  SyncLender: 28,
+  Withdraw: 29,
 } as const;
 
 export type ShortwinInstruction = (typeof ShortwinInstruction)[Exclude<
@@ -1125,6 +1131,17 @@ export function identifyShortwinInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([23, 246, 170, 138, 239, 63, 245, 123]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinInstruction.SetCoveragePause;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([63, 32, 154, 2, 56, 103, 79, 45]),
       ),
       0,
@@ -1281,6 +1298,9 @@ export type ParsedShortwinInstruction<
   | ({
       instructionType: typeof ShortwinInstruction.RevalidateVenue;
     } & ParsedRevalidateVenueInstruction<TProgram>)
+  | ({
+      instructionType: typeof ShortwinInstruction.SetCoveragePause;
+    } & ParsedSetCoveragePauseInstruction<TProgram>)
   | ({
       instructionType: typeof ShortwinInstruction.SetPause;
     } & ParsedSetPauseInstruction<TProgram>)
@@ -1458,6 +1478,13 @@ export function parseShortwinInstruction<TProgram extends string>(
         ...parseRevalidateVenueInstruction(instruction),
       };
     }
+    case ShortwinInstruction.SetCoveragePause: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: ShortwinInstruction.SetCoveragePause,
+        ...parseSetCoveragePauseInstruction(instruction),
+      };
+    }
     case ShortwinInstruction.SetPause: {
       assertIsInstructionWithAccounts(instruction);
       return {
@@ -1633,6 +1660,10 @@ export type ShortwinPluginInstructions = {
   revalidateVenue: (
     input: RevalidateVenueAsyncInput,
   ) => ReturnType<typeof getRevalidateVenueInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  setCoveragePause: (
+    input: SetCoveragePauseAsyncInput,
+  ) => ReturnType<typeof getSetCoveragePauseInstructionAsync> &
     SelfPlanAndSendFunctions;
   setPause: (
     input: SetPauseAsyncInput,
@@ -1816,6 +1847,11 @@ export function shortwinProgram() {
             addSelfPlanAndSendFunctions(
               client,
               getRevalidateVenueInstructionAsync(input),
+            ),
+          setCoveragePause: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSetCoveragePauseInstructionAsync(input),
             ),
           setPause: (input) =>
             addSelfPlanAndSendFunctions(

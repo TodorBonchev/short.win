@@ -430,6 +430,10 @@ pub struct CurvePricingInputs {
     /// The curve's creator is the default key: the new pool's coin creator is too, and PumpSwap
     /// charges no creator fee.
     pub coin_creator_is_default: bool,
+    /// M7-SEC-5: the one-way fee (ppm) of `fees::pump_curve` on `(vT, ⌊P_ema·vT/WAD⌋)` — the
+    /// curve's fee at the stored EMA price's market cap; `u32::MAX` without a price
+    /// ([`VenueState::cap_fee_ppm`]).
+    pub fee_ppm_at_ema: u32,
 }
 
 impl CurvePricingInputs {
@@ -586,6 +590,31 @@ impl VenueState {
             curve: None,
             pool: None,
         }
+    }
+
+    /// The one-way fee φ the fee-scaled caps take (ARCH §4.6; M7-SEC-5): `min(φ_live, φ at
+    /// P_ema)` on the pump venues, `φ_live` elsewhere. pump-fees picks the tier from the live
+    /// market cap and charges more as it falls, so a sale in the open's own transaction (down to
+    /// the spot–EMA guard's −10 %) moved the pool into a higher-fee tier and raised
+    /// `3.0·φ·X₀` / `7.5·φ·X₁` on an `X₀` the EMA terms hold (the reproducer: 30 → 35 bps, both
+    /// caps +16.7 %); at the EMA's market cap a same-transaction trade can only lower the fee
+    /// the caps use.
+    ///
+    /// The fee at `P_ema` rides in the pump views' padding (`pump_amm::PoolVenue`,
+    /// [`CurvePricingInputs`]), so `VenueState` does not grow: the pool-selection instructions
+    /// box several of them on the 32 KiB heap. It is resolved only by `open_short`'s pre-trade
+    /// read ([`read_state_boxed_for_open`]); elsewhere it reads `u32::MAX` and this is `φ_live`.
+    pub fn cap_fee_ppm(&self) -> u32 {
+        let at_ema = match self.kind {
+            VenueKind::PumpSwap => self.pool.as_ref().map_or(u32::MAX, |p| p.fee_ppm_at_ema),
+            VenueKind::PumpCurve | VenueKind::PumpMigrating => self
+                .curve
+                .as_ref()
+                .and_then(|c| c.pricing.as_ref())
+                .map_or(u32::MAX, |p| p.fee_ppm_at_ema),
+            _ => u32::MAX,
+        };
+        self.fee_ppm.min(at_ema)
     }
 
     /// Observed by the prologue's record (ARCH §3.0 step 7, A64): an executable venue, or a
@@ -771,11 +800,24 @@ pub fn read_state_with(
     now: i64,
     supply: Option<u64>,
 ) -> VenueState {
+    read_state_ema(market, kind, read, now, supply, false)
+}
+
+/// [`read_state_with`]; with `ema_fee` the pump venues also resolve their fee at the stored
+/// `P_ema`'s market cap ([`VenueState::cap_fee_ppm`], M7-SEC-5).
+fn read_state_ema(
+    market: &Market,
+    kind: VenueKind,
+    read: &[AccountInfo],
+    now: i64,
+    supply: Option<u64>,
+    ema_fee: bool,
+) -> VenueState {
     match kind {
         VenueKind::PumpCurve | VenueKind::PumpMigrating => {
-            pump_curve::read_state(market, kind, read)
+            pump_curve::read_state(market, kind, read, ema_fee)
         }
-        VenueKind::PumpSwap => pump_amm::read_state(market, read, supply),
+        VenueKind::PumpSwap => pump_amm::read_state(market, read, supply, ema_fee),
         VenueKind::RaydiumV4 => raydium_v4::read_state(market, read, now),
         VenueKind::RaydiumCpmm => raydium_cpmm::read_state(market, read, now),
         #[cfg(feature = "test-venue")]
@@ -798,6 +840,20 @@ pub fn read_state_boxed(
     supply: Option<u64>,
 ) -> Box<VenueState> {
     Box::new(read_state_with(market, kind, read, now, supply))
+}
+
+/// [`read_state_boxed`] for `open_short`'s pre-trade read: the pump venues also resolve their fee at
+/// the stored `P_ema`'s market cap, which the fee-scaled caps take (`VenueState::cap_fee_ppm`,
+/// M7-SEC-5; ≈ 1.3–1.6 k CU, paid by opens only).
+#[inline(never)]
+pub fn read_state_boxed_for_open(
+    market: &Market,
+    kind: VenueKind,
+    read: &[AccountInfo],
+    now: i64,
+    supply: Option<u64>,
+) -> Box<VenueState> {
+    Box::new(read_state_ema(market, kind, read, now, supply, true))
 }
 
 /// The supply of a mint account (`supply` @36; SPL Token or Token-2022), `None` if it does not

@@ -13,6 +13,9 @@ base64.workspace = true
 serde_json.workspace = true
 bs58.workspace = true
 tokio.workspace = true
+# M7-SEC-8: `getMultipleAccounts` chunks in parallel (already in this lockfile through the RPC
+# client).
+futures.workspace = true
 solana-rpc-client.workspace = true
 solana-rpc-client-api.workspace = true
 solana-commitment-config.workspace = true

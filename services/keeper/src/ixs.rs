@@ -80,6 +80,46 @@ pub fn flag_venue_upgraded(venue: u8) -> anyhow::Result<Instruction> {
     ))
 }
 
+/// `crank_sol_usd()` with the configured Pyth `PriceUpdateV2` `price_update` (ARCH §3.9; duty 11):
+/// anyone refreshes the `OracleCache`.
+pub fn crank_sol_usd(price_update: &Pubkey) -> Instruction {
+    build(
+        shortwin::accounts::CrankSolUsd {
+            config: pda::config(),
+            oracle_cache: pda::oracle_cache(),
+            price_update: *price_update,
+        },
+        shortwin::instruction::CrankSolUsd {},
+        Vec::new(),
+    )
+}
+
+/// `CoveragePauseSet.reason` of the keeper's coverage SLO (O17): the program's
+/// `events::COVERAGE_REASON_KEEPER`, the only reason it accepts.
+pub const COVERAGE_REASON_KEEPER: u8 = shortwin::events::COVERAGE_REASON_KEEPER;
+
+/// `set_coverage_pause(paused, reason = COVERAGE_REASON_KEEPER)` on `market`, signed by the
+/// `coverage_authority` `authority` (O17; ARCH §3.1): sets or clears `Market.flags` bit 6
+/// (`paused_coverage`), which refuses opens only (`CoveragePaused`); it moves no funds and
+/// never touches an exit. Accounts `[coverage_authority (signer), config, market (writable),
+/// event_authority, program]` (`#[event_cpi]`).
+pub fn set_coverage_pause(authority: &Pubkey, market: &Pubkey, paused: bool) -> Instruction {
+    build(
+        shortwin::accounts::SetCoveragePause {
+            coverage_authority: *authority,
+            config: pda::config(),
+            market: *market,
+            event_authority: pda::event_authority(),
+            program: shortwin::ID,
+        },
+        shortwin::instruction::SetCoveragePause {
+            paused,
+            reason: COVERAGE_REASON_KEEPER,
+        },
+        Vec::new(),
+    )
+}
+
 fn read_only_keys(keys: &[Pubkey]) -> Vec<AccountMeta> {
     keys.iter()
         .map(|k| AccountMeta::new_readonly(*k, false))
@@ -238,4 +278,38 @@ pub fn sol_settle(keeper: &Pubkey, mv: &MarketView, pos: &PositionView) -> Instr
         shortwin::instruction::SolSettle {},
         read_only(mv),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The M7 interface contract: `discriminator ‖ paused: bool ‖ reason: u8`, the authority the
+    /// only signer, the market the only writable account.
+    #[test]
+    fn set_coverage_pause_is_the_contract() {
+        let h = solana_sha256_hasher::hash(b"global:set_coverage_pause");
+        let (a, m) = (Pubkey::new_unique(), Pubkey::new_unique());
+        let ix = set_coverage_pause(&a, &m, true);
+        assert_eq!(ix.program_id, shortwin::ID);
+        assert_eq!(&ix.data[..8], &h.to_bytes()[..8]);
+        assert_eq!(ix.data[8..], [1, COVERAGE_REASON_KEEPER]);
+        assert_eq!(COVERAGE_REASON_KEEPER, 1);
+        assert_eq!(set_coverage_pause(&a, &m, false).data[8], 0);
+        let metas: Vec<(Pubkey, bool, bool)> = ix
+            .accounts
+            .iter()
+            .map(|x| (x.pubkey, x.is_signer, x.is_writable))
+            .collect();
+        assert_eq!(
+            metas,
+            vec![
+                (a, true, false),
+                (pda::config(), false, false),
+                (m, false, true),
+                (pda::event_authority(), false, false),
+                (shortwin::ID, false, false),
+            ]
+        );
+    }
 }

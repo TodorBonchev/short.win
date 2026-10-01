@@ -8,7 +8,8 @@
 //! O6 powers `set_route_broken` and `set_venue_extras`, and `sweep_trader` (ARCH §3.9, brought
 //! forward from M6 by M2-SEC-4: a full wipe is reachable from M2 on and a deposit then waits
 //! for it). M4: `propose_pool` and `execute_pool_switch` (Raydium pool selection, ARCH §2.6,
-//! §3.9; the rules are `crate::engine::pool_select`).
+//! §3.9; the rules are `crate::engine::pool_select`). M7: `set_coverage_pause` (O17, recorded in
+//! SPEC §14 on 2026-09-30: the keeper's pause-opens-only `coverage_authority`).
 
 pub mod add_margin;
 pub mod apply_config;
@@ -31,6 +32,7 @@ pub mod open_short;
 pub mod propose_config;
 pub mod propose_pool;
 pub mod revalidate_venue;
+pub mod set_coverage_pause;
 pub mod set_pause;
 pub mod set_route_broken;
 pub mod set_venue_extras;
@@ -66,6 +68,7 @@ pub use open_short::*;
 pub use propose_config::*;
 pub use propose_pool::*;
 pub use revalidate_venue::*;
+pub use set_coverage_pause::*;
 pub use set_pause::*;
 pub use set_route_broken::*;
 pub use set_venue_extras::*;

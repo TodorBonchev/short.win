@@ -1,56 +1,114 @@
+<!-- constants cross-checked against tests/bench/m7_keeper/results.json (19a368d0) -->
+
+### Measured inputs: requested CU per instruction (ceil(simulated x 1.1), what the priority fee is paid on) and crank batches
+
+| venue | crank_price | sol_settle (keep / settles) | liquidate / expire | v1 max cranks | v0 + protocol ALT cranks |
+|---|---|---|---|---|---|
+| PumpSwap | 41,159 | 64,119 / 74,158 | 212,255 / 208,348 | 8 | 3 |
+| curve | 37,365 | 62,700 / 72,721 | 191,938 / 188,919 | 11 | 5 |
+| CPMM | 32,826 | 65,640 / 77,388 | 125,282 / 117,479 | 9 | 4 |
+| AMM v4 | 32,762 | 57,648 / 67,713 | 105,268 / 101,001 | 9 | 4 |
+
 ### Cost of continuous coverage: one crank per market per second (SOL per market per day)
 
-| priority price (micro-lamports/CU) | unbatched (k = 1) | 4 per v0 tx (ALT) | 6 per v1 tx | 9 per v1 tx (64-address limit) |
-|---|---|---|---|---|
-| 0 | 0.4320 | 0.1080 | 0.0720 | 0.0480 |
-| 1,000 | 0.4350 | 0.1110 | 0.0750 | 0.0510 |
-| 10,000 | 0.4622 | 0.1382 | 0.1022 | 0.0782 |
-| 100,000 | 0.7344 | 0.4104 | 0.3744 | 0.3504 |
-
-### Transaction size of a crank batch (bytes; v0 limit 1,232 with the protocol ALT, v1 limit 4,096 and 64 inline addresses)
-
-| k | v0 PumpSwap / CPMM | v0 curve | v1 (all keys inline) |
-|---|---|---|---|
-| 3 | 848 | 749 | 953 B, 24 keys |
-| 4 | 1,061 | 929 | 1,166 B, 30 keys |
-| 5 | 1,274 (too large) | 1,109 | 1,379 B, 36 keys |
-| 6 | 1,487 (too large) | 1,289 (too large) | 1,592 B, 42 keys |
-| 9 | 2,126 (too large) | 1,829 (too large) | 2,231 B, 60 keys |
-
-### Targeted coverage (ECON §5.8 duties): per-second cranks only for a fraction f of the day, else one crank per 30 s; batched k = 6 (v1 transactions; the v0 fallback k = 4 costs 1.5x the base-fee part); SOL per market per day
-
-| share of the day near a threshold (f) | 1,000 uL/CU | 10,000 uL/CU | 100,000 uL/CU |
-|---|---|---|---|
-| 0 % | 0.0025 | 0.0034 | 0.0125 |
-| 1 % | 0.0032 | 0.0044 | 0.0161 |
-| 5 % | 0.0061 | 0.0083 | 0.0306 |
-| 20 % | 0.0170 | 0.0232 | 0.0849 |
-| 100 % | 0.0750 | 0.1022 | 0.3744 |
-
-### Event costs (unbatched; SOL per event)
-
-| priority price (uL/CU) | one armed position (45 x sol_settle) | one deviation burst (150 slots x crank) | one liquidation (+0.001 SOL tip) |
-|---|---|---|---|
-| 1,000 | 0.00023 | 0.00076 | 0.00101 |
-| 10,000 | 0.00027 | 0.00080 | 0.00101 |
-| 100,000 | 0.00063 | 0.00128 | 0.00103 |
-
-### Liquidity-anomaly coverage (duty 2, #101): the keeper's cost against the attacker's (SOL; a market with open positions; per-second coverage for liq_cover_s = 10 s after a foreign bucket liquidity deviation, extended while they recur)
-
-| priority price (uL/CU) | attacker: one LP-wrapped crank | keeper: one isolated trigger (10 cranks) | isolated trigger, keeper / attacker (unbatched / k = 6) | sustained, per second, keeper / attacker (unbatched / k = 6) | M4F-1's reverted per-slot burst per trigger (keeper / attacker) |
+| venue | priority price (uL/CU) | unbatched (k = 1) | v0 + ALT (venue's k) | v1 k = 6 | v1 max k |
 |---|---|---|---|---|---|
-| 0 | 0.0000050 | 0.000050 | 10.0x / 1.7x | 1.00x / 0.17x | 0.00075 (150x) |
-| 1,000 | 0.0000051 | 0.000050 | 9.8x / 1.7x | 0.98x / 0.17x | 0.00076 (147x) |
-| 10,000 | 0.0000065 | 0.000053 | 8.2x / 1.8x | 0.82x / 0.18x | 0.00080 (123x) |
-| 100,000 | 0.0000200 | 0.000085 | 4.2x / 2.2x | 0.42x / 0.22x | 0.00128 (64x) |
+| PumpSwap | 0 | 0.4320 | 0.1440 | 0.0720 | 0.0540 |
+| PumpSwap | 1,000 | 0.4356 | 0.1476 | 0.0756 | 0.0576 |
+| PumpSwap | 10,000 | 0.4676 | 0.1796 | 0.1076 | 0.0896 |
+| PumpSwap | 100,000 | 0.7876 | 0.4996 | 0.4276 | 0.4096 |
+| curve | 0 | 0.4320 | 0.0864 | 0.0720 | 0.0393 |
+| curve | 1,000 | 0.4353 | 0.0896 | 0.0752 | 0.0425 |
+| curve | 10,000 | 0.4643 | 0.1187 | 0.1043 | 0.0716 |
+| curve | 100,000 | 0.7549 | 0.4092 | 0.3948 | 0.3621 |
+| CPMM | 0 | 0.4320 | 0.1080 | 0.0720 | 0.0480 |
+| CPMM | 1,000 | 0.4349 | 0.1109 | 0.0748 | 0.0508 |
+| CPMM | 10,000 | 0.4604 | 0.1364 | 0.1004 | 0.0764 |
+| CPMM | 100,000 | 0.7157 | 0.3916 | 0.3556 | 0.3316 |
+| AMM v4 | 0 | 0.4320 | 0.1080 | 0.0720 | 0.0480 |
+| AMM v4 | 1,000 | 0.4349 | 0.1109 | 0.0748 | 0.0508 |
+| AMM v4 | 10,000 | 0.4603 | 0.1363 | 0.1003 | 0.0763 |
+| AMM v4 | 100,000 | 0.7151 | 0.3911 | 0.3551 | 0.3311 |
 
-### The same per market-day: an attacker that keeps the keeper busiest per transaction (one trigger every liq_cover_s + 1 s, the window lapsing in between), one a minute, and one every second (unbatched keeper; SOL per market per day, keeper / attacker)
+### Targeted coverage (duties 1-2): per-second cranks for a share f of the day, else one per 30 s; v1 k = 6 (unbatched in brackets); SOL per market per day
 
-| priority price (uL/CU) | every 11 s | every 60 s | every second (sustained, 1:1) | M4F-1's burst, one trigger a minute |
+| venue | f | 0 uL/CU | 1,000 uL/CU | 10,000 uL/CU | 100,000 uL/CU |
+|---|---|---|---|---|---|
+| PumpSwap | 0 % | 0.0024 (0.0144) | 0.0025 (0.0145) | 0.0036 (0.0156) | 0.0143 (0.0263) |
+| PumpSwap | 1 % | 0.0031 (0.0186) | 0.0032 (0.0187) | 0.0046 (0.0201) | 0.0184 (0.0339) |
+| PumpSwap | 5 % | 0.0059 (0.0353) | 0.0062 (0.0356) | 0.0088 (0.0382) | 0.0349 (0.0643) |
+| PumpSwap | 20 % | 0.0163 (0.0979) | 0.0171 (0.0987) | 0.0244 (0.1060) | 0.0969 (0.1785) |
+| PumpSwap | 100 % | 0.0720 (0.4320) | 0.0756 (0.4356) | 0.1076 (0.4676) | 0.4276 (0.7876) |
+| curve | 0 % | 0.0024 (0.0144) | 0.0025 (0.0145) | 0.0035 (0.0155) | 0.0132 (0.0252) |
+| curve | 1 % | 0.0031 (0.0186) | 0.0032 (0.0187) | 0.0045 (0.0200) | 0.0170 (0.0325) |
+| curve | 5 % | 0.0059 (0.0353) | 0.0061 (0.0355) | 0.0085 (0.0379) | 0.0322 (0.0616) |
+| curve | 20 % | 0.0163 (0.0979) | 0.0171 (0.0987) | 0.0236 (0.1052) | 0.0895 (0.1711) |
+| curve | 100 % | 0.0720 (0.4320) | 0.0752 (0.4353) | 0.1043 (0.4643) | 0.3948 (0.7549) |
+| CPMM | 0 % | 0.0024 (0.0144) | 0.0025 (0.0145) | 0.0033 (0.0153) | 0.0119 (0.0239) |
+| CPMM | 1 % | 0.0031 (0.0186) | 0.0032 (0.0187) | 0.0043 (0.0198) | 0.0153 (0.0308) |
+| CPMM | 5 % | 0.0059 (0.0353) | 0.0061 (0.0355) | 0.0082 (0.0376) | 0.0290 (0.0584) |
+| CPMM | 20 % | 0.0163 (0.0979) | 0.0170 (0.0986) | 0.0228 (0.1044) | 0.0806 (0.1622) |
+| CPMM | 100 % | 0.0720 (0.4320) | 0.0748 (0.4349) | 0.1004 (0.4604) | 0.3556 (0.7157) |
+| AMM v4 | 0 % | 0.0024 (0.0144) | 0.0025 (0.0145) | 0.0033 (0.0153) | 0.0118 (0.0238) |
+| AMM v4 | 1 % | 0.0031 (0.0186) | 0.0032 (0.0187) | 0.0043 (0.0198) | 0.0153 (0.0308) |
+| AMM v4 | 5 % | 0.0059 (0.0353) | 0.0061 (0.0355) | 0.0082 (0.0376) | 0.0290 (0.0584) |
+| AMM v4 | 20 % | 0.0163 (0.0979) | 0.0170 (0.0986) | 0.0227 (0.1043) | 0.0805 (0.1621) |
+| AMM v4 | 100 % | 0.0720 (0.4320) | 0.0748 (0.4349) | 0.1003 (0.4603) | 0.3551 (0.7151) |
+
+### Episode costs (unbatched, the costliest venue: PumpSwap; SOL per episode)
+
+| priority price (uL/CU) | one armed position (43 x sol_settle) | one price deviation (116 x crank) | one liquidation (+0.001 SOL tip) | a PumpSwap warm-up (8 cranks) |
 |---|---|---|---|---|
-| 0 | 0.3927 / 0.0393 | 0.0720 / 0.0072 | 0.4320 / 0.4320 | 1.0800 / 0.0072 |
-| 10,000 | 0.4202 / 0.0511 | 0.0770 / 0.0094 | 0.4622 / 0.5616 | 1.1556 / 0.0094 |
-| 100,000 | 0.6676 / 0.1571 | 0.1224 / 0.0288 | 0.7344 / 1.7280 | 1.8360 / 0.0288 |
+| 0 | 0.00021 | 0.00058 | 0.00101 | 0.00004 |
+| 1,000 | 0.00022 | 0.00058 | 0.00101 | 0.00004 |
+| 10,000 | 0.00024 | 0.00063 | 0.00101 | 0.00004 |
+| 100,000 | 0.00049 | 0.00106 | 0.00103 | 0.00007 |
+
+### Global lines (the protocol, not a market's budget; SOL)
+
+| priority price (uL/CU) | crank_sol_usd, a day (1,560 calls) | set_coverage_pause, one call (two signatures) |
+|---|---|---|
+| 0 | 0.0078 | 0.00001000 |
+| 1,000 | 0.0078 | 0.00001001 |
+| 10,000 | 0.0079 | 0.00001009 |
+| 100,000 | 0.0089 | 0.00001088 |
+
+### Liquidity-anomaly coverage (duty 2, #101): the keeper's cost against the attacker's (SOL; a market with open positions; per-second coverage for liq_cover_s = 10 s, measured 8 cranks above the control per isolated trigger; PumpSwap cranks)
+
+| priority price (uL/CU) | attacker: one LP-wrapped crank | keeper: one isolated trigger (8 cranks) | isolated trigger, keeper / attacker (unbatched / k = 6) | sustained, per second, keeper / attacker (unbatched / k = 6) |
+|---|---|---|---|---|
+| 0 | 0.0000050 | 0.000040 | 8.0x / 1.3x | 1.00x / 0.17x |
+| 1,000 | 0.0000051 | 0.000040 | 7.8x / 1.4x | 0.98x / 0.17x |
+| 10,000 | 0.0000065 | 0.000043 | 6.7x / 1.5x | 0.83x / 0.19x |
+| 100,000 | 0.0000200 | 0.000073 | 3.6x / 2.0x | 0.46x / 0.25x |
+
+### The O17 budget (0.03 SOL per market-day): what exhausts it (OWNER-M7-2). Triggers every 11 s on top of the quiet cadence of a market with a healthy position; the day's budget then puts the market in degraded mode (opens paused until the UTC day rolls over + 600 s; exits continue). LP-wrapped triggers need a pool with LP accounting: PumpSwap and Raydium only (the pump curve has none; M7-SEC-2)
+
+| venue | priority price (uL/CU) | unbatched keeper | batched keeper (k = 6) | quiet day's share of the budget (k = 6 / unbatched) |
+|---|---|---|---|---|
+| PumpSwap | 0 | 390 triggers, 1.2 h, attacker 0.0019 SOL | 4,140 triggers, 12.7 h, attacker 0.0207 SOL | 8 % / 48 % |
+| PumpSwap | 1,000 | 384 triggers, 1.2 h, attacker 0.0020 SOL | 3,929 triggers, 12.0 h, attacker 0.0202 SOL | 8 % / 48 % |
+| PumpSwap | 10,000 | 333 triggers, 1.0 h, attacker 0.0022 SOL | 2,653 triggers, 8.1 h, attacker 0.0172 SOL | 12 % / 52 % |
+| PumpSwap | 100,000 | 52 triggers, 0.2 h, attacker 0.0010 SOL | 398 triggers, 1.2 h, attacker 0.0080 SOL | 48 % / 88 % |
+| CPMM | 0 | 390 triggers, 1.2 h, attacker 0.0019 SOL | 4,140 triggers, 12.7 h, attacker 0.0207 SOL | 8 % / 48 % |
+| CPMM | 1,000 | 386 triggers, 1.2 h, attacker 0.0020 SOL | 3,970 triggers, 12.1 h, attacker 0.0204 SOL | 8 % / 48 % |
+| CPMM | 10,000 | 344 triggers, 1.1 h, attacker 0.0022 SOL | 2,869 triggers, 8.8 h, attacker 0.0186 SOL | 11 % / 51 % |
+| CPMM | 100,000 | 93 triggers, 0.3 h, attacker 0.0019 SOL | 552 triggers, 1.7 h, attacker 0.0110 SOL | 40 % / 80 % |
+| AMM v4 | 0 | 390 triggers, 1.2 h, attacker 0.0019 SOL | 4,140 triggers, 12.7 h, attacker 0.0207 SOL | 8 % / 48 % |
+| AMM v4 | 1,000 | 386 triggers, 1.2 h, attacker 0.0020 SOL | 3,970 triggers, 12.1 h, attacker 0.0204 SOL | 8 % / 48 % |
+| AMM v4 | 10,000 | 344 triggers, 1.1 h, attacker 0.0022 SOL | 2,870 triggers, 8.8 h, attacker 0.0187 SOL | 11 % / 51 % |
+| AMM v4 | 100,000 | 94 triggers, 0.3 h, attacker 0.0019 SOL | 553 triggers, 1.7 h, attacker 0.0111 SOL | 39 % / 79 % |
+
+### Price bursts (duty 2) after M7-SEC-2: a burst needs a reverted >= 2 % excursion, a price round trip of ~1 % of the token reserve (2 phi delta of fees), against the keeper's 116 cranks (PumpSwap cranks; SOL)
+
+| pool SOL reserve | fee one way | attacker: one round trip | keeper unbatched at 0 uL/CU (attacker / keeper; budget) | keeper unbatched at 100,000 uL/CU (attacker / keeper; budget) |
+|---|---|---|---|---|
+| 100 SOL | 25 bps | 0.00496 | 0.00058 (8.5x; 27 bursts = 0.134 SOL to spend the day's budget) | 0.00106 (4.7x; 4 bursts = 0.020 SOL to spend the day's budget) |
+| 100 SOL | 100 bps | 0.01980 | 0.00058 (34.1x; 27 bursts = 0.535 SOL to spend the day's budget) | 0.00106 (18.7x; 4 bursts = 0.079 SOL to spend the day's budget) |
+| 1,000 SOL | 25 bps | 0.04951 | 0.00058 (85.4x; 27 bursts = 1.337 SOL to spend the day's budget) | 0.00106 (46.8x; 4 bursts = 0.198 SOL to spend the day's budget) |
+| 1,000 SOL | 100 bps | 0.19800 | 0.00058 (341.4x; 27 bursts = 5.346 SOL to spend the day's budget) | 0.00106 (187.2x; 4 bursts = 0.792 SOL to spend the day's budget) |
+
+(As built at M7, before M7-SEC-2: one plain crank_price after anyone's honest >= 2 % move, 5,000 lamports, started the same burst.)
 
 ### Revenue of a market at the beta cap (25 SOL open notional, 80 % utilisation; SOL per day)
 
@@ -61,9 +119,10 @@
 | C | 200 % | 0.1370 | 0.0205 | 0.1164 |
 | D | 400 % | 0.2740 | 0.0411 | 0.2329 |
 
-### Break-even: open notional per market at which the protocol's rent share pays for continuous per-second coverage (k = 6)
+### Break-even: open notional per market at which the protocol's rent share pays for continuous per-second coverage (v1 k = 6, PumpSwap cranks)
 
 | priority price (uL/CU) | coverage cost (SOL/day) | A | B | C | D |
 |---|---|---|---|---|---|
-| 1,000 | 0.0750 | 365 SOL | 183 SOL | 91 SOL | 46 SOL |
-| 10,000 | 0.1022 | 498 SOL | 249 SOL | 124 SOL | 62 SOL |
+| 1,000 | 0.0756 | 368 SOL | 184 SOL | 92 SOL | 46 SOL |
+| 10,000 | 0.1076 | 523 SOL | 262 SOL | 131 SOL | 65 SOL |
+| 100,000 | 0.4276 | 2,081 SOL | 1,041 SOL | 520 SOL | 260 SOL |

@@ -1,7 +1,8 @@
 # On-chain workspace (ARCHITECTURE §1.2). Host-only crates (keeper, indexer, Agave 4.3
 # clients) live in services/ with their own lockfile and must never join this one.
 # tests/litesvm is the exception ARCH §1.2 names: the program tests share this lockfile so the
-# Agave line LiteSVM resolves is pinned next to the program's (C1-14).
+# Agave line LiteSVM resolves is pinned next to the program's (C1-14); tests/fuzz (M7) links it
+# and shares the lockfile for the same reason.
 [workspace]
 resolver = "3"
 members = [
@@ -12,6 +13,8 @@ members = [
     # The stateless straddle helper (ARCH §5.4, A66).
     "programs/complete_curve",
     "tests/litesvm",
+    # M7 invariant fuzz harness (ARCH §8.4): action sequences on LiteSVM through the I1–I18 hooks.
+    "tests/fuzz",
     # TEST-ONLY venue program for M2 (A49); built by `anchor build`, never deployed.
     "tests/mock_cpamm",
 ]

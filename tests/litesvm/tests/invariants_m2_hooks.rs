@@ -44,6 +44,8 @@ use common::*;
 type MarketMutant = Box<dyn Fn(&mut Market)>;
 /// A corruption of a stored position.
 type PositionMutant = fn(&mut ShortPosition);
+/// A corruption of any state of a case.
+type CaseMutant = Box<dyn Fn(&mut Case)>;
 
 /// A market with one open position (a few cranked seconds after the open); hooks off, since
 /// every test corrupts the state on purpose.
@@ -63,6 +65,9 @@ impl Case {
         let (_o, nonce, _) = open_ok(&mut env, &mm, &mut b, Q);
         env.tick(&mm, 2);
         env.check_invariants = false;
+        // The `Open` events below are built by hand to aim at I3, I5, I7, I13: I19 (the open's
+        // terms) has its own test, `i19_the_open_terms`.
+        invariants::open_terms::allow_synthetic_opens(true);
         let key = pda::position(&mm.market(), &b.key(), nonce).0;
         Self {
             env,
@@ -297,6 +302,112 @@ fn closes(e: Close) -> IxEvents {
         closes: vec![e],
         ..IxEvents::default()
     }
+}
+
+// ---- I4's coverage clause (O17) -----------------------------------------------------------
+
+/// I4's coverage clause: a real `set_coverage_pause` signed by the installed `coverage_authority`
+/// passes; the same instruction checked against a state in which it also changed another byte
+/// of the market, another flag bit, a vault's lamports, another market or the config fails I4.
+/// With the role disabled (the default) the clause is vacuous.
+#[test]
+fn i4_coverage_authority_changes_only_its_flag() {
+    let mut c = Case::new();
+    let market = c.mm.market();
+    let other = c.env.mock_market(MarketSpec::default());
+    let other_key = other.market();
+    assert!(
+        c.snapshot().coverage.is_none(),
+        "vacuous while the role is disabled"
+    );
+    c.env.plant_coverage_authority();
+    let kp = c.env.coverage_authority.insecure_clone();
+    let ix = shortwin_litesvm_tests::ix::set_coverage_pause(
+        &kp.pubkey(),
+        &market,
+        true,
+        shortwin::events::COVERAGE_REASON_KEEPER,
+    );
+    let pre = invariants::snapshot(&c.env.svm, &[market, other.market()]);
+    assert!(pre.coverage.is_some());
+    let meta = ok(c.env.send(std::slice::from_ref(&ix), &[&kp]));
+    let ev = IxEvents::of_instruction(&meta, 0, &ix);
+    assert!(ev.coverage_pause && ev.signers.contains(&kp.pubkey()));
+    let after = c.env.svm.clone();
+    assert_eq!(c.ix(&pre, &ev), Ok(()), "the real instruction passes");
+    let mutants: [CaseMutant; 6] = [
+        Box::new(|c: &mut Case| {
+            let mut m = c.market();
+            m.tier ^= 1;
+            c.set_market(&m);
+        }),
+        // M7-SEC-3: a set (not a clear) that moves `coverage_cleared_at`.
+        Box::new(|c: &mut Case| {
+            let mut m = c.market();
+            m.coverage_cleared_at = c.env.now();
+            c.set_market(&m);
+        }),
+        Box::new(|c: &mut Case| {
+            let mut m = c.market();
+            m.set_flag(shortwin::state::MARKET_FLAG_PAUSED_OPENS, true);
+            c.set_market(&m);
+        }),
+        Box::new(|c: &mut Case| {
+            let v = c.mm.keys.market_vault;
+            let mut a = c.env.svm.get_account(&v).unwrap();
+            a.lamports -= 1;
+            c.env.svm.set_account(v, a).unwrap();
+        }),
+        Box::new(move |c: &mut Case| {
+            let k = other.market();
+            let mut a = c.env.svm.get_account(&k).unwrap();
+            a.data[invariants::MARKET_FLAGS_OFFSET] |= 1 << 6;
+            c.env.svm.set_account(k, a).unwrap();
+        }),
+        Box::new(|c: &mut Case| {
+            let k = pda::config();
+            let mut a = c.env.svm.get_account(&k).unwrap();
+            a.data[11] ^= 1;
+            c.env.svm.set_account(k, a).unwrap();
+        }),
+    ];
+    for (i, m) in mutants.iter().enumerate() {
+        c.env.svm = after.clone();
+        m(&mut c);
+        assert_eq!(c.ix(&pre, &ev), Err("I4"), "mutant {i}");
+    }
+    // M7-SEC-3: a clear of the set flag records the clock in `coverage_cleared_at` — the real
+    // one passes; one that records nothing, or another second, does not.
+    c.env.svm = after.clone();
+    let clear = shortwin_litesvm_tests::ix::set_coverage_pause(
+        &kp.pubkey(),
+        &market,
+        false,
+        shortwin::events::COVERAGE_REASON_KEEPER,
+    );
+    let pre_clear = invariants::snapshot(&c.env.svm, &[market, other_key]);
+    let meta = ok(c.env.send(std::slice::from_ref(&clear), &[&kp]));
+    let ev_clear = IxEvents::of_instruction(&meta, 0, &clear);
+    assert_eq!(c.market().coverage_cleared_at, c.env.now());
+    assert_eq!(c.ix(&pre_clear, &ev_clear), Ok(()), "the real clear passes");
+    let cleared = c.env.svm.clone();
+    for at in [0, c.env.now() - 1] {
+        c.env.svm = cleared.clone();
+        let mut m = c.market();
+        m.coverage_cleared_at = at;
+        c.set_market(&m);
+        assert_eq!(c.ix(&pre_clear, &ev_clear), Err("I4"), "cleared_at {at}");
+    }
+    // Not the coverage key's instruction (another signer): the clause does not apply.
+    c.env.svm = after;
+    let mut m = c.market();
+    m.tier ^= 1;
+    c.set_market(&m);
+    let foreign = IxEvents {
+        signers: vec![Pubkey::new_unique()],
+        ..ev
+    };
+    assert_eq!(c.ix(&pre, &foreign), Ok(()));
 }
 
 // ---- check_all ----------------------------------------------------------------------------
@@ -677,6 +788,84 @@ fn i7_trader_state_after_a_leg() {
     assert_eq!(c.ix(&pre, &ev), Err("I7"), "trader_base_ata owner changed");
 }
 
+/// I7's `trader_wsol` clause per venue (FUZZ-M7-1): a pump-curve leg never names the
+/// `trader_wsol` address (it trades native lamports; ARCH §2.4 rule 2 normalises the address on
+/// the WSOL venues only), so a third party's pre-funding stays through it — the clause is a delta:
+/// the leg leaves those lamports as they were, System-owned with no data. A curve leg that moved
+/// them either way, or left data, fails I7; after a WSOL leg the address must hold nothing.
+#[test]
+fn i7_trader_wsol_on_a_curve_leg_is_a_delta() {
+    let mut c = Case::new();
+    let p = c.position();
+    let wsol = c.mm.trader_wsol;
+    let donated = 3_000_000;
+    c.env.fund(&wsol, donated);
+    let pre = c.snapshot();
+    let mut open = c.open_event(&p, c.key);
+    open.s = quote_sell(&c.env, &c.mm, p.q);
+    let ev = IxEvents {
+        opens: vec![open],
+        ..IxEvents::default()
+    };
+    // The mock is a WSOL venue: its leg normalises the address, so the donation after it fails.
+    assert_eq!(c.ix(&pre, &ev), Err("I7"), "a WSOL leg left lamports");
+    // The same state as a curve market's (the venue byte rewritten, the base ATA empty).
+    let mut m = c.market();
+    m.venue = VenueKind::PumpCurve as u8;
+    let ata = m.trader_base_ata;
+    c.set_market(&m);
+    fixtures::set_token_account(
+        &mut c.env.svm,
+        &ata,
+        &c.mm.mint(),
+        &m.trader,
+        0,
+        TokenProgram::Spl,
+    );
+    assert_eq!(
+        c.ix(&pre, &ev),
+        Ok(()),
+        "a curve leg leaves a third party's pre-funding where it is"
+    );
+    let set = |c: &mut Case, lamports: u64, data: Vec<u8>, owner: Pubkey| {
+        c.env
+            .svm
+            .set_account(
+                wsol,
+                Account {
+                    lamports,
+                    data,
+                    owner,
+                    executable: false,
+                    rent_epoch: 0,
+                },
+            )
+            .unwrap();
+    };
+    set(
+        &mut c,
+        donated + 1,
+        Vec::new(),
+        anchor_lang::system_program::ID,
+    );
+    assert_eq!(c.ix(&pre, &ev), Err("I7"), "a curve leg added lamports");
+    set(
+        &mut c,
+        donated - 1,
+        Vec::new(),
+        anchor_lang::system_program::ID,
+    );
+    assert_eq!(c.ix(&pre, &ev), Err("I7"), "a curve leg took lamports");
+    set(&mut c, donated, vec![0; 165], anchor_spl::token::ID);
+    assert_eq!(c.ix(&pre, &ev), Err("I7"), "trader_wsol left open");
+    set(&mut c, donated, Vec::new(), anchor_lang::system_program::ID);
+    assert_eq!(c.ix(&pre, &ev), Ok(()));
+    // A migrating curve's leg is a curve leg too.
+    m.venue = VenueKind::PumpMigrating as u8;
+    c.set_market(&m);
+    assert_eq!(c.ix(&pre, &ev), Ok(()));
+}
+
 /// I9: waterfalls that do not conserve `V`; (patch) a close's rent split off the locked share.
 #[test]
 fn i9_waterfalls() {
@@ -1049,4 +1238,121 @@ fn real_flows_pass_every_hook() {
     close_ok(&mut env, &mm, &b, nonce);
     env.tick(&mm, 1);
     assert!(env.hook_checkpoints > 10);
+}
+
+/// A copy of an event (Anchor events do not derive `Clone`).
+fn dup(o: &Open) -> Open {
+    use anchor_lang::{AnchorDeserialize, AnchorSerialize};
+    let mut bytes = Vec::new();
+    o.serialize(&mut bytes).expect("serialize");
+    Open::deserialize(&mut bytes.as_slice()).expect("deserialize")
+}
+
+/// I19 (M7-SEC-6): the open's terms recomputed. A real open passes; the review's mutants — the
+/// D4 margin without its EMA leg, a tier one step too generous, a wallet beyond its cap, the
+/// open fee off by one, the deadline off by one, `N_open` off the venue's buyback — each fail it
+/// (event and position kept consistent with each other, so I3 does not fire first).
+#[test]
+fn i19_the_open_terms() {
+    let (mut env, mm) = setup();
+    env.crank(&mm);
+    env.warp(1);
+    env.check_invariants = false;
+    invariants::open_terms::allow_synthetic_opens(false);
+    let market = mm.market();
+    let mut b = env.borrower();
+    let pre = invariants::snapshot(&env.svm, &[market]);
+    let (res, nonce) = env.open(&mm, &mut b, Q);
+    let meta = ok(res);
+    let o: Open = shortwin_litesvm_tests::events::one(&meta);
+    let key = pda::position(&market, &b.key(), nonce).0;
+    let p0 = env.position(&mm, &b.key(), nonce);
+    let lamports0 = lamports(&env, &key);
+    let run = |env: &Env, o: &Open| {
+        let ev = IxEvents {
+            opens: vec![dup(o)],
+            ..IxEvents::default()
+        };
+        invariants::check_ix(&env.svm, &pre, false, &ev).map_err(|v| v.invariant)
+    };
+    assert_eq!(run(&env, &o), Ok(()), "the real open");
+    let put = |env: &mut Env, p: &ShortPosition| {
+        let rent = env
+            .svm
+            .minimum_balance_for_rent_exemption(ShortPosition::SPACE);
+        fixtures::set_borsh(
+            &mut env.svm,
+            &key,
+            p,
+            ShortPosition::SPACE,
+            lamports0 - rent,
+        );
+    };
+    // (1) M without the EMA leg (`margin_d4(s, n_open, None, …)`): M7-SEC-6's mutant A.
+    let tp = env.config().tiers[usize::from(o.tier)];
+    let m_spot = shortwin_math::risk::margin_d4(o.s, o.n_open, None, tp.cr_open_bps).unwrap();
+    assert!(
+        m_spot < o.m,
+        "the EMA leg binds on an honest open ({m_spot} vs {})",
+        o.m
+    );
+    let mut e = dup(&o);
+    let mut p = p0.clone();
+    (e.m, e.v, p.m, p.v) = (m_spot, o.s + m_spot, m_spot, o.s + m_spot);
+    put(&mut env, &p);
+    assert_eq!(run(&env, &e), Err("I19"), "D4 without its EMA leg");
+    // (2) A tier one step better (C → B: the tier's terms with it).
+    let better = o.tier.saturating_sub(1);
+    let tb = env.config().tiers[usize::from(better)];
+    let mut e = dup(&o);
+    let mut p = p0.clone();
+    e.tier = better;
+    p.tier = better;
+    p.cr_liq_bps = tb.cr_liq_bps;
+    p.penalty_bps = u16::try_from(tb.penalty_bps).unwrap();
+    p.max_liq_slip_bps = u16::try_from(tb.max_liq_slip_bps).unwrap();
+    (p.rate_base_bps, p.rate_slope1_bps, p.rate_slope2_bps) =
+        (tb.rate_base_bps, tb.rate_slope1_bps, tb.rate_slope2_bps);
+    e.deadline = p0.t_open + i64::from(tb.max_duration_s);
+    p.deadline = e.deadline;
+    put(&mut env, &p);
+    assert_ne!(better, o.tier);
+    assert_eq!(run(&env, &e), Err("I19"), "a tier too generous");
+    // (3) The open fee and (4) the deadline, off by one.
+    for mutate in [
+        (|e: &mut Open, p: &mut ShortPosition| {
+            e.fee_open += 1;
+            p.fee_open += 1;
+        }) as fn(&mut Open, &mut ShortPosition),
+        |e, p| {
+            e.deadline += 1;
+            p.deadline += 1;
+        },
+        |e, p| {
+            e.n_open += 1;
+            e.b_spot += 1;
+            p.n_open += 1;
+        },
+    ] {
+        let mut e = dup(&o);
+        let mut p = p0.clone();
+        mutate(&mut e, &mut p);
+        put(&mut env, &p);
+        assert_eq!(run(&env, &e), Err("I19"));
+    }
+    put(&mut env, &p0);
+    assert_eq!(run(&env, &o), Ok(()));
+    // (5) The wallet beyond `wallet_cap_bps` of OI_cap (M7-SEC-6's "wallet cap removed").
+    let ek = pda::exposure(&market, &b.key()).0;
+    let mut ex: WalletExposure = shortwin_litesvm_tests::read::borsh(&env.svm, &ek).unwrap();
+    let saved = ex.clone();
+    ex.q_open = ex.q_open.saturating_add(10_000 * Q);
+    let lam = lamports(&env, &ek);
+    let rent = env
+        .svm
+        .minimum_balance_for_rent_exemption(WalletExposure::SPACE);
+    fixtures::set_borsh(&mut env.svm, &ek, &ex, WalletExposure::SPACE, lam - rent);
+    assert_eq!(run(&env, &o), Err("I19"), "the wallet cap");
+    fixtures::set_borsh(&mut env.svm, &ek, &saved, WalletExposure::SPACE, lam - rent);
+    assert_eq!(run(&env, &o), Ok(()));
 }

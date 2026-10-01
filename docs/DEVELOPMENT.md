@@ -308,6 +308,45 @@ curve as a normal user (`CurveUser`) and builds the graduation path on the real 
 `set_global_creator_fee_configurable`, `set_fee_config`, `set_pump_deploy_slot`) change only
 pump's accounts.
 
+## The invariant fuzzer (M7; `tests/fuzz`)
+
+`tests/fuzz` (package `shortwin-fuzz`, a member of the root workspace, ARCHITECTURE §8.4) runs
+seeded **action sequences** on LiteSVM through the program-test harness, so every transaction
+runs `Env::send`'s I1–I13, I15–I19 and A26 hooks, plus the fuzzer's own oracles (the I10 / I17
+gates, the mock's differential exit oracle, I14 omissions, I4's coverage clause on the whole VM,
+governance and oracle rules, and the end-of-run liveness wind-down). It loads the same builds as
+the program tests. Build it without the deploy profile's fat LTO:
+
+```sh
+anchor build --tools-version v1.57 --arch v3 --ignore-keys && scripts/build-test-venue.sh
+export CARGO_PROFILE_RELEASE_LTO=false CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16
+cargo test -p shortwin-fuzz --release -- --nocapture       # the CI smoke: fixed seeds on every
+                                                           # profile, corpus replays, self-tests
+cargo run -p shortwin-fuzz --release -- run --profile all --duration 10m --jobs 8 --out fuzz-out --minimize
+cargo run -p shortwin-fuzz --release -- one --profile curve --seed 42 --actions 400   # one run, full summary
+cargo run -p shortwin-fuzz --release -- replay fuzz-out/crash-<profile>-<seed>-<sig>.json
+cargo run -p shortwin-fuzz --release -- tmin   fuzz-out/crash-<profile>-<seed>-<sig>.json  # -> min-….json
+```
+
+Profiles: `mock`, `mixed` (test-venue build), `curve`, `pumpswap`, `amm-v4`, `cpmm` (release
+build, mainnet forks), or `all`. Each job owns one seed stream; the action list is a pure function
+of `(profile, seed)`, so `replay` and `tmin` are deterministic. `fuzz-out/` (gitignored) receives
+crash files (profile, seed, action list, signature, logs) and `summary.json` (counts and the
+coverage proxies: instructions landed, events, error codes returned). A minimised reproducer of a
+finding goes into `tests/fuzz/corpus/`; mark it `"status": "fixed"` once fixed and `corpus_replays`
+keeps it as a regression. **The M7 exit criterion "fuzz clean ≥ 24 h"** (ARCHITECTURE §9) is a
+`run --profile all --duration 24h --jobs 8 --actions 400 --minimize` with `CARGO_TARGET_DIR`
+outside the repository (≈ 270–310 actions/s on 5 jobs), or three nights of CI's `fuzz-nightly`
+once the branch is on main. Details: [`tests/fuzz/README.md`](../tests/fuzz/README.md).
+
+**Mutation testing** (M7-SEC-6): `scripts/mutants.sh [--fuzz 3m] [--work DIR] [mutant …]` builds the
+tests and the fuzzer once from the checkout, then each of the M7 security review's seven one-line
+program mutants (the test-venue or the release build of a private copy), and requires the mutant's
+named tests and a short fuzz run of its profile to fail against it — a surviving mutant is a missing
+oracle. It needs the unmutated builds the fork tests load (`SHORTWIN_SO`, `SHORTWIN_TEST_VENUE_SO`,
+`MOCK_CPAMM_SO`, `COMPLETE_CURVE_SO`, default `target/…`); `--work` outside the repository keeps
+the per-mutant builds out of `target/`.
+
 ## Benches
 
 Six standalone Cargo workspaces with their own lockfiles keep Mollusk 0.15.1 out of the
@@ -364,6 +403,26 @@ cargo test --manifest-path tests/bench/m6_cu/Cargo.toml --locked -- --nocapture
 # M6_CU_WRITE=1 rewrites results.md, M6_TRACE_WRITE=1 trace.md, M6_DEPTH_WRITE=1 depth.md;
 # SHORTWIN_SO / M6_WRAPPER_SO override the ELFs
 ```
+
+The M7 keeper benches are output directories, not workspaces: the real keeper measured by the
+services workspace's scenario tests, in release (`#[ignore]`d in the default suite):
+
+```sh
+anchor build --tools-version v1.57 --arch v3 --ignore-keys && scripts/build-test-venue.sh
+# ECON §5.8's cost-model inputs (CU per instruction and venue, crank batches, cadence, cost per
+# market-day, load at 50 / 200 markets) -> tests/bench/m7_keeper/results.{md,json}; the PumpSwap
+# 4-extras T-SIZE through the keeper's tables (OWNER-M7-1) -> tests/bench/m7_keeper/tsize_pumpswap.*;
+# T-CASCADE under the keeper's CU-per-slot policy -> tests/bench/m7_cascade/results.{md,json}
+M7_COST_WRITE=1 M7_CASCADE_WRITE=1 cargo test --manifest-path services/Cargo.toml --release --locked \
+  -p shortwin-keeper-litesvm --test scenarios -- --include-ignored --nocapture m7_cost:: pamm_alt:: cascade::
+python3 docs/design/sim/keeper_cost.py > docs/design/sim/out/keeper_cost.txt   # ECON §5.8's tables;
+                                                  # asserts its constants equal m7_keeper/results.json
+```
+
+`results.json` records the SHA-256 of the two program builds it measured; re-run after a program
+change (the load section's wall times and RPC capacity vary run to run). See
+[`tests/bench/m7_keeper/README.md`](../tests/bench/m7_keeper/README.md) and
+[`tests/bench/m7_cascade/README.md`](../tests/bench/m7_cascade/README.md).
 
 (The `cu_math` bench program and the `m3_cu` / `m5_cu` / `m6_cu` wrappers are separate crates, so their
 build commands name their manifests; the no-bare-`cargo build-sbf` rule is about the short.win
@@ -442,7 +501,18 @@ scenarios (`pamm.rs`, `pamm_lp.rs` — M6R-1: the keeper's per-second liquidity-
 knows the Raydium venues through the adapters' own account lists and the TEST-ONLY mock venue
 only with the feature `test-venue` of its scenario crate; the release keeper binary must not
 contain the mock's id (CI checks it). What each duty does and what v1 leaves out:
-[`services/README.md`](../services/README.md). Do not share one `CARGO_TARGET_DIR` between two
+[`services/README.md`](../services/README.md). **M7:** the O17 degraded mode — the designated
+pauser (`[coverage_pause] enabled = true` on exactly one instance, `--coverage-keypair
+coverage.json`, a key separate from the fee payer, installed on chain by Governance's timelocked
+`Authorities` change) sends `set_coverage_pause` when a market with open positions loses coverage
+and clears it 600 s after coverage returns —, the O17 budget (`[budget]`), duty 11's
+`crank_sol_usd` (`[oracle]`), the T-CASCADE CU-per-slot policy, `shortwin-build-alt market`
+(per-market lookup tables) and `shortwin-v1-probe` (U25: does a mainnet leader take v1?
+`--rpc <url> --keypair <funded> --send`, two transaction fees). **The degraded-mode runbook and
+drill** (install the role, run exactly one pauser, what pages, a lost or compromised key, the
+five drill steps on devnet or a local validator): [`services/README.md` "Degraded mode: runbook
+and drill"](../services/README.md#degraded-mode-runbook-and-drill-o17); the same steps run
+in-process on every CI run (`keeper-litesvm` `coverage_pause`). Do not share one `CARGO_TARGET_DIR` between two
 checkouts of the repository: Cargo keys path crates the same way in both and mixes their
 artifacts.
 
@@ -483,9 +553,16 @@ scripts/build-alt.sh print  --rpc https://api.mainnet-beta.solana.com   # + the 
 scripts/build-alt.sh create --rpc <url> --keypair payer.json [--authority auth.json] [--freeze]
 scripts/build-alt.sh extend --rpc <url> --keypair payer.json --table <alt>   # add what is missing
 scripts/build-alt.sh check  --rpc <url> --table <alt>        # exit 1 if an address is missing
+scripts/build-alt.sh market --rpc <url> --market <market> [--table <alt>] [--keypair payer.json]  # M7
 ```
 
-Put the table's address into the keeper's `lookup_tables` (`keeper.example.toml`). `--freeze` is
+Put the table's address into the keeper's `lookup_tables` (`keeper.example.toml`). **This table
+(A28 plus the four `VenueExtras` PDAs) is what the M7 measurements recommend as the normative A28**
+(OWNER-M7-1, ARCH §6.4): through it the PumpSwap open with the largest extras set and a separate
+fee payer fits (1,207–1,208 B), which A28 as enumerated does not. `market` (M7) lists a market's
+own table — 21 addresses on PumpSwap, 4,348,480 lamports of rent, recoverable — and creates it
+with `--keypair`; it lifts v0 crank batches to 8–10 and is the fallback for the 4-extras open.
+`--freeze` is
 the owner's call: a frozen table can never be deactivated but can never be extended either (a new
 pump recipient then rides inline, 31 B). Re-run `check` whenever pump rotates recipients.
 `tests/litesvm/tests/tx_size_raydium.rs` sizes every Raydium transaction through this table, and
@@ -531,15 +608,18 @@ model (`params::validate_econ`) are listed, not simulated; the program checks th
   `programs/shortwin`, the straddle helper `programs/complete_curve` (M5; crate `complete-curve`,
   also a member of `Anchor.toml [workspace]`; the services workspace links it for its Anchor
   types) and the program tests `tests/litesvm` (which share this lockfile so the
-  Agave line LiteSVM resolves is pinned next to the program's, C1-14). The release profile
+  Agave line LiteSVM resolves is pinned next to the program's, C1-14), and since M7 the
+  invariant fuzzer `tests/fuzz` (it links the program tests, so it shares the lockfile too). The release profile
   keeps `overflow-checks = true` (Anchor refuses to build without it), `lto = "fat"` and
   `codegen-units = 1`. The workspace also holds the TEST-ONLY mock venue `tests/mock_cpamm`
   (an Anchor program, also a member of `Anchor.toml [workspace]`; never deployed, A49).
 - **Cargo, services** (`services/Cargo.toml`, own `Cargo.lock`): host-only crates — the keeper
   and its chain client today, the indexer later (ARCHITECTURE §1.2, §7).
 - **Cargo, benches**: `tests/bench/cu_math`, `tests/bench/m1_cu`, `tests/bench/m2_cu`,
-  `tests/bench/m3_cu` and `tests/bench/m5_cu` (each of the last two with its own TEST-ONLY CPI
-  wrapper program), standalone workspaces with their own lockfiles (Mollusk 0.15.1).
+  `tests/bench/m3_cu`, `tests/bench/m5_cu` and `tests/bench/m6_cu` (each of the last three with
+  its own TEST-ONLY CPI wrapper program), standalone workspaces with their own lockfiles (Mollusk
+  0.15.1). `tests/bench/m7_keeper` and `tests/bench/m7_cascade` (M7) are output only, written by
+  the services workspace's scenario tests.
 - **`shortwin-math`** (ARCHITECTURE §2.2): `#![no_std]`, zero runtime dependencies,
   `#![deny(clippy::arithmetic_side_effects, clippy::cast_possible_truncation,
   clippy::cast_sign_loss, clippy::unwrap_used)]` (also on the program and
@@ -586,7 +666,7 @@ wrapped transaction first. Nothing in the program changes.
 | `clippy` | guard that `shortwin-math` keeps `#![no_std]`, the §2.2 denies and zero runtime deps; clippy `-D warnings` on `shortwin-math`, on the workspace, and on `shortwin` alone (the release feature set, without `test-venue`) |
 | `test` | `cargo test -p shortwin-math -p shortwin-math-wasm` with `PROPTEST_CASES=2000` |
 | `vectors` | re-runs every `tests/vectors/*/gen_*.py` with Python 3.14 and fails on any diff; T-CONFIG host part: `config_check.py` prints `OK` for the defaults, and `scripts/test_config_gate.py` |
-| `deny` | `cargo deny check` (`deny.toml`) and `cargo audit` on the workspace and the five bench lockfiles |
+| `deny` | `cargo deny check` (`deny.toml`) and `cargo audit` on the workspace and the six bench lockfiles |
 | `wasm` | wasm32 release build of `shortwin-math` and `shortwin-math-wasm` |
 | `cu-math` | T-CU-MATH bench (`tests/bench/cu_math`) |
 | `anchor-build` | Agave 4.1.2 + Anchor CLI 1.2.0, `anchor build --tools-version v1.57 --arch v3 --ignore-keys` (shortwin, the `complete_curve` helper and the mock) and `scripts/build-test-venue.sh`; asserts SBPF v3 on all four artifacts; A49: the release `shortwin.so` carries neither the test-venue marker nor the mock id (and `complete_curve.so` not the mock id), the test-venue build and `mock_cpamm.so` do; uploads the `.so` files, both IDLs and the TS types |
@@ -596,5 +676,11 @@ wrapped transaction first. Nothing in the program changes.
 | `m2-cu` | M2 CU bench and T-TRACE (`tests/bench/m2_cu`) within budget and 64 trace entries |
 | `m3-cu` | M3 CU bench, T-TRACE and stack depth on Raydium (`tests/bench/m3_cu`): builds the TEST-ONLY CPI wrapper (SBPF v3 asserted), every Raydium-path instruction (M4's `propose_pool` / `execute_pool_switch` included) within budget, the worst-case transactions at their exact trace counts, every path through 0–3 wrapper levels |
 | `m5-cu` | M5 CU bench, T-TRACE, the T-SIZE preview, T-STRADDLE (curve part) and stack depth on the pump curve (`tests/bench/m5_cu`): builds its TEST-ONLY CPI wrapper (SBPF v3 asserted), every curve-path instruction within ARCH §6.1's PROPOSED limits, the worst-case curve transactions at their exact trace counts and v0 + ALT sizes, the straddle's tx1 (the `complete_curve` helper) and tx2 (`migrate_v2`), every path through 0–3 wrapper levels |
-| `services` | the services workspace: fmt, clippy (also the keeper without `test-venue`), cargo-deny, cargo-audit, unit tests and the LiteSVM scenarios (mock, Raydium and pump fork, the helper included) on the `anchor-build` artifacts, and the A49 check on the release keeper binary |
-| `t-size` | T-SIZE on Raydium (`--test tx_size_raydium`) and on the pump curve (`--test tx_size_pump_it`), the size tables in the log, and the protocol ALT's static part (`scripts/build-alt.sh print`, uploaded as an artifact) |
+| `m6-cu` | M6 CU bench, T-TRACE, T-SIZE, T-DEPTH and the graduation transition on PumpSwap (`tests/bench/m6_cu`): its TEST-ONLY CPI wrapper, every PumpSwap-path instruction within budget, the worst-case transactions at their exact trace counts and v0 + ALT sizes |
+| `t-pot` | T-POT: every `pool_model` trace replayed through the program in release (`lender_it traces::`, `SHORTWIN_TRACES=full`) |
+| `services` | the services workspace: fmt, clippy (also the keeper without `test-venue`), cargo-deny, cargo-audit, unit tests and the LiteSVM scenarios (mock, Raydium and pump fork, the helper included; M7's degraded-mode drill, duty 11, the PumpSwap tables) on the `anchor-build` artifacts, and the A49 check on the release keeper binary |
+| `t-size` | T-SIZE on Raydium (`--test tx_size_raydium`), on the pump curve (`--test tx_size_pump_it`) and on PumpSwap (`--test tx_size_pumpswap_it`), the size tables in the log, and the protocol ALT's static part (`scripts/build-alt.sh print`, uploaded as an artifact) |
+| `fuzz-smoke` | M7: `cargo test --release -p shortwin-fuzz` — the fuzzer's fixed-seed smoke on every profile, the corpus replays (a reproducer marked fixed must pass) and its self-tests; crash files uploaded on failure |
+| `m7-keeper-bench` | M7: the keeper's cost inputs, the PumpSwap 4-extras T-SIZE and T-CASCADE in release (`m7_cost::`, `pamm_alt::`, `cascade::`; the tests' own gates), the regenerated `tests/bench/m7_*` compared with the committed ones (a warning) |
+| `fuzz-nightly` | M7: on the `schedule` trigger (main only) or `workflow_dispatch` with `fuzz_duration`: one 5 h `shortwin-fuzz run` shard per profile, failures minimised and uploaded, the job failing on any crash; every other job skips the `schedule` trigger |
+| `mutants` | M7-SEC-6: on the `schedule` trigger (main) or `workflow_dispatch`: `scripts/mutants.sh` — the LiteSVM tests and the fuzzer built once from the checkout (the oracle), then each of the M7 security review's seven one-line program mutants built and run against its named tests and a 3-minute fuzz of its profile; a mutant that survives either fails the job (a missing oracle) |

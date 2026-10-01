@@ -190,11 +190,15 @@ pub enum TierVenue {
 }
 
 /// The cached Pyth SOL/USD price (`OracleCache`; ADOPTED Q8): USD per SOL is
-/// `price·10^expo`.
+/// `price·10^expo`, its confidence interval `±conf·10^expo`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct OraclePrice {
     /// Pyth price mantissa.
     pub price: i64,
+    /// Pyth confidence (same exponent). [`assign`] converts the USD thresholds at
+    /// `price − conf`, the low end of the interval (M7-SEC-7): a lower SOL price is a larger
+    /// `θ` in lamports, so the uncertainty never tiers a market more generously.
+    pub conf: u64,
     /// Pyth exponent.
     pub expo: i32,
     /// Pyth publish time, unix seconds.
@@ -341,7 +345,8 @@ fn below_threshold_wide(
 /// ```
 ///
 /// with `Λ` from [`liquidity_lamports`], `age = now − graduated_at` and
-/// `θ_lamports = θ_usd_e6·10⁹/(price·10^(expo+6))` compared exactly. Anything that makes
+/// `θ_lamports = θ_usd_e6·10⁹/(price·10^(expo+6))` compared exactly, `price` the conservative
+/// `oracle.price − oracle.conf` (M7-SEC-7; a non-positive one tiers C). Anything that makes
 /// the inputs unusable (unknown graduation time, bad oracle, `λ_min = 0`) tiers as C,
 /// the tier with the largest cushion.
 pub fn assign(inp: &TierInputs) -> Tier {
@@ -351,7 +356,9 @@ pub fn assign(inp: &TierInputs) -> Tier {
         Err(_) => return Tier::C,
     };
     let stale = inp.now.saturating_sub(inp.oracle.publish_time) > i64::from(inp.oracle_stale_s);
-    let price = match u64::try_from(inp.oracle.price) {
+    // M7-SEC-7: the conservative end of the confidence interval (≤ `oracle_max_conf_bps` of the
+    // price, which `crank_sol_usd` enforces).
+    let price = match u64::try_from(inp.oracle.price).map(|p| p.saturating_sub(inp.oracle.conf)) {
         Ok(p) if p > 0 && !stale => p,
         _ => return Tier::C,
     };
@@ -394,6 +401,7 @@ mod tests {
             // $121.20 per SOL, Pyth style.
             oracle: OraclePrice {
                 price: 12_120_000_000,
+                conf: 0,
                 expo: -8,
                 publish_time: now - 30,
             },
@@ -401,6 +409,22 @@ mod tests {
             theta_a_usd_e6: 500_000_000_000,
             theta_b_usd_e6: 100_000_000_000,
         }
+    }
+
+    /// M7-SEC-7: the thresholds convert at `price − conf`, the low end of the confidence
+    /// interval: a market exactly at θ_A on the mid price tiers B once the interval is counted, and
+    /// a confidence as wide as the price fails safe to C.
+    #[test]
+    fn the_confidence_interval_never_tiers_more_generously() {
+        let mut at = inputs(2_063, AGE_A_S);
+        assert_eq!(assign(&at), Tier::A);
+        at.oracle.conf = 5_000_000; // $0.05 on $121.20 (4 bp)
+        assert_eq!(assign(&at), Tier::B, "Λ just above θ_A at the mid price");
+        let mut b = inputs(2_100, AGE_A_S);
+        b.oracle.conf = 5_000_000;
+        assert_eq!(assign(&b), Tier::A, "comfortably above θ_A");
+        b.oracle.conf = u64::try_from(b.oracle.price).unwrap();
+        assert_eq!(assign(&b), Tier::C, "price − conf ≤ 0");
     }
 
     #[test]

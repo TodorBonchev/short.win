@@ -397,6 +397,7 @@ impl<'a> FitContext<'a> {
             tiers: &config.tiers,
             oracle: OraclePrice {
                 price: oracle.price,
+                conf: oracle.conf,
                 expo: oracle.expo,
                 publish_time: oracle.publish_time,
             },
@@ -1415,6 +1416,7 @@ mod tests {
         let fresh = FitContext {
             oracle: OraclePrice {
                 price: 100_000_000_000,
+                conf: 0,
                 expo: -8,
                 publish_time: now,
             },

@@ -1069,6 +1069,7 @@ fn predicted_cap(env: &Env, pm: &PammMarket, lambda: u32) -> Capacity {
         graduated_at: now - 7 * 86_400,
         oracle: OraclePrice {
             price: 12_120_000_000,
+            conf: 0,
             expo: -8,
             publish_time: now,
         },

@@ -2818,6 +2818,74 @@
       ]
     },
     {
+      "name": "set_coverage_pause",
+      "docs": [
+        "The keeper's `coverage_authority` pauses or resumes new opens on one market for lost",
+        "keeper coverage (degraded mode; O17). Opens only; moves nothing."
+      ],
+      "discriminator": [
+        23,
+        246,
+        170,
+        138,
+        239,
+        63,
+        245,
+        123
+      ],
+      "accounts": [
+        {
+          "name": "coverage_authority",
+          "docs": [
+            "`config.coverage_authority` (the keeper's pause-opens-only key; O17)."
+          ],
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "docs": [
+            "The market, bound to its PDA `[\"market\", mint]` with the stored bump (`Market::is_pda`;",
+            "M1-SEC-6)."
+          ],
+          "writable": true
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "paused",
+          "type": "bool"
+        },
+        {
+          "name": "reason",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "set_pause",
       "docs": [
         "Pauses or resumes new opens, globally or on one market."
@@ -5268,7 +5336,8 @@
     {
       "name": "CoveragePauseSet",
       "docs": [
-        "`set_coverage_pause` (O17)."
+        "`set_coverage_pause` (O17): `paused_coverage` set or cleared on `market` by `by` (the",
+        "`coverage_authority`), with the reason code ([`COVERAGE_REASON_KEEPER`])."
       ],
       "type": {
         "kind": "struct",
@@ -5292,6 +5361,10 @@
           {
             "name": "reason",
             "type": "u8"
+          },
+          {
+            "name": "by",
+            "type": "pubkey"
           }
         ]
       }
@@ -5943,8 +6016,9 @@
           {
             "name": "coverage_authority",
             "docs": [
-              "Keeper key that may only set/clear a market's `paused_coverage` (A69). Default =",
-              "disabled until O17."
+              "Keeper key that may only set/clear a market's `paused_coverage` (`set_coverage_pause`;",
+              "A69, O17). `Pubkey::default()` = the role disabled (the `initialize_config` default);",
+              "governance installs or rotates it with a timelocked `Authorities` change."
             ],
             "type": "pubkey"
           },
@@ -7209,11 +7283,23 @@
             "type": "pubkey"
           },
           {
+            "name": "coverage_cleared_at",
+            "docs": [
+              "M7-SEC-3 (was `_reserved[0..8]`): the unix second `set_coverage_pause(false)` last cleared",
+              "a set `paused_coverage` flag. `open_short` refuses until `COVERAGE_CLEAR_DELAY_S` after it",
+              "(`CoveragePaused`; `engine::guard::open_static`), so the `coverage_authority` key cannot",
+              "bracket an open on a coverage-paused market — `[clear, open_short, set]` in one",
+              "transaction or one second — and the flag stays visibly cleared for the keeper's reads",
+              "before any open can land. 0 on existing accounts (no delay)."
+            ],
+            "type": "i64"
+          },
+          {
             "name": "_reserved",
             "type": {
               "array": [
                 "u8",
-                176
+                168
               ]
             }
           }

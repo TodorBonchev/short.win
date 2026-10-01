@@ -28,6 +28,8 @@ solana-message.workspace = true
 solana-signature.workspace = true
 solana-signer.workspace = true
 solana-transaction.workspace = true
+# The build digests of the M7 cost report (tests/bench/m7_keeper; already in this lockfile).
+solana-sha256-hasher = "3"
 
 [[test]]
 name = "scenarios"

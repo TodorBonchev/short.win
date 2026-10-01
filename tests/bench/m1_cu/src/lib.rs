@@ -292,6 +292,23 @@ fn set_pause_market() -> Prepared {
     prepared(env, ix, &[&pause])
 }
 
+/// `set_coverage_pause` (M7, O17; ARCH §3.1): the keeper's pause-opens-only key pauses one
+/// market, the role installed the way production installs it (Governance's timelocked
+/// `Authorities` change, `Env::enable_coverage_authority`).
+fn set_coverage_pause_market() -> Prepared {
+    let mut env = Env::initialized();
+    let (k, _) = env.install_market(TokenProgram::Spl, 6);
+    env.enable_coverage_authority();
+    let cov = env.coverage_authority.insecure_clone();
+    let ix = ix::set_coverage_pause(
+        &cov.pubkey(),
+        &k.market,
+        true,
+        shortwin::events::COVERAGE_REASON_KEEPER,
+    );
+    prepared(env, ix, &[&cov])
+}
+
 fn disable_venue() -> Prepared {
     let env = Env::initialized();
     let pause = env.pause_authority.insecure_clone();
@@ -550,7 +567,8 @@ fn crank_against_fresh_cache() -> Prepared {
     prepared(env, ix, &[])
 }
 
-/// Every M1 instruction (ARCH §9 M1), in the order of ARCH §3.1–§3.3 and §3.9.
+/// Every M1 instruction (ARCH §9 M1), in the order of ARCH §3.1–§3.3 and §3.9; since M7 also
+/// `set_coverage_pause` (O17), an admin flag of §3.1.
 pub fn cases() -> Vec<Case> {
     let case = |handler, case, budget, setup| Case {
         handler,
@@ -570,6 +588,12 @@ pub fn cases() -> Vec<Case> {
         case("cancel_config", "pending `Params`", ADMIN, cancel_config),
         case("set_pause", "global", ADMIN_FLAG, set_pause_global),
         case("set_pause", "one market", ADMIN_FLAG, set_pause_market),
+        case(
+            "set_coverage_pause",
+            "one market, role installed by the timelock (M7)",
+            ADMIN_FLAG,
+            set_coverage_pause_market,
+        ),
         case("disable_venue", "pump curve bit", ADMIN_FLAG, disable_venue),
         case(
             "flag_venue_upgraded",

@@ -204,10 +204,13 @@ pub fn pamm_claim_cashback_ix(user: &Pubkey, uva: &Pubkey, user_wsol: &Pubkey) -
     }
 }
 
+/// The number of [`fact_keys`].
+pub const FACT_KEYS_LEN: usize = 8;
+
 /// The accounts the keeper reads for a market's sweep and claim decisions, in order
 /// ([`SweepFacts::of`]): `ATA(trader, WSOL)`, `trader`, `trader_wsol`, the trader's base ATA, its
 /// pump UVA, `ATA(pAMM UVA(trader), WSOL)`, the Rent sysvar, the trader's pAMM UVA.
-pub fn fact_keys(market: &Market) -> [Pubkey; 8] {
+pub fn fact_keys(market: &Market) -> [Pubkey; FACT_KEYS_LEN] {
     [
         pump_curve::trader_wsol_ata(market),
         market.trader,

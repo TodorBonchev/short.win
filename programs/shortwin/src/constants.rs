@@ -33,6 +33,16 @@ pub const VENUE_EXTRAS_VERSION: u16 = 2;
 /// `Market.version` (ARCH §2.3.4).
 pub const MARKET_VERSION: u16 = 1;
 
+/// M7-SEC-3: seconds after `set_coverage_pause(false)` clears a set `paused_coverage` flag during
+/// which `open_short` still refuses (`CoveragePaused`; `Market.coverage_cleared_at`). The
+/// `coverage_authority` key then cannot bracket an open on a coverage-paused market,
+/// `[set_coverage_pause(false), open_short, set_coverage_pause(true)]`, in one transaction or one
+/// second: the flag stays cleared for at least this long before any open lands, which the
+/// keeper's per-second reads see (and alert) and its next tick sets again — longer than the
+/// keeper's read-to-landing loop (a `confirmed` read, a tick that waits for its confirmations,
+/// the send). Its only cost to an honest unpause: opens resume this much later. **PROPOSED**.
+pub const COVERAGE_CLEAR_DELAY_S: i64 = 5;
+
 // ---- governance --------------------------------------------------------------------------
 
 /// Compiled floor of `GlobalConfig.timelock_s` (A8): 24 h.

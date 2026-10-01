@@ -43,6 +43,7 @@ use crate::{events, pda, read};
 
 pub mod confirm;
 pub mod lender;
+pub mod open_terms;
 pub mod pool_select;
 pub mod positions;
 pub mod venue_view;
@@ -267,10 +268,78 @@ pub struct TxSnapshot {
     pub lender: lender::LenderSnapshot,
     /// The position-side state of the tracked markets ([`positions::check_ix`]).
     pub positions: positions::PositionsSnapshot,
+    /// I4's coverage clause (O17): while `coverage_authority` is installed, the key and every
+    /// account it could reach — `None` while the role is disabled (the default).
+    pub coverage: Option<CoverageSnapshot>,
+}
+
+/// The state `set_coverage_pause` could touch (I4's coverage clause, O17): every short.win
+/// account and the tracked markets' pool vaults, raw.
+#[derive(Clone)]
+pub struct CoverageSnapshot {
+    /// `GlobalConfig.coverage_authority` just before the instruction.
+    pub authority: Pubkey,
+    /// `(key, lamports, data)`.
+    pub accounts: Vec<(Pubkey, u64, Vec<u8>)>,
+}
+
+/// `Market.flags`' offset (discriminator included; bit 6 `paused_coverage` is in its low byte).
+pub const MARKET_FLAGS_OFFSET: usize = 10;
+
+/// `Market.coverage_cleared_at`'s offset (discriminator included; M7-SEC-3).
+pub const MARKET_COVERAGE_CLEARED_AT_OFFSET: usize = 2_928;
+
+/// [`CoverageSnapshot`] of `svm` while the role is enabled.
+fn coverage_snapshot(
+    svm: &LiteSVM,
+    config: Option<&shortwin::state::GlobalConfig>,
+    markets: &[Pubkey],
+) -> Option<CoverageSnapshot> {
+    let authority = config?.coverage_authority;
+    if authority == Pubkey::default() {
+        return None;
+    }
+    let mut accounts: Vec<(Pubkey, u64, Vec<u8>)> = svm
+        .get_program_accounts(&shortwin::ID)
+        .into_iter()
+        .map(|(k, a)| (k, a.lamports, a.data))
+        .collect();
+    for market in markets {
+        if let Some(m) = read::zc::<Market>(svm, market)
+            && let Some(a) = svm.get_account(&m.pool_vault)
+        {
+            accounts.push((m.pool_vault, a.lamports, a.data));
+        }
+    }
+    Some(CoverageSnapshot {
+        authority,
+        accounts,
+    })
 }
 
 /// Snapshots `markets` (and the latch and the fee recipient) before an instruction.
 pub fn snapshot(svm: &LiteSVM, markets: &[Pubkey]) -> TxSnapshot {
+    snapshot_with(svm, markets, true)
+}
+
+/// [`snapshot`] before an instruction of a transaction of `ixs` ([`crate::Env::send`]'s hot path):
+/// I4's coverage snapshot — every short.win account and tracked pool vault, raw — is taken only
+/// when an instruction of `ixs` is `set_coverage_pause`, the only instruction its clause judges
+/// ([`i4_coverage_authority_changes_only_its_flag`]), so nothing it checks is skipped.
+pub fn snapshot_for(svm: &LiteSVM, markets: &[Pubkey], ixs: &[Instruction]) -> TxSnapshot {
+    snapshot_with(svm, markets, ixs.iter().any(is_coverage_pause))
+}
+
+/// `ix` is short.win's `set_coverage_pause` (I4's coverage clause).
+pub fn is_coverage_pause(ix: &Instruction) -> bool {
+    use anchor_lang::Discriminator;
+    ix.program_id == shortwin::ID
+        && ix
+            .data
+            .starts_with(shortwin::instruction::SetCoveragePause::DISCRIMINATOR)
+}
+
+fn snapshot_with(svm: &LiteSVM, markets: &[Pubkey], coverage: bool) -> TxSnapshot {
     let snaps = markets
         .iter()
         .filter_map(|market| {
@@ -302,6 +371,11 @@ pub fn snapshot(svm: &LiteSVM, markets: &[Pubkey]) -> TxSnapshot {
         fee_recipient: config.map(|c| (c.fee_recipient, read::lamports(svm, &c.fee_recipient))),
         lender: lender::snapshot(svm, markets),
         positions: positions::snapshot(svm, markets),
+        coverage: if coverage {
+            coverage_snapshot(svm, config.as_ref(), markets)
+        } else {
+            None
+        },
     }
 }
 
@@ -334,6 +408,10 @@ pub struct IxEvents {
     pub venue_changed: Vec<VenueStateChanged>,
     /// The instruction's account keys (empty when unknown).
     pub accounts: Vec<Pubkey>,
+    /// The instruction's signers (empty when unknown; I4's coverage clause).
+    pub signers: Vec<Pubkey>,
+    /// The instruction is short.win's `set_coverage_pause` (I4's coverage clause).
+    pub coverage_pause: bool,
 }
 
 impl IxEvents {
@@ -358,6 +436,8 @@ impl IxEvents {
             cancelled: events::of_ix(meta, ix),
             venue_changed: events::of_ix(meta, ix),
             accounts: Vec::new(),
+            signers: Vec::new(),
+            coverage_pause: false,
         }
     }
 
@@ -369,6 +449,13 @@ impl IxEvents {
     ) -> Self {
         Self {
             accounts: instruction.accounts.iter().map(|m| m.pubkey).collect(),
+            signers: instruction
+                .accounts
+                .iter()
+                .filter(|m| m.is_signer)
+                .map(|m| m.pubkey)
+                .collect(),
+            coverage_pause: is_coverage_pause(instruction),
             ..Self::of(meta, ix)
         }
     }
@@ -434,6 +521,7 @@ pub fn check_ix(
     if admin_signed {
         i4_admin_moves_no_funds(svm, pre)?;
     }
+    i4_coverage_authority_changes_only_its_flag(svm, pre, ev)?;
     i17_no_open_on_flagged_venue(pre, &ev.opens)?;
     i17_no_curve_open_while_graduation_halted(pre, &ev.opens)?;
     i17_no_listing_on_flagged_venue(pre, &ev.created)?;
@@ -444,11 +532,92 @@ pub fn check_ix(
     lender::check_ix(svm, &pre.lender, ev)
 }
 
+/// I4's coverage clause (O17; ARCH §8.3: "`coverage_authority` can change only
+/// `paused_coverage`"): a `set_coverage_pause` signed by the installed `coverage_authority`
+/// leaves every short.win account and every tracked market's `pool_vault` byte for byte and
+/// lamport for lamport as it was, except bit 6 of the named market's `flags` and — when it
+/// cleared a set flag, and only then — the market's `coverage_cleared_at`, which it sets to the
+/// clock's second (M7-SEC-3: the clear delay). (The key's only power is that instruction — no
+/// other instruction reads `config.coverage_authority` — and the general I4 clause applies to
+/// anything else it signs, as to every admin key.)
+pub fn i4_coverage_authority_changes_only_its_flag(
+    svm: &LiteSVM,
+    pre: &TxSnapshot,
+    ev: &IxEvents,
+) -> Result<(), Violation> {
+    let Some(cov) = &pre.coverage else {
+        return Ok(());
+    };
+    if !ev.coverage_pause || !ev.signers.contains(&cov.authority) {
+        return Ok(());
+    }
+    let market = ev.accounts.get(2).copied().unwrap_or_default();
+    let bit = u8::try_from(shortwin::state::MARKET_FLAG_PAUSED_COVERAGE).unwrap_or(0);
+    for (key, lamports, data) in &cov.accounts {
+        let (l, d) = svm
+            .get_account(key)
+            .map_or((0, Vec::new()), |a| (a.lamports, a.data));
+        ensure(l == *lamports, "I4", || {
+            format!("set_coverage_pause changed the lamports of {key}: {lamports} → {l}")
+        })?;
+        if *key == market {
+            ensure(d.len() == data.len(), "I4", || {
+                format!("set_coverage_pause resized market {key}")
+            })?;
+            let at = MARKET_COVERAGE_CLEARED_AT_OFFSET..MARKET_COVERAGE_CLEARED_AT_OFFSET + 8;
+            for (i, (a, b)) in data.iter().zip(&d).enumerate() {
+                let mask = if i == MARKET_FLAGS_OFFSET {
+                    !bit
+                } else if at.contains(&i) {
+                    0
+                } else {
+                    0xff
+                };
+                ensure(a & mask == b & mask, "I4", || {
+                    format!(
+                        "set_coverage_pause changed byte {i} of market {key} ({a:#04x} → \
+                         {b:#04x}); only paused_coverage (and coverage_cleared_at) may change"
+                    )
+                })?;
+            }
+            // M7-SEC-3: `coverage_cleared_at` moves only to the clock's second, and only with a
+            // clear of a set flag.
+            let was_set = data.get(MARKET_FLAGS_OFFSET).is_some_and(|f| f & bit != 0);
+            let now_set = d.get(MARKET_FLAGS_OFFSET).is_some_and(|f| f & bit != 0);
+            let word = |v: &[u8]| {
+                v.get(at.clone())
+                    .and_then(|s| <[u8; 8]>::try_from(s).ok())
+                    .map(i64::from_le_bytes)
+            };
+            let (t0, t1) = (word(data), word(&d));
+            let now = svm
+                .get_sysvar::<anchor_lang::solana_program::clock::Clock>()
+                .unix_timestamp;
+            let cleared = was_set && !now_set;
+            ensure(
+                if cleared { t1 == Some(now) } else { t0 == t1 },
+                "I4",
+                || {
+                    format!(
+                        "set_coverage_pause on market {key}: flag {was_set} → {now_set}, \
+                         coverage_cleared_at {t0:?} → {t1:?} at clock {now}; only a clear of a \
+                         set flag records the clock, and it must"
+                    )
+                },
+            )?;
+        } else {
+            ensure(d == *data, "I4", || {
+                format!("set_coverage_pause changed account {key}")
+            })?;
+        }
+    }
+    Ok(())
+}
+
 /// I4: no admin-signed instruction decreases `pool_vault`, `ShortPosition` or `MarketVault`
 /// balances, except `sweep_protocol_fees` by ≤ `protocol_fees` to `config.fee_recipient`.
-/// (No instruction can change a venue program id: they are compile-time constants, C0-8.)
-///
-/// TRACK (M7/O17): `coverage_authority` can change only `paused_coverage`.
+/// (No instruction can change a venue program id: they are compile-time constants, C0-8.) The
+/// coverage clause is [`i4_coverage_authority_changes_only_its_flag`].
 pub fn i4_admin_moves_no_funds(svm: &LiteSVM, pre: &TxSnapshot) -> Result<(), Violation> {
     let recipient_gain = pre
         .fee_recipient

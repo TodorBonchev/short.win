@@ -77,6 +77,7 @@ fn tier_inputs(c: &TierCase) -> TierInputs {
         graduated_at: c.graduated_at.0,
         oracle: OraclePrice {
             price: c.price.0,
+            conf: 0,
             expo: c.expo.0,
             publish_time: c.publish_time.0,
         },
@@ -220,7 +221,7 @@ proptest! {
             p_ema: 1,
             now,
             graduated_at: now - age,
-            oracle: OraclePrice { price, expo: -8, publish_time: if stale { now - 3_601 } else { now } },
+            oracle: OraclePrice { price, conf: 0, expo: -8, publish_time: if stale { now - 3_601 } else { now } },
             oracle_stale_s: 3_600,
             theta_a_usd_e6: 500_000_000_000,
             theta_b_usd_e6: 100_000_000_000,

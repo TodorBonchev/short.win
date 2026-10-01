@@ -15,20 +15,90 @@ pub enum DegradedReason {
     Misses(u32),
     /// The program reported `CoverageGap{gap_s, open_positions}` (A69).
     CoverageGap { gap_s: i64, open_positions: u32 },
+    /// O17: the market's daily observation budget (`spent` of `budget` lamports) is exhausted
+    /// while it has open positions.
+    Budget { spent: u64, budget: u64 },
+}
+
+/// Why the keeper could not send (or had no need to hold) `set_coverage_pause` itself (O17): the
+/// `Degraded` alert's page to the Emergency multisig is then the pause path.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum PauseUnavailable {
+    /// This instance holds no `coverage_authority` key (`[coverage_pause] authority_keypair`).
+    NoKey,
+    /// `GlobalConfig.coverage_authority` is unset: the role is inert.
+    AuthorityUnset,
+    /// The key this instance holds is not the configured `coverage_authority` (rotated).
+    WrongKey { configured: Pubkey, held: Pubkey },
 }
 
 /// An alert.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Alert {
-    /// The keeper cannot meet duties 1–2 on `market`: page the Emergency multisig to
-    /// `set_pause(market)` with reason `KeeperCoverage` (or, once O17 enables the
-    /// `coverage_authority`, `set_coverage_pause(true)`).
+    /// The keeper cannot meet duties 1–2 on `market` (O17's degraded mode): the designated
+    /// pauser sends `set_coverage_pause(market, true)` itself ([`Alert::CoveragePauseSent`]);
+    /// without it (or when it cannot, [`Alert::CoveragePauseUnavailable`]) page the Emergency
+    /// multisig to `set_pause(market)` with reason `KeeperCoverage`. Exits continue.
     Degraded {
         market: Pubkey,
         reason: DegradedReason,
     },
     /// Coverage has been met for `recovery_s` again: the `KeeperCoverage` pause may lift.
     CoverageRestored { market: Pubkey, degraded_s: i64 },
+    /// O17: the keeper's `set_coverage_pause(market, paused)` landed (opens paused, or resumed).
+    CoveragePauseSent { market: Pubkey, paused: bool },
+    /// O17: the keeper's `set_coverage_pause(market, paused)` was refused in simulation or failed
+    /// on chain (`code`: the program's custom error); retried every second while the flag differs
+    /// from the coverage state. Alerted once per market, direction and detail.
+    CoveragePauseFailed {
+        market: Pubkey,
+        paused: bool,
+        code: Option<u32>,
+        detail: String,
+    },
+    /// O17: the designated pauser cannot send `set_coverage_pause` (`reason`): page the Emergency
+    /// multisig to `set_pause(market)` (reason `KeeperCoverage`) instead. Alerted once per market
+    /// and reason while the flag differs from the coverage state.
+    CoveragePauseUnavailable {
+        market: Pubkey,
+        paused: bool,
+        reason: PauseUnavailable,
+    },
+    /// Duty 11: the program refuses the configured feed's newer update (`reason`: the
+    /// `pyth::check` refusal the keeper's view found, or the simulation's error `code`) — the
+    /// cache keeps its last price and ages toward `oracle_stale_s` (every market's tier then falls
+    /// to C). Alerted once per reason until a crank lands.
+    OracleRefused {
+        publish_time: i64,
+        code: Option<u32>,
+        reason: String,
+    },
+    /// Duty 11: the `OracleCache` is `age_s` old (above `oracle.aging_alert_s`): the feed is not
+    /// updating, or its updates are refused. At `oracle_stale_s` every market's tier falls to C
+    /// (USD thresholds unreadable). At most hourly.
+    OracleAging { age_s: i64, publish_time: i64 },
+    /// Duty 11: the configured `PriceUpdateV2` account is missing or does not decode.
+    OracleUnreadable { account: Pubkey, detail: String },
+    /// O17: `market`'s `paused_coverage` flag was set when the keeper first saw it (a restart,
+    /// another instance's pause): it starts `Recovering`, and the flag clears after `recovery_s`
+    /// of met coverage.
+    CoveragePauseFound { market: Pubkey },
+    /// M7-SEC-3: `market`'s `paused_coverage` flag was found **cleared** while the keeper holds
+    /// the market degraded and had not cleared it itself — the `coverage_authority` key signed a
+    /// clear this instance did not send (another instance holding the key, or the key
+    /// compromised: the bracket `[clear, open_short, set]` the program's clear delay refuses).
+    /// The designated pauser sets it again in the same tick; page the Emergency multisig, which
+    /// can `set_pause(market)` (a pause this key cannot clear) and rotate the key.
+    CoveragePauseCleared { market: Pubkey },
+    /// M7-SEC-3: an open (`position`) landed on `market` while the keeper held it degraded
+    /// (degraded or recovering since `degraded_since`): with the flag set, only an open in the
+    /// clear delay's gap or a stale read of the flag lets that happen — page as for
+    /// [`Alert::CoveragePauseCleared`].
+    OpenWhileDegraded {
+        market: Pubkey,
+        position: Pubkey,
+        degraded_since: i64,
+    },
     /// The market's O17 daily observation budget is spent.
     BudgetExhausted {
         market: Pubkey,
@@ -166,7 +236,12 @@ impl Alert {
     /// Logs the alert.
     pub fn log(&self) {
         match self {
-            Self::Degraded { .. } | Self::BudgetExhausted { .. } => {
+            Self::Degraded { .. }
+            | Self::BudgetExhausted { .. }
+            | Self::CoveragePauseFailed { .. }
+            | Self::CoveragePauseUnavailable { .. }
+            | Self::CoveragePauseCleared { .. }
+            | Self::OpenWhileDegraded { .. } => {
                 tracing::error!(alert = ?self, "keeper coverage alert");
             }
             Self::VenueUpgraded { .. }
@@ -179,6 +254,11 @@ impl Alert {
                 tracing::error!(alert = ?self, "venue admin action");
             }
             Self::PoolPinned { .. } => tracing::error!(alert = ?self, "pool selection alert"),
+            Self::OracleRefused { .. }
+            | Self::OracleAging { .. }
+            | Self::OracleUnreadable { .. } => {
+                tracing::error!(alert = ?self, "oracle alert");
+            }
             Self::MigrateFailed { .. }
             | Self::StraddleWaiting { .. }
             | Self::TransitionFailed { .. } => {

@@ -128,6 +128,26 @@ pub fn set_pause(
     )
 }
 
+/// `set_coverage_pause(paused, reason)` on `market`, signed by `coverage_authority` (ARCH §3.1;
+/// O17). `reason` is `shortwin::events::COVERAGE_REASON_KEEPER` for every accepted call.
+pub fn set_coverage_pause(
+    coverage_authority: &Pubkey,
+    market: &Pubkey,
+    paused: bool,
+    reason: u8,
+) -> Instruction {
+    build(
+        shortwin::accounts::SetCoveragePause {
+            coverage_authority: *coverage_authority,
+            config: pda::config(),
+            market: *market,
+            event_authority: pda::event_authority(),
+            program: shortwin::ID,
+        },
+        shortwin::instruction::SetCoveragePause { paused, reason },
+    )
+}
+
 /// `disable_venue(bit)`, signed by `pause_authority`.
 pub fn disable_venue(pause_authority: &Pubkey, bit: u8) -> Instruction {
     build(

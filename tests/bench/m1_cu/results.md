@@ -4,27 +4,28 @@ Compute units of every M1 instruction (ARCH §9 M1) on the SBF program (`anchor 
 
 | Instruction | Case | Mollusk CU | LiteSVM CU | Budget | Budget source |
 |---|---|---|---|---|---|
-| `initialize_config` | defaults, 7 accounts created | 56074 | 56074 | 200000 | no §6.1 row; admin class (tests/litesvm cu.rs) |
-| `propose_config` | `Params` | 12831 | 12831 | 200000 | no §6.1 row; admin class (tests/litesvm cu.rs) |
-| `apply_config` | `Params` | 11373 | 11373 | 200000 | no §6.1 row; admin class (tests/litesvm cu.rs) |
-| `cancel_config` | pending `Params` | 6574 | 6574 | 200000 | no §6.1 row; admin class (tests/litesvm cu.rs) |
-| `set_pause` | global | 6085 | 6085 | 60000 | no §6.1 row; admin flag class (tests/litesvm cu.rs) |
-| `set_pause` | one market | 8063 | 8063 | 60000 | no §6.1 row; admin flag class (tests/litesvm cu.rs) |
+| `initialize_config` | defaults, 7 accounts created | 56073 | 56073 | 200000 | no §6.1 row; admin class (tests/litesvm cu.rs) |
+| `propose_config` | `Params` | 12833 | 12833 | 200000 | no §6.1 row; admin class (tests/litesvm cu.rs) |
+| `apply_config` | `Params` | 11375 | 11375 | 200000 | no §6.1 row; admin class (tests/litesvm cu.rs) |
+| `cancel_config` | pending `Params` | 6576 | 6576 | 200000 | no §6.1 row; admin class (tests/litesvm cu.rs) |
+| `set_pause` | global | 6089 | 6089 | 60000 | no §6.1 row; admin flag class (tests/litesvm cu.rs) |
+| `set_pause` | one market | 8067 | 8067 | 60000 | no §6.1 row; admin flag class (tests/litesvm cu.rs) |
+| `set_coverage_pause` | one market, role installed by the timelock (M7) | 7989 | 7989 | 60000 | no §6.1 row; admin flag class (tests/litesvm cu.rs) |
 | `disable_venue` | pump curve bit | 5700 | 5700 | 60000 | no §6.1 row; admin flag class (tests/litesvm cu.rs) |
-| `flag_venue_upgraded` | pump, 109 B mock ProgramData | 6026 | 6026 | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` |
-| `flag_venue_upgraded` | pump, 10 MiB ProgramData (U5) | 6026 | 6026 | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` |
-| `revalidate_venue` | pump, 109 B mock ProgramData | 8438 | 8438 | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` |
-| `revalidate_venue` | pump, 10 MiB ProgramData (U5) | 8438 | 8438 | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` |
-| `create_market` | SPL Token mint, `None` venue | 48541 | 48541 | 250000 | §6.1 `create_market` |
-| `create_market` | Token-2022 mint, `None` venue | 55886 | 55886 | 250000 | §6.1 `create_market` |
-| `flag_unsafe_mint` | freeze authority set | 6423 | 6423 | 60000 | no §6.1 row; crank class (§6.1 `crank_price`) |
-| `deposit` | first deposit, SPL Token | 34755 | 34755 | 100000 | §6.1 `deposit` / `withdraw` |
-| `deposit` | first deposit, Token-2022 | 36460 | 36460 | 100000 | §6.1 `deposit` / `withdraw` |
-| `deposit` | second deposit, SPL Token | 29453 | 29453 | 100000 | §6.1 `deposit` / `withdraw` |
-| `withdraw` | half the shares, SPL Token | 31371 | 31371 | 100000 | §6.1 `deposit` / `withdraw` |
-| `claim_sol` | pays a covered balance | 15988 | 15988 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |
+| `flag_venue_upgraded` | pump, 109 B mock ProgramData | 6028 | 6028 | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` |
+| `flag_venue_upgraded` | pump, 10 MiB ProgramData (U5) | 6028 | 6028 | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` |
+| `revalidate_venue` | pump, 109 B mock ProgramData | 8440 | 8440 | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` |
+| `revalidate_venue` | pump, 10 MiB ProgramData (U5) | 8440 | 8440 | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` |
+| `create_market` | SPL Token mint, `None` venue | 63545 | 63545 | 250000 | §6.1 `create_market` |
+| `create_market` | Token-2022 mint, `None` venue | 55890 | 55890 | 250000 | §6.1 `create_market` |
+| `flag_unsafe_mint` | freeze authority set | 6425 | 6425 | 60000 | no §6.1 row; crank class (§6.1 `crank_price`) |
+| `deposit` | first deposit, SPL Token | 34760 | 34760 | 100000 | §6.1 `deposit` / `withdraw` |
+| `deposit` | first deposit, Token-2022 | 37965 | 37965 | 100000 | §6.1 `deposit` / `withdraw` |
+| `deposit` | second deposit, SPL Token | 30958 | 30958 | 100000 | §6.1 `deposit` / `withdraw` |
+| `withdraw` | half the shares, SPL Token | 31375 | 31375 | 100000 | §6.1 `deposit` / `withdraw` |
+| `claim_sol` | pays a covered balance | 15990 | 15990 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |
 | `cover_deficit` | 1,000,000 lamports | 16388 | 16388 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |
 | `sync_lender` | lender on the current epoch | 13654 | 13654 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |
 | `sweep_protocol_fees` | the market creation fee | 11747 | 11747 | 60000 | no §6.1 row; crank class (§6.1 `crank_price`) |
-| `crank_sol_usd` | mainnet dump, empty cache | 6148 | 6148 | 60000 | no §6.1 row; crank class (§6.1 `crank_price`) |
-| `crank_sol_usd` | 55 s later, step checked | 6558 | 6558 | 60000 | no §6.1 row; crank class (§6.1 `crank_price`) |
+| `crank_sol_usd` | mainnet dump, empty cache | 6146 | 6146 | 60000 | no §6.1 row; crank class (§6.1 `crank_price`) |
+| `crank_sol_usd` | 55 s later, step checked | 6556 | 6556 | 60000 | no §6.1 row; crank class (§6.1 `crank_price`) |

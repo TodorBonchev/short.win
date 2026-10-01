@@ -36,6 +36,8 @@ pub const START_SLOT: u64 = 450_000_000;
 pub const FUNDING: u64 = 1_000_000_000_000;
 /// `GlobalConfig.venue_enabled`'s offset (discriminator included; `state::config` layout).
 pub const CONFIG_VENUE_ENABLED_OFFSET: usize = 12;
+/// `GlobalConfig.coverage_authority`'s offset (discriminator included).
+pub const CONFIG_COVERAGE_AUTHORITY_OFFSET: usize = 96;
 
 /// Path of the program under test: `$SHORTWIN_SO`, else `target/deploy/shortwin.so` (the
 /// output of `anchor build --tools-version v1.57 --arch v3`).
@@ -74,6 +76,11 @@ pub struct Env {
     pub pause_authority: Keypair,
     /// `GlobalConfig.fee_recipient` (a funded system account).
     pub fee_recipient: Keypair,
+    /// The keeper's `coverage_authority` key (O17). **Not installed** by
+    /// [`Env::default_init_args`] (the role stays inert, `Pubkey::default()`, as in production
+    /// until governance installs it): [`Env::enable_coverage_authority`] installs it through the
+    /// timelock, [`Env::plant_coverage_authority`] by a test-only write.
+    pub coverage_authority: Keypair,
     /// Run the invariant hooks in every [`Env::send`] (default `true`). Only a test that
     /// corrupts the state on purpose turns them off.
     pub check_invariants: bool,
@@ -128,6 +135,7 @@ impl Env {
             governance: Keypair::new(),
             pause_authority: Keypair::new(),
             fee_recipient: Keypair::new(),
+            coverage_authority: Keypair::new(),
             check_invariants: true,
             hook_checkpoints: 0,
             tracked: Vec::new(),
@@ -195,6 +203,59 @@ impl Env {
             util_kink_bps: shortwin_math::params::Params::DEFAULT.util_kink_bps,
             guard_slot: VENUE_GUARD_SLOTS_2026_09_27,
         }
+    }
+
+    /// Installs [`Env::coverage_authority`] as `GlobalConfig.coverage_authority` the way
+    /// production does (O17; ARCH §3.1): Governance proposes an `Authorities` change keeping the
+    /// other authorities, the clock advances by `timelock_s`, anyone applies it. Warps the clock.
+    pub fn enable_coverage_authority(&mut self) {
+        let c = self.config();
+        let change = shortwin::state::ConfigChange::Authorities {
+            governance: c.governance,
+            pause_authority: c.pause_authority,
+            coverage_authority: self.coverage_authority.pubkey(),
+            fee_recipient: c.fee_recipient,
+        };
+        let gov = self.governance.insecure_clone();
+        crate::errors::ok(self.send(
+            &[crate::ix::propose_config(&gov.pubkey(), change.clone())],
+            &[&gov],
+        ));
+        self.warp(i64::from(c.timelock_s));
+        crate::errors::ok(self.send(&[crate::ix::apply_config_for(&change)], &[]));
+        assert_eq!(
+            self.config().coverage_authority,
+            self.coverage_authority.pubkey()
+        );
+    }
+
+    /// **TEST-ONLY**: writes [`Env::coverage_authority`] into `GlobalConfig.coverage_authority`
+    /// (@96) directly — the state [`Env::enable_coverage_authority`] leaves, without its
+    /// `timelock_s` warp (for a scenario already running).
+    pub fn plant_coverage_authority(&mut self) {
+        let key = pda::config();
+        let mut acc = self
+            .svm
+            .get_account(&key)
+            .unwrap_or_else(|| panic!("no GlobalConfig at {key}"));
+        let at = CONFIG_COVERAGE_AUTHORITY_OFFSET;
+        acc.data[at..at + 32].copy_from_slice(self.coverage_authority.pubkey().as_ref());
+        self.svm
+            .set_account(key, acc)
+            .unwrap_or_else(|e| panic!("set GlobalConfig: {e:?}"));
+    }
+
+    /// `set_coverage_pause(paused, KeeperCoverage)` on `market`, signed by
+    /// [`Env::coverage_authority`].
+    pub fn set_coverage_pause(&mut self, market: &Pubkey, paused: bool) -> TxResult {
+        let kp = self.coverage_authority.insecure_clone();
+        let ix = crate::ix::set_coverage_pause(
+            &kp.pubkey(),
+            market,
+            paused,
+            shortwin::events::COVERAGE_REASON_KEEPER,
+        );
+        self.send(&[ix], &[&kp])
     }
 
     /// `apply_config()` with the optional accounts the pending change needs
@@ -282,7 +343,7 @@ impl Env {
         }
         self.track_markets_named_by(ixs);
         let admins = self.admin_keys();
-        let pre = invariants::snapshot(&self.svm, &self.tracked);
+        let pre = invariants::snapshot_for(&self.svm, &self.tracked, ixs);
         // The state before the last instruction (after every other one), unless a prefix
         // failed (the whole transaction then fails at the same instruction).
         let before_last = if ixs.len() > 1 {
@@ -409,7 +470,7 @@ impl Env {
                 }
             }
             self.hook_checkpoints += 1;
-            pre = invariants::snapshot(&svm, &markets);
+            pre = invariants::snapshot_for(&svm, &markets, ixs);
         }
         Some(pre)
     }

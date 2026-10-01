@@ -68,6 +68,7 @@ use anchor_lang::system_program::{self, Transfer};
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use anchor_spl::token_interface::{self, TransferChecked};
 use shortwin_math::fees::{self, CurveFeeSchedule, FeeBps, FeeTier};
+use shortwin_math::num::{mul_div, Rounding, WAD};
 use shortwin_math::quote::{CurveOffsets, CurveState};
 use shortwin_venue_state::{pump, pump_amm};
 
@@ -450,6 +451,7 @@ fn pricing_inputs(
     read: &[AccountInfo],
     curve: &pump::BondingCurve,
     live: &CurveState,
+    ema_fee: bool,
 ) -> Option<CurvePricingInputs> {
     let global_info = read.get(C_GLOBAL)?;
     let global_data = global_info.try_borrow_data().ok()?;
@@ -458,18 +460,22 @@ fn pricing_inputs(
     let fc_data = fc_info.try_borrow_data().ok()?;
     let fc = pump::read_fee_config(&fc_info.owner.to_bytes(), &fc_data).ok()?;
     let curve_tiers = math_tiers(fc.fee_tiers);
-    let fees = fees::pump_curve(
-        live.vt,
-        live.vq,
-        &CurveFeeSchedule {
-            tiers: &curve_tiers,
-            creator_fee_configurable: global.creator_fee_configurable(),
-            curve_creator_fee_bps: curve.creator_fee_bps,
-            creator_is_default: curve.creator_is_default(),
-            cap_bps: None,
-        },
-    )
-    .ok()?;
+    let schedule = CurveFeeSchedule {
+        tiers: &curve_tiers,
+        creator_fee_configurable: global.creator_fee_configurable(),
+        curve_creator_fee_bps: curve.creator_fee_bps,
+        creator_is_default: curve.creator_is_default(),
+        cap_bps: None,
+    };
+    let fees = fees::pump_curve(live.vt, live.vq, &schedule).ok()?;
+    // M7-SEC-5: the fee at the stored `P_ema`'s market cap (`⌊vQ·10¹⁵/vT⌋` is the price times
+    // the supply).
+    let p_ema = market.ema_price.get();
+    let fee_ppm_at_ema = (ema_fee && p_ema > 0)
+        .then(|| mul_div(p_ema, live.vt, WAD, Rounding::Floor).ok())
+        .flatten()
+        .and_then(|vq| fees::pump_curve(live.vt, vq, &schedule).ok())
+        .map_or(u32::MAX, |f| f.oneway_ppm());
     let offsets = CurveOffsets::of(live)?;
     // C4: the curve's base ATA (the tokens `migrate_v2` seeds the pool with, ARCH §4.3).
     let ata = read.get(C_CURVE_BASE_ATA)?;
@@ -496,13 +502,21 @@ fn pricing_inputs(
         pool_creator_fee_configurable: gc.creator_fee_configurable(),
         pool_disable_flags: gc.disable_flags(),
         coin_creator_is_default: curve.creator_is_default(),
+        fee_ppm_at_ema,
     })
 }
 
 /// The venue state of a `PumpCurve` or `PumpMigrating` market from its key-checked ReadSet
 /// (module docs). Never fails: whatever does not parse is "not executable" (A63); a curve that
 /// parses always yields its [`CurveVenue`] (the prologue's [`sync`] reads it).
-pub fn read_state(market: &Market, kind: VenueKind, read: &[AccountInfo]) -> VenueState {
+/// `ema_fee`: also resolve the fee at the stored `P_ema`'s market cap
+/// (`CurvePricingInputs::fee_ppm_at_ema`, M7-SEC-5; `open_short`'s pre-trade read only).
+pub fn read_state(
+    market: &Market,
+    kind: VenueKind,
+    read: &[AccountInfo],
+    ema_fee: bool,
+) -> VenueState {
     let mut st = VenueState::not_executable(kind);
     let Some(curve_info) = read.get(C_CURVE) else {
         return st;
@@ -523,7 +537,7 @@ pub fn read_state(market: &Market, kind: VenueKind, read: &[AccountInfo]) -> Ven
         _ => (CanonicalPool::Absent, None),
     };
     let pricing = if live.vt > 0 {
-        pricing_inputs(market, read, &curve, &live)
+        pricing_inputs(market, read, &curve, &live, ema_fee)
     } else {
         None
     };

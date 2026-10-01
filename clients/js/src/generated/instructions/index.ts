@@ -27,6 +27,7 @@ export * from "./openShort.ts";
 export * from "./proposeConfig.ts";
 export * from "./proposePool.ts";
 export * from "./revalidateVenue.ts";
+export * from "./setCoveragePause.ts";
 export * from "./setPause.ts";
 export * from "./setRouteBroken.ts";
 export * from "./setVenueExtras.ts";

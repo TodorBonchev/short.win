@@ -29,6 +29,12 @@
 //! batches hold [`KEEPER_BATCH_V0`] = 3 PumpSwap cranks (4 until M6R-1; the 4-crank batch is
 //! pinned over the limit).
 //!
+//! **M7 (OWNER-M7-1, measured by the keeper):** the composite is over only as the worst case here
+//! builds it, with a separate fee payer (a second signature and key, ≈ 96 B). The keeper pays its
+//! own fee (the "self-paid" column printed below): its `[crank, liquidate]` with 4 extras is
+//! 1,156–1,157 B through (a) and fits; the separate-payer open stays the one transaction over (a)
+//! (`tests/bench/m7_keeper/tsize_pumpswap.md`; ARCH §6.4).
+//!
 //! Run with `-- --nocapture` for the table.
 
 // `TxResult` is LiteSVM's own `TransactionResult` (as in the harness library).

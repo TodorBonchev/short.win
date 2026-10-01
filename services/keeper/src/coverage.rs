@@ -19,9 +19,18 @@
 //!   `P_ema`).
 //! - **Bursts** ([`MarketTrack::check_foreign`]): the keeper remembers the spot prices it read
 //!   in each second; an observation in a bucket (the open one, or the last completed one) that
-//!   deviates from that second's view by more than `burst_dev_bps` was not the keeper's — an
-//!   atomic `[pump, crank, dump]` bundle leaves exactly that — and starts 60 s of per-slot
-//!   observations. Only **prices** start a burst: the per-slot liquidity bursts M4F-1 added stay
+//!   deviates from that second's view by more than `burst_dev_bps` was not the keeper's, and —
+//!   **when the excursion reverted** (M7-SEC-2), the keeper's latest read, at or after that
+//!   second, more than `burst_dev_bps` away from the deviating extreme too — starts 60 s of
+//!   per-slot observations. An atomic `[pump, crank, dump]` bundle leaves exactly that: a bucket
+//!   extreme nobody else can see before or after it. A foreign price still there at the keeper's
+//!   next read is a genuine move (someone's crank after an honest trade, a trade landing between
+//!   the keeper's read and its own crank, another keeper instance on the other side of a trade),
+//!   which duty 1's per-second coverage above `ema_dev_bps` follows; as built at M7 each of those
+//!   started a burst, so one plain `crank_price` after any honest ≥ 2 % move bought 116 keeper
+//!   cranks charged to the O17 budget (the M7-SEC-2 reproducer: 51 such cranks, 0.000255 SOL,
+//!   spent the default 0.03-SOL budget). A price burst again needs a ≥ 2 % price round trip.
+//!   Only **prices** start a burst: the per-slot liquidity bursts M4F-1 added stay
 //!   reverted (M4G-2: an atomic `[deposit, crank_price, withdraw]` bought a 60-s per-slot burst,
 //!   25–150× the attacker's cost in the keeper's).
 //! - **Liquidity coverage** ([`MarketTrack::check_foreign`], FITS-2 (b), owner decision of
@@ -42,17 +51,36 @@
 //!   coverage (nothing there rests on the liquidity EMA). A venue change (graduation, a Raydium
 //!   adoption) rewrites the ring's liquidity to the new pool's, so the depths viewed before it are
 //!   dropped.
-//! - **Degraded mode** ([`MarketTrack::close_second`], [`MarketTrack::on_coverage_gap`]): a
-//!   second in which an observation was required and none landed is a miss;
-//!   `degraded_after_misses` consecutive misses, or a `CoverageGap` event from the program (an
-//!   integration after more than 30 s without one on a market with open positions), make the
-//!   market degraded: the keeper raises [`crate::alerts::Alert::Degraded`] (page the Emergency
-//!   multisig to pause opens with reason `KeeperCoverage`; `set_coverage_pause` itself waits
-//!   for O17). The state lifts after `recovery_s` (10 min) of met coverage
-//!   ([`crate::alerts::Alert::CoverageRestored`]).
-//! - **Budget** ([`MarketTrack::can_spend`]): lamports spent on observations per UTC day
-//!   against the O17 budget; an exhausted budget skips observations (visible as misses, hence
-//!   degraded mode), never exits.
+//! - **Degraded mode** ([`MarketTrack::close_second`], [`MarketTrack::on_coverage_gap`],
+//!   [`MarketTrack::on_budget_exhausted`]): a second in which an observation was required and
+//!   none landed is a miss; `degraded_after_misses` consecutive misses, a `CoverageGap` event
+//!   from the program (an integration after more than 30 s without one on a market with open
+//!   positions), or (O17) the market's daily observation budget exhausted while it has open
+//!   positions make the market degraded: the keeper raises [`crate::alerts::Alert::Degraded`]
+//!   and — the designated pauser holding the `coverage_authority` key (`[coverage_pause]`) —
+//!   sends `set_coverage_pause(market, true)`, which pauses opens only; otherwise the alert pages
+//!   the Emergency multisig to `set_pause` the market. The state lifts after `recovery_s`
+//!   (10 min) of met coverage ([`crate::alerts::Alert::CoverageRestored`]; seconds that require
+//!   nothing count as met, [`MarketTrack::advance`]), and the pause with it. **Timing
+//!   tolerances (M7-SEC-1):** a `CoverageGap` in the keeper's own transaction degrades only above
+//!   `idle_interval_s + gap_tolerance_s` (the program measures landing seconds, the keeper
+//!   schedules from its read: landing jitter makes 31–32-s gaps at the idle cadence — the keeper,
+//!   [`crate::config::CoverageConfig::gap_degrades_above`]); a tick that follows the previous
+//!   one by at most `1 + tick_gap_tolerance_s` seconds (a tick that waited for its confirmations)
+//!   misses only the skipped seconds that required per-second coverage, and only a longer skip
+//!   means the keeper was down (as built at M7 any skipped second restarted the recovery, so a
+//!   market whose ticks send never recovered). A market whose
+//!   on-chain `paused_coverage` flag is set when the keeper first sees it (a restart, another
+//!   instance's pause) starts `Recovering` ([`MarketTrack::sync_pause_flag`]).
+//! - **Budget** ([`MarketTrack::can_spend`]): lamports spent on coverage observations per UTC
+//!   day against the O17 budget; an exhausted budget skips them (misses) and, on a market with
+//!   open positions, degrades it at once (O17: opens paused, exits continue). The observations
+//!   exits depend on — per-second coverage of a position near a threshold (duty 1; without it
+//!   `P_ema` stays put and no liquidation becomes possible), a liquidatable or expired position
+//!   waiting for a fresh reference or its bound, the S3 chain — are charged but never
+//!   throttled; exits themselves, pool selection, graduation moves and `set_coverage_pause` are
+//!   neither charged nor throttled. What an exhausted budget stops is the rest: the idle
+//!   cadence, deviation bursts, the liquidity-anomaly and post-switch guard coverage, warm-ups.
 
 use std::collections::{HashMap, VecDeque};
 
@@ -84,8 +112,12 @@ pub type VenueId = (u8, Pubkey);
 /// What [`MarketTrack::check_foreign`] found.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Foreign {
-    /// The second of a newly detected foreign **price** (a burst started or extended; duty 2).
+    /// The second of a newly detected foreign **price** whose excursion reverted (a burst
+    /// started or extended; duty 2).
     pub price: Option<i64>,
+    /// The second of a foreign price the keeper's read in a later second still showed: a genuine
+    /// move, no burst (M7-SEC-2).
+    pub genuine: Option<i64>,
     /// The second of a newly detected foreign **liquidity** on a market with open positions
     /// (liquidity coverage started or extended; FITS-2 (b)).
     pub liquidity: Option<i64>,
@@ -125,6 +157,15 @@ impl CoverageState {
     pub fn is_degraded(&self) -> bool {
         !matches!(self, Self::Healthy)
     }
+
+    /// The second the market was degraded, while degraded or recovering.
+    pub fn degraded_since(&self) -> Option<i64> {
+        match *self {
+            Self::Healthy => None,
+            Self::Degraded { since } => Some(since),
+            Self::Recovering { degraded_since, .. } => Some(degraded_since),
+        }
+    }
 }
 
 /// One market's coverage bookkeeping (module docs).
@@ -134,8 +175,12 @@ pub struct MarketTrack {
     pub last_obs: Option<(i64, u64)>,
     /// A deviation burst runs while `now < burst_until`.
     pub burst_until: i64,
-    /// Seconds whose foreign deviation already started a burst.
-    burst_seen: Vec<i64>,
+    /// Seconds whose foreign price deviation is decided: it started a burst (reverted), or the
+    /// keeper's read in a later second found the price still there (a genuine move, M7-SEC-2).
+    price_decided: Vec<i64>,
+    /// The keeper's latest read: (second, spot price) — the reference that tells a reverted
+    /// excursion from a genuine move (M7-SEC-2).
+    spot_now: Option<(i64, u128)>,
     /// Liquidity-triggered per-second coverage runs while `now < liq_until` (FITS-2 (b)).
     pub liq_until: i64,
     /// Seconds whose foreign liquidity already started or extended the coverage.
@@ -157,6 +202,20 @@ pub struct MarketTrack {
     pub spend_day: i64,
     pub spent_today: u64,
     budget_alerted_day: Option<i64>,
+    /// The on-chain `paused_coverage` flag as last read ([`Self::sync_pause_flag`]).
+    pub flag_seen: Option<bool>,
+    /// The last second that was a miss or a degradation event (a refused observation, a gap,
+    /// seconds the keeper did not run while the market had open positions).
+    last_bad: i64,
+    /// The second of the keeper's last tick ([`Self::advance`]).
+    last_tick: Option<i64>,
+    /// The last tick second at which the market needed an observation every second (duties 1,
+    /// 2, 5; [`Self::note_every_second`]): the seconds a slow tick skips after it were required
+    /// (M7-SEC-1 (b)).
+    every_second_at: Option<i64>,
+    /// The open positions at the last read (M7-SEC-3: a new one while the market is held
+    /// degraded with its flag set is alerted).
+    positions_seen: Vec<Pubkey>,
 }
 
 impl MarketTrack {
@@ -177,6 +236,7 @@ impl MarketTrack {
             }
             self.venue = Some(venue);
         }
+        self.spot_now = price.map(|p| (now, p));
         let Some(p) = price else { return };
         match self.views.back_mut() {
             Some(v) if v.sec == now => {
@@ -204,6 +264,17 @@ impl MarketTrack {
         }
     }
 
+    /// Whether `position` was open at the last read ([`Self::set_positions`]).
+    pub fn knows_position(&self, position: &Pubkey) -> bool {
+        self.positions_seen.contains(position)
+    }
+
+    /// The open positions this read shows.
+    pub fn set_positions(&mut self, positions: impl Iterator<Item = Pubkey>) {
+        self.positions_seen.clear();
+        self.positions_seen.extend(positions);
+    }
+
     fn view_at(&self, sec: i64) -> Option<&View> {
         self.views.iter().find(|v| v.sec == sec)
     }
@@ -226,8 +297,14 @@ impl MarketTrack {
     /// Duty 2: checks the market's open bucket and last completed bucket for an observation
     /// the keeper did not make — a price, or (FITS-2 (b)) a liquidity, off the keeper's own view
     /// of that second by more than `burst_dev_bps`. A foreign price starts (or extends) a
-    /// per-slot burst of `burst_s` from that second. A foreign liquidity starts (or extends)
-    /// per-second coverage of `liq_cover_s` from that second, only when `open` (the market has
+    /// per-slot burst of `burst_s` from that second **if the excursion reverted** (M7-SEC-2):
+    /// the deviating extreme (a high above the keeper's range of that second and the one
+    /// before, a low below it) is more than `burst_dev_bps` off the keeper's latest read too
+    /// ([`Self::record_view`], the snapshot that already contains the bucket). A foreign price
+    /// the latest read — necessarily in a later second — still shows is a genuine move (no
+    /// burst: duty 1 follows a genuine move). Without a read (a venue with no price) a foreign
+    /// price starts a burst, as before. A foreign liquidity starts (or extends) per-second
+    /// coverage of `liq_cover_s` from that second, only when `open` (the market has
     /// open positions); without positions it is not even recorded. The last completed bucket's
     /// liquidity extremes are those of the ring entry that integrated it (the newest entry,
     /// pushed after that second with the same price extremes).
@@ -254,10 +331,34 @@ impl MarketTrack {
             if sec == 0 || lo == 0 {
                 continue;
             }
-            if !self.burst_seen.contains(&sec) && self.deviates(sec, lo, hi, dev) == Some(true) {
-                self.burst_seen.push(sec);
-                self.burst_until = self.burst_until.max(sec.saturating_add(cov.burst_s));
-                found.price = Some(sec);
+            if !self.price_decided.contains(&sec)
+                && let Some(v) = self.view_at(sec).copied()
+            {
+                // The keeper's own range around that second: its reads of that second and of the
+                // one before (M7-SEC-2: a price it saw a second earlier is the market moving
+                // away from it — another instance's or its own crank before a genuine move —,
+                // not an excursion nobody else can see).
+                let (vlo, vhi) = self
+                    .view_at(sec.saturating_sub(1))
+                    .map_or((v.lo, v.hi), |p| (v.lo.min(p.lo), v.hi.max(p.hi)));
+                let below = under(lo, vlo, dev);
+                let above = over(hi, vhi, dev);
+                if below || above {
+                    // M7-SEC-2: did the excursion revert by the keeper's latest read? A low the
+                    // price is back above, or a high it is back below, by more than `dev`. (A read
+                    // in the bucket's own second is part of the range above, so an excursion off
+                    // the range is off that read too: only a later read can show it stayed.)
+                    let reverted = self.spot_now.is_none_or(|(_, p)| {
+                        (below && under(lo, p, dev)) || (above && over(hi, p, dev))
+                    });
+                    self.price_decided.push(sec);
+                    if reverted {
+                        self.burst_until = self.burst_until.max(sec.saturating_add(cov.burst_s));
+                        found.price = Some(sec);
+                    } else {
+                        found.genuine = Some(sec);
+                    }
+                }
             }
             if !open || cov.liq_cover_s <= 0 || self.liq_seen.contains(&sec) {
                 continue;
@@ -272,7 +373,7 @@ impl MarketTrack {
                 found.liquidity = Some(sec);
             }
         }
-        for seen in [&mut self.burst_seen, &mut self.liq_seen] {
+        for seen in [&mut self.price_decided, &mut self.liq_seen] {
             if seen.len() > 64 {
                 seen.drain(..32);
             }
@@ -342,6 +443,13 @@ impl MarketTrack {
         self.note(now, true, false);
     }
 
+    /// Records that at `now` the market needed an observation every second (duty 1 near a
+    /// threshold or off its EMA, duty 2's burst, duty 5, a warm-up): the seconds a slow tick
+    /// skips after it were required ([`Self::advance`], M7-SEC-1 (b)).
+    pub fn note_every_second(&mut self, now: i64) {
+        self.every_second_at = Some(now);
+    }
+
     fn note(&mut self, now: i64, required: bool, landed: bool) {
         match &mut self.current {
             Some((s, r, l)) if *s == now => {
@@ -369,6 +477,7 @@ impl MarketTrack {
         self.current = None;
         let missed = required && !landed;
         if missed {
+            self.last_bad = self.last_bad.max(sec);
             self.miss_streak = self.miss_streak.saturating_add(1);
             if self.miss_streak >= cov.degraded_after_misses.max(1) {
                 self.degrade(
@@ -385,6 +494,133 @@ impl MarketTrack {
         Some(missed)
     }
 
+    /// Seconds that require no observation are met (a market whose positions closed while it
+    /// was degraded, one whose budget no longer matters, the seconds between idle observations):
+    /// a degraded market whose last closed second (`now − 1`) came after its last miss or
+    /// degradation event is recovering from the second after that event, and once the last
+    /// closed second is `recovery_s` past the start of the recovery with no miss pending the
+    /// degraded state lifts ([`Alert::CoverageRestored`]) — the rule [`Self::close_second`]
+    /// applies to required seconds, for the seconds that require none.
+    ///
+    /// Seconds in which the keeper did not run (no tick) on a market with open positions
+    /// (`open`), M7-SEC-1 (b):
+    /// - if the market needed an observation every second at the last tick
+    ///   ([`Self::note_every_second`]), each skipped second is a missed required second, exactly
+    ///   as [`Self::close_second`] counts one (`degraded_after_misses` consecutive ones degrade
+    ///   the market; an isolated one does not restart a recovery);
+    /// - if more than `tick_gap_tolerance_s` seconds were skipped, the keeper was down: those
+    ///   seconds were not covered, and a degraded or recovering market restarts its recovery
+    ///   after them (a healthy one on the idle cadence is degraded by the program's
+    ///   `CoverageGap` at its next integration);
+    /// - otherwise (the idle cadence, a tick that waited about a second for its confirmations)
+    ///   the skipped seconds required nothing and are met. As built at M7 any skipped second
+    ///   restarted the recovery, so on mainnet — where a tick that sends waits ≈ 1 s for
+    ///   `confirmed` — a degraded market whose ticks sent never recovered.
+    pub fn advance(
+        &mut self,
+        market: Pubkey,
+        now: i64,
+        open: bool,
+        cov: &CoverageConfig,
+        alerts: &mut Vec<Alert>,
+    ) {
+        let closed = now.saturating_sub(1);
+        if let Some(t) = self.last_tick
+            && now.saturating_sub(t) > 1
+            && open
+        {
+            let skipped = now.saturating_sub(t).saturating_sub(1);
+            if self.every_second_at == Some(t) {
+                self.last_bad = self.last_bad.max(closed);
+                self.miss_streak = self
+                    .miss_streak
+                    .saturating_add(u32::try_from(skipped).unwrap_or(u32::MAX));
+                if self.miss_streak >= cov.degraded_after_misses.max(1) {
+                    self.degrade(
+                        market,
+                        closed,
+                        DegradedReason::Misses(self.miss_streak),
+                        alerts,
+                    );
+                }
+            }
+            if skipped > cov.tick_gap_tolerance_s {
+                self.last_bad = self.last_bad.max(closed);
+                if let CoverageState::Recovering { degraded_since, .. } = self.state {
+                    self.state = CoverageState::Degraded {
+                        since: degraded_since,
+                    };
+                }
+            }
+        }
+        self.last_tick = Some(self.last_tick.map_or(now, |t| t.max(now)));
+        if closed > self.last_bad {
+            // The last closed second needed nothing, or was met: no miss is pending.
+            self.miss_streak = 0;
+        }
+        if let CoverageState::Degraded { since } = self.state
+            && closed > self.last_bad
+        {
+            self.state = CoverageState::Recovering {
+                degraded_since: since,
+                since: self.last_bad.saturating_add(1).max(since),
+            };
+        }
+        if let CoverageState::Recovering {
+            degraded_since,
+            since,
+        } = self.state
+            && self.miss_streak == 0
+            && closed.saturating_sub(since) >= cov.recovery_s
+        {
+            self.state = CoverageState::Healthy;
+            alerts.push(Alert::CoverageRestored {
+                market,
+                degraded_s: closed.saturating_sub(degraded_since),
+            });
+        }
+    }
+
+    /// The market's on-chain `paused_coverage` flag as this tick read it: a flag **newly** set
+    /// while the keeper holds the market healthy — found set at its first sight of the market (a
+    /// restart), or set by another instance since the last read — starts the market `Recovering`
+    /// from `now`, so the pause lifts only after `recovery_s` of this keeper's own met coverage
+    /// (never at once: two instances never flip-flop the flag). A flag that stays set through
+    /// the keeper's own degraded episode is the keeper's to lift once it has recovered.
+    /// `unpausing`: the keeper's own unpause of this market is pending (its flag still set until
+    /// it lands). Returns whether a set flag was adopted.
+    pub fn sync_pause_flag(&mut self, now: i64, paused_on_chain: bool, unpausing: bool) -> bool {
+        let newly = paused_on_chain && self.flag_seen != Some(true);
+        self.flag_seen = Some(paused_on_chain);
+        if newly && !unpausing && self.state == CoverageState::Healthy {
+            self.state = CoverageState::Recovering {
+                degraded_since: now,
+                since: now,
+            };
+            return true;
+        }
+        false
+    }
+
+    /// O17: the market's daily observation budget is spent while it has open positions —
+    /// degraded at once (opens pause; exits continue), not after `degraded_after_misses`.
+    pub fn on_budget_exhausted(
+        &mut self,
+        market: Pubkey,
+        now: i64,
+        budget: u64,
+        alerts: &mut Vec<Alert>,
+    ) {
+        let spent = self.spent_today;
+        self.last_bad = self.last_bad.max(now);
+        self.degrade(
+            market,
+            now,
+            DegradedReason::Budget { spent, budget },
+            alerts,
+        );
+    }
+
     /// The program reported a `CoverageGap` on this market (A69): degraded.
     pub fn on_coverage_gap(
         &mut self,
@@ -395,6 +631,7 @@ impl MarketTrack {
         alerts: &mut Vec<Alert>,
     ) {
         let before = self.state;
+        self.last_bad = self.last_bad.max(now.saturating_sub(1));
         self.degrade(
             market,
             now,
@@ -508,10 +745,19 @@ impl MarketTrack {
 
 /// Whether `[lo, hi]` reaches more than `dev_bps` below `vlo` or above `vhi`.
 fn outside(lo: u128, hi: u128, vlo: u128, vhi: u128, dev_bps: u32) -> bool {
+    under(lo, vlo, dev_bps) || over(hi, vhi, dev_bps)
+}
+
+/// `lo` is more than `dev_bps` below `v`.
+fn under(lo: u128, v: u128, dev_bps: u32) -> bool {
     let d = u128::from(dev_bps);
-    let below = lo.saturating_mul(10_000) < vlo.saturating_mul(10_000u128.saturating_sub(d));
-    let above = hi.saturating_mul(10_000) > vhi.saturating_mul(10_000u128.saturating_add(d));
-    below || above
+    lo.saturating_mul(10_000) < v.saturating_mul(10_000u128.saturating_sub(d))
+}
+
+/// `hi` is more than `dev_bps` above `v`.
+fn over(hi: u128, v: u128, dev_bps: u32) -> bool {
+    let d = u128::from(dev_bps);
+    hi.saturating_mul(10_000) > v.saturating_mul(10_000u128.saturating_add(d))
 }
 
 #[cfg(test)]
@@ -681,6 +927,7 @@ mod tests {
             f,
             Foreign {
                 price: None,
+                genuine: None,
                 liquidity: Some(20),
                 liq_started: true
             }
@@ -803,6 +1050,130 @@ mod tests {
         ));
     }
 
+    /// O17: a spent budget on a market with positions degrades it at once (one page); the
+    /// recovery lifts it after `recovery_s` even when nothing is required in between
+    /// ([`MarketTrack::advance`]); a flag found set at first sight starts the recovery.
+    #[test]
+    fn a_spent_budget_degrades_at_once_and_idle_seconds_recover() {
+        let c = cov();
+        let mk = Pubkey::new_unique();
+        let mut t = MarketTrack::default();
+        let mut alerts = Vec::new();
+        t.spend(100, 30_000_000);
+        assert!(!t.can_spend(mk, 100, Some(30_000_000), &mut alerts));
+        t.on_budget_exhausted(mk, 100, 30_000_000, &mut alerts);
+        t.on_budget_exhausted(mk, 101, 30_000_000, &mut alerts);
+        assert!(matches!(t.state, CoverageState::Degraded { since: 100 }));
+        assert!(matches!(
+            alerts.as_slice(),
+            [
+                Alert::BudgetExhausted { .. },
+                Alert::Degraded {
+                    reason: DegradedReason::Budget {
+                        spent: 30_000_000,
+                        budget: 30_000_000
+                    },
+                    ..
+                }
+            ]
+        ));
+        alerts.clear();
+        // An exit lands (never budgeted): the second is met, recovery starts...
+        t.landed(130, 0);
+        t.close_second(mk, 131, &c, &mut alerts);
+        assert!(matches!(
+            t.state,
+            CoverageState::Recovering { since: 130, .. }
+        ));
+        // ...but the next observation the budget skips degrades it again (the keeper calls
+        // `on_budget_exhausted` at every refusal), without a new page.
+        t.required(160);
+        t.on_budget_exhausted(mk, 160, 30_000_000, &mut alerts);
+        t.close_second(mk, 161, &c, &mut alerts);
+        assert!(matches!(t.state, CoverageState::Degraded { since: 100 }));
+        assert!(alerts.is_empty());
+        // A new UTC day: observations land again; nothing else is required in between (the idle
+        // cadence) and the recovery completes 600 s after the first met second.
+        let day = 86_400;
+        t.landed(day, 0);
+        t.close_second(mk, day + 1, &c, &mut alerts);
+        for now in (day + 2)..=(day + 600) {
+            t.advance(mk, now, true, &c, &mut alerts);
+            assert!(alerts.is_empty(), "{now}");
+        }
+        t.advance(mk, day + 601, true, &c, &mut alerts);
+        assert_eq!(t.state, CoverageState::Healthy);
+        assert!(matches!(
+            alerts.as_slice(),
+            [Alert::CoverageRestored { degraded_s, .. }] if *degraded_s == day + 600 - 100
+        ));
+        // Budget-degraded, then its positions close: nothing is required any more, so the
+        // seconds after the last refusal are met and the pause lifts 600 s after it.
+        let mut t = MarketTrack::default();
+        t.on_budget_exhausted(mk, 1_000, 1, &mut alerts);
+        alerts.clear();
+        for now in 1_001..=1_601 {
+            t.advance(mk, now, false, &c, &mut alerts);
+        }
+        assert!(matches!(
+            t.state,
+            CoverageState::Recovering { since: 1_001, .. }
+        ));
+        t.advance(mk, 1_602, false, &c, &mut alerts);
+        assert_eq!(t.state, CoverageState::Healthy);
+        assert_eq!(alerts.len(), 1);
+        // The keeper down while a market with positions recovers: the recovery restarts after
+        // the downtime (those seconds were not covered).
+        let mut t = MarketTrack::default();
+        t.on_budget_exhausted(mk, 2_000, 1, &mut alerts);
+        alerts.clear();
+        for now in 2_001..=2_300 {
+            t.advance(mk, now, true, &c, &mut alerts);
+        }
+        assert!(matches!(
+            t.state,
+            CoverageState::Recovering { since: 2_001, .. }
+        ));
+        t.advance(mk, 2_900, true, &c, &mut alerts);
+        assert!(matches!(t.state, CoverageState::Degraded { since: 2_000 }));
+        t.advance(mk, 2_901, true, &c, &mut alerts);
+        assert!(matches!(
+            t.state,
+            CoverageState::Recovering { since: 2_900, .. }
+        ));
+        for now in 2_902..=3_500 {
+            t.advance(mk, now, true, &c, &mut alerts);
+        }
+        assert!(t.state.is_degraded() && alerts.is_empty());
+        t.advance(mk, 3_501, true, &c, &mut alerts);
+        assert_eq!(t.state, CoverageState::Healthy);
+        alerts.clear();
+        // A set flag on a healthy market (first sight, another instance's pause): recovering
+        // from now; seen again while recovering, nothing more; still set once the keeper has
+        // recovered, it is the keeper's to lift (not adopted again).
+        let mut t = MarketTrack::default();
+        assert!(t.sync_pause_flag(500, true, false));
+        assert!(!t.sync_pause_flag(501, true, false));
+        assert!(matches!(
+            t.state,
+            CoverageState::Recovering { since: 500, .. }
+        ));
+        t.advance(mk, 1_101, false, &c, &mut alerts);
+        assert_eq!(t.state, CoverageState::Healthy);
+        assert!(!t.sync_pause_flag(1_101, true, false));
+        assert_eq!(t.state, CoverageState::Healthy);
+        // Cleared, then set again by someone else: adopted.
+        assert!(!t.sync_pause_flag(1_102, false, false));
+        assert!(t.sync_pause_flag(1_103, true, false));
+        alerts.clear();
+        let mut t = MarketTrack::default();
+        assert!(!t.sync_pause_flag(500, false, false));
+        assert_eq!(t.state, CoverageState::Healthy);
+        // The keeper's own unpause pending: not adopted again.
+        assert!(!t.sync_pause_flag(501, true, true));
+        assert_eq!(t.state, CoverageState::Healthy);
+    }
+
     #[test]
     fn the_budget_is_per_utc_day() {
         let mk = Pubkey::new_unique();
@@ -815,5 +1186,271 @@ mod tests {
         assert_eq!(alerts.len(), 1);
         assert!(t.can_spend(mk, 86_400, Some(10_000), &mut alerts));
         assert!(t.can_spend(mk, 86_401, None, &mut alerts));
+    }
+
+    /// A deterministic xorshift64 stream for the property tests.
+    struct Rng(u64);
+
+    impl Rng {
+        fn next(&mut self) -> u64 {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 7;
+            self.0 ^= self.0 << 17;
+            self.0
+        }
+        fn below(&mut self, n: u64) -> u64 {
+            self.next() % n.max(1)
+        }
+    }
+
+    /// One keeper tick of a market with open positions at `now`, as `Keeper::tick` drives the
+    /// track: close the previous second, advance, note the needs, the observation if due and
+    /// `lands`.
+    fn tick(
+        t: &mut MarketTrack,
+        mk: Pubkey,
+        now: i64,
+        needs: &MarketNeeds,
+        lands: bool,
+        c: &CoverageConfig,
+        alerts: &mut Vec<Alert>,
+    ) -> Option<Due> {
+        t.close_second(mk, now, c, alerts);
+        t.advance(mk, now, true, c, alerts);
+        if needs.per_second {
+            t.note_every_second(now);
+        }
+        let due = t.observation_due(needs, now, 0, c);
+        if due.is_some() {
+            t.required(now);
+            if lands {
+                t.landed(now, 0);
+            }
+        }
+        due
+    }
+
+    /// M7-SEC-1 (b), property: on the idle cadence, ticks that skip up to `tick_gap_tolerance_s`
+    /// seconds (a tick that waited for its confirmations) never degrade a healthy market, and a
+    /// degraded one recovers `recovery_s` after its last bad second whatever the skips — as
+    /// built at M7 any skipped second restarted the recovery, so it never completed.
+    #[test]
+    fn slow_ticks_on_the_idle_cadence_neither_degrade_nor_block_the_recovery() {
+        let c = cov();
+        let mk = Pubkey::new_unique();
+        let idle = MarketNeeds {
+            open_positions: true,
+            ..MarketNeeds::default()
+        };
+        for seed in 1..=200u64 {
+            let mut rng = Rng(seed.wrapping_mul(0x9e37_79b9_7f4a_7c15) | 1);
+            let mut t = MarketTrack::default();
+            let mut alerts = Vec::new();
+            let mut now = 1_000_000;
+            for _ in 0..3_000 {
+                tick(&mut t, mk, now, &idle, true, &c, &mut alerts);
+                now += 1 + i64::try_from(
+                    rng.below(u64::try_from(c.tick_gap_tolerance_s).unwrap() + 1),
+                )
+                .unwrap();
+            }
+            assert_eq!(t.state, CoverageState::Healthy, "seed {seed}");
+            assert!(alerts.is_empty(), "seed {seed}: {alerts:?}");
+            // Degraded by an outage (the gap's event in this tick's crank), then the same slow
+            // ticks: healthy again ≈ recovery_s later.
+            tick(&mut t, mk, now, &idle, true, &c, &mut alerts);
+            t.on_coverage_gap(mk, now, 45, 1, &mut alerts);
+            let degraded_at = now;
+            let mut lifted = None;
+            for _ in 0..3_000 {
+                now += 1 + i64::try_from(
+                    rng.below(u64::try_from(c.tick_gap_tolerance_s).unwrap() + 1),
+                )
+                .unwrap();
+                tick(&mut t, mk, now, &idle, true, &c, &mut alerts);
+                if t.state == CoverageState::Healthy {
+                    lifted = Some(now - degraded_at);
+                    break;
+                }
+            }
+            let lifted = lifted.unwrap_or_else(|| panic!("seed {seed}: never recovered"));
+            assert!(
+                (c.recovery_s..=c.recovery_s + 1 + c.tick_gap_tolerance_s).contains(&lifted),
+                "seed {seed}: recovered after {lifted} s"
+            );
+        }
+    }
+
+    /// M7-SEC-1 (b): a longer stall is the keeper down — a recovering market restarts its
+    /// recovery — and on a market that needed an observation every second the skipped seconds
+    /// are misses: `degraded_after_misses` (3) in a row degrade it, an isolated one does not.
+    #[test]
+    fn skipped_required_seconds_are_misses_and_a_long_stall_restarts_the_recovery() {
+        let c = cov();
+        let mk = Pubkey::new_unique();
+        let near = MarketNeeds {
+            per_second: true,
+            open_positions: true,
+            ..MarketNeeds::default()
+        };
+        let mut alerts = Vec::new();
+        // Isolated skipped seconds (a slow tick every other tick) never degrade.
+        let mut t = MarketTrack::default();
+        let mut now = 5_000;
+        for i in 0..600 {
+            tick(&mut t, mk, now, &near, true, &c, &mut alerts);
+            now += if i % 2 == 0 { 2 } else { 1 };
+        }
+        assert_eq!(t.state, CoverageState::Healthy);
+        assert!(alerts.is_empty(), "{alerts:?}");
+        // A tick three seconds late: three required seconds missed in a row.
+        tick(&mut t, mk, now, &near, true, &c, &mut alerts);
+        now += 4;
+        tick(&mut t, mk, now, &near, true, &c, &mut alerts);
+        assert!(t.state.is_degraded(), "{:?}", t.state);
+        assert!(matches!(
+            alerts.as_slice(),
+            [Alert::Degraded {
+                reason: DegradedReason::Misses(3),
+                ..
+            }]
+        ));
+        // The same skip on the idle cadence is nothing.
+        let idle = MarketNeeds {
+            open_positions: true,
+            ..MarketNeeds::default()
+        };
+        let mut t = MarketTrack::default();
+        let mut alerts = Vec::new();
+        tick(&mut t, mk, 9_000, &idle, true, &c, &mut alerts);
+        tick(&mut t, mk, 9_004, &idle, true, &c, &mut alerts);
+        assert_eq!(t.state, CoverageState::Healthy);
+        // A stall over the tolerance while recovering restarts the recovery.
+        t.on_coverage_gap(mk, 9_010, 40, 1, &mut alerts);
+        let mut now = 9_011;
+        for _ in 0..300 {
+            tick(&mut t, mk, now, &idle, true, &c, &mut alerts);
+            now += 1;
+        }
+        assert!(matches!(t.state, CoverageState::Recovering { .. }));
+        // A skip of the tolerance plus one second.
+        now += c.tick_gap_tolerance_s + 1;
+        tick(&mut t, mk, now, &idle, true, &c, &mut alerts);
+        assert!(
+            matches!(t.state, CoverageState::Degraded { .. }),
+            "{:?}",
+            t.state
+        );
+        let restart = now;
+        tick(&mut t, mk, now + 1, &idle, true, &c, &mut alerts);
+        assert!(
+            matches!(t.state, CoverageState::Recovering { since, .. } if since >= restart),
+            "{:?}",
+            t.state
+        );
+        // Within the tolerance it would not have.
+        let mut t2 = MarketTrack::default();
+        t2.on_coverage_gap(mk, 9_010, 40, 1, &mut alerts);
+        let mut now = 9_011;
+        for _ in 0..300 {
+            tick(&mut t2, mk, now, &idle, true, &c, &mut alerts);
+            now += 1;
+        }
+        // (`now` is already the second after the last tick: a skip of exactly the tolerance.)
+        now += c.tick_gap_tolerance_s;
+        tick(&mut t2, mk, now, &idle, true, &c, &mut alerts);
+        assert!(matches!(t2.state, CoverageState::Recovering { since, .. } if since <= 9_011));
+    }
+
+    /// M7-SEC-1, the review's property: required observations that land within two seconds of
+    /// schedule — every tick a second or a few late, the crank landing — never degrade a market,
+    /// on any mix of per-second and idle needs.
+    #[test]
+    fn observations_landing_within_two_seconds_of_schedule_never_degrade() {
+        let c = cov();
+        let mk = Pubkey::new_unique();
+        for seed in 1..=300u64 {
+            let mut rng = Rng(seed.wrapping_mul(0xd1b5_4a32_d192_ed03) | 1);
+            let mut t = MarketTrack::default();
+            let mut alerts = Vec::new();
+            let mut now = 2_000_000;
+            for _ in 0..2_000 {
+                let needs = MarketNeeds {
+                    per_second: rng.below(4) == 0,
+                    open_positions: true,
+                    ..MarketNeeds::default()
+                };
+                tick(&mut t, mk, now, &needs, true, &c, &mut alerts);
+                // The next tick 1–3 s later: at most two skipped seconds, never three in a row.
+                now += 1 + i64::try_from(rng.below(3)).unwrap();
+            }
+            assert!(alerts.is_empty(), "seed {seed}: {alerts:?}");
+            assert_eq!(t.state, CoverageState::Healthy, "seed {seed}");
+        }
+    }
+
+    /// M7-SEC-2, property: a foreign price the keeper's next read (in a later second) still shows
+    /// is a genuine move — no burst, decided once; an excursion that reverted by the next read is
+    /// a burst; a price the keeper itself saw the second before is no excursion at all.
+    #[test]
+    fn only_reverted_excursions_burst() {
+        let c = cov();
+        let p = 1_000_000u128;
+        let bucket = |sec: i64, lo: u128, hi: u128| {
+            let mut m = Market::zeroed();
+            m.b_sec = sec;
+            m.b_lo.set(lo);
+            m.b_hi.set(hi);
+            m
+        };
+        for seed in 1..=500u64 {
+            let mut rng = Rng(seed.wrapping_mul(0xa076_1d64_78bd_642f) | 1);
+            let mut t = MarketTrack::default();
+            // The keeper read `p` in second 10 (before the move).
+            t.record_view(10, Some(p), None, VENUE);
+            // Someone observed `p·(1 ± k)` in second 10, k ∈ (2.5 %, 50 %).
+            let k = 250 + rng.below(4_750);
+            let up = rng.below(2) == 0;
+            let moved = if up {
+                p * (10_000 + u128::from(k)) / 10_000
+            } else {
+                p * 10_000 / (10_000 + u128::from(k))
+            };
+            let m = if up {
+                bucket(10, p, moved)
+            } else {
+                bucket(10, moved, p)
+            };
+            let genuine = rng.below(2) == 0;
+            // The keeper's next read, 1–2 s later: the price still there (± 0.5 %), or back.
+            let later = 11 + i64::try_from(rng.below(2)).unwrap();
+            let jitter = 9_950 + u128::from(rng.below(100));
+            let next = if genuine { moved } else { p } * jitter / 10_000;
+            t.record_view(later, Some(next), None, VENUE);
+            let f = t.check_foreign(&m, &c, true);
+            if genuine {
+                assert_eq!((f.price, f.genuine), (None, Some(10)), "seed {seed}");
+                assert_eq!(t.burst_until, 0);
+            } else {
+                assert_eq!((f.price, f.genuine), (Some(10), None), "seed {seed}");
+                assert_eq!(t.burst_until, 10 + c.burst_s);
+            }
+            // Decided once.
+            assert_eq!(t.check_foreign(&m, &c, true), Foreign::default());
+        }
+        // In the bucket's own second the current read is part of the range: an extreme off it
+        // reverted (a burst at once).
+        let mut t = MarketTrack::default();
+        t.record_view(20, Some(p), None, VENUE);
+        t.record_view(20, Some(p * 101 / 100), None, VENUE);
+        let f = t.check_foreign(&bucket(20, p, p * 106 / 100), &c, true);
+        assert_eq!((f.price, f.genuine), (Some(20), None));
+        // A price the keeper read the second before (another instance's crank before a genuine
+        // move, M7-SEC-2 (c)): no excursion.
+        let mut t = MarketTrack::default();
+        t.record_view(30, Some(p), None, VENUE);
+        t.record_view(31, Some(p * 103 / 100), None, VENUE);
+        let m = bucket(31, p, p * 103 / 100);
+        assert_eq!(t.check_foreign(&m, &c, true), Foreign::default());
     }
 }

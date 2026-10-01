@@ -46,6 +46,11 @@ use crate::chain::{
 /// Largest `getMultipleAccounts` request.
 const MULTIPLE_ACCOUNTS_MAX: usize = 100;
 
+/// `getMultipleAccounts` requests of one read in flight at once (M7-SEC-8: a read of `n` keys
+/// takes ⌈n/100⌉ requests; awaited one after another they cost ⌈n/100⌉ round trips, in parallel
+/// about one). Results keep the keys' order.
+pub const MULTIPLE_ACCOUNTS_CONCURRENCY: usize = 8;
+
 /// The path of a Jito block engine's `sendBundle` endpoint (docs.jito.wtf).
 pub const JITO_BUNDLES_PATH: &str = "/api/v1/bundles";
 
@@ -252,23 +257,34 @@ impl Chain for RpcChain {
     }
 
     async fn accounts(&self, keys: &[Pubkey]) -> anyhow::Result<Vec<Option<AccountData>>> {
-        let mut out = Vec::with_capacity(keys.len());
-        for chunk in keys.chunks(MULTIPLE_ACCOUNTS_MAX) {
-            let res = self
-                .client
-                .get_multiple_accounts_with_commitment(chunk, self.commitment)
-                .await
-                .context("getMultipleAccounts")?;
-            out.extend(res.value.into_iter().map(|a| {
-                a.map(|a| AccountData {
-                    lamports: a.lamports,
-                    owner: a.owner,
-                    executable: a.executable,
-                    data: a.data,
+        use futures::stream::{self, StreamExt, TryStreamExt};
+        // M7-SEC-8: the chunks in parallel (at most `MULTIPLE_ACCOUNTS_CONCURRENCY`), in order.
+        let chunks: Vec<Vec<Option<AccountData>>> =
+            stream::iter(keys.chunks(MULTIPLE_ACCOUNTS_MAX))
+                .map(|chunk| async move {
+                    let res = self
+                        .client
+                        .get_multiple_accounts_with_commitment(chunk, self.commitment)
+                        .await
+                        .context("getMultipleAccounts")?;
+                    anyhow::Ok(
+                        res.value
+                            .into_iter()
+                            .map(|a| {
+                                a.map(|a| AccountData {
+                                    lamports: a.lamports,
+                                    owner: a.owner,
+                                    executable: a.executable,
+                                    data: a.data,
+                                })
+                            })
+                            .collect::<Vec<_>>(),
+                    )
                 })
-            }));
-        }
-        Ok(out)
+                .buffered(MULTIPLE_ACCOUNTS_CONCURRENCY)
+                .try_collect()
+                .await?;
+        Ok(chunks.into_iter().flatten().collect())
     }
 
     async fn account_headers(
