@@ -35,6 +35,9 @@ allow = [
     "ISC",
     # webpki-roots (the RPC client's TLS root store).
     "CDLA-Permissive-2.0",
+    # postgresql_embedded / _archive / _commands ("(Apache-2.0 OR MIT) AND PostgreSQL"; OSI
+    # approved, permissive): the indexer's TEST-ONLY embedded-Postgres fixture (INDEXER.md §11.1).
+    "PostgreSQL",
 ]
 
 # solana-config-interface declares its licence only as a file (the Apache-2.0 text, which

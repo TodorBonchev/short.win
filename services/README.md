@@ -9,6 +9,8 @@ workspace's lockfile.
 | `common/` (`shortwin-services-common`) | The chain-client abstraction (`Chain`: clock, accounts, account headers, program accounts — also by exact size, a `dataSize` filter on JSON-RPC —, blockhash, simulate, send, recent priority fees, Jito bundles: send and pre-flight), its JSON-RPC backend (`RpcChain`; bundles through a Jito block engine's `sendBundle`, **UNVERIFIED** against a live engine), transaction building: v1 (SIMD-0385) with a v0 fallback (ComputeBudget instructions, optional lookup tables), `⌈simulated × 1.1⌉` compute units, sizes, decompilation |
 | `keeper/` (`shortwin-keeper`) | Keeper v1 (ARCH §7.1 duties 1–14 on every venue, with duty 5's Raydium fast path and M7's O17 degraded mode through the `coverage_authority`) and its binary; `shortwin-build-alt`, the protocol address lookup table of A28 (`scripts/build-alt.sh`) and M7's per-market tables |
 | `keeper-litesvm/` (`shortwin-keeper-litesvm`) | TEST-ONLY: the in-process LiteSVM backend (the program-test harness's invariant hooks after every instruction of every keeper transaction; bundles executed in order and all-or-nothing) and the keeper's scenario tests on the mock venue and on the Raydium and pump mainnet forks |
+| `indexer/` (`shortwin-indexer`) | The indexer and API (ARCH §7.2, M8; contract [`docs/design/INDEXER.md`](../docs/design/INDEXER.md)): RPC backfill and live ingest of short.win, complete_curve and venue events into Postgres (`migrations/`), projections and analytics, axum REST + WebSocket (`openapi.yaml`), one binary `shortwin-indexer` (`migrate`, `backfill`, `live`, `serve`, `rollups`, `run`, `replay`, `rebuild`); its TEST-ONLY `embedded-pg` feature runs PostgreSQL 17 from the user cache (no Docker, no root); the reference deployment is `indexer/deploy/` |
+| `indexer-litesvm/` (`shortwin-indexer-litesvm`) | TEST-ONLY: records LiteSVM sessions (the program-test harness, the keeper scenarios) in the indexer's session format and replays them into an embedded Postgres, asserting the indexed state against the chain (INDEXER.md §11.3, §11.4) |
 
 ## Keeper
 
@@ -704,6 +706,111 @@ Measured on the mock: a v1 batch of 6 cranks is 1,360 B, 35 accounts, ≈ 146 k 
 (977–1,010 B); through the built ALT, a v0 batch of 3 is 887 B and an AMM v4 liquidation 705 B.
 The worst cases of every Raydium transaction are T-SIZE's (`tests/litesvm/tests/tx_size_raydium.rs`).
 
+## Indexer (M8)
+
+The contract is [`docs/design/INDEXER.md`](../docs/design/INDEXER.md) (the three tracks' file
+ownership is its §13; what was built and how it was integrated, §13.5); the schema is
+`indexer/migrations/`, the HTTP contract `indexer/openapi.yaml`, the configuration
+`indexer/indexer.example.toml` (every key with its default; `DATABASE_URL`, `SHORTWIN_RPC_URL`,
+`SHORTWIN_WS_URL` override).
+
+```sh
+cargo build --manifest-path services/Cargo.toml -p shortwin-indexer --release
+I=services/target/release/shortwin-indexer
+$I --config indexer.toml migrate          # the schema (the ingest role's DDL rights)
+$I --config indexer.toml backfill         # every signature stream back to its start, at finalized
+$I --config indexer.toml live             # logsSubscribe at confirmed + finality tracker + refresher
+$I --config indexer.toml serve            # REST (openapi.yaml) + /v1/ws, read-only role
+$I --config indexer.toml rollups          # the hourly rollups and the invocations retention prune
+$I --config indexer.toml run              # live + rollups + serve in one process (stops on the first failure)
+$I --config indexer.toml replay <session.jsonl>    # ingest a recorded session (§11.3)
+$I --config indexer.toml rebuild [--market <key>]  # recompute projections from events (§3.4)
+```
+
+**One writer per database:** `backfill`, `live`, `replay` and `rebuild` take an advisory lock; a
+second writer is refused (run `backfill` before `live`, or let `live` gap-fill from the cursors).
+`live_source = "yellowstone"` is refused (deferred to v1.1, INDEXER.md §14 IX-4).
+
+### Tests
+
+The tests run a real PostgreSQL 17.11 as the current user (`postgresql_embedded`, the zonky builds
+from Maven Central, which bundle their libraries): ~15 MB downloaded once into
+`~/.cache/shortwin/postgresql-zonky` (`SHORTWIN_PG_INSTALL_DIR` overrides), data under
+`services/target/tmp` (`SHORTWIN_PG_TMP` overrides), removed after each test. No Docker, no root, no
+system Postgres. The production binary never links it (the TEST-ONLY `embedded-pg` feature; build
+the binary with `-p shortwin-indexer`, as above — a `--workspace` build unifies the feature in
+through `indexer-litesvm`; CI checks the `-p` dependency set).
+
+```sh
+M=services/Cargo.toml
+cargo test --manifest-path $M -p shortwin-indexer --test pg_fixture      # the fixture gate (~2 s cached)
+cargo test --manifest-path $M -p shortwin-indexer                        # everything below but the replay harness
+cargo test --manifest-path $M -p shortwin-indexer-litesvm                # the replay harness (M8 exit; ~80 s)
+cargo test --manifest-path $M -p shortwin-indexer --test ingest_rpc_validator -- --ignored   # needs solana-test-validator
+```
+
+- **Ingest (INGEST):** decoder unit tests (`src/ingest/decode/tests.rs`: every catalog event in both
+  layouts, attribution at stack heights 2–4, forged log lines, quarantine, v0 / v1 conversion, the
+  venue decoders); `ingest_writer` (quarantine, upgrades, failed and truncated transactions,
+  metadata and admin rows); `ingest_sessions` on the committed sessions (`tests/data/ingest/`, 14
+  fixtures, and REPLAY's `tests/data/sessions/`): no quarantine, every session matches the chain,
+  catalog coverage, idempotent re-ingest, rebuild, out-of-order delivery, the finality tracker's
+  rollback, the single writer, NOTIFY. `ingest_rpc_validator` (opt-in) runs the RPC backfill, the
+  live source and finality promotion against a local `solana-test-validator` (~40 s).
+- **API (API):** `api_contract` (every operation and documented status against `openapi.yaml` on
+  the SQL seed `tests/data/api_seed.sql`, the seeded values, paging), `api_limits` (GCRA, keys,
+  `X-Forwarded-For`, timeouts, the query semaphore, CORS), `api_ws` (every channel, `since`,
+  rollback, lagged and flood closes, connection caps); `api_replayed` (the contract on every
+  committed session ingested through the pipeline, and the chain's end state served through the
+  API).
+- **Security review regressions (M8-SEC-1 … -15):** `security_ingest` (a mock JSON-RPC node: no
+  unserved or erroring transaction is skipped, short pages and unknown listing bounds, the live
+  missing-signature retries; the finality
+  tracker deletes history only on proof; a rollback resets the cursors; a disabled venue stays
+  disabled; trades on pools that are not the market's; longer event layouts; late eventless rows in
+  the rollups), `security_api` (probe key lookups, the percent-encoded search, the deployment's
+  trusted proxy and the WebSocket process cap, the replay's indexes / charge / semaphore, the
+  trigger-kept counters, and the 30-day load test: 2,592,000 keeper observations plus attacker rows,
+  every former whole-table page under 750 ms; ~3 min), two more `ingest_rpc_validator` tests
+  (INDEXER.md §11.5a).
+- **Analytics (ANALYTICS):** `analytics_views` — the SQL helpers against their Rust twins, the
+  views on a seeded history, the rollups (carry-forward, flows, late data, `reset_from`), retention.
+  Views are in `migrations/0006_analytics.sql`; the hourly rollups are `shortwin-indexer rollups`
+  (`analytics::run_jobs`: a pass every `rollup_interval_s`, then the invocations retention prune,
+  which keeps `initialize_config` and the admin instructions forever).
+- **Replay harness (REPLAY, `indexer-litesvm/`, TEST-ONLY):** records eight LiteSVM sessions from the
+  current builds (it needs `target/deploy/{shortwin,mock_cpamm,complete_curve}.so` and
+  `target/test-venue/deploy/shortwin.so`, as the keeper scenarios do), checks the contract's
+  projection rules against the chain at every checkpoint, then runs INDEXER.md §11.4 through the
+  real `ingest::ingest_session`: projections vs the chain, the SOL ledgers, the analytics and
+  rollups, idempotence, rebuild, out-of-order delivery, a rollback through the finality tracker
+  (the rollups recomputed), catalog coverage and the API's read model. `SHORTWIN_RECORD_SESSIONS=<dir>`
+  writes the sessions; `<dir>/committed/` holds the thinned copies for
+  `indexer/tests/data/sessions/`.
+
+### Deployment
+
+`indexer/deploy/`: `docker-compose.yml` (`postgres:17.11`, a one-shot `migrate`, exactly one
+`ingest` running `live`, `rollups`, two `api` replicas on host ports 127.0.0.1:8080–8081 for a load
+balancer on the host — `indexer.toml` trusts its address, the compose network's gateway
+`172.30.0.1`, for `X-Forwarded-For`; a balancer elsewhere: bind the ports to its network and list
+its address in `[api] trusted_proxies`), the `Dockerfile`
+(build context: the repository root, filtered by `Dockerfile.dockerignore` — no `target/`, no keys),
+`initdb/01-roles.sh` (`shortwin_ingest` owns the schema; `shortwin_api` is read-only with a 2 s
+statement timeout) and `indexer.toml`. Secrets are files under `deploy/secrets/` (git-ignored):
+
+```sh
+cd services/indexer/deploy
+mkdir -p secrets && for r in admin ingest api; do openssl rand -hex 24 > secrets/pg_$r; done
+export SHORTWIN_RPC_URL=https://… SHORTWIN_WS_URL=wss://…
+docker compose up -d postgres migrate
+docker compose run --rm ingest backfill    # history first (one writer)
+docker compose up -d                       # live ingest, rollups, the API
+```
+
+Not run on the development machine (no Docker); CI validates the compose file. The tested database
+path is the embedded fixture. Operations (alerts, rebuilds, re-ingesting a range): INDEXER.md §12.3.
+
 ## Lockfile and toolchain
 
 The lockfile was seeded from the root `Cargo.lock`: the scenario tests link the LiteSVM harness
@@ -712,5 +819,7 @@ component versions (C1-14), and the RPC client is the matching `solana-rpc-clien
 §1.1 names the 4.3 clients for services; they move together with LiteSVM / Mollusk). The
 keeper's `solana-address-lookup-table-interface` 3.1 is the version LiteSVM already brought in.
 Host toolchain from the root `rust-toolchain.toml`. `deny.toml` here is the root policy plus the
-TLS stack's licences (ISC, CDLA-Permissive-2.0); `cargo audit -f services/Cargo.lock` uses the
-root's ignore list.
+TLS stack's licences (ISC, CDLA-Permissive-2.0) and the PostgreSQL licence of the indexer's
+TEST-ONLY fixture crates; `cargo audit -f services/Cargo.lock` uses the root's ignore list. The
+indexer crates declare Rust 1.94 (sqlx 0.9, postgresql_embedded 0.21); M8 added their dependencies
+without changing any existing lockfile entry.

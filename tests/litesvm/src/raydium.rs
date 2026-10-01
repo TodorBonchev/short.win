@@ -740,7 +740,8 @@ impl Env {
         );
         let tx = solana_transaction::versioned::VersionedTransaction::try_new(msg, &all)
             .expect("sign v0");
-        let res = self.svm.send_transaction(tx);
+        // `execute_recorded`: the session recording hook (record.rs; INDEXER.md §11.3).
+        let res = self.execute_recorded(tx);
         self.svm.expire_blockhash();
         if self.check_invariants {
             if let Ok(meta) = &res {

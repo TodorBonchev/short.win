@@ -14,10 +14,12 @@ How to set up the toolchain, build and test short.win. The pins come from
 | Node | 24.21.0 LTS | `mise.toml` |
 | pnpm | 12.7.0 | `mise.toml`, `package.json` `packageManager` (with sha512) |
 | Python | 3.14, standard library only | test-vector generators, `scripts/config_gate.py`, `scripts/dump-fixtures.py` |
+| PostgreSQL (the indexer, M8) | 17.11: embedded in the tests (zonky builds through `postgresql_embedded` 0.21, user cache), `postgres:17.11` in the reference deployment | `services/indexer/src/testing/pg.rs` (`PG_VERSION`), `services/indexer/deploy/docker-compose.yml` |
 
 On-chain crates declare `rust-version = "1.89"`. They are compiled by the platform-tools
 rustc (1.95), not the host toolchain, and Cargo's resolver 3 uses that `rust-version` to
-prefer dependency versions that still build there.
+prefer dependency versions that still build there. The indexer crates (host only) declare
+1.94 (sqlx 0.9, postgresql_embedded 0.21).
 
 ## Setup
 
@@ -574,6 +576,78 @@ pump recipient then rides inline, 31 B). Re-run `check` whenever pump rotates re
 `tests/litesvm/tests/tx_size_raydium.rs` sizes every Raydium transaction through this table, and
 the keeper scenario `raydium_alt` builds it on chain with the script's own code.
 
+## Indexer and API (M8; `services/indexer`)
+
+The indexer is two crates of the services workspace (contract and as-built notes:
+[`docs/design/INDEXER.md`](design/INDEXER.md); crate guide:
+[`services/README.md` "Indexer (M8)"](../services/README.md#indexer-m8)): `shortwin-indexer` (RPC
+backfill and `logsSubscribe` live ingest of short.win, complete_curve and venue events into
+Postgres, projections, analytics views and hourly rollups, axum REST + WebSocket per
+`services/indexer/openapi.yaml`, one binary) and the TEST-ONLY `shortwin-indexer-litesvm` (records
+LiteSVM sessions and replays them into a database, asserting it against the chain).
+
+**Run it** against a Postgres you have (a local server, a managed one, or the reference
+docker-compose below) and an RPC node that serves `getTransaction` with
+`maxSupportedTransactionVersion: 1`:
+
+```sh
+cargo build --manifest-path services/Cargo.toml -p shortwin-indexer --release
+cp services/indexer/indexer.example.toml indexer.toml          # every key, with its default
+export DATABASE_URL=postgres://shortwin@localhost:5432/shortwin
+export SHORTWIN_RPC_URL=http://127.0.0.1:8899 SHORTWIN_WS_URL=ws://127.0.0.1:8900
+I=services/target/release/shortwin-indexer
+$I --config indexer.toml migrate
+$I --config indexer.toml backfill        # history, at finalized (one writer per database)
+$I --config indexer.toml run             # live ingest + rollups + the API on [api] listen (:8080)
+#   or as separate processes: live | rollups | serve
+$I --config indexer.toml replay services/indexer/tests/data/sessions/mock_lifecycle.jsonl
+curl -s localhost:8080/v1/status; curl -s 'localhost:8080/v1/markets?sort=oi'
+```
+
+**Tests on an embedded PostgreSQL (no Docker, no root, no system Postgres).** The crate's tests start
+PostgreSQL 17.11 as the current user through `postgresql_embedded`, from the zonky builds (≈ 15 MB
+from Maven Central, downloaded once into `~/.cache/shortwin/postgresql-zonky`; they bundle their
+libraries, so they run on distributions without `libxml2.so.2`). Each test gets its own database
+under `services/target/tmp`, removed afterwards. `SHORTWIN_PG_INSTALL_DIR` and `SHORTWIN_PG_TMP`
+move the binaries and the data.
+
+```sh
+M=services/Cargo.toml
+cargo test --manifest-path $M -p shortwin-indexer --test pg_fixture   # the fixture gate (~2 s cached)
+cargo test --manifest-path $M -p shortwin-indexer                     # decoders, ingest, analytics, API contract
+cargo test --manifest-path $M -p shortwin-indexer --test api_contract --test api_limits --test api_ws --test api_replayed
+solana-test-validator --version && \
+  cargo test --manifest-path $M -p shortwin-indexer --test ingest_rpc_validator -- --ignored   # RPC paths, ~40 s
+```
+
+**The replay harness (the M8 exit criterion).** `cargo test --manifest-path services/Cargo.toml -p
+shortwin-indexer-litesvm` (~80 s) records eight sessions from the current builds — so build first,
+as for the keeper scenarios (`anchor build --tools-version v1.57 --arch v3 &&
+scripts/build-test-venue.sh`; `SHORTWIN_SO`, `SHORTWIN_TEST_VENUE_SO`, `MOCK_CPAMM_SO`,
+`COMPLETE_CURVE_SO` override the ELFs) — on the mock venue, the Raydium and pump forks and through
+the keeper's scenarios, then ingests each through the real pipeline into a fresh database and
+asserts INDEXER.md §11.4 against the chain at every checkpoint (projections, the SOL ledgers,
+analytics and rollups, idempotence, rebuild, out-of-order delivery, a rollback through the finality
+tracker, catalog coverage, the API's read model). The recording hook is `Env::start_recording` in
+`tests/litesvm/src/record.rs`; `SHORTWIN_RECORD_SESSIONS=<dir>` writes the sessions (and
+`<dir>/committed/` the thinned copies committed under `services/indexer/tests/data/sessions/`).
+Surfpool sessions are optional (the format takes a `recorder = "surfpool"` header).
+
+**Reference deployment (docker-compose; for real deployments, not run on this machine).**
+`services/indexer/deploy/`: Postgres 17.11, a one-shot `migrate`, exactly one `ingest` (`live`),
+`rollups`, two `api` replicas; database roles from `initdb/01-roles.sh` (the API's is read-only
+with a 2 s statement timeout); the image builds from the repository root through
+`Dockerfile.dockerignore` (no `target/`, no keys).
+
+```sh
+cd services/indexer/deploy
+mkdir -p secrets && for r in admin ingest api; do openssl rand -hex 24 > secrets/pg_$r; done
+export SHORTWIN_RPC_URL=https://… SHORTWIN_WS_URL=wss://…
+docker compose up -d postgres migrate
+docker compose run --rm ingest backfill
+docker compose up -d
+```
+
 ## Codama client
 
 `clients/js` is generated from the Anchor IDL; the IDL copy and the generated code are
@@ -620,7 +694,9 @@ model (`params::validate_econ`) are listed, not simulated; the program checks th
   `codegen-units = 1`. The workspace also holds the TEST-ONLY mock venue `tests/mock_cpamm`
   (an Anchor program, also a member of `Anchor.toml [workspace]`; never deployed, A49).
 - **Cargo, services** (`services/Cargo.toml`, own `Cargo.lock`): host-only crates — the keeper
-  and its chain client today, the indexer later (ARCHITECTURE §1.2, §7).
+  and its chain client, and since M8 the indexer and API (`services/indexer`, Rust 1.94+ for sqlx
+  0.9) with its TEST-ONLY replay harness (`services/indexer-litesvm`, which links the program
+  tests `tests/litesvm`) (ARCHITECTURE §1.2, §7).
 - **Cargo, benches**: `tests/bench/cu_math`, `tests/bench/m1_cu`, `tests/bench/m2_cu`,
   `tests/bench/m3_cu`, `tests/bench/m5_cu` and `tests/bench/m6_cu` (each of the last three with
   its own TEST-ONLY CPI wrapper program), standalone workspaces with their own lockfiles (Mollusk
@@ -684,7 +760,8 @@ wrapped transaction first. Nothing in the program changes.
 | `m5-cu` | M5 CU bench, T-TRACE, the T-SIZE preview, T-STRADDLE (curve part) and stack depth on the pump curve (`tests/bench/m5_cu`): builds its TEST-ONLY CPI wrapper (SBPF v3 asserted), every curve-path instruction within ARCH §6.1's PROPOSED limits, the worst-case curve transactions at their exact trace counts and v0 + ALT sizes, the straddle's tx1 (the `complete_curve` helper) and tx2 (`migrate_v2`), every path through 0–3 wrapper levels |
 | `m6-cu` | M6 CU bench, T-TRACE, T-SIZE, T-DEPTH and the graduation transition on PumpSwap (`tests/bench/m6_cu`): its TEST-ONLY CPI wrapper, every PumpSwap-path instruction within budget, the worst-case transactions at their exact trace counts and v0 + ALT sizes |
 | `t-pot` | T-POT: every `pool_model` trace replayed through the program in release (`lender_it traces::`, `SHORTWIN_TRACES=full`) |
-| `services` | the services workspace: fmt, clippy (also the keeper without `test-venue`), cargo-deny, cargo-audit, unit tests and the LiteSVM scenarios (mock, Raydium and pump fork, the helper included; M7's degraded-mode drill, duty 11, the PumpSwap tables) on the `anchor-build` artifacts, and the A49 check on the release keeper binary |
+| `services` | the services workspace: fmt, clippy (the indexer crates included; also the keeper without `test-venue`), cargo-deny, cargo-audit, the keeper's unit tests and LiteSVM scenarios (mock, Raydium and pump fork, the helper included; M7's degraded-mode drill, duty 11, the PumpSwap tables) on the `anchor-build` artifacts, and the A49 check on the release keeper binary |
+| `indexer` | M8: the indexer's tests on an embedded PostgreSQL 17.11 (zonky binaries cached): the fixture gate, `-p shortwin-indexer` (decoders, ingest on the recorded sessions, analytics, the API contract on the seed and on replayed sessions, limits, WebSocket), the replay harness `-p shortwin-indexer-litesvm` on the `anchor-build` artifacts (the M8 exit criterion), the RPC paths against `solana-test-validator`, no `postgresql_embedded` in the production dependencies, and `docker compose config` on the reference deployment |
 | `t-size` | T-SIZE on Raydium (`--test tx_size_raydium`), on the pump curve (`--test tx_size_pump_it`) and on PumpSwap (`--test tx_size_pumpswap_it`), the size tables in the log, and the protocol ALT's static part (`scripts/build-alt.sh print`, uploaded as an artifact) |
 | `fuzz-smoke` | M7: `cargo test --release -p shortwin-fuzz` — the fuzzer's fixed-seed smoke on every profile, the corpus replays (a reproducer marked fixed must pass) and its self-tests; crash files uploaded on failure |
 | `m7-keeper-bench` | M7: the keeper's cost inputs, the PumpSwap 4-extras T-SIZE and T-CASCADE in release (`m7_cost::`, `pamm_alt::`, `cascade::`; the tests' own gates), the regenerated `tests/bench/m7_*` compared with the committed ones (a warning) |

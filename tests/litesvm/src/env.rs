@@ -23,7 +23,7 @@ use solana_transaction::Transaction;
 
 use crate::fixtures::{self, MarketKeys};
 use crate::tokens::TokenProgram;
-use crate::{invariants, pda, read};
+use crate::{invariants, pda, read, record};
 
 /// Result of a transaction.
 pub type TxResult = Result<TransactionMetadata, FailedTransactionMetadata>;
@@ -89,6 +89,8 @@ pub struct Env {
     /// it).
     pub hook_checkpoints: u64,
     tracked: Vec<Pubkey>,
+    /// The session recorder while [`Env::start_recording`] is on ([`record`]).
+    pub(crate) recorder: Option<Box<record::Recorder>>,
 }
 
 impl Default for Env {
@@ -139,6 +141,7 @@ impl Env {
             check_invariants: true,
             hook_checkpoints: 0,
             tracked: Vec::new(),
+            recorder: None,
         };
         let mut env = env;
         env.set_clock(START_TS, START_SLOT);
@@ -351,7 +354,7 @@ impl Env {
     pub fn send(&mut self, ixs: &[Instruction], signers: &[&Keypair]) -> TxResult {
         if !self.check_invariants {
             let tx = self.transaction(ixs, signers);
-            let res = self.svm.send_transaction(tx);
+            let res = self.execute_recorded(tx.into());
             self.svm.expire_blockhash();
             return res;
         }
@@ -367,7 +370,7 @@ impl Env {
         };
 
         let tx = self.transaction(ixs, signers);
-        let res = self.svm.send_transaction(tx);
+        let res = self.execute_recorded(tx.into());
         self.svm.expire_blockhash();
 
         self.track_markets_named_by(ixs);

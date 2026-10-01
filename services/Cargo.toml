@@ -5,13 +5,18 @@
 # - keeper/          keeper v0 (ARCH §7.1 duties 1–4, batching, degraded mode) and its binary
 # - keeper-litesvm/  the in-process LiteSVM chain backend and the keeper's scenario tests
 #                    (TEST-ONLY: loads short.win's `test-venue` build and the mock venue)
+# - indexer/         the indexer and API (ARCH §7.2, M8; docs/design/INDEXER.md): ingest, Postgres,
+#                    analytics, axum REST + WebSocket; its embedded-Postgres test fixture behind the
+#                    TEST-ONLY `embedded-pg` feature
+# - indexer-litesvm/ TEST-ONLY: LiteSVM session recording and the indexer's replay harness
+#                    (DB-vs-chain assertions on an embedded Postgres)
 #
 # C1-14: the scenario tests link the LiteSVM harness (tests/litesvm), so this lockfile holds
 # the same Agave 4.2.2 runtime line and the same solana-* component versions as the root
 # Cargo.lock (it was seeded from it); the RPC client is the matching 4.2.2 line.
 [workspace]
 resolver = "3"
-members = ["common", "keeper", "keeper-litesvm"]
+members = ["common", "keeper", "keeper-litesvm", "indexer", "indexer-litesvm"]
 
 [workspace.package]
 edition = "2024"
@@ -25,6 +30,7 @@ shortwin-math = { path = "../crates/shortwin-math" }
 shortwin-venue-state = { path = "../crates/shortwin-venue-state" }
 shortwin-services-common = { path = "common" }
 shortwin-keeper = { path = "keeper" }
+shortwin-indexer = { path = "indexer" }
 # The stateless straddle helper (ARCH §5.4, A66): its Anchor account and instruction types for the
 # keeper's `complete_curve` (tx1 of the straddle bundle).
 complete-curve = { path = "../programs/complete_curve", features = ["no-entrypoint"] }
@@ -64,3 +70,28 @@ solana-transaction-error = "~3.3.1"
 # The address-lookup-table program's instruction builders and table layout (the protocol ALT of
 # ARCH §6.4 A28, `shortwin-build-alt`); already in this lockfile through LiteSVM.
 solana-address-lookup-table-interface = { version = "3.1", features = ["bincode"] }
+
+# The indexer and API (M8; docs/design/INDEXER.md §12.4 "Dependencies"). sqlx 0.9 and
+# postgresql_embedded 0.21 need Rust 1.94 (the indexer's own rust-version); the other crates keep
+# the workspace's 1.89. The set is frozen by the M8 contract: a track that needs another crate
+# asks the integrator (one writer of this lockfile).
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-webpki", "postgres", "migrate", "macros", "json"] }
+axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "tokio", "ws", "matched-path", "original-uri", "tower-log", "tracing"] }
+tower = { version = "0.5", default-features = false, features = ["util", "limit", "timeout"] }
+tower-http = { version = "0.6", default-features = false, features = ["cors", "trace", "timeout", "limit", "request-id", "util"] }
+# The live source's `logsSubscribe` client (the version axum's `ws` uses).
+tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+sha2 = "0.10"
+thiserror = "2"
+# TEST-ONLY (the indexer's `embedded-pg` feature): PostgreSQL binaries downloaded at first use into
+# the user cache, run as the current user (no Docker, no root; INDEXER.md §11.1). The zonky builds
+# (Maven Central) bundle their shared libraries (libxml2, OpenSSL, ICU, zlib) and need only glibc;
+# the theseus builds link the system's libxml2.so.2, which current distributions (libxml2 ≥ 2.14,
+# soname 16) no longer ship.
+postgresql_embedded = { version = "0.21", default-features = false, features = ["zonky", "tls-rustls-ring", "tokio"] }
+# The API contract tests (INDEXER.md §11.2): openapi.yaml parsed as YAML, every response body
+# validated against its schema (JSON Schema 2020-12, no network resolution), bodies read from the
+# router driven as a tower service.
+serde-saphyr = "1.3"
+jsonschema = { version = "0.58", default-features = false }
+http-body-util = "0.1"

@@ -644,10 +644,10 @@ jobs:
         run: git diff --exit-code -- tests/bench/m6_cu/results.md tests/bench/m6_cu/trace.md tests/bench/m6_cu/depth.md || echo "::warning::M6 CU, trace or depth figures changed; commit tests/bench/m6_cu/{results,trace,depth}.md"
 
   services:
-    # The off-chain services workspace (services/, its own Cargo.lock; ARCH §1.2, §7.1): fmt,
-    # clippy (the workspace, and the keeper alone on its release feature set, without the
-    # TEST-ONLY `test-venue`), cargo-deny and cargo-audit on its lockfile, the keeper's unit
-    # tests and its LiteSVM scenarios (duties 1–4, batching, degraded mode, duty 10's venue
+    # The off-chain services workspace (services/, its own Cargo.lock; ARCH §1.2, §7.1, §7.2): fmt,
+    # clippy (the workspace — the M8 indexer crates included —, and the keeper alone on its
+    # release feature set, without the TEST-ONLY `test-venue`), cargo-deny and cargo-audit on its
+    # lockfile, the keeper's unit tests and its LiteSVM scenarios (duties 1–4, batching, degraded mode, duty 10's venue
     # monitor, M4's duty 5 Raydium fast path and duty 12 pool monitor, M5's duty 6 on the pump
     # curve — migrate_v2 and the straddle bundle with the complete_curve helper — and M6's move
     # onto PumpSwap, PumpSwap exits, the post-wipe claims and duty 13's sweep_trader; M7's
@@ -656,7 +656,7 @@ jobs:
     # PumpSwap 4-extras T-SIZE through the keeper's tables (pamm_alt); every keeper transaction
     # under the invariant hooks) against the anchor-build artifacts, and the A49 check that the
     # keeper binary carries no mock-venue code. The M7 benches (m7_cost, cascade) are #[ignore]d
-    # here and run in release in m7-keeper-bench.
+    # here and run in release in m7-keeper-bench; the indexer's tests (M8) run in `indexer`.
     if: github.event_name != 'schedule'
     needs: anchor-build
     runs-on: ubuntu-24.04
@@ -675,7 +675,7 @@ jobs:
         with:
           name: shortwin-program
           path: target
-      - run: cargo fmt --manifest-path services/Cargo.toml -p shortwin-services-common -p shortwin-keeper -p shortwin-keeper-litesvm --check
+      - run: cargo fmt --manifest-path services/Cargo.toml -p shortwin-services-common -p shortwin-keeper -p shortwin-keeper-litesvm -p shortwin-indexer -p shortwin-indexer-litesvm --check
       - run: cargo clippy --manifest-path services/Cargo.toml --workspace --all-targets --locked -- -D warnings
       - name: The keeper on its release feature set (no test-venue)
         run: cargo clippy --manifest-path services/Cargo.toml -p shortwin-keeper --all-targets --locked -- -D warnings
@@ -686,13 +686,15 @@ jobs:
           cargo audit -f services/Cargo.lock --deny warnings
           --ignore RUSTSEC-2025-0141 --ignore RUSTSEC-2021-0139 --ignore RUSTSEC-2024-0388
           --ignore RUSTSEC-2024-0436 --ignore RUSTSEC-2025-0161
-      - name: Keeper unit tests and LiteSVM scenarios
+      - name: Keeper unit tests and LiteSVM scenarios (the indexer crates run in `indexer`)
         env:
           SHORTWIN_TEST_VENUE_SO: ${{ github.workspace }}/target/test-venue/deploy/shortwin.so
           MOCK_CPAMM_SO: ${{ github.workspace }}/target/deploy/mock_cpamm.so
           SHORTWIN_SO: ${{ github.workspace }}/target/deploy/shortwin.so
           COMPLETE_CURVE_SO: ${{ github.workspace }}/target/deploy/complete_curve.so
-        run: cargo test --manifest-path services/Cargo.toml --workspace --locked -- --nocapture
+        run: >-
+          cargo test --manifest-path services/Cargo.toml --workspace --locked
+          --exclude shortwin-indexer --exclude shortwin-indexer-litesvm -- --nocapture
       # A49 for the keeper: the release binary is built without `test-venue`, so it must not
       # embed the mock venue's program id; the scenario test binary (built with it) must.
       - name: The keeper binary has no mock venue (A49)
@@ -720,6 +722,85 @@ jobs:
               print(f"::error::the release keeper embeds the mock venue id {pid} (test-venue enabled?)"); sys.exit(1)
           print(f"ok: mock venue id {pid} absent from the release keeper")
           PY
+
+  indexer:
+    # M8, the indexer and API (services/indexer, services/indexer-litesvm; ARCH §7.2, §9 M8;
+    # docs/design/INDEXER.md §11). PostgreSQL 17.11 runs embedded as the runner's user (the
+    # zonky binaries, ~15 MB from Maven Central, cached; no service container, no root): the
+    # fixture gate, the unit and decoder tests, ingest on INGEST's recorded sessions (ordering,
+    # rebuild, rollback, the single writer), the analytics views and rollups, the API contract
+    # tests (every operation and documented status against openapi.yaml on the API seed, the
+    # rate and abuse limits, the WebSocket) and on replayed sessions with the chain's end state
+    # served through the API; the M8 exit — the replay harness: LiteSVM sessions recorded from
+    # the anchor-build artifacts (mock, Raydium and pump forks, keeper scenarios) replayed through
+    # the real ingest pipeline into an embedded database and checked against the chain at every
+    # checkpoint (§11.4: projections, ledgers, analytics, idempotence, rebuild, out-of-order
+    # delivery, the finality tracker's rollback with the rollups, catalog coverage). Then the RPC
+    # backfill, the logsSubscribe live source and finality promotion against a local
+    # solana-test-validator, the production dependency set (no embedded Postgres), and the
+    # reference docker-compose file (validated, not run).
+    if: github.event_name != 'schedule'
+    needs: anchor-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      SHORTWIN_SO: ${{ github.workspace }}/target/deploy/shortwin.so
+      SHORTWIN_TEST_VENUE_SO: ${{ github.workspace }}/target/test-venue/deploy/shortwin.so
+      MOCK_CPAMM_SO: ${{ github.workspace }}/target/deploy/mock_cpamm.so
+      COMPLETE_CURVE_SO: ${{ github.workspace }}/target/deploy/complete_curve.so
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: indexer
+          workspaces: services
+      - name: Cache the embedded PostgreSQL binaries (INDEXER.md §11.1)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/shortwin/postgresql-zonky
+          key: postgresql-zonky-17.11.0-${{ runner.os }}
+      - name: Cache Agave (solana-test-validator)
+        id: agave
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/share/solana/install
+          key: agave-${{ env.AGAVE_VERSION }}-${{ runner.os }}
+      - name: Install Agave ${{ env.AGAVE_VERSION }}
+        if: steps.agave.outputs.cache-hit != 'true'
+        run: sh -c "$(curl -sSfL https://release.anza.xyz/v${AGAVE_VERSION}/install)"
+      - name: Select Agave ${{ env.AGAVE_VERSION }}
+        run: |
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/share/solana/install/active_release/bin/agave-install" init "$AGAVE_VERSION"
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: shortwin-program
+          path: target
+      - name: The embedded-Postgres fixture (downloads the binaries on a cold cache)
+        run: cargo test --manifest-path services/Cargo.toml --locked -p shortwin-indexer --test pg_fixture -- --nocapture
+      - name: Indexer — unit and decoder tests, ingest, analytics, the API contract (seed and replayed sessions), the security review's regressions and its 30-day load test
+        run: cargo test --manifest-path services/Cargo.toml --locked -p shortwin-indexer -- --nocapture
+      - name: The replay harness — LiteSVM sessions through the real ingest into the chain state (M8 exit)
+        run: cargo test --manifest-path services/Cargo.toml --locked -p shortwin-indexer-litesvm -- --nocapture
+      - name: RPC backfill, logsSubscribe live source and finality against solana-test-validator (history past the status cache, a rolled-back cursor)
+        run: >-
+          cargo test --manifest-path services/Cargo.toml --locked -p shortwin-indexer
+          --test ingest_rpc_validator -- --ignored --nocapture
+      - name: The production indexer links no embedded Postgres (TEST-ONLY `embedded-pg`)
+        run: |
+          if cargo tree --manifest-path services/Cargo.toml --locked -p shortwin-indexer -e normal,build --prefix none | grep -q '^postgresql_embedded '; then
+            echo "::error::shortwin-indexer's normal dependencies include postgresql_embedded"; exit 1
+          fi
+      - name: The reference deployment parses (services/indexer/deploy; not run)
+        working-directory: services/indexer/deploy
+        env:
+          SHORTWIN_RPC_URL: http://127.0.0.1:8899
+          SHORTWIN_WS_URL: ws://127.0.0.1:8900
+        run: |
+          docker compose config --quiet
+          sh -n initdb/01-roles.sh
 
   t-size:
     # T-SIZE on Raydium (ARCH §6.4, §8.2; §9 M3): every Raydium transaction — open_short,

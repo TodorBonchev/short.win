@@ -362,7 +362,8 @@ pub fn send_with_hooks(
 ) -> Result<TransactionMetadata, litesvm::types::FailedTransactionMetadata> {
     if !env.check_invariants {
         // A test that corrupts state on purpose turned the hooks off (as `Env::send`).
-        let res = env.svm.send_transaction(tx.clone());
+        // `execute_recorded`: the harness's session recording hook (INDEXER.md §11.3).
+        let res = env.execute_recorded(tx.clone());
         env.svm.expire_blockhash();
         return res;
     }
@@ -430,7 +431,8 @@ pub fn send_with_hooks(
         pre = invariants::snapshot(&svm, &markets);
     }
 
-    let res = env.svm.send_transaction(tx.clone());
+    // `execute_recorded`: the harness's session recording hook (INDEXER.md §11.3).
+    let res = env.execute_recorded(tx.clone());
     env.svm.expire_blockhash();
     track_named(env, &ixs);
     env.hook_checkpoints += 1;
@@ -615,6 +617,8 @@ impl Chain for LiteSvmChain {
             });
         }
         let before = env.svm.clone();
+        // A bundle that fails commits nothing: neither does the session recording.
+        let recording = env.recording_mark();
         env.svm = before.clone().with_blockhash_check(false);
         let mut outs = Vec::with_capacity(txs.len());
         let mut record = SentBundle {
@@ -665,6 +669,7 @@ impl Chain for LiteSvmChain {
         } else {
             // All-or-nothing: nothing of the bundle is committed.
             env.svm = before;
+            env.recording_rollback(recording);
         }
         record.landed = landed;
         self.bundles_sent.borrow_mut().push(record);

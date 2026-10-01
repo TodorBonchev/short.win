@@ -37,6 +37,9 @@
 //!   (`create_market(Auto)` on a dumped live curve, lender, warm-up), [`pump::PumpMarket`]
 //!   (implements [`engine::VenueMarket`]: the curve ReadSet C0–C6 and TradeExtras T0–T19),
 //!   curve users, `sweep_trader`'s token leg.
+//! - [`record`]: session recording for the indexer's replay harness (M8; INDEXER.md §11.3):
+//!   [`Env::start_recording`], [`Env::execute_recorded`] (the one place a chain transaction
+//!   executes), account checkpoints; `services/indexer-litesvm` renders a recording as a session.
 //!
 //! Agave line: LiteSVM 0.16.0 on the 4.2.2 runtime crates, pinned in the workspace lockfile
 //! (C1-14; `Cargo.toml` of this crate).
@@ -63,6 +66,7 @@ pub mod pool_select;
 pub mod pump;
 pub mod raydium;
 pub mod read;
+pub mod record;
 pub mod tokens;
 
 pub use env::{Env, START_SLOT, START_TS, TxResult, test_venue_so_path};
