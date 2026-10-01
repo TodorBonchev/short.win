@@ -309,16 +309,23 @@ fn closes(e: Close) -> IxEvents {
 /// I4's coverage clause: a real `set_coverage_pause` signed by the installed `coverage_authority`
 /// passes; the same instruction checked against a state in which it also changed another byte
 /// of the market, another flag bit, a vault's lamports, another market or the config fails I4.
-/// With the role disabled (the default) the clause is vacuous.
+/// With the role disabled (the default) the clause still watches the Emergency's clear
+/// (★OWNER-M7-3 (b): [`i4_coverage_emergency_clears_only`]).
 #[test]
 fn i4_coverage_authority_changes_only_its_flag() {
     let mut c = Case::new();
     let market = c.mm.market();
     let other = c.env.mock_market(MarketSpec::default());
     let other_key = other.market();
-    assert!(
-        c.snapshot().coverage.is_none(),
-        "vacuous while the role is disabled"
+    let unset = c.snapshot();
+    let cov = unset
+        .coverage
+        .as_ref()
+        .expect("the Emergency's clear is watched");
+    assert_eq!(
+        (cov.authority, cov.emergency),
+        (Pubkey::default(), c.env.pause_authority.pubkey()),
+        "the role disabled, the Emergency set"
     );
     c.env.plant_coverage_authority();
     let kp = c.env.coverage_authority.insecure_clone();
@@ -398,16 +405,136 @@ fn i4_coverage_authority_changes_only_its_flag() {
         c.set_market(&m);
         assert_eq!(c.ix(&pre_clear, &ev_clear), Err("I4"), "cleared_at {at}");
     }
-    // Not the coverage key's instruction (another signer): the clause does not apply.
+    // A landed `set_coverage_pause` signed by any other key (neither the role nor the
+    // Emergency; the program refuses it, so only a broken check lets it land) violates the clause,
+    // even when it changed nothing but the flag.
     c.env.svm = after;
-    let mut m = c.market();
-    m.tier ^= 1;
-    c.set_market(&m);
     let foreign = IxEvents {
         signers: vec![Pubkey::new_unique()],
         ..ev
     };
-    assert_eq!(c.ix(&pre, &foreign), Ok(()));
+    assert_eq!(c.ix(&pre, &foreign), Err("I4"));
+    let governance = IxEvents {
+        signers: vec![c.env.governance.pubkey()],
+        ..foreign
+    };
+    assert_eq!(c.ix(&pre, &governance), Err("I4"));
+}
+
+/// ★OWNER-M7-3 (b) (owner decision of 2026-10-01): the Emergency vault's `set_coverage_pause`
+/// clear — with the role installed and with it unset — passes I4's coverage clause: the flag
+/// cleared, `coverage_cleared_at` at the clock, nothing else; the same instruction checked
+/// against a state in which the flag stayed (or became) set, or in which it changed another byte,
+/// another market or a vault, fails. So does a no-op clear that moved `coverage_cleared_at`.
+#[test]
+fn i4_coverage_emergency_clears_only() {
+    for installed in [true, false] {
+        let mut c = Case::new();
+        let market = c.mm.market();
+        let other = c.env.mock_market(MarketSpec::default());
+        let other_key = other.market();
+        // The flag set (by the coverage key, which is then removed when `installed` is false: the
+        // flag a disabled role left set).
+        c.env.plant_coverage_authority();
+        ok(c.env.set_coverage_pause(&market, true));
+        if !installed {
+            let cfg = pda::config();
+            let mut a = c.env.svm.get_account(&cfg).unwrap();
+            a.data[96..128].copy_from_slice(Pubkey::default().as_ref());
+            c.env.svm.set_account(cfg, a).unwrap();
+            assert_eq!(c.env.config().coverage_authority, Pubkey::default());
+        }
+        c.env.warp(3);
+        let ea = c.env.pause_authority.insecure_clone();
+        let clear = shortwin_litesvm_tests::ix::set_coverage_pause(
+            &ea.pubkey(),
+            &market,
+            false,
+            shortwin::events::COVERAGE_REASON_KEEPER,
+        );
+        let pre = invariants::snapshot(&c.env.svm, &[market, other_key]);
+        assert!(pre.coverage.is_some());
+        let meta = ok(c.env.send(std::slice::from_ref(&clear), &[&ea]));
+        let ev = IxEvents::of_instruction(&meta, 0, &clear);
+        assert!(ev.coverage_pause && ev.signers.contains(&ea.pubkey()));
+        assert!(
+            !c.market()
+                .has_flag(shortwin::state::MARKET_FLAG_PAUSED_COVERAGE)
+        );
+        assert_eq!(c.market().coverage_cleared_at, c.env.now());
+        let after = c.env.svm.clone();
+        assert_eq!(c.ix(&pre, &ev), Ok(()), "the real Emergency clear passes");
+        let mutants: [CaseMutant; 5] = [
+            // The flag left set by the Emergency's instruction.
+            Box::new(|c: &mut Case| {
+                let mut m = c.market();
+                m.set_flag(shortwin::state::MARKET_FLAG_PAUSED_COVERAGE, true);
+                m.coverage_cleared_at = 0;
+                c.set_market(&m);
+            }),
+            // The clear without its clock.
+            Box::new(|c: &mut Case| {
+                let mut m = c.market();
+                m.coverage_cleared_at = c.env.now() - 1;
+                c.set_market(&m);
+            }),
+            Box::new(|c: &mut Case| {
+                let mut m = c.market();
+                m.set_flag(shortwin::state::MARKET_FLAG_PAUSED_OPENS, true);
+                c.set_market(&m);
+            }),
+            Box::new(|c: &mut Case| {
+                let v = c.mm.keys.market_vault;
+                let mut a = c.env.svm.get_account(&v).unwrap();
+                a.lamports -= 1;
+                c.env.svm.set_account(v, a).unwrap();
+            }),
+            Box::new(move |c: &mut Case| {
+                let k = other.market();
+                let mut a = c.env.svm.get_account(&k).unwrap();
+                a.data[invariants::MARKET_FLAGS_OFFSET] |= 1 << 6;
+                c.env.svm.set_account(k, a).unwrap();
+            }),
+        ];
+        for (i, m) in mutants.iter().enumerate() {
+            c.env.svm = after.clone();
+            m(&mut c);
+            assert_eq!(
+                c.ix(&pre, &ev),
+                Err("I4"),
+                "installed {installed}, mutant {i}"
+            );
+        }
+        // A set signed by the Emergency alone (the program refuses it: `Unauthorized`, or
+        // `CoverageAuthorityDisabled` while the role is unset) violates the clause if it lands.
+        c.env.svm = after.clone();
+        let pre_set = invariants::snapshot(&c.env.svm, &[market, other_key]);
+        let mut m = c.market();
+        m.set_flag(shortwin::state::MARKET_FLAG_PAUSED_COVERAGE, true);
+        c.set_market(&m);
+        assert_eq!(
+            c.ix(&pre_set, &ev),
+            Err("I4"),
+            "installed {installed}: a set"
+        );
+        // A no-op clear (the flag already clear) records nothing.
+        c.env.svm = after.clone();
+        c.env.warp(1);
+        let pre_noop = invariants::snapshot(&c.env.svm, &[market, other_key]);
+        let at = c.market().coverage_cleared_at;
+        let meta = ok(c.env.send(std::slice::from_ref(&clear), &[&ea]));
+        let ev_noop = IxEvents::of_instruction(&meta, 0, &clear);
+        assert_eq!(c.market().coverage_cleared_at, at);
+        assert_eq!(c.ix(&pre_noop, &ev_noop), Ok(()), "a no-op clear passes");
+        let mut m = c.market();
+        m.coverage_cleared_at = c.env.now();
+        c.set_market(&m);
+        assert_eq!(
+            c.ix(&pre_noop, &ev_noop),
+            Err("I4"),
+            "installed {installed}: a no-op clear that records the clock"
+        );
+    }
 }
 
 // ---- check_all ----------------------------------------------------------------------------

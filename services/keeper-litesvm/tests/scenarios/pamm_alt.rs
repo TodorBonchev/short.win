@@ -243,7 +243,9 @@ fn measure(coin: PammCoin) -> Measured {
     let (mut env, pm, q) = listed(coin);
     let (sel, extras) = publish_worst_extras(&mut env);
     let key = pm.market();
-    let mut h = Harness::new(env, KeeperConfig::default());
+    // The position is below the 1-SOL value-at-risk floor: covered all the same (its liquidation
+    // is what is measured; `common::covering_all`).
+    let mut h = Harness::new(env, covering_all(KeeperConfig::default()));
 
     // The tables, built on chain by the keeper's code.
     let live = block_on(alt::live_entries(h.chain())).expect("live entries");

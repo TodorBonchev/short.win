@@ -80,7 +80,8 @@ pub mod shortwin {
     }
 
     /// The keeper's `coverage_authority` pauses or resumes new opens on one market for lost
-    /// keeper coverage (degraded mode; O17). Opens only; moves nothing.
+    /// keeper coverage (degraded mode; O17); the Emergency vault may resume them too (clear
+    /// only; OWNER-M7-3). Opens only; moves nothing.
     pub fn set_coverage_pause(
         ctx: Context<SetCoveragePause>,
         paused: bool,

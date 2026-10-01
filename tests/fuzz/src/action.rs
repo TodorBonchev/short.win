@@ -84,7 +84,8 @@ kinds! {
     Crank = "crank",
     /// One keeper exit (`b mod 3`: liquidate, expire, sol_settle) on position `a` (no warp).
     KeeperExit = "keeper_exit",
-    /// Keeper silence: `31 + a mod 900` seconds without an observation, then one crank
+    /// Keeper silence: `COVERAGE_GAP_S + 1 + a mod 900` seconds (41 s and more since the owner
+    /// raised `COVERAGE_GAP_S` to 40, OWNER-M7-12) without an observation, then one crank
     /// (`CoverageGap`); with `b mod 3 ≠ 0` and the role installed, degraded mode (O17): the
     /// keeper's `set_coverage_pause(true)` on every market, cleared `1..=8` actions later.
     Silence = "silence",
@@ -195,11 +196,11 @@ kinds! {
     // ---- M7: degraded mode, fees, the mint filter, extras sets ----------------------------------
     /// `set_coverage_pause` (O17's pause-opens-only `coverage_authority`): pause (`a` odd) or
     /// clear one market's `paused_coverage`, signed (`b mod 16`) by the role's key, Governance,
-    /// the Emergency vault or a stranger, with the keeper's reason or a bad one; `b mod 16 = 15`
-    /// rotates the role instead (Governance's timelocked `Authorities` change: a new key, or the
-    /// default key, which makes the role inert). The outcome is predicted exactly, and a landed
-    /// one must change nothing on the whole VM but bit 6 of that market's `flags` (I4's coverage
-    /// clause).
+    /// the Emergency vault (★OWNER-M7-3 (b): its clear accepted, its pause refused) or a
+    /// stranger, with the keeper's reason or a bad one; `b mod 16 = 15` rotates the role instead
+    /// (Governance's timelocked `Authorities` change: a new key, or the default key, which makes
+    /// the role inert). The outcome is predicted exactly, and a landed one must change nothing on
+    /// the whole VM but bit 6 of that market's `flags` (I4's coverage clause).
     CoveragePause = "coverage_pause",
     /// `sweep_protocol_fees` of the market (anyone; to `config.fee_recipient`).
     SweepFees = "sweep_protocol_fees",
@@ -225,6 +226,18 @@ kinds! {
     /// `[sale or buy of the venue within the open's spot–EMA guard, open_short, unwind or not]` in
     /// one transaction (M5-SEC-3, M7-SEC-4, M7-SEC-5): every term of the open is the I19 hook's.
     WrappedOpen = "wrapped_open",
+    // ---- the owner's decisions of 2026-10-01 ------------------------------------------------------
+    /// ★OWNER-M7-3 (b): the Emergency vault (`pause_authority`) clears one market's coverage pause
+    /// — never sets one. `a` odd first sets the flag with the role's key (a hijacked key's pause,
+    /// when the role is installed). `b mod 4`: 0 or 3, the clear alone (`b / 4 mod 8 = 7`: a bad
+    /// reason, `InvalidParams`) — accepted with the role installed, unset or rotated, changing
+    /// nothing on the whole VM but the flag and, for a set flag, `coverage_cleared_at` (I4's
+    /// coverage clause) — then, after a clear of a set flag, an open in the same second must be
+    /// refused `CoveragePaused` (the clear delay); 1, the Emergency's set: `Unauthorized`, or
+    /// `CoverageAuthorityDisabled` while the role is unset; 2, `[Emergency clear, open_short]` in
+    /// one transaction: refused `CoveragePaused` on a coverage-paused market, ordinary gates
+    /// otherwise.
+    EmergencyClear = "emergency_clear",
 }
 
 /// One action.
@@ -374,6 +387,7 @@ impl Profile {
             ConfigCancel => 1,
             CoverageBracket => 1,
             WrappedOpen => 3,
+            EmergencyClear => 2,
             Liquidity | LpWrappedCrank | DepositWrappedOpen | WithdrawWrappedExit => {
                 return if lp {
                     match kind {

@@ -231,7 +231,8 @@ export type Market = {
   pumpPoolAuthority: Address;
   /**
    * M7-SEC-3 (was `_reserved[0..8]`): the unix second `set_coverage_pause(false)` last cleared
-   * a set `paused_coverage` flag. `open_short` refuses until `COVERAGE_CLEAR_DELAY_S` after it
+   * a set `paused_coverage` flag (signed by the coverage key or, since OWNER-M7-3, the Emergency
+   * vault). `open_short` refuses until `COVERAGE_CLEAR_DELAY_S` after it
    * (`CoveragePaused`; `engine::guard::open_static`), so the `coverage_authority` key cannot
    * bracket an open on a coverage-paused market — `[clear, open_short, set]` in one
    * transaction or one second — and the flag stays visibly cleared for the keeper's reads
@@ -402,7 +403,8 @@ export type MarketArgs = {
   pumpPoolAuthority: Address;
   /**
    * M7-SEC-3 (was `_reserved[0..8]`): the unix second `set_coverage_pause(false)` last cleared
-   * a set `paused_coverage` flag. `open_short` refuses until `COVERAGE_CLEAR_DELAY_S` after it
+   * a set `paused_coverage` flag (signed by the coverage key or, since OWNER-M7-3, the Emergency
+   * vault). `open_short` refuses until `COVERAGE_CLEAR_DELAY_S` after it
    * (`CoveragePaused`; `engine::guard::open_static`), so the `coverage_authority` key cannot
    * bracket an open on a coverage-paused market — `[clear, open_short, set]` in one
    * transaction or one second — and the flag stays visibly cleared for the keeper's reads

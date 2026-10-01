@@ -1456,7 +1456,7 @@ struct CostRun {
     /// Per-slot bursts (foreign prices) and liquidity-coverage triggers (FITS-2 (b)) reported.
     bursts: usize,
     liq: usize,
-    /// The second the O17 budget refused an observation, if any.
+    /// The second the O17 (global) budget refused an observation, if any.
     exhausted: Option<i64>,
     /// The attacker's transactions.
     att_txs: u64,
@@ -1478,7 +1478,11 @@ fn budget_run(
 ) -> CostRun {
     use crate::raydium::{USELESS, ray_open, ray_setup};
     let mut cfg = KeeperConfig::default();
-    cfg.budget.per_market_daily_lamports = budget;
+    // The global budget (decision A, 2026-10-01) with this market alone: `budget` is `G` (`None`:
+    // no budget). The floor at 0 keeps the small position's market covered, so duty 2's
+    // liquidity-anomaly coverage — which runs on covered markets only — is what is measured.
+    cfg.budget.global_daily_lamports = budget.unwrap_or(0);
+    cfg.budget.var_floor_lamports = 0;
     let (mut h, markets) = ray_setup(&[USELESS], cfg);
     let (rm, q) = &markets[0];
     let key = rm.market();

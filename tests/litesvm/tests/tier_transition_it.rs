@@ -18,7 +18,7 @@
 //! | Test | What |
 //! |---|---|
 //! | `mock_usd_thresholds` | θ_A and θ_B crossed both ways at exactly `p*` (a walk from $121.20 in ≤ 19 % steps); `tier_computed_at` and `PriceCranked.tier` follow; the 24 h and 7 d age steps at a price above θ_A |
-//! | `mock_staleness_boundary` | the cache at exactly `oracle_stale_s` (3,600 s) still prices; one second later the market is Tier C, and an open there locks Tier C terms; a fresh update restores the tier |
+//! | `mock_staleness_boundary` | the cache at exactly `oracle_stale_s` (600 s since the owner's decision of 2026-10-01, OWNER-M7-15; was 3,600) still prices; one second later the market is Tier C, and an open there locks Tier C terms; a fresh update restores the tier |
 //! | `mock_oracle_feed_change_empties_the_cache` | an applied `OracleFeed` change empties the cache: Tier C until the first `crank_sol_usd`, which the step rule does not hold back |
 //! | `mock_non_positive_or_empty_price` | an empty or non-positive cached price is Tier C (a state `crank_sol_usd` itself refuses to write: `OracleConfidence`) |
 //! | `mock_liquidity_crossings` | Λ crossings through the pool: an LP deposit lifts the tier only as `L_slow` follows it (the lag, exact to the second), a withdrawal drops it at once (`R_now`) |

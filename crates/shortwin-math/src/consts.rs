@@ -95,8 +95,10 @@ pub const LOCK_BUCKETS: usize = 128;
 
 /// `CoverageGap` threshold in seconds: an integration that finds the EMA older than this
 /// while the market has open positions emits the event (ARCH §2.3.3, §3.10, §4.4, A69; no
-/// economic effect).
-pub const COVERAGE_GAP_S: i64 = 30;
+/// economic effect). 40 s since the owner's decision of 2026-10-01 (OWNER-M7-12, SPEC §14
+/// M7-12; was 30): above the keeper's 30-s idle cadence plus its 0–2-s landing jitter, so the
+/// event fires on an outage, not on jitter (M7-SEC-1).
+pub const COVERAGE_GAP_S: i64 = 40;
 
 // ARCH §2.3.3: `RING_LEN ≥ max(liq_persist_n, kappa_growth_n + 1)` for every compiled
 // value, and ring counters are `u8`.
@@ -140,7 +142,7 @@ mod tests {
     fn values_match_the_sim() {
         assert_eq!(P_ACC_MAX, 10u128.pow(29));
         assert_eq!(P_OPEN_MAX, 10u128.pow(27));
-        assert_eq!((EMA_TAU_S, RING_LEN, COVERAGE_GAP_S), (5, 8, 30));
+        assert_eq!((EMA_TAU_S, RING_LEN, COVERAGE_GAP_S), (5, 8, 40));
         assert_eq!((EMA_WARMUP_BUCKETS, REF_GUARD_TOL_BPS), (8, 100));
         assert_eq!(CARRIED_FEE_CAP_PPM, 2_500);
         // OWNER-M6D-1 (ECON #106): the sim's PUMPSWAP_LOCK_MIN_BPS, λ_min = 100 %.

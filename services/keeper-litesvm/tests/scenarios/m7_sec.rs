@@ -1,9 +1,11 @@
 //! M7 security review regressions on the keeper (the review's reproducers, fixed):
 //!
 //! - **M7-SEC-1** (timing): (a) an idle crank landing a second later relative to its read than
-//!   the previous one is a 31-s `CoverageGap` in the keeper's own transaction — landing jitter
-//!   of the idle cadence, tolerated up to `idle_interval_s + gap_tolerance_s` (34 s); 35 s still
-//!   degrades. (b) Keeper transactions landing 0–2 s after the read and ticks that wait for their
+//!   the previous one is a 31-s gap — landing jitter of the idle cadence. As built at M7 the
+//!   program emitted `CoverageGap{31}` for it (`COVERAGE_GAP_S` = 30) and the keeper tolerated it
+//!   up to `idle_interval_s + gap_tolerance_s` (34 s); since the owner raised `COVERAGE_GAP_S` to
+//!   40 s (OWNER-M7-12, 2026-10-01) the program emits nothing up to 40 s, and the first gap it
+//!   emits (41 s) degrades. (b) Keeper transactions landing 0–2 s after the read and ticks that wait for their
 //!   confirmations (the next tick a second later) keep a quiet market with a position open for
 //!   two hours — as built at M7 it was coverage-paused 99.7 % of the time. (c) After a real
 //!   outage the pause lifts ≈ 600 s later with slow ticks too — as built it never did.
@@ -60,8 +62,8 @@ impl Rng {
 }
 
 /// M7-SEC-1 (a): two minutes of the idle cadence, then the keeper's next transaction lands
-/// `late` seconds after the clock it read. Returns the tick report that saw the gap's event,
-/// the gap and the harness.
+/// `late` seconds after the clock it read. Returns the tick report of the tick after the late
+/// crank (the first that can see its outcome) and the harness.
 fn late_idle_crank(late: i64) -> (Harness, MockMarket, TickReport) {
     let (mut h, mms, _auth) = pauser_setup(1, pauser_cfg());
     let mm = mms.into_iter().next().expect("one market");
@@ -73,22 +75,28 @@ fn late_idle_crank(late: i64) -> (Harness, MockMarket, TickReport) {
     }
     h.chain().before_next_send(move |env| env.warp(late));
     let key = mm.market();
-    let before = h.keeper.metrics.markets[&key].coverage_gaps;
     for _ in 0..40 {
         let r = h.second().clone();
-        if h.keeper.metrics.markets[&key].coverage_gaps > before {
+        if r.cranked.contains(&key) {
             return (h, mm, r);
         }
     }
-    panic!("the late idle crank reported no CoverageGap");
+    panic!("no idle crank");
 }
 
+/// A 31-s gap (one second of landing jitter on the 30-s idle cadence): since `COVERAGE_GAP_S` is
+/// 40 s (OWNER-M7-12) the program emits no `CoverageGap` for it at all (as built at M7, with 30 s,
+/// it emitted `CoverageGap{31}`, which the keeper tolerated).
 #[test]
 fn m7_sec_1_a_a_one_second_late_idle_crank_is_jitter_not_an_outage() {
     let (mut h, mm, r) = late_idle_crank(1);
     let key = mm.market();
     let m = &h.keeper.metrics.markets[&key];
-    assert_eq!((m.coverage_gaps, m.coverage_gaps_tolerated), (1, 1));
+    assert_eq!(
+        (m.coverage_gaps, m.coverage_gaps_tolerated),
+        (0, 0),
+        "no event at 31 s"
+    );
     assert!(gap_degraded(&r).is_none() && r.coverage_pauses.is_empty());
     assert!(!paused(&h, &key));
     assert_eq!(try_open(&h, &mm), Ok(()), "opens keep landing");
@@ -97,20 +105,32 @@ fn m7_sec_1_a_a_one_second_late_idle_crank_is_jitter_not_an_outage() {
         let r = h.second().clone();
         assert!(!any_degraded(&r) && r.coverage_pauses.is_empty());
     }
-    println!("M7-SEC-1 (a): an idle crank 1 s late -> CoverageGap 31 s tolerated; opens land");
+    assert_eq!(h.keeper.metrics.markets[&key].coverage_gaps, 0);
+    println!(
+        "M7-SEC-1 (a): an idle crank 1 s late -> a 31-s gap, no CoverageGap event; opens land"
+    );
 }
 
-/// The tolerance's edge: 34 s is jitter, 35 s an outage (degraded, opens paused at once).
+/// The boundary (OWNER-M7-12): a 40-s gap (the idle crank 10 s late) is not reported and does
+/// not degrade; a 41-s gap is the program's `CoverageGap{41}`, and every gap it reports degrades
+/// (`gap_degrades_above` = max(30 + 4, 40) = 40): opens paused at once.
 #[test]
-fn m7_sec_1_a_the_gap_tolerance_ends_at_idle_plus_four_seconds() {
-    let (h, mm, r) = late_idle_crank(4);
+fn m7_sec_1_a_the_program_reports_a_gap_above_40_s_and_every_reported_gap_degrades() {
+    assert_eq!(shortwin_math::consts::COVERAGE_GAP_S, 40);
+    assert_eq!(KeeperConfig::default().coverage.gap_degrades_above(), 40);
+    let (mut h, mm, r) = late_idle_crank(10);
     let key = mm.market();
-    assert_eq!(h.keeper.metrics.markets[&key].coverage_gaps_tolerated, 1);
-    assert!(gap_degraded(&r).is_none() && !paused(&h, &key));
+    let r2 = h.second().clone();
+    assert_eq!(
+        h.keeper.metrics.markets[&key].coverage_gaps, 0,
+        "40 s: no event"
+    );
+    assert!(gap_degraded(&r).is_none() && gap_degraded(&r2).is_none() && !paused(&h, &key));
 
-    let (h, mm, r) = late_idle_crank(5);
+    let (h, mm, r) = late_idle_crank(11);
     let key = mm.market();
-    assert_eq!(gap_degraded(&r), Some(35));
+    assert_eq!(gap_degraded(&r), Some(41));
+    assert_eq!(h.keeper.metrics.markets[&key].coverage_gaps, 1);
     assert_eq!(h.keeper.metrics.markets[&key].coverage_gaps_tolerated, 0);
     assert!(
         r.coverage_pauses
@@ -174,13 +194,13 @@ fn m7_sec_1_b_landing_latency_and_slow_ticks_keep_a_quiet_market_open() {
     let m = &h.keeper.metrics.markets[&key];
     println!(
         "M7-SEC-1 (b): 7,200 s, {ticks} ticks, landing delays 0/1/2 s {:?}: {} observations, \
-         {} CoverageGap events on chain (all tolerated: {}), 0 s paused (was 99.7 %)",
+         {} CoverageGap events on chain (with COVERAGE_GAP_S = 30 there were 79 of 241, all \
+         tolerated; at 40 none), 0 s paused (was 99.7 %)",
         delays.get(),
         m.observations,
         m.coverage_gaps,
-        m.coverage_gaps_tolerated
     );
-    assert_eq!(m.coverage_gaps, m.coverage_gaps_tolerated);
+    assert_eq!((m.coverage_gaps, m.coverage_gaps_tolerated), (0, 0));
 }
 
 /// M7-SEC-1 (c): after the drill's 45-s outage, the pause lifts ≈ `recovery_s` later whether

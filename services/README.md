@@ -21,7 +21,12 @@ What it does, per tick (one per slot; `keeper/src/keeper.rs`):
   (metrics `markets_read`, `markets_cold_skipped`). The tick's due sweep checks are one read; at
   most `pool_select.discoveries_per_tick` (2) pool discoveries a tick, each one's four
   `getProgramAccounts` in parallel; `RpcChain` sends a read's 100-key chunks in parallel (8 at a
-  time). Junk list-only markets (≈ 0.047 SOL each to list) no longer grow every tick's reads.
+  time). Junk list-only markets (≈ 0.035–0.038 SOL each to list at ARCH §3.2's rent; the M7
+  review counted ≈ 0.047) no longer grow every tick's reads. **Decision A (2026-10-01):** a market
+  with positions **below the value-at-risk floor** (`[budget] var_floor_lamports`) is read only when
+  its 30-s idle crank is due, in the tick its set of positions changes, and while the keeper's own
+  `set_coverage_pause` on it is pending (metric `markets_idle_skipped`), so junk with positions does
+  not grow the per-tick reads either.
 
 - **Venues** (`venue.rs`): Raydium AMM v4 and CPMM markets (M3), through the adapters' own key
   functions (`shortwin::venues::raydium_v4::{read_keys, trade_keys}`, the same in
@@ -32,9 +37,12 @@ What it does, per tick (one per slot; `keeper/src/keeper.rs`):
   buyback recipient of the live `GlobalConfig` and the live coin creator's vault; the mint's
   supply is read with the ReadSet, since PumpSwap's fee tier is its market cap); and the
   TEST-ONLY mock (feature `test-venue`).
-- **Duty 1, coverage** (`coverage.rs`, `decide.rs`): one observation per second on a market with a
+- **Duty 1, coverage** (`coverage.rs`, `decide.rs`): one observation per second on a **covered**
+  market (open positions and value at risk at or above `var_floor_lamports`, decision A) with a
   position near a threshold (live CR below 1.3·L, deadline within 60 s, armed) or with
-  `|P_spot/P_ema − 1| > 2 %`; every 30 s on markets with open positions; every 30 s on markets
+  `|P_spot/P_ema − 1| > 2 %`; every 30 s on markets with open positions — and nothing more below
+  the floor: no per-second coverage, no bursts, no liquidity-anomaly coverage, exits on its idle
+  reads —; every 30 s on markets
   without a route (the continuous S3 chain, duty 5); none on markets without positions — except
   a Raydium market inside its listing window (M4V-5): every `listing_interval_s` (60 s) through
   the window and every second in its last `EMA_WARMUP_BUCKETS + 2` (10) seconds, and after it
@@ -95,17 +103,39 @@ What it does, per tick (one per slot; `keeper/src/keeper.rs`):
   exceed the format's size or account limit** (so any mix of the mock's 3-key, AMM v4's 4-key and
   CPMM's 5-key ReadSets packs as densely as fits); each batch is simulated and a market whose
   crank fails is dropped from it and cranked alone.
-- **Duties 8, 14, budget and priority** (`fees.rs`, config `[budget]`; O17, owner decision of
-  2026-09-30): compute-unit limit `⌈simulated × 1.1⌉`; priority price = p75 of the recent
-  per-account fees on the transaction's markets, ×1.5 per consecutive missed second, capped at the
-  O17 ceiling of **100,000 µlamports/CU** (observations and exits alike). The O17 per-market daily
-  observation budget (`per_market_daily_lamports`, PROPOSED 30,000,000 = 0.03 SOL a UTC day):
-  `crank_price` fees are charged to it; the cranks exits depend on (a position near a threshold, a
-  liquidatable or expired one waiting for a fresh reference or its bound, an armed position, the
-  S3 chain) are charged but never throttled; exits, pool selection, graduation moves, `crank_sol_usd`
-  and `set_coverage_pause` are neither charged nor throttled. An exhausted budget stops the rest
-  (the idle cadence, deviation bursts, liquidity-anomaly and post-switch guard coverage, warm-ups)
-  and, on a market with open positions, is degraded mode **at once** (duty 9).
+- **Duties 8, 14, budget and priority** (`budget.rs`, `fees.rs`, config `[budget]`; O17, owner
+  decisions of 2026-09-30 and 2026-10-01): compute-unit limit `⌈simulated × 1.1⌉`; priority price =
+  p75 of the recent per-account fees on the transaction's markets, ×1.5 per consecutive missed
+  second, capped at the O17 ceiling of **100,000 µlamports/CU** (observations and exits alike).
+  **The global budget** (owner decision A of 2026-10-01; ARCH §7.1 duty 8 has the exact
+  algorithm): one daily budget `G` (`global_daily_lamports`, PROPOSED 1 SOL a UTC day; the M7
+  `per_market_daily_lamports` is retired and refused) funds markets in order of their lenders'
+  value at risk `V = ⌊borrowed_q·min(ema_price, P_ACC_MAX)/10¹⁸⌋`. Covered markets (positions and
+  `V ≥ var_floor_lamports`, 1 SOL) are ranked by `V` and hold entitlements of twice a quiet day
+  (`reserve_margin_bps` 10,000), funded in rank order at 00:00 UTC — a market covered later gets
+  its prorated entitlement from the free pool, then from the lowest-ranked markets —; the rest of
+  `G` is the free pool. A charge (a crank's share of its batch's fee) draws on its market's
+  entitlement, then the free pool, then — exit-critical and baseline charges only, never price
+  bursts or liquidity-anomaly coverage — lower-ranked entitlements, lowest first. The cranks exits
+  depend on (a position near a threshold, armed or warming up, a liquidatable or expired one
+  waiting for a fresh reference or its bound, the S3 chain, a market without a route) are never
+  throttled — at most one crank a second per market (a price burst's further cranks are
+  discretionary; M7D-4) —: beyond `G` they are an overdraft (`budget_overdraft_lamports`,
+  `ExitOverdraft` once a day), and so are the warm-ups and listing windows of markets without
+  positions. A market is funded at most once a UTC day; what its join takes from lower-ranked
+  markets pays no burst and returns to them when it stops being covered (M7D-3). Before a market's
+  first crank its per-crank charge is estimated at the keeper's measured average, or `⌈5,000 /
+  batch_v1⌉` at a start, and re-estimated at its first crank, the excess released and the markets
+  still short topped up in rank order (M7D-5). Markets below the floor get the idle cadence only,
+  from the free pool within `tail_share_bps` (2,000: 0.2 SOL a day), read in the tick their idle
+  crank is due and — while a position is near an exit — in the seconds after an observation while
+  its reference is fresh, so the exit goes the second after the crank (M7D-1); the crank such an
+  exit waits on is exit-critical (beyond the tail it overdraws; M7D-2). Any other charge the budget cannot cover is refused (`BudgetExhausted` once a day) and, on
+  a market with open positions, is degraded mode **at once** (`Degraded{Budget{spent, budget,
+  rank}}`, duty 9). Exits, pool selection, graduation moves (the crank a graduation step forces
+  included), `crank_sol_usd` and `set_coverage_pause` are neither charged nor throttled. Metrics per
+  market: `var_lamports`, `budget_tier`, `budget_rank`, `budget_unspent_lamports`, the day's spend
+  per class, `budget_refused`; globally `budget_{global,free,tail,overdraft,spent,excess}_lamports`.
 - **T-CASCADE, exit compute per slot** (`[budget] market_cu_per_slot`, `payer_cu_per_slot`; C0-17,
   ARCH §6.6): every exit write-locks the `Market` and its `MarketVault`, and every keeper
   transaction its fee payer — 24,000,000 CU per account and block, charged with each transaction's
@@ -181,8 +211,9 @@ What it does, per tick (one per slot; `keeper/src/keeper.rs`):
   failure (severe after a wipe: deposits wait).
 - **Duty 9, degraded mode** (`coverage.rs`, `alerts.rs`, config `[coverage_pause]`; O17, ARCH
   §3.1 `set_coverage_pause`): three consecutive seconds with a required observation and none landed
-  (outage, contested blocks), a `CoverageGap` event from the program, or the market's O17 budget
-  exhausted while it has open positions raise `Alert::Degraded`. The **designated pauser** (one
+  (outage, contested blocks), a `CoverageGap` event from the program (a gap above 40 s since
+  OWNER-M7-12), or a charge of the market the global budget refused while it has open positions
+  raise `Alert::Degraded`. The **designated pauser** (one
   instance, `enabled = true`, holding the `coverage_authority` key — a separate key from the fee
   payer, `--coverage-keypair`) then sends `set_coverage_pause(market, true)` in the same tick —
   simulated first, at the exit ceiling, outside the budget, retried every second until the flag
@@ -190,8 +221,13 @@ What it does, per tick (one per slot; `keeper/src/keeper.rs`):
   expiries, settlements, cranks, deposits, withdrawals and claims continue. After ten minutes of
   restored coverage (`recovery_s`; seconds that require nothing count as met; seconds the keeper
   was down do not) `Alert::CoverageRestored` and `set_coverage_pause(market, false)`. A flag found
-  set (a restart, another instance) starts the market `Recovering`: never lifted at once, so two
-  instances never flip-flop it. Without the key, with the role unset on chain
+  set at the pauser's first sight (a restart) starts the market `Recovering`
+  (`CoveragePauseFound`): never lifted at once, so two instances never flip-flop it; one that turns
+  set while the pauser runs without its having sent the set raises **`CoveragePauseForeign`** (a
+  second or compromised coverage key; OWNER-M7-3 (b)) and is adopted the same way. The pauser sets
+  a cleared flag again only on a market it degraded itself and still holds degraded; a flag it only
+  adopted that someone else — the Emergency multisig — clears stays clear. Without the key, with the
+  role unset on chain
   (`coverage_authority` default) or with a rotated key, the pauser raises
   `Alert::CoveragePauseUnavailable` once and the `Degraded` alert's page to the Emergency multisig
   (`set_pause`, reason `KeeperCoverage`) is the pause path; a refusal raises
@@ -201,9 +237,10 @@ What it does, per tick (one per slot; `keeper/src/keeper.rs`):
   the program's own rules accept (`pyth::check`: verification, feed, age, confidence, step) is sent
   as `crank_sol_usd` at once (a global cost line, never a market's budget), a failed one retried
   every second. `Alert::OracleRefused` (once per reason) for a newer update the rules refuse,
-  `Alert::OracleAging` (hourly) when the cache is older than `aging_alert_s` (1,800 s; at
-  `oracle_stale_s` = 3,600 s every market tiers C), `Alert::OracleUnreadable` for a missing or
-  undecodable feed.
+  `Alert::OracleAging` (once per stall, hourly while it lasts; M7D-6) when the cache is older than `aging_alert_s` (300 s, validated in
+  (0, 600); at `oracle_stale_s` — 600 s since the owner's decision of 2026-10-01, OWNER-M7-15, was
+  3,600 — every graduated market tiers C), `Alert::OracleUnreadable` for a missing or undecodable
+  feed.
 - **Duty 10, the venue drift monitor** (`monitor.rs`, config `[venue_watch]`):
   - **Upgrades.** Every tick the keeper reads the 45-byte headers (`getMultipleAccounts` with
     `dataSlice`: the accounts are up to 10 MiB) of the six ProgramData accounts the `VenueGuard`
@@ -337,46 +374,59 @@ if its `lookup_tables` lack a protocol ALT key.
 from the fee payer and from every multisig key). Governance proposes an `Authorities` change with
 `coverage_authority` = its public key (the other three authorities unchanged) and applies it after
 the timelock (48 h by default, 24 h floor). Until then `set_coverage_pause` fails
-`CoverageAuthorityDisabled` whoever signs, and the pauser alerts `CoveragePauseUnavailable
+`CoverageAuthorityDisabled` whoever signs — except the Emergency vault's clear (OWNER-M7-3 (b)),
+which is accepted with the role unset —, and the pauser alerts `CoveragePauseUnavailable
 {AuthorityUnset}` instead of pausing.
 
 **Run exactly one pauser.** One instance: `[coverage_pause] enabled = true` and
 `--coverage-keypair coverage.json`. Every other instance (another region, a standby): `enabled =
 false` and no key — they alert only. A second enabled instance is tolerated (it adopts a pause it
 finds, never lifts it early; `coverage_pause::two_instances_never_flip_flop_the_flag`) but pays
-for its own failed attempts.
+for its own failed attempts, and each instance pages the other's sets as `CoveragePauseForeign`.
 
 **What pages.** `Degraded` (a market with open positions lost coverage: an outage over
-`idle_interval_s + gap_tolerance_s` = 34 s, 3 missed required seconds in a row — a tick that came
-late skips seconds, which count when the market needed per-second coverage —, or its daily budget
-spent) is followed in the same tick by
+`COVERAGE_GAP_S` = 40 s, 3 missed required seconds in a row — a tick that came late skips seconds,
+which count when the market needed per-second coverage —, or a charge the global budget refused at
+its rank) is followed in the same tick by
 `CoveragePauseSent{paused: true}` (metric `shortwin_keeper_market_paused_coverage` 1). Page the
 Emergency multisig to `set_pause(market)` with reason `KeeperCoverage` only on
 `CoveragePauseUnavailable` (no key, role unset, key rotated away) or a repeated
 `CoveragePauseFailed`. Opens resume by themselves `recovery_s` (600 s) after coverage returns
 (`CoverageRestored`, then `CoveragePauseSent{paused: false}`); a budget-degraded market stays
-paused until the UTC day rolls over (or `per_market_daily_lamports` is raised and the keeper
-restarted), then 600 s. Exits are never paused: nothing needs doing for them.
+paused until the UTC day rolls over and funds it again at its rank (or `global_daily_lamports` is
+raised: the difference goes to the free pool), then 600 s. Exits are never paused: nothing needs
+doing for them.
 
-**Timing (M7-SEC-1).** The program's `CoverageGap` fires above 30 s between two integrations'
-landing seconds; the keeper schedules its idle crank from its `confirmed` read, so landing jitter
-makes 31–32-s gaps on healthy markets (`shortwin_keeper_market_coverage_gaps_tolerated`, not a page;
-an indexer should apply the same 34-s tolerance). A tick that waits for its confirmations (≈ 1 s)
+**Timing (M7-SEC-1, OWNER-M7-12).** The program's `CoverageGap` fires above `COVERAGE_GAP_S` = 40 s
+(30 s as built at M7, raised by the owner on 2026-10-01) between two integrations' landing seconds;
+the keeper schedules its idle crank from its `confirmed` read, so landing jitter makes 31–32-s gaps
+on healthy markets — below 40 s, so the program emits nothing for them and indexers need no
+tolerance; every gap it emits degrades (`gap_degrades_above` = max(30 + 4, 40) = 40;
+`shortwin_keeper_market_coverage_gaps_tolerated` stays 0 at the defaults). A tick that waits for its confirmations (≈ 1 s)
 skips a second: that costs nothing on the idle cadence and is a miss on a market that needed
 per-second coverage; only a stall over `tick_gap_tolerance_s` (5 s) counts as the keeper down.
 
-**A foreign clear or open (M7-SEC-3).** `CoveragePauseCleared` (the flag found clear while the keeper
-holds the market degraded and did not clear it) and `OpenWhileDegraded` (a position opened while
-the flag was last seen set) mean the `coverage_authority` key signed outside the pauser: page the
-Emergency multisig to `set_pause(market)` — a pause this key cannot clear — and rotate the key. The
-pauser sets the flag again in the same tick; opens wait `COVERAGE_CLEAR_DELAY_S` (5 s) after any
-clear, so the key cannot bracket an open in one transaction.
+**A foreign clear, set or open (M7-SEC-3; OWNER-M7-3 (b)).** `CoveragePauseCleared` (the flag found
+clear while the keeper holds the market degraded and did not clear it), `CoveragePauseForeign` (the
+flag turned set without the pauser having sent the set) and `OpenWhileDegraded` (a position opened
+while the flag was last seen set) mean the `coverage_authority` key signed outside the pauser (or,
+for a clear, the Emergency multisig did): page the Emergency multisig — it can `set_pause(market)`
+(a pause this key cannot clear), clear a coverage pause itself and have the key rotated. On a
+market the pauser degraded itself it sets the flag again in the same tick; opens wait
+`COVERAGE_CLEAR_DELAY_S` (5 s) after any clear, by either signer, so no clear can bracket an open
+in one transaction.
 
-**Key lost or compromised.** Only `coverage_authority` clears the flag (ARCH §3.1; OWNER-M7-3):
-rotate the role with an `Authorities` change (the timelock applies), then have the new key clear
-the flags the old one left (`set_coverage_pause(market, false)`, or let the new pauser recover each
-market: a flag it finds set is lifted after 600 s of its own coverage). A compromised key can only
-pause opens.
+**Key lost or compromised (OWNER-M7-3 (b), owner decision of 2026-10-01).** The coverage key and the
+**Emergency multisig** (`pause_authority`) can clear a coverage pause; only the key can set one.
+A hijacked key: page the Emergency, which clears each market the key paused (one
+`set_coverage_pause(market, false)` per market, ≈ 8,000 CU, signed by the Emergency vault; the
+role need not be installed) and every later set the same way — the pauser leaves a pause it did
+not set cleared — while Governance rotates the key with the timelocked `Authorities` change
+(≥ 86,400 s). A lost or rotated key: the Emergency clears the flags the old key left (or the new
+pauser recovers each market: a flag it finds set is lifted after 600 s of its own coverage). **To
+override a pause of the honest pauser itself, stop it first** (`[coverage_pause] enabled = false`,
+or restart it without `--coverage-keypair`), then clear: a running pauser sets its own pause again
+while it holds the market degraded. A compromised key can only pause opens.
 
 **Drill** (devnet or a local validator with the program and a market with an open position;
 `keeper-litesvm`'s `coverage_pause::drill_*` run the same steps in-process on every CI run):
@@ -388,8 +438,13 @@ pause opens.
    `withdraw` and `claim_sol` land; the keeper's liquidations and settlements continue.
 4. After 600 s: `CoverageRestored`, `CoveragePauseSent{paused: false}`, bit 6 clear; an open lands
    5 s later (`COVERAGE_CLEAR_DELAY_S`; within them it fails `CoveragePaused`).
-5. Repeat with a small `per_market_daily_lamports` (e.g. 10,000) to see `BudgetExhausted` →
+5. Repeat with a small `[budget] global_daily_lamports` (e.g. 10,000) to see `BudgetExhausted` →
    `Degraded{Budget}` → the pause in the same tick; restore the budget and restart to lift it.
+6. The Emergency's clear (OWNER-M7-3 (b)): with the pauser running, set a market's flag with the
+   coverage key from outside it — expect `CoveragePauseForeign` —, then sign
+   `set_coverage_pause(market, false)` with the Emergency vault: `CoveragePauseCleared`, the flag
+   stays clear, opens land 5 s later. On a market the pauser itself paused the flag is set again;
+   stop the pauser first to override it.
 
 ## The protocol ALT (`shortwin-build-alt`, `scripts/build-alt.sh`)
 
@@ -453,7 +508,19 @@ harness's invariant hooks after every instruction; a bundle executes in order an
 M7 scenarios: `coverage_pause` (the T-COVERAGE drill — an outage and an exhausted budget pause
 opens through `set_coverage_pause` in the same tick, exits and lender flows land under the pause,
 the pause lifts 600 s after coverage returns; a restart, the role unset or rotated, two instances,
-the role through the real timelock), `degraded`, `oracle` (duty 11), `cascade` (T-CASCADE:
+the role through the real timelock; since 2026-10-01 the Emergency's clear of a hijacked key's
+pause, left clear, and of the pauser's own, set again until the pauser is stopped), `budget` (the
+global budget, decision A: a burst storm on one market spends its entitlement and the free pool and
+nothing else, junk below the floor gets the idle cadence only and stops at the tail, a junk market
+above the floor preempts the lowest-ranked first, exhaustion degrades the lowest-ranked first),
+`m7d` (the verification of decision A, fixed: below the floor an expiry and a liquidation land at
+the first second the program accepts, after an outside cranker stops and on the keeper's idle
+cranks alone, a cascade whose value at risk crosses the floor is liquidated — M7D-1 —; the crank a
+below-floor exit waits on is exit-critical, and junk filling the tail cannot stop an honest expiry
+— M7D-2 —; a burst on a market near a threshold charges one exit-critical crank a second — M7D-4
+—; a keeper start funds its covered markets at the batched estimate — M7D-5),
+`degraded`, `oracle` (duty 11: aging alerted at 301 s, Tier C from the first crank after 600 s; a
+second stall within the hour alerted again before Tier C — M7D-6), `cascade` (T-CASCADE:
 `M7_CASCADE_WRITE=1` writes `tests/bench/m7_cascade/results.{md,json}`), `m7_cost` (the ECON §5.8
 cost-model inputs per venue, batch capacities, cadence, load: `M7_COST_WRITE=1` writes
 `tests/bench/m7_keeper/results.{md,json}`), `pamm_alt` (OWNER-M7-1: the PumpSwap 4-extras

@@ -405,7 +405,7 @@ mod tests {
                 expo: -8,
                 publish_time: now - 30,
             },
-            oracle_stale_s: 3_600,
+            oracle_stale_s: 600,
             theta_a_usd_e6: 500_000_000_000,
             theta_b_usd_e6: 100_000_000_000,
         }

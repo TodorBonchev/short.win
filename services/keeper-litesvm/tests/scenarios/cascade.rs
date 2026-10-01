@@ -135,7 +135,10 @@ struct Basket {
 }
 
 fn cfg(market_cap: u64, payer_cap: u64) -> KeeperConfig {
-    let mut cfg = KeeperConfig::default();
+    // Every market with positions covered: as the basket clears, the market's value at risk falls
+    // below the global budget's 1-SOL floor (decision A, 2026-10-01) and its last positions would
+    // get the idle cadence only; the bench measures the CU-per-slot policy (`common::covering_all`).
+    let mut cfg = covering_all(KeeperConfig::default());
     cfg.budget.market_cu_per_slot = market_cap;
     cfg.budget.payer_cu_per_slot = payer_cap;
     cfg

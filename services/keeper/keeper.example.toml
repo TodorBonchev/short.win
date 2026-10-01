@@ -22,7 +22,8 @@ lookup_tables = []
 dry_run = false
 
 [coverage]
-# Duty 1: every 30 s on a market with open positions and nothing near a threshold.
+# Duty 1: every 30 s on a market with open positions and nothing near a threshold (at most 30 s);
+# the only cadence of a market below the value-at-risk floor ([budget] var_floor_lamports).
 idle_interval_s = 30
 # Duty 5: every 30 s on a market without a route (the S3 chain restarts after 60 s).
 no_route_interval_s = 30
@@ -54,13 +55,15 @@ discovery_interval_s = 10
 # until its price state has warmed up (opens refuse EmaWarmingUp before that).
 listing_interval_s = 60
 # M7-SEC-1 (a): a CoverageGap in the keeper's own transaction degrades the market only above
-# idle_interval_s + gap_tolerance_s (35 s or more): the program measures landing seconds, the
-# keeper schedules from its confirmed read, and the send latency (0-2 s) makes 31-32 s gaps at
-# the idle cadence. A crank that does not land is a miss; a longer gap still degrades.
+# max(idle_interval_s + gap_tolerance_s, COVERAGE_GAP_S): the program measures landing seconds,
+# the keeper schedules from its confirmed read, and the send latency (0-2 s) made 31-32 s gaps at
+# the idle cadence while COVERAGE_GAP_S was 30. Since the owner raised it to 40 s (2026-10-01) the
+# program emits none at the idle cadence, and every gap it emits (41 s or more) degrades. A crank
+# that does not land is a miss. [0, 30].
 gap_tolerance_s = 4
 # M7-SEC-1 (b): a tick more than 1 + tick_gap_tolerance_s seconds after the previous one means the
 # keeper was down (a degraded market's recovery restarts); a shorter skip (a tick that waited for
-# its confirmations) misses only the seconds that required per-second coverage.
+# its confirmations) misses only the seconds that required per-second coverage. [0, 30].
 tick_gap_tolerance_s = 5
 # M7-SEC-8: list-only markets and curve markets far from completion (the markets anyone can list for
 # a fee and rent), without open positions and nothing time-critical pending, are read every
@@ -72,16 +75,33 @@ cold_interval_s = 30
 hot_curve_completion_lamports = 20000000000
 
 [budget]
-# O17: lamports per market per UTC day for coverage observations (crank_price; 0: unlimited).
-# Its exhaustion on a market with open positions is degraded mode at once (opens paused through
-# [coverage_pause], or the Emergency multisig paged; exits continue). The cranks exits depend on
-# (per-second coverage of a position near a threshold, a liquidatable or expired position waiting
-# for a fresh reference or its bound, the S3 chain) are charged but never throttled; exits, pool
-# selection, graduation moves and set_coverage_pause are neither charged nor throttled. An
-# exhausted budget stops the rest: the idle cadence, deviation bursts, the liquidity-anomaly and
-# post-switch guard coverage, warm-ups. PROPOSED (the owner's to confirm; measured in
-# tests/bench/m7_keeper: a quiet market costs 0.0024-0.0263 SOL a day).
-per_market_daily_lamports = 30000000
+# O17, the global keeper budget (owner decision A of 2026-10-01; ARCHITECTURE §7.1 duty 8): ONE
+# daily budget G for coverage observations (crank_price), all markets together, funding them in
+# order of their lenders' value at risk V = floor(borrowed_q * min(ema_price, P_ACC_MAX) / 1e18)
+# lamports. The M7 per-market budget (per_market_daily_lamports) is retired: a config that sets it
+# is refused.
+# - Covered markets (open positions, V >= var_floor_lamports) are ranked by V; at 00:00 UTC each
+#   gets an entitlement of reserve_margin_bps over its quiet day (twice it by default), funded from
+#   the top; the rest of G is the free pool. A market covered later in the day gets its prorated
+#   entitlement from the free pool, then from the lowest-ranked covered markets.
+# - A charge draws on its market's entitlement, then the free pool, then - for the cranks exits
+#   depend on and the baseline cadence, never for price bursts or liquidity-anomaly coverage - the
+#   lower-ranked markets' entitlements, lowest first. The cranks exits depend on are never throttled
+#   (beyond G: an alerted overdraft, ExitOverdraft); any other charge the budget cannot cover is
+#   refused, and on a market with open positions that is degraded mode at once (opens paused
+#   through [coverage_pause], or the Emergency multisig paged; exits continue).
+# - Markets with positions below the floor get the 30-s idle cadence only (read at that cadence),
+#   from the free pool within tail_share_bps of G a day; never a covered market's entitlement.
+# - Exits, pool selection, graduation moves, crank_sol_usd and set_coverage_pause are neither
+#   charged nor throttled.
+# PROPOSED defaults (OWNER-M7-17). 0 = no budget (every charge admitted).
+global_daily_lamports = 1000000000
+# [0, market_max_notional]; 0 = every market with positions covered.
+var_floor_lamports = 1000000000
+# [0, 100000]: the entitlement is (1e4 + this) / 1e4 quiet days.
+reserve_margin_bps = 10000
+# [0, 10000]: the below-floor markets' share of G (0.2 SOL a day at the defaults).
+tail_share_bps = 2000
 # O17 (owner decision of 2026-09-30): priority-price ceilings, micro-lamports per CU
 # (observations / exits, set_coverage_pause, pool selection, the upgrade latch).
 priority_ceiling = 100000
@@ -112,12 +132,13 @@ authority_keypair = ""
 
 [oracle]
 # Duty 11 (ARCH §7.1, §4.7): crank_sol_usd whenever the configured Pyth PriceUpdateV2 holds an update
-# newer than the OracleCache (the USD tiers read it; a cache older than oracle_stale_s = 3,600 s puts
-# every market in Tier C). Read every interval_s (at most 30 s); a failed crank is retried every
-# second. Alert when the cache is older than aging_alert_s (at most hourly).
+# newer than the OracleCache (the USD tiers read it; a cache older than oracle_stale_s - 600 s since
+# the owner's decision of 2026-10-01, was 3,600 - puts every graduated market in Tier C). Read every
+# interval_s (at most 30 s); a failed crank is retried every second. Alert when the cache is older
+# than aging_alert_s (once per stall, hourly while it lasts): half of oracle_stale_s, in (0, 600).
 enabled = true
 interval_s = 30
-aging_alert_s = 1800
+aging_alert_s = 300
 
 [venue_watch]
 # Duty 10: watch the venue ProgramData accounts (pump, pAMM, pfee, AMM v4, CPMM, Jupiter; and

@@ -172,6 +172,12 @@ pub struct PositionEval {
     /// On a live pump curve, `Q` exceeds the curve's real token reserves `rT` (no buy on the
     /// curve can close it: the straddle of ARCH §5.4).
     pub straddle: bool,
+    /// The position waits only for a fresh reference (M7D-2): the completed bucket is stale and
+    /// the position is expired, or its EMA leg holds and its live CR at the risk fee is below L
+    /// (with a fresh bucket the spot leg would follow the live price) — on a venue that executes,
+    /// outside the warm-up. Below the value-at-risk floor the idle crank that brings the
+    /// reference is then exit-critical (ARCH §7.1 duty 8).
+    pub stale_exit: bool,
 }
 
 /// The market-level coverage needs (duties 1, 2, 5; M4F-1's guard coverage).
@@ -393,6 +399,12 @@ pub fn evaluate(
         Plan::SolSettle
     };
 
+    let stale_exit = st.executable
+        && !warming
+        && !fresh
+        && (expired
+            || (ema_leg && b_live_risk.is_some() && u128::from(cr_live_bps) < u128::from(l_bps)));
+
     Ok(PositionEval {
         key: pv.key,
         plan,
@@ -411,6 +423,7 @@ pub fn evaluate(
         k_s,
         s3_due,
         straddle,
+        stale_exit,
     })
 }
 

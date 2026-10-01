@@ -5,7 +5,10 @@
 //!   market with `[set_coverage_pause(false), open_short, set_coverage_pause(true)]` in one
 //!   transaction. A clear of a set flag now records its second (`Market.coverage_cleared_at`) and
 //!   opens refuse `CoveragePaused` for `COVERAGE_CLEAR_DELAY_S` after it: the bracket fails, and
-//!   so does any open in the delay; a no-op clear records nothing.
+//!   so does any open in the delay; a no-op clear records nothing. Since the owner's decision of
+//!   2026-10-01 (★OWNER-M7-3 (b)) the Emergency vault may clear the flag too: its clear starts the
+//!   same delay, so `[Emergency clear, open_short]` — and the bracket with the key's re-set — is
+//!   refused at its open as well.
 //! - **M7-SEC-4** (owner item OWNER-M7-11, as built): `N_open` — the launch guard, `min_notional`,
 //!   the open fee — is quoted on the post-open live reserves, so a sale in the open's own
 //!   transaction (down to the spot–EMA guard's −10 %) records ≈ 0.91 of the honest quote. The
@@ -126,6 +129,68 @@ mod mock_venue {
         println!(
             "M7-SEC-3: [clear, open, set] refused CoveragePaused; opens resume {COVERAGE_CLEAR_DELAY_S} s \
              after a clear"
+        );
+    }
+
+    /// ★OWNER-M7-3 (b) with M7-SEC-3: the Emergency vault's clear starts the clear delay like the
+    /// key's — `[Emergency clear, open_short]` and `[Emergency clear, open_short, key set]` are
+    /// refused `CoveragePaused` at the open (nothing committed: the flag still set, no clock
+    /// recorded); the Emergency's clear alone lets opens land `COVERAGE_CLEAR_DELAY_S` later.
+    #[test]
+    fn m7_sec_3_an_emergency_clear_cannot_bracket_an_open_either() {
+        let (mut env, mm) = setup();
+        env.plant_coverage_authority();
+        env.crank(&mm);
+        env.warp(1);
+        let key = mm.market();
+        ok(env.set_coverage_pause(&key, true));
+        let b = env.borrower();
+        let ea = env.pause_authority.insecure_clone();
+        let auth = env.coverage_authority.insecure_clone();
+        let open = || {
+            open_short_ix(
+                &mm,
+                &b.key(),
+                b.next_nonce,
+                Q,
+                0,
+                u64::MAX,
+                u64::MAX,
+                ExtrasSel::NONE,
+                &[],
+            )
+        };
+        let e_clear = ix::set_coverage_pause(&ea.pubkey(), &key, false, 1);
+        let k_set = ix::set_coverage_pause(&auth.pubkey(), &key, true, 1);
+        let bkp = b.kp.insecure_clone();
+        for ixs in [
+            vec![e_clear.clone(), open()],
+            vec![e_clear.clone(), open(), k_set.clone()],
+        ] {
+            let res = env.send(&ixs, &[&ea, &auth, &bkp]);
+            assert_err(&res, E::CoveragePaused);
+            assert!(env.market(&key).has_flag(MARKET_FLAG_PAUSED_COVERAGE));
+            assert_eq!(env.market(&key).coverage_cleared_at, 0, "nothing committed");
+        }
+        // The Emergency's clear alone: opens wait out the delay.
+        let meta = ok(env.emergency_clear_coverage(&key));
+        let ev: CoveragePauseSet = events::one(&meta);
+        assert!(!ev.paused && ev.by == ea.pubkey());
+        let t = env.now();
+        assert_eq!(env.market(&key).coverage_cleared_at, t);
+        let mut b = b;
+        for _ in 0..COVERAGE_CLEAR_DELAY_S {
+            let (res, _) = env.open(&mm, &mut b, Q);
+            assert_err(&res, E::CoveragePaused);
+            env.warp(1);
+            env.crank(&mm);
+        }
+        let (res, _) = env.open(&mm, &mut b, Q);
+        let o: Open = events::one(&ok(res));
+        assert_eq!(o.q, Q);
+        println!(
+            "OWNER-M7-3 (b): [Emergency clear, open] refused CoveragePaused; opens resume \
+             {COVERAGE_CLEAR_DELAY_S} s after the Emergency's clear"
         );
     }
 

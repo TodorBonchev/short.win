@@ -258,6 +258,20 @@ impl Env {
         self.send(&[ix], &[&kp])
     }
 
+    /// The Emergency vault's `set_coverage_pause(false, KeeperCoverage)` on `market`, signed by
+    /// [`Env::pause_authority`] (★OWNER-M7-3 (b), owner decision of 2026-10-01: the Emergency
+    /// may clear — never set — a market's coverage pause, with the role installed or not).
+    pub fn emergency_clear_coverage(&mut self, market: &Pubkey) -> TxResult {
+        let kp = self.pause_authority.insecure_clone();
+        let ix = crate::ix::set_coverage_pause(
+            &kp.pubkey(),
+            market,
+            false,
+            shortwin::events::COVERAGE_REASON_KEEPER,
+        );
+        self.send(&[ix], &[&kp])
+    }
+
     /// `apply_config()` with the optional accounts the pending change needs
     /// ([`crate::ix::apply_config_for`]); the plain instruction if nothing is pending.
     pub fn apply_config_ix(&self) -> Instruction {

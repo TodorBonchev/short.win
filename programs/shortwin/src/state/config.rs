@@ -116,6 +116,15 @@ impl GlobalConfig {
         self.coverage_enabled() && *key == self.coverage_authority
     }
 
+    /// `set_coverage_pause`'s Emergency clear (★OWNER-M7-3 (b), owner decision of 2026-10-01;
+    /// ARCH §3.1): `pause_authority` (the Emergency vault) **clearing** the flag — accepted whether
+    /// or not the coverage role is installed, so a flag a lost, rotated or disabled role left set,
+    /// or one a compromised coverage key keeps setting, is cleared at once. Never a set: the
+    /// Emergency pauses a market's opens through `set_pause`, never through this flag.
+    pub fn is_emergency_coverage_clear(&self, key: &Pubkey, paused: bool) -> bool {
+        !paused && self.pause_authority != Pubkey::default() && *key == self.pause_authority
+    }
+
     /// The whole parameter set as the math crate sees it (for validation and for readers).
     pub fn param_set(&self) -> Result<ParamSet> {
         param_set(
@@ -939,6 +948,29 @@ mod tests {
         assert!(!c.coverage_enabled());
         assert!(!c.is_coverage_authority(&Pubkey::default()));
         assert!(!c.is_coverage_authority(&next));
+    }
+
+    /// ★OWNER-M7-3 (b) (owner decision of 2026-10-01): the Emergency vault clears the flag —
+    /// with the role installed, unset or rotated — and never sets it; no other key clears through
+    /// this path (Governance, the coverage key and the default key included).
+    #[test]
+    fn the_emergency_clears_and_never_sets() {
+        let mut c = default_config();
+        c.governance = Pubkey::new_from_array([1; 32]);
+        c.pause_authority = Pubkey::new_from_array([2; 32]);
+        let keeper = Pubkey::new_from_array([7; 32]);
+        for installed in [Pubkey::default(), keeper] {
+            c.coverage_authority = installed;
+            assert!(c.is_emergency_coverage_clear(&c.pause_authority, false));
+            assert!(!c.is_emergency_coverage_clear(&c.pause_authority, true));
+            for k in [Pubkey::default(), c.governance, keeper] {
+                assert!(!c.is_emergency_coverage_clear(&k, false), "{k}");
+                assert!(!c.is_emergency_coverage_clear(&k, true), "{k}");
+            }
+        }
+        // An unset Emergency key (never accepted by `check_authorities`) matches nothing.
+        c.pause_authority = Pubkey::default();
+        assert!(!c.is_emergency_coverage_clear(&Pubkey::default(), false));
     }
 
     #[test]

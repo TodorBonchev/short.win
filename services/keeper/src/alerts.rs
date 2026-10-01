@@ -15,9 +15,16 @@ pub enum DegradedReason {
     Misses(u32),
     /// The program reported `CoverageGap{gap_s, open_positions}` (A69).
     CoverageGap { gap_s: i64, open_positions: u32 },
-    /// O17: the market's daily observation budget (`spent` of `budget` lamports) is exhausted
-    /// while it has open positions.
-    Budget { spent: u64, budget: u64 },
+    /// O17, the global budget (owner decision A of 2026-10-01; ARCH §7.1 duty 8): a charge of the
+    /// market, which has open positions, was refused — the budget can no longer cover it at its
+    /// rank. `spent`: the day's spend of the whole budget when it was refused; `budget`: `G`
+    /// (`global_daily_lamports`); `rank`: the market's rank by value at risk (`None`: below the
+    /// floor, the tail spent).
+    Budget {
+        spent: u64,
+        budget: u64,
+        rank: Option<u32>,
+    },
 }
 
 /// Why the keeper could not send (or had no need to hold) `set_coverage_pause` itself (O17): the
@@ -75,7 +82,8 @@ pub enum Alert {
     },
     /// Duty 11: the `OracleCache` is `age_s` old (above `oracle.aging_alert_s`): the feed is not
     /// updating, or its updates are refused. At `oracle_stale_s` every market's tier falls to C
-    /// (USD thresholds unreadable). At most hourly.
+    /// (USD thresholds unreadable). Once per stall (per cache `publish_time`, M7D-6), and at most
+    /// hourly while it lasts.
     OracleAging { age_s: i64, publish_time: i64 },
     /// Duty 11: the configured `PriceUpdateV2` account is missing or does not decode.
     OracleUnreadable { account: Pubkey, detail: String },
@@ -84,12 +92,24 @@ pub enum Alert {
     /// of met coverage.
     CoveragePauseFound { market: Pubkey },
     /// M7-SEC-3: `market`'s `paused_coverage` flag was found **cleared** while the keeper holds
-    /// the market degraded and had not cleared it itself — the `coverage_authority` key signed a
-    /// clear this instance did not send (another instance holding the key, or the key
-    /// compromised: the bracket `[clear, open_short, set]` the program's clear delay refuses).
-    /// The designated pauser sets it again in the same tick; page the Emergency multisig, which
-    /// can `set_pause(market)` (a pause this key cannot clear) and rotate the key.
+    /// the market degraded and had not cleared it itself — a clear this instance did not send:
+    /// the coverage key elsewhere (another instance holding it, or the key compromised: the
+    /// bracket `[clear, open_short, set]` the program's clear delay refuses) or, since
+    /// OWNER-M7-3 (b), the Emergency multisig. The designated pauser sets it again in the same
+    /// tick **only on a market it degraded itself and still holds degraded**; a flag it only
+    /// adopted (found set at a restart, or set by someone else) stays clear and the market's
+    /// adopted recovery ends. Page the Emergency multisig, which can `set_pause(market)` (a pause
+    /// the coverage key cannot clear), clear the coverage flag itself and have the key rotated; to
+    /// override the honest pauser's own pause, stop it first (`[coverage_pause] enabled = false`).
     CoveragePauseCleared { market: Pubkey },
+    /// ★OWNER-M7-3 (b) (2026-10-01; ARCH §7.1 duty 9): `market`'s `paused_coverage` flag turned
+    /// **set** while this designated pauser ran without having sent the set (seen clear, then
+    /// set): a second instance holding the coverage key, or the key compromised. The market starts
+    /// `Recovering` (the flag lifts only after `recovery_s` of this keeper's own coverage); page
+    /// the Emergency multisig, which can clear the flag at once (`set_coverage_pause(false)`,
+    /// clear only) while Governance rotates the key. A flag already set at the pauser's first
+    /// sight is a restart's ([`Alert::CoveragePauseFound`]).
+    CoveragePauseForeign { market: Pubkey },
     /// M7-SEC-3: an open (`position`) landed on `market` while the keeper held it degraded
     /// (degraded or recovering since `degraded_since`): with the flag set, only an open in the
     /// clear delay's gap or a stale read of the flag lets that happen — page as for
@@ -99,10 +119,22 @@ pub enum Alert {
         position: Pubkey,
         degraded_since: i64,
     },
-    /// The market's O17 daily observation budget is spent.
+    /// The global keeper budget (`[budget] global_daily_lamports`, owner decision A of
+    /// 2026-10-01; ARCH §7.1 duty 8) refused a charge for the first time this UTC day — on
+    /// `market`; `spent`: the day's spend so far, `budget`: `G`. Once a day (the per-market
+    /// refusals are each market's `Degraded{Budget}`).
     BudgetExhausted {
         market: Pubkey,
         spent: u64,
+        budget: u64,
+    },
+    /// The global budget booked a charge beyond `G` for the first time this UTC day (an
+    /// exit-critical crank, or a warm-up or listing-window crank of a market without positions,
+    /// which are sent anyway: OWNER-M7-6 (a), lender safety first); `overdraft`: `O` then. Once a
+    /// day; `budget_overdraft_lamports` follows the rest.
+    ExitOverdraft {
+        market: Pubkey,
+        overdraft: u64,
         budget: u64,
     },
     /// The cluster refused a v1 transaction: batches fall back to v0.
@@ -241,6 +273,8 @@ impl Alert {
             | Self::CoveragePauseFailed { .. }
             | Self::CoveragePauseUnavailable { .. }
             | Self::CoveragePauseCleared { .. }
+            | Self::CoveragePauseForeign { .. }
+            | Self::ExitOverdraft { .. }
             | Self::OpenWhileDegraded { .. } => {
                 tracing::error!(alert = ?self, "keeper coverage alert");
             }

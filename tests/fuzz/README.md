@@ -80,11 +80,11 @@ each replayed repeatedly.
 |---|---|
 | trading | `open` (log-uniform from just below 0.1 SOL of notional to just above `min(X/20, T)`; one in 32 with `min_proceeds = u64::MAX`, `max_margin = 0` or `max_open_fee = 0`), `open_near_cap` (the largest `q` accepted, by bisection on clones; the refusal one unit above is counted), `close` (one in 32 with `max_buyback_cost = 1`), `add_margin`; on the mock, opens and closes pick an extras selection (`none` / `current` / `previous` / `stable`) |
 | lenders | `deposit` (one in 101 of zero tokens), `withdraw` (a fraction, all shares, or exactly the pro-rata allowance), `claim_sol` ×1–4, `cover_deficit`, `sync_lender`, `sweep_trader`, `dust_sweeps` (1 lamport to the trader and a sweep every minute), `lenders_out` (all out, optionally a dust holder stays, then a sweep), `jit_deposit` (`[deposit, exit, withdraw]`) |
-| keeper and time | `keeper_seconds` (crank every market, then liquidate / expire / sol_settle every position, each second), `crank`, `keeper_exit`, `silence` (31–930 s without observation: `CoverageGap`; with the role installed, two in three are **degraded mode** (O17): the keeper's `set_coverage_pause(true)` on every market, cleared 1–8 actions later), `warp` (1 s – 3 d), `warp_to_deadline` (±, or past the S3 tail), `outage` (venue halted, fee above the hard cap, or halted and flagged, 130 s – 2 h with the keeper settling: the no-route chain, S3, T-S3-BROKEN) |
+| keeper and time | `keeper_seconds` (crank every market, then liquidate / expire / sol_settle every position, each second), `crank`, `keeper_exit`, `silence` (41–940 s without observation — past `COVERAGE_GAP_S`, 40 s since the owner's decision of 2026-10-01 (OWNER-M7-12; was 31–930 s against 30 s): `CoverageGap`; with the role installed, two in three are **degraded mode** (O17): the keeper's `set_coverage_pause(true)` on every market, cleared 1–8 actions later), `warp` (1 s – 3 d), `warp_to_deadline` (±, or past the S3 tail), `outage` (venue halted, fee above the hard cap, or halted and flagged, 130 s – 2 h with the keeper settling: the no-route chain, S3, T-S3-BROKEN) |
 | prices and liquidity | `trade`, `shock` (×/÷ 1.05–10, held), `ramp`, `liquidity` (add / remove), `lp_wrapped_crank` (`[withdraw, crank, deposit]` and `[deposit, crank, withdraw]`), `deposit_wrapped_open`, `withdraw_wrapped_exit` |
 | atomic bundles (ECON §12) | `pump_crank_dump` (`[push, crank, unwind]` 1–20 s in a row), `contrary_low` (a contrary low observation every second, with or without the keeper's, then `sol_settle`), `attacker_seconds` (1–6 attacker-only seconds up / down / flip before a settlement), `push_then_freeze`, `sandwich_exit` (`[front, close / liquidate / expire / sol_settle, back]`), `held_sandwich`, `dump_around_settle` (a dump or an LP deposit around `sol_settle`) |
 | pauses and flags | `gates` (opens paused / route broken / venue halted on the market, I10's fuzz action), `global_pause`, `disable_venue` (re-enabled by Governance after the timelock), `route_broken_venue`, `venue_halt`, `fee_shock`, `layout_shock`, `over_delivery`, `extras_shock` (the mock requires the per-mint PDA a template derives, or fresh keys no template names); each disturbance lasts 1–8 further actions |
-| degraded mode (O17, M7) | `coverage_pause`: `set_coverage_pause` pausing or clearing one market, signed by the role's key, Governance, the Emergency vault or a stranger, with the keeper's reason or a bad one — the outcome predicted exactly (`CoverageAuthorityDisabled` while the role is inert, whoever signs; `Unauthorized`; `InvalidParams`); or the role rotated by Governance's timelocked `Authorities` change (a new key, or the default key: inert); ★`coverage_bracket` (M7-SEC-3): `[set_coverage_pause(false), open_short, set_coverage_pause(true)]` by the role's key — refused `CoveragePaused` on a paused market (the clear delay), ordinary gates otherwise |
+| degraded mode (O17, M7) | `coverage_pause`: `set_coverage_pause` pausing or clearing one market, signed by the role's key, Governance, the Emergency vault or a stranger, with the keeper's reason or a bad one — the outcome predicted exactly (`CoverageAuthorityDisabled` while the role is inert, whoever signs — except the Emergency's clear; `Unauthorized`; `InvalidParams`); or the role rotated by Governance's timelocked `Authorities` change (a new key, or the default key: inert); ★`coverage_bracket` (M7-SEC-3): `[set_coverage_pause(false), open_short, set_coverage_pause(true)]` by the role's key — refused `CoveragePaused` on a paused market (the clear delay), ordinary gates otherwise; ★`emergency_clear` (OWNER-M7-3 (b), owner decision of 2026-10-01): the Emergency vault clears a market's coverage pause (after a hijacked key's set, or a no-op) with the role installed, unset or rotated — the whole VM unchanged but the flag and its clock (I4's coverage clause), an open in the clear delay refused `CoveragePaused` —, its set refused (`Unauthorized`, or `CoverageAuthorityDisabled` while the role is unset), and `[Emergency clear, open_short]` refused `CoveragePaused` on a paused market |
 | price-wrapped opens (M7-SEC-6) | ★`wrapped_open`: a sale or a buy of the venue within the open's spot–EMA guard, `open_short`, unwound or not, in one transaction (the M5-SEC-3 / M7-SEC-4 / M7-SEC-5 class); the open's terms are I19's |
 | extras sets (mock) | `extras_set`: the Emergency's `set_venue_extras` on the sell leg, the buy leg or both — the template the interface change needs, a hostile fixed-key entry, or an empty set |
 | mint filter | `mint_shock`: a freeze authority planted on the market's mint for 1–8 actions, `flag_unsafe_mint` by anyone on one in eight (one-way), or on a safe mint (`MintSafe` / `MintUnsafeFlagged`) |
@@ -142,7 +142,10 @@ each replayed repeatedly.
   the share epoch and takes every lender out at its allowance; the market must end with no position,
   no receivable, no rent aggregate and nothing borrowed, and the hooks' dust bound holds throughout.
   The keeper never migrates a completed curve in the wind-down: the S3 path must settle a market left
-  `PumpMigrating`.
+  `PumpMigrating`. A live curve whose real token reserves cannot buy a position back (`Q > rT`: its
+  close refuses `CurveStraddle`) is completed first — the straddle's first step (ARCH §5.4), which
+  one price-restore push (at most 50×) cannot always undo — and then settles the same way
+  (`fuzz:wind-down-curve-completed`; FUZZ-M7D-1).
 
 **Anomalies** (in the summary, not failures): a panic, compute exhaustion or framework error (an
 Anchor code of short.win's own, not a venue's error surfacing through its CPI — those are counted as
@@ -174,6 +177,7 @@ regression: `corpus_replays` requires it to pass.
 | id | reproducer | summary | status |
 |---|---|---|---|
 | FUZZ-M7-1 | `corpus/fuzz-m7-1-curve-trader-wsol.json` (2 actions) | a System transfer to a curve market's `trader_wsol` address survived a curve leg: the curve never names that address (ARCH §2.4 rule 2 normalises it on the WSOL venues only; `TraderAccounts::post_conditions` checks it there) while I7's hook required it closed after every leg; `sweep_trader` recovers the lamports | **resolved in the M7 integration, no program change**: I7's `trader_wsol` clause restated for the curve as a delta (ARCH §2.4 rule 5, §8.3 — the leg leaves the address's lamports unchanged, System-owned, no data; after a WSOL leg it holds nothing), the hook and its mutant test (`invariants_m2_hooks::i7_trader_wsol_on_a_curve_leg_is_a_delta`), a fork regression (`pump_it::exits::a_donation_to_the_trader_wsol_address_survives_curve_legs_until_swept`); the reproducer passes; the fuzzer donates to the address on curve markets again |
+| FUZZ-M7D-1 | `corpus/fuzz-m7d-1-curve-straddle-wind-down.json` (3 actions) | the liveness oracle on a fresh curve: two `shock`s buying 98 % of `rT` around an open left `Q > rT`, so `close_short`, `liquidate` and `expire` refused `CurveStraddle`; the wind-down's price restore (one push, at most 50×) did not bring `rT` back above `Q` and its keeper never completed the curve, so the position stayed open (found by the M7D fixes' 10-minute smoke, seed 1790845047; the harness's gap, not the program's) | **resolved in the fuzzer, no program change**: the wind-down completes such a curve (the straddle's first step, ARCH §5.4) and leaves it `PumpMigrating`, as every completed curve, for the S3 path to settle (`SolSettle(S3)`); the liveness oracle is unchanged; the reproducer passes |
 
 ## Runs so far (M7)
 
@@ -183,10 +187,18 @@ regression: `corpus_replays` requires it to pass.
 | fuzz track, confirmation | the M7 program | 724 s | 5 | 1,190 | 225,106 | 2,879,543 | 4,327,270 | 0 | 0 |
 | integration, `--seed 20261010` | the final tree (FUZZ-M7-1 resolved) | 605 s | 5 | 822 | 155,022 | 1,961,976 | 2,944,773 | 0 | 0 |
 | M7 security review fixes, `--seed 20261011` | the fixed tree (M7-SEC-1 … -9; I19, `wrapped_open`, `coverage_bracket`) | 617 s | 5 | 806 | 155,055 | 2,036,820 | 3,109,137 | 0 | 0 |
+| the owner's decisions of 2026-10-01 (default seed) | `COVERAGE_GAP_S` 40, `oracle_stale_s` 600, the Emergency's clear (`emergency_clear`; `silence` past 40 s) | 606 s | 4 | 1,176 | 167,812 | 2,181,234 | 3,342,239 | 0 | 0 |
+| the M7D fixes (keeper only; the program byte-identical), default seed | the decisions' tree | 640 s | 4 | 1,103 | 157,856 | 2,113,224 | 3,276,171 | 1 (FUZZ-M7D-1: the wind-down's missing curve completion) | 0 |
+| the M7D fixes, after FUZZ-M7D-1 (an interim wind-down that also migrated) | — | 601 s | 4 | 1,188 | 171,370 | 2,289,531 | 3,486,368 | 0 | 0 |
+| the M7D fixes, final (default seed) | the wind-down completes a straddled curve and leaves it to S3 | 603 s | 4 | 1,215 | 172,918 | 2,303,424 | 3,513,992 | 0 | 0 |
 
-≈ 1.62 h of wall clock (≈ 8.1 job-hours) in all, plus the M7 security review's runs (mutant builds)
+≈ 2.31 h of wall clock (≈ 10.8 job-hours) in all, plus the M7 security review's runs (mutant builds)
 and the mutation runs (below). In the fixes' run, 4,327 `wrapped_open` and 1,127 `coverage_bracket`
-actions: 832 wrapped opens landed with I19 recomputing their terms, 585 brackets refused at the clear delay. **The M7 exit criterion "fuzz clean ≥ 24 h"
+actions: 832 wrapped opens landed with I19 recomputing their terms, 585 brackets refused at the clear delay.
+In the owner's-decisions run, 3,104 `emergency_clear` actions: 541 clears of a set flag and 780
+no-op clears landed under I4's coverage clause (whole VM), 875 opens in the clear delay after an
+Emergency clear (alone or bundled) refused `CoveragePaused`; 601 `coverage_bracket`s refused;
+5,840 `CoverageGap` events. **The M7 exit criterion "fuzz clean ≥ 24 h"
 is not met yet** (ARCHITECTURE §9, OWNER-M7-16): run `run --profile all --duration 24h --jobs 8
 --actions 400 --minimize` locally, or let `fuzz-nightly` run for three nights once the branch is on
 main (GitHub runs `schedule` on the default branch only).

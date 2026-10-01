@@ -16,8 +16,11 @@
 //!   fail (the hooks check that nothing changed; an accepted replacement is an anomaly for
 //!   review, an accepted omission a violation);
 //! - **I4's coverage clause (O17)**: a landed `set_coverage_pause` changes nothing on the whole VM
-//!   but bit 6 of one market's `flags`; every refusal is the predicted code (the role inert, the
-//!   signer, the reason);
+//!   but bit 6 of one market's `flags` (and, for a clear of a set flag, its `coverage_cleared_at`);
+//!   every refusal is the predicted code (the role inert, the signer, the reason) — since the
+//!   owner's decision of 2026-10-01 (★OWNER-M7-3 (b)) the Emergency's clear lands with the role
+//!   installed, unset or rotated, its set never does, and no open lands in the clear delay after
+//!   it (`emergency_clear`);
 //! - **the mint filter, governance, the oracle, client bounds**: exits and `withdraw` never
 //!   return a mint-filter code; a change never applies before its timelock, after its window or
 //!   after a cancel, and the Emergency cannot cancel a `Timelock` change; `crank_sol_usd` never
@@ -600,7 +603,9 @@ impl World {
                 true
             }
             Kind::Silence => {
-                self.env.warp(i64::from(31 + a % 900));
+                // Past `COVERAGE_GAP_S` (40 s since OWNER-M7-12): the next crank reports the gap.
+                self.env
+                    .warp(shortwin_math::consts::COVERAGE_GAP_S + 1 + i64::from(a % 900));
                 for si in 0..self.slots.len() {
                     self.crank(si);
                 }
@@ -691,6 +696,7 @@ impl World {
             Kind::ReplaceAccount => self.i14(si, a, b, true),
             Kind::CoveragePause => self.coverage_pause(si, a, b),
             Kind::CoverageBracket => self.coverage_bracket(si, a, b),
+            Kind::EmergencyClear => self.emergency_clear(si, a, b),
             Kind::WrappedOpen => self.wrapped_open(si, a, b),
             Kind::SweepFees => {
                 let market = self.market_key(si);
@@ -1554,6 +1560,130 @@ impl World {
             (Err(_), _) => {}
         }
         true
+    }
+
+    /// ★OWNER-M7-3 (b) (owner decision of 2026-10-01): the Emergency vault clears a market's
+    /// coverage pause — never sets one ([`Kind::EmergencyClear`]).
+    fn emergency_clear(&mut self, si: usize, a: u32, b: u32) -> bool {
+        let installed = self
+            .coverage
+            .as_ref()
+            .is_some_and(|k| self.env.config().coverage_authority == k.pubkey());
+        if a % 2 == 1 && installed && self.coverage_set(si, true) {
+            // A (hijacked) key's pause, which the keeper would otherwise clear later.
+            self.later(b % 8, Undo::CoveragePause(si));
+        }
+        let ea = self.env.pause_authority.insecure_clone();
+        let role_unset = self.env.config().coverage_authority == Pubkey::default();
+        match b % 4 {
+            1 => {
+                let expect = if role_unset {
+                    E::CoverageAuthorityDisabled
+                } else {
+                    E::Unauthorized
+                };
+                self.coverage_send(si, &ea, true, COVERAGE_REASON_KEEPER, Err(expect));
+            }
+            2 => self.emergency_open(si, a, b, true),
+            _ => {
+                let reason = if (b / 4) % 8 == 7 {
+                    [0u8, 2, 255][(b / 32) as usize % 3]
+                } else {
+                    COVERAGE_REASON_KEEPER
+                };
+                let was_set = self.market(si).has_flag(MARKET_FLAG_PAUSED_COVERAGE);
+                let expect = if reason == COVERAGE_REASON_KEEPER {
+                    Ok(())
+                } else {
+                    Err(E::InvalidParams)
+                };
+                let landed = expect.is_ok();
+                self.coverage_send(si, &ea, false, reason, expect);
+                if landed {
+                    *self
+                        .stats
+                        .events
+                        .entry(if was_set {
+                            "emergency-clear".into()
+                        } else {
+                            "emergency-clear-noop".into()
+                        })
+                        .or_default() += 1;
+                }
+                if landed && was_set {
+                    // The clear delay: no open lands in this second.
+                    self.emergency_open(si, a, b, false);
+                }
+            }
+        }
+        true
+    }
+
+    /// An open on slot `si` — with `[Emergency clear, open_short]` in one transaction when
+    /// `bundled` (★OWNER-M7-3 (b), M7-SEC-3's bracket with the Emergency's clear), or alone right
+    /// after an Emergency clear of a set flag. Either way a clear of a set flag starts the clear
+    /// delay, so the open must be refused `CoveragePaused` (unless a gate the open meets first
+    /// refuses it); on a flag that was clear the bundled clear is a no-op and the open meets its
+    /// ordinary gates.
+    fn emergency_open(&mut self, si: usize, a: u32, b: u32, bundled: bool) {
+        let ea = self.env.pause_authority.insecure_clone();
+        let market = self.market_key(si);
+        let m = self.market(si);
+        let was_set = m.has_flag(MARKET_FLAG_PAUSED_COVERAGE);
+        let in_delay = !was_set
+            && self.env.now() < m.coverage_cleared_at.saturating_add(COVERAGE_CLEAR_DELAY_S);
+        let expect_delay = (bundled && was_set) || (!bundled && in_delay);
+        let other_gate = self.open_gate_with(si, false);
+        let gate = if bundled && was_set {
+            Some(
+                "the clear delay of the bundled Emergency clear (OWNER-M7-3, M7-SEC-3)".to_string(),
+            )
+        } else {
+            self.open_gate(si)
+        };
+        let bi = (a as usize / 2) % self.slots[si].borrowers.len();
+        let q = self.size(si, b / 5);
+        let (open, bk) = self.open_ix(si, bi, q);
+        let mut ixs = Vec::new();
+        if bundled {
+            ixs.push(Self::coverage_ix(
+                &ea.pubkey(),
+                &market,
+                false,
+                COVERAGE_REASON_KEEPER,
+            ));
+        }
+        ixs.extend(open.into_iter().filter(|ix| ix.program_id == shortwin::ID));
+        let cu = self.slots[si].venue.exit_cu().map(|_| 1_400_000);
+        let (res, all) = Self::with_cu(cu, &ixs, |all| self.cx().send(all, &[&ea, &bk]));
+        match (&res, gate) {
+            (Ok(_), Some(g)) => {
+                panic!(
+                    "{ORACLE} OWNER-M7-3: an open after the Emergency's clear landed through {g}"
+                )
+            }
+            (Ok(_), None) => {
+                let slot = &mut self.slots[si];
+                let nonce = slot.borrowers[bi].next_nonce;
+                slot.borrowers[bi].next_nonce += 1;
+                slot.positions.push(Pos { b: bi, nonce });
+            }
+            (Err(_), _) if expect_delay => {
+                let got = shortwin_code(&all, &res);
+                if got != Some(code(E::CoveragePaused)) && other_gate.is_none() {
+                    panic!(
+                        "{ORACLE} OWNER-M7-3: an open in the clear delay of the Emergency's clear \
+                         was refused with {got:?}, not CoveragePaused"
+                    );
+                }
+                *self
+                    .stats
+                    .events
+                    .entry("emergency-clear-open-refused".into())
+                    .or_default() += 1;
+            }
+            (Err(_), _) => {}
+        }
     }
 
     fn exit_ix(&self, si: usize, k: usize, which: u32) -> Option<(Instruction, Option<Keypair>)> {
@@ -2474,16 +2604,20 @@ impl World {
                 None => (stranger, false),
             },
         };
-        // The checks in order: the role enabled, the signer, the reason (ARCH §3.1).
-        let expect = if self.env.config().coverage_authority == Pubkey::default() {
-            Err(E::CoverageAuthorityDisabled)
-        } else if !role {
-            Err(E::Unauthorized)
-        } else if reason != COVERAGE_REASON_KEEPER {
-            Err(E::InvalidParams)
-        } else {
-            Ok(())
-        };
+        // ★OWNER-M7-3 (b): the Emergency's clear passes the role checks whatever the role.
+        let emergency_clear = mode == 13 && !paused;
+        // The checks in order: the Emergency clear, else the role enabled and the signer; then the
+        // reason (ARCH §3.1).
+        let expect =
+            if !emergency_clear && self.env.config().coverage_authority == Pubkey::default() {
+                Err(E::CoverageAuthorityDisabled)
+            } else if !role && !emergency_clear {
+                Err(E::Unauthorized)
+            } else if reason != COVERAGE_REASON_KEEPER {
+                Err(E::InvalidParams)
+            } else {
+                Ok(())
+            };
         let landed = expect.is_ok();
         self.coverage_send(si, &kp, paused, reason, expect);
         if landed && paused {
@@ -2715,6 +2849,7 @@ impl World {
                 break;
             }
             phase += 1;
+            let mut straddled: Vec<usize> = Vec::new();
             for si in 0..self.slots.len() {
                 let mut k = 0;
                 while k < self.slots[si].positions.len() {
@@ -2726,6 +2861,11 @@ impl World {
                     );
                     let res = self.send(&ixs, &[&kp]);
                     self.check_exit_refusal("close_short (wind-down)", &ixs, &res);
+                    if shortwin_code(&ixs, &res) == Some(code(E::CurveStraddle))
+                        && !straddled.contains(&si)
+                    {
+                        straddled.push(si);
+                    }
                     self.prune();
                     let still = self.slots[si].positions.iter().any(|p| {
                         p.nonce == nonce && self.slots[si].borrowers[p.b].key() == borrower
@@ -2739,6 +2879,30 @@ impl World {
                     if !gone {
                         k += 1;
                     }
+                }
+            }
+            // A position the live curve's real token reserves cannot buy back (`Q > rT`: every
+            // exit refuses `CurveStraddle`, ARCH §5.1) leaves once the curve completes — the
+            // straddle's first step (§5.4: the in-house keeper's bundle, or anyone's buy of `rT`).
+            // The wind-down completes it and, as for any completed curve, does not migrate it: the
+            // market is left `PumpMigrating` and the S3 path below must settle it. The price
+            // restore above cannot always bring `rT` back above `Q` (one push moves the price at
+            // most 50×); as built the wind-down never completed such a curve, and the position
+            // stayed open (FUZZ-M7D-1).
+            for si in straddled {
+                let World {
+                    env, stats, slots, ..
+                } = self;
+                if slots[si]
+                    .venue
+                    .special(&mut Ctx { env, stats }, Kind::CompleteCurve, 0, 0)
+                    .is_some()
+                {
+                    *self
+                        .stats
+                        .events
+                        .entry("fuzz:wind-down-curve-completed".into())
+                        .or_default() += 1;
                 }
             }
             match phase {

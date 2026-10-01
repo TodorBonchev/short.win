@@ -40,7 +40,9 @@ pub const MARKET_VERSION: u16 = 1;
 /// second: the flag stays cleared for at least this long before any open lands, which the
 /// keeper's per-second reads see (and alert) and its next tick sets again — longer than the
 /// keeper's read-to-landing loop (a `confirmed` read, a tick that waits for its confirmations,
-/// the send). Its only cost to an honest unpause: opens resume this much later. **PROPOSED**.
+/// the send). Its only cost to an honest unpause: opens resume this much later. It applies after
+/// a clear by either signer — the coverage key or the Emergency vault (OWNER-M7-3, owner decision
+/// of 2026-10-01). **PROPOSED**.
 pub const COVERAGE_CLEAR_DELAY_S: i64 = 5;
 
 // ---- governance --------------------------------------------------------------------------

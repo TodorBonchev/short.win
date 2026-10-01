@@ -415,8 +415,9 @@ anchor build --tools-version v1.57 --arch v3 --ignore-keys && scripts/build-test
 # T-CASCADE under the keeper's CU-per-slot policy -> tests/bench/m7_cascade/results.{md,json}
 M7_COST_WRITE=1 M7_CASCADE_WRITE=1 cargo test --manifest-path services/Cargo.toml --release --locked \
   -p shortwin-keeper-litesvm --test scenarios -- --include-ignored --nocapture m7_cost:: pamm_alt:: cascade::
-python3 docs/design/sim/keeper_cost.py > docs/design/sim/out/keeper_cost.txt   # ECON §5.8's tables;
-                                                  # asserts its constants equal m7_keeper/results.json
+python3 docs/design/sim/keeper_cost.py > docs/design/sim/out/keeper_cost.txt   # ECON §5.8's tables (and
+                                                  # the global budget's, #109); asserts its constants
+                                                  # equal m7_keeper/results.json
 ```
 
 `results.json` records the SHA-256 of the two program builds it measured; re-run after a program
@@ -505,8 +506,13 @@ contain the mock's id (CI checks it). What each duty does and what v1 leaves out
 pauser (`[coverage_pause] enabled = true` on exactly one instance, `--coverage-keypair
 coverage.json`, a key separate from the fee payer, installed on chain by Governance's timelocked
 `Authorities` change) sends `set_coverage_pause` when a market with open positions loses coverage
-and clears it 600 s after coverage returns —, the O17 budget (`[budget]`), duty 11's
-`crank_sol_usd` (`[oracle]`), the T-CASCADE CU-per-slot policy, `shortwin-build-alt market`
+and clears it 600 s after coverage returns; since the owner's decision of 2026-10-01 the Emergency
+multisig can clear a coverage pause too (never set one: stop the pauser first to override its own
+pause, ARCHITECTURE §3.1, §7.1 duty 9) —, the keeper budget (`[budget]`; since 2026-10-01 one
+global daily budget funding markets in order of lenders' value at risk — `global_daily_lamports`,
+`var_floor_lamports`, `reserve_margin_bps`, `tail_share_bps`; `per_market_daily_lamports` is
+retired; ARCHITECTURE §7.1 duty 8), duty 11's `crank_sol_usd` (`[oracle]`; `aging_alert_s` 300
+with `oracle_stale_s` 600), the T-CASCADE CU-per-slot policy, `shortwin-build-alt market`
 (per-market lookup tables) and `shortwin-v1-probe` (U25: does a mainnet leader take v1?
 `--rpc <url> --keypair <funded> --send`, two transaction fees). **The degraded-mode runbook and
 drill** (install the role, run exactly one pauser, what pages, a lost or compromised key, the

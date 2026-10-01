@@ -99,7 +99,8 @@ pub fn crank_sol_usd(price_update: &Pubkey) -> Instruction {
 pub const COVERAGE_REASON_KEEPER: u8 = shortwin::events::COVERAGE_REASON_KEEPER;
 
 /// `set_coverage_pause(paused, reason = COVERAGE_REASON_KEEPER)` on `market`, signed by the
-/// `coverage_authority` `authority` (O17; ARCH §3.1): sets or clears `Market.flags` bit 6
+/// `coverage_authority` `authority` (O17; ARCH §3.1) — or, for a clear only, by the Emergency
+/// vault `pause_authority` (OWNER-M7-3 (b), 2026-10-01): sets or clears `Market.flags` bit 6
 /// (`paused_coverage`), which refuses opens only (`CoveragePaused`); it moves no funds and
 /// never touches an exit. Accounts `[coverage_authority (signer), config, market (writable),
 /// event_authority, program]` (`#[event_cpi]`).

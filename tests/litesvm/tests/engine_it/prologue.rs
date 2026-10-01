@@ -58,25 +58,28 @@ fn one_second_lag() {
     assert!(env.market(&mm.market()).ema_price.get() > honest.ema_price.get());
 }
 
-/// A69: an integration that follows more than `COVERAGE_GAP_S` (30 s) without one, on a market
-/// with open positions, emits the `CoverageGap` log event; without positions it does not.
+/// A69: an integration that follows more than `COVERAGE_GAP_S` (40 s since OWNER-M7-12; was
+/// 30) without one, on a market with open positions, emits the `CoverageGap` log event; without
+/// positions it does not.
 #[test]
 fn coverage_gap_is_reported_with_open_positions_only() {
     let (mut env, mm) = setup();
     env.crank(&mm);
-    env.warp(40);
+    // Gaps well over the threshold, without positions.
+    env.warp(50);
     let meta = ok(env.send(&[crank_price_ix(&mm)], &[]));
-    env.warp(40);
+    env.warp(50);
     let meta2 = ok(env.send(&[crank_price_ix(&mm)], &[]));
     assert!(events::logged::<CoverageGap>(&meta).is_empty());
     assert!(events::logged::<CoverageGap>(&meta2).is_empty());
     let mut b = env.borrower();
     open_ok(&mut env, &mm, &mut b, Q);
-    env.warp(31);
+    let gap = shortwin_math::consts::COVERAGE_GAP_S + 1;
+    env.warp(gap);
     let meta = ok(env.send(&[crank_price_ix(&mm)], &[]));
     let gaps: Vec<CoverageGap> = events::logged(&meta);
     assert_eq!(gaps.len(), 1);
-    assert_eq!((gaps[0].gap_s, gaps[0].open_positions), (31, 1));
+    assert_eq!((gaps[0].gap_s, gaps[0].open_positions), (gap, 1));
     // Per-second cranks: no gap.
     env.warp(1);
     let meta = ok(env.send(&[crank_price_ix(&mm)], &[]));

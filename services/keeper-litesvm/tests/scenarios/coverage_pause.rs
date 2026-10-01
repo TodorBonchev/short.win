@@ -2,7 +2,8 @@
 //! ECON §5.8 "Degraded mode"; SPEC §14 O17, owner decision of 2026-09-30): the keeper instance
 //! designated as the pauser (`[coverage_pause] enabled`) holds the `coverage_authority` key and
 //! pauses opens on a market with open positions whose coverage lapses — a keeper outage (the
-//! program's `CoverageGap`), consecutive missed seconds, or its O17 daily budget exhausted — with
+//! program's `CoverageGap`), consecutive missed seconds, or a charge the global O17 budget refused
+//! (decision A of 2026-10-01) — with
 //! `set_coverage_pause(market, true)`; exits, settlements, lender withdrawals and claims keep
 //! working under the pause; after `recovery_s` (10 minutes) of restored coverage it sends
 //! `set_coverage_pause(market, false)` and opens land again (`COVERAGE_CLEAR_DELAY_S` later,
@@ -12,9 +13,10 @@
 //!   the same tick; an open is refused `CoveragePaused` while `close_short`, `add_margin`, an
 //!   outside `sol_settle` and `crank_price`, the lender's `withdraw` and `claim_sol` land, and the
 //!   keeper liquidates a pumped position; the pause lifts exactly `recovery_s` after the gap and an
-//!   open lands. The budget path: the budget exhausted → degraded and paused in the same tick (the
-//!   pause is not charged to the budget), the keeper's liquidation lands under it, the budget
-//!   restored → the pause lifts 600 s after the first landed observation.
+//!   open lands. The budget path: the global budget exhausted → degraded and paused in the same
+//!   tick (the pause is not charged to the budget), the keeper's liquidation lands under it (its
+//!   cranks exit-critical: an overdraft, never throttled), the budget raised → the pause lifts
+//!   600 s after the first landed observation.
 //! - **A restart** with the flag set: the new instance starts the market `Recovering`
 //!   (`CoveragePauseFound`), never unpauses at once, and unpauses after 600 s.
 //! - **The role unset** (inert): the pauser alerts `CoveragePauseUnavailable{AuthorityUnset}` once
@@ -22,7 +24,14 @@
 //!   the key rotated away (`WrongKey`) and no key loaded (`NoKey`) the same; the program refuses
 //!   the instruction while the role is unset.
 //! - **Two instances** holding the key: exactly one pause and one unpause land; the second instance
-//!   adopts the first one's pause (`Recovering`) instead of lifting it.
+//!   adopts the first one's pause (`Recovering`) instead of lifting it — and, being a designated
+//!   pauser that saw the flag clear and then set without sending the set, pages
+//!   `CoveragePauseForeign` (★OWNER-M7-3 (b)).
+//! - **★The Emergency's clear** (OWNER-M7-3 (b), owner decision of 2026-10-01): a hijacked coverage
+//!   key pauses a healthy market (`CoveragePauseForeign`, the market `Recovering`), the Emergency
+//!   multisig clears it and the pauser leaves it clear (it never set it), opens resume after the
+//!   clear delay; the Emergency clearing the pauser's **own** pause on a market it still holds
+//!   degraded is set again (`CoveragePauseCleared`) — to override it, stop the pauser first.
 //! - **Through the timelock**: the role enabled by a real `Authorities` change and revoked by
 //!   rotating it away (the pauser then falls back to alerting).
 //!
@@ -277,12 +286,13 @@ fn drill_an_outage_pauses_opens_exits_continue_and_recovery_resumes_them() {
     );
 }
 
-/// ★ **The drill, budget path** (K7 (4); O17: the budget's exhaustion is degraded mode at once).
+/// ★ **The drill, budget path** (K7 (4); O17: the budget's exhaustion is degraded mode at once;
+/// the global budget of decision A, 2026-10-01).
 #[test]
 fn drill_an_exhausted_budget_pauses_opens_and_restored_coverage_resumes_them() {
     let mut cfg = pauser_cfg();
-    // Two cranks' worth of fees per UTC day.
-    cfg.budget.per_market_daily_lamports = Some(10_000);
+    // Two cranks' worth of fees per UTC day (G), all of it the one covered market's entitlement.
+    cfg.budget.global_daily_lamports = 10_000;
     let (mut h, mms, _auth) = pauser_setup(1, cfg);
     let mm = &mms[0];
     let key = mm.market();
@@ -303,8 +313,10 @@ fn drill_an_exhausted_budget_pauses_opens_and_restored_coverage_resumes_them() {
     assert!(
         r.alerts.iter().any(|a| matches!(
             a,
-            Alert::Degraded { market, reason: DegradedReason::Budget { spent: 10_000, budget: 10_000 } }
-                if *market == key
+            Alert::Degraded {
+                market,
+                reason: DegradedReason::Budget { spent: 10_000, budget: 10_000, rank: Some(1) }
+            } if *market == key
         )),
         "{:?}",
         r.alerts
@@ -321,8 +333,13 @@ fn drill_an_exhausted_budget_pauses_opens_and_restored_coverage_resumes_them() {
     println!("T-COVERAGE budget drill: exhausted and paused at +{secs} s");
 
     assert_eq!(try_open(&h, mm), Err(code(ShortwinError::CoveragePaused)));
-    // Exits are never budgeted: the keeper liquidates the pumped position under the pause.
+    // Exits are never budgeted: the keeper liquidates the pumped position under the pause (the
+    // per-second cranks of the near position are exit-critical: booked to the overdraft).
     let r = pump_until_liquidated(&mut h, mm, &b1, n1);
+    assert!(
+        h.keeper.budget().overdraft > 0,
+        "exit-critical cranks overdrew"
+    );
     assert!(r.crank_failed.is_empty() || paused(&h, &key));
     assert!(paused(&h, &key));
     // Still exhausted, still degraded: the idle observations of b2 are refused.
@@ -334,7 +351,7 @@ fn drill_an_exhausted_budget_pauses_opens_and_restored_coverage_resumes_them() {
 
     // The owner raises the budget (the same as the UTC day rolling over): the next observation
     // lands, and the pause lifts 600 s later.
-    h.keeper.config_mut().budget.per_market_daily_lamports = Some(30_000_000);
+    h.keeper.config_mut().budget.global_daily_lamports = 30_000_000;
     let r = h.second().clone();
     assert!(r.cranked.contains(&key), "{r:?}");
     let resumed = h.now();
@@ -482,9 +499,116 @@ fn tick_other(k: &mut Keeper<LiteSvmChain>) -> TickReport {
     block_on(k.tick()).expect("keeper tick")
 }
 
+/// The Emergency multisig's `set_coverage_pause(false)` (★OWNER-M7-3 (b): clear only).
+fn emergency_clear(h: &Harness, market: &Pubkey) {
+    h.with_env(|env| ok(env.emergency_clear_coverage(market)));
+}
+
+/// ★OWNER-M7-3 (b) (owner decision of 2026-10-01; ARCH §7.1 duty 9's runbook): the coverage key
+/// is hijacked — someone outside the designated pauser sets the flag on a market it holds
+/// healthy. The pauser pages `CoveragePauseForeign` (it never sent that set) and adopts the pause
+/// (`Recovering`), sending nothing; the Emergency multisig clears the flag at once and the pauser
+/// leaves it clear (`CoveragePauseCleared` raised; the adopted recovery ends), opens resume
+/// `COVERAGE_CLEAR_DELAY_S` after the clear; a second set by the thief is paged and undone the
+/// same way.
+#[test]
+fn the_emergency_clears_a_hijacked_keys_pause_and_the_pauser_leaves_it_clear() {
+    let (mut h, mms, auth) = pauser_setup(1, pauser_cfg());
+    let mm = &mms[0];
+    let key = mm.market();
+    let _ = open(&h, mm, Q);
+    h.seconds(5);
+    for round in 0..2 {
+        // The thief's set, signed by the hijacked key outside the pauser.
+        let thief = auth.insecure_clone();
+        h.with_env(|env| {
+            let ix = shortwin_keeper::ixs::set_coverage_pause(&thief.pubkey(), &key, true);
+            ok(env.send(&[ix], &[&thief]));
+        });
+        let r = h.second().clone();
+        assert!(
+            r.alerts
+                .iter()
+                .any(|a| matches!(a, Alert::CoveragePauseForeign { market } if *market == key)),
+            "round {round}: {:?}",
+            r.alerts
+        );
+        assert!(r.coverage_pauses.is_empty(), "the pauser sends nothing");
+        assert!(matches!(
+            h.keeper.track(&key).unwrap().state,
+            CoverageState::Recovering { .. }
+        ));
+        assert!(!h.keeper.track(&key).unwrap().own_degraded);
+        assert_eq!(try_open(&h, mm), Err(code(ShortwinError::CoveragePaused)));
+        // The Emergency clears it; the pauser leaves it clear.
+        emergency_clear(&h, &key);
+        let r = h.second().clone();
+        assert!(
+            r.alerts
+                .iter()
+                .any(|a| matches!(a, Alert::CoveragePauseCleared { market } if *market == key)),
+            "{:?}",
+            r.alerts
+        );
+        assert!(r.coverage_pauses.is_empty(), "not set again: {r:?}");
+        assert_eq!(h.keeper.track(&key).unwrap().state, CoverageState::Healthy);
+        assert!(!paused(&h, &key));
+        // Opens wait out the clear delay, then land.
+        let delay = u32::try_from(shortwin::constants::COVERAGE_CLEAR_DELAY_S).unwrap();
+        h.seconds(delay);
+        assert_eq!(try_open(&h, mm), Ok(()));
+        for _ in 0..40 {
+            let r = h.second().clone();
+            assert!(r.coverage_pauses.is_empty(), "{r:?}");
+            assert!(!paused(&h, &key));
+        }
+    }
+    println!(
+        "OWNER-M7-3 (b): a hijacked key's pause paged (CoveragePauseForeign), cleared by the \
+         Emergency and left clear by the pauser, twice"
+    );
+}
+
+/// ★OWNER-M7-3 (b): the Emergency clearing the pauser's **own** pause (a market it degraded and
+/// still holds degraded) is set again in the same tick (`CoveragePauseCleared`); to override it,
+/// the runbook stops the pauser first (`[coverage_pause] enabled = false`), after which the
+/// Emergency's clear stays.
+#[test]
+fn the_emergency_clearing_the_pausers_own_pause_is_set_again_until_the_pauser_is_stopped() {
+    let (mut h, mms, _auth) = pauser_setup(1, pauser_cfg());
+    let mm = &mms[0];
+    let key = mm.market();
+    let _ = open(&h, mm, Q);
+    h.seconds(3);
+    h.idle(45);
+    let r = h.second().clone();
+    assert!(pause_sent(&r, &key, true), "{:?}", r.alerts);
+    assert!(h.keeper.track(&key).unwrap().own_degraded);
+    emergency_clear(&h, &key);
+    let r = h.second().clone();
+    assert!(
+        r.alerts
+            .iter()
+            .any(|a| matches!(a, Alert::CoveragePauseCleared { market } if *market == key))
+    );
+    assert!(pause_sent(&r, &key, true), "set again: {:?}", r.alerts);
+    assert!(paused(&h, &key));
+    // Stop the pauser, then clear: the clear stays (the keeper still holds the market degraded
+    // and alerts; the page to the Emergency is the path).
+    h.keeper.config_mut().coverage_pause.enabled = false;
+    emergency_clear(&h, &key);
+    for _ in 0..20 {
+        let r = h.second().clone();
+        assert!(r.coverage_pauses.is_empty(), "{r:?}");
+        assert!(!paused(&h, &key));
+    }
+    assert!(h.keeper.track(&key).unwrap().state.is_degraded());
+}
+
 /// K7 (7): two instances (two regions), both holding the key and enabled — a misconfiguration
 /// the design allows for: exactly one pause and one unpause land; the second instance adopts the
-/// first one's pause (`CoveragePauseFound`, `Recovering`) instead of lifting it.
+/// first one's pause (`Recovering`) instead of lifting it, and pages it as a set it did not send
+/// (`CoveragePauseForeign`: a second coverage key, ★OWNER-M7-3 (b)).
 #[test]
 fn two_instances_never_flip_flop_the_flag() {
     let (mut h, mms, auth) = pauser_setup(1, pauser_cfg());
@@ -512,7 +636,7 @@ fn two_instances_never_flip_flop_the_flag() {
             found_b |= rb
                 .alerts
                 .iter()
-                .any(|a| matches!(a, Alert::CoveragePauseFound { .. }));
+                .any(|a| matches!(a, Alert::CoveragePauseForeign { .. }));
         }
     };
     run(&mut h, &mut b, 3, &mut sent);
@@ -521,7 +645,7 @@ fn two_instances_never_flip_flop_the_flag() {
     assert_eq!(sent.len(), 2, "{sent:?}");
     assert!(sent[0].2 && !sent[1].2, "{sent:?}");
     assert_eq!(sent[1].0 - sent[0].0, 601, "{sent:?}");
-    assert!(found_b, "B adopted A's pause");
+    assert!(found_b, "B adopted A's pause and paged it as foreign");
     assert!(!paused(&h, &key));
     println!("two instances: {sent:?}");
 }

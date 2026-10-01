@@ -301,15 +301,48 @@ def gen_tiers(rng):
             else:
                 d = lr.choice([0, lr.randrange(0, 10**16), 2**100])
             c["lock"] = [d, lam_min]
-        tier, lam = assign(c)
-        row = {k: (S(v) if isinstance(v, int) and not isinstance(v, bool) else v) for k, v in c.items()}
-        if c["lock"] is not None:
-            row["lock"] = [S(x) for x in c["lock"]]
-        row["tier"] = tier
-        row["liquidity"] = None if lam is None else S(lam)
-        cases.append(row)
+        cases.append(tier_row(c))
     assert {c["tier"] for c in cases} == {"A", "B", "C", "D"}
+    cases += stale_boundary_rows(now)
     return cases
+
+
+def tier_row(c):
+    tier, lam = assign(c)
+    row = {k: (S(v) if isinstance(v, int) and not isinstance(v, bool) else v) for k, v in c.items()}
+    if c["lock"] is not None:
+        row["lock"] = [S(x) for x in c["lock"]]
+    row["tier"] = tier
+    row["liquidity"] = None if lam is None else S(lam)
+    return row
+
+
+def stale_boundary_rows(now):
+    """OWNER-M7-15, decided 2026-10-01 (SPEC §14): `oracle_stale_s` defaults to 600 s, its floor. Its
+    boundary at that value -- a cache exactly 600 s old tiers as fresh, 601 s old is Tier C -- on an aged
+    Raydium and PumpSwap market whose liquidity is well above theta_A (Tier A when fresh) or between theta_B
+    and theta_A (Tier B). A grid of its own, appended after the random rows (whose draws it leaves alone)."""
+    price, expo, theta_a, theta_b = 12_120_000_000, -8, 500_000_000_000, 100_000_000_000
+    sol_usd = price * 10.0**expo
+    rows = []
+    for venue in ("raydium", "pumpswap"):
+        for theta, mult in ((theta_a, 3), (theta_b, 3)):
+            # R_now = 3 x theta's half-liquidity (Lambda = 2 R_eff): 1.5 x theta_A (A) or 1.5 x theta_B (B).
+            r_now = int(theta / 1e6 / sol_usd * 1e9 / 2) * mult
+            p_ema = WAD
+            l_slow = r_now * sim.SQRT_WAD // sim.isqrt_ceil(p_ema)
+            y_slow = sim.reprice(l_slow, p_ema)[1]
+            lam_min = 5_000 if venue == "raydium" else sim.PUMPSWAP_LOCK_MIN_BPS
+            depth = 10 * r_now * sim.SQRT_WAD // max(math.isqrt(p_ema), 1)     # locked SOL 10 x R_now: idle
+            for age_of_print in (0, 30, 300, 599, 600, 601, 3_600):
+                c = dict(venue=venue, r_now=r_now, l_slow=l_slow, y_slow=y_slow, vqr=0, p_ema=p_ema, now=now,
+                         graduated_at=now - 10 * AGE_A_S, price=price, expo=expo, publish_time=now - age_of_print,
+                         oracle_stale_s=600, theta_a=theta_a, theta_b=theta_b, lock=[depth, lam_min])
+                rows.append(tier_row(c))
+    fresh = {r["tier"] for r in rows if int(r["now"]) - int(r["publish_time"]) <= 600}
+    stale = {r["tier"] for r in rows if int(r["now"]) - int(r["publish_time"]) > 600}
+    assert fresh == {"A", "B"} and stale == {"C"}, (fresh, stale)
+    return rows
 
 
 def main() -> None:

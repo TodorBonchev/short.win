@@ -1,7 +1,7 @@
 //! Degraded mode (ARCH §7.1 duty 9; ECON §5.8): a keeper that cannot meet its coverage on a
-//! market says so — the program's `CoverageGap` after an outage, or consecutive missed
-//! seconds (an exhausted O17 budget) — and the alert lifts after 10 minutes of restored
-//! coverage.
+//! market says so — the program's `CoverageGap` after an outage (a gap above `COVERAGE_GAP_S`,
+//! 40 s since OWNER-M7-12), or a charge the global O17 budget refused — and the alert lifts after
+//! 10 minutes of restored coverage.
 
 use shortwin_keeper::DegradedReason;
 use shortwin_keeper::coverage::CoverageState;
@@ -60,16 +60,17 @@ fn an_outage_is_reported_through_coverage_gap_and_recovers_after_ten_minutes() {
     );
 }
 
-/// O17 (owner decision of 2026-09-30): an exhausted per-market budget on a market with open
-/// positions is degraded mode **at once** (`DegradedReason::Budget`, at the first observation the
-/// budget refuses) — before the M7 change it waited for `degraded_after_misses` (3) consecutive
-/// misses, which on the 30-s idle cadence took 90 s. The skipped observations still count as
-/// misses (and escalate the price for when the budget returns).
+/// O17 (owner decision of 2026-09-30; the global budget of decision A, 2026-10-01): a charge the
+/// budget refuses on a market with open positions is degraded mode **at once**
+/// (`DegradedReason::Budget`, at the first observation the budget refuses) — before the M7 change
+/// it waited for `degraded_after_misses` (3) consecutive misses, which on the 30-s idle cadence
+/// took 90 s. The skipped observations still count as misses (and escalate the price for when the
+/// budget returns).
 #[test]
 fn an_exhausted_budget_misses_observations_and_degrades_the_market() {
     let mut cfg = KeeperConfig::default();
-    // Two cranks' worth of fees per day.
-    cfg.budget.per_market_daily_lamports = Some(10_000);
+    // Two cranks' worth of fees per day, all of it the one covered market's entitlement.
+    cfg.budget.global_daily_lamports = 10_000;
     let (mut h, mms) = setup(1, cfg);
     let key = mms[0].market();
     let _ = open(&h, &mms[0], Q);
@@ -99,7 +100,8 @@ fn an_exhausted_budget_misses_observations_and_degrades_the_market() {
                 market,
                 reason: DegradedReason::Budget {
                     spent: 10_000,
-                    budget: 10_000
+                    budget: 10_000,
+                    rank: Some(1)
                 }
             } if *market == key
         )),
@@ -113,8 +115,8 @@ fn an_exhausted_budget_misses_observations_and_degrades_the_market() {
     assert_eq!(m.cranks, 2);
     assert_eq!(m.budget_degraded, 1);
     assert!(m.misses >= 1 && m.degraded);
-    // Raising the budget restores coverage at once.
-    h.keeper.config_mut().budget.per_market_daily_lamports = None;
+    // Lifting the budget restores coverage at once.
+    h.keeper.config_mut().budget.global_daily_lamports = 0;
     let r = h.second();
     assert!(r.cranked.contains(&key));
     h.second();

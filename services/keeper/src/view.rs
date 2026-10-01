@@ -18,7 +18,7 @@
 //! then in full — `Market`, `MarketVault`, ReadSet, extras — every market with positions or with
 //! something time-critical pending, and the other ("cold") markets every `cold_interval_s`,
 //! staggered ([`crate::keeper`]); as built at M7 every discovered market was read every tick,
-//! so permissionless junk listings (≈ 0.047 SOL each) added ≈ 0.05 sequential RPC calls to every
+//! so permissionless junk listings (≈ 0.035–0.038 SOL each at ARCH §3.2's rent) added ≈ 0.05 sequential RPC calls to every
 //! tick each. `RpcChain` issues a read's `getMultipleAccounts` chunks in parallel.
 //!
 //! **PumpSwap** (M6): the fee tier is chosen on the market cap `effective_quote·supply/base`

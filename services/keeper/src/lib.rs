@@ -35,12 +35,25 @@
 //!    block engine — the exit on the pool follows at the post-change warm-up's gate (`T + 8`);
 //!    **right after a full wipe** the venue cashback claims and `sweep_trader` ([`sweep`]), so the
 //!    market takes deposits and opens again.
+//! 8. **The global budget** ([`budget`]; owner decision A of 2026-10-01): one daily budget `G`
+//!    funding markets in order of their lenders' value at risk `V = ΣB_Q·P_ema`; covered markets
+//!    (positions and `V ≥ var_floor_lamports`) hold entitlements in rank order, the rest is the
+//!    free pool; bursts and liquidity-anomaly coverage draw on the market's own entitlement, then
+//!    the free pool, never another market's (nor what a join took from lower-ranked markets: a
+//!    market is funded once a UTC day, M7D-3); markets below the floor get the 30-s idle cadence
+//!    only, from the free pool within `tail_share_bps`, read at that cadence and — while a
+//!    position is near an exit — in the seconds after an observation while its reference is fresh
+//!    (M7D-1); the cranks exits depend on (at most one a second per market, M7D-4; below the floor
+//!    the crank an exit waits on, M7D-2) are never throttled (an alerted overdraft beyond `G`).
 //! 9. **Degraded mode** ([`coverage`], [`alerts`]; O17, M7): a market with open positions whose
 //!    coverage lapses — `degraded_after_misses` missed seconds in a row, the program's
-//!    `CoverageGap`, or its daily observation budget spent — is degraded; the designated pauser
-//!    (`[coverage_pause]`, holding the `coverage_authority` key) sends `set_coverage_pause(market,
-//!    true)` in the same tick (opens only; every exit continues) and `false` after `recovery_s` of
-//!    restored coverage; without the key or the role it alerts, and the page is the pause path.
+//!    `CoverageGap`, or a charge the global budget refused at its rank — is degraded; the
+//!    designated pauser (`[coverage_pause]`, holding the `coverage_authority` key) sends
+//!    `set_coverage_pause(market, true)` in the same tick (opens only; every exit continues) and
+//!    `false` after `recovery_s` of restored coverage; without the key or the role it alerts, and
+//!    the page is the pause path. Since 2026-10-01 the Emergency multisig can clear a coverage
+//!    pause too (OWNER-M7-3 (b)): the pauser re-sets only a flag on a market it degraded itself,
+//!    and pages `CoveragePauseForeign` on a set it did not send.
 //! 10. **Venue drift monitor** ([`monitor`]): the six venue ProgramData deploy slots against the
 //!     `VenueGuard` latch — an upgrade is flagged with `flag_venue_upgraded` in the slot it is
 //!     seen, once, and refreshed when a second upgrade lands during review; Token-2022's upgrade
@@ -48,8 +61,9 @@
 //!     `update_pool_status`, `update_amm_config`, seen as the account changes they make):
 //!     route lost / restored, status, open time and fee against the opens and hard caps.
 //! 11. **The SOL/USD cache** (M7): `crank_sol_usd` of every newer Pyth update the program's rules
-//!     accept, read every ≤ 30 s (the USD tiers; a stale cache tiers every market C); refusals and
-//!     an aging cache alerted.
+//!     accept, read every ≤ 30 s (the USD tiers; a cache older than `oracle_stale_s` — 600 s
+//!     since 2026-10-01 — tiers every graduated market C); refusals and an aging cache (300 s)
+//!     alerted.
 //! 12. **Raydium pool monitor** ([`pool_monitor`]): every Raydium SOL pool of each covered mint
 //!     (`getProgramAccounts` on both programs, optionally through a separate endpoint), each
 //!     verified and ranked by locked depth `D` with the program's own verifier; `propose_pool`
@@ -64,7 +78,7 @@
 //! Operations: several markets' cranks per transaction ([`keeper`]: v1 batches of up to 6, v0
 //! batches of up to 4 where v1 is refused, each cut where its transaction would exceed the
 //! format's limits), `⌈simulated × 1.1⌉` compute units, a priority price from recent fees capped
-//! at the O17 ceiling of 100,000 µlamports/CU ([`fees`]), the O17 per-market daily budget (the
+//! at the O17 ceiling of 100,000 µlamports/CU ([`fees`]), the global daily budget ([`budget`]; the
 //! cranks exits depend on charged, never throttled), T-CASCADE's cap on the compute units of exits
 //! requested per market and per slot (`budget.market_cu_per_slot`, `payer_cu_per_slot`),
 //! per-market metrics and U28's `B̂_live/B̂_ref` histogram ([`metrics`]). The protocol address
@@ -88,6 +102,7 @@
 
 pub mod alerts;
 pub mod alt;
+pub mod budget;
 pub mod config;
 pub mod coverage;
 pub mod decide;

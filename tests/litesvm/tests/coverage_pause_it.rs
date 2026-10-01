@@ -1,11 +1,13 @@
 //! T-COVERAGE's `set_coverage_pause` part (ARCH §3.1, §8.2 T-COVERAGE; A69; **O17**, recorded by
 //! the owner in SPEC §14 on 2026-09-30): the keeper's pause-opens-only `coverage_authority` for
-//! degraded mode. (The emission part, `CoverageGap` at 31 s and not at 30 s, is
-//! `crank_price_it`'s.)
+//! degraded mode, and — since the owner's decision of 2026-10-01 (★OWNER-M7-3 (b), SPEC §14
+//! M7-3) — the Emergency vault's clear of it. (The emission part, `CoverageGap` at 41 s and not at
+//! 40 s since `COVERAGE_GAP_S` became 40 (OWNER-M7-12), is `crank_price_it`'s.)
 //!
 //! | Module | What |
 //! |---|---|
-//! | `role` | inert while `coverage_authority` is unset (`CoverageAuthorityDisabled`, whoever signs: Governance, the Emergency vault, the upgrade authority); installed by a timelocked `Authorities` change, then only that key signs (`Unauthorized`); a rotation revokes the old key and keeps the flag; setting the role back to the default key makes it inert again; the argument and account checks (reason, market PDA and version, config, signer, the event accounts); idempotence; independence from `set_pause`; the event; CU and trace entries |
+//! | `role` | inert while `coverage_authority` is unset (`CoverageAuthorityDisabled`, whoever signs: Governance, the upgrade authority, any key — and the Emergency vault for a set; its clear is `emergency`'s); installed by a timelocked `Authorities` change, then only that key sets (`Unauthorized`) and only it or the Emergency clears; a rotation revokes the old key and keeps the flag; setting the role back to the default key makes it inert again; the argument and account checks (reason, market PDA and version, config, signer, the event accounts); idempotence; independence from `set_pause`; the event; CU and trace entries |
+//! | `emergency` | ★OWNER-M7-3 (b) (owner decision of 2026-10-01): the Emergency vault (`pause_authority`) clears a set flag — with the role installed, unset and rotated — records `coverage_cleared_at`, after which opens wait `COVERAGE_CLEAR_DELAY_S`; it never sets one (`Unauthorized` with the role installed, `CoverageAuthorityDisabled` without); its clear is idempotent, emits `CoveragePauseSet{by: pause_authority}` and passes the reason check; Governance still cannot sign either way; on the whole VM it changes the flag and the clock word only; `[Emergency clear, open_short]` is refused by the delay; and the hijacked-coverage-key drill: a stolen key re-pauses markets until Governance's timelocked rotation lands, and each of its sets is undone by one Emergency clear while exits land throughout |
 //! | `moves_nothing` | I4's coverage clause, checked here on the whole VM: the instruction changes nothing but bit 6 of one market's `flags` (every short.win, token, venue and system account byte for byte, lamports included, the fee payer aside) — with positions, lenders and protocol fees on the market |
 //! | `exits` | pause-opens-only on the mock, **differentially**: every exit and lender instruction — `close_short`, `add_margin`, `crank_price`, `deposit`, `withdraw`, `claim_sol`, `sync_lender`, `sweep_trader`, `liquidate`, `expire`, `sol_settle` S1, S2 and S3 — runs from the same state with and without the pause and leaves the same events and the same VM (the flag aside), while `open_short` is refused `CoveragePaused`; clearing the flag restores opens |
 //! | `venues` | the same on the real venues' forks: the pump curve, PumpSwap, Raydium AMM v4 and CPMM (open refused, crank and close identical, cleared → an open lands), and Raydium pool selection (`propose_pool`'s zero-position adoption, the fast path's `propose_pool` / `execute_pool_switch` with positions) under the pause |
@@ -298,9 +300,11 @@ mod role {
     }
 
     /// ARCH §3.1: inert while `coverage_authority == Pubkey::default()` (the `initialize_config`
-    /// default until governance installs a key): whoever signs — Governance, the Emergency
-    /// vault, the upgrade authority, any key — the instruction fails `CoverageAuthorityDisabled`
-    /// before its signer check, and nothing changes.
+    /// default until governance installs a key): whoever signs — Governance, the upgrade
+    /// authority, any key, and the Emergency vault for a **set** — the instruction fails
+    /// `CoverageAuthorityDisabled` before its signer check, and nothing changes. The Emergency's
+    /// clear is accepted with the role unset (★OWNER-M7-3 (b); here a no-op on a clear flag,
+    /// which records nothing).
     #[test]
     fn inert_while_unset() {
         let (mut env, mm) = mock();
@@ -308,7 +312,6 @@ mod role {
         let before = cov::world(&env);
         let signers = [
             env.governance.insecure_clone(),
-            env.pause_authority.insecure_clone(),
             env.upgrade_authority.insecure_clone(),
             Keypair::new(),
         ];
@@ -320,12 +323,20 @@ mod role {
                 );
             }
         }
+        let ea = env.pause_authority.insecure_clone();
+        assert_err(
+            &cov::send(&mut env, &ea, &mm.market(), true),
+            E::CoverageAuthorityDisabled,
+        );
+        cov::set(&mut env, &ea, &mm.market(), false);
+        assert_eq!(cov::cleared_at(&env, &mm.market()), 0, "a no-op clear");
         cov::assert_same_but_flag(&before, &cov::world(&env), &mm.market(), false, false);
         ok(try_open(&mut env, &mm));
     }
 
-    /// Installed by a timelocked `Authorities` change, only that key signs: Governance, the
-    /// Emergency vault and any other key fail `Unauthorized`. The key sets the flag (opens
+    /// Installed by a timelocked `Authorities` change, only that key sets the flag: Governance,
+    /// the Emergency vault and any other key fail `Unauthorized`; only it — and the Emergency
+    /// vault (★OWNER-M7-3 (b), the `emergency` module) — clears it. The key sets the flag (opens
     /// refused `CoveragePaused`), sets it again (idempotent: the keeper retries until the flag
     /// matches), and clears it (opens resume).
     #[test]
@@ -352,12 +363,14 @@ mod role {
         cov::set(&mut env, &keeper, &mm.market(), true);
         assert!(cov::is_paused(&env, &mm.market()));
         assert_err(&try_open(&mut env, &mm), E::CoveragePaused);
-        for kp in &others {
+        let ea = env.pause_authority.pubkey();
+        for kp in others.iter().filter(|k| k.pubkey() != ea) {
             assert_err(
                 &cov::send(&mut env, kp, &mm.market(), false),
                 E::Unauthorized,
             );
         }
+        assert!(cov::is_paused(&env, &mm.market()));
         cov::set(&mut env, &keeper, &mm.market(), false);
         let at = cov::cleared_at(&env, &mm.market());
         assert_eq!(at, env.now(), "the clear records its second");
@@ -373,8 +386,9 @@ mod role {
     }
 
     /// A rotation (`Authorities` through the timelock) revokes the old key at once and keeps the
-    /// flag as it is (only the new key clears it; OWNER-M7-3); setting the role back to the
-    /// default key makes the instruction inert again, with the flag left where it was.
+    /// flag as it is (the new key clears it — or the Emergency, ★OWNER-M7-3 (b), the `emergency`
+    /// module); setting the role back to the default key makes the instruction inert again for
+    /// the keys, with the flag left where it was.
     #[test]
     fn rotation_revokes_and_the_default_key_disables() {
         let mut env = Env::test_venue();
@@ -631,6 +645,249 @@ mod moves_nothing {
         // the clock's second.
         let now = env.now();
         cov::assert_same_but(&w0, &w2, &mm.market(), false, false, Some(now));
+    }
+}
+
+/// ★OWNER-M7-3 (b) (owner decision of 2026-10-01; ARCH §3.1, T-COVERAGE): the Emergency vault
+/// (`pause_authority`) clears — never sets — a market's `paused_coverage`, with the role
+/// installed, unset or rotated; the clear delay applies after its clear too.
+mod emergency {
+    use anchor_lang::prelude::Pubkey;
+    use shortwin::errors::ShortwinError as E;
+    use shortwin_litesvm_tests::ix;
+    use solana_keypair::Keypair;
+    use solana_signer::Signer;
+
+    use crate::cov;
+    use crate::support::common::*;
+
+    fn try_open(env: &mut Env, mm: &MockMarket) -> TxResult {
+        let mut b = env.borrower();
+        env.open(mm, &mut b, Q).0
+    }
+
+    /// Opens on `mm` refuse `CoveragePaused` in every second of the clear delay after the clear
+    /// at `t` (the current second), and land after it.
+    fn opens_wait_the_delay(env: &mut Env, mm: &MockMarket, t: i64) {
+        assert_eq!(env.now(), t);
+        for s in 0..shortwin::constants::COVERAGE_CLEAR_DELAY_S {
+            assert_err(&try_open(env, mm), E::CoveragePaused);
+            assert_eq!(env.now(), t + s);
+            env.warp(1);
+            env.crank(mm);
+        }
+        ok(try_open(env, mm));
+    }
+
+    /// With the role installed the Emergency's set fails `Unauthorized`, its clear of a clear flag
+    /// is an idempotent no-op that records nothing, and its clear of a flag the key set lands —
+    /// `CoveragePauseSet{by: pause_authority}`, `coverage_cleared_at` at its second, opens refused
+    /// for `COVERAGE_CLEAR_DELAY_S` — after the same reason check as the key's (`InvalidParams`).
+    /// Governance still cannot sign either way. After a rotation (the old key revoked) and with
+    /// the role set back to the default key (`CoverageAuthorityDisabled` for every key's set and
+    /// for the Emergency's), the Emergency still clears the flag the old key left set.
+    #[test]
+    fn the_emergency_clears_with_the_role_installed_rotated_or_unset() {
+        let mut env = Env::test_venue();
+        let k1 = Keypair::new();
+        cov::install_by_governance(&mut env, k1.pubkey());
+        let mm = env.mock_market(MarketSpec::default());
+        let market = mm.market();
+        let ea = env.pause_authority.insecure_clone();
+        let gov = env.governance.insecure_clone();
+
+        // Installed: the Emergency never sets.
+        assert_err(&cov::send(&mut env, &ea, &market, true), E::Unauthorized);
+        assert!(!cov::is_paused(&env, &market));
+        // A clear of a clear flag: accepted (the event), nothing recorded.
+        cov::set(&mut env, &ea, &market, false);
+        assert_eq!(cov::cleared_at(&env, &market), 0);
+        // The key sets; Governance can neither clear nor set.
+        cov::set(&mut env, &k1, &market, true);
+        for paused in [true, false] {
+            assert_err(&cov::send(&mut env, &gov, &market, paused), E::Unauthorized);
+        }
+        // The reason check applies to the Emergency's clear too.
+        for reason in [0u8, 2, 255] {
+            assert_err(
+                &env.send(
+                    &[cov::ix_with(&ea.pubkey(), &market, false, reason)],
+                    &[&ea],
+                ),
+                E::InvalidParams,
+            );
+        }
+        assert!(cov::is_paused(&env, &market));
+        env.warp(1);
+        env.crank(&mm);
+        cov::set(&mut env, &ea, &market, false);
+        let t = env.now();
+        assert_eq!(cov::cleared_at(&env, &market), t);
+        // Idempotent: again in the same second, nothing more recorded.
+        cov::set(&mut env, &ea, &market, false);
+        assert_eq!(cov::cleared_at(&env, &market), t);
+        opens_wait_the_delay(&mut env, &mm, t);
+
+        // Rotated: the old key's flag stays set; the old key is revoked; the Emergency clears.
+        cov::set(&mut env, &k1, &market, true);
+        let k2 = Keypair::new();
+        cov::install_by_governance(&mut env, k2.pubkey());
+        assert!(cov::is_paused(&env, &market), "a rotation clears nothing");
+        assert_err(&cov::send(&mut env, &k1, &market, false), E::Unauthorized);
+        assert_err(&cov::send(&mut env, &ea, &market, true), E::Unauthorized);
+        env.crank(&mm);
+        cov::set(&mut env, &ea, &market, false);
+        let t = env.now();
+        assert_eq!(cov::cleared_at(&env, &market), t);
+        opens_wait_the_delay(&mut env, &mm, t);
+
+        // Unset: every set refused `CoverageAuthorityDisabled` (the Emergency's included), every
+        // key's clear too — but the Emergency's clear lands.
+        cov::set(&mut env, &k2, &market, true);
+        cov::install_by_governance(&mut env, Pubkey::default());
+        for kp in [&k1, &k2, &gov] {
+            for paused in [true, false] {
+                assert_err(
+                    &cov::send(&mut env, kp, &market, paused),
+                    E::CoverageAuthorityDisabled,
+                );
+            }
+        }
+        assert_err(
+            &cov::send(&mut env, &ea, &market, true),
+            E::CoverageAuthorityDisabled,
+        );
+        assert!(cov::is_paused(&env, &market));
+        env.crank(&mm);
+        assert_err(&try_open(&mut env, &mm), E::CoveragePaused);
+        cov::set(&mut env, &ea, &market, false);
+        let t = env.now();
+        assert_eq!(cov::cleared_at(&env, &market), t);
+        opens_wait_the_delay(&mut env, &mm, t);
+    }
+
+    /// I4's coverage clause on the whole VM for the Emergency's clear, on a market with an open
+    /// position: the clear changes bit 6 of that market's `flags` and its `coverage_cleared_at`
+    /// (to the clock's second) and nothing else anywhere — no lamports, no token balance, no
+    /// other byte of any short.win, venue, token or system account (the fee payer aside); a
+    /// refused Emergency set changes nothing.
+    #[test]
+    fn the_emergency_clear_changes_the_flag_and_its_clock_only() {
+        let (mut env, mm) = setup();
+        let keeper = cov::planted(&mut env);
+        let mut b = env.borrower();
+        let (_o, _n, _) = open_ok(&mut env, &mm, &mut b, Q);
+        env.tick(&mm, 5);
+        cov::set(&mut env, &keeper, &mm.market(), true);
+        env.warp(2);
+        let w0 = cov::world(&env);
+        let ea = env.pause_authority.insecure_clone();
+        let meta = cov::set(&mut env, &ea, &mm.market(), false);
+        assert!(meta.compute_units_consumed <= 60_000);
+        let now = env.now();
+        cov::assert_same_but(&w0, &cov::world(&env), &mm.market(), true, false, Some(now));
+        let w1 = cov::world(&env);
+        assert_err(
+            &cov::send(&mut env, &ea, &mm.market(), true),
+            E::Unauthorized,
+        );
+        cov::assert_same_but_flag(&w1, &cov::world(&env), &mm.market(), false, false);
+        println!(
+            "OWNER-M7-3 (b): the Emergency's clear: {} CU, 2 trace entries",
+            meta.compute_units_consumed
+        );
+    }
+
+    /// The hijacked-coverage-key drill (★OWNER-M7-3 (b); ARCH §7.1 duty 9's runbook): a stolen
+    /// `coverage_authority` key pauses every market. Governance proposes the rotation at once
+    /// (it lands `timelock_s`, 48 h, later); meanwhile each of the thief's sets is undone by one
+    /// Emergency clear per market (≈ 8,000 CU), opens resume `COVERAGE_CLEAR_DELAY_S` after each
+    /// clear, and exits land under every pause. Once the rotation applies the stolen key is
+    /// refused (`Unauthorized`) and the new key works.
+    #[test]
+    fn a_hijacked_coverage_key_is_neutralised_by_the_emergency() {
+        let mut env = Env::test_venue();
+        let stolen = Keypair::new();
+        cov::install_by_governance(&mut env, stolen.pubkey());
+        let markets = [
+            env.mock_market(MarketSpec::default()),
+            env.mock_market(MarketSpec::default()),
+        ];
+        for m in &markets {
+            env.crank(m);
+        }
+        let ea = env.pause_authority.insecure_clone();
+        let gov = env.governance.insecure_clone();
+        // The page: Governance proposes the rotation at once.
+        let fresh = Keypair::new();
+        let change = cov::authorities(&env, fresh.pubkey());
+        ok(env.send(
+            &[ix::propose_config(&gov.pubkey(), change.clone())],
+            &[&gov],
+        ));
+        let applies_at = env.now() + i64::from(env.config().timelock_s);
+        let mut positions: Vec<(usize, Borrower, u64)> = Vec::new();
+        let (mut clears, mut max_cu) = (0u32, 0u64);
+        for _round in 0..3 {
+            // The thief pauses every market ...
+            for m in &markets {
+                cov::set(&mut env, &stolen, &m.market(), true);
+            }
+            for m in &markets {
+                assert_err(&try_open(&mut env, m), E::CoveragePaused);
+            }
+            // ... the exits land under its pause ...
+            for (i, b, nonce) in positions.drain(..) {
+                close_ok(&mut env, &markets[i], &b, nonce);
+            }
+            // ... and the Emergency undoes each set, one clear per market.
+            for m in &markets {
+                let meta = cov::set(&mut env, &ea, &m.market(), false);
+                max_cu = max_cu.max(meta.compute_units_consumed);
+                clears += 1;
+                assert_eq!(cov::cleared_at(&env, &m.market()), env.now());
+            }
+            // Opens resume after the clear delay.
+            cov::wait_clear_delay(&mut env);
+            for (i, m) in markets.iter().enumerate() {
+                env.crank(m);
+                let mut b = env.borrower();
+                let (_o, nonce, _) = open_ok(&mut env, m, &mut b, Q);
+                positions.push((i, b, nonce));
+            }
+            env.warp(600);
+            for m in &markets {
+                env.crank(m);
+            }
+            assert!(env.now() < applies_at, "the drill runs inside the timelock");
+        }
+        for (i, b, nonce) in positions.drain(..) {
+            close_ok(&mut env, &markets[i], &b, nonce);
+        }
+        // The rotation applies: the stolen key is revoked, the flag stays clear, the new key
+        // works.
+        env.warp(applies_at - env.now());
+        ok(env.send(&[ix::apply_config_for(&change)], &[]));
+        assert_eq!(env.config().coverage_authority, fresh.pubkey());
+        for m in &markets {
+            env.crank(m);
+            for paused in [true, false] {
+                assert_err(
+                    &cov::send(&mut env, &stolen, &m.market(), paused),
+                    E::Unauthorized,
+                );
+            }
+            assert!(!cov::is_paused(&env, &m.market()));
+            ok(try_open(&mut env, m));
+        }
+        cov::set(&mut env, &fresh, &markets[0].market(), true);
+        cov::set(&mut env, &fresh, &markets[0].market(), false);
+        assert!(max_cu <= 60_000);
+        println!(
+            "OWNER-M7-3 (b) drill: {clears} Emergency clears undid the stolen key's sets on 2 \
+             markets (max {max_cu} CU each); exits landed under every pause; the key refused \
+             after the rotation"
+        );
     }
 }
 

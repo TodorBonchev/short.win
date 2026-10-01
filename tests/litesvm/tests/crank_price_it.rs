@@ -2,8 +2,8 @@
 //! §5.2, §5.8; A16, A17, A59, A63, A64, A69, A72; R3A-9), on the mock venue:
 //!
 //! - **Coverage gap** (A69, T-COVERAGE's emission part): `CoverageGap` exactly when an
-//!   integration follows more than `COVERAGE_GAP_S` = 30 s with open positions — at 30 s not,
-//!   at 31 s yes; measured from the last **integration** (`ema_ts`), not from the last crank,
+//!   integration follows more than `COVERAGE_GAP_S` = 40 s with open positions — at 40 s not,
+//!   at 41 s yes (40 s since the owner's decision of 2026-10-01, OWNER-M7-12; was 30); measured from the last **integration** (`ema_ts`), not from the last crank,
 //!   so per-second cranks on a halted venue still report the gap when the venue returns; from
 //!   every prologue that rolls (`crank_price`, `open_short`, `close_short`, `deposit`,
 //!   `withdraw`); a log event that costs no trace entry; `open_positions` as it stands.
@@ -133,20 +133,22 @@ fn big_actor(env: &mut Env, mm: &MockMarket) -> Actor {
 
 // ---- coverage gap -------------------------------------------------------------------------
 
-/// `gap = now − ema_ts > 30` emits; `= 30` does not; the event carries the gap and the open
-/// positions; it is a log event (no trace entry).
+/// `gap = now − ema_ts > 40` emits; `= 40` does not (OWNER-M7-12, 2026-10-01: 40 s, was 30 —
+/// the keeper's 30-s idle cadence with 0–2 s of landing jitter, 31–32-s gaps, emits nothing); the
+/// event carries the gap and the open positions; it is a log event (no trace entry).
 #[test]
 fn coverage_gap_boundary_and_fields() {
     let (mut env, mm, _b, _n) = with_position();
     let ema_ts = env.market(&mm.market()).ema_ts;
-    assert_eq!(COVERAGE_GAP_S, 30);
+    assert_eq!(COVERAGE_GAP_S, 40);
     let saved = env.svm.clone();
-    env.warp(ema_ts + COVERAGE_GAP_S - env.now());
-    let meta = crank_meta(&mut env, &mm);
-    assert!(
-        gaps(&meta).is_empty(),
-        "a gap of exactly 30 s is not reported"
-    );
+    // The idle cadence with landing jitter (31 and 32 s) and the boundary itself: no event.
+    for gap in [31, 32, COVERAGE_GAP_S] {
+        env.svm = saved.clone();
+        env.warp(ema_ts + gap - env.now());
+        let meta = crank_meta(&mut env, &mm);
+        assert!(gaps(&meta).is_empty(), "a gap of {gap} s is not reported");
+    }
     env.svm = saved;
     env.warp(ema_ts + COVERAGE_GAP_S + 1 - env.now());
     let meta = crank_meta(&mut env, &mm);
@@ -154,7 +156,7 @@ fn coverage_gap_boundary_and_fields() {
     assert_eq!(g.len(), 1);
     assert_eq!(
         (g[0].market, g[0].gap_s, g[0].open_positions, g[0].ts),
-        (mm.market(), 31, 1, env.now())
+        (mm.market(), 41, 1, env.now())
     );
     assert_eq!(
         trace_entries(&meta, 0),
@@ -230,7 +232,7 @@ fn coverage_gap_needs_open_positions_and_counts_them() {
 fn coverage_gap_from_every_rolling_prologue() {
     // deposit and withdraw
     let (mut env, mm, _b, _n) = with_position();
-    env.warp(40);
+    env.warp(50);
     let ema_ts = env.market(&mm.market()).ema_ts;
     let lender = mm.lender.insecure_clone();
     // A small deposit from the market's lender (it holds no tokens left: mint some).
@@ -248,23 +250,23 @@ fn coverage_gap_from_every_rolling_prologue() {
     let g = gaps(&meta);
     assert_eq!(g.len(), 1, "deposit rolls (A16)");
     assert_eq!(g[0].gap_s, env.now() - ema_ts);
-    assert_eq!(g[0].gap_s, 40);
+    assert_eq!(g[0].gap_s, 50);
     // The bucket was rolled and nothing recorded: a crank now opens a new one, and a withdraw
-    // 35 s later rolls it and reports again.
+    // 45 s later rolls it and reports again (gaps above `COVERAGE_GAP_S` = 40).
     env.warp(1);
     env.crank(&mm);
-    env.warp(35);
+    env.warp(45);
     let shares = env.lender(&mm.market(), &lender.pubkey()).unwrap().shares / 1_000;
     let meta = ok(env.send(&[ix::withdraw(&mm.lender_keys(), shares, 0)], &[&lender]));
     assert_eq!(gaps(&meta).len(), 1, "withdraw rolls (A16)");
 
     // open and close
     let (mut env, mm, b, nonce) = with_position();
-    env.warp(35);
+    env.warp(45);
     let mut b2 = env.borrower();
     let (_o, _n2, meta) = open_ok(&mut env, &mm, &mut b2, Q / 2);
     assert_eq!(gaps(&meta).len(), 1, "open_short's prologue reports");
-    env.warp(35);
+    env.warp(45);
     let (_c, meta) = close_ok(&mut env, &mm, &b, nonce);
     let g = gaps(&meta);
     assert_eq!(g.len(), 1, "close_short's prologue reports");

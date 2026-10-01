@@ -225,16 +225,19 @@ fn a_full_wipe_on_a_pumpswap_cashback_coin_is_unlocked_and_the_market_reopens() 
     let cashback = read::token_amount(&env.svm, &pm.cashback_ata()).unwrap_or(0);
     assert!(cashback > 0, "the trader's trades accrued cashback");
     let position = shortwin_litesvm_tests::pda::position(&market, &b2.key(), n2).0;
+    // The wipe scenarios' last positions are below the 1-SOL value-at-risk floor: covered all the
+    // same (the per-second `sol_settle` of the wipe is a covered market's duty;
+    // `common::covering_all`).
     let mut h = Harness::new(
         env,
-        KeeperConfig {
+        covering_all(KeeperConfig {
             // The post-wipe duty is checked alone first: a deposit waits for it.
             sweep: SweepConfig {
                 post_wipe: false,
                 ..SweepConfig::default()
             },
             ..KeeperConfig::default()
-        },
+        }),
     );
     let lender_sol0 = h.with_env(|env| env.market_vault(&market).lender_sol);
     let r = keeper_wipes(&mut h, &market, &position);
@@ -319,7 +322,7 @@ fn a_full_wipe_on_a_non_cashback_pumpswap_market_needs_only_the_sweep() {
     let whale = PammUser::new(&mut env, &pm.pool, 1_000 * SOL);
     ok(whale.push_price(&mut env, &pm.pool, 5, 1));
     let position = shortwin_litesvm_tests::pda::position(&market, &b.key(), n).0;
-    let mut h = Harness::new(env, KeeperConfig::default());
+    let mut h = Harness::new(env, covering_all(KeeperConfig::default()));
     let r = keeper_wipes(&mut h, &market, &position);
     let (n, ev) = post_wipe(&r, &market);
     assert_eq!(n, 1, "sweep_trader alone");
@@ -381,7 +384,7 @@ fn a_full_wipe_on_a_cashback_curve_is_unlocked_by_the_pump_claim() {
     ok(crowd.buy(&mut env, &c, out, u64::MAX));
     assert!(!c.state(&env.svm).complete);
     let position = shortwin_litesvm_tests::pda::position(&market, &b.key(), n).0;
-    let mut h = Harness::new(env, KeeperConfig::default());
+    let mut h = Harness::new(env, covering_all(KeeperConfig::default()));
     let r = keeper_wipes(&mut h, &market, &position);
     let (n, ev) = post_wipe(&r, &market);
     assert_eq!(n, 2, "pump claim_cashback, sweep_trader");

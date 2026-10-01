@@ -23,14 +23,23 @@
 //! cashback claims, the market reopening; duty 13's `sweep_trader` and weekly cashback claim),
 //! `coverage_pause` (M7, O17: the T-COVERAGE drill — the designated pauser's `set_coverage_pause`
 //! on an outage and on an exhausted budget, exits continuing under the pause, the recovery, a
-//! restart, the role unset or rotated, two instances), `oracle` (M7, duty 11: `crank_sol_usd` within
+//! restart, the role unset or rotated, two instances; since 2026-10-01 the Emergency's clear of
+//! a hijacked key's pause and of the pauser's own), `oracle` (M7, duty 11: `crank_sol_usd` within
 //! 30 s of every feed update, refusals and aging alerted), `cascade` (M7 T-CASCADE: a 25-SOL basket
 //! of `min_notional` positions liquidated under the per-account block budget), `m7_cost` (M7: the
 //! keeper cost-model inputs of ECON §5.8, T-SIZE batch sizes, load), `pamm_alt` (M7 OWNER-M7-1:
 //! the PumpSwap 4-extras transactions through the tables the keeper's `alt` module builds) and
 //! `m7_sec` (the M7 security review's keeper findings, fixed: landing latency and slow ticks —
 //! the CI latency scenario —, bursts only on reverted excursions, a coverage clear or an open
-//! the keeper did not expect alerted, junk list-only markets off the per-tick reads).
+//! the keeper did not expect alerted, junk list-only markets off the per-tick reads), and
+//! `budget` (the owner's decision A of 2026-10-01: the global keeper budget — a burst storm on one
+//! market spends its entitlement and the free pool and nothing else, junk below the value-at-risk
+//! floor gets the idle cadence only and stops at the tail, a junk market above it preempts the
+//! lowest-ranked first, exhaustion degrades the lowest-ranked markets first), and `m7d` (the
+//! verification of decision A, fixed: below the floor an exit lands the second after the idle
+//! crank that makes it possible, a cascade whose value at risk crosses the floor is liquidated,
+//! that crank is exit-critical, a burst charges one exit-critical crank a second, a keeper start
+//! funds its markets at the batched estimate).
 //! Every keeper transaction runs the harness's invariant hooks after every instruction
 //! (`shortwin_keeper_litesvm`).
 //!
@@ -44,6 +53,7 @@
 #![allow(clippy::result_large_err)]
 
 mod batching;
+mod budget;
 mod bursts;
 mod cadence;
 mod cascade;
@@ -57,6 +67,7 @@ mod graduation;
 mod liquidate;
 mod m7_cost;
 mod m7_sec;
+mod m7d;
 mod oracle;
 mod pamm;
 mod pamm_alt;

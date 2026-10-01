@@ -7,7 +7,8 @@
 //! harness's invariant hooks (I1–I13, I15–I19 and A26 after every instruction and after every
 //! prefix of a multi-instruction transaction) are checked after every action — plus the fuzzer's
 //! own oracles ([`world`]: I10 / I17 gates, the mock's differential exit oracle for I9 / I11 /
-//! I12 / I13 / I-E11, I14 omissions, I4's coverage clause on every `set_coverage_pause` (O17),
+//! I12 / I13 / I-E11, I14 omissions, I4's coverage clause on every `set_coverage_pause` (O17;
+//! since 2026-10-01 the Emergency's clear-only power too, OWNER-M7-3 (b)),
 //! the mint filter on exits, governance's timelock and cancels, the oracle's refusals, the
 //! wind-down's liveness). Failures are crash files with the
 //! profile, seed and action list ([`runner`]); `replay` re-runs them and `tmin` minimises them by

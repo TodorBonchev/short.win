@@ -90,8 +90,9 @@ use solana_message::AddressLookupTableAccount;
 use solana_signer::Signer;
 
 use crate::alerts::{Alert, PauseUnavailable};
+use crate::budget::{self, Admission, BudgetParams, ChargeClass, ChargeReq, GlobalBudget, Tier};
 use crate::config::{KeeperConfig, TxFormatPolicy};
-use crate::coverage::{Due, MarketTrack};
+use crate::coverage::{Due, FlagSet, MarketTrack};
 use crate::decide::{self, MarketNeeds, Plan, PositionEval};
 use crate::events::{self, PoolEvent, PoolEventKind};
 use crate::fees;
@@ -490,18 +491,31 @@ pub struct Keeper<C: Chain> {
     /// T-CASCADE: (slot, compute units requested) of the keeper's exits per market.
     slot_cu: BTreeMap<Pubkey, (u64, u64)>,
     /// Duty 11: the second of the next read of the Pyth feed; the oracle alerts raised (cleared
-    /// when a crank lands); the second of the last aging alert.
+    /// when a crank lands); the last aging alert: (the cache's `publish_time` it was raised for,
+    /// the second it was raised) — one per stall (M7D-6), repeated hourly within one.
     oracle_next: i64,
     oracle_alerted: HashSet<String>,
-    oracle_aging_alerted: Option<i64>,
+    oracle_aging_alerted: Option<(i64, i64)>,
     /// The slot of the tick in progress.
     tick_slot: u64,
-    /// O17: markets whose crank this tick is one exits depend on — a position near a threshold
-    /// (duty 1: live CR below `near_cr_bps`·L, deadline within the window, armed, the
-    /// post-change warm-up; without it `P_ema` stays where it was and no liquidation becomes
-    /// possible), a liquidatable or expired position waiting for a fresh reference or its bound,
-    /// the S3 chain: charged to the budget, never throttled by it ("exits continue").
-    exit_cranks: HashSet<Pubkey>,
+    /// Decision A (2026-10-01; ARCH §7.1 duty 8): the global keeper budget ([`crate::budget`]).
+    budget: GlobalBudget,
+    /// The charge class of each market's crank queued this tick ([`crate::budget::ChargeReq`]):
+    /// exit-critical — the cranks exits depend on: a position near a threshold (duty 1: live CR
+    /// below `near_cr_bps`·L, deadline within the window, armed, the post-change warm-up; without
+    /// it `P_ema` stays where it was and no liquidation becomes possible), a liquidatable or
+    /// expired position waiting for a fresh reference or its bound, the S3 chain, a market
+    /// without a route: charged, never throttled ("exits continue") —, baseline or discretionary.
+    crank_charges: BTreeMap<Pubkey, ChargeReq>,
+    /// Markets whose crank this tick a graduation step forced (after the keeper's `migrate_v2` or
+    /// straddle, a list-only market's re-detection): a graduation move, neither charged nor
+    /// throttled.
+    free_cranks: HashSet<Pubkey>,
+    /// Markets whose crank the budget refused this tick.
+    refused: HashSet<Pubkey>,
+    /// Decision A: the second at which each below-floor market (tier 2) is read next — when its
+    /// idle crank is due (not every tick: M7-SEC-8).
+    idle_next: BTreeMap<Pubkey, i64>,
     /// M7-SEC-8: markets classified cold at their last full read (no open positions, nothing
     /// time-critical pending: read every `coverage.cold_interval_s`, staggered), and the second
     /// of each market's last full read.
@@ -560,7 +574,11 @@ impl<C: Chain> Keeper<C> {
             oracle_alerted: HashSet::new(),
             oracle_aging_alerted: None,
             tick_slot: 0,
-            exit_cranks: HashSet::new(),
+            budget: GlobalBudget::default(),
+            crank_charges: BTreeMap::new(),
+            free_cranks: HashSet::new(),
+            refused: HashSet::new(),
+            idle_next: BTreeMap::new(),
             cold: HashSet::new(),
             last_read: BTreeMap::new(),
             open_alerted: HashSet::new(),
@@ -634,6 +652,32 @@ impl<C: Chain> Keeper<C> {
     /// A market's coverage state.
     pub fn track(&self, market: &Pubkey) -> Option<&MarketTrack> {
         self.tracks.get(market)
+    }
+
+    /// The global keeper budget (decision A of 2026-10-01; [`crate::budget`]).
+    pub fn budget(&self) -> &GlobalBudget {
+        &self.budget
+    }
+
+    /// The budget's parameters this tick: `[budget]`, the idle cadence, the value-at-risk floor
+    /// clamped to the deployment's `market_max_notional` (its bound), and (M7D-5) the per-crank
+    /// charge estimated before the keeper has measured any: one signature shared by a full batch
+    /// of the transaction format in use, `⌈5,000 / batch⌉` (834 at `batch_v1` = 6).
+    fn budget_params(&self, config: &shortwin::state::GlobalConfig) -> BudgetParams {
+        let b = &self.cfg.budget;
+        let batch = match self.cfg.tx_format {
+            TxFormatPolicy::V0 => self.cfg.batch_v0,
+            _ => self.cfg.batch_v1,
+        };
+        let batch = u64::try_from(batch.max(1)).unwrap_or(1);
+        BudgetParams {
+            global: b.global_daily_lamports,
+            var_floor: b.var_floor_lamports.min(config.params.market_max_notional),
+            reserve_margin_bps: b.reserve_margin_bps,
+            tail_share_bps: b.tail_share_bps,
+            idle_interval_s: self.cfg.coverage.idle_interval_s,
+            first_charge: budget::FIRST_CHARGE_LAMPORTS.div_ceil(batch),
+        }
     }
 
     /// The covered markets as of the last discovery.
@@ -925,7 +969,31 @@ impl<C: Chain> Keeper<C> {
         let mut view = view::load_with_positions(&self.chain, &read, &positions).await?;
         let now = view.clock.unix_timestamp;
         self.tick_slot = view.clock.slot;
-        self.exit_cranks.clear();
+        self.crank_charges.clear();
+        self.free_cranks.clear();
+        self.refused.clear();
+        // Decision A (2026-10-01; ARCH §7.1 duty 8): the global budget's UTC day, and the class
+        // of every market read this tick (its value at risk from the `Market` as read).
+        let params = self.budget_params(&view.config);
+        self.budget.roll(now, &params);
+        let known: HashSet<Pubkey> = self.markets.iter().copied().collect();
+        let gone: Vec<Pubkey> = self
+            .budget
+            .markets
+            .keys()
+            .filter(|k| !known.contains(k))
+            .copied()
+            .collect();
+        for k in gone {
+            self.budget.forget(&k);
+            self.idle_next.remove(&k);
+        }
+        for mv in &view.markets {
+            let open = !mv.positions.is_empty() || mv.market.open_positions > 0;
+            let var = budget::value_at_risk(&mv.market);
+            self.budget
+                .classify(now, mv.key, open, var, mv.market.created_at, &params);
+        }
         let mut report = TickReport {
             clock: Some(view.clock),
             skipped: view.skipped.clone(),
@@ -973,7 +1041,8 @@ impl<C: Chain> Keeper<C> {
                     .push(format!("{}: {e:#}", view.markets[idx].key));
             }
         }
-        self.send_cranks(&view, crank_queue, &mut report).await;
+        self.send_cranks(&view, crank_queue, &mut report, true)
+            .await;
         // Pool selection after this second's observations and exits (M4-SEC-7): its RPC work —
         // discovery, ranking, the best candidates' accounts — never delays duties 1–4; the
         // cranks it asks for (a failing market's `pool_fail` chain) go out in a batch of their
@@ -983,7 +1052,9 @@ impl<C: Chain> Keeper<C> {
             self.select_pools(&mut view, &mut report, &mut chain_cranks)
                 .await;
             if !chain_cranks.is_empty() {
-                self.send_cranks(&view, chain_cranks, &mut report).await;
+                // Pool selection's chain cranks: neither charged nor throttled (ARCH §7.1 duty 8).
+                self.send_cranks(&view, chain_cranks, &mut report, false)
+                    .await;
             }
         }
 
@@ -994,6 +1065,8 @@ impl<C: Chain> Keeper<C> {
         for (key, track) in &self.tracks {
             self.metrics.market(*key).degraded = track.state.is_degraded();
         }
+        self.schedule_idle_reads(&view, &report);
+        self.budget_metrics(&view);
         self.classify_reads(&view, &report);
         for a in self.alerts.drain(..) {
             a.log();
@@ -1041,7 +1114,12 @@ impl<C: Chain> Keeper<C> {
     /// M7-SEC-8: the covered markets this tick reads in full — every market with open positions
     /// (`positions`, read this tick), every market not classified cold at its last read (new
     /// markets included), and each cold market on its poll: every `cold_interval_s`, at a phase
-    /// staggered by its key (and at once when a poll was skipped).
+    /// staggered by its key (and at once when a poll was skipped). Decision A (2026-10-01; ARCH
+    /// §7.1 duty 8): a market with positions **below the value-at-risk floor** at its last read is
+    /// read only when its idle crank is due ([`Self::schedule_idle_reads`]), in the tick its set
+    /// of open positions changes (this tick's first read shows it), and while the keeper's own
+    /// `set_coverage_pause` on it is pending — junk with positions does not grow the per-tick
+    /// reads.
     fn markets_to_read(
         &mut self,
         now: i64,
@@ -1050,7 +1128,23 @@ impl<C: Chain> Keeper<C> {
         let every = self.cfg.coverage.cold_interval_s.max(1);
         let mut out = Vec::with_capacity(self.markets.len());
         let mut skipped = 0u64;
+        let mut idle_skipped = 0u64;
         for k in &self.markets {
+            if let Some(ps) = positions.get(k)
+                && self.budget.tier(k) == Some(Tier::BelowFloor)
+            {
+                let changed = self
+                    .tracks
+                    .get(k)
+                    .is_none_or(|t| t.positions_changed(ps.iter().map(|p| p.key)));
+                let due = self.idle_next.get(k).is_none_or(|t| now >= *t);
+                if changed || due || self.pause_intent.contains_key(k) {
+                    out.push(*k);
+                } else {
+                    idle_skipped += 1;
+                }
+                continue;
+            }
             let hot = positions.contains_key(k) || !self.cold.contains(k);
             let due = self.last_read.get(k).is_none_or(|t| {
                 now < *t
@@ -1069,7 +1163,94 @@ impl<C: Chain> Keeper<C> {
             .saturating_add(u64::try_from(out.len()).unwrap_or(u64::MAX));
         self.metrics.markets_cold_skipped =
             self.metrics.markets_cold_skipped.saturating_add(skipped);
+        self.metrics.markets_idle_skipped = self
+            .metrics
+            .markets_idle_skipped
+            .saturating_add(idle_skipped);
         out
+    }
+
+    /// Decision A: after the tick, each below-floor market read gets the second of its next read
+    /// — when its next idle crank is due (`idle_interval_s` after its last observation; a crank
+    /// due and not landed is retried the next second), or `idle_interval_s` from now when the
+    /// budget refused it (the tail spent).
+    ///
+    /// M7D-1: while a position is near an exit (near a threshold or its deadline, expired, armed,
+    /// waiting only for a fresh reference, or with any plan but `Idle` / `Watch`), the market is
+    /// read **every second the reference of the keeper's last observation is still fresh** (its
+    /// positions' `ref_max_age_s`, 2 s by default): an exit needs a completed bucket at most that
+    /// old, so the crank at `t` is followed by the read — and the exit the program accepts — at
+    /// `t + 1` (and `t + 2`). Cranks stay at the idle cadence; a landed exit is an observation,
+    /// so a cascade keeps going second by second. As reviewed, each read came 30 s after the
+    /// last observation and so always found its own reference stale: no exit ever went.
+    fn schedule_idle_reads(&mut self, view: &ChainView, report: &TickReport) {
+        let now = view.clock.unix_timestamp;
+        let idle = self.cfg.coverage.idle_interval_s.max(1);
+        for mv in &view.markets {
+            if self.budget.tier(&mv.key) != Some(Tier::BelowFloor) {
+                self.idle_next.remove(&mv.key);
+                continue;
+            }
+            let last = self.tracks.get(&mv.key).and_then(|t| t.last_obs);
+            let next = if self.refused.contains(&mv.key) {
+                now.saturating_add(idle)
+            } else {
+                let fresh_for = mv
+                    .positions
+                    .iter()
+                    .map(|p| i64::from(p.pos.ref_max_age_s))
+                    .max()
+                    .unwrap_or(0)
+                    .max(1);
+                let near_exit = report.evaluations.get(&mv.key).is_some_and(|evs| {
+                    evs.iter().any(|e| {
+                        e.near
+                            || e.expired
+                            || e.armed
+                            || e.stale_exit
+                            || !matches!(e.plan, Plan::Idle | Plan::Watch)
+                    })
+                });
+                match last {
+                    Some((t, _)) if near_exit && now < t.saturating_add(fresh_for) => {
+                        now.saturating_add(1)
+                    }
+                    Some((t, _)) => t.saturating_add(idle).max(now.saturating_add(1)),
+                    None => now.saturating_add(1),
+                }
+            };
+            self.idle_next.insert(mv.key, next);
+        }
+    }
+
+    /// Decision A: the budget's per-market gauges of the markets read this tick, and its global
+    /// balances.
+    fn budget_metrics(&mut self, view: &ChainView) {
+        let ranked = self.budget.ranked();
+        for mv in &view.markets {
+            let Some(b) = self.budget.markets.get(&mv.key) else {
+                continue;
+            };
+            let rank = ranked
+                .iter()
+                .position(|k| *k == mv.key)
+                .map_or(0, |i| i + 1);
+            let m = self.metrics.market(mv.key);
+            m.var_lamports = b.var;
+            m.budget_tier = b.tier.number();
+            m.budget_rank = u64::try_from(rank).unwrap_or(u64::MAX);
+            m.budget_unspent_lamports = b.unspent;
+            m.budget_spent_exit_lamports = b.spent[0];
+            m.budget_spent_baseline_lamports = b.spent[1];
+            m.budget_spent_discretionary_lamports = b.spent[2];
+        }
+        let g = &self.budget;
+        self.metrics.budget_global_lamports = g.global;
+        self.metrics.budget_free_lamports = g.free;
+        self.metrics.budget_tail_lamports = g.tail;
+        self.metrics.budget_overdraft_lamports = g.overdraft;
+        self.metrics.budget_spent_lamports = g.spent;
+        self.metrics.budget_excess_lamports = g.excess;
     }
 
     /// M7-SEC-8: after the tick, each market read is classified: **hot** (read every tick) while it
@@ -1097,8 +1278,9 @@ impl<C: Chain> Keeper<C> {
     /// Whether `mv` must be read every tick ([`Self::classify_reads`]). Only a list-only market,
     /// or a curve market that a buy of more than `coverage.hot_curve_completion_lamports` is still
     /// away from completing, can be cold — the markets anyone can list for a fee and rent
-    /// (≈ 0.047 SOL; a pump coin ≈ 0.02 SOL more); a PumpSwap or Raydium market needs real
-    /// liquidity to exist and stays hot, so its venue-drift alerts come at once.
+    /// (≈ 0.035–0.038 SOL at ARCH §3.2's rent — the M7 review counted ≈ 0.047; a pump coin
+    /// ≈ 0.02 SOL more); a PumpSwap or Raydium market needs real liquidity to exist and stays hot,
+    /// so its venue-drift alerts come at once.
     fn hot(&self, mv: &MarketView, needs: Option<&MarketNeeds>, now: i64) -> bool {
         let Some(n) = needs else { return true };
         let m = mv.market.as_ref();
@@ -1173,6 +1355,8 @@ impl<C: Chain> Keeper<C> {
             );
             let unpausing = self.pause_intent.get(&key) == Some(&false);
             let flag = mv.market.has_flag(MARKET_FLAG_PAUSED_COVERAGE);
+            let covered = self.budget.tier(&key) == Some(Tier::Covered);
+            let pauser = self.cfg.coverage_pause.enabled;
             // M7-SEC-3: while the keeper holds the market degraded, a flag found cleared that it did
             // not clear, and a position that appeared while the flag was last seen set, were
             // signed by the `coverage_authority` key outside this instance.
@@ -1197,24 +1381,43 @@ impl<C: Chain> Keeper<C> {
                         });
                     }
                 }
+                // ★OWNER-M7-3 (b): a pause this keeper only adopted (found set, or set by
+                // someone else) that someone else cleared — the Emergency multisig — stays clear;
+                // a market the keeper degraded itself stays degraded (the pauser sets it again).
+                if !flag && !unpausing {
+                    track.on_flag_cleared_by_other();
+                }
             }
             track.set_positions(mv.positions.iter().map(|p| p.key));
-            if track.sync_pause_flag(now, flag, unpausing) {
-                self.alerts.push(Alert::CoveragePauseFound { market: key });
-            }
-            let found = track.check_foreign(&mv.market, &cov, open);
-            if let Some(sec) = found.price {
-                report.bursts.push((key, sec));
-                self.metrics.market(key).bursts += 1;
-            }
-            if found.genuine.is_some() {
-                self.metrics.market(key).foreign_moves += 1;
-            }
-            if let Some(sec) = found.liquidity {
-                report.liq_covers.push((key, sec));
-                if found.liq_started {
-                    self.metrics.market(key).liq_covers += 1;
+            match track.sync_pause_flag(now, flag, unpausing) {
+                // ★OWNER-M7-3 (b): the designated pauser saw the flag clear, then set, without
+                // having sent the set: a second or compromised coverage key.
+                Some(FlagSet::Foreign) if pauser => {
+                    self.alerts
+                        .push(Alert::CoveragePauseForeign { market: key });
                 }
+                Some(_) => self.alerts.push(Alert::CoveragePauseFound { market: key }),
+                None => {}
+            }
+            if covered {
+                let found = track.check_foreign(&mv.market, &cov, open);
+                if let Some(sec) = found.price {
+                    report.bursts.push((key, sec));
+                    self.metrics.market(key).bursts += 1;
+                }
+                if found.genuine.is_some() {
+                    self.metrics.market(key).foreign_moves += 1;
+                }
+                if let Some(sec) = found.liquidity {
+                    report.liq_covers.push((key, sec));
+                    if found.liq_started {
+                        self.metrics.market(key).liq_covers += 1;
+                    }
+                }
+            } else {
+                // Decision A (ARCH §7.1 duties 2, 8): price bursts and liquidity-anomaly coverage
+                // run on covered markets only.
+                track.stop_bursts();
             }
         }
 
@@ -1281,8 +1484,20 @@ impl<C: Chain> Keeper<C> {
                         self.metrics.b_ratio_wait.record(bps);
                     }
                 }
-                let due = self.tracks[&key].observation_due(&needs, now, slot, &cov);
+                // Decision A (ARCH §7.1 duty 8): below the value-at-risk floor, the idle cadence
+                // only — no per-second coverage of any kind; exits still go on these reads.
+                let below = self.budget.tier(&key) == Some(Tier::BelowFloor);
+                let due_needs = if below {
+                    MarketNeeds {
+                        open_positions: needs.open_positions,
+                        ..MarketNeeds::default()
+                    }
+                } else {
+                    needs
+                };
+                let due = self.tracks[&key].observation_due(&due_needs, now, slot, &cov);
                 if let Some(t) = self.tracks.get_mut(&key)
+                    && !below
                     && (needs.per_second || needs.warm_up || t.in_burst(now))
                 {
                     // M7-SEC-1 (b): the seconds a slow tick skips after this one were required.
@@ -1398,19 +1613,13 @@ impl<C: Chain> Keeper<C> {
         if observed {
             report.observed.push((key, due));
         } else if let Some(d) = due.or(force_crank.then_some(Due::Second)) {
-            // O17: a crank exits depend on is never throttled by the budget — a position near a
-            // threshold (the EMA leg must follow the price for a liquidation to become
-            // possible), a liquidatable or expired position waiting for a fresh reference
-            // (`Observe`) or its bound (`*Wait`), an armed position, the S3 chain.
-            let serves_exit = report.evaluations.get(&key).is_some_and(|evs| {
-                evs.iter()
-                    .any(|e| e.near || !matches!(e.plan, Plan::Idle | Plan::Watch))
-            }) || report
-                .needs
-                .get(&key)
-                .is_some_and(|n| n.no_route || n.start_chain || n.s3_due_executable);
-            if serves_exit {
-                self.exit_cranks.insert(key);
+            if force_crank {
+                // A graduation step's crank (after the keeper's `migrate_v2` or straddle, a
+                // list-only market's re-detection): a graduation move, never charged or throttled.
+                self.free_cranks.insert(key);
+            } else {
+                let req = self.charge_of(&key, d, now, report);
+                self.crank_charges.insert(key, req);
             }
             crank_queue.push((key, d));
         }
@@ -1419,6 +1628,74 @@ impl<C: Chain> Keeper<C> {
         // pool is followed by its post-wipe sweep in the same second).
         self.sweep_duties(view, idx, now, report).await?;
         Ok(())
+    }
+
+    /// Decision A (2026-10-01; ARCH §7.1 duty 8): the charge class of `key`'s crank due for `d`
+    /// at `now`. On a covered market: **exit-critical** — the cranks exits depend on, never
+    /// throttled (O17): a position near a threshold (the EMA leg must follow the price for a
+    /// liquidation to become possible), a liquidatable or expired position waiting for a fresh
+    /// reference (`Observe`) or its bound (`*Wait`), an armed position, the S3 chain, a market
+    /// without a route — **at most one crank a second** (M7D-4: the per-second coverage these
+    /// need; a burst's further per-slot cranks in a second the keeper already observed are
+    /// discretionary) —; **discretionary** — a price burst (`Due::Slot`) or per-second coverage
+    /// owed to the liquidity anomaly alone —; **baseline** otherwise (the idle cadence, the guard
+    /// coverage after a switch, per-second coverage of a market off its EMA). Below the floor
+    /// (M7D-2): the idle crank an exit waits on — a position that waits only for a fresh
+    /// reference (`PositionEval::stale_exit`) or its bound, an armed position, the S3 chain, a
+    /// market without a route — is exit-critical (the tail, then the overdraft: exits are never
+    /// paused); any other idle crank baseline (the tail). Without positions: a warm-up or
+    /// listing-window crank (may overdraw), or another baseline charge.
+    fn charge_of(&self, key: &Pubkey, d: Due, now: i64, report: &TickReport) -> ChargeReq {
+        let evals = report.evaluations.get(key);
+        let needs = report.needs.get(key).copied().unwrap_or_default();
+        let chain = needs.no_route || needs.start_chain || needs.s3_due_executable;
+        match self.budget.tier(key).unwrap_or_default() {
+            Tier::Covered => {
+                let serves_exit = evals.is_some_and(|evs| {
+                    evs.iter()
+                        .any(|e| e.near || !matches!(e.plan, Plan::Idle | Plan::Watch))
+                }) || chain;
+                // M7D-4: an observation of the keeper's already landed this second (a crank in an
+                // earlier slot, an exit): the per-second coverage an exit needs is met.
+                let observed = self
+                    .tracks
+                    .get(key)
+                    .and_then(|t| t.last_obs)
+                    .is_some_and(|(t, _)| t >= now);
+                let near =
+                    evals.is_some_and(|evs| evs.iter().any(|e| e.near || e.plan != Plan::Idle));
+                let liq_only = needs.liq_covered
+                    && !(near
+                        || needs.ema_deviates
+                        || needs.warming
+                        || needs.guarded
+                        || needs.s3_due_executable);
+                let class = if serves_exit && !(d == Due::Slot && observed) {
+                    ChargeClass::ExitCritical
+                } else if d == Due::Slot || (d == Due::Second && liq_only) {
+                    ChargeClass::Discretionary
+                } else {
+                    ChargeClass::Baseline
+                };
+                ChargeReq::of(class)
+            }
+            Tier::BelowFloor => {
+                let serves_exit = evals.is_some_and(|evs| {
+                    evs.iter().any(|e| {
+                        e.stale_exit || e.armed || !matches!(e.plan, Plan::Idle | Plan::Watch)
+                    })
+                }) || chain;
+                ChargeReq::of(if serves_exit {
+                    ChargeClass::ExitCritical
+                } else {
+                    ChargeClass::Baseline
+                })
+            }
+            Tier::NoPositions => ChargeReq {
+                class: ChargeClass::Baseline,
+                warm_up: d == Due::Listing || needs.warm_up,
+            },
+        }
     }
 
     /// Duty 6 (M5; module docs): the trader's base ATA and pump UVA of `view.markets[idx]`'s curve
@@ -3026,7 +3303,8 @@ impl<C: Chain> Keeper<C> {
     /// step) is cranked at once — simulated first, at the observation ceiling, outside every
     /// market's budget (a global line) — and a failed crank is retried every second. A newer
     /// update the rules refuse raises `Alert::OracleRefused` (once per reason until a crank
-    /// lands); a cache older than `oracle.aging_alert_s` raises `Alert::OracleAging` (hourly).
+    /// lands); a cache older than `oracle.aging_alert_s` raises `Alert::OracleAging` (once per
+    /// stall — per cache `publish_time`, M7D-6 — and hourly while it lasts).
     async fn oracle_duty(&mut self, view: &ChainView, report: &mut TickReport) {
         use shortwin_venue_state::pyth;
         let now = view.clock.unix_timestamp;
@@ -3044,13 +3322,17 @@ impl<C: Chain> Keeper<C> {
                 publish_time: c.publish_time,
             });
         let age = now.saturating_sub(cached.publish_time);
+        // M7D-6: once per stall — per cache `publish_time` —, and hourly while one lasts. As
+        // reviewed the alert was rate-limited to once an hour across stalls, which held while
+        // the cache went stale after 3,600 s (alert at 1,800 s); with `oracle_stale_s` 600
+        // (decision C) a second stall within ~50 min of an alert reached Tier C unalerted.
         if cached.publish_time > 0
             && age > self.cfg.oracle.aging_alert_s
-            && self
-                .oracle_aging_alerted
-                .is_none_or(|t| now.saturating_sub(t) >= 3_600)
+            && self.oracle_aging_alerted.is_none_or(|(published, t)| {
+                published != cached.publish_time || now.saturating_sub(t) >= 3_600
+            })
         {
-            self.oracle_aging_alerted = Some(now);
+            self.oracle_aging_alerted = Some((cached.publish_time, now));
             self.alerts.push(Alert::OracleAging {
                 age_s: age,
                 publish_time: cached.publish_time,
@@ -3174,7 +3456,10 @@ impl<C: Chain> Keeper<C> {
     /// outside the observation budget, at most once a second per market, retried every second
     /// until the flag matches; others only alert (the `Degraded` alert pages the Emergency
     /// multisig). A market without positions is never paused: its opens wait for its own
-    /// warm-up, and nothing rests on its coverage.
+    /// warm-up, and nothing rests on its coverage. ★OWNER-M7-3 (b) (2026-10-01): a cleared flag
+    /// is set again only on a market this keeper degraded itself
+    /// ([`crate::coverage::MarketTrack::own_degraded`]) — a pause it only adopted that the
+    /// Emergency multisig cleared stays clear.
     async fn coverage_pauses(&mut self, view: &ChainView, report: &mut TickReport) {
         let now = view.clock.unix_timestamp;
         for mv in &view.markets {
@@ -3185,7 +3470,11 @@ impl<C: Chain> Keeper<C> {
             let flag = mv.market.has_flag(MARKET_FLAG_PAUSED_COVERAGE);
             self.metrics.market(key).paused_coverage = flag;
             let open = !mv.positions.is_empty() || mv.market.open_positions > 0;
-            let want = track.state.is_degraded() && (open || flag);
+            let mut want = track.state.is_degraded() && (open || flag);
+            if want && !flag && !track.own_degraded {
+                // Adopted, then cleared by someone else (the Emergency): not set again.
+                want = false;
+            }
             if want == flag {
                 self.pause_alerted.retain(|(k, _)| *k != key);
                 self.pause_intent.remove(&key);
@@ -3309,39 +3598,77 @@ impl<C: Chain> Keeper<C> {
         }
     }
 
-    /// Sends the queued cranks in batches (module docs).
+    /// Sends the queued cranks in batches (module docs). `charged`: the cranks go through the
+    /// global budget (decision A, [`crate::budget`]) — presented exit-critical, baseline,
+    /// discretionary (each by rank), then tier 2, then tier 3; a refused charge is not sent and,
+    /// on a market with open positions, degrades it at once; an admitted one is booked at its
+    /// landed share of the batch's fee, or returned when it does not land. A graduation step's
+    /// crank, and pool selection's (`charged` false), are neither charged nor throttled.
     async fn send_cranks(
         &mut self,
         view: &ChainView,
         queue: Vec<(Pubkey, Due)>,
         report: &mut TickReport,
+        charged: bool,
     ) {
         let now = view.clock.unix_timestamp;
         let slot = view.clock.slot;
-        // 0 (or `None`): no budget.
-        let budget = self.cfg.budget.per_market_daily_lamports.filter(|b| *b > 0);
+        let params = self.budget_params(&view.config);
+        let req_of = |charges: &BTreeMap<Pubkey, ChargeReq>, k: &Pubkey| {
+            charges
+                .get(k)
+                .copied()
+                .unwrap_or(ChargeReq::of(ChargeClass::Baseline))
+        };
+        let mut queue = queue;
+        if charged {
+            let ranks = self.budget.ranks();
+            queue.sort_by_cached_key(|(k, _)| {
+                self.budget.order(k, req_of(&self.crank_charges, k), &ranks)
+            });
+        }
         let mut ready: Vec<(Pubkey, Due)> = Vec::new();
+        let mut held: BTreeMap<Pubkey, budget::Reservation> = BTreeMap::new();
         for (k, d) in queue {
-            let open = view
-                .market(&k)
-                .is_some_and(|mv| !mv.positions.is_empty() || mv.market.open_positions > 0);
-            let exempt = self.exit_cranks.contains(&k);
-            let track = self.tracks.entry(k).or_default();
-            if exempt || track.can_spend(k, now, budget, &mut self.alerts) {
+            if !charged || self.free_cranks.contains(&k) {
                 ready.push((k, d));
-            } else {
-                // O17: an exhausted budget on a market with open positions is degraded mode at
-                // once (opens paused; exits, never budgeted, continue).
-                if open && let Some(b) = budget {
-                    let was = track.state.is_degraded();
-                    track.on_budget_exhausted(k, now, b, &mut self.alerts);
-                    if !was {
-                        self.metrics.market(k).budget_degraded += 1;
-                    }
+                continue;
+            }
+            let req = req_of(&self.crank_charges, &k);
+            match self.budget.admit(now, k, req, &params, &mut self.alerts) {
+                Admission::Admitted(r) => {
+                    held.insert(k, r);
+                    ready.push((k, d));
                 }
-                report
-                    .crank_failed
-                    .push((k, "daily observation budget spent".into()));
+                Admission::Refused { rank } => {
+                    self.refused.insert(k);
+                    self.metrics.market(k).budget_refused += 1;
+                    // O17: a refused charge on a market with open positions is degraded mode at
+                    // once (opens paused; exits, never budgeted, continue).
+                    let open = view
+                        .market(&k)
+                        .is_some_and(|mv| !mv.positions.is_empty() || mv.market.open_positions > 0);
+                    if open {
+                        let spent = self.budget.spent;
+                        let track = self.tracks.entry(k).or_default();
+                        let was = track.state.is_degraded();
+                        track.on_budget_exhausted(
+                            k,
+                            now,
+                            spent,
+                            params.global,
+                            rank,
+                            &mut self.alerts,
+                        );
+                        if !was {
+                            self.metrics.market(k).budget_degraded += 1;
+                        }
+                    }
+                    report.crank_failed.push((
+                        k,
+                        format!("refused by the global keeper budget ({req:?}, rank {rank:?})"),
+                    ));
+                }
             }
         }
         let why: BTreeMap<Pubkey, Due> = ready.iter().copied().collect();
@@ -3402,6 +3729,9 @@ impl<C: Chain> Keeper<C> {
                             units_consumed: out.units_consumed / n,
                             ..TxOutcome::default()
                         };
+                        if let Some(r) = held.remove(k) {
+                            self.budget.settle(r, share.fee);
+                        }
                         self.on_landed(*k, &share, now, slot, true);
                         self.metrics.market(*k).cranks += 1;
                         report.cranked.push(*k);
@@ -3497,6 +3827,9 @@ impl<C: Chain> Keeper<C> {
                     price,
                     unit_limit,
                 }) => {
+                    if let Some(r) = held.remove(&k) {
+                        self.budget.settle(r, out.fee);
+                    }
                     self.on_landed(k, &out, now, slot, true);
                     self.metrics.market(k).cranks += 1;
                     report.cranked.push(k);
@@ -3522,6 +3855,10 @@ impl<C: Chain> Keeper<C> {
                 Ok(Sent::DryRun { .. }) => {}
                 Err(e) => report.crank_failed.push((k, format!("{e:#}"))),
             }
+        }
+        // Admitted cranks that did not land: nothing is booked.
+        for (_, r) in held {
+            self.budget.release(r);
         }
     }
 }

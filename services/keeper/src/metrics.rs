@@ -66,8 +66,23 @@ pub struct MarketMetrics {
     /// O17: `set_coverage_pause(true)` / `(false)` calls of the keeper landed.
     pub coverage_pauses: u64,
     pub coverage_unpauses: u64,
-    /// O17: times the market's exhausted daily budget degraded it (with open positions).
+    /// O17: times a refused charge of the global budget degraded the market (with open
+    /// positions).
     pub budget_degraded: u64,
+    /// Decision A (2026-10-01; ARCH §7.1 duty 8): charges of the market the global budget refused.
+    pub budget_refused: u64,
+    /// The market's value at risk `V` (lamports) at its last read.
+    pub var_lamports: u64,
+    /// Its class: 1 covered, 2 below the floor, 3 without positions.
+    pub budget_tier: u64,
+    /// Its rank among the covered markets (1 = the most value at risk; 0: not covered).
+    pub budget_rank: u64,
+    /// Its unspent entitlement `U` (lamports).
+    pub budget_unspent_lamports: u64,
+    /// Today's budget spend by charge class: exit-critical, baseline, discretionary (lamports).
+    pub budget_spent_exit_lamports: u64,
+    pub budget_spent_baseline_lamports: u64,
+    pub budget_spent_discretionary_lamports: u64,
     /// The market's `paused_coverage` flag as last read (1) or not (0).
     pub paused_coverage: bool,
     /// Degraded (1) or not (0).
@@ -153,6 +168,17 @@ pub struct Metrics {
     pub oracle_reads: u64,
     pub oracle_refusals: u64,
     pub oracle_lamports: u64,
+    /// Decision A (2026-10-01; ARCH §7.1 duty 8): the global budget's balances — `G`, the free
+    /// pool `F`, today's tier-2 spend `T`, the overdraft `O`, today's spend and the spend above the
+    /// admitted estimates no balance could take — and the markets it skipped reading because they
+    /// are below the floor and their idle crank is not due.
+    pub budget_global_lamports: u64,
+    pub budget_free_lamports: u64,
+    pub budget_tail_lamports: u64,
+    pub budget_overdraft_lamports: u64,
+    pub budget_spent_lamports: u64,
+    pub budget_excess_lamports: u64,
+    pub markets_idle_skipped: u64,
     /// U28 (ARCH §12): `B̂_live/B̂_ref` (bps) of the keeper's landed liquidations and expiries, at
     /// its decision, and of the positions it evaluated waiting for their bound (`LiquidateWait`,
     /// `ExpireWait`; once per position and tick).
@@ -274,6 +300,51 @@ impl Metrics {
             "Lamports spent on crank_sol_usd (duty 11).",
             self.oracle_lamports,
         );
+        g(
+            &mut s,
+            "shortwin_keeper_markets_idle_skipped_total",
+            "Below-floor markets not read by a tick: their idle crank not due (decision A).",
+            self.markets_idle_skipped,
+        );
+        let gauge = |s: &mut String, name: &str, help: &str, v: u64| {
+            let _ = writeln!(s, "# HELP {name} {help}\n# TYPE {name} gauge\n{name} {v}");
+        };
+        gauge(
+            &mut s,
+            "shortwin_keeper_budget_global_lamports",
+            "The global daily keeper budget G (decision A of 2026-10-01).",
+            self.budget_global_lamports,
+        );
+        gauge(
+            &mut s,
+            "shortwin_keeper_budget_free_lamports",
+            "The global budget's free pool F.",
+            self.budget_free_lamports,
+        );
+        gauge(
+            &mut s,
+            "shortwin_keeper_budget_tail_lamports",
+            "Today's spend of the below-floor markets from the free pool (T).",
+            self.budget_tail_lamports,
+        );
+        gauge(
+            &mut s,
+            "shortwin_keeper_budget_overdraft_lamports",
+            "Today's charges booked beyond G (exit-critical cranks, warm-ups without positions).",
+            self.budget_overdraft_lamports,
+        );
+        gauge(
+            &mut s,
+            "shortwin_keeper_budget_spent_lamports",
+            "Today's spend of the global budget.",
+            self.budget_spent_lamports,
+        );
+        gauge(
+            &mut s,
+            "shortwin_keeper_budget_excess_lamports",
+            "Today's spend above the admitted estimates that no balance could take.",
+            self.budget_excess_lamports,
+        );
         let name = "shortwin_keeper_exit_b_live_over_ref_bps";
         let _ = writeln!(
             s,
@@ -283,7 +354,7 @@ impl Metrics {
             .render(&mut s, name, "outcome=\"landed\"");
         self.b_ratio_wait.render(&mut s, name, "outcome=\"wait\"");
         type Row = (&'static str, &'static str, fn(&MarketMetrics) -> u64);
-        let rows: [Row; 31] = [
+        let rows: [Row; 39] = [
             (
                 "covered_seconds",
                 "Seconds with a keeper observation.",
@@ -376,8 +447,48 @@ impl Metrics {
             ),
             (
                 "budget_degraded",
-                "Times the exhausted daily budget degraded the market (O17).",
+                "Times a refused charge of the global budget degraded the market (O17).",
                 |m| m.budget_degraded,
+            ),
+            (
+                "budget_refused",
+                "Charges of the market the global budget refused.",
+                |m| m.budget_refused,
+            ),
+            (
+                "var_lamports",
+                "The market's value at risk V (lamports).",
+                |m| m.var_lamports,
+            ),
+            (
+                "budget_tier",
+                "1 covered, 2 below the value-at-risk floor, 3 without positions.",
+                |m| m.budget_tier,
+            ),
+            (
+                "budget_rank",
+                "Rank among the covered markets by value at risk (0: not covered).",
+                |m| m.budget_rank,
+            ),
+            (
+                "budget_unspent_lamports",
+                "The market's unspent entitlement U.",
+                |m| m.budget_unspent_lamports,
+            ),
+            (
+                "budget_spent_exit_lamports",
+                "Today's exit-critical budget spend.",
+                |m| m.budget_spent_exit_lamports,
+            ),
+            (
+                "budget_spent_baseline_lamports",
+                "Today's baseline budget spend.",
+                |m| m.budget_spent_baseline_lamports,
+            ),
+            (
+                "budget_spent_discretionary_lamports",
+                "Today's discretionary budget spend (bursts, liquidity anomalies).",
+                |m| m.budget_spent_discretionary_lamports,
             ),
             (
                 "paused_coverage",
@@ -390,7 +501,18 @@ impl Metrics {
         ];
         for (name, help, get) in rows {
             let full = format!("shortwin_keeper_market_{name}");
-            let kind = if matches!(name, "degraded" | "paused_coverage") {
+            let kind = if matches!(
+                name,
+                "degraded"
+                    | "paused_coverage"
+                    | "var_lamports"
+                    | "budget_tier"
+                    | "budget_rank"
+                    | "budget_unspent_lamports"
+                    | "budget_spent_exit_lamports"
+                    | "budget_spent_baseline_lamports"
+                    | "budget_spent_discretionary_lamports"
+            ) {
                 "gauge"
             } else {
                 "counter"
@@ -424,6 +546,9 @@ mod tests {
             "shortwin_keeper_market_lamports{{market=\"{k}\"}} 5000"
         )));
         assert!(out.contains("# TYPE shortwin_keeper_market_degraded gauge"));
+        assert!(out.contains("# TYPE shortwin_keeper_market_budget_rank gauge"));
+        assert!(out.contains("# TYPE shortwin_keeper_market_budget_refused counter"));
+        assert!(out.contains("# TYPE shortwin_keeper_budget_free_lamports gauge"));
     }
 
     /// U28's histogram: cumulative buckets, `+Inf`, sum and count, per outcome.

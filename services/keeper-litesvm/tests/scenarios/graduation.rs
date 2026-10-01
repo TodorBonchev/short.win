@@ -75,7 +75,9 @@ fn pump_setup(cfg: KeeperConfig) -> (Harness, PumpMarket, u64) {
     ok(env.list_pump(&c));
     let q = c.state(&env.svm).virtual_token_reserves / 200;
     let pm = env.pump_market_listed(PumpSpec::new(PumpCoin::Near, q * 40), c);
-    let h = Harness::new(env, cfg);
+    // Positions of `q` are below the 1-SOL value-at-risk floor: covered all the same (the duties of
+    // a covered market are what is tested; `common::covering_all`).
+    let h = Harness::new(env, covering_all(cfg));
     // A priority price: every v0 transaction carries both ComputeBudget instructions (ARCH §5.4's
     // "ComputeBudget ×2").
     h.chain().set_priority_fees(vec![5_000]);

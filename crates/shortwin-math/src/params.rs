@@ -134,7 +134,9 @@ pub struct Params {
     pub theta_b_usd_e6: u64,
     /// Oracle cache usable for tiering if at most this old, seconds.
     pub oracle_max_age_s: u32,
-    /// Oracle cache stale (graduated markets tier as C), seconds.
+    /// Oracle cache stale (graduated markets tier as C), seconds. Default 600 since the owner's
+    /// decision of 2026-10-01 (OWNER-M7-15, SPEC §14 M7-15; was 3,600): ten of the feed's 55-s
+    /// heartbeats, twenty of the keeper's ≤ 30-s `crank_sol_usd` periods.
     pub oracle_stale_s: u32,
     /// Oracle confidence limit, bps.
     pub oracle_max_conf_bps: u32,
@@ -212,7 +214,7 @@ impl Params {
         theta_a_usd_e6: 500_000_000_000,
         theta_b_usd_e6: 100_000_000_000,
         oracle_max_age_s: 120,
-        oracle_stale_s: 3_600,
+        oracle_stale_s: 600,
         oracle_max_conf_bps: 200,
         oracle_max_step_bps: 2_000,
         venue_fee_cap_bps: 150,

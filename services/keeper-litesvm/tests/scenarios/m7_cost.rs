@@ -131,6 +131,14 @@ impl Kind {
     }
 }
 
+/// The bench's keeper configuration: the defaults, every market with positions covered. The
+/// bench measures the cadence and cost of a **covered** market (ECON §5.8's per-market inputs);
+/// its positions are below the global budget's 1-SOL value-at-risk floor (owner decision A of
+/// 2026-10-01), where a market would get the idle cadence only (`common::covering_all`).
+fn bench_cfg() -> KeeperConfig {
+    covering_all(KeeperConfig::default())
+}
+
 /// A number with thousands separators.
 fn sep(n: u64) -> String {
     let s = n.to_string();
@@ -367,12 +375,12 @@ fn curve_pump(c: PumpCurve) -> Pump<'static> {
 /// The mock's CU facts (a fresh market per run).
 fn venue_mock() -> VenueCu {
     let mut cu = VenueCu::default();
-    let (h, mms) = setup(1, KeeperConfig::default());
+    let (h, mms) = setup(1, bench_cfg());
     let pump = mock_pump(&mms[0]);
     run_liquidation(h, &mms[0], Q, pump, &mut cu);
-    let (h, mms) = setup(1, KeeperConfig::default());
+    let (h, mms) = setup(1, bench_cfg());
     run_expiry(h, &mms[0], Q, &mut cu);
-    let (h, mms) = setup(1, KeeperConfig::default());
+    let (h, mms) = setup(1, bench_cfg());
     let pump = mock_pump(&mms[0]);
     run_settlement(h, &mms[0], Q, pump, &mut cu);
     cu
@@ -380,14 +388,14 @@ fn venue_mock() -> VenueCu {
 
 fn venue_raydium(fixture: shortwin_litesvm_tests::raydium::RayFixture) -> VenueCu {
     let mut cu = VenueCu::default();
-    let (h, mut ms) = ray_setup(&[fixture], KeeperConfig::default());
+    let (h, mut ms) = ray_setup(&[fixture], bench_cfg());
     let (rm, q) = ms.remove(0);
     let pump = ray_pump(rm.pool);
     run_liquidation(h, &rm, q, pump, &mut cu);
-    let (h, mut ms) = ray_setup(&[fixture], KeeperConfig::default());
+    let (h, mut ms) = ray_setup(&[fixture], bench_cfg());
     let (rm, q) = ms.remove(0);
     run_expiry(h, &rm, q, &mut cu);
-    let (h, mut ms) = ray_setup(&[fixture], KeeperConfig::default());
+    let (h, mut ms) = ray_setup(&[fixture], bench_cfg());
     let (rm, q) = ms.remove(0);
     let pump = ray_pump(rm.pool);
     run_settlement(h, &rm, q, pump, &mut cu);
@@ -404,7 +412,7 @@ fn pamm_setup() -> (Harness, pamm::PammMarket, u64) {
         .expect("u64");
     ok(env.list_pamm(&p.mint, &p.base_program));
     let pm = env.pamm_market_listed(&p.mint, q * 40, 60);
-    (Harness::new(env, KeeperConfig::default()), pm, q / 3)
+    (Harness::new(env, bench_cfg()), pm, q / 3)
 }
 
 fn venue_pamm() -> VenueCu {
@@ -430,7 +438,7 @@ fn curve_setup() -> (Harness, shortwin_litesvm_tests::pump::PumpMarket, u64) {
     ok(env.list_pump(&c));
     let q = c.state(&env.svm).virtual_token_reserves / 200;
     let pm = env.pump_market_listed(PumpSpec::new(PumpCoin::Fresh, q * 40), c);
-    (Harness::new(env, KeeperConfig::default()), pm, q)
+    (Harness::new(env, bench_cfg()), pm, q)
 }
 
 fn venue_curve() -> VenueCu {
@@ -587,10 +595,10 @@ fn capacities(shapes: &[CrankShape]) -> Vec<Capacity> {
 /// The real venues' crank shapes, from listed markets of the forks and the mock.
 fn crank_shapes() -> Vec<CrankShape> {
     let mut v = Vec::new();
-    let (h, mms) = setup(1, KeeperConfig::default());
+    let (h, mms) = setup(1, bench_cfg());
     drop(h);
     v.push(CrankShape::new("mock", crank_price_ix(&mms[0]), &[]));
-    let (h, ms) = ray_setup(&[FART, USELESS], KeeperConfig::default());
+    let (h, ms) = ray_setup(&[FART, USELESS], bench_cfg());
     drop(h);
     v.push(CrankShape::new(
         "raydium_amm_v4",
@@ -643,7 +651,7 @@ fn full() -> bool {
 fn rates() -> Rates {
     let mut out = Rates::default();
     // Quiet: one healthy position, a tick a second.
-    let (mut h, mms) = setup(1, KeeperConfig::default());
+    let (mut h, mms) = setup(1, bench_cfg());
     let key = mms[0].market();
     let _ = open(&h, &mms[0], Q);
     h.seconds(2);
@@ -657,7 +665,7 @@ fn rates() -> Rates {
 
     // Near a threshold: the price lifted until the position is near (live CR below 1.3·L) but
     // not liquidatable, then held; every second is observed.
-    let (mut h, mms) = setup(1, KeeperConfig::default());
+    let (mut h, mms) = setup(1, bench_cfg());
     let mm = &mms[0];
     let key = mm.market();
     let _ = open(&h, mm, Q);
@@ -689,7 +697,7 @@ fn rates() -> Rates {
 
     // One foreign price deviation: `[buy 3 %, crank_price, sell]` in one transaction, then the
     // keeper ticks every slot (2.5 a second on mainnet; 2 here) for 70 s.
-    let (mut h, mms) = setup(1, KeeperConfig::default());
+    let (mut h, mms) = setup(1, bench_cfg());
     let mm = &mms[0];
     let key = mm.market();
     let _ = open(&h, mm, Q);
@@ -716,7 +724,7 @@ fn rates() -> Rates {
     out.burst_cranks -= 2;
 
     // A genuine 10 % move, held: per second until |P_spot/P_ema − 1| ≤ 2 %.
-    let (mut h, mms) = setup(1, KeeperConfig::default());
+    let (mut h, mms) = setup(1, bench_cfg());
     let mm = &mms[0];
     let key = mm.market();
     let _ = open(&h, mm, Q);
@@ -731,7 +739,7 @@ fn rates() -> Rates {
     }
 
     // Armed: the S1 run's calls (mock).
-    let (h, mms) = setup(1, KeeperConfig::default());
+    let (h, mms) = setup(1, bench_cfg());
     let pump = mock_pump(&mms[0]);
     let mut cu = VenueCu::default();
     out.armed_settle_calls = run_settlement(h, &mms[0], Q, pump, &mut cu);
@@ -740,7 +748,7 @@ fn rates() -> Rates {
     // observations over a control run (liquidity-anomaly coverage, ≤ liq_cover_s).
     let lp_run = |wrap: bool| -> u64 {
         use shortwin_litesvm_tests::lp;
-        let (mut h, ms) = ray_setup(&[USELESS], KeeperConfig::default());
+        let (mut h, ms) = ray_setup(&[USELESS], bench_cfg());
         let (rm, q) = &ms[0];
         let key = rm.market();
         let _ = crate::raydium::ray_open(&h, rm, *q / 4);
@@ -782,7 +790,7 @@ fn rates() -> Rates {
     ok(env.list_pamm(&p.mint, &p.base_program));
     let pm = env.pamm_market_listed(&p.mint, r.base / 10, 0);
     let key = pm.market();
-    let mut h = Harness::new(env, KeeperConfig::default());
+    let mut h = Harness::new(env, bench_cfg());
     for _ in 0..20 {
         let r = h.second().clone();
         out.pamm_warmup_cranks += u64::from(r.observed(&key));
@@ -808,7 +816,7 @@ fn globals() -> Globals {
     use crate::coverage_pause::{pause_sent, pauser_cfg, pauser_setup};
     let mut out = Globals::default();
     // The pause after a 45-s outage, and the unpause 600 s after coverage returns.
-    let (mut h, mms, _auth) = pauser_setup(1, pauser_cfg());
+    let (mut h, mms, _auth) = pauser_setup(1, covering_all(pauser_cfg()));
     let key = mms[0].market();
     let _ = open(&h, &mms[0], Q);
     h.seconds(3);
@@ -837,7 +845,7 @@ fn globals() -> Globals {
     }
     assert_eq!(out.pause.0.len(), 2, "one pause, one unpause");
     // Duty 11 on a feed publishing every 55 s (the sponsored heartbeat), for an hour.
-    let (mut h, mms) = setup(1, KeeperConfig::default());
+    let (mut h, mms) = setup(1, bench_cfg());
     let _ = open(&h, &mms[0], Q);
     let p0 = crate::oracle::dump().price;
     h.keeper.config_mut().oracle.enabled = true;
@@ -892,9 +900,17 @@ struct Load {
 }
 
 fn load(n: usize, per_second: bool, secs: u32) -> Load {
-    let mut cfg = KeeperConfig::default();
+    let mut cfg = bench_cfg();
+    // The idle cadence runs under the global budget's defaults: a fresh keeper funds every
+    // market's entitlement at its batched first-crank estimate `⌈5,000 / batch_v1⌉` (M7D-5; as
+    // reviewed it took the unbatched 5,000, so 1 SOL covered 85 markets at the harness's 14:13 UTC
+    // and the 200-market run's lowest-ranked ones were refused until 00:00 UTC), so all 200 are
+    // funded and every due observation lands (`observed_every_due`).
     if per_second {
-        // Every market due every second (the per-second SLO for all of them at once).
+        // Every market due every second (the per-second SLO for all of them at once): the load is
+        // measured, not the budget — no budget (200 markets' per-second entitlements are ≈ 29 SOL
+        // a day).
+        cfg.budget.global_daily_lamports = 0;
         cfg.coverage.idle_interval_s = 1;
     }
     let mut env = Env::test_venue();

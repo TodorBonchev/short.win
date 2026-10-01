@@ -268,8 +268,10 @@ pub struct TxSnapshot {
     pub lender: lender::LenderSnapshot,
     /// The position-side state of the tracked markets ([`positions::check_ix`]).
     pub positions: positions::PositionsSnapshot,
-    /// I4's coverage clause (O17): while `coverage_authority` is installed, the key and every
-    /// account it could reach — `None` while the role is disabled (the default).
+    /// I4's coverage clause (O17): the instruction's possible signers — the installed
+    /// `coverage_authority` and the Emergency vault, which may clear the flag (★OWNER-M7-3 (b),
+    /// 2026-10-01) — and every account they could reach; `None` before `initialize_config`, and
+    /// when no instruction of the transaction is `set_coverage_pause` ([`snapshot_for`]).
     pub coverage: Option<CoverageSnapshot>,
 }
 
@@ -277,8 +279,13 @@ pub struct TxSnapshot {
 /// account and the tracked markets' pool vaults, raw.
 #[derive(Clone)]
 pub struct CoverageSnapshot {
-    /// `GlobalConfig.coverage_authority` just before the instruction.
+    /// `GlobalConfig.coverage_authority` just before the instruction (`Pubkey::default()` while
+    /// the role is inert).
     pub authority: Pubkey,
+    /// `GlobalConfig.pause_authority` just before the instruction: the Emergency vault, which
+    /// may **clear** a market's `paused_coverage` — with the role installed or not — and never
+    /// set it (★OWNER-M7-3 (b), owner decision of 2026-10-01).
+    pub emergency: Pubkey,
     /// `(key, lamports, data)`.
     pub accounts: Vec<(Pubkey, u64, Vec<u8>)>,
 }
@@ -289,14 +296,17 @@ pub const MARKET_FLAGS_OFFSET: usize = 10;
 /// `Market.coverage_cleared_at`'s offset (discriminator included; M7-SEC-3).
 pub const MARKET_COVERAGE_CLEARED_AT_OFFSET: usize = 2_928;
 
-/// [`CoverageSnapshot`] of `svm` while the role is enabled.
+/// [`CoverageSnapshot`] of `svm` once the config exists (the Emergency's clear is accepted
+/// whether or not the role is installed, so the clause is never vacuous after
+/// `initialize_config`).
 fn coverage_snapshot(
     svm: &LiteSVM,
     config: Option<&shortwin::state::GlobalConfig>,
     markets: &[Pubkey],
 ) -> Option<CoverageSnapshot> {
-    let authority = config?.coverage_authority;
-    if authority == Pubkey::default() {
+    let c = config?;
+    let (authority, emergency) = (c.coverage_authority, c.pause_authority);
+    if authority == Pubkey::default() && emergency == Pubkey::default() {
         return None;
     }
     let mut accounts: Vec<(Pubkey, u64, Vec<u8>)> = svm
@@ -313,6 +323,7 @@ fn coverage_snapshot(
     }
     Some(CoverageSnapshot {
         authority,
+        emergency,
         accounts,
     })
 }
@@ -533,13 +544,17 @@ pub fn check_ix(
 }
 
 /// I4's coverage clause (O17; ARCH §8.3: "`coverage_authority` can change only
-/// `paused_coverage`"): a `set_coverage_pause` signed by the installed `coverage_authority`
-/// leaves every short.win account and every tracked market's `pool_vault` byte for byte and
+/// `paused_coverage`"; ★OWNER-M7-3 (b), owner decision of 2026-10-01: "`pause_authority` can
+/// change it too, but only by clearing a set flag"): a landed `set_coverage_pause` is signed by
+/// the installed `coverage_authority` or the Emergency vault (`pause_authority`) — no other key
+/// — and leaves every short.win account and every tracked market's `pool_vault` byte for byte and
 /// lamport for lamport as it was, except bit 6 of the named market's `flags` and — when it
 /// cleared a set flag, and only then — the market's `coverage_cleared_at`, which it sets to the
-/// clock's second (M7-SEC-3: the clear delay). (The key's only power is that instruction — no
-/// other instruction reads `config.coverage_authority` — and the general I4 clause applies to
-/// anything else it signs, as to every admin key.)
+/// clock's second (M7-SEC-3: the clear delay, after either signer's clear). Signed by the
+/// Emergency alone, the flag is clear afterwards (it never sets one). (The coverage key's only
+/// power is that instruction — no other instruction reads `config.coverage_authority` — and the
+/// general I4 clause applies to anything else it signs, as to every admin key; the Emergency's
+/// other powers are §3.1's.)
 pub fn i4_coverage_authority_changes_only_its_flag(
     svm: &LiteSVM,
     pre: &TxSnapshot,
@@ -548,9 +563,18 @@ pub fn i4_coverage_authority_changes_only_its_flag(
     let Some(cov) = &pre.coverage else {
         return Ok(());
     };
-    if !ev.coverage_pause || !ev.signers.contains(&cov.authority) {
+    if !ev.coverage_pause {
         return Ok(());
     }
+    let by_role = cov.authority != Pubkey::default() && ev.signers.contains(&cov.authority);
+    let by_emergency = cov.emergency != Pubkey::default() && ev.signers.contains(&cov.emergency);
+    ensure(by_role || by_emergency, "I4", || {
+        format!(
+            "set_coverage_pause landed signed by {:?}: neither the installed coverage_authority \
+             ({}) nor the Emergency ({})",
+            ev.signers, cov.authority, cov.emergency
+        )
+    })?;
     let market = ev.accounts.get(2).copied().unwrap_or_default();
     let bit = u8::try_from(shortwin::state::MARKET_FLAG_PAUSED_COVERAGE).unwrap_or(0);
     for (key, lamports, data) in &cov.accounts {
@@ -605,6 +629,13 @@ pub fn i4_coverage_authority_changes_only_its_flag(
                     )
                 },
             )?;
+            // ★OWNER-M7-3 (b): the Emergency only clears.
+            ensure(by_role || !now_set, "I4", || {
+                format!(
+                    "set_coverage_pause signed by the Emergency alone left market {key}'s \
+                     paused_coverage set ({was_set} → {now_set}); it may only clear it"
+                )
+            })?;
         } else {
             ensure(d == *data, "I4", || {
                 format!("set_coverage_pause changed account {key}")

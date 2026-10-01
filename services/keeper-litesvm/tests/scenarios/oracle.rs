@@ -1,6 +1,6 @@
 //! Duty 11 (ARCH §7.1, §4.7, §3.9; C1-12; M7 K3): `crank_sol_usd` every ≤ 30 s — the USD tiers read
-//! the cached Pyth SOL/USD price, and a cache older than `oracle_stale_s` (3,600 s) puts every market
-//! in Tier C. The recorded mainnet `PriceUpdateV2` (`tests/fixtures`) is planted at the configured
+//! the cached Pyth SOL/USD price, and a cache older than `oracle_stale_s` (600 s since the owner's
+//! decision of 2026-10-01, OWNER-M7-15; was 3,600) puts every graduated market in Tier C. The recorded mainnet `PriceUpdateV2` (`tests/fixtures`) is planted at the configured
 //! address with fresh publish times:
 //!
 //! - the keeper cranks the first update at its first tick, then only newer ones — each within
@@ -9,8 +9,9 @@
 //!   cache) is not sent: `Alert::OracleRefused` once, the cache kept; an acceptable one after it
 //!   lands and clears the alert;
 //! - a feed that stops updating: `Alert::OracleAging` once the cache is older than
-//!   `aging_alert_s` (hourly), and the market's tier falls to C at `oracle_stale_s` (the
-//!   program's rule, unchanged);
+//!   `aging_alert_s` (300 s; once per stall, hourly while it lasts), and the market's tier falls to
+//!   C at the keeper's first crank after `oracle_stale_s` (600 s; the program's rule); a second
+//!   stall within the hour is alerted too, before Tier C (M7D-6);
 //! - the keeper's crank is a global cost line (`oracle_lamports`), never a market's budget.
 
 use shortwin::constants::PYTH_SOL_USD_ACCOUNT;
@@ -147,23 +148,37 @@ fn the_keeper_keeps_the_sol_usd_cache_fresh() {
     let landed = (0..31).any(|_| cranked(&h.second().clone()).is_some());
     assert!(landed);
 
-    // The feed stops: aging alerted once past 1,800 s; the tier falls to C at 3,600 s.
+    // The feed stops: aging alerted once past `aging_alert_s` (300 s); the tier falls to C at the
+    // first crank after `oracle_stale_s` (600 s; OWNER-M7-15).
     let tier = |h: &Harness| h.with_env(|env| env.market(&key).tier);
     let tier_fresh = tier(&h);
+    let stale_s = h.with_env(|env| i64::from(env.config().params.oracle_stale_s));
+    assert_eq!(stale_s, 600);
+    assert_eq!(h.keeper.config().oracle.aging_alert_s, 300);
     let mut aging = Vec::new();
+    let mut c_at = None;
     for _ in 0..3_700 {
         let r = h.second().clone();
-        aging.extend(
-            r.alerts
-                .iter()
-                .filter(|a| matches!(a, Alert::OracleAging { .. }))
-                .cloned(),
-        );
+        aging.extend(r.alerts.iter().filter_map(|a| match a {
+            Alert::OracleAging { age_s, .. } => Some(*age_s),
+            _ => None,
+        }));
+        if c_at.is_none() && tier(&h) == shortwin_math::tier::Tier::C as u8 {
+            c_at = Some(h.now() - t);
+        }
     }
     assert_eq!(aging.len(), 1, "{aging:?}");
+    assert!((301..=302).contains(&aging[0]), "{aging:?}");
+    let c_at = c_at.expect("Tier C once stale");
+    assert!(
+        c_at > stale_s && c_at <= stale_s + 31,
+        "Tier C {c_at} s after the last update"
+    );
     let tier_stale = tier(&h);
     println!(
-        "duty 11: tier {tier_fresh} with a fresh cache, {tier_stale} 3,700 s after the last update"
+        "duty 11: tier {tier_fresh} with a fresh cache; aging alerted at {} s, Tier C from {c_at} s \
+         (oracle_stale_s {stale_s}), {tier_stale} 3,700 s after the last update",
+        aging[0]
     );
     // With the keeper's cache fresh the aged, deep market is Tier A; once the feed stops, the
     // keeper's next crank_price after `oracle_stale_s` re-tiers it C (the program's rule).
@@ -204,4 +219,74 @@ fn a_missing_feed_alerts_once_and_is_cranked_once_it_appears() {
     let landed = (0..31).find(|_| cranked(&h.second().clone()).is_some());
     assert!(landed.is_some());
     assert_eq!(h.with_env(|env| env.oracle_cache()).publish_time, now);
+}
+
+/// ★M7D-6 (decision C keeps the aging alert ahead of Tier C): two feed stalls within the hour.
+/// The first, 400 s, is alerted at ≈ 301 s; the feed resumes; the second is alerted again at
+/// ≈ 301 s — before the market falls to Tier C at the first crank after 600 s. As reviewed the
+/// alert was limited to once an hour across stalls (as when Tier C came after 3,600 s), so the
+/// second stall reached Tier C (619 s) with no aging alert.
+#[test]
+fn a_second_stall_within_the_hour_is_alerted_before_tier_c() {
+    let (mut h, mm) = aged_deep_market();
+    let key = mm.market();
+    let p0 = dump().price;
+    let now = h.now();
+    h.with_env(|env| plant(env, &update(now - 5, p0)));
+    h.keeper.config_mut().oracle.enabled = true;
+    h.second();
+    let tier = |h: &Harness| h.with_env(|env| env.market(&key).tier);
+    let aging_in = |r: &TickReport| {
+        r.alerts
+            .iter()
+            .filter_map(|a| match a {
+                Alert::OracleAging { age_s, .. } => Some(*age_s),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+    // Stall 1: 400 s, then the feed resumes.
+    let mut first = Vec::new();
+    for _ in 0..400 {
+        first.extend(aging_in(&h.second().clone()));
+    }
+    let t = h.now() + 1;
+    let p = h.with_env(|env| env.oracle_cache()).price;
+    h.with_env(|env| plant(env, &update(t, p)));
+    for _ in 0..40 {
+        h.second();
+    }
+    assert_eq!(
+        h.with_env(|env| env.oracle_cache()).publish_time,
+        t,
+        "resumed"
+    );
+    assert_eq!(tier(&h), shortwin_math::tier::Tier::A as u8);
+    // Stall 2: from `t`, until Tier C.
+    let mut second = Vec::new();
+    let mut c_at = None;
+    for _ in 0..700 {
+        let r = h.second().clone();
+        if c_at.is_none() {
+            second.extend(aging_in(&r));
+        }
+        if c_at.is_none() && tier(&h) == shortwin_math::tier::Tier::C as u8 {
+            c_at = Some(h.now() - t);
+        }
+    }
+    println!(
+        "M7D-6: stall 1 aging alerts at {first:?} s; stall 2 at {second:?} s, Tier C at {c_at:?} s"
+    );
+    assert_eq!(first.len(), 1);
+    assert!((301..=302).contains(&first[0]), "{first:?}");
+    let c_at = c_at.expect("Tier C in the second stall");
+    assert_eq!(
+        second.len(),
+        1,
+        "the second stall alerted once, before Tier C"
+    );
+    assert!(
+        (301..=302).contains(&second[0]) && second[0] < c_at,
+        "{second:?} vs {c_at}"
+    );
 }

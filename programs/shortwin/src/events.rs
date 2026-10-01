@@ -464,12 +464,14 @@ pub struct CoverageGap {
     pub open_positions: u32,
 }
 
-/// `CoveragePauseSet.reason`: the in-house keeper lost coverage of the market (an outage, an
-/// exhausted per-market budget; ARCH §3.1 `KeeperCoverage`, O17). The only reason accepted.
+/// `CoveragePauseSet.reason`: the in-house keeper lost coverage of the market (an outage, a
+/// keeper budget that can no longer cover it; ARCH §3.1 `KeeperCoverage`, O17). The only reason
+/// accepted, from either signer (the coverage key, or the Emergency vault's clear).
 pub const COVERAGE_REASON_KEEPER: u8 = 1;
 
 /// `set_coverage_pause` (O17): `paused_coverage` set or cleared on `market` by `by` (the
-/// `coverage_authority`), with the reason code ([`COVERAGE_REASON_KEEPER`]).
+/// `coverage_authority`, or — a clear only, OWNER-M7-3 — the Emergency vault `pause_authority`),
+/// with the reason code ([`COVERAGE_REASON_KEEPER`]).
 #[event]
 pub struct CoveragePauseSet {
     pub market: Pubkey,

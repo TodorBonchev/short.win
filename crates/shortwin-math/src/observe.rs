@@ -1062,7 +1062,9 @@ mod tests {
         assert_eq!(o.roll(6, &EmaParams::DEFAULT), Ok(Some(-4)));
         assert_eq!((o.ema.price, o.ema.count, o.ring.len()), (WAD, 0, 1));
         assert_eq!((o.last.lo, o.last.sec), (2 * WAD, 5));
-        assert!(coverage_gap(31, 1) && !coverage_gap(30, 1) && !coverage_gap(100, 0));
+        // OWNER-M7-12 (2026-10-01): the threshold is 40 s (was 30).
+        assert!(coverage_gap(41, 1) && !coverage_gap(40, 1) && !coverage_gap(100, 0));
+        assert!(!coverage_gap(31, 1) && !coverage_gap(32, 1));
     }
 
     #[test]

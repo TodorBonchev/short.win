@@ -129,7 +129,8 @@ pub fn set_pause(
 }
 
 /// `set_coverage_pause(paused, reason)` on `market`, signed by `coverage_authority` (ARCH §3.1;
-/// O17). `reason` is `shortwin::events::COVERAGE_REASON_KEEPER` for every accepted call.
+/// O17) — or, for a clear, by `pause_authority` (the Emergency vault; OWNER-M7-3 (b)). `reason`
+/// is `shortwin::events::COVERAGE_REASON_KEEPER` for every accepted call.
 pub fn set_coverage_pause(
     coverage_authority: &Pubkey,
     market: &Pubkey,

@@ -946,6 +946,24 @@ fn admin_instructions_never_move_funds() {
         ],
         &[&cov, &owner],
     ));
+    // ★OWNER-M7-3 (b): the Emergency vault clears that pause (clear only), bundled with the
+    // lender's exit — the general I4 clause (admin-signed) and the coverage clause run on it.
+    ok(env.send(
+        &[
+            ix::withdraw(&lk, shares / 16, 0),
+            ix::set_coverage_pause(
+                &pause.pubkey(),
+                &market,
+                false,
+                shortwin::events::COVERAGE_REASON_KEEPER,
+            ),
+        ],
+        &[&pause, &owner],
+    ));
+    assert!(
+        !env.market(&market)
+            .has_flag(shortwin::state::MARKET_FLAG_PAUSED_COVERAGE)
+    );
     // The fee sweep is the one allowed outflow (to the configured recipient, ≤ the fees).
     let recipient = env.fee_recipient.pubkey();
     ok(env.send(

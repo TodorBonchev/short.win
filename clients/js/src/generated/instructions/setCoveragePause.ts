@@ -136,7 +136,10 @@ export type SetCoveragePauseAsyncInput<
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  /** `config.coverage_authority` (the keeper's pause-opens-only key; O17). */
+  /**
+   * `config.coverage_authority` (the keeper's pause-opens-only key; O17: sets or clears), or
+   * `config.pause_authority` (the Emergency vault; OWNER-M7-3 (b): clears only).
+   */
   coverageAuthority: TAccountCoverageAuthority;
   config?: TAccountConfig;
   /**
@@ -276,7 +279,10 @@ export type SetCoveragePauseInput<
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  /** `config.coverage_authority` (the keeper's pause-opens-only key; O17). */
+  /**
+   * `config.coverage_authority` (the keeper's pause-opens-only key; O17: sets or clears), or
+   * `config.pause_authority` (the Emergency vault; OWNER-M7-3 (b): clears only).
+   */
   coverageAuthority: TAccountCoverageAuthority;
   config: TAccountConfig;
   /**
@@ -406,7 +412,10 @@ export type ParsedSetCoveragePauseInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** `config.coverage_authority` (the keeper's pause-opens-only key; O17). */
+    /**
+     * `config.coverage_authority` (the keeper's pause-opens-only key; O17: sets or clears), or
+     * `config.pause_authority` (the Emergency vault; OWNER-M7-3 (b): clears only).
+     */
     coverageAuthority: TAccountMetas[0];
     config: TAccountMetas[1];
     /**

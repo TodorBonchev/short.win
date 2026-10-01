@@ -2821,7 +2821,8 @@
       "name": "set_coverage_pause",
       "docs": [
         "The keeper's `coverage_authority` pauses or resumes new opens on one market for lost",
-        "keeper coverage (degraded mode; O17). Opens only; moves nothing."
+        "keeper coverage (degraded mode; O17); the Emergency vault may resume them too (clear",
+        "only; OWNER-M7-3). Opens only; moves nothing."
       ],
       "discriminator": [
         23,
@@ -2837,7 +2838,8 @@
         {
           "name": "coverage_authority",
           "docs": [
-            "`config.coverage_authority` (the keeper's pause-opens-only key; O17)."
+            "`config.coverage_authority` (the keeper's pause-opens-only key; O17: sets or clears), or",
+            "`config.pause_authority` (the Emergency vault; OWNER-M7-3 (b): clears only)."
           ],
           "signer": true
         },
@@ -5337,7 +5339,8 @@
       "name": "CoveragePauseSet",
       "docs": [
         "`set_coverage_pause` (O17): `paused_coverage` set or cleared on `market` by `by` (the",
-        "`coverage_authority`), with the reason code ([`COVERAGE_REASON_KEEPER`])."
+        "`coverage_authority`, or — a clear only, OWNER-M7-3 — the Emergency vault `pause_authority`),",
+        "with the reason code ([`COVERAGE_REASON_KEEPER`])."
       ],
       "type": {
         "kind": "struct",
@@ -7286,7 +7289,8 @@
             "name": "coverage_cleared_at",
             "docs": [
               "M7-SEC-3 (was `_reserved[0..8]`): the unix second `set_coverage_pause(false)` last cleared",
-              "a set `paused_coverage` flag. `open_short` refuses until `COVERAGE_CLEAR_DELAY_S` after it",
+              "a set `paused_coverage` flag (signed by the coverage key or, since OWNER-M7-3, the Emergency",
+              "vault). `open_short` refuses until `COVERAGE_CLEAR_DELAY_S` after it",
               "(`CoveragePaused`; `engine::guard::open_static`), so the `coverage_authority` key cannot",
               "bracket an open on a coverage-paused market — `[clear, open_short, set]` in one",
               "transaction or one second — and the flag stays visibly cleared for the keeper's reads",

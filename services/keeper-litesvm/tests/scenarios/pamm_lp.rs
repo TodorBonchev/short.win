@@ -98,7 +98,9 @@ struct Drag {
 /// the attacker's `[withdraw all, crank_price, deposit]` after each tick from the second the keeper
 /// first skips (the adversarial timing).
 fn drag(env: Env, pm: &PammMarket, lp: &PammLp, cover: Option<i64>, secs: i64) -> Drag {
-    let mut cfg = KeeperConfig::default();
+    // The half-cap position is below the 1-SOL value-at-risk floor: covered all the same (duty 2's
+    // liquidity-anomaly coverage runs on covered markets only; `common::covering_all`).
+    let mut cfg = covering_all(KeeperConfig::default());
     if let Some(c) = cover {
         cfg.coverage.liq_cover_s = c;
     }

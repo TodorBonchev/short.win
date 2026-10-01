@@ -389,15 +389,18 @@ fn a_large_step_against_a_fresh_cache_is_refused() {
 fn the_step_is_not_bounded_by_a_stale_cache() {
     let mut env = env();
     let u = seed(&mut env);
-    // oracle_stale_s = 3,600: at exactly 3,600 s the cache still bounds the step …
-    let jump = later(&u, 3_600, u.price * 2);
+    // oracle_stale_s = 600 (the default since the owner's decision of 2026-10-01, OWNER-M7-15;
+    // was 3,600): at exactly 600 s the cache still bounds the step …
+    let stale = i64::from(env.config().params.oracle_stale_s);
+    assert_eq!(stale, 600);
+    let jump = later(&u, stale, u.price * 2);
     put_update(&mut env, &jump);
-    env.set_clock(u.publish_time + 3_600, DUMP_SLOT + 9_000);
+    env.set_clock(u.publish_time + stale, DUMP_SLOT + 9_000);
     assert_err(&crank(&mut env), ShortwinError::OracleStep);
     // … one second later it does not.
-    let jump = later(&u, 3_601, u.price * 2);
+    let jump = later(&u, stale + 1, u.price * 2);
     put_update(&mut env, &jump);
-    env.set_clock(u.publish_time + 3_601, DUMP_SLOT + 9_003);
+    env.set_clock(u.publish_time + stale + 1, DUMP_SLOT + 9_003);
     ok(crank(&mut env));
     assert_eq!(cache(&env).price, u.price * 2);
 }

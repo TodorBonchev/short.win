@@ -13,6 +13,16 @@ pub use shortwin_litesvm_tests::{Env, mock};
 /// Positions of this size fit every default cap (≈ 3 SOL of notional on the default pool).
 pub const Q: u64 = 3_000_000_000_000;
 
+/// `cfg` covering every market with open positions (`var_floor_lamports` 0). The fork scenarios'
+/// positions are small — well below the global budget's 1-SOL value-at-risk floor (owner decision
+/// A of 2026-10-01; ARCH §7.1 duty 8) — and what they test (straddles, wipes, exits and per-second
+/// coverage on the pump and PumpSwap venues) are the duties of a covered market; below the floor a
+/// market gets the idle cadence only, which the `budget` scenarios test.
+pub fn covering_all(mut cfg: KeeperConfig) -> KeeperConfig {
+    cfg.budget.var_floor_lamports = 0;
+    cfg
+}
+
 /// A test-venue environment with `n` default mock markets and a keeper with `cfg`.
 pub fn setup(n: usize, cfg: KeeperConfig) -> (Harness, Vec<MockMarket>) {
     let mut env = Env::test_venue();

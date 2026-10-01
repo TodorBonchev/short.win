@@ -1,6 +1,6 @@
 //! Keeper configuration (ARCHITECTURE §7.1 "Operations" 7–9, 14; duties 10 and 12; owner item
-//! O17: the per-market daily budget, the priority-price ceiling and the markets covered are the
-//! owner's to set).
+//! O17: the daily budget — one global budget since the owner's decision A of 2026-10-01 —, the
+//! priority-price ceiling and the markets covered are the owner's to set).
 //!
 //! Every field has the design default (ECON §5.8 duties, ARCH §7.1), so an empty file is a
 //! valid configuration. `keeper.example.toml` documents each one.
@@ -50,11 +50,24 @@ pub enum TxFormatPolicy {
     V0,
 }
 
+/// The longest idle cadence (ARCH §7.1 duty 1: "otherwise at least every 30 s for markets with
+/// open positions"), and the bound of the timing tolerances. Below `COVERAGE_GAP_S` (40 s since
+/// OWNER-M7-12): the idle cadence plus its 0–2-s landing jitter emits no `CoverageGap`.
+pub const IDLE_INTERVAL_MAX_S: i64 = 30;
+const _: () = assert!(IDLE_INTERVAL_MAX_S + 2 < shortwin_math::consts::COVERAGE_GAP_S);
+
+/// `oracle.aging_alert_s` must stay below this: the floor of `oracle_stale_s` (600 s; at
+/// `oracle_stale_s` every graduated market tiers C), so the alert precedes Tier C at every value
+/// governance can set (owner decision C of 2026-10-01, OWNER-M7-15).
+pub const ORACLE_STALE_FLOOR_S: i64 = 600;
+
 /// Observation coverage (ARCH §7.1 duties 1, 2, 5; ECON §5.8).
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, deny_unknown_fields)]
 pub struct CoverageConfig {
-    /// Cadence for a market with open positions and nothing near a threshold (duty 1): 30 s.
+    /// Cadence for a market with open positions and nothing near a threshold (duty 1), and the
+    /// only cadence of a market below the value-at-risk floor (duty 8): 30 s, at most
+    /// [`IDLE_INTERVAL_MAX_S`].
     pub idle_interval_s: i64,
     /// Cadence for a market without a route (duty 5; keeps the S3 chain continuous, which
     /// restarts after `S3_OBS_GAP_S` = 60 s): 30 s.
@@ -94,14 +107,16 @@ pub struct CoverageConfig {
     /// the first open after the window finds an honest `P_ema` and a confirmed EMA.
     pub listing_interval_s: i64,
     /// M7-SEC-1 (a): a `CoverageGap{gap_s}` the program emits in the keeper's own transaction
-    /// degrades the market only when `gap_s > idle_interval_s + gap_tolerance_s`. The program
-    /// measures the gap between two integrations' **landing** seconds, the keeper schedules its
-    /// idle crank from the second it **read** (a `confirmed` clock), and the two differ by the
-    /// send latency (0–2 s on mainnet): at the idle cadence of `COVERAGE_GAP_S` itself a crank
-    /// landing one second later relative to its read than the previous one is a 31-s gap, which
-    /// is jitter, not an outage. A crank that does not land at all is a miss
-    /// ([`crate::coverage::MarketTrack::close_second`]), and a longer gap still degrades. 4 (a
-    /// gap of 35 s or more degrades); at most `COVERAGE_GAP_S`.
+    /// degrades the market only when `gap_s > max(idle_interval_s + gap_tolerance_s,
+    /// COVERAGE_GAP_S)` ([`CoverageConfig::gap_degrades_above`]). The program measures the gap
+    /// between two integrations' **landing** seconds, the keeper schedules its idle crank from the
+    /// second it **read** (a `confirmed` clock), and the two differ by the send latency (0–2 s on
+    /// mainnet). As built at M7, with `COVERAGE_GAP_S` = 30, a crank landing one second later
+    /// relative to its read than the previous one was a 31-s gap — jitter, not an outage; since
+    /// the owner raised `COVERAGE_GAP_S` to 40 (OWNER-M7-12, 2026-10-01) the program emits no gap
+    /// at the 30-s idle cadence under that jitter, and with the defaults every gap it emits (41 s
+    /// or more) degrades. A crank that does not land at all is a miss
+    /// ([`crate::coverage::MarketTrack::close_second`]). 4; at most [`IDLE_INTERVAL_MAX_S`].
     pub gap_tolerance_s: i64,
     /// M7-SEC-1 (b): a tick that follows the previous one by more than `1 + tick_gap_tolerance_s`
     /// seconds on a market with open positions counts as "the keeper was down" (a degraded
@@ -109,7 +124,7 @@ pub struct CoverageConfig {
     /// confirmation, which takes about a second on mainnet — misses only the seconds that
     /// **required** an observation (per-second coverage: they count toward
     /// `degraded_after_misses` like any missed required second); on the idle cadence the skipped
-    /// seconds required nothing. 5.
+    /// seconds required nothing. 5; at most [`IDLE_INTERVAL_MAX_S`].
     pub tick_gap_tolerance_s: i64,
     /// M7-SEC-8: a list-only market, or a curve market far from completion
     /// (`hot_curve_completion_lamports`), without open positions and with nothing time-critical
@@ -163,22 +178,40 @@ impl CoverageConfig {
     }
 }
 
-/// Budget and priority policy (O17; ARCH §7.1 duties 8 and 14).
+/// Budget and priority policy (O17; ARCH §7.1 duties 8 and 14). The coverage budget is **one
+/// global daily budget** funding markets in order of their lenders' value at risk (owner decision
+/// A of 2026-10-01 on OWNER-M7-13 / -14; [`crate::budget`] has the exact algorithm); the M7
+/// per-market budget `per_market_daily_lamports` is retired — a configuration that still sets it
+/// is refused ([`KeeperConfig::from_toml`]).
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, deny_unknown_fields)]
 pub struct BudgetConfig {
-    /// Lamports the keeper may spend on coverage observations (`crank_price`) per market per UTC
-    /// day (0 or `None`: unlimited). O17: its exhaustion on a market with open positions is degraded
-    /// mode (opens paused, exits continue). The cranks exits depend on (per-second coverage of a
-    /// position near a threshold, a liquidatable or expired position waiting for a fresh
-    /// reference or its bound, the S3 chain) are charged but never throttled; exits (`liquidate`,
-    /// `expire`, `sol_settle`), pool selection, graduation moves and `set_coverage_pause` are
-    /// neither charged nor throttled. An exhausted budget stops the rest: the idle cadence,
-    /// deviation bursts, the liquidity-anomaly and post-switch guard coverage, warm-ups.
-    /// PROPOSED default 30,000,000 (0.03 SOL: O17's upper figure for targeted coverage; measured,
-    /// `tests/bench/m7_keeper`: a quiet market costs 0.0024–0.0263 SOL a day from batched at no
-    /// priority to unbatched at the 100,000 ceiling) — the owner's to confirm.
-    pub per_market_daily_lamports: Option<u64>,
+    /// `G`: lamports the keeper may spend on coverage observations (`crank_price`) per UTC day,
+    /// all markets together (0: no budget, every charge admitted). Covered markets' entitlements
+    /// are funded from it in rank order, the rest is the free pool; price bursts and
+    /// liquidity-anomaly coverage draw on the market's own entitlement and then the free pool;
+    /// a charge the budget can no longer cover at the market's rank is refused, and on a market
+    /// with open positions that is degraded mode at once (opens paused, exits continue). The
+    /// cranks exits depend on are charged but never throttled (beyond `G` they are an alerted
+    /// overdraft); exits (`liquidate`, `expire`, `sol_settle`), pool selection, graduation moves,
+    /// `crank_sol_usd` and `set_coverage_pause` are neither charged nor throttled. PROPOSED
+    /// 1,000,000,000 (1 SOL a day; OWNER-M7-17).
+    pub global_daily_lamports: u64,
+    /// A market with open positions is **covered** (ranked and funded) when its value at risk
+    /// `V = ⌊borrowed_q · min(ema_price, P_ACC_MAX) / 10¹⁸⌋` is at least this; below it the
+    /// 30-s idle cadence only, read at that cadence (and, near an exit, in the seconds after an
+    /// observation: M7D-1), its cranks from the free pool within `tail_share_bps` of `G` — the
+    /// crank an exit waits on exit-critical (M7D-2) — (0: every market with positions covered). Bounds [0,
+    /// `market_max_notional`] — the compiled maximum here, the deployment's value at run time (a
+    /// larger floor is clamped to it). PROPOSED 1,000,000,000 (1 SOL; OWNER-M7-17).
+    pub var_floor_lamports: u64,
+    /// A covered market's entitlement is its quiet day (one crank per `idle_interval_s` at its
+    /// last per-crank charge) × (10⁴ + this) / 10⁴: twice it by default. Bounds [0, 100,000].
+    /// PROPOSED 10,000 (OWNER-M7-17).
+    pub reserve_margin_bps: u32,
+    /// The most the below-floor markets' idle cadence may draw from the free pool in a day, bps of
+    /// `G` (0.2 SOL at the defaults). Bounds [0, 10,000]. PROPOSED 2,000 (OWNER-M7-17).
+    pub tail_share_bps: u32,
     /// The O17 priority-price ceiling for observations, micro-lamports per CU: 100,000 (O17,
     /// owner decision of 2026-09-30).
     pub priority_ceiling: u64,
@@ -207,7 +240,10 @@ pub struct BudgetConfig {
 impl Default for BudgetConfig {
     fn default() -> Self {
         Self {
-            per_market_daily_lamports: Some(30_000_000),
+            global_daily_lamports: 1_000_000_000,
+            var_floor_lamports: 1_000_000_000,
+            reserve_margin_bps: 10_000,
+            tail_share_bps: 2_000,
             priority_ceiling: 100_000,
             exit_priority_ceiling: 100_000,
             priority_floor: 0,
@@ -245,7 +281,8 @@ impl CoveragePauseConfig {
 }
 
 /// Duty 11 (ARCH §7.1, §4.7; C1-12): `crank_sol_usd` — the USD tiers read the cached Pyth SOL/USD
-/// price, and a cache older than `oracle_stale_s` (3,600 s) puts every market in Tier C.
+/// price, and a cache older than `oracle_stale_s` (600 s since the owner's decision of
+/// 2026-10-01, OWNER-M7-15; was 3,600) puts every graduated market in Tier C.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, deny_unknown_fields)]
 pub struct OracleConfig {
@@ -257,7 +294,10 @@ pub struct OracleConfig {
     /// every second): 30.
     pub interval_s: i64,
     /// `Alert::OracleAging` when the cache's publish time is older than this (half of
-    /// `oracle_stale_s`; at `oracle_stale_s` every market falls to Tier C), at most hourly: 1,800.
+    /// `oracle_stale_s`; at `oracle_stale_s` every graduated market falls to Tier C), once per
+    /// stall and hourly while it lasts (M7D-6): 300 (was 1,800 with the 3,600-s `oracle_stale_s`);
+    /// validated in (0, 600) —
+    /// below [`ORACLE_STALE_FLOOR_S`], the floor of `oracle_stale_s`.
     pub aging_alert_s: i64,
 }
 
@@ -266,7 +306,7 @@ impl Default for OracleConfig {
         Self {
             enabled: true,
             interval_s: 30,
-            aging_alert_s: 1_800,
+            aging_alert_s: 300,
         }
     }
 }
@@ -511,8 +551,22 @@ impl Default for KeeperConfig {
 }
 
 impl KeeperConfig {
-    /// Parses and checks a TOML configuration.
+    /// Parses and checks a TOML configuration. `[budget] per_market_daily_lamports` (M7's
+    /// per-market budget) is refused with its own message: the global budget replaced it (owner
+    /// decision A of 2026-10-01).
     pub fn from_toml(s: &str) -> anyhow::Result<Self> {
+        let raw: toml::Table = toml::from_str(s).context("keeper configuration")?;
+        if raw
+            .get("budget")
+            .and_then(toml::Value::as_table)
+            .is_some_and(|b| b.contains_key("per_market_daily_lamports"))
+        {
+            bail!(
+                "[budget] per_market_daily_lamports is retired (owner decision A of 2026-10-01): \
+                 the keeper budget is global — set global_daily_lamports (and var_floor_lamports, \
+                 reserve_margin_bps, tail_share_bps); ARCHITECTURE §7.1 duty 8"
+            );
+        }
         let cfg: Self = toml::from_str(s).context("keeper configuration")?;
         cfg.validate()?;
         Ok(cfg)
@@ -532,11 +586,8 @@ impl KeeperConfig {
                 shortwin_math::consts::S3_OBS_GAP_S
             );
         }
-        if c.idle_interval_s <= 0 || c.idle_interval_s > shortwin_math::consts::COVERAGE_GAP_S {
-            bail!(
-                "idle_interval_s must be in (0, {}] (COVERAGE_GAP_S)",
-                shortwin_math::consts::COVERAGE_GAP_S
-            );
+        if c.idle_interval_s <= 0 || c.idle_interval_s > IDLE_INTERVAL_MAX_S {
+            bail!("idle_interval_s must be in (0, {IDLE_INTERVAL_MAX_S}] (ARCH §7.1 duty 1)");
         }
         if c.burst_s < 0 || c.liq_cover_s < 0 || c.recovery_s < 0 || c.s3_probe_interval_s <= 0 {
             bail!("coverage intervals must be non-negative");
@@ -544,19 +595,11 @@ impl KeeperConfig {
         if c.listing_interval_s <= 0 {
             bail!("listing_interval_s must be positive");
         }
-        if c.gap_tolerance_s < 0 || c.gap_tolerance_s > shortwin_math::consts::COVERAGE_GAP_S {
-            bail!(
-                "gap_tolerance_s must be in [0, {}] (COVERAGE_GAP_S)",
-                shortwin_math::consts::COVERAGE_GAP_S
-            );
+        if c.gap_tolerance_s < 0 || c.gap_tolerance_s > IDLE_INTERVAL_MAX_S {
+            bail!("gap_tolerance_s must be in [0, {IDLE_INTERVAL_MAX_S}]");
         }
-        if c.tick_gap_tolerance_s < 0
-            || c.tick_gap_tolerance_s > shortwin_math::consts::COVERAGE_GAP_S
-        {
-            bail!(
-                "tick_gap_tolerance_s must be in [0, {}] (COVERAGE_GAP_S)",
-                shortwin_math::consts::COVERAGE_GAP_S
-            );
+        if c.tick_gap_tolerance_s < 0 || c.tick_gap_tolerance_s > IDLE_INTERVAL_MAX_S {
+            bail!("tick_gap_tolerance_s must be in [0, {IDLE_INTERVAL_MAX_S}]");
         }
         if c.cold_interval_s <= 0 || c.cold_interval_s > 60 {
             bail!("cold_interval_s must be in (0, 60]");
@@ -567,6 +610,20 @@ impl KeeperConfig {
         }
         if b.priority_percentile_bps > 10_000 {
             bail!("priority_percentile_bps above 10,000");
+        }
+        // Decision A (2026-10-01): the global budget's bounds (ECON §15 #109).
+        let max_notional = shortwin_math::params::Rule::MarketMaxNotional.bounds().1;
+        if b.var_floor_lamports > max_notional {
+            bail!(
+                "budget.var_floor_lamports must be in [0, market_max_notional] (at most \
+                 {max_notional}, the compiled maximum)"
+            );
+        }
+        if b.reserve_margin_bps > 100_000 {
+            bail!("budget.reserve_margin_bps must be in [0, 100,000]");
+        }
+        if b.tail_share_bps > 10_000 {
+            bail!("budget.tail_share_bps must be in [0, 10,000]");
         }
         let p = &self.pool_select;
         if p.discovery_interval_s <= 0
@@ -597,9 +654,13 @@ impl KeeperConfig {
             bail!("sweep intervals must be positive");
         }
         let o = &self.oracle;
-        if o.interval_s <= 0 || o.interval_s > 30 || o.aging_alert_s <= 0 {
+        if o.interval_s <= 0 || o.interval_s > 30 {
+            bail!("oracle.interval_s must be in (0, 30] (ARCH §7.1 duty 11)");
+        }
+        if o.aging_alert_s <= 0 || o.aging_alert_s >= ORACLE_STALE_FLOOR_S {
             bail!(
-                "oracle.interval_s must be in (0, 30] (ARCH §7.1 duty 11) and aging_alert_s positive"
+                "oracle.aging_alert_s must be in (0, {ORACLE_STALE_FLOOR_S}): below the floor of \
+                 oracle_stale_s, so the alert precedes Tier C (ARCH §7.1 duty 11)"
             );
         }
         self.markets.keys()?;
@@ -647,7 +708,10 @@ mod tests {
             [coverage]
             idle_interval_s = 20
             [budget]
-            per_market_daily_lamports = 30000000
+            global_daily_lamports = 2000000000
+            var_floor_lamports = 0
+            reserve_margin_bps = 50000
+            tail_share_bps = 1000
             priority_ceiling = 5000
             market_cu_per_slot = 6000000
             [coverage_pause]
@@ -673,7 +737,15 @@ mod tests {
         assert_eq!(cfg.coverage.idle_interval_s, 20);
         assert_eq!(cfg.coverage.burst_s, 60);
         assert_eq!(cfg.coverage.liq_cover_s, 10);
-        assert_eq!(cfg.budget.per_market_daily_lamports, Some(30_000_000));
+        assert_eq!(
+            (
+                cfg.budget.global_daily_lamports,
+                cfg.budget.var_floor_lamports,
+                cfg.budget.reserve_margin_bps,
+                cfg.budget.tail_share_bps
+            ),
+            (2_000_000_000, 0, 50_000, 1_000)
+        );
         assert_eq!(cfg.budget.priority_ceiling, 5_000);
         assert_eq!(cfg.budget.market_cu_per_slot, 6_000_000);
         assert_eq!(cfg.budget.payer_cu_per_slot, 20_000_000);
@@ -690,7 +762,18 @@ mod tests {
             (100_000, 100_000)
         );
         assert!(!d.coverage_pause.enabled && d.coverage_pause.authority_keypair().is_none());
-        assert_eq!(d.budget.per_market_daily_lamports, Some(30_000_000));
+        // Decision A (2026-10-01): the global budget's PROPOSED defaults (OWNER-M7-17).
+        assert_eq!(
+            (
+                d.budget.global_daily_lamports,
+                d.budget.var_floor_lamports,
+                d.budget.reserve_margin_bps,
+                d.budget.tail_share_bps
+            ),
+            (1_000_000_000, 1_000_000_000, 10_000, 2_000)
+        );
+        // Decision C (2026-10-01): the aging alert at half the 600-s `oracle_stale_s`.
+        assert_eq!((d.oracle.interval_s, d.oracle.aging_alert_s), (30, 300));
         assert!(!cfg.venue_watch.pool_admin && cfg.venue_watch.flag_upgrades);
         assert_eq!(cfg.pool_select.eval_interval_s, 5);
         assert_eq!(cfg.pool_select.discovery_rpc(), Some("https://gpa.example"));
@@ -745,8 +828,31 @@ mod tests {
             "[oracle]\ninterval_s = 31",
             "[oracle]\ninterval_s = 0",
             "[oracle]\nunknown = 1",
+            // Decision C: the aging alert below the 600-s floor of `oracle_stale_s`.
+            "[oracle]\naging_alert_s = 0",
+            "[oracle]\naging_alert_s = 600",
+            "[oracle]\naging_alert_s = 1800",
+            // Decision A: the global budget's bounds, and the retired per-market budget.
+            "[budget]\nvar_floor_lamports = 100000000000001",
+            "[budget]\nreserve_margin_bps = 100001",
+            "[budget]\ntail_share_bps = 10001",
+            "[budget]\nper_market_daily_lamports = 30000000",
+            "[budget]\nglobal_daily_lamports = -1",
         ] {
             assert!(KeeperConfig::from_toml(bad).is_err(), "{bad}");
+        }
+        let retired = KeeperConfig::from_toml("[budget]\nper_market_daily_lamports = 1")
+            .unwrap_err()
+            .to_string();
+        assert!(retired.contains("retired"), "{retired}");
+        // The bounds themselves are accepted.
+        for good in [
+            "[oracle]\naging_alert_s = 599",
+            "[budget]\nvar_floor_lamports = 100000000000000\nreserve_margin_bps = 100000\n\
+             tail_share_bps = 10000\nglobal_daily_lamports = 0",
+            "[coverage]\nidle_interval_s = 30\ngap_tolerance_s = 30\ntick_gap_tolerance_s = 30",
+        ] {
+            assert!(KeeperConfig::from_toml(good).is_ok(), "{good}");
         }
     }
 }
