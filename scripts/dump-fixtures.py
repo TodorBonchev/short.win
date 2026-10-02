@@ -32,6 +32,18 @@ Writes, under ``tests/fixtures/``:
   ``pamm_synthetic``: pools **derived offline** from ``pamm_state`` bytes (``PAMM_SYNTHETIC``: the
   mature pool with a negative ``virtual_quote_reserves``), each marked ``"synthetic": true`` with
   its ``derived_from`` source and the ``patch`` applied;
+- M10 program groups (no test loads them yet; ``M10_PROGRAM_GROUPS``):
+  ``raydium_cpmm_2026_10`` (``programs/raydium_cpmm_2026_10.so`` and
+  ``accounts/raydium_cpmm_2026_10/*.bin``: CPMM as redeployed at slot 452,376,460; the pool and
+  config **state** stays ``raydium_state``'s, whose layouts the redeploy kept, and
+  ``raydium_programs`` keeps the 445,763,504 deploy for T-LATCH); ``spl_programs``
+  (``programs/token_2022.so`` with ``accounts/spl/*.bin``: the deployed upgradeable Token-2022;
+  ``programs/spl_memo_v3.so``: spl-memo v3 under BPFLoader2, whose account data is the ELF);
+  ``squads_programs`` (``programs/squads_v4.so``, ``accounts/squads/*.bin``: Squads v4 and its
+  ``ProgramConfig``; ``idl/squads_multisig_program.json``: the IDL 2.1.0 vendored from the source
+  repository at a pinned commit, recorded in the group's snapshot under ``vendored``). Each of
+  them is pinned (deploy slot, trimmed-ELF or account sha256) and a fetch that reads anything
+  else stops before it writes a file;
 - ``manifest.json``: one entry per account (address, owner, lamports, executable, rent epoch,
   space, **slot**, sha256, purpose, decoded fields) and one snapshot record per fetch;
 - ``SHA256SUMS``: every fixture file (CI: ``cd tests/fixtures && sha256sum -c SHA256SUMS``).
@@ -39,6 +51,9 @@ Writes, under ``tests/fixtures/``:
 All venue *state* accounts are read in **one** ``getMultipleAccounts`` call, so pools, vaults
 and fee counters are one consistent mainnet state at one slot (pinned in the manifest).
 Programs are fetched separately (their deploy slot is in the ProgramData header).
+A fetch stages every file it writes and puts them on disk, with ``manifest.json`` and
+``SHA256SUMS``, only once every group it fetched has passed its checks: a fetch that stops
+leaves the committed fixtures untouched.
 
 Usage (Python 3.14, standard library only)::
 
@@ -55,6 +70,17 @@ Usage (Python 3.14, standard library only)::
     scripts/dump-fixtures.py fetch --refresh --group pamm_state --pool fresh=latest
                                         # re-dump the PumpSwap pools (the fresh role must be
                                         #   minutes old; pamm_synthetic is re-derived with it)
+    scripts/dump-fixtures.py check --live      # mainnet, read-only: has any pinned program been
+                                               #   redeployed? (exit 1 naming each drifted one)
+
+``check --live`` reads the six ``VenueGuard`` programs, Token-2022, spl-memo and Squads (plus its
+``ProgramConfig``) with read-only RPC calls (one ``getMultipleAccounts`` for the program
+accounts, one for the 45-byte ProgramData headers, then one ``getAccountInfo`` per pinned ELF,
+paced). It compares each against its **newest** fixture (deploy slot, upgrade authority, trimmed
+ELF sha256; older groups of the same program, kept for T-LATCH, are listed but not compared) and
+each ``VenueGuard`` program's deploy slot against the newest ``VENUE_GUARD_SLOTS_YYYY_MM_DD`` in
+``programs/shortwin/src/constants.rs`` (the test baseline; Jupiter has no fixture, so its slot is
+compared with that constant only). Run it before every freeze and merge.
 
 The pump coin roles are pinned mints (``PUMP_COINS``). A curve moves on: at a refresh each role's
 expectation is re-checked (e.g. "near" must still be live with ``rT`` at most ``NEAR_RT_MAX``,
@@ -66,8 +92,8 @@ A refresh replaces the pinned bytes: the reader unit tests
 (``crates/shortwin-venue-state/src/{raydium_v4,raydium_cpmm,pump,pump_amm}.rs``) assert the
 decoded values of this dump and move with it (the manifest's ``decoded`` fields list the new
 ones).
-Exit status: 0 ok, 1 a check failed; an RPC or consistency error while fetching exits with its
-message.
+Exit status: 0 ok, 1 a check failed (``check --live``: a program drifted); an RPC or consistency
+error while fetching exits with its message.
 """
 
 import argparse
@@ -76,6 +102,7 @@ import datetime as dt
 import hashlib
 import json
 import os
+import re
 import struct
 import sys
 import time
@@ -247,8 +274,11 @@ class Rpc:
                 return out["result"]
         raise SystemExit(f"rpc {method} failed on every endpoint: {last}")
 
-    def multiple(self, keys):
-        res = self.call("getMultipleAccounts", [keys, {"encoding": "base64"}])
+    def multiple(self, keys, data_slice=None):
+        cfg = {"encoding": "base64"}
+        if data_slice:
+            cfg["dataSlice"] = {"offset": data_slice[0], "length": data_slice[1]}
+        res = self.call("getMultipleAccounts", [keys, cfg])
         return res["context"]["slot"], res["value"]
 
 
@@ -1436,6 +1466,285 @@ def cmd_candidates(args):
     return 0
 
 
+# ---- M10 program groups (CPMM redeploy, mainnet SPL programs, Squads v4) ---------------------
+#
+# The programs the M10 suites run on, pinned as mainnet deployed them (M10 plan WP-1). Nothing
+# loads them yet: WP-2 moves the CPMM tests to `raydium_cpmm_2026_10`, WP-3 the SPL programs to
+# `spl_programs`, WP-7 the governance tests to `squads_programs`.
+
+CPMM_2026_10_ACCOUNT_DIR = "accounts/raydium_cpmm_2026_10"
+SPL_ACCOUNT_DIR = "accounts/spl"
+SQUADS_ACCOUNT_DIR = "accounts/squads"
+IDL_DIR = "idl"
+LOADER_V2 = "BPFLoader2111111111111111111111111111111111"
+MEMO = "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
+SQUADS = "SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf"
+SQUADS_PROGRAM_CONFIG = "BSTq9w3kZwNwpBXJEvTZz2G9ZTNyKBvoSeXMvwb4cNZr"
+SQUADS_PROGRAM_CONFIG_DISC = hashlib.sha256(b"account:ProgramConfig").digest()[:8]
+SQUADS_PROGRAM_CONFIG_LEN = 144  # 8 + authority 32 + multisig_creation_fee 8 + treasury 32 + 64
+
+# Upgradeable programs: (name, program, ProgramData, trimmed-ELF sha256, deploy slot); both pins
+# are hard (`fetch_programs`). The CPMM hash is verify.osec.io's `on_chain_hash` (2026-10-02).
+CPMM_PROGRAMS_2026_10 = [
+    (
+        "raydium_cpmm_2026_10",
+        CPMM,
+        "DMawCQzbgNTmbzaESc7o6pvL1KAeetY8zA7jNpzntHhU",
+        "93cad2458ac72435c94b8ac89faa686987f4e29d2f0e862d546fbc5aa814a0d2",
+        452_376_460,
+    ),
+]
+SPL_PROGRAMS = [
+    (
+        "token_2022",
+        TOKEN_2022,
+        "DoU57AYuPFu2QU514RktNPG22QhApEjnKxnBcu4BHDTY",
+        "7ea94a027005b39196fa08e6d0ddcd55ec32eb43266179921a834a1ba2eb1947",
+        427_147_035,
+    ),
+]
+SQUADS_PROGRAMS = [
+    (
+        "squads_v4",
+        SQUADS,
+        "Fy3YMJCvwbAXUgUM5b91ucUVA3jYzwWLHL3MwBqKsh8n",
+        "d48660833989ecea3145ff726164fe640bd90696f03ce00dfd0cda258cbf2fac",
+        302_582_236,
+    ),
+]
+# BPFLoader2 programs (immutable; the account data is the ELF): (name, program, sha256 of the
+# account data).
+LOADER2_PROGRAMS = [
+    ("spl_memo_v3", MEMO, "f520eaf096361abbb9639ea4dc3e5388a87b9330e121f476607b87c46ef67954"),
+]
+# Files vendored into a group from a pinned source (recorded in the group's snapshot).
+SQUADS_IDL = {
+    "file": f"{IDL_DIR}/squads_multisig_program.json",
+    "url": "https://raw.githubusercontent.com/Squads-Protocol/v4/"
+    "64af7330413d5c85cbbccfd8c27a05d45b6e666f/sdk/multisig/idl/squads_multisig_program.json",
+    "sha256": "cb9a0a29040ec3853a5105c547ffc608bb0e3175d78dacf30d463aff939f9b9b",
+    "version": "2.1.0",
+    "purpose": "the Squads v4 Anchor IDL 2.1.0 (`sdk/multisig/idl`, set by Squads commit "
+    "39c92c1 `bump(idl): to 2.1.0` and unchanged at 64af733): the instruction discriminators and "
+    "account layouts the squads-v4-ix encoder (WP-7) is pinned against",
+}
+
+# Where each pinned build comes from, as far as it is known (`source` in the ProgramData entry).
+PROGRAM_SOURCES = {
+    "raydium_cpmm_2026_10": {
+        "repository": "https://github.com/raydium-io/raydium-cp-swap",
+        "commit": "bdeee23fc06467602e65305eb5bf3ce46887f943",
+        "status": "UNVERIFIED: probably the feat/creator-fee-share branch head (the ELF names "
+        "`CreatorFeeShare` / `create_creator_fee_share`, absent from the 445,763,504 build); not "
+        "rebuilt. verify.osec.io (2026-10-02): not verified, registered commit cfdb70a8…",
+    },
+    "token_2022": {
+        "repository": "https://github.com/solana-program/token-2022",
+        "commit": "9bc02757f600ffe754746708a8a072bcd49d1260",
+        "status": "verified build per verify.osec.io (on_chain_hash = executable_hash = "
+        "elf_trimmed_sha256, last verified 2026-09-16; read 2026-10-02)",
+    },
+    "squads_v4": {
+        "repository": "https://github.com/Squads-Protocol/v4",
+        "commit": "64af7330413d5c85cbbccfd8c27a05d45b6e666f",
+        "status": "UNVERIFIED: the newest commit of the default branch (2024-11-19, program "
+        "2.1.0) before the deploy (block time 2024-11-20T18:36:48Z); the commits up to the "
+        "2024-11-22 release merge 8ba270d5 touch no program file; not rebuilt. verify.osec.io "
+        "(2026-10-02): not verified, registered commit 3742e552… (2024-01-19, older)",
+    },
+}
+
+# What the M10 groups are for: (program-account purpose tail, ProgramData purpose head).
+M10_GROUP_USE = {
+    "raydium_cpmm_2026_10": (
+        "The CPMM redeploy of 452,376,460 (M10 WP-1); the CPMM suites move to it in WP-2",
+        "the CPMM ELF as redeployed at 452,376,460 (UNVERIFIED source, see `source`). The ELF "
+        "only: the pools and configs stay `raydium_state`'s (AmmConfig 236 B and PoolState 637 B "
+        "unchanged; the 21 live configs equal the fixture bytes at slot 452,488,420), and "
+        "`raydium_programs` keeps the 445,763,504 deploy for T-LATCH",
+    ),
+    "spl_programs": (
+        "The deployed mainnet program, so T-MEMO and the suites run the mainnet build instead of "
+        "LiteSVM's bundled one (WP-3)",
+        "the mainnet Token-2022 ELF (verified build, see `source`) and its live upgrade authority",
+    ),
+    "squads_programs": (
+        "Squads v4, the governance and emergency multisigs' program (WP-7)",
+        "the immutable Squads v4 ELF (no upgrade authority since 302,582,236; source see "
+        "`source`)",
+    ),
+}
+
+
+def decode_squads_program_config(d):
+    """Squads v4 `ProgramConfig` (IDL 2.1.0: authority, multisig_creation_fee, treasury)."""
+    return {
+        "authority": key_at(d, 8),
+        "multisig_creation_fee": u64_at(d, 40),
+        "treasury": key_at(d, 48),
+    }
+
+
+def fetch_loader2_programs(rpc, programs=None):
+    """BPFLoader2 programs: the account data is the ELF (``programs/<name>.so``, whole)."""
+    entries, files = [], []
+    for name, program, sha_expected in programs or LOADER2_PROGRAMS:
+        res = rpc.call("getAccountInfo", [program, {"encoding": "base64"}])
+        if res["value"] is None:
+            raise SystemExit(f"{program} does not exist")
+        a = decode_value(res["value"])
+        d = a["data"]
+        if a["owner"] != LOADER_V2 or not a["executable"]:
+            raise SystemExit(f"{program}: not an executable BPFLoader2 program")
+        n = elf_len(d)
+        if any(d[n:]):
+            raise SystemExit(f"{program}: non-zero bytes after the ELF's end ({n})")
+        if sha256(d) != sha_expected:
+            raise SystemExit(f"{name}: account sha256 {sha256(d)} != the pinned {sha_expected} "
+                             "(BPFLoader2 programs are immutable: was it replaced by a feature?)")
+        rel = f"{PROGRAM_DIR}/{name}.so"
+        write_file(rel, d)
+        files.append(rel)
+        trimmed = d.rstrip(b"\0")
+        entries.append(
+            {
+                "name": f"{name}_program",
+                "group": "spl_programs",
+                "purpose": f"{name}: the program account under BPFLoader2 (immutable), whose data "
+                "is the ELF itself; the file is the whole account. The mainnet build T-MEMO runs "
+                "(WP-3: `add_program_with_loader(.., bpf_loader)`)",
+                "address": program,
+                "owner": a["owner"],
+                "lamports": a["lamports"],
+                "executable": True,
+                "rent_epoch": a["rent_epoch"],
+                "space": len(d),
+                "slot": res["context"]["slot"],
+                "sha256": sha256(d),
+                "sha256_expected": sha_expected,
+                "file": rel,
+                "elf_len": n,
+                "elf_trimmed_len": len(trimmed),
+                "elf_trimmed_sha256": sha256(trimmed),
+                "decoded": {"e_flags": struct.unpack_from("<I", d, 0x30)[0]},
+            }
+        )
+    return entries, files
+
+
+def fetch_spl(rpc):
+    """Group `spl_programs`: Token-2022 (upgradeable) and spl-memo v3 (BPFLoader2)."""
+    entries, files, snap = fetch_programs(rpc, SPL_PROGRAMS, "spl_programs", SPL_ACCOUNT_DIR)
+    e2, f2 = fetch_loader2_programs(rpc)
+    snap["method"] += ("; spl-memo: getAccountInfo (base64) of the BPFLoader2 program account, "
+                       "whose data is the ELF")
+    return entries + e2, files + f2, snap
+
+
+def fetch_vendored(spec):
+    """Downloads a pinned file (sha256-checked) into the fixtures; returns its snapshot record."""
+    req = urllib.request.Request(spec["url"], headers={"User-Agent": "short.win dump-fixtures"})
+    with urllib.request.urlopen(req, timeout=120) as r:
+        data = r.read()
+    if sha256(data) != spec["sha256"]:
+        raise SystemExit(f"{spec['url']}: sha256 {sha256(data)} != the pinned {spec['sha256']}")
+    write_file(spec["file"], data)
+    return {"file": spec["file"], "bytes": len(data), "sha256": spec["sha256"],
+            "source": spec["url"], "version": spec["version"], "purpose": spec["purpose"]}
+
+
+def fetch_squads(rpc):
+    """Group `squads_programs`: Squads v4, its ProgramConfig and the vendored IDL 2.1.0."""
+    entries, files, snap = fetch_programs(rpc, SQUADS_PROGRAMS, "squads_programs",
+                                          SQUADS_ACCOUNT_DIR)
+    if pda([b"multisig", b"program_config"], SQUADS) != SQUADS_PROGRAM_CONFIG:
+        raise SystemExit("Squads ProgramConfig is not PDA(SQDS4, [multisig, program_config])")
+    res = rpc.call("getAccountInfo", [SQUADS_PROGRAM_CONFIG, {"encoding": "base64"}])
+    if res["value"] is None:
+        raise SystemExit(f"Squads ProgramConfig {SQUADS_PROGRAM_CONFIG} does not exist")
+    a = decode_value(res["value"])
+    d = a["data"]
+    if (a["owner"] != SQUADS or d[:8] != SQUADS_PROGRAM_CONFIG_DISC
+            or len(d) != SQUADS_PROGRAM_CONFIG_LEN):
+        raise SystemExit(f"{SQUADS_PROGRAM_CONFIG}: not a Squads v4 ProgramConfig")
+    rel = f"{SQUADS_ACCOUNT_DIR}/squads_program_config.bin"
+    write_file(rel, d)
+    files.append(rel)
+    entries.append(
+        {
+            "name": "squads_program_config",
+            "group": "squads_programs",
+            "purpose": "Squads v4 ProgramConfig PDA [\"multisig\", \"program_config\"]: "
+            "multisig_create_v2 charges `multisig_creation_fee` to `treasury` (both accounts of "
+            "that instruction; WP-7)",
+            "address": SQUADS_PROGRAM_CONFIG,
+            "owner": a["owner"],
+            "lamports": a["lamports"],
+            "executable": a["executable"],
+            "rent_epoch": a["rent_epoch"],
+            "space": len(d),
+            "slot": res["context"]["slot"],
+            "sha256": sha256(d),
+            "file": rel,
+            "decoded": decode_squads_program_config(d),
+        }
+    )
+    snap["vendored"] = [fetch_vendored(SQUADS_IDL)]
+    snap["method"] += ("; ProgramConfig: getAccountInfo (base64); the IDL from the source "
+                       "repository at the pinned commit (raw.githubusercontent.com, sha256-pinned)")
+    return entries, files + [SQUADS_IDL["file"]], snap
+
+
+def check_m10(m, only=None):
+    """Offline checks of the M10 program groups (or of group `only`) against the script's pins;
+    returns problems."""
+    problems = []
+
+    def in_group(group):
+        return {e["name"]: e for e in m["accounts"] if e.get("group") == group}
+
+    for group, programs in (("raydium_cpmm_2026_10", CPMM_PROGRAMS_2026_10),
+                            ("spl_programs", SPL_PROGRAMS), ("squads_programs", SQUADS_PROGRAMS)):
+        if only not in (None, group):
+            continue
+        by_name = in_group(group)
+        for name, program, program_data, trimmed, slot in programs:
+            p, pd_ = by_name.get(f"{name}_program"), by_name.get(f"{name}_program_data")
+            if p is None or pd_ is None:
+                problems.append(f"{name}: no program / ProgramData fixture in {group}")
+                continue
+            if p["address"] != program or pd_["address"] != program_data:
+                problems.append(f"{name}: addresses differ from the pins")
+            if p["decoded"]["program_data"] != program_data:
+                problems.append(f"{name}: the program account does not name its ProgramData")
+            if pd_["elf_trimmed_sha256"] != trimmed or pd_["decoded"]["deploy_slot"] != slot:
+                problems.append(f"{name}: trimmed ELF / deploy slot differ from the pins")
+    for name, program, sha_expected in LOADER2_PROGRAMS if only in (None, "spl_programs") else []:
+        e = in_group("spl_programs").get(f"{name}_program")
+        if e is None:
+            problems.append(f"{name}: no fixture in spl_programs")
+        elif (e["address"] != program or e["sha256"] != sha_expected or e["owner"] != LOADER_V2
+              or not e["executable"]):
+            problems.append(f"{name}: differs from the pin (BPFLoader2, sha256 {sha_expected})")
+    if only not in (None, "squads_programs"):
+        return problems
+    cfg = in_group("squads_programs").get("squads_program_config")
+    if cfg is None or cfg["address"] != SQUADS_PROGRAM_CONFIG or cfg["owner"] != SQUADS:
+        problems.append("squads_program_config: missing or not the Squads ProgramConfig")
+    else:
+        try:
+            d = read_file(cfg["file"])
+            if (d[:8] != SQUADS_PROGRAM_CONFIG_DISC or len(d) != SQUADS_PROGRAM_CONFIG_LEN
+                    or decode_squads_program_config(d) != cfg["decoded"]):
+                problems.append("squads_program_config: the decoded fields differ from the bytes")
+        except FileNotFoundError:
+            pass  # `check` reports the missing file
+    snap = next((s for s in m.get("snapshots", []) if s["group"] == "squads_programs"), {})
+    if [v["sha256"] for v in snap.get("vendored", [])] != [SQUADS_IDL["sha256"]]:
+        problems.append("squads_programs: the vendored IDL is not the pinned 2.1.0")
+    return problems
+
+
 # ---- manifest -------------------------------------------------------------------------------
 
 
@@ -1448,7 +1757,11 @@ RAYDIUM_GROUPS = ("raydium_programs", "raydium_state")
 PUMP_GROUPS = ("pump_programs", "pump_state")
 # `pamm_synthetic` is derived from `pamm_state` and must follow it.
 PAMM_GROUPS = ("pamm_state", "pamm_synthetic")
-GROUPS = RAYDIUM_GROUPS + PUMP_GROUPS + PAMM_GROUPS
+M10_PROGRAM_GROUPS = ("raydium_cpmm_2026_10", "spl_programs", "squads_programs")
+GROUPS = RAYDIUM_GROUPS + PUMP_GROUPS + PAMM_GROUPS + M10_PROGRAM_GROUPS
+# Every directory whose files are all managed (SHA256SUMS lines outside them are kept verbatim).
+MANAGED_DIRS = (ACCOUNT_DIR, PUMP_ACCOUNT_DIR, PAMM_ACCOUNT_DIR, CPMM_2026_10_ACCOUNT_DIR,
+                SPL_ACCOUNT_DIR, SQUADS_ACCOUNT_DIR, PROGRAM_DIR, IDL_DIR)
 
 
 def managed(entry):
@@ -1460,6 +1773,12 @@ def entry_files(e):
     if e.get("absent"):
         return []
     return [e["file"]] if "file" in e else list(e["files"].values())
+
+
+def vendored_files(m):
+    """The files the managed snapshots vendored (e.g. the Squads IDL)."""
+    return [v["file"] for s in m.get("snapshots", []) if s["group"] in GROUPS
+            for v in s.get("vendored", [])]
 
 
 def write_manifest(m):
@@ -1475,24 +1794,37 @@ def write_sums(paths):
         with open(SUMS) as f:
             for line in f:
                 p = line.rstrip("\n").split("  ", 1)[-1]
-                dirs = (ACCOUNT_DIR, PUMP_ACCOUNT_DIR, PAMM_ACCOUNT_DIR, PROGRAM_DIR)
-                if not p.startswith(tuple(d + "/" for d in dirs)):
+                if not p.startswith(tuple(d + "/" for d in MANAGED_DIRS)):
                     keep.append(line.rstrip("\n"))
     lines = keep + [f"{sha256(read_file(p))}  {p}" for p in sorted(paths)]
     with open(SUMS, "w") as f:
         f.write("\n".join(lines) + "\n")
 
 
+# The files a fetch writes, staged until every group it fetches has passed its pins
+# (`commit_files`): a fetch that stops (SystemExit) leaves the committed fixtures as they are.
+STAGED = {}
+
+
 def read_file(rel):
+    if rel in STAGED:
+        return STAGED[rel]
     with open(os.path.join(FIXTURES, rel), "rb") as f:
         return f.read()
 
 
 def write_file(rel, data):
-    path = os.path.join(FIXTURES, rel)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "wb") as f:
-        f.write(data)
+    """Stages ``data`` for ``rel`` (`read_file` sees it); `commit_files` writes it to disk."""
+    STAGED[rel] = bytes(data)
+
+
+def commit_files():
+    for rel, data in sorted(STAGED.items()):
+        path = os.path.join(FIXTURES, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as f:
+            f.write(data)
+    STAGED.clear()
 
 
 def now_utc():
@@ -1506,9 +1838,11 @@ def fetch_programs(rpc, programs=None, group="raydium_programs", account_dir=ACC
     """Program accounts, ProgramData headers and ELFs; returns (entries, files, snapshot).
 
     ``programs``: ``(name, program, ProgramData, trimmed-ELF sha256 or None, expected deploy
-    slot or None)`` tuples (default: the Raydium programs)."""
+    slot or None)`` tuples (default: the Raydium programs). In the M10 groups both pins are
+    hard: a differing trimmed ELF stops the fetch (elsewhere it is a warning)."""
     entries, files = [], []
     slot_before = rpc.call("getSlot", [])
+    use = M10_GROUP_USE.get(group)
     for name, program, program_data, trimmed_expected, slot_expected in programs or PROGRAMS:
         res = rpc.call("getAccountInfo", [program, {"encoding": "base64"}])
         prog = decode_value(res["value"])
@@ -1528,6 +1862,22 @@ def fetch_programs(rpc, programs=None, group="raydium_programs", account_dir=ACC
         trimmed = elf.rstrip(b"\0")
         deploy_slot = u64_at(d, 4)
         authority = key_at(d, 13) if d[12] == 1 else None
+        # The pins first: nothing is written (staged) for a program that fails them.
+        if slot_expected and deploy_slot != slot_expected:
+            raise SystemExit(
+                f"{name}: deploy slot {deploy_slot} != {slot_expected} (the pinned slot; for a "
+                "venue, ARCH §8.2 / VENUE_GUARD_SLOTS_*): the program was upgraded; dump it as a "
+                "new group and move the pins deliberately (`check --live` names what drifted)"
+            )
+        if use and sha256(trimmed) != trimmed_expected:
+            raise SystemExit(f"{name}: trimmed ELF sha256 {sha256(trimmed)} != the pinned "
+                             f"{trimmed_expected}")
+        if trimmed_expected and sha256(trimmed) != trimmed_expected:
+            print(
+                f"WARNING: {name}: trimmed ELF sha256 {sha256(trimmed)} differs from R-RAY §1.3 "
+                f"{trimmed_expected} (upgraded since the research?)",
+                file=sys.stderr,
+            )
         prog_file = f"{account_dir}/{name}_program.bin"
         header_file = f"{account_dir}/{name}_program_data_header.bin"
         elf_file = f"{PROGRAM_DIR}/{name}.so"
@@ -1540,7 +1890,8 @@ def fetch_programs(rpc, programs=None, group="raydium_programs", account_dir=ACC
                 "name": f"{name}_program",
                 "group": group,
                 "purpose": f"the {name} program account (upgradeable loader; names its ProgramData). "
-                "tests/litesvm/src/fork.rs deploys the ELF at the mainnet address with it",
+                + (use[0] if use else "tests/litesvm/src/fork.rs deploys the ELF at the mainnet "
+                   "address with it"),
                 "address": program,
                 "owner": prog["owner"],
                 "lamports": prog["lamports"],
@@ -1554,14 +1905,16 @@ def fetch_programs(rpc, programs=None, group="raydium_programs", account_dir=ACC
             }
         )
         tests = "T-RAY-*" if group == "raydium_programs" else "T-PUMP-MATH, M5 / M6"
+        stored = ("Stored as header ‖ ELF; the account is header ‖ ELF ‖ zeros up to `space`, "
+                  "whose sha256 is `sha256` (fork.rs rebuilds and checks it)")
         entries.append(
             {
                 "name": f"{name}_program_data",
                 "group": group,
-                "purpose": f"{name} ProgramData: the deployed ELF ({tests}) and the header the "
+                "purpose": f"{name} ProgramData: {use[1]}. {stored}" if use else
+                f"{name} ProgramData: the deployed ELF ({tests}) and the header the "
                 "venue-upgrade latch reads (T-LATCH on the dumped ProgramData, ARCH §8.2, §9). "
-                "Stored as header ‖ ELF; the account is header ‖ ELF ‖ zeros up to `space`, whose "
-                "sha256 is `sha256` (fork.rs rebuilds and checks it)",
+                + stored,
                 "address": program_data,
                 "owner": pd["owner"],
                 "lamports": pd["lamports"],
@@ -1577,6 +1930,7 @@ def fetch_programs(rpc, programs=None, group="raydium_programs", account_dir=ACC
                 "elf_trimmed_sha256": sha256(trimmed),
                 **({"elf_trimmed_sha256_expected": trimmed_expected} if trimmed_expected else {}),
                 **({"deploy_slot_expected": slot_expected} if slot_expected else {}),
+                **({"source": PROGRAM_SOURCES[name]} if name in PROGRAM_SOURCES else {}),
                 "decoded": {
                     "deploy_slot": deploy_slot,
                     "upgrade_authority": authority,
@@ -1584,17 +1938,6 @@ def fetch_programs(rpc, programs=None, group="raydium_programs", account_dir=ACC
                 },
             }
         )
-        if slot_expected and deploy_slot != slot_expected:
-            raise SystemExit(
-                f"{name}: deploy slot {deploy_slot} != {slot_expected} (ARCH §8.2 / "
-                "VENUE_GUARD_SLOTS_2026_09_27): the program was upgraded; update both deliberately"
-            )
-        if trimmed_expected and sha256(trimmed) != trimmed_expected:
-            print(
-                f"WARNING: {name}: trimmed ELF sha256 {sha256(trimmed)} differs from R-RAY §1.3 "
-                f"{trimmed_expected} (upgraded since the research?)",
-                file=sys.stderr,
-            )
     snapshot = {
         "group": group,
         "slot": slot_before,
@@ -1787,6 +2130,13 @@ def cmd_fetch(args):
             entries, files, snap = fetch_pump_state(rpc, pump_coins(args.coin))
         elif g == "pamm_state":
             entries, files, snap = fetch_pamm_state(rpc, pamm_pools(args.pool, rpc))
+        elif g == "raydium_cpmm_2026_10":
+            entries, files, snap = fetch_programs(rpc, CPMM_PROGRAMS_2026_10, g,
+                                                  CPMM_2026_10_ACCOUNT_DIR)
+        elif g == "spl_programs":
+            entries, files, snap = fetch_spl(rpc)
+        elif g == "squads_programs":
+            entries, files, snap = fetch_squads(rpc)
         else:
             entries, files, snap = synthesize_pamm(m)
         m["accounts"] = [e for e in m["accounts"] if e.get("group") != g] + entries
@@ -1798,11 +2148,15 @@ def cmd_fetch(args):
         "tests/fixtures && sha256sum -c SHA256SUMS). The Raydium entries (groups raydium_programs "
         "and raydium_state), the pump entries (groups pump_programs and pump_state) and the "
         "PumpSwap entries (group pamm_state, and pamm_synthetic: pools derived offline from "
-        "pamm_state bytes, marked `synthetic`) are written by scripts/dump-fixtures.py; "
-        "`snapshots` records the slot and RPC of each group."
+        "pamm_state bytes, marked `synthetic`) and the M10 program groups (raydium_cpmm_2026_10: "
+        "the CPMM redeploy; spl_programs: the mainnet Token-2022 and spl-memo; squads_programs: "
+        "Squads v4, its ProgramConfig and the vendored IDL) are written by "
+        "scripts/dump-fixtures.py; `snapshots` records the slot and RPC of each group "
+        "(`vendored`: files taken from a pinned source)."
     )
+    commit_files()
     write_manifest(m)
-    managed_files = []
+    managed_files = vendored_files(m)
     for e in m["accounts"]:
         if managed(e):
             managed_files += entry_files(e)
@@ -1814,7 +2168,9 @@ def cmd_fetch(args):
             for f in os.listdir(full):
                 if f"{rel_dir}/{f}" not in managed_files:
                     os.remove(os.path.join(full, f))
-    problems = check(load_manifest())
+    # `--group` checks what it fetched (a group not fetched yet is no failure of this fetch).
+    m = load_manifest()
+    problems = [p for g in todo for p in check(m, only=g)] if args.group else check(m)
     for p in problems:
         print("FAIL:", p, file=sys.stderr)
     return 1 if problems else 0
@@ -1851,6 +2207,11 @@ def check(m, only=None):
                     problems.append(f"{e['file']}: bytes differ from the manifest")
                 if sums.get(e["file"]) != sha256(d):
                     problems.append(f"{e['file']}: missing or wrong in SHA256SUMS")
+                names = (e.get("decoded") or {}).get("program_data")
+                if (e["owner"] == LOADER_UPGRADEABLE and names
+                        and (d[:4] != b"\x02\0\0\0" or key_at(d, 4) != names)):
+                    problems.append(f"{e['name']}: the program account does not name its decoded "
+                                    "ProgramData")
             else:
                 header = read_file(e["files"]["header"])
                 elf = read_file(e["files"]["elf"])
@@ -1861,12 +2222,18 @@ def check(m, only=None):
                     problems.append(f"{e['files']['elf']}: ELF differs from the manifest")
                 if ("elf_trimmed_sha256_expected" in e
                         and sha256(elf.rstrip(b"\0")) != e["elf_trimmed_sha256_expected"]):
-                    problems.append(f"{e['name']}: trimmed ELF hash != R-RAY §1.3")
+                    problems.append(f"{e['name']}: trimmed ELF hash != its pin (raydium_programs: "
+                                    "R-RAY §1.3)")
                 if ("deploy_slot_expected" in e
                         and u64_at(header, 4) != e["deploy_slot_expected"]):
-                    problems.append(f"{e['name']}: deploy slot != ARCH §8.2's")
+                    problems.append(f"{e['name']}: deploy slot != its pin (venues: ARCH §8.2)")
                 if u64_at(header, 4) != e["decoded"]["deploy_slot"]:
                     problems.append(f"{e['name']}: deploy slot differs from the header")
+                authority = key_at(header, 13) if header[12] == 1 else None
+                if (header[:4] != b"\x03\0\0\0" or header[12] not in (0, 1)
+                        or authority != e["decoded"]["upgrade_authority"]):
+                    problems.append(f"{e['name']}: upgrade authority differs from the header "
+                                    "(`check --live` compares mainnet with the decoded one)")
                 for p in e["files"].values():
                     if sums.get(p) != sha256(read_file(p)):
                         problems.append(f"{p}: missing or wrong in SHA256SUMS")
@@ -1904,7 +2271,169 @@ def check(m, only=None):
     if only in (None, "pamm_state", "pamm_synthetic") and any(
             e["group"] in PAMM_GROUPS for e in entries):
         problems += check_pamm(m, only)
+    for sn in m.get("snapshots", []):
+        if sn["group"] not in GROUPS or only not in (None, sn["group"]):
+            continue
+        for v in sn.get("vendored", []):
+            try:
+                d = read_file(v["file"])
+            except FileNotFoundError as ex:
+                problems.append(f"{sn['group']}: {ex}")
+                continue
+            if sha256(d) != v["sha256"] or len(d) != v["bytes"]:
+                problems.append(f"{v['file']}: bytes differ from the manifest")
+            if sums.get(v["file"]) != sha256(d):
+                problems.append(f"{v['file']}: missing or wrong in SHA256SUMS")
+    if only is None or only in M10_PROGRAM_GROUPS:
+        problems += check_m10(m, only)
     return problems
+
+
+# ---- check --live (mainnet drift; read-only) ----------------------------------------------------
+
+CONSTANTS_RS = os.path.normpath(
+    os.path.join(HERE, "..", "programs", "shortwin", "src", "constants.rs"))
+LIVE_PACE_S = 1.0  # between the large reads, to stay gentle on the public endpoints
+
+
+def venue_guard_baseline():
+    """The `VenueGuard` programs as ``constants.rs`` pins them: (name of the newest
+    ``VENUE_GUARD_SLOTS_YYYY_MM_DD``, [(label, program, ProgramData, baseline slot)])."""
+    with open(CONSTANTS_RS) as f:
+        src = f.read()
+    consts = re.findall(r"pub const (VENUE_GUARD_SLOTS_(\d{4}_\d{2}_\d{2})): \[u64; \w+\] = "
+                        r"\[([^\]]*)\];", src)
+    if not consts:
+        raise SystemExit(f"{CONSTANTS_RS}: no VENUE_GUARD_SLOTS_YYYY_MM_DD constant")
+    name, _, body = max(consts, key=lambda c: c[1])
+    slots = [int(x.replace("_", "")) for x in re.findall(r"\d[\d_]*", body)]
+
+    def array(const):
+        m = re.search(rf"pub const {const}: \[Pubkey; \w+\] = \[(.*?)\];", src, re.S)
+        if not m:
+            raise SystemExit(f"{CONSTANTS_RS}: no {const}")
+        return m.group(1)
+
+    ids = re.findall(r"\b([A-Z0-9_]+_PROGRAM_ID)\b", array("VENUE_PROGRAM_IDS"))
+    pds = re.findall(r'pubkey!\("(\w+)"\)', array("VENUE_PROGRAM_DATA"))
+    programs = []
+    for const in ids:
+        m = re.search(rf'pub const {const}: Pubkey = pubkey!\("(\w+)"\);', src)
+        if not m:
+            raise SystemExit(f"{CONSTANTS_RS}: no {const}")
+        programs.append((const.removesuffix("_PROGRAM_ID").lower(), m.group(1)))
+    if not len(programs) == len(pds) == len(slots):
+        raise SystemExit(f"{CONSTANTS_RS}: VenueGuard arrays of different lengths")
+    return name, [(lb, p, pd_, sl) for (lb, p), pd_, sl in zip(programs, pds, slots)]
+
+
+def _fmt_slot(slot):
+    return f"{slot:,}" if slot is not None else "-"
+
+
+def cmd_check_live(args):
+    """Mainnet against the pins: exit 1 naming every drifted program (read-only RPC)."""
+    m = load_manifest()
+    rpc = Rpc([args.rpc] if args.rpc else RPCS)
+    baseline_name, venues = venue_guard_baseline()
+    # Every ProgramData fixture by address; the newest deploy is the one a program is held to.
+    fixtures = {}
+    for e in m["accounts"]:
+        if managed(e) and "files" in e and "elf_sha256" in e:
+            fixtures.setdefault(e["address"], []).append(e)
+    for v in fixtures.values():
+        v.sort(key=lambda e: e["decoded"]["deploy_slot"], reverse=True)
+    targets = [(lb, p, pd_, sl) for lb, p, pd_, sl in venues]
+    seen = {p for _, p, _, _ in targets}
+    for name, program, program_data, _, _ in CPMM_PROGRAMS_2026_10 + SPL_PROGRAMS + SQUADS_PROGRAMS:
+        if program not in seen:
+            targets.append((name, program, program_data, None))
+            seen.add(program)
+    by_name = {e["name"]: e for e in m["accounts"] if managed(e)}
+    # (label, manifest name, address) of the accounts compared byte for byte.
+    plain = [(n, f"{n}_program", p) for n, p, _ in LOADER2_PROGRAMS]
+    plain.append(("squads_program_config", "squads_program_config", SQUADS_PROGRAM_CONFIG))
+
+    # 1. The program accounts and the plain accounts (one call); 2. the ProgramData headers.
+    slot, accs = rpc.multiple([p for _, p, _, _ in targets] + [a for _, _, a in plain])
+    time.sleep(LIVE_PACE_S)
+    _, heads = rpc.multiple([pd_ for _, _, pd_, _ in targets], data_slice=(0, 45))
+    print(f"check --live at slot {slot:,} ({rpc.used}); VenueGuard baseline {baseline_name} "
+          f"({os.path.relpath(CONSTANTS_RS)})")
+    drifted = []
+    for (label, program, program_data, base), acc, head in zip(targets, accs, heads):
+        why, notes = [], []
+        if acc is None or head is None:
+            drifted.append(label)
+            print(f"  {label:<24} DRIFT: program or ProgramData account missing")
+            continue
+        a = decode_value(acc)
+        if (a["owner"] != LOADER_UPGRADEABLE or a["data"][:4] != b"\x02\0\0\0"
+                or b58encode(a["data"][4:36]) != program_data):
+            why.append(f"the program account no longer names {program_data}")
+        h = decode_value(head)["data"]
+        live_slot = u64_at(h, 4)
+        live_auth = key_at(h, 13) if h[12] == 1 else None
+        notes.append(f"deploy {_fmt_slot(live_slot)}")
+        if base is not None:
+            notes.append(f"baseline {_fmt_slot(base)}")
+            if live_slot != base:
+                why.append(f"deploy slot {_fmt_slot(live_slot)} != {baseline_name} "
+                           f"{_fmt_slot(base)}")
+        fx = fixtures.get(program_data, [])
+        if not fx:
+            notes.append("no fixture")
+        else:
+            cur = fx[0]
+            notes.append(f"fixture {cur['group']} {_fmt_slot(cur['decoded']['deploy_slot'])}")
+            if len(fx) > 1:
+                notes.append("kept: " + ", ".join(
+                    f"{e['group']} {_fmt_slot(e['decoded']['deploy_slot'])}" for e in fx[1:]))
+            if live_slot != cur["decoded"]["deploy_slot"]:
+                why.append(f"deploy slot {_fmt_slot(live_slot)} != fixture {cur['group']} "
+                           f"{_fmt_slot(cur['decoded']['deploy_slot'])}")
+            else:
+                # Same deploy: confirm the bytes (one read per program, paced).
+                time.sleep(LIVE_PACE_S)
+                full = rpc.call("getAccountInfo", [program_data, {"encoding": "base64"}])
+                elf = decode_value(full["value"])["data"][45:]
+                live_trim = sha256(elf.rstrip(b"\0"))
+                if live_trim != cur["elf_trimmed_sha256"]:
+                    why.append(f"trimmed ELF {live_trim[:8]}… != fixture "
+                               f"{cur['elf_trimmed_sha256'][:8]}…")
+                else:
+                    notes.append(f"ELF = fixture ({live_trim[:8]}…)")
+            if live_auth != cur["decoded"]["upgrade_authority"]:
+                why.append(f"upgrade authority {live_auth} != fixture "
+                           f"{cur['decoded']['upgrade_authority']}")
+        verdict = "DRIFT: " + "; ".join(why) if why else "unchanged"
+        if why:
+            drifted.append(label)
+        print(f"  {label:<24} {verdict}\n  {'':<24} ({', '.join(notes)})")
+    for (label, name, _), acc in zip(plain, accs[len(targets):]):
+        e = by_name.get(name)
+        if e is None:
+            drifted.append(label)
+            print(f"  {label:<24} DRIFT: no fixture `{name}` (run fetch)")
+            continue
+        if acc is None:
+            drifted.append(label)
+            print(f"  {label:<24} DRIFT: the account no longer exists")
+            continue
+        a = decode_value(acc)
+        if sha256(a["data"]) != e["sha256"] or a["owner"] != e["owner"]:
+            drifted.append(label)
+            print(f"  {label:<24} DRIFT: account bytes {sha256(a['data'])[:8]}… / owner "
+                  f"{a['owner']} != fixture {e['sha256'][:8]}… / {e['owner']}")
+        else:
+            print(f"  {label:<24} unchanged\n  {'':<24} (account sha256 = fixture "
+                  f"{e['sha256'][:8]}…, owner {a['owner']})")
+    sys.stdout.flush()
+    if drifted:
+        print(f"DRIFT: {', '.join(drifted)}", file=sys.stderr)
+        return 1
+    print("ok: every pinned program and account matches mainnet")
+    return 0
 
 
 def cmd_check(_args):
@@ -1913,16 +2442,19 @@ def cmd_check(_args):
         print("FAIL:", p, file=sys.stderr)
     if not problems:
         n = sum(1 for e in load_manifest()["accounts"] if managed(e))
-        print(f"ok: {n} Raydium, pump and PumpSwap fixture entries match their files, "
-              "SHA256SUMS and "
-              "each other")
+        print(f"ok: {n} Raydium, pump, PumpSwap and M10 program fixture entries match their "
+              "files, SHA256SUMS, their pins and each other")
     return 1 if problems else 0
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd")
-    sub.add_parser("check", help="offline verification (default)")
+    ck = sub.add_parser("check", help="offline verification (default)")
+    ck.add_argument("--live", action="store_true",
+                    help="instead: compare the pinned programs with mainnet (read-only RPC)")
+    ck.add_argument("--rpc", help="JSON-RPC endpoint for --live (default: mainnet-beta, then "
+                    "publicnode)")
     f = sub.add_parser("fetch", help="dump from mainnet what is missing or invalid")
     f.add_argument("--refresh", action="store_true", help="re-dump every group at a new slot")
     f.add_argument("--rpc", help="JSON-RPC endpoint (default: mainnet-beta, then publicnode)")
@@ -1943,6 +2475,8 @@ def main():
         return cmd_fetch(args)
     if args.cmd == "candidates":
         return cmd_candidates(args)
+    if getattr(args, "live", False):
+        return cmd_check_live(args)
     return cmd_check(args)
 
 

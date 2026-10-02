@@ -93,8 +93,19 @@ export function fixtureAddress(name: string): Address {
     return a.address as Address;
 }
 
-/** Groups deployed as programs, not loaded as accounts. */
-const PROGRAM_GROUPS = new Set(['raydium_programs', 'pump_programs']);
+/**
+ * Groups deployed as programs (or not deployed at all), never loaded as accounts. The M10 groups
+ * (scripts/dump-fixtures.py `M10_PROGRAM_GROUPS`: the CPMM redeploy, the mainnet SPL programs,
+ * Squads v4) hold program accounts at genesis-program or venue addresses; a validator that runs
+ * them deploys them itself.
+ */
+const PROGRAM_GROUPS = new Set([
+    'raydium_programs',
+    'pump_programs',
+    'raydium_cpmm_2026_10',
+    'spl_programs',
+    'squads_programs',
+]);
 const SYSVAR_PREFIX = 'Sysvar';
 
 /** The dumped venue programs: `[program id, ELF path, upgrade authority]` for `--upgradeable-program`. */
