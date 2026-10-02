@@ -1,0 +1,371 @@
+/*
+ * MARKETS track styles (FRONTEND.md §7): the markets table, the market page, create market and
+ * protocol status. Tokens only (styles/tokens.css); class names are prefixed `mk-`.
+ */
+
+/* ---- markets table ------------------------------------------------------------------------ */
+.mk-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+    border-bottom: 1px solid var(--line);
+}
+
+.mk-search {
+    width: 300px;
+}
+
+.mk-toolbar .checkbox {
+    align-items: center;
+}
+
+.mk-toolbar .checkbox input {
+    margin-top: 0;
+}
+
+.mk-pad {
+    padding: var(--sp-4);
+}
+
+.mk-more {
+    display: flex;
+    justify-content: center;
+    padding: var(--sp-3);
+    border-top: 1px solid var(--line);
+}
+
+.mk-open-mint {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    max-width: 560px;
+    margin: 0 auto;
+}
+
+.mk-token {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    max-width: 260px;
+    overflow: hidden;
+}
+
+.mk-token-symbol {
+    font-weight: var(--fw-bold);
+    color: var(--text-0);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+}
+
+.mk-token-mint {
+    font-size: var(--fs-xs);
+}
+
+.mk-dup {
+    font-family: var(--font-num);
+}
+
+.mk-pair {
+    white-space: nowrap;
+}
+
+.mk-flags {
+    display: inline-flex;
+    gap: var(--sp-1);
+}
+
+.mk-util {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+}
+
+.mk-util .num {
+    min-width: 4.5ch;
+    text-align: right;
+}
+
+.mk-util-track {
+    display: inline-block;
+    width: 48px;
+    height: 6px;
+    background: var(--bg-3);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.mk-util-fill {
+    display: block;
+    height: 100%;
+    background: var(--ok);
+}
+
+.mk-util-fill[data-tone="warn"] {
+    background: var(--warn);
+}
+
+.mk-util-fill[data-tone="danger"] {
+    background: var(--danger);
+}
+
+/* ---- market page ---------------------------------------------------------------------------- */
+.mk-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-3) var(--sp-4);
+}
+
+.mk-head-title {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-3);
+}
+
+.mk-head-name {
+    color: var(--text-1);
+    font-size: var(--fs-md);
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mk-head-mint {
+    font-size: var(--fs-sm);
+    color: var(--text-1);
+}
+
+.mk-head-prices {
+    display: flex;
+    gap: var(--sp-4);
+    margin-left: auto;
+    font-size: var(--fs-lg);
+}
+
+.mk-head-price-label {
+    display: block;
+    font-size: var(--fs-xs);
+    color: var(--text-2);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.mk-tier-button {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+}
+
+.mk-tier-button .badge {
+    cursor: pointer;
+}
+
+.mk-popover {
+    position: absolute;
+    z-index: var(--z-menu);
+    top: calc(100% + 6px);
+    left: 0;
+    width: 440px;
+    padding: var(--sp-4);
+    background: var(--bg-2);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 55%);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+}
+
+.mk-anchor {
+    position: relative;
+    display: inline-flex;
+}
+
+.mk-banners {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+}
+
+.mk-banner {
+    display: flex;
+    flex-direction: column;
+}
+
+.mk-stats > .stat {
+    flex-basis: 130px;
+}
+
+.mk-stat-sub {
+    display: block;
+    font-size: var(--fs-xs);
+    color: var(--text-2);
+}
+
+.mk-tabs-body {
+    padding: var(--sp-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+}
+
+.mk-tabs-body.flush {
+    padding: 0;
+}
+
+.mk-section-title {
+    margin-bottom: var(--sp-2);
+}
+
+.mk-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--sp-4) var(--sp-6);
+}
+
+.mk-note {
+    font-size: var(--fs-xs);
+    color: var(--text-2);
+}
+
+.mk-tabs-body.flush > .mk-note {
+    margin: 0;
+    padding: 0 var(--sp-4) var(--sp-3);
+}
+
+.mk-why-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    font-size: var(--fs-sm);
+}
+
+.mk-why-list li {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr);
+    gap: var(--sp-3);
+}
+
+.mk-why-key {
+    color: var(--text-1);
+}
+
+.mk-why-effect {
+    display: block;
+    color: var(--text-2);
+    font-size: var(--fs-xs);
+}
+
+.mk-creator {
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--warn);
+    border-radius: var(--radius);
+    background: var(--bg-2);
+    padding: var(--sp-3) var(--sp-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+}
+
+.mk-badges {
+    display: inline-flex;
+    gap: var(--sp-1);
+    margin-left: var(--sp-2);
+}
+
+/* ---- create market ------------------------------------------------------------------------- */
+.mk-create {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: var(--sp-3);
+    align-items: start;
+}
+
+@media (max-width: 1180px) {
+    .mk-create {
+        grid-template-columns: minmax(0, 1fr) 340px;
+    }
+}
+
+.mk-verdict {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    font-weight: var(--fw-bold);
+}
+
+.mk-reasons {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+}
+
+.mk-reason {
+    border-left: 3px solid var(--danger);
+    background: var(--danger-bg);
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--radius-sm);
+    font-size: var(--fs-sm);
+}
+
+.mk-reason-code {
+    font-family: var(--font-num);
+    font-size: var(--fs-xs);
+    color: var(--text-1);
+}
+
+.mk-ext-list {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--sp-1);
+}
+
+.mk-choice {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-2) var(--sp-3);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    cursor: pointer;
+}
+
+.mk-choice:has(input:checked) {
+    border-color: var(--accent);
+    background: var(--bg-2);
+}
+
+.mk-choice input[type="radio"] {
+    accent-color: var(--accent);
+}
+
+.mk-cost-total {
+    font-size: var(--fs-lg);
+    font-weight: var(--fw-bold);
+}
+
+/* ---- protocol status ----------------------------------------------------------------------- */
+.mk-status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    gap: var(--sp-3);
+    align-items: start;
+}
+
+.mk-status-pause {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    font-size: var(--fs-lg);
+}

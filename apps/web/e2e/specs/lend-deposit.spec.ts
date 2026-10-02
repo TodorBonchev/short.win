@@ -1,0 +1,87 @@
+/**
+ * lend-deposit (FRONTEND.md §3.6, §4 `lender.solRepayment`, §5.3, §10.2). NEEDS the LEND track's
+ * lend panel and lender dashboard (and MARKETS' market page that renders the panel): `@lend`.
+ *
+ * SPEC §5.3's sentence verbatim on the deposit screen before signing, its required checkbox gating
+ * the submit and again the review's Sign; the simulated deltas (source token account, lender
+ * shares); the confirmed deposit on chain; the dashboard row.
+ */
+import { LENDER_SOL_REPAYMENT } from '../../src/config/disclosures.ts';
+import { dataValue, expect, need, T, test } from '../fixtures.ts';
+import { landedTransaction, lenderPosition, lenderPositionAddress } from '../validator/actions.ts';
+import { getTokenAmount } from '../validator/chain.ts';
+
+test.use({ wallet: 'lender' });
+
+const AMOUNT_TOKENS = 1_000n;
+
+test.describe('lend: deposit', { tag: '@lend' }, () => {
+    test('SPEC §5.3 verbatim, Sign gated by its checkbox, simulated deltas, confirmed, dashboard', async ({
+        app,
+        state,
+    }) => {
+        const m = state.markets.main;
+        const source = need(state.tokenAccounts.mainAta.lender, 'lender main ATA');
+        const raw = AMOUNT_TOKENS * 10n ** BigInt(m.decimals);
+
+        await app.goto(`/m/${m.mint}?panel=lend&action=deposit`, 'market');
+        await app.connectWallet();
+        const panel = app.id(T.lendPanel);
+        await expect(panel).toHaveAttribute('data-mint', m.mint);
+        await expect(panel).toHaveAttribute('data-action', 'deposit');
+
+        // §4.1 rule 2: verbatim, on the deposit screen, before signing, with its own checkbox.
+        const sol = panel.getByTestId(T.disclosure('lender.solRepayment'));
+        await expect(sol).toBeVisible();
+        await expect(sol).toContainText(LENDER_SOL_REPAYMENT);
+        await expect(panel.getByTestId(T.disclosureAck('lender.solRepayment'))).not.toBeChecked();
+        await expect(panel.getByTestId(T.disclosure('lender.risks'))).toBeVisible();
+
+        await app.selectTokenAccount(panel.getByTestId(T.lendTokenAccount), source);
+        await panel.getByTestId(T.lendAmountInput).fill(AMOUNT_TOKENS.toString());
+        await expect(panel.getByTestId(T.lendPreview('shares'))).toHaveAttribute('data-value', /^[1-9]\d*$/);
+        const previewShares = await dataValue(panel.getByTestId(T.lendPreview('shares')));
+
+        await expect(panel.getByTestId(T.lendSubmit)).toBeDisabled();
+        await panel.getByTestId(T.disclosureAck('lender.solRepayment')).check();
+        await expect(panel.getByTestId(T.lendSubmit)).toBeEnabled();
+        await app.a11y('market page, lend panel (deposit)');
+        await panel.getByTestId(T.lendSubmit).click();
+
+        expect(await app.simulated()).toBe('review');
+        await expect(app.inModal(T.txSimStatus)).toHaveAttribute('data-ok', 'true');
+        // The review repeats the sentence; acknowledgements are per transaction (never remembered).
+        await expect(app.inModal(T.disclosure('lender.solRepayment'))).toContainText(LENDER_SOL_REPAYMENT);
+        await expect(app.inModal(T.disclosureAck('lender.solRepayment'))).not.toBeChecked();
+        await expect(app.inModal(T.txSign)).toBeDisabled();
+
+        expect(await app.delta(source, 'amount')).toBe(-raw);
+        const lenderPda = await lenderPositionAddress(m.market, app.walletAddress);
+        const simShares = await app.delta(lenderPda, 'shares');
+        // FE-D6: min_shares = ⌊preview·(1 − 0.5 %)⌋; the preview equals the program up to rent accrued since.
+        expect(simShares).toBeGreaterThanOrEqual((previewShares * 995n) / 1000n);
+        expect(simShares).toBeLessThanOrEqual((previewShares * 1005n) / 1000n);
+        expect(await dataValue(app.inModal(T.txCu))).toBeGreaterThan(0n);
+        expect(await dataValue(app.inModal(T.txFee))).toBeGreaterThanOrEqual(5_000n);
+        await app.a11y('deposit review', `[data-testid="${T.txModal}"]`);
+
+        await app.ackInReview('lender.solRepayment');
+        const before = need(await getTokenAmount(source), 'source balance');
+        const signature = await app.signAndConfirm();
+        await expect(app.inModal(T.txExplorer)).toHaveAttribute('href', new RegExp(signature));
+
+        const landed = need(await landedTransaction(signature as never), 'landed deposit');
+        expect(landed.err).toBeNull();
+        expect(await getTokenAmount(source)).toBe(before - raw);
+        const lp = need(await lenderPosition(m.market, app.walletAddress), 'lender position');
+        expect(lp.shares).toBeGreaterThanOrEqual((previewShares * 995n) / 1000n);
+        await app.closeModal();
+
+        await app.goto('/lend', 'lend');
+        await expect(app.id(T.lenderDashboard)).toBeVisible();
+        const row = app.id(T.lenderRow(m.market));
+        await expect(row).toBeVisible();
+        await expect(row.getByTestId(T.lenderCell('shares'))).toHaveAttribute('data-value', lp.shares.toString());
+        await app.a11y('lender dashboard');
+    });
+});

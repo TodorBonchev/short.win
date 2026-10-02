@@ -433,6 +433,99 @@ jobs:
       - run: pnpm --filter @shortwin/client typecheck
       - run: pnpm --filter @shortwin/client test
 
+  web:
+    # M9 web frontend (docs/design/FRONTEND.md §10.4): the WASM math package built from
+    # crates/shortwin-math-wasm (wasm-bindgen =0.2.129, the crate's pin), then Biome, the type
+    # check, Vitest and the production build of apps/web (`web-e2e` runs the Playwright suite).
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: wasm-bindgen CLI (the crate's exact pin)
+        run: cargo install wasm-bindgen-cli --version =0.2.129 --locked
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @shortwin/math-wasm build
+      - run: pnpm --filter web lint
+      - run: pnpm --filter web typecheck
+      - run: pnpm --filter web test
+      - run: pnpm --filter web build
+
+  web-e2e:
+    # M9 web E2E (docs/design/FRONTEND.md §10.2–§10.4; apps/web/e2e), profile `chain`: Playwright
+    # 1.63 on a local solana-test-validator (Agave 4.1.2) loading the anchor-build artifact's
+    # test-venue shortwin.so, mock_cpamm.so and complete_curve.so plus the dumped venue fixtures of
+    # tests/fixtures, seeded by e2e/validator/seed.ts (Kit + @shortwin/client); the production build
+    # of apps/web served by vite preview; the injected "ShortWin E2E" Wallet Standard wallet; the
+    # indexer as a Playwright-routed mock built from the chain. Playwright's own Chromium, installed
+    # into the runner user's cache (`SHORTWIN_CHROMIUM=playwright`; the hosted image carries its
+    # system libraries). Every spec runs (the M9 exit, FRONTEND.md §12.3: incl. lend-cpi-guard and
+    # lend-withdraw-memo of §10.3, axe on every page and the `screens` pass, whose PNGs are kept as
+    # an artifact for review).
+    if: github.event_name != 'schedule'
+    needs: anchor-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      SHORTWIN_CHROMIUM: playwright
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: wasm-bindgen CLI (the crate's exact pin)
+        run: cargo install wasm-bindgen-cli --version =0.2.129 --locked
+      - name: Cache Agave
+        id: tools
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/share/solana/install
+          key: agave-${{ env.AGAVE_VERSION }}-${{ runner.os }}
+      - name: Install Agave ${{ env.AGAVE_VERSION }}
+        if: steps.tools.outputs.cache-hit != 'true'
+        run: sh -c "$(curl -sSfL https://release.anza.xyz/v${AGAVE_VERSION}/install)"
+      - name: Select Agave ${{ env.AGAVE_VERSION }}
+        run: |
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/share/solana/install/active_release/bin/agave-install" init "$AGAVE_VERSION"
+          "$HOME/.local/share/solana/install/active_release/bin/solana-test-validator" --version
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: shortwin-program
+          path: target
+      - name: The test-venue build (A49) and the helpers are present
+        run: |
+          LC_ALL=C grep -aq "shortwin:test-venue:mock-cpamm" target/test-venue/deploy/shortwin.so
+          ls -l target/deploy/mock_cpamm.so target/deploy/complete_curve.so
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @shortwin/math-wasm build
+      - name: Playwright's Chromium (user cache, no --with-deps)
+        run: pnpm --filter web exec playwright install chromium
+      - name: E2E (profile chain)
+        run: pnpm --filter web e2e
+      - name: Screenshots of every page (e2e/specs/screens.spec.ts)
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: web-e2e-screenshots
+          path: apps/web/.e2e/screenshots
+          if-no-files-found: ignore
+      - name: Report, traces and logs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: web-e2e
+          path: |
+            apps/web/.e2e/report
+            apps/web/.e2e/test-results
+            apps/web/.e2e/logs
+            apps/web/.e2e/state.json
+          if-no-files-found: ignore
+
   m1-cu:
     # M1 CU baseline (ARCH §6.1, §9 M1): every M1 instruction on Mollusk 0.15.1 within its
     # budget, cross-checked on LiteSVM (tests/bench/m1_cu, a standalone workspace with its own

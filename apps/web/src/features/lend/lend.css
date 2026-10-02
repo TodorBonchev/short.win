@@ -1,0 +1,82 @@
+/* LEND track: the lend panel (360 px trade column) and the lender dashboard (FRONTEND.md §3.6, §3.8, §7). */
+
+.lend {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    min-width: 0;
+}
+
+.lend-body {
+    padding-top: var(--sp-3);
+}
+
+.lend-form {
+    gap: var(--sp-3);
+}
+
+.lend-position {
+    padding: var(--sp-3);
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+}
+
+.lend-select {
+    width: 100%;
+    min-width: 0;
+    color: var(--text-0);
+    font-family: var(--font-num);
+    font-size: var(--fs-sm);
+}
+
+.lend-select:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+}
+
+.lend-notice {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+}
+
+.lend-notice[data-state="blocked"] .disclosure {
+    border-left-color: var(--danger);
+}
+
+.lend-blocked {
+    align-items: flex-start;
+    flex-direction: column;
+}
+
+.lend-note {
+    font-size: var(--fs-xs);
+    line-height: var(--lh);
+}
+
+.lend-quick {
+    gap: var(--sp-2);
+}
+
+.lend-tolerance {
+    max-width: 120px;
+}
+
+.lend-form .kv dd {
+    white-space: nowrap;
+}
+
+.lend-dashboard .tbl td .badge + .badge {
+    margin-left: var(--sp-2);
+}
+
+.lend-dashboard .stat-strip {
+    max-width: 720px;
+}
+
+/* the token the panel lends (symbol and mint, M9-SEC-5) and the age of its chain read (§6.6) */
+.lend-token {
+    justify-content: space-between;
+    gap: var(--sp-2);
+}

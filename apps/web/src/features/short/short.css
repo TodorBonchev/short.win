@@ -1,0 +1,167 @@
+/* SHORT track — the Short panel, the positions dashboard and the position page (FRONTEND.md §3.7,
+ * §3.8). Dense terminal layout on the design tokens of styles/tokens.css only. */
+
+.short-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+}
+
+.short-inputs {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 96px;
+    gap: var(--sp-3);
+    align-items: start;
+}
+
+.short-preview {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--bg-0);
+    padding: var(--sp-3) var(--sp-4);
+}
+
+.short-preview .kv {
+    grid-template-columns: max-content minmax(0, 1fr);
+    row-gap: var(--sp-2);
+}
+
+.short-preview .kv dt {
+    white-space: nowrap;
+}
+
+.short-preview .kv dd {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.short-preview-sub {
+    display: block;
+    color: var(--text-2);
+    font-size: var(--fs-xs);
+}
+
+.short-section-title {
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-1);
+    margin: 0 0 var(--sp-2);
+}
+
+.short-caps {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: var(--sp-4);
+    row-gap: var(--sp-1);
+    font-size: var(--fs-xs);
+    color: var(--text-1);
+    margin: var(--sp-2) 0 0;
+}
+
+.short-cap-value {
+    margin: 0;
+    text-align: right;
+}
+
+.short-caps [data-binding="true"] {
+    color: var(--warn);
+    font-weight: var(--fw-medium);
+}
+
+.short-terms {
+    font-size: var(--fs-sm);
+}
+
+.short-terms summary {
+    cursor: pointer;
+    color: var(--text-1);
+}
+
+.short-terms .kv {
+    margin-top: var(--sp-2);
+}
+
+.cr[data-risk="safe"] {
+    color: var(--risk-safe);
+}
+
+.cr[data-risk="watch"] {
+    color: var(--risk-watch);
+}
+
+.cr[data-risk="danger"] {
+    color: var(--risk-danger);
+}
+
+.cr[data-risk="below"],
+.cr[data-risk="critical"] {
+    color: var(--risk-critical);
+}
+
+.short-blocked {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    align-items: stretch;
+}
+
+.short-blocked .banner {
+    margin-bottom: 0;
+}
+
+.short-note {
+    font-size: var(--fs-xs);
+    color: var(--text-2);
+}
+
+/* ---- positions ---------------------------------------------------------------------------- */
+
+.positions-toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+}
+
+.position-actions {
+    display: flex;
+    gap: var(--sp-2);
+    justify-content: flex-end;
+}
+
+.position-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: var(--sp-3);
+    align-items: start;
+}
+
+@media (max-width: 1180px) {
+    .position-layout {
+        grid-template-columns: minmax(0, 1fr) 320px;
+    }
+}
+
+.timeline {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: var(--fs-sm);
+}
+
+.timeline li {
+    display: grid;
+    grid-template-columns: 150px 110px minmax(0, 1fr);
+    gap: var(--sp-3);
+    padding: var(--sp-2) 0;
+    border-bottom: 1px solid var(--line);
+}
+
+.timeline li:last-child {
+    border-bottom: 0;
+}
+
+.exit-badge {
+    text-transform: capitalize;
+}

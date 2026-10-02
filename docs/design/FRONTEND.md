@@ -1,0 +1,1637 @@
+# short.win — Web frontend (M9 contract)
+
+*v1.2 • 2026-10-02 • **as built** (M9 integrated, then the M9 security and UX review fixed — §13
+"Review fixes"; v1.0 of 2026-10-01 was the contract the four parallel tracks — MARKETS, LEND,
+SHORT, E2E — built against, §12). Owner decision for the visual
+style: **dark trading terminal** — dense, dark, data-first, as memecoin traders know it from
+Photon / BullX / Axiom, and still accessible (§7, §8).*
+
+This document turns ARCHITECTURE §7.3 ("Frontend") and the M9 row of ARCH §9 ("All §7.3 flows with
+simulation-before-sign and disclosures"; exit: "Playwright E2E; CPI Guard and memo UX tests") into a
+buildable specification: the information architecture and routes, every user-facing disclosure with
+its exact copy, the transaction lifecycle, the data layer, the design system, accessibility,
+security, the test plan, the `data-testid` contract and the tracks' file ownership.
+
+The machine-readable halves of the contract live in `apps/web` and are held to this document by
+tests:
+
+| Artifact | Path | What it fixes | Held by |
+|---|---|---|---|
+| Disclosure copy | `src/config/disclosures.ts` | every disclosure's id, title, body, acknowledgement text (§4) | `disclosures.test.ts` (SPEC §5.3 verbatim; every paragraph present in §4 of this file) |
+| `data-testid` contract | `src/config/testids.ts` | every test id and prefix (§11) | `testids.test.ts` (unique; every id present in §11) |
+| Program error messages | `src/config/errors.ts` | a human message and an action for each code 6000–6104 (§5.9) | `errors.test.ts` (against `@shortwin/client`'s constants) |
+| Pinned program ids | `src/config/programs.ts` | the programs a transaction may invoke (§9.1) | `programs.test.ts` (against `constants.rs`, the client, `complete_curve`) |
+| Route tree | `src/router.tsx` | paths, typed search parameters, page components and their props (§3.2) | `router.test.tsx` (every route renders in the shell) |
+| Transaction pipeline | `src/tx/types.ts`, `useTxFlow.ts`, `TxReviewModal.tsx` | `TxPlan`, the stages, the review (§5) | `tx/*.test.ts` |
+| Venue layer interface | `src/venues/types.ts` | what MARKETS and SHORT share (§5.1, §12) | the type check |
+| API types | `src/api/types.ts` | the indexer responses (`services/indexer/openapi.yaml`) | `types.test.ts` (required fields against the YAML) |
+| Design tokens | `src/styles/tokens.css` | colours, type, density (§7) | the contrast table in §7.1 |
+| CSP | `src/config/csp.ts`, `vite.config.ts` | the policy and the static host's headers (§9.3) | `csp.test.ts` |
+
+**Status (v1.2, as built).** Every §7.3 flow is implemented on the scaffold: the markets table,
+the market page, create market and protocol status (MARKETS); the lend panel and the lender
+dashboard (LEND); the venue layer, the short panel, the positions dashboard and the position page
+(SHORT); the Playwright suite on a local validator (E2E). The integration applied the tracks'
+shared-file requests (§13 "Integration changes"), and the M9 exit is met (§12.3): `pnpm -r
+build`, `biome check`, `vitest run` (56 files, 533 tests) and the E2E (19 specs, 50 tests,
+including §10.3) pass. Where the build deviates from v1.0, the section says so and §13 lists it.
+v1.2 fixes the sixteen findings of the M9 security and UX review (§13 "Review fixes").
+
+---
+
+## 0. Decisions and owner items
+
+Decisions this contract takes (binding for the tracks unless the owner rules otherwise):
+
+| # | Decision | Why |
+|---|---|---|
+| FE-D1 | **Money paths read the chain; browsing reads the indexer.** Every number a transaction depends on (quotes, margin, bounds, allowance, claimable SOL) is computed from accounts read through RPC at `confirmed` with the WASM math; the indexer feeds lists, history, analytics and search. | The indexer can lag or be down (INDEXER §3.2); a preview must equal what the program computes (ARCH §7.3). |
+| FE-D2 | **Simulate before every signature** (§5.3): no wallet prompt without a successful simulation of the same instructions less than 20 s old; a stale review is re-simulated and shown again, never signed blind. | SPEC §9, ARCH §7.3. |
+| FE-D3 | **No blind signing** (§5.8): only pinned programs at the top level; if the wallet changes the message, only compute-budget instructions may differ. | Wallet-side tampering or a compromised wallet extension. |
+| FE-D4 | **One copy of every disclosure** (§4): rendered verbatim from `disclosures.ts`; the acknowledgement checkboxes gate the Sign button. | SPEC §5.3's "exact" sentence; reviewability. |
+| FE-D5 | **Mint safety check client-side** (§3.5): the create-market verdict is computed in the browser from the mint account (the program's allow-list rule) and confirmed by simulating `create_market`; no indexer endpoint in M9. | INDEXER §14 IX-7 deferred `GET /v1/mints/{mint}/check` to M9; a client check plus simulation needs no new service. |
+| FE-D6 | **Defaults for user bounds** (§5.10): open slippage 1 % (`min_proceeds`), margin and open-fee tolerance +2 % (`max_margin`, `max_open_fee`), close slippage 1 % (`max_buyback_cost`), deposit −0.5 % (`min_shares`), withdraw −0.5 % (`min_tokens`) and `min_sol` = the quoted SOL payout (ARCH §3.3, M1-SEC-2). User-adjustable within [0.1 %, 50 %]. | Memecoin volatility vs sandwich exposure (SPEC R4). |
+| FE-D7 | **The mock venue is test-only in the frontend too**: its adapter is compiled in only with `VITE_ENABLE_TEST_VENUE=true`, which the config refuses off localnet (§2.1). | A49 (the mock never ships). |
+| FE-D8 | **No remote token images or fonts** (§9.3): token identity is the mint; symbol and name are untrusted text. | Privacy, CSP, ticker impersonation (R-MINT §10.11). |
+
+Owner items (each has a recommendation, which is what the scaffold assumes until the owner rules):
+
+| # | Item | Recommendation |
+|---|---|---|
+| FE-1 | **CPI Guard deposits.** ARCH §3.3: "a lender whose token account has `CpiGuard.lock_cpi` cannot deposit through our CPI; the frontend detects it. A delegate-based deposit path is v1.1." Options: (a) block and explain (use another account, or turn CPI Guard off in the wallet); (b) additionally offer an opt-in **bracket** in one transaction: Token-2022 `DisableCpiGuard` → `deposit` → `EnableCpiGuard`, all top-level and signed by the owner, so the guard is off only inside that transaction. | (b), opt-in per deposit, with the `token.cpiGuard` disclosure; (a) is the default state of the panel. The E2E covers both (§10.3). |
+| FE-2 | **Wallet-modified transactions.** Some wallets add or change priority-fee instructions in `solana:signTransaction`. | Accept compute-budget-only changes (a raised fee is shown after signing), refuse anything else (§5.8). |
+| FE-3 | **Curve straddle close by the borrower.** A close that would complete the Pump.fun curve fails `CurveStraddle`; the exit is a ≥ 3-transaction Jito bundle (ARCH §5.4). Submitting bundles from the browser needs a block-engine endpoint (CSP, availability) and is UNVERIFIED on a live engine. | Not in M9: the position page explains the state (`closeStraddleNotice`); the keeper's graduation bundle exits it (T + 8 s) and the borrower can add margin meanwhile. Revisit with v1.1's `ExitInProgress`. |
+| FE-4 | **Geo-restriction (SPEC R6).** | At the CDN edge per legal advice; the app shows no jurisdiction UI of its own in M9 (placeholder footer text only after legal review). |
+| FE-5 | **Degraded-market listing.** `/v1/markets` has no flag filter; the status page filters the first pages client-side on `flags.paused_coverage` / `route_broken`. | Accept for M9; an indexer follow-up adds `flag=` filters (INDEXER §14). |
+| FE-6 | **Priority-fee ceiling for users.** | 1,000,000 µlamports/CU by default (`VITE_PRIORITY_FEE_MAX_MICROLAMPORTS`); the keeper's own ceiling (O17) is 100,000. |
+
+---
+
+## 1. Scope
+
+**In (SPEC §8, ARCH §7.3):** wallet connect; token search by mint or ticker; permissionless market
+creation; lender deposit / withdraw (token + SOL mix) / claim / cover deficit; atomic open short on
+the Pump.fun curve, PumpSwap, Raydium AMM v4 / CPMM; close; add margin; the position dashboard
+(`Q` owed, vault SOL, CR, liquidation price, P&L, rent accrued, time left); the market page (tier,
+inventory, utilisation, rate, open interest, caps, recent liquidations, creator-wallet deposits);
+the lender dashboard (shares, SOL claimable, locks, vesting); protocol status (degraded /
+coverage-paused markets, the venue upgrade latch, route-broken); every disclosure of §4.
+
+**Not in M9:** liquidation, expiry and `sol_settle` buttons (keeper instructions; the UI shows the
+state and history, never sends them); governance / Emergency instructions; the borrower's straddle
+bundle (FE-3); Jupiter (v1.1); partial closes, limit orders, copy trading (SPEC §8 deferred);
+charts beyond a price sparkline from `/candles` (optional, MARKETS); mobile-first layouts (the app
+targets ≥ 1024 px laptops; §7.3).
+
+---
+
+## 2. Stack and workspace
+
+| Layer | Pin | Notes |
+|---|---|---|
+| Runtime | Node 24.21.0, pnpm 12.7.0 (`mise.toml`) | `eval "$(mise activate bash)"` |
+| Build | Vite **8.3.1**, `@vitejs/plugin-react` 6.1.1, TypeScript 5.9.3 (strict) | `tsc --noEmit` then `vite build` |
+| UI | React **19.3.0**, TanStack Router **1.170.41** (code-based routes), TanStack Query **5.104.0** | no CSS framework; plain CSS with tokens (§7) |
+| Solana | `@solana/kit` **8.3.0**, `@solana/react` 8.3.0, `@solana/kit-plugin-wallet` **0.20.0**, `@solana/kit-plugin-rpc` **0.19.0**, `@solana-program/token` 0.17.0, `@solana-program/token-2022` 0.19.0 | **no** web3.js v1, wallet-adapter or `@anchor-lang/core` (ARCH §1.1) |
+| Program client | `@shortwin/client` (workspace, Codama) | instruction builders, account decoders, PDAs, error codes |
+| Math | `@shortwin/math-wasm` (workspace, `packages/math-wasm`) | wasm-bindgen `--target web` build of `crates/shortwin-math-wasm` (§6.7) |
+| Lint / format | Biome **2.5.14** (`biome.json` at the root, scoped to `apps/web` and `packages/math-wasm`) | 4 spaces, single quotes, width 120; a11y rules on |
+| Unit tests | Vitest **5.0.2** + jsdom 30.1.1 + Testing Library 16.3.3 | `src/**/*.test.ts(x)` |
+| E2E | Playwright **1.63.0** (`@playwright/test`), `@axe-core/playwright` 4.13.0 | system Chromium `/usr/bin/chromium` or Playwright's user-cache browser; never a root install (§10.2) |
+| E2E seeding | `@solana-program/system` 0.15.0, `@solana-program/address-lookup-table` 0.15.0 (dev) | Node scripts with Kit and the Codama client |
+
+**Dependencies are frozen for the tracks**: the scaffold installed everything the four tracks need
+(`pnpm-lock.yaml` changed by additions only). A track that needs a new package asks the integrator;
+no track edits `package.json` or the lockfile.
+
+**Scripts** (`apps/web/package.json`): `wasm` (builds `@shortwin/math-wasm` if stale), `dev`,
+`dev:e2e` (`vite --mode e2e`: the dev server against the E2E validator, configured by the
+`.env.e2e.local` that `node e2e/validator/start.ts --env` writes), `build` (wasm → type check →
+`vite build`), `preview`, `typecheck`, `lint` (`biome check .`), `lint:fix`, `test` (`vitest
+run`), `test:watch`, `e2e` (`playwright test`).
+
+**The WASM package.** `packages/math-wasm/scripts/build.mjs` runs `cargo build -p shortwin-math-wasm
+--target wasm32-unknown-unknown --release --locked` and `wasm-bindgen --target web` into
+`packages/math-wasm/pkg/` (generated, not committed: the `.wasm` embeds absolute registry paths). A
+SHA-256 of both crates' sources, manifests and the root `Cargo.lock` is stamped into
+`pkg/.inputs-sha256`; a matching stamp skips the build, so `pnpm --filter web build` needs neither
+cargo nor wasm-bindgen once `pkg/` is current. wasm-bindgen must be the crate's exact pin
+**0.2.129** (`$WASM_BINDGEN`, `PATH` or `~/.cargo/bin`; `cargo install wasm-bindgen-cli --version
+=0.2.129 --locked`).
+
+### 2.1 Configuration (`src/config/parseConfig.ts`, `.env.example`)
+
+| Variable | Default (localnet) | Rule |
+|---|---|---|
+| `VITE_CLUSTER` | `localnet` | `mainnet` \| `devnet` \| `localnet`; the wallet chain is `solana:<cluster>` |
+| `VITE_RPC_URL`, `VITE_RPC_WS_URL` | `http://127.0.0.1:8899`, `ws://127.0.0.1:8900` | required off localnet; `https` / `wss` on mainnet; no credentials in the URL (an origin-restricted public key in the path or query is the only acceptable form) |
+| `VITE_INDEXER_URL`, `VITE_INDEXER_WS_URL` | `http://127.0.0.1:8080`, `ws://127.0.0.1:8080/v1/ws` | as above |
+| `VITE_PROTOCOL_ALT` | none | base58; the protocol lookup table (ARCH §6.4 A28) |
+| `VITE_PRIORITY_FEE_MAX_MICROLAMPORTS` | `1000000` | integer µlamports/CU (FE-6) |
+| `VITE_ENABLE_TEST_VENUE` | `false` | TEST-ONLY mock venue adapter; refused unless `VITE_CLUSTER=localnet` (FE-D7) |
+| `VITE_EXPLORER_TX_URL` | Solana Explorer | must contain `{sig}` |
+
+`parseConfig` is pure and lists every problem at once (`ConfigError`); `vite.config.ts` runs it at
+build time, so an invalid configuration fails the build, and `main.tsx` renders the error instead
+of a half-working app in development. A bare build is a localnet build.
+
+### 2.2 Build output
+
+`apps/web/dist/`: `index.html` with the CSP `<meta>` first in `<head>` (§9.3), hashed JS and CSS,
+the math module as a hashed `.wasm` asset (≈ 205 kB, ≈ 74 kB gzip), and `_headers` for the static
+host (the header form of the CSP with `frame-ancestors`, and the other security headers). No asset
+is inlined (`assetsInlineLimit: 0`), so nothing needs `data:` scripts. *v1.2 (M9-SEC-6):* source
+maps are generated `hidden` (no `sourceMappingURL`) and moved out of `dist/` into
+`apps/web/dist-sourcemaps/` (gitignored) — upload them privately to an error tracker, or publish
+them deliberately (owner choice, §13 FE-23).
+
+---
+
+## 3. Information architecture and routes
+
+### 3.1 Shell
+
+```
+┌ header ─────────────────────────────────────────────────────────────────────────────────┐
+│ ▼ ShortWin [LOCALNET]  Markets  Positions  Lend  Status   [ search mint or ticker  / ]   [wallet] │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│ (indexer-down banner)                                                                    │
+│                                   routed page                                            │
+├ status bar ─────────────────────────────────────────────────────────────────────────────┤
+│ ● RPC 412,334,120  ● Indexer live +1s  ● Live open                SOL $142.10  math 0.1.0  localnet │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+- **Header** (`AppShell`): brand, cluster badge off mainnet, nav (Markets, Positions, Lend,
+  Status), the search combobox (`SearchBox`: `/v1/search` results by symbol / name prefix, an exact
+  mint always offers "Open mint" even before the indexer knows it; `/` focuses it), the wallet
+  button (`WalletButton`: Wallet Standard discovery and connect, address and disconnect).
+- **Status bar** (`StatusBar`): RPC slot and health, indexer freshness and lag (§6.6), live-feed
+  state, SOL/USD (from `/v1/stats`), the math module's state and version, cluster. Always visible:
+  stale data is never silent.
+- **Indexer-down banner**: while `/v1/status` fails, pages fall back to RPC reads (§6.5).
+- **Keyboard**: skip link to `#main`; `/` search; table rows reachable by Tab, moved with ↑ / ↓,
+  opened with Enter; Escape closes menus and dismissible dialogs.
+
+### 3.2 Routes (`src/router.tsx`, frozen)
+
+| Path | Search params (validated) | Component (props) | Owner | Data |
+|---|---|---|---|---|
+| `/` | — | redirect → `/markets` | SCAFFOLD | — |
+| `/markets` | `q` (≤ 64), `venue`, `tier`, `sort` ∈ tvl, oi, util, created, open_positions, `order`, `active` | `MarketsPage` | MARKETS | `/v1/markets`, `markets` channel |
+| `/markets/new` | `mint` (base58) | `CreateMarketPage` | MARKETS | RPC (mint, venue accounts), `GlobalConfig` |
+| `/m/$mint` | `tab` ∈ overview, positions, lenders, liquidations, pools, coverage, events; `panel` ∈ short, lend; `action` ∈ deposit, withdraw, claim | `MarketPage({ mint })` → `ShortPanel({ mint })`, `LendPanel({ mint, action })`, `CapsSummary({ mint })` | MARKETS (page), SHORT (`ShortPanel`, `CapsSummary`), LEND (`LendPanel`) | `/v1/markets/{mint}` + subresources; RPC `Market`, `MarketVault`, venue |
+| `/positions` | `status` ∈ open, closed, liquidated, expired, settled, all | `PositionsPage` | SHORT | `/v1/borrowers/{owner}/positions`; RPC `ShortPosition` + venue |
+| `/positions/$position` | — | `PositionDetailPage({ position })` | SHORT | `/v1/positions/{pubkey}`; RPC |
+| `/lend` | — | `LenderDashboardPage` | LEND | `/v1/lenders/{owner}`; RPC `LenderPosition`, `Market`, `MarketVault`, `ShareEpoch` |
+| `/status` | — | `ProtocolStatusPage` | MARKETS | `/v1/venues`, `/v1/admin/config`, `/v1/status`, markets flags |
+
+A path parameter that is not a base58 address renders Not found. Tracks implement the components
+with exactly these props and never edit `router.tsx`; a new search parameter is a contract change.
+*As built:* every page is its own chunk (`lazyRouteComponent`); the router loads it before it
+renders the route and preloads it on link intent, so no page suspends (the largest chunk is now
+the shared vendor one, ≈ 222 kB / 70 kB gzip, instead of one 616 kB app chunk).
+Every page keeps `data-testid="page-<name>"` (`T.page`) on its root element — the router smoke
+test and the E2E rely on it.
+
+### 3.3 Markets table (MARKETS)
+
+Columns (dense, sortable where the API sorts): token (symbol, short mint; full mint on hover),
+venue badge, tier badge, price (`ema_price` as SOL per token, subscript zeros), TVL (SOL, USD on
+hover), inventory (tokens) and free, utilisation (bar + %), open interest (SOL), open positions,
+flags (paused / coverage / route-broken / unsafe icons with text), created (age). Search box `q`
+filters by mint or symbol / name prefix (`/v1/markets?q=`); filters for venue and tier; sort by
+TVL (default), OI, utilisation, created, open positions; keyset paging ("Load more"). Rows update
+live from the `markets` channel (patched in place, §6.4). Duplicate symbols show the mint suffix in
+the token cell (two markets named BONK are visibly different). "Create market" links to
+`/markets/new?mint=<q>` when `q` is a mint without a market.
+
+### 3.4 Market page (MARKETS; panels SHORT / LEND)
+
+Layout `.layout-trade`: left the market column, right the 360 px trade panel (tabs Short | Lend).
+
+- **Header:** symbol, name, mint (copy), tier badge (popover "Why this tier": the tier inputs — pool
+  age from `graduated_at` / listing, locked liquidity in USD, SOL/USD age — and the
+  `market.tierAge` disclosure), venue badge, flag badges (`marketFlag-*`), price (spot and EMA).
+  *As built:* the popover shows the Tier A / B liquidity thresholds in USD and in SOL at the
+  oracle price, not the pool's own locked liquidity Λ (FE-14); an `OracleCache` never cranked
+  reads "No reading yet".
+- **Banners** in severity order: `market.mintUnsafe`, `market.routeBroken`, `market.coveragePause`,
+  `market.venueUpgraded`, `market.migrating`, `market.graduationHalted`, `market.listOnly`; a
+  collection window or a warm-up (`ema_warm > 0`) shows `market.poolSwitch`.
+- **Stat strip** (SPEC §8): inventory (`inventory_tokens`, free `tokens_free`), utilisation
+  (`util_bps`), rate (the APR a new open pays now: `rateBps(base, slope1, slope2, util, kink)` with
+  the live tier terms), open interest (`oi_lamports`, `open_positions`, `total_notional_open`), caps
+  (`CapsSummary`, SHORT: the binding size cap for the next open), TVL (`tvl_lamports`, `tvl_usd`),
+  lenders (`lender_count`).
+- **Tabs:** Overview (the stats above in full, fee lines, exit counts and rates, realised lender
+  loss by S1 / S2 / S3, `market.creatorSelfDealing`, `market.venueTrust` collapsed); Positions
+  (`/positions?status=open`, each with CR and risk computed client-side — *as built* through
+  SHORT's `useMarketPositionsLive`: the positions' accounts in one read and the market's
+  snapshot, the same `positionMetrics` as the dashboard); Lenders (largest first,
+  `is_coin_creator` and `is_market_creator` badges — the **creator-wallet deposits** of SPEC §8 /
+  R1, plus `creator_exposure.coin_creator_share_bps` in the header of the tab); Liquidations
+  (`/liquidations`: kind, condition S1–S3, Q, buyback, lender amount, keeper paid, borrower payout,
+  time, signature); Pools (`/pools`: current pool, candidates with `D`, adoption history, the open
+  window); Coverage (`/coverage`: gaps, pauses, last 24 h observations); Events (`/events`).
+- **Live:** subscribes `market:<mint>` (and `trades:<mint>` if a sparkline is shown); the panels
+  read the chain (FE-D1).
+
+### 3.5 Create market (MARKETS)
+
+1. Mint input (`createMintInput`; prefilled from `?mint=`). If a market exists (`findMarketPda` +
+   RPC), link to it (`createExisting`).
+2. **Safety verdict** (`createVerdict`, `data-verdict`): `readMint` → the program's rule (ARCH §3.2
+   check 1): owner ∈ {Token, Token-2022}; not a native mint; no freeze authority; every extension
+   type ∈ {MetadataPointer 18, TokenMetadata 19, GroupPointer 20, TokenGroup 21,
+   GroupMemberPointer 22, TokenGroupMember 23}; a malformed TLV rejects. Each failing rule shows as
+   `createReason-<ErrorName>` with the message of `config/errors.ts` (6016–6020).
+3. **Venue detection** (`detectVenue`, SHORT's venue layer): pump curve / migrating / PumpSwap /
+   none, with a refusal reason for unsupported pump coins; for non-pump mints, the Raydium
+   candidates (`raydiumCandidates`): pool, kind, real SOL, `D`, λ, fee, eligibility and reasons
+   (`createPoolRow-<pool>`). The user picks Auto (list-only or pump) or an eligible Raydium pool.
+4. **Cost** (`createCost`): `market_creation_fee` from `GlobalConfig` plus the rent of `Market`
+   (3,104 B), `MarketVault` (2,200 B), `pool_vault` and, on pump venues, the trader ATA and UVA
+   (`getMinimumBalanceForRentExemption`); `market.create` disclosure.
+5. Submit → `create_market(venue_hint, max_creation_fee = the fee read)` through the pipeline;
+   `extend_account` prepended for a curve shorter than 115 B (`CurveNeedsExtend`); watched:
+   the wallet's SOL. On confirmation, navigate to `/m/<mint>`.
+
+### 3.6 Lend panel (LEND)
+
+Tabs Deposit | Withdraw | Claim (`lendTab-*`, `?action=`).
+
+- **Deposit:** source token account select (`readOwnerTokenAccounts`, ATA first; balance; CPI
+  Guard flag), amount (`AmountInput`, Max = balance), preview (shares minted
+  `previewDeposit` → `lendPreview-shares`, resulting share of the pool `lendPreview-share-bps`,
+  token value). Disclosures: `lender.solRepayment` **inline above the amount and again in the
+  review, with its required checkbox** (SPEC §5.3), `lender.risks`, `lender.lossHistory`,
+  `market.creatorSelfDealing` (collapsed), `lender.residuals` (collapsed). A source with CPI Guard
+  shows `token.cpiGuard` (`lendCpiGuardNotice`, plain deposit disabled) and the opt-in bracket
+  (`lendCpiGuardBracket`, FE-1). `deposit(amount, min_shares)`; `WipeSweepPending` → prepend the
+  permissionless sweep bundle (ARCH §3.3, §3.9: `sweep_trader`, on pump venues pump's
+  `claim_cashback` first when the UVA holds cashback, on PumpSwap pAMM `init_user_volume_accumulator`
+  when missing); a lender behind on epochs gets `ShareEpoch` remaining accounts
+  (`getShareEpochAccountMetas`) or `sync_lender` first.
+- **Withdraw:** shares (or %), Max = the pro-rata allowance (`previewAllowance`), preview tokens and
+  SOL (`previewWithdraw`), lock and `lock_until` after the withdrawal (`previewLock`,
+  `previewLockUntil`), destination account (ATA created idempotently if missing; memo flag →
+  `token.memoRequired`, `memo_program` = spl-memo v3, else the short.win program id as "none").
+  `lender.exitForfeitsVest` with its checkbox when shares remain and unreleased vest exists.
+  `withdraw(shares, min_tokens, min_sol)` with `min_sol` = the quoted SOL (FE-D6).
+  `LastSharesBorrowed`, `NegativePending` (→ cover deficit), `AboveProRataAllowance` mapped (§5.9).
+  *As built:* the input is in shares, displayed at the token's decimals, with 25 %, 50 % and Max
+  (the allowance); `withdraw-preview-sol` is a lower bound from the WASM (`previewWithdraw`
+  returns tokens only, FE-15) and the exact `min_sol` is the market vault's lamport delta in a
+  simulation of the same withdrawal with `min_sol = 0`, so the vest a last lender is paid is
+  included; `withdraw-preview-lock-until` is the end a new lock would get (the review's simulated
+  lender `lock` is exact); the vest-forfeit box is ticked in the panel and again in the review;
+  the destination select is `withdraw-destination-select`.
+- **Claim:** claimable now (`previewClaim`), vesting (`previewVestRelease` share), the pot, a
+  deficit (`claimValue-*`); `claim_sol()`; when the pot cannot cover the claim, prepend
+  `sync_lender` for other lenders whose touch moves a surplus to the pot (from
+  `/v1/markets/{mint}/lenders`, each judged with `previewTouch` on its on-chain state; ≤ 4 per
+  transaction); **cover deficit** (`cover_deficit(lamports)`) when pending < 0. *As built:* the
+  claim tab shows "credited" next to "claimable"; a lender more than 12 share epochs behind
+  (more records than one transaction carries) gets a `sync_lender` step first
+  (`lend-sync-submit`).
+
+### 3.7 Short panel (SHORT) — the open preview
+
+Inputs: size `Q` in tokens (`shortQInput`), slippage (`shortSlippageInput`, default 1 %). Every
+field below is recomputed on input and every new slot of the venue accounts (§6.5), from the
+chain with `@shortwin/math-wasm` (§6.7), and shown in `shortPreview-<field>`:
+
+| Field | Computation (as the program, ARCH §3.4) |
+|---|---|
+| `q` | the borrowed quantity (raw tokens) |
+| `proceeds` (S) | `S_exp` = venue `sell(q, x, y, realQuoteCap)` (curve: `sellCurve`); `min_proceeds = ⌊S_exp·(10⁴ − slippage_bps)/10⁴⌋` |
+| `margin` (M) | `marginD4(S_exp, B̂_spot, B̂_ema, cr_open_bps)` with `B̂_spot` the buyback quote on the post-sale reserves and `B̂_ema` on the newest ring entry's cached reserves; `max_margin = ⌈M·1.02⌉` |
+| `open-fee` | `openFee(N_open, open_fee_bps)` with `N_open = B̂_spot` post-open; `max_open_fee = ⌈fee·1.02⌉` |
+| `total-cost` | M + open fee + new-account rent (position; exposure on a first open) + network fee; the position's rent returns on close |
+| `cr-open`, `cr-ema` | `crBps(vEff(S + M, 0), B̂_spot)`, `crBps(S + M, B̂_ema)` (≥ the tier's opening CR) |
+| `liq-price` | `venue.capped(fee cap).liquidationPrice(q, v_eff, cr_liq_bps, L, P)` as SOL per token |
+| `rent-rate` | APR after the open: `rateBps(base, slope1, slope2, utilizationBps(T − q, ΣB_Q + q), kink)`; per-day SOL at `P_ema` |
+| `min-rent` | `minRent(q, P_ema, …, min_rent_s)` (1 h; Tier D 4 h) |
+| `max-duration`, `deadline` | the tier's `max_duration_s`; `now + max_duration_s` (UTC) |
+| `tier-terms` | the terms locked into the position at open: opening and liquidation CR, penalty, max liquidation slippage, rate curve, rent protocol share, max duration |
+| `caps` | `maxQPosition(conservativeX0(…), impact_pos_bps)`, `oiCap`, `utilOk`, `walletOk` (25 % of the OI cap per key), `curveGammaOk` (Tier D), `notionalOk`; the binding cap first; `shortCapWarning` above it |
+
+Blocked states (`shortBlocked`, `data-code` = the program error that would refuse the open) are
+derived before simulation from the chain: paused opens, coverage pause and the 5 s after a clear,
+route broken, venue disabled / upgraded / flagged, list-only, migrating, graduation halted, listing
+window, market warm-up, EMA warm-up, boost in progress, mint unsafe, price deviates from EMA, no
+inventory. Disclosures: `borrower.liquidation` with its required checkbox (placeholders from the
+live tier terms), `borrower.residuals` (collapsed), `market.tierAge` (tier popover). Submit →
+`open_short(nonce, q, min_proceeds, max_margin, max_open_fee)` with a random u64 `nonce` (the
+position PDA is `["position", market, borrower, nonce]`); watched: the wallet's SOL, the new
+position (`q`, `s`, `m`, `v`, deadline), the market's free tokens.
+
+### 3.8 Positions, position detail, lender dashboard
+
+- **Positions** (SHORT; SPEC §8): one row per position (`positionRow-<pubkey>`): market, `Q` owed,
+  vault SOL (`v`), CR now (`crBps(vEff(v, R_due), B̂_live(q))`), liquidation price, P&L if closed now
+  (`previewClose(v, B̂_live, R_due, rent_protocol_bps).borrower − (m + margin_added + fee_open)`),
+  rent accrued (`PositionRent.due`), time left (`Countdown` to `deadline`), risk badge
+  (`riskLevel(CR, CR_ema, cr_liq_bps)`: safe / watch / at risk / at risk (live price below) /
+  liquidatable), status; actions add margin,
+  close. Closed positions show the exit (`exit` of the API): kind, condition, payout, P&L. Live:
+  `position:<pubkey>` per open row (≤ 40), else a 5 s refetch.
+- **Position detail** (SHORT): the row's fields, locked terms, arming state (`armed`), the event
+  timeline (`/v1/positions/{pubkey}`); **add margin** (`addMarginInput`, CR after →
+  `addMarginPreviewCr`, `add_margin(amount)`); **close** (`closeSlippageInput`; preview buyback
+  `B̂_live`, rent, payout, P&L; `close_short(max_buyback_cost = ⌈B̂·(1 + slippage)⌉)`; `InsufficientVault`
+  → suggest add margin; `CurveStraddle` → `closeStraddleNotice`, FE-3).
+- **Lender dashboard** (LEND; `/lend`): per market (`lenderRow-<market>`): shares and share of the
+  pool, token value (`previewTokenValue`), SOL claimable (`previewClaim`), vesting, lock and
+  `lock_until`, creator badge; claim per row and "claim all" (one transaction per market).
+  *As built:* plus the share-epoch standing and the indexer's view per row (`lender-epochs-*`,
+  `lender-indexer-*`), a per-row `sync_lender`; while the indexer fails, the rows come from
+  `getProgramAccounts` on the owner's `LenderPosition`s (memcmp on the owner, `dataSize` 241).
+- **Risk levels** (as built; *v1.2, M9-UX-4*): `riskLevel(crBps, crEmaBps, liqCrBps)` returns
+  `safe` / `watch` / `danger` / `below` / `critical` — the values of `data-risk` — shown as Safe /
+  Watch / At risk / At risk (live price below) / Liquidatable. It judges as the program does
+  (`shortwin-math risk::cr_below`): `critical` only when the CR is **strictly** below the line on
+  **both** the live and the smoothed leg, `below` when only the live leg is; `danger` / `watch` are
+  within 10 % / 30 % above it on the live leg. The exit state (`SettlementRisk` `exitState`, the
+  badge's tooltip) is derived from the same function, so the two never disagree. A single CR figure
+  (a preview's CR at open) is coloured by `crBand` and never reads "Liquidatable".
+- **Which market prices a position** (*v1.2, M9-SEC-2*): the chain's. The live columns use the
+  snapshot of the mint of the `Market` the position account names (read from the chain); a
+  snapshot of another market is refused. When the indexer's market or mint for a row disagrees,
+  the row carries `position-data-mismatch` and the page a banner; the position page reads the
+  `Market` at `position.market` whatever the indexer says.
+
+### 3.9 Protocol status (MARKETS)
+
+Global pause (`/v1/admin/config.paused_opens`), the venue programs (`/v1/venues.guards`: name,
+upgraded latch, guard slot vs ProgramData slot, flagged at; enabled bit; route-broken bit), the
+extras sets in force, markets in degraded mode (coverage-paused) and with route-broken or a running
+no-route chain (FE-5), the indexer's health (`/v1/status`: lag, quarantined, missing, truncated
+logs), the keeper coverage totals (`/v1/stats.coverage_gap_s`).
+
+### 3.10 Loading, empty and error states
+
+Skeleton rows while loading (never a spinner over a table); empty states say what would fill them
+and offer the next action; errors show the mapped message with Retry (`ErrorState`); 404 from the
+indexer for a market that exists on chain renders the chain view (FE-D1).
+
+---
+
+## 4. Disclosures
+
+### 4.1 Rules
+
+1. The copy below is **exact**. Components render it only through `<Disclosure id=… />` from
+   `src/config/disclosures.ts`; no component paraphrases, truncates or restyles a disclosure into
+   other words. `{name}` placeholders are filled with formatted values; a missing value throws (it
+   never renders `{name}`).
+2. SPEC §5.3's sentence is verbatim, on the deposit screen, **before signing**, with a required
+   checkbox whose label is the sentence itself; the review modal repeats it and the Sign button
+   stays disabled until it is ticked (`canSign`).
+3. Disclosures with an acknowledgement text gate the Sign button of the flow that lists them in
+   its `TxPlan.disclosures`. Acknowledgements are per transaction (never remembered).
+4. Changing a text is a contract change: edit `disclosures.ts` and this section together
+   (`disclosures.test.ts` fails otherwise).
+5. Numbers quoted in disclosures come from SPEC / ECON / ARCH as cited in *Source*; every number
+   governance can change (ECON §15 bounds) is a placeholder: the live tier terms and `GlobalConfig`
+   parameters fill it on the panels, the terms a position locked at open fill it on that position's
+   pages (*v1.2, M9-UX-3:* `{expiryFee}`, `{s3Wait}`, `{keeperReward}`, `{vestPeriod}`,
+   `{lockGrace}`; `{maxDuration}` of an open position is its own `deadline − t_open`; filled by
+   `src/config/disclosureVars.ts` and the features' `*DisclosureVars`).
+
+### 4.2 Catalogue
+
+#### `lender.solRepayment` — You may be repaid in SOL
+
+*Severity:* danger · *Acknowledgement:* required · *Source:* SPEC §5.3 (verbatim, required checkbox)
+*Shown:* Lend → Deposit, inline above the amount, and in the review modal (required checkbox before signing)
+
+> If a borrower can't be bought back, you will be repaid in SOL, which may be worth less than the tokens you lent.
+
+Checkbox: “If a borrower can't be bought back, you will be repaid in SOL, which may be worth less than the tokens you lent.”
+
+#### `lender.risks` — How lending works here
+
+*Severity:* warn · *Acknowledgement:* none · *Source:* SPEC §2.4, §5.4, §7; ARCH §3.3, §7.3; ECON §9.3–§9.5, §15
+*Shown:* Lend → Deposit (always visible, collapsible after first view per wallet), lender dashboard header; `{lockGrace}`, `{vestPeriod}` from `GlobalConfig` (`lock_grace_s`, `lump_vest_s`)
+
+> Lending is not staking and not risk-free. You earn rent from borrowers who short this token.
+>
+> Losses stay in this market: if a position cannot be bought back, every lender in this pool shares the loss pro-rata. There is no insurance fund and no treasury backstop.
+>
+> You can withdraw only from tokens that are not lent out, as a pro-rata mix of tokens and SOL. While tokens are borrowed, part of your shares can stay locked until the positions they stand for have expired, plus up to {lockGrace}.
+>
+> Rent is credited continuously. One-off income (your share of liquidation penalties, expiry fees, settlement proceeds above market value and swept balances) vests over {vestPeriod}.
+>
+> SOL that arrives while this market has no lenders goes to the protocol.
+
+#### `lender.lossHistory` — What gaps cost lenders
+
+*Severity:* info · *Acknowledgement:* none · *Source:* ECON §11.6 (alpha = 2 column); INDEXER §8.4
+*Shown:* Lend → Deposit and market page → Lenders tab; `{tier}`, `{breakEvenDays}` (ECON §11.6 α = 2: A 535, B 205, C 84, D 28), `{settlements}`, `{realisedLoss}` from `/v1/markets/{mint}`
+
+> If the price jumps past a position faster than it can be liquidated, the lenders are repaid in SOL worth less than the tokens. In the protocol’s model, lending in Tier {tier} breaks even if such a jump happens on this token less than about once every {breakEvenDays} days. These figures are illustrative and not yet calibrated on real data.
+>
+> This market so far: {settlements} SOL settlements, realised lender loss {realisedLoss} SOL.
+
+#### `lender.exitForfeitsVest` — Unvested income stays in the pool
+
+*Severity:* warn · *Acknowledgement:* required · *Source:* ARCH §3.3 (last lender, R4B-4)
+*Shown:* Lend → Withdraw, when the withdrawal leaves shares behind and the vest is unreleased (`previewVestRelease`); `{vesting}` in SOL; required checkbox
+
+> You have {vesting} SOL of income still vesting. If you withdraw now, the unvested part stays with the lenders who remain.
+
+Checkbox: “I understand I give up my unvested income.”
+
+#### `lender.residuals` — Known limits (accepted by the protocol)
+
+*Severity:* info · *Acknowledgement:* none · *Source:* ARCH §8.5, §10 O19 (OWNER-M7-11, R4B-10); ECON §8.2, §9.3, §9.5, §12.9–§12.11
+*Shown:* Lend → Deposit (collapsed `<details>`), FAQ link. *v1.2 (M9-UX-2):* the three O19 residuals that fall on lenders — the liquidation that reserves nothing (ARCH §8.5's Tier A figures), Raydium pool pinning by a standing minimum position (R4B-10), the notional-cap exceedance of M7-SEC-4 in a lender's framing — were missing and are added
+
+> If lenders withdraw ahead of a loss, those who leave first can take more than their fair share and those who stay less: about 4% of value at 90% utilisation, up to about 11% at 50–60%.
+>
+> A borrower can pay to delay its own liquidation by disturbing the price check every second. It only delays, at the borrower’s cost.
+>
+> Settlement amounts can be pushed by up to ±1%, and a settlement can be delayed (about 13 seconds per second an attacker controls the price observations, or indefinitely at a cost paid every second).
+>
+> If the keeper loses coverage, 5 consecutive seconds of attacker-controlled observations can turn a capped settlement into a full one.
+>
+> Small positions depend on short.win’s own keeper. A liquidating keeper is paid at least the SOL-settlement keeper reward.
+>
+> A liquidation sets nothing aside for the lenders: when buying the tokens back uses up the position’s vault, the lenders and the protocol lose the penalty and, on a position open for a long time, the rent the vault no longer covers. In the protocol’s Tier A model this is about 2.06 SOL on a fresh position and about 8.02 SOL on one open for 25 days at 90% utilisation.
+>
+> A minimum-size position held open can stop a Raydium market from moving to a deeper pool, so the market can stay on a thinner pool than it could use. The emergency multisig can pause new shorts to clear it.
+>
+> A sale bundled into an open can make that open record up to 10% less notional than an honest quote, so the market’s notional cap — the limit on how much can be shorted while a market is new — can be exceeded by up to about 11%.
+>
+> Tiny dust amounts can be left behind when a pool rebases.
+
+#### `borrower.liquidation` — How this short can end
+
+*Severity:* danger · *Acknowledgement:* required · *Source:* SPEC §4, §5, §6.1; ARCH §3.4–§3.8
+*Shown:* Short panel above the submit button and in the review modal (required checkbox); placeholders from the live tier terms and parameters (`GlobalConfig`: `{expiryFee}` = `expiry_fee_bps`, `{s3Wait}` = `s3_wait_s`); on the position page from the position's locked terms (its `expiry_fee_bps`, `s3_wait_s`, `{maxDuration}` = `deadline − t_open`)
+
+> Your collateral is your margin plus the sale proceeds, locked in the position’s vault. Collateral ratio (CR) = vault SOL ÷ the SOL needed to buy the tokens back now, including price impact.
+>
+> Liquidation: if CR falls below {liqCr} on both the live price and the smoothed price, anyone can liquidate. The tokens are bought back with your vault SOL, a {penalty} penalty is taken, and the rest comes back to you.
+>
+> Expiry: after {maxDuration} the position can be closed by anyone. You pay a {expiryFee} expiry fee instead of the penalty.
+>
+> Settlement in SOL, when the tokens cannot be bought back:
+>
+> S1 — the price jumped past your vault: the lenders take all vault SOL minus the keeper reward. You receive nothing.
+>
+> S2 — buying back would exceed the maximum liquidation slippage ({maxSlippage}): the lenders take the vault SOL minus the keeper reward, but no more than fair value (the buyback at the smoothed price plus the penalty and rent; the {expiryFee} expiry fee instead of the penalty for an expired position). Anything above that comes back to you.
+>
+> S3 — no route to buy back for {s3Wait} while the position is liquidatable (venue halted, pool drained, migration stuck): as S2.
+>
+> Rent accrues every second on the borrowed tokens’ value; at least {minRent} of rent is charged.
+
+Checkbox: “I understand my position can be liquidated or settled in SOL.”
+
+#### `borrower.residuals` — Known limits (accepted by the protocol)
+
+*Severity:* info · *Acknowledgement:* none · *Source:* ARCH §8.5, §10 O19 (OWNER-M7-11); ECON §8.2, §12.2, §12.5, §12.6
+*Shown:* Short panel (collapsed `<details>`), position detail; `{keeperReward}` from `GlobalConfig` (`settle_keeper_fixed`, `_bps`, `_cap`) on the panel and from the position's locked terms on its page, `{maxDuration}` as for `borrower.liquidation`
+
+> A keeper that liquidates you may pay up to 2% more than the protocol’s reference price for the buyback; that comes out of what is returned to you.
+>
+> If someone holds the price up while your position is being liquidated, the keeper can take most of what would otherwise come back to you.
+>
+> A liquidating keeper is paid at least {keeperReward}, topped up from what would come back to you.
+>
+> If the venue halts or breaks, a healthy position can be neither closed nor settled until the route returns, an adapter upgrade lands (48-hour timelock), or the position reaches its deadline (up to {maxDuration}).
+>
+> A sale bundled into an open can make that open record up to 10% less notional than an honest quote, so a market’s notional cap can be exceeded by up to about 11%. Your margin is not affected.
+>
+> On low-fee Raydium pools, a basket of positions at the market’s open-interest cap can still be profitable to manipulate.
+
+#### `market.creatorSelfDealing` — The token’s creator can be on both sides
+
+*Severity:* warn · *Acknowledgement:* none · *Source:* SPEC §7, §12 R1; ARCH §7.3 (C0-18), §8.5; ECON §12.8
+*Shown:* Market page → Overview (always), Lend → Deposit (collapsed); `{creatorFee}` = `creator_exposure.creator_fee_income_lamports` in SOL
+
+> The creator of this token can lend its own supply here and short it from another wallet — in effect selling into the market. If the token then rises, the creator may be repaid in SOL on its own lending.
+>
+> Deposits from the creator’s wallet are shown on this page. Other wallets the creator controls cannot be identified, and the per-wallet cap does not stop one person from using several wallets.
+>
+> The creator also earns the venue’s creator fee on every short.win trade of this token: {creatorFee} so far.
+
+#### `market.tierAge` — Why this tier
+
+*Severity:* info · *Acknowledgement:* none · *Source:* SPEC §4 (O13, O13b)
+*Shown:* Market page → tier badge popover (“Why this tier”) and Short panel tier terms
+
+> Tiers are set automatically from on-chain liquidity and pool age, and checked again on every trade.
+>
+> short.win can only prove a pool’s age from the moment it first saw it: the real graduation time for tokens listed before they graduated, otherwise the listing time. A Raydium CPMM pool created after mid-2024 records its own creation time, which is used instead.
+>
+> An older pool listed today therefore starts in Tier C for 24 hours and is at most Tier B until day 7. This is conservative: higher margins, smaller caps and shorter durations.
+
+#### `market.coveragePause` — New shorts paused: keeper coverage
+
+*Severity:* warn · *Acknowledgement:* none · *Source:* SPEC §11 (O17, M7-3, M7-13/14)
+*Shown:* Market page banner and Short panel (replaces the form) while `flags.paused_coverage`; status page
+
+> short.win’s keeper cannot currently cover this market (degraded mode), so new shorts are paused.
+>
+> Closing, adding margin, liquidations, settlements, withdrawals and claims continue. New shorts resume automatically once coverage is back.
+>
+> While coverage is degraded, positions here may be liquidated later than usual.
+
+#### `market.poolSwitch` — This market’s pool can change
+
+*Severity:* info · *Acknowledgement:* none · *Source:* SPEC §14 (#99, M4R-1, M4F-1); ARCH §2.6
+*Shown:* Market page → Pools tab; banner while a collection window is open (`/pools.window`) or `ema_warm > 0`
+
+> If the current pool fails (halted, drained or too expensive), short.win can move this market to a deeper pool.
+>
+> Open positions move only if each one fits the new pool’s normal opening limits. Otherwise they stay and settle in SOL at fair value at their deadline (S3).
+>
+> Right after a change, the new pool’s prices are confirmed for 8 seconds before liquidations and new shorts resume.
+
+#### `market.routeBroken` — Route marked broken
+
+*Severity:* danger · *Acknowledgement:* none · *Source:* SPEC §11 (O6)
+*Shown:* Market page banner and Short panel while the market or venue route-broken bit is set; status page; `{s3Wait}` from `GlobalConfig` (`s3_wait_s`)
+
+> The emergency multisig marked this market’s trading route as broken. New shorts are refused.
+>
+> Closes and liquidations are never paused by this flag, but they can fail while the venue cannot trade. Positions that are liquidatable settle in SOL after {s3Wait} without a route (S3).
+
+#### `market.venueUpgraded` — Venue upgraded, under review
+
+*Severity:* warn · *Acknowledgement:* none · *Source:* ARCH §0 (8), §3.1 (ADOPTED Q13)
+*Shown:* Market page banner and Short panel while the venue guard latches the market’s venue; status page
+
+> A venue program this market trades on was upgraded and has not been re-validated yet. New shorts wait for the review; exits are never blocked by it.
+
+#### `market.migrating` — Graduating to its pool
+
+*Severity:* warn · *Acknowledgement:* none · *Source:* SPEC §5.3; ARCH §5.4
+*Shown:* Market page banner and position rows while the venue is `pump_migrating`
+
+> This token is migrating from the Pump.fun curve to its pool. Closes and liquidations pause during the migration and resume once the pool’s prices are confirmed.
+>
+> If the migration gets stuck, positions settle in SOL (S3) after the migration pause.
+
+#### `market.graduationHalted` — Graduation halted
+
+*Severity:* warn · *Acknowledgement:* none · *Source:* SPEC §14 M6-SEC-3; ARCH §3.11 (6104)
+*Shown:* Short panel on a curve market while PumpSwap `disable_flags` bit 0 is set
+
+> PumpSwap pool creation is disabled, so this curve cannot graduate. New curve positions are refused until it is re-enabled; open positions are unaffected.
+
+#### `market.listOnly` — Lend only
+
+*Severity:* info · *Acknowledgement:* none · *Source:* SPEC §3
+*Shown:* Market page and Short panel on a `none` venue
+
+> This token has no pool short.win can price on-chain yet (for example it trades only on Orca, Meteora DLMM or Raydium CLMM). It can be listed and lent, but not shorted.
+
+#### `market.venueTrust` — Venue trust assumptions
+
+*Severity:* info · *Acknowledgement:* none · *Source:* ARCH §8.5; SPEC §12 R5
+*Shown:* Market page → Overview (collapsed), create-market page
+
+> Pump.fun, PumpSwap and their fee program can be upgraded at any time by one upgrade authority, and are upgraded several times a month.
+>
+> Raydium AMM v4 and CPMM are upgraded by a 3-of-4 multisig with no timelock and have no verified builds. A 2-of-3 pool admin can halt a pool or raise its fees.
+>
+> Token-2022 is upgradeable. short.win itself is upgradeable by its governance multisig after a 48-hour timelock.
+>
+> A malicious venue upgrade can harm exits; no design can prevent that.
+
+#### `market.mintUnsafe` — Token flagged unsafe
+
+*Severity:* danger · *Acknowledgement:* none · *Source:* SPEC §3; ARCH §3.9 flag_unsafe_mint
+*Shown:* Market page banner, Short and Lend panels while `flags.mint_unsafe`
+
+> This token no longer passes the safety filter (freeze authority, permanent delegate, transfer hook or transfer fee). Deposits and new shorts are blocked; withdrawals, claims and exits continue.
+
+#### `market.create` — Creating a market
+
+*Severity:* info · *Acknowledgement:* none · *Source:* SPEC §3; ARCH §3.2
+*Shown:* Create-market page and its review modal; `{fee}` from `GlobalConfig`, `{rent}` from `getMinimumBalanceForRentExemption` of the accounts
+
+> Anyone can create a market for any token that passes the safety filter. There is no approval and no special status for the creator.
+>
+> You pay the creation fee ({fee}) and the rent for the market’s accounts ({rent}). The rent stays in the accounts.
+
+#### `token.cpiGuard` — CPI Guard is on for this token account
+
+*Severity:* warn · *Acknowledgement:* none · *Source:* ARCH §3.3; R-MINT §8.4
+*Shown:* Lend → Deposit when the source token account has `CpiGuard.lock_cpi` (blocks the plain deposit; offers the bracket, FE-1)
+
+> CPI Guard blocks transfers that programs make on your behalf, so short.win cannot deposit from this token account.
+>
+> Deposit from another account of this token without CPI Guard, or turn CPI Guard off for this one deposit: the transaction turns it off, deposits and turns it back on, and your wallet shows all three steps.
+
+#### `token.memoRequired` — Memo required
+
+*Severity:* info · *Acknowledgement:* none · *Source:* ARCH §3.3 (M1-SEC-7)
+*Shown:* Lend → Withdraw when the destination has `MemoTransfer.require_incoming_transfer_memos` (informational; `memo_program` is passed)
+
+> This token account only accepts transfers with a memo. short.win adds the memo when it pays tokens to it.
+
+#### `tx.simulation` — Simulated result
+
+*Severity:* info · *Acknowledgement:* none · *Source:* SPEC §9; ARCH §7.3
+*Shown:* Every review modal (collapsed)
+
+> These changes come from simulating the transaction against the current chain state. The result can differ if the market moves before it lands; the limits you set protect you.
+
+
+---
+
+## 5. Transaction lifecycle
+
+Every transaction goes through one pipeline (`src/tx/`), driven by `useTxFlow` and shown in
+`TxReviewModal`:
+
+```
+feature ── TxPlan ──▶ simulating ──▶ review ──(Sign: ok ∧ acks ∧ < 20 s)──▶ signing ──▶ confirming ──▶ confirmed
+                         ▲   │  ▲         │                                   │              │
+                         │   ▼  └─Refresh─┘                                   ▼              ▼
+                         └─ failed ◀──────────────────────────────────── (mapped error, Retry per `retryMode`)
+```
+
+### 5.1 Building (features; `@shortwin/client`; `src/venues`)
+
+- **Instructions** come only from the Codama builders of `@shortwin/client`
+  (`getOpenShortInstructionAsync`, `getDepositInstructionAsync`, …; PDAs from its `find*Pda`
+  helpers, `ShareEpoch` metas from `getShareEpochAccountMetas`), from `@solana-program/token` /
+  `token-2022` (idempotent ATA creation, CPI Guard enable / disable) and from the venue layer.
+  No hand-encoded instruction data. Every signer input of a builder (`owner`, `borrower`,
+  `creator`, the fee payer) is the connected wallet's `signer` from `useWallet()` — the same object
+  for the whole plan — never a bare address, so Kit's `signTransactionMessageWithSigners` finds
+  exactly one signer: the wallet.
+- **Venue accounts** (`src/venues`, SHORT; frozen interface `src/venues/types.ts`): `ReadSet ++
+  TradeExtras ++ Extras` for `open_short` / `close_short` per venue (ARCH §3.0, §3.12) — a
+  TypeScript port of `services/keeper/src/venue.rs` (the same slot order and writability), with the
+  slots the program checks against live state read at the same slot (the pump / PumpSwap fee and
+  buyback recipients picked at random from the live `Global` / `GlobalConfig` lists, ARCH §7.3 —
+  the keeper instead spreads its own exits by the mint's first byte —, and the coin-creator vault of
+  the live curve / pool). Extras: the `current` set of `VenueExtras`; on a simulation
+  failure with `BadExtras` / `BadRemainingAccounts`, retry once with `previous`, then `stable`
+  (ARCH §7.1 duty 10). `detectVenue` and `raydiumCandidates` serve create-market (§3.5).
+- **Prepended instructions** (idempotent, each shown in the review): ATA creation for a withdrawal
+  destination; pump `extend_account` for a short curve; PumpSwap T11 `create_idempotent` after a
+  coin-creator change (ARCH §5.4 case 4); `sync_lender` / `ShareEpoch` records for a lender behind on
+  epochs; the post-wipe sweep bundle for a deposit into a wiped pool (§3.6); the CPI Guard bracket
+  (FE-1).
+- **Plan** (`TxPlan`, `src/tx/types.ts`): `kind`, `title`, `instructions` (no compute-budget ones),
+  `watch` (accounts whose before / after the review shows: `lamports`, `token`, or `program` with a
+  decoder and field units), `disclosures`, `disclosureVars`, extra `lookupTables`, `invalidate`
+  (query keys to refetch after confirmation).
+
+### 5.2 Message
+
+`buildMessage` (`src/tx/message.ts`): v0 with the protocol ALT (`VITE_PROTOCOL_ALT`, ARCH §6.4
+A28, built with `scripts/build-alt.sh`) plus the plan's tables, compressed with Kit's
+`compressTransactionMessageUsingAddressLookupTables`; fee payer = the connected wallet's signer;
+`SetComputeUnitLimit` and `SetComputeUnitPrice` first; the plan's instructions in order. Legacy
+(without tables) only when the wallet cannot sign v0 (`supportedTransactionVersions`). A compiled
+transaction over 1,232 bytes is refused before simulation (`kind: 'size'`; the PumpSwap open with 4
+extras fits A28 only when the wallet pays its own fee, OWNER-M7-1 — it always does here).
+
+### 5.3 Simulation and review
+
+`simulatePlan` (`src/tx/simulate.ts`):
+
+1. Refuse any instruction whose program is not in `TOP_LEVEL_ALLOWLIST` (§5.8).
+2. Build the message exactly as it will be signed, with the compute limit at 1,400,000 and the
+   chosen priority fee.
+3. In parallel: `getMultipleAccounts(watch, base64, confirmed)` (pre-state) and
+   `simulateTransaction(wire, { encoding: 'base64', sigVerify: false, replaceRecentBlockhash: true,
+   commitment: 'confirmed', accounts: { addresses: watch, encoding: 'base64' } })`.
+4. `computeDeltas(watch, pre, post)`: SOL balances, token amounts (offset 64 of a token account),
+   decoded program fields (e.g. position `q`, `v`, `m`; lender `shares`, `lock`; market `T`); the
+   compute-unit limit for signing = `⌈unitsConsumed·1.15⌉ + 10,000` within [20,000, 1,400,000]; the
+   fee = 5,000 lamports + `⌈limit·price/10⁶⌉`.
+5. A failing simulation maps its error (§5.9) and the flow stops in `failed` (Sign never enabled).
+6. *v1.2 (M9-UX-1).* **Retry** does what fixes the failure (`useTxFlow` `retryMode`): a transient
+   one (RPC, an expired blockhash, a wallet rejection) re-simulates the same plan; a refusal a
+   fresh plan fixes — a short.win error whose action is `retry` (a moved quote under its `min_*` /
+   `max_*` bounds, changed venue accounts or epoch records, a missing memo / sync / sweep step) or
+   Token-2022's memo (36) / CPI Guard (42) refusal — runs `TxPlan.rebuild()`: the same user inputs
+   on a fresh chain read, a new quote and new bounds, the steps re-derived (`features/lend/build.ts`
+   for deposit / withdraw / claim / cover / sync, `features/short/trades.ts` + `useTradeFlow` for
+   open / close), shown with `tx-rebuilt-notice` and new acknowledgements ("Retry with a new
+   quote"); a plan without `rebuild` (add margin, create market) closes the review and invalidates
+   its `invalidate` keys so the form re-reads and builds a new one ("Close and review again"). A
+   transaction that may still land (`unknown-outcome`) or has landed (a post hoc integrity
+   incident) offers no Retry. The refusal copy says "a new review …" (§5.9).
+
+The review shows: title, stage, *v1.2:* **who signs** (`tx-wallet`: "Signing with <wallet icon and
+name> · <short account>", and the caveat for a sending-only wallet; M9-SEC-8), simulation status,
+**the plan's instructions** (`tx-instruction-<i>`:
+program and instruction name decoded from each instruction's own program id and discriminator by
+`src/tx/describe.ts` — the Codama / `@solana-program` identifiers, pump and PumpSwap by their
+Anchor discriminators — never from the feature's description; *added at integration*), the delta
+table (before → after → change, signed and coloured, units), compute units and fee, the priority
+selector (Normal p75 / Fast p95, re-simulates), the plan's disclosures with their checkboxes,
+`tx.simulation` (collapsed; *v1.2:* in every review, M9-UX-3), and errors with their action.
+Titles and delta labels name the token by symbol **and** short mint ("Open short · 1,000 BONK ·
+DezX…B263", "Borrowed (BONK · DezX…B263)"; M9-SEC-5). **Watched accounts per flow** (minimum): create market — wallet SOL; deposit —
+wallet SOL, source token account, lender position (`shares`, `lock`); withdraw — wallet SOL,
+destination token account, lender position; claim / cover — wallet SOL, lender position (`claimed`,
+`pending`); open — wallet SOL, position (`q`, `s`, `m`, `v`, `deadline`), market (`tokens_free`);
+close — wallet SOL, position (closed → absent); add margin — wallet SOL, position (`m`, `v`).
+Decoded fields carry the generated client's names (`tokensFree`, `q`, `shares`, …), which is what
+`tx-delta-<address>:<field>` uses.
+
+### 5.4 Signing (Wallet Standard)
+
+Discovery, connection and account selection are `@solana/kit-plugin-wallet` (`walletWithoutSigner`:
+the plugin never signs implicitly; the pipeline passes the connected `signer` as fee payer). At Sign:
+
+1. If the review is older than `STALE_REVIEW_MS` (20 s), re-simulate and return to the review with a
+   notice; the user signs only numbers they saw.
+2. Rebuild the message with the measured compute limit and a fresh `confirmed` blockhash.
+3. A wallet with `solana:signTransaction` (Kit `TransactionModifyingSigner`) signs through
+   `signTransactionMessageWithSigners`; the returned message is checked by `assertSameIntent` (§5.8)
+   before anything is sent. A wallet with only `solana:signAndSendTransaction` sends itself
+   (`signAndSendTransactionMessageWithSigners`); the app then confirms by signature status and checks
+   the landed transaction post hoc (a mismatch is reported, not prevented — such wallets are
+   labelled in the wallet menu). *As built v1.2 (M9-SEC-1):* `send.ts` `checkLanded` reads the
+   landed transaction (`getTransaction`, base64, `maxSupportedTransactionVersion: 0`, `confirmed`),
+   decompiles it with the same tables and runs `assertSameIntent` on it (any lifetime, the fee
+   ceiling); a mismatch, or a transaction that cannot be read back, is an integrity incident
+   (`LandedIntegrityError` → `integrity`, no Retry). The app cannot see which blockhash such a
+   wallet sent with, so a signature not seen by the app's blockhash bound + 151 blocks (or the
+   confirmation timeout) ends as `unknown-outcome` ("check the explorer before trying again"),
+   never as `expired`. The wallet menu badges such a wallet (`wallet-sends-itself-badge`) and the
+   review says it cannot be checked before it is sent.
+4. A rejection in the wallet maps to `wallet-rejected` (`action: retry`), not to an error banner.
+   *v1.2 (M9-UX-7):* only what the wallet call itself throws (`send.ts` wraps it in
+   `WalletCallError`) or a wallet-specific code / name (4001, `WalletSignTransactionError`,
+   `WalletRejectedError`) can read as a rejection; an RPC's "access denied", a rate limit's "request
+   denied" or a load balancer's "cancelled" maps to `rpc`.
+5. *v1.2 (M9-SEC-8).* Wallet identity: two registered wallets with the same name are told apart in
+   the menu (keyed by identity, `wallet-option-<name> (2)`, a `wallet-duplicate-badge` with the
+   registration rank and feature set); a silent reconnect (the plugin's stored `name:address`) is
+   undone when another installed wallet uses that name or the wallet came back with another
+   account, and the user picks the wallet explicitly.
+
+### 5.5 Send and confirm
+
+Kit's `sendAndConfirmTransactionFactory({ rpc, rpcSubscriptions })` with preflight at `confirmed`
+(the second simulation catches state that moved since the review) and confirmation at `confirmed`
+within the blockhash's `lastValidBlockHeight`; the signature is shown as soon as it is known
+(stage `confirming`), with an explorer link (`VITE_EXPLORER_TX_URL`). Block-height expiry maps to
+`expired` (Retry re-simulates and signs again: a new transaction, never a re-broadcast of an expired
+one). On confirmation: the plan's `invalidate` keys and the wallet balance are invalidated, a success
+toast is pushed, the modal shows Done. The modal cannot be dismissed while signing or confirming.
+*v1.2 (M9-SEC-4):* the lifetime confirmed against is always explicit (`confirmationLifetime`): ours
+when the wallet kept our blockhash; when it chose its own, that one only while `isBlockhashValid`
+says so, bounded by the current block height + 151 (Kit would otherwise confirm a changed message
+against `lastValidBlockHeight` = 2⁶⁴ − 1, forever). Confirmation has a hard timeout
+(`CONFIRM_TIMEOUT_MS`, 120 s) after which the review is dismissible in `unknown-outcome`. When the
+wallet changed the compute budget, the fee as it signed it is shown (`tx-final-fee`, FE-2).
+
+### 5.6 Compute budget and priority fee
+
+Compute limit from the simulation (§5.3). Priority fee (`src/tx/priorityFee.ts`): the 75th (Normal)
+or 95th (Fast) percentile of `getRecentPrioritizationFees` over the transaction's writable accounts,
+clamped to [1,000, `VITE_PRIORITY_FEE_MAX_MICROLAMPORTS`] µlamports per CU (FE-6); 0 on localnet.
+The review shows the resulting fee in SOL; a wallet that raises it (FE-2) is shown the final fee.
+
+### 5.7 Token accounts: CPI Guard, memo-required destinations, ATAs (ARCH §3.3; R-MINT §8.4)
+
+`src/tx/tokenAccount.ts` parses token accounts by hand (base layout 165 B, Token-2022 account-type
+byte 2 at 165, TLV from 166): `CpiGuard` (extension 11, `lock_cpi`) and `MemoTransfer` (extension 8,
+`require_incoming_transfer_memos`).
+
+- **Deposit from a CPI-Guarded account:** the program's `transfer_checked` CPI with the owner's
+  signature fails Token-2022 error 42 (`CpiGuardTransferBlocked`). The panel detects the flag before
+  building (`readOwnerTokenAccounts`), disables the plain deposit, shows `token.cpiGuard`, and offers
+  (FE-1) the bracket `[DisableCpiGuard(owner), deposit, EnableCpiGuard(owner)]` — all top-level,
+  owner-signed, in one transaction; the review shows all three. If a deposit nevertheless fails with
+  42 (the flag changed between read and send), the error maps to the CPI Guard message.
+- **Withdrawal to a memo-required account:** `withdraw`'s `memo_program` = spl-memo v3
+  (`MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr`), so the program CPIs a memo right before its
+  `transfer_checked` (M1-SEC-7); otherwise the short.win program id ("none"). Without it the
+  program refuses `MemoProgramRequired` (6095); Token-2022's `NoMemo` (36) maps to the same advice.
+  Mainnet acceptance of a CPI'd memo is UNVERIFIED (T-MEMO, M10); the E2E proves it on the local
+  validator's Token-2022 (§10.3).
+- **ATAs:** a missing withdrawal destination is created with `createAssociatedTokenIdempotent` for
+  the mint's token program (`mint.owner`; never assume SPL Token, R-MINT §8.5).
+
+### 5.8 Integrity: no blind signing (`src/tx/integrity.ts`)
+
+1. `assertAllowedInstructions` (*v1.2, M9-SEC-7:* per instruction, not per program;
+   `src/tx/allowlist.ts`): every top-level instruction of a plan is one of short.win's own
+   (identified by its discriminator), ATA `CreateIdempotent`, Token-2022 `EnableCpiGuard` /
+   `DisableCpiGuard` (the bracket, FE-1), pump `extend_account` / `claim_cashback`, PumpSwap
+   `init_user_volume_accumulator` / `claim_cashback` (the post-wipe bundle). Compute-budget
+   instructions are the pipeline's own (`message.ts`), never a plan's. System, SPL Token and
+   `complete_curve` are not allowed (no plan invokes them at the top level; `TOP_LEVEL_ALLOWLIST`
+   lists the five programs). Anything else is refused before simulation; `describe.ts` names the
+   review's instructions from the same table and marks a refused one.
+2. `assertSameIntent(expected, signed, tables)`: identical message bytes pass; otherwise both are
+   decompiled and must have the same fee payer and the same non-compute-budget instructions
+   (program, accounts with roles, data) in the same order (FE-2), and (*v1.2, M9-SEC-4*) the same
+   lifetime token unless the caller validates a changed one (§5.5). Any other change throws and
+   nothing is sent.
+3. The review always shows what was simulated; amounts are never taken from the wallet's display.
+
+### 5.9 Error mapping (`src/tx/errors.ts`, `src/config/errors.ts`)
+
+| Source | Mapping |
+|---|---|
+| `{ InstructionError: [i, { Custom: n }] }`, n ∈ 6000–6104, failing program short.win (from the logs' **first** "Program … failed": the innermost failing program logs first and every caller up the CPI stack repeats the code after it; v1.0 said "last", which attributed a CPI'd Token-2022 error to short.win — fixed at integration) | `config/errors.ts`: name, message, action (`retry`, `adjust`, `wait`, `blocked`, `report`, `admin`) |
+| same, failing program Token / Token-2022 | 1 insufficient tokens, 4 owner mismatch, 17 frozen, 36 memo required, 42 CPI Guard |
+| `InstructionError` built-ins | `InsufficientFunds`, `ComputationalBudgetExceeded`, others → `report` |
+| transaction-level | `InsufficientFundsForFee`, `InsufficientFundsForRent`, `AccountNotFound`, `BlockhashNotFound`, `AccountInUse`, block / account cost limits, `ProgramAccountNotFound` |
+| Kit `SolanaError` with a preflight `transactionError` and logs | as above |
+| wallet | rejection (`4001`, "rejected", `AbortError` — *v1.2:* only from the wallet call, `WalletCallError`) → `wallet-rejected`; another wallet failure → `wallet`; a refused intent check (`IntegrityError`, §5.8) → `integrity` (`report`); a landed transaction that differs → `integrity` (no Retry) |
+| transport | network, HTTP status, "denied" / "cancelled" / rate limit outside the wallet → `rpc` (retry); block height exceeded → `expired`; *v1.2:* no confirmation in time, or a sending wallet's signature not seen → `unknown-outcome` (no Retry) |
+| plan | *v1.2:* a rebuild that the fresh chain refuses (`PlanError`) → `plan` (`adjust`) |
+
+The `txError` element carries `data-kind` and `data-code`. `action` drives the UI: `retry` →
+Retry (re-simulate a transient failure; rebuild the plan, or close for a new review, after a
+refusal a fresh plan fixes — §5.3 step 6), `adjust` → focus the input, `wait` → explain and keep
+the form, `blocked` → disable the action with the reason, `report` → show the code and logs
+(copyable). *v1.2 (M9-UX-1):* the refusal copy promises only what happens: "Review again with a
+new quote", "A new review adds that step" — never "Try again: the app adds it" for a re-simulation.
+
+### 5.10 Per-instruction parameters
+
+| Instruction | Arguments from the UI | Bounds |
+|---|---|---|
+| `create_market(venue_hint, max_creation_fee)` | Auto 0, Raydium v4 4, CPMM 5 (Mock 6 test-only) | `max_creation_fee` = the fee read from `GlobalConfig` |
+| `deposit(amount, min_shares)` | amount | `min_shares = ⌊previewDeposit·(1 − 0.5 %)⌋` |
+| `withdraw(shares, min_tokens, min_sol)` | shares | `min_tokens = ⌊tokens·(1 − 0.5 %)⌋`, `min_sol` = quoted SOL (vest incl.) |
+| `claim_sol()` | — | — |
+| `cover_deficit(lamports)` | the deficit | exact |
+| `sync_lender(max_epochs)` | — | ≤ the epochs one transaction holds |
+| `open_short(nonce, q, min_proceeds, max_margin, max_open_fee)` | q, slippage | §3.7; nonce random u64 |
+| `close_short(max_buyback_cost)` | slippage | `⌈B̂_live·(1 + slippage)⌉` |
+| `add_margin(amount)` | amount | ≤ wallet SOL − fee reserve (0.01 SOL kept) |
+
+### 5.11 Curve straddle (FE-3)
+
+When `q > rT` on a live curve the close fails `CurveStraddle`. The position page shows
+`closeStraddleNotice` (the 6031 message) and the add-margin action; the borrower's own Jito bundle
+is not in M9.
+
+---
+
+## 6. Data layer
+
+### 6.1 Sources
+
+| Source | Used for | Client |
+|---|---|---|
+| Indexer REST (`/v1/*`, INDEXER §9) | lists, search, history, analytics, creator exposure, coverage, venue status | `src/api/client.ts` (`createApiClient`), `src/api/queries.ts` |
+| Indexer WebSocket (`/v1/ws`) | live invalidation and in-place market rows | `src/api/ws.ts` (`IndexerSocket`), `src/api/live.tsx` |
+| RPC (Kit) | every account a transaction or preview depends on; the fallback when the indexer is down | `src/rpc/*`, `@shortwin/client` decoders |
+| RPC subscriptions | the slot (staleness), account changes of the open market / positions (SHORT, LEND) | `src/rpc/slot.ts`; features |
+| WASM math | quotes, margin, CR, liquidation price, rent, caps, tiers, lender previews | `src/math/*` |
+
+The API is GET-only and CORS-exposes `X-Indexer-Slot` / `X-Indexer-Finalized-Slot`
+(`services/indexer/src/api/mod.rs`). Requests carry no credentials and no referrer.
+
+### 6.2 Query keys (`src/api/keys.ts`)
+
+Two roots. `['indexer', …]`: `status`, `search(q)`, `markets(params)` (`params.cursor` for keyset
+pages: each page is its own query, so the `markets` channel patches rows on every loaded page),
+`market(mint)` and its
+sub-keys (`positions`, `lenders`, `pools`, `coverage`, `liquidations`, `events`, `snapshots`,
+`trades`, `candles`, `stats`), `position(pubkey)`, `borrower(owner, …)`, `lender(owner)`, `stats`,
+`liquidations`, `settlements`, `keepers`, `admin/*`, `venues`, `tx(sig)`. `['chain', …]`: `slot`,
+`account(addr)`, `config`, `venue-guard`, `oracle`, `market(mint)` and `…/vault`, `…/venue`,
+`…/lender/<owner>`, `…/exposure/<owner>`, `position(pubkey)`, `balance(owner)`,
+`token-accounts(owner, mint)`, `mint(mint)`, `alt(list)`. Components never write key literals.
+*As built:* the protocol accounts several pages show are read through one hook each in
+`src/rpc/queries.ts` (`useChainMarket`, `useChainConfig`, `useChainVenueGuard`, `useChainOracle`),
+so a key always holds one shape (`MaybeAccount<…>` from `rpc/accounts.ts`); feature reads hang
+their keys below these (`[...qk.marketAccount(mint), 'lend', owner]`, `…'short-snapshot'`), so a
+prefix invalidation after a confirmed transaction refreshes them all. short.win's event authority
+(every builder names it) is derived once in `src/rpc/pda.ts`.
+
+### 6.3 Timings
+
+| Data | staleTime | Refetch |
+|---|---|---|
+| `/v1/status` | 2 s | every 10 s (freshness) |
+| `/v1/stats` | 2 s | every 10 s and the `stats` channel |
+| lists and market detail | 2 s | WS invalidation; no focus refetch |
+| `/v1/admin/config` | 60 s | — |
+| `/v1/venues` | 2 s | every 30 s and the `admin` / `coverage` channels |
+| chain accounts behind a preview | 0 | on the account subscription, at most once per slot |
+| protocol ALT | 10 min | — |
+
+Indexer retries: 429 / 503 / network up to 4 times honouring `Retry-After`; other 4xx never.
+
+### 6.4 Live updates
+
+`IndexerSocket` subscribes reference-counted channels (`useLiveChannels`), resumes with
+`since = last event id` after a reconnect, closes a connection silent for 45 s (heartbeats are
+20 s), backs off exponentially with jitter (1 s → 30 s; 16 s+ after a policy close 1008).
+`applyWsMessage`: `market:<mint>` events invalidate `['indexer','market',mint]`; `position:<pk>`
+the position and borrower lists; `lender:<owner>` the lender; `liquidations` the global list;
+`admin` / `coverage` venues and config; a `markets` summary patches every cached markets page in
+place; `stats` replaces the stats query; `rollback`, a lagged close (4008) or a replay error
+invalidates every indexer query. Channels per page: markets — `markets`; market page —
+`market:<mint>` (+ `trades:<mint>`); positions — `position:<pk>` per open row (≤ 40); lend —
+`lender:<owner>`; status — `admin`, `coverage`.
+
+### 6.5 RPC reads and the fallback
+
+`src/rpc/accounts.ts` reads `Market`, `MarketVault`, `LenderPosition`, `WalletExposure`,
+`ShortPosition`, `GlobalConfig`, `VenueGuard`, `OracleCache` through the generated `fetchMaybe*`
+at `confirmed`; `src/rpc/mint.ts` and `src/rpc/tokens.ts` read mints and the owner's token
+accounts. While the indexer is down (`fallbackBanner`): the market page renders from the chain
+(no history / analytics tabs); positions and the lender dashboard use `getProgramAccounts` with a
+`memcmp` on the borrower / owner field and the account size; the markets list is replaced by
+"search a mint" (no `getProgramAccounts` over all markets on mainnet). Previews always use RPC.
+
+### 6.6 Staleness
+
+`lib/staleness.ts`: lag = (RPC slot − `X-Indexer-Slot`) × 0.4 s; `live` ≤ 10 s, `lagging` ≤ 60 s,
+`stale` beyond, `down` when `/v1/status` fails, `unknown` before the first response. The status bar
+always shows it; indexer-backed panels show a `staleBadge` when not `live`, with the age in seconds
+(*v1.2, M9-UX-6:* the markets page, the market header, the status page, the positions list, the
+lender dashboard and the position timeline). A preview's account reads show their slot age when it
+exceeds 2 slots behind the confirmed tip (the RPC's slot less its usual 2-slot confirmation lag;
+`shell/SlotAge.tsx`, `slot-age-badge`): the Short panel (its snapshot), the Lend panel (its chain
+read — current while every account subscription is live) and the position page; above 75 slots
+or 30 s the read is `stale` and the panel's Submit waits for a fresh one. A polled list without a
+slot (the positions' accounts) shows its age above 10 s.
+
+### 6.7 Previews with the WASM math
+
+`src/math/load.ts`: `loadMath()` initialises `@shortwin/math-wasm` once (Vite emits the `.wasm`
+as an asset; CSP `'wasm-unsafe-eval'`), `useMath()` exposes it; `initMathSync(bytes)` for tests.
+Rules: (1) the frontend never re-implements protocol math — every protocol number comes from an
+export of the facade (crate README "Exports"); (2) inputs are the live on-chain state and the live
+`GlobalConfig` terms (a position's locked terms for an open position); `defaultTierTerms` (the
+compiled SPEC table) is for explanations only; (3) WASM objects are freed after use (`free()` or
+`using`); (4) an `undefined` result (e.g. a quote with `q ≥ X`) renders "—" and disables Submit.
+
+---
+
+## 7. Design system — dark trading terminal
+
+### 7.1 Colour tokens (`src/styles/tokens.css`)
+
+| Token | Value | Use | Contrast (on `--bg-0` / `--bg-1` / `--bg-3`) |
+|---|---|---|---|
+| `--bg-0` | `#0b0e11` | app background | — |
+| `--bg-1` | `#12161b` | panels, table body | — |
+| `--bg-2` | `#181d23` | table header, hover, menus | — |
+| `--bg-3` | `#1f252c` | inputs, selected row | — |
+| `--line` | `#2a323b` | hairlines (decorative) | — |
+| `--line-strong` | `#66727f` | input borders | 3.94 / 3.70 / 3.15 (≥ 3:1) |
+| `--text-0` | `#e8ecf1` | primary text | 16.31 / 15.31 / 13.02 |
+| `--text-1` | `#aab4bf` | labels | 9.21 / 8.64 / 7.35 |
+| `--text-2` | `#8a95a1` | muted | 6.35 / 5.96 / 5.07 |
+| `--accent` | `#f0b90b` | primary action, active nav | 10.74 / 10.07 / 8.57 |
+| `--focus` | `#8ab4ff` | focus ring | 9.26 / 8.69 / 7.40 |
+| `--gain` | `#2ebd85` | P&L gain, healthy | 8.05 / 7.55 / 6.43 |
+| `--loss` | `#ff5c6c` | P&L loss, short action, danger | 6.45 / 6.05 / 5.15 |
+| `--risk-safe` / `-watch` / `-danger` / `-critical` | `#2ebd85` / `#f0b90b` / `#ff8a3d` / `#ff5c6c` | position health | ≥ 5.15 on each tinted badge background |
+| `--info` | `#5aa2ff` | links, info banners | 7.42 / 6.96 / 5.92 |
+| `--tier-a` … `--tier-d` | `#36c5a0`, `#5aa2ff`, `#f0b90b`, `#ff6b8a` | tier badges (A safest → D riskiest) | ≥ 5.68 |
+
+Semantics: **gain / loss are the user's P&L** (for a short, a price fall is a gain); price direction
+in charts uses the same pair with an arrow. Risk: `riskLevel(CR, CR_ema, cr_liq)` (§3.8) —
+critical strictly below the liquidation CR on both legs, below on the live leg alone, danger within
++10 %, watch within +30 %, safe beyond. Colour never carries meaning alone (signs, arrows, words:
+§8). Prices carry a visible unit (`Price`: "0.0₇28 SOL", SOL per token in `title` and the
+screen-reader text; *v1.2, M9-UX-8*).
+
+### 7.2 Typography and numbers
+
+UI: system stack (`Inter` if installed); numbers: monospace stack (`JetBrains Mono`, `IBM Plex
+Mono`, `ui-monospace`, …) with `font-variant-numeric: tabular-nums slashed-zero` (`.num`). Base
+13 px (`--fs-md`), 11–22 px scale. Number rules (`lib/format.ts`, `components/Num.tsx`): amounts
+are `bigint` end to end and formatted once; balances truncate (never round up); SOL 4 decimals in
+tables; tokens by their decimals (≤ 4 shown); tiny prices with subscript zeros (`0.0₅1234`), the
+plain value in `title` and for screen readers; P&L always signed with U+2212 and ▲ / ▼; numeric
+columns right-aligned; every number element carries `data-value` with the raw integer.
+
+### 7.3 Density and layout
+
+Compact rows 28 px, controls 30 px (comfortable: 34 / 34 px via `data-density`); 4 px grid; header
+44 px, status bar 24 px; minimum width 1024 px; the trade layout is a fluid market column plus a
+360 px panel (320 px under 1,180 px). Panels: 6 px radius, hairline borders, uppercase 12 px titles.
+*As built (the visual pass, §10.2 `screens`):* the trade panel is sticky and scrolls on its own
+(its submit stays a short scroll from the inputs while the market column scrolls); table cells
+tighten to 4 px padding under 1,280 px so the markets table fits 1,024 px without sideways
+scroll; the stat strip wraps as flex rows that fill the width (no empty cells, no clipped values;
+the size cap is compact there, exact in its title and the panel); a ticker or a mint inside an
+uppercase label keeps its case (`.case-keep`: a mint is case-sensitive).
+
+### 7.4 Components (`src/components`, scaffold; tracks compose them)
+
+| Component | Contract |
+|---|---|
+| `Button` | variants default / primary / short / danger / ghost, sizes sm / md, `busy` |
+| `Panel` | titled `<section>`, actions slot, flush body |
+| `DataTable` | columns (align, sortable, width), sticky header, `aria-sort`, row activation by click / Enter, ↑ / ↓ between rows, skeleton rows, empty state, caption; *as built:* `rowAttrs` (`data-*` state on a row, e.g. `data-status`), and a click or key on a link / button / input inside a cell is that control's, not the row's |
+| `Sol`, `Tokens`, `Bps`, `Price`, `Pnl` (`Num.tsx`) | formatted numbers with `data-value` and screen-reader text |
+| `Badge`, `TierBadge`, `RiskBadge`, `VenueBadge`, `riskLevel` | tone / risk / tier semantics |
+| `Modal` | native `<dialog>` (focus trap, Escape, focus return), non-dismissible mode |
+| `ToastProvider` / `useToast` | polite and assertive live regions; errors persist; *as built:* bottom-left (the trade panel is the right column), the empty region lets clicks through |
+| `Field`, `AmountInput`, `Checkbox`, `Select` | labelled inputs, strict amount parsing, Max, hints and errors wired with `aria-describedby` |
+| `Tabs`, `TabPanel` | WAI-ARIA tabs (arrows, Home / End) |
+| `Disclosure` | verbatim disclosure with optional acknowledgement, collapsible; a disclosure whose acknowledgement is its whole text (SPEC §5.3's sentence) shows it once, as the checkbox's label |
+| `Empty`, `ErrorState`, `Skeleton`, `Stat`, `Kv` | states, stat strips, key / value previews |
+| `AddressText`, `Countdown` | short address with copy; live time left |
+| `TxReviewModal` (`src/tx`) | the review of §5.3 |
+
+Track-specific components live in the track's directory; a component two tracks need is proposed
+to the integrator for `src/components`.
+
+### 7.5 Motion
+
+Short transitions (80–140 ms) on hover and focus only; no number flashing or animated tickers
+by default; skeleton shimmer; everything off under `prefers-reduced-motion`.
+
+---
+
+## 8. Accessibility (WCAG 2.2 AA)
+
+- **Contrast:** the token table of §7.1 (text ≥ 4.5:1, input borders and focus ≥ 3:1).
+- **Keyboard:** every action reachable and operable; visible focus (`--focus` 2 px ring); skip
+  link; `/` search; tables, tabs and menus follow the WAI-ARIA patterns; dialogs trap focus and
+  return it; no keyboard trap; Escape closes dismissible layers.
+- **Semantics:** landmarks (`header`, `nav`, `main`, `footer`), headings per page, tables with
+  captions and `scope`, sortable headers as buttons with `aria-sort`, the search as a combobox with
+  `aria-activedescendant`, form controls with labels and `aria-describedby` for hints and errors,
+  `aria-invalid` on invalid input, live regions for toasts (polite) and errors (assertive) and for
+  the transaction stage.
+- **Non-colour cues:** P&L sign and arrow and a spoken "gain" / "loss"; risk and tier badges with
+  words; flags with text.
+- **Numbers for screen readers:** plain values with units (no subscript notation, no glyph
+  arrows).
+- **Motion:** `prefers-reduced-motion` honoured.
+- **Checks:** Biome's a11y rules in lint; `@axe-core/playwright` on every page of the E2E (no
+  serious or critical violation); one keyboard-only E2E per main flow (§10.2).
+
+---
+
+## 9. Security
+
+### 9.1 Pinned programs and accounts
+
+`src/config/programs.ts` pins short.win, `complete_curve`, the venue, token, memo, ATA, System and
+ComputeBudget programs; `programs.test.ts` holds them to `constants.rs`, the Codama client and the
+helper's `declare_id!`. Which of their instructions a plan may put at the top level is
+`src/tx/allowlist.ts` (§5.8). The program id is never read from configuration, the indexer or a URL.
+PDAs are derived locally (`find*Pda`); an indexer-supplied address is used only for display and
+navigation, and every account a transaction touches is re-derived or read from the chain.
+
+### 9.2 No blind signing
+
+§5.3, §5.8: simulation of the exact instructions before any wallet prompt; a review older than
+20 s is refreshed; the top-level allowlist; the signed message is compared with the built one; the
+user-set bounds (`min_*` / `max_*`) are always present so a moved market reverts instead of
+filling badly.
+
+### 9.3 Content Security Policy and headers
+
+Production builds inject (as `<meta>`) and write to `dist/_headers` (for the host; the CDN must
+send the header form):
+
+```
+default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:;
+font-src 'self'; connect-src 'self' <RPC http + ws origins> <indexer http + ws origins>;
+manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none';
+frame-ancestors 'none' (header only); upgrade-insecure-requests (mainnet)
+X-Frame-Options: DENY · X-Content-Type-Options: nosniff · Referrer-Policy: no-referrer ·
+Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), hid=() ·
+Cross-Origin-Opener-Policy: same-origin · Strict-Transport-Security: max-age=63072000; includeSubDomains
+```
+
+No inline scripts or styles in the HTML, no `eval`, no third-party scripts, fonts or images (wallet
+icons are `data:` URIs from the Wallet Standard registry). **Clickjacking:** `frame-ancestors 'none'`
+and `X-Frame-Options: DENY`; the app never renders inside a frame. *As built v1.2 (M9-SEC-6):* a
+`<meta>` CSP cannot carry `frame-ancestors` and a host may ignore `dist/_headers`, so (1)
+`main.tsx` does not mount the app when `window.top !== window.self` and renders `frame-guard` ("open
+short.win directly") instead; (2) `vite preview` (the E2E server) sends `X-Frame-Options: DENY` and
+`frame-ancestors 'none'` too; (3) a deploy check, `pnpm --filter web check:headers <https://origin>`
+(`scripts/check-headers.ts`, `missingSecurityHeaders` in `csp.ts`), fails unless the live origin
+sends them (and `nosniff`, HSTS) and publishes no source map; the E2E `frame.spec.ts` frames the
+build both with and without the headers.
+
+### 9.4 Secrets
+
+None in the app or the repository. Every `VITE_*` value is public (compiled into the bundle); the
+RPC URL must be an origin-restricted public key; `.env*` files are gitignored except `.env.example`;
+the config refuses URLs carrying credentials. E2E keypairs are generated at run time into the
+gitignored `apps/web/.e2e/` and never committed (program-id keypairs stay in `keys/`, never read by
+the app or the E2E).
+
+### 9.5 Input validation
+
+Amounts: `lib/amount.ts` (digits and one dot, ≤ the mint's decimals, no sign / exponent / grouping,
+≤ u64); slippage in bps within bounds; addresses: base58 via Kit's `isAddress` (`lib/address.ts`)
+before any RPC or API use; route params and search params validated in `router.tsx`; API path
+segments validated (`keySegment`); `q` ≤ 64 chars. Indexer strings (symbols, names) are rendered as
+text only (React escaping; `noDangerouslySetInnerHtml` is a lint error) and never used as keys.
+*v1.2 (M9-SEC-5):* they are normalised once where indexer data enters (`api/client.ts`, `api/ws.ts`
+→ `lib/displayText.ts`: controls, bidi embeddings / overrides / isolates, zero-width and other
+invisible characters removed, NFC, whitespace collapsed, symbols ≤ 16 and names ≤ 64 code points;
+the indexer's refresher strips the same set), rendered isolated (`<bdi>`, `unicode-bidi: isolate`),
+and wherever a symbol names the token of a trade the short mint stands next to it (`TokenId`,
+`tokenLabel`: review titles and delta labels, both trade panels, position and lender rows, search
+results, which also mark a symbol two results share). The market header marks a symbol another
+listed market uses (`market-duplicate-symbol`). The market page takes the token's identity from the
+route and its decimals, venue, tier, flags and creator from the chain; a detail the indexer serves
+for another mint is not used (`market-indexer-mismatch`; M9-SEC-3).
+
+### 9.6 Dependencies and supply chain
+
+Exact versions in `package.json`; the lockfile is the workspace's (`pnpm install --frozen-lockfile`
+in CI); pnpm's supply-chain policy applies; no `postinstall` downloads (Playwright browsers are
+installed explicitly into the user cache, never as root).
+
+---
+
+## 10. Test plan
+
+### 10.1 Unit tests (Vitest; `src/**/*.test.ts(x)`; jsdom)
+
+Present in the scaffold (87 tests in 23 files): config (`parseConfig`, CSP, disclosures verbatim and documented,
+errors complete against the client, programs pinned, test ids unique and documented), lib
+(formatting, amount parsing, staleness), api (client errors and headers, WebSocket resume /
+back-off / watchdog, live cache updates, types against `openapi.yaml`), tx (token-account
+extensions, error mapping, deltas, integrity, compute budget and fees, the flow's gating), math (the
+WASM module loads and computes SPEC numbers), mint parsing, components (numbers, badges,
+disclosure, table, amount input) and a router smoke test (every route renders in the shell).
+
+*As built:* 50 files (one, the live-validator suite of SHORT, skipped unless `SHORTWIN_LIVE_RPC`
+points at a validator), 476 tests (*v1.2:* 56 files, 533 tests — the review's regressions in
+`src/m9-review/` and `features/markets/m9-review.test.tsx`, §13): the scaffold's, plus MARKETS 56, LEND 68, SHORT 261 (venue
+readers and account lists against keeper vectors and `tests/fixtures`, previews and plans equal to
+what the program booked on LiteSVM), and the integration's (`tx/describe.test.ts`, the error
+mapping on real nested logs and `IntegrityError`, the oracle with no reading, the SPEC §5.3
+sentence shown once).
+
+Each track adds, at minimum: MARKETS — the safety verdict for every rule (one fixture per rejected
+extension and for freeze authority / native mints), the market page's mapping of API fields, the
+markets table sorting and paging, the status page's flag aggregation; LEND — deposit / withdraw /
+claim previews against `pool_model`-derived vectors through the WASM, CPI-Guard and memo branches
+of plan building, the bracket's instruction order, `min_sol` / `min_tokens`, the sync / sweep
+prepends; SHORT — the venue account lists against vectors produced by the keeper's `venue.rs` for
+each venue (fixtures in `tests/fixtures/accounts`), venue-state readers against the fixture
+accounts, the open preview against `shortwin_sim`-derived numbers (margin, fee, CR, liquidation
+price, caps), close / add-margin previews, P&L and risk.
+
+### 10.2 End-to-end (Playwright 1.63; `apps/web/e2e`; E2E track)
+
+**Environment.** Everything runs locally, without Docker or network:
+
+- `solana-test-validator` from `~/.local/share/solana/install/active_release/bin`, with
+  `--reset --ledger apps/web/.e2e/ledger` (on disk, gitignored; never `/tmp`), dedicated ports
+  (RPC 18899, WS 18900, faucet 19900) so a developer validator can run alongside, and:
+  `--upgradeable-program 5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK
+  target/test-venue/deploy/shortwin.so <generated authority>` (the test-venue build,
+  `scripts/build-test-venue.sh`; `initialize_config` requires the upgrade authority's signature),
+  `--bpf-program BPAZFPkmVtYEWEZHCzFUns7oybh1VWfAvmu3ofM2mQi7 target/deploy/mock_cpamm.so`,
+  `--bpf-program 4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ target/deploy/complete_curve.so`, and
+  optionally the dumped venue programs and accounts of `tests/fixtures` (`--bpf-program` /
+  `--account`) for venue-specific specs. Token, Token-2022, ATA and the memo programs are the
+  validator's built-ins.
+- **Seed** (`e2e/validator/seed.ts`, Node with Kit and `@shortwin/client`): generated keypairs
+  (authority, governance, pause, fee recipient, lenders, the E2E wallet); `initialize_config`
+  (`venue_enabled` with the mock bit; windows and warm-ups at their compiled minima; the live
+  ProgramData slots as `initialize_config` takes them); a protocol ALT (`@solana-program/
+  address-lookup-table`) for the v0 path; an SPL mint with a mock pool and a market
+  (`venue_hint = 6`), lent by a seed lender, cranked until opens are allowed; a Token-2022 mint
+  (metadata only) with a list-only market; for the wallet: SOL, tokens of both mints, a Token-2022
+  account **with CPI Guard enabled** and one **requiring incoming memos**; a market in coverage
+  pause (`set_coverage_pause` with the generated coverage authority) for the status / blocked
+  specs. Writes `apps/web/.e2e/state.json` (addresses and the generated keys' paths).
+- **App:** `vite build` with `VITE_CLUSTER=localnet`, `VITE_ENABLE_TEST_VENUE=true`, the E2E ports
+  and the seeded ALT, served by `vite preview` (Playwright `webServer`).
+- **Indexer:** profile `chain` (CI): the indexer URL points at a Playwright-routed mock
+  (`page.route`) that serves OpenAPI-shaped responses built from the seed's on-chain state, or at
+  nothing for the fallback specs. Profile `full` (local, optional): `shortwin-indexer run` against
+  the validator and a user-space PostgreSQL (the zonky binaries of INDEXER §11.1), same specs.
+- **Browser:** `chromium.launch({ executablePath: process.env.SHORTWIN_CHROMIUM ?? '/usr/bin/chromium' })`,
+  or Playwright's own Chromium installed into the user cache (`npx playwright install chromium`,
+  never `--with-deps` as root). Checked here: Playwright 1.63 drives `/usr/bin/chromium` 152.
+
+**Injected test wallet** (`e2e/wallet/injected-wallet.js`, plain browser JS added with
+`page.addInitScript`): a Wallet Standard wallet named **`ShortWin E2E`** registered through the
+`wallet-standard:register-wallet` / `wallet-standard:app-ready` events, chains `solana:localnet`,
+features `standard:connect`, `standard:disconnect`, `standard:events`, `solana:signTransaction`
+(versions `legacy` and `0`), `solana:signMessage`; Ed25519 signing with WebCrypto from a secret key
+passed as the init-script argument (generated per run). Test controls on `window.__shortwinE2E`:
+`rejectNext()` (the wallet rejects), `tamperNext(fn)` (the wallet changes the message — the app
+must refuse, §5.8), `raiseFeeNext(price)` (a compute-budget-only change — the app must accept),
+`signed()` (the transactions signed so far).
+
+**Specs** (each selects only by the §11 ids; `axe` on every page):
+
+| Spec | Covers |
+|---|---|
+| `smoke.spec.ts` | shell, nav, search by mint and ticker, wallet connect / disconnect, status bar states, math ready |
+| `markets.spec.ts` | table, filters, sort, live row update, open market, create-market link |
+| `create-market.spec.ts` | verdicts (ok, freeze authority, disallowed extension, existing), list-only listing through the pipeline |
+| `lend-deposit.spec.ts` | SPEC §5.3 text verbatim, Sign disabled until ticked, simulated deltas, confirm, dashboard updated |
+| `lend-cpi-guard.spec.ts` | **CPI Guard UX** (§10.3) |
+| `lend-withdraw-memo.spec.ts` | **memo UX** (§10.3) |
+| `lend-claim.spec.ts` | claimable after rent accrues, claim, vest-forfeit warning on a partial exit |
+| `short-open.spec.ts` | every preview field present and equal to the simulated position (`q`, `s`, `m`, `v`), the borrower disclosure gate, blocked states (coverage pause) |
+| `short-close.spec.ts` | P&L after a mock price move, close, payout delta |
+| `add-margin.spec.ts` | CR preview and the confirmed CR |
+| `positions.spec.ts` | dashboard fields, risk badge after a price move, time left |
+| `status.spec.ts` | coverage-paused market listed, venue rows |
+| `tx-errors.spec.ts` | wallet rejection, a failing simulation (Sign never enabled, mapped message, `data-code`), a stale review refreshed at Sign, `tamperNext` refused, `raiseFeeNext` accepted (*v1.2:* the review names the signing wallet, `tx-wallet`, and shows the fee as signed, `tx-final-fee`) |
+| `fallback.spec.ts` | indexer down: banner, market page from the chain, a deposit still works |
+| `keyboard.spec.ts` | deposit and open completed with the keyboard only |
+| `harness.spec.ts` | *as built:* the seeded scenario is on chain; the routed indexer's REST and WebSocket shapes; the Node-side actions |
+| `wallet.spec.ts` | *as built:* the injected wallet's Wallet Standard features, reject / tamper / raise-fee controls |
+| `frame.spec.ts` | *v1.2 (M9-SEC-6):* the preview sends `X-Frame-Options: DENY` and `frame-ancestors 'none'`; a framing page gets no app — the browser refuses it, and with the headers stripped (a host ignoring `_headers`) the app renders `frame-guard` instead |
+| `screens.spec.ts` | *as built:* every page and state (markets, search, create market ok / rejected / pump curve, every market tab, the tier popover, coverage-paused and list-only markets, 1,024 px, the short preview and its review, the blocked panel, positions, a position, deposit / withdraw / claim, the lender dashboard, the CPI Guard notice and the bracket's review, the indexer-down views) saved as PNGs with axe on each; asserts no sideways scroll at 1,024 px |
+
+**As built** (v1.1):
+
+- The validator and the preview are started by Playwright's global setup, not `webServer` (the
+  build needs the seeded protocol ALT, and `webServer` starts first). Extra ports: gossip 18901,
+  dynamic 18910–18960, preview 14173; `--limit-ledger-size 200000000` (the default keeps minutes
+  of history, which breaks profile `full`'s backfill).
+- One seeded wallet per independent spec group (`trader`, `lender`, `guard`, `memo`, `memoRace`,
+  `claimer`, `creator`, `closer`, `margin`, `holder`, `errors`, `keyboard`), so specs do not depend
+  on their order; one worker (one validator); specs that change shared state undo it.
+- `SHORTWIN_E2E_REUSE=1` reuses the validator and its seed, and the build only while its sources,
+  configuration, WASM stamp and `VITE_*` values are unchanged (`sourceFingerprint`); a rebuild
+  restarts the preview.
+- The release program is optional (`SHORTWIN_E2E_PROGRAM=release`: the trading specs skip); the
+  wallet's `tamperNext` takes `'data' | 'drop' | fn`; tags `@scaffold`, `@markets`, `@lend`,
+  `@short`, `@screens`.
+- `screens.spec.ts` writes `.e2e/screenshots/`; `SHORTWIN_E2E_SCREENSHOTS=update` refreshes the
+  reviewed set committed in `e2e/screenshots/`.
+- For manual work the same environment runs the app: `node e2e/validator/start.ts --env`,
+  `node e2e/validator/fund.ts <wallet>`, `pnpm --filter web dev:e2e` (docs/DEVELOPMENT.md).
+
+### 10.3 CPI Guard and memo UX tests (the M9 exit's named tests)
+
+- **CPI Guard:** with the CPI-Guarded account selected, `lend-cpi-guard-notice` is shown with the
+  `token.cpiGuard` text and the plain deposit is disabled; selecting the ATA re-enables it; opting
+  into the bracket (`lend-cpi-guard-bracket`) yields a review listing DisableCpiGuard / deposit /
+  EnableCpiGuard (*as built:* `tx-instruction-0…2` with `data-program` / `data-name`, and checked
+  again on the landed transaction's top-level instructions); the deposit lands and the account
+  still reads `lock_cpi = true` afterwards.
+  **Race:** the spec selects an unguarded account, then enables CPI Guard on it from Node before
+  Sign; the simulation fails and the review shows the mapped CPI Guard message (`tx-error`
+  `data-kind="token"`, `data-code="42"`) with Sign disabled; Cancel and re-entry re-read the account
+  and show the notice.
+- **Memo:** withdrawing to the memo-required account shows `withdraw-memo-notice`; the transaction
+  passes `memo_program` and lands; the destination's balance rises by the previewed tokens.
+  **Race:** the spec selects a plain Token-2022 destination, then requires memos on it from Node
+  before Sign; the simulation fails with `MemoProgramRequired` (`data-code="6095"`), and re-entry
+  shows the notice and lands with the memo. *v1.2 (M9-UX-1):* Retry (`data-mode="rebuild"`)
+  rebuilds the withdrawal from a fresh read with `memo_program` (`tx-rebuilt-notice`) and it lands
+  with the memo; re-entry (lent again) shows the notice.
+
+### 10.4 CI
+
+The scaffold adds the `web` job to `.github/workflows/ci.yml`: install wasm-bindgen 0.2.129, build
+`@shortwin/math-wasm`, `pnpm --filter web lint`, `typecheck`, `test`, `build`. The E2E track adds
+`web-e2e` (needs `anchor-build` and the test-venue build; Agave 4.1.2 for `solana-test-validator`;
+Playwright's Chromium in the user cache; profile `chain`). *As built:* `web-e2e` runs every spec
+(no tag filter since the integration) and uploads the `screens` PNGs on every run, the report,
+traces and logs on failure.
+
+---
+
+## 11. `data-testid` contract
+
+Ids come from `src/config/testids.ts` (`T`); specs import the same constants. A parametrised id
+appends `-<key>` (an address, a signature, an enum value or a disclosure id). State is exposed in
+data attributes on the same element (`data-state`, `data-stage`, `data-ok`, `data-kind`,
+`data-code`, `data-verdict`, `data-risk`, `data-value` with the raw integer), never only in text.
+Adding an id is free; renaming or removing one changes this table in the same change
+(`testids.test.ts`).
+
+### 11.1 Shell, transaction review and disclosures (SCAFFOLD)
+
+| id | constant | element and state |
+|---|---|---|
+| `app-header` | `T.header` | app header |
+| `cluster-badge` | `T.clusterBadge` | cluster name off mainnet |
+| `nav-<…>` | `T.nav` | `<key>` ∈ markets, positions, lend, status; `aria-current="page"` when active |
+| `search-input` | `T.searchInput` | combobox input (mint or ticker); `/` focuses it |
+| `search-results` | `T.searchResults` | listbox |
+| `search-result-<…>` | `T.searchResult` | `<mint>`; an option (a valid mint always yields one) |
+| `wallet-button` | `T.walletButton` | opens the wallet menu; `aria-expanded` |
+| `wallet-menu` | `T.walletMenu` | role=menu |
+| `wallet-option-<…>` | `T.walletOption` | `<wallet name>` as the wallet reports it (the E2E wallet: `ShortWin E2E`); *v1.2:* a second wallet with the same name is `<name> (2)`, and so on (M9-SEC-8); `data-duplicate` = its rank |
+| `wallet-address` | `T.walletAddress` | connected address; `data-value` = full base58 |
+| `wallet-disconnect` | `T.walletDisconnect` | menu item |
+| `wallet-duplicate-badge` | `T.walletDuplicate` | *v1.2:* on an entry whose name another registered wallet uses: registration rank and feature set (M9-SEC-8) |
+| `wallet-sends-itself-badge` | `T.walletSendsItself` | *v1.2:* on an entry with only `solana:signAndSendTransaction` (checked after landing, §5.4) |
+| `frame-guard` | `T.frameGuard` | *v1.2:* the notice rendered instead of the app inside a frame (§9.3) |
+| `slot-age-badge` | `T.slotAge` | *v1.2:* the age of a preview's chain read (§6.6); `data-state` ∈ fresh, aging, stale; `data-slots` |
+| `status-bar` | `T.statusBar` | bottom bar |
+| `status-indexer` | `T.statusIndexer` | `data-state` ∈ live, lagging, stale, down, unknown |
+| `status-rpc` | `T.statusRpc` | `data-state` ∈ ok, bad |
+| `status-ws` | `T.statusWs` | `data-state` ∈ idle, connecting, open, reconnecting, closed |
+| `status-sol-usd` | `T.statusSolUsd` | SOL/USD from `/v1/stats` |
+| `status-math` | `T.statusMath` | `data-state` ∈ loading, ready, error (the WASM math module) |
+| `stale-badge` | `T.staleBadge` | per-panel freshness badge; `data-state` as statusIndexer |
+| `fallback-banner` | `T.fallbackBanner` | shown while the indexer is unreachable (RPC fallback) |
+| `toast-region` | `T.toastRegion` | live regions container |
+| `toast` | `T.toast` | `data-kind` ∈ success, error, info |
+| `page-<…>` | `T.page` | `<page>` ∈ markets, create-market, market, positions, position, lend, status; the page root — every track keeps it on its page |
+| `route-stub-<…>` | `T.routeStub` | `<route>`; placeholder until a track replaces the page (removed by then) |
+| `tx-modal` | `T.txModal` | review dialog |
+| `tx-stage` | `T.txStage` | `data-stage` ∈ simulating, review, signing, confirming, confirmed, failed |
+| `tx-sim-status` | `T.txSimStatus` | `data-ok` ∈ true, false |
+| `tx-delta-<…>` | `T.txDelta` | `<address>:<field>` (`lamports`, `amount`, or a decoded field); `data-value` = signed change |
+| `tx-cu` | `T.txCu` | `data-value` = compute-unit limit |
+| `tx-fee` | `T.txFee` | `data-value` = fee lamports |
+| `tx-sign` | `T.txSign` | enabled only after a successful simulation and every required acknowledgement |
+| `tx-cancel` | `T.txCancel` | disabled while signing / confirming |
+| `tx-retry` | `T.txRetry` | Refresh (review) / Retry (failed); *v1.2:* `data-mode` ∈ resimulate, rebuild ("Retry with a new quote"), close ("Close and review again") — `retryMode`, §5.3; absent when the outcome is unknown or the transaction landed |
+| `tx-error` | `T.txError` | `data-kind` (TxErrorKind), `data-code` (custom error code) |
+| `tx-signature` | `T.txSignature` | `data-value` = signature |
+| `tx-explorer-link` | `T.txExplorer` | explorer link |
+| `tx-wallet` | `T.txWallet` | *v1.2:* "Signing with <wallet> · <account>"; `data-value` = address, `data-sends-itself` (M9-SEC-8) |
+| `tx-final-fee` | `T.txFinalFee` | *v1.2:* the fee as the wallet signed it, when it changed the compute budget; `data-value` = lamports (FE-2) |
+| `tx-rebuilt-notice` | `T.txRebuilt` | *v1.2:* Retry rebuilt the plan from a fresh chain read (§5.3) |
+| `tx-instruction-<…>` | `T.txInstruction` | `<i>` = index in the plan (compute-budget instructions excluded); `data-program` (`short.win`, `Token-2022`, …), `data-name` (the program client's instruction name, e.g. `DisableCpiGuard`, `Deposit`) |
+| `disclosure-<…>` | `T.disclosure` | `<disclosure id>` (§4); rendered verbatim |
+| `disclosure-ack-<…>` | `T.disclosureAck` | `<disclosure id>`; the acknowledgement checkbox |
+
+### 11.2 Markets table, market page, create market, protocol status (MARKETS)
+
+| id | constant | element and state |
+|---|---|---|
+| `markets-table` | `T.marketsTable` | table |
+| `markets-row-<…>` | `T.marketsRow` | `<mint>`; row, Enter / click opens the market |
+| `markets-filter-venue` | `T.marketsFilterVenue` | select |
+| `markets-filter-tier` | `T.marketsFilterTier` | select |
+| `markets-sort-<…>` | `T.marketsSort` | `<key>` ∈ tvl, oi, util, created, open_positions; header button, `aria-sort` on its th |
+| `markets-empty` | `T.marketsEmpty` | empty state |
+| `markets-load-more` | `T.marketsLoadMore` | keyset paging button |
+| `markets-create-link` | `T.marketsCreateLink` | link to /markets/new (prefilled with the searched mint) |
+| `markets-search` | `T.marketsSearch` | filter input `q` (mint, or symbol / name prefix; ≤ 64 chars) |
+| `markets-filter-active` | `T.marketsFilterActive` | checkbox: only markets with open positions (`active`) |
+| `markets-open-mint` | `T.marketsOpenMint` | “open a mint” input, shown instead of the list while the indexer is unreachable (§6.5) |
+| `market-header` | `T.marketHeader` | page head |
+| `market-symbol` | `T.marketSymbol` | ticker |
+| `market-mint` | `T.marketMint` | `data-value` = mint |
+| `market-tier-badge` | `T.marketTier` | tier badge; opens the `market.tierAge` popover |
+| `market-venue-badge` | `T.marketVenue` | venue badge |
+| `market-flag-<…>` | `T.marketFlag` | `<flag>` ∈ paused-opens, coverage-paused, route-broken, venue-upgraded, migrating, graduation-halted, list-only, mint-unsafe, warming-up, pool-window; present only while true |
+| `market-stat-<…>` | `T.marketStat` | `<stat>` ∈ inventory, utilisation, rate, oi, caps, tvl, price, lenders; `data-value` raw |
+| `market-tier-why` | `T.marketTierWhy` | tier explanation |
+| `market-creator-deposits` | `T.marketCreatorDeposits` | creator-wallet deposits block (SPEC R1) |
+| `market-liquidations-table` | `T.marketLiquidations` | recent liquidations table |
+| `market-liquidation-row-<…>` | `T.marketLiquidationRow` | `<signature>`; `data-kind` ∈ liquidation, expiry, settlement; `data-condition` S1–S3 |
+| `market-tab-<…>` | `T.marketTab` | `<tab>` ∈ overview, positions, lenders, liquidations, pools, coverage, events |
+| `market-panel-tab-<…>` | `T.marketPanelTab` | `<panel>` ∈ short, lend (trade panel tabs, rendered by the market page) |
+| `market-source` | `T.marketSource` | `data-value` ∈ indexer, chain (chain: the indexer is down or does not know the market, FE-D1) |
+| `market-not-found` | `T.marketNotFound` | no market for this mint, on chain or in the indexer; links to `/markets/new?mint=` |
+| `market-banner-<…>` | `T.marketBanner` | `<flag>` as in `market-flag-<…>`; one banner per flag in §3.4's severity order, `data-severity` |
+| `market-spot-price` | `T.marketSpotPrice` | spot price (`spot_wad`); `data-value` = WAD |
+| `market-indexer-mismatch` | `T.marketIndexerMismatch` | *v1.2:* banner while the indexer answers for this mint with another token's detail; the page shows the chain's view (M9-SEC-3) |
+| `market-duplicate-symbol` | `T.marketDuplicateSymbol` | *v1.2:* another listed market uses this symbol (R-MINT §10.11) |
+| `market-fees-table` | `T.marketFees` | fee lines (Overview) |
+| `market-lender-loss` | `T.marketLenderLoss` | realised lender loss by S1 / S2 / S3 (Overview); `data-value` = total lamports |
+| `market-positions-table` | `T.marketPositions` | open positions (Positions tab) |
+| `market-position-row-<…>` | `T.marketPositionRow` | `<position>`; opens the position page |
+| `market-lenders-table` | `T.marketLenders` | lenders, largest first (Lenders tab) |
+| `market-lender-row-<…>` | `T.marketLenderRow` | `<owner>`; `data-coin-creator`, `data-market-creator` ∈ true, false (SPEC R1) |
+| `market-creator-share` | `T.marketCreatorShare` | the coin creator's share of the pool (Lenders tab header); `data-value` = bps |
+| `market-pools-table` | `T.marketPools` | pools and their adoption history (Pools tab) |
+| `market-coverage` | `T.marketCoverage` | keeper coverage: gaps, pauses, observations (Coverage tab) |
+| `market-events-table` | `T.marketEvents` | the market's events, newest first (Events tab) |
+| `market-route-chain-<…>` | `T.marketRouteChain` | `<chain>` ∈ no-route, pool-fail: the running route chain's start (Overview); `data-value` = unix seconds, 0 when none |
+| `create-mint-input` | `T.createMintInput` | mint input |
+| `create-check-verdict` | `T.createVerdict` | `data-verdict` ∈ ok, reject, existing, checking |
+| `create-check-reason-<…>` | `T.createReason` | `<code>` = the program error name the filter would return (e.g. MintFreezeAuthority) |
+| `create-venue-detected` | `T.createVenue` | detected venue; `data-value` = VenueName |
+| `create-pool-candidates` | `T.createPools` | Raydium candidates table |
+| `create-pool-row-<…>` | `T.createPoolRow` | `<pool>`; `data-eligible` |
+| `create-cost` | `T.createCost` | fee + rent; `data-value` lamports |
+| `create-submit` | `T.createSubmit` | opens the review |
+| `create-existing-market` | `T.createExisting` | link to the existing market of this mint |
+| `create-mint-info` | `T.createMintInfo` | the mint's program, decimals, supply, authorities and extensions |
+| `create-choice-<…>` | `T.createChoice` | `auto` or `<pool>`: the listing choice (radio) |
+| `status-page` | `T.statusPage` | page root |
+| `status-indexer-lag` | `T.statusIndexerLag` | indexer lag; `data-state` |
+| `status-paused-opens` | `T.statusPausedOpens` | global pause; `data-value` true/false |
+| `status-venues-table` | `T.statusVenues` | venue table |
+| `status-venue-row-<…>` | `T.statusVenueRow` | `<venue program name>` (pump, pump_amm, pump_fees, raydium_v4, raydium_cpmm); `data-upgraded`, `data-enabled`, `data-route-broken` |
+| `status-degraded-markets` | `T.statusDegraded` | coverage-paused markets table |
+| `status-degraded-row-<…>` | `T.statusDegradedRow` | `<mint>` |
+| `status-route-broken` | `T.statusRouteBroken` | route-broken markets / venues list |
+| `status-route-broken-row-<…>` | `T.statusRouteBrokenRow` | `<mint>` or `<venue>`; `data-kind` ∈ market, venue |
+| `status-scanned` | `T.statusScanned` | markets scanned for the degraded and route-broken lists (FE-5); `data-value` = count |
+| `status-indexer-health` | `T.statusIndexerHealth` | `/v1/status` lag and data-quality counts |
+| `status-coverage-gap` | `T.statusCoverageGap` | keeper coverage gaps (`/v1/stats.coverage_gap_s`); `data-value` = seconds |
+| `status-extras-table` | `T.statusExtras` | the venue extras sets in force (`/v1/venues.extras`) |
+
+### 11.3 Lend panel and lender dashboard (LEND)
+
+| id | constant | element and state |
+|---|---|---|
+| `lend-panel` | `T.lendPanel` | `data-mint`, `data-action` |
+| `lend-tab-<…>` | `T.lendTab` | `<action>` ∈ deposit, withdraw, claim |
+| `lend-amount-input` | `T.lendAmountInput` | deposit amount (tokens) |
+| `lend-max` | `T.lendMax` | fills the source account balance |
+| `lend-token-account-select` | `T.lendTokenAccount` | source account select (lists the owner’s accounts of the mint, ATA first) |
+| `lend-preview-<…>` | `T.lendPreview` | `<field>` ∈ shares, share-bps, value; `data-value` raw |
+| `lend-submit` | `T.lendSubmit` | opens the review; disabled until the SPEC §5.3 box is ticked |
+| `lend-cpi-guard-notice` | `T.lendCpiGuardNotice` | `token.cpiGuard` notice; `data-state` ∈ blocked, bracket |
+| `lend-cpi-guard-bracket` | `T.lendCpiGuardBracket` | opt-in checkbox for the disable → deposit → enable bracket (FE-1) |
+| `withdraw-shares-input` | `T.withdrawSharesInput` | shares to withdraw (or % of position) |
+| `withdraw-max` | `T.withdrawMax` | fills the pro-rata allowance |
+| `withdraw-preview-<…>` | `T.withdrawPreview` | `<field>` ∈ tokens, sol, allowance, lock, lock-until, vesting-forfeit |
+| `withdraw-memo-notice` | `T.withdrawMemoNotice` | `token.memoRequired` notice |
+| `withdraw-submit` | `T.withdrawSubmit` | opens the review |
+| `claim-value-<…>` | `T.claimValue` | `<field>` ∈ claimable, vesting, pot, deficit; `data-value` lamports |
+| `claim-submit` | `T.claimSubmit` | opens the review (`sync_lender` prepended when needed) |
+| `cover-deficit-submit` | `T.coverDeficitSubmit` | cover_deficit |
+| `lender-dashboard` | `T.lenderDashboard` | dashboard table |
+| `lender-row-<…>` | `T.lenderRow` | `<market>` |
+| `lender-cell-<…>` | `T.lenderCell` | `<field>` ∈ shares, value, claimable, vesting, lock, lock-until, creator |
+| `lend-blocked-reason` | `T.lendBlocked` | why a lend action is refused now; `data-code` = the program error name (e.g. MintUnsafeFlagged, LenderBehindEpochs, NegativePending) |
+| `lend-position-<…>` | `T.lendPosition` | the panel's position summary; `<field>` ∈ shares, share-bps, value, claimable, lock; `data-value` raw |
+| `lend-slippage-input` | `T.lendSlippageInput` | tolerance in % for `min_shares` / `min_tokens` (default 0.5, FE-D6) |
+| `lend-sweep-notice` | `T.lendSweepNotice` | the post-wipe sweep bundle will be prepended to the deposit |
+| `lend-sync-submit` | `T.lendSyncSubmit` | `sync_lender` of the own position when it is behind more share epochs than one transaction carries |
+| `withdraw-destination-select` | `T.withdrawDestination` | destination token account select (ATA first; a missing ATA is created idempotently); `data-memo` true/false |
+| `withdraw-percent-<…>` | `T.withdrawPercent` | `<pct>` ∈ 25, 50: fills that share of the holding |
+| `lender-epochs-<…>` | `T.lenderEpochs` | `<market>`; `data-state` ∈ current, behind, parked; `data-value` = epochs behind |
+| `lender-indexer-<…>` | `T.lenderIndexer` | `<market>`; `data-state` ∈ ok, unsynced (indexer shares ≠ chain), quarantined (the market has quarantined events), missing (chain only) |
+| `lender-claim-<…>` | `T.lenderClaim` | `<market>`; per-row claim |
+| `lender-sync-<…>` | `T.lenderSync` | `<market>`; per-row `sync_lender` when behind |
+| `lender-claim-all` | `T.lenderClaimAll` | claims every market with SOL claimable, one reviewed transaction per market |
+| `lender-empty` | `T.lenderEmpty` | empty state (no wallet / no positions) |
+
+### 11.4 Short panel, positions and position detail (SHORT)
+
+| id | constant | element and state |
+|---|---|---|
+| `short-panel` | `T.shortPanel` | `data-mint` |
+| `short-q-input` | `T.shortQInput` | size Q in tokens |
+| `short-slippage-input` | `T.shortSlippageInput` | max slippage in % (bps inside) |
+| `short-preview-<…>` | `T.shortPreview` | `<field>` ∈ q, proceeds, margin, open-fee, total-cost, cr-open, cr-ema, liq-price, rent-rate, min-rent, max-duration, deadline, tier-terms, caps; `data-value` raw (`caps`: the largest `Q` the program accepts now, with `data-cap` = the binding cap; `tier-terms`: the tier letter) |
+| `short-blocked-reason` | `T.shortBlocked` | why opens are refused now; `data-code` = the program error name |
+| `short-cap-warning` | `T.shortCapWarning` | size above a cap; `data-cap` ∈ position, market, utilisation, wallet, gamma, inventory, notional |
+| `short-submit` | `T.shortSubmit` | opens the review |
+| `positions-table` | `T.positionsTable` | positions table |
+| `positions-filter` | `T.positionsFilter` | status filter |
+| `position-row-<…>` | `T.positionRow` | `<position>`; `data-status` |
+| `position-cell-<…>` | `T.positionCell` | `<field>` ∈ market, q, vault, cr, liq-price, pnl, rent, time-left, risk, status; `data-value` raw, risk `data-risk` |
+| `position-add-margin` | `T.positionAddMargin` | row action (links to the position page's add-margin form; the page itself uses `add-margin-submit`) |
+| `position-close` | `T.positionClose` | row action (links to the position page's close form; the page itself uses `close-submit`) |
+| `position-detail` | `T.positionDetail` | detail page root; `data-value` = position |
+| `position-data-mismatch` | `T.positionDataMismatch` | *v1.2:* the indexer's market or mint for a position disagrees with the chain's (dashboard row badge, position page banner; M9-SEC-2) |
+| `add-margin-input` | `T.addMarginInput` | SOL amount |
+| `add-margin-preview-cr` | `T.addMarginPreviewCr` | CR after; `data-value` bps |
+| `add-margin-submit` | `T.addMarginSubmit` | opens the review |
+| `close-slippage-input` | `T.closeSlippageInput` | max slippage on the buyback |
+| `close-preview-<…>` | `T.closePreview` | `<field>` ∈ buyback, rent, payout, pnl |
+| `close-straddle-notice` | `T.closeStraddleNotice` | CurveStraddle explanation (FE-3) |
+| `close-submit` | `T.closeSubmit` | opens the review |
+
+---
+
+## 12. Tracks and file ownership
+
+### 12.1 Tracks
+
+| Track | Builds | Depends on |
+|---|---|---|
+| **MARKETS** | markets table (§3.3), market page (§3.4), create market (§3.5), protocol status (§3.9) | the scaffold; `src/venues` `detectVenue` / `raydiumCandidates` (SHORT; mocked in MARKETS' tests until it lands); `ShortPanel`, `LendPanel`, `CapsSummary` by their frozen props |
+| **LEND** | lend panel — deposit, withdraw, claim, cover deficit (§3.6) — and the lender dashboard (§3.8) | the scaffold (pipeline, token-account and mint readers, WASM lender previews) |
+| **SHORT** | the venue layer (§5.1), short panel and open preview (§3.7), `CapsSummary`, positions dashboard and position detail with add margin and close (§3.8) | the scaffold |
+| **E2E** | local validator bootstrap and seed, injected test wallet, Playwright config and specs (§10.2–§10.3), the `web-e2e` CI job | the scaffold now (smoke, shell, wallet, pipeline); each track's pages as they land, selecting only by §11 ids |
+
+### 12.2 File ownership
+
+Paths are under `apps/web/` unless absolute from the repository root. **SCAFFOLD** files are frozen:
+a track that needs a change asks the integrator (a contract change updates this document).
+
+| Owner | Files |
+|---|---|
+| SCAFFOLD (integrator) | `/biome.json`; `/pnpm-lock.yaml`; `/packages/math-wasm/**`; `/.github/workflows/ci.yml` job `web`; `package.json`, `tsconfig.json`, `vite.config.ts`, `vitest.config.ts`, `index.html`, `.env.example`, `public/**`; `src/main.tsx`, `src/App.tsx`, `src/router.tsx`; `src/config/**` (`disclosures.ts`, `errors.ts`, `programs.ts`, `env.ts`, `parseConfig.ts`, `csp.ts`; `testids.ts` — see the append rule below); `src/styles/**`; `src/components/**`; `src/shell/**`; `src/lib/**`; `src/api/**`; `src/rpc/**`; `src/wallet/**`; `src/math/**`; `src/tx/**`; `src/test/**`; `src/venues/types.ts`; this document's §0–§11 |
+| MARKETS | `src/features/markets/**` — `MarketsPage.tsx`, `MarketPage.tsx`, `CreateMarketPage.tsx`, `ProtocolStatusPage.tsx` and new files beside them (e.g. `table/`, `market/`, `create/` with `mintSafety.ts`, `status/`, `markets.css`, `*.test.ts(x)`) |
+| LEND | `src/features/lend/**` — `LendPanel.tsx`, `LenderDashboardPage.tsx` and new files (e.g. `deposit/`, `withdraw/`, `claim/`, `plans.ts` — the `TxPlan` builders for deposit, withdraw, claim, cover deficit, sync, the post-wipe sweep bundle and the CPI Guard bracket —, `previews.ts` — `PoolState` / `LenderState` / `ShareEpochs` from the accounts —, `lend.css`, `*.test.ts(x)`) |
+| SHORT | `src/features/short/**` — `ShortPanel.tsx`, `CapsSummary.tsx`, `PositionsPage.tsx`, `PositionDetailPage.tsx` and new files (e.g. `open/`, `positions/`, `plans.ts` for open / close / add margin, `previews.ts`, `short.css`, `*.test.ts(x)`); `src/venues/**` except `types.ts` (`index.ts`, readers, account lists, extras, `*.test.ts` with keeper-derived vectors) |
+| E2E | `playwright.config.ts`; `e2e/**` (`global-setup.ts`, `global-teardown.ts`, `validator/` start and seed scripts, `wallet/injected-wallet.js`, `fixtures.ts`, `indexer-mock.ts`, `specs/*.spec.ts`); `/.github/workflows/ci.yml` job `web-e2e` (a new job only); `/docs/DEVELOPMENT.md` a new "Web E2E" section (append only) |
+
+**Append rule for shared contract files.** `src/config/testids.ts` and §11 of this document have one
+section per track (the comments `// ---- … (MARKETS)` etc.). A track may **add** ids, and their §11
+rows, inside its own section only; renaming or removing an id goes through the integrator. No track
+edits `disclosures.ts` (copy changes need the owner) or `errors.ts`.
+
+**Dependencies** are frozen (§2): no track edits `package.json` or the lockfile.
+
+### 12.3 Integration and the M9 exit
+
+1. SHORT lands `src/venues` first (`detectVenue`, `raydiumCandidates`, `tradeContext`); MARKETS
+   switches from its mocks.
+2. E2E lands the environment, the wallet and `smoke` / `tx-errors` against the scaffold; the other
+   specs follow each track.
+3. Exit (ARCH §9 M9): every §7.3 flow implemented with simulation before signing and the §4
+   disclosures; `pnpm --filter web build`, `biome check`, `vitest run` green; the E2E profile
+   `chain` green, including `lend-cpi-guard` and `lend-withdraw-memo` (§10.3) and axe on every page;
+   this document updated "as built" (deviations flagged in §13).
+
+**The exit is met (2026-10-02), with this evidence** (the integrated tree; Node 24.21.0, pnpm
+12.7.0, Chromium 152 at `/usr/bin/chromium`, Agave 4.1.2's `solana-test-validator`):
+
+| Criterion | Evidence |
+|---|---|
+| Every §7.3 flow, simulated before signing | market search, create market (verdict, venue detection, Raydium candidates, cost), deposit / withdraw / claim / cover deficit / sync, open / close / add margin, the dashboards, the market page and protocol status — each transaction through `useTxFlow` → `simulatePlan` (exact instructions, < 20 s) → `TxReviewModal` (instructions, deltas, disclosures) → Wallet Standard signing with `assertSameIntent`; E2E `short-open`, `short-close`, `add-margin`, `lend-deposit`, `lend-claim`, `lend-withdraw-memo`, `create-market`, `keyboard` land them on the validator; `tx-errors` proves Sign stays disabled on a failing simulation, a stale review is re-simulated, a tampered message is refused and a raised fee accepted |
+| The §4 disclosures | one copy in `disclosures.ts`, held to this document and SPEC §5.3 verbatim by `disclosures.test.ts`; `lend-deposit` checks the SPEC §5.3 sentence on the deposit screen and that its checkbox gates Review and Sign |
+| CPI Guard UX (§10.3) | `lend-cpi-guard`: notice and blocked plain deposit, the ATA re-enables it; the bracket's review lists `DisableCpiGuard` / `Deposit` / `EnableCpiGuard` and the landed transaction is exactly that, guard still on; the race maps Token-2022 error 42 (`data-kind="token"`, `data-code="42"`), Sign disabled, re-entry shows the notice |
+| Memo UX (§10.3) | `lend-withdraw-memo`: the notice, `memo_program` passed, the memo program invoked before Token-2022's transfer, the destination rises by the previewed tokens; the race fails `MemoProgramRequired` (6095) and re-entry lands with the memo |
+| Accessibility | axe (WCAG 2.2 A / AA) on every page and state the specs visit, `screens` included (0 violations); keyboard-only deposit and open |
+| Security | the production build under its CSP: every spec fails on any CSP violation (none); the top-level allowlist and the intent check in `tx-errors` |
+| Builds and tests | `pnpm -r build`, `biome check` (root and `apps/web`), `tsc --noEmit`, `vitest run` (*v1.2:* 56 files, 533 tests, 1 opt-in file skipped), `pnpm --filter @shortwin/client check` (28); `pnpm --filter web e2e`: **50 passed** (19 specs) on a fresh validator and seed |
+| Visual pass | `screens.spec.ts`: 32 PNGs of every page and state, reviewed; the layout fixes are in §7.3; the reviewed set is in `apps/web/e2e/screenshots/` (*v1.2:* refreshed — price units, token mints, the signing wallet, the slot age) |
+| Deviation | ARCH §9 names "Playwright E2E on Surfpool"; the E2E runs on `solana-test-validator` (FE-7) |
+
+---
+
+## 13. Open items and known limits
+
+| # | Item | Status |
+|---|---|---|
+| FE-1 … FE-6 | Owner items of §0 | open (owner) |
+| FE-7 | ARCH §9's M9 row names "Playwright E2E on Surfpool"; Surfpool needs live mainnet and the network (INDEXER §11.3), so the E2E runs on `solana-test-validator` with the test-venue build and dumped fixtures (§10.2). A Surfpool profile can be added later for the real venues. | flagged deviation |
+| FE-8 | The mock venue drives the trading E2E; real-venue trading paths are covered by the SHORT track's unit vectors (keeper-derived account lists, fixture readers) and by the program's fork tests, not by a browser test against a live venue. | by design |
+| FE-9 | Mainnet acceptance of `withdraw`'s CPI'd memo (T-MEMO, U17) | M10 |
+| FE-10 | Indexer follow-ups: `flag=` filters on `/v1/markets` (FE-5); a `borrower:<owner>` WebSocket channel would replace per-position subscriptions (≤ 40 rows live today) | open (indexer) |
+| FE-11 | Wallets with only `solana:signAndSendTransaction` cannot be checked before sending (§5.4); they are labelled and checked post hoc (*v1.2:* implemented — `checkLanded`, `wallet-sends-itself-badge`, `unknown-outcome` instead of `expired`; M9-SEC-1). Refusing such wallets for writes altogether is the stricter alternative (FE-21) | by design |
+| FE-12 | Token-2022 metadata (name / symbol) on mints without Metaplex metadata depends on the indexer's refresher (INDEXER IX-16); the UI falls back to the short mint | open (indexer) |
+| FE-13 | Price charts: an optional sparkline from `/candles`; a full chart is not in M9 | by design |
+| FE-14 | "Why this tier" shows the Tier A / B thresholds in USD and SOL, the pool's age and its basis, and SOL/USD with its age, but not the pool's own locked liquidity Λ in USD: that needs live reserves from the venue layer's `tradeContext` or an indexer field | open (MARKETS follow-up) |
+| FE-15 | WASM facade gaps (`crates/shortwin-math-wasm`): `previewWithdraw` returns tokens only (the SOL part and the lock after a withdrawal come from the simulation, §3.6); `spot_near_ema`, `P_OPEN_MAX`, `lambda_bps`, `locked_depth`, `locked_sol` and `locked_floor_ok` are not exported, so these integer comparisons are ported in `features/short/previews.ts` and `venues/` (tested against fixtures and program vectors); the create-market verdict is a TypeScript port of `shortwin_venue_state::mint::check` (tested against the Rust fixtures). Exporting them removes the second copies | open (Rust; M10) |
+| FE-16 | The vector generators `venues/vectors/keeper_vectors.rs` and `features/short/vectors/program_vectors.rs` run outside the web build (copied into `services/keeper/examples` and `tests/litesvm/examples`, instructions in each header); moving them into those crates would let CI regenerate the vectors | open |
+| FE-17 | `raydiumCandidates` runs the keeper's four `getProgramAccounts` discovery calls from the browser; public mainnet RPCs may refuse or throttle them on AMM v4 — an indexer endpoint or a dedicated discovery RPC | open (M11) |
+| FE-18 | Not exercised on a validator: the pump / PumpSwap post-wipe sweep bundle (needs pump venues and a full wipe) and the claim-time `sync_lender` of other lenders; both are unit-tested against the keeper's `sweep.rs` and `pool_model.py` | open (M10 adversarial suite) |
+| FE-19 | While the indexer is down the chain-only views fill `{creatorFee}` with "n/a (indexer unavailable)" and the `lender.lossHistory` numbers with "—"; the indexer mock's lender deposit / withdrawal history is 0 (it derives responses from chain state; profile `full` serves the real values) | by design |
+| FE-20 | `tradeContext` (frozen interface) is implemented in `venues/index.ts` on SHORT's snapshot loader; the trading panels build from that snapshot directly, so the venue layer imports `features/short/snapshot.ts` | note |
+| FE-21 | Sending-only wallets (M9-SEC-1): v1.2 implements the documented post hoc check — a wallet that lands something else is reported after the fact, not prevented. The stricter option is to refuse such wallets for writes (every major wallet also offers `solana:signTransaction`) | open (owner) |
+| FE-22 | Slot-age thresholds (§6.6): shown above 2 slots behind the confirmed tip, Submit blocked above 75 slots / 30 s; the Lend panel counts as current while its account subscriptions are live. Tune after mainnet latency is measured | open (M10) |
+| FE-23 | Source maps (M9-SEC-6): built `hidden` into `dist-sourcemaps/`, not deployed; whether to upload them to a private error tracker or publish them deliberately | open (owner) |
+| FE-24 | The deploy header check (`check:headers`) exists but no deployment pipeline runs it yet; the CDN must send `_headers`' header form | open (M11 deployment) |
+| FE-25 | Homoglyph tickers ("USDС" with a Cyrillic С) survive normalisation by design; the defence is the mint next to every symbol and the duplicate-symbol marks — no confusable-skeleton detection | by design |
+| FE-26 | Retry rebuilds (M9-UX-1) cover deposit, withdraw, claim, cover deficit, sync, open and close; add margin (no quote bound) and create market close the review for a new one instead | by design |
+
+### Review fixes (v1.1 → v1.2, the M9 security and UX review)
+
+Every finding was reproduced first (the review's reproducers; they now fail against the fixed
+tree) and has a regression test (`src/m9-review/*.test.ts(x)`, `src/features/markets/m9-review.test.tsx`,
+the E2E specs named):
+
+| Finding | Fix | Regression |
+|---|---|---|
+| M9-SEC-1 sending-only wallets unchecked; "expired" from the app's blockhash | post hoc `checkLanded`; `unknown-outcome` instead of `expired`; menu and review labels (§5.4) | `tx.test.ts`, `render.test.tsx`, `wallet.test.tsx` |
+| M9-SEC-2 positions priced on the indexer's market | the chain's mint of the position's own market; mismatch flagged (§3.8) | `positions.test.tsx` |
+| M9-SEC-3 market header identity and decimals from the indexer | route mint, chain decimals / venue / tier / flags / creator; a detail for another mint ignored (§9.5) | `markets/m9-review.test.tsx` |
+| M9-UX-1 Retry re-simulated a stale plan; "the app adds it" never kept | `TxPlan.rebuild`, `retryMode`, accurate copy (§5.3, §5.9) | `ux.test.tsx`, `render.test.tsx`, E2E `lend-withdraw-memo` race |
+| M9-UX-2 lender residuals missing | three `lender.residuals` paragraphs (§4.2) | `ux.test.tsx`, `disclosures.test.ts` |
+| M9-SEC-4 changed blockhash unchecked; endless confirming; FE-2 fee not shown | lifetime in `assertSameIntent`, `confirmationLifetime`, hard timeout, `tx-final-fee` (§5.5, §5.8) | `tx.test.ts`, E2E `tx-errors` |
+| M9-SEC-5 untrusted symbols in titles and labels | normalisation at the API boundary (and in the indexer), `<bdi>`, the mint next to every symbol, duplicate marks (§9.5) | `positions.test.tsx`, indexer `refresher` test |
+| M9-SEC-6 frameable on a header-less host; public source maps | runtime frame guard, preview headers, deploy check, hidden maps (§2.2, §9.3) | `render.test.tsx`, E2E `frame.spec.ts` |
+| M9-SEC-7 allowlist per program | per (program, instruction) (§5.8) | `tx.test.ts` |
+| M9-SEC-8 same-name wallets indistinguishable; signer not shown | identity keys, duplicate badge, silent reconnect undone, `tx-wallet` (§5.4) | `wallet.test.tsx`, `render.test.tsx`, E2E `tx-errors` |
+| M9-UX-3 governable numbers hard-coded; `tx.simulation` missing | placeholders from config / locked terms; `tx.simulation` in every review (§4.1, §4.2) | `positions.test.tsx`, `render.test.tsx`, `disclosures.test.ts` |
+| M9-UX-4 "Liquidatable" on the spot leg alone / at the line | `riskLevel` on both legs, strict, one function with the exit state (§3.8) | `positions.test.tsx`, `components.test.tsx` |
+| M9-UX-5 lender previews on the device clock | `Clock` in the lend read; `chainNowSeconds` (§6.5) | `ux.test.tsx`, `chain.test.ts` |
+| M9-UX-6 stale data silent in the money views | `slot-age-badge`, Submit blocked when stale, freshness badges (§6.6) | `render.test.tsx` |
+| M9-UX-7 RPC errors read as "you rejected" | only the wallet call's errors (§5.4, §5.9) | `tx.test.ts` |
+| M9-UX-8 prices without a visible unit | `Price` shows SOL; "Buyback cost (SOL)" | `render.test.tsx` |
+
+### Integration changes (v1.0 → v1.1)
+
+The tracks' shared-file requests, applied by the integrator, and the integration's own fixes:
+
+1. `src/tx/errors.ts`: the failing program is the **first** "Program … failed" log line (Token-2022
+   42 / 36 inside short.win's CPI map to `token`); `IntegrityError` maps to `integrity` (§5.9).
+2. `src/api`: `MarketsParams.cursor`, passed by `indexerQueries.markets`; MARKETS' paging uses it.
+3. `src/rpc/queries.ts`: the shared chain hooks (from MARKETS); `src/rpc/pda.ts`: the event
+   authority (three copies removed); the pump / PumpSwap discriminators and event authorities of
+   the sweep bundle live once in `venues/constants.ts`.
+4. `src/shell/freshness.tsx`: `useNow`, `useIndexerFreshness`, `FreshnessBadge` (from MARKETS),
+   used by the status bar; LEND's clock on `useNow`.
+5. `BREAK_EVEN_DAYS` in `src/config/disclosures.ts` (MARKETS and LEND had a copy each).
+6. `src/venues/types.ts`: `ExtrasSelection`, `ExtrasChoice`, `TradeContext.extras` and
+   `extrasCandidates` (SHORT returned a subtype).
+7. `DataTable`: `rowAttrs` and control-aware row activation; SHORT's own `PositionsTable` removed.
+8. `TxReviewModal`: the plan's instructions (`src/tx/describe.ts`, `tx-instruction-<i>`).
+9. Toasts bottom-left; route-level code splitting (`lazyRouteComponent`).
+10. The market page's Positions tab: CR now and risk (SHORT's `useMarketPositionsLive`).
+11. The visual pass (§7.3, §10.2 `screens`): stat strip, compact size cap, sticky trade panel,
+    table padding at 1,024 px, `.case-keep`, the token label without a repeated mint, "No reading
+    yet" for an uncranked oracle, SPEC §5.3's sentence once, the Positions tab's note padding.
+12. Lint: 26 `useJsxKeyInIterable` errors (MARKETS, LEND; the rule only fires in a git checkout).
+13. E2E: the review's instruction list asserted in `lend-cpi-guard`; `screens.spec.ts`; a reused
+    build is checked against its sources; `fund.ts`, `start.ts --env`, `dev:e2e`; CI runs every
+    spec.

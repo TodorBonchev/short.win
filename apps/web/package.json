@@ -1,0 +1,57 @@
+{
+    "name": "web",
+    "version": "0.1.0",
+    "private": true,
+    "description": "short.win web frontend (M9; docs/design/FRONTEND.md): Vite + React 19 SPA, TanStack Router/Query, @solana/kit, the Codama client and the WASM math facade.",
+    "license": "UNLICENSED",
+    "type": "module",
+    "scripts": {
+        "wasm": "pnpm --filter @shortwin/math-wasm build",
+        "dev": "pnpm run wasm && vite",
+        "dev:e2e": "pnpm run wasm && vite --mode e2e",
+        "build": "pnpm run wasm && tsc -p tsconfig.json --noEmit && vite build",
+        "preview": "vite preview",
+        "check:headers": "node scripts/check-headers.ts",
+        "typecheck": "tsc -p tsconfig.json --noEmit",
+        "lint": "biome check .",
+        "lint:fix": "biome check --write .",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "e2e": "playwright test"
+    },
+    "dependencies": {
+        "@shortwin/client": "workspace:*",
+        "@shortwin/math-wasm": "workspace:*",
+        "@solana-program/token": "0.17.0",
+        "@solana-program/token-2022": "0.19.0",
+        "@solana/kit": "8.3.0",
+        "@solana/kit-plugin-rpc": "0.19.0",
+        "@solana/kit-plugin-wallet": "0.20.0",
+        "@solana/react": "8.3.0",
+        "@tanstack/react-query": "5.104.0",
+        "@tanstack/react-router": "1.170.41",
+        "react": "19.3.0",
+        "react-dom": "19.3.0"
+    },
+    "devDependencies": {
+        "@axe-core/playwright": "4.13.0",
+        "@biomejs/biome": "2.5.14",
+        "@playwright/test": "1.63.0",
+        "@solana-program/address-lookup-table": "0.15.0",
+        "@solana-program/system": "0.15.0",
+        "@testing-library/dom": "10.4.2",
+        "@testing-library/react": "16.3.3",
+        "@testing-library/user-event": "14.6.7",
+        "@types/node": "24.19.0",
+        "@types/react": "19.3.0",
+        "@types/react-dom": "19.3.0",
+        "@vitejs/plugin-react": "6.1.1",
+        "jsdom": "30.1.1",
+        "typescript": "5.9.3",
+        "vite": "8.3.1",
+        "vitest": "5.0.2"
+    },
+    "engines": {
+        "node": ">=24.21.0"
+    }
+}

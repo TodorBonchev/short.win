@@ -648,6 +648,152 @@ docker compose run --rm ingest backfill
 docker compose up -d
 ```
 
+## Web frontend (M9; `apps/web`)
+
+The contract is [`docs/design/FRONTEND.md`](design/FRONTEND.md) (as built: v1.1). The app is a
+Vite 8 + React 19 SPA in the pnpm workspace (`apps/web`, package `web`); it uses
+`@shortwin/client` and the WASM math package `@shortwin/math-wasm` (`packages/math-wasm`, built
+from `crates/shortwin-math-wasm`). Every page is its own chunk (route-level code splitting).
+
+```sh
+eval "$(mise activate bash)"
+cargo install wasm-bindgen-cli --version =0.2.129 --locked   # once: the crate's exact pin
+pnpm install --frozen-lockfile
+pnpm --filter @shortwin/math-wasm build   # cargo build (wasm32, release) + wasm-bindgen --target web -> packages/math-wasm/pkg
+pnpm --filter web lint                    # biome check . (root biome.json)
+pnpm --filter web typecheck               # tsc --noEmit (strict; includes e2e/ and playwright.config.ts)
+pnpm --filter web test                    # vitest run (jsdom)
+pnpm --filter web build                   # wasm (skipped when current) + tsc + vite build -> apps/web/dist (+ _headers; source maps -> apps/web/dist-sourcemaps, not deployed)
+pnpm -r build                             # every workspace package that has a build (math-wasm, web)
+pnpm --filter web check:headers https://<origin>   # after a deploy: X-Frame-Options, frame-ancestors, nosniff, HSTS; no public source maps
+```
+
+`packages/math-wasm/pkg/` is generated and gitignored; `pkg/.inputs-sha256` stamps the crate
+sources, so later builds skip cargo and wasm-bindgen until `crates/shortwin-math*` or
+`Cargo.lock` change (`$WASM_BINDGEN` may point at a matching binary instead of `PATH`; cargo is
+looked up in `~/.cargo/bin` when it is not on `PATH`). The app is configured by `VITE_*`
+variables (`apps/web/.env.example`; a bare build is a localnet build, and an invalid value fails
+the build). Never put a secret in a `VITE_*` value: it ships in the bundle.
+
+`src/features/short/live.validator.test.ts` is an optional Vitest suite against a running
+validator (skipped unless `SHORTWIN_LIVE_RPC` is set; start one with
+`src/features/short/vectors/live-validator.sh`, ports 38899/38900/39900).
+
+### Run the app against a local validator
+
+The E2E bootstrap doubles as the local environment: a `solana-test-validator` with the test-venue
+program, the mock venue and the dumped real venues, seeded with markets, lenders and open
+positions (details under "Web E2E" below). On ports of its own (RPC 18899, WS 18900), so a
+developer validator on 8899 can run alongside.
+
+```sh
+anchor build --tools-version v1.57 --arch v3 && scripts/build-test-venue.sh   # the ELFs (once per program change)
+pnpm --filter @shortwin/math-wasm build
+cd apps/web
+node e2e/validator/start.ts --env      # validator + seed (≈ 80 s), left running; writes .env.e2e.local
+node e2e/validator/fund.ts <your wallet address>   # 25 SOL and 1,000,000 of every seeded mint
+pnpm dev:e2e                           # vite --mode e2e: http://localhost:5173 against the validator
+node e2e/validator/stop.ts             # stop the validator (and the preview / indexer)
+```
+
+- **Wallet:** any Wallet Standard wallet (Phantom, Solflare, Backpack) with a custom RPC of
+  `http://127.0.0.1:18899` signs on `solana:localnet`. `fund.ts` uses the seed's generated
+  (throwaway) mint authority in `.e2e/keys/`; the seeded addresses are in `.e2e/state.json`.
+- **Indexer:** none by default, so the app runs in its RPC fallback (banner, the market page from
+  the chain, the markets list replaced by "open a mint"; FRONTEND.md §6.5). For the full app,
+  start the real indexer on the same validator: `SHORTWIN_E2E_PROFILE=full
+  SHORTWIN_INDEXER_BIN=<built shortwin-indexer> node e2e/validator/start.ts --env` (PostgreSQL
+  from the zonky binaries, API on :18080; see "Profile `full`" below).
+- **The production build** instead of the dev server: `node e2e/validator/start.ts --app` builds
+  it with the E2E configuration (CSP meta, `_headers`, hashed WASM) and serves it with
+  `vite preview` on http://127.0.0.1:14173.
+- The mock venue (`VITE_ENABLE_TEST_VENUE=true`) exists only in the test-venue program build and
+  on localnet; the configuration refuses it anywhere else (FE-D7).
+
+### Web E2E (M9; `apps/web/e2e`)
+
+Playwright 1.63 against the production build, a local `solana-test-validator` and an injected
+Wallet Standard test wallet ([`FRONTEND.md`](design/FRONTEND.md) §10.2–§10.3). No Docker, no
+network, nothing installed as root; everything the run writes is under `apps/web/.e2e/`
+(gitignored: the ledger, generated keys, the seed's `state.json`, the app build, logs, the HTML
+report, traces and the screenshots).
+
+```sh
+anchor build --tools-version v1.57 --arch v3 && scripts/build-test-venue.sh   # the ELFs the validator loads
+pnpm --filter @shortwin/math-wasm build
+pnpm --filter web e2e                       # every spec: ≈ 5 min (≈ 2 of them setup: validator, seed, build)
+pnpm --filter web e2e e2e/specs/lend-cpi-guard.spec.ts e2e/specs/lend-withdraw-memo.spec.ts   # the §10.3 exit tests
+pnpm --filter web e2e --grep @scaffold      # the harness, smoke and wallet specs only
+SHORTWIN_E2E_KEEP=1 pnpm --filter web e2e   # leave the validator and the preview running, then…
+SHORTWIN_E2E_REUSE=1 pnpm --filter web e2e e2e/specs/smoke.spec.ts   # …rerun in seconds without reseeding
+SHORTWIN_E2E_SCREENSHOTS=update pnpm --filter web e2e e2e/specs/screens.spec.ts   # refresh e2e/screenshots/
+pnpm --filter web exec playwright show-report .e2e/report
+```
+
+With `SHORTWIN_E2E_REUSE=1` the app is rebuilt (and the preview restarted) whenever its sources,
+build configuration, the WASM stamp or the E2E `VITE_*` values changed since the last build
+(`sourceFingerprint` in `e2e/validator/app.ts`); the seed is reused as it is, so a spec that needs
+a fresh chain needs a run without `REUSE`.
+
+**Global setup** (`e2e/global-setup.ts`; the validator and the preview are started there rather
+than by Playwright's `webServer`, because the build needs the seeded protocol ALT):
+
+1. `e2e/validator/validator.ts`: `solana-test-validator --reset --ledger apps/web/.e2e/ledger
+   --limit-ledger-size 200000000` on dedicated ports (RPC 18899, WS 18900, faucet 19900, gossip
+   18901, dynamic 18910–18960), with short.win's **test-venue** build
+   (`target/test-venue/deploy/shortwin.so`) as an upgradeable program whose upgrade authority is
+   a generated key, `mock_cpamm.so` and `complete_curve.so` from `target/deploy`, the dumped
+   pump / pump-fees / PumpSwap / Raydium AMM v4 / CPMM ELFs of `tests/fixtures/programs` with
+   their mainnet upgrade authorities, and genesis accounts (`--account-dir .e2e/accounts`): every
+   generated key funded, the mock's empty `VenueExtras` (as the LiteSVM harness installs it) and
+   the dumped venue state of `tests/fixtures` (deduplicated; sysvars, synthetic and absent entries
+   skipped). Boots in ≈ 1.5 s.
+2. `e2e/validator/seed.ts` (Kit, `@shortwin/client`, `@solana-program/*`): `initialize_config`
+   with the ECON §15 defaults read from the WASM `ParamSet`, the generated governance / Emergency /
+   coverage / fee keys and the live ProgramData slots; three SPL mints with mock pools and markets
+   (`main` for trading, `move` for the price-move specs, `paused` in coverage pause) and a
+   list-only Token-2022 market (`t22`, metadata only); a protocol ALT; one funded wallet per
+   independent spec group with its token accounts (a CPI-Guarded and a guard-capable Token-2022
+   account, memo-required ATAs, lender positions); create-market mints (safe, freeze authority,
+   a permanent delegate); after the 50 s market warm-up, three open positions. ≈ 80 s.
+3. `vite build` with the E2E configuration (`VITE_ENABLE_TEST_VENUE=true`, the E2E ports, the
+   seeded ALT) into `.e2e/dist`, served by `vite preview` on :14173.
+
+**In the browser** (`e2e/fixtures.ts`): `wallet/injected-wallet.js` registers the "ShortWin E2E"
+wallet (Wallet Standard, `solana:localnet`, Ed25519 by WebCrypto with the spec's generated key)
+with test controls (`rejectNext`, `tamperNext('data' | 'drop' | fn)`, `raiseFeeNext`, `signed`);
+the indexer is a `page.route` / `page.routeWebSocket` mock that builds OpenAPI-shaped responses
+from the chain at request time (`indexer-mock.ts`; `indexer: 'down'` simulates an outage); every
+spec selects by the §11 `data-testid`s only, fails on any CSP violation and runs axe (WCAG 2.2
+AA) on the pages it visits. Node-side helpers (`validator/actions.ts`) move a mock pool's price
+and flip CPI Guard or required memos for the race tests.
+
+**Specs** (18 files, 48 tests): `harness`, `smoke`, `wallet` (`@scaffold`); `markets`,
+`create-market`, `status`, `fallback` (`@markets`); `lend-deposit`, `lend-cpi-guard`,
+`lend-withdraw-memo`, `lend-claim`, `keyboard` (`@lend`); `short-open`, `short-close`,
+`add-margin`, `positions`, `tx-errors` (`@short`); `screens` (`@screens`: every page and state as
+a full-height PNG in `.e2e/screenshots/`, axe on each, the 1024 px minimum without sideways
+scroll; `SHORTWIN_E2E_SCREENSHOTS=update` writes the reviewed set in `e2e/screenshots/`). CI's
+`web-e2e` job runs them all and keeps the screenshots as an artifact.
+
+**Variables.** `SHORTWIN_CHROMIUM` (browser; default `/usr/bin/chromium` when present, `playwright`
+forces Playwright's own Chromium, installed once with `pnpm --filter web exec playwright install
+chromium` into the user cache — never `--with-deps` as root); `SHORTWIN_E2E_PROGRAM=release`
+(the release `shortwin.so`: list-only markets, the trading specs skip); `SHORTWIN_E2E_VENUES=0`
+(no dumped venues); `SOLANA_BIN`, `SHORTWIN_SO`, `MOCK_CPAMM_SO`, `COMPLETE_CURVE_SO`.
+
+**Profile `full`** (local, optional): `SHORTWIN_E2E_PROFILE=full SHORTWIN_INDEXER_BIN=<built
+shortwin-indexer> pnpm --filter web e2e` starts PostgreSQL 17 from the zonky binaries the indexer's
+tests cache (`~/.cache/shortwin/postgresql-zonky`, or `SHORTWIN_PG_INSTALL_DIR`; data in
+`.e2e/pg`, port 15432), runs `migrate`, `backfill` and `run` against the validator (API on :18080)
+and points the app at it; the mock-specific checks skip.
+
+**By hand.** `node e2e/validator/start.ts [--app] [--env]` boots and seeds the environment (and
+serves the app, or writes `.env.e2e.local` for the dev server) and leaves it running;
+`node e2e/validator/fund.ts <address>` funds a browser wallet; `node e2e/validator/stop.ts` stops
+everything. The seeded addresses are in `.e2e/state.json`, the generated (throwaway) keys in
+`.e2e/keys/`.
+
 ## Codama client
 
 `clients/js` is generated from the Anchor IDL; the IDL copy and the generated code are
@@ -710,7 +856,8 @@ model (`params::validate_econ`) are listed, not simulated; the program checks th
   chosen per the ECONOMICS §2 rounding rule (in the pool's and lenders' favour). Module docs
   name the owning track and the ECON/ARCH sections. The program calls it for all arithmetic.
 - **pnpm**: root `package.json` is private; workspaces per `pnpm-workspace.yaml`
-  (`clients/js` today); `pnpm-lock.yaml` committed.
+  (`clients/js`, and since M9 `apps/web` and `packages/math-wasm`); `pnpm-lock.yaml` committed.
+  Biome (`biome.json` at the root) covers `apps/web` and `packages/math-wasm`.
 
 ## Program id and keypair
 
@@ -754,6 +901,8 @@ wrapped transaction first. Nothing in the program changes.
 | `anchor-build` | Agave 4.1.2 + Anchor CLI 1.2.0, `anchor build --tools-version v1.57 --arch v3 --ignore-keys` (shortwin, the `complete_curve` helper and the mock) and `scripts/build-test-venue.sh`; asserts SBPF v3 on all four artifacts; A49: the release `shortwin.so` carries neither the test-venue marker nor the mock id (and `complete_curve.so` not the mock id), the test-venue build and `mock_cpamm.so` do; uploads the `.so` files, both IDLs and the TS types |
 | `program-tests` | on the `anchor-build` artifact: fixture checksums (`SHA256SUMS` and `scripts/dump-fixtures.py check`), `cargo check -p shortwin --target wasm32-unknown-unknown` (T-LAYOUT), `cargo test -p shortwin` on the release feature set, `cargo test -p shortwin -p shortwin-venue-state -p shortwin-litesvm-tests` (incl. every Raydium and pump fork binary, `straddle_it` with the helper) |
 | `codama` | IDL copy and generated client are current; `tsc`; `node --test` (T-LAYOUT Codama leg) |
+| `web` | M9: wasm-bindgen 0.2.129, `@shortwin/math-wasm` build, then `apps/web`'s Biome check, type check, Vitest and production build (FRONTEND.md §10.4) |
+| `web-e2e` | M9: Playwright (profile `chain`) on `solana-test-validator` with the `anchor-build` artifact's test-venue `shortwin.so`, mock and helper plus the dumped venues, the seeded scenario, the production build and the injected test wallet; every spec (incl. the §10.3 CPI Guard and memo exit tests, axe on every page); the `screens` PNGs uploaded always, report, traces and logs on failure |
 | `m1-cu` | M1 CU baseline bench (`tests/bench/m1_cu`) within budget |
 | `m2-cu` | M2 CU bench and T-TRACE (`tests/bench/m2_cu`) within budget and 64 trace entries |
 | `m3-cu` | M3 CU bench, T-TRACE and stack depth on Raydium (`tests/bench/m3_cu`): builds the TEST-ONLY CPI wrapper (SBPF v3 asserted), every Raydium-path instruction (M4's `propose_pool` / `execute_pool_switch` included) within budget, the worst-case transactions at their exact trace counts, every path through 0–3 wrapper levels |

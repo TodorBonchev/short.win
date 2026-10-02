@@ -565,8 +565,56 @@ pub async fn record_admin_value(
 /// The watched fields of one venue account: `(field, value)`.
 type WatchedFields = Vec<(&'static str, String)>;
 
+/// Display text from untrusted token metadata (M9-SEC-5): every control character (NUL padding
+/// included) and every invisible formatting character — bidi embeddings, overrides and isolates,
+/// zero-width characters, the BOM, variation selectors, tag characters — is dropped, whitespace
+/// runs collapse to one space, and the result is trimmed and capped at `n` characters. The web app
+/// normalises again (NFC, `apps/web/src/lib/displayText.ts`) and shows the mint next to a symbol.
 fn cap(s: &str, n: usize) -> String {
-    s.trim_end_matches('\0').chars().take(n).collect()
+    let mut out = String::new();
+    let mut pending_space = false;
+    for c in s.chars() {
+        if c.is_whitespace() {
+            pending_space = !out.is_empty();
+            continue;
+        }
+        if invisible(c) {
+            continue;
+        }
+        if pending_space {
+            out.push(' ');
+            pending_space = false;
+        }
+        out.push(c);
+    }
+    out.chars()
+        .take(n)
+        .collect::<String>()
+        .trim_end()
+        .to_owned()
+}
+
+/// Control and invisible formatting characters (the same set the web app strips).
+fn invisible(c: char) -> bool {
+    c.is_control()
+        || matches!(
+            u32::from(c),
+            0xAD | 0x61C
+                | 0x115F
+                | 0x1160
+                | 0x17B4
+                | 0x17B5
+                | 0x180B..=0x180F
+                | 0x200B..=0x200F
+                | 0x2028..=0x202E
+                | 0x2060..=0x206F
+                | 0x3164
+                | 0xFE00..=0xFE0F
+                | 0xFEFF
+                | 0xFFA0
+                | 0xFFF9..=0xFFFB
+                | 0xE0000..=0xE007F
+        )
 }
 
 /// Metaplex `Metadata`: key (1), update_authority (32), mint (32), then Borsh strings name,
@@ -596,6 +644,13 @@ mod tests {
         }
         let (n, s, u) = metaplex_strings(&d).expect("parsed");
         assert_eq!(cap(&n, 64), "Name");
+        // M9-SEC-5: bidi overrides, zero-width and control characters never reach the API.
+        assert_eq!(cap("USDC\u{202E}\u{200B}\u{7}", 16), "USDC");
+        assert_eq!(
+            cap("  Wrapped \u{2066}SOL\u{2069}\t\n coin ", 64),
+            "Wrapped SOL coin"
+        );
+        assert_eq!(cap("ABCDEFGHIJKLMNOPQRS", 16), "ABCDEFGHIJKLMNOP");
         assert_eq!(s, "SYM");
         assert_eq!(u, "https://x");
         assert!(metaplex_strings(&d[..70]).is_none());

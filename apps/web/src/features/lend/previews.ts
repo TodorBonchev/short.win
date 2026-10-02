@@ -1,0 +1,676 @@
+/**
+ * Lender previews (FRONTEND.md §3.6, §3.8, §6.7): the accounts as the program stores them
+ * (`Market`'s lender-pool group and flags, `MarketVault`, `LenderPosition`, `ShareEpoch`
+ * records) → `@shortwin/math-wasm`'s `PoolState` / `LenderState` / `ShareEpochs` — exactly the
+ * program's own `Market::pool()`, `MarketVault::vault()` and `LenderPosition::lender()` — and
+ * every number the lend panel and the lender dashboard show, computed by the facade (the frontend
+ * never re-implements pool math; FRONTEND.md §6.7 rule 1).
+ *
+ * Every function here is pure: it creates the WASM objects, reads what it needs and frees them
+ * before returning plain `bigint`s. `previews.test.ts` holds the results to `pool_model.py`
+ * v0.4.1 (`vectors/lend_vectors.json`).
+ *
+ * `now` is the program's `market_now`: `max(clock, Market.last_accrual_ts)` for `deposit` /
+ * `withdraw` (`engine::prologue::market_now`); `claim_sol`, `cover_deficit` and `sync_lender`
+ * read the clock. The previews run on the last stored state: the program's prologue first
+ * accrues rent and releases the vest due since `last_accrual_ts`, which only adds to a lender's
+ * entitlement — so a SOL preview is a lower bound and the review's simulation shows the exact
+ * amount (FRONTEND.md §5.3).
+ */
+import type { LenderPosition, Market, MarketVault, PodI128, PodU128, ShareEpoch } from '@shortwin/client';
+import { podI128ToBigInt, podU128ToBigInt } from '@shortwin/client';
+import { PROGRAM_ERRORS, type ProgramErrorInfo } from '../../config/errors.ts';
+import type { MathModule } from '../../math/load.ts';
+
+// ---- the account shapes the previews read ----------------------------------------------
+
+/** `Market`'s lender-pool group (ARCH §2.3.4) and the fields that decide a lender flow. */
+export type MarketPoolFields = Pick<
+    Market,
+    | 'tokensFree'
+    | 'borrowedQ'
+    | 'totalShares'
+    | 'acc'
+    | 'carry'
+    | 'accR'
+    | 'carryR'
+    | 'dust'
+    | 'receivable'
+    | 'maxRelease'
+    | 'vestBal'
+    | 'vestLast'
+    | 'vestEnd'
+    | 'shareEpoch'
+    | 'flags'
+>;
+
+/** `MarketVault`'s lender-pool part (ARCH §2.3.6). */
+export type VaultPoolFields = Pick<
+    MarketVault,
+    'lenderSol' | 'unmatched' | 'protocolFees' | 'pi' | 'lockNorm' | 'bMin' | 'piEpoch' | 'calDay' | 'lockCal'
+>;
+
+/** A `LenderPosition`'s math state (ARCH §2.3.6). */
+export type LenderFields = Pick<
+    LenderPosition,
+    | 'shares'
+    | 'snap'
+    | 'pending'
+    | 'snapR'
+    | 'real'
+    | 'claimed'
+    | 'epoch'
+    | 'lock'
+    | 'lockPi'
+    | 'lockEpoch'
+    | 'lockTerm'
+    | 'lockUntil'
+>;
+
+/** A `ShareEpoch` record (`@shortwin/client` helpers; ARCH §2.3.6, A39). */
+export type RecordFields = Pick<
+    ShareEpoch,
+    'epoch' | 'accEnd' | 'accREnd' | 'sOld' | 'carry' | 'carryR' | 'num' | 'denLog1000'
+>;
+
+// ---- Market flags (programs/shortwin/src/state/market.rs MARKET_FLAG_*) -------------------
+
+export const MARKET_FLAG = {
+    pausedOpens: 1 << 0,
+    mintUnsafe: 1 << 1,
+    routeBroken: 1 << 2,
+    wipeLive: 1 << 5,
+    pausedCoverage: 1 << 6,
+    wipeTraderSwept: 1 << 7,
+    wipeRewardsClaimed: 1 << 8,
+} as const;
+
+/** `shortwin_math::pool::WIPE_TRADER_SWEPT` / `WIPE_REWARDS_CLAIMED`. */
+const WIPE_TRADER_SWEPT = 1;
+const WIPE_REWARDS_CLAIMED = 2;
+
+/** `VenueKind` codes that pay venue cashback (`engine::lender::rewards_required`). */
+const PUMP_VENUES = new Set([1, 2, 3]);
+
+export function hasFlag(market: Pick<Market, 'flags'>, flag: number): boolean {
+    return (market.flags & flag) !== 0;
+}
+
+/**
+ * Whether a deposit into a live full-wipe record also waits for the venue-reward sweep
+ * (`engine::lender::rewards_required`: every pump-curve, migrating and PumpSwap market; R4A-7).
+ */
+export function rewardsRequired(venue: number): boolean {
+    return PUMP_VENUES.has(venue);
+}
+
+/** A full-wipe record is live (`S = 0` and `wipe_live`): the next deposit finalises it. */
+export function wipeLive(market: MarketPoolFields): boolean {
+    return podU128ToBigInt(market.totalShares) === 0n && hasFlag(market, MARKET_FLAG.wipeLive);
+}
+
+/**
+ * A deposit would be refused `WipeSweepPending` until the permissionless post-wipe sweeps run
+ * (R4A-7; the keeper's `sweep::wipe_pending`): the trader bit, and on a pump venue the
+ * venue-reward bit.
+ */
+export function wipeSweepPending(market: MarketPoolFields & Pick<Market, 'venue'>): boolean {
+    if (!wipeLive(market)) return false;
+    if (!hasFlag(market, MARKET_FLAG.wipeTraderSwept)) return true;
+    return rewardsRequired(market.venue) && !hasFlag(market, MARKET_FLAG.wipeRewardsClaimed);
+}
+
+// ---- conversions (the program's `Market::pool`, `MarketVault::vault`, `LenderPosition::lender`) ----
+
+type Pool = InstanceType<MathModule['PoolState']>;
+type Lender = ReturnType<MathModule['LenderState']['newIn']>;
+type Records = InstanceType<MathModule['ShareEpochs']>;
+
+const u128 = (p: PodU128): bigint => podU128ToBigInt(p);
+const i128 = (p: PodI128): bigint => podI128ToBigInt(p);
+
+/** Overrides for a pool copy (e.g. the state after a bundled post-wipe sweep). */
+export interface PoolOverrides {
+    readonly wipeSwept?: number;
+    readonly totalShares?: bigint;
+    readonly tokensFree?: bigint;
+}
+
+export function toPoolState(
+    m: MathModule,
+    market: MarketPoolFields,
+    vault: VaultPoolFields,
+    o: PoolOverrides = {},
+): Pool {
+    const p = new m.PoolState();
+    try {
+        p.totalShares = o.totalShares ?? u128(market.totalShares);
+        p.acc = i128(market.acc);
+        p.carry = i128(market.carry);
+        p.accR = u128(market.accR);
+        p.carryR = u128(market.carryR);
+        p.dust = i128(market.dust);
+        p.tokensFree = o.tokensFree ?? market.tokensFree;
+        p.borrowedQ = market.borrowedQ;
+        p.receivable = market.receivable;
+        p.maxRelease = market.maxRelease;
+        p.vestBal = market.vestBal;
+        p.vestLast = market.vestLast;
+        p.vestEnd = market.vestEnd;
+        p.shareEpoch = market.shareEpoch;
+        p.wipeLive = hasFlag(market, MARKET_FLAG.wipeLive);
+        p.wipeSwept =
+            o.wipeSwept ??
+            (hasFlag(market, MARKET_FLAG.wipeTraderSwept) ? WIPE_TRADER_SWEPT : 0) |
+                (hasFlag(market, MARKET_FLAG.wipeRewardsClaimed) ? WIPE_REWARDS_CLAIMED : 0);
+        p.lenderSol = vault.lenderSol;
+        p.unmatched = vault.unmatched;
+        p.protocolFees = vault.protocolFees;
+        p.pi = u128(vault.pi);
+        p.lockNorm = u128(vault.lockNorm);
+        p.bMin = vault.bMin;
+        p.piEpoch = vault.piEpoch;
+        p.calDay = vault.calDay;
+        vault.lockCal.forEach((term, slot) => {
+            const v = u128(term);
+            if (v !== 0n) p.setLockBucket(slot, v);
+        });
+        return p;
+    } catch (e) {
+        p.free();
+        throw e;
+    }
+}
+
+/** The lender's math state; a lender that never deposited starts as `pool::Lender::new`. */
+export function toLenderState(m: MathModule, pool: Pool, lender: LenderFields | null): Lender {
+    const l = m.LenderState.newIn(pool);
+    if (!lender) return l;
+    try {
+        l.shares = lender.shares;
+        l.snap = lender.snap;
+        l.snapR = lender.snapR;
+        l.lock = lender.lock;
+        l.lockPi = lender.lockPi;
+        l.lockTerm = lender.lockTerm;
+        l.pending = lender.pending;
+        l.real = lender.real;
+        l.claimed = lender.claimed;
+        l.epoch = lender.epoch;
+        l.lockEpoch = lender.lockEpoch;
+        l.lockUntil = lender.lockUntil;
+        return l;
+    } catch (e) {
+        l.free();
+        throw e;
+    }
+}
+
+/** Consecutive records, in epoch order (extra records are ignored by the math). */
+export function toShareEpochs(m: MathModule, records: readonly RecordFields[]): Records {
+    const r = new m.ShareEpochs();
+    try {
+        for (const x of [...records].sort((a, b) => a.epoch - b.epoch)) {
+            r.push(x.epoch, x.accEnd, x.accREnd, x.sOld, x.carry, x.carryR, x.num, x.denLog1000);
+        }
+        return r;
+    } catch (e) {
+        r.free();
+        throw e;
+    }
+}
+
+// ---- refusals ---------------------------------------------------------------------------
+
+/** `MathError::as_str()` → the program error the program maps it to (`errors.rs` `From<MathError>`). */
+const MATH_ERRORS: Readonly<Record<string, string>> = {
+    overflow: 'MathOverflow',
+    underflow: 'MathOverflow',
+    'division by zero': 'MathOverflow',
+    undefined: 'MathOverflow',
+    'invariant violated': 'MathOverflow',
+    'invalid input': 'InvalidParams',
+    'negative pending': 'NegativePending',
+    'insufficient shares': 'InsufficientShares',
+    'insufficient free inventory': 'InsufficientFreeInventory',
+    'above pro-rata allowance': 'AboveProRataAllowance',
+    'lender behind share epochs': 'LenderBehindEpochs',
+    'deposit too small': 'ZeroAmount',
+    'post-wipe sweep pending': 'WipeSweepPending',
+};
+
+const BY_NAME: ReadonlyMap<string, ProgramErrorInfo> = new Map(
+    [...PROGRAM_ERRORS.values()].map((e) => [e.name, e] as const),
+);
+
+/** The program error a refusal stands for, with its message (`config/errors.ts`). */
+export function programErrorByName(name: string): ProgramErrorInfo | undefined {
+    return BY_NAME.get(name);
+}
+
+/** A preview the program would refuse: the program error name, its code and message. */
+export interface Refusal {
+    readonly name: string;
+    readonly code: number | null;
+    readonly message: string;
+}
+
+/** Maps a thrown facade error to the program error it becomes on chain. */
+export function refusalOf(e: unknown): Refusal {
+    const msg = e instanceof Error ? e.message : String(e);
+    const name = MATH_ERRORS[msg] ?? 'MathOverflow';
+    const info = programErrorByName(name);
+    return { name, code: info?.code ?? null, message: info?.message ?? msg };
+}
+
+export function refusalNamed(name: string): Refusal {
+    const info = programErrorByName(name);
+    return { name, code: info?.code ?? null, message: info?.message ?? name };
+}
+
+export type Result<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly refusal: Refusal };
+
+/** A refusal raised by the frontend's own copy of a program check (not by the facade). */
+export class LendRefusal extends Error {
+    readonly refusal: Refusal;
+    constructor(refusal: Refusal) {
+        super(refusal.message);
+        this.name = 'LendRefusal';
+        this.refusal = refusal;
+    }
+}
+
+function attempt<T>(fn: () => T): Result<T> {
+    try {
+        return { ok: true, value: fn() };
+    } catch (e) {
+        return { ok: false, refusal: e instanceof LendRefusal ? e.refusal : refusalOf(e) };
+    }
+}
+
+// ---- sessions: the WASM objects of one preview ------------------------------------------
+
+/** The inputs every lender preview reads. */
+export interface LendState {
+    readonly market: MarketPoolFields & Pick<Market, 'venue'>;
+    readonly vault: VaultPoolFields;
+    readonly lender: LenderFields | null;
+    /** The `ShareEpoch` records from the lender's epoch on (empty for a current lender). */
+    readonly records: readonly RecordFields[];
+}
+
+function session<T>(
+    m: MathModule,
+    s: LendState,
+    fn: (pool: Pool, lender: Lender, records: Records) => T,
+    o: PoolOverrides = {},
+): T {
+    const pool = toPoolState(m, s.market, s.vault, o);
+    let lender: Lender | null = null;
+    let records: Records | null = null;
+    try {
+        lender = toLenderState(m, pool, s.lender);
+        records = toShareEpochs(m, s.records);
+        return fn(pool, lender, records);
+    } finally {
+        records?.free();
+        lender?.free();
+        pool.free();
+    }
+}
+
+/** The lender after the program's `touch` at `now` (no state is changed). */
+export interface Touched {
+    readonly shares: bigint;
+    readonly pending: bigint;
+    readonly real: bigint;
+    readonly claimed: bigint;
+    readonly lock: bigint;
+    readonly epoch: number;
+}
+
+export function previewTouched(m: MathModule, s: LendState, now: bigint): Result<Touched> {
+    return attempt(() =>
+        session(m, s, (pool, lender, records) => {
+            const t = m.previewTouch(pool, lender, records, now);
+            try {
+                return {
+                    shares: t.shares,
+                    pending: t.pending,
+                    real: t.real,
+                    claimed: t.claimed,
+                    lock: t.lock,
+                    epoch: t.epoch,
+                };
+            } finally {
+                t.free();
+            }
+        }),
+    );
+}
+
+/** Basis points of `part / whole` (floor); 0 when `whole` is 0. */
+export function shareBps(part: bigint, whole: bigint): number {
+    return whole === 0n ? 0 : Number((part * 10_000n) / whole);
+}
+
+/** `⌊x·(10⁴ − bps)/10⁴⌋`: a lower bound `bps` below the quote (FE-D6: `min_shares`, `min_tokens`). */
+export function lessBps(x: bigint, bps: number): bigint {
+    return (x * BigInt(10_000 - bps)) / 10_000n;
+}
+
+/** Where a lender stands against the market's share epoch (C0-6, V2-12). */
+export type Standing =
+    | { readonly kind: 'none' }
+    | { readonly kind: 'current' }
+    | { readonly kind: 'parked' }
+    | { readonly kind: 'behind'; readonly epochs: number };
+
+export function standingOf(market: MarketPoolFields, lender: LenderFields | null): Standing {
+    if (!lender) return { kind: 'none' };
+    if (lender.epoch >= market.shareEpoch) return { kind: 'current' };
+    if (wipeLive(market) && lender.epoch + 1 === market.shareEpoch) return { kind: 'parked' };
+    return { kind: 'behind', epochs: market.shareEpoch - lender.epoch };
+}
+
+// ---- the lender's position (panel summary, dashboard row) ---------------------------------
+
+export interface PositionView {
+    /** Shares after the touch (converted to the current epoch); 0 while parked. */
+    readonly shares: bigint;
+    /** Share of the pool's `S`, bps. */
+    readonly shareBps: number;
+    /** Token value of the shares (`previewTokenValue`). */
+    readonly value: bigint;
+    /** SOL `claim_sol` pays now (`previewClaim`, pot draw included). */
+    readonly claimable: bigint;
+    /** Credited SOL entitlement after the touch (`pending`, may be negative). */
+    readonly pending: bigint;
+    /** The lender's pro-rata share of the unreleased vest (`vest_bal`), lamports. */
+    readonly vesting: bigint;
+    /** Locked shares now (`previewLock`) and when the lock ends (0 without a lock). */
+    readonly lock: bigint;
+    readonly lockUntil: bigint;
+    /** Tokens withdrawable now (`previewAllowance`). */
+    readonly allowance: bigint;
+    readonly standing: Standing;
+}
+
+/** The pro-rata part of `lamports` that `shares` of `S` receive (vest display; ECON §9.4). */
+export function proRata(lamports: bigint, shares: bigint, total: bigint): bigint {
+    return total === 0n ? 0n : (lamports * shares) / total;
+}
+
+export function previewPosition(m: MathModule, s: LendState, now: bigint): Result<PositionView> {
+    return attempt(() =>
+        session(m, s, (pool, lender, records) => {
+            const t = m.previewTouch(pool, lender, records, now);
+            let touched: Touched;
+            try {
+                touched = {
+                    shares: t.shares,
+                    pending: t.pending,
+                    real: t.real,
+                    claimed: t.claimed,
+                    lock: t.lock,
+                    epoch: t.epoch,
+                };
+            } finally {
+                t.free();
+            }
+            const current = touched.epoch === s.market.shareEpoch;
+            const shares = current ? touched.shares : 0n;
+            const total = pool.totalShares;
+            const lock = m.previewLock(pool, lender, records, now);
+            return {
+                shares,
+                shareBps: shareBps(shares, total),
+                value: m.previewTokenValue(pool, lender, records, now),
+                claimable: m.previewClaim(pool, lender, records, now),
+                pending: touched.pending,
+                vesting: proRata(pool.vestBal, shares, total),
+                lock,
+                lockUntil: lock > 0n && s.lender ? s.lender.lockUntil : 0n,
+                allowance: current ? m.previewAllowance(pool, lender, records, now) : 0n,
+                standing: standingOf(s.market, s.lender),
+            };
+        }),
+    );
+}
+
+// ---- deposit ----------------------------------------------------------------------------
+
+export interface DepositView {
+    /** Shares `deposit(amount)` mints (`previewDeposit`). */
+    readonly shares: bigint;
+    /** `min_shares` = the quote less the tolerance (FE-D6). */
+    readonly minShares: bigint;
+    /** The lender's share of the pool after the deposit, bps. */
+    readonly shareBps: number;
+    /** Token value of the minted shares in the pool after the deposit. */
+    readonly value: bigint;
+    /** Token value of the lender's whole position after the deposit. */
+    readonly positionValue: bigint;
+}
+
+/**
+ * `deposit(amount)` on the stored state. `sweepBundled`: the post-wipe sweeps run first in the same
+ * transaction (FRONTEND.md §3.6), so the preview reads the pool with both sweep bits set.
+ */
+export function previewDepositView(
+    m: MathModule,
+    s: LendState,
+    now: bigint,
+    amount: bigint,
+    toleranceBps: number,
+    sweepBundled = false,
+): Result<DepositView> {
+    const o: PoolOverrides = sweepBundled ? { wipeSwept: WIPE_TRADER_SWEPT | WIPE_REWARDS_CLAIMED } : {};
+    const minted = attempt(() =>
+        session(
+            m,
+            s,
+            (pool, lender, records) =>
+                m.previewDeposit(pool, lender, records, now, amount, rewardsRequired(s.market.venue)),
+            o,
+        ),
+    );
+    if (!minted.ok) return minted;
+    const shares = minted.value;
+    const touched = previewTouched(m, s, now);
+    const before =
+        touched.ok && touched.value.epoch === s.market.shareEpoch && !wipeLive(s.market) ? touched.value.shares : 0n;
+    const mine = before + shares;
+    const total = u128(s.market.totalShares) + shares;
+    return attempt(() =>
+        session(
+            m,
+            s,
+            (pool) => ({
+                shares,
+                minShares: lessBps(shares, toleranceBps),
+                shareBps: shareBps(mine, total),
+                value: m.tokensForShares(pool, shares),
+                positionValue: m.tokensForShares(pool, mine),
+            }),
+            { ...o, totalShares: total, tokensFree: s.market.tokensFree + amount },
+        ),
+    );
+}
+
+// ---- withdraw ---------------------------------------------------------------------------
+
+export interface WithdrawLimits {
+    /** Tokens withdrawable now (`previewAllowance`). */
+    readonly allowance: bigint;
+    /** The most shares whose tokens fit the allowance (`sharesForTokens`, capped at the holding). */
+    readonly maxShares: bigint;
+    /** The holding after the touch. */
+    readonly shares: bigint;
+    /** Locked shares now (`previewLock`). */
+    readonly lock: bigint;
+    /** `lock_until` a growing lock gets from a withdrawal now (`previewLockUntil`). */
+    readonly lockUntilIfLocked: bigint;
+    /** The current lock's end (0 without a lock). */
+    readonly lockUntil: bigint;
+}
+
+export function previewWithdrawLimits(
+    m: MathModule,
+    s: LendState,
+    now: bigint,
+    lockGraceS: number,
+): Result<WithdrawLimits> {
+    return attempt(() =>
+        session(m, s, (pool, lender, records) => {
+            const t = m.previewTouch(pool, lender, records, now);
+            let shares: bigint;
+            let current: boolean;
+            try {
+                current = t.epoch === s.market.shareEpoch;
+                shares = current ? t.shares : 0n;
+            } finally {
+                t.free();
+            }
+            const allowance = current ? m.previewAllowance(pool, lender, records, now) : 0n;
+            const fit = allowance > 0n ? m.sharesForTokens(pool, allowance) : 0n;
+            const lock = m.previewLock(pool, lender, records, now);
+            return {
+                allowance,
+                maxShares: fit < shares ? fit : shares,
+                shares,
+                lock,
+                lockUntilIfLocked: m.previewLockUntil(pool, now, lockGraceS),
+                lockUntil: lock > 0n && s.lender ? s.lender.lockUntil : 0n,
+            };
+        }),
+    );
+}
+
+export interface WithdrawView {
+    /** Tokens `withdraw(shares)` pays (`previewWithdraw`). */
+    readonly tokens: bigint;
+    /** `min_tokens` = the quote less the tolerance (FE-D6). */
+    readonly minTokens: bigint;
+    /**
+     * The SOL part `withdraw` pays, as far as the stored state shows it (`previewClaim`): a lower
+     * bound — the prologue's accrual and vest release only add to it; the exact quote is the
+     * simulation's (`quoteWithdrawSol`).
+     */
+    readonly solAtLeast: bigint;
+    /** The withdrawal takes `S` to 0: the program pays this lender the unreleased vest first (R3B-2). */
+    readonly lastLenderExit: boolean;
+    /** Unreleased vest at `now` (`vest_bal` − the release due), lamports. */
+    readonly unreleased: bigint;
+    /** The lender's share of the unreleased vest (the `lender.exitForfeitsVest` `{vesting}`). */
+    readonly vesting: bigint;
+    /** The part of it the withdrawn shares give up to the lenders who stay (0 on the last exit). */
+    readonly vestingForfeit: bigint;
+}
+
+export function previewWithdrawView(
+    m: MathModule,
+    s: LendState,
+    now: bigint,
+    lockGraceS: number,
+    shares: bigint,
+    toleranceBps: number,
+): Result<WithdrawView> {
+    return attempt(() =>
+        session(m, s, (pool, lender, records) => {
+            const tokens = m.previewWithdraw(pool, lender, records, now, lockGraceS, shares);
+            const total = pool.totalShares;
+            const t = m.previewTouch(pool, lender, records, now);
+            let mine: bigint;
+            try {
+                mine = t.epoch === s.market.shareEpoch ? t.shares : 0n;
+            } finally {
+                t.free();
+            }
+            const released = m.previewVestRelease(pool, now);
+            const unreleased = pool.vestBal - released;
+            const last = shares === total;
+            if (last && pool.borrowedQ > 0n) {
+                // The program's own check on top of the pool math (M1-SEC-3): never `S = 0` while tokens are lent.
+                throw new LendRefusal(refusalNamed('LastSharesBorrowed'));
+            }
+            return {
+                tokens,
+                minTokens: lessBps(tokens, toleranceBps),
+                solAtLeast: m.previewClaim(pool, lender, records, now),
+                lastLenderExit: last && pool.vestBal > 0n,
+                unreleased,
+                vesting: proRata(unreleased, mine, total),
+                vestingForfeit: last ? 0n : proRata(unreleased, shares, total),
+            };
+        }),
+    );
+}
+
+// ---- claim ------------------------------------------------------------------------------
+
+export interface ClaimView {
+    /** Lamports `claim_sol` pays now (`previewClaim`, pot draw included). */
+    readonly claimable: bigint;
+    /** Credited entitlement after the touch (`max(pending, 0)`). */
+    readonly entitled: bigint;
+    /** The lender's pro-rata share of the unreleased vest. */
+    readonly vesting: bigint;
+    /** The market's pot (`MarketVault.unmatched`). */
+    readonly pot: bigint;
+    /** A negative balance after a shortfall debit (`−pending`), else 0: `cover_deficit` it to withdraw. */
+    readonly deficit: bigint;
+    /** Entitlement not yet realised that the pot cannot cover now: other lenders' touches may fund it. */
+    readonly shortfall: bigint;
+}
+
+export function previewClaimView(m: MathModule, s: LendState, now: bigint): Result<ClaimView> {
+    return attempt(() =>
+        session(m, s, (pool, lender, records) => {
+            const t = m.previewTouch(pool, lender, records, now);
+            let pending: bigint;
+            let own: bigint;
+            let shares: bigint;
+            try {
+                pending = t.pending;
+                own = t.real - t.claimed;
+                shares = t.epoch === s.market.shareEpoch ? t.shares : 0n;
+            } finally {
+                t.free();
+            }
+            const need = pending - own > 0n ? pending - own : 0n;
+            return {
+                claimable: m.previewClaim(pool, lender, records, now),
+                entitled: pending > 0n ? pending : 0n,
+                vesting: proRata(pool.vestBal, shares, pool.totalShares),
+                pot: pool.unmatched,
+                deficit: pending < 0n ? -pending : 0n,
+                shortfall: need > pool.unmatched ? need - pool.unmatched : 0n,
+            };
+        }),
+    );
+}
+
+/**
+ * What touching another lender would add to the pot (R3A-2: its realised SOL beyond its
+ * entitlement moves to `unmatched` at its touch). Measured with the facade: the lender's
+ * `real` after a touch that cannot move anything (its entitlement raised out of reach) minus
+ * its `real` after the real touch.
+ */
+export function potGainOfTouch(m: MathModule, s: LendState, now: bigint): bigint {
+    if (!s.lender) return 0n;
+    const actual = previewTouched(m, s, now);
+    const lifted = previewTouched(m, { ...s, lender: { ...s.lender, pending: 1n << 61n } }, now);
+    if (!actual.ok || !lifted.ok) return 0n;
+    const gain = lifted.value.real - actual.value.real;
+    return gain > 0n ? gain : 0n;
+}
+
+/** `previewClaim` with the pot raised by `extraPot` (other lenders synced first in the same transaction). */
+export function previewClaimWithPot(m: MathModule, s: LendState, now: bigint, extraPot: bigint): Result<bigint> {
+    return attempt(() =>
+        session(m, { ...s, vault: { ...s.vault, unmatched: s.vault.unmatched + extraPot } }, (pool, lender, records) =>
+            m.previewClaim(pool, lender, records, now),
+        ),
+    );
+}

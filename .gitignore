@@ -18,11 +18,15 @@ test-ledger/
 node_modules/
 .pnpm-store/
 dist/
+# apps/web production source maps, kept out of the deployed dist/ (FRONTEND.md §2.2, §9.3)
+dist-sourcemaps/
 coverage/
 *.tsbuildinfo
 .vite/
 playwright-report/
 test-results/
+# apps/web E2E working directory (validator ledger, generated keys, state; FRONTEND.md §10.2)
+.e2e/
 
 # Python
 __pycache__/

@@ -1,0 +1,119 @@
+/*
+ * ShortWin design tokens — dark trading terminal (FRONTEND.md §7). Owner decision: dense, dark,
+ * data-first. Every text/background pair below meets WCAG 2.2 AA (≥ 4.5:1 for text, ≥ 3:1 for
+ * input borders and focus rings); the ratios are in FRONTEND.md §7.1. Colour never carries meaning
+ * alone: P&L has a sign and an arrow, risk badges have a word.
+ */
+:root {
+    color-scheme: dark;
+
+    /* Surfaces, darkest first */
+    --bg-0: #0b0e11; /* app background */
+    --bg-1: #12161b; /* panels, table body */
+    --bg-2: #181d23; /* raised: table header, hovered row, menus */
+    --bg-3: #1f252c; /* inputs, selected row */
+    --bg-overlay: rgb(5 7 9 / 72%);
+
+    /* Lines */
+    --line: #2a323b; /* hairlines between rows and panels (decorative) */
+    --line-strong: #66727f; /* input borders: ≥ 3:1 on --bg-3 */
+
+    /* Text */
+    --text-0: #e8ecf1; /* primary, 15–16:1 */
+    --text-1: #aab4bf; /* secondary labels, ≥ 7.3:1 */
+    --text-2: #8a95a1; /* muted, ≥ 5:1 */
+    --text-inverse: #0b0e11;
+
+    /* Brand and interaction */
+    --accent: #f0b90b; /* primary action, active nav */
+    --accent-hover: #ffd033;
+    --focus: #8ab4ff; /* focus ring, ≥ 7:1 */
+
+    /* P&L and price direction (gain = good for the user; for a short, a price fall) */
+    --gain: #2ebd85;
+    --gain-bg: #0f2e24;
+    --loss: #ff5c6c;
+    --loss-bg: #3a1a20;
+    --flat: var(--text-1);
+
+    /* Risk scale (position health, market state) */
+    --risk-safe: #2ebd85;
+    --risk-safe-bg: #0f2e24;
+    --risk-watch: #f0b90b;
+    --risk-watch-bg: #33290a;
+    --risk-danger: #ff8a3d;
+    --risk-danger-bg: #3a2414;
+    --risk-critical: #ff5c6c;
+    --risk-critical-bg: #3a1a20;
+
+    /* Status */
+    --info: #5aa2ff;
+    --info-bg: #14243a;
+    --warn: #f0b90b;
+    --warn-bg: #33290a;
+    --danger: #ff5c6c;
+    --danger-bg: #3a1a20;
+    --ok: #2ebd85;
+    --ok-bg: #0f2e24;
+
+    /* Tiers (A safest → D riskiest) */
+    --tier-a: #36c5a0;
+    --tier-b: #5aa2ff;
+    --tier-c: #f0b90b;
+    --tier-d: #ff6b8a;
+
+    /* Typography: system stacks (no third-party font requests; CSP font-src 'self') */
+    --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-num: "JetBrains Mono", "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --fs-xs: 11px;
+    --fs-sm: 12px;
+    --fs-md: 13px; /* base */
+    --fs-lg: 15px;
+    --fs-xl: 18px;
+    --fs-2xl: 22px;
+    --lh-tight: 1.25;
+    --lh: 1.45;
+    --fw-regular: 400;
+    --fw-medium: 500;
+    --fw-bold: 650;
+
+    /* Spacing (4 px grid) and density */
+    --sp-1: 2px;
+    --sp-2: 4px;
+    --sp-3: 8px;
+    --sp-4: 12px;
+    --sp-5: 16px;
+    --sp-6: 24px;
+    --sp-7: 32px;
+    --row-h: 28px; /* compact (default) */
+    --control-h: 30px;
+    --header-h: 44px;
+    --statusbar-h: 24px;
+    --radius-sm: 3px;
+    --radius: 4px;
+    --radius-lg: 6px;
+
+    /* Motion */
+    --t-fast: 80ms;
+    --t: 140ms;
+
+    /* Layers */
+    --z-header: 20;
+    --z-menu: 40;
+    --z-modal: 60;
+    --z-toast: 80;
+}
+
+/* Comfortable density (user preference, stored per viewer) */
+:root[data-density="comfortable"] {
+    --row-h: 34px;
+    --control-h: 34px;
+    --fs-md: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --t-fast: 0ms;
+        --t: 0ms;
+    }
+}
