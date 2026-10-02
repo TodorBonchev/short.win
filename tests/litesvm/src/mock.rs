@@ -31,6 +31,7 @@ use solana_account::Account;
 use solana_keypair::Keypair;
 use solana_signer::Signer;
 
+use crate::env::send_direct;
 use crate::errors::custom_code;
 use crate::fixtures::mints;
 use crate::tokens::{self, TokenProgram};
@@ -467,18 +468,21 @@ pub fn wsol_account(env: &mut Env, owner: &Pubkey, amount: u64) -> Pubkey {
     acc
 }
 
-/// Adds `amount` wrapped lamports to the WSOL account `acc` (lamports + `SyncNative`).
+/// Adds `amount` wrapped lamports to the WSOL account `acc` (lamports + `SyncNative`). Both
+/// sends go through [`send_direct`]: a `SyncNative` of `acc` is the same transaction on every
+/// call, so each must run on a fresh blockhash (FUZZ-M7-24H-2).
 pub fn wrap(env: &mut Env, acc: &Pubkey, amount: u64) {
     ensure_airdrop(&mut env.svm, amount);
-    env.svm
-        .airdrop(acc, amount)
+    send_direct(&mut env.svm, |svm| svm.airdrop(acc, amount))
         .unwrap_or_else(|e| panic!("airdrop to {acc}: {:?}", e.err));
     let payer = env.payer.insecure_clone();
     let spl = TokenProgram::Spl.id();
-    SyncNative::new(&mut env.svm, &payer, acc)
-        .token_program_id(&spl)
-        .send()
-        .unwrap_or_else(|e| panic!("sync_native: {:?}", e.err));
+    send_direct(&mut env.svm, |svm| {
+        SyncNative::new(svm, &payer, acc)
+            .token_program_id(&spl)
+            .send()
+    })
+    .unwrap_or_else(|e| panic!("sync_native: {:?}", e.err));
 }
 
 /// A new base-mint token account owned by `owner` with `amount` minted by `mint_authority`.

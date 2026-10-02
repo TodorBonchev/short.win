@@ -1280,14 +1280,9 @@ fn pumpswap_open_sized_on_burned_depth(
             o.position, pre.borrowed_q, o.q
         )
     })?;
-    // The tier: `R_eff ≤ max(⌊D·isqrt(P_ema)/10⁹⌋ − VQR⁺, 0)`, the burned LP's real SOL.
-    let vqr = read::account(svm, &pre.canonical_pool)
-        .and_then(|a| {
-            shortwin_venue_state::pump_amm::read_pool(&a.owner.to_bytes(), &a.data)
-                .ok()
-                .map(|p| u128::try_from(p.virtual_quote_reserves.max(0)).unwrap_or(u128::MAX))
-        })
-        .unwrap_or(0);
+    // The tier: `R_eff ≤ max(⌊D·isqrt(P_ema)/10⁹⌋ − VQR⁺, 0)`, the burned LP's real SOL — `VQR⁺`
+    // of the pre-trade view, as `D` (never the pool after the open's own sale; FUZZ-M7-24H-1).
+    let vqr = u128::from(view.pump_tier.map_or(0, |(_, v)| v));
     let locked = d.saturating_mul(p_ema.isqrt()) / 1_000_000_000;
     let bound = locked.saturating_sub(vqr);
     let oracle = read::borsh::<OracleCache>(svm, &crate::pda::oracle_cache()).map_or(

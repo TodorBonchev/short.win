@@ -8,7 +8,7 @@ use shortwin::state::{MarketVault, PodU128};
 use shortwin_litesvm_tests::errors::ok;
 use shortwin_litesvm_tests::invariants::{self, check_all};
 use shortwin_litesvm_tests::tokens::{self, TokenProgram};
-use shortwin_litesvm_tests::{Env, START_SLOT, START_TS, fixtures, ix, pda, read};
+use shortwin_litesvm_tests::{Env, START_SLOT, START_TS, fixtures, ix, mock, pda, read};
 use solana_signer::Signer;
 
 #[test]
@@ -48,6 +48,53 @@ fn mints_and_holders_on_both_token_programs() {
         assert_eq!(read::token_amount(&env.svm, &h.token_account), Some(5_000));
         assert_eq!(read::token_delegate(&env.svm, &h.token_account), None);
     }
+}
+
+/// FUZZ-M7-24H-2: a helper that sends around `Env::send` (a litesvm-token builder, an airdrop)
+/// may be called twice in a row with the same arguments — and again after the VM is restored
+/// from a clone taken just after such a call (the fuzzer's probes) — without LiteSVM refusing
+/// the second, byte-identical transaction as `AlreadyProcessed` (a `SyncNative` carries no
+/// amount, so any two wraps of one account are identical).
+#[test]
+fn identical_helper_calls_in_a_row_are_not_duplicates() {
+    let mut env = Env::new();
+    let payer = env.payer.insecure_clone();
+    for program in TokenProgram::BOTH {
+        let authority = env.funded_keypair();
+        let mint = tokens::create_mint(&mut env.svm, &payer, &authority.pubkey(), 6, program);
+        let h = tokens::holder(&mut env.svm, &payer, &mint, &authority, 0, program);
+        for _ in 0..2 {
+            tokens::mint_to(
+                &mut env.svm,
+                &payer,
+                &mint,
+                &h.token_account,
+                &authority,
+                170_000_001,
+                program,
+            );
+        }
+        assert_eq!(
+            read::token_amount(&env.svm, &h.token_account),
+            Some(340_000_002)
+        );
+    }
+    let owner = env.funded_keypair().pubkey();
+    for _ in 0..2 {
+        env.fund(&owner, 1_000_000);
+    }
+    // Two wraps of different amounts: the airdrops differ, the `SyncNative`s do not.
+    let wsol = mock::wsol_account(&mut env, &owner, 0);
+    for amount in [5_000, 6_000] {
+        mock::wrap(&mut env, &wsol, amount);
+    }
+    // The fuzzer's probe (`wrapped_open`): a send on the live VM, then the VM restored from a
+    // clone taken just after a wrap.
+    let before = env.svm.clone();
+    ok(env.send(&[system_transfer(&payer.pubkey(), &owner, 1)], &[]));
+    env.svm = before;
+    mock::wrap(&mut env, &wsol, 7_000);
+    assert_eq!(read::token_amount(&env.svm, &wsol), Some(18_000));
 }
 
 #[test]

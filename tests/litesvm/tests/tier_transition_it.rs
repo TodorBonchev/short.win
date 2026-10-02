@@ -27,6 +27,7 @@
 //! | `cpmm_age_from_listing` | a CPMM pool whose `open_time` precedes `T_CLAMP`: age from the listing (O13) — C to 24 h, B to 7 d, then A |
 //! | `cpmm_thresholds` | USELESS (age from `open_time`, O13b: A at once): θ_A and θ_B crossed exactly |
 //! | `pumpswap_thresholds_bounded_by_the_burned_lp` | the mature pool (7 % third-party LP): Λ bounded by the burned LP's real SOL (M6R-1 / M6D-1) strictly below the unbounded Λ, and the crossing at `p*` of the bounded Λ — one lamport of price below it the tier stays down although the unbounded Λ would lift it; age from the listing |
+//! | `pumpswap_open_tiers_before_its_own_sale` | FUZZ-M7-24H-1: a Tier B market whose `R_eff` is the live WSOL vault (a third party's sale below `P_ema`, within the open guard), the oracle at exactly `p*_B`: the open locks Tier B — the venue before its own sale (ARCH §3.4 step 5) — although the vault its sale leaves would tier C |
 //! | `curve_then_graduate_ages_c_b_a` | a curve market is Tier D at any price; after its graduation onto PumpSwap it is C for 24 h, B until day 7, then A (the oracle above θ_A); the curve position keeps its Tier D terms throughout (A26) |
 
 #![allow(clippy::result_large_err)]
@@ -757,6 +758,67 @@ mod pump {
         eprintln!(
             "PumpSwap mature: Λ {bounded} (unbounded {unbounded}) lamports, p*_A {tight} \
              (unbounded {loose})"
+        );
+    }
+
+    /// FUZZ-M7-24H-1 (I19): an open is tiered on the venue **before its own sale** (ARCH §3.4 step
+    /// 5 precedes the sale of step 7; §4.7's `R_now` is the pool's real SOL then). A Tier B market
+    /// (the fresh graduate, its boost waited out; age 1–7 d from the listing, O13) whose `R_eff`
+    /// is `R_now` — a third party's sale moved the spot below `P_ema` within the open guard, so
+    /// the live WSOL vault binds — at a SOL/USD price of exactly `p*_B` of that `Λ`: the open
+    /// locks Tier B, although the WSOL the open's own sale leaves in the vault would tier the
+    /// market C. (The harness's I19 read the vault after the instruction and failed this open;
+    /// the fuzzer found it on a price-wrapped open.)
+    #[test]
+    fn pumpswap_open_tiers_before_its_own_sale() {
+        let (mut env, pm, q) = setup(PammCoin::Fresh);
+        let listed = env.market(&pm.market()).graduated_at;
+        let mut usd = Usd::fresh(&mut env, t::USD_121);
+        assert_eq!(
+            t::tier_at_age(&mut env, &pm, &mut usd, listed + AGE_C_S + 3_600),
+            Tier::B
+        );
+        crank_secs(&mut env, &pm, 2);
+        // A third party sells into the pool in half-percent steps (within `open_ema_dev_bps`)
+        // until the live WSOL vault is the binding term of `R_eff` (`Λ = 2·R_now`).
+        let seller = PammUser::new(&mut env, &pm.pool, SOL);
+        let base = pm.pool.reserves(&env.svm).expect("reserves").base;
+        let mut binds = false;
+        for _ in 0..12 {
+            ok(seller.sell(&mut env, &pm.pool, base / 200, 0));
+            let st = t::host_state(&env, &pm);
+            if t::lambda(&env, &pm) == 2 * u128::from(st.r) {
+                binds = true;
+                break;
+            }
+        }
+        assert!(binds, "R_now binds R_eff after the sale");
+        // The oracle at exactly `p*_B` of `Λ` before the open (the same second: `Λ` is fixed).
+        let theta_b = env.config().params.theta_b_usd_e6;
+        let before = t::lambda(&env, &pm);
+        let p_b = t::p_star(theta_b, before);
+        usd.walk(&mut env, p_b);
+        assert_eq!(t::lambda(&env, &pm), before, "Λ is fixed within the second");
+        let vault_before = t::host_state(&env, &pm).r;
+        let mut b = env.borrower();
+        let (open, _, _) = open_ok(&mut env, &pm, &mut b, q);
+        assert_eq!(
+            open.tier,
+            Tier::B as u8,
+            "tiered on the venue before the sale"
+        );
+        // The vault after the open's own sale: `Λ` on it is below `θ_B` at this price.
+        let after = t::lambda(&env, &pm);
+        let vault_after = t::host_state(&env, &pm).r;
+        assert!(vault_after < vault_before && after < before);
+        assert!(
+            t::reaches(theta_b, before, p_b) && !t::reaches(theta_b, after, p_b),
+            "Λ {before} → {after} straddles θ_B at p*_B {p_b}"
+        );
+        eprintln!(
+            "PumpSwap fresh: R_now {vault_before} → {vault_after} (S {}), Λ {before} → {after} \
+             lamports, p*_B {p_b}",
+            open.s
         );
     }
 

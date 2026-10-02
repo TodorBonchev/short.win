@@ -3,7 +3,9 @@
 //! - [`Env`]: LiteSVM with `target/deploy/shortwin.so` (build it first with `anchor build
 //!   --tools-version v1.57 --arch v3`), the admin keys (short.win's upgrade authority recorded
 //!   in its ProgramData, Governance, Emergency, fee recipient), the clock under test control
-//!   ([`Env::warp`], [`Env::set_clock`]) and the invariant hooks on every [`Env::send`].
+//!   ([`Env::warp`], [`Env::set_clock`]) and the invariant hooks on every [`Env::send`]. The
+//!   setup helpers that send around it (token builders, airdrops) go through
+//!   [`env::send_direct`], which expires the blockhash after each send as [`Env::send`] does.
 //! - [`ix`]: instruction builders for every M1 instruction (anchor-lang's generated types).
 //! - [`tokens`]: SPL Token and Token-2022 mints, accounts and holders.
 //! - [`fixtures`]: mock venue ProgramData (T-LATCH), raw account writers, an installed

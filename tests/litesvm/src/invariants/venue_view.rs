@@ -75,6 +75,12 @@ pub struct VenueView {
     /// ⌊λ_bps·isqrt(X·(Y + VQR))/10⁴⌋`, `λ_bps = ⌊(Pool.lp_supply − lp_mint.supply)·10⁴/lp_supply⌋`
     /// (recomputed here from the pool and its LP mint) when executable; `None` elsewhere.
     pub locked_depth: Option<u128>,
+    /// PumpSwap: the tier's venue inputs on this state (ARCH §4.7) — `R_now = min(WSOL vault,
+    /// WSOL vault + VQR)` (the reader's `R`) and `max(VQR, 0)` — when executable; `None`
+    /// elsewhere (Raydium and the mock tier on `Y`, without a VQR). Read before an open's own
+    /// sale (the snapshot's view): the program tiers on the venue before the trade (ARCH §3.4
+    /// step 5; FUZZ-M7-24H-1).
+    pub pump_tier: Option<(u64, u64)>,
 }
 
 impl VenueView {
@@ -89,6 +95,7 @@ impl VenueView {
         curve: None,
         venue_rent: 0,
         locked_depth: None,
+        pump_tier: None,
     };
 
     /// `B̂_live(q)`: the exact-out buy of `q` tokens on this state (the curve: up to `rT`).
@@ -238,6 +245,10 @@ fn pump_swap(svm: &LiteSVM, m: &Market) -> Option<VenueView> {
         curve: None,
         venue_rent,
         locked_depth: Some(locked_depth),
+        pump_tier: Some((
+            r.real_quote.min(effective),
+            u64::try_from(p.virtual_quote_reserves.max(0)).unwrap_or(u64::MAX),
+        )),
     })
 }
 
@@ -346,6 +357,7 @@ fn pump_curve(svm: &LiteSVM, m: &Market) -> VenueView {
         curve: Some((state, f)),
         venue_rent,
         locked_depth: None,
+        pump_tier: None,
     }
 }
 
@@ -372,6 +384,7 @@ fn mock(svm: &LiteSVM, m: &Market) -> VenueView {
         curve: None,
         venue_rent: 0,
         locked_depth: None,
+        pump_tier: None,
     }
 }
 
@@ -456,6 +469,7 @@ fn ray_v4(svm: &LiteSVM, m: &Market) -> Option<VenueView> {
         curve: None,
         venue_rent: 0,
         locked_depth: None,
+        pump_tier: None,
     })
 }
 
@@ -541,5 +555,6 @@ fn ray_cpmm(svm: &LiteSVM, m: &Market) -> Option<VenueView> {
         curve: None,
         venue_rent: 0,
         locked_depth: None,
+        pump_tier: None,
     })
 }

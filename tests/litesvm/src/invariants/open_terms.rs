@@ -11,9 +11,10 @@
 //!   now + t.max_duration_s`, `V = S + M`;
 //! - **the tier**: `tier::assign` on the market after the open's roll (`P_ema`, `L_slow`, `pool_d`,
 //!   `graduated_at`: an open integrates nothing of its own), the venue's real SOL before the
-//!   trade (the view's `Y`; PumpSwap `min(WSOL vault, Y + VQR)` less nothing — `max(VQR, 0)`
-//!   is the tier's own input), the cached oracle (with its confidence, M7-SEC-7) and `now`; the
-//!   curve is Tier D;
+//!   trade (the view's `Y`; PumpSwap `min(WSOL vault, WSOL vault + VQR)` with `max(VQR, 0)` the
+//!   tier's own input, both from the view taken before the instruction — after it the open's
+//!   own sale has drained the vault: FUZZ-M7-24H-1), the cached oracle (with its confidence,
+//!   M7-SEC-7) and `now`; the curve is Tier D;
 //! - **the caps** (ECON §6.1, ARCH §4.6): `X₀` — the curve's at `P_ema` (M5-SEC-3), else
 //!   `conservative_x0(X_now, L_slow, P_ema, (D, λ_min))` with Raydium's `pool_lock_min_bps` and
 //!   PumpSwap's 100 % —, `q` within the per-position impact cap and the fee-scaled size cap at
@@ -201,10 +202,6 @@ pub fn check_open(
             publish_time: c.publish_time,
         },
     );
-    let pump_pool = (kind == Some(VenueKind::PumpSwap))
-        .then(|| read::account(svm, &pre.canonical_pool))
-        .flatten()
-        .and_then(|a| shortwin_venue_state::pump_amm::read_pool(&a.owner.to_bytes(), &a.data).ok());
     let want_tier = match (kind, view) {
         (Some(VenueKind::PumpCurve | VenueKind::PumpMigrating), _) => Some(Tier::D),
         (Some(k), Some(v)) => {
@@ -219,16 +216,17 @@ pub fn check_open(
                     0,
                 ),
                 VenueKind::PumpSwap => {
-                    let vqr = pump_pool.map_or(0, |p| p.virtual_quote_reserves);
-                    let vault = pre.pool_cache[shortwin::state::pump_swap_cache::POOL_QUOTE_VAULT];
-                    let wsol = read::token_amount(svm, &vault).unwrap_or(0);
+                    // `R_now` and `max(VQR, 0)` of the view taken before the instruction, never
+                    // `svm` after it: the open's own sale has taken its SOL out of the WSOL
+                    // vault by then (FUZZ-M7-24H-1).
+                    let (r_now, vqr) = v.pump_tier.unwrap_or((0, 0));
                     (
                         TierVenue::PumpSwap {
                             locked_depth: post.pool_d.get(),
                             lambda_min_bps: PUMPSWAP_LAMBDA_MIN_BPS,
                         },
-                        wsol.min(y),
-                        u64::try_from(vqr.max(0)).unwrap_or(u64::MAX),
+                        r_now,
+                        vqr,
                     )
                 }
                 _ => (TierVenue::Unlocked, y, 0),

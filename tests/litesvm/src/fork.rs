@@ -83,6 +83,7 @@ use solana_message::Message;
 use solana_signer::Signer;
 use solana_transaction::Transaction;
 
+use crate::env::send_direct;
 use crate::tokens::TokenProgram;
 use crate::{Env, TxResult, invariants, read};
 
@@ -1082,31 +1083,34 @@ fn ensure_airdrop(svm: &mut LiteSVM, lamports: u64) {
 pub fn fund_wsol(env: &mut Env, owner: &Pubkey, lamports: u64) -> Pubkey {
     let payer = env.payer.insecure_clone();
     let spl = TOKEN_PROGRAM_ID;
-    let acc = CreateAccount::new(&mut env.svm, &payer, &WSOL_MINT)
-        .owner(owner)
-        .token_program_id(&spl)
-        .send()
-        .unwrap_or_else(|e| panic!("create WSOL account: {:?}", e.err));
+    let acc = send_direct(&mut env.svm, |svm| {
+        CreateAccount::new(svm, &payer, &WSOL_MINT)
+            .owner(owner)
+            .token_program_id(&spl)
+            .send()
+    })
+    .unwrap_or_else(|e| panic!("create WSOL account: {:?}", e.err));
     if lamports > 0 {
         wrap(env, &acc, lamports);
     }
     acc
 }
 
-/// Adds `lamports` wrapped lamports to the WSOL account `acc` (credit + `SyncNative`). Each
-/// call runs on a fresh blockhash, so repeating the same top-up is not a duplicate transaction.
+/// Adds `lamports` wrapped lamports to the WSOL account `acc` (credit + `SyncNative`). Both
+/// sends go through [`send_direct`] (the blockhash expires after each), so repeating the same
+/// top-up is not a duplicate transaction (FUZZ-M7-24H-2).
 pub fn wrap(env: &mut Env, acc: &Pubkey, lamports: u64) {
-    env.svm.expire_blockhash();
     ensure_airdrop(&mut env.svm, lamports);
-    env.svm
-        .airdrop(acc, lamports)
+    send_direct(&mut env.svm, |svm| svm.airdrop(acc, lamports))
         .unwrap_or_else(|e| panic!("airdrop to {acc}: {:?}", e.err));
     let payer = env.payer.insecure_clone();
     let spl = TOKEN_PROGRAM_ID;
-    SyncNative::new(&mut env.svm, &payer, acc)
-        .token_program_id(&spl)
-        .send()
-        .unwrap_or_else(|e| panic!("sync_native: {:?}", e.err));
+    send_direct(&mut env.svm, |svm| {
+        SyncNative::new(svm, &payer, acc)
+            .token_program_id(&spl)
+            .send()
+    })
+    .unwrap_or_else(|e| panic!("sync_native: {:?}", e.err));
 }
 
 /// A new token account of `mint` (under `program`) owned by `owner`, created by the token
@@ -1122,11 +1126,13 @@ pub fn fund_token(
 ) -> Pubkey {
     let payer = env.payer.insecure_clone();
     let id = program.id();
-    let acc = CreateAccount::new(&mut env.svm, &payer, mint)
-        .owner(owner)
-        .token_program_id(&id)
-        .send()
-        .unwrap_or_else(|e| panic!("create token account: {:?}", e.err));
+    let acc = send_direct(&mut env.svm, |svm| {
+        CreateAccount::new(svm, &payer, mint)
+            .owner(owner)
+            .token_program_id(&id)
+            .send()
+    })
+    .unwrap_or_else(|e| panic!("create token account: {:?}", e.err));
     if amount > 0 {
         set_token_amount(&mut env.svm, &acc, amount);
     }

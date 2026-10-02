@@ -20,6 +20,7 @@ use solana_clock::Clock;
 use solana_keypair::Keypair;
 use solana_signer::Signer;
 use solana_transaction::Transaction;
+use solana_transaction_error::TransactionError;
 
 use crate::fixtures::{self, MarketKeys};
 use crate::tokens::TokenProgram;
@@ -59,6 +60,23 @@ pub fn test_venue_so_path() -> PathBuf {
         },
         PathBuf::from,
     )
+}
+
+/// Runs `send` — a transaction sent around [`Env::send`]: a litesvm-token builder's
+/// `.send()`, [`LiteSVM::airdrop`] — and then expires the blockhash, as [`Env::send`] does.
+/// Every such helper in the harness goes through here (FUZZ-M7-24H-2).
+///
+/// LiteSVM refuses a transaction whose signature it has already seen (`AlreadyProcessed`,
+/// before any program runs), and a helper's transaction is a function of its arguments and
+/// the blockhash alone: two equal `MintTo`s or airdrops are byte-identical, and so is any
+/// `SyncNative` of one account (it carries no amount). Expiring after every send keeps the
+/// latest blockhash one no committed transaction has used — also after the VM is restored
+/// from a clone taken just after a helper call (the fuzzer's probes) — so repeating a helper
+/// call is never a duplicate.
+pub fn send_direct<T>(svm: &mut LiteSVM, send: impl FnOnce(&mut LiteSVM) -> T) -> T {
+    let res = send(svm);
+    svm.expire_blockhash();
+    res
 }
 
 /// A LiteSVM environment with short.win deployed.
@@ -349,14 +367,12 @@ impl Env {
     /// current authorities.
     ///
     /// Panics on a violation, with the transaction's logs. Expires the blockhash afterwards, so
-    /// an identical transaction can be sent again. [`Env::check_invariants`] `= false` skips
-    /// every hook.
+    /// an identical transaction can be sent again; panics on `AlreadyProcessed` (a duplicate is
+    /// the harness's fault). [`Env::check_invariants`] `= false` skips every hook.
     pub fn send(&mut self, ixs: &[Instruction], signers: &[&Keypair]) -> TxResult {
         if !self.check_invariants {
             let tx = self.transaction(ixs, signers);
-            let res = self.execute_recorded(tx.into());
-            self.svm.expire_blockhash();
-            return res;
+            return self.execute_once(tx);
         }
         self.track_markets_named_by(ixs);
         let admins = self.admin_keys();
@@ -370,8 +386,7 @@ impl Env {
         };
 
         let tx = self.transaction(ixs, signers);
-        let res = self.execute_recorded(tx.into());
-        self.svm.expire_blockhash();
+        let res = self.execute_once(tx);
 
         self.track_markets_named_by(ixs);
         self.hook_checkpoints += 1;
@@ -400,6 +415,20 @@ impl Env {
                 self.check_tracked_or_panic(Some(meta));
             }
             Err(failed) => self.check_tracked_or_panic(Some(&failed.meta)),
+        }
+        res
+    }
+
+    /// [`Env::execute_recorded`], then the blockhash expired. Panics on `AlreadyProcessed`: a
+    /// duplicate never reaches a program, so it is the harness's fault — never a refusal a test
+    /// or the fuzzer may count (an I14 omission or a gated open "refused"; FUZZ-M7-24H-2).
+    fn execute_once(&mut self, tx: Transaction) -> TxResult {
+        let res = self.execute_recorded(tx.into());
+        self.svm.expire_blockhash();
+        if let Err(f) = &res
+            && f.err == TransactionError::AlreadyProcessed
+        {
+            panic!("Env::send: a duplicate transaction (AlreadyProcessed): a harness bug");
         }
         res
     }
@@ -567,10 +596,9 @@ impl Env {
 
     // ---- accounts -----------------------------------------------------------------------
 
-    /// Airdrops `lamports` to `key`.
+    /// Airdrops `lamports` to `key` ([`send_direct`]: the same airdrop may be repeated).
     pub fn fund(&mut self, key: &Pubkey, lamports: u64) {
-        self.svm
-            .airdrop(key, lamports)
+        send_direct(&mut self.svm, |svm| svm.airdrop(key, lamports))
             .unwrap_or_else(|e| panic!("airdrop: {:?}", e.err));
     }
 

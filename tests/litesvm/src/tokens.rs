@@ -5,6 +5,9 @@
 //! set, Token-2022 is v11.0.0 (R-TOOL §2). Mints with Token-2022 extensions (the filter's one
 //! fixture per extension) are built by the market track with `spl-token-2022-interface`
 //! instructions and [`crate::Env::send`].
+//!
+//! Every helper here sends through [`send_direct`], which expires the blockhash afterwards, so
+//! the same call may be repeated (two equal `mint_to`s are byte-identical; FUZZ-M7-24H-2).
 
 use anchor_lang::prelude::Pubkey;
 use litesvm::LiteSVM;
@@ -12,6 +15,8 @@ use litesvm_token::{CreateAccount, CreateAssociatedTokenAccount, CreateMint, Min
 use shortwin::constants::{TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID};
 use solana_keypair::Keypair;
 use solana_signer::Signer;
+
+use crate::env::send_direct;
 
 /// Which token program a mint lives under.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -45,12 +50,14 @@ pub fn create_mint(
     program: TokenProgram,
 ) -> Pubkey {
     let id = program.id();
-    CreateMint::new(svm, payer)
-        .authority(authority)
-        .decimals(decimals)
-        .token_program_id(&id)
-        .send()
-        .unwrap_or_else(|e| panic!("create_mint: {:?}", e.err))
+    send_direct(svm, |svm| {
+        CreateMint::new(svm, payer)
+            .authority(authority)
+            .decimals(decimals)
+            .token_program_id(&id)
+            .send()
+    })
+    .unwrap_or_else(|e| panic!("create_mint: {:?}", e.err))
 }
 
 /// Creates a mint **with** a freeze authority (fails the filter).
@@ -62,13 +69,15 @@ pub fn create_mint_with_freeze(
     program: TokenProgram,
 ) -> Pubkey {
     let id = program.id();
-    CreateMint::new(svm, payer)
-        .authority(authority)
-        .freeze_authority(authority)
-        .decimals(decimals)
-        .token_program_id(&id)
-        .send()
-        .unwrap_or_else(|e| panic!("create_mint_with_freeze: {:?}", e.err))
+    send_direct(svm, |svm| {
+        CreateMint::new(svm, payer)
+            .authority(authority)
+            .freeze_authority(authority)
+            .decimals(decimals)
+            .token_program_id(&id)
+            .send()
+    })
+    .unwrap_or_else(|e| panic!("create_mint_with_freeze: {:?}", e.err))
 }
 
 /// Creates a (non-ATA) token account of `mint` owned by `owner`.
@@ -80,11 +89,13 @@ pub fn create_token_account(
     program: TokenProgram,
 ) -> Pubkey {
     let id = program.id();
-    CreateAccount::new(svm, payer, mint)
-        .owner(owner)
-        .token_program_id(&id)
-        .send()
-        .unwrap_or_else(|e| panic!("create_token_account: {:?}", e.err))
+    send_direct(svm, |svm| {
+        CreateAccount::new(svm, payer, mint)
+            .owner(owner)
+            .token_program_id(&id)
+            .send()
+    })
+    .unwrap_or_else(|e| panic!("create_token_account: {:?}", e.err))
 }
 
 /// Creates `ATA(owner, mint, program)` (anyone can: the ATA program checks only the address).
@@ -97,11 +108,13 @@ pub fn create_ata(
     program: TokenProgram,
 ) -> Pubkey {
     let id = program.id();
-    CreateAssociatedTokenAccount::new(svm, payer, mint)
-        .owner(owner)
-        .token_program_id(&id)
-        .send()
-        .unwrap_or_else(|e| panic!("create_ata: {:?}", e.err))
+    send_direct(svm, |svm| {
+        CreateAssociatedTokenAccount::new(svm, payer, mint)
+            .owner(owner)
+            .token_program_id(&id)
+            .send()
+    })
+    .unwrap_or_else(|e| panic!("create_ata: {:?}", e.err))
 }
 
 /// Mints `amount` raw units of `mint` to `destination` (`authority` signs).
@@ -115,11 +128,13 @@ pub fn mint_to(
     program: TokenProgram,
 ) {
     let id = program.id();
-    MintTo::new(svm, payer, mint, destination, amount)
-        .owner(authority)
-        .token_program_id(&id)
-        .send()
-        .unwrap_or_else(|e| panic!("mint_to: {:?}", e.err));
+    send_direct(svm, |svm| {
+        MintTo::new(svm, payer, mint, destination, amount)
+            .owner(authority)
+            .token_program_id(&id)
+            .send()
+    })
+    .unwrap_or_else(|e| panic!("mint_to: {:?}", e.err));
 }
 
 /// A funded token holder: a keypair, its token account and the amount minted to it.
@@ -138,7 +153,7 @@ pub fn holder(
     program: TokenProgram,
 ) -> Holder {
     let owner = Keypair::new();
-    svm.airdrop(&owner.pubkey(), 10_000_000_000)
+    send_direct(svm, |svm| svm.airdrop(&owner.pubkey(), 10_000_000_000))
         .unwrap_or_else(|e| panic!("airdrop: {:?}", e.err));
     let token_account = create_token_account(svm, payer, mint, &owner.pubkey(), program);
     if amount > 0 {
