@@ -4,7 +4,9 @@
 //! outcomes (a graduated coin lists on its canonical pool since M6, a coin that graduated
 //! elsewhere lists as `None`), and every refusal:
 //! mayhem and non-SOL curves (Q6), a curve under 115 bytes (`CurveNeedsExtend`), a pump curve that
-//! does not parse (fail closed), a Raydium hint on a live curve (D1), a missing or wrong init set.
+//! does not parse (fail closed), a Raydium hint on a live curve (D1), a missing or wrong init set;
+//! and (M10 G-A3) spoofed owners at the bonding-curve and canonical-pool PDAs: no pump venue at
+//! listing or at `crank_price`'s re-detection, D1 kept for a re-owned canonical pool.
 
 use shortwin::events::MarketCreated;
 use shortwin::instructions::create_market::{VENUE_HINT_AUTO, VENUE_HINT_RAYDIUM_V4};
@@ -265,4 +267,174 @@ fn the_init_set_is_strict() {
     wrong.accounts[base.accounts.len() - 1].pubkey = Pubkey::new_unique();
     assert_err(&env.send(&[wrong], &[&creator]), E::VenueAccountMismatch);
     ok(env.send(&[ix::with_remaining(base, &good)], &[&creator]));
+}
+
+// ---- spoofed owners at the detection PDAs (M10 G-A3) ---------------------------------------------
+
+/// A list-only market's view for `crank_price`: the detection set `[bonding_curve,
+/// canonical_pool]` as its ReadSet.
+struct Detection(shortwin_litesvm_tests::fixtures::MarketKeys);
+
+impl Detection {
+    fn of(mint: &Pubkey, token_program: &Pubkey) -> Self {
+        let market = pda::market(mint).0;
+        Self(shortwin_litesvm_tests::fixtures::MarketKeys {
+            mint: *mint,
+            token_program: *token_program,
+            market,
+            market_vault: pda::market_vault(&market).0,
+            pool_vault: pda::pool_vault(&market).0,
+            trader: pda::trader(&market).0,
+        })
+    }
+}
+
+impl VenueMarket for Detection {
+    fn keys(&self) -> &shortwin_litesvm_tests::fixtures::MarketKeys {
+        &self.0
+    }
+    fn read_set(&self, _writable: bool) -> Vec<AccountMeta> {
+        vec![
+            AccountMeta::new_readonly(pda::bonding_curve(&self.0.mint), false),
+            AccountMeta::new_readonly(pda::canonical_pool(&self.0.mint), false),
+        ]
+    }
+    fn trade_extras(&self) -> Vec<AccountMeta> {
+        Vec::new()
+    }
+}
+
+/// `create_market(Auto)` with the detection set only (a list-only listing).
+fn list_only(env: &mut Env, mint: &Pubkey, token_program: &Pubkey) -> TxResult {
+    let creator = env.funded_keypair();
+    let ix = ix::create_market(
+        &creator.pubkey(),
+        mint,
+        token_program,
+        VENUE_HINT_AUTO,
+        &pda::canonical_pool(mint),
+    );
+    env.send(&[ix], &[&creator])
+}
+
+/// ARCH §2.5 `classify_pump` (`bc.owner == pump`; `venues::pump_curve::parse_curve`), M10 G-A3: an
+/// account at a live coin's bonding-curve PDA that pump does not own — a System account pre-funded
+/// by a griefer (the reachable case), and plants mainnet cannot reach: the real curve's bytes
+/// under the System program, under pAMM, under an unknown program — is no pump curve. The listing
+/// with the pump init set is refused (`BadRemainingAccounts`: a list-only outcome takes none), the
+/// list-only listing lands as `None` (no `graduated_elsewhere`, no price), and `crank_price`'s
+/// re-detection keeps it there (no `VenueStateChanged`). The control: the real pump-owned curve put
+/// back, the next crank moves the market `None → PumpCurve`.
+#[test]
+fn a_spoofed_curve_owner_is_not_a_pump_venue() {
+    let unknown = Pubkey::new_unique();
+    for (what, owner, keep_bytes) in [
+        (
+            "a System account pre-funded",
+            anchor_lang::system_program::ID,
+            false,
+        ),
+        (
+            "the curve's bytes, System-owned",
+            anchor_lang::system_program::ID,
+            true,
+        ),
+        (
+            "the curve's bytes, pAMM-owned",
+            shortwin::constants::PUMP_AMM_PROGRAM_ID,
+            true,
+        ),
+        ("the curve's bytes, an unknown owner", unknown, true),
+    ] {
+        let (mut env, c) = Env::fork_pump_coin(PumpCoin::T22_115);
+        let saved = env.svm.get_account(&c.curve).expect("curve");
+        let mut spoof = saved.clone();
+        spoof.owner = owner;
+        if !keep_bytes {
+            spoof.data.clear();
+            spoof.lamports = 1_000_000;
+        }
+        env.svm.set_account(c.curve, spoof).unwrap();
+        assert_err(&env.list_pump(&c), E::BadRemainingAccounts);
+        let program = c.token_program.id();
+        ok(list_only(&mut env, &c.mint, &program));
+        let m = listed(&env, &c);
+        assert_eq!(m.venue_kind(), Some(VenueKind::None), "{what}");
+        assert!(!m.has_flag(MARKET_FLAG_GRADUATED_ELSEWHERE), "{what}");
+        assert_eq!(m.ema_price.get(), 0, "{what}: no price");
+        let det = Detection::of(&c.mint, &program);
+        env.warp(1);
+        no_venue_change(&crank(&mut env, &det));
+        assert_eq!(
+            listed(&env, &c).venue_kind(),
+            Some(VenueKind::None),
+            "{what}"
+        );
+        env.svm.set_account(c.curve, saved).unwrap();
+        env.warp(1);
+        venue_changed(
+            &crank(&mut env, &det),
+            VenueKind::None,
+            VenueKind::PumpCurve,
+        );
+    }
+}
+
+/// ARCH §2.5 `canonical_pool_valid` (`cp.owner == pAMM`; `venues::detect::canonical_pool`), M10
+/// G-A3: the canonical pool of a graduated coin re-owned — its bytes under pump, under an unknown
+/// program (plants mainnet cannot reach: only pAMM can create an account at its PDA) — is not a
+/// PumpSwap pool, yet still a pump venue for D1 (M5-SEC-5's `Unreadable`): the PumpSwap listing is
+/// refused (`BadRemainingAccounts`), a Raydium hint is refused before its candidate is read
+/// (`PumpVenuePrecedence`), the list-only listing lands as `None` **without** `graduated_elsewhere`,
+/// and the crank keeps it there. The control: the real pool put back, the next crank moves the
+/// market `None → PumpSwap`.
+#[test]
+fn a_spoofed_canonical_pool_owner_is_not_a_pumpswap_pool() {
+    for (what, owner) in [
+        ("pump-owned", shortwin::constants::PUMP_PROGRAM_ID),
+        ("an unknown owner", Pubkey::new_unique()),
+    ] {
+        let (mut env, c) = Env::fork_pump_coin(PumpCoin::Graduated);
+        let pool = pda::canonical_pool(&c.mint);
+        let saved = env.svm.get_account(&pool).expect("canonical pool");
+        assert_eq!(saved.owner, shortwin::constants::PUMP_AMM_PROGRAM_ID);
+        let mut spoof = saved.clone();
+        spoof.owner = owner;
+        env.svm.set_account(pool, spoof).unwrap();
+        let program = c.token_program.id();
+        let creator = env.funded_keypair();
+        let market = pda::market(&c.mint).0;
+        let plain = ix::create_market(&creator.pubkey(), &c.mint, &program, VENUE_HINT_AUTO, &pool);
+        let with = ix::with_remaining(plain, &shortwin_litesvm_tests::pamm::pamm_init_set(&market));
+        assert_err(&env.send(&[with], &[&creator]), E::BadRemainingAccounts);
+        let hinted = ix::with_remaining(
+            ix::create_market(
+                &creator.pubkey(),
+                &c.mint,
+                &program,
+                VENUE_HINT_RAYDIUM_V4,
+                &pool,
+            ),
+            &[
+                AccountMeta::new_readonly(Pubkey::new_unique(), false),
+                AccountMeta::new_readonly(Pubkey::new_unique(), false),
+                AccountMeta::new_readonly(Pubkey::new_unique(), false),
+                AccountMeta::new_readonly(Pubkey::new_unique(), false),
+            ],
+        );
+        assert_err(&env.send(&[hinted], &[&creator]), E::PumpVenuePrecedence);
+        ok(list_only(&mut env, &c.mint, &program));
+        let m = listed(&env, &c);
+        assert_eq!(m.venue_kind(), Some(VenueKind::None), "{what}");
+        assert!(
+            !m.has_flag(MARKET_FLAG_GRADUATED_ELSEWHERE),
+            "{what}: D1 holds"
+        );
+        let det = Detection::of(&c.mint, &program);
+        env.warp(1);
+        no_venue_change(&crank(&mut env, &det));
+        env.svm.set_account(pool, saved).unwrap();
+        env.warp(1);
+        venue_changed(&crank(&mut env, &det), VenueKind::None, VenueKind::PumpSwap);
+    }
 }

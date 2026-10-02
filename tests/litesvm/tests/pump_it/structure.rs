@@ -151,3 +151,42 @@ fn the_creator_vault_follows_the_live_creator() {
     );
     assert_trader_clean(&env, &pm);
 }
+
+/// I14 on the curve's keeper exits (M10 G-A1b): every ReadSet (C0–C6) and TradeExtras (T0–T19)
+/// slot of `liquidate` and `expire` omitted, replaced by a foreign key, a trailing extra and the
+/// first two slots swapped fail with `BadRemainingAccounts` / `VenueAccountMismatch` and leave the
+/// position as it was; the controls: the honest `liquidate` of the healthy position gets past the
+/// accounts and is refused by its body (`NotLiquidatable`), and the honest `expire` after the
+/// deadline lands (pump's charge, `q` back in the lending vault, the trader clean).
+#[test]
+fn liquidate_and_expire_check_every_curve_slot() {
+    use shortwin_litesvm_tests::engine::{expire_ix, liquidate_ix};
+    let (mut env, pm, q) = setup(PumpCoin::T22_115);
+    let mut b = env.borrower();
+    let (_, nonce, _) = open_ok(&mut env, &pm, &mut b, q);
+    env.warp(1);
+    crank(&mut env, &pm);
+    let kp = keeper(&mut env);
+    let position = pda::position(&pm.market(), &b.key(), nonce).0;
+    let before = env.svm.get_account(&position).map(|a| a.data);
+    let liq = liquidate_ix(&pm, &kp.pubkey(), &b.key(), nonce);
+    assert_all_fail(&mut env, &liq, 27, &[&kp]);
+    assert_eq!(env.svm.get_account(&position).map(|a| a.data), before);
+    let cu = pump::cu_limit_ix(pump::CURVE_KEEPER_EXIT_CU);
+    assert_err(&env.send(&[cu.clone(), liq], &[&kp]), E::NotLiquidatable);
+
+    warp_to_deadline(&mut env, &pm, &b.key(), nonce, 1);
+    crank(&mut env, &pm);
+    env.warp(1);
+    let exp = expire_ix(&pm, &kp.pubkey(), &b.key(), nonce);
+    let before = env.svm.get_account(&position).map(|a| a.data);
+    assert_all_fail(&mut env, &exp, 27, &[&kp]);
+    assert_eq!(env.svm.get_account(&position).map(|a| a.data), before);
+    let charge = pm.curve.charge_buy(&env.svm, q).unwrap();
+    let vault0 = tokens(&env, &pm.keys.pool_vault);
+    let meta = ok(env.send(&[cu, exp], &[&kp]));
+    let ev: shortwin::events::Expire = events::one(&meta);
+    assert_eq!(ev.buyback_cost, charge.cost);
+    assert_eq!(tokens(&env, &pm.keys.pool_vault) - vault0, q);
+    assert_trader_clean(&env, &pm);
+}

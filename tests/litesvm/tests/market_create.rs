@@ -6,6 +6,8 @@
 //!   `MarketCreated` event, the creator's cost;
 //! - uniqueness and griefing: one market per mint, front-running, pre-funded PDAs, a
 //!   pre-created trader ATA, forged or missing detection keys (C0-15), constraint violations;
+//!   spoofed owners at the detection PDAs (pre-funded, a curve's bytes under another owner: M10
+//!   G-A3);
 //! - `flag_unsafe_mint`: `MintSafe` on a safe mint (also after the changes Token-2022 allows),
 //!   the flag and `MintSafetyTripped` after an authority / extension / owner change that only
 //!   a Token-2022 upgrade or a bug could make, and the one-way flag.
@@ -862,4 +864,79 @@ fn pool_vault_address() {
     let market = pda::market(&mint).0;
     let (key, _) = Pubkey::find_program_address(&[POOL_VAULT_SEED, market.as_ref()], &shortwin::ID);
     assert_eq!(key, pda::pool_vault(&market).0);
+}
+
+/// Spoofed owners at the detection PDAs (ARCH §2.5 `classify_pump`, C0-15; M10 G-A3), on a fresh
+/// SPL mint with no pump programs loaded: a griefer pre-funding the mint's bonding-curve and
+/// canonical-pool addresses (System accounts, the reachable case), and a real pump curve's bytes
+/// (the dumped `t22_115` curve) planted at the curve PDA under another owner — the System
+/// program, the token program, an unknown program (unreachable on mainnet: only pump can create an
+/// account at its PDA). Each is no pump venue: the list-only listing lands as `None`, no
+/// `graduated_elsewhere`. The control: the same bytes under pump are a live curve, so the same
+/// list-only listing is refused (`BadRemainingAccounts`: a `PumpCurve` listing needs the pump
+/// init set).
+#[test]
+fn spoofed_owners_at_the_detection_pdas_list_only() {
+    let curve_bytes = {
+        let mut env = Env::initialized();
+        let c = env.load_pump_coin(shortwin_litesvm_tests::fork::PumpCoin::T22_115);
+        env.svm.get_account(&c.curve).expect("the dumped curve")
+    };
+    let spl = TokenProgram::Spl.id();
+    let unknown = Pubkey::new_unique();
+    let pre_funded = Account {
+        lamports: 5_000_000,
+        ..Account::default()
+    };
+    let planted = |owner: Pubkey| Account {
+        owner,
+        ..curve_bytes.clone()
+    };
+    let cases: [(&str, Option<Account>, Option<Account>); 4] = [
+        (
+            "both PDAs pre-funded",
+            Some(pre_funded.clone()),
+            Some(pre_funded),
+        ),
+        (
+            "curve bytes, System-owned",
+            Some(planted(anchor_lang::system_program::ID)),
+            None,
+        ),
+        ("curve bytes, token-program-owned", Some(planted(spl)), None),
+        (
+            "curve bytes, an unknown owner",
+            Some(planted(unknown)),
+            None,
+        ),
+    ];
+    for (what, at_curve, at_pool) in cases {
+        let mut env = Env::initialized();
+        let (mint, _) = mint_for(&mut env, TokenProgram::Spl);
+        if let Some(a) = at_curve {
+            env.svm.set_account(pda::bonding_curve(&mint), a).unwrap();
+        }
+        if let Some(a) = at_pool {
+            env.svm.set_account(pda::canonical_pool(&mint), a).unwrap();
+        }
+        let creator = env.funded_keypair();
+        ok(create(&mut env, &creator, &mint, &spl));
+        let m = env.market(&pda::market(&mint).0);
+        assert_eq!(m.venue_kind(), Some(VenueKind::None), "{what}");
+        assert!(
+            !m.has_flag(shortwin::state::MARKET_FLAG_GRADUATED_ELSEWHERE),
+            "{what}"
+        );
+    }
+    // The control: pump's own curve at the PDA is detected.
+    let mut env = Env::initialized();
+    let (mint, _) = mint_for(&mut env, TokenProgram::Spl);
+    env.svm
+        .set_account(pda::bonding_curve(&mint), curve_bytes)
+        .unwrap();
+    let creator = env.funded_keypair();
+    assert_err(
+        &create(&mut env, &creator, &mint, &spl),
+        ShortwinError::BadRemainingAccounts,
+    );
 }

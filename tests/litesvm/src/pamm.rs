@@ -58,6 +58,8 @@ pub const PAMM_INIT_UVA: [u8; 8] = [0x5e, 0x06, 0xca, 0x73, 0xff, 0x60, 0xe8, 0x
 pub const PAMM_CLAIM_CASHBACK: [u8; 8] = [0x25, 0x3a, 0x23, 0x7e, 0xbe, 0x35, 0xe4, 0xc5];
 /// `extend_account` (the same Anchor name on pump and PumpSwap).
 pub const EXTEND_ACCOUNT: [u8; 8] = [0xea, 0x66, 0xc2, 0xcb, 0x96, 0x48, 0x3e, 0xe5];
+/// `create_pool` (pAMM IDL `pump_amm.json`, the PPD refresh of 2026-09-12 — the deployed ELF's).
+pub const PAMM_CREATE_POOL: [u8; 8] = [233, 146, 209, 142, 207, 104, 64, 188];
 /// `GlobalConfig.disable_flags` (u8 @56).
 pub const GC_DISABLE_FLAGS: usize = 56;
 /// PumpSwap's `DisabledBuy` (T-DISABLE, bit 3).
@@ -267,6 +269,25 @@ impl PammPool {
         }
     }
 
+    /// The pool at `pool` (any pAMM pool of `mint`, canonical or not; panics if it does not
+    /// parse).
+    pub fn at(svm: &LiteSVM, pool: &Pubkey, mint: &Pubkey) -> Self {
+        let acc = svm.get_account(pool).expect("pool");
+        let p = pump_amm::read_pool(&acc.owner.to_bytes(), &acc.data).expect("Pool");
+        let base_program = svm.get_account(mint).expect("mint").owner;
+        let bv = boost_vault(pool);
+        Self {
+            mint: *mint,
+            base_program,
+            pool: *pool,
+            base_vault: Pubkey::new_from_array(p.pool_base_token_account),
+            quote_vault: Pubkey::new_from_array(p.pool_quote_token_account),
+            lp_mint: Pubkey::new_from_array(p.lp_mint),
+            boost_vault: bv,
+            boost_vault_ata: wsol_ata(&bv),
+        }
+    }
+
     /// The pool as the reader sees it now.
     pub fn state(&self, svm: &LiteSVM) -> pump_amm::Pool {
         let acc = svm.get_account(&self.pool).expect("pool");
@@ -389,6 +410,116 @@ pub fn pump_extend_account_ix(user: &Pubkey, account: &Pubkey) -> Instruction {
         ],
         data: EXTEND_ACCOUNT.to_vec(),
     }
+}
+
+/// `PDA(pAMM, ["pool", index u16 LE, creator, mint, WSOL])`: the address of `creator`'s pool
+/// `index` of `mint` (the canonical pool is index 0 by pump's pool authority).
+pub fn pool_address(index: u16, creator: &Pubkey, mint: &Pubkey) -> Pubkey {
+    pamm_pda(&[
+        pump_amm::POOL_SEED,
+        &index.to_le_bytes(),
+        creator.as_ref(),
+        mint.as_ref(),
+        WSOL_MINT.as_ref(),
+    ])
+}
+
+/// PumpSwap `create_pool(index, base_amount_in, quote_amount_in, coin_creator = default,
+/// is_mayhem_mode = false, is_cashback_coin = false, creator_fee_bps = 0, can_edit_creator_fee =
+/// false, is_holder_reward = false)` by `creator` (signer) from its base account `user_base` and
+/// WSOL account `user_quote` (IDL: 18 accounts; the LP lands in `ATA(creator, LP mint)` under
+/// Token-2022, the vaults are the pool's ATAs). Anyone may create a WSOL pool of any mint at any
+/// index of their own: only index 0 by pump's pool authority is the canonical one (ARCH §2.5).
+#[allow(clippy::too_many_arguments)]
+pub fn pamm_create_pool_ix(
+    creator: &Pubkey,
+    mint: &Pubkey,
+    base_program: &Pubkey,
+    index: u16,
+    user_base: &Pubkey,
+    user_quote: &Pubkey,
+    base_in: u64,
+    quote_in: u64,
+) -> Instruction {
+    let pool = pool_address(index, creator, mint);
+    let lp_mint = pamm_pda(&[pump_amm::LP_MINT_SEED, pool.as_ref()]);
+    let mut data = PAMM_CREATE_POOL.to_vec();
+    data.extend_from_slice(&index.to_le_bytes());
+    data.extend_from_slice(&base_in.to_le_bytes());
+    data.extend_from_slice(&quote_in.to_le_bytes());
+    data.extend_from_slice(Pubkey::default().as_ref());
+    data.push(0); // is_mayhem_mode
+    data.push(0); // is_cashback_coin
+    data.extend_from_slice(&0u64.to_le_bytes()); // creator_fee_bps
+    data.push(0); // can_edit_creator_fee
+    data.push(0); // is_holder_reward
+    Instruction {
+        program_id: PUMP_AMM_PROGRAM_ID,
+        accounts: vec![
+            m(pool, true),
+            m(PUMP_AMM_GLOBAL_CONFIG, false),
+            AccountMeta::new(*creator, true),
+            m(*mint, false),
+            m(WSOL_MINT, false),
+            m(lp_mint, true),
+            m(*user_base, true),
+            m(*user_quote, true),
+            m(pda::ata(creator, &lp_mint, &TOKEN_2022_PROGRAM_ID), true),
+            m(pda::ata(&pool, mint, base_program), true),
+            m(pda::ata(&pool, &WSOL_MINT, &TOKEN_PROGRAM_ID), true),
+            m(anchor_lang::system_program::ID, false),
+            m(TOKEN_2022_PROGRAM_ID, false),
+            m(*base_program, false),
+            m(TOKEN_PROGRAM_ID, false),
+            m(ASSOCIATED_TOKEN_PROGRAM_ID, false),
+            m(PUMP_AMM_EVENT_AUTHORITY, false),
+            m(PUMP_AMM_PROGRAM_ID, false),
+        ],
+        data,
+    }
+}
+
+/// A third party's own PumpSwap pool of `mint` (M10 G-A2): a funded creator puts `base_in`
+/// tokens (planted in its base account) and `quote_in` wrapped lamports into a real
+/// `create_pool(index)` on the dumped pAMM ELF — a valid WSOL pool with real liquidity that is not
+/// the mint's canonical pool (another address, another creator, `index ≠ 0` unless chosen). Returns
+/// the pool and its creator.
+pub fn create_third_party_pool(
+    env: &mut Env,
+    mint: &Pubkey,
+    index: u16,
+    base_in: u64,
+    quote_in: u64,
+) -> (PammPool, Keypair) {
+    let base_program = env.svm.get_account(mint).expect("mint").owner;
+    let kp = env.funded_keypair();
+    let payer = env.payer.pubkey();
+    errors::ok(env.send(
+        &[fork::create_ata_idempotent_ix(
+            &payer,
+            &kp.pubkey(),
+            mint,
+            &base_program,
+        )],
+        &[],
+    ));
+    let user_base = pda::ata(&kp.pubkey(), mint, &base_program);
+    fork::set_token_amount(&mut env.svm, &user_base, base_in);
+    let user_quote = fork::fund_wsol(env, &kp.pubkey(), quote_in);
+    let ix = pamm_create_pool_ix(
+        &kp.pubkey(),
+        mint,
+        &base_program,
+        index,
+        &user_base,
+        &user_quote,
+        base_in,
+        quote_in,
+    );
+    let signer = kp.insecure_clone();
+    errors::ok(env.send(&[crate::pump::cu_limit_ix(400_000), ix], &[&signer]));
+    let pool = pool_address(index, &kp.pubkey(), mint);
+    (PammPool::at(&env.svm, &pool, mint), kp)
 }
 
 /// A PumpSwap trade direction.

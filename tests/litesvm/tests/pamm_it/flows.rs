@@ -181,3 +181,11 @@ fn sol_settle_on_the_pool() {
     assert_trader_clean(&env, &pm);
     assert_eq!(market(&env, &pm).open_positions, 0);
 }
+
+/// The zero-lamport borrower on PumpSwap (M10 G-H10; `engine::zero_lamport_exits`): with the wallet
+/// emptied after the open (A) or inside the exit's transaction (B), the borrower's close and a
+/// keeper's expiry land and credit at least the position's and the exposure record's rent.
+#[test]
+fn a_zero_lamport_borrower_exits_on_pumpswap() {
+    shortwin_litesvm_tests::engine::zero_lamport_exits(|| setup(PammCoin::Legacy261), "PumpSwap");
+}

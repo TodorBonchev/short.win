@@ -274,3 +274,28 @@ pub fn warp_to_deadline(env: &mut Env, pm: &PammMarket, b: &Pubkey, nonce: u64, 
         env.warp(to - now);
     }
 }
+
+/// Moves `amount` of the market's tokens from a third party's (planted) account into `to`
+/// (`TransferChecked`, signed by the third party): a donation anyone can make.
+pub fn donate_tokens(env: &mut Env, pm: &PammMarket, to: &Pubkey, amount: u64) {
+    let u = PammUser::new(env, &pm.pool, SOL);
+    fork::set_token_amount(&mut env.svm, &u.base, amount);
+    let mint = env.svm.get_account(&pm.keys.mint).expect("mint");
+    let decimals = shortwin_venue_state::mint::read_base(&mint.owner.to_bytes(), &mint.data)
+        .expect("mint")
+        .decimals;
+    let mut data = vec![12u8];
+    data.extend_from_slice(&amount.to_le_bytes());
+    data.push(decimals);
+    let ix = Instruction {
+        program_id: pm.keys.token_program,
+        accounts: vec![
+            AccountMeta::new(u.base, false),
+            AccountMeta::new_readonly(pm.keys.mint, false),
+            AccountMeta::new(*to, false),
+            AccountMeta::new_readonly(u.kp.pubkey(), true),
+        ],
+        data,
+    };
+    ok(env.send(&[ix], &[&u.kp]));
+}

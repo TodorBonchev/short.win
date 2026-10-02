@@ -209,3 +209,82 @@ fn the_latch_blocks_curve_opens_only() {
         open_ok(&mut env, &pm, &mut b2, q);
     }
 }
+
+/// `sweep_trader`'s pump token leg is strict (ARCH §3.9; M5; M10 G-A1c): with tokens donated to
+/// `trader_base_ata`, each of the leg's five accounts (`trader_base_ata`, `pool_vault`, the mint,
+/// its token program, the trader's pump UVA) omitted or replaced by a foreign key, by another
+/// holder's real account of the same kind (the lender's token account of the mint at slots 0 and
+/// 1, the WSOL mint, the other token program, another user's pump UVA), the first two swapped, a
+/// trailing account, the whole leg missing, and another owner's `ATA(·, WSOL)` as the named
+/// `trader_wsol_ata` are each refused (`AccountMismatch` / `BadRemainingAccounts`) with the
+/// donation where it was; the honest sweep (the control) then moves it to the lending vault.
+#[test]
+fn sweep_trader_token_leg_account_rules() {
+    let (mut env, pm, _) = setup(PumpCoin::Legacy115);
+    donate_tokens(&mut env, &pm, &pm.trader_base_ata, 31_337);
+    let other = CurveUser::new(&mut env, &pm.curve);
+    let honest = pump::sweep_trader_pump_ix(&env, &pm);
+    let n = honest.accounts.len();
+    let start = n - 5;
+    let other_program = if pm.keys.token_program == shortwin::constants::TOKEN_PROGRAM_ID {
+        shortwin::constants::TOKEN_2022_PROGRAM_ID
+    } else {
+        shortwin::constants::TOKEN_PROGRAM_ID
+    };
+    let others = [
+        pm.lender_account,
+        pm.lender_account,
+        shortwin::constants::WSOL_MINT,
+        other_program,
+        fork::pump_user_volume_accumulator(&other.kp.pubkey()),
+    ];
+    let mut cases: Vec<(String, Instruction, E)> = Vec::new();
+    for (i, other_key) in others.into_iter().enumerate() {
+        let mut ix = honest.clone();
+        ix.accounts.remove(start + i);
+        cases.push((format!("omit leg {i}"), ix, E::BadRemainingAccounts));
+        let mut ix = honest.clone();
+        ix.accounts[start + i].pubkey = Pubkey::new_unique();
+        cases.push((format!("foreign leg {i}"), ix, E::AccountMismatch));
+        let mut ix = honest.clone();
+        ix.accounts[start + i].pubkey = other_key;
+        cases.push((format!("another holder's leg {i}"), ix, E::AccountMismatch));
+    }
+    let mut ix = honest.clone();
+    ix.accounts.swap(start, start + 1);
+    cases.push(("leg 0 and 1 swapped".into(), ix, E::AccountMismatch));
+    let mut ix = honest.clone();
+    ix.accounts
+        .push(AccountMeta::new_readonly(Pubkey::new_unique(), false));
+    cases.push(("a trailing account".into(), ix, E::BadRemainingAccounts));
+    let mut ix = honest.clone();
+    ix.accounts.truncate(start);
+    cases.push(("no token leg".into(), ix, E::BadRemainingAccounts));
+    let mut ix = honest.clone();
+    let named = ix
+        .accounts
+        .iter()
+        .position(|a| a.pubkey == pump::wsol_ata(&pm.trader()))
+        .expect("trader_wsol_ata");
+    ix.accounts[named].pubkey = pump::wsol_ata(&other.kp.pubkey());
+    cases.push(("another owner's WSOL ATA".into(), ix, E::AccountMismatch));
+    for (what, ix, want) in cases {
+        let res = env.send(&[ix], &[]);
+        assert_eq!(custom_code(&res), Some(code_of(want)), "{what}");
+        assert_eq!(tokens(&env, &pm.trader_base_ata), 31_337, "{what}: kept");
+    }
+    let vault0 = tokens(&env, &pm.keys.pool_vault);
+    let meta = ok(env.send(&[honest], &[]));
+    let ev: TraderSwept = events::one(&meta);
+    assert_eq!(ev.tokens, 31_337);
+    assert_eq!(tokens(&env, &pm.keys.pool_vault) - vault0, 31_337);
+    assert_trader_clean(&env, &pm);
+}
+
+/// The zero-lamport borrower on the curve (M10 G-H10; `engine::zero_lamport_exits`): with the
+/// wallet emptied after the open (A) or inside the exit's transaction (B), the borrower's close and
+/// a keeper's expiry land and credit at least the position's and the exposure record's rent.
+#[test]
+fn a_zero_lamport_borrower_exits_on_the_curve() {
+    shortwin_litesvm_tests::engine::zero_lamport_exits(|| setup(PumpCoin::T22_115), "curve");
+}

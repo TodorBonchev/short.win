@@ -706,3 +706,106 @@ impl Env {
             .unwrap_or_else(|| panic!("no position {borrower}/{nonce}"))
     }
 }
+
+// ---- the zero-lamport borrower (M10 G-H10) ----------------------------------------------------
+
+/// The System transfer of every lamport `from` holds now to a fresh address: the wallet is reaped
+/// (the zero-lamport borrower, ARCH §8.2 venue group; A18).
+pub fn drain_ix(env: &Env, from: &Pubkey) -> Instruction {
+    let all = read::lamports(&env.svm, from);
+    let mut data = vec![2, 0, 0, 0];
+    data.extend_from_slice(&all.to_le_bytes());
+    Instruction {
+        program_id: anchor_lang::system_program::ID,
+        accounts: vec![
+            AccountMeta::new(*from, true),
+            AccountMeta::new(Pubkey::new_unique(), false),
+        ],
+        data,
+    }
+}
+
+/// The zero-lamport borrower's exits on any venue (M10 G-H10), in both meanings: **(A)** the wallet
+/// emptied right after the open (its own transaction) and kept at 0, **(B)** emptied inside the
+/// exit's own transaction just before the exit. For each meaning, on a fresh `make()` market with
+/// size `q`: one borrower opens and then closes (`close_short`, it signs; the harness payer pays
+/// the fee), another opens and is expired by a keeper after its deadline (`expire`). Every exit
+/// lands, and the borrower's account ends holding at least the position's rent plus the exposure
+/// record's (A18: the borrower is paid through the position's close, so the credit is never below
+/// the rent-exempt minimum). `second` advances the market one honest second (a warp and a crank).
+/// Every instruction goes through [`Env::send`]: the hooks (I3, I9, I12) run on each one.
+pub fn zero_lamport_exits<M: VenueMarket>(mut make: impl FnMut() -> (Env, M, u64), label: &str) {
+    const EXIT_CU: u32 = 400_000;
+    for meaning in ['A', 'B'] {
+        let (mut env, mm, q) = make();
+        let what = format!("{label} ({meaning})");
+        let mut b1 = env.borrower();
+        let (res, n1) = env.open(&mm, &mut b1, q);
+        errors::ok(res);
+        let mut b2 = env.borrower();
+        let (res, n2) = env.open(&mm, &mut b2, q);
+        errors::ok(res);
+        if meaning == 'A' {
+            for b in [&b1, &b2] {
+                let ix = drain_ix(&env, &b.key());
+                errors::ok(env.send(&[ix], &[&b.kp]));
+                assert_eq!(read::lamports(&env.svm, &b.key()), 0, "{what}: reaped");
+            }
+        }
+        let records = |env: &Env, b: &Pubkey, n: u64| {
+            read::lamports(&env.svm, &pda::position(&mm.market(), b, n).0).min(
+                env.svm
+                    .minimum_balance_for_rent_exemption(ShortPosition::SPACE),
+            ) + read::lamports(&env.svm, &pda::exposure(&mm.market(), b).0)
+        };
+        let min0 = env.svm.minimum_balance_for_rent_exemption(0);
+
+        // The borrower's own close.
+        env.warp(1);
+        env.crank(&mm);
+        let owed = records(&env, &b1.key(), n1);
+        let close = close_short_ix(&mm, &b1.key(), n1, u64::MAX, ExtrasSel::NONE, &[]);
+        let mut ixs = vec![crate::pump::cu_limit_ix(EXIT_CU)];
+        if meaning == 'B' {
+            ixs.push(drain_ix(&env, &b1.key()));
+        }
+        ixs.push(close);
+        let kp = b1.kp.insecure_clone();
+        errors::ok(env.send(&ixs, &[&kp]));
+        let got = read::lamports(&env.svm, &b1.key());
+        assert!(
+            got >= owed && got >= min0,
+            "{what}: close credits {got} ≥ {owed}"
+        );
+
+        // The keeper's expiry.
+        let deadline = env.position(&mm, &b2.key(), n2).deadline;
+        let now = env.now();
+        env.warp(deadline - now + 1);
+        env.crank(&mm);
+        for _ in 0..3 {
+            env.warp(1);
+            env.crank(&mm);
+        }
+        let owed = records(&env, &b2.key(), n2);
+        let k = env.funded_keypair();
+        let exp = expire_ix(&mm, &k.pubkey(), &b2.key(), n2);
+        let mut ixs = vec![crate::pump::cu_limit_ix(EXIT_CU)];
+        if meaning == 'B' {
+            ixs.push(drain_ix(&env, &b2.key()));
+        }
+        ixs.push(exp);
+        let kp = b2.kp.insecure_clone();
+        let signers: Vec<&Keypair> = if meaning == 'B' {
+            vec![&kp, &k]
+        } else {
+            vec![&k]
+        };
+        errors::ok(env.send(&ixs, &signers));
+        let got = read::lamports(&env.svm, &b2.key());
+        assert!(
+            got >= owed && got >= min0,
+            "{what}: expiry credits {got} ≥ {owed}"
+        );
+    }
+}

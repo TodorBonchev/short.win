@@ -96,3 +96,11 @@ fn expiry_of_a_healthy_position() {
         assert!(e.expiry_fee > 0 && e.keeper_reward > 0);
     }
 }
+
+/// The zero-lamport borrower on AMM v4 (M10 G-H10; `engine::zero_lamport_exits`): with the wallet
+/// emptied after the open (A) or inside the exit's transaction (B), the borrower's close and a
+/// keeper's expiry land and credit at least the position's and the exposure record's rent.
+#[test]
+fn a_zero_lamport_borrower_exits_on_amm_v4() {
+    shortwin_litesvm_tests::engine::zero_lamport_exits(|| setup(FART), "AMM v4");
+}

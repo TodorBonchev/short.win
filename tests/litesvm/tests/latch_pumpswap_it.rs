@@ -21,6 +21,9 @@
 //!   PumpSwap bits must be clear before an open is accepted again;
 //! - U5: `flag_venue_upgraded` and `revalidate_venue` cost the same CU on the real 10 MiB PumpSwap
 //!   ProgramData as on pump-fees' 0.95 MB, far inside §6.1's 400 k.
+//! - the ProgramData account is checked for `GUARD_PUMP_AMM` and `GUARD_PUMP_FEES` (M10 G-A7):
+//!   wrong keys, and a moved-slot header under another owner or loader state, are
+//!   `VenueAccountMismatch` for both instructions; nothing is latched until the real account moves.
 //!
 //! Every transaction goes through `Env::send` (or `fork::admin_send`): the invariant hooks run
 //! after each one.
@@ -410,4 +413,66 @@ fn u5_flag_and_revalidate_cost_the_same_whatever_the_programdata_size() {
             .len(),
         PAMM_PROGRAM_DATA_LEN
     );
+}
+
+/// The ProgramData account is checked for both PumpSwap guard indices (M10 G-A7; ARCH §3.1; as
+/// `latch_pump_it::the_program_data_account_is_checked` for pump): for `GUARD_PUMP_AMM` and
+/// `GUARD_PUMP_FEES`, the other venues' ProgramData, the program id itself, short.win's own
+/// ProgramData and a fresh key are `VenueAccountMismatch` for `flag_venue_upgraded` and
+/// `revalidate_venue`; so is the right address after a (planted) upgrade — the header's deploy
+/// slot moved, which the flag would latch — when it is owned by another program or carries another
+/// loader state (a `Buffer` tag). The controls: the real account at the dumped slot is
+/// `VenueNotUpgraded`, and with the slot moved the flag lands and sets exactly that bit.
+#[test]
+fn the_program_data_account_is_checked_for_pamm_and_pump_fees() {
+    for (program, guard, other) in [
+        (PumpProgram::Amm, GUARD_PUMP_AMM, PumpProgram::Fees),
+        (PumpProgram::Fees, GUARD_PUMP_FEES, PumpProgram::Amm),
+    ] {
+        let (mut env, _) = Env::fork_pamm_coin(SPL261);
+        let ea = env.pause_authority.insecure_clone();
+        let s = VENUE_GUARD_SLOTS_2026_09_27[usize::from(guard)];
+        let wrong_keys = [
+            other.program_data().address,
+            PumpProgram::Pump.program_data().address,
+            program.id(),
+            pda::program_data(),
+            Pubkey::new_unique(),
+        ];
+        for key in wrong_keys {
+            assert_err(
+                &env.send(&[ix::flag_venue_upgraded_with(guard, key)], &[]),
+                E::VenueAccountMismatch,
+            );
+            assert_err(
+                &env.send(
+                    &[ix::revalidate_venue_with(&ea.pubkey(), guard, s, key)],
+                    &[&ea],
+                ),
+                E::VenueAccountMismatch,
+            );
+        }
+        let key = program.program_data().address;
+        assert_err(&flag(&mut env, guard), E::VenueNotUpgraded);
+        fork::set_pump_deploy_slot(&mut env.svm, program, s + 7);
+        let moved = read::account(&env.svm, &key).unwrap();
+        let mut forged = moved.clone();
+        forged.owner = anchor_lang::system_program::ID;
+        env.svm.set_account(key, forged).unwrap();
+        assert_err(&flag(&mut env, guard), E::VenueAccountMismatch);
+        assert_err(&revalidate(&mut env, guard, s + 7), E::VenueAccountMismatch);
+        let mut forged = moved.clone();
+        forged.data[0] = 1;
+        env.svm.set_account(key, forged).unwrap();
+        assert_err(&flag(&mut env, guard), E::VenueAccountMismatch);
+        assert_err(&revalidate(&mut env, guard, s + 7), E::VenueAccountMismatch);
+        assert_eq!(env.venue_guard().upgraded, 0, "{guard}: nothing latched");
+        env.svm.set_account(key, moved).unwrap();
+        ok(flag(&mut env, guard));
+        assert_eq!(
+            env.venue_guard().upgraded,
+            1 << guard,
+            "{guard}: exactly its bit"
+        );
+    }
 }

@@ -25,3 +25,4 @@ mod smoke;
 mod structure;
 mod trace_cu;
 mod trader;
+mod zero_lamport;

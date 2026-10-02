@@ -2,8 +2,9 @@
 //! C0-14; M6): the post-change warm-up (`EmaWarmingUp`), `disable_flags` (`VenueFlagged` on any
 //! non-zero value, `NoRoute` under the T-DISABLE buy bit), the boost gate (`BoostInProgress`), the
 //! latch on pAMM and pump-fees (`VenueUpgraded`, exits unaffected), the existence requirement and
-//! account substitution in the TradeExtras (`VenueAccountMismatch`). The venue-generic refusals are
-//! `engine_it`'s and `pump_it`'s.
+//! account substitution in the TradeExtras (`VenueAccountMismatch`); and (M10 G-A2) a third party's
+//! real non-canonical pool of the mint (`create_pool(index = 1)` on the ELF) in the ReadSet of
+//! every instruction and at listing. The venue-generic refusals are `engine_it`'s and `pump_it`'s.
 
 use shortwin::constants::{GUARD_PUMP_AMM, GUARD_PUMP_FEES};
 use shortwin_litesvm_tests::ix;
@@ -220,4 +221,193 @@ fn every_slot_is_key_checked() {
     let mut b = env.borrower();
     let (res, _) = env.open(&pm, &mut b, q);
     ok(res);
+}
+
+// ---- a real non-canonical pool (M10 G-A2) ---------------------------------------------------------
+
+/// `ix` (whose last `remaining` metas are the venue's) with `np`'s pool, vaults, boost ATA and LP
+/// mint in place of the market's ReadSet slots P0–P2, P5, P6.
+fn on_pool(ix: &Instruction, remaining: usize, np: &PammPool) -> Instruction {
+    use shortwin::venues::pump_amm::{
+        P_BASE_VAULT, P_BOOST_VAULT_ATA, P_LP_MINT, P_POOL, P_QUOTE_VAULT,
+    };
+    let mut ix = ix.clone();
+    let start = ix.accounts.len() - remaining;
+    for (slot, key) in [
+        (P_POOL, np.pool),
+        (P_BASE_VAULT, np.base_vault),
+        (P_QUOTE_VAULT, np.quote_vault),
+        (P_BOOST_VAULT_ATA, np.boost_vault_ata),
+        (P_LP_MINT, np.lp_mint),
+    ] {
+        ix.accounts[start + slot].pubkey = key;
+    }
+    ix
+}
+
+/// A third party's own, valid PumpSwap pool of the market's mint (ARCH §2.5 `canonical_pool_valid`;
+/// `venues::detect::canonical_pool`; M10 G-A2): a real `create_pool(index = 1)` on the dumped pAMM
+/// ELF with a WSOL quote, no mayhem, real liquidity (a trader buys on it), only its address,
+/// creator and index differ from the canonical pool's. Its keys in the ReadSet (P0–P2, the boost
+/// ATA, the LP mint) are refused (`VenueAccountMismatch`) on `open_short`, `crank_price`,
+/// `sol_settle`, `close_short` and `liquidate`, the position unchanged; the honest instructions
+/// (controls) land.
+#[test]
+fn a_real_non_canonical_pool_is_never_the_market_pool() {
+    let (mut env, pm, q) = setup(PammCoin::Legacy261);
+    let r = pm.pool.reserves(&env.svm).unwrap();
+    let (np, creator) =
+        pamm::create_third_party_pool(&mut env, &pm.keys.mint, 1, r.base / 4, 20 * SOL);
+    let st = np.state(&env.svm);
+    assert_eq!(st.index, 1);
+    assert_eq!(st.creator, creator.pubkey().to_bytes());
+    assert_ne!(
+        st.creator,
+        pda::pump_pool_authority(&pm.keys.mint).to_bytes()
+    );
+    assert_eq!(
+        (st.base_mint, st.quote_mint),
+        (
+            pm.keys.mint.to_bytes(),
+            shortwin::constants::WSOL_MINT.to_bytes()
+        )
+    );
+    assert!(!st.is_mayhem_mode);
+    assert_ne!(np.pool, pm.pool.pool);
+    let u = PammUser::new(&mut env, &np, 5 * SOL);
+    ok(u.buy(&mut env, &np, q / 10, u64::MAX));
+    assert!(np.reserves(&env.svm).unwrap().base > 0, "real liquidity");
+
+    let all = shortwin::venues::pump_amm::READ_LEN + shortwin::venues::pump_amm::TRADE_LEN;
+    let read = shortwin::venues::pump_amm::READ_LEN;
+    let mut b = env.borrower();
+    let open = open_short_ix(
+        &pm,
+        &b.key(),
+        0,
+        q,
+        0,
+        u64::MAX,
+        u64::MAX,
+        ExtrasSel::NONE,
+        &[],
+    );
+    let cu = cu_limit_ix(KEEPER_EXIT_CU);
+    assert_err(
+        &env.send(&[cu.clone(), on_pool(&open, all, &np)], &[&b.kp]),
+        E::VenueAccountMismatch,
+    );
+    let (_, n, _) = open_ok(&mut env, &pm, &mut b, q);
+    let position = pda::position(&pm.market(), &b.key(), n).0;
+    let before = env.svm.get_account(&position).map(|a| a.data);
+    env.warp(1);
+    let crank_ix = crank_price_ix(&pm);
+    assert_err(
+        &env.send(&[on_pool(&crank_ix, read, &np)], &[]),
+        E::VenueAccountMismatch,
+    );
+    crank(&mut env, &pm);
+    let kp = keeper(&mut env);
+    let settle_ix = sol_settle_ix(&env, &pm, &kp.pubkey(), &b.key(), n);
+    assert_err(
+        &env.send(&[on_pool(&settle_ix, read, &np)], &[&kp]),
+        E::VenueAccountMismatch,
+    );
+    let liq = liquidate_ix(&pm, &kp.pubkey(), &b.key(), n);
+    assert_err(
+        &env.send(&[cu.clone(), on_pool(&liq, all, &np)], &[&kp]),
+        E::VenueAccountMismatch,
+    );
+    let close = close_short_ix(&pm, &b.key(), n, u64::MAX, ExtrasSel::NONE, &[]);
+    assert_err(
+        &env.send(&[cu, on_pool(&close, all, &np)], &[&b.kp]),
+        E::VenueAccountMismatch,
+    );
+    assert_eq!(env.svm.get_account(&position).map(|a| a.data), before);
+    ok(settle(&mut env, &pm, &kp, &b.key(), n));
+    assert_err(
+        &liquidate(&mut env, &pm, &kp, &b.key(), n),
+        E::NotLiquidatable,
+    );
+    env.warp(1);
+    close_ok(&mut env, &pm, &b, n);
+}
+
+/// The same pool at listing (ARCH §2.5, §3.2; `pump_amm.rs` canonical-pool rule; M10 G-A2), on a
+/// fresh fork of the `mature` coin: given as the detection set's canonical-pool account it is
+/// refused (`VenueAccountMismatch`: the key is derived on chain). Planted at the canonical address
+/// (its bytes; mainnet cannot get it there, the address is pAMM's PDA of index 0 by pump's pool
+/// authority) it is **not** valid — with its own index 1 and creator, with the index alone set to 0,
+/// with the creator alone set to pump's pool authority — so the PumpSwap listing is refused
+/// (`BadRemainingAccounts`) and the list-only listing lands as `None` without
+/// `graduated_elsewhere` (D1). The control: index 0 **and** pump's authority make the same bytes a
+/// valid canonical pool, and the PumpSwap listing lands on it.
+#[test]
+fn a_real_non_canonical_pool_is_never_listed() {
+    use shortwin_venue_state::pump_amm::{OFF_CREATOR, OFF_INDEX};
+    let (mut env0, p0) = Env::fork_pamm_coin(PammCoin::Mature);
+    let r = p0.reserves(&env0.svm).unwrap();
+    let (np, _) = pamm::create_third_party_pool(&mut env0, &p0.mint, 1, r.base / 4, 20 * SOL);
+    let authority = pda::pump_pool_authority(&p0.mint);
+    let creator = env0.funded_keypair();
+    let market = pda::market(&p0.mint).0;
+    let mut by_key = pamm::create_pamm_market_ix(&creator.pubkey(), &p0.mint, &p0.base_program);
+    let det = by_key.accounts.len() - 4;
+    by_key.accounts[det].pubkey = np.pool;
+    assert_err(&env0.send(&[by_key], &[&creator]), E::VenueAccountMismatch);
+
+    type Patch<'a> = (&'a str, &'a dyn Fn(&mut Vec<u8>), bool);
+    let patches: [Patch; 4] = [
+        ("its own index 1 and creator", &|_| {}, false),
+        (
+            "index 0, its own creator",
+            &|d| d[OFF_INDEX..OFF_INDEX + 2].fill(0),
+            false,
+        ),
+        (
+            "index 1, pump's authority",
+            &|d| d[OFF_CREATOR..OFF_CREATOR + 32].copy_from_slice(authority.as_ref()),
+            false,
+        ),
+        (
+            "index 0 and pump's authority (the control)",
+            &|d| {
+                d[OFF_INDEX..OFF_INDEX + 2].fill(0);
+                d[OFF_CREATOR..OFF_CREATOR + 32].copy_from_slice(authority.as_ref());
+            },
+            true,
+        ),
+    ];
+    for (what, patch, valid) in patches {
+        let (mut env, p) = Env::fork_pamm_coin(PammCoin::Mature);
+        let (np2, _) = pamm::create_third_party_pool(&mut env, &p.mint, 1, r.base / 4, 20 * SOL);
+        let mut acc = env.svm.get_account(&np2.pool).unwrap();
+        assert_eq!(acc.data[OFF_INDEX..OFF_INDEX + 2], 1u16.to_le_bytes());
+        patch(&mut acc.data);
+        env.svm.set_account(p.pool, acc).unwrap();
+        let creator = env.funded_keypair();
+        let full = pamm::create_pamm_market_ix(&creator.pubkey(), &p.mint, &p.base_program);
+        if valid {
+            ok(env.send(&[full], &[&creator]));
+            assert_eq!(
+                env.market(&market).venue_kind(),
+                Some(VenueKind::PumpSwap),
+                "{what}"
+            );
+            continue;
+        }
+        assert_err(
+            &env.send(std::slice::from_ref(&full), &[&creator]),
+            E::BadRemainingAccounts,
+        );
+        let mut plain = full;
+        plain.accounts.truncate(plain.accounts.len() - 3);
+        ok(env.send(&[plain], &[&creator]));
+        let m = env.market(&market);
+        assert_eq!(m.venue_kind(), Some(VenueKind::None), "{what}");
+        assert!(
+            !m.has_flag(shortwin::state::MARKET_FLAG_GRADUATED_ELSEWHERE),
+            "{what}: D1 holds"
+        );
+    }
 }

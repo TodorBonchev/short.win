@@ -17,7 +17,10 @@
 //!   `ATA(pAMM UVA(trader), WSOL)`; after a full wipe `sweep_trader` leaves `wipe_rewards_claimed`
 //!   clear while it holds any, and `[create_idempotent ATA(trader, WSOL), claim_cashback(user =
 //!   trader), sweep_trader]` — signed by the fee payer alone, on a venue halted for buys —
-//!   credits it to the wiped epoch's record and sets both bits (M5-SEC-1's remainder).
+//!   credits it to the wiped epoch's record and sets both bits (M5-SEC-1's remainder);
+//! - **`sweep_trader`'s token leg** (M10 G-A1c): its six accounts strict (omitted, foreign, another
+//!   holder's, swapped, trailing, the curve's five-account leg), and the cashback slot failing
+//!   closed: a non-WSOL account there keeps `wipe_rewards_claimed` clear.
 
 use shortwin::constants::{PUMP_AMM_PROGRAM_ID, TOKEN_PROGRAM_ID, WSOL_MINT};
 use shortwin::events::TraderSwept;
@@ -493,4 +496,170 @@ fn withdraw_all_free(env: &mut Env, pm: &PammMarket) {
     let kp = pm.lender.insecure_clone();
     ok(env.send(&[ix::withdraw(&pm.lender_keys(), lo, want)], &[&kp]));
     assert_eq!(env.market(&pm.market()).tokens_free, 0);
+}
+
+// ---- sweep_trader's PumpSwap token leg (M10 G-A1c) ---------------------------------------------
+
+/// `sweep_trader`'s PumpSwap token leg is strict (ARCH §3.9; M6): with tokens donated to
+/// `trader_base_ata`, each of the leg's six accounts (`trader_base_ata`, `pool_vault`, the mint, its
+/// token program, the trader's pump UVA, `ATA(pAMM UVA(trader), WSOL)`) omitted or replaced by a
+/// foreign key, by another holder's real account of the same kind (the lender's token account at
+/// slots 0 and 1, the WSOL mint, the other token program, another user's pump UVA, another
+/// trader's cashback ATA), the first two swapped, a trailing account, the whole leg missing, and
+/// the curve's five-account leg (no cashback slot) are each refused (`AccountMismatch` /
+/// `BadRemainingAccounts`) with the donation where it was; the honest sweep (the control) moves it.
+#[test]
+fn sweep_trader_token_leg_account_rules() {
+    let (mut env, pm, _) = setup(PammCoin::Cashback);
+    donate_tokens(&mut env, &pm, &pm.trader_base_ata, 31_337);
+    let other = PammUser::new(&mut env, &pm.pool, SOL);
+    let honest = pamm::sweep_trader_pamm_ix(&env, &pm);
+    let n = honest.accounts.len();
+    let start = n - 6;
+    assert_eq!(honest.accounts[n - 1].pubkey, pm.cashback_ata());
+    let other_program = if pm.keys.token_program == TOKEN_PROGRAM_ID {
+        shortwin::constants::TOKEN_2022_PROGRAM_ID
+    } else {
+        TOKEN_PROGRAM_ID
+    };
+    let others = [
+        pm.lender_account,
+        pm.lender_account,
+        WSOL_MINT,
+        other_program,
+        fork::pump_user_volume_accumulator(&other.kp.pubkey()),
+        wsol_ata(&pamm::pamm_uva(&other.kp.pubkey())),
+    ];
+    let mut cases: Vec<(String, Instruction, E)> = Vec::new();
+    for (i, other_key) in others.into_iter().enumerate() {
+        let mut ix = honest.clone();
+        ix.accounts.remove(start + i);
+        cases.push((format!("omit leg {i}"), ix, E::BadRemainingAccounts));
+        let mut ix = honest.clone();
+        ix.accounts[start + i].pubkey = Pubkey::new_unique();
+        cases.push((format!("foreign leg {i}"), ix, E::AccountMismatch));
+        let mut ix = honest.clone();
+        ix.accounts[start + i].pubkey = other_key;
+        cases.push((format!("another holder's leg {i}"), ix, E::AccountMismatch));
+    }
+    let mut ix = honest.clone();
+    ix.accounts.swap(start, start + 1);
+    cases.push(("leg 0 and 1 swapped".into(), ix, E::AccountMismatch));
+    let mut ix = honest.clone();
+    ix.accounts.swap(start + 4, start + 5);
+    cases.push(("leg 4 and 5 swapped".into(), ix, E::AccountMismatch));
+    let mut ix = honest.clone();
+    ix.accounts
+        .push(AccountMeta::new_readonly(Pubkey::new_unique(), false));
+    cases.push(("a trailing account".into(), ix, E::BadRemainingAccounts));
+    let mut ix = honest.clone();
+    ix.accounts.truncate(start);
+    cases.push(("no token leg".into(), ix, E::BadRemainingAccounts));
+    let mut ix = honest.clone();
+    ix.accounts.truncate(n - 1);
+    cases.push((
+        "the curve's five-account leg".into(),
+        ix,
+        E::BadRemainingAccounts,
+    ));
+    for (what, ix, want) in cases {
+        let res = env.send(&[ix], &[]);
+        assert_eq!(custom_code(&res), Some(code(want)), "{what}");
+        assert_eq!(tokens(&env, &pm.trader_base_ata), 31_337, "{what}: kept");
+    }
+    let vault0 = tokens(&env, &pm.keys.pool_vault);
+    let meta = ok(env.send(&[honest], &[]));
+    let ev: TraderSwept = events::one(&meta);
+    assert_eq!(ev.tokens, 31_337);
+    assert_eq!(tokens(&env, &pm.keys.pool_vault) - vault0, 31_337);
+    assert_trader_clean(&env, &pm);
+}
+
+/// The cashback slot fails closed (ARCH §3.9 "M6's choice"; `venues::pump_amm::cashback_claimable`;
+/// M10 G-A1c): after a full wipe of a market whose pAMM UVA has no cashback ATA, an account at
+/// `ATA(pAMM UVA(trader), WSOL)` that is **not** a WSOL token account under SPL Token — a token
+/// account of another mint, a WSOL-layout account owned by Token-2022, an account another program
+/// owns (plants: mainnet's ATA program cannot put them there) — reads as "cashback outstanding":
+/// `sweep_trader` sets the trader bit only, `wipe_rewards_claimed` stays clear and a deposit waits.
+/// The control: the same bytes as a WSOL account under SPL Token holding 0 set both bits (and the
+/// address left empty does too: `t_cashback_nothing_to_claim_sets_both_bits_at_once`).
+#[test]
+fn a_non_wsol_account_at_the_cashback_slot_fails_closed() {
+    let (mut env, pm, q) = setup(PammCoin::Legacy261);
+    let ata = pm.cashback_ata();
+    assert!(env.svm.get_account(&ata).is_none_or(|a| a.data.is_empty()));
+    let mut b = env.borrower();
+    let (_, n, _) = open_ok(&mut env, &pm, &mut b, q);
+    withdraw_all_free(&mut env, &pm);
+    let whale = PammUser::new(&mut env, &pm.pool, 1_000 * SOL);
+    ok(whale.push_price(&mut env, &pm.pool, 5, 1));
+    let kp = keeper(&mut env);
+    let mut done = false;
+    for _ in 0..120 {
+        env.warp(1);
+        crank(&mut env, &pm);
+        let meta = ok(settle(&mut env, &pm, &kp, &b.key(), n));
+        if !events::of::<SolSettle>(&meta).is_empty() {
+            done = true;
+            break;
+        }
+    }
+    assert!(done, "settled");
+    assert!(env.market(&pm.market()).has_flag(MARKET_FLAG_WIPE_LIVE));
+
+    // Plants at the cashback address, each made from a real account's bytes: owner field the
+    // trader's pAMM UVA, amount 0, rent-exempt for 165 bytes.
+    let rent165 = env.svm.minimum_balance_for_rent_exemption(165);
+    let plant = |key: &Pubkey, program: Pubkey| {
+        let mut acc = env.svm.get_account(key).expect("a token account");
+        acc.data[32..64].copy_from_slice(pm.trader_uva().as_ref());
+        acc.data[64..72].fill(0);
+        acc.lamports = rent165;
+        acc.owner = program;
+        acc
+    };
+    let other_mint = plant(&whale.base, TOKEN_PROGRAM_ID);
+    assert_ne!(other_mint.data[..32], WSOL_MINT.to_bytes()[..]);
+    let t22_owned = plant(&whale.wsol, shortwin::constants::TOKEN_2022_PROGRAM_ID);
+    let foreign_owned = plant(&whale.wsol, PUMP_AMM_PROGRAM_ID);
+    // The same bytes under SPL Token are a valid, empty WSOL account: nothing claimable.
+    let real_empty = plant(&whale.wsol, TOKEN_PROGRAM_ID);
+    let rewards = |env: &Env| {
+        env.market(&pm.market())
+            .has_flag(MARKET_FLAG_WIPE_REWARDS_CLAIMED)
+    };
+    for (what, acc) in [
+        ("a token account of the base mint", other_mint),
+        ("a WSOL account owned by Token-2022", t22_owned),
+        ("a WSOL-layout account owned by pAMM", foreign_owned),
+    ] {
+        env.svm.set_account(ata, acc).unwrap();
+        env.warp(1);
+        let meta = ok(env.send(&[pamm::sweep_trader_pamm_ix(&env, &pm)], &[]));
+        let ev: TraderSwept = events::one(&meta);
+        assert_eq!(
+            ev.wipe_bits & WIPE_TRADER_SWEPT,
+            WIPE_TRADER_SWEPT,
+            "{what}: the trader bit"
+        );
+        assert_eq!(
+            ev.wipe_bits & WIPE_REWARDS_CLAIMED,
+            0,
+            "{what}: fails closed"
+        );
+        assert!(!rewards(&env), "{what}");
+    }
+    // The control: the same bytes under SPL Token, an empty WSOL account: nothing claimable, both
+    // bits (one control per wipe: the bit stays set once set).
+    env.svm.set_account(ata, real_empty).unwrap();
+    env.warp(1);
+    let meta = ok(env.send(&[pamm::sweep_trader_pamm_ix(&env, &pm)], &[]));
+    let ev: TraderSwept = events::one(&meta);
+    assert_eq!(
+        ev.wipe_bits & WIPE_REWARDS_CLAIMED,
+        WIPE_REWARDS_CLAIMED,
+        "an empty WSOL account: both bits"
+    );
+    assert_eq!(ev.wipe_bits & WIPE_TRADER_SWEPT, WIPE_TRADER_SWEPT);
+    assert!(rewards(&env));
 }

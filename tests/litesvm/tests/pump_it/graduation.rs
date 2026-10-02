@@ -14,7 +14,9 @@
 //! The M6 security review's curve-side findings: M6-SEC-5 (a full wipe settled during the
 //! migration pause waits for the curve-era cashback) and M6-SEC-3 (decided by the owner on
 //! 2026-09-30: curve opens refuse `GraduationHalted` exactly while PumpSwap's `create_pool` halt is
-//! set; a position opened before it keeps the stalled-graduation path to S3).
+//! set; a position opened before it keeps the stalled-graduation path to S3). M10 G-A2: a
+//! stranger's real `create_pool(index = 1)` of the coin after the completion never graduates the
+//! market (nor do its bytes at the canonical address); the real `migrate_v2` does.
 //!
 //! Every instruction goes through `Env::send`: the invariant hooks run after each one. The only
 //! planted state is the venue's (pump's curve account: reserves zeroed as by a migration to
@@ -996,5 +998,65 @@ fn m6_sec_3_a_position_opened_before_the_create_pool_halt_stalls_until_s3() {
         at - t0,
         ev.fv,
         ev.lender_amount
+    );
+}
+
+/// A third party's real, valid PumpSwap pool of the coin at the curve's `→ PumpSwap` transition
+/// (ARCH §2.5 "On → PumpSwap", `canonical_pool_valid`; M10 G-A2): after the completion, before any
+/// `migrate_v2`, a stranger creates its own WSOL pool of the mint with real liquidity
+/// (`create_pool(index = 1)` on the dumped pAMM ELF). It is not the canonical pool, so the cranks
+/// keep the market `PumpMigrating` (no `VenueStateChanged`, the migration pause kept); its bytes
+/// planted at the canonical address (index 1, a creator that is not pump's pool authority; a state
+/// mainnet cannot reach) are not a valid canonical pool either: still `PumpMigrating`, never
+/// `PumpSwap`, never "graduated elsewhere" (M5-SEC-5's `Unreadable`). The control: the address
+/// emptied again, the real `migrate_v2` creates the canonical pool and the next crank moves the
+/// market `PumpMigrating → PumpSwap`.
+#[test]
+fn a_real_non_canonical_pool_does_not_graduate_the_market() {
+    let (mut env, pm, q) = setup(PumpCoin::Near);
+    let mut b = env.borrower();
+    open_ok(&mut env, &pm, &mut b, q);
+    env.warp(1);
+    buy_down_to(&mut env, &pm, 0);
+    env.warp(1);
+    venue_changed(
+        &crank(&mut env, &pm),
+        VenueKind::PumpCurve,
+        VenueKind::PumpMigrating,
+    );
+    let seen = market(&env, &pm).migration_seen_at;
+    let (np, _) = pamm::create_third_party_pool(&mut env, &pm.keys.mint, 1, q * 10, 20_000_000_000);
+    assert_eq!(np.state(&env.svm).index, 1);
+    let canonical = pda::canonical_pool(&pm.keys.mint);
+    assert_ne!(np.pool, canonical);
+    assert!(
+        env.svm
+            .get_account(&canonical)
+            .is_none_or(|a| a.data.is_empty())
+    );
+    env.warp(1);
+    no_venue_change(&crank(&mut env, &pm));
+    assert_eq!(venue(&env, &pm), VenueKind::PumpMigrating);
+    // Its bytes at the canonical address.
+    let planted = env.svm.get_account(&np.pool).unwrap();
+    env.svm.set_account(canonical, planted).unwrap();
+    env.warp(1);
+    no_venue_change(&crank(&mut env, &pm));
+    let m = market(&env, &pm);
+    assert_eq!(m.venue_kind(), Some(VenueKind::PumpMigrating));
+    assert!(!m.has_flag(MARKET_FLAG_GRADUATED_ELSEWHERE));
+    assert_eq!(m.migration_seen_at, seen, "the pause is kept");
+    // The control.
+    env.svm
+        .set_account(canonical, solana_account::Account::default())
+        .unwrap();
+    let migrator = env.funded_keypair();
+    let ix = pump::migrate_v2_ix(&env.svm, &migrator.pubkey(), &pm.curve);
+    ok(env.send(&[pump::cu_limit_ix(600_000), ix], &[&migrator]));
+    env.warp(1);
+    venue_changed(
+        &crank(&mut env, &pm),
+        VenueKind::PumpMigrating,
+        VenueKind::PumpSwap,
     );
 }
