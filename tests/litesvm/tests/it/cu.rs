@@ -1,6 +1,7 @@
 //! CU baseline (M1 exit criterion; ARCH §6.1 T-CU starts here). Measured under LiteSVM's
 //! mainnet feature set; the budgets are ARCH §6.1's transaction limits for the admin class
-//! (the table's `flag_venue_upgraded` row is 400 k while the 10 MiB copy is UNVERIFIED, U5).
+//! (the table's `flag_venue_upgraded` row stays 400 k; U5's 10 MiB ProgramData copy is VERIFIED
+//! for CU since M3 — not metered, 6,032 / 8,440 CU — and only its latency and fee are unmeasured).
 //! `cargo test -p shortwin-litesvm-tests cu_baseline -- --nocapture` prints the table.
 
 use shortwin::PauseScope;

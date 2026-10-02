@@ -11,6 +11,8 @@ Raydium AMM v4 and CPMM). When a buyback is impossible, lenders are repaid in SO
 - How it is built: [`docs/design/ARCHITECTURE.md`](docs/design/ARCHITECTURE.md) and
   [`docs/design/ECONOMICS.md`](docs/design/ECONOMICS.md)
 - Toolchain, build and test commands: [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)
+- For auditors: [`docs/AUDIT.md`](docs/AUDIT.md) (scope, threat model, known issues);
+  reporting a vulnerability: [`SECURITY.md`](SECURITY.md)
 
 Status: milestones M0–M9 built (M7's 24-hour fuzz run still pending): the program with every
 venue (pump.fun curve, PumpSwap, Raydium AMM v4 and CPMM), the keeper, the indexer and API, and

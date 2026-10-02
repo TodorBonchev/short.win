@@ -59,7 +59,8 @@ pub const ADMIN_FLAG: Budget = Budget {
     cu: 60_000,
     source: "no §6.1 row; admin flag class (tests/litesvm cu.rs)",
 };
-/// ARCH §6.1 `flag_venue_upgraded` / `revalidate_venue` (UNVERIFIED U5 for a 10 MiB account).
+/// ARCH §6.1 `flag_venue_upgraded` / `revalidate_venue` (U5: the 10 MiB ProgramData copy is not
+/// metered — VERIFIED for CU in M3, 6,032 / 8,440 CU; latency and fee cost unmeasured).
 pub const LATCH: Budget = Budget {
     cu: 400_000,
     source: "§6.1 `flag_venue_upgraded` / `revalidate_venue`",

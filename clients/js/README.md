@@ -12,18 +12,24 @@ instruction names, and `PodU128` / `PodI128` ↔ `bigint`. `idl/shortwin.json` i
 verbatim copy of `target/idl/shortwin.json` from `anchor build`. Both are committed, and CI
 rebuilds and diffs them (the `codama` job in `.github/workflows/ci.yml`).
 
+`idl/complete_curve.json` is the verbatim `target/idl/complete_curve.json` of the stateless
+straddle helper (`programs/complete_curve`, M5; ARCHITECTURE §5.4). Nothing is generated from
+it; it is committed for clients and the audit package (`docs/AUDIT.md`), and the same CI job
+diffs it against the build.
+
 ## Regenerate after a program change
 
 ```sh
-anchor build --tools-version v1.57 --arch v3          # writes target/idl/shortwin.json
+anchor build --tools-version v1.57 --arch v3          # writes target/idl/{shortwin,complete_curve}.json
 pnpm install
-pnpm --filter @shortwin/client idl:sync               # target/idl/shortwin.json -> idl/shortwin.json
+pnpm --filter @shortwin/client idl:sync               # target/idl/*.json -> idl/ (both programs)
 pnpm --filter @shortwin/client generate               # idl/shortwin.json -> src/generated/
 pnpm --filter @shortwin/client check                  # typecheck + tests
 ```
 
 `idl:sync` takes a path argument or `$SHORTWIN_IDL` when the build is not in `target/` (for
-example with `CARGO_TARGET_DIR` set).
+example with `CARGO_TARGET_DIR` set); the helper's IDL is read next to it, or from
+`$COMPLETE_CURVE_IDL`.
 
 ## Pins and generator options
 

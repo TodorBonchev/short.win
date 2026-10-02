@@ -474,6 +474,12 @@ jobs:
             echo "::error::clients/js/idl/shortwin.json is stale: pnpm --filter @shortwin/client idl:sync && pnpm --filter @shortwin/client generate"
             exit 1
           }
+          # The straddle helper's IDL (M5) is committed for clients and the audit package
+          # (docs/AUDIT.md); nothing is generated from it.
+          diff -u clients/js/idl/complete_curve.json target/idl/complete_curve.json || {
+            echo "::error::clients/js/idl/complete_curve.json is stale: pnpm --filter @shortwin/client idl:sync"
+            exit 1
+          }
       - name: Generated client is current
         run: |
           pnpm --filter @shortwin/client generate
