@@ -41,6 +41,10 @@ env:
   CARGO_DENY_VERSION: "0.20.2"
   CARGO_AUDIT_VERSION: "0.22.2"
   PYTHON_VERSION: "3.14"
+  # M10 verifiable build (job verifiable-build, scripts/verifiable-build.sh): solana-verify and the
+  # image its 0.5.2 IMAGE_MAP pins for (4,1,2), Docker Hub solanafoundation/solana-verifiable-build:4.1.2.
+  SOLANA_VERIFY_VERSION: "0.5.2"
+  SVB_IMAGE_DIGEST: "sha256:2e0b78f44ee76612e9260c7c988570c5e14de6fbd93e0ab07115ec7054473b4f"
 
 jobs:
   fmt:
@@ -250,28 +254,8 @@ jobs:
       # `test-venue`) would embed it. The search must find the id in mock_cpamm.so itself.
       - name: Release artifact has no mock venue (A49)
         run: |
-          python3 - <<'PY'
-          import re, sys
-          src = open("tests/mock_cpamm/src/lib.rs").read()
-          pid = re.search(r'declare_id!\("([1-9A-HJ-NP-Za-km-z]{32,44})"\)', src).group(1)
-          alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-          n = 0
-          for c in pid:
-              n = n * 58 + alphabet.index(c)
-          key = n.to_bytes(32, "big")
-          words = [key[i:i + 8] for i in range(0, 32, 8)]
-          def embeds(path):
-              elf = open(path, "rb").read()
-              return (key in elf
-                      or all(w in elf for w in words)
-                      or all(w[:4] + bytes(4) + w[4:] in elf for w in words))
-          if not embeds("target/deploy/mock_cpamm.so"):
-              print("::error::the search does not find the mock id in mock_cpamm.so itself"); sys.exit(1)
-          for so in ("target/deploy/shortwin.so", "target/deploy/complete_curve.so"):
-              if embeds(so):
-                  print(f"::error::{so} embeds the mock venue id {pid} (test-venue build?)"); sys.exit(1)
-          print(f"ok: mock venue id {pid} absent from the release shortwin.so and complete_curve.so")
-          PY
+          python3 scripts/check-a49.py --has-id target/deploy/mock_cpamm.so \
+            --no-id target/deploy/shortwin.so target/deploy/complete_curve.so
           flags=$(od -An -t x4 -j 48 -N 4 target/deploy/mock_cpamm.so | tr -d ' ')
           [ "$flags" = "00000003" ] || { echo "::error::mock_cpamm.so e_flags=$flags, expected SBPF v3"; exit 1; }
       # A49, M2: the test-venue variant (`VenueKind::Mock`) is built by its own script into its
@@ -291,21 +275,7 @@ jobs:
           if cmp -s target/deploy/shortwin.so target/test-venue/deploy/shortwin.so; then
             echo "::error::the release and test-venue builds are identical"; exit 1
           fi
-          python3 - <<'PY'
-          import re, sys
-          src = open("tests/mock_cpamm/src/lib.rs").read()
-          pid = re.search(r'declare_id!\("([1-9A-HJ-NP-Za-km-z]{32,44})"\)', src).group(1)
-          alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-          n = 0
-          for c in pid:
-              n = n * 58 + alphabet.index(c)
-          key = n.to_bytes(32, "big")
-          words = [key[i:i + 8] for i in range(0, 32, 8)]
-          elf = open("target/test-venue/deploy/shortwin.so", "rb").read()
-          if not (key in elf or all(w in elf for w in words) or all(w[:4] + bytes(4) + w[4:] in elf for w in words)):
-              print("::error::the mock id search does not find the id in the test-venue shortwin.so"); sys.exit(1)
-          print("ok: the test-venue build embeds the mock id; the release build does not")
-          PY
+          python3 scripts/check-a49.py --has-id target/test-venue/deploy/shortwin.so
           sha256sum target/deploy/shortwin.so target/test-venue/deploy/shortwin.so
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -323,6 +293,69 @@ jobs:
             target/idl/shortwin.json
             target/idl/complete_curve.json
             target/types/shortwin.ts
+          if-no-files-found: error
+
+  verifiable-build:
+    # M10 verifiable build (ARCH §1.1 "Verifiable build", C1-5; §9 M10): shortwin and complete_curve
+    # built by solana-verify $SOLANA_VERIFY_VERSION in its pinned Agave 4.1.2 image (picked through
+    # [workspace.metadata.cli] solana = "4.1.2"; $SVB_IMAGE_DIGEST), `--arch v3
+    # --cargo-build-sbf-args="--tools-version v1.57"`, by scripts/verifiable-build.sh. Each must be
+    # byte-identical to the anchor-build artifact the tests, CU benches and fuzzers ran against:
+    # the binary we deploy and that verify.osec.io rebuilds is then the tested one. The A49 checks
+    # run on these files too (the deploy artifact). The hashes (file sha256, and solana-verify's
+    # trailing-zero-trimmed executable hash, which `solana-verify get-program-hash` and
+    # verify.osec.io compare with the on-chain ProgramData) go to the job summary and the
+    # `verifiable-build` artifact. Hosts without Docker: `scripts/verifiable-build.sh --local`.
+    if: github.event_name != 'schedule'
+    needs: anchor-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain from rust-toolchain.toml (to install solana-verify)
+        run: rustup toolchain install || rustup show
+      - name: Cache solana-verify ${{ env.SOLANA_VERIFY_VERSION }}
+        id: sv
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/bin/solana-verify
+          key: solana-verify-${{ env.SOLANA_VERIFY_VERSION }}-${{ runner.os }}
+      - name: Install solana-verify ${{ env.SOLANA_VERIFY_VERSION }}
+        if: steps.sv.outputs.cache-hit != 'true'
+        run: cargo install solana-verify --version "=${SOLANA_VERIFY_VERSION}" --locked
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: shortwin-program
+          path: anchor-build
+      - name: Verifiable build of shortwin and complete_curve; byte-equal to the anchor-build artifact
+        env:
+          # On pull_request the checkout is the merge commit; the hashes file names the PR head too.
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: scripts/verifiable-build.sh --out verifiable --compare anchor-build/deploy
+      - name: Only the pinned image was used
+        run: |
+          imgs=$(docker images --digests --format '{{.Repository}}@{{.Digest}}' | grep solana-verifiable-build | sort -u)
+          [ "$imgs" = "solanafoundation/solana-verifiable-build@${SVB_IMAGE_DIGEST}" ] || { echo "::error::images: $imgs"; exit 1; }
+      - name: Verifiable artifacts have no mock venue and no test-venue code path (A49)
+        run: |
+          python3 scripts/check-a49.py \
+            --has-id anchor-build/deploy/mock_cpamm.so --has-marker anchor-build/test-venue/deploy/shortwin.so \
+            --no-id verifiable/shortwin.so verifiable/complete_curve.so \
+            --no-marker verifiable/shortwin.so verifiable/complete_curve.so
+      - name: Job summary
+        if: always()
+        run: |
+          [ -f verifiable/verifiable-hashes.txt ] || exit 0
+          { echo '### Verifiable build'; echo '```'; cat verifiable/verifiable-hashes.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: verifiable-build
+          path: |
+            verifiable/verifiable-hashes.txt
+            verifiable/shortwin.so
+            verifiable/complete_curve.so
+            verifiable/*.build.log
           if-no-files-found: error
 
   program-tests:
@@ -799,27 +832,10 @@ jobs:
         run: |
           cargo build --manifest-path services/Cargo.toml -p shortwin-keeper --release --locked
           cargo test --manifest-path services/Cargo.toml -p shortwin-keeper-litesvm --test scenarios --no-run --locked
-          python3 - <<'PY'
-          import glob, os, re, sys
-          src = open("tests/mock_cpamm/src/lib.rs").read()
-          pid = re.search(r'declare_id!\("([1-9A-HJ-NP-Za-km-z]{32,44})"\)', src).group(1)
-          alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-          n = 0
-          for c in pid:
-              n = n * 58 + alphabet.index(c)
-          key = n.to_bytes(32, "big")
-          words = [key[i:i + 8] for i in range(0, 32, 8)]
-          def embeds(path):
-              elf = open(path, "rb").read()
-              return key in elf or all(w in elf for w in words)
-          tests = [p for p in glob.glob("services/target/debug/deps/scenarios-*")
-                   if os.access(p, os.X_OK) and not p.endswith(".d")]
-          if not tests or not embeds(max(tests, key=os.path.getmtime)):
-              print("::error::the search does not find the mock id in the keeper's scenario binary"); sys.exit(1)
-          if embeds("services/target/release/shortwin-keeper"):
-              print(f"::error::the release keeper embeds the mock venue id {pid} (test-venue enabled?)"); sys.exit(1)
-          print(f"ok: mock venue id {pid} absent from the release keeper")
-          PY
+          scenarios=$(find services/target/debug/deps -maxdepth 1 -name 'scenarios-*' ! -name '*.d' -perm -u+x \
+            -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-)
+          [ -n "$scenarios" ] || { echo "::error::no keeper scenario test binary"; exit 1; }
+          python3 scripts/check-a49.py --has-id "$scenarios" --no-id services/target/release/shortwin-keeper
 
   indexer:
     # M8, the indexer and API (services/indexer, services/indexer-litesvm; ARCH §7.2, §9 M8;
