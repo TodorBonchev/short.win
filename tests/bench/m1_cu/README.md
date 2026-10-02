@@ -8,8 +8,9 @@ source of each. T-CU starts from this bench and becomes a gate in M3–M7.
 
 The pre-state of each case is built by the LiteSVM harness (`tests/litesvm`, `Env`). That
 harness uses the real program from `target/deploy/shortwin.so`, the SPL Token (p-token under the
-mainnet feature set), Token-2022 and ATA ELFs that LiteSVM bundles, and a clock under test
-control. The bench then:
+mainnet feature set) and ATA ELFs that LiteSVM bundles, mainnet's Token-2022 and spl-memo v3
+(since M10, `fork::load_mainnet_spl`; `SHORTWIN_BUNDLED_SPL=1` keeps LiteSVM's), and a clock
+under test control. The bench then:
 
 1. copies every account the instruction names into a fresh Mollusk, loads the same ELFs into
    its program cache, and copies LiteSVM's clock and rent;

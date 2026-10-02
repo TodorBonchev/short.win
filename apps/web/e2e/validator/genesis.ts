@@ -80,6 +80,9 @@ interface ManifestEntry {
     readonly absent?: boolean;
     readonly synthetic?: boolean;
     readonly decoded?: Readonly<Record<string, unknown>>;
+    /** The pins of the M10 groups (scripts/dump-fixtures.py). */
+    readonly sha256_expected?: string;
+    readonly elf_trimmed_sha256_expected?: string;
 }
 
 function manifest(): { accounts: ManifestEntry[] } {
@@ -97,7 +100,7 @@ export function fixtureAddress(name: string): Address {
  * Groups deployed as programs (or not deployed at all), never loaded as accounts. The M10 groups
  * (scripts/dump-fixtures.py `M10_PROGRAM_GROUPS`: the CPMM redeploy, the mainnet SPL programs,
  * Squads v4) hold program accounts at genesis-program or venue addresses; a validator that runs
- * them deploys them itself.
+ * them deploys them itself (the SPL programs: splPrograms()).
  */
 const PROGRAM_GROUPS = new Set([
     'raydium_programs',
@@ -128,6 +131,37 @@ export function venuePrograms(): [string, string, string][] {
         out.push([p.address, join(PATHS.fixtures, elf), auth]);
     }
     return out;
+}
+
+/**
+ * The mainnet SPL programs (group `spl_programs`, M10 T-MEMO): Token-2022 for `--upgradeable-program`
+ * (`[program id, ELF path, upgrade authority]`) with its pinned trimmed-ELF sha256, and spl-memo v3's
+ * pinned account sha256. spl-memo v3 needs no override: solana-test-validator 4.1.2's built-in at
+ * `MemoSq4g…` is already mainnet's account (BPFLoader2, the same 74,800 bytes; `checkSplPrograms`
+ * holds it to the pin). Its built-in Token-2022 is not mainnet's build.
+ */
+export function splPrograms(): {
+    token2022: [string, string, string];
+    token2022TrimmedSha256: string;
+    memoSha256: string;
+} {
+    const byName = new Map(manifest().accounts.map((a) => [a.name, a]));
+    const p = byName.get('token_2022_program');
+    const d = byName.get('token_2022_program_data');
+    const memo = byName.get('spl_memo_v3_program');
+    const elf = d?.files?.elf;
+    const auth = d?.decoded?.upgrade_authority;
+    const trimmed = d?.elf_trimmed_sha256_expected;
+    if (!p || !elf || typeof auth !== 'string' || !trimmed || !memo?.sha256_expected) {
+        throw new Error(
+            'fixture manifest lacks the spl_programs group (scripts/dump-fixtures.py fetch --group spl_programs)',
+        );
+    }
+    return {
+        token2022: [p.address, join(PATHS.fixtures, elf), auth],
+        token2022TrimmedSha256: trimmed,
+        memoSha256: memo.sha256_expected,
+    };
 }
 
 /** The dumped venue state accounts (deduplicated by address; synthetic, absent and sysvars skipped). */

@@ -50,6 +50,13 @@
 //! creator, per-coin fee), `Global.creator_fee_configurable` and a `FeeConfig`'s tiers. Accounts
 //! the dump found absent (the event authorities, a closed boost vault, a creator vault that never
 //! existed) are simply not loaded ([`is_absent`]).
+//!
+//! **The mainnet SPL programs (M10, T-MEMO; at the end of the file).** Group `spl_programs`:
+//! [`load_mainnet_spl`] replaces LiteSVM's bundled Token-2022 and spl-memo v3 with the builds
+//! mainnet runs — Token-2022 from its dumped ProgramData (real header, the ELF, the zero
+//! padding; trimmed ELF [`TOKEN_2022_MAINNET_TRIMMED_SHA256`]) under the upgradeable loader,
+//! spl-memo v3 under BPFLoader2 ([`SPL_MEMO_V3_MAINNET_SHA256`]). Every [`Env`] calls it right
+//! after `LiteSVM::new()`, unless `SHORTWIN_BUNDLED_SPL=1` ([`bundled_spl`]).
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -113,7 +120,7 @@ pub const PAMM_GROUPS: [&str; 2] = ["pamm_state", "pamm_synthetic"];
 pub struct Fixture {
     /// The manifest name (e.g. `ray_v4_fartcoin_pool`).
     pub name: String,
-    /// One of [`RAYDIUM_GROUPS`] or [`PUMP_GROUPS`].
+    /// One of [`RAYDIUM_GROUPS`], [`PUMP_GROUPS`], [`PAMM_GROUPS`] or [`SPL_GROUPS`].
     pub group: String,
     pub address: Pubkey,
     /// The mainnet slot the account was read at.
@@ -155,13 +162,25 @@ fn read_fixture_file(rel: &str) -> Vec<u8> {
     std::fs::read(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()))
 }
 
-/// Loads the entries of `groups` and the snapshot of `state_group`, rebuilding and
-/// sha256-checking every account.
-fn load_fixtures(groups: &[&str], state_group: &str) -> Fixtures {
+/// The entries of `groups`: by name, name by address, and the addresses the dump recorded as
+/// absent.
+type Entries = (
+    HashMap<String, Fixture>,
+    HashMap<Pubkey, String>,
+    std::collections::HashSet<Pubkey>,
+);
+
+/// `tests/fixtures/manifest.json`, parsed.
+fn manifest() -> serde_json::Value {
     let path = fixtures_dir().join("manifest.json");
     let text =
         std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    let m: serde_json::Value = serde_json::from_str(&text).expect("manifest.json");
+    serde_json::from_str(&text).expect("manifest.json")
+}
+
+/// Rebuilds and sha256-checks every account of `groups` in manifest `m` (ProgramData: header ‖
+/// ELF ‖ zeros up to `space`).
+fn load_entries(m: &serde_json::Value, groups: &[&str]) -> Entries {
     let str_of = |e: &serde_json::Value, k: &str| -> String {
         e[k].as_str()
             .unwrap_or_else(|| panic!("manifest entry {}: no `{k}`", e["name"]))
@@ -225,6 +244,14 @@ fn load_fixtures(groups: &[&str], state_group: &str) -> Fixtures {
         by_address.insert(address, name.clone());
         by_name.insert(name, fixture);
     }
+    (by_name, by_address, absent)
+}
+
+/// Loads the entries of `groups` and the snapshot of `state_group`, rebuilding and
+/// sha256-checking every account.
+fn load_fixtures(groups: &[&str], state_group: &str) -> Fixtures {
+    let m = manifest();
+    let (by_name, by_address, absent) = load_entries(&m, groups);
     let snap = m["snapshots"]
         .as_array()
         .expect("snapshots")
@@ -2758,6 +2785,97 @@ pub fn pump_trade_events(meta: &TransactionMetadata) -> Vec<PumpTradeEvent> {
             }
         })
         .collect()
+}
+
+// ---- the mainnet SPL programs (M10, T-MEMO) ---------------------------------------------------
+
+/// The manifest group of the mainnet SPL programs (M10): Token-2022 as deployed (upgradeable;
+/// its ProgramData at deploy slot 427,147,035 with the live upgrade authority, `header ‖ ELF ‖
+/// zeros` up to 1,382,061 bytes) and spl-memo v3 (BPFLoader2: the account data is the ELF).
+pub const SPL_GROUPS: [&str; 1] = ["spl_programs"];
+
+/// The deployed Token-2022's executable hash: sha256 of its ProgramData after the 45-byte
+/// header with the trailing zeros trimmed (solana-verify's hash). It equals OtterSec's verified
+/// build of `solana-program/token-2022@9bc02757` (program v11.0.0).
+pub const TOKEN_2022_MAINNET_TRIMMED_SHA256: &str =
+    "7ea94a027005b39196fa08e6d0ddcd55ec32eb43266179921a834a1ba2eb1947";
+
+/// sha256 of the deployed spl-memo v3 program account (74,800 bytes; its data is the ELF).
+pub const SPL_MEMO_V3_MAINNET_SHA256: &str =
+    "f520eaf096361abbb9639ea4dc3e5388a87b9330e121f476607b87c46ef67954";
+
+/// The opt-out: `SHORTWIN_BUNDLED_SPL=1` keeps LiteSVM's bundled Token-2022 and spl-memo v3
+/// builds in every [`Env`] instead of [`load_mainnet_spl`]'s.
+pub const BUNDLED_SPL_ENV: &str = "SHORTWIN_BUNDLED_SPL";
+
+/// Whether [`BUNDLED_SPL_ENV`] is `1` (the environments keep LiteSVM's bundled SPL builds).
+pub fn bundled_spl() -> bool {
+    std::env::var_os(BUNDLED_SPL_ENV).is_some_and(|v| v == "1")
+}
+
+/// sha256 (lowercase hex) of an upgradeable program's ELF as solana-verify hashes it: the
+/// ProgramData after its 45-byte header, trailing zero bytes trimmed.
+pub fn trimmed_elf_sha256(program_data: &[u8]) -> String {
+    let elf = program_data.get(45..).unwrap_or_default();
+    let end = elf.iter().rposition(|&b| b != 0).map_or(0, |i| i + 1);
+    sha256_hex(&elf[..end])
+}
+
+/// The mainnet SPL fixtures, rebuilt and sha256-checked against the manifest once per process,
+/// and held to the pins above.
+fn spl_fixtures() -> &'static HashMap<String, Fixture> {
+    static F: OnceLock<HashMap<String, Fixture>> = OnceLock::new();
+    F.get_or_init(|| {
+        let (by_name, _, absent) = load_entries(&manifest(), &SPL_GROUPS);
+        assert!(absent.is_empty(), "spl_programs: absent entries {absent:?}");
+        let pd = by_name.get("token_2022_program_data").expect(
+            "no token_2022_program_data (scripts/dump-fixtures.py fetch --group spl_programs)",
+        );
+        assert_eq!(
+            trimmed_elf_sha256(&pd.account.data),
+            TOKEN_2022_MAINNET_TRIMMED_SHA256,
+            "token_2022_program_data: not the pinned mainnet Token-2022"
+        );
+        let memo = by_name
+            .get("spl_memo_v3_program")
+            .expect("no spl_memo_v3_program");
+        assert_eq!(
+            sha256_hex(&memo.account.data),
+            SPL_MEMO_V3_MAINNET_SHA256,
+            "spl_memo_v3_program: not the pinned mainnet spl-memo v3"
+        );
+        by_name
+    })
+}
+
+/// The mainnet SPL fixture `name` (group `spl_programs`).
+pub fn spl_fixture(name: &str) -> &'static Fixture {
+    spl_fixtures()
+        .get(name)
+        .unwrap_or_else(|| panic!("no fixture `{name}` in group spl_programs"))
+}
+
+/// Replaces LiteSVM's bundled Token-2022 and spl-memo v3 with the programs mainnet runs
+/// (T-MEMO, U17), exactly as mainnet holds their accounts: Token-2022 under the upgradeable
+/// loader from its dumped ProgramData (real header: deploy slot 427,147,035 and the live
+/// upgrade authority; the ELF; the zero padding), and spl-memo v3 under BPFLoader2. Each
+/// account is checked against the manifest's sha256 and the pins
+/// ([`TOKEN_2022_MAINNET_TRIMMED_SHA256`], [`SPL_MEMO_V3_MAINNET_SHA256`]).
+///
+/// [`Env`]'s constructors call it right after `LiteSVM::new()` unless [`bundled_spl`]. SPL
+/// Token (p-token under the mainnet feature set), the ATA program and spl-memo v1 stay
+/// LiteSVM's.
+pub fn load_mainnet_spl(svm: &mut LiteSVM) {
+    // The ProgramData first: setting the program account compiles the ELF it names.
+    for name in [
+        "token_2022_program_data",
+        "token_2022_program",
+        "spl_memo_v3_program",
+    ] {
+        let f = spl_fixture(name);
+        svm.set_account(f.address, f.account.clone())
+            .unwrap_or_else(|e| panic!("set_account({name}): {e:?}"));
+    }
 }
 
 #[cfg(test)]

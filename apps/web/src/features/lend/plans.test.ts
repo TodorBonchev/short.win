@@ -202,7 +202,7 @@ describe('withdraw plans', () => {
         vesting: 0n,
     };
 
-    it('encode shares, min_tokens and min_sol; "none" memo program for a plain destination', async () => {
+    it('encode shares, min_tokens and min_sol; spl-memo for a plain Token-2022 destination, unannounced', async () => {
         const plan = await buildWithdrawPlan(base);
         expect(kinds(plan.instructions)).toEqual(['Withdraw']);
         const ix = plan.instructions[0];
@@ -212,10 +212,12 @@ describe('withdraw plans', () => {
             minSol: 12_345n,
         });
         // [owner, config, market, vault, lender, mint, destination, pool vault, token program, system, memo, event authority, program]
-        expect(ix?.accounts?.[10]?.address).toBe(SHORTWIN_PROGRAM);
+        // TMEMO-9: spl-memo for every Token-2022 destination (CPI'd only if it requires memos then).
+        expect(ix?.accounts?.[10]?.address).toBe(MEMO_PROGRAM);
         expect(ix?.accounts?.[6]).toMatchObject({ address: SOURCE, role: AccountRole.WRITABLE });
         expect(ix?.accounts?.[8]?.address).toBe(TOKEN_2022_PROGRAM);
         expect(plan.disclosures).toEqual([]);
+        expect(plan.title).not.toContain('with memo');
         expect(plan.watch.map((w) => w.address)).toEqual([OWNER, SOURCE, LENDER, VAULT]);
     });
 
@@ -224,6 +226,12 @@ describe('withdraw plans', () => {
         expect(plan.instructions[0]?.accounts?.[10]?.address).toBe(MEMO_PROGRAM);
         expect(plan.disclosures).toEqual(['token.memoRequired']);
         expect(plan.title).toContain('with memo');
+    });
+
+    it('pass the "none" memo program for an SPL Token destination', async () => {
+        const plan = await buildWithdrawPlan({ ...base, tokenProgram: TOKEN_PROGRAM });
+        expect(plan.instructions[0]?.accounts?.[10]?.address).toBe(SHORTWIN_PROGRAM);
+        expect(plan.disclosures).toEqual([]);
     });
 
     it('create a missing ATA destination idempotently under the market’s token program first', async () => {

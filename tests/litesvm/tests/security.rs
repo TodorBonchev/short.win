@@ -11,20 +11,23 @@
 
 use anchor_lang::error::ErrorCode as AnchorErrorCode;
 use anchor_lang::prelude::Pubkey;
+use anchor_lang::solana_program::bpf_loader_upgradeable;
 use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
 use anchor_lang::{Discriminator, InstructionData};
 use shortwin::PauseScope;
 use shortwin::constants::{
-    CONFIG_APPLY_WINDOW_S, DEFAULT_TIMELOCK_S, MAX_TIMELOCK_S, PYTH_RECEIVER_ID,
+    CONFIG_APPLY_WINDOW_S, DEFAULT_TIMELOCK_S, MAX_TIMELOCK_S, MEMO_PROGRAM_ID, PYTH_RECEIVER_ID,
     PYTH_SOL_USD_ACCOUNT, PYTH_SOL_USD_FEED_ID, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID,
 };
 use shortwin::errors::ShortwinError;
 use shortwin::state::{ConfigChange, Params, TierParams};
-use shortwin_litesvm_tests::errors::{assert_anchor_err, assert_err, assert_failed, ok};
+use shortwin_litesvm_tests::errors::{
+    assert_anchor_err, assert_err, assert_failed, custom_code, ok,
+};
 use shortwin_litesvm_tests::fixtures::MarketKeys;
 use shortwin_litesvm_tests::ix::{self, LenderKeys};
 use shortwin_litesvm_tests::tokens::{self, Holder, TokenProgram};
-use shortwin_litesvm_tests::{Env, TxResult, events, pda, read};
+use shortwin_litesvm_tests::{Env, TxResult, events, fork, pda, read};
 use shortwin_venue_state::pyth::{self, PriceUpdate};
 use solana_account::Account;
 use solana_keypair::Keypair;
@@ -461,14 +464,91 @@ fn memo_account(env: &mut Env, mint: &Pubkey, owner: &Keypair) -> Pubkey {
     acct.pubkey()
 }
 
+/// The environment runs mainnet's Token-2022 (trimmed ELF `7ea94a02…`, the verified build of
+/// `solana-program/token-2022@9bc02757`, from its real ProgramData) and spl-memo v3 (BPFLoader2,
+/// `f520eaf0…`), not LiteSVM's bundled builds (M10 T-MEMO). Pinned here independently of the
+/// harness's own check. Skipped (with a note) under `SHORTWIN_BUNDLED_SPL=1`.
+fn assert_mainnet_spl(env: &Env) {
+    if fork::bundled_spl() {
+        eprintln!("[t-memo] SHORTWIN_BUNDLED_SPL=1: LiteSVM's bundled Token-2022 / spl-memo v3");
+        return;
+    }
+    let program = env.svm.get_account(&TOKEN_2022_PROGRAM_ID).unwrap();
+    assert_eq!(program.owner, bpf_loader_upgradeable::ID);
+    let pd_key = Pubkey::find_program_address(
+        &[TOKEN_2022_PROGRAM_ID.as_ref()],
+        &bpf_loader_upgradeable::ID,
+    )
+    .0;
+    assert_eq!(
+        pd_key.to_string(),
+        "DoU57AYuPFu2QU514RktNPG22QhApEjnKxnBcu4BHDTY"
+    );
+    let pd = env.svm.get_account(&pd_key).unwrap();
+    assert_eq!(pd.data.len(), 1_382_061, "the mainnet ProgramData's space");
+    assert_eq!(&pd.data[..4], &3u32.to_le_bytes(), "ProgramData tag");
+    assert_eq!(
+        u64::from_le_bytes(pd.data[4..12].try_into().unwrap()),
+        427_147_035,
+        "deploy slot"
+    );
+    assert_eq!(pd.data[12], 1, "an upgrade authority");
+    assert_eq!(
+        Pubkey::new_from_array(pd.data[13..45].try_into().unwrap()).to_string(),
+        "AeLmXCbPaQHGWRLr2saFsEVfmMNuKnxRAbWCT9P5twgz"
+    );
+    assert_eq!(
+        fork::trimmed_elf_sha256(&pd.data),
+        "7ea94a027005b39196fa08e6d0ddcd55ec32eb43266179921a834a1ba2eb1947",
+        "Token-2022: not the mainnet build"
+    );
+    let memo = env.svm.get_account(&MEMO_PROGRAM_ID).unwrap();
+    assert_eq!(
+        memo.owner.to_string(),
+        "BPFLoader2111111111111111111111111111111111"
+    );
+    assert!(memo.executable);
+    assert_eq!(
+        fork::sha256_hex(&memo.data),
+        "f520eaf096361abbb9639ea4dc3e5388a87b9330e121f476607b87c46ef67954",
+        "spl-memo v3: not the mainnet build"
+    );
+}
+
+/// The `consumed` CU of each invocation of `program` at stack height `depth` in `logs`, in order.
+fn consumed_at(logs: &[String], program: &Pubkey, depth: usize) -> Vec<u64> {
+    let invoke = format!("Program {program} invoke [{depth}]");
+    let consumed = format!("Program {program} consumed ");
+    // One entry per open invocation: is it `program` at `depth`?
+    let mut frames: Vec<bool> = Vec::new();
+    let mut out = Vec::new();
+    for l in logs {
+        if let Some(rest) = l.strip_prefix(&consumed) {
+            if frames.last() == Some(&true) {
+                out.push(rest.split(' ').next().unwrap().parse().unwrap());
+            }
+        } else if l.starts_with("Program ") && l.contains(" invoke [") {
+            frames.push(*l == invoke);
+        } else if l.starts_with("Program ") && (l.ends_with(" success") || l.contains(" failed")) {
+            frames.pop();
+        }
+    }
+    out
+}
+
 /// Without the memo program the withdrawal names the problem (`MemoProgramRequired`); with it
-/// the program CPIs the memo right before `transfer_checked`, and Token-2022 (the v11 ELF
-/// LiteSVM ships) accepts the CPI'd memo as the transfer's previous sibling (T-MEMO's question,
-/// U17, still to be confirmed on mainnet in M10). A plain destination needs no memo program,
-/// and a zero-token withdrawal moves nothing, so it needs none either.
+/// the program CPIs the memo right before `transfer_checked`, and Token-2022 accepts the CPI'd
+/// memo as the transfer's previous sibling (T-MEMO, U17). Since M10 this runs on the programs
+/// mainnet runs ([`assert_mainnet_spl`]): the logs show spl-memo v3's `invoke [2]` before
+/// Token-2022's `invoke [2]`, the memo at 7,928 CU (asserted above 5,000), `transfer_checked` at
+/// exactly 2,487 and the whole withdrawal at about 42,700 CU (printed; it varies by a few tens of
+/// CU with the random keys). On LiteSVM's bundled builds (`SHORTWIN_BUNDLED_SPL=1`, the CU
+/// assertions skipped) the same figures are 287, 2,470 and about 35,000. A plain destination
+/// needs no memo program, and a zero-token withdrawal moves nothing, so it needs none either.
 #[test]
 fn sec_7_memo_required_destination_is_served() {
     let mut env = Env::initialized();
+    assert_mainnet_spl(&env);
     let (l, h) = market_with_holder(&mut env, TokenProgram::Token2022, 1_000_000);
     let owner = h.owner.insecure_clone();
     let lk = lender_keys(&l.k, &h);
@@ -494,6 +574,36 @@ fn sec_7_memo_required_destination_is_served() {
     let logs = meta.logs.join("\n");
     assert!(logs.contains("short.win withdraw"), "{logs}");
     assert_eq!(events::raw(&meta).len(), 1, "one event CPI");
+    // The memo CPI, then the transfer CPI, both at stack height 2 (siblings).
+    let at = |p: &str| {
+        meta.logs
+            .iter()
+            .position(|l| l == &format!("Program {p} invoke [2]"))
+    };
+    let memo_at = at(&MEMO_PROGRAM_ID.to_string()).expect("memo invoke [2]");
+    let xfer_at = at(&TOKEN_2022_PROGRAM_ID.to_string()).expect("Token-2022 invoke [2]");
+    assert!(memo_at < xfer_at, "{logs}");
+    let memo_cu = consumed_at(&meta.logs, &MEMO_PROGRAM_ID, 2);
+    let xfer_cu = consumed_at(&meta.logs, &TOKEN_2022_PROGRAM_ID, 2);
+    eprintln!(
+        "[t-memo] memo-required withdraw: {} CU in all; spl-memo v3 {memo_cu:?} CU, Token-2022 \
+         transfer_checked {xfer_cu:?} CU",
+        meta.compute_units_consumed
+    );
+    if !fork::bundled_spl() {
+        // What the VM executes, not just the account bytes `assert_mainnet_spl` hashes (a program
+        // cache that kept the bundled ELF would pass that check). Mainnet's spl-memo v3 is a
+        // 74,800-byte ELF; LiteSVM bundles spl-memo 4.0.0 (2,304 bytes, a few hundred CU) at the
+        // same address. Mainnet's Token-2022 spends 2,487 CU on this `transfer_checked`, LiteSVM's
+        // bundled v11 build 2,470.
+        assert_eq!(memo_cu.len(), 1);
+        assert!(memo_cu[0] > 5_000, "{memo_cu:?}");
+        assert_eq!(
+            xfer_cu,
+            [2_487],
+            "Token-2022 transfer_checked CU: not mainnet's ELF?"
+        );
+    }
 
     // A plain destination works without the memo program (and with it, the memo is skipped).
     let rest = env.lender(&l.k.market, &owner.pubkey()).unwrap().shares;
@@ -510,10 +620,69 @@ fn sec_7_memo_required_destination_is_served() {
     let slot = bad
         .accounts
         .iter()
-        .position(|m| m.pubkey == shortwin::constants::MEMO_PROGRAM_ID)
+        .position(|m| m.pubkey == MEMO_PROGRAM_ID)
         .unwrap();
     bad.accounts[slot].pubkey = TOKEN_PROGRAM_ID;
     assert_err(&env.send(&[bad], &[&o2]), ShortwinError::AccountMismatch);
+    let _ = l.authority;
+}
+
+/// T-MEMO control (M10, TMEMO-3): Token-2022's sibling check is live in the mainnet ELF the
+/// environment runs, so sec_7 passing means the CPI'd memo satisfies it (not that the check is
+/// missing). A top-level `transfer_checked` into a memo-required account fails `NoMemo` (36)
+/// alone, passes right after a memo (spl-memo v3 or v1), and fails again when another
+/// instruction sits between the memo and the transfer.
+#[test]
+fn t_memo_control_top_level_sibling_check() {
+    use spl_token_2022_interface as t22;
+    let mut env = Env::initialized();
+    assert_mainnet_spl(&env);
+    let (l, h) = market_with_holder(&mut env, TokenProgram::Token2022, 1_000_000);
+    let owner = h.owner.insecure_clone();
+    let dest = memo_account(&mut env, &l.k.mint, &owner);
+    let xfer = |amount: u64| {
+        t22::instruction::transfer_checked(
+            &TOKEN_2022_PROGRAM_ID,
+            &h.token_account,
+            &l.k.mint,
+            &dest,
+            &owner.pubkey(),
+            &[],
+            amount,
+            6,
+        )
+        .unwrap()
+    };
+    let memo = |program: Pubkey, text: &[u8]| Instruction {
+        program_id: program,
+        accounts: vec![],
+        data: text.to_vec(),
+    };
+    let v1: Pubkey = "Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo"
+        .parse()
+        .unwrap();
+
+    let res = env.send(&[xfer(1)], &[&owner]);
+    assert_eq!(custom_code(&res), Some(36), "no memo: NoMemo");
+    let meta = ok(env.send(&[memo(MEMO_PROGRAM_ID, b"t-memo v3"), xfer(2)], &[&owner]));
+    let memo_cu = consumed_at(&meta.logs, &MEMO_PROGRAM_ID, 1);
+    eprintln!("[t-memo] top-level spl-memo v3: {memo_cu:?} CU");
+    ok(env.send(&[memo(v1, b"t-memo v1"), xfer(3)], &[&owner]));
+    let gap = anchor_lang::solana_program::system_instruction::transfer(
+        &env.payer.pubkey(),
+        &owner.pubkey(),
+        1,
+    );
+    let res = env.send(
+        &[memo(MEMO_PROGRAM_ID, b"t-memo gap"), gap, xfer(4)],
+        &[&owner],
+    );
+    assert_eq!(
+        custom_code(&res),
+        Some(36),
+        "memo not the previous sibling: NoMemo"
+    );
+    assert_eq!(read::token_amount(&env.svm, &dest).unwrap(), 5);
     let _ = l.authority;
 }
 

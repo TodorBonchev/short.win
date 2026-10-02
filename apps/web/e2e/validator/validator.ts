@@ -3,13 +3,18 @@
  * dedicated ports, short.win's test-venue build as an upgradeable program whose upgrade authority
  * is the generated `authority` key (`initialize_config` requires its signature), the mock venue and
  * `complete_curve`, the dumped venue programs (pump, pump-fees, PumpSwap, Raydium AMM v4 / CPMM)
- * with their mainnet upgrade authorities, and the genesis accounts of `genesis.ts`. Token,
- * Token-2022, the ATA program and spl-memo are the validator's built-ins.
+ * with their mainnet upgrade authorities, and the genesis accounts of `genesis.ts`. Token-2022 is
+ * mainnet's build (M10 T-MEMO; `splPrograms()`: the dumped ELF as an upgradeable program with its
+ * mainnet upgrade authority), replacing the validator's built-in; `SHORTWIN_BUNDLED_SPL=1` keeps the
+ * built-in. spl-memo v3 is the built-in, which in solana-test-validator 4.1.2 is already mainnet's
+ * BPFLoader2 account byte for byte; `checkSplPrograms()` holds both to their mainnet pins. SPL Token
+ * and the ATA program are the built-ins.
  */
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { ENV, PATHS, PORTS, programPaths, validatorBinary } from '../env.ts';
-import { getAccount, PROGRAMS, rpc } from './chain.ts';
-import { venuePrograms, writeGenesis } from './genesis.ts';
+import { getAccount, PROGRAMS, programDataOf, rpc } from './chain.ts';
+import { splPrograms, venuePrograms, writeGenesis } from './genesis.ts';
 import { loadSecretKey, publicKeyOf } from './keys.ts';
 import { isAlive, readRuntime, spawnLogged, stopPid, updateRuntime, waitFor } from './process.ts';
 
@@ -73,6 +78,8 @@ export async function startValidator(): Promise<void> {
         PATHS.accounts,
     ];
     if (ENV.program === 'test-venue') args.push('--bpf-program', PROGRAMS.mock, progs.mock);
+    // A program given on the command line replaces the genesis SPL program at its address.
+    if (!ENV.bundledSpl) args.push('--upgradeable-program', ...splPrograms().token2022);
     if (ENV.venues) {
         for (const [id, elf, auth] of venuePrograms()) args.push('--upgradeable-program', id, elf, auth);
     }
@@ -91,6 +98,43 @@ export async function startValidator(): Promise<void> {
             return validatorHealthy();
         },
         120_000,
+    );
+    await checkSplPrograms();
+}
+
+/** BPFLoader2: spl-memo v3's loader on mainnet. */
+const BPF_LOADER_2 = 'BPFLoader2111111111111111111111111111111111';
+
+function sha256Hex(data: Uint8Array): string {
+    return createHash('sha256').update(data).digest('hex');
+}
+
+/**
+ * Holds the running validator's Token-2022 and spl-memo v3 to the mainnet pins (M10 T-MEMO): the
+ * Token-2022 ProgramData after its 45-byte header, trailing zeros trimmed (solana-verify's hash), and
+ * the spl-memo v3 account (BPFLoader2, data = ELF; the built-in, a guard against a validator whose
+ * built-in differs). A no-op under `SHORTWIN_BUNDLED_SPL=1`.
+ */
+export async function checkSplPrograms(): Promise<void> {
+    if (ENV.bundledSpl) {
+        console.log("[e2e] SHORTWIN_BUNDLED_SPL=1: the validator's built-in Token-2022 and spl-memo v3");
+        return;
+    }
+    const spl = splPrograms();
+    const pd = await getAccount(await programDataOf(PROGRAMS.token2022));
+    const elf = pd?.data.subarray(45) ?? new Uint8Array();
+    let end = elf.length;
+    while (end > 0 && elf[end - 1] === 0) end--;
+    const t22 = sha256Hex(elf.subarray(0, end));
+    const memo = await getAccount(PROGRAMS.memo);
+    const memoSha = memo ? sha256Hex(memo.data) : 'missing';
+    if (t22 !== spl.token2022TrimmedSha256 || memoSha !== spl.memoSha256 || memo?.owner !== BPF_LOADER_2) {
+        throw new Error(
+            `the E2E validator does not run the mainnet SPL programs: Token-2022 ProgramData trimmed sha256 ${t22} (want ${spl.token2022TrimmedSha256}), spl-memo v3 ${memoSha} owner ${memo?.owner} (want ${spl.memoSha256} under ${BPF_LOADER_2}); restart it without SHORTWIN_E2E_REUSE`,
+        );
+    }
+    console.log(
+        `[e2e] mainnet SPL programs: Token-2022 ProgramData trimmed sha256 ${t22}, spl-memo v3 ${memoSha} (${BPF_LOADER_2})`,
     );
 }
 

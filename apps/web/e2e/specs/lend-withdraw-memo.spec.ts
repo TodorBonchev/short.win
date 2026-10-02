@@ -1,6 +1,7 @@
 /**
  * lend-withdraw-memo — the M9 exit's memo UX tests (FRONTEND.md §10.3; ARCH §3.3 M1-SEC-7; T-MEMO
- * on the local validator's Token-2022). NEEDS the LEND track's withdraw tab: `@lend`.
+ * on mainnet's Token-2022 and spl-memo v3, which the E2E validator runs since M10). NEEDS the LEND
+ * track's withdraw tab: `@lend`.
  *
  * Wallets `memo` and `memoRace` each lent into the list-only Token-2022 market `t22` (seed) and own
  * a Token-2022 ATA with the MemoTransfer extension: required (`memo`) or not (`memoRace`). The
@@ -9,9 +10,11 @@
  * 1. Withdrawing to the memo-required ATA shows `withdraw-memo-notice`; the transaction passes
  *    `memo_program` (spl-memo v3, CPI'd right before the token transfer) and lands; the ATA's
  *    balance rises by the previewed tokens.
- * 2. Race: memos become required (from Node) after the review simulated; Refresh fails with
- *    `MemoProgramRequired` (`data-code="6095"`); Retry rebuilds the withdrawal from a fresh read
- *    (M9-UX-1) with `memo_program`, and it lands with the memo; re-entry shows the notice.
+ * 2. Race: memos become required (from Node) after the review simulated. Every Token-2022
+ *    withdrawal passes `memo_program` (TMEMO-9; the program CPIs it only when the destination
+ *    requires memos), so Refresh still simulates, and the withdrawal lands with the memo CPI'd;
+ *    re-entry shows the notice. (Before M10 the plan passed it only for a destination read as
+ *    memo-required: Refresh failed with `MemoProgramRequired` 6095 and Retry rebuilt the plan.)
  */
 
 import type { Address } from '@solana/kit';
@@ -81,7 +84,7 @@ test.describe('lend: withdraw to a memo-required account (§10.3)', { tag: '@len
     test.describe('race', () => {
         test.use({ wallet: 'memoRace' });
 
-        test('memos required before Sign → MemoProgramRequired (6095); Retry rebuilds with the memo and lands', async ({
+        test('memos required before Sign: the plan already passes memo_program, Refresh simulates, it lands with the memo', async ({
             app,
             state,
         }) => {
@@ -96,22 +99,11 @@ test.describe('lend: withdraw to a memo-required account (§10.3)', { tag: '@len
                 await panel.getByTestId(T.withdrawSubmit).click();
                 expect(await app.simulated()).toBe('review');
 
+                // TMEMO-9: memos become required after the review; the plan already names spl-memo, so
+                // Refresh re-simulates the same plan and it still passes.
                 await setRequireMemos('memoRace', ata, true);
                 await app.inModal(T.txRetry).click();
-                expect(await app.simulated()).toBe('failed');
-                const err = app.inModal(T.txError);
-                await expect(err).toHaveAttribute('data-kind', 'program');
-                await expect(err).toHaveAttribute('data-code', '6095');
-                await expect(app.inModal(T.txSign)).toBeDisabled();
-                expect(await app.walletSigned()).toEqual([]);
-
-                // M9-UX-1: Retry rebuilds the withdrawal from a fresh read — the destination now
-                // requires memos, so the new plan passes `memo_program` (and says so).
-                await expect(app.inModal(T.txRetry)).toHaveAttribute('data-mode', 'rebuild');
-                await app.inModal(T.txRetry).click();
                 expect(await app.simulated()).toBe('review');
-                await expect(app.inModal(T.txRebuilt)).toBeVisible();
-                await expect(app.inModal(T.disclosure('token.memoRequired'))).toBeVisible();
                 expect(await app.delta(ata, 'amount')).toBe(tokens);
                 const before = need(await getTokenAmount(ata), 'ATA balance');
                 const signature = await app.signAndConfirm();

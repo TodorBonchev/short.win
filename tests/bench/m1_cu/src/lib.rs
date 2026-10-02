@@ -3,7 +3,9 @@
 //!
 //! Every [`Case`] builds its pre-state with the LiteSVM harness (`shortwin_litesvm_tests::Env`:
 //! the SBF program from `target/deploy/shortwin.so`, the SPL Token (p-token under the mainnet
-//! feature set), Token-2022 and ATA ELFs LiteSVM bundles, the clock under test control), then
+//! feature set) and ATA ELFs LiteSVM bundles, mainnet's Token-2022 and spl-memo v3 (since M10,
+//! `fork::load_mainnet_spl`; `SHORTWIN_BUNDLED_SPL=1` keeps LiteSVM's), the clock under test
+//! control), then
 //!
 //! 1. copies every account the instruction names into a fresh Mollusk 0.15.1 and loads the
 //!    same ELFs into its program cache, with LiteSVM's clock and rent;

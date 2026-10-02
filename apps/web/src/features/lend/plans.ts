@@ -28,7 +28,7 @@ import {
 import type { QueryKey } from '@tanstack/react-query';
 import { qk } from '../../api/keys.ts';
 import type { DisclosureId } from '../../config/disclosures.ts';
-import { MEMO_PROGRAM, SHORTWIN_PROGRAM } from '../../config/programs.ts';
+import { MEMO_PROGRAM, SHORTWIN_PROGRAM, TOKEN_2022_PROGRAM } from '../../config/programs.ts';
 import { cleanSymbol, tokenLabel } from '../../lib/displayText.ts';
 import { formatSol, formatTokens, shortAddress } from '../../lib/format.ts';
 import { eventAuthority } from '../../rpc/pda.ts';
@@ -198,7 +198,10 @@ export interface WithdrawPlanInput extends LendContext {
     readonly destination: Address;
     /** The destination does not exist yet: it must be the owner's ATA, created idempotently. */
     readonly createDestination: boolean;
-    /** `MemoTransfer.require_incoming_transfer_memos` on the destination (Token-2022). */
+    /**
+     * `MemoTransfer.require_incoming_transfer_memos` on the destination (Token-2022), as last read: the
+     * disclosure and the title. `memo_program` does not depend on it (TMEMO-9).
+     */
     readonly memoRequired: boolean;
     readonly shares: bigint;
     readonly minTokens: bigint;
@@ -232,8 +235,10 @@ export async function buildWithdrawPlan(i: WithdrawPlanInput): Promise<TxPlan> {
             mint: i.mint,
             ownerTokenAccount: i.destination,
             tokenProgram: i.tokenProgram,
-            // spl-memo v3 for a memo-required destination; otherwise the program id, Anchor's "none".
-            memoProgram: i.memoRequired ? MEMO_PROGRAM : SHORTWIN_PROGRAM,
+            // spl-memo v3 for every Token-2022 destination (TMEMO-9): the program CPIs it only when the
+            // destination requires memos at execution, so one that turns memo-required after the read
+            // still lands. SPL Token: the program id, Anchor's "none".
+            memoProgram: i.tokenProgram === TOKEN_2022_PROGRAM ? MEMO_PROGRAM : SHORTWIN_PROGRAM,
             eventAuthority: await eventAuthority(),
             program,
             shares: i.shares,

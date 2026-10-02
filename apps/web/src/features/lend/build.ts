@@ -146,7 +146,8 @@ export async function withdrawPlanFrom(
         inp.toleranceBps,
     );
     if (!view.ok) throw refused(view.refusal);
-    // The destination's flags as the chain has them now: a memo-required one gets `memo_program`.
+    // The destination's flags as the chain has them now: a memo-required one gets the disclosure
+    // (`memo_program` goes to every Token-2022 destination, TMEMO-9).
     const info = chain.tokenAccounts.find((a) => a.address === inp.destination) ?? null;
     const create = !info && inp.destination === chain.ata;
     if (!info && !create) throw new PlanError('The destination token account no longer exists.');

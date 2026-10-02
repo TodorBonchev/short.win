@@ -2,14 +2,15 @@
 //! R-MINT §9.5).
 //!
 //! - [`t22_mint`]: a Token-2022 mint carrying the requested extensions, built with the real
-//!   Token-2022 v11.0.0 program that LiteSVM 0.16 bundles, through [`Env::send`], with the
-//!   instruction builders of `spl-token-2022-interface` 3.1 (the pinned test dependency, which
-//!   knows every type up to `PermissionedBurn` = 28). Companion extensions the program
-//!   requires are added automatically (TokenMetadata → MetadataPointer, TokenGroup →
-//!   GroupPointer, TokenGroupMember → GroupMemberPointer and a group mint,
-//!   ConfidentialTransferFeeConfig → TransferFeeConfig + ConfidentialTransferMint,
-//!   ConfidentialMintBurn → ConfidentialTransferMint). The token-metadata and token-group
-//!   instructions are encoded by hand (their interface crates are not dependencies here).
+//!   Token-2022 v11.0.0 program (mainnet's ELF, [`crate::fork::load_mainnet_spl`]), through
+//!   [`Env::send`], with the instruction builders of `spl-token-2022-interface` 3.1 (the pinned
+//!   test dependency, which knows every type up to `PermissionedBurn` = 28). Companion
+//!   extensions the program requires are added automatically (TokenMetadata →
+//!   MetadataPointer, TokenGroup → GroupPointer, TokenGroupMember → GroupMemberPointer and a
+//!   group mint, ConfidentialTransferFeeConfig → TransferFeeConfig +
+//!   ConfidentialTransferMint, ConfidentialMintBurn → ConfidentialTransferMint). The
+//!   token-metadata and token-group instructions are encoded by hand (their interface crates
+//!   are not dependencies here).
 //! - [`pump_style_mint`]: the shape of a pump.fun `create_v2` coin (R-MINT §7.2):
 //!   MetadataPointer (authority `None`, pointing at the mint) + TokenMetadata (update
 //!   authority `None`), mint and freeze authorities `None`.

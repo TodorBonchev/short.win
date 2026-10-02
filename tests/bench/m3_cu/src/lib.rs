@@ -5,8 +5,9 @@
 //! (`shortwin_litesvm_tests::fork` / `raydium`: the **release** short.win build —
 //! `anchor build --tools-version v1.57 --arch v3`, or `SHORTWIN_SO` — the dumped AMM v4 and CPMM
 //! programs deployed from their mainnet ProgramData, the dumped pools, mints and configs, the
-//! SPL Token (p-token under the mainnet feature set) and Token-2022 ELFs LiteSVM bundles, the
-//! clock at the fixtures' snapshot), then
+//! SPL Token (p-token under the mainnet feature set) ELF LiteSVM bundles, mainnet's Token-2022
+//! (since M10, `fork::load_mainnet_spl`; `SHORTWIN_BUNDLED_SPL=1` keeps LiteSVM's), the clock at
+//! the fixtures' snapshot), then
 //!
 //! 1. copies every account the instruction names into a fresh Mollusk 0.15.1 and loads the same
 //!    ELFs into its program cache (short.win, both Raydium programs, the token programs), with

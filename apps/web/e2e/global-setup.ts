@@ -14,7 +14,7 @@ import { appBuiltFor, appUp, buildApp, startPreview } from './validator/app.ts';
 import { startIndexer } from './validator/indexer.ts';
 import { seed } from './validator/seed.ts';
 import { type E2EState, loadState } from './validator/state.ts';
-import { startValidator, validatorHealthy } from './validator/validator.ts';
+import { checkSplPrograms, startValidator, validatorHealthy } from './validator/validator.ts';
 
 export default async function globalSetup(): Promise<void> {
     mkdirSync(E2E_DIR, { recursive: true });
@@ -22,6 +22,7 @@ export default async function globalSetup(): Promise<void> {
     if (ENV.reuse && existsSync(PATHS.state) && (await validatorHealthy())) {
         state = loadState();
         console.log(`[e2e] reusing the running validator and its seed of ${state.createdAt}`);
+        await checkSplPrograms();
     } else {
         await startValidator();
         state = await seed();

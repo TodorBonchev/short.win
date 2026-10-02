@@ -1,5 +1,6 @@
 //! [`Env`]: one LiteSVM instance with short.win loaded, the admin keys, a clock under test
-//! control, and the invariant hooks wired into every transaction.
+//! control, and the invariant hooks wired into every transaction. Its Token-2022 and spl-memo
+//! v3 are mainnet's (M10; `SHORTWIN_BUNDLED_SPL=1` opts out).
 
 use std::path::PathBuf;
 
@@ -121,6 +122,10 @@ impl Env {
     /// Loads `target/deploy/shortwin.so` (upgradeable loader), makes
     /// [`Env::upgrade_authority`] its upgrade authority, funds the harness keys and sets the
     /// clock to [`START_TS`] / [`START_SLOT`]. The config is **not** initialized.
+    ///
+    /// Token-2022 and spl-memo v3 are the builds mainnet runs ([`crate::fork::load_mainnet_spl`],
+    /// M10 T-MEMO), in every constructor; `SHORTWIN_BUNDLED_SPL=1` keeps LiteSVM's bundled
+    /// builds instead.
     pub fn new() -> Self {
         Self::with_program(
             &program_so_path(),
@@ -146,6 +151,9 @@ impl Env {
             )
         });
         let mut svm = LiteSVM::new();
+        if !crate::fork::bundled_spl() {
+            crate::fork::load_mainnet_spl(&mut svm);
+        }
         svm.add_program(shortwin::ID, &so)
             .unwrap_or_else(|e| panic!("add_program: {e:?}"));
         let env = Self {

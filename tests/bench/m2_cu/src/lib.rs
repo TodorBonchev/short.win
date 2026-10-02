@@ -3,7 +3,8 @@
 //! Every [`Case`] builds its pre-state with the LiteSVM harness (`shortwin_litesvm_tests`:
 //! short.win's **test-venue** SBF build with `VenueKind::Mock` (`scripts/build-test-venue.sh`,
 //! or `SHORTWIN_TEST_VENUE_SO`), the mock venue (`MOCK_CPAMM_SO`), the SPL Token (p-token
-//! under the mainnet feature set) and Token-2022 ELFs LiteSVM bundles, the clock under test
+//! under the mainnet feature set) ELF LiteSVM bundles, mainnet's Token-2022 (since M10,
+//! `fork::load_mainnet_spl`; `SHORTWIN_BUNDLED_SPL=1` keeps LiteSVM's), the clock under test
 //! control), then
 //!
 //! 1. copies every account the instruction names into a fresh Mollusk 0.15.1 and loads the

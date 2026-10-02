@@ -4,15 +4,15 @@ Compute units of every M2 instruction (ARCH §9 M2) on short.win's **test-venue*
 
 | Instruction | Case | Mollusk CU | LiteSVM CU | Budget | Budget source | Trace | ARCH §6.2 (Raydium) |
 |---|---|---|---|---|---|---|---|
-| `open_short` | first open of a wallet, SPL Token base (position + exposure created) | 106475 | 106475 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) |
-| `open_short` | first open of a wallet, Token-2022 base | 106864 | 106864 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) |
-| `open_short` | second position of a wallet (exposure exists), SPL | 99656 | 99656 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 14 | 13 (≤ 15) |
-| `open_short` | with normalisation (trader and trader_wsol donated to), SPL | 110959 | 110959 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 18 | 13 (≤ 15) |
+| `open_short` | first open of a wallet, SPL Token base (position + exposure created) | 100496 | 100496 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) |
+| `open_short` | first open of a wallet, Token-2022 base | 106915 | 106915 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) |
+| `open_short` | second position of a wallet (exposure exists), SPL | 98156 | 98156 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 14 | 13 (≤ 15) |
+| `open_short` | with normalisation (trader and trader_wsol donated to), SPL | 106459 | 106459 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 18 | 13 (≤ 15) |
 | `close_short` | SPL Token base | 70061 | 70061 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) |
-| `close_short` | Token-2022 base | 72168 | 72168 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) |
+| `close_short` | Token-2022 base | 72183 | 72183 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) |
 | `close_short` | with normalisation, SPL | 76044 | 76044 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 12 | 9 (≤ 11) |
 | `add_margin` | 1 SOL to an open position | 13459 | 13459 | 60000 | no §6.1 row; §6.1 `claim_sol` / `cover_deficit` / `sync_lender` class | 3 | — |
-| `liquidate` | price ×2.3 held 40 s: both legs, fresh reference, within the fixed bound | 95516 | 95516 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) |
+| `liquidate` | price ×2.3 held 40 s: both legs, fresh reference, within the fixed bound | 95518 | 95518 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) |
 | `expire` | past the deadline, not CR-liquidatable, within the expiry bound | 90716 | 90716 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) |
 | `sol_settle` | healthy position: the no-change call (a keeper's per-second crank) | 37158 | 37158 | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) |
 | `sol_settle` | S3: expired, route flagged, chain unbroken for s3_wait_s | 56889 | 56889 | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) |

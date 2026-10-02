@@ -9,6 +9,9 @@
  * - `SHORTWIN_E2E_PROGRAM`   `test-venue` (default; the mock venue drives trading) | `release`
  * - `SHORTWIN_E2E_VENUES`    `1` (default): load the dumped venue programs and accounts of
  *                            tests/fixtures; `0` skips them (faster start, no real-venue specs)
+ * - `SHORTWIN_BUNDLED_SPL`    `1`: keep the validator's built-in Token-2022 instead of mainnet's build
+ *                            from tests/fixtures (group `spl_programs`; as the LiteSVM harness's opt-out)
+ *                            and skip the SPL pin check (the built-in spl-memo v3 is mainnet's either way)
  * - `SHORTWIN_E2E_REUSE`     `1`: reuse a running E2E validator, its seed and the app build
  * - `SHORTWIN_E2E_KEEP`      `1`: leave the validator and the preview server running after the run
  * - `SHORTWIN_CHROMIUM`      browser executable (default `/usr/bin/chromium` when it exists, else
@@ -77,6 +80,7 @@ export const ENV = {
     profile: (process.env.SHORTWIN_E2E_PROFILE === 'full' ? 'full' : 'chain') as Profile,
     program: process.env.SHORTWIN_E2E_PROGRAM === 'release' ? ('release' as const) : ('test-venue' as const),
     venues: flag('SHORTWIN_E2E_VENUES', true),
+    bundledSpl: flag('SHORTWIN_BUNDLED_SPL', false),
     reuse: flag('SHORTWIN_E2E_REUSE', false),
     keep: flag('SHORTWIN_E2E_KEEP', false),
     ci: flag('CI', false),
