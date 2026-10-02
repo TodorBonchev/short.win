@@ -4,13 +4,13 @@ Compute units of every curve-path instruction (ARCH §9 M5: T-CU) of the **relea
 
 | Instruction | Case | Mollusk CU | LiteSVM CU | pump CU | Budget | Budget source | Trace | ARCH §6.2 (curve) | Peak height |
 |---|---|---|---|---|---|---|---|---|---|
-| `create_market` | Auto, SPL Token, 115 B curve, no creator (legacy115): `PumpCurve`, the trader's base ATA and pump UVA created | 141400 | 141400 | 17004 | 250000 | §6.1 `create_market` | 15 | — | 3 |
-| `create_market` | Auto, Token-2022, 115 B curve (t22_115): `PumpCurve`, the trader's base ATA and pump UVA created | 169823 | 169823 | 15504 | 250000 | §6.1 `create_market` | 15 | — | 3 |
-| `create_market` | Auto, Token-2022, 125 B curve (fresh): `PumpCurve`, the trader's base ATA and pump UVA created | 143070 | 143070 | 15504 | 250000 | §6.1 `create_market` | 15 | — | 3 |
-| `create_market` | Auto, Token-2022, 151 B curve near completion (near): `PumpCurve`, the trader's base ATA and pump UVA created | 169836 | 169836 | 17004 | 250000 | §6.1 `create_market` | 15 | — | 3 |
-| `create_market` | Auto, Token-2022, 151 B curve near completion (near), completed by a third party: `PumpMigrating`, with the init set | 169985 | 169985 | 17004 | 250000 | §6.1 `create_market` | 15 | — | 3 |
-| `create_market` | Auto, PumpSwap-class coin (graduated): `PumpSwap` on its canonical pool, the pAMM init set (M6) | 138942 | 138942 | — | 250000 | §6.1 `create_market` | 15 | — | 3 |
-| `create_market` | Auto, graduated elsewhere (Fartcoin): list-only `None` (detection set only) | 57949 | 57949 | — | 250000 | §6.1 `create_market` | 7 | — | 2 |
+| `create_market` | Auto, SPL Token, 115 B curve, no creator (legacy115): `PumpCurve`, the trader's base ATA and pump UVA created | 141394 | 141394 | 17004 | 250000 | §6.1 `create_market` | 15 | — | 3 |
+| `create_market` | Auto, Token-2022, 115 B curve (t22_115): `PumpCurve`, the trader's base ATA and pump UVA created | 169817 | 169817 | 15504 | 250000 | §6.1 `create_market` | 15 | — | 3 |
+| `create_market` | Auto, Token-2022, 125 B curve (fresh): `PumpCurve`, the trader's base ATA and pump UVA created | 143064 | 143064 | 15504 | 250000 | §6.1 `create_market` | 15 | — | 3 |
+| `create_market` | Auto, Token-2022, 151 B curve near completion (near): `PumpCurve`, the trader's base ATA and pump UVA created | 169830 | 169830 | 17004 | 250000 | §6.1 `create_market` | 15 | — | 3 |
+| `create_market` | Auto, Token-2022, 151 B curve near completion (near), completed by a third party: `PumpMigrating`, with the init set | 169979 | 169979 | 17004 | 250000 | §6.1 `create_market` | 15 | — | 3 |
+| `create_market` | Auto, PumpSwap-class coin (graduated): `PumpSwap` on its canonical pool, the pAMM init set (M6) | 138936 | 138936 | — | 250000 | §6.1 `create_market` | 15 | — | 3 |
+| `create_market` | Auto, graduated elsewhere (Fartcoin): list-only `None` (detection set only) | 57943 | 57943 | — | 250000 | §6.1 `create_market` | 7 | — | 2 |
 | `open_short` | SPL Token, 115 B curve, no creator (legacy115): first open of a wallet (position + exposure created) | 171979 | 171979 | 74791 | 250000 | §6.1 `open_short` curve | 14 | 12 (≤ 15) | 3 |
 | `open_short` | Token-2022, 115 B curve (t22_115): first open of a wallet (position + exposure created) | 181908 | 181908 | 80127 | 250000 | §6.1 `open_short` curve | 14 | 12 (≤ 15) | 3 |
 | `open_short` | Token-2022, 125 B curve (fresh): first open of a wallet (position + exposure created) | 176386 | 176386 | 69630 | 250000 | §6.1 `open_short` curve | 14 | 12 (≤ 15) | 3 |
@@ -39,10 +39,10 @@ Compute units of every curve-path instruction (ARCH §9 M5: T-CU) of the **relea
 | `expire` | Token-2022, 151 B curve near completion (near): past the deadline, healthy | 179457 | 179457 | 92447 | 300000 | §6.1 `liquidate` / `expire` curve | 13 | 12 (≤ 15) | 3 |
 | `expire` | Token-2022, 151 B curve near completion (near): costliest — normalising, creator change into an empty vault, last recipients | 198435 | 198435 | 96202 | 300000 | §6.1 `liquidate` / `expire` curve | 17 | 12 (≤ 15) | 3 |
 | `expire` | Token-2022, 151 B curve near completion (near): completing buyback (q = rT; `PumpCurve → PumpMigrating`) | 189015 | 189015 | 97889 | 300000 | §6.1 `liquidate` / `expire` curve | 15 | 12 (≤ 15) | 3 |
-| `sol_settle` | SPL Token, 115 B curve, no creator (legacy115): healthy, the no-change call | 42381 | 42381 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
-| `sol_settle` | Token-2022, 115 B curve (t22_115): healthy, the no-change call | 42770 | 42770 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
-| `sol_settle` | `PumpMigrating` (stuck migration): S3 at migration_seen_at + 70 min, FV on the post-migration pool | 64959 | 64959 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
-| `sol_settle` | `None` (graduated elsewhere; the detection set as ReadSet): S3 after s3_wait_s (M2-SEC-5) | 45554 | 45554 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
+| `sol_settle` | SPL Token, 115 B curve, no creator (legacy115): healthy, the no-change call | 42371 | 42371 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
+| `sol_settle` | Token-2022, 115 B curve (t22_115): healthy, the no-change call | 42760 | 42760 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
+| `sol_settle` | `PumpMigrating` (stuck migration): S3 at migration_seen_at + 70 min, FV on the post-migration pool | 64949 | 64949 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
+| `sol_settle` | `None` (graduated elsewhere; the detection set as ReadSet): S3 after s3_wait_s (M2-SEC-5) | 45544 | 45544 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
 | `crank_price` | SPL Token, 115 B curve, no creator (legacy115): roll + record (first crank of a second) | 31544 | 31544 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |
 | `crank_price` | Token-2022, 115 B curve (t22_115): roll + record (first crank of a second) | 31572 | 31572 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |
 | `crank_price` | Token-2022, 125 B curve (fresh): roll + record (first crank of a second) | 31808 | 31808 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |
@@ -58,5 +58,5 @@ Compute units of every curve-path instruction (ARCH §9 M5: T-CU) of the **relea
 | `flag_venue_upgraded` | pump, the dumped 10,485,760-byte ProgramData | 6028 | 6028 | — | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` (U5) | 2 | 2 (≤ 2) | 2 |
 | `flag_venue_upgraded` | pump-fees, the dumped 948,989-byte ProgramData | 6028 | 6028 | — | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` (U5) | 2 | 2 (≤ 2) | 2 |
 | `flag_venue_upgraded` | PumpSwap, the dumped 10,485,760-byte ProgramData | 6028 | 6028 | — | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` (U5) | 2 | 2 (≤ 2) | 2 |
-| `revalidate_venue` | pump, the dumped ProgramData | 8440 | 8440 | — | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` (U5) | 2 | 2 (≤ 2) | 2 |
-| `revalidate_venue` | pump-fees, the dumped ProgramData | 8440 | 8440 | — | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` (U5) | 2 | 2 (≤ 2) | 2 |
+| `revalidate_venue` | pump, the dumped ProgramData | 8434 | 8434 | — | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` (U5) | 2 | 2 (≤ 2) | 2 |
+| `revalidate_venue` | pump-fees, the dumped ProgramData | 8434 | 8434 | — | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` (U5) | 2 | 2 (≤ 2) | 2 |

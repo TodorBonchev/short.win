@@ -19,11 +19,11 @@ The graduation transition (§2.5) is the crank that detects the migration and re
 | SPL Token, 261 B (legacy261): ComputeBudget ×2 + crank_price + liquidate (keeper) | 21 | 21 | 3 | 207413 | 300000 | **1578** / 41 | 1087 / 41 | 2 + 2 + 17 (≤ 19 on PumpSwap; §6.2) |
 | SPL Token, 261 B (legacy261): ComputeBudget ×2 + crank_price + expire (keeper) | 21 | 21 | 3 | 205273 | 300000 | **1578** / 41 | 1087 / 41 | 2 + 2 + 17 (≤ 19 on PumpSwap; §6.2) |
 | Token-2022, 301 B, boost spent (mature): ComputeBudget ×2 + crank_price + the costliest liquidate (keeper) | 24 | 24 | 3 | 226564 | 300000 | **1610** / 42 | 1088 / 42 | 2 + 2 + 20 (above §6.2's ≤ 19; creator change and normalisation) |
-| ComputeBudget ×2 + crank_price + sol_settle S3 (keeper; the buy halt) | 6 | 6 | 2 | 85204 | 150000 | 944 / 22 | 794 / 22 | 2 + 2 + 2 (§6.2) |
+| ComputeBudget ×2 + crank_price + sol_settle S3 (keeper; the buy halt) | 6 | 6 | 2 | 85194 | 150000 | 944 / 22 | 794 / 22 | 2 + 2 + 2 (§6.2) |
 | ComputeBudget ×2 + crank_price (graduation transition → PumpSwap) | 6 | 6 | 2 | 32392 | 250000 | 626 / 15 | 445 / 15 | no row (§2.5; the ring rewrite, VenueStateChanged + RouteChainChanged) |
 | ComputeBudget ×2 + crank_price (→ PumpSwap) + close_short (straddle tx3, borrower) | 23 | 23 | 3 | 207302 | 400000 | **1713** / 45 | 1129 / 45 | no row (§5.4 tx3; the transition crank then the borrower's close on the pool) |
-| Token-2022, 301 B, boost spent (mature): ComputeBudget ×2 + create_market (Auto, PumpSwap, init set) | 17 | 17 | 3 | 134742 | 250000 | 897 / 21 | 685 / 21 | no row |
-| SPL Token, 261 B (legacy261): ComputeBudget ×2 + create_market (Auto, PumpSwap, init set) | 17 | 17 | 3 | 113790 | 250000 | 897 / 21 | 685 / 21 | no row |
+| Token-2022, 301 B, boost spent (mature): ComputeBudget ×2 + create_market (Auto, PumpSwap, init set) | 17 | 17 | 3 | 134736 | 250000 | 897 / 21 | 685 / 21 | no row |
+| SPL Token, 261 B (legacy261): ComputeBudget ×2 + create_market (Auto, PumpSwap, init set) | 17 | 17 | 3 | 113784 | 250000 | 897 / 21 | 685 / 21 | no row |
 | Token-2022, 301 B, boost spent (mature): ComputeBudget ×2 + sweep_trader (token leg) | 6 | 6 | 2 | 24784 | 60000 | 725 / 18 | 606 / 18 | no row (§3.9; the post-wipe token leg) |
 | ComputeBudget ×2 + create ATA(trader, WSOL) + pAMM claim_cashback + sweep_trader (post-wipe reward claim) | 14 | 14 | 2 | 59801 | 150000 | 948 / 24 | 767 / 24 | no row (§3.9; claim_venue_rewards was not built — the UVA-reading pattern) |
 | ComputeBudget ×2 + flag_venue_upgraded ×2 (PumpSwap, pump-fees; the dumped ProgramData) | 6 | 6 | 2 | 12356 | 400000 | 378 / 7 | 352 / 7 | 2 + 2 + 2 (§6.2) |

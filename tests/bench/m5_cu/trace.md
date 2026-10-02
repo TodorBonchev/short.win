@@ -24,11 +24,11 @@ T-STRADDLE's curve part (ARCH §5.4): tx1 is the `complete-curve` helper (A66, `
 | Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + crank_price + liquidate (keeper) | 17 | 17 | 3 | 213336 | 300000 | **1643** / 43 | 1059 / 43 | 2 + 2 + ≤ 15 on the curve (§6.2) |
 | Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + crank_price + expire (keeper) | 17 | 17 | 3 | 209898 | 300000 | **1643** / 43 | 1059 / 43 | 2 + 2 + ≤ 15 on the curve (§6.2) |
 | Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + crank_price + the costliest liquidate (keeper) | 21 | 21 | 3 | 230814 | 300000 | **1643** / 43 | 1059 / 43 | 2 + 2 + ≤ 15 on the curve (§6.2) |
-| ComputeBudget ×2 + crank_price + sol_settle S3 (keeper; `PumpMigrating`, 70 min) | 6 | 6 | 2 | 97227 | 150000 | 944 / 22 | 732 / 22 | 2 + 2 + 2 (§6.2) |
-| ComputeBudget ×2 + crank_price + sol_settle S3 (keeper; `None`, detection set) | 6 | 6 | 2 | 62801 | 150000 | 774 / 17 | 686 / 17 | 2 + 2 + 2 (§6.2) |
+| ComputeBudget ×2 + crank_price + sol_settle S3 (keeper; `PumpMigrating`, 70 min) | 6 | 6 | 2 | 97217 | 150000 | 944 / 22 | 732 / 22 | 2 + 2 + 2 (§6.2) |
+| ComputeBudget ×2 + crank_price + sol_settle S3 (keeper; `None`, detection set) | 6 | 6 | 2 | 62791 | 150000 | 774 / 17 | 686 / 17 | 2 + 2 + 2 (§6.2) |
 | ComputeBudget ×2 + flag_venue_upgraded ×3 (pump, pump-fees, PumpSwap; the dumped ProgramData) | 8 | 8 | 2 | 18384 | 400000 | 426 / 8 | 400 / 8 | 2 + 2 + 2 + 2 (§6.2) |
-| SPL Token, 115 B curve, no creator (legacy115): ComputeBudget ×2 + create_market (Auto, `PumpCurve`, init set) | 17 | 17 | 3 | 141700 | 250000 | 897 / 21 | 685 / 21 | no row |
-| Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + create_market (Auto, `PumpCurve`, init set) | 17 | 17 | 3 | 170123 | 250000 | 897 / 21 | 685 / 21 | no row |
+| SPL Token, 115 B curve, no creator (legacy115): ComputeBudget ×2 + create_market (Auto, `PumpCurve`, init set) | 17 | 17 | 3 | 141694 | 250000 | 897 / 21 | 685 / 21 | no row |
+| Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + create_market (Auto, `PumpCurve`, init set) | 17 | 17 | 3 | 170117 | 250000 | 897 / 21 | 685 / 21 | no row |
 | Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + sweep_trader (token leg) | 6 | 6 | 2 | 24953 | 60000 | 692 / 17 | 573 / 17 | no row |
 | Token-2022, 151 B curve near completion (near): straddle tx1 — ComputeBudget ×2 + complete_curve (helper → pump buy_v2(rT at execution)) | 12 | 12 | 3 | 110411 | 1400000 | 1192 / 30 | 763 / 30 | ≈ 11 (§6.2 `complete_curve`, ComputeBudget ×2 included) |
 | Token-2022, 151 B curve near completion (near): straddle tx1 ★ — a third party's curve buy landed between the keeper's read and the bundle | 12 | 12 | 3 | 110412 | 1400000 | 1192 / 30 | 763 / 30 | ≈ 11 (§6.2 `complete_curve`; §5.4: tx1 reads `rT` at execution) |

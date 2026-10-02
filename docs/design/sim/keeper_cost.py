@@ -59,13 +59,13 @@ VENUES = ("pumpswap", "pump_curve", "raydium_cpmm", "raydium_amm_v4")
 NAMES = {"pumpswap": "PumpSwap", "pump_curve": "curve", "raydium_cpmm": "CPMM", "raydium_amm_v4": "AMM v4"}
 # Requested CU (ceil(consumed x 1.1)), the costliest measured per kind (tests/bench/m7_keeper/results.json).
 CU = {
-    "pumpswap": {"crank": 41_199, "sol_settle_keep": 64_144, "sol_settle_settle": 74_182,
+    "pumpswap": {"crank": 41_199, "sol_settle_keep": 64_133, "sol_settle_settle": 74_171,
                  "liquidate": 212_313, "expire": 208_405},
-    "pump_curve": {"crank": 37_382, "sol_settle_keep": 62_713, "sol_settle_settle": 72_734,
+    "pump_curve": {"crank": 37_382, "sol_settle_keep": 62_702, "sol_settle_settle": 72_723,
                    "liquidate": 191_983, "expire": 188_964},
-    "raydium_cpmm": {"crank": 32_843, "sol_settle_keep": 65_642, "sol_settle_settle": 77_390,
+    "raydium_cpmm": {"crank": 32_843, "sol_settle_keep": 65_631, "sol_settle_settle": 77_379,
                      "liquidate": 125_289, "expire": 117_487},
-    "raydium_amm_v4": {"crank": 32_779, "sol_settle_keep": 57_650, "sol_settle_settle": 67_715,
+    "raydium_amm_v4": {"crank": 32_779, "sol_settle_keep": 57_639, "sol_settle_settle": 67_704,
                        "liquidate": 105_270, "expire": 101_004},
 }
 LP_WRAP_CU = 150_000             # the attacker's [deposit, crank_price, withdraw] (estimate, M4G-2)
@@ -94,7 +94,7 @@ JUNK_PHI_BPS = 100               # its venue fee, one way
 TIER_D = {"cr_open": 40_000, "cr_liq": 17_500, "dur_days": 3, "rate_u0_bps": 10_000, "rate_u50_bps": 28_750}
 OPEN_FEE_BPS = 25
 PROTOCOL_RENT_BPS = 1_500
-SET_COVERAGE_PAUSE_CU = 8_921
+SET_COVERAGE_PAUSE_CU = 8_915
 CRANK_SOL_USD_CU = 7_212
 CRANK_SOL_USD_PER_DAY = 1_560    # a feed publishing every 55 s
 RATE80 = {"A": 5_000, "B": 10_000, "C": 20_000, "D": 40_000}   # APR bps at 80 % utilisation
