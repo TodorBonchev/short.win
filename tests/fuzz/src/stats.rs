@@ -2,8 +2,9 @@
 //! events emitted (a branch-coverage proxy: `Liquidate`, `SolSettle` S1/S2/S3, `CoverageGap`,
 //! `PoolSwitched`, `VenueStateChanged`, …), and **anomalies** — outcomes that are not invariant
 //! violations but that a reviewer should see (a program panic inside a short.win instruction, a
-//! compute-budget exhaustion, a framework error on a well-formed instruction, an I14 replacement
-//! the program accepted). [`Ctx::send`] records every transaction the fuzzer sends.
+//! compute-budget exhaustion, a framework error on a well-formed instruction; an I14 replacement
+//! the program accepted was one until M10, when it became a failure). [`Ctx::send`] records every
+//! transaction the fuzzer sends.
 
 use std::collections::BTreeMap;
 

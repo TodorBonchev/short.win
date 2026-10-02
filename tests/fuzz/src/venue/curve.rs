@@ -7,7 +7,7 @@
 
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::Instruction;
-use shortwin::constants::{GUARD_PUMP, GUARD_PUMP_AMM, GUARD_PUMP_FEES};
+use shortwin::constants::{GUARD_PUMP, GUARD_PUMP_AMM, GUARD_PUMP_FEES, PUMP_FEE_CONFIG};
 use shortwin::state::VenueKind;
 use shortwin_litesvm_tests::engine::VenueMarket;
 use shortwin_litesvm_tests::fork::{self, PumpCoin, PumpV2};
@@ -17,7 +17,9 @@ use shortwin_litesvm_tests::{Env, errors, read};
 use solana_keypair::Keypair;
 use solana_signer::Signer;
 
-use super::pswap::{PammVenue, disable_flags, program_data_slot, pump_program};
+use super::pswap::{
+    FeeSpecs, PammVenue, disable_flags, program_data_slot, pump_fee_shock, pump_program,
+};
 use super::{Move, Venue, factor};
 use crate::action::Kind;
 use crate::rng::Rng;
@@ -38,6 +40,9 @@ pub struct CurveVenue {
     /// The PumpSwap venue once the market moved there.
     pub grad: Option<PammVenue>,
     pub label: String,
+    /// pump's `FeeConfig` as a fee shock found it (restored at level 0; after the graduation
+    /// the shocks move to PumpSwap's, [`PammVenue::fee_saved`]).
+    pub fee_saved: Option<FeeSpecs>,
 }
 
 impl CurveVenue {
@@ -96,6 +101,10 @@ impl Venue for CurveVenue {
             Some(g) => &g.pm,
             None => &self.pm,
         }
+    }
+
+    fn as_curve(&self) -> Option<&PumpMarket> {
+        self.grad.is_none().then_some(&self.pm)
     }
 
     fn seed_lender(&self) -> (Keypair, Pubkey) {
@@ -205,6 +214,19 @@ impl Venue for CurveVenue {
         true
     }
 
+    fn fee_shock(&mut self, cx: &mut Ctx, level: u32) -> bool {
+        // pump's `FeeConfig` prices the curve (and its sale into `migrate_v2`'s pool); once the
+        // market is on PumpSwap, PumpSwap's prices the pool. Level 0 restores both.
+        match (&mut self.grad, level) {
+            (Some(g), 0) => {
+                pump_fee_shock(cx, &PUMP_FEE_CONFIG, &mut self.fee_saved, 0, None);
+                g.fee_shock(cx, 0)
+            }
+            (Some(g), _) => g.fee_shock(cx, level),
+            (None, _) => pump_fee_shock(cx, &PUMP_FEE_CONFIG, &mut self.fee_saved, level, None),
+        }
+    }
+
     fn special(&mut self, cx: &mut Ctx, kind: Kind, a: u32, _b: u32) -> Option<()> {
         match kind {
             Kind::CompleteCurve => {
@@ -273,11 +295,13 @@ impl Venue for CurveVenue {
 
     fn restore(&mut self, cx: &mut Ctx) {
         pamm::set_disable_flags(&mut cx.env.svm, 0);
-        cx.env.assert_invariants();
+        self.fee_shock(cx, 0);
     }
 
     fn disturbed(&self, env: &Env) -> bool {
         disable_flags(env) != 0
+            || self.fee_saved.is_some()
+            || self.grad.as_ref().is_some_and(|g| g.fee_saved.is_some())
     }
 }
 
@@ -321,6 +345,7 @@ pub fn setup(rng: &mut Rng) -> (Env, Vec<Slot>) {
         crowd,
         grad: None,
         label,
+        fee_saved: None,
     };
     let slot = crate::setup::slot(&mut env, Box::new(v), lend / 4);
     (env, vec![slot])

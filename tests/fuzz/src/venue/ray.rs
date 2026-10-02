@@ -112,6 +112,10 @@ impl Venue for RayVenue {
         &self.rm
     }
 
+    fn as_ray_v4(&self) -> Option<&RayMarket> {
+        matches!(self.rm.pool, AnyPool::V4(_)).then_some(&self.rm)
+    }
+
     fn seed_lender(&self) -> (Keypair, Pubkey) {
         (self.rm.lender.insecure_clone(), self.rm.lender_account)
     }

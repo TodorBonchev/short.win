@@ -6,11 +6,12 @@
 //! graduation, PumpSwap, Raydium AMM v4 and CPMM), every transaction through `Env::send` — so the
 //! harness's invariant hooks (I1–I13, I15–I19 and A26 after every instruction and after every
 //! prefix of a multi-instruction transaction) are checked after every action — plus the fuzzer's
-//! own oracles ([`world`]: I10 / I17 gates, the mock's differential exit oracle for I9 / I11 /
-//! I12 / I13 / I-E11, I14 omissions, I4's coverage clause on every `set_coverage_pause` (O17;
-//! since 2026-10-01 the Emergency's clear-only power too, OWNER-M7-3 (b)),
-//! the mint filter on exits, governance's timelock and cancels, the oracle's refusals, the
-//! wind-down's liveness). Failures are crash files with the
+//! own oracles ([`world`]: I10 / I17 gates, the differential exit oracles — the mock's and AMM
+//! v4's for I9 / I11 / I12 / I13 / I-E11, the curve's for every decision and I-E11 (M10) —, I14
+//! omissions and replacements, the JIT capture and claim-bundle oracles (M10), I4's coverage
+//! clause on every `set_coverage_pause` (O17; since 2026-10-01 the Emergency's clear-only power
+//! too, OWNER-M7-3 (b)), the mint filter on exits, governance's timelock and cancels, the
+//! oracle's refusals, the wind-down's liveness). Failures are crash files with the
 //! profile, seed and action list ([`runner`]); `replay` re-runs them and `tmin` minimises them by
 //! delta debugging over the action list.
 //!
@@ -26,6 +27,7 @@
 #![allow(clippy::result_large_err, unused_must_use)]
 
 pub mod action;
+pub mod curve_exit;
 pub mod rng;
 pub mod runner;
 pub mod setup;
@@ -38,3 +40,16 @@ pub mod world;
 /// the program tests include it.
 #[path = "../../litesvm/tests/liquidate_support.rs"]
 pub mod liq;
+
+/// `tests/litesvm/tests/raydium_v4_support.rs`, the AMM v4 fork E2E's differential exit oracle
+/// (every decision of ARCH §3.6 / §3.7 — `ExitBoundNotMet` against `⌊B̂_ref·(10⁴ + δ)/10⁴⌋`
+/// included, so I-E11 — and every lamport and token recomputed from `shortwin-math` and the
+/// venue-state readers), included as the AMM v4 tests include it (M10, G-I11-real).
+#[path = "../../litesvm/tests/raydium_v4_support.rs"]
+pub mod v4;
+
+/// `tests/litesvm/tests/pump_curve_support.rs`, the curve fork E2E's keeper view of a position
+/// (`status`: the legs, `B̂_live`, "buyback allowed" from `shortwin-math` on the readers), on
+/// which [`curve_exit`] predicts every exit decision (M10, G-I11-real).
+#[path = "../../litesvm/tests/pump_curve_support.rs"]
+pub mod curve_support;

@@ -8,7 +8,7 @@
 //! Needs the program builds, as `shortwin-litesvm-tests` does (`SHORTWIN_SO`,
 //! `SHORTWIN_TEST_VENUE_SO`, `MOCK_CPAMM_SO`).
 
-use shortwin_fuzz::action::{Kind, Profile, stream};
+use shortwin_fuzz::action::{Action, Kind, Profile, stream};
 use shortwin_fuzz::runner::{self, Crash, Opts};
 use shortwin_fuzz::stats::Stats;
 use shortwin_fuzz::world::{INJECT, INJECTED};
@@ -184,6 +184,50 @@ fn smoke_amm_v4() {
 #[test]
 fn smoke_cpmm() {
     smoke(Profile::Cpmm);
+}
+
+/// M10 (G-G4): `fee_shock` reaches the pump venues. On the curve and PumpSwap profiles a shock to
+/// level 5 — every tier's protocol fee in pump's or PumpSwap's `FeeConfig` at 1,000 bps, above
+/// `venue_fee_hard_cap_bps` — held for 8 actions refuses the opens inside it `VenueFeeTooHigh`, and
+/// `outage`'s fee branch runs (the keeper settling through it); every oracle holds and the
+/// wind-down restores the configs. (Before M10 both returned "unsupported": the actions were
+/// skipped.)
+#[test]
+fn fee_shocks_reach_the_pump_venues() {
+    let acts: Vec<Action> = [
+        "open 0 0 6000",
+        "keeper_seconds 0 3 0",
+        "fee_shock 0 12 7",
+        "open 0 1 6000",
+        "open 0 2 5000",
+        "keeper_seconds 0 5 0",
+        "close 0 0 0",
+        "outage 0 0 1",
+        "open 0 3 6000",
+    ]
+    .iter()
+    .map(|a| a.parse().expect("action"))
+    .collect();
+    for profile in [Profile::Curve, Profile::PumpSwap] {
+        let o = runner::run(profile, SEED_BASE + 7, Some(&acts), 0, Opts::default());
+        if let Some(f) = &o.failure {
+            panic!("{}: {}\n{}", profile.name(), f.signature, f.message);
+        }
+        let fee_shocks = o.stats.actions.get("fee_shock").copied().unwrap_or(0);
+        let outages = o.stats.actions.get("outage").copied().unwrap_or(0);
+        let refused = o
+            .stats
+            .errors
+            .get("open_short:VenueFeeTooHigh")
+            .copied()
+            .unwrap_or(0);
+        println!(
+            "{}: fee_shock {fee_shocks}, outage {outages}, opens refused VenueFeeTooHigh {refused}",
+            profile.name()
+        );
+        assert_eq!((fee_shocks, outages), (1, 1), "{}", profile.name());
+        assert!(refused >= 2, "{}: {:?}", profile.name(), o.stats.errors);
+    }
 }
 
 /// The action stream is a pure function of the profile and the seed, and a run of a given

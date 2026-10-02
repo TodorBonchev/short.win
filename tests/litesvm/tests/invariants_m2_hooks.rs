@@ -1,6 +1,6 @@
 //! The M2 invariant hooks fire on a deliberately broken state (ARCH §8.3; the mutation tests
-//! of I3, A26, I5–I7, I9–I13, I16 — I14 is structural, `tests/engine_it/structure.rs` and
-//! `tests/add_margin_it.rs`).
+//! of I3, A26, I5–I7, I9–I13, I16, and since M10 I17's M6-SEC-3 graduation-halt clause on the
+//! pump fork — I14 is structural, `tests/engine_it/structure.rs` and `tests/add_margin_it.rs`).
 //!
 //! Each test builds a real state through real instructions on the mock venue, then corrupts it
 //! the way a program mutant would leave it — a stored field, an account, a token account, or
@@ -1482,4 +1482,90 @@ fn i19_the_open_terms() {
     assert_eq!(run(&env, &o), Err("I19"), "the wallet cap");
     fixtures::set_borsh(&mut env.svm, &ek, &saved, WalletExposure::SPACE, lam - rent);
     assert_eq!(run(&env, &o), Ok(()));
+}
+
+/// I17's M6-SEC-3 clause (ARCH §3.4 step 3, §8.3; the owner's decision of 2026-09-30) on the pump
+/// fork (M10, G-I17): no curve open while PumpSwap's `GlobalConfig.disable_flags` bit 0
+/// (`create_pool`, and with it `migrate_v2`) is set just before it. The real program refuses such
+/// an open `GraduationHalted`; a real curve open with the flags clear passes every hook — also
+/// against a snapshot with bit 3 alone (the pools' trading halt, which a curve open does not
+/// read) — and the same open against the snapshot a program without the check would have met,
+/// bit 0 set, fails I17. A PumpSwap open under bit 0 is not this clause's.
+#[test]
+fn i17_no_curve_open_while_graduation_halted() {
+    use shortwin_litesvm_tests::engine::with_cu_limit;
+    use shortwin_litesvm_tests::fork::PumpCoin;
+    use shortwin_litesvm_tests::pamm;
+    use shortwin_litesvm_tests::pump::PumpSpec;
+
+    let (mut env, c) = Env::fork_pump_coin(PumpCoin::Near);
+    ok(env.list_pump(&c));
+    let q = c.state(&env.svm).virtual_token_reserves / 200;
+    let pm = env.pump_market_listed(PumpSpec::new(PumpCoin::Near, q.saturating_mul(40)), c);
+    let market = pm.market();
+    let mut b = env.borrower();
+    // The program: refused under bit 0, nothing kept.
+    pamm::set_disable_flags(&mut env.svm, 0x01);
+    let before = env.market(&market);
+    assert_err(
+        &env.open(&pm, &mut b, q).0,
+        shortwin::errors::ShortwinError::GraduationHalted,
+    );
+    assert_eq!(env.market(&market).open_positions, before.open_positions);
+    // The snapshots a program mutant could have met, then the real open (flags clear).
+    let mut snap = |flags: u8| {
+        pamm::set_disable_flags(&mut env.svm, flags);
+        invariants::snapshot(&env.svm, &[market])
+    };
+    let halted = snap(0x01);
+    let trading_halted = snap(0x08);
+    let clear = snap(0x00);
+    assert_eq!(
+        (
+            halted.pamm_disable_flags,
+            trading_halted.pamm_disable_flags,
+            clear.pamm_disable_flags
+        ),
+        (Some(0x01), Some(0x08), Some(0x00))
+    );
+    let ixs = with_cu_limit(
+        &pm,
+        open_short_ix(
+            &pm,
+            &b.key(),
+            b.next_nonce,
+            q,
+            0,
+            u64::MAX,
+            u64::MAX,
+            shortwin::venues::ExtrasSel::NONE,
+            &[],
+        ),
+    );
+    let meta = ok(env.send(&ixs, &[&b.kp]));
+    let last = ixs.len() - 1;
+    let ev = IxEvents::of_instruction(&meta, last, &ixs[last]);
+    assert_eq!(ev.opens.len(), 1);
+    assert_eq!(ev.opens[0].venue, VenueKind::PumpCurve as u8);
+    let run = |pre: &TxSnapshot, ev: &IxEvents| {
+        invariants::check_ix(&env.svm, pre, false, ev).map_err(|v| v.invariant)
+    };
+    assert_eq!(run(&clear, &ev), Ok(()), "the real open");
+    assert_eq!(run(&trading_halted, &ev), Ok(()), "bit 3 alone");
+    assert_eq!(run(&halted, &ev), Err("I17"), "a curve open under bit 0");
+    // Every other bit with bit 0 set still fails; a PumpSwap open is not gated by this clause.
+    let mut all = halted.clone();
+    all.pamm_disable_flags = Some(0xff);
+    assert_eq!(run(&all, &ev), Err("I17"));
+    let mut pamm_open = dup(&ev.opens[0]);
+    pamm_open.venue = VenueKind::PumpSwap as u8;
+    assert_eq!(
+        invariants::i17_no_curve_open_while_graduation_halted(&halted, &[pamm_open])
+            .map_err(|v| v.invariant),
+        Ok(())
+    );
+    // Without a PumpSwap `GlobalConfig` (no pump fork) the clause is vacuous.
+    let mut none = halted.clone();
+    none.pamm_disable_flags = None;
+    assert_eq!(run(&none, &ev), Ok(()));
 }

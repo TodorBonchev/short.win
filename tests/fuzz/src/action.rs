@@ -55,7 +55,8 @@ kinds! {
     Deposit = "deposit",
     /// `withdraw` by lender `a` of `b`‰ of its shares (all of them at `b ≥ 1000`).
     Withdraw = "withdraw",
-    /// `claim_sol` ×`1 + b mod 4` by lender `a`.
+    /// `claim_sol` ×`1 + b mod 4` by lender `a`, in one transaction (M10, V2-2: every claim
+    /// after the first pays 0).
     ClaimSol = "claim_sol",
     /// `cover_deficit` by lender `a`.
     CoverDeficit = "cover_deficit",
@@ -131,7 +132,9 @@ kinds! {
     HeldSandwich = "held_sandwich",
     /// `[dump or LP deposit, sol_settle(a), unwind]` in one transaction.
     DumpAroundSettle = "dump_around_settle",
-    /// A JIT deposit around an exit: `[deposit, exit(a), withdraw]` by lender `b`.
+    /// A JIT deposit around an exit: `[deposit, exit(a), withdraw]` by lender `b` — the exit a
+    /// liquidation or an expiry that lands (with `b` even, at the position's deadline), the
+    /// withdrawal the minted shares within the allowance; the JIT capture oracle (M10, R3B-2).
     JitDeposit = "jit_deposit",
     // ---- pauses, flags, venue admin ------------------------------------------------------------
     /// Sets the market's gates from `a`'s bits: opens paused (1), route broken (2), venue halted
@@ -164,7 +167,8 @@ kinds! {
     /// `set_route_broken(Global, venue bit)` on (`a` odd) or off.
     RouteBrokenVenue = "route_broken_venue",
     /// A donation (`a mod 7`: trader, `trader_wsol` address, `ATA(trader, WSOL)`, boost ATA,
-    /// pool vault tokens, market vault, a position) of `b`-scaled lamports or tokens.
+    /// tokens — to the pool vault, or on a pump venue with `a / 7` even to `trader_base_ata`
+    /// (M10) —, market vault, a position) of `b`-scaled lamports or tokens.
     Donate = "donate",
     // ---- governance and oracle ---------------------------------------------------------------
     /// An adversarial in-bound config change (a parameter at a bound, the EMA parameters or
@@ -188,10 +192,12 @@ kinds! {
     /// PumpSwap `disable_flags` bit 0 (`create_pool`, graduation halt) on (`a` odd) or off.
     GraduationHalt = "graduation_halt",
     // ---- I14 -------------------------------------------------------------------------------------
-    /// A short.win instruction (`a mod 5`: open, close, liquidate, sol_settle, crank) with one
-    /// remaining account (`b`) omitted: must be refused with nothing changed.
+    /// A short.win instruction (`a mod 5`: open, liquidate, expire, sol_settle, and at 4 —
+    /// with a position open and `a / 5` even — close (M10), else crank) with one remaining
+    /// account (`b`) omitted: must be refused with nothing changed.
     OmitAccount = "omit_account",
-    /// The same with one remaining account replaced by a fresh key.
+    /// The same with one remaining account replaced by a fresh key: must be refused too (an
+    /// accepted replacement fails the run since M10; before, an anomaly).
     ReplaceAccount = "replace_account",
     // ---- M7: degraded mode, fees, the mint filter, extras sets ----------------------------------
     /// `set_coverage_pause` (O17's pause-opens-only `coverage_authority`): pause (`a` odd) or
@@ -238,6 +244,11 @@ kinds! {
     /// one transaction: refused `CoveragePaused` on a coverage-paused market, ordinary gates
     /// otherwise.
     EmergencyClear = "emergency_clear",
+    // ---- M10: the adversarial suite (ARCH §8.2 F5) -------------------------------------------
+    /// `[withdraw, sol_settle]` in one transaction (C0-9): lender `a` withdraws (the shares as
+    /// [`Kind::Withdraw`] picks them from `b`) ahead of a settlement of position `b / 1100`; the
+    /// withdrawal must stay within the pro-rata allowance the lender had before it.
+    WithdrawThenSettle = "withdraw_then_settle",
 }
 
 /// One action.
@@ -388,6 +399,7 @@ impl Profile {
             CoverageBracket => 1,
             WrappedOpen => 3,
             EmergencyClear => 2,
+            WithdrawThenSettle => 1,
             Liquidity | LpWrappedCrank | DepositWrappedOpen | WithdrawWrappedExit => {
                 return if lp {
                     match kind {

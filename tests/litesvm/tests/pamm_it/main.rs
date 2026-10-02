@@ -17,6 +17,7 @@
 //! | `negvqr` | the synthetic negative-VQR pool: pricing on `vault + VQR`, trades to the lamport, the tier inputs at `min(real, effective)` |
 //! | `lock` | ★T-PAMM-LOCK (M6R-1, the owner's decision of 2026-09-30): the pool's locked depth `D` from its burned LP (the LP mint P6), key-checked; third-party `deposit` / `withdraw` against the size cap, the tier, the reference cap and the warm-up's `L_slow ≤ D` (`attacks/pumpswap_lp.py` parts 2 and 3); FITS-2 (a) and FITX-1 on a pool with third-party LP; M6D-1 as decided (OWNER-M6D-1, ARCH row 57, ECON #106: PumpSwap credited on its burned LP only — part 3 (b): a held deposit lifts no open; part 3 (e): the pulled pump liquidates, the lenders whole; part 3 (f), M6E-1: the reference cap at `D`, so a deposit pulled at a deadline holds no expiry up); the capacity the rule costs on every pool fixture |
 //! | `admin` | venue admin with a position open (M10): PumpSwap `FeeConfig` hikes between the caps and above the hard cap (G-G4: opens refused, S3 evidence, risk and FV at the locked cap, closes and liquidations at the live fee), mayhem at listing and mid-position and a non-WSOL quote plant (G-H9), a pool layout change (G-H3: not executable, S3 at the cap), the Emergency route-broken flag (G-D6: S3 after the timer, liquidations identical second by second, O15's race against an honest expiry), extras on the sell leg (G-H2: appended to the `sell` CPI) |
+//! | `hooks` | M10: the PumpSwap clauses of I18 — (a) the price start's anchor at the burned depth, (d) the exit reference capped at `D`, (f) `L_slow ≤ pool_d` through the warm-up — and I15's burned-LP sizing and tier (OWNER-M6D-1) fire on a mutant's state after a real instruction, which passes |
 //! | `graduation` | a curve market with open positions through completion, `PumpMigrating`, `migrate_v2`, `→ PumpSwap`, the warm-up and exits on the pool; a graduation without positions, then trading on the pool. The atomic `[buy_v2(rT), migrate_v2]` is `m5_sec_curve_it::m5_sec_4_an_atomic_complete_and_migrate_graduates_the_market_onto_its_pool`, a borrower's self-made straddle and the bundle `straddle_it::a_self_made_straddle_is_liquidated_on_the_pool_after_the_bundle`, the real `migrate_v2` scenarios `pump_curve_e2e` |
 //!
 //! Opens and closes are sent with a 300 k CU limit (`VenueMarket::cu_limit`), keeper exits with
@@ -31,6 +32,7 @@ mod creator;
 mod flows;
 mod gates;
 mod graduation;
+mod hooks;
 mod listing;
 mod lock;
 mod negvqr;

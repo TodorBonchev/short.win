@@ -9,6 +9,8 @@ use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
 use shortwin::venues::ExtrasSel;
 use shortwin_litesvm_tests::Env;
 use shortwin_litesvm_tests::engine::{MockMarket, VenueMarket};
+use shortwin_litesvm_tests::pump::PumpMarket;
+use shortwin_litesvm_tests::raydium::RayMarket;
 use solana_keypair::Keypair;
 
 use crate::action::Kind;
@@ -37,8 +39,20 @@ pub trait Venue {
     /// `shortwin_litesvm_tests::engine` take it.
     fn vm(&self) -> &dyn VenueMarket;
 
-    /// The mock market (the mock-only differential exit oracle runs on it).
+    /// The mock market (the mock's differential exit oracle runs on it).
     fn as_mock(&self) -> Option<&MockMarket> {
+        None
+    }
+
+    /// The Raydium market while its adopted pool is an AMM v4 pool (the AMM v4 differential exit
+    /// oracle, `raydium_v4_support`, runs on it; M10).
+    fn as_ray_v4(&self) -> Option<&RayMarket> {
+        None
+    }
+
+    /// The curve market before its graduation (the curve's differential exit oracle,
+    /// [`crate::curve_exit`], runs on it while the market is on the live curve; M10).
+    fn as_curve(&self) -> Option<&PumpMarket> {
         None
     }
 

@@ -6,10 +6,11 @@
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::Instruction;
 use shortwin::constants::{
-    GUARD_PUMP_AMM, GUARD_PUMP_FEES, PUMP_AMM_GLOBAL_CONFIG, VENUE_PROGRAM_DATA,
+    GUARD_PUMP_AMM, GUARD_PUMP_FEES, PUMP_AMM_FEE_CONFIG, PUMP_AMM_GLOBAL_CONFIG,
+    VENUE_PROGRAM_DATA,
 };
 use shortwin_litesvm_tests::engine::VenueMarket;
-use shortwin_litesvm_tests::fork::{self, PumpProgram};
+use shortwin_litesvm_tests::fork::{self, PumpProgram, TierSpec};
 use shortwin_litesvm_tests::pamm::{
     self, GC_DISABLE_FLAGS, PammCoin, PammLp, PammMarket, PammTrade, PammUser, pamm_trade_ix,
 };
@@ -32,6 +33,88 @@ pub struct PammVenue {
     pub user: PammUser,
     pub lp: PammLp,
     pub coin: String,
+    /// PumpSwap's `FeeConfig` as a fee shock found it (restored at level 0).
+    pub fee_saved: Option<FeeSpecs>,
+}
+
+/// A pump-fees `FeeConfig`'s fee lists as [`fork::fee_config_specs`] reads them: `(flat, tiers,
+/// stable, exotic)`.
+pub type FeeSpecs = ([u64; 3], Vec<TierSpec>, Vec<TierSpec>, [u64; 3]);
+
+/// The protocol fee (bps) a fee shock of `level` writes into every list of a pump-fees
+/// `FeeConfig`, the LP and creator parts kept: from none to ten times the hard cap's reach —
+/// with the curve's 0 / 30 and PumpSwap's 20 / 5 bps around it, one-way fees from about 0.3 % to
+/// 10.3 %, below `venue_fee_cap_bps` (150), between the caps and above `venue_fee_hard_cap_bps`
+/// (500; [`crate::world::FEE_ABOVE_CAP`] ≡ 5 (mod 6) is the highest).
+const PUMP_FEE_SHOCK_BPS: [u64; 6] = [0, 10, 50, 150, 300, 1_000];
+
+/// A fee shock of the pump-fees `FeeConfig` at `key` (pump's `8Wf5Ti…` for the curve, PumpSwap's
+/// `5PHirr…` for the pools; the admin's `update_fee_config` / `upsert_fee_tiers`, here written by
+/// `fork::set_fee_config`): level 0 restores what `saved` holds, any other level saves the config
+/// first (once) and either sets every tier's protocol fee to
+/// [`PUMP_FEE_SHOCK_BPS`]`[level mod 6]` or — with the market caps `(at the spot, at P_ema)`
+/// (PumpSwap) and `level / 6` odd — plants a **tier boundary**: midway between the two when the
+/// spot is below `P_ema`, else at `(90 + level mod 9) %` of the spot's; the fees in effect at the
+/// spot now below it, a third of the LP and creator parts and no protocol fee above it (M7-SEC-5's
+/// shape: the live fee above the fee at `P_ema` the fee-scaled caps take, which then bind below
+/// the impact and wallet caps — an open after the spot fell, or wrapped in a sale inside the open's
+/// spot–EMA guard, meets it; `open_near_cap` probes the cap's edge).
+pub fn pump_fee_shock(
+    cx: &mut Ctx,
+    key: &Pubkey,
+    saved: &mut Option<FeeSpecs>,
+    level: u32,
+    mcaps: Option<(u128, u128)>,
+) -> bool {
+    if level == 0 {
+        if let Some((flat, tiers, stable, exotic)) = saved.take() {
+            fork::set_fee_config(&mut cx.env.svm, key, flat, &tiers, &stable, exotic);
+        }
+    } else {
+        let (flat, tiers, stable, exotic) = saved
+            .get_or_insert_with(|| fork::fee_config_specs(&cx.env.svm, key))
+            .clone();
+        match mcaps.filter(|_| (level / 6) % 2 == 1) {
+            Some((cap, at_ema)) => {
+                // The tier in effect at `cap`: the last whose threshold it reaches.
+                let now = tiers
+                    .iter()
+                    .filter(|(t, _)| *t <= cap)
+                    .max_by_key(|(t, _)| *t)
+                    .map_or(flat, |(_, f)| *f);
+                let above = [now[0] / 3, 0, now[2] / 3];
+                let boundary = if cap < at_ema {
+                    cap / 2 + at_ema / 2
+                } else {
+                    cap / 100 * u128::from(90 + level % 9)
+                };
+                fork::set_fee_config(
+                    &mut cx.env.svm,
+                    key,
+                    flat,
+                    &[(0, now), (boundary, above)],
+                    &stable,
+                    exotic,
+                );
+            }
+            None => {
+                let p = PUMP_FEE_SHOCK_BPS[(level % 6) as usize];
+                let set = |f: [u64; 3]| [f[0], p, f[2]];
+                let list =
+                    |l: &[TierSpec]| l.iter().map(|(t, f)| (*t, set(*f))).collect::<Vec<_>>();
+                fork::set_fee_config(
+                    &mut cx.env.svm,
+                    key,
+                    set(flat),
+                    &list(&tiers),
+                    &list(&stable),
+                    set(exotic),
+                );
+            }
+        }
+    }
+    cx.env.assert_invariants();
+    true
 }
 
 /// The pAMM `GlobalConfig.disable_flags` byte.
@@ -71,6 +154,7 @@ impl PammVenue {
             user,
             lp,
             coin: coin.to_string(),
+            fee_saved: None,
         }
     }
 
@@ -235,6 +319,22 @@ impl Venue for PammVenue {
         true
     }
 
+    fn fee_shock(&mut self, cx: &mut Ctx, level: u32) -> bool {
+        // The pool's market cap as pump-fees tiers it, `effective_quote·supply/base`, and at the
+        // market's `P_ema`, `P_ema·supply/WAD` (the fee the caps take, M7-SEC-5).
+        let p_ema = cx.env.market(&self.pm.market()).ema_price.get();
+        let mcaps = self.pm.pool.reserves(&cx.env.svm).and_then(|r| {
+            let a = cx.env.svm.get_account(&self.pm.pool.mint)?;
+            let supply = shortwin_venue_state::mint::read_base(&a.owner.to_bytes(), &a.data)
+                .ok()?
+                .supply;
+            let spot = r.effective_quote * u128::from(supply) / u128::from(r.base.max(1));
+            let at_ema = p_ema.checked_mul(u128::from(supply))? / shortwin_math::num::WAD;
+            (r.base > 0).then_some((spot, at_ema))
+        });
+        pump_fee_shock(cx, &PUMP_AMM_FEE_CONFIG, &mut self.fee_saved, level, mcaps)
+    }
+
     fn special(&mut self, cx: &mut Ctx, kind: Kind, a: u32, _b: u32) -> Option<()> {
         match kind {
             Kind::GraduationHalt => {
@@ -274,11 +374,11 @@ impl Venue for PammVenue {
 
     fn restore(&mut self, cx: &mut Ctx) {
         pamm::set_disable_flags(&mut cx.env.svm, 0);
-        cx.env.assert_invariants();
+        self.fee_shock(cx, 0);
     }
 
     fn disturbed(&self, env: &Env) -> bool {
-        disable_flags(env) != 0
+        disable_flags(env) != 0 || self.fee_saved.is_some()
     }
 }
 
