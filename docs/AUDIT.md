@@ -122,16 +122,18 @@ two cases:
 
 So a new program, crate or service, for example WP-7's governance tool under `services/`,
 fails `check` until a reviewed edit of the script puts it in a unit or excludes it with a
-reason. Line counts at `e857a2a`:
+reason. Line counts on the integrated M10 tree (`m10/integration`, release ELF `a5766d13…`).
+Since `e857a2a`, WP-6's `security_txt!` block and AUD-10 lints add 13 non-test nLOC to each
+program (tokei: +18 `shortwin`, +14 `complete_curve`):
 
 | Class | Unit | `.rs` files | tokei 14.0.0 "code" | non-test nLOC |
 |---|---|---|---|---|
-| core | `programs/shortwin` (without the TEST-ONLY `venues/mock.rs`) | 70 | 15,858 | 13,109 |
-| core | `programs/complete_curve` | 1 | 280 | 201 |
+| core | `programs/shortwin` (without the TEST-ONLY `venues/mock.rs`) | 70 | 15,876 | 13,122 |
+| core | `programs/complete_curve` | 1 | 294 | 214 |
 | core | `crates/shortwin-math` (`src/`) | 25 | 10,063 | 6,190 |
 | core | `crates/shortwin-venue-state` (`src/`, without the TEST-ONLY `mock_cpamm.rs`) | 10 | 3,697 | 1,617 |
 | core | build pins: `Cargo.toml`, `Cargo.lock`, `Anchor.toml`, `rust-toolchain.toml` | — | — | — |
-| **core** | **total** | **106** | **29,898** | **21,117** |
+| **core** | **total** | **106** | **29,930** | **21,143** |
 | keeper (Q2) | keeper core: exit and crank decisions, coverage and budget, the instructions and account lists it sends (`decide`, `coverage`, `budget`, `fees`, `graduation`, `ixs`, `venue`, `view`, `pda`, `sweep`, `monitor`, `pool_monitor`; `services/common` `tx`, `chain`) | 14 | 7,759 | 4,692 |
 | keeper (Q2) | keeper rest: the loop (`keeper.rs`, 3,235 non-test nLOC), config, metrics, alerts, the RPC backend, the ALT and v1-probe tools | 12 | 6,320 | 5,825 |
 | out | TEST-ONLY mock venue code (`venues/mock.rs`, `mock_cpamm.rs`, `tests/mock_cpamm`) | 6 | 1,422 | 1,188 |
@@ -142,7 +144,7 @@ reason. Line counts at `e857a2a`:
 - **non-test nLOC**: `python3 scripts/audit_scope.py nloc`. It drops every `#[cfg(test)]` item,
   then counts the same way. The item's end is found by counting braces outside string, char
   and comment text. The script warns when a braced item does not close at its attribute's
-  indentation; it gives no warning at `e857a2a`.
+  indentation; it gives no warning on this tree.
 - The M10 audit-preparation research counted ≈ 21.4k on-chain (shortwin 13,702 with the mock
   adapter; math 6,193; venue-state 1,686). The script does better on two files:
   - `mint_filter.rs`: the research kept a test module whose attribute spans several lines
@@ -470,7 +472,10 @@ The full gate (G-full in the M10 plan; CI's `ci.yml`) also runs fmt and clippy w
 - program-tests, t-pot, codama (IDL and client diffs, both IDLs), web, web-e2e;
 - the benches m1-cu, m2-cu, m3-cu, m5-cu, m6-cu, m7-keeper-bench, and t-size;
 - services and indexer;
-- fuzz-smoke, fuzz-nightly (schedule only) and mutants.
+- fuzz-smoke on every push; fuzz-nightly and mutants are opt-in. A `schedule` run (main only)
+  runs them only when the repository variable `FUZZ_NIGHTLY` is `true` (owner decision
+  2026-10-02, `4cb7729`). Otherwise they run on `workflow_dispatch`: fuzz-nightly only with a
+  `fuzz_duration` input, mutants on every dispatch.
 
 TODO(WP-4) adds the `verifiable-build` job, and TODO(WP-6) a `security.txt` step.
 TODO(WP-12): the green run URL on the tag (Q1: how `m1-core` gets CI).
