@@ -524,3 +524,507 @@ fn close_under_a_fee_above_the_hard_cap() {
         assert_eq!(close.buyback_cost, b_exp, "{fixture:?}: the live 8 % fee");
     }
 }
+
+// ---- M10 WP-8a: venue admin with positions open on AMM v4 (G-D6, G-G5, G-H3) -------------------
+
+/// The Emergency multisig sets or clears the route-broken flag of `rm`'s market
+/// (`venue_scope = false`) or the AMM v4 bit of `venue_route_broken` (O6, A40).
+fn set_flag(env: &mut Env, rm: &RayMarket, venue_scope: bool, broken: bool) {
+    let ea = env.pause_authority.insecure_clone();
+    let ix = if venue_scope {
+        let bit = shortwin::constants::VENUE_BIT_RAYDIUM_V4.trailing_zeros() as u8;
+        shortwin_litesvm_tests::engine::set_route_broken_ix(
+            &ea.pubkey(),
+            shortwin::PauseScope::Global,
+            bit,
+            broken,
+            None,
+        )
+    } else {
+        shortwin_litesvm_tests::engine::set_route_broken_ix(
+            &ea.pubkey(),
+            shortwin::PauseScope::Market,
+            0,
+            broken,
+            Some(rm.market()),
+        )
+    };
+    ok(env.send(&[ix], &[&ea]));
+}
+
+/// The pool's live AMM v4 fee as a pricing.
+fn v4_pricing(env: &Env, rm: &RayMarket) -> Pricing {
+    let i = rm.v4().info(&env.svm);
+    Pricing::RayV4(RayV4Fee {
+        num: i.swap_fee_numerator,
+        den: i.swap_fee_denominator,
+    })
+}
+
+/// A whale that buys the token on `rm`'s pool with its WSOL.
+fn whale(env: &mut Env, rm: &RayMarket) -> fork::Trader {
+    let (tok, program) = rm.pool.token();
+    let (_, y) = rm.reserves(&env.svm).unwrap();
+    fork::trader(env, &tok, program, y.saturating_mul(4), 0)
+}
+
+/// The whale's exact-in buy of `sol` lamports (a real swap).
+fn whale_buys(env: &mut Env, rm: &RayMarket, w: &fork::Trader, sol: u64) {
+    ok(fork::swap(
+        env,
+        &rm.pool,
+        w,
+        shortwin_math::fees::Direction::Buy,
+        fork::Swap::ExactIn(sol, 0),
+    ));
+}
+
+/// Jumps the clock to `deadline + after` of `pos` (a new slot range) and cranks 3 s there.
+fn jump_to_deadline(env: &mut Env, rm: &RayMarket, pos: &ShortPosition, after: i64) {
+    let slot = env.clock().slot;
+    env.set_clock(pos.deadline + after, slot + 1_500_000);
+    env.tick(rm, 3);
+}
+
+/// One keeper second: a crank and a `liquidate` attempt: `Ok(event fields)` or the refusal
+/// code.
+type LiqAttempt = Result<[u64; 10], Option<u32>>;
+
+fn liquidate_attempt(
+    env: &mut Env,
+    rm: &RayMarket,
+    keeper: &Keypair,
+    b: &Borrower,
+    nonce: u64,
+) -> LiqAttempt {
+    env.warp(1);
+    env.crank(rm);
+    let ix = liquidate_ix(rm, &keeper.pubkey(), &b.key(), nonce);
+    let res = env.send(&[ix], &[keeper]);
+    match &res {
+        Ok(meta) => {
+            let e: shortwin::events::Liquidate = events::one(meta);
+            Ok([
+                e.buyback_cost,
+                e.b_live,
+                e.b_ref,
+                e.max_in,
+                e.rent,
+                e.penalty,
+                e.penalty_keeper,
+                e.keeper_topup,
+                e.borrower_payout,
+                e.token_surplus,
+            ])
+        }
+        Err(_) => Err(custom_code(&res)),
+    }
+}
+
+/// G-D6 / T-S3-BROKEN on AMM v4 (ARCH §5.3, §8.2; V2-1, O15): the Emergency flag — the market's
+/// or the AMM v4 venue bit — on an executable pool starts the S3 chain at the next observation
+/// and nothing else (`pool_fail` stays clear; the pool is still observed). A healthy position
+/// never settles before its deadline; flagged 300 s before it, the expired position waits for
+/// the chain's `s3_wait_s` and settles S3 at the first keeper call after `since + s3_wait_s`,
+/// with the expiry fee at both corners and FV at the EMA point priced at the live fee (the
+/// venue executes: `min(φ_live, cap)` = `φ_live`). Clearing the flag clears the chain.
+#[test]
+fn amm_v4_an_emergency_flag_settles_expired_positions_after_the_timer() {
+    for venue_scope in [false, true] {
+        let (mut env, rm, q) = setup(FART);
+        let mut b = env.borrower();
+        let (_, nonce, _) = open_ok(&mut env, &rm, &mut b, q);
+        let pos = env.position(&rm, &b.key(), nonce);
+        jump_to_deadline(&mut env, &rm, &pos, -300);
+        set_flag(&mut env, &rm, venue_scope, true);
+        let mut b2 = env.borrower();
+        assert_err(&env.open(&rm, &mut b2, q).0, E::RouteBroken);
+        env.warp(1);
+        env.crank(&rm);
+        let m = env.market(&rm.market());
+        let since = m.no_route_since;
+        assert_eq!(
+            since,
+            env.now(),
+            "venue scope {venue_scope}: the chain starts"
+        );
+        assert_eq!(m.pool_fail_since, 0, "pool_fail never reads the flag");
+        assert!(m.b_lo.get() > 0, "the pool is still observed");
+        let keeper = env.funded_keypair();
+        let due = (since + i64::from(pos.s3_wait_s)).max(pos.deadline);
+        let ev = loop {
+            env.warp(30);
+            env.crank(&rm);
+            if let Some(ev) = settle(&mut env, &rm, &keeper, &b, nonce) {
+                break ev;
+            }
+            assert!(env.now() < due, "S3 is due at {due}");
+        };
+        assert!(
+            env.now() >= due && env.now() < due + 30,
+            "S3 at the first call after the timer"
+        );
+        assert_eq!(ev.condition, 3);
+        assert_eq!(
+            (ev.pprime_lo, ev.pprime_hi),
+            (pos.expiry_fee_bps, pos.expiry_fee_bps),
+            "O15: an expired healthy position pays the expiry fee"
+        );
+        let m = env.market(&rm.market());
+        let (p, l) = (m.ema_price.get(), m.ema_liq.get());
+        let r_due = rent::due(&pos.pos_rent(), &m.basis()).unwrap();
+        let live = v4_pricing(&env, &rm).capped(u64::from(pos.venue_fee_hard_cap_bps));
+        let fv = fair_value(live, pos.q, p, l, ev.pprime_lo, r_due);
+        assert_eq!(ev.fv, fv, "FV at the EMA point, the live fee");
+        let take = pos.v - k_s(&pos);
+        assert_eq!(ev.lender_amount, fv.min(take));
+        assert_eq!(ev.borrower_amount, take - ev.lender_amount);
+        // Cleared: the next observation clears the chain.
+        set_flag(&mut env, &rm, venue_scope, false);
+        env.warp(1);
+        env.crank(&rm);
+        assert_eq!(env.market(&rm.market()).no_route_since, 0);
+    }
+}
+
+/// G-D6 / T-S3-BROKEN, the liquidation side on AMM v4 (V2-1, I10): from the same state, along
+/// the same path of real whale buys (1 % of the SOL reserve a second), with and without the
+/// Emergency flag the keeper's `liquidate` refuses with the same codes in the same seconds and
+/// executes in the same second with identical amounts; `pool_fail` stays clear in both runs and
+/// only the flagged run has an S3 chain.
+#[test]
+fn amm_v4_liquidations_are_identical_with_and_without_the_flag() {
+    let (mut env, rm, q) = setup(FART);
+    let mut b = env.borrower();
+    let (_, nonce, _) = open_ok(&mut env, &rm, &mut b, q);
+    env.tick(&rm, 3);
+    let keeper = env.funded_keypair();
+    let w = whale(&mut env, &rm);
+    let (_, y) = rm.reserves(&env.svm).unwrap();
+    let saved = env.svm.clone();
+    let mut runs = Vec::new();
+    for flag in [false, true] {
+        env.svm = saved.clone();
+        if flag {
+            set_flag(&mut env, &rm, false, true);
+        }
+        let mut trace = Vec::new();
+        for _ in 0..120 {
+            whale_buys(&mut env, &rm, &w, y / 100);
+            let a = liquidate_attempt(&mut env, &rm, &keeper, &b, nonce);
+            let done = a.is_ok();
+            trace.push(a);
+            if done {
+                break;
+            }
+        }
+        let m = env.market(&rm.market());
+        runs.push((trace, m.pool_fail_since, m.no_route_since));
+    }
+    let (plain, flagged) = (&runs[0], &runs[1]);
+    assert!(
+        plain.0.last().is_some_and(Result::is_ok),
+        "the path liquidates"
+    );
+    assert!(plain.0.len() > 1, "healthy first");
+    assert_eq!(plain.0, flagged.0, "the same attempts, second by second");
+    assert_eq!(
+        (plain.1, flagged.1),
+        (0, 0),
+        "pool_fail never reads the flag"
+    );
+    assert_eq!(plain.2, 0);
+    assert!(flagged.2 > 0, "only the flagged run has an S3 chain");
+}
+
+/// ECON §8.6's race under the Emergency flag on AMM v4 (O15; ARCH §8.2 round 3): at the
+/// deadline of a flagged, expired, healthy position whose S3 chain has run `s3_wait_s`, the
+/// honest keeper's `expire()` and a lender-keeper's `sol_settle(S3)` are both valid; whichever
+/// lands first closes the position and the other finds none (Anchor's
+/// `AccountNotInitialized`). The S3 take equals the expiry's buyback, fee and rent within
+/// 0.1 %, and the borrower's difference is `K_s − K_e` within the same margin.
+#[test]
+fn amm_v4_an_emergency_flag_s3_races_an_honest_expiry() {
+    let (mut env, rm, q) = setup(FART);
+    let mut b = env.borrower();
+    let (_, nonce, _) = open_ok(&mut env, &rm, &mut b, q);
+    let pos = env.position(&rm, &b.key(), nonce);
+    jump_to_deadline(&mut env, &rm, &pos, -700);
+    set_flag(&mut env, &rm, false, true);
+    let keeper = env.funded_keypair();
+    for _ in 0..23 {
+        env.warp(30);
+        env.crank(&rm);
+        assert!(settle(&mut env, &rm, &keeper, &b, nonce).is_none());
+    }
+    let now = env.now();
+    env.warp(pos.deadline - 5 - now);
+    env.tick(&rm, 5);
+    assert_eq!(env.now(), pos.deadline);
+    let honest = env.funded_keypair();
+    let saved = env.svm.clone();
+
+    let ix = shortwin_litesvm_tests::engine::expire_ix(&rm, &honest.pubkey(), &b.key(), nonce);
+    let exp: shortwin::events::Expire = events::one(&ok(env.send(&[ix], &[&honest])));
+    let ix = sol_settle_ix(&env, &rm, &keeper.pubkey(), &b.key(), nonce);
+    assert_eq!(
+        custom_code(&env.send(&[ix], &[&keeper])),
+        Some(ANCHOR_ACCOUNT_NOT_INITIALIZED),
+        "the lender-keeper's S3 finds no position"
+    );
+
+    env.svm = saved;
+    let ev = settle(&mut env, &rm, &keeper, &b, nonce).expect("S3 at the deadline");
+    assert_eq!(ev.condition, 3);
+    assert_eq!(
+        (ev.pprime_lo, ev.pprime_hi),
+        (pos.expiry_fee_bps, pos.expiry_fee_bps)
+    );
+    let ix = shortwin_litesvm_tests::engine::expire_ix(&rm, &honest.pubkey(), &b.key(), nonce);
+    assert_eq!(
+        custom_code(&env.send(&[ix], &[&honest])),
+        Some(ANCHOR_ACCOUNT_NOT_INITIALIZED),
+        "the honest expiry finds no position"
+    );
+    let expiry_value = exp.buyback_cost + exp.expiry_fee + exp.rent;
+    let diff = ev.lender_amount.abs_diff(expiry_value);
+    assert!(
+        diff * 1_000 <= expiry_value,
+        "S3 take {} vs the expiry's B + fee + rent {expiry_value}",
+        ev.lender_amount
+    );
+    let extra = i128::from(exp.borrower_payout) - i128::from(ev.borrower_amount);
+    let keeper_gap = i128::from(ev.k_s) - i128::from(exp.keeper_reward);
+    assert!(
+        (extra - keeper_gap).unsigned_abs() <= u128::from(diff),
+        "borrower: expiry {} vs S3 {} (K_s {} / K_e {})",
+        exp.borrower_payout,
+        ev.borrower_amount,
+        ev.k_s,
+        exp.keeper_reward
+    );
+}
+
+/// Anchor's `AccountNotInitialized`: a closed position account.
+const ANCHOR_ACCOUNT_NOT_INITIALIZED: u32 = 3_012;
+
+/// G-G5 (V2-1, I16 risk-quote clause) on AMM v4: **the liquidatable set is unchanged above the
+/// hard cap**. A real whale buy (sized so that the position is CR-liquidatable at the
+/// position's 500 bps cap but not at the pool's own 25 bps), then the keeper every second. With
+/// the pool's fee hiked to exactly the cap (500 bps: between the caps, no route evidence) and to
+/// 70 % (far above it: both chains run), the risk view is the same `min(φ_live, cap)` = cap:
+/// `liquidate` refuses `NotLiquidatable` in exactly the same seconds and stops doing so in the
+/// same second. At the cap the liquidation executes; at 70 % the buyback at the live fee no
+/// longer fits `V − K_s` (`UseSolSettle`): the keeper's per-second `sol_settle` settles it S3
+/// once the hike's chain has run `s3_wait_s`, with the penalty and FV at the position's cap.
+/// Control: without a hike (risk at 25 bps) the position is never liquidatable on this path.
+#[test]
+fn amm_v4_the_liquidatable_set_is_unchanged_above_the_hard_cap() {
+    let (mut env, rm, q) = setup(FART);
+    let mut b = env.borrower();
+    let (_, nonce, _) = open_ok(&mut env, &rm, &mut b, q);
+    let pos = env.position(&rm, &b.key(), nonce);
+    env.tick(&rm, 3);
+    let keeper = env.funded_keypair();
+    let w = whale(&mut env, &rm);
+    let cap = u64::from(pos.venue_fee_hard_cap_bps);
+    let at_cap = Pricing::RayV4(RayV4Fee {
+        num: cap,
+        den: 10_000,
+    });
+    let own = v4_pricing(&env, &rm);
+    // The buy that puts B̂ at the CR_liq boundary between the two fee views: B̂_own·L <
+    // V_eff·10⁴ < B̂_cap·L, by bisection on clones of the VM.
+    let m = env.market(&rm.market());
+    let r_due = rent::due(&pos.pos_rent(), &m.basis()).unwrap();
+    let target = u128::from(pos.v - r_due) * 10_000 / u128::from(pos.cr_liq_bps);
+    let cost_after = |env: &mut Env, sol: u64, pr: Pricing| -> u128 {
+        let saved = env.svm.clone();
+        whale_buys(env, &rm, &w, sol);
+        let (x, y) = rm.reserves(&env.svm).unwrap();
+        env.svm = saved;
+        u128::from(pr.buy(q, u128::from(x), u128::from(y)).unwrap().cost)
+    };
+    let (_, y) = rm.reserves(&env.svm).unwrap();
+    let (mut lo, mut hi) = (0u64, y);
+    for _ in 0..40 {
+        let mid = lo + (hi - lo) / 2;
+        // Aim B̂_own at 2.4 % under the boundary (B̂_cap is ≈ 4.8 % above B̂_own).
+        if cost_after(&mut env, mid, own) * 1_024 < target * 1_000 {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    whale_buys(&mut env, &rm, &w, lo);
+    let (x1, y1) = rm.reserves(&env.svm).unwrap();
+    let cost = |pr: Pricing| u128::from(pr.buy(q, u128::from(x1), u128::from(y1)).unwrap().cost);
+    assert!(
+        cost(own) < target && cost(at_cap) > target,
+        "the boundary sits between"
+    );
+    let saved = env.svm.clone();
+    let mut runs = Vec::new();
+    let mut above_state = None;
+    for hike in [Some(cap), Some(7_000), None] {
+        env.svm = saved.clone();
+        if let Some(bps) = hike {
+            set_fee(&mut env, &rm, bps);
+        }
+        let mut trace = Vec::new();
+        for _ in 0..60 {
+            let a = liquidate_attempt(&mut env, &rm, &keeper, &b, nonce);
+            let stop = a != Err(Some(code(E::NotLiquidatable)));
+            trace.push(a);
+            if stop {
+                break;
+            }
+        }
+        if hike == Some(7_000) {
+            above_state = Some(env.svm.clone());
+        }
+        let m = env.market(&rm.market());
+        runs.push((trace, m.no_route_since, m.pool_fail_since));
+    }
+    let (at, above, none) = (&runs[0], &runs[1], &runs[2]);
+    assert!(
+        at.0.last().unwrap().is_ok(),
+        "liquidated with the fee at the cap"
+    );
+    assert!(at.0.len() > 1, "the EMA leg follows first");
+    assert_eq!(at.0.len(), above.0.len(), "liquidatable in the same second");
+    assert_eq!(
+        at.0[..at.0.len() - 1],
+        above.0[..above.0.len() - 1],
+        "the same refusals before it"
+    );
+    assert_eq!(
+        *above.0.last().unwrap(),
+        Err(Some(code(E::UseSolSettle))),
+        "70 %: the normal buyback is not allowed at the live fee"
+    );
+    assert_eq!(
+        (at.1, at.2),
+        (0, 0),
+        "a fee at the cap is no route evidence"
+    );
+    assert!(above.1 > 0 && above.2 > 0, "70 %: both chains run");
+    assert_eq!(none.0.len(), 60, "never liquidatable at 25 bps");
+    assert!(
+        none.0
+            .iter()
+            .all(|a| *a == Err(Some(code(E::NotLiquidatable))))
+    );
+    // At 70 % the CR-liquidatable position leaves through `sol_settle`: the keeper's call every
+    // second settles it S3 once the chain (started by the hike) has run `s3_wait_s`, with the
+    // penalty at both corners and FV at the EMA point priced at the position's cap.
+    env.svm = above_state.expect("the 70 % run");
+    let mut exit = None;
+    for s in 1..=900u32 {
+        env.warp(1);
+        env.crank(&rm);
+        if let Some(ev) = settle(&mut env, &rm, &keeper, &b, nonce) {
+            exit = Some((s, ev));
+            break;
+        }
+    }
+    let (s, ev) = exit.expect("settled through sol_settle");
+    eprintln!(
+        "G-G5 at 70 %: sol_settle S{} after {s} s, lenders {} of V − K_s {}",
+        ev.condition,
+        ev.lender_amount,
+        pos.v - k_s(&pos)
+    );
+    assert_eq!(ev.condition, 3);
+    let m = env.market(&rm.market());
+    assert!(env.now() >= m.no_route_since + i64::from(pos.s3_wait_s));
+    assert!(env.now() < m.no_route_since + i64::from(pos.s3_wait_s) + 2);
+    assert_eq!(
+        (ev.pprime_lo, ev.pprime_hi),
+        (pos.penalty_bps, pos.penalty_bps)
+    );
+    let (p, l) = (m.ema_price.get(), m.ema_liq.get());
+    let r_due = rent::due(&pos.pos_rent(), &m.basis()).unwrap();
+    let fv = fair_value(at_cap, pos.q, p, l, ev.pprime_lo, r_due);
+    assert_eq!(ev.fv, fv, "FV at the locked cap");
+    assert_eq!(ev.lender_amount, fv.min(pos.v - k_s(&pos)));
+}
+
+/// G-H3 on AMM v4 (A63, V1-8; I16 "no observation while not executable", I12 S3 rules): the
+/// pool account grows by one byte with a position open — a venue-state layout change the
+/// reader refuses (`WrongTag`). The crank and `sol_settle` succeed and record nothing; both
+/// chains start; opens and closes fail with `NoRoute`. The expired position settles S3 once the
+/// chain has run `s3_wait_s`, on the frozen EMA point with FV priced at the position's hard cap
+/// — the pool's fee is unreadable (`min(φ_live, cap)` with `φ_live` unknown) — not at the
+/// pool's last known 25 bps (that FV differs). The old layout back, both chains clear.
+#[test]
+fn amm_v4_a_layout_change_with_a_position_open() {
+    let (mut env, rm, q) = setup(FART);
+    let mut b = env.borrower();
+    let (_, nonce, _) = open_ok(&mut env, &rm, &mut b, q);
+    let pos = env.position(&rm, &b.key(), nonce);
+    env.tick(&rm, 3);
+    let own = v4_pricing(&env, &rm);
+    let pool = rm.v4().pool;
+    let original = env.svm.get_account(&pool).unwrap();
+    fork::patch(&mut env.svm, &pool, |d| d.push(0));
+    env.warp(1);
+    let m0 = env.market(&rm.market());
+    env.crank(&rm);
+    let m = env.market(&rm.market());
+    assert_eq!(
+        (m.no_route_since, m.pool_fail_since),
+        (env.now(), env.now())
+    );
+    assert_eq!(m.b_lo.get(), 0, "nothing recorded");
+    // The hooks' own view (I13 / I16) sees the venue as not executable too, so a recorded
+    // observation or a missing chain here would fail every instruction's hooks.
+    let view = shortwin_litesvm_tests::invariants::venue_view::view(&env.svm, &m);
+    assert!(!view.expect("a venue view").executable);
+    assert_eq!(
+        m.ema_count,
+        m0.ema_count + 1,
+        "the bucket before integrates"
+    );
+    let keeper = env.funded_keypair();
+    assert!(settle(&mut env, &rm, &keeper, &b, nonce).is_none());
+    assert_err(&env.close(&rm, &b, nonce), E::NoRoute);
+    let mut b2 = env.borrower();
+    assert_err(&env.open(&rm, &mut b2, q).0, E::NoRoute);
+    let frozen = env.market(&rm.market());
+    jump_to_deadline(&mut env, &rm, &pos, -5);
+    let since = env.market(&rm.market()).no_route_since;
+    let ev = run_to_s3(&mut env, &rm, &keeper, &b, nonce, 30, 30).expect("S3");
+    assert_eq!(ev.condition, 3);
+    assert!(env.now() >= since + i64::from(pos.s3_wait_s) && env.now() < since + 630);
+    let m = env.market(&rm.market());
+    let (p, l) = (m.ema_price.get(), m.ema_liq.get());
+    assert_eq!(
+        (p, l),
+        (frozen.ema_price.get(), frozen.ema_liq.get()),
+        "the EMA is frozen"
+    );
+    assert_eq!((ev.p_lo, ev.p_hi, ev.l_lo, ev.l_hi), (p, p, l, l));
+    assert_eq!(ev.pprime_lo, pos.expiry_fee_bps);
+    let r_due = rent::due(&pos.pos_rent(), &m.basis()).unwrap();
+    let cap = u64::from(pos.venue_fee_hard_cap_bps);
+    let at_cap = Pricing::RayV4(RayV4Fee {
+        num: cap,
+        den: 10_000,
+    });
+    let fv = fair_value(at_cap, pos.q, p, l, ev.pprime_lo, r_due);
+    assert_eq!(ev.fv, fv, "FV at the position's hard cap");
+    assert_ne!(
+        ev.fv,
+        fair_value(own.capped(cap), pos.q, p, l, ev.pprime_lo, r_due),
+        "not at the pool's last fee"
+    );
+    assert_eq!(ev.lender_amount, fv.min(pos.v - k_s(&pos)));
+    // The old layout back.
+    env.svm.set_account(pool, original).unwrap();
+    env.warp(1);
+    env.crank(&rm);
+    let m = env.market(&rm.market());
+    assert_eq!((m.no_route_since, m.pool_fail_since), (0, 0));
+    assert!(m.b_lo.get() > 0);
+}

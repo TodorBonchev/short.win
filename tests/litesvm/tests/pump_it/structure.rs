@@ -190,3 +190,138 @@ fn liquidate_and_expire_check_every_curve_slot() {
     assert_eq!(tokens(&env, &pm.keys.pool_vault) - vault0, q);
     assert_trader_clean(&env, &pm);
 }
+
+// ---- M10 WP-8a: extras on the curve's sell leg (G-H2) -------------------------------------------
+
+/// The Emergency multisig publishes `entries` as the curve's sell-leg `current` extras set.
+fn publish_curve_sell_extras(env: &mut Env, entries: Vec<shortwin::ExtraEntryArg>) {
+    let ea = env.pause_authority.insecure_clone();
+    let ix = shortwin_litesvm_tests::engine::set_venue_extras_ix(
+        &ea.pubkey(),
+        VenueKind::PumpCurve as u8,
+        shortwin::state::EXTRAS_IX_SELL as u8,
+        entries,
+    );
+    ok(env.send(&[ix], &[&ea]));
+}
+
+/// A fixed read-only extras entry.
+fn fixed_extra(key: Pubkey) -> shortwin::ExtraEntryArg {
+    shortwin::ExtraEntryArg {
+        kind: shortwin::state::ENTRY_FIXED,
+        writable: false,
+        key,
+        seeds: Vec::<shortwin::SeedPartArg>::new(),
+    }
+}
+
+/// The transaction of an open of `q` by `b` (nonce 0) with extras selection `set` and `extras`
+/// after the curve's accounts; the open is its last instruction.
+fn open_with_extras_ixs(
+    pm: &PumpMarket,
+    b: &Borrower,
+    q: u64,
+    set: u8,
+    extras: &[AccountMeta],
+) -> Vec<Instruction> {
+    let sel = ExtrasSel { set, bumps: [0; 4] };
+    let ix = open_short_ix(pm, &b.key(), 0, q, 0, u64::MAX, u64::MAX, sel, extras);
+    with_cu_limit(pm, ix)
+}
+
+/// An open of `q` by `b` (nonce 0) with extras selection `set` and `extras` after the curve's
+/// accounts.
+fn open_with_extras(
+    env: &mut Env,
+    pm: &PumpMarket,
+    b: &Borrower,
+    q: u64,
+    set: u8,
+    extras: &[AccountMeta],
+) -> TxResult {
+    env.send(&open_with_extras_ixs(pm, b, q, set, extras), &[&b.kp])
+}
+
+/// The account list of the one pump CPI at height 2 (short.win's `sell_v2` / `buy_v2`) inside
+/// the last instruction of `ixs`, a transaction the harness payer sent.
+fn curve_leg_cpi_accounts(
+    env: &Env,
+    ixs: &[Instruction],
+    meta: &TransactionMetadata,
+) -> Vec<Pubkey> {
+    use shortwin::constants::PUMP_PROGRAM_ID;
+    let keys = solana_message::Message::new(ixs, Some(&env.payer.pubkey())).account_keys;
+    let calls: Vec<Vec<Pubkey>> = meta.inner_instructions[ixs.len() - 1]
+        .iter()
+        .filter(|i| {
+            i.stack_height == 2
+                && keys[usize::from(i.instruction.program_id_index)] == PUMP_PROGRAM_ID
+        })
+        .map(|i| {
+            i.instruction
+                .accounts
+                .iter()
+                .map(|a| keys[usize::from(*a)])
+                .collect()
+        })
+        .collect();
+    assert_eq!(calls.len(), 1, "one pump call at height 2");
+    calls.into_iter().next().unwrap()
+}
+
+/// G-H2 on the curve (A41, V2-6; C0-4 a): the Emergency publishes a harmless fixed extra on the
+/// curve's sell leg and an open selects `current`: short.win appends it to the `sell_v2` CPI
+/// (read from the transaction's inner instructions: the plain open's accounts plus the extra
+/// last), and pump ignores the trailing account, so the proceeds equal those of the same open
+/// without extras (from the same state).
+/// A second, hostile write names the lending vault: the open selecting `current` is refused
+/// `DeniedAccount` (the open's denylist), and the same open selecting `previous` — the harmless
+/// set — lands with the same proceeds.
+#[test]
+fn extras_on_the_sell_leg_ride_along_and_a_hostile_set_is_bypassed() {
+    use shortwin::venues::{EXTRAS_SET_CURRENT, EXTRAS_SET_PREVIOUS};
+    let (mut env, pm, q) = setup(PumpCoin::T22_115);
+    let b = env.borrower();
+    let extra = env.funded_keypair().pubkey();
+    publish_curve_sell_extras(&mut env, vec![fixed_extra(extra)]);
+    let seed = AccountMeta::new_readonly(pda::venue_extras_seed(VenueKind::PumpCurve as u8), false);
+    let harmless = [seed.clone(), AccountMeta::new_readonly(extra, false)];
+    let saved = env.svm.clone();
+    let ixs = open_with_extras_ixs(&pm, &b, q, ExtrasSel::NONE.set, &[]);
+    let meta = ok(env.send(&ixs, &[&b.kp]));
+    let plain: Open = events::one(&meta);
+    let plain_cpi = curve_leg_cpi_accounts(&env, &ixs, &meta);
+    env.svm = saved.clone();
+    let ixs = open_with_extras_ixs(&pm, &b, q, EXTRAS_SET_CURRENT, &harmless);
+    let meta = ok(env.send(&ixs, &[&b.kp]));
+    let with: Open = events::one(&meta);
+    // The extra reaches pump: the `sell_v2` CPI is the plain open's account list plus the
+    // published key at its end (forwarded, not dropped), and pump runs it.
+    let with_cpi = curve_leg_cpi_accounts(&env, &ixs, &meta);
+    assert_eq!(
+        with_cpi.split_last(),
+        Some((&extra, plain_cpi.as_slice())),
+        "sell_v2 carries the extra last"
+    );
+    assert_eq!(
+        (with.s, with.n_open),
+        (plain.s, plain.n_open),
+        "proceeds unchanged"
+    );
+    env.svm = saved;
+    publish_curve_sell_extras(&mut env, vec![fixed_extra(pm.keys.pool_vault)]);
+    let hostile = [seed, AccountMeta::new_readonly(pm.keys.pool_vault, false)];
+    assert_err(
+        &open_with_extras(&mut env, &pm, &b, q, EXTRAS_SET_CURRENT, &hostile),
+        E::DeniedAccount,
+    );
+    let prev: Open = events::one(&ok(open_with_extras(
+        &mut env,
+        &pm,
+        &b,
+        q,
+        EXTRAS_SET_PREVIOUS,
+        &harmless,
+    )));
+    assert_eq!(prev.s, plain.s, "previous: the harmless set");
+}

@@ -188,44 +188,61 @@ mod t_s3_broken {
 type LiqRun = (Vec<Option<u32>>, Option<(u32, [u64; 10])>, i64, i64);
 
 fn liquidation_run(sc: &mut Sc, flag: bool, keeper: &solana_keypair::Keypair) -> LiqRun {
-    use solana_signer::Signer;
     if flag {
         sc.set_route_broken(true);
     }
+    liquidation_path(sc, keeper, 1.01, 90)
+}
+
+/// One keeper `liquidate` of `borrower`'s position `nonce` now: the executed event's amounts
+/// (buyback, quotes, bound, rent, penalty and its keeper share, keeper top-up, borrower payout,
+/// token surplus), or the refusal code.
+fn liquidate_once(
+    sc: &mut Sc,
+    keeper: &solana_keypair::Keypair,
+    borrower: &anchor_lang::prelude::Pubkey,
+    nonce: u64,
+) -> Result<[u64; 10], Option<u32>> {
+    use solana_signer::Signer;
+    let ix =
+        shortwin_litesvm_tests::engine::liquidate_ix(&sc.mm, &keeper.pubkey(), borrower, nonce);
+    let res = sc.env.send(&[ix], &[keeper]);
+    match &res {
+        Ok(meta) => {
+            let e: shortwin::events::Liquidate = events::one(meta);
+            Ok([
+                e.buyback_cost,
+                e.b_live,
+                e.b_ref,
+                e.max_in,
+                e.rent,
+                e.penalty,
+                e.penalty_keeper,
+                e.keeper_topup,
+                e.borrower_payout,
+                e.token_surplus,
+            ])
+        }
+        Err(_) => Err(custom_code(&res)),
+    }
+}
+
+/// [`liquidation_run`]'s path from the state as it is: `n` seconds, each a move by `step`, a
+/// crank and the keeper's `liquidate`.
+fn liquidation_path(sc: &mut Sc, keeper: &solana_keypair::Keypair, step: f64, n: u32) -> LiqRun {
     let mut refusals = Vec::new();
     let mut done = None;
-    for s in 1..=90u32 {
-        sc.move_by(1.01);
+    for s in 1..=n {
+        sc.move_by(step);
         sc.env.warp(1);
         sc.crank();
-        let ix = shortwin_litesvm_tests::engine::liquidate_ix(
-            &sc.mm,
-            &keeper.pubkey(),
-            &sc.b.key(),
-            sc.nonce,
-        );
-        let res = sc.env.send(&[ix], &[keeper]);
-        match res {
-            Ok(meta) => {
-                let e: shortwin::events::Liquidate = events::one(&meta);
-                done = Some((
-                    s,
-                    [
-                        e.buyback_cost,
-                        e.b_live,
-                        e.b_ref,
-                        e.max_in,
-                        e.rent,
-                        e.penalty,
-                        e.penalty_keeper,
-                        e.keeper_topup,
-                        e.borrower_payout,
-                        e.token_surplus,
-                    ],
-                ));
+        let (b, nonce) = (sc.b.key(), sc.nonce);
+        match liquidate_once(sc, keeper, &b, nonce) {
+            Ok(amounts) => {
+                done = Some((s, amounts));
                 break;
             }
-            Err(_) => refusals.push(custom_code(&res)),
+            Err(code) => refusals.push(code),
         }
     }
     let m = sc.market();
@@ -502,5 +519,299 @@ mod not_executable {
         );
         sc.env.warp(1);
         close_ok(&mut sc.env, &sc.mm, &sc.b, sc.nonce);
+    }
+}
+
+/// G-G3 (ARCH §4.3 "two fee views", §5.3; A26, V2-1, R3A-4 c): Governance moving the **global**
+/// `venue_fee_hard_cap_bps` across the live fee while a position is open. The global cap is an
+/// input of the market-level route predicates only (`s3_no_route`, `pool_fail`); every quote of
+/// an open position — its risk view, its exit bounds, its S3 fair value — takes the cap the
+/// position snapshotted at its open.
+mod hard_cap {
+    use super::*;
+    use shortwin::state::ConfigChange;
+    use shortwin_litesvm_tests::ix;
+    use solana_signer::Signer;
+
+    /// The live fee of these scenarios: 4 %, between the venue cap (150 bps) and the default
+    /// hard cap (500 bps), so opens are refused and nothing else changes.
+    const LIVE_FEE_PPM: u32 = 40_000;
+    /// The lowered global hard cap: below the live fee, at its compiled floor.
+    const LOWERED_BPS: u32 = 300;
+
+    /// Governance proposes `venue_fee_hard_cap_bps = cap`, every other parameter kept.
+    fn propose_hard_cap(sc: &mut Sc, cap: u32) {
+        let c = sc.env.config();
+        let mut params = c.params;
+        params.venue_fee_hard_cap_bps = cap;
+        let gov = sc.env.governance.insecure_clone();
+        let change = ConfigChange::Params {
+            params,
+            tiers: c.tiers,
+        };
+        ok(sc
+            .env
+            .send(&[ix::propose_config(&gov.pubkey(), change)], &[&gov]));
+    }
+
+    /// Anyone applies the pending change.
+    fn apply(sc: &mut Sc) {
+        let ix = sc.env.apply_config_ix();
+        ok(sc.env.send(&[ix], &[]));
+    }
+
+    /// The second position of the G-G3 scenarios: a borrower and the nonce of its position.
+    struct Second(Borrower, u64);
+
+    /// Two positions open at the default caps — the scenario's [`Q`] and, opened after the pool
+    /// rose 5 % and the EMA followed, a second one of `Q / 2` (it becomes liquidatable later on
+    /// a rising path) — the pool's fee raised to [`LIVE_FEE_PPM`] by its admin, and a hard-cap
+    /// change to `cap` proposed and timelocked (the keeper cranking every 30 s through the last
+    /// 10 minutes, then every second for 5 s): the change is ready to apply.
+    fn ready(cap: u32) -> (Sc, Second) {
+        let mut sc = Sc::default_market();
+        sc.env.tick(&sc.mm, 5);
+        sc.move_by(1.05);
+        sc.crank_every(30, 20);
+        let mut b2 = sc.env.borrower();
+        let (_open, n2, _) = open_ok(&mut sc.env, &sc.mm, &mut b2, Q / 2);
+        sc.knobs(|k| k.fee_ppm = LIVE_FEE_PPM);
+        propose_hard_cap(&mut sc, cap);
+        sc.env.warp(i64::from(sc.env.config().timelock_s) - 600);
+        sc.crank_every(30, 20);
+        sc.env.tick(&sc.mm, 5);
+        assert_eq!(sc.pos().venue_fee_hard_cap_bps, 500);
+        assert_eq!(
+            sc.env
+                .position(&sc.mm, &b2.key(), n2)
+                .venue_fee_hard_cap_bps,
+            500
+        );
+        (sc, Second(b2, n2))
+    }
+
+    /// One keeper `liquidate` attempt (its amounts or refusal code).
+    type Attempt = Result<[u64; 10], Option<u32>>;
+
+    /// A G-G3 run from the state as it is: each second the pool moves by `step`, the keeper
+    /// cranks and tries `liquidate` on each position still open (`(second, position, attempt)`,
+    /// position 0 the scenario's, 1 the [`Second`]), until both are liquidated or `n` seconds
+    /// pass; then the market's `pool_fail_since` and `no_route_since`.
+    type PairRun = (Vec<(u32, usize, Attempt)>, i64, i64);
+
+    fn pair_path(
+        sc: &mut Sc,
+        keeper: &solana_keypair::Keypair,
+        second: &Second,
+        step: f64,
+        n: u32,
+    ) -> PairRun {
+        let owners = [(sc.b.key(), sc.nonce), (second.0.key(), second.1)];
+        let mut open = [true; 2];
+        let mut attempts = Vec::new();
+        for s in 1..=n {
+            sc.move_by(step);
+            sc.env.warp(1);
+            sc.crank();
+            for (i, (b, nonce)) in owners.iter().enumerate() {
+                if open[i] {
+                    let a = liquidate_once(sc, keeper, b, *nonce);
+                    open[i] = a.is_err();
+                    attempts.push((s, i, a));
+                }
+            }
+            if !open.iter().any(|o| *o) {
+                break;
+            }
+        }
+        let m = sc.market();
+        (attempts, m.pool_fail_since, m.no_route_since)
+    }
+
+    /// The second each position was liquidated in.
+    fn liquidated_at(run: &PairRun) -> [Option<u32>; 2] {
+        let mut at = [None; 2];
+        for (s, i, a) in &run.0 {
+            if a.is_ok() {
+                at[*i] = Some(*s);
+            }
+        }
+        at
+    }
+
+    /// The borrowers' closes of both positions now, each on its own clone of the state: the
+    /// `Close` amounts (buyback, rent and its protocol share, payout, `B̂_live`, token surplus).
+    fn closes(sc: &mut Sc, second: &Second) -> [[u64; 6]; 2] {
+        let saved = sc.env.svm.clone();
+        let amounts = |c: shortwin::events::Close| {
+            [
+                c.buyback_cost,
+                c.rent,
+                c.rent_protocol,
+                c.borrower_payout,
+                c.b_live,
+                c.token_surplus,
+            ]
+        };
+        let (first, _) = close_ok(&mut sc.env, &sc.mm, &sc.b, sc.nonce);
+        sc.env.svm = saved.clone();
+        let (other, _) = close_ok(&mut sc.env, &sc.mm, &second.0, second.1);
+        sc.env.svm = saved;
+        [amounts(first), amounts(other)]
+    }
+
+    /// G-G3, the differential (two positions): from the same state, with the global hard cap
+    /// kept at 500 bps and lowered to 300 bps (below the live 4 %), the borrowers' closes of
+    /// both positions have identical amounts — buyback, rent, payout and the leg's bound
+    /// `B̂_live` (a bound at 300 bps would sit below the 4 % charge) — and the keeper's
+    /// `liquidate` along the same rising path refuses with the same codes in the same seconds
+    /// and executes in the same seconds with identical amounts (`B̂_ref`, `B̂_live`, `max_in`,
+    /// penalty, payout) for both positions: the liquidatable set is the same; both positions
+    /// keep their 500 bps throughout. Only the lowered run's route chains (`s3_no_route`,
+    /// `pool_fail`) start. Control: the same path at a live fee of 300 bps — the risk view the
+    /// positions would get if the lowered global cap leaked into their quotes — liquidates them
+    /// in later seconds, so the comparison has the resolution to see such a leak.
+    #[test]
+    fn a_hard_cap_below_the_live_fee_moves_only_the_route_chains() {
+        let (mut sc, second) = ready(LOWERED_BPS);
+        let keeper = sc.env.funded_keypair();
+        let saved = sc.env.svm.clone();
+        let kept_closes = closes(&mut sc, &second);
+        let kept = pair_path(&mut sc, &keeper, &second, 1.004, 300);
+        let m = sc.market();
+        assert_eq!((m.no_route_since, m.pool_fail_since), (0, 0));
+
+        sc.env.svm = saved.clone();
+        apply(&mut sc);
+        assert_eq!(sc.env.config().params.venue_fee_hard_cap_bps, LOWERED_BPS);
+        assert_eq!(
+            sc.pos().venue_fee_hard_cap_bps,
+            500,
+            "the position keeps its cap"
+        );
+        let lowered_closes = closes(&mut sc, &second);
+        let lowered = pair_path(&mut sc, &keeper, &second, 1.004, 300);
+
+        assert_eq!(
+            kept_closes, lowered_closes,
+            "the same closes, to the lamport"
+        );
+        let at = liquidated_at(&kept);
+        assert!(
+            at[0].is_some() && at[1].is_some(),
+            "the path makes both positions liquidatable: {at:?}"
+        );
+        assert!(at[0] < at[1], "the second position later: {at:?}");
+        for (i, liquidated) in at.iter().enumerate() {
+            assert!(
+                kept.0
+                    .iter()
+                    .any(|(s, j, _)| *j == i && Some(*s) < *liquidated),
+                "position {i} was healthy first"
+            );
+        }
+        assert!(
+            kept.0
+                .iter()
+                .all(|(_, _, a)| a.is_ok() || *a == Err(Some(code(E::NotLiquidatable)))),
+            "only not-yet before each liquidation"
+        );
+        assert_eq!(
+            kept.0, lowered.0,
+            "the same refusals and liquidations, second by second, to the lamport"
+        );
+        assert_eq!((kept.1, kept.2), (0, 0), "no chain under the kept cap");
+        assert!(
+            lowered.1 > 0 && lowered.2 > 0,
+            "the lowered cap starts both chains: pool_fail {}, no_route {}",
+            lowered.1,
+            lowered.2
+        );
+
+        // Control: the risk view at 300 bps.
+        sc.env.svm = saved;
+        sc.knobs(|k| k.fee_ppm = LOWERED_BPS * 100);
+        let leaked = pair_path(&mut sc, &keeper, &second, 1.004, 300);
+        let leaked_at = liquidated_at(&leaked);
+        eprintln!(
+            "G-G3: liquidated at seconds {at:?} under both caps, at {leaked_at:?} with a \
+             300 bps risk view"
+        );
+        for (i, (leaked, kept)) in leaked_at.iter().zip(at).enumerate() {
+            assert!(
+                leaked.is_some_and(|s| Some(s) > kept),
+                "a 300 bps risk view makes position {i} liquidatable later: {leaked_at:?} vs {at:?}"
+            );
+        }
+    }
+
+    /// G-G3, S3 and the way back: under the lowered global cap an expired healthy position
+    /// settles S3 once the chain has run `s3_wait_s` — never before its deadline — and its FV is
+    /// priced at `min(φ_live, its own 500 bps)` = the live 4 %, not at the lowered 300 bps (an
+    /// FV at 300 bps differs). Raising the cap back above the live fee clears both chains at
+    /// the next observation.
+    #[test]
+    fn the_lowered_cap_is_s3_evidence_and_fv_keeps_the_positions_cap() {
+        let (mut sc, _second) = ready(LOWERED_BPS);
+        apply(&mut sc);
+        let back = sc.env.svm.clone();
+        sc.warp_to_deadline(-700);
+        for _ in 0..23 {
+            sc.env.warp(30);
+            sc.crank();
+            assert!(
+                sc.settle_ok().settled.is_none(),
+                "not expired, not liquidatable"
+            );
+        }
+        let m = sc.market();
+        assert!(m.no_route_since > 0 && m.pool_fail_since > 0 && m.b_lo.get() > 0);
+        assert!(sc.env.now() - m.no_route_since >= i64::from(sc.pos().s3_wait_s));
+        let pos = sc.pos();
+        sc.warp_to_deadline(0);
+        let (_s, ev) = sc.run_until_settled(10).expect("S3");
+        assert_eq!(ev.condition, 3);
+        assert_eq!(ev.pprime_lo, pos.expiry_fee_bps, "O15");
+        let m = sc.market();
+        let (p, l) = (m.ema_price.get(), m.ema_liq.get());
+        let r_due = rent::due(&pos.pos_rent(), &m.basis()).unwrap();
+        let fv = fair_value(pos.q, p, l, u64::from(LIVE_FEE_PPM), ev.pprime_lo, r_due);
+        assert_eq!(ev.fv, fv, "FV at the live fee under the position's own cap");
+        let at_global = fair_value(
+            pos.q,
+            p,
+            l,
+            u64::from(LOWERED_BPS) * 100,
+            ev.pprime_lo,
+            r_due,
+        );
+        assert!(
+            at_global < fv,
+            "the lowered global cap would price FV lower"
+        );
+
+        // The way back.
+        sc.env.svm = back;
+        sc.env.warp(1);
+        sc.crank();
+        let m = sc.market();
+        assert!(m.no_route_since > 0 && m.pool_fail_since > 0);
+        propose_hard_cap(&mut sc, 500);
+        sc.env.warp(i64::from(sc.env.config().timelock_s));
+        sc.crank();
+        assert!(
+            sc.market().no_route_since > 0,
+            "still above the lowered cap"
+        );
+        apply(&mut sc);
+        sc.env.warp(1);
+        sc.crank();
+        let m = sc.market();
+        assert_eq!(
+            (m.no_route_since, m.pool_fail_since),
+            (0, 0),
+            "an observation under the restored cap clears both chains"
+        );
+        assert!(sc.settle_ok().settled.is_none());
     }
 }
