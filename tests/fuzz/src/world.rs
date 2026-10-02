@@ -1094,22 +1094,46 @@ impl World {
 
     /// A lender whose SOL balance is negative after a shortfall debit (ECON §9.4) covers
     /// exactly the deficit (`cover_deficit`), as it must before it can withdraw.
+    ///
+    /// The deficit is the lender's pro-rata share of the shortfall at its current shares (a
+    /// lender that deposited after the rent was credited bears part of it, ECON §9.4), so it is
+    /// bounded by neither the lender's deposit nor its income: one that deposited ≈ 59 % of the
+    /// shares while a near-cap position carried ≈ 3,640 SOL of receivable owed ≈ 1,044 SOL once
+    /// that position exited short. Every lender starts with `FUNDING` (1,000 SOL), so the System
+    /// transfer inside `cover_deficit` failed (insufficient funds), the withdraw then refused
+    /// `NegativePending` and the wind-down reported `wind-down-withdraw-refused` (FUZZ-M7-24H-3:
+    /// the 24 h run at eb82a2a, amm-v4 seed 20333958). The lender is first topped up to the
+    /// deficit plus 1 SOL for fees, as a real lender brings the SOL (`wind-down-deficit-funded`).
     fn cover_negative(&mut self, si: usize, li: usize) {
         let owner = self.slots[si].lenders[li].kp.insecure_clone();
         let Some(p) = self.touched_pending(si, &owner.pubkey()).filter(|p| *p < 0) else {
             return;
         };
+        let need = p.unsigned_abs().saturating_add(1_000_000_000);
+        let have = self.env.svm.get_balance(&owner.pubkey()).unwrap_or(0);
+        if have < need {
+            crate::setup::refill_faucet(&mut self.env);
+            self.env.fund(&owner.pubkey(), need - have);
+            *self
+                .stats
+                .events
+                .entry("wind-down-deficit-funded".into())
+                .or_default() += 1;
+        }
         let market = self.market_key(si);
         let ix = ix::with_remaining(
             ix::cover_deficit(&owner.pubkey(), &market, p.unsigned_abs()),
             &self.epoch_metas(si, &owner.pubkey()),
         );
-        self.send(&[ix], &[&owner]);
-        *self
-            .stats
-            .events
-            .entry("wind-down-deficit-covered".into())
-            .or_default() += 1;
+        // Counted only when it lands: a cover that fails leaves the withdraw's NegativePending to
+        // the wind-down's `wind-down-withdraw-refused` report.
+        let landed = self.send(&[ix], &[&owner]).is_ok();
+        let event = if landed {
+            "wind-down-deficit-covered"
+        } else {
+            "wind-down-deficit-cover-failed"
+        };
+        *self.stats.events.entry(event.into()).or_default() += 1;
     }
 
     fn withdraw(&mut self, si: usize, a: u32, b: u32) -> bool {

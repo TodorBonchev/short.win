@@ -99,7 +99,8 @@ fn smoke_mixed() {
 /// The corpus (`corpus/*.json`: minimised reproducers of reported findings) replays: an open
 /// finding either still fails with its recorded signature or passes (fixed: then mark the file
 /// `"status": "fixed"`) — never with another failure; a finding marked fixed must pass, so its
-/// reproducer is a regression.
+/// reproducer is a regression. A finding that was an anomaly, not a failure, names its class in
+/// `"anomaly"` (its `"signature"` is empty): fixed, the replay must also not report that class.
 #[test]
 fn corpus_replays() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("corpus");
@@ -114,6 +115,25 @@ fn corpus_replays() {
             serde_json::from_str(&std::fs::read_to_string(&path).expect("read")).expect("json");
         let fixed = raw["status"].as_str() == Some("fixed");
         let o = runner::run(c.profile, c.seed, Some(&c.actions), 0, c.opts);
+        if let Some(class) = raw["anomaly"].as_str() {
+            let seen = o.stats.anomalies.get(class).map_or(0, |a| a.count);
+            if fixed {
+                assert_eq!(
+                    seen,
+                    0,
+                    "{} is marked fixed but reports its anomaly `{class}` again:\n{}",
+                    path.display(),
+                    o.stats.anomalies[class]
+                        .detail
+                        .lines()
+                        .take(30)
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                );
+            } else {
+                println!("{}: anomaly `{class}` × {seen}", path.display());
+            }
+        }
         match &o.failure {
             None => println!(
                 "{}: passes ({})",
