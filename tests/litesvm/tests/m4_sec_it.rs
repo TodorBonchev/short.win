@@ -946,9 +946,9 @@ fn m4_sec_6_a_deeper_fast_path_candidate_keeps_the_box_narrow() {
 /// moving the position off the halted pool; opens keep the whole mask (R4B-7).
 #[test]
 fn m4_sec_8_the_latch_holds_only_the_candidates_program() {
-    use shortwin::constants::{GUARD_MASK_RAYDIUM, GUARD_RAYDIUM_V4, VENUE_GUARD_SLOTS_2026_09_27};
+    use shortwin::constants::{GUARD_MASK_RAYDIUM, GUARD_RAYDIUM_V4};
     use shortwin::events::POOL_KIND_FAST;
-    use shortwin_litesvm_tests::fork::RaydiumProgram;
+    use shortwin_litesvm_tests::fork::{FIXTURE_GUARD_SLOTS, RaydiumProgram};
     use shortwin_litesvm_tests::ix;
     use shortwin_litesvm_tests::pool_select::pool_key;
 
@@ -961,7 +961,7 @@ fn m4_sec_8_the_latch_holds_only_the_candidates_program() {
     let v4 = plant(&mut env, &rm.pool, Plant::V4, true, (60, 100), lam);
     let cpmm = plant(&mut env, &rm.pool, Plant::Cpmm, true, (50, 100), lam);
     // An AMM v4 upgrade: flagged, and the incumbent's pools halt.
-    let dumped = VENUE_GUARD_SLOTS_2026_09_27[usize::from(GUARD_RAYDIUM_V4)];
+    let dumped = FIXTURE_GUARD_SLOTS[usize::from(GUARD_RAYDIUM_V4)];
     fork::set_deploy_slot(&mut env.svm, RaydiumProgram::AmmV4, dumped + 1);
     ok(env.send(&[ix::flag_venue_upgraded(GUARD_RAYDIUM_V4)], &[]));
     assert!(

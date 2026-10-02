@@ -1,7 +1,12 @@
 //! T-LATCH on the dumped ProgramData (ARCH §2.3.2, §3.1 "Venue-upgrade latch", §5.5, §6.5, §8.2,
 //! §9 M3; A7, R4B-7; I17; U5, U26), on the mainnet fork of `shortwin_litesvm_tests::fork`: the
 //! real AMM v4 (1,406,429 B) and CPMM (793,869 B) ProgramData accounts, dumped at their mainnet
-//! deploy slots, which `initialize_config` recorded as `guard_slot`.
+//! deploy slots, which `initialize_config` recorded as `guard_slot` (`fork::FIXTURE_GUARD_SLOTS`:
+//! CPMM is its 2026-10 redeploy, 452,376,460).
+//!
+//! The upgrade mainnet itself made is replayed too (M10 WP-2): CPMM's 2026-09-10 build
+//! (445,763,504, the slot `VENUE_GUARD_SLOTS_2026_09_27` names) upgraded by the loader to the
+//! redeploy's ELF, which latches Raydium opens until Emergency revalidates the loader's slot.
 //!
 //! An upgrade here is a **real** one: the upgradeable loader's own `Upgrade` instruction, with a
 //! buffer holding the dumped ELF and the program's real upgrade authority (the Squads v4 vault
@@ -52,7 +57,9 @@ use shortwin_litesvm_tests::engine::{
     Borrower, VenueMarket, add_margin_ix, expire_ix, liquidate_ix, open_short_ix, sol_settle_ix,
 };
 use shortwin_litesvm_tests::errors::{assert_err, custom_code, ok};
-use shortwin_litesvm_tests::fork::{self, CpmmFixture, RaydiumProgram, V4Fixture};
+use shortwin_litesvm_tests::fork::{
+    self, CpmmDeploy, CpmmFixture, FIXTURE_GUARD_SLOTS, RaydiumProgram, V4Fixture,
+};
 use shortwin_litesvm_tests::raydium::{RayFixture, RayMarket, RaySpec};
 use shortwin_litesvm_tests::{Env, TxResult, events, fixtures, ix, pda, read};
 use shortwin_math::fees::Direction;
@@ -292,7 +299,7 @@ fn the_dumped_headers_are_the_recorded_slots() {
         assert_eq!(a.owner, bpf_loader_upgradeable::ID);
         assert_eq!(a.data.len(), len, "{program:?}: ARCH §6.5 size");
         let h = header(&env, program);
-        assert_eq!(h.slot, VENUE_GUARD_SLOTS_2026_09_27[i], "{program:?}");
+        assert_eq!(h.slot, FIXTURE_GUARD_SLOTS[i], "{program:?}");
         assert_eq!(
             h.upgrade_authority,
             Some(RAYDIUM_UPGRADE_AUTHORITY.to_bytes()),
@@ -320,7 +327,7 @@ fn a_real_upgrade_latches_opens_on_every_raydium_market() {
     for program in RaydiumProgram::ALL {
         let venue = guard_index(program);
         let i = usize::from(venue);
-        let dumped = VENUE_GUARD_SLOTS_2026_09_27[i];
+        let dumped = FIXTURE_GUARD_SLOTS[i];
         let (mut env, markets) = three_markets();
         let [(fart, qf), (useless, qu), (t22, qt)] = &markets;
         let own = markets
@@ -516,7 +523,7 @@ fn both_raydium_bits_must_clear() {
 fn pump_side_upgrades_leave_raydium_opens_alone() {
     let (mut env, markets) = three_markets();
     for venue in [GUARD_PUMP, GUARD_PUMP_AMM, GUARD_PUMP_FEES, GUARD_JUPITER] {
-        let slot = VENUE_GUARD_SLOTS_2026_09_27[usize::from(venue)] + 1;
+        let slot = FIXTURE_GUARD_SLOTS[usize::from(venue)] + 1;
         env.set_venue_program_data(venue, slot);
         ok(flag(&mut env, venue));
     }
@@ -538,7 +545,7 @@ fn the_program_data_account_is_checked() {
     let ea = env.pause_authority.insecure_clone();
     let v4 = RaydiumProgram::AmmV4;
     let cp = RaydiumProgram::Cpmm;
-    let s = VENUE_GUARD_SLOTS_2026_09_27[usize::from(GUARD_RAYDIUM_V4)];
+    let s = FIXTURE_GUARD_SLOTS[usize::from(GUARD_RAYDIUM_V4)];
     let wrong_keys = [
         cp.program_data().address,
         v4.id(),
@@ -644,7 +651,7 @@ fn u5_latch_cost_does_not_grow_with_the_program_data() {
     }
     // Pump's ProgramData size, synthetic (not dumped): header ‖ zeros.
     let pump = VENUE_PROGRAM_DATA[usize::from(GUARD_PUMP)];
-    let s = VENUE_GUARD_SLOTS_2026_09_27[usize::from(GUARD_PUMP)] + 1;
+    let s = FIXTURE_GUARD_SLOTS[usize::from(GUARD_PUMP)] + 1;
     fixtures::set_program_data(
         &mut env.svm,
         &pump,
@@ -698,4 +705,109 @@ fn one_upgrade_per_slot() {
     );
     env.warp(1);
     loader_upgrade(&mut env, RaydiumProgram::AmmV4);
+}
+
+/// Anchor's discriminator of `create_creator_fee_share`
+/// (`sha256("global:create_creator_fee_share")[..8]`): an instruction only the 2026-10 CPMM build
+/// has (`raydium-cp-swap@bdeee23`).
+const CPMM_CREATE_CREATOR_FEE_SHARE: [u8; 8] = [0x7f, 0x1f, 0xbc, 0x77, 0xab, 0xec, 0x80, 0x24];
+/// Anchor's `InstructionFallbackNotFound`: the discriminator names no instruction.
+const ANCHOR_INSTRUCTION_FALLBACK_NOT_FOUND: u32 = 101;
+/// Anchor's `AccountNotEnoughKeys`.
+const ANCHOR_ACCOUNT_NOT_ENOUGH_KEYS: u32 = 3005;
+
+/// Which CPMM build executes: `create_creator_fee_share` without its accounts fails with
+/// `InstructionFallbackNotFound` on the 2026-09 build and with `AccountNotEnoughKeys` on the
+/// redeploy (which dispatches it, then finds no accounts).
+fn cpmm_build_running(env: &mut Env) -> CpmmDeploy {
+    let mut data = CPMM_CREATE_CREATOR_FEE_SHARE.to_vec();
+    data.extend_from_slice(&0u64.to_le_bytes());
+    let probe = Instruction {
+        program_id: RaydiumProgram::Cpmm.id(),
+        accounts: vec![],
+        data,
+    };
+    let res = env.send(&[probe], &[]);
+    match custom_code(&res) {
+        Some(ANCHOR_INSTRUCTION_FALLBACK_NOT_FOUND) => CpmmDeploy::Sep2026,
+        Some(ANCHOR_ACCOUNT_NOT_ENOUGH_KEYS) => CpmmDeploy::Oct2026,
+        other => panic!("unexpected CPMM answer {other:?}: {res:?}"),
+    }
+}
+
+/// The upgrade mainnet made on 2026-10 (slot 452,376,460), replayed with the real accounts: the
+/// fork starts on CPMM's 2026-09-10 build (its ProgramData at 445,763,504, which
+/// `VENUE_GUARD_SLOTS_2026_09_27` names and `initialize_config` records), positions are open on
+/// both programs, and the loader's own `Upgrade` installs the redeploy's ELF. Flagged by anyone, it
+/// refuses opens on every Raydium market while exits keep working on the new ELF; only the loader's
+/// slot revalidates, after which opens resume and the market keeps trading on the redeploy.
+#[test]
+fn the_2026_10_cpmm_redeploy_latches_until_revalidated() {
+    let venue = GUARD_RAYDIUM_CPMM;
+    let i = usize::from(venue);
+    let old = VENUE_GUARD_SLOTS_2026_09_27[i];
+    assert_eq!(old, CpmmDeploy::Sep2026.deploy_slot());
+
+    // The fork as of 2026-09-27: the old CPMM build, the baseline the program constant names.
+    let mut env = Env::new();
+    let mut args = env.default_init_args();
+    args.guard_slot = VENUE_GUARD_SLOTS_2026_09_27;
+    ok(env.initialize_config(args));
+    fork::load_program(&mut env.svm, RaydiumProgram::AmmV4);
+    fork::load_cpmm_deploy(&mut env.svm, CpmmDeploy::Sep2026);
+    env.set_fork_clock();
+    assert_eq!(header(&env, RaydiumProgram::Cpmm).slot, old);
+    assert_eq!(env.venue_guard().guard_slot[i], old);
+    assert_eq!(cpmm_build_running(&mut env), CpmmDeploy::Sep2026);
+    assert_err(&flag(&mut env, venue), E::VenueNotUpgraded);
+
+    let markets = [add_market(&mut env, FART), add_market(&mut env, USELESS)];
+    let [(fart, qf), (useless, qu)] = &markets;
+    let (bu, nu) = open_ok(&mut env, useless, *qu);
+    let (bf, nf) = open_ok(&mut env, fart, *qf);
+
+    // The redeploy: the loader writes its slot and the 2026-10 ELF (`RaydiumProgram::Cpmm.elf()`).
+    env.warp(1);
+    let s = loader_upgrade(&mut env, RaydiumProgram::Cpmm);
+    assert_ne!(s, old);
+    env.warp(1);
+    assert_eq!(cpmm_build_running(&mut env), CpmmDeploy::Oct2026);
+
+    let meta = ok(flag(&mut env, venue));
+    let ev: VenueUpgradeFlagged = events::one(&meta);
+    assert_eq!(
+        (ev.venue, ev.guard_slot, ev.programdata_slot),
+        (venue, old, s)
+    );
+    for (rm, q) in &markets {
+        assert_err(&try_open(&mut env, rm, *q), E::VenueUpgraded);
+    }
+
+    // Exits never read the latch (I10); the CPMM close buys back on the new ELF.
+    crank_all(&mut env, &markets);
+    env.warp(1);
+    let meta = ok(env.close(useless, &bu, nu));
+    let _: Close = events::one(&meta);
+    let meta = ok(env.send(
+        &[add_margin_ix(fart, &bf.key(), nf, 1_000_000_000)],
+        &[&bf.kp],
+    ));
+    let _: MarginAdded = events::one(&meta);
+    assert!(env.venue_guard().is_flagged(venue));
+
+    // Only the loader's slot revalidates; the 2026-09 baseline does not.
+    for wrong in [old, s + 1] {
+        assert_err(&revalidate(&mut env, venue, wrong), E::VenueSlotMismatch);
+    }
+    crank_all(&mut env, &markets);
+    let meta = ok(revalidate(&mut env, venue, s));
+    let ev: VenueRevalidated = events::one(&meta);
+    assert_eq!((ev.guard_slot, ev.expected_slot), (old, s));
+    assert_eq!(env.venue_guard().guard_slot[i], s);
+    for (rm, q) in &markets {
+        ok(try_open(&mut env, rm, *q / 2));
+    }
+    // A direct user swap executes on the redeploy.
+    whale_buy(&mut env, useless, 1_000_000_000);
+    assert_eq!(cpmm_build_running(&mut env), CpmmDeploy::Oct2026);
 }

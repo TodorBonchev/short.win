@@ -1329,13 +1329,11 @@ mod sides {
 /// adoptions and window candidates, on the candidate's own program since M4-SEC-8; the
 /// engine's flagged deviation from ARCH §3.9; I17).
 mod latched {
-    use shortwin::constants::{
-        GUARD_MASK_RAYDIUM, GUARD_RAYDIUM_CPMM, GUARD_RAYDIUM_V4, VENUE_GUARD_SLOTS_2026_09_27,
-    };
+    use shortwin::constants::{GUARD_MASK_RAYDIUM, GUARD_RAYDIUM_CPMM, GUARD_RAYDIUM_V4};
     use shortwin::events::{
         POOL_KIND_FAST, POOL_KIND_LISTING_WINDOW, POOL_KIND_ZERO_POSITION, PoolSwitched,
     };
-    use shortwin_litesvm_tests::fork::RaydiumProgram;
+    use shortwin_litesvm_tests::fork::{FIXTURE_GUARD_SLOTS, RaydiumProgram};
     use shortwin_litesvm_tests::ix;
     use shortwin_litesvm_tests::pool_select::{pool_key, propose_pool_ix};
     use shortwin_litesvm_tests::raydium::candidate_read_set;
@@ -1359,7 +1357,7 @@ mod latched {
         let b = plant(&mut env, &rm.pool, Plant::Cpmm, false, (13, 10), lam);
         let c_v4 = plant(&mut env, &rm.pool, Plant::V4, true, (169, 100), lam);
         let c_cpmm = plant(&mut env, &rm.pool, Plant::Cpmm, true, (190, 100), lam);
-        let dumped = VENUE_GUARD_SLOTS_2026_09_27[usize::from(GUARD_RAYDIUM_CPMM)];
+        let dumped = FIXTURE_GUARD_SLOTS[usize::from(GUARD_RAYDIUM_CPMM)];
         fork::set_deploy_slot(&mut env.svm, RaydiumProgram::Cpmm, dumped + 1);
         let (mint, _) = rm.pool.token();
         let prefix = candidate_read_set(&env.svm, &rm.pool, false);
@@ -1416,7 +1414,7 @@ mod latched {
         let cand = plant(&mut env, &rm.pool, Plant::V4, true, (50, 100), lam);
         crank_every(&mut env, &rm, 30, 5);
         window_ok(&mut env, &rm.pool, &cand);
-        let dumped = VENUE_GUARD_SLOTS_2026_09_27[usize::from(GUARD_RAYDIUM_V4)];
+        let dumped = FIXTURE_GUARD_SLOTS[usize::from(GUARD_RAYDIUM_V4)];
         fork::set_deploy_slot(&mut env.svm, RaydiumProgram::AmmV4, dumped + 1);
         ok(env.send(&[ix::flag_venue_upgraded(GUARD_RAYDIUM_V4)], &[]));
         crank_every(&mut env, &rm, 30, 2);

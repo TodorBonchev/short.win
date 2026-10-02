@@ -638,7 +638,7 @@ fn latch_instructions() {
         (RaydiumProgram::AmmV4, GUARD_RAYDIUM_V4),
         (RaydiumProgram::Cpmm, GUARD_RAYDIUM_CPMM),
     ] {
-        let dumped = shortwin::constants::VENUE_GUARD_SLOTS_2026_09_27[usize::from(venue)];
+        let dumped = shortwin_litesvm_tests::fork::FIXTURE_GUARD_SLOTS[usize::from(venue)];
         fork::set_deploy_slot(&mut env.svm, program, dumped + 1);
         let ixs = [ix::flag_venue_upgraded(venue)];
         let meta = send(&mut env, &ixs, &[]);
@@ -852,7 +852,7 @@ fn worst_case_keeper_transactions() {
         (RaydiumProgram::AmmV4, GUARD_RAYDIUM_V4),
         (RaydiumProgram::Cpmm, GUARD_RAYDIUM_CPMM),
     ] {
-        let dumped = shortwin::constants::VENUE_GUARD_SLOTS_2026_09_27[usize::from(venue)];
+        let dumped = shortwin_litesvm_tests::fork::FIXTURE_GUARD_SLOTS[usize::from(venue)];
         fork::set_deploy_slot(&mut env.svm, program, dumped + 1);
     }
     let ixs = with_cb(vec![

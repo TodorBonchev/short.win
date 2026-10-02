@@ -47,15 +47,16 @@ use mollusk_svm::Mollusk;
 use mollusk_svm::program::keyed_account_for_system_program;
 use shortwin::constants::{
     GUARD_PUMP, GUARD_RAYDIUM_CPMM, GUARD_RAYDIUM_V4, RAYDIUM_CPMM_PROGRAM_ID,
-    RAYDIUM_V4_PROGRAM_ID, TOKEN_PROGRAM_ID, VENUE_GUARD_SLOTS_2026_09_27, VENUE_PROGRAM_DATA,
-    WSOL_MINT,
+    RAYDIUM_V4_PROGRAM_ID, TOKEN_PROGRAM_ID, VENUE_PROGRAM_DATA, WSOL_MINT,
 };
 use shortwin::events::SolSettle;
 use shortwin::venues::ExtrasSel;
 use shortwin_litesvm_tests::engine::{
     Borrower, close_short_ix, crank_price_ix, expire_ix, liquidate_ix, open_short_ix, sol_settle_ix,
 };
-use shortwin_litesvm_tests::fork::{self, AnyPool, CpmmFixture, RaydiumProgram, V4Fixture};
+use shortwin_litesvm_tests::fork::{
+    self, AnyPool, CpmmFixture, FIXTURE_GUARD_SLOTS, RaydiumProgram, V4Fixture,
+};
 use shortwin_litesvm_tests::pool_select::{
     detection_set, execute_pool_switch_ix, plant_cpmm, propose_pool_ix, spec_like,
 };
@@ -690,7 +691,7 @@ fn crank_halted(fixture: RayFixture) -> Prepared {
 /// `flag_venue_upgraded` on the dumped ProgramData whose deploy slot changed.
 fn flag_raydium(venue: u8) -> Prepared {
     let mut env = Env::ray_fork();
-    let dumped = VENUE_GUARD_SLOTS_2026_09_27[usize::from(venue)];
+    let dumped = FIXTURE_GUARD_SLOTS[usize::from(venue)];
     fork::set_deploy_slot(&mut env.svm, raydium_program(venue), dumped + 1);
     prepared(env, ix::flag_venue_upgraded(venue), &[])
 }
@@ -699,7 +700,7 @@ fn flag_raydium(venue: u8) -> Prepared {
 fn flag_refresh() -> Prepared {
     let mut env = Env::ray_fork();
     let venue = GUARD_RAYDIUM_V4;
-    let dumped = VENUE_GUARD_SLOTS_2026_09_27[usize::from(venue)];
+    let dumped = FIXTURE_GUARD_SLOTS[usize::from(venue)];
     fork::set_deploy_slot(&mut env.svm, RaydiumProgram::AmmV4, dumped + 1);
     ok(env.send(&[ix::flag_venue_upgraded(venue)], &[]));
     env.warp(30);
@@ -712,7 +713,7 @@ fn flag_refresh() -> Prepared {
 fn flag_ten_mib() -> Prepared {
     let mut env = Env::ray_fork();
     let key = VENUE_PROGRAM_DATA[usize::from(GUARD_PUMP)];
-    let slot = VENUE_GUARD_SLOTS_2026_09_27[usize::from(GUARD_PUMP)] + 1;
+    let slot = FIXTURE_GUARD_SLOTS[usize::from(GUARD_PUMP)] + 1;
     fixtures::set_program_data(
         &mut env.svm,
         &key,
@@ -726,7 +727,7 @@ fn flag_ten_mib() -> Prepared {
 fn revalidate_raydium(venue: u8) -> Prepared {
     let Prepared { mut env, ix, .. } = flag_raydium(venue);
     ok(env.send(&[ix], &[]));
-    let dumped = VENUE_GUARD_SLOTS_2026_09_27[usize::from(venue)];
+    let dumped = FIXTURE_GUARD_SLOTS[usize::from(venue)];
     let ea = env.pause_authority.insecure_clone();
     let ix = ix::revalidate_venue(&ea.pubkey(), venue, dumped + 1);
     prepared(env, ix, &[&ea])
@@ -1435,7 +1436,7 @@ fn tx_keeper_settlement(f: RayFixture) -> (Env, Vec<Instruction>, Vec<Keypair>) 
 fn tx_flag_both() -> (Env, Vec<Instruction>, Vec<Keypair>) {
     let mut env = Env::ray_fork();
     for venue in [GUARD_RAYDIUM_V4, GUARD_RAYDIUM_CPMM] {
-        let dumped = VENUE_GUARD_SLOTS_2026_09_27[usize::from(venue)];
+        let dumped = FIXTURE_GUARD_SLOTS[usize::from(venue)];
         fork::set_deploy_slot(&mut env.svm, raydium_program(venue), dumped + 1);
     }
     let ixs = vec![

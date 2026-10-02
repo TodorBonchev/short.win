@@ -520,7 +520,7 @@ fn t_cascade_a_launch_cap_basket_clears_under_the_block_budget() {
     let per_slot = |cu: u64| MARKET_CAP / cu;
     let _ = writeln!(
         md,
-        "\nPer-exit requested CU: mock `liquidate` {}–{}; PumpSwap `liquidate` {}–{} (`tests/bench/m7_keeper`: PumpSwap 212,313, the curve 191,983, AMM v4 105,270, CPMM 125,284). At 12 M per market per slot that is {} mock / {} PumpSwap / {} curve / {} AMM v4 / {} CPMM liquidations a slot — {} / {} / {} / {} / {} a second at 2.5 slots a second; a 250-position basket clears in {} / {} / {} / {} / {} slots.",
+        "\nPer-exit requested CU: mock `liquidate` {}–{}; PumpSwap `liquidate` {}–{} (`tests/bench/m7_keeper`: PumpSwap 212,313, the curve 191,983, AMM v4 105,270, CPMM 125,289). At 12 M per market per slot that is {} mock / {} PumpSwap / {} curve / {} AMM v4 / {} CPMM liquidations a slot — {} / {} / {} / {} / {} a second at 2.5 slots a second; a 250-position basket clears in {} / {} / {} / {} / {} slots.",
         runs[1].0.exit_cu.0,
         mock_liq,
         cp.exit_cu.0,
@@ -529,17 +529,17 @@ fn t_cascade_a_launch_cap_basket_clears_under_the_block_budget() {
         per_slot(212_313),
         per_slot(191_983),
         per_slot(105_270),
-        per_slot(125_284),
+        per_slot(125_289),
         per_slot(mock_liq) * 5 / 2,
         per_slot(212_313) * 5 / 2,
         per_slot(191_983) * 5 / 2,
         per_slot(105_270) * 5 / 2,
-        per_slot(125_284) * 5 / 2,
+        per_slot(125_289) * 5 / 2,
         250u64.div_ceil(per_slot(mock_liq)),
         250u64.div_ceil(per_slot(212_313)),
         250u64.div_ceil(per_slot(191_983)),
         250u64.div_ceil(per_slot(105_270)),
-        250u64.div_ceil(per_slot(125_284)),
+        250u64.div_ceil(per_slot(125_289)),
     );
     slot_table(
         &mut md,

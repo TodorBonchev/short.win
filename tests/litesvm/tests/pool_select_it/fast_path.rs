@@ -342,8 +342,8 @@ fn cancellations() {
 /// mask (R4B-7).
 #[test]
 fn adoptions_wait_for_the_venue_review() {
-    use shortwin::constants::{GUARD_RAYDIUM_CPMM, GUARD_RAYDIUM_V4, VENUE_GUARD_SLOTS_2026_09_27};
-    use shortwin_litesvm_tests::fork::RaydiumProgram;
+    use shortwin::constants::{GUARD_RAYDIUM_CPMM, GUARD_RAYDIUM_V4};
+    use shortwin_litesvm_tests::fork::{FIXTURE_GUARD_SLOTS, RaydiumProgram};
     use shortwin_litesvm_tests::ix;
     let (mut env, rm, _b, _) = halted_with_positions();
     let lam = lambda_of(&env, &rm.pool);
@@ -352,7 +352,7 @@ fn adoptions_wait_for_the_venue_review() {
     let deeper = plant(&mut env, &rm.pool, Plant::V4, true, (60, 100), lam);
     crank_every(&mut env, &rm, 30, 5);
     let flag = |env: &mut Env, guard: u8, program: RaydiumProgram| {
-        let dumped = VENUE_GUARD_SLOTS_2026_09_27[usize::from(guard)];
+        let dumped = FIXTURE_GUARD_SLOTS[usize::from(guard)];
         fork::set_deploy_slot(&mut env.svm, program, dumped + 1);
         ok(env.send(&[ix::flag_venue_upgraded(guard)], &[]));
         dumped + 1

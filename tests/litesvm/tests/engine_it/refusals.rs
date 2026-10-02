@@ -13,12 +13,13 @@
 
 use anchor_lang::prelude::Pubkey;
 use shortwin::PauseScope;
-use shortwin::constants::{GUARD_RAYDIUM_CPMM, VENUE_GUARD_SLOTS_2026_09_27};
+use shortwin::constants::GUARD_RAYDIUM_CPMM;
 use shortwin::errors::ShortwinError as E;
 use shortwin::state::{MARKET_FLAG_MINT_UNSAFE, MARKET_FLAG_PAUSED_COVERAGE, Market, VenueKind};
 use shortwin::venues::ExtrasSel;
 use shortwin_litesvm_tests::engine::set_route_broken_ix;
 use shortwin_litesvm_tests::fixtures;
+use shortwin_litesvm_tests::fork::FIXTURE_GUARD_SLOTS;
 use shortwin_litesvm_tests::ix;
 use shortwin_litesvm_tests::mock::{Knobs, update_knobs};
 
@@ -213,7 +214,7 @@ fn no_shares_no_borrow() {
 fn venue_upgraded_latch() {
     let (mut env, mm) = setup();
     env.set_all_venue_program_data();
-    let slot = VENUE_GUARD_SLOTS_2026_09_27[usize::from(GUARD_RAYDIUM_CPMM)] + 1;
+    let slot = FIXTURE_GUARD_SLOTS[usize::from(GUARD_RAYDIUM_CPMM)] + 1;
     env.set_venue_program_data(GUARD_RAYDIUM_CPMM, slot);
     ok(env.send(&[ix::flag_venue_upgraded(GUARD_RAYDIUM_CPMM)], &[]));
     assert_err(&try_open_q(&mut env, &mm, Q), E::VenueUpgraded);

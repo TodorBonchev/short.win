@@ -119,7 +119,7 @@ fn upgrade_flags_refreshes_and_revalidates() {
 fn an_upgrade_landing_between_review_and_execution_is_not_validated() {
     let mut env = latched_env();
     let venue = GUARD_RAYDIUM_CPMM;
-    let old = VENUE_GUARD_SLOTS_2026_09_27[usize::from(venue)];
+    let old = shortwin_litesvm_tests::fork::FIXTURE_GUARD_SLOTS[usize::from(venue)];
     env.set_venue_program_data(venue, old + 10);
     ok(flag(&mut env, venue));
     // The Squads proposal names old + 10; another upgrade lands before it executes.

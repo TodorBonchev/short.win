@@ -1,12 +1,12 @@
 //! Fork E2E on Raydium **CPMM** (M3 exit criterion "fork E2E on … USELESS (CPMM) through open →
 //! liquidation → S2/S3"; ARCH §2.4.1, §2.6, §3.2–§3.8, §4.5, §4.7, §5.3, §5.5, §8.2, §9 M3;
 //! SPEC §2–§5; O13, D3, O15): the release short.win against the **dumped** CPMM program
-//! (`CPMMoo8…`, deploy slot 445,763,504) and three dumped mainnet pools — USELESS `Q2sPHPdU…`
-//! (SPL, config 0), the Token-2022 pool `7ZRtFcgf…` and the creator-fee pool `FQd8z3…` — driven
-//! only through real instructions: `create_market`, lender `deposit` / `withdraw`, `open_short`,
-//! `close_short`, `crank_price`, `liquidate`, `expire`, `sol_settle`, real CPMM swaps by other
-//! market participants (the price moves), and the pool admin's real `update_pool_status` /
-//! `update_amm_config` (signature forged, `fork::raydium_admin_send`).
+//! (`CPMMoo8…`, its 2026-10 redeploy at slot 452,376,460) and three dumped mainnet pools —
+//! USELESS `Q2sPHPdU…` (SPL, config 0), the Token-2022 pool `7ZRtFcgf…` and the creator-fee pool
+//! `FQd8z3…` — driven only through real instructions: `create_market`, lender `deposit` /
+//! `withdraw`, `open_short`, `close_short`, `crank_price`, `liquidate`, `expire`, `sol_settle`,
+//! real CPMM swaps by other market participants (the price moves), and the pool admin's real
+//! `update_pool_status` / `update_amm_config` (signature forged, `fork::raydium_admin_send`).
 //!
 //! | Test | Journey |
 //! |---|---|

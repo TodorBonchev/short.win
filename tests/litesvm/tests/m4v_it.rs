@@ -833,9 +833,9 @@ fn m4v_3_a_low_lambda_candidate_is_a_bounded_delay() {
 /// window at once and is adopted, well before the S3 wait; the position closes on it.
 #[test]
 fn m4v_4_a_latched_window_candidate_cancels_and_the_fast_path_goes_on() {
-    use shortwin::constants::{GUARD_RAYDIUM_CPMM, VENUE_GUARD_SLOTS_2026_09_27};
+    use shortwin::constants::GUARD_RAYDIUM_CPMM;
     use shortwin::events::POOL_KIND_FAST;
-    use shortwin_litesvm_tests::fork::RaydiumProgram;
+    use shortwin_litesvm_tests::fork::{FIXTURE_GUARD_SLOTS, RaydiumProgram};
     use shortwin_litesvm_tests::ix;
     use shortwin_litesvm_tests::pool_select::pool_key;
 
@@ -851,7 +851,7 @@ fn m4v_4_a_latched_window_candidate_cancels_and_the_fast_path_goes_on() {
     crank_every(&mut env, &rm, 30, 5);
     window_ok(&mut env, &rm.pool, &cpmm);
     // A CPMM program upgrade lands during the window and is flagged (permissionless).
-    let dumped = VENUE_GUARD_SLOTS_2026_09_27[usize::from(GUARD_RAYDIUM_CPMM)];
+    let dumped = FIXTURE_GUARD_SLOTS[usize::from(GUARD_RAYDIUM_CPMM)];
     fork::set_deploy_slot(&mut env.svm, RaydiumProgram::Cpmm, dumped + 1);
     ok(env.send(&[ix::flag_venue_upgraded(GUARD_RAYDIUM_CPMM)], &[]));
     let s3_wait = i64::from(env.config().params.s3_wait_s);

@@ -5,9 +5,9 @@
 //! margins and the windows.
 
 use anchor_lang::error::ErrorCode as AnchorErrorCode;
-use shortwin::constants::{GUARD_RAYDIUM_V4, VENUE_GUARD_SLOTS_2026_09_27};
+use shortwin::constants::GUARD_RAYDIUM_V4;
 use shortwin_litesvm_tests::errors::assert_anchor_err;
-use shortwin_litesvm_tests::fork::RaydiumProgram;
+use shortwin_litesvm_tests::fork::{FIXTURE_GUARD_SLOTS, RaydiumProgram};
 use shortwin_litesvm_tests::ix;
 use shortwin_litesvm_tests::pool_select::{
     PlantSpec, detection_set, execute_pool_switch_raw, kind_of, propose_pool_ix, propose_pool_raw,
@@ -220,7 +220,7 @@ fn a_list_only_adoption_waits_for_the_venue_review() {
         let mut env = Env::ray_fork();
         let pool = env.load_ray_pool(USELESS);
         list_auto(&mut env, &pool);
-        let dumped = VENUE_GUARD_SLOTS_2026_09_27[usize::from(guard)];
+        let dumped = FIXTURE_GUARD_SLOTS[usize::from(guard)];
         fork::set_deploy_slot(&mut env.svm, program, dumped + 1);
         ok(env.send(&[ix::flag_venue_upgraded(guard)], &[]));
         if held {

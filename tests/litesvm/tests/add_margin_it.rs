@@ -33,13 +33,14 @@ mod common;
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
 use shortwin::PauseScope;
-use shortwin::constants::{GUARD_RAYDIUM_CPMM, VENUE_GUARD_SLOTS_2026_09_27};
+use shortwin::constants::GUARD_RAYDIUM_CPMM;
 use shortwin::errors::ShortwinError as E;
 use shortwin::events::MarginAdded;
 use shortwin::state::{ConfigChange, Market, ShortPosition};
 use shortwin_litesvm_tests::engine::{add_margin_ix, set_route_broken_ix};
 use shortwin_litesvm_tests::errors::assert_anchor_err;
 use shortwin_litesvm_tests::fixtures;
+use shortwin_litesvm_tests::fork::FIXTURE_GUARD_SLOTS;
 use shortwin_litesvm_tests::ix;
 use shortwin_litesvm_tests::mock::{Knobs, update_knobs};
 use solana_keypair::Keypair;
@@ -279,7 +280,7 @@ fn allowed_through_every_gate() {
     env.set_all_venue_program_data();
     env.set_venue_program_data(
         GUARD_RAYDIUM_CPMM,
-        VENUE_GUARD_SLOTS_2026_09_27[usize::from(GUARD_RAYDIUM_CPMM)] + 7,
+        FIXTURE_GUARD_SLOTS[usize::from(GUARD_RAYDIUM_CPMM)] + 7,
     );
     ok(env.send(&[ix::flag_venue_upgraded(GUARD_RAYDIUM_CPMM)], &[]));
     step(&mut env, "venue upgraded (latch set)");

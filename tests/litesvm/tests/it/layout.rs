@@ -4,11 +4,11 @@
 //! Here: the accounts the SBF program creates have exactly the documented sizes, and fields
 //! sit at the documented byte offsets of the raw account data (what a Codama decoder reads).
 
-use shortwin::constants::VENUE_GUARD_SLOTS_2026_09_27;
 use shortwin::state::{
     GlobalConfig, LenderPosition, Market, MarketVault, OracleCache, ShareEpoch, ShortPosition,
     VenueExtras, VenueGuard, VenueKind, WalletExposure,
 };
+use shortwin_litesvm_tests::fork::FIXTURE_GUARD_SLOTS;
 use shortwin_litesvm_tests::tokens::TokenProgram;
 use shortwin_litesvm_tests::{Env, pda, read};
 use shortwin_venue_state::bytes::{i64_at, key_at, u8_at, u16_at, u32_at, u64_at};
@@ -85,7 +85,7 @@ fn venue_guard_fields_sit_at_their_offsets() {
     let data = read::account(&env.svm, &pda::venue_guard()).unwrap().data;
     assert_eq!(u16_at(&data, 8), shortwin::constants::VENUE_GUARD_VERSION);
     assert_eq!(u32_at(&data, 12), 0);
-    for (i, slot) in VENUE_GUARD_SLOTS_2026_09_27.iter().enumerate() {
+    for (i, slot) in FIXTURE_GUARD_SLOTS.iter().enumerate() {
         assert_eq!(u64_at(&data, 16 + 8 * i), *slot);
     }
 }

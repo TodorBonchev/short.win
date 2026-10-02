@@ -29,7 +29,7 @@ mod support;
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::AccountMeta;
 use shortwin::PauseScope;
-use shortwin::constants::{GUARD_RAYDIUM_CPMM, VENUE_GUARD_SLOTS_2026_09_27};
+use shortwin::constants::GUARD_RAYDIUM_CPMM;
 use shortwin::events::{Liquidate, MintSafetyTripped, TraderSwept};
 use shortwin::state::{PLACEHOLDER_MINT, SEED_CONST, SEED_PLACEHOLDER};
 use shortwin::venues::{EXTRAS_SET_CURRENT, EXTRAS_SET_PREVIOUS, ExtrasSel};
@@ -37,6 +37,7 @@ use shortwin::{ExtraEntryArg, SeedPartArg};
 use shortwin_litesvm_tests::engine::{
     VENUE_HINT_MOCK, mock_extras_key, set_route_broken_ix, set_venue_extras_ix,
 };
+use shortwin_litesvm_tests::fork::FIXTURE_GUARD_SLOTS;
 use shortwin_litesvm_tests::invariants::{self, IxEvents};
 use shortwin_litesvm_tests::ix;
 use shortwin_litesvm_tests::mock::{Knobs, update_knobs};
@@ -503,7 +504,7 @@ fn pause_and_flag_everything(env: &mut Env, mm: &MockMarket) {
     env.set_all_venue_program_data();
     env.set_venue_program_data(
         GUARD_RAYDIUM_CPMM,
-        VENUE_GUARD_SLOTS_2026_09_27[usize::from(GUARD_RAYDIUM_CPMM)] + 7,
+        FIXTURE_GUARD_SLOTS[usize::from(GUARD_RAYDIUM_CPMM)] + 7,
     );
     ok(env.send(&[ix::flag_venue_upgraded(GUARD_RAYDIUM_CPMM)], &[]));
 }

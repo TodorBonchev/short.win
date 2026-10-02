@@ -544,7 +544,7 @@ fn all_three_pump_bits_must_clear() {
 fn raydium_and_jupiter_upgrades_leave_curve_opens_alone() {
     let (mut env, markets) = two_markets();
     for venue in [GUARD_RAYDIUM_V4, GUARD_RAYDIUM_CPMM, GUARD_JUPITER] {
-        let slot = VENUE_GUARD_SLOTS_2026_09_27[usize::from(venue)] + 1;
+        let slot = fork::FIXTURE_GUARD_SLOTS[usize::from(venue)] + 1;
         env.set_venue_program_data(venue, slot);
         ok(flag(&mut env, venue));
     }

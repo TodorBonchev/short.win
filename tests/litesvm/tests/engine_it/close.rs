@@ -1,11 +1,12 @@
 //! `close_short` refusals and what closes never read (ARCH §3.5; I10, V2-1).
 
 use shortwin::PauseScope;
-use shortwin::constants::{GUARD_RAYDIUM_CPMM, VENUE_GUARD_SLOTS_2026_09_27};
+use shortwin::constants::GUARD_RAYDIUM_CPMM;
 use shortwin::errors::ShortwinError as E;
 use shortwin::events::MintSafetyTripped;
 use shortwin::venues::ExtrasSel;
 use shortwin_litesvm_tests::engine::set_route_broken_ix;
+use shortwin_litesvm_tests::fork::FIXTURE_GUARD_SLOTS;
 use shortwin_litesvm_tests::ix;
 use shortwin_litesvm_tests::mock::{Knobs, update_knobs};
 use solana_signer::Signer;
@@ -114,7 +115,7 @@ fn exits_ignore_pauses_flags_latch_and_the_fee_cap() {
     env.set_all_venue_program_data();
     env.set_venue_program_data(
         GUARD_RAYDIUM_CPMM,
-        VENUE_GUARD_SLOTS_2026_09_27[usize::from(GUARD_RAYDIUM_CPMM)] + 7,
+        FIXTURE_GUARD_SLOTS[usize::from(GUARD_RAYDIUM_CPMM)] + 7,
     );
     ok(env.send(&[ix::flag_venue_upgraded(GUARD_RAYDIUM_CPMM)], &[]));
     // A venue fee above the global hard cap (500 bps): the borrower's bound allows it.

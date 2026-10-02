@@ -5,9 +5,9 @@
 //! them); exits keep working; `revalidate_venue` with the reviewed slot re-enables opens, and
 //! only that slot.
 
-use shortwin::constants::{GUARD_RAYDIUM_CPMM, GUARD_RAYDIUM_V4, VENUE_GUARD_SLOTS_2026_09_27};
+use shortwin::constants::{GUARD_RAYDIUM_CPMM, GUARD_RAYDIUM_V4};
 use shortwin::events::VenueUpgradeFlagged;
-use shortwin_litesvm_tests::fork::RaydiumProgram;
+use shortwin_litesvm_tests::fork::{FIXTURE_GUARD_SLOTS, RaydiumProgram};
 use shortwin_litesvm_tests::ix;
 
 use crate::common::*;
@@ -35,7 +35,7 @@ fn either_raydium_upgrade_blocks_opens_on_both() {
         let mut env = Env::ray_fork();
         let (fart, qf) = add_market(&mut env, FART);
         let (useless, qu) = add_market(&mut env, USELESS);
-        let dumped = VENUE_GUARD_SLOTS_2026_09_27[usize::from(venue)];
+        let dumped = FIXTURE_GUARD_SLOTS[usize::from(venue)];
         assert_eq!(
             program.program_data().account.data[4..12],
             dumped.to_le_bytes(),

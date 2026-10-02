@@ -111,7 +111,11 @@ const PROGRAM_GROUPS = new Set([
 ]);
 const SYSVAR_PREFIX = 'Sysvar';
 
-/** The dumped venue programs: `[program id, ELF path, upgrade authority]` for `--upgradeable-program`. */
+/**
+ * The dumped venue programs: `[program id, ELF path, upgrade authority]` for `--upgradeable-program`.
+ * CPMM is the 2026-10 redeploy (group `raydium_cpmm_2026_10`, M10 WP-2), the build every CPMM test
+ * runs on; its program account and upgrade authority equal `raydium_programs`' 445,763,504 build's.
+ */
 export function venuePrograms(): [string, string, string][] {
     const m = manifest();
     const out: [string, string, string][] = [];
@@ -121,7 +125,7 @@ export function venuePrograms(): [string, string, string][] {
         ['pump_amm_program', 'pump_amm_program_data'],
         ['pump_fees_program', 'pump_fees_program_data'],
         ['raydium_amm_v4_program', 'raydium_amm_v4_program_data'],
-        ['raydium_cpmm_program', 'raydium_cpmm_program_data'],
+        ['raydium_cpmm_2026_10_program', 'raydium_cpmm_2026_10_program_data'],
     ] as const) {
         const p = byName.get(prog);
         const d = byName.get(dataName);

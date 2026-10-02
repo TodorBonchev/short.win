@@ -1,8 +1,17 @@
 //! A mainnet fork of the Raydium venues (M3; ARCH §8.2 "dumped mainnet ELFs", "account
 //! fixtures", "scenario builders"): the real AMM v4 and CPMM programs and pools, dumped by
 //! `scripts/dump-fixtures.py` into `tests/fixtures/` with their provenance in
-//! `tests/fixtures/manifest.json` (groups `raydium_programs` and `raydium_state`: every venue
-//! state account at **one** mainnet slot).
+//! `tests/fixtures/manifest.json` (groups `raydium_programs`, `raydium_cpmm_2026_10` and
+//! `raydium_state`: every venue state account at **one** mainnet slot).
+//!
+//! - **CPMM deploys (M10 WP-2).** CPMM was redeployed at slot 452,376,460 (group
+//!   `raydium_cpmm_2026_10`: the ELF only; the pools and configs are `raydium_state`'s, whose
+//!   layouts the redeploy kept). [`RaydiumProgram::Cpmm`] and every loader deploy that build
+//!   ([`CpmmDeploy::CURRENT`]) with its real header, so the harness's guard slots are
+//!   [`FIXTURE_GUARD_SLOTS`], not `VENUE_GUARD_SLOTS_2026_09_27`. The 445,763,504 deploy
+//!   (`raydium_programs`, the one that constant names) stays loadable as [`CpmmDeploy::Sep2026`]
+//!   ([`load_cpmm_deploy`]) for T-LATCH's old→new upgrade. `tests/fixtures/README.md` has the
+//!   interface diff between the two builds.
 //!
 //! - **Loading.** [`Env::fork_raydium_v4`] / [`Env::fork_cpmm`] give an initialized short.win
 //!   environment (release build, [`Env::initialized`]) with the Raydium programs deployed at
@@ -69,11 +78,11 @@ use litesvm::LiteSVM;
 use litesvm::types::TransactionMetadata;
 use litesvm_token::{CreateAccount, SyncNative};
 use shortwin::constants::{
-    ASSOCIATED_TOKEN_PROGRAM_ID, GUARD_PUMP, GUARD_PUMP_AMM, GUARD_PUMP_FEES, PUMP_AMM_PROGRAM_ID,
-    PUMP_EVENT_AUTHORITY, PUMP_FEE_CONFIG, PUMP_FEES_PROGRAM_ID, PUMP_GLOBAL,
+    ASSOCIATED_TOKEN_PROGRAM_ID, GUARD_PUMP, GUARD_PUMP_AMM, GUARD_PUMP_FEES, GUARD_RAYDIUM_CPMM,
+    PUMP_AMM_PROGRAM_ID, PUMP_EVENT_AUTHORITY, PUMP_FEE_CONFIG, PUMP_FEES_PROGRAM_ID, PUMP_GLOBAL,
     PUMP_GLOBAL_VOLUME_ACCUMULATOR, PUMP_PROGRAM_ID, RAYDIUM_CPMM_AUTHORITY,
     RAYDIUM_CPMM_PROGRAM_ID, RAYDIUM_V4_AUTHORITY, RAYDIUM_V4_PROGRAM_ID, TOKEN_2022_PROGRAM_ID,
-    TOKEN_PROGRAM_ID, WSOL_MINT,
+    TOKEN_PROGRAM_ID, VENUE_GUARD_SLOTS_2026_09_27, VENUE_PROGRAMS, WSOL_MINT,
 };
 use shortwin::state::Market;
 use shortwin_math::fees::{
@@ -104,8 +113,11 @@ pub fn fixtures_dir() -> PathBuf {
     )
 }
 
-/// The manifest groups of the Raydium fork (loaded, and sha256-checked, on first use).
-pub const RAYDIUM_GROUPS: [&str; 2] = ["raydium_programs", "raydium_state"];
+/// The manifest groups of the Raydium fork (loaded, and sha256-checked, on first use). CPMM's
+/// program and ProgramData addresses are in both program groups; [`fixture_at`] resolves them to
+/// the later one, `raydium_cpmm_2026_10` ([`CpmmDeploy::CURRENT`]), and the loaders pick a deploy
+/// by name ([`CpmmDeploy`]).
+pub const RAYDIUM_GROUPS: [&str; 3] = ["raydium_programs", "raydium_cpmm_2026_10", "raydium_state"];
 /// The manifest groups of the pump fork (loaded separately, on first use of a pump fixture, so
 /// the Raydium tests never rebuild the two 10 MiB pump ProgramData accounts).
 pub const PUMP_GROUPS: [&str; 2] = ["pump_programs", "pump_state"];
@@ -190,7 +202,7 @@ fn load_entries(m: &serde_json::Value, groups: &[&str]) -> Entries {
         e[k].as_u64()
             .unwrap_or_else(|| panic!("manifest entry {}: no `{k}`", e["name"]))
     };
-    let mut by_name = HashMap::new();
+    let mut by_name: HashMap<String, Fixture> = HashMap::new();
     let mut by_address = HashMap::new();
     let mut absent = std::collections::HashSet::new();
     for e in m["accounts"].as_array().expect("accounts") {
@@ -241,7 +253,14 @@ fn load_entries(m: &serde_json::Value, groups: &[&str]) -> Entries {
             elf_len,
             role: e["role"].as_str().map(str::to_owned),
         };
-        by_address.insert(address, name.clone());
+        // An address held by two groups (CPMM's two deploys) resolves to the later of `groups`.
+        let rank = |g: &str| groups.iter().position(|x| *x == g);
+        if by_address
+            .get(&address)
+            .is_none_or(|prev| rank(group) >= rank(&by_name[prev].group))
+        {
+            by_address.insert(address, name.clone());
+        }
         by_name.insert(name, fixture);
     }
     (by_name, by_address, absent)
@@ -327,7 +346,7 @@ pub fn fixture_at(address: &Pubkey) -> Option<&'static Fixture> {
         .or_else(|| pump_fixture_at(address))
 }
 
-/// Every Raydium fixture (both groups).
+/// Every Raydium fixture (every group of [`RAYDIUM_GROUPS`]).
 pub fn all_fixtures() -> impl Iterator<Item = &'static Fixture> {
     fixtures().by_name.values()
 }
@@ -368,10 +387,11 @@ pub enum RaydiumProgram {
 impl RaydiumProgram {
     pub const ALL: [Self; 2] = [Self::AmmV4, Self::Cpmm];
 
+    /// The fixture name prefix (CPMM: [`CpmmDeploy::CURRENT`]'s).
     fn prefix(self) -> &'static str {
         match self {
             Self::AmmV4 => "raydium_amm_v4",
-            Self::Cpmm => "raydium_cpmm",
+            Self::Cpmm => CpmmDeploy::CURRENT.prefix(),
         }
     }
 
@@ -404,11 +424,85 @@ impl RaydiumProgram {
 
 /// Deploys `program` at its mainnet address from the dumped accounts: the ProgramData first
 /// (the real header: deploy slot and upgrade authority), then the executable program account,
-/// which makes LiteSVM compile the ELF.
+/// which makes LiteSVM compile the ELF. CPMM is [`CpmmDeploy::CURRENT`].
 pub fn load_program(svm: &mut LiteSVM, program: RaydiumProgram) {
     let pd = program.program_data();
     load(svm, &pd.name);
     load(svm, &program.program().name);
+}
+
+/// CPMM's deploy slot since its 2026-10 redeploy (group `raydium_cpmm_2026_10`; the manifest's
+/// `deploy_slot_expected`). `VENUE_GUARD_SLOTS_2026_09_27` still names 445,763,504.
+pub const CPMM_DEPLOY_SLOT_2026_10: u64 = 452_376_460;
+
+/// The venue deploy slots the harness's ProgramData carry and [`Env::default_init_args`] records
+/// as `guard_slot` (A7; by `VenueGuard` index): `VENUE_GUARD_SLOTS_2026_09_27` with CPMM at
+/// [`CPMM_DEPLOY_SLOT_2026_10`], the build every fork loads ([`CpmmDeploy::CURRENT`]). The tests
+/// use it wherever they mean "the deploy slot the fork holds"; the program constant stays the
+/// 2026-09-27 baseline, which T-LATCH's old→new upgrade starts from ([`CpmmDeploy::Sep2026`]).
+pub const FIXTURE_GUARD_SLOTS: [u64; VENUE_PROGRAMS] = {
+    let mut s = VENUE_GUARD_SLOTS_2026_09_27;
+    s[GUARD_RAYDIUM_CPMM as usize] = CPMM_DEPLOY_SLOT_2026_10;
+    s
+};
+
+/// The CPMM builds the fixtures hold, both at `CPMMoo8L…` / ProgramData `DMawCQzb…` (the same
+/// upgrade authority, the Squads v4 vault `FytDrVz…`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CpmmDeploy {
+    /// Deploy slot 445,763,504 (2026-09-10; group `raydium_programs`): the build R-RAY and
+    /// `VENUE_GUARD_SLOTS_2026_09_27` name (`raydium-cp-swap@59fb845`, behavioural match).
+    Sep2026,
+    /// Deploy slot 452,376,460 ([`CPMM_DEPLOY_SLOT_2026_10`]; group `raydium_cpmm_2026_10`):
+    /// the redeploy mainnet runs: `raydium-cp-swap@bdeee23` (`feat/creator-fee-share`; a
+    /// solana-verify 3.1.10 rebuild is byte-identical, `tests/fixtures/README.md`). Same swap
+    /// interface, same `PoolState` / `AmmConfig` layouts.
+    Oct2026,
+}
+
+impl CpmmDeploy {
+    /// The build every fork loads ([`RaydiumProgram::Cpmm`], [`Env::load_raydium_programs`]).
+    pub const CURRENT: Self = Self::Oct2026;
+
+    fn prefix(self) -> &'static str {
+        match self {
+            Self::Sep2026 => "raydium_cpmm",
+            Self::Oct2026 => "raydium_cpmm_2026_10",
+        }
+    }
+
+    /// The deploy slot its ProgramData header carries.
+    pub fn deploy_slot(self) -> u64 {
+        match self {
+            Self::Sep2026 => VENUE_GUARD_SLOTS_2026_09_27[usize::from(GUARD_RAYDIUM_CPMM)],
+            Self::Oct2026 => CPMM_DEPLOY_SLOT_2026_10,
+        }
+    }
+
+    /// The fixture of its ProgramData account.
+    pub fn program_data(self) -> &'static Fixture {
+        fixture(&format!("{}_program_data", self.prefix()))
+    }
+
+    /// The fixture of its program account (the same bytes for both builds).
+    pub fn program(self) -> &'static Fixture {
+        fixture(&format!("{}_program", self.prefix()))
+    }
+
+    /// The dumped ELF.
+    pub fn elf(self) -> &'static [u8] {
+        let pd = self.program_data();
+        let start = shortwin_venue_state::program_data::HEADER_LEN;
+        let len = pd.elf_len.expect("a ProgramData fixture");
+        &pd.account.data[start..start + len]
+    }
+}
+
+/// Deploys CPMM build `deploy` at its mainnet address (as [`load_program`]), replacing whichever
+/// CPMM build the VM held: LiteSVM recompiles the ELF when the program account is rewritten.
+pub fn load_cpmm_deploy(svm: &mut LiteSVM, deploy: CpmmDeploy) {
+    load(svm, &deploy.program_data().name);
+    load(svm, &deploy.program().name);
 }
 
 /// Rewrites the deploy slot in `program`'s ProgramData header (an "upgrade" for the latch

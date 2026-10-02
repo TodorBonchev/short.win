@@ -22,16 +22,14 @@
 //!   Token-2022's upgrade is alerted only.
 
 use anchor_lang::prelude::Pubkey;
-use shortwin::constants::{
-    GUARD_RAYDIUM_CPMM, GUARD_RAYDIUM_V4, TOKEN_2022_PROGRAM_ID, VENUE_GUARD_SLOTS_2026_09_27,
-};
+use shortwin::constants::{GUARD_RAYDIUM_CPMM, GUARD_RAYDIUM_V4, TOKEN_2022_PROGRAM_ID};
 use shortwin::errors::ShortwinError;
 use shortwin::events::SolSettle;
 use shortwin_keeper::events;
 use shortwin_keeper::monitor::{self, AdminChange};
 use shortwin_litesvm_tests::engine::VenueMarket;
 use shortwin_litesvm_tests::errors::custom_code;
-use shortwin_litesvm_tests::fork::{self, RaydiumProgram, V4Fees};
+use shortwin_litesvm_tests::fork::{self, FIXTURE_GUARD_SLOTS, RaydiumProgram, V4Fees};
 use shortwin_litesvm_tests::{fixtures, ix};
 use solana_signer::Signer;
 
@@ -441,8 +439,8 @@ fn cpmm_status_bits_swap_is_a_lost_route_deposit_is_only_a_status_change() {
 #[test]
 fn upgrades_are_flagged_in_the_slot_they_are_seen_once_and_refreshed_during_review() {
     let (mut h, ms) = ray_setup(&[FART, USELESS], KeeperConfig::default());
-    let v4_slot = VENUE_GUARD_SLOTS_2026_09_27[usize::from(GUARD_RAYDIUM_V4)];
-    let cpmm_slot = VENUE_GUARD_SLOTS_2026_09_27[usize::from(GUARD_RAYDIUM_CPMM)];
+    let v4_slot = FIXTURE_GUARD_SLOTS[usize::from(GUARD_RAYDIUM_V4)];
+    let cpmm_slot = FIXTURE_GUARD_SLOTS[usize::from(GUARD_RAYDIUM_CPMM)];
     // Token-2022's ProgramData (LiteSVM loads Token-2022 without one): watched, alert only.
     let t22_pd = monitor::program_data_address(&TOKEN_2022_PROGRAM_ID);
     h.with_env(|env| fixtures::set_program_data(&mut env.svm, &t22_pd, 400_000_000, None, 64));

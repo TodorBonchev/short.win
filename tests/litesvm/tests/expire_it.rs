@@ -22,13 +22,14 @@ use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::AccountMeta;
 use shortwin::ExtraEntryArg;
 use shortwin::PauseScope;
-use shortwin::constants::{GUARD_RAYDIUM_CPMM, VENUE_GUARD_SLOTS_2026_09_27};
+use shortwin::constants::GUARD_RAYDIUM_CPMM;
 use shortwin::events::{Expire, MintSafetyTripped, TraderSwept};
 use shortwin::state::ShortPosition;
 use shortwin::venues::{EXTRAS_SET_CURRENT, ExtrasSel};
 use shortwin_litesvm_tests::engine::{
     VENUE_HINT_MOCK, mock_extras_key, set_route_broken_ix, set_venue_extras_ix,
 };
+use shortwin_litesvm_tests::fork::FIXTURE_GUARD_SLOTS;
 use shortwin_litesvm_tests::invariants::{self, IxEvents};
 use shortwin_litesvm_tests::ix;
 use shortwin_litesvm_tests::mock::{Knobs, update_knobs};
@@ -322,7 +323,7 @@ fn expiries_ignore_pauses_flags_latch_fee_cap_and_the_mint_filter() {
     env.set_all_venue_program_data();
     env.set_venue_program_data(
         GUARD_RAYDIUM_CPMM,
-        VENUE_GUARD_SLOTS_2026_09_27[usize::from(GUARD_RAYDIUM_CPMM)] + 7,
+        FIXTURE_GUARD_SLOTS[usize::from(GUARD_RAYDIUM_CPMM)] + 7,
     );
     ok(env.send(&[ix::flag_venue_upgraded(GUARD_RAYDIUM_CPMM)], &[]));
     // A venue fee of 5.2 %, above the global hard cap (5 %): the reference and the fee base take

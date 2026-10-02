@@ -374,15 +374,15 @@ fn m3_sec_1c_cpmm_zero_fee_predicate_vs_elf() {
 /// Before the fix the CPMM listing succeeded on the flagged program (59,924 CU).
 #[test]
 fn m3_sec_2_a_raydium_listing_waits_for_the_venue_review() {
-    use shortwin::constants::{GUARD_RAYDIUM_CPMM, GUARD_RAYDIUM_V4, VENUE_GUARD_SLOTS_2026_09_27};
-    use shortwin_litesvm_tests::fork::RaydiumProgram;
+    use shortwin::constants::{GUARD_RAYDIUM_CPMM, GUARD_RAYDIUM_V4};
+    use shortwin_litesvm_tests::fork::{FIXTURE_GUARD_SLOTS, RaydiumProgram};
     use shortwin_litesvm_tests::{ix, tokens};
     for (program, venue) in [
         (RaydiumProgram::AmmV4, GUARD_RAYDIUM_V4),
         (RaydiumProgram::Cpmm, GUARD_RAYDIUM_CPMM),
     ] {
         let mut env = Env::ray_fork();
-        let dumped = VENUE_GUARD_SLOTS_2026_09_27[usize::from(venue)];
+        let dumped = FIXTURE_GUARD_SLOTS[usize::from(venue)];
         fork::set_deploy_slot(&mut env.svm, program, dumped + 1);
         ok(env.send(&[ix::flag_venue_upgraded(venue)], &[]));
         assert_ne!(env.venue_guard().upgraded, 0, "the latch is set");
@@ -442,12 +442,12 @@ fn m3_sec_2_a_raydium_listing_waits_for_the_venue_review() {
 /// latch just before the instruction, not on a list-only listing, not on a clear latch.
 #[test]
 fn m3_sec_2_the_i17_hook_refuses_a_listing_on_a_flagged_venue() {
-    use shortwin::constants::{GUARD_RAYDIUM_CPMM, VENUE_GUARD_SLOTS_2026_09_27};
-    use shortwin_litesvm_tests::fork::RaydiumProgram;
+    use shortwin::constants::GUARD_RAYDIUM_CPMM;
+    use shortwin_litesvm_tests::fork::{FIXTURE_GUARD_SLOTS, RaydiumProgram};
     use shortwin_litesvm_tests::ix;
     let mut env = Env::ray_fork();
     let clear = invariants::snapshot(&env.svm, &[]);
-    let dumped = VENUE_GUARD_SLOTS_2026_09_27[usize::from(GUARD_RAYDIUM_CPMM)];
+    let dumped = FIXTURE_GUARD_SLOTS[usize::from(GUARD_RAYDIUM_CPMM)];
     fork::set_deploy_slot(&mut env.svm, RaydiumProgram::Cpmm, dumped + 1);
     ok(env.send(&[ix::flag_venue_upgraded(GUARD_RAYDIUM_CPMM)], &[]));
     let flagged = invariants::snapshot(&env.svm, &[]);

@@ -1,7 +1,8 @@
 //! T-RAY-MATH, execution half (ARCH §8.2, §9 M3; R-RAY §3.3–§3.4, §9.6 item 8; U11, U12):
 //! direct user swaps on the **real** Raydium programs dumped from mainnet (AMM v4
-//! `675kPX9…`, deploy slot 445,763,204; CPMM `CPMMoo8…`, 445,763,504; `tests/fixtures/`, loaded
-//! by `shortwin_litesvm_tests::fork`) execute exactly what `shortwin-math`'s `quote::ray_v4` /
+//! `675kPX9…`, deploy slot 445,763,204; CPMM `CPMMoo8…` as redeployed at 452,376,460 (M10 WP-2;
+//! the 445,763,504 build is T-LATCH's "before"); `tests/fixtures/`, loaded by
+//! `shortwin_litesvm_tests::fork`) execute exactly what `shortwin-math`'s `quote::ray_v4` /
 //! `quote::cpmm` compute on the `shortwin-venue-state` readers' reserves:
 //!
 //! - both directions (WSOL in / token in), exact in (tag 16, `swap_base_input`) and exact out
@@ -23,7 +24,8 @@
 //! - seeded random trade sequences on the evolving state.
 //!
 //! Also here, because they validate the fork and the readers against the ELFs: the fixture
-//! integrity (ProgramData rebuilt to the mainnet sha256, R-RAY §1.3's ELF hashes), the reader
+//! integrity (ProgramData rebuilt to the mainnet sha256, R-RAY §1.3's ELF hashes and the
+//! redeploy's), the reader
 //! constants against the program's, every PDA the venues derive, the route predicates of both
 //! readers against the ELFs (status values and bits, open times, counters: the venue half of
 //! T-RAY-DISABLE), and the byte-level admin builders against the admins' real instructions.
@@ -40,7 +42,7 @@ use litesvm::LiteSVM;
 use shortwin::constants::{
     GUARD_RAYDIUM_CPMM, GUARD_RAYDIUM_V4, RAYDIUM_CPMM_AUTHORITY, RAYDIUM_CPMM_PROGRAM_ID,
     RAYDIUM_V4_AUTHORITY, RAYDIUM_V4_PROGRAM_ID, T_CLAMP, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID,
-    VENUE_GUARD_SLOTS_2026_09_27, VENUE_PROGRAM_DATA, WSOL_MINT,
+    VENUE_GUARD_SLOTS_2026_09_27, VENUE_PROGRAM_DATA, VENUE_PROGRAM_IDS, WSOL_MINT,
 };
 use shortwin_litesvm_tests::errors::custom_code;
 use shortwin_litesvm_tests::fork::{
@@ -330,43 +332,58 @@ fn run_grid(env: &mut Env, pool: &AnyPool, t: &Trader) -> (usize, usize) {
 
 /// The dumped programs and their ProgramData are what mainnet holds: the rebuilt ProgramData
 /// (header ‖ ELF ‖ zeros) hashes to the fetched account (checked on load), the ELF with its
-/// trailing zeros trimmed hashes to R-RAY §1.3's value, the header carries the deploy slots
-/// short.win's latch compiles in and the Squads v4 upgrade authority, at the latch's addresses.
+/// trailing zeros trimmed hashes to R-RAY §1.3's value (the redeploy: the manifest's pin, which is
+/// OtterSec's on-chain hash), the header carries the deploy slot and the Squads v4 upgrade
+/// authority, at the latch's addresses. AMM v4 and the CPMM build the fork loads carry
+/// [`fork::FIXTURE_GUARD_SLOTS`]; the CPMM build `VENUE_GUARD_SLOTS_2026_09_27` names (445,763,504)
+/// is kept for T-LATCH.
 #[test]
 fn fixtures_are_mainnet() {
+    use fork::CpmmDeploy;
+    let v4 = RaydiumProgram::AmmV4;
     let cases = [
         (
-            RaydiumProgram::AmmV4,
+            "AMM v4",
             GUARD_RAYDIUM_V4,
+            v4.program_data(),
+            v4.program(),
+            v4.elf(),
+            "raydium_amm_v4",
             445_763_204,
             "d4cee0cd4f78f69d05f5d645fc6d120dff830f231162d35cf2b2dae1df7b2c9f",
         ),
         (
-            RaydiumProgram::Cpmm,
+            "CPMM 2026-09",
             GUARD_RAYDIUM_CPMM,
+            CpmmDeploy::Sep2026.program_data(),
+            CpmmDeploy::Sep2026.program(),
+            CpmmDeploy::Sep2026.elf(),
+            "raydium_cpmm",
             445_763_504,
             "bdaff73e7ed9fc75f091d732987d36476d7378d32c47495fe9eef0a930dbf8cc",
         ),
+        (
+            "CPMM 2026-10",
+            GUARD_RAYDIUM_CPMM,
+            CpmmDeploy::Oct2026.program_data(),
+            CpmmDeploy::Oct2026.program(),
+            CpmmDeploy::Oct2026.elf(),
+            "raydium_cpmm_2026_10",
+            452_376_460,
+            "93cad2458ac72435c94b8ac89faa686987f4e29d2f0e862d546fbc5aa814a0d2",
+        ),
     ];
     let authority = Pubkey::from_str_const("FytDrVzDybM1TwFQPGb8qaxZR7dBCzNeqT3vtQsceZQK");
-    for (p, guard, slot, trimmed) in cases {
-        let pd = p.program_data();
-        assert_eq!(pd.address, VENUE_PROGRAM_DATA[usize::from(guard)]);
+    for (label, guard, pd, prog, elf, file, slot, trimmed) in cases {
+        let g = usize::from(guard);
+        assert_eq!(pd.address, VENUE_PROGRAM_DATA[g], "{label}");
         let h = program_data::read(&pd.account.owner.to_bytes(), &pd.account.data).unwrap();
-        assert_eq!(h.slot, slot);
-        assert_eq!(h.slot, VENUE_GUARD_SLOTS_2026_09_27[usize::from(guard)]);
-        assert_eq!(h.upgrade_authority, Some(authority.to_bytes()));
-        let elf = p.elf();
+        assert_eq!(h.slot, slot, "{label}");
+        assert_eq!(h.upgrade_authority, Some(authority.to_bytes()), "{label}");
         assert_eq!(&elf[..4], b"\x7fELF");
         // SBPF v0 (`e_flags` 0): the loader runs mainnet's own binary, not a rebuild.
-        assert_eq!(elf[48..52], [0, 0, 0, 0]);
-        let file = format!(
-            "programs/{}.so",
-            match p {
-                RaydiumProgram::AmmV4 => "raydium_amm_v4",
-                RaydiumProgram::Cpmm => "raydium_cpmm",
-            }
-        );
+        assert_eq!(elf[48..52], [0, 0, 0, 0], "{label}");
+        let file = format!("programs/{file}.so");
         assert_eq!(std::fs::read(fork::fixtures_dir().join(file)).unwrap(), elf);
         assert!(
             pd.account.data[program_data::HEADER_LEN + elf.len()..]
@@ -374,12 +391,42 @@ fn fixtures_are_mainnet() {
                 .all(|&b| b == 0)
         );
         let end = elf.iter().rposition(|&b| b != 0).unwrap() + 1;
-        assert_eq!(fork::sha256_hex(&elf[..end]), trimmed);
-        let prog = p.program();
-        assert_eq!(prog.address, p.id());
+        assert_eq!(fork::sha256_hex(&elf[..end]), trimmed, "{label}");
+        assert_eq!(prog.address, VENUE_PROGRAM_IDS[g], "{label}");
         assert!(prog.account.executable);
         assert_eq!(prog.account.data[4..36], pd.address.to_bytes());
     }
+    // The fork loads the redeploy; the program constant still names the 2026-09 build.
+    for p in RaydiumProgram::ALL {
+        let g = usize::from(match p {
+            RaydiumProgram::AmmV4 => GUARD_RAYDIUM_V4,
+            RaydiumProgram::Cpmm => GUARD_RAYDIUM_CPMM,
+        });
+        let h = program_data::read(
+            &p.program_data().account.owner.to_bytes(),
+            &p.program_data().account.data,
+        )
+        .unwrap();
+        assert_eq!(h.slot, fork::FIXTURE_GUARD_SLOTS[g], "{p:?}");
+        assert_eq!(p.program().address, p.id());
+    }
+    assert_eq!(RaydiumProgram::Cpmm.elf(), CpmmDeploy::CURRENT.elf());
+    assert_eq!(CpmmDeploy::CURRENT, CpmmDeploy::Oct2026);
+    assert_eq!(
+        CpmmDeploy::Sep2026.deploy_slot(),
+        VENUE_GUARD_SLOTS_2026_09_27[usize::from(GUARD_RAYDIUM_CPMM)]
+    );
+    assert_eq!(
+        CpmmDeploy::Oct2026.deploy_slot(),
+        fork::CPMM_DEPLOY_SLOT_2026_10
+    );
+    assert_eq!(
+        fork::fixture_at(&VENUE_PROGRAM_DATA[usize::from(GUARD_RAYDIUM_CPMM)])
+            .unwrap()
+            .name,
+        "raydium_cpmm_2026_10_program_data",
+        "an address in both CPMM groups resolves to the redeploy"
+    );
     // Every state fixture is one snapshot.
     let s = fork::state_snapshot();
     for f in fork::all_fixtures().filter(|f| f.group == "raydium_state") {

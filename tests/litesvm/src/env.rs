@@ -10,8 +10,7 @@ use litesvm::LiteSVM;
 use litesvm::types::{FailedTransactionMetadata, TransactionMetadata};
 use shortwin::constants::{
     PYTH_SOL_USD_ACCOUNT, PYTH_SOL_USD_FEED_ID, VENUE_BIT_PUMP_CURVE, VENUE_BIT_PUMP_SWAP,
-    VENUE_BIT_RAYDIUM_CPMM, VENUE_BIT_RAYDIUM_V4, VENUE_BITS_UNFINISHED,
-    VENUE_GUARD_SLOTS_2026_09_27, VENUE_PROGRAM_DATA,
+    VENUE_BIT_RAYDIUM_CPMM, VENUE_BIT_RAYDIUM_V4, VENUE_BITS_UNFINISHED, VENUE_PROGRAM_DATA,
 };
 use shortwin::state::{
     EmaParamsArgs, GlobalConfig, InitConfigArgs, LenderPosition, Market, MarketVault, OracleCache,
@@ -25,7 +24,7 @@ use solana_transaction_error::TransactionError;
 
 use crate::fixtures::{self, MarketKeys};
 use crate::tokens::TokenProgram;
-use crate::{invariants, pda, read, record};
+use crate::{fork, invariants, pda, read, record};
 
 /// Result of a transaction.
 pub type TxResult = Result<TransactionMetadata, FailedTransactionMetadata>;
@@ -212,7 +211,8 @@ impl Env {
 
     /// ECON §15 defaults, the harness authorities, the sponsored Pyth feed, every MVP venue
     /// enabled (the pump curve through [`Env::initialize_config`]'s test-only write, M5-SEC-4),
-    /// the 48 h timelock and the v0.4.1 venue deploy slots.
+    /// the 48 h timelock and the deploy slots the fork's venue programs carry
+    /// ([`fork::FIXTURE_GUARD_SLOTS`]: v0.4.1's, with CPMM's 2026-10 redeploy).
     pub fn default_init_args(&self) -> InitConfigArgs {
         InitConfigArgs {
             governance: self.governance.pubkey(),
@@ -230,7 +230,7 @@ impl Env {
             tiers: TierParams::defaults(),
             ema: EmaParamsArgs::defaults(),
             util_kink_bps: shortwin_math::params::Params::DEFAULT.util_kink_bps,
-            guard_slot: VENUE_GUARD_SLOTS_2026_09_27,
+            guard_slot: fork::FIXTURE_GUARD_SLOTS,
         }
     }
 
@@ -660,7 +660,7 @@ impl Env {
     /// Writes mock ProgramData accounts for all six venue programs at the slots
     /// `initialize_config` recorded (no venue is "upgraded").
     pub fn set_all_venue_program_data(&mut self) {
-        for (venue, slot) in VENUE_GUARD_SLOTS_2026_09_27.iter().enumerate() {
+        for (venue, slot) in fork::FIXTURE_GUARD_SLOTS.iter().enumerate() {
             self.set_venue_program_data(venue as u8, *slot);
         }
     }

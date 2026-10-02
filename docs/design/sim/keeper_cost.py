@@ -64,7 +64,7 @@ CU = {
     "pump_curve": {"crank": 37_382, "sol_settle_keep": 62_713, "sol_settle_settle": 72_734,
                    "liquidate": 191_983, "expire": 188_964},
     "raydium_cpmm": {"crank": 32_843, "sol_settle_keep": 65_642, "sol_settle_settle": 77_390,
-                     "liquidate": 125_284, "expire": 117_482},
+                     "liquidate": 125_289, "expire": 117_487},
     "raydium_amm_v4": {"crank": 32_779, "sol_settle_keep": 57_650, "sol_settle_settle": 67_715,
                        "liquidate": 105_270, "expire": 101_004},
 }

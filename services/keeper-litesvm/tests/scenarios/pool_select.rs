@@ -1101,8 +1101,8 @@ fn nothing_is_proposed_while_positions_are_open_and_the_incumbent_is_healthy() {
 /// thin listing is replaced at the next evaluation, still inside the listing window.
 #[test]
 fn proposals_wait_for_the_venue_review() {
-    use shortwin::constants::{GUARD_RAYDIUM_V4, VENUE_GUARD_SLOTS_2026_09_27};
-    use shortwin_litesvm_tests::fork::RaydiumProgram;
+    use shortwin::constants::GUARD_RAYDIUM_V4;
+    use shortwin_litesvm_tests::fork::{FIXTURE_GUARD_SLOTS, RaydiumProgram};
     use shortwin_litesvm_tests::ix;
     use solana_signer::Signer;
 
@@ -1113,7 +1113,7 @@ fn proposals_wait_for_the_venue_review() {
     let key = pda::market(&thin.token().0).0;
     let seen = env.market(&key).pool_seen_at;
     let window = i64::from(env.config().params.pool_list_window_s);
-    let upgraded = VENUE_GUARD_SLOTS_2026_09_27[usize::from(GUARD_RAYDIUM_V4)] + 777;
+    let upgraded = FIXTURE_GUARD_SLOTS[usize::from(GUARD_RAYDIUM_V4)] + 777;
     fork::set_deploy_slot(&mut env.svm, RaydiumProgram::AmmV4, upgraded);
     let mut h = Harness::new(env, KeeperConfig::default());
     let r = h.second().clone();

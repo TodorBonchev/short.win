@@ -460,7 +460,7 @@ pub fn mock_lifecycle() -> Session {
     }
     // The venue-upgrade latch: a CPMM ProgramData redeploy flagged, then revalidated.
     let guard = shortwin::constants::GUARD_RAYDIUM_CPMM;
-    let slot = shortwin::constants::VENUE_GUARD_SLOTS_2026_09_27[usize::from(guard)] + 1;
+    let slot = shortwin_litesvm_tests::fork::FIXTURE_GUARD_SLOTS[usize::from(guard)] + 1;
     env.set_venue_program_data(guard, slot);
     ok(env.send(&[ix::flag_venue_upgraded(guard)], &[]));
     env.warp(60);
