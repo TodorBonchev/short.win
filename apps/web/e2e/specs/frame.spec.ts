@@ -3,11 +3,13 @@
  * (this suite's server) must not run inside another page: the server sends `X-Frame-Options: DENY`
  * and `frame-ancestors 'none'`, and — for a host that ignores `dist/_headers` — the app itself
  * refuses to mount when framed and shows `frame-guard` instead (no wallet button, no Sign button).
+ * The same server serves the RFC 9116 `/.well-known/security.txt` as plain text (M10 SECTXT-4).
  *
  * Uses Playwright's own `test` (not the app fixtures): the browser logs the refused frame as an
  * error, which the fixtures would count as a CSP violation of the app.
  */
 import { expect, test } from '@playwright/test';
+import { SECURITY_TXT_PATH, securityTxtProblems } from '../../src/config/securityTxt.ts';
 import { T } from '../../src/config/testids.ts';
 import { URLS } from '../env.ts';
 
@@ -22,6 +24,19 @@ test.describe('framing', { tag: '@scaffold' }, () => {
             expect(res.headers()['x-frame-options']).toBe('DENY');
             expect(res.headers()['content-security-policy']).toContain("frame-ancestors 'none'");
         }
+    });
+
+    test('the server serves /.well-known/security.txt as text/plain', async ({ request }) => {
+        const res = await request.get(`${URLS.app}${SECURITY_TXT_PATH}`);
+        expect(res.status()).toBe(200);
+        // `vite preview` ignores `dist/_headers` and types the file by its extension: this covers the
+        // preview server only. The `_headers` block (`charset=utf-8`) is pinned by csp.test.ts
+        // (`headersFile`), a deployed host by `check:headers`.
+        expect(res.headers()['content-type']).toMatch(/^text\/plain\b/);
+        const body = await res.text();
+        expect(body).not.toContain('<html');
+        // The E2E build is a localnet build: the owner placeholders may remain (a mainnet build refuses them).
+        expect(securityTxtProblems(body, { now: new Date(), production: false })).toEqual([]);
     });
 
     test('a framing page gets no app — the browser refuses, and so does the app on a header-less host', async ({

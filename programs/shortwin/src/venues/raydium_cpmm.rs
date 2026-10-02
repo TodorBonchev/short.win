@@ -551,7 +551,11 @@ pub fn buy<'info>(
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::arithmetic_side_effects)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::arithmetic_side_effects
+)]
 mod tests {
     use super::*;
     use crate::constants::{TOKEN_2022_PROGRAM_ID, T_CLAMP};

@@ -104,7 +104,8 @@ pub fn check_mint_safety(mint: &AccountInfo) -> Result<()> {
 #[allow(
     clippy::arithmetic_side_effects,
     clippy::cast_possible_truncation,
-    clippy::unwrap_used
+    clippy::unwrap_used,
+    clippy::panic
 )]
 mod tests {
     use super::*;

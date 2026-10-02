@@ -27,6 +27,9 @@ test-venue = []
 
 [dependencies]
 anchor-lang = "=1.2.0"
+# The security.txt of the release ELF (M10 SECTXT-1; `src/lib.rs`): one macro, no dependencies
+# without its `parser` feature. Exact pin: the blob layout is what Explorer parses.
+solana-security-txt = "=1.1.3"
 # The length-tolerant pump `BondingCurve` reader the core program and the keeper use (zero
 # runtime dependencies, `no_std`): the helper reads `real_token_reserves` and `complete` with the
 # same bytes-in, values-out function.

@@ -27,6 +27,9 @@ custom-panic = []
 test-venue = ["shortwin-venue-state/test-venue"]
 
 [dependencies]
+# The security.txt of the release ELF (M10 SECTXT-1; `src/lib.rs`): one macro, no dependencies
+# without its `parser` feature. Exact pin: the blob layout is what Explorer parses.
+solana-security-txt = "=1.1.3"
 # event-cpi: every event goes through `emit_cpi!` (ARCH §3.10); init-if-needed: `deposit`
 # creates the LenderPosition on first use (ARCH §3.3).
 anchor-lang = { version = "=1.2.0", features = ["event-cpi", "init-if-needed"] }

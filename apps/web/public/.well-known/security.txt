@@ -1,0 +1,10 @@
+# short.win vulnerability disclosure (RFC 9116).
+# Scope: this web app and the short.win on-chain programs on Solana mainnet:
+#   short.win       5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK
+#   complete_curve  4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ
+# Both programs also embed a security.txt (query-security-txt <program id>).
+Contact: mailto:OWNER-FILL-security-mailbox
+Expires: OWNER-FILL-YYYY-MM-DDT00:00:00.000Z
+Policy: https://OWNER-FILL-domain/OWNER-FILL-policy-path
+Preferred-Languages: en
+Canonical: https://OWNER-FILL-domain/.well-known/security.txt

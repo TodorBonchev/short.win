@@ -27,7 +27,10 @@
     clippy::arithmetic_side_effects,
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
-    clippy::unwrap_used
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    unsafe_code
 )]
 
 use anchor_lang::prelude::*;
@@ -46,6 +49,25 @@ pub use instructions::*;
 pub use state::*;
 
 declare_id!("5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK");
+
+// security.txt (neodyme-labs/solana-security-txt =1.1.3; ARCH §8.5, M10 SECTXT-1), read by
+// Solana Explorer and `query-security-txt`; `scripts/check-security-txt.py` checks it in CI. The
+// `OWNER-FILL` values wait for the public identity (M10 owner question Q3); the release gate
+// (`--forbid-placeholders`) refuses them. Not in `no-entrypoint` builds (the keeper links both
+// programs as libraries: two `#[no_mangle] SECURITY_TXT` symbols would clash) nor in the TEST-ONLY
+// `test-venue` build (A49). No `expiry`, `source_code` or `source_revision` while the repository
+// is private; `source_release` is the package version, never a commit (the hash must not depend
+// on it).
+#[cfg(not(any(feature = "no-entrypoint", feature = "test-venue")))]
+solana_security_txt::security_txt! {
+    name: "short.win",
+    project_url: "https://OWNER-FILL-domain",
+    contacts: "email:OWNER-FILL-security-mailbox,link:https://OWNER-FILL-domain/.well-known/security.txt",
+    policy: "https://OWNER-FILL-domain/OWNER-FILL-policy-path",
+    preferred_languages: "en",
+    source_release: concat!("v", env!("CARGO_PKG_VERSION")),
+    auditors: "https://OWNER-FILL-domain/OWNER-FILL-audits-path"
+}
 
 #[program]
 pub mod shortwin {

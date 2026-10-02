@@ -6,6 +6,7 @@
  * carry).
  */
 import type { AppConfig } from './parseConfig.ts';
+import { SECURITY_TXT_CONTENT_TYPE, SECURITY_TXT_PATH } from './securityTxt.ts';
 
 type CspSources = Pick<AppConfig, 'rpcUrl' | 'rpcWsUrl' | 'indexerUrl' | 'indexerWsUrl' | 'cluster'>;
 
@@ -83,4 +84,19 @@ export function securityHeaders(c: CspSources): Record<string, string> {
         'Cross-Origin-Opener-Policy': 'same-origin',
         'Strict-Transport-Security': 'max-age=63072000; includeSubDomains',
     };
+}
+
+/**
+ * The `dist/_headers` file (Netlify / Cloudflare Pages syntax): the security headers on every path,
+ * and `/.well-known/security.txt` as `text/plain; charset=utf-8` (RFC 9116 §3; M10 SECTXT-4).
+ */
+export function headersFile(c: CspSources): string {
+    return [
+        '/*',
+        ...Object.entries(securityHeaders(c)).map(([k, v]) => `  ${k}: ${v}`),
+        '',
+        SECURITY_TXT_PATH,
+        `  Content-Type: ${SECURITY_TXT_CONTENT_TYPE}`,
+        '',
+    ].join('\n');
 }

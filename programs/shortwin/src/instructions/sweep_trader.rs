@@ -42,8 +42,8 @@
 //! part, verified on the dumped ELF by `m5_sec_curve_it`), so anyone unlocks the market with
 //! `[pump claim_cashback(user = trader), sweep_trader]` in one transaction: the claim pays the
 //! trader, this sweep credits the wipe record and sets both bits. No pump CPI here, so neither a
-//! change of pump's claim interface nor a venue that cannot execute can lock deposits (the TODO
-//! of `engine::lender::rewards_required`).
+//! change of pump's claim interface nor a venue that cannot execute can lock deposits (no M1-FID-12
+//! deadlock; `engine::lender::rewards_required` documents why the bit can always be set).
 //!
 //! **PumpSwap (M6; the M5-SEC-1 remainder, ARCH §3.9 "M6's choice").** PumpSwap accrues the
 //! trader's cashback as WSOL in `ATA(pAMM UVA(trader), WSOL)` (R-VEN Update H7), so a PumpSwap

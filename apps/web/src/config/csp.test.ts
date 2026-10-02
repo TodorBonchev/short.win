@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { contentSecurityPolicy, securityHeaders } from './csp.ts';
+import { contentSecurityPolicy, headersFile, securityHeaders } from './csp.ts';
 import { parseConfig } from './parseConfig.ts';
+import { SECURITY_TXT_CONTENT_TYPE, SECURITY_TXT_PATH } from './securityTxt.ts';
 
 const mainnet = parseConfig({
     VITE_CLUSTER: 'mainnet',
@@ -29,5 +30,28 @@ describe('content security policy', () => {
         expect(h['Content-Security-Policy']).toContain("frame-ancestors 'none'");
         expect(h['X-Frame-Options']).toBe('DENY');
         expect(h['Referrer-Policy']).toBe('no-referrer');
+    });
+
+    it('dist/_headers sends the security headers everywhere and security.txt as UTF-8 plain text', () => {
+        // `vite.config.ts` emits exactly this; `vite preview` (the E2E server) ignores the file.
+        const blocks = new Map<string, Record<string, string>>();
+        let path = '';
+        for (const line of headersFile(mainnet).split('\n')) {
+            if (line === '') continue;
+            if (!line.startsWith('  ')) {
+                path = line;
+                expect(blocks.has(path)).toBe(false);
+                blocks.set(path, {});
+                continue;
+            }
+            const m = /^ {2}([A-Za-z-]+): (.+)$/.exec(line);
+            expect(m, line).not.toBeNull();
+            const block = blocks.get(path);
+            if (m?.[1] && m[2] && block) block[m[1]] = m[2];
+        }
+        expect([...blocks.keys()]).toEqual(['/*', SECURITY_TXT_PATH]);
+        expect(blocks.get('/*')).toEqual(securityHeaders(mainnet));
+        expect(blocks.get(SECURITY_TXT_PATH)).toEqual({ 'Content-Type': SECURITY_TXT_CONTENT_TYPE });
+        expect(SECURITY_TXT_CONTENT_TYPE).toBe('text/plain; charset=utf-8');
     });
 });
