@@ -16,6 +16,10 @@ on:
   # M7: the invariant fuzzer's nightly run (fuzz-nightly). GitHub runs `schedule` on the default
   # branch only. The nightly run builds the programs (anchor-build) and fuzzes; every other job
   # carries `if: github.event_name != 'schedule'` (it already ran on the push that made main).
+  # Opt-in (owner decision 2026-10-02): the private repository's Actions minutes cannot carry
+  # 6 × 5 h every night, so a scheduled run does nothing unless the repository variable
+  # FUZZ_NIGHTLY is `true` (`gh variable set FUZZ_NIGHTLY --body true`); long fuzz runs are local
+  # (tests/fuzz/README.md). workflow_dispatch with `fuzz_duration` still runs it on demand.
   schedule:
     - cron: "17 1 * * *"
 
@@ -194,6 +198,7 @@ jobs:
   anchor-build:
     # Always `anchor build --tools-version v1.57 --arch v3`, never a bare `cargo build-sbf`
     # (Agave 4.1.2's cargo-build-sbf 4.1.0 defaults to platform-tools v1.54 / arch v0).
+    if: github.event_name != 'schedule' || vars.FUZZ_NIGHTLY == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1036,7 +1041,7 @@ jobs:
     # `tmin` and uploaded as crash files (replay: `shortwin-fuzz replay FILE`); the job fails on
     # any crash. Also on demand: workflow_dispatch with `fuzz_duration`. Release without fat LTO
     # (the fuzzer needs speed, not the deploy profile's link time).
-    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.fuzz_duration != '')
+    if: (github.event_name == 'schedule' && vars.FUZZ_NIGHTLY == 'true') || (github.event_name == 'workflow_dispatch' && inputs.fuzz_duration != '')
     needs: anchor-build
     runs-on: ubuntu-24.04
     timeout-minutes: 350
@@ -1089,8 +1094,9 @@ jobs:
     # cap removed, Tier C as B, the coverage clear immediate, the curve caps on the live reserves,
     # the pump caps at the live fee), and requires the mutant's named tests and a 3-minute fuzz of
     # its profile to fail against it: a surviving mutant is a missing oracle and fails the job.
-    # Nightly with fuzz-nightly (the schedule trigger, main) and on demand (workflow_dispatch).
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    # Nightly with fuzz-nightly (the schedule trigger, main; opt-in, FUZZ_NIGHTLY) and on demand
+    # (workflow_dispatch).
+    if: (github.event_name == 'schedule' && vars.FUZZ_NIGHTLY == 'true') || github.event_name == 'workflow_dispatch'
     needs: anchor-build
     runs-on: ubuntu-24.04
     timeout-minutes: 240
