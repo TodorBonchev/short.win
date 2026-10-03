@@ -38,7 +38,7 @@ to build and test the code, what the code relies on, and what we already know ab
 | `complete_curve` program id | `4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ` (`programs/complete_curve/src/lib.rs`) |
 | TEST-ONLY mock venue | `BPAZFPkmVtYEWEZHCzFUns7oybh1VWfAvmu3ofM2mQi7` (`tests/mock_cpamm`; never deployed; out of scope, §2) |
 | Toolchain | Anchor CLI and `anchor-lang` 1.2.0; Agave CLI 4.1.2; platform-tools v1.57 (rustc 1.95), SBPF v3; host Rust 1.98.1 (`docs/DEVELOPMENT.md` "Pins") |
-| Build | `anchor build --tools-version v1.57 --arch v3` (never a bare `cargo build-sbf`) |
+| Build | `anchor build --tools-version v1.57 --arch v3 --ignore-keys` (never a bare `cargo build-sbf`; never `anchor keys sync`, which would rewrite `declare_id!` and so the hashes below) |
 | Verifiable build | solana-verify 0.5.2, image `solanafoundation/solana-verifiable-build@sha256:2e0b78f44ee76612e9260c7c988570c5e14de6fbd93e0ab07115ec7054473b4f`, `--arch v3 --cargo-build-sbf-args="--tools-version v1.57"`: `scripts/verifiable-build.sh` (Docker, or `--local`: a bubblewrap shim running the same digest-pinned image) and CI's `verifiable-build` job, which fail unless each output is byte-identical to the `anchor build` artifact (ARCH §1.1) |
 | Contacts | Security reports: `security@short.win`; policy page `https://short.win/security` (`SECURITY.md`; the same values are in both programs' `security.txt` and the web's `/.well-known/security.txt`; owner decision Q3 of 2026-10-02). The auditors' point of contact is named at the engagement (§12) |
 
@@ -539,8 +539,10 @@ the toolchain is installed; the times in the comments are this package's gate (�
 3-job build limit, with a warm `target/`.
 
 ```sh
-# 1. Build both programs (release) and the TEST-ONLY test-venue build; check SBPF v3
-anchor build --tools-version v1.57 --arch v3 && scripts/build-test-venue.sh
+# 1. Build both programs (release) and the TEST-ONLY test-venue build; check SBPF v3.
+#    A clone has no program keypair: --ignore-keys silences Anchor's "Program ID mismatch"
+#    warning (the id comes from declare_id!). Never run `anchor keys sync`.
+anchor build --tools-version v1.57 --arch v3 --ignore-keys && scripts/build-test-venue.sh
 od -An -t x4 -j 48 -N 4 target/deploy/shortwin.so            # 00000003
 # 2. Hashes, compared with §0
 sha256sum target/deploy/shortwin.so target/deploy/complete_curve.so
