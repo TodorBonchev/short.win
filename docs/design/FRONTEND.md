@@ -1,8 +1,8 @@
 # short.win — Web frontend (M9 contract)
 
-*v1.2 • 2026-10-02 • **as built** (M9 integrated, then the M9 security and UX review fixed — §13
-"Review fixes"; v1.0 of 2026-10-01 was the contract the four parallel tracks — MARKETS, LEND,
-SHORT, E2E — built against, §12). Owner decision for the visual
+*v1.3 • 2026-10-03 • **as built** (M9 integrated, then the M9 security and UX review fixed — §13
+"Review fixes"; v1.3 folds in M10 — §13 "M10 changes"; v1.0 of 2026-10-01 was the contract the four
+parallel tracks — MARKETS, LEND, SHORT, E2E — built against, §12). Owner decision for the visual
 style: **dark trading terminal** — dense, dark, data-first, as memecoin traders know it from
 Photon / BullX / Axiom, and still accessible (§7, §8).*
 
@@ -19,7 +19,7 @@ tests:
 |---|---|---|---|
 | Disclosure copy | `src/config/disclosures.ts` | every disclosure's id, title, body, acknowledgement text (§4) | `disclosures.test.ts` (SPEC §5.3 verbatim; every paragraph present in §4 of this file) |
 | `data-testid` contract | `src/config/testids.ts` | every test id and prefix (§11) | `testids.test.ts` (unique; every id present in §11) |
-| Program error messages | `src/config/errors.ts` | a human message and an action for each code 6000–6104 (§5.9) | `errors.test.ts` (against `@shortwin/client`'s constants) |
+| Program error messages | `src/config/errors.ts` | a human message and an action for each code 6000–6105 (§5.9) | `errors.test.ts` (against `@shortwin/client`'s constants) |
 | Pinned program ids | `src/config/programs.ts` | the programs a transaction may invoke (§9.1) | `programs.test.ts` (against `constants.rs`, the client, `complete_curve`) |
 | Route tree | `src/router.tsx` | paths, typed search parameters, page components and their props (§3.2) | `router.test.tsx` (every route renders in the shell) |
 | Transaction pipeline | `src/tx/types.ts`, `useTxFlow.ts`, `TxReviewModal.tsx` | `TxPlan`, the stages, the review (§5) | `tx/*.test.ts` |
@@ -35,7 +35,13 @@ dashboard (LEND); the venue layer, the short panel, the positions dashboard and 
 shared-file requests (§13 "Integration changes"), and the M9 exit is met (§12.3): `pnpm -r
 build`, `biome check`, `vitest run` (56 files, 533 tests) and the E2E (19 specs, 50 tests,
 including §10.3) pass. Where the build deviates from v1.0, the section says so and §13 lists it.
-v1.2 fixes the sixteen findings of the M9 security and UX review (§13 "Review fixes").
+v1.2 fixes the sixteen findings of the M9 security and UX review (§13 "Review fixes"). **v1.3
+(M10):** the WASM facade replaces the TypeScript math ports (FE-15), the validator E2E covers the
+post-wipe bundle on the mock venue and the claim-time `sync_lender` (FE-18, partly), withdrawals
+pass spl-memo v3 to every Token-2022 destination (TMEMO-9) and the E2E runs mainnet's Token-2022,
+the `/security` page and `/.well-known/security.txt` exist, the deposit shows the pool's unpaid
+rent (`lender.unpaidRent`), a `DeniedAccount` extras set falls back to the next set, and error
+6105 is mapped (§13 "M10 changes").
 
 ---
 
@@ -167,8 +173,8 @@ them deliberately (owner choice, §13 FE-23).
   mint always offers "Open mint" even before the indexer knows it; `/` focuses it), the wallet
   button (`WalletButton`: Wallet Standard discovery and connect, address and disconnect).
 - **Status bar** (`StatusBar`): RPC slot and health, indexer freshness and lag (§6.6), live-feed
-  state, SOL/USD (from `/v1/stats`), the math module's state and version, cluster. Always visible:
-  stale data is never silent.
+  state, SOL/USD (from `/v1/stats`), the math module's state and version, cluster, and (*M10*) a
+  "Security" link to `/security` (`nav-security`). Always visible: stale data is never silent.
 - **Indexer-down banner**: while `/v1/status` fails, pages fall back to RPC reads (§6.5).
 - **Keyboard**: skip link to `#main`; `/` search; table rows reachable by Tab, moved with ↑ / ↓,
   opened with Enter; Escape closes menus and dismissible dialogs.
@@ -185,6 +191,7 @@ them deliberately (owner choice, §13 FE-23).
 | `/positions/$position` | — | `PositionDetailPage({ position })` | SHORT | `/v1/positions/{pubkey}`; RPC |
 | `/lend` | — | `LenderDashboardPage` | LEND | `/v1/lenders/{owner}`; RPC `LenderPosition`, `Market`, `MarketVault`, `ShareEpoch` |
 | `/status` | — | `ProtocolStatusPage` | MARKETS | `/v1/venues`, `/v1/admin/config`, `/v1/status`, markets flags |
+| `/security` | — | `SecurityPolicyPage` (*M10*, owner decision Q3 of 2026-10-02: the vulnerability disclosure policy that security.txt's `Policy` names, §9.3) | SCAFFOLD | static |
 
 A path parameter that is not a base58 address renders Not found. Tracks implement the components
 with exactly these props and never edit `router.tsx`; a new search parameter is a contract change.
@@ -242,7 +249,10 @@ Layout `.layout-trade`: left the market column, right the 360 px trade panel (ta
 1. Mint input (`createMintInput`; prefilled from `?mint=`). If a market exists (`findMarketPda` +
    RPC), link to it (`createExisting`).
 2. **Safety verdict** (`createVerdict`, `data-verdict`): `readMint` → the program's rule (ARCH §3.2
-   check 1): owner ∈ {Token, Token-2022}; not a native mint; no freeze authority; every extension
+   check 1; *M10, FE-15:* `shortwin_venue_state::mint::check` itself, through the WASM facade's
+   `mintCheck` — the further reasons are `check` re-run with each earlier rule lifted; if the math
+   module fails to load, the page shows the load error in place of the verdict, and an existing
+   market still shows): owner ∈ {Token, Token-2022}; not a native mint; no freeze authority; every extension
    type ∈ {MetadataPointer 18, TokenMetadata 19, GroupPointer 20, TokenGroup 21,
    GroupMemberPointer 22, TokenGroupMember 23}; a malformed TLV rejects. Each failing rule shows as
    `createReason-<ErrorName>` with the message of `config/errors.ts` (6016–6020).
@@ -264,9 +274,21 @@ Tabs Deposit | Withdraw | Claim (`lendTab-*`, `?action=`).
 - **Deposit:** source token account select (`readOwnerTokenAccounts`, ATA first; balance; CPI
   Guard flag), amount (`AmountInput`, Max = balance), preview (shares minted
   `previewDeposit` → `lendPreview-shares`, resulting share of the pool `lendPreview-share-bps`,
-  token value). Disclosures: `lender.solRepayment` **inline above the amount and again in the
-  review, with its required checkbox** (SPEC §5.3), `lender.risks`, `lender.lossHistory`,
-  `market.creatorSelfDealing` (collapsed), `lender.residuals` (collapsed). A source with CPI Guard
+  token value). *M10 (owner decision of 2026-10-03; ECON §9.4's late-depositor shortfall):* the
+  pool's unpaid rent as the deposit meets it — `Market.receivable` plus the lender credit the
+  deposit's prologue books over `market_now − last_accrual_ts` (`pendingLenderCredit`, the WASM
+  `RentBasis.lenderCredit` on `rent_aggr`) — (row "Unpaid rent in the pool",
+  `lend-preview-unpaid-rent`) and this deposit's part of it should none be paid,
+  ⌈receivable·shares/(S + shares)⌉ at the pool's size after the deposit (`previewUnpaidRent`, the
+  split in plain integers `unpaidRentExposure`; row "This deposit’s part if it is never paid",
+  `lend-preview-unpaid-rent-share` with `data-level` none / info / warn), shown when that
+  receivable is > 0. It warns when the part is ≥ `UNPAID_RENT_WARN_BPS` (100 bps) of the deposit's
+  value at `P_ema` (⌊amount·P_ema/WAD⌋) or ≥ `UNPAID_RENT_WARN_LAMPORTS` (1 SOL; the only threshold
+  without a price): `lender.unpaidRent` expanded and repeated in the review (`TxPlan.disclosures`);
+  otherwise collapsed and not in the review. The thresholds are proposed defaults awaiting the
+  owner's confirmation (FE-27). Disclosures: `lender.solRepayment` **inline above the amount and
+  again in the review, with its required checkbox** (SPEC §5.3), `lender.risks`, `lender.lossHistory`,
+  `market.creatorSelfDealing` (collapsed), `lender.residuals` (collapsed), `lender.unpaidRent` (M10). A source with CPI Guard
   shows `token.cpiGuard` (`lendCpiGuardNotice`, plain deposit disabled) and the opt-in bracket
   (`lendCpiGuardBracket`, FE-1). `deposit(amount, min_shares)`; `WipeSweepPending` → prepend the
   permissionless sweep bundle (ARCH §3.3, §3.9: `sweep_trader`, on pump venues pump's
@@ -276,16 +298,21 @@ Tabs Deposit | Withdraw | Claim (`lendTab-*`, `?action=`).
 - **Withdraw:** shares (or %), Max = the pro-rata allowance (`previewAllowance`), preview tokens and
   SOL (`previewWithdraw`), lock and `lock_until` after the withdrawal (`previewLock`,
   `previewLockUntil`), destination account (ATA created idempotently if missing; memo flag →
-  `token.memoRequired`, `memo_program` = spl-memo v3, else the short.win program id as "none").
+  `token.memoRequired` and the title; `memo_program` = spl-memo v3 for every Token-2022
+  destination — *M10, TMEMO-9:* the program CPIs it only when the destination requires memos at
+  execution —, the short.win program id as "none" for SPL Token).
   `lender.exitForfeitsVest` with its checkbox when shares remain and unreleased vest exists.
   `withdraw(shares, min_tokens, min_sol)` with `min_sol` = the quoted SOL (FE-D6).
   `LastSharesBorrowed`, `NegativePending` (→ cover deficit), `AboveProRataAllowance` mapped (§5.9).
   *As built:* the input is in shares, displayed at the token's decimals, with 25 %, 50 % and Max
-  (the allowance); `withdraw-preview-sol` is a lower bound from the WASM (`previewWithdraw`
-  returns tokens only, FE-15) and the exact `min_sol` is the market vault's lamport delta in a
-  simulation of the same withdrawal with `min_sol = 0`, so the vest a last lender is paid is
-  included; `withdraw-preview-lock-until` is the end a new lock would get (the review's simulated
-  lender `lock` is exact); the vest-forfeit box is ticked in the panel and again in the review;
+  (the allowance); `withdraw-preview-sol` is the WASM `previewWithdrawal`'s SOL part on the stored
+  state (*M10, FE-15:* the claim right after the burn, a last lender's vest flush included); it is a
+  lower bound only because the prologue's rent accrual can add to it, and the exact `min_sol` is
+  the market vault's lamport delta in a simulation of the same withdrawal with `min_sol = 0`;
+  `withdraw-preview-lock-after` ("Locked shares after"; `data-value` = shares, `data-until` =
+  `lock_until`) is the lock `previewWithdrawal` leaves — the borrowed part of the burn added to the
+  live lock, capped at the shares left —, next to "Locked shares now" and "A new lock would end"
+  (`withdraw-preview-lock-until`, the end a new lock would get); the vest-forfeit box is ticked in the panel and again in the review;
   the destination select is `withdraw-destination-select`.
 - **Claim:** claimable now (`previewClaim`), vesting (`previewVestRelease` share), the pot, a
   deficit (`claimValue-*`); `claim_sol()`; when the pot cannot cover the claim, prepend
@@ -466,6 +493,17 @@ Checkbox: “I understand I give up my unvested income.”
 > A sale bundled into an open can make that open record up to 10% less notional than an honest quote, so the market’s notional cap — the limit on how much can be shorted while a market is new — can be exceeded by up to about 11%.
 >
 > Tiny dust amounts can be left behind when a pool rebases.
+
+#### `lender.unpaidRent` — Rent this pool has not been paid yet
+
+*Severity:* warn · *Acknowledgement:* none · *Source:* ECON §9.4 (a shortfall is debited pro-rata to current shares); the owner’s decision of 2026-10-03 (*M10*)
+*Shown:* Lend → Deposit when the pool has unpaid rent at the deposit (`Market.receivable` plus the credit of the deposit's prologue > 0): collapsed, expanded when this deposit's part is material (≥ 1 % of its value at `P_ema` or ≥ 1 SOL), and then also in the review; `{receivable}`, `{exposure}` in SOL (9 decimals), `{share}` this deposit's shares' share of the pool after it
+
+> This pool has credited {receivable} SOL of rent that borrowers have not paid yet; it is paid when their positions close. If a position closes without enough SOL left to pay its rent, the unpaid part is taken from the lenders pro-rata to the shares they hold at that moment — including lenders who joined after the rent was credited.
+>
+> At the pool’s current size, this deposit would carry {exposure} SOL of it ({share} of the pool from this deposit). If other lenders withdraw first, that share — and this deposit’s part of such a loss — grows.
+>
+> Such a loss is taken from your SOL balance in this pool. If it leaves that balance below zero, you must pay the difference in SOL (Cover deficit, on the Claim tab) before you can withdraw your tokens.
 
 #### `borrower.liquidation` — How this short can end
 
@@ -673,9 +711,12 @@ feature ── TxPlan ──▶ simulating ──▶ review ──(Sign: ok ∧ 
   slots the program checks against live state read at the same slot (the pump / PumpSwap fee and
   buyback recipients picked at random from the live `Global` / `GlobalConfig` lists, ARCH §7.3 —
   the keeper instead spreads its own exits by the mint's first byte —, and the coin-creator vault of
-  the live curve / pool). Extras: the `current` set of `VenueExtras`; on a simulation
-  failure with `BadExtras` / `BadRemainingAccounts`, retry once with `previous`, then `stable`
-  (ARCH §7.1 duty 10). `detectVenue` and `raydiumCandidates` serve create-market (§3.5).
+  the live curve / pool). Extras: the `current` set of `VenueExtras`; on a failure with
+  `BadExtras` / `BadRemainingAccounts` / `DeniedAccount` (`EXTRAS_RETRY_CODES`, 6003–6005: the
+  refusals of the selected set itself; *M10 batch 3:* a set naming the position's borrower or the
+  adopted pool's own accounts is `DeniedAccount`), retry with the next set — `current`, none,
+  `previous`, `stable` (`extrasCandidates`; ARCH §7.1 duty 10). A denied set costs one extra
+  simulation until the Emergency key replaces it; nothing filters it out before sending. `detectVenue` and `raydiumCandidates` serve create-market (§3.5).
 - **Prepended instructions** (idempotent, each shown in the review): ATA creation for a withdrawal
   destination; pump `extend_account` for a short curve; PumpSwap T11 `create_idempotent` after a
   coin-creator change (ARCH §5.4 case 4); `sync_lender` / `ShareEpoch` records for a lender behind on
@@ -814,8 +855,11 @@ byte 2 at 165, TLV from 166): `CpiGuard` (extension 11, `lock_cpi`) and `MemoTra
   (`MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr`), so the program CPIs a memo right before its
   `transfer_checked` (M1-SEC-7); otherwise the short.win program id ("none"). Without it the
   program refuses `MemoProgramRequired` (6095); Token-2022's `NoMemo` (36) maps to the same advice.
-  Mainnet acceptance of a CPI'd memo is UNVERIFIED (T-MEMO, M10); the E2E proves it on the local
-  validator's Token-2022 (§10.3).
+  *M10 (TMEMO-9):* every Token-2022 withdrawal passes spl-memo v3 — the program CPIs it only when
+  the destination requires memos at execution —, so a destination that turns memo-required after
+  the review still lands; the memo flag only drives `token.memoRequired` and the title. Verified on
+  the mainnet Token-2022 and spl-memo v3 ELFs (T-MEMO, M10): LiteSVM `security::sec_7_*` and the
+  E2E, whose validator runs the same ELFs (§10.2). A mainnet transaction is M11's (TMEMO-10).
 - **ATAs:** a missing withdrawal destination is created with `createAssociatedTokenIdempotent` for
   the mint's token program (`mint.owner`; never assume SPL Token, R-MINT §8.5).
 
@@ -841,7 +885,7 @@ byte 2 at 165, TLV from 166): `CpiGuard` (extension 11, `lock_cpi`) and `MemoTra
 
 | Source | Mapping |
 |---|---|
-| `{ InstructionError: [i, { Custom: n }] }`, n ∈ 6000–6104, failing program short.win (from the logs' **first** "Program … failed": the innermost failing program logs first and every caller up the CPI stack repeats the code after it; v1.0 said "last", which attributed a CPI'd Token-2022 error to short.win — fixed at integration) | `config/errors.ts`: name, message, action (`retry`, `adjust`, `wait`, `blocked`, `report`, `admin`) |
+| `{ InstructionError: [i, { Custom: n }] }`, n ∈ 6000–6105 (*M10:* 6105 `AuthoritiesNotDistinct`, action `admin`), failing program short.win (from the logs' **first** "Program … failed": the innermost failing program logs first and every caller up the CPI stack repeats the code after it; v1.0 said "last", which attributed a CPI'd Token-2022 error to short.win — fixed at integration) | `config/errors.ts`: name, message, action (`retry`, `adjust`, `wait`, `blocked`, `report`, `admin`) |
 | same, failing program Token / Token-2022 | 1 insufficient tokens, 4 owner mismatch, 17 frozen, 36 memo required, 42 CPI Guard |
 | `InstructionError` built-ins | `InsufficientFunds`, `ComputationalBudgetExceeded`, others → `report` |
 | transaction-level | `InsufficientFundsForFee`, `InsufficientFundsForRent`, `AccountNotFound`, `BlockhashNotFound`, `AccountInUse`, block / account cost limits, `ProgramAccountNotFound` |
@@ -971,6 +1015,11 @@ export of the facade (crate README "Exports"); (2) inputs are the live on-chain 
 `GlobalConfig` terms (a position's locked terms for an open position); `defaultTierTerms` (the
 compiled SPEC table) is for explanations only; (3) WASM objects are freed after use (`free()` or
 `using`); (4) an `undefined` result (e.g. a quote with `q ≥ X`) renders "—" and disables Submit.
+*M10 (FE-15):* the last second copies are gone — the open guards (`spotNearEma`, `pOpenMax`), the
+pool-selection comparisons (`lambdaBps`, `lockedDepth`, `lockedSol`, `lockedFloorOk`), the mint
+verdict (`mintCheck`) and the full withdrawal (`previewWithdrawal`) are facade exports; the static
+flag and timer guards and the boost gate, which the facade does not export, stay in
+`features/short/previews.ts`.
 
 ---
 
@@ -1119,6 +1168,21 @@ short.win directly") instead; (2) `vite preview` (the E2E server) sends `X-Frame
 sends them (and `nosniff`, HSTS) and publishes no source map; the E2E `frame.spec.ts` frames the
 build both with and without the headers.
 
+*As built (M10 SECTXT-4, owner decision Q3 of 2026-10-02):* `public/.well-known/security.txt`
+(RFC 9116: `Contact: mailto:security@short.win`, `Policy: https://short.win/security`,
+`Preferred-Languages: en`, `Canonical`, `Expires: 2027-09-30` — rotate it before 2027-08-31) is
+checked by `src/config/securityTxt.ts`: Contact mailto: or https:; exactly one RFC 3339 Expires;
+an https Policy and the Canonical at `/.well-known/security.txt`; registry fields only. An OpenPGP
+cleartext-signed file (RFC 9116 §2.3) is checked on its signed text; the signature is not
+verified. Every build runs the check; only a `VITE_CLUSTER=mainnet` build and `check:headers`
+(production checks) also refuse `OWNER-FILL` placeholders and an Expires 30 days or less, or more
+than a year, ahead, so other builds never fail because the date nears; the unit test checks the
+file on a clock pinned 90 days before its own Expires. `dist/_headers` (`csp.ts` `headersFile`,
+pinned by `csp.test.ts`) serves it as `text/plain; charset=utf-8`. `Policy` is the app's own
+`/security` page (§3.2; `SecurityPolicyPage`: scope, how to report, response, safe harbour,
+audits; the repository's `SECURITY.md` carries the same values). Both programs embed their own
+security.txt with the same contact and policy (ARCH §8.5).
+
 ### 9.4 Secrets
 
 None in the app or the repository. Every `VITE_*` value is public (compiled into the bundle); the
@@ -1173,6 +1237,16 @@ what the program booked on LiteSVM), and the integration's (`tx/describe.test.ts
 mapping on real nested logs and `IntegrityError`, the oracle with no reading, the SPEC §5.3
 sentence shown once).
 
+*M10:* 59 files (the live-validator one skipped), 555 tests on the integrated tree before program
+batch 3, which adds 4. New: `src/m10-fe15/parity.test.ts` (FE-15: the facade against the
+TypeScript ports it replaced, frozen in `legacy.ts` as the oracle — both sides of the spot/EMA edge
+included — and against the Rust crates' vectors and every dumped mint and pool), `config/securityTxt.test.ts`
+and `config/securityPolicy.test.ts` (SECTXT-4, the `/security` values), `errors.test.ts` with 6105;
+batch 3: `features/lend/previews.test.ts` "the pool’s unpaid rent at a deposit" (the split, the
+thresholds, the prologue's pending credit), `LendPanel.test.tsx` (no rows on a paid-in pool, info
+collapsed, warn expanded and in the plan, a stored-zero accruing pool, a top-up's labels) and
+`features/short/plans.test.ts`'s extras fallback (`EXTRAS_RETRY_CODES` is exactly 6003–6005).
+
 Each track adds, at minimum: MARKETS — the safety verdict for every rule (one fixture per rejected
 extension and for freeze authority / native mints), the market page's mapping of API fields, the
 markets table sorting and paging, the status page's flag aggregation; LEND — deposit / withdraw /
@@ -1196,8 +1270,12 @@ price, caps), close / add-margin previews, P&L and risk.
   `--bpf-program BPAZFPkmVtYEWEZHCzFUns7oybh1VWfAvmu3ofM2mQi7 target/deploy/mock_cpamm.so`,
   `--bpf-program 4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ target/deploy/complete_curve.so`, and
   optionally the dumped venue programs and accounts of `tests/fixtures` (`--bpf-program` /
-  `--account`) for venue-specific specs. Token, Token-2022, ATA and the memo programs are the
-  validator's built-ins.
+  `--account`) for venue-specific specs. *M10 (T-MEMO):* Token-2022 is mainnet's ELF
+  (`--upgradeable-program` from `tests/fixtures` group `spl_programs` with its mainnet upgrade
+  authority; the built-in is a different build; `SHORTWIN_BUNDLED_SPL=1` keeps the built-in).
+  spl-memo v3 is the validator's built-in, which in Agave 4.1.2 already is mainnet's BPFLoader2
+  account byte for byte. Global setup (`checkSplPrograms`) holds both to the mainnet hashes. SPL
+  Token and the ATA program are the built-ins. CPMM is the 2026-10 redeploy.
 - **Seed** (`e2e/validator/seed.ts`, Node with Kit and `@shortwin/client`): generated keypairs
   (authority, governance, pause, fee recipient, lenders, the E2E wallet); `initialize_config`
   (`venue_enabled` with the mock bit; windows and warm-ups at their compiled minima; the live
@@ -1235,10 +1313,13 @@ must refuse, §5.8), `raiseFeeNext(price)` (a compute-budget-only change — the
 | `smoke.spec.ts` | shell, nav, search by mint and ticker, wallet connect / disconnect, status bar states, math ready |
 | `markets.spec.ts` | table, filters, sort, live row update, open market, create-market link |
 | `create-market.spec.ts` | verdicts (ok, freeze authority, disallowed extension, existing), list-only listing through the pipeline |
-| `lend-deposit.spec.ts` | SPEC §5.3 text verbatim, Sign disabled until ticked, simulated deltas, confirm, dashboard updated |
+| `lend-deposit.spec.ts` | SPEC §5.3 text verbatim, Sign disabled until ticked, simulated deltas, confirm, dashboard updated; *M10 batch 3:* the unpaid-rent rows after an empty `sweep_trader` credits the seeded rent (`actions.accrue`): the panel's receivable ≥ the stored one, the exposure and level recomputed from it (`unpaidRentExposure`); the `info` level (`warn` is unit-tested) |
 | `lend-cpi-guard.spec.ts` | **CPI Guard UX** (§10.3) |
 | `lend-withdraw-memo.spec.ts` | **memo UX** (§10.3) |
 | `lend-claim.spec.ts` | claimable after rent accrues, claim, vest-forfeit warning on a partial exit |
+| `lend-post-wipe.spec.ts` | *M10 (FE-18):* an organic full wipe on the mock venue (every free token withdrawn, a 10× gap, keeper seconds until S1 rolls `num = 0`); a plain deposit refused `WipeSweepPending`; the wiped lender's claim through the live record; a new lender's deposit lands exactly `[sweep_trader, deposit]` (the sweep notice, the review's steps, `TraderSwept` to the record, initial-rate shares); the swept SOL claimed through the final record |
+| `lend-claim-sync.spec.ts` | *M10 (FE-18):* a claim the pot cannot pay lands `[sync_lender(other lender), claim_sol]`: `pot_draw > 0`; paid = the claim alone (simulated) + the draw; the pot afterwards = before + the other lender's surplus (simulated `sync_lender` alone) − the draw |
+| `lend-sweep-cashback.spec.ts` | *M10 (FE-18):* the bundle's pump / PumpSwap cashback claims built by `sweep.ts` (`readSweepFacts` / `cashbackClaimIxs`: pump and PumpSwap `claim_cashback`, pAMM `init_user_volume_accumulator`), landed by themselves on the dumped ELFs on an unused trader PDA — no wipe, sweep or deposit |
 | `short-open.spec.ts` | every preview field present and equal to the simulated position (`q`, `s`, `m`, `v`), the borrower disclosure gate, blocked states (coverage pause) |
 | `short-close.spec.ts` | P&L after a mock price move, close, payout delta |
 | `add-margin.spec.ts` | CR preview and the confirmed CR |
@@ -1249,8 +1330,8 @@ must refuse, §5.8), `raiseFeeNext(price)` (a compute-budget-only change — the
 | `keyboard.spec.ts` | deposit and open completed with the keyboard only |
 | `harness.spec.ts` | *as built:* the seeded scenario is on chain; the routed indexer's REST and WebSocket shapes; the Node-side actions |
 | `wallet.spec.ts` | *as built:* the injected wallet's Wallet Standard features, reject / tamper / raise-fee controls |
-| `frame.spec.ts` | *v1.2 (M9-SEC-6):* the preview sends `X-Frame-Options: DENY` and `frame-ancestors 'none'`; a framing page gets no app — the browser refuses it, and with the headers stripped (a host ignoring `_headers`) the app renders `frame-guard` instead |
-| `screens.spec.ts` | *as built:* every page and state (markets, search, create market ok / rejected / pump curve, every market tab, the tier popover, coverage-paused and list-only markets, 1,024 px, the short preview and its review, the blocked panel, positions, a position, deposit / withdraw / claim, the lender dashboard, the CPI Guard notice and the bracket's review, the indexer-down views) saved as PNGs with axe on each; asserts no sideways scroll at 1,024 px |
+| `frame.spec.ts` | *v1.2 (M9-SEC-6):* the preview sends `X-Frame-Options: DENY` and `frame-ancestors 'none'`; a framing page gets no app — the browser refuses it, and with the headers stripped (a host ignoring `_headers`) the app renders `frame-guard` instead; *M10 (SECTXT-4):* it GETs `/.well-known/security.txt` (200, `text/plain`, valid; the preview server only — `vite preview` ignores `_headers`) |
+| `screens.spec.ts` | *as built:* every page and state (markets, search, create market ok / rejected / pump curve, every market tab, the tier popover, coverage-paused and list-only markets, 1,024 px, the short preview and its review, the blocked panel, positions, a position, deposit / withdraw / claim, the lender dashboard, the CPI Guard notice and the bracket's review, the indexer-down views; *M10:* the `/security` page, `60-security`) saved as PNGs with axe on each; asserts no sideways scroll at 1,024 px |
 
 **As built** (v1.1):
 
@@ -1259,8 +1340,18 @@ must refuse, §5.8), `raiseFeeNext(price)` (a compute-budget-only change — the
   dynamic 18910–18960, preview 14173; `--limit-ledger-size 200000000` (the default keeps minutes
   of history, which breaks profile `full`'s backfill).
 - One seeded wallet per independent spec group (`trader`, `lender`, `guard`, `memo`, `memoRace`,
-  `claimer`, `creator`, `closer`, `margin`, `holder`, `errors`, `keyboard`), so specs do not depend
+  `claimer`, `creator`, `closer`, `margin`, `holder`, `errors`, `keyboard`; *M10, FE-18:* `wiped`,
+  `wipeBorrower`, `rejoin`, `potClaimer`, `potLate`, `potBorrower`), so specs do not depend
   on their order; one worker (one validator); specs that change shared state undo it.
+- *M10 (FE-18):* two more seeded mock markets, `wipe` and `pot`, each lent by one spec wallet
+  alone, with positions after the warm-up (five SPL mock markets, five open positions). Under
+  `SHORTWIN_E2E_REUSE=1` they are spent after one run: the FE-18 specs then skip with a message.
+  The markets / status reference PNGs (`01-markets`, `03-status`, `16-markets-1024`,
+  `51-fallback-markets`) predate the two markets; a refresh (`SHORTWIN_E2E_SCREENSHOTS=update`)
+  shows two more rows. The PNGs are not asserted.
+- *M10:* 22 specs, 58 tests; about 9 minutes on a fresh validator (the seed ≈ 100 s; the wipe
+  spec's keeper loop ≈ 60 s). On a host whose `/tmp` is a small tmpfs run with `TMPDIR` on disk
+  (Chromium's profile; docs/DEVELOPMENT.md).
 - `SHORTWIN_E2E_REUSE=1` reuses the validator and its seed, and the build only while its sources,
   configuration, WASM stamp and `VITE_*` values are unchanged (`sourceFingerprint`); a rebuild
   restarts the preview.
@@ -1287,10 +1378,12 @@ must refuse, §5.8), `raiseFeeNext(price)` (a compute-budget-only change — the
 - **Memo:** withdrawing to the memo-required account shows `withdraw-memo-notice`; the transaction
   passes `memo_program` and lands; the destination's balance rises by the previewed tokens.
   **Race:** the spec selects a plain Token-2022 destination, then requires memos on it from Node
-  before Sign; the simulation fails with `MemoProgramRequired` (`data-code="6095"`), and re-entry
-  shows the notice and lands with the memo. *v1.2 (M9-UX-1):* Retry (`data-mode="rebuild"`)
-  rebuilds the withdrawal from a fresh read with `memo_program` (`tx-rebuilt-notice`) and it lands
-  with the memo; re-entry (lent again) shows the notice.
+  after the review simulated. *M10 (TMEMO-9):* every Token-2022 withdrawal already passes
+  `memo_program`, so Refresh still simulates and the withdrawal lands with the memo CPI'd before
+  Token-2022's transfer; re-entry shows the notice. (Through v1.2 the simulation failed with
+  `MemoProgramRequired`, `data-code="6095"`, and Retry, `data-mode="rebuild"`, rebuilt the
+  withdrawal with `memo_program`, M9-UX-1; that rebuild path keeps its unit tests.) Since M10 both
+  memo tests run on mainnet's Token-2022 and spl-memo v3 ELFs (§10.2).
 
 ### 10.4 CI
 
@@ -1318,7 +1411,7 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 |---|---|---|
 | `app-header` | `T.header` | app header |
 | `cluster-badge` | `T.clusterBadge` | cluster name off mainnet |
-| `nav-<…>` | `T.nav` | `<key>` ∈ markets, positions, lend, status; `aria-current="page"` when active |
+| `nav-<…>` | `T.nav` | `<key>` ∈ markets, positions, lend, status, security (*M10:* the status bar's link to `/security`); `aria-current="page"` when active |
 | `search-input` | `T.searchInput` | combobox input (mint or ticker); `/` focuses it |
 | `search-results` | `T.searchResults` | listbox |
 | `search-result-<…>` | `T.searchResult` | `<mint>`; an option (a valid mint always yields one) |
@@ -1341,7 +1434,7 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `fallback-banner` | `T.fallbackBanner` | shown while the indexer is unreachable (RPC fallback) |
 | `toast-region` | `T.toastRegion` | live regions container |
 | `toast` | `T.toast` | `data-kind` ∈ success, error, info |
-| `page-<…>` | `T.page` | `<page>` ∈ markets, create-market, market, positions, position, lend, status; the page root — every track keeps it on its page |
+| `page-<…>` | `T.page` | `<page>` ∈ markets, create-market, market, positions, position, lend, status, security (*M10*); the page root — every track keeps it on its page |
 | `route-stub-<…>` | `T.routeStub` | `<route>`; placeholder until a track replaces the page (removed by then) |
 | `tx-modal` | `T.txModal` | review dialog |
 | `tx-stage` | `T.txStage` | `data-stage` ∈ simulating, review, signing, confirming, confirmed, failed |
@@ -1441,13 +1534,13 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `lend-amount-input` | `T.lendAmountInput` | deposit amount (tokens) |
 | `lend-max` | `T.lendMax` | fills the source account balance |
 | `lend-token-account-select` | `T.lendTokenAccount` | source account select (lists the owner’s accounts of the mint, ATA first) |
-| `lend-preview-<…>` | `T.lendPreview` | `<field>` ∈ shares, share-bps, value; `data-value` raw |
+| `lend-preview-<…>` | `T.lendPreview` | `<field>` ∈ shares, share-bps, value, unpaid-rent, unpaid-rent-share (*M10 batch 3*; the latter's cell carries `data-level` none / info / warn); `data-value` raw |
 | `lend-submit` | `T.lendSubmit` | opens the review; disabled until the SPEC §5.3 box is ticked |
 | `lend-cpi-guard-notice` | `T.lendCpiGuardNotice` | `token.cpiGuard` notice; `data-state` ∈ blocked, bracket |
 | `lend-cpi-guard-bracket` | `T.lendCpiGuardBracket` | opt-in checkbox for the disable → deposit → enable bracket (FE-1) |
 | `withdraw-shares-input` | `T.withdrawSharesInput` | shares to withdraw (or % of position) |
 | `withdraw-max` | `T.withdrawMax` | fills the pro-rata allowance |
-| `withdraw-preview-<…>` | `T.withdrawPreview` | `<field>` ∈ tokens, sol, allowance, lock, lock-until, vesting-forfeit |
+| `withdraw-preview-<…>` | `T.withdrawPreview` | `<field>` ∈ tokens, sol, allowance, lock, lock-after (*M10, FE-15*: `data-value` shares, `data-until` the lock's end), lock-until, vesting-forfeit |
 | `withdraw-memo-notice` | `T.withdrawMemoNotice` | `token.memoRequired` notice |
 | `withdraw-submit` | `T.withdrawSubmit` | opens the review |
 | `claim-value-<…>` | `T.claimValue` | `<field>` ∈ claimable, vesting, pot, deficit; `data-value` lamports |
@@ -1549,7 +1642,7 @@ edits `disclosures.ts` (copy changes need the owner) or `errors.ts`.
 | Every §7.3 flow, simulated before signing | market search, create market (verdict, venue detection, Raydium candidates, cost), deposit / withdraw / claim / cover deficit / sync, open / close / add margin, the dashboards, the market page and protocol status — each transaction through `useTxFlow` → `simulatePlan` (exact instructions, < 20 s) → `TxReviewModal` (instructions, deltas, disclosures) → Wallet Standard signing with `assertSameIntent`; E2E `short-open`, `short-close`, `add-margin`, `lend-deposit`, `lend-claim`, `lend-withdraw-memo`, `create-market`, `keyboard` land them on the validator; `tx-errors` proves Sign stays disabled on a failing simulation, a stale review is re-simulated, a tampered message is refused and a raised fee accepted |
 | The §4 disclosures | one copy in `disclosures.ts`, held to this document and SPEC §5.3 verbatim by `disclosures.test.ts`; `lend-deposit` checks the SPEC §5.3 sentence on the deposit screen and that its checkbox gates Review and Sign |
 | CPI Guard UX (§10.3) | `lend-cpi-guard`: notice and blocked plain deposit, the ATA re-enables it; the bracket's review lists `DisableCpiGuard` / `Deposit` / `EnableCpiGuard` and the landed transaction is exactly that, guard still on; the race maps Token-2022 error 42 (`data-kind="token"`, `data-code="42"`), Sign disabled, re-entry shows the notice |
-| Memo UX (§10.3) | `lend-withdraw-memo`: the notice, `memo_program` passed, the memo program invoked before Token-2022's transfer, the destination rises by the previewed tokens; the race fails `MemoProgramRequired` (6095) and re-entry lands with the memo |
+| Memo UX (§10.3) | `lend-withdraw-memo`: the notice, `memo_program` passed, the memo program invoked before Token-2022's transfer, the destination rises by the previewed tokens; the race fails `MemoProgramRequired` (6095) and re-entry lands with the memo (*M10, TMEMO-9:* the race now lands with the memo, on mainnet's Token-2022) |
 | Accessibility | axe (WCAG 2.2 A / AA) on every page and state the specs visit, `screens` included (0 violations); keyboard-only deposit and open |
 | Security | the production build under its CSP: every spec fails on any CSP violation (none); the top-level allowlist and the intent check in `tx-errors` |
 | Builds and tests | `pnpm -r build`, `biome check` (root and `apps/web`), `tsc --noEmit`, `vitest run` (*v1.2:* 56 files, 533 tests, 1 opt-in file skipped), `pnpm --filter @shortwin/client check` (28); `pnpm --filter web e2e`: **50 passed** (19 specs) on a fresh validator and seed |
@@ -1565,24 +1658,43 @@ edits `disclosures.ts` (copy changes need the owner) or `errors.ts`.
 | FE-1 … FE-6 | Owner items of §0 | open (owner) |
 | FE-7 | ARCH §9's M9 row names "Playwright E2E on Surfpool"; Surfpool needs live mainnet and the network (INDEXER §11.3), so the E2E runs on `solana-test-validator` with the test-venue build and dumped fixtures (§10.2). A Surfpool profile can be added later for the real venues. | flagged deviation |
 | FE-8 | The mock venue drives the trading E2E; real-venue trading paths are covered by the SHORT track's unit vectors (keeper-derived account lists, fixture readers) and by the program's fork tests, not by a browser test against a live venue. | by design |
-| FE-9 | Mainnet acceptance of `withdraw`'s CPI'd memo (T-MEMO, U17) | M10 |
+| FE-9 | Mainnet acceptance of `withdraw`'s CPI'd memo (T-MEMO, U17) | met on the mainnet build (M10: LiteSVM and the E2E run mainnet's Token-2022 and spl-memo v3 ELFs, §5.7, §10.2); a mainnet transaction is M11's (TMEMO-10) |
 | FE-10 | Indexer follow-ups: `flag=` filters on `/v1/markets` (FE-5); a `borrower:<owner>` WebSocket channel would replace per-position subscriptions (≤ 40 rows live today) | open (indexer) |
 | FE-11 | Wallets with only `solana:signAndSendTransaction` cannot be checked before sending (§5.4); they are labelled and checked post hoc (*v1.2:* implemented — `checkLanded`, `wallet-sends-itself-badge`, `unknown-outcome` instead of `expired`; M9-SEC-1). Refusing such wallets for writes altogether is the stricter alternative (FE-21) | by design |
 | FE-12 | Token-2022 metadata (name / symbol) on mints without Metaplex metadata depends on the indexer's refresher (INDEXER IX-16); the UI falls back to the short mint | open (indexer) |
 | FE-13 | Price charts: an optional sparkline from `/candles`; a full chart is not in M9 | by design |
 | FE-14 | "Why this tier" shows the Tier A / B thresholds in USD and SOL, the pool's age and its basis, and SOL/USD with its age, but not the pool's own locked liquidity Λ in USD: that needs live reserves from the venue layer's `tradeContext` or an indexer field | open (MARKETS follow-up) |
-| FE-15 | WASM facade gaps (`crates/shortwin-math-wasm`): `previewWithdraw` returns tokens only (the SOL part and the lock after a withdrawal come from the simulation, §3.6); `spot_near_ema`, `P_OPEN_MAX`, `lambda_bps`, `locked_depth`, `locked_sol` and `locked_floor_ok` are not exported, so these integer comparisons are ported in `features/short/previews.ts` and `venues/` (tested against fixtures and program vectors); the create-market verdict is a TypeScript port of `shortwin_venue_state::mint::check` (tested against the Rust fixtures). Exporting them removes the second copies | open (Rust; M10) |
+| FE-15 | WASM facade gaps — **closed in M10**: `spotNearEma`, `pOpenMax`, `lambdaBps`, `lockedDepth`, `lockedSol`, `lockedFloorOk`, `mintCheck` (over `shortwin_venue_state::mint::check`; the further reasons are `check` re-run with each earlier rule lifted) and `previewWithdrawal` (withdraw, `LastSharesBorrowed`, claim, as the handler composes them: the tokens, the SOL part and the lender afterwards, so the panel shows the lock a withdrawal leaves, §3.6) are exported; the TypeScript ports are deleted (frozen in `src/m10-fe15/legacy.ts` as the test oracle of `parity.test.ts`). Frontend only, no program bytecode | closed (M10) |
 | FE-16 | The vector generators `venues/vectors/keeper_vectors.rs` and `features/short/vectors/program_vectors.rs` run outside the web build (copied into `services/keeper/examples` and `tests/litesvm/examples`, instructions in each header); moving them into those crates would let CI regenerate the vectors | open |
 | FE-17 | `raydiumCandidates` runs the keeper's four `getProgramAccounts` discovery calls from the browser; public mainnet RPCs may refuse or throttle them on AMM v4 — an indexer endpoint or a dedicated discovery RPC | open (M11) |
-| FE-18 | Not exercised on a validator: the pump / PumpSwap post-wipe sweep bundle (needs pump venues and a full wipe) and the claim-time `sync_lender` of other lenders; both are unit-tested against the keeper's `sweep.rs` and `pool_model.py` | open (M10 adversarial suite) |
+| FE-18 | Validator E2E (M10): `lend-post-wipe` lands the post-wipe bundle `[sweep_trader, deposit]` after an organic full wipe on the **mock** venue, and the wiped lender claims through the live and then the final record; `lend-claim-sync` lands `[sync_lender(other), claim_sol]` with a pot draw (the pot afterwards exactly before + the simulated surplus − the draw); `lend-sweep-cashback` lands the bundle's venue claim encodings (pump and PumpSwap `claim_cashback`, pAMM `init_user_volume_accumulator`) **by themselves** on the dumped ELFs, on an unused trader PDA. **Open:** one transaction composing the pump / PumpSwap venue claims with `sweep_trader` (token leg, UVA) and `deposit` on a wiped pump / PumpSwap market — it needs a pump / PumpSwap wipe on the validator (Node trade encoders and a cashback-coin curve fixture); LiteSVM covers it today (`m5_sec_curve_it`, `pamm_it::gates`) | partly closed (M10): the mock-venue bundle, the claim-time sync and the venue claim encodings on a validator; the pump / PumpSwap composite bundle is open (M11) |
 | FE-19 | While the indexer is down the chain-only views fill `{creatorFee}` with "n/a (indexer unavailable)" and the `lender.lossHistory` numbers with "—"; the indexer mock's lender deposit / withdrawal history is 0 (it derives responses from chain state; profile `full` serves the real values) | by design |
 | FE-20 | `tradeContext` (frozen interface) is implemented in `venues/index.ts` on SHORT's snapshot loader; the trading panels build from that snapshot directly, so the venue layer imports `features/short/snapshot.ts` | note |
 | FE-21 | Sending-only wallets (M9-SEC-1): v1.2 implements the documented post hoc check — a wallet that lands something else is reported after the fact, not prevented. The stricter option is to refuse such wallets for writes (every major wallet also offers `solana:signTransaction`) | open (owner) |
-| FE-22 | Slot-age thresholds (§6.6): shown above 2 slots behind the confirmed tip, Submit blocked above 75 slots / 30 s; the Lend panel counts as current while its account subscriptions are live. Tune after mainnet latency is measured | open (M10) |
+| FE-22 | Slot-age thresholds (§6.6): shown above 2 slots behind the confirmed tip, Submit blocked above 75 slots / 30 s; the Lend panel counts as current while its account subscriptions are live. Tune after mainnet latency is measured | open (M11; needs mainnet latency) |
 | FE-23 | Source maps (M9-SEC-6): built `hidden` into `dist-sourcemaps/`, not deployed; whether to upload them to a private error tracker or publish them deliberately | open (owner) |
-| FE-24 | The deploy header check (`check:headers`) exists but no deployment pipeline runs it yet; the CDN must send `_headers`' header form | open (M11 deployment) |
+| FE-24 | The deploy header check (`check:headers`) exists but no deployment pipeline runs it yet; the CDN must send `_headers`' header form. *M10:* it also checks `/.well-known/security.txt` (served as plain text, the production rules of §9.3) | open (M11 deployment) |
 | FE-25 | Homoglyph tickers ("USDС" with a Cyrillic С) survive normalisation by design; the defence is the mint next to every symbol and the duplicate-symbol marks — no confusable-skeleton detection | by design |
 | FE-26 | Retry rebuilds (M9-UX-1) cover deposit, withdraw, claim, cover deficit, sync, open and close; add margin (no quote bound) and create market close the review for a new one instead | by design |
+| FE-27 | The deposit's unpaid-rent warning (M10 batch 3, §3.6): thresholds `UNPAID_RENT_WARN_BPS` = 100 (1 % of the deposit's value at `P_ema`) and `UNPAID_RENT_WARN_LAMPORTS` = 1 SOL are proposed defaults for the owner to confirm. The preview uses the stored `util_kink_bps` (the prologue first syncs a pending kink change), and rent keeps accruing between the preview and the landing; the exposure is this deposit's shares' part at the pool's current size (it grows if others withdraw first, as the text says) | open (owner) |
+| FE-28 | `lender.risks` (§4.2) lists the one-off income that vests but not "rent paid above what accrued, such as the minimum rent of an early exit", which vests since M10-8C-1 (ECON §9.4; the Claim form's note already says it). The copy lives in `disclosures.ts` and this document together (`disclosures.test.ts` pins them verbatim), so both change in one commit | open (copy) |
+| FE-29 | `/.well-known/security.txt`'s `Expires` (2027-09-30) must be rotated before 2027-08-31: a mainnet build and `check:headers` refuse 30 days or less ahead | open (operations) |
+
+### M10 changes (v1.2 → v1.3)
+
+What M10 changed in the app and this contract (each item names its section; the decisions are the
+owner's of 2026-10-02 and 2026-10-03):
+
+| Item | Change | Tests |
+|---|---|---|
+| FE-15 (WASM facade) | the TypeScript math ports removed; the facade exports the open guards, the pool-selection comparisons, `mintCheck` and `previewWithdrawal`; the withdraw panel shows the lock a withdrawal leaves (§3.5, §3.6, §6.7, §13) | `src/m10-fe15/parity.test.ts`, `previews.test.ts` |
+| FE-18 (validator E2E) | the post-wipe bundle on the mock venue, the claim-time `sync_lender`, the venue cashback claims on their own; two more seeded markets and six wallets (§10.2, §13) | E2E `lend-post-wipe`, `lend-claim-sync`, `lend-sweep-cashback` |
+| T-MEMO, TMEMO-9 | every Token-2022 withdrawal passes spl-memo v3; the validator runs mainnet's Token-2022 and checks both SPL programs' hashes; FE-9 met on the mainnet build (§3.6, §5.7, §10.2, §10.3) | E2E `lend-withdraw-memo` (the race lands), `lend-cpi-guard` |
+| Q3 (security contact) | `/security` (`SecurityPolicyPage`) and RFC 9116 `/.well-known/security.txt` with build, unit, E2E and deploy checks; the status bar links the page (§3.1, §3.2, §9.3, §11) | `securityTxt.test.ts`, `securityPolicy.test.ts`, E2E `frame`, `screens` (`60-security`) |
+| SQ-G8 | error 6105 `AuthoritiesNotDistinct` mapped (action `admin`) (§5.9) | `errors.test.ts` |
+| Late-depositor shortfall (owner, 2026-10-03; program batch 3 in the web only) | the deposit shows the pool's unpaid rent and this deposit's part of it; `lender.unpaidRent` (§3.6, §4.2, §11; FE-27) | `previews.test.ts`, `LendPanel.test.tsx`, E2E `lend-deposit` |
+| Extras denylist hardening (program batch 3) | a `DeniedAccount` set falls back to the next set like `BadExtras` / `BadRemainingAccounts`; error 6003's message names the new cases (§5.1) | `plans.test.ts` |
+| Open items | FE-9 met; FE-15 closed; FE-18 partly closed (composite pump / PumpSwap bundle M11); FE-22 → M11; FE-24 → M11 deployment (now also security.txt); FE-21 and FE-23 still the owner's; new FE-27 … FE-29 (§13) | — |
 
 ### Review fixes (v1.1 → v1.2, the M9 security and UX review)
 
