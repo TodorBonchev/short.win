@@ -2,7 +2,9 @@
 
 *v1.2 • 2026-10-01 • the M8 contract, as built: three parallel tracks built against v1.0, then
 integrated (§13.5) — the exit criteria are met (ARCH §9 M8; evidence in §13.5); v1.2 folds in the
-M8 security review's fixes (M8-SEC-1 … -15; regressions §11.5a, open items §14)*
+M8 security review's fixes (M8-SEC-1 … -15; regressions §11.5a, open items §14); v1.3 (2026-10-03)
+folds in M10: the venue trades' post-trade reserves are the venues' pricing reserves (GC-F1, §7.2,
+§7.3, §11.5), checked on recorded mainnet transactions, and IX-16's decoder half is closed (§14)*
 
 This document turns ARCHITECTURE §7.2 ("Indexer and API") and the M8 row of ARCH §9 into a buildable
 specification: the ingest pipeline, its correctness rules (commitment, reorgs, idempotency, ordering,
@@ -103,7 +105,9 @@ The decoder sees nothing else, so every source decodes identically. A source tha
   empty page** (a provider that caps pages below `page_limit` does not end the history early,
   M8-SEC-11), then processed **oldest first**. A bound the node does not know (`-32020`: a
   rolled-back signature, a node with shorter retention) falls back to its slot — listing from the
-  newest down to that slot — with an error log for the operator (M8-SEC-5).
+  newest down to that slot — with an error log for the operator (M8-SEC-5). publicnode, for one,
+  refuses an `until` older than its ≈ 28 h retention with `-32020` (measured 2026-10-02 by M10's
+  gap-calibration crawler, GC-F3), so a cursor of a quiet stream on such a node takes this path.
 - **Fetch:** `getTransaction(sig, {encoding: "base64", maxSupportedTransactionVersion: 1,
   commitment: "finalized"})` with `backfill.fetch_concurrency` in flight and at most
   `backfill.max_rps` requests per second. Version **1** is required: keeper batches are SIMD-0385 v1
@@ -604,8 +608,11 @@ them; the transparency they give is the point (SPEC §11's powers are visible as
   below the venue frame (§5.2).
 - **Everyone's trades of listed pools** — when `venue_trades.third_party = true`: one signature
   stream per tracked pool (§2.2), at most `max_pools`, chosen by OI then TVL. For charts (candles,
-  §9.2) and the **gap-frequency calibration** of ECON §11.6 / G37 (the top open question before
-  mainnet; the raw trade tape is what that calibration needs).
+  §9.2) and, once markets are listed, the **gap-frequency calibration** of ECON §11.6 / G37. *M10:*
+  before launch this indexer sees only short.win's markets, so the calibration runs from a
+  public-RPC crawl that ports these decoders to Python (`scripts/gapcal`,
+  `docs/research/gap-calibration.md`); a "gap" there is a persistent price jump of at least 1.5×,
+  not an observation gap.
 - `venue_pools` gives each pool its venue, mint, market, orientation and LP mint (refresher, §2.6).
 - **Which market a trade belongs to (M8-SEC-6).** A short.win leg: the market of its short.win
   instruction. Anyone else's trade (and a venue event that names a pool): only when it trades one of
@@ -625,7 +632,7 @@ them; the transparency they give is the point (SPEC §11's powers are visible as
 |---|---|---|---|---|
 | pump curve | `TradeEvent` | `emit_cpi!` of the pump program (`6EF8…`), Anchor event tag | mint, sol_amount, token_amount, is_buy, user, post-trade virtual/real reserves, fee, creator, creator_fee (later fields when present) | token = mint; side = is_buy ? buy : sell |
 | pump curve | `CompleteEvent` | `emit_cpi!` of pump | mint, bonding_curve, user | → `venue_events` |
-| PumpSwap | `BuyEvent` / `SellEvent` | `emit_cpi!` of pAMM (`pAMM…`) | base/quote amounts, lp_fee, protocol_fee, pool, user, coin_creator, coin_creator_fee, pool reserves | base = token, quote = WSOL (canonical pools) |
+| PumpSwap | `BuyEvent` / `SellEvent` | `emit_cpi!` of pAMM (`pAMM…`) | base/quote amounts, lp_fee, protocol_fee, pool, user, coin_creator, coin_creator_fee, pool reserves; *M10:* `virtual_quote_reserves` (the 2026-09 event tail, after the cashback / buyback fields, an i128) | base = token, quote = WSOL (canonical pools) |
 | PumpSwap | `CreatePoolEvent`, `DisableEvent`, … | `emit_cpi!` of pAMM | as declared | → `venue_events` |
 | Raydium CPMM | `SwapEvent` (`40c6cde8260871e2`) | `emit!` "Program data:" **only while CPMM (`CPMMoo8…`) is on top** — CLMM and others emit an event with the same name and discriminator | pool_id, input/output vault before, input/output amounts, input/output mint, trade_fee, creator_fee, creator_fee_on_input | from the mints |
 | Raydium AMM v4 | `ray_log` | "Program log: ray_log: <base64 bincode>" while AMM v4 (`675k…`) is on top | `SwapBaseInLog` (log_type 3: amount_in, minimum_out, direction, user_source, pool_coin, pool_pc, out_amount) / `SwapBaseOutLog` (4: max_in, amount_out, direction, …, deduct_in) | `venue_pools.sol_is_first` (SOL is the coin side or not) |
@@ -635,6 +642,31 @@ Normalised row (`venue_trades`): `side` from the trader's view (buy = tokens out
 `token_amount`, `sol_amount` (lamports paid or received), fees, `fee_creator_lamports` (a CPMM
 creator fee charged on the token side is valued at the trade's price `⌊fee·sol_amount/token_amount⌋`),
 `creator`, `user_key`, post-trade reserves, `price_wad = ⌊sol_amount·WAD/token_amount⌋`.
+
+**Post-trade reserves are the venue's pricing reserves (M10 GC-F1).** `pool_token_reserve` and
+`pool_sol_reserve` are what the next trade of the pool prices on, so consecutive trades of a pool
+chain exactly:
+- pump: the curve's virtual reserves.
+- PumpSwap: base = the base vault; quote = the quote vault + the event's `virtual_quote_reserves`,
+  the effective quote reserves every buy and sell prices on. VQR is read from the event's tail and
+  is 0 for an event that predates the field. No quote reserve is stored when the sum leaves
+  [0, u64::MAX].
+- CPMM: `vault − (protocol + fund + creator counters)`. On the input side that is
+  `*_vault_before + input_amount − ⌊trade_fee·protocol_fee_rate/10⁶⌋ − ⌊trade_fee·fund_fee_rate/10⁶⌋
+  − creator_fee` (the creator fee only when charged on the input); on the output side
+  `*_vault_before − output_amount − creator_fee` (only when charged on the output). The rates are
+  those of the swap's `amm_config` (its account 2): the venue admin watch's observation at or before
+  the transaction's slot (§7.3), else the earliest one, else 120,000 / 40,000 ppm, the rates of every
+  mainnet config (`CpmmFeeRates::MAINNET`).
+- AMM v4: `ray_log`'s `pool_coin` / `pool_pc` ± the swap, i.e. vault − `need_take_pnl`.
+
+Checked on recorded mainnet transactions (`tests/venue_mainnet.rs`, §11.5). **M8 builds stored
+other values:** CPMM reserves with the protocol and fund shares of the trade fee still counted (and
+the creator counters ignored), so consecutive swaps did not chain, and PumpSwap quote reserves
+without VQR (understated by 17.6 SOL on the recorded canonical pool). Rows written by an M8 build
+(before GC-F1) keep those values: there is no migration or backfill, and `rebuild` re-applies
+events without re-decoding `venue_trades`, so only a re-ingest (a fresh database indexed from the
+chain) gives them the pricing reserves. No schema change.
 
 **Layouts are pinned against the venue programs the repository runs** (`tests/fixtures/programs/*.so`,
 sha-checked): a decoder test replays a recorded fork session (§11.3: Raydium v4, CPMM, pump curve,
@@ -655,7 +687,14 @@ known prefix, trailing bytes ignored.
   the fields the adapters read — PumpSwap `GlobalConfig.disable_flags` (bit 0 halts curve opens,
   `GraduationHalted`), fee configs and recipients, AMM v4 `AmmInfo.status` and fee fields, CPMM
   `PoolState.status` and `AmmConfig` rates — with `shortwin-venue-state`'s readers;
-  `venue_admin_states` keeps every change (`old_value → new_value`, observed slot).
+  `venue_admin_states` keeps every change (`old_value → new_value`, observed slot). *As built
+  (M10):* the watch reads each Raydium market pool's `status` and, since GC-F1, its CPMM
+  `AmmConfig`'s `trade_fee_rate`, `protocol_fee_rate`, `fund_fee_rate` and `creator_fee_rate`
+  (`account` = the config); the writer reads `protocol_fee_rate` / `fund_fee_rate` back for the
+  CPMM swaps' pricing reserves (§7.2). It watches no AMM v4 fee field and no pump / PumpSwap config
+  field yet (IX-16). A field's first observation after a restart is compared with its latest stored
+  row (`refresher::observe_admin_value`), so a restart records only real changes, with their old
+  value.
 - **Coverage:** `CoverageGap` and `CoveragePauseSet` (`coverage_events`), plus `invocations` for
   observation counts (§8.5).
 
@@ -1139,6 +1178,19 @@ Synthetic transactions built in Rust (Borsh-serialised `shortwin::events::*` beh
 CLMM (rejected); `Log truncated`; failed transactions; v0 lookup-table and v1 key resolution; the
 `ConfigChange` hash check. Then the committed sessions of §11.3 end-to-end through `to_raw_tx`.
 
+**On recorded mainnet transactions (M10 GC-F1).** `tests/venue_mainnet.rs` runs the gap-calibration
+crawler's recorded mainnet transactions (`scripts/gapcal/tests/fixtures`, about 20 per venue, each
+venue's from one pool) through `to_raw_tx`, the decoders and, for CPMM, the writer:
+- CPMM: 20 consecutive swaps of one pool chain exactly in `venue_trades`, with creator fees on both
+  sides; `vault − reserves` grows by exactly the protocol and fund shares plus the creator fee; the
+  watched rate at or before the slot is selected; with the rates zeroed (M8's formula) every link
+  breaks by exactly the counters' share.
+- PumpSwap: the effective reserves (vault + VQR) price every sale exactly, and VQR has one value
+  (17,600,247,874 on `4JAnKF…`) after every buy and sell of 20 transactions (slots 452,463,723 to
+  452,464,091).
+- AMM v4: the `ray_log` reserves are vault − `need_take_pnl`, and chain.
+- pump: the curve's virtual reserves chain by each trade's SOL and token amounts.
+
 ### 11.5a The security review's regressions (M8-SEC-1 … -15)
 
 The M8 security review's reproducers, turned around (each fails on the code the review found and
@@ -1336,7 +1388,7 @@ track reads (§9.2's read model, §6's projections) needs that track's agreement
 | IX-13 | No event carries the record donation (§6.4). REPLAY proposed a `share_epochs.record_donation` column; INGEST's `events.derived.record_donation` (on the rolling `EpochRolled`) does the same job, and assertion 6 reads it — no column added | closed (integration) |
 | IX-14 | Raydium S2 on the fork is not in the session set: it needs `raydium_v4_support.rs`'s `s2_corner` init arguments, `hold_unlocked_lp` and `remove_liquidity`, which live in a test-only module of `tests/litesvm/tests`. S2 is covered on the mock venue (`mock_lifecycle`) | open (move those helpers into `tests/litesvm/src`) |
 | IX-15 | IX-11's silent `accrue` credit while `S = 0` is reached by no session; the harness would report it as a `lender_sol` mismatch | open |
-| IX-16 | Venue layouts not exercised against mainnet: PumpSwap `Buy/SellEvent` field order is pinned only by the fixture programs' legs (their SOL sums equal short.win's events); pump / pAMM lifecycle events decode only `CompleteEvent` and `CreatePoolEvent` fields (others stored as raw hex); the refresher's token metadata reads Metaplex only (no Token-2022 metadata extension) and the venue admin watch Raydium's pool `status` only (no pump / PumpSwap config fields) — both tested at the SQL level only | open (M9/M10, with recorded fork or Surfpool sessions) |
+| IX-16 | Venue layouts not exercised against mainnet. *M10 (GC-7 / GC-F1): the decoder half is closed* — PumpSwap `Buy/SellEvent` field order (the prefix and the VQR tail), CPMM `SwapEvent` and AMM v4 `ray_log` decode recorded mainnet transactions exactly (`tests/venue_mainnet.rs`, §11.5; and the Python port, `scripts/gapcal/tests/test_decode.py`). Still open: pump / pAMM lifecycle events decode only `CompleteEvent` and `CreatePoolEvent` fields (others stored as raw hex); the refresher's token metadata reads Metaplex only (no Token-2022 metadata extension), and the venue admin watch reads Raydium pool `status` and CPMM `AmmConfig` rates only (no AMM v4 fee fields, no pump / PumpSwap config fields) — both tested at the SQL level only | partly closed (M10: decoders); the refresher and the admin watch: M11 |
 | IX-17 | The invocation retention prune keeps `initialize_config` (and every admin, listing and transparency instruction, `analytics::RETAINED_INSTRUCTIONS`) forever: the global rebuild reads `initialize_config`'s arguments | by design |
 | API-1 | `/v1/health` and `/v1/status` are not rate-limited (probes; no 429 documented) | by design (owner may change) |
 | API-2 | 503 is documented on every database-backed operation (was only `/v1/status`); the contract test produces it on each | fixed at integration |
