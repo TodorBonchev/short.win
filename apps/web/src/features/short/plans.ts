@@ -24,6 +24,7 @@ import { keeperRewardText, percent, proseDuration } from '../../config/disclosur
 import { SHORTWIN_PROGRAM } from '../../config/programs.ts';
 import { cleanSymbol, tokenLabel } from '../../lib/displayText.ts';
 import { formatBps, formatSol, formatTokens, shortAddress } from '../../lib/format.ts';
+import { failingProgram } from '../../tx/errors.ts';
 import type { TxError, TxPlan, WatchedAccount } from '../../tx/types.ts';
 import { EXTRAS_IX, PAMM_POOL_LEN_2026_10, PUMP_CURVE_LEN_2026_10 } from '../../venues/constants.ts';
 import {
@@ -265,13 +266,18 @@ export function venueGrowth(s: Pick<ChainSnapshot, 'kind' | 'read'>): keyof type
 /**
  * An open plan's `refineError` on such an account: short.win's `ProceedsBelowMin` gets the specific
  * message (`VENUE_GROWTH_MESSAGES`); everything else, and any other venue, keeps the mapped error.
+ * Only when the error's logs name short.win as the failing program: the mapper also reads a 6063
+ * whose logs name no failing program (truncated logs) as short.win's, and PumpSwap's own 6063 has
+ * the same number, so an unattributed one keeps the generic message. The account length is the
+ * snapshot's: a trade that grows the account between the plan and the simulation leaves the
+ * specific message on a refusal the price move caused (its advice, retry, still holds; §5.9).
  */
 export function growthRefinement(s: Pick<ChainSnapshot, 'kind' | 'read'>): Pick<TxPlan, 'refineError'> {
     const growth = venueGrowth(s);
     if (growth === null) return {};
     return {
         refineError: (e: TxError): TxError =>
-            e.kind === 'program' && e.code === PROCEEDS_BELOW_MIN
+            e.kind === 'program' && e.code === PROCEEDS_BELOW_MIN && failingProgram(e.logs ?? []) === SHORTWIN_PROGRAM
                 ? { ...e, message: VENUE_GROWTH_MESSAGES[growth] }
                 : e,
     };

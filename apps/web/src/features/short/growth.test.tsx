@@ -13,6 +13,8 @@ import { act, renderHook } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PROGRAM_ERRORS } from '../../config/errors.ts';
+import { SHORTWIN_PROGRAM } from '../../config/programs.ts';
+import { mapTransactionError } from '../../tx/errors.ts';
 import type { SimulationReport, TxError, TxPlan } from '../../tx/types.ts';
 import type { KindName } from '../../venues/constants.ts';
 import type { RawAccount } from '../../venues/readers.ts';
@@ -53,10 +55,12 @@ vi.mock('../../tx/simulate.ts', () => ({
 
 const { useTxFlow } = await import('../../tx/useTxFlow.ts');
 
-const refusal = (code: number): TxError => {
-    const info = PROGRAM_ERRORS.get(code);
-    return { kind: 'program', code, name: info?.name, action: info?.action ?? 'retry', message: info?.message ?? '' };
-};
+/** short.win's refusal as the mapper builds it from a simulation whose logs name short.win failing. */
+const refusal = (code: number): TxError =>
+    mapTransactionError({ InstructionError: [2, { Custom: code }] }, [
+        `Program ${SHORTWIN_PROGRAM} invoke [1]`,
+        `Program ${SHORTWIN_PROGRAM} failed: custom program error: 0x${code.toString(16)}`,
+    ]);
 
 /** A ReadSet whose first account (P0 / C0) has `len` bytes. */
 function snapshot(kind: KindName, len: number | null) {
@@ -115,10 +119,21 @@ describe('PUMP-2026-10-2: an open on a pump account its first trade grows', () =
         const e = refineError(refusal(6063));
         expect(e.message).toBe(VENUE_GROWTH_MESSAGES.pool);
         expect([e.kind, e.code, e.action, e.name]).toEqual(['program', 6063, 'retry', 'ProceedsBelowMin']);
+        expect(e.logs).toEqual(refusal(6063).logs);
         expect(refineError(refusal(6062))).toEqual(refusal(6062));
         // PumpSwap's own 6063 (`InsufficientRealQuoteReserves`) maps to `unknown`, not to this.
         const venue: TxError = { kind: 'unknown', code: 6063, action: 'report', message: 'in pAMM' };
         expect(refineError(venue)).toEqual(venue);
+        // A 6063 whose logs name no failing program (truncated logs) maps to short.win's error, but
+        // could be PumpSwap's: it keeps the generic message.
+        const unattributed = mapTransactionError({ InstructionError: [2, { Custom: 6063 }] }, []);
+        expect([unattributed.kind, unattributed.code]).toEqual(['program', 6063]);
+        expect(refineError(unattributed)).toEqual(unattributed);
+        const truncated = mapTransactionError({ InstructionError: [2, { Custom: 6063 }] }, [
+            `Program ${SHORTWIN_PROGRAM} invoke [1]`,
+            'Log truncated',
+        ]);
+        expect(refineError(truncated)).toEqual(truncated);
         const curve = growthRefinement(snapshot('pump_curve', 125)).refineError;
         expect(curve?.(refusal(6063)).message).toBe(VENUE_GROWTH_MESSAGES.curve);
         expect(growthRefinement(snapshot('pump_swap', 301)).refineError).toBeUndefined();
