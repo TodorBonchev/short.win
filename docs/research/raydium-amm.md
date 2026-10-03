@@ -125,7 +125,7 @@ The four members of the Squads v4 multisig are `4aky1VxQ…`, `7W4mr6bH…`, `AZ
 - **UNVERIFIED:** a byte-exact reproducible build of either HEAD. I did not attempt Docker `solana-verify` builds.
 - An unmerged CPMM branch `feat/creator-fee-share` (last commit `bdeee23`, 2026-09-15) contains "Fix: update for verify build". It also adds a creator-fee split into the protocol fee.
   - The split fits inside existing padding (`AmmConfig.creator_fee_share_rate`, sizes unchanged) and does **not** change the swap math or the reserve formula.
-  - Expect another CPMM upgrade.
+  - Expect another CPMM upgrade. (*It came: CPMM was redeployed at slot 452,376,460, 2026-10-01, from that branch; §13.*)
 
 **IDLs.**
 
@@ -919,7 +919,7 @@ If `emit_cpi!` events are kept (ARCH §3.10), each adds 1 trace entry. Even with
 
 **UNVERIFIED:**
 
-- Byte-exact reproducible builds of `raydium-amm@d26944b` and `raydium-cp-swap@59fb845`. I only have a behavioral match via ELF strings and mainnet logs.
+- Byte-exact reproducible builds of `raydium-amm@d26944b` and `raydium-cp-swap@59fb845`. I only have a behavioral match via ELF strings and mainnet logs. (*M10:* the CPMM half is superseded — the deploy mainnet runs since 452,376,460 is `raydium-cp-swap@bdeee23`, rebuilt byte for byte, §13. AMM v4 is still a behavioural match to `d26944b` only.)
 - Whether the AMM v4 ProgramData transactions of 2025-02-22 and 2025-03-11 were upgrades (the RPC did not return them).
 - Whether the CPMM deploy of 2024-05-16 06:31Z contained the `open_time` clamp; hence the conservative `T_clamp` of 2024-06-01.
 - Whether Raydium's admin has ever used `SetParams` status, `update_pool_status` or fee changes on individual pools. Current state: none disabled.
@@ -983,3 +983,43 @@ An admin halt of the only eligible pool leaves no fast-path target. Live check, 
 ### 12.6 Rule 5 adopted (V2-8)
 
 §6.3 rule 5's optional cap ("cap tier liquidity at `L/λ_min` so that unlocked liquidity cannot inflate tiers") is now the design's rule for opens, replacing the v0.2 open-time `λ_now ≥ λ_min` check, which anyone could trip by adding unlocked liquidity (λ' = λ/(1 + f)).
+
+---
+
+## 13. M10 update (2026-10-03): the CPMM redeploy
+
+Re-read for M10. Mainnet reads: the ProgramData headers at slot 452,485,424 (2026-10-02) and again
+by `scripts/dump-fixtures.py check --live` at slot 452,907,481 (2026-10-03); the fixtures are in
+`tests/fixtures` (group `raydium_cpmm_2026_10`), whose README has the full interface diff and the
+reproduction. §1–§12 above are not edited except where they point here.
+
+- **Redeploy.** CPMM (`CPMMoo8L…`, ProgramData `DMawCQzb…`) was upgraded at slot **452,376,460**
+  (block time 2026-10-01 19:05:48Z) by the same authority, the Squads v4 vault `FytDrVz…`. The
+  ProgramData's lamports went from 5,028,383,001 to 4,033,504,760 (excess lamports collected); its
+  size is unchanged (793,869 B). AMM v4 is unchanged (445,763,204).
+- **Source: reproduced.** The trimmed ELF (722,617 B, sha256 `93cad245…a0d2`) is the build of
+  `raydium-io/raydium-cp-swap` branch `feat/creator-fee-share` at `bdeee23` (2026-09-15; 5 commits
+  ahead of `59fb845`): solana-verify 0.5.2 in its (3,1,10) image (`sha256:f71be5ca…`, which the
+  branch selects with `[workspace.metadata.cli] solana = "3.1.10"`), run through the repository's
+  bubblewrap shim, outputs a byte-identical file. verify.osec.io still lists the program as not
+  verified (registered commit `cfdb70a8…`, on-chain hash `93cad245…`; checked 2026-10-03).
+- **Interface.** The 18 instructions of `59fb845` plus `create_creator_fee_share` and
+  `close_creator_fee_share`; a new `CreatorFeeShare` account; `SwapEvent` unchanged.
+  **The swap path is unchanged**: `swap_base_input` / `swap_base_output`, the curve and fee math at
+  swap time and `vault_amount_without_fee` (the pricing reserves short.win reads) are
+  byte-identical in source. `AmmConfig` gains `creator_fee_share_rate: u64` at offset 116, carved
+  from the padding (still 236 B); `PoolState` is unchanged (637 B). All 21 configs hold 0 there
+  (they equal the fixture bytes at slot 452,488,420).
+- **Creator fees (§9.4, ECON R1).** When a pool's accrued creator fee is collected,
+  `collect_creator_fee` (which now takes a trailing `creator_fee_share` account) moves
+  ⌊fee·share_rate/10⁶⌋ of it to the protocol's counter and pays the creator the rest. With every
+  rate at 0 today, nothing changes; a non-zero rate would divert part of a pool creator's fee to
+  Raydium. Neither short.win's costs nor its pricing move (both counters are excluded from the
+  pricing reserves), and short.win never calls the collect instructions.
+- **short.win: no adapter change.** Every CPMM test, bench and the web E2E validator run the
+  redeploy (`fork::CpmmDeploy::CURRENT`); each CPMM swap costs 5 CU more inside the venue
+  (`tests/bench/m3_cu`). T-LATCH replays the real 445,763,504 → 452,376,460 upgrade
+  (`latch_raydium_it`). The program's `VENUE_GUARD_SLOTS_2026_10_02` records 452,376,460 as the test
+  baseline; `initialize_config` takes the live slots.
+- **Jupiter** was also redeployed (451,957,263, read at slot 452,485,424); no fixture.
+

@@ -172,7 +172,7 @@ quote_mint     = WSOL (So111…112) for SOL-paired coins; the bonding curve stor
   - **VQR can change after the boost.** It stayed equal to the `InitBoostEvent` value during the boost, in every event traced for `4JAnKF…`.
     - But 2 pools now show a larger live VQR. Live VQR was compared with the initial VQR for 132 of the sampled pools, of which 34 were older than one day, and both drifted pools are among those 34: `CxakjwVvLftY4i6nYhdkdF23cWok88C89x7kGSPrmwKD` +617,275,524 and `4JAnKF…` +13,353,869.
     - Their boost vaults had already closed (`CxakjwVv…` boost ended 2026-09-25 15:00 UTC).
-    - What changes it (possibly trade-path logic: `BuyEvent`/`SellEvent` carry `virtual_quote_reserves` and a `can_boost` flag, and `buy`/`sell` write `pool`) is **UNVERIFIED**.
+    - What changes it (possibly trade-path logic: `BuyEvent`/`SellEvent` carry `virtual_quote_reserves` and a `can_boost` flag, and `buy`/`sell` write `pool`) is **UNVERIFIED**. (*M10:* that the events carry VQR is now confirmed, Update 2026-10-03 below; what moves it is still open.)
   - ⇒ Read VQR live on every quote, never cache it, and treat it as proportional to migrated quote.
 - **Mechanism, from TX-MIG's inner instructions:**
   1. `create_pool` deposits 84.990 SOL + 206.9M tokens.
@@ -957,3 +957,42 @@ Run on the dumped ELF with `GlobalConfig.disable_flags` (u8 @56) set to 0, each 
 - A PumpSwap `buy` by a third-party PDA `user` on mainnet (T-PDA-USER is verified on the ELF only).
 - Whether v2 trades will change the fee tier's market-cap basis (the candidate prices on `vault + VQR` like v1; only v1 was compared with shortwin-math).
 - What `BoostPoolLiquidityUnsupported` (6064) guards: no deposit or withdrawal in the probes raised it, a boost vault holding SOL included (H11); and whether `8ewuF2o8…`'s 2-lamport fall was a withdrawal (H3).
+
+---
+
+## Update 2026-10-03 (M10)
+
+*M10 findings that touch this note. The sections above are not edited except where they point here.*
+
+### I1. `BuyEvent` / `SellEvent` carry `virtual_quote_reserves` (§1.4, confirmed)
+
+- The 2026-09 events end with the cashback / buyback fields and then `virtual_quote_reserves`
+  as an i128 (`services/indexer/src/ingest/decode/venue.rs`, `pamm_virtual_quote_reserves`).
+- On the canonical pool `4JAnKFddd5fFTk5PxDj3PpTWJuTEfSWQEjZJcgKQ9KwW`, 20 recorded mainnet
+  transactions (slots 452,463,723 to 452,464,091; `scripts/gapcal/tests/fixtures/pamm.json.gz`):
+  the event's VQR (17,600,247,874) is the same after every buy and sell, and the effective
+  reserves `vault + VQR` price every sale exactly, the vault alone does not
+  (`services/indexer/tests/venue_mainnet.rs`). No trade in that window moved VQR. What else moves
+  it (an admin action, a migration) is still **UNVERIFIED**.
+- The M8 indexer stored the quote vault alone as the pool's SOL reserve; since M10 (GC-F1) it
+  stores `vault + VQR` (INDEXER.md §7.2).
+
+### I2. A third party can create a non-canonical WSOL pool of any coin
+
+`create_pool` with the PPD IDL's argument list (`index`, `base_amount_in`, `quote_amount_in`,
+`coin_creator`, `is_mayhem_mode`, then the four option fields, 18 accounts) executes on the dumped
+pAMM ELF for a stranger's index-1 pool (`tests/litesvm/src/pamm.rs` `pamm_create_pool_ix` /
+`create_third_party_pool`; `tests/litesvm/tests/pamm_it/refusals.rs`, M10 adversarial suite, G-A2:
+such a pool in the ReadSet is refused). Only index 0 by pump's pool authority is canonical; short.win's detection
+never adopts another index (ARCH §2.5).
+
+### I3. pump, PumpSwap and pump-fees were redeployed on 2026-10-02
+
+`scripts/dump-fixtures.py check --live` at slot 452,907,481 (2026-10-03) reads new deploy slots for
+all three programs: PumpSwap 452,654,882, pump 452,654,932 and pump-fees 452,655,002 (block times
+2026-10-02 15:47:07Z / 15:47:21Z / 15:47:39Z), against 446,462,733 / 449,734,335 / 446,465,969 in
+the fixtures and `VENUE_GUARD_SLOTS_2026_10_02`. What changed was not examined here (whether it is
+the "September 30" negative-VQR change of G2 / H2 is **UNVERIFIED**); the repository's pump and
+PumpSwap tests still run the 2026-09 ELFs until the programs are dumped as new groups and
+re-validated, as M10 did for Raydium CPMM (`raydium-amm.md` §13).
+

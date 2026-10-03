@@ -53,7 +53,7 @@ All from the [1.0.0 release notes](https://github.com/otter-sec/anchor/blob/v1.2
 - **The legacy on-chain IDL instructions are replaced by the Program Metadata Program (PMP)**, `ProgM6JCCvbYkfKqJYHePx4xxSUSqJp7rh8Lyv7nk7S` ([cli/src/fetch/pmp.rs#L23@v1.2.0](https://github.com/otter-sec/anchor/blob/v1.2.0/cli/src/fetch/pmp.rs#L23)).
 - **`anchor test` / `anchor localnet` use Surfpool by default.** `--validator legacy` selects `solana-test-validator`. In-process templates (LiteSVM/Mollusk) set `skip_local_validator = true` ([cli/src/lib.rs#L1725-L1728@v1.2.0](https://github.com/otter-sec/anchor/blob/v1.2.0/cli/src/lib.rs#L1725)). `anchor init` now defaults to a **LiteSVM** Rust test template.
 - IDL: unsupported field types (e.g. Rust tuples) are now a hard error. External accounts are no longer added to the IDL `accounts` array.
-- **1.1.x:** `anchor-syn` moves to syn 2. A `[toolchain]` section and `Anchor.toml` `[scripts]` are added. **1.2.0:** `--arch`/`--tools-version`; `security.json` template plus `anchor deploy --security-metadata` (uploads via program-metadata); a TS error-constants file is generated. Fixes include `declare_program!` namespace collisions with prelude names (#4776), zero-copy undersized-buffer panics (#4555/#4633), and all-zero discriminators now being rejected (#4645) ([CHANGELOG 1.2.0](https://github.com/otter-sec/anchor/blob/v1.2.0/CHANGELOG.md#120---2026-09-04)).
+- **1.1.x:** `anchor-syn` moves to syn 2. A `[toolchain]` section and `Anchor.toml` `[scripts]` are added. **1.2.0:** `--arch`/`--tools-version`; a TS error-constants file is generated. (*Corrected M10, below:* the `security.json` template and `anchor deploy --security-metadata` are **not** in 1.2.0; they are under [Unreleased], PR #4177.) Fixes include `declare_program!` namespace collisions with prelude names (#4776), zero-copy undersized-buffer panics (#4555/#4633), and all-zero discriminators now being rejected (#4645) ([CHANGELOG 1.2.0](https://github.com/otter-sec/anchor/blob/v1.2.0/CHANGELOG.md#120---2026-09-04)).
 - Unreleased on master: `CreateAccountAllowPrefund` for `init` on pre-funded accounts, and Token-2022 extension checks for `init_if_needed` on existing mints ([CHANGELOG Unreleased](https://github.com/otter-sec/anchor/blob/2b4b2fd22a881228e02c41b26bd23addb5b8b26f/CHANGELOG.md)). The second one is worth watching for our mint handling.
 
 ### 1.4 Features to use
@@ -133,7 +133,7 @@ All from the [1.0.0 release notes](https://github.com/otter-sec/anchor/blob/v1.2
 - **Accounts:** `solana account -u m <ADDR> --output json --output-file tests/fixtures/accounts/<addr>.json`. The JSON is a flattened `RpcKeyedAccount` (`pubkey` + `account{lamports,data,owner,executable,rentEpoch,space}`) ([cli-output `CliAccount`@v4.1.2](https://github.com/anza-xyz/agave/blob/v4.1.2/cli-output/src/cli_output.rs)). The same files work with `solana-test-validator --account <ADDR> <FILE>` / `--account-dir`, and with `--clone`, `--maybe-clone`, `--clone-upgradeable-program`, `--bpf-program`, `--upgradeable-program` ([validator/src/cli.rs@v4.1.2](https://github.com/anza-xyz/agave/blob/v4.1.2/validator/src/cli.rs)). In Anchor 1.2 these are `[[test.validator.account]]`, `[[test.validator.clone]]` and `[[test.genesis]]`.
 - **LiteSVM:** `svm.add_program(id, &bytes)` (the upgradeable loader is the default) or `add_program_with_loader(...)` to match mainnet CU, then `svm.set_account(addr, Account{..})` after decoding the JSON (base64 `data`). A ~50-line fixture loader in `tests/litesvm/src/fixtures.rs` handles this.
 - **Provenance:** keep a `tests/fixtures/manifest.json` with, for each file: source slot, programdata `slot`, sha256, and IDL commit. A scheduled CI job re-reads the programdata `slot` of pump / pump_amm / pump_fees / Jupiter and fails if it changed (upgrade risk R5).
-- **Default programs:** LiteSVM already bundles SPL Token (or p-token under the feature), Token-2022 v11.0.0, ATA 1.1.1, Memo and ALT ([programs/mod.rs@v0.16.0](https://github.com/LiteSVM/litesvm/blob/v0.16.0/crates/litesvm/src/programs/mod.rs)). The mainnet Token-2022 programdata was deployed at slot 427,147,035. Dump it if byte-for-byte parity matters.
+- **Default programs:** LiteSVM already bundles SPL Token (or p-token under the feature), Token-2022 v11.0.0, ATA 1.1.1, Memo and ALT ([programs/mod.rs@v0.16.0](https://github.com/LiteSVM/litesvm/blob/v0.16.0/crates/litesvm/src/programs/mod.rs)). The mainnet Token-2022 programdata was deployed at slot 427,147,035. Dump it if byte-for-byte parity matters. (*M10:* done — the harness now runs the deployed Token-2022 and spl-memo v3, not the bundled builds; below.)
 
 ---
 
@@ -246,7 +246,7 @@ Keeper language: **Rust**. It reuses `shortwin-math` and `shortwin-venue-state` 
 - **Radar** (Auditware): a template-based static analyzer for Rust/Anchor that runs in Docker and has a GitHub Action ([Auditware/radar](https://github.com/Auditware/radar), pushed 2026-09-07; [radar-action](https://github.com/Auditware/radar-action)).
 - **Trail of Bits `solana-lints`** (Dylint lints from the Sealevel attacks: missing signer/owner check, arbitrary CPI, insecure close, …) ([crytic/solana-lints](https://github.com/crytic/solana-lints), last push 2026-02-19; `cargo-dylint` 6.1.0 on crates.io). **UNVERIFIED:** whether it builds against the current nightly and Anchor 1.2.
 - **Dependency hygiene:** `cargo deny` (licenses, bans, duplicate SDK majors) and `cargo audit` (RustSec).
-- **Program metadata:** `solana-security-txt` 1.1.3 ([neodyme-labs](https://github.com/neodyme-labs/solana-security-txt)) and/or Anchor 1.2's `security.json` uploaded through program-metadata (`anchor deploy --security-metadata`).
+- **Program metadata:** `solana-security-txt` 1.1.3 ([neodyme-labs](https://github.com/neodyme-labs/solana-security-txt)), and/or a `security` JSON uploaded through the Program Metadata Program. (*Corrected M10:* Anchor 1.2.0 has neither a `security.json` template nor `anchor deploy --security-metadata`; the upload goes through the program-metadata CLI, below.)
 - A web search also turns up newer third-party scanners (e.g. solana-fender, Solazy, SolAudit; [dev.to overview](https://dev.to/ohmygod/the-solana-security-toolbox-in-2026-a-practitioners-guide-to-fuzzing-static-analysis-and-5h7f)). None was evaluated here (**UNVERIFIED** quality). The external audit in §9 remains mandatory.
 
 ### 5.2 Verifiable builds
@@ -255,9 +255,9 @@ Keeper language: **Rust**. It reuses `shortwin-math` and `shortwin-venue-state` 
 - The image is chosen from `[workspace.metadata.cli] solana = "…"` and otherwise from the `Cargo.lock` versions of solana-program / solana-program-error / solana-account-info ([README](https://github.com/solana-foundation/solana-verifiable-build/blob/master/README.md)). For an Anchor 1.2 program that fallback would find a **3.x** crate version and pick an **old image**.
 - ⇒ **Must do:**
   - set `[workspace.metadata.cli] solana = "4.1.2"`;
-  - pass `--arch v3 --cargo-build-sbf-args="--tools-version v1.57"` so the result matches `anchor build`. The option is declared with clap 2 `.require_equals(true)` on `build`, `verify-from-repo` and `remote submit-job` ([src/main.rs#L162-L167@v0.5.2](https://github.com/solana-foundation/solana-verifiable-build/blob/v0.5.2/src/main.rs#L162-L167), also L268–273 and L334–339; `Cargo.lock` resolves clap 2.34.0). A local clap 2.34.0 reproduction of that declaration rejects `--cargo-build-sbf-args "--tools-version v1.57"` with "requires a value but none was supplied" and accepts the `=` form. solana-verify splits the value on whitespace before passing it to `cargo build-sbf` (L1101–1102). Use the same `=` form in `verify-from-repo`;
-  - check hash equality in CI. **UNVERIFIED** that the hashes match.
-- Alternative: `anchor build --verifiable` (image `quay.io/ottersec/anchor:v1.2.0`) and `anchor verify`. Explorer/OtterSec verification ([verify.osec.io](https://verify.osec.io), used by `@anchor-lang/core` since 1.1.1) consumes the solana-verify PDA flow: `verify-from-repo` uploads the PDA with the upgrade authority, then `remote submit-job`. With Squads, the PDA upload is a multisig transaction; solana-foundation/github-actions v0.2.14 notes "Prevent squads system transfers" ([releases](https://github.com/solana-foundation/github-actions/releases)).
+  - pass `--arch v3 --cargo-build-sbf-args="--tools-version v1.57"` so the result matches `anchor build`. The option is declared with clap 2 `.require_equals(true)` on `build`, `verify-from-repo` and `export-pda-tx` (*corrected M10*; `remote submit-job` takes no build arguments) ([src/main.rs#L162-L167@v0.5.2](https://github.com/solana-foundation/solana-verifiable-build/blob/v0.5.2/src/main.rs#L162-L167), also L268–273 and L334–339; `Cargo.lock` resolves clap 2.34.0). A local clap 2.34.0 reproduction of that declaration rejects `--cargo-build-sbf-args "--tools-version v1.57"` with "requires a value but none was supplied" and accepts the `=` form. solana-verify splits the value on whitespace before passing it to `cargo build-sbf` (L1101–1102). Use the same `=` form in `verify-from-repo`;
+  - check hash equality in CI. (*M10: verified* — `scripts/verifiable-build.sh` builds both programs byte-identical to `anchor build`, locally and in CI's `verifiable-build` job; below.)
+- Alternative: `anchor build --verifiable` (image `quay.io/ottersec/anchor:v1.2.0`) and `anchor verify`. Explorer/OtterSec verification ([verify.osec.io](https://verify.osec.io), used by `@anchor-lang/core` since 1.1.1) consumes the solana-verify PDA flow: `verify-from-repo` uploads the PDA with the upgrade authority, then `remote submit-job` (*M10:* `verify-from-repo --remote` is deprecated and returns an error pointing to that flow; with Squads the PDA upload is `export-pda-tx`, executed by the vault). With Squads, the PDA upload is a multisig transaction; solana-foundation/github-actions v0.2.14 notes "Prevent squads system transfers" ([releases](https://github.com/solana-foundation/github-actions/releases)).
 
 ### 5.3 Upgrade authority via Squads v4, and timelocks
 - Squads v4 `SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf` is live and immutable on mainnet (programdata `Fy3YMJCv…`, upgrade authority `None`, deployed at slot 302,582,236). It has been audited by OtterSec, Neodyme, Certora (with formal verification) and Trail of Bits ([README](https://github.com/Squads-Protocol/v4/blob/af94153ff77a28b6effe46b9c94baaa93742b48c/README.md)).
@@ -296,7 +296,7 @@ The install finished 2026-09-27 00:42:51. Observed state (from the log, `~/.loca
 ## 8. Not verified (summary)
 - None of this was compiled: `declare_program!` on the pump / pump_amm / pump_fees / Jupiter IDLs under anchor-lang 1.2.0; anchor-lang 1.2 + LiteSVM 0.16 type unification (inferred from the solana-address 1.1→2.x semver trick); whether LiteSVM 0.10/0.11 (Anchor template / anchor-litesvm) load SBPFv3 ELFs by default.
 - Completeness of the platform-tools v1.57 install in `~/.cache/solana/v1.57`.
-- Hash equality between solana-verify (with the flags above) and `anchor build`.
+- Hash equality between solana-verify (with the flags above) and `anchor build`. (*Verified in M10*, below.)
 - Radar and solana-lints compatibility with Anchor 1.2; quality of the newer third-party scanners.
 - Ecosystem compatibility of TypeScript 7.
 - The npm `latest` for pnpm is 12.6.0 while GitHub shows v12.7.0 (2026-09-25). Pin whichever CI resolves reproducibly.
@@ -322,3 +322,71 @@ These apply the first-pass review findings that target this note. Each was re-ch
    - **Added:** pin the resolved Agave versions in the on-chain workspace `Cargo.lock`, so LiteSVM and Mollusk share one Agave version.
 
 No review finding against this note was rejected.
+
+---
+
+## M10 corrections and updates (2026-10-03)
+
+Checked against primary sources and the repository's M10 tree; each item names its evidence.
+
+1. **Anchor 1.2.0 has no `security.json` / `--security-metadata` (§1.3, §5.1).**
+   - Anchor's CHANGELOG lists them under [Unreleased] (PR #4177, merged 2026-09-17; v1.2.0 shipped
+     2026-09-04); `cli/src/template.rs@v1.2.0` contains no "security", and the installed
+     `anchor-1.2.0` has no such deploy flag (M10 security.txt research).
+   - What short.win does instead: both programs embed `solana-security-txt =1.1.3`'s
+     `security_txt!` (compiled out of `no-entrypoint` and `test-venue` builds;
+     `scripts/check-security-txt.py`, the CI release gate; ARCH §8.5). A Program Metadata
+     `security` upload (`npx @solana-program/program-metadata write security <program-id> …`,
+     through Squads with `--export`) is optional and M11's (SECTXT-7).
+2. **`require_equals` scope (§5.2, review correction 1).** In solana-verify 0.5.2
+   (`src/main.rs` at `f8cfe2f8`), `--cargo-build-sbf-args` is `.require_equals(true)` on `build`
+   (L165), `verify-from-repo` (L271) and `export-pda-tx` (L337). `remote submit-job` takes only
+   `--program-id` and `--uploader`. The value is split on whitespace before `cargo build-sbf`
+   (L1102).
+3. **`--remote` is deprecated (§5.2).** `verify-from-repo --remote` returns an error ("The --remote
+   flag has been deprecated. Upload your verify PDA with programs upgrade authority, then queue the
+   remote worker with `solana-verify remote submit-job --program-id … --uploader …`", L500). The
+   flow is the PDA upload (with Squads: `export-pda-tx`, executed by the vault), then
+   `remote submit-job`; verify.osec.io requires public source. On-chain verification is M11.
+4. **Verifiable build: done and byte-equal (§5.2, §8).**
+   - `[workspace.metadata.cli] solana = "4.1.2"` selects
+     `solanafoundation/solana-verifiable-build@sha256:2e0b78f4…` (IMAGE_MAP entry (4,1,2) at
+     v0.5.2); `--arch v3 --cargo-build-sbf-args="--tools-version v1.57"` reproduces `anchor build`
+     byte for byte for `shortwin` and `complete_curve` (`scripts/verifiable-build.sh --compare`, CI
+     job `verifiable-build`).
+   - Without Docker, `scripts/verifiable-build.sh --local` runs the same image's rootfs (fetched by
+     digest, every blob checked) under bubblewrap (docs/DEVELOPMENT.md "The build rule").
+   - IMAGE_MAP at v0.5.2 has 291 entries from 1.10.1 up (including (1,18,16) and (3,1,10)), so the
+     shim can also rebuild third-party programs: Raydium CPMM's 2026-10 redeploy
+     (`raydium-cp-swap@bdeee23`, (3,1,10)) was reproduced byte for byte (`tests/fixtures/README.md`).
+     Squads v4 (1.18.16) was not attempted.
+5. **The LiteSVM harness runs mainnet's SPL programs (§2.3).** Since M10 every `Env` replaces the
+   bundled Token-2022 and spl-memo v3 with the deployed builds (fixture group `spl_programs`):
+   Token-2022 at deploy slot 427,147,035, trimmed ELF `7ea94a02…` = OtterSec's verified build of
+   `solana-program/token-2022@9bc02757` (program v11.0.0, the same version LiteSVM bundles, a
+   different build), and spl-memo v3 (BPFLoader2, `f520eaf0…`); `SHORTWIN_BUNDLED_SPL=1` opts out.
+   Token-2022 CPIs cost about 15 CU more on the mainnet ELF.
+6. **Squads v4 facts (§5.3), as M10 pinned and tested them.**
+   - Program `SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf`: immutable since slot 302,582,236 (no
+     upgrade authority), trimmed ELF `d4866083…2fac`; IDL 2.1.0 vendored from
+     `Squads-Protocol/v4@64af733` (sha256 `cb9a0a29…`; fixture group `squads_programs`). The source
+     of the deployed ELF is **UNVERIFIED** (probably `64af733`, the newest default-branch commit before the
+     deploy; not rebuilt, and verify.osec.io lists it as not verified, registered commit `3742e552`,
+     checked 2026-10-03).
+   - `MAX_TIME_LOCK` = 7,776,000 s (90 days; `crates/squads-v4-ix`). The time lock runs from the
+     approval that reaches the threshold and is checked at execution against the multisig's
+     **current** time lock, so a later increase delays an approved transaction. An `Approved` vault
+     transaction never expires and survives a member rotation and a threshold or time-lock change
+     (only `Active` proposals and config transactions go stale); cancel unwanted ones with
+     `proposal_cancel_v2` (T-SQ-7 in `tests/litesvm/tests/squads_gov_it.rs`).
+   - The owner's layout (2026-10-02): Governance 3-of-5 with time lock 172,800 s (the upgrade
+     authority and `governance`, its vault 0; `fee_recipient`, its vault 1), Emergency 2-of-4 with
+     time lock 0 (`pause_authority`); short.win requires the authorities pairwise distinct (SQ-G8).
+     A program change takes 96 h end to end (48 h Squads + 48 h program). Members sign in the Squads
+     app; the repository's `shortwin-gov` (`services/ops`) stages and verifies only (2026-10-03).
+   - Governance cannot cancel a parameter change reactively inside the program window (its cancel
+     executes at `not_before` at the earliest); the Emergency has no veto over upgrades and its
+     members cannot vote on Governance proposals. `ExtendProgram` is permissionless, so an upgrade
+     to a larger ELF needs it before execution.
+   - The multisigs are created on mainnet in M11. Spending limits are not used.
+

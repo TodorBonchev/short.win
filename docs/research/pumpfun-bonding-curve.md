@@ -1059,3 +1059,15 @@ On the `near` fixture (`tcand2.txt`, `tcand4.txt`):
 
 - Whether and when the K2 programs are deployed, and whether they equal the 0.2.0 artifacts.
 - Whether `partial_fill` stays an optional trailing byte on `buy_v2` in the deployed release (its default is "no partial fill" in the candidate).
+
+---
+
+## Update 2026-10-03 (M10)
+
+- **The three pump programs were redeployed on 2026-10-02.** `scripts/dump-fixtures.py check --live`
+  at slot 452,907,481 reads deploy slots 452,654,932 (pump), 452,654,882 (PumpSwap) and 452,655,002
+  (pump-fees), 2026-10-02 15:47:07Z–15:47:39Z, against the fixtures' and
+  `VENUE_GUARD_SLOTS_2026_10_02`'s 449,734,335 / 446,462,733 / 446,465,969. Whether these are the
+  K2 programs (K6's first open question) is **UNVERIFIED**: nothing was dumped or compared yet, and
+  the repository's curve and PumpSwap tests still run the 2026-09 ELFs (`graduated-venues.md`,
+  Update 2026-10-03, I3).

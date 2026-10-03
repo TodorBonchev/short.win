@@ -156,7 +156,7 @@ The decoders are exact. `scripts/gapcal/tests/test_decode.py` checks them on 20 
 | venue | check |
 |---|---|
 | PumpSwap | the event-derived post reserves equal the vault balances after the transaction, to the unit |
-| CPMM | `SwapEvent`'s pre-trade reserves exclude the fee counters, and M8 adds the whole input. With the pool's `AmmConfig` rates the decoder also removes the protocol and fund parts of the trade fee and the creator fee, so each swap's reserves after equal the next swap's before, and `vault − reserves` grows by exactly those fees. Without the rates, the chain breaks by exactly that amount (M8's reserves overstate the input side by about 0.04 % of the trade). |
+| CPMM | `SwapEvent`'s pre-trade reserves exclude the fee counters, and the M8 decoder added the whole input. With the pool's `AmmConfig` rates the decoder also removes the protocol and fund parts of the trade fee and the creator fee, so each swap's reserves after equal the next swap's before, and `vault − reserves` grows by exactly those fees. Without the rates, the chain breaks by exactly that amount (the M8 indexer's reserves overstated the input side by about 0.04 % of the trade; this finding, GC-F1, is fixed in the indexer, which now applies the watched `AmmConfig` rates and adds PumpSwap's VQR: INDEXER.md §7.2). |
 | AMM v4 | `ray_log` reserves chain exactly, and `vault − reserves` equals `need_take_pnl` (0.55 SOL on SOL/USDC) |
 | pump curve | virtual reserves chain; virtual − real = 30 SOL / 279.9 M tokens; the curve's token account = real + 206.9 M; its lamports move by exactly the trades' SOL |
 
