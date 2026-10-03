@@ -888,6 +888,15 @@ jobs:
       COMPLETE_CURVE_SO: ${{ github.workspace }}/target/deploy/complete_curve.so
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The 30-day load test's bulk load sorts through PostgreSQL's pgsql_tmp, beside the
+      # services target/ and the replay sessions; on 2026-10-03 (run 37130341616) that filled the
+      # runner's root disk ("No space left on device"). Drop the preinstalled SDKs this job never
+      # uses (about 20 GB).
+      - name: Free runner disk space
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h /
       - name: Rust toolchain from rust-toolchain.toml
         run: rustup toolchain install || rustup show
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
