@@ -10,12 +10,14 @@ marker (the crate's README: "the contract should not include the security.txt ma
 else").
 
     python3 scripts/check-security-txt.py target/deploy/shortwin.so "short.win"
-    python3 scripts/check-security-txt.py --forbid-placeholders target/deploy/complete_curve.so \
-        "short.win complete_curve"
+    python3 scripts/check-security-txt.py --forbid-placeholders --source-release v1.0.0 \
+        target/deploy/complete_curve.so "short.win complete_curve"
 
-The owner fields hold `OWNER-FILL` placeholders until the public identity is decided (M10 owner
-question Q3): without `--forbid-placeholders` they are reported, not refused, so every build stays
-checkable. `--forbid-placeholders` is the release gate (the audit freeze and the mainnet deploy).
+The owner fields held `OWNER-FILL` placeholders until the public identity was decided (M10 owner
+question Q3, answered 2026-10-02): without `--forbid-placeholders` a placeholder is reported, not
+refused, so any build stays checkable. `--forbid-placeholders` is the release gate (CI, the audit
+freeze and the mainnet deploy). `--source-release` also requires `source_release` to be exactly
+the given value (CI passes `v` plus the program's Cargo.toml version: the release the ELF claims).
 
 Exit status: 0 valid, 1 invalid, 2 usage.
 """
@@ -31,7 +33,8 @@ CONTACT_TYPES = ("email", "discord", "telegram", "twitter", "link", "other")
 PLACEHOLDER = "OWNER-FILL"
 
 
-def problems_of(elf: bytes, name: str | None, forbid_placeholders: bool):
+def problems_of(elf: bytes, name: str | None, forbid_placeholders: bool,
+                source_release: str | None = None):
     """The parsed fields and the list of problems (empty: valid)."""
     n = elf.count(BEGIN)
     if n != 1:
@@ -67,6 +70,8 @@ def problems_of(elf: bytes, name: str | None, forbid_placeholders: bool):
             problems.append(f"invalid contact {c!r}")
     if name is not None and fields.get("name") != name:
         problems.append(f"name {fields.get('name')!r}, expected {name!r}")
+    if source_release is not None and fields.get("source_release") != source_release:
+        problems.append(f"source_release {fields.get('source_release')!r}, expected {source_release!r}")
     held = sorted(k for k, v in fields.items() if PLACEHOLDER in v)
     if held and forbid_placeholders:
         problems.append(f"{PLACEHOLDER} placeholders in {', '.join(held)} (the release gate)")
@@ -79,13 +84,15 @@ def main() -> int:
     ap.add_argument("name", nargs="?", help="the expected `name` field")
     ap.add_argument("--forbid-placeholders", action="store_true",
                     help=f"refuse any {PLACEHOLDER} value (the release gate)")
+    ap.add_argument("--source-release", metavar="VERSION",
+                    help="require source_release to be exactly VERSION (e.g. v1.0.0)")
     args = ap.parse_args()
     try:
         elf = open(args.elf, "rb").read()
     except OSError as e:
         print(f"::error::{args.elf}: {e}")
         return 2
-    fields, problems = problems_of(elf, args.name, args.forbid_placeholders)
+    fields, problems = problems_of(elf, args.name, args.forbid_placeholders, args.source_release)
     for p in problems:
         print(f"::error::{args.elf}: {p}")
     if problems:

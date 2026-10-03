@@ -66,6 +66,22 @@ test.describe('screens: browsing', { tag: ['@screens', '@markets'] }, () => {
         await app.a11y('not found');
     });
 
+    test('security policy (M10 Q3)', async ({ app, page }) => {
+        await app.goto('/security', 'security');
+        const policy = app.id(T.page('security'));
+        await expect(policy.locator('a[href="mailto:security@short.win"]').first()).toBeVisible();
+        for (const name of ['Scope', 'Reporting a vulnerability', 'What happens next', 'Safe harbour', 'Audits']) {
+            await expect(policy.getByRole('region', { name })).toBeVisible();
+        }
+        await expect(policy.getByRole('region', { name: 'What happens next' })).toContainText('best effort');
+        await shot(page, '60-security');
+        await app.a11y('security policy');
+        // The status bar links to it from every page.
+        await app.goto('/markets', 'markets');
+        await app.id(T.nav('security')).click();
+        await expect(app.id(T.page('security'))).toBeVisible();
+    });
+
     test('create market: ok, rejected, pump curve', async ({ app, page, state }) => {
         await app.goto(`/markets/new?mint=${state.createMints.ok}`, 'create-market');
         await app.connectWallet();

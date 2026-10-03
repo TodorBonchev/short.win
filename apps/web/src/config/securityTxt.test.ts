@@ -36,8 +36,15 @@ describe('security.txt (RFC 9116; SECTXT-4)', () => {
         if (COMMITTED.includes(SECURITY_TXT_PLACEHOLDER)) {
             expect(problems.some((p) => p.includes(SECURITY_TXT_PLACEHOLDER))).toBe(true);
         } else {
-            // Filled in by the owner: it must then pass the production check today.
-            expect(prod(COMMITTED, new Date())).toEqual([]);
+            // Filled in by the owner: it passes the production check on a clock pinned 90 days
+            // before its own Expires, so this test does not start failing on a calendar date.
+            // The real-clock window is the deploy's: a mainnet build (vite.config.ts) and
+            // `pnpm --filter web check:headers` (scripts/check-headers.ts) refuse an Expires
+            // that is 30 days or less ahead, so the file is rotated before then (owner item).
+            const expires = /^Expires: (.+)$/m.exec(COMMITTED)?.[1] ?? '';
+            const pinned = new Date(Date.parse(expires) - 90 * 86_400_000);
+            expect(Number.isNaN(pinned.getTime())).toBe(false);
+            expect(prod(COMMITTED, pinned)).toEqual([]);
         }
     });
 

@@ -4,10 +4,11 @@
  * (`scripts/check-headers.ts`). The two programs embed their own security.txt with the same owner
  * values (`programs/{shortwin,complete_curve}/src/lib.rs`, `scripts/check-security-txt.py`).
  *
- * The owner fields hold `OWNER-FILL` placeholders until the public identity is decided (M10 owner
- * question Q3). A non-production check (every other build, the E2E suite) requires every field and
- * its format, but lets a placeholder pass and does not judge `Expires` against the clock, so a
- * localnet / devnet build or a rebuild of an old commit never starts failing as the date nears. A
+ * The owner fields held `OWNER-FILL` placeholders until the public identity was decided (M10 owner
+ * question Q3, answered 2026-10-02: `config/securityPolicy.ts`). A non-production check (every other
+ * build, the E2E suite) requires every field and its format, but lets a placeholder pass and does not
+ * judge `Expires` against the clock, so a localnet / devnet build or a rebuild of an old commit never
+ * starts failing as the date nears. A
  * production check (a `VITE_CLUSTER=mainnet` build, a deployed origin) refuses placeholders and an
  * `Expires` that is 30 days or less, or more than a year, ahead.
  *

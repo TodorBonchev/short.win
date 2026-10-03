@@ -56,22 +56,23 @@ use shortwin_venue_state::pump;
 declare_id!("4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ");
 
 // security.txt (neodyme-labs/solana-security-txt =1.1.3; ARCH §8.5, M10 SECTXT-1), read by
-// Solana Explorer and `query-security-txt`; `scripts/check-security-txt.py` checks it in CI. The
-// `OWNER-FILL` values wait for the public identity (M10 owner question Q3); the release gate
-// (`--forbid-placeholders`) refuses them. Not in `no-entrypoint` builds (the keeper links both
-// programs as libraries: two `#[no_mangle] SECURITY_TXT` symbols would clash) nor in the TEST-ONLY
-// `test-venue` build (A49). No `expiry`, `source_code` or `source_revision` while the repository
-// is private; `source_release` is the package version, never a commit (the hash must not depend
-// on it).
+// Solana Explorer and `query-security-txt`; `scripts/check-security-txt.py
+// --forbid-placeholders` checks it in CI (the release gate). The values are the owner's (M10 Q3,
+// 2026-10-02; `SECURITY.md`, the web app's `/security` page and `/.well-known/security.txt` carry
+// the same). Not in
+// `no-entrypoint` builds (the keeper links both programs as libraries: two `#[no_mangle]
+// SECURITY_TXT` symbols would clash) nor in the TEST-ONLY `test-venue` build (A49). No `expiry`,
+// `source_code` or `source_revision` while the repository is private, and no `auditors` before
+// the first published audit; `source_release` is the package version (`v1.0.0` at the audit
+// freeze), never a commit (the hash must not depend on it).
 #[cfg(not(any(feature = "no-entrypoint", feature = "test-venue")))]
 solana_security_txt::security_txt! {
     name: "short.win complete_curve",
-    project_url: "https://OWNER-FILL-domain",
-    contacts: "email:OWNER-FILL-security-mailbox,link:https://OWNER-FILL-domain/.well-known/security.txt",
-    policy: "https://OWNER-FILL-domain/OWNER-FILL-policy-path",
+    project_url: "https://short.win",
+    contacts: "email:security@short.win,link:https://short.win/security",
+    policy: "https://short.win/security",
     preferred_languages: "en",
-    source_release: concat!("v", env!("CARGO_PKG_VERSION")),
-    auditors: "https://OWNER-FILL-domain/OWNER-FILL-audits-path"
+    source_release: concat!("v", env!("CARGO_PKG_VERSION"))
 }
 
 /// The pump program `6EF8rr…` (the only CPI target).

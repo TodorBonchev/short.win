@@ -278,14 +278,18 @@ jobs:
           python3 scripts/check-a49.py --has-id target/test-venue/deploy/shortwin.so
           sha256sum target/deploy/shortwin.so target/test-venue/deploy/shortwin.so
       # SECTXT-1 (ARCH §8.5, M10): both deployed programs embed exactly one valid security.txt
-      # (solana-security-txt =1.1.3, the `security_txt!` of each lib.rs) with the expected name;
-      # the TEST-ONLY test-venue build compiles it out. The OWNER-FILL values are reported, not
-      # refused, until the owner fills them; `--forbid-placeholders` is the release gate.
+      # (solana-security-txt =1.1.3, the `security_txt!` of each lib.rs) with the expected name,
+      # the owner's values (Q3, 2026-10-02: no OWNER-FILL placeholder, the release gate) and
+      # `source_release` = "v" + the program's Cargo.toml version; the TEST-ONLY test-venue build
+      # compiles it out.
       - name: Release artifacts carry security.txt (SECTXT-1)
         run: |
           python3 scripts/test_check_security_txt.py
-          python3 scripts/check-security-txt.py target/deploy/shortwin.so "short.win"
-          python3 scripts/check-security-txt.py target/deploy/complete_curve.so "short.win complete_curve"
+          version() { sed -n 's/^version = "\(.*\)"$/\1/p' "programs/$1/Cargo.toml" | head -n 1; }
+          python3 scripts/check-security-txt.py --forbid-placeholders --source-release "v$(version shortwin)" \
+            target/deploy/shortwin.so "short.win"
+          python3 scripts/check-security-txt.py --forbid-placeholders --source-release "v$(version complete_curve)" \
+            target/deploy/complete_curve.so "short.win complete_curve"
           if LC_ALL=C grep -aq '=======BEGIN SECURITY.TXT V1=======' target/test-venue/deploy/shortwin.so; then
             echo "::error::target/test-venue/deploy/shortwin.so carries a security.txt (TEST-ONLY build)"; exit 1
           fi

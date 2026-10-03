@@ -1,10 +1,10 @@
 # Security policy
 
-> **Draft (M10).** Each `OWNER-FILL` marker is a value the owner has not decided yet (M10
-> owner question Q3: domain, security contact, policy, source visibility). This file, the web
-> app's `/.well-known/security.txt` (RFC 9116) and the `security.txt` that both programs
-> embed must carry the same values. The release gate refuses any placeholder
-> (`scripts/check-security-txt.py --forbid-placeholders`; TODO(WP-6)).
+This file, the web app's policy page (`https://short.win/security`), its
+`/.well-known/security.txt` (RFC 9116) and the `security.txt` that both programs embed carry
+the same values (owner decision of 2026-10-02, M10 Q3). The release gate refuses any
+placeholder in the programs' copies (`scripts/check-security-txt.py --forbid-placeholders`, CI's
+`anchor-build` job).
 
 ## Scope
 
@@ -12,11 +12,12 @@
 |---|---|
 | short.win program (Solana mainnet) | `5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK` |
 | `complete_curve` helper program (Solana mainnet) | `4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ` |
-| Web app | `https://OWNER-FILL-domain` |
-| Keeper, indexer and API operated by short.win | OWNER-FILL (in scope or not) |
+| Web app | `https://short.win` |
+| Keeper, indexer and API operated by short.win | in scope: reports are welcome and handled like the others |
 
-From the audit release on, both programs embed a `security.txt` (TODO(WP-6): not in the
-programs yet). To read it: `query-security-txt <program id>`.
+Both programs embed a `security.txt` (`solana-security-txt` 1.1.3). To read it:
+`query-security-txt <program id>`. Its `source_release` is the programs' package version
+(`v1.0.0` at the audit freeze).
 
 Not in scope:
 - the third-party programs short.win calls: pump.fun, PumpSwap, pump-fees, Raydium, SPL
@@ -28,9 +29,10 @@ Not in scope:
 
 ## Reporting a vulnerability
 
-- **Contact:** `mailto:OWNER-FILL-security-mailbox`. A second channel (a bug-bounty platform
-  link) is OWNER-FILL.
-- **Encryption:** OWNER-FILL (a PGP key or the platform's channel).
+- **Contact:** `mailto:security@short.win`. The policy page `https://short.win/security`
+  repeats this policy.
+- **Encryption:** none published yet. If your report needs an encrypted channel, say so in a
+  first short message without the details and we will arrange one.
 - **Language:** English.
 - **Do not** open a public issue, pull request or discussion for a vulnerability.
 
@@ -44,17 +46,26 @@ Please include:
 
 ## What happens next
 
-- **Acknowledgement and triage times:** OWNER-FILL.
+- **Acknowledgement and triage:** best effort. We acknowledge a report as soon as we can and
+  keep the reporter informed of the triage and the fix.
 - **Fix:** a fix that needs a program upgrade goes through the Governance multisig's
   timelock (`docs/design/ARCHITECTURE.md` §3.1, §8.5). Before the upgrade, the Emergency
   multisig can pause new opens and disable a venue for opens. No admin key can move user
   funds or pause exits.
-- **Disclosure:** coordinated. We publish an advisory after the fix is deployed, crediting
-  the reporter unless they ask otherwise. The timeline is OWNER-FILL.
-- **Rewards:** OWNER-FILL. Either the bug-bounty programme and its terms, or "no bounty yet".
-- **Safe harbour:** OWNER-FILL.
+- **Disclosure:** coordinated, on a best-effort timeline agreed with the reporter. We publish
+  an advisory after the fix is deployed, crediting the reporter unless they ask otherwise.
+- **Rewards:** no bug bounty yet. A bounty programme is planned for the beta, after the audit
+  and the public audit contest; its terms will be published on the policy page.
+- **Safe harbour:** we will not pursue or support legal action against research done in good
+  faith under this policy: research that avoids privacy violations, the loss or destruction of
+  data and the interruption or degradation of the service; that never moves or puts at risk
+  funds that are not your own (reproduce on a local validator or a LiteSVM fork, never against
+  other users on mainnet); that does not exploit an issue beyond what is needed to show it;
+  and that reports the issue to us promptly and keeps it confidential until a fix is deployed.
 
 ## Audits
 
-Audit reports are listed at OWNER-FILL (the `auditors` link of the on-chain `security.txt`).
-The audit package for reviewers is [`docs/AUDIT.md`](docs/AUDIT.md).
+No audit has been published yet: a full private audit, then a public audit contest, is
+planned before mainnet (M10 owner decision Q2). Reports will be listed on
+`https://short.win/security` once published, and the programs' `security.txt` will gain its
+`auditors` field then. The audit package for reviewers is [`docs/AUDIT.md`](docs/AUDIT.md).

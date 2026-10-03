@@ -178,6 +178,13 @@ export const statusRoute = createRoute({
     component: lazyRouteComponent(() => import('./features/markets/ProtocolStatusPage.tsx'), 'ProtocolStatusPage'),
 });
 
+/** The vulnerability disclosure policy (M10 Q3): security.txt's `Policy`. */
+export const securityRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/security',
+    component: lazyRouteComponent(() => import('./features/security/SecurityPolicyPage.tsx'), 'SecurityPolicyPage'),
+});
+
 export const routeTree = rootRoute.addChildren([
     indexRoute,
     marketsRoute,
@@ -187,6 +194,7 @@ export const routeTree = rootRoute.addChildren([
     positionRoute,
     lendRoute,
     statusRoute,
+    securityRoute,
 ]);
 
 export function createAppRouter(queryClient: QueryClient) {

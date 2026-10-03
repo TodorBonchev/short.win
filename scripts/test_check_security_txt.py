@@ -17,10 +17,10 @@ END = b"=======END SECURITY.TXT V1=======\0"
 VALID = [
     ("name", "short.win"),
     ("project_url", "https://short.win"),
-    ("contacts", "email:security@short.win,link:https://short.win/.well-known/security.txt"),
+    ("contacts", "email:security@short.win,link:https://short.win/security"),
     ("policy", "https://short.win/security"),
     ("preferred_languages", "en"),
-    ("source_release", "v0.1.0"),
+    ("source_release", "v1.0.0"),
 ]
 
 
@@ -93,7 +93,7 @@ class CheckSecurityTxt(unittest.TestCase):
         self.expect(1, blob(VALID)[: -len(END)] + b"auditors\0" + END, says="odd number of")
 
     def test_non_utf8_value(self):
-        data = blob(VALID).replace(b"v0.1.0", b"v0.1.\xff")
+        data = blob(VALID).replace(b"v1.0.0", b"v1.0.\xff")
         self.expect(1, data, says="field b'source_release' is not UTF-8")
 
     def test_placeholders_pass_unless_forbidden(self):
@@ -101,6 +101,13 @@ class CheckSecurityTxt(unittest.TestCase):
         self.expect(0, blob(held), says="OWNER-FILL placeholders in project_url")
         self.expect(1, blob(held), "--forbid-placeholders", says="the release gate")
         self.expect(0, blob(VALID), "--forbid-placeholders")
+
+    def test_source_release(self):
+        self.expect(0, blob(VALID), "--source-release", "v1.0.0")
+        self.expect(1, blob(VALID), "--source-release", "v0.1.0",
+                    says="source_release 'v1.0.0', expected 'v0.1.0'")
+        none = [(k, v) for k, v in VALID if k != "source_release"]
+        self.expect(1, blob(none), "--source-release", "v1.0.0", says="source_release None")
 
 
 if __name__ == "__main__":

@@ -35,8 +35,10 @@ test.describe('framing', { tag: '@scaffold' }, () => {
         expect(res.headers()['content-type']).toMatch(/^text\/plain\b/);
         const body = await res.text();
         expect(body).not.toContain('<html');
-        // The E2E build is a localnet build: the owner placeholders may remain (a mainnet build refuses them).
+        // The E2E build is a localnet build (no Expires window); the owner's values hold no placeholder.
         expect(securityTxtProblems(body, { now: new Date(), production: false })).toEqual([]);
+        expect(body).toContain('Policy: https://short.win/security');
+        expect(body).not.toContain('OWNER-FILL');
     });
 
     test('a framing page gets no app — the browser refuses, and so does the app on a header-less host', async ({

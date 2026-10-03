@@ -3,6 +3,7 @@
  * live-feed state, SOL/USD. Always visible, so stale data is never silent.
  */
 import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { wsState } from '../api/live.tsx';
 import { indexerQueries } from '../api/queries.ts';
 import { config } from '../config/env.ts';
@@ -54,6 +55,9 @@ export function StatusBar() {
                 math {math ? math.version() : mathError ? 'unavailable' : '…'}
             </span>
             <span className="statusbar-item muted">{config.cluster}</span>
+            <Link to="/security" className="statusbar-item" data-testid={T.nav('security')}>
+                Security
+            </Link>
         </footer>
     );
 }

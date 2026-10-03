@@ -20,7 +20,7 @@ export const T = {
     // ---- shell ----------------------------------------------------------------------------
     header: 'app-header',
     clusterBadge: 'cluster-badge',
-    nav: p<'markets' | 'positions' | 'lend' | 'status'>('nav'),
+    nav: p<'markets' | 'positions' | 'lend' | 'status' | 'security'>('nav'),
     searchInput: 'search-input',
     searchResults: 'search-results',
     searchResult: p('search-result'),
@@ -48,7 +48,7 @@ export const T = {
     toastRegion: 'toast-region',
     toast: 'toast',
     /** The root element of every page; tracks keep it on their page (router smoke test, E2E). */
-    page: p<'markets' | 'create-market' | 'market' | 'positions' | 'position' | 'lend' | 'status'>('page'),
+    page: p<'markets' | 'create-market' | 'market' | 'positions' | 'position' | 'lend' | 'status' | 'security'>('page'),
     routeStub: p('route-stub'),
 
     // ---- markets table (MARKETS) ----------------------------------------------------------
