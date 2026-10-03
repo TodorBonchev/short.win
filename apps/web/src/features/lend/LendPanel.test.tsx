@@ -6,6 +6,7 @@
  * Chain reads, the wallet and the transaction flow are stubbed; the previews run the real WASM.
  */
 import {
+    bigIntToPodU128,
     findShareEpochPda,
     getCoverDeficitInstructionDataDecoder,
     getWithdrawInstructionDataDecoder,
@@ -24,6 +25,7 @@ import { LENDER_SOL_REPAYMENT } from '../../config/disclosures.ts';
 import { config } from '../../config/env.ts';
 import { MEMO_PROGRAM, TOKEN_2022_PROGRAM } from '../../config/programs.ts';
 import { T } from '../../config/testids.ts';
+import { formatBps, formatSol } from '../../lib/format.ts';
 import { initMathSync, type MathModule } from '../../math/load.ts';
 import { createAppClient } from '../../rpc/client.ts';
 import { AppClientProvider } from '../../rpc/context.tsx';
@@ -33,7 +35,7 @@ import type { TxPlan } from '../../tx/types.ts';
 import type { TxFlow } from '../../tx/useTxFlow.ts';
 import type { LendChain } from './chain.ts';
 import { LendPanelView } from './LendPanel.tsx';
-import { MARKET_FLAG, previewClaimView, previewDepositView } from './previews.ts';
+import { MARKET_FLAG, previewClaimView, previewDepositView, unpaidRentExposure } from './previews.ts';
 import { fakeMarket, simpleLender, simplePool } from './testkit.ts';
 
 const h = vi.hoisted(() => ({
@@ -124,13 +126,17 @@ function chainOf(o: {
     accounts?: TokenAccountInfo[];
     recordsComplete?: boolean;
     market?: null;
+    marketFields?: Parameters<typeof fakeMarket>[1];
 }): LendChain {
     const pool = o.pool ?? { tokensFree: 1_000_000_000n, totalShares: 1_000_000_000_000n, lenderSol: 1_000_000n };
     return {
         mint: MINT,
         marketAddress: MARKET,
         vaultAddress: VAULT,
-        market: o.market === null ? null : fakeMarket(pool, { tokenProgram: TOKEN_2022_PROGRAM, mint: MINT }),
+        market:
+            o.market === null
+                ? null
+                : fakeMarket(pool, { tokenProgram: TOKEN_2022_PROGRAM, mint: MINT, ...o.marketFields }),
         vault: simplePool(pool).vault as unknown as MarketVault,
         config: { params: { lockGraceS: 86_400 } } as unknown as LendChain['config'],
         mintInfo: null,
@@ -295,6 +301,115 @@ describe('Lend → Deposit', () => {
         const [record] = await findShareEpochPda({ market: MARKET, epoch: 1 });
         expect(sweep?.accounts?.[sweep.accounts.length - 1]).toEqual({ address: record, role: AccountRole.WRITABLE });
         expect(plan.title).toContain('post-wipe sweep');
+    });
+
+    it('shows no unpaid-rent rows on a pool whose rent is all paid in', () => {
+        renderPanel('deposit');
+        fireEvent.change(screen.getByTestId(T.lendAmountInput), { target: { value: '1.5' } });
+        expect(screen.getByTestId(T.lendPreview('shares'))).toBeTruthy();
+        expect(screen.queryByTestId(T.lendPreview('unpaid-rent'))).toBeNull();
+        expect(screen.queryByTestId(T.disclosure('lender.unpaidRent'))).toBeNull();
+    });
+
+    it('shows the pool’s unpaid rent and the deposit’s part of it, collapsed while immaterial', async () => {
+        const pool = { tokensFree: 1_000_000_000n, totalShares: 1_000_000_000_000n, receivable: 1_000_000_000n };
+        setChain(chainOf({ pool }));
+        renderPanel('deposit');
+        expect(screen.getByTestId(T.lendPreview('unpaid-rent')).dataset.value).toBe('1000000000');
+        fireEvent.change(screen.getByTestId(T.lendAmountInput), { target: { value: '1.5' } });
+        const shares = BigInt(screen.getByTestId(T.lendPreview('shares')).dataset.value ?? '0');
+        const expected = unpaidRentExposure(pool.receivable, pool.totalShares, shares, 1_500_000n, 0n);
+        expect(expected.level).toBe('info');
+        const cell = screen.getByTestId(T.lendPreview('unpaid-rent-share'));
+        expect(cell.dataset.value).toBe(expected.exposure.toString());
+        expect(cell.closest('[data-level]')?.getAttribute('data-level')).toBe('info');
+        const disclosure = screen.getByTestId(T.disclosure('lender.unpaidRent'));
+        expect(disclosure.tagName).toBe('DETAILS');
+        expect(disclosure.textContent).toContain(
+            'This pool has credited 1 SOL of rent that borrowers have not paid yet',
+        );
+        fireEvent.click(screen.getByTestId(T.disclosureAck('lender.solRepayment')));
+        fireEvent.click(submit());
+        await waitFor(() => expect(started).toHaveLength(1));
+        expect((started[0] as TxPlan).disclosures).toEqual(['lender.solRepayment']);
+    });
+
+    it('warns when the deposit’s part is material and repeats the disclosure in the review', async () => {
+        // 1,000 SOL unpaid: a 0.15 % deposit carries about 1.5 SOL of it (≥ 1 SOL; no price on this market).
+        const pool = { tokensFree: 1_000_000_000n, totalShares: 1_000_000_000_000n, receivable: 10n ** 12n };
+        setChain(chainOf({ pool }));
+        renderPanel('deposit');
+        fireEvent.change(screen.getByTestId(T.lendAmountInput), { target: { value: '1.5' } });
+        const shares = BigInt(screen.getByTestId(T.lendPreview('shares')).dataset.value ?? '0');
+        const expected = unpaidRentExposure(pool.receivable, pool.totalShares, shares, 1_500_000n, 0n);
+        expect(expected.level).toBe('warn');
+        expect(expected.exposure).toBeGreaterThanOrEqual(10n ** 9n);
+        const cell = screen.getByTestId(T.lendPreview('unpaid-rent-share'));
+        expect(cell.dataset.value).toBe(expected.exposure.toString());
+        expect(cell.closest('[data-level]')?.getAttribute('data-level')).toBe('warn');
+        const disclosure = screen.getByTestId(T.disclosure('lender.unpaidRent'));
+        expect(disclosure.tagName).toBe('SECTION');
+        expect(disclosure.dataset.severity).toBe('warn');
+        expect(disclosure.textContent).toContain(
+            `this deposit would carry ${formatSol(expected.exposure, 9)} SOL of it`,
+        );
+        expect(disclosure.textContent).toContain('(Cover deficit, on the Claim tab)');
+        fireEvent.click(screen.getByTestId(T.disclosureAck('lender.solRepayment')));
+        fireEvent.click(submit());
+        await waitFor(() => expect(started).toHaveLength(1));
+        const plan = started[0] as TxPlan;
+        expect(plan.disclosures).toEqual(['lender.solRepayment', 'lender.unpaidRent']);
+        expect(plan.disclosureVars?.['lender.unpaidRent']).toEqual({
+            receivable: '1,000',
+            exposure: formatSol(expected.exposure, 9),
+            share: formatBps(expected.shareBps),
+        });
+    });
+
+    it('counts the rent accrued since the last accrual: a pool nothing has touched still shows it', () => {
+        // Stored receivable 0, one open position accruing since t = 0 (the panel's clock reads 1,000 s):
+        // the deposit's prologue credits it first.
+        const pool = { tokensFree: 1_000_000_000n, totalShares: 1_000_000_000_000n };
+        const lastAccrualTs = 0n;
+        const aggr = [1_000n, 5_000n, 100_000n].map((c) => 1_000_000_000n * c * 8_500n);
+        setChain(
+            chainOf({
+                pool,
+                marketFields: {
+                    lastAccrualTs,
+                    emaPrice: bigIntToPodU128(10n ** 18n),
+                    rentAggr: aggr.map((a) => bigIntToPodU128(a)),
+                },
+            }),
+        );
+        renderPanel('deposit');
+        // 1,000 s of 85 % of 10 % APR on 1 SOL of tokens: ⌊8.5·10⁷·1,000/31,536,000⌋.
+        expect(screen.getByTestId(T.lendPreview('unpaid-rent')).dataset.value).toBe('2695');
+        fireEvent.change(screen.getByTestId(T.lendAmountInput), { target: { value: '1.5' } });
+        const shares = BigInt(screen.getByTestId(T.lendPreview('shares')).dataset.value ?? '0');
+        const expected = unpaidRentExposure(2_695n, pool.totalShares, shares, 1_500_000n, 10n ** 18n);
+        expect(expected.exposure).toBeGreaterThan(0n);
+        expect(screen.getByTestId(T.lendPreview('unpaid-rent-share')).dataset.value).toBe(expected.exposure.toString());
+        expect(screen.getByTestId(T.disclosure('lender.unpaidRent'))).toBeTruthy();
+    });
+
+    it('labels a top-up’s figure as this deposit’s part, beside the position’s whole share', () => {
+        // The wallet holds half the pool already; the 1.5-token deposit adds about 0.15 %.
+        const pool = { tokensFree: 1_000_000_000n, totalShares: 1_000_000_000_000n, receivable: 1_000_000_000n };
+        setChain(chainOf({ pool, lender: lenderAccount(simpleLender(500_000_000_000n)) }));
+        renderPanel('deposit');
+        fireEvent.change(screen.getByTestId(T.lendAmountInput), { target: { value: '1.5' } });
+        const shares = BigInt(screen.getByTestId(T.lendPreview('shares')).dataset.value ?? '0');
+        const expected = unpaidRentExposure(pool.receivable, pool.totalShares, shares, 1_500_000n, 0n);
+        expect(screen.getByText('This deposit’s part if it is never paid')).toBeTruthy();
+        expect(screen.getByTestId(T.lendPreview('unpaid-rent-share')).dataset.value).toBe(expected.exposure.toString());
+        // The position's share counts the old shares too; the disclosure's share is this deposit's.
+        const whole = Number(screen.getByTestId(T.lendPreview('share-bps')).dataset.value);
+        expect(whole).toBeGreaterThan(5_000);
+        expect(expected.shareBps).toBeLessThan(20);
+        expect(screen.getByTestId(T.disclosure('lender.unpaidRent')).textContent).toContain(
+            `(${formatBps(expected.shareBps)} of the pool from this deposit)`,
+        );
     });
 
     it('asks for a wallet, and explains a missing market', () => {

@@ -2,9 +2,11 @@
  * Lend → Deposit (FRONTEND.md §3.6): source account (ATA first; CPI Guard detected per account),
  * the SPEC §5.3 disclosure inline above the amount with its required checkbox, the amount (Max =
  * the source's balance), the preview (shares minted, share of the pool, token value; WASM on the
- * chain state) and the review. A CPI-Guarded source blocks the plain deposit and offers the
- * opt-in bracket (FE-1); a live wipe record prepends the post-wipe sweep bundle; a mint flagged
- * unsafe blocks deposits.
+ * chain state), the pool's unpaid rent — the stored receivable plus the rent the deposit's own
+ * prologue credits first — and this deposit's part of it (`lender.unpaidRent`: collapsed, or expanded
+ * and repeated in the review when material; ECON §9.4) and the review. A CPI-Guarded
+ * source blocks the plain deposit and offers the opt-in bracket (FE-1); a live wipe record
+ * prepends the post-wipe sweep bundle; a mint flagged unsafe blocks deposits.
  */
 import { getLenderPositionSize } from '@shortwin/client';
 import { useQuery } from '@tanstack/react-query';
@@ -29,8 +31,16 @@ import {
     nowFor,
     parseTolerance,
     toInputText,
+    unpaidRentVarsOf,
 } from '../ctx.ts';
-import { hasFlag, MARKET_FLAG, previewDepositView, wipeSweepPending } from '../previews.ts';
+import {
+    hasFlag,
+    MARKET_FLAG,
+    pendingLenderCredit,
+    previewDepositView,
+    previewUnpaidRent,
+    wipeSweepPending,
+} from '../previews.ts';
 import { AccountSelect, accountLabel, Blocked, RefusalLine, ToleranceInput } from '../ui.tsx';
 import { LenderRisks } from './LenderRisks.tsx';
 
@@ -73,11 +83,15 @@ export function DepositForm({ ctx }: { ctx: LendCtx }) {
     const unsafe = hasFlag(market, MARKET_FLAG.mintUnsafe);
     const guard = source?.cpiGuard ?? false;
     const bracket = guard && bracketFor === source?.address;
+    const now = nowFor(ctx, 'market');
     const preview =
         amount !== null && tolBps !== null
-            ? previewDepositView(math, lendStateOf(chain), nowFor(ctx, 'market'), amount, tolBps, sweep)
+            ? previewDepositView(math, lendStateOf(chain), now, amount, tolBps, sweep)
             : null;
     const vars = disclosureVarsOf(market, ctx.detail);
+    // The receivable the deposit meets: the stored one plus what its prologue credits first.
+    const poolUnpaid = market.receivable + pendingLenderCredit(math, market, now);
+    const unpaid = preview?.ok ? previewUnpaidRent(math, market, now, preview.value.shares, amount ?? 0n) : null;
 
     const ready =
         !!signer &&
@@ -223,6 +237,33 @@ export function DepositForm({ ctx }: { ctx: LendCtx }) {
                             '—'
                         ),
                     ],
+                    ...(poolUnpaid > 0n
+                        ? ([
+                              [
+                                  'Unpaid rent in the pool',
+                                  <Sol
+                                      key="unpaid"
+                                      lamports={unpaid?.receivable ?? poolUnpaid}
+                                      frac={9}
+                                      testId={T.lendPreview('unpaid-rent')}
+                                  />,
+                              ],
+                              [
+                                  'This deposit’s part if it is never paid',
+                                  unpaid ? (
+                                      <span key="unpaid-share" className="lend-unpaid" data-level={unpaid.level}>
+                                          <Sol
+                                              lamports={unpaid.exposure}
+                                              frac={9}
+                                              testId={T.lendPreview('unpaid-rent-share')}
+                                          />
+                                      </span>
+                                  ) : (
+                                      '—'
+                                  ),
+                              ],
+                          ] as const)
+                        : []),
                     ...(signer && !chain.lender && rent.data !== undefined
                         ? ([
                               ['New account rent (refunded on exit)', <Sol key="rent" lamports={rent.data} frac={6} />],
@@ -230,6 +271,13 @@ export function DepositForm({ ctx }: { ctx: LendCtx }) {
                         : []),
                 ]}
             />
+            {unpaid && unpaid.level !== 'none' && (
+                <Disclosure
+                    id="lender.unpaidRent"
+                    vars={unpaidRentVarsOf(unpaid)}
+                    collapsible={unpaid.level !== 'warn'}
+                />
+            )}
             {sweep && (
                 <div className="banner" data-tone="info" role="status" data-testid={T.lendSweepNotice}>
                     This pool was wiped out. Your deposit first runs the permissionless post-wipe sweep (the venue

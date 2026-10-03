@@ -8,13 +8,13 @@ import type { Address, TransactionSigner } from '@solana/kit';
 import type { MarketDetail, TierName } from '../../api/types.ts';
 import { BREAK_EVEN_DAYS } from '../../config/disclosures.ts';
 import { parseBps } from '../../lib/amount.ts';
-import { formatSol } from '../../lib/format.ts';
+import { formatBps, formatSol } from '../../lib/format.ts';
 import type { MathModule } from '../../math/load.ts';
 import type { AppRpc } from '../../rpc/client.ts';
 import type { TxFlow } from '../../tx/useTxFlow.ts';
 import { type LendChain, marketNow } from './chain.ts';
 import type { LendContext } from './plans.ts';
-import type { LendState } from './previews.ts';
+import type { LendState, UnpaidRentView } from './previews.ts';
 
 export type LoadedChain = LendChain & { readonly market: Market; readonly vault: MarketVault };
 
@@ -100,6 +100,11 @@ export function disclosureVarsOf(market: Market, detail: MarketDetail | undefine
                 : 'n/a (indexer unavailable)',
         },
     };
+}
+
+/** The variables of `lender.unpaidRent` (exact lamports: an exposure can be a few lamports). */
+export function unpaidRentVarsOf(v: UnpaidRentView): Readonly<Record<string, string>> {
+    return { receivable: formatSol(v.receivable, 9), exposure: formatSol(v.exposure, 9), share: formatBps(v.shareBps) };
 }
 
 /** A raw amount as plain input text (no grouping): `1234.5`. */

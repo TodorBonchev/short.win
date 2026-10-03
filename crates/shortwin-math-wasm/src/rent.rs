@@ -1,7 +1,7 @@
 //! Rent: utilisation, the kinked rate, minimum rent and rent due on the basis indices
 //! (`shortwin_math::rent`; ECON §7; ARCH §4.5).
 
-use shortwin_math::rent::{self as mrent, Basis, PosRent, RentTerms};
+use shortwin_math::rent::{self as mrent, Aggr, Basis, PosRent, RentTerms};
 use wasm_bindgen::JsError;
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -97,6 +97,27 @@ impl RentBasis {
         mrent::accrue(&mut b, p_ema, util_bps, kink_bps, dt)?;
         Ok(RentBasis(b))
     }
+
+    /// The lenders' rent credit of that accrual: [`RentBasis::accrue`]'s increments weighed by
+    /// the market's aggregate `Market.rent_aggr = [a0, a1, a2]` (`rent::lender_credit`, floored)
+    /// — what the next instruction's prologue adds to `acc` and to `receivable` (ARCH §3.0
+    /// step 4, `engine::prologue::accrue`).
+    #[allow(clippy::too_many_arguments)]
+    #[wasm_bindgen(js_name = lenderCredit)]
+    pub fn lender_credit(
+        &self,
+        a0: u128,
+        a1: u128,
+        a2: u128,
+        p_ema: u128,
+        util_bps: u32,
+        kink_bps: u32,
+        dt: u64,
+    ) -> Result<u64, JsError> {
+        let mut b = self.0;
+        let delta = mrent::accrue(&mut b, p_ema, util_bps, kink_bps, dt)?;
+        Ok(mrent::lender_credit(&Aggr { a: [a0, a1, a2] }, &delta)?)
+    }
 }
 
 /// A position's rent terms (`rent::PosRent`).
@@ -162,5 +183,24 @@ mod tests {
             5_000
         );
         assert_eq!(utilization_bps(1, 2).unwrap(), 6_667);
+    }
+
+    #[test]
+    fn lender_credit_of_a_year() {
+        // The same position in the aggregate: 85 % of its 10 % APR (rent_protocol_bps 1,500).
+        let wad = shortwin_math::num::WAD;
+        let terms = RentTerms {
+            base_bps: 1_000,
+            slope1_bps: 5_000,
+            slope2_bps: 100_000,
+        };
+        let mut aggr = Aggr::default();
+        aggr.add(1_000_000_000, &terms, 1_500).unwrap();
+        let [a0, a1, a2] = aggr.a;
+        let open = RentBasis::new(0, 0, 0);
+        let credit = open.lender_credit(a0, a1, a2, wad, 0, 8_000, 31_536_000);
+        assert_eq!(credit.unwrap(), 85_000_000);
+        let none = open.lender_credit(a0, a1, a2, wad, 0, 8_000, 0);
+        assert_eq!(none.unwrap(), 0);
     }
 }

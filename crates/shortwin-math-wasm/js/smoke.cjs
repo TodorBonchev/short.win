@@ -72,6 +72,10 @@ const open = new m.RentBasis(0n, 0n, 0n);
 const later = open.accrue(WAD, 0, 8_000, 31_536_000n);
 const pos = new m.PositionRent(1_000_000_000n, open, 1_000, 5_000, 100_000, 1_500, 7n);
 assert.equal(pos.due(later), 100_000_000n);
+// The lenders' credit of that year from the aggregate `A_j = q·coef_j·(10⁴ − 1,500)`: 85 % of it.
+const share = 10_000n - 1_500n;
+const [a0, a1, a2] = [1_000n, 5_000n, 100_000n].map((c) => 1_000_000_000n * c * share);
+assert.equal(open.lenderCredit(a0, a1, a2, WAD, 0, 8_000, 31_536_000n), 85_000_000n);
 // Liquidation with the keeper floor at K_s (N22): 15 + a top-up of 5 from the borrower.
 const liq = m.previewLiquidation(1_000n, 600n, 100n, 500n, 550n, 1_500, 1_000, 5_000, 2_000, 3_000, 20n);
 assert.equal(liq.buyback + liq.keeper + liq.protocol + liq.lenders + liq.borrower, 1_000n);

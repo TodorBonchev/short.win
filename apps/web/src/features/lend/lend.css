@@ -67,6 +67,11 @@
     white-space: nowrap;
 }
 
+/* The deposit's part of the pool's unpaid rent once it is material (lender.unpaidRent). */
+.lend-unpaid[data-level="warn"] .num {
+    color: var(--warn);
+}
+
 .lend-dashboard .tbl td .badge + .badge {
     margin-left: var(--sp-2);
 }

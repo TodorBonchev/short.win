@@ -5,18 +5,24 @@
  * the SOL part, `previewWithdrawal`), claims, allowances, touches, token values, locks, lock ends
  * and vest releases.
  */
+
+import { bigIntToPodU128 } from '@shortwin/client';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { UNPAID_RENT_WARN_BPS, UNPAID_RENT_WARN_LAMPORTS } from '../../config/disclosures.ts';
 import { initMathSync, type MathModule } from '../../math/load.ts';
 import { readRepo, readRepoBytes } from '../../test/repo.ts';
 import {
+    lamportsAtPrice,
     lessBps,
     MARKET_FLAG,
+    pendingLenderCredit,
     potGainOfTouch,
     previewClaimView,
     previewClaimWithPot,
     previewDepositView,
     previewPosition,
     previewTouched,
+    previewUnpaidRent,
     previewWithdrawLimits,
     previewWithdrawView,
     proRata,
@@ -24,10 +30,11 @@ import {
     rewardsRequired,
     standingOf,
     toPoolState,
+    unpaidRentExposure,
     wipeLive,
     wipeSweepPending,
 } from './previews.ts';
-import { simpleLender, simplePool, stateOf, type VectorCase } from './testkit.ts';
+import { fakeMarket, simpleLender, simplePool, stateOf, type VectorCase } from './testkit.ts';
 
 let m: MathModule;
 let cases: VectorCase[];
@@ -346,6 +353,98 @@ describe('lend previews on simple pools', () => {
         expect(refusalOf(new Error('lender behind share epochs'))).toMatchObject({ name: 'LenderBehindEpochs' });
         expect(refusalOf(new Error('post-wipe sweep pending'))).toMatchObject({ name: 'WipeSweepPending' });
         expect(refusalOf(new Error('something else'))).toMatchObject({ name: 'MathOverflow', code: 6000 });
+    });
+});
+
+describe('the pool’s unpaid rent at a deposit (ECON §9.4, lender.unpaidRent)', () => {
+    const WAD = 10n ** 18n;
+    const S = 3_000_000_000_000n;
+    const exposure = (receivable: bigint, shares: bigint, amount: bigint, emaPrice = 0n) =>
+        unpaidRentExposure(receivable, S, shares, amount, emaPrice);
+    // One open position in the aggregate: q = 10⁹ raw at Tier A's curve (10 % / 50 % / 1,000 %),
+    // rent_protocol_bps 1,500 — `A_j = q·coef_j·(10⁴ − 1,500)` (`rent::Aggr::add`).
+    const A = [1_000n, 5_000n, 100_000n].map((c) => 1_000_000_000n * c * 8_500n);
+    const accruing = (o: { receivable?: bigint; lastAccrualTs?: bigint; aggr?: readonly bigint[] } = {}) =>
+        fakeMarket(
+            { tokensFree: 10n ** 12n, totalShares: S, receivable: o.receivable ?? 0n },
+            {
+                lastAccrualTs: o.lastAccrualTs ?? 1_000n,
+                emaPrice: bigIntToPodU128(WAD),
+                rentAggr: (o.aggr ?? A).map((a) => bigIntToPodU128(a)),
+            },
+        );
+
+    it('is the deposit’s pro-rata part of the receivable at the pool’s size after it, rounded up', () => {
+        // 10¹² new shares of 4·10¹²: a quarter of 7 lamports is 1.75 → 2.
+        const v = exposure(7n, 1_000_000_000_000n, 10n ** 9n);
+        expect(v.exposure).toBe(2n);
+        expect(v.shareBps).toBe(2_500);
+        // Exact multiples are not rounded.
+        expect(exposure(8n, 1_000_000_000_000n, 10n ** 9n).exposure).toBe(2n);
+        // No shares minted, nothing carried; a pool with nothing unpaid shows nothing.
+        expect(exposure(8n, 0n, 0n)).toMatchObject({ exposure: 0n, level: 'info' });
+        expect(exposure(0n, 1_000_000_000_000n, 10n ** 9n)).toMatchObject({ exposure: 0n, level: 'none' });
+    });
+
+    it('values the deposit at P_ema and warns from 1 % of that value or from 1 SOL', () => {
+        expect(UNPAID_RENT_WARN_BPS).toBe(100);
+        expect(UNPAID_RENT_WARN_LAMPORTS).toBe(1_000_000_000n);
+        // 1 lamport per raw unit: 10⁹ raw tokens are worth 1 SOL.
+        expect(lamportsAtPrice(10n ** 9n, WAD)).toBe(10n ** 9n);
+        expect(lamportsAtPrice(10n ** 9n, 0n)).toBeNull();
+        const shares = 1_000_000_000_000n; // a quarter of the pool after the deposit
+        // 1 % of 1 SOL is 10⁷ lamports: a receivable of 4·10⁷ puts exactly that on the deposit.
+        const at = exposure(40_000_000n, shares, 10n ** 9n, WAD);
+        expect(at).toMatchObject({ exposure: 10_000_000n, value: 10n ** 9n, level: 'warn' });
+        const below = exposure(39_999_996n, shares, 10n ** 9n, WAD);
+        expect(below).toMatchObject({ exposure: 9_999_999n, level: 'info' });
+        // Without a price only the absolute threshold applies.
+        expect(exposure(40_000_000n, shares, 10n ** 9n)).toMatchObject({ value: null, level: 'info' });
+        expect(exposure(4_000_000_000n, shares, 10n ** 9n)).toMatchObject({
+            exposure: 1_000_000_000n,
+            level: 'warn',
+        });
+        expect(exposure(3_999_999_996n, shares, 10n ** 9n).level).toBe('info');
+        // A large deposit at a high price: 1 SOL carried warns even below 1 % of its value.
+        const whale = exposure(4_000_000_000n, shares, 10n ** 9n, 1_000n * WAD);
+        expect(whale).toMatchObject({ value: 10n ** 12n, level: 'warn' });
+    });
+
+    it('adds the rent the deposit’s own prologue credits first (engine::prologue::accrue)', () => {
+        // U = 0: only J0 moves, P_ema·dt; the lenders get 85 % of the 10 % APR on 1 SOL of tokens.
+        expect(pendingLenderCredit(m, accruing(), 1_000n + 31_536_000n)).toBe(85_000_000n);
+        // A day: ⌊8.5·10⁷·86,400/31,536,000⌋.
+        expect(pendingLenderCredit(m, accruing(), 1_000n + 86_400n)).toBe(232_876n);
+        // Nothing elapsed, or no open position: nothing pending.
+        expect(pendingLenderCredit(m, accruing(), 1_000n)).toBe(0n);
+        expect(pendingLenderCredit(m, accruing({ aggr: [0n, 0n, 0n] }), 1_000n + 86_400n)).toBe(0n);
+
+        // A pool whose rent nothing has credited yet (stored receivable 0, keepers quiet): the rows show.
+        const shares = 1_000_000_000_000n;
+        const v = previewUnpaidRent(m, accruing(), 1_000n + 86_400n, shares, 10n ** 9n);
+        expect(v).toMatchObject({ stored: 0n, pending: 232_876n, receivable: 232_876n, level: 'info' });
+        expect(v.exposure).toBe((232_876n * shares + S + shares - 1n) / (S + shares));
+        // On top of a stored receivable; the same second as the last accrual adds nothing.
+        const w = previewUnpaidRent(m, accruing({ receivable: 7n }), 1_000n + 86_400n, shares, 10n ** 9n);
+        expect(w.receivable).toBe(232_883n);
+        expect(previewUnpaidRent(m, accruing(), 1_000n, shares, 10n ** 9n)).toMatchObject({
+            receivable: 0n,
+            exposure: 0n,
+            level: 'none',
+        });
+    });
+
+    it('reads the shares the deposit preview mints (the WASM)', () => {
+        const market = fakeMarket({ receivable: 1_000_000n });
+        const s = { market, vault: simplePool().vault, lender: null, records: [] };
+        const r = previewDepositView(m, s, 100n, 1_000_000_000n, 50);
+        expect(r.ok).toBe(true);
+        if (!r.ok) return;
+        const total = 1_000_000_000_000n + r.value.shares;
+        const v = previewUnpaidRent(m, market, 100n, r.value.shares, 1_000_000_000n);
+        expect(v).toMatchObject({ stored: 1_000_000n, pending: 0n, receivable: 1_000_000n });
+        expect(v.exposure).toBe((1_000_000n * r.value.shares + total - 1n) / total);
+        expect(v.shareBps).toBe(r.value.shareBps);
     });
 });
 

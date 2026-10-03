@@ -1,9 +1,10 @@
 /**
  * Node-side actions the specs take on the chain between UI steps (FRONTEND.md §10.2–§10.3): move a
  * mock pool's price, flip CPI Guard or required memos on a wallet's token account (the race tests),
- * set a coverage pause, donate to a market's trader and sweep it (vesting income), a lender's and a
- * keeper's part of a full wipe (FE-18), and readers for positions, lenders, markets, landed
- * transactions and their events. Every key is a generated E2E key.
+ * set a coverage pause, donate to a market's trader and sweep it (vesting income), run a market's
+ * lender prologue (rent credited up to now), a lender's and a keeper's part of a full wipe (FE-18),
+ * and readers for positions, lenders, markets, landed transactions and their events. Every key is a
+ * generated E2E key.
  */
 import {
     EPOCH_ROLLED_EVENT_DISCRIMINATOR,
@@ -268,6 +269,26 @@ export async function closeShortFromNode(borrower: KeyPairSigner, m: MarketInfo,
     return send(borrower, [{ ...ix, accounts: [...ix.accounts, ...mockTradeAccounts(m)] }], {
         computeUnits: 1_000_000,
     });
+}
+
+/**
+ * Runs mock market `m`'s lender prologue from the seeding payer (a `sweep_trader` with nothing to
+ * sweep): the rent of its open positions is credited up to now (`Market.receivable`, the lender
+ * rent not yet paid in, grows with it) — what the deposit review's unpaid-rent rows read. Not
+ * `crank_price`: a crank records a price observation that a later open's prologue integrates, which
+ * moves that open's margin off the preview the short panel computed before it (short-open.spec).
+ */
+export async function accrue(m: MarketInfo): Promise<Signature> {
+    const payer = await signerFor('payer');
+    const ix = await getSweepTraderInstructionAsync({
+        market: m.market,
+        trader: m.trader,
+        traderWsol: m.traderWsol,
+        traderWsolAta: await ata(m.trader, WSOL_MINT, PROGRAMS.token),
+        eventAuthority: await eventAuthority(),
+        program: SHORTWIN_PROGRAM_ADDRESS,
+    });
+    return send(payer, [ix]);
 }
 
 export async function shortPosition(position: Address): Promise<ShortPosition | null> {

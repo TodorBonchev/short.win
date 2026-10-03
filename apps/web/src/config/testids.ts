@@ -128,7 +128,7 @@ export const T = {
     lendAmountInput: 'lend-amount-input',
     lendMax: 'lend-max',
     lendTokenAccount: 'lend-token-account-select',
-    lendPreview: p<'shares' | 'share-bps' | 'value'>('lend-preview'),
+    lendPreview: p<'shares' | 'share-bps' | 'value' | 'unpaid-rent' | 'unpaid-rent-share'>('lend-preview'),
     lendSubmit: 'lend-submit',
     lendCpiGuardNotice: 'lend-cpi-guard-notice',
     lendCpiGuardBracket: 'lend-cpi-guard-bracket',

@@ -13,7 +13,7 @@ import type { MathModule } from '../../math/load.ts';
 import type { AppRpc } from '../../rpc/client.ts';
 import type { TxPlan } from '../../tx/types.ts';
 import { chainNowSeconds, liveWipeRecordEpoch, marketNow, readLendChain } from './chain.ts';
-import { type LoadedChain, lendStateOf, lockGraceOf, planContextFor } from './ctx.ts';
+import { type LoadedChain, lendStateOf, lockGraceOf, planContextFor, unpaidRentVarsOf } from './ctx.ts';
 import {
     buildClaimPlan,
     buildCoverPlan,
@@ -29,6 +29,7 @@ import {
     previewClaimView,
     previewClaimWithPot,
     previewDepositView,
+    previewUnpaidRent,
     previewWithdrawView,
     type Refusal,
     wipeSweepPending,
@@ -97,6 +98,7 @@ export async function depositPlanFrom(
         sweep,
     );
     if (!preview.ok) throw refused(preview.refusal);
+    const unpaid = previewUnpaidRent(env.math, market, marketNow(market, nowS), preview.value.shares, inp.amount);
     let sweepIxs: Instruction[] = [];
     if (sweep) {
         const facts = await readSweepFacts(env.rpc, market);
@@ -112,6 +114,7 @@ export async function depositPlanFrom(
         minShares: preview.value.minShares,
         bracket: inp.bracket,
         sweep: sweepIxs,
+        ...(unpaid.level === 'warn' ? { unpaidRent: unpaidRentVarsOf(unpaid) } : {}),
     });
     return {
         ...plan,

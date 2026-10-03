@@ -131,6 +131,11 @@ export interface DepositPlanInput extends LendContext {
     readonly bracket: boolean;
     /** The post-wipe sweep bundle (`sweep.ts`), when a deposit would otherwise wait for it. */
     readonly sweep: readonly Instruction[];
+    /**
+     * `lender.unpaidRent`'s variables when the deposit's part of the pool's unpaid rent is material
+     * (`previewUnpaidRent` level `warn`): the review repeats the disclosure. Omitted otherwise.
+     */
+    readonly unpaidRent?: Readonly<Record<string, string>>;
 }
 
 export { PlanError };
@@ -170,7 +175,11 @@ export async function buildDepositPlan(i: DepositPlanInput): Promise<TxPlan> {
         ...(i.sweep.length ? ['post-wipe sweep'] : []),
         ...(bracket ? ['CPI Guard off', 'deposit', 'CPI Guard on'] : []),
     ];
-    const disclosures: DisclosureId[] = ['lender.solRepayment', ...(bracket ? (['token.cpiGuard'] as const) : [])];
+    const disclosures: DisclosureId[] = [
+        'lender.solRepayment',
+        ...(i.unpaidRent ? (['lender.unpaidRent'] as const) : []),
+        ...(bracket ? (['token.cpiGuard'] as const) : []),
+    ];
     return {
         kind: 'deposit',
         title: `Deposit ${amount}${steps.length ? ` · ${steps.join(' → ')}` : ''}`,
@@ -187,6 +196,7 @@ export async function buildDepositPlan(i: DepositPlanInput): Promise<TxPlan> {
             lenderWatch(i, ['shares', 'lock']),
         ],
         disclosures,
+        disclosureVars: i.unpaidRent ? { 'lender.unpaidRent': i.unpaidRent } : undefined,
         invalidate: lendInvalidations(i.mint, i.signer.address),
     };
 }

@@ -15,11 +15,14 @@
  * read the clock. The previews run on the last stored state: the program's prologue first
  * accrues rent and releases the vest due since `last_accrual_ts`, which only adds to a lender's
  * entitlement — so a SOL preview is a lower bound and the review's simulation shows the exact
- * amount (FRONTEND.md §5.3).
+ * amount (FRONTEND.md §5.3). The deposit's unpaid-rent figure is a risk, where a lower bound is the
+ * wrong direction: it adds the rent the prologue credits first (`previewUnpaidRent`).
  */
 import type { LenderPosition, Market, MarketVault, PodI128, PodU128, ShareEpoch } from '@shortwin/client';
 import { podI128ToBigInt, podU128ToBigInt } from '@shortwin/client';
+import { UNPAID_RENT_WARN_BPS, UNPAID_RENT_WARN_LAMPORTS } from '../../config/disclosures.ts';
 import { PROGRAM_ERRORS, type ProgramErrorInfo } from '../../config/errors.ts';
+import { WAD } from '../../lib/format.ts';
 import type { MathModule } from '../../math/load.ts';
 
 // ---- the account shapes the previews read ----------------------------------------------
@@ -496,6 +499,134 @@ export function previewDepositView(
             { ...o, totalShares: total, tokensFree: s.market.tokensFree + amount },
         ),
     );
+}
+
+// ---- the pool's unpaid rent at a deposit (ECON §9.4; the owner's decision of 2026-10-03) -----
+
+/** How the deposit review shows the pool's unpaid rent: hidden, collapsed or as a warning. */
+export type UnpaidRentLevel = 'none' | 'info' | 'warn';
+
+/** The `Market` fields the unpaid-rent preview reads (the accrual's inputs and the pool's size). */
+export type UnpaidRentMarket = Pick<
+    Market,
+    | 'receivable'
+    | 'totalShares'
+    | 'rentBasis'
+    | 'rentAggr'
+    | 'lastAccrualTs'
+    | 'utilKinkBps'
+    | 'tokensFree'
+    | 'borrowedQ'
+> &
+    Partial<Pick<Market, 'emaPrice'>>;
+
+export interface UnpaidRentView {
+    /**
+     * Lender rent credited (entitlement) and not yet paid in at the deposit, lamports: the stored
+     * `Market.receivable` plus {@link UnpaidRentView.pending}.
+     */
+    readonly receivable: bigint;
+    /** `Market.receivable` as stored (as of `last_accrual_ts`). */
+    readonly stored: bigint;
+    /**
+     * The rent the deposit's own prologue credits first, over `now − last_accrual_ts`
+     * ({@link pendingLenderCredit}).
+     */
+    readonly pending: bigint;
+    /**
+     * This deposit's pro-rata part of `receivable` should none of it be paid, at the pool's size
+     * after the deposit: `⌈receivable·shares/(S + shares)⌉` lamports (rounded up). It grows if other
+     * lenders withdraw first (a shortfall is debited to the shares holding when it happens).
+     */
+    readonly exposure: bigint;
+    /** This deposit's shares' share of the pool after it, bps (floor). */
+    readonly shareBps: number;
+    /** The deposit's value at `P_ema`, `⌊amount·P_ema/WAD⌋` lamports; `null` without a price. */
+    readonly value: bigint | null;
+    readonly level: UnpaidRentLevel;
+}
+
+/** `⌊amount·price/WAD⌋` lamports (the value of raw tokens at a WAD price); `null` at price 0. */
+export function lamportsAtPrice(amount: bigint, priceWad: bigint): bigint | null {
+    return priceWad > 0n ? (amount * priceWad) / WAD : null;
+}
+
+/**
+ * The lender rent the next instruction's prologue credits to `receivable` at `now` (the program's
+ * `market_now`): `RentBasis.lenderCredit` — `rent::accrue` over `now − last_accrual_ts` at `P_ema`
+ * and the stored utilisation, weighed by `Market.rent_aggr` (`engine::prologue::accrue`). 0 with no
+ * open position, no price or no time elapsed. A math error is the program's too (the deposit's
+ * prologue would refuse `MathOverflow`), so it reads as 0 here.
+ */
+export function pendingLenderCredit(m: MathModule, market: UnpaidRentMarket, now: bigint): bigint {
+    const dt = now - market.lastAccrualTs;
+    const a = market.rentAggr.map(u128);
+    if (dt <= 0n || a.every((x) => x === 0n)) return 0n;
+    const j = market.rentBasis.map(u128);
+    const basis = new m.RentBasis(j[0] ?? 0n, j[1] ?? 0n, j[2] ?? 0n);
+    try {
+        const util = m.utilizationBps(market.tokensFree, market.borrowedQ);
+        const pEma = market.emaPrice ? u128(market.emaPrice) : 0n;
+        return basis.lenderCredit(a[0] ?? 0n, a[1] ?? 0n, a[2] ?? 0n, pEma, util, market.utilKinkBps, dt);
+    } catch {
+        return 0n;
+    } finally {
+        basis.free();
+    }
+}
+
+/**
+ * A deposit's exposure to `receivable` lamports of unpaid rent (plain integers; also what the E2E
+ * recomputes from the figure the panel shows): `shares` minted into a pool of `totalShares`,
+ * `amount` raw tokens valued at `emaPrice` (WAD, 0 without a price).
+ */
+export function unpaidRentExposure(
+    receivable: bigint,
+    totalShares: bigint,
+    shares: bigint,
+    amount: bigint,
+    emaPrice: bigint,
+): Pick<UnpaidRentView, 'exposure' | 'shareBps' | 'value' | 'level'> {
+    const total = totalShares + shares;
+    const exposure = total === 0n || shares === 0n ? 0n : (receivable * shares + total - 1n) / total;
+    const value = lamportsAtPrice(amount, emaPrice);
+    const material =
+        exposure > 0n &&
+        (exposure >= UNPAID_RENT_WARN_LAMPORTS ||
+            (value !== null && exposure * 10_000n >= BigInt(UNPAID_RENT_WARN_BPS) * value));
+    return {
+        exposure,
+        shareBps: shareBps(shares, total),
+        value,
+        level: receivable === 0n ? 'none' : material ? 'warn' : 'info',
+    };
+}
+
+/**
+ * The pool's unpaid rent and a deposit's exposure to it (FRONTEND.md §3.6, `lender.unpaidRent`).
+ * The receivable is the one the deposit meets: the stored `Market.receivable` plus the rent its own
+ * prologue credits first ({@link pendingLenderCredit}; the stored value alone lags while nothing
+ * touches the market, and reads 0 on a pool whose positions accrue). The split itself is plain
+ * integer arithmetic: the program has no instruction that quotes it (a shortfall is the exit's
+ * `Δ < 0` booked into `acc`, `pool::repay` / `pool::settle`). `now` is the program's `market_now`;
+ * `shares` the deposit's minted shares (`previewDepositView`), `amount` its raw tokens.
+ */
+export function previewUnpaidRent(
+    m: MathModule,
+    market: UnpaidRentMarket,
+    now: bigint,
+    shares: bigint,
+    amount: bigint,
+): UnpaidRentView {
+    const pending = pendingLenderCredit(m, market, now);
+    const receivable = market.receivable + pending;
+    const emaPrice = market.emaPrice ? u128(market.emaPrice) : 0n;
+    return {
+        receivable,
+        stored: market.receivable,
+        pending,
+        ...unpaidRentExposure(receivable, u128(market.totalShares), shares, amount, emaPrice),
+    };
 }
 
 // ---- withdraw ---------------------------------------------------------------------------

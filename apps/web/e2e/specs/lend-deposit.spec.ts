@@ -3,12 +3,24 @@
  * lend panel and lender dashboard (and MARKETS' market page that renders the panel): `@lend`.
  *
  * SPEC §5.3's sentence verbatim on the deposit screen before signing, its required checkbox gating
- * the submit and again the review's Sign; the simulated deltas (source token account, lender
- * shares); the confirmed deposit on chain; the dashboard row.
+ * the submit and again the review's Sign; the pool's unpaid rent (`Market.receivable`, credited by
+ * a lender prologue just before — the seeded `margin` short pays rent into `main` — plus what the
+ * deposit's own prologue credits since) and this deposit's part of it, with its level
+ * (`lender.unpaidRent`, ECON §9.4; none on a release-build run, where nothing is shorted); the
+ * simulated deltas (source token account, lender shares); the confirmed deposit on chain; the
+ * dashboard row.
  */
+import { podU128ToBigInt } from '@shortwin/client';
 import { LENDER_SOL_REPAYMENT } from '../../src/config/disclosures.ts';
+import { unpaidRentExposure } from '../../src/features/lend/previews.ts';
 import { dataValue, expect, need, T, test } from '../fixtures.ts';
-import { landedTransaction, lenderPosition, lenderPositionAddress } from '../validator/actions.ts';
+import {
+    accrue,
+    landedTransaction,
+    lenderPosition,
+    lenderPositionAddress,
+    marketAccount,
+} from '../validator/actions.ts';
 import { getTokenAmount } from '../validator/chain.ts';
 
 test.use({ wallet: 'lender' });
@@ -23,6 +35,9 @@ test.describe('lend: deposit', { tag: '@lend' }, () => {
         const m = state.markets.main;
         const source = need(state.tokenAccounts.mainAta.lender, 'lender main ATA');
         const raw = AMOUNT_TOKENS * 10n ** BigInt(m.decimals);
+        // The seeded short's rent credited up to now (test-venue build): the pool has unpaid rent.
+        if (state.positions) await accrue(m);
+        const market = await marketAccount(m);
 
         await app.goto(`/m/${m.mint}?panel=lend&action=deposit`, 'market');
         await app.connectWallet();
@@ -42,6 +57,43 @@ test.describe('lend: deposit', { tag: '@lend' }, () => {
         await expect(panel.getByTestId(T.lendPreview('shares'))).toHaveAttribute('data-value', /^[1-9]\d*$/);
         const previewShares = await dataValue(panel.getByTestId(T.lendPreview('shares')));
 
+        // ECON §9.4: the unpaid rent the deposit meets — at least the stored receivable (the panel adds
+        // the rent accrued since) — and this deposit's pro-rata part of it should none be paid.
+        let unpaid = unpaidRentExposure(0n, podU128ToBigInt(market.totalShares), previewShares, raw, 0n);
+        if (state.positions) {
+            expect(market.receivable).toBeGreaterThan(0n);
+            const row = panel.getByTestId(T.lendPreview('unpaid-rent'));
+            const share = panel.getByTestId(T.lendPreview('unpaid-rent-share'));
+            const of = (receivable: bigint) =>
+                unpaidRentExposure(
+                    receivable,
+                    podU128ToBigInt(market.totalShares),
+                    previewShares,
+                    raw,
+                    podU128ToBigInt(market.emaPrice),
+                );
+            // The two figures of one render (the panel's clock ticks every 5 s and the receivable with it).
+            let shown = 0n;
+            await expect
+                .poll(async () => {
+                    shown = await dataValue(row);
+                    return (await dataValue(share)) === of(shown).exposure;
+                })
+                .toBe(true);
+            expect(shown).toBeGreaterThanOrEqual(market.receivable);
+            unpaid = of(shown);
+            expect(unpaid.exposure).toBeGreaterThan(0n);
+            expect(unpaid.exposure).toBeLessThanOrEqual(shown);
+            await expect(panel.locator(`.lend-unpaid[data-level="${unpaid.level}"]`)).toHaveCount(1);
+            const disclosure = panel.getByTestId(T.disclosure('lender.unpaidRent'));
+            await expect(disclosure).toHaveCount(1);
+            await expect(disclosure).toHaveJSProperty('tagName', unpaid.level === 'warn' ? 'SECTION' : 'DETAILS');
+        } else {
+            expect(market.receivable).toBe(0n);
+            await expect(panel.getByTestId(T.lendPreview('unpaid-rent'))).toHaveCount(0);
+            await expect(panel.getByTestId(T.disclosure('lender.unpaidRent'))).toHaveCount(0);
+        }
+
         await expect(panel.getByTestId(T.lendSubmit)).toBeDisabled();
         await panel.getByTestId(T.disclosureAck('lender.solRepayment')).check();
         await expect(panel.getByTestId(T.lendSubmit)).toBeEnabled();
@@ -54,6 +106,8 @@ test.describe('lend: deposit', { tag: '@lend' }, () => {
         await expect(app.inModal(T.disclosure('lender.solRepayment'))).toContainText(LENDER_SOL_REPAYMENT);
         await expect(app.inModal(T.disclosureAck('lender.solRepayment'))).not.toBeChecked();
         await expect(app.inModal(T.txSign)).toBeDisabled();
+        // The review repeats the unpaid-rent disclosure only when the deposit's part is material.
+        await expect(app.inModal(T.disclosure('lender.unpaidRent'))).toHaveCount(unpaid.level === 'warn' ? 1 : 0);
 
         expect(await app.delta(source, 'amount')).toBe(-raw);
         const lenderPda = await lenderPositionAddress(m.market, app.walletAddress);

@@ -17,6 +17,7 @@ export type DisclosureId =
     | 'lender.lossHistory'
     | 'lender.exitForfeitsVest'
     | 'lender.residuals'
+    | 'lender.unpaidRent'
     | 'borrower.liquidation'
     | 'borrower.residuals'
     | 'market.creatorSelfDealing'
@@ -40,6 +41,17 @@ export type DisclosureId =
  * tier (ECON §11.6, α = 2 column; FRONTEND.md §4.2).
  */
 export const BREAK_EVEN_DAYS: Readonly<Record<'A' | 'B' | 'C' | 'D', number>> = { A: 535, B: 205, C: 84, D: 28 };
+
+/**
+ * When the deposit review warns about the pool's unpaid rent (`lender.unpaidRent`; FRONTEND.md §3.6,
+ * ECON §9.4; the owner's decision of 2026-10-03): the deposit's pro-rata part of `Market.receivable`
+ * is material once it reaches {@link UNPAID_RENT_WARN_BPS} of the deposit's value at `P_ema`, or
+ * {@link UNPAID_RENT_WARN_LAMPORTS} whatever the deposit's size (also on a market without a price).
+ * Below both, the review shows the figures and the disclosure collapsed.
+ */
+export const UNPAID_RENT_WARN_BPS = 100;
+/** 1 SOL: see {@link UNPAID_RENT_WARN_BPS}. */
+export const UNPAID_RENT_WARN_LAMPORTS = 1_000_000_000n;
 
 export type Severity = 'info' | 'warn' | 'danger';
 
@@ -118,6 +130,18 @@ export const DISCLOSURES: Readonly<Record<DisclosureId, Disclosure>> = {
         ack: null,
         severity: 'info',
         source: 'ARCH §8.5, §10 O19 (OWNER-M7-11, R4B-10); ECON §8.2, §9.3, §9.5, §12.9–§12.11',
+    }),
+    'lender.unpaidRent': d({
+        id: 'lender.unpaidRent',
+        title: 'Rent this pool has not been paid yet',
+        body: [
+            'This pool has credited {receivable} SOL of rent that borrowers have not paid yet; it is paid when their positions close. If a position closes without enough SOL left to pay its rent, the unpaid part is taken from the lenders pro-rata to the shares they hold at that moment — including lenders who joined after the rent was credited.',
+            'At the pool’s current size, this deposit would carry {exposure} SOL of it ({share} of the pool from this deposit). If other lenders withdraw first, that share — and this deposit’s part of such a loss — grows.',
+            'Such a loss is taken from your SOL balance in this pool. If it leaves that balance below zero, you must pay the difference in SOL (Cover deficit, on the Claim tab) before you can withdraw your tokens.',
+        ],
+        ack: null,
+        severity: 'warn',
+        source: 'ECON §9.4 (a shortfall is debited pro-rata to current shares); the owner’s decision of 2026-10-03',
     }),
     'borrower.liquidation': d({
         id: 'borrower.liquidation',

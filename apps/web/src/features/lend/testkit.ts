@@ -149,6 +149,7 @@ export function simplePool(
         lenderSol?: bigint;
         unmatched?: bigint;
         maxRelease?: bigint;
+        receivable?: bigint;
     } = {},
 ): Pick<LendState, 'market' | 'vault'> {
     return {
@@ -161,7 +162,7 @@ export function simplePool(
             accR: bigIntToPodU128(0n),
             carryR: bigIntToPodU128(0n),
             dust: bigIntToPodI128(0n),
-            receivable: 0n,
+            receivable: o.receivable ?? 0n,
             maxRelease: o.maxRelease ?? 0n,
             vestBal: o.vestBal ?? 0n,
             vestLast: o.vestLast ?? 0n,
@@ -224,6 +225,10 @@ export function fakeMarket(
             | 'traderBaseAta'
             | 'pumpUva'
             | 'poolCache'
+            | 'emaPrice'
+            | 'rentBasis'
+            | 'rentAggr'
+            | 'utilKinkBps'
         >
     > = {},
 ): Market {
@@ -242,6 +247,10 @@ export function fakeMarket(
         traderBaseAta: address('JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN'),
         pumpUva: address('So11111111111111111111111111111111111111112'),
         poolCache: Array.from({ length: 10 }, () => address(ZERO)),
+        // No open position: nothing accrues.
+        rentBasis: [0n, 0n, 0n].map(bigIntToPodU128),
+        rentAggr: [0n, 0n, 0n].map(bigIntToPodU128),
+        utilKinkBps: 8_000,
         ...o,
     } as unknown as Market;
 }

@@ -1,7 +1,9 @@
 /**
  * screens — a visual pass over every page (FRONTEND.md §7, §8, §10.2): each route and state a user
  * reaches, rendered by the production build against the seeded validator, saved as a full-page PNG
- * and scanned with axe. Read-only: reviews are opened and cancelled, nothing is signed.
+ * and scanned with axe. Read-only: reviews are opened and cancelled, nothing is signed (the lend
+ * screens' one write is an empty `sweep_trader` from Node — the lender prologue, so the deposit
+ * shows the pool's unpaid rent).
  *
  * The PNGs go to `.e2e/screenshots/` (gitignored); `SHORTWIN_E2E_SCREENSHOTS=update` writes the
  * committed reference set in `e2e/screenshots/` instead (docs/DEVELOPMENT.md "Web E2E").
@@ -11,6 +13,7 @@ import { join } from 'node:path';
 import type { Page } from '@playwright/test';
 import { E2E_DIR, WEB_DIR } from '../env.ts';
 import { type App, expect, need, requireTrading, requireVenueFixtures, T, test } from '../fixtures.ts';
+import { accrue } from '../validator/actions.ts';
 
 const DIR =
     process.env.SHORTWIN_E2E_SCREENSHOTS === 'update'
@@ -198,11 +201,20 @@ test.describe('screens: lend', { tag: ['@screens', '@lend'] }, () => {
 
     test('deposit, withdraw, claim and the lender dashboard', async ({ app, page, state }) => {
         const main = state.markets.main;
+        // The seeded short's rent credited up to now: the deposit shows the pool's unpaid rent.
+        if (state.positions) await accrue(main);
         for (const action of ['deposit', 'withdraw', 'claim'] as const) {
             await app.goto(`/m/${main.mint}?panel=lend&action=${action}`, 'market');
             await app.connectWallet();
             await expect(app.id(T.lendPanel)).toHaveAttribute('data-action', action);
-            if (action === 'deposit') await app.id(T.lendAmountInput).fill('1000');
+            if (action === 'deposit') {
+                await app.id(T.lendAmountInput).fill('1000');
+                if (state.positions)
+                    await expect(app.id(T.lendPreview('unpaid-rent-share'))).toHaveAttribute(
+                        'data-value',
+                        /^[1-9]\d*$/,
+                    );
+            }
             if (action === 'claim')
                 await expect(app.id(T.claimValue('claimable'))).toHaveAttribute('data-value', /^\d+$/);
             await shot(page, `40-lend-${action}`);
