@@ -25,8 +25,8 @@
 //! then `crank_price` on the **PumpSwap** ReadSet: the pool's first observation, in the same
 //! transaction — the first bucket of the warm-up is the keeper's own read of the pool as
 //! `migrate_v2` left it (in the straddle bundle nobody can trade between them), and the warm-up
-//! ends one second earlier. No `extend_account`: a fresh 271-byte pool trades as it is (R-VEN
-//! Update G4), and the adapter reads it. A market that is already `PumpSwap` (someone else cranked
+//! ends one second earlier. No `extend_account`: a fresh pool (287 bytes since pump's 2026-10-02
+//! redeploy, 271 before) trades as it is (R-VEN Update G4), and the adapter reads it. A market that is already `PumpSwap` (someone else cranked
 //! the transition, or a PumpSwap listing) gets the missing accounts alone ([`pamm_account_ixs`]).
 //!
 //! **A list-only market back on a pump venue, and the trader's accounts** ([`redetection_due`],

@@ -31,7 +31,7 @@ const SOL: u64 = 1_000_000_000;
 
 /// `legacy261` listed on a config with the notional limit and the wallet cap lifted
 /// (`market_max_notional` 10¹³, `wallet_cap_bps` 10⁴, as the program tests' `lock_setup`), `400·q` lent, warmed up, the boost waited out, the pool grown
-/// to 271 bytes by a small trade (pAMM's `deposit` needs it), then a deposit of 1× the pool by the
+/// by a small trade (to 287 bytes since the 2026-10-02 redeploy, 271 before; pAMM's `deposit` needs it), then a deposit of 1× the pool by the
 /// attacker's LP held 10 min (λ 50 %: `L_ema` and `L_slow` follow the deeper pool). With
 /// `position`, a position of 1 % of the pool is open.
 fn market(position: bool) -> (Env, PammMarket, PammLp) {
