@@ -154,8 +154,8 @@ function tierInputs(math: MathModule, s: MarketSnapshot) {
         }
     }
     t.ySlow = ySlow;
-    const vqr = s.venue.pool?.vqr ?? 0n;
-    t.vqr = vqr > 0n ? vqr : 0n;
+    // PumpSwap's boost `max(VQR + buckets, 0)` (PUMP-2026-10-1); 0 elsewhere.
+    t.vqr = s.venue.pool?.virtualPart ?? 0n;
     t.pEma = pEma;
     t.now = s.now;
     t.graduatedAt = s.market.graduatedAt;

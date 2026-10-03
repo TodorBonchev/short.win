@@ -284,6 +284,13 @@ export interface PammPool {
     /** Signed (negative from 2026-09-30). */
     readonly virtualQuoteReserves: bigint;
     readonly creatorFeeBps: bigint;
+    /**
+     * The fee buckets of pump's 2026-10-02 redeploy (`protocol_fees` @271, `creator_fees` @279; 0 on
+     * a pool shorter than 287 bytes): v2 trades' fees kept in the quote vault and off the VQR, never
+     * paid out by a sale (PUMP-2026-10-1).
+     */
+    readonly protocolFees: bigint;
+    readonly creatorFees: bigint;
 }
 
 /** PumpSwap `Pool` (`pump_amm::read_pool`): owner, discriminator, every bool 0 / 1; zero-padded. */
@@ -306,6 +313,8 @@ export function readPammPool(owner: Address, d: Uint8Array): Read<PammPool> {
         isCashbackCoin: bools[1] as boolean,
         virtualQuoteReserves: i128At(d, 245),
         creatorFeeBps: u64At(d, 261),
+        protocolFees: u64At(d, PAMM_POOL_OFF_PROTOCOL_FEES),
+        creatorFees: u64At(d, PAMM_POOL_OFF_CREATOR_FEES),
     });
 }
 
@@ -314,17 +323,41 @@ export interface PammReserves {
     readonly base: bigint;
     /** `Y`: the WSOL vault + `virtual_quote_reserves`. */
     readonly effectiveQuote: bigint;
-    /** `R`: the WSOL vault. */
+    /** The WSOL vault. */
     readonly realQuote: bigint;
+    /** `R`'s vault part: the WSOL vault less the fee buckets, what a sale can be paid out of. */
+    readonly payableQuote: bigint;
 }
 
 const U64_MAX = (1n << 64n) - 1n;
 
-/** `Pool::reserves`: `None` when `quote vault + VQR` is negative or above `u64`. */
+/** `Pool.protocol_fees` (u64; pump's 2026-10-02 redeploy). */
+export const PAMM_POOL_OFF_PROTOCOL_FEES = 271;
+/** `Pool.creator_fees` (u64). */
+export const PAMM_POOL_OFF_CREATOR_FEES = 279;
+
+/**
+ * `Pool::reserves`: `None` when `quote vault + VQR` is negative or above `u64`, or when the fee
+ * buckets exceed the quote vault (PUMP-2026-10-1: pump's invariant broken, not executable).
+ */
 export function pammReserves(pool: PammPool, baseAmount: bigint, quoteAmount: bigint): PammReserves | null {
     const effective = quoteAmount + pool.virtualQuoteReserves;
     if (effective < 0n || effective > U64_MAX) return null;
-    return { base: baseAmount, effectiveQuote: effective, realQuote: quoteAmount };
+    const buckets = pool.protocolFees + pool.creatorFees;
+    if (buckets > U64_MAX || buckets > quoteAmount) return null;
+    return { base: baseAmount, effectiveQuote: effective, realQuote: quoteAmount, payableQuote: quoteAmount - buckets };
+}
+
+/**
+ * `Pool::virtual_part`: the virtual part of the effective reserve the tier subtracts, the boost
+ * `max(VQR + buckets, 0)` (the buckets come off the VQR; PUMP-2026-10-1); `null` past `u64`.
+ */
+export function pammVirtualPart(pool: PammPool): bigint | null {
+    const buckets = pool.protocolFees + pool.creatorFees;
+    if (buckets > U64_MAX) return null;
+    const v = pool.virtualQuoteReserves + buckets;
+    if (v <= 0n) return 0n;
+    return v > U64_MAX ? null : v;
 }
 
 export interface PammGlobalConfig {

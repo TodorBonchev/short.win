@@ -12,7 +12,7 @@ import { MARKET_FLAG, PAMM_CACHE, RAY_CACHE } from './constants.ts';
 import { detectFrom } from './detect.ts';
 import type { MarketKeys } from './lists.ts';
 import { canonicalPool, pammBoostVault, pammLpMint, poolAuthority, wsolAta } from './pda.ts';
-import type { RawAccount } from './readers.ts';
+import { PAMM_POOL_OFF_CREATOR_FEES, PAMM_POOL_OFF_PROTOCOL_FEES, type RawAccount } from './readers.ts';
 import {
     afterSale,
     capFeePpm,
@@ -144,6 +144,65 @@ describe('pump curve', () => {
 });
 
 describe('PumpSwap', () => {
+    it('PUMP-2026-10-1: R is the payable SOL under fee buckets, the tier subtracts the boost', async () => {
+        const role = 'mature';
+        const mint = fixtureAddress(`pamm_${role}_mint`);
+        const pool = fixtureAddress(`pamm_${role}_pool`);
+        const pc = cache();
+        pc[PAMM_CACHE.poolBaseVault] = fixtureAddress(`pamm_${role}_pool_base_vault`);
+        pc[PAMM_CACHE.poolQuoteVault] = fixtureAddress(`pamm_${role}_pool_quote_vault`);
+        const boostVault = await pammBoostVault(pool);
+        pc[PAMM_CACHE.boostVault] = boostVault;
+        pc[PAMM_CACHE.boostVaultAta] = await wsolAta(boostVault);
+        const mk = market({
+            mint,
+            tokenProgram: fixture(`pamm_${role}_mint`).owner as Address,
+            canonicalPool: pool,
+            poolCache: pc,
+            pumpPoolAuthority: await poolAuthority(mint),
+        });
+        const p = dec(`pamm_${role}_pool`);
+        const quote = big(dec(`pamm_${role}_pool_quote_vault`).amount);
+        const boost = big(p.virtual_quote_reserves ?? 0);
+        const supply = big(dec(`pamm_${role}_mint`).supply);
+        // The buckets a third party's v2 trades leave: in the vault, off the VQR (`VQR = boost − B`).
+        const state = (protocol: bigint, creator: bigint, vqr: bigint) => {
+            const a = acc(`pamm_${role}_pool`) as RawAccount;
+            const data = a.data.slice();
+            const v = new DataView(data.buffer, data.byteOffset, data.byteLength);
+            v.setBigUint64(PAMM_POOL_OFF_PROTOCOL_FEES, protocol, true);
+            v.setBigUint64(PAMM_POOL_OFF_CREATOR_FEES, creator, true);
+            v.setBigUint64(245, BigInt.asUintN(64, vqr), true);
+            v.setBigInt64(253, vqr < 0n ? -1n : 0n, true);
+            const read = [
+                { ...a, data },
+                acc(`pamm_${role}_pool_base_vault`),
+                acc(`pamm_${role}_pool_quote_vault`),
+                acc('pamm_state_global_config'),
+                acc('pamm_state_fee_config'),
+                acc(`pamm_${role}_boost_vault_ata`),
+                acc(`pamm_${role}_lp_mint`),
+            ];
+            return readVenueState(m, 'pump_swap', mk, read, { now: 0n, supply, pEma: 0n });
+        };
+        const b = boost / 2n;
+        const s = state(b / 2n, b - b / 2n, boost - b);
+        expect(s.executable).toBe(true);
+        expect(s.y).toBe(quote + boost - b);
+        expect(s.r).toBe(quote - b);
+        expect(s.pool?.virtualPart).toBe(boost);
+        // The open's sale cap is the payable SOL.
+        const sale = quoteSell(m, s, 1_000_000n);
+        expect(sale && sale.proceeds > 0n).toBe(true);
+        expect(quoteSell(m, { ...s, r: 1n }, s.x / 10n)).toBeNull();
+        // No buckets: the 2026-09 reading.
+        const plain = state(0n, 0n, boost);
+        expect(plain.r).toBe(quote);
+        expect(plain.pool?.virtualPart).toBe(boost);
+        // Buckets above the vault: not executable.
+        expect(state(quote, 1n, boost).executable).toBe(false);
+    });
+
     for (const role of ['fresh', 'mature', 'cashback']) {
         it(`${role}: vault + VQR, the tier at the live supply, the burned-LP depth`, async () => {
             const mint = fixtureAddress(`pamm_${role}_mint`);

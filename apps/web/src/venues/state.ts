@@ -37,6 +37,7 @@ import {
     type FeeTier,
     mockReserves,
     pammReserves,
+    pammVirtualPart,
     type RawAccount,
     readAmmInfo,
     readCpmmConfig,
@@ -58,6 +59,8 @@ import {
 
 const WAD = 10n ** 18n;
 const U32_MAX = 0xffff_ffff;
+/** `u64::MAX`: the program's fallback for a virtual part past `u64` (never on a pool it prices). */
+const U64_MAX_BIG = (1n << 64n) - 1n;
 
 /** Fee components in bps (`fees::FeeBps`). */
 export interface FeeBps {
@@ -127,7 +130,8 @@ export interface CurveView {
 export interface PoolView {
     readonly disableFlags: number;
     readonly boostAmount: bigint;
-    readonly vqr: bigint;
+    /** `max(VQR + buckets, 0)`, the boost the tier subtracts (`PoolVenue::virtual_part`). */
+    readonly virtualPart: bigint;
     readonly isCashback: boolean;
     readonly coinCreator: Address;
     readonly fees: FeeBps | null;
@@ -541,7 +545,7 @@ function pammState(
     const poolView: PoolView = {
         disableFlags: gc.disableFlags,
         boostAmount,
-        vqr: pool.virtualQuoteReserves,
+        virtualPart: pammVirtualPart(pool) ?? U64_MAX_BIG,
         isCashback: pool.isCashbackCoin,
         coinCreator: pool.coinCreator,
         fees,
@@ -563,7 +567,8 @@ function pammState(
         executable: true,
         x: reserves.base,
         y: reserves.effectiveQuote,
-        r: reserves.realQuote < reserves.effectiveQuote ? reserves.realQuote : reserves.effectiveQuote,
+        // The payable SOL (the vault less the fee buckets), at most the effective reserve.
+        r: reserves.payableQuote < reserves.effectiveQuote ? reserves.payableQuote : reserves.effectiveQuote,
         pricing: { type: 'pumpSwap', fees },
         feePpm: onewayPpm(m, fees),
         lockedDepth: depth,

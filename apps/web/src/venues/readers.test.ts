@@ -20,7 +20,10 @@ import {
     wsolAta,
 } from './pda.ts';
 import {
+    PAMM_POOL_OFF_CREATOR_FEES,
+    PAMM_POOL_OFF_PROTOCOL_FEES,
     pammReserves,
+    pammVirtualPart,
     readAmmInfo,
     readCpmmConfig,
     readCpmmPool,
@@ -210,6 +213,45 @@ describe('PumpSwap', () => {
         const r = pammReserves(p, 1_000n, 1_000_000_000_000n);
         expect(r?.effectiveQuote).toBe(1_000_000_000_000n + p.virtualQuoteReserves);
         expect(pammReserves(p, 1n, 1n)).toBeNull();
+    });
+
+    it("PUMP-2026-10-1: the fee buckets @271/@279 are the vault's, not payable, and the boost's", () => {
+        const a = acc('pamm_mature_pool');
+        const p0 = value(readPammPool(a.owner, a.data));
+        if (!p0) throw new Error('pool');
+        expect([p0.protocolFees, p0.creatorFees]).toEqual([0n, 0n]);
+        const boost = p0.virtualQuoteReserves;
+        expect(boost > 0n).toBe(true);
+        // As a third party's v2 trades leave them: in the vault, off the VQR.
+        const planted = (protocol: bigint, creator: bigint, vqr: bigint) => {
+            const d = a.data.slice();
+            const v = new DataView(d.buffer, d.byteOffset, d.byteLength);
+            v.setBigUint64(PAMM_POOL_OFF_PROTOCOL_FEES, protocol, true);
+            v.setBigUint64(PAMM_POOL_OFF_CREATOR_FEES, creator, true);
+            v.setBigUint64(245, BigInt.asUintN(64, vqr), true);
+            v.setBigInt64(253, vqr < 0n ? -1n : 0n, true);
+            const p = value(readPammPool(a.owner, d));
+            if (!p) throw new Error('pool');
+            return p;
+        };
+        const p = planted(300n, 100n, boost - 400n);
+        expect([p.protocolFees, p.creatorFees, p.virtualQuoteReserves]).toEqual([300n, 100n, boost - 400n]);
+        const r = pammReserves(p, 7n, 5_000n);
+        expect(r?.effectiveQuote).toBe(5_000n + boost - 400n);
+        expect(r?.payableQuote).toBe(4_600n);
+        expect(pammVirtualPart(p)).toBe(boost);
+        // A short (2026-09) pool reads no buckets.
+        const short = value(readPammPool(a.owner, a.data.slice(0, 271)));
+        expect(short?.protocolFees).toBe(0n);
+        expect(pammReserves(short as NonNullable<typeof short>, 7n, 5_000n)?.payableQuote).toBe(5_000n);
+        // Buckets above the boost leave VQR < 0 and the boost the virtual part; a VQR negative
+        // before any bucket gives 0.
+        expect(pammVirtualPart(planted(boost, boost, -boost))).toBe(boost);
+        expect(pammVirtualPart(planted(1n, 0n, -2_000n))).toBe(0n);
+        // Buckets equal to the vault: nothing payable; above it: not executable.
+        const full = planted(3_000n, 2_000n, 0n);
+        expect(pammReserves(full, 7n, 5_000n)?.payableQuote).toBe(0n);
+        expect(pammReserves(full, 7n, 4_999n)).toBeNull();
     });
 
     it('GlobalConfig: disable flags and the recipient lists', () => {
