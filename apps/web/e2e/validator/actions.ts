@@ -1,21 +1,55 @@
 /**
  * Node-side actions the specs take on the chain between UI steps (FRONTEND.md §10.2–§10.3): move a
  * mock pool's price, flip CPI Guard or required memos on a wallet's token account (the race tests),
- * set a coverage pause, donate to a market's trader and sweep it (vesting income), and readers for
- * positions, lenders and landed transactions. Every key is a generated E2E key.
+ * set a coverage pause, donate to a market's trader and sweep it (vesting income), a lender's and a
+ * keeper's part of a full wipe (FE-18), and readers for positions, lenders, markets, landed
+ * transactions and their events. Every key is a generated E2E key.
  */
 import {
+    EPOCH_ROLLED_EVENT_DISCRIMINATOR,
+    type EpochRolledEvent,
+    findShareEpochPda,
+    getClaimSolInstructionAsync,
     getCloseShortInstructionAsync,
+    getCrankPriceInstructionAsync,
     getDepositInstructionAsync,
+    getEpochRolledEventDecoder,
     getLenderPositionDecoder,
+    getMarketDecoder,
+    getMarketVaultDecoder,
     getSetCoveragePauseInstructionAsync,
+    getShareEpochAccountMetas,
     getShortPositionDecoder,
+    getSolSettleEventDecoder,
+    getSolSettleInstructionAsync,
     getSweepTraderInstructionAsync,
+    getSyncLenderInstructionAsync,
+    getWithdrawInstructionAsync,
     type LenderPosition,
+    type Market,
+    type MarketVault,
+    podU128ToBigInt,
     SHORTWIN_PROGRAM_ADDRESS,
     type ShortPosition,
+    SOL_SETTLE_EVENT_DISCRIMINATOR,
+    type SolSettleEvent,
 } from '@shortwin/client';
-import type { Address, Signature } from '@solana/kit';
+import {
+    type AccountMeta,
+    AccountRole,
+    type Address,
+    appendTransactionMessageInstructions,
+    createTransactionMessage,
+    getBase64EncodedWireTransaction,
+    type Instruction,
+    type KeyPairSigner,
+    pipe,
+    type ReadonlyUint8Array,
+    type Signature,
+    setTransactionMessageFeePayerSigner,
+    setTransactionMessageLifetimeUsingBlockhash,
+    signTransactionMessageWithSigners,
+} from '@solana/kit';
 import { getTransferSolInstruction } from '@solana-program/system';
 import {
     getCreateAssociatedTokenIdempotentInstructionAsync,
@@ -28,11 +62,15 @@ import {
     getEnableCpiGuardInstruction,
     getEnableMemoTransfersInstruction,
 } from '@solana-program/token-2022';
-import { ata, eventAuthority, getAccount, PROGRAMS, pda, rpc, send, WSOL_MINT } from './chain.ts';
+import { ata, eventAuthority, getAccount, PROGRAMS, pda, rpc, send, sleep, WSOL_MINT } from './chain.ts';
 import { signerFor, type WalletName } from './keys.ts';
 import { derivePool, reserves, swapExactInIx } from './mock-cpamm.ts';
 import { mockTradeAccounts, openShortFromNode } from './seed.ts';
-import type { MarketInfo } from './state.ts';
+import type { MarketInfo, PositionInfo } from './state.ts';
+
+/** `VS`, `VA` (ECON §9.2; `shortwin_math::pool`). */
+const VIRTUAL_SHARES = 1_000n;
+const VIRTUAL_ASSETS = 1n;
 
 /**
  * Moves a mock market's spot price by about `bps` (positive: up — someone buys tokens with SOL;
@@ -174,7 +212,18 @@ export async function donateAndSweep(m: MarketInfo, lamports: bigint): Promise<S
 export async function ensureLent(owner: WalletName, m: MarketInfo, source: Address, amount: bigint): Promise<void> {
     const o = await signerFor(owner);
     if (((await lenderPosition(m.market, o.address))?.shares ?? 0n) > 0n) return;
-    await send(o, [
+    await lendFromNode(owner, m, source, amount);
+}
+
+/** `deposit(amount, min_shares = 0)` of `owner` from `source`, from Node (no epoch records). */
+export async function lendFromNode(
+    owner: WalletName,
+    m: MarketInfo,
+    source: Address,
+    amount: bigint,
+): Promise<Signature> {
+    const o = await signerFor(owner);
+    return send(o, [
         await getDepositInstructionAsync({
             owner: o,
             mint: m.mint,
@@ -200,8 +249,13 @@ export async function payRentIn(m: MarketInfo, qRaw: bigint, holdMs = 30_000): P
     const nonce = BigInt(Date.now());
     const p = await openShortFromNode(payer, m, qRaw, nonce);
     await new Promise((resolve) => setTimeout(resolve, holdMs));
+    await closeShortFromNode(payer, m, p);
+}
+
+/** `close_short` of position `p` on mock market `m` by its borrower, from Node, the buyback unbounded. */
+export async function closeShortFromNode(borrower: KeyPairSigner, m: MarketInfo, p: PositionInfo): Promise<Signature> {
     const ix = await getCloseShortInstructionAsync({
-        borrower: payer,
+        borrower,
         mint: m.mint,
         position: p.position,
         trader: m.trader,
@@ -211,7 +265,9 @@ export async function payRentIn(m: MarketInfo, qRaw: bigint, holdMs = 30_000): P
         maxBuybackCost: 0xffff_ffff_ffff_ffffn,
         extras: { set: 0, bumps: new Uint8Array(4) },
     });
-    await send(payer, [{ ...ix, accounts: [...ix.accounts, ...mockTradeAccounts(m)] }], { computeUnits: 1_000_000 });
+    return send(borrower, [{ ...ix, accounts: [...ix.accounts, ...mockTradeAccounts(m)] }], {
+        computeUnits: 1_000_000,
+    });
 }
 
 export async function shortPosition(position: Address): Promise<ShortPosition | null> {
@@ -231,6 +287,8 @@ export async function lenderPosition(market: Address, owner: Address): Promise<L
 export interface LandedInstruction {
     readonly program: Address;
     readonly data: Uint8Array;
+    /** The instruction's accounts in order (resolved through the loaded addresses). */
+    readonly accounts: readonly Address[];
 }
 
 export interface LandedTransaction {
@@ -263,6 +321,7 @@ export async function landedTransaction(signature: Signature | string): Promise<
     const instructions = t.transaction.message.instructions.map((ix) => ({
         program: keys[ix.programIdIndex] as Address,
         data: bs58ToBytes(String(ix.data)),
+        accounts: ix.accounts.map((i) => keys[i] as Address),
     }));
     let computeUnitPrice: bigint | null = null;
     let computeUnitLimit: number | null = null;
@@ -293,6 +352,255 @@ export async function signatureKnown(signature: string): Promise<boolean> {
         .getSignatureStatuses([signature as Signature], { searchTransactionHistory: true })
         .send();
     return value[0] !== null;
+}
+
+// ---- FE-18: the full wipe and the claim-time pot (lend-post-wipe, lend-claim-sync) ----------
+
+/** Anchor's `EVENT_IX_TAG` (`0x1d9acb512ea545e4` LE): the prefix of an `emit_cpi!` self-CPI's data. */
+const EVENT_IX_TAG = Uint8Array.from([0xe4, 0x45, 0xa5, 0x2e, 0x51, 0xcb, 0x9a, 0x1d]);
+
+/**
+ * The events a confirmed transaction emitted (`emit_cpi!`: short.win's inner self-CPIs whose data
+ * is `EVENT_IX_TAG ‖ event discriminator ‖ fields`), as the bytes after the tag, in order.
+ */
+export async function landedEvents(signature: Signature | string): Promise<Uint8Array[]> {
+    const t = await rpc()
+        .getTransaction(signature as Signature, {
+            commitment: 'confirmed',
+            maxSupportedTransactionVersion: 0,
+            encoding: 'json',
+        })
+        .send();
+    if (!t) throw new Error(`transaction ${signature} not found`);
+    const keys = [
+        ...t.transaction.message.accountKeys,
+        ...(t.meta?.loadedAddresses?.writable ?? []),
+        ...(t.meta?.loadedAddresses?.readonly ?? []),
+    ];
+    const out: Uint8Array[] = [];
+    for (const group of t.meta?.innerInstructions ?? []) {
+        for (const ix of group.instructions) {
+            if (keys[ix.programIdIndex] !== PROGRAMS.shortwin) continue;
+            const data = bs58ToBytes(String(ix.data));
+            if (data.length > 8 && EVENT_IX_TAG.every((b, i) => data[i] === b)) out.push(data.subarray(8));
+        }
+    }
+    return out;
+}
+
+/** The events of one type (`discriminator`, decoded with `decoder`) in a confirmed transaction. */
+export async function eventsOf<E>(
+    signature: Signature | string,
+    discriminator: ReadonlyUint8Array,
+    decoder: { decode(bytes: Uint8Array): E },
+): Promise<E[]> {
+    return (await landedEvents(signature))
+        .filter((d) => discriminator.every((b, i) => d[i] === b))
+        .map((d) => decoder.decode(d));
+}
+
+/** The custom program error number in a failed `send` (Anchor's `Error Number: N` log), or `null`. */
+export function programErrorNumber(e: unknown): number | null {
+    const m = /Error Number: (\d+)/.exec(e instanceof Error ? e.message : String(e));
+    return m ? Number(m[1]) : null;
+}
+
+/** A market's `Market` account, decoded. */
+export async function marketAccount(m: MarketInfo): Promise<Market> {
+    const a = await getAccount(m.market);
+    if (!a) throw new Error(`no market ${m.market}`);
+    return getMarketDecoder().decode(a.data);
+}
+
+/** A market's `MarketVault` account, decoded (`null` if it does not exist). */
+export async function marketVaultAccount(m: MarketInfo): Promise<MarketVault | null> {
+    const a = await getAccount(m.marketVault);
+    return a ? getMarketVaultDecoder().decode(a.data) : null;
+}
+
+/** The mock venue's `ReadSet` `[pool, base vault, quote vault]` (read-only; `crank_price`, `sol_settle`). */
+function mockReadSet(m: MarketInfo): AccountMeta[] {
+    if (!m.pool) throw new Error(`${m.symbol} is not a mock market`);
+    return [m.pool.pool, m.pool.baseVault, m.pool.quoteVault].map((address) => ({
+        address,
+        role: AccountRole.READONLY,
+    }));
+}
+
+/**
+ * The lender withdraws every free token of `m` (`T = 0` after it; settle_it.rs's
+ * `withdraw_down_to(0)`): the most shares whose burn pays at most `T`, `⌊s·(T + ΣB_Q + VA)/(S +
+ * VS)⌋ ≤ T`, with `min_tokens = T` so the burn pays exactly `T`. Returns the tokens withdrawn.
+ */
+export async function withdrawAllFree(owner: WalletName, m: MarketInfo, destination: Address): Promise<bigint> {
+    const o = await signerFor(owner);
+    const mk = await marketAccount(m);
+    const lp = await lenderPosition(m.market, o.address);
+    if (!lp) throw new Error(`${owner} does not lend in ${m.symbol}`);
+    const want = mk.tokensFree;
+    const claims = mk.tokensFree + mk.borrowedQ + VIRTUAL_ASSETS;
+    const sharesVs = podU128ToBigInt(mk.totalShares) + VIRTUAL_SHARES;
+    let shares = ((want + 1n) * sharesVs - 1n) / claims;
+    if (shares > lp.shares) shares = lp.shares;
+    await send(o, [
+        await getWithdrawInstructionAsync({
+            owner: o,
+            mint: m.mint,
+            ownerTokenAccount: destination,
+            tokenProgram: m.tokenProgram,
+            memoProgram: m.tokenProgram === PROGRAMS.token2022 ? PROGRAMS.memo : PROGRAMS.shortwin,
+            eventAuthority: await eventAuthority(),
+            program: SHORTWIN_PROGRAM_ADDRESS,
+            shares,
+            minTokens: want,
+            minSol: 0n,
+        }),
+    ]);
+    const left = (await marketAccount(m)).tokensFree;
+    if (left !== 0n) throw new Error(`${m.symbol}: ${left} free tokens left after the withdrawal`);
+    return want;
+}
+
+/**
+ * The in-house keeper's seconds (ECON §5.8 duties 1 and 4; settle_support.rs `Sc::second`): one
+ * `[crank_price, sol_settle]` by the seeding payer about every second until the position is
+ * settled (its account closed) or `timeoutMs` passes. Returns the settling transaction.
+ */
+export async function settleUntilClosed(
+    m: MarketInfo,
+    p: PositionInfo,
+    timeoutMs = 300_000,
+): Promise<{ signature: Signature; rounds: number }> {
+    const keeper = await signerFor('payer');
+    const ea = await eventAuthority();
+    const deadline = Date.now() + timeoutMs;
+    for (let rounds = 1; ; rounds++) {
+        const { shareEpoch } = await marketAccount(m);
+        const crank = await getCrankPriceInstructionAsync({
+            mint: m.mint,
+            eventAuthority: ea,
+            program: SHORTWIN_PROGRAM_ADDRESS,
+        });
+        const settle = await getSolSettleInstructionAsync({
+            keeper,
+            position: p.position,
+            borrower: p.borrower,
+            mint: m.mint,
+            shareEpochRec: (await findShareEpochPda({ market: m.market, epoch: shareEpoch }))[0],
+            eventAuthority: ea,
+            program: SHORTWIN_PROGRAM_ADDRESS,
+        });
+        const signature = await send(
+            keeper,
+            [
+                { ...crank, accounts: [...crank.accounts, ...mockReadSet(m)] },
+                { ...settle, accounts: [...settle.accounts, ...mockReadSet(m)] },
+            ],
+            { computeUnits: 600_000 },
+        );
+        if (!(await getAccount(p.position))) return { signature, rounds };
+        if (Date.now() > deadline) throw new Error(`${p.position} not settled after ${rounds} keeper seconds`);
+        await sleep(1_000);
+    }
+}
+
+/** What `fullWipe` did. */
+export interface WipeOutcome {
+    /** Tokens the only lender withdrew (every free token). */
+    readonly withdrawn: bigint;
+    /** The settling `sol_settle`'s events and signature. */
+    readonly settle: SolSettleEvent;
+    readonly rolled: EpochRolledEvent;
+    readonly signature: Signature;
+    readonly rounds: number;
+}
+
+/** A spot move far beyond any tier's S1 boundary (`cr_open` ≤ 4×: the buyback alone exceeds `V`). */
+export const WIPE_GAP_BPS = 90_000;
+
+/**
+ * An organic full wipe of mock market `m` (settle_it.rs `a_full_wipe_rolls_the_epoch_into_a_live_
+ * record`, on the validator): its only lender `lender` withdraws every free token into
+ * `destination`, the pool gaps up by `WIPE_GAP_BPS`, and keeper seconds run until position `p`
+ * — the last borrowed tokens — settles S1, which rolls the epoch with `num = 0`.
+ */
+export async function fullWipe(
+    m: MarketInfo,
+    lender: WalletName,
+    destination: Address,
+    p: PositionInfo,
+): Promise<WipeOutcome> {
+    const withdrawn = await withdrawAllFree(lender, m, destination);
+    await movePrice(m, WIPE_GAP_BPS);
+    const { signature, rounds } = await settleUntilClosed(m, p);
+    const [settle] = await eventsOf(signature, SOL_SETTLE_EVENT_DISCRIMINATOR, getSolSettleEventDecoder());
+    const [rolled] = await eventsOf(signature, EPOCH_ROLLED_EVENT_DISCRIMINATOR, getEpochRolledEventDecoder());
+    if (!settle || !rolled) throw new Error(`the settlement ${signature} did not roll the epoch`);
+    return { withdrawn, settle, rolled, signature, rounds };
+}
+
+/**
+ * Simulates `ix` (signed by `feePayer`, not sent) on the validator and returns the raw data of
+ * account `address` after it.
+ */
+async function simulateAccount(feePayer: KeyPairSigner, ix: Instruction, address: Address): Promise<Uint8Array> {
+    const { value: blockhash } = await rpc().getLatestBlockhash({ commitment: 'confirmed' }).send();
+    const message = pipe(
+        createTransactionMessage({ version: 0 }),
+        (x) => setTransactionMessageFeePayerSigner(feePayer, x),
+        (x) => setTransactionMessageLifetimeUsingBlockhash(blockhash, x),
+        (x) => appendTransactionMessageInstructions([ix], x),
+    );
+    const wire = getBase64EncodedWireTransaction(await signTransactionMessageWithSigners(message));
+    const { value } = await rpc()
+        .simulateTransaction(wire, {
+            encoding: 'base64',
+            commitment: 'confirmed',
+            accounts: { addresses: [address], encoding: 'base64' },
+        })
+        .send();
+    if (value.err) throw new Error(`simulation failed: ${JSON.stringify(value.err)}\n${(value.logs ?? []).join('\n')}`);
+    const acct = value.accounts?.[0];
+    if (!acct) throw new Error(`the simulation returned no account ${address}`);
+    return new Uint8Array(Buffer.from(acct.data[0], 'base64'));
+}
+
+/**
+ * What `claim_sol` alone would pay `owner` in `m` now: the change of its `claimed` in a validator
+ * simulation (signed, not sent), with the epoch records it is behind on.
+ */
+export async function simulateClaimSol(owner: WalletName, m: MarketInfo): Promise<bigint> {
+    const o = await signerFor(owner);
+    const lender = await lenderPositionAddress(m.market, o.address);
+    const lp = await lenderPosition(m.market, o.address);
+    if (!lp) throw new Error(`${owner} does not lend in ${m.symbol}`);
+    const { shareEpoch } = await marketAccount(m);
+    const records = await getShareEpochAccountMetas({ market: m.market, fromEpoch: lp.epoch, shareEpoch });
+    const ix = await getClaimSolInstructionAsync({
+        owner: o,
+        market: m.market,
+        eventAuthority: await eventAuthority(),
+        program: SHORTWIN_PROGRAM_ADDRESS,
+    });
+    const data = await simulateAccount(o, { ...ix, accounts: [...ix.accounts, ...records] }, lender);
+    return getLenderPositionDecoder().decode(data).claimed - lp.claimed;
+}
+
+/**
+ * The market vault after a plain touch of `owner`'s lender position in `m` (`sync_lender(0)`,
+ * signed by the payer, simulated, not sent): its `unmatched` less the current one is the
+ * surplus that touch moves to the pot (R3A-2).
+ */
+export async function simulateSyncLender(owner: WalletName, m: MarketInfo): Promise<MarketVault> {
+    const o = await signerFor(owner);
+    const ix = await getSyncLenderInstructionAsync({
+        market: m.market,
+        lender: await lenderPositionAddress(m.market, o.address),
+        eventAuthority: await eventAuthority(),
+        program: SHORTWIN_PROGRAM_ADDRESS,
+        maxEpochs: 0,
+    });
+    return getMarketVaultDecoder().decode(await simulateAccount(await signerFor('payer'), ix, m.marketVault));
 }
 
 const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';

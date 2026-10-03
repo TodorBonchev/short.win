@@ -93,6 +93,14 @@ export const KEY_NAMES = {
         'holder',
         'errors',
         'keyboard',
+        // FE-18: lend-post-wipe (the wiped market's only lender, its borrower, a new lender) and
+        // lend-claim-sync (the claiming lender, the late lender, the borrower).
+        'wiped',
+        'wipeBorrower',
+        'rejoin',
+        'potClaimer',
+        'potLate',
+        'potBorrower',
     ],
 } as const;
 

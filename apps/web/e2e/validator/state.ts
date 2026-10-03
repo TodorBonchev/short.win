@@ -67,7 +67,8 @@ export interface E2EState {
     readonly wallets: Readonly<Record<WalletName, WalletInfo>>;
     /**
      * `main` (mock venue: trading), `move` (mock: the price-move specs), `paused` (mock, coverage
-     * paused), `t22` (list-only Token-2022: CPI Guard and memo). On a release-build run the three
+     * paused), `t22` (list-only Token-2022: CPI Guard and memo), `wipe` and `pot` (mock, each lent by
+     * one spec wallet alone: the FE-18 full wipe and the claim-time pot). On a release-build run the
      * mock markets are list-only (`venue: 'none'`) and nothing is shorted.
      */
     readonly markets: {
@@ -75,6 +76,8 @@ export interface E2EState {
         readonly move: MarketInfo;
         readonly paused: MarketInfo;
         readonly t22: MarketInfo;
+        readonly wipe: MarketInfo;
+        readonly pot: MarketInfo;
     };
     /** Mints without a market for create-market (§3.5): safe, freeze authority, a disallowed extension. */
     readonly createMints: {
@@ -90,6 +93,10 @@ export interface E2EState {
         readonly margin: PositionInfo;
         readonly closer: PositionInfo;
         readonly holder: PositionInfo;
+        /** `wipeBorrower` on `wipe`: the last borrowed tokens the full wipe settles. */
+        readonly wipe: PositionInfo;
+        /** `potBorrower` on `pot`: its rent is credited to `potClaimer` alone until `potLate` lends. */
+        readonly pot: PositionInfo;
     } | null;
     /** Token accounts of the wallets (FRONTEND.md §10.3). */
     readonly tokenAccounts: {
@@ -99,6 +106,10 @@ export interface E2EState {
         readonly memo: { readonly ata: Address; readonly source: Address };
         readonly memoRace: { readonly ata: Address; readonly source: Address };
         readonly errors: { readonly t22Ata: Address; readonly race: Address };
+        /** `wipe`: the only lender's ATA (empty: its tokens are lent) and the new lender's, with tokens. */
+        readonly wipe: { readonly lender: Address; readonly rejoin: Address };
+        /** `pot`: the late lender's ATA, with the tokens it lends. */
+        readonly pot: { readonly late: Address };
     };
     /** Dumped mainnet mints present on the validator (SHORTWIN_E2E_VENUES=1), for venue detection. */
     readonly venueMints: {

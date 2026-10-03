@@ -16,8 +16,11 @@
  *    position in `t22` and an ATA that requires incoming memos (`memo`) or has the MemoTransfer
  *    extension off (`memoRace`).
  * 5. Mints without a market for create-market: safe (two), freeze authority, a disallowed extension.
- * 6. After the 50 s market warm-up: three open positions (`margin` on main, `closer` and `holder`
- *    on move) with generous bounds.
+ * 6. Two more mock markets for FE-18, each lent by one spec wallet alone: `wipe` (wallet `wiped`;
+ *    lend-post-wipe drives its full wipe) and `pot` (wallet `potClaimer`; lend-claim-sync), with the
+ *    tokens their other lenders deposit later (`rejoin`, `potLate`).
+ * 7. After the 50 s market warm-up: five open positions (`margin` on main, `closer` and `holder`
+ *    on move, `wipeBorrower` on wipe, `potBorrower` on pot) with generous bounds.
  *
  * Run standalone: `node e2e/validator/seed.ts` (against a running E2E validator).
  */
@@ -350,13 +353,17 @@ async function deposit(
     await send(owner, [ix]);
 }
 
-/** A mock market: mint, pool with `base` tokens against `quoteSol` SOL, listing, the seed lender's deposit. */
+/**
+ * A mock market: mint, pool with `base` tokens against `quoteSol` SOL, listing (by the seed lender),
+ * and the first deposit of `lend` tokens by `lender` (default: the seed lender).
+ */
 async function mockMarket(
     c: Ctx,
     label: { symbol: string; name: string },
     base: bigint,
     quoteSol: bigint,
     lend: bigint,
+    lender: KeyPairSigner = c.seedLender,
 ): Promise<MarketInfo> {
     const mint = await createSplMint(c);
     const k = await marketKeys(mint, PROGRAMS.token);
@@ -375,9 +382,9 @@ async function mockMarket(
         );
     }
     await createMarket(c, c.seedLender, mint, PROGRAMS.token, pool);
-    const lenderSrc = await ensureAta(c, c.seedLender.address, mint, PROGRAMS.token);
+    const lenderSrc = await ensureAta(c, lender.address, mint, PROGRAMS.token);
     await mintTo(c, mint, lenderSrc, PROGRAMS.token, lend);
-    await deposit(c, c.seedLender, mint, PROGRAMS.token, lenderSrc, lend);
+    await deposit(c, lender, mint, PROGRAMS.token, lenderSrc, lend);
     log(`market ${label.symbol} ${k.market} (mint ${mint}${pool ? `, mock pool ${pool.pool}` : ', list-only'})`);
     return {
         ...label,
@@ -491,6 +498,25 @@ export async function seed(): Promise<E2EState> {
         100n,
         10_000_000n * TOKEN,
     );
+    // FE-18: lent by one spec wallet each. `wipe` at `move`'s depth (1e-6 SOL a token); `pot` ten
+    // times dearer and ten times deeper (its wallet cap admits a 5 SOL position), its lender's 600k tokens
+    // mostly borrowed (high utilisation: rent accrues fast).
+    const wipe = await mockMarket(
+        c,
+        { symbol: 'E2EWIPE', name: 'ShortWin E2E Wipe' },
+        100_000_000n * TOKEN,
+        100n,
+        10_000_000n * TOKEN,
+        await w('wiped'),
+    );
+    const pot = await mockMarket(
+        c,
+        { symbol: 'E2EPOT', name: 'ShortWin E2E Pot' },
+        1_000_000_000n * TOKEN,
+        10_000n,
+        600_000n * TOKEN,
+        await w('potClaimer'),
+    );
     const createdAt = (await clock()).unixTimestamp;
 
     const t22Mint = await createT22Mint(c, (mint) => ({
@@ -586,6 +612,14 @@ export async function seed(): Promise<E2EState> {
         [{ __kind: 'CpiGuard', lockCpi: false }],
         1_000n * TOKEN,
     );
+    // FE-18: the wiped market's only lender withdraws into its ATA; `rejoin` and `potLate` lend later.
+    const wipeAccounts = {
+        lender: await ata((await w('wiped')).address, wipe.mint, PROGRAMS.token),
+        rejoin: await ensureAta(c, (await w('rejoin')).address, wipe.mint, PROGRAMS.token),
+    };
+    await mintTo(c, wipe.mint, wipeAccounts.rejoin, PROGRAMS.token, 1_000_000n * TOKEN);
+    const potAccounts = { late: await ensureAta(c, (await w('potLate')).address, pot.mint, PROGRAMS.token) };
+    await mintTo(c, pot.mint, potAccounts.late, PROGRAMS.token, 5_400_000n * TOKEN);
     log('wallet token accounts ready');
 
     // create-market mints (§3.5): two safe, one with a freeze authority, one with a disallowed extension.
@@ -613,7 +647,7 @@ export async function seed(): Promise<E2EState> {
     for (const seedName of ['config', 'venue_guard', 'sol_usd'])
         altAddresses.push(await pda(PROGRAMS.shortwin, [seedName]));
     if (ENV.program === 'test-venue') altAddresses.push(PROGRAMS.mock);
-    for (const m of [main, move, paused, t22]) {
+    for (const m of [main, move, paused, t22, wipe, pot]) {
         altAddresses.push(m.market, m.marketVault, m.poolVault, m.trader, m.traderWsol, m.mint);
         if (m.pool) altAddresses.push(m.pool.pool, m.pool.baseVault, m.pool.quoteVault, m.pool.authority);
     }
@@ -629,6 +663,10 @@ export async function seed(): Promise<E2EState> {
             margin: await openShortFromNode(await w('margin'), main, 2_000_000n * TOKEN, 1n),
             closer: await openShortFromNode(await w('closer'), move, 300_000n * TOKEN, 1n),
             holder: await openShortFromNode(await w('holder'), move, 300_000n * TOKEN, 1n),
+            // ≈ 0.3 SOL of notional at 3 % utilisation (as `move`'s: inside the wallet cap of a
+            // 100M-token pool, ≈ 469k tokens); ≈ 5 SOL at 83 %.
+            wipe: await openShortFromNode(await w('wipeBorrower'), wipe, 300_000n * TOKEN, 1n),
+            pot: await openShortFromNode(await w('potBorrower'), pot, 500_000n * TOKEN, 1n),
         };
         log('seeded positions open');
     }
@@ -678,7 +716,7 @@ export async function seed(): Promise<E2EState> {
         protocolAlt,
         admin,
         wallets,
-        markets: { main, move, paused, t22 },
+        markets: { main, move, paused, t22, wipe, pot },
         createMints,
         positions,
         tokenAccounts: {
@@ -687,6 +725,8 @@ export async function seed(): Promise<E2EState> {
             memo,
             memoRace,
             errors: { t22Ata: errorsT22, race: errorsRace },
+            wipe: wipeAccounts,
+            pot: potAccounts,
         },
         venueMints,
     };
