@@ -6,10 +6,10 @@ The legacy size is the transaction's wire size without an address lookup table, 
 
 | Transaction | Entries | CU | Legacy size (B) | ARCH §6.2 |
 |---|---|---|---|---|
-| ComputeBudget ×2 + open_short with normalisation (first open) | 20 | 106778 | 1033 | 2 + ≤ 15 (§6.2 Raydium `open_short` max) |
+| ComputeBudget ×2 + open_short with normalisation (first open) | 20 | 112759 | 1033 | 2 + ≤ 15 (§6.2 Raydium `open_short` max) |
 | ComputeBudget ×2 + close_short with normalisation | 14 | 76349 | 935 | 2 + ≤ 11 (§6.2 Raydium exit max) |
-| ComputeBudget ×2 + [front-run swap, open_short with normalisation, back-run swap] | 26 | 144367 | 1269 (> 1,232: v0 + ALT or v1) | no row (atomic sandwich bundle, §8.2) |
-| ComputeBudget ×2 + four opens of one wallet (the most that fit: 2 + 15 + 3·14) | 59 | 401227 | 1366 (> 1,232: v0 + ALT or v1) | no row |
+| ComputeBudget ×2 + [front-run swap, open_short with normalisation, back-run swap] | 26 | 145867 | 1269 (> 1,232: v0 + ALT or v1) | no row (atomic sandwich bundle, §8.2) |
+| ComputeBudget ×2 + four opens of one wallet (the most that fit: 2 + 15 + 3·14) | 59 | 411727 | 1366 (> 1,232: v0 + ALT or v1) | no row |
 | ComputeBudget ×2 + crank_price ×6, every crank starting a route chain | 20 | 146010 | 1394 (> 1,232: v0 + ALT or v1) | 2 + 2k = 14 (§6.2, k = 6) |
 | ComputeBudget ×2 + add_margin ×20 | 62 | 269280 | 942 | no row (3 per add_margin) |
 | ComputeBudget ×2 + crank_price + liquidate (keeper) | 13 | 119823 | 1012 | ≤ 2 + 2 + 19 = 23 (§6.2; 2 + 2 + 11 on Raydium) |

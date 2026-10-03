@@ -175,9 +175,9 @@ Duty 11 on a feed publishing every 55 s: 65 cranks in 3600 s → **1560 a day**,
 
 | markets | cadence | ticks | wall ms / tick (avg, max) | reads + sends / tick | simulations / tick | transactions / tick | batches (max) | every due market observed | a v1 batch of 6 sent (B / accounts / CU consumed / requested) |
 |---|---|---|---|---|---|---|---|---|---|
-| 50 | quiet (30 s) | 60 | 3.1, 31.2 | 6.5 | 0.3 | 0.30 | 9 | true | 1,360 / 35 / 147,750 / 162,525 |
-| 50 | all every second | 20 | 29.4, 33.2 | 15.1 | 9.0 | 9.00 | 9 | true | 1,360 / 35 / 147,726 / 162,499 |
-| 200 | quiet (30 s) | 60 | 12.8, 125.9 | 16.5 | 1.1 | 1.13 | 34 | true | 1,360 / 35 / 147,750 / 162,525 |
-| 200 | all every second | 10 | 116.1, 117.1 | 49.1 | 34.0 | 34.00 | 34 | true | 1,360 / 35 / 147,726 / 162,499 |
+| 50 | quiet (30 s) | 60 | 2.6, 23.3 | 6.5 | 0.3 | 0.30 | 9 | true | 1,360 / 35 / 147,750 / 162,525 |
+| 50 | all every second | 20 | 22.6, 27.9 | 15.1 | 9.0 | 9.00 | 9 | true | 1,360 / 35 / 147,726 / 162,499 |
+| 200 | quiet (30 s) | 60 | 10.4, 95.4 | 16.5 | 1.1 | 1.13 | 34 | true | 1,360 / 35 / 147,750 / 162,525 |
+| 200 | all every second | 10 | 87.9, 89.8 | 49.1 | 34.0 | 34.00 | 34 | true | 1,360 / 35 / 147,726 / 162,499 |
 
-Over JSON-RPC (derived, UNVERIFIED on a live RPC): the keeper awaits its backend calls one after another, so a tick lasts ≈ wall + calls × RTT. With every market due every second (calls and wall fitted on the 50- and 200-market runs), one instance keeps this many markets observed every second: 572 at 5 ms, 338 at 10 ms, 120 at 30 ms, 68 at 50 ms, 26 at 100 ms. Targeted coverage makes a small share of markets due in any second (quiet markets every 30 s), so the covered-market capacity is several times these; above them the keeper needs concurrent calls or more instances (each with its own markets).
+Over JSON-RPC (derived, UNVERIFIED on a live RPC): the keeper awaits its backend calls one after another, so a tick lasts ≈ wall + calls × RTT. With every market due every second (calls and wall fitted on the 50- and 200-market runs), one instance keeps this many markets observed every second: 624 at 5 ms, 355 at 10 ms, 122 at 30 ms, 68 at 50 ms, 26 at 100 ms. Targeted coverage makes a small share of markets due in any second (quiet markets every 30 s), so the covered-market capacity is several times these; above them the keeper needs concurrent calls or more instances (each with its own markets).

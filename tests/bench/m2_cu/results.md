@@ -4,10 +4,10 @@ Compute units of every M2 instruction (ARCH §9 M2) on short.win's **test-venue*
 
 | Instruction | Case | Mollusk CU | LiteSVM CU | Budget | Budget source | Trace | ARCH §6.2 (Raydium) |
 |---|---|---|---|---|---|---|---|
-| `open_short` | first open of a wallet, SPL Token base (position + exposure created) | 112475 | 112475 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) |
-| `open_short` | first open of a wallet, Token-2022 base | 109894 | 109894 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) |
-| `open_short` | second position of a wallet (exposure exists), SPL | 98156 | 98156 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 14 | 13 (≤ 15) |
-| `open_short` | with normalisation (trader and trader_wsol donated to), SPL | 115459 | 115459 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 18 | 13 (≤ 15) |
+| `open_short` | first open of a wallet, SPL Token base (position + exposure created) | 100475 | 100475 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) |
+| `open_short` | first open of a wallet, Token-2022 base | 105394 | 105394 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) |
+| `open_short` | second position of a wallet (exposure exists), SPL | 96656 | 96656 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 14 | 13 (≤ 15) |
+| `open_short` | with normalisation (trader and trader_wsol donated to), SPL | 110959 | 110959 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 18 | 13 (≤ 15) |
 | `close_short` | SPL Token base | 69554 | 69554 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) |
 | `close_short` | Token-2022 base | 71676 | 71676 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) |
 | `close_short` | with normalisation, SPL | 76049 | 76049 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 12 | 9 (≤ 11) |
