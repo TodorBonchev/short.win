@@ -192,7 +192,10 @@ the skeleton; batch 3's `DeniedAccount` fallback is in `keeper.rs` (keeper rest)
   Their pins (deploy slots, trimmed ELF hashes, sources) are in `tests/fixtures/README.md` and
   ARCH §1.1. M10 added the CPMM redeploy (`raydium_cpmm_2026_10`, slot 452,376,460), the
   mainnet Token-2022 (v11.0.0, `7ea94a02…`) and spl-memo v3 (`f520eaf0…`), and Squads v4
-  (slot 302,582,236, `d4866083…2fac`). `python3 scripts/dump-fixtures.py check --live` reports
+  (slot 302,582,236, `d4866083…2fac`), and the pump venues' 2026-10-02 redeploys
+  (`pump_programs_2026_10`: pump 452,654,932 `b0b777c6…`, PumpSwap 452,654,882 `01557035…`,
+  pump-fees 452,655,002 `f166c296…`; the `VenueGuard` baseline `VENUE_GUARD_SLOTS_2026_10_03`).
+  `python3 scripts/dump-fixtures.py check --live` reports
   a pinned program that has moved on mainnet.
 
 **The TEST-ONLY code is compiled out of the release ELF:**
@@ -381,20 +384,22 @@ bound is wrong or can be exceeded. Summary:
 | §1 | KI-01 … KI-15, KI-52, KI-53 | Economic residuals (O19): the 2 % exit bound and the held model, with the real-venue figures accepted on 2026-10-03 (AMM v4 +61.27, CPMM +37.33 / atomic extra +5.34, PumpSwap +10.20 SOL); no liquidation reserve; baskets; settlement push and deferral; degraded-mode S2→S1; the sale-wrapped open's notional (accepted); the run residual; gap risk; creator self-dealing; **M10-8C-1 (fixed)**; the **late-depositor shortfall** (accepted, with the deposit warning at 1 % / 1 SOL) |
 | §2 | KI-16 … KI-29 | Pool switches and third-party LP (O18; ECON §12.12 residuals 1–17), graduation delays |
 | §3 | KI-30 … KI-41 | Keeper coverage and budget (O17, OWNER-M7-*), transaction sizes |
-| §4 | KI-42 … KI-46, KI-54 … KI-63 | Trust: the venue guard window, halted venues, upgradeable venues and programs (with the pump venues' 2026-10-02 redeploy), admin powers; the **extras-denylist residuals** (batch 3); the **CPMM creator-fee share**; the Squads source; the **Squads semantics** |
+| §4 | KI-42 … KI-46, KI-54 … KI-64 | Trust: the venue guard window, halted venues, upgradeable venues and programs (with the pump venues' 2026-10-02 redeploy), admin powers; the **extras-denylist residuals** (batch 3); the **CPMM creator-fee share**; the Squads source; the **Squads semantics** |
 | §5 | KI-47 … KI-51 | Platform facts relied on (U16's 40 M limit, U17, U25, U29, log events) |
-| §6 | — | M10 findings: M10-8C-1, B2-2, the extras denylist, the 24 h fuzz findings, FUZZ-M10-1, the WP-1 / WP-10 doc findings, GC-F1 |
+| §6 | — | M10 findings: M10-8C-1, B2-2, the extras denylist, PUMP-2026-10-1 … -3 (the pump venues' redeploy), the 24 h fuzz findings, FUZZ-M10-1, the WP-1 / WP-10 doc findings, GC-F1 |
 
 **Status by owner decision** (SPEC §14, ARCH §10):
 - **Accepted by the owner:** the real-venue held sandwich (KI-01's and KI-02's figures,
-  2026-10-03), the late-depositor shortfall as designed (KI-53, 2026-10-03), the Squads layout
-  (KI-45, 2026-10-02), and the earlier rows marked accepted (KI-12, KI-22 … KI-24, KI-27,
-  KI-28's M6R-4, KI-29, KI-30, KI-35).
-- **Fixed:** M10-8C-1 (KI-52), the extras denylist hardening (batch 3), and the harness and doc
-  findings of the register's §6.
+  2026-10-03), the late-depositor shortfall as designed with the warning's 1 % / 1 SOL
+  thresholds (KI-53, 2026-10-03), B2-2 kept as built (KI-52, 2026-10-03), the extras-denylist
+  residuals (KI-54 … KI-57, 2026-10-03), the first-trade venue rent on short pump accounts
+  (KI-64, PUMP-2026-10-2, 2026-10-03), the Squads layout (KI-45, 2026-10-02), and the earlier
+  rows marked accepted (KI-12, KI-22 … KI-24, KI-27, KI-28's M6R-4, KI-29, KI-30, KI-35).
+- **Fixed:** M10-8C-1 (KI-52), the extras denylist hardening (batch 3), PUMP-2026-10-1 (batch 4:
+  PumpSwap's fee buckets are not payable SOL), and the harness and doc findings of the
+  register's §6.
 - **Open** (build default in force; §7): the rest of O19 (KI-03 … KI-11 are disclosed but not
-  signed off), O18 (§2), the M7 keeper items, the extras-denylist residuals (KI-54 … KI-57),
-  the deposit warning's thresholds and B2-2's confirmation.
+  signed off), O18 (§2) and the M7 keeper items.
 
 ---
 
@@ -409,15 +414,15 @@ only that code.
 shape, Q3 security contact, Q4 Squads layout and SQ-G8, Q5/Q6 defaults (2026-10-02);
 M10-8C-1, the release version, the keeper scope, calibration data, CI minutes (2026-10-02);
 O19's real-venue figures, the late-depositor warning, the extras denylist hardening, Squads
-signing (2026-10-03). All the program-affecting ones are built (batches 2 and 3).
+signing (2026-10-03, third round); B2-2 kept as built, the extras-denylist residuals KI-54 …
+KI-57 accepted, the deposit-warning thresholds (1 % / 1 SOL) confirmed, the `SECURITY.md` /
+`/security` policy defaults kept (2026-10-03, fourth round); PUMP-2026-10-1 fixed and
+PUMP-2026-10-2 disclosed after the pump venues' 2026-10-02 redeploys were re-dumped and
+revalidated (2026-10-03, fifth round). All the program-affecting ones are built (batches 2, 3
+and 4).
 
 | Item | Decision needed | Build default (in force) | Changes program code? |
 |---|---|---|---|
-| **Pump venues' redeploy** (ARCH §12 U30, [V21]; KI-44) | pump, PumpSwap and pump-fees were redeployed on 2026-10-02 (slots 452,654,932 / 452,654,882 / 452,655,002), after the M10 fixtures were dumped. Re-dump them as new fixture groups, re-run their suites, then freeze; or tag first and treat them under the venue-upgrade addendum (§12) | The fixtures and every test are on the pre-redeploy ELFs; on mainnet the latch refuses opens on those venues until they are revalidated | Not by itself; **program** only if the new binaries need an adapter change |
-| **Deposit-warning thresholds** (KI-53) | `UNPAID_RENT_WARN_BPS` 100 (1 % of the deposit's value at `P_ema`) and `UNPAID_RENT_WARN_LAMPORTS` 1 SOL (`apps/web/src/config/disclosures.ts`); or a receivable-aware share price instead | The warning at 1 % / 1 SOL; no share-price change | Web only; the share-price alternative is **program** |
-| **Extras-denylist residuals** (KI-54 … KI-57) | Accept residuals (i)–(iv) of batch 3 | Accept and disclose | No; a different rule is **program** |
-| **B2-2** (KI-52) | Confirm the M10-8C-1 rule for settlements: past `min_rent_s` the top-up a settlement vests is about `rent_protocol_bps` of the rent, which goes to the lenders who stay | As built (batch 2) | No if confirmed; **program** otherwise |
-| **`SECURITY.md` / `/security` policy defaults** (Q3 fixed only the contact, policy URL and project URL) | Response times "best effort" (no number); no published encryption key ("ask for a channel"); no bounty before the beta; the safe-harbour wording; the keeper, indexer and API operated by short.win in scope for reports | As written in `SECURITY.md` and the web page | Web / docs only |
 | **O19** (the rest) | Sign off the disclosed residuals of known-issues §1 (KI-01, KI-03 … KI-11); the real-venue figures are already accepted | Accept and disclose; no liquidation reserve | No; the alternative (a rent-only liquidation reserve) is **program** |
 | **O18** with the SPEC §14 "Delegated, proposed" rows **10** (collateral and liquidation by tier), **13** (dynamic rent) and **18** (fee split) | Confirm the PROPOSED parameters and venue rules: ARCH §2.3.3, §10 O18; ECON §14 lists 32 PROPOSED rows | As built | No if accepted; **program** for any rule the owner rejects |
 | **O9** (ECON G37, U21) | The calibrated gap frequencies per tier and the pre-committed rule (if the 95 % upper bound of λ_up exceeds a tier's break-even, raise CR_open or rent, or cut caps), after ≥ 30 days of the public-RPC crawl | Uncalibrated Monte Carlo (ECON §11.6, illustrative); the crawl runs | Parameters through governance; **program** only if a value leaves its compiled bounds |
@@ -465,7 +470,7 @@ are historical: where they disagree with ARCH §12 or the code, ARCH §12 and th
 | U10 | Delegated `pool_vault` sell; direct delivery for Token-2022 CPMM | **VERIFIED** on the dumped ELFs, re-run on the 452,376,460 CPMM ELF | a mainnet example in M11 |
 | U12 | Raydium deployed binaries vs public source | **CPMM closed:** the redeploy is `raydium-cp-swap@bdeee23`, rebuilt byte for byte (the manifest's `source.status` text still says UNVERIFIED; ARCH §12 is normative). **AMM v4:** a behavioural match only | — |
 | U13, U14 | Raydium admin history; the `open_time` clamp deploy | Keeper monitor; a conservative constant | — |
-| U15, U30 | VQR drift; pump's announced upgrade | Third-party LP explains the drift. pump, PumpSwap and pump-fees **were redeployed on 2026-10-02**, after the fixtures; not yet re-dumped | Before the freeze or under the addendum (§7, §12) |
+| U15, U30 | VQR drift; pump's announced upgrade | Third-party LP explains the drift. The upgrade **was deployed on 2026-10-02** (the `pump-rust-client` 0.2.0 release; what its added `.text` does is UNVERIFIED, coverage is behavioural); re-dumped as `pump_programs_2026_10`, every pump suite and the T-LATCH replay re-run on it, the fee buckets read since batch 4 (PUMP-2026-10-1) | Closed for the freeze; a later pump upgrade goes through the addendum (§12) |
 | U16 | The per-writable-account limit | **Desk-checked:** 40 M CU on mainnet in Agave master and Firedancer (below); other clients not checked | monitoring |
 | U17 | CPI'd memo satisfies Token-2022 MemoTransfer | **VERIFIED on the mainnet build** (Token-2022 v11.0.0 `7ea94a02…`, spl-memo v3) | a mainnet transaction (M11, TMEMO-10) |
 | U18 | `declare_program!`, the lockfile resolution, solana-verify vs `anchor build` | **RESOLVED:** byte-identical for both programs (§0) | CI on this tree (§10) |
@@ -770,8 +775,9 @@ A finding may instead be acknowledged with a written rationale; it then becomes 
 **Venue-upgrade addendum.** The venues upgrade on their own schedule (KI-44); CPMM did so on
 2026-09-30 / 10-01. If a venue program changes between the tag and the end of the engagement:
 1. Re-dump it as a new fixture group, and confirm the drift with
-   `python3 scripts/dump-fixtures.py check --live`. This applies now to pump, PumpSwap and
-   pump-fees, redeployed on 2026-10-02 after the M10 fixtures (§7).
+   `python3 scripts/dump-fixtures.py check --live`. The pump venues' 2026-10-02 redeploys went
+   through these steps before the freeze (ARCH changelog 73: `pump_programs_2026_10`, the
+   T-LATCH replay, PUMP-2026-10-1 fixed in batch 4).
 2. Diff its interface and layouts against the previous dump.
 3. Re-run the fork suites, benches and fuzz profiles of that venue on the new ELF.
 4. If short.win's adapter has to change, the change is an addendum, with its own scope

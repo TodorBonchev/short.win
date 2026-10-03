@@ -634,6 +634,7 @@ them; the transparency they give is the point (SPEC §11's powers are visible as
 | pump curve | `CompleteEvent` | `emit_cpi!` of pump | mint, bonding_curve, user | → `venue_events` |
 | PumpSwap | `BuyEvent` / `SellEvent` | `emit_cpi!` of pAMM (`pAMM…`) | base/quote amounts, lp_fee, protocol_fee, pool, user, coin_creator, coin_creator_fee, pool reserves; *M10:* `virtual_quote_reserves` (the 2026-09 event tail, after the cashback / buyback fields, an i128) | base = token, quote = WSOL (canonical pools) |
 | PumpSwap | `CreatePoolEvent`, `DisableEvent`, … | `emit_cpi!` of pAMM | as declared | → `venue_events` |
+| pump curve, PumpSwap | ★`SweepBondingCurveFeeEvent` (pump), `SweepPoolFeeEvent` (pAMM): the only events the 2026-10-02 redeploys add | `emit_cpi!` | the curve or pool, mint, recipient, `amount`, `bucket` (`pump-rust-client` 0.2.0's IDLs; no recorded sweep yet, a unit test on the IDL layout and on each discriminator being in the dumped redeploy only) | → `venue_events` (a sweep moves the vault and the VQR oppositely: no reserve row) |
 | Raydium CPMM | `SwapEvent` (`40c6cde8260871e2`) | `emit!` "Program data:" **only while CPMM (`CPMMoo8…`) is on top** — CLMM and others emit an event with the same name and discriminator | pool_id, input/output vault before, input/output amounts, input/output mint, trade_fee, creator_fee, creator_fee_on_input | from the mints |
 | Raydium AMM v4 | `ray_log` | "Program log: ray_log: <base64 bincode>" while AMM v4 (`675k…`) is on top | `SwapBaseInLog` (log_type 3: amount_in, minimum_out, direction, user_source, pool_coin, pool_pc, out_amount) / `SwapBaseOutLog` (4: max_in, amount_out, direction, …, deduct_in) | `venue_pools.sol_is_first` (SOL is the coin side or not) |
 | mock | — | the TEST-ONLY venue emits nothing | — | — |
@@ -650,7 +651,13 @@ chain exactly:
 - PumpSwap: base = the base vault; quote = the quote vault + the event's `virtual_quote_reserves`,
   the effective quote reserves every buy and sell prices on. VQR is read from the event's tail and
   is 0 for an event that predates the field. No quote reserve is stored when the sum leaves
-  [0, u64::MAX].
+  [0, u64::MAX]. *M10 pump revalidation:* since the 2026-10-02 redeploy v2 `BuyEvent` /
+  `SellEvent` keep the v1 layout (`ix_name` "buy_v2" …) and carry the **pre-trade** VQR; their
+  fees stay in the vault as buckets and come off the VQR by the same amount, so `vault_before ±
+  quote_amount_*_lp_fee + VQR` is still the post-trade effective reserve exactly
+  (`pamm_it::buckets::v2_trades_keep_their_fees_in_the_pool_buckets`). The stored quote reserve is
+  the pricing reserve, not what a sale can be paid (that is `vault − buckets`, short.win's `R`
+  since PUMP-2026-10-1).
 - CPMM: `vault − (protocol + fund + creator counters)`. On the input side that is
   `*_vault_before + input_amount − ⌊trade_fee·protocol_fee_rate/10⁶⌋ − ⌊trade_fee·fund_fee_rate/10⁶⌋
   − creator_fee` (the creator fee only when charged on the input); on the output side

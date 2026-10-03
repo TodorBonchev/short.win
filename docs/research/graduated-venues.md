@@ -995,4 +995,67 @@ the fixtures and `VENUE_GUARD_SLOTS_2026_10_02`. What changed was not examined h
 the "September 30" negative-VQR change of G2 / H2 is **UNVERIFIED**); the repository's pump and
 PumpSwap tests still run the 2026-09 ELFs until the programs are dumped as new groups and
 re-validated, as M10 did for Raydium CPMM (`raydium-amm.md` §13).
+*Resolved by I4 below.*
+
+### I4. The 2026-10-02 redeploys, examined (M10 pump revalidation)
+
+**Method.** All three programs re-dumped from mainnet (`solana program dump`; group
+`pump_programs_2026_10`, trimmed ELFs pump `b0b777c6…0c75`, PumpSwap `01557035…3cc3`, pump-fees
+`f166c296…62fd`; the same upgrade authority `7gZufw…`) and compared with the 2026-09 dumps, with
+`pump-rust-client` 0.2.0's unreleased ELF artifacts (H2) and with the on-chain IDLs: the Anchor
+discriminators of every instruction, account and event of the PPD, 0.2.0 and on-chain IDLs searched
+in each ELF as `lddw` immediates and raw bytes; `.text` / `.rodata` sizes and bytes; every Anchor
+error origin (file, line, code) from the disassembly. **They are the 0.2.0 release:** the same
+discriminators, the same `.rodata` byte for byte and the same error sites as its artifacts, with
+`.text` 312 / 352 / 1,296 B longer (pump / PumpSwap / pump-fees): source lines added in pump
+`buy_v2.rs` and `lib.rs`, PumpSwap `swap/buy.rs`, `swap/sell.rs`, `swap/trade_v2.rs`, pump-fees
+`fee_sharing/*` (one more `NotEnoughRemainingAccounts` check; short.win calls none of it). Not the
+same build, and there is no public source: what the added code does is **UNVERIFIED**; coverage is
+behavioural.
+
+**Instructions, ELF to ELF (the 2026-09 build against the redeploy):** pump adds only `buy_v3`,
+`sell_v3`, `buy_exact_quote_in_v3`, `sweep_protocol_fee`, `sweep_creator_fee`; PumpSwap only
+`buy_v2`, `sell_v2`, `buy_exact_quote_in_v2`, `sweep_protocol_fee`, `sweep_creator_fee`; pump-fees
+none; nothing is removed. `set_quote_control_mint_reserves`, `set_quote_control_reserves_admin` and
+`QuoteControl.reserves_admin` are new only against the stale on-chain IDL (2026-09-12): the 2026-09
+pump ELF already dispatches both. The redeploy also adds pump errors `CashbackCoinNotSupported`
+("v3 trades do not support cashback coins"), `CreatorFeesNotSwept`, `FeeTiersEmpty` and
+`FeeConfigTooShort`. The only new events are pump `SweepBondingCurveFeeEvent` and PumpSwap
+`SweepPoolFeeEvent` (the indexer names them since M10 program batch 4). Every instruction short.win
+CPIs keeps its discriminator, account list, PDA seeds and arguments (`buy_v2` gains an optional
+trailing `partial_fill` byte short.win does not send).
+
+**Behaviour, verified on the dumped ELFs** (`pamm_it::buckets`, `pump_it::buckets`, `tests/fixtures/
+README.md`):
+- v2 PumpSwap trades pay the buyback slice in the trade and keep the rest of the protocol fee and
+  the creator fee in the quote vault, counted in `Pool.protocol_fees` @271 and `creator_fees` @279
+  (287-B pools) and taken off `virtual_quote_reserves`: **`VQR = boost − buckets`**, so the price
+  `vault + VQR` excludes them; a v2 trade costs or pays exactly the v1 quote. The v2 `BuyEvent`
+  keeps the v1 layout (`ix_name` "buy_v2") and carries the pre-trade VQR, so the indexer's
+  reconstruction stays exact.
+- **A v1 `sell` is paid from `vault − buckets`** (6063 `InsufficientRealQuoteReserves` above it; the
+  2026-09 build paid up to the vault). short.win's v1 `sell` / `buy` stay exact and leave the
+  buckets as they are. short.win read `R = min(vault, vault + VQR)` and the tier subtracted
+  `max(VQR, 0)`, overstating payable SOL by `min(buckets, boost)` (PUMP-2026-10-1): **fixed in M10
+  program batch 4** (`R = min(vault − buckets, vault + VQR)`, the tier's virtual part `max(VQR +
+  buckets, 0)`).
+- The permissionless sweeps pay a bucket to its recipient (a listed protocol-fee recipient, the coin
+  creator's vault authority) and add it back to the VQR: the price does not move.
+- Every trade grows a pool shorter than 287 B to 287 (271 before) and tops its rent up from `user`:
+  81,280 lamports more than before on any such pool, 386,080 from 211 B at minimum rent
+  (PUMP-2026-10-2: disclosed; ARCH §8.5).
+
+**Mainnet census.** At slots 452,964,412–452,964,638 no fixture pool or curve and none of the 1,873
+PumpSwap pools of 287 B carried a bucket, and 40 + 40 recent transactions held no v2 / v3 trade. A
+full census at slots 452,994,774–452,995,262 (`getProgramAccounts` by `dataSize` with a
+`dataSlice`, public RPC): the bucket mechanism is **live on venues short.win cannot list** — 904
+non-SOL-quote curves of 151 B, 627 of 141 B and 265 non-WSOL pools of 301 B hold non-zero buckets —
+and **absent on every SOL / WSOL venue**: 0 of 5,996,499 SOL-quoted 151-B curves, 0 SOL-quoted
+141-B curves, 0 of 165,688 WSOL 301-B pools, 0 of 48 WSOL 287-B pools. PUMP-2026-10-1 was therefore
+latent for listable venues, not hypothetical.
+
+**In the repository:** every curve and PumpSwap test, bench and fuzz profile runs the redeploys;
+T-LATCH replays the real loader upgrades from the 2026-09 builds with positions opened on them
+(`latch_pump_it` / `latch_pumpswap_it` `::the_2026_10_*`); `VENUE_GUARD_SLOTS_2026_10_03`;
+`check --live` clean at 452,966,546 and 453,037,762.
 

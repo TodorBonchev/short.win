@@ -901,6 +901,20 @@ the form, `blocked` → disable the action with the reason, `report` → show th
 (copyable). *v1.2 (M9-UX-1):* the refusal copy promises only what happens: "Review again with a
 new quote", "A new review adds that step" — never "Try again: the app adds it" for a re-simulation.
 
+*M10 batch 4 (PUMP-2026-10-2; disclosed, the owner's decision of 2026-10-03):* a plan may carry
+`refineError(e)`, which the flow applies to a failed simulation's mapped error — the message
+only; kind, code and action stay. The open plan sets it when the venue account its sale would
+grow is short (`venueGrowth`: a PumpSwap pool under 287 bytes, P0, or a curve under 141 bytes,
+C0, of the snapshot's ReadSet): since the pump venues' 2026-10-02 redeploys the first trade on
+such an account grows it and charges that trade the rent (81,280–386,080 lamports measured),
+which the program nets out of the proceeds, so an open whose tolerance cannot cover it fails
+`ProceedsBelowMin` though no price moved. short.win's `ProceedsBelowMin` there reads "This pool
+needs a first trade to grow its account: PumpSwap charges that trade the account’s rent, which
+this open’s slippage tolerance cannot cover at this size. Try again after another trade on the
+pool, or with a larger size." (the curve's names the bonding curve and pump;
+`VENUE_GROWTH_MESSAGES`). PumpSwap's own 6063 (`InsufficientRealQuoteReserves`, the same number)
+fails in pAMM and maps to `unknown`, untouched (`growth.test.tsx`).
+
 ### 5.10 Per-instruction parameters
 
 | Instruction | Arguments from the UI | Bounds |
@@ -1238,7 +1252,7 @@ mapping on real nested logs and `IntegrityError`, the oracle with no reading, th
 sentence shown once).
 
 *M10:* 59 files (the live-validator one skipped), 555 tests on the integrated tree before program
-batch 3, which adds 10 (565 passed, 1 skipped, on the final tree). New: `src/m10-fe15/parity.test.ts` (FE-15: the facade against the
+batch 3, which adds 10 (565 passed, 1 skipped, on the final tree); program batch 4 adds 5 (PUMP-2026-10-1: `readers.test.ts`, `state.test.ts`; PUMP-2026-10-2: `growth.test.tsx`, 3). New: `src/m10-fe15/parity.test.ts` (FE-15: the facade against the
 TypeScript ports it replaced, frozen in `legacy.ts` as the oracle — both sides of the spot/EMA edge
 included — and against the Rust crates' vectors and every dumped mint and pool), `config/securityTxt.test.ts`
 and `config/securityPolicy.test.ts` (SECTXT-4, the `/security` values), `errors.test.ts` with 6105;
@@ -1676,7 +1690,7 @@ edits `disclosures.ts` (copy changes need the owner) or `errors.ts`.
 | FE-24 | The deploy header check (`check:headers`) exists but no deployment pipeline runs it yet; the CDN must send `_headers`' header form. *M10:* it also checks `/.well-known/security.txt` (served as plain text, the production rules of §9.3) | open (M11 deployment) |
 | FE-25 | Homoglyph tickers ("USDС" with a Cyrillic С) survive normalisation by design; the defence is the mint next to every symbol and the duplicate-symbol marks — no confusable-skeleton detection | by design |
 | FE-26 | Retry rebuilds (M9-UX-1) cover deposit, withdraw, claim, cover deficit, sync, open and close; add margin (no quote bound) and create market close the review for a new one instead | by design |
-| FE-27 | The deposit's unpaid-rent warning (M10 batch 3, §3.6): thresholds `UNPAID_RENT_WARN_BPS` = 100 (1 % of the deposit's value at `P_ema`) and `UNPAID_RENT_WARN_LAMPORTS` = 1 SOL are proposed defaults for the owner to confirm. The preview uses the stored `util_kink_bps` (the prologue first syncs a pending kink change), and rent keeps accruing between the preview and the landing; the exposure is this deposit's shares' part at the pool's current size (it grows if others withdraw first, as the text says) | open (owner) |
+| FE-27 | The deposit's unpaid-rent warning (M10 batch 3, §3.6): thresholds `UNPAID_RENT_WARN_BPS` = 100 (1 % of the deposit's value at `P_ema`) and `UNPAID_RENT_WARN_LAMPORTS` = 1 SOL, confirmed by the owner on 2026-10-03. The preview uses the stored `util_kink_bps` (the prologue first syncs a pending kink change), and rent keeps accruing between the preview and the landing; the exposure is this deposit's shares' part at the pool's current size (it grows if others withdraw first, as the text says) | closed (owner, 2026-10-03) |
 | FE-28 | `lender.risks` (§4.2) lists the one-off income that vests but not "rent paid above what accrued, such as the minimum rent of an early exit", which vests since M10-8C-1 (ECON §9.4; the Claim form's note already says it). The copy lives in `disclosures.ts` and this document together (`disclosures.test.ts` pins them verbatim), so both change in one commit | open (copy) |
 | FE-29 | `/.well-known/security.txt`'s `Expires` (2027-09-30) must be rotated before 2027-08-31: a mainnet build and `check:headers` refuse 30 days or less ahead | open (operations) |
 
@@ -1694,6 +1708,8 @@ owner's of 2026-10-02 and 2026-10-03):
 | SQ-G8 | error 6105 `AuthoritiesNotDistinct` mapped (action `admin`) (§5.9) | `errors.test.ts` |
 | Late-depositor shortfall (owner, 2026-10-03; program batch 3 in the web only) | the deposit shows the pool's unpaid rent and this deposit's part of it; `lender.unpaidRent` (§3.6, §4.2, §11; FE-27) | `previews.test.ts`, `LendPanel.test.tsx`, E2E `lend-deposit` |
 | Extras denylist hardening (program batch 3) | a `DeniedAccount` set falls back to the next set like `BadExtras` / `BadRemainingAccounts`; error 6003's message names the new cases (§5.1) | `plans.test.ts` |
+| PUMP-2026-10-1 (program batch 4) | the PumpSwap reader and venue state read the pool's fee buckets (`protocol_fees` @271, `creator_fees` @279): `payableQuote = vault − buckets` (none above the vault: not executable), `r = min(payable, effective)`, `PoolView.virtualPart = max(VQR + buckets, 0)` for the tier inputs (§6.7, the program's `PoolVenue::virtual_part`) | `readers.test.ts`, `state.test.ts` |
+| PUMP-2026-10-2 (owner, 2026-10-03: disclose) | `TxPlan.refineError`; an open's `ProceedsBelowMin` on a pump account its first trade grows gets a specific message (§5.9) | `growth.test.tsx` |
 | Open items | FE-9 met; FE-15 closed; FE-18 partly closed (composite pump / PumpSwap bundle M11); FE-22 → M11; FE-24 → M11 deployment (now also security.txt); FE-21 and FE-23 still the owner's; new FE-27 … FE-29 (§13) | — |
 
 ### Review fixes (v1.1 → v1.2, the M9 security and UX review)

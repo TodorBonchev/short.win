@@ -1070,4 +1070,22 @@ On the `near` fixture (`tcand2.txt`, `tcand4.txt`):
   `VENUE_GUARD_SLOTS_2026_10_02`'s 449,734,335 / 446,462,733 / 446,465,969. Whether these are the
   K2 programs (K6's first open question) is **UNVERIFIED**: nothing was dumped or compared yet, and
   the repository's curve and PumpSwap tests still run the 2026-09 ELFs (`graduated-venues.md`,
-  Update 2026-10-03, I3).
+  Update 2026-10-03, I3). *Resolved below.*
+- **K6 resolved (M10 pump revalidation).** They are the `pump-rust-client` 0.2.0 release, not
+  byte-identical to its artifacts (the same discriminators, `.rodata` and error sites; `.text` +312
+  B on pump; `graduated-venues.md` I4 has the method and the full instruction diff). ELF to ELF,
+  pump adds only `buy_v3`, `sell_v3`, `buy_exact_quote_in_v3`, `sweep_protocol_fee` and
+  `sweep_creator_fee`; `set_quote_control_*` predate the redeploy (the 2026-09 ELF dispatches
+  them; they are new only against the on-chain IDL).
+- **Curves grow to 141 B** on their first v2/v3 trade since the redeploy (the layout through the
+  fee buckets `creator_fee` @125 and `protocol_fees` @133), which corrects U10's 125 for the new
+  build: 81,280 lamports from a 125-B curve at minimum rent, 132,080 from 115 B, taken from the
+  trader (PUMP-2026-10-2, disclosed; an open whose tolerance cannot cover it fails
+  `ProceedsBelowMin`).
+- **v3 trades** keep their fees in the curve's buckets (outside `rQ`), and v3 buys credit `n(q)`
+  without ε₁ (1 lamport below the v2 quote); after v3 trades the migrated pool is seeded at `Y_p`,
+  not `Y_p − 1`, never above, so `B̂_str` still covers the bundle but its 1-lamport margin can
+  vanish (PUMP-2026-10-3). `migrate_v2` moves `rQ` and leaves the buckets in the curve.
+  short.win's curve adapter reads `rQ` as the curve's real SOL, so the buckets need no change
+  there (`pump_it::buckets`).
+- Every curve test runs the redeploy (`pump_programs_2026_10`); T-LATCH replays the real upgrade.
