@@ -201,20 +201,35 @@ fn decide(
 /// short.win) with the prediction. `Err` describes a mismatch; `Ok` names the outcome for the
 /// summary.
 pub fn check(pred: &Prediction, res: &TxResult, code: Option<u32>) -> Result<String, String> {
-    let name = match pred.which {
+    let ctx = format!(
+        "prediction: {:?} (b_ref {:?}, max_in {:?}, q {}, rT {}, ema_warm {})\nstatus: {:?}",
+        pred.decision, pred.b_ref, pred.max_in, pred.q, pred.rt, pred.ema_warm, pred.status
+    );
+    check_outcome("curve", pred.which, &pred.decision, &ctx, res, code)
+}
+
+/// The comparison of [`check`] for any venue's decision-level prediction (the curve's, and
+/// since M10 PumpSwap's, [`crate::pswap_exit`]): an executing prediction must land with the
+/// event's `(b_live, b_ref, max_in)`, a refusal must be the predicted code; a venue refusal of
+/// a leg predicted to execute fails (I-E11 / I13), a compute-budget exhaustion does not (an
+/// anomaly). `venue` tags the outcome (`liquidate:<venue>-differential-…`); `ctx` describes the
+/// prediction for a mismatch.
+pub fn check_outcome(
+    venue: &str,
+    which: Which,
+    decision: &Result<Bound, E>,
+    ctx: &str,
+    res: &TxResult,
+    code: Option<u32>,
+) -> Result<String, String> {
+    let name = match which {
         Which::Liquidate => "liquidate",
         Which::Expire => "expire",
     };
-    let mismatch = |what: String| {
-        format!(
-            "{what}\nprediction: {:?} (b_ref {:?}, max_in {:?}, q {}, rT {}, ema_warm {})\nstatus: \
-             {:?}",
-            pred.decision, pred.b_ref, pred.max_in, pred.q, pred.rt, pred.ema_warm, pred.status
-        )
-    };
-    match (res, &pred.decision) {
+    let mismatch = |what: String| format!("{what}\n{ctx}");
+    match (res, decision) {
         (Ok(meta), Ok(want)) => {
-            let got = match pred.which {
+            let got = match which {
                 Which::Liquidate => events::of::<Liquidate>(meta).first().map(|e| Bound {
                     b_live: e.b_live,
                     b_ref: e.b_ref,
@@ -231,7 +246,7 @@ pub fn check(pred: &Prediction, res: &TxResult, code: Option<u32>) -> Result<Str
                     "{name} landed with (b_live, b_ref, max_in) {got:?}, predicted {want:?}"
                 )));
             }
-            Ok(format!("{name}:curve-differential-landed"))
+            Ok(format!("{name}:{venue}-differential-landed"))
         }
         (Ok(_), Err(e)) => Err(mismatch(format!(
             "{name} landed; predicted the refusal {e:?}"
@@ -249,7 +264,7 @@ pub fn check(pred: &Prediction, res: &TxResult, code: Option<u32>) -> Result<Str
             ))),
             // The compute budget ran out (`Ctx::send` records it as an anomaly): not a decision.
             None if compute_exhausted(res) => {
-                Ok(format!("{name}:curve-differential-compute-exhausted"))
+                Ok(format!("{name}:{venue}-differential-compute-exhausted"))
             }
             // Any other failure without a code (an account, funds or CPI error) refused the leg
             // the program chose to run: its `B̂_live` or `max_in` wrong for the venue (I-E11, I13).
@@ -269,7 +284,7 @@ pub fn check(pred: &Prediction, res: &TxResult, code: Option<u32>) -> Result<Str
                     code.map_or_else(|| "outside short.win".into(), crate::world::code_name)
                 )));
             }
-            Ok(format!("{name}:curve-differential-refused:{e:?}"))
+            Ok(format!("{name}:{venue}-differential-refused:{e:?}"))
         }
     }
 }

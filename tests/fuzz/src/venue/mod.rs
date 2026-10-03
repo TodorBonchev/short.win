@@ -44,9 +44,9 @@ pub trait Venue {
         None
     }
 
-    /// The Raydium market while its adopted pool is an AMM v4 pool (the AMM v4 differential exit
-    /// oracle, `raydium_v4_support`, runs on it; M10).
-    fn as_ray_v4(&self) -> Option<&RayMarket> {
+    /// The Raydium market on its adopted pool, AMM v4 or CPMM (`raydium_v4_support`'s
+    /// venue-generic differential exit oracle runs on it; M10).
+    fn as_ray(&self) -> Option<&RayMarket> {
         None
     }
 

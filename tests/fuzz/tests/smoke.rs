@@ -11,7 +11,7 @@
 use shortwin_fuzz::action::{Action, Kind, Profile, stream};
 use shortwin_fuzz::runner::{self, Crash, Opts};
 use shortwin_fuzz::stats::Stats;
-use shortwin_fuzz::world::{INJECT, INJECTED};
+use shortwin_fuzz::world::{CREDITED_SKEW, DEFICIT_BOUND_PPM, INJECT, INJECTED};
 
 fn env_num(name: &str, default: u64) -> u64 {
     std::env::var(name)
@@ -289,4 +289,106 @@ fn tmin_minimises_an_injected_failure() {
     );
     assert!(m.actions.len() < before);
     assert_eq!(m.actions.last().map(|a| a.kind), Some(Kind::Crank));
+}
+
+/// M10: the deficit tripwire and the wind-down's second claim pass on FUZZ-M7-24H-3's reproducer
+/// (a late depositor owing ≈ 1,044 SOL, its pro-rata share of a near-cap short's shortfall). The
+/// deficit sits at its bound — the late depositor's share of the shortfall the exit's events and
+/// the receivable show — within the dust, and the run fails the tripwire once the bound is scaled
+/// to 99 %: a debit 1 % above the lender's share would be caught; a receivable over-credited by
+/// 1 SOL fails its cross-check against the position's `credited_for`. The first pass's claim of the
+/// seeding lender finds `lender_sol` short until the late depositor covers; the second pass pays
+/// it, and nothing is left owed.
+#[test]
+fn deficit_tripwire_on_fuzz_m7_24h_3() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("corpus/fuzz-m7-24h-3-amm-v4-wind-down-deficit-unfunded.json");
+    let c = runner::read_crash(&path).expect("corpus file");
+    let o = runner::run(c.profile, c.seed, Some(&c.actions), 0, c.opts);
+    if let Some(f) = &o.failure {
+        panic!("{}\n{}", f.signature, f.message);
+    }
+    let d = o.stats.deficits;
+    let ev = |k: &str| o.stats.events.get(k).copied().unwrap_or(0);
+    println!(
+        "deficits {d:?}; second claims paid {}, nothing {}; unpaid {} lender_sol {}; events {:?}",
+        ev("wind-down-second-claim-paid"),
+        ev("wind-down-second-claim-nothing"),
+        o.stats.wind_down_unpaid_max,
+        o.stats.wind_down_lender_sol_max,
+        o.stats.events
+    );
+    assert!(d.largest > 1_000_000_000_000, "{d:?}");
+    let excess = i128::from(d.largest) - d.largest_bound as i128;
+    assert!(
+        excess <= shortwin_fuzz::shortfall::DEFICIT_DUST as i128,
+        "{d:?}"
+    );
+    assert!(d.tightest_ppm >= 990_000, "the bound is loose: {d:?}");
+    assert!(ev("shortfall-exits-short") > 0);
+    assert!(ev("wind-down-second-claim-paid") > 0);
+    assert!(o.stats.wind_down_unpaid_max <= shortwin_fuzz::world::CLAIM_DUST);
+
+    DEFICIT_BOUND_PPM.with(|c| c.set(990_000));
+    let o = runner::run(c.profile, c.seed, Some(&c.actions), 0, c.opts);
+    DEFICIT_BOUND_PPM.with(|c| c.set(1_000_000));
+    let f = o.failure.expect("the tripwire fires on a 99 % bound");
+    assert!(f.message.contains("deficit tripwire"), "{}", f.message);
+
+    // A receivable 1 SOL over its positions' credit would widen the bound with the deficit; the
+    // independent `credited_for` catches it at the exit.
+    CREDITED_SKEW.with(|c| c.set(1_000_000_000));
+    let o = runner::run(c.profile, c.seed, Some(&c.actions), 0, c.opts);
+    CREDITED_SKEW.with(|c| c.set(0));
+    let f = o.failure.expect("the credited cross-check fires");
+    assert!(f.message.contains("took"), "{}", f.message);
+}
+
+/// M10: `stale_receivable` (FUZZ-M7-24H-3's shape) reaches the deficit tripwire on both Raydium
+/// programs: a near-cap short left unattended for days, a late depositor of three times the
+/// pool, the price steered until `B̂_live` lies in `(V − R_due, V − K_s − ert]`, keeper seconds — a
+/// liquidation realises a shortfall (`shortfall-exits-short`), the wind-down covers the late
+/// depositor's deficit within its bound (each at ≥ 99.9 % of it: the bound is tight), and the
+/// second claim pass leaves nothing owed. PumpSwap reaches the window too, but rarely (a probe:
+/// its counts are printed, not asserted); on the mock and the curve it stays empty.
+#[test]
+fn stale_receivable_reaches_the_tripwire() {
+    for profile in [Profile::AmmV4, Profile::Cpmm, Profile::PumpSwap] {
+        let mut checked = 0;
+        for k in 0..2u32 {
+            let acts: Vec<Action> = [
+                format!("stale_receivable 0 {} {}", k * 7 + 2, k * 3002 + 2),
+                "keeper_seconds 0 5 0".into(),
+            ]
+            .iter()
+            .map(|a| a.parse().expect("action"))
+            .collect();
+            let o = runner::run(
+                profile,
+                SEED_BASE + 0x31 + u64::from(k),
+                Some(&acts),
+                0,
+                Opts::default(),
+            );
+            if let Some(f) = &o.failure {
+                panic!("{}: {}\n{}", profile.name(), f.signature, f.message);
+            }
+            let ev = |k: &str| o.stats.events.get(k).copied().unwrap_or(0);
+            let d = o.stats.deficits;
+            println!(
+                "{} +{k}: deficits {d:?}, in window {}, shortfall exits {}, unpaid {}",
+                profile.name(),
+                ev("stale-receivable-in-window"),
+                ev("shortfall-exits-short"),
+                o.stats.wind_down_unpaid_max
+            );
+            assert!(d.checked == 0 || d.tightest_ppm >= 999_000, "{d:?}");
+            checked += d.checked;
+        }
+        assert!(
+            !FULL || checked > 0 || profile == Profile::PumpSwap,
+            "{}: no deficit reached",
+            profile.name()
+        );
+    }
 }

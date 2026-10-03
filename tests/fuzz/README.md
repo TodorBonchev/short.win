@@ -13,7 +13,8 @@ scripts/build-test-venue.sh                                  # target/test-venue
 cargo run -p shortwin-fuzz --release -- run --profile all --duration 1h --jobs 8 --out fuzz-out --minimize
 cargo run -p shortwin-fuzz --release -- replay fuzz-out/crash-<profile>-<seed>-<sig>.json
 cargo run -p shortwin-fuzz --release -- tmin   fuzz-out/crash-<profile>-<seed>-<sig>.json
-cargo run -p shortwin-fuzz --release -- one --profile curve --seed 42 --actions 400   # one run, full summary
+cargo run -p shortwin-fuzz --release -- one --profile curve --seed 42 --actions 400   # `run --actions 400`'s run of that seed, full summary
+cargo run -p shortwin-fuzz --release -- one --profile curve --seed 42 --length 280    # exactly 280 actions
 cargo test -p shortwin-fuzz --release                                                  # smoke, corpus replays, self-tests
 ```
 
@@ -23,7 +24,12 @@ The program paths are the harness's (`SHORTWIN_SO`, `SHORTWIN_TEST_VENUE_SO`, `M
 (CI does the same). `run` without `--duration` does one run; `--runs N` caps the count; each job
 (`--jobs`, default: every core) owns one seed stream (`seed + job + k·jobs`); a run's length varies
 with its seed from a quarter of `--actions` to all of it (so the wind-down's liveness check meets
-states at every depth); the exit status is 1 if any run failed. `run` prints progress every
+states at every depth: `runner::run_length`, `--actions/4 + splitmix64(seed ^ 0x1e57) % (3·--actions/4
++ 1)`); since M10 `one` derives the same length from its own `--actions` (default 300, as `run`), so
+`one --profile P --seed S --actions N` replays exactly the run `run --actions N` made of seed `S`
+(`--length N` runs exactly `N` actions instead), and an anomaly's `first` cursor reads `profile seed
+#i/n \`action\`` (or `… wind-down after n actions`) with the run's length `n`; the exit status is 1
+if any run failed. `run` prints progress every
 minute and a summary (also `OUT/summary.json`).
 
 ## Why not Crucible
@@ -71,7 +77,7 @@ each replayed repeatedly.
 | `mock` | test-venue | one mock market (SPL or Token-2022, 0.05–1 % fee, thin / default / deep pool) with the mock's knobs: halt, fee, layout change, over-delivery, interface change |
 | `mixed` | test-venue | two mock markets (SPL and Token-2022): global pauses, venue bits and config changes hit both |
 | `curve` | release | the pump fork: `fresh` taken to 0–95 % by a real `buy_v2`, `legacy115`, `t22_115`, `near`; completion, real `migrate_v2`, the `→ PumpSwap` transition, then the PumpSwap venue on the new pool |
-| `pumpswap` | release | the PumpSwap fork: `fresh` (boost running), `mature` (third-party LP), `cashback`, `legacy261`; a third-party LP |
+| `pumpswap` | release | the PumpSwap fork: `fresh` (boost running), `mature` (third-party LP), `cashback`, `legacy261`; a third-party LP; since M10's fuzz follow-ups `fee_shock` (weight 3) and `open_near_cap` (6) three times as dense as elsewhere — M7-SEC-5's tier-boundary shape |
 | `amm-v4` | release | Fartcoin's AMM v4 pool; planted AMM v4 / CPMM candidates of the token |
 | `cpmm` | release | USELESS, the Token-2022 pool or the creator-fee pool; an LP provider (the program's own `deposit` / `withdraw`); planted candidates |
 
@@ -80,7 +86,7 @@ each replayed repeatedly.
 | group | actions |
 |---|---|
 | trading | `open` (log-uniform from just below 0.1 SOL of notional to just above `min(X/20, T)`; one in 32 with `min_proceeds = u64::MAX`, `max_margin = 0` or `max_open_fee = 0`), `open_near_cap` (the largest `q` accepted, by bisection on clones from 5 % above the minimum notional — since M10; from `X/10⁵` it started below it on every fork pool and was skipped —; the refusal one unit above is counted), `close` (one in 32 with `max_buyback_cost = 1`), `add_margin`; on the mock, opens and closes pick an extras selection (`none` / `current` / `previous` / `stable`) |
-| lenders | `deposit` (one in 101 of zero tokens), `withdraw` (a fraction, all shares, or exactly the pro-rata allowance), `claim_sol` ×1–4 **in one transaction** (M10), `cover_deficit`, `sync_lender`, `sweep_trader`, `dust_sweeps` (1 lamport to the trader and a sweep every minute), `lenders_out` (all out, optionally a dust holder stays, then a sweep), `jit_deposit` (`[deposit, exit, withdraw]`; since M10 the exit a liquidation or an expiry that lands, else a `sol_settle` that settles — with `b` odd after arming the settlement clock and up to 30 s, with `b` even at the position's deadline — and the withdrawal the minted shares within the allowance after the exit), ★`withdraw_then_settle` (M10, C0-9: `[withdraw, sol_settle]` in one transaction) |
+| lenders | `deposit` (one in 101 of zero tokens), `withdraw` (a fraction, all shares, or exactly the pro-rata allowance), `claim_sol` ×1–4 **in one transaction** (M10), `cover_deficit`, `sync_lender`, `sweep_trader`, `dust_sweeps` (1 lamport to the trader and a sweep every minute), `lenders_out` (all out, optionally a dust holder stays, then a sweep), `jit_deposit` (`[deposit, exit, withdraw]`; since M10 the exit a liquidation or an expiry that lands, else a `sol_settle` that settles — with `b` odd after arming the settlement clock and up to 30 s, with `b` even at the position's deadline — and the withdrawal the minted shares within the allowance after the exit), ★`withdraw_then_settle` (M10, C0-9: `[withdraw, sol_settle]` in one transaction), ★`stale_receivable` (M10's fuzz follow-ups, FUZZ-M7-24H-3's shape: a position — opened near the cap if none is — left without a keeper for 1–3 days, one crank, a late lender depositing 1–3× the pool's token claims, then — with `b` even — the price steered in cranked steps until the position's `B̂_live` lies in `(V − R_due, V − K_s − ert]`, the only window where a liquidation pays less rent than it was credited (`rent = min(R_due, V − B)` while the buyback is allowed), and 10–59 keeper seconds: the late depositor is debited its share, the deficit the wind-down covers and the tripwire bounds; it reaches deficits on AMM v4 and CPMM, where `R_due` can exceed `K_s + ert`, and — rarely — on PumpSwap (a 5-minute pumpswap run: the window 3 times, 4 short exits, 1 deficit checked); on the mock and the curve the window stays empty) |
 | keeper and time | `keeper_seconds` (crank every market, then liquidate / expire / sol_settle every position, each second), `crank`, `keeper_exit`, `silence` (41–940 s without observation — past `COVERAGE_GAP_S`, 40 s since the owner's decision of 2026-10-01 (OWNER-M7-12; was 31–930 s against 30 s): `CoverageGap`; with the role installed, two in three are **degraded mode** (O17): the keeper's `set_coverage_pause(true)` on every market, cleared 1–8 actions later), `warp` (1 s – 3 d), `warp_to_deadline` (±, or past the S3 tail), `outage` (venue halted, fee above the hard cap, or halted and flagged, 130 s – 2 h with the keeper settling: the no-route chain, S3, T-S3-BROKEN) |
 | prices and liquidity | `trade`, `shock` (×/÷ 1.05–10, held), `ramp`, `liquidity` (add / remove), `lp_wrapped_crank` (`[withdraw, crank, deposit]` and `[deposit, crank, withdraw]`), `deposit_wrapped_open`, `withdraw_wrapped_exit` |
 | atomic bundles (ECON §12) | `pump_crank_dump` (`[push, crank, unwind]` 1–20 s in a row), `contrary_low` (a contrary low observation every second, with or without the keeper's, then `sol_settle`), `attacker_seconds` (1–6 attacker-only seconds up / down / flip before a settlement), `push_then_freeze`, `sandwich_exit` (`[front, close / liquidate / expire / sol_settle, back]`), `held_sandwich`, `dump_around_settle` (a dump or an LP deposit around `sol_settle`) |
@@ -109,10 +115,12 @@ each replayed repeatedly.
   opens pause, the market's or venue's route-broken flag, a disabled venue bit, the upgrade latch or a
   non-executable venue (the harness's view) holds just before it; an exit or top-up refused with an
   open-only code (paused, flagged, latched, disabled, caps, notional, oracle, listing window).
-- **Differential exits (mock, and since M10 AMM v4)**: every keeper `liquidate` / `expire` on an
-  undisturbed mock market goes through `tests/litesvm/tests/liquidate_support.rs`'s oracle, and on a
-  market whose adopted pool is an AMM v4 pool through `tests/litesvm/tests/raydium_v4_support.rs`'s
-  (both included with `#[path]`): the decision — including `ExitBoundNotMet` against
+- **Differential exits (mock, and since M10 AMM v4 and CPMM)**: every keeper `liquidate` / `expire`
+  on an undisturbed mock market goes through `tests/litesvm/tests/liquidate_support.rs`'s oracle, and
+  on a market whose adopted pool is an AMM v4 pool — or, since M10's fuzz follow-ups, a CPMM pool (the
+  oracle is venue-generic: CPMM's fees per direction and creator-fee side, U11's exact out; held to
+  the dumped ELF by `tests/litesvm/tests/raydium_cpmm_exits_it.rs`) — through
+  `tests/litesvm/tests/raydium_v4_support.rs`'s (both included with `#[path]`): the decision — including `ExitBoundNotMet` against
   `⌊B̂_ref·(10⁴ + δ)/10⁴⌋`, so I11's liveness clause (I-E11) — and every lamport and token of the
   waterfall recomputed from `shortwin-math` on the pre-state.
 - **Differential exits (the curve, M10)**: every keeper `liquidate` / `expire` on a market still on
@@ -125,6 +133,13 @@ each replayed repeatedly.
   with the predicted code: no `ExitBoundNotMet` once `B̂_live ≤ max_in` (I-E11), and no failure of
   pump's buyback leg when the exit was predicted to execute (only a compute-budget exhaustion is
   exempt, and it is an anomaly). The waterfall's amounts there are the hooks' (I9, I11, I12).
+- **Differential exits (PumpSwap, M10's fuzz follow-ups; decision level)**: every keeper `liquidate` /
+  `expire` on a PumpSwap market is decided first by `raydium_v4_support`'s venue-generic predictor on a
+  view built from the hooks' PumpSwap venue view (pricing reserves `(base vault, quote vault + VQR)`,
+  `Pricing::PumpSwap` at the live tier) with the reference liquidity capped at the burned-LP depth `D`
+  itself (`λ_min` = `PUMPSWAP_LOCK_MIN_BPS`, M6R-1), after a same-second crank on a clone
+  (`src/pswap_exit.rs`), and must land with the predicted `b_live`, `b_ref`, `max_in` or be refused
+  with the predicted code, as on the curve. The lamports are the hooks'.
 - **I14 omissions and replacements**: an instruction with a remaining account omitted or replaced by a
   fresh key must fail (the hooks check nothing changed); since M10 an accepted replacement fails the
   run as an accepted omission does (before, an anomaly for review: no run ever reported one).
@@ -140,6 +155,32 @@ each replayed repeatedly.
   that rolls the share epoch is not checked, `jit-unchecked:epoch-rolled`).
   `[withdraw, sol_settle]` (C0-9): the withdrawal stays within the pro-rata allowance the lender had
   before the bundle, and the bundle never returns an open-only or mint-filter code.
+- **The deficit tripwire (M10's fuzz follow-ups; ECON §9.4)**: before a lender covers a negative SOL
+  balance (`cover_negative`, which since FUZZ-M7-24H-3 funds a deficit of any size), the deficit must
+  be at most its **pro-rata share of the shortfall the landed exits realised** plus `DEFICIT_DUST`
+  (0.001 SOL) — a bound kept from the exits' events and the observed receivable, not from the pool
+  accounting that computed the deficit (`src/shortfall.rs`): for each landed transaction with exits on
+  a market, `credited` = the receivable the transaction started from minus the receivable after it —
+  stored, when the market had accrued in that second (after the keeper's crank: the transaction
+  accrues nothing more), else after a same-second crank on a clone of the pre-state; each exit's lender part from its event (`Close.rent − rent_protocol`;
+  `Liquidate` / `Expire` `rent` less the position's locked `rent_protocol_bps` read before it (a
+  position it does not list: all protocol, the lender part 0); a settlement's
+  principal `lender_amount − min(lump, lender_amount)`); each lender's `shares/S` at the exit walked
+  from the pre-state through the transaction's `Deposit` / `Withdraw` events (a lender behind the
+  share epoch counts every share). A lender's bound is the sum of its charges **since its balance was
+  last seen not negative** (a touch on each exit transaction's pre-state restarts it: a deficit
+  grows only by debits, so the earlier ones bound nothing left); the run's cumulative sum is kept
+  beside it. A deficit of a lender behind the share epoch (parked on a full-wipe record) is read
+  through the records and checked like any other. `credited` is the program's own receivable, so
+  it is **cross-checked** on every transaction whose exits' positions the pre-state lists: it must
+  equal the positions' `rent::credited_for` on their pre-state terms at the basis after the
+  transaction, each clamped by what is left of the receivable (`shortfall-credited-checked`, else
+  `shortfall-credited-unchecked`); a program over-crediting the receivable cannot widen the bound
+  with the deficit. `summary.json`'s `wind_down_deficits` records the deficits checked, the
+  largest with its bound and its cumulative bound, and the largest and smallest deficit/bound. On
+  FUZZ-M7-24H-3's reproducer the 1,044.467-SOL deficit is 99.9998 % of its bound; scaled to 99 %
+  the run fails, and so does a receivable over-credited by 1 SOL
+  (`smoke::deficit_tripwire_on_fuzz_m7_24h_3`).
 - **`add_margin`** is never refused (ARCH §3.5).
 - **I4's coverage clause (O17)**: every `set_coverage_pause` that lands changes nothing on the whole VM
   (every account short.win, the token programs, the venues and the System program own, lamports
@@ -169,6 +210,15 @@ each replayed repeatedly.
   lender up to the deficit when its 1,000 SOL of funding falls short: `wind-down-deficit-funded`,
   FUZZ-M7-24H-3) and takes every lender out at its allowance; the market must end with no position,
   no receivable, no rent aggregate and nothing borrowed, and the hooks' dust bound holds throughout.
+  Since M10's fuzz follow-ups a **second claim pass** follows (every lender claims again, past the
+  latest vest end and a crank): `lenders_out` takes the lenders out one by one, so a lender's claim can
+  find `lender_sol` short until a later lender covers its deficit (FUZZ-M7-24H-3's seeding lender);
+  after it no lender may be owed more than `CLAIM_DUST` (1,000 lamports) and `lender_sol` must be
+  within the hooks' liveness dust cap (0.01 SOL); `summary.json`'s `wind_down_claims` records both
+  maxima. Every lender counts: one parked on a live full-wipe record stays behind the share epoch
+  after any `sync_lender` (V2-12), so its balance is read through the record
+  (`wind-down-claim-parked`), and a lender that cannot be touched while it holds shares or a
+  balance fails the run.
   The keeper never migrates a completed curve in the wind-down: the S3 path must settle a market left
   `PumpMigrating`. A live curve whose real token reserves cannot buy a position back (`Q > rT`: its
   close refuses `CurveStraddle`) is completed first — the straddle's first step (ARCH §5.4), which
@@ -192,7 +242,12 @@ refusals; since M10 the I14 refusals by instruction and code (`i14-omit-refused:
 `i14-replace-refused:…`), the lender oracles' reach (`claim-bundle-landed`, `jit-capture-checked`,
 `jit-capture-checked:settle`, `jit-settle-clock:<settles|none>`, `jit-unchecked:<why>`,
 `jit-old-shape:<why>`, `withdraw-then-settle-landed`) and
-`donate-trader-base-ata`), and prints **coverage proxies**: short.win instructions that landed (of 30), events emitted, and
+`donate-trader-base-ata`; since M10's fuzz follow-ups `…:cpmm-differential-…`, `…:pswap-differential-…`,
+the shortfall ledger's `shortfall-exits-measured` / `shortfall-exits-short` / `shortfall-unmeasured`
+and `shortfall-credited-checked` / `-unchecked`,
+`stale-receivable-in-window`,
+`wind-down-deficit-covered` / `-funded`, `wind-down-second-claim-paid` / `-nothing`,
+`wind-down-claim-parked`), and prints **coverage proxies**: short.win instructions that landed (of 30), events emitted, and
 short.win error codes returned (of the codes `errors.rs` declares), with the codes never returned —
 a branch proxy (`summary.json`'s `coverage`). sBPF PC coverage is not measured (LiteSVM 0.16's
 `register-tracing` would add it without a second runtime; it changes the shared feature set).
@@ -202,9 +257,9 @@ Not fuzzed: `create_market` and `initialize_config` (setup only), AMM v4 third-p
 slot, extras sets, venue-state layout changes and over-delivery on the real venues (the dumped ELFs
 cannot over-deliver; a stub ELF was not built, M10 G-E7 N/A). Not checked by an oracle (the hooks
 still run): the waterfall amounts of curve exits beyond the hooks (the curve's differential oracle
-predicts the decision and the bound, not every lamport), keeper exits on CPMM and PumpSwap markets
-(no differential exit oracle there: the CPMM fixture is being re-dumped, WP-2; PumpSwap has none
-in `tests/litesvm` to reuse), sandwich and bundle exits (only the keeper's own exits go through the
+predicts the decision and the bound, not every lamport), the waterfall amounts of PumpSwap exits
+beyond the hooks (its oracle is decision level: no support module recomputes PumpSwap's creator
+vault, cashback and fee recipients), sandwich and bundle exits (only the keeper's own exits go through the
 differential oracles), the JIT capture around a settlement that rolls the share epoch, and any
 economic outcome of the ECON §12 bundles (attacker P&L, lenders whole, deferral seconds), which
 are `tests/litesvm`'s attack suites.
@@ -223,8 +278,10 @@ that class.
 | FUZZ-M7D-1 | `corpus/fuzz-m7d-1-curve-straddle-wind-down.json` (3 actions) | the liveness oracle on a fresh curve: two `shock`s buying 98 % of `rT` around an open left `Q > rT`, so `close_short`, `liquidate` and `expire` refused `CurveStraddle`; the wind-down's price restore (one push, at most 50×) did not bring `rT` back above `Q` and its keeper never completed the curve, so the position stayed open (found by the M7D fixes' 10-minute smoke, seed 1790845047; the harness's gap, not the program's) | **resolved in the fuzzer, no program change**: the wind-down completes such a curve (the straddle's first step, ARCH §5.4) and leaves it `PumpMigrating`, as every completed curve, for the S3 path to settle (`SolSettle(S3)`); the liveness oracle is unchanged; the reproducer passes |
 | FUZZ-M7-24H-1 | `corpus/fuzz-m7-24h-1-pumpswap-wrapped-open-tier.json` (152 actions) | I19 on a PumpSwap `wrapped_open` (`[ComputeBudget, sale within open_ema_dev_bps, open_short]`, the market ≈ 4 d after its listing: B iff `Λ ≥ θ_B`): the open landed at Tier B and the hook recomputed C — its tier inputs read the WSOL quote vault and the pool's VQR from the VM **after** the open's instruction, so after the open's own sale had drained 1.65 SOL from the vault, while the program (`engine::tier::inputs`, `r_now = state.r`) and ARCH §3.4 step 5 / §4.7 tier on the venue before the trade; with `R_now` binding `R_eff` (the wrapped sale had moved the spot below `P_ema`) the pre-sale Λ 543.52 SOL reached θ_B (541.58 SOL at `price − conf`, M7-SEC-7) and the post-sale 540.22 SOL did not (the first 24-hour run, profile `all`, seed base 20261001; the harness's mistake, not the program's) | **resolved in the harness, no program change**: the PumpSwap view carries the tier's `R_now` and `max(VQR, 0)` (`VenueView::pump_tier`) and I19 — as I15's burned-LP tier bound (`pool_select::pumpswap_open_sized_on_burned_depth`, the same post-instruction VQR read; latent: a swap leaves VQR unchanged) — takes them from the snapshot before the instruction; the other open-term inputs (caps on the pre-trade view, `N_open` and `B̂_ema` on the post-sale venue, as the program) and the other hooks were audited for the same mistake on every venue; a fork regression (`tier_transition_it::pump::pumpswap_open_tiers_before_its_own_sale`: `R_now` binding, the oracle at exactly `p*_B`, fails on the unfixed hook); the reproducer passes |
 | FUZZ-M7-24H-2 | `corpus/fuzz-m7-24h-2-mixed-mint-to-duplicate.json` (2 actions), `corpus/fuzz-m7-24h-2-mock-sync-native-duplicate.json` (4 actions) | LiteSVM refused a harness helper's transaction as `AlreadyProcessed` (found by the 24 h run at eb82a2a): the helpers that send around `Env::send` — the litesvm-token builders (`tokens::mint_to`, `SyncNative` in `mock::wrap`), the airdrops — did not expire the blockhash, and their transactions are functions of their arguments (a `SyncNative` carries no amount), so two `donate`s topping up the pool vault by the same amount in a row sent the same `MintTo` twice, and a `wrap` repeated after `wrapped_open` restored the VM from a clone taken just after one sent the same `SyncNative` under the same blockhash (the harness's gap, not the program's: no program ran) | **resolved in the harness, no program change**: every such helper sends through `env::send_direct`, which expires the blockhash afterwards as `Env::send` does (`tokens.rs`, `mock::wrap`, `fork::{wrap, fund_wsol, fund_token}`, `Env::fund`); `Env::send` panics on `AlreadyProcessed`, so a duplicate can never pass as a refusal an oracle counts (an I14 omission, a gated open); no invariant changed; the reproducers pass; a harness test (`it` `harness::identical_helper_calls_in_a_row_are_not_duplicates`) |
-| FUZZ-M7-24H-3 | `corpus/fuzz-m7-24h-3-amm-v4-wind-down-deficit-unfunded.json` (12 actions; an anomaly) | `wind-down-withdraw-refused` (`NegativePending`, 6082) in 1 of 84,049 wind-downs of the second 24 h run at eb82a2a (amm-v4 seed 20333958; `one --profile amm-v4 --seed 20333958 --actions 280` replays it — `run` draws the length `400/4 + splitmix64(seed ^ 0x1e57) % 301` per seed): a near-cap short accrued ≈ 3,640 SOL of rent receivable to the seeding lender, a second lender's deposit then took ≈ 59 % of the shares, and the position exited in the wind-down paying less than it was credited — the true-up debits the shortfall pro-rata to the current shares (ECON §9.4, disclosed), so the late depositor's `pending` was ≈ −1,044 SOL (−1,018 SOL in the full run). The wind-down's exact `cover_deficit` failed in its System transfer (insufficient funds: every lender is funded with 1,000 SOL), so the withdraw refused (the harness's gap, not the program's: the entitlement identity Σ pending = `lender_sol` held, within 261 lamports of dust) | **resolved in the harness, no program change**: `cover_negative` tops the lender up to the deficit plus 1 SOL before the cover (`wind-down-deficit-funded`); the cover lands and the withdraw lands in the same state; `corpus_replays` checks an anomaly-class regression; the reproducer passes |
+| FUZZ-M7-24H-3 | `corpus/fuzz-m7-24h-3-amm-v4-wind-down-deficit-unfunded.json` (12 actions; an anomaly) | `wind-down-withdraw-refused` (`NegativePending`, 6082) in 1 of 84,049 wind-downs of the second 24 h run at eb82a2a (amm-v4 seed 20333958; `one --profile amm-v4 --seed 20333958 --actions 400` replays it — `run` draws the length `400/4 + splitmix64(seed ^ 0x1e57) % 301` = 280 per seed, and since M10's fuzz follow-ups `one` derives it too; `--length 280` as well): a near-cap short accrued ≈ 3,640 SOL of rent receivable to the seeding lender, a second lender's deposit then took ≈ 59 % of the shares, and the position exited in the wind-down paying less than it was credited — the true-up debits the shortfall pro-rata to the current shares (ECON §9.4, disclosed), so the late depositor's `pending` was ≈ −1,044 SOL (−1,018 SOL in the full run). The wind-down's exact `cover_deficit` failed in its System transfer (insufficient funds: every lender is funded with 1,000 SOL), so the withdraw refused (the harness's gap, not the program's: the entitlement identity Σ pending = `lender_sol` held, within 261 lamports of dust) | **resolved in the harness, no program change**: `cover_negative` tops the lender up to the deficit plus 1 SOL before the cover (`wind-down-deficit-funded`); the cover lands and the withdraw lands in the same state; `corpus_replays` checks an anomaly-class regression; the reproducer passes |
 | FUZZ-M10-1 | `corpus/fuzz-m10-1-amm-v4-jit-lender-rent.json` (27 actions) | the new JIT capture oracle (R3B-2, M10) read +2,568,240 lamports for a JIT lender around a landed expiry on AMM v4: the lender's `LenderPosition` held no shares, the bundle's withdrawal emptied it and the program closed it, refunding its rent to the wallet, while the control (the expiry without the deposit) left the account open — the lender's own account rent, not SOL of the exit (found by WP-8d's 10-minute all-profile run; the harness's mistake, not the program's) | **resolved in the fuzzer, no program change**: the oracle's lender SOL counts the `LenderPosition`'s lamports (wallet + account + touched balance); the bound is unchanged; the reproducer passes |
+
+The M10 fuzz follow-ups add no finding (nor do their review fixes: every `credited` cross-check matched to the lamport). Their checks reproduce on the corpus. FUZZ-M7-24H-3's reproducer covers a 1,044.467-SOL deficit at 99.9998 % of the tripwire's bound, and the seeding lender's positive balance, short in the first pass, is paid by the second claim pass. In the 10-minute cpmm and amm-v4 runs, no CPMM or AMM v4 differential exit, no deficit and no second-pass claim disagreed with the program. PumpSwap's decision-level oracle ran only in the smoke (`smoke_pumpswap`), where it found no disagreement.
 
 ## Runs so far (M7, M10)
 
@@ -249,8 +306,41 @@ that class.
 | M10 WP-8d review fixes (the curve oracle fails a refused buyback), `--profile curve`, `--seed 20261021` | the reviewed tree | 602 s | 3 | 374 | 47,961 | 613,345 | 1,120,779 | 0 | 0 |
 | the same, `--profile pumpswap`, `--seed 20261022` | the reviewed tree | 602 s | 3 | 334 | 47,511 | 659,789 | 1,186,910 | 0 | 0 |
 | the same, `--profile all`, `--seed 20261023` | the reviewed tree | 602 s | 3 | 348 | 49,722 | 637,343 | 1,126,933 | 0 | 0 |
+| M10 fuzz follow-ups, `--profile cpmm`, `--seed 20261031` | the deficit tripwire, the second claim pass, `stale_receivable`, CPMM / PumpSwap exit oracles | 628 s | 3 | 245 | 34,477 | 376,737 | 722,843 | 0 | 0 |
+| the same, `--profile amm-v4`, `--seed 20261032` | the same | 604 s | 3 | 222 | 31,770 | 360,668 | 689,103 | 0 | 0 |
+| M10 fuzz follow-ups final, `--profile cpmm`, `--seed 20261041` | exit pre-states cloned only when unaccrued, PumpSwap's M7-SEC-5 shape denser | 611 s | 3 | 334 | 47,582 | 523,117 | 1,001,063 | 0 | 0 |
+| the same, `--profile amm-v4`, `--seed 20261042` | the same | 606 s | 3 | 343 | 49,618 | 554,578 | 1,048,735 | 0 | 0 |
+| M10 fuzz follow-ups review fixes, `--profile cpmm`, `--seed 20261041` | parked lenders in the claim liveness and the tripwire, bound restarts, the `credited` cross-check | 614 s | 3 | 345 | 49,327 | 546,459 | 1,043,562 | 0 | 0 |
+| the same, `--profile amm-v4`, `--seed 20261042` | the same | 608 s | 3 | 319 | 46,026 | 516,524 | 981,250 | 0 | 0 |
+| the same, `--profile pumpswap`, `--seed 20261053` (5 minutes) | the same | 302 s | 3 | 72 | 10,483 | 165,116 | 311,162 | 0 | 0 |
 
-≈ 4.20 h of wall clock (≈ 16.5 job-hours) in all, plus the M7 security review's runs (mutant builds)
+In the M10 fuzz follow-ups' final runs: on `cpmm`, 180 liquidations and 337 expiries landed through
+the CPMM differential oracle (every lamport; 25 / 31 more through AMM v4's on adopted candidates),
+1,803 exits fed the shortfall ledger (18 realised a shortfall; `stale_receivable` hit its window 14
+times), 4 deficits were checked against their bounds (the largest 2.104 SOL, the tightest at 99.98 %
+of its bound), the second claim pass paid 68 claims and left nothing owed (`lender_sol` at most
+5,731,356 lamports, within the 0.01-SOL cap); on `amm-v4`, 170 liquidations and 346 expiries through
+the AMM v4 oracle and 15 / 32 through CPMM's, 1,822 exits measured (36 short), 8 deficits checked (the
+largest 6.700 SOL, the tightest at 99.95 %), 69 second-pass claims paid, `lender_sol` at most 12,071
+lamports.
+
+After the review's fixes (same seeds): on `cpmm`, 195 / 344 CPMM differential exits, 1,862
+transactions' `credited` equal to their positions' `credited_for` (none unchecked), 19 short
+exits, 4 deficits within their bounds (the largest 2.104 SOL at 99.98 %, the smallest at 8.5 %),
+3 lenders parked on a full-wipe record read through it in the second claim pass (the 3 the
+first version skipped as `wind-down-claim-behind-epoch`), nothing owed after it; on `amm-v4`,
+159 / 316 through AMM v4's oracle and 15 / 32 through CPMM's, 1,702 `credited` cross-checks, 30
+short exits, 7 deficits (the largest 6.700 SOL at 37.5 % of its bound, the tightest at 99.92 %), 1
+parked lender; on `pumpswap`, 36 / 100 decision-level exits, 467 cross-checks, `stale_receivable` in
+its window 3 times, 4 short exits and 1 deficit (0.010 SOL at 8.9 % of its bound). In the `amm-v4` and
+`pumpswap` reruns (which count it; the `cpmm` rerun predates the counter) no short exit was charged
+at every share or with several exits in its transaction (`shortfall-short-every-share` /
+`-several-exits` 0), and the restarts left every largest bound at its cumulative value: where a
+deficit sits far below its bound, rent credited after the exit (the wind-down's warps accrue the
+other positions' rent) repaid part of it — the bound ignores later credits, so it is loose there by
+construction, not by a conservative charge.
+
+≈ 4.9 h of wall clock (≈ 18.5 job-hours) in all, plus the M7 security review's runs (mutant builds)
 and the mutation runs (below). In the fixes' run, 4,327 `wrapped_open` and 1,127 `coverage_bracket`
 actions: 832 wrapped opens landed with I19 recomputing their terms, 585 brackets refused at the clear delay.
 In the owner's-decisions run, 3,104 `emergency_clear` actions: 541 clears of a set flag and 780
@@ -270,7 +360,7 @@ oracle. Before I19, the first four survived 15 minutes of `mock,mixed` fuzzing (
 M5-SEC-3's revert 12 minutes of `curve` (1,118 runs); with it, every one of the seven is killed by
 its tests and by a 3-minute fuzz of its profile (2026-10-01, on the final tree: 10 / 10 / 10 / 133
 failures on `mock` for the margin, fee-cap, wallet and tier mutants, 27 for the clear delay, 16 on
-`curve`, 1 on `pumpswap`; the wallet mutant also fails `caps_boundary_it`'s M7-SEC-9 regression). **M10 (WP-8d):** on the new action stream the PumpSwap mutant (the caps at the live fee, M7-SEC-5) first survived its 3-minute fuzz — its kill had been a single failure, and `open_near_cap` was skipped on every fork pool —; with PumpSwap's tier-boundary fee shock and `open_near_cap` from the minimum notional all seven are killed again (2026-10-02, `MUTANTS_JOBS=3`, the script's default `MUTANTS_SEED` 20261001: 10 / 7 / 8 / 117 failures on `mock`, 32 for the clear delay, 16 on `curve`, 2 on `pumpswap`); again after the review's fixes: 10 / 7 / 8 / 113, 30, 13, 2).
+`curve`, 1 on `pumpswap`; the wallet mutant also fails `caps_boundary_it`'s M7-SEC-9 regression). **M10 (WP-8d):** on the new action stream the PumpSwap mutant (the caps at the live fee, M7-SEC-5) first survived its 3-minute fuzz — its kill had been a single failure, and `open_near_cap` was skipped on every fork pool —; with PumpSwap's tier-boundary fee shock and `open_near_cap` from the minimum notional all seven are killed again (2026-10-02, `MUTANTS_JOBS=3`, the script's default `MUTANTS_SEED` 20261001: 10 / 7 / 8 / 117 failures on `mock`, 32 for the clear delay, 16 on `curve`, 2 on `pumpswap`); again after the review's fixes: 10 / 7 / 8 / 113, 30, 13, 2). **M10 fuzz follow-ups:** the new action stream (`stale_receivable`) and the per-exit oracles on PumpSwap left the PumpSwap mutant alive again: its 3-minute fuzz reached 42 runs on a loaded machine, against WP-8d's 114, and WP-8d's kill had been 2 failures, both at seeds about 24 runs deep per job. PumpSwap's `fee_shock` and `open_near_cap` weights are now 3 and 6, three times as dense, and all seven are killed again (2026-10-02, `MUTANTS_JOBS=3`, seed 20261001: 10 / 5 / 9 / 110 failures on `mock`, 27 for the clear delay, 15 on `curve`, 5 on `pumpswap`).
 
 ## CI
 

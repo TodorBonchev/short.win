@@ -8,23 +8,27 @@
 //!   upgrade latch or a non-executable venue (the harness's own view) holds just before it; a
 //!   close, liquidation, expiry, settlement or top-up refused with an open-only gate code
 //!   (paused, route broken, latched, disabled, caps, oracle, warm-up);
-//! - **exits on the mock and AMM v4 (I9, I11, I12, I13, I-E11)**: every `liquidate` / `expire`
-//!   the keeper sends on an undisturbed mock market goes through `liquidate_support`'s
-//!   differential oracle, and (M10) on a market whose pool is an AMM v4 pool through
-//!   `raydium_v4_support`'s (the decision, including `ExitBoundNotMet` against
-//!   `⌊B̂_ref·(10⁴ + δ)/10⁴⌋`, and every lamport and token of the waterfall recomputed from
-//!   `shortwin-math` on the pre-state);
+//! - **exits on the mock, AMM v4 and CPMM (I9, I11, I12, I13, I-E11)**: every `liquidate` /
+//!   `expire` the keeper sends on an undisturbed mock market goes through `liquidate_support`'s
+//!   differential oracle, and (M10) on a market whose pool is an AMM v4 pool — since M10's fuzz
+//!   follow-ups also a CPMM pool — through `raydium_v4_support`'s (the decision, including
+//!   `ExitBoundNotMet` against `⌊B̂_ref·(10⁴ + δ)/10⁴⌋`, and every lamport and token of the
+//!   waterfall recomputed from `shortwin-math` on the pre-state);
 //! - **exits on the curve (I11, I-E11; M10)**: every keeper `liquidate` / `expire` on a live curve
 //!   market is predicted first ([`crate::curve_exit`]: every decision in the program's order, the
 //!   bound `B̂_live ≤ max_in`) and must land with the predicted `b_live`, `b_ref`, `max_in`, or be
-//!   refused with the predicted code — no `ExitBoundNotMet` once the bound is met;
+//!   refused with the predicted code — no `ExitBoundNotMet` once the bound is met; on PumpSwap
+//!   (M10's fuzz follow-ups) the same at the decision level ([`crate::pswap_exit`]);
 //! - **I14**: an instruction with a remaining account omitted or replaced by a fresh key must
 //!   fail (the hooks check that nothing changed; since M10 `close_short` is among them and an
 //!   accepted replacement fails as an accepted omission does);
 //! - **lenders (M10)**: `claim_sol ×N` in one transaction pays once (V2-2); a JIT deposit around
 //!   a landed liquidation or expiry gains no more than its shares' part of the rent the exit
 //!   credits at once — none of the lump — against the same exit without it (R3B-2); `[withdraw,
-//!   sol_settle]` withdraws no more than the allowance before it (C0-9);
+//!   sol_settle]` withdraws no more than the allowance before it (C0-9); the **deficit
+//!   tripwire** (M10's fuzz follow-ups): a lender's negative balance never exceeds its pro-rata
+//!   share of the shortfall the landed exits realised, from their events and the observed
+//!   receivable ([`crate::shortfall`]);
 //! - **I4's coverage clause (O17)**: a landed `set_coverage_pause` changes nothing on the whole VM
 //!   but bit 6 of one market's `flags` (and, for a clear of a set flag, its `coverage_cleared_at`);
 //!   every refusal is the predicted code (the role inert, the signer, the reason) — since the
@@ -40,7 +44,9 @@
 //!   cleared, the price restored, every position closed or exited by the keeper (with deadline
 //!   and S3 warps when needed), every lender out — must end with no position, no receivable, no
 //!   rent aggregate and no borrowed tokens; the hooks' own liveness check (dust ≤ 0.01 SOL) runs
-//!   after each of those transactions.
+//!   after each of those transactions; then (M10's fuzz follow-ups) a second claim pass past the
+//!   vest, after which no lender — one parked behind the share epoch on a full-wipe record
+//!   included — is owed more than [`CLAIM_DUST`] and `lender_sol` is within the hooks' dust cap.
 
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
@@ -63,6 +69,7 @@ use shortwin_litesvm_tests::engine::{
     Borrower, add_margin_ix, close_short_ix, crank_price_ix, expire_ix, liquidate_ix,
     open_short_ix, set_route_broken_ix, sol_settle_ix, trader_wsol_ata, with_cu_limit,
 };
+use shortwin_litesvm_tests::fork::AnyPool;
 use shortwin_litesvm_tests::invariants::positions::venue_executable;
 use shortwin_litesvm_tests::ix::{self, LenderKeys};
 use shortwin_litesvm_tests::{Env, TxResult, pda, read};
@@ -73,7 +80,8 @@ use solana_signer::Signer;
 
 use crate::action::{Action, Kind, Profile};
 use crate::liq;
-use crate::stats::{Ctx, Stats, failure, shortwin_code};
+use crate::shortfall::{self, DEFICIT_DUST, Ledger, TxExits};
+use crate::stats::{Ctx, Stats, failure, ix_name, shortwin_code};
 use crate::venue::{Move, Venue};
 
 /// The mainnet `PriceUpdateV2` dump (`tests/fixtures`), re-planted with moved prices.
@@ -159,6 +167,10 @@ pub fn code_name(c: u32) -> String {
 /// (the mock's 15 %) and `≡ 5 (mod 6)` (AMM v4's 10 %, CPMM's 10 %).
 pub const FEE_ABOVE_CAP: u32 = 41;
 
+/// What the wind-down's second claim pass may leave a lender owed (lamports): the claims'
+/// floor roundings ([`World::second_claims`]; M10).
+pub const CLAIM_DUST: u64 = 1_000;
+
 /// A fuzzer panic message prefix (the runner's crash files group by it).
 pub const ORACLE: &str = "FUZZ-ORACLE";
 
@@ -170,6 +182,16 @@ thread_local! {
 
 /// The injected failure's message.
 pub const INJECTED: &str = "FUZZ-INJECTED failure (harness self-test)";
+
+thread_local! {
+    /// The deficit tripwire's bound scaled by this many ppm (the harness's own test,
+    /// `tests/smoke.rs`, shrinks it to show the tripwire fires; 10⁶ otherwise).
+    pub static DEFICIT_BOUND_PPM: std::cell::Cell<u64> = const { std::cell::Cell::new(1_000_000) };
+    /// Lamports added to every receivable fall the shortfall ledger reads — a receivable the
+    /// program over-credits by that much (`tests/smoke.rs` shows `World::check_credited` catches
+    /// it; 0 otherwise).
+    pub static CREDITED_SKEW: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
 
 /// An open position: its borrower (index into the slot's borrowers) and nonce.
 #[derive(Clone, Copy, Debug)]
@@ -220,6 +242,12 @@ pub struct World {
     pub coverage: Option<Keypair>,
     /// Mints whose `freeze_authority` a mint shock replaced: the original bytes `46..82`.
     pub mint_saved: Vec<(Pubkey, Vec<u8>)>,
+    /// Every lender's deficit bound: its pro-rata share of the shortfall each landed exit
+    /// realised, from the events and the observed receivable ([`crate::shortfall`]; M10).
+    pub ledger: Ledger,
+    /// PumpSwap's expiry prediction made with a liquidation's (`(now, position, transactions
+    /// landed)` it holds for), reused when the keeper's expiry follows a refused liquidation.
+    pub pswap_expire: Option<((i64, Pubkey, u64), crate::pswap_exit::Prediction)>,
 }
 
 /// A disturbance's clearing action.
@@ -269,6 +297,39 @@ pub fn transfer_ix(from: &Pubkey, to: &Pubkey, lamports: u64) -> Instruction {
     }
 }
 
+/// One market of [`ExitPre`].
+pub struct PreMarket {
+    /// `receivable` as stored.
+    receivable: u64,
+    /// The market accrued in this second (`last_accrual_ts == now`): the transaction accrues
+    /// nothing more and `receivable` is its starting point.
+    accrued: bool,
+    total: u128,
+    shares: std::collections::BTreeMap<Pubkey, Option<u128>>,
+    /// Open position → its locked `rent_protocol_bps` and its rent terms (the independent
+    /// `credited_for` the receivable's fall is checked against).
+    pos: std::collections::BTreeMap<Pubkey, (u16, shortwin_math::rent::PosRent)>,
+    /// The lenders whose SOL balance is not negative before the transaction (a touch on the
+    /// pre-state, before its same-second accrual, which only adds): their bounds restart here.
+    clear: std::collections::BTreeSet<Pubkey>,
+}
+
+/// The pre-state of a transaction with an exit ([`World::exit_pre`]).
+pub struct ExitPre {
+    markets: Vec<PreMarket>,
+    /// A clone of the VM when a market had not accrued in this second.
+    svm: Option<litesvm::LiteSVM>,
+}
+
+/// Whether `ix` is an exit of short.win (a position resolved, the receivable trued up).
+fn is_exit(ix: &Instruction) -> bool {
+    ix.program_id == shortwin::ID
+        && matches!(
+            ix_name(&ix.data),
+            "close_short" | "liquidate" | "expire" | "sol_settle"
+        )
+}
+
 /// The factor `k` in ppm of a price move from `b`: log-uniform in `[1.05, 10]`.
 pub fn k_ppm(b: u32) -> u64 {
     let t = f64::from(b % 10_000) / 10_000.0;
@@ -299,9 +360,279 @@ impl World {
         self.env.market(&self.market_key(si))
     }
 
-    /// Sends through the hooks and the counters.
+    /// Sends through the hooks and the counters (and, for a transaction with an exit of
+    /// short.win, the shortfall ledger: [`World::send_tracked`]).
     pub fn send(&mut self, ixs: &[Instruction], signers: &[&Keypair]) -> TxResult {
-        self.cx().send(ixs, signers)
+        self.send_tracked(ixs, signers)
+    }
+
+    /// [`Ctx::send`], and when `ixs` hold an exit of short.win (`close_short`, `liquidate`,
+    /// `expire`, `sol_settle`) that lands, its shortfall charged to the lenders' bounds
+    /// ([`World::exit_pre`] before it, [`World::observe_exits`] after it).
+    fn send_tracked(&mut self, ixs: &[Instruction], signers: &[&Keypair]) -> TxResult {
+        if !ixs.iter().any(is_exit) {
+            return self.cx().send(ixs, signers);
+        }
+        let pre = self.exit_pre();
+        let res = self.cx().send(ixs, signers);
+        if let Ok(meta) = &res {
+            self.observe_exits(pre, ixs, meta);
+        }
+        res
+    }
+
+    /// What [`World::observe_exits`] reads of the state before a transaction with an exit: per
+    /// market its receivable, `S`, each lender's shares in the current share epoch and each open
+    /// position's locked `rent_protocol_bps`; and, only when a market has not accrued in this
+    /// second, a clone of the VM to crank (the transaction's first instruction on that market
+    /// accrues; after the keeper's crank of the second — the common case — nothing does).
+    fn exit_pre(&self) -> ExitPre {
+        let now = self.env.now();
+        let mut stale = false;
+        let markets = (0..self.slots.len())
+            .map(|si| {
+                let market = self.market_key(si);
+                let m = self.env.market(&market);
+                stale |= m.last_accrual_ts < now;
+                let shares = self.slots[si]
+                    .lenders
+                    .iter()
+                    .map(|l| {
+                        let owner = l.kp.pubkey();
+                        let s = match self.env.lender(&market, &owner) {
+                            None => Some(0),
+                            Some(lp) => (lp.epoch == m.share_epoch).then_some(lp.shares),
+                        };
+                        (owner, s)
+                    })
+                    .collect();
+                let pos = self.slots[si]
+                    .positions
+                    .iter()
+                    .filter_map(|p| {
+                        let key =
+                            pda::position(&market, &self.slots[si].borrowers[p.b].key(), p.nonce).0;
+                        read::borsh::<shortwin::state::ShortPosition>(&self.env.svm, &key)
+                            .map(|pos| (key, (pos.rent_protocol_bps, pos.pos_rent())))
+                    })
+                    .collect();
+                let clear = self.slots[si]
+                    .lenders
+                    .iter()
+                    .map(|l| l.kp.pubkey())
+                    .filter(|o| self.touched_pending(si, o).is_some_and(|p| p >= 0))
+                    .collect();
+                PreMarket {
+                    receivable: m.receivable,
+                    accrued: m.last_accrual_ts >= now,
+                    total: m.total_shares.get(),
+                    shares,
+                    pos,
+                    clear,
+                }
+            })
+            .collect();
+        ExitPre {
+            markets,
+            svm: stale.then(|| self.env.svm.clone()),
+        }
+    }
+
+    /// Charges the shortfall a landed transaction's exits realised (module [`crate::shortfall`])
+    /// to each lender's bound: the lender parts from the events, `credited` from the receivable
+    /// before it (after a same-second crank on the pre-state's clone when the market had not
+    /// accrued in this second) against the receivable now, the fractions from the pre-state's
+    /// shares walked through the transaction's lender events. A position the pre-state does not
+    /// list counts its rent as all protocol (the lender part 0: the bound only grows).
+    fn observe_exits(
+        &mut self,
+        pre: ExitPre,
+        ixs: &[Instruction],
+        meta: &litesvm::types::TransactionMetadata,
+    ) {
+        use shortwin::events as ev;
+        use shortwin_litesvm_tests::events::of_ix;
+        let ExitPre { markets, svm } = pre;
+        let mut clone = svm;
+        for (si, pm) in markets.into_iter().enumerate() {
+            let market = self.market_key(si);
+            let mut tx = TxExits {
+                total: pm.total,
+                shares: pm.shares,
+                ..TxExits::default()
+            };
+            // The positions the exits resolved, in order (`exits` keeps their lender parts).
+            let mut resolved: Vec<Pubkey> = Vec::new();
+            for (i, ix) in ixs.iter().enumerate() {
+                if ix.program_id != shortwin::ID {
+                    continue;
+                }
+                let lender_rent = |rent: u64, position: &Pubkey| {
+                    let bps = pm.pos.get(position).map_or(10_000, |p| u128::from(p.0));
+                    rent - (u128::from(rent) * bps / 10_000) as u64
+                };
+                for e in of_ix::<ev::Close>(meta, i)
+                    .iter()
+                    .filter(|e| e.market == market)
+                {
+                    tx.exits.push((i, e.rent.saturating_sub(e.rent_protocol)));
+                    resolved.push(e.position);
+                }
+                for e in of_ix::<ev::Liquidate>(meta, i)
+                    .iter()
+                    .filter(|e| e.market == market)
+                {
+                    tx.exits.push((i, lender_rent(e.rent, &e.position)));
+                    resolved.push(e.position);
+                }
+                for e in of_ix::<ev::Expire>(meta, i)
+                    .iter()
+                    .filter(|e| e.market == market)
+                {
+                    tx.exits.push((i, lender_rent(e.rent, &e.position)));
+                    resolved.push(e.position);
+                }
+                for e in of_ix::<ev::SolSettle>(meta, i)
+                    .iter()
+                    .filter(|e| e.market == market)
+                {
+                    tx.exits
+                        .push((i, e.lender_amount - e.lump.min(e.lender_amount)));
+                    resolved.push(e.position);
+                }
+                for e in of_ix::<ev::Deposit>(meta, i)
+                    .iter()
+                    .filter(|e| e.market == market)
+                {
+                    tx.moves.push((i, e.owner, e.shares as i128, e.s_after));
+                }
+                for e in of_ix::<ev::Withdraw>(meta, i)
+                    .iter()
+                    .filter(|e| e.market == market)
+                {
+                    tx.moves.push((i, e.owner, -(e.shares as i128), e.s_after));
+                }
+                if of_ix::<ev::EpochRolled>(meta, i)
+                    .iter()
+                    .any(|e| e.market == market)
+                {
+                    tx.rolls.push(i);
+                }
+            }
+            if tx.exits.is_empty() {
+                continue;
+            }
+            // The receivable the transaction started from after its own accrual.
+            let before = if pm.accrued {
+                Some(pm.receivable)
+            } else {
+                clone.as_mut().and_then(|c| {
+                    let post = std::mem::replace(&mut self.env.svm, c.clone());
+                    let crank = self
+                        .env
+                        .transaction(&[crank_price_ix(&self.slots[si].venue.vm())], &[]);
+                    let ok = shortwin_litesvm_tests::env::send_direct(&mut self.env.svm, |svm| {
+                        svm.send_transaction(crank)
+                    })
+                    .is_ok();
+                    let r = self.env.market(&market).receivable;
+                    *c = std::mem::replace(&mut self.env.svm, post);
+                    ok.then_some(r)
+                })
+            };
+            let event = match before {
+                None => {
+                    // Unmeasured: every lender is charged without bound (the check is off for
+                    // them).
+                    for l in &self.slots[si].lenders {
+                        let mut inc = std::collections::BTreeMap::new();
+                        inc.insert(l.kp.pubkey(), u128::from(u64::MAX));
+                        self.ledger.add(market, &inc);
+                    }
+                    "shortfall-unmeasured"
+                }
+                Some(r) => {
+                    let after = self.env.market(&market);
+                    tx.credited = r
+                        .saturating_sub(after.receivable)
+                        .saturating_add(CREDITED_SKEW.with(|c| c.get()));
+                    self.check_credited(si, r, tx.credited, &resolved, &pm.pos, &after.basis());
+                    for who in &pm.clear {
+                        self.ledger.restart(market, who);
+                    }
+                    let inc = shortfall::debits(&tx);
+                    self.ledger.add(market, &inc);
+                    if inc.values().any(|d| *d > 0) {
+                        // Where the charge is conservative (the bound loosens): a lender charged
+                        // every share (behind the share epoch, or after a roll), or several exits
+                        // in one transaction.
+                        let every = tx.shares.values().any(Option::is_none) || !tx.rolls.is_empty();
+                        for (on, tag) in [
+                            (every, "shortfall-short-every-share"),
+                            (tx.exits.len() > 1, "shortfall-short-several-exits"),
+                        ] {
+                            if on {
+                                *self.stats.events.entry(tag.into()).or_default() += 1;
+                            }
+                        }
+                        "shortfall-exits-short"
+                    } else {
+                        "shortfall-exits-measured"
+                    }
+                }
+            };
+            *self.stats.events.entry(event.into()).or_default() += 1;
+        }
+        drop(clone);
+    }
+
+    /// The receivable's fall a transaction's exits caused (`credited`, the program's stored
+    /// `receivable` before − after) against an independent figure: each resolved position's
+    /// `rent::credited_for` on its pre-state rent terms at the market's basis after the
+    /// transaction (its accrual is the transaction's first market instruction; the basis does not
+    /// move after it in the same second), clamped in turn by what is left of the receivable
+    /// (`pool::repay` / `pool::settle`: `receivable −= min(credited, receivable)`). Half of each
+    /// shortfall's bound is `credited`; this keeps it from following a receivable the program
+    /// over-credits. A transaction with an exit on a position the pre-state does not list is
+    /// not checked (`shortfall-credited-unchecked`).
+    fn check_credited(
+        &mut self,
+        si: usize,
+        before: u64,
+        credited: u64,
+        resolved: &[Pubkey],
+        pos: &std::collections::BTreeMap<Pubkey, (u16, shortwin_math::rent::PosRent)>,
+        basis: &shortwin_math::rent::Basis,
+    ) {
+        let mut left = before;
+        for p in resolved {
+            let Some(c) = pos
+                .get(p)
+                .and_then(|(_, r)| shortwin_math::rent::credited_for(r, basis).ok())
+            else {
+                *self
+                    .stats
+                    .events
+                    .entry("shortfall-credited-unchecked".into())
+                    .or_default() += 1;
+                return;
+            };
+            left -= c.min(left);
+        }
+        let expected = before - left;
+        *self
+            .stats
+            .events
+            .entry("shortfall-credited-checked".into())
+            .or_default() += 1;
+        if expected != credited {
+            panic!(
+                "{ORACLE} deficit tripwire (ECON §9.4, ARCH §4.5): the exits of market {} took \
+                 {credited} lamports off the receivable ({before} before), not the {expected} \
+                 their positions' credited_for gives\npositions: {resolved:?}",
+                self.market_key(si)
+            );
+        }
     }
 
     /// Sends `ixs` behind the venue's compute-unit limit instruction (when it has one).
@@ -314,7 +645,7 @@ impl World {
         signers: &[&Keypair],
     ) -> (TxResult, Vec<Instruction>) {
         let cu = self.slots[si].venue.exit_cu();
-        Self::with_cu(cu, ixs, |all| self.cx().send(all, signers))
+        Self::with_cu(cu, ixs, |all| self.send_tracked(all, signers))
     }
 
     /// `ixs` behind a compute-unit limit instruction when `cu` is set, sent by `f`.
@@ -340,7 +671,7 @@ impl World {
         signers: &[&Keypair],
     ) -> (TxResult, Vec<Instruction>) {
         let cu = self.slots[si].venue.exit_cu().map(|_| 1_400_000);
-        Self::with_cu(cu, ixs, |all| self.cx().send(all, signers))
+        Self::with_cu(cu, ixs, |all| self.send_tracked(all, signers))
     }
 
     /// [`World::send_bundle`] through the hooks but not the counters (a probe on a clone of the
@@ -501,6 +832,7 @@ impl World {
             } else {
                 liq::Which::Expire
             };
+            let pre = self.exit_pre();
             let exit = liq::exit_checked(
                 &mut self.env,
                 mm,
@@ -521,41 +853,67 @@ impl World {
             *self.stats.events.entry(tag).or_default() += 1;
             if exit.executed() {
                 self.stats.record(&[], &Ok(exit.meta().clone()));
+                let vm = &self.slots[si].venue.vm();
+                let ix = match which {
+                    0 => liquidate_ix(vm, &keeper.pubkey(), &borrower, p.nonce),
+                    _ => expire_ix(vm, &keeper.pubkey(), &borrower, p.nonce),
+                };
+                self.observe_exits(pre, &[ix], exit.meta());
                 self.slots[si].positions.remove(k);
                 return true;
             }
             return false;
         }
-        // AMM v4 (M10, G-I11-real): `raydium_v4_support`'s differential oracle — every decision
+        // Raydium (M10, G-I11-real): `raydium_v4_support`'s differential oracle — every decision
         // (I-E11's `ExitBoundNotMet` included) and every lamport and token, from `shortwin-math`
-        // on the readers — on a market whose adopted pool is an AMM v4 pool.
-        let on_v4 = self.differential
-            && which < 2
-            && self.market(si).venue_kind() == Some(VenueKind::RaydiumV4)
-            && self.slots[si].venue.as_ray_v4().is_some();
-        if on_v4 {
+        // on the readers — on a market whose adopted pool is an AMM v4 pool, and (venue-generic
+        // since M10's fuzz follow-ups) a CPMM pool: its fees per direction, U11's creator fee on
+        // either side.
+        let ray = if self.differential && which < 2 {
+            let kind = self.market(si).venue_kind();
+            self.slots[si]
+                .venue
+                .as_ray()
+                .and_then(|rm| match (kind, &rm.pool) {
+                    (Some(VenueKind::RaydiumV4), AnyPool::V4(_)) => Some("v4"),
+                    (Some(VenueKind::RaydiumCpmm), AnyPool::Cpmm(_)) => Some("cpmm"),
+                    _ => None,
+                })
+        } else {
+            None
+        };
+        if let Some(tag_venue) = ray {
             let w = if which == 0 {
                 crate::v4::Which::Liquidate
             } else {
                 crate::v4::Which::Expire
             };
+            let pre = self.exit_pre();
             let exit = {
                 let World { env, slots, .. } = self;
-                let rm = slots[si].venue.as_ray_v4().expect("v4");
+                let rm = slots[si].venue.as_ray().expect("raydium");
                 crate::v4::exit_alone(env, rm, w, &keeper, &borrower, p.nonce)
             };
             let name = if which == 0 { "liquidate" } else { "expire" };
             let (tag, meta) = match &exit {
-                crate::v4::Exit::Refused(e, _) => {
-                    (format!("{name}:v4-differential-refused:{e:?}"), None)
-                }
-                crate::v4::Exit::Liquidated(_, _, m) | crate::v4::Exit::Expired(_, _, m) => {
-                    (format!("{name}:v4-differential-landed"), Some(m.clone()))
-                }
+                crate::v4::Exit::Refused(e, _) => (
+                    format!("{name}:{tag_venue}-differential-refused:{e:?}"),
+                    None,
+                ),
+                crate::v4::Exit::Liquidated(_, _, m) | crate::v4::Exit::Expired(_, _, m) => (
+                    format!("{name}:{tag_venue}-differential-landed"),
+                    Some(m.clone()),
+                ),
             };
             *self.stats.events.entry(tag).or_default() += 1;
             if let Some(meta) = meta {
-                self.stats.record(&[], &Ok(meta));
+                self.stats.record(&[], &Ok(meta.clone()));
+                let vm = &self.slots[si].venue.vm();
+                let ix = match which {
+                    0 => liquidate_ix(vm, &keeper.pubkey(), &borrower, p.nonce),
+                    _ => expire_ix(vm, &keeper.pubkey(), &borrower, p.nonce),
+                };
+                self.observe_exits(pre, &[ix], &meta);
                 self.slots[si].positions.remove(k);
                 return true;
             }
@@ -577,6 +935,46 @@ impl World {
         } else {
             None
         };
+        // PumpSwap (M10's fuzz follow-ups): the decision predicted on a clone
+        // ([`crate::pswap_exit`]), then the exit sent and compared.
+        let pswap_pred = if self.differential
+            && which < 2
+            && curve_pred.is_none()
+            && self.market(si).venue_kind() == Some(VenueKind::PumpSwap)
+        {
+            let w = if which == 0 {
+                crate::curve_exit::Which::Liquidate
+            } else {
+                crate::curve_exit::Which::Expire
+            };
+            let market = self.market_key(si);
+            let key = (
+                self.env.now(),
+                pda::position(&market, &borrower, p.nonce).0,
+                self.stats.txs - self.stats.txs_failed,
+            );
+            // The expiry right after a refused liquidation of the same position in the same
+            // second: nothing landed since, so the state is the one both were predicted on.
+            match self.pswap_expire.take() {
+                Some((k, pred)) if k == key && w == crate::curve_exit::Which::Expire => Some(pred),
+                _ => {
+                    let both = {
+                        let World { env, slots, .. } = self;
+                        crate::pswap_exit::predict(env, slots[si].venue.vm(), &borrower, p.nonce)
+                    };
+                    both.map(|(liq, exp)| {
+                        if w == crate::curve_exit::Which::Liquidate {
+                            self.pswap_expire = Some((key, exp));
+                            liq
+                        } else {
+                            exp
+                        }
+                    })
+                }
+            }
+        } else {
+            None
+        };
         let vm = &self.slots[si].venue.vm();
         let ix = match which {
             0 => liquidate_ix(vm, &keeper.pubkey(), &borrower, p.nonce),
@@ -595,6 +993,28 @@ impl World {
                         Err(f) => f.meta.pretty_logs(),
                     };
                     panic!("{ORACLE} curve differential exit (I11 / I-E11): {why}\nlogs:\n{logs}");
+                }
+            }
+        }
+        if let Some(pred) = pswap_pred {
+            let ctx = format!("prediction: {:?}\n{}", pred.decision, pred.detail);
+            match crate::curve_exit::check_outcome(
+                "pswap",
+                pred.which,
+                &pred.decision,
+                &ctx,
+                &res,
+                shortwin_code(&sent, &res),
+            ) {
+                Ok(tag) => *self.stats.events.entry(tag).or_default() += 1,
+                Err(why) => {
+                    let logs = match &res {
+                        Ok(m) => m.pretty_logs(),
+                        Err(f) => f.meta.pretty_logs(),
+                    };
+                    panic!(
+                        "{ORACLE} PumpSwap differential exit (I11 / I-E11): {why}\nlogs:\n{logs}"
+                    );
                 }
             }
         }
@@ -728,6 +1148,7 @@ impl World {
             Kind::DumpAroundSettle => self.dump_around_settle(si, a, b),
             Kind::JitDeposit => self.jit_deposit(si, a, b),
             Kind::WithdrawThenSettle => self.withdraw_then_settle(si, a, b),
+            Kind::StaleReceivable => self.stale_receivable(si, a, b),
             Kind::Gates => self.gates(si, a),
             Kind::GlobalPause => {
                 let e = self.env.pause_authority.insecure_clone();
@@ -1125,8 +1546,6 @@ impl World {
 
     fn deposit(&mut self, si: usize, a: u32, b: u32) -> bool {
         let li = a as usize % self.slots[si].lenders.len();
-        let k = self.lender_keys(si, li);
-        let have = read::token_amount(&self.env.svm, &k.owner_token_account).unwrap_or(0);
         let x = self.slots[si]
             .venue
             .reserves(&self.env)
@@ -1139,6 +1558,13 @@ impl World {
         } else {
             want.max(1)
         };
+        self.deposit_tokens(si, li, amount)
+    }
+
+    /// `deposit` of `amount` tokens by lender `li` (topped up first when short).
+    fn deposit_tokens(&mut self, si: usize, li: usize, amount: u64) -> bool {
+        let k = self.lender_keys(si, li);
+        let have = read::token_amount(&self.env.svm, &k.owner_token_account).unwrap_or(0);
         if have < amount {
             let World { env, slots, .. } = self;
             slots[si]
@@ -1153,6 +1579,98 @@ impl World {
             panic!("{ORACLE} a deposit of 0 tokens landed (ZeroAmount)");
         }
         true
+    }
+
+    /// FUZZ-M7-24H-3's shape ([`Kind::StaleReceivable`]; M10's fuzz follow-ups): a position held
+    /// unattended for days accrues a rent receivable credited to the lenders of then; a lender
+    /// that deposits after it holds most of the shares when the position exits, and an exit paying
+    /// less rent than it was credited debits it its share (ECON §9.4) — the deficit the wind-down
+    /// covers and the tripwire bounds ([`World::cover_negative`]).
+    ///
+    /// Only a liquidation pays the rent junior to the buyback (`waterfall::liquidate`: `rent =
+    /// min(R_due, V − B)`), and it runs only while the buyback is allowed (`B + ert ≤ V − K_s`), so
+    /// a shortfall needs `V − R_due < B̂_live ≤ V − K_s − ert`: the price is steered into that
+    /// window (`b` odd: to its middle; even: left where the shock put it), in ten steps of a crank
+    /// each so the references follow, then held through keeper seconds.
+    fn stale_receivable(&mut self, si: usize, a: u32, b: u32) -> bool {
+        if self.slots[si].positions.is_empty() {
+            self.open(si, a, b, true);
+        }
+        let n = self.slots[si].positions.len();
+        if n == 0 {
+            return false;
+        }
+        self.env.warp(86_400 * (1 + i64::from(a % 3)));
+        self.crank(si);
+        let m = self.market(si);
+        let claims = m.tokens_free.saturating_add(m.borrowed_q);
+        let li = b as usize % self.slots[si].lenders.len();
+        self.deposit_tokens(si, li, claims.saturating_mul(1 + u64::from(b % 3)).max(1));
+        let (borrower, nonce, _) = self.position_key(si, a as usize % n).expect("pos");
+        for _ in 0..3 {
+            if !b.is_multiple_of(2) {
+                break;
+            }
+            let Some((b_live, lo, hi)) = self.shortfall_window(si, &borrower, nonce) else {
+                break;
+            };
+            if lo < b_live && b_live <= hi {
+                break;
+            }
+            let ratio = (lo / 2 + hi / 2) as f64 / b_live.max(1) as f64;
+            let step = ratio.powf(0.1);
+            for _ in 0..10 {
+                let up = step > 1.0;
+                let k = ((if up { step } else { 1.0 / step }) * 1e6) as u64;
+                if let Some(mv) = self.push(si, up, k) {
+                    self.send_move(si, &mv, false);
+                }
+                self.env.warp(1);
+                self.crank(si);
+            }
+        }
+        if self
+            .shortfall_window(si, &borrower, nonce)
+            .is_some_and(|(b, lo, hi)| lo < b && b <= hi)
+        {
+            *self
+                .stats
+                .events
+                .entry("stale-receivable-in-window".into())
+                .or_default() += 1;
+        }
+        for _ in 0..(10 + a % 50) {
+            if self.slots[si].positions.is_empty() {
+                break;
+            }
+            self.keeper_second();
+        }
+        true
+    }
+
+    /// `(B̂_live, V − R_due, V − K_s − ert)` of a position now (the venue's quote on the harness's
+    /// view, the rent due on the stored basis): a liquidation inside `(lo, hi]` pays less rent
+    /// than it was credited ([`World::stale_receivable`]).
+    fn shortfall_window(
+        &self,
+        si: usize,
+        borrower: &Pubkey,
+        nonce: u64,
+    ) -> Option<(u64, u64, u64)> {
+        let m = self.market(si);
+        let pos = read::borsh::<shortwin::state::ShortPosition>(
+            &self.env.svm,
+            &pda::position(&self.market_key(si), borrower, nonce).0,
+        )?;
+        let r_due = shortwin_math::rent::due(&pos.pos_rent(), &m.basis()).ok()?;
+        let k_s = shortwin_math::risk::k_s(pos.v, &pos.settle_keeper_terms()).ok()?;
+        let hi = pos.v.checked_sub(k_s.checked_add(pos.ert)?)?;
+        let lo = pos.v.saturating_sub(r_due);
+        let view = shortwin_litesvm_tests::invariants::venue_view::view(&self.env.svm, &m)?;
+        if lo >= hi {
+            return None;
+        }
+        Some((view.buy(pos.q)?, lo, hi))
     }
 
     /// The shares whose tokens are exactly the lender's pro-rata allowance now
@@ -1173,8 +1691,12 @@ impl World {
         Some(shares.min(lp.shares))
     }
 
-    /// The lender's SOL balance after a touch now (`pool::touch` on the state the program sees),
-    /// or `None` for a lender behind the share epoch.
+    /// The lender's SOL balance after a touch now (`pool::touch` on the state the program sees,
+    /// through the `ShareEpoch` records the lender is behind on, as `claim_sol` and
+    /// `cover_deficit` read them), or `None` without a lender or when the touch fails (records
+    /// missing: the hooks' record invariant fails first). A lender parked on a live full-wipe
+    /// record (V2-12: behind the share epoch until the wipe clears, which no `sync_lender`
+    /// changes) has its pending through that record.
     fn touched_pending(&self, si: usize, owner: &Pubkey) -> Option<i64> {
         let market = self.market_key(si);
         let m = self.env.market(&market);
@@ -1182,10 +1704,14 @@ impl World {
         let pool = m.pool();
         let mut vault = *self.env.market_vault(&market).vault();
         let mut lender = lp.lender();
-        if lender.epoch != pool.share_epoch {
-            return None;
-        }
-        shortwin_math::pool::touch(&pool, &mut vault, &mut lender, &[], self.env.now()).ok()?;
+        let records: Vec<_> = (lender.epoch..pool.share_epoch)
+            .filter_map(|e| {
+                let key = pda::share_epoch(&market, e).0;
+                read::borsh::<shortwin::state::ShareEpoch>(&self.env.svm, &key).map(|r| r.record())
+            })
+            .collect();
+        shortwin_math::pool::touch(&pool, &mut vault, &mut lender, &records, self.env.now())
+            .ok()?;
         Some(lender.pending)
     }
 
@@ -1201,11 +1727,18 @@ impl World {
     /// `NegativePending` and the wind-down reported `wind-down-withdraw-refused` (FUZZ-M7-24H-3:
     /// the 24 h run at eb82a2a, amm-v4 seed 20333958). The lender is first topped up to the
     /// deficit plus 1 SOL for fees, as a real lender brings the SOL (`wind-down-deficit-funded`).
+    ///
+    /// **The tripwire (M10).** Before the cover, the deficit must stay within the lender's bound —
+    /// its pro-rata share of the shortfall every landed exit realised ([`crate::shortfall`]: from
+    /// the events and the observed receivable, not from `pool::touch`, which computed the
+    /// deficit) — plus [`DEFICIT_DUST`]; the largest deficit is in `summary.json`. A lender behind
+    /// the share epoch (parked on a full-wipe record) is read and checked through the records.
     fn cover_negative(&mut self, si: usize, li: usize) {
         let owner = self.slots[si].lenders[li].kp.insecure_clone();
         let Some(p) = self.touched_pending(si, &owner.pubkey()).filter(|p| *p < 0) else {
             return;
         };
+        self.check_deficit(si, &owner.pubkey(), p.unsigned_abs());
         let need = p.unsigned_abs().saturating_add(1_000_000_000);
         let have = self.env.svm.get_balance(&owner.pubkey()).unwrap_or(0);
         if have < need {
@@ -1231,6 +1764,47 @@ impl World {
             "wind-down-deficit-cover-failed"
         };
         *self.stats.events.entry(event.into()).or_default() += 1;
+    }
+
+    /// The deficit tripwire ([`World::cover_negative`]): `deficit ≤ bound + DEFICIT_DUST`, the
+    /// bound the debits since the lender's balance was last seen not negative ([`Ledger`]); the
+    /// run's cumulative bound is recorded beside it.
+    fn check_deficit(&mut self, si: usize, owner: &Pubkey, deficit: u64) {
+        let market = self.market_key(si);
+        let raw = self.ledger.of(&market, owner);
+        let total = self.ledger.total_of(&market, owner);
+        let bound = raw.saturating_mul(u128::from(DEFICIT_BOUND_PPM.with(|c| c.get()))) / 1_000_000;
+        let d = &mut self.stats.deficits;
+        if d.checked == 0 {
+            d.runs += 1;
+        }
+        d.checked += 1;
+        if deficit > d.largest {
+            d.largest = deficit;
+            d.largest_bound = raw;
+            d.largest_total_bound = total;
+        }
+        if let Some(ppm) = (u128::from(deficit) * 1_000_000).checked_div(raw) {
+            let ppm = u64::try_from(ppm).unwrap_or(u64::MAX);
+            d.tightest_ppm = d.tightest_ppm.max(ppm);
+            if deficit > DEFICIT_DUST {
+                d.loosest_ppm = Some(d.loosest_ppm.map_or(ppm, |l| l.min(ppm)));
+            }
+        }
+        if u128::from(deficit) > bound.saturating_add(u128::from(DEFICIT_DUST)) {
+            let m = self.market(si);
+            panic!(
+                "{ORACLE} deficit tripwire (ECON §9.4): lender {owner} owes {deficit} lamports, \
+                 above its pro-rata share of the shortfall the exits realised ({bound} + dust \
+                 {DEFICIT_DUST}; {total} over the whole run)\nmarket {market}: total_shares {} \
+                 receivable {} open {} share_epoch {}\nlender: {:?}",
+                m.total_shares.get(),
+                m.receivable,
+                m.open_positions,
+                m.share_epoch,
+                self.env.lender(&market, owner)
+            );
+        }
     }
 
     fn withdraw(&mut self, si: usize, a: u32, b: u32) -> bool {
@@ -3477,7 +4051,108 @@ impl World {
                 );
             }
         }
+        self.second_claims();
         self.env.assert_invariants();
+    }
+
+    /// The wind-down's second claim pass and its liveness check (M10): `lenders_out` takes the
+    /// lenders out one by one, so a lender's claim can find `lender_sol` short until a later
+    /// lender covers its deficit (FUZZ-M7-24H-3's shape: the seeding lender's positive `pending` is
+    /// paid from the late depositor's cover). Past the latest vest end (a crank on every market
+    /// releases what a lender left holding shares is owed), every lender claims again; then no
+    /// lender may be owed more than [`CLAIM_DUST`] and `lender_sol` must be at most the hooks'
+    /// liveness dust cap (the realised SOL no lender is allocated, ECON §9.4 R3A-2). Every lender
+    /// counts, including one still behind the share epoch: `lenders_out` syncs a lender behind,
+    /// but one parked on a live full-wipe record stays behind (V2-12), and its balance is read
+    /// through the record ([`World::touched_pending`], `wind-down-claim-parked`); a lender whose
+    /// touch fails while it holds shares or a balance fails the run.
+    fn second_claims(&mut self) {
+        let now = self.env.now();
+        let until = (0..self.slots.len())
+            .map(|si| self.market(si).vest_end)
+            .max()
+            .unwrap_or(now);
+        if until > now {
+            self.env.warp(until - now + 1);
+        }
+        for si in 0..self.slots.len() {
+            self.crank(si);
+        }
+        let cap = shortwin_litesvm_tests::invariants::lender::liveness_dust_cap();
+        for si in 0..self.slots.len() {
+            let market = self.market_key(si);
+            let mut unpaid: u64 = 0;
+            for li in 0..self.slots[si].lenders.len() {
+                let kp = self.slots[si].lenders[li].kp.insecure_clone();
+                if self.env.lender(&market, &kp.pubkey()).is_none() {
+                    continue;
+                }
+                let ix = ix::with_remaining(
+                    ix::claim_sol(&kp.pubkey(), &market),
+                    &self.epoch_metas(si, &kp.pubkey()),
+                );
+                let res = self.send(&[ix], &[&kp]);
+                let paid = res.as_ref().ok().map_or(0, |m| {
+                    shortwin_litesvm_tests::events::of::<shortwin::events::ClaimSol>(m)
+                        .first()
+                        .map_or(0, |e| e.sol_paid)
+                });
+                let tag = if paid > 0 {
+                    "wind-down-second-claim-paid"
+                } else {
+                    "wind-down-second-claim-nothing"
+                };
+                *self.stats.events.entry(tag.into()).or_default() += 1;
+                // A lender still behind the share epoch after its claim is parked on the live
+                // full-wipe record (its pending read through it); one whose touch fails cannot
+                // be paid at all — a liveness failure if it holds shares or a balance.
+                let lp = self.env.lender(&market, &kp.pubkey()).expect("lender");
+                if lp.epoch < self.market(si).share_epoch {
+                    *self
+                        .stats
+                        .events
+                        .entry("wind-down-claim-parked".into())
+                        .or_default() += 1;
+                }
+                match self.touched_pending(si, &kp.pubkey()) {
+                    Some(p) => unpaid = unpaid.max(p.max(0).unsigned_abs()),
+                    None if lp.shares > 0 || lp.pending != 0 => panic!(
+                        "{ORACLE} liveness (I-P6): after the wind-down's second claim pass lender \
+                         {} of market {market} cannot be touched (share epoch {}) and holds \
+                         {} shares, pending {}\nlender: {lp:?}",
+                        kp.pubkey(),
+                        self.market(si).share_epoch,
+                        lp.shares,
+                        lp.pending
+                    ),
+                    None => {
+                        *self
+                            .stats
+                            .events
+                            .entry("wind-down-claim-untouchable-empty".into())
+                            .or_default() += 1;
+                    }
+                }
+            }
+            let lender_sol = self.env.market_vault(&market).vault().lender_sol;
+            self.stats.wind_down_unpaid_max = self.stats.wind_down_unpaid_max.max(unpaid);
+            self.stats.wind_down_lender_sol_max =
+                self.stats.wind_down_lender_sol_max.max(lender_sol);
+            if unpaid > CLAIM_DUST || lender_sol > cap {
+                let lenders: Vec<String> = self.slots[si]
+                    .lenders
+                    .iter()
+                    .map(|l| format!("{:?}", self.env.lender(&market, &l.kp.pubkey())))
+                    .collect();
+                panic!(
+                    "{ORACLE} liveness (I-P6): after the wind-down's second claim pass market \
+                     {market} still owes a lender {unpaid} lamports (dust {CLAIM_DUST}) with \
+                     lender_sol {lender_sol} (cap {cap})\nvault: {:?}\nlenders:\n{}",
+                    self.env.market_vault(&market).vault(),
+                    lenders.join("\n")
+                );
+            }
+        }
     }
 
     /// Why the remaining positions are stuck: each exit's outcome now, the market's venue and

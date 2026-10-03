@@ -220,6 +220,8 @@ pub fn world(profile: Profile, seed: u64, opts: crate::runner::Opts) -> World {
         undo: Vec::new(),
         coverage,
         mint_saved: Vec::new(),
+        ledger: Default::default(),
+        pswap_expire: None,
     };
     for si in 0..w.slots.len() {
         let key = w.slots[si].venue.vm().market();

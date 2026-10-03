@@ -6,8 +6,11 @@
 //!                      [--minimize]
 //! shortwin-fuzz replay FILE
 //! shortwin-fuzz tmin   FILE [--budget N]
-//! shortwin-fuzz one    --profile P --seed S [--actions N]
+//! shortwin-fuzz one    --profile P --seed S [--actions N | --length N]
 //! ```
+//!
+//! `one` runs the action list `run` draws for that seed: `--actions` is `run`'s (the length is
+//! derived from the seed, [`runner::run_length`]), `--length` an exact count instead.
 //!
 //! Needs the program builds (`anchor build --tools-version v1.57 --arch v3` and
 //! `scripts/build-test-venue.sh`, or `SHORTWIN_SO`, `SHORTWIN_TEST_VENUE_SO`, `MOCK_CPAMM_SO`,
@@ -38,6 +41,8 @@ struct Args {
     avoid_known: bool,
     minimize: bool,
     budget: usize,
+    /// `one --length N`: exactly `N` actions (else `run`'s per-seed length under `--actions`).
+    length: Option<usize>,
 }
 
 fn usage() -> ! {
@@ -45,7 +50,7 @@ fn usage() -> ! {
         "usage:\n  shortwin-fuzz run [--profile P|all] [--duration 1h] [--runs N] [--jobs N] \
          [--actions N] [--seed S] [--out DIR] [--no-differential] [--include-known] [--minimize]\n  \
          shortwin-fuzz replay FILE\n  shortwin-fuzz tmin FILE [--budget N]\n  \
-         shortwin-fuzz one --profile P --seed S [--actions N]\nprofiles: {}",
+         shortwin-fuzz one --profile P --seed S [--actions N | --length N]\nprofiles: {}",
         Profile::ALL.map(|p| p.name()).join(", ")
     );
     std::process::exit(2)
@@ -70,6 +75,7 @@ fn parse() -> Args {
         avoid_known: true,
         minimize: false,
         budget: 400,
+        length: None,
     };
     while let Some(arg) = it.next() {
         let mut val = || it.next().unwrap_or_else(|| usage());
@@ -96,6 +102,7 @@ fn parse() -> Args {
             "--seed" => a.seed = val().parse().unwrap_or_else(|_| usage()),
             "--out" => a.out = PathBuf::from(val()),
             "--budget" => a.budget = val().parse().unwrap_or_else(|_| usage()),
+            "--length" => a.length = Some(val().parse().unwrap_or_else(|_| usage())),
             "--no-differential" => a.differential = false,
             "--include-known" => a.avoid_known = false,
             "--minimize" => a.minimize = true,
@@ -196,6 +203,23 @@ fn report(s: &Stats, secs: f64, failures: &[(String, String)]) -> serde_json::Va
         names.len()
     );
     println!("  codes never returned: {}", codes_missed.join(", "));
+    let d = &s.deficits;
+    println!(
+        "\n-- the deficit tripwire and the wind-down's claims (M10) --\n  deficits checked {} in {} runs; \
+         largest {} lamports (its bound {}, over the whole run {}), deficit/bound largest {:.4} \
+         smallest {}\n  after the second claim pass: \
+         largest unpaid pending {} lamports, largest lender_sol {} lamports",
+        d.checked,
+        d.runs,
+        d.largest,
+        d.largest_bound,
+        d.largest_total_bound,
+        d.tightest_ppm as f64 / 1e6,
+        d.loosest_ppm
+            .map_or("-".into(), |p| format!("{:.4}", p as f64 / 1e6)),
+        s.wind_down_unpaid_max,
+        s.wind_down_lender_sol_max
+    );
     println!("\n-- anomalies (not invariant violations; for review) --");
     if s.anomalies.is_empty() {
         println!("  none");
@@ -225,6 +249,21 @@ fn report(s: &Stats, secs: f64, failures: &[(String, String)]) -> serde_json::Va
         "events": s.events,
         "anomalies": s.anomalies.iter().map(|(k, a)| (k.clone(), json!({"count": a.count, "first": a.first, "detail": a.detail}))).collect::<serde_json::Map<_, _>>(),
         "failures": failures.iter().map(|(s, f)| json!({"signature": s, "file": f})).collect::<Vec<_>>(),
+        "wind_down_deficits": {
+            "checked": d.checked,
+            "runs_with_deficit": d.runs,
+            "largest_lamports": d.largest,
+            "largest_bound_lamports": d.largest_bound.to_string(),
+            "largest_cumulative_bound_lamports": d.largest_total_bound.to_string(),
+            "largest_share_of_bound_ppm": d.tightest_ppm,
+            "smallest_share_of_bound_ppm": d.loosest_ppm,
+            "dust_lamports": shortwin_fuzz::shortfall::DEFICIT_DUST,
+        },
+        "wind_down_claims": {
+            "largest_unpaid_pending_lamports": s.wind_down_unpaid_max,
+            "largest_lender_sol_lamports": s.wind_down_lender_sol_max,
+            "claim_dust_lamports": shortwin_fuzz::world::CLAIM_DUST,
+        },
         "coverage": {
             "instructions_landed": ix_landed,
             "instructions_total": shortwin_fuzz::stats::IX_COUNT,
@@ -298,11 +337,8 @@ fn cmd_run(a: &Args) -> i32 {
                             % profiles.len() as u64)
                             as usize];
                         // Run lengths vary (¼ to all of `--actions`), so the wind-down's
-                        // liveness check meets states at every depth.
-                        let n = actions / 4
-                            + (shortwin_fuzz::rng::splitmix64(seed ^ 0x1e57)
-                                % (actions as u64 * 3 / 4 + 1))
-                                as usize;
+                        // liveness check meets states at every depth; `one` derives the same.
+                        let n = runner::run_length(seed, actions);
                         let o = runner::run(profile, seed, None, n, opts);
                         total.lock().expect("stats").merge(&o.stats);
                         if let Some(fail) = &o.failure {
@@ -435,7 +471,22 @@ fn cmd_one(a: &Args) -> i32 {
         differential: a.differential,
         avoid_known: a.avoid_known,
     };
-    let o = runner::run(profile, a.seed, None, a.actions, opts);
+    // The length `run --actions N` draws for this seed (an anomaly's or a crash's cursor names it
+    // as `#i/n`), unless `--length` gives it.
+    let n = a
+        .length
+        .unwrap_or_else(|| runner::run_length(a.seed, a.actions));
+    println!(
+        "one: {} seed {} — {n} actions{}",
+        profile.name(),
+        a.seed,
+        if a.length.is_some() {
+            String::new()
+        } else {
+            format!(" (`run --actions {}`'s length for this seed)", a.actions)
+        }
+    );
+    let o = runner::run(profile, a.seed, None, n, opts);
     let f: Vec<(String, String)> = if let Some(fail) = &o.failure {
         print_failure(&o);
         let p = runner::write_crash(&a.out, &o, false);

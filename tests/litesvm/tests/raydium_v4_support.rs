@@ -9,6 +9,14 @@
 //! `tests/raydium_v4_e2e.rs` and `tests/raydium_v4_attacks.rs` include this file with `#[path]`;
 //! compiled on its own it is an empty test binary (it has no tests of its own).
 //!
+//! **CPMM (M10).** The keeper-exit oracle ([`view`], [`predict`], [`exit_checked`]) is
+//! venue-generic: it prices with the hooks' venue view (`Pricing::Cpmm` with each direction's fees
+//! and creator-fee side on a CPMM pool), reads the route flag of the market's own venue bit, and
+//! falls back to the program's fee view of a pool that no longer parses (AMM v4: the pool's fee,
+//! else the cap; CPMM: the cap as a trade fee) — so `tests/raydium_cpmm_exits_it.rs` and the
+//! fuzzer run it on CPMM markets as well. The scenario builders (`Fart`, LP removal, `SetParams`)
+//! stay AMM v4's.
+//!
 //! **The differential oracle.** Every short.win instruction the E2E sends goes through a
 //! `*_checked` function that recomputes what the program must do **from `shortwin-math` and the
 //! venue-state readers alone** (the hooks' `venue_view` for the pool; never the program's
@@ -90,7 +98,7 @@ use shortwin_math::settle::{
 };
 use shortwin_math::tier::{self, OraclePrice, Tier, TierInputs, TierVenue};
 use shortwin_math::waterfall::{self, ExitInputs, Payout};
-use shortwin_venue_state::raydium_v4;
+use shortwin_venue_state::{raydium_cpmm, raydium_v4};
 
 /// short.win's error codes.
 pub type E = ShortwinError;
@@ -184,11 +192,14 @@ pub fn locked_depth(env: &Env, rm: &RayMarket) -> u128 {
 }
 
 /// The config's hard cap and the market's / venue's route-broken flags → `s3_no_route` and
-/// `pool_fail` of `venue` (ARCH §5.3; the **global** cap, R3A-4 c).
+/// `pool_fail` of `venue` (ARCH §5.3; the **global** cap, R3A-4 c). The venue flag is the bit of
+/// the market's venue (AMM v4 or CPMM).
 fn route_predicates(env: &Env, m: &Market, venue: &VenueView) -> (bool, bool) {
     let config = env.config();
-    let flag = m.has_flag(MARKET_FLAG_ROUTE_BROKEN)
-        || config.venue_route_broken & VENUE_BIT_RAYDIUM_V4 != 0;
+    let bit = m
+        .venue_kind()
+        .map_or(VENUE_BIT_RAYDIUM_V4, |k| k.venue_bit());
+    let flag = m.has_flag(MARKET_FLAG_ROUTE_BROKEN) || config.venue_route_broken & bit != 0;
     let cap = u64::from(config.params.venue_fee_hard_cap_bps);
     (
         settle::s3_no_route(venue.executable, flag, venue.fee_ppm, cap),
@@ -671,15 +682,77 @@ pub fn read_market_view(env: &Env, rm: &RayMarket) -> MarketView {
         now: market.last_accrual_ts,
         pool: market.pool(),
         vault: *env.market_vault(&rm.market()).vault(),
-        live: venue
-            .pricing
-            .unwrap_or(Pricing::RayV4(pool_fee(env, rm, cap))),
+        live: venue.pricing.unwrap_or_else(|| fee_view(env, rm, cap)),
         donated: lamports(env, &market.trader) + lamports(env, &market.trader_wsol),
         venue,
         s3_no_route: s3,
         lambda_min_bps: env.config().params.pool_lock_min_bps,
         market,
     }
+}
+
+/// The fee view of a pool that cannot execute (`venues::raydium_v4::fee_view` /
+/// `venues::raydium_cpmm::fee_view`) **before their final `.capped(cap_bps)`**: the pool's own
+/// fee while it parses — AMM v4's [`pool_fee`]; CPMM's both directions from the cached pool and
+/// the config it names (`fees::cpmm`, the creator-fee side included) — else `cap_bps` itself
+/// (on CPMM as a trade fee). It is [`MarketView`]'s uncapped `live` pricing, as an executable
+/// pool's is: the program caps both at the **position's** locked hard cap
+/// (`venues::risk_quoter`), which [`View::risky`] applies; capping here at the config's cap
+/// would take `min(config cap, position cap)` where the two differ. One divergence remains:
+/// [`read_market_view`] passes the config's cap, so on a pool that no longer parses the
+/// cap-as-fee is the config's where the program's is the position's. An exit refuses `NoRoute`
+/// before it quotes on such a pool, so no exit decision reads either.
+pub fn fee_view(env: &Env, rm: &RayMarket, cap_bps: u64) -> Pricing {
+    if matches!(rm.pool, AnyPool::V4(_)) {
+        return Pricing::RayV4(pool_fee(env, rm, cap_bps));
+    }
+    let m = env.market(&rm.market());
+    let live = (|| {
+        let acc = env
+            .svm
+            .get_account(&m.pool_cache[raydium_cache::RAY_POOL])?;
+        let pool = raydium_cpmm::read_pool(&acc.owner.to_bytes(), &acc.data).ok()?;
+        let cfg_key = m.pool_cache[raydium_cache::RAY_AMM_CONFIG];
+        if pool.amm_config != cfg_key.to_bytes() {
+            return None;
+        }
+        let acc = env.svm.get_account(&cfg_key)?;
+        let cfg = raydium_cpmm::read_config(&acc.owner.to_bytes(), &acc.data).ok()?;
+        let resolve = |dir| {
+            fees::cpmm(
+                &fees::CpmmConfig {
+                    trade_fee_rate: cfg.trade_fee_rate,
+                    protocol_fee_rate: cfg.protocol_fee_rate,
+                    fund_fee_rate: cfg.fund_fee_rate,
+                    creator_fee_rate: cfg.creator_fee_rate,
+                },
+                &fees::CpmmPoolFees {
+                    enable_creator_fee: pool.enable_creator_fee,
+                    creator_fee_on: pool.creator_fee_on,
+                    sol_is_token0: m.has_flag(MARKET_FLAG_SOL_IS_TOKEN0_OR_COIN),
+                },
+                dir,
+            )
+            .ok()
+        };
+        Some(Pricing::Cpmm {
+            buy: resolve(Direction::Buy)?,
+            sell: resolve(Direction::Sell)?,
+        })
+    })();
+    live.unwrap_or_else(|| {
+        let cap = fees::CpmmFees {
+            trade: cap_bps.saturating_mul(100),
+            creator: 0,
+            creator_on_input: true,
+            protocol: 0,
+            fund: 0,
+        };
+        Pricing::Cpmm {
+            buy: cap,
+            sell: cap,
+        }
+    })
 }
 
 /// The [`View`] of `borrower`'s position `nonce` as it is.
@@ -1611,7 +1684,7 @@ fn check_liquidation(ev: &Liquidate, pred: &Predicted, plan: &Plan, payout: &Pay
     let pos = &pred.view.pos;
     assert_eq!(
         ev.buyback_cost, plan.b_live,
-        "AMM v4 charges exactly B̂_live"
+        "the venue charges exactly B̂_live (AMM v4; CPMM's exact out, U11's creator fee included)"
     );
     assert_eq!(ev.b_live, plan.b_live);
     assert_eq!(ev.b_live_risk, plan.b_live_risk);
@@ -1636,7 +1709,7 @@ fn check_expiry(ev: &Expire, pred: &Predicted, plan: &Plan, payout: &Payout) {
     let _ = pred;
     assert_eq!(
         ev.buyback_cost, plan.b_live,
-        "AMM v4 charges exactly B̂_live"
+        "the venue charges exactly B̂_live (AMM v4; CPMM's exact out, U11's creator fee included)"
     );
     assert_eq!(ev.b_live, plan.b_live);
     assert_eq!(ev.b_live_risk, plan.b_live_risk);

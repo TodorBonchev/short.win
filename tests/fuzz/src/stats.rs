@@ -27,6 +27,44 @@ pub struct Anomaly {
     pub detail: String,
 }
 
+/// The deficit tripwire's reach (M10, [`crate::shortfall`]): every negative SOL balance a lender
+/// covered before its withdrawal, against its pro-rata share of the realised shortfall.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Deficits {
+    /// Deficits checked against their bound.
+    pub checked: u64,
+    /// Runs with at least one.
+    pub runs: u64,
+    /// The largest deficit (lamports), that lender's bound then and its cumulative bound over
+    /// the run (no restarts, [`crate::shortfall::Ledger`]).
+    pub largest: u64,
+    pub largest_bound: u128,
+    pub largest_total_bound: u128,
+    /// The largest `deficit / bound` (ppm) over the deficits with a bound above 0 (one with a
+    /// bound of 0 must stay within the dust).
+    pub tightest_ppm: u64,
+    /// The smallest `deficit / bound` (ppm) over the deficits above the dust: how loose the
+    /// bound gets.
+    pub loosest_ppm: Option<u64>,
+}
+
+impl Deficits {
+    fn merge(&mut self, o: &Deficits) {
+        self.checked += o.checked;
+        self.runs += o.runs;
+        if o.largest > self.largest {
+            self.largest = o.largest;
+            self.largest_bound = o.largest_bound;
+            self.largest_total_bound = o.largest_total_bound;
+        }
+        self.tightest_ppm = self.tightest_ppm.max(o.tightest_ppm);
+        self.loosest_ppm = match (self.loosest_ppm, o.loosest_ppm) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (a, b) => a.or(b),
+        };
+    }
+}
+
 /// Counters of one run, or merged over many.
 #[derive(Clone, Debug, Default)]
 pub struct Stats {
@@ -46,6 +84,12 @@ pub struct Stats {
     pub cursor: String,
     pub hook_checkpoints: u64,
     pub wind_downs: u64,
+    /// The deficit tripwire (M10).
+    pub deficits: Deficits,
+    /// The wind-down's claim liveness (M10): the largest `lender_sol` and the largest positive
+    /// `pending` left unpaid after the second claim pass (lamports).
+    pub wind_down_lender_sol_max: u64,
+    pub wind_down_unpaid_max: u64,
 }
 
 impl Stats {
@@ -81,6 +125,11 @@ impl Stats {
         }
         self.hook_checkpoints += o.hook_checkpoints;
         self.wind_downs += o.wind_downs;
+        self.deficits.merge(&o.deficits);
+        self.wind_down_lender_sol_max = self
+            .wind_down_lender_sol_max
+            .max(o.wind_down_lender_sol_max);
+        self.wind_down_unpaid_max = self.wind_down_unpaid_max.max(o.wind_down_unpaid_max);
     }
 
     /// Records an anomaly of class `class` at the cursor.

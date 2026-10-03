@@ -149,6 +149,15 @@ pub fn signature(message: &str) -> String {
     format!("{loc} | {first}")
 }
 
+/// The number of actions `run` draws for `seed` under `--actions max`: from a quarter of `max`
+/// to all of it, `max/4 + splitmix64(seed ^ 0x1e57) % (3·max/4 + 1)` (so the wind-down's liveness
+/// check meets states at every depth). `one` derives its length the same way, so `one --profile P
+/// --seed S --actions M` replays exactly the run `run --actions M` made of that seed (M10; before,
+/// `one` ran `M` actions and a reproducer had to recompute the length, FUZZ-M7-24H-3).
+pub fn run_length(seed: u64, max: usize) -> usize {
+    max / 4 + (crate::rng::splitmix64(seed ^ 0x1e57) % (max as u64 * 3 / 4 + 1)) as usize
+}
+
 /// Runs `profile` / `seed`: the given `actions`, or `n` drawn from the seed.
 pub fn run(
     profile: Profile,
@@ -187,7 +196,16 @@ pub fn run(
     let mut failure = None;
     let mut done = list.len();
     for (i, act) in list.iter().enumerate() {
-        world.stats.cursor = format!("{} {} #{} `{}`", profile.name(), seed, i, act);
+        // `#i/n`: the action's index and the list's length (`one … --length n` replays a drawn
+        // list; M10).
+        world.stats.cursor = format!(
+            "{} {} #{}/{} `{}`",
+            profile.name(),
+            seed,
+            i,
+            list.len(),
+            act
+        );
         let r = panic::catch_unwind(AssertUnwindSafe(|| {
             world.apply(act);
         }));
@@ -203,7 +221,12 @@ pub fn run(
         }
     }
     if failure.is_none() {
-        world.stats.cursor = format!("{} {} wind-down", profile.name(), seed);
+        world.stats.cursor = format!(
+            "{} {} wind-down after {} actions",
+            profile.name(),
+            seed,
+            list.len()
+        );
         let r = panic::catch_unwind(AssertUnwindSafe(|| world.wind_down()));
         if r.is_err() {
             let message = take_panic();
@@ -405,6 +428,18 @@ pub fn parse_duration(s: &str) -> Result<u64, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The derived lengths stay where FUZZ-M7-24H-3's reproducer recorded them (`--actions 400`,
+    /// amm-v4 seed 20333958: 280 actions), within `[max/4, max]`.
+    #[test]
+    fn run_lengths() {
+        assert_eq!(run_length(20_333_958, 400), 280);
+        for seed in 0..1_000 {
+            let n = run_length(seed, 300);
+            assert!((75..=300).contains(&n), "{seed}: {n}");
+        }
+        assert_eq!(run_length(7, 0), 0);
+    }
 
     #[test]
     fn durations() {

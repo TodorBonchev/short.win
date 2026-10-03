@@ -249,6 +249,14 @@ kinds! {
     /// [`Kind::Withdraw`] picks them from `b`) ahead of a settlement of position `b / 1100`; the
     /// withdrawal must stay within the pro-rata allowance the lender had before it.
     WithdrawThenSettle = "withdraw_then_settle",
+    /// FUZZ-M7-24H-3's shape (M10, the deficit tripwire's reach): position `a` — opened near the
+    /// cap first when none is open — left without a keeper for `1 + a mod 3` days, one crank (the
+    /// rent receivable accrues to the lenders of then), lender `b` deposits `1 + b mod 3` times
+    /// the pool's token claims (a late depositor, ECON §9.4); with `b` even the price is steered
+    /// (ten cranked steps, up to three times) until the position's `B̂_live` lies in `(V − R_due,
+    /// V − K_s − ert]`, where a liquidation pays less rent than it was credited; then `10 + a mod
+    /// 50` keeper seconds.
+    StaleReceivable = "stale_receivable",
 }
 
 /// One action.
@@ -400,6 +408,7 @@ impl Profile {
             WrappedOpen => 3,
             EmergencyClear => 2,
             WithdrawThenSettle => 1,
+            StaleReceivable => 1,
             Liquidity | LpWrappedCrank | DepositWrappedOpen | WithdrawWrappedExit => {
                 return if lp {
                     match kind {
@@ -433,6 +442,18 @@ impl Profile {
                 };
             }
         };
+        // PumpSwap: M7-SEC-5's shape — a fee shock planting a tier boundary between the market
+        // caps, with an `open_near_cap` inside its hold — three times as dense since M10's fuzz
+        // follow-ups (the fee-scaled caps at the live fee, `scripts/mutants.sh`'s
+        // `pump-caps-live-fee`, was killed by two runs in a hundred and survived a 3-minute fuzz
+        // on a loaded machine).
+        if self == Profile::PumpSwap {
+            match kind {
+                FeeShock => return 3,
+                OpenNearCap => return 6,
+                _ => {}
+            }
+        }
         // The Raydium and PumpSwap programs are upgraded through their own guard indices; the
         // mock has no venue program in the guard, so upgrade shocks there are no-ops.
         if mock && matches!(kind, UpgradeShock | Revalidate) {
