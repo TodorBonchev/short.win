@@ -13,7 +13,8 @@ How to set up the toolchain, build and test short.win. The pins come from
 | Platform-tools / SBPF arch | v1.57 (rustc 1.95) / v3 | the build command (below) |
 | Node | 24.21.0 LTS | `mise.toml` |
 | pnpm | 12.7.0 | `mise.toml`, `package.json` `packageManager` (with sha512) |
-| Python | 3.14, standard library only | test-vector generators, `scripts/config_gate.py`, `scripts/dump-fixtures.py` |
+| Python | 3.14, standard library only | test-vector generators, `scripts/config_gate.py`, `scripts/dump-fixtures.py`; since M10 `scripts/check-security-txt.py`, `scripts/audit_scope.py`, `scripts/gapcal/` |
+| solana-verify (verifiable builds, M10) | 0.5.2, image `solanafoundation/solana-verifiable-build@sha256:2e0b78f4…` (Agave 4.1.2) | `ci.yml` `SOLANA_VERIFY_VERSION` / `SVB_IMAGE_DIGEST`, `scripts/verifiable-build.sh` |
 | PostgreSQL (the indexer, M8) | 17.11: embedded in the tests (zonky builds through `postgresql_embedded` 0.21, user cache), `postgres:17.11` in the reference deployment | `services/indexer/src/testing/pg.rs` (`PG_VERSION`), `services/indexer/deploy/docker-compose.yml` |
 
 On-chain crates declare `rust-version = "1.89"`. They are compiled by the platform-tools
@@ -73,8 +74,51 @@ Check an artifact: `od -An -t x4 -j 48 -N 4 target/deploy/shortwin.so` prints `0
 and `target/idl/complete_curve.json`.
 
 Verifiable builds (M10) use solana-verify 0.5.2 with the same pins; the `=` form of the
-option is required:
+option is required (clap 2 `require_equals` on `build`, `verify-from-repo` and `export-pda-tx`):
 `solana-verify build --library-name shortwin --arch v3 --cargo-build-sbf-args="--tools-version v1.57"`.
+solana-verify picks its image from `[workspace.metadata.cli] solana = "4.1.2"` (root `Cargo.toml`):
+`solanafoundation/solana-verifiable-build@sha256:2e0b78f4…` (rust 1.95.0, `cargo-build-sbf` 4.1.0;
+the `--tools-version v1.57` argument makes it fetch v1.57 inside the container).
+`scripts/verifiable-build.sh` builds both deployed programs that way and must be byte-identical to
+`anchor build`:
+
+```sh
+cargo install solana-verify --version =0.5.2 --locked
+scripts/verifiable-build.sh --compare target/deploy          # Docker (CI's verifiable-build job)
+scripts/verifiable-build.sh --local --compare target/deploy  # no Docker daemon: bubblewrap shim
+# --out DIR (default target/verifiable): the two .so files, the build logs and verifiable-hashes.txt
+```
+
+- `verifiable-hashes.txt` holds, per program, the file's sha256 and solana-verify's
+  **executable hash** (the file with its trailing zero bytes trimmed: what `get-program-hash`,
+  `verify-from-repo` and verify.osec.io compare with the on-chain ProgramData).
+- `--compare DIR` fails unless each program equals `DIR/<program>.so` byte for byte. CI compares
+  with the `anchor-build` artifact, so the binary that is deployed and verified is the tested one.
+- `--local` runs the same image without Docker. `scripts/svb-shim/fetch-image` downloads it by
+  digest from Docker Hub, checks every blob's sha256 and extracts it once into `$SVB_CACHE`
+  (default `~/.cache/shortwin/svb`). `scripts/svb-shim/docker` stands in for `docker` and runs it
+  under bubblewrap in an unprivileged user namespace (no daemon, no root). It builds a fresh clone
+  of HEAD: committed state only; the checkout's `target/deploy` is not touched. A container that a
+  failed build leaves behind is removed on exit. `fetch-image` refuses an image whose layers would
+  delete, write or hard-link through a symlink that leads out of the extracted rootfs (the rootfs
+  has absolute links such as `var/run -> /run`). Needs `bwrap`, unprivileged user namespaces,
+  python3, ≈ 8 GB on disk (a reflink file system such as btrfs makes each container instant) and
+  network (crates.io, platform-tools v1.57 from GitHub).
+- The shim runs any digest-pinned image of solana-verify's IMAGE_MAP (`SVB_IMAGE_DIGEST` is the
+  allow-list). M10 rebuilt Raydium CPMM's 2026-10 redeploy that way, byte for byte, in the 3.1.10
+  image (`tests/fixtures/README.md`).
+- The script refuses a build tree in which another `Cargo.toml` has the same library name
+  (`--library-name` takes the first match).
+- On `pull_request`, CI builds GitHub's merge commit; `verifiable-hashes.txt` names it and the PR
+  head (`PR_HEAD_SHA`).
+
+On-chain verification (the PDA upload through Squads and `solana-verify remote submit-job`; the
+old `verify-from-repo --remote` is deprecated and returns an error) needs the deployed program and
+public source: M11.
+
+**A comment-only program edit is bytecode-neutral only if no line below it moves.** Anchor's error
+origins embed source line numbers (`error!`, `require!`), so a comment that adds or removes a line
+changes the ELF. Check by hash (`sha256sum target/deploy/*.so` before and after).
 
 `anchor build` builds the three programs of the Anchor workspace: `shortwin`, the stateless
 straddle helper `programs/complete_curve` (M5; ARCH §5.4, A66: `complete_curve(max_sol_cost)`
@@ -122,7 +166,11 @@ PROPTEST_CASES=2000 cargo test --workspace           # the CI count; LiteSVM tes
 PROPTEST_CASES=20000 cargo test -p shortwin-math     # deeper local run (can only raise the count)
 cargo build -p shortwin-math-wasm --target wasm32-unknown-unknown --release
 cargo check -p shortwin --target wasm32-unknown-unknown   # T-LAYOUT wasm32 leg
+cargo test -p squads-v4-ix                           # M10: the Squads v4 encoders against the vendored IDL
 anchor build --tools-version v1.57 --arch v3
+python3 scripts/check-security-txt.py --forbid-placeholders --source-release v1.0.0 \
+  target/deploy/shortwin.so "short.win"              # M10 SECTXT-1: the release gate (also complete_curve.so,
+python3 scripts/test_check_security_txt.py           #   "short.win complete_curve"); the checker's own tests
 cargo deny check
 cargo audit --deny warnings --ignore RUSTSEC-2025-0141 --ignore RUSTSEC-2021-0139 \
   --ignore RUSTSEC-2024-0388 --ignore RUSTSEC-2024-0436 --ignore RUSTSEC-2025-0161
@@ -132,6 +180,18 @@ cargo audit --deny warnings --ignore RUSTSEC-2025-0141 --ignore RUSTSEC-2021-013
 whole workspace at that count.) The ignored advisories are the ones in `deny.toml`: all
 "unmaintained", none a vulnerability;
 bincode comes with anchor-lang 1.2.0, the other four only with the LiteSVM test harness.
+
+**security.txt (M10, ARCH §8.5).** Both deployed programs embed a
+neodyme security.txt (`solana-security-txt =1.1.3`, `security_txt!` in
+`programs/{shortwin,complete_curve}/src/lib.rs`): the owner's values of 2026-10-02 (contact
+`security@short.win`, policy `https://short.win/security`) and `source_release` = `v` + the
+package version (both crates are 1.0.0). It is compiled out of `no-entrypoint` builds (the keeper,
+the harness and the fuzzer link the programs as libraries) and out of the TEST-ONLY `test-venue`
+build. `scripts/check-security-txt.py` mirrors the crate's and the Explorer's parser and requires
+exactly one marker; without `--forbid-placeholders` an `OWNER-FILL` placeholder is reported, not
+refused. CI runs it with `--forbid-placeholders --source-release v<Cargo version>` on both release
+ELFs and checks that the test-venue build carries no marker. Read a deployed program's with
+`query-security-txt <program id>`.
 
 Test vectors from the normative sims: `python3 crates/shortwin-math/tests/vectors/<track>/gen_<topic>.py`.
 The conventions are in [`crates/shortwin-math/tests/vectors/README.md`](../crates/shortwin-math/tests/vectors/README.md).
@@ -148,7 +208,7 @@ workspace `Cargo.lock`, C1-14). They load the SBF builds, so build them first:
 ```sh
 anchor build --tools-version v1.57 --arch v3          # target/deploy/shortwin.so and mock_cpamm.so
 scripts/build-test-venue.sh                           # target/test-venue/deploy/shortwin.so (M2 tests)
-cargo test -p shortwin-litesvm-tests                  # every binary below, ~15 min (debug)
+cargo test -p shortwin-litesvm-tests                  # every binary below, ≈ 25 min (debug, M10)
 cargo test -p shortwin -p shortwin-venue-state        # host unit tests of the program and readers
 ```
 
@@ -162,9 +222,25 @@ program only; `Env::ray_fork()` the release program and the dumped Raydium progr
 `Env::fork_pump_coin(coin)` the release program, the dumped pump, pump-fees and PumpSwap programs,
 pump's statics, one coin's accounts, mainnet's Rent and the pump snapshot's clock (M5);
 `Env::fork_pamm_coin(coin)` (M6) the same with PumpSwap's statics and one canonical pool role of
-the `pamm_state` dump (`Env::plant_negative_vqr` swaps in the synthetic negative-VQR pool). A
+the `pamm_state` dump (`Env::plant_negative_vqr` swaps in the synthetic negative-VQR pool);
+`Env::with_squads()` (M10) adds the immutable mainnet Squads v4 and its `ProgramConfig`, and
+`Env::squads_governed()` the owner's layout on it (Governance 3-of-5 with a 48 h Squads time lock,
+Emergency 2-of-4 with none, `initialize_config` with the vaults). A
 stale `target/deploy/shortwin.so` fails the Raydium and pump binaries in confusing ways: rebuild
 after any program change (or point `SHORTWIN_SO` at a private build).
+
+**The mainnet SPL programs (M10, T-MEMO).** Every `Env` replaces LiteSVM 0.16's bundled Token-2022
+and spl-memo v3 with the builds mainnet runs, right after `LiteSVM::new()`
+(`fork::load_mainnet_spl`, fixture group `spl_programs`): Token-2022 from its dumped ProgramData
+(deploy slot 427,147,035, the live upgrade authority; trimmed ELF `7ea94a02…`, OtterSec's verified
+build of `solana-program/token-2022@9bc02757`, program v11.0.0) under the upgradeable loader, and
+spl-memo v3 under BPFLoader2 (account sha256 `f520eaf0…`); both are held to their manifest
+sha256 and pinned in `fork.rs`. `SHORTWIN_BUNDLED_SPL=1` keeps the bundled builds. SPL Token
+(p-token), the ATA program and spl-memo v1 stay LiteSVM's. Token-2022 CPIs cost about 15 CU more
+on the mainnet ELF than on the bundled one; the benches, which copy the `Env`'s ELFs into Mollusk,
+were re-baselined on it. The memo-required withdrawal and its control:
+`cargo test -p shortwin-litesvm-tests --test security -- sec_7 t_memo --nocapture` (prints the
+memo's CU, 7,928, and the whole withdrawal's, ≈ 42,700).
 
 **The curve venue bit in tests (M5-SEC-4).** The M5 build refuses to enable the pump-curve venue
 (`constants::VENUE_BITS_UNFINISHED`; `initialize_config` and `EnableVenues` fail `InvalidParams`),
@@ -177,29 +253,32 @@ the venue as M6 will enable it; `Env::initialize_config_as_sent` sends the argum
 | Binary | Covers |
 |---|---|
 | `--test it` | admin and config (T-CONFIG on-chain: every compiled bound, the timelock), pause, T-LATCH (mock ProgramData), T-LAYOUT (runtime offsets), lender constraint cases, the harness, the admin CU table (`cu_baseline -- --nocapture`) |
-| `--test market_create` | `create_market` (exact state, creation fee, griefing, detection keys, venue hints) and `flag_unsafe_mint` |
-| `--test mint_filter_extensions` | the SPEC §3 allowlist filter: one fixture per Token-2022 extension, program vs byte-level filter |
+| `--test market_create` | `create_market` (exact state, creation fee, griefing, detection keys, venue hints) and `flag_unsafe_mint`; M10: SQ-G8, the four authorities pairwise distinct (`AuthoritiesNotDistinct`, 6105) at `initialize_config` and at an `Authorities` proposal and its apply |
+| `--test mint_filter_extensions` | the SPEC §3 allowlist filter: one fixture per Token-2022 extension, program vs byte-level filter; M10: spoofed owners at the detection PDAs (G-A3) |
 | `--test lender_it` | the six lender-pool instructions, T-POT, the lender adversarial cases (C0-6, C0-9, C0-13, R3A-2, R3A-10, R3B-1, R3B-2, V2-2, V2-12), `pool_model` trace replays |
+| `--test lender_real_it` | M10 (WP-8c): the lender cases on **real** exits — a JIT whale's `[deposit 9×, exit, claim_sol, withdraw]` around a real liquidation's penalty, an expiry's fee, a `sweep_trader` and (on the fork) PumpSwap's cashback lump realises 0, a whale holding `h` takes `h/lump_vest_s` of its share; `[withdraw, sol_settle]` in one transaction held to the pre-settlement allowance; `claim_sol ×N`; two consecutive real wipes; `rent_protocol_bps` changed with positions open; the same on Raydium CPMM; finding M10-8C-1's regressions (`finding_m10_8c_1_*`: the rent top-up of an early exit vests, the whale realises 0) |
 | `--test oracle_crank` | `crank_sol_usd` on the committed mainnet `PriceUpdateV2` dump (`tests/fixtures/`, checked by `sha256sum -c SHA256SUMS` there) |
 | `--test security` | the M1 security review's findings as regressions and its refutation tests |
-| `--test security_m2` | the M2 security review's findings as regressions: M2-SEC-1 (no box collapse on an executable venue), M2-SEC-2 (the `stable` extras set), M2-SEC-3 (canonical template bumps), M2-SEC-4 (`sweep_trader` reopens lending after a full wipe), M2-SEC-5 **inverted by M5** (`m2_sec_5_sol_settle_reaches_s3_on_a_none_market`: `sol_settle` on a `None` market takes the detection set as ReadSet and settles S3 after the chain, FV at the cap-only view; a planted state, hooks off from the plant — the real transition runs with hooks on in `pump_it::graduation`), and A49 (the release build refuses the mock venue) |
+| `--test security_m2` | the M2 security review's findings as regressions: M2-SEC-1 (no box collapse on an executable venue), M2-SEC-2 (the `stable` extras set), M2-SEC-3 (canonical template bumps), M2-SEC-4 (`sweep_trader` reopens lending after a full wipe), M2-SEC-5 **inverted by M5** (`m2_sec_5_sol_settle_reaches_s3_on_a_none_market`: `sol_settle` on a `None` market takes the detection set as ReadSet and settles S3 after the chain, FV at the cap-only view; a planted state, hooks off from the plant — the real transition runs with hooks on in `pump_it::graduation`), and A49 (the release build refuses the mock venue); since M10 on mainnet's Token-2022 and spl-memo v3: `sec_7_*` (the memo CPI right before `transfer_checked`, 7,928 CU) and `t_memo_control_top_level_sibling_check` (T-MEMO) |
 | `--test mock_cpamm` | the mock venue itself: execution equals `shortwin-math`'s `quote::cpmm` exactly (a differential proptest, `MOCK_CPAMM_CASES`, default 96), the layout at its documented offsets, every knob (disable, fee, layout change, over-delivery, required extras), delegate-aware sources, Token-2022 bases |
 | `--test engine_it` | M2 engine: `open_short` / `close_short` flows and every refusal reachable on the mock, the prologue, trader normalisation and griefing, over-delivery, sandwiches around opens and closes, the O6 powers and T-REPLAY-PDA, T-TRACE / CU, the structural I14 test, the hooks' own mutants, and the seeded random walk (`ENGINE_FUZZ_SEEDS`, default 4, and `ENGINE_FUZZ_STEPS`, default 120) over opens, closes, top-ups, keeper exits, shocks, deadlines and I10's pause-and-flag action |
-| `--test add_margin_it` | `add_margin` (every gate ignored, snapshots unchanged, I14 on its accounts, a random walk: `ADD_MARGIN_WALK_SEEDS`) |
+| `--test add_margin_it` | `add_margin` (every gate ignored, snapshots unchanged, I14 on its accounts, a random walk: `ADD_MARGIN_WALK_SEEDS`); M10: the extras denylist on every leg instruction (`o6`, G-A5; since batch 3 also the borrower and the adopted pool's accounts, template aliases included) and the zero-lamport borrower (`zero_lamport`, G-H10) |
 | `--test crank_price_it` | `crank_price`: `CoverageGap`, same-second floods, the ring rewrite, forced EMA adoption |
 | `--test liquidate_it`, `--test expire_it` | the keeper exits against an oracle recomputed from `shortwin-math` alone: every waterfall branch, every refusal, what exits ignore (I10), donations, over-delivery, extras, I14, liveness (I-E11), T-TRACE / CU, hook mutants |
 | `--test attacks_exit_it` | ECON §12's exit attacks on ECON's `RA` market, to the lamport: `sandwich.py`, `fixed_delta.py`, `block_spot.py`, `ema_atomic.py`, `ema_near.py`, `ema_atomic_multi.py` (the OI-cap basket: atomic, held, and S1 forcing), `ptf_sandwich.py`, `fvcap.py` (the RA rows), `cascade.py` |
 | `--test settle_it` | `sol_settle`: arming, S1 / S2 / S3, epoch records, T-BOX (seeded push / freeze / dump runs) |
 | `--test route_it` | T-S3-BROKEN (the flag, a fee above the hard cap, a disabled venue, a layout change; liquidations and closes equal the unflagged run; the Emergency-flag S3 raced against an honest expiry) |
-| `--test extras_it` | T-REPLAY-PDA end to end (a per-mint PDA extra recovered with a template; a hostile `current` bypassed) |
+| `--test extras_it` | T-REPLAY-PDA end to end (a per-mint PDA extra recovered with a template; a hostile `current` bypassed); M10 G-G3: the global hard cap moved across the live fee with two positions open |
 | `--test attacks_settle_it` | ECON §12.10–§12.11 on an `RC`-like pool: `arming.py`, `refute_push.py`, `fv_push.py` (incl. the S2 → S1 flip and its limit) |
 | `--test invariants_m2_hooks` | the M2 hooks fire on deliberately broken states (I2, I3, A26, I5–I7, I9–I13, I16) |
-| `--test ray_math_it` | M3, T-RAY-MATH (execution half): direct swaps on the dumped AMM v4 / CPMM ELFs (both directions, exact in and out, every fixture pool, all 21 CPMM configs × creator-fee sides, fee and `need_take_pnl` changes, seeded sequences: `RAY_MATH_SEQ`, default 40, and `RAY_MATH_SEED`) equal `quote::ray_v4` / `quote::cpmm` on the readers' reserves, the exact bound passing and one unit tighter failing; negative controls; fixture integrity and venue PDAs; both readers' route predicates against the ELFs; the byte-level admin builders against the real admin instructions |
+| `--test ray_math_it` | M3, T-RAY-MATH (execution half): direct swaps on the dumped AMM v4 / CPMM ELFs (both directions, exact in and out, every fixture pool, all 21 CPMM configs × creator-fee sides, fee and `need_take_pnl` changes, seeded sequences: `RAY_MATH_SEQ`, default 40, and `RAY_MATH_SEED`) equal `quote::ray_v4` / `quote::cpmm` on the readers' reserves, the exact bound passing and one unit tighter failing; negative controls; fixture integrity and venue PDAs; both readers' route predicates against the ELFs; the byte-level admin builders against the real admin instructions; M10: I17's M6-SEC-3 clause on the pump fork |
 | `--test ray_it` | M3, the Raydium adapters on the fork: listing (exact state, O13, every verification / eligibility refusal, D1 precedence on Fartcoin's real curve), open → close to the lamport on both programs (SPL, Token-2022, WSOL on either side, every fee variant incl. U11), the Raydium open refusals, T-LATCH (byte-patched slots), T-RAY-PDA, T-RAY-WSOL, T-RAY-DISABLE, T-RAY-FEE, liquidation and expiry, I14, the hooks' Raydium view, T-RAY-TRACE / CU and T-SIZE (`-- --nocapture` prints them) |
-| `--test raydium_v4_e2e`, `--test raydium_v4_attacks` | M3 fork E2E on Fartcoin (AMM v4) and ECON §12 on the real pool, every short.win instruction against the differential oracle of `raydium_v4_support.rs`: lifecycle (listing window, Tier C → A, close, two liquidations after a real pump, expiry, the lender's exit), S3 after a real `SetParams` halt, S2 via LP removal (unreachable at the defaults; reached under an in-bound governance corner), S1 on a real gap; exit sandwiches, atomic and held pushes, `fv_push` and the flip bundle (`-- --nocapture` prints the figures) |
+| `--test raydium_v4_e2e`, `--test raydium_v4_attacks` | M3 fork E2E on Fartcoin (AMM v4) and ECON §12 on the real pool, every short.win instruction against the differential oracle of `raydium_v4_support.rs`: lifecycle (listing window, Tier C → A, close, two liquidations after a real pump, expiry, the lender's exit), S3 after a real `SetParams` halt, S2 via LP removal (unreachable at the defaults; reached under an in-bound governance corner), S1 on a real gap; exit sandwiches, atomic and held pushes, `fv_push` and the flip bundle (`-- --nocapture` prints the figures); M10 (on the 2026-10 CPMM ELF): a thin pool in place of the adopted one on every instruction (G-A6), a denylisted Emergency extra bypassed with `previous` and, since batch 3, the pool, its vaults (template aliases of the CPMM `pool_vault` PDA included) and the borrower refused as extras (G-A5), griefing on CPMM (G-B), the zero-lamport borrower on both programs (G-H10), and venue admin with a position open (`route::amm_v4_*` / `cpmm_*`: the Emergency flag's S3, the liquidation differential, the O15 race, G-G5, G-H3) |
 | `--test raydium_cpmm_e2e` | M3 fork E2E on CPMM: the USELESS, Token-2022 and creator-fee journeys (list → deposit → open → real price moves → close / liquidation / expiry → S3 on an admin halt and on a fee hike above the hard cap → S2 on an out-of-model drained pool → lender exit), the settlement matrix on every fixture pool, U11 through short.win's exits, O13 ages |
+| `--test raydium_cpmm_exits_it` | M10 (fuzz follow-ups): `raydium_v4_support`'s keeper-exit oracle on the 2026-10 CPMM ELF (USELESS, the Token-2022 pool, the creator-fee pool with its fee on either side): refusals as predicted, a liquidation after a real pump and an expiry checked to the lamport |
+| `--test raydium_cpmm_attacks`, `--test pumpswap_attacks` | M10 (WP-8b): ECON §12 on Raydium CPMM (USELESS, the creator-fee pool) and PumpSwap (`mature`), with the shared `venue_attacks_support.rs` (no oracle on these venues: the program's own decision read on a clone of the VM, the structural claims asserted on what lands — I11, the lenders' legs, never S1): sandwiches, held pushes (O19's figures), the OI basket, the held fresh push, the `p′` veto, LP round trips around `sol_settle` (G-E4); PumpSwap also round 3 (`-- --nocapture` prints the figures) |
 | `--test latch_raydium_it` | M3, T-LATCH on the dumped ProgramData: real loader upgrades (the Squads vault's signature forged), opens refused on every Raydium market while exits keep working, revalidation only at the loader's slot, a second upgrade during review, both Raydium bits, `[flag, open]` vs `[open, flag]`, U5 (the same CU on 1.4 MB, 0.79 MB and 10 MiB) |
-| `--test trace_raydium_it` | M3, T-RAY-TRACE: the exact call shape (program and stack height of every CPI) and trace entries of every Raydium-path instruction on AMM v4, CPMM and Token-2022 CPMM; peak height 3; the worst-case transactions ≤ 64 and the runtime's refusal of one open more |
+| `--test trace_raydium_it` | M3, T-RAY-TRACE: the exact call shape (program and stack height of every CPI) and trace entries of every Raydium-path instruction on AMM v4, CPMM and Token-2022 CPMM; peak height 3; the worst-case transactions ≤ 64 and the runtime's refusal of one open more; M10: the upgrade mainnet made, CPMM's 445,763,504 build upgraded by the loader to the 2026-10 redeploy and latched until revalidated |
 | `--test ray_sec_it` | M3 security review regressions on the fork: M3-SEC-1 (a CPMM config trade fee of 0 is no route — S3 chain, healthy positions frozen, never an uncapped S1 — and a fee-free risk view; the fee-split predicate against the ELF), M3-SEC-2 (Raydium listings refused while the Raydium latch is set), M3-SEC-3 as inverted by M4 (`m3_sec_3_propose_pool_unpins_the_first_listing`: a list-only front-run of a Raydium token moved onto its main pool by `propose_pool`; a thin eligible listing replaced by the main pool inside `pool_list_window_s`, the window not extended) |
 | `--test pool_select_it` | M4, Raydium pool selection on the fork (release build, dumped programs, **planted** candidate pools — `pool_select::plant_v4` / `plant_cpmm`, a dumped pool's bytes on fresh keys that the dumped ELFs trade): a list-only market's adoption (exact state, O13 / O13b ages, D1 on real and planted curves, base/quote order); the listing window's 5 % margin, never extended; zero-position adoption at 25 % and `PositionsOpen`; AMM v4 ↔ CPMM switches with trades on the new pool; the fast path with open positions (the `pool_fail` chain — halt, fee above the hard cap, never the Emergency flag —, 120 s, the 60 s window keeping the deepest candidate, locked terms and EMA continuity, the ring rewrite and a ≤ 1 % box from the first second, exits on the new pool), cancellations, the latch; every refusal; T-RAY-SWITCH's attacks; #99's switch only if all fit (`carried_fit`: per position and per market on both programs, cancellation at the execution, the dump guard at `P_ema`, a withdrawal-wrapped execution, the mark) and #100's FIT regressions (`carried_fit::fit1_*`: FIT-1's residual — a dump-wrapped proposal carries at most the execution's cap, ≤ `λ·√(P_cand/P_ema)` × a native open's cap, knobs `FIT_R_BPS`, `FIT_Q_PERMILLE`; `carried_fit::fit3_*`: FIT-3's residual — a closed max-size position keeps a fitting candidate refused while positions are open, and they settle S3 at their deadlines with the lenders at FV; the I15 hook `i15_the_carried_fee_and_the_marks`: the fee mark `min_open_fee_ppm` moves only at an open and the last exit); the I15 hook's mutants; T-TRACE / CU (`-- --nocapture` prints them) |
 | `--test pool_attacks_it` | M4 pool-capture attacks on the fork (ARCH §2.6's attack table; the attacker's liquidity moves by the dumped CPMM ELF's real `deposit` / `withdraw`): unlocked-LP capture and pull (`D` unchanged), λ burn / locker / "unburn" games, hysteresis and the wash-trading cost of a flip, fast-path front-running, R4B-10 griefing and the pause remedy, mirrored and look-alike quotes, the latch (per candidate program, M4-SEC-8), `venue_switch.py`'s RA / RB / RC rows, no forced exit through a switch; the implementer's two tripwires are **inverted** by the M4 security review (`lambda_games::lp_dilution_no_longer_cancels_the_fast_path`, `…::a_round_trip_under_the_sol_floor_no_longer_cancels_the_fast_path`: an atomic `[deposit LP / sell, execute_pool_switch, withdraw / buy back]` no longer cancels the fast-path window, eligibility being the locked depth at `P_ema`) (`-- --nocapture` prints the figures) |
@@ -210,20 +289,22 @@ the venue as M6 will enable it; `Env::initialize_config_as_sent` sends the argum
 | `--test tx_size_raydium` | M3, T-SIZE: every Raydium transaction in its worst case (both ComputeBudget instructions, a separate fee payer, a first-time borrower, the largest extras set) fits 1,232 B and 64 accounts as v0 through the protocol ALT (A28 as enumerated, and the table `scripts/build-alt.sh` builds) and executes that way; crank batches (4 per v0 transaction); the keeper's composite and a Jito tip; M4's `propose_pool` / `execute_pool_switch` in their largest shapes (CPMM incumbent + CPMM candidate, a list-only market's detection set), executed through the table (`-- --nocapture` prints the table) |
 | `--test pump_math_it` | M5, T-PUMP-MATH (execution half) on the pump fork: a normal user's `buy_v2` / `sell_v2` / `buy_exact_quote_in_v2` on every live SOL curve of the dump (125-, 151-, 115- and 49-byte layouts, SPL Token and Token-2022) over grids and seeded sequences equal `fees::pump_curve` and `quote::sol_leg` on the readers' state to the lamport — every account delta and the `TradeEvent` —, the exact bound passing and one unit tighter failing; the live and synthetic fee tiers, the creator override, a default creator; 6021 above `rT`, the completing buy, 6005 after completion; the undocumented cap byte; the creator-vault top-up; recipient refusals; the tripwire on the live-supply fee tier (R-PUMP Update U10) |
 | `--test pump_it` | M5, the pump-curve adapter on the fork (release build, dumped pump / pump-fees / PumpSwap programs and coins): `listing` (`create_market(Auto)`: curve cache, trader base ATA and pump UVA, the list-only outcomes, every refusal), `flows` (open → close to the lamport on every curve layout), `refusals`, `structure` (I14), `rent` (T-RENT: the creator-vault top-up on sales and buys), `pda` (T-PDA-USER: the trader PDA as pump's `user` under CPI), `straddle` (`CurveStraddle`; `B̂_str` against the executed completion + `migrate_v2` + PumpSwap `buy`), `graduation` (`→ PumpMigrating`, the migration pause and S3 at 70 min, a real `migrate_v2`, `→ None` and S3 on the detection set, `None → PumpCurve` re-detection; M4's carry-overs: a graduated-elsewhere market with a position adopts its Raydium pool through the collection window, and the re-detection clears a running window; since M6 a migrated market moves `→ PumpSwap` and a graduated coin lists on its pool; the M6 security review's `m6_sec_5_*` — a full wipe during the migration pause waits for the curve cashback, without cashback `sweep_trader` alone unlocks the market — and M6-SEC-3 as the owner decided it on 2026-09-30 (ARCH §3.4, SPEC §14): `m6_sec_3_curve_opens_are_refused_exactly_while_create_pool_is_halted` — a curve open fails `GraduationHalted` (6104) exactly while PumpSwap's `disable_flags` bit 0 is set (0x01 / 0x03 / 0x09 / 0x19 / 0xff refused, 0xfe opens, clearing the bit re-enables opens, a close runs under the halt) — and `m6_sec_3_a_position_opened_before_the_create_pool_halt_stalls_until_s3` — a position opened before the halt keeps the stalled-graduation path: `migrate_v2` fails 6017 (`DisabledCreatePool`), the healthy position frozen past the 70-min pause until its deadline, then S3), `exits` (expiry, liquidation, `sweep_trader`'s token leg, the pump latch bits) |
-| `--test straddle_it` | M5, T-STRADDLE (curve part) with the `complete_curve` helper (`COMPLETE_CURVE_SO`): tx1 completes at the `rT` it reads, is a no-op on a completed or migrated curve; ★ a buy, a sale, a third-party completion or migration between the keeper's read and the bundle; v0.3's stale tx1 reverting the bundle; `max_sol_cost`; a straddled short.win position (`CurveStraddle`, `B̂_str` stable); every live SOL curve; the helper's own checks; trace / CU / size per transaction (`-- --nocapture`). **M6:** tx3 as built — the keeper's (the transition plus the pool's first bucket; its exit at T + 8, T + 9 without that bucket; a tx3 carrying the exit reverts the bundle `EmaWarmingUp`), the three-transaction bundle against a curve trade before it, the borrower's own tx3 with `close_short` at `B̂_str`, a borrower's self-made straddle (`rT − q + 1`) |
+| `--test straddle_it` | M5, T-STRADDLE (curve part) with the `complete_curve` helper (`COMPLETE_CURVE_SO`): tx1 completes at the `rT` it reads, is a no-op on a completed or migrated curve; ★ a buy, a sale, a third-party completion or migration between the keeper's read and the bundle; v0.3's stale tx1 reverting the bundle; `max_sol_cost`; a straddled short.win position (`CurveStraddle`, `B̂_str` stable); every live SOL curve; the helper's own checks; trace / CU / size per transaction (`-- --nocapture`). **M6:** tx3 as built — the keeper's (the transition plus the pool's first bucket; its exit at T + 8, T + 9 without that bucket; a tx3 carrying the exit reverts the bundle `EmaWarmingUp`), the three-transaction bundle against a curve trade before it, the borrower's own tx3 with `close_short` at `B̂_str`, a borrower's self-made straddle (`rT − q + 1`); M10: `fees` (pump `FeeConfig` between and above the caps with a position open, G-G4; a curve layout change, G-H3; the Emergency flag's S3, the liquidation differential and the O15 race, G-D6), extras on the sell leg checked on the ELF's CPI (A41), and since batch 3 the curve, its ATAs (template aliases included) and the borrower refused as extras |
 | `--test pump_curve_scenarios`, `--test pump_curve_attacks`, `--test pump_curve_e2e` | M5 fork E2E on the curve (shared `pump_curve_support.rs`, no tests of its own; ≈ 2.5 / 1.5 / 1.3 min debug): ECON §11.2 and §10.1 curve rows replayed second by second against `shortwin_sim` to the lamport (D@50 % / D@80 % / D@90 %, stuck migrations with S3 at +4,200 s; D@0 % refused, `ProceedsBelowMin`); ECON §12 on the curve (expiry and liquidation sandwiches, atomic and held pushes, the OI-cap basket); the lifecycle on a live curve (listing, lenders, opens, a close, liquidations, an expiry, the lenders' exit), completion with positions open (`→ PumpMigrating` → `None`, S3), a curve migrated elsewhere between two reads, a real `migrate_v2` moving the market onto the pool (M6), and a fast `migrate_v2` priced on the pool (M6; the M5-only EMA freeze is gone); §10.1's graduation rows are `graduation_scenarios`' (`-- --nocapture` prints the figures) |
 | `--test trace_pump_it` | M5, T-TRACE on the curve: the exact call shape (program and stack height of every CPI) and entries of every curve-path instruction (listing, cranks incl. the venue transitions, opens, closes incl. a completing buyback, liquidate, expire, `sol_settle` on `PumpMigrating` and `None`, `sweep_trader`, the latch), peak height 3; the worst-case transactions ≤ 64 and the runtime's refusal of one open more |
 | `--test tx_size_pump_it` | M5, T-SIZE on the curve: every curve transaction in its worst case (the largest extras set, a separate fee payer, a first-time borrower) as v0 through both tables (A28 with its pump part, and `scripts/build-alt.sh`'s), executed that way; crank batches (5 per v0 transaction); the keeper's composite; a tipped liquidation with the largest extras set measured as **not** fitting v0 (`-- --nocapture` prints the table) |
 | `--test latch_pump_it` | M5, T-LATCH on the dumped pump / pump-fees / PumpSwap ProgramData: real loader upgrades, opens refused on curve markets while cranks, top-ups, `sol_settle`, `sweep_trader`, closes, liquidations and expiries keep working; revalidation only at the loader's slot; all three bits must clear; U5 on the 10 MiB accounts |
 | `--test m5_sec_curve_it` | the M5 security review's findings on the curve as regressions (release build, pump fork; shares `pump_curve_support.rs`; the audit's reproducers, converted): M5-SEC-1 (a full wipe on a live curve reopens once `sweep_trader` has set the venue-reward bit, the trader's pump UVA holding no claimable cashback; a cashback coin's `[pump claim_cashback(user = trader), sweep_trader]` credits the wiped epoch — T-CASHBACK's pump part), M5-SEC-3 (a sale wrapped around the open no longer lifts the Tier D guard or `X₀`: the curve caps read the reserves at `P_ema`), M5-SEC-4 **inverted by M6** (`m5_sec_4_m6_can_enable_the_curve_venue`; `m5_sec_4_an_atomic_complete_and_migrate_graduates_the_market_onto_its_pool`: the atomic `[buy_v2(rT), migrate_v2]` with the pool pushed ≥ 3.5× the last curve EMA moves the market onto the pool, which liquidates only after the 8-integration warm-up), M5-SEC-5 (an unreadable canonical pool keeps the market `PumpMigrating` and fails Raydium adoptions closed; an empty address is graduated elsewhere), M5-SEC-6 (a low-bump market costs short.win no extra CU) |
-| `--test pamm_it` | M6, the PumpSwap adapter on the fork (release build, the dumped pAMM / pump / pump-fees programs and the `pamm_state` pools): `listing` (a PumpSwap-class coin lists on its canonical pool with the pAMM init set — Token-2022 301 B, SPL 261 B, 211 B after `extend_account` —; the first observation starts the price marked for the warm-up; the init set key-checked; `None → PumpSwap` re-detection), `graduation` (completion → `PumpMigrating` → a real `migrate_v2` → `PumpSwap`: the cache, `graduated_at`, the ring at `lp_supply`, `(8, 1)`, exits and opens refused `EmaWarmingUp` until 8 integrations, the borrower's close on the pool), `flows` (open → close to the lamport on every pool role, expiry and liquidation after a ×2.8 pump, `sol_settle` no-op and S1 after a held ×10), `refusals` (the warm-up, every `disable_flags` bit, the boost gate, the pAMM / pump-fees latch, the existence requirement, every trade slot substituted), `gates` (T-DISABLE on the ELF, T-ATA / T-PDA-USER, T-RENT, T-CASHBACK pAMM part), `negvqr` (the synthetic pool prices on `vault + VQR`; the tier inputs), `creator` (M6-SEC-4: a stranger's `set_coin_creator` on the dumped ELF costs an exit one retry — `VenueAccountMismatch` until the new creator vault's WSOL ATA exists — and `crank_price` re-caches the creator), `lock` (★T-PAMM-LOCK, the owner's M6R-1 decision of 2026-09-30 and OWNER-M6D-1, ARCH rows 56–57, ECON #105–#106; ARCH §8.2, `attacks/pumpswap_lp.py` parts 2–3; 12 tests of `pamm_it`'s 41: U33 — `pool_d` is the burned LP's depth `D` on every pool role —, the LP mint P6 key-checked, a deposit and its withdrawal moving neither `D` nor the bounds, a deposit wrapped around the open inflating nothing (3 (c)), `part_3b_a_held_deposit_lifts_no_open_the_burned_lp_sizes_it` — a 3× deposit held 1 h: the next open's cap 1.0000× the honest one at `pool_lock_min_bps` 5,000 and 2,000 (2.000× / 2.842× as built at ARCH row 56) —, a held deposit pulled at a pump liquidating a position sized before it with the control (3 (a), +88 s, `L_b` the drained pool's depth), `[migrate_v2, deposit, crank_price]` capped at `D` by the first PumpSwap observation (part 2), FITS-2 (a) and FITX-1 on a pool with third-party LP (3 (d)); **M6D-1's pin, as decided** `part_3e_a_held_deposit_sizes_nothing_and_the_pulled_pump_is_liquidated` — the held cap 1.0000×, the position at 95 % of it liquidated at +59 s when the deposit is pulled at a genuine 5×/120-s pump (the control +61 s), the lenders `Q` back and 0.0632 SOL, +4.20 % of `Q`'s value, the same second at `pool_lock_min_bps` 2,000 (row 56: S1 at +124 s, −37.9 %); **M6E-1's pin** `part_3f_a_deposit_pulled_at_the_deadline_does_not_hold_up_the_expiry` — a 3× / 2× deposit held for the last ≈ 62 min before a position's deadline and pulled at it (3× also 10 min before): expired at +1 s like the control, `L_b = L_live`, while the reference at the cap `2D` would have refused the executed buyback (the `2D` build: +3,347 / +1,910 / +2,536 s); and `capacity_on_the_canonical_pool_fixtures` — the wholly burned pools lose nothing, e/acc's (λ 92.98 %) −0.12 % after the warm-up and −6.13 % after 2 h; ECON §12.12 (12) (e), (f)) |
-| `--test graduation_scenarios`, `--test graduation_e2e` | M6 fork E2E through a real graduation (shared `graduation_support.rs`, no tests of its own, which includes `pump_curve_support.rs`; ≈ 19 / 14 s debug): ECON §10.1's twelve graduation rows through completion, `migrate_v2`, the `→ PumpSwap` transition, pump's real `boost_buy_and_burn` on the sim's schedule and PumpSwap ramps, to the lamport against the sim with M6's graduation rule (the module docs list the three differences from ECON's published table; since #105 the normative sim runs M6's graduation rule and the ELF's boost rounding, so only `R_min` at the pre-open 0 % remains — ECON §10.1's as-built column, §11.2); ★T-SEED-FALL (M6-SEC-1: on D@80 % a 0.25× low recorded in post-change second 8 / 4 / 1 delays the liquidation to +14 / +22 / +28 s against the honest +12 s, as the sim; a genuine dump to 0.25× forces nothing on D@80 % or D@97 %; `graduation_e2e::m6_sec_1_*`, the review's reproducer: a 0.1× low in second 1 / 4 / 8 after the atomic attack, the seed at the gate exactly the fall bound, liquidated at +23 / +17 / +12 s against +9 s); a lifecycle through a real graduation, T-VENUE-SWITCH (graduation), the M5-SEC-4 atomic attack and a borrower's self-made straddle, ECON §10.2's borrower bundle, a completing close, the boost gate (`-- --nocapture` prints ECON-format rows) |
+| `--test pamm_it` | M6, the PumpSwap adapter on the fork (release build, the dumped pAMM / pump / pump-fees programs and the `pamm_state` pools): `listing` (a PumpSwap-class coin lists on its canonical pool with the pAMM init set — Token-2022 301 B, SPL 261 B, 211 B after `extend_account` —; the first observation starts the price marked for the warm-up; the init set key-checked; `None → PumpSwap` re-detection), `graduation` (completion → `PumpMigrating` → a real `migrate_v2` → `PumpSwap`: the cache, `graduated_at`, the ring at `lp_supply`, `(8, 1)`, exits and opens refused `EmaWarmingUp` until 8 integrations, the borrower's close on the pool), `flows` (open → close to the lamport on every pool role, expiry and liquidation after a ×2.8 pump, `sol_settle` no-op and S1 after a held ×10), `refusals` (the warm-up, every `disable_flags` bit, the boost gate, the pAMM / pump-fees latch, the existence requirement, every trade slot substituted), `gates` (T-DISABLE on the ELF, T-ATA / T-PDA-USER, T-RENT, T-CASHBACK pAMM part), `negvqr` (the synthetic pool prices on `vault + VQR`; the tier inputs), `creator` (M6-SEC-4: a stranger's `set_coin_creator` on the dumped ELF costs an exit one retry — `VenueAccountMismatch` until the new creator vault's WSOL ATA exists — and `crank_price` re-caches the creator), `lock` (★T-PAMM-LOCK, the owner's M6R-1 decision of 2026-09-30 and OWNER-M6D-1, ARCH rows 56–57, ECON #105–#106; ARCH §8.2, `attacks/pumpswap_lp.py` parts 2–3; 12 of `pamm_it`'s 41 M6 tests: U33 — `pool_d` is the burned LP's depth `D` on every pool role —, the LP mint P6 key-checked, a deposit and its withdrawal moving neither `D` nor the bounds, a deposit wrapped around the open inflating nothing (3 (c)), `part_3b_a_held_deposit_lifts_no_open_the_burned_lp_sizes_it` — a 3× deposit held 1 h: the next open's cap 1.0000× the honest one at `pool_lock_min_bps` 5,000 and 2,000 (2.000× / 2.842× as built at ARCH row 56) —, a held deposit pulled at a pump liquidating a position sized before it with the control (3 (a), +88 s, `L_b` the drained pool's depth), `[migrate_v2, deposit, crank_price]` capped at `D` by the first PumpSwap observation (part 2), FITS-2 (a) and FITX-1 on a pool with third-party LP (3 (d)); **M6D-1's pin, as decided** `part_3e_a_held_deposit_sizes_nothing_and_the_pulled_pump_is_liquidated` — the held cap 1.0000×, the position at 95 % of it liquidated at +59 s when the deposit is pulled at a genuine 5×/120-s pump (the control +61 s), the lenders `Q` back and 0.0632 SOL, +4.20 % of `Q`'s value, the same second at `pool_lock_min_bps` 2,000 (row 56: S1 at +124 s, −37.9 %); **M6E-1's pin** `part_3f_a_deposit_pulled_at_the_deadline_does_not_hold_up_the_expiry` — a 3× / 2× deposit held for the last ≈ 62 min before a position's deadline and pulled at it (3× also 10 min before): expired at +1 s like the control, `L_b = L_live`, while the reference at the cap `2D` would have refused the executed buyback (the `2D` build: +3,347 / +1,910 / +2,536 s); and `capacity_on_the_canonical_pool_fixtures` — the wholly burned pools lose nothing, e/acc's (λ 92.98 %) −0.12 % after the warm-up and −6.13 % after 2 h; ECON §12.12 (12) (e), (f)) |
+| `--test graduation_scenarios`, `--test graduation_e2e` | M6 fork E2E through a real graduation (shared `graduation_support.rs`, no tests of its own, which includes `pump_curve_support.rs`; ≈ 19 / 14 s debug): ECON §10.1's twelve graduation rows through completion, `migrate_v2`, the `→ PumpSwap` transition, pump's real `boost_buy_and_burn` on the sim's schedule and PumpSwap ramps, to the lamport against the sim with M6's graduation rule (the module docs list the three differences from ECON's published table; since #105 the normative sim runs M6's graduation rule and the ELF's boost rounding, so only `R_min` at the pre-open 0 % remains — ECON §10.1's as-built column, §11.2); ★T-SEED-FALL (M6-SEC-1: on D@80 % a 0.25× low recorded in post-change second 8 / 4 / 1 delays the liquidation to +14 / +22 / +28 s against the honest +12 s, as the sim; a genuine dump to 0.25× forces nothing on D@80 % or D@97 %; `graduation_e2e::m6_sec_1_*`, the review's reproducer: a 0.1× low in second 1 / 4 / 8 after the atomic attack, the seed at the gate exactly the fall bound, liquidated at +23 / +17 / +12 s against +9 s); a lifecycle through a real graduation, T-VENUE-SWITCH (graduation), the M5-SEC-4 atomic attack and a borrower's self-made straddle, ECON §10.2's borrower bundle, a completing close, the boost gate (`-- --nocapture` prints ECON-format rows); M10: `structure` and `wsol` (I14 on all six instructions, G-B on PumpSwap), `admin` (venue admin with a position open: `FeeConfig` hikes, mayhem, a layout change, the Emergency flag; since batch 3 the pool, its vaults and the borrower refused as extras), `hooks` (the I15 / I18 mutants); 67 tests since batch 3 |
 | `--test pumpswap_negvqr_e2e` | M6, a lifecycle on the **synthetic** negative-VQR pool (`pamm_synthetic`): opens, a close, liquidations after a ×3 pump, an expiry, S1 after a ×10 gap, the lenders' exit; every quote on `vault + VQR`, the tier input `min(vault, vault + VQR)` |
 | `--test graduation_surfpool` | M6, the Surfpool E2E through a real graduation on **live mainnet** (`#[ignore]`d; needs Surfpool 1.6 and network: `scripts/surfpool-e2e.sh`, below) |
 | `--test trace_pumpswap_it` | M6, T-TRACE on PumpSwap: the exact call shape and entries of every PumpSwap-path instruction (open 22–23, normalising 26; close 16–17; liquidate / expire 17; crank 2; the `→ PumpSwap` transition 4; the listing 15; `sweep_trader`'s token leg 4), peak height 3 |
 | `--test tx_size_pumpswap_it` | M6, T-SIZE on PumpSwap: every transaction in its worst case (the largest extras set, a separate fee payer, a first-time borrower) as v0 through both tables, executed that way; the listing; the transition and tx3; since M6R-1's LP mint (+33 B per PumpSwap ReadSet) 3 cranks per v0 batch (the 4-crank batch pinned over 1,232 B), and the open with the largest (4-entry) extras set and the keeper's `[crank, liquidate]` with it pinned over 1,232 B through A28 — fitting through the build-alt table, the open executed through A28 plus a per-market table (the owner trade-off of ARCH §6.4) (`-- --nocapture` prints the table) |
 | `--test latch_pumpswap_it` | M6, T-LATCH on the dumped pAMM / pump-fees ProgramData: a real loader upgrade refuses PumpSwap opens while exits, cranks, `sweep_trader` and `sol_settle` keep working; the PumpSwap mask is pAMM + pump-fees only; U5 |
 | `--test replay_0428_it` | M6, T-REPLAY-0428 on the test-venue build (`SHORTWIN_TEST_VENUE_SO`, `MOCK_CPAMM_SO`): pump's 2026-04-28 added-account change, modelled on the mock's `required_extras` knob (the deployed ELFs only accept trailing accounts), recovered through the extras sets (`current`, `previous`, a pinned `stable`, `none`) |
+| `--test coverage_pause_it`, `--test tier_transition_it`, `--test caps_boundary_it`, `--test launch_guard_it`, `--test m7_sec_it` | M7: T-COVERAGE's `set_coverage_pause` part (O17) and the Emergency's clear, T-TIER, T-CAP, the launch guard (`market_max_notional`, `min_notional`) and the M7 security review's program findings (details in `tests/litesvm/README.md`) |
+| `--test squads_gov_it` | M10 (WP-7), T-SQ-1..9 on the mainnet Squads v4 ELF in the owner's layout (`Env::squads_governed`): the double timelock (Squads 172,800 s, then the program's `timelock_s`; 96 h end to end), every Emergency power in ≤ 2 transactions (the worst-case `set_venue_extras` through the transaction buffer), the Emergency's refusals, the checked upgrade-authority transfer and an upgrade through the vault, the disclosed Squads semantics (an `Approved` transaction never expires), sizes and CU, I4 on the vault path (`-- --nocapture` prints sizes and CU) |
 
 Every instruction goes through `Env::send`, which runs the invariant hooks — I1, I2, I6, I7,
 I8, I13 (state part) on every market a transaction names or creates; I3, I4, I5, I7, I9–I13,
@@ -255,13 +336,16 @@ for T-LATCH), rebuilt to the mainnet account's sha256; every fixture file is che
 
 | Fixture | What |
 |---|---|
-| `programs/raydium_amm_v4.so`, `programs/raydium_cpmm.so` | the deployed ELFs (deploy slots 445,763,204 and 445,763,504) |
+| `programs/raydium_amm_v4.so`, `programs/raydium_cpmm.so` (group `raydium_programs`) | the deployed ELFs (deploy slots 445,763,204 and 445,763,504). Every AMM v4 test loads the first; the CPMM build is T-LATCH's "before" since M10 (`fork::CpmmDeploy::Sep2026`) |
 | `accounts/raydium/*.bin` | both program accounts and ProgramData headers; AMM v4: Fartcoin `Bzc9NZfM…` and its reversed-order sibling `9GWMrDgH…`, the `AmmConfig` and authority; CPMM: USELESS `Q2sPHPdU…`, the creator-fee pools `FQd8z3…` (WSOL token 0), `3Cv9uPpa…` (WSOL token 1) and `FrZnJAFt…` (both tokens), the Token-2022 pool `7ZRtFcgf…`, each with vaults, mints, LP mint and observation; the authority and all 21 `AmmConfig`s |
 | `programs/pump.so`, `programs/pump_fees.so`, `programs/pump_amm.so` (M5, group `pump_programs`, slot 451,672,911) | the deployed pump, pump-fees and PumpSwap ELFs (deploy slots 449,734,335 / 446,465,969 / 446,462,733, `VENUE_GUARD_SLOTS_2026_09_27`) |
 | `accounts/pump/*.bin` (M5, group `pump_state`: one `getMultipleAccounts` at slot 451,675,432, 100 entries — the call's cap —, 13 recorded `"absent": true`) | the three program accounts and ProgramData headers; pump's `Global`, both pump-fees `FeeConfig`s, PumpSwap's `GlobalConfig`, both volume accumulators, the fee / buyback / withdraw authorities, WSOL, USDC, PumpSwap's protocol-fee and buyback WSOL ATAs, the Rent sysvar; ten pinned coin **roles**: `fresh` (125 B), `near` (151 B, near completion), `t22_115`, `legacy115` (SPL Token, no creator), `legacy49` (2024 layout), `graduated` (canonical 301-B pool and boost vault), `mayhem`, `usdc`, `legacy150`, `fartcoin` (graduated elsewhere) |
 | `accounts/pamm/*.bin` (M6, group `pamm_state`: slot 451,784,607, 76 entries, 18 absent) | PumpSwap's `GlobalConfig`, `FeeConfig`, global volume accumulator, WSOL, Rent, the 16 recipient WSOL ATAs; per pool **role** the pool, mint, vaults, LP mint, coin-creator vault authority and ATA, boost vault and ATA, pool authority and migrated curve: `fresh` (301 B, boost vault 13.98 SOL), `mature` (boost spent, 7 % third-party LP), `cashback`, `legacy211`, `legacy261` |
 | `accounts/pamm/pamm_mature_pool_negative_vqr.bin` (M6, group `pamm_synthetic`) | **synthetic**: the `mature` pool with VQR = −⌊vault/2⌋ (no negative-VQR pool exists on mainnet yet), at the same address — load one or the other; `check` verifies it equals its source but for that patch |
-| `manifest.json` | per account: address, owner, lamports, executable, rent epoch, space, slot, sha256, purpose, decoded fields; one snapshot record per group |
+| `programs/raydium_cpmm_2026_10.so`, `accounts/raydium_cpmm_2026_10/*.bin` (M10, group `raydium_cpmm_2026_10`) | CPMM as **redeployed at 452,376,460** (trimmed ELF `93cad245…a0d2`; `raydium-cp-swap@bdeee23`, `feat/creator-fee-share`, rebuilt byte for byte in solana-verify's 3.1.10 image, `tests/fixtures/README.md`; the manifest's pin text still says UNVERIFIED). The ELF only: the pools and configs stay `raydium_state`'s (layouts unchanged; the 21 live configs equal the fixture bytes at slot 452,488,420). It shares its two addresses with `raydium_programs`' CPMM entries, so the harness loads a build by name: `fork::CpmmDeploy::CURRENT` (= `Oct2026`), which every CPMM test, bench and the web E2E validator run, or `Sep2026` (T-LATCH's old → new upgrade). `fork::FIXTURE_GUARD_SLOTS` is the guard slot set the harness records (`VENUE_GUARD_SLOTS_2026_09_27` with CPMM at 452,376,460) |
+| `programs/token_2022.so`, `accounts/spl/*.bin`, `programs/spl_memo_v3.so` (M10, group `spl_programs`) | the deployed Token-2022 (upgradeable, deploy 427,147,035, authority `AeLmXCbP…`, trimmed ELF `7ea94a02…`: OtterSec's verified build of `solana-program/token-2022@9bc02757`) and spl-memo v3 (BPFLoader2: the account data is the ELF, sha256 `f520eaf0…`); every `Env` loads them (above) |
+| `programs/squads_v4.so`, `accounts/squads/*.bin`, `idl/squads_multisig_program.json` (M10, group `squads_programs`) | Squads v4: immutable since 302,582,236, trimmed ELF `d4866083…`, source UNVERIFIED (probably `Squads-Protocol/v4@64af733`); its `ProgramConfig` (creation fee 0, treasury `5DH2e3…`) and the IDL 2.1.0 vendored at `64af733` (sha256 `cb9a0a29…`, the snapshot's `vendored` list), which `crates/squads-v4-ix` is pinned against |
+| `manifest.json` | per account: address, owner, lamports, executable, rent epoch, space, slot, sha256, purpose, decoded fields; one snapshot record per group (`vendored`: files taken from a pinned source) |
 | `SHA256SUMS` | every fixture file |
 
 `scripts/dump-fixtures.py` (Python 3.14, standard library only) writes and checks them:
@@ -280,7 +364,25 @@ python3 scripts/dump-fixtures.py candidates      # live mints that fit each pump
 python3 scripts/dump-fixtures.py fetch --group pamm_state --pool negative_vqr=MINT
                                                  # M6: add a PumpSwap pool role (e.g. a real
                                                  #   negative-VQR pool once one exists)
+python3 scripts/dump-fixtures.py check --live    # M10, mainnet, read-only: exit 1 naming each redeployed
+                                                 #   program (vs its newest fixture and, for the six
+                                                 #   VenueGuard programs, the newest
+                                                 #   VENUE_GUARD_SLOTS_YYYY_MM_DD of constants.rs)
 ```
+
+**A venue redeploy (M10)** is dumped as a **new** program group, as `raydium_cpmm_2026_10` was.
+Never refresh the old group: T-LATCH keeps loading it. Then pin the new group in
+`dump-fixtures.py` and move the test baseline deliberately (a new
+`VENUE_GUARD_SLOTS_YYYY_MM_DD`; the program never reads it, `initialize_config` takes the live
+slots). A fetch that reads anything other than a pin stops before it writes a file: the script
+stages every file and writes them, `manifest.json` and `SHA256SUMS` only once every group it
+fetched has passed its checks. `check --live` (about ten paced calls) holds every program to its
+newest group and lists the older ones as "kept"; Jupiter has no fixture and is held to the
+constant only. Run it before every freeze and merge. **On 2026-10-03 (slot 452,907,481) it reports
+pump, PumpSwap and pump-fees redeployed** — deploy slots 452,654,932 / 452,654,882 / 452,655,002,
+2026-10-02 ≈ 15:47Z, after `VENUE_GUARD_SLOTS_2026_10_02` was read — against `pump_programs` and
+the baseline; Raydium, Jupiter, Token-2022, spl-memo v3 and Squads are unchanged. The pump groups
+have not been re-dumped yet: every pump and PumpSwap test still runs the 2026-09 ELFs.
 
 A `--refresh` re-pins every byte: the reader unit tests (`crates/shortwin-venue-state/src/
 raydium_{v4,cpmm}.rs`, `pump.rs`, `pump_amm.rs`) assert decoded values of this dump (vault
@@ -316,8 +418,11 @@ pump's accounts.
 seeded **action sequences** on LiteSVM through the program-test harness, so every transaction
 runs `Env::send`'s I1–I13, I15–I19 and A26 hooks, plus the fuzzer's own oracles (the I10 / I17
 gates, the mock's differential exit oracle, I14 omissions, I4's coverage clause on the whole VM,
-governance and oracle rules, and the end-of-run liveness wind-down). It loads the same builds as
-the program tests. Build it without the deploy profile's fat LTO:
+governance and oracle rules, and the end-of-run liveness wind-down; since M10 also the
+differential exit oracles on AMM v4 and CPMM, the curve's and PumpSwap's decision-level exit
+predictors, the lender oracles — `claim_sol ×N`, the JIT capture bound, `[withdraw, sol_settle]`
+within the allowance —, the deficit tripwire and the second claim pass; `tests/fuzz/README.md`
+"Oracles"). It loads the same builds as the program tests. Build it without the deploy profile's fat LTO:
 
 ```sh
 anchor build --tools-version v1.57 --arch v3 --ignore-keys && scripts/build-test-venue.sh
@@ -326,6 +431,9 @@ cargo test -p shortwin-fuzz --release -- --nocapture       # the CI smoke: fixed
                                                            # profile, corpus replays, self-tests
 cargo run -p shortwin-fuzz --release -- run --profile all --duration 10m --jobs 8 --out fuzz-out --minimize
 cargo run -p shortwin-fuzz --release -- one --profile curve --seed 42 --actions 400   # one run, full summary
+                                     # (M10: exactly the run `run --actions 400` draws for that seed:
+                                     #  N/4 + splitmix64(S ^ 0x1e57) % (3N/4 + 1) actions; `--length N`
+                                     #  runs exactly N; anomaly cursors read `profile seed #i/n`)
 cargo run -p shortwin-fuzz --release -- replay fuzz-out/crash-<profile>-<seed>-<sig>.json
 cargo run -p shortwin-fuzz --release -- tmin   fuzz-out/crash-<profile>-<seed>-<sig>.json  # -> min-….json
 ```
@@ -338,8 +446,12 @@ coverage proxies: instructions landed, events, error codes returned). A minimise
 finding goes into `tests/fuzz/corpus/`; mark it `"status": "fixed"` once fixed and `corpus_replays`
 keeps it as a regression. **The M7 exit criterion "fuzz clean ≥ 24 h"** (ARCHITECTURE §9) is a
 `run --profile all --duration 24h --jobs 8 --actions 400 --minimize` with `CARGO_TARGET_DIR`
-outside the repository (≈ 270–310 actions/s on 5 jobs), or three nights of CI's `fuzz-nightly`
-once the branch is on main. Details: [`tests/fuzz/README.md`](../tests/fuzz/README.md).
+outside the repository (≈ 270–310 actions/s on 5 jobs), or nights of CI's `fuzz-nightly`, which
+since 2026-10-02 runs only when the repository variable `FUZZ_NIGHTLY` is `true` (below, "CI").
+It is **met** by the second local 24 h run (2026-10-02/03, at `4cb7729`, seed 20261002, 4 jobs,
+86,402 s: 72,149 runs, 13,821,419 actions, 0 failures, 0 anomalies); the first (at `eb82a2a`) found
+four harness failures and one anomaly, all fixed (FUZZ-M7-24H-1, -2, -3). The M10 program batches
+need their own ≥ 24 h run on the final tree. Details: [`tests/fuzz/README.md`](../tests/fuzz/README.md).
 
 **Mutation testing** (M7-SEC-6): `scripts/mutants.sh [--fuzz 3m] [--work DIR] [mutant …]` builds the
 tests and the fuzzer once from the checkout, then each of the M7 security review's seven one-line
@@ -433,7 +545,14 @@ program.) The figures are in each bench's `results.md` (and `trace.md`, `depth.m
 when they change. The M3, M5 and M6 benches use fixed borrower, keeper and attacker keys (M3 also
 draws the keys of its planted M4 pools in a fixed order), so their reports are byte-identical
 across runs (the M1 and M2 benches use random keys: their PDA bump searches move the figures by
-≈ 1.5 k CU per iteration from run to run). See
+≈ 1.5 k CU per iteration from run to run). **Not every row is deterministic (M10).** Re-runs on the
+same ELFs move: the M1 / M2 rows that create random mints or keypairs (`create_market`, a first
+`deposit`, `open_short` and the M2 bundles, with their trace rows) in multiples of 1,500 CU; M6's
+graduation-path `liquidate` by a few tens of CU (+19 on M10's integrated tree, its random keys);
+and the M7 cascade's sums and the load section's wall times. Compare CU across builds net of
+that, and commit a re-baseline only with the ELF hashes it ran on. Since M10 the M1–M6 benches
+(they take their ELFs from the program-test `Env`) and the keeper benches run mainnet's
+Token-2022 (+15 CU per Token-2022 CPI; above). See
 [`tests/bench/cu_math/README.md`](../tests/bench/cu_math/README.md),
 [`tests/bench/m1_cu/README.md`](../tests/bench/m1_cu/README.md),
 [`tests/bench/m2_cu/README.md`](../tests/bench/m2_cu/README.md),
@@ -576,6 +695,48 @@ pump recipient then rides inline, 31 B). Re-run `check` whenever pump rotates re
 `tests/litesvm/tests/tx_size_raydium.rs` sizes every Raydium transaction through this table, and
 the keeper scenario `raydium_alt` builds it on chain with the script's own code.
 
+### Governance: Squads v4 and `shortwin-gov` (M10)
+
+The owner's layout (decisions of 2026-10-02 and 2026-10-03, ARCHITECTURE §1.1 "Admin", §8.5):
+Governance, an autonomous Squads v4 3-of-5 multisig with a 48 h Squads time lock (172,800 s),
+holds short.win's and complete_curve's upgrade authority (its vault 0, which is also
+`governance`) and the fee recipient (its vault 1); Emergency, an autonomous 2-of-4 with time lock
+0, is `pause_authority` (its vault 0). Since SQ-G8 the program refuses a config in which
+`governance`, `pause_authority`, `fee_recipient` and an installed `coverage_authority` are not
+pairwise distinct (`AuthoritiesNotDistinct`, 6105). A program change takes 96 h end to end (48 h
+Squads, then the program's 48 h timelock). Members sign in the Squads app; the repository's tool
+only stages and verifies. The multisigs are created on mainnet in M11.
+
+- **`crates/squads-v4-ix`** (root workspace, host-only): encoders, the Squads `TransactionMessage`
+  compiler, PDAs and account decoders for the program mainnet runs, pinned against the vendored
+  IDL 2.1.0 (`tests/fixtures/idl/squads_multisig_program.json`) by `tests/idl.rs`. The program
+  tests (`src/squads.rs`) and `services/ops` link it.
+- **`squads_gov_it`** (T-SQ-1..9) drives the governance through the mainnet Squads ELF (table
+  above).
+- **`shortwin-gov`** (`services/ops`, package `shortwin-ops`): creates the two multisigs,
+  initializes the config with their vaults, stages vault transactions (the checked upgrade-authority
+  transfer, `Authorities` changes, upgrades, every admin instruction; a transaction buffer for
+  large messages, resumed after an interruption), decodes them for review (`status`), approves,
+  executes, cancels, applies timelocked changes and `verify`s the whole layout. Every transaction is
+  simulated first; `--dry-run` sends nothing; key files are read only to sign and never printed;
+  hardware-wallet paths are refused (Ledger members approve and execute in the Squads app). By the
+  owner's decision of 2026-10-03 the (M11) runbook does the Emergency's worst-case
+  `set_venue_extras` as three single-signer transactions (`squads_gov_it` lands it in two, the
+  second co-signed by two members). Commands: [`services/README.md` "Governance"](../services/README.md#governance-shortwin-gov-m10).
+
+```sh
+cargo test -p shortwin-litesvm-tests --test squads_gov_it -- --nocapture   # T-SQ-1..9 (sizes, CU)
+cargo test -p squads-v4-ix                                                 # the IDL pins
+cargo test --manifest-path services/Cargo.toml -p shortwin-ops             # unit tests, T-OPS (gov_e2e)
+G="cargo run --release --manifest-path services/Cargo.toml -p shortwin-ops --bin shortwin-gov --"
+$G verify --config gov.toml --rpc <url>     # every derived address and authority; exit 1 on a FAIL
+```
+
+`services/ops/governance.example.toml` names public keys only (the members, the two create keys,
+the keeper's `coverage_authority`) and the launch values; its keys are placeholders and the tool
+refuses to send with it. `init-config` refuses a venue guard slot that differs from the live
+ProgramData: re-read the six slots on the day.
+
 ## Indexer and API (M8; `services/indexer`)
 
 The indexer is two crates of the services workspace (contract and as-built notes:
@@ -616,9 +777,17 @@ M=services/Cargo.toml
 cargo test --manifest-path $M -p shortwin-indexer --test pg_fixture   # the fixture gate (~2 s cached)
 cargo test --manifest-path $M -p shortwin-indexer                     # decoders, ingest, analytics, API contract
 cargo test --manifest-path $M -p shortwin-indexer --test api_contract --test api_limits --test api_ws --test api_replayed
+cargo test --manifest-path $M -p shortwin-indexer --test venue_mainnet   # M10 GC-F1: the venue decoders on recorded mainnet txs
 solana-test-validator --version && \
   cargo test --manifest-path $M -p shortwin-indexer --test ingest_rpc_validator -- --ignored   # RPC paths, ~40 s
 ```
+
+`venue_mainnet` (M10 GC-F1) runs the gap-calibration crawler's recorded mainnet transactions
+(`scripts/gapcal/tests/fixtures`) through the production conversion, the decoders and, for CPMM,
+the writer: the stored post-trade reserves are the venues' pricing reserves (INDEXER.md §7.2). A
+test that reads `pg_stat_*` counters must first force a statistics flush on every backend that
+could have touched them (`flush_stats` in `tests/security_api.rs`: `pg_stat_force_next_flush()`
+on each connection), not sleep.
 
 **The replay harness (the M8 exit criterion).** `cargo test --manifest-path services/Cargo.toml -p
 shortwin-indexer-litesvm` (~80 s) records eight sessions from the current builds — so build first,
@@ -665,8 +834,20 @@ pnpm --filter web typecheck               # tsc --noEmit (strict; includes e2e/ 
 pnpm --filter web test                    # vitest run (jsdom)
 pnpm --filter web build                   # wasm (skipped when current) + tsc + vite build -> apps/web/dist (+ _headers; source maps -> apps/web/dist-sourcemaps, not deployed)
 pnpm -r build                             # every workspace package that has a build (math-wasm, web)
-pnpm --filter web check:headers https://<origin>   # after a deploy: X-Frame-Options, frame-ancestors, nosniff, HSTS; no public source maps
+pnpm --filter web check:headers https://<origin>   # after a deploy: X-Frame-Options, frame-ancestors, nosniff, HSTS; no public source maps; /.well-known/security.txt
 ```
+
+**security.txt (M10 SECTXT-4).** `apps/web/public/.well-known/security.txt` (RFC 9116: the owner's
+contact and policy, `Expires` 2027-09-30, rotate it before 2027-08-31) is checked by
+`src/config/securityTxt.ts` in every build (fields and their format), by its unit test (on a clock
+pinned 90 days before its own `Expires`) and by the E2E `frame` spec. Only a `VITE_CLUSTER=mainnet`
+build and `check:headers` (production checks) also refuse an `OWNER-FILL` placeholder and an
+`Expires` 30 days or less, or more than a year, ahead; other builds never fail because the date
+nears. `dist/_headers` serves it as `text/plain; charset=utf-8`. The policy it names is the app's
+`/security` page (`SecurityPolicyPage`, FRONTEND.md §3.2); the repository's `SECURITY.md` carries the
+same values. FE-15 (M10): the TypeScript ports of the mint verdict, the open guards
+(`spot_near_ema`, `P_OPEN_MAX`) and the pool-selection comparisons are gone; the WASM facade
+exports them (FRONTEND.md §13 FE-15).
 
 `packages/math-wasm/pkg/` is generated and gitignored; `pkg/.inputs-sha256` stamps the crate
 sources, so later builds skip cargo and wasm-bindgen until `crates/shortwin-math*` or
@@ -690,7 +871,7 @@ developer validator on 8899 can run alongside.
 anchor build --tools-version v1.57 --arch v3 && scripts/build-test-venue.sh   # the ELFs (once per program change)
 pnpm --filter @shortwin/math-wasm build
 cd apps/web
-node e2e/validator/start.ts --env      # validator + seed (≈ 80 s), left running; writes .env.e2e.local
+node e2e/validator/start.ts --env      # validator + seed (≈ 100 s), left running; writes .env.e2e.local
 node e2e/validator/fund.ts <your wallet address>   # 25 SOL and 1,000,000 of every seeded mint
 pnpm dev:e2e                           # vite --mode e2e: http://localhost:5173 against the validator
 node e2e/validator/stop.ts             # stop the validator (and the preview / indexer)
@@ -721,9 +902,9 @@ report, traces and the screenshots).
 ```sh
 anchor build --tools-version v1.57 --arch v3 && scripts/build-test-venue.sh   # the ELFs the validator loads
 pnpm --filter @shortwin/math-wasm build
-pnpm --filter web e2e                       # every spec: ≈ 5 min (≈ 2 of them setup: validator, seed, build)
+pnpm --filter web e2e                       # every spec: ≈ 9 min (≈ 2 of them setup: validator, seed, build)
 pnpm --filter web e2e e2e/specs/lend-cpi-guard.spec.ts e2e/specs/lend-withdraw-memo.spec.ts   # the §10.3 exit tests
-pnpm --filter web e2e --grep @scaffold      # the harness, smoke and wallet specs only
+pnpm --filter web e2e --grep @scaffold      # the harness, smoke, wallet and frame specs only
 SHORTWIN_E2E_KEEP=1 pnpm --filter web e2e   # leave the validator and the preview running, then…
 SHORTWIN_E2E_REUSE=1 pnpm --filter web e2e e2e/specs/smoke.spec.ts   # …rerun in seconds without reseeding
 SHORTWIN_E2E_SCREENSHOTS=update pnpm --filter web e2e e2e/specs/screens.spec.ts   # refresh e2e/screenshots/
@@ -744,18 +925,24 @@ than by Playwright's `webServer`, because the build needs the seeded protocol AL
    (`target/test-venue/deploy/shortwin.so`) as an upgradeable program whose upgrade authority is
    a generated key, `mock_cpamm.so` and `complete_curve.so` from `target/deploy`, the dumped
    pump / pump-fees / PumpSwap / Raydium AMM v4 / CPMM ELFs of `tests/fixtures/programs` with
-   their mainnet upgrade authorities, and genesis accounts (`--account-dir .e2e/accounts`): every
-   generated key funded, the mock's empty `VenueExtras` (as the LiteSVM harness installs it) and
-   the dumped venue state of `tests/fixtures` (deduplicated; sysvars, synthetic and absent entries
-   skipped). Boots in ≈ 1.5 s.
+   their mainnet upgrade authorities (CPMM: the 2026-10 redeploy, M10), mainnet's Token-2022
+   (`--upgradeable-program` from the `spl_programs` group with its mainnet upgrade authority,
+   replacing the built-in, which is another build; M10 T-MEMO), and genesis accounts
+   (`--account-dir .e2e/accounts`): every generated key funded, the mock's empty `VenueExtras` (as
+   the LiteSVM harness installs it) and the dumped venue state of `tests/fixtures` (deduplicated;
+   sysvars, synthetic and absent entries and the program groups — `raydium_programs`,
+   `pump_programs` and the M10 groups — skipped). spl-memo v3 is the validator's built-in, which
+   in Agave 4.1.2 already is mainnet's BPFLoader2 account byte for byte; global setup
+   (`checkSplPrograms`) holds both to their mainnet hashes. Boots in ≈ 1.5 s.
 2. `e2e/validator/seed.ts` (Kit, `@shortwin/client`, `@solana-program/*`): `initialize_config`
    with the ECON §15 defaults read from the WASM `ParamSet`, the generated governance / Emergency /
-   coverage / fee keys and the live ProgramData slots; three SPL mints with mock pools and markets
-   (`main` for trading, `move` for the price-move specs, `paused` in coverage pause) and a
-   list-only Token-2022 market (`t22`, metadata only); a protocol ALT; one funded wallet per
+   coverage / fee keys and the live ProgramData slots; five SPL mints with mock pools and markets
+   (`main` for trading, `move` for the price-move specs, `paused` in coverage pause, and since
+   M10 `wipe` for FE-18's full wipe and `pot` for the claim-time pot, each lent by one spec wallet
+   alone) and a list-only Token-2022 market (`t22`, metadata only); a protocol ALT; one funded wallet per
    independent spec group with its token accounts (a CPI-Guarded and a guard-capable Token-2022
    account, memo-required ATAs, lender positions); create-market mints (safe, freeze authority,
-   a permanent delegate); after the 50 s market warm-up, three open positions. ≈ 80 s.
+   a permanent delegate); after the 50 s market warm-up, five open positions. ≈ 100 s.
 3. `vite build` with the E2E configuration (`VITE_ENABLE_TEST_VENUE=true`, the E2E ports, the
    seeded ALT) into `.e2e/dist`, served by `vite preview` on :14173.
 
@@ -766,11 +953,15 @@ the indexer is a `page.route` / `page.routeWebSocket` mock that builds OpenAPI-s
 from the chain at request time (`indexer-mock.ts`; `indexer: 'down'` simulates an outage); every
 spec selects by the §11 `data-testid`s only, fails on any CSP violation and runs axe (WCAG 2.2
 AA) on the pages it visits. Node-side helpers (`validator/actions.ts`) move a mock pool's price
-and flip CPI Guard or required memos for the race tests.
+and flip CPI Guard or required memos for the race tests; since M10 also a full wipe (`fullWipe`:
+`withdrawAllFree`, a gap, `settleUntilClosed`), validator simulations of a lone `claim_sol` /
+`sync_lender` (`simulateClaimSol`, `simulateSyncLender`), emit_cpi event decoding (`eventsOf`) and
+an empty `sweep_trader` that credits a market's pending rent (`accrue`).
 
-**Specs** (18 files, 48 tests): `harness`, `smoke`, `wallet` (`@scaffold`); `markets`,
+**Specs** (22 files, 58 tests at M10): `harness`, `smoke`, `wallet`, `frame` (`@scaffold`); `markets`,
 `create-market`, `status`, `fallback` (`@markets`); `lend-deposit`, `lend-cpi-guard`,
-`lend-withdraw-memo`, `lend-claim`, `keyboard` (`@lend`); `short-open`, `short-close`,
+`lend-withdraw-memo`, `lend-claim`, `keyboard`, and since M10 (FE-18) `lend-post-wipe`,
+`lend-claim-sync`, `lend-sweep-cashback` (`@lend`); `short-open`, `short-close`,
 `add-margin`, `positions`, `tx-errors` (`@short`); `screens` (`@screens`: every page and state as
 a full-height PNG in `.e2e/screenshots/`, axe on each, the 1024 px minimum without sideways
 scroll; `SHORTWIN_E2E_SCREENSHOTS=update` writes the reviewed set in `e2e/screenshots/`). CI's
@@ -780,7 +971,24 @@ scroll; `SHORTWIN_E2E_SCREENSHOTS=update` writes the reviewed set in `e2e/screen
 forces Playwright's own Chromium, installed once with `pnpm --filter web exec playwright install
 chromium` into the user cache — never `--with-deps` as root); `SHORTWIN_E2E_PROGRAM=release`
 (the release `shortwin.so`: list-only markets, the trading specs skip); `SHORTWIN_E2E_VENUES=0`
-(no dumped venues); `SOLANA_BIN`, `SHORTWIN_SO`, `MOCK_CPAMM_SO`, `COMPLETE_CURVE_SO`.
+(no dumped venues); `SHORTWIN_BUNDLED_SPL=1` (M10: keep the validator's built-in Token-2022 and
+skip the SPL pin check); `SOLANA_BIN`, `SHORTWIN_SO`, `MOCK_CPAMM_SO`, `COMPLETE_CURVE_SO`.
+
+**On a shared or small host (M10).**
+- Playwright puts Chromium's profile in `os.tmpdir()`. On a host where `/tmp` is a quota'd or
+  full tmpfs, Chromium fails lazy chunk loads with `net::ERR_INSUFFICIENT_RESOURCES`, and the
+  tests show the app's error boundary, "RPC node is unreachable" or "Target crashed". Run the
+  suite with `TMPDIR=<a directory on disk>`.
+- System Chromium 152 (Arch) renderer crashes (SIGTRAP) failed every page spec on the M10
+  development machine; `SHORTWIN_CHROMIUM=playwright` (Playwright's own Chromium) is the
+  workaround.
+- The E2E ports are fixed (above), so one run per host: a second run, or a run beside a
+  `start.ts` session, collides. Serialize them, e.g.
+  `flock ~/.cache/shortwin/e2e.lock pnpm --filter web e2e`, and stop a validator you started
+  (`node e2e/validator/stop.ts`) before releasing the lock.
+- Do not carry the program tests' `SHORTWIN_SO` (the **release** build there) into an E2E run: here
+  it replaces the default **test-venue** build, the validator then has no mock venue, and the
+  trading specs fail.
 
 **Profile `full`** (local, optional): `SHORTWIN_E2E_PROFILE=full SHORTWIN_INDEXER_BIN=<built
 shortwin-indexer> pnpm --filter web e2e` starts PostgreSQL 17 from the zonky binaries the indexer's
@@ -802,12 +1010,14 @@ committed. After any change to the program's interface (accounts, args, events, 
 ```sh
 anchor build --tools-version v1.57 --arch v3
 pnpm install --frozen-lockfile
-pnpm --filter @shortwin/client idl:sync     # target/idl/shortwin.json -> clients/js/idl/
+pnpm --filter @shortwin/client idl:sync     # target/idl/{shortwin,complete_curve}.json -> clients/js/idl/
 pnpm --filter @shortwin/client generate     # -> clients/js/src/generated/
 pnpm --filter @shortwin/client check        # tsc + node --test (incl. the T-LAYOUT Codama leg)
 ```
 
-CI fails if the IDL copy or the generated code is stale. See
+CI fails if the IDL copy or the generated code is stale. `clients/js/idl/complete_curve.json` (the
+straddle helper's IDL) is committed for clients and the audit package; nothing is generated from
+it, and the `codama` job diffs it against the build too. See
 [`clients/js/README.md`](../clients/js/README.md).
 
 ## Governance config gate (A73)
@@ -827,6 +1037,53 @@ Exit 0 accepted, 1 rejected (a liveness row), 2 rejected (bounds), 3 needs the o
 model (`params::validate_econ`) are listed, not simulated; the program checks their bounds at
 `propose_config`.
 
+## Gap-frequency calibration crawler (M10; `scripts/gapcal`)
+
+The jump parameters of ECON §11.6's Monte Carlo (`lam_up`, `lam_dn`, `alpha`, `sigma` per tier;
+G37, U21, O9) are calibrated from a read-only crawl of public mainnet RPC, because the M8 indexer
+sees only short.win's own markets until launch. Method and status:
+[`docs/research/gap-calibration.md`](research/gap-calibration.md); results need at least 30 days of
+tapes (the crawl started on 2026-10-02). Python 3.14, standard library only
+([`scripts/gapcal/README.md`](../scripts/gapcal/README.md)):
+
+```sh
+python3 -m unittest discover scripts/gapcal/tests     # offline, a few seconds (recorded mainnet txs)
+DATA=~/.cache/shortwin-work/gapcal-data               # the default data directory; outside git
+setsid nohup python3 scripts/gapcal/fetch.py crawl --data $DATA > $DATA/crawl.log 2>&1 &
+python3 scripts/gapcal/fetch.py status --data $DATA   # offline: pid, rates, coverage per tier
+python3 scripts/gapcal/fetch.py stop --data $DATA     # SIGTERM; it saves its state and exits
+python3 scripts/gapcal/fetch.py replay --data $DATA --day 2026-10-02   # re-decode a day: 0 RPC calls
+```
+
+- **Resume** by running the same `crawl` command: it continues from `state.json` (listing cursors,
+  the transaction queue, discovery cursors) and the universe.
+- **Rate.** Two rate-limited threads, `fg` (polls, state, listings, discovery; 1.9 requests/s) and
+  `bg` (transactions, the weekly census, ages; 1.0 requests/s); `--fg-rps` / `--bg-rps` override
+  them and `fg + bg ≤ 3` is enforced. 429 and 5xx back off. Every `getTransaction` is cached.
+- **Data.** Per UTC day `<data>/tapes/<day>/` (poll, trades, activity and events tapes, gzip'd and
+  hashed into `manifest.json` when the day closes).
+- Do not run `universe.py census` beside a live crawl: it refuses, since both together would exceed
+  3 requests/s. The crawl runs its own weekly census.
+- publicnode keeps about 28 h of signatures and transactions: an outage longer than that loses
+  activity and trade history for good. CI does not run these tests.
+
+## Audit package (M10)
+
+`docs/AUDIT.md` (scope, threat model, reproduce path), `docs/audit/{scope.txt, known-issues.md,
+findings.md}` and `SECURITY.md`. The scope file is generated:
+
+```sh
+python3 scripts/audit_scope.py write   # regenerate docs/audit/scope.txt from `git ls-files`
+python3 scripts/audit_scope.py check   # exit 1 if it differs, or a watched file is in no unit
+python3 scripts/audit_scope.py nloc    # AUDIT.md §2's table: files and non-test nLOC per unit
+```
+
+`check` fails when a tracked file under `programs/`, `crates/`, `services/` or a Cargo workspace
+member is in no unit and not on the script's `EXCLUDED` list: a new crate or service is classified
+in the script (a unit, or `EXCLUDED` with a reason) before `write`. `nloc` drops `#[cfg(test)]`
+items (braces inside literals and comments are ignored) and counts the lines that are neither blank
+nor comments; AUDIT.md's second column is tokei 14.0.0's "code" (`tokei <paths> -t Rust`).
+
 ## Workspaces
 
 - **Cargo, on-chain** (root `Cargo.toml`, resolver 3, `Cargo.lock` committed):
@@ -835,14 +1092,21 @@ model (`params::validate_econ`) are listed, not simulated; the program checks th
   also a member of `Anchor.toml [workspace]`; the services workspace links it for its Anchor
   types) and the program tests `tests/litesvm` (which share this lockfile so the
   Agave line LiteSVM resolves is pinned next to the program's, C1-14), and since M7 the
-  invariant fuzzer `tests/fuzz` (it links the program tests, so it shares the lockfile too). The release profile
+  invariant fuzzer `tests/fuzz` (it links the program tests, so it shares the lockfile too), and
+  since M10 the host-only Squads v4 encoders `crates/squads-v4-ix` (the program tests and
+  `services/ops` link it). The release profile
   keeps `overflow-checks = true` (Anchor refuses to build without it), `lto = "fat"` and
   `codegen-units = 1`. The workspace also holds the TEST-ONLY mock venue `tests/mock_cpamm`
   (an Anchor program, also a member of `Anchor.toml [workspace]`; never deployed, A49).
 - **Cargo, services** (`services/Cargo.toml`, own `Cargo.lock`): host-only crates — the keeper
   and its chain client, and since M8 the indexer and API (`services/indexer`, Rust 1.94+ for sqlx
   0.9) with its TEST-ONLY replay harness (`services/indexer-litesvm`, which links the program
-  tests `tests/litesvm`) (ARCHITECTURE §1.2, §7).
+  tests `tests/litesvm`), and since M10 the governance tool `services/ops` (`shortwin-gov`)
+  (ARCHITECTURE §1.2, §7). **Lockfiles:** the five bench workspaces m1–m6 also depend on
+  `shortwin-litesvm-tests`, so a dependency added to the root workspace or `tests/litesvm` changes
+  seven lockfiles (root, `services/`, `tests/bench/{m1,m2,m3,m5,m6}_cu`): refresh each with
+  `cargo metadata --format-version 1 --manifest-path <manifest> >/dev/null` and re-run
+  `cargo deny` / `cargo audit` where CI does.
 - **Cargo, benches**: `tests/bench/cu_math`, `tests/bench/m1_cu`, `tests/bench/m2_cu`,
   `tests/bench/m3_cu`, `tests/bench/m5_cu` and `tests/bench/m6_cu` (each of the last three with
   its own TEST-ONLY CPI wrapper program), standalone workspaces with their own lockfiles (Mollusk
@@ -851,7 +1115,10 @@ model (`params::validate_econ`) are listed, not simulated; the program checks th
 - **`shortwin-math`** (ARCHITECTURE §2.2): `#![no_std]`, zero runtime dependencies,
   `#![deny(clippy::arithmetic_side_effects, clippy::cast_possible_truncation,
   clippy::cast_sign_loss, clippy::unwrap_used)]` (also on the program and
-  `shortwin-venue-state`). Every fallible function returns `Result<_, MathError>`, or `Option`
+  `shortwin-venue-state`). The two programs additionally deny `clippy::expect_used`,
+  `clippy::panic` and `unsafe_code` (AUD-10, M10); `unsafe_code` does not fire inside Anchor's or
+  `security_txt!`'s external macro expansions, and a test module that needs `expect` allows it
+  as it allows `unwrap_used`. Every fallible function returns `Result<_, MathError>`, or `Option`
   where the API says a value is undefined. Every division takes an explicit `num::Rounding`,
   chosen per the ECONOMICS §2 rounding rule (in the pool's and lenders' favour). Module docs
   name the owning track and the ECON/ARCH sections. The program calls it for all arithmetic.
@@ -887,18 +1154,24 @@ wrapped transaction first. Nothing in the program changes.
 
 ## CI
 
-`.github/workflows/ci.yml`, actions pinned to commit SHAs:
+`.github/workflows/ci.yml`, actions pinned to commit SHAs. It runs on pushes to `main`, on pull
+requests and on demand; pushes to other branches run nothing (since the owner's decision of
+2026-10-02, `m1-core` is fast-forwarded into `main` after each verified commit). **Actions
+minutes:** the private repository's minutes cannot carry the nightly fuzz (6 shards × 5 h), so it is
+opt-in (`gh variable set FUZZ_NIGHTLY --body true`) and long fuzz runs are local; one push to
+`main` costs about 243 runner minutes (M10).
 
 | Job | Runs |
 |---|---|
 | `fmt` | `cargo fmt --all --check` (workspace and the `cu_math` bench) |
 | `clippy` | guard that `shortwin-math` keeps `#![no_std]`, the §2.2 denies and zero runtime deps; clippy `-D warnings` on `shortwin-math`, on the workspace, and on `shortwin` alone (the release feature set, without `test-venue`) |
-| `test` | `cargo test -p shortwin-math -p shortwin-math-wasm` with `PROPTEST_CASES=2000` |
+| `test` | `cargo test -p shortwin-math -p shortwin-math-wasm -p squads-v4-ix` with `PROPTEST_CASES=2000` (M10: the Squads encoders' IDL pins) |
 | `vectors` | re-runs every `tests/vectors/*/gen_*.py` with Python 3.14 and fails on any diff; T-CONFIG host part: `config_check.py` prints `OK` for the defaults, and `scripts/test_config_gate.py` |
 | `deny` | `cargo deny check` (`deny.toml`) and `cargo audit` on the workspace and the six bench lockfiles |
 | `wasm` | wasm32 release build of `shortwin-math` and `shortwin-math-wasm` |
 | `cu-math` | T-CU-MATH bench (`tests/bench/cu_math`) |
-| `anchor-build` | Agave 4.1.2 + Anchor CLI 1.2.0, `anchor build --tools-version v1.57 --arch v3 --ignore-keys` (shortwin, the `complete_curve` helper and the mock) and `scripts/build-test-venue.sh`; asserts SBPF v3 on all four artifacts; A49: the release `shortwin.so` carries neither the test-venue marker nor the mock id (and `complete_curve.so` not the mock id), the test-venue build and `mock_cpamm.so` do; uploads the `.so` files, both IDLs and the TS types |
+| `anchor-build` | Agave 4.1.2 + Anchor CLI 1.2.0, `anchor build --tools-version v1.57 --arch v3 --ignore-keys` (shortwin, the `complete_curve` helper and the mock) and `scripts/build-test-venue.sh`; asserts SBPF v3 on all four artifacts; A49: the release `shortwin.so` carries neither the test-venue marker nor the mock id (and `complete_curve.so` not the mock id), the test-venue build and `mock_cpamm.so` do; M10 SECTXT-1: `scripts/test_check_security_txt.py`, then `scripts/check-security-txt.py --forbid-placeholders --source-release v<Cargo version>` on both release ELFs (exactly one valid security.txt with the owner's values), and none in the test-venue build; uploads the `.so` files, both IDLs and the TS types |
+| `verifiable-build` | M10: `scripts/verifiable-build.sh --compare` in Docker — solana-verify 0.5.2 in the pinned image (`SVB_IMAGE_DIGEST`), `--arch v3 --cargo-build-sbf-args="--tools-version v1.57"` — must be byte-identical to the `anchor-build` artifact for `shortwin` and `complete_curve`; only that image used; A49 on the verifiable artifacts; the file and executable hashes in the job summary and the `verifiable-build` artifact |
 | `program-tests` | on the `anchor-build` artifact: fixture checksums (`SHA256SUMS` and `scripts/dump-fixtures.py check`), `cargo check -p shortwin --target wasm32-unknown-unknown` (T-LAYOUT), `cargo test -p shortwin` on the release feature set, `cargo test -p shortwin -p shortwin-venue-state -p shortwin-litesvm-tests` (incl. every Raydium and pump fork binary, `straddle_it` with the helper) |
 | `codama` | IDL copy and generated client are current; `tsc`; `node --test` (T-LAYOUT Codama leg) |
 | `web` | M9: wasm-bindgen 0.2.129, `@shortwin/math-wasm` build, then `apps/web`'s Biome check, type check, Vitest and production build (FRONTEND.md §10.4) |
@@ -909,10 +1182,10 @@ wrapped transaction first. Nothing in the program changes.
 | `m5-cu` | M5 CU bench, T-TRACE, the T-SIZE preview, T-STRADDLE (curve part) and stack depth on the pump curve (`tests/bench/m5_cu`): builds its TEST-ONLY CPI wrapper (SBPF v3 asserted), every curve-path instruction within ARCH §6.1's PROPOSED limits, the worst-case curve transactions at their exact trace counts and v0 + ALT sizes, the straddle's tx1 (the `complete_curve` helper) and tx2 (`migrate_v2`), every path through 0–3 wrapper levels |
 | `m6-cu` | M6 CU bench, T-TRACE, T-SIZE, T-DEPTH and the graduation transition on PumpSwap (`tests/bench/m6_cu`): its TEST-ONLY CPI wrapper, every PumpSwap-path instruction within budget, the worst-case transactions at their exact trace counts and v0 + ALT sizes |
 | `t-pot` | T-POT: every `pool_model` trace replayed through the program in release (`lender_it traces::`, `SHORTWIN_TRACES=full`) |
-| `services` | the services workspace: fmt, clippy (the indexer crates included; also the keeper without `test-venue`), cargo-deny, cargo-audit, the keeper's unit tests and LiteSVM scenarios (mock, Raydium and pump fork, the helper included; M7's degraded-mode drill, duty 11, the PumpSwap tables) on the `anchor-build` artifacts, and the A49 check on the release keeper binary |
+| `services` | the services workspace: fmt, clippy (the indexer crates included; also the keeper without `test-venue`), cargo-deny, cargo-audit, the keeper's and (M10) `shortwin-gov`'s unit tests, T-OPS (`gov_e2e`: the governance sequence through the tool's command line on the mainnet Squads ELF) and the keeper's LiteSVM scenarios (mock, Raydium and pump fork, the helper included; M7's degraded-mode drill, duty 11, the PumpSwap tables) on the `anchor-build` artifacts, and the A49 check on the release keeper binary |
 | `indexer` | M8: the indexer's tests on an embedded PostgreSQL 17.11 (zonky binaries cached): the fixture gate, `-p shortwin-indexer` (decoders, ingest on the recorded sessions, analytics, the API contract on the seed and on replayed sessions, limits, WebSocket), the replay harness `-p shortwin-indexer-litesvm` on the `anchor-build` artifacts (the M8 exit criterion), the RPC paths against `solana-test-validator`, no `postgresql_embedded` in the production dependencies, and `docker compose config` on the reference deployment |
 | `t-size` | T-SIZE on Raydium (`--test tx_size_raydium`), on the pump curve (`--test tx_size_pump_it`) and on PumpSwap (`--test tx_size_pumpswap_it`), the size tables in the log, and the protocol ALT's static part (`scripts/build-alt.sh print`, uploaded as an artifact) |
 | `fuzz-smoke` | M7: `cargo test --release -p shortwin-fuzz` — the fuzzer's fixed-seed smoke on every profile, the corpus replays (a reproducer marked fixed must pass) and its self-tests; crash files uploaded on failure |
 | `m7-keeper-bench` | M7: the keeper's cost inputs, the PumpSwap 4-extras T-SIZE and T-CASCADE in release (`m7_cost::`, `pamm_alt::`, `cascade::`; the tests' own gates), the regenerated `tests/bench/m7_*` compared with the committed ones (a warning) |
-| `fuzz-nightly` | M7: on the `schedule` trigger (main only) or `workflow_dispatch` with `fuzz_duration`: one 5 h `shortwin-fuzz run` shard per profile, failures minimised and uploaded, the job failing on any crash; every other job skips the `schedule` trigger |
-| `mutants` | M7-SEC-6: on the `schedule` trigger (main) or `workflow_dispatch`: `scripts/mutants.sh` — the LiteSVM tests and the fuzzer built once from the checkout (the oracle), then each of the M7 security review's seven one-line program mutants built and run against its named tests and a 3-minute fuzz of its profile; a mutant that survives either fails the job (a missing oracle) |
+| `fuzz-nightly` | M7: on the `schedule` trigger (main only) **only while the repository variable `FUZZ_NIGHTLY` is `true`** (owner decision of 2026-10-02, `4cb7729`), or on `workflow_dispatch` with `fuzz_duration`: one 5 h `shortwin-fuzz run` shard per profile, failures minimised and uploaded, the job failing on any crash; every other job skips the `schedule` trigger (`anchor-build` runs for it only when the variable is set) |
+| `mutants` | M7-SEC-6: on the `schedule` trigger (main, only while `FUZZ_NIGHTLY` is `true`) or `workflow_dispatch`: `scripts/mutants.sh` — the LiteSVM tests and the fuzzer built once from the checkout (the oracle), then each of the M7 security review's seven one-line program mutants built and run against its named tests and a 3-minute fuzz of its profile; a mutant that survives either fails the job (a missing oracle) |
