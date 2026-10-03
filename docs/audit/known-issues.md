@@ -147,5 +147,5 @@ row above.
 | WP10-DOC-U16 | Doc: the design docs stated a 24 M per-writable-account limit; mainnet enforces 40 M | ARCH §0 [V10], §6.6, U16 and ECON §17 restated (WP-11); KI-47 | fixed (docs) |
 | WP10-PLAN-NLOC | The research's ≈ 21.4k on-chain nLOC overcounted test code by 266 lines | `scripts/audit_scope.py nloc` (AUDIT.md §2) | fixed (docs) |
 | WP10-PLAN-Q2 | The plan's list of freeze-gating owner items named two keeper-only items and missed Q3, Q4(e), the version and CPMM | Corrected in AUDIT.md §7; Q3, Q4(e) and the version were decided on 2026-10-02 and built in batch 2; CPMM needed no adapter change | fixed (docs) |
-| GC-F1, GC-F1b | Indexer: CPMM and PumpSwap `venue_trades` reserves were not the pricing reserves | Fixed (`5c20369` and its review round); the indexer is out of scope | fixed (off-chain) |
+| GC-F1, GC-F1b | Indexer: CPMM and PumpSwap `venue_trades` reserves were not the pricing reserves | Fixed (`5b63d4d`, which squashes the WP and its review round); the indexer is out of scope | fixed (off-chain) |
 | WP6-INFO-2 | The m1–m6 CU benches are not deterministic (random keys: PDA-bump steps of 1,500 CU, ±21 CU) | Documented with the benches (ARCH §12 U4) | by design |
