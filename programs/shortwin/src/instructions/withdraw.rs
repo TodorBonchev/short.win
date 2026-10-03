@@ -34,18 +34,18 @@
 //! 4. **memo** (ARCH §3.3, R-MINT §8.4): if the destination is a Token-2022 account with
 //!    `MemoTransfer.require_incoming_transfer_memos`, the optional `memo_program` (spl-memo,
 //!    `MemoSq4g…`) is CPI'd first (`MemoProgramRequired` without it), so the transfer's
-//!    previous sibling instruction is a memo. T-MEMO (U17, M10) is UNVERIFIED on mainnet; the
-//!    LiteSVM Token-2022 v11 ELF accepts it (`tests/litesvm/tests/security.rs`);
+//!    previous sibling instruction is a memo. T-MEMO (U17) is verified on the mainnet build:
+//!    Token-2022 slot 427,147,035, sha `7ea94a02…` = program@v11.0.0 (OtterSec `9bc02757`),
+//!    spl-memo v3 `f520eaf0…` (`tests/litesvm/tests/security.rs`); the mainnet drill is M11's;
 //! 5. `transfer_checked(pool_vault → owner_token_account, tokens)` signed by the `market` PDA
 //!    (the vault's authority), with the market's token program;
 //! 6. the SOL, a direct lamport debit of `market_vault` (never below rent + `lender_sol +
 //!    protocol_fees`, I2);
 //! 7. post-conditions: `pool_vault.amount ≥ T`, the vault floor;
 //! 8. `lender` is closed to `owner` when `shares == 0 ∧ pending == 0 ∧ lock == 0`;
-//! 9. events: the `Withdraw` `emit_cpi!` (one per instruction, ARCH §3.0 step 11); a mint that
-//!    failed the filter is reported as a `MintSafetyTripped` **log** event (`emit!`, no trace
-//!    entry, like `CoverageGap`), which reconciles ARCH §3.0 steps 3 and 11 (M1-SEC-11 /
-//!    M1-FID-10).
+//! 9. events: the `Withdraw` `emit_cpi!` (one per instruction, ARCH §3.0 step 11); a mint failing
+//!    the filter is a `MintSafetyTripped` **log** event (`emit!`, no trace entry, like
+//!    `CoverageGap`), which reconciles ARCH §3.0 steps 3 and 11 (M1-SEC-11 / M1-FID-10).
 //!
 //! Works in every venue state (no venue accounts); no cooldown (ADOPTED Q22). Pausing opens
 //! never blocks it.

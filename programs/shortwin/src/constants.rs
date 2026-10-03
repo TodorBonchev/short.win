@@ -190,6 +190,20 @@ pub const VENUE_GUARD_SLOTS_2026_09_27: [u64; VENUE_PROGRAMS] = [
     449_280_566,
 ];
 
+/// Deploy slots read on mainnet on 2026-10-02 (M10; the plan's synthesizer at slot 452,483,329
+/// and the review at 452,485,424): Raydium CPMM was redeployed at 452,376,460 and Jupiter at
+/// 451,957,263, the others are unchanged from [`VENUE_GUARD_SLOTS_2026_09_27`]. A test and
+/// `scripts/dump-fixtures.py check --live` baseline only (the newest such constant); the program
+/// never reads it (`initialize_config` takes the live values as arguments).
+pub const VENUE_GUARD_SLOTS_2026_10_02: [u64; VENUE_PROGRAMS] = [
+    449_734_335,
+    446_462_733,
+    446_465_969,
+    445_763_204,
+    452_376_460,
+    451_957_263,
+];
+
 /// The ProgramData address of venue program `venue` (a `VenueGuard` index), or `None`.
 pub const fn venue_program_data(venue: u8) -> Option<Pubkey> {
     let i = venue as usize;
