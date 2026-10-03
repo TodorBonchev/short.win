@@ -404,10 +404,12 @@ fn fee_between_the_caps() {
 /// A fee far above the hard cap (70 %): opens refused; the S3 and `pool_fail` chains run while
 /// the pool is still observed; risk is priced at the position's locked cap (500 bps), so the
 /// healthy position is not liquidatable — at the live 70 % it would be; the borrower can still
-/// close at the live fee; at the deadline S3 pays FV at the cap.
+/// close at the live fee; at the deadline S3 pays FV at the cap. On CPMM also (M10 WP-8a's CPMM
+/// part) on the Token-2022 pool and on the creator-fee pool, whose creator fee the cap leaves no
+/// room for (`CpmmFees::capped`: FV at a 500 bps trade fee, no creator fee).
 #[test]
 fn fee_above_the_hard_cap() {
-    for fixture in [FART, USELESS] {
+    for fixture in [FART, USELESS, T22, CREATOR_FEE] {
         let (mut env, rm, q) = setup(fixture);
         let mut b = env.borrower();
         let (open, nonce, _) = open_ok(&mut env, &rm, &mut b, q);
@@ -440,31 +442,20 @@ fn fee_above_the_hard_cap() {
         let (p, l) = (m.ema_price.get(), m.ema_liq.get());
         let r_due = rent::due(&pos.pos_rent(), &m.basis()).unwrap();
         let cap = u64::from(pos.venue_fee_hard_cap_bps);
-        let at_cap = match &rm.pool {
-            AnyPool::V4(_) => Pricing::RayV4(RayV4Fee {
-                num: cap,
-                den: 10_000,
-            }),
-            AnyPool::Cpmm(p) => {
-                let f = p
-                    .fees(&env.svm, shortwin_math::fees::Direction::Buy)
-                    .unwrap();
-                Pricing::Cpmm {
-                    buy: CpmmFees {
-                        trade: cap * 100,
-                        ..f
-                    },
-                    sell: CpmmFees {
-                        trade: cap * 100,
-                        ..f
-                    },
-                }
-            }
-        };
+        let live = live_pricing(&env, &rm);
+        let at_cap = pricing_at_cap(live, cap);
+        if let Pricing::Cpmm { buy, .. } = at_cap {
+            assert_eq!((buy.trade, buy.creator), (cap * 100, 0), "{fixture:?}");
+        }
         assert_eq!(
             ev.fv,
             fair_value(at_cap, pos.q, p, l, ev.pprime_lo, r_due),
             "{fixture:?}: FV at the locked cap"
+        );
+        assert_ne!(
+            ev.fv,
+            fair_value(live, pos.q, p, l, ev.pprime_lo, r_due),
+            "{fixture:?}: never at the live fee"
         );
     }
 }
@@ -513,7 +504,7 @@ fn a_zero_fee_is_below_every_cap() {
 /// the live fee and `venue_executable`, never the cap or the flag; V2-1).
 #[test]
 fn close_under_a_fee_above_the_hard_cap() {
-    for fixture in [FART, USELESS] {
+    for fixture in [FART, USELESS, T22] {
         let (mut env, rm, q) = setup(fixture);
         let mut b = env.borrower();
         let (_, nonce, _) = open_ok(&mut env, &rm, &mut b, q);
@@ -525,14 +516,22 @@ fn close_under_a_fee_above_the_hard_cap() {
     }
 }
 
-// ---- M10 WP-8a: venue admin with positions open on AMM v4 (G-D6, G-G5, G-H3) -------------------
+// ---- M10 WP-8a: venue admin with positions open (G-D6, G-G5, G-H3) ----------------------------
+//
+// Each case is one body run on AMM v4 (Fartcoin, `amm_v4_*`) and on CPMM (USELESS, `cpmm_*`; the
+// 2026-10 redeploy), driven by the pool admin's real instructions where they exist.
 
 /// The Emergency multisig sets or clears the route-broken flag of `rm`'s market
-/// (`venue_scope = false`) or the AMM v4 bit of `venue_route_broken` (O6, A40).
+/// (`venue_scope = false`) or the market's venue bit of `venue_route_broken` (O6, A40).
 fn set_flag(env: &mut Env, rm: &RayMarket, venue_scope: bool, broken: bool) {
     let ea = env.pause_authority.insecure_clone();
     let ix = if venue_scope {
-        let bit = shortwin::constants::VENUE_BIT_RAYDIUM_V4.trailing_zeros() as u8;
+        let bit = match rm.kind() {
+            VenueKind::RaydiumV4 => shortwin::constants::VENUE_BIT_RAYDIUM_V4,
+            VenueKind::RaydiumCpmm => shortwin::constants::VENUE_BIT_RAYDIUM_CPMM,
+            k => panic!("not a Raydium venue: {k:?}"),
+        }
+        .trailing_zeros() as u8;
         shortwin_litesvm_tests::engine::set_route_broken_ix(
             &ea.pubkey(),
             shortwin::PauseScope::Global,
@@ -552,13 +551,50 @@ fn set_flag(env: &mut Env, rm: &RayMarket, venue_scope: bool, broken: bool) {
     ok(env.send(&[ix], &[&ea]));
 }
 
-/// The pool's live AMM v4 fee as a pricing.
-fn v4_pricing(env: &Env, rm: &RayMarket) -> Pricing {
-    let i = rm.v4().info(&env.svm);
-    Pricing::RayV4(RayV4Fee {
-        num: i.swap_fee_numerator,
-        den: i.swap_fee_denominator,
-    })
+/// The pool's live fee as a pricing: AMM v4's swap fee, CPMM's resolved fees of both
+/// directions (trade and creator fee of the config and the pool's fee model).
+fn live_pricing(env: &Env, rm: &RayMarket) -> Pricing {
+    match &rm.pool {
+        AnyPool::V4(p) => {
+            let i = p.info(&env.svm);
+            Pricing::RayV4(RayV4Fee {
+                num: i.swap_fee_numerator,
+                den: i.swap_fee_denominator,
+            })
+        }
+        AnyPool::Cpmm(p) => Pricing::Cpmm {
+            buy: p
+                .fees(&env.svm, shortwin_math::fees::Direction::Buy)
+                .unwrap(),
+            sell: p
+                .fees(&env.svm, shortwin_math::fees::Direction::Sell)
+                .unwrap(),
+        },
+    }
+}
+
+/// `own` with its trade fee at `cap` bps — the pricing of a fee hiked to exactly the hard cap:
+/// AMM v4 `cap/10⁴`; CPMM a trade fee of `cap·100` ppm with the creator fee trimmed to what the
+/// cap leaves (`CpmmFees::capped`; 0 on every fixture used here).
+fn pricing_at_cap(own: Pricing, cap: u64) -> Pricing {
+    match own {
+        Pricing::RayV4(_) => Pricing::RayV4(RayV4Fee {
+            num: cap,
+            den: 10_000,
+        }),
+        Pricing::Cpmm { buy, sell } => Pricing::Cpmm {
+            buy: CpmmFees {
+                trade: cap * 100,
+                ..buy
+            },
+            sell: CpmmFees {
+                trade: cap * 100,
+                ..sell
+            },
+        }
+        .capped(cap),
+        _ => unreachable!("not a Raydium pricing"),
+    }
 }
 
 /// A whale that buys the token on `rm`'s pool with its WSOL.
@@ -621,17 +657,16 @@ fn liquidate_attempt(
     }
 }
 
-/// G-D6 / T-S3-BROKEN on AMM v4 (ARCH §5.3, §8.2; V2-1, O15): the Emergency flag — the market's
-/// or the AMM v4 venue bit — on an executable pool starts the S3 chain at the next observation
+/// G-D6 / T-S3-BROKEN (ARCH §5.3, §8.2; V2-1, O15): the Emergency flag — the market's or the
+/// market's venue bit — on an executable pool starts the S3 chain at the next observation
 /// and nothing else (`pool_fail` stays clear; the pool is still observed). A healthy position
 /// never settles before its deadline; flagged 300 s before it, the expired position waits for
 /// the chain's `s3_wait_s` and settles S3 at the first keeper call after `since + s3_wait_s`,
 /// with the expiry fee at both corners and FV at the EMA point priced at the live fee (the
 /// venue executes: `min(φ_live, cap)` = `φ_live`). Clearing the flag clears the chain.
-#[test]
-fn amm_v4_an_emergency_flag_settles_expired_positions_after_the_timer() {
+fn an_emergency_flag_settles_expired_positions_after_the_timer(fixture: RayFixture) {
     for venue_scope in [false, true] {
-        let (mut env, rm, q) = setup(FART);
+        let (mut env, rm, q) = setup(fixture);
         let mut b = env.borrower();
         let (_, nonce, _) = open_ok(&mut env, &rm, &mut b, q);
         let pos = env.position(&rm, &b.key(), nonce);
@@ -673,9 +708,9 @@ fn amm_v4_an_emergency_flag_settles_expired_positions_after_the_timer() {
         let m = env.market(&rm.market());
         let (p, l) = (m.ema_price.get(), m.ema_liq.get());
         let r_due = rent::due(&pos.pos_rent(), &m.basis()).unwrap();
-        let live = v4_pricing(&env, &rm).capped(u64::from(pos.venue_fee_hard_cap_bps));
+        let live = live_pricing(&env, &rm).capped(u64::from(pos.venue_fee_hard_cap_bps));
         let fv = fair_value(live, pos.q, p, l, ev.pprime_lo, r_due);
-        assert_eq!(ev.fv, fv, "FV at the EMA point, the live fee");
+        assert_eq!(ev.fv, fv, "{fixture:?}: FV at the EMA point, the live fee");
         let take = pos.v - k_s(&pos);
         assert_eq!(ev.lender_amount, fv.min(take));
         assert_eq!(ev.borrower_amount, take - ev.lender_amount);
@@ -687,14 +722,24 @@ fn amm_v4_an_emergency_flag_settles_expired_positions_after_the_timer() {
     }
 }
 
-/// G-D6 / T-S3-BROKEN, the liquidation side on AMM v4 (V2-1, I10): from the same state, along
+#[test]
+fn amm_v4_an_emergency_flag_settles_expired_positions_after_the_timer() {
+    an_emergency_flag_settles_expired_positions_after_the_timer(FART);
+}
+
+/// G-D6 on CPMM: the flag (the market's, then CPMM's venue bit) on USELESS.
+#[test]
+fn cpmm_an_emergency_flag_settles_expired_positions_after_the_timer() {
+    an_emergency_flag_settles_expired_positions_after_the_timer(USELESS);
+}
+
+/// G-D6 / T-S3-BROKEN, the liquidation side (V2-1, I10): from the same state, along
 /// the same path of real whale buys (1 % of the SOL reserve a second), with and without the
 /// Emergency flag the keeper's `liquidate` refuses with the same codes in the same seconds and
 /// executes in the same second with identical amounts; `pool_fail` stays clear in both runs and
 /// only the flagged run has an S3 chain.
-#[test]
-fn amm_v4_liquidations_are_identical_with_and_without_the_flag() {
-    let (mut env, rm, q) = setup(FART);
+fn liquidations_are_identical_with_and_without_the_flag(fixture: RayFixture) {
+    let (mut env, rm, q) = setup(fixture);
     let mut b = env.borrower();
     let (_, nonce, _) = open_ok(&mut env, &rm, &mut b, q);
     env.tick(&rm, 3);
@@ -724,7 +769,7 @@ fn amm_v4_liquidations_are_identical_with_and_without_the_flag() {
     let (plain, flagged) = (&runs[0], &runs[1]);
     assert!(
         plain.0.last().is_some_and(Result::is_ok),
-        "the path liquidates"
+        "{fixture:?}: the path liquidates"
     );
     assert!(plain.0.len() > 1, "healthy first");
     assert_eq!(plain.0, flagged.0, "the same attempts, second by second");
@@ -737,15 +782,26 @@ fn amm_v4_liquidations_are_identical_with_and_without_the_flag() {
     assert!(flagged.2 > 0, "only the flagged run has an S3 chain");
 }
 
-/// ECON §8.6's race under the Emergency flag on AMM v4 (O15; ARCH §8.2 round 3): at the
+#[test]
+fn amm_v4_liquidations_are_identical_with_and_without_the_flag() {
+    liquidations_are_identical_with_and_without_the_flag(FART);
+}
+
+/// G-D6's liquidation differential on CPMM (USELESS): the same path of real whale buys on the
+/// 2026-10 ELF.
+#[test]
+fn cpmm_liquidations_are_identical_with_and_without_the_flag() {
+    liquidations_are_identical_with_and_without_the_flag(USELESS);
+}
+
+/// ECON §8.6's race under the Emergency flag (O15; ARCH §8.2 round 3): at the
 /// deadline of a flagged, expired, healthy position whose S3 chain has run `s3_wait_s`, the
 /// honest keeper's `expire()` and a lender-keeper's `sol_settle(S3)` are both valid; whichever
 /// lands first closes the position and the other finds none (Anchor's
 /// `AccountNotInitialized`). The S3 take equals the expiry's buyback, fee and rent within
 /// 0.1 %, and the borrower's difference is `K_s − K_e` within the same margin.
-#[test]
-fn amm_v4_an_emergency_flag_s3_races_an_honest_expiry() {
-    let (mut env, rm, q) = setup(FART);
+fn an_emergency_flag_s3_races_an_honest_expiry(fixture: RayFixture) {
+    let (mut env, rm, q) = setup(fixture);
     let mut b = env.borrower();
     let (_, nonce, _) = open_ok(&mut env, &rm, &mut b, q);
     let pos = env.position(&rm, &b.key(), nonce);
@@ -790,7 +846,7 @@ fn amm_v4_an_emergency_flag_s3_races_an_honest_expiry() {
     let diff = ev.lender_amount.abs_diff(expiry_value);
     assert!(
         diff * 1_000 <= expiry_value,
-        "S3 take {} vs the expiry's B + fee + rent {expiry_value}",
+        "{fixture:?}: S3 take {} vs the expiry's B + fee + rent {expiry_value}",
         ev.lender_amount
     );
     let extra = i128::from(exp.borrower_payout) - i128::from(ev.borrower_amount);
@@ -805,12 +861,23 @@ fn amm_v4_an_emergency_flag_s3_races_an_honest_expiry() {
     );
 }
 
+#[test]
+fn amm_v4_an_emergency_flag_s3_races_an_honest_expiry() {
+    an_emergency_flag_s3_races_an_honest_expiry(FART);
+}
+
+/// O15's race under the flag on CPMM (USELESS).
+#[test]
+fn cpmm_an_emergency_flag_s3_races_an_honest_expiry() {
+    an_emergency_flag_s3_races_an_honest_expiry(USELESS);
+}
+
 /// Anchor's `AccountNotInitialized`: a closed position account.
 const ANCHOR_ACCOUNT_NOT_INITIALIZED: u32 = 3_012;
 
-/// G-G5 (V2-1, I16 risk-quote clause) on AMM v4: **the liquidatable set is unchanged above the
-/// hard cap**. A real whale buy (sized so that the position is CR-liquidatable at the
-/// position's 500 bps cap but not at the pool's own 25 bps), then the keeper every second. With
+/// G-G5 (V2-1, I16 risk-quote clause): **the liquidatable set is unchanged above the hard cap**.
+/// A real whale buy (sized so that the position is CR-liquidatable at the position's 500 bps cap
+/// but not at the pool's own 25 bps), then the keeper every second. With
 /// the pool's fee hiked to exactly the cap (500 bps: between the caps, no route evidence) and to
 /// 70 % (far above it: both chains run), the risk view is the same `min(φ_live, cap)` = cap:
 /// `liquidate` refuses `NotLiquidatable` in exactly the same seconds and stops doing so in the
@@ -818,9 +885,8 @@ const ANCHOR_ACCOUNT_NOT_INITIALIZED: u32 = 3_012;
 /// longer fits `V − K_s` (`UseSolSettle`): the keeper's per-second `sol_settle` settles it S3
 /// once the hike's chain has run `s3_wait_s`, with the penalty and FV at the position's cap.
 /// Control: without a hike (risk at 25 bps) the position is never liquidatable on this path.
-#[test]
-fn amm_v4_the_liquidatable_set_is_unchanged_above_the_hard_cap() {
-    let (mut env, rm, q) = setup(FART);
+fn the_liquidatable_set_is_unchanged_above_the_hard_cap(fixture: RayFixture) {
+    let (mut env, rm, q) = setup(fixture);
     let mut b = env.borrower();
     let (_, nonce, _) = open_ok(&mut env, &rm, &mut b, q);
     let pos = env.position(&rm, &b.key(), nonce);
@@ -828,11 +894,8 @@ fn amm_v4_the_liquidatable_set_is_unchanged_above_the_hard_cap() {
     let keeper = env.funded_keypair();
     let w = whale(&mut env, &rm);
     let cap = u64::from(pos.venue_fee_hard_cap_bps);
-    let at_cap = Pricing::RayV4(RayV4Fee {
-        num: cap,
-        den: 10_000,
-    });
-    let own = v4_pricing(&env, &rm);
+    let own = live_pricing(&env, &rm);
+    let at_cap = pricing_at_cap(own, cap);
     // The buy that puts B̂ at the CR_liq boundary between the two fee views: B̂_own·L <
     // V_eff·10⁴ < B̂_cap·L, by bisection on clones of the VM.
     let m = env.market(&rm.market());
@@ -930,7 +993,7 @@ fn amm_v4_the_liquidatable_set_is_unchanged_above_the_hard_cap() {
     }
     let (s, ev) = exit.expect("settled through sol_settle");
     eprintln!(
-        "G-G5 at 70 %: sol_settle S{} after {s} s, lenders {} of V − K_s {}",
+        "G-G5 at 70 % on {fixture:?}: sol_settle S{} after {s} s, lenders {} of V − K_s {}",
         ev.condition,
         ev.lender_amount,
         pos.v - k_s(&pos)
@@ -946,28 +1009,39 @@ fn amm_v4_the_liquidatable_set_is_unchanged_above_the_hard_cap() {
     let (p, l) = (m.ema_price.get(), m.ema_liq.get());
     let r_due = rent::due(&pos.pos_rent(), &m.basis()).unwrap();
     let fv = fair_value(at_cap, pos.q, p, l, ev.pprime_lo, r_due);
-    assert_eq!(ev.fv, fv, "FV at the locked cap");
+    assert_eq!(ev.fv, fv, "{fixture:?}: FV at the locked cap");
     assert_eq!(ev.lender_amount, fv.min(pos.v - k_s(&pos)));
 }
 
-/// G-H3 on AMM v4 (A63, V1-8; I16 "no observation while not executable", I12 S3 rules): the
-/// pool account grows by one byte with a position open — a venue-state layout change the
-/// reader refuses (`WrongTag`). The crank and `sol_settle` succeed and record nothing; both
+#[test]
+fn amm_v4_the_liquidatable_set_is_unchanged_above_the_hard_cap() {
+    the_liquidatable_set_is_unchanged_above_the_hard_cap(FART);
+}
+
+/// G-G5 on CPMM (USELESS, config 0's 25 bps): the hikes by the admin's real `update_amm_config`
+/// (the config's trade fee to 500 bps, then to 70 %); FV at the cap is a 500 bps trade fee.
+#[test]
+fn cpmm_the_liquidatable_set_is_unchanged_above_the_hard_cap() {
+    the_liquidatable_set_is_unchanged_above_the_hard_cap(USELESS);
+}
+
+/// G-H3 (A63, V1-8; I16 "no observation while not executable", I12 S3 rules): a venue-state
+/// layout change with a position open, which the reader refuses (`WrongTag`), made by `change`
+/// on the pool account. The crank and `sol_settle` succeed and record nothing; both
 /// chains start; opens and closes fail with `NoRoute`. The expired position settles S3 once the
 /// chain has run `s3_wait_s`, on the frozen EMA point with FV priced at the position's hard cap
 /// — the pool's fee is unreadable (`min(φ_live, cap)` with `φ_live` unknown) — not at the
 /// pool's last known 25 bps (that FV differs). The old layout back, both chains clear.
-#[test]
-fn amm_v4_a_layout_change_with_a_position_open() {
-    let (mut env, rm, q) = setup(FART);
+fn a_layout_change_with_a_position_open(fixture: RayFixture, change: impl FnOnce(&mut Vec<u8>)) {
+    let (mut env, rm, q) = setup(fixture);
     let mut b = env.borrower();
     let (_, nonce, _) = open_ok(&mut env, &rm, &mut b, q);
     let pos = env.position(&rm, &b.key(), nonce);
     env.tick(&rm, 3);
-    let own = v4_pricing(&env, &rm);
-    let pool = rm.v4().pool;
+    let own = live_pricing(&env, &rm);
+    let pool = shortwin_litesvm_tests::pool_select::pool_key(&rm.pool);
     let original = env.svm.get_account(&pool).unwrap();
-    fork::patch(&mut env.svm, &pool, |d| d.push(0));
+    fork::patch(&mut env.svm, &pool, change);
     env.warp(1);
     let m0 = env.market(&rm.market());
     env.crank(&rm);
@@ -1008,12 +1082,26 @@ fn amm_v4_a_layout_change_with_a_position_open() {
     assert_eq!(ev.pprime_lo, pos.expiry_fee_bps);
     let r_due = rent::due(&pos.pos_rent(), &m.basis()).unwrap();
     let cap = u64::from(pos.venue_fee_hard_cap_bps);
-    let at_cap = Pricing::RayV4(RayV4Fee {
-        num: cap,
-        den: 10_000,
-    });
+    // The program's fee view with the fee unreadable: the cap itself as the fee (AMM v4
+    // `cap/10⁴`; CPMM a trade fee of `cap·100` ppm, no creator, protocol or fund share).
+    let at_cap = match &rm.pool {
+        AnyPool::V4(_) => Pricing::RayV4(RayV4Fee {
+            num: cap,
+            den: 10_000,
+        }),
+        AnyPool::Cpmm(_) => {
+            let f = CpmmFees {
+                trade: cap * 100,
+                creator: 0,
+                creator_on_input: true,
+                protocol: 0,
+                fund: 0,
+            };
+            Pricing::Cpmm { buy: f, sell: f }
+        }
+    };
     let fv = fair_value(at_cap, pos.q, p, l, ev.pprime_lo, r_due);
-    assert_eq!(ev.fv, fv, "FV at the position's hard cap");
+    assert_eq!(ev.fv, fv, "{fixture:?}: FV at the position's hard cap");
     assert_ne!(
         ev.fv,
         fair_value(own.capped(cap), pos.q, p, l, ev.pprime_lo, r_due),
@@ -1027,4 +1115,17 @@ fn amm_v4_a_layout_change_with_a_position_open() {
     let m = env.market(&rm.market());
     assert_eq!((m.no_route_since, m.pool_fail_since), (0, 0));
     assert!(m.b_lo.get() > 0);
+}
+
+/// G-H3 on AMM v4: the pool account grows by one byte.
+#[test]
+fn amm_v4_a_layout_change_with_a_position_open() {
+    a_layout_change_with_a_position_open(FART, |d| d.push(0));
+}
+
+/// G-H3 on CPMM (USELESS): the `PoolState` discriminator changes (its first byte flipped) — the
+/// pool no longer parses for short.win nor for the venue, and its fee is unreadable.
+#[test]
+fn cpmm_a_layout_change_with_a_position_open() {
+    a_layout_change_with_a_position_open(USELESS, |d| d[0] ^= 0xff);
 }

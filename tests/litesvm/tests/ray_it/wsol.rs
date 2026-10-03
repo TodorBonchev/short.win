@@ -84,7 +84,7 @@ fn pre_funded_trader_pdas() {
 /// closes it and credits lenders (M2-SEC-4's instruction, on a Raydium market).
 #[test]
 fn a_pre_created_trader_wsol_ata() {
-    for fixture in [FART, USELESS] {
+    for fixture in [FART, USELESS, T22] {
         let (mut env, rm, q) = setup(fixture);
         let ata_key = trader_wsol_ata(&rm.market());
         assert_eq!(
@@ -137,26 +137,116 @@ fn a_pre_created_trader_wsol_ata() {
 
 /// The `trader_wsol` address pre-funded between the two instructions of one transaction (a
 /// front-runner's bundle): an open right after the donation, in the same transaction, still
-/// sweeps and trades.
+/// sweeps and trades at the exact quote, on both programs (CPMM: USELESS and the Token-2022
+/// pool, M10 G-B1).
 #[test]
 fn a_donation_in_the_same_transaction() {
-    let (mut env, rm, q) = setup(FART);
-    let b = env.borrower();
-    let open = open_short_ix(
-        &rm,
-        &b.key(),
-        0,
-        q,
-        0,
-        u64::MAX,
-        u64::MAX,
-        ExtrasSel::NONE,
-        &[],
-    );
-    let kp = b.kp.insecure_clone();
-    let donate = transfer(&kp, &rm.trader_wsol, 10_000_000);
-    let meta = ok(env.send(&[donate, open], &[&kp]));
-    let swept: TraderSwept = events::of_ix(&meta, 1).into_iter().next().expect("swept");
-    assert_eq!(swept.lamports, 10_000_000);
-    assert_eq!(lamports(&env, &rm.trader_wsol), 0);
+    for fixture in [FART, USELESS, T22] {
+        let (mut env, rm, q) = setup(fixture);
+        let b = env.borrower();
+        let open = open_short_ix(
+            &rm,
+            &b.key(),
+            0,
+            q,
+            0,
+            u64::MAX,
+            u64::MAX,
+            ExtrasSel::NONE,
+            &[],
+        );
+        let kp = b.kp.insecure_clone();
+        let donate = transfer(&kp, &rm.trader_wsol, 10_000_000);
+        let s_exp = rm.quote_sell(&env.svm, q).unwrap().proceeds;
+        let meta = ok(env.send(&[donate, open], &[&kp]));
+        let swept: TraderSwept = events::of_ix(&meta, 1).into_iter().next().expect("swept");
+        assert_eq!(swept.lamports, 10_000_000, "{fixture:?}");
+        let ev: Open = events::one(&meta);
+        assert_eq!(ev.s, s_exp, "{fixture:?}");
+        assert_eq!(lamports(&env, &rm.trader_wsol), 0);
+    }
+}
+
+/// M10 G-B1/B2 on a keeper's exit on CPMM (USELESS and the Token-2022 pool): lamports donated to
+/// the trader PDA and to the `trader_wsol` address before an expiry never block the keeper's
+/// leg — it sweeps them into `market_vault` as a vesting lump (`TraderSwept`, credited on top of
+/// the expiry's own lender amounts), funds exactly its buy-back (the pool's WSOL vault grows by
+/// exactly `buyback_cost`, and `trader_wsol` ends empty: none of the donation reaches the pool and
+/// nothing is left over) and buys back at the exact quote; both addresses end empty. The control:
+/// the same expiry without the donations moves `lender_sol` by exactly the donation less.
+#[test]
+fn donations_before_a_keeper_expiry_on_cpmm() {
+    use shortwin::events::Expire;
+    use shortwin_litesvm_tests::engine::expire_ix;
+    for fixture in [USELESS, T22] {
+        let (mut env, rm, q) = setup(fixture);
+        let mut b = env.borrower();
+        let (_, nonce, _) = open_ok(&mut env, &rm, &mut b, q);
+        let pos = env.position(&rm, &b.key(), nonce);
+        let slot = env.clock().slot;
+        env.set_clock(pos.deadline + 1, slot + 1_600_000);
+        env.tick(&rm, 3);
+        let keeper = env.funded_keypair();
+        let saved = env.svm.clone();
+        let mut deltas = Vec::new();
+        for donated in [0, 2_500_000_000u64] {
+            env.svm = saved.clone();
+            if donated > 0 {
+                let griefer = env.funded_keypair();
+                ok(env.send(
+                    &[
+                        transfer(&griefer, &rm.keys.trader, 500_000_000),
+                        transfer(&griefer, &rm.trader_wsol, donated - 500_000_000),
+                    ],
+                    &[&griefer],
+                ));
+            }
+            let v0 = env.market_vault(&rm.market());
+            let vest0 = env.market(&rm.market()).vest_bal;
+            let pool_vault0 = tokens(&env, &rm.keys.pool_vault);
+            let venue_wsol = rm.vaults().1;
+            let venue_wsol0 = tokens(&env, &venue_wsol);
+            let b_exp = rm.quote_buy(&env.svm, q).unwrap().cost;
+            let meta = ok(env.send(
+                &[expire_ix(&rm, &keeper.pubkey(), &b.key(), nonce)],
+                &[&keeper],
+            ));
+            let e: Expire = events::one(&meta);
+            assert_eq!(e.buyback_cost, b_exp, "{fixture:?}: the exact quote");
+            assert_eq!(tokens(&env, &rm.keys.pool_vault) - pool_vault0, q);
+            assert_eq!(
+                tokens(&env, &venue_wsol) - venue_wsol0,
+                e.buyback_cost,
+                "{fixture:?}: the leg funds exactly its buy-back"
+            );
+            let swept: Vec<TraderSwept> = events::of(&meta);
+            if donated > 0 {
+                assert_eq!(swept.len(), 1, "{fixture:?}");
+                assert_eq!(swept[0].lamports, donated);
+            } else {
+                assert!(swept.is_empty(), "{fixture:?}: nothing to sweep");
+            }
+            assert_eq!(lamports(&env, &rm.keys.trader), 0);
+            assert_eq!(lamports(&env, &rm.trader_wsol), 0);
+            let v1 = env.market_vault(&rm.market());
+            let vest1 = env.market(&rm.market()).vest_bal;
+            deltas.push((
+                i128::from(v1.lender_sol) - i128::from(v0.lender_sol),
+                i128::from(vest1) - i128::from(vest0),
+                e,
+            ));
+        }
+        let (plain, griefed) = (&deltas[0], &deltas[1]);
+        assert_eq!(
+            griefed.0 - plain.0,
+            2_500_000_000,
+            "{fixture:?}: lender_sol moves by the donation on top"
+        );
+        assert_eq!(griefed.1 - plain.1, 2_500_000_000, "{fixture:?}: it vests");
+        assert_eq!(
+            (griefed.2.buyback_cost, griefed.2.borrower_payout),
+            (plain.2.buyback_cost, plain.2.borrower_payout),
+            "{fixture:?}: the exit's own amounts unchanged"
+        );
+    }
 }

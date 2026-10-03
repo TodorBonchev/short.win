@@ -4,8 +4,9 @@
 //! swapped, or a trailing account appended makes the instruction fail with
 //! `BadRemainingAccounts` / `VenueAccountMismatch`, never "no route" or a silent default.
 //! Also: the venue ignores trailing extras (R-RAY §9.6), so a selected extras set with a fixed
-//! read-only entry trades normally on both programs. M10 on AMM v4: a thin pool (the reversed
-//! Fartcoin pool) in place of the adopted one on every instruction (G-A6's AMM v4 part), and a
+//! read-only entry trades normally on both programs. M10 on both programs: a thin pool in place
+//! of the adopted one on every instruction (G-A6: the reversed Fartcoin pool on AMM v4, a planted
+//! same-mint CPMM pool at a tenth of the depth on USELESS and the Token-2022 pool), and a
 //! denylisted key in an extras set refused and bypassed with `previous` (G-A5's fork run).
 
 use shortwin::state::EXTRAS_IX_SELL;
@@ -98,34 +99,6 @@ fn every_venue_slot_is_mandatory_and_key_checked() {
     }
 }
 
-/// The ReadSet and TradeExtras are the ones the market recorded at listing: another pool of
-/// the same mint (the reversed Fartcoin pool) in place of the adopted one is refused.
-#[test]
-fn a_thin_pool_in_place_of_the_adopted_one() {
-    let (mut env, rm, q) = setup(FART);
-    let rev = env.load_ray_v4(V4Fixture::FartcoinReversed);
-    let b = env.borrower();
-    let mut open = open_short_ix(
-        &rm,
-        &b.key(),
-        0,
-        q,
-        0,
-        u64::MAX,
-        u64::MAX,
-        ExtrasSel::NONE,
-        &[],
-    );
-    let start = open.accounts.len() - 10;
-    for (i, key) in [rev.pool, rev.coin_vault, rev.pc_vault, rev.lp_mint]
-        .into_iter()
-        .enumerate()
-    {
-        open.accounts[start + i].pubkey = key;
-    }
-    assert_err(&env.send(&[open], &[&b.kp]), E::VenueAccountMismatch);
-}
-
 /// A selected extras set (A41) is appended to the venue CPI; AMM v4 v2 and CPMM ignore
 /// trailing accounts (R-RAY §9.6), so a harmless fixed entry changes nothing.
 #[test]
@@ -199,35 +172,52 @@ fn the_hooks_see_raydium_markets() {
     }
 }
 
-/// The reversed Fartcoin pool's keys (pool, coin vault, pc vault, LP mint) in place of the adopted
-/// pool's in the first four ReadSet slots of `ix`, whose last `remaining` metas are the venue's.
-fn thin(ix: &Instruction, remaining: usize, rev: &fork::V4Pool) -> Instruction {
+/// `ix` with `subs` applied: each `(i, key)` puts `key` in the `i`-th venue slot (of the last
+/// `remaining` metas, ReadSet first), where `ix` has that slot (a TradeExtras slot only on the
+/// trading instructions).
+fn thin(ix: &Instruction, remaining: usize, subs: &[(usize, Pubkey)]) -> Instruction {
     let mut ix = ix.clone();
     let start = ix.accounts.len() - remaining;
-    for (i, key) in [rev.pool, rev.coin_vault, rev.pc_vault, rev.lp_mint]
-        .into_iter()
-        .enumerate()
-    {
+    for &(i, key) in subs.iter().filter(|(i, _)| *i < remaining) {
         ix.accounts[start + i].pubkey = key;
     }
     ix
 }
 
-/// M10 G-A6's AMM v4 part beyond the open: the reversed Fartcoin pool in place of the adopted one
-/// is refused (`VenueAccountMismatch`) on `crank_price`, `sol_settle`, `close_short`, `liquidate`
-/// and `expire` as on `open_short`, the position unchanged; each honest instruction (the control)
-/// is accepted — the crank, the `sol_settle` no-op, the close, the healthy position's liquidation
-/// refused by its body (`NotLiquidatable`), the expiry after the deadline.
-#[test]
-fn a_thin_pool_in_place_of_the_adopted_one_on_every_instruction() {
-    let (mut env, rm, q) = setup(FART);
-    let rev = env.load_ray_v4(V4Fixture::FartcoinReversed);
+/// The thin pool on every instruction of a market on `fixture`, `subs` (from [`thin`]) naming
+/// the other pool's keys: refused (`VenueAccountMismatch`) on `open_short`, `crank_price`,
+/// `sol_settle`, `liquidate`, `close_short` and `expire`, the position unchanged; each honest
+/// instruction (the control) is accepted — the open, the crank, the `sol_settle` no-op, the
+/// close, the healthy position's liquidation refused by its body (`NotLiquidatable`), the expiry
+/// after the deadline.
+fn thin_pool_on_every_instruction(
+    fixture: RayFixture,
+    subs: impl FnOnce(&mut Env, &RayMarket) -> Vec<(usize, Pubkey)>,
+) {
+    let (mut env, rm, q) = setup(fixture);
+    let subs = subs(&mut env, &rm);
     let (read_len, all) = (
         rm.read_set(false).len(),
         rm.read_set(false).len() + rm.trade_extras().len(),
     );
     let mut b = env.borrower();
+    let open = open_short_ix(
+        &rm,
+        &b.key(),
+        0,
+        q,
+        0,
+        u64::MAX,
+        u64::MAX,
+        ExtrasSel::NONE,
+        &[],
+    );
+    assert_err(
+        &env.send(&[thin(&open, all, &subs)], &[&b.kp]),
+        E::VenueAccountMismatch,
+    );
     let (_, n0, _) = open_ok(&mut env, &rm, &mut b, q);
+    assert_eq!(n0, 0, "{fixture:?}: the refused open created no position");
     let mut b2 = env.borrower();
     let (_, n1, _) = open_ok(&mut env, &rm, &mut b2, q);
     env.tick(&rm, 1);
@@ -238,27 +228,31 @@ fn a_thin_pool_in_place_of_the_adopted_one_on_every_instruction() {
 
     let crank = crank_price_ix(&rm);
     assert_err(
-        &env.send(&[thin(&crank, read_len, &rev)], &[]),
+        &env.send(&[thin(&crank, read_len, &subs)], &[]),
         E::VenueAccountMismatch,
     );
     ok(env.send(&[crank], &[]));
     let settle = sol_settle_ix(&env, &rm, &keeper.pubkey(), &b2.key(), n1);
     assert_err(
-        &env.send(&[thin(&settle, read_len, &rev)], &[&keeper]),
+        &env.send(&[thin(&settle, read_len, &subs)], &[&keeper]),
         E::VenueAccountMismatch,
     );
     let liq = liquidate_ix(&rm, &keeper.pubkey(), &b2.key(), n1);
     assert_err(
-        &env.send(&[thin(&liq, all, &rev)], &[&keeper]),
+        &env.send(&[thin(&liq, all, &subs)], &[&keeper]),
         E::VenueAccountMismatch,
     );
-    assert_eq!(pos_bytes(&env), before, "the position unchanged");
+    assert_eq!(
+        pos_bytes(&env),
+        before,
+        "{fixture:?}: the position unchanged"
+    );
     ok(env.send(&[settle], &[&keeper]));
     assert_err(&env.send(&[liq], &[&keeper]), E::NotLiquidatable);
 
     let close = close_short_ix(&rm, &b.key(), n0, u64::MAX, ExtrasSel::NONE, &[]);
     assert_err(
-        &env.send(&[thin(&close, all, &rev)], &[&b.kp]),
+        &env.send(&[thin(&close, all, &subs)], &[&b.kp]),
         E::VenueAccountMismatch,
     );
     ok(env.send(&[close], &[&b.kp]));
@@ -270,24 +264,87 @@ fn a_thin_pool_in_place_of_the_adopted_one_on_every_instruction() {
     let exp = expire_ix(&rm, &keeper.pubkey(), &b2.key(), n1);
     let before = pos_bytes(&env);
     assert_err(
-        &env.send(&[thin(&exp, all, &rev)], &[&keeper]),
+        &env.send(&[thin(&exp, all, &subs)], &[&keeper]),
         E::VenueAccountMismatch,
     );
-    assert_eq!(pos_bytes(&env), before, "the position unchanged");
+    assert_eq!(
+        pos_bytes(&env),
+        before,
+        "{fixture:?}: the position unchanged"
+    );
     let meta = ok(env.send(&[exp], &[&keeper]));
     let _: shortwin::events::Expire = events::one(&meta);
 }
 
-/// A denylisted key in an AMM v4 extras set (M10 G-A5's fork run; ARCH §2.4 rule 4, A41): the
-/// Emergency publishes a harmless fixed extra, then a hostile set naming the market's pool vault —
-/// on the sell leg and on the buy leg. Selecting the hostile `current` set fails `DeniedAccount`
-/// on the open and on the close; selecting `previous` (the harmless set) bypasses it and trades
-/// exactly as with no extras.
+/// The ReadSet and TradeExtras are the ones the market recorded at listing (M10 G-A6 on AMM v4):
+/// another pool of the same mint — the reversed Fartcoin pool's keys (pool, coin vault, pc
+/// vault, LP mint) — in place of the adopted pool's ReadSet is refused on every instruction,
+/// the open included ([`thin_pool_on_every_instruction`]).
 #[test]
-fn a_denylisted_extra_on_amm_v4_is_bypassed_with_previous() {
+fn a_thin_pool_in_place_of_the_adopted_one_on_every_instruction() {
+    thin_pool_on_every_instruction(FART, |env, _| {
+        let rev = env.load_ray_v4(V4Fixture::FartcoinReversed);
+        vec![
+            (0, rev.pool),
+            (1, rev.coin_vault),
+            (2, rev.pc_vault),
+            (3, rev.lp_mint),
+        ]
+    });
+}
+
+/// M10 G-A6 on CPMM (USELESS, and the Token-2022 pool): a **same-mint** pool at a tenth of the
+/// adopted pool's depth, a real CPMM pool on the same config (`pool_select::plant_cpmm`: its own
+/// vaults, LP mint and observation; it trades on the 2026-10 ELF), in place of the adopted one —
+/// its pool, vaults and LP mint in the ReadSet (the config slot is the same key) and its
+/// observation in the TradeExtras — on every instruction ([`thin_pool_on_every_instruction`]).
+#[test]
+fn cpmm_a_thin_same_mint_pool_in_place_of_the_adopted_one_on_every_instruction() {
+    use shortwin_litesvm_tests::pool_select::{plant_cpmm, spec_like};
+    for fixture in [USELESS, T22] {
+        thin_pool_on_every_instruction(fixture, |env, rm| {
+            let RayFixture::Cpmm(template) = fixture else {
+                unreachable!()
+            };
+            let p = rm.cpmm();
+            let spec = spec_like(&env.svm, &rm.pool, p.sol_is_token0, 10_000).scaled(1, 10);
+            let t = plant_cpmm(env, template, spec);
+            assert_eq!(
+                (t.token_0_mint, t.token_1_mint, t.amm_config),
+                (p.token_0_mint, p.token_1_mint, p.amm_config),
+                "same mints, same config"
+            );
+            let thin = AnyPool::Cpmm(t);
+            assert!(
+                t.venue_executable(&env.svm, env.now()),
+                "an executable pool"
+            );
+            let (x, _) = thin
+                .io_reserves(&env.svm, shortwin_math::fees::Direction::Sell)
+                .unwrap();
+            let (x0, _) = rm.reserves(&env.svm).unwrap();
+            assert_eq!(x, x0 / 10, "a tenth of the depth");
+            let read_len = rm.read_set(false).len();
+            vec![
+                (0, t.pool),
+                (2, t.token_0_vault),
+                (3, t.token_1_vault),
+                (4, t.lp_mint),
+                (read_len + 2, t.observation),
+            ]
+        });
+    }
+}
+
+/// A denylisted key in a Raydium extras set (M10 G-A5's fork run; ARCH §2.4 rule 4, A41): the
+/// Emergency publishes a harmless fixed extra, then a hostile set naming the market's pool vault
+/// (the venue's source / destination of the leg) — on the sell leg and on the buy leg. Selecting
+/// the hostile `current` set fails `DeniedAccount` on the open and on the close; selecting
+/// `previous` (the harmless set) bypasses it and trades exactly as with no extras.
+fn a_denylisted_extra_is_bypassed_with_previous(fixture: RayFixture) {
     use shortwin::state::EXTRAS_IX_BUY;
     use shortwin::venues::EXTRAS_SET_PREVIOUS;
-    let (mut env, rm, q) = setup(FART);
+    let (mut env, rm, q) = setup(fixture);
     let venue = rm.kind() as u8;
     let ea = env.pause_authority.insecure_clone();
     let harmless = env.funded_keypair().pubkey();
@@ -335,7 +392,7 @@ fn a_denylisted_extra_on_amm_v4_is_bypassed_with_previous() {
     let s_exp = rm.quote_sell(&env.svm, q).unwrap().proceeds;
     let meta = ok(env.send(&[open(previous, &good)], &[&b.kp]));
     let ev: Open = events::one(&meta);
-    assert_eq!(ev.s, s_exp, "as with no extras");
+    assert_eq!(ev.s, s_exp, "{fixture:?}: as with no extras");
     env.tick(&rm, 1);
     let close =
         |sel, extras: &[AccountMeta]| close_short_ix(&rm, &b.key(), 0, u64::MAX, sel, extras);
@@ -346,5 +403,19 @@ fn a_denylisted_extra_on_amm_v4_is_bypassed_with_previous() {
     let b_exp = rm.quote_buy(&env.svm, q).unwrap().cost;
     let meta = ok(env.send(&[close(previous, &good)], &[&b.kp]));
     let ev: Close = events::one(&meta);
-    assert_eq!(ev.buyback_cost, b_exp, "as with no extras");
+    assert_eq!(ev.buyback_cost, b_exp, "{fixture:?}: as with no extras");
+}
+
+#[test]
+fn a_denylisted_extra_on_amm_v4_is_bypassed_with_previous() {
+    a_denylisted_extra_is_bypassed_with_previous(FART);
+}
+
+/// G-A5 on CPMM: the hostile set names the CPMM market's pool vault (the swap's token source on
+/// the sale, its destination on the buy-back), on USELESS and on the Token-2022 pool.
+#[test]
+fn a_denylisted_extra_on_cpmm_is_bypassed_with_previous() {
+    for fixture in [USELESS, T22] {
+        a_denylisted_extra_is_bypassed_with_previous(fixture);
+    }
 }

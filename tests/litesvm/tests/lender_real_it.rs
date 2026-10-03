@@ -3,9 +3,9 @@
 //! (`tests/lender_it`) proves these cases with the borrower side injected through
 //! `shortwin_math::pool`; here every lump, rent payment and wipe comes from a real `liquidate`,
 //! `expire`, `sol_settle`, `close_short` or `sweep_trader` (the mock venue, test-venue build;
-//! and one PumpSwap cashback lump on the fork), and every instruction goes through `Env::send`,
-//! so the invariant hooks (I1, I2, I6, I8 with its allowance, claim and liveness clauses, …)
-//! run after each one and on every prefix of a bundle.
+//! one PumpSwap cashback lump and a Raydium CPMM liquidation and expiry on the fork), and every
+//! instruction goes through `Env::send`, so the invariant hooks (I1, I2, I6, I8 with its
+//! allowance, claim and liveness clauses, …) run after each one and on every prefix of a bundle.
 //!
 //! - `jit` (G-F2, R3B-2): a whale deposits 9× the pool around a real lump — a liquidation's
 //!   penalty, an expiry's fee, a `sweep_trader` of donated lamports — in **one transaction**
@@ -37,6 +37,9 @@
 //! - `pswap` (G-F2 on a real venue): the JIT whale around PumpSwap's cashback lump `[create
 //!   ATA(trader, WSOL), pAMM claim_cashback(user = trader), sweep_trader]` (the as-built
 //!   `claim_venue_rewards`, which is not an instruction of its own; ARCH §3.9) realises 0.
+//! - `cpmm` (G-F2, G-F7 on Raydium CPMM, the 2026-10 ELF): the JIT whale around a CPMM
+//!   liquidation after a real whale pump (past `min_rent_s`) and around a CPMM expiry realises 0;
+//!   `claim_sol ×3` in one transaction after the CPMM liquidation's lump pays once.
 //!
 //! Every scenario ends with no position open and asserts `receivable = 0` and `A_j =
 //! rent_aggr = 0` (I-P7) explicitly, besides the I8 hook.
@@ -50,6 +53,11 @@ mod support;
 #[allow(unused_imports)]
 #[path = "pamm_it/common.rs"]
 mod pswap_common;
+
+/// The Raydium adapter tests' helpers (`ray_it/common.rs`), for `cpmm`.
+#[allow(unused_imports)]
+#[path = "ray_it/common.rs"]
+mod ray_common;
 
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::Instruction;
@@ -1371,6 +1379,238 @@ mod pswap {
             }
             assert!(env.lender(&market, &whale.pubkey()).is_none());
             assert_zero_at_zero_positions(&env, &market);
+        }
+    }
+}
+
+mod cpmm {
+    use crate::ray_common::*;
+    use crate::{assert_zero_at_zero_positions, claim, lands, sol_paid, tokens_withdrawn};
+    use shortwin::events::{Deposit as DepositEv, Expire, Liquidate};
+    use shortwin_litesvm_tests::engine::{expire_ix, liquidate_ix};
+    use shortwin_litesvm_tests::ix;
+    use shortwin_math::fees::Direction;
+    use solana_keypair::Keypair;
+
+    /// The CPMM exit that makes the lump.
+    #[derive(Clone, Copy, Debug)]
+    enum Lump {
+        /// `liquidate` after a real whale pump, the position open longer than `min_rent_s`
+        /// (outside finding M10-8C-1): the penalty's lender part vests.
+        Liquidate,
+        /// `expire` after the deadline: the expiry fee (100 % lenders) vests.
+        Expire,
+    }
+
+    /// A market on USELESS with one position, driven to the second in which `kind`'s exit lands;
+    /// the keeper and the exit's instruction.
+    fn ready(kind: Lump) -> (Env, RayMarket, Keypair, Instruction) {
+        let (mut env, rm, q) = setup(USELESS);
+        let mut b = env.borrower();
+        let (_, nonce, _) = open_ok(&mut env, &rm, &mut b, q);
+        let pos = env.position(&rm, &b.key(), nonce);
+        let keeper = env.funded_keypair();
+        let slot = env.clock().slot;
+        let exit = match kind {
+            Lump::Liquidate => {
+                let min_rent = env.config().tiers.iter().map(|t| t.min_rent_s).max();
+                let past = pos.t_open + i64::from(min_rent.unwrap()) + 60;
+                env.set_clock(past, slot + 1_000_000);
+                env.tick(&rm, 5);
+                // √2.2 − 1 of the SOL reserve lifts the price ≈ 2.2× (as `ray_it/exits.rs`).
+                let (tok, program) = rm.pool.token();
+                let (_, y) = rm.reserves(&env.svm).unwrap();
+                let sol = y / 1_000 * 484;
+                let whale = fork::trader(&mut env, &tok, program, sol + 1_000_000_000, 0);
+                ok(fork::swap(
+                    &mut env,
+                    &rm.pool,
+                    &whale,
+                    Direction::Buy,
+                    fork::Swap::ExactIn(sol, 0),
+                ));
+                let liq = liquidate_ix(&rm, &keeper.pubkey(), &b.key(), nonce);
+                let mut landed = false;
+                for _ in 0..60 {
+                    env.tick(&rm, 1);
+                    if lands(&mut env, std::slice::from_ref(&liq), &[&keeper]) {
+                        landed = true;
+                        break;
+                    }
+                }
+                assert!(landed, "never liquidatable");
+                liq
+            }
+            Lump::Expire => {
+                env.set_clock(pos.deadline + 1, slot + 1_600_000);
+                env.tick(&rm, 3);
+                expire_ix(&rm, &keeper.pubkey(), &b.key(), nonce)
+            }
+        };
+        assert_eq!(
+            env.market(&rm.market()).vest_bal,
+            0,
+            "no lump vesting before"
+        );
+        (env, rm, keeper, exit)
+    }
+
+    /// The lenders' vesting lump of the exit, from its event.
+    fn lump_of(meta: &TransactionMetadata, kind: Lump) -> u64 {
+        match kind {
+            Lump::Liquidate => events::one::<Liquidate>(meta).penalty_lender,
+            Lump::Expire => events::one::<Expire>(meta).expiry_fee,
+        }
+    }
+
+    /// G-F2 / R3B-2 on CPMM: the whale's `[deposit 9×, exit, claim_sol, withdraw]` realises 0 and
+    /// the honest lender's take is the run's without the whale; a whale holding through
+    /// `lump_vest_s` takes its share (the control: the vesting is what stops the capture).
+    fn jit_case(kind: Lump) {
+        let (mut env, rm, keeper, exit) = ready(kind);
+        let market = rm.market();
+        let honest = rm.lender.insecure_clone();
+        let lend = env.lender(&market, &honest.pubkey()).unwrap();
+        let amount = 9 * u64::try_from(
+            shortwin_math::pool::tokens_for_shares(&env.market(&market).pool(), lend.shares)
+                .unwrap(),
+        )
+        .unwrap();
+        let whale = env.funded_keypair();
+        let acc = fork::fund_token(
+            &mut env,
+            &whale.pubkey(),
+            &rm.keys.mint,
+            rm.program(),
+            amount,
+        );
+        let keys = ix::LenderKeys {
+            owner: whale.pubkey(),
+            mint: rm.keys.mint,
+            token_program: rm.keys.token_program,
+            owner_token_account: acc,
+        };
+        let vest = i64::from(env.config().params.lump_vest_s);
+        let t0 = env.now();
+        let saved = env.svm.clone();
+
+        // Without the whale.
+        let meta = ok(env.send(std::slice::from_ref(&exit), &[&keeper]));
+        let lump = lump_of(&meta, kind);
+        assert!(lump > 0, "{kind:?}: a real lump");
+        env.warp(vest + 1);
+        env.crank(&rm);
+        let alone = claim(&mut env, &market, &honest);
+        assert!(
+            alone >= lump,
+            "{kind:?}: the honest lender is paid the lump"
+        );
+
+        for hold in [0, vest] {
+            env.svm = saved.clone();
+            let minted =
+                shortwin_math::pool::shares_for_tokens(&env.market(&market).pool(), amount)
+                    .unwrap();
+            let mut ixs = vec![ix::deposit(&keys, amount, minted), exit.clone()];
+            if hold == 0 {
+                ixs.push(ix::claim_sol(&whale.pubkey(), &market));
+                ixs.push(ix::withdraw(&keys, minted, 0));
+            }
+            let meta = ok(env.send(&ixs, &[&keeper, &whale]));
+            assert_eq!(
+                lump_of(&meta, kind),
+                lump,
+                "{kind:?}: the whale does not change it"
+            );
+            let dep: DepositEv = events::one(&meta);
+            let mut w = sol_paid(&meta, &whale.pubkey());
+            let mut back = tokens_withdrawn(&meta, &whale.pubkey());
+            if hold > 0 {
+                env.warp(hold);
+                let meta = ok(env.send(
+                    &[
+                        ix::claim_sol(&whale.pubkey(), &market),
+                        ix::withdraw(&keys, minted, 0),
+                    ],
+                    &[&whale],
+                ));
+                w += sol_paid(&meta, &whale.pubkey());
+                back += tokens_withdrawn(&meta, &whale.pubkey());
+            }
+            assert!(
+                back <= amount && amount - back <= 2,
+                "{kind:?}, h = {hold}: the whale's tokens back {back} of {amount}"
+            );
+            env.warp(t0 + vest + 1 - env.now());
+            env.crank(&rm);
+            w += claim(&mut env, &market, &whale);
+            let h = claim(&mut env, &market, &honest);
+            let share =
+                u128::from(lump) * minted / (dep.s_after + shortwin_math::pool::VIRTUAL_SHARES);
+            eprintln!(
+                "CPMM {kind:?} lump {lump} hold {hold} s: whale {w} (share {share}), honest {h} \
+                 (alone {alone})"
+            );
+            if hold == 0 {
+                assert_eq!(w, 0, "{kind:?}: the JIT whale realises 0 at h = 0");
+                assert!(
+                    h.abs_diff(alone) <= 2,
+                    "{kind:?}: honest {h} vs alone {alone}"
+                );
+            } else {
+                assert!(
+                    u128::from(w).abs_diff(share) <= 2 + share / 1_000_000,
+                    "{kind:?}: held through the vest: its share {share}, took {w}"
+                );
+                assert!(
+                    (w + h).abs_diff(alone) <= 2,
+                    "{kind:?}: {w} + {h} vs {alone}"
+                );
+            }
+            assert!(env.lender(&market, &whale.pubkey()).is_none());
+            assert_zero_at_zero_positions(&env, &market);
+        }
+    }
+
+    #[test]
+    fn a_jit_whale_around_a_real_cpmm_liquidation_realises_nothing() {
+        jit_case(Lump::Liquidate);
+    }
+
+    #[test]
+    fn a_jit_whale_around_a_real_cpmm_expiry_realises_nothing() {
+        jit_case(Lump::Expire);
+    }
+
+    /// G-F7 on CPMM (V2-2): after the CPMM liquidation's lump, `claim_sol ×3` by the honest lender
+    /// in one transaction pays once — the first claim exactly what a single claim pays, the later
+    /// ones 0, `lender_sol` down by the first only — in the middle of the vest and after it.
+    #[test]
+    fn repeated_claims_in_one_transaction_after_a_cpmm_lump_pay_once() {
+        let (mut env, rm, keeper, exit) = ready(Lump::Liquidate);
+        let market = rm.market();
+        let honest = rm.lender.insecure_clone();
+        let meta = ok(env.send(&[exit], &[&keeper]));
+        assert!(lump_of(&meta, Lump::Liquidate) > 0);
+        let vest = i64::from(env.config().params.lump_vest_s);
+        for wait in [vest / 2, vest / 2 + 1] {
+            env.warp(wait);
+            env.crank(&rm);
+            let claim_ix = ix::claim_sol(&honest.pubkey(), &market);
+            let state = env.svm.clone();
+            let single = ok(env.send(std::slice::from_ref(&claim_ix), &[&honest]));
+            let one = sol_paid(&single, &honest.pubkey());
+            env.svm = state;
+            let before = env.market_vault(&market).lender_sol;
+            let meta = ok(env.send(&[claim_ix.clone(), claim_ix.clone(), claim_ix], &[&honest]));
+            let paid: Vec<u64> = events::of::<shortwin::events::ClaimSol>(&meta)
+                .iter()
+                .map(|e| e.sol_paid)
+                .collect();
+            assert_eq!(paid.len(), 3, "three claims landed");
+            assert!(one > 0, "the claim pays");
+            assert_eq!(paid, [one, 0, 0], "the later claims pay 0");
+            assert_eq!(before - env.market_vault(&market).lender_sol, one);
         }
     }
 }

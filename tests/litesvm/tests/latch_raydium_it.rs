@@ -29,7 +29,8 @@
 //!   it lands unflagged between review and execution;
 //! - both Raydium bits must be clear before a Raydium market opens again; pump-side and Jupiter
 //!   upgrades never block Raydium opens;
-//! - the ProgramData account is checked by address, owner and tag on the real accounts;
+//! - the ProgramData account is checked by address, owner and tag on the real accounts, for both
+//!   guard indices (CPMM's forged after a real upgrade: M10 G-A7);
 //! - the residual the design discloses (ARCH §3.1, §8.5): an open that lands after the upgrade
 //!   and before the flag is accepted; `[flag, open]` in one transaction is not;
 //! - U5: `flag_venue_upgraded` and `revalidate_venue` cost the same CU on the real 1.4 MB and
@@ -591,6 +592,82 @@ fn the_program_data_account_is_checked() {
     );
     env.svm.set_account(key, real).unwrap();
     assert_err(&flag(&mut env, GUARD_RAYDIUM_V4), E::VenueNotUpgraded);
+    assert_eq!(env.venue_guard().upgraded, 0);
+}
+
+/// G-A7 on CPMM (M10; ARCH §3.1): the ProgramData account of `GUARD_RAYDIUM_CPMM` is checked as
+/// AMM v4's is. AMM v4's ProgramData, the CPMM program id itself, short.win's own ProgramData and
+/// a fresh key are `VenueAccountMismatch` for `flag_venue_upgraded` and `revalidate_venue`; so is
+/// the right address after a **real** upgrade by the loader (its header holds the new deploy slot,
+/// which the flag would latch) when it is owned by another program or carries another loader
+/// state (a `Buffer` tag). The controls: the real account at the fixture's slot is
+/// `VenueNotUpgraded`; after the upgrade the real account flags exactly the CPMM bit, and
+/// `revalidate_venue` at the loader's slot clears it.
+#[test]
+fn the_cpmm_program_data_account_is_checked() {
+    let mut env = Env::ray_fork();
+    let ea = env.pause_authority.insecure_clone();
+    let v4 = RaydiumProgram::AmmV4;
+    let cp = RaydiumProgram::Cpmm;
+    let s = FIXTURE_GUARD_SLOTS[usize::from(GUARD_RAYDIUM_CPMM)];
+    let wrong_keys = [
+        v4.program_data().address,
+        cp.id(),
+        pda::program_data(),
+        Pubkey::new_unique(),
+    ];
+    for key in wrong_keys {
+        assert_err(
+            &env.send(
+                &[ix::flag_venue_upgraded_with(GUARD_RAYDIUM_CPMM, key)],
+                &[],
+            ),
+            E::VenueAccountMismatch,
+        );
+        assert_err(
+            &env.send(
+                &[ix::revalidate_venue_with(
+                    &ea.pubkey(),
+                    GUARD_RAYDIUM_CPMM,
+                    s,
+                    key,
+                )],
+                &[&ea],
+            ),
+            E::VenueAccountMismatch,
+        );
+    }
+    assert_err(&flag(&mut env, GUARD_RAYDIUM_CPMM), E::VenueNotUpgraded);
+    env.warp(1);
+    let slot = loader_upgrade(&mut env, cp);
+    assert_ne!(slot, s);
+    let key = cp.program_data().address;
+    let real = read::account(&env.svm, &key).unwrap();
+    let mut forged = real.clone();
+    forged.owner = anchor_lang::system_program::ID;
+    env.svm.set_account(key, forged).unwrap();
+    assert_err(&flag(&mut env, GUARD_RAYDIUM_CPMM), E::VenueAccountMismatch);
+    assert_err(
+        &revalidate(&mut env, GUARD_RAYDIUM_CPMM, slot),
+        E::VenueAccountMismatch,
+    );
+    let mut forged = real.clone();
+    forged.data[0] = 1;
+    env.svm.set_account(key, forged).unwrap();
+    assert_err(&flag(&mut env, GUARD_RAYDIUM_CPMM), E::VenueAccountMismatch);
+    assert_err(
+        &revalidate(&mut env, GUARD_RAYDIUM_CPMM, slot),
+        E::VenueAccountMismatch,
+    );
+    assert_eq!(env.venue_guard().upgraded, 0, "nothing latched");
+    env.svm.set_account(key, real).unwrap();
+    ok(flag(&mut env, GUARD_RAYDIUM_CPMM));
+    assert_eq!(
+        env.venue_guard().upgraded,
+        1 << GUARD_RAYDIUM_CPMM,
+        "exactly the CPMM bit"
+    );
+    ok(revalidate(&mut env, GUARD_RAYDIUM_CPMM, slot));
     assert_eq!(env.venue_guard().upgraded, 0);
 }
 
