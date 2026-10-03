@@ -491,7 +491,8 @@ historical:
 | `tests/litesvm/tests/graduation_e2e.rs:1188` | how a bot spends a donation | R-VEN §1.4 (not relied on) |
 | `crates/shortwin-math/README.md`, `crates/shortwin-math/tests/quotes_mainnet.rs` | five fee branches with no mainnet trade | covered by the reference-model proptests; the re-scan is deferred (below) |
 | `tests/bench/cu_math/README.md` | ARCH §1.1's old Agave resolver question | settled (U18) |
-| `docs/design/sim/shortwin_sim.py` | the proportional boost rule | U15 |
+| `docs/design/sim/shortwin_sim.py`, `docs/design/sim/legacy/v0_3/shortwin_sim.py` (historical, the v0.3 sim) | the proportional boost rule | U15 |
+| `docs/design/ARCHITECTURE.md` outside §12 (the changelog, the conventions, §1.1, §4.7, §5.4, §6.4, §7.1, §8.2, §10, Appendix A) | the conventions' definition, and the register's items where they are used | the §12 rows each cites: U5, U8, U15, U16, U22, U25, U34; the keeper's live-RPC load is OWNER-M7-9 (KI-38) |
 | `docs/AUDIT.md`, `docs/audit/*` | this package | this section |
 
 The stale markers the M10 plan named (ARCH lines 598, 917, 1389, 1736, 1804, 1824, 2448 at
