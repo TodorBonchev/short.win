@@ -1238,7 +1238,7 @@ mapping on real nested logs and `IntegrityError`, the oracle with no reading, th
 sentence shown once).
 
 *M10:* 59 files (the live-validator one skipped), 555 tests on the integrated tree before program
-batch 3, which adds 4. New: `src/m10-fe15/parity.test.ts` (FE-15: the facade against the
+batch 3, which adds 10 (565 passed, 1 skipped, on the final tree). New: `src/m10-fe15/parity.test.ts` (FE-15: the facade against the
 TypeScript ports it replaced, frozen in `legacy.ts` as the oracle — both sides of the spot/EMA edge
 included — and against the Rust crates' vectors and every dumped mint and pool), `config/securityTxt.test.ts`
 and `config/securityPolicy.test.ts` (SECTXT-4, the `/security` values), `errors.test.ts` with 6105;
