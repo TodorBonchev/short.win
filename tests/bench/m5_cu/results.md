@@ -9,7 +9,7 @@ Compute units of every curve-path instruction (ARCH §9 M5: T-CU) of the **relea
 | `create_market` | Auto, Token-2022, 125 B curve (fresh): `PumpCurve`, the trader's base ATA and pump UVA created | 143100 | 143100 | 15534 | 250000 | §6.1 `create_market` | 15 | — | 3 |
 | `create_market` | Auto, Token-2022, 151 B curve near completion (near): `PumpCurve`, the trader's base ATA and pump UVA created | 169866 | 169866 | 17034 | 250000 | §6.1 `create_market` | 15 | — | 3 |
 | `create_market` | Auto, Token-2022, 151 B curve near completion (near), completed by a third party: `PumpMigrating`, with the init set | 170015 | 170015 | 17034 | 250000 | §6.1 `create_market` | 15 | — | 3 |
-| `create_market` | Auto, PumpSwap-class coin (graduated): `PumpSwap` on its canonical pool, the pAMM init set (M6) | 138957 | 138957 | — | 250000 | §6.1 `create_market` | 15 | — | 3 |
+| `create_market` | Auto, PumpSwap-class coin (graduated): `PumpSwap` on its canonical pool, the pAMM init set (M6) | 139077 | 139077 | — | 250000 | §6.1 `create_market` | 15 | — | 3 |
 | `create_market` | Auto, graduated elsewhere (Fartcoin): list-only `None` (detection set only) | 57949 | 57949 | — | 250000 | §6.1 `create_market` | 7 | — | 2 |
 | `open_short` | SPL Token, 115 B curve, no creator (legacy115): first open of a wallet (position + exposure created) | 172350 | 172350 | 75032 | 250000 | §6.1 `open_short` curve | 14 | 12 (≤ 15) | 3 |
 | `open_short` | Token-2022, 115 B curve (t22_115): first open of a wallet (position + exposure created) | 182298 | 182298 | 80387 | 250000 | §6.1 `open_short` curve | 14 | 12 (≤ 15) | 3 |

@@ -59,10 +59,10 @@ VENUES = ("pumpswap", "pump_curve", "raydium_cpmm", "raydium_amm_v4")
 NAMES = {"pumpswap": "PumpSwap", "pump_curve": "curve", "raydium_cpmm": "CPMM", "raydium_amm_v4": "AMM v4"}
 # Requested CU (ceil(consumed x 1.1)), the costliest measured per kind (tests/bench/m7_keeper/results.json).
 CU = {
-    "pumpswap": {"crank": 41_199, "sol_settle_keep": 64_146, "sol_settle_settle": 74_267,
-                 "liquidate": 211_847, "expire": 208_591},
+    "pumpswap": {"crank": 41_437, "sol_settle_keep": 64_324, "sol_settle_settle": 74_445,
+                 "liquidate": 212_585, "expire": 209_329},
     "pump_curve": {"crank": 37_382, "sol_settle_keep": 62_715, "sol_settle_settle": 72_818,
-                   "liquidate": 191_516, "expire": 188_693},
+                   "liquidate": 191_837, "expire": 189_015},
     "raydium_cpmm": {"crank": 32_843, "sol_settle_keep": 65_644, "sol_settle_settle": 77_470,
                      "liquidate": 124_814, "expire": 117_671},
     "raydium_amm_v4": {"crank": 32_779, "sol_settle_keep": 57_653, "sol_settle_settle": 67_798,
