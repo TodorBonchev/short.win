@@ -34,9 +34,7 @@
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::bpf_loader_upgradeable;
 use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
-use shortwin::constants::{
-    GUARD_PUMP, GUARD_PUMP_AMM, GUARD_PUMP_FEES, VENUE_GUARD_SLOTS_2026_09_27,
-};
+use shortwin::constants::{GUARD_PUMP, GUARD_PUMP_AMM, GUARD_PUMP_FEES};
 use shortwin::errors::ShortwinError as E;
 use shortwin::events::{Close, Liquidate, TraderSwept, VenueRevalidated, VenueUpgradeFlagged};
 use shortwin_litesvm_tests::engine::{
@@ -232,7 +230,7 @@ fn a_pamm_upgrade_refuses_opens_and_exits_keep_working() {
     let (b_hold, n_hold) = open(&mut env, &pm, q);
 
     // The dumped header is the recorded slot; an unchanged header writes nothing.
-    let dumped = VENUE_GUARD_SLOTS_2026_09_27[usize::from(GUARD_PUMP_AMM)];
+    let dumped = fork::FIXTURE_GUARD_SLOTS[usize::from(GUARD_PUMP_AMM)];
     assert_eq!(header(&env, PumpProgram::Amm).slot, dumped);
     assert_eq!(
         env.venue_guard().guard_slot[usize::from(GUARD_PUMP_AMM)],
@@ -431,7 +429,7 @@ fn the_program_data_account_is_checked_for_pamm_and_pump_fees() {
     ] {
         let (mut env, _) = Env::fork_pamm_coin(SPL261);
         let ea = env.pause_authority.insecure_clone();
-        let s = VENUE_GUARD_SLOTS_2026_09_27[usize::from(guard)];
+        let s = fork::FIXTURE_GUARD_SLOTS[usize::from(guard)];
         let wrong_keys = [
             other.program_data().address,
             PumpProgram::Pump.program_data().address,

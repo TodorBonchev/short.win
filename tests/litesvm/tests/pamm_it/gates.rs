@@ -10,9 +10,9 @@
 //!   short.win's `invoke_signed` at height 2, nothing deeper than height 3;
 //! - **T-RENT (pAMM)**: with the existence requirement met the venue takes no rent on a 301-byte
 //!   pool (`Open.venue_rent = 0`, `ert` refunded to the lamport); a 211-byte pool held at its
-//!   minimum grows to 271 bytes on the sale and takes `minimum_balance(271) −
-//!   minimum_balance(211)` from the trader, netted out of `S`, refunded to the borrower and
-//!   reported in `Open.venue_rent`;
+//!   minimum grows to 287 bytes on the sale (271 before pump's 2026-10-02 redeploy) and takes
+//!   `minimum_balance(287) − minimum_balance(211)` from the trader, netted out of `S`, refunded
+//!   to the borrower and reported in `Open.venue_rent`;
 //! - **T-CASHBACK (pAMM)**: on a cashback coin short.win's trades accrue WSOL cashback in
 //!   `ATA(pAMM UVA(trader), WSOL)`; after a full wipe `sweep_trader` leaves `wipe_rewards_claimed`
 //!   clear while it holds any, and `[create_idempotent ATA(trader, WSOL), claim_cashback(user =
@@ -271,32 +271,47 @@ fn t_rent_no_venue_rent_on_a_full_size_pool() {
 
 /// T-RENT (pAMM) on the 211-byte pool held at `minimum_balance(211)` (the fixture's is
 /// over-funded at the old rent: its rent is lowered to today's minimum, a plant of the venue's
-/// account): PumpSwap grows it to 271 bytes on the sale and tops its rent up from the trader —
-/// `minimum_balance(271) − minimum_balance(211)` = 304,800 — which the leg nets out of `S`
-/// (`S = sol_leg − 304,800`), reports in `Open.venue_rent`, and refunds to the borrower (the
-/// venue took it out of the borrower's `ert`). As on the curve (T-RENT's curve part), an open
-/// whose `S_exp` tolerance (`exec_tol_bps`) cannot cover the growth fails `ProceedsBelowMin`, the
-/// pool untouched; the growth is paid once.
+/// account): PumpSwap grows it on the sale — to **287** bytes since its 2026-10-02 redeploy (the
+/// fee buckets @271/@279; 271 before) — and tops its rent up from the trader —
+/// `minimum_balance(287) − minimum_balance(211)` = 386,080 (304,800 to 271 bytes before) — which
+/// the leg nets out of `S` (`S = sol_leg − 386,080`), reports in `Open.venue_rent`, and refunds to
+/// the borrower (the venue took it out of the borrower's `ert`). As on the curve (T-RENT's curve
+/// part), an open whose `S_exp` tolerance (`exec_tol_bps`) cannot cover the growth fails
+/// `ProceedsBelowMin`, the pool untouched; the growth is paid once. Since the redeploy no size
+/// inside Tier C's 1.16 % wallet cap has a tolerance that covers 386,080 on this pool (2.1 %
+/// does; 1.8 % covered the 2026-09 build's 304,800), so the wallet cap is lifted here within its
+/// compiled bounds (`wallet_cap_bps` 10⁴, as `lock`): with the defaults, short.win's first open on
+/// a 211-byte pool held at its minimum rent is refused until any trade has grown it.
 #[test]
 fn t_rent_a_short_pool_grows_on_the_sale() {
-    let (mut env, p) = Env::fork_pamm_coin(PammCoin::Legacy211);
+    let (mut env, p) = Env::fork_pamm_coin_with(PammCoin::Legacy211, |a| {
+        a.params.wallet_cap_bps = 10_000;
+    });
     let r = p.reserves(&env.svm).unwrap();
-    // 1.8 % of the pool's 934.9 M tokens (19.13 SOL): a sale of ≈ 0.33 SOL, inside Tier C's
-    // impact and wallet caps, whose 10-bps tolerance (≈ 330,000) covers the growth.
     assert!(r.effective_quote < 20 * u128::from(SOL));
-    let q = r.base / 1_000 * 18;
-    let pm = list_on(&mut env, &p, q * 4);
     let min211 = env.svm.minimum_balance_for_rent_exemption(211);
-    let min271 = env.svm.minimum_balance_for_rent_exemption(271);
+    let min287 = env
+        .svm
+        .minimum_balance_for_rent_exemption(pamm::POOL_LEN_2026_10);
+    let growth = min287 - min211;
+    assert_eq!(growth, 386_080);
+    let tol = u64::from(env.config().params.exec_tol_bps);
+    // The smallest size in steps of 0.1 % of the pool's 934.9 M tokens (19.13 SOL) whose 10-bps
+    // tolerance covers the growth: 2.1 %, a sale of ≈ 0.39 SOL, inside Tier C's impact cap.
+    let q = (1..)
+        .map(|k| r.base / 1_000 * k)
+        .find(|&q| quote_sell(&env, &p, q).expect("quote") * tol / 10_000 >= growth)
+        .unwrap();
+    assert_eq!(q, r.base / 1_000 * 21);
+    let pm = list_on(&mut env, &p, q * 4);
     let mut acc = env.svm.get_account(&p.pool).unwrap();
     assert_eq!(acc.data.len(), 211);
     acc.lamports = min211;
     env.svm.set_account(p.pool, acc).unwrap();
-    let tol = u64::from(env.config().params.exec_tol_bps);
     // A sale whose tolerance is below the growth.
     let small = q / 20;
     let s_small = quote_sell(&env, &p, small).expect("quote");
-    assert!(s_small * tol / 10_000 < 304_800);
+    assert!(s_small * tol / 10_000 < growth);
     let mut b = env.borrower();
     let (res, _) = env.open(&pm, &mut b, small);
     assert_err(&res, E::ProceedsBelowMin);
@@ -304,16 +319,17 @@ fn t_rent_a_short_pool_grows_on_the_sale() {
     env.warp(1);
     let s_exp = quote_sell(&env, &p, q).expect("quote");
     assert!(
-        s_exp * tol / 10_000 >= 304_800,
+        s_exp * tol / 10_000 >= growth,
         "the tolerance covers the growth"
     );
     let (open, _, _) = open_ok(&mut env, &pm, &mut b, q);
-    let growth = min271 - min211;
-    assert_eq!(growth, 304_800);
     assert_eq!(open.venue_rent, growth);
     assert_eq!(open.s, s_exp - growth, "S net of the venue-side rent");
     let acc = env.svm.get_account(&p.pool).unwrap();
-    assert_eq!((acc.data.len(), acc.lamports), (271, min271));
+    assert_eq!(
+        (acc.data.len(), acc.lamports),
+        (pamm::POOL_LEN_2026_10, min287)
+    );
     assert_trader_clean(&env, &pm);
 }
 

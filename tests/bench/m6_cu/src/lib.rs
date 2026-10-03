@@ -49,8 +49,7 @@ use shortwin::constants::{
     GUARD_PUMP, GUARD_PUMP_AMM, GUARD_PUMP_FEES, PUMP_AMM_EVENT_AUTHORITY, PUMP_AMM_FEE_CONFIG,
     PUMP_AMM_GLOBAL_CONFIG, PUMP_AMM_GLOBAL_VOLUME_ACCUMULATOR, PUMP_AMM_PROGRAM_ID,
     PUMP_EVENT_AUTHORITY, PUMP_FEE_CONFIG, PUMP_FEES_PROGRAM_ID, PUMP_GLOBAL,
-    PUMP_GLOBAL_VOLUME_ACCUMULATOR, PUMP_PROGRAM_ID, TOKEN_PROGRAM_ID,
-    VENUE_GUARD_SLOTS_2026_09_27, WSOL_MINT,
+    PUMP_GLOBAL_VOLUME_ACCUMULATOR, PUMP_PROGRAM_ID, TOKEN_PROGRAM_ID, WSOL_MINT,
 };
 use shortwin::events::SolSettle;
 use shortwin::state::VenueKind;
@@ -1096,7 +1095,7 @@ fn sweep(coin: PammCoin, donated: bool) -> Prepared {
 
 fn flag_pump(venue: u8) -> Prepared {
     let (mut env, _) = Env::fork_pamm_coin(MATURE);
-    let dumped = VENUE_GUARD_SLOTS_2026_09_27[usize::from(venue)];
+    let dumped = fork::FIXTURE_GUARD_SLOTS[usize::from(venue)];
     fork::set_pump_deploy_slot(&mut env.svm, pump_program(venue), dumped + 1);
     let ix = ix::flag_venue_upgraded(venue);
     prepared(env, ix, &[])
@@ -1104,7 +1103,7 @@ fn flag_pump(venue: u8) -> Prepared {
 
 fn revalidate_pump(venue: u8) -> Prepared {
     let (mut env, _) = Env::fork_pamm_coin(MATURE);
-    let dumped = VENUE_GUARD_SLOTS_2026_09_27[usize::from(venue)];
+    let dumped = fork::FIXTURE_GUARD_SLOTS[usize::from(venue)];
     let new = dumped + 1;
     fork::set_pump_deploy_slot(&mut env.svm, pump_program(venue), new);
     ok(env.send(&[ix::flag_venue_upgraded(venue)], &[]));
@@ -1632,7 +1631,7 @@ fn tx_claim_rewards() -> (Env, Vec<Instruction>, Vec<Keypair>) {
 fn tx_flag_two() -> (Env, Vec<Instruction>, Vec<Keypair>) {
     let (mut env, _) = Env::fork_pamm_coin(MATURE);
     for venue in [GUARD_PUMP_AMM, GUARD_PUMP_FEES] {
-        let dumped = VENUE_GUARD_SLOTS_2026_09_27[usize::from(venue)];
+        let dumped = fork::FIXTURE_GUARD_SLOTS[usize::from(venue)];
         fork::set_pump_deploy_slot(&mut env.svm, pump_program(venue), dumped + 1);
     }
     let ixs = with_cb(vec![

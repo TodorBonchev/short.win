@@ -42,10 +42,13 @@
 //! - **Logs.** [`ray_logs`] decodes AMM v4's `ray_log` (the reserves the venue priced on) and
 //!   [`cpmm_swap_events`] CPMM's `SwapEvent` (`emit!`, "Program data:").
 //!
-//! **The pump fork (M5, appended below the Raydium part).** Groups `pump_programs` and
-//! `pump_state` of the same manifest: the pump, pump-fees and PumpSwap ELFs (deployed from their
-//! dumped ProgramData, sha256-checked like the Raydium ones, so the latch reads the real deploy
-//! slots 449,734,335 / 446,465,969 / 446,462,733), and pump's statics and one set of accounts
+//! **The pump fork (M5, appended below the Raydium part).** Groups `pump_programs`,
+//! `pump_programs_2026_10` and `pump_state` of the same manifest: the pump, pump-fees and
+//! PumpSwap ELFs (deployed from their dumped ProgramData, sha256-checked like the Raydium ones,
+//! so the latch reads the real deploy slots: since the M10 pump revalidation the 2026-10-02
+//! redeploys 452,654,932 / 452,655,002 / 452,654,882, [`PumpDeploy::CURRENT`]; the 2026-09
+//! builds of `pump_programs` stay loadable as [`PumpDeploy::Sep2026`] through
+//! [`load_pump_deploy`] for T-LATCH), and pump's statics and one set of accounts
 //! per coin **role** ([`PumpCoin`]) at one mainnet slot, loaded on first use apart from the
 //! Raydium fixtures. [`Env::fork_pump`] / [`Env::fork_pump_coin`], or piecewise
 //! [`Env::load_pump_programs`], [`Env::load_pump_statics`], [`Env::load_pump_coin`],
@@ -124,12 +127,14 @@ pub fn fixtures_dir() -> PathBuf {
 /// by name ([`CpmmDeploy`]).
 pub const RAYDIUM_GROUPS: [&str; 3] = ["raydium_programs", "raydium_cpmm_2026_10", "raydium_state"];
 /// The manifest groups of the pump fork (loaded separately, on first use of a pump fixture, so
-/// the Raydium tests never rebuild the two 10 MiB pump ProgramData accounts).
-pub const PUMP_GROUPS: [&str; 2] = ["pump_programs", "pump_state"];
+/// the Raydium tests never rebuild the 10 MiB pump ProgramData accounts). The three programs'
+/// addresses are in both program groups; [`pump_fixture_at`] resolves them to the later one,
+/// `pump_programs_2026_10` ([`PumpDeploy::CURRENT`]), and the loaders pick a deploy by name.
+pub const PUMP_GROUPS: [&str; 3] = ["pump_programs", "pump_programs_2026_10", "pump_state"];
 /// The manifest groups of the PumpSwap state (M6; R-VEN Update 2026-09-30 H10): `pamm_state` (one
 /// `getMultipleAccounts` at slot 451,784,607: PumpSwap's statics and five canonical-pool roles)
 /// and `pamm_synthetic` (pools derived offline from `pamm_state` bytes, marked `synthetic`: the
-/// negative-VQR pool). The programs are `pump_programs`' (unchanged deploys, H1).
+/// negative-VQR pool). The programs are [`PUMP_GROUPS`]' ([`PumpDeploy::CURRENT`]).
 pub const PAMM_GROUPS: [&str; 2] = ["pamm_state", "pamm_synthetic"];
 
 /// One manifest entry of the managed groups, with its account rebuilt and checked.
@@ -443,12 +448,17 @@ pub const CPMM_DEPLOY_SLOT_2026_10: u64 = 452_376_460;
 
 /// The venue deploy slots the harness's ProgramData carry and [`Env::default_init_args`] records
 /// as `guard_slot` (A7; by `VenueGuard` index): `VENUE_GUARD_SLOTS_2026_09_27` with CPMM at
-/// [`CPMM_DEPLOY_SLOT_2026_10`], the build every fork loads ([`CpmmDeploy::CURRENT`]). The tests
-/// use it wherever they mean "the deploy slot the fork holds"; the program constant stays the
-/// 2026-09-27 baseline, which T-LATCH's old→new upgrade starts from ([`CpmmDeploy::Sep2026`]).
+/// [`CPMM_DEPLOY_SLOT_2026_10`] and pump, PumpSwap and pump-fees at their 2026-10-02 redeploys
+/// ([`PumpDeploy::Oct2026`]), the builds every fork loads ([`CpmmDeploy::CURRENT`],
+/// [`PumpDeploy::CURRENT`]). The tests use it wherever they mean "the deploy slot the fork
+/// holds"; `VENUE_GUARD_SLOTS_2026_09_27` stays the 2026-09-27 baseline, which T-LATCH's old→new
+/// upgrades start from ([`CpmmDeploy::Sep2026`], [`PumpDeploy::Sep2026`]).
 pub const FIXTURE_GUARD_SLOTS: [u64; VENUE_PROGRAMS] = {
     let mut s = VENUE_GUARD_SLOTS_2026_09_27;
     s[GUARD_RAYDIUM_CPMM as usize] = CPMM_DEPLOY_SLOT_2026_10;
+    s[GUARD_PUMP as usize] = PUMP_DEPLOY_SLOT_2026_10;
+    s[GUARD_PUMP_AMM as usize] = PUMP_AMM_DEPLOY_SLOT_2026_10;
+    s[GUARD_PUMP_FEES as usize] = PUMP_FEES_DEPLOY_SLOT_2026_10;
     s
 };
 
@@ -1943,12 +1953,9 @@ pub enum PumpProgram {
 impl PumpProgram {
     pub const ALL: [Self; 3] = [Self::Pump, Self::Fees, Self::Amm];
 
+    /// The fixture name prefix of its [`PumpDeploy::CURRENT`] build.
     fn prefix(self) -> &'static str {
-        match self {
-            Self::Pump => "pump",
-            Self::Fees => "pump_fees",
-            Self::Amm => "pump_amm",
-        }
+        PumpDeploy::CURRENT.prefix(self)
     }
 
     /// The program id.
@@ -1969,19 +1976,85 @@ impl PumpProgram {
         }
     }
 
-    /// The fixture of its ProgramData account.
+    /// The fixture of its ProgramData account ([`PumpDeploy::CURRENT`]).
     pub fn program_data(self) -> &'static Fixture {
         fixture(&format!("{}_program_data", self.prefix()))
     }
 
-    /// The fixture of its program account.
+    /// The fixture of its program account ([`PumpDeploy::CURRENT`]).
     pub fn program(self) -> &'static Fixture {
         fixture(&format!("{}_program", self.prefix()))
     }
 
-    /// The dumped ELF (the ProgramData after its 45-byte header, up to the ELF's own end).
+    /// The dumped ELF (the ProgramData after its 45-byte header, up to the ELF's own end) of
+    /// [`PumpDeploy::CURRENT`].
     pub fn elf(self) -> &'static [u8] {
-        let pd = self.program_data();
+        PumpDeploy::CURRENT.elf(self)
+    }
+}
+
+/// pump's deploy slot since its 2026-10-02 redeploy (group `pump_programs_2026_10`).
+pub const PUMP_DEPLOY_SLOT_2026_10: u64 = 452_654_932;
+/// PumpSwap's deploy slot since its 2026-10-02 redeploy (group `pump_programs_2026_10`).
+pub const PUMP_AMM_DEPLOY_SLOT_2026_10: u64 = 452_654_882;
+/// pump-fees' deploy slot since its 2026-10-02 redeploy (group `pump_programs_2026_10`).
+pub const PUMP_FEES_DEPLOY_SLOT_2026_10: u64 = 452_655_002;
+/// What pump's 2026-10-02 redeploy grows a shorter curve to on a v2 trade (the layout through its
+/// fee buckets `creator_fee` @125 and `protocol_fees` @133; `shortwin_venue_state::pump::
+/// CURVE_LEN_V2` = 125, the 2026-09 build's target, is the reader's layout and stays).
+pub const CURVE_LEN_2026_10: usize = 141;
+
+/// The builds of the three pump programs the fixtures hold, each pair at the same program and
+/// ProgramData addresses with the same upgrade authority (`7gZufw…`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PumpDeploy {
+    /// Deploy slots 449,734,335 / 446,462,733 / 446,465,969 (group `pump_programs`): the builds
+    /// R-PUMP, R-VEN and `VENUE_GUARD_SLOTS_2026_09_27` name, on which M5 and M6 were built.
+    Sep2026,
+    /// The 2026-10-02 redeploys ([`PUMP_DEPLOY_SLOT_2026_10`], [`PUMP_AMM_DEPLOY_SLOT_2026_10`],
+    /// [`PUMP_FEES_DEPLOY_SLOT_2026_10`]; group `pump_programs_2026_10`): the release whose
+    /// unreleased artifacts `pump-rust-client` 0.2.0 shipped (v2 PumpSwap and v3 curve trades
+    /// with fee buckets; `tests/fixtures/README.md`). short.win's instructions and account lists
+    /// are unchanged.
+    Oct2026,
+}
+
+impl PumpDeploy {
+    /// The builds every fork loads ([`PumpProgram`], [`Env::load_pump_programs`]).
+    pub const CURRENT: Self = Self::Oct2026;
+
+    fn prefix(self, program: PumpProgram) -> &'static str {
+        match (self, program) {
+            (Self::Sep2026, PumpProgram::Pump) => "pump",
+            (Self::Sep2026, PumpProgram::Fees) => "pump_fees",
+            (Self::Sep2026, PumpProgram::Amm) => "pump_amm",
+            (Self::Oct2026, PumpProgram::Pump) => "pump_2026_10",
+            (Self::Oct2026, PumpProgram::Fees) => "pump_fees_2026_10",
+            (Self::Oct2026, PumpProgram::Amm) => "pump_amm_2026_10",
+        }
+    }
+
+    /// The deploy slot `program`'s ProgramData header carries in this build.
+    pub fn deploy_slot(self, program: PumpProgram) -> u64 {
+        match self {
+            Self::Sep2026 => VENUE_GUARD_SLOTS_2026_09_27[usize::from(program.guard())],
+            Self::Oct2026 => FIXTURE_GUARD_SLOTS[usize::from(program.guard())],
+        }
+    }
+
+    /// The fixture of `program`'s ProgramData account in this build.
+    pub fn program_data(self, program: PumpProgram) -> &'static Fixture {
+        fixture(&format!("{}_program_data", self.prefix(program)))
+    }
+
+    /// The fixture of `program`'s program account in this build (the same bytes in both).
+    pub fn program(self, program: PumpProgram) -> &'static Fixture {
+        fixture(&format!("{}_program", self.prefix(program)))
+    }
+
+    /// `program`'s dumped ELF in this build.
+    pub fn elf(self, program: PumpProgram) -> &'static [u8] {
+        let pd = self.program_data(program);
         let start = shortwin_venue_state::program_data::HEADER_LEN;
         let len = pd.elf_len.expect("a ProgramData fixture");
         &pd.account.data[start..start + len]
@@ -1990,10 +2063,16 @@ impl PumpProgram {
 
 /// Deploys pump program `program` at its mainnet address from the dumped ProgramData (header ‖
 /// ELF ‖ zeros, sha256-checked against the mainnet account when first read), then the program
-/// account, which makes LiteSVM compile the ELF.
+/// account, which makes LiteSVM compile the ELF. The build is [`PumpDeploy::CURRENT`].
 pub fn load_pump_program(svm: &mut LiteSVM, program: PumpProgram) {
-    load(svm, &program.program_data().name);
-    load(svm, &program.program().name);
+    load_pump_deploy(svm, program, PumpDeploy::CURRENT);
+}
+
+/// Deploys build `deploy` of `program` (as [`load_pump_program`]), replacing whichever build the
+/// VM held: LiteSVM recompiles the ELF when the program account is rewritten.
+pub fn load_pump_deploy(svm: &mut LiteSVM, program: PumpProgram, deploy: PumpDeploy) {
+    load(svm, &deploy.program_data(program).name);
+    load(svm, &deploy.program(program).name);
 }
 
 /// Rewrites the deploy slot in `program`'s ProgramData header (a latch "upgrade"; the program

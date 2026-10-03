@@ -1088,6 +1088,174 @@ pub fn sweep_trader_pamm_ix(env: &Env, pm: &PammMarket) -> Instruction {
     }
 }
 
+// ---- the 2026-10-02 redeploy's fee buckets (M10 pump revalidation) -----------------------------
+//
+// The PumpSwap deployed on 2026-10-02 (`fork::PumpDeploy::Oct2026`) has the v2 trades of
+// `pump-rust-client` 0.2.0's IDL (`pump_amm.json`; R-VEN Update 2026-09-30 H2): `buy_v2` /
+// `sell_v2` pay the buyback slice in the trade and keep the rest of the protocol fee and the
+// creator fee **in the quote vault**, counted in `Pool.protocol_fees` @271 and `creator_fees` @279
+// and subtracted from `virtual_quote_reserves`; `sweep_protocol_fee` / `sweep_creator_fee` pay
+// them out. `shortwin-venue-state` does not read these fields yet (the layout table stops at
+// `is_holder_reward` @270), so the offsets are the harness's own.
+
+/// PumpSwap `buy_v2` (`b817ee61…`).
+pub const PAMM_BUY_V2: [u8; 8] = [0xb8, 0x17, 0xee, 0x61, 0x67, 0xc5, 0xd3, 0x3d];
+/// PumpSwap `sell_v2` (`5df6823c…`).
+pub const PAMM_SELL_V2: [u8; 8] = [0x5d, 0xf6, 0x82, 0x3c, 0xe7, 0xe9, 0x40, 0xb2];
+/// `sweep_protocol_fee` (`0830be07…`; the same Anchor name on pump and PumpSwap).
+pub const SWEEP_PROTOCOL_FEE: [u8; 8] = [0x08, 0x30, 0xbe, 0x07, 0xb6, 0x44, 0xb7, 0xe5];
+/// `sweep_creator_fee` (`20f6bf34…`).
+pub const SWEEP_CREATOR_FEE: [u8; 8] = [0x20, 0xf6, 0xbf, 0x34, 0x08, 0xc9, 0x49, 0xba];
+/// `Pool.protocol_fees` (u64), the un-swept protocol fee bucket.
+pub const POOL_OFF_PROTOCOL_FEES: usize = 271;
+/// `Pool.creator_fees` (u64), the un-swept creator fee bucket.
+pub const POOL_OFF_CREATOR_FEES: usize = 279;
+/// What the redeploy's `create_pool` allocates and its trades grow a shorter pool to.
+pub const POOL_LEN_2026_10: usize = 287;
+/// PumpSwap's `InsufficientRealQuoteReserves`: a sale paying out more than `vault − buckets`.
+pub const PAMM_ERR_INSUFFICIENT_REAL_QUOTE: u32 = 6063;
+
+/// The pool's fee buckets `(protocol_fees, creator_fees)` (0 on a pool shorter than 287 bytes).
+pub fn pool_buckets(svm: &LiteSVM, pool: &Pubkey) -> (u64, u64) {
+    let d = svm.get_account(pool).expect("pool").data;
+    let at = |o: usize| {
+        d.get(o..o + 8)
+            .map_or(0, |b| u64::from_le_bytes(b.try_into().unwrap()))
+    };
+    (at(POOL_OFF_PROTOCOL_FEES), at(POOL_OFF_CREATOR_FEES))
+}
+
+/// A byte-level plant of what un-swept v2 trades leave on a 287- or 301-byte pool (the scenario
+/// builders' idiom): `protocol` and `creator` lamports of the quote vault counted in the buckets
+/// and taken off `virtual_quote_reserves` (the vault itself is unchanged, so the price falls by
+/// the buckets, exactly as pump's `effective = vault + VQR` with `VQR = boost − buckets`).
+pub fn plant_buckets(svm: &mut LiteSVM, p: &PammPool, protocol: u64, creator: u64) {
+    fork::patch(svm, &p.pool, |d| {
+        assert!(d.len() >= POOL_LEN_2026_10, "a pool of at least 287 bytes");
+        let vqr = i128::from_le_bytes(d[245..261].try_into().unwrap());
+        let vqr = vqr - i128::from(protocol) - i128::from(creator);
+        d[245..261].copy_from_slice(&vqr.to_le_bytes());
+        d[POOL_OFF_PROTOCOL_FEES..POOL_OFF_PROTOCOL_FEES + 8]
+            .copy_from_slice(&protocol.to_le_bytes());
+        d[POOL_OFF_CREATOR_FEES..POOL_OFF_CREATOR_FEES + 8].copy_from_slice(&creator.to_le_bytes());
+    });
+}
+
+/// PumpSwap `buy_v2(base_amount_out, max_quote_amount_in)` or `sell_v2(base_amount_in,
+/// min_quote_amount_out)` by `user` (IDL `pump_amm.json` of `pump-rust-client` 0.2.0: 17
+/// accounts — the pool, `user`, `GlobalConfig`, both mints, both user and pool token accounts,
+/// both token programs, System, the user's pAMM UVA, the pAMM `FeeConfig`, the first buyback
+/// recipient's WSOL ATA, the event authority, the program; no protocol or creator fee accounts
+/// and no pump-fees CPI). Canonical pump pools only; cashback coins and mayhem pools stay on v1.
+#[allow(clippy::too_many_arguments)]
+pub fn pamm_trade_v2_ix(
+    svm: &LiteSVM,
+    p: &PammPool,
+    kind: PammTrade,
+    user: &Pubkey,
+    user_base: &Pubkey,
+    user_quote: &Pubkey,
+    a: u64,
+    b: u64,
+) -> Instruction {
+    let buyback = buyback_fee_recipient(svm, 0);
+    let accounts = vec![
+        m(p.pool, true),
+        AccountMeta::new(*user, true),
+        m(PUMP_AMM_GLOBAL_CONFIG, false),
+        m(p.mint, false),
+        m(WSOL_MINT, false),
+        m(*user_base, true),
+        m(*user_quote, true),
+        m(p.base_vault, true),
+        m(p.quote_vault, true),
+        m(p.base_program, false),
+        m(TOKEN_PROGRAM_ID, false),
+        m(anchor_lang::system_program::ID, false),
+        m(pamm_uva(user), true),
+        m(PUMP_AMM_FEE_CONFIG, false),
+        m(wsol_ata(&buyback), true),
+        m(PUMP_AMM_EVENT_AUTHORITY, false),
+        m(PUMP_AMM_PROGRAM_ID, false),
+    ];
+    let mut data = match kind {
+        PammTrade::Buy => PAMM_BUY_V2.to_vec(),
+        PammTrade::Sell => PAMM_SELL_V2.to_vec(),
+    };
+    data.extend_from_slice(&a.to_le_bytes());
+    data.extend_from_slice(&b.to_le_bytes());
+    Instruction {
+        program_id: PUMP_AMM_PROGRAM_ID,
+        accounts,
+        data,
+    }
+}
+
+/// `sweep_protocol_fee()` (`protocol`) or `sweep_creator_fee()` of `p` to `recipient` (a listed
+/// protocol fee recipient, or the coin creator's vault authority), paid by `payer` (12 accounts;
+/// the recipient's WSOL ATA is created idempotently at the payer's cost).
+pub fn pamm_sweep_ix(
+    p: &PammPool,
+    protocol: bool,
+    payer: &Pubkey,
+    recipient: &Pubkey,
+) -> Instruction {
+    Instruction {
+        program_id: PUMP_AMM_PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(*payer, true),
+            m(PUMP_AMM_GLOBAL_CONFIG, false),
+            m(p.pool, true),
+            m(WSOL_MINT, false),
+            m(TOKEN_PROGRAM_ID, false),
+            m(p.quote_vault, true),
+            m(*recipient, false),
+            m(wsol_ata(recipient), true),
+            m(anchor_lang::system_program::ID, false),
+            m(ASSOCIATED_TOKEN_PROGRAM_ID, false),
+            m(PUMP_AMM_EVENT_AUTHORITY, false),
+            m(PUMP_AMM_PROGRAM_ID, false),
+        ],
+        data: if protocol {
+            SWEEP_PROTOCOL_FEE.to_vec()
+        } else {
+            SWEEP_CREATOR_FEE.to_vec()
+        },
+    }
+}
+
+impl PammUser {
+    /// `buy_v2(base_out, max_in)` or `sell_v2(base_in, min_out)` (a sale plants the base balance
+    /// first if short).
+    pub fn trade_v2(
+        &self,
+        env: &mut Env,
+        p: &PammPool,
+        kind: PammTrade,
+        a: u64,
+        b: u64,
+    ) -> TxResult {
+        if kind == PammTrade::Sell {
+            let have = read::token_amount(&env.svm, &self.base).unwrap_or(0);
+            if have < a {
+                fork::set_token_amount(&mut env.svm, &self.base, a);
+            }
+        }
+        let ix = pamm_trade_v2_ix(
+            &env.svm,
+            p,
+            kind,
+            &self.kp.pubkey(),
+            &self.base,
+            &self.wsol,
+            a,
+            b,
+        );
+        let kp = self.kp.insecure_clone();
+        env.send(&[ix], &[&kp])
+    }
+}
+
 impl Env {
     /// Loads PumpSwap's statics of the `pamm_state` dump (`GlobalConfig`, `FeeConfig`, the global
     /// volume accumulator, WSOL, the 16 recipient WSOL ATAs; its Rent sysvar is

@@ -5,9 +5,10 @@
 //! `cargo test -p shortwin-litesvm-tests cu_baseline -- --nocapture` prints the table.
 
 use shortwin::PauseScope;
-use shortwin::constants::{GUARD_PUMP, VENUE_GUARD_SLOTS_2026_09_27};
+use shortwin::constants::GUARD_PUMP;
 use shortwin::state::ConfigChange;
 use shortwin_litesvm_tests::errors::ok;
+use shortwin_litesvm_tests::fork;
 use shortwin_litesvm_tests::{Env, ix};
 use solana_signer::Signer;
 
@@ -75,7 +76,7 @@ fn cu_baseline() {
     let meta = ok(env.send(&[ix::disable_venue(&pause.pubkey(), 0)], &[&pause]));
     rows.push(("disable_venue", meta.compute_units_consumed, 60_000));
 
-    env.set_venue_program_data(GUARD_PUMP, VENUE_GUARD_SLOTS_2026_09_27[0] + 1);
+    env.set_venue_program_data(GUARD_PUMP, fork::FIXTURE_GUARD_SLOTS[0] + 1);
     let meta = ok(env.send(&[ix::flag_venue_upgraded(GUARD_PUMP)], &[]));
     rows.push((
         "flag_venue_upgraded (mock ProgramData)",
@@ -86,7 +87,7 @@ fn cu_baseline() {
         &[ix::revalidate_venue(
             &pause.pubkey(),
             GUARD_PUMP,
-            VENUE_GUARD_SLOTS_2026_09_27[0] + 1,
+            fork::FIXTURE_GUARD_SLOTS[0] + 1,
         )],
         &[&pause],
     ));

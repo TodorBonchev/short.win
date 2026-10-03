@@ -45,7 +45,7 @@ use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
 use litesvm::types::TransactionMetadata;
 use shortwin::constants::{
     GUARD_JUPITER, GUARD_MASK_PUMP_CURVE, GUARD_PUMP, GUARD_PUMP_FEES, GUARD_RAYDIUM_CPMM,
-    GUARD_RAYDIUM_V4, VENUE_GUARD_SLOTS_2026_09_27, VENUE_PROGRAM_DATA,
+    GUARD_RAYDIUM_V4, VENUE_PROGRAM_DATA,
 };
 use shortwin::errors::ShortwinError as E;
 use shortwin::events::{
@@ -270,9 +270,9 @@ fn donate_lamports(env: &mut Env, pm: &PumpMarket, lamports: u64) {
 // ---- tests ----------------------------------------------------------------------------------
 
 /// The dumped ProgramData are the real accounts at the compile-time addresses, with the deploy
-/// slots of `VENUE_GUARD_SLOTS_2026_09_27`, the sizes of ARCH §6.5 and one upgrade authority for
-/// all three programs (ARCH §5.5); `initialize_config` recorded exactly those slots. An unchanged
-/// header is not an upgrade and writes nothing.
+/// slots of `fork::FIXTURE_GUARD_SLOTS` (the 2026-10-02 redeploys), the sizes of ARCH §6.5 and
+/// one upgrade authority for all three programs (ARCH §5.5); `initialize_config` recorded exactly
+/// those slots. An unchanged header is not an upgrade and writes nothing.
 #[test]
 fn the_dumped_headers_are_the_recorded_slots() {
     let (mut env, _) = Env::fork_pump_coin(T22);
@@ -295,7 +295,7 @@ fn the_dumped_headers_are_the_recorded_slots() {
             "{program:?}: ARCH §6.5 size"
         );
         let h = header(&env, program);
-        assert_eq!(h.slot, VENUE_GUARD_SLOTS_2026_09_27[i], "{program:?}");
+        assert_eq!(h.slot, fork::FIXTURE_GUARD_SLOTS[i], "{program:?}");
         authorities.push(h.upgrade_authority.expect("upgradeable"));
         assert_eq!(env.venue_guard().guard_slot[i], h.slot, "recorded at init");
 
@@ -330,7 +330,7 @@ fn a_real_upgrade_latches_opens_on_every_curve_market() {
             "in the curve's mask"
         );
         let i = usize::from(venue);
-        let dumped = VENUE_GUARD_SLOTS_2026_09_27[i];
+        let dumped = fork::FIXTURE_GUARD_SLOTS[i];
         let (mut env, markets) = two_markets();
         let [(spl, qs), (t22, qt)] = &markets;
 
@@ -562,7 +562,7 @@ fn raydium_and_jupiter_upgrades_leave_curve_opens_alone() {
 fn the_program_data_account_is_checked() {
     let (mut env, _) = Env::fork_pump_coin(T22);
     let ea = env.pause_authority.insecure_clone();
-    let s = VENUE_GUARD_SLOTS_2026_09_27[usize::from(GUARD_PUMP)];
+    let s = fork::FIXTURE_GUARD_SLOTS[usize::from(GUARD_PUMP)];
     let wrong_keys = [
         PumpProgram::Fees.program_data().address,
         PumpProgram::Amm.program_data().address,

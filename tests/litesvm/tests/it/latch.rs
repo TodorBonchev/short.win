@@ -9,7 +9,7 @@ use anchor_lang::error::ErrorCode as AnchorErrorCode;
 use anchor_lang::prelude::Pubkey;
 use shortwin::constants::{
     GUARD_JUPITER, GUARD_PUMP, GUARD_PUMP_AMM, GUARD_PUMP_FEES, GUARD_RAYDIUM_CPMM,
-    GUARD_RAYDIUM_V4, VENUE_GUARD_SLOTS_2026_09_27, VENUE_PROGRAM_DATA,
+    GUARD_RAYDIUM_V4, VENUE_PROGRAM_DATA,
 };
 use shortwin::errors::ShortwinError;
 use shortwin::events::{VenueRevalidated, VenueUpgradeFlagged};
@@ -54,7 +54,7 @@ fn upgrade_flags_refreshes_and_revalidates() {
     let mut env = latched_env();
     let venue = GUARD_PUMP;
     let i = usize::from(venue);
-    let old = VENUE_GUARD_SLOTS_2026_09_27[i];
+    let old = shortwin_litesvm_tests::fork::FIXTURE_GUARD_SLOTS[i];
 
     // First upgrade: anyone flags it.
     env.set_venue_program_data(venue, old + 1_000);
@@ -135,7 +135,7 @@ fn an_upgrade_landing_between_review_and_execution_is_not_validated() {
 fn only_the_emergency_vault_revalidates() {
     let mut env = latched_env();
     let venue = GUARD_PUMP_AMM;
-    let slot = VENUE_GUARD_SLOTS_2026_09_27[usize::from(venue)] + 5;
+    let slot = shortwin_litesvm_tests::fork::FIXTURE_GUARD_SLOTS[usize::from(venue)] + 5;
     env.set_venue_program_data(venue, slot);
     ok(flag(&mut env, venue));
     for signer in [

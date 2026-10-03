@@ -19,7 +19,8 @@
 //! - over amount grids from 1 raw unit to the whole curve, and seeded random sequences, on every
 //!   live SOL curve of the dump: 125 bytes (`create_v2` today), 151 (extended), 115 (Token-2022
 //!   and legacy SPL-Token) and the 2024 49-byte layout (the first v2 trade grows a curve under
-//!   125 bytes to 125, the user topping up its rent reserve); at the live fee tier and under
+//!   141 bytes to 141 since pump's 2026-10-02 redeploy — 125 before —, the user topping up its
+//!   rent reserve); at the live fee tier and under
 //!   rewritten `FeeConfig`s (PumpSwap's 25 market-cap tiers, thresholds at a curve's own market
 //!   cap, the per-coin creator override, a default creator). One deviation is pinned as a
 //!   tripwire: the deployed pump resolves the tier at the mint's **live** supply, `fees::
@@ -182,9 +183,10 @@ fn one_trade(meta: &litesvm::types::TransactionMetadata) -> PumpTradeEvent {
 }
 
 /// The curve's growth on a v2 trade, as the deployed ELF does it: a curve shorter than the
-/// current layout grows to [`pump::CURVE_LEN_V2`] (125 bytes — not the docs' 115), and the user
-/// tops its rent reserve (`lamports − rQ`) up to `Rent.minimum_balance(125)`; a longer curve is
-/// left alone. Returns the expected top-up.
+/// current layout grows to [`fork::CURVE_LEN_2026_10`] (141 bytes since the 2026-10-02 redeploy,
+/// the fee buckets included; 125 before — not the docs' 115), and the user tops its rent reserve
+/// (`lamports − rQ`) up to `Rent.minimum_balance(141)`; a longer curve is left alone. Returns the
+/// expected top-up.
 #[track_caller]
 fn curve_growth(
     svm: &LiteSVM,
@@ -196,13 +198,13 @@ fn curve_growth(
 ) -> u64 {
     assert_eq!(
         len_after,
-        len_before.max(pump::CURVE_LEN_V2),
-        "{ctx}: a v2 trade leaves the curve at max(len, 125)"
+        len_before.max(fork::CURVE_LEN_2026_10),
+        "{ctx}: a v2 trade leaves the curve at max(len, 141)"
     );
-    if len_before >= pump::CURVE_LEN_V2 {
+    if len_before >= fork::CURVE_LEN_2026_10 {
         return 0;
     }
-    svm.minimum_balance_for_rent_exemption(pump::CURVE_LEN_V2)
+    svm.minimum_balance_for_rent_exemption(fork::CURVE_LEN_2026_10)
         .saturating_sub(lamports_before - rq_before)
 }
 
@@ -701,11 +703,12 @@ fn legacy_spl_115_byte_curve_without_a_creator() {
     assert!(grid(PumpCoin::Legacy115) >= 30);
 }
 
-/// The 2024 layout: the first v2 trade grows the curve to 125 bytes (the fields past the old end
-/// zero), the user paying its rent reserve up to `minimum_balance(125)` — 53,320 lamports here:
-/// the reserve was the old rent of 49 bytes —, and every trade after it is exact.
+/// The 2024 layout: the first v2 trade grows the curve to 141 bytes (125 before the 2026-10-02
+/// redeploy; the fields past the old end zero), the user paying its rent reserve up to
+/// `minimum_balance(141)` — 134,600 lamports here (53,320 to 125 bytes before): the reserve was
+/// the old rent of 49 bytes —, and every trade after it is exact.
 #[test]
-fn legacy_spl_49_byte_curve_grows_to_125() {
+fn legacy_spl_49_byte_curve_grows_to_141() {
     let (mut env, c) = Env::fork_pump_coin(PumpCoin::Legacy49);
     assert_eq!(c.data_len(&env.svm), pump::CURVE_LEN_ORIGINAL);
     let s = c.state(&env.svm);
@@ -718,17 +721,17 @@ fn legacy_spl_49_byte_curve_grows_to_125() {
     let u0 = read::lamports(&env.svm, &u.kp.pubkey());
     let ch = c.charge_buy(&env.svm, 1_000_000_000_000).unwrap();
     assert!(exact_buy(&mut env, &c, &u, 1_000_000_000_000, 0));
-    assert_eq!(c.data_len(&env.svm), pump::CURVE_LEN_V2);
+    assert_eq!(c.data_len(&env.svm), fork::CURVE_LEN_2026_10);
     assert_eq!(
         u0 - read::lamports(&env.svm, &u.kp.pubkey()),
-        ch.cost + 53_320
+        ch.cost + 134_600
     );
     let acc = env.svm.get_account(&c.curve).unwrap();
     assert!(acc.data[pump::CURVE_LEN_ORIGINAL..].iter().all(|&b| b == 0));
     assert_eq!(
         acc.lamports - c.state(&env.svm).real_quote_reserves,
         env.svm
-            .minimum_balance_for_rent_exemption(pump::CURVE_LEN_V2)
+            .minimum_balance_for_rent_exemption(fork::CURVE_LEN_2026_10)
     );
     drop(env);
     assert!(grid(PumpCoin::Legacy49) >= 30);
@@ -1232,32 +1235,90 @@ fn random_sequences_on_every_live_curve() {
 
 // ---- fixtures, programs, readers ---------------------------------------------------------------------
 
-/// The dumped programs are the ones ARCH §8.2 names (deploy slots = `VENUE_GUARD_SLOTS_2026_09_27`,
-/// the ProgramData rebuilt to the mainnet sha256 when loaded), every pump-state account is one
+/// The dumped programs are mainnet's, in both builds the fixtures hold: the 2026-09 deploys ARCH
+/// §8.2 names (deploy slots = `VENUE_GUARD_SLOTS_2026_09_27`, kept for T-LATCH) and the 2026-10-02
+/// redeploys every fork loads ([`PumpDeploy::CURRENT`], slots = [`fork::FIXTURE_GUARD_SLOTS`]):
+/// trimmed-ELF sha256 as pinned by `scripts/dump-fixtures.py`, SBPF v0, one upgrade authority, the
+/// ProgramData rebuilt to the mainnet sha256 when loaded. Every pump-state account is one
 /// snapshot, the reader constants equal the program's, the statics sit at their PDAs, and every
 /// role holds what the dump script expects of it.
 #[test]
 fn fixtures_programs_and_readers() {
+    use fork::PumpDeploy;
+    let authority = Pubkey::from_str_const("7gZufwwAo17y5kg8FMyJy2phgpvv9RSdzWtdXiWHjFr8");
+    let trimmed = |deploy, p| match (deploy, p) {
+        (PumpDeploy::Sep2026, PumpProgram::Pump) => {
+            "dbf5541c092438c2c9d19a278a3516114b88dfd7c8756730ac0d11046921c42f"
+        }
+        (PumpDeploy::Sep2026, PumpProgram::Fees) => {
+            "1092b124324088948a419910e718ca31fb6479a8dab514adbf05a3a6ee2db788"
+        }
+        (PumpDeploy::Sep2026, PumpProgram::Amm) => {
+            "c04bea8bee62502c62a9fa796fc99ce0d616469908b85595a517ade2bfe36522"
+        }
+        (PumpDeploy::Oct2026, PumpProgram::Pump) => {
+            "b0b777c64ccf811ab21493d47d618b8db272f9bfd06b4fba4ba66ef565cb0c75"
+        }
+        (PumpDeploy::Oct2026, PumpProgram::Fees) => {
+            "f166c2967fbfa6a9d80146360e5b79a2b263e821c999f1e74f266162788462fd"
+        }
+        (PumpDeploy::Oct2026, PumpProgram::Amm) => {
+            "015570358c672ae42e5706daa87eb67d4c45e8fd8afec80c66bd85b9f9333cc3"
+        }
+    };
+    for (deploy, slots) in [
+        (PumpDeploy::Sep2026, VENUE_GUARD_SLOTS_2026_09_27),
+        (PumpDeploy::Oct2026, fork::FIXTURE_GUARD_SLOTS),
+    ] {
+        for p in PumpProgram::ALL {
+            let pd = deploy.program_data(p);
+            let elf = deploy.elf(p);
+            let h = program_data::read(&pd.account.owner.to_bytes(), &pd.account.data)
+                .expect("ProgramData header");
+            let guard = usize::from(p.guard());
+            assert_eq!(pd.address, VENUE_PROGRAM_DATA[guard], "{deploy:?} {p:?}");
+            assert_eq!(h.slot, slots[guard], "{deploy:?} {p:?}: deploy slot");
+            assert_eq!(h.slot, deploy.deploy_slot(p), "{deploy:?} {p:?}");
+            assert_eq!(
+                h.upgrade_authority,
+                Some(authority.to_bytes()),
+                "{deploy:?} {p:?}"
+            );
+            assert!(
+                pd.account.data[program_data::HEADER_LEN + elf.len()..]
+                    .iter()
+                    .all(|&b| b == 0)
+            );
+            assert_eq!(&elf[..4], b"\x7fELF");
+            assert_eq!(elf[48..52], [0, 0, 0, 0], "{deploy:?} {p:?}: SBPF v0");
+            let end = elf.iter().rposition(|&b| b != 0).unwrap() + 1;
+            assert_eq!(
+                fork::sha256_hex(&elf[..end]),
+                trimmed(deploy, p),
+                "{deploy:?} {p:?}"
+            );
+            let prog = deploy.program(p);
+            assert_eq!(prog.address, p.id());
+            assert!(prog.account.executable);
+            assert_eq!(prog.account.data[4..36], pd.address.to_bytes());
+        }
+    }
+    assert_eq!(PumpDeploy::CURRENT, PumpDeploy::Oct2026);
     for p in PumpProgram::ALL {
-        let pd = p.program_data();
-        let slot = program_data::deploy_slot(&pd.account.owner.to_bytes(), &pd.account.data)
-            .expect("ProgramData header");
-        let guard = usize::from(p.guard());
-        assert_eq!(pd.address, VENUE_PROGRAM_DATA[guard], "{p:?}");
+        let g = usize::from(p.guard());
         assert_eq!(
-            slot, VENUE_GUARD_SLOTS_2026_09_27[guard],
-            "{p:?}: ARCH §8.2 deploy slot"
+            fork::FIXTURE_GUARD_SLOTS[g],
+            shortwin::constants::VENUE_GUARD_SLOTS_2026_10_03[g],
+            "{p:?}: the fork's slot is the newest baseline's"
         );
-        assert!(
-            pd.account.data[program_data::HEADER_LEN + p.elf().len()..]
-                .iter()
-                .all(|&b| b == 0)
+        assert_eq!(p.elf(), PumpDeploy::CURRENT.elf(p));
+        assert_eq!(
+            fork::pump_fixture_at(&p.program_data().address)
+                .unwrap()
+                .name,
+            p.program_data().name,
+            "an address lookup resolves to the redeploy"
         );
-        assert_eq!(&p.elf()[..4], b"\x7fELF");
-        let prog = p.program();
-        assert_eq!(prog.address, p.id());
-        assert!(prog.account.executable);
-        assert_eq!(prog.account.data[4..36], pd.address.to_bytes());
     }
     let s = fork::pump_snapshot();
     for f in fork::all_pump_fixtures().filter(|f| f.group == "pump_state") {

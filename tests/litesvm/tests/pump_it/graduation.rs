@@ -280,7 +280,11 @@ fn migrate_v2_on_the_real_elf_graduates_the_market_onto_its_pool() {
     );
     let np = pump::NewPool::of(&pm.curve);
     let acc = env.svm.get_account(&np.pool).expect("the canonical pool");
-    assert_eq!(acc.data.len(), 271, "a new pool is 271 bytes");
+    assert_eq!(
+        acc.data.len(),
+        shortwin_litesvm_tests::pamm::POOL_LEN_2026_10,
+        "a new pool is 287 bytes (271 before the 2026-10-02 redeploy)"
+    );
     let r = np.reserves(&env.svm).expect("reserves");
     assert_eq!(u128::from(r.base), xp, "X_p");
     assert_eq!(pool_tokens, shortwin::venues::STANDARD_POOL_TOKENS);

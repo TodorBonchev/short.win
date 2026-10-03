@@ -45,7 +45,7 @@ use shortwin::constants::{
     GUARD_PUMP, GUARD_PUMP_AMM, GUARD_PUMP_FEES, PUMP_AMM_EVENT_AUTHORITY, PUMP_AMM_FEE_CONFIG,
     PUMP_AMM_GLOBAL_CONFIG, PUMP_AMM_GLOBAL_VOLUME_ACCUMULATOR, PUMP_AMM_PROGRAM_ID,
     PUMP_EVENT_AUTHORITY, PUMP_FEE_CONFIG, PUMP_FEES_PROGRAM_ID, PUMP_GLOBAL,
-    PUMP_GLOBAL_VOLUME_ACCUMULATOR, PUMP_PROGRAM_ID, VENUE_GUARD_SLOTS_2026_09_27,
+    PUMP_GLOBAL_VOLUME_ACCUMULATOR, PUMP_PROGRAM_ID,
 };
 use shortwin::events::{SolSettle, VenueStateChanged};
 use shortwin::state::VenueKind;
@@ -1101,7 +1101,7 @@ fn sweep(coin: PumpCoin, donated: bool) -> Prepared {
 /// rewritten; `tests/litesvm/tests/latch_pump_it.rs` runs the loader's real `Upgrade`).
 fn flag_pump(venue: u8) -> Prepared {
     let (mut env, _) = Env::fork_pump_coin(T22);
-    let dumped = VENUE_GUARD_SLOTS_2026_09_27[usize::from(venue)];
+    let dumped = fork::FIXTURE_GUARD_SLOTS[usize::from(venue)];
     fork::set_pump_deploy_slot(&mut env.svm, pump_program(venue), dumped + 1);
     prepared(env, ix::flag_venue_upgraded(venue), &[])
 }
@@ -1109,7 +1109,7 @@ fn flag_pump(venue: u8) -> Prepared {
 fn revalidate_pump(venue: u8) -> Prepared {
     let Prepared { mut env, ix, .. } = flag_pump(venue);
     ok(env.send(&[ix], &[]));
-    let dumped = VENUE_GUARD_SLOTS_2026_09_27[usize::from(venue)];
+    let dumped = fork::FIXTURE_GUARD_SLOTS[usize::from(venue)];
     let ea = env.pause_authority.insecure_clone();
     let ix = ix::revalidate_venue(&ea.pubkey(), venue, dumped + 1);
     prepared(env, ix, &[&ea])
@@ -1728,7 +1728,7 @@ fn tx_keeper_s3_none() -> (Env, Vec<Instruction>, Vec<Keypair>) {
 fn tx_flag_three() -> (Env, Vec<Instruction>, Vec<Keypair>) {
     let (mut env, _) = Env::fork_pump_coin(T22);
     for venue in [GUARD_PUMP, GUARD_PUMP_FEES, GUARD_PUMP_AMM] {
-        let dumped = VENUE_GUARD_SLOTS_2026_09_27[usize::from(venue)];
+        let dumped = fork::FIXTURE_GUARD_SLOTS[usize::from(venue)];
         fork::set_pump_deploy_slot(&mut env.svm, pump_program(venue), dumped + 1);
     }
     let ixs = vec![

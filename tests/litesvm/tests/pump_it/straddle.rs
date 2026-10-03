@@ -62,8 +62,9 @@ fn pool_tiers(env: &Env) -> Vec<fees::FeeTier> {
 /// n(rT) − pool_migration_fee`, at the PumpSwap tier of its market cap. Then, on the real ELFs:
 /// a third party completes the curve (`buy_v2(rT)`), anyone calls `migrate_v2` (the pool it
 /// creates holds exactly `X_p` and `Y_p − 1`: the quote's intended `+1`), `extend_account`
-/// takes the 271-byte pool to 301 bytes, and PumpSwap `buy(q, B̂_str)` delivers `q` for at most
-/// `B̂_str` — the quote covers the execution, within a few lamports.
+/// takes the new pool (287 bytes since the 2026-10-02 redeploy, 271 before) to 301 bytes, and
+/// PumpSwap `buy(q, B̂_str)` delivers `q` for at most `B̂_str` — the quote covers the execution,
+/// within a few lamports.
 #[test]
 fn b_str_prices_the_executed_bundle() {
     let (mut env, pm, q) = setup(PumpCoin::Near);

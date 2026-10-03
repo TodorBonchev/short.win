@@ -182,7 +182,7 @@ fn the_latch_blocks_curve_opens_only() {
         let (mut env, pm, q) = setup(PumpCoin::T22_115);
         let mut b = env.borrower();
         let (_, nonce, _) = open_ok(&mut env, &pm, &mut b, q);
-        let slot = shortwin::constants::VENUE_GUARD_SLOTS_2026_09_27[usize::from(guard)];
+        let slot = fork::FIXTURE_GUARD_SLOTS[usize::from(guard)];
         assert_err(
             &env.send(&[ix::flag_venue_upgraded(guard)], &[]),
             E::VenueNotUpgraded,

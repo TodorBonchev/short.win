@@ -30,9 +30,9 @@
 //! canonical pool does not exist on mainnet either and `migrate_v2` creates it on the fork.
 //!
 //! The path, all real instructions sent over JSON-RPC: `initialize_config` (the live venue deploy
-//! slots must equal `VENUE_GUARD_SLOTS_2026_09_27`; 10 accounts and 730 data bytes: 1,294 B with
-//! a separate fee payer, over the 1,232-B limit, so the upgrade authority pays its own fee:
-//! 1,198 B) → a trader's `buy_v2` to ECON's D@80 % (the live pump lands on `at_progress(0.8)`
+//! slots must equal `fork::FIXTURE_GUARD_SLOTS`, the 2026-10-02 pump redeploys; 10 accounts and
+//! 730 data bytes: 1,294 B with a separate fee payer, over the 1,232-B limit, so the upgrade
+//! authority pays its own fee: 1,198 B) → a trader's `buy_v2` to ECON's D@80 % (the live pump lands on `at_progress(0.8)`
 //! exactly) → `create_market(Auto)` (PumpCurve) → the trader lends its tokens → a borrower opens
 //! ECON's D@80 % position, **`S`, `M`, `V` equal to the dumped ELFs' to the lamport** → the trader
 //! completes the curve (`PumpCurve → PumpMigrating`) → the trader's `migrate_v2` on the live pump
@@ -65,7 +65,7 @@ use std::str::FromStr;
 use anchor_lang::__private::base64::{self, Engine};
 use anchor_lang::{AnchorDeserialize, Discriminator, Event};
 use serde_json::{Value, json};
-use shortwin::constants::{VENUE_GUARD_SLOTS_2026_09_27, VENUE_PROGRAM_DATA};
+use shortwin::constants::VENUE_PROGRAM_DATA;
 use shortwin_litesvm_tests::{invariants, raydium};
 use solana_account::Account;
 use solana_transaction::Transaction;
@@ -547,8 +547,9 @@ fn surfpool_mainnet_fork_graduation() {
         let slot = u64::from_le_bytes(pd.data[4..12].try_into().unwrap());
         eprintln!("venue {i}: live deploy slot {slot}");
         assert_eq!(
-            slot, VENUE_GUARD_SLOTS_2026_09_27[i],
-            "no upgrade since 2026-09-27"
+            slot,
+            shortwin_litesvm_tests::fork::FIXTURE_GUARD_SLOTS[i],
+            "no upgrade since 2026-10-02"
         );
     }
 

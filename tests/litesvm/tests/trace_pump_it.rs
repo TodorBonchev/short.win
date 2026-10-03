@@ -43,7 +43,7 @@ use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
 use litesvm::types::TransactionMetadata;
 use shortwin::constants::{
     ASSOCIATED_TOKEN_PROGRAM_ID, GUARD_PUMP, GUARD_PUMP_AMM, GUARD_PUMP_FEES, PUMP_FEES_PROGRAM_ID,
-    PUMP_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID, VENUE_GUARD_SLOTS_2026_09_27,
+    PUMP_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID,
 };
 use shortwin::events::{
     Close, Expire, Liquidate, Open, PriceCranked, RouteChainChanged, SolSettle, TraderSwept,
@@ -979,7 +979,7 @@ fn latch_instructions() {
         (PumpProgram::Fees, GUARD_PUMP_FEES),
         (PumpProgram::Amm, GUARD_PUMP_AMM),
     ] {
-        let dumped = VENUE_GUARD_SLOTS_2026_09_27[usize::from(venue)];
+        let dumped = fork::FIXTURE_GUARD_SLOTS[usize::from(venue)];
         fork::set_pump_deploy_slot(&mut env.svm, program, dumped + 1);
         let ixs = [ix::flag_venue_upgraded(venue)];
         let meta = send(&mut env, &ixs, &[]);
@@ -1226,7 +1226,7 @@ fn worst_case_keeper_transactions() {
         (PumpProgram::Fees, GUARD_PUMP_FEES),
         (PumpProgram::Amm, GUARD_PUMP_AMM),
     ] {
-        let dumped = VENUE_GUARD_SLOTS_2026_09_27[usize::from(venue)];
+        let dumped = fork::FIXTURE_GUARD_SLOTS[usize::from(venue)];
         fork::set_pump_deploy_slot(&mut env.svm, program, dumped + 1);
     }
     let ixs = with_cb(vec![

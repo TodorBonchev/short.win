@@ -24,12 +24,10 @@ use anchor_lang::solana_program::instruction::Instruction;
 use mollusk_svm::Mollusk;
 use mollusk_svm::program::keyed_account_for_system_program;
 use shortwin::PauseScope;
-use shortwin::constants::{
-    GUARD_PUMP, PYTH_RECEIVER_ID, PYTH_SOL_USD_ACCOUNT, VENUE_GUARD_SLOTS_2026_09_27,
-    VENUE_PROGRAM_DATA,
-};
+use shortwin::constants::{GUARD_PUMP, PYTH_RECEIVER_ID, PYTH_SOL_USD_ACCOUNT, VENUE_PROGRAM_DATA};
 use shortwin::state::ConfigChange;
 use shortwin_litesvm_tests::fixtures::{self, MarketKeys};
+use shortwin_litesvm_tests::fork;
 use shortwin_litesvm_tests::ix::{self, LenderKeys};
 use shortwin_litesvm_tests::tokens::{self, Holder, TokenProgram};
 use shortwin_litesvm_tests::{Env, pda};
@@ -326,7 +324,7 @@ const TEN_MIB: usize = 10 * 1024 * 1024;
 fn pump_upgraded(len: usize) -> (Env, u64) {
     let mut env = Env::initialized();
     env.set_all_venue_program_data();
-    let slot = VENUE_GUARD_SLOTS_2026_09_27[usize::from(GUARD_PUMP)] + 1;
+    let slot = fork::FIXTURE_GUARD_SLOTS[usize::from(GUARD_PUMP)] + 1;
     let extra = len - shortwin_venue_state::program_data::HEADER_LEN;
     fixtures::set_program_data(
         &mut env.svm,

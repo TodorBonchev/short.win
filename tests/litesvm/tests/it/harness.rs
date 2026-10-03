@@ -364,7 +364,7 @@ fn i17_reads_the_latch_just_before_each_instruction() {
     env.set_all_venue_program_data();
     let clear = invariants::snapshot(&env.svm, &[]);
     let pause = env.pause_authority.insecure_clone();
-    let flagged_slot = shortwin::constants::VENUE_GUARD_SLOTS_2026_09_27[0] + 1;
+    let flagged_slot = shortwin_litesvm_tests::fork::FIXTURE_GUARD_SLOTS[0] + 1;
     env.set_venue_program_data(0, flagged_slot);
     // Flag and revalidate in one transaction: each instruction is checked on its own pre-state.
     ok(env.send(

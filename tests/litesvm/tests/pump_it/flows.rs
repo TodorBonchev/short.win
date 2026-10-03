@@ -128,16 +128,17 @@ pub fn round_trip(env: &mut Env, pm: &PumpMarket, q: u64) -> (u64, u64) {
     (open.s, close.buyback_cost)
 }
 
-/// A Token-2022 curve of 115 bytes (the first v2 trade grows it to 125; its rent reserve already
-/// covers 125 bytes, so no top-up).
+/// A Token-2022 curve of 115 bytes (the first v2 trade — the listing's warm-up already — grows it
+/// to 141 bytes since the 2026-10-02 redeploy, 125 before; its rent reserve already covers that,
+/// so no top-up).
 #[test]
 fn round_trip_t22_115() {
     let (mut env, pm, q) = setup(PumpCoin::T22_115);
     round_trip(&mut env, &pm, q);
     assert_eq!(
         pm.curve.data_len(&env.svm),
-        125,
-        "the curve grew to 125 bytes"
+        fork::CURVE_LEN_2026_10,
+        "the curve grew to 141 bytes"
     );
 }
 
@@ -151,11 +152,12 @@ fn round_trip_legacy_spl_without_creator() {
     round_trip(&mut env, &pm, q);
 }
 
-/// A fresh `create_v2` curve (125 bytes, Token-2022) after 5 SOL of buys.
+/// A fresh `create_v2` curve (125 bytes, Token-2022) after 5 SOL of buys (which grow it to 141
+/// bytes since the 2026-10-02 redeploy).
 #[test]
 fn round_trip_fresh_125() {
     let (mut env, pm, q) = setup(PumpCoin::Fresh);
-    assert_eq!(pm.curve.data_len(&env.svm), 125);
+    assert_eq!(pm.curve.data_len(&env.svm), fork::CURVE_LEN_2026_10);
     round_trip(&mut env, &pm, q);
 }
 

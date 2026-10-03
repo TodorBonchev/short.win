@@ -51,9 +51,9 @@ fn lambda_min(env: &Env) -> u32 {
 /// the wallet cap lifted within their compiled bounds (`market_max_notional` 10¹³, `wallet_cap_bps`
 /// 10⁴, as `raydium_v4_support::lift_notional`: the beta's 25-SOL notional limit binds first
 /// otherwise, and these tests compare the size caps on `X₀`), `400·q` lent, warmed up, the boost
-/// waited out, and the pool grown from 261 to 271 bytes by a small trade (pAMM's `deposit`
-/// serializes the pool at 271 bytes: on a shorter one it fails until a trade grows it, R-VEN
-/// Update H8). Returns it and `q`.
+/// waited out, and the pool grown from 261 bytes by a small trade (to 287 bytes since the
+/// 2026-10-02 redeploy, 271 before; pAMM's `deposit` serializes the whole pool: on a shorter one
+/// it fails until a trade grows it, R-VEN Update H8). Returns it and `q`.
 fn lock_setup() -> (Env, PammMarket, u64) {
     lock_setup_lambda(None)
 }

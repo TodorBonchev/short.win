@@ -99,7 +99,7 @@ export function fixtureAddress(name: string): Address {
 /**
  * Groups deployed as programs (or not deployed at all), never loaded as accounts. The M10 groups
  * (scripts/dump-fixtures.py `M10_PROGRAM_GROUPS`: the CPMM redeploy, the mainnet SPL programs,
- * Squads v4) hold program accounts at genesis-program or venue addresses; a validator that runs
+ * Squads v4, the pump redeploys) hold program accounts at genesis-program or venue addresses; a validator that runs
  * them deploys them itself (the SPL programs: splPrograms()).
  */
 const PROGRAM_GROUPS = new Set([
@@ -108,6 +108,7 @@ const PROGRAM_GROUPS = new Set([
     'raydium_cpmm_2026_10',
     'spl_programs',
     'squads_programs',
+    'pump_programs_2026_10',
 ]);
 const SYSVAR_PREFIX = 'Sysvar';
 
@@ -115,15 +116,17 @@ const SYSVAR_PREFIX = 'Sysvar';
  * The dumped venue programs: `[program id, ELF path, upgrade authority]` for `--upgradeable-program`.
  * CPMM is the 2026-10 redeploy (group `raydium_cpmm_2026_10`, M10 WP-2), the build every CPMM test
  * runs on; its program account and upgrade authority equal `raydium_programs`' 445,763,504 build's.
+ * pump, PumpSwap and pump-fees are their 2026-10-02 redeploys (group `pump_programs_2026_10`, the
+ * M10 pump revalidation), with the same program accounts and upgrade authority as `pump_programs`'.
  */
 export function venuePrograms(): [string, string, string][] {
     const m = manifest();
     const out: [string, string, string][] = [];
     const byName = new Map(m.accounts.map((a) => [a.name, a]));
     for (const [prog, dataName] of [
-        ['pump_program', 'pump_program_data'],
-        ['pump_amm_program', 'pump_amm_program_data'],
-        ['pump_fees_program', 'pump_fees_program_data'],
+        ['pump_2026_10_program', 'pump_2026_10_program_data'],
+        ['pump_amm_2026_10_program', 'pump_amm_2026_10_program_data'],
+        ['pump_fees_2026_10_program', 'pump_fees_2026_10_program_data'],
         ['raydium_amm_v4_program', 'raydium_amm_v4_program_data'],
         ['raydium_cpmm_2026_10_program', 'raydium_cpmm_2026_10_program_data'],
     ] as const) {

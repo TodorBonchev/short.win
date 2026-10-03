@@ -10,7 +10,11 @@
 //!   top-up exceeds the `exec_tol_bps` tolerance on `S_exp` is refused (`ProceedsBelowMin`);
 //! - **buys**: the same top-up comes out of the leg's funding (`max_in + ert`), so `B` = pump's
 //!   charge + 650,240, within the bound;
-//! - the pump UVA was created at listing (`create_market`), so no leg pays its 1,346,200.
+//! - the pump UVA was created at listing (`create_market`), so no leg pays its 1,346,200;
+//! - **growth** (pump's 2026-10-02 redeploy): a curve under 141 bytes grows to 141 on short.win's
+//!   first v2 trade, its rent reserve (`lamports − rQ`) topped up to `Rent.minimum_balance(141)`
+//!   from the trader the same way — out of `S` on a sale (125 bytes before the redeploy, which
+//!   no curve of the dump needed: they are over-funded).
 //!
 //! The empty creator vault is planted on pump's side (the vault PDA's lamports removed), as
 //! `pump_math_it::an_empty_creator_vault_is_topped_up_by_the_user` does for a normal user.
@@ -129,4 +133,45 @@ fn the_uva_created_at_listing_is_never_paid_by_a_leg() {
     env.warp(1);
     close_ok(&mut env, &pm, &b, nonce);
     assert_eq!(lamports(&env, &uva), l0, "no rent moved");
+}
+
+/// A sale on a 115-byte curve whose rent reserve is planted down to `minimum_balance(115)` (the
+/// dump's is over-funded at the old rent): pump's 2026-10-02 redeploy grows it to 141 bytes and
+/// tops the reserve up to `minimum_balance(141)` — 132,080 lamports — from the trader before the
+/// proceeds, so `S` = the quote less the growth; the curve is 141 bytes after it, the borrower got
+/// `ert` back, the trader is clean.
+#[test]
+fn a_sale_pays_a_short_curves_growth_out_of_its_proceeds() {
+    let (mut env, pm, _) = setup(PumpCoin::T22_115);
+    assert_eq!(pm.curve.data_len(&env.svm), 115);
+    let min115 = env.svm.minimum_balance_for_rent_exemption(115);
+    let min141 = env
+        .svm
+        .minimum_balance_for_rent_exemption(fork::CURVE_LEN_2026_10);
+    let growth = min141 - min115;
+    assert_eq!(growth, 132_080);
+    let rq = pm.curve.state(&env.svm).real_quote_reserves;
+    let mut acc = env.svm.get_account(&pm.curve.curve).unwrap();
+    acc.lamports = rq + min115;
+    env.svm.set_account(pm.curve.curve, acc).unwrap();
+    let vt = pm.curve.state(&env.svm).virtual_token_reserves;
+    // Large enough that the growth fits the 10 bps tolerance on S_exp.
+    let q = vt / 100;
+    let sale = pm.curve.quote_sell(&env.svm, q).unwrap();
+    let tol = u64::from(env.config().params.exec_tol_bps);
+    assert!(
+        sale.proceeds * tol / 10_000 >= growth,
+        "S_exp {}",
+        sale.proceeds
+    );
+    let mut b = env.borrower();
+    let (open, _, _) = open_ok(&mut env, &pm, &mut b, q);
+    assert_eq!(open.s, sale.proceeds - growth, "S = proceeds − the growth");
+    let acc = env.svm.get_account(&pm.curve.curve).unwrap();
+    assert_eq!(acc.data.len(), fork::CURVE_LEN_2026_10);
+    assert_eq!(
+        acc.lamports - pm.curve.state(&env.svm).real_quote_reserves,
+        min141
+    );
+    assert_trader_clean(&env, &pm);
 }

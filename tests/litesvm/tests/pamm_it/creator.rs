@@ -47,8 +47,8 @@ fn close_with(
 }
 
 /// ★ M6-SEC-4 on the dumped pAMM ELF (module docs): a stranger's `set_coin_creator` on the
-/// `legacy211` pool (grown to 271 bytes by the position's open; on 211 bytes pAMM cannot write the
-/// field, `BorshIoError`); the close built before it and the close built after it both fail
+/// `legacy211` pool (grown by the position's open, to 287 bytes since the 2026-10-02 redeploy, 271
+/// before; on 211 bytes pAMM cannot write the field, `BorshIoError`); the close built before it and the close built after it both fail
 /// `VenueAccountMismatch` while the new creator's vault ATA is missing; the next crank re-caches the
 /// creator (pre-fix it stayed on the old one: every trade re-derived T12 / T11); the close with
 /// `create_idempotent(T11)` in its own transaction lands.
@@ -61,7 +61,10 @@ fn m6_sec_4_a_strangers_coin_creator_change_costs_one_retry_and_the_crank_recach
     assert!(res.is_err(), "the 211-byte pool has no coin-creator field");
     let mut b = env.borrower();
     let (_, n, _) = open_ok(&mut env, &pm, &mut b, q);
-    assert_eq!(env.svm.get_account(&pm.pool.pool).unwrap().data.len(), 271);
+    assert_eq!(
+        env.svm.get_account(&pm.pool.pool).unwrap().data.len(),
+        pamm::POOL_LEN_2026_10
+    );
     assert_eq!(pm.pool.coin_creator(&env.svm), Pubkey::default());
     assert_eq!(
         cached(&env, &pm, pc::CACHED_COIN_CREATOR),
