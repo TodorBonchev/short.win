@@ -8,7 +8,8 @@ import { execFileSync, spawnSync } from 'node:child_process';
 //
 // pkg/ is generated and not committed (the .wasm embeds absolute registry paths, so it is not
 // byte-reproducible across machines). The build is skipped when pkg/ holds the output of the
-// same inputs: a SHA-256 over the two crates' sources and manifests and the root Cargo.lock is
+// same inputs: a SHA-256 over the three crates' sources and manifests (shortwin-math,
+// shortwin-venue-state for the mint filter, shortwin-math-wasm) and the root Cargo.lock is
 // written to pkg/.inputs-sha256 and compared on the next run (`--force` rebuilds anyway).
 //
 // wasm-bindgen must be the CLI matching the crate's exact pin (=0.2.129). It is looked up in
@@ -43,8 +44,10 @@ function listFiles(dir) {
 function inputsHash() {
     const files = [
         ...listFiles(join(repo, 'crates', 'shortwin-math', 'src')),
+        ...listFiles(join(repo, 'crates', 'shortwin-venue-state', 'src')),
         ...listFiles(join(repo, 'crates', 'shortwin-math-wasm', 'src')),
         join(repo, 'crates', 'shortwin-math', 'Cargo.toml'),
+        join(repo, 'crates', 'shortwin-venue-state', 'Cargo.toml'),
         join(repo, 'crates', 'shortwin-math-wasm', 'Cargo.toml'),
         join(repo, 'Cargo.lock'),
     ].sort();

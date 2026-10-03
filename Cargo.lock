@@ -2669,6 +2669,7 @@ name = "shortwin-math-wasm"
 version = "0.1.0"
 dependencies = [
  "shortwin-math",
+ "shortwin-venue-state",
  "wasm-bindgen",
 ]
 

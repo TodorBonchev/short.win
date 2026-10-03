@@ -366,6 +366,58 @@ pub fn preview_withdraw(
     )?)
 }
 
+/// What `withdraw(shares)` does, step for step as the program's handler after its prologue
+/// (ARCH §3.3 `withdraw`): `pool::withdraw` (the tokens, the lock and `lock_until`, the last
+/// lender's vest flush, R3B-2), the program's own check on top of it and the SOL part, which is
+/// `pool::claim` right after (as `claim_sol`: the pot draw, `min(pending, real − claimed,
+/// lender_sol)`).
+#[wasm_bindgen]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Withdrawal {
+    /// Tokens paid.
+    pub tokens: u64,
+    /// Lamports paid (the vest flush of a last lender's exit included).
+    pub sol: u64,
+    /// The burn leaves `S = 0` while `ΣB_Q > 0`: the program refuses it (`LastSharesBorrowed`,
+    /// M1-SEC-3; ARCH §9 M0b note 4).
+    #[wasm_bindgen(js_name = lastSharesBorrowed)]
+    pub last_shares_borrowed: bool,
+    /// The lender afterwards (`lock`, `lockUntil`, `shares`, `pending`, …).
+    pub lender: LenderState,
+}
+
+/// [`Withdrawal`] of `shares` at `now` on the stored state (the program's prologue may first
+/// accrue rent, so its SOL part can only be larger); throws `withdraw`'s and `claim`'s
+/// refusals as [`preview_withdraw`] does.
+#[wasm_bindgen(js_name = previewWithdrawal)]
+pub fn preview_withdrawal(
+    pool: &PoolState,
+    lender: &LenderState,
+    records: &ShareEpochs,
+    now: i64,
+    lock_grace_s: u32,
+    shares: u128,
+) -> Result<Withdrawal, JsError> {
+    let (mut p, mut v, mut l) = (pool.pool(), pool.vault(), lender.lender());
+    let tokens = mpool::withdraw(
+        &mut p,
+        &mut v,
+        &mut l,
+        &records.0,
+        now,
+        lock_grace_s,
+        shares,
+    )?;
+    let last_shares_borrowed = p.total_shares == 0 && p.borrowed_q != 0;
+    let sol = mpool::claim(&p, &mut v, &mut l, &records.0, now)?;
+    Ok(Withdrawal {
+        tokens,
+        sol,
+        last_shares_borrowed,
+        lender: LenderState::of(&l),
+    })
+}
+
 /// Shares `deposit(amount)` would mint; throws `"post-wipe sweep pending"` while a wipe
 /// record waits for its sweeps.
 #[wasm_bindgen(js_name = previewDeposit)]
@@ -482,6 +534,13 @@ mod tests {
             1_000_000_000
         );
         assert_eq!(pool.tokens_free, 1_000_000_000);
+        let w = preview_withdrawal(&pool, &lender, &none, 0, 86_400, lender.shares).unwrap();
+        assert_eq!(
+            (w.tokens, w.sol, w.last_shares_borrowed),
+            (1_000_000_000, 0, false)
+        );
+        assert_eq!((w.lender.shares, w.lender.lock), (0, 0));
+        assert_eq!(pool.total_shares, lender.shares);
         assert_eq!(preview_claim(&pool, &lender, &none, 0).unwrap(), 0);
         assert_eq!(
             tokens_for_shares(&pool, lender.shares).unwrap(),

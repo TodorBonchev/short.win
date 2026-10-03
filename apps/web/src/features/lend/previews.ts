@@ -548,14 +548,15 @@ export function previewWithdrawLimits(
 }
 
 export interface WithdrawView {
-    /** Tokens `withdraw(shares)` pays (`previewWithdraw`). */
+    /** Tokens `withdraw(shares)` pays (`previewWithdrawal`). */
     readonly tokens: bigint;
     /** `min_tokens` = the quote less the tolerance (FE-D6). */
     readonly minTokens: bigint;
     /**
-     * The SOL part `withdraw` pays, as far as the stored state shows it (`previewClaim`): a lower
-     * bound — the prologue's accrual and vest release only add to it; the exact quote is the
-     * simulation's (`quoteWithdrawSol`).
+     * The SOL part `withdraw` pays on the stored state (`previewWithdrawal`: `claim` right after the
+     * burn, as the handler; a last lender's vest flush included, FE-15): a lower bound — the
+     * prologue's rent accrual only adds to it; the exact quote is the simulation's
+     * (`quoteWithdrawSol`).
      */
     readonly solAtLeast: bigint;
     /** The withdrawal takes `S` to 0: the program pays this lender the unreleased vest first (R3B-2). */
@@ -566,6 +567,14 @@ export interface WithdrawView {
     readonly vesting: bigint;
     /** The part of it the withdrawn shares give up to the lenders who stay (0 on the last exit). */
     readonly vestingForfeit: bigint;
+    /**
+     * The lender's locked shares right after the withdrawal (`previewWithdrawal`'s lender: the
+     * borrowed part of the burn added to the live lock, capped at the shares left; FE-15). A
+     * withdrawal does not move `Π`, so this is `lock_of` on the state afterwards.
+     */
+    readonly lockAfter: bigint;
+    /** When that lock ends (`lock_until` afterwards); 0 when the withdrawal leaves no lock. */
+    readonly lockUntilAfter: bigint;
 }
 
 export function previewWithdrawView(
@@ -578,7 +587,13 @@ export function previewWithdrawView(
 ): Result<WithdrawView> {
     return attempt(() =>
         session(m, s, (pool, lender, records) => {
-            const tokens = m.previewWithdraw(pool, lender, records, now, lockGraceS, shares);
+            const w = m.previewWithdrawal(pool, lender, records, now, lockGraceS, shares);
+            const { tokens, sol, lastSharesBorrowed } = w;
+            const after = w.lender;
+            const lockAfter = after.lock;
+            const lockUntilAfter = lockAfter > 0n ? after.lockUntil : 0n;
+            after.free();
+            w.free();
             const total = pool.totalShares;
             const t = m.previewTouch(pool, lender, records, now);
             let mine: bigint;
@@ -590,18 +605,20 @@ export function previewWithdrawView(
             const released = m.previewVestRelease(pool, now);
             const unreleased = pool.vestBal - released;
             const last = shares === total;
-            if (last && pool.borrowedQ > 0n) {
+            if (lastSharesBorrowed) {
                 // The program's own check on top of the pool math (M1-SEC-3): never `S = 0` while tokens are lent.
                 throw new LendRefusal(refusalNamed('LastSharesBorrowed'));
             }
             return {
                 tokens,
                 minTokens: lessBps(tokens, toleranceBps),
-                solAtLeast: m.previewClaim(pool, lender, records, now),
+                solAtLeast: sol,
                 lastLenderExit: last && pool.vestBal > 0n,
                 unreleased,
                 vesting: proRata(unreleased, mine, total),
                 vestingForfeit: last ? 0n : proRata(unreleased, shares, total),
+                lockAfter,
+                lockUntilAfter,
             };
         }),
     );

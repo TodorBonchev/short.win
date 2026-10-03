@@ -7,14 +7,7 @@ import type { Address } from '@solana/kit';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { initMathSync, type MathModule } from '../math/load.ts';
 import { readRepoBytes } from '../test/repo.ts';
-import {
-    candidateReadKeys,
-    discoveryQueries,
-    type EligibilityParams,
-    judgeCandidate,
-    lockedFloorOk,
-    lockedSol,
-} from './candidates.ts';
+import { candidateReadKeys, discoveryQueries, type EligibilityParams, judgeCandidate } from './candidates.ts';
 import { GUARD_MASK, TOKEN_PROGRAM, WSOL_MINT } from './constants.ts';
 import type { RawAccount } from './readers.ts';
 import { spotPrice } from './state.ts';
@@ -84,8 +77,8 @@ describe('raydium candidates', () => {
         expect(j.lockedDepth).toBe(j.state?.lockedDepth);
         const p = j.state ? spotPrice(m, j.state) : null;
         if (p === null || !j.state) throw new Error('spot');
-        expect(lockedFloorOk(m, j.lockedDepth, p, params.poolLockMinBps, params.poolMinRealSol)).toBe(true);
-        expect(lockedSol(m, j.lockedDepth, p) > 0n).toBe(true);
+        expect(m.lockedFloorOk(j.lockedDepth, p, params.poolLockMinBps, params.poolMinRealSol)).toBe(true);
+        expect(m.lockedSol(j.lockedDepth, p) > 0n).toBe(true);
     });
 
     it('refuses another mint, a Token-2022 market on AMM v4, and a latched Raydium program', () => {
@@ -131,7 +124,7 @@ describe('raydium candidates', () => {
             for (const r of j.reasons) expect(['PoolIneligible', 'PoolTooThin']).toContain(r);
             const p = j.state ? spotPrice(m, j.state) : null;
             if (p !== null && j.state) {
-                const floor = lockedFloorOk(m, j.lockedDepth, p, params.poolLockMinBps, params.poolMinRealSol);
+                const floor = m.lockedFloorOk(j.lockedDepth, p, params.poolLockMinBps, params.poolMinRealSol);
                 const fee = m.exceedsCap(j.feePpm, params.venueFeeCapBps);
                 expect(j.eligible).toBe(floor && !fee);
             }

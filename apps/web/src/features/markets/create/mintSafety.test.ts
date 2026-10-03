@@ -1,10 +1,12 @@
 /**
- * The safety verdict against the fixtures of the program's own tests
- * (programs/shortwin/src/mint_filter.rs `decisions`, crates/shortwin-venue-state/src/mint.rs):
- * one fixture per rule, every rejected extension type, the TLV walk's edges and the malformed shapes.
+ * The safety verdict (the facade's `mintCheck` = `shortwin_venue_state::mint::check`, FE-15) against
+ * the fixtures of the program's own tests (programs/shortwin/src/mint_filter.rs `decisions`,
+ * crates/shortwin-venue-state/src/mint.rs): one fixture per rule, every rejected extension type,
+ * the TLV walk's edges and the malformed shapes. `src/m10-fe15/parity.test.ts` holds it to the
+ * TypeScript port it replaced.
  */
 import { type Address, address, getAddressEncoder } from '@solana/kit';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import {
     SYSTEM_PROGRAM,
     TOKEN_2022_PROGRAM,
@@ -12,15 +14,23 @@ import {
     WSOL_2022_MINT,
     WSOL_MINT,
 } from '../../../config/programs.ts';
-import {
-    ACCOUNT_TYPE_OFFSET,
-    ALLOWED_EXTENSIONS,
-    checkMintSafety,
-    MINT_LEN,
-    MULTISIG_LEN,
-    reasonCodes,
-    TLV_OFFSET,
-} from './mintSafety.ts';
+import { initMathSync, type MathModule } from '../../../math/load.ts';
+import { readRepoBytes } from '../../../test/repo.ts';
+import { checkMintSafety, extensionRejected, reasonCodes } from './mintSafety.ts';
+
+/** The mint layout (crates/shortwin-venue-state/src/mint.rs), for building fixtures. */
+const MINT_LEN = 82;
+const MULTISIG_LEN = 355;
+const ACCOUNT_TYPE_OFFSET = 165;
+const TLV_OFFSET = 166;
+
+let m: MathModule;
+let allowedTypes: readonly number[];
+
+beforeAll(() => {
+    m = initMathSync(readRepoBytes('packages/math-wasm/pkg/shortwin_math_wasm_bg.wasm'));
+    allowedTypes = [...m.allowedExtensions()];
+});
 
 const KEY = address('7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU');
 const AUTH = address('9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin');
@@ -55,7 +65,7 @@ function extended(entries: readonly (readonly [number, number])[], freeze = fals
 }
 
 const run = (owner: Address | null, data: number[] | null, key: Address = KEY) =>
-    checkMintSafety(key, owner, data === null ? null : new Uint8Array(data));
+    checkMintSafety(m, key, owner, data === null ? null : new Uint8Array(data));
 
 describe('checkMintSafety (the program’s rule, ARCH §3.2 check 1)', () => {
     it('passes plain SPL Token and Token-2022 mints and the pump.fun create_v2 shape', () => {
@@ -72,7 +82,7 @@ describe('checkMintSafety (the program’s rule, ARCH §3.2 check 1)', () => {
         expect(pump.extensions).toEqual([18, 19]);
         expect(pump.base?.decimals).toBe(6);
         expect(pump.base?.supply).toBe(1_000_000n);
-        const all = run(TOKEN_2022_PROGRAM, extended(ALLOWED_EXTENSIONS.map((t) => [t, 16] as const)));
+        const all = run(TOKEN_2022_PROGRAM, extended(allowedTypes.map((t) => [t, 16] as const)));
         expect(all.ok).toBe(true);
     });
 
@@ -121,7 +131,7 @@ describe('checkMintSafety (the program’s rule, ARCH §3.2 check 1)', () => {
         }
         for (let t = 1; t <= 64; t++) {
             const v = run(TOKEN_2022_PROGRAM, extended([[t, 8]]).slice(0, TLV_OFFSET + 12));
-            expect(v.ok, String(t)).toBe(ALLOWED_EXTENSIONS.includes(t));
+            expect(v.ok, String(t)).toBe(allowedTypes.includes(t));
         }
     });
 
@@ -135,6 +145,9 @@ describe('checkMintSafety (the program’s rule, ARCH §3.2 check 1)', () => {
             ]),
         );
         expect(v.reasons.map((r) => r.extension)).toEqual([12, 14, 1]);
+        expect(v.extensions).toEqual([12, 14, 1]);
+        expect([12, 14, 1].every((t) => extensionRejected(v, t))).toBe(true);
+        expect(allowedTypes).toEqual([18, 19, 20, 21, 22, 23]);
         expect(v.reasons.map((r) => r.detail).join(' ')).toMatch(/PermanentDelegate.*TransferHook.*TransferFeeConfig/);
         expect(reasonCodes(v)).toEqual(['MintDisallowedExtension']);
     });

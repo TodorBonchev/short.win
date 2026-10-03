@@ -35,7 +35,6 @@ import {
     cpmmReserves,
     cpmmSolIsToken0,
     type FeeTier,
-    lambdaBps,
     mockReserves,
     pammReserves,
     type RawAccount,
@@ -182,11 +181,6 @@ export interface ReadContext {
 
 const at = (read: readonly (RawAccount | null)[], i: number): RawAccount | null => read[i] ?? null;
 
-/** `pool_select::locked_depth`: `⌊λ_bps·isqrt(X·Y)/10⁴⌋` (the root by the facade's `liquidity`). */
-export function lockedDepth(m: MathModule, lpCounter: bigint, lpSupply: bigint, x: bigint, y: bigint): bigint {
-    return (BigInt(lambdaBps(lpCounter, lpSupply)) * m.liquidity(x, y)) / 10_000n;
-}
-
 function feesOf(f: { lp: number; protocol: number; creator: number; free(): void }): FeeBps {
     const out = { lp: f.lp, protocol: f.protocol, creator: f.creator };
     f.free();
@@ -320,7 +314,7 @@ function v4State(m: MathModule, market: MarketKeys, read: readonly (RawAccount |
         r: y,
         pricing: { type: 'rayV4', num: info.swapFeeNumerator, den: info.swapFeeDenominator },
         feePpm,
-        lockedDepth: lockedDepth(m, info.lpAmount, lp, x, y),
+        lockedDepth: m.lockedDepth(info.lpAmount, lp, x, y),
     };
 }
 
@@ -383,7 +377,7 @@ function cpmmState(m: MathModule, market: MarketKeys, read: readonly (RawAccount
             solIsToken0: sf,
         },
         feePpm,
-        lockedDepth: lockedDepth(m, pool.lpSupply, lp, x, y),
+        lockedDepth: m.lockedDepth(pool.lpSupply, lp, x, y),
     };
 }
 
@@ -556,7 +550,7 @@ function pammState(
     };
     const lpSupply = lpa.address === pool.lpMint ? lpMintSupply(lpa) : null;
     const depth =
-        lpSupply === null ? null : lockedDepth(m, pool.lpSupply, lpSupply, reserves.base, reserves.effectiveQuote);
+        lpSupply === null ? null : m.lockedDepth(pool.lpSupply, lpSupply, reserves.base, reserves.effectiveQuote);
     const executable =
         reserves.base > 0n &&
         reserves.effectiveQuote > 0n &&

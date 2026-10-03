@@ -3,7 +3,7 @@
 //! (`shortwin_math::{risk, bounds, caps, tier}`; ECON §3.3, §4, §6, §8; ARCH §3.6, §3.7,
 //! §4.5–§4.7).
 
-use shortwin_math::consts::PUMPSWAP_LOCK_MIN_BPS;
+use shortwin_math::consts::{P_OPEN_MAX, PUMPSWAP_LOCK_MIN_BPS};
 use shortwin_math::risk::{self as mrisk, ExpiryKeeperTerms, SettleKeeperTerms};
 use shortwin_math::tier::{self, OraclePrice, Tier, TierVenue};
 use shortwin_math::{MathError, bounds, caps};
@@ -59,6 +59,21 @@ pub fn margin_d4(
 #[wasm_bindgen(js_name = openFee)]
 pub fn open_fee(n_open: u64, open_fee_bps: u32) -> Result<u64, JsError> {
     Ok(mrisk::open_fee(n_open, open_fee_bps)?)
+}
+
+/// Open guard `|P_spot − P_ema|·10⁴ ≤ devBps·P_ema` (ECON §4 "Open guards"; ARCH §3.4 step
+/// 4): `P_spot` the live pre-trade spot, `P_ema` the post-roll EMA (WAD); `false` for a zero
+/// `P_ema` (no price: no open).
+#[wasm_bindgen(js_name = spotNearEma)]
+pub fn spot_near_ema(p_spot: u128, p_ema: u128, dev_bps: u32) -> bool {
+    caps::spot_near_ema(p_spot, p_ema, dev_bps)
+}
+
+/// `P_OPEN_MAX` (WAD, 1 SOL per raw unit; ECON §2.2): opens are refused while `P_ema` is
+/// above it (`PriceAboveOpenMax`).
+#[wasm_bindgen(js_name = pOpenMax)]
+pub fn p_open_max() -> u128 {
+    P_OPEN_MAX
 }
 
 /// The FV rate `p'` at one evaluated state: the penalty if `penalty_applies` (not expired,
@@ -466,6 +481,21 @@ mod tests {
             Some(1_010)
         );
         assert_eq!(v_eff(10, 11), 0);
+    }
+
+    #[test]
+    fn open_guards() {
+        let wad = 1_000_000_000_000_000_000u128;
+        // 20 % deviation at dev 2,000 bps passes on both sides; a wei more does not.
+        assert!(spot_near_ema(1_200_000_000_000_000_000, wad, 2_000));
+        assert!(spot_near_ema(800_000_000_000_000_000, wad, 2_000));
+        assert!(!spot_near_ema(1_200_000_000_000_000_001, wad, 2_000));
+        assert!(!spot_near_ema(799_999_999_999_999_999, wad, 2_000));
+        assert!(!spot_near_ema(wad, 0, 10_000));
+        // No overflow at the u128 edge (the product is compared without being formed).
+        assert!(spot_near_ema(u128::MAX, u128::MAX, 0));
+        assert!(!spot_near_ema(0, u128::MAX, 9_999));
+        assert_eq!(p_open_max(), 1_000_000_000_000_000_000_000_000_000);
     }
 
     #[test]

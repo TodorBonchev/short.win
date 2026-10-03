@@ -12,9 +12,9 @@
  * the results to the program itself (`vectors/program-vectors.json`: the test-venue build on
  * LiteSVM, every account dumped in the same second as the instruction).
  *
- * Four comparisons the facade does not export are written out here as the program states them:
- * the static open guards (flags and timers), `caps::spot_near_ema` (`|P_spot − P_ema|·10⁴ ≤
- * dev·P_ema`), `P_ema ≤ P_OPEN_MAX` and the boost gate. They gate, they do not price.
+ * The static open guards (flags and timers) and the boost gate, which the facade does not export,
+ * are written out here as the program states them; they gate, they do not price. The price guards
+ * are the facade's (`spotNearEma`, `pOpenMax`; FE-15).
  */
 import {
     type GlobalConfig,
@@ -50,8 +50,6 @@ import {
 
 export const WAD = 10n ** 18n;
 const U64_MAX = (1n << 64n) - 1n;
-/** `P_OPEN_MAX` (WAD; `shortwin_math::consts`): opens refuse above it. */
-export const P_OPEN_MAX = 10n ** 27n;
 /** FE-D6: the default margin / open-fee tolerance (+2 %). */
 export const MARGIN_TOLERANCE_BPS = 200n;
 /** FE-D6: the default open / close slippage (1 %), and its allowed range [0.1 %, 50 %]. */
@@ -216,13 +214,6 @@ export interface Blocked {
     readonly waitS?: bigint;
 }
 
-/** `caps::spot_near_ema`: `|P_spot − P_ema|·10⁴ ≤ dev·P_ema`; `false` without an EMA. */
-export function spotNearEma(pSpot: bigint, pEma: bigint, devBps: number): boolean {
-    if (pEma === 0n) return false;
-    const diff = pSpot > pEma ? pSpot - pEma : pEma - pSpot;
-    return diff * 10_000n <= BigInt(devBps) * pEma;
-}
-
 /**
  * The open guards of `open_short` steps 1, 3 and 4 (`engine::guard::open_static`, the latch, the
  * venue guards, the open guards), in the program's order: the first that refuses, else `null`.
@@ -277,8 +268,8 @@ export function openBlocked(math: MathModule, s: MarketSnapshot): Blocked | null
     const pEma = marketPrice(s).pEma;
     const pSpot = spotPrice(math, venue);
     if (pSpot === null) return { code: 'NoRoute' };
-    if (!spotNearEma(pSpot, pEma, p.openEmaDevBps)) return { code: 'PriceDeviatesFromEma' };
-    if (pEma > P_OPEN_MAX) return { code: 'PriceAboveOpenMax' };
+    if (!math.spotNearEma(pSpot, pEma, p.openEmaDevBps)) return { code: 'PriceDeviatesFromEma' };
+    if (pEma > math.pOpenMax()) return { code: 'PriceAboveOpenMax' };
     if (venue.pool && venue.pool.boostAmount > p.boostDustLamports && now < m.graduatedAt + BigInt(p.boostWindowS)) {
         return { code: 'BoostInProgress', waitS: m.graduatedAt + BigInt(p.boostWindowS) - now };
     }

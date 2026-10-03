@@ -1,9 +1,12 @@
 # shortwin-math-wasm
 
-wasm-bindgen facade over [`shortwin-math`](../shortwin-math) for the frontend
-(`packages/math-wasm`, ARCHITECTURE §1.2, §7.3). Every export converts its arguments,
-makes one `shortwin-math` call and converts the result, so the UI computes exactly what
-the program will; the frontend never re-implements protocol math.
+wasm-bindgen facade over [`shortwin-math`](../shortwin-math) (and the mint filter of
+[`shortwin-venue-state`](../shortwin-venue-state)) for the frontend (`packages/math-wasm`,
+ARCHITECTURE §1.2, §7.3). Every export converts its arguments, makes the `shortwin-math` calls
+the program's handler makes, in its order, and converts the result, so the UI computes exactly
+what the program will; the frontend never re-implements protocol math (FRONTEND.md FE-15: the
+open guards, pool selection, the mint verdict and a withdrawal's SOL part were TypeScript ports
+until M10).
 
 ## JS conventions
 
@@ -22,14 +25,16 @@ the program will; the frontend never re-implements protocol math.
 | Fees | `Fees` (`onewayPpm`, `onewayBps`, `capped`), `CurveSchedule`, `PammSchedule` (`addTier`, `resolve`) | `fees::{pump_curve, pump_amm, ray_v4, cpmm, exceeds_cap}` |
 | States | `reprice` (`isqrt⁺(P)`, `X` floor, `Y` ceil; `undefined` when `X = 0`), `CurveState.reprice`, `CurveState.migratedPool`, `liquidity` (throws `overflow` if `X·Y ≥ 2¹²⁸`), `priceWad`, `Reserves` | `quote::{reprice, curve_reprice, migrated_pool, liquidity}`, `risk::price_wad` |
 | CR and liquidation | `vEff`, `crBps`, `crBelow`, `Venue.liquidationPrice`, `sigma`, `sigmaXy` | `risk` |
-| Opening | `marginD4`, `openFee` | `risk::{margin_d4, open_fee}` |
+| Opening | `marginD4`, `openFee`; the open guards `spotNearEma(pSpot, pEma, devBps)` and `pOpenMax()` (`P_ema > P_OPEN_MAX` refuses) | `risk::{margin_d4, open_fee}`, `caps::spot_near_ema`, `consts::P_OPEN_MAX` |
+| Pool selection | `lambdaBps(lpCounter, lpSupply)` (λ), `lockedDepth(lpCounter, lpSupply, x, y)` (`D`), `lockedSol(D, P)`, `lockedFloorOk(D, pRef, λ_min, poolMinRealSol)` (the listing floor) | `pool_select::{lambda_bps, locked_depth, locked_floor_ok}`, `tier::locked_sol` |
 | Exit bounds | `maxInLiq` (no reserve), `maxInExp` (rent and fee senior), `piRef` | `bounds::{max_in_liq, max_in_exp, pi_ref}` |
 | Settlement | `OracleState` (`push` ring entries, `settleBox(now, executable)`, `ringMedians`, `sustainedGrowth`), `SettleBox` (`pLo`, `pHi`, `lLo`, `lHi`, `isPoint`, `contains`), `ringLen`, `pprime`, `amountOk`, `fairValue`, `fvRateBps`, `settleKeeperReward`, `expiryKeeperReward` | `settle::{box_of, pprime, amount_ok}`, `observe::{ring_medians, sustained_growth}`, `risk` |
 | Rent | `utilizationBps`, `rateBps` (display: each slope term floored), `minRent`, `RentBasis` (`accrue` preview, `P_ACC_MAX` clamp), `PositionRent` (with its `rent_protocol_bps`; `accrued`, `due`) | `rent` |
 | Waterfall previews | `previewClose`, `previewLiquidation` (keeper floor at `K_s`), `previewExpiry`, `previewSettlement` (vesting lump) → `Payout` (`keeperTopup`, `lump`) | `waterfall` |
 | Caps | `maxQPosition`, `maxTotalQ`, `feeSizeCap`, `feeOiCap`, `oiCap` (φ in ppm), `utilOk`, `curveGammaOk`, `curveGammaMaxQ`, `walletOk`, `notionalOk`, `conservativeX0(venue, xNow, lSlow, pEma, lockedDepth, poolLockMinBps)` (venue codes as `TierInputs`; PumpSwap sizes on `D` itself, `λ_min` = `pumpswapLockMinBps()` = 10,000 whatever `poolLockMinBps` is — OWNER-M6D-1, ECON #106 — Raydium on `D/λ_min`) | `caps`, `consts::PUMPSWAP_LOCK_MIN_BPS` |
 | Tiers | `TierInputs` (`tier`, `liquidityLamports`; `lambdaMinBps` is the config's `pool_lock_min_bps`, read on Raydium only — PumpSwap's bound is its burned LP's real SOL, OWNER-M6D-1), `tierParams`, `TierParams` | `tier` |
-| Lender previews | `PoolState` (Market lender-pool group and `MarketVault`: pot `unmatched`, `protocolFees`, vest `vestBal`/`vestLast`/`vestEnd`, `maxRelease`, `wipeSwept`, `calDay`, `setLockBucket`), `LenderState` (`lockUntil`), `ShareEpochs`; `sharesForTokens`, `tokensForShares`, `previewTouch`, `previewAllowance`, `previewLock`, `previewLockedTotal`, `previewLockUntil`, `previewVestRelease`, `previewTokenValue`, `previewWithdraw` (`lockGraceS`), `previewDeposit` (`rewardsRequired`; throws `post-wipe sweep pending`), `previewClaim` (pot draw); every preview takes `now` | `pool` (on copies) |
+| Lender previews | `PoolState` (Market lender-pool group and `MarketVault`: pot `unmatched`, `protocolFees`, vest `vestBal`/`vestLast`/`vestEnd`, `maxRelease`, `wipeSwept`, `calDay`, `setLockBucket`), `LenderState` (`lockUntil`), `ShareEpochs`; `sharesForTokens`, `tokensForShares`, `previewTouch`, `previewAllowance`, `previewLock`, `previewLockedTotal`, `previewLockUntil`, `previewVestRelease`, `previewTokenValue`, `previewWithdraw` (`lockGraceS`; tokens), `previewWithdrawal` → `Withdrawal` (`tokens`, `sol` — `claim` right after, the last lender's vest flush included —, `lastSharesBorrowed`, the `lender` after: `lock`, `lockUntil`), `previewDeposit` (`rewardsRequired`; throws `post-wipe sweep pending`), `previewClaim` (pot draw); every preview takes `now` | `pool` (on copies) |
+| Mint filter | `mintCheck(key, owner, data)` → `MintVerdict` (`ok`; `codes`: every failing rule as its program error, the first being `create_market`'s; `extensions`: the rejected type per reason, −1 otherwise; `types`: the TLV types in order; the base fields), `isAllowedExtension`, `allowedExtensions` | `shortwin_venue_state::mint::{check, read_base}` (each further reason is `check` again with the previous rule lifted on a copy) |
 | Parameters | `ParamSet` (`get`, `set` by ECON §15 name and tier 0–3, `validate` (what the program refuses: the sim's rules, then the bounds of the parameters the sim does not model, `validate_econ`), `validateSim` (= `shortwin_sim.validate_params`), `violations`) | `params::{ParamSet, check, validate, validate_econ}` |
 
 The keeper-side state machines (`observe::{record, integrate}`, `persist`, `settle::evaluate`

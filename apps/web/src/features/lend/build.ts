@@ -168,7 +168,7 @@ export async function withdrawPlanFrom(
         signer: env.signer,
         vault: chain.vaultAddress,
         solAtLeast: view.value.solAtLeast,
-        vestOnLastExit: view.value.lastLenderExit ? chain.market.vestBal : 0n,
+        vestOnLastExit: view.value.lastLenderExit ? view.value.unreleased : 0n,
         toleranceBps: inp.toleranceBps,
     });
     const minSol = quote.ok ? quote.lamports : view.value.solAtLeast;

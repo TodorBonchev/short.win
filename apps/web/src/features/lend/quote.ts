@@ -6,8 +6,8 @@
  *   is paid the unreleased vest (R3B-2). The exact payout is what a simulation of the same
  *   withdrawal with `min_sol = 0` takes out of `MarketVault`; the plan the user signs carries it
  *   as `min_sol`, so a front-run that would cut it (a dust deposit making the exit "not last")
- *   reverts `SolBelowMin` instead. If that quote cannot be had, the WASM lower bound is used — plus
- *   the vest, less the deposit tolerance, on a last exit.
+ *   reverts `SolBelowMin` instead. If that quote cannot be had, the WASM preview is used (its
+ *   lower bound, a last exit's vest flush included), less the tolerance on that vest.
  * - **The pot for a claim**: other lenders whose touch moves realised SOL beyond their entitlement
  *   to the pot (R3A-2), judged with `previewTouch` on their on-chain state; `sync_lender(0)` of the
  *   best ≤ 4 runs before `claim_sol`.
@@ -29,7 +29,8 @@ export type SolQuote =
 
 /**
  * `min_sol` for a withdrawal: the simulated payout of `plan` (built with `min_sol = 0`), else the
- * preview's lower bound. `vestOnLastExit` is the unreleased vest a last lender's full exit is paid.
+ * preview's lower bound `solAtLeast` (`previewWithdrawal`), which includes `vestOnLastExit`, the
+ * unreleased vest a last lender's full exit is paid; the tolerance is taken off that vest.
  */
 export async function quoteWithdrawSol(a: {
     readonly rpc: AppRpc;
@@ -56,11 +57,8 @@ export async function quoteWithdrawSol(a: {
     } catch {
         // fall through to the preview's bound
     }
-    return {
-        ok: true,
-        lamports: a.solAtLeast + (a.vestOnLastExit > 0n ? lessBps(a.vestOnLastExit, a.toleranceBps) : 0n),
-        source: 'preview',
-    };
+    const cut = a.vestOnLastExit - lessBps(a.vestOnLastExit, a.toleranceBps);
+    return { ok: true, lamports: a.solAtLeast > cut ? a.solAtLeast - cut : 0n, source: 'preview' };
 }
 
 export interface SyncPick {

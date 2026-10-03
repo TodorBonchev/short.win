@@ -5,8 +5,9 @@
  * pool judged as `create_market(venue_hint = Raydium…)` would: `raydium_v4::verify` /
  * `raydium_cpmm::verify` (owner, length, status, nonce, the SOL and token sides, vaults, config,
  * LP mint), the venue predicate, and `eligible()` at the candidate's own spot (a new market has no
- * price): the fee gate and the locked-depth floor (`pool_select::locked_floor_ok`, M4-SEC-1 / -3),
- * plus the venue-upgrade latch of a listing (M3-SEC-2).
+ * price): the fee gate and the locked-depth floor (the facade's `lockedFloorOk` =
+ * `pool_select::locked_floor_ok`, M4-SEC-1 / -3; λ by its `lambdaBps`), plus the venue-upgrade
+ * latch of a listing (M3-SEC-2).
  *
  * The pure part (`judgeCandidate`) takes the accounts as read, so it is tested on the dumped
  * Raydium fixtures.
@@ -31,7 +32,6 @@ import {
     AMM_V4_LEN,
     CPMM_POOL_LEN,
     cpmmSolIsToken0,
-    lambdaBps,
     type RawAccount,
     readAmmInfo,
     readCpmmConfig,
@@ -48,23 +48,6 @@ export interface EligibilityParams {
     readonly venueFeeCapBps: number;
     readonly poolMinRealSol: bigint;
     readonly poolLockMinBps: number;
-}
-
-/** `tier::locked_sol`: `⌊D·isqrt(P)/10⁹⌋` (the root by the facade's `liquidity(P, 1)`). */
-export function lockedSol(m: MathModule, depth: bigint, p: bigint): bigint {
-    return (depth * m.liquidity(p, 1n)) / 1_000_000_000n;
-}
-
-/** `pool_select::locked_floor_ok`: `pool_min_real_sol·λ_min ≤ locked_sol·10⁴`; false for `λ_min = 0`. */
-export function lockedFloorOk(
-    m: MathModule,
-    depth: bigint,
-    pRef: bigint,
-    lambdaMinBps: number,
-    minRealSol: bigint,
-): boolean {
-    if (lambdaMinBps === 0) return false;
-    return minRealSol * BigInt(lambdaMinBps) <= lockedSol(m, depth, pRef) * 10_000n;
 }
 
 /** The candidate's ReadSet keys from its pool account (the adapter's order). */
@@ -101,7 +84,7 @@ export function judgeCandidate(
     const reasons: string[] = [];
     const out = (s: Partial<{ state: VenueState | null; solFirst: boolean }> = NO_ADOPTION) => {
         const st = s.state ?? null;
-        const lam = lambdaOf(kind, read);
+        const lam = lambdaOf(m, kind, read);
         return {
             pool: (pool?.address ?? '') as Address,
             kind,
@@ -129,13 +112,13 @@ export function judgeCandidate(
     if (m.exceedsCap(state.feePpm, params.venueFeeCapBps)) reasons.push('PoolIneligible');
     const pRef = spotPrice(m, state);
     if (pRef === null) reasons.push('PoolIneligible');
-    else if (!lockedFloorOk(m, state.lockedDepth, pRef, params.poolLockMinBps, params.poolMinRealSol)) {
+    else if (!m.lockedFloorOk(state.lockedDepth, pRef, params.poolLockMinBps, params.poolMinRealSol)) {
         reasons.push('PoolTooThin');
     }
     return out({ state });
 }
 
-function lambdaOf(kind: PoolCandidate['kind'], read: readonly (RawAccount | null)[]): number {
+function lambdaOf(m: MathModule, kind: PoolCandidate['kind'], read: readonly (RawAccount | null)[]): number {
     const pool = read[0];
     const lp = read[kind === 'raydium_v4' ? 3 : 4];
     if (!pool || !lp) return 0;
@@ -145,7 +128,7 @@ function lambdaOf(kind: PoolCandidate['kind'], read: readonly (RawAccount | null
         kind === 'raydium_v4'
             ? value(readAmmInfo(pool.owner, pool.data))?.lpAmount
             : value(readCpmmPool(pool.owner, pool.data))?.lpSupply;
-    return counter === undefined ? 0 : lambdaBps(counter, supply);
+    return counter === undefined ? 0 : m.lambdaBps(counter, supply);
 }
 
 /** A market as the listing would write it for this candidate (the pool cache, the SOL side). */

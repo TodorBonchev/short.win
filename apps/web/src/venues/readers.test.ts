@@ -5,6 +5,8 @@
  */
 import type { Address } from '@solana/kit';
 import { describe, expect, it } from 'vitest';
+import { initMathSync } from '../math/load.ts';
+import { readRepoBytes } from '../test/repo.ts';
 import { PUMP_PROGRAM, TOKEN_2022_PROGRAM, TOKEN_PROGRAM } from './constants.ts';
 import {
     ata,
@@ -18,7 +20,6 @@ import {
     wsolAta,
 } from './pda.ts';
 import {
-    lambdaBps,
     pammReserves,
     readAmmInfo,
     readCpmmConfig,
@@ -239,14 +240,15 @@ describe('Raydium', () => {
         });
     }
 
-    it('the locked LP share λ of the Fartcoin pool (pool_select tests: 9,978 bps)', () => {
+    it('the locked LP share λ of the Fartcoin pool (pool_select tests: 9,978 bps; the facade’s lambdaBps)', () => {
+        const m = initMathSync(readRepoBytes('packages/math-wasm/pkg/shortwin_math_wasm_bg.wasm'));
         const i = value(readAmmInfo(acc('ray_v4_fartcoin_pool').owner, acc('ray_v4_fartcoin_pool').data));
         if (!i) throw new Error('pool');
         const lp = value(readMintBase(TOKEN_PROGRAM, acc('ray_v4_fartcoin_lp_mint').data));
-        expect(lambdaBps(i.lpAmount, lp?.supply ?? 0n)).toBe(9_978);
+        expect(m.lambdaBps(i.lpAmount, lp?.supply ?? 0n)).toBe(9_978);
         expect(v4SolIsCoin(i)).toBe(true);
-        expect(lambdaBps(0n, 0n)).toBe(0);
-        expect(lambdaBps(5n, 7n)).toBe(0);
+        expect(m.lambdaBps(0n, 0n)).toBe(0);
+        expect(m.lambdaBps(5n, 7n)).toBe(0);
     });
 
     for (const role of ['useless', 'creator_fee', 'token2022', 'wsol_token1', 'creator_both']) {

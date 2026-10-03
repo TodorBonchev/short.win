@@ -1,9 +1,9 @@
 /**
  * The lend previews against pool_model.py v0.4.1 (FRONTEND.md §10.1, LEND): the account-shaped
  * states of `vectors/lend_vectors.json` go through the panel's own conversion (`previews.ts`) into
- * `@shortwin/math-wasm`, which must return exactly the model's deposits, withdrawals (tokens, and
- * the SOL part as a lower bound that is exact when nothing vests), claims, allowances, touches,
- * token values, locks, lock ends and vest releases.
+ * `@shortwin/math-wasm`, which must return exactly the model's deposits, withdrawals (tokens and
+ * the SOL part, `previewWithdrawal`), claims, allowances, touches, token values, locks, lock ends
+ * and vest releases.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { initMathSync, type MathModule } from '../../math/load.ts';
@@ -71,13 +71,11 @@ describe('pool_model vectors through the WASM facade', () => {
         expect(n).toBeGreaterThan(50);
     });
 
-    it('withdrawals pay the model’s tokens; the SOL preview is a lower bound, exact when nothing vests', () => {
+    it('withdrawals pay the model’s tokens and SOL (previewWithdrawal: claim right after, vest flush included)', () => {
         let n = 0;
-        let exact = 0;
         for (const c of cases) {
             const now = BigInt(c.now);
             const pool = toPoolState(m, stateOf(c, null).market, stateOf(c, null).vault);
-            const release = m.previewVestRelease(pool, now);
             const total = pool.totalShares;
             const vestBal = pool.vestBal;
             pool.free();
@@ -92,20 +90,15 @@ describe('pool_model vectors through the WASM facade', () => {
                     expect(r.ok, label).toBe(true);
                     if (!r.ok) continue;
                     expect(r.value.tokens.toString(), label).toBe(e.result.tokens);
-                    const sol = BigInt(e.result.sol);
-                    expect(r.value.solAtLeast <= sol, label).toBe(true);
+                    // FE-15: the facade's whole withdrawal (`claim` right after the burn): the model's `sol`.
+                    expect(r.value.solAtLeast, label).toBe(BigInt(e.result.sol));
                     const flush = BigInt(e.shares) === total && vestBal > 0n;
                     expect(r.value.lastLenderExit, label).toBe(flush);
-                    if (release === 0n && !flush) {
-                        expect(r.value.solAtLeast, label).toBe(sol);
-                        exact++;
-                    }
                 }
                 n++;
             }
         }
         expect(n).toBeGreaterThan(50);
-        expect(exact).toBeGreaterThan(10);
     });
 
     it('claims, allowances, touches, token values and locks equal the model', () => {
@@ -275,6 +268,20 @@ describe('lend previews on simple pools', () => {
         expect(w.value.unreleased).toBe(500_000_000n);
         expect(w.value.vesting).toBe(250_000_000n);
         expect(w.value.vestingForfeit).toBe(proRata(500_000_000n, lim.value.maxShares, 1_000_000n));
+        // FE-15: the lock the withdrawal leaves (`previewWithdrawal`'s lender). Burning the whole
+        // allowance while half the tokens are borrowed locks every share left, until the new end.
+        expect(w.value.lockAfter).toBe(500_000n - lim.value.maxShares);
+        expect(w.value.lockUntilAfter).toBe(lim.value.lockUntilIfLocked);
+        // Half of it locks ⌈x·(u − b)/b⌉ of the rest (x burnt, u unlocked, b the allowance in shares).
+        const x = lim.value.maxShares / 2n;
+        const half = previewWithdrawView(m, s, 10_800n, 86_400, x, 50);
+        expect(half.ok).toBe(true);
+        if (!half.ok) return;
+        const b = lim.value.maxShares;
+        const add = (x * (500_000n - b) + b - 1n) / b;
+        expect(half.value.lockAfter).toBe(add < 500_000n - x ? add : 500_000n - x);
+        expect(half.value.lockAfter > 0n && half.value.lockAfter < 500_000n - x).toBe(true);
+        expect(half.value.lockUntilAfter).toBe(lim.value.lockUntilIfLocked);
         const over = previewWithdrawView(m, s, 10_800n, 86_400, 500_000n, 50);
         expect(!over.ok && over.refusal.name).toBe('AboveProRataAllowance');
     });
@@ -291,6 +298,16 @@ describe('lend previews on simple pools', () => {
         const w = previewWithdrawView(m, s, 0n, 86_400, 1_000_000n, 50);
         expect(w.ok && w.value.lastLenderExit).toBe(true);
         expect(w.ok && w.value.vestingForfeit).toBe(0n);
+        // Nothing is borrowed: no lock afterwards, and no end to show.
+        expect(w.ok && [w.value.lockAfter, w.value.lockUntilAfter]).toEqual([0n, 0n]);
+        // FE-15: the SOL preview is the facade's withdrawal (claim right after the burn), the flush
+        // included — what the app composed by hand until M10 (previewClaim + the vest).
+        const before = previewClaimView(m, s, 0n);
+        expect(before.ok && before.value.claimable).toBe(0n);
+        expect(w.ok && w.value.solAtLeast).toBe(600n);
+        // A partial exit is no flush: the vest stays with the shares.
+        const part = previewWithdrawView(m, s, 0n, 86_400, 999_999n, 50);
+        expect(part.ok && [part.value.lastLenderExit, part.value.solAtLeast]).toEqual([false, 0n]);
     });
 
     it('refuses a withdrawal with a negative balance (cover the deficit first)', () => {

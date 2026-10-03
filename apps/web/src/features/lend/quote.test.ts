@@ -62,20 +62,27 @@ describe('quoteWithdrawSol', () => {
         );
     });
 
-    it('falls back to the preview’s lower bound, plus the vest less the tolerance on a last exit', async () => {
+    it('falls back to the preview’s lower bound (vest included), less the tolerance on a last exit’s vest', async () => {
         const failing = (async () => ({ report: report({ ok: false }), lifetime: null })) as unknown as Simulate;
         const throwing = (async () => {
             throw new Error('rpc down');
         }) as unknown as Simulate;
-        const args = { rpc, plan, signer, vault: VAULT, solAtLeast: 100n, toleranceBps: 50 };
-        expect(await quoteWithdrawSol({ ...args, vestOnLastExit: 0n, simulate: failing })).toEqual({
+        const args = { rpc, plan, signer, vault: VAULT, toleranceBps: 50 };
+        expect(await quoteWithdrawSol({ ...args, solAtLeast: 100n, vestOnLastExit: 0n, simulate: failing })).toEqual({
             ok: true,
             lamports: 100n,
             source: 'preview',
         });
-        expect(await quoteWithdrawSol({ ...args, vestOnLastExit: 1_000_000n, simulate: throwing })).toEqual({
+        const last = { ...args, solAtLeast: 1_000_100n, vestOnLastExit: 1_000_000n, simulate: throwing };
+        expect(await quoteWithdrawSol(last)).toEqual({
             ok: true,
             lamports: 100n + lessBps(1_000_000n, 50),
+            source: 'preview',
+        });
+        // Never below zero, whatever the preview says.
+        expect(await quoteWithdrawSol({ ...last, solAtLeast: 1n })).toEqual({
+            ok: true,
+            lamports: 0n,
             source: 'preview',
         });
     });

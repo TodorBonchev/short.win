@@ -1,10 +1,11 @@
 /**
  * Lend → Withdraw (FRONTEND.md §3.6): shares (or a share of the holding; Max = the pro-rata
- * allowance), the preview (tokens, SOL, allowance, the lock and when a new lock would end, the
- * vest the withdrawal gives up), the destination account (the ATA, created idempotently when
- * missing; a memo-required destination gets `memo_program`), `lender.exitForfeitsVest` with its
- * checkbox, and the review with `min_tokens` (the tolerance below the quote) and `min_sol` (the
- * quoted SOL part, vest included: `quote.ts`).
+ * allowance), the preview (tokens, SOL, allowance, the lock now, the lock the withdrawal leaves
+ * and until when (`previewWithdrawal`), when a new lock would end, the vest the withdrawal gives
+ * up), the destination account (the ATA, created idempotently when missing; a memo-required
+ * destination gets `memo_program`), `lender.exitForfeitsVest` with its checkbox, and the review
+ * with `min_tokens` (the tolerance below the quote) and `min_sol` (the quoted SOL part, vest
+ * included: `quote.ts`).
  */
 import type { Address } from '@solana/kit';
 import { useEffect, useState } from 'react';
@@ -117,7 +118,7 @@ export function WithdrawForm({ ctx, onCoverDeficit }: { ctx: LendCtx; onCoverDef
         );
     }
     const lim = limits.ok ? limits.value : null;
-    const solShown = view?.ok ? view.value.solAtLeast + (view.value.lastLenderExit ? chain.market.vestBal : 0n) : null;
+    const solShown = view?.ok ? view.value.solAtLeast : null;
 
     return (
         <div className="stack lend-form">
@@ -218,6 +219,24 @@ export function WithdrawForm({ ctx, onCoverDeficit }: { ctx: LendCtx; onCoverDef
                     ...(lim && lim.lock > 0n
                         ? ([['Current lock ends', <span key="cur">{formatUtc(lim.lockUntil)}</span>]] as const)
                         : []),
+                    [
+                        'Locked shares after',
+                        view?.ok ? (
+                            <span
+                                key="after"
+                                className="num"
+                                data-testid={T.withdrawPreview('lock-after')}
+                                data-value={view.value.lockAfter.toString()}
+                                data-until={view.value.lockUntilAfter.toString()}
+                            >
+                                {view.value.lockAfter > 0n
+                                    ? `${formatTokens(view.value.lockAfter, decimals)} until ${formatUtc(view.value.lockUntilAfter)}`
+                                    : 'none'}
+                            </span>
+                        ) : (
+                            '—'
+                        ),
+                    ],
                     [
                         'A new lock would end',
                         lim ? (

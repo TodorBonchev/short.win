@@ -127,6 +127,14 @@ lender.shares = 1_000_000_000_000n; lender.pending = -1n;
 assert.throws(() => m.previewWithdraw(pool, lender, none, now, 86_400, 1n), /negative pending/);
 lender.pending = 0n;
 assert.equal(m.previewAllowance(pool, lender, none, now), 1_000_000_000n);
+// The whole withdrawal: tokens, then the SOL part as claim_sol right after; the program's
+// last-shares check while tokens are lent (M1-SEC-3) is a flag, not a throw.
+const w = m.previewWithdrawal(pool, lender, none, now, 86_400, 1_000_000_000_000n);
+assert.equal(w.tokens, 1_000_000_000n);
+assert.equal(w.sol, 0n);
+assert.equal(w.lastSharesBorrowed, false);
+assert.equal(w.lender.shares, 0n);
+assert.throws(() => m.previewWithdrawal(pool, lender, none, now, 86_400, 2_000_000_000_000n), /insufficient shares/);
 // A live wipe record waits for its post-wipe sweep before the next deposit (R4A-7).
 const wiped = new m.PoolState();
 wiped.wipeLive = true; wiped.wipeSwept = 0; // Market.flags bits 7, 8 cleared at the full wipe
@@ -169,4 +177,34 @@ pst.lambdaMinBps = 5_000;
 assert.equal(pst.liquidityLamports(), 4_000_000_000_000n);
 pst.venue = 2;
 assert.equal(pst.liquidityLamports(), 8_000_000_000_000n);
+// FE-15 (M10): the open guards, pool selection and the mint filter.
+assert.equal(m.spotNearEma(12n * WAD / 10n, WAD, 2_000), true);
+assert.equal(m.spotNearEma(12n * WAD / 10n + 1n, WAD, 2_000), false);
+assert.equal(m.spotNearEma(WAD, 0n, 10_000), false);
+assert.equal(m.pOpenMax(), 10n ** 27n);
+assert.equal(m.lambdaBps(10_000n, 22n), 9_978);
+assert.equal(m.lockedDepth(10_000n, 22n, 1_000_000n, 1_000_000n), 997_800n);
+assert.equal(m.lockedSol(10_000_000_000_000n, WAD), 10_000_000_000_000n);
+assert.equal(m.lockedFloorOk(12_500_000_000n, WAD, 5_000, 25_000_000_000n), true);
+assert.equal(m.lockedFloorOk(12_499_999_999n, WAD, 5_000, 25_000_000_000n), false);
+const TOKEN = Uint8Array.from([
+    6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121, 172, 28, 180, 133, 237, 95, 91, 55, 145,
+    58, 140, 245, 133, 126, 255, 0, 169,
+]);
+const mintBytes = new Uint8Array(82);
+mintBytes[45] = 1;
+mintBytes[46] = 1; // a freeze authority
+mintBytes[44] = 6;
+const verdict = m.mintCheck(new Uint8Array(32).fill(7), TOKEN, mintBytes);
+assert.equal(verdict.ok, false);
+assert.deepEqual(verdict.codes, ["MintFreezeAuthority"]);
+assert.deepEqual([...verdict.extensions], [-1]);
+assert.equal(verdict.decimals, 6);
+assert.equal(verdict.freezeAuthority.length, 32);
+assert.equal(verdict.mintAuthority, undefined);
+assert.deepEqual(m.mintCheck(new Uint8Array(32).fill(7), new Uint8Array(32), new Uint8Array(0)).codes, [
+    "MintUnsupportedProgram",
+]);
+assert.throws(() => m.mintCheck(new Uint8Array(31), TOKEN, mintBytes), /invalid input/);
+assert.deepEqual([...m.allowedExtensions()], [18, 19, 20, 21, 22, 23]);
 console.log("facade smoke test: ok");

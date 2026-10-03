@@ -134,7 +134,9 @@ export const T = {
     lendCpiGuardBracket: 'lend-cpi-guard-bracket',
     withdrawSharesInput: 'withdraw-shares-input',
     withdrawMax: 'withdraw-max',
-    withdrawPreview: p<'tokens' | 'sol' | 'allowance' | 'lock' | 'lock-until' | 'vesting-forfeit'>('withdraw-preview'),
+    withdrawPreview: p<'tokens' | 'sol' | 'allowance' | 'lock' | 'lock-after' | 'lock-until' | 'vesting-forfeit'>(
+        'withdraw-preview',
+    ),
     withdrawMemoNotice: 'withdraw-memo-notice',
     withdrawSubmit: 'withdraw-submit',
     claimValue: p<'claimable' | 'vesting' | 'pot' | 'deficit'>('claim-value'),

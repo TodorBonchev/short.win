@@ -568,12 +568,6 @@ export function cpmmAgeStart(p: CpmmPool, now: bigint): bigint {
     return p.openTime < T_CLAMP ? now : p.openTime < now ? p.openTime : now;
 }
 
-/** `locked_lp_bps` / `pool_select::lambda_bps`: `⌊(counter − supply)·10⁴/counter⌋`, 0 when unlocked. */
-export function lambdaBps(lpCounter: bigint, lpSupply: bigint): number {
-    if (lpCounter === 0n || lpSupply > lpCounter) return 0;
-    return Number(((lpCounter - lpSupply) * 10_000n) / lpCounter);
-}
-
 // ---- mock (mock_cpamm.rs, TEST-ONLY) -------------------------------------------------------------
 
 export const MOCK_POOL_DISCRIMINATOR = [0x3a, 0xc4, 0xd0, 0xf1, 0x1f, 0xd8, 0xf3, 0x30];

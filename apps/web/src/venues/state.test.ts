@@ -17,7 +17,6 @@ import {
     afterSale,
     capFeePpm,
     liquidityOf,
-    lockedDepth,
     quoteBuy,
     quoteBuyAt,
     quoteSell,
@@ -186,7 +185,7 @@ describe('PumpSwap', () => {
             expect(s.pool?.isCashback).toBe(p.is_cashback_coin === 1);
             expect(s.feePpm).toBeGreaterThan(0);
             const lp = big(dec(`pamm_${role}_lp_mint`).supply);
-            expect(s.lockedDepth).toBe(lockedDepth(m, big(p.lp_supply), lp, base, quote + vqr));
+            expect(s.lockedDepth).toBe(m.lockedDepth(big(p.lp_supply), lp, base, quote + vqr));
             const q = base / 1_000n;
             const sale = quoteSell(m, s, q);
             const buy = quoteBuy(m, s, q);

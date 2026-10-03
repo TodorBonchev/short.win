@@ -19,7 +19,6 @@ import {
     previewAddMargin,
     previewCloseFor,
     previewOpen,
-    spotNearEma,
     withTolerance,
 } from './previews.ts';
 import { type AccountSource, type ChainSnapshot, decodePosition, exposureQ } from './snapshot.ts';
@@ -87,7 +86,9 @@ describe('the open preview equals open_short', () => {
                 // A liquidation price above the spot exists for a healthy open.
                 const spot = big(e.spotWad);
                 expect(preview.liqPriceWad !== null && preview.liqPriceWad > spot).toBe(true);
-                expect(spotNearEma(spot, podU128ToBigInt(s.market.emaPrice), s.config.params.openEmaDevBps)).toBe(true);
+                expect(math.spotNearEma(spot, podU128ToBigInt(s.market.emaPrice), s.config.params.openEmaDevBps)).toBe(
+                    true,
+                );
             } else {
                 const want = errName(c.result.code);
                 const got = blocked?.code ?? preview?.refusal ?? null;

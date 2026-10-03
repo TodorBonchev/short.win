@@ -8,7 +8,7 @@
 import type { Address } from '@solana/kit';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { qk } from '../../api/keys.ts';
 import type { VenueName } from '../../api/types.ts';
 import { AddressText } from '../../components/Address.tsx';
@@ -24,6 +24,7 @@ import { PROGRAM_ERRORS, type ProgramErrorInfo } from '../../config/errors.ts';
 import { T } from '../../config/testids.ts';
 import { parseAddress } from '../../lib/address.ts';
 import { formatBps, formatFixed, formatSol, shortAddress } from '../../lib/format.ts';
+import { useMath } from '../../math/useMath.ts';
 import { useAppClient } from '../../rpc/context.tsx';
 import { TxReviewModal } from '../../tx/TxReviewModal.tsx';
 import { useTxFlow } from '../../tx/useTxFlow.ts';
@@ -38,9 +39,9 @@ import {
     listingVenue,
 } from './create/createPlan.ts';
 import {
-    ALLOWED_EXTENSIONS,
     checkMintSafety,
     extensionName,
+    extensionRejected,
     type MintVerdict,
     reasonCodes,
 } from './create/mintSafety.ts';
@@ -115,8 +116,8 @@ function MintInfo({ v }: { v: MintVerdict }) {
                         ) : (
                             <span key="r99" className="mk-ext-list">
                                 {v.extensions.map((t) => (
-                                    <Badge key={t} tone={ALLOWED_EXTENSIONS.includes(t) ? 'ok' : 'danger'}>
-                                        {ALLOWED_EXTENSIONS.includes(t) ? '✓ ' : '✕ '}
+                                    <Badge key={t} tone={extensionRejected(v, t) ? 'danger' : 'ok'}>
+                                        {extensionRejected(v, t) ? '✕ ' : '✓ '}
                                         {extensionName(t)}
                                     </Badge>
                                 ))}
@@ -323,10 +324,14 @@ export function CreateMarketPage() {
 
     const account = useRawAccount(mint);
     const existing = useChainMarket(mint);
-    const verdict: MintVerdict | null =
-        mint && account.isSuccess
-            ? checkMintSafety(mint, account.data?.owner ?? null, account.data?.data ?? null)
-            : null;
+    const { math, error: mathError } = useMath();
+    const verdict: MintVerdict | null = useMemo(
+        () =>
+            math && mint && account.isSuccess
+                ? checkMintSafety(math, mint, account.data?.owner ?? null, account.data?.data ?? null)
+                : null,
+        [math, mint, account.isSuccess, account.data],
+    );
     const state: VerdictState | null = !mint
         ? null
         : existing.data?.exists
@@ -473,6 +478,9 @@ export function CreateMarketPage() {
                                             void existing.refetch();
                                         }}
                                     />
+                                ) : mathError && !math && state === 'checking' ? (
+                                    // The verdict is the WASM facade's (`mintCheck`, FE-15): no module, no verdict.
+                                    <ErrorState error={mathError} />
                                 ) : (
                                     <Verdict state={state} verdict={verdict} mint={mint} />
                                 ))}

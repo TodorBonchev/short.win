@@ -23,9 +23,10 @@ wasm-bindgen CLI at the crate's exact pin, **0.2.129**, from `$WASM_BINDGEN`, `P
 cargo install wasm-bindgen-cli --version =0.2.129 --locked
 ```
 
-`pkg/.inputs-sha256` records a SHA-256 of both crates' sources and manifests and the root
-`Cargo.lock`; a matching stamp skips the build, so `pnpm --filter web build` needs neither
-cargo nor wasm-bindgen once `pkg/` is current.
+`pkg/.inputs-sha256` records a SHA-256 of the three crates' sources and manifests
+(`shortwin-math`, `shortwin-venue-state`, `shortwin-math-wasm`) and the root `Cargo.lock`; a
+matching stamp skips the build, so `pnpm --filter web build` needs neither cargo nor
+wasm-bindgen once `pkg/` is current.
 
 `--target web` output: the app calls the default export `init()` once (Vite serves the
 `.wasm` as an asset through `new URL(…, import.meta.url)`); Node tests call

@@ -37,6 +37,7 @@ const h = vi.hoisted(() => ({
     wallet: null as unknown,
     start: [] as unknown[],
     setStage: null as null | ((stage: string) => void),
+    mathError: null as Error | null,
 }));
 
 vi.mock('../../rpc/accounts.ts', async (orig) => ({
@@ -54,6 +55,16 @@ vi.mock('../../venues/index.ts', async (orig) => ({
     detectVenue: vi.fn(),
     raydiumCandidates: vi.fn(),
 }));
+vi.mock('../../math/useMath.ts', async (orig) => {
+    const actual = await orig<typeof import('../../math/useMath.ts')>();
+    return {
+        ...actual,
+        useMath: () => {
+            const real = actual.useMath();
+            return h.mathError ? { math: undefined, error: h.mathError } : real;
+        },
+    };
+});
 vi.mock('../../wallet/useWallet.ts', () => ({
     useWallet: () => ({ ready: true, status: h.wallet ? 'connected' : 'disconnected', connected: h.wallet }),
 }));
@@ -142,6 +153,7 @@ beforeEach(() => {
         supportsV0: true,
     };
     h.start = [];
+    h.mathError = null;
     mockIndexer({});
     vi.mocked(accounts.readMarket).mockResolvedValue(missing(MINT_A));
     vi.mocked(accounts.readGlobalConfig).mockResolvedValue(exists(MINT_A, globalConfig()));
@@ -246,6 +258,16 @@ describe('CreateMarketPage', () => {
         await waitFor(() => expect(verdict()).toBe('reject'));
         expect(screen.getByTestId(T.createReason('MintUnsupportedProgram')).textContent).toContain('No account');
         second.queryClient.clear();
+    });
+
+    it('shows the math module’s load error instead of checking forever (the verdict is the facade’s)', async () => {
+        h.mathError = new Error('math module failed to load');
+        const { queryClient } = await renderAt(`/markets/new?mint=${MINT_A}`);
+        await waitFor(() => expect(screen.getByText(/math module failed to load/).className).toBe('error-state'));
+        expect(screen.queryByTestId(T.createVerdict)).toBeNull();
+        expect(submit().disabled).toBe(true);
+        expect(vi.mocked(venuesLayer.detectVenue)).not.toHaveBeenCalled();
+        queryClient.clear();
     });
 
     it('links to the existing market of a mint', async () => {
