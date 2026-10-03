@@ -916,10 +916,12 @@ impl Lab {
     }
 
     /// `pool_model.settle(pid, sol_in, lump)`: the token debt is extinguished, `sol_in` reaches
-    /// `MarketVault`; a rolled epoch's record is written.
+    /// `MarketVault` (with the model's default rent, the position's [`Self::owed`], as `R_due`:
+    /// its part above the credited rent vests, M10-8C-1); a rolled epoch's record is written.
     pub fn settle(&mut self, pid: &str, sol_in: u64, lump: u64) {
         let now = self.now();
         let lump_vest_s = self.lump_vest_s;
+        let rent = self.owed(pid);
         let (pos, credited) = self.take(pid);
         let res = Resolution {
             q: pos.q,
@@ -928,7 +930,7 @@ impl Lab {
         };
         let rec = self
             .inject_raw(-1, 0, |p, v, _| {
-                pool::settle(p, v, now, lump_vest_s, &res, sol_in)
+                pool::settle(p, v, now, lump_vest_s, &res, sol_in, rent).map(|s| s.rec)
             })
             .expect("settle");
         if let Some(r) = rec {
@@ -1016,19 +1018,20 @@ impl Lab {
         })
     }
 
-    /// `s Q SOL CREDITED LUMP`: `pool::settle` (a rolled epoch's record is written).
+    /// `s Q SOL CREDITED LUMP RENT`: `pool::settle` (a rolled epoch's record is written).
     pub fn settle_raw(
         &mut self,
         q: u64,
         sol_in: u64,
         credited: u64,
         lump: u64,
+        rent: u64,
     ) -> Result<(), MathError> {
         let now = self.now();
         let lump_vest_s = self.lump_vest_s;
         let res = Resolution { q, credited, lump };
         let rec = self.inject_raw(-1, 0, |p, v, _| {
-            pool::settle(p, v, now, lump_vest_s, &res, sol_in)
+            pool::settle(p, v, now, lump_vest_s, &res, sol_in, rent).map(|s| s.rec)
         })?;
         if let Some(r) = rec {
             self.write_record(&r);

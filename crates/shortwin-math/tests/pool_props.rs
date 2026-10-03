@@ -177,9 +177,18 @@ impl Driver {
         }
     }
 
+    /// `paid`: `None` pays the accrued rent; an even seed a shortfall below it, an odd seed
+    /// the accrued rent plus an excess of up to 1 SOL (an exit within `min_rent_s` pays
+    /// `R_min` above it; its lender part above the credited rent vests, M10-8C-1).
     fn repay(&mut self, id: u64, paid: Option<u64>, lump: u64) -> Result<(), TestCaseError> {
         let owed = self.s.owed(id);
-        let paid = paid.map_or(owed, |s| s % (owed + 1));
+        let paid = paid.map_or(owed, |s| {
+            if s % 2 == 0 {
+                s % (owed + 1)
+            } else {
+                owed.saturating_add((s >> 1) % 1_000_000_000)
+            }
+        });
         let before = self.s.m.clone();
         if let Err(e) = self.s.repay(id, paid, lump) {
             refusal(e)?;
@@ -189,8 +198,19 @@ impl Driver {
     }
 
     fn settle(&mut self, id: u64, sol: u64, lump: u64) -> Result<(), TestCaseError> {
+        self.settle_above(id, sol, lump, 0)
+    }
+
+    /// A settlement whose `R_due` is `excess` above the accrued rent (M10-8C-1).
+    fn settle_above(
+        &mut self,
+        id: u64,
+        sol: u64,
+        lump: u64,
+        excess: u64,
+    ) -> Result<(), TestCaseError> {
         let before = self.s.m.clone();
-        if let Err(e) = self.s.settle(id, sol, lump) {
+        if let Err(e) = self.s.settle_above(id, sol, lump, excess) {
             refusal(e)?;
             prop_assert_eq!(&self.s.m, &before);
         }
@@ -339,8 +359,14 @@ impl Driver {
             }
             Op::Settle(k, sol, lump) => {
                 if let Some(id) = self.pick(k) {
+                    // One in four settlements pays R_due above the accrued rent (M10-8C-1).
+                    let excess = if lump % 4 == 1 {
+                        (lump >> 2) % 1_000_000_000
+                    } else {
+                        0
+                    };
                     let lump = if lump % 3 == 0 { lump % (sol + 1) } else { 0 };
-                    self.settle(id, sol, lump)?;
+                    self.settle_above(id, sol, lump, excess)?;
                 }
             }
             Op::Wipe(sol) => {
@@ -600,7 +626,7 @@ proptest! {
             let t = m.pool.tokens_free;
             let q = t.saturating_sub(left).max(1);
             m.borrow(q, m.now + 30 * DAY).expect("borrow");
-            m.settle(q, sol, 0, sol / 7).expect("settle");
+            m.settle(q, sol, 0, sol / 7, sol / 5).expect("settle");
             let p = m.pool;
             let claims = u128::from(p.tokens_free) + u128::from(p.borrowed_q);
             prop_assert!(p.total_shares == 0 || p.total_shares + pool::VIRTUAL_SHARES <= pool::R_MAX * (claims + pool::VIRTUAL_ASSETS));

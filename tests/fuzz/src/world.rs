@@ -2063,19 +2063,39 @@ impl World {
         res.is_ok()
     }
 
+    /// Whether `sol_settle` of position `k` executes a settlement now (S1 / S2 / S3, not only an
+    /// arming change; on a clone, through the hooks; nothing is kept).
+    fn exit_settles(&mut self, si: usize, k: usize) -> bool {
+        let Some((ix, _)) = self.exit_ix(si, k, 3) else {
+            return false;
+        };
+        let keeper = self.keeper.insecure_clone();
+        let saved = self.env.svm.clone();
+        let (res, _) = self.send_bundle_quiet(si, &[ix], &[&keeper]);
+        self.env.svm = saved;
+        res.is_ok_and(|meta| {
+            !shortwin_litesvm_tests::events::of::<shortwin::events::SolSettle>(&meta).is_empty()
+        })
+    }
+
     /// A JIT deposit around a keeper exit (R3B-2, ECON §9.4; M10 G-F1/G-F2): `[deposit, exit(a),
     /// withdraw]` in one transaction by lender `b` — the exit a liquidation or an expiry that lands
-    /// now if there is one —, the withdrawal taking back the shares the
-    /// deposit minted (within the pro-rata allowance the lender has after the exit, measured on a
-    /// clone). **The capture oracle** (liquidate / expire, while another lender holds shares — a
-    /// last lender is paid the unreleased vest by design, R4B-4): against a clone in which the same
-    /// exit lands without the deposit, the lender's SOL (wallet + its `LenderPosition`'s lamports +
-    /// touched balance) gains at most its shares' part of what the exit credits at once —
-    /// `max(0, lender_rent − credited)`, the minimum rent above the continuous credit (ECON §9.4:
-    /// "Δ = paid lender rent − credited_for(pos) → acc") — and none of the lump (the lender half of the penalty, the
-    /// expiry fee, a swept donation: they vest over `lump_vest_s`); its tokens come back at most
-    /// at the deposit's own rate. `sol_settle` keeps the old shape without the oracle (its
-    /// principal is immediate and trades tokens for SOL).
+    /// now if there is one, else a `sol_settle` that settles now, else `b`'s pick —, the withdrawal
+    /// taking back the shares the deposit minted (within the pro-rata allowance the lender has
+    /// after the exit, measured on a clone). **The capture oracle** (a landed liquidation, expiry
+    /// or settlement, while another lender holds shares — a last lender is paid the unreleased
+    /// vest by design, R4B-4): against a clone in which the same exit lands without the deposit,
+    /// the lender's SOL (wallet + its `LenderPosition`'s lamports + touched balance) gains at most
+    /// rounding (2 lamports) beyond the minted shares' part of what the exit realises at once for
+    /// the tokens it extinguishes: nothing for a liquidation or an expiry, and for a settlement its
+    /// token part `principal − top-up − credited` (`principal` = the lenders' amount − the lump;
+    /// the shares give up that much token value). None of the lump (the lender half of the
+    /// penalty, the expiry fee, the S2/S3 premium, a swept donation) and, since M10-8C-1 was fixed
+    /// (WP-6 batch 2), none of the rent top-up `max(0, min(principal, rent) − credited)` (`rent` =
+    /// the lender rent, or a settlement's `R_due`; `pool::rent_top_up`), which vests with the lump
+    /// over `lump_vest_s` — credited at once before, its minted shares' part was the old bound.
+    /// The tokens come back at most at the deposit's own rate. A settlement that rolls the share
+    /// epoch (a rebase) is not checked (`jit-unchecked:epoch-rolled`).
     fn jit_deposit(&mut self, si: usize, a: u32, b: u32) -> bool {
         let n = self.slots[si].positions.len();
         if n == 0 {
@@ -2097,10 +2117,38 @@ impl World {
             self.env.assert_invariants();
         }
         let k_pos = a as usize % n;
-        // The exit: a liquidation or an expiry that lands now (probed alone on a clone; the
-        // oracle's lumps) — with `b` even, the clock first taken to the position's deadline with
-        // two cranks (a fresh bucket) if none does — else `b`'s pick (no oracle).
+        // The exit: a liquidation or an expiry that lands now, else a `sol_settle` that settles
+        // now (each probed alone on a clone) — if none does, with `b` odd the settlement clock
+        // armed and run up to 30 s, with `b` even time first taken to the position's
+        // deadline with two cranks (a fresh bucket) — else `b`'s pick (checked only if it lands).
         let mut which = [1, 2].into_iter().find(|w| self.exit_lands(si, k_pos, *w));
+        if which.is_none() && self.exit_settles(si, k_pos) {
+            which = Some(3);
+        }
+        if which.is_none() && !b.is_multiple_of(2) {
+            // A settlement's clock: the keeper's `sol_settle` arms it (kept), then up to 30
+            // seconds with a crank each until a `sol_settle` would settle.
+            let keeper = self.keeper.insecure_clone();
+            for _ in 0..30 {
+                let Some((ix, _)) = self.exit_ix(si, k_pos, 3) else {
+                    break;
+                };
+                let (res, sent) = self.send_bundle(si, &[ix], &[&keeper]);
+                self.check_exit_refusal("jit_deposit arming sol_settle", &sent, &res);
+                self.env.warp(1);
+                self.crank(si);
+                if self.exit_settles(si, k_pos) {
+                    which = Some(3);
+                    break;
+                }
+            }
+            let got = if which.is_some() { "settles" } else { "none" };
+            *self
+                .stats
+                .events
+                .entry(format!("jit-settle-clock:{got}"))
+                .or_default() += 1;
+        }
         if which.is_none() && b.is_multiple_of(2) {
             let (borrower, nonce, _) = self.position_key(si, k_pos).expect("pos");
             let deadline = self
@@ -2124,6 +2172,7 @@ impl World {
         let market = self.market_key(si);
         let pre_shares = self.env.lender(&market, &k.owner).map_or(0, |l| l.shares);
         let others = self.market(si).total_shares.get() > pre_shares;
+        let epoch_before = self.market(si).pool().share_epoch;
         let lender = self.slots[si].lenders[li].kp.insecure_clone();
         let keeper = self.keeper.insecure_clone();
         let mut signers: Vec<&Keypair> = vec![&lender, &keeper];
@@ -2184,21 +2233,29 @@ impl World {
                 .or_default() += 1;
             return true;
         };
-        let rent = match which {
+        // What landed: a liquidation's or an expiry's rent paid, or a settlement's lenders' amount
+        // and lump (`None`: nothing did, e.g. a `sol_settle` that only armed or disarmed).
+        let landed = match which {
             1 => shortwin_litesvm_tests::events::of::<shortwin::events::Liquidate>(meta)
                 .first()
-                .map(|e| e.rent),
+                .map(|e| (e.rent, None)),
             2 => shortwin_litesvm_tests::events::of::<shortwin::events::Expire>(meta)
                 .first()
-                .map(|e| e.rent),
-            _ => None,
+                .map(|e| (e.rent, None)),
+            _ => shortwin_litesvm_tests::events::of::<shortwin::events::SolSettle>(meta)
+                .first()
+                .map(|e| (0, Some((e.lender_amount, e.lump)))),
         };
-        let (Some(rent), true, Ok(_), Some(control_sol)) = (rent, others, &control, control_sol)
+        let rolled = self.market(si).pool().share_epoch != epoch_before;
+        let (Some((rent, settled)), true, false, Ok(_), Some(control_sol)) =
+            (landed, others, rolled, &control, control_sol)
         else {
-            let why = if rent.is_none() {
-                "settlement"
+            let why = if landed.is_none() {
+                "no-exit"
             } else if !others {
                 "last-lender"
+            } else if rolled {
+                "epoch-rolled"
             } else if control.is_err() {
                 "control-refused"
             } else {
@@ -2215,14 +2272,31 @@ impl World {
             return true;
         };
         let m = self.market(si);
-        let credited = shortwin_math::rent::credited_for(&pos.pos_rent(), &m.basis()).ok();
-        let protocol = u128::from(rent) * u128::from(pos.rent_protocol_bps) / 10_000;
-        let lender_rent = u128::from(rent) - protocol;
-        let immediate = credited.map_or(lender_rent, |c| lender_rent.saturating_sub(u128::from(c)));
-        // The shares at the exit: the market's after the deposit (the virtual shares only
-        // lower each real share's part).
+        let basis = m.basis();
+        let credited = shortwin_math::rent::credited_for(&pos.pos_rent(), &basis).ok();
+        // The immediate SOL that carries the rent (`principal`) and the rent it pays first: a
+        // liquidation's or an expiry's lender rent; a settlement's lenders' amount less its lump,
+        // and `R_due` (the rent the settlement's prologue accrued to, all of it the lenders').
+        let (principal, exit_rent) = match settled {
+            None => {
+                let lender_rent =
+                    rent - (u128::from(rent) * u128::from(pos.rent_protocol_bps) / 10_000) as u64;
+                (lender_rent, lender_rent)
+            }
+            Some((lenders, lump)) => (
+                lenders.saturating_sub(lump),
+                shortwin_math::rent::due(&pos.pos_rent(), &basis).unwrap_or(u64::MAX),
+            ),
+        };
+        // The rent top-up (M10-8C-1) vests with the lump; the token part of a settlement (the
+        // rest above the credited rent) is immediate, and the minted shares take their part.
+        let c = credited.unwrap_or(0);
+        let top_up = shortwin_math::pool::rent_top_up(principal, exit_rent, c);
+        let token_part = principal.saturating_sub(top_up).saturating_sub(c);
         let s_at_exit = (m.total_shares.get() + w).max(1);
-        let bound = i128::try_from(immediate * minted / s_at_exit + 2).unwrap_or(i128::MAX);
+        let bound = i128::try_from(u128::from(token_part) * minted / s_at_exit)
+            .unwrap_or(i128::MAX)
+            .saturating_add(2);
         let tokens_back = read::token_amount(&self.env.svm, &k.owner_token_account)
             .unwrap_or(0)
             .saturating_add(amount)
@@ -2233,14 +2307,22 @@ impl World {
             .events
             .entry("jit-capture-checked".into())
             .or_default() += 1;
+        if settled.is_some() {
+            *self
+                .stats
+                .events
+                .entry("jit-capture-checked:settle".into())
+                .or_default() += 1;
+        }
         if sol - control_sol > bound || tokens_back > tokens_fair.saturating_add(1) {
             panic!(
                 "{ORACLE} R3B-2 JIT capture: [deposit {amount}, {}, withdraw {w} of {minted} \
                  minted shares] gained {} lamports over the exit without the deposit (bound {bound}: \
-                 the minted shares' part of the immediate rent credit {immediate} = lender rent \
-                 {lender_rent} − credited {credited:?}, S {s_at_exit}) and took back {tokens_back} \
-                 tokens for the {tokens_fair} its shares were worth at the deposit",
-                ["", "liquidate", "expire"][which as usize % 3],
+                 the minted shares' part of the token part {token_part}, + 2; the rent top-up \
+                 {top_up} = min(principal {principal}, rent {exit_rent}) − credited {credited:?} \
+                 vests, S {s_at_exit}) and took back {tokens_back} tokens for the {tokens_fair} \
+                 its shares were worth at the deposit",
+                ["sol_settle", "liquidate", "expire"][which as usize % 3],
                 sol - control_sol
             );
         }

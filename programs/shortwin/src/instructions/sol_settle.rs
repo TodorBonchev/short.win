@@ -46,8 +46,11 @@
 //!
 //! - `K_s` (locked terms) to the keeper; the lenders' `x` (S1 `V − K_s`; S2/S3 `x(P_ema,
 //!   L_ema)`, box-consistent) to `market_vault` through `pool::settle` — for S2/S3 the part
-//!   above `⌊Q·P_ema/WAD⌋ + R_due` vests as a lump, the rest is immediate (R4B-6); the token
-//!   debt is extinguished; the protocol gets nothing (SPEC §6.3);
+//!   above `⌊Q·P_ema/WAD⌋ + R_due` vests as a lump, the rest is immediate (R4B-6) but for its
+//!   rent top-up: the immediate part pays `R_due` first, and the part of that above the rent
+//!   credited while the position was open (`pool::rent_top_up`) vests with the lump
+//!   (finding M10-8C-1, every kind); the token debt is extinguished; the protocol gets nothing
+//!   (SPEC §6.3);
 //! - the position's aggregates leave the market (`open_positions`, `ΣB_Q` by tier, `A_j`,
 //!   notional), the exposure falls by `q` (closed at 0), and the position — with the borrower's
 //!   `V − K_s − x` and its rent — is closed to the borrower (A18);
@@ -146,8 +149,10 @@ struct Booked {
     pool: pool::Pool,
     vault: Box<pool::Vault>,
     rec: Option<pool::ShareEpoch>,
-    /// `vest_bal` before `pool::settle` (a full wipe flushes it plus the lump).
+    /// `vest_bal` before `pool::settle` (a full wipe flushes it plus `vested`).
     vest_before: u64,
+    /// What `pool::settle` vested (`Settled::vested`): the lump and the rent top-up.
+    vested: u64,
     lump_vest_s: u32,
 }
 
@@ -260,7 +265,7 @@ fn evaluate<'info>(
             let credited = rent::credited_for(&pos.pos_rent(), &market.basis()).math()?;
             let mut pool = pro.pool;
             let vest_before = pool.vest_bal;
-            let rec = pool::settle(
+            let settled = pool::settle(
                 &mut pool,
                 &mut vault,
                 now,
@@ -271,6 +276,7 @@ fn evaluate<'info>(
                     lump: payout.lump,
                 },
                 payout.lenders,
+                inp.r_due,
             )
             .math()?;
             let mut aggr = market.aggr();
@@ -282,8 +288,9 @@ fn evaluate<'info>(
                 payout,
                 pool,
                 vault,
-                rec,
+                rec: settled.rec,
                 vest_before,
+                vested: settled.vested,
                 lump_vest_s: config.params.lump_vest_s,
             })
         }
@@ -419,7 +426,7 @@ pub fn handler<'info>(ctx: Context<'info, SolSettle<'info>>) -> Result<()> {
             record.try_serialize(&mut w)?;
         }
         let vest_flushed = if rec.is_full_wipe() {
-            b.vest_before.checked_add(b.payout.lump).or_math()?
+            b.vest_before.checked_add(b.vested).or_math()?
         } else {
             0
         };

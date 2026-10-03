@@ -55,6 +55,9 @@ struct Trace {
     samples: Option<Dec<usize>>,
     #[serde(default)]
     above: Option<Dec<usize>>,
+    /// Rent top-up profiles (M10-8C-1): exits whose top-up was positive.
+    #[serde(default)]
+    top_ups: Option<Dec<u64>>,
 }
 
 #[derive(Deserialize)]
@@ -407,6 +410,25 @@ fn ext_u64_extreme_amounts_and_scripted_notes() {
     ] {
         assert!(runs.iter().any(|(n, _)| n == name), "{name}");
     }
+}
+
+/// Finding M10-8C-1 (review of WP-6 batch 2): exits that pay rent above what accrued — a
+/// repay of the accrued rent plus an `R_min`-like excess, a settlement whose `R_due` exceeds
+/// it — so `pool::repay` / `pool::settle` vest an `R_min`-sized rent top-up, not only the
+/// rounding-sized one of the other traces; and the scripted JIT bundles around an early
+/// repay and an early settlement (the model asserts the whale realises at most rounding
+/// beyond a settlement's token value; the replay pins every claim).
+#[test]
+fn ext_rent_top_up_vests() {
+    let runs = replay_group("pool_ext_topup", 16_000);
+    let traces = load_all("pool_ext_topup");
+    let profiles: Vec<u64> = traces
+        .iter()
+        .filter_map(|t| t.top_ups.as_ref().map(|d| d.0))
+        .collect();
+    assert_eq!(profiles.len(), 5, "five profiles");
+    assert!(profiles.iter().all(|&n| n >= 50), "{profiles:?}");
+    assert!(runs.iter().any(|(n, _)| n == "ext_topup_scripted_jit"));
 }
 
 #[test]

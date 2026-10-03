@@ -122,7 +122,14 @@ mod more {
         assert_eq!(m.borrowed_q_by_tier, [0; 4]);
         assert_eq!(m.total_notional_open, 0);
         assert_eq!(m.aggr().a, [0; 3]);
-        assert_eq!(m.vest_bal, 0, "S1 SOL is immediate: nothing vests");
+        // S1 has no lump; its SOL is immediate but for the rent top-up (M10-8C-1): `R_due` above
+        // the rent credited while the position was open (here `R_min`, the gap a minute after
+        // the open) vests like a lump.
+        let r_due = shortwin_math::rent::due(&pos.pos_rent(), &m.basis()).unwrap();
+        let credited = shortwin_math::rent::credited_for(&pos.pos_rent(), &m.basis()).unwrap();
+        let top = shortwin_math::pool::rent_top_up(pos.v - k, r_due, credited);
+        assert!(top > 0 && r_due == pos.r_min);
+        assert_eq!(m.vest_bal, top, "S1 vests only its rent top-up");
     }
 
     /// ARCH §3.8 step 3: a stale bucket (no crank for a few seconds) keeps a live clock

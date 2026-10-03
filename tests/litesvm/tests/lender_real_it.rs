@@ -12,9 +12,12 @@
 //!   `[deposit, exit, claim_sol, withdraw]` and realises **0** lamports (its tokens come back as
 //!   deposited); the honest lender's take equals the run without the whale; a whale that holds
 //!   `h` seconds takes its share of the vest released by then (linear in `h`: the control that
-//!   shows the vesting is what stops the capture). **Finding M10-8C-1** (`#[ignore]`d,
-//!   failing): within `min_rent_s` of the open the exit's `R_min` top-up is credited at once,
-//!   and the whale takes its share.
+//!   shows the vesting is what stops the capture). **Finding M10-8C-1** (fixed in M10 WP-6
+//!   batch 2; regressions): within `min_rent_s` of the open an exit pays `R_min`, above the
+//!   rent credited while the position was open, and that top-up now vests like a lump
+//!   (`pool::rent_top_up`) — around a liquidation and a borrower's `close_short` the whale
+//!   realises 0, and around a real S2 settlement (whose rent is all the lenders') it is paid
+//!   the value of the tokens it gave up and none of the rent.
 //! - `bundles` (G-F5, G-F7): `[withdraw, sol_settle]` in one transaction: the withdrawal is held
 //!   to the pro-rata allowance of the state before the settlement (`AboveProRataAllowance` one
 //!   token above it, the whole bundle reverted), the S2 lump vests, the settlement's amounts are
@@ -53,7 +56,9 @@ use anchor_lang::solana_program::instruction::Instruction;
 use litesvm::types::TransactionMetadata;
 use shortwin::events::{ClaimSol as ClaimSolEv, Deposit as DepositEv, Withdraw as WithdrawEv};
 use shortwin_litesvm_tests::drive::Actor;
-use shortwin_litesvm_tests::engine::{expire_ix, liquidate_ix, sweep_trader_ix_for};
+use shortwin_litesvm_tests::engine::{
+    close_short_ix, expire_ix, liquidate_ix, sweep_trader_ix_for, with_cu_limit,
+};
 use shortwin_litesvm_tests::ix;
 use solana_keypair::Keypair;
 use solana_signer::Signer;
@@ -188,7 +193,8 @@ fn rise_until_liquidatable(sc: &mut Sc, b: &Pubkey, nonce: u64) {
 
 mod jit {
     use super::*;
-    use shortwin::events::{Expire, Liquidate, SWEEP_TO_VEST, TraderSwept};
+    use shortwin::events::{Close, Expire, Liquidate, SWEEP_TO_VEST, TraderSwept};
+    use shortwin::venues::ExtrasSel;
 
     /// What makes the lump.
     #[derive(Clone, Copy, Debug)]
@@ -197,8 +203,11 @@ mod jit {
         /// penalty's lender share vests, the rent was credited while it accrued.
         Liquidate,
         /// The same within `min_rent_s` of the open: the rent paid is `R_min`, above what
-        /// accrued (finding M10-8C-1).
+        /// accrued; its top-up vests (finding M10-8C-1).
         LiquidateEarly,
+        /// The borrower's `close_short` within `min_rent_s` of the open: no lump, the `R_min`
+        /// top-up vests (finding M10-8C-1).
+        CloseEarly,
         /// `expire` at the deadline: the expiry fee (100 % lenders) vests.
         Expire,
         /// `sweep_trader` of 5 SOL donated to the trader PDA: the donation vests.
@@ -225,6 +234,7 @@ mod jit {
                 let (b, n) = (sc.b.key(), sc.nonce);
                 rise_until_liquidatable(&mut sc, &b, n);
             }
+            Lump::CloseEarly => {}
             Lump::Expire => {
                 // Daily cranks, then one a second up to the deadline (the expiry needs the
                 // previous second's completed bucket, `ref_max_age_s`).
@@ -245,6 +255,9 @@ mod jit {
                     next_nonce: n + 1,
                 };
                 close_ok(&mut sc.env, &sc.mm, &b, n);
+                // The close's `R_min` top-up vests (M10-8C-1): let it release first.
+                sc.env.warp(vest_s(&sc.env) + 1);
+                sc.crank();
                 let trader = sc.mm.keys.trader;
                 sc.env.fund(&trader, DONATION);
             }
@@ -252,7 +265,7 @@ mod jit {
         let lend = sc.mm.spec.lend;
         let jit = sc.env.actor(&sc.mm, 9 * lend, 0);
         let exit = exit_ixs(&sc, kind);
-        let kp = sc.keeper.insecure_clone();
+        let kp = exit_signer(&sc, kind);
         assert!(lands(&mut sc.env, &exit, &[&kp]), "{kind:?} lands now");
         assert_eq!(sc.market().vest_bal, 0, "no lump vesting before");
         (sc, jit)
@@ -265,8 +278,27 @@ mod jit {
             Lump::Liquidate | Lump::LiquidateEarly => {
                 vec![liquidate_ix(&sc.mm, &k, &sc.b.key(), sc.nonce)]
             }
+            Lump::CloseEarly => with_cu_limit(
+                &sc.mm,
+                close_short_ix(
+                    &sc.mm,
+                    &sc.b.key(),
+                    sc.nonce,
+                    u64::MAX,
+                    ExtrasSel::NONE,
+                    &[],
+                ),
+            ),
             Lump::Expire => vec![expire_ix(&sc.mm, &k, &sc.b.key(), sc.nonce)],
             Lump::Sweep => vec![sweep_trader_ix_for(&sc.env, &sc.mm.market())],
+        }
+    }
+
+    /// Who signs the exit: the borrower for its `close_short`, else the keeper.
+    fn exit_signer(sc: &Sc, kind: Lump) -> Keypair {
+        match kind {
+            Lump::CloseEarly => sc.b.kp.insecure_clone(),
+            _ => sc.keeper.insecure_clone(),
         }
     }
 
@@ -276,6 +308,10 @@ mod jit {
             Lump::Liquidate | Lump::LiquidateEarly => {
                 let ev: Liquidate = events::one(meta);
                 (ev.penalty_lender, ev.rent)
+            }
+            Lump::CloseEarly => {
+                let ev: Close = events::one(meta);
+                (0, ev.rent)
             }
             Lump::Expire => {
                 let ev: Expire = events::one(meta);
@@ -293,6 +329,9 @@ mod jit {
     struct Run {
         /// The lump (lenders' vesting part of the exit).
         lump: u64,
+        /// What the exit put into the vest (`vest_bal` just after its transaction): the lump
+        /// and the rent top-up above the rent credited while the position was open (M10-8C-1).
+        vested: u64,
         /// The rent the exit paid (`R_due`).
         rent: u64,
         /// The whale's realised SOL, everything it was ever paid.
@@ -310,9 +349,10 @@ mod jit {
     fn run(sc: &mut Sc, jit: &Actor, kind: Lump, hold: Option<i64>) -> Run {
         let market = sc.mm.market();
         let exit = exit_ixs(sc, kind);
-        let (kp, wk) = (sc.keeper.insecure_clone(), jit.kp.insecure_clone());
+        let (kp, wk) = (exit_signer(sc, kind), jit.kp.insecure_clone());
         let mut out = Run {
             lump: 0,
+            vested: 0,
             rent: 0,
             whale: 0,
             whale_frac: (0, 0),
@@ -323,6 +363,7 @@ mod jit {
             None => {
                 let meta = ok(sc.env.send(&exit, &[&kp]));
                 (out.lump, out.rent) = lump_of(&meta, kind);
+                out.vested = sc.market().vest_bal;
             }
             Some(hold) => {
                 let keys = keys_of(&sc.mm, jit);
@@ -340,6 +381,7 @@ mod jit {
                 assert_eq!(dep.shares, minted);
                 out.whale_frac = (minted, dep.s_after);
                 (out.lump, out.rent) = lump_of(&meta, kind);
+                out.vested = sc.market().vest_bal;
                 out.whale += sol_paid(&meta, &jit.key());
                 let mut back = tokens_withdrawn(&meta, &jit.key());
                 if hold > 0 {
@@ -386,22 +428,32 @@ mod jit {
 
     /// G-F2 / R3B-2 on one lump: the whale realises 0 at `h = 0`, and the honest lender's take
     /// is the run's without the whale; holding `h` of the vest window it takes its share of what
-    /// vested by then (`h/lump_vest_s` of the lump: linear in `h`), the whole share at `h =
-    /// lump_vest_s` — the control that shows the vesting (not the bundle's shape) is what stops
-    /// the capture.
+    /// vested by then (`h/lump_vest_s` of what the exit vested — the lump and the rent top-up of
+    /// M10-8C-1: linear in `h`), the whole share at `h = lump_vest_s` — the control that shows
+    /// the vesting (not the bundle's shape) is what stops the capture.
     fn jit_case(kind: Lump) {
         let (mut sc, jit) = ready(kind);
         let r_min = sc.pos_opt().map(|p| p.r_min);
         let saved = sc.env.svm.clone();
         let control = run(&mut sc, &jit, kind, None);
+        let top_up = control.vested - control.lump;
         eprintln!(
-            "{kind:?}: rent paid {} (the position's R_min {r_min:?}), lump {}",
+            "{kind:?}: rent paid {} (the position's R_min {r_min:?}), lump {}, rent top-up {top_up}",
             control.rent, control.lump
         );
-        assert!(control.lump > 0, "{kind:?}: a real lump");
+        assert!(control.vested >= control.lump, "{kind:?}: the lump vests");
+        if matches!(kind, Lump::LiquidateEarly | Lump::CloseEarly) {
+            // M10-8C-1: R_min above the credited rent; the lenders' part of the excess vests.
+            assert!(
+                top_up > 0 && control.rent == r_min.unwrap(),
+                "{kind:?}: the R_min top-up vests"
+            );
+        } else {
+            assert!(control.lump > 0, "{kind:?}: a real lump");
+        }
         assert!(
-            control.honest >= control.lump,
-            "the honest lender is paid the lump"
+            control.honest >= control.vested,
+            "the honest lender is paid what vested"
         );
 
         let vest = vest_s(&sc.env);
@@ -410,15 +462,16 @@ mod jit {
             sc.env.svm = saved.clone();
             let r = run(&mut sc, &jit, kind, Some(hold));
             assert_eq!(
-                r.lump, control.lump,
-                "{kind:?}: the whale does not change the lump"
+                (r.lump, r.vested),
+                (control.lump, control.vested),
+                "{kind:?}: the whale does not change the lump or the vest"
             );
-            let released = u128::from(r.lump) * hold as u128 / vest as u128;
+            let released = u128::from(r.vested) * hold as u128 / vest as u128;
             let want = share_of(released, r.whale_frac);
             eprintln!(
-                "{kind:?}: lump {} hold {hold:>5} s: whale {} (share of the vested part {want}), \
+                "{kind:?}: vested {} hold {hold:>5} s: whale {} (share of the vested part {want}), \
                  honest {} (alone {})",
-                r.lump, r.whale, r.honest, control.honest
+                r.vested, r.whale, r.honest, control.honest
             );
             if hold == 0 {
                 assert_eq!(r.whale, 0, "{kind:?}: the JIT whale realises 0 at h = 0");
@@ -459,21 +512,155 @@ mod jit {
         jit_case(Lump::Liquidate);
     }
 
-    /// **Finding M10-8C-1** (kept failing; the program is unchanged in this lane). Within
-    /// `min_rent_s` of the open an exit pays `R_due = R_min`, above the rent credited while the
-    /// position was open, and `pool::repay` credits the difference to `acc` **at once** (ARCH
-    /// §3.3 `repay`: "credits the entitlement difference `lender_rent − credited_for(pos)`"),
-    /// not through the vest. A whale's `[deposit 9×, liquidate, claim_sol, withdraw]` around the
-    /// liquidation of a ≈ 3 SOL position opened a minute before takes ≈ 9/10 of that top-up
-    /// atomically: 128,972 of the lenders' 145,549 lamports of its `R_min` (171,233), and the
-    /// honest lender loses as much — against ECON §9.4's "the atomic bundle gets nothing". The
-    /// same true-up runs for `close_short` and for the immediate part of an S2/S3 settlement
-    /// (`⌊Q·P_ema/WAD⌋ + R_due`; ARCH §3.3, by reading — not exercised here). Bounded by the
-    /// lenders' part of `min_rent_s` of rent on the position.
+    /// **Finding M10-8C-1** (fixed; the regression). Within `min_rent_s` of the open an exit
+    /// pays `R_due = R_min`, above the rent credited while the position was open. Before the
+    /// fix `pool::repay` credited the difference to `acc` at once, and a whale's `[deposit 9×,
+    /// liquidate, claim_sol, withdraw]` around the liquidation of a ≈ 3 SOL position opened a
+    /// minute before took ≈ 9/10 of it atomically (128,972 of the lenders' 145,549 lamports of
+    /// its `R_min` of 171,233). The top-up now vests like a lump (`pool::rent_top_up`): the
+    /// whale realises 0 at `h = 0` and the honest lender gets it over `lump_vest_s` (ECON
+    /// §9.4's "the atomic bundle gets nothing").
     #[test]
-    #[ignore = "M10 finding M10-8C-1: the R_min top-up of an exit within min_rent_s is credited at once, a JIT whale takes its share"]
-    fn finding_m10_8c_1_a_jit_whale_takes_the_r_min_top_up_of_an_early_liquidation() {
+    fn finding_m10_8c_1_a_jit_whale_around_an_early_liquidation_realises_nothing() {
         jit_case(Lump::LiquidateEarly);
+    }
+
+    /// M10-8C-1 on `close_short`: the borrower closes a minute after the open and pays
+    /// `R_min`; the lenders' part above the credited rent vests, and a whale's `[deposit 9×,
+    /// close_short, claim_sol, withdraw]` (the borrower's signature in the bundle) realises 0.
+    #[test]
+    fn finding_m10_8c_1_a_jit_whale_around_an_early_close_realises_nothing() {
+        jit_case(Lump::CloseEarly);
+    }
+
+    /// M10-8C-1 on `sol_settle` (S2 after an LP drain and a 1.8× move, ≈ 2 minutes after the
+    /// open: `R_due = R_min`, and a settlement's rent is all the lenders'). The immediate part
+    /// `min(x, ⌊Q·P_ema/WAD⌋ + R_due)` pays `R_due` first; its part above the rent credited while
+    /// the position was open (`pool::rent_top_up`) vests with the S2 lump, the rest — the value
+    /// of the extinguished tokens — stays immediate. A whale's `[deposit 9×, sol_settle,
+    /// claim_sol, withdraw]` is paid its share of that token value (for the tokens it gave up)
+    /// and none of the rent: at most `f·(principal − top-up − credited)` (+2), against `f·
+    /// (principal − credited)` before the fix. What it takes the honest lender loses (the
+    /// honest lender keeps the tokens the whale gave up), and the honest lender gets the whole
+    /// vest.
+    #[test]
+    fn finding_m10_8c_1_a_jit_whale_around_a_real_settlement_takes_none_of_its_rent() {
+        let mut sc = Sc::default_market();
+        sc.env.tick(&sc.mm, 5);
+        sc.drain(9_850);
+        sc.env.tick(&sc.mm, 90);
+        sc.move_by(1.8);
+        let mut found = false;
+        for _ in 0..120 {
+            let saved = sc.env.svm.clone();
+            if sc.second().settled.is_some() {
+                sc.env.svm = saved;
+                found = true;
+                break;
+            }
+        }
+        assert!(found, "an S2 settlement");
+        sc.env.warp(1);
+        sc.crank();
+        let market = sc.mm.market();
+        let pos = sc.pos();
+        let lend = sc.mm.spec.lend;
+        let jit = sc.env.actor(&sc.mm, 9 * lend, 0);
+        let ready = sc.env.svm.clone();
+        let (kp, wk) = (sc.keeper.insecure_clone(), jit.kp.insecure_clone());
+        let honest = sc.mm.lender.insecure_clone();
+        let vest_before = sc.market().vest_bal;
+
+        // The settlement's amounts (both runs settle the same way): R_due and the rent credited
+        // on the basis the settlement's prologue accrued to.
+        let settle_once = |sc: &mut Sc, ixs: &[Instruction], signers: &[&Keypair]| {
+            let meta = ok(sc.env.send(ixs, signers));
+            let ev = Outcome::of(&meta).settled.expect("settles");
+            let basis = sc.market().basis();
+            let r_due = shortwin_math::rent::due(&pos.pos_rent(), &basis).unwrap();
+            let credited = shortwin_math::rent::credited_for(&pos.pos_rent(), &basis).unwrap();
+            (meta, ev, r_due, credited)
+        };
+
+        // The control: the settlement alone.
+        let six = sc.settle_ix();
+        let (_m, ctl, r_due, credited) = settle_once(&mut sc, &[six], &[&kp]);
+        assert_eq!(ctl.condition, 2, "S2");
+        let principal = ctl.lender_amount - ctl.lump;
+        let top = shortwin_math::pool::rent_top_up(principal, r_due, credited);
+        eprintln!(
+            "S2: lender amount {}, lump {}, R_due {r_due} (R_min {}), credited {credited}, \
+             rent top-up {top}",
+            ctl.lender_amount, ctl.lump, pos.r_min
+        );
+        assert!(
+            top > 0 && r_due == pos.r_min,
+            "R_min above the credited rent"
+        );
+        assert_eq!(
+            sc.market().vest_bal - vest_before,
+            ctl.lump + top,
+            "the S2 lump and the rent top-up vest"
+        );
+        sc.env.warp(vest_s(&sc.env) + 1);
+        sc.crank();
+        let control_honest = claim_all(&mut sc.env, &market, &[&honest])[0];
+
+        // The whale's bundle at h = 0.
+        sc.env.svm = ready;
+        let keys = keys_of(&sc.mm, &jit);
+        let amount = 9 * lend;
+        let minted = shortwin_math::pool::shares_for_tokens(&sc.market().pool(), amount).unwrap();
+        let ixs = [
+            ix::deposit(&keys, amount, minted),
+            sc.settle_ix(),
+            ix::claim_sol(&jit.key(), &market),
+            ix::withdraw(&keys, minted, 0),
+        ];
+        let (meta, ev, r_due2, credited2) = settle_once(&mut sc, &ixs, &[&kp, &wk]);
+        assert_eq!(
+            (ev.lender_amount, ev.lump, r_due2, credited2),
+            (ctl.lender_amount, ctl.lump, r_due, credited),
+            "the whale does not change the settlement"
+        );
+        let dep: DepositEv = events::one(&meta);
+        let whale = sol_paid(&meta, &jit.key());
+        let token_value = u128::from(principal - top - credited);
+        let bound = share_of(token_value, (minted, dep.s_after)) + 2;
+        let before_fix = share_of(u128::from(principal - credited), (minted, dep.s_after));
+        eprintln!(
+            "S2 whale h = 0: paid {whale} (bound {bound}: its share of the token value \
+             {token_value}; {before_fix} with the top-up credited at once), tokens back {} of \
+             {amount}",
+            tokens_withdrawn(&meta, &jit.key())
+        );
+        assert!(
+            u128::from(whale) <= bound,
+            "the whale takes none of the rent top-up: {whale} > {bound}"
+        );
+        assert!(
+            before_fix > bound,
+            "the bound separates the fix from the old credit"
+        );
+        assert_eq!(
+            sc.market().vest_bal - vest_before,
+            ctl.lump + top,
+            "the whale bundle vests the same"
+        );
+        sc.env.warp(vest_s(&sc.env) + 1);
+        sc.crank();
+        let honest_paid = claim_all(&mut sc.env, &market, &[&wk, &honest]);
+        assert_eq!(honest_paid[0], 0, "the whale left with nothing owed");
+        assert!(
+            (whale + honest_paid[1]).abs_diff(control_honest) <= 2,
+            "what the whale takes the honest lender loses: {whale} + {} vs {control_honest}",
+            honest_paid[1]
+        );
+        assert!(
+            honest_paid[1] >= ctl.lump + top,
+            "the honest lender gets the whole vest"
+        );
+        assert_zero_at_zero_positions(&sc.env, &market);
     }
 
     /// The expiry at the deadline: the 2 % expiry fee vests (ECON §12.2's R3B-2 lump).
@@ -583,7 +770,11 @@ mod bundles {
         let la = sc.mm.lender.insecure_clone();
 
         // The control: the settlement alone.
+        let vest_ready = sc.market().vest_bal;
         let ctl_ev = Outcome::of(&ok(sc.settle())).settled.expect("settles");
+        // Its lump and its rent top-up (M10-8C-1) vest.
+        let ctl_vested = sc.market().vest_bal - vest_ready;
+        assert!(ctl_vested >= ctl_ev.lump);
         assert_eq!(ctl_ev.condition, 2, "S2");
         assert!(ctl_ev.lump > 0);
         sc.env.warp(vest_s(&sc.env) + 1);
@@ -639,8 +830,8 @@ mod bundles {
         );
         assert_eq!(
             sc.market().vest_bal,
-            vest0 + ev.lump,
-            "the settlement's lump vests"
+            vest0 + ctl_vested,
+            "the settlement's lump and rent top-up vest as in the control"
         );
         let mut paid_a = w.sol_paid;
         paid_a += claim(&mut sc.env, &market, &la);
@@ -672,8 +863,10 @@ mod bundles {
         // (`lender_amount` for `Q`), the exchange is even: B's total is the control's.
         let dt = ctl_tb.checked_sub(tb).expect("B's token claim falls");
         let ds = paid_b.checked_sub(ctl_b).expect("B's SOL rises");
+        // (The SOL side to rounding: the settlement's rent top-up reaches both runs through the
+        // vest, released to different shares — M10-8C-1.)
         assert!(
-            ta - ctl_ta == dt && ctl_a - paid_a == ds,
+            ta - ctl_ta == dt && (ctl_a - paid_a).abs_diff(ds) <= 2,
             "A gains what B cedes"
         );
         assert!(
@@ -799,7 +992,8 @@ mod wipes {
     /// record. The settlement, the epoch it closed and the seconds the position was open.
     fn wipe(sc: &mut Sc, s2: bool) -> (SolSettleEv, u32, i64) {
         let epoch = sc.market().share_epoch;
-        let t_open = sc.pos().t_open;
+        let pos = sc.pos();
+        let t_open = pos.t_open;
         let ev = if s2 {
             sc.drain(9_900);
             sc.env.tick(&sc.mm, 90);
@@ -810,9 +1004,17 @@ mod wipes {
             assert!(ev.lump > 0);
             let rolled = out.rolled.expect("EpochRolled");
             assert_eq!((rolled.epoch, rolled.num, rolled.den), (epoch, 0, 1));
+            // The rent top-up above the credited rent vests with the lump (M10-8C-1), and the
+            // roll flushes both.
+            let basis = sc.market().basis();
+            let r_due = shortwin_math::rent::due(&pos.pos_rent(), &basis).unwrap();
+            let credited = shortwin_math::rent::credited_for(&pos.pos_rent(), &basis).unwrap();
+            let top = shortwin_math::pool::rent_top_up(ev.lender_amount - ev.lump, r_due, credited);
+            assert!(top > 0);
             assert_eq!(
-                rolled.vest_flushed, ev.lump,
-                "the S2 lump goes to the wiped lenders"
+                rolled.vest_flushed,
+                ev.lump + top,
+                "the S2 lump and the rent top-up go to the wiped lenders"
             );
             ev
         } else {
@@ -1061,6 +1263,9 @@ mod pswap {
         env.warp(1);
         crank(&mut env, &pm);
         close_ok(&mut env, &pm, &b, n0);
+        // The close's `R_min` top-up vests (M10-8C-1): let it release first.
+        env.warp(i64::from(env.config().params.lump_vest_s) + 1);
+        crank(&mut env, &pm);
         let cashback = tokens(&env, &pm.cashback_ata());
         assert!(cashback > 0, "the trader's trades accrued cashback");
         assert_eq!(env.market(&market).vest_bal, 0);

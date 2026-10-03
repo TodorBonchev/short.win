@@ -83,8 +83,10 @@ pub fn remove_position(market: &mut Market, aggr: &mut Aggr, pos: &ShortPosition
 /// Books a repayment (close, liquidation, expiry; ARCH §3.3 "borrower-side pool calls"):
 /// `pool::repay` with the position's `q`, the lender rent it was credited continuously
 /// (`rent::credited_for` on the current basis, ceil) and the payout's vesting lump; the rent
-/// paid and the position's locked share; then `protocol_fees += payout.protocol`. Returns the
-/// lender rent. The lamports are [`pay_vault`]'s.
+/// paid and the position's locked share (the lender rent above the credited rent — `R_min`
+/// within `min_rent_s` of the open — vests with the lump, `pool::rent_top_up`, M10-8C-1);
+/// then `protocol_fees += payout.protocol`. Returns the lender rent. The lamports are
+/// [`pay_vault`]'s.
 pub fn book_repay(
     pool: &mut Pool,
     vault: &mut Vault,

@@ -3,7 +3,8 @@
  * LEND track's claim and withdraw tabs: `@lend`.
  *
  * Wallet `claimer` lent most of `main`'s inventory before the seeded positions opened, so rent
- * accrues to it continuously; a short opened and closed from Node pays rent in.
+ * accrues to it continuously; a short opened from Node and closed 30 s later pays rent in (its
+ * minimum rent's excess over what accrued vests, M10-8C-1).
  *
  * 1. SOL becomes claimable as rent accrues; the claim lands (the lender's `claimed` rises by the
  *    simulated amount).
@@ -23,7 +24,8 @@ test.describe('lend: claim and the vest-forfeit warning', { tag: '@lend' }, () =
         requireTrading(state);
         const m = state.markets.main;
         // Rent accrues every second on the open positions and is claimable once a borrower pays it
-        // in: a short opened and closed from Node pays at least the minimum rent.
+        // in: a short opened from Node and closed 30 s later pays at least the minimum rent; what it
+        // accrued while open is claimable at once, the minimum rent's excess vests (M10-8C-1).
         await payRentIn(m, 200_000n * 10n ** BigInt(m.decimals));
         await app.goto(`/m/${m.mint}?panel=lend&action=claim`, 'market');
         await app.connectWallet();

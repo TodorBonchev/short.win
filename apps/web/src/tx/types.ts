@@ -99,7 +99,7 @@ export interface TxError {
     readonly kind: TxErrorKind;
     readonly message: string;
     readonly action: ErrorAction;
-    /** The custom error code (short.win 6000–6104, or a token program code). */
+    /** The custom error code (short.win 6000–6105, or a token program code). */
     readonly code?: number;
     readonly name?: string;
     /** Index of the failing instruction in the transaction. */

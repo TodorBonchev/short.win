@@ -14,7 +14,9 @@ Model (all integers; rounding in favour of the pool):
   * Lender SOL, option (a) of the round-3 brief (SPEC §2.4 "rent accrues to the pool
     continuously"):
       - entitlement `acc` (WAD lamports/share, signed): rent credited continuously,
-        trued up per position at repay/settle; lumps and settlement principal;
+        trued up per position at repay/settle (a shortfall at once; M10-8C-1: the rent paid
+        above what was credited -- R_min within min_rent_s, a settlement's rent -- vests like
+        a lump); lumps and settlement principal;
       - realised allocation `acc_r`: SOL allocated to the shares holding when it
         reaches the vault; a claim pays from the lender's own realised allocation;
       - v0.4 (R3A-2): a lender's realised allocation beyond its entitlement (surplus)
@@ -526,6 +528,23 @@ class Pool:
         self.receivable -= min(credited, self.receivable)
         return q, i_open, p, credited
 
+    @staticmethod
+    def _rent_top_up(principal: int, rent: int, credited: int) -> int:
+        """M10-8C-1: exit rent never credited while the position was open (R_due = R_min within
+        min_rent_s of the open; a settlement's rent, which has no protocol share).  Credited at
+        once it would go to the shares holding at the exit (a JIT deposit takes its part); it
+        vests like a lump instead.  `principal` pays the rent first."""
+        return max(min(principal, rent) - credited, 0)
+
+    def _true_up(self, principal: int, rent: int, credited: int) -> int:
+        """Continuous mode, repay/settle: `principal` reached sol_vault and `credited` of it was
+        credited while the position was open.  The immediate part is trued up against `credited`
+        (a shortfall is a debit) and realised; returns the top-up, which the caller vests."""
+        top = self._rent_top_up(principal, rent, credited)
+        self._credit(principal - top - credited)
+        self._credit_r(principal - top)
+        return top
+
     def repay(self, pid, rent_paid: int, lender_lump: int):
         """Close / liquidation / expiry: Q returns; rent_paid (total, before the split with
         the position's own protocol share) and lender_lump (penalty share / expiry fee)."""
@@ -538,16 +557,21 @@ class Pool:
         self.sol_vault += lender_rent + lender_lump
         self.inflow += lender_rent + lender_lump
         if self.mode == "continuous":
-            self._credit(lender_rent - credited)
-            self._credit_r(lender_rent)
-            self._vest(lender_lump)
+            top = self._true_up(lender_rent, lender_rent, credited)
+            self._vest(lender_lump + top)               # M10-8C-1: the rent top-up vests with the lump
         else:
             self._vest(lender_rent + lender_lump)       # (b): all lender SOL released linearly
 
-    def settle(self, pid, sol_in: int, lump: int = 0):
+    def settle(self, pid, sol_in: int, lump: int = 0, rent: int | None = None):
         """SOL settlement: token debt extinguished; sol_in lamports to lenders, of which
-        `lump` (the penalty part of an S2/S3 take) vests and the rest is immediate."""
+        `lump` (the penalty part of an S2/S3 take) vests and the rest is immediate, but for
+        the rent top-up (M10-8C-1): the principal pays `rent` first (R_due, all of it the
+        lenders' in a settlement; default the position's accrued rent ceil(q*dI/WAD), R_due
+        past min_rent_s), and its part above `credited` vests with the lump."""
         self._release()
+        if rent is None:
+            q, i_open, _p, _dl = self.positions[pid]
+            rent = cdiv(q * (self.index - i_open), WAD)
         q, i_open, p, credited = self._close_pos(pid)
         self.B -= q
         lump = min(lump, sol_in)
@@ -555,8 +579,7 @@ class Pool:
         self.sol_vault += sol_in
         self.inflow += sol_in
         if self.mode == "continuous":
-            self._credit(principal - credited)
-            self._credit_r(principal)
+            lump += self._true_up(principal, rent, credited)
         else:
             self._credit(principal, realised=True)
         self._vest(lump)

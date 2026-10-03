@@ -84,8 +84,9 @@ export function ClaimForm({ ctx }: { ctx: LendCtx }) {
                 ]}
             />
             <div className="muted lend-note">
-                Rent is credited continuously and becomes claimable once borrowers have paid it in; one-off income vests
-                over {lenderRiskVars(chain.config?.params).vestPeriod}.
+                Rent is credited continuously and becomes claimable once borrowers have paid it in; one-off income, and
+                rent paid above what accrued (the minimum rent of an early exit), vests over{' '}
+                {lenderRiskVars(chain.config?.params).vestPeriod}.
                 {v.shortfall > 0n &&
                     ` ${formatSol(v.shortfall, 6)} SOL credited to you is not paid in yet. A claim first syncs other lenders whose surplus can fund it, where there are any.`}
             </div>

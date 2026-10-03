@@ -54,7 +54,10 @@ impl PenaltySplit {
 /// down for events and the lender pool: a close, liquidation or expiry calls
 /// [`pool::repay`](crate::pool::repay) with `rent_paid = rent` and
 /// `Resolution { lump, .. }`, a settlement [`pool::settle`](crate::pool::settle) with
-/// `sol_in = lenders` and `Resolution { lump, .. }`.
+/// `sol_in = lenders`, `rent = R_due` and `Resolution { lump, .. }`. Either also vests the
+/// rent paid above what was credited while the position was open
+/// ([`pool::rent_top_up`](crate::pool::rent_top_up); finding M10-8C-1), which `lump` does
+/// not include.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Payout {
     /// Measured venue spend `B` of the buyback (0 in a settlement).

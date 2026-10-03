@@ -1588,13 +1588,54 @@ fn close_pos(p: &mut Pool, v: &mut Vault, now: i64, res: &Resolution) -> Result<
     Ok(())
 }
 
+/// `pool_model.Pool._rent_top_up` (finding M10-8C-1; ECON §9.4): the part of an exit's
+/// lender rent that was never credited while the position was open,
+/// `max(0, min(principal, rent) − credited)`. It is positive when the exit pays more rent than
+/// accrued to the lenders — `R_due = R_min` within `min_rent_s` of the open, or a settlement's
+/// rent, which carries no protocol share — and it **vests like a lump** in [`repay`] and
+/// [`settle`]: credited at once it would go to the shares holding at the exit, so a just-in-time
+/// deposit bundled around the exit would take its pro-rata part atomically. `principal` is the
+/// immediate SOL that carries the rent (`repay`: the lender rent itself; `settle`: the
+/// settlement's immediate part, which pays the rent first). Never above `principal`.
+#[must_use]
+pub fn rent_top_up(principal: u64, rent: u64, credited: u64) -> u64 {
+    principal.min(rent).saturating_sub(credited)
+}
+
+/// The rent true-up of an exit (`repay` and `settle`): `principal` lamports reached
+/// `lender_sol`, `credited` of them were credited while the position was open. The top-up
+/// above `credited` ([`rent_top_up`]) is returned for the vest; the rest is immediate: the
+/// entitlement difference `immediate − credited` (signed: a shortfall is a debit, ≤ 0 here)
+/// and the realised allocation `immediate`.
+fn true_up(
+    p: &mut Pool,
+    v: &mut Vault,
+    principal: u64,
+    rent: u64,
+    credited: u64,
+) -> Result<u64, MathError> {
+    let top = rent_top_up(principal, rent, credited);
+    let immediate = sub_u64(principal, top)?;
+    credit_in(
+        p,
+        v,
+        None,
+        sub_i128(i128::from(immediate), i128::from(credited))?,
+        false,
+    )?;
+    credit_r_in(p, immediate)?;
+    Ok(top)
+}
+
 /// `pool_model.Pool.repay` (close, liquidation, expiry; ECON §9.4; ARCH §3.3): releases
 /// the vest, resolves the position's `q` ([`resolve`]; `receivable −= min(credited,
 /// receivable)`), returns `q` to `T`, adds `lender_rent + lump` to `lender_sol` with
 /// `lender_rent = rent_paid − ⌊rent_paid·rent_protocol_bps/10⁴⌋` (the position's snapshot
-/// share; the protocol part is the program's), credits the entitlement difference
-/// `lender_rent − credited` (signed: a shortfall is a debit), allocates `lender_rent` as
-/// realised and vests the lump. Returns `lender_rent`.
+/// share; the protocol part is the program's), and trues the rent up against `credited`:
+/// a shortfall `lender_rent − credited < 0` is debited at once, `min(lender_rent, credited)`
+/// is allocated as realised, and the top-up above `credited` ([`rent_top_up`], e.g. the
+/// `R_min` excess of an exit within `min_rent_s`; finding M10-8C-1) vests with the lump.
+/// Returns `lender_rent`.
 ///
 /// # Errors
 /// `InvalidInput` if `q = 0`, `q > ΣB_Q` or `rent_protocol_bps > 10⁴`;
@@ -1623,15 +1664,15 @@ pub fn repay(
     )?)?;
     let lender_rent = sub_u64(rent_paid, protocol)?;
     v.lender_sol = add_u64(v.lender_sol, add_u64(lender_rent, res.lump)?)?;
-    credit_in(
+    let top = true_up(&mut p, &mut v, lender_rent, lender_rent, res.credited)?;
+    vest_in(
         &mut p,
         &mut v,
         None,
-        sub_i128(i128::from(lender_rent), i128::from(res.credited))?,
-        false,
+        now,
+        lump_vest_s,
+        add_u64(res.lump, top)?,
     )?;
-    credit_r_in(&mut p, lender_rent)?;
-    vest_in(&mut p, &mut v, None, now, lump_vest_s, res.lump)?;
     *pool = p;
     *vault = v;
     Ok(lender_rent)
@@ -1640,10 +1681,12 @@ pub fn repay(
 /// `pool_model.Pool.settle` (SOL settlement S1/S2/S3; ECON §8.6, §9.4, §9.5; ARCH §3.3):
 /// the token debt `q` is extinguished ([`resolve`], `ΣB_Q −= q`; token claims fall
 /// pro-rata), `sol_in` lamports reach `lender_sol`; the lump part `min(lump, sol_in)` vests
-/// and the principal `sol_in − lump` is immediate: the entitlement is trued up by
-/// `principal − credited` and the principal is allocated as realised SOL; then
-/// [`maybe_roll`]. Returns the new share-epoch record if the epoch rolled (the program
-/// writes it).
+/// and the principal `sol_in − lump` is immediate but for its rent top-up: the principal
+/// pays `rent` (the position's `R_due`, all of it the lenders' in a settlement) first, and
+/// the part of that above `credited` ([`rent_top_up`]; finding M10-8C-1) vests with the
+/// lump; the entitlement is trued up by `principal − top-up − credited` and that much is
+/// allocated as realised SOL; then [`maybe_roll`]. Returns [`Settled`]: the new share-epoch
+/// record if the epoch rolled (the program writes it) and the SOL vested.
 ///
 /// # Errors
 /// `InvalidInput` if `q = 0` or `q > ΣB_Q`; `Overflow`/`Underflow` if a counter leaves
@@ -1655,26 +1698,33 @@ pub fn settle(
     lump_vest_s: u32,
     res: &Resolution,
     sol_in: u64,
-) -> Result<Option<ShareEpoch>, MathError> {
+    rent: u64,
+) -> Result<Settled, MathError> {
     let (mut p, mut v) = (*pool, *vault);
     close_pos(&mut p, &mut v, now, res)?;
     p.borrowed_q = sub_u64(p.borrowed_q, res.q)?;
     let lump = res.lump.min(sol_in);
     let principal = sub_u64(sol_in, lump)?;
     v.lender_sol = add_u64(v.lender_sol, sol_in)?;
-    credit_in(
-        &mut p,
-        &mut v,
-        None,
-        sub_i128(i128::from(principal), i128::from(res.credited))?,
-        false,
-    )?;
-    credit_r_in(&mut p, principal)?;
-    vest_in(&mut p, &mut v, None, now, lump_vest_s, lump)?;
+    let top = true_up(&mut p, &mut v, principal, rent, res.credited)?;
+    let vested = add_u64(lump, top)?;
+    vest_in(&mut p, &mut v, None, now, lump_vest_s, vested)?;
     let rec = maybe_roll_in(&mut p, &mut v, now)?;
     *pool = p;
     *vault = v;
-    Ok(rec)
+    Ok(Settled { rec, vested })
+}
+
+/// What [`settle`] booked.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub struct Settled {
+    /// The new share-epoch record if the epoch rolled (the program writes it).
+    pub rec: Option<ShareEpoch>,
+    /// The SOL the settlement added to the vest: `min(lump, sol_in)` and the rent top-up
+    /// ([`rent_top_up`]; finding M10-8C-1). A full wipe flushes it with the vest before
+    /// (`EpochRolled.vest_flushed`).
+    pub vested: u64,
 }
 
 // ---- share epochs (ECON §9.5; C0-6) -----------------------------------------------------------
@@ -1942,7 +1992,10 @@ mod tests {
             credited: 0,
             lump: 0,
         };
-        let r0 = settle(&mut p, &mut v, 0, VEST, &res, 5).unwrap().unwrap();
+        let r0 = settle(&mut p, &mut v, 0, VEST, &res, 5, 0)
+            .unwrap()
+            .rec
+            .unwrap();
         assert!(r0.is_full_wipe() && p.is_wipe_live());
         assert_eq!(p.wipe_swept, 0);
         let (vc, mut stale) = (v, a);
@@ -1979,7 +2032,10 @@ mod tests {
             credited: 0,
             lump: 0,
         };
-        let mut rec = settle(&mut p, &mut v, 0, VEST, &res, 50).unwrap().unwrap();
+        let mut rec = settle(&mut p, &mut v, 0, VEST, &res, 50, 0)
+            .unwrap()
+            .rec
+            .unwrap();
         let mut dust = Lender::new(&p);
         for req in [false, true] {
             assert_eq!(
@@ -2048,6 +2104,83 @@ mod tests {
         assert_eq!(p.vest_bal, 0);
         assert_eq!(release(&mut p, 5), Ok(0), "no vest: vest_last follows now");
         assert_eq!(p.vest_last, 5);
+    }
+
+    /// M10-8C-1: the rent an exit pays above what was credited while the position was open
+    /// vests like a lump — `repay` (the `R_min` excess of an exit within `min_rent_s`) and
+    /// `settle` (whose immediate part pays `R_due` first) — so a depositor who joins in the
+    /// exit's second claims 0 of it, while a shortfall is still debited at once.
+    #[test]
+    fn rent_top_up_vests_like_a_lump() {
+        assert_eq!(rent_top_up(170, 170, 30), 140);
+        assert_eq!(rent_top_up(850, 200, 30), 170, "settle: R_due's part only");
+        assert_eq!(
+            rent_top_up(20, 200, 30),
+            0,
+            "principal below the credited rent"
+        );
+        assert_eq!(rent_top_up(170, 170, 300), 0, "a shortfall");
+
+        let setup = || {
+            let (mut p, mut v) = (Pool::new(), Vault::new());
+            let mut h = Lender::new(&p);
+            deposit(&mut p, &mut v, &mut h, &[], 0, 1_000_000, false).unwrap();
+            borrow(&mut p, 0, 1_000, D).unwrap();
+            accrue(&mut p, &mut v, 60, 30).unwrap();
+            let mut j = Lender::new(&p);
+            deposit(&mut p, &mut v, &mut j, &[], 60, 9_000_000, false).unwrap();
+            (p, v, h, j)
+        };
+        // repay: rent 200 at 15 %: lender rent 170, credited 30, top-up 140 vests with the lump.
+        let (mut p, mut v, mut h, mut j) = setup();
+        let (acc, acc_r) = (p.acc, p.acc_r);
+        let res = Resolution {
+            q: 1_000,
+            credited: 30,
+            lump: 50,
+        };
+        assert_eq!(repay(&mut p, &mut v, 60, VEST, &res, 200, 1_500), Ok(170));
+        assert_eq!(p.acc, acc, "nothing above the credited rent at once");
+        assert!(p.acc_r > acc_r, "the credited rent is realised");
+        assert_eq!((p.vest_bal, p.vest_end), (190, 60 + i64::from(VEST)));
+        assert_eq!(claim(&p, &mut v, &mut j, &[], 60), Ok(0), "the JIT lender");
+        assert!((29..=30).contains(&claim(&p, &mut v, &mut h, &[], 60).unwrap()));
+        // A shortfall (rent 20: lender rent 17 < 30) is debited at once; nothing vests.
+        let (mut p, mut v, _, _) = setup();
+        let acc = p.acc;
+        repay(
+            &mut p,
+            &mut v,
+            60,
+            VEST,
+            &Resolution { lump: 0, ..res },
+            20,
+            1_500,
+        )
+        .unwrap();
+        assert!(p.acc < acc);
+        assert_eq!(p.vest_bal, 0);
+
+        // settle: 900 in, lump 50; the principal 850 pays R_due = 200 first: 170 above the
+        // credited 30 vests with the lump, the token part 650 is immediate.
+        let (mut p, mut v, mut h, mut j) = setup();
+        assert_eq!(
+            settle(&mut p, &mut v, 60, VEST, &res, 900, 200),
+            Ok(Settled {
+                rec: None,
+                vested: 220
+            })
+        );
+        assert_eq!(p.vest_bal, 220, "the vest booked is the one returned");
+        assert_eq!(p.borrowed_q, 0);
+        let paid_j = claim(&p, &mut v, &mut j, &[], 60).unwrap();
+        // The JIT lender's part of the immediate token value (650·9/10), none of the rent.
+        assert!(
+            paid_j <= 650 * 9 / 10 && paid_j + 2 >= 650 * 9 / 10,
+            "{paid_j}"
+        );
+        let paid_h = claim(&p, &mut v, &mut h, &[], 60).unwrap();
+        assert!(paid_h <= 30 + 65 && paid_h + 2 >= 30 + 65, "{paid_h}");
     }
 
     /// M0B-A-2 (review): "never earlier" needs `lump_vest_s ≥ vest_end − now`. After a

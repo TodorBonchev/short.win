@@ -289,6 +289,7 @@ impl Market {
         sol_in: u64,
         credited: u64,
         lump: u64,
+        rent: u64,
     ) -> Result<(), MathError> {
         let res = Resolution { q, credited, lump };
         let rec = pool::settle(
@@ -298,7 +299,9 @@ impl Market {
             self.lump_vest_s,
             &res,
             sol_in,
-        )?;
+            rent,
+        )?
+        .rec;
         self.inflow += u128::from(sol_in);
         if let Some(r) = rec {
             assert_eq!(
@@ -366,7 +369,7 @@ impl Market {
                 u64a(3),
                 u64a(4),
             )),
-            "s" => none(self.settle(u64a(0), u64a(1), u64a(2), u64a(3))),
+            "s" => none(self.settle(u64a(0), u64a(1), u64a(2), u64a(3), u64a(4))),
             "p" => none(self.sweep(u64a(0))),
             _ => panic!("unknown op {op}"),
         }
@@ -778,14 +781,22 @@ impl Rent {
 
     /// Rent owed by a position: `⌈q·(I − I_open)/WAD⌉`.
     pub fn owed(&self, pos: &Pos) -> u64 {
-        let o = mul_div(
+        u64::try_from(self.owed_wide(pos)).expect("owed fits u64")
+    }
+
+    /// [`Self::owed`] clamped to `u64` (a settlement's `R_due`; `gen_pool.py` clamps the same).
+    pub fn owed_sat(&self, pos: &Pos) -> u64 {
+        u64::try_from(self.owed_wide(pos)).unwrap_or(u64::MAX)
+    }
+
+    fn owed_wide(&self, pos: &Pos) -> u128 {
+        mul_div(
             u128::from(pos.q),
             self.index - pos.index_open,
             WAD,
             Rounding::Ceil,
         )
-        .expect("owed");
-        u64::try_from(o).expect("owed fits u64")
+        .expect("owed")
     }
 
     pub fn open(&mut self, q: u64, deadline: i64) -> u64 {
@@ -919,10 +930,25 @@ impl Model {
         Ok(())
     }
 
+    /// `pool_model.Pool.settle(pid, sol_in, lump)`: the rent `R_due` is the model's default,
+    /// the position's accrued rent ([`Self::owed`]).
     pub fn settle(&mut self, id: u64, sol_in: u64, lump: u64) -> Result<(), MathError> {
+        self.settle_above(id, sol_in, lump, 0)
+    }
+
+    /// `pool_model.Pool.settle(pid, sol_in, lump, rent)` with `R_due` = the accrued rent +
+    /// `excess` (an early settlement's `R_min` above it; finding M10-8C-1).
+    pub fn settle_above(
+        &mut self,
+        id: u64,
+        sol_in: u64,
+        lump: u64,
+        excess: u64,
+    ) -> Result<(), MathError> {
         let pos = self.rent.get(id);
         let credited = self.rent.credited_for(&pos);
-        self.m.settle(pos.q, sol_in, credited, lump)?;
+        let rent = self.rent.owed_sat(&pos).saturating_add(excess);
+        self.m.settle(pos.q, sol_in, credited, lump, rent)?;
         self.rent.take(id);
         Ok(())
     }

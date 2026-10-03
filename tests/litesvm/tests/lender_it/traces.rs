@@ -223,7 +223,14 @@ impl Model {
         Ok(())
     }
 
-    fn settle(&mut self, q: u64, sol_in: u64, credited: u64, lump: u64) -> Result<(), MathError> {
+    fn settle(
+        &mut self,
+        q: u64,
+        sol_in: u64,
+        credited: u64,
+        lump: u64,
+        rent: u64,
+    ) -> Result<(), MathError> {
         let res = Resolution { q, credited, lump };
         if let Some(r) = pool::settle(
             &mut self.pool,
@@ -232,7 +239,10 @@ impl Model {
             self.lump_vest_s,
             &res,
             sol_in,
-        )? {
+            rent,
+        )?
+        .rec
+        {
             self.records.push(r);
         }
         Ok(())
@@ -657,10 +667,16 @@ fn replay(trace: &Value, program: TokenProgram, max_lines: usize) -> Stats {
                     show(&r.map(|()| None::<u8>))
                 }
                 "s" => {
-                    let (q, sol, cred, lump) = (n(&args, 0), n(&args, 1), n(&args, 2), n(&args, 3));
-                    let r = m.settle(q, sol, cred, lump);
+                    let (q, sol, cred, lump, rent) = (
+                        n(&args, 0),
+                        n(&args, 1),
+                        n(&args, 2),
+                        n(&args, 3),
+                        n(&args, 4),
+                    );
+                    let r = m.settle(q, sol, cred, lump, rent);
                     liveness_cap_from_model(&m, &lab);
-                    assert_eq!(lab.settle_raw(q, sol, cred, lump), r, "{ctx}");
+                    assert_eq!(lab.settle_raw(q, sol, cred, lump, rent), r, "{ctx}");
                     show(&r.map(|()| None::<u8>))
                 }
                 "p" => {
@@ -732,9 +748,9 @@ fn lock_heavy_mix_keeps_i_p4_on_the_untouched_state() {
 }
 
 /// T-POT / R3A-2: the reviewer's 40-seed stranding table (`pool_model.stranded_table()`,
-/// v0.4 rows: 20,399 lamports stranded over 51,186 SOL of inflow, worst seed 596). Through the
-/// program (which pays the SOL part of withdrawals at once) nothing is stranded beyond
-/// rounding either.
+/// v0.4 rows: 19,887 lamports stranded over 51,186 SOL of inflow, worst seed 582 — 20,399 and
+/// 596 before M10-8C-1's vested rent top-up). Through the program (which pays the SOL part of
+/// withdrawals at once) nothing is stranded beyond rounding either.
 #[test]
 fn stranding_table_wind_down_strands_only_dust() {
     // Quick: the first seed of two files; full: all 40 seeds.
@@ -763,7 +779,7 @@ fn stranding_table_wind_down_strands_only_dust() {
     println!("stranding: {seeds} seeds, total {total} lamports, worst {worst}");
     if full() {
         // Exactly the model's R3A-2 row (the generator's `source` line of these files).
-        assert_eq!((seeds, total, worst), (40, 20_399, 596));
+        assert_eq!((seeds, total, worst), (40, 19_887, 582));
     }
 }
 
@@ -777,7 +793,8 @@ fn pool_model_scenarios_replay() {
 }
 
 /// The extended profiles: lazy lenders many epochs behind (repeated wipes, deep rebases),
-/// runs and churn, dust amounts, the scripted lock-term and over-lock cases.
+/// runs and churn, dust amounts, exits whose rent top-up vests (M10-8C-1; not the u64-extreme
+/// profile) with the scripted JIT whale, the scripted lock-term and over-lock cases.
 #[test]
 fn extended_profiles_replay() {
     let lines = if full() { usize::MAX } else { 1_000 };
@@ -791,6 +808,17 @@ fn extended_profiles_replay() {
             // at the model's own figure.
             let s = replay(&t, TokenProgram::Token2022, lines);
             println!("{}: {s:?}", t["name"]);
+        }
+    }
+    for t in load("pool_ext_topup_1.json") {
+        let nm = t["name"].as_str().unwrap();
+        if nm != "ext_topup_extreme_100" {
+            let s = replay(
+                &t,
+                TokenProgram::BOTH[usize::from(nm.ends_with("_90"))],
+                lines,
+            );
+            println!("{nm}: {s:?}");
         }
     }
     for t in load("pool_ext_extreme_1.json") {

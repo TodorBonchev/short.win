@@ -2028,8 +2028,10 @@ pub fn settle_checked(
             lump: payout.lump,
         },
         payout.lenders,
+        pred.inp.r_due,
     )
-    .unwrap();
+    .unwrap()
+    .rec;
     assert!(rec.is_none(), "no epoch roll in these scenarios");
     let m1 = env.market(&rm.market());
     assert_eq!(m1.pool(), p, "pool::settle");

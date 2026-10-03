@@ -429,7 +429,7 @@ jobs:
   t-pot:
     # T-POT gate (ARCH §8.2, §9 M1 exit criteria; M1-FID-2): every `pool_model` v0.4.1 trace
     # replayed through the program in release — the reviewer's 40-seed stranding table (the
-    # R3A-2 row asserted exactly: 40 seeds, 20,399 lamports, worst seed 596), the lock-heavy mix
+    # R3A-2 row asserted exactly: 40 seeds, 19,887 lamports, worst seed 582), the lock-heavy mix
     # with the untouched-state I-P4, the extended profiles and both ECON §9.6 fuzz runs (60,000
     # operations each) — with the invariant hooks after every instruction and the I-P6 liveness
     # cap at the model's own figure. The `program-tests` job replays only a quick subset. ~4 min.

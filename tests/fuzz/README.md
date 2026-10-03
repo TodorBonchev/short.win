@@ -80,7 +80,7 @@ each replayed repeatedly.
 | group | actions |
 |---|---|
 | trading | `open` (log-uniform from just below 0.1 SOL of notional to just above `min(X/20, T)`; one in 32 with `min_proceeds = u64::MAX`, `max_margin = 0` or `max_open_fee = 0`), `open_near_cap` (the largest `q` accepted, by bisection on clones from 5 % above the minimum notional — since M10; from `X/10⁵` it started below it on every fork pool and was skipped —; the refusal one unit above is counted), `close` (one in 32 with `max_buyback_cost = 1`), `add_margin`; on the mock, opens and closes pick an extras selection (`none` / `current` / `previous` / `stable`) |
-| lenders | `deposit` (one in 101 of zero tokens), `withdraw` (a fraction, all shares, or exactly the pro-rata allowance), `claim_sol` ×1–4 **in one transaction** (M10), `cover_deficit`, `sync_lender`, `sweep_trader`, `dust_sweeps` (1 lamport to the trader and a sweep every minute), `lenders_out` (all out, optionally a dust holder stays, then a sweep), `jit_deposit` (`[deposit, exit, withdraw]`; since M10 the exit a liquidation or an expiry that lands — with `b` even at the position's deadline — and the withdrawal the minted shares within the allowance after the exit), ★`withdraw_then_settle` (M10, C0-9: `[withdraw, sol_settle]` in one transaction) |
+| lenders | `deposit` (one in 101 of zero tokens), `withdraw` (a fraction, all shares, or exactly the pro-rata allowance), `claim_sol` ×1–4 **in one transaction** (M10), `cover_deficit`, `sync_lender`, `sweep_trader`, `dust_sweeps` (1 lamport to the trader and a sweep every minute), `lenders_out` (all out, optionally a dust holder stays, then a sweep), `jit_deposit` (`[deposit, exit, withdraw]`; since M10 the exit a liquidation or an expiry that lands, else a `sol_settle` that settles — with `b` odd after arming the settlement clock and up to 30 s, with `b` even at the position's deadline — and the withdrawal the minted shares within the allowance after the exit), ★`withdraw_then_settle` (M10, C0-9: `[withdraw, sol_settle]` in one transaction) |
 | keeper and time | `keeper_seconds` (crank every market, then liquidate / expire / sol_settle every position, each second), `crank`, `keeper_exit`, `silence` (41–940 s without observation — past `COVERAGE_GAP_S`, 40 s since the owner's decision of 2026-10-01 (OWNER-M7-12; was 31–930 s against 30 s): `CoverageGap`; with the role installed, two in three are **degraded mode** (O17): the keeper's `set_coverage_pause(true)` on every market, cleared 1–8 actions later), `warp` (1 s – 3 d), `warp_to_deadline` (±, or past the S3 tail), `outage` (venue halted, fee above the hard cap, or halted and flagged, 130 s – 2 h with the keeper settling: the no-route chain, S3, T-S3-BROKEN) |
 | prices and liquidity | `trade`, `shock` (×/÷ 1.05–10, held), `ramp`, `liquidity` (add / remove), `lp_wrapped_crank` (`[withdraw, crank, deposit]` and `[deposit, crank, withdraw]`), `deposit_wrapped_open`, `withdraw_wrapped_exit` |
 | atomic bundles (ECON §12) | `pump_crank_dump` (`[push, crank, unwind]` 1–20 s in a row), `contrary_low` (a contrary low observation every second, with or without the keeper's, then `sol_settle`), `attacker_seconds` (1–6 attacker-only seconds up / down / flip before a settlement), `push_then_freeze`, `sandwich_exit` (`[front, close / liquidate / expire / sol_settle, back]`), `held_sandwich`, `dump_around_settle` (a dump or an LP deposit around `sol_settle`) |
@@ -130,12 +130,14 @@ each replayed repeatedly.
   run as an accepted omission does (before, an anomaly for review: no run ever reported one).
 - **Lenders (M10)**: `claim_sol ×N` in one transaction: every claim after the first pays 0 and the
   lender's wallet gains exactly the first (V2-2). The JIT capture oracle (R3B-2, ECON §9.4): around
-  a landed liquidation or expiry, while another lender holds shares, the JIT lender's SOL (wallet +
-  its `LenderPosition`'s lamports + touched balance) gains at most its minted shares' part of the rent the exit credits at once
-  (`max(0, lender_rent − credited_for(pos))`, the minimum rent above the continuous credit) over a
-  clone in which the same exit lands without the deposit — none of the lump, which vests — and its
-  tokens come back at most at the deposit's rate (a settlement's immediate principal trades
-  tokens for SOL and is not checked; a last lender is paid the unreleased vest by design, R4B-4).
+  a landed liquidation, expiry or settlement, while another lender holds shares, the JIT lender's
+  SOL (wallet + its `LenderPosition`'s lamports + touched balance) gains over a clone in which the
+  same exit lands without the deposit at most 2 lamports beyond its minted shares' part of the
+  settlement's token part (`principal − top-up − credited`; 0 for a liquidation or an expiry) —
+  none of the lump and, since M10-8C-1, none of the rent top-up
+  `max(0, min(principal, rent) − credited_for(pos))`, which vest — and its tokens come back at most
+  at the deposit's rate (a last lender is paid the unreleased vest by design, R4B-4; a settlement
+  that rolls the share epoch is not checked, `jit-unchecked:epoch-rolled`).
   `[withdraw, sol_settle]` (C0-9): the withdrawal stays within the pro-rata allowance the lender had
   before the bundle, and the bundle never returns an open-only or mint-filter code.
 - **`add_margin`** is never refused (ARCH §3.5).
@@ -188,7 +190,8 @@ by `instruction:Error`, and events (`Liquidate`, `Expire`, `SolSettle(S1/S2/S3)`
 M10, `…:v4-differential-…` and `…:curve-differential-…` —, near-cap refusals by cap, venue CPI
 refusals; since M10 the I14 refusals by instruction and code (`i14-omit-refused:…`,
 `i14-replace-refused:…`), the lender oracles' reach (`claim-bundle-landed`, `jit-capture-checked`,
-`jit-unchecked:<why>`, `jit-old-shape:<why>`, `withdraw-then-settle-landed`) and
+`jit-capture-checked:settle`, `jit-settle-clock:<settles|none>`, `jit-unchecked:<why>`,
+`jit-old-shape:<why>`, `withdraw-then-settle-landed`) and
 `donate-trader-base-ata`), and prints **coverage proxies**: short.win instructions that landed (of 30), events emitted, and
 short.win error codes returned (of the codes `errors.rs` declares), with the codes never returned —
 a branch proxy (`summary.json`'s `coverage`). sBPF PC coverage is not measured (LiteSVM 0.16's
@@ -202,7 +205,7 @@ still run): the waterfall amounts of curve exits beyond the hooks (the curve's d
 predicts the decision and the bound, not every lamport), keeper exits on CPMM and PumpSwap markets
 (no differential exit oracle there: the CPMM fixture is being re-dumped, WP-2; PumpSwap has none
 in `tests/litesvm` to reuse), sandwich and bundle exits (only the keeper's own exits go through the
-differential oracles), the JIT capture around a settlement (its principal is immediate), and any
+differential oracles), the JIT capture around a settlement that rolls the share epoch, and any
 economic outcome of the ECON §12 bundles (attacker P&L, lenders whole, deferral seconds), which
 are `tests/litesvm`'s attack suites.
 

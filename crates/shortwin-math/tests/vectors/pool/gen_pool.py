@@ -38,6 +38,17 @@ writes, next to itself:
                        a lock term (its shares and lock floored to 0 in a rebase, its term
                        did not), which the next roll's record must scale (M0b review
                        M0B-A-1).
+  pool_ext_topup_<k>.json
+                       the rent top-up of finding M10-8C-1: extended profiles whose exits pay
+                       rent above what accrued (`rpx`: a repay of the accrued rent plus an
+                       R_min-like excess; `stx`: a settlement whose RENT = R_due exceeds the
+                       accrued rent), so the top-up `max(0, min(principal, rent) − credited)`
+                       is R_min-sized and not rounding-sized (`top_ups` counts the exits
+                       with a positive top-up); and two scripted JIT bundles (a whale's
+                       deposit, the exit, claim, withdrawal and claim in one second, around
+                       an early repay and an early settlement) whose claims the model
+                       asserts: the whale realises at most rounding, beyond its share of a
+                       settlement's token value.
   pool_scenarios_<k>.json
                        the default-switch branches of pool_model's demos (ECON §9.3–§9.6),
                        the round-3 cases of attacks/pool_r3.py (jit_hold_table,
@@ -69,9 +80,12 @@ starts at 0. Operations:
                     rent credit A·dI/(WAD·10^4)); refused as a whole, time included
   r Q RENT P CREDITED LUMP
                     pool::repay (RENT = rent paid, P = the position's rent_protocol_bps,
-                    CREDITED = rent::credited_for, LUMP = lender lump that vests)
-  s Q SOL CREDITED LUMP
-                    pool::settle (LUMP = the part of SOL that vests)
+                    CREDITED = rent::credited_for, LUMP = lender lump that vests; the
+                    lender rent above CREDITED vests with it, M10-8C-1)
+  s Q SOL CREDITED LUMP RENT
+                    pool::settle (LUMP = the part of SOL that vests; RENT = R_due, paid
+                    first by the immediate rest, whose part above CREDITED vests too,
+                    M10-8C-1)
   p LAMPORTS        pool::sweep (SweepSource::Trader)
 
 U is an index into the trace's `users`; a lender is created (pool::Lender::new) the
@@ -495,13 +509,18 @@ class RecPool(BasePool):
         return self.rec_call(f"r {q} {rent_paid} {p} {credited} {lender_lump}",
                              lambda: BasePool.repay(self, pid, rent_paid, lender_lump))
 
-    def settle(self, pid, sol_in, lump=0):
+    def settle(self, pid, sol_in, lump=0, rent=None):
         if self.rec_depth:
-            return BasePool.settle(self, pid, sol_in, lump)
+            return BasePool.settle(self, pid, sol_in, lump, rent)
         q, io, p, _dl = self.positions[pid]
         credited = self._credited_for(q, io, p)
-        assert 0 <= sol_in <= U64 and 0 <= lump <= U64
-        return self.rec_call(f"s {q} {sol_in} {credited} {lump}", lambda: BasePool.settle(self, pid, sol_in, lump))
+        if rent is None:
+            # pool_model.settle's default: the position's accrued rent (R_due past min_rent_s).
+            # Clamped to u64 (R_due is a u64 on-chain), passed explicitly so both sides agree.
+            rent = min(pm.cdiv(q * (self.index - io), pm.WAD), U64)
+        assert 0 <= sol_in <= U64 and 0 <= lump <= U64 and 0 <= rent <= U64
+        return self.rec_call(f"s {q} {sol_in} {credited} {lump} {rent}",
+                             lambda: BasePool.settle(self, pid, sol_in, lump, rent))
 
     def sweep_sol(self, lamports):
         if self.rec_depth:
@@ -678,6 +697,7 @@ class Ext:
             p = pm.Pool("continuous", util_cap_bps=self.cap, **self.pool_kw)
         self.pid = 0
         self.p, self.rng = p, rng
+        self.top_ups = 0
         counts = {}
         for _ in range(self.n_ops):
             op = rng.choice(self.ops)
@@ -688,8 +708,12 @@ class Ext:
                 counts[op + "!"] = counts.get(op + "!", 0) + 1
             p.rec_end_line()
         assert not p.rec_tainted
+        extra = {}
+        if {"rpx", "stx"} & set(self.ops):
+            assert self.top_ups >= self.n_ops // 40, (self.name, self.top_ups)
+            extra["top_ups"] = str(self.top_ups)
         return trace_json(p, self.name, self.note, seed=str(self.seed),
-                          op_counts={k: str(v) for k, v in sorted(counts.items())})
+                          op_counts={k: str(v) for k, v in sorted(counts.items())}, **extra)
 
     def amt(self, kind, *a):
         return self.amounts[kind](self.rng, self.p, *a)
@@ -765,6 +789,35 @@ class Ext:
             sol = self.amt("sol")
             p.settle(self.rng.choice(list(p.positions)), sol,
                      self.rng.randrange(0, sol + 1) if self.rng.random() < 0.4 else 0)
+
+    def op_rpx(self):
+        """M10-8C-1: an exit within min_rent_s pays R_due = R_min, above the rent accrued; the
+        lender part above the credited rent vests with the lump."""
+        p = self.p
+        if not p.positions:
+            return
+        k = self.rng.choice(list(p.positions))
+        q, io, pr, dl = p.positions[k]
+        paid = min(pm.cdiv(q * (p.index - io), pm.WAD) + self.amt("rmin"), U64)
+        top = max(paid - paid * pr // pm.BPS - p._credited_for(q, io, pr), 0)
+        p.repay(k, paid, self.amt("lump") if self.rng.random() < 0.5 else 0)
+        self.top_ups += top > 0
+
+    def op_stx(self):
+        """M10-8C-1: a settlement whose R_due (paid first by the immediate part) exceeds the
+        rent accrued: an early settlement's R_min, or a settlement past min_rent_s, whose rent
+        carries no protocol share."""
+        p = self.p
+        if not p.positions:
+            return
+        k = self.rng.choice(list(p.positions))
+        q, io, pr, dl = p.positions[k]
+        rent = min(pm.cdiv(q * (p.index - io), pm.WAD) + self.amt("rmin"), U64)
+        sol = self.amt("sol")
+        lump = self.rng.randrange(0, sol + 1) if self.rng.random() < 0.4 else 0
+        top = max(min(sol - lump, rent) - p._credited_for(q, io, pr), 0)
+        p.settle(k, sol, lump, rent)
+        self.top_ups += top > 0
 
     def op_wipe(self):
         """Run + full SOL settlement: borrow what the cap allows, settle everything."""
@@ -847,6 +900,7 @@ def normal_amounts():
         "sol": lambda r, p: r.randrange(0, 10**12),
         "lump": lambda r, p: r.randrange(0, 10**9),
         "sweep": lambda r, p: r.choice([0, 1, r.randrange(1, 10**9)]),
+        "rmin": lambda r, p: r.choice([1, r.randrange(1, 10**6), r.randrange(10**5, 10**9)]),
     }
 
 
@@ -858,6 +912,7 @@ def dust_amounts():
         "sol": lambda r, p: r.randrange(0, 12),
         "lump": lambda r, p: r.randrange(0, 4),
         "sweep": lambda r, p: r.randrange(0, 4),
+        "rmin": lambda r, p: r.randrange(0, 12),
     }
 
 
@@ -875,11 +930,13 @@ def extreme_amounts():
         "sol": lambda r, p: r.choice([0, 1, r.randrange(0, 10**14), 10**14]),
         "lump": lambda r, p: r.randrange(0, 10**12),
         "sweep": lambda r, p: r.choice([0, r.randrange(0, 10**13)]),
+        "rmin": lambda r, p: r.choice([1, r.randrange(0, 10**12), 10**13]),
     }
 
 
 LAZY = (["dep"] * 3 + ["wd"] * 3 + ["run", "bor", "bor", "acc", "acc", "adv", "rep", "rep", "set", "set",
         "clm", "clm", "clmN", "cov", "swp", "swp", "wipe", "deep", "chn", "tch", "gov", "view", "lock"])
+TOPUP = LAZY + ["bor"] * 6 + ["rpx"] * 4 + ["stx"] * 4 + ["dep", "clm", "wd"]
 RUNS = (["dep"] * 3 + ["run"] * 3 + ["wd", "bor", "bor", "acc", "adv", "rep", "set", "set", "clm", "clmN",
         "cov", "swp", "wipe", "chn", "chn", "chn", "tch", "view"])
 
@@ -905,6 +962,18 @@ def ext_profiles() -> list:
             "huge share counts, deep rebases"),
         Ext("ext_extreme_continuous_90", 7, 3_000, 9_000, 5, LAZY, extreme_amounts(),
             "u64-extreme token amounts, 90 % cap, lumps up to 1,000 SOL"),
+        Ext("ext_topup_continuous_90", 9, 4_000, 9_000, 6, TOPUP, normal_amounts(),
+            "M10-8C-1: exits paying rent above what accrued (rpx, stx: R_min-like excesses up to "
+            "1 SOL) among the lazy-lender mix, 90 % cap"),
+        Ext("ext_topup_continuous_100", 10, 4_000, 10_000, 6, TOPUP, normal_amounts(),
+            "M10-8C-1: exits paying rent above what accrued, 100 % cap: full wipes flush the top-up"),
+        Ext("ext_topup_minima_90", 11, 3_000, 9_000, 4, TOPUP, normal_amounts(),
+            "M10-8C-1: exits paying rent above what accrued, lump_vest_s at its compiled minimum "
+            "(3,600 s)", lump_vest_s=3_600, lock_grace_s=3_600),
+        Ext("ext_topup_dust_100", 12, 3_000, 10_000, 6, TOPUP, dust_amounts(),
+            "M10-8C-1: rent excesses of 0..11 lamports: top-ups at the rounding scale"),
+        Ext("ext_topup_extreme_100", 13, 2_000, 10_000, 5, TOPUP, extreme_amounts(),
+            "M10-8C-1: u64-extreme token amounts, rent excesses up to 10,000 SOL"),
     ]
 
 
@@ -1049,6 +1118,53 @@ def scripted_empty_lock_term() -> dict:
                       "which scales its term to 0, before the V2-12 jump")
 
 
+def scripted_topup_jit() -> dict:
+    """Finding M10-8C-1 (review of WP-6 batch 2): a whale's [deposit 9x, exit, claim,
+    withdraw, claim] in one second around an exit a minute after the open. A repay pays
+    R_min = 171,233 lamports (lender part 145,549 at a 15 % protocol share) against about
+    6,800 credited; a settlement pays R_due = R_min first out of its immediate part, beyond
+    the token value of the extinguished debt. The top-up vests: the whale realises 0 of
+    it (at most 2 lamports of rounding on the repay; its share of the token value on the
+    settlement); it is paid to the shares that hold through lump_vest_s."""
+    with recording(line_mode="op", explicit=True, verify=True) as reg:
+        p = pm.Pool("continuous", util_cap_bps=9_000)
+    r_min = 171_233
+    p.rent_protocol_bps = 1_500
+    p.deposit("h", 10**12)
+    p.borrow(1, 10**11, 3600)
+    p.borrow(2, 10**11, 3600)
+    p.advance(60, 8 * 10**10)                        # a minute of rent: ~6,800 lamports credited
+
+    def jit(who, exit_, top, token_part):
+        s_before = p.S
+        minted = p.deposit(who, 9 * 10**12)
+        exit_()
+        paid = p.claim_sol(who)
+        a = p.free_allowance(who)
+        shares = min(max(1, a * (p.S + pm.VS) // (p.T + p.B + pm.VA)), p.lenders[who].shares)
+        p.withdraw(who, shares)
+        paid += p.claim_sol(who)
+        bound = token_part * minted // (s_before + minted) + 2
+        assert top > 100_000 and paid <= bound, (who, paid, bound, top)
+        return paid
+
+    q, io, pr, _ = p.positions[1]
+    credited = p._credited_for(q, io, pr)
+    lender_rent = r_min - r_min * pr // pm.BPS
+    jit("w", lambda: p.repay(1, r_min, 10**6), lender_rent - credited, 0)
+    q, io, pr, _ = p.positions[2]
+    credited = p._credited_for(q, io, pr)
+    sol, lump = 5 * 10**9, 10**7
+    jit("x", lambda: p.settle(2, sol, lump, r_min), r_min - credited, sol - lump - r_min)
+    p.advance(p.lump_vest_s + 1)
+    for who in ("h", "w", "x"):
+        p.claim_sol(who)
+    return trace_json(p, "ext_topup_scripted_jit", "scripted, finding M10-8C-1: a 9x whale's one-second "
+                      "[deposit, exit, claim, withdraw, claim] around an early repay (R_min above the credited "
+                      "rent) and an early settlement (R_due = R_min paid first): the top-up vests, the whale "
+                      "realises none of it at once; the shares holding through lump_vest_s are paid it")
+
+
 # ---- 5. demos ------------------------------------------------------------------------------
 DEMOS = ["jit_demo", "jit_hold_table", "inflation_demo", "run_demo", "claim_loop_demo", "run_util_table",
          "wipe_demo", "wipe_tail_demo", "zero_share_demo", "protocol_change_demo", "escape_demo",
@@ -1138,7 +1254,8 @@ def main() -> None:
     ext["ext_scripted_no_shares"] = scripted_no_shares()
     ext["ext_scripted_overlock"] = scripted_overlock()
     ext["ext_scripted_empty_lock_term"] = scripted_empty_lock_term()
-    for group in ("lazy", "runs", "dust", "extreme"):
+    ext["ext_topup_scripted_jit"] = scripted_topup_jit()
+    for group in ("lazy", "runs", "dust", "extreme", "topup"):
         traces = [t for n, t in ext.items() if n.startswith(f"ext_{group}")
                   or (group == "extreme" and n.startswith("ext_scripted"))]
         pack(traces, f"pool_ext_{group}", f"{src}: Pool driven by gen_pool.py's extended fuzz profiles")

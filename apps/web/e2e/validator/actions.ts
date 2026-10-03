@@ -189,14 +189,17 @@ export async function ensureLent(owner: WalletName, m: MarketInfo, source: Addre
 }
 
 /**
- * Rent paid in: the seeding payer (not a spec wallet) opens a small short on mock market `m` and
- * closes it at once, paying at least the minimum rent into the pool — lenders then have SOL to claim
- * (rent is credited continuously but becomes claimable once a borrower pays it in).
+ * Rent paid in: the seeding payer (not a spec wallet) opens a small short on mock market `m`, holds
+ * it `holdMs` and closes it, paying at least the minimum rent into the pool — lenders then have SOL
+ * to claim (rent is credited continuously but becomes claimable once a borrower pays it in). Only the
+ * rent credited while the position was open is claimable at once: the minimum rent's excess above it
+ * vests over `lump_vest_s` like a lump (M10-8C-1), hence the hold.
  */
-export async function payRentIn(m: MarketInfo, qRaw: bigint): Promise<void> {
+export async function payRentIn(m: MarketInfo, qRaw: bigint, holdMs = 30_000): Promise<void> {
     const payer = await signerFor('payer');
     const nonce = BigInt(Date.now());
     const p = await openShortFromNode(payer, m, qRaw, nonce);
+    await new Promise((resolve) => setTimeout(resolve, holdMs));
     const ix = await getCloseShortInstructionAsync({
         borrower: payer,
         mint: m.mint,
