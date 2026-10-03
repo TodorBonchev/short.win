@@ -95,7 +95,7 @@ jobs:
       - name: Rust toolchain from rust-toolchain.toml
         run: rustup toolchain install || rustup show
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-      - run: cargo test -p shortwin-math -p shortwin-math-wasm --locked
+      - run: cargo test -p shortwin-math -p shortwin-math-wasm -p squads-v4-ix --locked
 
   vectors:
     # Committed test vectors must be exactly what the normative sims generate today.
@@ -841,7 +841,7 @@ jobs:
           cargo audit -f services/Cargo.lock --deny warnings
           --ignore RUSTSEC-2025-0141 --ignore RUSTSEC-2021-0139 --ignore RUSTSEC-2024-0388
           --ignore RUSTSEC-2024-0436 --ignore RUSTSEC-2025-0161
-      - name: Keeper unit tests and LiteSVM scenarios (the indexer crates run in `indexer`)
+      - name: Keeper and shortwin-gov unit tests, LiteSVM scenarios and T-OPS (the indexer crates run in `indexer`)
         env:
           SHORTWIN_TEST_VENUE_SO: ${{ github.workspace }}/target/test-venue/deploy/shortwin.so
           MOCK_CPAMM_SO: ${{ github.workspace }}/target/deploy/mock_cpamm.so
