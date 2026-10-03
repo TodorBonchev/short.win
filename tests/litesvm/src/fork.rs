@@ -101,7 +101,7 @@ use shortwin_math::quote::{
     BuyQuote, CurveState, SellQuote, cpmm as qcpmm, ray_v4 as qv4, sol_leg,
 };
 use shortwin_venue_state::{pump, pump_amm, raydium_cpmm, raydium_v4, token_account};
-use solana_account::Account;
+use solana_account::{Account, ReadableAccount};
 use solana_keypair::Keypair;
 use solana_message::Message;
 use solana_signer::Signer;
@@ -2058,6 +2058,80 @@ impl PumpDeploy {
         let start = shortwin_venue_state::program_data::HEADER_LEN;
         let len = pd.elf_len.expect("a ProgramData fixture");
         &pd.account.data[start..start + len]
+    }
+
+    /// The build whose ELF `program`'s ProgramData in `svm` holds — as loaded
+    /// ([`load_pump_deploy`]) or as the loader's `Upgrade` wrote it (T-LATCH) — told apart by the
+    /// ELF header (the 64 bytes after the loader's header: the builds' entry points and
+    /// section-table offsets differ). `None` for any other bytes: no account, a synthetic header
+    /// without an ELF. Read in place, so the invariant hooks can ask on every transaction.
+    pub fn held(svm: &LiteSVM, program: PumpProgram) -> Option<Self> {
+        const ELF_HEADER: usize = 64;
+        let start = shortwin_venue_state::program_data::HEADER_LEN;
+        let acc = svm
+            .accounts_db()
+            .get_account_ref(&program.program_data().address)?;
+        let held = acc.data().get(start..start + ELF_HEADER)?;
+        [Self::Sep2026, Self::Oct2026]
+            .into_iter()
+            .find(|d| &d.elf(program)[..ELF_HEADER] == held)
+    }
+
+    /// The size this build's v2 trades grow a shorter curve to (rent topped up from the trader):
+    /// 125 (`shortwin_venue_state::pump::CURVE_LEN_V2`, R-PUMP U10), 141 since the 2026-10-02
+    /// redeploy ([`CURVE_LEN_2026_10`]).
+    pub fn curve_len(self) -> usize {
+        match self {
+            Self::Sep2026 => pump::CURVE_LEN_V2,
+            Self::Oct2026 => CURVE_LEN_2026_10,
+        }
+    }
+
+    /// The size this build's trades grow a shorter PumpSwap pool to (rent topped up from the
+    /// trader): 271 (`shortwin_venue_state::pump_amm::POOL_LEN_CREATE`, R-VEN H8), 287 since the
+    /// 2026-10-02 redeploy ([`crate::pamm::POOL_LEN_2026_10`]).
+    pub fn pool_len(self) -> usize {
+        match self {
+            Self::Sep2026 => pump_amm::POOL_LEN_CREATE,
+            Self::Oct2026 => crate::pamm::POOL_LEN_2026_10,
+        }
+    }
+}
+
+/// pump's `buy_v3` (`07051dc4…`), new in its 2026-10-02 redeploy.
+pub const PUMP_BUY_V3: [u8; 8] = [0x07, 0x05, 0x1d, 0xc4, 0xf5, 0x17, 0x65, 0x50];
+/// Anchor's `InstructionFallbackNotFound`: the discriminator names no instruction.
+pub const ANCHOR_INSTRUCTION_FALLBACK_NOT_FOUND: u32 = 101;
+/// Anchor's `AccountNotEnoughKeys`.
+pub const ANCHOR_ACCOUNT_NOT_ENOUGH_KEYS: u32 = 3005;
+
+impl Env {
+    /// Which build of pump or PumpSwap **executes** (not only what its ProgramData holds,
+    /// [`PumpDeploy::held`]), asked of the program: an instruction new in the 2026-10-02 redeploy
+    /// — pump's `buy_v3`, PumpSwap's `buy_v2` ([`crate::pamm::PAMM_BUY_V2`]) — sent without
+    /// accounts fails `InstructionFallbackNotFound` on the 2026-09 build and
+    /// `AccountNotEnoughKeys` on the redeploy, which dispatches it and then finds no accounts.
+    /// pump-fees added no instruction, so it is not asked (panics). Callers warp a slot between
+    /// two probes of one program (the same transaction would be a duplicate).
+    pub fn pump_build_running(&mut self, program: PumpProgram) -> PumpDeploy {
+        let disc = match program {
+            PumpProgram::Pump => PUMP_BUY_V3,
+            PumpProgram::Amm => crate::pamm::PAMM_BUY_V2,
+            PumpProgram::Fees => panic!("pump-fees' builds share their instructions"),
+        };
+        let mut data = disc.to_vec();
+        data.extend_from_slice(&[0; 16]);
+        let probe = Instruction {
+            program_id: program.id(),
+            accounts: vec![],
+            data,
+        };
+        let res = self.send(&[probe], &[]);
+        match crate::errors::custom_code(&res) {
+            Some(ANCHOR_INSTRUCTION_FALLBACK_NOT_FOUND) => PumpDeploy::Sep2026,
+            Some(ANCHOR_ACCOUNT_NOT_ENOUGH_KEYS) => PumpDeploy::Oct2026,
+            other => panic!("unexpected {program:?} answer {other:?}: {res:?}"),
+        }
     }
 }
 

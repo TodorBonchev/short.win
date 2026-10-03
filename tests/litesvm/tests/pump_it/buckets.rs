@@ -19,15 +19,13 @@
 use shortwin::constants::{
     PUMP_EVENT_AUTHORITY, PUMP_FEE_CONFIG, PUMP_GLOBAL, PUMP_PROGRAM_ID, TOKEN_PROGRAM_ID,
 };
-use shortwin_litesvm_tests::fork::{PumpDeploy, PumpProgram};
+use shortwin_litesvm_tests::fork::{PUMP_BUY_V3, PumpDeploy, PumpProgram};
 use shortwin_math::quote::{self as mq, MigrationParams};
 use shortwin_venue_state::pump as vpump;
 
 use crate::common::*;
 use crate::flows::round_trip;
 
-/// pump `buy_v3` (`07051dc4…`).
-const PUMP_BUY_V3: [u8; 8] = [0x07, 0x05, 0x1d, 0xc4, 0xf5, 0x17, 0x65, 0x50];
 /// pump `sell_v3` (`1c92de77…`).
 const PUMP_SELL_V3: [u8; 8] = [0x1c, 0x92, 0xde, 0x77, 0x26, 0xc4, 0x69, 0xd5];
 /// `BondingCurve.creator_fee` (u64), the un-swept creator fee bucket.
