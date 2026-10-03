@@ -1,13 +1,13 @@
-<!-- constants cross-checked against tests/bench/m7_keeper/results.json (a5766d13) -->
+<!-- constants cross-checked against tests/bench/m7_keeper/results.json (c1f6feeb) -->
 
 ### Measured inputs: requested CU per instruction (ceil(simulated x 1.1), what the priority fee is paid on) and crank batches
 
 | venue | crank_price | sol_settle (keep / settles) | liquidate / expire | v1 max cranks | v0 + protocol ALT cranks |
 |---|---|---|---|---|---|
-| PumpSwap | 41,199 | 64,133 / 74,171 | 212,313 / 208,405 | 8 | 3 |
-| curve | 37,382 | 62,702 / 72,723 | 191,983 / 188,964 | 11 | 5 |
-| CPMM | 32,843 | 65,631 / 77,379 | 125,289 / 117,487 | 9 | 4 |
-| AMM v4 | 32,779 | 57,639 / 67,704 | 105,270 / 101,004 | 9 | 4 |
+| PumpSwap | 41,199 | 64,146 / 74,267 | 211,700 / 208,444 | 8 | 3 |
+| curve | 37,382 | 62,715 / 72,818 | 191,371 / 188,548 | 11 | 5 |
+| CPMM | 32,843 | 65,644 / 77,470 | 124,669 / 117,526 | 9 | 4 |
+| AMM v4 | 32,779 | 57,653 / 67,798 | 104,650 / 101,042 | 9 | 4 |
 
 ### Cost of continuous coverage: one crank per market per second (SOL per market per day)
 

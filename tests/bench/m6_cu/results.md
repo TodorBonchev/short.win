@@ -4,10 +4,10 @@ Compute units of every PumpSwap-path instruction and the `→ PumpSwap` graduati
 
 | Instruction | Case | Mollusk CU | LiteSVM CU | venue CU | Budget | Budget source | Trace | ARCH §6.2 (PumpSwap) | Peak height |
 |---|---|---|---|---|---|---|---|---|---|
-| `create_market` | Auto, Token-2022, 301 B, boost spent (mature): PumpSwap, the init set | 134436 | 134436 | — | 250000 | §6.1 `create_market` | 15 | — | 3 |
-| `create_market` | Auto, SPL Token, 261 B (legacy261): PumpSwap, the init set | 113484 | 113484 | — | 250000 | §6.1 `create_market` | 15 | — | 3 |
-| `create_market` | Auto, Token-2022, 301 B, boost active (fresh): PumpSwap, the init set | 117936 | 117936 | — | 250000 | §6.1 `create_market` | 15 | — | 3 |
-| `create_market` | Auto, Token-2022, 301 B, cashback (cashback): PumpSwap, the init set | 132934 | 132934 | — | 250000 | §6.1 `create_market` | 15 | — | 3 |
+| `create_market` | Auto, Token-2022, 301 B, boost spent (mature): PumpSwap, the init set | 134442 | 134442 | — | 250000 | §6.1 `create_market` | 15 | — | 3 |
+| `create_market` | Auto, SPL Token, 261 B (legacy261): PumpSwap, the init set | 113490 | 113490 | — | 250000 | §6.1 `create_market` | 15 | — | 3 |
+| `create_market` | Auto, Token-2022, 301 B, boost active (fresh): PumpSwap, the init set | 117942 | 117942 | — | 250000 | §6.1 `create_market` | 15 | — | 3 |
+| `create_market` | Auto, Token-2022, 301 B, cashback (cashback): PumpSwap, the init set | 132940 | 132940 | — | 250000 | §6.1 `create_market` | 15 | — | 3 |
 | `open_short` | Token-2022, 301 B, boost spent (mature): first open of a wallet | 198564 | 198564 | 75663 | 250000 | §6.1 `open_short` PumpSwap | 23 | 20 (≤ 23) | 3 |
 | `open_short` | SPL Token, 261 B (legacy261): first open of a wallet | 181822 | 181822 | 67533 | 250000 | §6.1 `open_short` PumpSwap | 23 | 20 (≤ 23) | 3 |
 | `open_short` | SPL Token, 211 B, no creator (legacy211): first open of a wallet | 181252 | 181252 | 64026 | 250000 | §6.1 `open_short` PumpSwap | 22 | 20 (≤ 23) | 3 |
@@ -15,20 +15,20 @@ Compute units of every PumpSwap-path instruction and the `→ PumpSwap` graduati
 | `open_short` | Token-2022, 301 B, boost spent (mature): second position of a wallet | 196031 | 196031 | 75666 | 250000 | §6.1 `open_short` PumpSwap | 22 | 20 (≤ 23) | 3 |
 | `open_short` | Token-2022, 301 B, boost spent (mature): first open, normalising | 207258 | 207258 | 75663 | 250000 | §6.1 `open_short` PumpSwap | 26 | 20 (≤ 23) | 3 |
 | `open_short` | Token-2022, 301 B, boost spent (mature): costliest — normalising, creator change into an empty vault, last recipients | 206008 | 206008 | 71299 | 250000 | §6.1 `open_short` PumpSwap | 26 | 20 (≤ 23) | 3 |
-| `close_short` | Token-2022, 301 B, boost spent (mature) | 164146 | 164146 | 83529 | 250000 | §6.1 `close_short` curve / PumpSwap | 17 | 16 (≤ 19) | 3 |
-| `close_short` | SPL Token, 261 B (legacy261) | 152858 | 152858 | 74808 | 250000 | §6.1 `close_short` curve / PumpSwap | 17 | 16 (≤ 19) | 3 |
-| `close_short` | SPL Token, 211 B, no creator (legacy211) | 150808 | 150808 | 73032 | 250000 | §6.1 `close_short` curve / PumpSwap | 16 | 16 (≤ 19) | 3 |
-| `close_short` | Token-2022, 301 B, cashback (cashback) | 169581 | 169581 | 87990 | 250000 | §6.1 `close_short` curve / PumpSwap | 17 | 16 (≤ 19) | 3 |
-| `close_short` | Token-2022, 301 B, boost spent (mature): normalising | 172839 | 172839 | 83529 | 250000 | §6.1 `close_short` curve / PumpSwap | 20 | 16 (≤ 19) | 3 |
-| `close_short` | Token-2022, 301 B, boost spent (mature): costliest — normalising, creator change into an empty vault, last recipients | 171589 | 171589 | 79165 | 250000 | §6.1 `close_short` curve / PumpSwap | 20 | 16 (≤ 19) | 3 |
-| `liquidate` | Token-2022, 301 B, boost spent (mature): after a real pump (× 2.8), both legs | 186033 | 186033 | 83394 | 300000 | §6.1 `liquidate` / `expire` PumpSwap | 17 | 16 (≤ 19) | 3 |
-| `expire` | Token-2022, 301 B, boost spent (mature): past the deadline, healthy | 181062 | 181062 | 83529 | 300000 | §6.1 `liquidate` / `expire` PumpSwap | 17 | 16 (≤ 19) | 3 |
-| `liquidate` | SPL Token, 261 B (legacy261): after a real pump (× 2.8), both legs | 172244 | 172244 | 74807 | 300000 | §6.1 `liquidate` / `expire` PumpSwap | 17 | 16 (≤ 19) | 3 |
-| `expire` | SPL Token, 261 B (legacy261): past the deadline, healthy | 169635 | 169635 | 74808 | 300000 | §6.1 `liquidate` / `expire` PumpSwap | 17 | 16 (≤ 19) | 3 |
-| `liquidate` | Token-2022, 301 B, boost spent (mature): costliest — normalising, creator change, last recipients | 193874 | 193874 | 79030 | 300000 | §6.1 `liquidate` / `expire` PumpSwap | 20 | 16 (≤ 19) | 3 |
-| `liquidate` | graduation path: on the migrated pool after the warm-up | 195074 | 195074 | 94100 | 300000 | §6.1 `liquidate` / `expire` PumpSwap | 17 | 16 (≤ 19) | 3 |
-| `sol_settle` | Token-2022, 301 B, boost spent (mature): healthy, the no-change call | 50278 | 50278 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
-| `sol_settle` | Token-2022, 301 B, boost spent (mature): S3 under the buy halt (disable_flags bit 3), after s3_wait_s | 56802 | 56802 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
+| `close_short` | Token-2022, 301 B, boost spent (mature) | 163639 | 163639 | 83529 | 250000 | §6.1 `close_short` curve / PumpSwap | 17 | 16 (≤ 19) | 3 |
+| `close_short` | SPL Token, 261 B (legacy261) | 152171 | 152171 | 74808 | 250000 | §6.1 `close_short` curve / PumpSwap | 17 | 16 (≤ 19) | 3 |
+| `close_short` | SPL Token, 211 B, no creator (legacy211) | 150121 | 150121 | 73032 | 250000 | §6.1 `close_short` curve / PumpSwap | 16 | 16 (≤ 19) | 3 |
+| `close_short` | Token-2022, 301 B, cashback (cashback) | 168894 | 168894 | 87990 | 250000 | §6.1 `close_short` curve / PumpSwap | 17 | 16 (≤ 19) | 3 |
+| `close_short` | Token-2022, 301 B, boost spent (mature): normalising | 172844 | 172844 | 83529 | 250000 | §6.1 `close_short` curve / PumpSwap | 20 | 16 (≤ 19) | 3 |
+| `close_short` | Token-2022, 301 B, boost spent (mature): costliest — normalising, creator change into an empty vault, last recipients | 171594 | 171594 | 79165 | 250000 | §6.1 `close_short` curve / PumpSwap | 20 | 16 (≤ 19) | 3 |
+| `liquidate` | Token-2022, 301 B, boost spent (mature): after a real pump (× 2.8), both legs | 185476 | 185476 | 83394 | 300000 | §6.1 `liquidate` / `expire` PumpSwap | 17 | 16 (≤ 19) | 3 |
+| `expire` | Token-2022, 301 B, boost spent (mature): past the deadline, healthy | 181097 | 181097 | 83529 | 300000 | §6.1 `liquidate` / `expire` PumpSwap | 17 | 16 (≤ 19) | 3 |
+| `liquidate` | SPL Token, 261 B (legacy261): after a real pump (× 2.8), both legs | 171687 | 171687 | 74807 | 300000 | §6.1 `liquidate` / `expire` PumpSwap | 17 | 16 (≤ 19) | 3 |
+| `expire` | SPL Token, 261 B (legacy261): past the deadline, healthy | 169670 | 169670 | 74808 | 300000 | §6.1 `liquidate` / `expire` PumpSwap | 17 | 16 (≤ 19) | 3 |
+| `liquidate` | Token-2022, 301 B, boost spent (mature): costliest — normalising, creator change, last recipients | 193317 | 193317 | 79030 | 300000 | §6.1 `liquidate` / `expire` PumpSwap | 20 | 16 (≤ 19) | 3 |
+| `liquidate` | graduation path: on the migrated pool after the warm-up | 194498 | 194498 | 94100 | 300000 | §6.1 `liquidate` / `expire` PumpSwap | 17 | 16 (≤ 19) | 3 |
+| `sol_settle` | Token-2022, 301 B, boost spent (mature): healthy, the no-change call | 50290 | 50290 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
+| `sol_settle` | Token-2022, 301 B, boost spent (mature): S3 under the buy halt (disable_flags bit 3), after s3_wait_s | 56838 | 56838 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
 | `crank_price` | Token-2022, 301 B, boost spent (mature): roll + record (first crank of a second) | 34817 | 34817 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |
 | `crank_price` | SPL Token, 261 B (legacy261): roll + record (first crank of a second) | 34224 | 34224 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |
 | `crank_price` | Token-2022, 301 B, boost spent (mature): record only (same second again) | 30625 | 30625 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |
@@ -39,4 +39,4 @@ Compute units of every PumpSwap-path instruction and the `→ PumpSwap` graduati
 | `sweep_trader` | SPL Token, 261 B (legacy261): token leg — a donation to the pool vault | 21945 | 21945 | — | 60000 | no §6.1 row (§3.9); §6.1 `claim_sol` / `cover_deficit` / `sync_lender` class | 4 | — | 2 |
 | `sweep_trader` | Token-2022, 301 B, boost spent (mature): nothing to sweep | 18525 | 18525 | — | 60000 | no §6.1 row (§3.9); §6.1 `claim_sol` / `cover_deficit` / `sync_lender` class | 2 | — | 2 |
 | `flag_venue_upgraded` | PumpSwap, the dumped 10,485,760-byte ProgramData | 6028 | 6028 | — | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` (U5) | 2 | 2 (≤ 2) | 2 |
-| `revalidate_venue` | PumpSwap, the dumped ProgramData | 8434 | 8434 | — | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` (U5) | 2 | 2 (≤ 2) | 2 |
+| `revalidate_venue` | PumpSwap, the dumped ProgramData | 8440 | 8440 | — | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` (U5) | 2 | 2 (≤ 2) | 2 |
