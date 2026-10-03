@@ -8,6 +8,7 @@
 
 mod api_support;
 
+use std::collections::BTreeSet;
 use std::net::{IpAddr, SocketAddr};
 use std::time::{Duration, Instant};
 
@@ -84,7 +85,64 @@ async fn subscribe(
         .expect("ping");
 }
 
-async fn api_keys_scans(admin: &sqlx::PgPool) -> i64 {
+/// Makes every client backend of the test database report its pending statistics now.
+///
+/// A backend reports only when it goes idle, and then at most once a second unless
+/// `pg_stat_force_next_flush()` asked (the report is sent before the query's `ReadyForQuery`), so
+/// a scan can reach `pg_stat_user_tables` seconds late, on either side of a baseline. Each idle
+/// connection of `pools` is asked in turn. A connection still on its way back to its pool (sqlx
+/// returns a dropped connection from a spawned task, late on a loaded machine) cannot be asked
+/// yet, so this repeats until every client backend of the database in `pg_stat_activity` has been
+/// asked or has exited (an exiting backend reports).
+async fn flush_stats(pools: &[&sqlx::PgPool]) {
+    async fn ask(c: &mut sqlx::PgConnection, asked: &mut BTreeSet<i32>) {
+        sqlx::query("SELECT pg_stat_force_next_flush()")
+            .execute(&mut *c)
+            .await
+            .expect("flush the statistics");
+        let pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
+            .fetch_one(&mut *c)
+            .await
+            .expect("pid");
+        asked.insert(pid);
+    }
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let mut asked = BTreeSet::new();
+    loop {
+        let mut held = Vec::new();
+        for p in pools {
+            while let Some(mut c) = p.try_acquire() {
+                ask(&mut c, &mut asked).await;
+                held.push(c);
+            }
+        }
+        if held.is_empty() {
+            let mut c = pools[0].acquire().await.expect("a connection");
+            ask(&mut c, &mut asked).await;
+            held.push(c);
+        }
+        let backends: Vec<i32> = sqlx::query_scalar(
+            "SELECT pid FROM pg_stat_activity \
+             WHERE datname = current_database() AND backend_type = 'client backend'",
+        )
+        .fetch_all(&mut *held[0])
+        .await
+        .expect("backends");
+        if backends.iter().all(|pid| asked.contains(pid)) {
+            return;
+        }
+        drop(held);
+        assert!(
+            Instant::now() < deadline,
+            "backends {backends:?} never reported (asked {asked:?})"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+}
+
+/// `api_keys`'s scans so far, once every backend has reported its own.
+async fn api_keys_scans(admin: &sqlx::PgPool, api: &sqlx::PgPool) -> i64 {
+    flush_stats(&[admin, api]).await;
     sqlx::query_scalar(
         "SELECT (COALESCE(seq_scan, 0) + COALESCE(idx_scan, 0))::bigint FROM pg_stat_user_tables \
          WHERE relname = 'api_keys'",
@@ -96,6 +154,15 @@ async fn api_keys_scans(admin: &sqlx::PgPool) -> i64 {
 
 /// M8-SEC-9: on the rate-limit-exempt probes an uncached `X-Api-Key` is not looked up at all; on
 /// the other routes a lookup needs the anonymous bucket's request.
+///
+/// Two timing effects made this flaky under load (M10 integration: `left: 1, right: 0`):
+/// - the fixture's migrations build `api_keys`'s primary key, which counts as a sequential scan
+///   of it, and the admin backend reported that up to a second or more after the seed, so it
+///   could land between the two reads; every backend now reports before each read
+///   ([`flush_stats`]);
+/// - the anonymous bucket (`anon_rps` 1, `anon_burst` 1) refills one request a second, and a
+///   refilled request buys one lookup by design. The probes are counted on their own and allow
+///   none; the `/v1/stats` leg allows one lookup per whole second it ran.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn random_api_keys_on_probes_buy_no_database_lookups() {
     let f = Fixture::seeded().await;
@@ -107,31 +174,28 @@ async fn random_api_keys_on_probes_buy_no_database_lookups() {
     let pool = f.api_pool(&cfg);
     let app = api::router(AppState::new(pool.clone(), cfg));
     let a = ip("198.51.100.7");
+
+    // The probes: not one lookup, however long they take.
+    let before = api_keys_scans(&f.admin, &pool).await;
+    for i in 0..300 {
+        let key = format!("random-key-{i}");
+        for path in ["/v1/health", "/v1/status"] {
+            let r = send(&app, Method::GET, path, a, &[("x-api-key", key.as_str())]).await;
+            assert_eq!(r.status, StatusCode::OK, "{path}");
+        }
+    }
+    let probes = api_keys_scans(&f.admin, &pool).await - before;
+    assert_eq!(probes, 0, "no random key on a probe reached the database");
+
+    // `/v1/stats`: the first request empties the bucket, then each lookup needs a refill.
+    let started = Instant::now();
     assert_eq!(
         send(&app, Method::GET, "/v1/stats", a, &[]).await.status,
         StatusCode::OK
     );
-    let before = api_keys_scans(&f.admin).await;
-    for i in 0..300 {
+    let before = api_keys_scans(&f.admin, &pool).await;
+    for i in 300..600 {
         let key = format!("random-key-{i}");
-        let r = send(
-            &app,
-            Method::GET,
-            "/v1/health",
-            a,
-            &[("x-api-key", key.as_str())],
-        )
-        .await;
-        assert_eq!(r.status, StatusCode::OK);
-        let r = send(
-            &app,
-            Method::GET,
-            "/v1/status",
-            a,
-            &[("x-api-key", key.as_str())],
-        )
-        .await;
-        assert_eq!(r.status, StatusCode::OK);
         let r = send(
             &app,
             Method::GET,
@@ -142,10 +206,13 @@ async fn random_api_keys_on_probes_buy_no_database_lookups() {
         .await;
         assert_eq!(r.status, StatusCode::TOO_MANY_REQUESTS);
     }
+    let refills = i64::try_from(started.elapsed().as_secs()).expect("seconds");
+    let lookups = api_keys_scans(&f.admin, &pool).await - before;
+    assert!(
+        lookups <= refills,
+        "{lookups} random keys reached the database in {refills} s of refills"
+    );
     pool.close().await;
-    tokio::time::sleep(Duration::from_millis(1_500)).await;
-    let after = api_keys_scans(&f.admin).await;
-    assert_eq!(after - before, 0, "no random key reached the database");
     f.stop().await;
 }
 
