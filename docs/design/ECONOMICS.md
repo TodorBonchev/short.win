@@ -694,14 +694,14 @@ Defaults (PROPOSED, all tiers): **τ = 5 s (constant), dt_max = 2 s, C = 10,000 
 
 The keeper keeps `batch_v1` = 6 (a larger v1 batch write-locks more markets, so one congested market holds up more observations) and `batch_v0` = 4 size-packed (a PumpSwap v0 batch is cut at 3). That v1 transactions land on mainnet is still UNVERIFIED (ARCH U25).
 
-**Cost model** (`python3 sim/keeper_cost.py`; ★#107: on measured inputs, U27 closed). Inputs: base fee 5,000 lamports per signature (mainnet `getFeeForMessage`, slot 450,897,283); priority price scenarios 0–100,000 µlamports/CU (mainnet `getRecentPrioritizationFees` on pAMM, a PumpSwap pool and AMM v4 over slots 450,897,105–255: the lowest landed fee was 0 in ≥ 75 % of slots, spikes to 1.31 lamports/CU; 100,000 is O17's ceiling); **CU per instruction measured on the real keeper's transactions** (`services/keeper-litesvm` `m7_cost`, `tests/bench/m7_keeper/results.json`, the costliest measured per kind) — the **requested** limit `⌈consumed × 1.1⌉`, on which the priority fee is paid, so a transaction costs `5,000 × signatures + ⌈requested × price / 10⁶⌉` — in place of v0.4's estimates (crank 35 k, `sol_settle` 90 k, `liquidate` 220 k); the keeper's measured **cadence** (a quiet market one crank per 30 s, 2,880 a day; per second near a threshold; an armed position 43 `sol_settle` calls; a foreign price deviation 116 cranks at the harness's 2 ticks a second, ≈ 150 at 2.5 slots a second; an isolated LP-wrapped trigger 8 cranks above the control; a PumpSwap warm-up 8). The script cross-checks its constants against `results.json`.
+**Cost model** (`python3 sim/keeper_cost.py`; ★#107: on measured inputs, U27 closed). Inputs: base fee 5,000 lamports per signature (mainnet `getFeeForMessage`, slot 450,897,283); priority price scenarios 0–100,000 µlamports/CU (mainnet `getRecentPrioritizationFees` on pAMM, a PumpSwap pool and AMM v4 over slots 450,897,105–255: the lowest landed fee was 0 in ≥ 75 % of slots, spikes to 1.31 lamports/CU; 100,000 is O17's ceiling); **CU per instruction measured on the real keeper's transactions** (`services/keeper-litesvm` `m7_cost`, `tests/bench/m7_keeper/results.json`, the costliest measured per kind) — the **requested** limit `⌈consumed × 1.1⌉`, on which the priority fee is paid, so a transaction costs `5,000 × signatures + ⌈requested × price / 10⁶⌉` — in place of v0.4's estimates (crank 35 k, `sol_settle` 90 k, `liquidate` 220 k); the keeper's measured **cadence** (a quiet market one crank per 30 s, 2,880 a day; per second near a threshold; an armed position 43 `sol_settle` calls; a foreign price deviation 116 cranks at the harness's 2 ticks a second, ≈ 150 at 2.5 slots a second; an isolated LP-wrapped trigger 8 cranks above the control; a PumpSwap warm-up 8). The script cross-checks its constants against `results.json`. ★#111 (M10): re-measured on the M10 release build (`shortwin.so` `c4398d01…`, the hash `out/keeper_cost.txt` records); every table below mirrors `out/keeper_cost.txt`. Against M7 the requested CU moved by crank +17…+40, `sol_settle` +4…+109, `liquidate` −408…−473 and `expire` −226…+243 (the mainnet Token-2022 ELF in the harness and the M10 program batches: the rent top-up's vesting, the extras denylist); the per-market-day costs moved by at most 0.0004 SOL, and no reading below changes.
 
 | venue | crank_price | sol_settle (keep / settles) | liquidate / expire | v1 max cranks | v0 + protocol ALT cranks |
 |---|---|---|---|---|---|
-| PumpSwap | 41,159 | 64,119 / 74,158 | 212,255 / 208,348 | 8 | 3 |
-| curve | 37,365 | 62,700 / 72,721 | 191,938 / 188,919 | 11 | 5 |
-| CPMM | 32,826 | 65,640 / 77,388 | 125,282 / 117,479 | 9 | 4 |
-| AMM v4 | 32,762 | 57,648 / 67,713 | 105,268 / 101,001 | 9 | 4 |
+| PumpSwap | 41,199 | 64,146 / 74,267 | 211,847 / 208,591 | 8 | 3 |
+| curve | 37,382 | 62,715 / 72,818 | 191,516 / 188,693 | 11 | 5 |
+| CPMM | 32,843 | 65,644 / 77,470 | 124,814 / 117,671 | 9 | 4 |
+| AMM v4 | 32,779 | 57,653 / 67,798 | 104,795 / 101,187 | 9 | 4 |
 
 Continuous coverage — one crank per market per second (SOL per market per day):
 
@@ -710,19 +710,19 @@ Continuous coverage — one crank per market per second (SOL per market per day)
 | PumpSwap | 0 | 0.4320 | 0.1440 | 0.0720 | 0.0540 |
 | PumpSwap | 1,000 | 0.4356 | 0.1476 | 0.0756 | 0.0576 |
 | PumpSwap | 10,000 | 0.4676 | 0.1796 | 0.1076 | 0.0896 |
-| PumpSwap | 100,000 | 0.7876 | 0.4996 | 0.4276 | 0.4096 |
+| PumpSwap | 100,000 | 0.7880 | 0.5000 | 0.4280 | 0.4100 |
 | curve | 0 | 0.4320 | 0.0864 | 0.0720 | 0.0393 |
 | curve | 1,000 | 0.4353 | 0.0896 | 0.0752 | 0.0425 |
 | curve | 10,000 | 0.4643 | 0.1187 | 0.1043 | 0.0716 |
-| curve | 100,000 | 0.7549 | 0.4092 | 0.3948 | 0.3621 |
+| curve | 100,000 | 0.7550 | 0.4094 | 0.3950 | 0.3623 |
 | CPMM | 0 | 0.4320 | 0.1080 | 0.0720 | 0.0480 |
-| CPMM | 1,000 | 0.4349 | 0.1109 | 0.0748 | 0.0508 |
+| CPMM | 1,000 | 0.4349 | 0.1109 | 0.0749 | 0.0508 |
 | CPMM | 10,000 | 0.4604 | 0.1364 | 0.1004 | 0.0764 |
-| CPMM | 100,000 | 0.7157 | 0.3916 | 0.3556 | 0.3316 |
+| CPMM | 100,000 | 0.7158 | 0.3918 | 0.3558 | 0.3318 |
 | AMM v4 | 0 | 0.4320 | 0.1080 | 0.0720 | 0.0480 |
 | AMM v4 | 1,000 | 0.4349 | 0.1109 | 0.0748 | 0.0508 |
 | AMM v4 | 10,000 | 0.4603 | 0.1363 | 0.1003 | 0.0763 |
-| AMM v4 | 100,000 | 0.7151 | 0.3911 | 0.3551 | 0.3311 |
+| AMM v4 | 100,000 | 0.7152 | 0.3912 | 0.3552 | 0.3312 |
 
 Targeted coverage (duties 1–2: per second for a share `f` of the day, else one crank per 30 s; v1 k = 6, unbatched in brackets; SOL per market per day; PumpSwap the costliest venue, AMM v4 the cheapest — the curve and CPMM in `out/keeper_cost.txt` and `tests/bench/m7_keeper/results.md`, which also has the v0 fallback):
 
@@ -730,14 +730,14 @@ Targeted coverage (duties 1–2: per second for a share `f` of the day, else one
 |---|---|---|---|---|---|
 | PumpSwap | 0 % | 0.0024 (0.0144) | 0.0025 (0.0145) | 0.0036 (0.0156) | 0.0143 (0.0263) |
 | PumpSwap | 1 % | 0.0031 (0.0186) | 0.0032 (0.0187) | 0.0046 (0.0201) | 0.0184 (0.0339) |
-| PumpSwap | 5 % | 0.0059 (0.0353) | 0.0062 (0.0356) | 0.0088 (0.0382) | 0.0349 (0.0643) |
-| PumpSwap | 20 % | 0.0163 (0.0979) | 0.0171 (0.0987) | 0.0244 (0.1060) | 0.0969 (0.1785) |
-| PumpSwap | 100 % | 0.0720 (0.4320) | 0.0756 (0.4356) | 0.1076 (0.4676) | 0.4276 (0.7876) |
+| PumpSwap | 5 % | 0.0059 (0.0353) | 0.0062 (0.0356) | 0.0088 (0.0382) | 0.0350 (0.0644) |
+| PumpSwap | 20 % | 0.0163 (0.0979) | 0.0171 (0.0987) | 0.0244 (0.1060) | 0.0970 (0.1786) |
+| PumpSwap | 100 % | 0.0720 (0.4320) | 0.0756 (0.4356) | 0.1076 (0.4676) | 0.4280 (0.7880) |
 | AMM v4 | 0 % | 0.0024 (0.0144) | 0.0025 (0.0145) | 0.0033 (0.0153) | 0.0118 (0.0238) |
 | AMM v4 | 1 % | 0.0031 (0.0186) | 0.0032 (0.0187) | 0.0043 (0.0198) | 0.0153 (0.0308) |
 | AMM v4 | 5 % | 0.0059 (0.0353) | 0.0061 (0.0355) | 0.0082 (0.0376) | 0.0290 (0.0584) |
 | AMM v4 | 20 % | 0.0163 (0.0979) | 0.0170 (0.0986) | 0.0227 (0.1043) | 0.0805 (0.1621) |
-| AMM v4 | 100 % | 0.0720 (0.4320) | 0.0748 (0.4349) | 0.1003 (0.4603) | 0.3551 (0.7151) |
+| AMM v4 | 100 % | 0.0720 (0.4320) | 0.0748 (0.4349) | 0.1003 (0.4603) | 0.3552 (0.7152) |
 
 Episode costs (unbatched, PumpSwap; SOL per episode):
 
@@ -748,14 +748,14 @@ Episode costs (unbatched, PumpSwap; SOL per episode):
 | 10,000 | 0.00024 | 0.00063 | 0.00101 | 0.00004 |
 | 100,000 | 0.00049 | 0.00106 | 0.00103 | 0.00007 |
 
-Global lines, never a market's budget (SOL): duty 11's `crank_sol_usd` on a feed publishing every 55 s (1,560 calls a day, 6.1–6.6 k CU) and one `set_coverage_pause` (two signatures: the fee payer and `coverage_authority`; 7,990 CU; a degraded episode takes two, the pause and the unpause):
+Global lines, never a market's budget (SOL): duty 11's `crank_sol_usd` on a feed publishing every 55 s (1,560 calls a day, 6.1–6.6 k CU) and one `set_coverage_pause` (two signatures: the fee payer and `coverage_authority`; 8,085–8,104 CU consumed, 8,894–8,915 requested, measured on the M10 release build; 7,990 at M7; a degraded episode takes two, the pause and the unpause):
 
 | priority price (uL/CU) | crank_sol_usd, a day (1,560 calls) | set_coverage_pause, one call (two signatures) |
 |---|---|---|
 | 0 | 0.0078 | 0.00001000 |
 | 1,000 | 0.0078 | 0.00001001 |
 | 10,000 | 0.0079 | 0.00001009 |
-| 100,000 | 0.0089 | 0.00001088 |
+| 100,000 | 0.0089 | 0.00001089 |
 
 Liquidity-anomaly coverage (duty 2, #101; `keeper_cost.py`): the attacker's trigger is one LP-wrapped crank (≈ 150 k CU, the M4G-2 reproducer's estimate), the keeper's answer one crank per second for `liq_cover_s` (10 s), extended while it recurs — **measured: 8 cranks above the control** per isolated trigger (SOL):
 
@@ -771,13 +771,13 @@ Liquidity-anomaly coverage (duty 2, #101; `keeper_cost.py`): the attacker's trig
 | venue | priority price (uL/CU) | unbatched keeper | batched keeper (k = 6) | quiet day's share of the budget (k = 6 / unbatched) |
 |---|---|---|---|---|
 | PumpSwap | 0 | 390 triggers, 1.2 h, attacker 0.0019 SOL | 4,140 triggers, 12.7 h, attacker 0.0207 SOL | 8 % / 48 % |
-| PumpSwap | 1,000 | 384 triggers, 1.2 h, attacker 0.0020 SOL | 3,929 triggers, 12.0 h, attacker 0.0202 SOL | 8 % / 48 % |
-| PumpSwap | 10,000 | 333 triggers, 1.0 h, attacker 0.0022 SOL | 2,653 triggers, 8.1 h, attacker 0.0172 SOL | 12 % / 52 % |
+| PumpSwap | 1,000 | 384 triggers, 1.2 h, attacker 0.0020 SOL | 3,928 triggers, 12.0 h, attacker 0.0202 SOL | 8 % / 48 % |
+| PumpSwap | 10,000 | 333 triggers, 1.0 h, attacker 0.0022 SOL | 2,652 triggers, 8.1 h, attacker 0.0172 SOL | 12 % / 52 % |
 | PumpSwap | 100,000 | 52 triggers, 0.2 h, attacker 0.0010 SOL | 398 triggers, 1.2 h, attacker 0.0080 SOL | 48 % / 88 % |
 | CPMM | 0 | 390 triggers, 1.2 h, attacker 0.0019 SOL | 4,140 triggers, 12.7 h, attacker 0.0207 SOL | 8 % / 48 % |
-| CPMM | 1,000 | 386 triggers, 1.2 h, attacker 0.0020 SOL | 3,970 triggers, 12.1 h, attacker 0.0204 SOL | 8 % / 48 % |
-| CPMM | 10,000 | 344 triggers, 1.1 h, attacker 0.0022 SOL | 2,869 triggers, 8.8 h, attacker 0.0186 SOL | 11 % / 51 % |
-| CPMM | 100,000 | 93 triggers, 0.3 h, attacker 0.0019 SOL | 552 triggers, 1.7 h, attacker 0.0110 SOL | 40 % / 80 % |
+| CPMM | 1,000 | 386 triggers, 1.2 h, attacker 0.0020 SOL | 3,969 triggers, 12.1 h, attacker 0.0204 SOL | 8 % / 48 % |
+| CPMM | 10,000 | 344 triggers, 1.1 h, attacker 0.0022 SOL | 2,868 triggers, 8.8 h, attacker 0.0186 SOL | 11 % / 51 % |
+| CPMM | 100,000 | 93 triggers, 0.3 h, attacker 0.0019 SOL | 551 triggers, 1.7 h, attacker 0.0110 SOL | 40 % / 80 % |
 | AMM v4 | 0 | 390 triggers, 1.2 h, attacker 0.0019 SOL | 4,140 triggers, 12.7 h, attacker 0.0207 SOL | 8 % / 48 % |
 | AMM v4 | 1,000 | 386 triggers, 1.2 h, attacker 0.0020 SOL | 3,970 triggers, 12.1 h, attacker 0.0204 SOL | 8 % / 48 % |
 | AMM v4 | 10,000 | 344 triggers, 1.1 h, attacker 0.0022 SOL | 2,870 triggers, 8.8 h, attacker 0.0187 SOL | 11 % / 51 % |
@@ -815,32 +815,32 @@ Covered markets funded in full (k = 6 / unbatched); in brackets, the below-floor
 |---|---|---|---|---|
 | 0.5 | 104 / 17 (41 / 6) | 99 / 17 (39 / 6) | 69 / 16 (27 / 6) | 17 / 9 (7 / 3) |
 | 1 | 208 / 34 (83 / 13) | 198 / 34 (79 / 13) | 139 / 32 (55 / 12) | 35 / 19 (14 / 7) |
-| 2 | 416 / 69 (166 / 27) | 397 / 68 (158 / 27) | 278 / 64 (111 / 25) | 70 / 38 (28 / 15) |
-| 5 | 1,041 / 173 (416 / 69) | 992 / 172 (397 / 68) | 697 / 160 (278 / 64) | 175 / 95 (70 / 38) |
+| 2 | 416 / 69 (166 / 27) | 396 / 68 (158 / 27) | 278 / 64 (111 / 25) | 70 / 38 (28 / 15) |
+| 5 | 1,041 / 173 (416 / 69) | 992 / 172 (396 / 68) | 697 / 160 (278 / 64) | 175 / 95 (70 / 38) |
 
 **Bursts against a real market** (duty 2): `G` = 1 SOL, 20 covered markets (the target and 19 quiet ones, k = 6), a storm from the start of the UTC day; a burst is 116 unbatched cranks; the attacker's round trip `2·φ·δ` with δ ≈ 1 % of the reserve. "As built" is the per-market 0.03 SOL less a quiet day at k = 6. Cells: bursts that degrade the market (opens paused) / the attacker's SOL:
 
 | pool SOL reserve | fee one way | priority (uL/CU) | as built: one market | global: the first market | global: each further market once the free pool is spent | all 20 markets: global / as built (attacker SOL) |
 |---|---|---|---|---|---|---|
 | 100 SOL | 25 bps | 0 | 48 / 0.238 | 1,567 / 7.764 (keeper 0.909) | 9 / 0.045 | 8.61 / 4.76 |
-| 100 SOL | 25 bps | 100,000 | 15 / 0.074 | 434 / 2.150 (keeper 0.458) | 27 / 0.134 | 4.69 / 1.49 |
+| 100 SOL | 25 bps | 100,000 | 15 / 0.074 | 433 / 2.146 (keeper 0.458) | 27 / 0.134 | 4.69 / 1.49 |
 | 100 SOL | 100 bps | 0 | 48 / 0.951 | 1,567 / 31.034 (keeper 0.909) | 9 / 0.178 | 34.42 / 19.01 |
-| 100 SOL | 100 bps | 100,000 | 15 / 0.297 | 434 / 8.595 (keeper 0.458) | 27 / 0.535 | 18.76 / 5.94 |
+| 100 SOL | 100 bps | 100,000 | 15 / 0.297 | 433 / 8.576 (keeper 0.458) | 27 / 0.535 | 18.74 / 5.94 |
 | 1,000 SOL | 25 bps | 0 | 48 / 2.376 | 1,567 / 77.574 (keeper 0.909) | 9 / 0.446 | 86.04 / 47.52 |
-| 1,000 SOL | 25 bps | 100,000 | 15 / 0.743 | 434 / 21.485 (keeper 0.458) | 27 / 1.337 | 46.88 / 14.85 |
+| 1,000 SOL | 25 bps | 100,000 | 15 / 0.743 | 433 / 21.436 (keeper 0.458) | 27 / 1.337 | 46.83 / 14.85 |
 | 1,000 SOL | 100 bps | 0 | 48 / 9.504 | 1,567 / 310.274 (keeper 0.909) | 9 / 1.782 | 344.13 / 190.08 |
-| 1,000 SOL | 100 bps | 100,000 | 15 / 2.970 | 434 / 85.934 (keeper 0.458) | 27 / 5.346 | 187.51 / 59.40 |
+| 1,000 SOL | 100 bps | 100,000 | 15 / 2.970 | 433 / 85.736 (keeper 0.458) | 27 / 5.346 | 187.31 / 59.40 |
 
-A burst storm degrades only its target: it spends the target's entitlement and the free pool, never another market's entitlement, so the other markets keep their baseline. Degrading one chosen market costs 29–33× the as-built per-market budget's bursts (1,567 against 48 at zero priority, 434 against 15 at the ceiling); once a storm has spent the free pool, each further market costs only its own entitlement (9 / 27 bursts). All 20 markets together cost 8.6 / 4.7 SOL of round trips on 100-SOL 25-bps pools against 4.8 / 1.5 SOL as built; that total is about `G`'s worth of keeper bursts against `n` × 0.03 SOL as built, so the global budget matches the per-market design protocol-wide at `n` ≈ 33 covered markets per SOL of `G` (OWNER-M7-17).
+A burst storm degrades only its target: it spends the target's entitlement and the free pool, never another market's entitlement, so the other markets keep their baseline. Degrading one chosen market costs 29–33× the as-built per-market budget's bursts (1,567 against 48 at zero priority, 433 against 15 at the ceiling); once a storm has spent the free pool, each further market costs only its own entitlement (9 / 27 bursts). All 20 markets together cost 8.6 / 4.7 SOL of round trips on 100-SOL 25-bps pools against 4.8 / 1.5 SOL as built; that total is about `G`'s worth of keeper bursts against `n` × 0.03 SOL as built, so the global budget matches the per-market design protocol-wide at `n` ≈ 33 covered markets per SOL of `G` (OWNER-M7-17).
 
 **LP-wrapped liquidity-anomaly triggers** (duty 2, OWNER-M7-2) under the same budget: 8 keeper cranks per isolated trigger, at most one per 11 s and market; cells: triggers / the attacker's wrapped cranks (SOL) / market-hours at one trigger per 11 s:
 
 | priority price (uL/CU) | unbatched keeper: the first market | unbatched: each further market | batched keeper (k = 6): the first market | batched: each further market |
 |---|---|---|---|---|
 | 0 | 22,720 / 0.1136 / 69 h | 120 / 0.00060 | 136,320 / 0.6816 / 417 h | 720 / 0.00360 |
-| 1,000 | 22,420 / 0.1155 / 69 h | 125 / 0.00064 | 129,259 / 0.6657 / 395 h | 720 / 0.00371 |
-| 10,000 | 19,950 / 0.1297 / 61 h | 166 / 0.00108 | 86,722 / 0.5637 / 265 h | 720 / 0.00468 |
-| 100,000 | 6,285 / 0.1257 / 19 h | 391 / 0.00782 | 11,576 / 0.2315 / 35 h | 720 / 0.01440 |
+| 1,000 | 22,419 / 0.1155 / 69 h | 125 / 0.00064 | 129,232 / 0.6655 / 395 h | 720 / 0.00371 |
+| 10,000 | 19,949 / 0.1297 / 61 h | 166 / 0.00108 | 86,695 / 0.5635 / 265 h | 720 / 0.00468 |
+| 100,000 | 6,277 / 0.1255 / 19 h | 392 / 0.00784 | 11,556 / 0.2311 / 35 h | 720 / 0.01440 |
 
 A trigger costs its attacker one transaction against the keeper's 8 cranks, so the free pool is cheap to drain this way (≈ 0.1–0.7 SOL a day, spread over ≥ 3 markets for the unbatched case, ≥ 18 for the batched one); after it each market keeps 120 (unbatched) to 720 (batched) triggers' worth. Against the per-market budget as built (390 triggers, 0.0019 SOL per market against an unbatched keeper at zero priority, the as-built table above) the first market costs 58×; the residual is OWNER-M7-2.
 
@@ -860,11 +860,11 @@ The keeper's spend on junk below the floor is at most `tail_share_bps` of `G` (0
 | V_R | priority (uL/CU) | C, keeper per junk market-day | junk markets | their notional at open | attacker capital | attacker per day | keeper per day | keeper / attacker per junk market-day |
 |---|---|---|---|---|---|---|---|---|
 | 1 SOL | 0 | 0.0720 | 14 | 8.0 | 39.8 | 0.076 | 1.008 | 13.2x |
-| 1 SOL | 100,000 | 0.4276 | 3 | 1.7 | 8.5 | 0.016 | 1.283 | 78.5x |
+| 1 SOL | 100,000 | 0.4280 | 3 | 1.7 | 8.5 | 0.016 | 1.284 | 78.6x |
 | 5 SOL | 0 | 0.0720 | 14 | 39.8 | 199.1 | 0.381 | 1.008 | 2.6x |
-| 5 SOL | 100,000 | 0.4276 | 3 | 8.5 | 42.7 | 0.082 | 1.283 | 15.7x |
+| 5 SOL | 100,000 | 0.4280 | 3 | 8.5 | 42.7 | 0.082 | 1.284 | 15.7x |
 | 25 SOL | 0 | 0.0720 | 14 | 199.1 | 995.3 | 1.906 | 1.008 | 0.5x |
-| 25 SOL | 100,000 | 0.4276 | 3 | 42.7 | 213.3 | 0.409 | 1.283 | 3.1x |
+| 25 SOL | 100,000 | 0.4280 | 3 | 42.7 | 213.3 | 0.409 | 1.284 | 3.1x |
 
 Such an attack degrades every market ranked below `V_J` (opens paused; their exit-critical cranks continue on the overdraft), never one above it. The pool depth the caps need for `V_J` comes on top — `V` ≤ ≈ `7.5·φ` × the conservative SOL depth —, so a junk curve market holds at most ≈ 3–11 SOL of `V` (7.5 × 1.25 % of its 30–115 SOL of virtual SOL, §1.1), and `V_J` = 25 SOL needs ≈ 222 SOL of locked or burned pool depth even at the 150-bps fee cap. The keeper's daily cost exceeds the attacker's below ≈ 13 SOL of `V` at zero priority (13× at 1 SOL) and at every beta-size `V` at the ceiling (79× at 1 SOL, 3.1× at 25 SOL); what bounds it is the attacker's capital, ≈ 2.8 SOL per SOL of `V` on every junk market, and that it reaches only the markets ranked below.
 
@@ -873,13 +873,13 @@ Such an attack degrades every market ranked below `V_J` (opens paused; their exi
 | V_R | priority (uL/CU) | C / D, keeper per junk market-day | junk markets (hovering -> and bursting) | attacker capital | attacker per day (full fee / self-LP pool) | keeper per day |
 |---|---|---|---|---|---|---|
 | 1 SOL | 0 | 0.0720 / 0.4032 | 14 -> 3 | 8.5 | 11.443 / 0.608 | 1.134 |
-| 1 SOL | 100,000 | 0.4276 / 0.7351 | 3 -> 2 | 5.7 | 7.628 / 0.405 | 1.342 |
+| 1 SOL | 100,000 | 0.4280 / 0.7354 | 3 -> 2 | 5.7 | 7.628 / 0.405 | 1.342 |
 | 5 SOL | 0 | 0.0720 / 0.4032 | 14 -> 3 | 42.7 | 57.127 / 2.955 | 1.134 |
-| 5 SOL | 100,000 | 0.4276 / 0.7351 | 3 -> 2 | 28.4 | 38.085 / 1.970 | 1.342 |
+| 5 SOL | 100,000 | 0.4280 / 0.7354 | 3 -> 2 | 28.4 | 38.085 / 1.970 | 1.342 |
 | 25 SOL | 0 | 0.0720 / 0.4032 | 14 -> 3 | 213.3 | 285.550 / 14.686 | 1.134 |
-| 25 SOL | 100,000 | 0.4276 / 0.7351 | 3 -> 2 | 142.2 | 190.367 / 9.791 | 1.342 |
+| 25 SOL | 100,000 | 0.4280 / 0.7354 | 3 -> 2 | 142.2 | 190.367 / 9.791 | 1.342 |
 
-Bursting cuts the junk markets needed from 14 / 3 to 3 / 2 and their capital ≈ 4.7× / 1.5×, at the price of the round trips: at `V` 1 SOL 0.61 / 0.41 SOL a day on a self-LP pool — about half the keeper's 1.13 / 1.34 SOL —, 11.4 / 7.6 SOL at the full fee; at 25 SOL 14.7 / 9.8 SOL a day self-LP. As built at #109, before M7D-4, every slot of a burst on a hovering market was exit-critical (≈ 2.5 cranks a second, never throttled: ≈ 1.08 SOL a junk market-day), so one junk market spent `G`. That the free pool is drainable by bursts on any covered market is OWNER-M7-17 (3): (a) accept it — it is what makes a storm on one real market cost 1,567 / 434 round trips —, or (b) confine bursts to their own market's entitlement (hovering junk then needs 14 / 3 again, but a storm degrades a real market after 9 / 27 round trips on its own pool).
+Bursting cuts the junk markets needed from 14 / 3 to 3 / 2 and their capital ≈ 4.7× / 1.5×, at the price of the round trips: at `V` 1 SOL 0.61 / 0.41 SOL a day on a self-LP pool — about half the keeper's 1.13 / 1.34 SOL —, 11.4 / 7.6 SOL at the full fee; at 25 SOL 14.7 / 9.8 SOL a day self-LP. As built at #109, before M7D-4, every slot of a burst on a hovering market was exit-critical (≈ 2.5 cranks a second, never throttled: ≈ 1.08 SOL a junk market-day), so one junk market spent `G`. That the free pool is drainable by bursts on any covered market is OWNER-M7-17 (3): (a) accept it — it is what makes a storm on one real market cost 1,567 / 433 round trips —, or (b) confine bursts to their own market's entitlement (hovering junk then needs 14 / 3 again, but a storm degrades a real market after 9 / 27 round trips on its own pool).
 
 **The floor's price for honest small markets** (OWNER-M7-17): a market with less than 1 SOL of `V` gets the 30-s keeper of §11.3, where a Tier C or D position in a 10×/60 s pump ends in S1 (lenders −67.7 % / −58.3 % of the borrowed tokens' terminal value) instead of being liquidated (+0.9 % / +1.7 % at 1 s); a 5× gap is S1 at every cadence. Those rows model a 30-s keeper that liquidates whenever the program accepts. Since #110 (M7D-1) the keeper does: an exit needs a completed bucket at most `ref_max_age_s` (2 s) old, so after each idle crank, while a position is near an exit, the market is read again in the seconds that reference stays fresh and the exit goes then (measured: a 0.3-SOL position after a ×2.3 jump is first liquidatable — the EMA following the 30-s cranks only — 297 s after it and liquidated that second; covered, 11 s; an expiry lands at the deadline's first idle crank + 1 s); and the crank it waits on is exit-critical, never refused once the tail is spent (M7D-2). As built at #109 no below-floor position was liquidated or expired at all — each read came 30 s after the last observation and found its reference stale —, and a covered market's cascade stopped where its `V` fell below the floor, so the floor's price was the lenders' whole position, not §11.3's 30-s rows.
 
@@ -897,14 +897,14 @@ Break-even: open notional per market at which the protocol's rent share pays for
 | priority price (uL/CU) | coverage cost (SOL/day) | A | B | C | D |
 |---|---|---|---|---|---|
 | 1,000 | 0.0756 | 368 SOL | 184 SOL | 92 SOL | 46 SOL |
-| 10,000 | 0.1076 | 523 SOL | 262 SOL | 131 SOL | 65 SOL |
-| 100,000 | 0.4276 | 2,081 SOL | 1,041 SOL | 520 SOL | 260 SOL |
+| 10,000 | 0.1076 | 524 SOL | 262 SOL | 131 SOL | 65 SOL |
+| 100,000 | 0.4280 | 2,083 SOL | 1,041 SOL | 521 SOL | 260 SOL |
 
 Reading (#107, measured): covering every market every second costs 0.43 SOL per market-day unbatched and 0.072 SOL batched in v1 transactions at zero priority (0.10–0.11 at 10,000 µlamports/CU, 0.36–0.43 at the 100,000 ceiling; the v0 fallback 0.09–0.14 at zero priority), against 0.005–0.04 SOL per day of protocol rent (0.03–0.23 SOL of lender rent) for a market at the 25 SOL beta cap; per-second coverage of every market pays for itself only above ≈ 180–520 SOL of open notional on Tier A/B markets at 1,000–10,000 µlamports/CU. Targeted coverage (duty 1: per second only near thresholds) costs **0.0024 SOL per market-day batched for a quiet market (0.0144 unbatched)** and 0.0059–0.0088 batched with 5 % of the day near a threshold at 0–10,000 µlamports/CU (0.029–0.035 at the ceiling) — v0.4.1's estimate was 0.003–0.03; armed positions, deviation bursts and liquidations cost fractions of a millisol each. Liquidity-anomaly coverage (duty 2, #101) runs only on markets with open positions and costs the keeper what the attacker pays while it is sustained (1:1 per second unbatched; at priority prices above zero the attacker's larger transaction costs more than the keeper's crank); an isolated trigger costs the keeper 8 cranks (3.6–8.0× the attacker's transaction unbatched, 1.3–2.0× batched). **The operating budget (O17, decided 2026-09-30):** every market with open positions is covered at targeted cadence, the ceiling is 100,000 µlamports/CU, and an exhausted budget on a market with positions is degraded mode (below), never a quiet stop (M4G-2); the per-market default 0.03 SOL covered a quiet market's day 2.1–12.5× over batched (1.1–2.1× unbatched) at 0–100,000 µlamports/CU. **Since 2026-10-01 (decision A, #109) one global budget** funds the covered markets in order of value at risk (the block and tables above): 1 SOL a day funds 208 covered markets' entitlements at zero priority batched and 35 at the ceiling (from a keeper start or restart too since #110: the batched first-crank estimate, re-estimated at each market's first crank), keeps each market's entitlement out of reach of every other market's bursts and of every lower-ranked market, and caps junk below the floor at 0.2 SOL a day. **Open (owner, ARCH §10):** OWNER-M7-17 (the global budget's defaults and their trade-offs), OWNER-M7-2 (LP-wrapped triggers drain the free pool for ≈ 0.1–0.7 SOL a day), OWNER-M7-6 (exit-critical cranks stay never throttled, beyond `G` on an alerted overdraft: a market held near a threshold all day costs 0.072 SOL a day batched, 0.43 unbatched at zero priority, 0.36–0.43 / 0.72–0.79 at the ceiling); OWNER-M7-7 (confirm 0.03 SOL) is superseded by OWNER-M7-17.
 
 **Degraded mode (PROPOSED).** Coverage lapses when the budget is exhausted, the keeper is down, or blocks are contested. Without an honest observation in a second, an attacker's atomic bundle achieves what the held model assumes at the atomic cost: the §12.6 held-model numbers become that market's exposure. Throttling must therefore be visible, not silent:
 
-1. **Opens pause.** New opens are paused on a market whose coverage SLO (duties 1–2) the keeper cannot meet, with reason code `KeeperCoverage`; the market page shows it, and the pause lifts when coverage returns. Closes, liquidations, settlements, withdrawals and claims are never paused. **As built (M7, #107; O17 approved the role on 2026-09-30, SPEC §11, §14):** the program's `set_coverage_pause` (ARCH §3.1) lets a separate `coverage_authority` key set or clear one market's `paused_coverage` flag, which only `open_short` reads (`CoveragePaused`); it moves no funds and is inert until Governance installs the key with a timelocked `Authorities` change. The keeper's designated pauser sends it in the tick a market **with open positions** degrades — an outage over `COVERAGE_GAP_S` (40 s since 2026-10-01; `CoverageGap`), 3 consecutive missed required seconds, or a charge the global budget refuses (decision A, #109) — and clears it after 600 s of restored coverage; a flag it finds set (a restart, another instance) is lifted only through that recovery; without the key, or with the role unset or rotated, it pages the Emergency multisig, whose `set_pause` is then the path. `coverage_authority` sets and clears the flag; **since the owner's decision of 2026-10-01 (OWNER-M7-3 (b), SPEC §11, §14 M7-3) the Emergency multisig (`pause_authority`) may also clear it — never set it** —, so a lost or hijacked coverage key can no longer hold a market's opens paused for the `Authorities` timelock (≥ 86,400 s): each of its sets is undone by one Emergency clear; nothing moves funds, and opens resume 5 s after any clear (`COVERAGE_CLEAR_DELAY_S`). A pause costs 10,000–10,880 lamports (two signatures, 7,990 CU; the table above), a degraded episode two of them. The drill (the keeper's `coverage_pause` scenarios, every CI run): opens fail `CoveragePaused` while liquidations, closes, `add_margin`, settlements, withdrawals and claims land. **#108 (the M7 security review):** a clear takes effect for opens only `COVERAGE_CLEAR_DELAY_S` (5 s) later, so the key cannot bracket an open on a paused market in one transaction (M7-SEC-3), and the keeper alerts a clear it did not send and an open that lands while it holds the market degraded; its timing tolerates the gap between its `confirmed` read and its transactions' landing (M7-SEC-1): as built at #107 an idle crank landing one second later than the previous one relative to its read was a 31-s `CoverageGap` and degraded mode, and a recovery never completed while the sending ticks waited for their confirmations — a quiet market with one healthy position was paused 99.7 % of two hours under 0–1-s landing jitter; now 0 s in two hours under 0–2-s jitter with slow ticks.
+1. **Opens pause.** New opens are paused on a market whose coverage SLO (duties 1–2) the keeper cannot meet, with reason code `KeeperCoverage`; the market page shows it, and the pause lifts when coverage returns. Closes, liquidations, settlements, withdrawals and claims are never paused. **As built (M7, #107; O17 approved the role on 2026-09-30, SPEC §11, §14):** the program's `set_coverage_pause` (ARCH §3.1) lets a separate `coverage_authority` key set or clear one market's `paused_coverage` flag, which only `open_short` reads (`CoveragePaused`); it moves no funds and is inert until Governance installs the key with a timelocked `Authorities` change. The keeper's designated pauser sends it in the tick a market **with open positions** degrades — an outage over `COVERAGE_GAP_S` (40 s since 2026-10-01; `CoverageGap`), 3 consecutive missed required seconds, or a charge the global budget refuses (decision A, #109) — and clears it after 600 s of restored coverage; a flag it finds set (a restart, another instance) is lifted only through that recovery; without the key, or with the role unset or rotated, it pages the Emergency multisig, whose `set_pause` is then the path. `coverage_authority` sets and clears the flag; **since the owner's decision of 2026-10-01 (OWNER-M7-3 (b), SPEC §11, §14 M7-3) the Emergency multisig (`pause_authority`) may also clear it — never set it** —, so a lost or hijacked coverage key can no longer hold a market's opens paused for the `Authorities` timelock (≥ 86,400 s): each of its sets is undone by one Emergency clear; nothing moves funds, and opens resume 5 s after any clear (`COVERAGE_CLEAR_DELAY_S`). A pause costs 10,000–10,892 lamports (two signatures, 8,085–8,104 CU since M10; the table above), a degraded episode two of them. The drill (the keeper's `coverage_pause` scenarios, every CI run): opens fail `CoveragePaused` while liquidations, closes, `add_margin`, settlements, withdrawals and claims land. **#108 (the M7 security review):** a clear takes effect for opens only `COVERAGE_CLEAR_DELAY_S` (5 s) later, so the key cannot bracket an open on a paused market in one transaction (M7-SEC-3), and the keeper alerts a clear it did not send and an open that lands while it holds the market degraded; its timing tolerates the gap between its `confirmed` read and its transactions' landing (M7-SEC-1): as built at #107 an idle crank landing one second later than the previous one relative to its read was a 31-s `CoverageGap` and degraded mode, and a recovery never completed while the sending ticks waited for their confirmations — a quiet market with one healthy position was paused 99.7 % of two hours under 0–1-s landing jitter; now 0 s in two hours under 0–2-s jitter with slow ticks.
 2. **On-chain signal.** Each integration that follows a gap of more than `COVERAGE_GAP_S` = **40 s** (owner decision of 2026-10-01, OWNER-M7-12; was 30 s) on a market with open positions emits `CoverageGap{market, gap_s, open_positions}`; indexers and the UI show coverage per market. **#108:** at the keeper's 30-s idle cadence the landing jitter makes 31–32-s gaps on healthy markets (measured: 79 of 241 integrations in two hours under 0–2-s jitter), which the 30-s constant reported as gaps; at 40 s none is emitted, every `CoverageGap` is a real outage (the keeper degrades on each), and indexers need no tolerance. The constant has no economic effect (§15).
 3. **Existing positions** keep their locked rules (A26). Their exposure during degraded mode is disclosed as the held-model bounds of §12.6. Right after a venue switch whose 8 warm-up seconds the keeper misses entirely it is §12.12's degraded mode (the attacker can then seed `L_ema = D`). After a switch whose guard-set seconds the keeper misses (duty 9), a deposit freeze can clear the guard; since #99 the carried positions fit the new pool's caps, so it delays their exits as in steady state (§12.12 (11)), and the §8.2 cap bounds the pushed reference at `λ/λ_min` of the depth.
 4. **Not adopted: raising persistence in degraded mode.** Persistence is a locked per-position term, so a raise could reach only new positions, which degraded mode pauses anyway; and 5 updates already break Tier C liveness (§5.7).
