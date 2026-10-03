@@ -278,12 +278,24 @@ fn t_rent_no_venue_rent_on_a_full_size_pool() {
 /// the borrower (the venue took it out of the borrower's `ert`). As on the curve (T-RENT's curve
 /// part), an open whose `S_exp` tolerance (`exec_tol_bps`) cannot cover the growth fails
 /// `ProceedsBelowMin`, the pool untouched; the growth is paid once. Since the redeploy no size
-/// inside Tier C's 1.16 % wallet cap has a tolerance that covers 386,080 on this pool (2.1 %
-/// does; 1.8 % covered the 2026-09 build's 304,800), so the wallet cap is lifted here within its
-/// compiled bounds (`wallet_cap_bps` 10⁴, as `lock`): with the defaults, short.win's first open on
-/// a 211-byte pool held at its minimum rent is refused until any trade has grown it.
+/// inside the default wallet cap has a tolerance that covers 386,080 on this pool (2.1 % of its
+/// tokens does; 1.8 % covered the 2026-09 build's 304,800). That is checked first with the
+/// defaults (PUMP-2026-10-2, disclosed): the smallest covering size is `CapWallet`, and every
+/// size inside the wallet cap is `ProceedsBelowMin` — the largest, found by bisection (≈ 1.81 %,
+/// `S_exp` ≈ 0.3375 SOL, a tolerance of 337,498), cannot cover the growth, and the quote rises
+/// with the size; the 0.1 % steps below it are each refused — so short.win's first open on a
+/// 211-byte pool held at its minimum rent is refused until any trade has grown it. The growth
+/// itself is then run with the wallet cap lifted within its compiled bounds (`wallet_cap_bps`
+/// 10⁴, as `lock`).
 #[test]
 fn t_rent_a_short_pool_grows_on_the_sale() {
+    // At minimum rent: the 211-byte pool's lamports planted down to `minimum_balance(211)`.
+    let at_min_rent = |env: &mut Env, p: &PammPool| {
+        let mut acc = env.svm.get_account(&p.pool).unwrap();
+        assert_eq!(acc.data.len(), 211);
+        acc.lamports = env.svm.minimum_balance_for_rent_exemption(211);
+        env.svm.set_account(p.pool, acc).unwrap();
+    };
     let (mut env, p) = Env::fork_pamm_coin_with(PammCoin::Legacy211, |a| {
         a.params.wallet_cap_bps = 10_000;
     });
@@ -303,11 +315,63 @@ fn t_rent_a_short_pool_grows_on_the_sale() {
         .find(|&q| quote_sell(&env, &p, q).expect("quote") * tol / 10_000 >= growth)
         .unwrap();
     assert_eq!(q, r.base / 1_000 * 21);
+
+    // With the defaults (the same fork, market and lending): no open qualifies.
+    {
+        let (mut env, p) = Env::fork_pamm_coin(PammCoin::Legacy211);
+        assert_eq!(env.config().params.exec_tol_bps, tol as u16);
+        let pm = list_on(&mut env, &p, q * 4);
+        at_min_rent(&mut env, &p);
+        let try_open = |env: &mut Env, size: u64| {
+            let mut b = env.borrower();
+            custom_code(&env.open(&pm, &mut b, size).0)
+        };
+        let cap_wallet = Some(u32::from(E::CapWallet));
+        let below_min = Some(u32::from(E::ProceedsBelowMin));
+        assert_eq!(
+            try_open(&mut env, q),
+            cap_wallet,
+            "the smallest covering size"
+        );
+        // The wallet cap's edge: `lo` passes it, `lo + 1` does not (the cap grows slower than `q`).
+        let (mut lo, mut hi) = (1, q);
+        while hi - lo > 1 {
+            let mid = lo + (hi - lo) / 2;
+            if try_open(&mut env, mid) == cap_wallet {
+                hi = mid;
+            } else {
+                lo = mid;
+            }
+        }
+        assert_eq!(
+            try_open(&mut env, lo),
+            below_min,
+            "the largest size inside the cap"
+        );
+        let s_lo = quote_sell(&env, &p, lo).expect("quote");
+        assert!(
+            s_lo * tol / 10_000 < growth,
+            "its tolerance {} is below the growth",
+            s_lo * tol / 10_000
+        );
+        for k in 1.. {
+            let size = r.base / 1_000 * k;
+            if size > lo {
+                break;
+            }
+            assert_eq!(try_open(&mut env, size), below_min, "{k} ‰");
+        }
+        eprintln!(
+            "defaults: the wallet cap admits {lo} ({:.3} % of the pool, S_exp {s_lo}, tolerance \
+             {}); 2.1 % is {q}",
+            lo as f64 * 100.0 / r.base as f64,
+            s_lo * tol / 10_000
+        );
+        assert_eq!(env.svm.get_account(&p.pool).unwrap().data.len(), 211);
+    }
+
     let pm = list_on(&mut env, &p, q * 4);
-    let mut acc = env.svm.get_account(&p.pool).unwrap();
-    assert_eq!(acc.data.len(), 211);
-    acc.lamports = min211;
-    env.svm.set_account(p.pool, acc).unwrap();
+    at_min_rent(&mut env, &p);
     // A sale whose tolerance is below the growth.
     let small = q / 20;
     let s_small = quote_sell(&env, &p, small).expect("quote");
