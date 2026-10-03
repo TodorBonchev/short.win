@@ -285,8 +285,8 @@ Tabs Deposit | Withdraw | Claim (`lendTab-*`, `?action=`).
   receivable is > 0. It warns when the part is ≥ `UNPAID_RENT_WARN_BPS` (100 bps) of the deposit's
   value at `P_ema` (⌊amount·P_ema/WAD⌋) or ≥ `UNPAID_RENT_WARN_LAMPORTS` (1 SOL; the only threshold
   without a price): `lender.unpaidRent` expanded and repeated in the review (`TxPlan.disclosures`);
-  otherwise collapsed and not in the review. The thresholds are proposed defaults awaiting the
-  owner's confirmation (FE-27). Disclosures: `lender.solRepayment` **inline above the amount and
+  otherwise collapsed and not in the review. The owner confirmed these thresholds on 2026-10-03
+  (fourth round; FE-27 closed). Disclosures: `lender.solRepayment` **inline above the amount and
   again in the review, with its required checkbox** (SPEC §5.3), `lender.risks`, `lender.lossHistory`,
   `market.creatorSelfDealing` (collapsed), `lender.residuals` (collapsed), `lender.unpaidRent` (M10). A source with CPI Guard
   shows `token.cpiGuard` (`lendCpiGuardNotice`, plain deposit disabled) and the opt-in bracket
@@ -913,7 +913,13 @@ needs a first trade to grow its account: PumpSwap charges that trade the account
 this open’s slippage tolerance cannot cover at this size. Try again after another trade on the
 pool, or with a larger size." (the curve's names the bonding curve and pump;
 `VENUE_GROWTH_MESSAGES`). PumpSwap's own 6063 (`InsufficientRealQuoteReserves`, the same number)
-fails in pAMM and maps to `unknown`, untouched (`growth.test.tsx`).
+fails in pAMM and maps to `unknown`, untouched (`growth.test.tsx`). The refinement applies only
+when the error's logs name short.win as the failing program: the mapper also reads a 6063 whose
+logs name none (truncated logs) as short.win's, which could be PumpSwap's, so such a refusal keeps
+the generic message (batch 4's review). The length is the snapshot's, so a trade that grows the
+account between the plan and the simulation leaves the specific message on a `ProceedsBelowMin`
+the price move caused; its advice, to retry, still leads to a correct review (accepted, batch 4's
+review: the only case where the message is not about the growth).
 
 ### 5.10 Per-instruction parameters
 

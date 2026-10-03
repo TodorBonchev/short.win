@@ -376,8 +376,8 @@ invariants.
 
 ## 6. Known issues
 
-[`docs/audit/known-issues.md`](audit/known-issues.md) is the single register: 63 rows (KI-01 …
-KI-63), each with its bound, the decision that covers it and its status, plus the M10
+[`docs/audit/known-issues.md`](audit/known-issues.md) is the single register: 64 rows (KI-01 …
+KI-64), each with its bound, the decision that covers it and its status, plus the M10
 findings and their resolution (its §6). Do not report these as findings unless the stated
 bound is wrong or can be exceeded. Summary:
 
