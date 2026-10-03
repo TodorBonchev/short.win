@@ -10,6 +10,7 @@ workspace's lockfile.
 | `keeper/` (`shortwin-keeper`) | Keeper v1 (ARCH §7.1 duties 1–14 on every venue, with duty 5's Raydium fast path and M7's O17 degraded mode through the `coverage_authority`) and its binary; `shortwin-build-alt`, the protocol address lookup table of A28 (`scripts/build-alt.sh`) and M7's per-market tables |
 | `keeper-litesvm/` (`shortwin-keeper-litesvm`) | TEST-ONLY: the in-process LiteSVM backend (the program-test harness's invariant hooks after every instruction of every keeper transaction; bundles executed in order and all-or-nothing) and the keeper's scenario tests on the mock venue and on the Raydium and pump mainnet forks |
 | `indexer/` (`shortwin-indexer`) | The indexer and API (ARCH §7.2, M8; contract [`docs/design/INDEXER.md`](../docs/design/INDEXER.md)): RPC backfill and live ingest of short.win, complete_curve and venue events into Postgres (`migrations/`), projections and analytics, axum REST + WebSocket (`openapi.yaml`), one binary `shortwin-indexer` (`migrate`, `backfill`, `live`, `serve`, `rollups`, `run`, `replay`, `rebuild`); its TEST-ONLY `embedded-pg` feature runs PostgreSQL 17 from the user cache (no Docker, no root); the reference deployment is `indexer/deploy/` |
+| `ops/` (`shortwin-ops`) | `shortwin-gov`, the Squads v4 governance tool (M10 WP-7; [below](#governance-shortwin-gov-m10)): creates the Governance and Emergency multisigs, initializes the config with their vaults, stages / approves / executes / cancels vault transactions (the checked upgrade-authority transfer, `Authorities` changes, upgrades, every admin instruction; the transaction-buffer path for large messages), applies timelocked changes, verifies the whole layout |
 | `indexer-litesvm/` (`shortwin-indexer-litesvm`) | TEST-ONLY: records LiteSVM sessions (the program-test harness, the keeper scenarios) in the indexer's session format and replays them into an embedded Postgres, asserting the indexed state against the chain (INDEXER.md §11.3, §11.4) |
 
 ## Keeper
@@ -491,10 +492,96 @@ breaks every v0 transaction naming it) but also never extended: a new pump recip
 inline (31 bytes) until a new table replaces it. Entries are usable one slot after they are
 added. Put the address in the keeper's `lookup_tables`.
 
+## Governance (`shortwin-gov`, M10)
+
+ARCH §1.1 "Admin", §8.5; owner decisions 2026-10-02 (Q4). The layout file
+(`ops/governance.example.toml`) names **public keys only** — the members, the two create keys, the
+keeper's `coverage_authority` — and the launch values `initialize_config` takes (program timelock,
+venues, Pyth feed, the venue programs' deploy slots). Everything else is derived and never typed:
+Governance (autonomous 3-of-5, Squads time lock 172,800 s) and Emergency (autonomous 2-of-4, time
+lock 0) are the Squads PDAs of their create keys; `governance` and the upgrade authority of
+short.win and complete_curve = Governance vault 0, `fee_recipient` = Governance vault 1,
+`pause_authority` = Emergency vault 0; each multisig's rent collector is its own vault 0. The
+four authorities must be pairwise distinct (SQ-G8). The example's keys are placeholders and the
+tool refuses to send with it (`example = true`).
+
+```sh
+G="cargo run --release --manifest-path services/Cargo.toml -p shortwin-ops --bin shortwin-gov --"
+$G verify                    --config gov.toml --rpc <url>     # every PDA / authority; exit 1 on a FAIL
+$G create-multisigs          --config gov.toml --rpc <url> --payer p.json --gov-create-key g.json --emg-create-key e.json
+$G init-config               --config gov.toml --rpc <url> --authority deployer.json
+$G stage-upgrade-authority   --config gov.toml --rpc <url> --checked --key member.json
+$G stage-authorities         --config gov.toml --rpc <url> --key member.json     # → the file's authorities
+$G stage-upgrade             --config gov.toml --rpc <url> --key member.json --buffer <buffer> [--spill <addr>]
+$G stage set-pause global on --config gov.toml --rpc <url> --key emg-member.json  # any admin ix (--help)
+$G approve --ms governance --index 3 --config gov.toml --rpc <url> --key member.json  [--execute]
+$G execute --ms governance --index 3 --config gov.toml --rpc <url> --key member.json  [--co-signer deployer.json]
+$G cancel  --ms governance --index 3 --config gov.toml --rpc <url> --key member.json
+$G apply   --config gov.toml --rpc <url> --key payer.json        # apply_config after short.win's timelock
+$G status  --config gov.toml --rpc <url> [--ms governance --index 3]
+$G close-buffer --ms emergency --config gov.toml --rpc <url> --key member.json [--buffer-index 0]
+```
+
+- **Keys** are keypair files named on the command line, read only when a command signs, never
+  printed (a file that does not parse is reported by path only; a group- or world-readable file
+  draws a warning). Hardware-wallet paths (`usb://…`) are refused: the remote-wallet stack is not
+  linked (M11 decides); Ledger members approve and execute in the Squads app, after checking the
+  transaction with `status --ms … --index …`.
+- **Every transaction** is legacy, paid by the acting key (no separate fee payer), at most 1,232
+  bytes, and **simulated first**: one that would fail is not sent, and the error is named by
+  program and Anchor name (a Squads `TimeLockNotReleased` and a short.win `TimelockNotElapsed` are
+  told apart even through `vault_transaction_execute`). `--dry-run` simulates and sends nothing
+  (a command of several transactions stops after its first). A sent transaction is awaited for
+  90 s (`--confirm-timeout <s>`), past its blockhash's lifetime, so one reported as not
+  confirmed has expired; the error says to check `status` before rerunning. There is no priority
+  fee yet.
+- **Staging** is one transaction (`vault_transaction_create` + `proposal_create` + the stager's
+  approval). A message above about 700 bytes (the transaction would exceed 1,232 B; T-SQ-3's
+  worst-case `set_venue_extras` is 1,243 B staged directly) goes through the stager's
+  transaction buffer instead (create, extends, `vault_transaction_create_from_buffer`);
+  `--force-buffer` always does. A buffer an interrupted run left holding the start of the same
+  message is **resumed** (only the missing bytes are sent); one holding anything else is refused,
+  and `close-buffer` closes it and returns its rent. A staging whose message the multisig's
+  newest transaction already holds, still open, is refused (a rerun after a send that landed
+  late; `--allow-duplicate` overrides). `status`, `approve` and `execute` print what the
+  transaction runs, decoded: short.win instruction names with their arguments and accounts
+  (scope and market, venue bit and name, extras entries; every value of a `ConfigChange`,
+  `feed_id` in hex, and for `Params` / `EmaParams` / `Kink` what moves against the live config),
+  loader and System instructions, and any other program's data with every account and its
+  flags; `execute`
+  rebuilds the accounts from the **stored** transaction and demands `--co-signer` for any other
+  signer of the message (the deployer in the checked transfer). `approve --execute` joins the
+  execution to the threshold approval when the time lock is 0: an Emergency action is two
+  transactions.
+- **Refused before anything is sent:** the unchecked upgrade-authority transfer
+  (`--checked` is required; T-SQ-5's typo hazard), `stage-upgrade` while the program's upgrade
+  authority is not yet Governance vault 0, an upgrade buffer the vault does not own (the
+  loader would refuse either only after the 48 h time lock), an ELF that does not fit the ProgramData
+  (the `solana program extend` to run first), `init-config` by anything but the upgrade
+  authority or with a guard slot that differs from the live ProgramData, `stage-authorities`
+  when the config already matches, a non-member key, `propose-*` by the Emergency and the
+  Emergency-only powers by Governance.
+- **`verify`** FAILs: Squads not executable or not immutable; a multisig missing, not autonomous,
+  with another threshold, time lock, member set, partial permissions or rent collector; the fee
+  vault unfunded or not a System account; `GlobalConfig` missing, or any of its four authorities
+  or `timelock_s` not the layout's, or the authorities not distinct; an upgrade authority that is
+  not Governance vault 0. It WARNs on a pending config change, on Active or Approved proposals
+  at every index of both multisigs (an Approved vault transaction never expires: `cancel` it) and
+  on `venue_enabled` differing from the launch set.
+- **Not supported:** moving `governance` itself to a new multisig (the tool stages through the
+  layout's two multisigs only; a layout naming a new Governance no longer names the current one),
+  Squads config transactions (members, threshold, time lock), `Params` / `EmaParams` proposals,
+  address lookup tables (M11).
+
+Tests: unit tests per module, and `ops/tests/gov_e2e.rs` (T-OPS-1/2): the whole sequence through
+the command line on the mainnet Squads ELF, every transaction replayed through the program
+harness's `Env::send` ([`tests/litesvm/README.md`](../tests/litesvm/README.md)).
+
 ## Tests
 
 ```sh
 cargo test --manifest-path services/Cargo.toml --workspace
+cargo test --manifest-path services/Cargo.toml -p shortwin-ops --test gov_e2e -- --nocapture   # T-OPS: shortwin-gov end to end
 ```
 
 The scenario tests (`keeper-litesvm/tests/scenarios`) load the same builds as the program tests:
@@ -822,4 +909,6 @@ Host toolchain from the root `rust-toolchain.toml`. `deny.toml` here is the root
 TLS stack's licences (ISC, CDLA-Permissive-2.0) and the PostgreSQL licence of the indexer's
 TEST-ONLY fixture crates; `cargo audit -f services/Cargo.lock` uses the root's ignore list. The
 indexer crates declare Rust 1.94 (sqlx 0.9, postgresql_embedded 0.21); M8 added their dependencies
-without changing any existing lockfile entry.
+without changing any existing lockfile entry. M10's `ops/` (WP-7) adds only its own package entry:
+every dependency it names (`squads-v4-ix` through the LiteSVM harness, `sha2`, `toml`, the
+solana-* components) was already in this lockfile.

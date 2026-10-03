@@ -4461,6 +4461,36 @@ name = "shortwin-math"
 version = "0.1.0"
 
 [[package]]
+name = "shortwin-ops"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anyhow",
+ "bytemuck",
+ "complete-curve",
+ "litesvm",
+ "serde",
+ "sha2 0.10.9",
+ "shortwin",
+ "shortwin-litesvm-tests",
+ "shortwin-math",
+ "shortwin-services-common",
+ "shortwin-venue-state",
+ "solana-account 4.3.2",
+ "solana-hash",
+ "solana-instruction",
+ "solana-keypair",
+ "solana-message",
+ "solana-pubkey 4.2.1",
+ "solana-signer",
+ "solana-transaction",
+ "solana-transaction-error",
+ "squads-v4-ix",
+ "tokio",
+ "toml",
+]
+
+[[package]]
 name = "shortwin-services-common"
 version = "0.1.0"
 dependencies = [

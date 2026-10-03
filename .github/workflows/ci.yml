@@ -809,7 +809,9 @@ jobs:
     # PumpSwap 4-extras T-SIZE through the keeper's tables (pamm_alt); every keeper transaction
     # under the invariant hooks) against the anchor-build artifacts, and the A49 check that the
     # keeper binary carries no mock-venue code. The M7 benches (m7_cost, cascade) are #[ignore]d
-    # here and run in release in m7-keeper-bench; the indexer's tests (M8) run in `indexer`.
+    # here and run in release in m7-keeper-bench; the indexer's tests (M8) run in `indexer`. M10
+    # (WP-7): the governance tool `shortwin-gov` (services/ops) — its unit tests and T-OPS, the
+    # whole governance sequence through its command line on the mainnet Squads ELF.
     if: github.event_name != 'schedule'
     needs: anchor-build
     runs-on: ubuntu-24.04
@@ -828,7 +830,7 @@ jobs:
         with:
           name: shortwin-program
           path: target
-      - run: cargo fmt --manifest-path services/Cargo.toml -p shortwin-services-common -p shortwin-keeper -p shortwin-keeper-litesvm -p shortwin-indexer -p shortwin-indexer-litesvm --check
+      - run: cargo fmt --manifest-path services/Cargo.toml -p shortwin-services-common -p shortwin-keeper -p shortwin-keeper-litesvm -p shortwin-indexer -p shortwin-indexer-litesvm -p shortwin-ops --check
       - run: cargo clippy --manifest-path services/Cargo.toml --workspace --all-targets --locked -- -D warnings
       - name: The keeper on its release feature set (no test-venue)
         run: cargo clippy --manifest-path services/Cargo.toml -p shortwin-keeper --all-targets --locked -- -D warnings

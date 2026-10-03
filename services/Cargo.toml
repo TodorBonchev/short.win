@@ -10,13 +10,15 @@
 #                    TEST-ONLY `embedded-pg` feature
 # - indexer-litesvm/ TEST-ONLY: LiteSVM session recording and the indexer's replay harness
 #                    (DB-vs-chain assertions on an embedded Postgres)
+# - ops/             `shortwin-gov`, the Squads v4 governance tool (M10 WP-7): multisig creation,
+#                    init, staging / approval / execution of vault transactions, apply, verify
 #
 # C1-14: the scenario tests link the LiteSVM harness (tests/litesvm), so this lockfile holds
 # the same Agave 4.2.2 runtime line and the same solana-* component versions as the root
 # Cargo.lock (it was seeded from it); the RPC client is the matching 4.2.2 line.
 [workspace]
 resolver = "3"
-members = ["common", "keeper", "keeper-litesvm", "indexer", "indexer-litesvm"]
+members = ["common", "keeper", "keeper-litesvm", "indexer", "indexer-litesvm", "ops"]
 
 [workspace.package]
 edition = "2024"

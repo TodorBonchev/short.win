@@ -207,6 +207,68 @@ impl VaultTransaction {
         })
     }
 
+    /// The vault this transaction executes as (`vault_index` of its multisig).
+    pub fn vault(&self) -> Pubkey {
+        crate::pda::vault(&self.multisig, self.vault_index)
+    }
+
+    /// Its ephemeral signers (one per `ephemeral_signer_bumps` entry).
+    pub fn ephemeral_signers(&self) -> Vec<Pubkey> {
+        let tx = crate::pda::transaction(&self.multisig, self.index);
+        (0..self.ephemeral_signer_bumps.len())
+            .filter_map(|i| u8::try_from(i).ok())
+            .map(|i| crate::pda::ephemeral_signer(&tx, i))
+            .collect()
+    }
+
+    /// The remaining accounts of this transaction's `vault_transaction_execute`, rebuilt from
+    /// the stored message (what [`crate::message::VaultMessage::execute_accounts`] gives for
+    /// the compiled one): the static keys with the header's writability, a signer passed as a
+    /// signer unless it is the vault or an ephemeral signer (Squads signs for those in its
+    /// CPIs). `None` for a message that loads keys from address lookup tables (the caller must
+    /// supply the tables' contents).
+    pub fn execute_accounts(&self) -> Option<Vec<AccountMeta>> {
+        let m = &self.message;
+        m.lookups.is_empty().then_some(())?;
+        let vault = self.vault();
+        let ephemeral = self.ephemeral_signers();
+        let (s, ws, wn) = (
+            usize::from(m.num_signers),
+            usize::from(m.num_writable_signers),
+            usize::from(m.num_writable_non_signers),
+        );
+        Some(
+            m.account_keys
+                .iter()
+                .enumerate()
+                .map(|(i, k)| {
+                    let signer = i < s && *k != vault && !ephemeral.contains(k);
+                    let writable = i < ws || (s..s + wn).contains(&i);
+                    AccountMeta {
+                        pubkey: *k,
+                        is_signer: signer,
+                        is_writable: writable,
+                    }
+                })
+                .collect(),
+        )
+    }
+
+    /// The keys that must sign the `vault_transaction_execute` besides the executing member:
+    /// the message's signers that are neither the vault nor an ephemeral signer (e.g. the
+    /// current upgrade authority in a `SetAuthorityChecked` handing it to the vault).
+    pub fn co_signers(&self) -> Vec<Pubkey> {
+        let vault = self.vault();
+        let ephemeral = self.ephemeral_signers();
+        self.message
+            .account_keys
+            .iter()
+            .take(usize::from(self.message.num_signers))
+            .filter(|k| **k != vault && !ephemeral.contains(k))
+            .copied()
+            .collect()
+    }
+
     /// The instructions a `vault_transaction_execute` of this transaction runs, given that
     /// instruction's remaining accounts (`remaining`: the lookup tables, the static keys, then
     /// the loaded writable and read-only keys — Squads' order,

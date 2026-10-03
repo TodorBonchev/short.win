@@ -329,13 +329,25 @@ pub fn vault_transaction_execute(
     member: &Pubkey,
     message: &VaultMessage,
 ) -> Instruction {
+    vault_transaction_execute_with(multisig, index, member, message.execute_accounts(&[]))
+}
+
+/// `vault_transaction_execute()` of transaction `index` by `member` with explicit remaining
+/// accounts — e.g. [`crate::state::VaultTransaction::execute_accounts`] of the stored
+/// transaction, when the compiled message is not at hand (the ops tool executes what it reads).
+pub fn vault_transaction_execute_with(
+    multisig: &Pubkey,
+    index: u64,
+    member: &Pubkey,
+    remaining: Vec<AccountMeta>,
+) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new_readonly(*multisig, false),
         AccountMeta::new(pda::proposal(multisig, index), false),
         AccountMeta::new_readonly(pda::transaction(multisig, index), false),
         AccountMeta::new_readonly(*member, true),
     ];
-    accounts.extend(message.execute_accounts(&[]));
+    accounts.extend(remaining);
     Instruction {
         program_id: ID,
         accounts,

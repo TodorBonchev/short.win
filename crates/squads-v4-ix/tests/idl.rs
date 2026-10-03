@@ -664,6 +664,80 @@ fn vault_transaction_decodes_and_resolves() {
     assert_eq!(VaultTransaction::decode(&raw[..raw.len() - 1]), None);
 }
 
+/// [`VaultTransaction::execute_accounts`] rebuilds, from the stored account alone, the remaining
+/// accounts the compiled message gives (the ops tool executes what it reads); a non-vault
+/// signer of the message is a co-signer of the execution; a message with lookup tables is left
+/// to the caller.
+#[test]
+fn stored_vault_transaction_gives_its_execute_accounts() {
+    let idl = Idl::load();
+    let multisig = k(2);
+    let vault = pda::vault(&multisig, 0);
+    let deployer = k(3);
+    let ixs = vec![Instruction {
+        program_id: k(9),
+        accounts: vec![
+            AccountMeta::new(k(4), false),
+            AccountMeta::new_readonly(deployer, true),
+            // The vault is the message's payer: always writable.
+            AccountMeta::new(vault, true),
+            AccountMeta::new_readonly(k(5), false),
+        ],
+        data: vec![7],
+    }];
+    let stored = |m: &squads_v4_ix::VaultMessage| {
+        let d = squads_v4_ix::message::decode(&m.bytes).unwrap();
+        let instructions: Vec<Value> = d
+            .instructions
+            .iter()
+            .map(|(p, a, data)| json!({ "programIdIndex": p, "accountIndexes": a, "data": data }))
+            .collect();
+        let lookups: Vec<Value> = d
+            .lookups
+            .iter()
+            .map(|(t, w, r)| json!({ "accountKey": s(t), "writableIndexes": w, "readonlyIndexes": r }))
+            .collect();
+        let raw = idl.account(
+            "VaultTransaction",
+            &json!({
+                "multisig": s(&multisig), "creator": s(&k(6)), "index": 3, "bump": 254,
+                "vaultIndex": 0, "vaultBump": 255, "ephemeralSignerBumps": [],
+                "message": {
+                    "numSigners": d.num_signers, "numWritableSigners": d.num_writable_signers,
+                    "numWritableNonSigners": d.num_writable_non_signers,
+                    "accountKeys": d.account_keys.iter().map(s).collect::<Vec<_>>(),
+                    "instructions": instructions, "addressTableLookups": lookups,
+                },
+            }),
+        );
+        VaultTransaction::decode(&raw).unwrap()
+    };
+    let m = compile(&vault, &ixs, &[]).unwrap();
+    let t = stored(&m);
+    assert_eq!(t.vault(), vault);
+    assert!(t.ephemeral_signers().is_empty());
+    let remaining = t.execute_accounts().unwrap();
+    assert_eq!(remaining, m.execute_accounts(&[]));
+    // The vault is never passed as a signer (Squads signs for it); the deployer is.
+    assert!(remaining.iter().any(|a| a.pubkey == vault && !a.is_signer));
+    assert!(
+        remaining
+            .iter()
+            .any(|a| a.pubkey == deployer && a.is_signer)
+    );
+    assert_eq!(t.co_signers(), vec![deployer]);
+    assert_eq!(t.executed_instructions(&remaining).unwrap(), ixs);
+    let exec = ix::vault_transaction_execute_with(&multisig, 3, &k(7), remaining);
+    assert_eq!(exec, ix::vault_transaction_execute(&multisig, 3, &k(7), &m));
+    // With an address lookup table the stored message alone does not name every key.
+    let table = squads_v4_ix::LookupTable {
+        key: k(100),
+        addresses: vec![k(5)],
+    };
+    let with_table = compile(&vault, &ixs, std::slice::from_ref(&table)).unwrap();
+    assert_eq!(stored(&with_table).execute_accounts(), None);
+}
+
 #[test]
 fn pdas_follow_the_seeds() {
     // The mainnet ProgramConfig the fixture group holds.
