@@ -4,7 +4,8 @@
 //! (c) push-then-freeze (§12.10 ii–iv), and `fv_push.py` (§12.11): the amount pushes, the
 //! S2 → S1 flip with 1–2 pushed seconds, push-then-freeze flips, `n` consecutive
 //! attacker-only seconds (5 is the documented limit, R4A-9), the Emergency-flag S3 of an
-//! expiring position (E) and the `p'` veto (V, R4A-3).
+//! expiring position (E), the `p'` veto (V, R4A-3) and (M10 G-E2) a contrary observation every
+//! second deferring an S3 that is due (D, V2-14: deferral only).
 //!
 //! **Market.** The mock is a CPMM with the fee on the input, which is ECON's `RC` (a fresh pump
 //! graduate on a 25 bps CPMM pool, 206.9 M tokens against 84.99 SOL, Tier C by age): every
@@ -437,6 +438,81 @@ mod fv_push {
                 flip_bundle(&mut sc, 3.0).is_none(),
                 "S3 → S1 flip with {n} pushes"
             );
+        }
+    }
+
+    /// (D) V2-14 / `refute_push.py` (d) (M10 G-E2): the borrower's contrary observation every
+    /// second against an S3 that is due. The Emergency flag is set 30 min before a healthy
+    /// position's deadline; from 11 s before the deadline (the sim's `lead` 12) the borrower
+    /// lands one atomic `[dump 1 % or 3 %, crank_price, buy back]` after the keeper's crank each
+    /// second for `w` = 20 and 60 s, the keeper calling `sol_settle` every second. What ECON
+    /// claims is a deferral only: whatever lands is the S3, its amount within `2·fv_dev_bps` of
+    /// the honest S3's (as `amount_pushes_and_flips`; the rent accrues meanwhile). Pinned: on
+    /// this configuration (a 0.4 % position) a −1 % round trip does not widen the box enough to
+    /// defer at all — the S3 in the honest second, at the deadline; a −3 % one defers it for as
+    /// long as it is paid, and the S3 lands exactly 6 s after the last contrary second (14 / 54 s
+    /// after the deadline, the seconds of `refute_push.widen_s3` on ECON's `RC`, whose
+    /// max-size position the sim defers at −1 % too: `python3 tests/litesvm/sim/s3_widen.py`).
+    /// `-- --nocapture` prints the seconds and amounts.
+    #[test]
+    fn a_contrary_observation_every_second_defers_s3_only() {
+        let mut sc = Sc::rc();
+        sc.env.tick(&sc.mm, 5);
+        sc.warp_to_deadline(-1800);
+        sc.set_route_broken(true);
+        sc.crank_every(30, 58);
+        let deadline = sc.pos().deadline;
+        let now = sc.env.now();
+        sc.env
+            .tick(&sc.mm, u32::try_from(deadline - 12 - now).unwrap());
+        let dev = u64::from(sc.pos().fv_dev_bps);
+        let saved = sc.env.svm.clone();
+        let (hs, honest) = sc.run_until_settled(60).expect("the honest S3");
+        assert_eq!(honest.condition, 3);
+        assert_eq!(sc.env.now(), deadline, "the honest S3 at the deadline");
+        for pct in [100u128, 300] {
+            for w in [20u32, 60] {
+                sc.env.svm = saved.clone();
+                let mut cost = 0i128;
+                let mut got = None;
+                for s in 1..=200u32 {
+                    sc.env.warp(1);
+                    sc.crank();
+                    if s <= w {
+                        let target = sc.spot() * (10_000 - pct) / 10_000;
+                        cost += sc.attacker_bundle(target);
+                    }
+                    if let Some(ev) = sc.settle_ok().settled {
+                        got = Some((s, ev));
+                        break;
+                    }
+                }
+                let (s, ev) = got.expect("S3");
+                eprintln!(
+                    "contrary observation −{} % for {w} s (cost {:.4} SOL): S3 at {s} s (honest \
+                     {hs} s), {} vs honest {} lamports",
+                    pct / 100,
+                    cost as f64 / 1e9,
+                    ev.lender_amount,
+                    honest.lender_amount
+                );
+                assert_eq!(ev.condition, 3, "S3, nothing else");
+                if pct == 100 {
+                    assert_eq!(s, hs, "−1 % for {w} s: no deferral on this configuration");
+                } else {
+                    assert!(s > hs, "−3 % for {w} s: the S3 is deferred");
+                    assert_eq!(
+                        s,
+                        w + 6,
+                        "−3 % for {w} s: the S3 6 s after the last contrary second"
+                    );
+                }
+                assert!(
+                    ev.lender_amount.abs_diff(honest.lender_amount) * 10_000
+                        <= 2 * dev * honest.lender_amount,
+                    "−{pct} bps for {w} s: the honest S3's amount"
+                );
+            }
         }
     }
 

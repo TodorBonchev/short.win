@@ -20,6 +20,11 @@
 //! | `atomic_bundles_cannot_force_s1` | `ema_atomic_multi.py` (b) (atomic) | a lender-keeper's `[pump past the S1 boundary, sol_settle, dump]` every second never arms the settlement clock |
 //! | `held_pushes_on_a_fresh_position_do_not_pay` | `ema_atomic.py` (held) | holding the pool at ×2.5 until the position is liquidatable, then sandwiching the liquidation, costs the attacker more than it takes |
 //! | `pushed_seconds_cannot_flip_s2_or_move_its_amount` | `fv_push.py` (T-BOX) | on the pool thinned into S2 by LP removal (`raydium_v4_e2e.rs`), one attacker-only push up or down before the honest S2 leaves it an S2 within `fv_dev_bps` of the honest amount; the flip bundle `[pump → sol_settle → dump]` cannot make it an uncapped S1 |
+//! | `held_pushes_before_a_liquidation_take_from_the_borrower_only` (M10) | `sandwich.py` held, §12.6 | 1 s at +2.5 % and 3 s at +15 % held (attacker-only seconds) before the best sandwich: the spend within `⌊B̂_ref·(1 + δ)⌋` of the lifted reference, the lenders' and protocol's legs at least the honest ones, the attacker's extra out of the borrower's remainder only; the 3-s plan pays on this pool (O19's residual, scaled by `V`) |
+//! | `atomic_bundles_cannot_force_the_oi_cap_basket` (M10) | `ema_atomic_multi.py` (a) (atomic) | the market filled to its OI cap (three positions); `[pump, crank_price, dump]` every second at ×1.5 / ×2 / ×3 for 60 s: no position becomes liquidatable, the final bundles are refused `NotLiquidatable` |
+//! | `atomic_bundles_cannot_force_s1_on_the_oi_cap_basket` (M10) | `ema_atomic_multi.py` (b) (atomic) | the OI-cap basket; `[pump past the lowest S1 boundary, sol_settle × every position, dump]` every second for 60 s: the oracle sees nothing to arm, nothing arms or settles |
+//! | `round_3_pushes_cannot_flip_the_thin_pool_s2` (M10) | `fv_push.py` (R3A-1, R4B-2, R4A-9) | on the thin pool one second before its S2: 2 pushed seconds, 1 push + 2 / 4 / 6 frozen seconds, 1–4 consecutive attacker-only seconds and 2–6 pushes with an honest second between, each followed by the flip bundle: no S1, any settlement within `fv_dev_bps`; 5–6 consecutive attacker-only seconds (the documented degraded-mode limit) reported |
+//! | `round_3_settlement_attacks_delay_s1_by_seconds_only` (M10) | `arming.py`, `refute_push.py` (a), (b), (c) | the capped position 5 % beyond its S1 boundary after a genuine gap: honest S1 after 57 s (the mock's `RC` figure); a borrower bundle every 20 s changes nothing; a refutation push delays it ≤ 4 s, push-then-freeze ≤ 8 s, a spot-leg veto of 9–20 s ≤ 6 s; every settlement call the oracle's |
 
 #![allow(clippy::result_large_err)]
 
@@ -158,6 +163,28 @@ fn lenders_take(e: &Liquidate) -> u64 {
     e.rent + e.penalty_lender + e.penalty_protocol
 }
 
+/// The lenders' and protocol's legs of an attacked liquidation (`ev`) are the honest one's (`h`)
+/// up to the penalty (`penalty_bps`) on a drop of its base `min(B̂_live,risk, B̂_ref)` of at most
+/// 1 ppm (the front-run's own fees stay in the pool and move the reference by lamports) plus 2
+/// lamports of flooring (`venue_attacks_support::assert_lenders_keep`).
+fn assert_lenders_keep(h: &Liquidate, ev: &Liquidate, penalty_bps: u16, what: &str) {
+    let base = |e: &Liquidate| e.b_live_risk.min(e.b_ref);
+    let (hl, al) = (lenders_take(h), lenders_take(ev));
+    let drop = base(h).saturating_sub(base(ev));
+    assert!(
+        u128::from(drop) * 1_000_000 <= u128::from(base(h)),
+        "{what}: the penalty base falls by at most 1 ppm: {} → {}",
+        base(h),
+        base(ev)
+    );
+    let allowance = (u128::from(drop) * u128::from(penalty_bps)).div_ceil(10_000) as u64 + 2;
+    assert!(
+        al + allowance >= hl,
+        "{what}: lenders and protocol keep the honest legs: {hl} vs {al} lamports (allowance \
+         {allowance})"
+    );
+}
+
 /// `sandwich.py` / `fixed_delta.py` (d), liquidation, atomic model, on the real pool.
 #[test]
 fn exit_sandwich_on_a_liquidation() {
@@ -183,14 +210,14 @@ fn exit_sandwich_on_a_liquidation() {
     let loss = i128::from(h.borrower_payout) - i128::from(ev.borrower_payout);
     eprintln!(
         "sandwich at t: dX = {dx}, B {:.4} → {:.4} SOL (B̂_ref {:.4}), attacker extra {:+.4} SOL, \
-         borrower loss {:.4} SOL, lenders+protocol {:.6} → {:.6} SOL",
+         borrower loss {:.4} SOL, lenders+protocol {} → {} lamports",
         h.buyback_cost as f64 / 1e9,
         ev.buyback_cost as f64 / 1e9,
         ev.b_ref as f64 / 1e9,
         extra as f64 / 1e9,
         loss as f64 / 1e9,
-        lenders_take(&h) as f64 / 1e9,
-        lenders_take(&ev) as f64 / 1e9
+        lenders_take(&h),
+        lenders_take(&ev)
     );
     assert!(
         loss > 0 && extra < loss,
@@ -200,11 +227,8 @@ fn exit_sandwich_on_a_liquidation() {
         u128::try_from(loss).unwrap() * 10_000 <= u128::from(ev.b_ref) * delta,
         "the borrower loses at most δ·B̂_ref"
     );
-    let (hl, al) = (lenders_take(&h), lenders_take(&ev));
-    assert!(
-        al + al / 1_000 >= hl,
-        "lenders and protocol keep what the honest liquidation gives them: {hl} vs {al}"
-    );
+    let penalty = ex.predicted().view.pos.penalty_bps;
+    assert_lenders_keep(&h, &ev, penalty, "the atomic sandwich");
 
     // After 4 s of waiting (the price held, nobody exits): the same fixed δ.
     f.env.svm = saved;
@@ -608,4 +632,571 @@ fn pushed_seconds_cannot_flip_s2_or_move_its_amount() {
         evs.iter().all(|e| e.condition != 1),
         "the flip bundle cannot turn the capped S2 into an uncapped S1"
     );
+}
+
+// ---- M10: the §12.6 held model, the OI-cap basket, round 3 on the real pool --------------------
+
+/// `sandwich.attack(m, pos, t, ("liquidation",), "held")` on the real pool (ECON §12.6, the
+/// held-model residual, owner item O19): before its sandwich the attacker-keeper holds the pool
+/// at `P_ema × (1 + x)` for `h` whole seconds (attacker-only seconds: every observation of each
+/// second sees it, no honest crank — the degraded-mode exposure) to raise the reference the fixed
+/// bound is computed from, then lands its best `[buy dX, liquidate, sell dX]` the next second,
+/// every short.win instruction checked by the oracle. Plans 1 s at +2.5 % and 3 s at +15 % (the
+/// sim's RA / A plan). What holds, as on ECON's markets: the spend stays within
+/// `⌊B̂_ref·(1 + δ)⌋` of the lifted reference (I11); while the borrower keeps a remainder the
+/// lenders' and protocol's legs are at least the honest ones (the penalty grows with the
+/// reference); the attacker's extra over an honest keeper — net of its held pushes — comes out of
+/// the borrower's remainder only. What the real pool shows: at the per-position cap (`V` ≈ 869
+/// SOL) the 3-s plan **pays** — it beats the atomic sandwich by tens of SOL (`-- --nocapture`;
+/// `tests/litesvm/README.md`), the residual ECON §12.6 discloses (there: RA +1.52 SOL over an
+/// honest keeper on a 37.9-SOL vault), scaled by the position.
+#[test]
+fn held_pushes_before_a_liquidation_take_from_the_borrower_only() {
+    let (mut f, b, nonce) = setup_liq();
+    let a = attacker(&mut f);
+    let saved = f.env.svm.clone();
+    let h = clone_event(f.exit(Which::Liquidate, &b.key(), nonce).liquidated());
+    let honest_keeper = i128::from(h.penalty_keeper + h.keeper_topup);
+    f.env.svm = saved.clone();
+    let dx = best_dx(&mut f, &a, Which::Liquidate, &b.key(), nonce);
+    let (_, atomic) = sandwich(&mut f, &a, Which::Liquidate, &b.key(), nonce, dx);
+    for (secs, x_bps) in [(1u32, 250u128), (3, 1_500)] {
+        f.env.svm = saved.clone();
+        let mut pre = 0i128;
+        for _ in 0..secs {
+            let target = f.market().ema_price.get() * (10_000 + x_bps) / 10_000;
+            pre += held_second(&mut f, &a, target);
+        }
+        f.env.warp(1);
+        let dx = best_dx(&mut f, &a, Which::Liquidate, &b.key(), nonce);
+        let (ex, pnl) = sandwich(&mut f, &a, Which::Liquidate, &b.key(), nonce, dx);
+        let ev = clone_event(ex.liquidated());
+        let delta = u128::from(ex.predicted().view.pos.delta_liq_bps);
+        assert!(
+            u128::from(ev.buyback_cost) * 10_000 <= u128::from(ev.b_ref) * (10_000 + delta),
+            "I11: the spend within the fixed δ over the reference"
+        );
+        let (hl, al) = (lenders_take(&h), lenders_take(&ev));
+        assert!(
+            ev.borrower_payout > 0,
+            "the vault still covers the waterfall"
+        );
+        let penalty = ex.predicted().view.pos.penalty_bps;
+        assert_lenders_keep(&h, &ev, penalty, &format!("{secs} s at +{x_bps} bps"));
+        let net = pnl - pre;
+        let extra = net - honest_keeper;
+        let loss = i128::from(h.borrower_payout) - i128::from(ev.borrower_payout);
+        eprintln!(
+            "held {secs} s at +{:.1} %: push {:.4} SOL, sandwich + keeper {:+.4} SOL, net {:+.4} SOL \
+             (atomic sandwich {:+.4}), extra over an honest keeper {:+.4} SOL; B̂_ref {:.4} → {:.4} \
+             SOL, lenders + protocol {} → {} lamports, borrower {:.4} → {:.4} SOL",
+            x_bps as f64 / 100.0,
+            pre as f64 / 1e9,
+            pnl as f64 / 1e9,
+            net as f64 / 1e9,
+            atomic as f64 / 1e9,
+            extra as f64 / 1e9,
+            h.b_ref as f64 / 1e9,
+            ev.b_ref as f64 / 1e9,
+            hl,
+            al,
+            h.borrower_payout as f64 / 1e9,
+            ev.borrower_payout as f64 / 1e9
+        );
+        assert!(
+            loss > 0 && extra < loss,
+            "the attacker's extra comes out of the borrower's remainder only"
+        );
+    }
+}
+
+/// `ema_atomic_multi.fill` on the real pool: positions at the largest size the caps admit, one a
+/// second (a checked open and a keeper second each), until the per-market OI cap leaves no room
+/// for another (a further open is refused `CapMarketOi`).
+fn oi_basket() -> (Fart, Vec<(Borrower, u64)>) {
+    let mut f = Fart::new(fork_env_with(lift_notional), LEND);
+    let (x, _) = reserves(&f.env, &f.rm).unwrap();
+    let mut basket = Vec::new();
+    loop {
+        let q = max_open_q(&mut f);
+        if q <= x / 50_000 {
+            break;
+        }
+        let (b, nonce, _) = f.open(q);
+        basket.push((b, nonce));
+        f.second();
+        assert!(basket.len() < 20, "the OI cap binds");
+    }
+    let saved = f.env.svm.clone();
+    let mut extra = f.env.borrower();
+    let first = f.pos(&basket[0].0, basket[0].1).q;
+    let (res, _) = f.env.open(&f.rm, &mut extra, first / 2);
+    assert_err(&res, E::CapMarketOi);
+    f.env.svm = saved;
+    let sum: u64 = basket.iter().map(|(b, n)| f.pos(b, *n).q).sum();
+    eprintln!(
+        "OI basket: {} positions, ΣQ {:.3} % of X",
+        basket.len(),
+        sum as f64 * 100.0 / x as f64
+    );
+    f.tick(60);
+    (f, basket)
+}
+
+/// `ema_atomic_multi.py` (a), model atomic, on the real pool: the market filled to its OI cap
+/// ([`oi_basket`]), then at ×1.5 / ×2 / ×3 the attacker's `[pump, crank_price, dump]` every second
+/// next to the honest keeper's crank for 60 s: no basket position is ever liquidatable to the
+/// attacker's own final transaction (`would_liq`, the oracle's), and every 20 s its `[pump,
+/// liquidate, dump]` on the first and the last position is refused `NotLiquidatable` (oracle-
+/// checked).
+#[test]
+fn atomic_bundles_cannot_force_the_oi_cap_basket() {
+    let (mut f, basket) = oi_basket();
+    assert!(basket.len() >= 2, "a basket");
+    let a = attacker(&mut f);
+    let p_true = f.spot();
+    let saved = f.env.svm.clone();
+    for mult in [1.5, 2.0, 3.0] {
+        f.env.svm = saved.clone();
+        let target = scale(p_true, mult);
+        let mut cost = 0i128;
+        for n in 1..=60 {
+            cost += atomic_second(&mut f, &a, target);
+            for (b, nonce) in &basket {
+                let p = predict(&read_view(&f.env, &f.rm, &b.key(), *nonce));
+                assert!(
+                    !p.would_liq() && !p.cr_liquidatable(),
+                    "×{mult}, second {n}"
+                );
+            }
+            if n % 20 == 0 {
+                for (b, nonce) in [&basket[0], basket.last().unwrap()] {
+                    final_bundle_refused(&mut f, &a, &b.key(), *nonce, target);
+                }
+            }
+        }
+        eprintln!(
+            "OI basket ×{mult}: 60 atomic seconds cost the attacker {:.3} SOL, nothing forced",
+            cost as f64 / 1e9
+        );
+    }
+}
+
+/// `ema_atomic_multi.py` (b), model atomic, on the real pool: a lender-keeper pushes the pool past
+/// the basket's lowest S1 boundary (×1.1 / ×1.3 / ×1.6 of it) and calls `sol_settle` on every
+/// basket position inside its own pumped transaction each second for 60 s (the honest keeper
+/// cranks first in each second): the oracle sees nothing to arm on any position, and nothing arms
+/// or settles.
+#[test]
+fn atomic_bundles_cannot_force_s1_on_the_oi_cap_basket() {
+    let (mut f, basket) = oi_basket();
+    let kb = basket
+        .iter()
+        .map(|(b, n)| s1_boundary(&f.env, &f.rm, &f.pos(b, *n)))
+        .fold(f64::MAX, f64::min);
+    let a = attacker(&mut f);
+    let kp = a.owner.insecure_clone();
+    let p_true = f.spot();
+    let saved = f.env.svm.clone();
+    for m in [1.1, 1.3, 1.6] {
+        f.env.svm = saved.clone();
+        let target = scale(p_true, kb * m);
+        for n in 1..=60 {
+            f.second();
+            let d = u64::try_from(move_size(&f.env, &f.rm, target)).unwrap();
+            let front = buy_ix(&f.rm, &a, d);
+            let mut ixs = vec![front.clone()];
+            for (b, nonce) in &basket {
+                let pred = predict_settle(&view_after(
+                    &mut f.env,
+                    &f.rm,
+                    &b.key(),
+                    *nonce,
+                    std::slice::from_ref(&front),
+                    &[&kp],
+                ));
+                assert!(
+                    pred.eval.settlement.is_none() && pred.eval.arm == ArmChange::None,
+                    "×{:.2}, second {n}: the oracle sees nothing to arm",
+                    kb * m
+                );
+                ixs.push(sol_settle_ix(&f.env, &f.rm, &kp.pubkey(), &b.key(), *nonce));
+            }
+            ixs.push(sell_ix(&f.rm, &a, d));
+            let meta = ok(f.env.send(&ixs, &[&kp]));
+            assert!(
+                events::of::<SolSettle>(&meta).is_empty()
+                    && events::of::<SettleArmed>(&meta).is_empty(),
+                "×{:.2}, second {n}: nothing arms or settles",
+                kb * m
+            );
+        }
+        for (b, nonce) in &basket {
+            assert_eq!(f.pos(b, *nonce).s_armed, 0);
+        }
+    }
+}
+
+// ---- round 3 (ECON §12.10, §12.11) on the real pool ---------------------------------------------
+
+/// The flip bundle `[pump to mult × spot → sol_settle → dump]` one second later, its settlement
+/// predicted by the oracle on the pumped state (checked against the event). Returns the
+/// settlement, if any.
+fn flip_bundle(f: &mut Fart, a: &Trader, b: &Pubkey, nonce: u64, mult: f64) -> Option<SolSettle> {
+    f.env.warp(1);
+    let target = scale(f.spot(), mult);
+    let d = u64::try_from(move_size(&f.env, &f.rm, target)).unwrap();
+    let kp = a.owner.insecure_clone();
+    let front = buy_ix(&f.rm, a, d);
+    let pred = predict_settle(&view_after(
+        &mut f.env,
+        &f.rm,
+        b,
+        nonce,
+        std::slice::from_ref(&front),
+        &[&kp],
+    ));
+    let settle = sol_settle_ix(&f.env, &f.rm, &kp.pubkey(), b, nonce);
+    let ixs = [front, settle, sell_ix(&f.rm, a, d)];
+    let meta = ok(f.env.send(&ixs, &[&kp]));
+    let ev = events::of::<SolSettle>(&meta).pop();
+    match (pred.eval.settlement, &ev) {
+        (None, None) => {}
+        (Some(s), Some(ev)) => {
+            assert_eq!(ev.condition, s.kind as u8);
+            assert_eq!(ev.lender_amount, s.lenders);
+            assert_eq!(ev.borrower_amount, s.borrower);
+        }
+        (p, e) => panic!(
+            "the oracle ({p:?}) and the program ({:?}) disagree",
+            e.as_ref().map(|e| e.condition)
+        ),
+    }
+    ev
+}
+
+/// A frozen second (`refute_push.py` (c), `fv_push.py`'s freeze): the honest keeper cranks, then
+/// the attacker's `[move to target, crank_price, move back]` adds an observation at `target`
+/// (just above or below `P_ema`: the bucket straddles it). Returns the attacker's cost.
+fn frozen_second(f: &mut Fart, a: &Trader, target: u128) -> i128 {
+    f.second();
+    let d = move_size(&f.env, &f.rm, target);
+    let crank = crank_price_ix(&f.rm);
+    let ixs = match d {
+        0 => vec![crank],
+        d if d > 0 => {
+            let d = u64::try_from(d).unwrap();
+            vec![buy_ix(&f.rm, a, d), crank, sell_ix(&f.rm, a, d)]
+        }
+        d => {
+            let d = u64::try_from(-d).unwrap();
+            vec![sell_ix(&f.rm, a, d), crank, buy_ix(&f.rm, a, d)]
+        }
+    };
+    let w0 = wsol_of(&f.env, a);
+    let kp = a.owner.insecure_clone();
+    ok(f.env.send(&ixs, &[&kp]));
+    w0 - wsol_of(&f.env, a)
+}
+
+/// `fv_push.py` (R3A-1, R4B-2, R4A-9) on the thin real pool of `raydium_v4_e2e.rs`'s S2 path, one
+/// second before the honest S2 (every settlement call the oracle's): the flip bundle fails to
+/// make the S2 an uncapped S1 after 2 pushed seconds; after 1 push and 2 / 4 / 6 frozen seconds
+/// (push-then-freeze); after 1–4 consecutive attacker-only seconds, and after 2–6 pushes with an
+/// honest second between each. Five or six consecutive attacker-only seconds — a censored
+/// keeper, degraded mode, the documented limit (R4A-9) — are reported, not required to fail.
+/// Whatever settles stays within `fv_dev_bps` of the honest S2.
+#[test]
+fn round_3_pushes_cannot_flip_the_thin_pool_s2() {
+    let ThinPool {
+        mut f,
+        b,
+        nonce,
+        pos,
+        ..
+    } = thin_pool_market();
+    let a = attacker(&mut f);
+    let (saved, honest) = ready_to_settle(&mut f, &b.key(), nonce);
+    assert_eq!(honest.condition, 2);
+    let x_h = honest.lender_amount;
+    let fv_dev = u128::from(pos.fv_dev_bps);
+    let kb = s1_boundary(&f.env, &f.rm, &pos);
+    let check = |what: &str, ev: Option<SolSettle>| {
+        if let Some(ev) = &ev {
+            assert_ne!(ev.condition, 1, "{what}: no S1");
+            assert!(
+                u128::from(ev.lender_amount.abs_diff(x_h)) * 10_000 <= fv_dev * u128::from(x_h),
+                "{what}: within fv_dev_bps"
+            );
+        }
+        eprintln!(
+            "{what}: {}",
+            ev.map_or("no settlement".to_owned(), |e| format!(
+                "S{} of {:.6} SOL (honest {:.6})",
+                e.condition,
+                e.lender_amount as f64 / 1e9,
+                x_h as f64 / 1e9
+            ))
+        );
+    };
+    // Two pushed seconds, then the flip bundle.
+    f.env.svm = saved.clone();
+    for _ in 0..2 {
+        let t = scale(f.spot(), 1.3);
+        attacker_only_second(&mut f, &a, t);
+    }
+    let ev = flip_bundle(&mut f, &a, &b.key(), nonce, kb * 1.1);
+    check("2 pushed seconds + flip", ev);
+    // Push then freeze.
+    for k in [2, 4, 6] {
+        f.env.svm = saved.clone();
+        let t = scale(f.spot(), 1.3);
+        attacker_only_second(&mut f, &a, t);
+        for _ in 0..k {
+            let ema = f.market().ema_price.get();
+            frozen_second(&mut f, &a, ema * 10_005 / 10_000);
+        }
+        let ev = flip_bundle(&mut f, &a, &b.key(), nonce, kb * 1.1);
+        check(&format!("1 push + {k} frozen seconds + flip"), ev);
+    }
+    // n attacker-only seconds, consecutive or with an honest second between each.
+    for n in 1..=6u32 {
+        for gap in [0u32, 1] {
+            if n == 1 && gap == 1 {
+                continue;
+            }
+            f.env.svm = saved.clone();
+            for i in 0..n {
+                let t = scale(f.spot(), 1.3);
+                attacker_only_second(&mut f, &a, t);
+                if i + 1 < n {
+                    for _ in 0..gap {
+                        f.second();
+                    }
+                }
+            }
+            let ev = flip_bundle(&mut f, &a, &b.key(), nonce, kb * 1.1);
+            let what = format!("{n} pushes, {gap} honest s between");
+            if n >= 5 && gap == 0 {
+                eprintln!(
+                    "{what} (the documented limit): {}",
+                    ev.as_ref()
+                        .map_or("no settlement".to_owned(), |e| format!("S{}", e.condition))
+                );
+            } else {
+                check(&what, ev);
+            }
+        }
+    }
+}
+
+/// The attack scripts' S1 set-up on the real pool (`arming.py`, `refute_push.py`): the capped
+/// position, 120 s of honest keeper cranks, then a genuine gap (the whale's real buy) to
+/// `beyond` × the S1 boundary. Returns the market, the position and the pre-gap spot and
+/// boundary multiple.
+fn s1_setup(beyond: f64) -> (Fart, Borrower, u64, u128, f64) {
+    let (mut f, b, nonce) = capped_market();
+    f.tick(120);
+    let kb = s1_boundary(&f.env, &f.rm, &f.pos(&b, nonce));
+    let p0 = f.spot();
+    f.move_to(scale(p0, kb * beyond));
+    (f, b, nonce, p0, kb)
+}
+
+/// `mature_soon` of `refute_push.py`: armed, and `lead` more EMA updates complete the clock.
+fn mature_soon(f: &Fart, b: &Borrower, nonce: u64, lead: u64) -> bool {
+    let p = f.pos(b, nonce);
+    p.s_armed == 1 && f.market().ema_count + lead >= p.s_count + u64::from(p.settle_persist_n)
+}
+
+/// One keeper second (checked crank and checked `sol_settle`); the settlement, if any.
+fn keeper_second(f: &mut Fart, b: &Borrower, nonce: u64) -> Option<SolSettle> {
+    f.second();
+    f.settle(&b.key(), nonce).ev
+}
+
+/// ECON §12.10 on the real pool (`arming.py`, `refute_push.py` (a), (b), (c)), the capped
+/// Fartcoin position 5 % beyond its S1 boundary after a genuine gap, the keeper's checked crank
+/// and `sol_settle` every second (the oracle predicts the arming clock every second):
+/// - honest: S1 after `s_h` seconds;
+/// - (V2-4) the borrower's `[dump below the S1 price → sol_settle → buy back]` every 20 s neither
+///   disarms nor delays it;
+/// - (a) a refutation push — one attacker-only second at ×0.7 one EMA update before maturity,
+///   every cycle — delays S1 by at most 4 s (the mock: 2–4 s);
+/// - (c) push-then-freeze — one attacker-only ×0.7 second three updates before maturity, then 4
+///   frozen seconds just below `P_ema` — by at most 8 s;
+/// - (b) a spot-leg veto — from 20 s after arming, one low observation per second below the
+///   liquidation price for 9 / 12 / 20 s — keeps the clock running: at most 6 s late.
+#[test]
+fn round_3_settlement_attacks_delay_s1_by_seconds_only() {
+    let honest = {
+        let (mut f, b, nonce, ..) = s1_setup(1.05);
+        let mut got = None;
+        for s in 1..=600u32 {
+            if let Some(ev) = keeper_second(&mut f, &b, nonce) {
+                got = Some((s, ev));
+                break;
+            }
+        }
+        let (s, ev) = got.expect("S1");
+        assert_eq!(ev.condition, 1, "the gap settles S1");
+        s
+    };
+    eprintln!("honest S1 after {honest} s");
+
+    // arming.py: a borrower bundle every 20 s.
+    {
+        let (mut f, b, nonce, p0, kb) = s1_setup(1.05);
+        let a = attacker(&mut f);
+        let kp = a.owner.insecure_clone();
+        let mut bundles = 0;
+        let mut got = None;
+        for s in 1..=600u32 {
+            if let Some(ev) = keeper_second(&mut f, &b, nonce) {
+                got = Some((s, ev));
+                break;
+            }
+            if s % 20 == 0 {
+                let target = scale(p0, kb * 0.99);
+                let d = u64::try_from(-move_size(&f.env, &f.rm, target)).unwrap();
+                let settle = sol_settle_ix(&f.env, &f.rm, &kp.pubkey(), &b.key(), nonce);
+                let ixs = [sell_ix(&f.rm, &a, d), settle, buy_ix(&f.rm, &a, d)];
+                let meta = ok(f.env.send(&ixs, &[&kp]));
+                assert!(
+                    events::of::<SolSettle>(&meta).is_empty()
+                        && events::of::<shortwin::events::SettleDisarmed>(&meta).is_empty(),
+                    "the bundle cannot disarm"
+                );
+                bundles += 1;
+            }
+        }
+        let (s, ev) = got.expect("S1");
+        eprintln!("borrower bundle every 20 s ({bundles}): S1 after {s} s");
+        assert_eq!((ev.condition, s), (1, honest), "no delay");
+    }
+
+    // (a) refutation push and (c) push-then-freeze.
+    for (lead, freeze, max_delay) in [(1u64, 0u32, 4u32), (3, 4, 8)] {
+        let (mut f, b, nonce, ..) = s1_setup(1.05);
+        let a = attacker(&mut f);
+        let (mut pushes, mut frozen, mut freeze_left) = (0, 0, 0);
+        let mut last = None;
+        let mut got = None;
+        for s in 1..=600u32 {
+            let since = f.pos(&b, nonce).s_since;
+            if freeze_left == 0 && mature_soon(&f, &b, nonce, lead) && last != Some(since) {
+                last = Some(since);
+                let t = scale(f.spot(), 0.7);
+                attacker_only_second(&mut f, &a, t);
+                pushes += 1;
+                freeze_left = freeze;
+                continue;
+            }
+            if freeze_left > 0 {
+                let ema = f.market().ema_price.get();
+                frozen_second(&mut f, &a, ema * 9_995 / 10_000);
+                frozen += 1;
+                freeze_left -= 1;
+                if let Some(ev) = f.settle(&b.key(), nonce).ev {
+                    got = Some((s, ev));
+                    break;
+                }
+                continue;
+            }
+            if let Some(ev) = keeper_second(&mut f, &b, nonce) {
+                got = Some((s, ev));
+                break;
+            }
+        }
+        let (s, ev) = got.expect("S1");
+        eprintln!(
+            "{} ({pushes} attacker-only, {frozen} frozen seconds): S1 after {s} s (honest {honest})",
+            if freeze == 0 {
+                "refutation push"
+            } else {
+                "push-then-freeze"
+            }
+        );
+        assert_eq!(ev.condition, 1);
+        assert!(
+            s <= honest + max_delay,
+            "delayed by {} s (at most {max_delay})",
+            s - honest
+        );
+    }
+
+    // (b) the spot-leg veto.
+    for w in [9u32, 12, 20] {
+        let (mut f, b, nonce, ..) = s1_setup(1.05);
+        let a = attacker(&mut f);
+        let (mut armed_at, mut blocked) = (None, 0);
+        let mut got = None;
+        for s in 1..=600u32 {
+            if armed_at.is_none() && f.pos(&b, nonce).s_armed == 1 {
+                armed_at = Some(s);
+            }
+            if armed_at.is_some_and(|t| s - t >= 20) && blocked < w {
+                f.second();
+                let pr = f.predict(&b.key(), nonce);
+                let target = liq_price_target(&pr) * 995 / 1_000;
+                let d = move_size(&f.env, &f.rm, target);
+                assert!(d < 0, "a low observation needs a sale");
+                let d = u64::try_from(-d).unwrap();
+                let kp = a.owner.insecure_clone();
+                let ixs = [
+                    sell_ix(&f.rm, &a, d),
+                    crank_price_ix(&f.rm),
+                    buy_ix(&f.rm, &a, d),
+                ];
+                ok(f.env.send(&ixs, &[&kp]));
+                let out = f.settle(&b.key(), nonce);
+                assert!(
+                    out.ev.is_none() && out.disarmed.is_none(),
+                    "a vetoed second neither settles nor disarms"
+                );
+                blocked += 1;
+                continue;
+            }
+            if let Some(ev) = keeper_second(&mut f, &b, nonce) {
+                got = Some((s, ev));
+                break;
+            }
+        }
+        let (s, ev) = got.expect("S1");
+        eprintln!("spot-leg veto of {w} s: S1 after {s} s (honest {honest})");
+        assert_eq!(ev.condition, 1);
+        assert!(
+            s <= honest + 6,
+            "veto of {w} s: delayed by {} s",
+            s - honest
+        );
+    }
+}
+
+/// `block_spot.liq_price_target` on the real pool: the largest spot at which the liquidation spot
+/// leg still fails — `CR(V_eff, B̂(q; reprice(L_live, P))) ≥ L` at the position's risk view — by
+/// bisection on `P`.
+fn liq_price_target(p: &Predicted) -> u128 {
+    let pos = &p.view.pos;
+    let (x, y) = p.view.xy();
+    let l = shortwin_math::quote::liquidity(x, y).unwrap();
+    let healthy = |price: u128| {
+        p.view
+            .risky()
+            .buy_repriced(pos.q, l, price)
+            .is_some_and(|b| {
+                u128::from(p.v_eff) * 10_000 / u128::from(b.cost) >= u128::from(pos.cr_liq_bps)
+            })
+    };
+    let spot = shortwin_math::risk::price_wad(x, y).unwrap();
+    let (mut lo, mut hi) = (spot / 4, spot);
+    for _ in 0..80 {
+        let mid = (lo + hi) / 2;
+        if healthy(mid) {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    lo
 }

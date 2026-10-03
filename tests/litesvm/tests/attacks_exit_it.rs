@@ -6,8 +6,9 @@
 //! position and the OI-cap basket; the basket attack's held model and its S1-forcing variant),
 //! `ptf_sandwich.py` (push-then-freeze cannot lift the liquidation reference, R4B-2),
 //! `fvcap.py` (the fair-value cap binds in S2, never in S1; drained-pool model cases),
-//! `ema_near.py` (near-threshold positions) and `cascade.py` (an honest cascade on a market
-//! filled to the OI cap).
+//! `ema_near.py` (near-threshold positions), `cascade.py` (an honest cascade on a market
+//! filled to the OI cap) and `block_spot.py` (b), the borrower's paid veto of its own liquidation
+//! (V1-2, M10 G-E2: `a_borrower_veto_defers_its_liquidation_at_the_sims_cost_ra`).
 //!
 //! **ECON's `RA` market, exactly.** The mock prices like `shortwin_sim.RaydiumPool` with
 //! `fee_ppm = 2,500` and `out_share_ppm = 120,000` (the mock's fixed protocol share), so
@@ -839,6 +840,194 @@ fn blocking_the_spot_leg_cannot_widen_the_bound_ra() {
         616_888_103,
         455_901_241,
     );
+}
+
+/// The sim's run of the borrower's veto: `w`, its total cost, the last veto second's cost, and
+/// the liquidation 2 s after the veto stops (`B`, `B̂_ref`, `max_in`, penalty, borrower).
+struct Veto {
+    w: u32,
+    cost: i128,
+    last: i128,
+    liq: SimExit,
+}
+
+/// `block_spot.py` (b), V1-2 (M10 G-E2), RA, run with the script's functions (its
+/// `liq_price_target`, `move_size`, `try_exit`): ECON §12.9 prices one veto second statically
+/// (`block_spot.defensive`: 0.1098 SOL/s at the first liquidatable second of the rise, 53 s of
+/// veto for the 5.776-SOL remainder); here the veto runs. The honest +0.1 %/s rise until the EMA
+/// leg starts (t = 610), then the price held flat. Honestly the position is liquidated at 612.
+/// Instead its borrower lands one atomic `[sell to 0.995 × the liquidation price, crank_price,
+/// buy back]` every second after the keeper's crank, for `w` = 10, 60 and 300 s — the robust
+/// spot leg fails for every honest keeper, whose checked `liquidate` is refused every second —
+/// then stops. To the lamport: the veto costs the sim's 0.950 / 6.073 / 41.983 SOL (0.0939 SOL in its first second, 0.0961 / 0.1089 /
+/// 0.1991 in its last: each round trip leaves its fees in the pool); the liquidation lands 2 s
+/// after the last veto (`liq_persist_n` − 1 EMA updates), its buyback, reference, bound, penalty
+/// and remainder the sim's (rent adjusted). The lenders get `Q` back and their legs; the low
+/// observations lower the reference a little (penalty −0.5 % … −0.3 % against the unvetoed
+/// liquidation), the borrower pays the rest. The figures: `python3 tests/litesvm/sim/ra_veto.py`.
+#[test]
+fn a_borrower_veto_defers_its_liquidation_at_the_sims_cost_ra() {
+    let runs = [
+        Veto {
+            w: 10,
+            cost: 949_902_505,
+            last: 96_064_700,
+            liq: SimExit {
+                b: 30_513_932_642,
+                rent: SIM_RMIN,
+                pen: 1_517_697_017,
+                borrower: 5_837_738_031,
+                b_ref: 30_353_940_335,
+                max_in: 30_961_019_141,
+            },
+        },
+        Veto {
+            w: 60,
+            cost: 6_073_451_212,
+            last: 108_890_251,
+            liq: SimExit {
+                b: 30_563_267_399,
+                rent: SIM_RMIN,
+                pen: 1_518_099_549,
+                borrower: 5_788_000_742,
+                b_ref: 30_361_990_968,
+                max_in: 30_969_230_787,
+            },
+        },
+        Veto {
+            w: 300,
+            cost: 41_983_331_023,
+            last: 199_087_390,
+            liq: SimExit {
+                b: 30_909_247_721,
+                rent: SIM_RMIN,
+                pen: 1_520_922_909,
+                borrower: 5_439_197_060,
+                b_ref: 30_418_458_168,
+                max_in: 31_026_827_331,
+            },
+        },
+    ];
+    let mut s = Sim::ra(RA_Q);
+    let (b, nonce) = s.open(RA_Q);
+    let v = s.env.position(&s.mm, &b.key(), nonce).v;
+    let spot_post = s.spot();
+    for t in 1..=120 {
+        s.step_to(t);
+    }
+    let (mut t, mut k) = (120i64, 1.0f64);
+    loop {
+        k *= 1.001;
+        t += 1;
+        s.at(t);
+        s.exo_move((spot_post as f64 * k) as u128);
+        s.env.crank(&s.mm);
+        let p = predict(&read_view(&s.env, &s.mm, &b.key(), nonce));
+        assert!(p.liquidation().is_err(), "not yet liquidatable at {t}");
+        if ema_run_started(&p) {
+            break;
+        }
+    }
+    assert_eq!(t, 610, "the sim's EMA-leg start");
+    let start = t;
+    let saved = s.env.svm.clone();
+    let kk = keeper(&mut s.env);
+    // The honest control: the price held, the keeper liquidates at 612.
+    let mut tt = start;
+    let honest = loop {
+        let ex = liquidate_checked(&mut s.env, &s.mm, &kk, &b.key(), nonce);
+        if ex.executed() {
+            break ex.liquidated().clone_event();
+        }
+        tt += 1;
+        s.step_to(tt);
+    };
+    assert_eq!(tt, 612, "honestly liquidated at 612");
+    assert_sim_liquidation(
+        &honest,
+        &SimExit {
+            b: 30_504_786_809,
+            rent: SIM_RMIN,
+            pen: 1_525_239_341,
+            borrower: 5_839_341_540,
+            b_ref: 30_524_351_635,
+            max_in: 31_134_838_667,
+        },
+        v,
+    );
+    for run in &runs {
+        s.env.svm = saved.clone();
+        let a = attacker(&mut s);
+        let kp = a.kp.insecure_clone();
+        let mut tt = start;
+        let (mut cost, mut first, mut last) = (0i128, 0i128, 0i128);
+        for i in 0..run.w {
+            if i > 0 {
+                tt += 1;
+                s.step_to(tt);
+            }
+            let p = predict(&read_view(&s.env, &s.mm, &b.key(), nonce));
+            let tgt = liq_price_target(&p) * 995 / 1_000;
+            let d = s.move_size(tgt);
+            assert!(d < 0, "a low observation needs a sale");
+            let d = u64::try_from(-d).unwrap();
+            let w0 = i128::from(read::token_amount(&s.env.svm, &a.wsol).unwrap());
+            let ixs = [s.sell_ix(&a, d), crank_price_ix(&s.mm), s.buy_ix(&a, d)];
+            ok(s.env.send(&ixs, &[&kp]));
+            let c = w0 - i128::from(read::token_amount(&s.env.svm, &a.wsol).unwrap());
+            if i == 0 {
+                first = c;
+            }
+            last = c;
+            cost += c;
+            let ex = liquidate_checked(&mut s.env, &s.mm, &kk, &b.key(), nonce);
+            assert!(!ex.executed(), "w {}: vetoed at {tt}", run.w);
+        }
+        let stop = tt;
+        let ev = loop {
+            tt += 1;
+            s.step_to(tt);
+            let ex = liquidate_checked(&mut s.env, &s.mm, &kk, &b.key(), nonce);
+            if ex.executed() {
+                break ex.liquidated().clone_event();
+            }
+            assert!(tt - stop < 30, "liquidated after the veto");
+        };
+        eprintln!(
+            "veto of {} s: cost {:.4} SOL ({:.4} → {:.4} SOL/s), liquidated {} s after it; \
+             penalty {:.4} → {:.4} SOL, borrower {:.4} → {:.4} SOL",
+            run.w,
+            cost as f64 / 1e9,
+            first as f64 / 1e9,
+            last as f64 / 1e9,
+            tt - stop,
+            honest.penalty as f64 / 1e9,
+            ev.penalty as f64 / 1e9,
+            honest.borrower_payout as f64 / 1e9,
+            ev.borrower_payout as f64 / 1e9
+        );
+        assert_eq!(
+            first, 93_923_030,
+            "the sim's first-second cost (block_spot.defensive)"
+        );
+        assert_eq!(
+            (cost, last),
+            (run.cost, run.last),
+            "w {}: the sim's cost",
+            run.w
+        );
+        assert_eq!(
+            tt - stop,
+            2,
+            "w {}: liquidated 2 s after the last veto",
+            run.w
+        );
+        assert_sim_liquidation(&ev, &run.liq, v);
+        assert!(
+            ev.penalty * 100 >= honest.penalty * 99,
+            "the lenders' and protocol's penalty within 1 % of the unvetoed one"
+        );
+    }
 }
 
 // ---- ptf_sandwich.py: push-then-freeze cannot lift the liquidation reference (R4B-2) ------
