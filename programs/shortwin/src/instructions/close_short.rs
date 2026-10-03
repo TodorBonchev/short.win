@@ -151,6 +151,7 @@ pub fn handler<'info>(
             market.trader_wsol,
             position_key,
             ctx.accounts.exposure.key(),
+            borrower_key,
         ];
         let rem = venues::parse(
             &market,

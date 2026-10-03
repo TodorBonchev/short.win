@@ -10,7 +10,7 @@
 //! | `listing` | `create_market(Auto)` on every pump coin of the dump: the curve cache, the trader's base ATA and pump UVA, the price start; the list-only outcomes; every listing refusal |
 //! | `flows` | open → close to the lamport on the curve (Token-2022 125- and 115-byte curves, a legacy SPL-Token 115-byte curve without a creator, the 151-byte extended curve), every delta against `shortwin-math` on the readers' view |
 //! | `refusals` | every `open_short` refusal on a curve market, in the program's order |
-//! | `structure` | I14: every ReadSet / TradeExtras slot of open, close, crank and `sol_settle` key-checked; any listed recipient; the creator vault follows the live creator; extras on the sell leg ride along (appended to the `sell_v2` CPI), a hostile set is bypassed with `previous` (G-H2) |
+//! | `structure` | I14: every ReadSet / TradeExtras slot of open, close, crank and `sol_settle` key-checked; any listed recipient; the creator vault follows the live creator; extras on the sell leg ride along (appended to the `sell_v2` CPI), a hostile set is bypassed with `previous` (G-H2); the curve and its ATAs on every extras site and the borrower on the keeper exits are `DeniedAccount` (M10 batch 3) |
 //! | `rent` | T-RENT (curve): the creator-vault top-up on sales (out of `S`, `ert` refunded) and buys (inside `B`), the small sale it refuses, the UVA paid at listing |
 //! | `pda` | T-PDA-USER (curve): `buy_v2` / `sell_v2` with the trader PDA as `user` under CPI, read off the inner instructions |
 //! | `straddle` | `CurveStraddle` above `rT`; `B̂_str` against the executed bundle (completing buy, `migrate_v2`, PumpSwap `buy`) on the real ELFs |

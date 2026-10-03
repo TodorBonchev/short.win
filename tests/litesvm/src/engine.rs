@@ -809,3 +809,355 @@ pub fn zero_lamport_exits<M: VenueMarket>(mut make: impl FnMut() -> (Env, M, u64
         );
     }
 }
+
+// ---- the extras denylist: the adopted pool and the borrower (M10 batch 3) ----------------------
+
+/// `ix` with its trailing `ExtrasSel` argument replaced by `sel` and `extras` appended (the
+/// keeper exits' builders select `none`).
+pub fn with_extras(mut ix: Instruction, sel: ExtrasSel, extras: &[AccountMeta]) -> Instruction {
+    let n = ix.data.len();
+    ix.data.truncate(n - 5);
+    ix.data.push(sel.set);
+    ix.data.extend_from_slice(&sel.bumps);
+    ix.accounts.extend_from_slice(extras);
+    ix
+}
+
+/// A fixed read-only extras entry.
+pub fn fixed_extra(key: Pubkey) -> ExtraEntryArg {
+    ExtraEntryArg {
+        kind: shortwin::state::ENTRY_FIXED,
+        writable: false,
+        key,
+        seeds: Vec::new(),
+    }
+}
+
+/// The adopted pool's own accounts the extras denylist keeps out (ARCH §2.4 rule 4; M10 batch 3,
+/// the program's `venues::pool_denylist`), in the harness's own view: the slots of `mm`'s ReadSet
+/// (and the curve's TradeExtras) that name the pool and its two reserve accounts — the mock pool
+/// and its vaults, the AMM v4 pool and its coin / pc vaults, the CPMM pool and its token 0 / 1
+/// vaults, the canonical PumpSwap pool and its base / quote vaults, the bonding curve (its SOL
+/// reserve), its base ATA and its quote ATA.
+pub fn pool_denied_keys(kind: VenueKind, mm: &impl VenueMarket) -> Vec<(String, Pubkey)> {
+    use shortwin::venues::{mock as vm, pump_amm, pump_curve, raydium_cpmm, raydium_v4};
+    let read = mm.read_set(false);
+    let r = |what: &str, i: usize| (what.to_string(), read[i].pubkey);
+    match kind {
+        VenueKind::Mock => vec![
+            r("the mock pool", vm::R_POOL),
+            r("its base vault", vm::R_BASE_VAULT),
+            r("its quote vault", vm::R_QUOTE_VAULT),
+        ],
+        VenueKind::RaydiumV4 => vec![
+            r("the AMM v4 pool", raydium_v4::R_POOL),
+            r("its coin vault", raydium_v4::R_COIN_VAULT),
+            r("its pc vault", raydium_v4::R_PC_VAULT),
+        ],
+        VenueKind::RaydiumCpmm => vec![
+            r("the CPMM pool", raydium_cpmm::R_POOL),
+            r("its token 0 vault", raydium_cpmm::R_TOKEN_0_VAULT),
+            r("its token 1 vault", raydium_cpmm::R_TOKEN_1_VAULT),
+        ],
+        VenueKind::PumpSwap => vec![
+            r("the PumpSwap pool", pump_amm::P_POOL),
+            r("its base vault", pump_amm::P_BASE_VAULT),
+            r("its quote vault", pump_amm::P_QUOTE_VAULT),
+        ],
+        VenueKind::PumpCurve => vec![
+            r("the bonding curve", pump_curve::C_CURVE),
+            r("its base ATA", pump_curve::C_CURVE_BASE_ATA),
+            (
+                "its quote ATA".to_string(),
+                mm.trade_extras()[pump_curve::T_CURVE_QUOTE_ATA].pubkey,
+            ),
+        ],
+        other => panic!("no trading venue: {other:?}"),
+    }
+}
+
+/// M10 batch 3 (ARCH §2.4 rule 4; the owner's decision of 2026-10-03) on a fork venue, on a fresh
+/// `make()` market with size `q`: each of the adopted pool's own accounts ([`pool_denied_keys`])
+/// published by the Emergency key as a one-entry fixed `current` set — writable exactly as the
+/// instruction names it, so the parser's writable-flag check passes and only the denylist can
+/// refuse it (on the batch-2 ELF these selections passed the parser) — and selected is
+/// `DeniedAccount` on `open_short` (the sell set), `close_short`, `liquidate` and `expire` (the
+/// buy set), and on the keeper exits so is the position's borrower (not a signer there; on the
+/// borrower's own instructions it signs, which the parser refuses already) — the position
+/// unchanged by every refusal. The control on each site is the same set shape with a fresh key,
+/// which the venue ignores as a trailing account: the open and the close land, the healthy
+/// position's liquidation reaches its body (`NotLiquidatable`), the expiry after the deadline
+/// lands. Every instruction goes through [`Env::send`]: the hooks run on each one.
+pub fn pool_and_borrower_denied_extras<M: VenueMarket>(
+    make: impl FnOnce() -> (Env, M, u64),
+    label: &str,
+) {
+    use shortwin::state::{EXTRAS_IX_BUY, EXTRAS_IX_SELL};
+    use shortwin::venues::EXTRAS_SET_CURRENT;
+    const EXIT_CU: u32 = 400_000;
+    let (mut env, mm, q) = make();
+    let kind = env.market(&mm.market()).venue_kind().expect("a venue kind");
+    let venue = kind as u8;
+    let pool = pool_denied_keys(kind, &mm);
+    let ve = AccountMeta::new_readonly(pda::venue_extras_seed(venue), false);
+    let current = ExtrasSel {
+        set: EXTRAS_SET_CURRENT,
+        bumps: [0; 4],
+    };
+    let ea = env.pause_authority.insecure_clone();
+    // A fixed entry, writable exactly when the instruction already names the key writable: the
+    // parser's flag check then passes, so only the denylist can refuse it whatever the order of
+    // the two checks (as built `parse_extras` checks the denylist first, so since batch 3 an entry
+    // with the other flag is `DeniedAccount` too; before batch 3 it was `BadExtras`).
+    let publish = |env: &mut Env, ix_kind: usize, key: Pubkey, writable: bool| {
+        let mut entry = fixed_extra(key);
+        entry.writable = writable;
+        let ix = set_venue_extras_ix(&ea.pubkey(), venue, ix_kind as u8, vec![entry]);
+        errors::ok(env.send(&[ix], &[&ea]));
+        [
+            ve.clone(),
+            AccountMeta {
+                pubkey: key,
+                is_signer: false,
+                is_writable: writable,
+            },
+        ]
+    };
+    let send = |env: &mut Env, ix: Instruction, signers: &[&Keypair]| {
+        env.send(&[crate::pump::cu_limit_ix(EXIT_CU), ix], signers)
+    };
+    let denied = |env: &mut Env,
+                  site: &str,
+                  ix_kind: usize,
+                  keys: &[(String, Pubkey)],
+                  build: &dyn Fn(&[AccountMeta]) -> Instruction,
+                  signers: &[&Keypair],
+                  watch: Option<Pubkey>| {
+        let before = watch.and_then(|p| env.svm.get_account(&p).map(|a| a.data));
+        let named = build(&[]).accounts;
+        for (what, key) in keys {
+            let writable = named.iter().any(|m| m.pubkey == *key && m.is_writable);
+            let extras = publish(env, ix_kind, *key, writable);
+            let res = send(env, build(&extras), signers);
+            assert_eq!(
+                errors::custom_code(&res),
+                Some(u32::from(shortwin::errors::ShortwinError::DeniedAccount)),
+                "{label}: {site}: {what} ({key}) as an extra"
+            );
+        }
+        if let Some(p) = watch {
+            assert_eq!(
+                env.svm.get_account(&p).map(|a| a.data),
+                before,
+                "{label}: {site}: the position unchanged"
+            );
+        }
+    };
+
+    // open_short (the sell set): the pool's accounts; the control opens position 0.
+    let b = env.borrower();
+    let bk = b.kp.insecure_clone();
+    let open = |x: &[AccountMeta]| {
+        open_short_ix(&mm, &bk.pubkey(), 0, q, 0, u64::MAX, u64::MAX, current, x)
+    };
+    denied(
+        &mut env,
+        "open_short",
+        EXTRAS_IX_SELL,
+        &pool,
+        &open,
+        &[&bk],
+        None,
+    );
+    let x = publish(&mut env, EXTRAS_IX_SELL, Pubkey::new_unique(), false);
+    let _: shortwin::events::Open =
+        crate::events::one(&errors::ok(send(&mut env, open(&x), &[&bk])));
+    // The keeper exits' position (another wallet: the wallet cap).
+    let mut b2 = env.borrower();
+    let (res, n2) = env.open(&mm, &mut b2, q);
+    errors::ok(res);
+    env.warp(1);
+    env.crank(&mm);
+
+    // close_short (the buy set) of position 0: the pool's accounts and the borrower (it signs).
+    let pos0 = pda::position(&mm.market(), &b.key(), 0).0;
+    let mut keys = pool.clone();
+    keys.push(("the borrower (signer)".into(), b.key()));
+    let close = |x: &[AccountMeta]| close_short_ix(&mm, &bk.pubkey(), 0, u64::MAX, current, x);
+    denied(
+        &mut env,
+        "close_short",
+        EXTRAS_IX_BUY,
+        &keys,
+        &close,
+        &[&bk],
+        Some(pos0),
+    );
+
+    // liquidate (the buy set) of the healthy position: the pool's accounts and its borrower.
+    let k = env.funded_keypair();
+    let pos2 = pda::position(&mm.market(), &b2.key(), n2).0;
+    let mut keys = pool.clone();
+    keys.push(("the borrower (not a signer)".into(), b2.key()));
+    let (kk, b2k) = (k.pubkey(), b2.key());
+    let liq = |x: &[AccountMeta]| with_extras(liquidate_ix(&mm, &kk, &b2k, n2), current, x);
+    denied(
+        &mut env,
+        "liquidate",
+        EXTRAS_IX_BUY,
+        &keys,
+        &liq,
+        &[&k],
+        Some(pos2),
+    );
+    let x = publish(&mut env, EXTRAS_IX_BUY, Pubkey::new_unique(), false);
+    errors::assert_err(
+        &send(&mut env, liq(&x), &[&k]),
+        shortwin::errors::ShortwinError::NotLiquidatable,
+    );
+    // The close's control on the same harmless set.
+    let _: shortwin::events::Close =
+        crate::events::one(&errors::ok(send(&mut env, close(&x), &[&bk])));
+
+    // expire (the buy set) after the deadline (the reference needs a few honest seconds).
+    let deadline = env.position(&mm, &b2.key(), n2).deadline;
+    let now = env.now();
+    env.warp(deadline - now + 1);
+    env.crank(&mm);
+    for _ in 0..3 {
+        env.warp(1);
+        env.crank(&mm);
+    }
+    let exp = |x: &[AccountMeta]| with_extras(expire_ix(&mm, &kk, &b2k, n2), current, x);
+    denied(
+        &mut env,
+        "expire",
+        EXTRAS_IX_BUY,
+        &keys,
+        &exp,
+        &[&k],
+        Some(pos2),
+    );
+    let x = publish(&mut env, EXTRAS_IX_BUY, Pubkey::new_unique(), false);
+    let _: shortwin::events::Expire =
+        crate::events::one(&errors::ok(send(&mut env, exp(&x), &[&k])));
+}
+
+/// A constant seed part of a template entry (`bytes` ≤ 32).
+pub fn seed_const(bytes: &[u8]) -> shortwin::SeedPartArg {
+    let mut b = [0u8; 32];
+    b[..bytes.len()].copy_from_slice(bytes);
+    shortwin::SeedPartArg {
+        kind: shortwin::state::SEED_CONST,
+        len: bytes.len() as u8,
+        bytes: b,
+    }
+}
+
+/// A placeholder seed part of a template entry (`PLACEHOLDER_*`).
+pub fn seed_placeholder(id: u8) -> shortwin::SeedPartArg {
+    shortwin::SeedPartArg {
+        kind: shortwin::state::SEED_PLACEHOLDER,
+        len: id,
+        bytes: [0; 32],
+    }
+}
+
+/// One template entry that derives one of the adopted pool's own accounts from the placeholders
+/// (for [`template_aliases_denied`]): a label, the derivation program, the seed parts and the
+/// seeds they resolve to on the market under test.
+pub struct PoolAlias {
+    pub what: String,
+    pub program: Pubkey,
+    pub seeds: Vec<shortwin::SeedPartArg>,
+    pub resolved: Vec<Vec<u8>>,
+}
+
+/// M10 batch 3 (the security review): a template entry is re-derived on chain before the
+/// denylist runs, so an Emergency template that derives one of the adopted pool's own accounts
+/// from the `pool` / `mint` / `bonding_curve` placeholders (an ATA of the pool, a CPMM
+/// `pool_vault` PDA) is refused like the fixed key. Each alias of `aliases` must resolve to one
+/// of [`pool_denied_keys`]; published as the `current` sell set (writable as `open_short` names the
+/// key, the canonical bump) it is `DeniedAccount` on `open_short`, and so it stays once a harmless
+/// write moves it to `previous` and `previous` is selected.
+pub fn template_aliases_denied<M: VenueMarket>(
+    make: impl FnOnce() -> (Env, M, u64),
+    label: &str,
+    aliases: impl FnOnce(&Env, &M) -> Vec<PoolAlias>,
+) {
+    use shortwin::state::{ENTRY_TEMPLATE, EXTRAS_IX_SELL};
+    use shortwin::venues::{EXTRAS_SET_CURRENT, EXTRAS_SET_PREVIOUS};
+    let (mut env, mm, q) = make();
+    let kind = env.market(&mm.market()).venue_kind().expect("a venue kind");
+    let venue = kind as u8;
+    let denied: Vec<Pubkey> = pool_denied_keys(kind, &mm)
+        .into_iter()
+        .map(|(_, k)| k)
+        .collect();
+    let ea = env.pause_authority.insecure_clone();
+    let ve = AccountMeta::new_readonly(pda::venue_extras_seed(venue), false);
+    let b = env.borrower();
+    let bk = b.kp.insecure_clone();
+    let open = |sel: ExtrasSel, x: &[AccountMeta]| {
+        open_short_ix(&mm, &bk.pubkey(), 0, q, 0, u64::MAX, u64::MAX, sel, x)
+    };
+    let named = open(ExtrasSel::NONE, &[]).accounts;
+    let list = aliases(&env, &mm);
+    assert!(!list.is_empty(), "{label}: no alias");
+    for a in list {
+        let seeds: Vec<&[u8]> = a.resolved.iter().map(Vec::as_slice).collect();
+        let (key, bump) = Pubkey::find_program_address(&seeds, &a.program);
+        assert!(
+            denied.contains(&key),
+            "{label}: {}: the template must derive a pool account ({key})",
+            a.what
+        );
+        let writable = named.iter().any(|m| m.pubkey == key && m.is_writable);
+        let entry = ExtraEntryArg {
+            kind: ENTRY_TEMPLATE,
+            writable,
+            key: a.program,
+            seeds: a.seeds,
+        };
+        let ix = set_venue_extras_ix(&ea.pubkey(), venue, EXTRAS_IX_SELL as u8, vec![entry]);
+        errors::ok(env.send(&[ix], &[&ea]));
+        let extras = [
+            ve.clone(),
+            AccountMeta {
+                pubkey: key,
+                is_signer: false,
+                is_writable: writable,
+            },
+        ];
+        for (set, which) in [
+            (EXTRAS_SET_CURRENT, "current"),
+            (EXTRAS_SET_PREVIOUS, "previous"),
+        ] {
+            if set == EXTRAS_SET_PREVIOUS {
+                // A harmless write moves the alias to `previous`.
+                let ix = set_venue_extras_ix(
+                    &ea.pubkey(),
+                    venue,
+                    EXTRAS_IX_SELL as u8,
+                    vec![fixed_extra(Pubkey::new_unique())],
+                );
+                errors::ok(env.send(&[ix], &[&ea]));
+            }
+            let sel = ExtrasSel {
+                set,
+                bumps: [bump, 0, 0, 0],
+            };
+            let res = env.send(
+                &[crate::pump::cu_limit_ix(400_000), open(sel, &extras)],
+                &[&bk],
+            );
+            assert_eq!(
+                errors::custom_code(&res),
+                Some(u32::from(shortwin::errors::ShortwinError::DeniedAccount)),
+                "{label}: {} through a template ({which})",
+                a.what
+            );
+        }
+        env.warp(1);
+    }
+}

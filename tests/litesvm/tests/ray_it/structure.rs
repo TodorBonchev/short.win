@@ -7,7 +7,9 @@
 //! read-only entry trades normally on both programs. M10 on both programs: a thin pool in place
 //! of the adopted one on every instruction (G-A6: the reversed Fartcoin pool on AMM v4, a planted
 //! same-mint CPMM pool at a tenth of the depth on USELESS and the Token-2022 pool), and a
-//! denylisted key in an extras set refused and bypassed with `previous` (G-A5's fork run).
+//! denylisted key in an extras set refused and bypassed with `previous` (G-A5's fork run); M10
+//! batch 3 on both programs: the adopted pool and its vaults on every extras site and the
+//! position's borrower on the keeper exits are `DeniedAccount` extras, with a fresh-key control.
 
 use shortwin::state::EXTRAS_IX_SELL;
 use shortwin::venues::EXTRAS_SET_CURRENT;
@@ -418,4 +420,60 @@ fn a_denylisted_extra_on_cpmm_is_bypassed_with_previous() {
     for fixture in [USELESS, T22] {
         a_denylisted_extra_is_bypassed_with_previous(fixture);
     }
+}
+
+/// M10 batch 3 on both Raydium programs (ARCH §2.4 rule 4; `engine::pool_and_borrower_denied_extras`):
+/// the adopted pool — the AMM v4 pool and its coin / pc vaults (Fartcoin), the CPMM pool and its
+/// token 0 / 1 vaults (USELESS, on the 2026-10 CPMM build) — and, on the keeper exits, the
+/// position's borrower, each published as a fixed extra, are `DeniedAccount` on `open_short`,
+/// `close_short`, `liquidate` and `expire`, the position unchanged; the same set shape with a fresh
+/// key rides along (Raydium ignores trailing accounts): the open, the close and the expiry land,
+/// the healthy liquidation reaches `NotLiquidatable`.
+#[test]
+fn the_pool_and_the_borrower_are_denied_extras_on_both_programs() {
+    for (fixture, label) in [(FART, "AMM v4"), (USELESS, "CPMM 2026-10")] {
+        shortwin_litesvm_tests::engine::pool_and_borrower_denied_extras(|| setup(fixture), label);
+    }
+}
+
+/// M10 batch 3 (the security review) on the CPMM 2026-10 build (USELESS): the pool's token
+/// vaults are CPMM PDAs `["pool_vault", pool, mint]`, so an Emergency template on the `pool` and
+/// `mint` placeholders derives them; the denylist runs on the derived key, so each is
+/// `DeniedAccount` on `open_short` through `current` and through `previous`
+/// (`engine::template_aliases_denied`). AMM v4's vaults cannot be derived from the placeholders.
+#[test]
+fn template_aliases_of_the_cpmm_vaults_are_denied_extras() {
+    use shortwin::constants::WSOL_MINT;
+    use shortwin::state::{PLACEHOLDER_MINT, PLACEHOLDER_POOL};
+    use shortwin_litesvm_tests::engine::{PoolAlias, VenueMarket, seed_const, seed_placeholder};
+    shortwin_litesvm_tests::engine::template_aliases_denied(
+        || setup(USELESS),
+        "CPMM 2026-10",
+        |env, rm| {
+            let pool = rm.read_set(false)[shortwin::venues::raydium_cpmm::R_POOL].pubkey;
+            let program = env.svm.get_account(&pool).unwrap().owner;
+            let vault = |what: &str, second: shortwin::SeedPartArg, key: Pubkey| PoolAlias {
+                what: what.into(),
+                program,
+                seeds: vec![
+                    seed_const(b"pool_vault"),
+                    seed_placeholder(PLACEHOLDER_POOL),
+                    second,
+                ],
+                resolved: vec![
+                    b"pool_vault".to_vec(),
+                    pool.to_bytes().to_vec(),
+                    key.to_bytes().to_vec(),
+                ],
+            };
+            vec![
+                vault(
+                    "the token vault",
+                    seed_placeholder(PLACEHOLDER_MINT),
+                    rm.mint(),
+                ),
+                vault("the WSOL vault", seed_const(WSOL_MINT.as_ref()), WSOL_MINT),
+            ]
+        },
+    );
 }

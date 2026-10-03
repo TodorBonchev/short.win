@@ -534,6 +534,7 @@ pub(crate) fn keeper_exit<'info>(
             market.trader_wsol,
             accs.position.key(),
             accs.exposure,
+            pos.borrower,
         ];
         let rem = venues::parse(
             &market,

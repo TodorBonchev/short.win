@@ -24,8 +24,10 @@
 //! higher bump must fail to derive, so a caller cannot substitute a second, non-canonical PDA of
 //! the template's program; ARCH says "no search" — this is a search of the bumps above the
 //! caller's only, usually 0–2 extra derivations). Every extra must be a non-signer, not
-//! owned by short.win, not on the denylist (ARCH §2.4 rule 4), and writable exactly when its
-//! flag says so; the resolved metas are appended to the venue CPI. Because `none` and
+//! owned by short.win, not on the denylist (ARCH §2.4 rule 4: the instruction's own list — the
+//! market's PDAs and vaults, the position, the exposure record and, since M10 batch 3, the
+//! position's borrower — and the adopted pool's own accounts, [`pool_denylist`]), and writable
+//! exactly when its flag says so; the resolved metas are appended to the venue CPI. Because `none` and
 //! `previous` stay selectable, a wrong or hostile Emergency write never bricks exits; because
 //! `stable` keeps a set that worked for `EXTRAS_STABLE_S` (or that Governance published),
 //! neither do several quick ones (M2-SEC-2, `set_venue_extras`).
@@ -144,7 +146,8 @@ impl Placeholders {
 /// unknown selection, a `VenueExtras` account that is not this venue's (PDA with its stored
 /// bump, owner, discriminator, version, venue byte), an entry that does not match (fixed key,
 /// template re-derivation, writable flag), or a placeholder the market has no value for;
-/// `DeniedAccount` for a signer, a short.win-owned account or a denylisted key.
+/// `DeniedAccount` for a signer, a short.win-owned account or a key on either denylist (`deny`,
+/// the instruction's; `pool_deny`, the adopted pool's own accounts, [`pool_denylist`]).
 pub fn parse_extras<'info>(
     kind: VenueKind,
     ix: usize,
@@ -152,6 +155,7 @@ pub fn parse_extras<'info>(
     accounts: &'info [AccountInfo<'info>],
     ph: &Placeholders,
     deny: &[Pubkey],
+    pool_deny: &[Pubkey],
 ) -> Result<(Vec<AccountMeta>, &'info [AccountInfo<'info>])> {
     if sel.set == EXTRAS_SET_NONE {
         require!(accounts.is_empty(), ShortwinError::BadRemainingAccounts);
@@ -206,7 +210,10 @@ pub fn parse_extras<'info>(
         require_keys_eq!(info.key(), expected, ShortwinError::BadExtras);
         require!(!info.is_signer, ShortwinError::DeniedAccount);
         require_keys_neq!(*info.owner, crate::ID, ShortwinError::DeniedAccount);
-        require!(!deny.contains(info.key), ShortwinError::DeniedAccount);
+        require!(
+            !deny.contains(info.key) && !pool_deny.contains(info.key),
+            ShortwinError::DeniedAccount
+        );
         let writable = entry.writable == 1;
         require!(info.is_writable == writable, ShortwinError::BadExtras);
         metas.push(AccountMeta {
@@ -928,6 +935,42 @@ pub fn pool_key(market: &Market, kind: VenueKind) -> Option<Pubkey> {
     }
 }
 
+/// The adopted pool's own accounts that no extra may name (ARCH §2.4 rule 4; M10 batch 3, the
+/// owner's decision of 2026-10-03): the pool and the two accounts that hold its reserves — the
+/// mock pool and its vaults; the AMM v4 pool and its coin / pc vaults; the CPMM pool and its
+/// token 0 / 1 vaults; the canonical PumpSwap pool and its base / quote vaults; the bonding curve
+/// (its SOL reserve), `curve_base_ata` and `curve_quote_ata`. The venue names them in its own
+/// account list already (key-checked, the ReadSet and TradeExtras); an Emergency extras set that
+/// named one again could only hand the venue a second, writable copy of its own reserves. Keys
+/// from the market's cache, which the ReadSet is checked against: no derivation.
+pub fn pool_denylist(market: &Market, kind: VenueKind) -> Result<[Pubkey; 3]> {
+    use crate::state::{pump_swap_cache as ps, raydium_cache as rc};
+    match kind {
+        VenueKind::RaydiumV4 | VenueKind::RaydiumCpmm => Ok([
+            raydium::cached(market, rc::RAY_POOL),
+            raydium::cached(market, rc::RAY_VAULT_SOL),
+            raydium::cached(market, rc::RAY_VAULT_TOK),
+        ]),
+        #[cfg(feature = "test-venue")]
+        VenueKind::Mock => Ok([
+            raydium::cached(market, rc::RAY_POOL),
+            raydium::cached(market, rc::RAY_VAULT_SOL),
+            raydium::cached(market, rc::RAY_VAULT_TOK),
+        ]),
+        VenueKind::PumpSwap => Ok([
+            market.canonical_pool,
+            pump_amm::cached(market, ps::POOL_BASE_VAULT),
+            pump_amm::cached(market, ps::POOL_QUOTE_VAULT),
+        ]),
+        VenueKind::PumpCurve => Ok([
+            market.bonding_curve,
+            market.curve_base_ata,
+            market.curve_quote_ata,
+        ]),
+        _ => err!(ShortwinError::NoSupportedVenue),
+    }
+}
+
 /// The remaining accounts of a trading or cranking instruction, split and checked.
 pub struct Remaining<'info> {
     /// The ReadSet (key-checked).
@@ -989,7 +1032,9 @@ pub fn parse<'info>(
                     pump_amm::cached(market, crate::state::pump_swap_cache::CACHED_COIN_CREATOR)
                 }),
             };
-            let (extra_metas, extra_infos) = parse_extras(kind, ix, &sel, extras, &ph, deny)?;
+            let pool_deny = pool_denylist(market, kind)?;
+            let (extra_metas, extra_infos) =
+                parse_extras(kind, ix, &sel, extras, &ph, deny, &pool_deny)?;
             Ok(Remaining {
                 read,
                 trade,
@@ -1285,5 +1330,86 @@ mod tests {
             non_canonical > 0,
             "the sample must contain non-canonical PDAs"
         );
+    }
+
+    /// M10 batch 3: the pool denylist is the adopted pool and its two reserve accounts, read
+    /// from the cache the ReadSet (and, for the curve's quote ATA, the TradeExtras) is checked
+    /// against — on both Raydium layouts whichever side WSOL is on, and on both pump venues.
+    #[test]
+    fn the_pool_denylist_is_the_pool_and_its_reserves() {
+        use crate::state::{
+            pump_swap_cache as ps, raydium_cache as rc, MARKET_FLAG_SOL_IS_TOKEN0_OR_COIN,
+        };
+        use bytemuck::Zeroable;
+        let mut m = Market::zeroed();
+        for slot in m.pool_cache.iter_mut() {
+            *slot = Pubkey::new_unique();
+        }
+        m.bonding_curve = Pubkey::new_unique();
+        m.curve_base_ata = Pubkey::new_unique();
+        m.curve_quote_ata = Pubkey::new_unique();
+        m.canonical_pool = Pubkey::new_unique();
+        let reserves = [
+            m.pool_cache[rc::RAY_POOL],
+            m.pool_cache[rc::RAY_VAULT_SOL],
+            m.pool_cache[rc::RAY_VAULT_TOK],
+        ];
+        for sol_first in [false, true] {
+            if sol_first {
+                m.flags |= MARKET_FLAG_SOL_IS_TOKEN0_OR_COIN;
+            }
+            let v4 = raydium_v4::read_keys(&m);
+            let cpmm = raydium_cpmm::read_keys(&m);
+            for (kind, read, slots) in [
+                (
+                    VenueKind::RaydiumV4,
+                    &v4[..],
+                    [
+                        raydium_v4::R_POOL,
+                        raydium_v4::R_COIN_VAULT,
+                        raydium_v4::R_PC_VAULT,
+                    ],
+                ),
+                (
+                    VenueKind::RaydiumCpmm,
+                    &cpmm[..],
+                    [
+                        raydium_cpmm::R_POOL,
+                        raydium_cpmm::R_TOKEN_0_VAULT,
+                        raydium_cpmm::R_TOKEN_1_VAULT,
+                    ],
+                ),
+            ] {
+                let deny = pool_denylist(&m, kind).unwrap();
+                assert_eq!(deny, reserves, "{kind:?}");
+                for i in slots {
+                    assert!(deny.contains(&read[i]), "{kind:?} slot {i}");
+                }
+            }
+        }
+        let pamm = pump_amm::read_keys(&m);
+        let deny = pool_denylist(&m, VenueKind::PumpSwap).unwrap();
+        assert_eq!(
+            deny,
+            [
+                pamm[pump_amm::P_POOL],
+                pamm[pump_amm::P_BASE_VAULT],
+                pamm[pump_amm::P_QUOTE_VAULT]
+            ]
+        );
+        assert_eq!(deny[1], m.pool_cache[ps::POOL_BASE_VAULT]);
+        let curve = pump_curve::read_keys(&m);
+        assert_eq!(
+            pool_denylist(&m, VenueKind::PumpCurve).unwrap(),
+            [
+                curve[pump_curve::C_CURVE],
+                curve[pump_curve::C_CURVE_BASE_ATA],
+                m.curve_quote_ata
+            ]
+        );
+        // No trading venue, no list (the instruction refused before the extras).
+        for kind in [VenueKind::None, VenueKind::PumpMigrating] {
+            assert!(pool_denylist(&m, kind).is_err(), "{kind:?}");
+        }
     }
 }

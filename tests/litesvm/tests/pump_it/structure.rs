@@ -5,7 +5,9 @@
 //! `BadRemainingAccounts` / `VenueAccountMismatch`, never "no route" or a silent default; then
 //! the recipient slots take any key of the live `Global` lists, and the creator-vault slots
 //! follow the **live** curve creator (a creator change after the listing: the stale cached vault
-//! is refused, the re-derived one accepted).
+//! is refused, the re-derived one accepted). M10 batch 3: the bonding curve and its base / quote
+//! ATAs on every extras site and the position's borrower on the keeper exits are `DeniedAccount`
+//! extras, with a fresh-key control.
 //!
 //! Every instruction goes through `Env::send`: the invariant hooks run after each one.
 
@@ -324,4 +326,61 @@ fn extras_on_the_sell_leg_ride_along_and_a_hostile_set_is_bypassed() {
         &harmless,
     )));
     assert_eq!(prev.s, plain.s, "previous: the harmless set");
+}
+
+/// M10 batch 3 on the curve (ARCH §2.4 rule 4; `engine::pool_and_borrower_denied_extras`): the
+/// bonding curve (its SOL reserve), its base ATA and its quote ATA — and, on the keeper exits, the
+/// position's borrower — each published as a fixed extra, are `DeniedAccount` on `open_short`,
+/// `close_short`, `liquidate` and `expire`, the position unchanged; the same set shape with a fresh
+/// key rides along (pump ignores the trailing account): the open, the close and the expiry land,
+/// the healthy liquidation reaches `NotLiquidatable`.
+#[test]
+fn the_curve_and_the_borrower_are_denied_extras() {
+    shortwin_litesvm_tests::engine::pool_and_borrower_denied_extras(
+        || setup(PumpCoin::T22_115),
+        "curve",
+    );
+}
+
+/// M10 batch 3 (the security review) on the curve: its base and quote ATAs are ATA-program PDAs
+/// of the `bonding_curve` placeholder, so an Emergency template derives them; the denylist runs
+/// on the derived key, so each is `DeniedAccount` on `open_short` through `current` and through
+/// `previous` (`engine::template_aliases_denied`).
+#[test]
+fn template_aliases_of_the_curve_atas_are_denied_extras() {
+    use shortwin::constants::{ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID, WSOL_MINT};
+    use shortwin::state::{PLACEHOLDER_BONDING_CURVE, PLACEHOLDER_MINT};
+    use shortwin_litesvm_tests::engine::{PoolAlias, VenueMarket, seed_const, seed_placeholder};
+    shortwin_litesvm_tests::engine::template_aliases_denied(
+        || setup(PumpCoin::T22_115),
+        "curve",
+        |env, pm| {
+            let bc = pm.read_set(false)[shortwin::venues::pump_curve::C_CURVE].pubkey;
+            let mint = pm.mint();
+            let tp = env.svm.get_account(&mint).unwrap().owner;
+            let ata = |what: &str, prog: Pubkey, m: shortwin::SeedPartArg, mk: Pubkey| PoolAlias {
+                what: what.into(),
+                program: ASSOCIATED_TOKEN_PROGRAM_ID,
+                seeds: vec![
+                    seed_placeholder(PLACEHOLDER_BONDING_CURVE),
+                    seed_const(prog.as_ref()),
+                    m,
+                ],
+                resolved: vec![
+                    bc.to_bytes().to_vec(),
+                    prog.to_bytes().to_vec(),
+                    mk.to_bytes().to_vec(),
+                ],
+            };
+            vec![
+                ata("the base ATA", tp, seed_placeholder(PLACEHOLDER_MINT), mint),
+                ata(
+                    "the quote ATA",
+                    TOKEN_PROGRAM_ID,
+                    seed_const(WSOL_MINT.as_ref()),
+                    WSOL_MINT,
+                ),
+            ]
+        },
+    );
 }

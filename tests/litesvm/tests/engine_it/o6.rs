@@ -3,7 +3,9 @@
 //! T-REPLAY-PDA on the mock — a venue interface change that adds a per-mint PDA trailing
 //! account is followed with a derivation template, and a hostile `current` set is bypassed
 //! with `previous` or `none`; and (M10 G-A5) the extras denylist on all four extras sites —
-//! `open_short`, `close_short`, `liquidate`, `expire` — key by key, with a landed control each.
+//! `open_short`, `close_short`, `liquidate`, `expire` — key by key, with a landed control each,
+//! since M10 batch 3 with the mock pool's own accounts on every site and the position's borrower
+//! on the keeper exits.
 
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
@@ -12,11 +14,13 @@ use shortwin::errors::ShortwinError as E;
 use shortwin::events::{RouteBrokenSet, VenueExtrasSet};
 use shortwin::state::{
     MARKET_FLAG_ROUTE_BROKEN, PLACEHOLDER_MINT, SEED_CONST, SEED_PLACEHOLDER, VenueExtras,
+    VenueKind,
 };
 use shortwin::venues::{EXTRAS_SET_CURRENT, EXTRAS_SET_NONE, EXTRAS_SET_PREVIOUS, ExtrasSel};
 use shortwin::{ExtraEntryArg, SeedPartArg};
 use shortwin_litesvm_tests::engine::{
-    VENUE_HINT_MOCK, mock_extras_key, set_route_broken_ix, set_venue_extras_ix,
+    VENUE_HINT_MOCK, mock_extras_key, pool_denied_keys, set_route_broken_ix, set_venue_extras_ix,
+    with_extras,
 };
 use shortwin_litesvm_tests::mock::{Knobs, update_knobs};
 use solana_keypair::Keypair;
@@ -530,22 +534,13 @@ fn extras_parser_is_strict() {
 
 // ---- the denylist on every leg instruction (M10 G-A5) ------------------------------------------
 
-/// `ix` with its trailing `ExtrasSel` argument replaced by `sel` and `extras` appended (the
-/// keeper exits' builders select `none`).
-fn with_extras(mut ix: Instruction, sel: ExtrasSel, extras: &[AccountMeta]) -> Instruction {
-    let n = ix.data.len();
-    ix.data.truncate(n - 5);
-    ix.data.push(sel.set);
-    ix.data.extend_from_slice(&sel.bumps);
-    ix.accounts.extend_from_slice(extras);
-    ix
-}
-
 /// Every key the denylist of an extras site must keep out of the venue CPI (ARCH §2.4 rule 4;
 /// `open_short.rs` / `close_short.rs` / `liquidate.rs` deny arrays, the owner rule for the rest):
 /// the config, the venue guard, the oracle cache, the market, its vaults, the trader PDAs, the
 /// position and the exposure record (also before they exist: the open's), the seeding lender's
-/// position and any `ShareEpoch` record (none on a fresh market); the caller adds the signers.
+/// position and any `ShareEpoch` record (none on a fresh market), and since M10 batch 3 the
+/// adopted pool's own accounts (the mock pool and its two vaults, `venues::pool_denylist`); the
+/// caller adds the signers and, on the keeper exits, the position's borrower.
 fn denied_keys(env: &Env, mm: &MockMarket, borrower: &Pubkey, nonce: u64) -> Vec<(String, Pubkey)> {
     let market = mm.market();
     let epoch = env.market(&market).share_epoch;
@@ -567,6 +562,7 @@ fn denied_keys(env: &Env, mm: &MockMarket, borrower: &Pubkey, nonce: u64) -> Vec
         ("exposure".into(), pda::exposure(&market, borrower).0),
         ("lender position".into(), lender),
     ];
+    keys.extend(pool_denied_keys(VenueKind::Mock, mm));
     // `ShareEpoch` records exist only once an epoch has rolled; an empty address of a future
     // record is not on the list (nothing there for a venue to touch, and only short.win can
     // create an account at its PDA).
@@ -583,8 +579,9 @@ fn denied_keys(env: &Env, mm: &MockMarket, borrower: &Pubkey, nonce: u64) -> Vec
     keys
 }
 
-/// Publishes `[fixed key]` as the `ix_kind` set and sends `build(sel, extras)` signed by
-/// `signers`, for every key of `keys`: each is `DeniedAccount`.
+/// Publishes `[fixed key]` (writable exactly as the instruction names the key) as the `ix_kind`
+/// set and sends `build(sel, extras)` signed by `signers`, for every key of `keys`: each is
+/// `DeniedAccount`.
 fn assert_denied(
     env: &mut Env,
     label: &str,
@@ -594,13 +591,18 @@ fn assert_denied(
     signers: &[&Keypair],
 ) {
     let ve = AccountMeta::new_readonly(mock_extras_key(), false);
+    let named = build(env, sel(EXTRAS_SET_CURRENT, 0), &[]).accounts;
     for (what, key) in keys {
-        ok(set_extras(env, ix_kind, vec![fixed(*key, false)]));
-        let ix = build(
-            env,
-            sel(EXTRAS_SET_CURRENT, 0),
-            &[ve.clone(), AccountMeta::new_readonly(*key, false)],
-        );
+        // Writable exactly as the instruction names the key: the flag check passes, so only the
+        // denylist (or the owner and signer rules) can refuse it.
+        let w = named.iter().any(|m| m.pubkey == *key && m.is_writable);
+        ok(set_extras(env, ix_kind, vec![fixed(*key, w)]));
+        let meta = AccountMeta {
+            pubkey: *key,
+            is_signer: false,
+            is_writable: w,
+        };
+        let ix = build(env, sel(EXTRAS_SET_CURRENT, 0), &[ve.clone(), meta]);
         let res = env.send(&[ix], signers);
         assert_eq!(
             custom_code(&res),
@@ -629,12 +631,13 @@ fn no_extras(env: &mut Env, mm: &MockMarket) {
 }
 
 /// ARCH §2.4 rule 4 on all four extras sites (M10 G-A5; `extras_parser_is_strict` is the open's
-/// pool vault and market only): every short.win account and market PDA of the denylist — and the
-/// instruction's signers (the borrower on `open_short` / `close_short`, the keeper on `liquidate` /
-/// `expire`) — published as a fixed extra is `DeniedAccount` on `open_short` (the sell set),
-/// `close_short`, `liquidate` and `expire` (the buy set), the position unchanged; the control on
-/// each site — the same set shape with a fresh key — lands (the open, the close, a liquidation
-/// after a genuine 2.4× rise, an expiry after the deadline).
+/// pool vault and market only): every short.win account and market PDA of the denylist, the mock
+/// pool and its vaults (M10 batch 3) — and the instruction's signers (the borrower on `open_short`
+/// / `close_short`, the keeper on `liquidate` / `expire`), and on the keeper exits the position's
+/// borrower, not a signer there (M10 batch 3) — published as a fixed extra is `DeniedAccount` on
+/// `open_short` (the sell set), `close_short`, `liquidate` and `expire` (the buy set), the
+/// position unchanged; the control on each site — the same set shape with a fresh key — lands
+/// (the open, the close, a liquidation after a genuine 2.4× rise, an expiry after the deadline).
 #[test]
 fn the_denylist_holds_on_every_leg_instruction() {
     use shortwin_litesvm_tests::engine::{expire_ix, liquidate_ix};
@@ -676,6 +679,7 @@ fn the_denylist_holds_on_every_leg_instruction() {
     let kk = k.insecure_clone();
     let mut keys = denied_keys(&env, &mm, &b2.key(), n1);
     keys.push(("the keeper (signer)".into(), k.pubkey()));
+    keys.push(("the borrower (not a signer)".into(), b2.key()));
     let bkey = b2.key();
     let liq_build = |_: &Env, s: ExtrasSel, x: &[AccountMeta]| {
         with_extras(liquidate_ix(&mm, &kk.pubkey(), &bkey, n1), s, x)
@@ -726,6 +730,7 @@ fn the_denylist_holds_on_every_leg_instruction() {
     env.crank(&mm);
     let mut keys = denied_keys(&env, &mm, &b3.key(), n2);
     keys.push(("the keeper (signer)".into(), k.pubkey()));
+    keys.push(("the borrower (not a signer)".into(), b3.key()));
     let b3key = b3.key();
     let exp_build = |_: &Env, s: ExtrasSel, x: &[AccountMeta]| {
         with_extras(expire_ix(&mm, &kk.pubkey(), &b3key, n2), s, x)

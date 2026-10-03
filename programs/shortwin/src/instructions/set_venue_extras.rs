@@ -33,8 +33,10 @@
 //! seeds of at most 32 bytes (zero past their length); placeholders among `mint`, `pool`,
 //! `trader`, `bonding_curve`, `coin_creator`. **At use time** (`venues::parse_extras`) each
 //! extra must also be a non-signer, not owned by short.win and not on the instruction's
-//! denylist (the market's own PDAs and vaults, the position, …), and writable exactly as its
-//! flag says.
+//! denylist (the market's own PDAs and vaults, the position, the borrower, …) or the adopted
+//! pool's (its pool account and reserve vaults, `venues::pool_denylist`), and writable exactly
+//! as its flag says. A set this instruction accepts can therefore still be refused at use time:
+//! its caller then selects `previous`, `stable` or `none`.
 
 use anchor_lang::prelude::*;
 

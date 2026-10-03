@@ -28,6 +28,9 @@
 //!   CPI, which pAMM runs ignoring the trailing account: the proceeds equal an open without
 //!   extras); a hostile `current` set naming the lending vault is refused `DeniedAccount`, and
 //!   `previous` lands.
+//! - **M10 batch 3, the extras denylist's pool and borrower keys**: the canonical pool and its
+//!   base / quote vaults on every extras site, and the position's borrower on the keeper exits,
+//!   are `DeniedAccount`; a fresh key in the same set shape rides along (the control).
 //!
 //! PumpSwap has no `pool_fail` chain (Raydium's fast path only): it stays 0 throughout. Every
 //! instruction goes through `Env::send`: the invariant hooks run after each one.
@@ -759,4 +762,66 @@ fn extras_on_the_sell_leg_ride_along_and_a_hostile_set_is_bypassed() {
         &harmless,
     )));
     assert_eq!(prev.s, plain.s, "previous: the harmless set");
+}
+
+/// M10 batch 3 on PumpSwap (ARCH §2.4 rule 4; `engine::pool_and_borrower_denied_extras`): the
+/// canonical pool and its base / quote vaults — and, on the keeper exits, the position's borrower —
+/// each published as a fixed extra, are `DeniedAccount` on `open_short`, `close_short`,
+/// `liquidate` and `expire`, the position unchanged; the same set shape with a fresh key rides
+/// along (pAMM accepts trailing accounts, R-VEN Update H5): the open, the close and the expiry
+/// land, the healthy liquidation reaches `NotLiquidatable`.
+#[test]
+fn the_pool_and_the_borrower_are_denied_extras_on_pumpswap() {
+    shortwin_litesvm_tests::engine::pool_and_borrower_denied_extras(
+        || setup(PammCoin::Legacy261),
+        "PumpSwap",
+    );
+}
+
+/// M10 batch 3 (the security review) on PumpSwap (legacy261): the canonical pool's base and
+/// quote vaults are ATA-program PDAs of the `pool` placeholder, so an Emergency template derives
+/// them; the denylist runs on the derived key, so each is `DeniedAccount` on `open_short` through
+/// `current` and through `previous` (`engine::template_aliases_denied`).
+#[test]
+fn template_aliases_of_the_pool_vaults_are_denied_extras_on_pumpswap() {
+    use shortwin::constants::{ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID, WSOL_MINT};
+    use shortwin::state::{PLACEHOLDER_MINT, PLACEHOLDER_POOL};
+    use shortwin_litesvm_tests::engine::{PoolAlias, VenueMarket, seed_const, seed_placeholder};
+    shortwin_litesvm_tests::engine::template_aliases_denied(
+        || setup(PammCoin::Legacy261),
+        "PumpSwap",
+        |env, pm| {
+            let pool = pm.read_set(false)[shortwin::venues::pump_amm::P_POOL].pubkey;
+            let mint = pm.mint();
+            let tp = env.svm.get_account(&mint).unwrap().owner;
+            let ata = |what: &str, prog: Pubkey, m: SeedPartArg, mk: Pubkey| PoolAlias {
+                what: what.into(),
+                program: ASSOCIATED_TOKEN_PROGRAM_ID,
+                seeds: vec![
+                    seed_placeholder(PLACEHOLDER_POOL),
+                    seed_const(prog.as_ref()),
+                    m,
+                ],
+                resolved: vec![
+                    pool.to_bytes().to_vec(),
+                    prog.to_bytes().to_vec(),
+                    mk.to_bytes().to_vec(),
+                ],
+            };
+            vec![
+                ata(
+                    "the base vault",
+                    tp,
+                    seed_placeholder(PLACEHOLDER_MINT),
+                    mint,
+                ),
+                ata(
+                    "the quote vault",
+                    TOKEN_PROGRAM_ID,
+                    seed_const(WSOL_MINT.as_ref()),
+                    WSOL_MINT,
+                ),
+            ]
+        },
+    );
 }
