@@ -1082,7 +1082,10 @@ python3 scripts/audit_scope.py nloc    # AUDIT.md §2's table: files and non-tes
 member is in no unit and not on the script's `EXCLUDED` list: a new crate or service is classified
 in the script (a unit, or `EXCLUDED` with a reason) before `write`. `nloc` drops `#[cfg(test)]`
 items (braces inside literals and comments are ignored) and counts the lines that are neither blank
-nor comments; AUDIT.md's second column is tokei 14.0.0's "code" (`tokei <paths> -t Rust`).
+nor comments; AUDIT.md §2's tokei column is tokei 14.0.0's "code" (`tokei <paths> -t Rust`).
+The script puts each unit in one of four classes: `core` and `keeper` (the keeper core subset) are
+in scope, `context` (the keeper rest and the governance tool with its Squads encoders) is read for
+context only, and `out` is the TEST-ONLY mock venue code.
 
 ## Workspaces
 
