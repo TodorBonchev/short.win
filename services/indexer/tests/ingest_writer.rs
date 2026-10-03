@@ -290,6 +290,19 @@ async fn another_transaction_at_an_occupied_position_replaces_a_confirmed_one_on
     pool.close().await;
 }
 
+/// One venue admin watch observation of `k(6)`'s `field`: whether it recorded a row.
+async fn watch(
+    pool: &PgPool,
+    known: &mut refresher::AdminValues,
+    field: &'static str,
+    slot: u64,
+    value: &str,
+) -> bool {
+    refresher::observe_admin_value(pool, known, &k(6), field, slot, "raydium_v4", value.into())
+        .await
+        .expect("observe")
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn refresher_rows_token_metadata_and_venue_admin_changes() {
     let pg = pg().await;
@@ -329,6 +342,36 @@ async fn refresher_rows_token_metadata_and_venue_admin_changes() {
     assert_eq!(
         one(&pool, "SELECT count(*) FROM venue_admin_states").await,
         2
+    );
+
+    // The watch after a restart (an empty cache) reads the last value back from the rows: an
+    // unchanged value records nothing, a changed one records its stored old value.
+    let mut known = refresher::AdminValues::new();
+    assert!(!watch(&pool, &mut known, "status", 300, "4").await);
+    assert!(!watch(&pool, &mut known, "status", 310, "4").await);
+    assert!(watch(&pool, &mut known, "status", 320, "1").await);
+    // A field never stored before: its first value, with no old value.
+    assert!(watch(&pool, &mut known, "trade_fee_rate", 320, "2500").await);
+    assert!(!watch(&pool, &mut known, "trade_fee_rate", 330, "2500").await);
+    // A second restart sees the latest row, not the first one.
+    let mut known = refresher::AdminValues::new();
+    assert!(!watch(&pool, &mut known, "status", 400, "1").await);
+    assert!(watch(&pool, &mut known, "status", 410, "6").await);
+    let rows: Vec<(String, i64, Option<String>, String)> = sqlx::query_as(
+        "SELECT field, observed_slot, old_value, new_value FROM venue_admin_states \
+         WHERE observed_slot > 200 ORDER BY observed_slot, field",
+    )
+    .fetch_all(&pool)
+    .await
+    .expect("rows");
+    let s = |v: &str| v.to_string();
+    assert_eq!(
+        rows,
+        [
+            (s("status"), 320, Some(s("4")), s("1")),
+            (s("trade_fee_rate"), 320, None, s("2500")),
+            (s("status"), 410, Some(s("1")), s("6")),
+        ]
     );
     pool.close().await;
 }

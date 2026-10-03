@@ -65,6 +65,8 @@ tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 serde-saphyr.workspace = true
 jsonschema.workspace = true
 http-body-util.workspace = true
+# The venue decoders on recorded mainnet transactions (`tests/venue_mainnet.rs`).
+flate2.workspace = true
 
 [[bin]]
 name = "shortwin-indexer"

@@ -18,6 +18,20 @@
 //! venue's fees, the fees, `fee_creator_lamports` (a creator fee charged in tokens is valued at
 //! the trade's price `⌊fee·sol_amount/token_amount⌋`), `creator`, `user_key`, the post-trade
 //! reserves and `price_wad = ⌊sol_amount·WAD/token_amount⌋`.
+//!
+//! **Post-trade reserves are the venue's pricing reserves** — what the next trade prices on, so
+//! consecutive trades of a pool chain exactly (M10 GC-F1; `tests/venue_mainnet.rs` on WP-9's
+//! recorded mainnet swaps):
+//! - pump: the curve's virtual reserves from the event;
+//! - PumpSwap: base = the base vault; quote = the quote vault + the event's
+//!   `virtual_quote_reserves` (the effective quote reserves every buy and sell prices on,
+//!   `shortwin_venue_state::pump_amm::PoolReserves`);
+//! - CPMM: `vault − (protocol + fund + creator counters)` (`vault_amount_without_fee`): the
+//!   event's `*_vault_before` are those, and of the input the protocol and fund shares of the
+//!   trade fee (`AmmConfig` rates, [`CpmmFeeRates`]) and an input-side creator fee go to the
+//!   counters, an output-side creator fee likewise;
+//! - AMM v4: `vault − need_take_pnl`, as `ray_log`'s `pool_coin` / `pool_pc` report them (a
+//!   swap moves only the vaults: the whole input stays, the output leaves).
 
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -192,8 +206,14 @@ impl Rd<'_> {
     fn u64(&mut self) -> Option<u64> {
         Some(u64::from_le_bytes(self.take(8)?.try_into().ok()?))
     }
+    fn u32(&mut self) -> Option<u32> {
+        Some(u32::from_le_bytes(self.take(4)?.try_into().ok()?))
+    }
     fn i64(&mut self) -> Option<i64> {
         Some(i64::from_le_bytes(self.take(8)?.try_into().ok()?))
+    }
+    fn i128(&mut self) -> Option<i128> {
+        Some(i128::from_le_bytes(self.take(16)?.try_into().ok()?))
     }
     fn key(&mut self) -> Option<Pubkey> {
         Some(Pubkey::new_from_array(self.take(32)?.try_into().ok()?))
@@ -252,10 +272,36 @@ pub fn pump_trade(body: &[u8]) -> Option<Trade> {
     })
 }
 
+/// The `virtual_quote_reserves` of a pAMM `BuyEvent` / `SellEvent`, read from the fields after
+/// `coin_creator_fee` (pAMM IDL 2026-09): a `BuyEvent`'s `track_volume`, five u64 / i64 volume
+/// fields and `ix_name` (a Borsh string), then on both `cashback_fee_basis_points`, `cashback`,
+/// `buyback_fee_basis_points`, `buyback_fee` and `virtual_quote_reserves` (i128). `None` for an
+/// event that ends before it (one emitted before the boost added the field, when every pool's
+/// virtual quote reserves were 0; R-VEN §1.4).
+fn pamm_virtual_quote_reserves(buy: bool, r: &mut Rd<'_>) -> Option<i128> {
+    if buy {
+        let _track_volume = r.bool()?;
+        for _ in 0..5 {
+            r.u64()?; // total_unclaimed_tokens … min_base_amount_out
+        }
+        let n = usize::try_from(r.u32()?).ok()?;
+        r.take(n)?; // ix_name
+    }
+    for _ in 0..4 {
+        r.u64()?; // cashback_fee_basis_points, cashback, buyback_fee_basis_points, buyback_fee
+    }
+    r.i128()
+}
+
 /// pAMM `BuyEvent` / `SellEvent` (`buy` = BuyEvent). `base_mint` / `quote_mint`: the pool's
 /// mints from the emitting instruction's accounts (3 and 4). `None` unless one side is WSOL: a
 /// pool pairing a token with anything else is not a SOL market, and its quote amounts are not
 /// lamports (M8-SEC-6; the CPMM decoder checks the same).
+///
+/// Reserves: the event's `pool_*_token_reserves` are the vaults before the trade; the quote side
+/// is stored as the effective quote reserves `vault + virtual_quote_reserves` (the event's; every
+/// buy and sell prices on that sum, which pump keeps in `[0, u64::MAX]` — outside it the pool
+/// breaks pump's invariant and the quote reserve is not stored).
 pub fn pump_amm_trade(
     buy: bool,
     body: &[u8],
@@ -289,8 +335,9 @@ pub fn pump_amm_trade(
     let coin_creator = r.key()?;
     let _coin_creator_fee_bps = r.u64()?;
     let coin_creator_fee = r.u64()?;
-    // Post-trade reserves: the lp fee stays in the pool, the other fees leave it.
-    let (base_after, quote_after) = if buy {
+    let virtual_quote = pamm_virtual_quote_reserves(buy, &mut r).unwrap_or(0);
+    // Post-trade vaults: the lp fee stays in the pool, the other fees leave it.
+    let (base_after, quote_vault_after) = if buy {
         (
             pool_base.saturating_sub(base_amount),
             pool_quote.saturating_add(quote_net_lp),
@@ -301,6 +348,9 @@ pub fn pump_amm_trade(
             pool_quote.saturating_sub(quote_net_lp),
         )
     };
+    let quote_after = i128::from(quote_vault_after)
+        .checked_add(virtual_quote)
+        .and_then(|q| u64::try_from(q).ok());
     // Canonical pools: base = the token, quote = WSOL. A reversed pool (base = WSOL) swaps the
     // trader's view.
     let base_is_sol = base_mint == Some(WSOL);
@@ -311,7 +361,7 @@ pub fn pump_amm_trade(
             base_amount,
             quote_mint,
             quote_after,
-            base_after,
+            Some(base_after),
         )
     } else {
         (
@@ -319,7 +369,7 @@ pub fn pump_amm_trade(
             base_amount,
             user_quote,
             base_mint.filter(|m| *m != WSOL),
-            base_after,
+            Some(base_after),
             quote_after,
         )
     };
@@ -342,14 +392,59 @@ pub fn pump_amm_trade(
         fee_creator_lamports: Some(creator_lamports),
         creator: (coin_creator != Pubkey::default()).then_some(coin_creator),
         user,
-        pool_token_reserve: Some(tok_res),
-        pool_sol_reserve: Some(sol_res),
+        pool_token_reserve: tok_res,
+        pool_sol_reserve: sol_res,
     })
 }
 
+/// The shares of a CPMM trade fee that leave the pricing reserves: `AmmConfig.protocol_fee_rate`
+/// and `fund_fee_rate` (ppm of the trade fee). The venue moves `⌊trade_fee·rate/10⁶⌋` of each
+/// into the pool's protocol and fund counters, which `vault_amount_without_fee` subtracts.
+/// `creator_fee_rate` is not needed (the event carries the creator fee itself), nor is the 2026-10
+/// build's `creator_fee_share_rate` (it splits a collected creator fee between two counters
+/// that are both excluded: the swap path is unchanged, tests/fixtures/README.md).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct CpmmFeeRates {
+    pub protocol: u64,
+    pub fund: u64,
+}
+
+impl CpmmFeeRates {
+    /// Every mainnet `AmmConfig` (indexes 0–20, `tests/fixtures/accounts/raydium/cpmm_config_*`,
+    /// equal to the live configs at slot 452,488,420): 12 % protocol, 4 % fund. Used for a
+    /// config the venue admin watch has not observed (`venue_admin_states`).
+    pub const MAINNET: Self = Self {
+        protocol: 120_000,
+        fund: 40_000,
+    };
+    /// The rates' denominator (CPMM's `FEE_RATE_DENOMINATOR_VALUE`).
+    pub const DENOMINATOR: u64 = 1_000_000;
+
+    /// The part of `trade_fee` moved into the protocol and fund counters (each share floored, as
+    /// the venue's `Fees::protocol_fee` / `fund_fee`).
+    pub fn counters_share(self, trade_fee: u64) -> u64 {
+        let share = |rate: u64| {
+            u64::try_from(u128::from(trade_fee) * u128::from(rate) / u128::from(Self::DENOMINATOR))
+                .unwrap_or(u64::MAX)
+        };
+        share(self.protocol).saturating_add(share(self.fund))
+    }
+}
+
+/// `venue_admin_states.field` of the watched `AmmConfig` rates (the refresher's venue admin watch
+/// writes them, the writer reads the two the reserves need).
+pub const CPMM_PROTOCOL_FEE_RATE: &str = "protocol_fee_rate";
+pub const CPMM_FUND_FEE_RATE: &str = "fund_fee_rate";
+
 /// Raydium CPMM `SwapEvent` (the whole "Program data:" payload, discriminator included).
-/// `user`: the swap instruction's payer (its account 0).
-pub fn cpmm_swap(payload: &[u8], user: Pubkey) -> Option<Trade> {
+/// `user`: the swap instruction's payer (its account 0); `rates`: the pool's `AmmConfig` rates
+/// (the swap's account 2; [`PoolCtx::cpmm_rates`]).
+///
+/// Post-trade (pricing) reserves: `input_vault_before + input_amount − (protocol + fund shares
+/// of trade_fee) − (creator_fee if on the input)` and `output_vault_before − output_amount −
+/// (creator_fee if on the output)`. `input_amount` is what reached the input vault (a Token-2022
+/// transfer fee already deducted) and `output_amount` what left the output vault.
+pub fn cpmm_swap(payload: &[u8], user: Pubkey, rates: CpmmFeeRates) -> Option<Trade> {
     let body = payload.strip_prefix(&CPMM_SWAP_EVENT)?;
     let mut r = Rd(body);
     let pool = r.key()?;
@@ -386,16 +481,22 @@ pub fn cpmm_swap(payload: &[u8], user: Pubkey) -> Option<Trade> {
     } else {
         at_price(creator_fee, sol_amount, token_amount)
     };
-    let (tok_res, sol_res) = if buy {
-        (
-            output_before.saturating_sub(output_amount),
-            input_before.saturating_add(input_amount),
-        )
+    let (creator_in, creator_out) = if creator_fee_on_input {
+        (creator_fee, 0)
     } else {
-        (
-            input_before.saturating_add(input_amount),
-            output_before.saturating_sub(output_amount),
-        )
+        (0, creator_fee)
+    };
+    let input_after = input_before
+        .saturating_add(input_amount)
+        .saturating_sub(rates.counters_share(trade_fee))
+        .saturating_sub(creator_in);
+    let output_after = output_before
+        .saturating_sub(output_amount)
+        .saturating_sub(creator_out);
+    let (tok_res, sol_res) = if buy {
+        (output_after, input_after)
+    } else {
+        (input_after, output_after)
     };
     Some(Trade {
         venue: "raydium_cpmm",
@@ -637,10 +738,23 @@ pub fn venue_upgrade(
 }
 
 /// What the decoder knows about pools (from `venue_pools`): AMM v4 orientation, mints and
-/// markets of pools whose events do not carry them.
+/// markets of pools whose events do not carry them; and the CPMM `AmmConfig` rates the venue
+/// admin watch observed (`venue_admin_states`), by config.
 #[derive(Clone, Debug, Default)]
 pub struct PoolCtx {
     pub pools: HashMap<Pubkey, PoolInfo>,
+    pub cpmm_configs: HashMap<Pubkey, CpmmFeeRates>,
+}
+
+impl PoolCtx {
+    /// The rates of the CPMM `amm_config` (a swap's account 2): the observed ones, else
+    /// [`CpmmFeeRates::MAINNET`].
+    pub fn cpmm_rates(&self, amm_config: Option<&Pubkey>) -> CpmmFeeRates {
+        amm_config
+            .and_then(|c| self.cpmm_configs.get(c))
+            .copied()
+            .unwrap_or(CpmmFeeRates::MAINNET)
+    }
 }
 
 /// One `venue_pools` row.
@@ -702,7 +816,7 @@ mod tests {
         p.extend(1u64.to_le_bytes()); // trade fee (tokens)
         p.extend(10u64.to_le_bytes()); // creator fee
         p.push(1); // on the input (tokens)
-        let t = cpmm_swap(&p, Pubkey::default()).expect("a SOL swap");
+        let t = cpmm_swap(&p, Pubkey::default(), CpmmFeeRates::MAINNET).expect("a SOL swap");
         assert_eq!(
             (t.side, t.token_amount, t.sol_amount),
             (Side::Sell, 100, 40)
@@ -710,6 +824,125 @@ mod tests {
         assert_eq!(t.fee_creator_lamports, Some(4));
         assert_eq!(t.mint, Some(tok));
         assert_eq!(t.price_wad(), Some(40 * WAD / 100));
+    }
+
+    /// A CPMM `SwapEvent` payload: SOL in (`buy`) or tokens in, the vaults before, the amounts and
+    /// the fees.
+    fn cpmm_event(
+        buy: bool,
+        before: (u64, u64),
+        amounts: (u64, u64),
+        fees: (u64, u64, bool),
+    ) -> Vec<u8> {
+        let tok = Pubkey::new_from_array([5; 32]);
+        let mut p = CPMM_SWAP_EVENT.to_vec();
+        p.extend([9u8; 32]); // pool
+        for v in [before.0, before.1, amounts.0, amounts.1, 0, 0] {
+            p.extend(v.to_le_bytes());
+        }
+        p.push(1); // base_input
+        let (input, output) = if buy { (WSOL, tok) } else { (tok, WSOL) };
+        p.extend(input.to_bytes());
+        p.extend(output.to_bytes());
+        p.extend(fees.0.to_le_bytes()); // trade fee (on the input)
+        p.extend(fees.1.to_le_bytes()); // creator fee
+        p.push(u8::from(fees.2)); // creator fee on the input
+        p
+    }
+
+    #[test]
+    fn cpmm_reserves_leave_the_counters_shares_out() {
+        let rates = CpmmFeeRates {
+            protocol: 120_000,
+            fund: 40_000,
+        };
+        // trade fee 1_000: protocol 120 + fund 40 leave the input.
+        assert_eq!(rates.counters_share(1_000), 160);
+        assert_eq!(rates.counters_share(9), 1); // ⌊1.08⌋ + ⌊0.36⌋
+        let r = |t: &Trade| (t.pool_sol_reserve, t.pool_token_reserve);
+        // A buy, creator fee on the input (SOL): sol = 10_000 + 2_000 − 160 − 30.
+        let p = cpmm_event(true, (10_000, 50_000), (2_000, 8_000), (1_000, 30, true));
+        let t = cpmm_swap(&p, Pubkey::default(), rates).expect("a buy");
+        assert_eq!(r(&t), (Some(11_810), Some(42_000)));
+        // The same buy, creator fee on the output (tokens): tokens = 50_000 − 8_000 − 30.
+        let p = cpmm_event(true, (10_000, 50_000), (2_000, 8_000), (1_000, 30, false));
+        let t = cpmm_swap(&p, Pubkey::default(), rates).expect("a buy");
+        assert_eq!(r(&t), (Some(11_840), Some(41_970)));
+        // A sale (tokens in), creator fee on the output (SOL).
+        let p = cpmm_event(false, (50_000, 10_000), (8_000, 1_500), (1_000, 30, false));
+        let t = cpmm_swap(&p, Pubkey::default(), rates).expect("a sale");
+        assert_eq!(r(&t), (Some(8_470), Some(57_840)));
+        // M8's formula is the zero-rate case: the input keeps the whole trade fee.
+        let zero = CpmmFeeRates {
+            protocol: 0,
+            fund: 0,
+        };
+        let t = cpmm_swap(&p, Pubkey::default(), zero).expect("a sale");
+        assert_eq!(r(&t), (Some(8_470), Some(58_000)));
+        // Unknown configs fall back to the mainnet rates.
+        let ctx = PoolCtx::default();
+        assert_eq!(ctx.cpmm_rates(None), CpmmFeeRates::MAINNET);
+        assert_eq!(
+            ctx.cpmm_rates(Some(&Pubkey::default())),
+            CpmmFeeRates::MAINNET
+        );
+    }
+
+    /// A pAMM event body: the 14 u64 prefix, the 7 keys, the creator fee fields, then (when `tail`)
+    /// the 2026-09 fields up to `virtual_quote_reserves`.
+    fn pamm_body(
+        buy: bool,
+        pool_base: u64,
+        pool_quote: u64,
+        base: u64,
+        net: u64,
+        vqr: Option<i128>,
+    ) -> Vec<u8> {
+        let mut b = Vec::new();
+        for v in [
+            0, base, 0, 0, 0, pool_base, pool_quote, 0, 0, 0, 0, 0, net, net,
+        ] {
+            b.extend(u64::to_le_bytes(v));
+        }
+        b.extend([1u8; 32 * 7]);
+        b.extend([0u8; 16]); // coin_creator_fee_basis_points, coin_creator_fee
+        if let Some(vqr) = vqr {
+            if buy {
+                b.push(1); // track_volume
+                b.extend([0u8; 40]);
+                b.extend(3u32.to_le_bytes());
+                b.extend(b"buy");
+            }
+            b.extend([0u8; 32]); // cashback and buyback fields
+            b.extend(vqr.to_le_bytes());
+            b.push(1); // can_boost
+            b.extend([0u8; 24]);
+        }
+        b
+    }
+
+    #[test]
+    fn pump_swap_quote_reserves_add_the_virtual_quote_reserves() {
+        let tok = Some(Pubkey::new_from_array([5; 32]));
+        let w = Some(WSOL);
+        let r = |t: Trade| (t.pool_sol_reserve, t.pool_token_reserve);
+        let buy = pamm_body(true, 1_000, 500, 10, 7, Some(170));
+        let t = pump_amm_trade(true, &buy, tok, w).expect("a buy");
+        assert_eq!(r(t), (Some(500 + 7 + 170), Some(990)));
+        let sell = pamm_body(false, 1_000, 500, 10, 7, Some(-300));
+        let t = pump_amm_trade(false, &sell, tok, w).expect("a sale");
+        assert_eq!(r(t), (Some(500 - 7 - 300), Some(1_010)));
+        // An event without the field (before the boost): the vault alone.
+        let old = pamm_body(true, 1_000, 500, 10, 7, None);
+        let t = pump_amm_trade(true, &old, tok, w).expect("a buy");
+        assert_eq!(r(t), (Some(507), Some(990)));
+        // A sum outside [0, u64::MAX] breaks pump's invariant: no quote reserve.
+        let broken = pamm_body(false, 1_000, 500, 10, 7, Some(-1_000));
+        let t = pump_amm_trade(false, &broken, tok, w).expect("a sale");
+        assert_eq!(r(t), (None, Some(1_010)));
+        // A reversed pool (base = WSOL): the virtual reserves are on the token (quote) side.
+        let t = pump_amm_trade(true, &buy, w, tok).expect("a reversed sale");
+        assert_eq!(r(t), (Some(990), Some(677)));
     }
 
     #[test]

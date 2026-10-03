@@ -10,8 +10,10 @@
 //! - Live ([`run`]): after a confirmed slot with events of a market (at most every
 //!   `refresher.market_min_interval_ms` per market) `getMultipleAccounts([market, market_vault])`;
 //!   new positions; every `refresher.oracle_interval_s` the `OracleCache`; every
-//!   `refresher.venue_watch_interval_s` the venue admin accounts the adapters read (a changed
-//!   watched field → `venue_admin_states`); token metadata (Metaplex metadata PDA, else decimals
+//!   `refresher.venue_watch_interval_s` the venue admin accounts the adapters read — each
+//!   Raydium market pool's status and its CPMM `AmmConfig`'s rates (a changed watched field →
+//!   `venue_admin_states`; the writer reads the CPMM protocol and fund rates back for the swaps'
+//!   pricing reserves); token metadata (Metaplex metadata PDA, else decimals
 //!   only) at `MarketCreated`.
 //! - Replay: a session's account checkpoints play this role ([`apply_checkpoint`]).
 
@@ -24,8 +26,8 @@ use serde_json::Value;
 use solana_pubkey::Pubkey;
 use sqlx::{PgConnection, PgPool, Row};
 
-use super::decode::idl;
 use super::decode::shortwin_events::{i64_field, key_field, u32_field, u64_field, u128_field};
+use super::decode::{idl, venue};
 use super::session::AccountsCheckpoint;
 use super::store::slot_i64;
 
@@ -263,7 +265,7 @@ pub struct Refresher {
     last_market: HashMap<Pubkey, Instant>,
     last_oracle: Option<Instant>,
     last_watch: Option<Instant>,
-    watched: HashMap<(Pubkey, &'static str), String>,
+    watched: AdminValues,
 }
 
 impl Refresher {
@@ -420,8 +422,9 @@ impl Refresher {
         Ok(())
     }
 
-    /// The venue admin watch (§7.3): the status / fee fields the adapters read; a changed value
-    /// → `venue_admin_states`.
+    /// The venue admin watch (§7.3): the status / fee fields the adapters read (AMM v4 and CPMM
+    /// pool status, then the CPMM pools' `AmmConfig` rates); a changed value →
+    /// `venue_admin_states`.
     async fn venue_watch(&mut self, pool: &PgPool) -> anyhow::Result<()> {
         let pools: Vec<(String, i16)> = sqlx::query_as(
             "SELECT ray_pool::text, venue::smallint FROM markets WHERE ray_pool IS NOT NULL AND venue IN (4, 5)",
@@ -440,6 +443,7 @@ impl Refresher {
             )
             .await?;
         let slot = res.context.slot;
+        let mut configs: Vec<Pubkey> = Vec::new();
         for ((key, (_, venue)), acc) in keys.iter().zip(&pools).zip(res.value) {
             let Some(acc) = acc else { continue };
             let owner = acc.owner.to_bytes();
@@ -462,6 +466,10 @@ impl Refresher {
             } else {
                 match shortwin_venue_state::raydium_cpmm::read_pool(&owner, &acc.data) {
                     Ok(state) => {
+                        let config = Pubkey::new_from_array(state.amm_config);
+                        if !configs.contains(&config) {
+                            configs.push(config);
+                        }
                         let sol0 = state.sol_is_token0();
                         let token = if sol0 == Some(true) {
                             state.token_1_mint
@@ -492,17 +500,61 @@ impl Refresher {
                 .execute(pool)
                 .await?;
             }
+            let venue = crate::model::venue_name(u8::try_from(*venue).unwrap_or(0));
             for (field, value) in fields {
-                let prev = self.watched.insert((*key, field), value.clone());
-                if prev.as_deref() == Some(value.as_str()) {
-                    continue;
-                }
-                let venue = crate::model::venue_name(u8::try_from(*venue).unwrap_or(0));
-                record_admin_value(pool, key, field, slot, venue, prev.as_deref(), &value).await?;
+                observe_admin_value(pool, &mut self.watched, key, field, slot, venue, value)
+                    .await?;
+            }
+        }
+        // The CPMM pools' `AmmConfig` rates (the writer reads the protocol and fund rates back
+        // for the swaps' pricing reserves, `venue::CpmmFeeRates`).
+        if configs.is_empty() {
+            return Ok(());
+        }
+        let res = self
+            .client
+            .get_multiple_accounts_with_commitment(
+                &configs,
+                solana_commitment_config::CommitmentConfig::confirmed(),
+            )
+            .await?;
+        let slot = res.context.slot;
+        for (key, acc) in configs.iter().zip(res.value) {
+            let Some(acc) = acc else { continue };
+            let Ok(config) =
+                shortwin_venue_state::raydium_cpmm::read_config(&acc.owner.to_bytes(), &acc.data)
+            else {
+                continue;
+            };
+            for (field, value) in cpmm_config_fields(&config) {
+                observe_admin_value(
+                    pool,
+                    &mut self.watched,
+                    key,
+                    field,
+                    slot,
+                    "raydium_cpmm",
+                    value,
+                )
+                .await?;
             }
         }
         Ok(())
     }
+}
+
+/// The watched rates of a CPMM `AmmConfig` (ppm): `trade_fee_rate`, `protocol_fee_rate`,
+/// `fund_fee_rate`, `creator_fee_rate`.
+pub fn cpmm_config_fields(c: &shortwin_venue_state::raydium_cpmm::AmmConfig) -> WatchedFields {
+    vec![
+        ("trade_fee_rate", c.trade_fee_rate.to_string()),
+        (
+            venue::CPMM_PROTOCOL_FEE_RATE,
+            c.protocol_fee_rate.to_string(),
+        ),
+        (venue::CPMM_FUND_FEE_RATE, c.fund_fee_rate.to_string()),
+        ("creator_fee_rate", c.creator_fee_rate.to_string()),
+    ]
 }
 
 /// `token_metadata` of `mint` (the first observation wins): decimals and, when the Metaplex
@@ -536,6 +588,41 @@ pub async fn insert_token_metadata(
     Ok(())
 }
 
+/// The venue admin watch's last value of each watched `(account, field)`.
+pub type AdminValues = HashMap<(Pubkey, &'static str), String>;
+
+/// One observation of a watched venue admin field: a row only when `value` differs from the last
+/// one. The last value is `known`'s, else (the first observation since the indexer started) the
+/// latest stored row's, so a restart neither repeats unchanged values nor loses the old value of
+/// one that changed while the indexer was down. Returns whether a row was recorded.
+pub async fn observe_admin_value(
+    pool: &PgPool,
+    known: &mut AdminValues,
+    account: &Pubkey,
+    field: &'static str,
+    slot: u64,
+    venue: &str,
+    value: String,
+) -> anyhow::Result<bool> {
+    let prev = match known.insert((*account, field), value.clone()) {
+        Some(prev) => Some(prev),
+        None => sqlx::query_scalar(
+            "SELECT new_value FROM venue_admin_states WHERE account = $1 AND field = $2 \
+             ORDER BY observed_slot DESC LIMIT 1",
+        )
+        .bind(account.to_string())
+        .bind(field)
+        .fetch_optional(pool)
+        .await
+        .context("venue_admin_states")?,
+    };
+    if prev.as_deref() == Some(value.as_str()) {
+        return Ok(false);
+    }
+    record_admin_value(pool, account, field, slot, venue, prev.as_deref(), &value).await?;
+    Ok(true)
+}
+
 /// One observed change of a watched venue admin field (`venue_admin_states`, §7.3).
 pub async fn record_admin_value(
     pool: &PgPool,
@@ -563,7 +650,7 @@ pub async fn record_admin_value(
 }
 
 /// The watched fields of one venue account: `(field, value)`.
-type WatchedFields = Vec<(&'static str, String)>;
+pub type WatchedFields = Vec<(&'static str, String)>;
 
 /// Display text from untrusted token metadata (M9-SEC-5): every control character (NUL padding
 /// included) and every invisible formatting character — bidi embeddings, overrides and isolates,
@@ -654,5 +741,30 @@ mod tests {
         assert_eq!(s, "SYM");
         assert_eq!(u, "https://x");
         assert!(metaplex_strings(&d[..70]).is_none());
+    }
+
+    /// The watched CPMM rates are the config's, under the names the writer reads back; every
+    /// dumped mainnet `AmmConfig` holds the decoder's default protocol and fund rates.
+    #[test]
+    fn cpmm_config_rates_are_watched_under_the_writers_names() {
+        use shortwin_venue_state::raydium_cpmm::{PROGRAM, read_config};
+        let dir = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/fixtures/accounts/raydium"
+        );
+        for i in 0..=20 {
+            let path = format!("{dir}/cpmm_config_{i:02}.bin");
+            let data = std::fs::read(&path).unwrap_or_else(|e| panic!("{path}: {e}"));
+            let c = read_config(&PROGRAM, &data).expect("an AmmConfig");
+            assert_eq!(c.index, i);
+            let f: HashMap<_, _> = cpmm_config_fields(&c).into_iter().collect();
+            assert_eq!(f["trade_fee_rate"], c.trade_fee_rate.to_string());
+            assert_eq!(f["creator_fee_rate"], c.creator_fee_rate.to_string());
+            let rates = venue::CpmmFeeRates {
+                protocol: f[venue::CPMM_PROTOCOL_FEE_RATE].parse().expect("u64"),
+                fund: f[venue::CPMM_FUND_FEE_RATE].parse().expect("u64"),
+            };
+            assert_eq!(rates, venue::CpmmFeeRates::MAINNET, "{path}");
+        }
     }
 }

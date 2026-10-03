@@ -260,11 +260,21 @@ impl Writer {
         Ok(WriteOutcome::Written { events })
     }
 
-    /// The `venue_pools` rows of the pools `raw` trades on (AMM v4 orientation, pAMM mints).
+    /// The `venue_pools` rows of the pools `raw` trades on (AMM v4 orientation, pAMM mints), and
+    /// the observed rates of the CPMM configs its swaps name (account 2): per config and field,
+    /// the `venue_admin_states` value observed last at or before the transaction's slot, else the
+    /// earliest observed (a backfill decodes transactions older than the watch); a config never
+    /// observed keeps [`venue::CpmmFeeRates::MAINNET`].
     async fn pool_ctx(&self, raw: &RawTx) -> anyhow::Result<venue::PoolCtx> {
         let mut keys: Vec<String> = Vec::new();
+        let mut configs: Vec<String> = Vec::new();
         for top in &raw.instructions {
             for ix in std::iter::once(&top.ix).chain(top.inner.iter()) {
+                if ix.program_id == venue::RAYDIUM_CPMM
+                    && let Some(c) = ix.accounts.get(2)
+                {
+                    configs.push(c.to_string());
+                }
                 let k = if ix.program_id == venue::RAYDIUM_V4 {
                     ix.accounts.get(1)
                 } else if ix.program_id == venue::PUMP_AMM {
@@ -278,27 +288,57 @@ impl Writer {
             }
         }
         let mut ctx = venue::PoolCtx::default();
-        if keys.is_empty() {
-            return Ok(ctx);
+        if !keys.is_empty() {
+            let rows = sqlx::query(
+                "SELECT pool::text, mint::text, market::text, sol_is_first FROM venue_pools WHERE pool = ANY($1)",
+            )
+            .bind(keys)
+            .fetch_all(&self.pool)
+            .await?;
+            for r in rows {
+                let pool: String = r.try_get("pool")?;
+                let mint: String = r.try_get("mint")?;
+                let market: Option<String> = r.try_get("market")?;
+                ctx.pools.insert(
+                    crate::numeric::parse_key(&pool)?,
+                    venue::PoolInfo {
+                        mint: crate::numeric::parse_key(&mint)?,
+                        market: market.map(|m| crate::numeric::parse_key(&m)).transpose()?,
+                        sol_is_first: r.try_get("sol_is_first")?,
+                    },
+                );
+            }
         }
-        let rows = sqlx::query(
-            "SELECT pool::text, mint::text, market::text, sol_is_first FROM venue_pools WHERE pool = ANY($1)",
-        )
-        .bind(keys)
-        .fetch_all(&self.pool)
-        .await?;
-        for r in rows {
-            let pool: String = r.try_get("pool")?;
-            let mint: String = r.try_get("mint")?;
-            let market: Option<String> = r.try_get("market")?;
-            ctx.pools.insert(
-                crate::numeric::parse_key(&pool)?,
-                venue::PoolInfo {
-                    mint: crate::numeric::parse_key(&mint)?,
-                    market: market.map(|m| crate::numeric::parse_key(&m)).transpose()?,
-                    sol_is_first: r.try_get("sol_is_first")?,
-                },
-            );
+        if !configs.is_empty() {
+            let rows = sqlx::query(
+                "SELECT DISTINCT ON (account, field) account::text, field, new_value \
+                 FROM venue_admin_states WHERE account = ANY($1) AND field IN ($2, $3) \
+                 ORDER BY account, field, observed_slot > $4, \
+                   CASE WHEN observed_slot <= $4 THEN -observed_slot ELSE observed_slot END",
+            )
+            .bind(configs)
+            .bind(venue::CPMM_PROTOCOL_FEE_RATE)
+            .bind(venue::CPMM_FUND_FEE_RATE)
+            .bind(slot_i64(raw.slot))
+            .fetch_all(&self.pool)
+            .await?;
+            for r in rows {
+                let account: String = r.try_get("account")?;
+                let field: String = r.try_get("field")?;
+                let value: String = r.try_get("new_value")?;
+                let Ok(value) = value.parse::<u64>() else {
+                    continue;
+                };
+                let rates = ctx
+                    .cpmm_configs
+                    .entry(crate::numeric::parse_key(&account)?)
+                    .or_insert(venue::CpmmFeeRates::MAINNET);
+                if field == venue::CPMM_PROTOCOL_FEE_RATE {
+                    rates.protocol = value;
+                } else {
+                    rates.fund = value;
+                }
+            }
         }
         Ok(ctx)
     }

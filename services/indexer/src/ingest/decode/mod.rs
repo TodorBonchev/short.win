@@ -201,8 +201,9 @@ pub fn instruction_error(err: &Value) -> (Option<i16>, Option<i64>) {
 }
 
 /// Decodes `raw` (module docs). `pools`: what `venue_pools` knows (AMM v4 orientation, pool
-/// mints); `market_of_mint`: the indexed markets by mint (complete_curve events and third-party
-/// trades name a mint, not a market).
+/// mints) and the CPMM config rates the venue admin watch observed; `market_of_mint`: the
+/// indexed markets by mint (complete_curve events and third-party trades name a mint, not a
+/// market).
 pub fn decode(
     raw: &RawTx,
     ids: &ProgramIds,
@@ -471,11 +472,12 @@ pub fn decode(
                 if entry.program == venue::RAYDIUM_CPMM
                     && bytes.starts_with(&venue::CPMM_SWAP_EVENT) =>
             {
-                let user = entry
-                    .node
-                    .and_then(|n| accounts_of(k, n).first().copied())
-                    .unwrap_or(raw.fee_payer);
-                let Some(trade) = venue::cpmm_swap(bytes, user) else {
+                // `swap_base_input` / `swap_base_output`: [payer, authority, amm_config,
+                // pool_state, …]; the venue checks `amm_config == pool_state.amm_config`.
+                let accounts = entry.node.map(|n| accounts_of(k, n)).unwrap_or_default();
+                let user = accounts.first().copied().unwrap_or(raw.fee_payer);
+                let rates = pools.cpmm_rates(accounts.get(2));
+                let Some(trade) = venue::cpmm_swap(bytes, user, rates) else {
                     continue;
                 };
                 let frame = below_frame(&entry.below, &sw_id).and_then(|n| sw_frame(k, n));

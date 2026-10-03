@@ -4297,6 +4297,7 @@ dependencies = [
  "base64 0.22.1",
  "bs58",
  "complete-curve",
+ "flate2",
  "futures",
  "http-body-util",
  "jsonschema",

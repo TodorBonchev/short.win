@@ -844,6 +844,14 @@ cargo test --manifest-path $M -p shortwin-indexer --test ingest_rpc_validator --
   catalog coverage, idempotent re-ingest, rebuild, out-of-order delivery, the finality tracker's
   rollback, the single writer, NOTIFY. `ingest_rpc_validator` (opt-in) runs the RPC backfill, the
   live source and finality promotion against a local `solana-test-validator` (~40 s).
+  `venue_mainnet` (M10 GC-F1) runs WP-9's recorded mainnet transactions
+  (`scripts/gapcal/tests/fixtures/*.json.gz`) through `to_raw_tx`, the decoder and (CPMM) the
+  writer: every venue's stored post-trade reserves are its pricing reserves — 20 consecutive CPMM
+  swaps chain exactly in `venue_trades` (the `AmmConfig` protocol and fund shares and the creator
+  fee out of the input, as the venue admin watch observed the rates; zero rates, M8's formula,
+  break every link by exactly that share), PumpSwap's quote is the vault plus
+  `virtual_quote_reserves` (on which every sale prices exactly), AMM v4's are the vaults net of
+  `need_take_pnl`, pump's virtual reserves chain.
 - **API (API):** `api_contract` (every operation and documented status against `openapi.yaml` on
   the SQL seed `tests/data/api_seed.sql`, the seeded values, paging), `api_limits` (GCRA, keys,
   `X-Forwarded-For`, timeouts, the query semaphore, CORS), `api_ws` (every channel, `since`,
