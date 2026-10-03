@@ -305,5 +305,10 @@ export async function planAddMargin(inp: {
     };
 }
 
-/** Program errors after which a trade is retried with the next extras set (ARCH §7.1 duty 10). */
-export const EXTRAS_RETRY_CODES: ReadonlySet<number> = new Set([6004, 6005]);
+/**
+ * Program errors after which a trade is retried with the next extras set (ARCH §7.1 duty 10): the
+ * refusals of the selected set itself — `DeniedAccount` (raised only by the extras parser; since M10
+ * batch 3 also for a set naming the borrower or the adopted pool's own accounts), `BadRemainingAccounts`
+ * and `BadExtras`. A hostile `current` set then costs a retry, never the trade (M2-SEC-2).
+ */
+export const EXTRAS_RETRY_CODES: ReadonlySet<number> = new Set([6003, 6004, 6005]);

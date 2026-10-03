@@ -2458,19 +2458,19 @@ impl<C: Chain> Keeper<C> {
                     let mut exit: Vec<Instruction> = prep.iter().cloned().collect();
                     exit.push(ix);
                     let r = self.send_exit(&exit, mv.key, c.sel, now).await;
-                    // Only a venue-side failure makes another extras set worth trying; the
-                    // program's own refusals do not depend on the set.
+                    // Another extras set is worth trying after a venue-side failure or a
+                    // refusal of the set itself: `BadExtras`, `BadRemainingAccounts` and
+                    // `DeniedAccount` (raised only by `venues::parse_extras`; since M10 batch 3
+                    // also for a set naming the adopted pool's accounts or the borrower, so a
+                    // hostile `current` must not stall the exit — M2-SEC-2). The program's other
+                    // refusals do not depend on the set.
                     let retry = match &r {
                         ExitResult::Refused { outcome, .. } => {
+                            let code = outcome.err.as_ref().and_then(TxError::custom_code);
                             events::failing_program(outcome).is_some_and(|p| p != shortwin::ID)
-                                || is(
-                                    outcome.err.as_ref().and_then(TxError::custom_code),
-                                    ShortwinError::BadExtras,
-                                )
-                                || is(
-                                    outcome.err.as_ref().and_then(TxError::custom_code),
-                                    ShortwinError::BadRemainingAccounts,
-                                )
+                                || is(code, ShortwinError::BadExtras)
+                                || is(code, ShortwinError::BadRemainingAccounts)
+                                || is(code, ShortwinError::DeniedAccount)
                         }
                         _ => false,
                     };

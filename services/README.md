@@ -89,10 +89,13 @@ What it does, per tick (one per slot; `keeper/src/keeper.rs`):
 - **Duty 3, exits**: `liquidate` at the first second the program accepts it (the fixed-δ bound;
   retried every second on `ExitBoundNotMet`), `expire` when the expiry bound is met. Trading
   exits try the extras sets `current`, `none`, `previous`, `stable` and keep the first that
-  simulates (duty 10's rule; `stable` is M2-SEC-2's set). On PumpSwap, when the pool's live coin
-  creator is not the market's cached one (anyone can change it through pAMM; the next
-  `crank_price` re-caches it), the exit's transaction starts with `create_idempotent` of the new
-  creator vault's WSOL ATA (T11), which the program's existence requirement needs (M6-SEC-4).
+  simulates (duty 10's rule; `stable` is M2-SEC-2's set), moving on after a venue failure or a
+  refusal of the set itself (`BadExtras`, `BadRemainingAccounts`, `DeniedAccount` — since M10
+  batch 3 also a set naming the borrower or the adopted pool's own accounts). On PumpSwap, when
+  the pool's live coin creator is not the market's cached one (anyone can change it through
+  pAMM; the next `crank_price` re-caches it), the exit's transaction starts with
+  `create_idempotent` of the new creator vault's WSOL ATA (T11), which the program's existence
+  requirement needs (M6-SEC-4).
 - **Duty 4, `sol_settle`**: at most once per second for armed positions and for liquidatable
   positions without a normal buyback (it arms, keeps the clock, disarms on box evidence, or
   settles), and for positions whose S3 is due (on a halted venue: probed by simulation, sent
@@ -626,7 +629,8 @@ first second an outside oracle's simulation accepts, a spike above the bound wai
 (`ExitBoundNotMet`) and liquidated the next second, an expiry at the deadline, S3 on a disabled
 mock pool (continuous chain; an expired position settles, a healthy one stays frozen), S1 after
 arming with one `sol_settle` per second, and extras (a published template, a hostile `current`
-bypassed with `previous`).
+bypassed with `previous`, a `current` the program denies — a borrower's wallet, the mock pool —
+bypassed with `none`).
 
 Pump-curve and graduation scenarios (`graduation.rs`, duty 6, M5 and M6; the dumped pump,
 pump-fees and PumpSwap programs and the near-complete curve): an outside buy completes a covered

@@ -15,6 +15,7 @@ import {
 import { AccountRole, type Address, type Blockhash, createNoopSigner, type Instruction } from '@solana/kit';
 import { describe, expect, it } from 'vitest';
 import { renderDisclosure } from '../../config/disclosures.ts';
+import { programError } from '../../config/errors.ts';
 import { assertAllowedInstructions } from '../../tx/integrity.ts';
 import { buildMessage, MAX_TRANSACTION_BYTES, SIMULATION_CU_LIMIT, wireOf } from '../../tx/message.ts';
 import { MOCK_CPAMM_PROGRAM } from '../../venues/constants.ts';
@@ -23,6 +24,7 @@ import { keeperRecipientIndex, NO_EXTRAS } from '../../venues/lists.ts';
 import { mockPool } from '../../venues/pda.ts';
 import {
     borrowerDisclosureVars,
+    EXTRAS_RETRY_CODES,
     extrasFor,
     planAddMargin,
     planCloseShort,
@@ -257,6 +259,18 @@ describe('the plans build exactly the instructions the program executed', () => 
             expect(flat(ix)).toEqual((c as unknown as { ix: unknown }).ix);
         });
     }
+});
+
+describe('the extras fallback (ARCH §7.1 duty 10, M2-SEC-2)', () => {
+    it('retries with the next set after every refusal of the selected set itself', () => {
+        // The extras parser's refusals: a `DeniedAccount` set (M10 batch 3: the borrower or the adopted
+        // pool's own accounts) must not stall the trade any more than a stale one.
+        expect([...EXTRAS_RETRY_CODES].map((c) => programError(c)?.name).sort()).toEqual([
+            'BadExtras',
+            'BadRemainingAccounts',
+            'DeniedAccount',
+        ]);
+    });
 });
 
 describe('the mock listing (TEST-ONLY)', () => {

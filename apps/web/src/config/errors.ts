@@ -31,7 +31,12 @@ const ROWS: readonly Row[] = [
         'retry',
         'The venue’s accounts changed (for example the coin creator). A new review re-reads them.',
     ],
-    [6003, 'DeniedAccount', 'report', 'The transaction passed a protocol account where it is not allowed.'],
+    [
+        6003,
+        'DeniedAccount',
+        'report',
+        'The transaction passed an account the program refuses here (a protocol account, or a venue extra naming the pool or the borrower).',
+    ],
     [
         6004,
         'BadRemainingAccounts',
