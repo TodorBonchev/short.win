@@ -27,7 +27,7 @@ contest, are **not verified**.
 ### What each RFQ carries
 
 1. The one-page summary (AUDIT.md §1) and the scope (AUDIT.md §2 table, `scope.txt`):
-   - the on-chain core: 106 Rust files, 21,243 non-test nLOC (30,206 tokei code);
+   - the on-chain core: 106 Rust files, 21,268 non-test nLOC (30,289 tokei code);
    - the keeper core subset, in scope by the owner's decision: 14 files, 4,692 non-test nLOC
      (7,759 tokei code);
    - out of scope, read for context: the rest of the keeper (5,821) and the governance tool

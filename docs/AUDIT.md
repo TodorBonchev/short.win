@@ -43,23 +43,25 @@ to build and test the code, what the code relies on, and what we already know ab
 | Contacts | Security reports: `security@short.win`; policy page `https://short.win/security` (`SECURITY.md`; the same values are in both programs' `security.txt` and the web's `/.well-known/security.txt`; owner decision Q3 of 2026-10-02). The auditors' point of contact is named at the engagement (§12) |
 
 **Verified hashes of this tree.** `scripts/verifiable-build.sh --local --compare target/deploy`
-on the head of `m10/final` (2026-10-03; its `verifiable-hashes.txt` names the commit):
+on `m10/batch4` (2026-10-04, commit `f08426d`; its `verifiable-hashes.txt` names the commit):
 solana-verify 0.5.2 in the pinned image built both programs from a fresh clone of `HEAD`, and
 each output is byte-identical to the `anchor build` artifact the tests ran on. The hashes:
 
 | Program | sha256 of the `.so` file | executable hash (trailing zeros trimmed; the on-chain comparison) | bytes |
 |---|---|---|---|
-| `shortwin.so` | `c4398d01a36bf1c8c998e7b9f19f0544606c29737e643913ac87e1cb46ef39ea` | `42f476fe0ab0e68b6d078e9235e1b84716f4872251e64b75e5b87d1553c4200b` | 1,574,648 |
+| `shortwin.so` | `bbef107570e8eac229911f0b59ba22b48796674605e290e3921c66727817f289` | `3214661b4778a5744ef30b1e1a70c90987185d22ab9c857597c5fbd42c21ee09` | 1,575,216 |
 | `complete_curve.so` | `f3a47201738fd72d4dd02f756ba3c17f241dc2bedde1c9d25f63eccaaafc6d42` | `2f2ef7da92c7b8dffc57bd7ae9bf33f64c8dbc09dc552c401742ad85f45382ab` | 122,264 |
 
 - Both ELFs have `e_flags` 0x3 (SBPF v3) and carry exactly one `security.txt` (§10).
-- The program code has not changed since batch 3 (`391aed3`): these are the hashes ARCH §1.1
-  and §9 record for batch 3.
+- Program batch 4 (PUMP-2026-10-1: PumpSwap's fee buckets) changed `shortwin` only; at batch 3
+  (`391aed3`) it was `c4398d01…39ea` / `42f476fe…200b`, 1,574,648 B. `complete_curve` is
+  unchanged since batch 3. ARCH §9 records both.
 - The executable hash is what `solana-verify get-program-hash` and verify.osec.io compare with
   the deployed ProgramData. Verifying the deployment on chain is M11's (ARCH §9 M11).
 - At the skeleton base `e857a2a` the hashes were `00011844…e1a1` / `117392ce…e469` and
   `1970661a…2bd` / `8cbeaea8…6f43`. Batches 1–3 changed both programs (`security.txt` and the
-  version), and `shortwin` also by SQ-G8, M10-8C-1 and the extras denylist.
+  version), and `shortwin` also by SQ-G8, M10-8C-1 and the extras denylist; batch 4 changed
+  `shortwin`'s PumpSwap adapter.
 
 ---
 
@@ -134,17 +136,17 @@ a unit or excludes it with a reason. On this tree WP-7's `crates/squads-v4-ix` a
 
 **What is in scope** (owner decisions of 2026-10-02, Q2 and "Audit keeper scope"): the on-chain
 core and the keeper's core subset (its coverage budget, liquidation and settlement duties, and
-transaction building; ≈ 4.7k non-test nLOC). Line counts on this tree (the head of `m10/final`; release ELF
-`c4398d01…`):
+transaction building; ≈ 4.7k non-test nLOC). Line counts on this tree (`m10/batch4`; release ELF
+`bbef1075…`):
 
 | Class | Unit | `.rs` files | tokei 14.0.0 "code" | non-test nLOC |
 |---|---|---|---|---|
-| core | `programs/shortwin` (without the TEST-ONLY `venues/mock.rs`) | 70 | 16,058 | 13,199 |
+| core | `programs/shortwin` (without the TEST-ONLY `venues/mock.rs`) | 70 | 16,066 | 13,205 |
 | core | `programs/complete_curve` | 1 | 293 | 213 |
 | core | `crates/shortwin-math` (`src/`) | 25 | 10,158 | 6,214 |
-| core | `crates/shortwin-venue-state` (`src/`, without the TEST-ONLY `mock_cpamm.rs`) | 10 | 3,697 | 1,617 |
+| core | `crates/shortwin-venue-state` (`src/`, without the TEST-ONLY `mock_cpamm.rs`) | 10 | 3,772 | 1,636 |
 | core | build pins: `Cargo.toml`, `Cargo.lock`, `Anchor.toml`, `rust-toolchain.toml` | — | — | — |
-| **core** | **total** | **106** | **30,206** | **21,243** |
+| **core** | **total** | **106** | **30,289** | **21,268** |
 | **keeper** (in scope) | keeper core: exit and crank decisions, coverage and budget, the instructions and account lists it sends (`decide`, `coverage`, `budget`, `fees`, `graduation`, `ixs`, `venue`, `view`, `pda`, `sweep`, `monitor`, `pool_monitor`; `services/common` `tx`, `chain`) | 14 | 7,759 | **4,692** |
 | context | keeper rest: the loop (`keeper.rs`, 3,231 non-test nLOC), config, metrics, alerts, the RPC backend, the ALT and v1-probe tools | 12 | 6,316 | 5,821 |
 | context | governance: `shortwin-gov` (`services/ops`) and its Squads v4 encoders (`crates/squads-v4-ix`); host-only, never on-chain | 16 | 4,661 | 4,124 |
@@ -590,39 +592,40 @@ The full gate (G-full in the M10 plan; CI's `ci.yml`) also runs fmt and clippy w
 run is pending the owner-approved push (owner decision Q1: `main` is fast-forwarded after each
 verified step); its URL and the `verifiable-build` job's hashes go here at the tag.
 
-**This package's gate** (2026-10-03, on `m10/final` from the merged tree `3a0ad1f` through
-this package's commits; every commit after `e972f88` changes only docs and the scope script,
-so no ELF, test, IDL or lockfile input changed during the gate). Every step of CI's jobs, run
-locally with at most 3 concurrent build jobs:
+**This package's gate** (re-run for program batch 4, 2026-10-03/04, on `m10/batch4` at
+`09778df` … `f08426d`: the pump venues' 2026-10-02 redeploys, PUMP-2026-10-1 and -2, then docs
+and the bench re-baselines; the program is the same from `e4f516b` on). Every step of CI's jobs,
+run locally through the machine's 3-slot wrapper (logs:
+`~/.cache/shortwin-work/m10/b4/logs/SUMMARY`):
 
 | Step (CI job) | Result |
 |---|---|
-| anchor build + `scripts/build-test-venue.sh` | `shortwin.so` `c4398d01…39ea`, `complete_curve.so` `f3a47201…6d42`, test-venue `shortwin.so` `b6793ea3…397c` |
+| anchor build + `scripts/build-test-venue.sh` | `shortwin.so` `bbef1075…f289`, `complete_curve.so` `f3a47201…6d42`, test-venue `shortwin.so` `b32f85a0…3e5b`, `mock_cpamm.so` `4cf17007…7ab9` |
 | A49 (anchor-build) | `e_flags` 0x3 on every ELF; the mock id in neither release ELF and in the test-venue one; the marker only in the test-venue `shortwin.so`; release ≠ test-venue: `A49-OK` |
-| security.txt (anchor-build) | the checker's 11 unit tests; both release ELFs valid with `--forbid-placeholders --source-release v1.0.0`; one marker each, none in the test-venue ELF |
+| security.txt (anchor-build) | the checker's unit tests; both release ELFs valid with `--forbid-placeholders --source-release v1.0.0`; one marker each, none in the test-venue ELF: `SECTXT-OK` |
 | fmt; clippy `-D warnings` on the workspace, `-p shortwin`, `-p shortwin-math` | clean |
-| lockfiles; `cargo deny` (root, services); `cargo audit` (8 lockfiles, CI's ignore list) | no lockfile change; `advisories ok, bans ok, licenses ok, sources ok` twice; no vulnerability |
+| lockfiles; `cargo deny` (root, services); `cargo audit` (8 lockfiles, CI's ignore list) | no lockfile change; `advisories ok, bans ok, licenses ok, sources ok`; no vulnerability |
 | vectors; T-CONFIG | regenerated, no diff; `config_check.py` OK and `test_config_gate.py` 8 tests |
 | wasm | `shortwin-math` and the facade on `wasm32-unknown-unknown`, `cargo check -p shortwin` there; the facade smoke test |
-| fixtures | `dump-fixtures.py check`: 259 entries; `SHA256SUMS`: 245 files OK |
-| `cargo test -p shortwin-math -p shortwin-math-wasm`, then `PROPTEST_CASES=2000 cargo test -p shortwin-math` | 310 + 20 passed, then 310 passed at 2,000 cases; 0 failed |
+| fixtures; `check --live` | `dump-fixtures.py check`: 265 entries; `SHA256SUMS` OK; **`check --live` at slot 453,037,762: every pinned program and account matches mainnet** (the pump venues on `pump_programs_2026_10`, `VENUE_GUARD_SLOTS_2026_10_03`) |
+| `cargo test -p shortwin-math -p shortwin-math-wasm`, then `PROPTEST_CASES=2000 cargo test -p shortwin-math` | 640 passed (310 + 20, then 310 at 2,000 cases); 0 failed |
 | `cargo test -p squads-v4-ix` (test) | 13 passed |
-| **`cargo test --workspace --locked`** (test, program-tests) | **1,534 passed, 0 failed, 4 ignored** (103 test binaries and the doc tests; the whole LiteSVM suite with the hooks), 1,276 s |
-| verifiable build (`--local --compare`) | byte-identical for both programs (§0), 251 s |
-| codama; client check | both IDLs equal the build's; the regenerated client has no diff; 28 client tests twice |
-| web: build, lint, typecheck, Vitest | clean; **565 passed, 1 skipped** |
-| **web E2E** (all specs, under the E2E lock) | **58 passed** in 22 spec files (6.5 min) |
+| **`cargo test --workspace --locked`** (test, program-tests) | **1,551 passed, 0 failed, 4 ignored** (112 result blocks incl. the doc tests; the whole LiteSVM suite with the hooks, the pump suites on the redeploys), 1,385 s |
+| verifiable build (`--local --compare`) | byte-identical for both programs (§0), 284 s |
+| codama; client check | both IDLs equal the build's (no IDL change in batch 4); the regenerated client has no diff |
+| web: build, lint, typecheck, Vitest | clean; **570 passed, 1 skipped** |
+| **web E2E** (all specs, under the E2E lock) | **58 passed** (6.5 min) |
 | services: fmt, clippy (workspace, keeper), build | clean |
-| **services tests** (services, indexer) | **350 passed, 0 failed, 6 ignored** (27 test binaries; keeper, LiteSVM scenarios, T-OPS, indexer with Postgres) |
+| **services tests** (services, indexer) | **351 passed, 0 failed, 6 ignored** (33 result blocks; keeper, LiteSVM scenarios, T-OPS, indexer with Postgres) |
 | keeper A49 | the release `shortwin-keeper` is free of the mock id; the scenarios binary embeds it |
-| m7-keeper-bench; `keeper_cost.py` | 3 passed; the cost model's output equals `docs/design/sim/out/keeper_cost.txt` |
+| m7-keeper-bench; `keeper_cost.py` | 3 passed; the cost model's constants follow the re-measured PumpSwap and curve exits, and its output equals `docs/design/sim/out/keeper_cost.txt` |
 | fuzz crate tests (fuzz-smoke) | 24 passed (release: smoke tests and corpus replays) |
-| **fuzz, 10 min**, `--profile all --seed 20261071 --jobs 3` | 629 s: 399 runs, 58,414 actions, 833,822 transactions, 1,661,827 hook checkpoints, 399 wind-downs; **0 failures, 0 anomalies**; the deficit tripwire checked 3 deficits (largest at 0.9997 of its bound) |
+| **fuzz, 10 min each**, `--jobs 3`: `--profile all --seed 20261081`; `--profile curve --seed 20261082`; `--profile pumpswap --seed 20261083` | all: 441 runs, 64,676 actions, 866,755 transactions, 1,702,677 hook checkpoints; curve: 597 runs, 77,021 actions, 1,031,838 transactions, 1,917,894 checkpoints; pumpswap: 335 runs, 49,187 actions, 757,773 transactions, 1,428,899 checkpoints; **0 failures, 0 anomalies** in each; the new `fee_buckets` action (v2 PumpSwap trades and the sweeps) landed 241 / 258 / 933 bucket-carrying v2 trades |
 | **mutants** (`scripts/mutants.sh`) | **7 / 7 killed**, by the tests and by a 3-minute fuzz each |
 | cu-math; t-pot; t-size | 2; 5; 11 passed |
-| benches m1, m2, m3, m5, m6 (fmt, clippy, run) | 1, 4, 5, 7, 3 passed: every figure within its budget; no committed result changed |
+| benches m1, m2, m3, m5, m6 (fmt, clippy, run, re-baselined) | 1, 4, 5, 7, 3 passed: every figure within its budget; m6 (PumpSwap) +120 … +379 CU from the bucket reads, m5's graduated listing +120; m3 unchanged; m1 / m2 only per-run PDA-bump noise (not committed) |
 | `python3 scripts/audit_scope.py check` | ok |
-| relative links of `docs/`, `SECURITY.md`, `README.md` | 20 files, 71 relative links, 0 broken (no link checker is installed; a script checks every relative markdown link and anchor) |
+| relative links of `docs/`, `SECURITY.md`, `README.md`, the test READMEs | 23 files, 72 relative links, 0 broken (a script checks every relative markdown link and anchor) |
 
 **Which ELF each suite runs on.** Know this before reading test results:
 - The **M2 engine suites run on the TEST-ONLY test-venue ELF**
