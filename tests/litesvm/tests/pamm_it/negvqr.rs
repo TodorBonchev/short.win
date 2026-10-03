@@ -71,7 +71,7 @@ fn a_negative_vqr_pool_prices_on_the_effective_reserve() {
     assert!(st.r < r.real_quote);
     assert_eq!(st.fee_ppm, fees.oneway_ppm());
     let pool = st.pool.expect("pool facts");
-    assert!(pool.vqr < 0);
+    assert_eq!(pool.virtual_part, 0, "a negative VQR is no virtual part");
 
     let s_exp = quote_sell(&env, &p, q).expect("quote");
     let mut b = env.borrower();

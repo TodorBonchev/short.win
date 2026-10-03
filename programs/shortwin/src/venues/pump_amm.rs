@@ -53,11 +53,16 @@
 //!
 //! **Pricing** ([`read_state`]; ARCH §4.1–§4.2): `X` = base vault, `Y` = WSOL vault + VQR (VQR
 //! read live and signed: negative from 2026-09-30, the sum in `[0, u64::MAX]`), `R = min(WSOL
-//! vault, Y)` — the real SOL a sale can be paid out of and the tier's `R_now`, each the smaller of
-//! the real and the effective SOL (ECON §6.2, the negative-VQR reading, delegated PROPOSED, #103);
-//! the fee `fees::pump_amm` on the pre-trade `(Y, X)` with the mint's **live supply** (the tier's
-//! market cap), `FeeConfig.fee_tiers`, `creator_fee_configurable` and the pool's own creator
-//! override, resolved on every read.
+//! vault − buckets, Y)` — the real SOL a sale can be paid out of and the tier's `R_now`, each the
+//! smaller of the real and the effective SOL (ECON §6.2, the negative-VQR reading, delegated
+//! PROPOSED, #103), the real SOL net of the fee buckets `Pool.protocol_fees` @271 +
+//! `creator_fees` @279 that pump's 2026-10-02 redeploy keeps in the vault for v2 trades and pays
+//! no sale out of (6063; PUMP-2026-10-1, `pump_amm::PoolReserves::payable_quote`; buckets above
+//! the vault: not executable); the tier's virtual part is the boost `max(VQR + buckets, 0)`
+//! (`PoolVenue::virtual_part`), since the buckets come off the VQR; the fee `fees::pump_amm` on
+//! the pre-trade `(Y, X)` with the mint's **live supply** (the tier's market cap),
+//! `FeeConfig.fee_tiers`, `creator_fee_configurable` and the pool's own creator override, resolved
+//! on every read.
 //!
 //! **Locked depth** (M6R-1, owner decision of 2026-09-30; ARCH §2.5, §2.6, changelog 56; ECON
 //! #105): canonical pools take third-party LP (R-VEN Update H11), so a PumpSwap pool gets the
@@ -574,8 +579,10 @@ pub struct PoolVenue {
     pub disable_flags: u8,
     /// The boost vault's WSOL (0 when its ATA does not exist) — the boost gate (A13).
     pub boost_amount: u64,
-    /// `Pool.virtual_quote_reserves` (signed; the tier's `R_slow` subtracts `max(VQR, 0)`).
-    pub vqr: i128,
+    /// The virtual part of the effective reserve, `max(VQR + buckets, 0)` (the boost;
+    /// `pump_amm::Pool::virtual_part`, PUMP-2026-10-1): what the tier's `R_slow` and the burned-LP
+    /// bound subtract. `max(VQR, 0)` on a pool without fee buckets; 0 under a negative VQR.
+    pub virtual_part: u64,
     /// `Pool.is_cashback_coin`.
     pub is_cashback: bool,
     /// The live fee resolved on the pool's state (execution quotes when executable; the risk
@@ -687,6 +694,7 @@ pub fn read_state(
         };
         a
     };
+    // `None` also when the fee buckets exceed the quote vault (PUMP-2026-10-1).
     let Some(reserves) = pool.reserves(base.amount, quote.amount) else {
         return st;
     };
@@ -717,7 +725,7 @@ pub fn read_state(
     st.pool = Some(PoolVenue {
         disable_flags,
         boost_amount,
-        vqr: pool.virtual_quote_reserves,
+        virtual_part: pool.virtual_part().unwrap_or(u64::MAX),
         is_cashback: pool.is_cashback_coin,
         fees: fee,
         fee_ppm_at_ema: fee_ema.map_or(u32::MAX, |e| e.oneway_ppm()),
@@ -744,9 +752,11 @@ pub fn read_state(
             st.x = reserves.base;
             st.y = effective;
             // ECON §6.2 (#103, delegated PROPOSED; built in M6): the real SOL is the smaller of
-            // the WSOL vault and the effective reserve — the tier's `R_now` under a negative VQR,
-            // and the sale's payout cap (which cannot bind below the effective reserve).
-            st.r = reserves.real_quote.min(effective);
+            // the payable SOL and the effective reserve — the tier's `R_now` under a negative
+            // VQR, and the sale's payout cap (which cannot bind below the effective reserve).
+            // Payable: the WSOL vault less the fee buckets (PUMP-2026-10-1; PumpSwap pays no sale
+            // out of them, 6063).
+            st.r = reserves.payable_quote.min(effective);
             st.pricing = Some(Pricing::PumpSwap(f));
             st.fee_ppm = f.oneway_ppm();
             st.locked_depth = d;
@@ -1289,6 +1299,8 @@ mod tests {
             creator_fee_bps: 0,
             can_edit_creator_fee: false,
             is_holder_reward: false,
+            protocol_fees: 0,
+            creator_fees: 0,
         };
         write_cache(&mut m, &pool).unwrap();
         assert_eq!(cached(&m, cache::POOL_BASE_VAULT).to_bytes(), [7; 32]);

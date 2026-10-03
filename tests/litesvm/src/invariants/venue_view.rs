@@ -32,14 +32,17 @@
 //!   pool authority, the market's mint against WSOL, not mayhem) with the vaults the market's
 //!   cache names (base under the mint's program, WSOL under SPL Token, both owned by the pool),
 //!   `GlobalConfig`, `FeeConfig`, the boost vault's ATA and — since M6R-1 — the pool's LP mint
-//!   (SPL Token or Token-2022) parse, `vault + VQR` is a `u64`, both reserves non-zero and
-//!   **`disable_flags` bit 3 clear** (T-DISABLE); the locked depth `D` from `lp_supply` and the LP
-//!   mint's supply on `(base vault, vault + VQR)` (recomputed with integer square roots); pricing `(base vault,
-//!   WSOL vault + VQR)` with `fees::pump_amm` at the mint's live supply; the quotes
-//!   `quote::sol_leg` (ε₁ = 0). `venue_rent`: a pool under 287 bytes grows to 287 on the trade (271
-//!   on the 2026-09 build: the build PumpSwap's ProgramData holds, `fork::PumpDeploy::held`) and
-//!   tops its rent up to `minimum_balance(287)` from the trader (R-VEN Update H8;
-//!   `pamm::POOL_LEN_2026_10`).
+//!   (SPL Token or Token-2022) parse, `vault + VQR` is a `u64`, the fee buckets (`protocol_fees`
+//!   @271 + `creator_fees` @279, pump's 2026-10-02 redeploy) at most the WSOL vault, both reserves
+//!   non-zero and **`disable_flags` bit 3 clear** (T-DISABLE); the locked depth `D` from
+//!   `lp_supply` and the LP mint's supply on `(base vault, vault + VQR)` (recomputed with integer
+//!   square roots); pricing `(base vault, WSOL vault + VQR)` with `fees::pump_amm` at the mint's
+//!   live supply; the quotes `quote::sol_leg` (ε₁ = 0), the sale capped by the payable SOL
+//!   `min(vault − buckets, vault + VQR)` (PumpSwap's 6063 above `vault − buckets`; PUMP-2026-10-1);
+//!   the tier's inputs that SOL and the boost `max(VQR + buckets, 0)`. `venue_rent`: a pool under
+//!   287 bytes grows to 287 on the trade (271 on the 2026-09 build: the build PumpSwap's
+//!   ProgramData holds, `fork::PumpDeploy::held`) and tops its rent up to `minimum_balance(287)`
+//!   from the trader (R-VEN Update H8; `pamm::POOL_LEN_2026_10`).
 //!
 //! A venue that cannot execute has no reserves and `fee_ppm` 0, as the program's
 //! `VenueState::not_executable` (the route predicates then hold whatever the fee).
@@ -85,11 +88,12 @@ pub struct VenueView {
     /// ⌊λ_bps·isqrt(X·(Y + VQR))/10⁴⌋`, `λ_bps = ⌊(Pool.lp_supply − lp_mint.supply)·10⁴/lp_supply⌋`
     /// (recomputed here from the pool and its LP mint) when executable; `None` elsewhere.
     pub locked_depth: Option<u128>,
-    /// PumpSwap: the tier's venue inputs on this state (ARCH §4.7) — `R_now = min(WSOL vault,
-    /// WSOL vault + VQR)` (the reader's `R`) and `max(VQR, 0)` — when executable; `None`
-    /// elsewhere (Raydium and the mock tier on `Y`, without a VQR). Read before an open's own
-    /// sale (the snapshot's view): the program tiers on the venue before the trade (ARCH §3.4
-    /// step 5; FUZZ-M7-24H-1).
+    /// PumpSwap: the tier's venue inputs on this state (ARCH §4.7) — `R_now = min(WSOL vault −
+    /// buckets, WSOL vault + VQR)` (the payable SOL, also the sale's cap) and the virtual part
+    /// `max(VQR + buckets, 0)` (the boost; PUMP-2026-10-1, recomputed here from the pool's raw
+    /// fields) — when executable; `None` elsewhere (Raydium and the mock tier on `Y`, without a
+    /// VQR). Read before an open's own sale (the snapshot's view): the program tiers on the venue
+    /// before the trade (ARCH §3.4 step 5; FUZZ-M7-24H-1).
     pub pump_tier: Option<(u64, u64)>,
 }
 
@@ -129,8 +133,10 @@ impl VenueView {
             return sol_leg::sell_exact_in(q, c.vt, c.vq, &f, cap).map(|s| s.proceeds);
         }
         let (x, y) = self.reserves?;
+        // PumpSwap pays no sale out of its fee buckets (6063): the cap is the payable SOL.
+        let cap = self.pump_tier.map_or(y, |(r, _)| r);
         self.pricing?
-            .sell(q, u128::from(x), u128::from(y), y)
+            .sell(q, u128::from(x), u128::from(y), cap)
             .map(|s| s.proceeds)
     }
 }
@@ -196,6 +202,12 @@ fn pump_swap(svm: &LiteSVM, m: &Market) -> Option<VenueView> {
         .supply;
     let r = p.reserves(base.amount, quote.amount)?;
     let effective = u64::try_from(r.effective_quote).ok()?;
+    // PUMP-2026-10-1, from the raw fields (not the reader's `payable_quote` / `virtual_part`):
+    // buckets above the vault break pump's invariant; a sale is paid out of `vault − buckets`;
+    // the buckets came off the VQR, so `VQR + buckets` is the boost.
+    let buckets = u128::from(p.protocol_fees) + u128::from(p.creator_fees);
+    let payable = u64::try_from(u128::from(quote.amount).checked_sub(buckets)?).ok()?;
+    let boost = p.virtual_quote_reserves + i128::try_from(buckets).ok()?;
     // M6R-1: λ_bps and D on the pricing reserves, recomputed (not the program's function).
     let lam = if p.lp_supply == 0 || lp_supply > p.lp_supply {
         0
@@ -259,8 +271,8 @@ fn pump_swap(svm: &LiteSVM, m: &Market) -> Option<VenueView> {
         venue_rent,
         locked_depth: Some(locked_depth),
         pump_tier: Some((
-            r.real_quote.min(effective),
-            u64::try_from(p.virtual_quote_reserves.max(0)).unwrap_or(u64::MAX),
+            payable.min(effective),
+            u64::try_from(boost.max(0)).unwrap_or(u64::MAX),
         )),
     })
 }

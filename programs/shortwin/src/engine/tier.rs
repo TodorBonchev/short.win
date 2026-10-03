@@ -13,8 +13,9 @@ use crate::venues::VenueState;
 /// The tier venue of a market (ARCH §4.7): the curve kinds are Tier D; Raydium adds the
 /// locked-depth bound `D / λ_min` (`pool_lock_min_bps`) to `min(R_now, R_slow)` (V2-8), and
 /// PumpSwap — since the owner's decision of 2026-09-30 (M6R-1; ECON #105) — a bound on its burned
-/// LP's locked SOL less `max(VQR, 0)` (`D = pool_d`) over `λ_min` = `PUMPSWAP_LOCK_MIN_BPS` (100 %,
-/// OWNER-M6D-1, ECON #106, ARCH row 57: `R_eff ≤ max(⌊D·isqrt(P_ema)/10⁹⌋ − max(VQR, 0), 0)`, so a
+/// LP's locked SOL less the virtual part `max(VQR + buckets, 0)` (`D = pool_d`; the boost,
+/// PUMP-2026-10-1) over `λ_min` = `PUMPSWAP_LOCK_MIN_BPS` (100 %, OWNER-M6D-1, ECON #106, ARCH row
+/// 57: `R_eff ≤ max(⌊D·isqrt(P_ema)/10⁹⌋ − max(VQR + buckets, 0), 0)`, so a
 /// held third-party deposit lifts no PumpSwap tier; `VenueKind::lock_min_bps`); the mock
 /// (a CPMM stand-in without pool selection or LP accounting, so without a locked depth) prices on
 /// `min(R_now, R_slow)` alone.
@@ -36,11 +37,13 @@ pub fn tier_venue(config: &GlobalConfig, market: &Market, kind: VenueKind) -> Op
 }
 
 /// The `tier::assign` inputs of `market` now (ARCH §4.7): `R_now` the venue's real SOL (on
-/// PumpSwap `min(WSOL vault, WSOL vault + VQR)`, the reader's `R`), `Y(reprice(L_slow, P_ema))`
-/// for `R_slow` less `max(VQR, 0)` (PumpSwap; 0 elsewhere) — under a negative VQR each input the
-/// smaller of its real and effective SOL (ECON §6.2, #103: the delegated PROPOSED reading, built
-/// in M6; exactly ADOPTED Q19 while `VQR ≥ 0`) —, age from `graduated_at`, the cached oracle.
-/// `None` for a list-only market (no opens).
+/// PumpSwap `min(WSOL vault − buckets, WSOL vault + VQR)`, the reader's `R`),
+/// `Y(reprice(L_slow, P_ema))` for `R_slow` less the virtual part `max(VQR + buckets, 0)`
+/// (PumpSwap, the boost: pump's 2026-10-02 redeploy takes the fee buckets off the VQR and keeps
+/// them in the vault, PUMP-2026-10-1; 0 elsewhere) — under a negative VQR each input the smaller
+/// of its real and effective SOL (ECON §6.2, #103: the delegated PROPOSED reading, built in M6;
+/// exactly ADOPTED Q19 while `VQR ≥ 0` and no buckets) —, age from `graduated_at`, the cached
+/// oracle. `None` for a list-only market (no opens).
 fn inputs(
     config: &GlobalConfig,
     market: &Market,
@@ -51,11 +54,11 @@ fn inputs(
     let venue = tier_venue(config, market, state.kind)?;
     let p_ema = market.ema_price.get();
     let y_slow = reprice(market.liq_slow.get(), p_ema).map_or(0, |(_, y)| y);
-    // `max(VQR, 0)`: a positive VQR is not liquidity (Q19); a negative one is already out of
-    // the effective reserve `Y(reprice(L_slow, P_ema))` prices on (ECON §6.2, #103).
-    let vqr = state
-        .pool
-        .map_or(0, |p| u64::try_from(p.vqr.max(0)).unwrap_or(u64::MAX));
+    // `max(VQR + buckets, 0)`: a positive VQR is not liquidity (Q19), and neither is the part of
+    // the boost the fee buckets took off it (PUMP-2026-10-1: they are real SOL, but no sale is
+    // paid out of them, so they are not in `R_now` either); a negative one is already out of the
+    // effective reserve `Y(reprice(L_slow, P_ema))` prices on (ECON §6.2, #103).
+    let vqr = state.pool.map_or(0, |p| p.virtual_part);
     Some(TierInputs {
         venue,
         r_now: state.r,
@@ -91,7 +94,7 @@ pub fn assign(
 
 /// `R_eff` of ARCH §4.7 in lamports: `min(R_now, R_slow)`, and on Raydium also
 /// `≤ ⌊⌊D·isqrt(P_ema)/10⁹⌋·10⁴/λ_min_bps⌋` (locked SOL over `λ_min`, V2-8; on PumpSwap the
-/// locked SOL less `max(VQR, 0)`, M6R-1) — half of the tier
+/// locked SOL less `max(VQR + buckets, 0)`, M6R-1, PUMP-2026-10-1) — half of the tier
 /// liquidity `Λ = 2·R_eff` (`tier::liquidity_lamports`, which floors each term exactly as the
 /// tier does). The open gate `R_eff ≥ pool_min_real_sol` of a Raydium market (ARCH §2.6 rule
 /// 5, §3.4 step 3). `None` for a list-only market or the curve (no pool liquidity), or if the

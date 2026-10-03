@@ -7,13 +7,14 @@
 //!
 //! Every threshold is recomputed here, independently of the program's glue, from the market's
 //! stored observation state and the venue's live state: `Λ = 2·R_eff` with
-//! `shortwin_math::tier::liquidity_lamports` on `R_now`, `Y(reprice(L_slow, P_ema))`, `max(VQR,
-//! 0)` and the venue's locked-depth bound (Raydium `D/λ_min`, PumpSwap the burned LP at 100 %),
-//! and the exact crossing price: the least published `p*` whose conservative `p* − conf` (the
-//! low end of Pyth's confidence interval, M7-SEC-7; the fixture publishes 1 bp) reaches
-//! `⌈θ_usd_e6·10¹¹/Λ⌉` (Pyth `expo = −8`: `Λ·(p − conf)·10^(expo+6) ≥ θ·10⁹`). Within one clock second the observation state does not move (a second's bucket is
-//! integrated only in the next second), so `Λ` is fixed while the oracle crosses `p* − 1 → p* →
-//! p* − 1 → p*`.
+//! `shortwin_math::tier::liquidity_lamports` on `R_now`, `Y(reprice(L_slow, P_ema))`, `max(VQR +
+//! buckets, 0)` (PumpSwap's boost; PUMP-2026-10-1) and the venue's locked-depth bound (Raydium
+//! `D/λ_min`, PumpSwap the burned LP at 100 %), and the exact crossing price: the least published
+//! `p*` whose conservative `p* − conf` (the low end of Pyth's confidence interval, M7-SEC-7; the
+//! fixture publishes 1 bp) reaches `⌈θ_usd_e6·10¹¹/Λ⌉` (Pyth `expo = −8`: `Λ·(p − conf)·10^(expo+6)
+//! ≥ θ·10⁹`). Within one clock second the observation state does not move (a second's bucket is
+//! integrated only in the next second), so `Λ` is fixed while the oracle crosses `p* − 1 → p* → p*
+//! − 1 → p*`.
 //!
 //! | Test | What |
 //! |---|---|
@@ -27,6 +28,7 @@
 //! | `cpmm_age_from_listing` | a CPMM pool whose `open_time` precedes `T_CLAMP`: age from the listing (O13) — C to 24 h, B to 7 d, then A |
 //! | `cpmm_thresholds` | USELESS (age from `open_time`, O13b: A at once): θ_A and θ_B crossed exactly |
 //! | `pumpswap_thresholds_bounded_by_the_burned_lp` | the mature pool (7 % third-party LP): Λ bounded by the burned LP's real SOL (M6R-1 / M6D-1) strictly below the unbounded Λ, and the crossing at `p*` of the bounded Λ — one lamport of price below it the tier stays down although the unbounded Λ would lift it; age from the listing |
+//! | `pumpswap_thresholds_on_the_payable_sol_under_fee_buckets` | PUMP-2026-10-1: a pool carrying the 2026-10-02 redeploy's fee buckets (in the vault, off the VQR) crosses θ_B at `p*` of the payable Λ (`R_now = min(vault − buckets, vault + VQR)`, the boost `max(VQR + buckets, 0)` off `R_slow` and the burned LP's SOL), recomputed from the raw fields; at `p* − 1` and at the bucket-blind Λ's lower `p*` it stays C; on the mature pool the burned-LP bound binds, on the fresh graduate the payable SOL; an open at `p*` locks B |
 //! | `pumpswap_open_tiers_before_its_own_sale` | FUZZ-M7-24H-1: a Tier B market whose `R_eff` is the live WSOL vault (a third party's sale below `P_ema`, within the open guard), the oracle at exactly `p*_B`: the open locks Tier B — the venue before its own sale (ARCH §3.4 step 5) — although the vault its sale leaves would tier C |
 //! | `curve_then_graduate_ages_c_b_a` | a curve market is Tier D at any price; after its graduation onto PumpSwap it is C for 24 h, B until day 7, then A (the oracle above θ_A); the curve position keeps its Tier D terms throughout (A26) |
 
@@ -213,9 +215,7 @@ mod t {
         assert!(st.executable, "the venue executes");
         let p_ema = m.ema_price.get();
         let y_slow = reprice(m.liq_slow.get(), p_ema).map_or(0, |(_, y)| y);
-        let vqr = st
-            .pool
-            .map_or(0, |p| u64::try_from(p.vqr.max(0)).unwrap_or(u64::MAX));
+        let vqr = st.pool.map_or(0, |p| p.virtual_part);
         let params = env.config().params;
         let inp = TierInputs {
             venue: venue(env, &m, bounded).expect("a tiered venue"),
@@ -820,6 +820,91 @@ mod pump {
              lamports, p*_B {p_b}",
             open.s
         );
+    }
+
+    /// `Λ = 2·R_eff` of a PumpSwap market from the pool's raw fields and the stored observation
+    /// state alone (never the program's reader): `(the payable reading, the bucket-blind one)`
+    /// and the binding term of the first. Payable (PUMP-2026-10-1): `R_now = min(vault − buckets,
+    /// vault + VQR)`, the virtual part the boost `max(VQR + buckets, 0)`; bucket-blind (the build
+    /// before it): `R_now = min(vault, vault + VQR)`, `max(VQR, 0)`. Each is `2·min(R_now,
+    /// Y(reprice(L_slow, P_ema)) − virtual, ⌊D·isqrt(P_ema)/10⁹⌋ − virtual)` (λ_min 100 %).
+    fn bucket_lambdas(env: &Env, pm: &PammMarket) -> (u128, u128, &'static str) {
+        let m = env.market(&pm.market());
+        let pool = pm.pool.state(&env.svm);
+        let vault = fork::vault_amount(&env.svm, &pm.pool.quote_vault);
+        let vqr = pool.virtual_quote_reserves;
+        let effective = u128::try_from(i128::from(vault) + vqr).expect("vault + VQR ≥ 0");
+        let buckets = pool.protocol_fees + pool.creator_fees;
+        let boost = u128::try_from((vqr + i128::from(buckets)).max(0)).expect("u128");
+        let p_ema = m.ema_price.get();
+        let y_slow = shortwin_math::quote::reprice(m.liq_slow.get(), p_ema).map_or(0, |(_, y)| y);
+        let locked = shortwin_math::tier::locked_sol(m.pool_d.get(), p_ema);
+        let terms = |r_now: u128, virt: u128| {
+            [
+                (r_now, "R_now"),
+                (y_slow.saturating_sub(virt), "R_slow"),
+                (locked.saturating_sub(virt), "locked"),
+            ]
+        };
+        let payable = terms(u128::from(vault - buckets).min(effective), boost);
+        let blind = terms(
+            u128::from(vault).min(effective),
+            u128::try_from(vqr.max(0)).expect("u128"),
+        );
+        let (r, binds) = payable.into_iter().min_by_key(|(r, _)| *r).expect("terms");
+        let b = blind.into_iter().map(|(r, _)| r).min().expect("terms");
+        (2 * r, 2 * b, binds)
+    }
+
+    /// PUMP-2026-10-1 (pump's 2026-10-02 redeploy; `pamm_it::buckets`): a PumpSwap market whose
+    /// pool carries fee buckets (planted as a third party's `buy_v2` / `sell_v2` leave them: in
+    /// the vault, off the VQR) crosses θ_B at `p*` of the payable `Λ` — the program's, equal to the
+    /// one recomputed here from the raw fields — one lamport of price below it the tier stays C,
+    /// and at the bucket-blind `Λ`'s (lower) `p*` too: the buckets lift nothing. Two pools, two
+    /// binding terms: the mature pool's burned-LP bound (`locked − boost`) and, on the fresh
+    /// graduate (wholly burned, its boost waited out), the payable SOL `vault − buckets`. An open
+    /// at `p*` locks Tier B, and the hooks' I19 re-derives it from the view's payable inputs.
+    #[test]
+    fn pumpswap_thresholds_on_the_payable_sol_under_fee_buckets() {
+        for (coin, binds) in [(PammCoin::Mature, "locked"), (PammCoin::Fresh, "R_now")] {
+            let (mut env, pm, q) = setup(coin);
+            let listed = env.market(&pm.market()).graduated_at;
+            let mut usd = Usd::fresh(&mut env, t::USD_121);
+            assert_eq!(
+                t::tier_at_age(&mut env, &pm, &mut usd, listed + AGE_C_S + 3_600),
+                Tier::B
+            );
+            crank_secs(&mut env, &pm, 2);
+            let vqr = pm.pool.state(&env.svm).virtual_quote_reserves;
+            let boost = u64::try_from(vqr).expect("a boosted pool");
+            pamm::plant_buckets(&mut env.svm, &pm.pool, boost / 4, boost / 8);
+            env.warp(1);
+            env.crank(&pm);
+            let (lambda, blind, bound) = bucket_lambdas(&env, &pm);
+            assert_eq!(bound, binds, "{coin:?}: the binding term");
+            assert_eq!(t::lambda(&env, &pm), lambda, "{coin:?}: the program's Λ");
+            assert!(blind > lambda, "{coin:?}: {blind} > {lambda}");
+            let theta_b = env.config().params.theta_b_usd_e6;
+            let (tight, loose) = (t::p_star(theta_b, lambda), t::p_star(theta_b, blind));
+            assert!(loose < tight - 1, "{coin:?}: {loose} < {tight} − 1");
+            usd.walk(&mut env, loose);
+            assert_eq!(
+                crank_tier(&mut env, &pm),
+                Tier::C,
+                "{coin:?}: the bucket-blind Λ's threshold lifts nothing"
+            );
+            t::cross(&mut env, &pm, &mut usd, theta_b, Tier::C, Tier::B);
+            assert_eq!(t::lambda(&env, &pm), lambda, "Λ is fixed within the second");
+            let mut b = env.borrower();
+            let (open, _, _) = open_ok(&mut env, &pm, &mut b, q);
+            assert_eq!(open.tier, Tier::B as u8, "{coin:?}: the open at p*_B");
+            eprintln!(
+                "PumpSwap {coin:?} with buckets {} + {}: Λ {lambda} ({bound} binds; bucket-blind \
+                 {blind}) lamports, p*_B {tight} (bucket-blind {loose})",
+                boost / 4,
+                boost / 8
+            );
+        }
     }
 
     /// A curve market (the near-complete fixture) is Tier D at any SOL/USD price; its position

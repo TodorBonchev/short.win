@@ -4,31 +4,47 @@
 //! **Scope.** M3 used [`read_pool`] for detection (`classify_pump`: a Raydium listing honours
 //! D1's precedence when the mint's canonical PumpSwap pool exists). Since M5 this module is the
 //! full reader of the pool side: the pool's reserves as PumpSwap prices them (real vaults plus
-//! `virtual_quote_reserves`, read live and never cached, C1-13), `GlobalConfig` (the protocol
+//! `virtual_quote_reserves`, read live and never cached, C1-13) and pays them out (the quote
+//! vault less the fee buckets, since pump's 2026-10-02 redeploy), `GlobalConfig` (the protocol
 //! and buyback fee recipient lists, `disable_flags`, `creator_fee_configurable`), and the boost
 //! vault's WSOL balance (the boost-window gate, A13). The post-migration pool is also what the
 //! curve's straddle quote `B̂_str` prices on (ARCH §4.3). The PumpSwap `FeeConfig` has the
 //! pump-fees layout: [`crate::pump::read_fee_config`].
 //!
-//! # `Pool` (discriminator `f19a6d0411b16dbc`; 271, 300 or 301 bytes today, older pools 211–261)
+//! # `Pool` (discriminator `f19a6d0411b16dbc`; 271, 287, 300 or 301 bytes today, older pools
+//! 211–261)
 //!
 //! | Offset | Field | | Offset | Field |
 //! |---|---|---|---|---|
-//! | 8 | `pool_bump` u8 | | 203 | `lp_supply` u64 |
-//! | 9 | `index` u16 | | 211 | `coin_creator` |
-//! | 11 | `creator` | | 243 | `is_mayhem_mode` bool |
-//! | 43 | `base_mint` | | 244 | `is_cashback_coin` bool |
-//! | 75 | `quote_mint` | | 245 | `virtual_quote_reserves` i128 |
-//! | 107 | `lp_mint` | | 261 | `creator_fee_bps` u64 |
-//! | 139 | `pool_base_token_account` | | 269 | `can_edit_creator_fee` bool |
-//! | 171 | `pool_quote_token_account` | | 270 | `is_holder_reward` bool |
+//! | 8 | `pool_bump` u8 | | 211 | `coin_creator` |
+//! | 9 | `index` u16 | | 243 | `is_mayhem_mode` bool |
+//! | 11 | `creator` | | 244 | `is_cashback_coin` bool |
+//! | 43 | `base_mint` | | 245 | `virtual_quote_reserves` i128 |
+//! | 75 | `quote_mint` | | 261 | `creator_fee_bps` u64 |
+//! | 107 | `lp_mint` | | 269 | `can_edit_creator_fee` bool |
+//! | 139 | `pool_base_token_account` | | 270 | `is_holder_reward` bool |
+//! | 171 | `pool_quote_token_account` | | 271 | `protocol_fees` u64 (2026-10) |
+//! | 203 | `lp_supply` u64 | | 279 | `creator_fees` u64 (2026-10) |
 //!
 //! Missing trailing fields of an older pool read as 0 / false (this reader zero-pads).
-//! `create_pool` allocates [`POOL_LEN_CREATE`] = 271 bytes (the layout through
-//! `is_holder_reward`), and such a pool trades as it is; clients' `extend_account` takes pools
-//! to [`POOL_LEN`] = 301 (older ones to [`POOL_LEN_EXTENDED_OLD`] = 300: the SDK's
-//! `POOL_ACCOUNT_NEW_SIZE`, not a program requirement; R-VEN Update 2026-09-29 G4 corrects
-//! §1.2).
+//! The 2026-09 build's `create_pool` allocated [`POOL_LEN_CREATE`] = 271 bytes (the layout
+//! through `is_holder_reward`); pump's 2026-10-02 redeploy allocates [`POOL_LEN_2026_10`] = 287
+//! (through the fee buckets) and its trades grow a shorter pool to it, the trader topping up the
+//! rent; clients' `extend_account` takes pools to [`POOL_LEN`] = 301 (older ones to
+//! [`POOL_LEN_EXTENDED_OLD`] = 300: the SDK's `POOL_ACCOUNT_NEW_SIZE`, not a program requirement;
+//! R-VEN Update 2026-09-29 G4 corrects §1.2), whose bytes 271–287 the redeploy reads as the
+//! buckets.
+//!
+//! **Fee buckets** (pump's 2026-10-02 redeploy, the `pump-rust-client` 0.2.0 release; ARCH §12
+//! U30, PUMP-2026-10-1): `buy_v2` / `sell_v2` keep the protocol fee (less the buyback slice)
+//! and the creator fee **in the quote vault**, counted in `protocol_fees` / `creator_fees` and
+//! taken off `virtual_quote_reserves` (`VQR = boost − buckets`), until the permissionless
+//! `sweep_protocol_fee` / `sweep_creator_fee` pay them out and add them back to the VQR. So the
+//! price `vault + VQR` excludes them, and so does what a sale can be paid: a sale paying out more
+//! than `vault − buckets` fails 6063 `InsufficientRealQuoteReserves`. [`PoolReserves::
+//! payable_quote`] is that `vault − buckets`; buckets above the vault break pump's invariant
+//! (not executable). v1 trades (short.win's) pay their fees out and leave the buckets as they
+//! are.
 //!
 //! The canonical pool of a mint is `PDA(pAMM, ["pool", 0u16 LE, pool_authority, mint, WSOL])`
 //! with `pool_authority = PDA(pump, ["pool-authority", mint])` (R-VEN §1.3): its address alone
@@ -93,8 +109,12 @@ pub const POOL_DISCRIMINATOR: [u8; 8] = [0xf1, 0x9a, 0x6d, 0x04, 0x11, 0xb1, 0x6
 
 /// The index of the canonical (migration) pool.
 pub const CANONICAL_POOL_INDEX: u16 = 0;
-/// What `create_pool` allocates today: the layout through `is_holder_reward`.
+/// What the 2026-09 build's `create_pool` allocated (and its trades grew a shorter pool to): the
+/// layout through `is_holder_reward`.
 pub const POOL_LEN_CREATE: usize = 271;
+/// What pump's 2026-10-02 redeploy's `create_pool` allocates and its trades grow a shorter pool
+/// to: the layout through the fee buckets.
+pub const POOL_LEN_2026_10: usize = 287;
 /// A pool after `extend_account` today (every boosted pool within minutes of its migration).
 pub const POOL_LEN: usize = 301;
 /// A pool extended to the SDK's older `POOL_ACCOUNT_NEW_SIZE`.
@@ -132,6 +152,11 @@ pub const OFF_CREATOR_FEE_BPS: usize = 261;
 pub const OFF_CAN_EDIT_CREATOR_FEE: usize = 269;
 /// `is_holder_reward` (bool).
 pub const OFF_IS_HOLDER_REWARD: usize = 270;
+/// `protocol_fees` (u64): the un-swept protocol fee of v2 trades, held in the quote vault
+/// (2026-10).
+pub const OFF_PROTOCOL_FEES: usize = 271;
+/// `creator_fees` (u64): the un-swept creator fee of v2 trades, held in the quote vault (2026-10).
+pub const OFF_CREATOR_FEES: usize = 279;
 
 /// The fields of a PumpSwap `Pool` short.win reads.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -152,6 +177,9 @@ pub struct Pool {
     pub creator_fee_bps: u64,
     pub can_edit_creator_fee: bool,
     pub is_holder_reward: bool,
+    /// The fee buckets (module docs; 0 on a pool shorter than 287 bytes).
+    pub protocol_fees: u64,
+    pub creator_fees: u64,
 }
 
 /// PumpSwap's pricing reserves of a pool (R-VEN §1.4, §2.4; ARCH §4.1 "Pricing reserves").
@@ -162,8 +190,12 @@ pub struct PoolReserves {
     /// `Y`: `pool_quote_token_account.amount + virtual_quote_reserves` (every buy and sell
     /// prices on it; `virtual_quote_reserves` may be negative from 2026-09-30, the sum never).
     pub effective_quote: u128,
-    /// `R`: `pool_quote_token_account.amount` (a sale's payout is capped by it).
+    /// `pool_quote_token_account.amount`, the WSOL vault.
     pub real_quote: u64,
+    /// `R`'s vault part: `real_quote − protocol_fees − creator_fees`, the SOL a sale can be paid
+    /// out of (module docs: PumpSwap's 6063 above it); `real_quote` while the pool holds no
+    /// buckets.
+    pub payable_quote: u64,
 }
 
 impl Pool {
@@ -177,12 +209,19 @@ impl Pool {
         self.coin_creator == [0; 32]
     }
 
+    /// `protocol_fees + creator_fees`, the quote vault's SOL PumpSwap holds back from sales
+    /// (module docs); `None` if the sum overflows.
+    pub fn buckets(&self) -> Option<u64> {
+        self.protocol_fees.checked_add(self.creator_fees)
+    }
+
     /// PumpSwap's pricing reserves from the two vault amounts. `virtual_quote_reserves` is
     /// signed: pump announced negative values from 2026-09-30 and guarantees that
     /// `quote vault + virtual_quote_reserves` is never negative and fits a `u64`
     /// ([DOCS] `NEGATIVE_VIRTUAL_QUOTE_RESERVES.md`, `pump-public-docs@cb188ce0`; R-PUMP Update
-    /// 2026-09-29 U2). `None` (not executable) if that sum is negative or exceeds `u64`: the
-    /// pool breaks pump's own invariant.
+    /// 2026-09-29 U2). `None` (not executable) if that sum is negative or exceeds `u64`, or if
+    /// the fee buckets exceed the quote vault (PUMP-2026-10-1): the pool breaks pump's own
+    /// invariant.
     pub fn reserves(
         &self,
         base_vault_amount: u64,
@@ -190,11 +229,24 @@ impl Pool {
     ) -> Option<PoolReserves> {
         let effective = i128::from(quote_vault_amount).checked_add(self.virtual_quote_reserves)?;
         let effective = u64::try_from(effective).ok()?;
+        let payable = quote_vault_amount.checked_sub(self.buckets()?)?;
         Some(PoolReserves {
             base: base_vault_amount,
             effective_quote: u128::from(effective),
             real_quote: quote_vault_amount,
+            payable_quote: payable,
         })
+    }
+
+    /// The virtual part of the effective reserve the tier subtracts (ARCH §4.7; ECON §6.2 #103,
+    /// #105): the boost `max(VQR + buckets, 0)` — the buckets are real SOL PumpSwap took off the
+    /// VQR, not liquidity, so adding them back gives what a v1-only pool's `max(VQR, 0)` was;
+    /// `None` if the sum does not fit a `u64` (never on a pool [`Self::reserves`] accepts).
+    pub fn virtual_part(&self) -> Option<u64> {
+        let v = self
+            .virtual_quote_reserves
+            .checked_add(i128::from(self.buckets()?))?;
+        u64::try_from(v.max(0)).ok()
     }
 }
 
@@ -233,6 +285,8 @@ pub fn read_pool(owner: &Key, data: &[u8]) -> Result<Pool, ReadError> {
         creator_fee_bps: u64_at(data, OFF_CREATOR_FEE_BPS),
         can_edit_creator_fee: bool_at(data, OFF_CAN_EDIT_CREATOR_FEE)?,
         is_holder_reward: bool_at(data, OFF_IS_HOLDER_REWARD)?,
+        protocol_fees: u64_at(data, OFF_PROTOCOL_FEES),
+        creator_fees: u64_at(data, OFF_CREATOR_FEES),
     })
 }
 
@@ -521,15 +575,74 @@ mod tests {
         assert!(!p.is_sol_quote() && !p.coin_creator_is_default());
         let r = p.reserves(1_000, 2_000).unwrap();
         assert_eq!(
-            (r.base, r.effective_quote, r.real_quote),
-            (1_000, 17_584_507_333, 2_000)
+            (r.base, r.effective_quote, r.real_quote, r.payable_quote),
+            (1_000, 17_584_507_333, 2_000, 2_000)
         );
+        assert_eq!((p.protocol_fees, p.creator_fees), (0, 0));
+        // The redeploy's buckets @271 / @279 (on a 287-, 300- or 301-byte pool).
+        put(&mut d, OFF_PROTOCOL_FEES, &300u64.to_le_bytes());
+        put(&mut d, OFF_CREATOR_FEES, &200u64.to_le_bytes());
+        let p = read_pool(&PROGRAM, &d).unwrap();
+        assert_eq!(
+            (p.protocol_fees, p.creator_fees, p.buckets()),
+            (300, 200, Some(500))
+        );
+        assert_eq!(read_pool(&PROGRAM, &d[..POOL_LEN_2026_10]).unwrap(), p);
         // An older 211-byte pool reads the appended fields as zero.
         let old = read_pool(&PROGRAM, &d[..211]).unwrap();
         assert!(!old.is_mayhem_mode && !old.is_holder_reward);
         assert_eq!((old.coin_creator, old.virtual_quote_reserves), ([0; 32], 0));
         assert!(old.coin_creator_is_default());
         assert_eq!(old.reserves(5, 6).unwrap().effective_quote, 6);
+        // So does the 2026-09 build's 271-byte pool's: no buckets.
+        let create = read_pool(&PROGRAM, &d[..POOL_LEN_CREATE]).unwrap();
+        assert_eq!((create.protocol_fees, create.creator_fees), (0, 0));
+        assert_eq!(create.reserves(5, 6).unwrap().payable_quote, 6);
+    }
+
+    /// PUMP-2026-10-1: the buckets stay in the quote vault and out of the VQR (`VQR = boost −
+    /// buckets`), so the price `vault + VQR` excludes them, a sale is paid out of `vault −
+    /// buckets`, and the tier's virtual part is the boost `max(VQR + buckets, 0)`.
+    #[test]
+    fn the_fee_buckets_are_not_payable_sol() {
+        let mut d = [0u8; POOL_LEN_2026_10];
+        put(&mut d, 0, &POOL_DISCRIMINATOR);
+        let set = |d: &mut [u8; POOL_LEN_2026_10], vqr: i128, pf: u64, cf: u64| {
+            put(d, OFF_VIRTUAL_QUOTE_RESERVES, &vqr.to_le_bytes());
+            put(d, OFF_PROTOCOL_FEES, &pf.to_le_bytes());
+            put(d, OFF_CREATOR_FEES, &cf.to_le_bytes());
+            read_pool(&PROGRAM, &d[..]).unwrap()
+        };
+        // A boosted pool (boost 1,000) whose v2 trades left 300 + 100 in the vault.
+        let p = set(&mut d, 1_000 - 400, 300, 100);
+        let r = p.reserves(7, 5_000).unwrap();
+        assert_eq!(
+            (r.effective_quote, r.real_quote, r.payable_quote),
+            (5_600, 5_000, 4_600)
+        );
+        assert_eq!(p.virtual_part(), Some(1_000), "the boost");
+        // Buckets above the boost: VQR < 0, the virtual part 0, the price still vault + VQR.
+        let p = set(&mut d, 1_000 - 1_500, 1_000, 500);
+        let r = p.reserves(7, 5_000).unwrap();
+        assert_eq!((r.effective_quote, r.payable_quote), (4_500, 3_500));
+        assert_eq!(p.virtual_part(), Some(1_000));
+        // A negative-VQR pool (−2,000 before any bucket) with buckets: the virtual part stays 0.
+        let p = set(&mut d, -2_000 - 400, 300, 100);
+        let r = p.reserves(7, 5_000).unwrap();
+        assert_eq!((r.effective_quote, r.payable_quote), (2_600, 4_600));
+        assert_eq!(p.virtual_part(), Some(0));
+        // Buckets equal to the vault: nothing payable; above it: not executable.
+        let p = set(&mut d, 0, 3_000, 2_000);
+        assert_eq!(p.reserves(7, 5_000).unwrap().payable_quote, 0);
+        assert_eq!(p.reserves(7, 4_999), None);
+        let p = set(&mut d, 0, u64::MAX, 1);
+        assert_eq!((p.buckets(), p.reserves(7, u64::MAX)), (None, None));
+        assert_eq!(p.virtual_part(), None);
+        // No buckets: the 2026-09 reading, `max(VQR, 0)`.
+        let p = set(&mut d, 1_000, 0, 0);
+        assert_eq!(p.reserves(7, 5_000).unwrap().payable_quote, 5_000);
+        assert_eq!(p.virtual_part(), Some(1_000));
+        assert_eq!(set(&mut d, -1, 0, 0).virtual_part(), Some(0));
     }
 
     #[test]
@@ -586,6 +699,9 @@ mod tests {
     #[test]
     fn layout_constants() {
         assert_eq!(OFF_IS_HOLDER_REWARD + 1, POOL_LEN_CREATE);
+        assert_eq!(POOL_LEN_CREATE, OFF_PROTOCOL_FEES);
+        assert_eq!(OFF_PROTOCOL_FEES + 8, OFF_CREATOR_FEES);
+        assert_eq!(OFF_CREATOR_FEES + 8, POOL_LEN_2026_10);
         assert_eq!(POOL_LEN_CREATE + 30, POOL_LEN);
         assert_eq!(
             OFF_GC_PROTOCOL_FEE_RECIPIENTS + 8 * 32,
@@ -709,7 +825,12 @@ mod tests {
         assert_eq!((base, quote), (201_657_242_940_632, 69_672_839_939));
         let r = p.reserves(base, quote).unwrap();
         assert_eq!(r.effective_quote, 69_672_839_939 + 17_584_505_981);
-        assert_eq!(r.real_quote, quote);
+        assert_eq!((r.real_quote, r.payable_quote), (quote, quote));
+        assert_eq!(
+            (p.protocol_fees, p.creator_fees),
+            (0, 0),
+            "dumped before the redeploy"
+        );
         let boost_vault = b58("7TWNzBs7g1PByMaHd9xxKkgG2YDXFqqqZ1wsgGh2XAN");
         assert_eq!(
             boost_vault_amount(

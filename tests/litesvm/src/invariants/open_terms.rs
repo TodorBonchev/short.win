@@ -11,10 +11,10 @@
 //!   now + t.max_duration_s`, `V = S + M`;
 //! - **the tier**: `tier::assign` on the market after the open's roll (`P_ema`, `L_slow`, `pool_d`,
 //!   `graduated_at`: an open integrates nothing of its own), the venue's real SOL before the
-//!   trade (the view's `Y`; PumpSwap `min(WSOL vault, WSOL vault + VQR)` with `max(VQR, 0)` the
-//!   tier's own input, both from the view taken before the instruction — after it the open's
-//!   own sale has drained the vault: FUZZ-M7-24H-1), the cached oracle (with its confidence,
-//!   M7-SEC-7) and `now`; the curve is Tier D;
+//!   trade (the view's `Y`; PumpSwap `min(WSOL vault − buckets, WSOL vault + VQR)` with the boost
+//!   `max(VQR + buckets, 0)` the tier's own input (PUMP-2026-10-1), both from the view taken before
+//!   the instruction — after it the open's own sale has drained the vault: FUZZ-M7-24H-1), the
+//!   cached oracle (with its confidence, M7-SEC-7) and `now`; the curve is Tier D;
 //! - **the caps** (ECON §6.1, ARCH §4.6): `X₀` — the curve's at `P_ema` (M5-SEC-3), else
 //!   `conservative_x0(X_now, L_slow, P_ema, (D, λ_min))` with Raydium's `pool_lock_min_bps` and
 //!   PumpSwap's 100 % —, `q` within the per-position impact cap and the fee-scaled size cap at
@@ -216,8 +216,8 @@ pub fn check_open(
                     0,
                 ),
                 VenueKind::PumpSwap => {
-                    // `R_now` and `max(VQR, 0)` of the view taken before the instruction, never
-                    // `svm` after it: the open's own sale has taken its SOL out of the WSOL
+                    // `R_now` and `max(VQR + buckets, 0)` of the view taken before the instruction,
+                    // never `svm` after it: the open's own sale has taken its SOL out of the WSOL
                     // vault by then (FUZZ-M7-24H-1).
                     let (r_now, vqr) = v.pump_tier.unwrap_or((0, 0));
                     (

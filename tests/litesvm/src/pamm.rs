@@ -1095,8 +1095,8 @@ pub fn sweep_trader_pamm_ix(env: &Env, pm: &PammMarket) -> Instruction {
 // `sell_v2` pay the buyback slice in the trade and keep the rest of the protocol fee and the
 // creator fee **in the quote vault**, counted in `Pool.protocol_fees` @271 and `creator_fees` @279
 // and subtracted from `virtual_quote_reserves`; `sweep_protocol_fee` / `sweep_creator_fee` pay
-// them out. `shortwin-venue-state` does not read these fields yet (the layout table stops at
-// `is_holder_reward` @270), so the offsets are the harness's own.
+// them out. `shortwin-venue-state` reads them since PUMP-2026-10-1 (`pump_amm::Pool::
+// protocol_fees` / `creator_fees`, `PoolReserves::payable_quote`); the constants below are its.
 
 /// PumpSwap `buy_v2` (`b817ee61…`).
 pub const PAMM_BUY_V2: [u8; 8] = [0xb8, 0x17, 0xee, 0x61, 0x67, 0xc5, 0xd3, 0x3d];
@@ -1107,11 +1107,11 @@ pub const SWEEP_PROTOCOL_FEE: [u8; 8] = [0x08, 0x30, 0xbe, 0x07, 0xb6, 0x44, 0xb
 /// `sweep_creator_fee` (`20f6bf34…`).
 pub const SWEEP_CREATOR_FEE: [u8; 8] = [0x20, 0xf6, 0xbf, 0x34, 0x08, 0xc9, 0x49, 0xba];
 /// `Pool.protocol_fees` (u64), the un-swept protocol fee bucket.
-pub const POOL_OFF_PROTOCOL_FEES: usize = 271;
+pub const POOL_OFF_PROTOCOL_FEES: usize = pump_amm::OFF_PROTOCOL_FEES;
 /// `Pool.creator_fees` (u64), the un-swept creator fee bucket.
-pub const POOL_OFF_CREATOR_FEES: usize = 279;
+pub const POOL_OFF_CREATOR_FEES: usize = pump_amm::OFF_CREATOR_FEES;
 /// What the redeploy's `create_pool` allocates and its trades grow a shorter pool to.
-pub const POOL_LEN_2026_10: usize = 287;
+pub const POOL_LEN_2026_10: usize = pump_amm::POOL_LEN_2026_10;
 /// PumpSwap's `InsufficientRealQuoteReserves`: a sale paying out more than `vault − buckets`.
 pub const PAMM_ERR_INSUFFICIENT_REAL_QUOTE: u32 = 6063;
 

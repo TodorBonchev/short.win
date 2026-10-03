@@ -166,13 +166,15 @@ pub enum TierVenue {
     /// decision of 2026-09-30; ECON #105, ARCH §4.7): `D = ⌊λ_bps·isqrt(X·(Y + VQR))/10⁴⌋` with
     /// `λ_bps` from `Pool.lp_supply` and the LP mint's supply
     /// ([`pool_select::locked_depth`](crate::pool_select::locked_depth)), less the virtual reserve
-    /// (`R_eff ≤ ⌊max(⌊D·isqrt(P_ema)/10⁹⌋ − max(VQR, 0), 0)·10⁴/λ_min⌋`: real SOL only, Q19).
+    /// (`R_eff ≤ ⌊max(⌊D·isqrt(P_ema)/10⁹⌋ − max(VQR + buckets, 0), 0)·10⁴/λ_min⌋`: real SOL only,
+    /// Q19).
     PumpSwap {
         /// The canonical pool's locked depth `D` (`Market.pool_d`).
         locked_depth: u128,
         /// λ_min: [`PUMPSWAP_LOCK_MIN_BPS`](crate::consts::PUMPSWAP_LOCK_MIN_BPS) (100 %) on the
         /// program's path since OWNER-M6D-1 (ECON #106; as built at #105 `pool_lock_min_bps`),
-        /// so `R_eff ≤ max(⌊D·isqrt(P_ema)/10⁹⌋ − max(VQR, 0), 0)`: the burned LP's real SOL.
+        /// so `R_eff ≤ max(⌊D·isqrt(P_ema)/10⁹⌋ − max(VQR + buckets, 0), 0)`: the burned LP's real
+        /// SOL.
         lambda_min_bps: u32,
     },
     /// Adopted Raydium AMM v4 / CPMM pool, bounded by its locked depth (V2-8):
@@ -210,15 +212,17 @@ pub struct OraclePrice {
 pub struct TierInputs {
     /// Venue kind.
     pub venue: TierVenue,
-    /// `R_now`: the adopted pool's real SOL (PumpSwap quote vault without VQR; Raydium
-    /// vault minus fee counters), lamports.
+    /// `R_now`: the adopted pool's real SOL (PumpSwap: the quote vault without VQR and less the
+    /// fee buckets, at most `vault + VQR`; Raydium vault minus fee counters), lamports.
     pub r_now: u64,
     /// `Y(reprice(L_slow, P_ema))`: the SOL reserve of the slow-liquidity state at the
     /// EMA price, lamports (effective, i.e. incl. VQR on PumpSwap), from
     /// [`quote::reprice`](crate::quote::reprice()) (v0.4.1: `⌈L·isqrt⁺(P)/10⁹⌉`).
     pub y_slow: u128,
-    /// Live `max(virtual_quote_reserves, 0)` (0 on Raydium), lamports: subtracted from `R_slow`
-    /// and, on PumpSwap, from the locked SOL (ECON §6.2, #103, #105).
+    /// The live virtual part of the effective reserve (0 on Raydium), lamports: on PumpSwap
+    /// `max(virtual_quote_reserves + buckets, 0)` — the boost; `max(VQR, 0)` on a pool without
+    /// the 2026-10-02 redeploy's fee buckets, which come off the VQR (PUMP-2026-10-1) —,
+    /// subtracted from `R_slow` and from the locked SOL (ECON §6.2, #103, #105).
     pub vqr: u64,
     /// `P_ema`, WAD (for the Raydium and PumpSwap locked-depth bounds).
     pub p_ema: u128,
@@ -252,8 +256,8 @@ pub fn locked_sol(locked_depth: u128, p_ema: u128) -> u128 {
 /// locked SOL over `λ_min`, V2-8), each term floored separately (ECON §2.1; ARCH §4.7;
 /// v0.3 floored the product once) (ADOPTED Q19; ECON §6.2). On PumpSwap (M6R-1, ECON #105) the
 /// same bound on the burned LP's locked SOL less the virtual reserve,
-/// `R_eff ≤ ⌊max(locked − VQR, 0)·10⁴/λ_min_bps⌋` (`inp.vqr` is `max(VQR, 0)`): only real SOL
-/// counts (Q19); at the program's `λ_min` =
+/// `R_eff ≤ ⌊max(locked − VQR, 0)·10⁴/λ_min_bps⌋` (`inp.vqr` is `max(VQR + buckets, 0)`): only real
+/// SOL counts (Q19); at the program's `λ_min` =
 /// [`PUMPSWAP_LOCK_MIN_BPS`](crate::consts::PUMPSWAP_LOCK_MIN_BPS) (100 %, OWNER-M6D-1, ECON
 /// #106) a deposit held to push `L_slow` credits nothing beyond `D` (at a `λ_min` of 50 % it
 /// credited up to `λ/λ_min` of `D`). `None` for the curve, which is tiered by venue.
@@ -497,7 +501,7 @@ mod tests {
     }
 
     /// M6R-1 (ECON #105): a PumpSwap pool's tier liquidity is bounded by its burned LP's locked
-    /// SOL less `max(VQR, 0)`, over `λ_min`, each term floored first; a bound past u128
+    /// SOL less `max(VQR + buckets, 0)`, over `λ_min`, each term floored first; a bound past u128
     /// saturates and never binds; `λ_min = 0` tiers as C.
     #[test]
     fn pumpswap_locked_depth_bounds_liquidity() {

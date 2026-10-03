@@ -61,18 +61,18 @@ pub const CARRIED_FEE_CAP_PPM: u32 = 2_500;
 /// Some((D, PUMPSWAP_LOCK_MIN_BPS)))`, i.e. `X₀ ≤ ⌊D·10⁹/isqrt⁺(P_ema)⌋`, and with it the
 /// per-position, market-OI, fee-scaled, wallet and utilisation caps on `X₀ + q` — and tiered on
 /// it — `tier::TierVenue::PumpSwap { lambda_min_bps: PUMPSWAP_LOCK_MIN_BPS }`, i.e. `R_eff ≤
-/// max(⌊D·isqrt(P_ema)/10⁹⌋ − max(VQR, 0), 0)` — and its exits' reference is capped at `D` —
-/// `bounds::ref_depth_cap(D, PUMPSWAP_LOCK_MIN_BPS)`, so `L_b = L_live` on a canonical pool (`D ≤
-/// L_live`) — as is a PumpSwap price start's anchor: a third-party deposit, however long it is
-/// held, credits a PumpSwap position, the market caps, the tier and an exit's reference with
+/// max(⌊D·isqrt(P_ema)/10⁹⌋ − max(VQR + buckets, 0), 0)` — and its exits' reference is capped at
+/// `D` — `bounds::ref_depth_cap(D, PUMPSWAP_LOCK_MIN_BPS)`, so `L_b = L_live` on a canonical pool
+/// (`D ≤ L_live`) — as is a PumpSwap price start's anchor: a third-party deposit, however long it
+/// is held, credits a PumpSwap position, the market caps, the tier and an exit's reference with
 /// nothing. Under `pool_lock_min_bps` (50 %) a deposit held ≈ 1 h sized opens at up to `λ/λ_min` =
-/// 2× the burned depth's cap, and such a position gapped into S1 when the deposit left at a
-/// genuine pump (M6D-1; the sim's `attacks/pumpswap_lp.py` part 3 (e)); a reference cap kept at
-/// `2D` let a deposit held into a deadline and pulled there hold a `D`-sized expiry up for up to
-/// an hour (M6E-1, part 3 (f) (iv): the buyback on the drained pool ≈ 1.2 % above a reference at
-/// twice its depth, over `δ_exp` = 1 %). Compiled, not a parameter: a governed PumpSwap `λ_min`
-/// below 100 % would credit held deposits again. Raydium keeps `pool_lock_min_bps` everywhere.
-/// The sim's `shortwin_sim.PUMPSWAP_LOCK_MIN_BPS` (`Market.lock_min_bps`); the program's
+/// 2× the burned depth's cap, and such a position gapped into S1 when the deposit left at a genuine
+/// pump (M6D-1; the sim's `attacks/pumpswap_lp.py` part 3 (e)); a reference cap kept at `2D` let a
+/// deposit held into a deadline and pulled there hold a `D`-sized expiry up for up to an hour
+/// (M6E-1, part 3 (f) (iv): the buyback on the drained pool ≈ 1.2 % above a reference at twice its
+/// depth, over `δ_exp` = 1 %). Compiled, not a parameter: a governed PumpSwap `λ_min` below 100 %
+/// would credit held deposits again. Raydium keeps `pool_lock_min_bps` everywhere. The sim's
+/// `shortwin_sim.PUMPSWAP_LOCK_MIN_BPS` (`Market.lock_min_bps`); the program's
 /// `VenueKind::lock_min_bps`.
 pub const PUMPSWAP_LOCK_MIN_BPS: u32 = 10_000;
 

@@ -259,7 +259,7 @@ pub fn conservative_x0(
 /// curve, 1 = PumpSwap, 2 = Raydium (both with `lockedDepth`; PumpSwap since M6R-1, ECON #105),
 /// 3 = a pool without a locked depth (the program's test-venue mock). The locked-depth bound's
 /// `λ_min` is `lambdaMinBps` on Raydium and `PUMPSWAP_LOCK_MIN_BPS` (100 %) on PumpSwap
-/// (OWNER-M6D-1, ECON #106: `R_eff ≤ max(⌊D·isqrt(P_ema)/10⁹⌋ − max(VQR, 0), 0)`).
+/// (OWNER-M6D-1, ECON #106: `R_eff ≤ max(⌊D·isqrt(P_ema)/10⁹⌋ − max(VQR + buckets, 0), 0)`).
 #[wasm_bindgen]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TierInputs {
@@ -278,7 +278,8 @@ pub struct TierInputs {
     /// `Y(reprice(L_slow, P_ema))`, lamports.
     #[wasm_bindgen(js_name = ySlow)]
     pub y_slow: u128,
-    /// Live `virtual_quote_reserves` (0 on Raydium).
+    /// The live virtual part `max(virtual_quote_reserves + buckets, 0)` (PumpSwap's boost; the
+    /// program's `PoolVenue::virtual_part`, PUMP-2026-10-1; 0 on Raydium).
     pub vqr: u64,
     /// `P_ema`, WAD.
     #[wasm_bindgen(js_name = pEma)]

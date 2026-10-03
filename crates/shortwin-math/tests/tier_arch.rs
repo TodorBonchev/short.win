@@ -2,10 +2,10 @@
 //! / ECON §6.2–§6.3 v0.4.1 transcription — the sims have no tier function — with
 //! `R_slow = Y(reprice(L_slow, P_ema)) − VQR` from the v0.4.1 sim's own `reprice`, the
 //! Raydium term `⌊⌊D·isqrt(P_ema)/10⁹⌋·10⁴/λ_min_bps⌋`, ECON §2.1, and since ECON #105 (M6R-1)
-//! the PumpSwap term `⌊max(⌊D·isqrt(P_ema)/10⁹⌋ − max(VQR, 0), 0)·10⁴/λ_min_bps⌋`, since #106
-//! (OWNER-M6D-1) at `λ_min_bps` = `PUMPSWAP_LOCK_MIN_BPS`: `max(⌊D·isqrt(P_ema)/10⁹⌋ − VQR⁺, 0)`), plus
-//! properties: the locked-SOL terms are floored separately, and tiers are monotone in liquidity
-//! and age.
+//! the PumpSwap term `⌊max(⌊D·isqrt(P_ema)/10⁹⌋ − max(VQR + buckets, 0), 0)·10⁴/λ_min_bps⌋`, since
+//! #106 (OWNER-M6D-1) at `λ_min_bps` = `PUMPSWAP_LOCK_MIN_BPS`: `max(⌊D·isqrt(P_ema)/10⁹⌋ − VQR⁺,
+//! 0)`), plus properties: the locked-SOL terms are floored separately, and tiers are monotone in
+//! liquidity and age.
 
 mod common;
 
