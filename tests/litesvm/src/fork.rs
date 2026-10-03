@@ -66,6 +66,11 @@
 //! padding; trimmed ELF [`TOKEN_2022_MAINNET_TRIMMED_SHA256`]) under the upgradeable loader,
 //! spl-memo v3 under BPFLoader2 ([`SPL_MEMO_V3_MAINNET_SHA256`]). Every [`Env`] calls it right
 //! after `LiteSVM::new()`, unless `SHORTWIN_BUNDLED_SPL=1` ([`bundled_spl`]).
+//!
+//! **Squads v4 (M10 WP-7; at the end of the file).** Group `squads_programs`: [`load_squads`]
+//! deploys the immutable mainnet Squads v4 from its dumped ProgramData (deploy slot 302,582,236,
+//! no upgrade authority; trimmed ELF [`SQUADS_V4_MAINNET_TRIMMED_SHA256`]) and writes its
+//! `ProgramConfig`; [`Env::with_squads`] calls it, `crate::squads` drives it.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -132,7 +137,8 @@ pub const PAMM_GROUPS: [&str; 2] = ["pamm_state", "pamm_synthetic"];
 pub struct Fixture {
     /// The manifest name (e.g. `ray_v4_fartcoin_pool`).
     pub name: String,
-    /// One of [`RAYDIUM_GROUPS`], [`PUMP_GROUPS`], [`PAMM_GROUPS`] or [`SPL_GROUPS`].
+    /// One of [`RAYDIUM_GROUPS`], [`PUMP_GROUPS`], [`PAMM_GROUPS`], [`SPL_GROUPS`] or
+    /// [`SQUADS_GROUPS`].
     pub group: String,
     pub address: Pubkey,
     /// The mainnet slot the account was read at.
@@ -2967,6 +2973,84 @@ pub fn load_mainnet_spl(svm: &mut LiteSVM) {
         "spl_memo_v3_program",
     ] {
         let f = spl_fixture(name);
+        svm.set_account(f.address, f.account.clone())
+            .unwrap_or_else(|e| panic!("set_account({name}): {e:?}"));
+    }
+}
+
+// ---- Squads v4 (M10 WP-7) --------------------------------------------------------------------
+
+/// The manifest group of Squads v4 (M10): its program account (upgradeable loader), its
+/// ProgramData (`header ‖ ELF ‖ zeros` up to 1,470,461 bytes; deploy slot 302,582,236, **no**
+/// upgrade authority) and its `ProgramConfig` PDA (creation fee 0, the mainnet treasury).
+pub const SQUADS_GROUPS: [&str; 1] = ["squads_programs"];
+
+/// The deployed Squads v4's executable hash (the trimmed ELF, solana-verify's hash). Source
+/// UNVERIFIED (probably `Squads-Protocol/v4@64af733`, program 2.1.0; tests/fixtures/README.md).
+pub const SQUADS_V4_MAINNET_TRIMMED_SHA256: &str =
+    "d48660833989ecea3145ff726164fe640bd90696f03ce00dfd0cda258cbf2fac";
+
+/// Squads v4's deploy slot (its ProgramData header; immutable since).
+pub const SQUADS_V4_DEPLOY_SLOT: u64 = 302_582_236;
+
+/// The Squads fixtures, rebuilt and sha256-checked against the manifest once per process, and
+/// held to the pins above (trimmed ELF, deploy slot, no upgrade authority, the program's own
+/// address and `ProgramConfig` PDA).
+fn squads_fixtures() -> &'static HashMap<String, Fixture> {
+    static F: OnceLock<HashMap<String, Fixture>> = OnceLock::new();
+    F.get_or_init(|| {
+        let (by_name, _, absent) = load_entries(&manifest(), &SQUADS_GROUPS);
+        assert!(
+            absent.is_empty(),
+            "squads_programs: absent entries {absent:?}"
+        );
+        let pd = by_name.get("squads_v4_program_data").expect(
+            "no squads_v4_program_data (scripts/dump-fixtures.py fetch --group squads_programs)",
+        );
+        assert_eq!(
+            trimmed_elf_sha256(&pd.account.data),
+            SQUADS_V4_MAINNET_TRIMMED_SHA256,
+            "squads_v4_program_data: not the pinned mainnet Squads v4"
+        );
+        let header = shortwin_venue_state::program_data::read(
+            &pd.account.owner.to_bytes(),
+            &pd.account.data,
+        )
+        .expect("squads_v4_program_data: a ProgramData header");
+        assert_eq!(
+            (header.slot, header.upgrade_authority),
+            (SQUADS_V4_DEPLOY_SLOT, None),
+            "squads_v4_program_data: deploy slot / authority"
+        );
+        assert_eq!(by_name["squads_v4_program"].address, squads_v4_ix::ID);
+        let pc = &by_name["squads_program_config"];
+        assert_eq!(
+            (pc.address, pc.account.owner),
+            (squads_v4_ix::pda::program_config(), squads_v4_ix::ID)
+        );
+        by_name
+    })
+}
+
+/// The Squads fixture `name` (group `squads_programs`).
+pub fn squads_fixture(name: &str) -> &'static Fixture {
+    squads_fixtures()
+        .get(name)
+        .unwrap_or_else(|| panic!("no fixture `{name}` in group squads_programs"))
+}
+
+/// Deploys Squads v4 exactly as mainnet holds it — its ProgramData (real header: deploy slot
+/// 302,582,236, no upgrade authority; the ELF; the zero padding) and program account under the
+/// upgradeable loader — and its `ProgramConfig` (`multisig_create_v2` reads the creation fee
+/// and the treasury from it). [`Env::with_squads`] calls it.
+pub fn load_squads(svm: &mut LiteSVM) {
+    // The ProgramData first: setting the program account compiles the ELF it names.
+    for name in [
+        "squads_v4_program_data",
+        "squads_v4_program",
+        "squads_program_config",
+    ] {
+        let f = squads_fixture(name);
         svm.set_account(f.address, f.account.clone())
             .unwrap_or_else(|e| panic!("set_account({name}): {e:?}"));
     }

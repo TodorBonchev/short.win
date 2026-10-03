@@ -39,6 +39,11 @@
 //!   (`create_market(Auto)` on a dumped live curve, lender, warm-up), [`pump::PumpMarket`]
 //!   (implements [`engine::VenueMarket`]: the curve ReadSet C0–C6 and TradeExtras T0–T19),
 //!   curve users, `sweep_trader`'s token leg.
+//! - [`squads`]: Squads v4 governance (M10 WP-7): the mainnet Squads ELF ([`Env::with_squads`]),
+//!   [`squads::SquadsMs`] (create, stage — also through a transaction buffer —, approve,
+//!   execute, cancel, config transactions; every transaction through [`Env::send`], ≤ 1,232
+//!   bytes), the owner's layout ([`Env::squads_governed`]), the loader's authority and upgrade
+//!   instructions.
 //! - [`record`]: session recording for the indexer's replay harness (M8; INDEXER.md §11.3):
 //!   [`Env::start_recording`], [`Env::execute_recorded`] (the one place a chain transaction
 //!   executes), account checkpoints; `services/indexer-litesvm` renders a recording as a session.
@@ -69,6 +74,7 @@ pub mod pump;
 pub mod raydium;
 pub mod read;
 pub mod record;
+pub mod squads;
 pub mod tokens;
 
 pub use env::{Env, START_SLOT, START_TS, TxResult, test_venue_so_path};

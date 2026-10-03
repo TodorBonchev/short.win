@@ -9,6 +9,8 @@ members = [
     "crates/shortwin-math",
     "crates/shortwin-math-wasm",
     "crates/shortwin-venue-state",
+    # M10 WP-7: Squads v4 encoders for the governance tests (host-only; tests/litesvm links it).
+    "crates/squads-v4-ix",
     "programs/shortwin",
     # The stateless straddle helper (ARCH §5.4, A66).
     "programs/complete_curve",

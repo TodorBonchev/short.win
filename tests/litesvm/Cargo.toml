@@ -22,6 +22,8 @@ shortwin-venue-state = { path = "../../crates/shortwin-venue-state" }
 # The TEST-ONLY mock venue (tests/mock_cpamm, M2; A49): its id, instruction data and pool
 # layout for `src/mock.rs`; the SBF build target/deploy/mock_cpamm.so is what runs.
 mock-cpamm = { path = "../mock_cpamm", features = ["no-entrypoint"] }
+# M10 WP-7: Squads v4 encoders (crates/squads-v4-ix) for `src/squads.rs` and I4's vault path.
+squads-v4-ix = { path = "../../crates/squads-v4-ix" }
 anchor-lang = "=1.2.0"
 anchor-spl = { version = "=1.2.0", default-features = false, features = ["token", "token_2022", "associated_token"] }
 bytemuck = "1.25"

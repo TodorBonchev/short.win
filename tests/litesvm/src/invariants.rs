@@ -271,7 +271,8 @@ pub struct TxSnapshot {
     /// I4's coverage clause (O17): the instruction's possible signers — the installed
     /// `coverage_authority` and the Emergency vault, which may clear the flag (★OWNER-M7-3 (b),
     /// 2026-10-01) — and every account they could reach; `None` before `initialize_config`, and
-    /// when no instruction of the transaction is `set_coverage_pause` ([`snapshot_for`]).
+    /// when no instruction of the transaction is `set_coverage_pause`, directly or through a
+    /// Squads vault ([`snapshot_for`]).
     pub coverage: Option<CoverageSnapshot>,
 }
 
@@ -335,10 +336,59 @@ pub fn snapshot(svm: &LiteSVM, markets: &[Pubkey]) -> TxSnapshot {
 
 /// [`snapshot`] before an instruction of a transaction of `ixs` ([`crate::Env::send`]'s hot path):
 /// I4's coverage snapshot — every short.win account and tracked pool vault, raw — is taken only
-/// when an instruction of `ixs` is `set_coverage_pause`, the only instruction its clause judges
-/// ([`i4_coverage_authority_changes_only_its_flag`]), so nothing it checks is skipped.
+/// when an instruction of `ixs` is `set_coverage_pause`, or a Squads `vault_transaction_execute`
+/// whose `VaultTransaction` (already in `svm`) runs one ([`vault_coverage_pause`]): the only
+/// instructions its clause judges ([`i4_coverage_authority_changes_only_its_flag`]), so nothing
+/// it checks is skipped. (A vault transaction created by an earlier instruction of the same
+/// transaction is seen by the snapshot [`crate::Env::send`] takes after that prefix.)
 pub fn snapshot_for(svm: &LiteSVM, markets: &[Pubkey], ixs: &[Instruction]) -> TxSnapshot {
-    snapshot_with(svm, markets, ixs.iter().any(is_coverage_pause))
+    let coverage = ixs
+        .iter()
+        .any(|ix| is_coverage_pause(ix) || vault_coverage_pause(svm, ix).is_some());
+    snapshot_with(svm, markets, coverage)
+}
+
+/// The instructions a top-level Squads `vault_transaction_execute` `ix` runs, read from its
+/// `VaultTransaction` account in `svm` and resolved against `ix`'s remaining accounts
+/// ([`squads_v4_ix::state::VaultTransaction::executed_instructions`]: the executing vault and
+/// any ephemeral signer are signers, as Squads makes them in its CPIs). `None` for any other
+/// instruction, or when the account is missing, not Squads', does not decode or does not match
+/// `ix`. Squads does not close a `VaultTransaction` on execution, so the state just after `ix`
+/// reads the same.
+pub fn vault_executed(svm: &LiteSVM, ix: &Instruction) -> Option<Vec<Instruction>> {
+    use squads_v4_ix::ix::VAULT_TRANSACTION_EXECUTE_NAMED as NAMED;
+    if !squads_v4_ix::ix::is_vault_transaction_execute(ix) {
+        return None;
+    }
+    let transaction = svm.get_account(&ix.accounts.get(2)?.pubkey)?;
+    (transaction.owner == squads_v4_ix::ID).then_some(())?;
+    let t = squads_v4_ix::state::VaultTransaction::decode(&transaction.data)?;
+    t.executed_instructions(ix.accounts.get(NAMED..)?)
+}
+
+/// I4's coverage clause on the vault path (M10 WP-7a): a top-level `vault_transaction_execute`
+/// whose executed message runs short.win's `set_coverage_pause` — the Emergency's clear in the
+/// owner's layout, where `pause_authority` is a Squads vault — is judged as that instruction:
+/// `Some((markets, signers))`, the markets its `set_coverage_pause` instructions name and their
+/// signer keys (the executing vault; not the member who sent the transaction, whom the inner
+/// instruction never sees). The clause compares the state around the whole top-level
+/// instruction, so a message that also runs another short.win instruction is judged as one
+/// `set_coverage_pause` and fails it if that instruction changed anything: stage such actions as
+/// separate vault transactions (the harness's `SquadsMs` never mixes them). `None` if `ix` runs
+/// no `set_coverage_pause` ([`vault_executed`]).
+pub fn vault_coverage_pause(svm: &LiteSVM, ix: &Instruction) -> Option<(Vec<Pubkey>, Vec<Pubkey>)> {
+    let run = vault_executed(svm, ix)?;
+    let pauses: Vec<&Instruction> = run.iter().filter(|i| is_coverage_pause(i)).collect();
+    if pauses.is_empty() {
+        return None;
+    }
+    let mut markets = Vec::new();
+    let mut signers = Vec::new();
+    for p in pauses {
+        markets.extend(p.accounts.get(2).map(|m| m.pubkey));
+        signers.extend(p.accounts.iter().filter(|m| m.is_signer).map(|m| m.pubkey));
+    }
+    Some((markets, signers))
 }
 
 /// `ix` is short.win's `set_coverage_pause` (I4's coverage clause).
@@ -419,10 +469,16 @@ pub struct IxEvents {
     pub venue_changed: Vec<VenueStateChanged>,
     /// The instruction's account keys (empty when unknown).
     pub accounts: Vec<Pubkey>,
-    /// The instruction's signers (empty when unknown; I4's coverage clause).
+    /// The instruction's signers (empty when unknown; I4's coverage clause). For a Squads
+    /// `vault_transaction_execute` that runs `set_coverage_pause`, that inner instruction's
+    /// signers ([`IxEvents::of_instruction_in`]).
     pub signers: Vec<Pubkey>,
-    /// The instruction is short.win's `set_coverage_pause` (I4's coverage clause).
+    /// The instruction is short.win's `set_coverage_pause`, directly or through a Squads vault
+    /// (I4's coverage clause).
     pub coverage_pause: bool,
+    /// The markets that `set_coverage_pause` names (its third account; one per executed
+    /// instruction on the vault path).
+    pub coverage_markets: Vec<Pubkey>,
 }
 
 impl IxEvents {
@@ -449,6 +505,7 @@ impl IxEvents {
             accounts: Vec::new(),
             signers: Vec::new(),
             coverage_pause: false,
+            coverage_markets: Vec::new(),
         }
     }
 
@@ -467,7 +524,39 @@ impl IxEvents {
                 .map(|m| m.pubkey)
                 .collect(),
             coverage_pause: is_coverage_pause(instruction),
+            coverage_markets: if is_coverage_pause(instruction) {
+                instruction
+                    .accounts
+                    .get(2)
+                    .map(|m| m.pubkey)
+                    .into_iter()
+                    .collect()
+            } else {
+                Vec::new()
+            },
             ..Self::of(meta, ix)
+        }
+    }
+
+    /// [`IxEvents::of_instruction`], with I4's vault path ([`crate::Env::send`]): a top-level
+    /// Squads `vault_transaction_execute` that runs `set_coverage_pause` (read from its
+    /// `VaultTransaction` in `svm`, [`vault_coverage_pause`]) is that instruction for the
+    /// coverage clause — its markets, and the vault as its signer.
+    pub fn of_instruction_in(
+        svm: &LiteSVM,
+        meta: &TransactionMetadata,
+        ix: usize,
+        instruction: &Instruction,
+    ) -> Self {
+        let ev = Self::of_instruction(meta, ix, instruction);
+        match vault_coverage_pause(svm, instruction) {
+            Some((markets, signers)) => Self {
+                coverage_pause: true,
+                coverage_markets: markets,
+                signers,
+                ..ev
+            },
+            None => ev,
         }
     }
 
@@ -513,10 +602,31 @@ impl IxEvents {
 /// `true` if one of `admins` signs `ix` itself (a signer meta of that instruction; I4 is decided
 /// per instruction, M1-FID-5: an admin co-signing another instruction of the transaction
 /// does not make a lender's own withdrawal "admin-signed").
+///
+/// **The vault path (M10 WP-7).** The authorities are Squads vaults: a PDA never signs the
+/// transaction; Squads' `vault_transaction_execute` signs for it in the CPIs it makes, and
+/// passes it to the top-level instruction as a non-signer remaining account. So a top-level
+/// `vault_transaction_execute` that carries an admin key among its remaining accounts is
+/// admin-signed too (conservatively: any admin key in its message, not only the executing
+/// vault — at worst a stricter check). Everything that instruction executes is checked
+/// against the state just before it.
 pub fn is_admin_signed(ix: &Instruction, admins: &[Pubkey]) -> bool {
     ix.accounts
         .iter()
         .any(|m| m.is_signer && admins.contains(&m.pubkey))
+        || is_admin_vault_execute(ix, admins)
+}
+
+/// `true` if `ix` is a Squads `vault_transaction_execute` whose remaining accounts (the
+/// executed message's keys, after the four named accounts) include one of `admins`
+/// ([`is_admin_signed`]'s vault path).
+pub fn is_admin_vault_execute(ix: &Instruction, admins: &[Pubkey]) -> bool {
+    squads_v4_ix::ix::is_vault_transaction_execute(ix)
+        && ix
+            .accounts
+            .iter()
+            .skip(squads_v4_ix::ix::VAULT_TRANSACTION_EXECUTE_NAMED)
+            .any(|m| admins.contains(&m.pubkey))
 }
 
 /// The instruction-level invariants (I4, I17, and the lender bounds of [`lender::check_ix`])
@@ -575,7 +685,6 @@ pub fn i4_coverage_authority_changes_only_its_flag(
             ev.signers, cov.authority, cov.emergency
         )
     })?;
-    let market = ev.accounts.get(2).copied().unwrap_or_default();
     let bit = u8::try_from(shortwin::state::MARKET_FLAG_PAUSED_COVERAGE).unwrap_or(0);
     for (key, lamports, data) in &cov.accounts {
         let (l, d) = svm
@@ -584,7 +693,7 @@ pub fn i4_coverage_authority_changes_only_its_flag(
         ensure(l == *lamports, "I4", || {
             format!("set_coverage_pause changed the lamports of {key}: {lamports} → {l}")
         })?;
-        if *key == market {
+        if ev.coverage_markets.contains(key) {
             ensure(d.len() == data.len(), "I4", || {
                 format!("set_coverage_pause resized market {key}")
             })?;

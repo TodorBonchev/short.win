@@ -184,6 +184,16 @@ impl Env {
         env
     }
 
+    /// [`Env::new`] plus Squads v4 as mainnet runs it (M10 WP-7; group `squads_programs`):
+    /// the immutable program from its dumped ProgramData and its `ProgramConfig`
+    /// ([`fork::load_squads`]). The config is not initialized; [`crate::squads`] creates the
+    /// multisigs and [`Env::squads_governed`] the owner's layout on top.
+    pub fn with_squads() -> Self {
+        let mut env = Self::new();
+        fork::load_squads(&mut env.svm);
+        env
+    }
+
     /// [`Env::new`] plus `initialize_config` with [`Env::default_init_args`].
     pub fn initialized() -> Self {
         let mut env = Self::new();
@@ -409,7 +419,7 @@ impl Env {
                 });
                 let last = ixs.len().saturating_sub(1);
                 if let Some(ix) = ixs.get(last) {
-                    let ev = invariants::IxEvents::of_instruction(meta, last, ix);
+                    let ev = invariants::IxEvents::of_instruction_in(&self.svm, meta, last, ix);
                     let admin = invariants::is_admin_signed(ix, &admins);
                     if let Err(v) = invariants::check_ix(&self.svm, &pre, admin, &ev) {
                         panic!(
@@ -503,7 +513,7 @@ impl Env {
                     meta.pretty_logs()
                 )
             };
-            let ev = invariants::IxEvents::of_instruction(&meta, k - 1, &ixs[k - 1]);
+            let ev = invariants::IxEvents::of_instruction_in(&svm, &meta, k - 1, &ixs[k - 1]);
             let admin = invariants::is_admin_signed(&ixs[k - 1], admins);
             if let Err(v) = invariants::check_ix(&svm, &pre, admin, &ev) {
                 fail(v);
@@ -530,7 +540,10 @@ impl Env {
     }
 
     /// The admin keys (I4): the harness's upgrade authority, governance and Emergency keys,
-    /// and the config's current governance, Emergency and (if set) coverage authority.
+    /// and the config's current governance, Emergency and (if set) coverage authority. A Squads
+    /// vault among them (M10 WP-7: `governance` and `pause_authority` are vaults in the owner's
+    /// layout, and the Governance vault is also the upgrade authority there) makes its vault
+    /// transactions admin-signed ([`invariants::is_admin_signed`]).
     pub fn admin_keys(&self) -> Vec<Pubkey> {
         let mut keys = vec![
             self.upgrade_authority.pubkey(),

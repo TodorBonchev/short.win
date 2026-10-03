@@ -2760,6 +2760,7 @@ dependencies = [
  "solana-transaction-error",
  "spl-token-2022-interface 3.1.2",
  "spl-token-interface 3.0.0",
+ "squads-v4-ix",
 ]
 
 [[package]]
@@ -4769,6 +4770,14 @@ dependencies = [
  "solana-zero-copy",
  "spl-discriminator",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "squads-v4-ix"
+version = "0.1.0"
+dependencies = [
+ "solana-instruction",
+ "solana-pubkey 4.2.1",
 ]
 
 [[package]]
