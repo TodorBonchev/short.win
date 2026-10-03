@@ -104,7 +104,12 @@ pub struct InitializeConfig<'info> {
 
 pub fn handler(ctx: Context<InitializeConfig>, args: InitConfigArgs) -> Result<()> {
     check_timelock(args.timelock_s)?;
-    check_authorities(&args.governance, &args.pause_authority, &args.fee_recipient)?;
+    check_authorities(
+        &args.governance,
+        &args.pause_authority,
+        &args.coverage_authority,
+        &args.fee_recipient,
+    )?;
     require_keys_neq!(
         args.pyth_sol_usd,
         Pubkey::default(),

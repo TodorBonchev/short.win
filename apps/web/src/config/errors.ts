@@ -323,6 +323,12 @@ const ROWS: readonly Row[] = [
         'blocked',
         'PumpSwap pool creation is disabled, so this curve cannot graduate. New curve positions are refused until it is re-enabled; open positions are unaffected.',
     ],
+    [
+        6105,
+        'AuthoritiesNotDistinct',
+        'admin',
+        'Governance, the Emergency key, the fee recipient and the coverage key must be four different keys.',
+    ],
 ];
 
 export const PROGRAM_ERRORS: ReadonlyMap<number, ProgramErrorInfo> = new Map(

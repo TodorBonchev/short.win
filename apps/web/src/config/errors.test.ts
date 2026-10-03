@@ -13,7 +13,7 @@ describe('program error messages', () => {
     const constants = Object.entries(client).filter(([k]) => k.startsWith('SHORTWIN_ERROR__')) as [string, number][];
 
     it('covers every error code of the generated client, by name', () => {
-        expect(constants.length).toBeGreaterThanOrEqual(105);
+        expect(constants.length).toBeGreaterThanOrEqual(106);
         for (const [k, code] of constants) {
             const info = programError(code);
             expect(info, k).toBeDefined();
@@ -40,6 +40,8 @@ describe('program error messages', () => {
         expect(programError(6063)?.action).toBe('retry');
         expect(programError(6051)?.action).toBe('wait');
         expect(programError(6104)?.name).toBe('GraduationHalted');
+        expect(programError(6105)?.name).toBe('AuthoritiesNotDistinct');
+        expect(programError(6105)?.action).toBe('admin');
         expect(programError(5999)).toBeUndefined();
     });
 });

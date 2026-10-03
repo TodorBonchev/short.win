@@ -725,9 +725,14 @@ impl ConfigChange {
             Self::Authorities {
                 governance,
                 pause_authority,
+                coverage_authority,
                 fee_recipient,
-                ..
-            } => check_authorities(governance, pause_authority, fee_recipient),
+            } => check_authorities(
+                governance,
+                pause_authority,
+                coverage_authority,
+                fee_recipient,
+            ),
             Self::Timelock { timelock_s } => check_timelock(*timelock_s),
             Self::EnableVenues { bits } => {
                 // Known bits only, and none this build cannot finish (M5-SEC-4:
@@ -748,10 +753,20 @@ impl ConfigChange {
 }
 
 /// Governance and the Emergency vault must be real keys (a default key could never sign, which
-/// would freeze the config); the fee recipient must be a real account.
+/// would freeze the config); the fee recipient must be a real account (`InvalidParams`).
+///
+/// **SQ-G8** (owner decision of 2026-10-02, Q4): `governance` (the Squads Governance vault 0),
+/// `pause_authority` (the Emergency vault), `fee_recipient` (the Governance vault 1) and an
+/// installed `coverage_authority` (a hot keeper key) must be **pairwise distinct**
+/// (`AuthoritiesNotDistinct`), so one key never holds two roles — the Emergency 2-of-4 can
+/// never act as the timelocked 3-of-5, nor the keeper key as either. An unset
+/// `coverage_authority` (`Pubkey::default()`, A69/O17) is no key and is skipped. Checked by
+/// `initialize_config` and by `check_change` on an `Authorities` change, so `propose_config`
+/// refuses it early and `apply_config` again.
 pub fn check_authorities(
     governance: &Pubkey,
     pause_authority: &Pubkey,
+    coverage_authority: &Pubkey,
     fee_recipient: &Pubkey,
 ) -> Result<()> {
     let zero = Pubkey::default();
@@ -759,6 +774,22 @@ pub fn check_authorities(
         *governance != zero && *pause_authority != zero && *fee_recipient != zero,
         ShortwinError::InvalidParams
     );
+    let keys = [
+        governance,
+        pause_authority,
+        fee_recipient,
+        coverage_authority,
+    ];
+    let set = if *coverage_authority == zero {
+        &keys[..3]
+    } else {
+        &keys[..]
+    };
+    for (i, a) in set.iter().enumerate() {
+        for b in set.iter().skip(i.saturating_add(1)) {
+            require_keys_neq!(**a, **b, ShortwinError::AuthoritiesNotDistinct);
+        }
+    }
     Ok(())
 }
 
@@ -948,6 +979,38 @@ mod tests {
         assert!(!c.coverage_enabled());
         assert!(!c.is_coverage_authority(&Pubkey::default()));
         assert!(!c.is_coverage_authority(&next));
+    }
+
+    /// SQ-G8: every pair of the four authorities refused when equal (an installed coverage key
+    /// included); an unset coverage key is skipped; a default governance, Emergency or recipient
+    /// key stays `InvalidParams`.
+    #[test]
+    fn authorities_must_be_pairwise_distinct() {
+        let k = |b: u8| Pubkey::new_from_array([b; 32]);
+        let code = |r: Result<()>| match r {
+            Ok(()) => None,
+            Err(anchor_lang::error::Error::AnchorError(e)) => Some(e.error_code_number),
+            Err(_) => Some(0),
+        };
+        let distinct = u32::from(ShortwinError::AuthoritiesNotDistinct);
+        let base = [k(1), k(2), k(4), k(3)]; // governance, pause, coverage, fee recipient
+        let check = |a: &[Pubkey; 4]| code(check_authorities(&a[0], &a[1], &a[2], &a[3]));
+        assert_eq!(check(&base), None);
+        for i in 0..4 {
+            for j in (i + 1)..4 {
+                let mut a = base;
+                a[j] = a[i];
+                assert_eq!(check(&a), Some(distinct), "roles {i} and {j}");
+            }
+        }
+        let unset = [k(1), k(2), Pubkey::default(), k(3)];
+        assert_eq!(check(&unset), None, "an unset coverage key is no key");
+        let zero = u32::from(ShortwinError::InvalidParams);
+        for i in [0, 1, 3] {
+            let mut a = base;
+            a[i] = Pubkey::default();
+            assert_eq!(check(&a), Some(zero), "role {i} unset");
+        }
     }
 
     /// ★OWNER-M7-3 (b) (owner decision of 2026-10-01): the Emergency vault clears the flag —

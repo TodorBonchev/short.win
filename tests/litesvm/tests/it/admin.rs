@@ -157,6 +157,186 @@ fn initialize_config_checks_its_arguments() {
     assert_eq!(env.config().timelock_s, MIN_TIMELOCK_S);
 }
 
+/// SQ-G8 (owner decision of 2026-10-02): `initialize_config` refuses any two of `governance`,
+/// `pause_authority`, an installed `coverage_authority` and `fee_recipient` that are the same
+/// key (`AuthoritiesNotDistinct`), every pair; an unset coverage key (`Pubkey::default()`) is
+/// no key — the three others must still differ — and four distinct keys are accepted.
+#[test]
+fn initialize_config_refuses_shared_authorities() {
+    let mut env = Env::new();
+    let mut base = env.default_init_args();
+    base.coverage_authority = env.coverage_authority.pubkey();
+    for (i, j) in role_pairs() {
+        let mut a = base.clone();
+        let key = roles(&a)[i];
+        set_role(&mut a, j, key);
+        assert_err(
+            &env.initialize_config(a),
+            ShortwinError::AuthoritiesNotDistinct,
+        );
+    }
+    let mut unset = base.clone();
+    unset.coverage_authority = Pubkey::default();
+    for (i, j) in role_pairs().filter(|&(i, j)| i != 2 && j != 2) {
+        let mut a = unset.clone();
+        let key = roles(&a)[i];
+        set_role(&mut a, j, key);
+        assert_err(
+            &env.initialize_config(a),
+            ShortwinError::AuthoritiesNotDistinct,
+        );
+    }
+    ok(env.initialize_config(base));
+    let c = env.config();
+    assert_eq!(c.coverage_authority, env.coverage_authority.pubkey());
+}
+
+/// SQ-G8 at an `Authorities` change: `propose_config` refuses every pair early
+/// (`AuthoritiesNotDistinct`, nothing pending), and `apply_config` checks again — a pending
+/// change that shares a key (planted, as no proposal can leave one) is refused at apply and
+/// stays pending; an unset coverage key is skipped at both (the other three must still
+/// differ), and a rotation to four distinct keys applies.
+#[test]
+fn authorities_changes_refuse_shared_keys_at_propose_and_apply() {
+    let mut env = Env::initialized();
+    let gov = env.governance.pubkey();
+    let base = ConfigChange::Authorities {
+        governance: gov,
+        pause_authority: env.pause_authority.pubkey(),
+        coverage_authority: env.coverage_authority.pubkey(),
+        fee_recipient: env.fee_recipient.pubkey(),
+    };
+    for (i, j) in role_pairs() {
+        let mut change = base.clone();
+        let key = change_roles(&change)[i];
+        set_change_role(&mut change, j, key);
+        let before = env.config().pending.hash();
+        assert_err(
+            &propose(&mut env, change.clone()),
+            ShortwinError::AuthoritiesNotDistinct,
+        );
+        assert_eq!(env.config().pending.hash(), before, "roles {i} and {j}");
+
+        plant_pending(&mut env, &change);
+        let res = env.send(&[ix::apply_config_for(&change)], &[]);
+        assert_err(&res, ShortwinError::AuthoritiesNotDistinct);
+        assert!(
+            env.config().pending.is_some(),
+            "a refused apply keeps the change"
+        );
+        assert_eq!(env.config().governance, gov);
+    }
+    // Unset coverage: only the three others must differ.
+    let mut unset = base.clone();
+    set_change_role(&mut unset, 2, Pubkey::default());
+    let mut shared = unset.clone();
+    set_change_role(&mut shared, 3, env.pause_authority.pubkey());
+    assert_err(
+        &propose(&mut env, shared.clone()),
+        ShortwinError::AuthoritiesNotDistinct,
+    );
+    ok(propose(&mut env, unset.clone()));
+    // ... and at the application: refused and kept with two of the three sharing a key,
+    // applied with the three distinct.
+    plant_pending(&mut env, &shared);
+    assert_err(
+        &env.send(&[ix::apply_config_for(&shared)], &[]),
+        ShortwinError::AuthoritiesNotDistinct,
+    );
+    assert!(
+        env.config().pending.is_some(),
+        "a refused apply keeps the change"
+    );
+    ok(propose(&mut env, unset.clone()));
+    env.warp(i64::from(env.config().timelock_s));
+    ok(env.send(&[ix::apply_config_for(&unset)], &[]));
+    assert_eq!(env.config().coverage_authority, Pubkey::default());
+    // Four distinct keys (the coverage key installed) apply.
+    let fees = Pubkey::new_unique();
+    let mut rotate = base;
+    set_change_role(&mut rotate, 3, fees);
+    ok(propose(&mut env, rotate.clone()));
+    env.warp(i64::from(env.config().timelock_s));
+    ok(env.send(&[ix::apply_config_for(&rotate)], &[]));
+    let c = env.config();
+    assert_eq!(
+        (c.coverage_authority, c.fee_recipient),
+        (env.coverage_authority.pubkey(), fees)
+    );
+}
+
+/// The six pairs `(i, j)`, `i < j`, of the four roles of [`roles`].
+fn role_pairs() -> impl Iterator<Item = (usize, usize)> {
+    (0..4).flat_map(|i| ((i + 1)..4).map(move |j| (i, j)))
+}
+
+/// `[governance, pause_authority, coverage_authority, fee_recipient]` of `a`.
+fn roles(a: &shortwin::state::InitConfigArgs) -> [Pubkey; 4] {
+    [
+        a.governance,
+        a.pause_authority,
+        a.coverage_authority,
+        a.fee_recipient,
+    ]
+}
+
+fn set_role(a: &mut shortwin::state::InitConfigArgs, role: usize, key: Pubkey) {
+    match role {
+        0 => a.governance = key,
+        1 => a.pause_authority = key,
+        2 => a.coverage_authority = key,
+        _ => a.fee_recipient = key,
+    }
+}
+
+/// [`roles`] of an `Authorities` change.
+fn change_roles(c: &ConfigChange) -> [Pubkey; 4] {
+    match c {
+        ConfigChange::Authorities {
+            governance,
+            pause_authority,
+            coverage_authority,
+            fee_recipient,
+        } => [
+            *governance,
+            *pause_authority,
+            *coverage_authority,
+            *fee_recipient,
+        ],
+        _ => panic!("not an Authorities change"),
+    }
+}
+
+fn set_change_role(c: &mut ConfigChange, role: usize, key: Pubkey) {
+    if let ConfigChange::Authorities {
+        governance,
+        pause_authority,
+        coverage_authority,
+        fee_recipient,
+    } = c
+    {
+        match role {
+            0 => *governance = key,
+            1 => *pause_authority = key,
+            2 => *coverage_authority = key,
+            _ => *fee_recipient = key,
+        }
+    }
+}
+
+/// **TEST-ONLY**: stores `change` as the pending change, due now, by rewriting `GlobalConfig`
+/// (bypassing `propose_config`'s checks) — the only way to reach `apply_config`'s own re-check
+/// of a change no proposal can leave pending.
+fn plant_pending(env: &mut Env, change: &ConfigChange) {
+    let key = pda::config();
+    let mut acc = env.svm.get_account(&key).expect("GlobalConfig");
+    let size = core::mem::size_of::<shortwin::state::GlobalConfig>();
+    let c: &mut shortwin::state::GlobalConfig =
+        bytemuck::from_bytes_mut(&mut acc.data[8..8 + size]);
+    c.pending.set(change, env.now()).expect("encodes");
+    env.svm.set_account(key, acc).expect("set GlobalConfig");
+}
+
 // ---- propose / apply / cancel --------------------------------------------------------------
 
 #[test]

@@ -224,10 +224,13 @@ export const SHORTWIN_ERROR__CARRIED_POSITIONS_TOO_LARGE = 0x17d6; // 6102
 export const SHORTWIN_ERROR__RESERVED_SCAN_OUT_OF_ORDER = 0x17d7; // 6103
 /** GraduationHalted: PumpSwap pool creation is disabled (GlobalConfig.disable_flags bit 0), so this curve cannot graduate: new curve positions are refused until it is re-enabled; open positions are unaffected */
 export const SHORTWIN_ERROR__GRADUATION_HALTED = 0x17d8; // 6104
+/** AuthoritiesNotDistinct: governance, pause_authority, fee_recipient and coverage_authority must be pairwise distinct */
+export const SHORTWIN_ERROR__AUTHORITIES_NOT_DISTINCT = 0x17d9; // 6105
 
 export type ShortwinError =
   | typeof SHORTWIN_ERROR__ABOVE_PRO_RATA_ALLOWANCE
   | typeof SHORTWIN_ERROR__ACCOUNT_MISMATCH
+  | typeof SHORTWIN_ERROR__AUTHORITIES_NOT_DISTINCT
   | typeof SHORTWIN_ERROR__AUTHORITY_TAMPERED
   | typeof SHORTWIN_ERROR__BAD_EXTRAS
   | typeof SHORTWIN_ERROR__BAD_REMAINING_ACCOUNTS
@@ -337,6 +340,7 @@ if (process.env["NODE_ENV"] !== "production") {
   shortwinErrorMessages = {
     [SHORTWIN_ERROR__ABOVE_PRO_RATA_ALLOWANCE]: `Withdrawal above the pro-rata allowance`,
     [SHORTWIN_ERROR__ACCOUNT_MISMATCH]: `An account does not match the key, owner or state the instruction expects`,
+    [SHORTWIN_ERROR__AUTHORITIES_NOT_DISTINCT]: `governance, pause_authority, fee_recipient and coverage_authority must be pairwise distinct`,
     [SHORTWIN_ERROR__AUTHORITY_TAMPERED]: `An account authority was tampered with`,
     [SHORTWIN_ERROR__BAD_EXTRAS]: `A venue extras set or entry is invalid`,
     [SHORTWIN_ERROR__BAD_REMAINING_ACCOUNTS]: `Remaining accounts are missing, extra or out of order`,

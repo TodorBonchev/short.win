@@ -4910,6 +4910,11 @@
       "code": 6104,
       "name": "GraduationHalted",
       "msg": "PumpSwap pool creation is disabled (GlobalConfig.disable_flags bit 0), so this curve cannot graduate: new curve positions are refused until it is re-enabled; open positions are unaffected"
+    },
+    {
+      "code": 6105,
+      "name": "AuthoritiesNotDistinct",
+      "msg": "governance, pause_authority, fee_recipient and coverage_authority must be pairwise distinct"
     }
   ],
   "types": [

@@ -11,7 +11,8 @@
 //! `PositionScanOutOfOrder` = 6103, which is **reserved** since its instruction `refresh_max_q`
 //! was removed with the keeper's refresh duty, before any deployment: `ReservedScanOutOfOrder`
 //! keeps the slot so no later code moves, and nothing returns it; the owner's M6-SEC-3 decision
-//! of 2026-09-30 appended `GraduationHalted` = 6104).
+//! of 2026-09-30 appended `GraduationHalted` = 6104, and M10's SQ-G8 (owner decision of
+//! 2026-10-02) `AuthoritiesNotDistinct` = 6105).
 //! `tests::codes_are_stable` pins every code.
 
 use anchor_lang::prelude::*;
@@ -309,6 +310,17 @@ pub enum ShortwinError {
         "PumpSwap pool creation is disabled (GlobalConfig.disable_flags bit 0), so this curve cannot graduate: new curve positions are refused until it is re-enabled; open positions are unaffected"
     )]
     GraduationHalted,
+
+    // ---- Appended by M10 SQ-G8 (6105; group in brackets) ----
+    /// [Admin] `initialize_config`, or an `Authorities` change at `propose_config` /
+    /// `apply_config`, whose `governance`, `pause_authority`, `fee_recipient` and installed
+    /// `coverage_authority` (an unset one, `Pubkey::default()`, is skipped) are not pairwise
+    /// distinct (owner decision of 2026-10-02, SQ-G8; ARCH §3.1, §8.5;
+    /// `state::config::check_authorities`).
+    #[msg(
+        "governance, pause_authority, fee_recipient and coverage_authority must be pairwise distinct"
+    )]
+    AuthoritiesNotDistinct,
 }
 
 impl From<MathError> for ShortwinError {
@@ -403,6 +415,7 @@ mod tests {
             (ShortwinError::CarriedPositionsTooLarge, 6102),
             (ShortwinError::ReservedScanOutOfOrder, 6103),
             (ShortwinError::GraduationHalted, 6104),
+            (ShortwinError::AuthoritiesNotDistinct, 6105),
         ];
         for (e, c) in pins {
             assert_eq!(code(e), c, "{e:?}");
