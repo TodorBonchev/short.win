@@ -1,7 +1,10 @@
 //! PumpSwap on the fork (M6): a canonical pool of the `pamm_state` dump (`fresh` with a running
 //! boost, `mature` with third-party LP, `cashback`, `legacy261`), a trader, and a third-party
 //! LP whose `deposit` / `withdraw` are the LP-wrapped bundles of M6R-1; `disable_flags` as the
-//! venue's halt (bit 3 trading, bit 0 `create_pool`).
+//! venue's halt (bit 3 trading, bit 0 `create_pool`); since M10's program batch 4 the trader's
+//! `buy_v2` / `sell_v2` and the sweeps of the 2026-10-02 redeploy ([`Kind::FeeBuckets`]), so the
+//! hooks meet pools whose quote vault holds fee buckets (PUMP-2026-10-1: `R = min(vault −
+//! buckets, vault + VQR)`, the tier's virtual part `max(VQR + buckets, 0)`).
 
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::Instruction;
@@ -199,6 +202,63 @@ impl PammVenue {
         let y = u64::try_from(r.effective_quote).ok()?;
         (r.base > 0 && y > 0).then_some((r.base, y))
     }
+
+    /// [`Kind::FeeBuckets`]: the trader's `buy_v2` / `sell_v2` (the buckets grow by what the VQR
+    /// falls), or both sweeps; a refusal (a cashback coin's v2 trade, a halt, nothing to sweep)
+    /// is the venue's and changes nothing.
+    fn fee_buckets(&mut self, cx: &mut Ctx, a: u32, b: u32) {
+        let Some((x, y)) = self.pool_xy(cx.env) else {
+            return;
+        };
+        if a % 8 == 7 {
+            let payer = cx.env.funded_keypair();
+            let coin_creator = Pubkey::new_from_array(self.pm.pool.state(&cx.env.svm).coin_creator);
+            for (protocol, recipient) in [
+                (true, pamm::protocol_fee_recipient(&cx.env.svm, 0)),
+                (false, pamm::coin_creator_vault_authority(&coin_creator)),
+            ] {
+                let ix = pamm::pamm_sweep_ix(&self.pm.pool, protocol, &payer.pubkey(), &recipient);
+                let tag = match cx.send(&[ix], &[&payer]) {
+                    Ok(_) => "fuzz:fee_buckets-swept",
+                    Err(_) => "fuzz:fee_buckets-sweep-refused",
+                };
+                *cx.stats.events.entry(tag.into()).or_default() += 1;
+            }
+            return;
+        }
+        let frac = 1 + u64::from(b % 500);
+        let q = (u128::from(x) * u128::from(frac) / 10_000) as u64;
+        if q == 0 {
+            return;
+        }
+        let (kind, bound) = if a.is_multiple_of(2) {
+            let cost = (u128::from(y) * u128::from(frac) * 2 / 10_000) as u64;
+            self.fund_user(cx.env, cost.clamp(1, MAX_SWAP), 0);
+            (PammTrade::Buy, u64::MAX)
+        } else {
+            self.fund_user(cx.env, 0, q);
+            (PammTrade::Sell, 0)
+        };
+        let ix = pamm::pamm_trade_v2_ix(
+            &cx.env.svm,
+            &self.pm.pool,
+            kind,
+            &self.user.kp.pubkey(),
+            &self.user.base,
+            &self.user.wsol,
+            q,
+            bound,
+        );
+        let signer = self.user.kp.insecure_clone();
+        let tag = match cx.send_cu(Some(pamm::PAMM_TRADE_CU), &[ix], &[&signer]) {
+            Ok(_) if pamm::pool_buckets(&cx.env.svm, &self.pm.pool.pool) != (0, 0) => {
+                "fuzz:fee_buckets-v2-landed"
+            }
+            Ok(_) => "fuzz:fee_buckets-v2-landed-empty",
+            Err(_) => "fuzz:fee_buckets-v2-refused",
+        };
+        *cx.stats.events.entry(tag.into()).or_default() += 1;
+    }
 }
 
 impl Venue for PammVenue {
@@ -335,13 +395,17 @@ impl Venue for PammVenue {
         pump_fee_shock(cx, &PUMP_AMM_FEE_CONFIG, &mut self.fee_saved, level, mcaps)
     }
 
-    fn special(&mut self, cx: &mut Ctx, kind: Kind, a: u32, _b: u32) -> Option<()> {
+    fn special(&mut self, cx: &mut Ctx, kind: Kind, a: u32, b: u32) -> Option<()> {
         match kind {
             Kind::GraduationHalt => {
                 let f = disable_flags(cx.env);
                 let f = if a % 2 == 1 { f | 1 } else { f & !1 };
                 pamm::set_disable_flags(&mut cx.env.svm, f);
                 cx.env.assert_invariants();
+                Some(())
+            }
+            Kind::FeeBuckets => {
+                self.fee_buckets(cx, a, b);
                 Some(())
             }
             _ => None,

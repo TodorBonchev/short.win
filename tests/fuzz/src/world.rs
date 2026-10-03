@@ -1222,7 +1222,8 @@ impl World {
             | Kind::ExecuteSwitch
             | Kind::CompleteCurve
             | Kind::Migrate
-            | Kind::GraduationHalt => {
+            | Kind::GraduationHalt
+            | Kind::FeeBuckets => {
                 let World {
                     env, stats, slots, ..
                 } = self;

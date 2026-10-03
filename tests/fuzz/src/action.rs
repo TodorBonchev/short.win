@@ -191,6 +191,12 @@ kinds! {
     Migrate = "migrate",
     /// PumpSwap `disable_flags` bit 0 (`create_pool`, graduation halt) on (`a` odd) or off.
     GraduationHalt = "graduation_halt",
+    /// PumpSwap's fee buckets (pump's 2026-10-02 redeploy, PUMP-2026-10-1): a third party's
+    /// `buy_v2` (`a` even) or `sell_v2` of `1 + b mod 500`‱ of the pool's tokens, which keeps
+    /// the protocol fee (less the buyback slice) and the creator fee in the quote vault, off the
+    /// VQR; with `a mod 8 = 7` the permissionless `sweep_protocol_fee` and `sweep_creator_fee`
+    /// instead (the buckets out, the price unchanged). On the curve profile once graduated.
+    FeeBuckets = "fee_buckets",
     // ---- I14 -------------------------------------------------------------------------------------
     /// A short.win instruction (`a mod 5`: open, liquidate, expire, sol_settle, and at 4 —
     /// with a position open and `a / 5` even — close (M10), else crank) with one remaining
@@ -439,6 +445,13 @@ impl Profile {
                     1
                 } else {
                     0
+                };
+            }
+            FeeBuckets => {
+                return match self {
+                    Profile::PumpSwap => 3,
+                    Profile::Curve => 1,
+                    _ => 0,
                 };
             }
         };

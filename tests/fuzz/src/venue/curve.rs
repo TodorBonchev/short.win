@@ -227,7 +227,7 @@ impl Venue for CurveVenue {
         }
     }
 
-    fn special(&mut self, cx: &mut Ctx, kind: Kind, a: u32, _b: u32) -> Option<()> {
+    fn special(&mut self, cx: &mut Ctx, kind: Kind, a: u32, b: u32) -> Option<()> {
         match kind {
             Kind::CompleteCurve => {
                 let s = self.state(cx.env)?;
@@ -249,6 +249,8 @@ impl Venue for CurveVenue {
                 cx.send(&[pump::cu_limit_ix(MIGRATE_CU), ix], &[&migrator]);
                 Some(())
             }
+            // The graduated pool's buckets (PUMP-2026-10-1): its PumpSwap venue's.
+            Kind::FeeBuckets => self.grad.as_mut()?.special(cx, kind, a, b),
             Kind::GraduationHalt => {
                 let f = disable_flags(cx.env);
                 let f = if a % 2 == 1 { f | 1 } else { f & !1 };

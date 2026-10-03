@@ -101,6 +101,7 @@ each replayed repeatedly.
 | governance and oracle | `config_change` (a parameter of `shortwin_math::params::Rule` at its lower or upper bound or midway, valid, proposed, timelock waited out, applied — as a `Params`, an `EmaParams` (new version: adopted at once without positions, forced after `ema_force_delay_s`) or a `Kink` change; or an `OracleFeed` change to a second account and back, which empties the cache), `config_cancel` (a change cancelled by Governance or the Emergency vault, a `Timelock` change the Emergency may not cancel, or one left past `CONFIG_APPLY_WINDOW_S`), `oracle_crank` (`crank_sol_usd` on a re-planted mainnet `PriceUpdateV2` at the configured account: ±30 % against a 20 % step bound, 0–4 min old; or future-dated, too wide a confidence interval, not owned by the receiver) |
 | pool selection | `plant_candidate`, `propose_pool`, `execute_switch`, `fast_path` (incumbent halted or over the fee cap past `pool_fast_route_s`, a window proposal, the window waited out, the execution) |
 | graduation | `complete_curve`, `migrate`, `graduation_halt` (PumpSwap `disable_flags` bit 0, M6-SEC-3) |
+| PumpSwap fee buckets (M10 program batch 4) | ★`fee_buckets`: the trader's `buy_v2` / `sell_v2` of pump's 2026-10-02 redeploy (fees kept in the quote vault as `protocol_fees` @271 / `creator_fees` @279, off the VQR), or both permissionless sweeps; on `pumpswap` and a graduated `curve`, so the hooks meet pools whose payable SOL is `vault − buckets` (PUMP-2026-10-1); outcomes counted as `fuzz:fee_buckets-v2-landed` / `-v2-refused` (a cashback coin's or a halted pool's) / `-swept` / `-sweep-refused` |
 | I14 | `omit_account`, `replace_account` (a remaining account of open / liquidate / expire / sol_settle / crank and — since M10 — close omitted or replaced by a fresh key; the refusals counted by instruction and code, `i14-*-refused:…`) |
 
 ## Oracles
@@ -236,7 +237,7 @@ wind-down withdrawal refused even at the allowance (shares worth at most one raw
 The summary counts actions by kind (and skips), short.win instructions landed and refused, refusals
 by `instruction:Error`, and events (`Liquidate`, `Expire`, `SolSettle(S1/S2/S3)`, `SettleArmed`,
 `CoverageGap`, `CoveragePauseSet`, `PoolSwitched`, `VenueStateChanged`, `MintSafetyTripped`,
-`fuzz:graduated`, the differential oracles' decisions — `…:differential-…` on the mock and, since
+`fuzz:graduated`, `fuzz:fee_buckets-…` (M10 program batch 4), the differential oracles' decisions — `…:differential-…` on the mock and, since
 M10, `…:v4-differential-…` and `…:curve-differential-…` —, near-cap refusals by cap, venue CPI
 refusals; since M10 the I14 refusals by instruction and code (`i14-omit-refused:…`,
 `i14-replace-refused:…`), the lender oracles' reach (`claim-bundle-landed`, `jit-capture-checked`,
