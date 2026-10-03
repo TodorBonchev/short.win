@@ -17,10 +17,11 @@ how the harness loads them.
 |---|---|---|
 | `raydium_programs` | `programs/raydium_{amm_v4,cpmm}.so`, `accounts/raydium/*_program*.bin` | AMM v4 (deploy 445,763,204) and CPMM (445,763,504). Every AMM v4 test loads these; the CPMM build is T-LATCH's "before" |
 | `raydium_state` | `accounts/raydium/*.bin` | Raydium pools, vaults, mints, observations, all 21 CPMM configs (one snapshot, slot 451,187,550) |
-| `pump_programs`, `pump_state` | `programs/pump{,_fees,_amm}.so`, `accounts/pump/*` | pump, pump-fees and PumpSwap (M5) |
+| `pump_programs`, `pump_state` | `programs/pump{,_fees,_amm}.so`, `accounts/pump/*` | pump, pump-fees and PumpSwap (M5): the 2026-09 deploys (449,734,335 / 446,465,969 / 446,462,733), T-LATCH's "before" since the 2026-10 redeploy |
 | `pamm_state`, `pamm_synthetic` | `accounts/pamm/*` | PumpSwap pools (M6). The synthetic group is derived offline |
 | `raydium_cpmm_2026_10` (M10) | `programs/raydium_cpmm_2026_10.so`, `accounts/raydium_cpmm_2026_10/*` | CPMM **as redeployed at 452,376,460**. This group holds the ELF only. The pools and configs stay `raydium_state`'s, because the redeploy kept their layouts (AmmConfig 236 B, PoolState 637 B) and the 21 live configs still equal the fixture bytes. Every CPMM test loads this build |
 | `spl_programs` (M10) | `programs/token_2022.so`, `accounts/spl/*`, `programs/spl_memo_v3.so` | the deployed Token-2022 (upgradeable, a verified build) and spl-memo v3 (BPFLoader2, where the account data *is* the ELF) |
+| `pump_programs_2026_10` (M10) | `programs/pump{,_fees,_amm}_2026_10.so`, `accounts/pump_2026_10/*` | pump, pump-fees and PumpSwap **as redeployed on 2026-10-02**. ELFs only: the state stays `pump_state`'s and `pamm_state`'s, because the redeploy only appends fee buckets (`BondingCurve` @125/@133, `Pool` @271/@279) and pump `Global`, both `FeeConfig`s, `GlobalConfig` and the volume accumulators still equal the fixture bytes on mainnet (slot 452,964,363). Every curve and PumpSwap test loads this group |
 | `squads_programs` (M10) | `programs/squads_v4.so`, `accounts/squads/*`, `idl/squads_multisig_program.json` | Squads v4 (immutable), its `ProgramConfig` and the IDL 2.1.0 vendored from `Squads-Protocol/v4@64af733` |
 
 Program groups are stored as `header ‖ ELF`. The mainnet ProgramData account is `header ‖ ELF ‖
@@ -35,6 +36,9 @@ The M10 groups are pinned in the script:
 | Token-2022 `TokenzQd…` | 427,147,035 (authority `AeLmXCbP…`) | `7ea94a02…1947` (ELF `9bbf90b3…a5d1`) | `solana-program/token-2022` @ `9bc02757`, verified on verify.osec.io |
 | spl-memo v3 `MemoSq4g…` | (BPFLoader2) | account `f520eaf0…7954` | |
 | Squads v4 `SQDS4ep6…` | 302,582,236 (no authority) | `d4866083…2fac` | UNVERIFIED (probably `Squads-Protocol/v4` @ `64af733`) |
+| pump `6EF8rrec…` | 452,654,932 (authority `7gZufwwA…`) | `b0b777c6…0c75` | UNVERIFIED: no public source; the release of `pump-rust-client` 0.2.0's unreleased artifacts (below) |
+| PumpSwap `pAMMBay6…` | 452,654,882 (authority `7gZufwwA…`) | `01557035…3cc3` | the same |
+| pump-fees `pfeeUxB6…` | 452,655,002 (authority `7gZufwwA…`) | `f166c296…62fd` | the same |
 
 A fetch that reads anything other than these pins stops before it writes a file. The script
 stages every file and writes them, `manifest.json` and `SHA256SUMS` only after every group it
@@ -51,6 +55,12 @@ fetched has passed its checks.
   `venuePrograms()`).
 - Every `Env` runs on the mainnet SPL ELFs (WP-3).
 - WP-7 uses `squads_programs`.
+- Every curve and PumpSwap test, bench and fuzz profile runs on `pump_programs_2026_10` (the M10
+  pump revalidation). `fork.rs` keeps loading `pump_programs` too and picks a build by name
+  (`PumpDeploy::Oct2026`, the default `PumpDeploy::CURRENT`, or `PumpDeploy::Sep2026`); an
+  address lookup resolves to the redeploy, and `fork::FIXTURE_GUARD_SLOTS` carries its three
+  deploy slots (= `VENUE_GUARD_SLOTS_2026_10_03`, the newest baseline). The web e2e validator
+  deploys the same builds.
 
 `raydium_programs` stays for T-LATCH. It is the deploy that `VENUE_GUARD_SLOTS_2026_09_27` names.
 `latch_raydium_it`'s `the_2026_10_cpmm_redeploy_latches_until_revalidated` starts from it and
@@ -111,6 +121,45 @@ unchanged (`shortwin-venue-state`'s unit test spells `CONFIG_LEN` as `… + 15 *
 new field is one of those 15 words, the total still 236 B). Every LiteSVM suite, the services
 workspace and the m3/m5/m6 benches pass on the redeploy; each CPMM swap costs 5 CU more inside
 the venue (`tests/bench/m3_cu`).
+
+## pump, PumpSwap and pump-fees 2026-10-02 redeploys: what changed (M10 pump revalidation)
+
+`check --live` on 2026-10-03 found all three pump programs redeployed on 2026-10-02 between
+15:47:07Z and 15:47:39Z (ARCH V21, U30). There is no public source: `pump-public-docs` has no
+commit after `cb188ce0` (2026-09-29), the on-chain Anchor IDLs were last written 2026-09-12
+(pump) and 2026-05-14 (PumpSwap, pump-fees), and npm's SDKs are unchanged. The release matches
+the **unreleased ELF artifacts of `pump-rust-client` 0.2.0** (crates.io, 2026-09-29), which
+R-VEN Update H2 and R-PUMP Update K2–K5 already ran. Method: the Anchor discriminators of every
+instruction, account and event of the PPD IDLs, the 0.2.0 IDLs and the on-chain IDLs, searched in
+each ELF as `lddw` immediates and raw bytes; `.text` / `.rodata` sizes and bytes; every Anchor
+error origin (file, line, code) from the disassembly.
+
+| | 2026-09 deploys (`pump_programs`) | 2026-10-02 redeploys (`pump_programs_2026_10`) |
+|---|---|---|
+| pump trimmed ELF / `.text` | `dbf5541c…c42f` / 1,542,264 B | `b0b777c6…0c75` / 1,640,304 B |
+| PumpSwap trimmed ELF / `.text` | `c04bea8b…6522` / 950,384 B | `01557035…3cc3` / 1,040,088 B |
+| pump-fees trimmed ELF / `.text` | `1092b124…b788` / 775,384 B | `f166c296…62fd` / 779,872 B |
+| Against 0.2.0's artifacts | — | the same discriminators, the same `.rodata` byte for byte, the same error sites; `.text` 312 / 352 / 1,296 B longer (pump / PumpSwap / pump-fees): source lines added in pump `buy_v2.rs` and `lib.rs`, PumpSwap `swap/buy.rs`, `swap/sell.rs` and `swap/trade_v2.rs`, pump-fees `fee_sharing/*` (one more `NotEnoughRemainingAccounts` check). Not the same build |
+| New instructions | — | pump `buy_v3`, `sell_v3`, `buy_exact_quote_in_v3`, `sweep_protocol_fee`, `sweep_creator_fee`, `set_quote_control_mint_reserves`, `set_quote_control_reserves_admin`; PumpSwap `buy_v2`, `sell_v2`, `buy_exact_quote_in_v2`, `sweep_protocol_fee`, `sweep_creator_fee`; pump-fees none. Nothing removed |
+| Layouts | — | `BondingCurve` + `creator_fee` @125, `protocol_fees` @133 (141 B); `Pool` + `protocol_fees` @271, `creator_fees` @279 (287 B; `create_pool` and every trade's growth target); `QuoteControl.reserves_admin` (unused by short.win). Every other account and every event short.win or the indexer reads is unchanged |
+| short.win's CPIs | — | pump `buy_v2` / `sell_v2` (+ an optional trailing `partial_fill` byte short.win does not send), `migrate_v2`, PumpSwap `buy` / `sell`, `claim_cashback`, `init_user_volume_accumulator`, pump-fees `get_fees_with_quote_mint` (called by the venues): the same discriminators, account lists, PDA seeds and arguments (IDL diff) |
+
+What the release does (on the dumped ELFs, `pamm_it::buckets`, `pump_it::buckets`):
+- v2 PumpSwap and v3 curve trades pay the buyback slice in the trade and keep the rest of the
+  protocol fee and the creator fee in the pool's quote vault / the curve account, counted in the
+  buckets; on PumpSwap the buckets are taken off `virtual_quote_reserves`, so the price `vault +
+  VQR` excludes them; on the curve they stay outside `rQ`. A v2/v3 trade costs or pays exactly the
+  v1/v2 quote. Anyone can sweep a bucket to its recipient; a sweep does not move the price.
+- A PumpSwap v1 `sell` is paid from `vault − buckets` (6063 `InsufficientRealQuoteReserves`
+  above it; the 2026-09 build paid up to the vault).
+- Every PumpSwap trade grows a shorter pool to **287** bytes (271 before) and tops its rent up
+  from `user`: at the fixture's 5,080 lamports per byte, 81,280 more than before on any pool
+  shorter than 287 bytes (386,080 from 211 B; short.win measures it as `Open.venue_rent`).
+- `migrate_v2` moves `rQ`, not the curve's buckets, so `B̂_str` prices the same pool.
+- On mainnet on 2026-10-03 (slots 452,964,412–452,964,638): no bucket is non-zero on the
+  fixture pools and curves or on any of the 1,873 PumpSwap pools of 287 bytes (the 663 k
+  301-byte pools could not be scanned on the public RPC); a sample of 40 + 40 recent pump and
+  PumpSwap transactions held no v2 / v3 trade.
 
 ## Commands
 
