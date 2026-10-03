@@ -4,41 +4,41 @@ Compute units of every curve-path instruction (ARCH §9 M5: T-CU) of the **relea
 
 | Instruction | Case | Mollusk CU | LiteSVM CU | pump CU | Budget | Budget source | Trace | ARCH §6.2 (curve) | Peak height |
 |---|---|---|---|---|---|---|---|---|---|
-| `create_market` | Auto, SPL Token, 115 B curve, no creator (legacy115): `PumpCurve`, the trader's base ATA and pump UVA created | 141400 | 141400 | 17004 | 250000 | §6.1 `create_market` | 15 | — | 3 |
-| `create_market` | Auto, Token-2022, 115 B curve (t22_115): `PumpCurve`, the trader's base ATA and pump UVA created | 169823 | 169823 | 15504 | 250000 | §6.1 `create_market` | 15 | — | 3 |
-| `create_market` | Auto, Token-2022, 125 B curve (fresh): `PumpCurve`, the trader's base ATA and pump UVA created | 143070 | 143070 | 15504 | 250000 | §6.1 `create_market` | 15 | — | 3 |
-| `create_market` | Auto, Token-2022, 151 B curve near completion (near): `PumpCurve`, the trader's base ATA and pump UVA created | 169836 | 169836 | 17004 | 250000 | §6.1 `create_market` | 15 | — | 3 |
-| `create_market` | Auto, Token-2022, 151 B curve near completion (near), completed by a third party: `PumpMigrating`, with the init set | 169985 | 169985 | 17004 | 250000 | §6.1 `create_market` | 15 | — | 3 |
-| `create_market` | Auto, PumpSwap-class coin (graduated): `PumpSwap` on its canonical pool, the pAMM init set (M6) | 138942 | 138942 | — | 250000 | §6.1 `create_market` | 15 | — | 3 |
+| `create_market` | Auto, SPL Token, 115 B curve, no creator (legacy115): `PumpCurve`, the trader's base ATA and pump UVA created | 141430 | 141430 | 17034 | 250000 | §6.1 `create_market` | 15 | — | 3 |
+| `create_market` | Auto, Token-2022, 115 B curve (t22_115): `PumpCurve`, the trader's base ATA and pump UVA created | 169853 | 169853 | 15534 | 250000 | §6.1 `create_market` | 15 | — | 3 |
+| `create_market` | Auto, Token-2022, 125 B curve (fresh): `PumpCurve`, the trader's base ATA and pump UVA created | 143100 | 143100 | 15534 | 250000 | §6.1 `create_market` | 15 | — | 3 |
+| `create_market` | Auto, Token-2022, 151 B curve near completion (near): `PumpCurve`, the trader's base ATA and pump UVA created | 169866 | 169866 | 17034 | 250000 | §6.1 `create_market` | 15 | — | 3 |
+| `create_market` | Auto, Token-2022, 151 B curve near completion (near), completed by a third party: `PumpMigrating`, with the init set | 170015 | 170015 | 17034 | 250000 | §6.1 `create_market` | 15 | — | 3 |
+| `create_market` | Auto, PumpSwap-class coin (graduated): `PumpSwap` on its canonical pool, the pAMM init set (M6) | 138957 | 138957 | — | 250000 | §6.1 `create_market` | 15 | — | 3 |
 | `create_market` | Auto, graduated elsewhere (Fartcoin): list-only `None` (detection set only) | 57949 | 57949 | — | 250000 | §6.1 `create_market` | 7 | — | 2 |
-| `open_short` | SPL Token, 115 B curve, no creator (legacy115): first open of a wallet (position + exposure created) | 172109 | 172109 | 74791 | 250000 | §6.1 `open_short` curve | 14 | 12 (≤ 15) | 3 |
-| `open_short` | Token-2022, 115 B curve (t22_115): first open of a wallet (position + exposure created) | 182038 | 182038 | 80127 | 250000 | §6.1 `open_short` curve | 14 | 12 (≤ 15) | 3 |
-| `open_short` | Token-2022, 125 B curve (fresh): first open of a wallet (position + exposure created) | 176516 | 176516 | 69630 | 250000 | §6.1 `open_short` curve | 14 | 12 (≤ 15) | 3 |
-| `open_short` | Token-2022, 151 B curve near completion (near): first open of a wallet (position + exposure created) | 183470 | 183470 | 81628 | 250000 | §6.1 `open_short` curve | 14 | 12 (≤ 15) | 3 |
-| `open_short` | SPL Token, 115 B curve, no creator (legacy115): second position of a wallet | 174533 | 174533 | 74794 | 250000 | §6.1 `open_short` curve | 13 | 12 (≤ 15) | 3 |
-| `open_short` | SPL Token, 115 B curve, no creator (legacy115): first open, normalising (lamports to the trader, tokens to trader_base_ata) | 178462 | 178462 | 74791 | 250000 | §6.1 `open_short` curve | 17 | 12 (≤ 15) | 3 |
-| `open_short` | Token-2022, 115 B curve (t22_115): second position of a wallet | 181103 | 181103 | 80130 | 250000 | §6.1 `open_short` curve | 13 | 12 (≤ 15) | 3 |
-| `open_short` | Token-2022, 115 B curve (t22_115): first open, normalising (lamports to the trader, tokens to trader_base_ata) | 190727 | 190727 | 80127 | 250000 | §6.1 `open_short` curve | 17 | 12 (≤ 15) | 3 |
-| `open_short` | Token-2022, 151 B curve near completion (near): costliest — first open, normalising, after a creator change into an empty vault (top-up), last recipients | 201823 | 201823 | 85383 | 250000 | §6.1 `open_short` curve | 18 | 12 (≤ 15) | 3 |
-| `close_short` | SPL Token, 115 B curve, no creator (legacy115) | 150169 | 150169 | 83790 | 250000 | §6.1 `close_short` curve / PumpSwap | 12 | 12 (≤ 15) | 3 |
-| `close_short` | Token-2022, 115 B curve (t22_115) | 160384 | 160384 | 90949 | 250000 | §6.1 `close_short` curve / PumpSwap | 13 | 12 (≤ 15) | 3 |
-| `close_short` | Token-2022, 125 B curve (fresh) | 150114 | 150114 | 80449 | 250000 | §6.1 `close_short` curve / PumpSwap | 13 | 12 (≤ 15) | 3 |
-| `close_short` | Token-2022, 151 B curve near completion (near) | 162172 | 162172 | 92447 | 250000 | §6.1 `close_short` curve / PumpSwap | 13 | 12 (≤ 15) | 3 |
-| `close_short` | SPL Token, 115 B curve, no creator (legacy115): normalising | 157033 | 157033 | 83790 | 250000 | §6.1 `close_short` curve / PumpSwap | 15 | 12 (≤ 15) | 3 |
-| `close_short` | Token-2022, 115 B curve (t22_115): normalising | 169584 | 169584 | 90949 | 250000 | §6.1 `close_short` curve / PumpSwap | 16 | 12 (≤ 15) | 3 |
-| `close_short` | Token-2022, 115 B curve (t22_115): costliest — normalising, after a creator change into an empty vault (top-up in B), last recipients | 177976 | 177976 | 93204 | 250000 | §6.1 `close_short` curve / PumpSwap | 17 | 12 (≤ 15) | 3 |
-| `close_short` | Token-2022, 151 B curve near completion (near): costliest — normalising, after a creator change into an empty vault (top-up in B), last recipients | 181264 | 181264 | 96202 | 250000 | §6.1 `close_short` curve / PumpSwap | 17 | 12 (≤ 15) | 3 |
-| `close_short` | Token-2022, 151 B curve near completion (near): completing buyback (q = rT; `PumpCurve → PumpMigrating` in the same instruction) | 174937 | 174937 | 97889 | 250000 | §6.1 `close_short` curve / PumpSwap | 15 | 12 (≤ 15) | 3 |
-| `liquidate` | SPL Token, 115 B curve, no creator (legacy115): after a real pump (40 % of vT bought), both legs | 171162 | 171162 | 83788 | 300000 | §6.1 `liquidate` / `expire` curve | 12 | 12 (≤ 15) | 3 |
-| `liquidate` | Token-2022, 115 B curve (t22_115): after a real pump (40 % of vT bought), both legs | 181041 | 181041 | 90948 | 300000 | §6.1 `liquidate` / `expire` curve | 13 | 12 (≤ 15) | 3 |
-| `liquidate` | Token-2022, 125 B curve (fresh): after a real pump (40 % of vT bought), both legs | 171583 | 171583 | 80449 | 300000 | §6.1 `liquidate` / `expire` curve | 13 | 12 (≤ 15) | 3 |
-| `liquidate` | Token-2022, 115 B curve (t22_115): costliest — normalising, creator change into an empty vault, last recipients | 198519 | 198519 | 93203 | 300000 | §6.1 `liquidate` / `expire` curve | 17 | 12 (≤ 15) | 3 |
-| `expire` | SPL Token, 115 B curve, no creator (legacy115): past the deadline, healthy | 167526 | 167526 | 83790 | 300000 | §6.1 `liquidate` / `expire` curve | 12 | 12 (≤ 15) | 3 |
-| `expire` | Token-2022, 115 B curve (t22_115): past the deadline, healthy | 177757 | 177757 | 90949 | 300000 | §6.1 `liquidate` / `expire` curve | 13 | 12 (≤ 15) | 3 |
-| `expire` | Token-2022, 125 B curve (fresh): past the deadline, healthy | 167956 | 167956 | 80449 | 300000 | §6.1 `liquidate` / `expire` curve | 13 | 12 (≤ 15) | 3 |
-| `expire` | Token-2022, 151 B curve near completion (near): past the deadline, healthy | 179624 | 179624 | 92447 | 300000 | §6.1 `liquidate` / `expire` curve | 13 | 12 (≤ 15) | 3 |
-| `expire` | Token-2022, 151 B curve near completion (near): costliest — normalising, creator change into an empty vault, last recipients | 198602 | 198602 | 96202 | 300000 | §6.1 `liquidate` / `expire` curve | 17 | 12 (≤ 15) | 3 |
-| `expire` | Token-2022, 151 B curve near completion (near): completing buyback (q = rT; `PumpCurve → PumpMigrating`) | 189182 | 189182 | 97889 | 300000 | §6.1 `liquidate` / `expire` curve | 15 | 12 (≤ 15) | 3 |
+| `open_short` | SPL Token, 115 B curve, no creator (legacy115): first open of a wallet (position + exposure created) | 172350 | 172350 | 75032 | 250000 | §6.1 `open_short` curve | 14 | 12 (≤ 15) | 3 |
+| `open_short` | Token-2022, 115 B curve (t22_115): first open of a wallet (position + exposure created) | 182298 | 182298 | 80387 | 250000 | §6.1 `open_short` curve | 14 | 12 (≤ 15) | 3 |
+| `open_short` | Token-2022, 125 B curve (fresh): first open of a wallet (position + exposure created) | 176824 | 176824 | 69938 | 250000 | §6.1 `open_short` curve | 14 | 12 (≤ 15) | 3 |
+| `open_short` | Token-2022, 151 B curve near completion (near): first open of a wallet (position + exposure created) | 183778 | 183778 | 81936 | 250000 | §6.1 `open_short` curve | 14 | 12 (≤ 15) | 3 |
+| `open_short` | SPL Token, 115 B curve, no creator (legacy115): second position of a wallet | 174822 | 174822 | 75083 | 250000 | §6.1 `open_short` curve | 13 | 12 (≤ 15) | 3 |
+| `open_short` | SPL Token, 115 B curve, no creator (legacy115): first open, normalising (lamports to the trader, tokens to trader_base_ata) | 178703 | 178703 | 75032 | 250000 | §6.1 `open_short` curve | 17 | 12 (≤ 15) | 3 |
+| `open_short` | Token-2022, 115 B curve (t22_115): second position of a wallet | 181411 | 181411 | 80438 | 250000 | §6.1 `open_short` curve | 13 | 12 (≤ 15) | 3 |
+| `open_short` | Token-2022, 115 B curve (t22_115): first open, normalising (lamports to the trader, tokens to trader_base_ata) | 190987 | 190987 | 80387 | 250000 | §6.1 `open_short` curve | 17 | 12 (≤ 15) | 3 |
+| `open_short` | Token-2022, 151 B curve near completion (near): costliest — first open, normalising, after a creator change into an empty vault (top-up), last recipients | 202131 | 202131 | 85691 | 250000 | §6.1 `open_short` curve | 18 | 12 (≤ 15) | 3 |
+| `close_short` | SPL Token, 115 B curve, no creator (legacy115) | 150461 | 150461 | 84082 | 250000 | §6.1 `close_short` curve / PumpSwap | 12 | 12 (≤ 15) | 3 |
+| `close_short` | Token-2022, 115 B curve (t22_115) | 160676 | 160676 | 91241 | 250000 | §6.1 `close_short` curve / PumpSwap | 13 | 12 (≤ 15) | 3 |
+| `close_short` | Token-2022, 125 B curve (fresh) | 150406 | 150406 | 80741 | 250000 | §6.1 `close_short` curve / PumpSwap | 13 | 12 (≤ 15) | 3 |
+| `close_short` | Token-2022, 151 B curve near completion (near) | 162464 | 162464 | 92739 | 250000 | §6.1 `close_short` curve / PumpSwap | 13 | 12 (≤ 15) | 3 |
+| `close_short` | SPL Token, 115 B curve, no creator (legacy115): normalising | 157325 | 157325 | 84082 | 250000 | §6.1 `close_short` curve / PumpSwap | 15 | 12 (≤ 15) | 3 |
+| `close_short` | Token-2022, 115 B curve (t22_115): normalising | 169876 | 169876 | 91241 | 250000 | §6.1 `close_short` curve / PumpSwap | 16 | 12 (≤ 15) | 3 |
+| `close_short` | Token-2022, 115 B curve (t22_115): costliest — normalising, after a creator change into an empty vault (top-up in B), last recipients | 178268 | 178268 | 93496 | 250000 | §6.1 `close_short` curve / PumpSwap | 17 | 12 (≤ 15) | 3 |
+| `close_short` | Token-2022, 151 B curve near completion (near): costliest — normalising, after a creator change into an empty vault (top-up in B), last recipients | 181556 | 181556 | 96494 | 250000 | §6.1 `close_short` curve / PumpSwap | 17 | 12 (≤ 15) | 3 |
+| `close_short` | Token-2022, 151 B curve near completion (near): completing buyback (q = rT; `PumpCurve → PumpMigrating` in the same instruction) | 175244 | 175244 | 98196 | 250000 | §6.1 `close_short` curve / PumpSwap | 15 | 12 (≤ 15) | 3 |
+| `liquidate` | SPL Token, 115 B curve, no creator (legacy115): after a real pump (40 % of vT bought), both legs | 171454 | 171454 | 84080 | 300000 | §6.1 `liquidate` / `expire` curve | 12 | 12 (≤ 15) | 3 |
+| `liquidate` | Token-2022, 115 B curve (t22_115): after a real pump (40 % of vT bought), both legs | 181333 | 181333 | 91240 | 300000 | §6.1 `liquidate` / `expire` curve | 13 | 12 (≤ 15) | 3 |
+| `liquidate` | Token-2022, 125 B curve (fresh): after a real pump (40 % of vT bought), both legs | 171875 | 171875 | 80741 | 300000 | §6.1 `liquidate` / `expire` curve | 13 | 12 (≤ 15) | 3 |
+| `liquidate` | Token-2022, 115 B curve (t22_115): costliest — normalising, creator change into an empty vault, last recipients | 198811 | 198811 | 93495 | 300000 | §6.1 `liquidate` / `expire` curve | 17 | 12 (≤ 15) | 3 |
+| `expire` | SPL Token, 115 B curve, no creator (legacy115): past the deadline, healthy | 167818 | 167818 | 84082 | 300000 | §6.1 `liquidate` / `expire` curve | 12 | 12 (≤ 15) | 3 |
+| `expire` | Token-2022, 115 B curve (t22_115): past the deadline, healthy | 178049 | 178049 | 91241 | 300000 | §6.1 `liquidate` / `expire` curve | 13 | 12 (≤ 15) | 3 |
+| `expire` | Token-2022, 125 B curve (fresh): past the deadline, healthy | 168248 | 168248 | 80741 | 300000 | §6.1 `liquidate` / `expire` curve | 13 | 12 (≤ 15) | 3 |
+| `expire` | Token-2022, 151 B curve near completion (near): past the deadline, healthy | 179916 | 179916 | 92739 | 300000 | §6.1 `liquidate` / `expire` curve | 13 | 12 (≤ 15) | 3 |
+| `expire` | Token-2022, 151 B curve near completion (near): costliest — normalising, creator change into an empty vault, last recipients | 198894 | 198894 | 96494 | 300000 | §6.1 `liquidate` / `expire` curve | 17 | 12 (≤ 15) | 3 |
+| `expire` | Token-2022, 151 B curve near completion (near): completing buyback (q = rT; `PumpCurve → PumpMigrating`) | 189489 | 189489 | 98196 | 300000 | §6.1 `liquidate` / `expire` curve | 15 | 12 (≤ 15) | 3 |
 | `sol_settle` | SPL Token, 115 B curve, no creator (legacy115): healthy, the no-change call | 42383 | 42383 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
 | `sol_settle` | Token-2022, 115 B curve (t22_115): healthy, the no-change call | 42772 | 42772 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
 | `sol_settle` | `PumpMigrating` (stuck migration): S3 at migration_seen_at + 70 min, FV on the post-migration pool | 64984 | 64984 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
