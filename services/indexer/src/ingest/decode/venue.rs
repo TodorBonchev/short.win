@@ -80,6 +80,8 @@ const PUMP_EVENTS: &[&str] = &[
     "InitUserVolumeAccumulatorEvent",
     "CloseUserVolumeAccumulatorEvent",
     "SyncUserVolumeAccumulatorEvent",
+    // pump's 2026-10-02 redeploy (v3 trades keep their fees in the curve's buckets).
+    "SweepBondingCurveFeeEvent",
 ];
 const PUMP_AMM_EVENTS: &[&str] = &[
     "BuyEvent",
@@ -101,6 +103,8 @@ const PUMP_AMM_EVENTS: &[&str] = &[
     "InitUserVolumeAccumulatorEvent",
     "CloseUserVolumeAccumulatorEvent",
     "SyncUserVolumeAccumulatorEvent",
+    // PumpSwap's 2026-10-02 redeploy (v2 trades keep their fees in the pool's buckets).
+    "SweepPoolFeeEvent",
 ];
 
 fn table(names: &'static [&'static str]) -> Vec<([u8; 8], &'static str)> {
@@ -640,7 +644,11 @@ pub struct LifecycleEvent {
 
 /// A pump / pAMM lifecycle event: the decoded prefix where the layout is known (pump
 /// `CompleteEvent`: user, mint, bonding_curve, timestamp; pAMM `CreatePoolEvent`: through
-/// `pool`), always the raw body as hex.
+/// `pool`; the 2026-10-02 redeploys' sweeps — pump `SweepBondingCurveFeeEvent` and pAMM
+/// `SweepPoolFeeEvent`, `pump-rust-client` 0.2.0's IDLs: the bucket a permissionless
+/// `sweep_protocol_fee` / `sweep_creator_fee` paid out, `amount` lamports to `recipient`; a sweep
+/// moves the vault and the VQR oppositely, so no price or reserve row changes), always the raw
+/// body as hex.
 pub fn lifecycle(program: &Pubkey, kind: &'static str, body: &[u8]) -> LifecycleEvent {
     let venue = if *program == PUMP {
         "pump_curve"
@@ -686,6 +694,63 @@ pub fn lifecycle(program: &Pubkey, kind: &'static str, body: &[u8]) -> Lifecycle
                 data["quote_mint"] = key_json(&quote_mint);
                 data["pool"] = key_json(&p);
                 data["lp_mint"] = key_json(&lp_mint);
+                pool = Some(p);
+                mint = Some(if base_mint == WSOL {
+                    quote_mint
+                } else {
+                    base_mint
+                });
+            }
+        }
+        ("pump_curve", "SweepBondingCurveFeeEvent") => {
+            // timestamp, mint, bonding_curve, quote_mint, recipient, amount, bucket.
+            let decoded = (|| {
+                let ts = r.i64()?;
+                let m = r.key()?;
+                let curve = r.key()?;
+                let quote_mint = r.key()?;
+                let recipient = r.key()?;
+                let amount = r.u64()?;
+                let bucket = r.take(1)?[0];
+                Some((ts, m, curve, quote_mint, recipient, amount, bucket))
+            })();
+            if let Some((ts, m, curve, quote_mint, recipient, amount, bucket)) = decoded {
+                data["timestamp"] = Value::String(ts.to_string());
+                data["mint"] = key_json(&m);
+                data["bonding_curve"] = key_json(&curve);
+                data["quote_mint"] = key_json(&quote_mint);
+                data["recipient"] = key_json(&recipient);
+                data["amount"] = Value::String(amount.to_string());
+                data["bucket"] = Value::from(bucket);
+                pool = Some(curve);
+                mint = Some(m);
+            }
+        }
+        ("pump_swap", "SweepPoolFeeEvent") => {
+            // timestamp, pool, base_mint, quote_mint, recipient, payer, amount, bucket.
+            let decoded = (|| {
+                let ts = r.i64()?;
+                let p = r.key()?;
+                let base_mint = r.key()?;
+                let quote_mint = r.key()?;
+                let recipient = r.key()?;
+                let payer = r.key()?;
+                let amount = r.u64()?;
+                let bucket = r.take(1)?[0];
+                Some((
+                    ts, p, base_mint, quote_mint, recipient, payer, amount, bucket,
+                ))
+            })();
+            if let Some((ts, p, base_mint, quote_mint, recipient, payer, amount, bucket)) = decoded
+            {
+                data["timestamp"] = Value::String(ts.to_string());
+                data["pool"] = key_json(&p);
+                data["base_mint"] = key_json(&base_mint);
+                data["quote_mint"] = key_json(&quote_mint);
+                data["recipient"] = key_json(&recipient);
+                data["payer"] = key_json(&payer);
+                data["amount"] = Value::String(amount.to_string());
+                data["bucket"] = Value::from(bucket);
                 pool = Some(p);
                 mint = Some(if base_mint == WSOL {
                     quote_mint
@@ -779,6 +844,85 @@ mod tests {
         let d = anchor_event_discriminator("CompleteEvent");
         assert_eq!(venue_event_name(&PUMP, &d), Some("CompleteEvent"));
         assert_eq!(venue_event_name(&RAYDIUM_CPMM, &d), None);
+    }
+
+    /// The 2026-10-02 redeploys' new events (pump `SweepBondingCurveFeeEvent`, pAMM
+    /// `SweepPoolFeeEvent`) are named on their own program only, and each discriminator is one
+    /// the dumped redeploy emits and the 2026-09 build does not (`tests/fixtures/programs`: the
+    /// 8 bytes, or an `lddw` pair holding them, in the ELF); no recorded transaction carries a
+    /// sweep yet, so the body is built from `pump-rust-client` 0.2.0's IDL layout.
+    #[test]
+    fn the_2026_10_sweep_events_are_named_and_decoded() {
+        let elf = |name: &str| {
+            std::fs::read(format!(
+                "{}/../../tests/fixtures/programs/{name}.so",
+                env!("CARGO_MANIFEST_DIR")
+            ))
+            .expect("a dumped ELF")
+        };
+        // The discriminator as bytes, or split over an `lddw` (imm32 at +4 and +12).
+        let emits = |elf: &[u8], d: &[u8; 8]| {
+            elf.windows(8).any(|w| w == d)
+                || elf
+                    .windows(16)
+                    .any(|w| w[4..8] == d[..4] && w[12..16] == d[4..])
+        };
+        for (program, name, old, new) in [
+            (PUMP, "SweepBondingCurveFeeEvent", "pump", "pump_2026_10"),
+            (
+                PUMP_AMM,
+                "SweepPoolFeeEvent",
+                "pump_amm",
+                "pump_amm_2026_10",
+            ),
+        ] {
+            let d = anchor_event_discriminator(name);
+            assert_eq!(venue_event_name(&program, &d), Some(name));
+            let other = if program == PUMP { PUMP_AMM } else { PUMP };
+            assert_eq!(venue_event_name(&other, &d), None);
+            assert!(emits(&elf(new), &d), "{name} in {new}.so");
+            assert!(!emits(&elf(old), &d), "{name} not in {old}.so");
+        }
+
+        let (mint, curve, pool, to, payer) = (
+            Pubkey::new_unique(),
+            Pubkey::new_unique(),
+            Pubkey::new_unique(),
+            Pubkey::new_unique(),
+            Pubkey::new_unique(),
+        );
+        let mut b = 1_791_000_000i64.to_le_bytes().to_vec();
+        for k in [mint, curve, WSOL, to] {
+            b.extend(k.to_bytes());
+        }
+        b.extend(81_280u64.to_le_bytes());
+        b.push(1);
+        let ev = lifecycle(&PUMP, "SweepBondingCurveFeeEvent", &b);
+        assert_eq!(
+            (ev.venue, ev.pool, ev.mint),
+            ("pump_curve", Some(curve), Some(mint))
+        );
+        assert_eq!(ev.data["amount"], "81280");
+        assert_eq!(ev.data["bucket"], 1);
+        assert_eq!(ev.data["recipient"], key_json(&to));
+
+        let mut b = 1_791_000_000i64.to_le_bytes().to_vec();
+        for k in [pool, mint, WSOL, to, payer] {
+            b.extend(k.to_bytes());
+        }
+        b.extend(452_066u64.to_le_bytes());
+        b.push(0);
+        let ev = lifecycle(&PUMP_AMM, "SweepPoolFeeEvent", &b);
+        assert_eq!(
+            (ev.venue, ev.pool, ev.mint),
+            ("pump_swap", Some(pool), Some(mint))
+        );
+        assert_eq!(ev.data["amount"], "452066");
+        assert_eq!(ev.data["payer"], key_json(&payer));
+        // A truncated body keeps the raw hex only.
+        let ev = lifecycle(&PUMP_AMM, "SweepPoolFeeEvent", &b[..40]);
+        assert_eq!((ev.pool, ev.mint), (None, None));
+        assert!(ev.data.get("amount").is_none());
     }
 
     #[test]
