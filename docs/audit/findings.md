@@ -28,7 +28,8 @@ belongs to the audit package ([`docs/AUDIT.md`](../AUDIT.md) §12). The M10 exit
 
 | Firm | Commit / tag audited | Start | End | Report | Fix review |
 |---|---|---|---|---|---|
-| TODO(owner, Q2) | TODO(WP-12): `audit-1` | | | `docs/audit/<firm>-<date>.pdf` | |
+| the private audit's firm (booked by the owner; RFQ log in [`README.md`](README.md)) | `audit-1` / `v1.0.0` (AUDIT.md §0) | | | `docs/audit/<firm>-<date>.pdf` | |
+| the public contest (Sherlock or Cantina) | the 1.0.x tag after the audit's fixes | | | | |
 
 ## Tracker
 
