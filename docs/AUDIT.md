@@ -4,9 +4,12 @@ This is the auditors' entry point to short.win's on-chain code. It says what is 
 to build and test the code, what the code relies on, and what we already know about it.
 
 **Status:**
-- This is the M10 skeleton (WP-10), written at base commit `e857a2a`.
-- `TODO(WP-n)` marks a part that a later M10 work package fills in. The package is final only
-  at the audit tag (WP-12), after the owner has reviewed it.
+- This is the M10 final package (WP-10 final), written on the merged M10 tree (branch
+  `m10/final`, §0). Every M10 work package has landed: program code is final for the audit
+  (batch 3).
+- What is still pending is named where it applies: the owner's review of this package and the
+  tag (§0), CI on this tree (§10), the ≥ 24 h fuzz run on this tree (§10), the open owner
+  items (§7), the calibration results (KI-14) and the external audit itself (§12).
 - Normative sources:
   - the design documents `docs/SPEC.md`, `docs/design/ARCHITECTURE.md` (ARCH) and
     `docs/design/ECONOMICS.md` (ECON);
@@ -29,29 +32,34 @@ to build and test the code, what the code relies on, and what we already know ab
 
 | Item | Value |
 |---|---|
-| Audit commit / tag | TODO(WP-12): `audit-1`, plus `v<package version>` on the same commit. Both programs are at version 0.1.0 and the repository has no tags yet. The version that `security.txt`'s `source_release` embeds must be fixed before the freeze hash (M10 plan review B7). |
-| Skeleton base | `e857a2a` (branch `m1-core`) |
+| Audit commit / tag | the head of branch `m10/final`, the commit that carries this file (the M10 tree: `m1-core` at `98b1181`, batch 3, the doc sync and this package), **to be tagged `audit-1` / `v1.0.0` by the owner** (owner decision of 2026-10-02: release 1.0.0 at the audit tag; post-audit fixes are 1.0.x). The tag goes on the commit whose hashes match the table below |
+| Package version | `shortwin` and `complete_curve` are both 1.0.0 (`programs/*/Cargo.toml`); `security.txt`'s `source_release` reads `v1.0.0` |
 | `shortwin` program id | `5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK` (`programs/shortwin/src/lib.rs` `declare_id!`) |
 | `complete_curve` program id | `4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ` (`programs/complete_curve/src/lib.rs`) |
 | TEST-ONLY mock venue | `BPAZFPkmVtYEWEZHCzFUns7oybh1VWfAvmu3ofM2mQi7` (`tests/mock_cpamm`; never deployed; out of scope, §2) |
 | Toolchain | Anchor CLI and `anchor-lang` 1.2.0; Agave CLI 4.1.2; platform-tools v1.57 (rustc 1.95), SBPF v3; host Rust 1.98.1 (`docs/DEVELOPMENT.md` "Pins") |
 | Build | `anchor build --tools-version v1.57 --arch v3` (never a bare `cargo build-sbf`) |
-| Verifiable build | solana-verify 0.5.2, image `solanafoundation/solana-verifiable-build@sha256:2e0b78f44ee76612e9260c7c988570c5e14de6fbd93e0ab07115ec7054473b4f`, `--arch v3 --cargo-build-sbf-args="--tools-version v1.57"`. TODO(WP-4): `scripts/verifiable-build.sh` and the CI job `verifiable-build`. |
-| Contacts | TODO(owner, Q3): the security mailbox and the auditors' point of contact; see `SECURITY.md` |
+| Verifiable build | solana-verify 0.5.2, image `solanafoundation/solana-verifiable-build@sha256:2e0b78f44ee76612e9260c7c988570c5e14de6fbd93e0ab07115ec7054473b4f`, `--arch v3 --cargo-build-sbf-args="--tools-version v1.57"`: `scripts/verifiable-build.sh` (Docker, or `--local`: a bubblewrap shim running the same digest-pinned image) and CI's `verifiable-build` job, which fail unless each output is byte-identical to the `anchor build` artifact (ARCH §1.1) |
+| Contacts | Security reports: `security@short.win`; policy page `https://short.win/security` (`SECURITY.md`; the same values are in both programs' `security.txt` and the web's `/.well-known/security.txt`; owner decision Q3 of 2026-10-02). The auditors' point of contact is named at the engagement (§12) |
 
-**Hashes at the skeleton base `e857a2a`.** These are not the audit hashes: WP-6 changes both
-programs (it adds `security.txt`).
+**Verified hashes of this tree.** `scripts/verifiable-build.sh --local --compare target/deploy`
+on the head of `m10/final` (2026-10-03; its `verifiable-hashes.txt` names the commit):
+solana-verify 0.5.2 in the pinned image built both programs from a fresh clone of `HEAD`, and
+each output is byte-identical to the `anchor build` artifact the tests ran on. The hashes:
 
 | Program | sha256 of the `.so` file | executable hash (trailing zeros trimmed; the on-chain comparison) | bytes |
 |---|---|---|---|
-| `shortwin.so` | `00011844c95bba6464ee05a6ff1f47016dcd3d0a2e6cb7c7e60eced2a6a8e1a1` | `117392ceccbbb0172e60bd22dea8c953e6b889571e0bd11bf73dc80b3a74e469` | 1,570,536 |
-| `complete_curve.so` | `1970661a9fa5edfa3142b5148354725b51d6627eac400e466a027c37118cd2bd` | `8cbeaea894e862a91cd975458b86213616dab3114fb299371fa82010fed96f43` | 121,968 |
+| `shortwin.so` | `c4398d01a36bf1c8c998e7b9f19f0544606c29737e643913ac87e1cb46ef39ea` | `42f476fe0ab0e68b6d078e9235e1b84716f4872251e64b75e5b87d1553c4200b` | 1,574,648 |
+| `complete_curve.so` | `f3a47201738fd72d4dd02f756ba3c17f241dc2bedde1c9d25f63eccaaafc6d42` | `2f2ef7da92c7b8dffc57bd7ae9bf33f64c8dbc09dc552c401742ad85f45382ab` | 122,264 |
 
-Both rows come from a fresh `anchor build --tools-version v1.57 --arch v3 --ignore-keys` of
-`e857a2a` (WP-10, 2026-10-02), with ELF `e_flags` 0x3. They are byte-identical to the M10
-verifiable-build research run on the same commit (solana-verify 0.5.2 under a bubblewrap shim
-of the pinned image, no Docker). TODO(WP-12): the final hashes, with the CI run URL of the
-`verifiable-build` job.
+- Both ELFs have `e_flags` 0x3 (SBPF v3) and carry exactly one `security.txt` (§10).
+- The program code has not changed since batch 3 (`391aed3`): these are the hashes ARCH §1.1
+  and §9 record for batch 3.
+- The executable hash is what `solana-verify get-program-hash` and verify.osec.io compare with
+  the deployed ProgramData. Verifying the deployment on chain is M11's (ARCH §9 M11).
+- At the skeleton base `e857a2a` the hashes were `00011844…e1a1` / `117392ce…e469` and
+  `1970661a…2bd` / `8cbeaea8…6f43`. Batches 1–3 changed both programs (`security.txt` and the
+  version), and `shortwin` also by SQ-G8, M10-8C-1 and the extras denylist.
 
 ---
 
@@ -120,44 +128,57 @@ two cases:
   in no unit and not on the script's explicit `EXCLUDED` list (listed at the end of
   `scope.txt`).
 
-So a new program, crate or service, for example WP-7's governance tool under `services/`,
-fails `check` until a reviewed edit of the script puts it in a unit or excludes it with a
-reason. Line counts on the integrated M10 tree (`m10/integration`, release ELF `a5766d13…`).
-Since `e857a2a`, WP-6's `security_txt!` block and AUD-10 lints add 13 non-test nLOC to each
-program (tokei: +18 `shortwin`, +14 `complete_curve`):
+So a new program, crate or service fails `check` until a reviewed edit of the script puts it in
+a unit or excludes it with a reason. On this tree WP-7's `crates/squads-v4-ix` and
+`services/ops` (`shortwin-gov`) are classified as the `governance` context unit.
+
+**What is in scope** (owner decisions of 2026-10-02, Q2 and "Audit keeper scope"): the on-chain
+core and the keeper's core subset (its coverage budget, liquidation and settlement duties, and
+transaction building; ≈ 4.7k non-test nLOC). Line counts on this tree (the head of `m10/final`; release ELF
+`c4398d01…`):
 
 | Class | Unit | `.rs` files | tokei 14.0.0 "code" | non-test nLOC |
 |---|---|---|---|---|
-| core | `programs/shortwin` (without the TEST-ONLY `venues/mock.rs`) | 70 | 15,876 | 13,122 |
-| core | `programs/complete_curve` | 1 | 294 | 214 |
-| core | `crates/shortwin-math` (`src/`) | 25 | 10,063 | 6,190 |
+| core | `programs/shortwin` (without the TEST-ONLY `venues/mock.rs`) | 70 | 16,058 | 13,199 |
+| core | `programs/complete_curve` | 1 | 293 | 213 |
+| core | `crates/shortwin-math` (`src/`) | 25 | 10,158 | 6,214 |
 | core | `crates/shortwin-venue-state` (`src/`, without the TEST-ONLY `mock_cpamm.rs`) | 10 | 3,697 | 1,617 |
 | core | build pins: `Cargo.toml`, `Cargo.lock`, `Anchor.toml`, `rust-toolchain.toml` | — | — | — |
-| **core** | **total** | **106** | **29,930** | **21,143** |
-| keeper (Q2) | keeper core: exit and crank decisions, coverage and budget, the instructions and account lists it sends (`decide`, `coverage`, `budget`, `fees`, `graduation`, `ixs`, `venue`, `view`, `pda`, `sweep`, `monitor`, `pool_monitor`; `services/common` `tx`, `chain`) | 14 | 7,759 | 4,692 |
-| keeper (Q2) | keeper rest: the loop (`keeper.rs`, 3,235 non-test nLOC), config, metrics, alerts, the RPC backend, the ALT and v1-probe tools | 12 | 6,320 | 5,825 |
+| **core** | **total** | **106** | **30,206** | **21,243** |
+| **keeper** (in scope) | keeper core: exit and crank decisions, coverage and budget, the instructions and account lists it sends (`decide`, `coverage`, `budget`, `fees`, `graduation`, `ixs`, `venue`, `view`, `pda`, `sweep`, `monitor`, `pool_monitor`; `services/common` `tx`, `chain`) | 14 | 7,759 | **4,692** |
+| context | keeper rest: the loop (`keeper.rs`, 3,231 non-test nLOC), config, metrics, alerts, the RPC backend, the ALT and v1-probe tools | 12 | 6,316 | 5,821 |
+| context | governance: `shortwin-gov` (`services/ops`) and its Squads v4 encoders (`crates/squads-v4-ix`); host-only, never on-chain | 16 | 4,661 | 4,124 |
 | out | TEST-ONLY mock venue code (`venues/mock.rs`, `mock_cpamm.rs`, `tests/mock_cpamm`) | 6 | 1,422 | 1,188 |
 
+Since the M10 skeleton (`e857a2a`: core 21,117 nLOC), the three program batches added 126
+non-test nLOC to the core: `security.txt` and the AUD-10 lints (batch 1), SQ-G8, M10-8C-1 and
+the version (batch 2), and the extras denylist (batch 3). The keeper core is unchanged since
+the skeleton; batch 3's `DeniedAccount` fallback is in `keeper.rs` (keeper rest).
+
 **How the lines were counted:**
-- **tokei "code"**: tokei 14.0.0 over each unit's `.rs` files (`tokei <files> -t Rust`). It
-  counts non-blank, non-comment lines and keeps the inline `#[cfg(test)]` modules.
+- **tokei "code"**: tokei 14.0.0 over each unit's `.rs` files (`tokei <files> -t Rust`, the
+  file list from `audit_scope.UNITS`). It counts non-blank, non-comment lines and keeps the
+  inline `#[cfg(test)]` modules.
 - **non-test nLOC**: `python3 scripts/audit_scope.py nloc`. It drops every `#[cfg(test)]` item,
   then counts the same way. The item's end is found by counting braces outside string, char
   and comment text. The script warns when a braced item does not close at its attribute's
   indentation; it gives no warning on this tree.
-- The M10 audit-preparation research counted ≈ 21.4k on-chain (shortwin 13,702 with the mock
-  adapter; math 6,193; venue-state 1,686). The script does better on two files:
+- The M10 audit-preparation research counted ≈ 21.4k on-chain at `e857a2a` (shortwin 13,702
+  with the mock adapter; math 6,193; venue-state 1,686). The script does better on two files:
   - `mint_filter.rs`: the research kept a test module whose attribute spans several lines
     (+263 lines);
   - `u256.rs`: the research kept a test-only `static` (+3 lines).
 
   It also excludes the mock adapter.
 - The research's "keeper subset ≈ 4.8k" had no file list. The keeper-core unit above (4,692)
-  is this package's proposal; the owner decides whether the keeper is in scope at all (Q2).
+  is the subset the owner put in scope.
 
 **Out of scope** (read for context only):
 - the frontend (`apps/web`), the indexer and API (`services/indexer*`), the generated client
   (`clients/js`) and the WASM facade (`crates/shortwin-math-wasm`, `packages/math-wasm`);
+- the keeper outside its core subset, and the governance tool `shortwin-gov` with
+  `crates/squads-v4-ix` (the `context` units above; members review and sign in the Squads app,
+  the tool only stages and verifies: owner decision of 2026-10-03);
 - the tests (`tests/**`, `crates/*/tests`, `services/*-litesvm`), the simulations
   (`docs/design/sim`) and the scripts;
 - the external programs. short.win calls or reads them, and the fork tests run their dumped
@@ -166,14 +187,19 @@ program (tokei: +18 `shortwin`, +14 `complete_curve`):
   - Raydium AMM v4 and CPMM;
   - SPL Token (p-token), Token-2022, the ATA program and spl-memo;
   - the Pyth SOL/USD feed;
-  - Squads v4.
+  - Squads v4 (trusted, not reproduced: KI-59).
 
-  TODO(WP-1): add the Token-2022, memo and Squads fixture pins.
+  Their pins (deploy slots, trimmed ELF hashes, sources) are in `tests/fixtures/README.md` and
+  ARCH §1.1. M10 added the CPMM redeploy (`raydium_cpmm_2026_10`, slot 452,376,460), the
+  mainnet Token-2022 (v11.0.0, `7ea94a02…`) and spl-memo v3 (`f520eaf0…`), and Squads v4
+  (slot 302,582,236, `d4866083…2fac`). `python3 scripts/dump-fixtures.py check --live` reports
+  a pinned program that has moved on mainnet.
 
 **The TEST-ONLY code is compiled out of the release ELF:**
-- The mock venue exists only under the Cargo feature `test-venue`: 34 `cfg` sites in 6 files
+- The mock venue exists only under the Cargo feature `test-venue`: 35 `cfg` sites in 6 files
   (`constants.rs`, `engine/tier.rs`, `instructions/create_market.rs`, `state/market.rs`,
-  `venues/mod.rs`, and venue-state's `lib.rs`).
+  `venues/mod.rs`, and venue-state's `lib.rs`). Two more `cfg`s keep `security.txt` out of the
+  test-venue (and `no-entrypoint`) builds of both programs.
 - That feature goes only into a separate build, `scripts/build-test-venue.sh`, written to
   `target/test-venue/`.
 - CI's anchor-build job (A49) checks that:
@@ -181,7 +207,8 @@ program (tokei: +18 `shortwin`, +14 `complete_curve`):
   - the release `shortwin.so` lacks the marker `shortwin:test-venue:mock-cpamm`. The marker
     is a `shortwin` constant (`constants.rs`), and `complete_curve`'s `test-venue` feature is
     a no-op, so CI does not grep `complete_curve.so` for it;
-  - the test-venue `shortwin.so` contains both, which shows that the checks can see them.
+  - the test-venue `shortwin.so` contains both, which shows that the checks can see them;
+  - the same checks run on the `verifiable-build` job's artifacts.
 - Auditors should still confirm that no `test-venue` path reaches release behaviour.
 
 ---
@@ -220,20 +247,51 @@ program (tokei: +18 `shortwin`, +14 `complete_curve`):
 
 ## 4. Trust and threat model
 
-**Roles.** TODO(WP-7): the Squads v4 layout the owner records (Q4), with vault addresses.
+**Roles.** The owner's layout (decision Q4 of 2026-10-02; ARCH §2.3.2, §3.1, §7.4, §8.5). The
+two Squads v4 multisigs are created on mainnet in M11 with the members' keys, so their
+addresses are not known yet; `shortwin-gov create-multisigs` derives every vault from the
+layout file (`services/ops/governance.example.toml`), and `squads_gov_it` builds this exact
+layout on the dumped mainnet Squads ELF.
+
+| Multisig | Squads v4 config | Its vaults' roles in short.win |
+|---|---|---|
+| **Governance** | 3-of-5, `time_lock` 172,800 s (48 h); autonomous (no config authority), no spending limits, rent collector its own vault 0 | vault 0: the upgrade authority of `shortwin` and `complete_curve`, and `governance`; vault 1: `fee_recipient` |
+| **Emergency** | 2-of-4, `time_lock` 0; autonomous, no spending limits | vault 0: `pause_authority` |
+| (no multisig) | the keeper's hot key | `coverage_authority`, set at `initialize_config` or by a timelocked `Authorities` change |
+
+**SQ-G8 (built in batch 2).** The program refuses a configuration in which two of
+`governance`, `pause_authority`, `fee_recipient` and an installed `coverage_authority` share a
+key (`config::check_authorities`, `AuthoritiesNotDistinct` = 6105; an unset coverage key is
+skipped). It is checked in `initialize_config` and, for an `Authorities` change, at
+`propose_config` and again at `apply_config`.
 
 | Role | Key | Can | Cannot |
 |---|---|---|---|
-| Upgrade authority | the Governance multisig's vault 0 (Squads v4; Q4 default: 3-of-5, `time_lock` 172,800 s) | upgrade `shortwin` and `complete_curve`; runs `initialize_config` once, from the deployer, before the authority moves | — (the upgrade is the trust assumption, ARCH §8.5) |
-| `governance` | the Governance vault | `propose_config` (timelocked, within compiled bounds, `params::validate` + `validate_econ`), `cancel_config`, `set_pause`, `set_route_broken`, `set_venue_extras` (pins `stable`) | move funds; change a venue program id; skip the timelock |
-| `pause_authority` | the Emergency multisig's vault 0 (Q4 default: 2-of-4, `time_lock` 0) | `set_pause`, `disable_venue`, `revalidate_venue(venue, expected_slot)`, `set_route_broken`, `set_venue_extras`, `cancel_config` (not `Authorities` or `Timelock` changes), clear (never set) `paused_coverage` | move funds; re-enable a venue (timelocked); veto an upgrade (to disclose, TODO(WP-7)) |
-| `coverage_authority` | the keeper's hot key, installed only by a timelocked `Authorities` change | set or clear one market's `paused_coverage` (opens only) | anything else (I4: byte for byte) |
-| `fee_recipient` | Q4 default: Governance vault 1 (no spending limits) | receive `sweep_protocol_fees` | — |
+| Upgrade authority | Governance vault 0, after the deployer moves it with the checked `SetAuthorityChecked` (staged by `shortwin-gov`; the deployer runs `initialize_config` once, before) | upgrade `shortwin` and `complete_curve` after the 48 h Squads time lock | — (the upgrade is the trust assumption; ARCH §8.5, KI-45, KI-62) |
+| `governance` | Governance vault 0 | `propose_config` (timelocked, within compiled bounds, `params::validate` + `validate_econ`), `cancel_config`, `set_pause`, `set_route_broken`, `set_venue_extras` (pins `stable`) | move funds; change a venue program id; skip the timelock |
+| `pause_authority` | Emergency vault 0 | `set_pause`, `disable_venue`, `revalidate_venue(venue, expected_slot)`, `set_route_broken`, `set_venue_extras`, `cancel_config` (not `Authorities` or `Timelock` changes), clear (never set) `paused_coverage` | move funds; re-enable a venue (timelocked); veto an upgrade (KI-62) |
+| `coverage_authority` | the keeper's hot key | set or clear one market's `paused_coverage` (opens only) | anything else (I4: byte for byte) |
+| `fee_recipient` | Governance vault 1 (no spending limits) | receive `sweep_protocol_fees` | — |
 | Anyone | — | `crank_price`, `crank_sol_usd`, `liquidate`, `expire`, `sol_settle`, `flag_venue_upgraded`, `flag_unsafe_mint`, `sweep_trader`, `sweep_protocol_fees`, `propose_pool`, `execute_pool_switch`, `create_market`, `apply_config` (after the timelock) | change locked position terms; take any amount but the bounded keeper reward |
 
-Owner question Q4(e) (SQ-G8, a program change) would make the program check that
-`governance`, `pause_authority` and `fee_recipient` are pairwise distinct (the M10 plan
-review adds `coverage_authority`); TODO(WP-6) if the owner approves.
+**Disclosed Squads v4 semantics** (ARCH §8.5; `squads_gov_it` T-SQ-2, -4, -6, -7; known issues
+KI-45, KI-59 … KI-63):
+- A parameter change takes ≈ 96 h end to end: 48 h of Squads time lock from the threshold
+  approval, then 48 h of `timelock_s`. An upgrade waits only for the 48 h Squads time lock.
+- An Approved vault transaction **never expires**. It survives a member rotation and a
+  threshold increase, and executes with the approvals it had. A time-lock increase delays it
+  but does not stale it.
+- Governance **cannot cancel reactively** inside the program window: its `cancel_config` lands
+  at `not_before` at the earliest. Only the Emergency can cancel a parameter change in time,
+  and never an `Authorities` or `Timelock` change.
+- The Emergency **cannot veto an upgrade**; its members cannot vote on Governance proposals.
+- A refused vault execution stays Approved and can be re-executed.
+- `ExtendProgram` is permissionless: an upgrade to a larger ELF needs it first.
+- **No spending limits** exist on either multisig (`shortwin-gov verify` checks the config
+  authority is unset).
+- Members approve and execute **in the Squads app**; `shortwin-gov` only stages and verifies,
+  with no hardware-wallet support. The Emergency's worst-case `set_venue_extras` goes out as
+  three single-signer transactions (owner decision of 2026-10-03).
 
 **Attacker models** (ECON §12.1):
 - **Atomic model.** Bundles inside one transaction or block.
@@ -248,7 +306,9 @@ review adds `coverage_authority`); TODO(WP-6) if the owner approves.
 - the Token programs and memo (U17);
 - the Pyth SOL/USD feed, read through `crank_sol_usd` into an oracle cache. Tiers fall back
   to C when the cache is older than `oracle_stale_s` (600 s);
-- Squads v4 (immutable at slot 302,582,236). TODO(WP-1/WP-7) for its pins.
+- Squads v4: immutable since slot 302,582,236, trimmed ELF `d4866083…2fac`, IDL 2.1.0; the
+  source (`Squads-Protocol/v4@64af733`) is UNVERIFIED and not rebuilt (ARCH §1.1, §12 U34;
+  KI-59). The governance tests run this mainnet ELF itself.
 
 What the design relies on and discloses: ARCH §8.5 and the register's §4.
 
@@ -266,11 +326,24 @@ invariants.
   prefix, so each instruction is checked against its own pre-state (ARCH §8.3 "The M1
   hooks").
 - **The fuzzer.** `tests/fuzz` (ARCH §8.4) runs the same hooks along seeded action sequences:
-  six profiles, on the test-venue build and the sha-checked mainnet forks. Its extra oracles
-  are the I10/I17 gates, a differential exit oracle, I14 omissions and replacements, and I4
-  over the whole VM.
+  six profiles (`mock`, `mixed`, `curve`, `pumpswap`, `amm-v4`, `cpmm`), on the test-venue
+  build and the sha-checked mainnet forks. Its extra oracles are:
+  - the I10/I17 gates and I4 over the whole VM;
+  - I14 omissions and replacements of every `ReadSet` / `TradeExtras` account (`close_short`
+    included since M10; an accepted replacement fails the run);
+  - the differential exit oracles: every keeper `liquidate` / `expire` recomputed from
+    `shortwin-math` on the mock, AMM v4 and CPMM (every lamport, including I11's liveness
+    clause), on the live curve (I-E11) and on PumpSwap (decision level);
+  - the lender oracles (M10): `claim_sol ×N` in one transaction pays once; a JIT deposit
+    around a landed liquidation, expiry or settlement gains at most its shares' part of the
+    immediate rent credit; `[withdraw, sol_settle]` stays within the pre-bundle allowance;
+  - the deficit tripwire and the second claim pass of the wind-down (M10; KI-53).
 - **Mutation testing.** `scripts/mutants.sh` (M7-SEC-6) proves that the hooks catch seeded
   bugs in the open and coverage paths: 7 of 7 killed.
+- **Hook mutants** (M10 WP-8d): tests that feed each hook a wrong instruction and expect it to
+  fail, for I17 (`invariants_m2_hooks::i17_no_curve_open_while_graduation_halted`), I18 on
+  PumpSwap (`pamm_it::hooks::i18_a_*`, `i18_d_*`, `i18_f_*`) and I15's burned-LP sizing and
+  tier (`pamm_it::hooks::i15_an_open_is_sized_and_tiered_on_the_burned_lp`).
 
 | Invariant | Statement (short; ARCH §8.3 is normative) |
 |---|---|
@@ -294,71 +367,84 @@ invariants.
 | I18 | The post-change confirmation (warm-up, guard, seeds) |
 | I19 | An open's terms, recomputed differentially from `shortwin-math` |
 
-TODO(WP-8d): the I13 doc row in `invariants/positions.rs`, and the new hook mutants (I15,
-I17, I18 on PumpSwap).
-
 ---
 
 ## 6. Known issues
 
-[`docs/audit/known-issues.md`](audit/known-issues.md) is the single register: 51 rows (KI-01 …
-KI-51), each with its bound, the decision that covers it and its status. Do not report these
-as findings unless the stated bound is wrong or can be exceeded. Summary:
+[`docs/audit/known-issues.md`](audit/known-issues.md) is the single register: 63 rows (KI-01 …
+KI-63), each with its bound, the decision that covers it and its status, plus the M10
+findings and their resolution (its §6). Do not report these as findings unless the stated
+bound is wrong or can be exceeded. Summary:
 
 | Section | Rows | What |
 |---|---|---|
-| §1 | KI-01 … KI-15 | Economic residuals (O19): the 2 % exit bound, the held model, no liquidation reserve, baskets, settlement push and deferral, degraded-mode S2→S1, the sale-wrapped open's notional (accepted), the run residual, gap risk, creator self-dealing |
+| §1 | KI-01 … KI-15, KI-52, KI-53 | Economic residuals (O19): the 2 % exit bound and the held model, with the real-venue figures accepted on 2026-10-03 (AMM v4 +61.27, CPMM +37.33 / atomic extra +5.34, PumpSwap +10.20 SOL); no liquidation reserve; baskets; settlement push and deferral; degraded-mode S2→S1; the sale-wrapped open's notional (accepted); the run residual; gap risk; creator self-dealing; **M10-8C-1 (fixed)**; the **late-depositor shortfall** (accepted, with the deposit warning at 1 % / 1 SOL) |
 | §2 | KI-16 … KI-29 | Pool switches and third-party LP (O18; ECON §12.12 residuals 1–17), graduation delays |
 | §3 | KI-30 … KI-41 | Keeper coverage and budget (O17, OWNER-M7-*), transaction sizes |
-| §4 | KI-42 … KI-46 | Trust: the venue guard window, halted venues, upgradeable venues and programs, admin powers |
-| §5 | KI-47 … KI-51 | Platform facts relied on (U16, U17, U25, U29, log events) |
+| §4 | KI-42 … KI-46, KI-54 … KI-63 | Trust: the venue guard window, halted venues, upgradeable venues and programs (with the pump venues' 2026-10-02 redeploy), admin powers; the **extras-denylist residuals** (batch 3); the **CPMM creator-fee share**; the Squads source; the **Squads semantics** |
+| §5 | KI-47 … KI-51 | Platform facts relied on (U16's 40 M limit, U17, U25, U29, log events) |
+| §6 | — | M10 findings: M10-8C-1, B2-2, the extras denylist, the 24 h fuzz findings, FUZZ-M10-1, the WP-1 / WP-10 doc findings, GC-F1 |
+
+**Status by owner decision** (SPEC §14, ARCH §10):
+- **Accepted by the owner:** the real-venue held sandwich (KI-01's and KI-02's figures,
+  2026-10-03), the late-depositor shortfall as designed (KI-53, 2026-10-03), the Squads layout
+  (KI-45, 2026-10-02), and the earlier rows marked accepted (KI-12, KI-22 … KI-24, KI-27,
+  KI-28's M6R-4, KI-29, KI-30, KI-35).
+- **Fixed:** M10-8C-1 (KI-52), the extras denylist hardening (batch 3), and the harness and doc
+  findings of the register's §6.
+- **Open** (build default in force; §7): the rest of O19 (KI-03 … KI-11 are disclosed but not
+  signed off), O18 (§2), the M7 keeper items, the extras-denylist residuals (KI-54 … KI-57),
+  the deposit warning's thresholds and B2-2's confirmation.
 
 ---
 
 ## 7. Open owner items and their build defaults
 
 Until the owner decides, the build default stays in force. **Program** marks items whose
-decision, or whose alternative to the build default, changes program bytecode. Those must
-land before the freeze hash. Items marked keeper or web change only that code.
+decision, or whose alternative to the build default, changes program bytecode. After the tag
+such a change is a 1.0.x fix batch with the §12 fix policy. Items marked keeper or web change
+only that code.
+
+**Decided in M10** (SPEC §14 and ARCH §10 record them with their dates): Q1 CI route, Q2 audit
+shape, Q3 security contact, Q4 Squads layout and SQ-G8, Q5/Q6 defaults (2026-10-02);
+M10-8C-1, the release version, the keeper scope, calibration data, CI minutes (2026-10-02);
+O19's real-venue figures, the late-depositor warning, the extras denylist hardening, Squads
+signing (2026-10-03). All the program-affecting ones are built (batches 2 and 3).
 
 | Item | Decision needed | Build default (in force) | Changes program code? |
 |---|---|---|---|
-| **O9** (ECON G37, U21) | Calibrated gap frequencies per tier and the pre-committed rule: if the 95 % upper bound of λ_up exceeds a tier's break-even, raise CR_open or rent, or cut caps (M10 Q5) | Uncalibrated Monte Carlo (ECON §11.6, illustrative) | Parameters through governance; **program** only if a value leaves its compiled bounds. TODO(WP-9) |
+| **Pump venues' redeploy** (ARCH §12 U30, [V21]; KI-44) | pump, PumpSwap and pump-fees were redeployed on 2026-10-02 (slots 452,654,932 / 452,654,882 / 452,655,002), after the M10 fixtures were dumped. Re-dump them as new fixture groups, re-run their suites, then freeze; or tag first and treat them under the venue-upgrade addendum (§12) | The fixtures and every test are on the pre-redeploy ELFs; on mainnet the latch refuses opens on those venues until they are revalidated | Not by itself; **program** only if the new binaries need an adapter change |
+| **Deposit-warning thresholds** (KI-53) | `UNPAID_RENT_WARN_BPS` 100 (1 % of the deposit's value at `P_ema`) and `UNPAID_RENT_WARN_LAMPORTS` 1 SOL (`apps/web/src/config/disclosures.ts`); or a receivable-aware share price instead | The warning at 1 % / 1 SOL; no share-price change | Web only; the share-price alternative is **program** |
+| **Extras-denylist residuals** (KI-54 … KI-57) | Accept residuals (i)–(iv) of batch 3 | Accept and disclose | No; a different rule is **program** |
+| **B2-2** (KI-52) | Confirm the M10-8C-1 rule for settlements: past `min_rent_s` the top-up a settlement vests is about `rent_protocol_bps` of the rent, which goes to the lenders who stay | As built (batch 2) | No if confirmed; **program** otherwise |
+| **`SECURITY.md` / `/security` policy defaults** (Q3 fixed only the contact, policy URL and project URL) | Response times "best effort" (no number); no published encryption key ("ask for a channel"); no bounty before the beta; the safe-harbour wording; the keeper, indexer and API operated by short.win in scope for reports | As written in `SECURITY.md` and the web page | Web / docs only |
+| **O19** (the rest) | Sign off the disclosed residuals of known-issues §1 (KI-01, KI-03 … KI-11); the real-venue figures are already accepted | Accept and disclose; no liquidation reserve | No; the alternative (a rent-only liquidation reserve) is **program** |
 | **O18** with the SPEC §14 "Delegated, proposed" rows **10** (collateral and liquidation by tier), **13** (dynamic rent) and **18** (fee split) | Confirm the PROPOSED parameters and venue rules: ARCH §2.3.3, §10 O18; ECON §14 lists 32 PROPOSED rows | As built | No if accepted; **program** for any rule the owner rejects |
-| **O19** | Accept the disclosed residuals (known-issues §1) | Accept and disclose; no liquidation reserve | No; the alternative (a rent-only liquidation reserve) is **program** |
+| **O9** (ECON G37, U21) | The calibrated gap frequencies per tier and the pre-committed rule (if the 95 % upper bound of λ_up exceeds a tier's break-even, raise CR_open or rent, or cut caps), after ≥ 30 days of the public-RPC crawl | Uncalibrated Monte Carlo (ECON §11.6, illustrative); the crawl runs | Parameters through governance; **program** only if a value leaves its compiled bounds |
 | **M6D residual 16** (ECON §12.12; KI-26) | Accept the margin of a position opened while a deposit is held, or price the open's margin on the burned depth | Accept (margin on the pool as it is) | The alternative is **program** |
-| **OWNER-M6SK-1** (KI-28) | The keeper's tx3 records the new pool's first bucket (+9 → +16 s tracking after a ×3 pump) | As built | Keeper only |
+| **OWNER-M6SK-1** (KI-28) | The keeper's tx3 records the new pool's first bucket (+9 → +16 s tracking after a ×3 pump) | As built | Keeper core |
 | OWNER-M7-1 (KI-41) | The build-alt table as the normative A28 | Adopt; per-market table as fallback | No (ALT) |
-| OWNER-M7-2 (KI-31) | (a) accept the free-pool drain, or (d) a per-market hourly cap on liquidity-anomaly coverage | (a) | Keeper only |
-| OWNER-M7-4 (KI-37) | Isolated missed seconds and `liq_cover_s` | PROPOSED until production telemetry | Keeper only |
+| OWNER-M7-2 (KI-31) | (a) accept the free-pool drain, or (d) a per-market hourly cap on liquidity-anomaly coverage | (a) | Keeper core |
+| OWNER-M7-4 (KI-37) | Isolated missed seconds and `liq_cover_s` | PROPOSED until production telemetry | Keeper core |
 | OWNER-M7-5 | The LiteSVM action-sequence fuzzer instead of Crucible | As built | No (tooling) |
-| OWNER-M7-6 (KI-32) | (a) the alerted overdraft, or (b) cap the overdraft | (a) | Keeper only |
+| OWNER-M7-6 (KI-32) | (a) the alerted overdraft, or (b) cap the overdraft | (a) | Keeper core |
 | OWNER-M7-7 | `per_market_daily_lamports` | Superseded by OWNER-M7-17 (decision A) | — |
-| OWNER-M7-8 (KI-36) | T-CASCADE defaults (12 M / 20 M) and the fee-payer residual | Confirm; separate crank payer not built | Keeper only |
+| OWNER-M7-8 (KI-36) | T-CASCADE defaults (12 M / 20 M) and the fee-payer residual | Confirm; separate crank payer not built | Keeper core |
 | OWNER-M7-9 (KI-38) | Keeper load: sequential RPC | Accept for the beta | Keeper / ops |
-| **OWNER-M7-17 (3)** and its defaults (KI-33, KI-34) | `G` 1 SOL, floor 1 SOL, margin 10,000 bps, tail 2,000 bps; (3) the drainable free pool, (a) accept or (b) confine bursts; (4) idle cadence below the floor | As built, (a) | Keeper only (budget logic and config) |
+| **OWNER-M7-17 (3)** and its defaults (KI-33, KI-34) | `G` 1 SOL, floor 1 SOL, margin 10,000 bps, tail 2,000 bps; (3) the drainable free pool, (a) accept or (b) confine bursts; (4) idle cadence below the floor | As built, (a) | Keeper core (budget logic and config) |
+| **M8: IX-1, IX-11** (INDEXER.md §14) | Add `rent_protocol`, `q` and `ema_price` to the `Liquidate` / `Expire` / `SolSettle` events, and `record_donation` to `EpochRolled`, so the indexer need not derive them | Not added; the indexer derives them | **Program** (IDL, CU, trace): after the tag only as a 1.0.x batch |
+| M8: IX-9, IX-10, IX-14, IX-15, IX-18 | Off-chain indexer items (deployment, fee-sharing attribution, harness coverage, versioned decoders) | Open, out of scope | Indexer only |
 | FE-21 | Refuse sending-only wallets for writes, or keep the post hoc check | Post hoc check | Web only |
 | FE-23 | Source maps: upload to a private error tracker, or publish | Built hidden, not deployed | Web / ops only |
+| Other M10 items | The G-H10 reading of a zero-lamport borrower ((A) reaped after the open, (B) emptied inside the exit's transaction; both tested); the fuzzer's PumpSwap weights (`fee_shock` 3, `open_near_cap` 6); whether to publish the private audit report (recommended, before the beta) | As built; publication undecided | No |
+| Scope note | `shortwin-gov` and `crates/squads-v4-ix` are out of scope under the owner's scope decision (programs plus keeper core). They prepare the transactions the members sign; add them to the RFQ if the owner wants them reviewed | Out of scope (§2) | No |
 
-**Corrections to the M10 plan (Q2):**
-- The plan lists OWNER-M7-17 (3) and OWNER-M6SK-1 among the "program-affecting" items that
-  gate the freeze. Both change only keeper code. They gate the freeze only if the keeper
-  subset is in scope.
-- Program-affecting decisions that the owner-gates list above does not name:
-  - **Q3**: the final `security.txt` values. They are bytes in both ELFs.
-  - **Q4(e)**: SQ-G8, the distinct-authorities check.
-  - **The version bump**: `source_release` embeds the package version (M10 plan review B7).
-  - **CPMM adapter changes**: any that WP-2 finds after the CPMM redeploy.
-
-**Items tagged M10 that no work package covers** (M10 plan review C1). The suggestion for each is
-WP-11's to record:
-- **FE-15**: the WASM facade exports. A frontend refactor, outside the audit; re-tag M11.
-- **FE-18**: the post-wipe sweep bundle and the claim-time `sync_lender` on a validator.
-  WP-8c's `lender_real_it` (two real wipes) can cover the program side; the browser side moves
-  to M11.
-- **FE-22**: the slot-age thresholds. They need mainnet latency data; re-tag M11.
-- **IX-16**: venue layouts against mainnet. WP-9's decoder parity tests (GC-7) cover the
-  decoder part.
+**Closed since the skeleton:** the M10 plan's corrections (WP10-PLAN-Q2) and the four items
+tagged M10 without a work package: FE-15 is done in M10 (frontend only, no program bytecode);
+FE-18 is partly closed (the mock-venue bundle, claim-time sync and venue claim encodings on a
+validator; the pump / PumpSwap composite bundle is M11's); FE-22 moved to M11 (it needs
+mainnet latency); IX-16's decoder half is closed (GC-7 / GC-F1), its refresher and admin
+watch are M11's.
 
 ---
 
@@ -367,44 +453,54 @@ WP-11's to record:
 ARCH §12 is the **normative** UNVERIFIED register. The research notes (`docs/research/*.md`)
 are historical: where they disagree with ARCH §12 or the code, ARCH §12 and the code win.
 
-TODO(WP-11): reconcile the doc-wide re-grep `grep -rn UNVERIFIED docs programs tests crates
-services` with §12. That includes the stale lines the M10 plan names (ARCH 598, 917, 1389,
-1736, 1804, 1824, 2448) and the R-TOOL corrections.
+**Status on this tree** (ARCH §12 after the M10 doc sync):
 
-| U | Item | Status at `e857a2a` | M10 action |
+| U | Item | Status | Left for |
 |---|---|---|---|
 | U1 | PDA `user` under CPI (pump buy, PumpSwap buy) | VERIFIED on the dumped ELFs (M5, M6). A PumpSwap buy by a third-party PDA is unseen on mainnet | — |
 | U2, U3, U6, U7, U9, U11, U24 | Non-ATA WSOL, `disable_flags` bits, rent debits, ATA depth, unsigned `claim_cashback`, CPMM exact-out creator fee, trailing accounts | VERIFIED / RESOLVED (M3–M6) | — |
-| U4 | Whole-instruction CU, trace and size figures | Every instruction class is measured: M1 admin (`m1_cu`), the M2 engine on the mock (`m2_cu`), Raydium (`m3_cu`), the curve (`m5_cu`), PumpSwap (`m6_cu`), the keeper's own transactions (`m7_keeper`). All are within the PROPOSED limits | **Relabel VERIFIED (measured)** (AUD-12; text for WP-11 in the WP-10 report). Re-baselined after each WP-6 batch |
-| U5 | Copying a 10 MiB ProgramData | VERIFIED for CU (M3: not metered, 6,032 / 8,440 CU). Latency and fee are unmeasured | The two stale test-file markers are fixed in WP-10 (`tests/litesvm/tests/it/cu.rs`, `tests/bench/m1_cu/src/lib.rs`; M10 plan review C4) |
-| U8, U22 | The straddle bundle on a live block engine; Jito semantics | Curve and tx3 VERIFIED on the fork. RPC pre-flight and live submission unverified | Q6(a) probe, else M11 |
-| U10 | Delegated `pool_vault` sell; direct delivery for Token-2022 CPMM | Tested in M3 (`ray_it::pda`, including `cpmm_token_2022`), but the §12 row was never relabelled | TODO(WP-2): re-run on the 452,376,460 CPMM ELF, then WP-11 relabels |
-| U12 | Raydium deployed binaries vs public source | Behavioural match only. CPMM was redeployed at 452,376,460, probably from branch `feat/creator-fee-share` `bdeee23` (M10 plan review A1); not verified | TODO(WP-2) |
+| U4 | Whole-instruction CU, trace and size figures | **VERIFIED (measured)** for every instruction class (`m1_cu`, `m2_cu`, `m3_cu`, `m5_cu`, `m6_cu`, `m7_keeper`), within the PROPOSED limits, re-baselined after each M10 batch | — |
+| U5 | Copying a 10 MiB ProgramData | VERIFIED for CU (not metered). Latency and fee are unmeasured | M11 (mainnet) |
+| U8, U22, U25 | The straddle bundle's pre-flight and a live block engine; Jito semantics; v1 transactions landing | Fork parts VERIFIED; the live parts **UNVERIFIED**: no mainnet spend before the audit (owner default Q6) | M11 probes |
+| U10 | Delegated `pool_vault` sell; direct delivery for Token-2022 CPMM | **VERIFIED** on the dumped ELFs, re-run on the 452,376,460 CPMM ELF | a mainnet example in M11 |
+| U12 | Raydium deployed binaries vs public source | **CPMM closed:** the redeploy is `raydium-cp-swap@bdeee23`, rebuilt byte for byte (the manifest's `source.status` text still says UNVERIFIED; ARCH §12 is normative). **AMM v4:** a behavioural match only | — |
 | U13, U14 | Raydium admin history; the `open_time` clamp deploy | Keeper monitor; a conservative constant | — |
-| U15, U30 | VQR drift; pump's announced 2026-09-30 upgrade | Third-party LP explains the drift. The upgrade is not deployed (watch) | The latch, and a re-dump on deployment |
-| U16 | The per-writable-account limit in clients other than Agave | **Desk-checked in WP-10** (below): 40 M on mainnet in both Agave master and Firedancer | TODO(WP-11): ARCH §0 [V10], §6.6, U16 text |
-| U17 | CPI'd memo satisfies Token-2022 MemoTransfer | Passes on the bundled Token-2022 | TODO(WP-3): on the mainnet Token-2022 v11.0.0 ELF (`7ea94a02…`) |
-| U18 | `declare_program!`, the lockfile resolution, solana-verify vs `anchor build` | The M10 research shows byte equality at `e857a2a`, and the WP-10 build reproduces the hash | TODO(WP-4) closes it in CI |
-| U19, U23 | Surfpool template fidelity; the Switchboard shutdown | Not used by the build | WP-11: close as not relied on |
-| U20, U21, U28 | Arbitrage of held pumps; gap frequencies; price noise | Uncalibrated assumptions | TODO(WP-9) (U21, partly U20 and U28); U28 from production |
-| U25 | v1 transactions land on mainnet | Tool built (`shortwin-v1-probe`), not run | Q6(a) |
+| U15, U30 | VQR drift; pump's announced upgrade | Third-party LP explains the drift. pump, PumpSwap and pump-fees **were redeployed on 2026-10-02**, after the fixtures; not yet re-dumped | Before the freeze or under the addendum (§7, §12) |
+| U16 | The per-writable-account limit | **Desk-checked:** 40 M CU on mainnet in Agave master and Firedancer (below); other clients not checked | monitoring |
+| U17 | CPI'd memo satisfies Token-2022 MemoTransfer | **VERIFIED on the mainnet build** (Token-2022 v11.0.0 `7ea94a02…`, spl-memo v3) | a mainnet transaction (M11, TMEMO-10) |
+| U18 | `declare_program!`, the lockfile resolution, solana-verify vs `anchor build` | **RESOLVED:** byte-identical for both programs (§0) | CI on this tree (§10) |
+| U19, U23 | Surfpool template fidelity; the Switchboard shutdown | **Closed: not relied on** | — |
+| U20, U21, U28 | Arbitrage of held pumps; gap frequencies; price noise | Uncalibrated. U21: method and public-RPC crawl since 2026-10-02, results pending | ≥ 30 days of tapes (O9); U28 from production |
 | U26 | The latch's reaction time | Monitoring; LiteSVM cannot model it | — |
 | U27 | Keeper cost inputs | Closed (M7) | — |
-| U29, U31, U32, U33 | pump's cap byte; pAMM `claim_cashback` and `init_user_volume_accumulator`; `set_coin_creator`; the LP accounting behind `D` | Pinned on the dumped ELFs | Re-verify on every pump / pAMM upgrade |
+| U29, U31, U32, U33 | pump's cap byte; pAMM `claim_cashback` and `init_user_volume_accumulator`; `set_coin_creator`; the LP accounting behind `D` | Pinned on the dumped ELFs | Re-verify on every pump / pAMM upgrade (U30) |
+| U34 | The Squads v4 program's source | Trusted, not reproduced (`64af733` probable, not rebuilt; KI-59) | optional rebuild |
 
-**UNVERIFIED markers in code** (`grep -rn UNVERIFIED --include=*.rs`) that no work package
-owns (M10 plan review C4):
-- U5 in `tests/litesvm/tests/it/cu.rs:3` and `tests/bench/m1_cu/src/lib.rs:60`: restated in
-  WP-10 as VERIFIED for CU, with latency and fee unmeasured. Comments only.
-- `services/common/src/rpc.rs:20` (U22), `services/keeper-litesvm/tests/scenarios/m7_cost.rs`
-  (OWNER-M7-9, the live-RPC capacity), `tests/litesvm/tests/graduation_e2e.rs:1188` (R-VEN
-  §1.4) and `crates/shortwin-math/tests/quotes_mainnet.rs` (the five fee branches): still
-  accurate.
-- `programs/shortwin/src/instructions/withdraw.rs:37` (U17): TODO(WP-6), once WP-3 lands.
+**The re-grep** (`grep -rn UNVERIFIED docs programs tests crates services` on this tree) has no
+contradiction with ARCH §12. Every marker outside ARCH §12 maps to a row above or is
+historical:
+
+| Where | Marker | Maps to |
+|---|---|---|
+| `docs/research/*.md` (100 lines) | the research notes' own markers | historical; ARCH §12 wins (the M10 doc sync corrected R-TOOL, R-MINT, R-RAY and the venue notes) |
+| `docs/design/ECONOMICS.md` (§17, the boost rule, v1 batches) | ECON's own register | U15, U25, U16 (struck through and restated as desk-checked) |
+| `docs/DEVELOPMENT.md`, `tests/fixtures/README.md`, `tests/fixtures/manifest.json`, `tests/litesvm/src/fork.rs`, `crates/squads-v4-ix/src/lib.rs` | the CPMM and Squads fixture sources | U12 (CPMM: rebuilt since; the manifest's status text predates it) and U34 |
+| `docs/design/FRONTEND.md` FE-3 | browser bundle submission | U22 |
+| `services/common/src/rpc.rs` | live bundle submission | U22 |
+| `services/keeper-litesvm/tests/scenarios/m7_cost.rs`, `tests/bench/m7_keeper/results.*`, `services/README.md` | the keeper's live-RPC capacity | OWNER-M7-9 (KI-38) |
+| `tests/litesvm/tests/graduation_e2e.rs:1188` | how a bot spends a donation | R-VEN §1.4 (not relied on) |
+| `crates/shortwin-math/README.md`, `crates/shortwin-math/tests/quotes_mainnet.rs` | five fee branches with no mainnet trade | covered by the reference-model proptests; the re-scan is deferred (below) |
+| `tests/bench/cu_math/README.md` | ARCH §1.1's old Agave resolver question | settled (U18) |
+| `docs/design/sim/shortwin_sim.py` | the proportional boost rule | U15 |
+| `docs/AUDIT.md`, `docs/audit/*` | this package | this section |
+
+The stale markers the M10 plan named (ARCH lines 598, 917, 1389, 1736, 1804, 1824, 2448 at
+`e857a2a`), the two U5 test-file markers and `withdraw.rs`'s U17 marker are gone: no marker is
+left under `programs/`.
 
 **AUD-12 cheap checks** (M10 audit preparation; M10 plan review C3):
-- **U4 label.** Done (table above). Read-only check: every bench has a committed
-  `results.md` from a passing run, and the benches fail CI on any figure over its budget.
+- **U4 label.** Done (ARCH §12 U4). Every bench has a committed `results.md` from a passing
+  run, and the benches fail CI on any figure over its budget.
 - **U16, the Firedancer desk check.** Done, read-only:
   - Firedancer at `firedancer-io/firedancer@e8f25f34` (2026-10-01):
     - `src/flamenco/runtime/fd_slot_params.h` sets `max_writable_account_units` to
@@ -422,23 +518,24 @@ owns (M10 plan review C4):
     was activated at slot 435,888,000.
   - Result: the effective limit is **40 M CU per writable account** (100 M per block) in both
     clients, not the 24 M that ARCH §0 [V10] and §6.6 state.
-  - Consequences, all for the doc delta; none is a program change:
-    - censoring a market costs ×1.67 more than ARCH §6.6 states;
-    - the keeper's `market_cu_per_slot` (12 M) is now 30 % of the per-account budget;
+  - Consequences, none a program change (ARCH §0 [V10], §6.6 and ECON §17 now state 40 M):
+    - censoring a market costs ×1.67 more than the 24 M assumption gave;
+    - the keeper's `market_cu_per_slot` (12 M) is 30 % of the per-account budget;
     - the OWNER-M7-8 payer residual has more room.
 - **The five fee branches with no mainnet trade** (`crates/shortwin-math/README.md:326`,
   `quotes_mainnet.rs:426`): **deferred**. A re-scan needs a crawl that looks for curve
   default-creator and per-curve or per-pool `creator_fee_bps` overrides, and CPMM exact-out
-  trades with the creator fee on either side. WP-9's crawler (GC-7 decoders) can flag them;
-  otherwise M11.
+  trades with the creator fee on either side. The calibration crawler's decoders (GC-7) can
+  flag them; otherwise M11.
 
 ---
 
 ## 9. Reproduce
 
 These commands are for a Linux host with the pinned toolchain (`docs/DEVELOPMENT.md` "Setup":
-rustup, Agave 4.1.2, Anchor 1.2.0, mise for Node and pnpm). TODO(WP-12): time them on the tag;
-the target is 30 minutes after the toolchain is installed.
+rustup, Agave 4.1.2, Anchor 1.2.0, mise for Node and pnpm). The target is 30 minutes after
+the toolchain is installed; the times in the comments are this package's gate (§10) on a
+3-job build limit, with a warm `target/`.
 
 ```sh
 # 1. Build both programs (release) and the TEST-ONLY test-venue build; check SBPF v3
@@ -446,13 +543,14 @@ anchor build --tools-version v1.57 --arch v3 && scripts/build-test-venue.sh
 od -An -t x4 -j 48 -N 4 target/deploy/shortwin.so            # 00000003
 # 2. Hashes, compared with §0
 sha256sum target/deploy/shortwin.so target/deploy/complete_curve.so
-#    TODO(WP-4): scripts/verifiable-build.sh --local --compare target/deploy
+#    and the verifiable build, byte for byte (Docker; --local runs the same image without one)
+scripts/verifiable-build.sh --compare target/deploy            # ≈ 4 min (a fresh clone)
 # 3. Fixtures: every dumped mainnet account and ELF matches its checksum
 (cd tests/fixtures && sha256sum -c SHA256SUMS) && python3 scripts/dump-fixtures.py check
 # 4. The math crate (proptests at the CI count)
 PROPTEST_CASES=2000 cargo test -p shortwin-math --locked
-# 5. The program tests with the invariant hooks (≈ 15 min debug): the engine on the test-venue
-#    build, every venue on the release build against the dumped mainnet ELFs
+# 5. The program tests with the invariant hooks (≈ 20 min debug): the engine on the
+#    test-venue build, every venue on the release build against the dumped mainnet ELFs
 cargo test -p shortwin-litesvm-tests --locked
 # 6. The fuzzer's smoke tests and corpus replays, then a short run on every profile
 cargo test --release -p shortwin-fuzz --locked
@@ -467,18 +565,56 @@ The full gate (G-full in the M10 plan; CI's `ci.yml`) also runs fmt and clippy w
 ## 10. Evidence
 
 **CI.** `.github/workflows/ci.yml` has these jobs:
-- fmt, clippy, test, vectors, deny, wasm, cu-math;
-- anchor-build, including A49, the release-vs-test-venue check;
+- fmt, clippy, test (with `squads-v4-ix`), vectors, deny, wasm, cu-math;
+- anchor-build, including A49 (the release-vs-test-venue check) and the release gate
+  `check-security-txt.py --forbid-placeholders` on both ELFs;
+- verifiable-build (solana-verify 0.5.2 in the pinned image, byte equality with
+  anchor-build's artifacts, A49 on its output, the hashes in the job summary);
 - program-tests, t-pot, codama (IDL and client diffs, both IDLs), web, web-e2e;
 - the benches m1-cu, m2-cu, m3-cu, m5-cu, m6-cu, m7-keeper-bench, and t-size;
-- services and indexer;
+- services (with `shortwin-gov`) and indexer;
 - fuzz-smoke on every push; fuzz-nightly and mutants are opt-in. A `schedule` run (main only)
   runs them only when the repository variable `FUZZ_NIGHTLY` is `true` (owner decision
   2026-10-02, `4cb7729`). Otherwise they run on `workflow_dispatch`: fuzz-nightly only with a
   `fuzz_duration` input, mutants on every dispatch.
 
-TODO(WP-4) adds the `verifiable-build` job, and TODO(WP-6) a `security.txt` step.
-TODO(WP-12): the green run URL on the tag (Q1: how `m1-core` gets CI).
+**CI runs:** the first green run on `main` is at `e857a2a` (run 36972628387). The final tree's
+run is pending the owner-approved push (owner decision Q1: `main` is fast-forwarded after each
+verified step); its URL and the `verifiable-build` job's hashes go here at the tag.
+
+**This package's gate** (2026-10-03, on `m10/final` from the merged tree `3a0ad1f` through
+this package's commits; every commit after `e972f88` changes only docs and the scope script,
+so no ELF, test, IDL or lockfile input changed during the gate). Every step of CI's jobs, run
+locally with at most 3 concurrent build jobs:
+
+| Step (CI job) | Result |
+|---|---|
+| anchor build + `scripts/build-test-venue.sh` | `shortwin.so` `c4398d01…39ea`, `complete_curve.so` `f3a47201…6d42`, test-venue `shortwin.so` `b6793ea3…397c` |
+| A49 (anchor-build) | `e_flags` 0x3 on every ELF; the mock id in neither release ELF and in the test-venue one; the marker only in the test-venue `shortwin.so`; release ≠ test-venue: `A49-OK` |
+| security.txt (anchor-build) | the checker's 11 unit tests; both release ELFs valid with `--forbid-placeholders --source-release v1.0.0`; one marker each, none in the test-venue ELF |
+| fmt; clippy `-D warnings` on the workspace, `-p shortwin`, `-p shortwin-math` | clean |
+| lockfiles; `cargo deny` (root, services); `cargo audit` (8 lockfiles, CI's ignore list) | no lockfile change; `advisories ok, bans ok, licenses ok, sources ok` twice; no vulnerability |
+| vectors; T-CONFIG | regenerated, no diff; `config_check.py` OK and `test_config_gate.py` 8 tests |
+| wasm | `shortwin-math` and the facade on `wasm32-unknown-unknown`, `cargo check -p shortwin` there; the facade smoke test |
+| fixtures | `dump-fixtures.py check`: 259 entries; `SHA256SUMS`: 245 files OK |
+| `cargo test -p shortwin-math -p shortwin-math-wasm`, then `PROPTEST_CASES=2000 cargo test -p shortwin-math` | 310 + 20 passed, then 310 passed at 2,000 cases; 0 failed |
+| `cargo test -p squads-v4-ix` (test) | 13 passed |
+| **`cargo test --workspace --locked`** (test, program-tests) | **1,534 passed, 0 failed, 4 ignored** (103 test binaries and the doc tests; the whole LiteSVM suite with the hooks), 1,276 s |
+| verifiable build (`--local --compare`) | byte-identical for both programs (§0), 251 s |
+| codama; client check | both IDLs equal the build's; the regenerated client has no diff; 28 client tests twice |
+| web: build, lint, typecheck, Vitest | clean; **565 passed, 1 skipped** |
+| **web E2E** (all specs, under the E2E lock) | **58 passed** in 22 spec files (6.5 min) |
+| services: fmt, clippy (workspace, keeper), build | clean |
+| **services tests** (services, indexer) | **350 passed, 0 failed, 6 ignored** (27 test binaries; keeper, LiteSVM scenarios, T-OPS, indexer with Postgres) |
+| keeper A49 | the release `shortwin-keeper` is free of the mock id; the scenarios binary embeds it |
+| m7-keeper-bench; `keeper_cost.py` | 3 passed; the cost model's output equals `docs/design/sim/out/keeper_cost.txt` |
+| fuzz crate tests (fuzz-smoke) | 24 passed (release: smoke tests and corpus replays) |
+| **fuzz, 10 min**, `--profile all --seed 20261071 --jobs 3` | 629 s: 399 runs, 58,414 actions, 833,822 transactions, 1,661,827 hook checkpoints, 399 wind-downs; **0 failures, 0 anomalies**; the deficit tripwire checked 3 deficits (largest at 0.9997 of its bound) |
+| **mutants** (`scripts/mutants.sh`) | **7 / 7 killed**, by the tests and by a 3-minute fuzz each |
+| cu-math; t-pot; t-size | 2; 5; 11 passed |
+| benches m1, m2, m3, m5, m6 (fmt, clippy, run) | 1, 4, 5, 7, 3 passed: every figure within its budget; no committed result changed |
+| `python3 scripts/audit_scope.py check` | ok |
+| relative links of `docs/`, `SECURITY.md`, `README.md` | 20 files, 71 relative links, 0 broken (no link checker is installed; a script checks every relative markdown link and anchor) |
 
 **Which ELF each suite runs on.** Know this before reading test results:
 - The **M2 engine suites run on the TEST-ONLY test-venue ELF**
@@ -501,18 +637,48 @@ trace, stack depth); `tests/litesvm/README.md` (the suites and their figures);
 `tests/bench/m7_keeper` and `m7_cascade` (keeper cost and T-CASCADE).
 
 **Fuzz:**
-- The M7 24 h run (`~/.cache/shortwin-work/fuzz24`) runs on a harness from before `e857a2a`.
-  Its three failures are harness bugs, fixed in `e857a2a` (FUZZ-M7-24H-1, -2; M10 plan review B6).
-- TODO(WP-12): a ≥ 24 h run on the final tree with 0 failures, with its commit and
-  `summary.json`.
+- **24 h run 1**, at `eb82a2a`: seed 20261001, 4 jobs, 86,405 s; 84,053 runs, 16,098,571
+  actions, 207,549,074 transactions, 318,356,256 hook checkpoints. 4 failures in 3 harness
+  signatures (FUZZ-M7-24H-1, -2; fixed in `e857a2a`) and 1 anomaly (FUZZ-M7-24H-3; fixed in
+  `22961b0`, the economics are KI-53). Program invariant violations: 0.
+- **24 h run 2** (the confirmation), at `4cb7729` (its `shortwin.so` equals `e857a2a`'s and
+  `eb82a2a`'s, `00011844…`): seed 20261002, 4 jobs, 86,401.8 s (2026-10-02T10:12:42Z →
+  2026-10-03T10:13Z); 72,149 runs, 13,821,419 actions, 178,365,479 transactions, 273,589,118
+  hook checkpoints, 72,149 wind-downs. **0 failures, 0 anomalies**: M7's exit criterion
+  "fuzz clean ≥ 24 h" is met.
+- **The final tree's ≥ 24 h run is pending.** The M10 program batches 1–3 changed both
+  programs after run 2's commit, so this tree needs its own run; it starts after this
+  package. Its commit, seed and `summary.json` go here, and a failure is handled as a finding
+  (§12).
+- This gate's 10-minute smoke on this tree is in the table above.
 
-**M10 additions:** TODO(WP-2 … WP-9):
-- WP-2: CPMM on the live binary;
-- WP-3: T-MEMO on the mainnet Token-2022;
-- WP-5 and WP-8: the adversarial matrix re-run with its new test binaries;
-- WP-7: Squads `squads_gov_it` T-SQ-1..9;
-- WP-6: `security.txt` (`query-security-txt` output);
-- WP-9: the calibration report.
+**M10 evidence** (ARCH §9 M10 row and §8.2 are normative):
+- **CPMM on the live binary** (WP-2): fixture group `raydium_cpmm_2026_10` (slot 452,376,460),
+  `raydium-cp-swap@bdeee23` rebuilt byte for byte; every CPMM suite, the m3 / m5 / m6 and M7
+  benches and the web E2E validator on it; no adapter change.
+- **T-MEMO** (WP-3, U17): `security::sec_7_*` and `t_memo_control_top_level_sibling_check` on
+  the mainnet Token-2022 and spl-memo v3 ELFs; the whole LiteSVM suite runs on them.
+- **Adversarial suite** (WP-5, WP-8, the CPMM-deferred cases): the M10 matrix's 62 sub-cases
+  per venue (ARCH §8.2 table); new binaries and modules `pamm_it::{structure, wsol, admin,
+  hooks}`, `ray_it::route`, `pump_it::fees`, `engine_it::zero_lamport`, `route_it::hard_cap`,
+  `raydium_cpmm_attacks`, `pumpswap_attacks`, `raydium_cpmm_exits_it`, `lender_real_it`; ECON
+  §12 figures per venue in `tests/litesvm/README.md`.
+- **Extras denylist** (batch 3): `engine_it::o6::the_denylist_holds_on_every_leg_instruction`,
+  `ray_it::structure::the_pool_and_the_borrower_are_denied_extras_on_both_programs`,
+  `pump_it::structure::the_curve_and_the_borrower_are_denied_extras`,
+  `pamm_it::admin::the_pool_and_the_borrower_are_denied_extras_on_pumpswap`, the three
+  `template_aliases_*` tests, and the keeper scenario
+  `extras::liquidations_bypass_a_current_set_the_program_denies`.
+- **M10-8C-1** (batch 2): `lender_real_it::finding_m10_8c_1_*` (un-ignored, passing).
+- **Squads governance** (WP-7): `crates/squads-v4-ix` (pinned to IDL 2.1.0), `squads_gov_it`
+  T-SQ-1..9 on the mainnet Squads ELF, `shortwin-gov` with its T-OPS end-to-end tests
+  (`services/ops/tests/gov_e2e.rs`).
+- **security.txt** (batches 1–2): the values in §0; `check-security-txt.py
+  --forbid-placeholders` on both ELFs in the gate; none in the test-venue ELF; the web's
+  `/.well-known/security.txt` and `/security` page; `SECURITY.md`.
+- **Gap calibration** (WP-9): the method (`docs/research/gap-calibration.md`) and the
+  public-RPC crawler (`scripts/gapcal`), crawling since 2026-10-02; results after ≥ 30 days
+  (KI-14, §7 O9).
 
 ---
 
@@ -523,7 +689,9 @@ These are where we would look first. They are not limits on the scope.
 1. **Remaining accounts.** Every instruction that prices or trades takes its venue accounts as
    a `ReadSet` / `TradeExtras` tail (ARCH §3.0). Check:
    - key checks against market state (I14);
-   - the extras templates and the denylist (A41; `set_venue_extras`, `venues/mod.rs`);
+   - the extras templates and the denylist (A41; `set_venue_extras`, `venues/mod.rs`), including
+     M10 batch 3's `venues::pool_denylist` (the adopted pool, its reserve vaults and the
+     borrower, checked after a template entry is re-derived);
    - account substitution and omission on every venue.
 2. **The trader PDA and the vault delegate.** Check the normalisation before each leg
    (donations of lamports, tokens or accounts), and the `ApproveChecked` of exactly `q` to the
@@ -540,14 +708,16 @@ These are where we would look first. They are not limits on the scope.
 5. **Exit math and waterfalls.** The fixed-δ bound, the keeper floor `K_s`, S1 / S2 / S3 and
    fair value (`engine/bounds.rs`, `engine/waterfall.rs`, `shortwin-math` `bounds`,
    `waterfall`, `risk`).
-6. **Lender accounting.** Entitlement and realised SOL, the pot, vesting, the lock calendar,
-   share epochs after a wipe, and repeated or bundled claims (I8; ECON §9).
+6. **Lender accounting.** Entitlement and realised SOL, the pot, vesting (since M10 also the
+   rent top-up, `pool::rent_top_up`), the lock calendar, share epochs after a wipe, the
+   shortfall debit on current shares (KI-53), and repeated or bundled claims (I8; ECON §9).
 7. **Pool selection and graduation.** `propose_pool` and `execute_pool_switch` (eligibility,
    the window, the fast path, the carried-fit rule); the curve → PumpSwap transition and its
    warm-up (I15, I18).
 8. **Admin and config:**
    - the timelock and the apply window;
-   - `Authorities` changes and the fee-recipient rule;
+   - `Authorities` changes, the fee-recipient rule and SQ-G8's distinct-authorities check
+     (`config::check_authorities`, at `initialize_config`, `propose_config` and `apply_config`);
    - Emergency limits (what it cannot cancel);
    - `revalidate_venue`'s `expected_slot`;
    - the coverage pause and its 5-s clear delay;
@@ -567,16 +737,22 @@ These are where we would look first. They are not limits on the scope.
 
 ## 12. Logistics and change policy
 
-**Engagement.** TODO(owner, Q2): the firm, dates, the kickoff walkthrough (2 h), and the
-communication channel. The RFQ log is [`docs/audit/README.md`](audit/README.md).
+**Engagement** (owner decision Q2 of 2026-10-02): one full private audit, then a public
+contest (Sherlock or Cantina) on the fixed code, then a bug bounty at the beta. The owner
+sends the requests for quotes to OtterSec, Neodyme, Zellic and Offside Labs; the RFQ log is
+[`docs/audit/README.md`](audit/README.md). The firm, the dates, the 2 h kickoff walkthrough
+and the communication channel are recorded there and in
+[`docs/audit/findings.md`](audit/findings.md) when booked.
 
 **Freeze:**
 - The audit commit is the tag named in §0.
 - Between the tag and the report, the in-scope files change only through fix batches.
 - `python3 scripts/audit_scope.py check` and the §0 hashes identify any drift.
-- Before the tag, WP-12 classifies every path that `check` reports as unclassified. That
-  covers each new crate, program or service since `e857a2a`, such as WP-7's `services/ops`.
-  Each one goes in a unit or in `EXCLUDED` with a reason, and then `write` is run.
+- `check` passes on this tree: WP-7's `services/ops` and `crates/squads-v4-ix` were
+  classified (the `governance` context unit) and `write` was run. Any later new crate,
+  program or service is classified the same way before a fix batch's tag.
+- The tag is `audit-1` together with `v1.0.0` (owner decision of 2026-10-02); fix batches
+  after it are 1.0.x, each with its own §0 hashes.
 
 **Findings.** Each finding is logged in [`docs/audit/findings.md`](audit/findings.md) and fixed
 in a program batch, one commit per finding where practical. Each fix comes with:
@@ -591,7 +767,8 @@ A finding may instead be acknowledged with a written rationale; it then becomes 
 **Venue-upgrade addendum.** The venues upgrade on their own schedule (KI-44); CPMM did so on
 2026-09-30 / 10-01. If a venue program changes between the tag and the end of the engagement:
 1. Re-dump it as a new fixture group, and confirm the drift with
-   `python3 scripts/dump-fixtures.py check --live` (TODO(WP-1)).
+   `python3 scripts/dump-fixtures.py check --live`. This applies now to pump, PumpSwap and
+   pump-fees, redeployed on 2026-10-02 after the M10 fixtures (§7).
 2. Diff its interface and layouts against the previous dump.
 3. Re-run the fork suites, benches and fuzz profiles of that venue on the new ELF.
 4. If short.win's adapter has to change, the change is an addendum, with its own scope
@@ -601,5 +778,7 @@ A finding may instead be acknowledged with a written rationale; it then becomes 
 **Doc changes.** A change to ARCH, ECON or SPEC that alters a bound in `known-issues.md`
 updates the register in the same commit.
 
-**Publication.** TODO(owner, Q2): reports published after the fixes and before the beta
-(recommended). A contest or bug bounty follows the fixes (M11).
+**Publication.** Open (§7): we recommend publishing the private audit's report after the
+fixes and before the beta. The public contest follows the fixes; the bug bounty starts at the
+beta (M11). Published reports are listed on `https://short.win/security`, and both programs'
+`security.txt` then gains its `auditors` field (a program upgrade).
