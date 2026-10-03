@@ -2,7 +2,7 @@
   "address": "5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK",
   "metadata": {
     "name": "shortwin",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "spec": "0.1.0",
     "description": "short.win: permissionless P2P token lending for shorting memecoins (Anchor program)"
   },

@@ -1,6 +1,6 @@
 [package]
 name = "complete-curve"
-version = "0.1.0"
+version = "1.0.0"
 description = "short.win's stateless complete-curve helper (ARCHITECTURE §5.4, A66): completes a pump.fun bonding curve for the straddle bundle, reading real_token_reserves at execution"
 edition = "2021"
 # Built by the platform-tools rustc (v1.57 = 1.95) through `anchor build` (ARCHITECTURE §1.1).

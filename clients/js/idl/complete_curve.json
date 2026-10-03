@@ -2,7 +2,7 @@
   "address": "4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ",
   "metadata": {
     "name": "complete_curve",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "spec": "0.1.0",
     "description": "short.win's stateless complete-curve helper (ARCHITECTURE §5.4, A66): completes a pump.fun bonding curve for the straddle bundle, reading real_token_reserves at execution"
   },
