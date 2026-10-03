@@ -68,6 +68,12 @@ export interface TxPlan {
      * fresh plan can fix (FRONTEND.md §5.3); without it the review offers "Close and review again".
      */
     readonly rebuild?: () => Promise<TxPlan>;
+    /**
+     * Rewrites the message of a failed simulation with what the plan knows and the bare error code
+     * does not (e.g. the venue's state at the build: an open's `ProceedsBelowMin` on a pump account
+     * its first trade grows, PUMP-2026-10-2). Never changes the kind, the code or the action.
+     */
+    readonly refineError?: (error: TxError) => TxError;
 }
 
 export interface Delta {

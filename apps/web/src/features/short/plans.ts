@@ -24,12 +24,14 @@ import { keeperRewardText, percent, proseDuration } from '../../config/disclosur
 import { SHORTWIN_PROGRAM } from '../../config/programs.ts';
 import { cleanSymbol, tokenLabel } from '../../lib/displayText.ts';
 import { formatBps, formatSol, formatTokens, shortAddress } from '../../lib/format.ts';
-import type { TxPlan, WatchedAccount } from '../../tx/types.ts';
-import { EXTRAS_IX } from '../../venues/constants.ts';
+import type { TxError, TxPlan, WatchedAccount } from '../../tx/types.ts';
+import { EXTRAS_IX, PAMM_POOL_LEN_2026_10, PUMP_CURVE_LEN_2026_10 } from '../../venues/constants.ts';
 import {
+    CURVE_SLOT,
     type ExtrasChoice,
     extrasCandidates,
     NO_EXTRAS,
+    PAMM_SLOT,
     pammCreatorVaultPrep,
     type RecipientIndex,
     randomRecipientIndex,
@@ -222,8 +224,56 @@ export async function planOpenShort(
         disclosures,
         disclosureVars: { 'borrower.liquidation': borrowerDisclosureVars(inp.tier, s.config.params) },
         invalidate: invalidations(s, inp.signer.address, position),
+        ...growthRefinement(s),
         position,
         nonce,
+    };
+}
+
+/** `ProceedsBelowMin` (6063): the open's proceeds fell below its `min_proceeds`. */
+const PROCEEDS_BELOW_MIN = 6063;
+
+/**
+ * The refusal of an open on a pump account its first trade grows (PUMP-2026-10-2; disclosed, the
+ * owner's decision of 2026-10-03).
+ */
+export const VENUE_GROWTH_MESSAGES = {
+    pool: 'This pool needs a first trade to grow its account: PumpSwap charges that trade the account’s rent, which this open’s slippage tolerance cannot cover at this size. Try again after another trade on the pool, or with a larger size.',
+    curve: 'This bonding curve needs a first trade to grow its account: pump charges that trade the account’s rent, which this open’s slippage tolerance cannot cover at this size. Try again after another trade on the curve, or with a larger size.',
+} as const;
+
+/**
+ * The pump account an open's sale would grow (PUMP-2026-10-2): since pump's 2026-10-02 redeploys
+ * the first trade on a PumpSwap pool shorter than 287 bytes, or a curve shorter than 141, grows it
+ * and charges that trade the rent (81,280–386,080 lamports measured), which the program nets out of
+ * the open's proceeds `S`; when the open's tolerance (`exec_tol_bps`, 10 bps) cannot cover it, the
+ * open fails `ProceedsBelowMin` though no price moved. From the snapshot's ReadSet (the pool P0, the
+ * curve C0); `null` for any other venue or an account at its size.
+ */
+export function venueGrowth(s: Pick<ChainSnapshot, 'kind' | 'read'>): keyof typeof VENUE_GROWTH_MESSAGES | null {
+    if (s.kind === 'pump_swap') {
+        const pool = s.read[PAMM_SLOT.pool];
+        return pool && pool.data.length < PAMM_POOL_LEN_2026_10 ? 'pool' : null;
+    }
+    if (s.kind === 'pump_curve') {
+        const curve = s.read[CURVE_SLOT.curve];
+        return curve && curve.data.length < PUMP_CURVE_LEN_2026_10 ? 'curve' : null;
+    }
+    return null;
+}
+
+/**
+ * An open plan's `refineError` on such an account: short.win's `ProceedsBelowMin` gets the specific
+ * message (`VENUE_GROWTH_MESSAGES`); everything else, and any other venue, keeps the mapped error.
+ */
+export function growthRefinement(s: Pick<ChainSnapshot, 'kind' | 'read'>): Pick<TxPlan, 'refineError'> {
+    const growth = venueGrowth(s);
+    if (growth === null) return {};
+    return {
+        refineError: (e: TxError): TxError =>
+            e.kind === 'program' && e.code === PROCEEDS_BELOW_MIN
+                ? { ...e, message: VENUE_GROWTH_MESSAGES[growth] }
+                : e,
     };
 }
 

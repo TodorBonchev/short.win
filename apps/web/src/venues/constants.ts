@@ -134,6 +134,13 @@ export const EXTRAS_MAX_SEEDS = 4;
 export const COVERAGE_CLEAR_DELAY_S = 5n;
 /** `STANDARD_POOL_TOKENS`: `migrate_v2`'s token seed on a standard curve (the EMA leg's `X_p`). */
 export const STANDARD_POOL_TOKENS = 206_900_000_000_000n;
+/**
+ * What pump's 2026-10-02 redeploys grow a shorter account to on its first trade, charging that trade
+ * the rent (PUMP-2026-10-2): a PumpSwap pool to 287 bytes (through the fee buckets), a bonding curve
+ * to 141.
+ */
+export const PAMM_POOL_LEN_2026_10 = 287;
+export const PUMP_CURVE_LEN_2026_10 = 141;
 /** `fees::PUMP_CURVE_MCAP_SUPPLY` (10¹⁵): the curve's fee-tier supply and the new pool's base supply. */
 export const PUMP_CURVE_MCAP_SUPPLY = 1_000_000_000_000_000n;
 /** The mock venue's protocol share of the trade fee, ppm (`mock_cpamm::PROTOCOL_FEE_RATE`). */

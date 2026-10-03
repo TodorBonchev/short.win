@@ -241,7 +241,9 @@ export function useTxFlow(): TxFlow {
                     version: connected.supportsV0 ? 0 : 'legacy',
                     priorityFeeMicroLamports: fee,
                 });
-                dispatch({ t: 'simulated', report });
+                const refined =
+                    report.error && plan.refineError ? { ...report, error: plan.refineError(report.error) } : report;
+                dispatch({ t: 'simulated', report: refined });
             } catch (e) {
                 dispatch({ t: 'failed', error: mapThrown(e) });
             }
