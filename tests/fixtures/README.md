@@ -140,7 +140,7 @@ error origin (file, line, code) from the disassembly.
 | PumpSwap trimmed ELF / `.text` | `c04bea8b…6522` / 950,384 B | `01557035…3cc3` / 1,040,088 B |
 | pump-fees trimmed ELF / `.text` | `1092b124…b788` / 775,384 B | `f166c296…62fd` / 779,872 B |
 | Against 0.2.0's artifacts | — | the same discriminators, the same `.rodata` byte for byte, the same error sites; `.text` 312 / 352 / 1,296 B longer (pump / PumpSwap / pump-fees): source lines added in pump `buy_v2.rs` and `lib.rs`, PumpSwap `swap/buy.rs`, `swap/sell.rs` and `swap/trade_v2.rs`, pump-fees `fee_sharing/*` (one more `NotEnoughRemainingAccounts` check). Not the same build |
-| New instructions | — | pump `buy_v3`, `sell_v3`, `buy_exact_quote_in_v3`, `sweep_protocol_fee`, `sweep_creator_fee`, `set_quote_control_mint_reserves`, `set_quote_control_reserves_admin`; PumpSwap `buy_v2`, `sell_v2`, `buy_exact_quote_in_v2`, `sweep_protocol_fee`, `sweep_creator_fee`; pump-fees none. Nothing removed |
+| New instructions | — | pump `buy_v3`, `sell_v3`, `buy_exact_quote_in_v3`, `sweep_protocol_fee`, `sweep_creator_fee`; PumpSwap `buy_v2`, `sell_v2`, `buy_exact_quote_in_v2`, `sweep_protocol_fee`, `sweep_creator_fee`; pump-fees none. Nothing removed. (`set_quote_control_mint_reserves` / `set_quote_control_reserves_admin` are new against the on-chain IDL only: the 2026-09 pump ELF already dispatches both) |
 | Layouts | — | `BondingCurve` + `creator_fee` @125, `protocol_fees` @133 (141 B); `Pool` + `protocol_fees` @271, `creator_fees` @279 (287 B; `create_pool` and every trade's growth target); `QuoteControl.reserves_admin` (unused by short.win). Every other account and every event short.win or the indexer reads is unchanged |
 | short.win's CPIs | — | pump `buy_v2` / `sell_v2` (+ an optional trailing `partial_fill` byte short.win does not send), `migrate_v2`, PumpSwap `buy` / `sell`, `claim_cashback`, `init_user_volume_accumulator`, pump-fees `get_fees_with_quote_mint` (called by the venues): the same discriminators, account lists, PDA seeds and arguments (IDL diff) |
 
@@ -157,9 +157,13 @@ What the release does (on the dumped ELFs, `pamm_it::buckets`, `pump_it::buckets
   shorter than 287 bytes (386,080 from 211 B; short.win measures it as `Open.venue_rent`).
 - `migrate_v2` moves `rQ`, not the curve's buckets, so `B̂_str` prices the same pool.
 - On mainnet on 2026-10-03 (slots 452,964,412–452,964,638): no bucket is non-zero on the
-  fixture pools and curves or on any of the 1,873 PumpSwap pools of 287 bytes (the 663 k
-  301-byte pools could not be scanned on the public RPC); a sample of 40 + 40 recent pump and
-  PumpSwap transactions held no v2 / v3 trade.
+  fixture pools and curves or on any of the 1,873 PumpSwap pools of 287 bytes; a sample of 40 +
+  40 recent pump and PumpSwap transactions held no v2 / v3 trade. A full census at slots
+  452,994,774–452,995,262 (`getProgramAccounts` by `dataSize` with a `dataSlice`, public RPC):
+  **no SOL-quoted curve and no WSOL-quoted pool carries a bucket** (5,996,499 + the SOL-quoted
+  141-byte curves; 165,688 WSOL pools of 301 and 48 of 287 bytes), but the buckets are live on
+  venues short.win does not list: 904 non-SOL-quote curves of 151 bytes, 627 of 141 bytes
+  and 265 non-WSOL pools of 301 bytes hold non-zero buckets.
 
 ## Commands
 
