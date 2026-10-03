@@ -204,6 +204,20 @@ pub const VENUE_GUARD_SLOTS_2026_10_02: [u64; VENUE_PROGRAMS] = [
     451_957_263,
 ];
 
+/// Deploy slots read on mainnet on 2026-10-03 (M10 pump revalidation, `scripts/dump-fixtures.py
+/// check --live` at slot 452,963,256): pump, PumpSwap and pump-fees were redeployed on
+/// 2026-10-02 at 452,654,932 / 452,654,882 / 452,655,002, the others are unchanged from
+/// [`VENUE_GUARD_SLOTS_2026_10_02`]. A test and `check --live` baseline only (the newest such
+/// constant); the program never reads it.
+pub const VENUE_GUARD_SLOTS_2026_10_03: [u64; VENUE_PROGRAMS] = [
+    452_654_932,
+    452_654_882,
+    452_655_002,
+    445_763_204,
+    452_376_460,
+    451_957_263,
+];
+
 /// The ProgramData address of venue program `venue` (a `VenueGuard` index), or `None`.
 pub const fn venue_program_data(venue: u8) -> Option<Pubkey> {
     let i = venue as usize;
