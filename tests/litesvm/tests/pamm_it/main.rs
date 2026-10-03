@@ -15,6 +15,7 @@
 //! | `wsol` | trader griefing (M10 G-B): lamports donated to `trader` / `trader_wsol` before an open, a close and in the open's transaction; a pre-created `ATA(trader, WSOL)`; tokens donated to `trader_base_ata` before an open, a close, an expiry and a liquidation — all normalised, the legs exact, `T` unchanged |
 //! | `gates` | T-DISABLE, T-ATA, T-PDA-USER (pAMM buy), T-RENT (pAMM), T-CASHBACK (pAMM); `sweep_trader`'s six-account token leg key-checked and its cashback slot failing closed on a non-WSOL account (M10 G-A1c) |
 //! | `negvqr` | the synthetic negative-VQR pool: pricing on `vault + VQR`, trades to the lamport, the tier inputs at `min(real, effective)` |
+//! | `buckets` | M10 pump revalidation, on the 2026-10-02 redeploy: v2 trades keep their fees in the pool's buckets (@271/@279, off VQR), a v1 sale is paid from `vault − buckets` (6063; the 2026-09 build pays it), the sweeps leave the price, short.win's v1 open and close on a pool carrying buckets to the lamport; ignored until the adapter change: `R` and the tier read the payable `vault − buckets` |
 //! | `lock` | ★T-PAMM-LOCK (M6R-1, the owner's decision of 2026-09-30): the pool's locked depth `D` from its burned LP (the LP mint P6), key-checked; third-party `deposit` / `withdraw` against the size cap, the tier, the reference cap and the warm-up's `L_slow ≤ D` (`attacks/pumpswap_lp.py` parts 2 and 3); FITS-2 (a) and FITX-1 on a pool with third-party LP; M6D-1 as decided (OWNER-M6D-1, ARCH row 57, ECON #106: PumpSwap credited on its burned LP only — part 3 (b): a held deposit lifts no open; part 3 (e): the pulled pump liquidates, the lenders whole; part 3 (f), M6E-1: the reference cap at `D`, so a deposit pulled at a deadline holds no expiry up); the capacity the rule costs on every pool fixture |
 //! | `admin` | venue admin with a position open (M10): PumpSwap `FeeConfig` hikes between the caps and above the hard cap (G-G4: opens refused, S3 evidence, risk and FV at the locked cap, closes and liquidations at the live fee), mayhem at listing and mid-position and a non-WSOL quote plant (G-H9), a pool layout change (G-H3: not executable, S3 at the cap), the Emergency route-broken flag (G-D6: S3 after the timer, liquidations identical second by second, O15's race against an honest expiry), extras on the sell leg (G-H2: appended to the `sell` CPI); the pool and its vaults on every extras site and the borrower on the keeper exits are `DeniedAccount` (M10 batch 3) |
 //! | `hooks` | M10: the PumpSwap clauses of I18 — (a) the price start's anchor at the burned depth, (d) the exit reference capped at `D`, (f) `L_slow ≤ pool_d` through the warm-up — and I15's burned-LP sizing and tier (OWNER-M6D-1) fire on a mutant's state after a real instruction, which passes |
@@ -27,6 +28,7 @@
 #![allow(clippy::result_large_err)]
 
 mod admin;
+mod buckets;
 mod common;
 mod creator;
 mod flows;

@@ -13,7 +13,7 @@ use crate::common::*;
 
 /// The program's own venue state of `pm` now (the host build of `venues::read_state_with` on the
 /// ReadSet as the VM holds it, with the mint's supply).
-fn host_state(env: &Env, pm: &PammMarket) -> shortwin::venues::VenueState {
+pub fn host_state(env: &Env, pm: &PammMarket) -> shortwin::venues::VenueState {
     use anchor_lang::prelude::AccountInfo;
     let mut accs: Vec<(Pubkey, u64, Vec<u8>, Pubkey)> = pm
         .read_set(false)
