@@ -9,28 +9,28 @@ Compute units of every Raydium-path instruction (ARCH §9 M3: T-RAY-CU, T-CU; M4
 | `create_market` | CPMM, Token-2022 base | 76888 | 76888 | — | 250000 | §6.1 `create_market` | 7 | — | 2 |
 | `create_market` | CPMM, creator fee on the SOL side | 73140 | 73140 | — | 250000 | §6.1 `create_market` | 7 | — | 2 |
 | `create_market` | CPMM, WSOL as token 1 | 69709 | 69709 | — | 250000 | §6.1 `create_market` | 7 | — | 2 |
-| `open_short` | AMM v4, SPL (Fartcoin): first open of a wallet (position + exposure created) | 101291 | 101291 | 15420 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) | 3 |
-| `open_short` | CPMM, SPL (USELESS): first open of a wallet (position + exposure created) | 117064 | 117064 | 25091 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) | 3 |
-| `open_short` | CPMM, Token-2022 base: first open of a wallet (position + exposure created) | 125292 | 125292 | 28041 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) | 3 |
-| `open_short` | CPMM, creator fee on the SOL side: first open of a wallet (position + exposure created) | 116558 | 116558 | 25110 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) | 3 |
-| `open_short` | CPMM, WSOL as token 1: first open of a wallet (position + exposure created) | 119332 | 119332 | 25093 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) | 3 |
-| `open_short` | AMM v4, SPL (Fartcoin): second position of a wallet | 99399 | 99399 | 15420 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 14 | 13 (≤ 15) | 3 |
-| `open_short` | AMM v4, SPL (Fartcoin): first open, normalising (trader and trader_wsol donated to) | 107275 | 107275 | 15420 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 18 | 13 (≤ 15) | 3 |
-| `open_short` | CPMM, Token-2022 base: second position of a wallet | 119898 | 119898 | 28035 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 14 | 13 (≤ 15) | 3 |
-| `open_short` | CPMM, Token-2022 base: first open, normalising (trader and trader_wsol donated to) | 131276 | 131276 | 28041 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 18 | 13 (≤ 15) | 3 |
-| `close_short` | AMM v4, SPL (Fartcoin) | 68292 | 68292 | 15900 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
-| `close_short` | CPMM, SPL (USELESS) | 79721 | 79721 | 25183 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
-| `close_short` | CPMM, Token-2022 base | 83290 | 83290 | 28094 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
-| `close_short` | CPMM, creator fee on the SOL side | 79772 | 79772 | 25184 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
-| `close_short` | CPMM, WSOL as token 1 | 79602 | 79602 | 25187 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
-| `close_short` | AMM v4, SPL (Fartcoin): normalising | 74787 | 74787 | 15900 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 12 | 9 (≤ 11) | 3 |
-| `close_short` | CPMM, Token-2022 base: normalising | 89785 | 89785 | 28094 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 12 | 9 (≤ 11) | 3 |
-| `liquidate` | AMM v4, SPL (Fartcoin): after a real ≈ 2.2× pump, both legs, within the fixed bound | 91080 | 91080 | 16032 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
-| `liquidate` | CPMM, SPL (USELESS): after a real ≈ 2.2× pump, both legs, within the fixed bound | 107760 | 107760 | 25236 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
-| `liquidate` | CPMM, Token-2022 base: after a real ≈ 2.2× pump, both legs, within the fixed bound | 111764 | 111764 | 28161 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
-| `expire` | AMM v4, SPL (Fartcoin): past the deadline, healthy | 86934 | 86934 | 15900 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
-| `expire` | CPMM, SPL (USELESS): past the deadline, healthy | 101919 | 101919 | 25189 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
-| `expire` | CPMM, Token-2022 base: past the deadline, healthy | 105459 | 105459 | 28100 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
+| `open_short` | AMM v4, SPL (Fartcoin): first open of a wallet (position + exposure created) | 101421 | 101421 | 15420 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) | 3 |
+| `open_short` | CPMM, SPL (USELESS): first open of a wallet (position + exposure created) | 117194 | 117194 | 25091 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) | 3 |
+| `open_short` | CPMM, Token-2022 base: first open of a wallet (position + exposure created) | 125422 | 125422 | 28041 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) | 3 |
+| `open_short` | CPMM, creator fee on the SOL side: first open of a wallet (position + exposure created) | 116688 | 116688 | 25110 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) | 3 |
+| `open_short` | CPMM, WSOL as token 1: first open of a wallet (position + exposure created) | 119462 | 119462 | 25093 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 15 | 13 (≤ 15) | 3 |
+| `open_short` | AMM v4, SPL (Fartcoin): second position of a wallet | 99529 | 99529 | 15420 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 14 | 13 (≤ 15) | 3 |
+| `open_short` | AMM v4, SPL (Fartcoin): first open, normalising (trader and trader_wsol donated to) | 107405 | 107405 | 15420 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 18 | 13 (≤ 15) | 3 |
+| `open_short` | CPMM, Token-2022 base: second position of a wallet | 120028 | 120028 | 28035 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 14 | 13 (≤ 15) | 3 |
+| `open_short` | CPMM, Token-2022 base: first open, normalising (trader and trader_wsol donated to) | 131406 | 131406 | 28041 | 150000 | §6.1 `open_short` RaydiumV4 / CPMM | 18 | 13 (≤ 15) | 3 |
+| `close_short` | AMM v4, SPL (Fartcoin) | 68422 | 68422 | 15900 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
+| `close_short` | CPMM, SPL (USELESS) | 79851 | 79851 | 25183 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
+| `close_short` | CPMM, Token-2022 base | 83420 | 83420 | 28094 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
+| `close_short` | CPMM, creator fee on the SOL side | 79902 | 79902 | 25184 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
+| `close_short` | CPMM, WSOL as token 1 | 79732 | 79732 | 25187 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
+| `close_short` | AMM v4, SPL (Fartcoin): normalising | 74917 | 74917 | 15900 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 12 | 9 (≤ 11) | 3 |
+| `close_short` | CPMM, Token-2022 base: normalising | 89915 | 89915 | 28094 | 200000 | no Raydium `close_short` row; §6.1 `liquidate` / `expire` Raydium | 12 | 9 (≤ 11) | 3 |
+| `liquidate` | AMM v4, SPL (Fartcoin): after a real ≈ 2.2× pump, both legs, within the fixed bound | 91212 | 91212 | 16032 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
+| `liquidate` | CPMM, SPL (USELESS): after a real ≈ 2.2× pump, both legs, within the fixed bound | 107892 | 107892 | 25236 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
+| `liquidate` | CPMM, Token-2022 base: after a real ≈ 2.2× pump, both legs, within the fixed bound | 111896 | 111896 | 28161 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
+| `expire` | AMM v4, SPL (Fartcoin): past the deadline, healthy | 87066 | 87066 | 15900 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
+| `expire` | CPMM, SPL (USELESS): past the deadline, healthy | 102051 | 102051 | 25189 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
+| `expire` | CPMM, Token-2022 base: past the deadline, healthy | 105591 | 105591 | 28100 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
 | `sol_settle` | AMM v4, SPL (Fartcoin): healthy, the no-change call | 38993 | 38993 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
 | `sol_settle` | AMM v4, SPL (Fartcoin): S3 on a halted pool at the deadline, chain run s3_wait_s | 47857 | 47857 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
 | `sol_settle` | CPMM, SPL (USELESS): healthy, the no-change call | 41377 | 41377 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |

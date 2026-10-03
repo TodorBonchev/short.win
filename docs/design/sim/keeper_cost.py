@@ -60,13 +60,13 @@ NAMES = {"pumpswap": "PumpSwap", "pump_curve": "curve", "raydium_cpmm": "CPMM", 
 # Requested CU (ceil(consumed x 1.1)), the costliest measured per kind (tests/bench/m7_keeper/results.json).
 CU = {
     "pumpswap": {"crank": 41_199, "sol_settle_keep": 64_146, "sol_settle_settle": 74_267,
-                 "liquidate": 211_700, "expire": 208_444},
+                 "liquidate": 211_847, "expire": 208_591},
     "pump_curve": {"crank": 37_382, "sol_settle_keep": 62_715, "sol_settle_settle": 72_818,
-                   "liquidate": 191_371, "expire": 188_548},
+                   "liquidate": 191_516, "expire": 188_693},
     "raydium_cpmm": {"crank": 32_843, "sol_settle_keep": 65_644, "sol_settle_settle": 77_470,
-                     "liquidate": 124_669, "expire": 117_526},
+                     "liquidate": 124_814, "expire": 117_671},
     "raydium_amm_v4": {"crank": 32_779, "sol_settle_keep": 57_653, "sol_settle_settle": 67_798,
-                       "liquidate": 104_650, "expire": 101_042},
+                       "liquidate": 104_795, "expire": 101_187},
 }
 LP_WRAP_CU = 150_000             # the attacker's [deposit, crank_price, withdraw] (estimate, M4G-2)
 V1_K = 6                         # the keeper's `batch_v1`
