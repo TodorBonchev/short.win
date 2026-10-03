@@ -41,8 +41,12 @@ Writes, under ``tests/fixtures/``:
   ``programs/spl_memo_v3.so``: spl-memo v3 under BPFLoader2, whose account data is the ELF);
   ``squads_programs`` (``programs/squads_v4.so``, ``accounts/squads/*.bin``: Squads v4 and its
   ``ProgramConfig``; ``idl/squads_multisig_program.json``: the IDL 2.1.0 vendored from the source
-  repository at a pinned commit, recorded in the group's snapshot under ``vendored``). Each of
-  them is pinned (deploy slot, trimmed-ELF or account sha256) and a fetch that reads anything
+  repository at a pinned commit, recorded in the group's snapshot under ``vendored``);
+  ``pump_programs_2026_10`` (``programs/{pump,pump_fees,pump_amm}_2026_10.so`` and
+  ``accounts/pump_2026_10/*.bin``: the three pump programs as redeployed at slots 452,654,932 /
+  452,655,002 / 452,654,882; ELFs only, ``pump_state`` / ``pamm_state`` stay the state, whose
+  layouts the redeploy kept apart from appended fee buckets, and ``pump_programs`` keeps the
+  2026-09 deploys for T-LATCH). Each of them is pinned (deploy slot, trimmed-ELF or account sha256) and a fetch that reads anything
   else stops before it writes a file;
 - ``manifest.json``: one entry per account (address, owner, lamports, executable, rent epoch,
   space, **slot**, sha256, purpose, decoded fields) and one snapshot record per fetch;
@@ -1468,11 +1472,13 @@ def cmd_candidates(args):
 
 # ---- M10 program groups (CPMM redeploy, mainnet SPL programs, Squads v4) ---------------------
 #
-# The programs the M10 suites run on, pinned as mainnet deployed them (M10 plan WP-1). Nothing
-# loads them yet: WP-2 moves the CPMM tests to `raydium_cpmm_2026_10`, WP-3 the SPL programs to
-# `spl_programs`, WP-7 the governance tests to `squads_programs`.
+# The programs the M10 suites run on, pinned as mainnet deployed them (M10 plan WP-1). WP-2 moved
+# the CPMM tests to `raydium_cpmm_2026_10`, WP-3 the SPL programs to `spl_programs`, WP-7 the
+# governance tests to `squads_programs`; the pump revalidation (M10, 2026-10-03) the curve and
+# PumpSwap tests to `pump_programs_2026_10`.
 
 CPMM_2026_10_ACCOUNT_DIR = "accounts/raydium_cpmm_2026_10"
+PUMP_2026_10_ACCOUNT_DIR = "accounts/pump_2026_10"
 SPL_ACCOUNT_DIR = "accounts/spl"
 SQUADS_ACCOUNT_DIR = "accounts/squads"
 IDL_DIR = "idl"
@@ -1492,6 +1498,33 @@ CPMM_PROGRAMS_2026_10 = [
         "DMawCQzbgNTmbzaESc7o6pvL1KAeetY8zA7jNpzntHhU",
         "93cad2458ac72435c94b8ac89faa686987f4e29d2f0e862d546fbc5aa814a0d2",
         452_376_460,
+    ),
+]
+# The pump, pump-fees and PumpSwap redeploys of 2026-10-02 (15:47 UTC); the trimmed hashes are
+# the ELFs read at slot 452,963,354. Not a public source: the ELFs carry the discriminators,
+# error sites and `.rodata` of `pump-rust-client` 0.2.0's unreleased artifacts with a few
+# instructions more (tests/fixtures/README.md).
+PUMP_PROGRAMS_2026_10 = [
+    (
+        "pump_2026_10",
+        PUMP,
+        "B5MvUwXdiW1NMM6QFFD3ssPKBujD4zMohncbM73Z2BQu",
+        "b0b777c64ccf811ab21493d47d618b8db272f9bfd06b4fba4ba66ef565cb0c75",
+        452_654_932,
+    ),
+    (
+        "pump_fees_2026_10",
+        PUMP_FEES,
+        "75Uu23mqWBb8LM8vDppqC1mQAnCcBuLXhVaDezVMQLRw",
+        "f166c2967fbfa6a9d80146360e5b79a2b263e821c999f1e74f266162788462fd",
+        452_655_002,
+    ),
+    (
+        "pump_amm_2026_10",
+        PUMP_AMM,
+        "6naEzKeUuFh1Jeeu51NXQgr5qkXgXtc9WKNct4xynVJc",
+        "015570358c672ae42e5706daa87eb67d4c45e8fd8afec80c66bd85b9f9333cc3",
+        452_654_882,
     ),
 ]
 SPL_PROGRAMS = [
@@ -1544,6 +1577,18 @@ PROGRAM_SOURCES = {
         "status": "verified build per verify.osec.io (on_chain_hash = executable_hash = "
         "elf_trimmed_sha256, last verified 2026-09-16; read 2026-10-02)",
     },
+    **{
+        name: {
+            "repository": "https://crates.io/crates/pump-rust-client (no public program source)",
+            "commit": None,
+            "status": "UNVERIFIED: no published source or verified build. The ELF has the same "
+            "Anchor discriminators, `.rodata` and error sites as the unreleased `artifacts/"
+            f"{name.removesuffix('_2026_10')}.so` in pump-rust-client 0.2.0 (crates.io "
+            "2026-09-29, crate sha256 4c940fb1…), with a slightly longer `.text` (a later build "
+            "of that release); the on-chain Anchor IDLs were not updated",
+        }
+        for name in ("pump_2026_10", "pump_fees_2026_10", "pump_amm_2026_10")
+    },
     "squads_v4": {
         "repository": "https://github.com/Squads-Protocol/v4",
         "commit": "64af7330413d5c85cbbccfd8c27a05d45b6e666f",
@@ -1562,6 +1607,15 @@ M10_GROUP_USE = {
         "only: the pools and configs stay `raydium_state`'s (AmmConfig 236 B and PoolState 637 B "
         "unchanged; the 21 live configs equal the fixture bytes at slot 452,488,420), and "
         "`raydium_programs` keeps the 445,763,504 deploy for T-LATCH",
+    ),
+    "pump_programs_2026_10": (
+        "The pump redeploy of 2026-10-02 (M10 pump revalidation); every curve and PumpSwap test "
+        "runs it",
+        "the ELF as redeployed on 2026-10-02 (UNVERIFIED source, see `source`). The ELF only: the "
+        "state stays `pump_state`'s and `pamm_state`'s (the redeploy appends fee buckets to "
+        "`BondingCurve` @125 and `Pool` @271 and keeps every other layout; the configs equal the "
+        "fixture bytes at slot 452,964,363), and `pump_programs` keeps the 2026-09 deploys for "
+        "T-LATCH",
     ),
     "spl_programs": (
         "The deployed mainnet program, so T-MEMO and the suites run the mainnet build instead of "
@@ -1704,7 +1758,8 @@ def check_m10(m, only=None):
         return {e["name"]: e for e in m["accounts"] if e.get("group") == group}
 
     for group, programs in (("raydium_cpmm_2026_10", CPMM_PROGRAMS_2026_10),
-                            ("spl_programs", SPL_PROGRAMS), ("squads_programs", SQUADS_PROGRAMS)):
+                            ("spl_programs", SPL_PROGRAMS), ("squads_programs", SQUADS_PROGRAMS),
+                            ("pump_programs_2026_10", PUMP_PROGRAMS_2026_10)):
         if only not in (None, group):
             continue
         by_name = in_group(group)
@@ -1757,11 +1812,13 @@ RAYDIUM_GROUPS = ("raydium_programs", "raydium_state")
 PUMP_GROUPS = ("pump_programs", "pump_state")
 # `pamm_synthetic` is derived from `pamm_state` and must follow it.
 PAMM_GROUPS = ("pamm_state", "pamm_synthetic")
-M10_PROGRAM_GROUPS = ("raydium_cpmm_2026_10", "spl_programs", "squads_programs")
+M10_PROGRAM_GROUPS = ("raydium_cpmm_2026_10", "spl_programs", "squads_programs",
+                      "pump_programs_2026_10")
 GROUPS = RAYDIUM_GROUPS + PUMP_GROUPS + PAMM_GROUPS + M10_PROGRAM_GROUPS
 # Every directory whose files are all managed (SHA256SUMS lines outside them are kept verbatim).
 MANAGED_DIRS = (ACCOUNT_DIR, PUMP_ACCOUNT_DIR, PAMM_ACCOUNT_DIR, CPMM_2026_10_ACCOUNT_DIR,
-                SPL_ACCOUNT_DIR, SQUADS_ACCOUNT_DIR, PROGRAM_DIR, IDL_DIR)
+                PUMP_2026_10_ACCOUNT_DIR, SPL_ACCOUNT_DIR, SQUADS_ACCOUNT_DIR, PROGRAM_DIR,
+                IDL_DIR)
 
 
 def managed(entry):
@@ -2133,6 +2190,9 @@ def cmd_fetch(args):
         elif g == "raydium_cpmm_2026_10":
             entries, files, snap = fetch_programs(rpc, CPMM_PROGRAMS_2026_10, g,
                                                   CPMM_2026_10_ACCOUNT_DIR)
+        elif g == "pump_programs_2026_10":
+            entries, files, snap = fetch_programs(rpc, PUMP_PROGRAMS_2026_10, g,
+                                                  PUMP_2026_10_ACCOUNT_DIR)
         elif g == "spl_programs":
             entries, files, snap = fetch_spl(rpc)
         elif g == "squads_programs":
@@ -2150,7 +2210,8 @@ def cmd_fetch(args):
         "PumpSwap entries (group pamm_state, and pamm_synthetic: pools derived offline from "
         "pamm_state bytes, marked `synthetic`) and the M10 program groups (raydium_cpmm_2026_10: "
         "the CPMM redeploy; spl_programs: the mainnet Token-2022 and spl-memo; squads_programs: "
-        "Squads v4, its ProgramConfig and the vendored IDL) are written by "
+        "Squads v4, its ProgramConfig and the vendored IDL; pump_programs_2026_10: the pump, "
+        "pump-fees and PumpSwap redeploys) are written by "
         "scripts/dump-fixtures.py; `snapshots` records the slot and RPC of each group "
         "(`vendored`: files taken from a pinned source)."
     )
@@ -2345,7 +2406,8 @@ def cmd_check_live(args):
         v.sort(key=lambda e: e["decoded"]["deploy_slot"], reverse=True)
     targets = [(lb, p, pd_, sl) for lb, p, pd_, sl in venues]
     seen = {p for _, p, _, _ in targets}
-    for name, program, program_data, _, _ in CPMM_PROGRAMS_2026_10 + SPL_PROGRAMS + SQUADS_PROGRAMS:
+    for name, program, program_data, _, _ in (CPMM_PROGRAMS_2026_10 + SPL_PROGRAMS + SQUADS_PROGRAMS
+                                              + PUMP_PROGRAMS_2026_10):
         if program not in seen:
             targets.append((name, program, program_data, None))
             seen.add(program)

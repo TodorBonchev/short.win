@@ -1,5 +1,5 @@
 {
-  "description": "Mainnet accounts, programs and transactions dumped for the program tests (ARCHITECTURE §1.2, §8.2). Each entry records how it was fetched; SHA256SUMS pins the bytes (CI: cd tests/fixtures && sha256sum -c SHA256SUMS). The Raydium entries (groups raydium_programs and raydium_state), the pump entries (groups pump_programs and pump_state) and the PumpSwap entries (group pamm_state, and pamm_synthetic: pools derived offline from pamm_state bytes, marked `synthetic`) and the M10 program groups (raydium_cpmm_2026_10: the CPMM redeploy; spl_programs: the mainnet Token-2022 and spl-memo; squads_programs: Squads v4, its ProgramConfig and the vendored IDL) are written by scripts/dump-fixtures.py; `snapshots` records the slot and RPC of each group (`vendored`: files taken from a pinned source).",
+  "description": "Mainnet accounts, programs and transactions dumped for the program tests (ARCHITECTURE §1.2, §8.2). Each entry records how it was fetched; SHA256SUMS pins the bytes (CI: cd tests/fixtures && sha256sum -c SHA256SUMS). The Raydium entries (groups raydium_programs and raydium_state), the pump entries (groups pump_programs and pump_state) and the PumpSwap entries (group pamm_state, and pamm_synthetic: pools derived offline from pamm_state bytes, marked `synthetic`) and the M10 program groups (raydium_cpmm_2026_10: the CPMM redeploy; spl_programs: the mainnet Token-2022 and spl-memo; squads_programs: Squads v4, its ProgramConfig and the vendored IDL; pump_programs_2026_10: the pump, pump-fees and PumpSwap redeploys) are written by scripts/dump-fixtures.py; `snapshots` records the slot and RPC of each group (`vendored`: files taken from a pinned source).",
   "accounts": [
     {
       "name": "pyth_sol_usd_shard0",
@@ -6355,6 +6355,156 @@
         "multisig_creation_fee": 0,
         "treasury": "5DH2e3cJmFpyi6mk65EGFediunm4ui6BiKNUNrhWtD1b"
       }
+    },
+    {
+      "name": "pump_2026_10_program",
+      "group": "pump_programs_2026_10",
+      "purpose": "the pump_2026_10 program account (upgradeable loader; names its ProgramData). The pump redeploy of 2026-10-02 (M10 pump revalidation); every curve and PumpSwap test runs it",
+      "address": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "lamports": 9296912471,
+      "executable": true,
+      "rent_epoch": 18446744073709551615,
+      "space": 36,
+      "slot": 452965688,
+      "sha256": "8101492b544ce08703d5de95363bf796e7e4cd17d03639cfe603071fb59652eb",
+      "file": "accounts/pump_2026_10/pump_2026_10_program.bin",
+      "decoded": {
+        "program_data": "B5MvUwXdiW1NMM6QFFD3ssPKBujD4zMohncbM73Z2BQu"
+      }
+    },
+    {
+      "name": "pump_2026_10_program_data",
+      "group": "pump_programs_2026_10",
+      "purpose": "pump_2026_10 ProgramData: the ELF as redeployed on 2026-10-02 (UNVERIFIED source, see `source`). The ELF only: the state stays `pump_state`'s and `pamm_state`'s (the redeploy appends fee buckets to `BondingCurve` @125 and `Pool` @271 and keeps every other layout; the configs equal the fixture bytes at slot 452,964,363), and `pump_programs` keeps the 2026-09 deploys for T-LATCH. Stored as header ‖ ELF; the account is header ‖ ELF ‖ zeros up to `space`, whose sha256 is `sha256` (fork.rs rebuilds and checks it)",
+      "address": "B5MvUwXdiW1NMM6QFFD3ssPKBujD4zMohncbM73Z2BQu",
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "lamports": 53268311040,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 10485760,
+      "slot": 452965688,
+      "sha256": "dc3a91d8c35b3017715daf83d54d58a2fd15fb3d20e94edc1fcb69847b8925e0",
+      "files": {
+        "header": "accounts/pump_2026_10/pump_2026_10_program_data_header.bin",
+        "elf": "programs/pump_2026_10.so"
+      },
+      "elf_len": 1769472,
+      "elf_sha256": "9d7d015fcf8976091c6319c76053783f7fc5e4aae7be2a1693b7c9dd28de6967",
+      "elf_trimmed_len": 1769457,
+      "elf_trimmed_sha256": "b0b777c64ccf811ab21493d47d618b8db272f9bfd06b4fba4ba66ef565cb0c75",
+      "elf_trimmed_sha256_expected": "b0b777c64ccf811ab21493d47d618b8db272f9bfd06b4fba4ba66ef565cb0c75",
+      "deploy_slot_expected": 452654932,
+      "source": {
+        "repository": "https://crates.io/crates/pump-rust-client (no public program source)",
+        "commit": null,
+        "status": "UNVERIFIED: no published source or verified build. The ELF has the same Anchor discriminators, `.rodata` and error sites as the unreleased `artifacts/pump.so` in pump-rust-client 0.2.0 (crates.io 2026-09-29, crate sha256 4c940fb1…), with a slightly longer `.text` (a later build of that release); the on-chain Anchor IDLs were not updated"
+      },
+      "decoded": {
+        "deploy_slot": 452654932,
+        "upgrade_authority": "7gZufwwAo17y5kg8FMyJy2phgpvv9RSdzWtdXiWHjFr8",
+        "e_flags": 0
+      }
+    },
+    {
+      "name": "pump_fees_2026_10_program",
+      "group": "pump_programs_2026_10",
+      "purpose": "the pump_fees_2026_10 program account (upgradeable loader; names its ProgramData). The pump redeploy of 2026-10-02 (M10 pump revalidation); every curve and PumpSwap test runs it",
+      "address": "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "lamports": 6046721,
+      "executable": true,
+      "rent_epoch": 18446744073709551615,
+      "space": 36,
+      "slot": 452965690,
+      "sha256": "cc9077315efa761cfe0b52aae08678ccda2a07e0fa2b374c98a1d51a1b4ce079",
+      "file": "accounts/pump_2026_10/pump_fees_2026_10_program.bin",
+      "decoded": {
+        "program_data": "75Uu23mqWBb8LM8vDppqC1mQAnCcBuLXhVaDezVMQLRw"
+      }
+    },
+    {
+      "name": "pump_fees_2026_10_program_data",
+      "group": "pump_programs_2026_10",
+      "purpose": "pump_fees_2026_10 ProgramData: the ELF as redeployed on 2026-10-02 (UNVERIFIED source, see `source`). The ELF only: the state stays `pump_state`'s and `pamm_state`'s (the redeploy appends fee buckets to `BondingCurve` @125 and `Pool` @271 and keeps every other layout; the configs equal the fixture bytes at slot 452,964,363), and `pump_programs` keeps the 2026-09 deploys for T-LATCH. Stored as header ‖ ELF; the account is header ‖ ELF ‖ zeros up to `space`, whose sha256 is `sha256` (fork.rs rebuilds and checks it)",
+      "address": "75Uu23mqWBb8LM8vDppqC1mQAnCcBuLXhVaDezVMQLRw",
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "lamports": 4821514360,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 948989,
+      "slot": 452965691,
+      "sha256": "fe28677b89dc6b1d9dd45c268afb7831883abded51d3a06ef66e2fa89c024e89",
+      "files": {
+        "header": "accounts/pump_2026_10/pump_fees_2026_10_program_data_header.bin",
+        "elf": "programs/pump_fees_2026_10.so"
+      },
+      "elf_len": 852456,
+      "elf_sha256": "0b9a3b553eee0a1a2370bb2ffaceb26ec3296c4c02f42ded2b8d8f3da4b451c1",
+      "elf_trimmed_len": 852441,
+      "elf_trimmed_sha256": "f166c2967fbfa6a9d80146360e5b79a2b263e821c999f1e74f266162788462fd",
+      "elf_trimmed_sha256_expected": "f166c2967fbfa6a9d80146360e5b79a2b263e821c999f1e74f266162788462fd",
+      "deploy_slot_expected": 452655002,
+      "source": {
+        "repository": "https://crates.io/crates/pump-rust-client (no public program source)",
+        "commit": null,
+        "status": "UNVERIFIED: no published source or verified build. The ELF has the same Anchor discriminators, `.rodata` and error sites as the unreleased `artifacts/pump_fees.so` in pump-rust-client 0.2.0 (crates.io 2026-09-29, crate sha256 4c940fb1…), with a slightly longer `.text` (a later build of that release); the on-chain Anchor IDLs were not updated"
+      },
+      "decoded": {
+        "deploy_slot": 452655002,
+        "upgrade_authority": "7gZufwwAo17y5kg8FMyJy2phgpvv9RSdzWtdXiWHjFr8",
+        "e_flags": 0
+      }
+    },
+    {
+      "name": "pump_amm_2026_10_program",
+      "group": "pump_programs_2026_10",
+      "purpose": "the pump_amm_2026_10 program account (upgradeable loader; names its ProgramData). The pump redeploy of 2026-10-02 (M10 pump revalidation); every curve and PumpSwap test runs it",
+      "address": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "lamports": 1178687650,
+      "executable": true,
+      "rent_epoch": 18446744073709551615,
+      "space": 36,
+      "slot": 452965692,
+      "sha256": "8a28beaa6366bb6236a8b455b61b280f430b4da6583becf73fd229886844e0da",
+      "file": "accounts/pump_2026_10/pump_amm_2026_10_program.bin",
+      "decoded": {
+        "program_data": "6naEzKeUuFh1Jeeu51NXQgr5qkXgXtc9WKNct4xynVJc"
+      }
+    },
+    {
+      "name": "pump_amm_2026_10_program_data",
+      "group": "pump_programs_2026_10",
+      "purpose": "pump_amm_2026_10 ProgramData: the ELF as redeployed on 2026-10-02 (UNVERIFIED source, see `source`). The ELF only: the state stays `pump_state`'s and `pamm_state`'s (the redeploy appends fee buckets to `BondingCurve` @125 and `Pool` @271 and keeps every other layout; the configs equal the fixture bytes at slot 452,964,363), and `pump_programs` keeps the 2026-09 deploys for T-LATCH. Stored as header ‖ ELF; the account is header ‖ ELF ‖ zeros up to `space`, whose sha256 is `sha256` (fork.rs rebuilds and checks it)",
+      "address": "6naEzKeUuFh1Jeeu51NXQgr5qkXgXtc9WKNct4xynVJc",
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "lamports": 53268311040,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 10485760,
+      "slot": 452965692,
+      "sha256": "e457605738da1db3eb59b5749da24b5d33a634f242cdb14939d4f17c2066bb3f",
+      "files": {
+        "header": "accounts/pump_2026_10/pump_amm_2026_10_program_data_header.bin",
+        "elf": "programs/pump_amm_2026_10.so"
+      },
+      "elf_len": 1138520,
+      "elf_sha256": "72668dc6dcd01bd5484a7941ee6c250bb1088fc191a5f1709e13ce3727811629",
+      "elf_trimmed_len": 1138505,
+      "elf_trimmed_sha256": "015570358c672ae42e5706daa87eb67d4c45e8fd8afec80c66bd85b9f9333cc3",
+      "elf_trimmed_sha256_expected": "015570358c672ae42e5706daa87eb67d4c45e8fd8afec80c66bd85b9f9333cc3",
+      "deploy_slot_expected": 452654882,
+      "source": {
+        "repository": "https://crates.io/crates/pump-rust-client (no public program source)",
+        "commit": null,
+        "status": "UNVERIFIED: no published source or verified build. The ELF has the same Anchor discriminators, `.rodata` and error sites as the unreleased `artifacts/pump_amm.so` in pump-rust-client 0.2.0 (crates.io 2026-09-29, crate sha256 4c940fb1…), with a slightly longer `.text` (a later build of that release); the on-chain Anchor IDLs were not updated"
+      },
+      "decoded": {
+        "deploy_slot": 452654882,
+        "upgrade_authority": "7gZufwwAo17y5kg8FMyJy2phgpvv9RSdzWtdXiWHjFr8",
+        "e_flags": 0
+      }
     }
   ],
   "snapshots": [
@@ -6455,6 +6605,13 @@
           "purpose": "the Squads v4 Anchor IDL 2.1.0 (`sdk/multisig/idl`, set by Squads commit 39c92c1 `bump(idl): to 2.1.0` and unchanged at 64af733): the instruction discriminators and account layouts the squads-v4-ix encoder (WP-7) is pinned against"
         }
       ]
+    },
+    {
+      "group": "pump_programs_2026_10",
+      "slot": 452965687,
+      "fetched_at": "2026-10-03T14:51:46Z",
+      "rpc": "https://api.mainnet-beta.solana.com",
+      "method": "getAccountInfo (base64) of each program and ProgramData account; `solana program dump -um <program> out.so` gives the same ELF bytes followed by the zero padding"
     }
   ]
 }
