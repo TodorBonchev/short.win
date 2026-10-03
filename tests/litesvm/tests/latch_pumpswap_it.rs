@@ -2,12 +2,19 @@
 //! §5.5, §6.5, §8.2, §9 M6; A7, R4B-7; I17; U5), on the PumpSwap fork of
 //! `shortwin_litesvm_tests::pamm` / `fork`: the real PumpSwap (10,485,760 B) and pump-fees
 //! (948,989 B) ProgramData accounts, dumped at their mainnet deploy slots, which
-//! `initialize_config` recorded as `guard_slot`.
+//! `initialize_config` recorded as `guard_slot` (`fork::FIXTURE_GUARD_SLOTS`: the 2026-10-02
+//! redeploys).
+//!
+//! The upgrade mainnet itself made is replayed too (M10 pump revalidation): the 2026-09 builds
+//! (`fork::PumpDeploy::Sep2026`, the slots `VENUE_GUARD_SLOTS_2026_09_27` names) upgraded by the
+//! loader to the 2026-10-02 redeploys' ELFs, with positions opened on the old builds and exited on
+//! the new ones, which latch PumpSwap opens until Emergency revalidates the loader's slots.
 //!
 //! An upgrade here is a **real** one: the upgradeable loader's own `Upgrade` instruction, with a
-//! buffer holding the dumped ELF and the program's real upgrade authority as signer (its signature
-//! forged for that one transaction, `fork::admin_send`; the hooks run). The loader writes the new
-//! deploy slot into the ProgramData header, as on mainnet, and the program keeps running.
+//! buffer holding the redeploy's dumped ELF (`fork::PumpDeploy::CURRENT`) and the program's real
+//! upgrade authority as signer (its signature forged for that one transaction,
+//! `fork::admin_send`; the hooks run). The loader writes the new deploy slot into the ProgramData
+//! header, as on mainnet, and the program keeps running.
 //!
 //! What it settles for M6:
 //!
@@ -34,14 +41,18 @@
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::bpf_loader_upgradeable;
 use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
-use shortwin::constants::{GUARD_PUMP, GUARD_PUMP_AMM, GUARD_PUMP_FEES};
+use shortwin::constants::{
+    GUARD_PUMP, GUARD_PUMP_AMM, GUARD_PUMP_FEES, VENUE_GUARD_SLOTS_2026_09_27,
+};
 use shortwin::errors::ShortwinError as E;
-use shortwin::events::{Close, Liquidate, TraderSwept, VenueRevalidated, VenueUpgradeFlagged};
+use shortwin::events::{
+    Close, Expire, Liquidate, Open, TraderSwept, VenueRevalidated, VenueUpgradeFlagged,
+};
 use shortwin_litesvm_tests::engine::{
-    Borrower, close_short_ix, crank_price_ix, liquidate_ix, sol_settle_ix,
+    Borrower, close_short_ix, crank_price_ix, expire_ix, liquidate_ix, sol_settle_ix,
 };
 use shortwin_litesvm_tests::errors::{assert_err, custom_code, ok};
-use shortwin_litesvm_tests::fork::{self, PumpProgram};
+use shortwin_litesvm_tests::fork::{self, PumpDeploy, PumpProgram};
 use shortwin_litesvm_tests::pamm::{self, PammCoin, PammMarket, PammPool, PammUser};
 use shortwin_litesvm_tests::pump::cu_limit_ix;
 use shortwin_litesvm_tests::{Env, TxResult, events, ix, pda, read};
@@ -473,4 +484,179 @@ fn the_program_data_account_is_checked_for_pamm_and_pump_fees() {
             "{guard}: exactly its bit"
         );
     }
+}
+
+/// The upgrade mainnet made on 2026-10-02, replayed with the real accounts (as
+/// `latch_raydium_it::the_2026_10_cpmm_redeploy_latches_until_revalidated` for CPMM): the fork
+/// starts on the 2026-09 builds of PumpSwap, pump-fees and pump (group `pump_programs`, the
+/// ProgramData at the slots `VENUE_GUARD_SLOTS_2026_09_27` names and `initialize_config`
+/// records), positions are opened on the 261-byte pool — held at `minimum_balance(261)`, so its
+/// first sale grows it to the 2026-09 build's 271 bytes and pays 50,800 lamports of rent out of
+/// `S` (`Open.venue_rent`) — and on e/acc's 301-byte pool, and the loader's own `Upgrade` installs
+/// the redeploys' ELFs (`PumpDeploy::Oct2026`) in mainnet's order (PumpSwap, pump, pump-fees).
+/// PumpSwap answers as the new build (`buy_v2` dispatches). Flagged by anyone, PumpSwap and
+/// pump-fees refuse opens on both pools, while a close — whose buyback grows the short pool to
+/// 287 bytes for another 81,280 lamports, which I13 re-quotes on the build PumpSwap's ProgramData
+/// holds (`PumpDeploy::held`) —, a liquidation after a real ×2.8 pump and an expiry run on the
+/// new PumpSwap. Only the loader's slots revalidate; clearing pump's bit alone, or PumpSwap's,
+/// does not resume opens; with all three clear opens land on the redeploy.
+#[test]
+fn the_2026_10_pumpswap_redeploy_latches_until_revalidated() {
+    // The fork as of 2026-09-27: the 2026-09 builds, the baseline the program constant names.
+    let (mut env, short) = Env::fork_pamm_coin_with(SPL261, |a| {
+        a.guard_slot = VENUE_GUARD_SLOTS_2026_09_27;
+    });
+    for program in PumpProgram::ALL {
+        fork::load_pump_deploy(&mut env.svm, program, PumpDeploy::Sep2026);
+    }
+    let mature = env.load_pamm_coin(MATURE);
+    let old = |program: PumpProgram| VENUE_GUARD_SLOTS_2026_09_27[usize::from(program.guard())];
+    for program in PumpProgram::ALL {
+        assert_eq!(old(program), PumpDeploy::Sep2026.deploy_slot(program));
+        assert_eq!(header(&env, program).slot, old(program), "{program:?}");
+        assert_eq!(
+            env.venue_guard().guard_slot[usize::from(program.guard())],
+            old(program)
+        );
+        assert_eq!(
+            PumpDeploy::held(&env.svm, program),
+            Some(PumpDeploy::Sep2026)
+        );
+        assert_err(&flag(&mut env, program.guard()), E::VenueNotUpgraded);
+    }
+    assert_eq!(
+        env.pump_build_running(PumpProgram::Amm),
+        PumpDeploy::Sep2026
+    );
+
+    let (spm, sq) = list_market(&mut env, &short);
+    let (mpm, mq) = list_market(&mut env, &mature);
+    let rent = |env: &Env, len: usize| env.svm.minimum_balance_for_rent_exemption(len);
+    let pool = |env: &Env| {
+        let a = read::account(&env.svm, &short.pool).unwrap();
+        (a.data.len(), a.lamports)
+    };
+    let mut acc = env.svm.get_account(&short.pool).unwrap();
+    assert_eq!(acc.data.len(), 261);
+    acc.lamports = rent(&env, 261);
+    env.svm.set_account(short.pool, acc).unwrap();
+
+    let mut b_close = env.borrower();
+    let (res, n_close) = env.open(&spm, &mut b_close, sq);
+    let first: Open = events::one(&ok(res));
+    let sep_len = PumpDeploy::Sep2026.pool_len();
+    assert_eq!(first.venue_rent, rent(&env, sep_len) - rent(&env, 261));
+    assert_eq!(first.venue_rent, 50_800);
+    assert_eq!(
+        pool(&env),
+        (sep_len, rent(&env, sep_len)),
+        "the 2026-09 growth"
+    );
+    let (b_exp, n_exp) = open(&mut env, &spm, sq);
+    let (b_liq, n_liq) = open(&mut env, &mpm, mq);
+
+    // The redeploys, in mainnet's order: the loader writes each slot and the 2026-10-02 ELF.
+    let mut slots = Vec::new();
+    for program in [PumpProgram::Amm, PumpProgram::Pump, PumpProgram::Fees] {
+        env.warp(1);
+        let s = loader_upgrade(&mut env, program);
+        assert_ne!(s, old(program));
+        assert_eq!(
+            PumpDeploy::held(&env.svm, program),
+            Some(PumpDeploy::Oct2026)
+        );
+        slots.push((program, s));
+    }
+    env.warp(1);
+    assert_eq!(
+        env.pump_build_running(PumpProgram::Amm),
+        PumpDeploy::Oct2026
+    );
+
+    // Anyone flags each in a later slot; opens are refused on both pools.
+    for (program, s) in &slots {
+        let venue = program.guard();
+        let ev: VenueUpgradeFlagged = events::one(&ok(flag(&mut env, venue)));
+        assert_eq!(
+            (ev.venue, ev.guard_slot, ev.programdata_slot),
+            (venue, old(*program), *s)
+        );
+    }
+    let all = (1 << GUARD_PUMP) | (1 << GUARD_PUMP_AMM) | (1 << GUARD_PUMP_FEES);
+    assert_eq!(env.venue_guard().upgraded, all);
+    for (pm, q) in [(&spm, sq), (&mpm, mq)] {
+        assert_err(&try_open(&mut env, pm, q), E::VenueUpgraded);
+    }
+
+    // Exits never read the latch (I10) and buy back on the new PumpSwap: a close on the short
+    // pool, which the redeploy grows to 287 bytes ...
+    env.warp(1);
+    for pm in [&spm, &mpm] {
+        ok(env.send(&[crank_price_ix(pm)], &[]));
+    }
+    let _: Close = events::one(&ok(close(&mut env, &spm, &b_close, n_close)));
+    let oct_len = PumpDeploy::Oct2026.pool_len();
+    assert_eq!(
+        pool(&env),
+        (oct_len, rent(&env, oct_len)),
+        "the redeploy's growth"
+    );
+    // ... a liquidation after a real ×2.8 pump on e/acc's pool ...
+    let keeper = env.funded_keypair();
+    let u = PammUser::new(&mut env, &mpm.pool, 2_000 * SOL);
+    ok(u.push_price(&mut env, &mpm.pool, 28, 10));
+    let mut liquidated = false;
+    for _ in 0..900 {
+        env.warp(1);
+        ok(env.send(&[crank_price_ix(&mpm)], &[]));
+        let ixl = liquidate_ix(&mpm, &keeper.pubkey(), &b_liq.key(), n_liq);
+        let res = env.send(&[cu_limit_ix(400_000), ixl], &[&keeper]);
+        match custom_code(&res) {
+            None => {
+                let _: Liquidate = events::one(&ok(res));
+                liquidated = true;
+                break;
+            }
+            Some(c) if c == u32::from(E::NotLiquidatable) => {}
+            Some(c) => panic!("liquidate failed with {c}"),
+        }
+    }
+    assert!(liquidated, "the liquidation runs on the redeployed pAMM");
+    // ... and an expiry on the short pool.
+    let deadline = env.position(&spm, &b_exp.key(), n_exp).deadline;
+    let now = env.now();
+    env.warp(deadline + 1 - now);
+    env.tick(&spm, 3);
+    let ixe = expire_ix(&spm, &keeper.pubkey(), &b_exp.key(), n_exp);
+    let e: Expire = events::one(&ok(env.send(&[cu_limit_ix(400_000), ixe], &[&keeper])));
+    assert!(e.buyback_cost > 0);
+    assert_eq!(
+        env.venue_guard().upgraded,
+        all,
+        "exits leave the latch alone"
+    );
+
+    // Only each loader slot revalidates, the 2026-09 baseline does not. pump's bit, then
+    // PumpSwap's, cleared alone leave pump-fees' latching PumpSwap opens.
+    for program in [PumpProgram::Pump, PumpProgram::Amm, PumpProgram::Fees] {
+        let venue = program.guard();
+        let s = slots.iter().find(|(p, _)| *p == program).unwrap().1;
+        for wrong in [old(program), s + 1] {
+            assert_err(&revalidate(&mut env, venue, wrong), E::VenueSlotMismatch);
+        }
+        let ev: VenueRevalidated = events::one(&ok(revalidate(&mut env, venue, s)));
+        assert_eq!((ev.guard_slot, ev.expected_slot), (old(program), s));
+        assert_eq!(env.venue_guard().guard_slot[usize::from(venue)], s);
+        env.tick(&spm, 1);
+        if program != PumpProgram::Fees {
+            assert_err(&try_open(&mut env, &spm, sq), E::VenueUpgraded);
+        }
+    }
+    assert_eq!(env.venue_guard().upgraded, 0);
+    ok(try_open(&mut env, &spm, sq));
+    env.warp(1);
+    assert_eq!(
+        env.pump_build_running(PumpProgram::Amm),
+        PumpDeploy::Oct2026
+    );
 }

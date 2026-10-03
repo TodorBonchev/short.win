@@ -2,14 +2,20 @@
 //! §8.2, §9 M5; A7, R4B-7; I17; U5), on the pump fork of `shortwin_litesvm_tests::fork`: the
 //! real pump (10,485,760 B), pump-fees (948,989 B) and PumpSwap (10,485,760 B) ProgramData
 //! accounts, dumped at their mainnet deploy slots, which `initialize_config` recorded as
-//! `guard_slot`.
+//! `guard_slot` (`fork::FIXTURE_GUARD_SLOTS`: the 2026-10-02 redeploys).
+//!
+//! The upgrade mainnet itself made is replayed too (M10 pump revalidation): the 2026-09 builds
+//! (`fork::PumpDeploy::Sep2026`, the slots `VENUE_GUARD_SLOTS_2026_09_27` names) upgraded by the
+//! loader to the 2026-10-02 redeploys' ELFs, with positions opened on the old builds and exited on
+//! the new ones, which latch curve opens until Emergency revalidates the loader's slots.
 //!
 //! An upgrade here is a **real** one: the upgradeable loader's own `Upgrade` instruction, with a
-//! buffer holding the dumped ELF and the program's real upgrade authority (one key holds all
-//! three programs, ARCH §5.5) as signer — the one key no test holds, so its signature is forged
-//! (`fork::admin_send`: LiteSVM's signature check is off for that one transaction; the hooks
-//! run). The loader itself writes the new deploy slot into the ProgramData header, as on
-//! mainnet, and the program keeps running (the same bytes, redeployed).
+//! buffer holding the redeploy's dumped ELF (`fork::PumpDeploy::CURRENT`) and the program's real
+//! upgrade authority (one key holds all three programs, ARCH §5.5) as signer — the one key no
+//! test holds, so its signature is forged (`fork::admin_send`: LiteSVM's signature check is off
+//! for that one transaction; the hooks run). The loader itself writes the new deploy slot into
+//! the ProgramData header, as on mainnet, and the program keeps running (the same bytes
+//! redeployed; the replay's new bytes).
 //!
 //! What it settles:
 //!
@@ -45,7 +51,7 @@ use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
 use litesvm::types::TransactionMetadata;
 use shortwin::constants::{
     GUARD_JUPITER, GUARD_MASK_PUMP_CURVE, GUARD_PUMP, GUARD_PUMP_FEES, GUARD_RAYDIUM_CPMM,
-    GUARD_RAYDIUM_V4, VENUE_PROGRAM_DATA,
+    GUARD_RAYDIUM_V4, VENUE_GUARD_SLOTS_2026_09_27, VENUE_PROGRAM_DATA,
 };
 use shortwin::errors::ShortwinError as E;
 use shortwin::events::{
@@ -56,10 +62,10 @@ use shortwin_litesvm_tests::engine::{
     Borrower, add_margin_ix, expire_ix, liquidate_ix, open_short_ix, sol_settle_ix,
 };
 use shortwin_litesvm_tests::errors::{assert_err, custom_code, ok};
-use shortwin_litesvm_tests::fork::{self, PumpCoin, PumpCurve, PumpProgram};
+use shortwin_litesvm_tests::fork::{self, PumpCoin, PumpCurve, PumpDeploy, PumpProgram};
 use shortwin_litesvm_tests::pump::{self, CurveUser, PumpMarket, PumpSpec};
 use shortwin_litesvm_tests::{Env, TxResult, events, ix, pda, read};
-use shortwin_venue_state::program_data;
+use shortwin_venue_state::{program_data, pump as vpump};
 use solana_account::Account;
 use solana_signer::Signer;
 
@@ -694,4 +700,213 @@ fn one_upgrade_per_slot() {
     );
     env.warp(1);
     loader_upgrade(&mut env, PumpProgram::Pump);
+}
+
+/// The upgrade mainnet made on 2026-10-02, replayed with the real accounts (as
+/// `latch_raydium_it::the_2026_10_cpmm_redeploy_latches_until_revalidated` for CPMM): the fork
+/// starts on the 2026-09 builds of pump, pump-fees and PumpSwap (group `pump_programs`, the
+/// ProgramData at the slots `VENUE_GUARD_SLOTS_2026_09_27` names and `initialize_config`
+/// records), positions are opened on both 115-byte curves — whose sales grow them to 125 bytes,
+/// the 2026-09 build's size; the Token-2022 curve's rent reserve held at `minimum_balance(115)`,
+/// so its first sale pays 50,800 lamports of growth out of `S` — and the loader's own `Upgrade`
+/// installs the redeploys' ELFs (`PumpDeploy::Oct2026`) in mainnet's order (PumpSwap, pump,
+/// pump-fees). The programs answer as the new builds (`buy_v3` and PumpSwap's `buy_v2`
+/// dispatch). Flagged by anyone, they refuse opens on both curve markets, while a top-up, a
+/// close, a liquidation after a real pump and an expiry run on the new pump — whose buybacks grow
+/// the curves to 141 bytes, the Token-2022 one for another 81,280 lamports of rent, which I13
+/// re-quotes on the build pump's ProgramData holds (`PumpDeploy::held`). Only the loader's slots
+/// revalidate, all three before a curve opens again; then opens land on the redeploy.
+#[test]
+fn the_2026_10_pump_redeploys_latch_until_revalidated() {
+    // The fork as of 2026-09-27: the 2026-09 builds, the baseline the program constant names.
+    let mut env = Env::new();
+    let mut args = env.default_init_args();
+    args.guard_slot = VENUE_GUARD_SLOTS_2026_09_27;
+    ok(env.initialize_config(args));
+    for program in PumpProgram::ALL {
+        fork::load_pump_deploy(&mut env.svm, program, PumpDeploy::Sep2026);
+    }
+    env.load_pump_statics();
+    let spl_curve = env.load_pump_coin(SPL);
+    let t22_curve = env.load_pump_coin(T22);
+    env.set_pump_rent();
+    env.set_pump_clock();
+    let old = |program: PumpProgram| VENUE_GUARD_SLOTS_2026_09_27[usize::from(program.guard())];
+    for program in PumpProgram::ALL {
+        assert_eq!(old(program), PumpDeploy::Sep2026.deploy_slot(program));
+        assert_eq!(header(&env, program).slot, old(program), "{program:?}");
+        assert_eq!(
+            env.venue_guard().guard_slot[usize::from(program.guard())],
+            old(program)
+        );
+        assert_eq!(
+            PumpDeploy::held(&env.svm, program),
+            Some(PumpDeploy::Sep2026)
+        );
+        assert_err(&flag(&mut env, program.guard()), E::VenueNotUpgraded);
+    }
+    assert_eq!(
+        env.pump_build_running(PumpProgram::Pump),
+        PumpDeploy::Sep2026
+    );
+    assert_eq!(
+        env.pump_build_running(PumpProgram::Amm),
+        PumpDeploy::Sep2026
+    );
+
+    let markets = [
+        add_market(&mut env, spl_curve),
+        add_market(&mut env, t22_curve),
+    ];
+    let [(spl, qs), (t22, qt)] = &markets;
+    let curve_len =
+        |env: &Env, pm: &PumpMarket| read::account(&env.svm, &pm.curve.curve).unwrap().data.len();
+    // The Token-2022 curve's rent reserve held at `minimum_balance(115)` (the dump's is
+    // over-funded at the old rent): each build's growth charges the trader its rent.
+    let rent = |env: &Env, len: usize| env.svm.minimum_balance_for_rent_exemption(len);
+    let reserve = |env: &Env, pm: &PumpMarket| {
+        read::lamports(&env.svm, &pm.curve.curve) - pm.curve.state(&env.svm).real_quote_reserves
+    };
+    assert_eq!(curve_len(&env, t22), vpump::CURVE_MIN_LEN);
+    let rq = t22.curve.state(&env.svm).real_quote_reserves;
+    let mut acc = env.svm.get_account(&t22.curve.curve).unwrap();
+    acc.lamports = rq + rent(&env, vpump::CURVE_MIN_LEN);
+    env.svm.set_account(t22.curve.curve, acc).unwrap();
+    let old_growth = rent(&env, PumpDeploy::Sep2026.curve_len()) - rent(&env, vpump::CURVE_MIN_LEN);
+    assert_eq!(old_growth, 50_800);
+    let sale = t22.curve.quote_sell(&env.svm, *qt).unwrap();
+
+    let (b_liq, n_liq) = open_ok(&mut env, spl, *qs);
+    let mut b_close = env.borrower();
+    let (res, n_close) = env.open(t22, &mut b_close, *qt);
+    let open: Open = events::one(&ok(res));
+    assert_eq!(
+        open.s,
+        sale.proceeds - old_growth,
+        "S net of the 2026-09 growth"
+    );
+    let (b_exp, n_exp) = open_ok(&mut env, t22, *qt);
+    let (b_top, n_top) = open_ok(&mut env, spl, *qs);
+    for pm in [spl, t22] {
+        assert_eq!(
+            curve_len(&env, pm),
+            PumpDeploy::Sep2026.curve_len(),
+            "the 2026-09 build's growth"
+        );
+    }
+    assert_eq!(
+        reserve(&env, t22),
+        rent(&env, PumpDeploy::Sep2026.curve_len())
+    );
+
+    // The redeploys, in mainnet's order: the loader writes each slot and the 2026-10-02 ELF.
+    let mut slots = Vec::new();
+    for program in [PumpProgram::Amm, PumpProgram::Pump, PumpProgram::Fees] {
+        env.warp(1);
+        let s = loader_upgrade(&mut env, program);
+        assert_ne!(s, old(program));
+        assert_eq!(
+            PumpDeploy::held(&env.svm, program),
+            Some(PumpDeploy::Oct2026)
+        );
+        slots.push((program, s));
+    }
+    env.warp(1);
+    assert_eq!(
+        env.pump_build_running(PumpProgram::Pump),
+        PumpDeploy::Oct2026
+    );
+    assert_eq!(
+        env.pump_build_running(PumpProgram::Amm),
+        PumpDeploy::Oct2026
+    );
+
+    // Anyone flags each in a later slot; opens are refused on both curve markets.
+    for (program, s) in &slots {
+        let venue = program.guard();
+        let meta = ok(flag(&mut env, venue));
+        let ev: VenueUpgradeFlagged = events::one(&meta);
+        assert_eq!(
+            (ev.venue, ev.guard_slot, ev.programdata_slot),
+            (venue, old(*program), *s)
+        );
+    }
+    assert_eq!(env.venue_guard().upgraded, GUARD_MASK_PUMP_CURVE);
+    for (pm, q) in &markets {
+        assert_err(&try_open(&mut env, pm, *q), E::VenueUpgraded);
+    }
+
+    // Exits never read the latch (I10), and buy back on the new pump: a top-up, a close on the
+    // Token-2022 curve (its buyback grows it to 141 bytes) ...
+    crank_all(&mut env, &markets);
+    let meta = ok(env.send(
+        &[add_margin_ix(spl, &b_top.key(), n_top, 1_000_000_000)],
+        &[&b_top.kp],
+    ));
+    let _: MarginAdded = events::one(&meta);
+    env.warp(1);
+    let vault0 = read::token_amount(&env.svm, &t22.keys.pool_vault).unwrap();
+    let meta = ok(env.close(t22, &b_close, n_close));
+    let c: Close = events::one(&meta);
+    assert_eq!(c.q, *qt);
+    assert_eq!(
+        read::token_amount(&env.svm, &t22.keys.pool_vault).unwrap() - vault0,
+        *qt,
+        "q bought back into the lending vault"
+    );
+    assert_eq!(curve_len(&env, t22), PumpDeploy::Oct2026.curve_len());
+    assert_eq!(
+        reserve(&env, t22),
+        rent(&env, PumpDeploy::Oct2026.curve_len()),
+        "the redeploy's growth, 81,280 more, out of the buyback (I13 re-quotes it)"
+    );
+    // ... a liquidation after a real pump on the SPL Token curve ...
+    let vault0 = read::token_amount(&env.svm, &spl.keys.pool_vault).unwrap();
+    let liq = liquidate_after_a_pump(&mut env, spl, &b_liq, n_liq);
+    assert!(liq.buyback_cost > 0);
+    assert_eq!(
+        read::token_amount(&env.svm, &spl.keys.pool_vault).unwrap() - vault0,
+        *qs,
+        "Q bought back into the lending vault"
+    );
+    assert_eq!(curve_len(&env, spl), PumpDeploy::Oct2026.curve_len());
+    // ... and an expiry on the Token-2022 curve.
+    let keeper = env.funded_keypair();
+    let deadline = env.position(t22, &b_exp.key(), n_exp).deadline;
+    let now = env.now();
+    env.warp(deadline + 1 - now);
+    env.tick(t22, 3);
+    let meta = ok(env.send(
+        &keeper_tx(expire_ix(t22, &keeper.pubkey(), &b_exp.key(), n_exp)),
+        &[&keeper],
+    ));
+    let e: Expire = events::one(&meta);
+    assert!(e.buyback_cost > 0);
+    assert_eq!(env.venue_guard().upgraded, GUARD_MASK_PUMP_CURVE);
+
+    // Only each loader slot revalidates, the 2026-09 baseline does not; every bit must clear.
+    for (k, (program, s)) in slots.iter().enumerate() {
+        let venue = program.guard();
+        for wrong in [old(*program), s + 1] {
+            assert_err(&revalidate(&mut env, venue, wrong), E::VenueSlotMismatch);
+        }
+        crank_all(&mut env, &markets);
+        let ev: VenueRevalidated = events::one(&ok(revalidate(&mut env, venue, *s)));
+        assert_eq!((ev.guard_slot, ev.expected_slot), (old(*program), *s));
+        assert_eq!(env.venue_guard().guard_slot[usize::from(venue)], *s);
+        if k + 1 < slots.len() {
+            for (pm, q) in &markets {
+                assert_err(&try_open(&mut env, pm, *q), E::VenueUpgraded);
+            }
+        }
+    }
+    assert_eq!(env.venue_guard().upgraded, 0);
+    for (pm, q) in &markets {
+        ok(try_open(&mut env, pm, *q));
+    }
+    env.warp(1);
+    assert_eq!(
+        env.pump_build_running(PumpProgram::Pump),
+        PumpDeploy::Oct2026
+    );
 }
