@@ -344,6 +344,47 @@ fn deficit_tripwire_on_fuzz_m7_24h_3() {
     assert!(f.message.contains("took"), "{}", f.message);
 }
 
+/// M10 (FUZZ-M10-24H-A): the wind-down's second claim pass leaves exactly ECON §9.4's I-P6
+/// residue — rounding and the SOL credited to rebase-orphan shares (§9.5) — and the final-tree
+/// 24 h run's reproducers pass through their own branch of the oracle. On CPMM the last lender,
+/// its shares all withdrawn, stays owed more than `CLAIM_DUST` of the accumulators' carry while
+/// none of its realised SOL is left and the pot is empty (`wind-down-owed-rounding`); on the curve
+/// `lender_sol` keeps more than the hooks' dust cap credited to orphan shares no lender holds
+/// (`wind-down-orphan-credit`). Either run failed the pass's first oracle.
+#[test]
+fn wind_down_residue_on_fuzz_m10_24h_a() {
+    use shortwin_fuzz::world::CLAIM_DUST;
+    use shortwin_litesvm_tests::invariants::lender::DEFAULT_LIVENESS_DUST_CAP;
+    for (file, event) in [
+        (
+            "corpus/fuzz-m10-24h-a-cpmm-carry-owed.json",
+            "wind-down-owed-rounding",
+        ),
+        (
+            "corpus/fuzz-m10-24h-a-curve-orphan-credit.json",
+            "wind-down-orphan-credit",
+        ),
+    ] {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(file);
+        let c = runner::read_crash(&path).expect("corpus file");
+        let o = runner::run(c.profile, c.seed, Some(&c.actions), 0, c.opts);
+        if let Some(f) = &o.failure {
+            panic!("{file}: {}\n{}", f.signature, f.message);
+        }
+        let ev = |k: &str| o.stats.events.get(k).copied().unwrap_or(0);
+        println!(
+            "{file}: unpaid {} lender_sol {}; events {:?}",
+            o.stats.wind_down_unpaid_max, o.stats.wind_down_lender_sol_max, o.stats.events
+        );
+        assert!(ev(event) > 0, "{file}: no `{event}`");
+        if event == "wind-down-owed-rounding" {
+            assert!(o.stats.wind_down_unpaid_max > CLAIM_DUST);
+        } else {
+            assert!(o.stats.wind_down_lender_sol_max > DEFAULT_LIVENESS_DUST_CAP);
+        }
+    }
+}
+
 /// M10: `stale_receivable` (FUZZ-M7-24H-3's shape) reaches the deficit tripwire on both Raydium
 /// programs: a near-cap short left unattended for days, a late depositor of three times the
 /// pool, the price steered until `B̂_live` lies in `(V − R_due, V − K_s − ert]`, keeper seconds — a

@@ -522,6 +522,11 @@ pub fn wind_down(st: &PoolState) -> Result<WindDown, Violation> {
     })
 }
 
+/// I-P6 on the wound-down copies ([`wind_down`]). Both checks bind only while some
+/// entitlement is unpaid: with nothing owed, any `lender_sol` left passes, however much of it
+/// is credited to rebase-orphan shares or allocated to no lender. Over-stranding with every
+/// lender paid is the fuzzer's to catch — its wind-down's second claim pass bounds `lender_sol`
+/// by the dust cap plus the orphan shares' realised SOL (`tests/fuzz`, FUZZ-M10-24H-A).
 fn liveness(st: &PoolState) -> Result<(), Violation> {
     let w = wind_down(st)?;
     let market = st.market;
