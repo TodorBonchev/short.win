@@ -4083,8 +4083,8 @@ impl World {
             }
             match phase {
                 // The keeper's per-second coverage, long enough for an armed settlement's
-                // persistence (`settle_persist_n` ≤ 600 observations inside
-                // `settle_arm_gap_s`) at phases 31 and 92.
+                // persistence (the positions' locked `settle_persist_n` ≤ 600 observations
+                // inside `settle_arm_gap_s`) at phases 31 and 92.
                 1..=30 | 32..=90 | 93..=150 => self.keeper_second(),
                 31 | 92 => self.persist_seconds(),
                 // Past every deadline, then the keeper's cadence (every 30 s, inside
@@ -4457,9 +4457,33 @@ impl World {
         out
     }
 
+    /// The largest of `f` over the open positions' locked terms, or `floor` (the config's).
+    fn locked_max(&self, floor: u64, f: impl Fn(&shortwin::state::ShortPosition) -> u64) -> u64 {
+        let mut max = floor;
+        for si in 0..self.slots.len() {
+            let market = self.market_key(si);
+            for p in &self.slots[si].positions {
+                let key = pda::position(&market, &self.slots[si].borrowers[p.b].key(), p.nonce).0;
+                if let Some(pos) =
+                    read::borsh::<shortwin::state::ShortPosition>(&self.env.svm, &key)
+                {
+                    max = max.max(f(&pos));
+                }
+            }
+        }
+        max
+    }
+
     /// Keeper seconds for `settle_persist_n` and half a minute more (while positions remain).
+    /// The persistence is the position's, locked at open (`sol_settle` reads
+    /// `position.settle_persist_n`, `engine::arming::terms`), so it is the largest open
+    /// position's when a `config_change` lowered the config's after an open: with the config's
+    /// value, a position opened at 320 and armed under a config of 40 got 70 keeper seconds
+    /// per phase and its settlement never persisted (FUZZ-M10-24H-B; the in-house keeper keeps
+    /// an armed position on the per-second cadence until it settles).
     fn persist_seconds(&mut self) {
-        let n = self.env.config().params.settle_persist_n + 30;
+        let floor = u64::from(self.env.config().params.settle_persist_n);
+        let n = self.locked_max(floor, |p| u64::from(p.settle_persist_n)) + 30;
         for _ in 0..n {
             if self.slots.iter().all(|s| s.positions.is_empty()) {
                 break;
@@ -4470,9 +4494,25 @@ impl World {
 
     /// The keeper's cadence (every 30 s) for `s3_wait_s + max(grad_grace_s,
     /// max_migration_pause_s)` and three more minutes: long enough for S3 from any chain start.
+    /// The S3 timers are the position's, locked at open (`ShortPosition::s3_terms`), so the
+    /// largest open position's when a `config_change` shortened the config's after an open
+    /// (FUZZ-M10-24H-B's sibling, latent: the same staleness as [`World::persist_seconds`]).
     fn s3_cadence(&mut self) {
         let p = self.env.config().params;
-        let secs = p.s3_wait_s + p.grad_grace_s.max(p.max_migration_pause_s) + 180;
+        let wait = |w: u64, g: u64, m: u64| w + g.max(m);
+        let floor = wait(
+            u64::from(p.s3_wait_s),
+            u64::from(p.grad_grace_s),
+            u64::from(p.max_migration_pause_s),
+        );
+        let secs = self.locked_max(floor, |q| {
+            wait(
+                u64::from(q.s3_wait_s),
+                u64::from(q.grad_grace_s),
+                u64::from(q.max_migration_pause_s),
+            )
+        }) + 180;
+        let secs = u32::try_from(secs).unwrap_or(u32::MAX);
         let mut t = 0;
         while t < secs && self.slots.iter().any(|s| !s.positions.is_empty()) {
             self.keeper_cadence(300.min(secs - t), 30);
