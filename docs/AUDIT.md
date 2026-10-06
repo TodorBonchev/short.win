@@ -4,12 +4,15 @@ This is the auditors' entry point to short.win's on-chain code. It says what is 
 to build and test the code, what the code relies on, and what we already know about it.
 
 **Status:**
-- This is the M10 final package (WP-10 final), written on the merged M10 tree (branch
-  `m10/final`, §0). Every M10 work package has landed: program code is final for the audit
-  (batch 3).
+- This is the M10 final package (WP-10 final), written on the merged M10 tree (`m1-core`,
+  §0). Every M10 work package has landed: program code is final for the audit (batch 4; the
+  release ELF `bbef1075…` since).
+- The final tree's ≥ 24 h fuzz run is clean and CI is green on the program-final head
+  `4f4849e` (§10).
 - What is still pending is named where it applies: the owner's review of this package and the
-  tag (§0), CI on this tree (§10), the ≥ 24 h fuzz run on this tree (§10), the open owner
-  items (§7), the calibration results (KI-14) and the external audit itself (§12).
+  tag (§0), CI on the head that carries this file (§10; no program change since `4f4849e`),
+  the open owner items (§7), the calibration results (KI-14) and the external audit itself
+  (§12).
 - Normative sources:
   - the design documents `docs/SPEC.md`, `docs/design/ARCHITECTURE.md` (ARCH) and
     `docs/design/ECONOMICS.md` (ECON);
@@ -32,7 +35,7 @@ to build and test the code, what the code relies on, and what we already know ab
 
 | Item | Value |
 |---|---|
-| Audit commit / tag | the head of branch `m10/final`, the commit that carries this file (the M10 tree: `m1-core` at `98b1181`, batch 3, the doc sync and this package), **to be tagged `audit-1` / `v1.0.0` by the owner** (owner decision of 2026-10-02: release 1.0.0 at the audit tag; post-audit fixes are 1.0.x). The tag goes on the commit whose hashes match the table below |
+| Audit commit / tag | the head of `m1-core` that carries this file: the M10 tree (`98b1181`, batch 3 from `391aed3`, the doc sync and this package; program batch 4 — the program change `1e4a273`, `3b33ab7` bytecode-neutral — with its docs and gate up to `4f4849e`), then the final tree's fuzz fixes `997c730` and `945d45a` (`tests/fuzz` and one test-harness doc comment only) and this evidence sync; the program bytes are those of `4f4849e`. **To be tagged `audit-1` / `v1.0.0` by the owner** (owner decision of 2026-10-02: release 1.0.0 at the audit tag; post-audit fixes are 1.0.x). The tag goes on the commit whose hashes match the table below |
 | Package version | `shortwin` and `complete_curve` are both 1.0.0 (`programs/*/Cargo.toml`); `security.txt`'s `source_release` reads `v1.0.0` |
 | `shortwin` program id | `5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK` (`programs/shortwin/src/lib.rs` `declare_id!`) |
 | `complete_curve` program id | `4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ` (`programs/complete_curve/src/lib.rs`) |
@@ -376,14 +379,14 @@ invariants.
 
 ## 6. Known issues
 
-[`docs/audit/known-issues.md`](audit/known-issues.md) is the single register: 64 rows (KI-01 …
-KI-64), each with its bound, the decision that covers it and its status, plus the M10
+[`docs/audit/known-issues.md`](audit/known-issues.md) is the single register: 65 rows (KI-01 …
+KI-65), each with its bound, the decision that covers it and its status, plus the M10
 findings and their resolution (its §6). Do not report these as findings unless the stated
 bound is wrong or can be exceeded. Summary:
 
 | Section | Rows | What |
 |---|---|---|
-| §1 | KI-01 … KI-15, KI-52, KI-53 | Economic residuals (O19): the 2 % exit bound and the held model, with the real-venue figures accepted on 2026-10-03 (AMM v4 +61.27, CPMM +37.33 / atomic extra +5.34, PumpSwap +10.20 SOL); no liquidation reserve; baskets; settlement push and deferral; degraded-mode S2→S1; the sale-wrapped open's notional (accepted); the run residual; gap risk; creator self-dealing; **M10-8C-1 (fixed)**; the **late-depositor shortfall** (accepted, with the deposit warning at 1 % / 1 SOL) |
+| §1 | KI-01 … KI-15, KI-52, KI-53, KI-65 | Economic residuals (O19): the 2 % exit bound and the held model, with the real-venue figures accepted on 2026-10-03 (AMM v4 +61.27, CPMM +37.33 / atomic extra +5.34, PumpSwap +10.20 SOL); no liquidation reserve; baskets; settlement push and deferral; degraded-mode S2→S1; the sale-wrapped open's notional (accepted); the run residual; gap risk; creator self-dealing; **M10-8C-1 (fixed)**; the **late-depositor shortfall** (accepted, with the deposit warning at 1 % / 1 SOL); the **rebase-orphan vest** (disclosed; found by the final tree's 24 h fuzz) |
 | §2 | KI-16 … KI-29 | Pool switches and third-party LP (O18; ECON §12.12 residuals 1–17), graduation delays |
 | §3 | KI-30 … KI-41 | Keeper coverage and budget (O17, OWNER-M7-*), transaction sizes |
 | §4 | KI-42 … KI-46, KI-54 … KI-64 | Trust: the venue guard window, halted venues, upgradeable venues and programs (with the pump venues' 2026-10-02 redeploy), admin powers; the **extras-denylist residuals** (batch 3); the **CPMM creator-fee share**; the Squads source; the **Squads semantics** |
@@ -400,8 +403,8 @@ bound is wrong or can be exceeded. Summary:
 - **Fixed:** M10-8C-1 (KI-52), the extras denylist hardening (batch 3), PUMP-2026-10-1 (batch 4:
   PumpSwap's fee buckets are not payable SOL), and the harness and doc findings of the
   register's §6.
-- **Open** (build default in force; §7): the rest of O19 (KI-03 … KI-11 are disclosed but not
-  signed off), O18 (§2) and the M7 keeper items.
+- **Open** (build default in force; §7): the rest of O19 (KI-03 … KI-11 and KI-65 are disclosed
+  but not signed off), O18 (§2) and the M7 keeper items.
 
 ---
 
@@ -426,6 +429,7 @@ and 4).
 | Item | Decision needed | Build default (in force) | Changes program code? |
 |---|---|---|---|
 | **O19** (the rest) | Sign off the disclosed residuals of known-issues §1 (KI-01, KI-03 … KI-11); the real-venue figures are already accepted | Accept and disclose; no liquidation reserve | No; the alternative (a rent-only liquidation reserve) is **program** |
+| **Rebase-orphan vest** (KI-65; O19; FUZZ-M10-24H-A) | Accept the disclosed residual — in a market whose pool rebased to a few raw token units, the vest every real lender forfeits by exiting during it goes to rebase-orphan shares, claimable by nobody (0.054 SOL in the fuzz) — or fix it with on-chain orphan tracking | Accept and disclose; lenders are told to wait for the market's `vest_end` (ECON §9.5) | The fix is **program** (not built) |
 | **O18** with the SPEC §14 "Delegated, proposed" rows **10** (collateral and liquidation by tier), **13** (dynamic rent) and **18** (fee split) | Confirm the PROPOSED parameters and venue rules: ARCH §2.3.3, §10 O18; ECON §14 lists 32 PROPOSED rows | As built | No if accepted; **program** for any rule the owner rejects |
 | **O9** (ECON G37, U21) | The calibrated gap frequencies per tier and the pre-committed rule (if the 95 % upper bound of λ_up exceeds a tier's break-even, raise CR_open or rent, or cut caps), after ≥ 30 days of the public-RPC crawl | Uncalibrated Monte Carlo (ECON §11.6, illustrative); the crawl runs | Parameters through governance; **program** only if a value leaves its compiled bounds |
 | **M6D residual 16** (ECON §12.12; KI-26) | Accept the margin of a position opened while a deposit is held, or price the open's margin on the burned depth | Accept (margin on the pool as it is) | The alternative is **program** |
@@ -588,9 +592,20 @@ The full gate (G-full in the M10 plan; CI's `ci.yml`) also runs fmt and clippy w
   2026-10-02, `4cb7729`). Otherwise they run on `workflow_dispatch`: fuzz-nightly only with a
   `fuzz_duration` input, mutants on every dispatch.
 
-**CI runs:** the first green run on `main` is at `e857a2a` (run 36972628387). The final tree's
-run is pending the owner-approved push (owner decision Q1: `main` is fast-forwarded after each
-verified step); its URL and the `verifiable-build` job's hashes go here at the tag.
+**CI runs:** the first green run on `main` is at `e857a2a` (run 36972628387).
+- **The program-final head `4f4849e`:** run 37161377613
+  (https://github.com/TodorBonchev/short.win/actions/runs/37161377613, 2026-10-03), green.
+  Every job a push runs succeeded (24 of 26; `fuzz-nightly` and `mutants` are opt-in and were
+  skipped). `verifiable-build` ran in Docker mode and found both programs byte-identical to
+  anchor-build's artifacts, with the hashes of §0: `shortwin` `bbef1075…f289` / executable
+  `3214661b…ee09`, 1,575,216 B; `complete_curve` `f3a47201…6d42` / `2f2ef7da…82ab`, 122,264 B.
+  `indexer` passed after the runner-disk fix `3d341c8`; the run before it (37130341616, on
+  `cbde0ec`) failed only that job, on a full runner disk.
+- **The head that carries this file:** pending. The commits after `4f4849e` (`997c730`,
+  `945d45a`: `tests/fuzz` and one test-harness doc comment; then this evidence sync, docs
+  only) change no program, client or service code. The next push to `main` (owner decision
+  Q1: `main` is fast-forwarded after each verified step) runs CI on it; its URL goes here at
+  the tag.
 
 **This package's gate** (re-run for program batch 4, 2026-10-03/04, on `m10/batch4` at
 `09778df` … `f08426d`: the pump venues' 2026-10-02 redeploys, PUMP-2026-10-1 and -2, then docs
@@ -657,10 +672,26 @@ trace, stack depth); `tests/litesvm/README.md` (the suites and their figures);
   2026-10-03T10:13Z); 72,149 runs, 13,821,419 actions, 178,365,479 transactions, 273,589,118
   hook checkpoints, 72,149 wind-downs. **0 failures, 0 anomalies**: M7's exit criterion
   "fuzz clean ≥ 24 h" is met.
-- **The final tree's ≥ 24 h run is pending.** The M10 program batches 1–3 changed both
-  programs after run 2's commit, so this tree needs its own run; it starts after this
-  package. Its commit, seed and `summary.json` go here, and a failure is handled as a finding
-  (§12).
+- **24 h run 3** (the final tree), at `4f4849e` (release `shortwin.so` `bbef1075…`; the M10
+  program batches changed both programs after run 2's commit): seed 20261004, 4 jobs,
+  86,408.5 s (2026-10-03T23:19:34Z → 2026-10-04T23:20Z); 52,272 runs, 10,162,831 actions,
+  132,425,511 transactions, 255,722,249 hook checkpoints, 0 anomalies. It failed two of the
+  fuzzer's liveness oracles, both harness bugs with the program unchanged:
+  - FUZZ-M10-24H-A (6 runs): the second claim pass's oracle was stricter than ECON §9.4 /
+    §9.5's I-P6 residue (the accumulators' rounding carries and rebase-orphan credits). Fixed
+    in `997c730` with exact state-derived bounds, which still catch the program mutants
+    mutL, mutS and mutC. Its spec-level residual is KI-65.
+  - FUZZ-M10-24H-B (1 run): the wind-down sized its per-second coverage from the config's
+    `settle_persist_n` instead of the position's locked one (latent since M7). Fixed in
+    `945d45a`.
+- **24 h run 4** (the final tree's confirmation), at `945d45a` (the fixed fuzzer; the program
+  bytes of `4f4849e`, `bbef1075…`): seed 20261005, 4 jobs, 86,404.9 s
+  (2026-10-05T01:38:12Z → 2026-10-06T01:38Z); 52,274 runs, 10,163,360 actions, 132,445,714
+  transactions, 255,725,412 hook checkpoints, 52,274 wind-downs. **0 failures, 0 anomalies**:
+  M10's "fuzz clean ≥ 24 h on the final tree" is met. The second claim pass left at most 445
+  lamports owed and at most 217,508,010 lamports of `lender_sol` (5 wind-downs above the
+  0.01-SOL dust cap, each within the rebase-orphan shares' realised SOL); it paid 13,618
+  claims.
 - This gate's 10-minute smoke on this tree is in the table above.
 
 **M10 evidence** (ARCH §9 M10 row and §8.2 are normative):
