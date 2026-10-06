@@ -4312,6 +4312,17 @@ impl World {
                         .events
                         .entry("wind-down-orphan-credit".into())
                         .or_default() += 1;
+                    if self.stats.orphan_cases.len() < crate::stats::ORPHAN_CASES_MAX {
+                        let m = self.market(si);
+                        let case = format!(
+                            "{}: lender_sol {lender_sol}, orphan credit ≤ {orphan}, unpaid \
+                             {unpaid}, S {}, share_epoch {}",
+                            self.stats.cursor,
+                            m.total_shares.get(),
+                            m.share_epoch
+                        );
+                        self.stats.orphan_cases.push(case);
+                    }
                 }
                 continue;
             }

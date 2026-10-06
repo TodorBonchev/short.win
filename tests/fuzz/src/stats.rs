@@ -90,7 +90,15 @@ pub struct Stats {
     /// `pending` left unpaid after the second claim pass (lamports).
     pub wind_down_lender_sol_max: u64,
     pub wind_down_unpaid_max: u64,
+    /// The wind-downs whose `lender_sol` the second claim pass accepted above the dust cap as
+    /// rebase-orphan credit (FUZZ-M10-24H-A), each as its cursor (`one --profile P --seed S
+    /// --length N` replays it) and its figures; at most [`ORPHAN_CASES_MAX`], so a 24 h run keeps
+    /// every such case for classification (KI-11 vs KI-65) at a bounded size.
+    pub orphan_cases: Vec<String>,
 }
+
+/// The most orphan-credit wind-downs [`Stats::orphan_cases`] keeps.
+pub const ORPHAN_CASES_MAX: usize = 64;
 
 impl Stats {
     /// Adds `o` into `self`.
@@ -130,6 +138,11 @@ impl Stats {
             .wind_down_lender_sol_max
             .max(o.wind_down_lender_sol_max);
         self.wind_down_unpaid_max = self.wind_down_unpaid_max.max(o.wind_down_unpaid_max);
+        for c in &o.orphan_cases {
+            if self.orphan_cases.len() < ORPHAN_CASES_MAX {
+                self.orphan_cases.push(c.clone());
+            }
+        }
     }
 
     /// Records an anomaly of class `class` at the cursor.

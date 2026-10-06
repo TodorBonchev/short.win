@@ -220,6 +220,9 @@ fn report(s: &Stats, secs: f64, failures: &[(String, String)]) -> serde_json::Va
         s.wind_down_unpaid_max,
         s.wind_down_lender_sol_max
     );
+    for c in &s.orphan_cases {
+        println!("  orphan credit: {c}");
+    }
     println!("\n-- anomalies (not invariant violations; for review) --");
     if s.anomalies.is_empty() {
         println!("  none");
@@ -263,6 +266,7 @@ fn report(s: &Stats, secs: f64, failures: &[(String, String)]) -> serde_json::Va
             "largest_unpaid_pending_lamports": s.wind_down_unpaid_max,
             "largest_lender_sol_lamports": s.wind_down_lender_sol_max,
             "claim_dust_lamports": shortwin_fuzz::world::CLAIM_DUST,
+            "orphan_credit_cases": s.orphan_cases,
         },
         "coverage": {
             "instructions_landed": ix_landed,
