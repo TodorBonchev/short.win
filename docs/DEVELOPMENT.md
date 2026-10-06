@@ -454,8 +454,13 @@ outside the repository (≈ 270–310 actions/s on 5 jobs), or nights of CI's `f
 since 2026-10-02 runs only when the repository variable `FUZZ_NIGHTLY` is `true` (below, "CI").
 It is **met** by the second local 24 h run (2026-10-02/03, at `4cb7729`, seed 20261002, 4 jobs,
 86,402 s: 72,149 runs, 13,821,419 actions, 0 failures, 0 anomalies); the first (at `eb82a2a`) found
-four harness failures and one anomaly, all fixed (FUZZ-M7-24H-1, -2, -3). The M10 program batches
-need their own ≥ 24 h run on the final tree. Details: [`tests/fuzz/README.md`](../tests/fuzz/README.md).
+four harness failures and one anomaly, all fixed (FUZZ-M7-24H-1, -2, -3). For the M10 final tree
+it is met by run 4 (2026-10-05/06, at `945d45a` with the program bytes of `4f4849e`, release
+`bbef1075…`; seed 20261005, 4 jobs, 86,404.9 s: 52,274 runs, 10,163,360 actions, 0 failures,
+0 anomalies); run 3 (at `4f4849e`, seed 20261004) failed only the fuzzer's own liveness oracles,
+both fixed (FUZZ-M10-24H-A, -B). Seeds are `base + job + k·jobs`, so runs 2 and 4 re-ran runs 1's
+and 3's streams shifted by one: confirmations, not new coverage. A run meant to add coverage takes
+a widely spaced `--seed`. Details: [`tests/fuzz/README.md`](../tests/fuzz/README.md).
 
 **Mutation testing** (M7-SEC-6): `scripts/mutants.sh [--fuzz 3m] [--work DIR] [mutant …]` builds the
 tests and the fuzzer once from the checkout, then each of the M7 security review's seven one-line
