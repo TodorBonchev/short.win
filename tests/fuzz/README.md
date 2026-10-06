@@ -22,7 +22,9 @@ The program paths are the harness's (`SHORTWIN_SO`, `SHORTWIN_TEST_VENUE_SO`, `M
 `COMPLETE_CURVE_SO`). The fuzzer needs speed, not the deploy profile's fat LTO:
 `CARGO_PROFILE_RELEASE_LTO=false CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16` builds it in ~2 min
 (CI does the same). `run` without `--duration` does one run; `--runs N` caps the count; each job
-(`--jobs`, default: every core) owns one seed stream (`seed + job + k·jobs`); a run's length varies
+(`--jobs`, default: every core) owns one seed stream (`seed + job + k·jobs`: runs at `--seed s` and
+`s + 1` on the same jobs share all but one stream's first seed, so a run meant to add coverage takes
+a seed far from earlier runs'; the 24 h runs 2 and 4 re-ran runs 1's and 3's); a run's length varies
 with its seed from a quarter of `--actions` to all of it (so the wind-down's liveness check meets
 states at every depth: `runner::run_length`, `--actions/4 + splitmix64(seed ^ 0x1e57) % (3·--actions/4
 + 1)`); since M10 `one` derives the same length from its own `--actions` (default 300, as `run`), so
@@ -332,7 +334,7 @@ The M10 fuzz follow-ups add no finding (nor do their review fixes: every `credit
 | the same, `--profile pumpswap`, `--seed 20261053` (5 minutes) | the same | 302 s | 3 | 72 | 10,483 | 165,116 | 311,162 | 0 | 0 |
 | 24 h run 3 (the M10 final tree), `--seed 20261004` | `4f4849e` (program batch 4, release `bbef1075…`) | 86,409 s | 4 | 52,272 | 10,162,831 | 132,425,511 | 255,722,249 | 7 (FUZZ-M10-24H-A ×6, FUZZ-M10-24H-B ×1: the fuzzer's liveness oracles, fixed in `997c730` and `945d45a`) | 0 |
 | FUZZ-M10-24H-B's fix (harness only; the program byte-identical, release `bbef1075…`), `--profile mock,mixed`, `--seed 20261051` | the wind-down's persistence and S3 waits read the positions' locked terms | 1,226 s | 3 | 382 | 76,564 | 1,050,827 | 2,091,557 | 1 (the final-tree run's open signature (A), `world.rs:4148` second-claim-pass `lender_sol` above the cap, mock seed 20261070; it fails the same way on the unfixed fuzzer; FUZZ-M10-24H-B's signature did not recur) | 0 |
-| 24 h run 4 (the final tree, the fixed fuzzer), `--seed 20261005` | `945d45a` (the program bytes of `4f4849e`, release `bbef1075…`) | 86,405 s | 4 | 52,274 | 10,163,360 | 132,445,714 | 255,725,412 | 0 | 0 |
+| 24 h run 4 (the final tree, the fixed fuzzer), `--seed 20261005` | `945d45a` (the program bytes of `4f4849e`, release `bbef1075…`); run 3's seed stream shifted by one, so essentially run 3's cases (below) | 86,405 s | 4 | 52,274 | 10,163,360 | 132,445,714 | 255,725,412 | 0 | 0 |
 
 In the M10 fuzz follow-ups' final runs: on `cpmm`, 180 liquidations and 337 expiries landed through
 the CPMM differential oracle (every lamport; 25 / 31 more through AMM v4's on adopted candidates),
@@ -373,7 +375,12 @@ run 2 at `4cb7729`, and for M10 by run 4 on the final tree at `945d45a` (the pro
 `4f4849e`, release `bbef1075…`), both with 0 failures and 0 anomalies (the table above; each a
 local `run` of all six profiles on 4 jobs; `fuzz-nightly` is opt-in, below). Runs 1 and 3 failed
 only the fuzzer's own checks (FUZZ-M7-24H-1 … -3, FUZZ-M10-24H-A, -B; no program invariant was
-violated), and each was fixed before the next run. In run 4 every one of the 52,274 runs ended in
+violated), and each was fixed before the next run. Runs 2 and 4 are confirmations, not independent
+coverage: their base seeds are runs 1's and 3's plus one, so on 4 jobs each stream is the earlier
+run's shifted by one (a run's profile and length derive from its seed). Run 4 re-executed
+essentially all of run 3's 52,272 cases, the six failing seeds included, with the fixed fuzzer (the
+two summaries' largest `lender_sol`, deficit, bound and deficit/bound figures are identical), and
+run 2 re-ran run 1's seeds. In run 4 every one of the 52,274 runs ended in
 the liveness wind-down: the deficit tripwire checked 834 deficits in 812 runs (the largest
 1,468.99 SOL, within its bound); the second claim pass paid 13,618 claims in its first round and
 1 more in its second round, and left at most 445 lamports owed; `lender_sol` was at most

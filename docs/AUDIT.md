@@ -696,6 +696,14 @@ trace, stack depth); `tests/litesvm/README.md` (the suites and their figures);
   summary records the same figure, and there any `lender_sol` above the cap failed), which
   got no crash file, so its shape is not yet classified (KI-65); the triaged reproducers'
   0.054 and 0.012–0.100 SOL are examples, not the bound.
+  Run 4 is not independent coverage: seeds are `base + job + k·jobs` per job and a run's
+  profile and length derive from its seed, so on 4 jobs run 4's stream (base 20261005) is
+  run 3's (base 20261004) shifted by one. It re-executed essentially all of run 3's 52,272
+  cases, the six failing seeds included, with the fixed fuzzer (the two summaries' largest
+  `lender_sol`, deficit, bound and deficit/bound figures are identical). It confirms the fixes
+  on run 3's cases and adds almost no new coverage. Runs 1 and 2 (bases 20261001 and
+  20261002) overlap the same way. A confirmation run meant to add coverage takes a widely
+  spaced base seed.
 - This gate's 10-minute smoke on this tree is in the table above.
 
 **M10 evidence** (ARCH §9 M10 row and §8.2 are normative):
