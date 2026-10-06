@@ -429,7 +429,7 @@ and 4).
 | Item | Decision needed | Build default (in force) | Changes program code? |
 |---|---|---|---|
 | **O19** (the rest) | Sign off the disclosed residuals of known-issues §1 (KI-01, KI-03 … KI-11); the real-venue figures are already accepted | Accept and disclose; no liquidation reserve | No; the alternative (a rent-only liquidation reserve) is **program** |
-| **Rebase-orphan vest** (KI-65; O19; FUZZ-M10-24H-A) | Accept the disclosed residual — in a market whose pool rebased to a few raw token units, the vest every real lender forfeits by exiting during it goes to rebase-orphan shares, claimable by nobody (0.054 SOL in the fuzz) — or fix it with on-chain orphan tracking | Accept and disclose; lenders are told to wait for the market's `vest_end` (ECON §9.5) | The fix is **program** (not built) |
+| **Rebase-orphan vest** (KI-65; O19; FUZZ-M10-24H-A) | Accept the disclosed residual — in a market whose pool rebased to a few raw token units, the vest every real lender forfeits by exiting during it goes to rebase-orphan shares, claimable by nobody (0.054 SOL in the triaged reproducer; the 24 h runs' largest orphan credit, ≈ 0.218 SOL in one wind-down, is not yet classified) — or fix it with on-chain orphan tracking; first, classify that case (KI-65) | Accept and disclose; lenders are told to wait for the market's `vest_end` (ECON §9.5) | The fix is **program** (not built) |
 | **O18** with the SPEC §14 "Delegated, proposed" rows **10** (collateral and liquidation by tier), **13** (dynamic rent) and **18** (fee split) | Confirm the PROPOSED parameters and venue rules: ARCH §2.3.3, §10 O18; ECON §14 lists 32 PROPOSED rows | As built | No if accepted; **program** for any rule the owner rejects |
 | **O9** (ECON G37, U21) | The calibrated gap frequencies per tier and the pre-committed rule (if the 95 % upper bound of λ_up exceeds a tier's break-even, raise CR_open or rent, or cut caps), after ≥ 30 days of the public-RPC crawl | Uncalibrated Monte Carlo (ECON §11.6, illustrative); the crawl runs | Parameters through governance; **program** only if a value leaves its compiled bounds |
 | **M6D residual 16** (ECON §12.12; KI-26) | Accept the margin of a position opened while a deposit is held, or price the open's margin on the burned depth | Accept (margin on the pool as it is) | The alternative is **program** |
@@ -677,10 +677,11 @@ trace, stack depth); `tests/litesvm/README.md` (the suites and their figures);
   86,408.5 s (2026-10-03T23:19:34Z → 2026-10-04T23:20Z); 52,272 runs, 10,162,831 actions,
   132,425,511 transactions, 255,722,249 hook checkpoints, 0 anomalies. It failed two of the
   fuzzer's liveness oracles, both harness bugs with the program unchanged:
-  - FUZZ-M10-24H-A (6 runs): the second claim pass's oracle was stricter than ECON §9.4 /
-    §9.5's I-P6 residue (the accumulators' rounding carries and rebase-orphan credits). Fixed
-    in `997c730` with exact state-derived bounds, which still catch the program mutants
-    mutL, mutS and mutC. Its spec-level residual is KI-65.
+  - FUZZ-M10-24H-A (6 runs; crash files for 5, as the fuzzer keeps 5 per signature): the
+    second claim pass's oracle was stricter than ECON §9.4 / §9.5's I-P6 residue (the
+    accumulators' rounding carries and rebase-orphan credits). Fixed in `997c730` with exact
+    state-derived bounds, which still catch the program mutants mutL, mutS and mutC. Its
+    spec-level residual is KI-65.
   - FUZZ-M10-24H-B (1 run): the wind-down sized its per-second coverage from the config's
     `settle_persist_n` instead of the position's locked one (latent since M7). Fixed in
     `945d45a`.
@@ -689,9 +690,12 @@ trace, stack depth); `tests/litesvm/README.md` (the suites and their figures);
   (2026-10-05T01:38:12Z → 2026-10-06T01:38Z); 52,274 runs, 10,163,360 actions, 132,445,714
   transactions, 255,725,412 hook checkpoints, 52,274 wind-downs. **0 failures, 0 anomalies**:
   M10's "fuzz clean ≥ 24 h on the final tree" is met. The second claim pass left at most 445
-  lamports owed and at most 217,508,010 lamports of `lender_sol` (5 wind-downs above the
-  0.01-SOL dust cap, each within the rebase-orphan shares' realised SOL); it paid 13,618
-  claims.
+  lamports owed and at most 217,508,010 lamports (≈ 0.218 SOL) of `lender_sol` (5 wind-downs
+  above the 0.01-SOL dust cap, each within the rebase-orphan shares' realised SOL); it paid
+  13,618 claims. That largest orphan credit is run 3's sixth FUZZ-M10-24H-A failure (run 3's
+  summary records the same figure, and there any `lender_sol` above the cap failed), which
+  got no crash file, so its shape is not yet classified (KI-65); the triaged reproducers'
+  0.054 and 0.012–0.100 SOL are examples, not the bound.
 - This gate's 10-minute smoke on this tree is in the table above.
 
 **M10 evidence** (ARCH §9 M10 row and §8.2 are normative):
