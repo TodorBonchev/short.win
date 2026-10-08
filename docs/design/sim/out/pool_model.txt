@@ -102,8 +102,28 @@ KI-66 I-P6 with absent lenders: random pools (late joiners, early leavers, posit
 | variant | runs with an absent lender behind a rebase | runs with a present lender unpaid above dust | unpaid in total (lamports) | worst run (lamports) |
 |---|---|---|---|---|
 | KI65-REV-SEC1 only (absent lenders behind a rebase untouched) | 668 | 24 | 56,611,095,850 | 12,519,515,622 |
-| pot-only touch of the absent lenders (KI-66) | 668 | 8 | 3,998,521,208 | 2,134,755,812 |
+| pot-only touch + forward chain (KI-66 full) | 668 | 0 | 2 | 1 |
 | every absent owner returns and converts | 668 | 0 | 2 | 1 |
+
+KI-66 full, the forward chain: KI-66's scenario a rebase later (A and C lend, a settlement rebases before anyone touched C, A's owner converts; in the new epoch rent is credited, A leaves early and the rent is paid, realised on C's unconverted shares beyond C's entitlement; then C's owner returns):
+| sync of C | pot after it (lamports) | C's fwd | A's next claim | A's pending left | C's shares, converted | C's claim | C's pending + claimed | lender_sol left |
+|---|---|---|---|---|---|---|---|---|
+| pot-only touch, held at the record only (KI-66, seventh round) | 0 | 0 | 4,123,790,163 | 201,209,837 | 1,000,000 | 4,325,000,000 | 4,325,000,000 | 1 |
+| pot-only touch + forward chain (KI-66 full) | 201,209,836 | 1 | 4,324,999,999 | 1 | 1,000,000 | 4,325,000,000 | 4,325,000,000 | 1 |
+| forward chain, touched twice | 201,209,836 | 1 | 4,324,999,999 | 1 | 1,000,000 | 4,325,000,000 | 4,325,000,000 | 1 |
+| C's owner converts C first | 201,209,836 | 0 | 4,324,999,999 | 1 | 1,000,000 | 4,325,000,000 | 4,325,000,000 | 1 |
+
+KI-66 full, the double-count differential: 2,000 random pools, world A (owners only) against world B (the same ops plus third-party pot-only touches with random 1-8 record windows); after every owner converts, shares, epochs, locks, pending + claimed, sum(real) + unmatched, every conv_rem and S are bit-equal: pot-only touches 6,539, owner syncs a chained lender 582, owner stops inside a chain 113, ... with lag 1 38, ... with epoch < fwd_epoch 43, pools with a chain left open 346
+
+KI-66 full, the residual: latent rounding units (an absent lender's shares beyond the chain's floor) (3,000 tuned pools; 2 x 20,000 adversarial random pools):
+| generator | variant | runs | runs with a present lender unpaid above dust | unpaid in total (lamports) | worst run | runs owed > 10,000 beyond every owner returning | that excess in total | worst excess |
+|---|---|---|---|---|---|---|---|---|
+| tuned latent units | pot-only touch, held at the record only (KI-66, seventh round) | 2,134 | 22 | 1,580,275 | 727,760 | 14 | 1,580,273 | 727,760 |
+| tuned latent units | pot-only touch + forward chain (KI-66 full) | 2,134 | 22 | 1,580,275 | 727,760 | 14 | 1,580,273 | 727,760 |
+| tuned latent units | every absent owner returns and converts | 2,134 | 0 | 2 | 1 | 0 | 0 | 0 |
+| adversarial random pools | pot-only touch, held at the record only (KI-66, seventh round) | 17,520 | 334 | 15,006,903,148,222 | 787,401,166,726 | 258 | 10,862,989,657,023 | 787,401,166,726 |
+| adversarial random pools | pot-only touch + forward chain (KI-66 full) | 17,520 | 63 | 4,143,914,187,796 | 496,677,804,341 | 4 | 696,597 | 374,750 |
+| adversarial random pools | every absent owner returns and converts | 17,520 | 63 | 4,143,913,491,899 | 496,677,778,695 | 0 | 0 | 0 |
 
 KI-65 lemma, lazy conversion order: 2,000 random pools, 2,593 rebase records, 9,934 conversions in random order between deposits and 0-token burns; sum(shares) == S once every lender converted, each conversion within [floor, floor + 1 per record] (v0.4.1 on the same pools: up to 6 orphan shares)
 

@@ -1,6 +1,6 @@
 {
   "schema": "shortwin.m7.keeper_cost/1",
-  "builds": {"shortwin_so_sha256": "42b11bc43a480a8e232b9725f767fbd7497ec55f7e33323e8033b027dc5560cd", "test_venue_so_sha256": "9296be90b735da1ad2c038ee6e66668bb301445efc20c3fe49951aabacd8542a"},
+  "builds": {"shortwin_so_sha256": "4d19c582f399f4a217a6d24725ad5dc3cb6b6308ff346a8f24312d41a01c1f75", "test_venue_so_sha256": "8cea17e115cd8eb9219654ec126b00bd4163042d856dbbcc296efd8c6c02bb98"},
   "fee_model": {"base_fee_lamports_per_signature": 5000, "priority_lamports": "ceil(requested_cu * price / 1e6)", "requested_cu": "ceil(consumed * 1.1)", "prices_micro_lamports_per_cu": [0, 1000, 10000, 100000]},
   "cu": {
     "mock": {"crank": {"n": 96, "consumed_cu": [24614, 26632], "requested_cu": [27076, 29296], "bytes": [455, 455]}, "liquidate": {"n": 1, "consumed_cu": [100071, 100071], "requested_cu": [110079, 110079], "bytes": [825, 825]}, "expire": {"n": 1, "consumed_cu": [95416, 95416], "requested_cu": [104958, 104958], "bytes": [825, 825]}, "sol_settle_keep": {"n": 42, "consumed_cu": [51362, 54007], "requested_cu": [56499, 59408], "bytes": [621, 621]}, "sol_settle_settle": {"n": 1, "consumed_cu": [64497, 64497], "requested_cu": [70947, 70947], "bytes": [621, 621]}},
@@ -34,10 +34,10 @@
     "raydium_cpmm": {"liquidate": [5000, 5125, 6249, 17482], "expire": [5000, 5118, 6177, 16768], "sol_settle_keep": [5000, 5066, 5657, 11565], "sol_settle_settle": [5000, 5078, 5775, 12747]}
   },
   "load": [
-    {"markets": 50, "all_per_second": false, "ticks": 60, "wall_ms_avg": 1.5, "wall_ms_max": 15.6, "backend_calls_per_tick": 6.5, "simulations_per_tick": 0.3, "txs_per_tick": 0.30, "batches_max": 9, "every_due_observed": true, "v1_batch_of_6": {"bytes": 1360, "accounts": 35, "consumed_cu": 147750, "requested_cu": 162525}},
-    {"markets": 50, "all_per_second": true, "ticks": 20, "wall_ms_avg": 14.6, "wall_ms_max": 14.7, "backend_calls_per_tick": 15.1, "simulations_per_tick": 9.0, "txs_per_tick": 9.00, "batches_max": 9, "every_due_observed": true, "v1_batch_of_6": {"bytes": 1360, "accounts": 35, "consumed_cu": 147726, "requested_cu": 162499}},
-    {"markets": 200, "all_per_second": false, "ticks": 60, "wall_ms_avg": 6.2, "wall_ms_max": 62.2, "backend_calls_per_tick": 16.5, "simulations_per_tick": 1.1, "txs_per_tick": 1.13, "batches_max": 34, "every_due_observed": true, "v1_batch_of_6": {"bytes": 1360, "accounts": 35, "consumed_cu": 147750, "requested_cu": 162525}},
-    {"markets": 200, "all_per_second": true, "ticks": 10, "wall_ms_avg": 58.1, "wall_ms_max": 59.0, "backend_calls_per_tick": 49.1, "simulations_per_tick": 34.0, "txs_per_tick": 34.00, "batches_max": 34, "every_due_observed": true, "v1_batch_of_6": {"bytes": 1360, "accounts": 35, "consumed_cu": 147726, "requested_cu": 162499}}
+    {"markets": 50, "all_per_second": false, "ticks": 60, "wall_ms_avg": 4.3, "wall_ms_max": 37.3, "backend_calls_per_tick": 6.5, "simulations_per_tick": 0.3, "txs_per_tick": 0.30, "batches_max": 9, "every_due_observed": true, "v1_batch_of_6": {"bytes": 1360, "accounts": 35, "consumed_cu": 147750, "requested_cu": 162525}},
+    {"markets": 50, "all_per_second": true, "ticks": 20, "wall_ms_avg": 34.2, "wall_ms_max": 39.1, "backend_calls_per_tick": 15.1, "simulations_per_tick": 9.0, "txs_per_tick": 9.00, "batches_max": 9, "every_due_observed": true, "v1_batch_of_6": {"bytes": 1360, "accounts": 35, "consumed_cu": 147726, "requested_cu": 162499}},
+    {"markets": 200, "all_per_second": false, "ticks": 60, "wall_ms_avg": 16.5, "wall_ms_max": 147.4, "backend_calls_per_tick": 16.5, "simulations_per_tick": 1.1, "txs_per_tick": 1.13, "batches_max": 34, "every_due_observed": true, "v1_batch_of_6": {"bytes": 1360, "accounts": 35, "consumed_cu": 147750, "requested_cu": 162525}},
+    {"markets": 200, "all_per_second": true, "ticks": 10, "wall_ms_avg": 135.1, "wall_ms_max": 135.9, "backend_calls_per_tick": 49.1, "simulations_per_tick": 34.0, "txs_per_tick": 34.00, "batches_max": 34, "every_due_observed": true, "v1_batch_of_6": {"bytes": 1360, "accounts": 35, "consumed_cu": 147726, "requested_cu": 162499}}
   ],
-  "rpc_per_second_capacity": {"note": "derived: sequential backend calls, tick = wall + calls x RTT <= 1000 ms, every market due every second; UNVERIFIED on a live RPC", "markets_by_rtt_ms": {"5": 689, "10": 376, "30": 125, "50": 69, "100": 27}}
+  "rpc_per_second_capacity": {"note": "derived: sequential backend calls, tick = wall + calls x RTT <= 1000 ms, every market due every second; UNVERIFIED on a live RPC", "markets_by_rtt_ms": {"5": 543, "10": 327, "30": 118, "50": 67, "100": 26}}
 }

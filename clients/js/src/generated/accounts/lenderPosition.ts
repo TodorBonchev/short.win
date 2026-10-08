@@ -86,6 +86,20 @@ export type LenderPosition = {
   /** When the lock expires (a calendar day end; R3B-1, R4A-2). */
   lockUntil: bigint;
   bump: number;
+  /**
+   * KI-66 full: the forward chain's shares in `fwd_epoch` (`pool::Lender::fwd_shares`; 0
+   * without a chain).
+   */
+  fwdShares: bigint;
+  /** KI-66 full: the epoch the forward chain reached (0 without a chain). */
+  fwdEpoch: number;
+  /**
+   * KI-66 full: `pool::FWD_NONE` / `FWD_HOLD` / `FWD_OPEN`; while not `FWD_NONE`, `snap` /
+   * `snap_r` are the chain's snapshots (module docs).
+   */
+  fwd: number;
+  /** KI-66 full, `FWD_OPEN`: `shares` minus the chain's shares in `epoch` (0 or 1). */
+  fwdLag: number;
   reserved: ReadonlyUint8Array;
 };
 
@@ -117,6 +131,20 @@ export type LenderPositionArgs = {
   /** When the lock expires (a calendar day end; R3B-1, R4A-2). */
   lockUntil: number | bigint;
   bump: number;
+  /**
+   * KI-66 full: the forward chain's shares in `fwd_epoch` (`pool::Lender::fwd_shares`; 0
+   * without a chain).
+   */
+  fwdShares: number | bigint;
+  /** KI-66 full: the epoch the forward chain reached (0 without a chain). */
+  fwdEpoch: number;
+  /**
+   * KI-66 full: `pool::FWD_NONE` / `FWD_HOLD` / `FWD_OPEN`; while not `FWD_NONE`, `snap` /
+   * `snap_r` are the chain's snapshots (module docs).
+   */
+  fwd: number;
+  /** KI-66 full, `FWD_OPEN`: `shares` minus the chain's shares in `epoch` (0 or 1). */
+  fwdLag: number;
   reserved: ReadonlyUint8Array;
 };
 
@@ -140,7 +168,11 @@ export function getLenderPositionEncoder(): FixedSizeEncoder<LenderPositionArgs>
       ["lockTerm", getU128Encoder()],
       ["lockUntil", getI64Encoder()],
       ["bump", getU8Encoder()],
-      ["reserved", fixEncoderSize(getBytesEncoder(), 32)],
+      ["fwdShares", getU128Encoder()],
+      ["fwdEpoch", getU32Encoder()],
+      ["fwd", getU8Encoder()],
+      ["fwdLag", getU8Encoder()],
+      ["reserved", fixEncoderSize(getBytesEncoder(), 10)],
     ]),
     (value) => ({ ...value, discriminator: LENDER_POSITION_DISCRIMINATOR }),
   );
@@ -165,7 +197,11 @@ export function getLenderPositionDecoder(): FixedSizeDecoder<LenderPosition> {
     ["lockTerm", getU128Decoder()],
     ["lockUntil", getI64Decoder()],
     ["bump", getU8Decoder()],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 32)],
+    ["fwdShares", getU128Decoder()],
+    ["fwdEpoch", getU32Decoder()],
+    ["fwd", getU8Decoder()],
+    ["fwdLag", getU8Decoder()],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 10)],
   ]);
 }
 

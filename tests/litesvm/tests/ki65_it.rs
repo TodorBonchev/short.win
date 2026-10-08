@@ -42,12 +42,15 @@ use anchor_lang::solana_program::instruction::AccountMeta;
 use common::{Lab, code};
 use shortwin::errors::ShortwinError;
 use shortwin::events::ClaimSol;
+use shortwin::state::LenderPosition;
 use shortwin_litesvm_tests::errors::custom_code;
 use shortwin_litesvm_tests::invariants::check_all;
 use shortwin_litesvm_tests::invariants::lender::PoolState;
 use shortwin_litesvm_tests::ix::LenderKeys;
 use shortwin_litesvm_tests::tokens::TokenProgram;
 use shortwin_litesvm_tests::{events, ix, pda};
+use shortwin_math::Rounding;
+use shortwin_math::num::{WAD, mul_div_i128};
 use shortwin_math::pool::{self, Standing, VIRTUAL_ASSETS, VIRTUAL_SHARES};
 
 /// One SOL.
@@ -156,15 +159,14 @@ fn rebased_pair(program: TokenProgram) -> Lab {
 #[test]
 fn the_last_lender_after_a_rebase_is_paid_the_vest() {
     let mut lab = rebased_pair(TokenProgram::Spl);
-    let lam = lab.lamports_of("W");
+    let lam = wealth(&mut lab, "W");
     // H converts first (claim_sol writes conv_rem 600) and holds nothing of the new epoch.
     lab.claim("H").unwrap();
     assert_eq!(conv_rem(&lab, 0), 600);
-    let h = lab.position("H").unwrap();
     assert_eq!(
-        (h.shares, h.epoch),
-        (0, 1),
-        "dust converts to 0 and jumps (V2-12)"
+        lab.position("H"),
+        None,
+        "dust converts to 0 and jumps (V2-12); empty and paid, the claim closes it (KI-67)"
     );
     assert_every_share_held(&lab, "after H");
     // W converts second: 600 + 7,199,600 = 7,200,200 → all 7,200 shares; its exit is the last.
@@ -179,7 +181,7 @@ fn the_last_lender_after_a_rebase_is_paid_the_vest() {
     assert_eq!(conv_rem(&lab, 0), 200);
     // The 3 SOL vest, W's part of the 1 SOL settled (7,199,600 / 7,200,200 of it) and the
     // position's rent back (the harness payer pays the fees).
-    let paid = lab.lamports_of("W") - lam;
+    let paid = wealth(&mut lab, "W") - lam;
     assert!(paid >= LUMP + 999_916_667, "W paid {paid}");
     lab.claim("H").unwrap();
     assert!(lab.vault().lender_sol <= 10, "{}", lab.vault().lender_sol);
@@ -199,7 +201,7 @@ fn w1_a_jit_whale_takes_nothing_while_a_share_is_latent() {
     lab.claim("W").unwrap();
     assert_eq!(lab.position("H").unwrap().epoch, 0, "H has not converted");
     assert_eq!(lab.market().total_shares.get(), 1, "H's latent share");
-    let lam = lab.lamports_of("J");
+    let lam = wealth(&mut lab, "J");
     lab.deposit("J", 199 * U).unwrap();
     let t = lab.market().tokens_free;
     lab.borrow30("q", t / 2).unwrap();
@@ -208,7 +210,7 @@ fn w1_a_jit_whale_takes_nothing_while_a_share_is_latent() {
     lab.claim("J").unwrap();
     assert_eq!(sol, 0);
     assert_eq!(
-        lab.lamports_of("J"),
+        wealth(&mut lab, "J"),
         lam,
         "the whale realises 0 (rent of its position back)"
     );
@@ -246,10 +248,10 @@ fn w2_the_sync_order_moves_only_the_rounding_unit() {
         );
         assert_eq!(h + w, 7_200);
         assert_eq!(conv_rem(&lab, 0), 200);
-        let lam_w = lab.lamports_of("W");
+        let lam_w = wealth(&mut lab, "W");
         exit_all(&mut lab, "W");
         lab.claim("W").unwrap();
-        let w_sol = lab.lamports_of("W") - lam_w;
+        let w_sol = wealth(&mut lab, "W") - lam_w;
         lab.advance(i64::from(lab.lump_vest_s) + 1, 0);
         let h_sol = lab.claim("H").unwrap();
         if first == "H" {
@@ -273,12 +275,12 @@ fn w3_a_deposit_while_a_share_is_latent_gets_no_flush() {
     exit_all(&mut lab, "W");
     lab.claim("W").unwrap();
     assert_eq!(lab.market().total_shares.get(), 1, "H's latent share");
-    let lam = lab.lamports_of("J");
+    let lam = wealth(&mut lab, "J");
     lab.deposit("J", 1_000_000).unwrap();
     lab.sweep_sol(LUMP);
     exit_all(&mut lab, "J");
     lab.claim("J").unwrap();
-    assert_eq!(lab.lamports_of("J"), lam, "the whale realises 0");
+    assert_eq!(wealth(&mut lab, "J"), lam, "the whale realises 0");
     assert_eq!(lab.market().total_shares.get(), 1);
     lab.advance(i64::from(lab.lump_vest_s) + 1, 0);
     let h = lab.claim("H").unwrap();
@@ -445,11 +447,11 @@ fn a_deficit_lender_converts_through_cover_and_blocks_the_flush() {
     lab.cover("A", l.pending.unsigned_abs()).unwrap();
     assert_eq!(lab.position("A").unwrap().epoch, 1);
     assert_ne!(conv_rem(&lab, 0), rem0, "cover_deficit wrote the record");
-    let lam = lab.lamports_of("A");
+    let lam = wealth(&mut lab, "A");
     exit_all(&mut lab, "A");
     let m = lab.market();
     assert_eq!((m.total_shares.get(), m.vest_bal), (0, 0));
-    assert!(lab.lamports_of("A") - lam >= vest, "A is paid the vest");
+    assert!(wealth(&mut lab, "A") - lam >= vest, "A is paid the vest");
 }
 
 /// Spec (8): after the last exit flushed the vest (`S = 0`), a new depositor is a first
@@ -472,20 +474,40 @@ fn re_entry_after_the_flush_is_a_first_deposit() {
 }
 
 /// Spec (9): `claim_sol ×3` in one transaction: the first converts the lender and writes the
-/// record; the others write nothing and pay 0 (V2-2).
+/// record; the others write nothing and pay 0 (V2-2). KI-67: H's claim converts its dust to 0
+/// shares and, paid in full, closes the position, so a second `claim_sol` of it in the same
+/// transaction fails with `AccountNotInitialized` (3012) and the whole transaction with it
+/// (nothing converted); W keeps shares, so its `claim_sol ×3` converts once and pays once.
+/// The same transaction for H after W's conversion would succeed: H then receives the record's
+/// rounding unit and keeps its position.
 #[test]
 fn claim_sol_three_times_converts_once() {
     let mut lab = rebased_pair(TokenProgram::Token2022);
     lab.advance(i64::from(lab.lump_vest_s) + 1, 0);
     let m = lab.k.market;
-    let h = lab.key("H");
-    let kp = lab.users["H"].kp.insecure_clone();
     let metas = ix::epoch_records(&m, 0, 1);
-    let one = ix::with_remaining(ix::claim_sol(&h, &m), &metas);
-    let meta = lab
-        .env
-        .send(&[one.clone(), one.clone(), one], &[&kp])
-        .expect("claim_sol ×3");
+    let three = |lab: &mut Lab, name: &str| {
+        let owner = lab.key(name);
+        let kp = lab.users[name].kp.insecure_clone();
+        let one = ix::with_remaining(ix::claim_sol(&owner, &m), &metas);
+        lab.env.send(&[one.clone(), one.clone(), one], &[&kp])
+    };
+    let before = lab.state().records;
+    let res = three(&mut lab, "H");
+    assert_eq!(
+        custom_code(&res),
+        Some(u32::from(
+            anchor_lang::error::ErrorCode::AccountNotInitialized
+        )),
+        "the second claim of a closed position"
+    );
+    assert_eq!(
+        lab.state().records,
+        before,
+        "the failed transaction converted nobody"
+    );
+    assert!(lab.position("H").is_some());
+    let meta = three(&mut lab, "W").expect("claim_sol ×3");
     let paid: Vec<u64> = events::of::<ClaimSol>(&meta)
         .iter()
         .map(|e| e.sol_paid)
@@ -494,12 +516,16 @@ fn claim_sol_three_times_converts_once() {
     assert!(paid[0] > 0 && paid[1] == 0 && paid[2] == 0, "{paid:?}");
     assert_eq!(conv_rem(&lab, 0), 600, "converted once");
     let before = lab.state().records;
-    assert_eq!(lab.claim("H"), Ok(0));
+    assert_eq!(lab.claim("W"), Ok(0));
     assert_eq!(
         lab.state().records,
         before,
         "a current lender writes no record"
     );
+    // W converted first, so H's conversion now carries the record's unit (600 + 600): it keeps
+    // a share and its position.
+    assert!(lab.claim("H").unwrap() > 0);
+    assert_eq!(lab.position("H").map(|h| h.shares), Some(1));
 }
 
 /// Spec (10): the hook against the `store_records` mutant. A lender instruction that converted
@@ -554,10 +580,27 @@ fn only_the_owner_converts_through_a_rebase_record() {
         (b.shares, b.epoch, b.lock, b.lock_term),
         "not converted"
     );
+    // KI-66 full: held at record 1 (accrued to its ends) and its forward chain walked to the
+    // current epoch on the floor of its shares, `⌊s/den⌋`.
+    let den = records[1].den().unwrap();
+    let q = b.shares / den;
+    assert_eq!(
+        (held.fwd, held.fwd_epoch, held.fwd_shares, held.fwd_lag),
+        (pool::FWD_HOLD, 2, q, 0),
+        "the forward chain"
+    );
+    let p = lab.market().pool();
+    let fl = |x: i128, n: u128| mul_div_i128(x, n, WAD, Rounding::Floor).unwrap();
+    let pending = i128::from(b.pending) + fl(records[1].acc_end - b.snap, b.shares) + fl(p.acc, q);
+    assert_eq!(
+        i128::from(held.pending),
+        pending,
+        "pending: the hold, then the chain"
+    );
     assert_eq!(
         (held.snap, held.snap_r),
-        (records[1].acc_end, records[1].acc_r_end),
-        "accrued to the record's ends"
+        (p.acc, p.acc_r),
+        "the chain's snapshots"
     );
     assert_eq!(lab.sync("B", 1), Ok(Standing::Behind));
     assert_eq!(lab.position("B").unwrap(), held, "idempotent");
@@ -637,7 +680,7 @@ fn sybil_market() -> (Lab, u128) {
 
 /// The SOL `names` receive from now on, after each exits whole and claims.
 fn exit_and_claim(lab: &mut Lab, names: &[&str]) -> u64 {
-    let lam: Vec<u64> = names.iter().map(|n| lab.lamports_of(n)).collect();
+    let lam: Vec<u64> = names.iter().map(|n| wealth(lab, n)).collect();
     for n in names {
         exit_all(lab, n);
         lab.claim(n).unwrap();
@@ -645,13 +688,41 @@ fn exit_and_claim(lab: &mut Lab, names: &[&str]) -> u64 {
     names
         .iter()
         .zip(&lam)
-        .map(|(n, l)| lab.lamports_of(n) - l)
+        .map(|(n, l)| wealth(lab, n) - l)
         .sum()
 }
 
-/// The lamports of `names` together.
+/// The `order_*` figures are SOL received, measured as [`wealth`] (a position's rent is the
+/// owner's whether it sits in the position or came back). KI-65's pins measured the owners'
+/// lamports alone, so they also counted the rent of the `closed` positions their `withdraw`
+/// closed and refunded within the window; since KI-67 `claim_sol` closes the positions a
+/// withdrawal left open and returns their rent too, which the lamports alone would add. The pins
+/// stay KI-65's: `gain` plus the `closed` positions' rent.
+fn pinned(lab: &Lab, got: (u64, u64), pin: (u64, u64), closed: u64) {
+    let rent = lab
+        .env
+        .svm
+        .minimum_balance_for_rent_exemption(LenderPosition::SPACE);
+    assert_eq!(rent, 2_568_240);
+    assert_eq!(
+        (got.0 + closed * rent, got.1),
+        pin,
+        "pinned (KI-65's figures: SOL plus {closed} position rents; SOL alone {got:?})"
+    );
+}
+
+/// What `name` owns in lamports: its own and its position account's (the rent `withdraw` and,
+/// since KI-67, `claim_sol` return when they close the position, which is the owner's either
+/// way; the figures below measure SOL paid, not where the rent sits).
+fn wealth(lab: &mut Lab, name: &str) -> u64 {
+    let owner = lab.key(name);
+    let pos = pda::lender(&lab.k.market, &owner).0;
+    lab.lamports_of(name) + shortwin_litesvm_tests::read::lamports(&lab.env.svm, &pos)
+}
+
+/// The lamports of `names` together ([`wealth`]).
 fn lamports(lab: &mut Lab, names: &[&str]) -> u64 {
-    names.iter().map(|n| lab.lamports_of(n)).sum()
+    names.iter().map(|n| wealth(lab, n)).sum()
 }
 
 /// The `held` lenders' conversions as a third party would order them: its `sync_lender`s are the
@@ -707,7 +778,7 @@ fn order_a_third_party_cannot_interleave_its_sybils_with_honest_lenders() {
     );
     assert!(lab.vault().lender_sol <= 10, "nothing stranded");
     eprintln!("Sybils, honest lenders lazy: attacker {gain} lamports, honest {honest}");
-    assert_eq!((gain, honest), (1_002_198_376, 3_000_369_862), "pinned");
+    pinned(&lab, (gain, honest), (1_002_198_376, 3_000_369_862), 1);
 }
 
 /// What remains: the attacker converts one of its Sybils (signed by itself) after each honest
@@ -757,7 +828,7 @@ fn order_sybils_converting_after_honest_conversions_collect_every_unit() {
     );
     assert!(lab.vault().lender_sol <= 10, "nothing stranded");
     eprintln!("Sybils converting after honest claims: attacker {gain} lamports, honest {honest}");
-    assert_eq!((gain, honest), (4_007_334_855, 369_862), "pinned");
+    pinned(&lab, (gain, honest), (4_007_334_855, 369_862), 3);
 
     // Both honest claims first: H2 keeps a unit and the attacker's exit is not the last.
     let (mut lab, w) = sybil_market();
@@ -777,7 +848,7 @@ fn order_sybils_converting_after_honest_conversions_collect_every_unit() {
     let h2 = lab.claim("H2").unwrap();
     assert!(gain < LUMP && h2 >= LUMP, "attacker {gain}, H2 {h2}");
     eprintln!("honest claims first: attacker {gain} lamports, H2 {h2}");
-    assert_eq!((gain, h2), (1_004_766_616, 3_000_000_000), "pinned");
+    pinned(&lab, (gain, h2), (1_004_766_616, 3_000_000_000), 2);
 }
 
 /// The later conversion needs no atomicity (the security review of the follow-up): the
@@ -826,7 +897,7 @@ fn order_the_later_conversion_needs_no_atomicity() {
     eprintln!(
         "Sybils converting an hour after each honest claim: attacker {gain}, honest {honest}"
     );
-    assert_eq!((gain, honest), (4_007_334_854, 369_862), "pinned");
+    pinned(&lab, (gain, honest), (4_007_334_854, 369_862), 3);
 }
 
 /// Without Sybils: a whale that tunes its own residue (`s_W ≡ 1 mod 1,000`). The security
@@ -857,7 +928,7 @@ fn order_a_residue_tuned_whale_collects_the_unit_only_after_an_honest_conversion
     assert!(gain < LUMP && honest >= LUMP, "W {gain}, honest {honest}");
     assert!(lab.vault().lender_sol <= 10);
     eprintln!("residue-tuned whale, honest lenders lazy: W {gain} lamports, honest {honest}");
-    assert_eq!((gain, honest), (1_002_346_116, 3_000_222_122), "pinned");
+    pinned(&lab, (gain, honest), (1_002_346_116, 3_000_222_122), 1);
 
     // W converts after H1's own claim.
     let (mut lab, w) = tuned();
@@ -881,7 +952,7 @@ fn order_a_residue_tuned_whale_collects_the_unit_only_after_an_honest_conversion
     eprintln!(
         "residue-tuned whale converting after H1's claim: W {gain} lamports, honest {honest}"
     );
-    assert_eq!((gain, honest), (4_002_346_115, 222_122), "pinned");
+    pinned(&lab, (gain, honest), (4_002_346_115, 222_122), 1);
 }
 
 /// W3 with one Sybil placed before the roll: H (600 old shares), the attacker's dust position A
@@ -912,11 +983,11 @@ fn order_w3_with_a_sybil_the_jit_depositor_is_paid_the_lump_only_after_hs_conver
     assert_eq!(shares(&mut lab, "A"), 0);
     exit_and_claim(&mut lab, &["G"]);
     assert_eq!(lab.market().total_shares.get(), 1, "H's latent unit");
-    let lam = lab.lamports_of("J");
+    let lam = wealth(&mut lab, "J");
     lab.deposit("J", 1_000_000).unwrap();
     lab.sweep_sol(LUMP);
     exit_and_claim(&mut lab, &["A", "J"]);
-    let gain = lab.lamports_of("J") - lam;
+    let gain = wealth(&mut lab, "J") - lam;
     assert_eq!(gain, 0, "J realises 0 (its position's rent back)");
     assert_eq!(lab.market().total_shares.get(), 1);
     lab.advance(i64::from(lab.lump_vest_s) + 1, 0);
@@ -938,17 +1009,17 @@ fn order_w3_with_a_sybil_the_jit_depositor_is_paid_the_lump_only_after_hs_conver
     // A collects the first vest as the only holder; then the JIT round, at one instant.
     lab.advance(i64::from(lab.lump_vest_s) + 1, 0);
     lab.claim("A").unwrap();
-    let lam = lab.lamports_of("J");
+    let lam = wealth(&mut lab, "J");
     lab.deposit("J", 1_000_000).unwrap();
     lab.sweep_sol(LUMP);
     exit_and_claim(&mut lab, &["A"]);
     exit_and_claim(&mut lab, &["J"]);
-    let gain = lab.lamports_of("J") - lam;
+    let gain = wealth(&mut lab, "J") - lam;
     assert_eq!(lab.market().total_shares.get(), 0);
     assert!(gain >= LUMP - 10, "J is paid the lump: {gain}");
     eprintln!("W3 with a Sybil converting after H's claim: J {gain} lamports of a {LUMP} lump");
     assert_eq!(gain, LUMP, "pinned");
-    assert_eq!(lab.position("H").unwrap().shares, 0);
+    assert_eq!(lab.position("H").map_or(0, |h| h.shares), 0);
 }
 
 // ---- The pot and a surplus holder that never returns (KI-66) --------------------------------
@@ -1045,4 +1116,126 @@ fn a_surplus_behind_a_rebase_record_reaches_the_pot_without_its_owner() {
         "pinned (pool_model.pot_touch_demo: the same figures)"
     );
     assert_every_share_held(&lab, "end");
+}
+
+/// `pool_model._chain_pair`: A and C lend 1,000 tokens each; a settlement of everything but
+/// 1,000 raw tokens (1 SOL) rebases the shares before anyone touched C; A's owner converts; in
+/// the new epoch 90 % of the tokens are borrowed and charged 10²⁵ of rent index over 10 days
+/// (credited to A and to C's unconverted shares), A withdraws its allowance (an early leaver)
+/// and the rent is paid, realised on the shares still there — C's among them, beyond C's
+/// entitlement — while A is short. Returns the lab and the SOL A's withdrawal paid at once.
+fn chain_pair() -> (Lab, u64) {
+    let mut lab = Lab::with_cap(TokenProgram::Spl, 10_000);
+    lab.deposit("A", 1_000_000_000_000).unwrap();
+    lab.deposit("C", 1_000_000_000_000).unwrap();
+    let t = lab.market().tokens_free;
+    lab.borrow30("p", t - 1_000).unwrap();
+    lab.settle("p", U, 0);
+    assert_eq!(lab.market().share_epoch, 1);
+    assert_eq!(lab.state().records[0].num, 1, "a rebase");
+    lab.touch("A");
+    let t = lab.market().tokens_free;
+    lab.borrow30("q", t * 9 / 10).unwrap();
+    lab.advance(10 * common::D, 10u128.pow(25));
+    let a = lab.free_allowance("A");
+    let s = lab.shares_for("A", a);
+    let (_, paid) = lab.withdraw("A", s).unwrap();
+    let owed = lab.owed("q");
+    lab.repay("q", owed, 0);
+    (lab, paid)
+}
+
+/// KI-66 full (owner decision of 2026-10-08, KI66-R3): what an absent lender's unconverted shares
+/// earn AFTER the rebase record reaches the pot without its owner, through the forward chain
+/// (`pool_model.pot_chain_demo` pins the same figures). C's surplus is all of the new epoch: the
+/// seventh round's hold (accrual to the record's ends only) moved nothing here, so A stayed short
+/// 201,209,837 lamports until C's owner returned — the row "owners only" below, which is what the
+/// held-only touch left. A third party's `sync_lender(1)` now walks C's chain (`⌊s/den⌋` shares
+/// through the record) to the current epoch and moves the surplus: A is paid in full (1 lamport
+/// of rounding, as when C's owner converts first); a second sync moves nothing; C's owner's
+/// later conversion counts nothing twice. Every row ends in the same state.
+#[test]
+fn a_surplus_after_the_rebase_record_reaches_the_pot_through_the_forward_chain() {
+    // (pot after C's sync, C's fwd, A's claim, A's pending left, C's shares, C's claim,
+    //  lender_sol left)
+    let row = |case: &str| -> (u64, u8, u64, i64, u128, u64, u64) {
+        let (mut lab, early) = chain_pair();
+        let c0 = lab.position("C").unwrap();
+        let rem0 = conv_rem(&lab, 0);
+        match case {
+            "owners only" => {}
+            "owner first" => assert_eq!(lab.sync_signed("C", 1), Ok(Standing::Current)),
+            _ => {
+                assert_eq!(lab.sync("C", 1), Ok(Standing::Behind));
+                let c1 = lab.position("C").unwrap();
+                assert_eq!(
+                    (
+                        c1.shares,
+                        c1.epoch,
+                        c1.lock,
+                        c1.lock_term,
+                        conv_rem(&lab, 0)
+                    ),
+                    (c0.shares, c0.epoch, c0.lock, c0.lock_term, rem0),
+                    "C is not converted, no record written"
+                );
+                assert_eq!(
+                    (c1.fwd, c1.fwd_epoch, c1.fwd_shares),
+                    (
+                        pool::FWD_HOLD,
+                        1,
+                        c0.shares / lab.state().records[0].den().unwrap()
+                    )
+                );
+                if case == "twice" {
+                    let pot = lab.vault().unmatched;
+                    assert_eq!(lab.sync("C", 1), Ok(Standing::Behind));
+                    assert_eq!(
+                        (lab.vault().unmatched, lab.position("C").unwrap()),
+                        (pot, c1),
+                        "a second pot-only touch moves nothing"
+                    );
+                }
+            }
+        }
+        let (pot, fwd) = (lab.vault().unmatched, lab.position("C").unwrap().fwd);
+        // The program's withdraw paid A's SOL part at once (`pool_model`'s pays it here).
+        let a = early + lab.claim("A").unwrap();
+        let left = lab.position("A").unwrap().pending;
+        assert_eq!(
+            lab.sync_signed("C", 1).map(|_| ()),
+            Ok(()),
+            "C's owner returns"
+        );
+        let c = lab.position("C").unwrap();
+        assert_eq!(c.fwd, pool::FWD_NONE);
+        let c_paid = lab.claim("C").unwrap();
+        lab.claim("A").unwrap();
+        (pot, fwd, a, left, c.shares, c_paid, lab.vault().lender_sol)
+    };
+    let rows: Vec<_> = ["owners only", "chain", "twice", "owner first"]
+        .iter()
+        .map(|c| (*c, row(c)))
+        .collect();
+    for (c, r) in &rows {
+        eprintln!("KI-66 full, the forward chain: {c}: {r:?}");
+    }
+    let end = |r: &(u64, u8, u64, i64, u128, u64, u64)| (r.4, r.5, r.6);
+    assert!(
+        rows.iter().all(|(_, r)| end(r) == end(&rows[0].1)),
+        "the same end"
+    );
+    assert_eq!(
+        rows.iter()
+            .map(|(_, r)| (r.0, r.1, r.2, r.3))
+            .collect::<Vec<_>>(),
+        vec![
+            (0, 0, 4_123_790_163, 201_209_837),
+            (201_209_836, 1, 4_324_999_999, 1),
+            (201_209_836, 1, 4_324_999_999, 1),
+            (201_209_836, 0, 4_324_999_999, 1),
+        ],
+        "pinned (pool_model.pot_chain_demo)"
+    );
+    assert_eq!(end(&rows[0].1), (1_000_000, 4_325_000_000, 1), "pinned");
 }

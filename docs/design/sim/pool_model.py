@@ -64,6 +64,14 @@ Model (all integers; rounding in favour of the pool):
     rebase record: it accrues the lender to the record's acc_end/acc_r_end and moves its surplus
     to the pot without converting (no shares, conv_rem or epoch move), so a surplus holder that
     never returns no longer keeps the deficit lenders waiting for the surplus it held at the roll.
+  * KI-66 full (eighth round): the forward chain.  After the hold, the pot-only touch also accrues
+    what the lender's shares earn in the later epochs, on the order-independent floor of its shares
+    through the later records (q_{E+1} = floor(s/den_E), q_{j+1} = floor(q_j*num_j/den_j)), by
+    cumulative floor (q*end//WAD - q*snap//WAD, so any number of touches sums to one floor), and
+    moves that surplus to the pot too; still no shares, conv_rem, epoch or lock move.  The owner's
+    later conversion takes the chain's part back exactly (FWD_HOLD / FWD_OPEN below), so its pending
+    ends bit-equal to its conversion alone.  What the chain cannot accrue is the latent rounding
+    unit (the owner's shares minus the floor: 0 or 1 per record), which stays with the owner.
 """
 from __future__ import annotations
 
@@ -88,13 +96,21 @@ LOCK_BUCKETS = 128           # ... 128 buckets >= max_duration_s (90 d) + S3 tai
 S3_TAIL_S = 3_600 + 600 + 600   # default max_migration_pause_s + grad_grace_s + s3_wait_s (R4A-8 / R4B-8)
 
 
+# KI-66 full, Lender.fwd: no forward chain; the pot-only touch held the lender at the rebase record
+# of its epoch (accrued to its ends) and the chain covers the later epochs up to fwd_epoch; the
+# owner converted part of the way (nothing accrued on its shares in its epoch yet) and the chain,
+# based on shares - fwd_lag, covers its epoch up to fwd_epoch.
+FWD_NONE, FWD_HOLD, FWD_OPEN = 0, 1, 2
+
+
 def cdiv(a, b):
     return -((-a) // b)
 
 
 class Lender:
     __slots__ = ("shares", "snap", "pending", "epoch", "lock", "lock_pi", "lock_epoch", "lock_term",
-                 "lock_until", "snap_r", "real", "claimed", "withdrawn")
+                 "lock_until", "snap_r", "real", "claimed", "withdrawn", "fwd", "fwd_epoch", "fwd_shares",
+                 "fwd_lag")
 
     def __init__(self, acc, acc_r, epoch):
         self.shares, self.snap, self.pending, self.epoch = 0, acc, 0, epoch
@@ -102,6 +118,13 @@ class Lender:
         self.snap_r, self.real = acc_r, 0          # realised SOL allocated to this lender (cumulative)
         self.claimed = 0                           # SOL paid to this lender (cumulative)
         self.withdrawn = 0                         # ghost (tests only)
+        # KI-66 full (forward chain): FWD_NONE, FWD_HOLD (the lender's own epoch accrued to its
+        # record's ends; the chain covers (epoch, fwd_epoch]) or FWD_OPEN (own epoch accrued 0 on
+        # the shares; the chain covers [epoch, fwd_epoch], based on shares - fwd_lag, 0 or 1).
+        # While a chain is active, snap / snap_r are the chain's snapshots in fwd_epoch (the
+        # lender's own are implicit: the record's ends in FWD_HOLD, 0 in FWD_OPEN) and fwd_shares
+        # its shares there.
+        self.fwd, self.fwd_epoch, self.fwd_shares, self.fwd_lag = 0, 0, 0, 0
 
 
 class Pool:
@@ -109,7 +132,7 @@ class Pool:
                  lump_vest_s: int = LUMP_VEST_S, lock_grace_s: int = LOCK_GRACE_S, pi_decay: bool = True,
                  lock_expiry: bool = True, lock_calendar: bool = True, vest_weighted: bool = True,
                  wipe_sweep_gate: bool = True, exit_flush_bps: int = 0, lock_floor: bool = True,
-                 cum_convert: bool = True):
+                 cum_convert: bool = True, fwd_chain: bool = True):
         assert mode in ("continuous", "release")
         self.mode = mode
         self.util_cap = util_cap_bps
@@ -126,6 +149,8 @@ class Pool:
                                                 #   a withdrawal that leaves S - shares < exit_flush_bps of S
         self.cum_convert = cum_convert          # False: v0.4.1 behaviour (each lender floored alone at a rebase:
                                                 #   up to n - 1 orphan shares nobody holds; KI-65 comparison rows)
+        self.fwd_chain = fwd_chain              # False: KI-66 as of the seventh round (the pot-only touch holds at
+                                                #   the rebase record only; KI-66 full comparison rows)
         self.now = 0
         self.T = 0
         self.B = 0
@@ -284,22 +309,65 @@ class Pool:
         self.carry_r = num - d * self.S
         self.acc_r += d
 
+    def _rec(self, e):
+        """The record of epoch e, None outside the window at hand (sync_lender's records)."""
+        w = getattr(self, "_win", None)
+        if w is not None and not (w[0] <= e < w[1]):
+            return None
+        return self.epochs[e]
+
     def _touch(self, who, pot_only: bool = False) -> Lender:
         self._cal_advance()
         L = self.lenders.get(who)
         if L is None:
             L = self.lenders[who] = Lender(self.acc, self.acc_r, self.epoch)
+        if pot_only and L.fwd:                 # KI-66 full: continue the forward chain
+            self._fwd_walk(L)
+            self._to_pot(L)
+            return L
         while L.epoch < self.epoch:            # lazy epoch conversion (C0-6)
-            acc_end, num, den, acc_r_end = self.epochs[L.epoch][:4]
-            L.pending += L.shares * (acc_end - L.snap) // WAD
-            L.real += L.shares * (acc_r_end - L.snap_r) // WAD
+            parks = self.wipe_live and L.epoch == self.epoch - 1
+            if L.shares == 0 and L.lock == 0 and L.lock_term == 0 and not parks and not L.fwd:
+                L.epoch = self.epoch           # V2-12 jump without a record (the math crate's shortcut)
+                L.snap, L.snap_r = self.acc, self.acc_r
+                continue
+            rec = self._rec(L.epoch)
+            if rec is None:
+                self.behind = True
+                return L                       # Standing::Behind: the partial conversion is kept
+            acc_end, num, den, acc_r_end = rec[:4]
+            if L.fwd == FWD_HOLD:              # own epoch accrued to these ends already
+                pass
+            elif L.fwd == FWD_OPEN:            # the chain took its part of this epoch
+                fp, fr = self._fwd_part(L, L.epoch, L.shares - L.fwd_lag, acc_end, acc_r_end)
+                L.pending += L.shares * acc_end // WAD - fp
+                L.real += L.shares * acc_r_end // WAD - fr
+            else:
+                L.pending += L.shares * (acc_end - L.snap) // WAD
+                L.real += L.shares * (acc_r_end - L.snap_r) // WAD
             held = pot_only and num and (L.shares or L.lock or L.lock_term)
-            if self.wipe_live and L.epoch == self.epoch - 1 or held:
-                # V2-12: parked on the live wipe record; KI-66: the pot-only touch stays on a
-                # rebase record, accrued to its ends, unconverted
+            if held and not self.fwd_chain:
+                # KI-66 held only (seventh round): accrued to the record's ends, kept as snapshots
                 L.snap, L.snap_r = acc_end, acc_r_end
                 self._to_pot(L)
                 return L
+            if held:
+                # KI-66: never through a rebase record; accrued to its ends, then (KI-66 full) the
+                # forward chain: the order-independent floor of the shares through the records
+                L.fwd, L.fwd_epoch, L.fwd_shares, L.fwd_lag = FWD_HOLD, L.epoch + 1, L.shares * num // den, 0
+                L.snap = L.snap_r = 0
+                self._fwd_walk(L)
+                self._to_pot(L)
+                return L
+            if self.wipe_live and L.epoch == self.epoch - 1:
+                # V2-12: parked on the live wipe record (a chain ending here is settled)
+                L.snap, L.snap_r = acc_end, acc_r_end
+                self._fwd_clear(L)
+                self._to_pot(L)
+                return L
+            if L.fwd:
+                q_next = (L.shares - L.fwd_lag) * num // den
+                settled = L.epoch >= L.fwd_epoch
             if num and self.cum_convert:       # v0.4.2 (KI-65): cumulative rounding through the record
                 rec = self.epochs[L.epoch]
                 L.shares, rec[7] = divmod(rec[7] + L.shares, den)
@@ -307,16 +375,32 @@ class Pool:
                 L.shares = L.shares * num // den   # a full wipe (conv_rem is not touched); v0.4.1 rebases
             L.lock = L.lock * num // den
             L.lock_term = L.lock_term * num // den     # v0.4.1: keeps the term consistent with the scaled bucket
-            L.snap = L.snap_r = 0
             L.epoch += 1
+            if L.fwd and not settled:
+                L.fwd, L.fwd_lag = FWD_OPEN, L.shares - q_next     # snap / snap_r stay the chain's
+                # the lag lemma: shares <= chain + 1 stays so through a record (conv_rem < den)
+                assert 0 <= L.fwd_lag <= 1 and (L.epoch < L.fwd_epoch or q_next == L.fwd_shares), (
+                    L.fwd_lag, q_next, L.fwd_shares)
+            else:
+                self._fwd_clear(L)
+                L.snap = L.snap_r = 0
             if L.shares == 0 and L.lock == 0:  # V2-12: nothing left to convert -> jump
                 L.epoch = self.epoch
+                self._fwd_clear(L)
                 L.snap, L.snap_r = self.acc, self.acc_r
         if L.shares:
             self.n_touch += 1
-        L.pending += L.shares * (self.acc - L.snap) // WAD
+        if L.fwd:                              # FWD_OPEN at fwd_epoch == the current epoch
+            assert L.fwd == FWD_OPEN and L.fwd_epoch == self.epoch, (L.fwd, L.fwd_epoch, self.epoch)
+            q = L.shares - L.fwd_lag
+            assert q == L.fwd_shares, (q, L.fwd_shares)
+            L.pending += L.shares * self.acc // WAD - q * L.snap // WAD
+            L.real += L.shares * self.acc_r // WAD - q * L.snap_r // WAD
+            self._fwd_clear(L)
+        else:
+            L.pending += L.shares * (self.acc - L.snap) // WAD
+            L.real += L.shares * (self.acc_r - L.snap_r) // WAD
         L.snap = self.acc
-        L.real += L.shares * (self.acc_r - L.snap_r) // WAD
         L.snap_r = self.acc_r
         if self.mode == "release":
             L.real = L.claimed + max(L.pending, 0)   # (b): everything credited is realised
@@ -327,15 +411,82 @@ class Pool:
             L.lock, L.lock_term, L.lock_epoch = 0, 0, -1               # v0.4.1: the calendar already dropped it
         return L
 
+    @staticmethod
+    def _fwd_part(L, j, q, acc_end, acc_r_end):
+        """KI-66 full: what the forward chain accrued in epoch j (its q shares there): the whole
+        epoch before fwd_epoch, up to the chain's snapshots in it (cumulative floor)."""
+        if j < L.fwd_epoch:
+            return q * acc_end // WAD, q * acc_r_end // WAD
+        return q * L.snap // WAD, q * L.snap_r // WAD
+
+    @staticmethod
+    def _fwd_clear(L):
+        L.fwd, L.fwd_epoch, L.fwd_shares, L.fwd_lag = FWD_NONE, 0, 0, 0
+
+    def _fwd_walk(self, L):
+        """KI-66 full: the pot-only touch accrues the floor chain fwd_shares from fwd_epoch on (the
+        records' ends, then the current acc; it parks on a live wipe record and, once the chain
+        holds 0 shares, jumps to the current epoch), by cumulative floor q*end//WAD - q*snap//WAD,
+        so its total over any number of touches is the single floor the owner's conversion takes
+        back.  Records come from the window at hand (_rec).  Writes pending, real, snap, snap_r,
+        fwd_epoch and fwd_shares only."""
+        j, q = L.fwd_epoch, L.fwd_shares
+        while True:
+            if q == 0:                         # nothing more to accrue, ever
+                j = self.epoch
+                L.snap, L.snap_r = self.acc, self.acc_r
+                break
+            if j == self.epoch:
+                L.pending += q * self.acc // WAD - q * L.snap // WAD
+                L.real += q * self.acc_r // WAD - q * L.snap_r // WAD
+                L.snap, L.snap_r = self.acc, self.acc_r
+                self.n_touch += 1
+                break
+            rec = self._rec(j)
+            if rec is None:
+                break
+            acc_end, num, den, acc_r_end = rec[:4]
+            L.pending += q * acc_end // WAD - q * L.snap // WAD
+            L.real += q * acc_r_end // WAD - q * L.snap_r // WAD
+            self.n_touch += 1
+            if self.wipe_live and j == self.epoch - 1:
+                L.snap, L.snap_r = acc_end, acc_r_end
+                break
+            q = q * num // den
+            j += 1
+            L.snap = L.snap_r = 0
+        assert j <= self.epoch
+        L.fwd_epoch, L.fwd_shares = j, q
+
+    def sync_lender(self, who, n: int, signed: bool):
+        """sync_lender(n) with the n records from where the walk starts at hand: the owner's
+        conversion (signed) from the lender's epoch, a third party's pot-only touch from the
+        lender's epoch or, with a forward chain, from its fwd_epoch.  Returns whether it stopped
+        behind (records missing)."""
+        L = self.lenders[who]
+        lo = L.fwd_epoch if (L.fwd and not signed) else L.epoch
+        cal = (self.lock_norm, dict(self.lock_cal))
+        self._win, self.behind = (lo, lo + n), False
+        try:
+            self._touch(who, pot_only=not signed)
+        finally:
+            self._win = None
+        if self.behind:                        # a partial conversion: no calendar, no pot (as convert)
+            self.lock_norm, self.lock_cal = cal
+        return self.behind
+
     def _touch_pot(self, who) -> Lender:
-        """KI-66: the pot-only touch, anyone's sync_lender of a lender it does not own.
+        """KI-66 (full): the pot-only touch, anyone's sync_lender of a lender it does not own.
         Since KI65-REV-SEC1 only the owner converts its position through a rebase record (the
         conversion order decides who receives the record's rounding units), so this touch stops at
-        one: the lender accrues pending/real to the record's acc_end/acc_r_end, keeps them as its
-        snapshots (its later conversion accrues 0 there) and moves its surplus to the pot (R3A-2);
-        its shares, lock, epoch and the record's conv_rem stay.  Idempotent.  Everywhere else it is
-        _touch (wipe catch-up, the V2-12 jump and parking, a current lender).  What the unconverted
-        shares earn after the record waits for the owner's conversion."""
+        one: the lender accrues pending/real to the record's acc_end/acc_r_end (FWD_HOLD), then
+        along the forward chain (_fwd_walk: the floor of its shares through the later records, which
+        no conversion order can lower) to the current epoch, and moves its surplus to the pot
+        (R3A-2); its shares, lock, lock term, epoch and every record's conv_rem stay.  A lender
+        with a chain continues it from fwd_epoch.  Idempotent; the owner's later conversion takes
+        the chain's accruals back exactly (no double count).  Everywhere else it is _touch (wipe
+        catch-up, the V2-12 jump and parking, a current lender).  What stays with the owner is the
+        latent rounding unit: its shares beyond the chain's floor (0 or 1 per record)."""
         return self._touch(who, pot_only=True)
 
     def _to_pot(self, L: Lender):
@@ -1689,12 +1840,13 @@ def pot_liveness_table(seeds: int = 2_000):
     lenders is absent; the wind-down resolves every position, releases the vest, touches the present
     lenders and the absent ones the way a third party may, and the present lenders claim twice.
     Variants: KI65-REV-SEC1 alone (an absent lender behind a rebase record is left as it is), the
-    pot-only touch (KI-66), and every owner returning (the absent lenders converted by their owners).
+    pot-only touch with its forward chain (KI-66 full; the seventh round's held-only touch left 8 runs
+    above dust, 3,998,521,208 lamports, worst 2,134,755,812: KI66-R3), and every owner returning (the absent lenders converted by their owners).
     Returns rows (variant, runs with an absent lender behind a rebase record, runs where a present
     lender is left unpaid above the dust bound, present entitlement left unpaid in total (lamports),
     worst run (lamports))."""
     variants = ("KI65-REV-SEC1 only (absent lenders behind a rebase untouched)",
-                "pot-only touch of the absent lenders (KI-66)", "every absent owner returns and converts")
+                "pot-only touch + forward chain (KI-66 full)", "every absent owner returns and converts")
     out = {v: [0, 0, 0, 0] for v in variants}
     for seed in range(seeds):
         rng = random.Random(seed)
@@ -1764,6 +1916,364 @@ def pot_liveness_table(seeds: int = 2_000):
             row[2] += unpaid
             row[3] = max(row[3], unpaid)
     return [(v, *out[v]) for v in variants]
+
+
+
+# ---- KI-66 full: the forward chain ---------------------------------------------------------------
+def _chain_pair(fwd_chain: bool = True):
+    """A rebase record behind which C (never touched) holds its shares, then a new epoch in which C's
+    unconverted shares earn more than C's entitlement while A is short: A and C lend 1,000 tokens
+    each; a settlement of everything but 1,000 raw tokens (1 SOL) rebases the shares; A's owner
+    converts; 90 % of the tokens are borrowed for 30 days and charged 10**25 of rent index over 10
+    days (credited to A and C's chain); A withdraws its allowance (early leaver) and the rent is
+    paid (realised on the shares still there, C's among them).  Returns the pool."""
+    p = Pool(util_cap_bps=10_000, fwd_chain=fwd_chain)
+    p.deposit("A", 10**12)
+    p.deposit("C", 10**12)
+    p.borrow(1, p.T - 1_000)
+    p.settle(1, 10**9)
+    assert p.epoch == 1 and p.epochs[0][1] == 1, p.epochs     # a rebase, C not converted
+    p._touch("A")                                            # A's owner converts
+    p.borrow(2, p.T * 9 // 10)
+    p.advance(10 * 86_400, 10**25)
+    L = p._touch("A")
+    p.withdraw("A", min(L.shares, p.free_allowance("A") * (p.S + VS) // (p.T + p.B + VA)))
+    q, io, _pr, _dl = p.positions[2]
+    p.repay(2, cdiv(q * (p.index - io), WAD), 0)
+    return p
+
+
+def pot_chain_demo():
+    """KI-66 full: what an absent lender's unconverted shares earn AFTER the rebase record (KI66-R3).
+    C's surplus of the new epoch is on shares C's owner never converted; the held-only pot-only touch
+    (seventh round) accrues C only to the record's ends, so A's shortfall waits for C's owner.  The
+    forward chain accrues the floor of C's shares through the record (no conversion order needed) to
+    the current epoch and moves that surplus too: A is paid in full without C's owner, a second touch
+    moves nothing, and C's owner's later conversion takes the chain's accruals back exactly, so C, A
+    and the vault end as when C's owner had converted first.
+    Returns rows (case, pot after C's sync, C's fwd after it, A's next claim, A's pending left, C's
+    shares after its own later sync, C's claim then, C's pending + claimed, lender_sol left)."""
+    rows = []
+    for case in ("pot-only touch, held at the record only (KI-66, seventh round)",
+                 "pot-only touch + forward chain (KI-66 full)", "forward chain, touched twice",
+                 "C's owner converts C first"):
+        p = _chain_pair(fwd_chain=not case.startswith("pot-only touch, held"))
+        c0 = p.lenders["C"]
+        pre = (c0.shares, c0.epoch, c0.lock, c0.lock_term, p.epochs[0][7])
+        if case.startswith("C's owner"):
+            p._touch("C")
+        else:
+            p._touch_pot("C")
+            L = p.lenders["C"]
+            assert (L.shares, L.epoch, L.lock, L.lock_term, p.epochs[0][7]) == pre   # C stays unconverted
+            if "twice" in case:
+                once = (p.unmatched, L.real, L.pending, L.snap, L.snap_r, L.fwd, L.fwd_epoch, L.fwd_shares)
+                p._touch_pot("C")
+                assert once == (p.unmatched, L.real, L.pending, L.snap, L.snap_r, L.fwd, L.fwd_epoch,
+                                L.fwd_shares), "a second pot-only touch moves nothing"
+        pot, fwd = p.unmatched, p.lenders["C"].fwd
+        a = p.claim_sol("A")
+        left = p.lenders["A"].pending
+        L = p._touch("C")                                    # C's owner returns
+        assert L.fwd == FWD_NONE
+        c = p.claim_sol("C")
+        p.claim_sol("A")
+        L = p.lenders["C"]
+        rows.append((case, pot, fwd, a, left, L.shares, c, L.pending + L.claimed, p.sol_vault))
+    base = rows[-1][5:]
+    assert all(r[5:] == base for r in rows), rows              # same end, whoever synced C and when
+    assert rows[0][4] > rows[-1][4] + 10**6, rows               # held only: A left owed
+    assert all(r[4] == rows[-1][4] for r in rows[1:]), rows     # the chain: as if C had converted
+    return rows
+
+
+def _diff_world(seed: int, with_pot: bool, stats: dict):
+    """fwd_differential's random pool: deposits (dust too), positions, rent, repays, withdrawals,
+    claims, covers, the owners' own partial syncs (1-3 records), sweeps, rebases and full wipes; with
+    with_pot, a third party's pot-only sync_lender of a random lender with a random window of 1-8
+    records before every other op (from the chain's fwd_epoch for a chained lender), checked to move
+    no share, lock, epoch or conv_rem, and to be idempotent on the same window."""
+    rng = random.Random(seed)                  # op stream (both worlds)
+    prng = random.Random(seed * 7 + 1)         # pot-only touches (world B only)
+    p = Pool(util_cap_bps=10_000)
+    users = [f"u{i}" for i in range(rng.randrange(3, 7))]
+    for u in users[:2]:
+        p.deposit(u, rng.randrange(10**9, 10**12))
+    pid = 0
+    for _ in range(rng.randrange(20, 80)):
+        if with_pot and prng.random() < 0.5 and p.lenders:
+            w = prng.choice(sorted(p.lenders))
+            L = p.lenders[w]
+            if L.fwd or (L.epoch < p.epoch and p.epochs[L.epoch][1] and (L.shares or L.lock or L.lock_term)):
+                n = prng.randrange(1, 9)
+                lo = L.fwd_epoch if L.fwd else L.epoch
+                pre = (L.shares, L.epoch, L.lock, L.lock_term, L.lock_until, L.lock_epoch, L.claimed,
+                       [e[7] for e in p.epochs.values()])
+                p.sync_lender(w, n, signed=False)
+                assert pre == (L.shares, L.epoch, L.lock, L.lock_term, L.lock_until, L.lock_epoch, L.claimed,
+                               [e[7] for e in p.epochs.values()]), seed
+                once = (L.pending, L.real, L.snap, L.snap_r, L.fwd, L.fwd_epoch, L.fwd_shares, L.fwd_lag,
+                        p.unmatched)
+                p._win = (L.fwd_epoch, lo + n)
+                p._touch_pot(w)
+                p._win = None
+                assert once == (L.pending, L.real, L.snap, L.snap_r, L.fwd, L.fwd_epoch, L.fwd_shares,
+                                L.fwd_lag, p.unmatched), seed
+                stats["pot-only touches"] += 1
+        r = rng.random()
+        try:
+            if r < 0.15 and p.T > 1:
+                pid += 1
+                p.borrow(pid, rng.randrange(1, p.T * 9 // 10 + 1), rng.choice([86_400, 9 * 86_400, 30 * 86_400]))
+            elif r < 0.3:
+                p.advance(rng.choice([3_600, 86_400, 9 * 86_400]), rng.randrange(0, 10**16))
+            elif r < 0.38 and p.positions:
+                k = rng.choice(sorted(p.positions))
+                q, io, _pr, _dl = p.positions[k]
+                p.repay(k, cdiv(q * (p.index - io), WAD) // rng.choice([1, 1, 3]),
+                        rng.choice([0, rng.randrange(0, 10**9)]))
+            elif r < 0.5:
+                p.deposit(rng.choice(users), rng.choice([rng.randrange(10**6, 10**12), rng.randrange(1, 5000)]))
+            elif r < 0.58:
+                u = rng.choice(users)
+                if u in p.lenders and p._touch(u).shares:
+                    L = p.lenders[u]
+                    p.withdraw(u, max(1, min(L.shares, p.free_allowance(u) * (p.S + VS) // (p.T + p.B + VA))))
+            elif r < 0.66:
+                u = rng.choice(users)
+                if u in p.lenders:
+                    p.claim_sol(u)
+            elif r < 0.7:
+                u = rng.choice(users)
+                if u in p.lenders:
+                    p.cover(u, rng.randrange(0, 10**8))
+            elif r < 0.8:
+                u = rng.choice(users)                       # the owner's own partial sync
+                if u in p.lenders:
+                    f0 = p.lenders[u].fwd
+                    p.sync_lender(u, rng.choice([1, 1, 2, 3]), signed=True)
+                    L = p.lenders[u]
+                    if with_pot and f0:
+                        stats["owner syncs a chained lender"] += 1
+                        stats["owner stops inside a chain"] += L.fwd == FWD_OPEN
+                        stats["... with lag 1"] += L.fwd == FWD_OPEN and L.fwd_lag == 1
+                        stats["... with epoch < fwd_epoch"] += L.fwd == FWD_OPEN and L.epoch < L.fwd_epoch
+            elif r < 0.83:
+                p.sweep_sol(rng.randrange(0, 10**9))
+            elif r < 0.95 and p.T > 1 and p.S:
+                pid += 1                                    # all but a few raw units: a rebase
+                p.borrow(pid, p.T - rng.choice([1, 1, 2, 7]))
+                p.settle(pid, rng.randrange(0, 10**10), rng.choice([0, rng.randrange(0, 10**9)]))
+            elif p.T > 0 and p.S and p.B == 0:
+                pid += 1                                    # a full wipe (everything borrowed and settled)
+                p.borrow(pid, p.T)
+                p.settle(pid, rng.randrange(0, 10**10))
+        except ValueError:
+            pass
+    return p
+
+
+def fwd_differential(seeds: int = 2_000):
+    """KI-66 full, the double-count differential: world A (the owners only) against world B (the same
+    ops plus random third-party pot-only touches with random record windows, _diff_world).  At the end
+    every owner converts; per lender shares, epoch, lock, lock term and pending + claimed must be
+    bit-equal, sum(real) + unmatched bit-equal, every record's conv_rem and S equal, and no chain
+    left; check() and the wind-down liveness hold in B.  Returns the coverage counters."""
+    stats = {k: 0 for k in ("pot-only touches", "owner syncs a chained lender", "owner stops inside a chain",
+                            "... with lag 1", "... with epoch < fwd_epoch", "pools with a chain left open")}
+    for seed in range(seeds):
+        A = _diff_world(seed, False, stats)
+        B = _diff_world(seed, True, stats)
+        stats["pools with a chain left open"] += any(L.fwd for L in B.lenders.values())
+        A2, B2 = copy.deepcopy(A), copy.deepcopy(B)
+        for w in sorted(A2.lenders):
+            A2._touch(w)
+            B2._touch(w)
+        for w in A2.lenders:
+            la, lb = A2.lenders[w], B2.lenders[w]
+            assert (la.shares, la.epoch, la.lock, la.lock_term) == (lb.shares, lb.epoch, lb.lock, lb.lock_term), (seed, w)
+            assert la.pending + la.claimed == lb.pending + lb.claimed, (seed, w)
+            assert lb.fwd == FWD_NONE, (seed, w)
+        assert sum(L.real for L in A2.lenders.values()) + A2.unmatched == \
+            sum(L.real for L in B2.lenders.values()) + B2.unmatched, seed
+        assert [e[7] for e in A2.epochs.values()] == [e[7] for e in B2.epochs.values()] and A2.S == B2.S, seed
+        copy.deepcopy(B).check()
+        B.wind_down_liveness()
+    return stats
+
+
+def _latent_tuned(rng):
+    """latent_residual_table's tuned generator: absent lenders with residue-tuned dust holdings (their
+    floor through the rebase is 0 or 1, the latent unit the rest), present lenders that convert first
+    (so the absent ones keep the units), a tiny position at a huge rent rate credited before the roll
+    and realised after it, deposits, rent and early leavers after the roll.  Returns (pool, absent)
+    or None when the settlement did not rebase."""
+    p = Pool(util_cap_bps=10_000)
+    absent = [f"h{i}" for i in range(rng.randrange(2, 6))]
+    present = [f"g{i}" for i in range(rng.randrange(1, 4))]
+    for u in present:
+        dust_shares(p, u, rng.choice([rng.randrange(1, 50), rng.randrange(10**3, 10**9)]), rng.randrange(REBASE))
+    for u in absent:
+        dust_shares(p, u, rng.choice([1, rng.randrange(1, 20)]), rng.randrange(1, REBASE))
+    p.borrow(1, rng.choice([1, 2, 5]))
+    p.advance(rng.choice([86_400, 9 * 86_400]), rng.randrange(10**26, 10**28))
+    try:
+        p.borrow(2, p.T - rng.choice([0, 1]))
+        p.settle(2, rng.randrange(0, 10**10))
+    except ValueError:
+        return None
+    if p.epoch == 0 or not p.epochs[0][1]:
+        return None
+    for u in present:
+        p._touch(u)
+    pid = 2
+    for _ in range(rng.randrange(3, 15)):
+        r = rng.random()
+        try:
+            if r < 0.3:
+                p.deposit(rng.choice(present + ["j"]), rng.randrange(1, 10**6))
+            elif r < 0.5:
+                p.advance(rng.choice([3_600, 86_400]), rng.randrange(0, 10**27))
+            elif r < 0.7:
+                u = rng.choice(present + ["j"])
+                if u in p.lenders and p._touch(u).shares:
+                    L = p.lenders[u]
+                    p.withdraw(u, max(1, min(L.shares, p.free_allowance(u) * (p.S + VS) // (p.T + p.B + VA))))
+            elif r < 0.85 and p.T > 1:
+                pid += 1
+                p.borrow(pid, rng.randrange(1, p.T))
+            elif p.positions:
+                k = rng.choice(list(p.positions))
+                q, io, _pr, _dl = p.positions[k]
+                p.repay(k, cdiv(q * (p.index - io), WAD), 0)
+        except ValueError:
+            pass
+    return p, absent
+
+
+def _latent_adversarial(rng):
+    """latent_residual_table's adversarial generator (the floor design's random_pool, stressed):
+    random pools with heavy rent, dust holdings tuned below a multiple of 1,000 (half the deposits),
+    partial repays, sweeps and rebases that leave other positions open across the roll; a random set
+    of lenders is absent.  Returns (pool, absent) or None without an absent lender behind a rebase."""
+    p = Pool(util_cap_bps=10_000)
+    users = [f"u{i}" for i in range(rng.randrange(3, 8))]
+    for u in users[:2]:
+        p.deposit(u, rng.randrange(10**9, 10**12))
+    pid = 0
+    for _ in range(rng.randrange(10, 40)):
+        r = rng.random()
+        try:
+            if r < 0.18 and p.T > 1:
+                pid += 1
+                p.borrow(pid, rng.randrange(1, p.T * 9 // 10 + 1), rng.choice([86_400, 9 * 86_400, 30 * 86_400]))
+            elif r < 0.36:
+                p.advance(rng.choice([3_600, 86_400, 9 * 86_400]), rng.randrange(0, 10**18))
+            elif r < 0.46 and p.positions:
+                k = rng.choice(list(p.positions))
+                q, io, _pr, _dl = p.positions[k]
+                owed = cdiv(q * (p.index - io), WAD)
+                p.repay(k, owed if rng.random() < 0.8 else rng.randrange(0, owed + 1),
+                        rng.choice([0, rng.randrange(0, 10**9)]))
+            elif r < 0.6:
+                u = rng.choice(users)
+                if rng.random() < 0.5:
+                    dust_shares(p, u, rng.choice([1, rng.randrange(1, 100), rng.randrange(1, 10**6)]), rng.randrange(REBASE))
+                else:
+                    p.deposit(u, rng.randrange(10**6, 10**12))
+            elif r < 0.68:
+                u = rng.choice(users)
+                if u in p.lenders and p._touch(u).shares:
+                    L = p.lenders[u]
+                    p.withdraw(u, max(1, min(L.shares, p.free_allowance(u) * (p.S + VS) // (p.T + p.B + VA))))
+            elif r < 0.76:
+                u = rng.choice(users)
+                if u in p.lenders:
+                    p.claim_sol(u)
+            elif r < 0.8:
+                p.sweep_sol(rng.randrange(1, 10**9))
+            elif p.T > 1 and p.S:
+                pid += 1
+                p.borrow(pid, p.T - rng.choice([1, 1, 2, 3]))
+                p.settle(pid, rng.randrange(0, 10**10), rng.choice([0, rng.randrange(0, 10**9)]))
+        except ValueError:
+            pass
+    lenders = list(p.lenders)
+    if len(lenders) < 2:
+        return None
+    absent = set(rng.sample(lenders, rng.randrange(1, len(lenders))))
+    if not any(p.lenders[w].epoch < p.epoch and p.epochs[p.lenders[w].epoch][1] for w in absent):
+        return None
+    return p, absent
+
+
+def _absent_wind_down(p, absent, variant: str) -> int:
+    """The wind-down with absent lenders (pot_liveness_table's): every position resolves, the vest is
+    released, the present lenders are touched by their owners and the absent ones by a third party's
+    sync_lender(8) repeated until the chain reaches the current epoch (variant "held": the seventh
+    round's held-only pot-only touch; "owner": every absent owner returns and converts), then the
+    present lenders claim twice.  Returns the present lenders' entitlement left unpaid."""
+    q = copy.deepcopy(p)
+    q.fwd_chain = variant != "held"
+    for k in list(q.positions):
+        qq, io, _pr, _dl = q.positions[k]
+        q.repay(k, cdiv(qq * (q.index - io), WAD), 0)
+    q.advance(q.lump_vest_s + 1)
+    lenders = list(q.lenders)
+    for w in lenders:
+        if w not in absent or variant == "owner":
+            q._touch(w)
+        elif variant == "held":
+            q._touch_pot(w)
+        else:
+            for _ in range(q.epoch + 1):            # MAX_RECORDS = 8 records per transaction
+                if not q.sync_lender(w, 8, signed=False) and (not q.lenders[w].fwd or q.lenders[w].fwd_epoch == q.epoch):
+                    break
+    for _ in range(2):
+        for w in lenders:
+            if w not in absent:
+                q.claim_sol(w)
+    return sum(max(q.lenders[w].pending, 0) for w in lenders if w not in absent), \
+        q.n_touch + 2 * len(lenders) + q.epoch + 2
+
+
+def latent_residual_table(tuned: int = 3_000, adversarial: int = 5_000):
+    """KI-66 full, what the forward chain leaves to the absent owners: the latent rounding units (an
+    absent lender's shares beyond the chain's floor, 0 or 1 per record, whose post-record earnings only
+    its owner's conversion can assign).  Two generators (_latent_tuned: residue-tuned holdings that
+    put the units on the absent lenders; _latent_adversarial: the floor design's random pools, stress
+    1 and 2) and three wind-downs (_absent_wind_down: the held-only pot-only touch, the forward chain in
+    sync_lender(8) steps, every owner returning); the adversarial pools are drawn twice per seed (two
+    seed streams).  Returns rows (generator, variant, runs, runs with a
+    present lender unpaid above dust, unpaid in total, worst run, runs owed > 10,000 lamports beyond
+    "every owner returns", that excess in total, the worst excess)."""
+    variants = (("held", "pot-only touch, held at the record only (KI-66, seventh round)"),
+                ("chain", "pot-only touch + forward chain (KI-66 full)"),
+                ("owner", "every absent owner returns and converts"))
+    gens = (("tuned latent units", [_latent_tuned(random.Random(s)) for s in range(tuned)]),
+            ("adversarial random pools", (_latent_adversarial(random.Random(s * 104_729 + stress))
+                                          for stress in (1, 2) for s in range(adversarial))))
+    rows = []
+    for gname, pools in gens:
+        out = {v: [0, 0, 0, 0, 0, 0, 0] for v, _ in variants}
+        for built in pools:
+            if built is None:
+                continue
+            p, absent = built
+            res = {v: _absent_wind_down(p, absent, v) for v, _ in variants}
+            for v, _ in variants:
+                unpaid, bound = res[v]
+                extra = unpaid - res["owner"][0]
+                o = out[v]
+                o[0] += 1
+                o[1] += unpaid > bound
+                o[2] += unpaid
+                o[3] = max(o[3], unpaid)
+                o[4] += extra > 10_000
+                o[5] += max(extra, 0)
+                o[6] = max(o[6], extra)
+        rows += [(gname, label, *out[v]) for v, label in variants]
+    return rows
 
 
 def main():
@@ -1866,6 +2376,26 @@ def main():
     print("|---|---|---|---|---|")
     for v, behind, short, tot, worst in pot_liveness_table(2_000):
         print(f"| {v} | {behind} | {short} | {tot:,} | {worst:,} |")
+    print("\nKI-66 full, the forward chain: KI-66's scenario a rebase later (A and C lend, a settlement rebases "
+          "before anyone touched C, A's owner converts; in the new epoch rent is credited, A leaves early and the "
+          "rent is paid, realised on C's unconverted shares beyond C's entitlement; then C's owner returns):")
+    print("| sync of C | pot after it (lamports) | C's fwd | A's next claim | A's pending left | C's shares, converted | "
+          "C's claim | C's pending + claimed | lender_sol left |")
+    print("|---|---|---|---|---|---|---|---|---|")
+    for case, pot, fwd, a, left, cs, c, cpc, sv in pot_chain_demo():
+        print(f"| {case} | {pot:,} | {fwd} | {a:,} | {left:,} | {cs:,} | {c:,} | {cpc:,} | {sv:,} |")
+    st = fwd_differential(2_000)
+    print("\nKI-66 full, the double-count differential: 2,000 random pools, world A (owners only) against world B (the "
+          "same ops plus third-party pot-only touches with random 1-8 record windows); after every owner converts, "
+          "shares, epochs, locks, pending + claimed, sum(real) + unmatched, every conv_rem and S are bit-equal: "
+          + ", ".join(f"{k} {v:,}" for k, v in st.items()))
+    print("\nKI-66 full, the residual: latent rounding units (an absent lender's shares beyond the chain's floor) "
+          "(3,000 tuned pools; 2 x 20,000 adversarial random pools):")
+    print("| generator | variant | runs | runs with a present lender unpaid above dust | unpaid in total (lamports) | "
+          "worst run | runs owed > 10,000 beyond every owner returning | that excess in total | worst excess |")
+    print("|---|---|---|---|---|---|---|---|---|")
+    for g, v, runs, above, tot, worst, n10, ex, wex in latent_residual_table(3_000, 20_000):
+        print(f"| {g} | {v} | {runs:,} | {above} | {tot:,} | {worst:,} | {n10} | {ex:,} | {wex:,} |")
     n, rb, conv, orph = lazy_order_check()
     print(f"\nKI-65 lemma, lazy conversion order: {n:,} random pools, {rb:,} rebase records, {conv:,} conversions in "
           f"random order between deposits and 0-token burns; sum(shares) == S once every lender converted, each "

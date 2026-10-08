@@ -122,7 +122,10 @@ pub fn store_records(
 /// lender empty, so it then jumps over every later record (or parks on the live wipe record)
 /// and reads no rebase record after it. Hence a conversion read a rebase record iff it moved
 /// the lender's epoch, the lender was not empty, and the record of its starting epoch is a
-/// rebase. Plain catch-up, the jump and the parking are not conversions through a rebase.
+/// rebase. Plain catch-up, the jump and the parking are not conversions through a rebase. The
+/// pot-only touch's forward chain (KI-66 full) reads later rebase records for their ends and
+/// ratios without converting: it moves no epoch, so it is not one either (`sync_lender` also
+/// requires the records back unchanged).
 pub fn reads_rebase(before: &Lender, after: &Lender, records: &[MathShareEpoch]) -> bool {
     let empty = before.shares == 0 && before.lock == 0 && before.lock_term == 0;
     after.epoch > before.epoch
@@ -246,7 +249,11 @@ mod tests {
             lock_term: 0,
             lock_until: 0,
             bump: 0,
-            _reserved: [0; 32],
+            fwd_shares: 0,
+            fwd_epoch: 0,
+            fwd: 0,
+            fwd_lag: 0,
+            _reserved: [0; 10],
         };
         let mut p = Pool::new();
         p.acc = 7;

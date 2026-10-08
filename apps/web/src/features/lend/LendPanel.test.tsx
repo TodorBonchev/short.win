@@ -119,7 +119,11 @@ const lenderAccount = (l: ReturnType<typeof simpleLender>): LenderPosition => ({
     owner: OWNER,
     market: MARKET,
     bump: 255,
-    reserved: new Uint8Array(32),
+    fwdShares: 0n,
+    fwdEpoch: 0,
+    fwd: 0,
+    fwdLag: 0,
+    reserved: new Uint8Array(10),
 });
 
 function chainOf(o: {

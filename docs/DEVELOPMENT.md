@@ -463,10 +463,13 @@ and 3's streams shifted by one: confirmations, not new coverage. A run meant to 
 a widely spaced `--seed`. Details: [`tests/fuzz/README.md`](../tests/fuzz/README.md).
 
 **Mutation testing** (M7-SEC-6): `scripts/mutants.sh [--fuzz 3m] [--work DIR] [mutant …]` builds the
-tests and the fuzzer once from the checkout, then each of the M7 security review's seven one-line
-program mutants (the test-venue or the release build of a private copy), and requires the mutant's
-named tests and a short fuzz run of its profile to fail against it — a surviving mutant is a missing
-oracle. It needs the unmutated builds the fork tests load (`SHORTWIN_SO`, `SHORTWIN_TEST_VENUE_SO`,
+tests and the fuzzer once from the checkout, then each one-line program mutant — the M7 security
+review's seven, and since M10 eleven more (KI-65, KI-66, and the eight of KI-66 full and KI-67:
+the forward chain accruing nothing, the owner's double count inside a chain, the held epoch accrued
+twice, a per-touch floor, a re-entered hold, a jump keeping the chain, a close with `pending` owed
+and a parked lender closed) — (the test-venue or the release build of a private copy), and requires
+the mutant's named tests and, for the M7 ones, a short fuzz run of its profile to fail against it;
+the M10 mutants are checked by their tests alone (`-`) — a surviving mutant is a missing oracle. It needs the unmutated builds the fork tests load (`SHORTWIN_SO`, `SHORTWIN_TEST_VENUE_SO`,
 `MOCK_CPAMM_SO`, `COMPLETE_CURVE_SO`, default `target/…`); `--work` outside the repository keeps
 the per-mutant builds out of `target/`.
 

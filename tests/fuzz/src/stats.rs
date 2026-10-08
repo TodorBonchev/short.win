@@ -417,6 +417,23 @@ impl Ctx<'_> {
                             .or_default() += 1;
                         return res;
                     }
+                    // KI-67: a claim_sol after a claim_sol of the same position in one
+                    // transaction finds it closed when the first claim emptied it (the claim
+                    // action's oracle checks that this happens exactly then).
+                    let not_init = u32::from(anchor_lang::error::ErrorCode::AccountNotInitialized);
+                    if name == "claim_sol"
+                        && *c == not_init
+                        && i > 0
+                        && ix_name(&ixs[i - 1].data) == "claim_sol"
+                        && ixs[i - 1].accounts == ixs[i].accounts
+                    {
+                        *self
+                            .stats
+                            .events
+                            .entry("claim-after-close-refused".into())
+                            .or_default() += 1;
+                        return res;
+                    }
                     self.stats.anomaly(
                         &format!(
                             "framework-error:{name}:{}",

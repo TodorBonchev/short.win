@@ -107,7 +107,11 @@ describe('pickSyncs', () => {
             owner: address('11111111111111111111111111111111'),
             market: address('11111111111111111111111111111111'),
             bump: 255,
-            reserved: new Uint8Array(32),
+            fwdShares: 0n,
+            fwdEpoch: 0,
+            fwd: 0,
+            fwdLag: 0,
+            reserved: new Uint8Array(10),
         },
     });
 

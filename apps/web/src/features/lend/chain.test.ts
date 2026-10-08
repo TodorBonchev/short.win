@@ -81,7 +81,11 @@ function lenderBytes(market: Address, epoch: number): Uint8Array {
             lockTerm: 0n,
             lockUntil: 0n,
             bump: 254,
-            reserved: new Uint8Array(32),
+            fwdShares: 0n,
+            fwdEpoch: 0,
+            fwd: 0,
+            fwdLag: 0,
+            reserved: new Uint8Array(10),
         }),
     );
 }

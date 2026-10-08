@@ -10,6 +10,10 @@
 //!     wipe, `conv_rem < 1,000^k` on a rebase record and 0 on a full wipe (KI-65); `wipe_live ⇒ S = 0`; `S = 0 ⇒ vest_bal = 0` (the vest is flushed whenever `S`
 //!     reaches 0); `S = 0 ⇒ ΣB_Q = 0` (the last shares never leave while tokens are borrowed,
 //!     ARCH §9 M0b note 4, M1-SEC-3);
+//!   - **the forward chain** (KI-66 full) of every stored lender ([`fwd_state`]): none
+//!     (`fwd_epoch`, `fwd_lag`, `fwd_shares` 0), or behind the pool with `fwd_epoch ≤ share
+//!     epoch`, `FWD_HOLD` with `epoch < fwd_epoch` and no lag, `FWD_OPEN` with `epoch ≤
+//!     fwd_epoch` and a lag of 0 or 1;
 //!   - **I-P4 on the untouched state** (v0.4.1, R4A-2/R4B-3): Σ over lenders of
 //!     `pool::allowance_view` (each lender touched alone, everyone else as stored) ≤ `T` +
 //!     number of lenders;
@@ -43,7 +47,10 @@
 //!   part `⌈C·VS/(S + VS)⌉` when its last shares just left (M1-FID-1); and **locks never
 //!   decrease** while `now < lock_until` and `Π`, its epoch and the share epoch are unchanged
 //!   (the withdrawing lender's down to its remaining shares at most; ARCH §8.3 I8, V2-3, R3B-1;
-//!   M1-FID-9).
+//!   M1-FID-9); and **a `LenderPosition` disappears only in `withdraw` or `claim_sol`** of its
+//!   owner, with a post-state `pool::closable` (a claim's recomputed on the pre-state; a
+//!   withdrawal's burns all its shares and leaves no lock), its rent going to the owner (KI-67;
+//!   [`closes_only_when_empty`]).
 
 use std::cell::Cell;
 
@@ -177,14 +184,44 @@ pub fn reads_rebase(p: &Pool, before: &Lender, after: &Lender, records: &[MathSh
 }
 
 /// What a third party's `sync_lender(n)` of `owner`'s position leaves (KI-66: the pot-only
-/// touch `pool::touch_pot` with the `n` records from the lender's epoch, on the pre-state): the
-/// lender and the vault. `None` without a position or if the math crate refuses.
+/// touch `pool::touch_pot` with the `n` records from the lender's epoch — KI-66 full: from its
+/// forward chain's `fwd_epoch` once it has one — on the pre-state): the lender and the vault.
+/// `None` without a position or if the math crate refuses.
 pub fn third_party_sync(st: &PoolState, owner: &Pubkey, n: usize) -> Option<(Lender, Vault)> {
     let mut l = st.lender_of(owner)?.lender();
-    let recs: Vec<MathShareEpoch> = st.records_from(l.epoch).iter().take(n).copied().collect();
+    let from = if l.fwd == pool::FWD_NONE {
+        l.epoch
+    } else {
+        l.fwd_epoch
+    };
+    let recs: Vec<MathShareEpoch> = st.records_from(from).iter().take(n).copied().collect();
     let mut v = *st.vault;
     pool::touch_pot(&st.pool, &mut v, &mut l, &recs, st.now).ok()?;
     Some((l, v))
+}
+
+/// KI-66 full: the forward-chain fields of a stored lender (ARCH §2.3.6 `LenderPosition`): no
+/// chain (`fwd_epoch`, `fwd_lag` and `fwd_shares` 0), or one the pot-only touch started at a
+/// rebase record (`FWD_HOLD`: `epoch < fwd_epoch`, no lag) or the owner's conversion entered
+/// (`FWD_OPEN`: `epoch ≤ fwd_epoch`, lag 0 or 1), on a lender behind the pool, never ahead of
+/// it (`fwd_epoch ≤ share_epoch`).
+pub fn fwd_state(p: &Pool, l: &Lender) -> bool {
+    match l.fwd {
+        pool::FWD_NONE => l.fwd_epoch == 0 && l.fwd_lag == 0 && l.fwd_shares == 0,
+        pool::FWD_HOLD => {
+            l.epoch < p.share_epoch
+                && l.fwd_epoch <= p.share_epoch
+                && l.epoch < l.fwd_epoch
+                && l.fwd_lag == 0
+        }
+        pool::FWD_OPEN => {
+            l.epoch < p.share_epoch
+                && l.fwd_epoch <= p.share_epoch
+                && l.epoch <= l.fwd_epoch
+                && l.fwd_lag <= 1
+        }
+        _ => false,
+    }
 }
 
 /// Every `ShareEpoch` record of `market` at its own address `["share_epoch", market, epoch]`
@@ -319,6 +356,17 @@ pub fn check_state(st: &PoolState) -> Result<(), Violation> {
             )
         },
     )?;
+
+    // KI-66 full: every stored forward chain is consistent.
+    for (key, l) in &st.lenders {
+        ensure(fwd_state(p, &l.lender()), "I8", || {
+            format!(
+                "market {market}: lender {key} forward chain fwd {} fwd_epoch {} fwd_lag {} \
+                 fwd_shares {} at epoch {} (share epoch {})",
+                l.fwd, l.fwd_epoch, l.fwd_lag, l.fwd_shares, l.epoch, p.share_epoch
+            )
+        })?;
+    }
 
     // I-P4 on the untouched state: each lender's allowance with only that lender touched.
     let mut seen: u128 = 0;
@@ -590,16 +638,124 @@ fn liveness(st: &PoolState) -> Result<(), Violation> {
 #[derive(Clone, Default)]
 pub struct LenderSnapshot {
     pub markets: Vec<PoolState>,
+    /// Per `LenderPosition` of those markets: `(market, owner, the position's lamports, the
+    /// owner's lamports)` (KI-67's close hook).
+    pub rents: Vec<(Pubkey, Pubkey, u64, u64)>,
 }
 
 /// Snapshots the lender state of `markets`.
 pub fn snapshot(svm: &LiteSVM, markets: &[Pubkey]) -> LenderSnapshot {
-    LenderSnapshot {
-        markets: markets
+    let markets: Vec<PoolState> = markets
+        .iter()
+        .filter_map(|m| PoolState::load(svm, m))
+        .collect();
+    let rents = markets
+        .iter()
+        .flat_map(|st| {
+            st.lenders.iter().map(|(key, l)| {
+                (
+                    st.market,
+                    l.owner,
+                    read::lamports(svm, key),
+                    read::lamports(svm, &l.owner),
+                )
+            })
+        })
+        .collect();
+    LenderSnapshot { markets, rents }
+}
+
+/// What an owner that is also the fee payer may pay besides (KI-67's rent check).
+const FEE_SLACK: u64 = 100_000;
+
+/// KI-67: a `LenderPosition` of `st` that no longer exists after the instruction was closed by
+/// its owner's `withdraw` or `claim_sol`, with a closable post-state — a claim's recomputed on
+/// the pre-state (`pool::touch`, `pool::claim`: `pool::closable`), a withdrawal's burning all its
+/// shares, leaving no lock and on the current epoch — and its rent went to the owner: the
+/// owner's lamports rose by exactly the position's rent plus the SOL paid. Conversely a claim
+/// whose recomputed post-state is closable must have closed the position.
+pub fn closes_only_when_empty(
+    svm: &LiteSVM,
+    st: &PoolState,
+    rents: &[(Pubkey, Pubkey, u64, u64)],
+    ev: &super::IxEvents,
+) -> Result<(), Violation> {
+    let market = st.market;
+    let now = svm.get_sysvar::<Clock>().unix_timestamp;
+    for (_, pos) in &st.lenders {
+        let owner = pos.owner;
+        let gone =
+            read::borsh::<LenderPosition>(svm, &crate::pda::lender(&market, &owner).0).is_none();
+        let claim = ev
+            .claims
             .iter()
-            .filter_map(|m| PoolState::load(svm, m))
-            .collect(),
+            .find(|c| c.market == market && c.owner == owner);
+        let withdraw = ev
+            .withdraws
+            .iter()
+            .find(|w| w.market == market && w.owner == owner);
+        let mut predicted = None;
+        let expect_closed = match (claim, withdraw) {
+            (Some(_), None) => {
+                let (mut v, mut l, mut recs) = (st.vault.clone(), pos.lender(), st.records.clone());
+                let recs = PoolState::records_from_mut(&mut recs, l.epoch);
+                let ok = pool::touch(&st.pool, &mut v, &mut l, recs, now)
+                    .and_then(|_| pool::claim(&st.pool, &mut v, &mut l, recs, now))
+                    .is_ok_and(|_| pool::closable(&st.pool, &l));
+                predicted = Some(l);
+                ok
+            }
+            (None, Some(w)) => {
+                // All its shares (as converted by the withdrawal's own touch), no lock left.
+                let (mut v, mut l, mut recs) = (st.vault.clone(), pos.lender(), st.records.clone());
+                let recs = PoolState::records_from_mut(&mut recs, l.epoch);
+                pool::touch(&st.pool, &mut v, &mut l, recs, now).is_ok()
+                    && w.shares == l.shares
+                    && w.lock == 0
+                    && w.epoch == st.pool.share_epoch
+            }
+            _ => false,
+        };
+        if !gone {
+            ensure(claim.is_none() || !expect_closed, "I8", || {
+                let stored =
+                    read::borsh::<LenderPosition>(svm, &crate::pda::lender(&market, &owner).0)
+                        .map(|p| p.lender());
+                format!(
+                    "market {market}: claim_sol left {owner}'s empty position open (KI-67): \
+                     predicted {predicted:?}, stored {stored:?}"
+                )
+            })?;
+            continue;
+        }
+        ensure(expect_closed, "I8", || {
+            format!(
+                "market {market}: {owner}'s LenderPosition closed outside withdraw / claim_sol \
+                 or with a post-state that is not closable (KI-67)"
+            )
+        })?;
+        let Some(&(_, _, rent, before)) = rents
+            .iter()
+            .find(|(m, o, _, _)| *m == market && *o == owner)
+        else {
+            return fail(
+                "I8",
+                format!("market {market}: no rent snapshot for {owner}"),
+            );
+        };
+        let paid = claim.map_or(0, |c| c.sol_paid) + withdraw.map_or(0, |w| w.sol_paid);
+        let after = read::lamports(svm, &owner);
+        // The owner may also pay the transaction's fee (a few signatures' worth).
+        let due = before + rent + paid;
+        ensure(after <= due && after + FEE_SLACK >= due, "I8", || {
+            format!(
+                "market {market}: {owner}'s position closed; the owner got {} lamports, not the \
+                 rent {rent} + SOL {paid} (KI-67)",
+                i128::from(after) - i128::from(before)
+            )
+        })?;
     }
+    Ok(())
 }
 
 /// The instruction-level lender checks (see the module docs): `pre` is the state just before
@@ -673,6 +829,7 @@ pub fn check_ix(
                 })?;
             }
         }
+        closes_only_when_empty(svm, st, &pre.rents, ev)?;
         let Some(post) = post else { continue };
         let deposits: Vec<_> = ev.deposits.iter().filter(|e| mine(&e.market)).collect();
         let withdraws: Vec<_> = ev.withdraws.iter().filter(|e| mine(&e.market)).collect();

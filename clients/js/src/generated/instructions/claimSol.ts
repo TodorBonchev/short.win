@@ -123,7 +123,10 @@ export type ClaimSolAsyncInput<
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  /** The lender; receives the SOL. */
+  /**
+   * The lender; receives the SOL, and the `LenderPosition` rent when the claim closes it
+   * (KI-67).
+   */
   owner: TAccountOwner;
   /**
    * Read-only (C0-17). Bound to its PDA `["market", mint]` with the stored bump
@@ -292,7 +295,10 @@ export type ClaimSolInput<
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  /** The lender; receives the SOL. */
+  /**
+   * The lender; receives the SOL, and the `LenderPosition` rent when the claim closes it
+   * (KI-67).
+   */
   owner: TAccountOwner;
   /**
    * Read-only (C0-17). Bound to its PDA `["market", mint]` with the stored bump
@@ -428,7 +434,10 @@ export type ParsedClaimSolInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** The lender; receives the SOL. */
+    /**
+     * The lender; receives the SOL, and the `LenderPosition` rent when the claim closes it
+     * (KI-67).
+     */
     owner: TAccountMetas[0];
     /**
      * Read-only (C0-17). Bound to its PDA `["market", mint]` with the stored bump

@@ -38,8 +38,9 @@
 //! The program key-checks the accounts. `sync_lender(max_epochs)` signed by the lender's owner
 //! is [`convert`] with the records at hand, then [`touch`] once the lender is no longer
 //! [`Standing::Behind`]; sent by anyone else it is [`touch_pot`], which never converts through
-//! a rebase record but still moves the surplus accrued up to it to the pot (KI65-REV-SEC1,
-//! KI-66).
+//! a rebase record but still moves the surplus accrued up to it, and along the lender's forward
+//! chain after it, to the pot (KI65-REV-SEC1, KI-66, KI-66 full); for a lender with a chain its
+//! records start at or before `fwd_epoch`. [`closable`] is when a position closes (KI-67).
 //! The records are `&mut`: a conversion through a rebase record rounds cumulatively and
 //! writes the record's `conv_rem` (KI-65, no rebase orphans; see [`convert`]), so every
 //! caller persists the records whose `conv_rem` changed together with the lender (the
@@ -68,7 +69,7 @@ use core::mem::{offset_of, size_of};
 
 use crate::consts::MAX_RELEASE_SPAN_S;
 use crate::error::MathError;
-use crate::num::{BPS, Rounding, WAD, mul_div, mul_div_i128, to_i128, to_u64};
+use crate::num::{BPS, Rounding, U256, WAD, mul_div, mul_div_i128, to_i128, to_u64};
 
 /// `VS`: virtual shares (decimals offset 3; ECON §9.2, §15).
 pub const VIRTUAL_SHARES: u128 = 1_000;
@@ -80,6 +81,14 @@ pub const R_MAX: u128 = 1_000_000;
 pub const REBASE: u128 = 1_000;
 /// `lock_epoch` of a lender without a lock (`pool_model.Lender`: −1).
 pub const NO_LOCK_EPOCH: u32 = u32::MAX;
+/// `Lender::fwd`: no forward chain (KI-66 full; `pool_model.FWD_NONE`).
+pub const FWD_NONE: u8 = 0;
+/// `Lender::fwd`: the pot-only touch held the lender at the rebase record of its `epoch` (accrued
+/// to the record's ends); the chain covers the epochs after it up to `fwd_epoch`.
+pub const FWD_HOLD: u8 = 1;
+/// `Lender::fwd`: the owner converted part of the way into the chain; nothing accrued on
+/// `shares` in `epoch` yet; the chain (base `shares − fwd_lag`) covers `epoch ..= fwd_epoch`.
+pub const FWD_OPEN: u8 = 2;
 /// The lock calendar's bucket length and ring size (ECON §9.3, §15; ARCH §2.3.6, A75),
 /// defined with the other compile-time constants.
 pub use crate::consts::{LOCK_BUCKET_S, LOCK_BUCKETS};
@@ -195,8 +204,20 @@ pub struct Lender {
     pub epoch: u32,
     /// `Π` epoch of `lock` ([`NO_LOCK_EPOCH`] without a lock).
     pub lock_epoch: u32,
+    /// KI-66 full: the epoch the forward chain reached (0 with [`FWD_NONE`]).
+    pub fwd_epoch: u32,
+    /// KI-66 full: [`FWD_NONE`], [`FWD_HOLD`] or [`FWD_OPEN`]. While a chain is active, `snap`
+    /// and `snap_r` are the chain's snapshots in `fwd_epoch`; the lender's own are implicit
+    /// (the record's ends in [`FWD_HOLD`], 0 in [`FWD_OPEN`]).
+    pub fwd: u8,
+    /// KI-66 full, [`FWD_OPEN`]: `shares` minus the chain's shares in `epoch`, 0 or 1 (each
+    /// record's rounding unit beyond the floor; 0 otherwise).
+    pub fwd_lag: u8,
     /// Explicit padding (zero).
-    pub _pad: [u8; 8],
+    pub _pad: [u8; 2],
+    /// KI-66 full: the forward chain's shares in `fwd_epoch`: the floor of the lender's shares
+    /// through the records, which no conversion order can lower (0 with [`FWD_NONE`]).
+    pub fwd_shares: u128,
 }
 
 /// Share-epoch record (`ShareEpoch`, ARCH §2.3.6, A39; `pool_model.Pool.epochs[e]`).
@@ -264,7 +285,7 @@ const _: () = {
     assert!(offset_of!(Vault, pi_epoch) == 2_120);
     assert!(offset_of!(Vault, _pad) == 2_124);
 
-    assert!(size_of::<Lender>() == 144);
+    assert!(size_of::<Lender>() == 160);
     assert!(offset_of!(Lender, shares) == 0);
     assert!(offset_of!(Lender, snap) == 16);
     assert!(offset_of!(Lender, snap_r) == 32);
@@ -277,7 +298,11 @@ const _: () = {
     assert!(offset_of!(Lender, lock_until) == 120);
     assert!(offset_of!(Lender, epoch) == 128);
     assert!(offset_of!(Lender, lock_epoch) == 132);
-    assert!(offset_of!(Lender, _pad) == 136);
+    assert!(offset_of!(Lender, fwd_epoch) == 136);
+    assert!(offset_of!(Lender, fwd) == 140);
+    assert!(offset_of!(Lender, fwd_lag) == 141);
+    assert!(offset_of!(Lender, _pad) == 142);
+    assert!(offset_of!(Lender, fwd_shares) == 144);
 
     assert!(size_of::<ShareEpoch>() == 112);
     assert!(offset_of!(ShareEpoch, acc_end) == 0);
@@ -428,8 +453,20 @@ impl Lender {
             lock_until: 0,
             epoch: pool.share_epoch,
             lock_epoch: NO_LOCK_EPOCH,
-            _pad: [0; 8],
+            fwd_epoch: 0,
+            fwd: FWD_NONE,
+            fwd_lag: 0,
+            _pad: [0; 2],
+            fwd_shares: 0,
         }
+    }
+
+    /// Drops the forward chain (KI-66 full): settled by the owner's conversion, a jump or a park.
+    pub const fn clear_fwd(&mut self) {
+        self.fwd = FWD_NONE;
+        self.fwd_epoch = 0;
+        self.fwd_lag = 0;
+        self.fwd_shares = 0;
     }
 }
 
@@ -649,9 +686,9 @@ impl Recs for Commit<'_> {
     }
 }
 
-/// The pot-only touch's pass ([`touch_pot`], KI-66): it stops at the first rebase record, so it
-/// converts through full-wipe records only, which keep their `conv_rem`; a remainder to write
-/// would be a bug (`Invariant`).
+/// The pot-only touch's pass ([`touch_pot`], KI-66): it stops at the first rebase record (the
+/// hold, which starts the forward chain), so it converts through full-wipe records only, which
+/// keep their `conv_rem`; a remainder to write would be a bug (`Invariant`).
 struct Hold<'a>(&'a [ShareEpoch]);
 
 impl Recs for Hold<'_> {
@@ -1097,7 +1134,7 @@ fn convert_steps<R: Recs>(
             return Ok(Standing::Current);
         }
         let parks = pool.is_wipe_live() && l.epoch.checked_add(1) == Some(pool.share_epoch);
-        if l.shares == 0 && l.lock == 0 && l.lock_term == 0 && !parks {
+        if l.shares == 0 && l.lock == 0 && l.lock_term == 0 && !parks && l.fwd == FWD_NONE {
             // V2-12 jump for an empty lender, without reading a record: the model reads
             // one, adds 0, scales nothing and jumps to the same state. A lender whose
             // shares and lock floored to 0 can still hold a term (`⌊lock·WAD/Π⌋ > lock`
@@ -1112,35 +1149,43 @@ fn convert_steps<R: Recs>(
             return Ok(Standing::Behind);
         };
         if R::ACCRUE {
-            *pending = add_i128(*pending, accrued(l.shares, sub_i128(rec.acc_end, l.snap)?)?)?;
-            *real = add_i128(
-                *real,
-                accrued(l.shares, diff_u128(rec.acc_r_end, l.snap_r)?)?,
-            )?;
+            match l.fwd {
+                // KI-66 full: the pot-only touch accrued this epoch to the record's ends.
+                FWD_HOLD => {}
+                FWD_OPEN => {
+                    // The chain took its part of this epoch; the shares' own accrual less it.
+                    let q = sub_u128(l.shares, u128::from(l.fwd_lag))?;
+                    if l.epoch < l.fwd_epoch {
+                        // The whole epoch: only the lag's part remains (one product).
+                        *pending = add_i128(*pending, lag_part(q, l.fwd_lag, rec.acc_end)?)?;
+                        *real = add_i128(*real, lag_part(q, l.fwd_lag, to_i128(rec.acc_r_end)?)?)?;
+                    } else {
+                        let (fp, fr) = fwd_part(l, l.epoch, q, rec.acc_end, rec.acc_r_end)?;
+                        *pending =
+                            add_i128(*pending, sub_i128(accrued(l.shares, rec.acc_end)?, fp)?)?;
+                        *real =
+                            add_i128(*real, sub_i128(accrued_r(l.shares, rec.acc_r_end)?, fr)?)?;
+                    }
+                }
+                _ => {
+                    *pending =
+                        add_i128(*pending, accrued(l.shares, sub_i128(rec.acc_end, l.snap)?)?)?;
+                    *real = add_i128(
+                        *real,
+                        accrued(l.shares, diff_u128(rec.acc_r_end, l.snap_r)?)?,
+                    )?;
+                }
+            }
         }
         if parks {
-            // V2-12: the full-wipe record is still open for top-ups; stay on it.
+            // V2-12: the full-wipe record is still open for top-ups; stay on it (a chain that
+            // ended here is settled by the accrual above).
             l.snap = rec.acc_end;
             l.snap_r = rec.acc_r_end;
+            l.clear_fwd();
             return Ok(Standing::Parked);
         }
         let (num, den) = rec.ratio()?;
-        if R::HOLD && num != 0 {
-            // KI-66: the pot-only touch accrued the lender up to the values the rebase record
-            // froze for its epoch and stays on it, unconverted: no share, lock or `conv_rem`
-            // moves, so it orders no conversion (KI65-REV-SEC1). The snapshots at the record's
-            // ends make the accrual happen once: the conversion through it adds 0.
-            l.snap = rec.acc_end;
-            l.snap_r = rec.acc_r_end;
-            return Ok(Standing::Behind);
-        }
-        // KI-65: cumulative rounding through the record, so the conversions of every holder
-        // of the old epoch sum to the new S (no orphan shares).
-        let (shares, rem) = convert_shares(l.shares, rec.conv_rem, num, den)?;
-        if rem != rec.conv_rem {
-            records.set_rem(idx, rem)?;
-        }
-        l.shares = shares;
         // `⌊x·num/den⌋` with `num ∈ {0, 1}` (`ratio`): a division, no 256-bit product.
         let scale = |x: u128| -> Result<u128, MathError> {
             if num == 0 {
@@ -1149,17 +1194,66 @@ fn convert_steps<R: Recs>(
                 ovf(x.checked_div(den))
             }
         };
+        if R::HOLD && num != 0 {
+            // KI-66: the pot-only touch accrued the lender up to the values the rebase record
+            // froze for its epoch and stays on it, unconverted: no share, lock or `conv_rem`
+            // moves, so it orders no conversion (KI65-REV-SEC1). KI-66 full: from here the
+            // forward chain (`fwd_walk`) accrues the floor of its shares through the later
+            // records, which no conversion order can lower.
+            l.fwd = FWD_HOLD;
+            l.fwd_epoch = ovf(l.epoch.checked_add(1))?;
+            l.fwd_shares = scale(l.shares)?;
+            l.fwd_lag = 0;
+            l.snap = 0;
+            l.snap_r = 0;
+            return Ok(Standing::Behind);
+        }
+        // KI-66 full: the chain's shares in the next epoch, and whether this epoch settled it.
+        let chain = if l.fwd == FWD_NONE {
+            None
+        } else {
+            let base = if l.fwd == FWD_OPEN {
+                sub_u128(l.shares, u128::from(l.fwd_lag))?
+            } else {
+                l.shares
+            };
+            Some((scale(base)?, l.epoch >= l.fwd_epoch))
+        };
+        // KI-65: cumulative rounding through the record, so the conversions of every holder
+        // of the old epoch sum to the new S (no orphan shares).
+        let (shares, rem) = convert_shares(l.shares, rec.conv_rem, num, den)?;
+        if rem != rec.conv_rem {
+            records.set_rem(idx, rem)?;
+        }
+        l.shares = shares;
         l.lock = scale(l.lock)?;
         // v0.4.1: the term scales with the bucket it sits in (the roll scaled the buckets).
         l.lock_term = scale(l.lock_term)?;
-        l.snap = 0;
-        l.snap_r = 0;
         l.epoch = ovf(l.epoch.checked_add(1))?;
+        match chain {
+            Some((q, false)) => {
+                // Inside the chain: nothing accrued on the new shares yet; `snap` / `snap_r`
+                // stay the chain's snapshots in `fwd_epoch`.
+                l.fwd = FWD_OPEN;
+                l.fwd_lag =
+                    u8::try_from(sub_u128(l.shares, q)?).map_err(|_| MathError::Invariant)?;
+                // The lag lemma: `shares ≤ chain + 1` stays so through a record (`conv_rem < den`).
+                if l.fwd_lag > 1 || (l.epoch == l.fwd_epoch && q != l.fwd_shares) {
+                    return Err(MathError::Invariant);
+                }
+            }
+            _ => {
+                l.clear_fwd();
+                l.snap = 0;
+                l.snap_r = 0;
+            }
+        }
         if l.shares == 0 && l.lock == 0 {
             // V2-12 jump: nothing left to convert.
             l.epoch = pool.share_epoch;
             l.snap = pool.acc;
             l.snap_r = pool.acc_r;
+            l.clear_fwd();
         }
     }
 }
@@ -1172,6 +1266,118 @@ fn to_pot(v: &mut Vault, claimed: u64, pending: i128, real: &mut i128) -> Result
         *real = sub_i128(*real, surplus)?;
         v.unmatched = add_u64(v.unmatched, to_unsigned(surplus)?)?;
     }
+    Ok(())
+}
+
+/// KI-66 full: `⌊(q + lag)·x/WAD⌋ − ⌊q·x/WAD⌋` (floor) with one product: with `q·x = WAD·h + r`,
+/// `r ∈ [0, WAD)` (Euclid), it is `⌊(r + lag·x)/WAD⌋`. 0 without a lag. The owner's accrual of an
+/// epoch the forward chain accrued whole, less the chain's part, at the cost of one accrual.
+fn lag_part(q: u128, lag: u8, x: i128) -> Result<i128, MathError> {
+    if lag == 0 || x == 0 {
+        return Ok(0);
+    }
+    let w = to_i128(WAD)?;
+    let mag = x.unsigned_abs();
+    let r_abs = match q.checked_mul(mag) {
+        Some(p) => p % WAD,
+        None => {
+            U256::from_product(q, mag)
+                .div_rem_u128(WAD)
+                .ok_or(MathError::DivByZero)?
+                .1
+        }
+    };
+    let r = to_i128(r_abs)?;
+    let r = if x < 0 && r != 0 { sub_i128(w, r)? } else { r };
+    match i128::from(lag)
+        .checked_mul(x)
+        .and_then(|lx| lx.checked_add(r))
+    {
+        Some(n) => Ok(ovf(n.checked_div_euclid(w))?),
+        None => sub_i128(accrued(add_u128(q, u128::from(lag))?, x)?, accrued(q, x)?),
+    }
+}
+
+/// `⌊shares·x/WAD⌋` of an unsigned accumulator value (floor).
+fn accrued_r(shares: u128, x: u128) -> Result<i128, MathError> {
+    to_i128(mul_div(x, shares, WAD, Rounding::Floor)?)
+}
+
+/// KI-66 full: what the forward chain accrued in epoch `j` on its `q` shares there: the whole
+/// epoch (to the record's ends) before `fwd_epoch`, up to the chain's snapshots in it. The chain
+/// accrues by cumulative floor (`⌊q·end⌋ − ⌊q·snap⌋`), so its total over any number of pot-only
+/// touches is this single floor, which the owner's conversion takes back.
+fn fwd_part(
+    l: &Lender,
+    j: u32,
+    q: u128,
+    end: i128,
+    end_r: u128,
+) -> Result<(i128, i128), MathError> {
+    if j < l.fwd_epoch {
+        Ok((accrued(q, end)?, accrued_r(q, end_r)?))
+    } else {
+        Ok((accrued(q, l.snap)?, accrued_r(q, l.snap_r)?))
+    }
+}
+
+/// KI-66 full: the pot-only touch's forward chain from `fwd_epoch` with `fwd_shares`, as far as
+/// `records` reach: each record's ends, then the current `acc` / `acc_r` (cumulative floor); it
+/// parks on a live wipe record and jumps to the current epoch once the chain holds 0 shares.
+/// Writes only `pending`, `real`, the snapshots, `fwd_epoch` and `fwd_shares`.
+fn fwd_walk(
+    pool: &Pool,
+    l: &mut Lender,
+    records: &[ShareEpoch],
+    pending: &mut i128,
+    real: &mut i128,
+) -> Result<(), MathError> {
+    let (mut j, mut q) = (l.fwd_epoch, l.fwd_shares);
+    loop {
+        if q == 0 {
+            j = pool.share_epoch;
+            l.snap = pool.acc;
+            l.snap_r = pool.acc_r;
+            break;
+        }
+        let (end, end_r) = if j == pool.share_epoch {
+            (pool.acc, pool.acc_r)
+        } else {
+            match record_idx(records, j)?.and_then(|i| records.get(i)) {
+                Some(r) => (r.acc_end, r.acc_r_end),
+                None => break,
+            }
+        };
+        *pending = add_i128(*pending, sub_i128(accrued(q, end)?, accrued(q, l.snap)?)?)?;
+        *real = add_i128(
+            *real,
+            sub_i128(accrued_r(q, end_r)?, accrued_r(q, l.snap_r)?)?,
+        )?;
+        l.snap = end;
+        l.snap_r = end_r;
+        if j == pool.share_epoch
+            || (pool.is_wipe_live() && j.checked_add(1) == Some(pool.share_epoch))
+        {
+            break;
+        }
+        let rec = records
+            .get(record_idx(records, j)?.ok_or(MathError::Invariant)?)
+            .ok_or(MathError::Invariant)?;
+        let (num, den) = rec.ratio()?;
+        q = if num == 0 {
+            0
+        } else {
+            ovf(q.checked_div(den))?
+        };
+        j = ovf(j.checked_add(1))?;
+        l.snap = 0;
+        l.snap_r = 0;
+    }
+    if j > pool.share_epoch {
+        return Err(MathError::Invariant);
+    }
+    l.fwd_epoch = j;
+    l.fwd_shares = q;
     Ok(())
 }
 
@@ -1192,10 +1398,11 @@ fn touch_in(
 
 /// The rest of `pool_model.Pool._touch` once the conversion stopped at `st` (the calendar
 /// already advanced), with the conversion's `pending` and `real`: a lender parked on a live
-/// wipe record, or held at a rebase record by the pot-only touch (`held`, [`touch_pot`]),
-/// moves its surplus to the pot and stops there; a current lender accrues the current epoch,
-/// moves its surplus and drops its own expired lock. `LenderBehind` for a lender neither
-/// current, parked nor held.
+/// wipe record, or held at a rebase record by the pot-only touch (`held`, [`touch_pot`], its
+/// forward chain walked), moves its surplus to the pot and stops there; a current lender
+/// accrues the current epoch (with a forward chain ending there, [`FWD_OPEN`], less the
+/// chain's part, then drops the chain), moves its surplus and drops its own expired lock.
+/// `LenderBehind` for a lender neither current, parked nor held.
 #[allow(clippy::too_many_arguments)]
 fn touch_tail(
     pool: &Pool,
@@ -1211,9 +1418,21 @@ fn touch_tail(
         Standing::Behind if !held => return Err(MathError::LenderBehind),
         Standing::Behind | Standing::Parked => to_pot(v, l.claimed, pending, &mut real)?,
         Standing::Current => {
-            pending = add_i128(pending, accrued(l.shares, sub_i128(pool.acc, l.snap)?)?)?;
+            if l.fwd == FWD_NONE {
+                pending = add_i128(pending, accrued(l.shares, sub_i128(pool.acc, l.snap)?)?)?;
+                real = add_i128(real, accrued(l.shares, diff_u128(pool.acc_r, l.snap_r)?)?)?;
+            } else {
+                // KI-66 full: the chain ended in this epoch; the shares' accrual less its part.
+                let q = sub_u128(l.shares, u128::from(l.fwd_lag))?;
+                if l.fwd != FWD_OPEN || l.fwd_epoch != l.epoch || q != l.fwd_shares {
+                    return Err(MathError::Invariant);
+                }
+                let (fp, fr) = fwd_part(l, l.epoch, q, pool.acc, pool.acc_r)?;
+                pending = add_i128(pending, sub_i128(accrued(l.shares, pool.acc)?, fp)?)?;
+                real = add_i128(real, sub_i128(accrued_r(l.shares, pool.acc_r)?, fr)?)?;
+                l.clear_fwd();
+            }
             l.snap = pool.acc;
-            real = add_i128(real, accrued(l.shares, diff_u128(pool.acc_r, l.snap_r)?)?)?;
             l.snap_r = pool.acc_r;
             to_pot(v, l.claimed, pending, &mut real)?;
             // R3B-1 / v0.4.1: the lender's own expired lock; the calendar already dropped
@@ -1260,6 +1479,13 @@ fn touch_tail(
 /// `pending`/`real` leave their field types; `Invariant` if the commit pass diverges from
 /// the read-only pass (unreachable). A refusal leaves the lender and `records` unchanged;
 /// a partial conversion ([`Standing::Behind`]) writes only the records it passed.
+///
+/// **The forward chain (KI-66 full).** A lender with a chain ([`touch_pot`]) accrues in each
+/// epoch only what the chain did not ([`FWD_HOLD`]: 0 at its own epoch; [`FWD_OPEN`]: the lag's
+/// part, or at `fwd_epoch` its shares' accrual less the chain's up to its snapshots), keeps
+/// [`FWD_OPEN`] while it stops inside the chain (`Invariant` if `shares − chain` leaves `{0, 1}`
+/// or the chain's shares at `fwd_epoch` differ from `fwd_shares`; unreachable) and drops the
+/// chain once it passes `fwd_epoch`, parks or jumps; [`touch`] drops it at the current epoch.
 pub fn convert(
     pool: &Pool,
     lender: &mut Lender,
@@ -1337,32 +1563,48 @@ pub fn touch(
     Ok(st)
 }
 
-/// The pot-only touch (KI-66; ECON §9.4 R3A-2, §9.5; ARCH §3.3 `sync_lender` without the
-/// owner's signature; `pool_model.Pool._touch_pot`): [`touch`], except that the lender is never
-/// converted through a rebase record (`1/1,000^k`; KI65-REV-SEC1). A lender whose conversion
-/// reaches one (holding shares, a lock or a lock term at that record's epoch, with the record
-/// at hand) accrues `pending` and `real` up to the record's `acc_end` / `acc_r_end` (the values
-/// it froze for that epoch; floor, as the conversion would), takes them as its snapshots and
-/// moves its surplus to the pot (R3A-2); its shares, lock, lock term and epoch stay, and no
-/// record's `conv_rem` is written, so it orders no conversion. Returns [`Standing::Behind`]
-/// then.
+/// The pot-only touch (KI-66, KI-66 full; ECON §9.4 R3A-2, §9.5; ARCH §3.3 `sync_lender` without
+/// the owner's signature; `pool_model.Pool._touch_pot`): [`touch`], except that the lender is
+/// never converted through a rebase record (`1/1,000^k`; KI65-REV-SEC1).
 ///
-/// Idempotent: a second pot-only touch accrues 0 through the record and finds no surplus.
-/// The owner's later conversion through the record accrues 0 more there (the snapshots are
-/// its ends), so nothing is counted twice: `pending`, the lender's shares and every record end
-/// as after a [`touch`] alone, and `real + unmatched` too (only the split between the two can
-/// differ, as between touches at two times). What the lender's unconverted shares earn in the
-/// epochs after the record waits for that conversion.
+/// **The hold.** A lender whose conversion reaches one (holding shares, a lock or a lock term at
+/// that record's epoch `E`, with the record at hand) accrues `pending` and `real` up to the
+/// record's `acc_end` / `acc_r_end` (the values it froze for that epoch; floor, as the
+/// conversion would) and starts its forward chain ([`FWD_HOLD`]: `fwd_epoch = E + 1`,
+/// `fwd_shares = ⌊s/den_E⌋`, snapshots 0).
+///
+/// **The forward chain.** It then accrues what the chain's shares earn in the later epochs, as
+/// far as `records` reach (they may start at or before `fwd_epoch`): each record's ends, then the
+/// current `acc` / `acc_r`, on `q_{j+1} = ⌊q_j·num_j/den_j⌋` (0 through a full wipe) — the floor
+/// of the lender's shares through the records, which no conversion order can lower — by
+/// cumulative floor (`⌊q·end/WAD⌋ − ⌊q·snap/WAD⌋`), so any number of touches sums to one floor.
+/// It parks on a live wipe record and, once the chain holds 0 shares, jumps to the current
+/// epoch. A lender with a chain continues it from `fwd_epoch` (no hold again). Then the surplus
+/// (R3A-2) moves to the pot. The shares, lock, lock term, `lock_until` and epoch stay, and no
+/// record is written, so it orders no conversion. Returns [`Standing::Behind`] for a held or
+/// chained lender.
+///
+/// **No double count.** Idempotent: a second pot-only touch accrues 0 and finds no surplus. The
+/// owner's later conversion ([`convert`], [`touch`]) takes the chain's accruals back exactly: it
+/// adds 0 at `E` in [`FWD_HOLD`]; through a record inside the chain it stores [`FWD_OPEN`] with
+/// `fwd_lag = shares − chain`, 0 or 1 (`shares ≤ chain + 1` stays so through a record, as
+/// `conv_rem < den`); at an epoch the chain accrued whole it adds only the lag's part
+/// (`⌊(q + lag)·A⌋ − ⌊q·A⌋`), and at `fwd_epoch` `⌊shares·A⌋ − ⌊q·snap⌋`, then drops the
+/// chain. So `pending`, the lender's shares and every record end as after a [`touch`] alone,
+/// and `real + unmatched` too (only the split between the two can differ, as between touches at
+/// two times). What stays with the owner is the latent rounding unit: its shares beyond the
+/// chain's floor (0 or 1 per record) earn in the later epochs only through its conversion.
 ///
 /// Otherwise as [`convert`] followed by [`touch`]: plain catch-up through full-wipe records, the
 /// V2-12 jump, the parking on a live wipe record and the touch of a current lender; a lender
-/// left [`Standing::Behind`] because records are missing keeps the partial conversion
-/// (`pending` and `real` accrued through the records passed), as [`convert`] does, without
-/// the calendar or the pot.
+/// left [`Standing::Behind`] because records are missing before any hold keeps the partial
+/// conversion (`pending` and `real` accrued through the records passed), as [`convert`] does,
+/// without the calendar or the pot.
 ///
 /// # Errors
 /// As [`convert`] and [`touch`] (never `LenderBehind`); `Invariant` if the conversion would
-/// write a record (unreachable: a full wipe keeps its `conv_rem`). A refusal changes nothing.
+/// write a record (unreachable: a full wipe keeps its `conv_rem`) or the chain would pass the
+/// current epoch. A refusal changes nothing.
 pub fn touch_pot(
     pool: &Pool,
     vault: &mut Vault,
@@ -1373,9 +1615,16 @@ pub fn touch_pot(
     let (mut v, mut l) = (*vault, *lender);
     let mut pending = i128::from(l.pending);
     let mut real = i128::from(l.real);
-    let mut hold = Hold(records);
-    let st = convert_steps(pool, &mut l, &mut hold, &mut pending, &mut real)?;
-    let held = st == Standing::Behind && hold.get(l.epoch)?.is_some();
+    let (st, held) = if l.fwd == FWD_NONE {
+        let mut hold = Hold(records);
+        let st = convert_steps(pool, &mut l, &mut hold, &mut pending, &mut real)?;
+        (st, st == Standing::Behind && l.fwd == FWD_HOLD)
+    } else {
+        (Standing::Behind, true)
+    };
+    if held {
+        fwd_walk(pool, &mut l, records, &mut pending, &mut real)?;
+    }
     if st == Standing::Behind && !held {
         l.pending = to_i64(pending)?;
         l.real = to_unsigned(real)?;
@@ -1386,6 +1635,20 @@ pub fn touch_pot(
     *vault = v;
     *lender = l;
     Ok(st)
+}
+
+/// Whether a `LenderPosition` may close and return its rent (KI-67; ARCH §3.3 `withdraw`,
+/// `claim_sol`): current, no shares, nothing owed either way (`pending == 0`, so `real ==
+/// claimed` after the touch's surplus move), no lock and no forward chain (KI-66 full). A
+/// `lock_term` without a `lock` is not read again (a lock of 0 is no lock, and the calendar
+/// keeps its own copy of the term until `lock_until`), so it does not keep a position open.
+#[must_use]
+pub const fn closable(pool: &Pool, l: &Lender) -> bool {
+    l.epoch == pool.share_epoch
+        && l.shares == 0
+        && l.pending == 0
+        && l.lock == 0
+        && l.fwd == FWD_NONE
 }
 
 // ---- share value ---------------------------------------------------------------------------
@@ -2645,6 +2908,166 @@ mod tests {
             epoch,
             ..Lender::new(p)
         }
+    }
+
+    /// KI-66 full: `lag_part` is the difference of the two floors, on edge and random values.
+    #[test]
+    fn lag_part_is_the_difference_of_two_floors() {
+        let mut x: u64 = 0x9e37_79b9_7f4a_7c15;
+        let mut next = || {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            x
+        };
+        let edge_q = [
+            0u128,
+            1,
+            999,
+            WAD - 1,
+            WAD,
+            WAD + 1,
+            u128::MAX / 4,
+            3 * 10u128.pow(38),
+        ];
+        let edge_x = [
+            0i128,
+            1,
+            -1,
+            10i128.pow(18),
+            -(10i128.pow(18)),
+            i128::MAX / 3,
+            i128::MIN / 3,
+        ];
+        let mut cases = std::vec![(0u128, 0i128); 20_056];
+        let mut n = 0;
+        for &q in &edge_q {
+            for &a in &edge_x {
+                cases[n] = (q, a);
+                n += 1;
+            }
+        }
+        for c in cases.iter_mut().skip(n) {
+            let q = (u128::from(next()) << (next() % 64)) >> (next() % 40);
+            let a = (i128::from(next() as i64) << (next() % 60)) >> (next() % 30);
+            *c = (q, a);
+        }
+        for (q, a) in cases {
+            for lag in 0u8..=2 {
+                let (Ok(hi), Ok(lo)) = (accrued(q + u128::from(lag), a), accrued(q, a)) else {
+                    continue;
+                };
+                assert_eq!(
+                    lag_part(q, lag, a).unwrap(),
+                    hi - lo,
+                    "q {q} lag {lag} x {a}"
+                );
+            }
+        }
+    }
+
+    /// KI-66 full, the lag lemma: an owner's shares stay at most one above its forward chain's
+    /// floor through any number of records, so `fwd_lag ∈ {0, 1}` (`u8`, `Invariant` above 1).
+    /// Exhaustive over `s < 3·10⁶` through two chained `1/1,000` records with conv_rem samples
+    /// (the extremes and the middle), then through the real path on a sample: the pot-only touch
+    /// holds the lender and walks its chain to the current epoch, the owner converts one record
+    /// at a time (`FWD_OPEN` with the lag the lemma gives, `epoch < fwd_epoch` then `epoch ==
+    /// fwd_epoch`) and touches; it ends bit-equal to the owner converting alone (`pending`,
+    /// shares, records) and `real + unmatched` equal.
+    #[test]
+    fn fwd_lag_at_most_one() {
+        let rems = [0u128, 1, 500, 998, 999];
+        for s in 0..3_000_000u128 {
+            let q1 = s / 1_000;
+            let q2 = q1 / 1_000;
+            for &c1 in &rems {
+                let (s1, _) = convert_shares(s, c1, 1, 1_000).unwrap();
+                assert!(s1 >= q1 && s1 - q1 <= 1, "s {s} c1 {c1}");
+                for &c2 in &[0u128, 999] {
+                    let (s2, _) = convert_shares(s1, c2, 1, 1_000).unwrap();
+                    assert!(s2 >= q2 && s2 - q2 <= 1, "s {s} c1 {c1} c2 {c2}");
+                }
+            }
+        }
+        let mut p = Pool::new();
+        p.share_epoch = 2;
+        p.total_shares = 3_000;
+        p.tokens_free = 10;
+        p.acc = 7_777_777_777_777_777_777;
+        p.acc_r = 6_666_666_666_666_666_666;
+        let recs0 = |c1: u128, c2: u128| {
+            let mut r = [rebase(0, 1, 3_000_000), rebase(1, 1, 3_000)];
+            (r[0].acc_end, r[0].acc_r_end, r[0].conv_rem) =
+                (-3_333_333_333_333_333_337, 5_555_555_555_555_555_557, c1);
+            (r[1].acc_end, r[1].acc_r_end, r[1].conv_rem) =
+                (9_999_999_999_999_999_991, 4_444_444_444_444_444_443, c2);
+            r
+        };
+        let mut lags = [0u32; 2];
+        for s in (1..3_000_000u128)
+            .step_by(997)
+            .chain([999, 1_000, 999_999, 1_000_000, 1_999_999])
+        {
+            for &(c1, c2) in &[(0, 0), (999, 0), (999, 999), (1, 998), (500, 500)] {
+                let mut l0 = behind(&p, 0, s);
+                l0.pending = 1_000;
+                l0.real = 10_000;
+                // The owner converting alone.
+                let (mut ra, mut va, mut la) = (recs0(c1, c2), Vault::new(), l0);
+                touch(&p, &mut va, &mut la, &mut ra, 0).unwrap();
+                // A third party's pot-only touch, then the owner one record at a time.
+                let (mut rb, mut vb, mut lb) = (recs0(c1, c2), Vault::new(), l0);
+                assert_eq!(
+                    touch_pot(&p, &mut vb, &mut lb, &rb, 0),
+                    Ok(Standing::Behind)
+                );
+                assert_eq!((lb.fwd, lb.fwd_epoch, lb.epoch), (FWD_HOLD, 2, 0), "s {s}");
+                assert_eq!(rb, recs0(c1, c2), "the pot-only touch writes no record");
+                let st = convert(&p, &mut lb, &mut rb[..1]);
+                let open = |l: &Lender| (l.fwd, l.epoch, l.fwd_lag);
+                if lb.shares == 0 && lb.lock == 0 {
+                    assert_eq!(st, Ok(Standing::Current));
+                    assert_eq!(
+                        open(&lb),
+                        (FWD_NONE, 2, 0),
+                        "the V2-12 jump drops the chain"
+                    );
+                } else {
+                    assert_eq!(st, Ok(Standing::Behind));
+                    assert_eq!(
+                        open(&lb),
+                        (FWD_OPEN, 1, u8::try_from(lb.shares - s / 1_000).unwrap())
+                    );
+                    lags[0] += u32::from(lb.fwd_lag);
+                    assert_eq!(convert(&p, &mut lb, &mut rb[1..]), Ok(Standing::Current));
+                    if lb.fwd != FWD_NONE {
+                        assert_eq!(
+                            open(&lb),
+                            (
+                                FWD_OPEN,
+                                2,
+                                u8::try_from(lb.shares - lb.fwd_shares).unwrap()
+                            )
+                        );
+                        lags[1] += u32::from(lb.fwd_lag);
+                    }
+                }
+                touch(&p, &mut vb, &mut lb, &mut rb, 0).unwrap();
+                assert_eq!(lb.fwd, FWD_NONE);
+                assert_eq!(
+                    (la.shares, la.epoch, la.pending, la.snap, la.snap_r),
+                    (lb.shares, lb.epoch, lb.pending, lb.snap, lb.snap_r),
+                    "s {s} c {c1} {c2}"
+                );
+                assert_eq!(ra, rb, "s {s}");
+                assert_eq!(
+                    u128::from(la.real) + u128::from(va.unmatched),
+                    u128::from(lb.real) + u128::from(vb.unmatched),
+                    "s {s}"
+                );
+            }
+        }
+        assert!(lags[0] > 1_000 && lags[1] > 1_000, "{lags:?}");
     }
 
     /// `convert_shares` through `rec`, as the conversion calls it.

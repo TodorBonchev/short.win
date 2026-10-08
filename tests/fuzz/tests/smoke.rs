@@ -413,21 +413,25 @@ fn wind_down_residue_on_fuzz_m10_24h_a() {
 /// KI-66's never-returns model (the KI-66 review), with absent owners forced on: three mock
 /// seeds whose wind-down finds a lender held behind a rebase record (found by scanning seeds
 /// 66,300,000 + 0…249 at `run`'s default 300 actions) and, in the full smoke, the KI-65
-/// reproducers. The held lender is reached only by two third-party syncs — the pot-only touch,
-/// which moves a surplus, then a no-op, each under the KI-66 oracle — while the others exit and
-/// claim; the present lenders' unpaid stays within what the absent lenders' own touches would
-/// move to the pot (no `wind-down-absent-owed-above-residual`), and once the absent owners
-/// return the wind-down's I-P6 oracle passes.
+/// reproducers. The held lender is reached only by third-party syncs — the pot-only touch and
+/// its forward chain (KI-66 full), 8 records at a time until the chain reaches the current
+/// epoch, then one more that must move nothing (`pot-touch-not-idempotent`), each under the
+/// KI-66 oracle — while the others exit and claim; the present lenders' unpaid stays within
+/// what the absent lenders' own touches would still move to the pot after their chains (no
+/// `wind-down-absent-owed-above-residual`), and once the absent owners return the wind-down's
+/// I-P6 oracle passes.
 #[test]
 fn absent_owners_at_the_wind_down() {
     let check = |what: &str, o: &runner::Outcome| -> (u64, u64) {
         let ev = |k: &str| o.stats.events.get(k).copied().unwrap_or(0);
         println!(
-            "{what}: absent {} held syncs {} (to the pot {}), present owed {} (max {}); unpaid {} \
-             lender_sol {}",
+            "{what}: absent {} held syncs {} (to the pot {}), chains started {} walked {}, \
+             present owed {} (max {}); unpaid {} lender_sol {}",
             ev("wind-down-absent-owner"),
             ev("sync-lender-held"),
             ev("sync-lender-held-to-pot"),
+            ev("pot-chain-hold"),
+            ev("pot-chain-walk"),
             ev("wind-down-absent-present-owed"),
             o.stats.wind_down_absent_owed_max,
             o.stats.wind_down_unpaid_max,

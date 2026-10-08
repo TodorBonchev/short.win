@@ -14,7 +14,7 @@ mod pool_harness;
 
 use pool_harness::{DAY, Market, Model, S3_TAIL_S};
 use proptest::prelude::*;
-use shortwin_math::num::{WAD, mul_div_i128};
+use shortwin_math::num::{WAD, mul_div, mul_div_i128};
 use shortwin_math::pool::{self, Lender, NO_LOCK_EPOCH, Pool, ShareEpoch, Standing, SweepSource};
 use shortwin_math::{MathError, Rounding};
 
@@ -51,6 +51,10 @@ enum Op {
     /// KI-66: a third party's `sync_lender` (the pot-only touch), of a lender behind a rebase
     /// record if there is one
     TouchPot(usize),
+    /// KI-66 full: `sync_lender(n)` with `n` records, signed by the owner (a partial conversion
+    /// that may stop inside a forward chain) or a third party's (the chain walked `n` records),
+    /// of a lender with a chain if there is one
+    Sync(usize, u8, bool),
     /// R4A-2 / R4B-3: the allowances as the program sees them (each lender touched alone)
     View,
 }
@@ -102,7 +106,8 @@ fn op(users: usize) -> impl Strategy<Value = Op> {
         2 => (lamports(), any::<bool>()).prop_map(|(x, r)| Op::Sweep(x, r)),
         2 => any::<u64>().prop_map(Op::Churn),
         1 => u.clone().prop_map(Op::Touch),
-        2 => u.prop_map(Op::TouchPot),
+        2 => u.clone().prop_map(Op::TouchPot),
+        2 => (u, 1u8..5, any::<bool>()).prop_map(|(u, n, s)| Op::Sync(u, n, s)),
         1 => Just(Op::View),
     ]
 }
@@ -151,36 +156,74 @@ fn pot_only_touch_is_sound(
         "a pot-only touch writes no record"
     );
     let a = *after.lender(u).expect("lender");
-    if let (Standing::Behind, Some(b)) = (st, before.lender(u)) {
-        prop_assert!(b.epoch < before.pool.share_epoch);
-        prop_assert!(
-            before.records[b.epoch as usize].num == 1,
-            "held at a rebase record"
-        );
+    let held = |b: &Lender| {
+        b.fwd != pool::FWD_NONE
+            || (b.epoch < before.pool.share_epoch
+                && before.records[b.epoch as usize].num == 1
+                && (b.shares != 0 || b.lock != 0 || b.lock_term != 0))
+    };
+    if let (Standing::Behind, Some(b)) = (st, before.lender(u).filter(|b| held(b))) {
         prop_assert_eq!(
             (a.shares, a.lock, a.lock_term, a.epoch, a.lock_until),
             (b.shares, b.lock, b.lock_term, b.epoch, b.lock_until)
         );
-        let r = before.records[b.epoch as usize];
-        prop_assert_eq!((a.snap, a.snap_r), (r.acc_end, r.acc_r_end));
-        // The move itself: `pending` and `real` accrued once to the record's ends (floor),
-        // and exactly R3A-2's surplus of that state reached the pot — none left with the
-        // lender (a touch that held without moving it would pass the comparisons below:
-        // the owner's touch would move the whole surplus later).
-        let floor = |d: i128| mul_div_i128(d, b.shares, WAD, Rounding::Floor).expect("accrual");
-        let pending = i128::from(b.pending) + floor(r.acc_end - b.snap);
-        let d_r = if r.acc_r_end >= b.snap_r {
-            i128::try_from(r.acc_r_end - b.snap_r)
-        } else {
-            i128::try_from(b.snap_r - r.acc_r_end).map(|d| -d)
+        // KI-66 full, recomputed independently: the hold to the record's ends on the shares,
+        // then the floor chain through every later record (cumulative floor), parking on a
+        // live wipe record, to the current `acc`; exactly R3A-2's surplus to the pot.
+        let fl = |x: i128, q: u128| mul_div_i128(x, q, WAD, Rounding::Floor).expect("accrual");
+        let flr = |x: u128, q: u128| {
+            i128::try_from(mul_div(x, q, WAD, Rounding::Floor).expect("accrual")).expect("i128")
         };
-        let real = i128::from(b.real) + floor(d_r.expect("Δacc_r"));
+        let (mut pending, mut real) = (i128::from(b.pending), i128::from(b.real));
+        let (mut j, mut q, mut sn, mut snr) = (b.fwd_epoch, b.fwd_shares, b.snap, b.snap_r);
+        if b.fwd == pool::FWD_NONE {
+            let r = before.records[b.epoch as usize];
+            pending += fl(r.acc_end - b.snap, b.shares);
+            let d_r = if r.acc_r_end >= b.snap_r {
+                i128::try_from(r.acc_r_end - b.snap_r)
+            } else {
+                i128::try_from(b.snap_r - r.acc_r_end).map(|d| -d)
+            };
+            real += fl(d_r.expect("Δacc_r"), b.shares);
+            (j, q, sn, snr) = (b.epoch + 1, b.shares / r.den().expect("den"), 0, 0);
+        }
+        let p = &before.pool;
+        loop {
+            if q == 0 {
+                (j, sn, snr) = (p.share_epoch, p.acc, p.acc_r);
+                break;
+            }
+            let (end, end_r) = if j == p.share_epoch {
+                (p.acc, p.acc_r)
+            } else {
+                let r = before.records[j as usize];
+                (r.acc_end, r.acc_r_end)
+            };
+            pending += fl(end, q) - fl(sn, q);
+            real += flr(end_r, q) - flr(snr, q);
+            (sn, snr) = (end, end_r);
+            if j == p.share_epoch || (p.is_wipe_live() && j + 1 == p.share_epoch) {
+                break;
+            }
+            let r = before.records[j as usize];
+            q = if r.num == 0 {
+                0
+            } else {
+                q / r.den().expect("den")
+            };
+            (j, sn, snr) = (j + 1, 0, 0);
+        }
+        prop_assert_eq!(
+            (a.fwd_epoch, a.fwd_shares, a.snap, a.snap_r),
+            (j, q, sn, snr)
+        );
+        prop_assert!(a.fwd == pool::FWD_HOLD || a.fwd == b.fwd);
         let surplus = (real - i128::from(b.claimed) - pending.max(0)).max(0);
-        prop_assert_eq!(i128::from(a.pending), pending, "pending accrued to acc_end");
+        prop_assert_eq!(i128::from(a.pending), pending, "pending: hold + chain");
         prop_assert_eq!(
             i128::from(after.vault.unmatched) - i128::from(before.vault.unmatched),
             surplus,
-            "the surplus accrued to the record moved to the pot"
+            "the surplus accrued through the chain moved to the pot"
         );
         prop_assert_eq!(i128::from(a.real), real - surplus);
         prop_assert!(
@@ -594,6 +637,47 @@ impl Driver {
                     }
                 }
             }
+            Op::Sync(u, n, signed) => {
+                // Preferably a lender with a forward chain, else one behind a rebase record.
+                let m = self.m();
+                let pick = |f: &dyn Fn(&Lender) -> bool| -> Vec<usize> {
+                    m.lenders
+                        .iter()
+                        .filter(|(_, l)| f(l))
+                        .map(|(w, _)| *w)
+                        .collect()
+                };
+                let chained = pick(&|l| l.fwd != pool::FWD_NONE);
+                let behind =
+                    pick(&|l| l.epoch < m.pool.share_epoch && m.records[l.epoch as usize].num == 1);
+                let from = if chained.is_empty() {
+                    &behind
+                } else {
+                    &chained
+                };
+                let u = from.get(u % from.len().max(1)).copied().unwrap_or(u);
+                let before = self.s.m.clone();
+                match self.s.m.sync(u, usize::from(n), signed) {
+                    Ok(()) if !signed => {
+                        // KI65-REV-SEC1: a third party moves no share, lock, epoch or record.
+                        prop_assert_eq!(&self.s.m.records, &before.records);
+                        let (b, a) = (before.lender(u), self.s.m.lender(u).expect("lender"));
+                        if let Some(b) =
+                            b.filter(|b| b.epoch < before.pool.share_epoch && a.epoch == b.epoch)
+                        {
+                            prop_assert_eq!(
+                                (a.shares, a.lock, a.lock_term, a.lock_until, a.claimed),
+                                (b.shares, b.lock, b.lock_term, b.lock_until, b.claimed)
+                            );
+                        }
+                    }
+                    Ok(()) => {}
+                    Err(e) => {
+                        refusal(e)?;
+                        prop_assert_eq!(&self.s.m, &before);
+                    }
+                }
+            }
             Op::View => {
                 // allowance_view is pure and equals the allowance after that lender's
                 // own touch.
@@ -917,5 +1001,129 @@ proptest! {
             }
         }
         prop_assert_eq!(ls.iter().map(|l| l.shares).sum::<u128>(), p.total_shares);
+    }
+
+    /// KI-66 full: third parties' windowed syncs (the pot-only touch walking the forward chain
+    /// 1–4 records at a time from `fwd_epoch`) interleaved with the owners' own partial syncs
+    /// (1–4 records: stops inside a chain, `FWD_OPEN`, lag 0 or 1), through chained records
+    /// (rebases by `1/1,000^k` with random `conv_rem`, full wipes, a live wipe record) with random
+    /// ends and lenders at random epochs, snapshots, balances and locks: no third-party sync
+    /// moves a share, lock, epoch or record, the stored chain stays consistent, and once every
+    /// owner has converted each lender is bit-equal to the run without the third parties
+    /// (`real` aside), the records too, with `Σ real + unmatched` equal — nothing counted twice.
+    #[test]
+    fn windowed_syncs_equal_owner_alone(
+        kinds in prop::collection::vec(prop_oneof![5 => 1u8..=3, 1 => Just(0u8)], 1..6),
+        ends in prop::collection::vec((-10i128.pow(21)..10i128.pow(21), 0u128..10u128.pow(21), any::<u64>()), 6),
+        cur in (-10i128.pow(21)..10i128.pow(21), 0u128..10u128.pow(21)),
+        live in any::<bool>(),
+        holdings in prop::collection::vec(
+            (
+                prop_oneof![0u128..1_000, 0u128..10_000_000, 0u128..10u128.pow(12)],
+                prop_oneof![2 => Just(0u128), 1 => 0u128..10u128.pow(9)],
+                any::<prop::sample::Index>(),
+                (-10i128.pow(21)..10i128.pow(21), any::<u64>()),
+                (-10i64.pow(12)..10i64.pow(12), 0u64..10u64.pow(12)),
+            ),
+            1..6,
+        ),
+        schedule in prop::collection::vec((any::<prop::sample::Index>(), 1usize..5, any::<bool>()), 0..40),
+    ) {
+        let n_rec = kinds.len();
+        let mut records = Vec::new();
+        for (e, &k) in kinds.iter().enumerate() {
+            let mut rec = ShareEpoch {
+                acc_end: ends[e].0,
+                acc_r_end: ends[e].1,
+                s_old: u128::MAX / 2,
+                carry: 0,
+                carry_r: 0,
+                conv_rem: 0,
+                epoch: u32::try_from(e).expect("epoch"),
+                num: u8::from(k != 0),
+                den_log1000: k,
+                _pad: [0; 10],
+            };
+            rec.conv_rem = u128::from(ends[e].2) % rec.den().expect("den");
+            records.push(rec);
+        }
+        let mut p = Pool::new();
+        p.share_epoch = u32::try_from(n_rec).expect("epochs");
+        (p.acc, p.acc_r) = cur;
+        p.wipe_live = u8::from(live && kinds[n_rec - 1] == 0);
+        let lenders: Vec<Lender> = holdings
+            .iter()
+            .map(|&(shares, lock, e, (snap, snap_r), (pending, real))| {
+                let epoch = e.index(n_rec + 1);
+                let r_end = records.get(epoch).map_or(cur.1, |r| r.acc_r_end);
+                Lender {
+                    shares,
+                    lock: lock.min(shares),
+                    lock_term: lock.min(shares),
+                    lock_epoch: if lock == 0 { NO_LOCK_EPOCH } else { 0 },
+                    lock_until: if lock == 0 { 0 } else { 30 * DAY },
+                    epoch: u32::try_from(epoch).expect("epoch"),
+                    snap,
+                    snap_r: u128::from(snap_r).min(r_end),
+                    pending,
+                    real,
+                    claimed: real / 2,
+                    ..Lender::new(&p)
+                }
+            })
+            .collect();
+        let fail = |e: MathError| TestCaseError::fail(format!("{e:?}"));
+        // sync_lender(n) as the program runs it (`pool_harness::Market::sync`).
+        let sync = |v: &mut pool::Vault, l: &mut Lender, recs: &mut [ShareEpoch], n: usize, signed: bool| {
+            let lo = if signed || l.fwd == pool::FWD_NONE { l.epoch } else { l.fwd_epoch } as usize;
+            let (a, b) = (lo.min(n_rec), lo.saturating_add(n).min(n_rec));
+            if signed {
+                if pool::convert(&p, l, &mut recs[a..b])? != Standing::Behind {
+                    pool::touch(&p, v, l, &mut recs[a..b], 0)?;
+                }
+            } else {
+                pool::touch_pot(&p, v, l, &recs[a..b], 0)?;
+            }
+            Ok::<(), MathError>(())
+        };
+        let mut worlds = Vec::new();
+        for third in [false, true] {
+            let (mut v, mut ls, mut recs) = (pool::Vault::new(), lenders.clone(), records.clone());
+            for &(ix, n, by_third) in &schedule {
+                let i = ix.index(ls.len());
+                if by_third && !third {
+                    continue;
+                }
+                let b = ls[i];
+                let before = recs.clone();
+                sync(&mut v, &mut ls[i], &mut recs, n, !by_third).map_err(fail)?;
+                let a = ls[i];
+                pool_harness::fwd_state(&p, &a).map_err(TestCaseError::fail)?;
+                if by_third {
+                    prop_assert_eq!(&recs, &before, "a third party wrote a record");
+                    if b.epoch < p.share_epoch && a.epoch == b.epoch {
+                        prop_assert_eq!(
+                            (a.shares, a.lock, a.lock_term, a.lock_until, a.claimed),
+                            (b.shares, b.lock, b.lock_term, b.lock_until, b.claimed)
+                        );
+                    }
+                }
+            }
+            for l in &mut ls {
+                let from = l.epoch as usize;
+                pool::touch(&p, &mut v, l, &mut recs[from.min(n_rec)..], 0).map_err(fail)?;
+                prop_assert_eq!(l.fwd, pool::FWD_NONE);
+            }
+            worlds.push((v, ls, recs));
+        }
+        let ((va, la, ra), (vb, lb, rb)) = (&worlds[0], &worlds[1]);
+        for (x, y) in la.iter().zip(lb) {
+            prop_assert_eq!(Lender { real: 0, ..*x }, Lender { real: 0, ..*y });
+        }
+        prop_assert_eq!(ra, rb);
+        let total = |v: &pool::Vault, ls: &[Lender]| {
+            ls.iter().map(|l| u128::from(l.real)).sum::<u128>() + u128::from(v.unmatched)
+        };
+        prop_assert_eq!(total(va, la), total(vb, lb));
     }
 }

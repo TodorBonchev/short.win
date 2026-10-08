@@ -492,7 +492,7 @@ impl Lab {
                 pool::withdraw(&mut p, &mut v, &mut l, &mut recs, now, lock_grace_s, shares)?;
             let touched = l;
             let pay = pool::claim(&p, &mut v, &mut l, &mut recs, now)?;
-            let closed = l.shares == 0 && l.pending == 0 && l.lock == 0;
+            let closed = pool::closable(&p, &l);
             Ok(Expect {
                 pool: p,
                 vault: v,
@@ -564,7 +564,8 @@ impl Lab {
     }
 
     /// `claim_sol()` by `name`: lamports paid (0 for a user without a position), or the
-    /// program error code.
+    /// program error code. A claim that leaves the position `pool::closable` closes it and
+    /// returns its rent to the owner (KI-67), as `withdraw` does.
     pub fn claim(&mut self, name: &str) -> Result<u64, u32> {
         let owner = self.key(name);
         if self.env.lender(&self.k.market, &owner).is_none() {
@@ -586,7 +587,7 @@ impl Lab {
             Ok(Expect {
                 pool: p,
                 vault: v,
-                lender: Some(l),
+                lender: (!pool::closable(&p, &l)).then_some(l),
                 result: 0,
                 pay,
                 pot_draw: l.real - touched.real,
@@ -594,6 +595,7 @@ impl Lab {
             })
         })();
         let lam = self.lamports_of(name);
+        let lender_rent = read::lamports(&self.env.svm, &pda::lender(&self.k.market, &owner).0);
         let ix = ix::with_remaining(ix::claim_sol(&owner, &self.k.market), &metas);
         match self.run("claim_sol", ix, &kp) {
             Ok(meta) => {
@@ -601,7 +603,8 @@ impl Lab {
                     panic!("claim_sol: program accepted, math crate refuses: {err:?}")
                 });
                 self.compare("claim_sol", &owner, &e);
-                assert_eq!(self.lamports_of(name), lam + e.pay);
+                let refund = if e.lender.is_none() { lender_rent } else { 0 };
+                assert_eq!(self.lamports_of(name), lam + e.pay + refund);
                 let ev = events::one::<shortwin::events::ClaimSol>(&meta);
                 assert_eq!((ev.sol_paid, ev.pot_draw), (e.pay, e.pot_draw));
                 Ok(e.pay)
@@ -664,24 +667,43 @@ impl Lab {
     }
 
     /// `sync_lender(max_epochs)` for `name` sent by a third party (the harness payer, without
-    /// the owner's signature), with the next `max_epochs` records: the pot-only touch
-    /// (`pool::touch_pot`, KI-66), which never converts through a rebase record
-    /// (KI65-REV-SEC1, [`reads_rebase`]) but moves the surplus accrued up to it to the pot.
+    /// the owner's signature), with the next `max_epochs` records from the lender's epoch, or
+    /// from its forward chain's `fwd_epoch` (KI-66 full; as the web passes them): the pot-only
+    /// touch (`pool::touch_pot`, KI-66), which never converts through a rebase record
+    /// (KI65-REV-SEC1, [`reads_rebase`]) but moves the surplus accrued up to it, and along the
+    /// forward chain after it, to the pot.
     pub fn sync(&mut self, name: &str, max_epochs: u8) -> Result<Standing, u32> {
-        self.sync_by(name, max_epochs, false)
+        self.sync_by(name, max_epochs, false, None)
+    }
+
+    /// A third party's `sync_lender(max_epochs)` of `name` with the records from epoch `from`
+    /// (a slice starting before, at or after the chain's `fwd_epoch`; KI-66 full).
+    #[allow(dead_code)] // ki66_sec_it's sliced walks; lender_it does not use it
+    pub fn sync_from(&mut self, name: &str, from: u32, max_epochs: u8) -> Result<Standing, u32> {
+        self.sync_by(name, max_epochs, false, Some(from))
     }
 
     /// `sync_lender(max_epochs)` signed by `name`, the position's owner: it may convert
     /// through rebase records.
     pub fn sync_signed(&mut self, name: &str, max_epochs: u8) -> Result<Standing, u32> {
-        self.sync_by(name, max_epochs, true)
+        self.sync_by(name, max_epochs, true, None)
     }
 
-    fn sync_by(&mut self, name: &str, max_epochs: u8, owner_signs: bool) -> Result<Standing, u32> {
+    fn sync_by(
+        &mut self,
+        name: &str,
+        max_epochs: u8,
+        owner_signs: bool,
+        from: Option<u32>,
+    ) -> Result<Standing, u32> {
         let owner = self.key(name);
         let st = self.state();
         let l0 = st.lender_of(&owner).expect("sync needs a lender");
-        let from = l0.epoch;
+        let from = from.unwrap_or(if owner_signs || l0.fwd == pool::FWD_NONE {
+            l0.epoch
+        } else {
+            l0.fwd_epoch
+        });
         let n = usize::from(max_epochs);
         let metas = self.record_metas(from, n);
         let mut standing = Standing::Behind;

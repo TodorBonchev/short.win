@@ -6,8 +6,8 @@
 # PROGRAM from a private copy with the change applied (the test-venue build for the mock oracles,
 # the release build for the fork ones). It expects the named tests AND a short fuzz run of the
 # named profile to FAIL against the mutant build: a mutant every check survives means an oracle is
-# missing again. A mutant with the profile `-` is checked by its tests alone: the KI-65 and KI-66
-# mutants below, whose fuzz oracles (I1 `Σ shares = S`, KI65-REV-SEC1, the pot-only touch) need a
+# missing again. A mutant with the profile `-` is checked by its tests alone: the KI-65, KI-66,
+# KI-66 full and KI-67 mutants below, whose fuzz oracles (I1 `Σ shares = S`, KI65-REV-SEC1, the pot-only touch) need a
 # share rebase, which a 3-minute run reaches too rarely to kill them reliably (the owner-check
 # mutant: one kill in 10 minutes).
 #
@@ -76,6 +76,34 @@ add ki65-rebase-without-owner rel programs/shortwin/src/instructions/sync_lender
 add ki66-pot-skip-surplus rel crates/shortwin-math/src/pool.rs \
   's/Standing::Behind \| Standing::Parked => to_pot\(v, l\.claimed, pending, &mut real\)\?,/Standing::Behind => {}\n        Standing::Parked => to_pot(v, l.claimed, pending, \&mut real)?,/' \
   "ki65_it" -
+# KI-66 full (eighth round): the forward chain accrues nothing after the record; the owner adds
+# its whole accrual in FWD_OPEN (double count); FWD_HOLD accrues the held epoch again; the walk
+# floors per touch instead of cumulatively; a chained lender re-enters the hold; the V2-12 jump
+# keeps the chain. KI-67: claim_sol closes with pending owed; `closable` closes a parked lender.
+add ki66full-walk-accrues-nothing rel crates/shortwin-math/src/pool.rs \
+  's/\*pending = add_i128\(\*pending, sub_i128\(accrued\(q, end\)\?, accrued\(q, l\.snap\)\?\)\?\)\?;/let _ = (accrued(q, end)?, \&pending);/' \
+  "ki65_it ki66_sec_it" -
+add ki66full-open-full-accrual rel crates/shortwin-math/src/pool.rs \
+  's/lag_part\(q, l\.fwd_lag, rec\.acc_end\)\?/accrued(l.shares, rec.acc_end)?/' \
+  "ki66_sec_it" -
+add ki66full-hold-accrues-again rel crates/shortwin-math/src/pool.rs \
+  's/FWD_HOLD => \{\}/FWD_HOLD if false => {}/' \
+  "ki65_it ki66_sec_it" -
+add ki66full-walk-per-touch-floor rel crates/shortwin-math/src/pool.rs \
+  's/sub_i128\(accrued\(q, end\)\?, accrued\(q, l\.snap\)\?\)\?/accrued(q, sub_i128(end, l.snap)?)?/' \
+  "ki66_sec_it" -
+add ki66full-rehold rel crates/shortwin-math/src/pool.rs \
+  's/let \(st, held\) = if l\.fwd == FWD_NONE \{/let (st, held) = if true {/' \
+  "ki65_it ki66_sec_it" -
+add ki66full-jump-keeps-chain rel crates/shortwin-math/src/pool.rs \
+  's/(l\.snap_r = pool\.acc_r;)\n(\s+)l\.clear_fwd\(\);\n(\s+)\}\n(\s+)\}\n\}/$1\n$3}\n$4}\n}/' \
+  "ki66_sec_it" -
+add ki67-close-with-pending rel programs/shortwin/src/instructions/claim_sol.rs \
+  's/pool::closable\(&pool_state, &l\)/pool::closable(\&pool_state, \&pool::Lender { pending: 0, ..l })/' \
+  "lender_it" -
+add ki67-close-parked rel crates/shortwin-math/src/pool.rs \
+  's/l\.epoch == pool\.share_epoch\n(\s+)&& l\.shares == 0/l.shares == 0/' \
+  "lender_it" -
 
 tools=${PLATFORM_TOOLS:-v1.57}
 arch=${SBPF_ARCH:-v3}

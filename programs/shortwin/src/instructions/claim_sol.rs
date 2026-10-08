@@ -11,11 +11,24 @@
 //! A lender parked on a live full-wipe record claims from that record. Event `ClaimSol`
 //! (`sol_paid`, and `pot_draw` of it).
 //!
+//! **Close (KI-67, owner decision of 2026-10-08).** A claim that leaves the position
+//! `pool::closable` — current, no shares, `pending == 0` (so nothing realised is left either),
+//! no lock and no forward chain — closes it and returns its rent (2,568,240 lamports) to the
+//! owner, as `withdraw` does: a lender wiped out, floored to 0 shares by a rebase or fully paid
+//! after its exit no longer keeps the rent locked. A `lock_term` without a `lock` does not keep
+//! it open (it is never read again; the calendar holds its own copy until `lock_until`). After
+//! the close a further `claim_sol` of the position (in the same transaction or later) fails with
+//! `AccountNotInitialized` (3012) instead of paying 0; a later `deposit` re-creates the PDA from
+//! `pool::Lender::new` (`init_if_needed`; within one transaction too), with no forward chain.
+//! The indexer infers the close from the account, as for `withdraw`; the event is unchanged.
+//!
 //! Remaining accounts: the `ShareEpoch` records the lender is behind on (key-checked);
 //! writable when the lender converts through a rebase record, whose conversion remainder
 //! `conv_rem` the touch writes (KI-65: `engine::lender::store_records`, else
 //! `EpochRecordReadOnly`). Apart from those records it writes no shared state but
-//! `MarketVault`. A second call writes no record (the lender is current).
+//! `MarketVault`. A second call writes no record (the lender is current). A lender with a
+//! forward chain (KI-66 full) passes the records from its own epoch, like any other; its
+//! conversion takes the chain's accruals back exactly (`pool::touch`).
 
 use anchor_lang::prelude::*;
 use shortwin_math::pool;
@@ -29,7 +42,8 @@ use crate::state::{LenderPosition, Market, MarketVault};
 #[event_cpi]
 #[derive(Accounts)]
 pub struct ClaimSol<'info> {
-    /// The lender; receives the SOL.
+    /// The lender; receives the SOL, and the `LenderPosition` rent when the claim closes it
+    /// (KI-67).
     #[account(mut)]
     pub owner: Signer<'info>,
     /// Read-only (C0-17). Bound to its PDA `["market", mint]` with the stored bump
@@ -62,7 +76,7 @@ pub fn handler<'info>(ctx: Context<'info, ClaimSol<'info>>) -> Result<()> {
     let now = clock.unix_timestamp;
     let market_key = ctx.accounts.market.key();
 
-    let (pay, pot_draw, t_after, s_after, after, tracked) = {
+    let (pay, pot_draw, t_after, s_after, after, tracked, closes) = {
         let market = ctx.accounts.market.load()?;
         let mut vault_acc = ctx.accounts.market_vault.load_mut()?;
         let pool_state = market.pool();
@@ -85,6 +99,7 @@ pub fn handler<'info>(ctx: Context<'info, ClaimSol<'info>>) -> Result<()> {
             pool_state.total_shares,
             l,
             lender::tracked(&vault)?,
+            pool::closable(&pool_state, &l),
         )
     };
 
@@ -95,6 +110,12 @@ pub fn handler<'info>(ctx: Context<'info, ClaimSol<'info>>) -> Result<()> {
         pay,
         tracked,
     )?;
+    // KI-67: a position the claim leaves empty closes; its rent returns to the owner.
+    if closes {
+        ctx.accounts
+            .lender
+            .close(ctx.accounts.owner.to_account_info())?;
+    }
 
     emit_cpi!(ClaimSolEvent {
         market: market_key,

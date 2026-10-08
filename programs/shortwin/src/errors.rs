@@ -337,8 +337,8 @@ pub enum ShortwinError {
     /// of the conversions through a rebase record decides who receives its rounding units, so
     /// a third party may not choose it for another owner's position. Since KI-66 an unsigned
     /// sync stops at a rebase record with the pot-only touch (`pool::touch_pot`), so this is a
-    /// post-condition the program does not reach (`engine::lender::reads_rebase`); the code
-    /// stays allocated.
+    /// post-condition the program does not reach (`engine::lender::reads_rebase`; since KI-66
+    /// full also a record the unsigned sync changed); the code stays allocated.
     #[msg(
         "Only the position's owner may convert it through a rebase record: sync_lender must be signed by the owner"
     )]

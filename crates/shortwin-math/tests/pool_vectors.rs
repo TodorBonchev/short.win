@@ -59,9 +59,14 @@ struct Trace {
     /// Rent top-up profiles (M10-8C-1): exits whose top-up was positive.
     #[serde(default)]
     top_ups: Option<Dec<u64>>,
-    /// Pot-only touch profiles (KI-66): the `h` operations that held at a rebase record.
+    /// Pot-only touch profiles (KI-66): the `h` (and `y U N 0`) operations that held at a
+    /// rebase record or continued a forward chain.
     #[serde(default)]
     pot_holds: Option<Dec<u64>>,
+    /// Forward-chain profiles (KI-66 full): `FWD_OPEN` lender states after a line, of which
+    /// with lag 1, of which at `fwd_epoch < share_epoch` (`"open,lag1,at_fwd"`).
+    #[serde(default)]
+    fwd_open: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -462,10 +467,14 @@ fn ext_orphans_lazy_conversion_order() {
 
 /// KI-66, the pot-only touch (`h`, `pool::touch_pot`, a third party's `sync_lender`): lazy
 /// lenders around deep rebases are touched by third parties (some twice) and claim; a lender
-/// behind a rebase record is accrued to the record's ends and moves its surplus to the pot
-/// without converting (the canonical state pins its shares, epoch and snapshots, the record's
-/// `conv_rem` and the pot), and converts later at its own touch; plus `pot_touch_demo` in
-/// `pool_scenarios` (T-POT's late joiner behind a rebase record: A paid in full without C).
+/// behind a rebase record is accrued to the record's ends and, KI-66 full, along its forward
+/// chain to the current epoch, and moves its surplus to the pot without converting (the
+/// canonical state pins its shares, epoch, snapshots and chain, the record's `conv_rem` and the
+/// pot), and converts later at its own touch; windowed syncs (`y`) walk the chain a few records
+/// at a time and the owners' partial syncs stop inside it (`FWD_OPEN`, lag 0 or 1, at an epoch
+/// before `fwd_epoch` and at `fwd_epoch` before the current one); plus `pot_touch_demo` and
+/// `pot_chain_demo` in `pool_scenarios` (T-POT's late joiner behind a rebase record, and a
+/// rebase later: A paid in full without C).
 #[test]
 fn ext_pot_only_touch() {
     let runs = replay_group("pool_ext_pot", 10_000);
@@ -474,16 +483,32 @@ fn ext_pot_only_touch() {
         .iter()
         .filter_map(|t| t.pot_holds.as_ref().map(|d| d.0))
         .collect();
-    assert_eq!(holds.len(), 3, "three profiles");
-    assert!(holds.iter().all(|&n| n >= 20), "{holds:?}");
+    assert_eq!(holds.len(), 7, "seven profiles");
+    assert!(holds.iter().all(|&n| n >= 10), "{holds:?}");
     assert!(
-        traces.iter().all(|t| t
-            .lines
+        traces
             .iter()
-            .any(|l| l.starts_with("h ") || l.contains(";h "))),
+            .all(|t| t.lines.iter().any(|l| l.starts_with("h ")
+                || l.contains(";h ")
+                || l.contains(" 0 #")
+                || l.contains("y "))),
         "every profile sends pot-only touches"
     );
-    assert_eq!(runs.len(), 3);
+    let open: Vec<Vec<u64>> = traces
+        .iter()
+        .filter_map(|t| t.fwd_open.as_ref())
+        .map(|f| f.split(',').map(|x| x.parse().expect("count")).collect())
+        .collect();
+    assert_eq!(open.len(), 4, "four forward-chain profiles");
+    let tuned = open
+        .iter()
+        .max_by_key(|c| c[0])
+        .expect("ext_pot_fwd_open_100");
+    assert!(
+        tuned[0] >= 200 && tuned[1] >= 50 && tuned[2] >= 20,
+        "{open:?}"
+    );
+    assert_eq!(runs.len(), 7);
 }
 
 #[test]
@@ -509,6 +534,7 @@ fn econ_demos_round_3_and_round_4_cases() {
         "restart_grief_table",
         "premium_jit_table",
         "pot_touch_demo",
+        "pot_chain_demo",
         "pool_edge",
     ] {
         assert!(

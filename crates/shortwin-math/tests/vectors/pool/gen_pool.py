@@ -55,7 +55,13 @@ writes, next to itself:
                        repeated, then everyone claims), so lenders behind a rebase record move
                        their surplus to the pot without converting and convert later at their
                        own touch; 100 % and 90 % caps, normal and dust amounts (`pot_holds`:
-                       the pot-only touches that held at a rebase record).
+                       the pot-only touches that held at a rebase record). KI-66 full (the
+                       forward chain): windowed third-party syncs (`y U N 0`, the chain walked
+                       through 1-8 records at a time) and the owners' partial syncs (`y U N 1`)
+                       that stop inside a chain; ext_pot_fwd_open_100 puts residues at 999
+                       modulo 1,000 before 1/1,000 rebases, so owners run a unit above their
+                       chain (`fwd_open`: FWD_OPEN lender states after a line, of which with
+                       lag 1, of which at fwd_epoch < share_epoch).
   pool_ext_topup_<k>.json
                        the rent top-up of finding M10-8C-1: extended profiles whose exits pay
                        rent above what accrued (`rpx`: a repay of the accrued rent plus an
@@ -74,7 +80,8 @@ writes, next to itself:
                        protocol_change_demo; stranded_table above), attacks/pool_edge.py
                        and the round-4 cases (stale_lock_demo, lock_tail_demo,
                        wipe_gate_demo, vest_exit_demo, restart_grief_table,
-                       premium_jit_table) and KI-66's pot_touch_demo.
+                       premium_jit_table), KI-66's pot_touch_demo and KI-66 full's
+                       pot_chain_demo (its held-only comparison pool is not recorded).
 
 Line format (parsed by tests/pool_vectors.rs). Each trace is a list of lines; a line
 holds one or more pool operations separated by ";" and ends with " #cccccccc", the
@@ -90,8 +97,12 @@ starts at 0. Operations:
   v U LAMPORTS      pool::cover
   t U               pool::touch
   h U               pool::touch_pot (KI-66: a third party's sync_lender; behind a rebase record
-                    the lender is accrued to its ends and its surplus moves to the pot,
-                    unconverted)
+                    the lender is accrued to its ends and, KI-66 full, along its forward chain
+                    to the current epoch, its surplus moves to the pot, unconverted)
+  y U N S           sync_lender(N) with the N records from where it starts (KI-66 full): S = 1,
+                    the owner's (pool::convert from the lender's epoch, then pool::touch unless
+                    still behind); S = 0, a third party's (pool::touch_pot from the lender's
+                    epoch or, with a forward chain, from its fwd_epoch)
   l U               pool::lock_of (pure)                         -> shares
   k                 pool::cal_advance
   R                 pool::release (the committed vest release of an open refused by the
@@ -128,7 +139,7 @@ operation's "=VALUE", "!CODE" or "" with "," and <state> is the canonical state:
   [;C<day>:<term>,...]                                   live calendar buckets, by day
   [;E<epoch>,acc_end,num,den_log1000,acc_r_end,s_old,carry,carry_r,conv_rem]   latest record
   [;<U>:shares,snap,pending,epoch,lock,lock_pi,lock_epoch,lock_term,lock_until,snap_r,
-   real,claimed]                                          per lender, creation order
+   real,claimed,fwd,fwd_epoch,fwd_shares,fwd_lag]         per lender, creation order
 
 `lock_epoch` is the model's -1 ("no lock") written as 4294967295 (u32::MAX); `wipe_swept`
 is the model's flag (the trader bit of Pool::wipe_swept). Rust types are the on-chain ones
@@ -182,7 +193,7 @@ ECON_LOCK_FUZZ = (954, 0)
 CHECKPOINT_EVERY = 1_000
 U32, U64, U128 = 2**32 - 1, 2**64 - 1, 2**128 - 1
 RANGES = {
-    "u32": (0, U32), "u64": (0, U64), "u128": (0, U128),
+    "u8": (0, 255), "u32": (0, U32), "u64": (0, U64), "u128": (0, U128),
     "i64": (-(2**63), 2**63 - 1), "i128": (-(2**127), 2**127 - 1),
     "lock_epoch": (-1, U32 - 1),
 }
@@ -195,7 +206,8 @@ POOL_T = [("now", "i64"), ("T", "u64"), ("B", "u64"), ("S", "u128"), ("acc", "i1
 LENDER_T = [("shares", "u128"), ("snap", "i128"), ("pending", "i64"), ("epoch", "u32"),
             ("lock", "u128"), ("lock_pi", "u128"), ("lock_epoch", "lock_epoch"),
             ("lock_term", "u128"), ("lock_until", "i64"), ("snap_r", "u128"), ("real", "u64"),
-            ("claimed", "u64")]
+            ("claimed", "u64"), ("fwd", "u8"), ("fwd_epoch", "u32"), ("fwd_shares", "u128"),
+            ("fwd_lag", "u8")]
 RECORD_T = [(0, "i128"), (3, "u128"), (4, "u128"), (5, "i128"), (6, "u128"), (7, "u128")]
 MODEL_ERRORS = {
     "deposit too small": "deposit_too_small",
@@ -210,7 +222,7 @@ MODEL_ERRORS = {
 # pools built with any of them are not recorded.
 DEFAULT_SWITCHES = {"mode": "continuous", "prorata": True, "pi_decay": True, "lock_expiry": True,
                     "lock_calendar": True, "vest_weighted": True, "wipe_sweep_gate": True,
-                    "exit_flush_bps": 0, "lock_floor": True, "cum_convert": True}
+                    "exit_flush_bps": 0, "lock_floor": True, "cum_convert": True, "fwd_chain": True}
 
 BasePool = pm.Pool
 REGISTRY: list = []
@@ -254,7 +266,8 @@ def state_str(p) -> str:
         out.append("E" + ",".join(map(str, [p.epoch - 1, r[0], r[1], den_log(r[2]), r[3], r[4], r[5], r[6], r[7]])))
     for who, L in p.lenders.items():
         vals = [L.shares, L.snap, L.pending, L.epoch, L.lock, L.lock_pi, L.lock_epoch % 2**32,
-                L.lock_term, L.lock_until, L.snap_r, L.real, L.claimed]
+                L.lock_term, L.lock_until, L.snap_r, L.real, L.claimed, L.fwd, L.fwd_epoch, L.fwd_shares,
+                L.fwd_lag]
         out.append(f"{p.rec_ids[who]}:" + ",".join(map(str, vals)))
     return ";".join(out)
 
@@ -492,6 +505,12 @@ class RecPool(BasePool):
         if self.rec_depth:
             return BasePool._touch_pot(self, who)
         return self.rec_call(f"h {self.rec_id(who)}", lambda: BasePool._touch_pot(self, who), who, result=False)
+
+    def sync_lender(self, who, n, signed):
+        if self.rec_depth:
+            return BasePool.sync_lender(self, who, n, signed)
+        return self.rec_call(f"y {self.rec_id(who)} {n} {int(signed)}",
+                             lambda: BasePool.sync_lender(self, who, n, signed), who, result=False)
 
     def _lock_of(self, L):
         if self.rec_depth:
@@ -735,6 +754,7 @@ class Ext:
         self.p, self.rng = p, rng
         self.top_ups = 0
         self.holds = 0
+        opens = [0, 0, 0]          # KI-66 full: FWD_OPEN states after a line; with lag 1; at fwd_epoch < epoch
         counts = {}
         for _ in range(self.n_ops):
             op = rng.choice(self.ops)
@@ -744,14 +764,23 @@ class Ext:
             except ValueError:
                 counts[op + "!"] = counts.get(op + "!", 0) + 1
             p.rec_end_line()
+            for L in p.lenders.values():
+                if L.fwd == pm.FWD_OPEN:
+                    opens[0] += 1
+                    opens[1] += L.fwd_lag == 1
+                    opens[2] += L.epoch == L.fwd_epoch < p.epoch
         assert not p.rec_tainted
         extra = {}
         if {"rpx", "stx"} & set(self.ops):
             assert self.top_ups >= self.n_ops // 40, (self.name, self.top_ups)
             extra["top_ups"] = str(self.top_ups)
-        if "pot" in self.ops:
-            assert self.holds >= self.n_ops // 200, (self.name, self.holds)
+        if "pot" in self.ops or "syw" in self.ops:
+            assert self.holds >= self.n_ops // (400 if "fwd" in self.name else 200), (self.name, self.holds)
             extra["pot_holds"] = str(self.holds)
+        if "fwd" in self.name:
+            extra["fwd_open"] = ",".join(map(str, opens))
+        if self.name == "ext_pot_fwd_open_100":
+            assert opens[0] >= 200 and opens[1] >= 50 and opens[2] >= 20, opens
         return trace_json(p, self.name, self.note, seed=str(self.seed),
                           op_counts={k: str(v) for k, v in sorted(counts.items())}, **extra)
 
@@ -996,6 +1025,57 @@ class Ext:
             self.holds += 1
         p._touch_pot(u)
 
+    def op_syw(self):
+        """KI-66 full: a third party's sync_lender(n) with n records from the lender's epoch, or from
+        its forward chain's epoch (the forward chain through the later records)."""
+        p = self.p
+        u = self.who()
+        if u in p.lenders:
+            L = p.lenders[u]
+            if L.fwd or (L.epoch < p.epoch and p.epochs[L.epoch][1] and (L.shares or L.lock or L.lock_term)):
+                self.holds += 1
+            p.sync_lender(u, self.rng.randrange(1, 9), False)
+
+    def op_sys(self):
+        """KI-66 full: the owner's own sync_lender(n) with few records: a partial conversion that
+        can stop inside a forward chain (FWD_OPEN)."""
+        p = self.p
+        u = self.who()
+        if u in p.lenders:
+            p.sync_lender(u, self.rng.choice([1, 1, 2, 3]), True)
+
+    def op_own1(self):
+        """KI-66 full: the owner's sync_lender(1) of a lender with a forward chain (or behind a rebase
+        record), so its conversion stops inside the chain (FWD_OPEN); else a random lender's."""
+        p = self.p
+        chained = [u for u, L in p.lenders.items() if L.fwd]
+        u = self.rng.choice(chained) if chained and self.rng.random() < 0.8 else self.who()
+        if u in p.lenders:
+            p.sync_lender(u, 1, True)
+
+    def op_reb1(self):
+        """KI-66 full: a settlement that leaves about S / (2 R_MAX) raw tokens: a rebase by 1/1,000 (k = 1),
+        whose conv_rem the residues of op_rem9 can put near den - 1."""
+        p = self.p
+        keep = max(1, p.S // (2 * pm.R_MAX))
+        if p.T > keep and p.S > 0 and p.B == 0:
+            self.pid += 1
+            p.borrow(self.pid, p.T - keep)
+            p.settle(self.pid, self.amt("sol"))
+
+    def op_rem9(self):
+        """KI-66 full: a 0-token burn that leaves the lender's shares at 999 modulo 1,000, so the first
+        conversion through the next rebase record leaves its conv_rem near den - 1 and the later
+        conversions carry a unit (a forward chain's lag of 1)."""
+        p, u = self.p, self.who()
+        if u not in p.lenders:
+            return
+        L = p._touch(u)
+        zero = pm.cdiv(p.S + pm.VS, p.T + p.B + pm.VA) - 1
+        s = last_shares_kept(p, min((L.shares - 999) % pm.REBASE, zero, L.shares))
+        if s > 0 and L.epoch == p.epoch:
+            p.withdraw(u, s)
+
     def op_pot(self):
         """KI-66: a third party's sync_lender of a lender it does not own: the pot-only touch
         (behind a rebase record: accrued to the record's ends, surplus to the pot, unconverted)."""
@@ -1068,6 +1148,11 @@ LAZY = (["dep"] * 3 + ["wd"] * 3 + ["run", "bor", "bor", "acc", "acc", "adv", "r
 TOPUP = LAZY + ["bor"] * 6 + ["rpx"] * 4 + ["stx"] * 4 + ["dep", "clm", "wd"]
 ORPHANS = (["dep"] * 3 + ["brn"] * 3 + ["deep"] * 3 + ["exit"] * 2 + ["tch"] * 2 +
            ["wdg", "bor", "acc", "adv", "rep", "set", "clm", "clmN", "cov", "swp", "swp", "wipe", "ord", "view"])
+FWD = (["dep"] * 3 + ["deep"] * 3 + ["pot"] * 3 + ["syw"] * 4 + ["sys"] * 3 + ["bor"] * 2 + ["acc"] * 2 +
+       ["rep"] * 2 + ["adv", "set", "clm", "clm", "swp", "wd", "brn", "exit", "cov", "view", "wipe", "potall"])
+FWD_DEEP = FWD + ["deep"] * 6 + ["sys"] * 3 + ["syw"] * 3 + ["bor"] * 2 + ["acc"] * 2
+FWD_OPEN = (["dep"] * 3 + ["rem9"] * 3 + ["deep"] * 2 + ["reb1"] * 4 + ["syw"] * 6 + ["own1"] * 6 +
+            ["bor"] * 2 + ["acc"] * 2 + ["rep", "adv", "set", "swp", "clm", "cov"])
 POT = (["dep"] * 3 + ["deep"] * 3 + ["pot"] * 6 + ["potall"] * 2 + ["bor"] * 2 + ["acc"] * 2 + ["rep"] * 2 +
        ["adv", "set", "clm", "swp", "wd", "brn", "exit", "cov", "view", "wipe"])
 RUNS = (["dep"] * 3 + ["run"] * 3 + ["wd", "bor", "bor", "acc", "adv", "rep", "set", "set", "clm", "clmN",
@@ -1121,6 +1206,19 @@ def ext_profiles() -> list:
             "KI-66: pot-only touches with dust amounts (1..40 raw tokens, 0..11 lamports)"),
         Ext("ext_pot_continuous_90", 18, 4_000, 9_000, 6, POT, normal_amounts(),
             "KI-66: pot-only touches, 90 % cap: positions stay open across rebases"),
+        Ext("ext_pot_fwd_100", 19, 4_000, 10_000, 6, FWD, normal_amounts(),
+            "KI-66 full: windowed third-party syncs (the forward chain through later records) and the "
+            "owners' partial conversions inside a chain (FWD_OPEN)"),
+        Ext("ext_pot_fwd_deep_100", 21, 4_000, 10_000, 4, FWD_DEEP, normal_amounts(),
+            "KI-66 full: four lenders, frequent deep rebases: chains through several records, owners "
+            "stopping inside them"),
+        Ext("ext_pot_fwd_dust_100", 20, 4_000, 10_000, 8, FWD, dust_amounts(),
+            "KI-66 full: the forward chain with dust amounts (most chains floor to 0 shares)"),
+        Ext("ext_pot_fwd_open_100", 22, 4_000, 10_000, 6, FWD_OPEN, normal_amounts(),
+            "KI-66 full: owners stopping inside forward chains (sync_lender(1) of a chained lender: "
+            "FWD_OPEN), residues at 999 modulo 1,000 before rebases so conv_rem sits near den - 1 and "
+            "the owner's shares run a unit above the chain (lag 1), chains walked to the current epoch "
+            "before the next roll (epoch == fwd_epoch < share_epoch)"),
     ]
 
 
@@ -1332,7 +1430,7 @@ def orphan_demo_traces() -> list:
 DEMOS = ["jit_demo", "jit_hold_table", "inflation_demo", "run_demo", "claim_loop_demo", "run_util_table",
          "wipe_demo", "wipe_tail_demo", "zero_share_demo", "protocol_change_demo", "escape_demo",
          "stuck_lock_table", "stale_lock_demo", "lock_tail_demo", "wipe_gate_demo", "vest_exit_demo",
-         "restart_grief_table", "premium_jit_table", "pot_touch_demo"]
+         "restart_grief_table", "premium_jit_table", "pot_touch_demo", "pot_chain_demo"]
 PATCHED = ("_resolve", "_maybe_roll", "claim_sol", "_touch", "withdraw", "deposit", "_credit")
 
 

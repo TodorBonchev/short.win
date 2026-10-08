@@ -328,7 +328,7 @@ pub fn settle_until(
 /// | M1 | three lenders; an open with `add_margin` and its close; a CR liquidation after a ×2.3 pump; an S1 after a ×4 gap; an expiry at the deadline after three days of hourly cranks (`CoverageGap`s on the way); `sweep_protocol_fees`; `claim_sol`, `withdraw`, `cover_deficit`, `sync_lender`; `set_pause` (market and global); `set_route_broken` (market and global); `flag_venue_upgraded` / `revalidate_venue`; `disable_venue`; `flag_unsafe_mint` |
 /// | M2 | S2: a 98.5 % LP drain, a ×1.8 pump, the capped settlement |
 /// | M3 | S3: the Emergency's route-broken flag, the 30 s chain, an expired position settled at the timer |
-/// | M4 | a full wipe (`EpochRolled` num 0) with a pre-funded record address (the donation of §6.4), `sweep_trader` into the wipe record, a deposit after it, the wiped lender's `sync_lender` |
+/// | M4 | a full wipe (`EpochRolled` num 0) with a pre-funded record address (the donation of §6.4), `sweep_trader` into the wipe record, a deposit after it, the wiped lender's `sync_lender`, then its `claim_sol`, which closes the position (KI-67) |
 /// | M5 | a rebase (`EpochRolled` num 1) and the lender's `sync_lender` across it |
 #[allow(clippy::too_many_lines)]
 pub fn mock_lifecycle() -> Session {
@@ -532,6 +532,19 @@ pub fn mock_lifecycle() -> Session {
         ix::sync_lender(&owner4, &m4.market(), 8),
     );
     ok(env.send(&[sync4], &[]));
+    // KI-67: the wiped lender's claim pays it in full and closes its position (rent back).
+    let claim4 = with_records(
+        &env,
+        &m4.market(),
+        &owner4,
+        ix::claim_sol(&owner4, &m4.market()),
+    );
+    let kp4 = m4.lender.insecure_clone();
+    ok(env.send(&[claim4], &[&kp4]));
+    assert!(
+        env.lender(&m4.market(), &owner4).is_none(),
+        "KI-67: the wiped lender's claim_sol closes its position"
+    );
     let _ = late;
 
     // ---- M5: a rebase ------------------------------------------------------------------------

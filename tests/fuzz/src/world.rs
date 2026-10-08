@@ -52,8 +52,10 @@
 //!   orphaned: at every roll and at the wind-down every share of `S` has a holder once every
 //!   lender is touched ([`World::orphan_shares`] must be 0). In one run in two (KI-66's
 //!   never-returns model, [`World::absent_owners_out`]) the lenders held behind a rebase record
-//!   stay away first, reached only by third parties' pot-only touches, while the others exit and
-//!   claim; the present lenders may then stay owed only KI-66's post-record residual.
+//!   stay away first, reached only by third parties' pot-only touches and their forward chains
+//!   (KI-66 full), while the others exit and claim; the present lenders may then stay owed only
+//!   the latent rounding units' residual. KI-67: a `claim_sol` closes the position exactly when the
+//!   math crate leaves it `pool::closable`, and a re-created position starts clean.
 
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
@@ -268,6 +270,9 @@ pub struct World {
     /// (the pot-only touch) reaches them while the others exit and claim — before they return
     /// ([`World::absent_owners_out`]).
     pub absent_owners: bool,
+    /// Owners that held a `LenderPosition` (KI-67: a deposit without one by such an owner
+    /// re-creates a closed position, `deposit-recreates`).
+    pub had_position: std::collections::BTreeSet<Pubkey>,
 }
 
 /// A disturbance's clearing action.
@@ -901,6 +906,23 @@ impl World {
             .lender(&market, owner)
             .map_or(m.share_epoch, |l| l.epoch);
         let to = m.share_epoch.min(from + 16);
+        ix::epoch_records(&market, from, to)
+    }
+
+    /// The records a third party's `sync_lender` passes (the pot-only touch, KI-66 full): at most
+    /// `max` from the lender's epoch or, with a forward chain, from its `fwd_epoch` (as the web
+    /// passes them).
+    fn pot_metas(&self, si: usize, owner: &Pubkey, max: u32) -> Vec<AccountMeta> {
+        let market = self.market_key(si);
+        let m = self.env.market(&market);
+        let from = self.env.lender(&market, owner).map_or(m.share_epoch, |l| {
+            if l.fwd == shortwin_math::pool::FWD_NONE {
+                l.epoch
+            } else {
+                l.fwd_epoch
+            }
+        });
+        let to = m.share_epoch.min(from + max);
         ix::epoch_records(&market, from, to)
     }
 
@@ -1677,9 +1699,29 @@ impl World {
         }
         let ix = ix::with_remaining(ix::deposit(&k, amount, 0), &self.epoch_metas(si, &k.owner));
         let kp = self.slots[si].lenders[li].kp.insecure_clone();
+        let market = self.market_key(si);
+        let existed = self.env.lender(&market, &k.owner).is_some();
         let res = self.send(std::slice::from_ref(&ix), &[&kp]);
         if amount == 0 && res.is_ok() {
             panic!("{ORACLE} a deposit of 0 tokens landed (ZeroAmount)");
+        }
+        if res.is_ok() {
+            // KI-67: a position closed by withdraw or claim_sol is re-created clean.
+            if !existed && !self.had_position.insert(k.owner) {
+                let l = self
+                    .env
+                    .lender(&market, &k.owner)
+                    .expect("deposited")
+                    .lender();
+                if (l.real, l.claimed, l.fwd, l.lock) != (0, 0, 0, 0) {
+                    panic!("{ORACLE} KI-67: a re-created position is not clean: {l:?}");
+                }
+                *self
+                    .stats
+                    .events
+                    .entry("deposit-recreates".into())
+                    .or_default() += 1;
+            }
         }
         true
     }
@@ -1824,6 +1866,28 @@ impl World {
         Some(lender)
     }
 
+    /// KI-67: whether `owner`'s `claim_sol` now leaves its position `pool::closable` (the math
+    /// crate's `touch` and `claim` on copies of the stored state, every record at hand).
+    fn claim_closes(&self, si: usize, owner: &Pubkey) -> bool {
+        let market = self.market_key(si);
+        let pool = self.env.market(&market).pool();
+        let Some(lp) = self.env.lender(&market, owner) else {
+            return false;
+        };
+        let mut vault = *self.env.market_vault(&market).vault();
+        let mut l = lp.lender();
+        let mut records: Vec<_> = (l.epoch..pool.share_epoch)
+            .filter_map(|e| {
+                let key = pda::share_epoch(&market, e).0;
+                read::borsh::<shortwin::state::ShareEpoch>(&self.env.svm, &key).map(|r| r.record())
+            })
+            .collect();
+        let now = self.env.now();
+        shortwin_math::pool::touch(&pool, &mut vault, &mut l, &mut records, now)
+            .and_then(|_| shortwin_math::pool::claim(&pool, &mut vault, &mut l, &mut records, now))
+            .is_ok_and(|_| shortwin_math::pool::closable(&pool, &l))
+    }
+
     /// A lender whose SOL balance is negative after a shortfall debit (ECON §9.4) covers
     /// exactly the deficit (`cover_deficit`), as it must before it can withdraw.
     ///
@@ -1964,12 +2028,48 @@ impl World {
             ix::claim_sol(&owner.pubkey(), &market),
             &self.epoch_metas(si, &owner.pubkey()),
         );
-        let n = 1 + (b % 4) as usize;
+        let mut n = 1 + (b % 4) as usize;
+        // KI-67: a claim that leaves the position closable closes it, so a second claim in the
+        // same transaction fails with AccountNotInitialized (3012), atomically.
+        let closes = self.claim_closes(si, &owner.pubkey());
+        if closes && n > 1 {
+            let res = self.send(&vec![ix.clone(); n], &[&owner]);
+            if shortwin_code(&vec![ix.clone(); n], &res)
+                != Some(u32::from(
+                    anchor_lang::error::ErrorCode::AccountNotInitialized,
+                ))
+            {
+                panic!(
+                    "{ORACLE} KI-67: claim_sol ×{n} of a position the first claim closes did not \
+                     fail with AccountNotInitialized: {:?}",
+                    res.as_ref().err().map(|f| &f.err)
+                );
+            }
+            *self
+                .stats
+                .events
+                .entry("claim-bundle-closes".into())
+                .or_default() += 1;
+            n = 1;
+        }
+        let pos = pda::lender(&market, &owner.pubkey()).0;
+        let rent = read::lamports(&self.env.svm, &pos);
         let before = read::lamports(&self.env.svm, &owner.pubkey());
         let res = self.send(&vec![ix; n], &[&owner]);
         let Ok(meta) = &res else {
             return true;
         };
+        let closed = self.env.lender(&market, &owner.pubkey()).is_none();
+        if closed != closes {
+            panic!(
+                "{ORACLE} KI-67: claim_sol of {} closed the position: {closed}, closable after \
+                 the claim: {closes}",
+                owner.pubkey()
+            );
+        }
+        if closed {
+            *self.stats.events.entry("claim-closes".into()).or_default() += 1;
+        }
         let paid: Vec<u64> = (0..n)
             .map(|i| {
                 shortwin_litesvm_tests::events::of_ix::<shortwin::events::ClaimSol>(meta, i)
@@ -1978,10 +2078,11 @@ impl World {
             })
             .collect();
         let gained = read::lamports(&self.env.svm, &owner.pubkey()).wrapping_sub(before);
-        if paid[1..].iter().any(|p| *p != 0) || gained != paid[0] {
+        let refund = if closed { rent } else { 0 };
+        if paid[1..].iter().any(|p| *p != 0) || gained != paid[0] + refund {
             panic!(
                 "{ORACLE} V2-2: claim_sol ×{n} in one transaction paid {paid:?} (later claims \
-                 must pay 0); the lender's wallet gained {gained}"
+                 must pay 0); the lender's wallet gained {gained} (rent back {refund})"
             );
         }
         if n > 1 {
@@ -2013,7 +2114,7 @@ impl World {
     /// when bit 16 of `a` is set, else sent by a third party.
     fn sync_lender(&mut self, si: usize, a: u32) -> bool {
         let li = a as usize % self.slots[si].lenders.len();
-        self.sync_lender_by(si, li, a >> 16 & 1 == 1)
+        self.sync_lender_by(si, li, a >> 16 & 1 == 1, 16)
     }
 
     /// `sync_lender` of lender `li`, signed by its owner or (`owner_signs` false) sent by a third
@@ -2023,8 +2124,12 @@ impl World {
     /// record; the surplus accrued up to one moves to the pot) and no `ShareEpoch` record
     /// changed. A third party's sync that holds the lender at a rebase record counts
     /// `sync-lender-held` (and `sync-lender-held-to-pot` when it moved a surplus): the oracle's
-    /// coverage of the hold.
-    fn sync_lender_by(&mut self, si: usize, li: usize, owner_signs: bool) -> bool {
+    /// coverage of the hold. KI-66 full: a third party's sync passes at most `window` records from
+    /// the chain's `fwd_epoch` once there is one ([`World::pot_metas`]); the counters
+    /// `pot-chain-hold` (a chain started), `pot-chain-walk` (a chain advanced),
+    /// `owner-stops-in-chain` and `owner-settles-chain` (the owner's sync of a chained lender)
+    /// measure the forward chain's coverage.
+    fn sync_lender_by(&mut self, si: usize, li: usize, owner_signs: bool, window: u32) -> bool {
         use shortwin_litesvm_tests::invariants::lender::{PoolState, third_party_sync};
         let kp = self.slots[si].lenders[li].kp.insecure_clone();
         let owner = kp.pubkey();
@@ -2032,8 +2137,13 @@ impl World {
         if self.env.lender(&market, &owner).is_none() {
             return false;
         }
-        let metas = self.epoch_metas(si, &owner);
+        let metas = if owner_signs {
+            self.epoch_metas(si, &owner)
+        } else {
+            self.pot_metas(si, &owner, window)
+        };
         let pre = PoolState::load(&self.env.svm, &market);
+        let before = self.env.lender(&market, &owner).map(|l| l.lender());
         let want = pre
             .as_ref()
             .filter(|_| !owner_signs)
@@ -2053,6 +2163,25 @@ impl World {
                 "{ORACLE} KI-66: sync_lender of {owner} on {market} (owner signs: {owner_signs}) \
                  refused with RebaseNeedsOwner"
             );
+        }
+        if let (true, Some(b), Some(a)) = (
+            res.is_ok(),
+            before,
+            self.env.lender(&market, &owner).map(|l| l.lender()),
+        ) {
+            use shortwin_math::pool::{FWD_HOLD, FWD_NONE, FWD_OPEN};
+            let event = match (owner_signs, b.fwd, a.fwd) {
+                (false, FWD_NONE, FWD_HOLD) => Some("pot-chain-hold"),
+                (false, f, _) if f != FWD_NONE && a.fwd_epoch > b.fwd_epoch => {
+                    Some("pot-chain-walk")
+                }
+                (true, f, FWD_OPEN) if f != FWD_NONE => Some("owner-stops-in-chain"),
+                (true, f, FWD_NONE) if f != FWD_NONE => Some("owner-settles-chain"),
+                _ => None,
+            };
+            if let Some(e) = event {
+                *self.stats.events.entry(e.into()).or_default() += 1;
+            }
         }
         if let (true, Some((l, v)), Some(pre)) = (res.is_ok(), want, pre) {
             // Held: left behind the share epoch on a rebase record, every record at hand.
@@ -2131,7 +2260,7 @@ impl World {
                 match self.env.lender(&market, &k.owner) {
                     Some(l) if l.epoch < self.env.market(&market).share_epoch => {
                         // The lender's own sync: it may convert through rebase records.
-                        self.sync_lender_by(si, li, true);
+                        self.sync_lender_by(si, li, true, 16);
                     }
                     _ => break,
                 }
@@ -4253,12 +4382,16 @@ impl World {
 
     /// KI-66's never-returns model ([`World::absent_owners`]; ECON §9.4 I-P6 and R3A-2): the
     /// lenders held behind a rebase record — shares, a lock or a lock term at the epoch of a
-    /// rebase record — have absent owners. Only third parties' `sync_lender` reach them, twice
-    /// (the pot-only touch moves the surplus they accrued up to the record; the second moves
-    /// nothing, under the KI-66 oracle), while every other lender exits ([`World::lenders_out`])
-    /// and claims in two more rounds. What the present lenders are then still owed is KI-66's
-    /// disclosed post-record residual: at most what the absent lenders' own touches would move to
-    /// the pot (`pool::touch` on copies of the state, through the records in turn), plus
+    /// rebase record — or with a forward chain have absent owners. Only third parties'
+    /// `sync_lender` reach them (KI-66 full): 8 records at a time from the chain's `fwd_epoch`
+    /// ([`World::pot_metas`]), repeated until the chain reaches the current epoch or a sync moves
+    /// nothing, under the KI-66 oracle; then one more round must move nothing at all (else the
+    /// anomaly `pot-touch-not-idempotent`). Every other lender exits ([`World::lenders_out`]) and
+    /// claims in two more rounds. What the present lenders are then still owed is KI-66 full's
+    /// disclosed residual, the latent rounding units: at most what the absent lenders' own
+    /// touches would still move to the pot after their chains (`pool::touch` of the chained
+    /// lenders on copies of the state, through the records in turn: the owner's conversion takes
+    /// the chain's accruals back, so this is exactly what the chain could not move), plus
     /// [`CLAIM_DUST`] per present lender and the carries' bound ([`World::carry_gap_bound`]).
     /// Above it the anomaly `wind-down-absent-owed-above-residual`; the largest owed total is
     /// `summary.json`'s `wind_down_claims.largest_absent_owed_lamports`. The absent owners then
@@ -4272,13 +4405,14 @@ impl World {
                 let owner = self.slots[si].lenders[li].kp.pubkey();
                 self.env.lender(&market, &owner).is_some_and(|lp| {
                     let l = lp.lender();
-                    l.epoch < epoch
-                        && (l.shares != 0 || l.lock != 0 || l.lock_term != 0)
-                        && read::borsh::<shortwin::state::ShareEpoch>(
-                            &self.env.svm,
-                            &pda::share_epoch(&market, l.epoch).0,
-                        )
-                        .is_some_and(|r| !r.record().is_full_wipe())
+                    l.fwd != shortwin_math::pool::FWD_NONE
+                        || l.epoch < epoch
+                            && (l.shares != 0 || l.lock != 0 || l.lock_term != 0)
+                            && read::borsh::<shortwin::state::ShareEpoch>(
+                                &self.env.svm,
+                                &pda::share_epoch(&market, l.epoch).0,
+                            )
+                            .is_some_and(|r| !r.record().is_full_wipe())
                 })
             })
             .collect();
@@ -4296,8 +4430,37 @@ impl World {
                 .events
                 .entry("wind-down-absent-owner".into())
                 .or_default() += 1;
-            self.sync_lender_by(si, li, false);
-            self.sync_lender_by(si, li, false);
+            let owner = self.slots[si].lenders[li].kp.pubkey();
+            let state = |w: &Self| {
+                (
+                    w.env.lender(&market, &owner).map(|l| l.lender()),
+                    w.env.market_vault(&market).vault().unmatched,
+                )
+            };
+            for _ in 0..=epoch / 8 + 1 {
+                let before = state(self);
+                self.sync_lender_by(si, li, false, 8);
+                let after = state(self);
+                let reached = after.0.is_some_and(|l| {
+                    l.fwd != shortwin_math::pool::FWD_NONE && l.fwd_epoch == epoch
+                });
+                if reached || after == before {
+                    break;
+                }
+            }
+            let before = state(self);
+            self.sync_lender_by(si, li, false, 8);
+            if state(self) != before {
+                self.stats.anomaly(
+                    "pot-touch-not-idempotent",
+                    format!(
+                        "market {market}: a further third-party sync_lender of absent lender {li} \
+                         moved {:?} -> {:?}",
+                        before,
+                        state(self)
+                    ),
+                );
+            }
         }
         self.lenders_out_but(si, false, true, &absent);
         let present: Vec<usize> = (0..self.slots[si].lenders.len())

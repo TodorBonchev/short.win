@@ -93,7 +93,11 @@ const lender = (o: Parameters<typeof simpleLender>[1] = {}): LenderPosition => (
     owner: OWNER,
     market: M1,
     bump: 255,
-    reserved: new Uint8Array(32),
+    fwdShares: 0n,
+    fwdEpoch: 0,
+    fwd: 0,
+    fwdLag: 0,
+    reserved: new Uint8Array(10),
 });
 
 function chain(mint: Address, market: Address, shareEpoch = 0): LoadedChain {

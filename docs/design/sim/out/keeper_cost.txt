@@ -1,4 +1,4 @@
-<!-- constants cross-checked against tests/bench/m7_keeper/results.json (42b11bc4) -->
+<!-- constants cross-checked against tests/bench/m7_keeper/results.json (4d19c582) -->
 
 ### Measured inputs: requested CU per instruction (ceil(simulated x 1.1), what the priority fee is paid on) and crank batches
 

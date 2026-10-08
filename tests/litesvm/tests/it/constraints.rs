@@ -56,7 +56,11 @@ fn install_lender(env: &mut Env, market: &Pubkey, owner: &Pubkey) {
         lock_term: 0,
         lock_until: 0,
         bump,
-        _reserved: [0; 32],
+        fwd_shares: 0,
+        fwd_epoch: 0,
+        fwd: 0,
+        fwd_lag: 0,
+        _reserved: [0; 10],
     };
     fixtures::set_borsh(&mut env.svm, &key, &l, LenderPosition::SPACE, 0);
 }

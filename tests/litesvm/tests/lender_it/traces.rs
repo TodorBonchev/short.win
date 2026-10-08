@@ -141,6 +141,34 @@ impl Model {
         .map(|_| ())
     }
 
+    /// KI-66 full: `sync_lender(n)` with the `n` records from where it starts
+    /// (`pool_harness::Market::sync`): signed, `convert` then `touch` unless still behind;
+    /// unsigned, `touch_pot` from the lender's epoch or its chain's `fwd_epoch`.
+    fn sync(&mut self, u: usize, n: usize, signed: bool) -> Result<(), MathError> {
+        let i = self.slot(u);
+        let (mut v, mut l) = (self.vault.clone(), self.lenders[i].1);
+        let lo = if signed || l.fwd == pool::FWD_NONE {
+            l.epoch
+        } else {
+            l.fwd_epoch
+        } as usize;
+        let len = self.records.len();
+        let (a, b) = (lo.min(len), lo.saturating_add(n).min(len));
+        let mut recs = self.records.clone();
+        if signed {
+            let st = pool::convert(&self.pool, &mut l, &mut recs[a..b])?;
+            if st != pool::Standing::Behind {
+                pool::touch(&self.pool, &mut v, &mut l, &mut recs[a..b], self.now)?;
+            }
+        } else {
+            pool::touch_pot(&self.pool, &mut v, &mut l, &recs[a..b], self.now)?;
+        }
+        self.records = recs;
+        self.vault = v;
+        self.lenders[i].1 = l;
+        Ok(())
+    }
+
     fn pre(&mut self, u: usize) -> Result<(), MathError> {
         let i = self.slot(u);
         let (mut p, mut v, mut l) = (self.pool, self.vault.clone(), self.lenders[i].1);
@@ -330,7 +358,11 @@ fn model_state(m: &Model, market: anchor_lang::prelude::Pubkey) -> inv::PoolStat
                 lock_term: 0,
                 lock_until: 0,
                 bump: 0,
-                _reserved: [0; 32],
+                fwd_shares: 0,
+                fwd_epoch: 0,
+                fwd: 0,
+                fwd_lag: 0,
+                _reserved: [0; 10],
             };
             pos.set_lender(l);
             (pos.owner, pos)
@@ -426,10 +458,11 @@ fn compare(lab: &Lab, m: &Model, users: &[String], ctx: &str) {
             m.now,
         )
         .unwrap();
-        // A lock's Π, epoch and expiry mean nothing without a lock or a term (a position the
-        // program closed and re-created has the defaults; the model keeps the stale values).
+        // A lock's Π, epoch, expiry and term mean nothing without a lock (a term without a
+        // lock is never read again: a position the program closed and re-created has the
+        // defaults, KI-67; the model keeps the stale values).
         let tok = |l: &Lender| {
-            if l.lock == 0 && l.lock_term == 0 {
+            if l.lock == 0 {
                 (l.shares, 0, 0, 0, 0, 0, l.epoch, l.snap, l.snap_r)
             } else {
                 (
@@ -663,6 +696,22 @@ fn replay(trace: &Value, program: TokenProgram, max_lines: usize) -> Stats {
                     if exists {
                         let steps = u8::try_from(MAX_RECORDS_PER_TX).expect("u8");
                         lab.sync(&nm, steps).unwrap();
+                    }
+                    show(&r.map(|()| None::<u8>))
+                }
+                "y" => {
+                    // KI-66 full: sync_lender(n), the owner's (1) or a third party's (0).
+                    let (k, signed): (usize, u8) = (n(&args, 1), n(&args, 2));
+                    let r = m.sync(u(), k, signed == 1);
+                    liveness_cap_from_model(&m, &lab);
+                    let (nm, exists) = who(&lab, u());
+                    if exists {
+                        let k = u8::try_from(k).expect("u8");
+                        if signed == 1 {
+                            lab.sync_signed(&nm, k).unwrap();
+                        } else {
+                            lab.sync(&nm, k).unwrap();
+                        }
                     }
                     show(&r.map(|()| None::<u8>))
                 }

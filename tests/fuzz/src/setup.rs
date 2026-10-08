@@ -227,6 +227,7 @@ pub fn world(profile: Profile, seed: u64, opts: crate::runner::Opts) -> World {
         ledger: Default::default(),
         pswap_expire: None,
         s_peaks: Vec::new(),
+        had_position: Default::default(),
         absent_owners: crate::world::ABSENT_OWNERS
             .with(|c| c.get())
             .unwrap_or_else(|| Rng::new(seed ^ KI66_SALT).chance(1, 2)),

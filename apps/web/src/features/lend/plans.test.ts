@@ -364,7 +364,11 @@ describe('claim, cover and sync plans', () => {
                 lockTerm: 0n,
                 lockUntil: 0n,
                 bump: 255,
-                reserved: new Uint8Array(32),
+                fwdShares: 0n,
+                fwdEpoch: 0,
+                fwd: 0,
+                fwdLag: 0,
+                reserved: new Uint8Array(10),
             });
             expect(w.decode(new Uint8Array(bytes))).toEqual({ shares: 7n, lock: 2n, claimed: 9n, pending: -3n });
             expect(Object.keys(w.fields)).toEqual(['pending']);

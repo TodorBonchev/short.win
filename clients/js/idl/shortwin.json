@@ -209,7 +209,8 @@
         {
           "name": "owner",
           "docs": [
-            "The lender; receives the SOL."
+            "The lender; receives the SOL, and the `LenderPosition` rent when the claim closes it",
+            "(KI-67)."
           ],
           "writable": true,
           "signer": true,
@@ -6435,11 +6436,41 @@
             "type": "u8"
           },
           {
+            "name": "fwd_shares",
+            "docs": [
+              "KI-66 full: the forward chain's shares in `fwd_epoch` (`pool::Lender::fwd_shares`; 0",
+              "without a chain)."
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "fwd_epoch",
+            "docs": [
+              "KI-66 full: the epoch the forward chain reached (0 without a chain)."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "fwd",
+            "docs": [
+              "KI-66 full: `pool::FWD_NONE` / `FWD_HOLD` / `FWD_OPEN`; while not `FWD_NONE`, `snap` /",
+              "`snap_r` are the chain's snapshots (module docs)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "fwd_lag",
+            "docs": [
+              "KI-66 full, `FWD_OPEN`: `shares` minus the chain's shares in `epoch` (0 or 1)."
+            ],
+            "type": "u8"
+          },
+          {
             "name": "_reserved",
             "type": {
               "array": [
                 "u8",
-                32
+                10
               ]
             }
           }

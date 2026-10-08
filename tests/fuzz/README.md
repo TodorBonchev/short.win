@@ -147,7 +147,16 @@ each replayed repeatedly.
   fresh key must fail (the hooks check nothing changed); since M10 an accepted replacement fails the
   run as an accepted omission does (before, an anomaly for review: no run ever reported one).
 - **Lenders (M10)**: `claim_sol ×N` in one transaction: every claim after the first pays 0 and the
-  lender's wallet gains exactly the first (V2-2). The JIT capture oracle (R3B-2, ECON §9.4): around
+  lender's wallet gains exactly the first (V2-2), plus the position's rent when the claim closes it:
+  **KI-67** (owner decision of 2026-10-08) — a claim closes the position exactly when the math
+  crate's `touch` and `claim` on the pre-state leave it `pool::closable` (else `FUZZ-ORACLE KI-67`;
+  `claim-closes`), and a bundle whose first claim closes it must fail atomically with
+  `AccountNotInitialized` (`claim-bundle-closes`; the claim is then sent alone; such a refusal of a
+  `claim_sol` after a `claim_sol` of the same position counts `claim-after-close-refused`, not a
+  `framework-error` anomaly); a deposit that
+  re-creates a closed position starts clean (`real`, `claimed`, chain and lock 0;
+  `deposit-recreates`). The hooks' close check (`invariants::lender::closes_only_when_empty`)
+  runs after every instruction. The JIT capture oracle (R3B-2, ECON §9.4): around
   a landed liquidation, expiry or settlement, while another lender holds shares, the JIT lender's
   SOL (wallet + its `LenderPosition`'s lamports + touched balance) gains over a clone in which the
   same exit lands without the deposit at most 2 lamports beyond its minted shares' part of the
@@ -237,14 +246,22 @@ each replayed repeatedly.
   the record's ends and unconverted, its surplus in the pot; elsewhere the plain touch) and no
   `ShareEpoch` record changed, else `FUZZ-ORACLE KI-66`. A third party's sync that holds the
   lender at a rebase record counts `sync-lender-held` (`sync-lender-held-to-pot` when it moved a
-  surplus): the hold's coverage. **The never-returns model** (KI-66 review): in one run in two
-  (from the seed, `setup::KI66_SALT`) the wind-down takes the lenders held behind a rebase record
-  (shares, a lock or a lock term at its epoch) for absent owners — two third-party syncs each
-  (the pot-only touch, then a no-op, both under the oracle; `wind-down-absent-owner`), then every
-  other lender exits and claims in two more rounds — and what the present lenders are still owed
-  must be KI-66's post-record residual: at most what the absent lenders' own touches would move
-  to the pot (`pool::touch` on copies), plus `CLAIM_DUST` per present lender and the carries'
-  bound, else the anomaly `wind-down-absent-owed-above-residual`
+  surplus): the hold's coverage. **KI-66 full (the forward chain, eighth round):** a third party's
+  sync passes its records from the chain's `fwd_epoch` once there is one (`World::pot_metas`, as
+  the web does); `pot-chain-hold` counts the chains started, `pot-chain-walk` the third-party syncs
+  that advanced one, `owner-stops-in-chain` / `owner-settles-chain` the owners' syncs that stopped
+  inside a chain (`FWD_OPEN`) or settled it. **The never-returns model** (KI-66 review): in one run
+  in two (from the seed, `setup::KI66_SALT`) the wind-down takes the lenders held behind a rebase
+  record (shares, a lock or a lock term at its epoch) or with a forward chain for absent owners —
+  third-party syncs each, 8 records at a time, until the chain reaches the current epoch or a sync
+  moves nothing, then one more that must move nothing at all (else the anomaly
+  `pot-touch-not-idempotent`), all under the oracle (`wind-down-absent-owner`); then every other
+  lender exits and claims in two more rounds — and what the present lenders are still owed must be
+  KI-66 full's residual, the latent rounding units: at most what the absent lenders' own touches
+  would still move to the pot after their chains (`pool::touch` of the chained lenders on copies:
+  the owner's conversion takes the chain's accruals back, so it moves exactly what the chain could
+  not), plus `CLAIM_DUST` per present lender and the carries' bound, else the anomaly
+  `wind-down-absent-owed-above-residual`
   (`wind-down-absent-present-owed` counts the markets owed above dust;
   `wind_down_claims.largest_absent_owed_lamports` the largest total). The absent owners then
   return and the wind-down ends as in every run. Both are rare: the KI-66 review's four
@@ -433,7 +450,7 @@ oracle. Before I19, the first four survived 15 minutes of `mock,mixed` fuzzing (
 M5-SEC-3's revert 12 minutes of `curve` (1,118 runs); with it, every one of the seven is killed by
 its tests and by a 3-minute fuzz of its profile (2026-10-01, on the final tree: 10 / 10 / 10 / 133
 failures on `mock` for the margin, fee-cap, wallet and tier mutants, 27 for the clear delay, 16 on
-`curve`, 1 on `pumpswap`; the wallet mutant also fails `caps_boundary_it`'s M7-SEC-9 regression). **M10 (WP-8d):** on the new action stream the PumpSwap mutant (the caps at the live fee, M7-SEC-5) first survived its 3-minute fuzz — its kill had been a single failure, and `open_near_cap` was skipped on every fork pool —; with PumpSwap's tier-boundary fee shock and `open_near_cap` from the minimum notional all seven are killed again (2026-10-02, `MUTANTS_JOBS=3`, the script's default `MUTANTS_SEED` 20261001: 10 / 7 / 8 / 117 failures on `mock`, 32 for the clear delay, 16 on `curve`, 2 on `pumpswap`); again after the review's fixes: 10 / 7 / 8 / 113, 30, 13, 2). **M10 fuzz follow-ups:** the new action stream (`stale_receivable`) and the per-exit oracles on PumpSwap left the PumpSwap mutant alive again: its 3-minute fuzz reached 42 runs on a loaded machine, against WP-8d's 114, and WP-8d's kill had been 2 failures, both at seeds about 24 runs deep per job. PumpSwap's `fee_shock` and `open_near_cap` weights are now 3 and 6, three times as dense, and all seven are killed again (2026-10-02, `MUTANTS_JOBS=3`, seed 20261001: 10 / 5 / 9 / 110 failures on `mock`, 27 for the clear delay, 15 on `curve`, 5 on `pumpswap`). **KI-65 (M10):** two more mutants, checked by their tests alone (profile `-`: their fuzz oracles need a share rebase, which a 3-minute run reaches too rarely) — `claim_sol` converting through a rebase record without storing `conv_rem` (`ki65-skip-store-records`) and `sync_lender`'s owner check made `true` (`ki65-rebase-without-owner`, KI65-REV-SEC1; since KI-66 its path selection takes every caller for the owner); `ki65_it` kills both. **KI-66 (M10):** a third, also tests only — the pot-only touch skipping the surplus move to the pot (`ki66-pot-skip-surplus`, in `shortwin_math::pool`); `ki65_it` kills it.
+`curve`, 1 on `pumpswap`; the wallet mutant also fails `caps_boundary_it`'s M7-SEC-9 regression). **M10 (WP-8d):** on the new action stream the PumpSwap mutant (the caps at the live fee, M7-SEC-5) first survived its 3-minute fuzz — its kill had been a single failure, and `open_near_cap` was skipped on every fork pool —; with PumpSwap's tier-boundary fee shock and `open_near_cap` from the minimum notional all seven are killed again (2026-10-02, `MUTANTS_JOBS=3`, the script's default `MUTANTS_SEED` 20261001: 10 / 7 / 8 / 117 failures on `mock`, 32 for the clear delay, 16 on `curve`, 2 on `pumpswap`); again after the review's fixes: 10 / 7 / 8 / 113, 30, 13, 2). **M10 fuzz follow-ups:** the new action stream (`stale_receivable`) and the per-exit oracles on PumpSwap left the PumpSwap mutant alive again: its 3-minute fuzz reached 42 runs on a loaded machine, against WP-8d's 114, and WP-8d's kill had been 2 failures, both at seeds about 24 runs deep per job. PumpSwap's `fee_shock` and `open_near_cap` weights are now 3 and 6, three times as dense, and all seven are killed again (2026-10-02, `MUTANTS_JOBS=3`, seed 20261001: 10 / 5 / 9 / 110 failures on `mock`, 27 for the clear delay, 15 on `curve`, 5 on `pumpswap`). **KI-65 (M10):** two more mutants, checked by their tests alone (profile `-`: their fuzz oracles need a share rebase, which a 3-minute run reaches too rarely) — `claim_sol` converting through a rebase record without storing `conv_rem` (`ki65-skip-store-records`) and `sync_lender`'s owner check made `true` (`ki65-rebase-without-owner`, KI65-REV-SEC1; since KI-66 its path selection takes every caller for the owner); `ki65_it` kills both. **KI-66 (M10):** a third, also tests only — the pot-only touch skipping the surplus move to the pot (`ki66-pot-skip-surplus`, in `shortwin_math::pool`); `ki65_it` kills it. **KI-66 full and KI-67 (M10, eighth round):** eight more, tests only — the forward chain accruing nothing after the record (`ki66full-walk-accrues-nothing`), the owner adding its whole accrual inside the chain instead of the lag's part (`ki66full-open-full-accrual`, a double count), `FWD_HOLD` accruing the held epoch again (`ki66full-hold-accrues-again`), the chain flooring per touch instead of cumulatively (`ki66full-walk-per-touch-floor`), a chained lender re-entering the hold (`ki66full-rehold`), the V2-12 jump keeping the chain (`ki66full-jump-keeps-chain`), `claim_sol` closing with `pending` owed (`ki67-close-with-pending`) and `closable` without its epoch check (`ki67-close-parked`, a parked lender closed); `ki65_it`, `ki66_sec_it` and `lender_it` kill them.
 
 ## CI
 

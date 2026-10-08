@@ -204,13 +204,17 @@ fn report(s: &Stats, secs: f64, failures: &[(String, String)]) -> serde_json::Va
     );
     println!("  codes never returned: {}", codes_missed.join(", "));
     let d = &s.deficits;
+    let ev = |k: &str| s.events.get(k).copied().unwrap_or(0);
     println!(
         "\n-- the deficit tripwire and the wind-down's claims (M10) --\n  deficits checked {} in {} runs; \
          largest {} lamports (its bound {}, over the whole run {}), deficit/bound largest {:.4} \
          smallest {}\n  after the second claim pass: \
          largest unpaid pending {} lamports, largest lender_sol {} lamports\n  with absent \
          owners held behind a rebase record (KI-66): {} markets, {} lenders, {} held \
-         third-party syncs; present lenders owed above dust {} times, at most {} lamports",
+         third-party syncs; present lenders owed above dust {} times, at most {} lamports\n  \
+         forward chain (KI-66 full): {} started, {} walked further by a third party, owners \
+         stopping inside one {} and settling one {}\n  KI-67: {} claims closed a position \
+         ({} claim bundles refused after the close), {} deposits re-created one",
         d.checked,
         d.runs,
         d.largest,
@@ -231,7 +235,14 @@ fn report(s: &Stats, secs: f64, failures: &[(String, String)]) -> serde_json::Va
             .get("wind-down-absent-present-owed")
             .copied()
             .unwrap_or(0),
-        s.wind_down_absent_owed_max
+        s.wind_down_absent_owed_max,
+        ev("pot-chain-hold"),
+        ev("pot-chain-walk"),
+        ev("owner-stops-in-chain"),
+        ev("owner-settles-chain"),
+        ev("claim-closes"),
+        ev("claim-bundle-closes"),
+        ev("deposit-recreates"),
     );
     println!("\n-- anomalies (not invariant violations; for review) --");
     if s.anomalies.is_empty() {

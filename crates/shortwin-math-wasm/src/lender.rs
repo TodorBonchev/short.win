@@ -175,7 +175,11 @@ impl LenderState {
             epoch: self.epoch,
             lock_epoch: self.lock_epoch,
             lock_until: self.lock_until,
-            _pad: [0; 8],
+            fwd_epoch: 0,
+            fwd: 0,
+            fwd_lag: 0,
+            _pad: [0; 2],
+            fwd_shares: 0,
         }
     }
 

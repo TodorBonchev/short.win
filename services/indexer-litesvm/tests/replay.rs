@@ -195,6 +195,20 @@ fn the_mock_lifecycle_covers_its_flows() {
         );
     }
     // Both epoch rolls: a full wipe and a rebase; the wipe's record donation was swept.
+    // KI-67: a wiped lender's claim closed its position; the end state lists it closed.
+    let end = mock_lifecycle().end_state().expect("end state");
+    assert!(
+        m.lenders.iter().any(|((market, owner), l)| {
+            l.claims > 0
+                && l.shares == 0
+                && end.closed.contains(
+                    &shortwin_litesvm_tests::pda::lender(market, owner)
+                        .0
+                        .to_string(),
+                )
+        }),
+        "mock_lifecycle: no LenderPosition closed by claim_sol"
+    );
     let nums: Vec<u8> = m.share_epochs.values().map(|(n, _)| *n).collect();
     assert!(nums.contains(&0) && nums.contains(&1), "{nums:?}");
     assert_eq!(m.donations.values().sum::<u64>(), 7_000_000);

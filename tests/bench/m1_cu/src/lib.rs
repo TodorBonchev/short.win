@@ -87,6 +87,15 @@ pub const LENDER_SOL_BEYOND_CAP: Budget = Budget {
     cu: 1_400_000,
     source: "transaction limit; beyond the web's 8-record cap (§6.1's 60,000 holds to 8)",
 };
+/// KI-66 full: an owner's conversion through 8 records of its forward chain with its shares a
+/// unit above the chain at every record (`fwd_lag = 1`: the `lag_part` product twice per record,
+/// ≈ 0.9k CU each) exceeds §6.1's 60,000 (64,355 at most), so the web caps a chained owner's
+/// settlement at 7 records per transaction (58,229 at most); `MAX_RECORDS` stays 8 for every
+/// other lender transaction. Reported against the transaction limit.
+pub const LENDER_SOL_CHAIN_BEYOND_CAP: Budget = Budget {
+    cu: 1_400_000,
+    source: "transaction limit; a chained settlement beyond the web's 7-record cap (lag 1)",
+};
 /// Permissionless cranks without a §6.1 row (the `crank_price` limit).
 pub const CRANK: Budget = Budget {
     cu: 60_000,
@@ -636,6 +645,216 @@ fn sync_lender_pot(n: u32) -> Prepared {
     prepared(s.env, ix, &[])
 }
 
+/// KI-66 full: [`behind`]`(n)`, then a third party's `sync_lender` with the first `min(n, 8)`
+/// records: the lender holds a forward chain (`FWD_HOLD`) through them.
+fn held(n: u32) -> LenderEnv {
+    chain_on(behind(n), n)
+}
+
+/// KI-66 full, the lag-1 worst case: [`behind`]`(n)` with every record's `conv_rem` at
+/// `den − 1 = 999` (earlier holders' conversions left it there; `S` counts the units they
+/// carried). The lender's shares are `≡ 1 (mod 1,000)` at every level, so each conversion carries
+/// a unit: its shares run one above the chain's floor at every record (`fwd_lag = 1`, the
+/// `lag_part` product at each epoch).
+fn behind_lag1(n: u32) -> LenderEnv {
+    use shortwin::state::ShareEpoch;
+    let mut s = behind(n);
+    let market = s.k.market;
+    let owner = s.h.owner.pubkey();
+    let mut sigma = s.env.lender(&market, &owner).expect("lender").shares;
+    let mut extra = 0u128;
+    for e in 0..n {
+        let key = pda::share_epoch(&market, e).0;
+        let mut rec: ShareEpoch =
+            shortwin_litesvm_tests::read::borsh(&s.env.svm, &key).expect("record");
+        rec.conv_rem = 999;
+        if e > 0 {
+            extra += rec.acc_r_end.div_ceil(WAD);
+        }
+        fixtures::set_borsh(&mut s.env.svm, &key, &rec, ShareEpoch::SPACE, 0);
+        // ⌊(conv_rem + σ)/1,000⌋ with conv_rem = 999.
+        sigma = sigma.div_ceil(1_000);
+    }
+    // The unit above the floor earns about one share's credit in each later epoch: fund it.
+    let extra = u64::try_from(extra).expect("u64");
+    let vk = s.k.market_vault;
+    let mut v: shortwin::state::MarketVault = s.env.market_vault(&market);
+    let lamports = s.env.svm.get_account(&vk).expect("vault").lamports;
+    let vault_rent = s
+        .env
+        .svm
+        .minimum_balance_for_rent_exemption(shortwin::state::MarketVault::SPACE);
+    v.lender_sol += extra;
+    fixtures::set_zc(&mut s.env.svm, &vk, &v, lamports - vault_rent + extra);
+    let mut m = s.env.market(&market);
+    let mut p = m.pool();
+    assert_eq!(sigma, p.total_shares + 1, "one unit above the floor chain");
+    p.total_shares = sigma;
+    m.set_pool(&p);
+    fixtures::set_zc(&mut s.env.svm, &market, &m, 0);
+    s
+}
+
+/// The pot-only touch of `s`'s lender with its first `min(n, 8)` records: a forward chain.
+fn chain_on(mut s: LenderEnv, n: u32) -> LenderEnv {
+    let m = n.min(8);
+    let ix = ix::with_remaining(
+        ix::sync_lender(
+            &s.h.owner.pubkey(),
+            &s.k.market,
+            u8::try_from(m).expect("u8"),
+        ),
+        &ix::epoch_records(&s.k.market, 0, m),
+    );
+    ok(s.env.send(&[ix], &[]));
+    let l = s
+        .env
+        .lender(&s.k.market, &s.h.owner.pubkey())
+        .expect("lender");
+    assert_eq!((l.fwd, l.epoch), (1u8, 0));
+    s
+}
+
+/// KI-66 full, the lag-1 worst case: the owner's conversion through `n` records of a chain, a
+/// unit above it at every record (`fwd_lag = 1` each time).
+fn claim_sol_held_lag1(n: u32) -> Prepared {
+    let s = chain_on(behind_lag1(n), n);
+    let ix = ix::with_remaining(
+        ix::claim_sol(&s.h.owner.pubkey(), &s.k.market),
+        &records(&s, n),
+    );
+    s.prepared(ix)
+}
+
+fn cover_deficit_held_lag1(n: u32) -> Prepared {
+    let s = chain_on(behind_lag1(n), n);
+    let ix = ix::with_remaining(
+        ix::cover_deficit(&s.h.owner.pubkey(), &s.k.market, COVER),
+        &records(&s, n),
+    );
+    s.prepared(ix)
+}
+
+fn sync_lender_held_lag1(n: u32) -> Prepared {
+    let s = chain_on(behind_lag1(n), n);
+    let ix = ix::with_remaining(
+        ix::sync_lender_signed(
+            &s.h.owner.pubkey(),
+            &s.k.market,
+            u8::try_from(n).expect("u8"),
+        ),
+        &records(&s, n),
+    );
+    s.prepared(ix)
+}
+
+/// KI-67: a wiped lender's claim — through a finalised full-wipe record, about 1 SOL owed — that
+/// leaves its position empty and paid, so `claim_sol` closes it and returns the rent.
+fn claim_sol_closes() -> Prepared {
+    use shortwin::state::{LenderPosition, MarketVault, ShareEpoch};
+    let mut s = LenderEnv::deposited(TokenProgram::Spl);
+    let market = s.k.market;
+    let owner = s.h.owner.pubkey();
+    let l: LenderPosition = s.env.lender(&market, &owner).expect("lender");
+    let mut m = s.env.market(&market);
+    let mut p = m.pool();
+    let d = credit_delta(l.shares);
+    let credit = l.shares * d / WAD;
+    let (key, bump) = pda::share_epoch(&market, 0);
+    let rec = ShareEpoch {
+        market,
+        epoch: 0,
+        acc_end: l.snap + i128::try_from(d).expect("i128"),
+        acc_r_end: l.snap_r + d,
+        s_old: l.shares,
+        carry: 0,
+        carry_r: 0,
+        num: 0,
+        den_log1000: 0,
+        bump,
+        conv_rem: 0,
+    };
+    fixtures::set_borsh(&mut s.env.svm, &key, &rec, ShareEpoch::SPACE, 0);
+    p.share_epoch = 1;
+    (p.total_shares, p.tokens_free) = (0, 0);
+    (p.acc, p.carry, p.acc_r, p.carry_r) = (0, 0, 0, 0);
+    m.set_pool(&p);
+    fixtures::set_zc(&mut s.env.svm, &market, &m, 0);
+    let credit = u64::try_from(credit).expect("u64");
+    let vk = s.k.market_vault;
+    let mut v: MarketVault = s.env.market_vault(&market);
+    let held_lamports = s.env.svm.get_account(&vk).expect("vault").lamports;
+    let rent = s
+        .env
+        .svm
+        .minimum_balance_for_rent_exemption(MarketVault::SPACE);
+    v.lender_sol += credit;
+    fixtures::set_zc(&mut s.env.svm, &vk, &v, held_lamports - rent + credit);
+    let ix = ix::with_remaining(ix::claim_sol(&owner, &market), &records(&s, 1));
+    s.prepared(ix)
+}
+
+/// KI-66 full: the owner's claim settling a forward chain through `n` records.
+fn claim_sol_held(n: u32) -> Prepared {
+    let s = held(n);
+    let ix = ix::with_remaining(
+        ix::claim_sol(&s.h.owner.pubkey(), &s.k.market),
+        &records(&s, n),
+    );
+    s.prepared(ix)
+}
+
+fn cover_deficit_held(n: u32) -> Prepared {
+    let s = held(n);
+    let ix = ix::with_remaining(
+        ix::cover_deficit(&s.h.owner.pubkey(), &s.k.market, COVER),
+        &records(&s, n),
+    );
+    s.prepared(ix)
+}
+
+fn sync_lender_held(n: u32) -> Prepared {
+    let s = held(n);
+    let ix = ix::with_remaining(
+        ix::sync_lender_signed(
+            &s.h.owner.pubkey(),
+            &s.k.market,
+            u8::try_from(n).expect("u8"),
+        ),
+        &records(&s, n),
+    );
+    s.prepared(ix)
+}
+
+/// KI-66 full, `FWD_OPEN`: [`held`]`(9)` (the chain reaches epoch 8), the owner converts one
+/// record (it stops inside the chain), then claims through the other 8.
+fn claim_sol_open_8() -> Prepared {
+    let mut s = held(9);
+    let owner = s.h.owner.insecure_clone();
+    let ix = ix::with_remaining(
+        ix::sync_lender_signed(&owner.pubkey(), &s.k.market, 1),
+        &ix::epoch_records(&s.k.market, 0, 1),
+    );
+    ok(s.env.send(&[ix], &[&owner]));
+    let l = s.env.lender(&s.k.market, &owner.pubkey()).expect("lender");
+    assert_eq!((l.fwd, l.epoch), (2u8, 1));
+    let ix = ix::with_remaining(
+        ix::claim_sol(&owner.pubkey(), &s.k.market),
+        &ix::epoch_records(&s.k.market, 1, 9),
+    );
+    s.prepared(ix)
+}
+
+/// KI-66 full: a third party continuing a chain from its `fwd_epoch` (8 records from there).
+fn sync_lender_pot_continue_8() -> Prepared {
+    let s = held(12);
+    let ix = ix::with_remaining(
+        ix::sync_lender(&s.h.owner.pubkey(), &s.k.market, 4),
+        &ix::epoch_records(&s.k.market, 8, 12),
+    );
+    prepared(s.env, ix, &[])
+}
+
 fn withdraw_behind(n: u32) -> Prepared {
     let s = behind(n);
     let ix = ix::with_remaining(ix::withdraw(&s.keys(), 100, 0), &records(&s, n));
@@ -672,6 +891,12 @@ at!(claim_sol_behind: claim_sol_behind_1 = 1, claim_sol_behind_3 = 3, claim_sol_
 at!(cover_deficit_behind: cover_deficit_behind_1 = 1, cover_deficit_behind_3 = 3, cover_deficit_behind_8 = 8, cover_deficit_behind_10 = 10, cover_deficit_behind_12 = 12);
 at!(sync_lender_behind: sync_lender_behind_1 = 1, sync_lender_behind_3 = 3, sync_lender_behind_8 = 8, sync_lender_behind_10 = 10, sync_lender_behind_12 = 12);
 at!(sync_lender_pot: sync_lender_pot_1 = 1, sync_lender_pot_8 = 8);
+at!(claim_sol_held: claim_sol_held_8 = 8);
+at!(cover_deficit_held: cover_deficit_held_8 = 8);
+at!(sync_lender_held: sync_lender_held_8 = 8);
+at!(claim_sol_held_lag1: claim_sol_held_lag1_7 = 7, claim_sol_held_lag1_8 = 8);
+at!(cover_deficit_held_lag1: cover_deficit_held_lag1_7 = 7, cover_deficit_held_lag1_8 = 8);
+at!(sync_lender_held_lag1: sync_lender_held_lag1_7 = 7, sync_lender_held_lag1_8 = 8);
 
 fn sweep_protocol_fees() -> Prepared {
     let (
@@ -992,6 +1217,78 @@ pub fn cases() -> Vec<Case> {
             "a third party, 8 rebase records passed: the pot-only touch",
             LENDER_SOL,
             sync_lender_pot_8,
+        ),
+        case(
+            "claim_sol",
+            "KI-66 full: settles a forward chain, 8 records",
+            LENDER_SOL,
+            claim_sol_held_8,
+        ),
+        case(
+            "cover_deficit",
+            "KI-66 full: settles a forward chain, 8 records",
+            LENDER_SOL,
+            cover_deficit_held_8,
+        ),
+        case(
+            "sync_lender",
+            "KI-66 full: owner settles a forward chain, 8 records",
+            LENDER_SOL,
+            sync_lender_held_8,
+        ),
+        case(
+            "claim_sol",
+            "KI-66 full: FWD_OPEN, settles through 8 records",
+            LENDER_SOL,
+            claim_sol_open_8,
+        ),
+        case(
+            "sync_lender",
+            "KI-66 full: a third party continues a chain, 4 records",
+            LENDER_SOL,
+            sync_lender_pot_continue_8,
+        ),
+        case(
+            "claim_sol",
+            "KI-66 full: settles a chain a unit above it at every record (lag 1), 7 records",
+            LENDER_SOL,
+            claim_sol_held_lag1_7,
+        ),
+        case(
+            "claim_sol",
+            "KI-66 full: settles a chain a unit above it at every record (lag 1), 8 records (the web caps a chained settlement at 7)",
+            LENDER_SOL_BEYOND_CAP,
+            claim_sol_held_lag1_8,
+        ),
+        case(
+            "cover_deficit",
+            "KI-66 full: settles a chain a unit above it at every record (lag 1), 7 records",
+            LENDER_SOL,
+            cover_deficit_held_lag1_7,
+        ),
+        case(
+            "cover_deficit",
+            "KI-66 full: settles a chain a unit above it at every record (lag 1), 8 records (the web caps a chained settlement at 7)",
+            LENDER_SOL_BEYOND_CAP,
+            cover_deficit_held_lag1_8,
+        ),
+        case(
+            "sync_lender",
+            "KI-66 full: owner settles a chain a unit above it at every record (lag 1), 7 records",
+            LENDER_SOL,
+            sync_lender_held_lag1_7,
+        ),
+        case(
+            "sync_lender",
+            "KI-66 full: owner settles a chain a unit above it at every record (lag 1), 8 records (the web caps a chained settlement at 7)",
+            LENDER_SOL_BEYOND_CAP,
+            sync_lender_held_lag1_8,
+        ),
+        case(
+            "claim_sol",
+            "KI-67: a wiped lender's claim that closes the position",
+            LENDER_SOL,
+            claim_sol_closes,
         ),
         case(
             "sweep_protocol_fees",

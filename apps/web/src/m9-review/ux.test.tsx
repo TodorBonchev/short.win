@@ -281,7 +281,11 @@ function lendChain(accounts: TokenAccountInfo[]): LoadedChain {
         owner: WALLET,
         market: MARKET,
         bump: 255,
-        reserved: new Uint8Array(32),
+        fwdShares: 0n,
+        fwdEpoch: 0,
+        fwd: 0,
+        fwdLag: 0,
+        reserved: new Uint8Array(10),
     } as LenderPosition;
     const c: LendChain = {
         mint: MINT,

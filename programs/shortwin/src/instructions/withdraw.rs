@@ -46,7 +46,8 @@
 //! 6. the SOL, a direct lamport debit of `market_vault` (never below rent + `lender_sol +
 //!    protocol_fees`, I2);
 //! 7. post-conditions: `pool_vault.amount ≥ T`, the vault floor;
-//! 8. `lender` is closed to `owner` when `shares == 0 ∧ pending == 0 ∧ lock == 0`;
+//! 8. `lender` is closed to `owner` when `pool::closable` holds (current, `shares == 0 ∧ pending
+//!    == 0 ∧ lock == 0`, no forward chain: always so for a current lender; KI-67, as `claim_sol`);
 //! 9. events: the `Withdraw` `emit_cpi!` (one per instruction, ARCH §3.0 step 11); a mint failing
 //!    the filter is a `MintSafetyTripped` **log** event (`emit!`, no trace entry, like
 //!    `CoverageGap`), which reconciles ARCH §3.0 steps 3 and 11 (M1-SEC-11 / M1-FID-10).
@@ -167,7 +168,7 @@ pub fn handler<'info>(
     let mint_key = ctx.accounts.mint.key();
 
     // Steps 1–5 and the pool body; every account is stored only once every check passed.
-    let (tokens, pay, pot_draw, t_after, s_after, after, tracked, market_bump, filter_ok) = {
+    let (tokens, pay, pot_draw, t_after, s_after, after, tracked, market_bump, filter_ok, closes) = {
         let config = ctx.accounts.config.load()?;
         let mut market = ctx.accounts.market.load_mut()?;
         let mut vault_acc = ctx.accounts.market_vault.load_mut()?;
@@ -225,6 +226,7 @@ pub fn handler<'info>(
             lender::tracked(&vault)?,
             market.bump,
             filter_ok,
+            pool::closable(&pool, &l),
         )
     };
 
@@ -278,7 +280,7 @@ pub fn handler<'info>(
     );
     lender::check_vault_floor(&vault_info, tracked)?;
 
-    if after.shares == 0 && after.pending == 0 && after.lock == 0 {
+    if closes {
         ctx.accounts
             .lender
             .close(ctx.accounts.owner.to_account_info())?;

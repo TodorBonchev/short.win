@@ -154,6 +154,34 @@ impl Market {
         )
     }
 
+    /// KI-66 full: `sync_lender(n)` with the `n` records from where the walk starts: signed, the
+    /// owner's `convert` then `touch` unless still behind (one unit); unsigned, `touch_pot` from the
+    /// lender's epoch or, with a forward chain, from its `fwd_epoch`.
+    pub fn sync(&mut self, user: usize, n: usize, signed: bool) -> Result<(), MathError> {
+        let i = self.slot(user);
+        let (mut v, mut l) = (self.vault, self.lenders[i].1);
+        let lo = if signed || l.fwd == pool::FWD_NONE {
+            l.epoch
+        } else {
+            l.fwd_epoch
+        } as usize;
+        let len = self.records.len();
+        let (a, b) = (lo.min(len), lo.saturating_add(n).min(len));
+        let mut recs = self.records.clone();
+        if signed {
+            let st = pool::convert(&self.pool, &mut l, &mut recs[a..b])?;
+            if st != Standing::Behind {
+                pool::touch(&self.pool, &mut v, &mut l, &mut recs[a..b], self.now)?;
+            }
+        } else {
+            pool::touch_pot(&self.pool, &mut v, &mut l, &recs[a..b], self.now)?;
+        }
+        self.records = recs;
+        self.vault = v;
+        self.lenders[i].1 = l;
+        Ok(())
+    }
+
     /// The committed first step of `d` / `w`: release + touch, as one unit.
     pub fn pre(&mut self, user: usize) -> Result<(), MathError> {
         let i = self.slot(user);
@@ -380,6 +408,7 @@ impl Market {
             "v" => none(self.cover(u(), u64a(1))),
             "t" => none(self.touch(u()).map(|_| ())),
             "h" => none(self.touch_pot(u()).map(|_| ())),
+            "y" => none(self.sync(u(), usize::try_from(n(1)).expect("n"), n(2) == 1)),
             "l" => show(&self.lock_of(u()).map(Some)),
             "k" => none(self.cal_advance()),
             "R" => none(self.release().map(|_| ())),
@@ -403,6 +432,9 @@ impl Market {
     /// creation order; I-P1–I-P3, I-P7; then touch + allowance for each (I-P4) and no
     /// lock effective at or after its `lock_until`.
     pub fn check_touch_all(&mut self) -> Result<(), String> {
+        for (u, l) in &self.lenders {
+            fwd_state(&self.pool, l).map_err(|e| format!("u{u}: {e}"))?;
+        }
         self.cal_advance()
             .map_err(|e| format!("cal_advance: {e}"))?;
         let t = u128::from(self.pool.tokens_free);
@@ -608,7 +640,7 @@ impl Market {
         for (u, l) in &self.lenders {
             write!(
                 s,
-                ";{u}:{},{},{},{},{},{},{},{},{},{},{},{}",
+                ";{u}:{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
                 l.shares,
                 l.snap,
                 l.pending,
@@ -620,7 +652,11 @@ impl Market {
                 l.lock_until,
                 l.snap_r,
                 l.real,
-                l.claimed
+                l.claimed,
+                l.fwd,
+                l.fwd_epoch,
+                l.fwd_shares,
+                l.fwd_lag
             )
             .expect("write");
         }
@@ -667,7 +703,7 @@ const RECORD_FIELDS: [&str; 9] = [
     "carry_r",
     "conv_rem",
 ];
-const LENDER_FIELDS: [&str; 12] = [
+const LENDER_FIELDS: [&str; 16] = [
     "shares",
     "snap",
     "pending",
@@ -680,9 +716,41 @@ const LENDER_FIELDS: [&str; 12] = [
     "snap_r",
     "real",
     "claimed",
+    "fwd",
+    "fwd_epoch",
+    "fwd_shares",
+    "fwd_lag",
 ];
 
 /// Names the fields in which two canonical states differ.
+/// KI-66 full: the forward-chain fields of a stored lender (ARCH §2.3.6 `LenderPosition`):
+/// none, or a chain the pot-only touch started at a rebase record (`FWD_HOLD`: `epoch <
+/// fwd_epoch`, no lag) or that the owner's conversion entered (`FWD_OPEN`: `epoch ≤ fwd_epoch`,
+/// lag 0 or 1), never ahead of the pool and never on a current lender.
+pub fn fwd_state(p: &Pool, l: &Lender) -> Result<(), String> {
+    let ok = match l.fwd {
+        pool::FWD_NONE => l.fwd_epoch == 0 && l.fwd_lag == 0 && l.fwd_shares == 0,
+        pool::FWD_HOLD | pool::FWD_OPEN => {
+            l.epoch < p.share_epoch
+                && l.fwd_epoch <= p.share_epoch
+                && if l.fwd == pool::FWD_HOLD {
+                    l.epoch < l.fwd_epoch && l.fwd_lag == 0
+                } else {
+                    l.epoch <= l.fwd_epoch && l.fwd_lag <= 1
+                }
+        }
+        _ => false,
+    };
+    if ok && l._pad == [0; 2] {
+        Ok(())
+    } else {
+        Err(format!(
+            "forward chain fwd {} fwd_epoch {} fwd_lag {} fwd_shares {} at epoch {} (share epoch {})",
+            l.fwd, l.fwd_epoch, l.fwd_lag, l.fwd_shares, l.epoch, p.share_epoch
+        ))
+    }
+}
+
 pub fn diff_states(expected: &str, got: &str) -> String {
     let (e, g): (Vec<&str>, Vec<&str>) = (expected.split(';').collect(), got.split(';').collect());
     let mut out = String::new();

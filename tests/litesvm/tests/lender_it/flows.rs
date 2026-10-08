@@ -261,15 +261,17 @@ fn records_must_be_consecutive() {
         &[&owner],
     );
     assert_err(&res, ShortwinError::EpochRecordMismatch);
-    // In order they work (A converts through the wipe and jumps: it holds nothing).
+    // In order they work (A converts through the wipe and jumps: it holds nothing). Paid in
+    // full and empty, the position closes (KI-67).
     assert_eq!(lab.claim("A"), Ok(5_000_000_000));
-    assert_eq!(lab.position("A").unwrap().epoch, 2);
+    assert_eq!(lab.position("A"), None);
 }
 
 /// `sync_lender` in `sync_lender(1)` steps through three rebase records. Converting through a
 /// rebase record needs the owner's signature (KI65-REV-SEC1): sent by a third party the first
 /// step is the pot-only touch (KI-66: A accrued to the record's ends, not converted, no record
-/// written); signed by A each step converts. The plain touch `sync_lender(0)` of a current
+/// written; KI-66 full: its forward chain starts at epoch 1 and waits for record 1); signed by
+/// A each step converts, taking the chain back. The plain touch `sync_lender(0)` of a current
 /// lender stays permissionless.
 #[test]
 fn sync_lender_goes_step_by_step_and_only_the_owner_converts_through_a_rebase() {
@@ -295,10 +297,29 @@ fn sync_lender_goes_step_by_step_and_only_the_owner_converts_through_a_rebase() 
     let records = lab.state().records;
     assert_eq!(lab.sync("A", 1), Ok(Standing::Behind));
     let held = lab.position("A").unwrap();
+    let den = records[0].den().unwrap();
     assert_eq!(
-        (held.shares, held.epoch, held.snap, held.snap_r),
-        (before.shares, 0, records[0].acc_end, records[0].acc_r_end),
-        "not converted, accrued to the record's ends"
+        (
+            held.shares,
+            held.epoch,
+            held.fwd,
+            held.fwd_epoch,
+            held.fwd_shares
+        ),
+        (before.shares, 0, pool::FWD_HOLD, 1, before.shares / den),
+        "not converted; the chain waits for record 1"
+    );
+    let accrued = shortwin_math::num::mul_div_i128(
+        records[0].acc_end - before.snap,
+        before.shares,
+        WAD,
+        shortwin_math::Rounding::Floor,
+    )
+    .unwrap();
+    assert_eq!(
+        (i128::from(held.pending), held.snap, held.snap_r),
+        (i128::from(before.pending) + accrued, 0, 0),
+        "accrued to the record's ends; the chain's snapshots start at 0"
     );
     assert_eq!(lab.state().records, records, "no record written");
     // One record at a time, signed by A: Behind until the last, then touched.
@@ -664,4 +685,140 @@ fn lender_flow_on_a_created_market() {
         ok(env.send(&[ix::sweep_protocol_fees(&market, &recipient)], &[]));
         assert_eq!(read::lamports(&env.svm, &recipient), before + fee);
     }
+}
+
+/// The `LenderPosition` rent (241 B).
+fn position_rent(lab: &Lab) -> u64 {
+    lab.env
+        .svm
+        .minimum_balance_for_rent_exemption(shortwin::state::LenderPosition::SPACE)
+}
+
+/// KI-67 (owner decision of 2026-10-08): `claim_sol` closes a position the claim leaves
+/// `pool::closable` — current, no shares, `pending` 0, no lock, no forward chain — and returns
+/// its rent (2,568,240 lamports) to the owner. A wiped lender: parked on the live wipe record its
+/// claim pays but keeps the position (not current); after the wipe is finalised its claim
+/// converts it through the record and closes it. A later deposit re-creates the position from
+/// `pool::Lender::new` (the lab checks it against the math crate's fresh lender). A further
+/// `claim_sol` or an unsigned `sync_lender` of the closed position fails with
+/// `AccountNotInitialized` (3012).
+#[test]
+fn claim_sol_closes_a_wiped_position_and_returns_its_rent() {
+    let mut lab = wiped_lab();
+    let rent = position_rent(&lab);
+    assert_eq!(rent, 2_568_240);
+    assert_eq!(lab.claim("A"), Ok(5_000_000_000));
+    let a = lab.position("A").expect("parked: not current, kept");
+    assert_eq!(
+        (a.pending, a.epoch),
+        (0, 0),
+        "paid, still on the wipe record"
+    );
+    lab.sweep_sol(0);
+    lab.deposit("B", 1_000_000_000).unwrap();
+    let lam = lab.lamports_of("A");
+    assert_eq!(lab.claim("A"), Ok(0));
+    assert_eq!(lab.position("A"), None, "converted, empty and paid: closed");
+    assert_eq!(
+        lab.lamports_of("A"),
+        lam + rent,
+        "the rent back to the owner"
+    );
+    let m = lab.k.market;
+    let owner = lab.key("A");
+    let kp = lab.users["A"].kp.insecure_clone();
+    let not_init = Some(u32::from(AnchorErrorCode::AccountNotInitialized));
+    let res = lab.env.send(&[ix::claim_sol(&owner, &m)], &[&kp]);
+    assert_eq!(shortwin_litesvm_tests::errors::custom_code(&res), not_init);
+    let payer = lab.env.payer.insecure_clone();
+    let res = lab.env.send(&[ix::sync_lender(&owner, &m, 0)], &[&payer]);
+    assert_eq!(shortwin_litesvm_tests::errors::custom_code(&res), not_init);
+    // A later deposit re-creates it, clean.
+    lab.deposit("A", 1_000_000_000).unwrap();
+    let a = lab.position("A").unwrap();
+    assert_eq!(
+        (
+            a.real,
+            a.claimed,
+            a.fwd,
+            a.fwd_epoch,
+            a.lock,
+            a.lock_term,
+            a.epoch
+        ),
+        (0, 0, pool::FWD_NONE, 0, 0, 0, lab.market().share_epoch)
+    );
+}
+
+/// KI-67: a position the claim does not leave closable stays open — `pending > 0` (H's dust
+/// converted to 0 shares through a rebase record while its credited rent was not realised yet)
+/// and `pending < 0` are kept — and the claim that pays the rest closes it: the open position
+/// repays, the realised rent lands on W's shares beyond W's entitlement, W's touch moves that
+/// surplus to the pot, and H's next claim draws its deficit from the pot and closes. In the same
+/// transaction a deposit re-creates the position (`[claim_sol, deposit]`), from a clean state.
+#[test]
+fn claim_sol_closes_only_when_nothing_is_owed_either_way() {
+    let mut lab = Lab::with_cap(TokenProgram::Spl, 10_000);
+    lab.deposit("H", 100_000).unwrap();
+    lab.deposit("W", 1_000_000_000_000).unwrap();
+    lab.borrow30("r", 1).unwrap();
+    lab.advance(10 * D, 10u128.pow(28));
+    let t = lab.market().tokens_free;
+    lab.borrow30("p", t - 1).unwrap();
+    lab.settle("p", 1_000_000_000, 0);
+    assert_eq!(lab.market().share_epoch, 1);
+    lab.claim("H").unwrap();
+    let h = lab.position("H").expect("pending > 0: kept");
+    assert_eq!((h.shares, h.epoch), (0, 1), "dust converted to 0 shares");
+    assert!(
+        h.pending > 0,
+        "its credited rent is not realised: {}",
+        h.pending
+    );
+    let owed = lab.owed("r");
+    lab.repay("r", owed, 0);
+    lab.claim("W").unwrap();
+    assert!(lab.vault().unmatched > 0, "W's surplus in the pot");
+    let rent = position_rent(&lab);
+    let m = lab.k.market;
+    let keys = lender_keys(&mut lab, "H");
+    let kp = lab.users["H"].kp.insecure_clone();
+    let lam = lab.lamports_of("H");
+    let meta = lab
+        .env
+        .send(
+            &[
+                ix::claim_sol(&keys.owner, &m),
+                ix::deposit(&keys, 1_000_000, 0),
+            ],
+            &[&kp],
+        )
+        .expect("[claim_sol, deposit]");
+    let paid = events::of::<shortwin::events::ClaimSol>(&meta)[0].sol_paid;
+    assert_eq!(
+        paid,
+        u64::try_from(h.pending).unwrap(),
+        "paid in full from the pot"
+    );
+    let h = lab
+        .position("H")
+        .expect("re-created in the same transaction");
+    assert_eq!(
+        (h.real, h.claimed, h.pending, h.fwd, h.lock, h.epoch),
+        (0, 0, 0, pool::FWD_NONE, 0, 1),
+        "a clean position"
+    );
+    assert!(h.shares > 0);
+    // The closing claim returned the rent, the deposit paid it again.
+    assert_eq!(lab.lamports_of("H"), lam + paid + rent - rent);
+    // A deficit lender (pending < 0) claims nothing and keeps its position.
+    let mut lab = Lab::with_cap(TokenProgram::Spl, 10_000);
+    lab.deposit("B", 1_000_000_000_000).unwrap();
+    lab.borrow30("1", 1_000_000_000).unwrap();
+    lab.advance(20 * D, 10u128.pow(19));
+    lab.deposit("C", 6_000_000_000_000).unwrap();
+    lab.repay("1", 0, 0);
+    assert_eq!(lab.claim("C"), Ok(0));
+    let c = lab.position("C").expect("pending < 0: kept");
+    assert!(c.pending < 0);
 }
