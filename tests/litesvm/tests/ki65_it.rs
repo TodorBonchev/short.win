@@ -17,17 +17,18 @@
 //! V2-12 jump; the writable-record rule (`EpochRecordReadOnly`); a deficit lender converting
 //! through `cover_deficit`; re-entry after the flush; `claim_sol ×3`; and the I1 hook against a
 //! conversion the program did not store. Since the owner's decision of 2026-10-07
-//! (KI65-REV-SEC1) only a position's owner converts it through a rebase record
-//! (`RebaseNeedsOwner`; plain catch-up, the V2-12 jump and the parking stay permissionless):
-//! the `order_*` tests pin that a third party can no longer order honest lenders' conversions
-//! (the security review's attacks are refused, and lazy honest lenders keep their units and the
-//! vest), and what remains: a party orders its own conversions (Sybil positions placed before
+//! (KI65-REV-SEC1) only a position's owner converts it through a rebase record; anyone else's
+//! `sync_lender` stops there with the pot-only touch (KI-66, seventh round; plain catch-up, the
+//! V2-12 jump and the parking stay permissionless): the `order_*` tests pin that a third party
+//! can no longer order honest lenders' conversions (the security review's attacks convert
+//! nobody, and lazy honest lenders keep their units and the vest), and what remains: a party orders its own conversions (Sybil positions placed before
 //! the roll, a tuned residue) and converts after honest lenders' own conversions — at any later
 //! time, no atomicity needed — collecting up to one unit per position it holds; where that
 //! leaves every honest holder at 0 shares it is paid the whole vest — a JIT depositor too, with
 //! one Sybil placed before the roll. The figures are pinned to the lamport (`assert_eq!`; the
-//! audit docs quote them). And the price of the rule: a surplus held by a lender behind a rebase
-//! record reaches the pot (R3A-2) only when its owner returns.
+//! audit docs quote them). And the rule's price for the pot, paid back by the pot-only touch
+//! (KI-66): a surplus held by a lender behind a rebase record reaches the pot (R3A-2) by anyone's
+//! sync, without its owner.
 //!
 //! Requires the SBF build: `anchor build --tools-version v1.57 --arch v3`.
 
@@ -219,8 +220,8 @@ fn w1_a_jit_whale_takes_nothing_while_a_share_is_latent() {
 }
 
 /// Spec (3) W2: the whale bundles [settlement (vest + rebase) → `sync_lender` of both lenders
-/// in either order → exit]. A third party's `sync_lender` of H is refused (`RebaseNeedsOwner`,
-/// KI65-REV-SEC1): each lender converts itself (signed). The record's rounding unit goes to the
+/// in either order → exit]. A third party's `sync_lender` of H converts nothing (the pot-only
+/// touch, KI65-REV-SEC1 / KI-66): each lender converts itself (signed). The record's rounding unit goes to the
 /// second converter; nobody gets less than its floor (H's is 0 shares). Order H then W (W
 /// converts after H's own conversion): W holds all of `S` and its exit is paid the 3 SOL vest that
 /// was stranded before KI-65; order W then H: H holds the unit and is paid the vest after W
@@ -229,11 +230,8 @@ fn w1_a_jit_whale_takes_nothing_while_a_share_is_latent() {
 fn w2_the_sync_order_moves_only_the_rounding_unit() {
     for (first, second) in [("H", "W"), ("W", "H")] {
         let mut lab = rebased_pair(TokenProgram::BOTH[usize::from(first == "W")]);
-        assert_eq!(
-            lab.sync("H", 1),
-            Err(code(ShortwinError::RebaseNeedsOwner)),
-            "a third party"
-        );
+        assert_eq!(lab.sync("H", 1), Ok(Standing::Behind), "a third party");
+        assert_eq!(conv_rem(&lab, 0), 0, "H not converted");
         assert_eq!(lab.sync_signed(first, 1), Ok(Standing::Current));
         assert_every_share_held(&lab, first);
         assert_eq!(lab.sync_signed(second, 1), Ok(Standing::Current));
@@ -525,7 +523,8 @@ fn a_conversion_not_stored_is_caught_by_i1() {
 // ---- Owner-signed rebase conversions (owner decision 2026-10-07, KI65-REV-SEC1) --------------
 
 /// Only a position's owner converts it through a rebase record: a third party's `sync_lender`
-/// that would read one is refused (`RebaseNeedsOwner`, nothing written), an owner that is not the
+/// that would read one is the pot-only touch (KI-66: the lender accrued to the record's ends,
+/// its shares, epoch and the record unchanged; idempotent), an owner that is not the
 /// position's is refused by the lender's seeds, and the owner's own signature converts. Without
 /// the owner the instruction stays permissionless where no rebase record is read: the parking on
 /// a live full-wipe record, the plain catch-up through a wipe record and the V2-12 jump over a
@@ -547,12 +546,21 @@ fn only_the_owner_converts_through_a_rebase_record() {
     // B is behind the rebase record: sync_lender(0) leaves it there, by anyone.
     assert_eq!(lab.sync("B", 0), Ok(Standing::Behind));
     let (records, b) = (lab.state().records, lab.position("B").unwrap());
-    assert_eq!(lab.sync("B", 1), Err(code(ShortwinError::RebaseNeedsOwner)));
+    assert_eq!(lab.sync("B", 1), Ok(Standing::Behind));
+    let held = lab.position("B").unwrap();
+    assert_eq!(lab.state().records, records, "no record written");
     assert_eq!(
-        (lab.state().records, lab.position("B").unwrap()),
-        (records, b),
-        "nothing written"
+        (held.shares, held.epoch, held.lock, held.lock_term),
+        (b.shares, b.epoch, b.lock, b.lock_term),
+        "not converted"
     );
+    assert_eq!(
+        (held.snap, held.snap_r),
+        (records[1].acc_end, records[1].acc_r_end),
+        "accrued to the record's ends"
+    );
+    assert_eq!(lab.sync("B", 1), Ok(Standing::Behind));
+    assert_eq!(lab.position("B").unwrap(), held, "idempotent");
     // Another signer in the owner's place: the lender's seeds refuse it.
     let m = lab.k.market;
     let (bk, ak) = (lab.key("B"), lab.key("A"));
@@ -587,7 +595,8 @@ fn only_the_owner_converts_through_a_rebase_record() {
 // The order of the conversions through a rebase record decides who receives its rounding
 // units (at most `n − 1`, one per position), never pushing a lender below its floor `⌊s/den⌋`.
 // Since the owner's decision of 2026-10-07 only a position's owner converts it through a
-// rebase record (KI65-REV-SEC1, `RebaseNeedsOwner`), so the security review's attacks — a third
+// rebase record (KI65-REV-SEC1; anyone else's sync is the pot-only touch, KI-66, which converts
+// nobody), so the security review's attacks — a third
 // party's `sync_lender` of the honest lenders, interleaved with its own Sybils or around a
 // tuned residue — are refused, and an honest lender that has not converted keeps its latent
 // unit: it counts in `S`, blocks the flush (W3) and is paid the vest when it converts. What
@@ -645,24 +654,26 @@ fn lamports(lab: &mut Lab, names: &[&str]) -> u64 {
     names.iter().map(|n| lab.lamports_of(n)).sum()
 }
 
-/// The `refused` conversions are a third party's `sync_lender`s: `RebaseNeedsOwner`, and no
-/// record or position written.
-fn third_party_refused(lab: &mut Lab, refused: &[&str]) {
+/// The `held` lenders' conversions as a third party would order them: its `sync_lender`s are the
+/// pot-only touch (KI-66), which converts nobody: no record written, every position at its
+/// shares and epoch.
+fn third_party_converts_nobody(lab: &mut Lab, held: &[&str]) {
     let records = lab.state().records;
-    for n in refused {
-        let before = lab.position(n);
+    for n in held {
+        let before = lab.position(n).unwrap();
+        assert_eq!(lab.sync(n, 1), Ok(Standing::Behind), "{n}");
+        let after = lab.position(n).unwrap();
         assert_eq!(
-            lab.sync(n, 1),
-            Err(code(ShortwinError::RebaseNeedsOwner)),
-            "{n}"
+            (after.shares, after.epoch),
+            (before.shares, before.epoch),
+            "{n}: not converted"
         );
-        assert_eq!(lab.position(n), before, "{n}: nothing written");
     }
     assert_eq!(lab.state().records, records, "no record written");
 }
 
 /// The security review's Sybil interleaving (H1, A1, H2, A2) needed a third party's
-/// `sync_lender` of H1 and H2: refused. With the honest lenders lazy, the attacker's own
+/// `sync_lender` of H1 and H2: it converts neither (the pot-only touch). With the honest lenders lazy, the attacker's own
 /// conversions, in any order, collect neither of the record's two units: the honest lenders'
 /// 1,998 latent old shares (with the Sybils' 2 left in `conv_rem`) keep both, the attacker's
 /// last exit is not the last of `S`, and the honest lenders, converting later, hold a share
@@ -670,7 +681,7 @@ fn third_party_refused(lab: &mut Lab, refused: &[&str]) {
 #[test]
 fn order_a_third_party_cannot_interleave_its_sybils_with_honest_lenders() {
     let (mut lab, w) = sybil_market();
-    third_party_refused(&mut lab, &["H1", "H2"]);
+    third_party_converts_nobody(&mut lab, &["H1", "H2"]);
     for n in ["A1", "W", "A2"] {
         assert_eq!(lab.sync_signed(n, 1), Ok(Standing::Current), "{n}");
         assert_every_share_held(&lab, n);
@@ -819,7 +830,8 @@ fn order_the_later_conversion_needs_no_atomicity() {
 }
 
 /// Without Sybils: a whale that tunes its own residue (`s_W ≡ 1 mod 1,000`). The security
-/// review's order (H1, W, H2 by a third party) is refused. With the honest lenders lazy, W's
+/// review's order (H1, W, H2 by a third party) converts neither H (the pot-only touch). With the
+/// honest lenders lazy, W's
 /// own conversion floors (`⌊s_W/1,000⌋`, remainder 1), the honest 1,998 old shares keep the
 /// record's unit, W's exit is not the last and the honest lenders are paid the vest. Converting
 /// after H1's own claim (remainder 999), W collects the unit and holds all of `S` — H2's
@@ -835,7 +847,7 @@ fn order_a_residue_tuned_whale_collects_the_unit_only_after_an_honest_conversion
         (lab, w)
     };
     let (mut lab, w) = tuned();
-    third_party_refused(&mut lab, &["H1", "H2"]);
+    third_party_converts_nobody(&mut lab, &["H1", "H2"]);
     assert_eq!(lab.sync_signed("W", 1), Ok(Standing::Current));
     assert_eq!(shares(&mut lab, "W"), w / DEN);
     assert_eq!(lab.market().total_shares.get(), w / DEN + 1);
@@ -873,7 +885,8 @@ fn order_a_residue_tuned_whale_collects_the_unit_only_after_an_honest_conversion
 }
 
 /// W3 with one Sybil placed before the roll: H (600 old shares), the attacker's dust position A
-/// (400) and an honest whale G. A third party's `sync_lender` of H is refused. While H stays
+/// (400) and an honest whale G. A third party's `sync_lender` of H converts nothing (the pot-only
+/// touch). While H stays
 /// lazy, A's own conversion floors to 0 (remainder 400), H's 600 latent old shares hold the
 /// record's unit, and after G leaves, a JIT depositor J around a 3 SOL sweep realises 0; H,
 /// converting later, is paid both vests. Converting after H's own claim (H at 0 shares,
@@ -892,7 +905,7 @@ fn order_w3_with_a_sybil_the_jit_depositor_is_paid_the_lump_only_after_hs_conver
     };
     // H lazy.
     let mut lab = w3();
-    third_party_refused(&mut lab, &["H"]);
+    third_party_converts_nobody(&mut lab, &["H"]);
     for n in ["A", "G"] {
         assert_eq!(lab.sync_signed(n, 1), Ok(Standing::Current), "{n}");
     }
@@ -938,19 +951,22 @@ fn order_w3_with_a_sybil_the_jit_depositor_is_paid_the_lump_only_after_hs_conver
     assert_eq!(lab.position("H").unwrap().shares, 0);
 }
 
-// ---- The price of the rule: the pot and a surplus holder that never returns -----------------
+// ---- The pot and a surplus holder that never returns (KI-66) --------------------------------
 
 /// The pot (R3A-2) is filled only by a touch of a lender holding realised SOL beyond its
-/// entitlement, and a third party's `sync_lender` was how a surplus holder that never returns got
-/// touched (ECON R3A-2, ARCH I-P6). Behind a rebase record that sync is now refused (spec review
-/// of the KI-65 follow-up): `lender_it`'s `the_pot_connects_early_leavers_and_late_joiners` (A
-/// leaves early, C joins late and holds the surplus) with a rebase rolled before anyone touched C. A third party's `sync_lender(1)` of C is
-/// refused, `sync_lender(0)` leaves it behind, the pot stays empty and A's second claim pays
-/// nothing of its shortfall; only C's own signed conversion moves the surplus to the pot, and A's
-/// next claim is then paid in full. Disclosed (known-issues KI65-REV-POT): deficit lenders wait
-/// for the surplus holder's owner.
+/// entitlement, and a third party's `sync_lender` is how a surplus holder that never returns
+/// gets touched (ECON R3A-2, ARCH I-P6). Behind a rebase record that sync may not convert it
+/// (KI65-REV-SEC1), so since KI-66 it is the pot-only touch: `lender_it`'s
+/// `the_pot_connects_early_leavers_and_late_joiners` (A leaves early, C joins late and holds the
+/// surplus) with a rebase rolled before anyone touched C. `sync_lender(0)` passes no record and
+/// leaves C as it is; a third party's `sync_lender(1)` accrues C to the record's ends and moves
+/// its surplus to the pot without converting C (shares, epoch, the record's `conv_rem`), a
+/// second one changes nothing, and A's next claim is paid in full — C's owner never signed. When
+/// C's owner returns, its conversion counts nothing twice: C is paid what it would have been had
+/// it converted first (`pool_model.pot_touch_demo` pins the same figures). Before KI-66 (the
+/// KI-65 follow-up) A stayed short 2,827,173,914 lamports until C's owner returned.
 #[test]
-fn a_surplus_behind_a_rebase_record_reaches_the_pot_only_when_its_owner_returns() {
+fn a_surplus_behind_a_rebase_record_reaches_the_pot_without_its_owner() {
     let mut lab = Lab::with_cap(TokenProgram::Spl, 10_000);
     lab.deposit("A", 1_000_000_000_000).unwrap();
     lab.deposit("B", 1_000_000_000_000).unwrap();
@@ -979,37 +995,54 @@ fn a_surplus_behind_a_rebase_record_reaches_the_pot_only_when_its_owner_returns(
     assert!(surplus > 0);
 
     rebase(&mut lab, "q", U, 0);
-    assert_eq!(lab.sync("C", 1), Err(code(ShortwinError::RebaseNeedsOwner)));
     assert_eq!(lab.sync("C", 0), Ok(Standing::Behind));
-    assert_eq!(lab.vault().unmatched, 0, "the pot stays empty");
-    // A's next claim is paid its share of the rebase's settlement, nothing of the shortfall.
-    let second = lab.claim("A").unwrap();
-    assert_eq!(lab.position("A").unwrap().pending, short, "A still waits");
-    // C's owner returns.
-    assert_eq!(lab.sync_signed("C", 1), Ok(Standing::Current));
+    assert_eq!(lab.vault().unmatched, 0, "sync_lender(0) passes no record");
+    let c0 = lab.position("C").unwrap();
+    // A third party's sync of C: the pot-only touch.
+    assert_eq!(lab.sync("C", 1), Ok(Standing::Behind));
     let pot = lab.vault().unmatched;
+    let c1 = lab.position("C").unwrap();
+    assert_eq!(
+        (c1.shares, c1.epoch, c1.lock, c1.lock_term),
+        (c0.shares, c0.epoch, c0.lock, c0.lock_term),
+        "C is not converted"
+    );
+    assert_eq!(conv_rem(&lab, 0), 0, "no record written");
     assert!(
         pot >= surplus,
         "C's surplus reached the pot: {pot} vs {surplus}"
     );
-    let third = lab.claim("A").unwrap();
-    let left = lab.position("A").unwrap().pending;
-    eprintln!(
-        "pot liveness behind a rebase: A claimed {first}, short {short}; C's surplus {surplus} \
-         (before the roll), pot after C's own sync {pot}; A's claims {second} then {third}, \
-         left {left}"
-    );
-    assert_eq!(left, 0, "A is paid in full once C converted");
+    assert_eq!(lab.sync("C", 1), Ok(Standing::Behind));
     assert_eq!(
-        (first, short, surplus, second, pot, third),
+        (lab.vault().unmatched, lab.position("C").unwrap()),
+        (pot, c1),
+        "idempotent"
+    );
+    // A's next claim: its share of the rebase's settlement and its whole shortfall.
+    let second = lab.claim("A").unwrap();
+    let left = lab.position("A").unwrap().pending;
+    assert_eq!(left, 0, "A is paid in full without C's owner");
+    // C's owner returns: nothing counted twice.
+    assert_eq!(lab.sync_signed("C", 1), Ok(Standing::Current));
+    let c_shares = lab.position("C").unwrap().shares;
+    let c_paid = lab.claim("C").unwrap();
+    eprintln!(
+        "pot liveness behind a rebase (KI-66): A claimed {first}, short {short}; C's surplus \
+         {surplus} (before the roll), pot after a third party's pot-only touch {pot}; A's next \
+         claim {second}, left {left}; C converted later: {c_shares} shares, claims {c_paid}"
+    );
+    assert_eq!(
+        (first, short, surplus, pot, second, c_shares, c_paid),
         (
             997_826_086,
             2_827_173_914,
             4_434_782_608,
-            130_434_782,
             4_434_782_609,
-            2_827_173_914
+            2_957_608_696,
+            2_000,
+            579_710_144
         ),
-        "pinned"
+        "pinned (pool_model.pot_touch_demo: the same figures)"
     );
+    assert_every_share_held(&lab, "end");
 }

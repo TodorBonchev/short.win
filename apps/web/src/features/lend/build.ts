@@ -13,7 +13,7 @@ import type { MathModule } from '../../math/load.ts';
 import type { AppRpc } from '../../rpc/client.ts';
 import type { TxPlan } from '../../tx/types.ts';
 import { chainNowSeconds, liveWipeRecordEpoch, marketNow, readLendChain } from './chain.ts';
-import { type LoadedChain, lendStateOf, lockGraceOf, planContextFor, unpaidRentVarsOf } from './ctx.ts';
+import { type LoadedChain, lendStateOf, lockGraceOf, planContextFor, subUnitVarsOf, unpaidRentVarsOf } from './ctx.ts';
 import {
     buildClaimPlan,
     buildCoverPlan,
@@ -29,6 +29,7 @@ import {
     previewClaimView,
     previewClaimWithPot,
     previewDepositView,
+    previewSubUnitConversion,
     previewUnpaidRent,
     previewWithdrawView,
     type Refusal,
@@ -58,6 +59,19 @@ const refused = (r: Refusal) => new PlanError(r.message);
 
 function display(env: LendEnv, chain: LoadedChain) {
     return { symbol: env.symbol, decimals: chain.market.decimals };
+}
+
+/**
+ * The plan context, with `lender.subUnitConversion`'s variables when the plan's own conversion at
+ * `now` takes the position to 0 shares while the pool's income vests (the owner's decision of
+ * 2026-10-07: the review advises waiting for the vest's end).
+ */
+function contextAt(env: LendEnv, chain: LoadedChain, now: bigint) {
+    const sub = previewSubUnitConversion(env.math, lendStateOf(chain), now);
+    return {
+        ...planContextFor(chain, env.signer, display(env, chain)),
+        ...(sub ? { subUnit: subUnitVarsOf(sub) } : {}),
+    };
 }
 
 function needRecords(chain: LoadedChain) {
@@ -107,7 +121,7 @@ export async function depositPlanFrom(
         sweepIxs = await postWipeSweepIxs(env.signer, chain.marketAddress, market, facts, record);
     }
     const plan = await buildDepositPlan({
-        ...planContextFor(chain, env.signer, display(env, chain)),
+        ...contextAt(env, chain, marketNow(market, nowS)),
         source: source.address,
         sourceCpiGuard: source.cpiGuard,
         amount: inp.amount,
@@ -155,7 +169,7 @@ export async function withdrawPlanFrom(
     const create = !info && inp.destination === chain.ata;
     if (!info && !create) throw new PlanError('The destination token account no longer exists.');
     const base = {
-        ...planContextFor(chain, env.signer, display(env, chain)),
+        ...contextAt(env, chain, marketNow(chain.market, nowS)),
         destination: inp.destination,
         createDestination: create,
         memoRequired: info?.memoRequired ?? false,
@@ -218,7 +232,7 @@ export async function claimPlanFrom(
         }
     }
     const plan = await buildClaimPlan({
-        ...planContextFor(chain, env.signer, display(env, chain)),
+        ...contextAt(env, chain, now),
         syncs,
         expected,
     });
@@ -236,7 +250,7 @@ export async function coverPlanFrom(env: LendEnv, chain: LoadedChain, nowS: numb
     const view = previewClaimView(env.math, lendStateOf(chain), BigInt(nowS));
     if (!view.ok) throw refused(view.refusal);
     const plan = await buildCoverPlan({
-        ...planContextFor(chain, env.signer, display(env, chain)),
+        ...contextAt(env, chain, BigInt(nowS)),
         lamports: view.value.deficit,
     });
     return {
@@ -249,7 +263,7 @@ export async function coverPlanFrom(env: LendEnv, chain: LoadedChain, nowS: numb
 }
 
 export async function syncPlanFrom(env: LendEnv, chain: LoadedChain): Promise<TxPlan> {
-    const plan = await buildSyncPlan(planContextFor(chain, env.signer, display(env, chain)));
+    const plan = await buildSyncPlan(contextAt(env, chain, BigInt(chainNowSeconds(chain, Date.now()))));
     return {
         ...plan,
         rebuild: async () => syncPlanFrom(env, (await freshChain(env)).chain),

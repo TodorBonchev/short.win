@@ -35,8 +35,11 @@
 //! for a lender in the current epoch or one without shares, lock and lock term (it jumps,
 //! V2-12); a lender whose shares and lock floored to 0 but whose term did not needs the
 //! record of its epoch, which scales the term before the jump (as `pool_model`).
-//! The program key-checks the accounts. `sync_lender(max_epochs)` is [`convert`] with the
-//! records at hand, then [`touch`] once the lender is no longer [`Standing::Behind`].
+//! The program key-checks the accounts. `sync_lender(max_epochs)` signed by the lender's owner
+//! is [`convert`] with the records at hand, then [`touch`] once the lender is no longer
+//! [`Standing::Behind`]; sent by anyone else it is [`touch_pot`], which never converts through
+//! a rebase record but still moves the surplus accrued up to it to the pot (KI65-REV-SEC1,
+//! KI-66).
 //! The records are `&mut`: a conversion through a rebase record rounds cumulatively and
 //! writes the record's `conv_rem` (KI-65, no rebase orphans; see [`convert`]), so every
 //! caller persists the records whose `conv_rem` changed together with the lender (the
@@ -587,6 +590,9 @@ trait Recs {
     /// Whether the conversion accrues `pending` and `real` through the records (the commit
     /// pass only replays the path: shares, locks and epochs, which no accrual decides).
     const ACCRUE: bool;
+    /// Whether the conversion stops at a rebase record instead of converting through it (the
+    /// pot-only touch, [`touch_pot`], KI-66).
+    const HOLD: bool = false;
     /// The record of `epoch` and its index, `None` if the slice does not reach it.
     fn get(&self, epoch: u32) -> Result<Option<(usize, ShareEpoch)>, MathError>;
     /// The conversion through record `idx` left `rem` (called only when it changed).
@@ -641,6 +647,23 @@ impl Recs for Commit<'_> {
     fn converted(&mut self, epoch: u32, shares: u128) {
         self.end = Some((epoch, shares));
     }
+}
+
+/// The pot-only touch's pass ([`touch_pot`], KI-66): it stops at the first rebase record, so it
+/// converts through full-wipe records only, which keep their `conv_rem`; a remainder to write
+/// would be a bug (`Invariant`).
+struct Hold<'a>(&'a [ShareEpoch]);
+
+impl Recs for Hold<'_> {
+    const ACCRUE: bool = true;
+    const HOLD: bool = true;
+    fn get(&self, epoch: u32) -> Result<Option<(usize, ShareEpoch)>, MathError> {
+        Ok(record_idx(self.0, epoch)?.and_then(|i| self.0.get(i).map(|r| (i, *r))))
+    }
+    fn set_rem(&mut self, _idx: usize, _rem: u128) -> Result<(), MathError> {
+        Err(MathError::Invariant)
+    }
+    fn converted(&mut self, _epoch: u32, _shares: u128) {}
 }
 
 /// A lender's shares through a record whose validated ratio is `(num, den)` (KI-65, ECON
@@ -1102,6 +1125,15 @@ fn convert_steps<R: Recs>(
             return Ok(Standing::Parked);
         }
         let (num, den) = rec.ratio()?;
+        if R::HOLD && num != 0 {
+            // KI-66: the pot-only touch accrued the lender up to the values the rebase record
+            // froze for its epoch and stays on it, unconverted: no share, lock or `conv_rem`
+            // moves, so it orders no conversion (KI65-REV-SEC1). The snapshots at the record's
+            // ends make the accrual happen once: the conversion through it adds 0.
+            l.snap = rec.acc_end;
+            l.snap_r = rec.acc_r_end;
+            return Ok(Standing::Behind);
+        }
         // KI-65: cumulative rounding through the record, so the conversions of every holder
         // of the old epoch sum to the new S (no orphan shares).
         let (shares, rem) = convert_shares(l.shares, rec.conv_rem, num, den)?;
@@ -1154,9 +1186,30 @@ fn touch_in(
     let mut pending = i128::from(l.pending);
     let mut real = i128::from(l.real);
     let st = convert_in(pool, l, records, &mut pending, &mut real)?;
+    touch_tail(pool, v, l, st, false, pending, real, now)?;
+    Ok(st)
+}
+
+/// The rest of `pool_model.Pool._touch` once the conversion stopped at `st` (the calendar
+/// already advanced), with the conversion's `pending` and `real`: a lender parked on a live
+/// wipe record, or held at a rebase record by the pot-only touch (`held`, [`touch_pot`]),
+/// moves its surplus to the pot and stops there; a current lender accrues the current epoch,
+/// moves its surplus and drops its own expired lock. `LenderBehind` for a lender neither
+/// current, parked nor held.
+#[allow(clippy::too_many_arguments)]
+fn touch_tail(
+    pool: &Pool,
+    v: &mut Vault,
+    l: &mut Lender,
+    st: Standing,
+    held: bool,
+    mut pending: i128,
+    mut real: i128,
+    now: i64,
+) -> Result<(), MathError> {
     match st {
-        Standing::Behind => return Err(MathError::LenderBehind),
-        Standing::Parked => to_pot(v, l.claimed, pending, &mut real)?,
+        Standing::Behind if !held => return Err(MathError::LenderBehind),
+        Standing::Behind | Standing::Parked => to_pot(v, l.claimed, pending, &mut real)?,
         Standing::Current => {
             pending = add_i128(pending, accrued(l.shares, sub_i128(pool.acc, l.snap)?)?)?;
             l.snap = pool.acc;
@@ -1174,7 +1227,7 @@ fn touch_in(
     }
     l.pending = to_i64(pending)?;
     l.real = to_unsigned(real)?;
-    Ok(st)
+    Ok(())
 }
 
 /// Lazy share-epoch conversion only, as far as `records` reach (the loop of
@@ -1192,7 +1245,7 @@ fn touch_in(
 /// decides who receives the record's at most `n − 1` rounding units (one per position: a
 /// party with several positions, or a tuned residue, can receive several; the program lets
 /// only a position's owner convert it through a rebase record, KI65-REV-SEC1, so a party
-/// orders only its own conversions). Hence ECON §13
+/// orders only its own conversions; anyone else's sync is [`touch_pot`]). Hence ECON §13
 /// I-P1′, recursive over the records `0..N` behind the current epoch `N`:
 /// `S = Σ current shares + L_{N−1}`, where `L_e = ⌊(conv_rem_e + U_e)/den_e⌋` through a
 /// rebase record (0 through a full wipe), `U_e` = the epoch-`e` shares of the lenders still
@@ -1279,6 +1332,57 @@ pub fn touch(
     let st = touch_in(pool, &mut v, &mut l, &mut ro, now)?;
     let seen = ro.first;
     commit_rems(pool, lender, records, seen)?;
+    *vault = v;
+    *lender = l;
+    Ok(st)
+}
+
+/// The pot-only touch (KI-66; ECON §9.4 R3A-2, §9.5; ARCH §3.3 `sync_lender` without the
+/// owner's signature; `pool_model.Pool._touch_pot`): [`touch`], except that the lender is never
+/// converted through a rebase record (`1/1,000^k`; KI65-REV-SEC1). A lender whose conversion
+/// reaches one (holding shares, a lock or a lock term at that record's epoch, with the record
+/// at hand) accrues `pending` and `real` up to the record's `acc_end` / `acc_r_end` (the values
+/// it froze for that epoch; floor, as the conversion would), takes them as its snapshots and
+/// moves its surplus to the pot (R3A-2); its shares, lock, lock term and epoch stay, and no
+/// record's `conv_rem` is written, so it orders no conversion. Returns [`Standing::Behind`]
+/// then.
+///
+/// Idempotent: a second pot-only touch accrues 0 through the record and finds no surplus.
+/// The owner's later conversion through the record accrues 0 more there (the snapshots are
+/// its ends), so nothing is counted twice: `pending`, the lender's shares and every record end
+/// as after a [`touch`] alone, and `real + unmatched` too (only the split between the two can
+/// differ, as between touches at two times). What the lender's unconverted shares earn in the
+/// epochs after the record waits for that conversion.
+///
+/// Otherwise as [`convert`] followed by [`touch`]: plain catch-up through full-wipe records, the
+/// V2-12 jump, the parking on a live wipe record and the touch of a current lender; a lender
+/// left [`Standing::Behind`] because records are missing keeps the partial conversion
+/// (`pending` and `real` accrued through the records passed), as [`convert`] does, without
+/// the calendar or the pot.
+///
+/// # Errors
+/// As [`convert`] and [`touch`] (never `LenderBehind`); `Invariant` if the conversion would
+/// write a record (unreachable: a full wipe keeps its `conv_rem`). A refusal changes nothing.
+pub fn touch_pot(
+    pool: &Pool,
+    vault: &mut Vault,
+    lender: &mut Lender,
+    records: &[ShareEpoch],
+    now: i64,
+) -> Result<Standing, MathError> {
+    let (mut v, mut l) = (*vault, *lender);
+    let mut pending = i128::from(l.pending);
+    let mut real = i128::from(l.real);
+    let mut hold = Hold(records);
+    let st = convert_steps(pool, &mut l, &mut hold, &mut pending, &mut real)?;
+    let held = st == Standing::Behind && hold.get(l.epoch)?.is_some();
+    if st == Standing::Behind && !held {
+        l.pending = to_i64(pending)?;
+        l.real = to_unsigned(real)?;
+    } else {
+        cal_advance(&mut v, now)?;
+        touch_tail(pool, &mut v, &mut l, st, held, pending, real, now)?;
+    }
     *vault = v;
     *lender = l;
     Ok(st)

@@ -381,6 +381,52 @@ export function standingOf(market: MarketPoolFields, lender: LenderFields | null
     return { kind: 'behind', epochs: market.shareEpoch - lender.epoch };
 }
 
+// ---- a sub-unit conversion while income vests (KI-65; the owner's decision of 2026-10-07) ----
+
+/** The lender's own next conversion can take its position to 0 shares while the pool's income vests. */
+export interface SubUnitConversion {
+    /** The position's shares before the conversion, in the units of its epoch. */
+    readonly shares: bigint;
+    /** The pool's unreleased vest at `now`, lamports. */
+    readonly unreleased: bigint;
+    /** `Market.vest_end`: when the whole vest is released, unix seconds. */
+    readonly vestEnd: bigint;
+}
+
+/**
+ * Whether the conversion every lender instruction of the owner runs first (`claim_sol`,
+ * `deposit`, `withdraw`, `cover_deficit`, its signed `sync_lender`) can take a position holding
+ * shares through rebase records only (`1/1,000^k`; a full wipe zeroes shares anyway) to 0 shares
+ * while the pool still has income vesting at `now` (`lender.subUnitConversion`, FRONTEND.md
+ * §3.6): the position is worth less than one new share, and a lender converting after it can
+ * receive that share and, holding every share, the vest still unreleased at its exit (ECON §9.5,
+ * KI-65 / KI65-REV-SEC1). `null` otherwise, also when the records at hand do not reach the
+ * current epoch (the conversion would stop behind) or the facade refuses.
+ *
+ * Judged on the worst case, not on the records' `conv_rem` at review time: other lenders'
+ * conversions through the same records can land before the transaction and move each remainder
+ * (no instruction takes a minimum of shares), and with every remainder at 0 the conversion is
+ * the floor `⌊s/1,000^(Σk)⌋` (KI-66 review). A position whose floor is 0 is flagged even when
+ * the remainders now would give it a share.
+ */
+export function previewSubUnitConversion(m: MathModule, s: LendState, now: bigint): SubUnitConversion | null {
+    const l = s.lender;
+    if (!l || l.shares === 0n || standingOf(s.market, l).kind !== 'behind') return null;
+    const passed = s.records.filter((r) => r.epoch >= l.epoch && r.epoch < s.market.shareEpoch);
+    if (passed.length !== s.market.shareEpoch - l.epoch || passed.some((r) => r.num !== 1)) return null;
+    const floor = passed.reduce((x, r) => x / 1_000n ** BigInt(r.denLog1000), l.shares);
+    if (floor > 0n) return null;
+    const unreleased = attempt(() =>
+        session(m, s, (pool, lender, records) => {
+            // The facade must accept the conversion with the records at hand.
+            m.previewTouch(pool, lender, records, now).free();
+            return pool.vestBal - m.previewVestRelease(pool, now);
+        }),
+    );
+    if (!unreleased.ok || unreleased.value <= 0n) return null;
+    return { shares: l.shares, unreleased: unreleased.value, vestEnd: s.market.vestEnd };
+}
+
 // ---- the lender's position (panel summary, dashboard row) ---------------------------------
 
 export interface PositionView {

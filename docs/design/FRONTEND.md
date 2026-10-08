@@ -319,9 +319,22 @@ Tabs Deposit | Withdraw | Claim (`lendTab-*`, `?action=`).
   `sync_lender` for other lenders whose touch moves a surplus to the pot (from
   `/v1/markets/{mint}/lenders`, each judged with `previewTouch` on its on-chain state; ≤ 4 per
   transaction); **cover deficit** (`cover_deficit(lamports)`) when pending < 0. *As built:* the
-  claim tab shows "credited" next to "claimable"; a lender more than 12 share epochs behind
+  claim tab shows "credited" next to "claimable"; a lender more than 8 (`MAX_RECORDS`) share epochs behind
   (more records than one transaction carries) gets a `sync_lender` step first
   (`lend-sync-submit`).
+- **A conversion to no shares during a vest** (*M10*, owner decision of 2026-10-07, seventh
+  round; ECON §9.5, known-issues KI-65): every lender transaction of the user's own — deposit,
+  withdraw, claim, cover deficit, the signed `sync_lender` — first converts the position through
+  the share epochs it is behind. When that conversion can take a position holding shares through
+  rebase records only to 0 shares (it is worth less than one new share; whoever converts after
+  it can receive the record's rounding unit) while the pool still has income vesting at the
+  transaction's time, the review lists `lender.subUnitConversion` last, with the vest's end (UTC),
+  advising to wait until then (`previewSubUnitConversion`; not shown with records missing, after
+  a full wipe, or with the vest released). "Can": the review judges the worst case, the
+  position's floor through the records with every `conv_rem` at 0, not the remainders it reads —
+  other lenders' own conversions landing between the review and the transaction move them, and
+  no instruction takes a minimum of shares (KI-66 review; KI-65's residual seen from the user's
+  side).
 
 ### 3.7 Short panel (SHORT) — the open preview
 
@@ -473,8 +486,8 @@ Checkbox: “I understand I give up my unvested income.”
 
 #### `lender.residuals` — Known limits (accepted by the protocol)
 
-*Severity:* info · *Acknowledgement:* none · *Source:* ARCH §8.5, §10 O19 (OWNER-M7-11, R4B-10); ECON §8.2, §9.3, §9.5, §12.9–§12.11
-*Shown:* Lend → Deposit (collapsed `<details>`), FAQ link. *v1.2 (M9-UX-2):* the three O19 residuals that fall on lenders — the liquidation that reserves nothing (ARCH §8.5's Tier A figures), Raydium pool pinning by a standing minimum position (R4B-10), the notional-cap exceedance of M7-SEC-4 in a lender's framing — were missing and are added
+*Severity:* info · *Acknowledgement:* none · *Source:* ARCH §8.5, §10 O19 (OWNER-M7-11, R4B-10); ECON §8.2, §9.3, §9.5 (KI-65, KI65-REV-SEC1), §12.9–§12.11
+*Shown:* Lend → Deposit (collapsed `<details>`), FAQ link. *v1.2 (M9-UX-2):* the three O19 residuals that fall on lenders — the liquidation that reserves nothing (ARCH §8.5's Tier A figures), Raydium pool pinning by a standing minimum position (R4B-10), the notional-cap exceedance of M7-SEC-4 in a lender's framing — were missing and are added. *M10 (owner decision of 2026-10-07, seventh round: approved):* the last paragraph, KI-65's conversion-order residual after a rebase (known-issues KI-65)
 
 > If lenders withdraw ahead of a loss, those who leave first can take more than their fair share and those who stay less: about 4% of value at 90% utilisation, up to about 11% at 50–60%.
 >
@@ -493,6 +506,8 @@ Checkbox: “I understand I give up my unvested income.”
 > A sale bundled into an open can make that open record up to 10% less notional than an honest quote, so the market’s notional cap — the limit on how much can be shorted while a market is new — can be exceeded by up to about 11%.
 >
 > Tiny dust amounts can be left behind when a pool rebases.
+>
+> After a pool rebase, only you can convert your position, but a position worth less than one new share can convert to none when you next claim, deposit or withdraw. A lender converting after you, at any later time, can receive that share, and if that leaves it holding every share, its exit takes the income still vesting.
 
 #### `lender.unpaidRent` — Rent this pool has not been paid yet
 
@@ -504,6 +519,15 @@ Checkbox: “I understand I give up my unvested income.”
 > At the pool’s current size, this deposit would carry {exposure} SOL of it ({share} of the pool from this deposit). If other lenders withdraw first, that share — and this deposit’s part of such a loss — grows.
 >
 > Such a loss is taken from your SOL balance in this pool. If it leaves that balance below zero, you must pay the difference in SOL (Cover deficit, on the Claim tab) before you can withdraw your tokens.
+
+#### `lender.subUnitConversion` — Your position may convert to no shares
+
+*Severity:* warn · *Acknowledgement:* none · *Source:* ECON §9.5 (KI-65, KI65-REV-SEC1); the owner’s decision of 2026-10-07 (seventh round) (*M10*)
+*Shown:* in the review of the user's own lender transaction — Deposit, Withdraw, Claim, Cover deficit, Sync position — when the conversion it runs first can take a position holding shares through rebase records only (`1/1,000^k`) to 0 shares while the pool still has income vesting at the transaction's time (`previewSubUnitConversion`: the position's floor through the records, `⌊s/1,000^(Σk)⌋`, is 0 — the worst case over the other lenders' conversions, which can land before the transaction and move each record's `conv_rem`; no instruction takes a minimum of shares — the WASM `previewTouch` accepts the records at hand, and the unreleased vest `vest_bal − previewVestRelease` > 0); last in `TxPlan.disclosures`; `{vestEnd}` `Market.vest_end` in UTC
+
+> This pool’s shares were rebased since your position last changed, and your position is worth less than one new share: this transaction can convert it to 0 shares. Whether it does depends on other lenders’ conversions that land before it, which this review cannot see. A lender converting after you can receive that share.
+>
+> Income is vesting in this pool until {vestEnd}. A lender that ends up holding every share is paid all of the income still vesting when it leaves. Unless you need to act now, we advise waiting until {vestEnd} before you claim, deposit or withdraw here.
 
 #### `borrower.liquidation` — How this short can end
 
@@ -1716,6 +1740,7 @@ owner's of 2026-10-02 and 2026-10-03):
 | Extras denylist hardening (program batch 3) | a `DeniedAccount` set falls back to the next set like `BadExtras` / `BadRemainingAccounts`; error 6003's message names the new cases (§5.1) | `plans.test.ts` |
 | PUMP-2026-10-1 (program batch 4) | the PumpSwap reader and venue state read the pool's fee buckets (`protocol_fees` @271, `creator_fees` @279): `payableQuote = vault − buckets` (none above the vault: not executable), `r = min(payable, effective)`, `PoolView.virtualPart = max(VQR + buckets, 0)` for the tier inputs (§6.7, the program's `PoolVenue::virtual_part`) | `readers.test.ts`, `state.test.ts` |
 | PUMP-2026-10-2 (owner, 2026-10-03: disclose) | `TxPlan.refineError`; an open's `ProceedsBelowMin` on a pump account its first trade grows gets a specific message (§5.9) | `growth.test.tsx` |
+| KI-65 sub-unit conversions (owner, 2026-10-07, seventh round) | the review of the user's own deposit, withdraw, claim, cover or sync shows `lender.subUnitConversion` with the vest's end when its conversion can take a sub-one-share position to 0 shares while the pool's income vests (the worst case, its floor through the records: other lenders' conversions can land first; KI-66 review); `lender.residuals` gains the approved KI-65 paragraph (§3.6, §4.2) | `previews.test.ts`, `plans.test.ts`, `LendPanel.test.tsx` (the claim's review), `disclosures.test.ts` |
 | Open items | FE-9 met; FE-15 closed; FE-18 partly closed (composite pump / PumpSwap bundle M11); FE-22 → M11; FE-24 → M11 deployment (now also security.txt); FE-21 and FE-23 still the owner's; new FE-27 … FE-29 (§13) | — |
 
 ### Review fixes (v1.1 → v1.2, the M9 security and UX review)

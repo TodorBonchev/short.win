@@ -6,9 +6,10 @@
 # PROGRAM from a private copy with the change applied (the test-venue build for the mock oracles,
 # the release build for the fork ones). It expects the named tests AND a short fuzz run of the
 # named profile to FAIL against the mutant build: a mutant every check survives means an oracle is
-# missing again. A mutant with the profile `-` is checked by its tests alone: the KI-65 mutants
-# below, whose fuzz oracles (I1 `Σ shares = S`, KI65-REV-SEC1) need a share rebase, which a 3-minute
-# run reaches too rarely to kill them reliably (the owner-check mutant: one kill in 10 minutes).
+# missing again. A mutant with the profile `-` is checked by its tests alone: the KI-65 and KI-66
+# mutants below, whose fuzz oracles (I1 `Σ shares = S`, KI65-REV-SEC1, the pot-only touch) need a
+# share rebase, which a 3-minute run reaches too rarely to kill them reliably (the owner-check
+# mutant: one kill in 10 minutes).
 #
 #   scripts/mutants.sh [--fuzz 3m] [--work DIR] [--keep] [mutant ...]     (default: every mutant)
 #
@@ -63,12 +64,17 @@ add pump-caps-live-fee rel programs/shortwin/src/instructions/open_short.rs \
   "m7_sec_it" pumpswap
 # KI-65 (M10): claim_sol converts through a rebase record without storing its `conv_rem` (the
 # next converter collects the unit again: Σ shares > S, the hooks' I1); sync_lender converts a
-# third party's position through a rebase record without the owner's signature (KI65-REV-SEC1).
+# third party's position through a rebase record without the owner's signature (KI65-REV-SEC1:
+# its path selection takes every caller for the owner). KI-66: the pot-only touch (a third
+# party's sync of a lender behind a rebase record) skips the surplus move to the pot.
 add ki65-skip-store-records rel programs/shortwin/src/instructions/claim_sol.rs \
   's/\n\s*lender::store_records\(ctx\.remaining_accounts, &loaded, &records\)\?;//' \
   "ki65_it" -
 add ki65-rebase-without-owner rel programs/shortwin/src/instructions/sync_lender.rs \
-  's/ctx\.accounts\.owner\.is_signer \|\| !lender::reads_rebase\(&before, &l, &loaded\)/true/' \
+  's/let owner_signs = ctx\.accounts\.owner\.is_signer;/let owner_signs = true;/' \
+  "ki65_it" -
+add ki66-pot-skip-surplus rel crates/shortwin-math/src/pool.rs \
+  's/Standing::Behind \| Standing::Parked => to_pot\(v, l\.claimed, pending, &mut real\)\?,/Standing::Behind => {}\n        Standing::Parked => to_pot(v, l.claimed, pending, \&mut real)?,/' \
   "ki65_it" -
 
 tools=${PLATFORM_TOOLS:-v1.57}

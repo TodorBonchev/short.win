@@ -268,8 +268,9 @@ fn records_must_be_consecutive() {
 
 /// `sync_lender` in `sync_lender(1)` steps through three rebase records. Converting through a
 /// rebase record needs the owner's signature (KI65-REV-SEC1): sent by a third party the first
-/// step is refused (`RebaseNeedsOwner`, nothing written); signed by A each step converts. The
-/// plain touch `sync_lender(0)` of a current lender stays permissionless.
+/// step is the pot-only touch (KI-66: A accrued to the record's ends, not converted, no record
+/// written); signed by A each step converts. The plain touch `sync_lender(0)` of a current
+/// lender stays permissionless.
 #[test]
 fn sync_lender_goes_step_by_step_and_only_the_owner_converts_through_a_rebase() {
     let mut lab = Lab::with_cap(TokenProgram::Token2022, 10_000);
@@ -290,10 +291,15 @@ fn sync_lender_goes_step_by_step_and_only_the_owner_converts_through_a_rebase() 
     let e = lab.market().share_epoch;
     let before = lab.position("A").unwrap();
     assert_eq!(before.epoch, 0);
-    // A third party may not convert A through a rebase record.
+    // A third party may not convert A through a rebase record: the pot-only touch.
     let records = lab.state().records;
-    assert_eq!(lab.sync("A", 1), Err(code(ShortwinError::RebaseNeedsOwner)));
-    assert_eq!(lab.position("A").unwrap(), before, "nothing written");
+    assert_eq!(lab.sync("A", 1), Ok(Standing::Behind));
+    let held = lab.position("A").unwrap();
+    assert_eq!(
+        (held.shares, held.epoch, held.snap, held.snap_r),
+        (before.shares, 0, records[0].acc_end, records[0].acc_r_end),
+        "not converted, accrued to the record's ends"
+    );
     assert_eq!(lab.state().records, records, "no record written");
     // One record at a time, signed by A: Behind until the last, then touched.
     let mut steps = 0;

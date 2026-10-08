@@ -42,10 +42,13 @@ package folder argument `.` is relative to this package, because `pnpm run gener
 Codama CLI from here:
 
 - `before`: `updateInstructionsVisitor` makes `sync_lender`'s `owner` an **either** signer
-  (`isSigner: "either"`). The program reads it as a plain account and requires its signature
-  only when the conversion reads a rebase record (KI65-REV-SEC1, `RebaseNeedsOwner` 6107), so
-  the IDL marks it `signer: false`. With the visitor a caller passes the owner's `Address` for a
-  third party's plain catch-up, or its `TransactionSigner` to sign (role `READONLY_SIGNER`).
+  (`isSigner: "either"`). The program reads it as a plain account and converts the position
+  through a rebase record only with its signature (KI65-REV-SEC1); unsigned, the sync stops at
+  a rebase record with the pot-only touch (KI-66: the surplus up to the record moves to the pot,
+  nothing converts), so the IDL marks it `signer: false`. With the visitor a caller passes the
+  owner's `Address` for a third party's sync (plain catch-up, the pot-only touch), or its
+  `TransactionSigner` to sign (role `READONLY_SIGNER`). `RebaseNeedsOwner` (6107) stays in the
+  error table as the program's post-condition; since KI-66 no path returns it.
 
 - `kitImportStrategy: "rootOnly"` — the generated code imports only `@solana/kit` and its
   `@solana/kit/program-client-core` subpath.

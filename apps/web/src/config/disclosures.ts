@@ -18,6 +18,7 @@ export type DisclosureId =
     | 'lender.exitForfeitsVest'
     | 'lender.residuals'
     | 'lender.unpaidRent'
+    | 'lender.subUnitConversion'
     | 'borrower.liquidation'
     | 'borrower.residuals'
     | 'market.creatorSelfDealing'
@@ -126,10 +127,11 @@ export const DISCLOSURES: Readonly<Record<DisclosureId, Disclosure>> = {
             'A minimum-size position held open can stop a Raydium market from moving to a deeper pool, so the market can stay on a thinner pool than it could use. The emergency multisig can pause new shorts to clear it.',
             'A sale bundled into an open can make that open record up to 10% less notional than an honest quote, so the market’s notional cap — the limit on how much can be shorted while a market is new — can be exceeded by up to about 11%.',
             'Tiny dust amounts can be left behind when a pool rebases.',
+            'After a pool rebase, only you can convert your position, but a position worth less than one new share can convert to none when you next claim, deposit or withdraw. A lender converting after you, at any later time, can receive that share, and if that leaves it holding every share, its exit takes the income still vesting.',
         ],
         ack: null,
         severity: 'info',
-        source: 'ARCH §8.5, §10 O19 (OWNER-M7-11, R4B-10); ECON §8.2, §9.3, §9.5, §12.9–§12.11',
+        source: 'ARCH §8.5, §10 O19 (OWNER-M7-11, R4B-10); ECON §8.2, §9.3, §9.5 (KI-65, KI65-REV-SEC1), §12.9–§12.11',
     }),
     'lender.unpaidRent': d({
         id: 'lender.unpaidRent',
@@ -142,6 +144,17 @@ export const DISCLOSURES: Readonly<Record<DisclosureId, Disclosure>> = {
         ack: null,
         severity: 'warn',
         source: 'ECON §9.4 (a shortfall is debited pro-rata to current shares); the owner’s decision of 2026-10-03',
+    }),
+    'lender.subUnitConversion': d({
+        id: 'lender.subUnitConversion',
+        title: 'Your position may convert to no shares',
+        body: [
+            'This pool’s shares were rebased since your position last changed, and your position is worth less than one new share: this transaction can convert it to 0 shares. Whether it does depends on other lenders’ conversions that land before it, which this review cannot see. A lender converting after you can receive that share.',
+            'Income is vesting in this pool until {vestEnd}. A lender that ends up holding every share is paid all of the income still vesting when it leaves. Unless you need to act now, we advise waiting until {vestEnd} before you claim, deposit or withdraw here.',
+        ],
+        ack: null,
+        severity: 'warn',
+        source: 'ECON §9.5 (KI-65, KI65-REV-SEC1); the owner’s decision of 2026-10-07 (seventh round)',
     }),
     'borrower.liquidation': d({
         id: 'borrower.liquidation',

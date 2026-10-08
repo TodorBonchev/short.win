@@ -141,6 +141,19 @@ impl Market {
         )
     }
 
+    /// KI-66: the pot-only touch (a third party's `sync_lender`), with every record.
+    pub fn touch_pot(&mut self, user: usize) -> Result<Standing, MathError> {
+        let i = self.slot(user);
+        let l = &mut self.lenders[i].1;
+        pool::touch_pot(
+            &self.pool,
+            &mut self.vault,
+            l,
+            records_from(&self.records, l.epoch),
+            self.now,
+        )
+    }
+
     /// The committed first step of `d` / `w`: release + touch, as one unit.
     pub fn pre(&mut self, user: usize) -> Result<(), MathError> {
         let i = self.slot(user);
@@ -366,6 +379,7 @@ impl Market {
             "c" => show(&self.claim(u()).map(Some)),
             "v" => none(self.cover(u(), u64a(1))),
             "t" => none(self.touch(u()).map(|_| ())),
+            "h" => none(self.touch_pot(u()).map(|_| ())),
             "l" => show(&self.lock_of(u()).map(Some)),
             "k" => none(self.cal_advance()),
             "R" => none(self.release().map(|_| ())),

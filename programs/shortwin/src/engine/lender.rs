@@ -17,7 +17,8 @@
 //!   lender converted through (KI-65: cumulative rebase rounding, no orphan shares); such a
 //!   record must have been passed writable.
 //! - [`reads_rebase`]: whether a conversion read a rebase record, which `sync_lender` lets
-//!   only the position's owner do (KI65-REV-SEC1, `RebaseNeedsOwner`).
+//!   only the position's owner do (KI65-REV-SEC1; anyone else's sync is the pot-only touch,
+//!   KI-66, and `RebaseNeedsOwner` its post-condition).
 //! - [`init_if_new`]: the fields of a `LenderPosition` that `deposit` just created.
 //! - [`rewards_required`]: which post-wipe sweeps a deposit into a live wipe record waits for
 //!   (R4A-7).
@@ -112,7 +113,8 @@ pub fn store_records(
 
 /// Whether the conversion that took the lender from `before` to `after` read a rebase record
 /// (`num = 1`, `1/1,000^k`) of `records`, which `sync_lender` lets only the position's owner
-/// do (owner decision of 2026-10-07, KI65-REV-SEC1; `RebaseNeedsOwner`): the order of the
+/// do (owner decision of 2026-10-07, KI65-REV-SEC1; `RebaseNeedsOwner`, a post-condition since
+/// anyone else's sync is `pool::touch_pot`, KI-66): the order of the
 /// conversions through a rebase record decides who receives its rounding units (ECON §9.5).
 ///
 /// `pool::convert` reads the record of the lender's epoch unless the lender is empty (no
@@ -264,7 +266,8 @@ mod tests {
         assert_eq!(pos.snap, 7);
     }
 
-    /// `reads_rebase` against the math crate itself: a conversion reads a rebase record iff,
+    /// `reads_rebase` against the math crate itself (and the pot-only touch never reads one,
+    /// KI-66): a conversion reads a rebase record iff,
     /// given only the records before the first rebase record, it stops `Behind` (it needed that
     /// record), while with every record it moved the lender's epoch. Every pattern of wipe and
     /// rebase records up to three epochs behind (the last one live or not), every starting
@@ -272,7 +275,7 @@ mod tests {
     /// more), a lock and a lock term.
     #[test]
     fn reads_rebase_is_the_conversion_reading_a_rebase_record() {
-        use shortwin_math::pool::{convert, Standing};
+        use shortwin_math::pool::{convert, touch_pot, Standing};
         let rec = |epoch: u32, rebase: bool| MathShareEpoch {
             acc_end: 0,
             acc_r_end: 0,
@@ -322,6 +325,22 @@ mod tests {
                                     "kinds {kinds:b} live {live} from {from} {before:?}"
                                 );
                                 seen[usize::from(want)] += 1;
+                                // KI-66: anyone else's sync, the pot-only touch, never does
+                                // (`sync_lender`'s post-condition), and stops exactly there.
+                                let mut pot = before;
+                                let st =
+                                    touch_pot(&p, &mut Vault::new(), &mut pot, tail, 0).unwrap();
+                                assert!(!reads_rebase(&before, &pot, tail));
+                                if want {
+                                    assert_eq!(st, Standing::Behind);
+                                    assert_eq!(pot.epoch, cut.epoch);
+                                    assert_eq!(pot.shares, cut.shares);
+                                } else {
+                                    assert_eq!(
+                                        (pot.epoch, pot.shares),
+                                        (after.epoch, after.shares)
+                                    );
+                                }
                             }
                         }
                     }

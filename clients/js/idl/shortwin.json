@@ -3482,7 +3482,8 @@
     {
       "name": "sync_lender",
       "docs": [
-        "Anyone advances a lender through share epochs; through a rebase record only its owner."
+        "Anyone advances a lender through share epochs; through a rebase record only its owner,",
+        "anyone else's sync stopping there with the pot-only touch (KI-66)."
       ],
       "discriminator": [
         189,
@@ -3567,8 +3568,9 @@
         {
           "name": "owner",
           "docs": [
-            "The position's owner. A signer only when the conversion reads a rebase record",
-            "(`RebaseNeedsOwner`, KI65-REV-SEC1); otherwise anyone may send the instruction."
+            "The position's owner. Signing, it converts the lender through rebase records",
+            "(KI65-REV-SEC1); unsigned, anyone may send the instruction, which then stops at a rebase",
+            "record with the pot-only touch (KI-66)."
           ],
           "relations": [
             "lender"

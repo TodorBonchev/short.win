@@ -14,8 +14,9 @@ mod pool_harness;
 
 use pool_harness::{DAY, Market, Model, S3_TAIL_S};
 use proptest::prelude::*;
-use shortwin_math::MathError;
+use shortwin_math::num::{WAD, mul_div_i128};
 use shortwin_math::pool::{self, Lender, NO_LOCK_EPOCH, Pool, ShareEpoch, Standing, SweepSource};
+use shortwin_math::{MathError, Rounding};
 
 #[derive(Clone, Debug)]
 enum Op {
@@ -47,6 +48,9 @@ enum Op {
     /// V2-3: another position opens and closes
     Churn(u64),
     Touch(usize),
+    /// KI-66: a third party's `sync_lender` (the pot-only touch), of a lender behind a rebase
+    /// record if there is one
+    TouchPot(usize),
     /// R4A-2 / R4B-3: the allowances as the program sees them (each lender touched alone)
     View,
 }
@@ -97,7 +101,8 @@ fn op(users: usize) -> impl Strategy<Value = Op> {
         1 => (u.clone(), lamports()).prop_map(|(u, x)| Op::Cover(u, x)),
         2 => (lamports(), any::<bool>()).prop_map(|(x, r)| Op::Sweep(x, r)),
         2 => any::<u64>().prop_map(Op::Churn),
-        1 => u.prop_map(Op::Touch),
+        1 => u.clone().prop_map(Op::Touch),
+        2 => u.prop_map(Op::TouchPot),
         1 => Just(Op::View),
     ]
 }
@@ -124,6 +129,84 @@ fn scenario() -> impl Strategy<Value = (Cfg, Vec<Op>)> {
 struct Driver {
     cfg: Cfg,
     s: Model,
+}
+
+/// KI-66: `after` is `before` with `u` touched by `pool::touch_pot` (standing `st`). It wrote no
+/// record; a lender left behind (with every record at hand: held at a rebase record) kept its
+/// shares, lock, lock term and epoch, accrued `pending` and `real` once to the record's ends and
+/// moved exactly R3A-2's surplus of that state to the pot; a second pot-only touch changes
+/// nothing; and the owner's touch afterwards ends where the owner's touch alone ends — the lender
+/// (`real` aside), the records, `pending` — with the same `real + unmatched` (the pot-only touch
+/// counts nothing twice). The touch after it may refuse only where the touch alone does, or with `Overflow`
+/// (its pot is the fuller one).
+fn pot_only_touch_is_sound(
+    before: &Market,
+    after: &Market,
+    u: usize,
+    st: Standing,
+) -> Result<(), TestCaseError> {
+    prop_assert_eq!(
+        &after.records,
+        &before.records,
+        "a pot-only touch writes no record"
+    );
+    let a = *after.lender(u).expect("lender");
+    if let (Standing::Behind, Some(b)) = (st, before.lender(u)) {
+        prop_assert!(b.epoch < before.pool.share_epoch);
+        prop_assert!(
+            before.records[b.epoch as usize].num == 1,
+            "held at a rebase record"
+        );
+        prop_assert_eq!(
+            (a.shares, a.lock, a.lock_term, a.epoch, a.lock_until),
+            (b.shares, b.lock, b.lock_term, b.epoch, b.lock_until)
+        );
+        let r = before.records[b.epoch as usize];
+        prop_assert_eq!((a.snap, a.snap_r), (r.acc_end, r.acc_r_end));
+        // The move itself: `pending` and `real` accrued once to the record's ends (floor),
+        // and exactly R3A-2's surplus of that state reached the pot — none left with the
+        // lender (a touch that held without moving it would pass the comparisons below:
+        // the owner's touch would move the whole surplus later).
+        let floor = |d: i128| mul_div_i128(d, b.shares, WAD, Rounding::Floor).expect("accrual");
+        let pending = i128::from(b.pending) + floor(r.acc_end - b.snap);
+        let d_r = if r.acc_r_end >= b.snap_r {
+            i128::try_from(r.acc_r_end - b.snap_r)
+        } else {
+            i128::try_from(b.snap_r - r.acc_r_end).map(|d| -d)
+        };
+        let real = i128::from(b.real) + floor(d_r.expect("Δacc_r"));
+        let surplus = (real - i128::from(b.claimed) - pending.max(0)).max(0);
+        prop_assert_eq!(i128::from(a.pending), pending, "pending accrued to acc_end");
+        prop_assert_eq!(
+            i128::from(after.vault.unmatched) - i128::from(before.vault.unmatched),
+            surplus,
+            "the surplus accrued to the record moved to the pot"
+        );
+        prop_assert_eq!(i128::from(a.real), real - surplus);
+        prop_assert!(
+            i128::from(a.real) - i128::from(a.claimed) <= i128::from(a.pending).max(0),
+            "no surplus left with the held lender"
+        );
+    }
+    let mut again = after.clone();
+    again.touch_pot(u).expect("a second pot-only touch");
+    prop_assert_eq!(&again, after, "idempotent");
+    let (mut alone, mut later) = (before.clone(), after.clone());
+    match (alone.touch(u), later.touch(u)) {
+        (Ok(_), Ok(_)) => {
+            let (x, y) = (*alone.lender(u).expect("x"), *later.lender(u).expect("y"));
+            prop_assert_eq!(Lender { real: 0, ..x }, Lender { real: 0, ..y });
+            prop_assert_eq!(&alone.records, &later.records);
+            prop_assert_eq!(
+                u128::from(x.real) + u128::from(alone.vault.unmatched),
+                u128::from(y.real) + u128::from(later.vault.unmatched)
+            );
+            prop_assert!(later.vault.unmatched >= alone.vault.unmatched);
+        }
+        (Err(_), Err(_)) | (Ok(_), Err(MathError::Overflow)) => {}
+        (x, y) => prop_assert!(false, "touch alone {x:?}, after the pot-only touch {y:?}"),
+    }
+    Ok(())
 }
 
 /// Refusals are pool rules (their own variants) or on-chain field limits.
@@ -490,6 +573,27 @@ impl Driver {
                     }
                 }
             }
+            Op::TouchPot(u) => {
+                // Preferably a lender behind a rebase record (where the touch holds).
+                let m = self.m();
+                let behind: Vec<usize> = m
+                    .lenders
+                    .iter()
+                    .filter(|(_, l)| {
+                        l.epoch < m.pool.share_epoch && m.records[l.epoch as usize].num == 1
+                    })
+                    .map(|(w, _)| *w)
+                    .collect();
+                let u = behind.get(u % behind.len().max(1)).copied().unwrap_or(u);
+                let before = self.s.m.clone();
+                match self.s.m.touch_pot(u) {
+                    Ok(st) => pot_only_touch_is_sound(&before, &self.s.m, u, st)?,
+                    Err(e) => {
+                        refusal(e)?;
+                        prop_assert_eq!(&self.s.m, &before);
+                    }
+                }
+            }
             Op::View => {
                 // allowance_view is pure and equals the allowance after that lender's
                 // own touch.
@@ -677,6 +781,76 @@ proptest! {
         } else if l0.lock_term > 0 {
             // Π = WAD while nothing resolves: the aggregate is the term itself.
             prop_assert_eq!(locked, l0.lock_term.min(s.m.pool.total_shares));
+        }
+    }
+
+    /// KI-66: the pot-only touch of a lender behind a rebase record, at random record ends,
+    /// snapshots and balances (negative `pending` included, accruals near the field limits):
+    /// held unconverted with its snapshots at the record's ends, the surplus moved to the pot,
+    /// idempotent, and the owner's conversion afterwards counting nothing twice
+    /// (`pot_only_touch_is_sound`); a refusal changes nothing.
+    #[test]
+    fn pot_only_touch_holds_at_a_rebase_record(
+        shares in prop_oneof![3 => 1u128..1_000, 3 => 1u128..10u128.pow(15), 1 => 1u128..u128::MAX / 64],
+        lock in prop_oneof![Just(0u128), 0u128..10u128.pow(15)],
+        acc in prop_oneof![
+            3 => (-10i128.pow(21)..10i128.pow(21), -10i128.pow(21)..10i128.pow(21)),
+            1 => (-10i128.pow(30)..10i128.pow(30), -10i128.pow(30)..10i128.pow(30)),
+        ],
+        acc_r in prop_oneof![
+            3 => (0u128..10u128.pow(21), 0u128..10u128.pow(21)),
+            1 => (0u128..10u128.pow(30), 0u128..10u128.pow(30)),
+        ],
+        pending in prop_oneof![3 => -10i64.pow(15)..10i64.pow(15), 1 => any::<i64>()],
+        (claimed, extra) in prop_oneof![
+            3 => (0u64..10u64.pow(15), 0u64..10u64.pow(15)),
+            1 => (0u64..u64::MAX / 2, 0u64..u64::MAX / 2),
+        ],
+        unmatched in prop_oneof![Just(0u64), 0u64..u64::MAX / 2],
+        k in 1u8..=12,
+        cur in (-10i128.pow(21)..10i128.pow(21), 0u128..10u128.pow(21)),
+    ) {
+        let rec = ShareEpoch {
+            acc_end: acc.0,
+            acc_r_end: acc_r.0,
+            s_old: shares,
+            carry: 0,
+            carry_r: 0,
+            conv_rem: 0,
+            epoch: 0,
+            num: 1,
+            den_log1000: k,
+            _pad: [0; 10],
+        };
+        let mut m = Market::new();
+        m.pool.share_epoch = 1;
+        m.pool.total_shares = shares / rec.den().expect("den");
+        (m.pool.acc, m.pool.acc_r) = cur;
+        m.vault.unmatched = unmatched;
+        m.records.push(rec);
+        let l = Lender {
+            shares,
+            lock,
+            lock_term: lock,
+            snap: acc.1,
+            snap_r: acc_r.1.min(acc_r.0),
+            pending,
+            real: claimed + extra,
+            claimed,
+            epoch: 0,
+            ..Lender::new(&m.pool)
+        };
+        m.lenders.push((0, l));
+        let before = m.clone();
+        match m.touch_pot(0) {
+            Ok(st) => {
+                prop_assert_eq!(st, Standing::Behind);
+                pot_only_touch_is_sound(&before, &m, 0, st)?;
+            }
+            Err(e) => {
+                refusal(e)?;
+                prop_assert_eq!(&m, &before);
+            }
         }
     }
 

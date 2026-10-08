@@ -21,6 +21,7 @@ import {
     previewClaimWithPot,
     previewDepositView,
     previewPosition,
+    previewSubUnitConversion,
     previewTouched,
     previewUnpaidRent,
     previewWithdrawLimits,
@@ -451,3 +452,70 @@ describe('the pool’s unpaid rent at a deposit (ECON §9.4, lender.unpaidRent)'
 function toPool(s: ReturnType<typeof simplePool>) {
     return toPoolState(m, s.market, s.vault);
 }
+
+describe('a sub-unit conversion while income vests (lender.subUnitConversion; KI-65, the owner’s decision of 2026-10-07)', () => {
+    /** The rebase record of epoch 0 (1/1,000), `convRem` as given. */
+    const rebase = (convRem = 0n, num = 1) => ({
+        epoch: 0,
+        accEnd: 0n,
+        accREnd: 0n,
+        sOld: 7_600n,
+        carry: 0n,
+        carryR: 0n,
+        num,
+        denLog1000: num,
+        convRem,
+    });
+    /** A 3 SOL vest released linearly over [0, 21,600 s]; the lender holds `shares` old shares at epoch 0. */
+    const state = (shares: bigint, o: { convRem?: bigint; num?: number; vestBal?: bigint; epoch?: number } = {}) => ({
+        ...simplePool({ shareEpoch: 1, totalShares: 7n, vestBal: o.vestBal ?? 3_000_000_000n, vestEnd: 21_600n }),
+        lender: simpleLender(shares, { epoch: o.epoch ?? 0 }),
+        records: [rebase(o.convRem, o.num)],
+    });
+
+    it('flags a position below one new share converting to 0 during the vest, with the vest’s end', () => {
+        const x = previewSubUnitConversion(m, state(600n), 1_000n);
+        expect(x).not.toBeNull();
+        expect(x?.vestEnd).toBe(21_600n);
+        expect(x?.shares).toBe(600n);
+        // The unreleased part at now: 3 SOL less the linear release over the first 1,000 of 21,600 s.
+        const released = previewTouched(m, state(600n), 1_000n);
+        expect(released.ok && released.value.shares).toBe(0n);
+        expect(x?.unreleased).toBe(3_000_000_000n - (3_000_000_000n * 1_000n) / 21_600n);
+    });
+
+    it('flags the worst case, not the remainder at review time (KI-66 review)', () => {
+        // With conv_rem 400 the conversion now gives ⌊(400 + 600)/1,000⌋ = 1 share, but another
+        // lender's conversion landing first can move the remainder below 400: the floor is 0.
+        const now = previewTouched(m, state(600n, { convRem: 400n }), 1_000n);
+        expect(now.ok && now.value.shares).toBe(1n);
+        expect(previewSubUnitConversion(m, state(600n, { convRem: 400n }), 1_000n)?.shares).toBe(600n);
+        // Two rebase records (1/1,000 each): 999,999 → 999 → 0, whatever the remainders; 1,000,000 keeps 1.
+        const two = (shares: bigint) => ({
+            ...simplePool({ shareEpoch: 2, totalShares: 7n, vestBal: 3_000_000_000n, vestEnd: 21_600n }),
+            lender: simpleLender(shares, { epoch: 0 }),
+            records: [
+                { ...rebase(), sOld: 7_600_000n },
+                { ...rebase(), epoch: 1 },
+            ],
+        });
+        expect(previewSubUnitConversion(m, two(999_999n), 1_000n)?.shares).toBe(999_999n);
+        expect(previewSubUnitConversion(m, two(1_000_000n), 1_000n)).toBeNull();
+    });
+
+    it('stays quiet where the conversion keeps a share, the vest has ended, or nothing vests', () => {
+        // ⌊1,600/1,000⌋ = 1 whatever the remainder.
+        expect(previewSubUnitConversion(m, state(1_600n), 1_000n)).toBeNull();
+        expect(previewSubUnitConversion(m, state(1_600n, { convRem: 999n }), 1_000n)).toBeNull();
+        expect(previewSubUnitConversion(m, state(600n), 21_600n)).toBeNull();
+        expect(previewSubUnitConversion(m, state(600n, { vestBal: 0n }), 1_000n)).toBeNull();
+    });
+
+    it('stays quiet for a full wipe, a current or empty lender, and records that do not reach the epoch', () => {
+        expect(previewSubUnitConversion(m, state(600n, { num: 0 }), 1_000n)).toBeNull();
+        expect(previewSubUnitConversion(m, state(600n, { epoch: 1 }), 1_000n)).toBeNull();
+        expect(previewSubUnitConversion(m, state(0n), 1_000n)).toBeNull();
+        expect(previewSubUnitConversion(m, { ...state(600n), records: [] }, 1_000n)).toBeNull();
+        expect(previewSubUnitConversion(m, { ...state(600n), lender: null }, 1_000n)).toBeNull();
+    });
+});

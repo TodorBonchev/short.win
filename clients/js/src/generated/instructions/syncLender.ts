@@ -140,8 +140,9 @@ export type SyncLenderAsyncInput<
   marketVault?: TAccountMarketVault;
   lender?: TAccountLender;
   /**
-   * The position's owner. A signer only when the conversion reads a rebase record
-   * (`RebaseNeedsOwner`, KI65-REV-SEC1); otherwise anyone may send the instruction.
+   * The position's owner. Signing, it converts the lender through rebase records
+   * (KI65-REV-SEC1); unsigned, anyone may send the instruction, which then stops at a rebase
+   * record with the pot-only touch (KI-66).
    */
   owner: TAccountOwner;
   eventAuthority: TAccountEventAuthority;
@@ -327,8 +328,9 @@ export type SyncLenderInput<
   marketVault: TAccountMarketVault;
   lender: TAccountLender;
   /**
-   * The position's owner. A signer only when the conversion reads a rebase record
-   * (`RebaseNeedsOwner`, KI65-REV-SEC1); otherwise anyone may send the instruction.
+   * The position's owner. Signing, it converts the lender through rebase records
+   * (KI65-REV-SEC1); unsigned, anyone may send the instruction, which then stops at a rebase
+   * record with the pot-only touch (KI-66).
    */
   owner: TAccountOwner;
   eventAuthority: TAccountEventAuthority;
@@ -480,8 +482,9 @@ export type ParsedSyncLenderInstruction<
     marketVault: TAccountMetas[1];
     lender: TAccountMetas[2];
     /**
-     * The position's owner. A signer only when the conversion reads a rebase record
-     * (`RebaseNeedsOwner`, KI65-REV-SEC1); otherwise anyone may send the instruction.
+     * The position's owner. Signing, it converts the lender through rebase records
+     * (KI65-REV-SEC1); unsigned, anyone may send the instruction, which then stops at a rebase
+     * record with the pot-only touch (KI-66).
      */
     owner: TAccountMetas[3];
     eventAuthority: TAccountMetas[4];

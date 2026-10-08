@@ -11,7 +11,7 @@
 use shortwin_fuzz::action::{Action, Kind, Profile, stream};
 use shortwin_fuzz::runner::{self, Crash, Opts};
 use shortwin_fuzz::stats::Stats;
-use shortwin_fuzz::world::{CREDITED_SKEW, DEFICIT_BOUND_PPM, INJECT, INJECTED};
+use shortwin_fuzz::world::{ABSENT_OWNERS, CREDITED_SKEW, DEFICIT_BOUND_PPM, INJECT, INJECTED};
 
 fn env_num(name: &str, default: u64) -> u64 {
     std::env::var(name)
@@ -408,6 +408,80 @@ fn wind_down_residue_on_fuzz_m10_24h_a() {
             &o,
         );
     }
+}
+
+/// KI-66's never-returns model (the KI-66 review), with absent owners forced on: three mock
+/// seeds whose wind-down finds a lender held behind a rebase record (found by scanning seeds
+/// 66,300,000 + 0…249 at `run`'s default 300 actions) and, in the full smoke, the KI-65
+/// reproducers. The held lender is reached only by two third-party syncs — the pot-only touch,
+/// which moves a surplus, then a no-op, each under the KI-66 oracle — while the others exit and
+/// claim; the present lenders' unpaid stays within what the absent lenders' own touches would
+/// move to the pot (no `wind-down-absent-owed-above-residual`), and once the absent owners
+/// return the wind-down's I-P6 oracle passes.
+#[test]
+fn absent_owners_at_the_wind_down() {
+    let check = |what: &str, o: &runner::Outcome| -> (u64, u64) {
+        let ev = |k: &str| o.stats.events.get(k).copied().unwrap_or(0);
+        println!(
+            "{what}: absent {} held syncs {} (to the pot {}), present owed {} (max {}); unpaid {} \
+             lender_sol {}",
+            ev("wind-down-absent-owner"),
+            ev("sync-lender-held"),
+            ev("sync-lender-held-to-pot"),
+            ev("wind-down-absent-present-owed"),
+            o.stats.wind_down_absent_owed_max,
+            o.stats.wind_down_unpaid_max,
+            o.stats.wind_down_lender_sol_max
+        );
+        if let Some(f) = &o.failure {
+            panic!("{what}: {}\n{}", f.signature, f.message);
+        }
+        assert!(
+            o.stats.anomalies.is_empty(),
+            "{what}: {:?}",
+            o.stats.anomalies
+        );
+        (ev("wind-down-absent-owner"), ev("sync-lender-held-to-pot"))
+    };
+    ABSENT_OWNERS.with(|c| c.set(Some(true)));
+    let seeds: &[(u64, usize)] = if FULL {
+        &[(66_300_007, 265), (66_300_136, 249), (66_300_236, 92)]
+    } else {
+        &[(66_300_236, 92)]
+    };
+    for &(seed, length) in seeds {
+        let o = runner::run(Profile::Mock, seed, None, length, Opts::default());
+        let (absent, to_pot) = check(&format!("one --profile mock --seed {seed}"), &o);
+        assert!(
+            absent > 0 && to_pot > 0,
+            "seed {seed}: no held lender's surplus moved"
+        );
+    }
+    if FULL {
+        for file in [
+            "corpus/fuzz-m10-24h-a-curve-orphan-credit.json",
+            "corpus/fuzz-m10-24h-a-cpmm-carry-owed.json",
+        ] {
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(file);
+            let c = runner::read_crash(&path).expect("corpus file");
+            check(
+                file,
+                &runner::run(c.profile, c.seed, Some(&c.actions), 0, c.opts),
+            );
+        }
+        for (profile, seed, length) in [
+            (Profile::Mock, 31_013_687, 398),
+            (Profile::Cpmm, 31_005_995, 390),
+            (Profile::PumpSwap, 31_016_959, 386),
+        ] {
+            let o = runner::run(profile, seed, None, length, Opts::default());
+            check(
+                &format!("one --profile {} --seed {seed}", profile.name()),
+                &o,
+            );
+        }
+    }
+    ABSENT_OWNERS.with(|c| c.set(None));
 }
 
 /// M10: `stale_receivable` (FUZZ-M7-24H-3's shape) reaches the deficit tripwire on both Raydium

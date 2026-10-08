@@ -6,7 +6,7 @@ import { DISCLOSURES, type DisclosureId, LENDER_SOL_REPAYMENT, placeholders, ren
  * Disclosures added by a program batch while FRONTEND.md has a single writer (M10 WP-11): the text
  * for §4.2 is in that batch's doc delta. Remove the id once the doc carries it.
  */
-const AWAITING_DOC_SYNC: ReadonlySet<DisclosureId> = new Set<DisclosureId>(['lender.unpaidRent']);
+const AWAITING_DOC_SYNC: ReadonlySet<DisclosureId> = new Set<DisclosureId>([]);
 
 describe('disclosures', () => {
     it('carries SPEC §5.3’s lender sentence verbatim and requires it as the acknowledgement', () => {
@@ -47,6 +47,7 @@ describe('disclosures', () => {
         expect(placeholders('lender.risks')).toEqual(['lockGrace', 'vestPeriod']);
         expect(placeholders('market.routeBroken')).toEqual(['s3Wait']);
         expect(placeholders('lender.unpaidRent')).toEqual(['receivable', 'exposure', 'share']);
+        expect(placeholders('lender.subUnitConversion')).toEqual(['vestEnd']);
         expect(() => renderDisclosure('borrower.liquidation', { liqCr: '125%' })).toThrow(/missing \{penalty\}/);
         const body = renderDisclosure('lender.exitForfeitsVest', { vesting: '0.42' });
         expect(body[0]).toContain('You have 0.42 SOL of income still vesting.');

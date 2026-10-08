@@ -26,10 +26,12 @@ import { config } from '../../config/env.ts';
 import { MEMO_PROGRAM, TOKEN_2022_PROGRAM } from '../../config/programs.ts';
 import { T } from '../../config/testids.ts';
 import { formatBps, formatSol } from '../../lib/format.ts';
+import { formatUtc } from '../../lib/time.ts';
 import { initMathSync, type MathModule } from '../../math/load.ts';
 import { createAppClient } from '../../rpc/client.ts';
 import { AppClientProvider } from '../../rpc/context.tsx';
 import { readRepoBytes } from '../../test/repo.ts';
+import { TxReviewModal } from '../../tx/TxReviewModal.tsx';
 import type { TokenAccountInfo } from '../../tx/tokenAccount.ts';
 import type { TxPlan } from '../../tx/types.ts';
 import type { TxFlow } from '../../tx/useTxFlow.ts';
@@ -125,6 +127,7 @@ function chainOf(o: {
     lender?: LenderPosition | null;
     accounts?: TokenAccountInfo[];
     recordsComplete?: boolean;
+    records?: LendChain['records'];
     market?: null;
     marketFields?: Parameters<typeof fakeMarket>[1];
 }): LendChain {
@@ -143,7 +146,7 @@ function chainOf(o: {
         owner: OWNER,
         lenderAddress: LENDER,
         lender: o.lender ?? null,
-        records: [],
+        records: o.records ?? [],
         recordsComplete: o.recordsComplete ?? true,
         tokenAccounts: o.accounts ?? [account(ATA, 5_000_000n), account(GUARDED, 9_000_000n, { cpiGuard: true })],
         ata: ATA,
@@ -574,6 +577,70 @@ describe('Lend → Claim', () => {
         expect(getCoverDeficitInstructionDataDecoder().decode(plan.instructions[0]?.data as Uint8Array).lamports).toBe(
             12_345n,
         );
+    });
+});
+
+describe('Lend → a sub-unit conversion while income vests (KI-65; the owner’s decision of 2026-10-07)', () => {
+    // After a 1/1,000 rebase the wallet holds 600 old shares (less than one new share) and the
+    // pool vests 3 SOL until 21,600 s; the panel's clock reads 1,000 s.
+    const rebase = {
+        epoch: 0,
+        accEnd: 0n,
+        accREnd: 0n,
+        sOld: 7_600n,
+        carry: 0n,
+        carryR: 0n,
+        num: 1,
+        denLog1000: 1,
+        convRem: 0n,
+    } as unknown as LendChain['records'][number];
+    const pool = {
+        tokensFree: 10n,
+        totalShares: 7n,
+        shareEpoch: 1,
+        vestBal: 3_000_000_000n,
+        vestEnd: 21_600n,
+        lenderSol: 4_000_000_000n,
+    };
+    const lender = lenderAccount(simpleLender(600n, { epoch: 0, pending: 300_000n, real: 300_000n }));
+
+    it('puts lender.subUnitConversion with the vest’s end into the claim’s review', async () => {
+        setChain(chainOf({ pool, lender, records: [rebase] }));
+        renderPanel('claim');
+        fireEvent.click(screen.getByTestId(T.claimSubmit));
+        await waitFor(() => expect(started).toHaveLength(1));
+        const plan = started[0] as TxPlan;
+        expect(plan.kind).toBe('claim_sol');
+        expect(plan.disclosures).toEqual(['lender.subUnitConversion']);
+        const vestEnd = formatUtc(21_600n);
+        expect(plan.disclosureVars?.['lender.subUnitConversion']).toEqual({ vestEnd });
+        // The review renders it, the vest's end filled in.
+        const review = render(
+            <TxReviewModal flow={{ ...flowStub(), state: { ...flowStub().state, stage: 'review', plan } }} />,
+        );
+        const d = within(review.container).getByTestId(T.disclosure('lender.subUnitConversion'));
+        expect(d.dataset.severity).toBe('warn');
+        expect(d.textContent).toContain('this transaction can convert it to 0 shares');
+        expect(d.textContent).toContain(`Income is vesting in this pool until ${vestEnd}.`);
+        expect(d.textContent).toContain(`we advise waiting until ${vestEnd}`);
+    });
+
+    it('also on a deposit, and not once the conversion keeps a share', async () => {
+        setChain(chainOf({ pool, lender, records: [rebase] }));
+        renderPanel('deposit');
+        fireEvent.change(screen.getByTestId(T.lendAmountInput), { target: { value: '1' } });
+        fireEvent.click(screen.getByTestId(T.disclosureAck('lender.solRepayment')));
+        fireEvent.click(submit());
+        await waitFor(() => expect(started).toHaveLength(1));
+        expect((started[0] as TxPlan).disclosures).toContain('lender.subUnitConversion');
+        // 1,600 old shares keep one new share: no warning.
+        started = [];
+        const keeps = lenderAccount(simpleLender(1_600n, { epoch: 0, pending: 300_000n, real: 300_000n }));
+        setChain(chainOf({ pool, lender: keeps, records: [rebase] }));
+        renderPanel('claim');
+        fireEvent.click(screen.getAllByTestId(T.claimSubmit).at(-1) as HTMLElement);
+        await waitFor(() => expect(started).toHaveLength(1));
+        expect((started[0] as TxPlan).disclosures).toEqual([]);
     });
 });
 

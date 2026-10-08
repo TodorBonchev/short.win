@@ -39,15 +39,20 @@ every step, so every record's `conv_rem` is written, the worst case per record; 
 credits the lender about 1 SOL through nonzero `acc_end` / `acc_r_end` deltas, funded in
 `lender_sol`, so `claim_sol` pays: the unit test `a_claim_behind_pays_what_the_records_credit`).
 Each such record costs ≈ 4.7–5.2k CU. `claim_sol` / `cover_deficit` / `sync_lender` stay within
-§6.1's 60,000 CU up to 8 records (54,194 / 54,549 / 52,206), the web's cap per lender
-transaction (`MAX_RECORDS`); at 9 `cover_deficit` is 59,694 (measured once, not a row), and the
+§6.1's 60,000 CU up to 8 records (54,258 / 54,581 / 52,240 since KI-66; 54,194 / 54,549 /
+52,206 before), the web's cap per lender
+transaction (`MAX_RECORDS`); at 9 `cover_deficit` was 59,694 at the KI-65 batch (measured once, not a row), and the
 10- and 12-record rows are reported against the transaction limit only
 (`LENDER_SOL_BEYOND_CAP`). The `sync_lender` rows behind rebase records are signed by the owner:
 since KI65-REV-SEC1 only the owner converts its position through a rebase record (the account
 `owner` and the check `engine::lender::reads_rebase`, +326 CU behind records, +341 on the current
-epoch). Every case is measured and within budget (`results.md`; only the
-KI-65 rows were rewritten at the KI-65 batch and the `sync_lender` rows at its follow-up, the
-others vary by PDA-bump noise between runs). A case whose Mollusk or LiteSVM run fails, or whose
+epoch). Since KI-66 a third party's `sync_lender` is the pot-only touch (`pool::touch_pot`): the
+rows "a third party, 1 / 8 rebase records passed" (16,673 / 31,575: every record passed is
+loaded and key-checked, only the first is read), and the plain touch of a current lender, sent
+unsigned, is one pass (13,950, −177); the owner's conversions cost +32–64 CU (the shared touch
+tail). Every case is measured and within budget (`results.md`; only the
+KI-65 rows were rewritten at the KI-65 batch, the `sync_lender` rows at its follow-up and the
+lender rows at KI-66, the others vary by PDA-bump noise between runs). A case whose Mollusk or LiteSVM run fails, or whose
 Mollusk figure exceeds its budget, fails the test.
 
 ## Workspace and pins

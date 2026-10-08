@@ -49,6 +49,13 @@ writes, next to itself:
                        whale_order_demo (R4B-4 W1-W3: a JIT whale around a lump while a lender
                        holds an unconverted share, both sync orders of a rebase's rounding
                        unit, a whale deposit while S is a latent share).
+  pool_ext_pot_<k>.json
+                       KI-66 (the pot-only touch): lazy lenders, deep rebases and a third party's
+                       sync_lender of random lenders (`h`, pool_model._touch_pot; some
+                       repeated, then everyone claims), so lenders behind a rebase record move
+                       their surplus to the pot without converting and convert later at their
+                       own touch; 100 % and 90 % caps, normal and dust amounts (`pot_holds`:
+                       the pot-only touches that held at a rebase record).
   pool_ext_topup_<k>.json
                        the rent top-up of finding M10-8C-1: extended profiles whose exits pay
                        rent above what accrued (`rpx`: a repay of the accrued rent plus an
@@ -67,7 +74,7 @@ writes, next to itself:
                        protocol_change_demo; stranded_table above), attacks/pool_edge.py
                        and the round-4 cases (stale_lock_demo, lock_tail_demo,
                        wipe_gate_demo, vest_exit_demo, restart_grief_table,
-                       premium_jit_table).
+                       premium_jit_table) and KI-66's pot_touch_demo.
 
 Line format (parsed by tests/pool_vectors.rs). Each trace is a list of lines; a line
 holds one or more pool operations separated by ";" and ends with " #cccccccc", the
@@ -82,6 +89,9 @@ starts at 0. Operations:
   c U               pool::claim                                  -> lamports paid
   v U LAMPORTS      pool::cover
   t U               pool::touch
+  h U               pool::touch_pot (KI-66: a third party's sync_lender; behind a rebase record
+                    the lender is accrued to its ends and its surplus moves to the pot,
+                    unconverted)
   l U               pool::lock_of (pure)                         -> shares
   k                 pool::cal_advance
   R                 pool::release (the committed vest release of an open refused by the
@@ -472,10 +482,16 @@ class RecPool(BasePool):
         assert 0 <= lamports <= U64
         return self.rec_call(f"v {self.rec_id(who)} {lamports}", lambda: BasePool.cover(self, who, lamports), who)
 
-    def _touch(self, who):
+    def _touch(self, who, pot_only: bool = False):
         if self.rec_depth:
-            return BasePool._touch(self, who)
+            return BasePool._touch(self, who, pot_only)
+        assert not pot_only, "an outermost pot-only touch is _touch_pot (op h)"
         return self.rec_call(f"t {self.rec_id(who)}", lambda: BasePool._touch(self, who), who, result=False)
+
+    def _touch_pot(self, who):
+        if self.rec_depth:
+            return BasePool._touch_pot(self, who)
+        return self.rec_call(f"h {self.rec_id(who)}", lambda: BasePool._touch_pot(self, who), who, result=False)
 
     def _lock_of(self, L):
         if self.rec_depth:
@@ -718,6 +734,7 @@ class Ext:
         self.pid = 0
         self.p, self.rng = p, rng
         self.top_ups = 0
+        self.holds = 0
         counts = {}
         for _ in range(self.n_ops):
             op = rng.choice(self.ops)
@@ -732,6 +749,9 @@ class Ext:
         if {"rpx", "stx"} & set(self.ops):
             assert self.top_ups >= self.n_ops // 40, (self.name, self.top_ups)
             extra["top_ups"] = str(self.top_ups)
+        if "pot" in self.ops:
+            assert self.holds >= self.n_ops // 200, (self.name, self.holds)
+            extra["pot_holds"] = str(self.holds)
         return trace_json(p, self.name, self.note, seed=str(self.seed),
                           op_counts={k: str(v) for k, v in sorted(counts.items())}, **extra)
 
@@ -968,6 +988,30 @@ class Ext:
         for u in self.rng.sample(list(self.p.lenders), len(self.p.lenders)):
             self.p._touch(u)
 
+    def pot(self, u):
+        """The pot-only touch of `u`; counts the touches that hold at a rebase record."""
+        p = self.p
+        L = p.lenders.get(u)
+        if L and L.epoch < p.epoch and p.epochs[L.epoch][1] and (L.shares or L.lock or L.lock_term):
+            self.holds += 1
+        p._touch_pot(u)
+
+    def op_pot(self):
+        """KI-66: a third party's sync_lender of a lender it does not own: the pot-only touch
+        (behind a rebase record: accrued to the record's ends, surplus to the pot, unconverted)."""
+        self.pot(self.who())
+
+    def op_potall(self):
+        """KI-66: pot-only touches of every lender in a random order (some twice: idempotent), then
+        every lender claims in a random order (the deficit lenders draw on the pot)."""
+        p, rng = self.p, self.rng
+        for u in rng.sample(list(p.lenders), len(p.lenders)):
+            self.pot(u)
+            if rng.random() < 0.2:
+                self.pot(u)
+        for u in rng.sample(list(p.lenders), len(p.lenders)):
+            p.claim_sol(u)
+
 
 def last_shares_kept(p, shares: int) -> int:
     """`shares`, less the one share a withdrawal of all of S must keep while tokens are borrowed:
@@ -1024,6 +1068,8 @@ LAZY = (["dep"] * 3 + ["wd"] * 3 + ["run", "bor", "bor", "acc", "acc", "adv", "r
 TOPUP = LAZY + ["bor"] * 6 + ["rpx"] * 4 + ["stx"] * 4 + ["dep", "clm", "wd"]
 ORPHANS = (["dep"] * 3 + ["brn"] * 3 + ["deep"] * 3 + ["exit"] * 2 + ["tch"] * 2 +
            ["wdg", "bor", "acc", "adv", "rep", "set", "clm", "clmN", "cov", "swp", "swp", "wipe", "ord", "view"])
+POT = (["dep"] * 3 + ["deep"] * 3 + ["pot"] * 6 + ["potall"] * 2 + ["bor"] * 2 + ["acc"] * 2 + ["rep"] * 2 +
+       ["adv", "set", "clm", "swp", "wd", "brn", "exit", "cov", "view", "wipe"])
 RUNS = (["dep"] * 3 + ["run"] * 3 + ["wd", "bor", "bor", "acc", "adv", "rep", "set", "set", "clm", "clmN",
         "cov", "swp", "wipe", "chn", "chn", "chn", "tch", "view"])
 
@@ -1067,6 +1113,14 @@ def ext_profiles() -> list:
         Ext("ext_orphans_dust_100", 15, 4_000, 10_000, 8, ORPHANS, dust_amounts(),
             "KI-65: dust amounts (1..40 raw tokens): most holdings are below one new share at a rebase, "
             "so the records' rounding units decide who holds S; whole exits while lumps vest"),
+        Ext("ext_pot_continuous_100", 16, 4_000, 10_000, 6, POT, normal_amounts(),
+            "KI-66: lazy lenders and third-party syncs (pot-only touches: a lender behind a rebase record "
+            "is accrued to its ends and its surplus moves to the pot, unconverted), some repeated, then "
+            "claims; late joiners and early leavers around deep rebases, rent paid across them"),
+        Ext("ext_pot_dust_100", 17, 4_000, 10_000, 8, POT, dust_amounts(),
+            "KI-66: pot-only touches with dust amounts (1..40 raw tokens, 0..11 lamports)"),
+        Ext("ext_pot_continuous_90", 18, 4_000, 9_000, 6, POT, normal_amounts(),
+            "KI-66: pot-only touches, 90 % cap: positions stay open across rebases"),
     ]
 
 
@@ -1278,7 +1332,7 @@ def orphan_demo_traces() -> list:
 DEMOS = ["jit_demo", "jit_hold_table", "inflation_demo", "run_demo", "claim_loop_demo", "run_util_table",
          "wipe_demo", "wipe_tail_demo", "zero_share_demo", "protocol_change_demo", "escape_demo",
          "stuck_lock_table", "stale_lock_demo", "lock_tail_demo", "wipe_gate_demo", "vest_exit_demo",
-         "restart_grief_table", "premium_jit_table"]
+         "restart_grief_table", "premium_jit_table", "pot_touch_demo"]
 PATCHED = ("_resolve", "_maybe_roll", "claim_sol", "_touch", "withdraw", "deposit", "_credit")
 
 
@@ -1366,7 +1420,7 @@ def main() -> None:
     ext["ext_topup_scripted_jit"] = scripted_topup_jit()
     for t in orphan_demo_traces():
         ext[t["name"]] = t
-    for group in ("lazy", "runs", "dust", "extreme", "topup", "orphans"):
+    for group in ("lazy", "runs", "dust", "extreme", "topup", "orphans", "pot"):
         traces = [t for n, t in ext.items() if n.startswith(f"ext_{group}")
                   or (group == "extreme" and n.startswith("ext_scripted"))]
         pack(traces, f"pool_ext_{group}", f"{src}: Pool driven by gen_pool.py's extended fuzz profiles")

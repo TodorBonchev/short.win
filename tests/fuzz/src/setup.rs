@@ -26,6 +26,10 @@ pub const SETUP_SALT: u64 = 0x5e75_eed0_000f_f1ce;
 /// corpus reproducers stay as they were).
 pub const M7_SALT: u64 = 0x0c0f_e7a9_e000_0017;
 
+/// The salt of the KI-66 wind-down choice ([`World::absent_owners`]), drawn apart as
+/// [`M7_SALT`]'s.
+pub const KI66_SALT: u64 = 0x0a6b_5e47_0000_0066;
+
 /// `GlobalConfig.coverage_authority` in the account data (discriminator included; the
 /// `state::config` layout, as `coverage_pause_it` writes it).
 pub const CONFIG_COVERAGE_AUTHORITY_OFFSET: usize = 96;
@@ -223,6 +227,9 @@ pub fn world(profile: Profile, seed: u64, opts: crate::runner::Opts) -> World {
         ledger: Default::default(),
         pswap_expire: None,
         s_peaks: Vec::new(),
+        absent_owners: crate::world::ABSENT_OWNERS
+            .with(|c| c.get())
+            .unwrap_or_else(|| Rng::new(seed ^ KI66_SALT).chance(1, 2)),
     };
     for si in 0..w.slots.len() {
         let key = w.slots[si].venue.vm().market();

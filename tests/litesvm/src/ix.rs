@@ -438,7 +438,8 @@ pub fn cover_deficit(owner: &Pubkey, market: &Pubkey, lamports: u64) -> Instruct
 }
 
 /// `sync_lender(max_epochs)` for `owner`'s position, sent by anyone (`owner` does not sign):
-/// refused with `RebaseNeedsOwner` if the conversion reads a rebase record (KI65-REV-SEC1).
+/// the pot-only touch at a rebase record, which only the owner converts through (KI65-REV-SEC1,
+/// KI-66).
 pub fn sync_lender(owner: &Pubkey, market: &Pubkey, max_epochs: u8) -> Instruction {
     build(
         shortwin::accounts::SyncLender {

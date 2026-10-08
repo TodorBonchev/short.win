@@ -163,8 +163,9 @@ impl PoolState {
 /// Whether the conversion that took a lender from `before` to `after` with `records` read a
 /// rebase record, by the math crate alone: it moved the lender's epoch, and given only the
 /// records before the first rebase record the conversion stops `Behind` (it needed that
-/// record). `sync_lender` then needs the owner's signature (KI65-REV-SEC1, `RebaseNeedsOwner`);
-/// the program's own test is `engine::lender::reads_rebase`.
+/// record). Only the owner's `sync_lender` may do that (KI65-REV-SEC1); anyone else's is the
+/// pot-only touch (KI-66), which never does. The program's own test is
+/// `engine::lender::reads_rebase`.
 pub fn reads_rebase(p: &Pool, before: &Lender, after: &Lender, records: &[MathShareEpoch]) -> bool {
     let first = records
         .iter()
@@ -175,25 +176,15 @@ pub fn reads_rebase(p: &Pool, before: &Lender, after: &Lender, records: &[MathSh
         && pool::convert(p, &mut cut, &mut records[..first].to_vec()) == Ok(Standing::Behind)
 }
 
-/// Whether `sync_lender(n)` of `owner`'s position (with the `n` records from its epoch) would
-/// read a rebase record ([`reads_rebase`]); `None` without a position or if the math crate
-/// refuses the conversion or the touch that follows it (the program evaluates the owner check
-/// after both, so it then refuses with the math error first).
-pub fn sync_reads_rebase(st: &PoolState, owner: &Pubkey, n: usize) -> Option<bool> {
-    let before = st.lender_of(owner)?.lender();
-    let mut recs: Vec<MathShareEpoch> = st
-        .records_from(before.epoch)
-        .iter()
-        .take(n)
-        .copied()
-        .collect();
-    let loaded = recs.clone();
-    let mut after = before;
-    if pool::convert(&st.pool, &mut after, &mut recs).ok()? != Standing::Behind {
-        let mut v = *st.vault;
-        pool::touch(&st.pool, &mut v, &mut after, &mut recs, st.now).ok()?;
-    }
-    Some(reads_rebase(&st.pool, &before, &after, &loaded))
+/// What a third party's `sync_lender(n)` of `owner`'s position leaves (KI-66: the pot-only
+/// touch `pool::touch_pot` with the `n` records from the lender's epoch, on the pre-state): the
+/// lender and the vault. `None` without a position or if the math crate refuses.
+pub fn third_party_sync(st: &PoolState, owner: &Pubkey, n: usize) -> Option<(Lender, Vault)> {
+    let mut l = st.lender_of(owner)?.lender();
+    let recs: Vec<MathShareEpoch> = st.records_from(l.epoch).iter().take(n).copied().collect();
+    let mut v = *st.vault;
+    pool::touch_pot(&st.pool, &mut v, &mut l, &recs, st.now).ok()?;
+    Some((l, v))
 }
 
 /// Every `ShareEpoch` record of `market` at its own address `["share_epoch", market, epoch]`

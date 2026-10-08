@@ -208,7 +208,9 @@ fn report(s: &Stats, secs: f64, failures: &[(String, String)]) -> serde_json::Va
         "\n-- the deficit tripwire and the wind-down's claims (M10) --\n  deficits checked {} in {} runs; \
          largest {} lamports (its bound {}, over the whole run {}), deficit/bound largest {:.4} \
          smallest {}\n  after the second claim pass: \
-         largest unpaid pending {} lamports, largest lender_sol {} lamports",
+         largest unpaid pending {} lamports, largest lender_sol {} lamports\n  with absent \
+         owners held behind a rebase record (KI-66): {} markets, {} lenders, {} held \
+         third-party syncs; present lenders owed above dust {} times, at most {} lamports",
         d.checked,
         d.runs,
         d.largest,
@@ -218,7 +220,18 @@ fn report(s: &Stats, secs: f64, failures: &[(String, String)]) -> serde_json::Va
         d.loosest_ppm
             .map_or("-".into(), |p| format!("{:.4}", p as f64 / 1e6)),
         s.wind_down_unpaid_max,
-        s.wind_down_lender_sol_max
+        s.wind_down_lender_sol_max,
+        s.events
+            .get("wind-down-absent-market")
+            .copied()
+            .unwrap_or(0),
+        s.events.get("wind-down-absent-owner").copied().unwrap_or(0),
+        s.events.get("sync-lender-held").copied().unwrap_or(0),
+        s.events
+            .get("wind-down-absent-present-owed")
+            .copied()
+            .unwrap_or(0),
+        s.wind_down_absent_owed_max
     );
     println!("\n-- anomalies (not invariant violations; for review) --");
     if s.anomalies.is_empty() {
@@ -262,6 +275,7 @@ fn report(s: &Stats, secs: f64, failures: &[(String, String)]) -> serde_json::Va
         "wind_down_claims": {
             "largest_unpaid_pending_lamports": s.wind_down_unpaid_max,
             "largest_lender_sol_lamports": s.wind_down_lender_sol_max,
+            "largest_absent_owed_lamports": s.wind_down_absent_owed_max,
             "claim_dust_lamports": shortwin_fuzz::world::CLAIM_DUST,
         },
         "coverage": {

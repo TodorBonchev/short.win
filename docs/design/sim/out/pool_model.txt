@@ -90,6 +90,21 @@ KI-65 against R4B-4: a whale, the conversion order and the R3B-2 flush (H: an ho
 | W2 sync order W then H, then the whale exits | v0.4.2 | 999,916,668 | 3,000,083,331 | 1 |
 | W3 whale deposits while S = 1 is H's unconverted share | v0.4.2 | 0 | 6,000,083,331 | 1 |
 
+KI-66 a surplus holder behind a rebase record that never returns (T-POT's early leaver A and late joiner C, a rebase rolled before anyone touched C; then C's owner returns):
+| sync of C | pot after it (lamports) | A's next claim | A's pending left | C's shares, converted | C's claim | lender_sol left |
+|---|---|---|---|---|---|---|
+| owner-signed conversions only (no sync of C) | 0 | 130,434,782 | 2,827,173,914 | 2,000 | 579,710,144 | 4,114,855,074 |
+| pot-only touch of C (anyone) | 4,434,782,609 | 2,957,608,696 | 0 | 2,000 | 579,710,144 | 4,114,855,074 |
+| pot-only touch twice | 4,434,782,609 | 2,957,608,696 | 0 | 2,000 | 579,710,144 | 4,114,855,074 |
+| C's owner converts C | 4,434,782,609 | 2,957,608,696 | 0 | 2,000 | 579,710,144 | 4,114,855,074 |
+
+KI-66 I-P6 with absent lenders: random pools (late joiners, early leavers, positions across one or more rebases), a random set of lenders never returns, the present lenders claim after the wind-down; 2,000 seeds:
+| variant | runs with an absent lender behind a rebase | runs with a present lender unpaid above dust | unpaid in total (lamports) | worst run (lamports) |
+|---|---|---|---|---|
+| KI65-REV-SEC1 only (absent lenders behind a rebase untouched) | 668 | 24 | 56,611,095,850 | 12,519,515,622 |
+| pot-only touch of the absent lenders (KI-66) | 668 | 8 | 3,998,521,208 | 2,134,755,812 |
+| every absent owner returns and converts | 668 | 0 | 2 | 1 |
+
 KI-65 lemma, lazy conversion order: 2,000 random pools, 2,593 rebase records, 9,934 conversions in random order between deposits and 0-token burns; sum(shares) == S once every lender converted, each conversion within [floor, floor + 1 per record] (v0.4.1 on the same pools: up to 6 orphan shares)
 
 R4B-5 a 10 SOL lump, then a 1-lamport sweep every k seconds (share of the 10 SOL released):

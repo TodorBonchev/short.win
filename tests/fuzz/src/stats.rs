@@ -90,6 +90,9 @@ pub struct Stats {
     /// `pending` left unpaid after the second claim pass (lamports).
     pub wind_down_lender_sol_max: u64,
     pub wind_down_unpaid_max: u64,
+    /// KI-66's never-returns model ([`crate::world::World::absent_owners`]): the largest total
+    /// the present lenders stayed owed while lenders held behind a rebase record were away.
+    pub wind_down_absent_owed_max: u64,
 }
 
 impl Stats {
@@ -130,6 +133,9 @@ impl Stats {
             .wind_down_lender_sol_max
             .max(o.wind_down_lender_sol_max);
         self.wind_down_unpaid_max = self.wind_down_unpaid_max.max(o.wind_down_unpaid_max);
+        self.wind_down_absent_owed_max = self
+            .wind_down_absent_owed_max
+            .max(o.wind_down_absent_owed_max);
     }
 
     /// Records an anomaly of class `class` at the cursor.

@@ -623,6 +623,19 @@ fn sync_lender_behind(n: u32) -> Prepared {
     s.prepared(ix)
 }
 
+/// KI-66: a third party's `sync_lender` with the `n` records passed: the pot-only touch, which
+/// loads and key-checks every record passed but reads only the first rebase record (the lender
+/// accrued to its ends, the surplus to the pot, nothing converted).
+fn sync_lender_pot(n: u32) -> Prepared {
+    let s = behind(n);
+    let max = u8::try_from(n).expect("u8");
+    let ix = ix::with_remaining(
+        ix::sync_lender(&s.h.owner.pubkey(), &s.k.market, max),
+        &records(&s, n),
+    );
+    prepared(s.env, ix, &[])
+}
+
 fn withdraw_behind(n: u32) -> Prepared {
     let s = behind(n);
     let ix = ix::with_remaining(ix::withdraw(&s.keys(), 100, 0), &records(&s, n));
@@ -658,6 +671,7 @@ at!(withdraw_behind: withdraw_behind_1 = 1, withdraw_behind_3 = 3, withdraw_behi
 at!(claim_sol_behind: claim_sol_behind_1 = 1, claim_sol_behind_3 = 3, claim_sol_behind_8 = 8, claim_sol_behind_10 = 10, claim_sol_behind_12 = 12);
 at!(cover_deficit_behind: cover_deficit_behind_1 = 1, cover_deficit_behind_3 = 3, cover_deficit_behind_8 = 8, cover_deficit_behind_10 = 10, cover_deficit_behind_12 = 12);
 at!(sync_lender_behind: sync_lender_behind_1 = 1, sync_lender_behind_3 = 3, sync_lender_behind_8 = 8, sync_lender_behind_10 = 10, sync_lender_behind_12 = 12);
+at!(sync_lender_pot: sync_lender_pot_1 = 1, sync_lender_pot_8 = 8);
 
 fn sweep_protocol_fees() -> Prepared {
     let (
@@ -966,6 +980,18 @@ pub fn cases() -> Vec<Case> {
             "12 rebase records behind, written",
             LENDER_SOL_BEYOND_CAP,
             sync_lender_behind_12,
+        ),
+        case(
+            "sync_lender",
+            "a third party, 1 rebase record passed: the pot-only touch",
+            LENDER_SOL,
+            sync_lender_pot_1,
+        ),
+        case(
+            "sync_lender",
+            "a third party, 8 rebase records passed: the pot-only touch",
+            LENDER_SOL,
+            sync_lender_pot_8,
         ),
         case(
             "sweep_protocol_fees",

@@ -24,7 +24,9 @@ Model (all integers; rounding in favour of the pool):
         draw from the pot up to the lender's own entitlement deficit.  O(1), no
         division, no keeper recycling duty (sync_lender stays permissionless for plain
         catch-up; since KI65-REV-SEC1 only the owner converts its position through a rebase
-        record -- the model does not check signatures);
+        record -- the model does not check signatures -- and anyone else's sync of a lender
+        behind one is the pot-only touch _touch_pot, KI-66, which still moves the surplus
+        accrued up to that record to the pot);
         liveness invariant: after all positions resolve, the vest is released and
         every lender is synced, sequential claims pay out lender_sol - dust;
       - v0.4 (R3B-2): LUMP credits (lender half of the penalty, expiry fee, penalty
@@ -58,6 +60,10 @@ Model (all integers; rounding in favour of the pool):
     more).  Once every lender converted, sum(shares) == S; R3B-2's "the last lender is paid the
     vest" (a withdrawal of all of S) again reaches every exit, and no SOL is credited to shares
     nobody holds.  v0.4.1 floored each lender separately (up to n - 1 orphan shares per rebase).
+  * KI-66: the pot-only touch (_touch_pot), a third party's sync_lender of a lender behind a
+    rebase record: it accrues the lender to the record's acc_end/acc_r_end and moves its surplus
+    to the pot without converting (no shares, conv_rem or epoch move), so a surplus holder that
+    never returns no longer keeps the deficit lenders waiting for the surplus it held at the roll.
 """
 from __future__ import annotations
 
@@ -278,7 +284,7 @@ class Pool:
         self.carry_r = num - d * self.S
         self.acc_r += d
 
-    def _touch(self, who) -> Lender:
+    def _touch(self, who, pot_only: bool = False) -> Lender:
         self._cal_advance()
         L = self.lenders.get(who)
         if L is None:
@@ -287,7 +293,10 @@ class Pool:
             acc_end, num, den, acc_r_end = self.epochs[L.epoch][:4]
             L.pending += L.shares * (acc_end - L.snap) // WAD
             L.real += L.shares * (acc_r_end - L.snap_r) // WAD
-            if self.wipe_live and L.epoch == self.epoch - 1:
+            held = pot_only and num and (L.shares or L.lock or L.lock_term)
+            if self.wipe_live and L.epoch == self.epoch - 1 or held:
+                # V2-12: parked on the live wipe record; KI-66: the pot-only touch stays on a
+                # rebase record, accrued to its ends, unconverted
                 L.snap, L.snap_r = acc_end, acc_r_end
                 self._to_pot(L)
                 return L
@@ -317,6 +326,17 @@ class Pool:
                 self.lock_norm -= min(L.lock_term, self.lock_norm)     # v0.4: expired lock leaves lock_norm here
             L.lock, L.lock_term, L.lock_epoch = 0, 0, -1               # v0.4.1: the calendar already dropped it
         return L
+
+    def _touch_pot(self, who) -> Lender:
+        """KI-66: the pot-only touch, anyone's sync_lender of a lender it does not own.
+        Since KI65-REV-SEC1 only the owner converts its position through a rebase record (the
+        conversion order decides who receives the record's rounding units), so this touch stops at
+        one: the lender accrues pending/real to the record's acc_end/acc_r_end, keeps them as its
+        snapshots (its later conversion accrues 0 there) and moves its surplus to the pot (R3A-2);
+        its shares, lock, epoch and the record's conv_rem stay.  Idempotent.  Everywhere else it is
+        _touch (wipe catch-up, the V2-12 jump and parking, a current lender).  What the unconverted
+        shares earn after the record waits for the owner's conversion."""
+        return self._touch(who, pot_only=True)
 
     def _to_pot(self, L: Lender):
         """R3A-2: realised allocation beyond the lender's entitlement -> MarketVault pot."""
@@ -1603,6 +1623,149 @@ def lazy_order_check(trials: int = 2_000, seed: int = 65):
     return trials, rebases, conversions, worst_v041
 
 
+# ---- KI-66: the pot-only touch -------------------------------------------------------------------
+def _pot_pair():
+    """lender_it's T-POT scenario (the_pot_connects_early_leavers_and_late_joiners) up to A's first
+    claim: A and B lend 1,000 tokens each, 900 are borrowed for 10 days, A withdraws its allowance
+    (early leaver), C deposits 2,000 (late joiner) before the rent is paid, so the paid rent is
+    realised on C's shares beyond C's entitlement: C holds a surplus, A a deficit.  Then a
+    settlement of everything but one raw token (1 SOL) rebases the shares (1/1,000) before anyone
+    touched C."""
+    p = Pool(util_cap_bps=10_000)
+    p.deposit("A", 10**12)
+    p.deposit("B", 10**12)
+    p.borrow(1, 9 * 10**11)
+    p.advance(10 * 86_400, 10**16)
+    L = p._touch("A")
+    p.withdraw("A", min(L.shares, p.free_allowance("A") * (p.S + VS) // (p.T + p.B + VA)))
+    p.deposit("C", 2 * 10**12)
+    q, io, _pr, _dl = p.positions[1]
+    p.repay(1, cdiv(q * (p.index - io), WAD), 0)
+    first = p.claim_sol("A")
+    short = p.lenders["A"].pending
+    p.borrow(2, p.T - 1)
+    p.settle(2, 10**9)
+    assert p.epoch == 1 and p.epochs[0][1] == 1, p.epochs     # a rebase, C not converted
+    return p, first, short
+
+
+def pot_touch_demo():
+    """KI-66: a surplus holder behind a rebase record that never returns.  Since KI65-REV-SEC1 a third
+    party's sync cannot convert C through the record, so before KI-66 C's surplus stayed on C and A's
+    shortfall waited for C's owner; the pot-only touch moves it to the pot without converting C.
+    The pot-only touch is idempotent, and C's own later conversion counts nothing twice: C, A and the
+    vault end as when C's owner had converted first.
+    Returns rows (case, pot after C's sync, A's next claim, A's pending left, C's shares after its own
+    later sync, C's claim then, lender_sol left)."""
+    rows = []
+    for case in ("owner-signed conversions only (no sync of C)", "pot-only touch of C (anyone)",
+                 "pot-only touch twice", "C's owner converts C"):
+        p, first, short = _pot_pair()
+        if case.startswith("pot-only"):
+            p._touch_pot("C")
+            if "twice" in case:
+                once = (p.unmatched, p.lenders["C"].real, p.lenders["C"].pending, p.lenders["C"].snap)
+                p._touch_pot("C")
+                assert once == (p.unmatched, p.lenders["C"].real, p.lenders["C"].pending, p.lenders["C"].snap)
+            assert p.lenders["C"].epoch == 0 and p.epochs[0][7] == 0       # C stays unconverted
+        elif case.startswith("C's owner"):
+            p._touch("C")
+        pot = p.unmatched
+        a = p.claim_sol("A")
+        left = p.lenders["A"].pending
+        L = p._touch("C")                                    # C's owner returns
+        c = p.claim_sol("C")
+        p.claim_sol("A")
+        rows.append((case, pot, a, left, L.shares, c, p.sol_vault))
+    base = rows[-1][4:]
+    assert all(r[4:] == base for r in rows), rows              # same end, whoever synced C and when
+    assert all(r[3] == 0 for r in rows[1:]), rows               # A paid in full without C returning
+    return rows
+
+
+def pot_liveness_table(seeds: int = 2_000):
+    """KI-66, I-P6 with lenders that never return: random pools (deposits, late joiners, early
+    leavers, positions across rebases, rent, lumps, claims, one or more rebases), then a random set of
+    lenders is absent; the wind-down resolves every position, releases the vest, touches the present
+    lenders and the absent ones the way a third party may, and the present lenders claim twice.
+    Variants: KI65-REV-SEC1 alone (an absent lender behind a rebase record is left as it is), the
+    pot-only touch (KI-66), and every owner returning (the absent lenders converted by their owners).
+    Returns rows (variant, runs with an absent lender behind a rebase record, runs where a present
+    lender is left unpaid above the dust bound, present entitlement left unpaid in total (lamports),
+    worst run (lamports))."""
+    variants = ("KI65-REV-SEC1 only (absent lenders behind a rebase untouched)",
+                "pot-only touch of the absent lenders (KI-66)", "every absent owner returns and converts")
+    out = {v: [0, 0, 0, 0] for v in variants}
+    for seed in range(seeds):
+        rng = random.Random(seed)
+        p = Pool(util_cap_bps=10_000)
+        users = [f"u{i}" for i in range(rng.randrange(3, 7))]
+        for u in users[:2]:
+            p.deposit(u, rng.randrange(10**9, 10**12))
+        pid = 0
+        for _ in range(rng.randrange(8, 30)):
+            r = rng.random()
+            try:
+                if r < 0.2 and p.T > 1:
+                    pid += 1
+                    p.borrow(pid, rng.randrange(1, p.T * 9 // 10 + 1), rng.choice([86_400, 9 * 86_400, 30 * 86_400]))
+                elif r < 0.4:
+                    p.advance(rng.choice([3_600, 86_400, 9 * 86_400]), rng.randrange(0, 10**16))
+                elif r < 0.5 and p.positions:
+                    k = rng.choice(list(p.positions))
+                    q, io, _pr, _dl = p.positions[k]
+                    p.repay(k, cdiv(q * (p.index - io), WAD), rng.choice([0, rng.randrange(0, 10**9)]))
+                elif r < 0.65:
+                    p.deposit(rng.choice(users), rng.randrange(10**6, 10**12))   # late joiners
+                elif r < 0.75:
+                    u = rng.choice(users)                                       # early leavers
+                    if u in p.lenders and p._touch(u).shares:
+                        L = p.lenders[u]
+                        p.withdraw(u, max(1, min(L.shares, p.free_allowance(u) * (p.S + VS) // (p.T + p.B + VA))))
+                elif r < 0.85:
+                    u = rng.choice(users)
+                    if u in p.lenders:
+                        p.claim_sol(u)
+                elif p.T > 1 and p.S:
+                    pid += 1                                                    # all but a raw unit: a rebase
+                    p.borrow(pid, p.T - 1)
+                    p.settle(pid, rng.randrange(0, 10**10), rng.choice([0, rng.randrange(0, 10**9)]))
+            except ValueError:
+                pass
+        lenders = list(p.lenders)
+        if len(lenders) < 2:
+            continue
+        absent = set(rng.sample(lenders, rng.randrange(1, len(lenders))))
+        behind = any(p.lenders[w].epoch < p.epoch and p.epochs[p.lenders[w].epoch][1] for w in absent)
+        for v in variants:
+            q = copy.deepcopy(p)
+            for k in list(q.positions):
+                qq, io, _pr, _dl = q.positions[k]
+                q.repay(k, cdiv(qq * (q.index - io), WAD), 0)
+            q.advance(q.lump_vest_s + 1)
+            for w in lenders:
+                if w not in absent or v.startswith("every"):
+                    q._touch(w)
+                elif v.startswith("pot-only"):
+                    q._touch_pot(w)
+                else:                                   # a third party's sync: refused behind a rebase record
+                    L = q.lenders[w]
+                    if not (L.epoch < q.epoch and q.epochs[L.epoch][1] and (L.shares or L.lock or L.lock_term)):
+                        q._touch(w)
+            for _ in range(2):
+                for w in lenders:
+                    if w not in absent:
+                        q.claim_sol(w)
+            unpaid = sum(max(q.lenders[w].pending, 0) for w in lenders if w not in absent)
+            bound = q.n_touch + 2 * len(lenders) + q.epoch + 2
+            row = out[v]
+            row[0] += behind
+            row[1] += unpaid > bound
+            row[2] += unpaid
+            row[3] = max(row[3], unpaid)
+    return [(v, *out[v]) for v in variants]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ops", type=int, default=60_000)
@@ -1689,6 +1852,20 @@ def main():
     print("|---|---|---|---|---|")
     for case, label, w, h, st in whale_order_demo():
         print(f"| {case} | {label} | {w:,} | {h:,} | {st:,} |")
+    print("\nKI-66 a surplus holder behind a rebase record that never returns (T-POT's early leaver A and late "
+          "joiner C, a rebase rolled before anyone touched C; then C's owner returns):")
+    print("| sync of C | pot after it (lamports) | A's next claim | A's pending left | C's shares, converted | "
+          "C's claim | lender_sol left |")
+    print("|---|---|---|---|---|---|---|")
+    for case, pot, a, left, cs, c, sv in pot_touch_demo():
+        print(f"| {case} | {pot:,} | {a:,} | {left:,} | {cs:,} | {c:,} | {sv:,} |")
+    print("\nKI-66 I-P6 with absent lenders: random pools (late joiners, early leavers, positions across one or more "
+          "rebases), a random set of lenders never returns, the present lenders claim after the wind-down; 2,000 seeds:")
+    print("| variant | runs with an absent lender behind a rebase | runs with a present lender unpaid above dust | "
+          "unpaid in total (lamports) | worst run (lamports) |")
+    print("|---|---|---|---|---|")
+    for v, behind, short, tot, worst in pot_liveness_table(2_000):
+        print(f"| {v} | {behind} | {short} | {tot:,} | {worst:,} |")
     n, rb, conv, orph = lazy_order_check()
     print(f"\nKI-65 lemma, lazy conversion order: {n:,} random pools, {rb:,} rebase records, {conv:,} conversions in "
           f"random order between deposits and 0-token burns; sum(shares) == S once every lender converted, each "

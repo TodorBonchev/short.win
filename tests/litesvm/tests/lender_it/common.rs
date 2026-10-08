@@ -664,9 +664,9 @@ impl Lab {
     }
 
     /// `sync_lender(max_epochs)` for `name` sent by a third party (the harness payer, without
-    /// the owner's signature), with the next `max_epochs` records: refused with
-    /// `RebaseNeedsOwner` where the conversion reads a rebase record (KI65-REV-SEC1,
-    /// [`reads_rebase`]).
+    /// the owner's signature), with the next `max_epochs` records: the pot-only touch
+    /// (`pool::touch_pot`, KI-66), which never converts through a rebase record
+    /// (KI65-REV-SEC1, [`reads_rebase`]) but moves the surplus accrued up to it to the pot.
     pub fn sync(&mut self, name: &str, max_epochs: u8) -> Result<Standing, u32> {
         self.sync_by(name, max_epochs, false)
     }
@@ -685,17 +685,23 @@ impl Lab {
         let n = usize::from(max_epochs);
         let metas = self.record_metas(from, n);
         let mut standing = Standing::Behind;
-        let mut needs_owner = false;
         let expect = (|| -> Result<Expect, MathError> {
             let (p, mut v) = (st.pool, st.vault.clone());
             let mut l = l0.lender();
             let mut recs = Self::records_slice(&st, from, n);
             let loaded = recs.clone();
-            standing = pool::convert(&p, &mut l, &mut recs)?;
-            if standing != Standing::Behind {
-                pool::touch(&p, &mut v, &mut l, &mut recs, st.now)?;
+            if owner_signs {
+                standing = pool::convert(&p, &mut l, &mut recs)?;
+                if standing != Standing::Behind {
+                    pool::touch(&p, &mut v, &mut l, &mut recs, st.now)?;
+                }
+            } else {
+                standing = pool::touch_pot(&p, &mut v, &mut l, &recs, st.now)?;
+                assert!(
+                    !reads_rebase(&p, &l0.lender(), &l, &loaded) && recs == loaded,
+                    "the pot-only touch converted {name} through a rebase record"
+                );
             }
-            needs_owner = reads_rebase(&p, &l0.lender(), &l, &loaded);
             Ok(Expect {
                 pool: p,
                 vault: v,
@@ -706,7 +712,6 @@ impl Lab {
                 records: recs,
             })
         })();
-        let refused = needs_owner && !owner_signs;
         let (kp, _) = self.keys(name);
         let (ixn, signer) = if owner_signs {
             (
@@ -723,20 +728,8 @@ impl Lab {
                 let e = expect.unwrap_or_else(|err| {
                     panic!("sync_lender: program accepted, math crate refuses: {err:?}")
                 });
-                assert!(
-                    !refused,
-                    "sync_lender: a third party converted {name} through a rebase record"
-                );
                 self.compare("sync_lender", &owner, &e);
                 Ok(standing)
-            }
-            Err(c) if refused && expect.is_ok() => {
-                assert_eq!(
-                    c,
-                    code(ShortwinError::RebaseNeedsOwner),
-                    "sync_lender: {name}"
-                );
-                Err(c)
             }
             Err(c) => {
                 Self::check_error("sync_lender", c, expect.map(|_| ()));

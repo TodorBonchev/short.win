@@ -253,6 +253,16 @@ describe('withdraw plans', () => {
         expect(plan.disclosureVars?.['lender.exitForfeitsVest']).toEqual({ vesting: '0.25' });
     });
 
+    it('add lender.subUnitConversion after the vest-forfeit acknowledgement (KI-65)', async () => {
+        const subUnit = { vestEnd: '2026-10-08 06:00 UTC' };
+        const plan = await buildWithdrawPlan({ ...base, subUnit, vestingForfeit: 1_000n, vesting: 250_000_000n });
+        expect(plan.disclosures).toEqual(['lender.exitForfeitsVest', 'lender.subUnitConversion']);
+        expect(plan.disclosureVars).toEqual({
+            'lender.exitForfeitsVest': { vesting: '0.25' },
+            'lender.subUnitConversion': subUnit,
+        });
+    });
+
     it('refuse zero shares', async () => {
         await expect(buildWithdrawPlan({ ...base, shares: 0n })).rejects.toBeInstanceOf(PlanError);
     });
@@ -298,6 +308,39 @@ describe('claim, cover and sync plans', () => {
         expect(ix?.accounts?.[2]).toMatchObject({ address: LENDER, role: AccountRole.WRITABLE });
         expect(ix?.accounts?.[3]).toMatchObject({ address: OWNER, role: AccountRole.READONLY_SIGNER });
         expect(tail(ix, MAX_RECORDS)[0]?.address).toBe((await findShareEpochPda({ market: MARKET, epoch: 1 }))[0]);
+    });
+
+    it('show lender.subUnitConversion last, with its variables, on every flow that converts the position', async () => {
+        const subUnit = { vestEnd: '2026-10-08 06:00 UTC' };
+        const c = ctx({ lenderEpoch: 0, shareEpoch: 1, subUnit });
+        const plans = [
+            await buildClaimPlan({ ...c, syncs: [], expected: 1n }),
+            await buildCoverPlan({ ...c, lamports: 1n }),
+            await buildSyncPlan(c),
+        ];
+        for (const plan of plans) {
+            expect(plan.disclosures, plan.kind).toEqual(['lender.subUnitConversion']);
+            expect(plan.disclosureVars?.['lender.subUnitConversion'], plan.kind).toEqual(subUnit);
+        }
+        const deposit = await buildDepositPlan({
+            ...c,
+            source: SOURCE,
+            sourceCpiGuard: false,
+            amount: 1n,
+            minShares: 0n,
+            bracket: false,
+            sweep: [],
+            unpaidRent: { receivable: '1', exposure: '0.5', share: '50%' },
+        });
+        expect(deposit.disclosures).toEqual(['lender.solRepayment', 'lender.unpaidRent', 'lender.subUnitConversion']);
+        expect(deposit.disclosureVars).toEqual({
+            'lender.unpaidRent': { receivable: '1', exposure: '0.5', share: '50%' },
+            'lender.subUnitConversion': subUnit,
+        });
+        // Without it nothing changes.
+        const plain = await buildClaimPlan({ ...ctx(), syncs: [], expected: 1n });
+        expect(plain.disclosures).toEqual([]);
+        expect(plain.disclosureVars).toBeUndefined();
     });
 
     it('decode the lender position for the review', () => {

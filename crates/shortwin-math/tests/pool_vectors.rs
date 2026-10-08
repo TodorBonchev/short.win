@@ -6,8 +6,8 @@
 //! untouched state) are asserted after every line (ARCH §8.3 I8), and must fail exactly
 //! where `pool_model.check()` fails. The two option-(a) ECON §9.6 fuzz runs are replayed
 //! whole (60,000 operations each), the lock-heavy mix of ECON §9.3, the 40-seed stranding
-//! table of R3A-2, the extended profiles (KI-65's lazy conversion orders among them) and
-//! every default-switch demo.
+//! table of R3A-2, the extended profiles (KI-65's lazy conversion orders and KI-66's pot-only
+//! touches among them) and every default-switch demo.
 
 mod common;
 #[path = "pool_harness.rs"]
@@ -59,6 +59,9 @@ struct Trace {
     /// Rent top-up profiles (M10-8C-1): exits whose top-up was positive.
     #[serde(default)]
     top_ups: Option<Dec<u64>>,
+    /// Pot-only touch profiles (KI-66): the `h` operations that held at a rebase record.
+    #[serde(default)]
+    pot_holds: Option<Dec<u64>>,
 }
 
 #[derive(Deserialize)]
@@ -457,6 +460,32 @@ fn ext_orphans_lazy_conversion_order() {
     }
 }
 
+/// KI-66, the pot-only touch (`h`, `pool::touch_pot`, a third party's `sync_lender`): lazy
+/// lenders around deep rebases are touched by third parties (some twice) and claim; a lender
+/// behind a rebase record is accrued to the record's ends and moves its surplus to the pot
+/// without converting (the canonical state pins its shares, epoch and snapshots, the record's
+/// `conv_rem` and the pot), and converts later at its own touch; plus `pot_touch_demo` in
+/// `pool_scenarios` (T-POT's late joiner behind a rebase record: A paid in full without C).
+#[test]
+fn ext_pot_only_touch() {
+    let runs = replay_group("pool_ext_pot", 10_000);
+    let traces = load_all("pool_ext_pot");
+    let holds: Vec<u64> = traces
+        .iter()
+        .filter_map(|t| t.pot_holds.as_ref().map(|d| d.0))
+        .collect();
+    assert_eq!(holds.len(), 3, "three profiles");
+    assert!(holds.iter().all(|&n| n >= 20), "{holds:?}");
+    assert!(
+        traces.iter().all(|t| t
+            .lines
+            .iter()
+            .any(|l| l.starts_with("h ") || l.contains(";h "))),
+        "every profile sends pot-only touches"
+    );
+    assert_eq!(runs.len(), 3);
+}
+
 #[test]
 fn econ_demos_round_3_and_round_4_cases() {
     let runs = replay_group("pool_scenarios", 5_000);
@@ -479,6 +508,7 @@ fn econ_demos_round_3_and_round_4_cases() {
         "vest_exit_demo",
         "restart_grief_table",
         "premium_jit_table",
+        "pot_touch_demo",
         "pool_edge",
     ] {
         assert!(

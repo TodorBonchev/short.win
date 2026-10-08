@@ -39,7 +39,7 @@ use shortwin_math::pool::{
     self, Lender, Pool, Resolution, ShareEpoch as MathShareEpoch, SweepSource, Vault,
 };
 
-use crate::common::{Lab, code, write_zc};
+use crate::common::{Lab, MAX_RECORDS_PER_TX, code, write_zc};
 
 /// Short error codes of the vectors (`pool_harness::code`).
 fn vcode(e: MathError) -> &'static str {
@@ -122,6 +122,20 @@ impl Model {
             &mut self.vault,
             l,
             recs_from_mut(&mut self.records, l.epoch),
+            self.now,
+        )
+        .map(|_| ())
+    }
+
+    /// KI-66: the pot-only touch (a third party's `sync_lender`).
+    fn touch_pot(&mut self, u: usize) -> Result<(), MathError> {
+        let i = self.slot(u);
+        let l = &mut self.lenders[i].1;
+        pool::touch_pot(
+            &self.pool,
+            &mut self.vault,
+            l,
+            recs_from(&self.records, l.epoch),
             self.now,
         )
         .map(|_| ())
@@ -641,6 +655,17 @@ fn replay(trace: &Value, program: TokenProgram, max_lines: usize) -> Stats {
                     }
                     show(&r.map(|()| None::<u8>))
                 }
+                "h" => {
+                    // KI-66: a third party's sync_lender, with the records it may need.
+                    let r = m.touch_pot(u());
+                    liveness_cap_from_model(&m, &lab);
+                    let (nm, exists) = who(&lab, u());
+                    if exists {
+                        let steps = u8::try_from(MAX_RECORDS_PER_TX).expect("u8");
+                        lab.sync(&nm, steps).unwrap();
+                    }
+                    show(&r.map(|()| None::<u8>))
+                }
                 "l" => show(&m.lock_of(u()).map(Some)),
                 "k" => {
                     let r = pool::cal_advance(&mut m.vault, m.now);
@@ -826,7 +851,7 @@ fn pool_model_scenarios_replay() {
 /// The extended profiles: lazy lenders many epochs behind (repeated wipes, deep rebases),
 /// runs and churn, dust amounts, exits whose rent top-up vests (M10-8C-1; not the u64-extreme
 /// profile) with the scripted JIT whale, KI-65's lazy conversion orders and orphan / whale demos,
-/// the scripted lock-term and over-lock cases.
+/// KI-66's pot-only touches, the scripted lock-term and over-lock cases.
 #[test]
 fn extended_profiles_replay() {
     let lines = if full() { usize::MAX } else { 1_000 };
@@ -855,6 +880,16 @@ fn extended_profiles_replay() {
     // KI-65: lazy lenders converting in random orders through deep rebases, dust residues,
     // whole exits during a vest, and the orphan / whale demos' v0.4.2 pools.
     for t in load("pool_ext_orphans_1.json") {
+        let nm = t["name"].as_str().unwrap();
+        let s = replay(
+            &t,
+            TokenProgram::BOTH[usize::from(nm.contains("dust"))],
+            lines,
+        );
+        println!("{nm}: {s:?}");
+    }
+    // KI-66: third parties' syncs of lazy lenders behind rebase records (the pot-only touch).
+    for t in load("pool_ext_pot_1.json") {
         let nm = t["name"].as_str().unwrap();
         let s = replay(
             &t,

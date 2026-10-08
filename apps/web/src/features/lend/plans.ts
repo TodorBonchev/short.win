@@ -52,6 +52,25 @@ export interface LendContext {
     /** The position's share epoch; `null` for a lender that has never deposited. */
     readonly lenderEpoch: number | null;
     readonly shareEpoch: number;
+    /**
+     * `lender.subUnitConversion`'s variables when the plan's own conversion takes the position to 0
+     * shares while the pool's income vests (`previewSubUnitConversion`): the review shows the
+     * disclosure. Omitted otherwise.
+     */
+    readonly subUnit?: Readonly<Record<string, string>>;
+}
+
+/** The plan's disclosures and their variables, with `lender.subUnitConversion` last when it applies. */
+function disclosuresOf(
+    c: LendContext,
+    ids: readonly DisclosureId[],
+    vars?: TxPlan['disclosureVars'],
+): Pick<TxPlan, 'disclosures' | 'disclosureVars'> {
+    if (!c.subUnit) return { disclosures: ids, disclosureVars: vars };
+    return {
+        disclosures: [...ids, 'lender.subUnitConversion'],
+        disclosureVars: { ...vars, 'lender.subUnitConversion': c.subUnit },
+    };
 }
 
 /**
@@ -198,8 +217,7 @@ export async function buildDepositPlan(i: DepositPlanInput): Promise<TxPlan> {
             },
             lenderWatch(i, ['shares', 'lock']),
         ],
-        disclosures,
-        disclosureVars: i.unpaidRent ? { 'lender.unpaidRent': i.unpaidRent } : undefined,
+        ...disclosuresOf(i, disclosures, i.unpaidRent ? { 'lender.unpaidRent': i.unpaidRent } : undefined),
         invalidate: lendInvalidations(i.mint, i.signer.address),
     };
 }
@@ -280,9 +298,11 @@ export async function buildWithdrawPlan(i: WithdrawPlanInput): Promise<TxPlan> {
             lenderWatch(i, ['shares', 'lock', 'claimed']),
             vaultWatch(i),
         ],
-        disclosures,
-        disclosureVars:
+        ...disclosuresOf(
+            i,
+            disclosures,
             i.vestingForfeit > 0n ? { 'lender.exitForfeitsVest': { vesting: formatSol(i.vesting, 6) } } : undefined,
+        ),
         invalidate: lendInvalidations(i.mint, i.signer.address),
     };
 }
@@ -304,8 +324,8 @@ export interface SyncTarget {
     /** Another lender's `LenderPosition` whose touch moves a surplus to the pot. */
     readonly lender: Address;
     /**
-     * Its owner (`LenderPosition.owner`; the instruction's `owner` account, not a signer here: a
-     * plain touch reads no rebase record, KI65-REV-SEC1).
+     * Its owner (`LenderPosition.owner`; the instruction's `owner` account, not a signer here: the
+     * plain touch of a current lender, which reads no rebase record, KI65-REV-SEC1).
      */
     readonly owner: Address;
 }
@@ -350,7 +370,7 @@ export async function buildClaimPlan(i: ClaimPlanInput): Promise<TxPlan> {
         title: `Claim ${formatSol(i.expected, 9)} SOL · ${tokenLabel(i.symbol, i.mint)}${syncs.length ? ` · ${syncs.length} lender sync${syncs.length > 1 ? 's' : ''} first` : ''}`,
         instructions: [...syncs, claim],
         watch: [walletWatch(i), lenderWatch(i, ['claimed', 'pending']), vaultWatch(i)],
-        disclosures: [],
+        ...disclosuresOf(i, []),
         invalidate: lendInvalidations(i.mint, i.signer.address),
     };
 }
@@ -379,15 +399,15 @@ export async function buildCoverPlan(i: CoverPlanInput): Promise<TxPlan> {
         title: `Cover deficit · ${formatSol(i.lamports, 9)} SOL · ${tokenLabel(i.symbol, i.mint)}`,
         instructions: [ix],
         watch: [walletWatch(i), lenderWatch(i, ['pending']), vaultWatch(i)],
-        disclosures: [],
+        ...disclosuresOf(i, []),
         invalidate: lendInvalidations(i.mint, i.signer.address),
     };
 }
 
 /**
  * `sync_lender(n)` of the owner's own position through its next `n ≤ MAX_RECORDS` records, signed
- * by the owner: only the owner may convert its position through a rebase record (KI65-REV-SEC1,
- * `RebaseNeedsOwner`).
+ * by the owner: only the owner converts its position through a rebase record (KI65-REV-SEC1);
+ * unsigned, the program would stop there with the pot-only touch (KI-66).
  */
 export async function buildSyncPlan(i: LendContext): Promise<TxPlan> {
     const metas = await recordMetas(i.marketAddress, i.lenderEpoch, i.shareEpoch);
@@ -408,7 +428,7 @@ export async function buildSyncPlan(i: LendContext): Promise<TxPlan> {
         title: `Sync position · ${tokenLabel(i.symbol, i.mint)} · ${metas.length} share epoch${metas.length === 1 ? '' : 's'}`,
         instructions: [ix],
         watch: [walletWatch(i), lenderWatch(i, ['shares', 'pending'])],
-        disclosures: [],
+        ...disclosuresOf(i, []),
         invalidate: lendInvalidations(i.mint, i.signer.address),
     };
 }

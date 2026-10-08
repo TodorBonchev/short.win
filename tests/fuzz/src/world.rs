@@ -50,7 +50,10 @@
 //!   and `lender_sol` is within the hooks' dust cap (ECON §9.4 I-P6; FUZZ-M10-24H-A). Since
 //!   KI-65 (ECON §9.5: conversions round cumulatively through each rebase record) no share is
 //!   orphaned: at every roll and at the wind-down every share of `S` has a holder once every
-//!   lender is touched ([`World::orphan_shares`] must be 0).
+//!   lender is touched ([`World::orphan_shares`] must be 0). In one run in two (KI-66's
+//!   never-returns model, [`World::absent_owners_out`]) the lenders held behind a rebase record
+//!   stay away first, reached only by third parties' pot-only touches, while the others exit and
+//!   claim; the present lenders may then stay owed only KI-66's post-record residual.
 
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
@@ -196,6 +199,9 @@ thread_local! {
     /// program over-credits by that much (`tests/smoke.rs` shows `World::check_credited` catches
     /// it; 0 otherwise).
     pub static CREDITED_SKEW: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+    /// [`World::absent_owners`] forced on or off (`tests/smoke.rs` replays the KI-65
+    /// reproducers with absent owners); `None`: from the seed.
+    pub static ABSENT_OWNERS: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 
 /// An open position: its borrower (index into the slot's borrowers) and nonce.
@@ -257,6 +263,11 @@ pub struct World {
     /// largest S)`, sampled after every [`World::send`]: what bounds the accumulators' carry
     /// gap the wind-down's second claim pass accepts as rounding (FUZZ-M10-24H-A).
     pub s_peaks: Vec<(u32, u128, u128)>,
+    /// KI-66's never-returns model (one run in two, from the seed): the wind-down takes the
+    /// lenders held behind a rebase record for absent owners — only third parties' `sync_lender`
+    /// (the pot-only touch) reaches them while the others exit and claim — before they return
+    /// ([`World::absent_owners_out`]).
+    pub absent_owners: bool,
 }
 
 /// A disturbance's clearing action.
@@ -2006,12 +2017,15 @@ impl World {
     }
 
     /// `sync_lender` of lender `li`, signed by its owner or (`owner_signs` false) sent by a third
-    /// party. Oracle (KI65-REV-SEC1): only the owner converts a position through a rebase
-    /// record — a third party's call is refused with `RebaseNeedsOwner` exactly when the
-    /// conversion (by the math crate, on the pre-state) reads a rebase record, and the owner's
-    /// call never is.
+    /// party. Oracle (KI65-REV-SEC1, KI-66): nobody's sync is refused `RebaseNeedsOwner`; a third
+    /// party's that lands is the pot-only touch — the stored lender and `MarketVault` are the
+    /// math crate's `pool::touch_pot` on the pre-state (never a conversion through a rebase
+    /// record; the surplus accrued up to one moves to the pot) and no `ShareEpoch` record
+    /// changed. A third party's sync that holds the lender at a rebase record counts
+    /// `sync-lender-held` (and `sync-lender-held-to-pot` when it moved a surplus): the oracle's
+    /// coverage of the hold.
     fn sync_lender_by(&mut self, si: usize, li: usize, owner_signs: bool) -> bool {
-        use shortwin_litesvm_tests::invariants::lender::{PoolState, sync_reads_rebase};
+        use shortwin_litesvm_tests::invariants::lender::{PoolState, third_party_sync};
         let kp = self.slots[si].lenders[li].kp.insecure_clone();
         let owner = kp.pubkey();
         let market = self.market_key(si);
@@ -2019,8 +2033,11 @@ impl World {
             return false;
         }
         let metas = self.epoch_metas(si, &owner);
-        let reads = PoolState::load(&self.env.svm, &market)
-            .and_then(|st| sync_reads_rebase(&st, &owner, metas.len()));
+        let pre = PoolState::load(&self.env.svm, &market);
+        let want = pre
+            .as_ref()
+            .filter(|_| !owner_signs)
+            .and_then(|st| third_party_sync(st, &owner, metas.len()));
         let n = metas.len() as u8;
         let ixs = [ix::with_remaining(
             if owner_signs {
@@ -2031,21 +2048,43 @@ impl World {
             &metas,
         )];
         let res = self.send(&ixs, &[&kp]);
-        let refused = shortwin_code(&ixs, &res) == Some(u32::from(E::RebaseNeedsOwner));
-        if let Some(reads) = reads {
-            let want = reads && !owner_signs;
-            if refused != want {
+        if shortwin_code(&ixs, &res) == Some(u32::from(E::RebaseNeedsOwner)) {
+            panic!(
+                "{ORACLE} KI-66: sync_lender of {owner} on {market} (owner signs: {owner_signs}) \
+                 refused with RebaseNeedsOwner"
+            );
+        }
+        if let (true, Some((l, v)), Some(pre)) = (res.is_ok(), want, pre) {
+            // Held: left behind the share epoch on a rebase record, every record at hand.
+            let held = l.epoch < pre.pool.share_epoch
+                && pre
+                    .records_from(l.epoch)
+                    .first()
+                    .is_some_and(|r| r.epoch == l.epoch && !r.is_full_wipe());
+            if held {
+                *self
+                    .stats
+                    .events
+                    .entry("sync-lender-held".into())
+                    .or_default() += 1;
+                if v.unmatched > pre.vault.unmatched {
+                    *self
+                        .stats
+                        .events
+                        .entry("sync-lender-held-to-pot".into())
+                        .or_default() += 1;
+                }
+            }
+            let post = PoolState::load(&self.env.svm, &market).expect("market");
+            let stored = post.lender_of(&owner).map(|p| p.lender());
+            if stored != Some(l) || *post.vault != v || post.records != pre.records {
                 panic!(
-                    "{ORACLE} KI65-REV-SEC1: sync_lender of {owner} on {market} (owner signs: \
-                     {owner_signs}, reads a rebase record: {reads}) {}",
-                    if refused {
-                        "refused with RebaseNeedsOwner".to_string()
-                    } else {
-                        format!(
-                            "was not refused with RebaseNeedsOwner: {:?}",
-                            res.as_ref().err()
-                        )
-                    }
+                    "{ORACLE} KI-66: a third party's sync_lender of {owner} on {market} is not the \
+                     pot-only touch: lender {stored:?} vs {l:?}, unmatched {} vs {}, records \
+                     changed: {}",
+                    post.vault.unmatched,
+                    v.unmatched,
+                    post.records != pre.records
                 );
             }
         }
@@ -2068,8 +2107,22 @@ impl World {
     /// Every lender withdraws all its shares and claims (`keep_dust`: the first keeps one
     /// share), then a `sweep_trader`. `strict` (the wind-down): refusals are reported.
     pub fn lenders_out(&mut self, si: usize, keep_dust: bool, strict: bool) -> bool {
+        self.lenders_out_but(si, keep_dust, strict, &[])
+    }
+
+    /// [`World::lenders_out`] without the lenders `absent` (their owners stay away).
+    fn lenders_out_but(
+        &mut self,
+        si: usize,
+        keep_dust: bool,
+        strict: bool,
+        absent: &[usize],
+    ) -> bool {
         let market = self.market_key(si);
         for li in 0..self.slots[si].lenders.len() {
+            if absent.contains(&li) {
+                continue;
+            }
             let k = self.lender_keys(si, li);
             let kp = self.slots[si].lenders[li].kp.insecure_clone();
             // A lender behind the market's share epoch (a full wipe) is synced first: its
@@ -4171,6 +4224,9 @@ impl World {
             self.keeper_seconds(2);
         }
         for si in 0..self.slots.len() {
+            if self.absent_owners {
+                self.absent_owners_out(si);
+            }
             self.lenders_out(si, false, true);
             let m = self.market(si);
             let rest = (
@@ -4193,6 +4249,134 @@ impl World {
         }
         self.second_claims();
         self.env.assert_invariants();
+    }
+
+    /// KI-66's never-returns model ([`World::absent_owners`]; ECON §9.4 I-P6 and R3A-2): the
+    /// lenders held behind a rebase record — shares, a lock or a lock term at the epoch of a
+    /// rebase record — have absent owners. Only third parties' `sync_lender` reach them, twice
+    /// (the pot-only touch moves the surplus they accrued up to the record; the second moves
+    /// nothing, under the KI-66 oracle), while every other lender exits ([`World::lenders_out`])
+    /// and claims in two more rounds. What the present lenders are then still owed is KI-66's
+    /// disclosed post-record residual: at most what the absent lenders' own touches would move to
+    /// the pot (`pool::touch` on copies of the state, through the records in turn), plus
+    /// [`CLAIM_DUST`] per present lender and the carries' bound ([`World::carry_gap_bound`]).
+    /// Above it the anomaly `wind-down-absent-owed-above-residual`; the largest owed total is
+    /// `summary.json`'s `wind_down_claims.largest_absent_owed_lamports`. The absent owners then
+    /// return: the wind-down's own `lenders_out` and second claim pass take them out under the
+    /// I-P6 oracle.
+    fn absent_owners_out(&mut self, si: usize) {
+        let market = self.market_key(si);
+        let epoch = self.market(si).share_epoch;
+        let absent: Vec<usize> = (0..self.slots[si].lenders.len())
+            .filter(|&li| {
+                let owner = self.slots[si].lenders[li].kp.pubkey();
+                self.env.lender(&market, &owner).is_some_and(|lp| {
+                    let l = lp.lender();
+                    l.epoch < epoch
+                        && (l.shares != 0 || l.lock != 0 || l.lock_term != 0)
+                        && read::borsh::<shortwin::state::ShareEpoch>(
+                            &self.env.svm,
+                            &pda::share_epoch(&market, l.epoch).0,
+                        )
+                        .is_some_and(|r| !r.record().is_full_wipe())
+                })
+            })
+            .collect();
+        if absent.is_empty() {
+            return;
+        }
+        *self
+            .stats
+            .events
+            .entry("wind-down-absent-market".into())
+            .or_default() += 1;
+        for &li in &absent {
+            *self
+                .stats
+                .events
+                .entry("wind-down-absent-owner".into())
+                .or_default() += 1;
+            self.sync_lender_by(si, li, false);
+            self.sync_lender_by(si, li, false);
+        }
+        self.lenders_out_but(si, false, true, &absent);
+        let present: Vec<usize> = (0..self.slots[si].lenders.len())
+            .filter(|li| !absent.contains(li))
+            .collect();
+        for _ in 0..2 {
+            for &li in &present {
+                let kp = self.slots[si].lenders[li].kp.insecure_clone();
+                if self.env.lender(&market, &kp.pubkey()).is_none() {
+                    continue;
+                }
+                let ix = ix::with_remaining(
+                    ix::claim_sol(&kp.pubkey(), &market),
+                    &self.epoch_metas(si, &kp.pubkey()),
+                );
+                self.send(&[ix], &[&kp]);
+            }
+        }
+        let mut owed: u64 = 0;
+        for &li in &present {
+            let owner = self.slots[si].lenders[li].kp.pubkey();
+            if let Some(l) = self.touched_lender(si, &owner) {
+                owed = owed.saturating_add(l.pending.max(0).unsigned_abs());
+            }
+        }
+        self.stats.wind_down_absent_owed_max = self.stats.wind_down_absent_owed_max.max(owed);
+        let dust = CLAIM_DUST.saturating_mul(present.len() as u64);
+        if owed <= dust {
+            return;
+        }
+        *self
+            .stats
+            .events
+            .entry("wind-down-absent-present-owed".into())
+            .or_default() += 1;
+        let residual = self.absent_residual(si, &absent);
+        let bound = residual.map(|r| {
+            r.saturating_add(dust)
+                .saturating_add(self.carry_gap_bound(si))
+        });
+        if bound.is_none_or(|b| owed > b) {
+            let vault = *self.env.market_vault(&market).vault();
+            let lenders: Vec<String> = self.slots[si]
+                .lenders
+                .iter()
+                .map(|l| format!("{:?}", self.env.lender(&market, &l.kp.pubkey())))
+                .collect();
+            self.stats.anomaly(
+                "wind-down-absent-owed-above-residual",
+                format!(
+                    "market {market}: the present lenders are owed {owed} lamports with absent \
+                     lenders {absent:?} held behind a rebase record; their touches would move \
+                     {residual:?} to the pot (bound {bound:?})\nvault: {vault:?}\nlenders:\n{}",
+                    lenders.join("\n")
+                ),
+            );
+        }
+    }
+
+    /// What the touches of lenders `absent` (by their owners) would move to the pot now:
+    /// `pool::touch` of each in turn on copies of the vault and the records. `None` when a touch
+    /// fails.
+    fn absent_residual(&self, si: usize, absent: &[usize]) -> Option<u64> {
+        use shortwin_litesvm_tests::invariants::lender::{PoolState, epoch_records};
+        let market = self.market_key(si);
+        let pool = self.env.market(&market).pool();
+        let mut vault = *self.env.market_vault(&market).vault();
+        let mut records = epoch_records(&self.env.svm, &market);
+        let before = vault.unmatched;
+        for &li in absent {
+            let owner = self.slots[si].lenders[li].kp.pubkey();
+            let Some(lp) = self.env.lender(&market, &owner) else {
+                continue;
+            };
+            let mut l = lp.lender();
+            let recs = PoolState::records_from_mut(&mut records, l.epoch);
+            shortwin_math::pool::touch(&pool, &mut vault, &mut l, recs, self.env.now()).ok()?;
+        }
+        vault.unmatched.checked_sub(before)
     }
 
     /// The wind-down's second claim pass and its liveness check (M10): `lenders_out` takes the

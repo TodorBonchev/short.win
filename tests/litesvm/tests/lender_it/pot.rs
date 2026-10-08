@@ -285,10 +285,10 @@ fn a_whale_around_the_last_settlement_captures_nothing() {
 /// The pot (R3A-2) end to end on the program: A's rent entitlement accrues, A withdraws what
 /// it may before the rent is paid (it keeps its entitlement; nothing is realised yet), C joins
 /// late and is allocated realised SOL it is not entitled to; C's surplus reaches the pot at
-/// C's next touch (`sync_lender`, permissionless while C is in the current epoch; behind a
-/// rebase record only C's owner converts it, KI65-REV-SEC1 — `ki65_it`'s
-/// `a_surplus_behind_a_rebase_record_reaches_the_pot_only_when_its_owner_returns`) and A draws
-/// its deficit from it. Nothing is stranded beyond rounding.
+/// C's next touch (`sync_lender`, permissionless; behind a rebase record only C's owner
+/// converts it, KI65-REV-SEC1, and anyone else's sync is the pot-only touch, KI-66 — `ki65_it`'s
+/// `a_surplus_behind_a_rebase_record_reaches_the_pot_without_its_owner`) and A draws its
+/// deficit from it. Nothing is stranded beyond rounding.
 #[test]
 fn the_pot_connects_early_leavers_and_late_joiners() {
     let mut lab = Lab::new(TokenProgram::Spl);
