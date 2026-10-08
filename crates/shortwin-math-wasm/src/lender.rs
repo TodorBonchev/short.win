@@ -212,7 +212,9 @@ impl LenderState {
     }
 }
 
-/// Consecutive `ShareEpoch` records from the lender's epoch on (`pool` module docs).
+/// Consecutive `ShareEpoch` records from the lender's epoch on (`pool` module docs). A
+/// preview converts on a copy: the program writes the records' `conv_rem` (KI-65), a
+/// preview never changes them.
 #[wasm_bindgen]
 #[derive(Clone, Debug, Default)]
 pub struct ShareEpochs(Vec<ShareEpoch>);
@@ -225,7 +227,8 @@ impl ShareEpochs {
         ShareEpochs::default()
     }
 
-    /// Appends the record of `epoch` (the next one in order).
+    /// Appends the record of `epoch` (the next one in order), with its conversion remainder
+    /// `conv_rem` as fetched (KI-65: a behind lender's conversion depends on it).
     #[allow(clippy::too_many_arguments)]
     pub fn push(
         &mut self,
@@ -237,6 +240,7 @@ impl ShareEpochs {
         carry_r: u128,
         num: u8,
         den_log1000: u8,
+        conv_rem: u128,
     ) {
         self.0.push(ShareEpoch {
             acc_end,
@@ -244,6 +248,7 @@ impl ShareEpochs {
             s_old,
             carry,
             carry_r,
+            conv_rem,
             epoch,
             num,
             den_log1000,
@@ -274,7 +279,7 @@ pub fn preview_touch(
     now: i64,
 ) -> Result<LenderState, JsError> {
     let (mut v, mut l) = (pool.vault(), lender.lender());
-    mpool::touch(&pool.pool(), &mut v, &mut l, &records.0, now)?;
+    mpool::touch(&pool.pool(), &mut v, &mut l, &mut records.0.clone(), now)?;
     Ok(LenderState::of(&l))
 }
 
@@ -304,7 +309,7 @@ pub fn preview_lock(
     now: i64,
 ) -> Result<u128, JsError> {
     let (mut v, mut l) = (pool.vault(), lender.lender());
-    mpool::touch(&pool.pool(), &mut v, &mut l, &records.0, now)?;
+    mpool::touch(&pool.pool(), &mut v, &mut l, &mut records.0.clone(), now)?;
     Ok(mpool::lock_of(&v, &l, now)?)
 }
 
@@ -317,7 +322,7 @@ pub fn preview_token_value(
     now: i64,
 ) -> Result<u128, JsError> {
     let (p, mut v, mut l) = (pool.pool(), pool.vault(), lender.lender());
-    mpool::touch(&p, &mut v, &mut l, &records.0, now)?;
+    mpool::touch(&p, &mut v, &mut l, &mut records.0.clone(), now)?;
     Ok(mpool::token_value(&p, &l)?)
 }
 
@@ -359,7 +364,7 @@ pub fn preview_withdraw(
         &mut p,
         &mut v,
         &mut l,
-        &records.0,
+        &mut records.0.clone(),
         now,
         lock_grace_s,
         shares,
@@ -399,17 +404,10 @@ pub fn preview_withdrawal(
     shares: u128,
 ) -> Result<Withdrawal, JsError> {
     let (mut p, mut v, mut l) = (pool.pool(), pool.vault(), lender.lender());
-    let tokens = mpool::withdraw(
-        &mut p,
-        &mut v,
-        &mut l,
-        &records.0,
-        now,
-        lock_grace_s,
-        shares,
-    )?;
+    let mut recs = records.0.clone();
+    let tokens = mpool::withdraw(&mut p, &mut v, &mut l, &mut recs, now, lock_grace_s, shares)?;
     let last_shares_borrowed = p.total_shares == 0 && p.borrowed_q != 0;
-    let sol = mpool::claim(&p, &mut v, &mut l, &records.0, now)?;
+    let sol = mpool::claim(&p, &mut v, &mut l, &mut recs, now)?;
     Ok(Withdrawal {
         tokens,
         sol,
@@ -434,7 +432,7 @@ pub fn preview_deposit(
         &mut p,
         &mut v,
         &mut l,
-        &records.0,
+        &mut records.0.clone(),
         now,
         amount,
         rewards_required,
@@ -450,7 +448,13 @@ pub fn preview_claim(
     now: i64,
 ) -> Result<u64, JsError> {
     let (mut v, mut l) = (pool.vault(), lender.lender());
-    Ok(mpool::claim(&pool.pool(), &mut v, &mut l, &records.0, now)?)
+    Ok(mpool::claim(
+        &pool.pool(),
+        &mut v,
+        &mut l,
+        &mut records.0.clone(),
+        now,
+    )?)
 }
 
 #[wasm_bindgen]
@@ -521,7 +525,7 @@ mod tests {
         );
         // Deposit 10⁹ for real (mirrors what the program writes back).
         let (mut p, mut v, mut l) = (pool.pool(), pool.vault(), lender.lender());
-        mpool::deposit(&mut p, &mut v, &mut l, &[], 0, 1_000_000_000, false).unwrap();
+        mpool::deposit(&mut p, &mut v, &mut l, &mut [], 0, 1_000_000_000, false).unwrap();
         pool.total_shares = p.total_shares;
         pool.tokens_free = p.tokens_free;
         let lender = LenderState::of(&l);
@@ -550,6 +554,27 @@ mod tests {
         assert_eq!(LenderState::no_lock_epoch(), u32::MAX);
         pool.set_lock_bucket(3, 7);
         assert_eq!(pool.vault().lock_cal[3], 7);
+    }
+
+    /// KI-65: a lender behind a rebase record converts with the record's `conv_rem`
+    /// (here the unit lands on it: 600 + 600 ≥ 1,000), and a preview never writes it.
+    #[test]
+    fn previews_convert_on_a_copy_of_the_records() {
+        let mut pool = PoolState::new();
+        pool.share_epoch = 1;
+        pool.total_shares = 1;
+        let mut recs = ShareEpochs::new();
+        recs.push(0, 0, 0, 1_200, 0, 0, 1, 1, 600);
+        let mut lender = LenderState::new_in(&pool);
+        (lender.epoch, lender.shares, lender.snap, lender.snap_r) = (0, 600, 0, 0);
+        let before = recs.clone();
+        for _ in 0..2 {
+            let l = preview_touch(&pool, &lender, &recs, 0).unwrap();
+            assert_eq!((l.epoch, l.shares), (1, 1));
+        }
+        assert_eq!(recs.0, before.0);
+        recs.0[0].conv_rem = 0;
+        assert_eq!(preview_touch(&pool, &lender, &recs, 0).unwrap().shares, 0);
     }
 
     #[test]

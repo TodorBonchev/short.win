@@ -1,6 +1,6 @@
-fuzz[continuous, util cap 90%]: 60000 ops, invariants held (liveness checked every 2,000 ops); share epochs rolled 1011; largest sum of negative pendings 226,933,401 lamports; worst stranded SOL after wind-down 177,483,394 lamports (all within the bound: rounding + 177,475,548 lamports credited to rebase-orphan shares); op counts {'accrue': 3391, 'adv': 3338, 'borrow': 2846, 'borrow!': 523, 'churn': 3172, 'churn!': 248, 'claim': 3381, 'claimN': 3418, 'cover': 3388, 'dep': 6638, 'donate': 3336, 'gov': 3291, 'repay': 3239, 'settle': 3344, 'sweep': 3302, 'wd': 6290, 'wd!': 225, 'wdall': 2933, 'wdall!': 351, 'wipe': 3346}
-fuzz[continuous, util cap 100%]: 60000 ops, invariants held (liveness checked every 2,000 ops); share epochs rolled 1930; largest sum of negative pendings 254,896,038 lamports; worst stranded SOL after wind-down 6,755 lamports (all within the bound: rounding + 39 lamports credited to rebase-orphan shares); op counts {'accrue': 3345, 'adv': 3340, 'borrow': 3372, 'churn': 3466, 'claim': 3378, 'claimN': 3459, 'cover': 3407, 'dep': 6100, 'dep!': 504, 'donate': 3299, 'gov': 3305, 'repay': 3275, 'settle': 3322, 'sweep': 3279, 'wd': 5558, 'wd!': 988, 'wdall': 2834, 'wdall!': 474, 'wipe': 3295}
-fuzz[release, util cap 90%]: 60000 ops, invariants held (liveness checked every 2,000 ops); share epochs rolled 1012; largest sum of negative pendings 0 lamports; worst stranded SOL after wind-down 402,882,754 lamports (all within the bound: rounding + 402,875,834 lamports credited to rebase-orphan shares); op counts {'accrue': 3374, 'adv': 3356, 'borrow': 2853, 'borrow!': 508, 'churn': 3177, 'churn!': 254, 'claim': 3378, 'claimN': 3407, 'cover': 3401, 'dep': 6651, 'donate': 3323, 'gov': 3290, 'repay': 3257, 'settle': 3322, 'sweep': 3299, 'wd': 6308, 'wd!': 197, 'wdall': 2916, 'wdall!': 373, 'wipe': 3356}
+fuzz[continuous, util cap 90%]: 60000 ops, invariants held (liveness checked every 2,000 ops); share epochs rolled 1020; largest sum of negative pendings 226,931,773 lamports; worst stranded SOL after wind-down 16,805 lamports (all within the rounding bound; no rebase-orphan shares, KI-65); op counts {'accrue': 3381, 'adv': 3331, 'borrow': 2822, 'borrow!': 524, 'churn': 3163, 'churn!': 261, 'claim': 3394, 'claimN': 3392, 'cover': 3404, 'dep': 6623, 'donate': 3335, 'gov': 3286, 'repay': 3257, 'settle': 3371, 'sweep': 3317, 'wd': 6279, 'wd!': 248, 'wdall': 2877, 'wdall!': 386, 'wipe': 3349}
+fuzz[continuous, util cap 100%]: 60000 ops, invariants held (liveness checked every 2,000 ops); share epochs rolled 1930; largest sum of negative pendings 254,896,038 lamports; worst stranded SOL after wind-down 6,741 lamports (all within the rounding bound; no rebase-orphan shares, KI-65); op counts {'accrue': 3345, 'adv': 3340, 'borrow': 3372, 'churn': 3466, 'claim': 3378, 'claimN': 3459, 'cover': 3407, 'dep': 6100, 'dep!': 504, 'donate': 3299, 'gov': 3305, 'repay': 3275, 'settle': 3322, 'sweep': 3279, 'wd': 5558, 'wd!': 988, 'wdall': 2834, 'wdall!': 474, 'wipe': 3295}
+fuzz[release, util cap 90%]: 60000 ops, invariants held (liveness checked every 2,000 ops); share epochs rolled 1020; largest sum of negative pendings 0 lamports; worst stranded SOL after wind-down 15,192 lamports (all within the rounding bound; no rebase-orphan shares, KI-65); op counts {'accrue': 3397, 'adv': 3330, 'borrow': 2834, 'borrow!': 506, 'churn': 3165, 'churn!': 259, 'claim': 3380, 'claimN': 3402, 'cover': 3377, 'dep': 6651, 'donate': 3324, 'gov': 3305, 'repay': 3236, 'settle': 3358, 'sweep': 3310, 'wd': 6325, 'wd!': 193, 'wdall': 2930, 'wdall!': 370, 'wipe': 3348}
 
 R3A-2 stranded lender SOL after an honest wind-down (40 seeds x 3,000 ops, reviewer's r3_stranded.py):
 | model | realised inflow (SOL) | stranded (SOL) | worst seed (SOL) | seeds above 0.01 SOL |
@@ -71,6 +71,26 @@ R4B-4 exits and the unreleased vest (3 SOL of lumps):
 | honest exit 10 min after the lumps | dust 1000 | 83,333,332 | 2,916,666,667 |
 | JIT whale x199 around a 3 SOL lump | v0.4.1 (no flush) | 0 | 3,000,000,000 |
 | JIT whale x199 around a 3 SOL lump | flush below 1 % of S (rejected) | 2,985,000,000 | 15,000,000 |
+
+KI-65 rebase orphans: three lenders, a settlement vests a 3 SOL lump and rebases the shares (1/1,000), every lender exits during the vest (converting at its own exit) and claims again after it; 200 seeds:
+| model | runs that rebased | runs with S > 0 after every exit | worst stranded (lamports) | its seed |
+|---|---|---|---|---|
+| v0.4.1 (each lender floored alone) | 198 | 98 | 3,000,000,002 | 4 |
+| v0.4.2 (cumulative conversion) | 198 | 0 | 3 | 0 |
+
+KI-65 against R4B-4: a whale, the conversion order and the R3B-2 flush (H: an honest lender whose shares were not converted yet; 3 SOL lumps):
+| case | model | whale gets (lamports) | H gets (lamports) | stranded (lamports) |
+|---|---|---|---|---|
+| W1 JIT x199 around a lump, H's share not converted | v0.4.1 | 0 | 6,000,000,999 | 1 |
+| W2 sync order H then W, then the whale exits | v0.4.1 | 999,916,668 | 83,331 | 3,000,000,001 |
+| W2 sync order W then H, then the whale exits | v0.4.1 | 999,916,668 | 83,331 | 3,000,000,001 |
+| W3 whale deposits while S = 1 is H's unconverted share | v0.4.1 | 0 | 83,331 | 6,000,000,001 |
+| W1 JIT x199 around a lump, H's share not converted | v0.4.2 | 0 | 6,000,000,999 | 1 |
+| W2 sync order H then W, then the whale exits | v0.4.2 | 3,999,916,667 | 83,331 | 2 |
+| W2 sync order W then H, then the whale exits | v0.4.2 | 999,916,668 | 3,000,083,331 | 1 |
+| W3 whale deposits while S = 1 is H's unconverted share | v0.4.2 | 0 | 6,000,083,331 | 1 |
+
+KI-65 lemma, lazy conversion order: 2,000 random pools, 2,593 rebase records, 9,934 conversions in random order between deposits and 0-token burns; sum(shares) == S once every lender converted, each conversion within [floor, floor + 1 per record] (v0.4.1 on the same pools: up to 6 orphan shares)
 
 R4B-5 a 10 SOL lump, then a 1-lamport sweep every k seconds (share of the 10 SOL released):
 | model | k (s) | released after 6 h | after 24 h |

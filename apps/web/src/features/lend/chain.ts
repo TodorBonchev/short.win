@@ -41,9 +41,13 @@ import { wipeLive } from './previews.ts';
 /**
  * The most `ShareEpoch` records one lender transaction carries (32 bytes each in the account
  * list, outside the ALT). A lender further behind is advanced with `sync_lender` first, in steps
- * of this size (ARCH §3.3).
+ * of this size (ARCH §3.3). 8 since KI-65: a conversion through a rebase record also writes the
+ * record's `conv_rem`, and with the record's SOL credit accrued each record costs ≈ 4.7–5.2k CU
+ * (`tests/bench/m1_cu`, records that credit the lender). `claim_sol` / `cover_deficit` /
+ * `sync_lender` stay within ARCH §6.1's 60,000 CU up to 8 records (≤ 54,549); 9 leaves 306 CU
+ * (`cover_deficit` 59,694) and 10 exceeds it (≈ 64.8k).
  */
-export const MAX_RECORDS = 12;
+export const MAX_RECORDS = 8;
 
 const COMMITMENT = { commitment: 'confirmed' } as const;
 const b64 = getBase64Encoder();

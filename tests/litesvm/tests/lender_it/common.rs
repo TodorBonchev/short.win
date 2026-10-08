@@ -104,6 +104,9 @@ struct Expect {
     pay: u64,
     /// Of which drawn from the pot.
     pot_draw: u64,
+    /// The records the instruction was given, as the math crate left them (KI-65: a
+    /// conversion writes `conv_rem`; the program must store exactly these).
+    records: Vec<MathShareEpoch>,
 }
 
 /// A list-only market with lenders and an injected borrower side.
@@ -270,7 +273,7 @@ impl Lab {
         let share_epoch = self.market().share_epoch;
         (from..share_epoch)
             .take(count)
-            .map(|e| AccountMeta::new_readonly(pda::share_epoch(&self.k.market, e).0, false))
+            .map(|e| AccountMeta::new(pda::share_epoch(&self.k.market, e).0, false))
             .collect()
     }
 
@@ -350,6 +353,15 @@ impl Lab {
             stored, e.lender,
             "{what}: LenderPosition differs from the math crate"
         );
+        // KI-65: every conversion remainder the math crate wrote is stored.
+        if let Some(first) = e.records.first() {
+            let on_chain = st.records_from(first.epoch);
+            assert_eq!(
+                &on_chain[..e.records.len().min(on_chain.len())],
+                e.records.as_slice(),
+                "{what}: ShareEpoch records differ from the math crate (conv_rem not stored?)"
+            );
+        }
     }
 
     fn check_error(what: &str, got: u32, want: Result<(), MathError>) {
@@ -387,7 +399,7 @@ impl Lab {
             let mut l = st
                 .lender_of(&lk.owner)
                 .map_or_else(|| Lender::new(&p), LenderPosition::lender);
-            let recs = Self::records_slice(&st, from, MAX_RECORDS_PER_TX);
+            let mut recs = Self::records_slice(&st, from, MAX_RECORDS_PER_TX);
             let rewards = matches!(
                 VenueKind::from_u8(m.venue),
                 Some(VenueKind::PumpCurve | VenueKind::PumpSwap)
@@ -395,7 +407,7 @@ impl Lab {
             if amount == 0 {
                 return Err(MathError::DepositTooSmall);
             }
-            let minted = pool::deposit(&mut p, &mut v, &mut l, &recs, now, amount, rewards)?;
+            let minted = pool::deposit(&mut p, &mut v, &mut l, &mut recs, now, amount, rewards)?;
             Ok(Expect {
                 pool: p,
                 vault: v,
@@ -403,6 +415,7 @@ impl Lab {
                 result: minted,
                 pay: 0,
                 pot_draw: 0,
+                records: recs,
             })
         })();
         let pv = self.pool_vault_amount();
@@ -474,10 +487,11 @@ impl Lab {
                 .lender_of(&lk.owner)
                 .expect("withdraw needs a lender")
                 .lender();
-            let recs = Self::records_slice(&st, from, MAX_RECORDS_PER_TX);
-            let tokens = pool::withdraw(&mut p, &mut v, &mut l, &recs, now, lock_grace_s, shares)?;
+            let mut recs = Self::records_slice(&st, from, MAX_RECORDS_PER_TX);
+            let tokens =
+                pool::withdraw(&mut p, &mut v, &mut l, &mut recs, now, lock_grace_s, shares)?;
             let touched = l;
-            let pay = pool::claim(&p, &mut v, &mut l, &recs, now)?;
+            let pay = pool::claim(&p, &mut v, &mut l, &mut recs, now)?;
             let closed = l.shares == 0 && l.pending == 0 && l.lock == 0;
             Ok(Expect {
                 pool: p,
@@ -486,6 +500,7 @@ impl Lab {
                 result: u128::from(tokens),
                 pay,
                 pot_draw: l.real - touched.real,
+                records: recs,
             })
         })();
         let pv = self.pool_vault_amount();
@@ -564,10 +579,10 @@ impl Lab {
         let expect = (|| -> Result<Expect, MathError> {
             let (p, mut v) = (st.pool, st.vault.clone());
             let mut l = l0.lender();
-            let recs = Self::records_slice(&st, from, MAX_RECORDS_PER_TX);
-            pool::touch(&p, &mut v, &mut l, &recs, st.now)?;
+            let mut recs = Self::records_slice(&st, from, MAX_RECORDS_PER_TX);
+            pool::touch(&p, &mut v, &mut l, &mut recs, st.now)?;
             let touched = l;
-            let pay = pool::claim(&p, &mut v, &mut l, &recs, st.now)?;
+            let pay = pool::claim(&p, &mut v, &mut l, &mut recs, st.now)?;
             Ok(Expect {
                 pool: p,
                 vault: v,
@@ -575,6 +590,7 @@ impl Lab {
                 result: 0,
                 pay,
                 pot_draw: l.real - touched.real,
+                records: recs,
             })
         })();
         let lam = self.lamports_of(name);
@@ -612,8 +628,8 @@ impl Lab {
             }
             let (p, mut v) = (st.pool, st.vault.clone());
             let mut l = l0.lender();
-            let recs = Self::records_slice(&st, from, MAX_RECORDS_PER_TX);
-            pool::cover(&p, &mut v, &mut l, &recs, st.now, lamports)?;
+            let mut recs = Self::records_slice(&st, from, MAX_RECORDS_PER_TX);
+            pool::cover(&p, &mut v, &mut l, &mut recs, st.now, lamports)?;
             Ok(Expect {
                 pool: p,
                 vault: v,
@@ -621,6 +637,7 @@ impl Lab {
                 result: 0,
                 pay: 0,
                 pot_draw: 0,
+                records: recs,
             })
         })();
         let lam = self.lamports_of(name);
@@ -659,10 +676,10 @@ impl Lab {
         let expect = (|| -> Result<Expect, MathError> {
             let (p, mut v) = (st.pool, st.vault.clone());
             let mut l = l0.lender();
-            let recs = Self::records_slice(&st, from, n);
-            standing = pool::convert(&p, &mut l, &recs)?;
+            let mut recs = Self::records_slice(&st, from, n);
+            standing = pool::convert(&p, &mut l, &mut recs)?;
             if standing != Standing::Behind {
-                pool::touch(&p, &mut v, &mut l, &recs, st.now)?;
+                pool::touch(&p, &mut v, &mut l, &mut recs, st.now)?;
             }
             Ok(Expect {
                 pool: p,
@@ -671,6 +688,7 @@ impl Lab {
                 result: 0,
                 pay: 0,
                 pot_draw: 0,
+                records: recs,
             })
         })();
         let payer = self.env.payer.insecure_clone();
@@ -813,6 +831,7 @@ impl Lab {
             s_old: 0,
             carry: 0,
             carry_r: 0,
+            conv_rem: 0,
             num: 0,
             den_log1000: 0,
             bump,
@@ -1065,11 +1084,11 @@ impl Lab {
         let Some(mut pos) = read::borsh::<LenderPosition>(&self.env.svm, &key) else {
             return self.inject(0, 0, |p, _, _| pool::release(p, now).map(|_| ()));
         };
-        let recs = self.state().records_from(pos.epoch).to_vec();
+        let mut recs = self.state().records_from(pos.epoch).to_vec();
         let mut l = pos.lender();
         self.inject_raw(0, 0, |p, v, _| {
             pool::release(p, now)?;
-            pool::touch(p, v, &mut l, &recs, now).map(|_| ())
+            pool::touch(p, v, &mut l, &mut recs, now).map(|_| ())
         })?;
         pos.set_lender(&l);
         let lamports = read::lamports(&self.env.svm, &key);
@@ -1080,6 +1099,10 @@ impl Lab {
         acc.data = data;
         acc.lamports = lamports;
         self.env.svm.set_account(key, acc).expect("set lender");
+        // KI-65: the touch's conversion remainders, as the program would have written them.
+        for r in &recs {
+            self.write_record(r);
+        }
         self.env.assert_invariants();
         Ok(())
     }

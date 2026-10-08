@@ -47,8 +47,10 @@
 //!   after each of those transactions; then (M10's fuzz follow-ups) a second claim pass past the
 //!   vest, after which no lender — one parked behind the share epoch on a full-wipe record
 //!   included — is owed more than [`CLAIM_DUST`] beyond rounding no SOL allocated to it could pay,
-//!   and `lender_sol` is within the hooks' dust cap plus the SOL credited to rebase-orphan shares
-//!   (ECON §9.4 I-P6, §9.5; FUZZ-M10-24H-A).
+//!   and `lender_sol` is within the hooks' dust cap (ECON §9.4 I-P6; FUZZ-M10-24H-A). Since
+//!   KI-65 (ECON §9.5: conversions round cumulatively through each rebase record) no share is
+//!   orphaned: at every roll and at the wind-down every share of `S` has a holder once every
+//!   lender is touched ([`World::orphan_shares`] must be 0).
 
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
@@ -255,11 +257,6 @@ pub struct World {
     /// largest S)`, sampled after every [`World::send`]: what bounds the accumulators' carry
     /// gap the wind-down's second claim pass accepts as rounding (FUZZ-M10-24H-A).
     pub s_peaks: Vec<(u32, u128, u128)>,
-    /// Per slot, `(share epoch, its rebase-orphan shares)`, measured when [`World::send`]
-    /// first sees the epoch ([`World::orphan_shares`]; constant within it, since every
-    /// instruction moves `S` by its lender's shares): what [`World::orphan_credit`] multiplies
-    /// a closed epoch's `acc_r_end` by (FUZZ-M10-24H-A's verification).
-    pub epoch_orphans: Vec<Vec<(u32, u128)>>,
 }
 
 /// A disturbance's clearing action.
@@ -394,38 +391,46 @@ impl World {
             }
             *peak = (*peak).max(m.total_shares.get());
             if rolled {
-                self.note_epoch_orphans(si);
+                self.assert_no_orphans(si, "the share epoch rolled");
             }
         }
     }
 
-    /// Records the current share epoch's rebase-orphan shares in [`World::epoch_orphans`]
-    /// (the latest measurement of an epoch wins: a restored VM re-enters it).
-    fn note_epoch_orphans(&mut self, si: usize) {
-        let Some((epoch, orphans)) = self.orphan_shares(si) else {
-            return;
-        };
-        self.epoch_orphans.resize_with(self.slots.len(), Vec::new);
-        let seen = &mut self.epoch_orphans[si];
-        seen.retain(|(e, _)| *e != epoch);
-        seen.push((epoch, orphans));
+    /// KI-65's oracle: once every lender is touched (on copies, through one shared copy of the
+    /// records, as the program converts), every share of `S` has a holder
+    /// ([`World::orphan_shares`] is 0). Checked at every roll and at the wind-down's second
+    /// claim pass; the hooks' I1 checks the same equality after every transaction.
+    fn assert_no_orphans(&self, si: usize, when: &str) {
+        if let Some((epoch, orphans)) = self.orphan_shares(si)
+            && orphans != 0
+        {
+            panic!(
+                "{ORACLE} I1 (KI-65): {when}: market {} has {orphans} shares in S no lender holds \
+                 once every lender is touched (share epoch {epoch})\npool: {:?}",
+                self.market_key(si),
+                self.market(si).pool()
+            );
+        }
     }
 
-    /// The current share epoch and its rebase-orphan shares: `S` less the shares every lender
-    /// holds once touched (one behind the epoch converted through the records, as the program
-    /// will; ECON §9.5), or `None` without a pool or when a touch fails.
+    /// The current share epoch and `S` less the shares every lender holds once touched (one
+    /// behind the epoch converted through the records, as the program will; the touches share
+    /// one copy of the records, whose `conv_rem` each conversion advances; ECON §9.5), or
+    /// `None` without a pool or when a touch fails. 0 since KI-65 ([`World::assert_no_orphans`]);
+    /// a `Σ held > S` (over-issue) saturates to 0 here and is the hooks' I1 to catch.
     fn orphan_shares(&self, si: usize) -> Option<(u32, u128)> {
         use shortwin_litesvm_tests::invariants::lender::PoolState;
         let st = PoolState::load(&self.env.svm, &self.market_key(si))?;
         let mut vault = *st.vault;
         let mut held: u128 = 0;
+        let mut recs = st.records.clone();
         for (_, lp) in &st.lenders {
             let mut l = lp.lender();
             shortwin_math::pool::touch(
                 &st.pool,
                 &mut vault,
                 &mut l,
-                st.records_from(lp.epoch),
+                PoolState::records_from_mut(&mut recs, lp.epoch),
                 st.now,
             )
             .ok()?;
@@ -1797,13 +1802,13 @@ impl World {
         let pool = m.pool();
         let mut vault = *self.env.market_vault(&market).vault();
         let mut lender = lp.lender();
-        let records: Vec<_> = (lender.epoch..pool.share_epoch)
+        let mut records: Vec<_> = (lender.epoch..pool.share_epoch)
             .filter_map(|e| {
                 let key = pda::share_epoch(&market, e).0;
                 read::borsh::<shortwin::state::ShareEpoch>(&self.env.svm, &key).map(|r| r.record())
             })
             .collect();
-        shortwin_math::pool::touch(&pool, &mut vault, &mut lender, &records, self.env.now())
+        shortwin_math::pool::touch(&pool, &mut vault, &mut lender, &mut records, self.env.now())
             .ok()?;
         Some(lender)
     }
@@ -2051,8 +2056,8 @@ impl World {
                     let mut res = self.send(&[ix], &[&kp]);
                     // All shares may be worth more than the allowance or `T` once losses were
                     // paid in SOL (the virtual shares' part, ECON §9.2 / §9.5): the lender then
-                    // takes exactly its allowance, and the remainder is the rounding and
-                    // rebase-orphan dust the hooks' liveness check bounds.
+                    // takes exactly its allowance, and the remainder is the rounding dust the
+                    // hooks' liveness check bounds.
                     if res.is_err()
                         && let Some(s) = self.allowance_shares(si, &k.owner).filter(|s| *s > 0)
                     {
@@ -4154,36 +4159,33 @@ impl World {
     /// paid from the late depositor's cover). Past the latest vest end (a crank on every market
     /// releases what a lender left holding shares is owed), every lender claims again, in two
     /// rounds (the pot fills at the touches). Then, as ECON §9.4's I-P6 and the hooks' liveness
-    /// check (`invariants::lender::liveness`) define the wind-down's residue — rounding plus the
-    /// SOL credited to rebase-orphan shares (§9.5) — (FUZZ-M10-24H-A):
+    /// check (`invariants::lender::liveness`) define the wind-down's residue — rounding; since
+    /// KI-65 no SOL is credited to rebase-orphan shares, there are none (§9.5) —
+    /// (FUZZ-M10-24H-A):
     ///
     /// - a lender owed more than [`CLAIM_DUST`] must be owed only rounding: no realised SOL of its
     ///   own left unclaimed (`real − claimed = 0`), an empty pot and at most [`CLAIM_DUST`] plus
-    ///   the carries' bound ([`World::carry_gap_bound`]) plus the orphans' realised SOL, within
-    ///   the hooks' dust cap (a flat 0.01 SOL let a realised-allocation leak of 2,000 lamports
-    ///   per credit pass as rounding, owed up to 649,301 lamports; FUZZ-M10-24H-A's
-    ///   verification). The gap between a lender's entitlement (`acc`) and its realised
+    ///   the carries' bound ([`World::carry_gap_bound`]), within the hooks' dust cap (a flat
+    ///   0.01 SOL let a realised-allocation leak of 2,000 lamports per credit pass as rounding,
+    ///   owed up to 649,301 lamports; FUZZ-M10-24H-A's verification). The gap between a lender's entitlement (`acc`) and its realised
     ///   allocation (`acc_r`) is the two accumulators' different carries, up to `S/WAD`
     ///   lamports: thousands of lamports
     ///   once `S` exceeds 10²¹ (10¹⁵ raw units with the share price fallen toward the rebase
     ///   bound of `R_MAX` = 10⁶ shares per unit, ECON §9.5), and its SOL stays in `lender_sol`
     ///   as `carry_r`, allocated to no lender, once the last shares leave (1,033 and 2,646
     ///   lamports owed on CPMM);
-    /// - `lender_sol` must be at most the hooks' liveness dust cap plus the realised SOL the
-    ///   rebase-orphan shares hold ([`World::orphan_credit`]): a rebase floors every lender's
-    ///   shares and `S` separately, so up to one share per lender stays in `S` that no lender
-    ///   holds, and SOL credited to it is claimable by nobody (ECON §9.5). In a dust pool `S`
-    ///   is a few thousand shares, so one orphan's `1/S` of what is credited — a vest the
-    ///   crank releases, or `acc_r` built while `S` was smaller still — is 0.012–0.10 SOL
-    ///   (AMM v4, CPMM and the mixed profile, with a lender left holding the dust shares it
-    ///   could not withdraw). Once every lender has left, the orphans are all of `S`, and the
-    ///   vest the lenders forfeit by leaving (a lender is paid it only when its burn takes `S`
-    ///   to 0, R3B-2, which the orphans prevent) releases to them: 0.054 SOL with two orphan
-    ///   shares on the curve.
+    /// - `lender_sol` must be at most the hooks' liveness dust cap. Before KI-65 a rebase floored
+    ///   every lender's shares and `S` separately, so up to one share per lender stayed in `S`
+    ///   that no lender held; SOL credited to it was claimable by nobody, and once every lender
+    ///   had left the vest they forfeited released to the orphans (19.1 SOL on the mock in run B
+    ///   of the 24 h fuzz, `one --profile mock --seed 31013687 --length 398`). The
+    ///   `wind-down-orphan-credit` acceptance this oracle had for it is gone: conversions now
+    ///   round cumulatively through each record, so every share has a holder
+    ///   ([`World::assert_no_orphans`]) and the last exit takes `S` to 0 and is paid the vest
+    ///   (R3B-2).
     ///
     /// The hooks' liveness check accepts any `lender_sol` once nothing is owed, so the second
-    /// bound is the only guard against SOL stranded with every lender paid; it must stay tight
-    /// (the orphans are measured, not assumed: [`World::orphan_credit`]).
+    /// bound is the only guard against SOL stranded with every lender paid; it must stay tight.
     ///
     /// Every lender counts, including one still behind the share epoch: `lenders_out` syncs a
     /// lender behind, but one parked on a live full-wipe record stays behind (V2-12), and its
@@ -4280,24 +4282,21 @@ impl World {
                     }
                 }
             }
+            self.assert_no_orphans(si, "the wind-down's second claim pass");
             let vault = *self.env.market_vault(&market).vault();
             let lender_sol = vault.lender_sol;
-            let orphan = self.orphan_credit(si);
             self.stats.wind_down_unpaid_max = self.stats.wind_down_unpaid_max.max(unpaid);
             self.stats.wind_down_lender_sol_max =
                 self.stats.wind_down_lender_sol_max.max(lender_sol);
             // What a lender can stay owed with none of its realised SOL left and an empty pot:
-            // the carries' gap, and the realised SOL rebase-orphan shares took beyond their
-            // entitlement (an entitlement credited while `S` was large, realised while it was
-            // small), within the hooks' cap.
+            // the carries' gap, within the hooks' cap.
             let carry_gap = self.carry_gap_bound(si);
             let owed_bound = u128::from(CLAIM_DUST)
                 .saturating_add(u128::from(carry_gap))
-                .saturating_add(orphan)
                 .min(u128::from(cap));
             let owed_rounding = unpaid <= CLAIM_DUST
                 || (owed_own == 0 && vault.unmatched == 0 && u128::from(unpaid) <= owed_bound);
-            let stranded_ok = u128::from(lender_sol) <= u128::from(cap) + orphan;
+            let stranded_ok = lender_sol <= cap;
             if owed_rounding && stranded_ok {
                 if unpaid > CLAIM_DUST {
                     *self
@@ -4305,24 +4304,6 @@ impl World {
                         .events
                         .entry("wind-down-owed-rounding".into())
                         .or_default() += 1;
-                }
-                if lender_sol > cap {
-                    *self
-                        .stats
-                        .events
-                        .entry("wind-down-orphan-credit".into())
-                        .or_default() += 1;
-                    if self.stats.orphan_cases.len() < crate::stats::ORPHAN_CASES_MAX {
-                        let m = self.market(si);
-                        let case = format!(
-                            "{}: lender_sol {lender_sol}, orphan credit ≤ {orphan}, unpaid \
-                             {unpaid}, S {}, share_epoch {}",
-                            self.stats.cursor,
-                            m.total_shares.get(),
-                            m.share_epoch
-                        );
-                        self.stats.orphan_cases.push(case);
-                    }
                 }
                 continue;
             }
@@ -4343,64 +4324,13 @@ impl World {
             }
             panic!(
                 "{ORACLE} liveness (I-P6): after the wind-down's second claim pass market \
-                 {market} holds lender_sol {lender_sol} above the dust cap {cap} plus the \
-                 rebase-orphan shares' realised SOL {orphan}\npool: {:?}\nvault: {vault:?}\n\
+                 {market} holds lender_sol {lender_sol} above the dust cap {cap} (no lender \
+                 owed; KI-65: no rebase-orphan shares)\npool: {:?}\nvault: {vault:?}\n\
                  lenders:\n{}",
                 self.market(si).pool(),
                 lenders.join("\n")
             );
         }
-    }
-
-    /// An upper bound on the realised SOL allocated to rebase-orphan shares since the last full
-    /// wipe (ECON §9.5), lamports, rounded up: the current epoch's orphans exactly
-    /// ([`World::orphan_shares`]: `S` less the shares its lenders hold once touched), times
-    /// `acc_r`; each closed epoch that followed a rebase its orphans as measured while it was
-    /// current ([`World::epoch_orphans`]), times the `acc_r_end` of its record (a full wipe's
-    /// record included: the orphans' part of its top-ups stays unclaimed too). An epoch never
-    /// measured (two rolls in one transaction) counts one orphan per lender of the world (a
-    /// rebase leaves `⌊o/1,000^k⌋ + n` orphans after `o`, so never more than `n` while
-    /// `n < 1,000`); that is loose by `(n − orphans)·acc_r_end`, tens of millions of lamports a
-    /// share in a dust pool, which is why the epochs are measured (FUZZ-M10-24H-A's
-    /// verification).
-    fn orphan_credit(&self, si: usize) -> u128 {
-        use shortwin_litesvm_tests::invariants::lender::PoolState;
-        use shortwin_math::num::WAD;
-        let market = self.market_key(si);
-        let Some(st) = PoolState::load(&self.env.svm, &market) else {
-            return 0;
-        };
-        let n = self.slots[si].lenders.len() as u128;
-        let measured = self
-            .epoch_orphans
-            .get(si)
-            .map(Vec::as_slice)
-            .unwrap_or_default();
-        let mut out: u128 = 0;
-        let mut after_rebase = false;
-        for r in &st.records {
-            if after_rebase {
-                let orphans = measured
-                    .iter()
-                    .find(|(e, _)| *e == r.epoch)
-                    .map_or(n, |&(_, o)| o);
-                out = out.saturating_add(orphans.saturating_mul(r.acc_r_end).div_ceil(WAD));
-            }
-            after_rebase = r.num != 0;
-        }
-        let orphans = self.orphan_shares(si).map_or_else(
-            || {
-                let held: u128 = st
-                    .lenders
-                    .iter()
-                    .filter(|(_, l)| l.epoch == st.pool.share_epoch)
-                    .map(|(_, l)| l.shares)
-                    .sum();
-                st.pool.total_shares.saturating_sub(held)
-            },
-            |(_, o)| o,
-        );
-        out.saturating_add(orphans.saturating_mul(st.pool.acc_r).div_ceil(WAD))
     }
 
     /// Why the remaining positions are stuck: each exit's outcome now, the market's venue and

@@ -241,9 +241,17 @@ fn lifecycle() {
         *env.market_vault(&market).vault(),
         lp.lender(),
     );
-    let want_tokens =
-        mpool::withdraw(&mut p, &mut v, &mut l, &[], now, lock_grace_s, lp.shares).unwrap();
-    let want_sol = mpool::claim(&p, &mut v, &mut l, &[], now).unwrap();
+    let want_tokens = mpool::withdraw(
+        &mut p,
+        &mut v,
+        &mut l,
+        &mut [],
+        now,
+        lock_grace_s,
+        lp.shares,
+    )
+    .unwrap();
+    let want_sol = mpool::claim(&p, &mut v, &mut l, &mut [], now).unwrap();
     let lp_key = pda::lender(&market, &lender.pubkey()).0;
     let lp_rent = lamports(&env, &lp_key);
     let (acc0, l0) = (tokens(&env, &lender_acc), lamports(&env, &lender.pubkey()));

@@ -23,7 +23,8 @@ fn documented_sizes() {
     assert_eq!(MarketVault::SPACE, 2_200);
     assert_eq!(ShortPosition::SPACE, 384);
     assert_eq!(LenderPosition::SPACE, 241);
-    assert_eq!(ShareEpoch::SPACE, 127);
+    assert_eq!(ShareEpoch::SPACE, 143); // 127 before KI-65 (`conv_rem`, the last 16 bytes)
+    assert_eq!(ShareEpoch::CONV_REM_OFFSET, 127);
     assert_eq!(WalletExposure::SPACE, 81);
 }
 

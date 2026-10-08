@@ -33,9 +33,18 @@ cargo test --manifest-path tests/bench/m1_cu/Cargo.toml -- --nocapture
 Every M1 handler is implemented: the M1 merge deleted `ShortwinError::NotImplemented`, and the
 bench's stub handling went with it. M7 adds `set_coverage_pause` (O17; the role installed through
 Governance's timelocked `Authorities` change, `Env::enable_coverage_authority`), an admin flag of
-ARCH §3.1 under the admin-flag class budget. All 25 cases are measured and within budget (`results.md`,
-regenerated at the merge). A case whose Mollusk or LiteSVM run fails, or whose Mollusk figure
-exceeds its budget, fails the test.
+ARCH §3.1 under the admin-flag class budget. M10's KI-65 adds the lender instructions on a lender
+1, 3, 8, 10 and 12 rebase records behind (`behind`, forged: a holding that leaves a remainder at
+every step, so every record's `conv_rem` is written, the worst case per record; and every record
+credits the lender about 1 SOL through nonzero `acc_end` / `acc_r_end` deltas, funded in
+`lender_sol`, so `claim_sol` pays: the unit test `a_claim_behind_pays_what_the_records_credit`).
+Each such record costs ≈ 4.7–5.2k CU. `claim_sol` / `cover_deficit` / `sync_lender` stay within
+§6.1's 60,000 CU up to 8 records (54,194 / 54,549 / 51,880), the web's cap per lender
+transaction (`MAX_RECORDS`); at 9 `cover_deficit` is 59,694 (measured once, not a row), and the
+10- and 12-record rows are reported against the transaction limit only
+(`LENDER_SOL_BEYOND_CAP`). Every case is measured and within budget (`results.md`; only the
+KI-65 rows were rewritten at the KI-65 batch, the others vary by PDA-bump noise between runs). A case whose Mollusk or LiteSVM run fails, or whose
+Mollusk figure exceeds its budget, fails the test.
 
 ## Workspace and pins
 

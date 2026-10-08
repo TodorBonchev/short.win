@@ -25,5 +25,5 @@ The graduation transition (§2.5) is the crank that detects the migration and re
 | Token-2022, 301 B, boost spent (mature): ComputeBudget ×2 + create_market (Auto, PumpSwap, init set) | 17 | 17 | 3 | 134877 | 250000 | 897 / 21 | 685 / 21 | no row |
 | SPL Token, 261 B (legacy261): ComputeBudget ×2 + create_market (Auto, PumpSwap, init set) | 17 | 17 | 3 | 113821 | 250000 | 897 / 21 | 685 / 21 | no row |
 | Token-2022, 301 B, boost spent (mature): ComputeBudget ×2 + sweep_trader (token leg) | 6 | 6 | 2 | 24784 | 60000 | 725 / 18 | 606 / 18 | no row (§3.9; the post-wipe token leg) |
-| ComputeBudget ×2 + create ATA(trader, WSOL) + pAMM claim_cashback + sweep_trader (post-wipe reward claim) | 14 | 14 | 2 | 59828 | 150000 | 948 / 24 | 767 / 24 | no row (§3.9; claim_venue_rewards was not built — the UVA-reading pattern) |
+| ComputeBudget ×2 + create ATA(trader, WSOL) + pAMM claim_cashback + sweep_trader (post-wipe reward claim) | 14 | 14 | 2 | 59905 | 150000 | 948 / 24 | 767 / 24 | no row (§3.9; claim_venue_rewards was not built — the UVA-reading pattern) |
 | ComputeBudget ×2 + flag_venue_upgraded ×2 (PumpSwap, pump-fees; the dumped ProgramData) | 6 | 6 | 2 | 12356 | 400000 | 378 / 7 | 352 / 7 | 2 + 2 + 2 (§6.2) |

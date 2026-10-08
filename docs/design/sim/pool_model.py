@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-short.win -- lender-pool accounting reference model + property tests (v0.4.1).
+short.win -- lender-pool accounting reference model + property tests (v0.4.2).
 
 Companion to docs/design/ECONOMICS.md §9 (normative for the math crate's `pool`
 module, ARCH §3.3).  Standard library only; deterministic.
@@ -49,6 +49,13 @@ Model (all integers; rounding in favour of the pool):
   * v0.4.1 lumps: value-weighted vest end (a lump no longer restarts the window, R4B-5); a
     deposit while a full-wipe record is live waits for the post-wipe sweep (R4A-7).
   * Share epochs (C0-6), 0-share jump and post-wipe record (V2-12) unchanged.
+  * v0.4.2 (KI-65): no rebase orphans.  A rebase record (1/den) carries a conversion remainder
+    conv_rem in [0, den); a lender's conversion through it mints floor((conv_rem + shares)/den)
+    and leaves the remainder there, so the conversions of every old-epoch holder sum to
+    floor(s_old/den) = the new S exactly, in any order (each lender gets floor(s/den) or one
+    more).  Once every lender converted, sum(shares) == S; R3B-2's "the last lender is paid the
+    vest" (a withdrawal of all of S) again reaches every exit, and no SOL is credited to shares
+    nobody holds.  v0.4.1 floored each lender separately (up to n - 1 orphan shares per rebase).
 """
 from __future__ import annotations
 
@@ -93,7 +100,8 @@ class Pool:
     def __init__(self, mode: str = "continuous", util_cap_bps: int = 9_000, prorata: bool = True,
                  lump_vest_s: int = LUMP_VEST_S, lock_grace_s: int = LOCK_GRACE_S, pi_decay: bool = True,
                  lock_expiry: bool = True, lock_calendar: bool = True, vest_weighted: bool = True,
-                 wipe_sweep_gate: bool = True, exit_flush_bps: int = 0, lock_floor: bool = True):
+                 wipe_sweep_gate: bool = True, exit_flush_bps: int = 0, lock_floor: bool = True,
+                 cum_convert: bool = True):
         assert mode in ("continuous", "release")
         self.mode = mode
         self.util_cap = util_cap_bps
@@ -108,6 +116,8 @@ class Pool:
         self.lock_floor = lock_floor            # False: v0.4 ceil'd lock terms and aggregate (comparison rows)
         self.exit_flush_bps = exit_flush_bps    # analysis only (R4B-4's suggestion, rejected): flush the vest before
                                                 #   a withdrawal that leaves S - shares < exit_flush_bps of S
+        self.cum_convert = cum_convert          # False: v0.4.1 behaviour (each lender floored alone at a rebase:
+                                                #   up to n - 1 orphan shares nobody holds; KI-65 comparison rows)
         self.now = 0
         self.T = 0
         self.B = 0
@@ -128,7 +138,7 @@ class Pool:
         self.vest_last = 0
         self.vest_end = 0
         self.epoch = 0
-        self.epochs = {}         # e -> [acc_end, num, den, acc_r_end, s_old, carry, carry_r]
+        self.epochs = {}         # e -> [acc_end, num, den, acc_r_end, s_old, carry, carry_r, conv_rem]
         self.wipe_live = False
         self.pi = WAD
         self.pi_epoch = 0
@@ -142,8 +152,6 @@ class Pool:
         self.vault_token_balance = 0
         self.inflow = 0          # ghost: lamports that reached sol_vault for lenders
         self.n_touch = 0         # ghost: rounding-event counter for the dust bound
-        self.orphans = 0         # ghost: current-epoch shares owned by nobody (rebase floors)
-        self.leak = 0            # ghost: lamports credited to orphan shares (bounded dust)
 
     # ---- time, rent, vesting --------------------------------------------------
     def advance(self, dt: int, d_index: int = 0):
@@ -257,8 +265,6 @@ class Pool:
         d = num // self.S
         self.carry = num - d * self.S
         self.acc += d
-        if self.orphans and lamports > 0:
-            self.leak += cdiv(lamports * self.orphans, self.S)
         if realised and self.mode == "continuous":
             self._credit_r(lamports)
 
@@ -283,7 +289,11 @@ class Pool:
                 L.snap, L.snap_r = acc_end, acc_r_end
                 self._to_pot(L)
                 return L
-            L.shares = L.shares * num // den
+            if num and self.cum_convert:       # v0.4.2 (KI-65): cumulative rounding through the record
+                rec = self.epochs[L.epoch]
+                L.shares, rec[7] = divmod(rec[7] + L.shares, den)
+            else:
+                L.shares = L.shares * num // den   # a full wipe (conv_rem is not touched); v0.4.1 rebases
             L.lock = L.lock * num // den
             L.lock_term = L.lock_term * num // den     # v0.4.1: keeps the term consistent with the scaled bucket
             L.snap = L.snap_r = 0
@@ -330,10 +340,9 @@ class Pool:
             self._roll(1, den)
 
     def _roll(self, num, den):
-        # ghost: shares that no lender will own after the per-lender floors (<= 1 per lender)
-        owned = sum(L.shares * num // den for L in self.lenders.values() if L.epoch == self.epoch)
-        self.orphans = self.S * num // den - owned
-        self.epochs[self.epoch] = [self.acc, num, den, self.acc_r, self.S, 0, 0]
+        # v0.4.2 (KI-65): conv_rem starts at 0; the lenders' conversions through this record sum
+        # to S * num // den exactly (no orphan shares)
+        self.epochs[self.epoch] = [self.acc, num, den, self.acc_r, self.S, 0, 0, 0]
         self.epoch += 1
         self.S = self.S * num // den
         if self.lock_calendar:
@@ -382,12 +391,15 @@ class Pool:
         (every other lender left as it is): the state I-P4 must hold on (R4A-2 / R4B-3)."""
         if who not in self.lenders:
             return 0
-        saved = (self.lenders[who], self.unmatched, self.n_touch, self.lock_norm, dict(self.lock_cal), self.leak)
+        saved = (self.lenders[who], self.unmatched, self.n_touch, self.lock_norm, dict(self.lock_cal))
+        rems = {e: self.epochs[e][7] for e in range(saved[0].epoch, self.epoch)}   # its touch may convert (KI-65)
         self.lenders[who] = copy.copy(saved[0])
         try:
             return self.free_allowance(who)
         finally:
-            self.lenders[who], self.unmatched, self.n_touch, self.lock_norm, self.lock_cal, self.leak = saved
+            self.lenders[who], self.unmatched, self.n_touch, self.lock_norm, self.lock_cal = saved
+            for e, r in rems.items():
+                self.epochs[e][7] = r
 
     def free_allowance(self, who) -> int:
         L = self._touch(who)
@@ -598,7 +610,9 @@ class Pool:
         cur = [L for L in Ls if L.epoch == self.epoch]
         tok_claims = sum(L.shares * (self.T + self.B + VA) // (self.S + VS) for L in cur)
         assert tok_claims <= self.T + self.B, ("token claims exceed assets", tok_claims, self.T + self.B)
-        assert sum(L.shares for L in cur) <= self.S, ("shares", sum(L.shares for L in cur), self.S)
+        # I-P1, v0.4.2 (KI-65): every lender is touched above, so every share of S has a holder
+        held = sum(L.shares for L in cur)
+        assert held == self.S if self.cum_convert else held <= self.S, ("shares", held, self.S)
         # I-P2 (claim side, strict per lender): unclaimed realised allocations + pot + unreleased
         # vest are backed by the vault; nobody was paid more than its own allocation.
         unclaimed_real = sum(L.real - L.claimed for L in Ls)
@@ -648,7 +662,7 @@ class Pool:
             for w in list(p.lenders):
                 paid += p.claim_sol(w)
         stranded = p.sol_vault
-        bound = p.n_touch + 2 * len(p.lenders) + p.epoch + 2 + 2 * p.leak
+        bound = p.n_touch + 2 * len(p.lenders) + p.epoch + 2
         # a lender with an uncovered negative balance forfeits nothing to others; the vault is
         # either drained to dust or every positive entitlement is fully paid.
         unpaid = sum(max(L.pending, 0) for L in p.lenders.values())
@@ -753,7 +767,7 @@ def fuzz(ops: int, seed: int, mode: str = "continuous", util_cap_bps: int = 9_00
             worst_strand = max(worst_strand, stranded)
     paid, before, stranded, bound = p.wind_down_liveness()
     worst_strand = max(worst_strand, stranded)
-    return counts, p.epoch, getattr(p, "max_neg", 0), (worst_strand, p.leak)
+    return counts, p.epoch, getattr(p, "max_neg", 0), worst_strand
 
 
 def legacy_pool_module():
@@ -1404,17 +1418,197 @@ def premium_jit_table():
     return rows
 
 
+# ---- v0.4.2 (KI-65): no rebase orphans -------------------------------------------------------
+def exit_all(p, who, max_burns: int = 64) -> int:
+    """`who` withdraws every share it holds in the largest burns it may: its allowance, or, while
+    that is 0, the largest burn that pays 0 tokens (always allowed); at most `max_burns` burns (a
+    pool whose share price is above a token per share while nothing is free cannot be left by
+    0-token burns).  Returns the tokens."""
+    got = 0
+    for _ in range(max_burns):
+        L = p._touch(who)
+        if not L.shares or L.epoch != p.epoch:
+            return got
+        allow = p.free_allowance(who)
+        zero = cdiv(p.S + VS, p.T + p.B + VA) - 1            # the largest burn that pays 0 tokens
+        fit = allow * (p.S + VS) // (p.T + p.B + VA)
+        got += p.withdraw(who, min(L.shares, max(fit, zero, 1)))
+    return got
+
+
+def dust_shares(p, who, amount: int, rem: int):
+    """`who` deposits `amount` tokens, then burns (for 0 tokens) what puts its shares at `rem`
+    modulo 1,000, below a multiple of the next rebase's denominator (a 0-token burn is allowed)."""
+    p.deposit(who, amount)
+    extra = (p._touch(who).shares - rem) % REBASE
+    if extra:
+        try:
+            p.withdraw(who, extra)
+        except ValueError:                               # the burn would pay a token above the allowance
+            pass
+
+
+def orphan_vest_demo(seeds: int = 200):
+    """KI-65 (FUZZ-M10-24H-A): three lenders, a settlement that vests a 3 SOL lump and rebases the
+    shares (1/1,000), then every lender exits during the vest -- each converts lazily at its own exit --
+    and claims again after it.  v0.4.1 floors each lender alone: the orphan shares keep S above 0, the
+    R3B-2 flush (a withdrawal of all of S) never fires and the vest is released to shares nobody holds.
+    Returns rows (model, runs that rolled, runs with S > 0 after every exit, worst stranded, its seed)."""
+    rows = []
+    for label, cum in (("v0.4.1 (each lender floored alone)", False),
+                       ("v0.4.2 (cumulative conversion)", True)):
+        runs = left = 0
+        worst = (0, None)
+        for seed in range(seeds):
+            rng = random.Random(seed)
+            p = Pool(util_cap_bps=10_000, cum_convert=cum)
+            p.deposit("u0", 1000)
+            p.borrow(1, 500)
+            p.settle(1, 10**6)                           # the share price is no longer 1,000 per token
+            for i in (1, 2):
+                p.deposit(f"u{i}", rng.randrange(100, 2000))
+            p.borrow(2, p.T - 1)
+            e0 = p.epoch
+            p.settle(2, 10**9 + 3 * 10**9, 3 * 10**9)    # 3 SOL vest, then (mostly) a rebase
+            rolled = p.epoch > e0
+            for w in list(p.lenders):                     # everyone leaves while the vest runs
+                exit_all(p, w)
+                p.claim_sol(w)
+            s_left = p.S
+            p.advance(p.lump_vest_s + 1)
+            for w in list(p.lenders):
+                p.claim_sol(w)
+            if not rolled:
+                continue
+            runs += 1
+            left += s_left > 0
+            if worst[1] is None or p.sol_vault > worst[0]:
+                worst = (p.sol_vault, seed)
+        rows.append((label, runs, left, worst[0], worst[1]))
+    return rows
+
+
+def _rebased_pair(cum: bool, h_rem: int, w_rem: int, w_amount: int = 9_000):
+    """H (1 token) and W (`w_amount` tokens) hold `h_rem`, `w_rem` shares modulo 1,000; a settlement
+    of everything but one raw token pays 1 SOL immediately and vests a 3 SOL lump, and the shares
+    rebase by 1/1,000 (H's old shares are dust below one new share)."""
+    p = Pool(util_cap_bps=10_000, cum_convert=cum)
+    dust_shares(p, "H", 1, h_rem)
+    dust_shares(p, "W", w_amount, w_rem)
+    p.borrow(1, p.T - 1)
+    p.settle(1, 10**9 + 3 * 10**9, 3 * 10**9)
+    assert p.epoch == 1 and p.epochs[0][2] == REBASE, (p.epoch, p.epochs)
+    return p
+
+
+def whale_order_demo():
+    """KI-65 against R4B-4: what a whale can do with the conversion order and the R3B-2 flush.
+    W1: a 199x JIT deposit around a 3 SOL lump while H holds a share it has not converted yet
+        (latent): S counts H's share, so the whale's exit never takes all of S and it realises 0.
+    W2: the whale bundles [settlement (3 SOL vest + rebase) -> sync in either order -> exit] while H
+        holds 600 old shares (dust below one new share).  The record's rounding unit goes to the
+        second converter; nobody gets less than its floor (H's floor is 0 shares).
+    W3: after the roll the other holder G leaves; H's unconverted share keeps S at 1; a whale
+        deposits, a 3 SOL sweep vests, the whale leaves: no flush (S > the whale's shares), and H,
+        converting later, is paid the vest.
+    Returns rows (case, model, whale gets, H gets, stranded)."""
+    rows = []
+    lump = 3 * 10**9
+    for label, cum in (("v0.4.1", False), ("v0.4.2", True)):
+        # W1
+        p = _rebased_pair(cum, 0, 0, w_amount=10**6)          # H holds 1,000 old shares: 1 new share
+        exit_all(p, "W")
+        p.claim_sol("W")
+        p.deposit("J", 199 * 10**9)                          # the whale, just in time
+        p.borrow(2, p.T // 2)
+        p.repay(2, 0, lump)                                  # a 3 SOL lump vests
+        exit_all(p, "J")
+        j = p.claim_sol("J")
+        p.advance(p.lump_vest_s + 1)
+        h = p.claim_sol("H")
+        rows.append(("W1 JIT x199 around a lump, H's share not converted", label, j, h, p.sol_vault))
+        # W2, both orders
+        for order in (("H", "W"), ("W", "H")):
+            p = _rebased_pair(cum, 600, 600)
+            for w in order:
+                p._touch(w)                                  # sync_lender, permissionless
+            w_got = p.claim_sol("W")
+            exit_all(p, "W")
+            w_got += p.claim_sol("W")
+            p.advance(p.lump_vest_s + 1)
+            h = p.claim_sol("H")
+            rows.append((f"W2 sync order {order[0]} then {order[1]}, then the whale exits", label, w_got, h,
+                         p.sol_vault))
+        # W3
+        p = _rebased_pair(cum, 600, 600)
+        exit_all(p, "W")                                     # G's part: the other holder leaves first
+        p.claim_sol("W")
+        s_latent = p.S
+        p.deposit("J", 10**6)
+        p.sweep_sol(lump)
+        exit_all(p, "J")
+        j = p.claim_sol("J")
+        p.advance(p.lump_vest_s + 1)
+        h = p.claim_sol("H")
+        rows.append((f"W3 whale deposits while S = {s_latent} is H's unconverted share", label, j, h, p.sol_vault))
+    return rows
+
+
+def lazy_order_check(trials: int = 2_000, seed: int = 65):
+    """KI-65 lemma, on the model: random lenders and holdings, one to three rebases (deep ones too),
+    lazy conversions in random order with deposits, 0-token burns and partial exits in between, then
+    every lender converts in a random order.  Asserts sum(shares) == S once all converted, and that
+    every conversion through k records lands in [floor chain, floor chain + 1 per record].
+    Returns (trials, rebases, conversions, worst orphans of the v0.4.1 floor on the same trials)."""
+    rng = random.Random(seed)
+    rebases = conversions = worst_v041 = 0
+    for _t in range(trials):
+        tseed = rng.randrange(2**32)
+        held = {}
+        for cum in (True, False):
+            r = random.Random(tseed)
+            p = Pool(util_cap_bps=10_000, cum_convert=cum)
+            users = [f"u{i}" for i in range(r.randrange(2, 9))]
+            for u in users:
+                dust_shares(p, u, r.choice([1, r.randrange(1, 50), r.randrange(1, 10**6)]), r.randrange(REBASE))
+            for _k in range(r.randrange(1, 4)):
+                q = p.T - r.choice([1, 1, 2, 3])
+                if q > 0:
+                    p.borrow(f"b{_k}", q)                # settle all but a few raw units: a (deep) rebase
+                    for k in list(p.positions):
+                        p.settle(k, r.randrange(0, 10**9))
+                for u in r.sample(users, r.randrange(0, len(users) + 1)):
+                    L = p.lenders[u]
+                    lo = hi = L.shares
+                    for e in range(L.epoch, p.epoch):
+                        num, den = p.epochs[e][1], p.epochs[e][2]
+                        lo, hi = lo * num // den, (hi * num // den + 1) if num else 0
+                    p._touch(u)
+                    assert lo <= L.shares <= hi or L.epoch != p.epoch or not cum, (lo, L.shares, hi)
+                    conversions += cum
+                    if r.random() < 0.3:
+                        dust_shares(p, u, r.randrange(1, 10**4), r.randrange(REBASE))
+            for u in r.sample(users, len(users)):
+                p._touch(u)
+            held[cum] = (sum(L.shares for L in p.lenders.values() if L.epoch == p.epoch), p.S)
+            p.check()
+            rebases += cum * sum(1 for e in p.epochs.values() if e[1])
+        assert held[True][0] == held[True][1], held
+        worst_v041 = max(worst_v041, held[False][1] - held[False][0])
+    return trials, rebases, conversions, worst_v041
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ops", type=int, default=60_000)
     ap.add_argument("--seed", type=int, default=20260927)
     a = ap.parse_args()
     for mode, cap in (("continuous", 9_000), ("continuous", 10_000), ("release", 9_000)):
-        c, ep, mneg, (strand, leak) = fuzz(a.ops, a.seed, mode, cap)
+        c, ep, mneg, strand = fuzz(a.ops, a.seed, mode, cap)
         print(f"fuzz[{mode}, util cap {cap/100:.0f}%]: {a.ops} ops, invariants held (liveness checked every "
               f"2,000 ops); share epochs rolled {ep}; largest sum of negative pendings {mneg:,} lamports; "
-              f"worst stranded SOL after wind-down {strand:,} lamports (all within the bound: rounding + "
-              f"{leak:,} lamports credited to rebase-orphan shares); op counts {dict(sorted(c.items()))}")
+              f"worst stranded SOL after wind-down {strand:,} lamports (all within the rounding bound; no "
+              f"rebase-orphan shares, KI-65); op counts {dict(sorted(c.items()))}")
     print("\nR3A-2 stranded lender SOL after an honest wind-down (40 seeds x 3,000 ops, reviewer's r3_stranded.py):")
     print("| model | realised inflow (SOL) | stranded (SOL) | worst seed (SOL) | seeds above 0.01 SOL |")
     print("|---|---|---|---|---|")
@@ -1478,6 +1672,22 @@ def main():
     print("|---|---|---|---|")
     for case, var, a, b in vest_exit_demo():
         print(f"| {case} | {var} | {a:,} | {b:,} |")
+    print("\nKI-65 rebase orphans: three lenders, a settlement vests a 3 SOL lump and rebases the shares (1/1,000), "
+          "every lender exits during the vest (converting at its own exit) and claims again after it; 200 seeds:")
+    print("| model | runs that rebased | runs with S > 0 after every exit | worst stranded (lamports) | its seed |")
+    print("|---|---|---|---|---|")
+    for label, runs, left, worst, sd in orphan_vest_demo():
+        print(f"| {label} | {runs} | {left} | {worst:,} | {sd} |")
+    print("\nKI-65 against R4B-4: a whale, the conversion order and the R3B-2 flush (H: an honest lender whose "
+          "shares were not converted yet; 3 SOL lumps):")
+    print("| case | model | whale gets (lamports) | H gets (lamports) | stranded (lamports) |")
+    print("|---|---|---|---|---|")
+    for case, label, w, h, st in whale_order_demo():
+        print(f"| {case} | {label} | {w:,} | {h:,} | {st:,} |")
+    n, rb, conv, orph = lazy_order_check()
+    print(f"\nKI-65 lemma, lazy conversion order: {n:,} random pools, {rb:,} rebase records, {conv:,} conversions in "
+          f"random order between deposits and 0-token burns; sum(shares) == S once every lender converted, each "
+          f"conversion within [floor, floor + 1 per record] (v0.4.1 on the same pools: up to {orph} orphan shares)")
     print("\nR4B-5 a 10 SOL lump, then a 1-lamport sweep every k seconds (share of the 10 SOL released):")
     print("| model | k (s) | released after 6 h | after 24 h |")
     print("|---|---|---|---|")

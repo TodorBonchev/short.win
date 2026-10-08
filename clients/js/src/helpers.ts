@@ -75,7 +75,7 @@ export function bigIntToPodI128(value: bigint): PodI128 {
 export const SHARE_EPOCH_DISCRIMINATOR = new Uint8Array([0xcb, 0x67, 0xdd, 0x98, 0x1c, 0x10, 0xc9, 0x37]);
 
 /** `ShareEpoch::SPACE`: the account size including the discriminator. */
-export const SHARE_EPOCH_SIZE = 127;
+export const SHARE_EPOCH_SIZE = 143;
 
 /** A share-epoch record (`programs/shortwin/src/state/epoch.rs`; ARCH §2.3.6). */
 export type ShareEpoch = {
@@ -96,6 +96,12 @@ export type ShareEpoch = {
     /** `k` of the denominator `1,000^k`. */
     denLog1000: number;
     bump: number;
+    /**
+     * Conversion remainder (KI-65): the old-epoch shares converted through this record so far,
+     * modulo `1,000^k`. A lender behind the record converts to `⌊(convRem + shares)/1,000^k⌋`
+     * shares and the lender instructions write it back, so a preview must use the value read.
+     */
+    convRem: bigint;
 };
 
 export type ShareEpochArgs = Omit<ShareEpoch, 'discriminator'>;
@@ -114,6 +120,7 @@ export function getShareEpochEncoder(): FixedSizeEncoder<ShareEpochArgs> {
             ['num', getU8Encoder()],
             ['denLog1000', getU8Encoder()],
             ['bump', getU8Encoder()],
+            ['convRem', getU128Encoder()],
         ]),
         (value: ShareEpochArgs) => ({ ...value, discriminator: SHARE_EPOCH_DISCRIMINATOR }),
     );
@@ -132,6 +139,7 @@ export function getShareEpochDecoder(): FixedSizeDecoder<ShareEpoch> {
         ['num', getU8Decoder()],
         ['denLog1000', getU8Decoder()],
         ['bump', getU8Decoder()],
+        ['convRem', getU128Decoder()],
     ]);
 }
 
@@ -152,10 +160,12 @@ export async function findShareEpochPda(
 }
 
 /**
- * The read-only remaining accounts a lender instruction (`deposit`, `withdraw`, `claim_sol`,
+ * The remaining accounts a lender instruction (`deposit`, `withdraw`, `claim_sol`,
  * `cover_deficit`, `sync_lender`) takes for a lender at `fromEpoch` in a market at
  * `shareEpoch`: the records `fromEpoch..shareEpoch`, in order, at most `limit` of them (ARCH
- * §3.3: a lender further behind is advanced with `sync_lender` first).
+ * §3.3: a lender further behind is advanced with `sync_lender` first). Writable: the lender's
+ * conversion through a rebase record writes the record's `conv_rem` (KI-65), and the program
+ * refuses such a record passed read-only (`EpochRecordReadOnly`).
  */
 export async function getShareEpochAccountMetas(
     input: { market: Address; fromEpoch: number; shareEpoch: number; limit?: number },
@@ -165,7 +175,7 @@ export async function getShareEpochAccountMetas(
     const metas: AccountMeta[] = [];
     for (let e = fromEpoch; e < shareEpoch && metas.length < limit; e++) {
         const [address] = await findShareEpochPda({ market, epoch: e }, config);
-        metas.push({ address, role: AccountRole.READONLY });
+        metas.push({ address, role: AccountRole.WRITABLE });
     }
     return metas;
 }

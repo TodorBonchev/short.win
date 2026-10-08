@@ -42,6 +42,8 @@ describe('program error messages', () => {
         expect(programError(6104)?.name).toBe('GraduationHalted');
         expect(programError(6105)?.name).toBe('AuthoritiesNotDistinct');
         expect(programError(6105)?.action).toBe('admin');
+        expect(programError(6106)?.name).toBe('EpochRecordReadOnly');
+        expect(programError(6106)?.action).toBe('retry');
         expect(programError(5999)).toBeUndefined();
     });
 });

@@ -344,44 +344,69 @@ fn deficit_tripwire_on_fuzz_m7_24h_3() {
     assert!(f.message.contains("took"), "{}", f.message);
 }
 
-/// M10 (FUZZ-M10-24H-A): the wind-down's second claim pass leaves exactly ECON §9.4's I-P6
-/// residue — rounding and the SOL credited to rebase-orphan shares (§9.5) — and the final-tree
-/// 24 h run's reproducers pass through their own branch of the oracle. On CPMM the last lender,
-/// its shares all withdrawn, stays owed more than `CLAIM_DUST` of the accumulators' carry while
-/// none of its realised SOL is left and the pot is empty (`wind-down-owed-rounding`); on the curve
-/// `lender_sol` keeps more than the hooks' dust cap credited to orphan shares no lender holds
-/// (`wind-down-orphan-credit`). Either run failed the pass's first oracle.
+/// M10 (FUZZ-M10-24H-A, KI-65): the wind-down's second claim pass leaves exactly ECON §9.4's
+/// I-P6 residue — rounding — and the final-tree 24 h runs' reproducers pass. On CPMM the last
+/// lender, its shares all withdrawn, stays owed more than `CLAIM_DUST` of the accumulators'
+/// carry while none of its realised SOL is left and the pot is empty
+/// (`wind-down-owed-rounding`). The rebase-orphan credit the oracle used to accept above the
+/// hooks' dust cap (`wind-down-orphan-credit`) is gone with KI-65's cumulative conversion (ECON
+/// §9.5): on the curve corpus file, and on run B's three largest cases — 19,131,900,419 lamports
+/// left on the mock, 890,963,742 on CPMM, 552,350,825 on PumpSwap, each with `S = 1` orphan
+/// share that the vest the leavers forfeited released to — every share has a holder, the last
+/// exit takes `S` to 0 and is paid the vest (R3B-2), and `lender_sol` ends within the cap. The
+/// three `one` replays run in the full (release) smoke only.
 #[test]
 fn wind_down_residue_on_fuzz_m10_24h_a() {
     use shortwin_fuzz::world::CLAIM_DUST;
     use shortwin_litesvm_tests::invariants::lender::DEFAULT_LIVENESS_DUST_CAP;
-    for (file, event) in [
-        (
-            "corpus/fuzz-m10-24h-a-cpmm-carry-owed.json",
-            "wind-down-owed-rounding",
-        ),
-        (
-            "corpus/fuzz-m10-24h-a-curve-orphan-credit.json",
-            "wind-down-orphan-credit",
-        ),
-    ] {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(file);
-        let c = runner::read_crash(&path).expect("corpus file");
-        let o = runner::run(c.profile, c.seed, Some(&c.actions), 0, c.opts);
+    let check = |what: &str, o: &runner::Outcome| {
         if let Some(f) = &o.failure {
-            panic!("{file}: {}\n{}", f.signature, f.message);
+            panic!("{what}: {}\n{}", f.signature, f.message);
         }
         let ev = |k: &str| o.stats.events.get(k).copied().unwrap_or(0);
         println!(
-            "{file}: unpaid {} lender_sol {}; events {:?}",
+            "{what}: unpaid {} lender_sol {}; events {:?}",
             o.stats.wind_down_unpaid_max, o.stats.wind_down_lender_sol_max, o.stats.events
         );
-        assert!(ev(event) > 0, "{file}: no `{event}`");
-        if event == "wind-down-owed-rounding" {
-            assert!(o.stats.wind_down_unpaid_max > CLAIM_DUST);
-        } else {
-            assert!(o.stats.wind_down_lender_sol_max > DEFAULT_LIVENESS_DUST_CAP);
-        }
+        assert!(o.stats.wind_downs > 0, "{what}: no wind-down");
+        assert!(
+            o.stats.wind_down_lender_sol_max <= DEFAULT_LIVENESS_DUST_CAP,
+            "{what}: lender_sol {} stranded",
+            o.stats.wind_down_lender_sol_max
+        );
+        assert_eq!(ev("wind-down-orphan-credit"), 0, "{what}");
+        ev("wind-down-owed-rounding")
+    };
+    let read = |file: &str| {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(file);
+        runner::read_crash(&path).expect("corpus file")
+    };
+    let c = read("corpus/fuzz-m10-24h-a-cpmm-carry-owed.json");
+    let o = runner::run(c.profile, c.seed, Some(&c.actions), 0, c.opts);
+    assert!(
+        check("cpmm-carry-owed", &o) > 0,
+        "no `wind-down-owed-rounding`"
+    );
+    assert!(o.stats.wind_down_unpaid_max > CLAIM_DUST);
+    let c = read("corpus/fuzz-m10-24h-a-curve-orphan-credit.json");
+    let o = runner::run(c.profile, c.seed, Some(&c.actions), 0, c.opts);
+    check("curve-orphan-credit (KI-65)", &o);
+    if !FULL {
+        return;
+    }
+    for (profile, seed, length) in [
+        (Profile::Mock, 31_013_687, 398),
+        (Profile::Cpmm, 31_005_995, 390),
+        (Profile::PumpSwap, 31_016_959, 386),
+    ] {
+        let o = runner::run(profile, seed, None, length, Opts::default());
+        check(
+            &format!(
+                "one --profile {} --seed {seed} --length {length} (KI-65)",
+                profile.name()
+            ),
+            &o,
+        );
     }
 }
 

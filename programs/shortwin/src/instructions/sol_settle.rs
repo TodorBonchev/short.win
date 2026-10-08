@@ -416,6 +416,8 @@ pub fn handler<'info>(ctx: Context<'info, SolSettle<'info>>) -> Result<()> {
             s_old: rec.s_old,
             carry: rec.carry,
             carry_r: rec.carry_r,
+            // 0: no lender has converted through the new record yet (KI-65).
+            conv_rem: rec.conv_rem,
             num: rec.num,
             den_log1000: rec.den_log1000,
             bump,

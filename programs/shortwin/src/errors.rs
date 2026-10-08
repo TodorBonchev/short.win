@@ -321,6 +321,14 @@ pub enum ShortwinError {
         "governance, pause_authority, fee_recipient and coverage_authority must be pairwise distinct"
     )]
     AuthoritiesNotDistinct,
+
+    // ---- Appended by M10 KI-65 (6106; group in brackets) ----
+    /// [Lender] `deposit`, `withdraw`, `claim_sol`, `cover_deficit` or `sync_lender` converted
+    /// the lender through a rebase record whose conversion remainder `conv_rem` changed, and
+    /// that record was passed read-only (ECON §9.5, KI-65: no rebase orphans; ARCH §2.3.6,
+    /// §6.2). A record the conversion does not change may stay read-only.
+    #[msg("A ShareEpoch record the lender converts through must be passed writable")]
+    EpochRecordReadOnly,
 }
 
 impl From<MathError> for ShortwinError {
@@ -416,6 +424,7 @@ mod tests {
             (ShortwinError::ReservedScanOutOfOrder, 6103),
             (ShortwinError::GraduationHalted, 6104),
             (ShortwinError::AuthoritiesNotDistinct, 6105),
+            (ShortwinError::EpochRecordReadOnly, 6106),
         ];
         for (e, c) in pins {
             assert_eq!(code(e), c, "{e:?}");

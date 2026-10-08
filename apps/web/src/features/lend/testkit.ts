@@ -121,6 +121,7 @@ export function recordOf(r: Record<string, string | number>): RecordFields {
         carryR: big(r.carryR),
         num: Number(r.num),
         denLog1000: Number(r.denLog1000),
+        convRem: big(r.convRem),
     };
 }
 

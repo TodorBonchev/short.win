@@ -4915,6 +4915,11 @@
       "code": 6105,
       "name": "AuthoritiesNotDistinct",
       "msg": "governance, pause_authority, fee_recipient and coverage_authority must be pairwise distinct"
+    },
+    {
+      "code": 6106,
+      "name": "EpochRecordReadOnly",
+      "msg": "A ShareEpoch record the lender converts through must be passed writable"
     }
   ],
   "types": [

@@ -1,11 +1,12 @@
-//! Property tests for `shortwin_math::pool` (v0.4.1): random operation sequences (dust to
+//! Property tests for `shortwin_math::pool` (v0.4.2): random operation sequences (dust to
 //! u64-extreme amounts, time passing, `rent_protocol_bps` governance changes, full wipes
 //! with post-wipe sweeps, deep rebases, runs, churn, repeated claims, covers, lumps,
 //! shortfalls; lazy or touch-all lenders; lump and lock parameters at their compiled
 //! extremes) with the ECON §13 invariants I-P1–I-P7 / ARCH §8.3 I8 asserted after every
 //! operation — I-P4 also on the untouched state — plus the calendar's own invariants, the
 //! per-operation ghost checks of `pool_model.fuzz`, atomicity of refusals and the claim
-//! side of the liveness wind-down (I-P6).
+//! side of the liveness wind-down (I-P6). KI-65: lazy conversions through chained rebase
+//! records in any order and in `sync_lender` steps of any size never orphan a share.
 
 mod common;
 #[path = "pool_harness.rs"]
@@ -14,7 +15,7 @@ mod pool_harness;
 use pool_harness::{DAY, Market, Model, S3_TAIL_S};
 use proptest::prelude::*;
 use shortwin_math::MathError;
-use shortwin_math::pool::{self, NO_LOCK_EPOCH, Standing, SweepSource};
+use shortwin_math::pool::{self, Lender, NO_LOCK_EPOCH, Pool, ShareEpoch, Standing, SweepSource};
 
 #[derive(Clone, Debug)]
 enum Op {
@@ -677,5 +678,70 @@ proptest! {
             // Π = WAD while nothing resolves: the aggregate is the term itself.
             prop_assert_eq!(locked, l0.lock_term.min(s.m.pool.total_shares));
         }
+    }
+
+    /// KI-65 (ECON §9.5): lenders holding random old shares convert through one to three
+    /// chained rebase records (`1/1,000^k`, k up to 12) in a random interleaving of
+    /// `sync_lender` steps of 1–3 records: every step lands within the floor chain and one
+    /// more unit per record passed, and once every lender has converted they hold exactly
+    /// the new `S` (no orphan share), whatever the order.
+    #[test]
+    fn conversion_order_and_steps_never_orphan_a_share(
+        holdings in prop::collection::vec(
+            prop_oneof![0u128..1_000, 0u128..10_000_000, 0u128..u128::MAX / 64],
+            1..12,
+        ),
+        ks in prop::collection::vec(1u8..=12, 1..4),
+        schedule in prop::collection::vec((any::<prop::sample::Index>(), 1usize..4), 0..40),
+    ) {
+        let mut s = holdings.iter().sum::<u128>();
+        let mut records = Vec::new();
+        for (e, &k) in ks.iter().enumerate() {
+            let rec = ShareEpoch {
+                acc_end: 0,
+                acc_r_end: 0,
+                s_old: s,
+                carry: 0,
+                carry_r: 0,
+                conv_rem: 0,
+                epoch: u32::try_from(e).expect("epoch"),
+                num: 1,
+                den_log1000: k,
+                _pad: [0; 10],
+            };
+            s /= rec.den().expect("den");
+            records.push(rec);
+        }
+        let mut p = Pool::new();
+        p.share_epoch = u32::try_from(ks.len()).expect("epochs");
+        p.total_shares = s;
+        let mut ls: Vec<Lender> = holdings
+            .iter()
+            .map(|&h| Lender { shares: h, epoch: 0, snap: 0, snap_r: 0, ..Lender::new(&p) })
+            .collect();
+        let n_lenders = ls.len();
+        let all: Vec<(usize, usize)> = (0..n_lenders).map(|i| (i, ks.len())).collect();
+        let steps = schedule.iter().map(|(ix, n)| (ix.index(n_lenders), *n)).chain(all);
+        for (i, n) in steps {
+            let l = &mut ls[i];
+            if l.epoch == p.share_epoch {
+                continue;
+            }
+            let from = l.epoch as usize;
+            let to = (from + n).min(records.len());
+            let (mut lo, mut hi) = (l.shares, l.shares);
+            for r in &records[from..to] {
+                let den = r.den().expect("den");
+                lo /= den;
+                hi = hi / den + 1;
+            }
+            let st = pool::convert(&p, l, &mut records[from..to]).map_err(|e| TestCaseError::fail(format!("{e}")))?;
+            prop_assert!(lo <= l.shares && l.shares <= hi, "{} not in [{lo}, {hi}]", l.shares);
+            prop_assert_eq!(st == Standing::Behind, l.epoch != p.share_epoch);
+            for r in &records {
+                prop_assert!(r.conv_rem < r.den().expect("den"));
+            }
+        }
+        prop_assert_eq!(ls.iter().map(|l| l.shares).sum::<u128>(), p.total_shares);
     }
 }

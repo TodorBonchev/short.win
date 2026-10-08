@@ -70,10 +70,15 @@ export type LenderFields = Pick<
     | 'lockUntil'
 >;
 
-/** A `ShareEpoch` record (`@shortwin/client` helpers; ARCH §2.3.6, A39). */
+/**
+ * A `ShareEpoch` record (`@shortwin/client` helpers; ARCH §2.3.6, A39), its conversion remainder
+ * `convRem` included (KI-65): a lender behind a rebase record converts to `⌊(convRem + s)/den⌋`
+ * shares, so the previews use the value read. Another lender converting through the same record
+ * first can move it (the quote by one share); the review's Retry re-reads the records.
+ */
 export type RecordFields = Pick<
     ShareEpoch,
-    'epoch' | 'accEnd' | 'accREnd' | 'sOld' | 'carry' | 'carryR' | 'num' | 'denLog1000'
+    'epoch' | 'accEnd' | 'accREnd' | 'sOld' | 'carry' | 'carryR' | 'num' | 'denLog1000' | 'convRem'
 >;
 
 // ---- Market flags (programs/shortwin/src/state/market.rs MARKET_FLAG_*) -------------------
@@ -214,7 +219,7 @@ export function toShareEpochs(m: MathModule, records: readonly RecordFields[]): 
     const r = new m.ShareEpochs();
     try {
         for (const x of [...records].sort((a, b) => a.epoch - b.epoch)) {
-            r.push(x.epoch, x.accEnd, x.accREnd, x.sOld, x.carry, x.carryR, x.num, x.denLog1000);
+            r.push(x.epoch, x.accEnd, x.accREnd, x.sOld, x.carry, x.carryR, x.num, x.denLog1000, x.convRem);
         }
         return r;
     } catch (e) {
@@ -735,6 +740,9 @@ export function previewWithdrawView(
             }
             const released = m.previewVestRelease(pool, now);
             const unreleased = pool.vestBal - released;
+            // R3B-2: a burn of all of `S` is paid the unreleased vest. Exact since KI-65 (no rebase
+            // orphans, ECON §9.5): `S` counts every share a lender holds or will receive at its
+            // conversion, so this is the exit of the only position holding a share of the epoch.
             const last = shares === total;
             if (lastSharesBorrowed) {
                 // The program's own check on top of the pool math (M1-SEC-3): never `S = 0` while tokens are lent.

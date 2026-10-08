@@ -1059,9 +1059,17 @@ pub fn withdraw_all(
         *env.market_vault(market).vault(),
         lp.lender(),
     );
-    let want_tokens = mpool::withdraw(&mut p, &mut v, &mut l, &[], now, lock_grace_s, lp.shares)
-        .expect("withdraw");
-    let want_sol = mpool::claim(&p, &mut v, &mut l, &[], now).expect("claim");
+    let want_tokens = mpool::withdraw(
+        &mut p,
+        &mut v,
+        &mut l,
+        &mut [],
+        now,
+        lock_grace_s,
+        lp.shares,
+    )
+    .expect("withdraw");
+    let want_sol = mpool::claim(&p, &mut v, &mut l, &mut [], now).expect("claim");
     let lp_rent = lamports(env, &lp_key);
     let (acc0, l0) = (
         tokens(env, &keys.owner_token_account),

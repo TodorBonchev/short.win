@@ -11,7 +11,11 @@
 //! A lender parked on a live full-wipe record claims from that record. Event `ClaimSol`
 //! (`sol_paid`, and `pot_draw` of it).
 //!
-//! Remaining accounts: the `ShareEpoch` records the lender is behind on (key-checked).
+//! Remaining accounts: the `ShareEpoch` records the lender is behind on (key-checked);
+//! writable when the lender converts through a rebase record, whose conversion remainder
+//! `conv_rem` the touch writes (KI-65: `engine::lender::store_records`, else
+//! `EpochRecordReadOnly`). Apart from those records it writes no shared state but
+//! `MarketVault`. A second call writes no record (the lender is current).
 
 use anchor_lang::prelude::*;
 use shortwin_math::pool;
@@ -63,12 +67,14 @@ pub fn handler<'info>(ctx: Context<'info, ClaimSol<'info>>) -> Result<()> {
         let mut vault_acc = ctx.accounts.market_vault.load_mut()?;
         let pool_state = market.pool();
         let mut vault = vault_acc.vault();
-        let records = lender::load_records(&market_key, ctx.remaining_accounts, usize::MAX)?;
+        let mut records = lender::load_records(&market_key, ctx.remaining_accounts, usize::MAX)?;
+        let loaded = records.clone();
         let position = &mut ctx.accounts.lender;
         let mut l = position.lender();
-        pool::touch(&pool_state, &mut vault, &mut l, &records, now).math()?;
+        pool::touch(&pool_state, &mut vault, &mut l, &mut records, now).math()?;
         let touched = l;
-        let pay = pool::claim(&pool_state, &mut vault, &mut l, &records, now).math()?;
+        let pay = pool::claim(&pool_state, &mut vault, &mut l, &mut records, now).math()?;
+        lender::store_records(ctx.remaining_accounts, &loaded, &records)?;
 
         vault_acc.set_vault(&vault);
         position.set_lender(&l);

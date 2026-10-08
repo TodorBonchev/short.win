@@ -2,7 +2,7 @@
 """Lend-panel preview vectors (FRONTEND.md §10.1, LEND: "deposit / withdraw / claim previews
 against pool_model-derived vectors through the WASM").
 
-Drives the normative lender-pool model `docs/design/sim/pool_model.py` v0.4.1 (default switches,
+Drives the normative lender-pool model `docs/design/sim/pool_model.py` v0.4.2 (default switches,
 continuous rent) through a lazy op mix — lenders are never touched by a `check()`, so they fall
 share epochs behind, their locks expire untouched and full wipes leave parked lenders — and, at
 sampled points, writes the state **as the program stores it** (the `Market` lender-pool fields
@@ -28,7 +28,8 @@ Mapping of the model to the accounts (ARCH §2.3.4, §2.3.6; `crates/shortwin-ma
 `sol_vault` -> `MarketVault.lender_sol`, `protocol` -> `protocol_fees`, `epoch` -> `share_epoch`,
 `wipe_live` -> `Market.flags` bit 5, `wipe_swept` -> bit 7 (the model has no venue-reward bit:
 `rewards_required = false`), `epochs[e] = [acc_end, num, den, acc_r_end, s_old, carry,
-carry_r]` -> `ShareEpoch` with `den_log1000 = log_1000(den)`, the lock calendar `{day: term}` ->
+carry_r, conv_rem]` -> `ShareEpoch` with `den_log1000 = log_1000(den)` (`conv_rem`: KI-65's
+conversion remainder, which a lender's conversion through a rebase record reads and writes), the lock calendar `{day: term}` ->
 `lock_cal[day mod 128]` with `cal_day` = the oldest bucket day (or today + 1 without buckets: the
 program's `cal_advance` drops every day up to today), `lock_epoch = -1` -> `u32::MAX`. States whose
 values do not fit the account fields (or whose calendar would not fit the 128-day ring) are not
@@ -49,7 +50,7 @@ sys.dont_write_bytecode = True
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[5]
 sys.path.insert(0, str(ROOT / "docs" / "design" / "sim"))
-import pool_model as pm  # noqa: E402  (v0.4.1)
+import pool_model as pm  # noqa: E402  (v0.4.2)
 
 SEED = 20261001
 OPS = 1_200
@@ -169,7 +170,7 @@ def dump_state(p: pm.Pool) -> dict:
     records = []
     need = min([L.epoch for L in p.lenders.values()] + [p.epoch - 1 if p.wipe_live else p.epoch])
     for e in sorted(x for x in p.epochs if x >= need):
-        acc_end, num, den, acc_r_end, s_old, carry, carry_r = p.epochs[e]
+        acc_end, num, den, acc_r_end, s_old, carry, carry_r, conv_rem = p.epochs[e]
         records.append({
             "epoch": e,
             "accEnd": s(acc_end, I128),
@@ -179,6 +180,7 @@ def dump_state(p: pm.Pool) -> dict:
             "carryR": u(carry_r, U128),
             "num": num,
             "denLog1000": den_log(den),
+            "convRem": u(conv_rem, U128),
         })
     return {"market": market, "vault": vault, "lenders": lenders, "records": records}
 
@@ -352,7 +354,7 @@ def main():
     vests = sum(1 for c in cases if c["market"]["vestBal"] != "0")
     doc = {
         "generator": "apps/web/src/features/lend/vectors/gen_lend_vectors.py",
-        "source": "docs/design/sim/pool_model.py v0.4.1 (default switches, continuous rent), lazy op mix",
+        "source": "docs/design/sim/pool_model.py v0.4.2 (default switches, continuous rent), lazy op mix",
         "seed": SEED,
         "stats": {"cases": len(cases), "skipped": skipped, "lendersBehind": behind, "wipeLive": wipes,
                   "withLocks": locks, "withVest": vests},

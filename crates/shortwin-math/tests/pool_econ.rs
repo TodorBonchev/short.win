@@ -476,11 +476,11 @@ fn post_wipe_credits_and_the_epoch_jump() {
     // lender jumps over the five later epochs without reading their records.
     let (p, mut v, mut l) = (s.m.pool, s.m.vault, *s.m.lender(old).expect("old"));
     assert_eq!(
-        pool::touch(&p, &mut v, &mut l, &[], s.m.now),
+        pool::touch(&p, &mut v, &mut l, &mut [], s.m.now),
         Err(MathError::LenderBehind)
     );
     assert_eq!(
-        pool::touch(&p, &mut v, &mut l, &s.m.records[..1], s.m.now),
+        pool::touch(&p, &mut v, &mut l, &mut s.m.records[..1], s.m.now),
         Ok(pool::Standing::Current)
     );
     assert_eq!((l.epoch, l.shares), (s.m.pool.share_epoch, 0));

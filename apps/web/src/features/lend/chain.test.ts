@@ -126,6 +126,7 @@ async function fakeRpc(s: Script) {
                     num: 1,
                     denLog1000: 1,
                     bump,
+                    convRem: 0n,
                 }),
             ),
         );

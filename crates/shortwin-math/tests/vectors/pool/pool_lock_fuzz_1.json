@@ -1,7 +1,7 @@
 {
  "format": "see the docstring of gen_pool.py",
  "generator": "gen_pool.py",
- "source": "docs/design/sim/pool_model.py v0.4.1: lock_fuzz() (R4A-2 / R4B-3) driven through a recording Pool",
+ "source": "docs/design/sim/pool_model.py v0.4.2: lock_fuzz() (R4A-2 / R4B-3) driven through a recording Pool",
  "traces": [
   {
    "above": "0",

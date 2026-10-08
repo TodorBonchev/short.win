@@ -1,5 +1,5 @@
 //! `pool_model` traces replayed through the program (`crates/shortwin-math/tests/vectors/pool`,
-//! written by `gen_pool.py` from `docs/design/sim/pool_model.py` v0.4.1).
+//! written by `gen_pool.py` from `docs/design/sim/pool_model.py` v0.4.2).
 //!
 //! Each trace line is one or more `pool_model` operations. Lender operations run as program
 //! instructions through the [`Lab`] (so every one is checked against the math crate on the
@@ -84,6 +84,11 @@ fn recs_from(records: &[MathShareEpoch], epoch: u32) -> &[MathShareEpoch] {
     &records[(epoch as usize).min(records.len())..]
 }
 
+fn recs_from_mut(records: &mut [MathShareEpoch], epoch: u32) -> &mut [MathShareEpoch] {
+    let n = records.len();
+    &mut records[(epoch as usize).min(n)..]
+}
+
 impl Model {
     fn new(now: i64, lump_vest_s: u32, lock_grace_s: u32) -> Self {
         Self {
@@ -116,7 +121,7 @@ impl Model {
             &self.pool,
             &mut self.vault,
             l,
-            recs_from(&self.records, l.epoch),
+            recs_from_mut(&mut self.records, l.epoch),
             self.now,
         )
         .map(|_| ())
@@ -127,7 +132,13 @@ impl Model {
         let (mut p, mut v, mut l) = (self.pool, self.vault.clone(), self.lenders[i].1);
         pool::release(&mut p, self.now)?;
         let e = l.epoch;
-        pool::touch(&p, &mut v, &mut l, recs_from(&self.records, e), self.now)?;
+        pool::touch(
+            &p,
+            &mut v,
+            &mut l,
+            recs_from_mut(&mut self.records, e),
+            self.now,
+        )?;
         self.pool = p;
         self.vault = v;
         self.lenders[i].1 = l;
@@ -142,7 +153,7 @@ impl Model {
             &mut self.pool,
             &mut self.vault,
             l,
-            recs_from(&self.records, l.epoch),
+            recs_from_mut(&mut self.records, l.epoch),
             self.now,
             amount,
             false,
@@ -157,7 +168,7 @@ impl Model {
             &mut self.pool,
             &mut self.vault,
             l,
-            recs_from(&self.records, l.epoch),
+            recs_from_mut(&mut self.records, l.epoch),
             self.now,
             self.lock_grace_s,
             shares,
@@ -193,7 +204,7 @@ impl Model {
             &self.pool,
             &mut self.vault,
             l,
-            recs_from(&self.records, l.epoch),
+            recs_from_mut(&mut self.records, l.epoch),
             self.now,
         )
     }
@@ -205,7 +216,7 @@ impl Model {
             &self.pool,
             &mut self.vault,
             l,
-            recs_from(&self.records, l.epoch),
+            recs_from_mut(&mut self.records, l.epoch),
             self.now,
             lamports,
         )
@@ -275,9 +286,9 @@ struct Stats {
     covers_added: usize,
     final_lender_sol: u64,
     final_unallocated: u64,
-    /// The host model's own unallocated realised SOL at the same point (rounding and
-    /// rebase-orphan shares, ECON §9.5): the program's differs only by the rounding of its
-    /// earlier SOL payments.
+    /// The host model's own unallocated realised SOL at the same point (rounding; since KI-65
+    /// no SOL is credited to rebase-orphan shares, ECON §9.5): the program's differs only by
+    /// the rounding of its earlier SOL payments.
     model_unallocated: u64,
 }
 
@@ -382,11 +393,25 @@ fn compare(lab: &Lab, m: &Model, users: &[String], ctx: &str) {
         let mut lc = on.lender();
         let mut va = st.vault.clone();
         let e = lc.epoch;
-        pool::touch(&st.pool, &mut va, &mut lc, st.records_from(e), m.now).unwrap();
+        pool::touch(
+            &st.pool,
+            &mut va,
+            &mut lc,
+            &mut st.records_from(e).to_vec(),
+            m.now,
+        )
+        .unwrap();
         let mut lm = *ml;
         let mut vb = m.vault.clone();
         let e = lm.epoch;
-        pool::touch(&m.pool, &mut vb, &mut lm, recs_from(&m.records, e), m.now).unwrap();
+        pool::touch(
+            &m.pool,
+            &mut vb,
+            &mut lm,
+            &mut recs_from(&m.records, e).to_vec(),
+            m.now,
+        )
+        .unwrap();
         // A lock's Π, epoch and expiry mean nothing without a lock or a term (a position the
         // program closed and re-created has the defaults; the model keeps the stale values).
         let tok = |l: &Lender| {
@@ -412,8 +437,8 @@ fn compare(lab: &Lab, m: &Model, users: &[String], ctx: &str) {
 
 /// Points the I-P6 liveness hook at ECON's own figure (M1-FID-8): whenever the host model has
 /// nothing borrowed and nothing receivable (the state the hook's wind-down runs on), the cap on
-/// the realised SOL no lender is allocated becomes the model's wind-down figure — rounding plus
-/// the SOL credited to rebase-orphan shares (ECON §9.5) — plus one lamport per lender, never
+/// the realised SOL no lender is allocated becomes the model's wind-down figure — rounding (no
+/// rebase-orphan credit since KI-65, ECON §9.5) — plus one lamport per lender, never
 /// below [`inv::DEFAULT_LIVENESS_DUST_CAP`]. Called after each model operation, before the
 /// program's, so the hook compares the program with the model at the same point.
 fn liveness_cap_from_model(m: &Model, lab: &Lab) {
@@ -532,8 +557,14 @@ fn replay(trace: &Value, program: TokenProgram, max_lines: usize) -> Stats {
                             let l = st.lender_of(&lab.users[&nm].pubkey()).unwrap().lender();
                             let mut x = l;
                             let mut v = st.vault.clone();
-                            pool::touch(&st.pool, &mut v, &mut x, st.records_from(l.epoch), st.now)
-                                .unwrap();
+                            pool::touch(
+                                &st.pool,
+                                &mut v,
+                                &mut x,
+                                &mut st.records_from(l.epoch).to_vec(),
+                                st.now,
+                            )
+                            .unwrap();
                             if x.pending < 0 {
                                 lab.cover(&nm, u64::try_from(-x.pending).unwrap()).unwrap();
                                 stats.covers_added += 1;
@@ -794,7 +825,8 @@ fn pool_model_scenarios_replay() {
 
 /// The extended profiles: lazy lenders many epochs behind (repeated wipes, deep rebases),
 /// runs and churn, dust amounts, exits whose rent top-up vests (M10-8C-1; not the u64-extreme
-/// profile) with the scripted JIT whale, the scripted lock-term and over-lock cases.
+/// profile) with the scripted JIT whale, KI-65's lazy conversion orders and orphan / whale demos,
+/// the scripted lock-term and over-lock cases.
 #[test]
 fn extended_profiles_replay() {
     let lines = if full() { usize::MAX } else { 1_000 };
@@ -804,8 +836,7 @@ fn extended_profiles_replay() {
         "pool_ext_dust_1.json",
     ] {
         for t in load(f) {
-            // Dust pools leave rebase-orphan SOL (ECON §9.5): the replay caps the liveness hook
-            // at the model's own figure.
+            // The replay caps the liveness hook at the model's own figure (rounding).
             let s = replay(&t, TokenProgram::Token2022, lines);
             println!("{}: {s:?}", t["name"]);
         }
@@ -820,6 +851,17 @@ fn extended_profiles_replay() {
             );
             println!("{nm}: {s:?}");
         }
+    }
+    // KI-65: lazy lenders converting in random orders through deep rebases, dust residues,
+    // whole exits during a vest, and the orphan / whale demos' v0.4.2 pools.
+    for t in load("pool_ext_orphans_1.json") {
+        let nm = t["name"].as_str().unwrap();
+        let s = replay(
+            &t,
+            TokenProgram::BOTH[usize::from(nm.contains("dust"))],
+            lines,
+        );
+        println!("{nm}: {s:?}");
     }
     for t in load("pool_ext_extreme_1.json") {
         let nm = t["name"].as_str().unwrap();

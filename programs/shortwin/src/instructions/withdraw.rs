@@ -10,7 +10,7 @@
 //! exit path: it never reverts on the filter; a mint that fails it now logs
 //! `MintSafetyTripped` and the withdrawal goes ahead [R-MINT §6, §9.4].
 //!
-//! Program checks on top of `pool::withdraw` (the math crate stays `pool_model` v0.4.1):
+//! Program checks on top of `pool::withdraw` (the math crate stays `pool_model` v0.4.2):
 //! - **the last shares stay while anything is borrowed** (ARCH §9 M0b carried-over note 4,
 //!   implemented after the M1 review, M1-SEC-3): a withdrawal that would leave `S = 0` while
 //!   `ΣB_Q > 0` is refused (`LastSharesBorrowed`). `S = 0 ∧ ΣB_Q > 0` would send every later
@@ -28,7 +28,11 @@
 //! 2. `pool::withdraw`: burn `shares`, `T −= tokens`; the lock update (the borrowed part of
 //!    the withdrawn fraction becomes a lock, `lock_until = ⌈(max(now, max_release) +
 //!    lock_grace_s)/1 d⌉·1 d` when it grows, the live term moves between calendar buckets);
-//!    the last lender (`shares == S`) is first paid the unreleased vest (R3B-2);
+//!    the last lender (`shares == S`) is first paid the unreleased vest (R3B-2). Since KI-65
+//!    (no rebase orphans) `shares == S` holds exactly when no other position holds or will
+//!    hold a share of the epoch: a lender that has not converted through a rebase record yet
+//!    still counts in `S`, so a JIT depositor never takes the vest while a holder remains
+//!    (R4B-4);
 //! 3. the SOL part exactly as `claim_sol` (`pool::claim`: pot draw up to the own deficit, pay
 //!    `min(pending, real − claimed, lender_sol)`);
 //! 4. **memo** (ARCH §3.3, R-MINT §8.4): if the destination is a Token-2022 account with
@@ -50,7 +54,12 @@
 //! Works in every venue state (no venue accounts); no cooldown (ADOPTED Q22). Pausing opens
 //! never blocks it.
 //!
-//! Remaining accounts: the `ShareEpoch` records the lender is behind on (key-checked).
+//! Remaining accounts: the `ShareEpoch` records the lender is behind on (key-checked);
+//! writable when the lender converts through a rebase record, whose conversion remainder
+//! `conv_rem` the touch writes (KI-65: `engine::lender::store_records`, else
+//! `EpochRecordReadOnly`). A lender behind a rebase record converts to `⌊s/den⌋` shares or
+//! one more, depending on who converted through the record before it: a client that quoted
+//! the conversion re-reads the records when `InsufficientShares` / `SolBelowMin` refuse it.
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::instruction::Instruction;
@@ -177,14 +186,15 @@ pub fn handler<'info>(
         // A16 step 5: roll a completed bucket (no ReadSet, so no record and no chains).
         prologue::roll_only(&market_key, &mut market, now, clock.slot)?;
 
-        let records = lender::load_records(&market_key, ctx.remaining_accounts, usize::MAX)?;
+        let mut records = lender::load_records(&market_key, ctx.remaining_accounts, usize::MAX)?;
+        let loaded = records.clone();
         let position = &mut ctx.accounts.lender;
         let mut l = position.lender();
         let tokens = pool::withdraw(
             &mut pool,
             &mut vault,
             &mut l,
-            &records,
+            &mut records,
             now,
             config.params.lock_grace_s,
             shares,
@@ -198,9 +208,10 @@ pub fn handler<'info>(
         );
         // The SOL part, exactly as `claim_sol` (the lender is current: records unused).
         let touched = l;
-        let pay = pool::claim(&pool, &mut vault, &mut l, &records, now).math()?;
+        let pay = pool::claim(&pool, &mut vault, &mut l, &mut records, now).math()?;
         require_gte!(pay, min_sol, ShortwinError::SolBelowMin);
 
+        lender::store_records(ctx.remaining_accounts, &loaded, &records)?;
         market.set_pool(&pool);
         vault_acc.set_vault(&vault);
         position.set_lender(&l);

@@ -28,6 +28,7 @@ import {
 import { eventAuthority } from '../../rpc/pda.ts';
 import { assertAllowedInstructions } from '../../tx/integrity.ts';
 import type { WatchedAccount } from '../../tx/types.ts';
+import { MAX_RECORDS } from './chain.ts';
 import {
     buildClaimPlan,
     buildCoverPlan,
@@ -167,7 +168,7 @@ describe('deposit plans', () => {
         expect(plan.disclosures).toEqual(['lender.solRepayment']);
     });
 
-    it('passes the ShareEpoch records a lender is behind on, in order and read-only', async () => {
+    it('passes the ShareEpoch records a lender is behind on, in order and writable (KI-65)', async () => {
         const plan = await buildDepositPlan({
             ...ctx({ lenderEpoch: 2, shareEpoch: 5 }),
             source: SOURCE,
@@ -181,11 +182,11 @@ describe('deposit plans', () => {
             [2, 3, 4].map(async (epoch) => (await findShareEpochPda({ market: MARKET, epoch }))[0]),
         );
         expect(tail(plan.instructions[0], 3)).toEqual(
-            expected.map((a) => ({ address: a, role: AccountRole.READONLY })),
+            expected.map((a) => ({ address: a, role: AccountRole.WRITABLE })),
         );
         expect(await recordMetas(MARKET, null, 5)).toEqual([]);
         expect(await recordMetas(MARKET, 5, 5)).toEqual([]);
-        expect(await recordMetas(MARKET, 0, 40)).toHaveLength(12);
+        expect(await recordMetas(MARKET, 0, 40)).toHaveLength(MAX_RECORDS);
     });
 });
 
@@ -289,8 +290,8 @@ describe('claim, cover and sync plans', () => {
     it('sync the own position through the records one transaction holds', async () => {
         const plan = await buildSyncPlan(ctx({ lenderEpoch: 1, shareEpoch: 30 }));
         const ix = plan.instructions[0];
-        expect(getSyncLenderInstructionDataDecoder().decode(data(ix)).maxEpochs).toBe(12);
-        expect(tail(ix, 12)[0]?.address).toBe((await findShareEpochPda({ market: MARKET, epoch: 1 }))[0]);
+        expect(getSyncLenderInstructionDataDecoder().decode(data(ix)).maxEpochs).toBe(MAX_RECORDS);
+        expect(tail(ix, MAX_RECORDS)[0]?.address).toBe((await findShareEpochPda({ market: MARKET, epoch: 1 }))[0]);
     });
 
     it('decode the lender position for the review', () => {

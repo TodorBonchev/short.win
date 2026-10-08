@@ -12,7 +12,12 @@
 //! (C0-17). Event `LenderSynced`.
 //!
 //! Remaining accounts: up to `max_epochs` `ShareEpoch` records, in epoch order, starting at or
-//! before the lender's epoch; extra accounts are ignored.
+//! before the lender's epoch; extra accounts are ignored. A rebase record the lender converts
+//! through must be writable: the conversion rounds cumulatively and writes the record's
+//! `conv_rem` (KI-65, no rebase orphans: the order in which lenders are synced decides only
+//! who receives each record's rounding units, never below a lender's floor;
+//! `engine::lender::store_records`, else `EpochRecordReadOnly`). Apart from those records
+//! it writes only the lender and `MarketVault`.
 
 use anchor_lang::prelude::*;
 use shortwin_math::pool::{self, Standing};
@@ -60,14 +65,16 @@ pub fn handler<'info>(ctx: Context<'info, SyncLender<'info>>, max_epochs: u8) ->
         let mut vault_acc = ctx.accounts.market_vault.load_mut()?;
         let pool_state = market.pool();
         let mut vault = vault_acc.vault();
-        let records =
+        let mut records =
             lender::load_records(&market_key, ctx.remaining_accounts, usize::from(max_epochs))?;
+        let loaded = records.clone();
         let position = &mut ctx.accounts.lender;
         let mut l = position.lender();
-        let standing = pool::convert(&pool_state, &mut l, &records).math()?;
+        let standing = pool::convert(&pool_state, &mut l, &mut records).math()?;
         if standing != Standing::Behind {
-            pool::touch(&pool_state, &mut vault, &mut l, &records, now).math()?;
+            pool::touch(&pool_state, &mut vault, &mut l, &mut records, now).math()?;
         }
+        lender::store_records(ctx.remaining_accounts, &loaded, &records)?;
 
         vault_acc.set_vault(&vault);
         position.set_lender(&l);

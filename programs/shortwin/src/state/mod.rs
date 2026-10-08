@@ -13,7 +13,7 @@
 //! | `trader_wsol` | ephemeral WSOL account | `["trader_wsol", market]` | 165 |
 //! | [`ShortPosition`] | Borsh | `["position", market, borrower, nonce u64 LE]` | 384 |
 //! | [`LenderPosition`] | Borsh | `["lender", market, owner]` | 241 |
-//! | [`ShareEpoch`] | Borsh | `["share_epoch", market, epoch u32 LE]` | 127 |
+//! | [`ShareEpoch`] | Borsh | `["share_epoch", market, epoch u32 LE]` | 143 |
 //! | [`WalletExposure`] | Borsh | `["exposure", market, borrower]` | 81 |
 //!
 //! Bumps are stored and re-used with `create_program_address`; `find_program_address` is never

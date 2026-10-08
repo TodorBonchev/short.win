@@ -95,9 +95,9 @@ fn fid_1_a_deposit_that_mints_nothing_is_caught() {
     assert!(check_all(&lab.env.svm, &market).is_ok());
 }
 
-/// M1-FID-1: without a rebase since the last full wipe every share has a holder; shares taken
-/// from a lender but left in `S` (orphaned) are caught at the state level, and so are tokens
-/// no lender claims beyond the virtual and orphan shares' part.
+/// M1-FID-1 (and KI-65: rebases included, every share has a holder once every lender is
+/// touched): shares taken from a lender but left in `S` (orphaned) are caught at the state
+/// level, and so are tokens no lender claims beyond the virtual (and orphan) shares' part.
 #[test]
 fn fid_1_orphan_shares_and_unclaimed_tokens_are_caught() {
     let mut lab = Lab::new(TokenProgram::Spl);
@@ -107,7 +107,7 @@ fn fid_1_orphan_shares_and_unclaimed_tokens_are_caught() {
     edit_lender(&mut lab, "B", |l| l.shares -= 1);
     let v = check_all(&lab.env.svm, &market).unwrap_err();
     assert_eq!(v.invariant, "I1", "{v}");
-    assert!(v.detail.contains("no rebase"), "{v}");
+    assert!(v.detail.contains("!= S"), "{v}");
     // The unclaimed bound: B's shares vanish from both B and S, their tokens stay in T.
     let mut lab = Lab::new(TokenProgram::Spl);
     lab.deposit("A", 1_000_000).unwrap();

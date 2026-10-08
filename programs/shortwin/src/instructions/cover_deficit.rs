@@ -8,7 +8,10 @@
 //! and a zero cover would only be a touch). Does not write `Market` (C0-17). Event
 //! `DeficitCovered` (`amount` = the lamports).
 //!
-//! Remaining accounts: the `ShareEpoch` records the lender is behind on (key-checked).
+//! Remaining accounts: the `ShareEpoch` records the lender is behind on (key-checked);
+//! writable when the lender converts through a rebase record, whose conversion remainder
+//! `conv_rem` the touch writes (KI-65: `engine::lender::store_records`, else
+//! `EpochRecordReadOnly`).
 
 use anchor_lang::prelude::*;
 use anchor_lang::system_program::{self, Transfer};
@@ -63,10 +66,12 @@ pub fn handler<'info>(ctx: Context<'info, CoverDeficit<'info>>, lamports: u64) -
         let mut vault_acc = ctx.accounts.market_vault.load_mut()?;
         let pool_state = market.pool();
         let mut vault = vault_acc.vault();
-        let records = lender::load_records(&market_key, ctx.remaining_accounts, usize::MAX)?;
+        let mut records = lender::load_records(&market_key, ctx.remaining_accounts, usize::MAX)?;
+        let loaded = records.clone();
         let position = &mut ctx.accounts.lender;
         let mut l = position.lender();
-        pool::cover(&pool_state, &mut vault, &mut l, &records, now, lamports).math()?;
+        pool::cover(&pool_state, &mut vault, &mut l, &mut records, now, lamports).math()?;
+        lender::store_records(ctx.remaining_accounts, &loaded, &records)?;
 
         vault_acc.set_vault(&vault);
         position.set_lender(&l);

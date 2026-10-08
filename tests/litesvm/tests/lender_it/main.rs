@@ -20,7 +20,7 @@
 //!   through the program: the lock-heavy mix, the R3A-2 stranding seeds, the lazy / runs /
 //!   dust profiles and the ECON §9.6 fuzz runs.
 //!
-//! Expected numbers come from `docs/design/sim/pool_model.py` v0.4.1 (each test names the
+//! Expected numbers come from `docs/design/sim/pool_model.py` v0.4.2 (each test names the
 //! function). Requires the SBF build: `anchor build --tools-version v1.57 --arch v3`.
 
 #![allow(clippy::result_large_err)]

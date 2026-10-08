@@ -54,7 +54,10 @@ export interface LendContext {
     readonly shareEpoch: number;
 }
 
-/** The `ShareEpoch` records a lender at `fromEpoch` is behind on, as read-only remaining accounts. */
+/**
+ * The `ShareEpoch` records a lender at `fromEpoch` is behind on, as writable remaining accounts: the
+ * lender's conversion through a rebase record writes its `conv_rem` (KI-65; `EpochRecordReadOnly`).
+ */
 export async function recordMetas(
     market: Address,
     fromEpoch: number | null,

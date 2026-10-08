@@ -7,6 +7,9 @@
 //! `pool_model.Pool.check` (ECON §13 I-P1–I-P7, I-P4 also on the untouched state;
 //! ARCH §8.3 I8); [`Market::invariants`] runs it on a copy. [`Model`] adds `pool_model`'s
 //! rent emulation and positions, so drivers can be written after the model's demos.
+//! KI-65: a lender's conversion writes `conv_rem` into the records it passes, so every
+//! lender operation takes the records `&mut` (the program writes them back), and I-P1 is
+//! an equality once every lender is touched: `Σ shares = S`.
 #![allow(dead_code)]
 
 use std::fmt::Write as _;
@@ -86,6 +89,12 @@ fn records_from(records: &[ShareEpoch], epoch: u32) -> &[ShareEpoch] {
     &records[(epoch as usize).min(records.len())..]
 }
 
+/// The records from `epoch` on, mutable: a conversion writes their `conv_rem` (KI-65).
+fn records_from_mut(records: &mut [ShareEpoch], epoch: u32) -> &mut [ShareEpoch] {
+    let n = records.len();
+    &mut records[(epoch as usize).min(n)..]
+}
+
 impl Market {
     pub fn new() -> Self {
         Self::with_params(LUMP_VEST_S, LOCK_GRACE_S)
@@ -127,7 +136,7 @@ impl Market {
             &self.pool,
             &mut self.vault,
             l,
-            records_from(&self.records, l.epoch),
+            records_from_mut(&mut self.records, l.epoch),
             self.now,
         )
     }
@@ -137,7 +146,7 @@ impl Market {
         let i = self.slot(user);
         let (mut p, mut v, mut l) = (self.pool, self.vault, self.lenders[i].1);
         pool::release(&mut p, self.now)?;
-        let recs = records_from(&self.records, l.epoch);
+        let recs = records_from_mut(&mut self.records, l.epoch);
         pool::touch(&p, &mut v, &mut l, recs, self.now)?;
         self.pool = p;
         self.vault = v;
@@ -163,7 +172,7 @@ impl Market {
             &mut self.pool,
             &mut self.vault,
             l,
-            records_from(&self.records, l.epoch),
+            records_from_mut(&mut self.records, l.epoch),
             self.now,
             amount,
             rewards_required,
@@ -179,7 +188,7 @@ impl Market {
             &mut self.pool,
             &mut self.vault,
             l,
-            records_from(&self.records, l.epoch),
+            records_from_mut(&mut self.records, l.epoch),
             self.now,
             self.lock_grace_s,
             shares,
@@ -216,7 +225,7 @@ impl Market {
             &self.pool,
             &mut self.vault,
             l,
-            records_from(&self.records, l.epoch),
+            records_from_mut(&mut self.records, l.epoch),
             self.now,
         )
     }
@@ -228,7 +237,7 @@ impl Market {
             &self.pool,
             &mut self.vault,
             l,
-            records_from(&self.records, l.epoch),
+            records_from_mut(&mut self.records, l.epoch),
             self.now,
             lamports,
         )?;
@@ -455,8 +464,10 @@ impl Market {
         if claims > t + b {
             return Err(format!("I-P1: token claims {claims} > T + B {}", t + b));
         }
-        if shares > p.total_shares {
-            return Err(format!("I-P1: Σ shares {shares} > S {}", p.total_shares));
+        if shares != p.total_shares {
+            // KI-65: conversions round cumulatively through each record, so once every
+            // lender is touched every share of S has a holder (no rebase orphans).
+            return Err(format!("I-P1: Σ shares {shares} ≠ S {}", p.total_shares));
         }
         // I-P2, claim side (strict, V1-10 / V2-2, R3A-2).
         let unclaimed: i128 = self
@@ -567,8 +578,16 @@ impl Market {
         if let Some(r) = self.records.last() {
             write!(
                 s,
-                ";E{},{},{},{},{},{},{},{}",
-                r.epoch, r.acc_end, r.num, r.den_log1000, r.acc_r_end, r.s_old, r.carry, r.carry_r
+                ";E{},{},{},{},{},{},{},{},{}",
+                r.epoch,
+                r.acc_end,
+                r.num,
+                r.den_log1000,
+                r.acc_r_end,
+                r.s_old,
+                r.carry,
+                r.carry_r,
+                r.conv_rem
             )
             .expect("write");
         }
@@ -623,7 +642,7 @@ const POOL_FIELDS: [&str; 25] = [
     "protocol",
     "inflow",
 ];
-const RECORD_FIELDS: [&str; 8] = [
+const RECORD_FIELDS: [&str; 9] = [
     "epoch",
     "acc_end",
     "num",
@@ -632,6 +651,7 @@ const RECORD_FIELDS: [&str; 8] = [
     "s_old",
     "carry",
     "carry_r",
+    "conv_rem",
 ];
 const LENDER_FIELDS: [&str; 12] = [
     "shares",

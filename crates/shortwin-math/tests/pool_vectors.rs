@@ -1,4 +1,4 @@
-//! `pool` against `pool_model.py` v0.4.1 (ARCH §8.1, §9 M0b): replays every trace of
+//! `pool` against `pool_model.py` v0.4.2 (ARCH §8.1, §9 M0b): replays every trace of
 //! `tests/vectors/pool/*.json` (written by `gen_pool.py`) and requires the state after
 //! every line to equal the model's (running CRC-32 of the canonical state and results),
 //! every explicit result and error, the checkpoints, the liveness wind-downs (I-P6) and
@@ -6,7 +6,8 @@
 //! untouched state) are asserted after every line (ARCH §8.3 I8), and must fail exactly
 //! where `pool_model.check()` fails. The two option-(a) ECON §9.6 fuzz runs are replayed
 //! whole (60,000 operations each), the lock-heavy mix of ECON §9.3, the 40-seed stranding
-//! table of R3A-2, the extended profiles and every default-switch demo.
+//! table of R3A-2, the extended profiles (KI-65's lazy conversion orders among them) and
+//! every default-switch demo.
 
 mod common;
 #[path = "pool_harness.rs"]
@@ -348,7 +349,7 @@ fn replay_fuzz_run(stem: &str, epochs: u32) {
 
 #[test]
 fn pool_model_fuzz_continuous_90() {
-    replay_fuzz_run("continuous_90", 1_011);
+    replay_fuzz_run("continuous_90", 1_020);
 }
 
 #[test]
@@ -429,6 +430,31 @@ fn ext_rent_top_up_vests() {
     assert_eq!(profiles.len(), 5, "five profiles");
     assert!(profiles.iter().all(|&n| n >= 50), "{profiles:?}");
     assert!(runs.iter().any(|(n, _)| n == "ext_topup_scripted_jit"));
+}
+
+/// KI-65 (v0.4.2, no rebase orphans): lazy lenders converting in random orders through
+/// forced deep rebases, dust residues below a rebase's unit, whole exits while lumps vest —
+/// the canonical state pins the latest record's `conv_rem` and the touch-all invariants
+/// after every line require `Σ shares = S` on the converted copy (I-P1); and the v0.4.2
+/// pools of `orphan_vest_demo` (the last exit takes `S` to 0 and is paid the vest) and
+/// `whale_order_demo` (R4B-4 W1–W3), every claim pinned.
+#[test]
+fn ext_orphans_lazy_conversion_order() {
+    let runs = replay_group("pool_ext_orphans", 8_000);
+    for name in [
+        "ext_orphans_continuous_100",
+        "ext_orphans_dust_100",
+        "ext_orphans_whale_order_demo_0",
+        "ext_orphans_orphan_vest_demo_0",
+    ] {
+        assert!(runs.iter().any(|(n, _)| n == name), "{name}");
+    }
+    // Every lender left during the vest: nothing is stranded beyond rounding.
+    for (n, st) in &runs {
+        if n.starts_with("ext_orphans_orphan_vest_demo") {
+            assert!(st.final_lender_sol <= 3, "{n}: {}", st.final_lender_sol);
+        }
+    }
 }
 
 #[test]

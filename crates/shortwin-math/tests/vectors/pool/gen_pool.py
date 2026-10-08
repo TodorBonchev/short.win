@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Vectors for shortwin_math::pool (ECONOMICS §9, §13; ARCHITECTURE §3.3, §8.1, §8.3 I8).
 
-Drives the normative lender-pool model `docs/design/sim/pool_model.py` v0.4.1 (default
+Drives the normative lender-pool model `docs/design/sim/pool_model.py` v0.4.2 (default
 switches: option (a), owner decision O16) through a recording subclass of its `Pool` and
 writes, next to itself:
 
@@ -38,6 +38,17 @@ writes, next to itself:
                        a lock term (its shares and lock floored to 0 in a rebase, its term
                        did not), which the next roll's record must scale (M0b review
                        M0B-A-1).
+  pool_ext_orphans_<k>.json
+                       KI-65 (v0.4.2, no rebase orphans): lazy lenders converting in random
+                       orders through forced deep rebases, 0-token burns that leave dust
+                       residues below the next rebase's unit, whole exits during a vest
+                       (`exit`: pool_model.exit_all) and permissionless syncs of every lender
+                       in a random order; plus the default-switch (v0.4.2) pools of
+                       pool_model.orphan_vest_demo (every lender exits during a vest after a
+                       rebase: the last exit takes S to 0 and is paid the vest) and
+                       whale_order_demo (R4B-4 W1-W3: a JIT whale around a lump while a lender
+                       holds an unconverted share, both sync orders of a rebase's rounding
+                       unit, a whale deposit while S is a latent share).
   pool_ext_topup_<k>.json
                        the rent top-up of finding M10-8C-1: extended profiles whose exits pay
                        rent above what accrued (`rpx`: a repay of the accrued rent plus an
@@ -105,7 +116,7 @@ operation's "=VALUE", "!CODE" or "" with "," and <state> is the canonical state:
   vest_end,epoch,wipe_live,wipe_swept,pi,pi_epoch,lock_norm,b_min,sol_vault,unmatched,
   protocol,inflow
   [;C<day>:<term>,...]                                   live calendar buckets, by day
-  [;E<epoch>,acc_end,num,den_log1000,acc_r_end,s_old,carry,carry_r]   latest record
+  [;E<epoch>,acc_end,num,den_log1000,acc_r_end,s_old,carry,carry_r,conv_rem]   latest record
   [;<U>:shares,snap,pending,epoch,lock,lock_pi,lock_epoch,lock_term,lock_until,snap_r,
    real,claimed]                                          per lender, creation order
 
@@ -139,7 +150,7 @@ sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[5]
 SIM = ROOT / "docs" / "design" / "sim"
 sys.path.insert(0, str(SIM))
-import pool_model as pm  # noqa: E402  (v0.4.1)
+import pool_model as pm  # noqa: E402  (v0.4.2)
 
 SEED = 20260927
 PM_OPS = 60_000          # the whole ECON §9.6 fuzz run (ARCH §8.1: 60,000 ops per rent mode)
@@ -147,10 +158,10 @@ FUZZ_PARTS = 3           # files per run, each under 1 MB (tests/vectors/README.
 MAX_FILE_BYTES = 990_000
 # ECON §9.6: share epochs rolled and op counts of the two option-(a) runs.
 ECON_9_6 = {
-    9_000: (1011, {'accrue': 3391, 'adv': 3338, 'borrow': 2846, 'borrow!': 523, 'churn': 3172,
-                   'churn!': 248, 'claim': 3381, 'claimN': 3418, 'cover': 3388, 'dep': 6638,
-                   'donate': 3336, 'gov': 3291, 'repay': 3239, 'settle': 3344, 'sweep': 3302,
-                   'wd': 6290, 'wd!': 225, 'wdall': 2933, 'wdall!': 351, 'wipe': 3346}),
+    9_000: (1020, {'accrue': 3381, 'adv': 3331, 'borrow': 2822, 'borrow!': 524, 'churn': 3163,
+                   'churn!': 261, 'claim': 3394, 'claimN': 3392, 'cover': 3404, 'dep': 6623,
+                   'donate': 3335, 'gov': 3286, 'repay': 3257, 'settle': 3371, 'sweep': 3317,
+                   'wd': 6279, 'wd!': 248, 'wdall': 2877, 'wdall!': 386, 'wipe': 3349}),
     10_000: (1930, {'accrue': 3345, 'adv': 3340, 'borrow': 3372, 'churn': 3466, 'claim': 3378,
                     'claimN': 3459, 'cover': 3407, 'dep': 6100, 'dep!': 504, 'donate': 3299,
                     'gov': 3305, 'repay': 3275, 'settle': 3322, 'sweep': 3279, 'wd': 5558,
@@ -175,7 +186,7 @@ LENDER_T = [("shares", "u128"), ("snap", "i128"), ("pending", "i64"), ("epoch", 
             ("lock", "u128"), ("lock_pi", "u128"), ("lock_epoch", "lock_epoch"),
             ("lock_term", "u128"), ("lock_until", "i64"), ("snap_r", "u128"), ("real", "u64"),
             ("claimed", "u64")]
-RECORD_T = [(0, "i128"), (3, "u128"), (4, "u128"), (5, "i128"), (6, "u128")]
+RECORD_T = [(0, "i128"), (3, "u128"), (4, "u128"), (5, "i128"), (6, "u128"), (7, "u128")]
 MODEL_ERRORS = {
     "deposit too small": "deposit_too_small",
     "share overflow": "overflow",
@@ -189,7 +200,7 @@ MODEL_ERRORS = {
 # pools built with any of them are not recorded.
 DEFAULT_SWITCHES = {"mode": "continuous", "prorata": True, "pi_decay": True, "lock_expiry": True,
                     "lock_calendar": True, "vest_weighted": True, "wipe_sweep_gate": True,
-                    "exit_flush_bps": 0, "lock_floor": True}
+                    "exit_flush_bps": 0, "lock_floor": True, "cum_convert": True}
 
 BasePool = pm.Pool
 REGISTRY: list = []
@@ -230,7 +241,7 @@ def state_str(p) -> str:
         out.append("C" + ",".join(f"{d}:{v}" for d, v in sorted(p.lock_cal.items())))
     if p.epoch:
         r = p.epochs[p.epoch - 1]
-        out.append("E" + ",".join(map(str, [p.epoch - 1, r[0], r[1], den_log(r[2]), r[3], r[4], r[5], r[6]])))
+        out.append("E" + ",".join(map(str, [p.epoch - 1, r[0], r[1], den_log(r[2]), r[3], r[4], r[5], r[6], r[7]])))
     for who, L in p.lenders.items():
         vals = [L.shares, L.snap, L.pending, L.epoch, L.lock, L.lock_pi, L.lock_epoch % 2**32,
                 L.lock_term, L.lock_until, L.snap_r, L.real, L.claimed]
@@ -246,8 +257,9 @@ def copy_lender(L):
 
 
 def model_copy(p, deep: bool = False):
-    """A plain BasePool copy of the model state (no recorder). check() reads the epoch
-    records and positions only, so the light copy shares them."""
+    """A plain BasePool copy of the model state (no recorder). check() reads the positions
+    only, so the light copy shares them; its touches write the conversion remainder of the
+    records a lender converts through (KI-65), so it copies those."""
     q = object.__new__(BasePool)
     items = {k: v for k, v in p.__dict__.items() if not k.startswith("rec_")}
     if deep:
@@ -256,6 +268,9 @@ def model_copy(p, deep: bool = False):
         q.__dict__.update(items)
         q.lenders = {w: copy_lender(L) for w, L in p.lenders.items()}
         q.lock_cal = dict(p.lock_cal)
+        q.epochs = dict(p.epochs)
+        for e in range(min((L.epoch for L in p.lenders.values()), default=p.epoch), p.epoch):
+            q.epochs[e] = list(p.epochs[e])
     return q
 
 
@@ -304,10 +319,13 @@ class RecPool(BasePool):
         lend = {w: [getattr(L, s) for s in pm.Lender.__slots__] for w, L in self.lenders.items()}
         n = len(self.epochs)
         last = list(self.epochs[n - 1]) if n else None
-        return scal, lend, n, last, dict(self.positions), dict(self.lock_cal)
+        # KI-65: a touch writes conv_rem into every record its lender converts through
+        lo = min((L.epoch for L in self.lenders.values()), default=n)
+        rems = {e: self.epochs[e][7] for e in range(lo, n)}
+        return scal, lend, n, last, dict(self.positions), dict(self.lock_cal), rems
 
     def rec_restore(self, snap):
-        scal, lend, n, last, pos, cal = snap
+        scal, lend, n, last, pos, cal, rems = snap
         self.__dict__.update(scal)
         for w in [w for w in self.lenders if w not in lend]:
             del self.lenders[w]
@@ -319,6 +337,8 @@ class RecPool(BasePool):
             del self.epochs[e]
         if n:
             self.epochs[n - 1][:] = last
+        for e, r in rems.items():
+            self.epochs[e][7] = r
         self.positions.clear()
         self.positions.update(pos)
         self.lock_cal = dict(cal)
@@ -563,7 +583,7 @@ class RecPool(BasePool):
             for w in list(r.lenders):
                 paid += r.claim_sol(w)
         stranded = r.sol_vault
-        bound = r.n_touch + 2 * len(r.lenders) + r.epoch + 2 + 2 * r.leak
+        bound = r.n_touch + 2 * len(r.lenders) + r.epoch + 2
         assert (paid, before, stranded, bound) == expect, ((paid, before, stranded, bound), expect)
         unpaid = sum(max(L.pending, 0) for L in r.lenders.values())
         assert stranded <= bound or unpaid == 0
@@ -891,6 +911,71 @@ class Ext:
         if u in p.lenders:
             p._lock_of(p.lenders[u])
 
+    def op_brn(self):
+        """KI-65: a burn of fewer than 1,000 shares that pays 0 tokens, so the lender's shares
+        end in a random residue below the next rebase's unit (dust conversions)."""
+        p, u = self.p, self.who()
+        if u not in p.lenders:
+            return
+        L = p._touch(u)
+        zero = pm.cdiv(p.S + pm.VS, p.T + p.B + pm.VA) - 1     # the largest burn that pays 0 tokens
+        s = last_shares_kept(p, min(self.rng.randrange(1, pm.REBASE), zero, L.shares))
+        if s > 0 and L.epoch == p.epoch:
+            p.withdraw(u, s)
+
+    def op_exit(self):
+        """KI-65: a lender leaves whole (pool_model.exit_all's burns), e.g. while a vest runs;
+        while tokens are borrowed the burn that would take S to 0 keeps one share."""
+        p, u = self.p, self.who()
+        if u not in p.lenders:
+            return
+        for _ in range(64):
+            L = p._touch(u)
+            if not L.shares or L.epoch != p.epoch:
+                break
+            allow = p.free_allowance(u)
+            zero = pm.cdiv(p.S + pm.VS, p.T + p.B + pm.VA) - 1
+            fit = allow * (p.S + pm.VS) // (p.T + p.B + pm.VA)
+            s = last_shares_kept(p, min(L.shares, max(fit, zero, 1)))
+            if s == 0:
+                break
+            p.withdraw(u, s)
+        p.claim_sol(u)
+
+    def op_wdg(self):
+        """op_wd, but never the burn that takes S to 0 while tokens are borrowed."""
+        p, u = self.p, self.who()
+        L = p.lenders.get(u)
+        if not (L and L.shares):
+            return
+        allow = p.free_allowance(u)
+        pend = L.pending
+        if L.shares == 0:
+            return
+        r = self.rng.random()
+        at = max(1, allow * (p.S + pm.VS) // (p.T + p.B + pm.VA))
+        s = (self.rng.randrange(1, L.shares + 1) if r < 0.4 else at if r < 0.8
+             else L.shares if r < 0.9 else 1)
+        s = last_shares_kept(p, min(s, L.shares))
+        if s == 0:
+            return
+        got = p.withdraw(u, s)
+        assert pend >= 0 and got <= allow, ("ghost C0-9/C0-13", pend, got, allow)
+
+    def op_ord(self):
+        """KI-65: permissionless syncs of every lender in a random order (the conversion order
+        decides who receives each record's rounding unit)."""
+        for u in self.rng.sample(list(self.p.lenders), len(self.p.lenders)):
+            self.p._touch(u)
+
+
+def last_shares_kept(p, shares: int) -> int:
+    """`shares`, less the one share a withdrawal of all of S must keep while tokens are borrowed:
+    the program refuses that burn (`LastSharesBorrowed`, ARCH §9 M0b note 4), pool_model does
+    not model the rule, so the KI-65 profiles never ask for it (the trace replays through the
+    program stay op for op)."""
+    return shares - 1 if shares == p.S and p.B > 0 else shares
+
 
 def normal_amounts():
     return {
@@ -937,6 +1022,8 @@ def extreme_amounts():
 LAZY = (["dep"] * 3 + ["wd"] * 3 + ["run", "bor", "bor", "acc", "acc", "adv", "rep", "rep", "set", "set",
         "clm", "clm", "clmN", "cov", "swp", "swp", "wipe", "deep", "chn", "tch", "gov", "view", "lock"])
 TOPUP = LAZY + ["bor"] * 6 + ["rpx"] * 4 + ["stx"] * 4 + ["dep", "clm", "wd"]
+ORPHANS = (["dep"] * 3 + ["brn"] * 3 + ["deep"] * 3 + ["exit"] * 2 + ["tch"] * 2 +
+           ["wdg", "bor", "acc", "adv", "rep", "set", "clm", "clmN", "cov", "swp", "swp", "wipe", "ord", "view"])
 RUNS = (["dep"] * 3 + ["run"] * 3 + ["wd", "bor", "bor", "acc", "adv", "rep", "set", "set", "clm", "clmN",
         "cov", "swp", "wipe", "chn", "chn", "chn", "tch", "view"])
 
@@ -974,6 +1061,12 @@ def ext_profiles() -> list:
             "M10-8C-1: rent excesses of 0..11 lamports: top-ups at the rounding scale"),
         Ext("ext_topup_extreme_100", 13, 2_000, 10_000, 5, TOPUP, extreme_amounts(),
             "M10-8C-1: u64-extreme token amounts, rent excesses up to 10,000 SOL"),
+        Ext("ext_orphans_continuous_100", 14, 4_000, 10_000, 6, ORPHANS, normal_amounts(),
+            "KI-65: lazy lenders through forced deep rebases, converting in random orders; 0-token burns "
+            "leave dust residues below the next rebase's unit; whole exits while lumps vest"),
+        Ext("ext_orphans_dust_100", 15, 4_000, 10_000, 8, ORPHANS, dust_amounts(),
+            "KI-65: dust amounts (1..40 raw tokens): most holdings are below one new share at a rebase, "
+            "so the records' rounding units decide who holds S; whole exits while lumps vest"),
     ]
 
 
@@ -1165,6 +1258,22 @@ def scripted_topup_jit() -> dict:
                       "realises none of it at once; the shares holding through lump_vest_s are paid it")
 
 
+def orphan_demo_traces() -> list:
+    """KI-65: the default-switch (v0.4.2) pools of pool_model's orphan demos, every result
+    explicit, so the replay pins each claim (the v0.4.1 comparison pools are not recorded)."""
+    traces = []
+    for demo, args in (("whale_order_demo", ()), ("orphan_vest_demo", (24,))):
+        with recording(line_mode="op", explicit=True, taint=True, verify=True) as reg:
+            ret = getattr(pm, demo)(*args)
+            pools = list(reg)
+        keep = [p for p in pools if kept(p)]
+        assert keep, demo
+        for i, p in enumerate(keep):
+            traces.append(trace_json(p, f"ext_orphans_{demo}_{i}", f"pool_model.{demo}{args or '()'} v0.4.2, "
+                                     f"default-switch pool #{i}; demo returned {ret!r}"))
+    return traces
+
+
 # ---- 5. demos ------------------------------------------------------------------------------
 DEMOS = ["jit_demo", "jit_hold_table", "inflation_demo", "run_demo", "claim_loop_demo", "run_util_table",
          "wipe_demo", "wipe_tail_demo", "zero_share_demo", "protocol_change_demo", "escape_demo",
@@ -1194,7 +1303,7 @@ def scenario_traces() -> list:
         keep = [p for p in pools if kept(p)]
         assert keep, demo
         for i, p in enumerate(keep):
-            traces.append(trace_json(p, f"{demo}_{i}", f"pool_model.{demo}() v0.4.1, default-switch variant #{i}; "
+            traces.append(trace_json(p, f"{demo}_{i}", f"pool_model.{demo}() v0.4.2, default-switch variant #{i}; "
                                      f"demo returned {ret!r}"))
     with recording(line_mode="op", explicit=True, taint=True, verify=True) as reg:
         with contextlib.redirect_stdout(io.StringIO()):
@@ -1203,7 +1312,7 @@ def scenario_traces() -> list:
     keep = [p for p in pools if kept(p)]
     assert keep
     for i, p in enumerate(keep):
-        traces.append(trace_json(p, f"pool_edge_{i}", f"attacks/pool_edge.py v0.4.1, pool #{i}"))
+        traces.append(trace_json(p, f"pool_edge_{i}", f"attacks/pool_edge.py v0.4.2, pool #{i}"))
     return traces
 
 
@@ -1239,7 +1348,7 @@ def pack(traces: list, stem: str, source: str) -> int:
 
 
 def main() -> None:
-    src = "docs/design/sim/pool_model.py v0.4.1"
+    src = "docs/design/sim/pool_model.py v0.4.2"
     for old in Path(__file__).parent.glob("pool_*.json"):
         old.unlink()
     for t in pm_fuzz_traces():
@@ -1255,7 +1364,9 @@ def main() -> None:
     ext["ext_scripted_overlock"] = scripted_overlock()
     ext["ext_scripted_empty_lock_term"] = scripted_empty_lock_term()
     ext["ext_topup_scripted_jit"] = scripted_topup_jit()
-    for group in ("lazy", "runs", "dust", "extreme", "topup"):
+    for t in orphan_demo_traces():
+        ext[t["name"]] = t
+    for group in ("lazy", "runs", "dust", "extreme", "topup", "orphans"):
         traces = [t for n, t in ext.items() if n.startswith(f"ext_{group}")
                   or (group == "extreme" and n.startswith("ext_scripted"))]
         pack(traces, f"pool_ext_{group}", f"{src}: Pool driven by gen_pool.py's extended fuzz profiles")

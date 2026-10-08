@@ -336,10 +336,12 @@ pub struct LenderKeys {
     pub owner_token_account: Pubkey,
 }
 
-/// `ShareEpoch` records `from..to` as read-only remaining accounts.
+/// `ShareEpoch` records `from..to` as writable remaining accounts: a lender converting through
+/// a rebase record writes its `conv_rem` (KI-65; a read-only one is refused with
+/// `EpochRecordReadOnly`, an unchanged one may stay read-only).
 pub fn epoch_records(market: &Pubkey, from: u32, to: u32) -> Vec<AccountMeta> {
     (from..to)
-        .map(|e| AccountMeta::new_readonly(pda::share_epoch(market, e).0, false))
+        .map(|e| AccountMeta::new(pda::share_epoch(market, e).0, false))
         .collect()
 }
 

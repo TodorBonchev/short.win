@@ -1,7 +1,7 @@
 {
  "format": "see the docstring of gen_pool.py",
  "generator": "gen_pool.py",
- "source": "docs/design/sim/pool_model.py v0.4.1: the default-switch demos of pool_model (ECON \u00a79.3\u2013\u00a79.6, round-3 and round-4 cases) and attacks/pool_edge.py",
+ "source": "docs/design/sim/pool_model.py v0.4.2: the default-switch demos of pool_model (ECON \u00a79.3\u2013\u00a79.6, round-3 and round-4 cases) and attacks/pool_edge.py",
  "traces": [
   {
    "check_each_line": false,
@@ -52,7 +52,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "jit_demo_0",
-   "note": "pool_model.jit_demo() v0.4.1, default-switch variant #0; demo returned [('continuous', 36986302, 0, 31438350, 9000000000), ('release', 36986302, 0, 31438357, 9000000000)]",
+   "note": "pool_model.jit_demo() v0.4.2, default-switch variant #0; demo returned [('continuous', 36986302, 0, 31438350, 9000000000), ('release', 36986302, 0, 31438357, 9000000000)]",
    "users": [
     "honest",
     "attacker"
@@ -81,7 +81,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "jit_hold_table_0",
-   "note": "pool_model.jit_hold_table() v0.4.1, default-switch variant #0; demo returned [('(a) v0.4: continuous rent, lumps vest 6 h', 0, 0, 3269925000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 1, 182385000, 3087540000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 3, 547155000, 2722770000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 6, 1094310000, 2175615000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 24, 1094310000, 2175615000, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 0, 0, 3269925000, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 1, 490488750, 2779436250, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 3, 1471466250, 1798458750, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 6, 2942932500, 326992500, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 24, 2942932500, 326992500, 3269925000)]",
+   "note": "pool_model.jit_hold_table() v0.4.2, default-switch variant #0; demo returned [('(a) v0.4: continuous rent, lumps vest 6 h', 0, 0, 3269925000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 1, 182385000, 3087540000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 3, 547155000, 2722770000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 6, 1094310000, 2175615000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 24, 1094310000, 2175615000, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 0, 0, 3269925000, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 1, 490488750, 2779436250, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 3, 1471466250, 1798458750, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 6, 2942932500, 326992500, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 24, 2942932500, 326992500, 3269925000)]",
    "users": [
     "H",
     "W"
@@ -110,7 +110,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "jit_hold_table_1",
-   "note": "pool_model.jit_hold_table() v0.4.1, default-switch variant #1; demo returned [('(a) v0.4: continuous rent, lumps vest 6 h', 0, 0, 3269925000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 1, 182385000, 3087540000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 3, 547155000, 2722770000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 6, 1094310000, 2175615000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 24, 1094310000, 2175615000, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 0, 0, 3269925000, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 1, 490488750, 2779436250, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 3, 1471466250, 1798458750, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 6, 2942932500, 326992500, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 24, 2942932500, 326992500, 3269925000)]",
+   "note": "pool_model.jit_hold_table() v0.4.2, default-switch variant #1; demo returned [('(a) v0.4: continuous rent, lumps vest 6 h', 0, 0, 3269925000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 1, 182385000, 3087540000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 3, 547155000, 2722770000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 6, 1094310000, 2175615000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 24, 1094310000, 2175615000, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 0, 0, 3269925000, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 1, 490488750, 2779436250, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 3, 1471466250, 1798458750, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 6, 2942932500, 326992500, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 24, 2942932500, 326992500, 3269925000)]",
    "users": [
     "H",
     "W"
@@ -139,7 +139,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "jit_hold_table_2",
-   "note": "pool_model.jit_hold_table() v0.4.1, default-switch variant #2; demo returned [('(a) v0.4: continuous rent, lumps vest 6 h', 0, 0, 3269925000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 1, 182385000, 3087540000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 3, 547155000, 2722770000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 6, 1094310000, 2175615000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 24, 1094310000, 2175615000, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 0, 0, 3269925000, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 1, 490488750, 2779436250, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 3, 1471466250, 1798458750, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 6, 2942932500, 326992500, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 24, 2942932500, 326992500, 3269925000)]",
+   "note": "pool_model.jit_hold_table() v0.4.2, default-switch variant #2; demo returned [('(a) v0.4: continuous rent, lumps vest 6 h', 0, 0, 3269925000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 1, 182385000, 3087540000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 3, 547155000, 2722770000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 6, 1094310000, 2175615000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 24, 1094310000, 2175615000, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 0, 0, 3269925000, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 1, 490488750, 2779436250, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 3, 1471466250, 1798458750, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 6, 2942932500, 326992500, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 24, 2942932500, 326992500, 3269925000)]",
    "users": [
     "H",
     "W"
@@ -168,7 +168,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "jit_hold_table_3",
-   "note": "pool_model.jit_hold_table() v0.4.1, default-switch variant #3; demo returned [('(a) v0.4: continuous rent, lumps vest 6 h', 0, 0, 3269925000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 1, 182385000, 3087540000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 3, 547155000, 2722770000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 6, 1094310000, 2175615000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 24, 1094310000, 2175615000, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 0, 0, 3269925000, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 1, 490488750, 2779436250, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 3, 1471466250, 1798458750, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 6, 2942932500, 326992500, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 24, 2942932500, 326992500, 3269925000)]",
+   "note": "pool_model.jit_hold_table() v0.4.2, default-switch variant #3; demo returned [('(a) v0.4: continuous rent, lumps vest 6 h', 0, 0, 3269925000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 1, 182385000, 3087540000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 3, 547155000, 2722770000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 6, 1094310000, 2175615000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 24, 1094310000, 2175615000, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 0, 0, 3269925000, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 1, 490488750, 2779436250, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 3, 1471466250, 1798458750, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 6, 2942932500, 326992500, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 24, 2942932500, 326992500, 3269925000)]",
    "users": [
     "H",
     "W"
@@ -197,7 +197,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "jit_hold_table_4",
-   "note": "pool_model.jit_hold_table() v0.4.1, default-switch variant #4; demo returned [('(a) v0.4: continuous rent, lumps vest 6 h', 0, 0, 3269925000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 1, 182385000, 3087540000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 3, 547155000, 2722770000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 6, 1094310000, 2175615000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 24, 1094310000, 2175615000, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 0, 0, 3269925000, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 1, 490488750, 2779436250, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 3, 1471466250, 1798458750, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 6, 2942932500, 326992500, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 24, 2942932500, 326992500, 3269925000)]",
+   "note": "pool_model.jit_hold_table() v0.4.2, default-switch variant #4; demo returned [('(a) v0.4: continuous rent, lumps vest 6 h', 0, 0, 3269925000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 1, 182385000, 3087540000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 3, 547155000, 2722770000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 6, 1094310000, 2175615000, 3269925000), ('(a) v0.4: continuous rent, lumps vest 6 h', 24, 1094310000, 2175615000, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 0, 0, 3269925000, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 1, 490488750, 2779436250, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 3, 1471466250, 1798458750, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 6, 2942932500, 326992500, 3269925000), ('(b) owner option: all lender SOL released over 6 h', 24, 2942932500, 326992500, 3269925000)]",
    "users": [
     "H",
     "W"
@@ -218,7 +218,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "inflation_demo_0",
-   "note": "pool_model.inflation_demo() v0.4.1, default-switch variant #0; demo returned (1000000000000, 1000000000)",
+   "note": "pool_model.inflation_demo() v0.4.2, default-switch variant #0; demo returned (1000000000000, 1000000000)",
    "users": [
     "attacker",
     "victim"
@@ -342,7 +342,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "run_demo_0",
-   "note": "pool_model.run_demo() v0.4.1, default-switch variant #0; demo returned [(False, 200000000000, 599999999999, 500000000000), (True, 100000000000, 573684210526, 526315789473)]",
+   "note": "pool_model.run_demo() v0.4.2, default-switch variant #0; demo returned [(False, 200000000000, 599999999999, 500000000000), (True, 100000000000, 573684210526, 526315789473)]",
    "users": [
     "A",
     "B"
@@ -368,7 +368,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "claim_loop_demo_0",
-   "note": "pool_model.claim_loop_demo() v0.4.1, default-switch variant #0; demo returned [('v0.2 (memoryless)', 1, 76500000000, 76500000000, 76500000000), ('v0.2 (memoryless)', 2, 76500000000, 102000000000, 51000000000), ('v0.2 (memoryless)', 5, 76500000000, 127500000000, 25500000000), ('v0.2 (memoryless)', 20, 76500000000, 145714285711, 7285714289), ('v0.2 (memoryless)', 100, 76500000000, 151485148497, 1514851503), ('v0.4 (own allocation + pot)', 1, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 2, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 5, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 20, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 100, 76500000000, 76500000000, 76500000000)]",
+   "note": "pool_model.claim_loop_demo() v0.4.2, default-switch variant #0; demo returned [('v0.2 (memoryless)', 1, 76500000000, 76500000000, 76500000000), ('v0.2 (memoryless)', 2, 76500000000, 102000000000, 51000000000), ('v0.2 (memoryless)', 5, 76500000000, 127500000000, 25500000000), ('v0.2 (memoryless)', 20, 76500000000, 145714285711, 7285714289), ('v0.2 (memoryless)', 100, 76500000000, 151485148497, 1514851503), ('v0.4 (own allocation + pot)', 1, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 2, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 5, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 20, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 100, 76500000000, 76500000000, 76500000000)]",
    "users": [
     "A",
     "B"
@@ -395,7 +395,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "claim_loop_demo_1",
-   "note": "pool_model.claim_loop_demo() v0.4.1, default-switch variant #1; demo returned [('v0.2 (memoryless)', 1, 76500000000, 76500000000, 76500000000), ('v0.2 (memoryless)', 2, 76500000000, 102000000000, 51000000000), ('v0.2 (memoryless)', 5, 76500000000, 127500000000, 25500000000), ('v0.2 (memoryless)', 20, 76500000000, 145714285711, 7285714289), ('v0.2 (memoryless)', 100, 76500000000, 151485148497, 1514851503), ('v0.4 (own allocation + pot)', 1, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 2, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 5, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 20, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 100, 76500000000, 76500000000, 76500000000)]",
+   "note": "pool_model.claim_loop_demo() v0.4.2, default-switch variant #1; demo returned [('v0.2 (memoryless)', 1, 76500000000, 76500000000, 76500000000), ('v0.2 (memoryless)', 2, 76500000000, 102000000000, 51000000000), ('v0.2 (memoryless)', 5, 76500000000, 127500000000, 25500000000), ('v0.2 (memoryless)', 20, 76500000000, 145714285711, 7285714289), ('v0.2 (memoryless)', 100, 76500000000, 151485148497, 1514851503), ('v0.4 (own allocation + pot)', 1, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 2, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 5, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 20, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 100, 76500000000, 76500000000, 76500000000)]",
    "users": [
     "A",
     "B"
@@ -425,7 +425,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "claim_loop_demo_2",
-   "note": "pool_model.claim_loop_demo() v0.4.1, default-switch variant #2; demo returned [('v0.2 (memoryless)', 1, 76500000000, 76500000000, 76500000000), ('v0.2 (memoryless)', 2, 76500000000, 102000000000, 51000000000), ('v0.2 (memoryless)', 5, 76500000000, 127500000000, 25500000000), ('v0.2 (memoryless)', 20, 76500000000, 145714285711, 7285714289), ('v0.2 (memoryless)', 100, 76500000000, 151485148497, 1514851503), ('v0.4 (own allocation + pot)', 1, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 2, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 5, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 20, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 100, 76500000000, 76500000000, 76500000000)]",
+   "note": "pool_model.claim_loop_demo() v0.4.2, default-switch variant #2; demo returned [('v0.2 (memoryless)', 1, 76500000000, 76500000000, 76500000000), ('v0.2 (memoryless)', 2, 76500000000, 102000000000, 51000000000), ('v0.2 (memoryless)', 5, 76500000000, 127500000000, 25500000000), ('v0.2 (memoryless)', 20, 76500000000, 145714285711, 7285714289), ('v0.2 (memoryless)', 100, 76500000000, 151485148497, 1514851503), ('v0.4 (own allocation + pot)', 1, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 2, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 5, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 20, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 100, 76500000000, 76500000000, 76500000000)]",
    "users": [
     "A",
     "B"
@@ -470,7 +470,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "claim_loop_demo_3",
-   "note": "pool_model.claim_loop_demo() v0.4.1, default-switch variant #3; demo returned [('v0.2 (memoryless)', 1, 76500000000, 76500000000, 76500000000), ('v0.2 (memoryless)', 2, 76500000000, 102000000000, 51000000000), ('v0.2 (memoryless)', 5, 76500000000, 127500000000, 25500000000), ('v0.2 (memoryless)', 20, 76500000000, 145714285711, 7285714289), ('v0.2 (memoryless)', 100, 76500000000, 151485148497, 1514851503), ('v0.4 (own allocation + pot)', 1, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 2, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 5, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 20, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 100, 76500000000, 76500000000, 76500000000)]",
+   "note": "pool_model.claim_loop_demo() v0.4.2, default-switch variant #3; demo returned [('v0.2 (memoryless)', 1, 76500000000, 76500000000, 76500000000), ('v0.2 (memoryless)', 2, 76500000000, 102000000000, 51000000000), ('v0.2 (memoryless)', 5, 76500000000, 127500000000, 25500000000), ('v0.2 (memoryless)', 20, 76500000000, 145714285711, 7285714289), ('v0.2 (memoryless)', 100, 76500000000, 151485148497, 1514851503), ('v0.4 (own allocation + pot)', 1, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 2, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 5, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 20, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 100, 76500000000, 76500000000, 76500000000)]",
    "users": [
     "A",
     "B"
@@ -595,7 +595,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "claim_loop_demo_4",
-   "note": "pool_model.claim_loop_demo() v0.4.1, default-switch variant #4; demo returned [('v0.2 (memoryless)', 1, 76500000000, 76500000000, 76500000000), ('v0.2 (memoryless)', 2, 76500000000, 102000000000, 51000000000), ('v0.2 (memoryless)', 5, 76500000000, 127500000000, 25500000000), ('v0.2 (memoryless)', 20, 76500000000, 145714285711, 7285714289), ('v0.2 (memoryless)', 100, 76500000000, 151485148497, 1514851503), ('v0.4 (own allocation + pot)', 1, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 2, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 5, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 20, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 100, 76500000000, 76500000000, 76500000000)]",
+   "note": "pool_model.claim_loop_demo() v0.4.2, default-switch variant #4; demo returned [('v0.2 (memoryless)', 1, 76500000000, 76500000000, 76500000000), ('v0.2 (memoryless)', 2, 76500000000, 102000000000, 51000000000), ('v0.2 (memoryless)', 5, 76500000000, 127500000000, 25500000000), ('v0.2 (memoryless)', 20, 76500000000, 145714285711, 7285714289), ('v0.2 (memoryless)', 100, 76500000000, 151485148497, 1514851503), ('v0.4 (own allocation + pot)', 1, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 2, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 5, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 20, 76500000000, 76500000000, 76500000000), ('v0.4 (own allocation + pot)', 100, 76500000000, 76500000000, 76500000000)]",
    "users": [
     "A",
     "B"
@@ -622,7 +622,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "run_util_table_0",
-   "note": "pool_model.run_util_table() v0.4.1, default-switch variant #0; demo returned [['90%', '+4.3%', '+4.3%'], ['80%', '+7.4%', '+7.4%'], ['60%', '+10.7%', '+10.7%'], ['50%', '+11.1%', '+11.1%'], ['30%', '+9.5%', '+9.5%']]",
+   "note": "pool_model.run_util_table() v0.4.2, default-switch variant #0; demo returned [['90%', '+4.3%', '+4.3%'], ['80%', '+7.4%', '+7.4%'], ['60%', '+10.7%', '+10.7%'], ['50%', '+11.1%', '+11.1%'], ['30%', '+9.5%', '+9.5%']]",
    "users": [
     "A",
     "B"
@@ -649,7 +649,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "run_util_table_1",
-   "note": "pool_model.run_util_table() v0.4.1, default-switch variant #1; demo returned [['90%', '+4.3%', '+4.3%'], ['80%', '+7.4%', '+7.4%'], ['60%', '+10.7%', '+10.7%'], ['50%', '+11.1%', '+11.1%'], ['30%', '+9.5%', '+9.5%']]",
+   "note": "pool_model.run_util_table() v0.4.2, default-switch variant #1; demo returned [['90%', '+4.3%', '+4.3%'], ['80%', '+7.4%', '+7.4%'], ['60%', '+10.7%', '+10.7%'], ['50%', '+11.1%', '+11.1%'], ['30%', '+9.5%', '+9.5%']]",
    "users": [
     "A",
     "B"
@@ -676,7 +676,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "run_util_table_2",
-   "note": "pool_model.run_util_table() v0.4.1, default-switch variant #2; demo returned [['90%', '+4.3%', '+4.3%'], ['80%', '+7.4%', '+7.4%'], ['60%', '+10.7%', '+10.7%'], ['50%', '+11.1%', '+11.1%'], ['30%', '+9.5%', '+9.5%']]",
+   "note": "pool_model.run_util_table() v0.4.2, default-switch variant #2; demo returned [['90%', '+4.3%', '+4.3%'], ['80%', '+7.4%', '+7.4%'], ['60%', '+10.7%', '+10.7%'], ['50%', '+11.1%', '+11.1%'], ['30%', '+9.5%', '+9.5%']]",
    "users": [
     "A",
     "B"
@@ -793,7 +793,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "run_util_table_3",
-   "note": "pool_model.run_util_table() v0.4.1, default-switch variant #3; demo returned [['90%', '+4.3%', '+4.3%'], ['80%', '+7.4%', '+7.4%'], ['60%', '+10.7%', '+10.7%'], ['50%', '+11.1%', '+11.1%'], ['30%', '+9.5%', '+9.5%']]",
+   "note": "pool_model.run_util_table() v0.4.2, default-switch variant #3; demo returned [['90%', '+4.3%', '+4.3%'], ['80%', '+7.4%', '+7.4%'], ['60%', '+10.7%', '+10.7%'], ['50%', '+11.1%', '+11.1%'], ['30%', '+9.5%', '+9.5%']]",
    "users": [
     "A",
     "B"
@@ -820,7 +820,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "run_util_table_4",
-   "note": "pool_model.run_util_table() v0.4.1, default-switch variant #4; demo returned [['90%', '+4.3%', '+4.3%'], ['80%', '+7.4%', '+7.4%'], ['60%', '+10.7%', '+10.7%'], ['50%', '+11.1%', '+11.1%'], ['30%', '+9.5%', '+9.5%']]",
+   "note": "pool_model.run_util_table() v0.4.2, default-switch variant #4; demo returned [['90%', '+4.3%', '+4.3%'], ['80%', '+7.4%', '+7.4%'], ['60%', '+10.7%', '+10.7%'], ['50%', '+11.1%', '+11.1%'], ['30%', '+9.5%', '+9.5%']]",
    "users": [
     "A",
     "B"
@@ -937,7 +937,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "run_util_table_5",
-   "note": "pool_model.run_util_table() v0.4.1, default-switch variant #5; demo returned [['90%', '+4.3%', '+4.3%'], ['80%', '+7.4%', '+7.4%'], ['60%', '+10.7%', '+10.7%'], ['50%', '+11.1%', '+11.1%'], ['30%', '+9.5%', '+9.5%']]",
+   "note": "pool_model.run_util_table() v0.4.2, default-switch variant #5; demo returned [['90%', '+4.3%', '+4.3%'], ['80%', '+7.4%', '+7.4%'], ['60%', '+10.7%', '+10.7%'], ['50%', '+11.1%', '+11.1%'], ['30%', '+9.5%', '+9.5%']]",
    "users": [
     "A",
     "B"
@@ -964,7 +964,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "run_util_table_6",
-   "note": "pool_model.run_util_table() v0.4.1, default-switch variant #6; demo returned [['90%', '+4.3%', '+4.3%'], ['80%', '+7.4%', '+7.4%'], ['60%', '+10.7%', '+10.7%'], ['50%', '+11.1%', '+11.1%'], ['30%', '+9.5%', '+9.5%']]",
+   "note": "pool_model.run_util_table() v0.4.2, default-switch variant #6; demo returned [['90%', '+4.3%', '+4.3%'], ['80%', '+7.4%', '+7.4%'], ['60%', '+10.7%', '+10.7%'], ['50%', '+11.1%', '+11.1%'], ['30%', '+9.5%', '+9.5%']]",
    "users": [
     "A",
     "B"
@@ -1081,7 +1081,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "run_util_table_7",
-   "note": "pool_model.run_util_table() v0.4.1, default-switch variant #7; demo returned [['90%', '+4.3%', '+4.3%'], ['80%', '+7.4%', '+7.4%'], ['60%', '+10.7%', '+10.7%'], ['50%', '+11.1%', '+11.1%'], ['30%', '+9.5%', '+9.5%']]",
+   "note": "pool_model.run_util_table() v0.4.2, default-switch variant #7; demo returned [['90%', '+4.3%', '+4.3%'], ['80%', '+7.4%', '+7.4%'], ['60%', '+10.7%', '+10.7%'], ['50%', '+11.1%', '+11.1%'], ['30%', '+9.5%', '+9.5%']]",
    "users": [
     "A",
     "B"
@@ -1108,7 +1108,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "run_util_table_8",
-   "note": "pool_model.run_util_table() v0.4.1, default-switch variant #8; demo returned [['90%', '+4.3%', '+4.3%'], ['80%', '+7.4%', '+7.4%'], ['60%', '+10.7%', '+10.7%'], ['50%', '+11.1%', '+11.1%'], ['30%', '+9.5%', '+9.5%']]",
+   "note": "pool_model.run_util_table() v0.4.2, default-switch variant #8; demo returned [['90%', '+4.3%', '+4.3%'], ['80%', '+7.4%', '+7.4%'], ['60%', '+10.7%', '+10.7%'], ['50%', '+11.1%', '+11.1%'], ['30%', '+9.5%', '+9.5%']]",
    "users": [
     "A",
     "B"
@@ -1225,7 +1225,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "run_util_table_9",
-   "note": "pool_model.run_util_table() v0.4.1, default-switch variant #9; demo returned [['90%', '+4.3%', '+4.3%'], ['80%', '+7.4%', '+7.4%'], ['60%', '+10.7%', '+10.7%'], ['50%', '+11.1%', '+11.1%'], ['30%', '+9.5%', '+9.5%']]",
+   "note": "pool_model.run_util_table() v0.4.2, default-switch variant #9; demo returned [['90%', '+4.3%', '+4.3%'], ['80%', '+7.4%', '+7.4%'], ['60%', '+10.7%', '+10.7%'], ['50%', '+11.1%', '+11.1%'], ['30%', '+9.5%', '+9.5%']]",
    "users": [
     "A",
     "B"
@@ -1236,26 +1236,26 @@
    "check_each_line": false,
    "checkpoints": [],
    "epochs_rolled": "2",
-   "final_state": "21601,0,0,0,0,0,0,0,0,0,2618401,0,21601,21600,2,1,0,1000000000000000000,3,0,0,1051042500000,0,0,1051042500000;E1,10010425000000,0,0,10010425000000,100000000000000000,0,0;0:100000000000000000,0,0,0,0,1000000000000000000,4294967295,0,0,0,0,0;1:100000000000000000,10000425000000,1000042500000,1,0,1000000000000000000,4294967295,0,0,10000425000000,1000042500000,0",
+   "final_state": "21601,0,0,0,0,0,0,0,0,0,2618401,0,21601,21600,2,1,0,1000000000000000000,3,0,0,1051042500000,0,0,1051042500000;E1,10010425000000,0,0,10010425000000,100000000000000000,0,0,0;0:100000000000000000,0,0,0,0,1000000000000000000,4294967295,0,0,0,0,0;1:100000000000000000,10000425000000,1000042500000,1,0,1000000000000000000,4294967295,0,0,10000425000000,1000042500000,0",
    "lines": [
     "d 0 100000000000000 =100000000000000000 #7206ec5c",
     "b 100000000000000 2596800 #c1a5494f",
-    "s 100000000000000 50000000000 0 0 0 #3b6432e9",
-    "p 0 #3c73b5d6",
-    "d 1 100000000000000 =100000000000000000 #cb45dc79",
-    "b 50000000000000 2596800 #078044ac",
-    "x 0 42500000 #5810ee8b",
-    "r 50000000000000 50000000 1500 42500000 1000000000000 #ce0d7f42",
-    "x 21601 0 #66fa903c",
-    "t 1 #17695276",
-    "b 100000000000000 2618401 #4137ae5f",
-    "s 100000000000000 1000000000 0 0 0 #4c3dfa66"
+    "s 100000000000000 50000000000 0 0 0 #0bb272f8",
+    "p 0 #518cdb43",
+    "d 1 100000000000000 =100000000000000000 #6d464160",
+    "b 50000000000000 2596800 #73ab0c3d",
+    "x 0 42500000 #cc8c17f3",
+    "r 50000000000000 50000000 1500 42500000 1000000000000 #c0f751b3",
+    "x 21601 0 #c56c24ac",
+    "t 1 #c6cae8a9",
+    "b 100000000000000 2618401 #14d7b920",
+    "s 100000000000000 1000000000 0 0 0 #fc917aea"
    ],
    "lock_grace_s": "86400",
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "wipe_demo_0",
-   "note": "pool_model.wipe_demo() v0.4.1, default-switch variant #0; demo returned [('v0.1 (no epochs)', 10000000000000100000000000000000, 0, 1000000000000020000000000000100000000000000000, True, 0), ('v0.4 (share epochs)', 100000000000000000, 1000042500000, 100000000000000000, False, 2)]",
+   "note": "pool_model.wipe_demo() v0.4.2, default-switch variant #0; demo returned [('v0.1 (no epochs)', 10000000000000100000000000000000, 0, 1000000000000020000000000000100000000000000000, True, 0), ('v0.4 (share epochs)', 100000000000000000, 1000042500000, 100000000000000000, False, 2)]",
    "users": [
     "old",
     "new"
@@ -1266,55 +1266,55 @@
    "check_each_line": false,
    "checkpoints": [],
    "epochs_rolled": "6",
-   "final_state": "21660,1000,0,1000000,0,0,0,0,919970055563542000,0,2618460,0,21660,21600,6,0,1,1000000000000000000,7,0,0,59000000001,0,0,60000000000;E5,9999999999,0,0,9999999999,100000000001000000,0,0;0:0,0,54000000000,6,0,1000000000000000000,4294967295,0,0,0,54000000000,0;1:1000,2777777000009972222229,0,1,0,1000000000000000000,4294967295,0,0,2777777000009972222229,2777777,2777777;2:100000000000000000,2777777000009972222229,0,1,0,1000000000000000000,4294967295,0,0,2777777000009972222229,997222222,997222222;3:100000000000000000,2777777000009972222229,0,1,0,1000000000000000000,4294967295,0,0,2777777000009972222229,0,0;4:1000000,0,0,2,0,1000000000000000000,4294967295,0,0,0,0,0;5:100000000000000000,0,0,2,0,1000000000000000000,4294967295,0,0,0,0,0;6:1000000,0,0,3,0,1000000000000000000,4294967295,0,0,0,0,0;7:100000000000000000,0,0,3,0,1000000000000000000,4294967295,0,0,0,0,0;8:1000000,0,0,4,0,1000000000000000000,4294967295,0,0,0,0,0;9:100000000000000000,0,0,4,0,1000000000000000000,4294967295,0,0,0,0,0;10:1000000,0,0,5,0,1000000000000000000,4294967295,0,0,0,0,0;11:100000000000000000,0,0,5,0,1000000000000000000,4294967295,0,0,0,0,0;12:1000000,0,0,6,0,1000000000000000000,4294967295,0,0,0,0,0",
+   "final_state": "21660,1000,0,1000000,0,0,0,0,919970055563542000,0,2618460,0,21660,21600,6,0,1,1000000000000000000,7,0,0,59000000001,0,0,60000000000;E5,9999999999,0,0,9999999999,100000000001000000,0,0,0;0:0,0,54000000000,6,0,1000000000000000000,4294967295,0,0,0,54000000000,0;1:1000,2777777000009972222229,0,1,0,1000000000000000000,4294967295,0,0,2777777000009972222229,2777777,2777777;2:100000000000000000,2777777000009972222229,0,1,0,1000000000000000000,4294967295,0,0,2777777000009972222229,997222222,997222222;3:100000000000000000,2777777000009972222229,0,1,0,1000000000000000000,4294967295,0,0,2777777000009972222229,0,0;4:1000000,0,0,2,0,1000000000000000000,4294967295,0,0,0,0,0;5:100000000000000000,0,0,2,0,1000000000000000000,4294967295,0,0,0,0,0;6:1000000,0,0,3,0,1000000000000000000,4294967295,0,0,0,0,0;7:100000000000000000,0,0,3,0,1000000000000000000,4294967295,0,0,0,0,0;8:1000000,0,0,4,0,1000000000000000000,4294967295,0,0,0,0,0;9:100000000000000000,0,0,4,0,1000000000000000000,4294967295,0,0,0,0,0;10:1000000,0,0,5,0,1000000000000000000,4294967295,0,0,0,0,0;11:100000000000000000,0,0,5,0,1000000000000000000,4294967295,0,0,0,0,0;12:1000000,0,0,6,0,1000000000000000000,4294967295,0,0,0,0,0",
    "lines": [
     "d 0 100000000000000 =100000000000000000 #7206ec5c",
     "b 100000000000000 2596800 #c1a5494f",
     "r 100000000000000 0 1500 0 3000000000 #cf7aefb9",
     "b 100000000000000 2596800 #3007c47a",
-    "s 100000000000000 50000000000 0 0 0 #a3f7d299",
-    "p 1000000000 #1d8c711a",
-    "t 0 #86834159",
-    "d 1 1 =1000 #b6f5ca5e",
-    "p 1000000000 #c179be93",
-    "c 1 =0 #d137ed75",
-    "x 60 0 #4bedf05d",
-    "d 2 100000000000000 =100000000000000000 #86bf0765",
-    "x 21600 0 #e6c5b891",
-    "c 1 =2777777 #768a8cf3",
-    "c 2 =997222222 #bc15965a",
-    "d 3 100000000000000 =100000000000000000 #411d59f4",
-    "b 200000000000001 2618460 #b580d187",
-    "s 200000000000001 1000000000 0 0 0 #0965681a",
-    "p 0 #4b6bb695",
-    "d 4 1000 =1000000 #a040d144",
-    "d 5 100000000000000 =100000000000000000 #9e3b20c2",
-    "b 100000000001000 2618460 #e3a0da13",
-    "s 100000000001000 1000000000 0 0 0 #503e5381",
-    "p 0 #e92d9b49",
-    "d 6 1000 =1000000 #9939abad",
-    "d 7 100000000000000 =100000000000000000 #5974ba82",
-    "b 100000000001000 2618460 #d6ffa923",
-    "s 100000000001000 1000000000 0 0 0 #bd05bc13",
-    "p 0 #03faf2af",
-    "d 8 1000 =1000000 #23aab527",
-    "d 9 100000000000000 =100000000000000000 #9aee9fc0",
-    "b 100000000001000 2618460 #53dec95f",
-    "s 100000000001000 1000000000 0 0 0 #31c4eb42",
-    "p 0 #b194ac09",
-    "d 10 1000 =1000000 #f55e85cd",
-    "d 11 100000000000000 =100000000000000000 #e301d1d2",
-    "b 100000000001000 2618460 #2739147b",
-    "s 100000000001000 1000000000 0 0 0 #31545d2a",
-    "p 0 #af8d4757",
-    "d 12 1000 =1000000 #9000aa92",
-    "t 0 #ae900271"
+    "s 100000000000000 50000000000 0 0 0 #848771e5",
+    "p 1000000000 #00378e3d",
+    "t 0 #8b3baa9a",
+    "d 1 1 =1000 #8fd494f1",
+    "p 1000000000 #6daea18d",
+    "c 1 =0 #6a4fe269",
+    "x 60 0 #e1ac9406",
+    "d 2 100000000000000 =100000000000000000 #d9cb97c4",
+    "x 21600 0 #e04a6ffe",
+    "c 1 =2777777 #9c9bfe7d",
+    "c 2 =997222222 #ed404e6f",
+    "d 3 100000000000000 =100000000000000000 #e5bc9798",
+    "b 200000000000001 2618460 #239ff7f5",
+    "s 200000000000001 1000000000 0 0 0 #fb855de4",
+    "p 0 #ad027ebc",
+    "d 4 1000 =1000000 #d3d3232e",
+    "d 5 100000000000000 =100000000000000000 #29bfa3ef",
+    "b 100000000001000 2618460 #d2096c51",
+    "s 100000000001000 1000000000 0 0 0 #36ad148a",
+    "p 0 #446748e8",
+    "d 6 1000 =1000000 #7ff39bcc",
+    "d 7 100000000000000 =100000000000000000 #5937609b",
+    "b 100000000001000 2618460 #702650a8",
+    "s 100000000001000 1000000000 0 0 0 #1601cb91",
+    "p 0 #abdc392e",
+    "d 8 1000 =1000000 #fcde1956",
+    "d 9 100000000000000 =100000000000000000 #16ea8921",
+    "b 100000000001000 2618460 #d5aa390e",
+    "s 100000000001000 1000000000 0 0 0 #93f72541",
+    "p 0 #456ed486",
+    "d 10 1000 =1000000 #e2b5688a",
+    "d 11 100000000000000 =100000000000000000 #2b2eab2b",
+    "b 100000000001000 2618460 #e5e5c89a",
+    "s 100000000001000 1000000000 0 0 0 #b0441dd2",
+    "p 0 #b32bb4cb",
+    "d 12 1000 =1000000 #9e07195f",
+    "t 0 #dda2c8b3"
    ],
    "lock_grace_s": "86400",
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "wipe_tail_demo_0",
-   "note": "pool_model.wipe_tail_demo() v0.4.1, default-switch variant #0; demo returned (4000000000, 0, 2777777, 997222222, 6, 6, True)",
+   "note": "pool_model.wipe_tail_demo() v0.4.2, default-switch variant #0; demo returned (4000000000, 0, 2777777, 997222222, 6, 6, True)",
    "users": [
     "old",
     "dust",
@@ -1350,7 +1350,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "zero_share_demo_0",
-   "note": "pool_model.zero_share_demo() v0.4.1, default-switch variant #0; demo returned [('v0.3', 1000000000, 0, 0), ('v0.4', 0, 0, 1000000000)]",
+   "note": "pool_model.zero_share_demo() v0.4.2, default-switch variant #0; demo returned [('v0.3', 1000000000, 0, 0), ('v0.4', 0, 0, 1000000000)]",
    "users": [
     "A",
     "dust"
@@ -1374,7 +1374,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "protocol_change_demo_0",
-   "note": "pool_model.protocol_change_demo() v0.4.1, default-switch variant #0; demo returned [('v0.3 (global value at every accrual and at the true-up)', 75000000, 775000000, 700000000), ('v0.4 (snapshot per position)', 0, 850000000, 850000000)]",
+   "note": "pool_model.protocol_change_demo() v0.4.2, default-switch variant #0; demo returned [('v0.3 (global value at every accrual and at the true-up)', 75000000, 775000000, 700000000), ('v0.4 (snapshot per position)', 0, 850000000, 850000000)]",
    "users": [
     "L"
    ],
@@ -1403,7 +1403,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "escape_demo_0",
-   "note": "pool_model.escape_demo() v0.4.1, default-switch variant #0; demo returned [('v0.1', 516883561643, -15195205480, True, 486493150686, 15195205478, 0, 0), ('v0.4', 500000000000, 1688356163, True, 501688356164, 0, 1688356165, 0)]",
+   "note": "pool_model.escape_demo() v0.4.2, default-switch variant #0; demo returned [('v0.1', 516883561643, -15195205480, True, 486493150686, 15195205478, 0, 0), ('v0.4', 500000000000, 1688356163, True, 501688356164, 0, 1688356165, 0)]",
    "users": [
     "A",
     "B"
@@ -2269,7 +2269,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "stuck_lock_table_0",
-   "note": "pool_model.stuck_lock_table() v0.4.1, default-switch variant #0; demo returned [('growing, always busy', 'v0.3 (PI / running minimum only)', ['0%', '0%', '0%', '0%']), ('growing, always busy', 'v0.4 (PI + lock_until)', ['0%', '0%', '0%', '100%']), ('growing, always busy', 'v0.4 without PI (lock_until only)', ['0%', '0%', '0%', '100%']), ('interest fades (100 of 900 stays out)', 'v0.3 (PI / running minimum only)', ['94%', '94%', '94%', '94%']), ('interest fades (100 of 900 stays out)', 'v0.4 (PI + lock_until)', ['94%', '94%', '94%', '100%']), ('interest fades (100 of 900 stays out)', 'v0.4 without PI (lock_until only)', ['0%', '0%', '0%', '100%'])]",
+   "note": "pool_model.stuck_lock_table() v0.4.2, default-switch variant #0; demo returned [('growing, always busy', 'v0.3 (PI / running minimum only)', ['0%', '0%', '0%', '0%']), ('growing, always busy', 'v0.4 (PI + lock_until)', ['0%', '0%', '0%', '100%']), ('growing, always busy', 'v0.4 without PI (lock_until only)', ['0%', '0%', '0%', '100%']), ('interest fades (100 of 900 stays out)', 'v0.3 (PI / running minimum only)', ['94%', '94%', '94%', '94%']), ('interest fades (100 of 900 stays out)', 'v0.4 (PI + lock_until)', ['94%', '94%', '94%', '100%']), ('interest fades (100 of 900 stays out)', 'v0.4 without PI (lock_until only)', ['0%', '0%', '0%', '100%'])]",
    "users": [
     "A",
     "B",
@@ -3076,7 +3076,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "stuck_lock_table_1",
-   "note": "pool_model.stuck_lock_table() v0.4.1, default-switch variant #1; demo returned [('growing, always busy', 'v0.3 (PI / running minimum only)', ['0%', '0%', '0%', '0%']), ('growing, always busy', 'v0.4 (PI + lock_until)', ['0%', '0%', '0%', '100%']), ('growing, always busy', 'v0.4 without PI (lock_until only)', ['0%', '0%', '0%', '100%']), ('interest fades (100 of 900 stays out)', 'v0.3 (PI / running minimum only)', ['94%', '94%', '94%', '94%']), ('interest fades (100 of 900 stays out)', 'v0.4 (PI + lock_until)', ['94%', '94%', '94%', '100%']), ('interest fades (100 of 900 stays out)', 'v0.4 without PI (lock_until only)', ['0%', '0%', '0%', '100%'])]",
+   "note": "pool_model.stuck_lock_table() v0.4.2, default-switch variant #1; demo returned [('growing, always busy', 'v0.3 (PI / running minimum only)', ['0%', '0%', '0%', '0%']), ('growing, always busy', 'v0.4 (PI + lock_until)', ['0%', '0%', '0%', '100%']), ('growing, always busy', 'v0.4 without PI (lock_until only)', ['0%', '0%', '0%', '100%']), ('interest fades (100 of 900 stays out)', 'v0.3 (PI / running minimum only)', ['94%', '94%', '94%', '94%']), ('interest fades (100 of 900 stays out)', 'v0.4 (PI + lock_until)', ['94%', '94%', '94%', '100%']), ('interest fades (100 of 900 stays out)', 'v0.4 without PI (lock_until only)', ['0%', '0%', '0%', '100%'])]",
    "users": [
     "A",
     "B"
@@ -3119,7 +3119,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "stale_lock_demo_0",
-   "note": "pool_model.stale_lock_demo() v0.4.1, default-switch variant #0; demo returned [(\"v0.4 (expiry leaves the aggregate at the holder's touch)\", 31.055555555555557, 1000000000000, 500000000000, 500000000000, 0), ('v0.4.1 (day-bucket expiry calendar)', 32.0, 1000000000000, 400000000000, 400000000000, 200000000000)]",
+   "note": "pool_model.stale_lock_demo() v0.4.2, default-switch variant #0; demo returned [(\"v0.4 (expiry leaves the aggregate at the holder's touch)\", 31.055555555555557, 1000000000000, 500000000000, 500000000000, 0), ('v0.4.1 (day-bucket expiry calendar)', 32.0, 1000000000000, 400000000000, 400000000000, 200000000000)]",
    "users": [
     "E",
     "F",
@@ -3145,7 +3145,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "lock_tail_demo_0",
-   "note": "pool_model.lock_tail_demo() v0.4.1, default-switch variant #0; demo returned [('v0.4 (lock_until from the deadline alone)', 30.041666666666668, 33.0), ('v0.4.1 (deadline + own S3 tail, day buckets)', 34.0, 33.0)]",
+   "note": "pool_model.lock_tail_demo() v0.4.2, default-switch variant #0; demo returned [('v0.4 (lock_until from the deadline alone)', 30.041666666666668, 33.0), ('v0.4.1 (deadline + own S3 tail, day buckets)', 34.0, 33.0)]",
    "users": [
     "A",
     "B"
@@ -3156,23 +3156,23 @@
    "check_each_line": false,
    "checkpoints": [],
    "epochs_rolled": "1",
-   "final_state": "21601,2,0,2000,0,0,0,0,0,0,2596800,0,21601,0,1,0,1,1000000000000000000,1,0,0,51000000000,0,0,51000000000;E0,510000000000,0,0,510000000000,100000000000000000,0,0;0:0,0,51000000000,1,0,1000000000000000000,4294967295,0,0,0,51000000000,0;1:2000,0,0,1,0,1000000000000000000,4294967295,0,0,0,0,0",
+   "final_state": "21601,2,0,2000,0,0,0,0,0,0,2596800,0,21601,0,1,0,1,1000000000000000000,1,0,0,51000000000,0,0,51000000000;E0,510000000000,0,0,510000000000,100000000000000000,0,0,0;0:0,0,51000000000,1,0,1000000000000000000,4294967295,0,0,0,51000000000,0;1:2000,0,0,1,0,1000000000000000000,4294967295,0,0,0,0,0",
    "lines": [
     "d 0 100000000000000 =100000000000000000 #7206ec5c",
     "b 100000000000000 2596800 #c1a5494f",
-    "s 100000000000000 50000000000 0 0 0 #3b6432e9",
-    "d 1 2 !wipe_sweep_pending #c7ee906f",
-    "p 1000000000 #8cabe6b5",
-    "d 1 2 =2000 #8103338b",
-    "x 21601 0 #a8c873f3",
-    "c 1 =0 #98c13428",
-    "t 0 #cfcbcaba"
+    "s 100000000000000 50000000000 0 0 0 #0bb272f8",
+    "d 1 2 !wipe_sweep_pending #00f518de",
+    "p 1000000000 #bf1b6220",
+    "d 1 2 =2000 #4140ed97",
+    "x 21601 0 #8cbf2c6b",
+    "c 1 =0 #96990312",
+    "t 0 #f448315d"
    ],
    "lock_grace_s": "86400",
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "wipe_gate_demo_0",
-   "note": "pool_model.wipe_gate_demo() v0.4.1, default-switch variant #0; demo returned [('v0.4 (deposit finalises the record at once)', 'ATT deposits first', 1000000000, 0), ('v0.4.1 (deposit waits for the post-wipe sweep)', 'deposit refused (WipeSweepPending)', 0, 1000000000)]",
+   "note": "pool_model.wipe_gate_demo() v0.4.2, default-switch variant #0; demo returned [('v0.4 (deposit finalises the record at once)', 'ATT deposits first', 1000000000, 0), ('v0.4.1 (deposit waits for the post-wipe sweep)', 'deposit refused (WipeSweepPending)', 0, 1000000000)]",
    "users": [
     "old",
     "ATT"
@@ -3200,7 +3200,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "vest_exit_demo_0",
-   "note": "pool_model.vest_exit_demo() v0.4.1, default-switch variant #0; demo returned [('honest exit 10 min after the lumps', 'dust 0', 3000000000, 0), ('honest exit 10 min after the lumps', 'dust 1000', 83333332, 2916666667), ('JIT whale x199 around a 3 SOL lump', 'v0.4.1 (no flush)', 0, 3000000000), ('JIT whale x199 around a 3 SOL lump', 'flush below 1 % of S (rejected)', 2985000000, 15000000)]",
+   "note": "pool_model.vest_exit_demo() v0.4.2, default-switch variant #0; demo returned [('honest exit 10 min after the lumps', 'dust 0', 3000000000, 0), ('honest exit 10 min after the lumps', 'dust 1000', 83333332, 2916666667), ('JIT whale x199 around a 3 SOL lump', 'v0.4.1 (no flush)', 0, 3000000000), ('JIT whale x199 around a 3 SOL lump', 'flush below 1 % of S (rejected)', 2985000000, 15000000)]",
    "users": [
     "H"
    ],
@@ -3229,7 +3229,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "vest_exit_demo_1",
-   "note": "pool_model.vest_exit_demo() v0.4.1, default-switch variant #1; demo returned [('honest exit 10 min after the lumps', 'dust 0', 3000000000, 0), ('honest exit 10 min after the lumps', 'dust 1000', 83333332, 2916666667), ('JIT whale x199 around a 3 SOL lump', 'v0.4.1 (no flush)', 0, 3000000000), ('JIT whale x199 around a 3 SOL lump', 'flush below 1 % of S (rejected)', 2985000000, 15000000)]",
+   "note": "pool_model.vest_exit_demo() v0.4.2, default-switch variant #1; demo returned [('honest exit 10 min after the lumps', 'dust 0', 3000000000, 0), ('honest exit 10 min after the lumps', 'dust 1000', 83333332, 2916666667), ('JIT whale x199 around a 3 SOL lump', 'v0.4.1 (no flush)', 0, 3000000000), ('JIT whale x199 around a 3 SOL lump', 'flush below 1 % of S (rejected)', 2985000000, 15000000)]",
    "users": [
     "H",
     "D"
@@ -3258,7 +3258,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "vest_exit_demo_2",
-   "note": "pool_model.vest_exit_demo() v0.4.1, default-switch variant #2; demo returned [('honest exit 10 min after the lumps', 'dust 0', 3000000000, 0), ('honest exit 10 min after the lumps', 'dust 1000', 83333332, 2916666667), ('JIT whale x199 around a 3 SOL lump', 'v0.4.1 (no flush)', 0, 3000000000), ('JIT whale x199 around a 3 SOL lump', 'flush below 1 % of S (rejected)', 2985000000, 15000000)]",
+   "note": "pool_model.vest_exit_demo() v0.4.2, default-switch variant #2; demo returned [('honest exit 10 min after the lumps', 'dust 0', 3000000000, 0), ('honest exit 10 min after the lumps', 'dust 1000', 83333332, 2916666667), ('JIT whale x199 around a 3 SOL lump', 'v0.4.1 (no flush)', 0, 3000000000), ('JIT whale x199 around a 3 SOL lump', 'flush below 1 % of S (rejected)', 2985000000, 15000000)]",
    "users": [
     "H",
     "W"
@@ -3326,7 +3326,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "restart_grief_table_0",
-   "note": "pool_model.restart_grief_table() v0.4.1, default-switch variant #0; demo returned [('v0.4 (every lump restarts the window)', 3600, 0.6651020227, 0.9874208839), ('v0.4 (every lump restarts the window)', 600, 0.6372899635, 0.9826923381), ('v0.4 (every lump restarts the window)', 60, 0.6326320616000001, 0.9817859678), ('v0.4.1 (value-weighted end)', 3600, 0.999768665, 0.9999999996), ('v0.4.1 (value-weighted end)', 600, 0.9983905616, 0.9999999976), ('v0.4.1 (value-weighted end)', 60, 0.9844729058, 0.9999999759)]",
+   "note": "pool_model.restart_grief_table() v0.4.2, default-switch variant #0; demo returned [('v0.4 (every lump restarts the window)', 3600, 0.6651020227, 0.9874208839), ('v0.4 (every lump restarts the window)', 600, 0.6372899635, 0.9826923381), ('v0.4 (every lump restarts the window)', 60, 0.6326320616000001, 0.9817859678), ('v0.4.1 (value-weighted end)', 3600, 0.999768665, 0.9999999996), ('v0.4.1 (value-weighted end)', 600, 0.9983905616, 0.9999999976), ('v0.4.1 (value-weighted end)', 60, 0.9844729058, 0.9999999759)]",
    "users": [
     "H"
    ],
@@ -3633,7 +3633,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "restart_grief_table_1",
-   "note": "pool_model.restart_grief_table() v0.4.1, default-switch variant #1; demo returned [('v0.4 (every lump restarts the window)', 3600, 0.6651020227, 0.9874208839), ('v0.4 (every lump restarts the window)', 600, 0.6372899635, 0.9826923381), ('v0.4 (every lump restarts the window)', 60, 0.6326320616000001, 0.9817859678), ('v0.4.1 (value-weighted end)', 3600, 0.999768665, 0.9999999996), ('v0.4.1 (value-weighted end)', 600, 0.9983905616, 0.9999999976), ('v0.4.1 (value-weighted end)', 60, 0.9844729058, 0.9999999759)]",
+   "note": "pool_model.restart_grief_table() v0.4.2, default-switch variant #1; demo returned [('v0.4 (every lump restarts the window)', 3600, 0.6651020227, 0.9874208839), ('v0.4 (every lump restarts the window)', 600, 0.6372899635, 0.9826923381), ('v0.4 (every lump restarts the window)', 60, 0.6326320616000001, 0.9817859678), ('v0.4.1 (value-weighted end)', 3600, 0.999768665, 0.9999999996), ('v0.4.1 (value-weighted end)', 600, 0.9983905616, 0.9999999976), ('v0.4.1 (value-weighted end)', 60, 0.9844729058, 0.9999999759)]",
    "users": [
     "H"
    ],
@@ -6541,7 +6541,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "restart_grief_table_2",
-   "note": "pool_model.restart_grief_table() v0.4.1, default-switch variant #2; demo returned [('v0.4 (every lump restarts the window)', 3600, 0.6651020227, 0.9874208839), ('v0.4 (every lump restarts the window)', 600, 0.6372899635, 0.9826923381), ('v0.4 (every lump restarts the window)', 60, 0.6326320616000001, 0.9817859678), ('v0.4.1 (value-weighted end)', 3600, 0.999768665, 0.9999999996), ('v0.4.1 (value-weighted end)', 600, 0.9983905616, 0.9999999976), ('v0.4.1 (value-weighted end)', 60, 0.9844729058, 0.9999999759)]",
+   "note": "pool_model.restart_grief_table() v0.4.2, default-switch variant #2; demo returned [('v0.4 (every lump restarts the window)', 3600, 0.6651020227, 0.9874208839), ('v0.4 (every lump restarts the window)', 600, 0.6372899635, 0.9826923381), ('v0.4 (every lump restarts the window)', 60, 0.6326320616000001, 0.9817859678), ('v0.4.1 (value-weighted end)', 3600, 0.999768665, 0.9999999996), ('v0.4.1 (value-weighted end)', 600, 0.9983905616, 0.9999999976), ('v0.4.1 (value-weighted end)', 60, 0.9844729058, 0.9999999759)]",
    "users": [
     "H"
    ],
@@ -6567,7 +6567,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "premium_jit_table_0",
-   "note": "pool_model.premium_jit_table() v0.4.1, default-switch variant #0; demo returned [(350, 'v0.4', 27850000000, 15749999999), (350, 'v0.4.1', 27850000000, -1), (700, 'v0.4', 45700000000, 31499999999), (700, 'v0.4.1', 45700000000, -1), (2000, 'v0.4', 112000000000, 89999999999), (2000, 'v0.4.1', 112000000000, -1)]",
+   "note": "pool_model.premium_jit_table() v0.4.2, default-switch variant #0; demo returned [(350, 'v0.4', 27850000000, 15749999999), (350, 'v0.4.1', 27850000000, -1), (700, 'v0.4', 45700000000, 31499999999), (700, 'v0.4.1', 45700000000, -1), (2000, 'v0.4', 112000000000, 89999999999), (2000, 'v0.4.1', 112000000000, -1)]",
    "users": [
     "H",
     "W"
@@ -6594,7 +6594,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "premium_jit_table_1",
-   "note": "pool_model.premium_jit_table() v0.4.1, default-switch variant #1; demo returned [(350, 'v0.4', 27850000000, 15749999999), (350, 'v0.4.1', 27850000000, -1), (700, 'v0.4', 45700000000, 31499999999), (700, 'v0.4.1', 45700000000, -1), (2000, 'v0.4', 112000000000, 89999999999), (2000, 'v0.4.1', 112000000000, -1)]",
+   "note": "pool_model.premium_jit_table() v0.4.2, default-switch variant #1; demo returned [(350, 'v0.4', 27850000000, 15749999999), (350, 'v0.4.1', 27850000000, -1), (700, 'v0.4', 45700000000, 31499999999), (700, 'v0.4.1', 45700000000, -1), (2000, 'v0.4', 112000000000, 89999999999), (2000, 'v0.4.1', 112000000000, -1)]",
    "users": [
     "H",
     "W"
@@ -6621,7 +6621,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "premium_jit_table_2",
-   "note": "pool_model.premium_jit_table() v0.4.1, default-switch variant #2; demo returned [(350, 'v0.4', 27850000000, 15749999999), (350, 'v0.4.1', 27850000000, -1), (700, 'v0.4', 45700000000, 31499999999), (700, 'v0.4.1', 45700000000, -1), (2000, 'v0.4', 112000000000, 89999999999), (2000, 'v0.4.1', 112000000000, -1)]",
+   "note": "pool_model.premium_jit_table() v0.4.2, default-switch variant #2; demo returned [(350, 'v0.4', 27850000000, 15749999999), (350, 'v0.4.1', 27850000000, -1), (700, 'v0.4', 45700000000, 31499999999), (700, 'v0.4.1', 45700000000, -1), (2000, 'v0.4', 112000000000, 89999999999), (2000, 'v0.4.1', 112000000000, -1)]",
    "users": [
     "H",
     "W"
@@ -6648,7 +6648,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "premium_jit_table_3",
-   "note": "pool_model.premium_jit_table() v0.4.1, default-switch variant #3; demo returned [(350, 'v0.4', 27850000000, 15749999999), (350, 'v0.4.1', 27850000000, -1), (700, 'v0.4', 45700000000, 31499999999), (700, 'v0.4.1', 45700000000, -1), (2000, 'v0.4', 112000000000, 89999999999), (2000, 'v0.4.1', 112000000000, -1)]",
+   "note": "pool_model.premium_jit_table() v0.4.2, default-switch variant #3; demo returned [(350, 'v0.4', 27850000000, 15749999999), (350, 'v0.4.1', 27850000000, -1), (700, 'v0.4', 45700000000, 31499999999), (700, 'v0.4.1', 45700000000, -1), (2000, 'v0.4', 112000000000, 89999999999), (2000, 'v0.4.1', 112000000000, -1)]",
    "users": [
     "H",
     "W"
@@ -6675,7 +6675,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "premium_jit_table_4",
-   "note": "pool_model.premium_jit_table() v0.4.1, default-switch variant #4; demo returned [(350, 'v0.4', 27850000000, 15749999999), (350, 'v0.4.1', 27850000000, -1), (700, 'v0.4', 45700000000, 31499999999), (700, 'v0.4.1', 45700000000, -1), (2000, 'v0.4', 112000000000, 89999999999), (2000, 'v0.4.1', 112000000000, -1)]",
+   "note": "pool_model.premium_jit_table() v0.4.2, default-switch variant #4; demo returned [(350, 'v0.4', 27850000000, 15749999999), (350, 'v0.4.1', 27850000000, -1), (700, 'v0.4', 45700000000, 31499999999), (700, 'v0.4.1', 45700000000, -1), (2000, 'v0.4', 112000000000, 89999999999), (2000, 'v0.4.1', 112000000000, -1)]",
    "users": [
     "H",
     "W"
@@ -6702,7 +6702,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "premium_jit_table_5",
-   "note": "pool_model.premium_jit_table() v0.4.1, default-switch variant #5; demo returned [(350, 'v0.4', 27850000000, 15749999999), (350, 'v0.4.1', 27850000000, -1), (700, 'v0.4', 45700000000, 31499999999), (700, 'v0.4.1', 45700000000, -1), (2000, 'v0.4', 112000000000, 89999999999), (2000, 'v0.4.1', 112000000000, -1)]",
+   "note": "pool_model.premium_jit_table() v0.4.2, default-switch variant #5; demo returned [(350, 'v0.4', 27850000000, 15749999999), (350, 'v0.4.1', 27850000000, -1), (700, 'v0.4', 45700000000, 31499999999), (700, 'v0.4.1', 45700000000, -1), (2000, 'v0.4', 112000000000, 89999999999), (2000, 'v0.4.1', 112000000000, -1)]",
    "users": [
     "H",
     "W"
@@ -6713,30 +6713,30 @@
    "check_each_line": false,
    "checkpoints": [],
    "epochs_rolled": "2",
-   "final_state": "21601,0,0,0,0,0,0,0,120000000000000000,0,2618401,0,21601,21600,2,1,0,1000000000000000000,3,0,0,1051000000000,0,0,1051000000000;E1,10011111111111,0,0,10011111111111,90000000000000000,0,0;0:90000000000000000,555555555555,49999999999,0,90000000000000000,1000000000000000000,0,90000000000000000,2764800,555555555555,49999999999,0;1:90000000000000000,10000000000000,1000000000000,1,90000000000000000,1000000000000000000,2,90000000000000000,2764800,10000000000000,1000000000000,0",
+   "final_state": "21601,0,0,0,0,0,0,0,120000000000000000,0,2618401,0,21601,21600,2,1,0,1000000000000000000,3,0,0,1051000000000,0,0,1051000000000;E1,10011111111111,0,0,10011111111111,90000000000000000,0,0,0;0:90000000000000000,555555555555,49999999999,0,90000000000000000,1000000000000000000,0,90000000000000000,2764800,555555555555,49999999999,0;1:90000000000000000,10000000000000,1000000000000,1,90000000000000000,1000000000000000000,2,90000000000000000,2764800,10000000000000,1000000000000,0",
    "lines": [
     "d 0 100000000000000 =100000000000000000 #7206ec5c",
     "b 90000000000000 2596800 #1ac2fba3",
     "a 0 =10000000000000 #7d987851",
     "w 0 10000000000000000 =10000000000000 #dcc0608e",
-    "s 90000000000000 50000000000 0 0 0 #d005c5a2",
-    "t 0 #5ada5e66",
-    "p 0 #9cff783c",
-    "d 1 100000000000000 =100000000000000000 #431a9d0d",
-    "b 50000000000000 2596800 #705ccbad",
-    "r 50000000000000 0 1500 0 1000000000000 #a0f60cd9",
-    "x 21601 0 #6e15b117",
-    "t 1 #a2973038",
-    "b 90000000000000 2618401 #ee1c6534",
-    "a 1 =10000000000000 #cbf40fc8",
-    "w 1 10000000000000000 =10000000000000 #ecf3f8ee",
-    "s 90000000000000 1000000000 0 0 0 #eb562276"
+    "s 90000000000000 50000000000 0 0 0 #6ae38924",
+    "t 0 #2e2cd85b",
+    "p 0 #c2d15d73",
+    "d 1 100000000000000 =100000000000000000 #f608ae90",
+    "b 50000000000000 2596800 #35a430ef",
+    "r 50000000000000 0 1500 0 1000000000000 #e4fd5e48",
+    "x 21601 0 #79e39afc",
+    "t 1 #8399f4ce",
+    "b 90000000000000 2618401 #35ad08e3",
+    "a 1 =10000000000000 #cb88e242",
+    "w 1 10000000000000000 =10000000000000 #6c24a050",
+    "s 90000000000000 1000000000 0 0 0 #5b974f29"
    ],
    "lock_grace_s": "86400",
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "pool_edge_0",
-   "note": "attacks/pool_edge.py v0.4.1, pool #0",
+   "note": "attacks/pool_edge.py v0.4.2, pool #0",
    "users": [
     "old",
     "new"
@@ -6767,7 +6767,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "pool_edge_1",
-   "note": "attacks/pool_edge.py v0.4.1, pool #1",
+   "note": "attacks/pool_edge.py v0.4.2, pool #1",
    "users": [
     "A",
     "B"
@@ -6794,7 +6794,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "pool_edge_2",
-   "note": "attacks/pool_edge.py v0.4.1, pool #2",
+   "note": "attacks/pool_edge.py v0.4.2, pool #2",
    "users": [
     "A",
     "C"
@@ -6918,7 +6918,7 @@
    "lump_vest_s": "21600",
    "model_check_fails": [],
    "name": "pool_edge_3",
-   "note": "attacks/pool_edge.py v0.4.1, pool #3",
+   "note": "attacks/pool_edge.py v0.4.2, pool #3",
    "users": [
     "A",
     "B"

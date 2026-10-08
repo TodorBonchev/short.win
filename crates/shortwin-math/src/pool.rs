@@ -1,6 +1,6 @@
-//! Owner: pool track. Lender pool: shares, epochs, pro-rata withdrawal with expiring locks and the lock calendar, SOL entitlement, realised claims, the pot, lump vesting (ECON §9; ARCH §3.3; normative `sim/pool_model.py` v0.4.1).
+//! Owner: pool track. Lender pool: shares, epochs, pro-rata withdrawal with expiring locks and the lock calendar, SOL entitlement, realised claims, the pot, lump vesting (ECON §9; ARCH §3.3; normative `sim/pool_model.py` v0.4.2).
 //!
-//! A port of `pool_model.Pool` v0.4.1 with its default switches (option (a) of the
+//! A port of `pool_model.Pool` v0.4.2 with its default switches (option (a) of the
 //! round-3 brief, owner decision O16: continuous rent entitlement, a pot for realised
 //! surplus, vested lumps), exact to the lamport and the share (differential vectors in
 //! `tests/vectors/pool/`). The state is split the way the program stores it:
@@ -37,6 +37,11 @@
 //! record of its epoch, which scales the term before the jump (as `pool_model`).
 //! The program key-checks the accounts. `sync_lender(max_epochs)` is [`convert`] with the
 //! records at hand, then [`touch`] once the lender is no longer [`Standing::Behind`].
+//! The records are `&mut`: a conversion through a rebase record rounds cumulatively and
+//! writes the record's `conv_rem` (KI-65, no rebase orphans; see [`convert`]), so every
+//! caller persists the records whose `conv_rem` changed together with the lender (the
+//! program writes them back, `engine::lender::store_records`). A refused call writes
+//! nothing; [`allowance_view`] only reads.
 //!
 //! **Errors and atomicity.** Every mutating function either succeeds or leaves all its
 //! arguments unchanged. A refusal by a pool rule has its own [`MathError`] variant, one per
@@ -205,6 +210,12 @@ pub struct ShareEpoch {
     pub carry: i128,
     /// Remainder of `acc_r_end` top-ups, lamports·WAD.
     pub carry_r: u128,
+    /// Conversion remainder (KI-65): the old-epoch shares converted through this record so far,
+    /// modulo `1,000^den_log1000`, in `[0, den)`. A lender's conversion mints
+    /// `⌊(conv_rem + shares)/den⌋` and leaves the remainder here, so the conversions of every
+    /// holder of the old epoch sum to `⌊s_old/den⌋` = the new `S` exactly (no rebase orphans).
+    /// 0 for a full wipe.
+    pub conv_rem: u128,
     /// The epoch this record closes.
     pub epoch: u32,
     /// Conversion numerator: 0 (full wipe) or 1.
@@ -265,16 +276,17 @@ const _: () = {
     assert!(offset_of!(Lender, lock_epoch) == 132);
     assert!(offset_of!(Lender, _pad) == 136);
 
-    assert!(size_of::<ShareEpoch>() == 96);
+    assert!(size_of::<ShareEpoch>() == 112);
     assert!(offset_of!(ShareEpoch, acc_end) == 0);
     assert!(offset_of!(ShareEpoch, acc_r_end) == 16);
     assert!(offset_of!(ShareEpoch, s_old) == 32);
     assert!(offset_of!(ShareEpoch, carry) == 48);
     assert!(offset_of!(ShareEpoch, carry_r) == 64);
-    assert!(offset_of!(ShareEpoch, epoch) == 80);
-    assert!(offset_of!(ShareEpoch, num) == 84);
-    assert!(offset_of!(ShareEpoch, den_log1000) == 85);
-    assert!(offset_of!(ShareEpoch, _pad) == 86);
+    assert!(offset_of!(ShareEpoch, conv_rem) == 80);
+    assert!(offset_of!(ShareEpoch, epoch) == 96);
+    assert!(offset_of!(ShareEpoch, num) == 100);
+    assert!(offset_of!(ShareEpoch, den_log1000) == 101);
+    assert!(offset_of!(ShareEpoch, _pad) == 102);
 };
 
 /// Where a lender stands after [`convert`] / [`touch`].
@@ -551,8 +563,9 @@ fn shares_vs(p: &Pool) -> Result<u128, MathError> {
     add_u128(p.total_shares, VIRTUAL_SHARES)
 }
 
-/// The record for `epoch` in a consecutive slice, `None` if the slice does not reach it.
-fn record_for(records: &[ShareEpoch], epoch: u32) -> Result<Option<&ShareEpoch>, MathError> {
+/// The index of the record for `epoch` in a consecutive slice, `None` if the slice does not
+/// reach it.
+fn record_idx(records: &[ShareEpoch], epoch: u32) -> Result<Option<usize>, MathError> {
     let Some(first) = records.first() else {
         return Ok(None);
     };
@@ -562,8 +575,100 @@ fn record_for(records: &[ShareEpoch], epoch: u32) -> Result<Option<&ShareEpoch>,
     let idx = usize::try_from(idx).map_err(|_| MathError::Overflow)?;
     match records.get(idx) {
         None => Ok(None),
-        Some(r) if r.epoch == epoch => Ok(Some(r)),
+        Some(r) if r.epoch == epoch => Ok(Some(idx)),
         Some(_) => Err(MathError::InvalidInput),
+    }
+}
+
+/// The epoch records a conversion reads and, on commit, writes `conv_rem` back to (KI-65).
+/// A conversion reads each record at most once, before it writes that record, so the
+/// read-only pass and the commit pass see the same remainders and compute the same lender.
+trait Recs {
+    /// Whether the conversion accrues `pending` and `real` through the records (the commit
+    /// pass only replays the path: shares, locks and epochs, which no accrual decides).
+    const ACCRUE: bool;
+    /// The record of `epoch` and its index, `None` if the slice does not reach it.
+    fn get(&self, epoch: u32) -> Result<Option<(usize, ShareEpoch)>, MathError>;
+    /// The conversion through record `idx` left `rem` (called only when it changed).
+    fn set_rem(&mut self, idx: usize, rem: u128) -> Result<(), MathError>;
+    /// A conversion stopped with the lender at `(epoch, shares)`.
+    fn converted(&mut self, epoch: u32, shares: u128);
+}
+
+/// The read-only pass every mutating function computes on copies first; remembers where
+/// its first conversion stopped, which the commit pass must reproduce.
+struct ReadOnly<'a> {
+    recs: &'a [ShareEpoch],
+    first: Option<(u32, u128)>,
+}
+
+impl<'a> ReadOnly<'a> {
+    const fn new(recs: &'a [ShareEpoch]) -> Self {
+        Self { recs, first: None }
+    }
+}
+
+impl Recs for ReadOnly<'_> {
+    const ACCRUE: bool = true;
+    fn get(&self, epoch: u32) -> Result<Option<(usize, ShareEpoch)>, MathError> {
+        Ok(record_idx(self.recs, epoch)?.and_then(|i| self.recs.get(i).map(|r| (i, *r))))
+    }
+    fn set_rem(&mut self, _idx: usize, _rem: u128) -> Result<(), MathError> {
+        Ok(())
+    }
+    fn converted(&mut self, epoch: u32, shares: u128) {
+        if self.first.is_none() {
+            self.first = Some((epoch, shares));
+        }
+    }
+}
+
+/// The commit pass: writes the conversion remainders.
+struct Commit<'a> {
+    recs: &'a mut [ShareEpoch],
+    end: Option<(u32, u128)>,
+}
+
+impl Recs for Commit<'_> {
+    const ACCRUE: bool = false;
+    fn get(&self, epoch: u32) -> Result<Option<(usize, ShareEpoch)>, MathError> {
+        Ok(record_idx(self.recs, epoch)?.and_then(|i| self.recs.get(i).map(|r| (i, *r))))
+    }
+    fn set_rem(&mut self, idx: usize, rem: u128) -> Result<(), MathError> {
+        self.recs.get_mut(idx).ok_or(MathError::Invariant)?.conv_rem = rem;
+        Ok(())
+    }
+    fn converted(&mut self, epoch: u32, shares: u128) {
+        self.end = Some((epoch, shares));
+    }
+}
+
+/// A lender's shares through a record whose validated ratio is `(num, den)` (KI-65, ECON
+/// §9.5): 0 at a full wipe (`conv_rem` is not touched); else `⌊(conv_rem + shares)/den⌋` with
+/// the new remainder `(conv_rem + shares) mod den`, so at least `⌊shares/den⌋` and at most
+/// one more. One u128 division; `(shares mod den) + conv_rem < 2·den ≤ 2·10^36` cannot
+/// overflow.
+///
+/// # Errors
+/// `InvalidInput` if `conv_rem ≥ den` (a malformed record).
+fn convert_shares(
+    shares: u128,
+    conv_rem: u128,
+    num: u128,
+    den: u128,
+) -> Result<(u128, u128), MathError> {
+    if num == 0 {
+        return Ok((0, conv_rem));
+    }
+    if conv_rem >= den {
+        return Err(MathError::InvalidInput);
+    }
+    let q = ovf(shares.checked_div(den))?;
+    let r = add_u128(sub_u128(shares, ovf(q.checked_mul(den))?)?, conv_rem)?;
+    if r >= den {
+        Ok((add_u128(q, 1)?, sub_u128(r, den)?))
+    } else {
+        Ok((q, r))
     }
 }
 
@@ -941,11 +1046,23 @@ pub fn credit_r(pool: &mut Pool, lamports: u64) -> Result<(), MathError> {
 // ---- lender touch (ECON §9.4, §9.5; ARCH §3.3 `touch`) ------------------------------------
 
 /// Epoch conversion as far as `records` reach (the loop of `pool_model.Pool._touch`),
-/// accumulating `pending` and `real` in `i128`.
-fn convert_in(
+/// accumulating `pending` and `real` in `i128`; tells `records` where it stopped.
+fn convert_in<R: Recs>(
     pool: &Pool,
     l: &mut Lender,
-    records: &[ShareEpoch],
+    records: &mut R,
+    pending: &mut i128,
+    real: &mut i128,
+) -> Result<Standing, MathError> {
+    let st = convert_steps(pool, l, records, pending, real)?;
+    records.converted(l.epoch, l.shares);
+    Ok(st)
+}
+
+fn convert_steps<R: Recs>(
+    pool: &Pool,
+    l: &mut Lender,
+    records: &mut R,
     pending: &mut i128,
     real: &mut i128,
 ) -> Result<Standing, MathError> {
@@ -968,14 +1085,16 @@ fn convert_in(
             l.snap_r = pool.acc_r;
             continue;
         }
-        let Some(rec) = record_for(records, l.epoch)? else {
+        let Some((idx, rec)) = records.get(l.epoch)? else {
             return Ok(Standing::Behind);
         };
-        *pending = add_i128(*pending, accrued(l.shares, sub_i128(rec.acc_end, l.snap)?)?)?;
-        *real = add_i128(
-            *real,
-            accrued(l.shares, diff_u128(rec.acc_r_end, l.snap_r)?)?,
-        )?;
+        if R::ACCRUE {
+            *pending = add_i128(*pending, accrued(l.shares, sub_i128(rec.acc_end, l.snap)?)?)?;
+            *real = add_i128(
+                *real,
+                accrued(l.shares, diff_u128(rec.acc_r_end, l.snap_r)?)?,
+            )?;
+        }
         if parks {
             // V2-12: the full-wipe record is still open for top-ups; stay on it.
             l.snap = rec.acc_end;
@@ -983,10 +1102,24 @@ fn convert_in(
             return Ok(Standing::Parked);
         }
         let (num, den) = rec.ratio()?;
-        l.shares = mul_div(l.shares, num, den, Rounding::Floor)?;
-        l.lock = mul_div(l.lock, num, den, Rounding::Floor)?;
+        // KI-65: cumulative rounding through the record, so the conversions of every holder
+        // of the old epoch sum to the new S (no orphan shares).
+        let (shares, rem) = convert_shares(l.shares, rec.conv_rem, num, den)?;
+        if rem != rec.conv_rem {
+            records.set_rem(idx, rem)?;
+        }
+        l.shares = shares;
+        // `⌊x·num/den⌋` with `num ∈ {0, 1}` (`ratio`): a division, no 256-bit product.
+        let scale = |x: u128| -> Result<u128, MathError> {
+            if num == 0 {
+                Ok(0)
+            } else {
+                ovf(x.checked_div(den))
+            }
+        };
+        l.lock = scale(l.lock)?;
         // v0.4.1: the term scales with the bucket it sits in (the roll scaled the buckets).
-        l.lock_term = mul_div(l.lock_term, num, den, Rounding::Floor)?;
+        l.lock_term = scale(l.lock_term)?;
         l.snap = 0;
         l.snap_r = 0;
         l.epoch = ovf(l.epoch.checked_add(1))?;
@@ -1014,7 +1147,7 @@ fn touch_in(
     pool: &Pool,
     v: &mut Vault,
     l: &mut Lender,
-    records: &[ShareEpoch],
+    records: &mut ReadOnly<'_>,
     now: i64,
 ) -> Result<Standing, MathError> {
     cal_advance(v, now)?;
@@ -1049,23 +1182,75 @@ fn touch_in(
 /// `sync_lender`). Does not accrue the current epoch, move a surplus to the pot or read
 /// the calendar: follow with [`touch`].
 ///
+/// **No rebase orphans (KI-65).** Through a rebase record (`1/den`) the lender's `s` old
+/// shares become `⌊(conv_rem + s)/den⌋` and the record keeps `(conv_rem + s) mod den`
+/// (written back into `records`: the caller persists every record whose `conv_rem`
+/// changed). The quotients telescope: whatever the order, the holders of the old epoch
+/// receive `⌊C/den⌋` new shares once they have converted `C` old ones, so once all of them
+/// have, they hold exactly the new `S = ⌊s_old/den⌋` (by induction from `S = 0`: every
+/// share of `s_old` was held). Each lender gets `⌊s/den⌋` or one more; the order only
+/// decides who receives the record's at most `n − 1` rounding units (one per position: a
+/// party with several positions, or a tuned residue, can receive several). Hence ECON §13
+/// I-P1′, recursive over the records `0..N` behind the current epoch `N`:
+/// `S = Σ current shares + L_{N−1}`, where `L_e = ⌊(conv_rem_e + U_e)/den_e⌋` through a
+/// rebase record (0 through a full wipe), `U_e` = the epoch-`e` shares of the lenders still
+/// at epoch `e` + `L_{e−1}` (`L_{−1} = 0`): only the latest record's term, its `U` carrying
+/// the latent units of the earlier records (a sum of every record's term would count a
+/// lender two records behind twice, in two epochs' units). `S` reaches 0 only when no
+/// position holds or will hold a share.
+///
 /// # Errors
 /// `InvalidInput` if the lender is ahead of the pool, the records are not consecutive
-/// or a record is malformed; `Overflow`/`Underflow` if `pending`/`real` leave their
-/// field types.
+/// or a record is malformed (`conv_rem ≥ den` included); `Overflow`/`Underflow` if
+/// `pending`/`real` leave their field types; `Invariant` if the commit pass diverges from
+/// the read-only pass (unreachable). A refusal leaves the lender and `records` unchanged;
+/// a partial conversion ([`Standing::Behind`]) writes only the records it passed.
 pub fn convert(
     pool: &Pool,
     lender: &mut Lender,
-    records: &[ShareEpoch],
+    records: &mut [ShareEpoch],
 ) -> Result<Standing, MathError> {
     let mut l = *lender;
     let mut pending = i128::from(l.pending);
     let mut real = i128::from(l.real);
-    let st = convert_in(pool, &mut l, records, &mut pending, &mut real)?;
+    let mut ro = ReadOnly::new(records);
+    let st = convert_in(pool, &mut l, &mut ro, &mut pending, &mut real)?;
     l.pending = to_i64(pending)?;
     l.real = to_unsigned(real)?;
+    let seen = ro.first;
+    commit_rems(pool, lender, records, seen)?;
     *lender = l;
     Ok(st)
+}
+
+/// The commit pass (KI-65): replays `before`'s conversion on the same records and writes
+/// each record's new `conv_rem`. It runs only after the read-only pass succeeded, from the
+/// same lender; the conversion's path (shares, lock, lock term, epoch, the jump and the
+/// parking) reads only the lender, the records and the pool's `share_epoch` and `wipe_live`
+/// (which a vest release does not move), so it takes the same path. It skips the accruals of
+/// `pending` and `real` (no path decision reads them) and must stop where the read-only pass's
+/// first conversion stopped (`seen`: epoch and shares), else `Invariant`. Records the lender
+/// does not convert through are left as they are.
+fn commit_rems(
+    pool: &Pool,
+    before: &Lender,
+    records: &mut [ShareEpoch],
+    seen: Option<(u32, u128)>,
+) -> Result<(), MathError> {
+    if before.epoch == pool.share_epoch {
+        return Ok(());
+    }
+    let mut l = *before;
+    let (mut pending, mut real) = (i128::from(before.pending), i128::from(before.real));
+    let mut c = Commit {
+        recs: records,
+        end: None,
+    };
+    convert_in(pool, &mut l, &mut c, &mut pending, &mut real).map_err(|_| MathError::Invariant)?;
+    if c.end.is_none() || c.end != seen {
+        return Err(MathError::Invariant);
+    }
+    Ok(())
 }
 
 /// `pool_model.Pool._touch(who)` (ECON §9.4, §9.5; ARCH §3.3 `touch`): [`cal_advance`];
@@ -1074,7 +1259,8 @@ pub fn convert(
 /// lender's own lock if it expired (`now ≥ lock_until`; the aggregate is not touched, the
 /// calendar dropped it). A lender parked on a live wipe record moves its surplus to the
 /// pot and stops there. Writes only the lender and the vault. Idempotent at a given `now`.
-/// Returns [`Standing::Current`] or [`Standing::Parked`].
+/// Returns [`Standing::Current`] or [`Standing::Parked`]. The conversion writes the
+/// `conv_rem` of the rebase records it passes back into `records` ([`convert`], KI-65).
 ///
 /// # Errors
 /// `LenderBehind` if records are missing (the lender would stay [`Standing::Behind`]);
@@ -1083,11 +1269,14 @@ pub fn touch(
     pool: &Pool,
     vault: &mut Vault,
     lender: &mut Lender,
-    records: &[ShareEpoch],
+    records: &mut [ShareEpoch],
     now: i64,
 ) -> Result<Standing, MathError> {
     let (mut v, mut l) = (*vault, *lender);
-    let st = touch_in(pool, &mut v, &mut l, records, now)?;
+    let mut ro = ReadOnly::new(records);
+    let st = touch_in(pool, &mut v, &mut l, &mut ro, now)?;
+    let seen = ro.first;
+    commit_rems(pool, lender, records, seen)?;
     *vault = v;
     *lender = l;
     Ok(st)
@@ -1182,7 +1371,8 @@ pub fn allowance(pool: &Pool, vault: &Vault, lender: &Lender, now: i64) -> Resul
 
 /// `pool_model.Pool.allowance_view`: the lender's [`allowance`] exactly as the program
 /// computes it when only this lender is touched and every other lender is left as it is
-/// (the state ECON §13 I-P4 must hold on, v0.4.1; T-POT). Pure: nothing changes.
+/// (the state ECON §13 I-P4 must hold on, v0.4.1; T-POT). Pure: nothing changes, the
+/// records' `conv_rem` included (the conversion is computed, not written).
 ///
 /// # Errors
 /// As [`touch`] and [`allowance`].
@@ -1194,7 +1384,7 @@ pub fn allowance_view(
     now: i64,
 ) -> Result<u64, MathError> {
     let (mut v, mut l) = (*vault, *lender);
-    touch_in(pool, &mut v, &mut l, records, now)?;
+    touch_in(pool, &mut v, &mut l, &mut ReadOnly::new(records), now)?;
     allowance(pool, &v, &l, now)
 }
 
@@ -1202,7 +1392,7 @@ fn withdraw_in(
     p: &mut Pool,
     v: &mut Vault,
     l: &mut Lender,
-    records: &[ShareEpoch],
+    records: &mut ReadOnly<'_>,
     now: i64,
     lock_grace_s: u32,
     shares: u128,
@@ -1270,7 +1460,9 @@ fn withdraw_in(
     l.lock_term = term;
     l.lock_until = until;
     if shares == p.total_shares && p.vest_bal != 0 {
-        // R3B-2 / R4B-4: the last lender is paid the unreleased vest first.
+        // R3B-2 / R4B-4: the last lender is paid the unreleased vest first. With cumulative
+        // conversion (KI-65) the burn takes S to 0 only when no other position holds or will
+        // hold a share of this epoch (I-P1′): a lender that has not converted yet still counts.
         let vb = p.vest_bal;
         p.vest_bal = 0;
         credit_pos(p, i128::from(vb), true)?;
@@ -1293,8 +1485,11 @@ fn withdraw_in(
 /// `Π` epoch sets `b_min = ΣB_Q` (V2-3). A live lock's term leaves its calendar bucket;
 /// the new term `⌊new_lock·WAD/Π⌋` (floor) enters the bucket of `lock_until`, which a
 /// lock increase moves to `max(lock_until, lock_until_for(now))` (R3B-1, R4A-2, R4A-8).
-/// If the burn takes `S` to 0 the unreleased vest is released to the lender first. The
-/// program pays SOL with [`claim`] afterwards.
+/// If the burn takes `S` to 0 the unreleased vest is released to the lender first (R3B-2);
+/// the burn takes `S` to 0 only when no other position holds or will hold a share (no
+/// rebase orphans, KI-65: a lender behind still counts in `S`, see [`convert`]). The
+/// program pays SOL with [`claim`] afterwards. The lender's conversion writes `conv_rem`
+/// into `records` ([`convert`]).
 ///
 /// # Errors
 /// In the model's order: `NegativePending`, `InsufficientShares`,
@@ -1305,13 +1500,16 @@ pub fn withdraw(
     pool: &mut Pool,
     vault: &mut Vault,
     lender: &mut Lender,
-    records: &[ShareEpoch],
+    records: &mut [ShareEpoch],
     now: i64,
     lock_grace_s: u32,
     shares: u128,
 ) -> Result<u64, MathError> {
     let (mut p, mut v, mut l) = (*pool, *vault, *lender);
-    let amount = withdraw_in(&mut p, &mut v, &mut l, records, now, lock_grace_s, shares)?;
+    let mut ro = ReadOnly::new(records);
+    let amount = withdraw_in(&mut p, &mut v, &mut l, &mut ro, now, lock_grace_s, shares)?;
+    let seen = ro.first;
+    commit_rems(pool, lender, records, seen)?;
     *pool = p;
     *vault = v;
     *lender = l;
@@ -1357,7 +1555,7 @@ fn deposit_in(
     p: &mut Pool,
     v: &mut Vault,
     l: &mut Lender,
-    records: &[ShareEpoch],
+    records: &mut ReadOnly<'_>,
     now: i64,
     amount: u64,
     rewards_required: bool,
@@ -1393,7 +1591,8 @@ fn deposit_in(
 /// `amount` to `T`. The first deposit after a full wipe needs the post-wipe sweeps
 /// (R4A-7): the trader sweep and, if `rewards_required` (a pump venue that can execute),
 /// the venue-reward claim; it then finalises the wipe record (clears `wipe_live`) and
-/// touches again, so a parked depositor converts through it.
+/// touches again, so a parked depositor converts through it. The lender's conversion
+/// writes `conv_rem` into `records` ([`convert`]).
 ///
 /// # Errors
 /// `DepositTooSmall` if nothing would be minted; `Overflow` if `S` or `T` would leave
@@ -1403,21 +1602,24 @@ pub fn deposit(
     pool: &mut Pool,
     vault: &mut Vault,
     lender: &mut Lender,
-    records: &[ShareEpoch],
+    records: &mut [ShareEpoch],
     now: i64,
     amount: u64,
     rewards_required: bool,
 ) -> Result<u128, MathError> {
     let (mut p, mut v, mut l) = (*pool, *vault, *lender);
+    let mut ro = ReadOnly::new(records);
     let minted = deposit_in(
         &mut p,
         &mut v,
         &mut l,
-        records,
+        &mut ro,
         now,
         amount,
         rewards_required,
     )?;
+    let seen = ro.first;
+    commit_rems(pool, lender, records, seen)?;
     *pool = p;
     *vault = v;
     *lender = l;
@@ -1428,7 +1630,8 @@ pub fn deposit(
 /// lender (no vest release: `Market` stays read-only), draws from the pot up to its own
 /// deficit, `draw = min(unmatched, max(0, pending − (real − claimed)))`, then pays
 /// `min(pending, real − claimed, lender_sol)` if positive, else 0 (the draw stays). A
-/// second call in the same state pays 0 (I-P5). Returns the lamports to transfer.
+/// second call in the same state pays 0 (I-P5) and writes no record (the lender is
+/// current). Returns the lamports to transfer.
 ///
 /// # Errors
 /// As [`touch`]; `Overflow` if `real` or `claimed` leave `u64`.
@@ -1436,11 +1639,13 @@ pub fn claim(
     pool: &Pool,
     vault: &mut Vault,
     lender: &mut Lender,
-    records: &[ShareEpoch],
+    records: &mut [ShareEpoch],
     now: i64,
 ) -> Result<u64, MathError> {
     let (mut v, mut l) = (*vault, *lender);
-    touch_in(pool, &mut v, &mut l, records, now)?;
+    let mut ro = ReadOnly::new(records);
+    touch_in(pool, &mut v, &mut l, &mut ro, now)?;
+    let seen = ro.first;
     let own = sub_i128(i128::from(l.real), i128::from(l.claimed))?;
     let need = sub_i128(i128::from(l.pending), own)?.max(0);
     let draw = u64::try_from(need.min(i128::from(v.unmatched))).map_err(|_| MathError::Overflow)?;
@@ -1461,6 +1666,7 @@ pub fn claim(
     } else {
         0
     };
+    commit_rems(pool, lender, records, seen)?;
     *vault = v;
     *lender = l;
     Ok(paid)
@@ -1469,6 +1675,7 @@ pub fn claim(
 /// `pool_model.Pool.cover` (C0-13; ARCH §3.3 `cover_deficit`): touches the lender, then
 /// the lender pays `lamports` into `lender_sol`: `pending += lamports`, `real +=
 /// lamports`. What exceeds the lender's entitlement reaches the pot at its next touch.
+/// The lender's conversion writes `conv_rem` into `records` ([`convert`]).
 ///
 /// # Errors
 /// `Overflow` if a counter leaves its type; as [`touch`].
@@ -1476,15 +1683,18 @@ pub fn cover(
     pool: &Pool,
     vault: &mut Vault,
     lender: &mut Lender,
-    records: &[ShareEpoch],
+    records: &mut [ShareEpoch],
     now: i64,
     lamports: u64,
 ) -> Result<(), MathError> {
     let (mut v, mut l) = (*vault, *lender);
-    touch_in(pool, &mut v, &mut l, records, now)?;
+    let mut ro = ReadOnly::new(records);
+    touch_in(pool, &mut v, &mut l, &mut ro, now)?;
+    let seen = ro.first;
     v.lender_sol = add_u64(v.lender_sol, lamports)?;
     l.pending = to_i64(add_i128(i128::from(l.pending), i128::from(lamports))?)?;
     l.real = add_u64(l.real, lamports)?;
+    commit_rems(pool, lender, records, seen)?;
     *vault = v;
     *lender = l;
     Ok(())
@@ -1760,6 +1970,7 @@ fn maybe_roll_in(p: &mut Pool, v: &mut Vault, now: i64) -> Result<Option<ShareEp
         s_old: p.total_shares,
         carry: 0,
         carry_r: 0,
+        conv_rem: 0,
         epoch: p.share_epoch,
         num,
         den_log1000: k,
@@ -1899,6 +2110,7 @@ mod tests {
             s_old: 1,
             carry: 0,
             carry_r: 0,
+            conv_rem: 0,
             epoch: 0,
             num: 0,
             den_log1000: 0,
@@ -1950,22 +2162,25 @@ mod tests {
         let (mut p, mut v) = (Pool::new(), Vault::new());
         let mut a = Lender::new(&p);
         let mut b = Lender::new(&p);
-        assert_eq!(deposit(&mut p, &mut v, &mut a, &[], 0, 1, false), Ok(1_000));
         assert_eq!(
-            deposit(&mut p, &mut v, &mut b, &[], 0, 1_000_000_000, false),
+            deposit(&mut p, &mut v, &mut a, &mut [], 0, 1, false),
+            Ok(1_000)
+        );
+        assert_eq!(
+            deposit(&mut p, &mut v, &mut b, &mut [], 0, 1_000_000_000, false),
             Ok(1_000_000_000_000)
         );
         assert_eq!(
-            withdraw(&mut p, &mut v, &mut b, &[], 0, GRACE, 1_000_000_000_000),
+            withdraw(&mut p, &mut v, &mut b, &mut [], 0, GRACE, 1_000_000_000_000),
             Ok(1_000_000_000)
         );
         let before = (p, v, b);
         assert_eq!(
-            deposit(&mut p, &mut v, &mut b, &[], 0, 0, false),
+            deposit(&mut p, &mut v, &mut b, &mut [], 0, 0, false),
             Err(MathError::DepositTooSmall)
         );
         assert_eq!(
-            withdraw(&mut p, &mut v, &mut b, &[], 0, GRACE, 1),
+            withdraw(&mut p, &mut v, &mut b, &mut [], 0, GRACE, 1),
             Err(MathError::InsufficientShares)
         );
         assert_eq!((p, v, b), before, "refusals change nothing");
@@ -1985,7 +2200,7 @@ mod tests {
     fn records_must_be_consecutive() {
         let (mut p, mut v) = (Pool::new(), Vault::new());
         let mut a = Lender::new(&p);
-        deposit(&mut p, &mut v, &mut a, &[], 0, 1_000, false).unwrap();
+        deposit(&mut p, &mut v, &mut a, &mut [], 0, 1_000, false).unwrap();
         borrow(&mut p, 0, 1_000, D).unwrap();
         let res = Resolution {
             q: 1_000,
@@ -2001,21 +2216,27 @@ mod tests {
         let (vc, mut stale) = (v, a);
         let mut vt = v;
         assert_eq!(
-            touch(&p, &mut vt, &mut stale, &[], 0),
+            touch(&p, &mut vt, &mut stale, &mut [], 0),
             Err(MathError::LenderBehind)
         );
         assert_eq!((vt, stale), (vc, a), "a refused touch changes nothing");
-        assert_eq!(convert(&p, &mut stale, &[]), Ok(Standing::Behind));
+        assert_eq!(convert(&p, &mut stale, &mut []), Ok(Standing::Behind));
         let later = ShareEpoch { epoch: 7, ..r0 };
         assert_eq!(
-            touch(&p, &mut vt, &mut stale, &[later], 0),
+            touch(&p, &mut vt, &mut stale, &mut [later], 0),
             Err(MathError::LenderBehind)
         );
-        let gap = [r0, ShareEpoch { epoch: 2, ..r0 }];
-        assert_eq!(convert(&p, &mut stale, &gap[1..]), Ok(Standing::Behind));
+        let mut gap = [r0, ShareEpoch { epoch: 2, ..r0 }];
+        assert_eq!(convert(&p, &mut stale, &mut gap[1..]), Ok(Standing::Behind));
         let dup = [ShareEpoch { epoch: 0, ..r0 }, ShareEpoch { epoch: 0, ..r0 }];
-        assert_eq!(record_for(&dup, 1), Err(MathError::InvalidInput));
-        assert_eq!(touch(&p, &mut v, &mut a, &[r0], 0), Ok(Standing::Parked));
+        assert_eq!(
+            record_idx(&dup, 1).map(|o| o.map(|i| &dup[i])),
+            Err(MathError::InvalidInput)
+        );
+        assert_eq!(
+            touch(&p, &mut v, &mut a, &mut [r0], 0),
+            Ok(Standing::Parked)
+        );
         assert_eq!(a.pending, 5);
         assert_eq!(allowance(&p, &v, &a, 0), Ok(0));
     }
@@ -2025,7 +2246,7 @@ mod tests {
         // R4A-7: after a full wipe a deposit waits for the post-wipe sweeps.
         let (mut p, mut v) = (Pool::new(), Vault::new());
         let mut old = Lender::new(&p);
-        deposit(&mut p, &mut v, &mut old, &[], 0, 1_000, false).unwrap();
+        deposit(&mut p, &mut v, &mut old, &mut [], 0, 1_000, false).unwrap();
         borrow(&mut p, 0, 1_000, D).unwrap();
         let res = Resolution {
             q: 1_000,
@@ -2039,7 +2260,7 @@ mod tests {
         let mut dust = Lender::new(&p);
         for req in [false, true] {
             assert_eq!(
-                deposit(&mut p, &mut v, &mut dust, &[rec], 1, 2, req),
+                deposit(&mut p, &mut v, &mut dust, &mut [rec], 1, 2, req),
                 Err(MathError::WipeSweepPending)
             );
         }
@@ -2055,7 +2276,7 @@ mod tests {
         .unwrap();
         assert_eq!(p.wipe_swept, WIPE_TRADER_SWEPT);
         assert_eq!(
-            deposit(&mut p, &mut v, &mut dust, &[rec], 1, 2, true),
+            deposit(&mut p, &mut v, &mut dust, &mut [rec], 1, 2, true),
             Err(MathError::WipeSweepPending)
         );
         // 1 SOL of cashback tops up the wipe record, not the next depositor.
@@ -2071,23 +2292,23 @@ mod tests {
         .unwrap();
         assert_eq!(v.lender_sol, 1_000_000_050);
         assert_eq!(
-            deposit(&mut p, &mut v, &mut dust, &[rec], 1, 2, true),
+            deposit(&mut p, &mut v, &mut dust, &mut [rec], 1, 2, true),
             Ok(2_000)
         );
         assert!(!p.is_wipe_live());
         assert_eq!(
-            touch(&p, &mut v, &mut old, &[rec], 2),
+            touch(&p, &mut v, &mut old, &mut [rec], 2),
             Ok(Standing::Current)
         );
         assert_eq!(old.pending, 1_000_000_050);
-        assert_eq!(claim(&p, &mut v, &mut dust, &[], 2), Ok(0));
+        assert_eq!(claim(&p, &mut v, &mut dust, &mut [], 2), Ok(0));
     }
 
     #[test]
     fn vest_releases_linearly_with_a_value_weighted_end() {
         let (mut p, mut v) = (Pool::new(), Vault::new());
         let mut h = Lender::new(&p);
-        deposit(&mut p, &mut v, &mut h, &[], 0, 1_000, false).unwrap();
+        deposit(&mut p, &mut v, &mut h, &mut [], 0, 1_000, false).unwrap();
         sweep(&mut p, &mut v, None, 0, VEST, 6_000, SweepSource::Trader).unwrap();
         assert_eq!((p.vest_bal, p.vest_end), (6_000, 21_600));
         assert_eq!(release(&mut p, 3_600), Ok(1_000));
@@ -2124,11 +2345,11 @@ mod tests {
         let setup = || {
             let (mut p, mut v) = (Pool::new(), Vault::new());
             let mut h = Lender::new(&p);
-            deposit(&mut p, &mut v, &mut h, &[], 0, 1_000_000, false).unwrap();
+            deposit(&mut p, &mut v, &mut h, &mut [], 0, 1_000_000, false).unwrap();
             borrow(&mut p, 0, 1_000, D).unwrap();
             accrue(&mut p, &mut v, 60, 30).unwrap();
             let mut j = Lender::new(&p);
-            deposit(&mut p, &mut v, &mut j, &[], 60, 9_000_000, false).unwrap();
+            deposit(&mut p, &mut v, &mut j, &mut [], 60, 9_000_000, false).unwrap();
             (p, v, h, j)
         };
         // repay: rent 200 at 15 %: lender rent 170, credited 30, top-up 140 vests with the lump.
@@ -2143,8 +2364,12 @@ mod tests {
         assert_eq!(p.acc, acc, "nothing above the credited rent at once");
         assert!(p.acc_r > acc_r, "the credited rent is realised");
         assert_eq!((p.vest_bal, p.vest_end), (190, 60 + i64::from(VEST)));
-        assert_eq!(claim(&p, &mut v, &mut j, &[], 60), Ok(0), "the JIT lender");
-        assert!((29..=30).contains(&claim(&p, &mut v, &mut h, &[], 60).unwrap()));
+        assert_eq!(
+            claim(&p, &mut v, &mut j, &mut [], 60),
+            Ok(0),
+            "the JIT lender"
+        );
+        assert!((29..=30).contains(&claim(&p, &mut v, &mut h, &mut [], 60).unwrap()));
         // A shortfall (rent 20: lender rent 17 < 30) is debited at once; nothing vests.
         let (mut p, mut v, _, _) = setup();
         let acc = p.acc;
@@ -2173,13 +2398,13 @@ mod tests {
         );
         assert_eq!(p.vest_bal, 220, "the vest booked is the one returned");
         assert_eq!(p.borrowed_q, 0);
-        let paid_j = claim(&p, &mut v, &mut j, &[], 60).unwrap();
+        let paid_j = claim(&p, &mut v, &mut j, &mut [], 60).unwrap();
         // The JIT lender's part of the immediate token value (650·9/10), none of the rent.
         assert!(
             paid_j <= 650 * 9 / 10 && paid_j + 2 >= 650 * 9 / 10,
             "{paid_j}"
         );
-        let paid_h = claim(&p, &mut v, &mut h, &[], 60).unwrap();
+        let paid_h = claim(&p, &mut v, &mut h, &mut [], 60).unwrap();
         assert!(paid_h <= 30 + 65 && paid_h + 2 >= 30 + 65, "{paid_h}");
     }
 
@@ -2221,6 +2446,7 @@ mod tests {
             s_old: 2_000,
             carry: 0,
             carry_r: 0,
+            conv_rem: 0,
             epoch: 0,
             num: 0,
             den_log1000: 0,
@@ -2232,11 +2458,14 @@ mod tests {
         l.lock_term = 1;
         let before = (v, l);
         assert_eq!(
-            touch(&p, &mut v, &mut l, &[], 0),
+            touch(&p, &mut v, &mut l, &mut [], 0),
             Err(MathError::LenderBehind)
         );
         assert_eq!((v, l), before, "a refused touch changes nothing");
-        assert_eq!(touch(&p, &mut v, &mut l, &[wipe], 0), Ok(Standing::Current));
+        assert_eq!(
+            touch(&p, &mut v, &mut l, &mut [wipe], 0),
+            Ok(Standing::Current)
+        );
         // pool_model: lock_term = 1·0 // 1 = 0 (the crate kept 1 before the fix).
         assert_eq!((l.epoch, l.lock_term), (1, 0));
         // Two 1/1000 rebases: the first record scales the term, then the lender jumps.
@@ -2249,13 +2478,13 @@ mod tests {
         let mut l = Lender::new(&p);
         l.epoch = 0;
         l.lock_term = 123_456;
-        assert_eq!(convert(&p, &mut l, &[]), Ok(Standing::Behind));
-        assert_eq!(convert(&p, &mut l, &[rebase]), Ok(Standing::Current));
+        assert_eq!(convert(&p, &mut l, &mut []), Ok(Standing::Behind));
+        assert_eq!(convert(&p, &mut l, &mut [rebase]), Ok(Standing::Current));
         assert_eq!((l.epoch, l.lock_term, l.snap), (2, 123, p.acc));
         // Without a term the lender jumps without records (V2-12).
         let mut l = Lender::new(&p);
         l.epoch = 0;
-        assert_eq!(convert(&p, &mut l, &[]), Ok(Standing::Current));
+        assert_eq!(convert(&p, &mut l, &mut []), Ok(Standing::Current));
         assert_eq!((l.epoch, l.lock_term), (2, 0));
     }
 
@@ -2264,8 +2493,8 @@ mod tests {
         // R3A-10: every lender left (no wipe), then a sweep arrives.
         let (mut p, mut v) = (Pool::new(), Vault::new());
         let mut a = Lender::new(&p);
-        let s = deposit(&mut p, &mut v, &mut a, &[], 0, 1_000_000_000_000, false).unwrap();
-        withdraw(&mut p, &mut v, &mut a, &[], 0, GRACE, s).unwrap();
+        let s = deposit(&mut p, &mut v, &mut a, &mut [], 0, 1_000_000_000_000, false).unwrap();
+        withdraw(&mut p, &mut v, &mut a, &mut [], 0, GRACE, s).unwrap();
         sweep(
             &mut p,
             &mut v,
@@ -2278,8 +2507,8 @@ mod tests {
         .unwrap();
         assert_eq!((v.lender_sol, v.protocol_fees), (0, 1_000_000_000));
         let mut d = Lender::new(&p);
-        deposit(&mut p, &mut v, &mut d, &[], 0, 1_000_000, false).unwrap();
-        assert_eq!(claim(&p, &mut v, &mut d, &[], 30_000), Ok(0));
+        deposit(&mut p, &mut v, &mut d, &mut [], 0, 1_000_000, false).unwrap();
+        assert_eq!(claim(&p, &mut v, &mut d, &mut [], 30_000), Ok(0));
         // A debit while S = 0 takes back from the protocol (signed, as the model).
         let (mut q, mut w) = (Pool::new(), Vault::new());
         assert_eq!(
@@ -2289,5 +2518,169 @@ mod tests {
         w.protocol_fees = 7;
         credit(&mut q, &mut w, None, -5, false).unwrap();
         assert_eq!((w.protocol_fees, w.lender_sol), (2, 5));
+    }
+
+    fn rebase(epoch: u32, k: u8, s_old: u128) -> ShareEpoch {
+        ShareEpoch {
+            s_old,
+            epoch,
+            num: 1,
+            den_log1000: k,
+            ..rec0()
+        }
+    }
+
+    /// A lender holding `shares` shares of an earlier `epoch`, not converted yet.
+    fn behind(p: &Pool, epoch: u32, shares: u128) -> Lender {
+        Lender {
+            shares,
+            snap: 0,
+            snap_r: 0,
+            epoch,
+            ..Lender::new(p)
+        }
+    }
+
+    /// `convert_shares` through `rec`, as the conversion calls it.
+    fn through(shares: u128, rec: &ShareEpoch) -> Result<(u128, u128), MathError> {
+        let (num, den) = rec.ratio()?;
+        convert_shares(shares, rec.conv_rem, num, den)
+    }
+
+    /// KI-65: `⌊(conv_rem + s)/den⌋` and the remainder, at least the floor and at most one
+    /// more; a full wipe leaves `conv_rem` alone; a malformed remainder is refused; the
+    /// widest denominator (1,000^12) cannot overflow.
+    #[test]
+    fn convert_shares_rounds_cumulatively() {
+        let r = |rem: u128| ShareEpoch {
+            conv_rem: rem,
+            ..rebase(0, 1, 10_000)
+        };
+        assert_eq!(through(1_999, &r(0)), Ok((1, 999)), "floor");
+        assert_eq!(through(1, &r(999)), Ok((1, 0)), "the unit, wrapping to 0");
+        assert_eq!(through(1_001, &r(999)), Ok((2, 0)));
+        assert_eq!(through(600, &r(600)), Ok((1, 200)), "dust lands the unit");
+        assert_eq!(through(600, &r(0)), Ok((0, 600)), "dust below the unit");
+        assert_eq!(through(0, &r(5)), Ok((0, 5)));
+        assert_eq!(through(5, &r(999)), Ok((1, 4)));
+        assert_eq!(through(5, &r(1_000)), Err(MathError::InvalidInput));
+        assert_eq!(through(5, &r(u128::MAX)), Err(MathError::InvalidInput));
+        let wipe = ShareEpoch {
+            conv_rem: 7,
+            ..rec0()
+        };
+        assert_eq!(through(1_234, &wipe), Ok((0, 7)), "a wipe keeps conv_rem");
+        let den = 10u128.pow(36);
+        let deep = ShareEpoch {
+            conv_rem: den - 1,
+            ..rebase(0, 12, u128::MAX)
+        };
+        let q = u128::MAX / den;
+        let r0 = u128::MAX % den;
+        assert_eq!(through(u128::MAX, &deep), Ok((q + 1, r0 - 1)));
+        assert_eq!(
+            through(
+                den - 1,
+                &ShareEpoch {
+                    conv_rem: 0,
+                    ..deep
+                }
+            ),
+            Ok((0, den - 1))
+        );
+    }
+
+    /// KI-65: whatever the conversion order, the old epoch's holders end with exactly the
+    /// new `S`; the order moves only the record's rounding unit, never below a floor.
+    #[test]
+    fn conversion_order_moves_only_the_rounding_unit() {
+        let (a, b) = (600u128, 7_199_600u128);
+        let mut p = Pool::new();
+        p.share_epoch = 1;
+        p.total_shares = (a + b) / 1_000;
+        let rec = rebase(0, 1, a + b);
+        for (first, second, got_a, got_b) in [(a, b, 0, 7_200), (b, a, 1, 7_199)] {
+            let mut recs = [rec];
+            let mut v = Vault::new();
+            let (mut x, mut y) = (behind(&p, 0, first), behind(&p, 0, second));
+            touch(&p, &mut v, &mut x, &mut recs, 0).unwrap();
+            touch(&p, &mut v, &mut y, &mut recs, 0).unwrap();
+            assert_eq!(x.shares + y.shares, p.total_shares);
+            let (sa, sb) = if first == a {
+                (x.shares, y.shares)
+            } else {
+                (y.shares, x.shares)
+            };
+            assert_eq!((sa, sb), (got_a, got_b));
+            assert!(sa >= a / 1_000 && sb >= b / 1_000);
+            assert_eq!(recs[0].conv_rem, (a + b) % 1_000);
+        }
+        // A view computes the conversion without writing it.
+        let recs = [rec];
+        let l = behind(&p, 0, a);
+        allowance_view(&p, &Vault::new(), &l, &recs, 0).unwrap();
+        assert_eq!(recs, [rec]);
+    }
+
+    /// KI-65: a refused touch, deposit or withdrawal leaves the records byte-identical; a
+    /// partial conversion (`Behind`) writes only the records it passed; a current lender
+    /// writes none.
+    #[test]
+    fn refusals_write_no_record_and_partial_conversions_only_theirs() {
+        let mut p = Pool::new();
+        p.share_epoch = 2;
+        p.total_shares = 7;
+        p.tokens_free = 10;
+        let recs0 = [rebase(0, 1, 7_654), rebase(1, 1, 7_654)];
+        let mut v = Vault::new();
+        let l0 = behind(&p, 0, 7_654);
+        // Missing the second record: touch refuses and writes nothing.
+        let (mut recs, mut l) = (recs0, l0);
+        assert_eq!(
+            touch(&p, &mut v, &mut l, &mut recs[..1], 0),
+            Err(MathError::LenderBehind)
+        );
+        assert_eq!((recs, l), (recs0, l0));
+        assert_eq!(
+            deposit(&mut p.clone(), &mut v, &mut l, &mut recs, 0, 0, false),
+            Err(MathError::DepositTooSmall)
+        );
+        assert_eq!((recs, l), (recs0, l0));
+        assert_eq!(
+            withdraw(&mut p.clone(), &mut v, &mut l, &mut recs, 0, GRACE, 1_000),
+            Err(MathError::InsufficientShares)
+        );
+        assert_eq!((recs, l), (recs0, l0));
+        // sync_lender(1): the first record only.
+        assert_eq!(convert(&p, &mut l, &mut recs[..1]), Ok(Standing::Behind));
+        assert_eq!((l.epoch, l.shares), (1, 7));
+        assert_eq!((recs[0].conv_rem, recs[1].conv_rem), (654, 0));
+        assert_eq!(convert(&p, &mut l, &mut recs[1..]), Ok(Standing::Current));
+        assert_eq!((l.epoch, l.shares), (2, 0));
+        assert_eq!(
+            recs[1].conv_rem, 7,
+            "the dust lender advances conv_rem and jumps"
+        );
+        // Current: claim writes nothing.
+        let before = recs;
+        claim(&p, &mut v, &mut l, &mut recs, 0).unwrap();
+        assert_eq!(recs, before);
+    }
+
+    /// The commit pass must stop where the read-only pass stopped (unreachable otherwise).
+    #[test]
+    fn commit_pass_must_match_the_read_only_pass() {
+        let mut p = Pool::new();
+        p.share_epoch = 1;
+        p.total_shares = 2;
+        let mut recs = [rebase(0, 1, 2_500)];
+        let l = behind(&p, 0, 2_500);
+        assert_eq!(
+            commit_rems(&p, &l, &mut recs, Some((1, 3))),
+            Err(MathError::Invariant)
+        );
+        let mut recs = [rebase(0, 1, 2_500)];
+        assert_eq!(commit_rems(&p, &l, &mut recs, Some((1, 2))), Ok(()));
+        assert_eq!(recs[0].conv_rem, 500);
     }
 }

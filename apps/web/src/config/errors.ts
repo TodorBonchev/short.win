@@ -252,7 +252,12 @@ const ROWS: readonly Row[] = [
         'retry',
         'You would receive fewer tokens than quoted (the pool changed). Review again with a new quote.',
     ],
-    [6079, 'InsufficientShares', 'adjust', 'You do not have that many shares.'],
+    [
+        6079,
+        'InsufficientShares',
+        'adjust',
+        'You do not have that many shares. A position behind a share rebase can end one share lower than quoted if another lender synced first: review again.',
+    ],
     [6080, 'InsufficientFreeInventory', 'adjust', 'Not enough unborrowed tokens to withdraw that much now.'],
     [
         6081,
@@ -333,6 +338,12 @@ const ROWS: readonly Row[] = [
         'AuthoritiesNotDistinct',
         'admin',
         'Governance, the Emergency key, the fee recipient and the coverage key must be four different keys.',
+    ],
+    [
+        6106,
+        'EpochRecordReadOnly',
+        'retry',
+        'A share-epoch record your position converts through was passed read-only. A new review passes it writable.',
     ],
 ];
 

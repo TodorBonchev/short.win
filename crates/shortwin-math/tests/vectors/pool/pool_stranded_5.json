@@ -1,7 +1,7 @@
 {
  "format": "see the docstring of gen_pool.py",
  "generator": "gen_pool.py",
- "source": "docs/design/sim/pool_model.py v0.4.1: stranded_table() v0.4 rows (R3A-2; attacks/pool_r3.py); table row (inflow, stranded, worst, above 0.01 SOL) = (51186440561791, 19887, 582, 0)",
+ "source": "docs/design/sim/pool_model.py v0.4.2: stranded_table() v0.4 rows (R3A-2; attacks/pool_r3.py); table row (inflow, stranded, worst, above 0.01 SOL) = (51186440561791, 19887, 582, 0)",
  "traces": [
   {
    "check_each_line": false,

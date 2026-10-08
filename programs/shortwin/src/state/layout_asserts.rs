@@ -6,7 +6,7 @@
 //! wasm32-unknown-unknown`, the T-LAYOUT CI step) — so a layout that differs on any of them
 //! fails that build. Offsets are written as in ARCH §2.3, i.e. **including** the 8-byte
 //! account discriminator for account types (`acct` rows) and from 0 for nested types. Borsh
-//! account sizes (`ShortPosition` 384, `LenderPosition` 241, `ShareEpoch` 127,
+//! account sizes (`ShortPosition` 384, `LenderPosition` 241, `ShareEpoch` 143,
 //! `WalletExposure` 81, `OracleCache` 45) are asserted here too.
 //!
 //! `tests::raw_128_bit_fields` is the ARCH §2.3 / §8.4 lint: no zero-copy file declares a raw
@@ -180,7 +180,11 @@ layout!(acct MarketVault, 2_200, {
 const _: () = {
     assert!(ShortPosition::SPACE == 384);
     assert!(LenderPosition::SPACE == 241);
-    assert!(ShareEpoch::SPACE == 127);
+    assert!(ShareEpoch::SPACE == 143);
+    // KI-65: `conv_rem` is the record's last field, rewritten in place by the lender
+    // instructions (`engine::lender::store_records`).
+    assert!(ShareEpoch::CONV_REM_OFFSET == 127);
+    assert!(ShareEpoch::CONV_REM_OFFSET + 16 == ShareEpoch::SPACE);
     assert!(WalletExposure::SPACE == 81);
     assert!(OracleCache::SPACE == 45);
     assert!(GlobalConfig::SPACE == 1_448);

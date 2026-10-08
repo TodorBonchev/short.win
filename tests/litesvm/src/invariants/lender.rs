@@ -3,23 +3,25 @@
 //!
 //! Everything here is computed with `shortwin_math::pool` on copies of the stored accounts
 //! (`Market` pool group, `MarketVault`, every `LenderPosition`, every `ShareEpoch` record of
-//! the market): nothing is written back. The checks follow `pool_model.Pool.check()` v0.4.1:
+//! the market): nothing is written back. The checks follow `pool_model.Pool.check()` v0.4.2:
 //!
 //! - [`check_market`] (per market, after every transaction):
 //!   - records: one `ShareEpoch` per rolled epoch, consecutive, the live wipe record a full
-//!     wipe; `wipe_live ⇒ S = 0`; `S = 0 ⇒ vest_bal = 0` (the vest is flushed whenever `S`
+//!     wipe, `conv_rem < 1,000^k` on a rebase record and 0 on a full wipe (KI-65); `wipe_live ⇒ S = 0`; `S = 0 ⇒ vest_bal = 0` (the vest is flushed whenever `S`
 //!     reaches 0); `S = 0 ⇒ ΣB_Q = 0` (the last shares never leave while tokens are borrowed,
 //!     ARCH §9 M0b note 4, M1-SEC-3);
 //!   - **I-P4 on the untouched state** (v0.4.1, R4A-2/R4B-3): Σ over lenders of
 //!     `pool::allowance_view` (each lender touched alone, everyone else as stored) ≤ `T` +
 //!     number of lenders;
-//!   - then every lender is touched in turn (as `check()` does), and on that state:
-//!     I1 claims side, **both directions** (SPEC §10's equality up to rounding, M1-FID-1):
-//!     `Σ claims ≤ T + ΣB_Q` and `T + ΣB_Q − Σ claims ≤ ⌈C·(VS + S − Σ shares)/(S + VS)⌉ + n`
-//!     with `claims = ⌊shares·C/(S + VS)⌋`, `C = T + ΣB_Q + VA` over the current epoch (the
-//!     virtual shares' part, the rebase-orphan shares' part and one unit of rounding per
-//!     lender); `Σ shares ≤ S`, with equality when no rebase happened since the last full wipe
-//!     (only a rebase's floors orphan shares); I-P2 per lender `claimed ≤ real`,
+//!   - then every lender is touched in turn (as `check()` does; the touches share one copy of
+//!     the records, whose `conv_rem` each conversion advances, as the program's transactions
+//!     would), and on that state: I1 claims side, **both directions** (SPEC §10's equality up
+//!     to rounding, M1-FID-1): `Σ claims ≤ T + ΣB_Q` and `T + ΣB_Q − Σ claims ≤
+//!     ⌈C·(VS + S − Σ shares)/(S + VS)⌉ + n` with `claims = ⌊shares·C/(S + VS)⌋`, `C = T + ΣB_Q +
+//!     VA` over the current epoch (the virtual shares' part and one unit of rounding per
+//!     lender); **`Σ shares = S`** (KI-65: conversions round cumulatively through each rebase
+//!     record, so no share is orphaned; a conversion the program did not persist would leave
+//!     one share too many or too few); I-P2 per lender `claimed ≤ real`,
 //!     `real − claimed ≤ max(pending, 0)`, and `Σ(real − claimed) + unmatched + vest_bal ≤
 //!     lender_sol`; the entitlement side `Σ pending ≤ lender_sol − vest_bal + receivable`
 //!     (signed); I-P4 again, every lender
@@ -28,8 +30,7 @@
 //!   - **liveness** (I-P6) when nothing is borrowed and nothing is receivable: on copies,
 //!     release the whole vest, touch everyone, claim twice in sequence; then either every
 //!     positive entitlement is paid, or what is left is exactly the realised SOL that no
-//!     lender was allocated (rounding and orphan shares), which must stay below
-//!     [`liveness_dust_cap`].
+//!     lender was allocated (rounding), which must stay below [`liveness_dust_cap`].
 //! - [`snapshot`] + [`check_ix`] (instruction level, against the state just before the
 //!   instruction; M1-FID-3, M1-FID-4): every withdrawal is within the pro-rata allowance the
 //!   lender had just before it, computed with only that lender touched (I-P4, C0-9), and never
@@ -77,8 +78,9 @@ fn shareless_borrow_allowed() -> bool {
 
 /// Default bound on the realised SOL no lender is allocated after a wind-down (lamports):
 /// 0.01 SOL, the "seeds above 0.01 SOL" line of the R3A-2 stranding table (ECON §9.4).
-/// Rounding leaves a few lamports per touch; only rebase-orphan shares in dust-sized pools
-/// leave more (ECON §9.5), and tests that build such pools raise the cap.
+/// Rounding leaves a few lamports per touch (since KI-65 no share is orphaned at a rebase, so
+/// nothing is credited to shares nobody holds); the `pool_model` trace replays point the cap at
+/// the model's own figure.
 pub const DEFAULT_LIVENESS_DUST_CAP: u64 = 10_000_000;
 
 /// The current cap (per test thread).
@@ -86,7 +88,7 @@ pub fn liveness_dust_cap() -> u64 {
     DUST_CAP.with(Cell::get)
 }
 
-/// Sets the cap for this test thread (rebase-orphan dust in dust-sized pools, ECON §9.5).
+/// Sets the cap for this test thread (the trace replays: the model's own wind-down figure).
 pub fn set_liveness_dust_cap(cap: u64) {
     DUST_CAP.with(|c| c.set(cap));
 }
@@ -138,6 +140,17 @@ impl PoolState {
         &self.records[i..]
     }
 
+    /// The records from `epoch` on, mutable: a conversion writes `conv_rem` (KI-65), so
+    /// touches on copies thread one copy of the records through every lender, as the program's
+    /// transactions would.
+    pub fn records_from_mut(records: &mut [MathShareEpoch], epoch: u32) -> &mut [MathShareEpoch] {
+        let i = records
+            .iter()
+            .position(|r| r.epoch >= epoch)
+            .unwrap_or(records.len());
+        &mut records[i..]
+    }
+
     /// The lender of `owner`, if any.
     pub fn lender_of(&self, owner: &Pubkey) -> Option<&LenderPosition> {
         self.lenders
@@ -187,19 +200,19 @@ fn token_value(p: &Pool, shares: u128) -> Result<u128, Violation> {
 /// A lender touched on copies, as `pool::touch` would leave it (and the vault).
 fn touch(
     st: &PoolState,
+    records: &mut [MathShareEpoch],
     vault: &mut Vault,
     l: &LenderPosition,
     who: &Pubkey,
 ) -> Result<Lender, Violation> {
     let mut x = l.lender();
-    pool::touch(&st.pool, vault, &mut x, st.records_from(l.epoch), st.now).map_err(|e| {
-        Violation {
-            invariant: "I8",
-            detail: format!(
-                "market {}: lender {who} cannot be touched with the stored records: {e:?}",
-                st.market
-            ),
-        }
+    let recs = PoolState::records_from_mut(records, l.epoch);
+    pool::touch(&st.pool, vault, &mut x, recs, st.now).map_err(|e| Violation {
+        invariant: "I8",
+        detail: format!(
+            "market {}: lender {who} cannot be touched with the stored records: {e:?}",
+            st.market
+        ),
     })?;
     Ok(x)
 }
@@ -227,6 +240,19 @@ pub fn check_state(st: &PoolState) -> Result<(), Violation> {
             format!(
                 "market {market}: ShareEpoch records not one per epoch from 0 (#{i} is epoch {})",
                 r.epoch
+            )
+        })?;
+        // KI-65: a rebase record's conversion remainder stays below its denominator; a full
+        // wipe's is never written.
+        let rem_ok = if r.is_full_wipe() {
+            r.conv_rem == 0
+        } else {
+            r.den().is_ok_and(|d| r.conv_rem < d)
+        };
+        ensure(rem_ok, "I8", || {
+            format!(
+                "market {market}: ShareEpoch {} conv_rem {} out of range (num {}, k {})",
+                r.epoch, r.conv_rem, r.num, r.den_log1000
             )
         })?;
     }
@@ -291,8 +317,9 @@ pub fn check_state(st: &PoolState) -> Result<(), Violation> {
         detail: format!("market {market}: cal_advance failed: {e:?}"),
     })?;
     let mut touched: Vec<(Pubkey, Lender)> = Vec::with_capacity(st.lenders.len());
+    let mut recs = st.records.clone();
     for (key, l) in &st.lenders {
-        touched.push((*key, touch(st, &mut vault, l, key)?));
+        touched.push((*key, touch(st, &mut recs, &mut vault, l, key)?));
     }
 
     // I1 claims side and share conservation, over the current epoch.
@@ -306,24 +333,16 @@ pub fn check_state(st: &PoolState) -> Result<(), Violation> {
     ensure(claims <= assets, "I1", || {
         format!("market {market}: token claims {claims} > T + ΣB_Q = {assets}")
     })?;
-    ensure(cur_shares <= p.total_shares, "I1", || {
+    // KI-65: conversions round cumulatively through each record, so once every lender is
+    // touched every share has a holder: Σ shares = S exactly.
+    ensure(cur_shares == p.total_shares, "I1", || {
         format!(
-            "market {market}: Σ lender shares {cur_shares} > S {}",
-            p.total_shares
-        )
-    })?;
-    // Only a rebase's floors orphan shares (ECON §9.5): none since the last full wipe ⇒ every
-    // share has a holder.
-    let rebases = rebases_since_wipe(&st.records);
-    ensure(rebases > 0 || cur_shares == p.total_shares, "I1", || {
-        format!(
-            "market {market}: Σ lender shares {cur_shares} != S {} with no rebase since the \
-             last full wipe",
+            "market {market}: Σ lender shares {cur_shares} != S {}",
             p.total_shares
         )
     })?;
     // I1's other direction (SPEC §10 is an equality; M1-FID-1): what no lender claims is at
-    // most the virtual shares' and the orphan shares' part plus one unit per lender.
+    // most the virtual shares' part plus one unit per lender.
     if p.total_shares > 0 {
         let unclaimed = assets.saturating_sub(claims);
         let bound = unclaimed_bound(p, cur_shares).map_err(|e| Violation {
@@ -437,19 +456,9 @@ pub fn check_state(st: &PoolState) -> Result<(), Violation> {
     Ok(())
 }
 
-/// Rebase records (`num = 1`) after the last full-wipe record (`num = 0`): the rolls whose
-/// floors may have orphaned shares still in `S`.
-pub fn rebases_since_wipe(records: &[MathShareEpoch]) -> usize {
-    records
-        .iter()
-        .rev()
-        .take_while(|r| r.num != 0)
-        .filter(|r| r.num == 1)
-        .count()
-}
-
 /// `⌈C·(VS + S − held)/(S + VS)⌉`, `C = T + ΣB_Q + VA`: the token value of the virtual shares
-/// and of the `S − held` shares no lender holds (I1's lower side, M1-FID-1).
+/// and of the `S − held` shares no lender holds (I1's lower side, M1-FID-1; `held = S` since
+/// KI-65, so only the virtual shares' part).
 pub fn unclaimed_bound(p: &Pool, held: u128) -> Result<u128, shortwin_math::MathError> {
     use shortwin_math::num::{Rounding, mul_div};
     let c = u128::from(p.tokens_free) + u128::from(p.borrowed_q) + pool::VIRTUAL_ASSETS;
@@ -493,8 +502,9 @@ pub fn wind_down(st: &PoolState) -> Result<WindDown, Violation> {
         ..st.clone()
     };
     let mut ls: Vec<Lender> = Vec::with_capacity(st.lenders.len());
+    let mut recs = st2.records.clone();
     for (key, l) in &st.lenders {
-        ls.push(touch(&st2, &mut vault, l, key)?);
+        ls.push(touch(&st2, &mut recs, &mut vault, l, key)?);
     }
     let own: u128 = ls.iter().map(|l| u128::from(l.real - l.claimed)).sum();
     let unallocated = u128::from(vault.lender_sol)
@@ -506,8 +516,8 @@ pub fn wind_down(st: &PoolState) -> Result<WindDown, Violation> {
     let mut paid = 0u64;
     for _ in 0..2 {
         for (i, l) in ls.iter_mut().enumerate() {
-            let recs = st2.records_from(st.lenders[i].1.epoch);
-            paid += pool::claim(&p, &mut vault, l, recs, end).map_err(|e| Violation {
+            let from = PoolState::records_from_mut(&mut recs, st.lenders[i].1.epoch);
+            paid += pool::claim(&p, &mut vault, l, from, end).map_err(|e| Violation {
                 invariant: "I8",
                 detail: format!("market {market}: wind-down claim failed: {e:?}"),
             })?;
@@ -524,9 +534,9 @@ pub fn wind_down(st: &PoolState) -> Result<WindDown, Violation> {
 
 /// I-P6 on the wound-down copies ([`wind_down`]). Both checks bind only while some
 /// entitlement is unpaid: with nothing owed, any `lender_sol` left passes, however much of it
-/// is credited to rebase-orphan shares or allocated to no lender. Over-stranding with every
-/// lender paid is the fuzzer's to catch — its wind-down's second claim pass bounds `lender_sol`
-/// by the dust cap plus the orphan shares' realised SOL (`tests/fuzz`, FUZZ-M10-24H-A).
+/// is allocated to no lender. Over-stranding with every lender paid is the fuzzer's to catch —
+/// its wind-down's second claim pass bounds `lender_sol` by the dust cap (`tests/fuzz`;
+/// FUZZ-M10-24H-A's rebase-orphan credit is gone since KI-65).
 fn liveness(st: &PoolState) -> Result<(), Violation> {
     let w = wind_down(st)?;
     let market = st.market;
@@ -617,11 +627,12 @@ pub fn check_ix(
             };
             let mut vault = st_now.vault.clone();
             let mut x = l.lender();
+            let mut recs = st_now.records.clone();
             let standing = pool::touch(
                 &st_now.pool,
                 &mut vault,
                 &mut x,
-                st_now.records_from(l.epoch),
+                PoolState::records_from_mut(&mut recs, l.epoch),
                 now,
             );
             if matches!(standing, Ok(Standing::Current | Standing::Parked)) {

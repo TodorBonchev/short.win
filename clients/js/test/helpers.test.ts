@@ -31,7 +31,7 @@ const anchorDiscriminator = (preimage: string): Uint8Array =>
 
 const MARKET = address('So11111111111111111111111111111111111111112');
 
-test('ShareEpoch: field order, size 127 and discriminator follow epoch.rs', () => {
+test('ShareEpoch: field order, size 143 and discriminator follow epoch.rs', () => {
     const fields = rustFields(read('programs/shortwin/src/state/epoch.rs'), 'ShareEpoch');
     const record = {
         market: MARKET,
@@ -44,6 +44,7 @@ test('ShareEpoch: field order, size 127 and discriminator follow epoch.rs', () =
         num: 1,
         denLog1000: 2,
         bump: 254,
+        convRem: 999_999n,
     };
     const bytes = client.getShareEpochEncoder().encode(record);
     const space = /assert!\(ShareEpoch::SPACE == ([\d_]+)\)/.exec(read('programs/shortwin/src/state/layout_asserts.rs'))?.[1];
@@ -58,6 +59,11 @@ test('ShareEpoch: field order, size 127 and discriminator follow epoch.rs', () =
     assert.equal(new DataView(bytes.buffer, bytes.byteOffset).getUint32(40, true), 7);
     assert.equal(bytes[124], 1);
     assert.equal(bytes[126], 254);
+    // KI-65: conv_rem is the last field, at ShareEpoch::CONV_REM_OFFSET, rewritten in place.
+    const offset = /pub const CONV_REM_OFFSET: usize = ([\d_]+);/.exec(read('programs/shortwin/src/state/epoch.rs'))?.[1];
+    assert.equal(Number(offset), 127);
+    assert.equal(new DataView(bytes.buffer, bytes.byteOffset).getBigUint64(127, true), 999_999n);
+    assert.equal(bytes.length - 16, 127);
 });
 
 test('findShareEpochPda and the remaining-account metas', async () => {
@@ -69,7 +75,8 @@ test('findShareEpochPda and the remaining-account metas', async () => {
     assert.equal(pda, expected);
     const metas = await client.getShareEpochAccountMetas({ market: MARKET, fromEpoch: 3, shareEpoch: 6 });
     assert.equal(metas.length, 3);
-    assert.ok(metas.every((m) => m.role === AccountRole.READONLY));
+    // Writable: a conversion through a rebase record writes its conv_rem (KI-65).
+    assert.ok(metas.every((m) => m.role === AccountRole.WRITABLE));
     assert.equal(metas[0].address, (await client.findShareEpochPda({ market: MARKET, epoch: 3 }))[0]);
     assert.equal((await client.getShareEpochAccountMetas({ market: MARKET, fromEpoch: 0, shareEpoch: 40 })).length, 16);
 });

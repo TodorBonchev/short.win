@@ -1,4 +1,4 @@
-//! Lender pool plumbing (ARCH §3.0, §3.3; ECON §9; `sim/pool_model.py` v0.4.1 through
+//! Lender pool plumbing (ARCH §3.0, §3.3; ECON §9; `sim/pool_model.py` v0.4.2 through
 //! `shortwin_math::pool`).
 //!
 //! The six lender instructions are thin wrappers: they load the math state
@@ -13,6 +13,9 @@
 //! - [`load_records`]: the `ShareEpoch` records a lender is behind on, from
 //!   `remaining_accounts`, key-checked against `["share_epoch", market, epoch u32 LE]` with
 //!   the record's stored bump (`create_program_address`, no bump search; A39).
+//! - [`store_records`]: writes back the conversion remainder `conv_rem` of every record the
+//!   lender converted through (KI-65: cumulative rebase rounding, no orphan shares); such a
+//!   record must have been passed writable.
 //! - [`init_if_new`]: the fields of a `LenderPosition` that `deposit` just created.
 //! - [`rewards_required`]: which post-wipe sweeps a deposit into a live wipe record waits for
 //!   (R4A-7).
@@ -69,6 +72,40 @@ pub fn load_records(
         out.push(rec.record());
     }
     Ok(out)
+}
+
+/// Writes back the `conv_rem` of every record the lender's conversion changed (KI-65,
+/// ECON §9.5): `before` is what [`load_records`] returned for the first `before.len()` of
+/// `accounts`, `after` the same records after the pool calls. A changed record must be
+/// writable (`EpochRecordReadOnly`); unchanged records may be read-only and are not
+/// touched. [`load_records`] already checked each account's owner, discriminator, market
+/// and address, so the 16 bytes at [`ShareEpoch::CONV_REM_OFFSET`] are written in place
+/// (no Borsh round trip). Call it with the other stores, after every check passed.
+pub fn store_records(
+    accounts: &[AccountInfo],
+    before: &[MathShareEpoch],
+    after: &[MathShareEpoch],
+) -> Result<()> {
+    require_eq!(
+        before.len(),
+        after.len(),
+        ShortwinError::EpochRecordMismatch
+    );
+    for ((info, b), a) in accounts.iter().zip(before).zip(after) {
+        if a.conv_rem == b.conv_rem {
+            continue;
+        }
+        require!(info.is_writable, ShortwinError::EpochRecordReadOnly);
+        let mut data = info.try_borrow_mut_data()?;
+        let end = ShareEpoch::CONV_REM_OFFSET
+            .checked_add(16)
+            .ok_or(ShortwinError::MathOverflow)?;
+        let field = data
+            .get_mut(ShareEpoch::CONV_REM_OFFSET..end)
+            .ok_or(ShortwinError::EpochRecordMismatch)?;
+        field.copy_from_slice(&a.conv_rem.to_le_bytes());
+    }
+    Ok(())
 }
 
 /// Fills a `LenderPosition` that `deposit` created in this instruction (`init_if_needed`

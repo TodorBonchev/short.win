@@ -226,6 +226,8 @@ export const SHORTWIN_ERROR__RESERVED_SCAN_OUT_OF_ORDER = 0x17d7; // 6103
 export const SHORTWIN_ERROR__GRADUATION_HALTED = 0x17d8; // 6104
 /** AuthoritiesNotDistinct: governance, pause_authority, fee_recipient and coverage_authority must be pairwise distinct */
 export const SHORTWIN_ERROR__AUTHORITIES_NOT_DISTINCT = 0x17d9; // 6105
+/** EpochRecordReadOnly: A ShareEpoch record the lender converts through must be passed writable */
+export const SHORTWIN_ERROR__EPOCH_RECORD_READ_ONLY = 0x17da; // 6106
 
 export type ShortwinError =
   | typeof SHORTWIN_ERROR__ABOVE_PRO_RATA_ALLOWANCE
@@ -256,6 +258,7 @@ export type ShortwinError =
   | typeof SHORTWIN_ERROR__EMA_WARMING_UP
   | typeof SHORTWIN_ERROR__EMERGENCY_CANNOT_CANCEL
   | typeof SHORTWIN_ERROR__EPOCH_RECORD_MISMATCH
+  | typeof SHORTWIN_ERROR__EPOCH_RECORD_READ_ONLY
   | typeof SHORTWIN_ERROR__EXIT_BOUND_NOT_MET
   | typeof SHORTWIN_ERROR__GRADUATION_HALTED
   | typeof SHORTWIN_ERROR__INSUFFICIENT_FREE_INVENTORY
@@ -366,6 +369,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [SHORTWIN_ERROR__EMA_WARMING_UP]: `The price state is warming up after a venue change; opens and keeper exits wait`,
     [SHORTWIN_ERROR__EMERGENCY_CANNOT_CANCEL]: `Only governance may cancel an authorities or timelock change`,
     [SHORTWIN_ERROR__EPOCH_RECORD_MISMATCH]: `A ShareEpoch record does not match the market or epoch`,
+    [SHORTWIN_ERROR__EPOCH_RECORD_READ_ONLY]: `A ShareEpoch record the lender converts through must be passed writable`,
     [SHORTWIN_ERROR__EXIT_BOUND_NOT_MET]: `Live buyback cost exceeds the exit bound`,
     [SHORTWIN_ERROR__GRADUATION_HALTED]: `PumpSwap pool creation is disabled (GlobalConfig.disable_flags bit 0), so this curve cannot graduate: new curve positions are refused until it is re-enabled; open positions are unaffected`,
     [SHORTWIN_ERROR__INSUFFICIENT_FREE_INVENTORY]: `Insufficient free (unborrowed) inventory`,

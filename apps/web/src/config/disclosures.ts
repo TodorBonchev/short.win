@@ -111,7 +111,7 @@ export const DISCLOSURES: Readonly<Record<DisclosureId, Disclosure>> = {
         ],
         ack: 'I understand I give up my unvested income.',
         severity: 'warn',
-        source: 'ARCH §3.3 (last lender, R4B-4)',
+        source: 'ARCH §3.3 (last lender, R4B-4); ECON §9.5 (no rebase orphans, KI-65)',
     }),
     'lender.residuals': d({
         id: 'lender.residuals',

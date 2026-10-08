@@ -78,6 +78,15 @@ pub const LENDER_SOL: Budget = Budget {
     cu: 60_000,
     source: "§6.1 `claim_sol` / `cover_deficit` / `sync_lender`",
 };
+/// KI-65: `claim_sol` / `cover_deficit` / `sync_lender` converting through more rebase records
+/// than a client passes (the web caps a lender transaction at 8 records, `apps/web/src/
+/// features/lend/chain.ts` `MAX_RECORDS`): reported against the transaction limit only. Each
+/// record a conversion writes and accrues through costs ≈ 4.7–5.2k CU, so §6.1's 60,000 holds
+/// to 8 records with margin (9: `cover_deficit` 59,694, 306 CU short of the limit).
+pub const LENDER_SOL_BEYOND_CAP: Budget = Budget {
+    cu: 1_400_000,
+    source: "transaction limit; beyond the web's 8-record cap (§6.1's 60,000 holds to 8)",
+};
 /// Permissionless cranks without a §6.1 row (the `crank_price` limit).
 pub const CRANK: Budget = Budget {
     cu: 60_000,
@@ -507,6 +516,148 @@ fn sync_lender() -> Prepared {
     prepared(s.env, ix, &[])
 }
 
+/// KI-65: the lender of [`LenderEnv::deposited`], forged `n` rebase records (`1/1,000` each)
+/// behind: it holds `300·1,000ⁿ + Σ_{i<n} 1,000ⁱ` old shares, so every conversion step leaves a
+/// remainder and writes its record's `conv_rem` (the worst case per record), and the market's
+/// `S` is their floor chain, 300 (every share held, as the hooks require). `n = 12` puts the
+/// holding at 3.0·10³⁸, the largest a 12-record chain of `u128` shares allows (`R_MAX` keeps a
+/// real pool far below: about 8 records of `/1,000` from the largest deposit).
+///
+/// Every record also credits the lender, as a real one does (a rebase follows a settlement
+/// that credits SOL): its `acc_end` / `acc_r_end` advance by [`credit_delta`] over the
+/// lender's snapshot, so `accrued` runs on nonzero deltas for both accumulators, and the
+/// vault's `lender_sol` (with the lamports behind it) holds exactly the lender's resulting
+/// entitlement, so `claim_sol` pays it all and the hooks' liveness check finds nothing left.
+fn behind(n: u32) -> LenderEnv {
+    use shortwin::state::{LenderPosition, MarketVault, ShareEpoch};
+    let mut s = LenderEnv::deposited(TokenProgram::Spl);
+    let market = s.k.market;
+    let owner = s.h.owner.pubkey();
+    let mut m = s.env.market(&market);
+    let mut p = m.pool();
+    let held = (0..n).fold(300u128, |s, _| s * 1_000 + 1);
+    let mut s_old = held;
+    let mut credit = 0u128;
+    let (mut base, mut base_r) = (p.acc, p.acc_r);
+    for e in 0..n {
+        let (key, bump) = pda::share_epoch(&market, e);
+        let d = credit_delta(s_old);
+        credit += s_old * d / WAD;
+        let rec = ShareEpoch {
+            market,
+            epoch: e,
+            acc_end: base + i128::try_from(d).expect("i128"),
+            acc_r_end: base_r + d,
+            s_old,
+            carry: 0,
+            carry_r: 0,
+            num: 1,
+            den_log1000: 1,
+            bump,
+            conv_rem: 0,
+        };
+        fixtures::set_borsh(&mut s.env.svm, &key, &rec, ShareEpoch::SPACE, 0);
+        // The lender's snapshots restart at 0 on the next epoch (`convert`).
+        (base, base_r) = (0, 0);
+        s_old /= 1_000;
+    }
+    assert_eq!(s_old, 300);
+    p.share_epoch = n;
+    p.total_shares = s_old;
+    (p.acc, p.carry, p.acc_r, p.carry_r) = (0, 0, 0, 0);
+    m.set_pool(&p);
+    fixtures::set_zc(&mut s.env.svm, &market, &m, 0);
+    let key = pda::lender(&market, &owner).0;
+    let mut l: LenderPosition = s.env.lender(&market, &owner).expect("lender");
+    l.shares = held;
+    fixtures::set_borsh(&mut s.env.svm, &key, &l, LenderPosition::SPACE, 0);
+    // Fund the lender's entitlement: `lender_sol` and the vault's lamports.
+    let credit = u64::try_from(credit).expect("the credit fits u64");
+    let vk = s.k.market_vault;
+    let mut v: MarketVault = s.env.market_vault(&market);
+    let held_lamports = s.env.svm.get_account(&vk).expect("vault").lamports;
+    let rent = s
+        .env
+        .svm
+        .minimum_balance_for_rent_exemption(MarketVault::SPACE);
+    v.lender_sol += credit;
+    fixtures::set_zc(&mut s.env.svm, &vk, &v, held_lamports - rent + credit);
+    s
+}
+
+/// `WAD`, the accumulators' scale (`shortwin_math::num::WAD`).
+const WAD: u128 = 1_000_000_000_000_000_000;
+/// The accumulator step of a forged record over `shares` old shares: about 1 SOL of credit
+/// (`⌈10⁹·WAD/shares⌉`, at least 1, so never a zero delta), except where even a step of 1
+/// would credit more than an `i64` `pending` holds (only the first record of the 12-record
+/// chain, 3.0·10³⁸ shares: that record alone keeps a zero delta).
+fn credit_delta(shares: u128) -> u128 {
+    const TARGET: u128 = 1_000_000_000;
+    if shares / WAD > u128::from(u64::MAX >> 2) {
+        return 0;
+    }
+    (TARGET * WAD).div_ceil(shares).max(1)
+}
+
+fn records(s: &LenderEnv, n: u32) -> Vec<anchor_lang::solana_program::instruction::AccountMeta> {
+    ix::epoch_records(&s.k.market, 0, n)
+}
+
+fn claim_sol_behind(n: u32) -> Prepared {
+    let s = behind(n);
+    let ix = ix::with_remaining(
+        ix::claim_sol(&s.h.owner.pubkey(), &s.k.market),
+        &records(&s, n),
+    );
+    s.prepared(ix)
+}
+
+fn sync_lender_behind(n: u32) -> Prepared {
+    let s = behind(n);
+    let max = u8::try_from(n).expect("u8");
+    let ix = ix::with_remaining(
+        ix::sync_lender(&s.h.owner.pubkey(), &s.k.market, max),
+        &records(&s, n),
+    );
+    prepared(s.env, ix, &[])
+}
+
+fn withdraw_behind(n: u32) -> Prepared {
+    let s = behind(n);
+    let ix = ix::with_remaining(ix::withdraw(&s.keys(), 100, 0), &records(&s, n));
+    s.prepared(ix)
+}
+
+fn deposit_behind(n: u32) -> Prepared {
+    let s = behind(n);
+    let ix = ix::with_remaining(ix::deposit(&s.keys(), DEPOSIT, 0), &records(&s, n));
+    s.prepared(ix)
+}
+
+fn cover_deficit_behind(n: u32) -> Prepared {
+    let s = behind(n);
+    let ix = ix::with_remaining(
+        ix::cover_deficit(&s.h.owner.pubkey(), &s.k.market, COVER),
+        &records(&s, n),
+    );
+    s.prepared(ix)
+}
+
+/// `fn $name() -> Prepared { $base($n) }` for each pair (a case's setup is a plain `fn`).
+macro_rules! at {
+    ($base:ident: $($name:ident = $n:literal),* $(,)?) => {
+        $(fn $name() -> Prepared {
+            $base($n)
+        })*
+    };
+}
+
+at!(deposit_behind: deposit_behind_1 = 1, deposit_behind_3 = 3, deposit_behind_8 = 8, deposit_behind_12 = 12);
+at!(withdraw_behind: withdraw_behind_1 = 1, withdraw_behind_3 = 3, withdraw_behind_8 = 8, withdraw_behind_12 = 12);
+at!(claim_sol_behind: claim_sol_behind_1 = 1, claim_sol_behind_3 = 3, claim_sol_behind_8 = 8, claim_sol_behind_10 = 10, claim_sol_behind_12 = 12);
+at!(cover_deficit_behind: cover_deficit_behind_1 = 1, cover_deficit_behind_3 = 3, cover_deficit_behind_8 = 8, cover_deficit_behind_10 = 10, cover_deficit_behind_12 = 12);
+at!(sync_lender_behind: sync_lender_behind_1 = 1, sync_lender_behind_3 = 3, sync_lender_behind_8 = 8, sync_lender_behind_10 = 10, sync_lender_behind_12 = 12);
+
 fn sweep_protocol_fees() -> Prepared {
     let (
         Prepared {
@@ -675,6 +826,146 @@ pub fn cases() -> Vec<Case> {
             LENDER_SOL,
             sync_lender,
         ),
+        // KI-65: converting through rebase records writes each record's `conv_rem`, and
+        // every record credits the lender (`behind`).
+        case(
+            "deposit",
+            "1 rebase record behind, written",
+            LENDER_TOKENS,
+            deposit_behind_1,
+        ),
+        case(
+            "deposit",
+            "3 rebase records behind, written",
+            LENDER_TOKENS,
+            deposit_behind_3,
+        ),
+        case(
+            "deposit",
+            "8 rebase records behind, written",
+            LENDER_TOKENS,
+            deposit_behind_8,
+        ),
+        case(
+            "deposit",
+            "12 rebase records behind, written",
+            LENDER_TOKENS,
+            deposit_behind_12,
+        ),
+        case(
+            "withdraw",
+            "1 rebase record behind, written",
+            LENDER_TOKENS,
+            withdraw_behind_1,
+        ),
+        case(
+            "withdraw",
+            "3 rebase records behind, written",
+            LENDER_TOKENS,
+            withdraw_behind_3,
+        ),
+        case(
+            "withdraw",
+            "8 rebase records behind, written",
+            LENDER_TOKENS,
+            withdraw_behind_8,
+        ),
+        case(
+            "withdraw",
+            "12 rebase records behind, written",
+            LENDER_TOKENS,
+            withdraw_behind_12,
+        ),
+        case(
+            "claim_sol",
+            "1 rebase record behind, written",
+            LENDER_SOL,
+            claim_sol_behind_1,
+        ),
+        case(
+            "claim_sol",
+            "3 rebase records behind, written",
+            LENDER_SOL,
+            claim_sol_behind_3,
+        ),
+        case(
+            "claim_sol",
+            "8 rebase records behind, written",
+            LENDER_SOL,
+            claim_sol_behind_8,
+        ),
+        case(
+            "claim_sol",
+            "10 rebase records behind, written",
+            LENDER_SOL_BEYOND_CAP,
+            claim_sol_behind_10,
+        ),
+        case(
+            "claim_sol",
+            "12 rebase records behind, written",
+            LENDER_SOL_BEYOND_CAP,
+            claim_sol_behind_12,
+        ),
+        case(
+            "cover_deficit",
+            "1 rebase record behind, written",
+            LENDER_SOL,
+            cover_deficit_behind_1,
+        ),
+        case(
+            "cover_deficit",
+            "3 rebase records behind, written",
+            LENDER_SOL,
+            cover_deficit_behind_3,
+        ),
+        case(
+            "cover_deficit",
+            "8 rebase records behind, written",
+            LENDER_SOL,
+            cover_deficit_behind_8,
+        ),
+        case(
+            "cover_deficit",
+            "10 rebase records behind, written",
+            LENDER_SOL_BEYOND_CAP,
+            cover_deficit_behind_10,
+        ),
+        case(
+            "cover_deficit",
+            "12 rebase records behind, written",
+            LENDER_SOL_BEYOND_CAP,
+            cover_deficit_behind_12,
+        ),
+        case(
+            "sync_lender",
+            "1 rebase record behind, written",
+            LENDER_SOL,
+            sync_lender_behind_1,
+        ),
+        case(
+            "sync_lender",
+            "3 rebase records behind, written",
+            LENDER_SOL,
+            sync_lender_behind_3,
+        ),
+        case(
+            "sync_lender",
+            "8 rebase records behind, written",
+            LENDER_SOL,
+            sync_lender_behind_8,
+        ),
+        case(
+            "sync_lender",
+            "10 rebase records behind, written",
+            LENDER_SOL_BEYOND_CAP,
+            sync_lender_behind_10,
+        ),
+        case(
+            "sync_lender",
+            "12 rebase records behind, written",
+            LENDER_SOL_BEYOND_CAP,
+            sync_lender_behind_12,
+        ),
         case(
             "sweep_protocol_fees",
             "the market creation fee",
@@ -694,4 +985,44 @@ pub fn cases() -> Vec<Case> {
             crank_against_fresh_cache,
         ),
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The forged rebase records accrue (KI-65 rows): the lender's `claim_sol` through them
+    /// pays the whole funded entitlement, so the rows measure a paying claim.
+    #[test]
+    fn a_claim_behind_pays_what_the_records_credit() {
+        for n in [1, 8, 10, 12] {
+            let mut s = behind(n);
+            let owner = s.h.owner.insecure_clone();
+            let market = s.k.market;
+            let funded = s.env.market_vault(&market).lender_sol;
+            assert!(
+                funded >= u64::from(n - u32::from(n == 12)) * 1_000_000_000,
+                "{n}: {funded}"
+            );
+            let before = s
+                .env
+                .svm
+                .get_account(&owner.pubkey())
+                .map_or(0, |a| a.lamports);
+            let claim =
+                ix::with_remaining(ix::claim_sol(&owner.pubkey(), &market), &records(&s, n));
+            ok(s.env.send(&[claim], &[&owner]));
+            let after = s
+                .env
+                .svm
+                .get_account(&owner.pubkey())
+                .map_or(0, |a| a.lamports);
+            assert_eq!(
+                after - before,
+                funded,
+                "{n}: the claim pays every record's credit"
+            );
+            assert_eq!(s.env.market_vault(&market).lender_sol, 0, "{n}");
+        }
+    }
 }

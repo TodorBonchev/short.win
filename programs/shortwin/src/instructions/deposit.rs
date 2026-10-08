@@ -25,7 +25,9 @@
 //! token account has `CpiGuard.lock_cpi` cannot deposit through our CPI (R-MINT §8.4).
 //!
 //! Remaining accounts: the `ShareEpoch` records `["share_epoch", market, e]` for the epochs
-//! the lender is behind, in order (key-checked; `EpochRecordMismatch`).
+//! the lender is behind, in order (key-checked; `EpochRecordMismatch`); writable when the
+//! lender converts through a rebase record, whose conversion remainder `conv_rem` the touch
+//! writes (KI-65: `engine::lender::store_records`, else `EpochRecordReadOnly`).
 
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
@@ -124,7 +126,8 @@ pub fn handler<'info>(
         // A16 step 5: roll a completed bucket (no ReadSet, so no record and no chains).
         prologue::roll_only(&market_key, &mut market, now, clock.slot)?;
 
-        let records = lender::load_records(&market_key, ctx.remaining_accounts, usize::MAX)?;
+        let mut records = lender::load_records(&market_key, ctx.remaining_accounts, usize::MAX)?;
+        let loaded = records.clone();
         let position = &mut ctx.accounts.lender;
         lender::init_if_new(position, &owner_key, &market_key, ctx.bumps.lender, &pool);
         let mut l = position.lender();
@@ -132,7 +135,7 @@ pub fn handler<'info>(
             &mut pool,
             &mut vault,
             &mut l,
-            &records,
+            &mut records,
             now,
             amount,
             lender::rewards_required(&market),
@@ -140,6 +143,7 @@ pub fn handler<'info>(
         .math()?;
         require!(minted >= min_shares, ShortwinError::SharesBelowMin);
 
+        lender::store_records(ctx.remaining_accounts, &loaded, &records)?;
         market.set_pool(&pool);
         vault_acc.set_vault(&vault);
         position.set_lender(&l);

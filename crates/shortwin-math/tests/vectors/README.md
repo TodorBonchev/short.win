@@ -2,7 +2,7 @@
 
 Differential test vectors produced by the normative reference models (ARCHITECTURE
 §8.1): `docs/design/sim/shortwin_sim.py` v0.4.1, its attack scripts
-`docs/design/sim/attacks/*.py`, `docs/design/sim/pool_model.py` v0.4.1 and
+`docs/design/sim/attacks/*.py`, `docs/design/sim/pool_model.py` v0.4.2 (KI-65) and
 `docs/design/sim/config_check.py` v0.4.1, always with their **default switches** (the
 analysis switches only feed comparison rows; generators assert the defaults). The crate
 must match them exactly: no tolerance, no exception. Mainnet-trade fixtures (curve,
@@ -35,7 +35,7 @@ generator's docstring and the Rust parser document it:
 | `quotes/` | `gen_sim.py` → `sim.json`; `gen_caps.py` → `caps.json` (caps, example markets, keeper rewards, tiers); `gen_port.py` → `port.json`; `gen_mainnet.py` → `mainnet.json` (+ `venue_state.json`) | this README |
 | `oracle/` | `gen_oracle.py` → `units_{observe,ring,persist,bounds,ref}.json` (units only since v0.4.1; the full replays moved to `settle/`; `units_ref.json`: the exit reference liquidity with the guard and the Raydium depth cap, M4F-1) | one line per operation of whitespace-separated decimal tokens, `-` for `None`, `1`/`0` for booleans (docstring of `gen_oracle.py`, parsers in `oracle_vectors.rs`) |
 | `settle/` | `gen_settle.py` → `units_settle.json`, `units_evaluate_1.json`, `trace_{attacks_1..3,scenarios_1,random_1}.json`, `fuzz_{1..3}.json` | the oracle line encoding plus quote tables at the points the sim's rule reads; an attack variant continuing another trace is a suffix with `base` (docstring of `gen_settle.py`, parsers in `settle_vectors.rs`) |
-| `pool/` | `gen_pool.py` → `pool_fuzz_continuous_{90,100}_{1..3}.json` (each option (a) ECON §9.6 run in parts that continue one CRC chain), `pool_lock_fuzz_1.json`, `pool_stranded_{1..5}.json`, `pool_ext_{lazy,runs,dust,extreme,topup}_1.json`, `pool_scenarios_1.json` | one line per `pool_model` operation; the state after every line is checked through a chained CRC-32 of a canonical state string plus full checkpoints, and `liveness` blocks record each wind-down (I-P6) (docstring of `gen_pool.py`) |
+| `pool/` | `gen_pool.py` → `pool_fuzz_continuous_{90,100}_{1..3}.json` (each option (a) ECON §9.6 run in parts that continue one CRC chain), `pool_lock_fuzz_1.json`, `pool_stranded_{1..5}.json`, `pool_ext_{lazy,runs,dust,extreme,topup,orphans}_1.json` (`orphans`: KI-65's lazy conversion orders, plus the `orphan_vest_demo` and `whale_order_demo` pools), `pool_scenarios_1.json` | one line per `pool_model` operation; the state after every line is checked through a chained CRC-32 of a canonical state string plus full checkpoints, and `liveness` blocks record each wind-down (I-P6) (docstring of `gen_pool.py`) |
 | `risk/` | `gen_rent.py` → `rent.json`; `gen_exits.py` → `exits.json` | this README |
 | `params/` | `gen_params.py` → `params.json` | `[overrides, violations]` string pairs (docstring of `gen_params.py`, parser in `params_vectors.rs`) |
 
@@ -58,7 +58,7 @@ prints a note and leaves the file alone, which is what CI's `vectors` job does.
   ROOT = Path(__file__).resolve().parents[5]          # repository root
   sys.path.insert(0, str(ROOT / "docs" / "design" / "sim"))
   import shortwin_sim as sim                           # noqa: E402  (v0.4.1)
-  import pool_model                                    # noqa: E402  (v0.4.1)
+  import pool_model                                    # noqa: E402  (v0.4.2)
   ```
 
 - Deterministic: fixed seeds (`random.Random(<seed>)`), no timestamps, and
