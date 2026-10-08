@@ -41,7 +41,9 @@ post-wipe bundle on the mock venue and the claim-time `sync_lender` (FE-18, part
 pass spl-memo v3 to every Token-2022 destination (TMEMO-9) and the E2E runs mainnet's Token-2022,
 the `/security` page and `/.well-known/security.txt` exist, the deposit shows the pool's unpaid
 rent (`lender.unpaidRent`), a `DeniedAccount` extras set falls back to the next set, and error
-6105 is mapped (§13 "M10 changes").
+6105 is mapped (§13 "M10 changes"). *M10, eighth round (KI66-R4, KI-67, and the batch's review
+fixes):* `vitest run` 60 files, 599 tests passed, 1 opt-in file skipped; the E2E 60 tests pass
+(`lend-claim-pot-chain` and `lend-post-wipe` among them).
 
 ---
 
@@ -326,8 +328,13 @@ Tabs Deposit | Withdraw | Claim (`lendTab-*`, `?action=`).
   `pool::touch_pot` (KI-66 full), which never converts a lender through a rebase record but holds
   it at the record and walks its forward chain, so what an **absent lender behind a rebase record**
   earned before and after the record reaches the pot without its owner. `claimPlanFrom`
-  (`build.ts`): (1) the indexer's lenders of the market (≤ 24, not the signer, accounts that exist,
-  `readOtherLenders`) — current, parked or behind alike; (2) one `readRecords` over the union of
+  (`build.ts`): (1) the indexer's lenders of the market — the first page of
+  `/v1/markets/{mint}/lenders` in its default `active` view: lenders with shares > 0, largest raw
+  share count first (raw counts of different share epochs are not comparable, so a large current
+  lender can push an absent surplus holder out of the 24) — at most 24, not the signer, and only
+  accounts that are positions (`readOtherLenders` / `lenderPositionOf`: owned by short.win, the
+  position's size and discriminator; a system account someone funded at a lender PDA reads as no
+  position) — current, parked or behind alike; (2) one `readRecords` over the union of
   the records each one's sync needs (`potEpochs`: from `fwdEpoch` once it has a forward chain, else
   from `epoch`; ≤ 8); (3) `pickPotSyncs` (`quote.ts`) judges each with the WASM `previewTouchPot`
   (`pool::touch_pot` on copies: the pot's gain) and takes the largest gains until the shortfall is
@@ -340,19 +347,30 @@ Tabs Deposit | Withdraw | Claim (`lendTab-*`, `?action=`).
   (`previewClaimOutcome`); (6) a plan with syncs is simulated once more before the review: a sync
   the simulation fails on (its position closed or changed since the read) is dropped and the plan
   rebuilt, so a stale target never blocks the claim; the review then simulates the result like
-  every plan, and nothing is signed before it. Without the indexer there are no syncs. The review
+  every plan, and nothing is signed before it. A sync dropped that way is not deferred (it is no
+  longer valid; the next claim's read leaves a closed one out). Without the indexer there are no
+  syncs. The dashboard's claims (and "Claim all") build the same plan with the same indexer list
+  (`claim/otherLenders.ts`). The review
   lists the syncs as steps (title "… · N lender syncs first") with `lender.potSyncs` (how many, what
   they move), and `lender.potSyncsDeferred` when lenders with a gain did not fit (the cap or the
   size) while the claim stays short: claim again once it lands. A stale `fwdEpoch` is harmless
   (a sync that finds nothing more to move moves nothing); a lender more than 8 records along
-  advances 8 per claim. The unsigned syncs cost ≈ 47.4k CU each at 8 records (ARCH §6.1): with the
-  claim ≈ 245k CU at most, the simulation sets the limit. *M10 (KI-67):* a claim that leaves the
+  advances 8 per claim. An unsigned sync costs ≈ 48.0k CU at 8 records (47,989, `m1_cu`; ARCH
+  §6.1), so four and a chained claimant's claim stay below ≈ 4 × 48k + 58k ≈ 250k CU; the
+  simulation sets the limit (no `m1_cu` row measures the four syncs and the claim together). *M10 (KI-67):* a claim that leaves the
   position current with no shares, `pending` 0, no lock and no forward chain closes it and returns
   its rent (2,568,240 lamports) to the wallet: the review shows `lender.claimCloses`
   (`previewClaimOutcome`), the position's fields read "—" after it, the dashboard drops the row
   once the account is gone (the chain decides, FE-D1), and a claim of a closed position is refused
   by the plan ("You have no lender position in this market …"; on chain a second `claim_sol` of it
-  fails `AccountNotInitialized`, 3012). *M10 (KI-66 full, the lag-1 CU case, ARCH §6.1):* the
+  fails `AccountNotInitialized`, 3012). A review built before such a close — the claimant's own
+  position closed from another tab or the dashboard, or a sync target closed meanwhile — fails its
+  simulation with 3012; `tx/errors.ts` maps short.win's 3012 to a program error with the action
+  *retry*, so the review's Retry rebuilds the plan from the chain (`plan.rebuild`: the closed
+  target left out, a closed own position refused with the plan's message) instead of re-simulating
+  the same one. The lend panel's read treats an account at the user's lender PDA that is not a
+  position (a system account someone funded) as no position, so the panel loads and `deposit`
+  takes the account over (`init_if_needed`). *M10 (KI-66 full, the lag-1 CU case, ARCH §6.1):* the
   user's own lender transactions carry at most 8 records (`MAX_RECORDS`), **7**
   (`MAX_RECORDS_CHAINED`) while its position has a forward chain (`fwd ≠ 0`; `recordLimitOf`) — the
   sync notice says how many per transaction. The previews map the chain's four fields
@@ -420,7 +438,8 @@ position (`q`, `s`, `m`, `v`, deadline), the market's free tokens.
   → suggest add margin; `CurveStraddle` → `closeStraddleNotice`, FE-3).
 - **Lender dashboard** (LEND; `/lend`): per market (`lenderRow-<market>`): shares and share of the
   pool, token value (`previewTokenValue`), SOL claimable (`previewClaim`), vesting, lock and
-  `lock_until`, creator badge; claim per row and "claim all" (one transaction per market).
+  `lock_until`, creator badge; claim per row and "claim all" (one transaction per market; each
+  claim syncs the other lenders it needs first, as Lend → Claim does, §3.6).
   *As built:* plus the share-epoch standing and the indexer's view per row (`lender-epochs-*`,
   `lender-indexer-*`), a per-row `sync_lender`; while the indexer fails, the rows come from
   `getProgramAccounts` on the owner's `LenderPosition`s (memcmp on the owner, `dataSize` 241).
@@ -577,7 +596,7 @@ Checkbox: “I understand I give up my unvested income.”
 #### `lender.potSyncsDeferred` — Not every sync fits this transaction
 
 *Severity:* info · *Acknowledgement:* none · *Source:* FRONTEND.md §3.6 (KI66-R4: at most 4 syncs per claim, 1,232 bytes per transaction) (*M10*)
-*Shown:* in the claim's review when the pot still cannot pay the claim with the syncs it carries and other lenders' syncs with a gain were left out — beyond the cap of 4 (`pickPotSyncs`' `more`) or dropped to fit 1,232 bytes; `{count}` / `{lenders}` those lenders, `{gain}` what they would move, in SOL
+*Shown:* in the claim's review when the pot still cannot pay the claim with the syncs it carries and other lenders' syncs with a gain were left out — beyond the cap of 4 (`pickPotSyncs`' `more`) or dropped to fit 1,232 bytes (a sync the pre-review simulation failed on is not counted: it was dropped as invalid, not deferred); `{count}` / `{lenders}` those lenders, `{gain}` what they would move, in SOL
 
 > Syncing {count} more {lenders} would move about {gain} SOL more to the pot, but one transaction carries at most four syncs within its size limit. This claim pays what it can now; claim again once it has landed, and the next claim syncs them first.
 
@@ -1783,7 +1802,7 @@ edits `disclosures.ts` (copy changes need the owner) or `errors.ts`.
 | FE-27 | The deposit's unpaid-rent warning (M10 batch 3, §3.6): thresholds `UNPAID_RENT_WARN_BPS` = 100 (1 % of the deposit's value at `P_ema`) and `UNPAID_RENT_WARN_LAMPORTS` = 1 SOL, confirmed by the owner on 2026-10-03. The preview uses the stored `util_kink_bps` (the prologue first syncs a pending kink change), and rent keeps accruing between the preview and the landing; the exposure is this deposit's shares' part at the pool's current size (it grows if others withdraw first, as the text says) | closed (owner, 2026-10-03) |
 | FE-28 | `lender.risks` (§4.2) lists the one-off income that vests but not "rent paid above what accrued, such as the minimum rent of an early exit", which vests since M10-8C-1 (ECON §9.4; the Claim form's note already says it). The copy lives in `disclosures.ts` and this document together (`disclosures.test.ts` pins them verbatim), so both change in one commit | open (copy) |
 | FE-29 | `/.well-known/security.txt`'s `Expires` (2027-09-30) must be rotated before 2027-08-31: a mainnet build and `check:headers` refuse 30 days or less ahead | open (operations) |
-| FE-30 | The claim-time pot syncs (KI66-R4, §3.6): the size check compiles without lookup tables (an upper bound: a v0 wallet with the protocol ALT could carry a sync more), and a sync is dropped only when the claim's own pre-review simulation fails on it — a target that closes or changes between that simulation and a stale review's re-simulation at Sign fails the review (`AccountNotInitialized`, a re-simulation, not a rebuild); closing the review and claiming again rebuilds without it. The judgement covers the indexer's first 24 lenders of the market | by design |
+| FE-30 | The claim-time pot syncs (KI66-R4, §3.6): the size check compiles without lookup tables (an upper bound: a v0 wallet with the protocol ALT could carry a sync more), and a sync is dropped only when the claim's own pre-review simulation fails on it — a target that closes or changes between that simulation and a stale review's re-simulation at Sign fails the review with `AccountNotInitialized` (3012), which the review's Retry rebuilds (`tx/errors.ts`: short.win's 3012 is a program error with the action *retry*; the rebuild leaves the closed target out, or refuses a claim of the claimant's own closed position). The judgement covers the indexer's first 24 lenders of the market: its default `active` list (shares > 0), largest raw share count first, so a large current lender can push an absent surplus holder out (paging further, or preferring lenders whose `epoch` is behind `shareEpoch`, is the owner's call; AUDIT §7) | by design |
 
 ### M10 changes (v1.2 → v1.3)
 

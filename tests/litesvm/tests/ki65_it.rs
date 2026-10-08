@@ -678,18 +678,23 @@ fn sybil_market() -> (Lab, u128) {
     (lab, w)
 }
 
-/// The SOL `names` receive from now on, after each exits whole and claims.
-fn exit_and_claim(lab: &mut Lab, names: &[&str]) -> u64 {
+/// The SOL `names` receive from now on, after each exits whole and claims, and how many of their
+/// positions the exit's own `withdraw` closed (all shares burned, nothing owed, no lock: the
+/// closes KI-65's `withdraw` made too, whose rent its pins counted, [`pinned`]).
+fn exit_and_claim(lab: &mut Lab, names: &[&str]) -> (u64, u64) {
     let lam: Vec<u64> = names.iter().map(|n| wealth(lab, n)).collect();
+    let mut closed = 0;
     for n in names {
         exit_all(lab, n);
+        closed += u64::from(lab.position(n).is_none());
         lab.claim(n).unwrap();
     }
-    names
+    let gain = names
         .iter()
         .zip(&lam)
         .map(|(n, l)| wealth(lab, n) - l)
-        .sum()
+        .sum();
+    (gain, closed)
 }
 
 /// The `order_*` figures are SOL received, measured as [`wealth`] (a position's rent is the
@@ -697,7 +702,10 @@ fn exit_and_claim(lab: &mut Lab, names: &[&str]) -> u64 {
 /// lamports alone, so they also counted the rent of the `closed` positions their `withdraw`
 /// closed and refunded within the window; since KI-67 `claim_sol` closes the positions a
 /// withdrawal left open and returns their rent too, which the lamports alone would add. The pins
-/// stay KI-65's: `gain` plus the `closed` positions' rent.
+/// stay KI-65's: `gain` plus the `closed` positions' rent, with `closed` counted by
+/// [`exit_and_claim`] as the scenario runs (the exits whose `withdraw` burned a position's last
+/// shares; `withdraw`'s close is KI-65's, `pool::closable` on a current lender), not read off
+/// the result. SOL alone is then unchanged from KI-65 exactly when the pin holds.
 fn pinned(lab: &Lab, got: (u64, u64), pin: (u64, u64), closed: u64) {
     let rent = lab
         .env
@@ -763,7 +771,7 @@ fn order_a_third_party_cannot_interleave_its_sybils_with_honest_lenders() {
         .collect();
     assert_eq!(got, vec![0, 0, w / DEN], "the attacker's own conversions");
     assert_eq!(conv_rem(&lab, 0), 2);
-    let gain = exit_and_claim(&mut lab, &["A1", "A2", "W"]);
+    let (gain, closed) = exit_and_claim(&mut lab, &["A1", "A2", "W"]);
     assert_eq!(
         lab.market().total_shares.get(),
         2,
@@ -778,7 +786,7 @@ fn order_a_third_party_cannot_interleave_its_sybils_with_honest_lenders() {
     );
     assert!(lab.vault().lender_sol <= 10, "nothing stranded");
     eprintln!("Sybils, honest lenders lazy: attacker {gain} lamports, honest {honest}");
-    pinned(&lab, (gain, honest), (1_002_198_376, 3_000_369_862), 1);
+    pinned(&lab, (gain, honest), (1_002_198_376, 3_000_369_862), closed);
 }
 
 /// What remains: the attacker converts one of its Sybils (signed by itself) after each honest
@@ -808,7 +816,7 @@ fn order_sybils_converting_after_honest_conversions_collect_every_unit() {
         vec![0, 0, 1, 1, w / DEN],
         "Sybils after the honest claims"
     );
-    let gain = exit_and_claim(&mut lab, &["A1", "A2", "W"]);
+    let (gain, closed) = exit_and_claim(&mut lab, &["A1", "A2", "W"]);
     assert_eq!(
         lab.market().total_shares.get(),
         0,
@@ -828,7 +836,7 @@ fn order_sybils_converting_after_honest_conversions_collect_every_unit() {
     );
     assert!(lab.vault().lender_sol <= 10, "nothing stranded");
     eprintln!("Sybils converting after honest claims: attacker {gain} lamports, honest {honest}");
-    pinned(&lab, (gain, honest), (4_007_334_855, 369_862), 3);
+    pinned(&lab, (gain, honest), (4_007_334_855, 369_862), closed);
 
     // Both honest claims first: H2 keeps a unit and the attacker's exit is not the last.
     let (mut lab, w) = sybil_market();
@@ -842,13 +850,13 @@ fn order_sybils_converting_after_honest_conversions_collect_every_unit() {
         .map(|n| shares(&mut lab, n))
         .collect();
     assert_eq!(got, vec![0, 1, 0, 1, w / DEN], "honest-first order");
-    let gain = exit_and_claim(&mut lab, &["A1", "A2", "W"]);
+    let (gain, closed) = exit_and_claim(&mut lab, &["A1", "A2", "W"]);
     assert_eq!(lab.market().total_shares.get(), 1, "H2's unit");
     lab.advance(i64::from(lab.lump_vest_s) + 1, 0);
     let h2 = lab.claim("H2").unwrap();
     assert!(gain < LUMP && h2 >= LUMP, "attacker {gain}, H2 {h2}");
     eprintln!("honest claims first: attacker {gain} lamports, H2 {h2}");
-    pinned(&lab, (gain, h2), (1_004_766_616, 3_000_000_000), 2);
+    pinned(&lab, (gain, h2), (1_004_766_616, 3_000_000_000), closed);
 }
 
 /// The later conversion needs no atomicity (the security review of the follow-up): the
@@ -883,7 +891,7 @@ fn order_the_later_conversion_needs_no_atomicity() {
         vec![0, 0, 1, 1, w / DEN],
         "an hour after each honest claim"
     );
-    let gain = exit_and_claim(&mut lab, &["A1", "A2", "W"]);
+    let (gain, closed) = exit_and_claim(&mut lab, &["A1", "A2", "W"]);
     assert_eq!(lab.market().total_shares.get(), 0);
     lab.advance(i64::from(lab.lump_vest_s) + 1, 0);
     lab.claim("H1").unwrap();
@@ -897,7 +905,7 @@ fn order_the_later_conversion_needs_no_atomicity() {
     eprintln!(
         "Sybils converting an hour after each honest claim: attacker {gain}, honest {honest}"
     );
-    pinned(&lab, (gain, honest), (4_007_334_854, 369_862), 3);
+    pinned(&lab, (gain, honest), (4_007_334_854, 369_862), closed);
 }
 
 /// Without Sybils: a whale that tunes its own residue (`s_W ≡ 1 mod 1,000`). The security
@@ -922,13 +930,13 @@ fn order_a_residue_tuned_whale_collects_the_unit_only_after_an_honest_conversion
     assert_eq!(lab.sync_signed("W", 1), Ok(Standing::Current));
     assert_eq!(shares(&mut lab, "W"), w / DEN);
     assert_eq!(lab.market().total_shares.get(), w / DEN + 1);
-    let gain = exit_and_claim(&mut lab, &["W"]);
+    let (gain, closed) = exit_and_claim(&mut lab, &["W"]);
     lab.advance(i64::from(lab.lump_vest_s) + 1, 0);
     let honest = lab.claim("H1").unwrap() + lab.claim("H2").unwrap();
     assert!(gain < LUMP && honest >= LUMP, "W {gain}, honest {honest}");
     assert!(lab.vault().lender_sol <= 10);
     eprintln!("residue-tuned whale, honest lenders lazy: W {gain} lamports, honest {honest}");
-    pinned(&lab, (gain, honest), (1_002_346_116, 3_000_222_122), 1);
+    pinned(&lab, (gain, honest), (1_002_346_116, 3_000_222_122), closed);
 
     // W converts after H1's own claim.
     let (mut lab, w) = tuned();
@@ -937,7 +945,7 @@ fn order_a_residue_tuned_whale_collects_the_unit_only_after_an_honest_conversion
     assert_eq!(lab.sync_signed("W", 1), Ok(Standing::Current));
     assert_eq!(shares(&mut lab, "W"), w / DEN + 1);
     assert_eq!(shares(&mut lab, "W"), lab.market().total_shares.get());
-    let gain = exit_and_claim(&mut lab, &["W"]);
+    let (gain, closed) = exit_and_claim(&mut lab, &["W"]);
     assert!(gain >= LUMP, "W's exit is the last: {gain}");
     lab.advance(i64::from(lab.lump_vest_s) + 1, 0);
     lab.claim("H1").unwrap();
@@ -952,7 +960,7 @@ fn order_a_residue_tuned_whale_collects_the_unit_only_after_an_honest_conversion
     eprintln!(
         "residue-tuned whale converting after H1's claim: W {gain} lamports, honest {honest}"
     );
-    pinned(&lab, (gain, honest), (4_002_346_115, 222_122), 1);
+    pinned(&lab, (gain, honest), (4_002_346_115, 222_122), closed);
 }
 
 /// W3 with one Sybil placed before the roll: H (600 old shares), the attacker's dust position A
@@ -981,12 +989,12 @@ fn order_w3_with_a_sybil_the_jit_depositor_is_paid_the_lump_only_after_hs_conver
         assert_eq!(lab.sync_signed(n, 1), Ok(Standing::Current), "{n}");
     }
     assert_eq!(shares(&mut lab, "A"), 0);
-    exit_and_claim(&mut lab, &["G"]);
+    let _ = exit_and_claim(&mut lab, &["G"]);
     assert_eq!(lab.market().total_shares.get(), 1, "H's latent unit");
     let lam = wealth(&mut lab, "J");
     lab.deposit("J", 1_000_000).unwrap();
     lab.sweep_sol(LUMP);
-    exit_and_claim(&mut lab, &["A", "J"]);
+    let _ = exit_and_claim(&mut lab, &["A", "J"]);
     let gain = wealth(&mut lab, "J") - lam;
     assert_eq!(gain, 0, "J realises 0 (its position's rent back)");
     assert_eq!(lab.market().total_shares.get(), 1);
@@ -1004,7 +1012,7 @@ fn order_w3_with_a_sybil_the_jit_depositor_is_paid_the_lump_only_after_hs_conver
         assert_eq!(lab.sync_signed(n, 1), Ok(Standing::Current), "{n}");
     }
     assert_eq!((shares(&mut lab, "H"), shares(&mut lab, "A")), (0, 1));
-    exit_and_claim(&mut lab, &["G"]);
+    let _ = exit_and_claim(&mut lab, &["G"]);
     assert_eq!(lab.market().total_shares.get(), 1, "A's unit");
     // A collects the first vest as the only holder; then the JIT round, at one instant.
     lab.advance(i64::from(lab.lump_vest_s) + 1, 0);
@@ -1012,8 +1020,8 @@ fn order_w3_with_a_sybil_the_jit_depositor_is_paid_the_lump_only_after_hs_conver
     let lam = wealth(&mut lab, "J");
     lab.deposit("J", 1_000_000).unwrap();
     lab.sweep_sol(LUMP);
-    exit_and_claim(&mut lab, &["A"]);
-    exit_and_claim(&mut lab, &["J"]);
+    let _ = exit_and_claim(&mut lab, &["A"]);
+    let _ = exit_and_claim(&mut lab, &["J"]);
     let gain = wealth(&mut lab, "J") - lam;
     assert_eq!(lab.market().total_shares.get(), 0);
     assert!(gain >= LUMP - 10, "J is paid the lump: {gain}");

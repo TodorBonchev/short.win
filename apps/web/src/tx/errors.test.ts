@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { SHORTWIN_PROGRAM, TOKEN_2022_PROGRAM } from '../config/programs.ts';
 import { failingProgram, mapThrown, mapTransactionError } from './errors.ts';
 import { WalletCallError } from './send.ts';
+import type { TxPlan } from './types.ts';
+import { retryMode, type TxFlowState } from './useTxFlow.ts';
 
 const logs = (failing: string) => [
     `Program ${SHORTWIN_PROGRAM} invoke [1]`,
@@ -22,6 +24,34 @@ describe('transaction error mapping', () => {
             action: 'retry',
             instructionIndex: 2,
         });
+    });
+
+    it('maps short.win’s AccountNotInitialized (3012, a position closed meanwhile) to a rebuild', () => {
+        // KI-67: a claim that empties a lender position closes it; a plan built before that fails
+        // with Anchor's 3012, which a fresh plan fixes (it drops a closed sync target, or refuses
+        // the claim of a closed position).
+        const e = mapTransactionError({ InstructionError: [3, { Custom: 3012 }] }, [
+            `Program ${SHORTWIN_PROGRAM} invoke [1]`,
+            'Program log: AnchorError caused by account: lender. Error Code: AccountNotInitialized. Error Number: 3012.',
+            `Program ${SHORTWIN_PROGRAM} failed: custom program error: 0xbc4`,
+        ]);
+        expect(e).toMatchObject({
+            kind: 'program',
+            code: 3012,
+            name: 'AccountNotInitialized',
+            action: 'retry',
+            instructionIndex: 3,
+        });
+        expect(e.message).toMatch(/no longer exists/);
+        // The review's Retry rebuilds the plan from the chain instead of re-simulating it.
+        const plan = { rebuild: async () => ({}) as TxPlan } as unknown as TxPlan;
+        const state = { stage: 'failed', plan, error: e, signature: null } as unknown as TxFlowState;
+        expect(retryMode(state)).toBe('rebuild');
+        // Another program's 3012 (an Anchor venue) stays unknown.
+        const other = mapTransactionError({ InstructionError: [3, { Custom: 3012 }] }, [
+            `Program ${TOKEN_2022_PROGRAM} failed: custom program error: 0xbc4`,
+        ]);
+        expect(other).toMatchObject({ kind: 'unknown', action: 'report' });
     });
 
     it('attributes token-program errors raised inside short.win’s CPI (CPI Guard, memo)', () => {

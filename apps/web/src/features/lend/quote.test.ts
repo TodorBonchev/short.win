@@ -2,16 +2,30 @@
  * `min_sol` quoting (M1-SEC-2: the quoted payout, vest included) and the choice of other lenders to
  * sync before a claim (R3A-2 pot), FRONTEND.md §3.6, §5.10.
  */
-import { bigIntToPodI128, bigIntToPodU128, type LenderPosition } from '@shortwin/client';
-import { address, createNoopSigner } from '@solana/kit';
+import {
+    bigIntToPodI128,
+    bigIntToPodU128,
+    findLenderPda,
+    getLenderPositionEncoder,
+    type LenderPosition,
+} from '@shortwin/client';
+import { type Address, address, createNoopSigner } from '@solana/kit';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { SHORTWIN_PROGRAM, SYSTEM_PROGRAM } from '../../config/programs.ts';
 import { initMathSync, type MathModule } from '../../math/load.ts';
 import type { AppRpc } from '../../rpc/client.ts';
 import { readRepoBytes } from '../../test/repo.ts';
 import type { SimulationReport, TxPlan } from '../../tx/types.ts';
 import { MAX_SYNCS_PER_CLAIM } from './plans.ts';
 import { FWD, type LenderFields, lessBps } from './previews.ts';
-import { type OtherLender, pickPotSyncs, quoteWithdrawSol, readPotRecords, type Simulate } from './quote.ts';
+import {
+    type OtherLender,
+    pickPotSyncs,
+    quoteWithdrawSol,
+    readOtherLenders,
+    readPotRecords,
+    type Simulate,
+} from './quote.ts';
 import { recordOf, simpleLender, simplePool } from './testkit.ts';
 
 let m: MathModule;
@@ -195,5 +209,61 @@ describe('readPotRecords', () => {
         expect(addresses).toHaveLength(9);
         await readPotRecords(rpc, VAULT, 12, [l(12)]);
         expect(getMultipleAccounts).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('readOtherLenders', () => {
+    it('drops owners without a position, and a funded system account at a lender PDA alone', async () => {
+        const owners = [
+            address('JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN'),
+            address('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'),
+            address('9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin'),
+        ];
+        const position = (owner: Address) =>
+            new Uint8Array(
+                getLenderPositionEncoder().encode({
+                    owner,
+                    market: VAULT,
+                    shares: 7n,
+                    snap: 0n,
+                    pending: 0n,
+                    snapR: 0n,
+                    real: 0n,
+                    claimed: 0n,
+                    epoch: 0,
+                    lock: 0n,
+                    lockPi: 10n ** 18n,
+                    lockEpoch: 4_294_967_295,
+                    lockTerm: 0n,
+                    lockUntil: 0n,
+                    bump: 255,
+                    fwdShares: 0n,
+                    fwdEpoch: 0,
+                    fwd: 0,
+                    fwdLag: 0,
+                    reserved: new Uint8Array(10),
+                }),
+            );
+        const acct = (owner: Address, data: Uint8Array, lamports: bigint) => ({
+            owner,
+            lamports,
+            executable: false,
+            rentEpoch: 0n,
+            space: BigInt(data.length),
+            data: [Buffer.from(data).toString('base64'), 'base64'] as const,
+        });
+        const send = vi.fn(async () => ({
+            value: [
+                acct(SHORTWIN_PROGRAM, position(owners[0] as Address), 2_568_240n),
+                // KI-67 closed this one; someone then funded its PDA (system-owned, no data).
+                acct(SYSTEM_PROGRAM, new Uint8Array(), 890_880n),
+                null,
+            ],
+        }));
+        const rpc = { getMultipleAccounts: vi.fn(() => ({ send })) } as unknown as AppRpc;
+        const got = await readOtherLenders(rpc, VAULT, owners);
+        expect(got).toHaveLength(1);
+        expect(got[0]?.lender.shares).toBe(7n);
+        expect(got[0]?.address).toBe((await findLenderPda({ market: VAULT, owner: owners[0] as Address }))[0]);
     });
 });

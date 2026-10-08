@@ -6,10 +6,8 @@
  * chain for a lender behind a rebase record: KI-66 full, KI66-R4). A claim that leaves the position
  * empty closes it (KI-67; the review says so). A negative balance is covered with `cover_deficit`.
  */
-import { type Address, isAddress } from '@solana/kit';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { indexerQueries } from '../../../api/queries.ts';
 import { Button } from '../../../components/Button.tsx';
 import { Sol } from '../../../components/Num.tsx';
 import { Kv } from '../../../components/States.tsx';
@@ -20,6 +18,7 @@ import { claimPlanFrom, coverPlanFrom } from '../build.ts';
 import { type LendCtx, lendEnvOf, lendStateOf, nowFor } from '../ctx.ts';
 import { previewClaimView } from '../previews.ts';
 import { Blocked, RefusalLine } from '../ui.tsx';
+import { indexerLenders } from './otherLenders.ts';
 
 /** SOL kept back in the wallet for fees when covering a deficit. */
 const FEE_RESERVE = 10_000_000n;
@@ -42,11 +41,7 @@ export function ClaimForm({ ctx }: { ctx: LendCtx }) {
         setBuildError(null);
         try {
             // Other lenders whose touch can fund the pot come from the indexer's list (§3.6).
-            const otherLenders = async (): Promise<Address[]> => {
-                const page = await qc.fetchQuery(indexerQueries.marketLenders(ctx.mint));
-                return page.data.data.map((l) => l.owner).filter((o): o is Address => isAddress(o));
-            };
-            flow.start(await claimPlanFrom(lendEnvOf(ctx, signer), chain, ctx.nowS, otherLenders));
+            flow.start(await claimPlanFrom(lendEnvOf(ctx, signer), chain, ctx.nowS, indexerLenders(qc, ctx.mint)));
         } catch (e) {
             setBuildError(e instanceof Error ? e.message : String(e));
         } finally {

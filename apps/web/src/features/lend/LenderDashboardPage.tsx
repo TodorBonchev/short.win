@@ -3,11 +3,13 @@
  * lends in — shares and share of the pool, token value, SOL claimable, vesting, lock and
  * `lock_until`, the share-epoch standing (current / behind / parked on a wipe record), whether the
  * indexer's view is in sync (unsynced / quarantined), creator badges — with a claim per row and
- * "claim all" (one reviewed transaction per market, in turn). Numbers come from the chain through
+ * "claim all" (one reviewed transaction per market, in turn; each claim syncs the other lenders
+ * whose touch funds the pot first, as Lend → Claim does, KI66-R4). Numbers come from the chain through
  * the WASM previews (FE-D1); the indexer lists the markets (or `getProgramAccounts` while it is
  * unavailable).
  */
 import './lend.css';
+import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 import { useLiveChannels } from '../../api/live.tsx';
@@ -32,6 +34,7 @@ import { useTxFlow } from '../../tx/useTxFlow.ts';
 import { useWallet } from '../../wallet/useWallet.ts';
 import { claimPlanFrom, syncPlanFrom } from './build.ts';
 import { chainNowSeconds } from './chain.ts';
+import { indexerLenders } from './claim/otherLenders.ts';
 import { planContextFor } from './ctx.ts';
 import { type IndexerState, type LenderRow, useLenderRows } from './dashboard/rows.ts';
 import { useNowSeconds } from './hooks.ts';
@@ -56,6 +59,7 @@ export function LenderDashboardPage() {
     const { rows, loading, indexerDown, error } = useLenderRows(owner, math, wallS * 1000);
     useLiveChannels(owner ? [`lender:${owner}`] : []);
     const flow = useTxFlow();
+    const qc = useQueryClient();
     const toast = useToast();
     const [busy, setBusy] = useState<string | null>(null);
     const [planError, setPlanError] = useState<string | null>(null);
@@ -69,11 +73,17 @@ export function LenderDashboardPage() {
         try {
             let plan: TxPlan;
             if (math) {
-                // The builders the review's Retry re-runs on a fresh read (`build.ts`, M9-UX-1).
+                // The builders the review's Retry re-runs on a fresh read (`build.ts`, M9-UX-1). A
+                // claim syncs the other lenders it needs first, as Lend → Claim does (KI66-R4).
                 const env = { rpc: client.rpc, math, mint: row.mint, signer, symbol: row.symbol };
                 plan =
                     make === 'claim'
-                        ? await claimPlanFrom(env, row.chain, chainNowSeconds(row.chain, Date.now()), null)
+                        ? await claimPlanFrom(
+                              env,
+                              row.chain,
+                              chainNowSeconds(row.chain, Date.now()),
+                              indexerLenders(qc, row.mint),
+                          )
                         : await syncPlanFrom(env, row.chain);
             } else {
                 const c = planContextFor(row.chain, signer, row);

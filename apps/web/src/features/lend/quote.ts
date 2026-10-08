@@ -17,13 +17,13 @@
  *   the record and their forward chain walked, so what their unconverted shares earned after it
  *   reaches the pot without their owners. The best ≤ 4 run before `claim_sol`.
  */
-import { decodeLenderPosition, findLenderPda, type LenderPosition, type ShareEpoch } from '@shortwin/client';
+import { findLenderPda, type LenderPosition, type ShareEpoch } from '@shortwin/client';
 import { type Address, parseBase64RpcAccount, type TransactionSigner } from '@solana/kit';
 import type { MathModule } from '../../math/load.ts';
 import type { AppRpc } from '../../rpc/client.ts';
 import { simulatePlan } from '../../tx/simulate.ts';
 import type { TxError, TxPlan } from '../../tx/types.ts';
-import { potEpochs, readRecords } from './chain.ts';
+import { lenderPositionOf, potEpochs, readRecords } from './chain.ts';
 import { MAX_SYNCS_PER_CLAIM, type SyncTarget, solPaidFrom } from './plans.ts';
 import { type LendState, lessBps, potGainOfSync, type RecordFields } from './previews.ts';
 
@@ -149,7 +149,9 @@ export function pickPotSyncs(
 
 /**
  * Reads the `LenderPosition`s of `owners` in `market` (other lenders, for `pickPotSyncs`); owners
- * without an account (never lent, or closed by `withdraw` / `claim_sol`, KI-67) are dropped.
+ * without a position (never lent, or closed by `withdraw` / `claim_sol`, KI-67) are dropped, and
+ * so is any account at a lender PDA that is not one (`lenderPositionOf`: a system account someone
+ * funded there), each on its own, so one such account costs only its own sync.
  */
 export async function readOtherLenders(
     rpc: AppRpc,
@@ -161,8 +163,8 @@ export async function readOtherLenders(
     const { value } = await rpc.getMultipleAccounts(addresses, { encoding: 'base64', commitment: 'confirmed' }).send();
     const out: OtherLender[] = [];
     addresses.forEach((address, i) => {
-        const d = decodeLenderPosition(parseBase64RpcAccount(address, value[i] ?? null));
-        if (d.exists) out.push({ address, lender: d.data });
+        const lender = lenderPositionOf(parseBase64RpcAccount(address, value[i] ?? null));
+        if (lender) out.push({ address, lender });
     });
     return out;
 }

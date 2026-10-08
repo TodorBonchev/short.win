@@ -15,8 +15,9 @@
 //! - Two rebase records: each epoch is accrued once.
 //! - KI-66 full (the forward chain): a chain through two rebases and a full wipe (parked, topped
 //!   up, passed); the owner stopping inside it with a lag of 0 and of 1; sliced walks; a deficit
-//!   debited after the record; a term-only hold; a jump inside a stale chain. KI-67: a dead lock
-//!   term does not keep a position open.
+//!   debited after the record; a term-only hold; a jump inside a stale chain; the owner parking
+//!   inside its chain on a live wipe record. KI-67: a dead lock term does not keep a position
+//!   open.
 //!
 //! Requires the SBF build: `anchor build --tools-version v1.57 --arch v3`.
 
@@ -555,6 +556,74 @@ fn an_owner_stopping_inside_the_chain_with_lag_0_and_1_pays_nobody_twice() {
         let x = run(false);
         let y = run(true);
         eprintln!("lag {lag}: owners alone {x:?}; with the forward chain {y:?}");
+        assert_eq!(x, y, "lag {lag}");
+    }
+}
+
+/// The owner parks inside its chain (the KI-66 full review's mutant 6, park half): a third
+/// party's walk parked C's chain on a live full-wipe record, and C's owner converts while that
+/// record is live, through the rebases into the chain (`FWD_OPEN`, lag 0 and 1) and onto the
+/// wipe record, where it parks: the park settles the chain (`fwd` none; the lab checks every
+/// stored field against the math crate), a top-up and a second owner sync accrue nothing twice,
+/// and once a deposit finalises the wipe the wind-down pays every lender what the run without
+/// third parties pays, where the owner converts at the same points.
+#[test]
+fn an_owner_parking_inside_its_chain_on_a_live_wipe_settles_it() {
+    for lag in [0u8, 1] {
+        let names = ["B", "C", "H"];
+        let run = |third_party: bool| -> (Vec<u64>, u64, u64) {
+            let mut lab = Lab::with_cap(TokenProgram::Spl, 10_000);
+            let base = lamports_of(&mut lab, &names);
+            dust(&mut lab, "H", 1_000_000_000, if lag == 1 { 999 } else { 0 });
+            assert_eq!(dust(&mut lab, "C", 1_000_000_000_000, 600) % 1_000, 600);
+            dust(&mut lab, "B", 1_000_000_000_000, 0);
+            rebase_k1(&mut lab, "p1", U);
+            lab.claim("H").unwrap();
+            rent_with_leaver(&mut lab, "r1", "B", 2, 10u128.pow(19));
+            rebase_k1(&mut lab, "p2", U);
+            rent_with_leaver(&mut lab, "r2", "H", 2, 10u128.pow(19));
+            if third_party {
+                assert_eq!(lab.sync("C", 8), Ok(Standing::Behind));
+                assert_eq!(lab.position("C").unwrap().fwd_epoch, 2);
+            }
+            // A full wipe: everything borrowed and settled; record 2 stays live.
+            let t = lab.market().tokens_free;
+            lab.borrow30("w", t).unwrap();
+            lab.settle("w", 2 * U, 0);
+            let w = *lab.state().records.last().unwrap();
+            assert!(w.is_full_wipe() && lab.market().pool().is_wipe_live());
+            lab.sweep_sol(U / 3);
+            if third_party {
+                assert_eq!(lab.sync("C", 8), Ok(Standing::Behind));
+                let c = lab.position("C").unwrap();
+                assert_eq!(
+                    (c.fwd, c.fwd_epoch),
+                    (pool::FWD_HOLD, w.epoch),
+                    "parked chain"
+                );
+            }
+            assert_eq!(lab.sync_signed("C", 8), Ok(Standing::Parked));
+            let c = lab.position("C").unwrap();
+            assert_eq!(
+                (c.fwd, c.fwd_epoch, c.fwd_lag, c.fwd_shares, c.epoch),
+                (pool::FWD_NONE, 0, 0, 0, w.epoch),
+                "the owner's park settled the chain"
+            );
+            lab.sweep_sol(U / 5);
+            assert_eq!(lab.sync_signed("C", 8), Ok(Standing::Parked));
+            if third_party {
+                assert_eq!(lab.sync("C", 8), Ok(Standing::Parked));
+                lab.claim("B").unwrap();
+            }
+            lab.deposit("B", 1_000_000_000).unwrap();
+            assert!(!lab.market().pool().is_wipe_live(), "finalised");
+            let g = wind_down(&mut lab, &names, &base);
+            let v = lab.vault();
+            (g, v.lender_sol, v.unmatched)
+        };
+        let x = run(false);
+        let y = run(true);
+        eprintln!("lag {lag}, parked owner: owners alone {x:?}; with the forward chain {y:?}");
         assert_eq!(x, y, "lag {lag}");
     }
 }

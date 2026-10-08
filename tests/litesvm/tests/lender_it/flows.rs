@@ -784,6 +784,9 @@ fn claim_sol_closes_only_when_nothing_is_owed_either_way() {
     let keys = lender_keys(&mut lab, "H");
     let kp = lab.users["H"].kp.insecure_clone();
     let lam = lab.lamports_of("H");
+    let position = pda::lender(&m, &keys.owner).0;
+    let held = read::lamports(&lab.env.svm, &position);
+    assert_eq!(held, rent, "the dust position holds exactly its rent");
     let meta = lab
         .env
         .send(
@@ -809,8 +812,16 @@ fn claim_sol_closes_only_when_nothing_is_owed_either_way() {
         "a clean position"
     );
     assert!(h.shares > 0);
-    // The closing claim returned the rent, the deposit paid it again.
-    assert_eq!(lab.lamports_of("H"), lam + paid + rent - rent);
+    // The re-created position holds a fresh rent, which the deposit's `init_if_needed` took
+    // from H (`payer = owner`; the harness payer pays the fees). H's lamports moved by exactly
+    // the SOL paid, plus the closing claim's refund, minus that fresh rent: the close refunded
+    // the old position's `held` lamports to H, all of them.
+    let fresh = read::lamports(&lab.env.svm, &position);
+    assert_eq!(fresh, rent, "the re-created position is rent-exempt");
+    let refund = (lab.lamports_of("H") + fresh)
+        .checked_sub(lam + paid)
+        .expect("the owner got at least the SOL paid back");
+    assert_eq!(refund, held, "the closing claim refunded the old rent to H");
     // A deficit lender (pending < 0) claims nothing and keeps its position.
     let mut lab = Lab::with_cap(TokenProgram::Spl, 10_000);
     lab.deposit("B", 1_000_000_000_000).unwrap();

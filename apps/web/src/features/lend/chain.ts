@@ -21,13 +21,21 @@ import {
     findMarketVaultPda,
     findShareEpochPda,
     type GlobalConfig,
+    getLenderPositionSize,
     getShareEpochDecoder,
+    LENDER_POSITION_DISCRIMINATOR,
     type LenderPosition,
     type Market,
     type MarketVault,
     type ShareEpoch,
 } from '@shortwin/client';
-import { type Address, type Base58EncodedBytes, getBase64Encoder, parseBase64RpcAccount } from '@solana/kit';
+import {
+    type Address,
+    type Base58EncodedBytes,
+    getBase64Encoder,
+    type MaybeEncodedAccount,
+    parseBase64RpcAccount,
+} from '@solana/kit';
 import { findAssociatedTokenPda } from '@solana-program/token-2022';
 import { qk } from '../../api/keys.ts';
 import { SHORTWIN_PROGRAM } from '../../config/programs.ts';
@@ -161,6 +169,25 @@ export async function readRecords(rpc: AppRpc, market: Address, epochs: readonly
     return out;
 }
 
+/**
+ * The `LenderPosition` in `account`, or `null` when there is none: missing, or not a short.win
+ * account of the position's size and discriminator. Anyone can send lamports to a lender PDA that
+ * does not exist — never created, or closed by `withdraw` / `claim_sol` (KI-67) — leaving a
+ * system-owned account with no data, which the decoder throws on; `deposit` takes such an
+ * account over (`init_if_needed`), so it reads as no position, never as a failed read.
+ */
+export function lenderPositionOf(account: MaybeEncodedAccount): LenderPosition | null {
+    if (!account.exists || account.programAddress !== SHORTWIN_PROGRAM) return null;
+    const { data } = account;
+    if (data.length !== getLenderPositionSize()) return null;
+    if (!LENDER_POSITION_DISCRIMINATOR.every((b, i) => data[i] === b)) return null;
+    try {
+        return decodeLenderPosition(account).data;
+    } catch {
+        return null;
+    }
+}
+
 /** Everything the lend panel shows for `mint`, as the chain has it now. */
 export async function readLendChain(
     rpc: AppRpc,
@@ -184,11 +211,10 @@ export async function readLendChain(
     const configAcc = decodeGlobalConfig(at(2));
     const mintRaw = value[3];
     const mintInfo = mintRaw ? parseMint(mint, mintRaw.owner, new Uint8Array(b64.encode(mintRaw.data[0]))) : null;
-    const lenderAcc = lenderAddress ? decodeLenderPosition(at(4)) : null;
+    const lender = lenderAddress ? lenderPositionOf(at(4)) : null;
     const walletLamports = owner ? BigInt(value[5]?.lamports ?? 0n) : 0n;
 
     const market = marketAcc.exists ? marketAcc.data : null;
-    const lender = lenderAcc?.exists ? lenderAcc.data : null;
     let records: ShareEpoch[] = [];
     let recordsComplete = true;
     if (market && lender && lender.epoch < market.shareEpoch) {
@@ -280,8 +306,8 @@ export async function findLenderPositionsOnChain(
         pubkey: Address;
         account: Parameters<typeof parseBase64RpcAccount>[1];
     }[]) {
-        const d = decodeLenderPosition(parseBase64RpcAccount(pubkey, account));
-        if (d.exists) out.push({ address: pubkey, lender: d.data });
+        const lender = lenderPositionOf(parseBase64RpcAccount(pubkey, account));
+        if (lender) out.push({ address: pubkey, lender });
     }
     return out;
 }

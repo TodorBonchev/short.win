@@ -274,6 +274,10 @@ describe('claimPlanFrom: the claim-time pot-only syncs (KI66-R4)', () => {
         );
         // The pot the remaining sync moves: 2 SOL.
         expect(plan.title).toContain('Claim 2 SOL');
+        // The failed sync is dropped as invalid, not deferred to the next claim: the review names
+        // no deferred syncs (it was neither capped nor trimmed for size).
+        expect(plan.disclosures).toEqual(['lender.potSyncs']);
+        expect(plan.disclosureVars?.['lender.potSyncsDeferred']).toBeUndefined();
         // A failure in the claim itself (or no simulation) keeps the syncs: the review shows it.
         const claimFails: Simulate = async () => ({
             report: report({ kind: 'program', action: 'report', message: 'x', instructionIndex: 4 }),

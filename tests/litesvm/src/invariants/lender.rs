@@ -48,16 +48,17 @@
 //!   decrease** while `now < lock_until` and `Π`, its epoch and the share epoch are unchanged
 //!   (the withdrawing lender's down to its remaining shares at most; ARCH §8.3 I8, V2-3, R3B-1;
 //!   M1-FID-9); and **a `LenderPosition` disappears only in `withdraw` or `claim_sol`** of its
-//!   owner, with a post-state `pool::closable` (a claim's recomputed on the pre-state; a
-//!   withdrawal's burns all its shares and leaves no lock), its rent going to the owner (KI-67;
-//!   [`closes_only_when_empty`]).
+//!   owner, with a post-state `pool::closable` recomputed on the pre-state (a withdrawal's
+//!   after its handler's prologue), its rent going to the owner, and a claim or withdrawal
+//!   whose recomputed post-state is closable closed it (KI-67; [`closes_only_when_empty`]).
 
 use std::cell::Cell;
 
 use anchor_lang::AccountDeserialize;
 use anchor_lang::prelude::Pubkey;
 use litesvm::LiteSVM;
-use shortwin::state::{LenderPosition, Market, MarketVault, ShareEpoch};
+use shortwin::engine::prologue;
+use shortwin::state::{GlobalConfig, LenderPosition, Market, MarketVault, ShareEpoch};
 use shortwin_math::pool::{
     self, Lender, NO_LOCK_EPOCH, Pool, ShareEpoch as MathShareEpoch, Standing, Vault,
 };
@@ -641,10 +642,17 @@ pub struct LenderSnapshot {
     /// Per `LenderPosition` of those markets: `(market, owner, the position's lamports, the
     /// owner's lamports)` (KI-67's close hook).
     pub rents: Vec<(Pubkey, Pubkey, u64, u64)>,
+    /// The `Market` accounts of those markets: a withdrawal's prologue (params sync and rent
+    /// accrual) replayed by KI-67's close hook.
+    pub accounts: Vec<(Pubkey, Market)>,
 }
 
 /// Snapshots the lender state of `markets`.
 pub fn snapshot(svm: &LiteSVM, markets: &[Pubkey]) -> LenderSnapshot {
+    let accounts = markets
+        .iter()
+        .filter_map(|m| read::zc::<Market>(svm, m).map(|a| (*m, a)))
+        .collect();
     let markets: Vec<PoolState> = markets
         .iter()
         .filter_map(|m| PoolState::load(svm, m))
@@ -662,26 +670,34 @@ pub fn snapshot(svm: &LiteSVM, markets: &[Pubkey]) -> LenderSnapshot {
             })
         })
         .collect();
-    LenderSnapshot { markets, rents }
+    LenderSnapshot {
+        markets,
+        rents,
+        accounts,
+    }
 }
 
 /// What an owner that is also the fee payer may pay besides (KI-67's rent check).
 const FEE_SLACK: u64 = 100_000;
 
 /// KI-67: a `LenderPosition` of `st` that no longer exists after the instruction was closed by
-/// its owner's `withdraw` or `claim_sol`, with a closable post-state — a claim's recomputed on
-/// the pre-state (`pool::touch`, `pool::claim`: `pool::closable`), a withdrawal's burning all its
-/// shares, leaving no lock and on the current epoch — and its rent went to the owner: the
-/// owner's lamports rose by exactly the position's rent plus the SOL paid. Conversely a claim
-/// whose recomputed post-state is closable must have closed the position.
+/// its owner's `withdraw` or `claim_sol`, with a closable post-state recomputed on the
+/// pre-state — a claim's with `pool::touch` and `pool::claim`, a withdrawal's with its handler's
+/// prologue on `account` (the pre-instruction `Market`: params sync, rent accrual), then
+/// `pool::withdraw` of the event's shares and `pool::claim`; `pool::closable` in both — and its
+/// rent went to the owner: the owner's lamports rose by exactly the position's rent plus the
+/// SOL paid. Conversely a claim or withdrawal whose recomputed post-state is closable must have
+/// closed the position.
 pub fn closes_only_when_empty(
     svm: &LiteSVM,
     st: &PoolState,
+    account: Option<&Market>,
     rents: &[(Pubkey, Pubkey, u64, u64)],
     ev: &super::IxEvents,
 ) -> Result<(), Violation> {
     let market = st.market;
     let now = svm.get_sysvar::<Clock>().unix_timestamp;
+    let config = read::zc::<GlobalConfig>(svm, &crate::pda::config());
     for (_, pos) in &st.lenders {
         let owner = pos.owner;
         let gone =
@@ -706,24 +722,45 @@ pub fn closes_only_when_empty(
                 ok
             }
             (None, Some(w)) => {
-                // All its shares (as converted by the withdrawal's own touch), no lock left.
-                let (mut v, mut l, mut recs) = (st.vault.clone(), pos.lender(), st.records.clone());
+                // The handler's own steps on copies: the prologue (`market_now`, the params
+                // sync, the rent accrual), `pool::withdraw` of the event's shares, `pool::claim`.
+                let (Some(m), Some(config)) = (account, config.as_ref()) else {
+                    return fail(
+                        "I8",
+                        format!("market {market}: no pre-instruction Market or config to replay"),
+                    );
+                };
+                let mut m = *m;
+                let t = prologue::market_now(&m, now);
+                prologue::sync_market_params(config, &mut m, t);
+                let (mut p, mut v, mut l, mut recs) =
+                    (m.pool(), st.vault.clone(), pos.lender(), st.records.clone());
                 let recs = PoolState::records_from_mut(&mut recs, l.epoch);
-                pool::touch(&st.pool, &mut v, &mut l, recs, now).is_ok()
-                    && w.shares == l.shares
-                    && w.lock == 0
-                    && w.epoch == st.pool.share_epoch
+                let ok = prologue::accrue(&mut m, &mut p, &mut v, t).is_ok()
+                    && pool::withdraw(
+                        &mut p,
+                        &mut v,
+                        &mut l,
+                        recs,
+                        t,
+                        config.params.lock_grace_s,
+                        w.shares,
+                    )
+                    .and_then(|_| pool::claim(&p, &mut v, &mut l, recs, t))
+                    .is_ok_and(|_| pool::closable(&p, &l));
+                predicted = Some(l);
+                ok
             }
             _ => false,
         };
         if !gone {
-            ensure(claim.is_none() || !expect_closed, "I8", || {
+            ensure(!expect_closed, "I8", || {
                 let stored =
                     read::borsh::<LenderPosition>(svm, &crate::pda::lender(&market, &owner).0)
                         .map(|p| p.lender());
                 format!(
-                    "market {market}: claim_sol left {owner}'s empty position open (KI-67): \
-                     predicted {predicted:?}, stored {stored:?}"
+                    "market {market}: claim_sol / withdraw left {owner}'s empty position open \
+                     (KI-67): predicted {predicted:?}, stored {stored:?}"
                 )
             })?;
             continue;
@@ -829,7 +866,12 @@ pub fn check_ix(
                 })?;
             }
         }
-        closes_only_when_empty(svm, st, &pre.rents, ev)?;
+        let account = pre
+            .accounts
+            .iter()
+            .find(|(k, _)| *k == market)
+            .map(|(_, a)| a);
+        closes_only_when_empty(svm, st, account, &pre.rents, ev)?;
         let Some(post) = post else { continue };
         let deposits: Vec<_> = ev.deposits.iter().filter(|e| mine(&e.market)).collect();
         let withdraws: Vec<_> = ev.withdraws.iter().filter(|e| mine(&e.market)).collect();

@@ -19,12 +19,20 @@ import {
     MARKET_DISCRIMINATOR,
     MARKET_VAULT_DISCRIMINATOR,
 } from '@shortwin/client';
-import { type Address, address, getAddressEncoder } from '@solana/kit';
+import { type Address, address, getAddressEncoder, parseBase64RpcAccount } from '@solana/kit';
 import { findAssociatedTokenPda } from '@solana-program/token-2022';
 import { describe, expect, it } from 'vitest';
 import { SHORTWIN_PROGRAM, SYSTEM_PROGRAM, TOKEN_2022_PROGRAM } from '../../config/programs.ts';
 import type { AppRpc } from '../../rpc/client.ts';
-import { lendKeys, liveWipeRecordEpoch, MAX_RECORDS, marketNow, neededEpochs, readLendChain } from './chain.ts';
+import {
+    lenderPositionOf,
+    lendKeys,
+    liveWipeRecordEpoch,
+    MAX_RECORDS,
+    marketNow,
+    neededEpochs,
+    readLendChain,
+} from './chain.ts';
 import { MARKET_FLAG } from './previews.ts';
 
 const MINT = address('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
@@ -104,6 +112,8 @@ function tokenBytes(amount: bigint, ext: [number, number][] = []): Uint8Array {
 
 interface Script {
     readonly lenderEpoch?: number;
+    /** A system-owned, empty account at the lender PDA (someone sent it the rent-exempt minimum). */
+    readonly fundedPda?: boolean;
     readonly shareEpoch?: number;
     readonly flags?: number;
     readonly missingRecord?: number;
@@ -148,9 +158,11 @@ async function fakeRpc(s: Script) {
                             rpcAccount(SHORTWIN_PROGRAM, vaultBytes()),
                             null,
                             rpcAccount(TOKEN_2022_PROGRAM, [...new Uint8Array(44), 6, 1, ...new Uint8Array(36)]),
-                            s.lenderEpoch === undefined
-                                ? null
-                                : rpcAccount(SHORTWIN_PROGRAM, lenderBytes(market, s.lenderEpoch)),
+                            s.fundedPda
+                                ? rpcAccount(SYSTEM_PROGRAM, [], 890_880n)
+                                : s.lenderEpoch === undefined
+                                  ? null
+                                  : rpcAccount(SHORTWIN_PROGRAM, lenderBytes(market, s.lenderEpoch)),
                             rpcAccount(SYSTEM_PROGRAM, [], 3_000_000_000n),
                         ],
                     };
@@ -211,6 +223,31 @@ describe('lend chain reads', () => {
         const f = await readLendChain(far.rpc, MINT, OWNER);
         expect(f.records).toHaveLength(MAX_RECORDS);
         expect(f.recordsComplete).toBe(false);
+    });
+
+    it('reads a system account someone funded at the lender PDA as no position', async () => {
+        // Anyone can send 890,880 lamports to a lender PDA that does not exist (never created, or
+        // closed by a claim or withdrawal, KI-67); `deposit` takes it over, so the panel must load.
+        const { rpc } = await fakeRpc({ fundedPda: true });
+        const c = await readLendChain(rpc, MINT, OWNER);
+        expect(c.market).not.toBeNull();
+        expect(c.lender).toBeNull();
+        expect(c.records).toEqual([]);
+        const at = (owner: Address, data: Uint8Array) =>
+            parseBase64RpcAccount(
+                OWNER,
+                rpcAccount(owner, data) as unknown as Parameters<typeof parseBase64RpcAccount>[1],
+            );
+        const [market] = await findMarketPda({ mint: MINT });
+        const good = lenderBytes(market, 0);
+        expect(lenderPositionOf(at(SHORTWIN_PROGRAM, good))?.shares).toBe(5n);
+        expect(lenderPositionOf(at(SYSTEM_PROGRAM, new Uint8Array()))).toBeNull();
+        expect(lenderPositionOf(at(SYSTEM_PROGRAM, good))).toBeNull();
+        expect(lenderPositionOf(at(SHORTWIN_PROGRAM, good.slice(0, 200)))).toBeNull();
+        const foreign = good.slice();
+        foreign[0] ^= 1;
+        expect(lenderPositionOf(at(SHORTWIN_PROGRAM, foreign))).toBeNull();
+        expect(lenderPositionOf(parseBase64RpcAccount(OWNER, null))).toBeNull();
     });
 
     it('reads no lender and no token accounts without a wallet', async () => {

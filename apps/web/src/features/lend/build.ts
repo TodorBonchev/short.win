@@ -270,10 +270,14 @@ export async function claimPlanFrom(
         }
     }
     const ctx = contextAt(env, chain, now);
+    // Syncs the pre-review simulation failed on (their position closed or changed meanwhile):
+    // dropped as invalid, not deferred — the next claim does not sync them first.
+    const failed: SyncTarget[] = [];
     const make = async (kept: readonly SyncTarget[]): Promise<TxPlan> => {
         const gain = kept.reduce((x, s) => x + s.gain, 0n);
         const out = previewClaimOutcome(env.math, state, now, gain);
-        const left = syncs.filter((s) => !kept.includes(s));
+        // Left out by the cap or the size limit only (`lender.potSyncsDeferred`).
+        const left = syncs.filter((s) => !kept.includes(s) && !failed.includes(s));
         const deferred = {
             count: more.count + left.length,
             gain: more.gain + left.reduce((x, s) => x + s.gain, 0n),
@@ -293,9 +297,10 @@ export async function claimPlanFrom(
         plan = await make(kept);
     }
     for (let tries = kept.length; tries > 0 && kept.length; tries--) {
-        const failed = await failingSync(env, plan, kept.length);
-        if (failed === null) break;
-        kept = kept.filter((_, i) => i !== failed);
+        const at = await failingSync(env, plan, kept.length);
+        if (at === null) break;
+        failed.push(kept[at] as SyncTarget);
+        kept = kept.filter((_, i) => i !== at);
         plan = await make(kept);
     }
     return {

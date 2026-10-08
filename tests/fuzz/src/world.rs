@@ -899,13 +899,19 @@ impl World {
     /// The `ShareEpoch` records a lender instruction needs (the lender's epoch up to the
     /// market's).
     fn epoch_metas(&self, si: usize, owner: &Pubkey) -> Vec<AccountMeta> {
+        self.epoch_metas_upto(si, owner, 16)
+    }
+
+    /// At most `max` of the records from the lender's epoch on ([`World::epoch_metas`]): an
+    /// owner's partial conversion (it may stop inside its forward chain, KI-66 full).
+    fn epoch_metas_upto(&self, si: usize, owner: &Pubkey, max: u32) -> Vec<AccountMeta> {
         let market = self.market_key(si);
         let m = self.env.market(&market);
         let from = self
             .env
             .lender(&market, owner)
             .map_or(m.share_epoch, |l| l.epoch);
-        let to = m.share_epoch.min(from + 16);
+        let to = m.share_epoch.min(from + max);
         ix::epoch_records(&market, from, to)
     }
 
@@ -2111,18 +2117,45 @@ impl World {
     }
 
     /// `sync_lender` of lender `a % n` through the records it is behind on, signed by its owner
-    /// when bit 16 of `a` is set, else sent by a third party.
+    /// when bit 16 of `a` is set, else sent by a third party. Bits 17–18 pick the window: 0, every
+    /// record up to 16 (one sync goes all the way); otherwise 1 or 2 records (bit 19), so a
+    /// third party's walk stops inside a forward chain and a later one continues it across
+    /// further rolls, and an owner's conversion stops inside its chain (`FWD_OPEN`). With bit 20
+    /// set the sync aims at a lender behind the share epoch or with a forward chain, when there
+    /// is one (KI66F-FUZZ-COVERAGE: with every sync going all the way, the chain was started and
+    /// settled but never walked further by a third party, and no owner stopped inside one).
     fn sync_lender(&mut self, si: usize, a: u32) -> bool {
-        let li = a as usize % self.slots[si].lenders.len();
-        self.sync_lender_by(si, li, a >> 16 & 1 == 1, 16)
+        let n = self.slots[si].lenders.len();
+        let mut li = a as usize % n;
+        if a >> 20 & 1 == 1 {
+            let market = self.market_key(si);
+            let epoch = self.market(si).share_epoch;
+            let behind: Vec<usize> = (0..n)
+                .filter(|&i| {
+                    let owner = self.slots[si].lenders[i].kp.pubkey();
+                    self.env.lender(&market, &owner).is_some_and(|lp| {
+                        lp.fwd != shortwin_math::pool::FWD_NONE || lp.epoch < epoch
+                    })
+                })
+                .collect();
+            if !behind.is_empty() {
+                li = behind[(a as usize >> 8) % behind.len()];
+            }
+        }
+        let window = if a >> 17 & 3 == 0 {
+            16
+        } else {
+            1 + (a >> 19 & 1)
+        };
+        self.sync_lender_by(si, li, a >> 16 & 1 == 1, window)
     }
 
     /// `sync_lender` of lender `li`, signed by its owner or (`owner_signs` false) sent by a third
-    /// party. Oracle (KI65-REV-SEC1, KI-66): nobody's sync is refused `RebaseNeedsOwner`; a third
-    /// party's that lands is the pot-only touch — the stored lender and `MarketVault` are the
-    /// math crate's `pool::touch_pot` on the pre-state (never a conversion through a rebase
-    /// record; the surplus accrued up to one moves to the pot) and no `ShareEpoch` record
-    /// changed. A third party's sync that holds the lender at a rebase record counts
+    /// party, through at most `window` records. Oracle (KI65-REV-SEC1, KI-66): nobody's sync is
+    /// refused `RebaseNeedsOwner`; a third party's that lands is the pot-only touch — the
+    /// stored lender and `MarketVault` are the math crate's `pool::touch_pot` on the pre-state
+    /// (never a conversion through a rebase record; the surplus accrued up to one moves to the
+    /// pot) and no `ShareEpoch` record changed. A third party's sync that holds the lender at a rebase record counts
     /// `sync-lender-held` (and `sync-lender-held-to-pot` when it moved a surplus): the oracle's
     /// coverage of the hold. KI-66 full: a third party's sync passes at most `window` records from
     /// the chain's `fwd_epoch` once there is one ([`World::pot_metas`]); the counters
@@ -2138,7 +2171,7 @@ impl World {
             return false;
         }
         let metas = if owner_signs {
-            self.epoch_metas(si, &owner)
+            self.epoch_metas_upto(si, &owner, window)
         } else {
             self.pot_metas(si, &owner, window)
         };
@@ -2292,9 +2325,16 @@ impl World {
                         res = self.send(&[ix], &[&kp]);
                     }
                     // Shares worth at most one raw token at the vault's rate are rounding
-                    // dust (a post-wipe epoch with `T` ≈ 1): counted, not reported.
+                    // dust (a post-wipe epoch with `T` ≈ 1): counted, not reported. In 256 bits:
+                    // after a rebase `S` and a lender's shares can exceed 2^128 / `T`.
                     let m = self.env.market(&market);
-                    let worth = shares * u128::from(m.tokens_free) / m.total_shares.get().max(1);
+                    let worth = shortwin_math::num::mul_div(
+                        shares,
+                        u128::from(m.tokens_free),
+                        m.total_shares.get().max(1),
+                        shortwin_math::num::Rounding::Floor,
+                    )
+                    .unwrap_or(u128::MAX);
                     if strict && res.is_err() && worth <= 1 {
                         *self
                             .stats
@@ -4393,6 +4433,10 @@ impl World {
     /// lenders on copies of the state, through the records in turn: the owner's conversion takes
     /// the chain's accruals back, so this is exactly what the chain could not move), plus
     /// [`CLAIM_DUST`] per present lender and the carries' bound ([`World::carry_gap_bound`]).
+    /// That take-back is itself checked right after the chains, against the spec's formula
+    /// computed without it — Σ max(0, the owner's touch on the state before any chain − what
+    /// its chain moved) — the anomaly `absent-residual-mismatch` above [`CLAIM_DUST`] (the
+    /// counter `absent-residual-differs` at any difference).
     /// Above it the anomaly `wind-down-absent-owed-above-residual`; the largest owed total is
     /// `summary.json`'s `wind_down_claims.largest_absent_owed_lamports`. The absent owners then
     /// return: the wind-down's own `lenders_out` and second claim pass take them out under the
@@ -4424,7 +4468,12 @@ impl World {
             .events
             .entry("wind-down-absent-market".into())
             .or_default() += 1;
+        // The spec's residual, computed without the take-back (KI66F-ORACLE): each absent
+        // owner's own touch on the state before any chain moved, less what its chain then moved.
+        let owners_first = self.absent_moves(si, &absent);
+        let mut chain_moved = Vec::with_capacity(absent.len());
         for &li in &absent {
+            let pot0 = self.env.market_vault(&market).vault().unmatched;
             *self
                 .stats
                 .events
@@ -4458,6 +4507,37 @@ impl World {
                          moved {:?} -> {:?}",
                         before,
                         state(self)
+                    ),
+                );
+            }
+            let pot1 = self.env.market_vault(&market).vault().unmatched;
+            chain_moved.push(pot1.saturating_sub(pot0));
+        }
+        // Cross-check (KI66F-ORACLE): what the owners' touches would still move after the chains
+        // (the bound below, which leans on the owner's conversion taking the chain's accruals
+        // back exactly) against Σ max(0, owner first − chain moved), computed without it. With an
+        // exact take-back the two are equal: the owner's touch after the chain moves
+        // max(0, surplus − chain moved) (the chain's moves left `real`, nothing else).
+        if let (Some(first), Some(after)) = (owners_first, self.absent_moves(si, &absent)) {
+            let spec = first
+                .iter()
+                .zip(&chain_moved)
+                .fold(0u64, |a, (f, c)| a.saturating_add(f.saturating_sub(*c)));
+            let left = after.iter().fold(0u64, |a, x| a.saturating_add(*x));
+            if spec != left {
+                *self
+                    .stats
+                    .events
+                    .entry("absent-residual-differs".into())
+                    .or_default() += 1;
+            }
+            if spec.abs_diff(left) > CLAIM_DUST {
+                self.stats.anomaly(
+                    "absent-residual-mismatch",
+                    format!(
+                        "market {market}: the absent owners' touches would move {left} lamports \
+                         after their chains, but Σ max(0, owner first − chain moved) is {spec} \
+                         (owner first {first:?}, chain moved {chain_moved:?}, after {after:?})"
                     ),
                 );
             }
@@ -4524,22 +4604,33 @@ impl World {
     /// `pool::touch` of each in turn on copies of the vault and the records. `None` when a touch
     /// fails.
     fn absent_residual(&self, si: usize, absent: &[usize]) -> Option<u64> {
+        self.absent_moves(si, absent)
+            .map(|m| m.iter().fold(0u64, |a, x| a.saturating_add(*x)))
+    }
+
+    /// Per lender of `absent`, what its owner's touch would move to the pot now, as
+    /// [`World::absent_residual`] (in turn, on one copy of the vault and the records; 0 for a
+    /// lender without a position).
+    fn absent_moves(&self, si: usize, absent: &[usize]) -> Option<Vec<u64>> {
         use shortwin_litesvm_tests::invariants::lender::{PoolState, epoch_records};
         let market = self.market_key(si);
         let pool = self.env.market(&market).pool();
         let mut vault = *self.env.market_vault(&market).vault();
         let mut records = epoch_records(&self.env.svm, &market);
-        let before = vault.unmatched;
+        let mut out = Vec::with_capacity(absent.len());
         for &li in absent {
             let owner = self.slots[si].lenders[li].kp.pubkey();
             let Some(lp) = self.env.lender(&market, &owner) else {
+                out.push(0);
                 continue;
             };
             let mut l = lp.lender();
+            let before = vault.unmatched;
             let recs = PoolState::records_from_mut(&mut records, l.epoch);
             shortwin_math::pool::touch(&pool, &mut vault, &mut l, recs, self.env.now()).ok()?;
+            out.push(vault.unmatched.checked_sub(before)?);
         }
-        vault.unmatched.checked_sub(before)
+        Some(out)
     }
 
     /// The wind-down's second claim pass and its liveness check (M10): `lenders_out` takes the

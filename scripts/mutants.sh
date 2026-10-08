@@ -79,7 +79,8 @@ add ki66-pot-skip-surplus rel crates/shortwin-math/src/pool.rs \
 # KI-66 full (eighth round): the forward chain accrues nothing after the record; the owner adds
 # its whole accrual in FWD_OPEN (double count); FWD_HOLD accrues the held epoch again; the walk
 # floors per touch instead of cumulatively; a chained lender re-enters the hold; the V2-12 jump
-# keeps the chain. KI-67: claim_sol closes with pending owed; `closable` closes a parked lender.
+# keeps the chain; the park on a live full-wipe record keeps the chain. KI-67: claim_sol closes
+# with pending owed; `closable` closes a parked lender.
 add ki66full-walk-accrues-nothing rel crates/shortwin-math/src/pool.rs \
   's/\*pending = add_i128\(\*pending, sub_i128\(accrued\(q, end\)\?, accrued\(q, l\.snap\)\?\)\?\)\?;/let _ = (accrued(q, end)?, \&pending);/' \
   "ki65_it ki66_sec_it" -
@@ -97,6 +98,9 @@ add ki66full-rehold rel crates/shortwin-math/src/pool.rs \
   "ki65_it ki66_sec_it" -
 add ki66full-jump-keeps-chain rel crates/shortwin-math/src/pool.rs \
   's/(l\.snap_r = pool\.acc_r;)\n(\s+)l\.clear_fwd\(\);\n(\s+)\}\n(\s+)\}\n\}/$1\n$3}\n$4}\n}/' \
+  "ki66_sec_it" -
+add ki66full-park-keeps-chain rel crates/shortwin-math/src/pool.rs \
+  's/(l\.snap_r = rec\.acc_r_end;)\n\s+l\.clear_fwd\(\);\n(\s+return Ok\(Standing::Parked\);)/$1\n$2/' \
   "ki66_sec_it" -
 add ki67-close-with-pending rel programs/shortwin/src/instructions/claim_sol.rs \
   's/pool::closable\(&pool_state, &l\)/pool::closable(\&pool_state, \&pool::Lender { pending: 0, ..l })/' \

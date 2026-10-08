@@ -464,10 +464,11 @@ a widely spaced `--seed`. Details: [`tests/fuzz/README.md`](../tests/fuzz/README
 
 **Mutation testing** (M7-SEC-6): `scripts/mutants.sh [--fuzz 3m] [--work DIR] [mutant …]` builds the
 tests and the fuzzer once from the checkout, then each one-line program mutant — the M7 security
-review's seven, and since M10 eleven more (KI-65, KI-66, and the eight of KI-66 full and KI-67:
+review's seven, and since M10 twelve more (KI-65, KI-66, and the nine of KI-66 full and KI-67:
 the forward chain accruing nothing, the owner's double count inside a chain, the held epoch accrued
-twice, a per-touch floor, a re-entered hold, a jump keeping the chain, a close with `pending` owed
-and a parked lender closed) — (the test-venue or the release build of a private copy), and requires
+twice, a per-touch floor, a re-entered hold, a jump keeping the chain, the park on a live wipe
+record keeping the chain (`ki66full-park-keeps-chain`, the KI-66 full review), a close with
+`pending` owed and a parked lender closed) — (the test-venue or the release build of a private copy), and requires
 the mutant's named tests and, for the M7 ones, a short fuzz run of its profile to fail against it;
 the M10 mutants are checked by their tests alone (`-`) — a surviving mutant is a missing oracle. It needs the unmutated builds the fork tests load (`SHORTWIN_SO`, `SHORTWIN_TEST_VENUE_SO`,
 `MOCK_CPAMM_SO`, `COMPLETE_CURVE_SO`, default `target/…`); `--work` outside the repository keeps

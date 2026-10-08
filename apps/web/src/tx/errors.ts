@@ -26,6 +26,24 @@ const TOKEN_ERRORS: Readonly<Record<number, string>> = {
         'CPI Guard is on for this token account, so short.win cannot move tokens from it. Turn it off for this deposit or use another account.',
 };
 
+/**
+ * Anchor framework errors (below 6000) short.win raises in normal use, when short.win itself
+ * failed. `AccountNotInitialized` (3012): an account the instruction names no longer exists.
+ * Since KI-67 the claim that empties a lender position closes it (as a full withdrawal does), so a
+ * plan built before such a close fails here: the claimant's own position closed by a claim from
+ * another tab or the dashboard, or a lender the claim syncs first closed meanwhile (FE-30). A new
+ * plan re-reads the chain (`plan.rebuild`): it leaves a closed sync target out, and a claim of a
+ * closed position is refused with a plain message.
+ */
+const ANCHOR_ERRORS: Readonly<Record<number, Pick<TxError, 'name' | 'message' | 'action'>>> = {
+    3012: {
+        name: 'AccountNotInitialized',
+        action: 'retry',
+        message:
+            'An account in this transaction no longer exists (for example a lender position closed by a claim or withdrawal). A new review re-reads the chain.',
+    },
+};
+
 const TX_LEVEL: Readonly<Record<string, Pick<TxError, 'kind' | 'message' | 'action'>>> = {
     InsufficientFundsForFee: { kind: 'funds', action: 'adjust', message: 'Not enough SOL to pay the transaction fee.' },
     InsufficientFundsForRent: {
@@ -96,6 +114,10 @@ export function mapTransactionError(err: unknown, logs: readonly string[] = []):
                             logs,
                         };
                     }
+                }
+                const anchor = ANCHOR_ERRORS[code];
+                if (anchor && failed === SHORTWIN_PROGRAM) {
+                    return { kind: 'program', code, ...anchor, instructionIndex: index, logs };
                 }
                 const tokenMsg = TOKEN_ERRORS[code];
                 if (token && tokenMsg) {

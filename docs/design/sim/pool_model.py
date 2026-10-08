@@ -2009,7 +2009,20 @@ def _diff_world(seed: int, with_pot: bool, stats: dict):
                 lo = L.fwd_epoch if L.fwd else L.epoch
                 pre = (L.shares, L.epoch, L.lock, L.lock_term, L.lock_until, L.lock_epoch, L.claimed,
                        [e[7] for e in p.epochs.values()])
+                # The over-move measure: does the touch move more to the pot than the owner's own
+                # touch would at the same moment (on a copy, every record at hand)?
+                o = copy.deepcopy(p)
+                try:
+                    u0 = o.unmatched
+                    o._touch(w)
+                    owner_moves = o.unmatched - u0
+                except ValueError:
+                    owner_moves = None
+                u1 = p.unmatched
                 p.sync_lender(w, n, signed=False)
+                if owner_moves is not None and p.unmatched - u1 > owner_moves:
+                    stats["touches moving more than the owner's own"] += 1
+                    stats["... lamports in total"] += p.unmatched - u1 - owner_moves
                 assert pre == (L.shares, L.epoch, L.lock, L.lock_term, L.lock_until, L.lock_epoch, L.claimed,
                                [e[7] for e in p.epochs.values()]), seed
                 once = (L.pending, L.real, L.snap, L.snap_r, L.fwd, L.fwd_epoch, L.fwd_shares, L.fwd_lag,
@@ -2078,9 +2091,15 @@ def fwd_differential(seeds: int = 2_000):
     ops plus random third-party pot-only touches with random record windows, _diff_world).  At the end
     every owner converts; per lender shares, epoch, lock, lock term and pending + claimed must be
     bit-equal, sum(real) + unmatched bit-equal, every record's conv_rem and S equal, and no chain
-    left; check() and the wind-down liveness hold in B.  Returns the coverage counters."""
+    left; check() and the wind-down liveness hold in B.  Returns the coverage counters, with two
+    measurements the docs cite: the pot-only touches that moved more than the owner's own touch would
+    have at the same moment (the over-move bound, ECON §9.4), and, once every lender of B has also
+    claimed, the positions pool::closable would close and those of them holding a dead lock term
+    (KI-67's lock_term note)."""
     stats = {k: 0 for k in ("pot-only touches", "owner syncs a chained lender", "owner stops inside a chain",
-                            "... with lag 1", "... with epoch < fwd_epoch", "pools with a chain left open")}
+                            "... with lag 1", "... with epoch < fwd_epoch", "pools with a chain left open",
+                            "touches moving more than the owner's own", "... lamports in total",
+                            "closable positions after every lender claims", "... holding a dead lock term")}
     for seed in range(seeds):
         A = _diff_world(seed, False, stats)
         B = _diff_world(seed, True, stats)
@@ -2097,6 +2116,15 @@ def fwd_differential(seeds: int = 2_000):
         assert sum(L.real for L in A2.lenders.values()) + A2.unmatched == \
             sum(L.real for L in B2.lenders.values()) + B2.unmatched, seed
         assert [e[7] for e in A2.epochs.values()] == [e[7] for e in B2.epochs.values()] and A2.S == B2.S, seed
+        # KI-67's predicate after every lender claims (pool::closable): current, no shares, pending 0,
+        # no lock, no chain; how many of those still hold a lock term with no lock (a dead term).
+        B3 = copy.deepcopy(B2)
+        for w in sorted(B3.lenders):
+            B3.claim_sol(w)
+            L = B3.lenders[w]
+            if L.epoch == B3.epoch and L.shares == 0 and L.pending == 0 and L.lock == 0 and L.fwd == FWD_NONE:
+                stats["closable positions after every lender claims"] += 1
+                stats["... holding a dead lock term"] += L.lock_term != 0
         copy.deepcopy(B).check()
         B.wind_down_liveness()
     return stats
@@ -2389,6 +2417,14 @@ def main():
           "same ops plus third-party pot-only touches with random 1-8 record windows); after every owner converts, "
           "shares, epochs, locks, pending + claimed, sum(real) + unmatched, every conv_rem and S are bit-equal: "
           + ", ".join(f"{k} {v:,}" for k, v in st.items()))
+    st = fwd_differential(5_000)
+    over, over_l = st["touches moving more than the owner's own"], st["... lamports in total"]
+    close, dead = st["closable positions after every lender claims"], st["... holding a dead lock term"]
+    print("\nKI-66 full over-move and KI-67 dead lock terms, the same differential over 5,000 random pools (the "
+          f"eighth round's measurement size): pot-only touches {st['pot-only touches']:,}, of which moving more to "
+          f"the pot than the owner's own touch would at the same moment {over:,} ({over_l:,} lamports in total); "
+          f"closable positions once every lender has claimed {close:,}, of which holding a lock term with no lock "
+          f"{dead:,}")
     print("\nKI-66 full, the residual: latent rounding units (an absent lender's shares beyond the chain's floor) "
           "(3,000 tuned pools; 2 x 20,000 adversarial random pools):")
     print("| generator | variant | runs | runs with a present lender unpaid above dust | unpaid in total (lamports) | "
