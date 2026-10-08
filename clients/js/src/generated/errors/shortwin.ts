@@ -228,6 +228,8 @@ export const SHORTWIN_ERROR__GRADUATION_HALTED = 0x17d8; // 6104
 export const SHORTWIN_ERROR__AUTHORITIES_NOT_DISTINCT = 0x17d9; // 6105
 /** EpochRecordReadOnly: A ShareEpoch record the lender converts through must be passed writable */
 export const SHORTWIN_ERROR__EPOCH_RECORD_READ_ONLY = 0x17da; // 6106
+/** RebaseNeedsOwner: Only the position's owner may convert it through a rebase record: sync_lender must be signed by the owner */
+export const SHORTWIN_ERROR__REBASE_NEEDS_OWNER = 0x17db; // 6107
 
 export type ShortwinError =
   | typeof SHORTWIN_ERROR__ABOVE_PRO_RATA_ALLOWANCE
@@ -309,6 +311,7 @@ export type ShortwinError =
   | typeof SHORTWIN_ERROR__PRICE_DEVIATES_FROM_EMA
   | typeof SHORTWIN_ERROR__PROCEEDS_BELOW_MIN
   | typeof SHORTWIN_ERROR__PUMP_VENUE_PRECEDENCE
+  | typeof SHORTWIN_ERROR__REBASE_NEEDS_OWNER
   | typeof SHORTWIN_ERROR__REFERENCE_STALE
   | typeof SHORTWIN_ERROR__RESERVED_SCAN_OUT_OF_ORDER
   | typeof SHORTWIN_ERROR__ROUTE_BROKEN
@@ -420,6 +423,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [SHORTWIN_ERROR__PRICE_DEVIATES_FROM_EMA]: `Spot price deviates from the EMA`,
     [SHORTWIN_ERROR__PROCEEDS_BELOW_MIN]: `Sale proceeds below the minimum`,
     [SHORTWIN_ERROR__PUMP_VENUE_PRECEDENCE]: `Pump venues take precedence for this mint`,
+    [SHORTWIN_ERROR__REBASE_NEEDS_OWNER]: `Only the position's owner may convert it through a rebase record: sync_lender must be signed by the owner`,
     [SHORTWIN_ERROR__REFERENCE_STALE]: `No fresh completed observation bucket`,
     [SHORTWIN_ERROR__RESERVED_SCAN_OUT_OF_ORDER]: `Reserved (6103): unused`,
     [SHORTWIN_ERROR__ROUTE_BROKEN]: `Route is flagged broken`,

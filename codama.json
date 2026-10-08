@@ -1,5 +1,21 @@
 {
   "idl": "clients/js/idl/shortwin.json",
+  "before": [
+    {
+      "from": "codama#updateInstructionsVisitor",
+      "args": [
+        {
+          "syncLender": {
+            "accounts": {
+              "owner": {
+                "isSigner": "either"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
   "scripts": {
     "js": {
       "from": "@codama/renderers-js",

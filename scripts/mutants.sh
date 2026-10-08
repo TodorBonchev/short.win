@@ -6,14 +6,17 @@
 # PROGRAM from a private copy with the change applied (the test-venue build for the mock oracles,
 # the release build for the fork ones). It expects the named tests AND a short fuzz run of the
 # named profile to FAIL against the mutant build: a mutant every check survives means an oracle is
-# missing again.
+# missing again. A mutant with the profile `-` is checked by its tests alone: the KI-65 mutants
+# below, whose fuzz oracles (I1 `Σ shares = S`, KI65-REV-SEC1) need a share rebase, which a 3-minute
+# run reaches too rarely to kill them reliably (the owner-check mutant: one kill in 10 minutes).
 #
 #   scripts/mutants.sh [--fuzz 3m] [--work DIR] [--keep] [mutant ...]     (default: every mutant)
 #
 # Environment: SHORTWIN_SO / SHORTWIN_TEST_VENUE_SO / MOCK_CPAMM_SO / COMPLETE_CURVE_SO for the
 # unmutated builds the fork tests also load (default: target/deploy, target/test-venue/deploy);
 # MUTANTS_JOBS (4), MUTANTS_SEED (20261001).
-# Exit status: 0 when every selected mutant is killed by its tests and by the fuzzer, 1 otherwise.
+# Exit status: 0 when every selected mutant is killed by its tests and (profile not `-`) by the
+# fuzzer, 1 otherwise.
 # Pinned toolchain as everywhere (anchor 1.2.0, platform-tools v1.57, SBPF v3; docs/DEVELOPMENT.md).
 set -uo pipefail
 
@@ -27,13 +30,14 @@ while [ $# -gt 0 ]; do
     --fuzz) fuzz=$2; shift 2 ;;
     --work) work=$2; shift 2 ;;
     --keep) keep=1; shift ;;
-    -h|--help) sed -n '2,19p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
     *) sel+=("$1"); shift ;;
   esac
 done
 
 # add NAME BUILD FILE SUBSTITUTION TESTS PROFILE — BUILD: tv (test-venue) or rel (release); the
-# perl substitution runs with -0 (whole file); TESTS: the litesvm test targets that must fail.
+# perl substitution runs with -0 (whole file); TESTS: the litesvm test targets that must fail;
+# PROFILE: the fuzz profile that must fail too, or `-` for the tests alone.
 names=(); builds=(); files=(); substs=(); testsets=(); profiles=()
 add() { names+=("$1"); builds+=("$2"); files+=("$3"); substs+=("$4"); testsets+=("$5"); profiles+=("$6"); }
 add d4-without-ema tv programs/shortwin/src/instructions/open_short.rs \
@@ -57,6 +61,15 @@ add curve-caps-live rel programs/shortwin/src/engine/caps.rs \
 add pump-caps-live-fee rel programs/shortwin/src/instructions/open_short.rs \
   's/phi_ppm: state\.cap_fee_ppm\(\),\n(\s+)tokens_free/phi_ppm: state.fee_ppm,\n$1tokens_free/' \
   "m7_sec_it" pumpswap
+# KI-65 (M10): claim_sol converts through a rebase record without storing its `conv_rem` (the
+# next converter collects the unit again: Σ shares > S, the hooks' I1); sync_lender converts a
+# third party's position through a rebase record without the owner's signature (KI65-REV-SEC1).
+add ki65-skip-store-records rel programs/shortwin/src/instructions/claim_sol.rs \
+  's/\n\s*lender::store_records\(ctx\.remaining_accounts, &loaded, &records\)\?;//' \
+  "ki65_it" -
+add ki65-rebase-without-owner rel programs/shortwin/src/instructions/sync_lender.rs \
+  's/ctx\.accounts\.owner\.is_signer \|\| !lender::reads_rebase\(&before, &l, &loaded\)/true/' \
+  "ki65_it" -
 
 tools=${PLATFORM_TOOLS:-v1.57}
 arch=${SBPF_ARCH:-v3}
@@ -126,20 +139,26 @@ for i in "${!names[@]}"; do
     MOCK_CPAMM_SO="$mock_so" COMPLETE_CURVE_SO="$curve_so" \
     cargo test --release --locked -p shortwin-litesvm-tests "${args[@]}" >"$dir/tests.log" 2>&1)
   tests_rc=$?
-  (cd "$root" && SHORTWIN_SO="$so_rel" SHORTWIN_TEST_VENUE_SO="$so_tv" MOCK_CPAMM_SO="$mock_so" \
-    COMPLETE_CURVE_SO="$curve_so" "$oracle/release/shortwin-fuzz" run --profile "$profile" \
-    --duration "$fuzz" --jobs "${MUTANTS_JOBS:-4}" --seed "${MUTANTS_SEED:-20261001}" \
-    --out "$dir/fuzz" >"$dir/fuzz.log" 2>&1)
-  fuzz_rc=$?
-  failures=$(grep -oE 'failures [0-9]+' "$dir/fuzz.log" | tail -1 | awk '{print $2}')
   if [ $tests_rc -ne 0 ]; then t_state=killed; else t_state=SURVIVED; fi
-  if [ "${failures:-0}" != 0 ] || [ $fuzz_rc -ne 0 ]; then
-    f_state="killed (${failures:-?} failures)"
+  if [ "$profile" = - ]; then
+    f_state="not run (tests only)"
+    echo "$name: tests $t_state, fuzz $f_state"
+    summary+=("$name: tests $t_state, fuzz $f_state")
   else
-    f_state=SURVIVED
+    (cd "$root" && SHORTWIN_SO="$so_rel" SHORTWIN_TEST_VENUE_SO="$so_tv" MOCK_CPAMM_SO="$mock_so" \
+      COMPLETE_CURVE_SO="$curve_so" "$oracle/release/shortwin-fuzz" run --profile "$profile" \
+      --duration "$fuzz" --jobs "${MUTANTS_JOBS:-4}" --seed "${MUTANTS_SEED:-20261001}" \
+      --out "$dir/fuzz" >"$dir/fuzz.log" 2>&1)
+    fuzz_rc=$?
+    failures=$(grep -oE 'failures [0-9]+' "$dir/fuzz.log" | tail -1 | awk '{print $2}')
+    if [ "${failures:-0}" != 0 ] || [ $fuzz_rc -ne 0 ]; then
+      f_state="killed (${failures:-?} failures)"
+    else
+      f_state=SURVIVED
+    fi
+    echo "$name: tests $t_state, fuzz ($profile, $fuzz) $f_state"
+    summary+=("$name: tests $t_state, fuzz ($profile, $fuzz) $f_state")
   fi
-  echo "$name: tests $t_state, fuzz ($profile, $fuzz) $f_state"
-  summary+=("$name: tests $t_state, fuzz ($profile, $fuzz) $f_state")
   if [ "$t_state" = SURVIVED ] || [ "$f_state" = SURVIVED ]; then
     fail=1
   fi

@@ -37,8 +37,15 @@ Pinned devDependencies (ARCH §1.1): `codama` 1.11.0, `@codama/nodes-from-anchor
 `@codama/renderers-js` 2.5.0, plus `typescript` 5.9.3 and `@types/node` 24.19.0. The only
 runtime dependency is `@solana/kit` 8.3.0. The lockfile is the workspace's `pnpm-lock.yaml`.
 
-`codama.json` (repository root) holds the renderer options. Its package folder argument `.`
-is relative to this package, because `pnpm run generate` runs the Codama CLI from here:
+`codama.json` (repository root) holds the renderer options and one `before` visitor. Its
+package folder argument `.` is relative to this package, because `pnpm run generate` runs the
+Codama CLI from here:
+
+- `before`: `updateInstructionsVisitor` makes `sync_lender`'s `owner` an **either** signer
+  (`isSigner: "either"`). The program reads it as a plain account and requires its signature
+  only when the conversion reads a rebase record (KI65-REV-SEC1, `RebaseNeedsOwner` 6107), so
+  the IDL marks it `signer: false`. With the visitor a caller passes the owner's `Address` for a
+  third party's plain catch-up, or its `TransactionSigner` to sign (role `READONLY_SIGNER`).
 
 - `kitImportStrategy: "rootOnly"` — the generated code imports only `@solana/kit` and its
   `@solana/kit/program-client-core` subpath.
@@ -66,4 +73,5 @@ is relative to this package, because `pnpm run generate` runs the Codama CLI fro
   instruction has builders and parsers and its Anchor discriminator. It checks the error codes
   against the declaration order in `errors.rs` (from 6000), and `crank_sol_usd`'s PDA
   defaults, account roles and data. It also checks the Borsh `OracleCache` layout and the
-  account discriminators.
+  account discriminators, and `sync_lender`'s either-signer `owner` (`READONLY` as an address,
+  `READONLY_SIGNER` as a signer; the lender PDA defaults from it).

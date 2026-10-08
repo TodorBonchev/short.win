@@ -3482,7 +3482,7 @@
     {
       "name": "sync_lender",
       "docs": [
-        "Anyone advances a lender through share epochs."
+        "Anyone advances a lender through share epochs; through a rebase record only its owner."
       ],
       "discriminator": [
         189,
@@ -3559,11 +3559,20 @@
               },
               {
                 "kind": "account",
-                "path": "lender.owner",
-                "account": "LenderPosition"
+                "path": "owner"
               }
             ]
           }
+        },
+        {
+          "name": "owner",
+          "docs": [
+            "The position's owner. A signer only when the conversion reads a rebase record",
+            "(`RebaseNeedsOwner`, KI65-REV-SEC1); otherwise anyone may send the instruction."
+          ],
+          "relations": [
+            "lender"
+          ]
         },
         {
           "name": "event_authority"
@@ -4920,6 +4929,11 @@
       "code": 6106,
       "name": "EpochRecordReadOnly",
       "msg": "A ShareEpoch record the lender converts through must be passed writable"
+    },
+    {
+      "code": 6107,
+      "name": "RebaseNeedsOwner",
+      "msg": "Only the position's owner may convert it through a rebase record: sync_lender must be signed by the owner"
     }
   ],
   "types": [

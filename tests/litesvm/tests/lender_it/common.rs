@@ -33,7 +33,7 @@ use shortwin::errors::ShortwinError;
 use shortwin::state::{GlobalConfig, LenderPosition, Market, MarketVault, ShareEpoch, VenueKind};
 use shortwin_litesvm_tests::errors::custom_code;
 use shortwin_litesvm_tests::fixtures::{self, MarketKeys};
-use shortwin_litesvm_tests::invariants::lender::PoolState;
+use shortwin_litesvm_tests::invariants::lender::{PoolState, reads_rebase};
 use shortwin_litesvm_tests::ix::{self, LenderKeys};
 use shortwin_litesvm_tests::tokens::{self, TokenProgram};
 use shortwin_litesvm_tests::{Env, TxResult, events, pda, read};
@@ -282,7 +282,7 @@ impl Lab {
     }
 
     /// Brings `name` within [`MAX_RECORDS_PER_TX`] epochs of the market with `sync_lender`
-    /// steps (each checked like any lender instruction).
+    /// steps signed by `name` (each checked like any lender instruction).
     fn catch_up(&mut self, name: &str) {
         loop {
             let Some(l) = self.position(name) else { return };
@@ -291,7 +291,7 @@ impl Lab {
                 return;
             }
             let steps = u8::try_from(MAX_RECORDS_PER_TX).expect("u8");
-            self.sync(name, steps).expect("sync_lender step");
+            self.sync_signed(name, steps).expect("sync_lender step");
         }
     }
 
@@ -663,9 +663,21 @@ impl Lab {
         }
     }
 
-    /// `sync_lender(max_epochs)` for `name` (sent without the owner's signature), with the
-    /// next `max_epochs` records.
+    /// `sync_lender(max_epochs)` for `name` sent by a third party (the harness payer, without
+    /// the owner's signature), with the next `max_epochs` records: refused with
+    /// `RebaseNeedsOwner` where the conversion reads a rebase record (KI65-REV-SEC1,
+    /// [`reads_rebase`]).
     pub fn sync(&mut self, name: &str, max_epochs: u8) -> Result<Standing, u32> {
+        self.sync_by(name, max_epochs, false)
+    }
+
+    /// `sync_lender(max_epochs)` signed by `name`, the position's owner: it may convert
+    /// through rebase records.
+    pub fn sync_signed(&mut self, name: &str, max_epochs: u8) -> Result<Standing, u32> {
+        self.sync_by(name, max_epochs, true)
+    }
+
+    fn sync_by(&mut self, name: &str, max_epochs: u8, owner_signs: bool) -> Result<Standing, u32> {
         let owner = self.key(name);
         let st = self.state();
         let l0 = st.lender_of(&owner).expect("sync needs a lender");
@@ -673,14 +685,17 @@ impl Lab {
         let n = usize::from(max_epochs);
         let metas = self.record_metas(from, n);
         let mut standing = Standing::Behind;
+        let mut needs_owner = false;
         let expect = (|| -> Result<Expect, MathError> {
             let (p, mut v) = (st.pool, st.vault.clone());
             let mut l = l0.lender();
             let mut recs = Self::records_slice(&st, from, n);
+            let loaded = recs.clone();
             standing = pool::convert(&p, &mut l, &mut recs)?;
             if standing != Standing::Behind {
                 pool::touch(&p, &mut v, &mut l, &mut recs, st.now)?;
             }
+            needs_owner = reads_rebase(&p, &l0.lender(), &l, &loaded);
             Ok(Expect {
                 pool: p,
                 vault: v,
@@ -691,15 +706,37 @@ impl Lab {
                 records: recs,
             })
         })();
-        let payer = self.env.payer.insecure_clone();
-        let ix = ix::with_remaining(ix::sync_lender(&owner, &self.k.market, max_epochs), &metas);
-        match self.run("sync_lender", ix, &payer) {
+        let refused = needs_owner && !owner_signs;
+        let (kp, _) = self.keys(name);
+        let (ixn, signer) = if owner_signs {
+            (
+                ix::sync_lender_signed(&owner, &self.k.market, max_epochs),
+                kp,
+            )
+        } else {
+            let payer = self.env.payer.insecure_clone();
+            (ix::sync_lender(&owner, &self.k.market, max_epochs), payer)
+        };
+        let ix = ix::with_remaining(ixn, &metas);
+        match self.run("sync_lender", ix, &signer) {
             Ok(_) => {
                 let e = expect.unwrap_or_else(|err| {
                     panic!("sync_lender: program accepted, math crate refuses: {err:?}")
                 });
+                assert!(
+                    !refused,
+                    "sync_lender: a third party converted {name} through a rebase record"
+                );
                 self.compare("sync_lender", &owner, &e);
                 Ok(standing)
+            }
+            Err(c) if refused && expect.is_ok() => {
+                assert_eq!(
+                    c,
+                    code(ShortwinError::RebaseNeedsOwner),
+                    "sync_lender: {name}"
+                );
+                Err(c)
             }
             Err(c) => {
                 Self::check_error("sync_lender", c, expect.map(|_| ()));
@@ -708,13 +745,14 @@ impl Lab {
         }
     }
 
-    /// `pool_model._touch(who)`: a committed touch (`sync_lender` with every record needed).
+    /// `pool_model._touch(who)`: a committed touch by the lender itself (`sync_lender` with
+    /// every record needed, signed by the owner).
     pub fn touch(&mut self, name: &str) -> Option<LenderPosition> {
         let owner = self.key(name);
         self.env.lender(&self.k.market, &owner)?;
         self.catch_up(name);
         let steps = u8::try_from(MAX_RECORDS_PER_TX).expect("u8");
-        self.sync(name, steps).expect("touch");
+        self.sync_signed(name, steps).expect("touch");
         self.position(name)
     }
 

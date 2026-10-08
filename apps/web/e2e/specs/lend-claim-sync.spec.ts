@@ -110,6 +110,11 @@ test.describe('lend: a claim syncs other lenders first (FE-18)', { tag: '@lend' 
         expect(Array.from(intent[0]?.data.subarray(8) ?? [])).toEqual([0]); // max_epochs = 0
         const lateLender = await lenderPositionAddress(m.market, late);
         expect(intent[0]?.accounts).toContain(lateLender);
+        // KI65-REV-SEC1: the other lender's owner rides along unsigned (sync_lender's `owner`, index
+        // 3); a plain touch reads no rebase record, so it needs no signature.
+        expect(intent[0]?.accounts[3]).toBe(late);
+        expect(landed.signers).not.toContain(late);
+        expect(landed.signers).toContain(app.walletAddress);
 
         const [synced] = await eventsOf(signature, LENDER_SYNCED_EVENT_DISCRIMINATOR, getLenderSyncedEventDecoder());
         expect(need(synced, 'LenderSynced event').owner).toBe(late);

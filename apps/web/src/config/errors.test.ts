@@ -44,6 +44,8 @@ describe('program error messages', () => {
         expect(programError(6105)?.action).toBe('admin');
         expect(programError(6106)?.name).toBe('EpochRecordReadOnly');
         expect(programError(6106)?.action).toBe('retry');
+        expect(programError(6107)?.name).toBe('RebaseNeedsOwner');
+        expect(programError(6107)?.action).toBe('blocked');
         expect(programError(5999)).toBeUndefined();
     });
 });

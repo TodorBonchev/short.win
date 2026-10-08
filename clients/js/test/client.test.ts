@@ -70,6 +70,40 @@ test('crank_sol_usd: PDA defaults, roles and data', async () => {
     assert.equal(client.identifyShortwinInstruction(ix.data), client.ShortwinInstruction.CrankSolUsd);
 });
 
+test('sync_lender (KI65-REV-SEC1): the owner is an either-signer, the lender PDA defaults from it', async () => {
+    const market = address('So11111111111111111111111111111111111111112');
+    const owner = createNoopSigner(address('7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE'));
+    const [lender] = await client.findLenderPda({ market, owner: owner.address });
+    const [marketVault] = await client.findMarketVaultPda({ market });
+    const eventAuthority = (
+        await getProgramDerivedAddress({ programAddress: client.SHORTWIN_PROGRAM_ADDRESS, seeds: ['__event_authority'] })
+    )[0];
+    const build = (o: typeof owner | typeof owner.address) =>
+        client.getSyncLenderInstructionAsync({
+            market,
+            owner: o,
+            eventAuthority,
+            program: client.SHORTWIN_PROGRAM_ADDRESS,
+            maxEpochs: 8,
+        });
+    const roles = async (o: typeof owner | typeof owner.address) =>
+        (await build(o)).accounts.map((a) => [a.address, a.role]);
+    const rest = [
+        [eventAuthority, AccountRole.READONLY],
+        [client.SHORTWIN_PROGRAM_ADDRESS, AccountRole.READONLY],
+    ];
+    const head = [
+        [market, AccountRole.READONLY],
+        [marketVault, AccountRole.WRITABLE],
+        [lender, AccountRole.WRITABLE],
+    ];
+    // A third party (the owner's address): a plain catch-up; the owner's signer: any conversion.
+    assert.deepEqual(await roles(owner.address), [...head, [owner.address, AccountRole.READONLY], ...rest]);
+    assert.deepEqual(await roles(owner), [...head, [owner.address, AccountRole.READONLY_SIGNER], ...rest]);
+    assert.equal(client.parseSyncLenderInstruction(await build(owner)).accounts.owner.address, owner.address);
+    assert.equal(client.SHORTWIN_ERROR__REBASE_NEEDS_OWNER, 6107);
+});
+
 test('set_coverage_pause (O17): the keeper key signs, the config PDA defaults, the market is writable', async () => {
     const coverageAuthority = createNoopSigner(address('7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE'));
     const market = address('So11111111111111111111111111111111111111112');

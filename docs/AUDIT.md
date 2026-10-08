@@ -6,14 +6,16 @@ to build and test the code, what the code relies on, and what we already know ab
 **Status:**
 - This is the M10 final package (WP-10 final), written on the merged M10 tree (`m1-core`,
   §0). Every M10 work package has landed: program code is final for the audit (batch 4, then
-  the KI-65 program batch of 2026-10-07 — no rebase orphans, known-issues KI-65; the release
-  ELF `386c5363…` since).
-- The ≥ 24 h fuzz run and CI were clean on batch 4's head `4f4849e` (§10). The KI-65 batch
-  changed the program after them: its local gate is green (§10), and **the ≥ 24 h fuzz and CI
-  must be repeated on the head that carries it** (pending).
+  the KI-65 program batch of 2026-10-07 — no rebase orphans, known-issues KI-65 — and its
+  follow-up of the same day — conversions through a rebase record are owner-signed,
+  KI65-REV-SEC1; the release ELF `cdbd2e70…` since).
+- The ≥ 24 h fuzz run and CI were clean on batch 4's head `4f4849e` (§10). The KI-65 batch and
+  its follow-up changed the program after them: their local gates are green (§10), and **the
+  ≥ 24 h fuzz and CI must be repeated on the head that carries them** (pending).
 - What is still pending is named where it applies: the owner's review of this package and the
-  tag (§0), CI on the head that carries this file (§10; the KI-65 batch changed the program,
-  the math crate, the JS client and the web after `4f4849e`, and CI has not run on it),
+  tag (§0), CI on the head that carries this file (§10; the KI-65 batch and its follow-up
+  changed the program, the math crate, the JS client and the web after `4f4849e`, and CI has
+  not run on them),
   the open owner items (§7), the calibration results (KI-14) and the external audit itself
   (§12).
 - Normative sources:
@@ -38,7 +40,7 @@ to build and test the code, what the code relies on, and what we already know ab
 
 | Item | Value |
 |---|---|
-| Audit commit / tag | the head of `m1-core` that carries this file: the M10 tree (`98b1181`, batch 3 from `391aed3`, the doc sync and this package; program batch 4 — the program change `1e4a273`, `3b33ab7` bytecode-neutral — with its docs and gate up to `4f4849e`), then the final tree's fuzz fixes `997c730` and `945d45a` (`tests/fuzz` and one test-harness doc comment only) and this evidence sync; then the **KI-65 program batch** (branch `m10/ki65`, 2026-10-07: `ShareEpoch.conv_rem`, cumulative conversion rounding; its program commit `3c7c689` on `m10/ki65`, the ids change if the branch is rebased at integration); the program bytes are those of the KI-65 batch. **To be tagged `audit-1` / `v1.0.0` by the owner** (owner decision of 2026-10-02: release 1.0.0 at the audit tag; post-audit fixes are 1.0.x). The tag goes on the commit whose hashes match the table below |
+| Audit commit / tag | the head of `m1-core` that carries this file: the M10 tree (`98b1181`, batch 3 from `391aed3`, the doc sync and this package; program batch 4 — the program change `1e4a273`, `3b33ab7` bytecode-neutral — with its docs and gate up to `4f4849e`), then the final tree's fuzz fixes `997c730` and `945d45a` (`tests/fuzz` and one test-harness doc comment only) and this evidence sync; then the **KI-65 program batch** (branch `m10/ki65`, 2026-10-07: `ShareEpoch.conv_rem`, cumulative conversion rounding; its program commit `3c7c689` on `m10/ki65`), then the **KI-65 follow-up** (branch `m10/ki65b`, 2026-10-07: owner-signed conversions through a rebase record, `sync_lender`'s `owner` account and `RebaseNeedsOwner`, KI65-REV-SEC1; its program commit `79cacd9` on `m10/ki65b`; the ids change if the branches are rebased at integration); the program bytes are those of the KI-65 follow-up. **To be tagged `audit-1` / `v1.0.0` by the owner** (owner decision of 2026-10-02: release 1.0.0 at the audit tag; post-audit fixes are 1.0.x). The tag goes on the commit whose hashes match the table below |
 | Package version | `shortwin` and `complete_curve` are both 1.0.0 (`programs/*/Cargo.toml`); `security.txt`'s `source_release` reads `v1.0.0` |
 | `shortwin` program id | `5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK` (`programs/shortwin/src/lib.rs` `declare_id!`) |
 | `complete_curve` program id | `4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ` (`programs/complete_curve/src/lib.rs`) |
@@ -49,18 +51,20 @@ to build and test the code, what the code relies on, and what we already know ab
 | Contacts | Security reports: `security@short.win`; policy page `https://short.win/security` (`SECURITY.md`; the same values are in both programs' `security.txt` and the web's `/.well-known/security.txt`; owner decision Q3 of 2026-10-02). The auditors' point of contact is named at the engagement (§12) |
 
 **Verified hashes of this tree.** `scripts/verifiable-build.sh --local --compare target/deploy`
-on `m10/ki65` (2026-10-07, commit `b48dbd7`; its `verifiable-hashes.txt` names the commit): solana-verify 0.5.2 in the pinned image built both programs from a fresh clone of
+on `m10/ki65b` (2026-10-07, commit `9612471`; its `verifiable-hashes.txt` names the commit): solana-verify 0.5.2 in the pinned image built both programs from a fresh clone of
 `HEAD`, and each output is byte-identical to the `anchor build` artifact the tests ran on. The
 hashes:
 
 | Program | sha256 of the `.so` file | executable hash (trailing zeros trimmed; the on-chain comparison) | bytes |
 |---|---|---|---|
-| `shortwin.so` | `386c53630faf28f0287c7b772bdeb3c20397b3413a7d6d301568ac2a1f8b2895` | `92860b40b96924cbe48475fd191538362b9b1eb7c7cc593feb9e203bea72e6f3` | 1,582,024 |
+| `shortwin.so` | `cdbd2e7015bb0d912e287206c1f2d3bdd158de0a2e5422d7ea87ddd77870c50a` | `d4f938a86cb40744933312396e317d59cb4f55ff1cdd77715938d6624e60386f` | 1,583,624 |
 | `complete_curve.so` | `f3a47201738fd72d4dd02f756ba3c17f241dc2bedde1c9d25f63eccaaafc6d42` | `2f2ef7da92c7b8dffc57bd7ae9bf33f64c8dbc09dc552c401742ad85f45382ab` | 122,264 |
 
-- The KI-65 batch changed `shortwin` only (+6,808 B); at batch 4 (`4f4849e`, verified on
-  `m10/batch4` at `f08426d`, 2026-10-04) it was `bbef1075…f289` / `3214661b…ee09`, 1,575,216 B.
-  The test-venue build is `d5b313d3…6ca5` (batch 4: `b32f85a0…3e5b`).
+- The KI-65 follow-up changed `shortwin` only (+1,600 B); at the KI-65 batch (`m10/ki65`,
+  verified at `b48dbd7`) it was `386c5363…2895` / `92860b40…e6f3`, 1,582,024 B, which changed
+  `shortwin` only too (+6,808 B); at batch 4 (`4f4849e`, verified on `m10/batch4` at `f08426d`,
+  2026-10-04) it was `bbef1075…f289` / `3214661b…ee09`, 1,575,216 B. The test-venue build is
+  `0d8cc621…a1fd` (the KI-65 batch: `d5b313d3…6ca5`; batch 4: `b32f85a0…3e5b`).
 
 - Both ELFs have `e_flags` 0x3 (SBPF v3) and carry exactly one `security.txt` (§10).
 - Program batch 4 (PUMP-2026-10-1: PumpSwap's fee buckets) changed `shortwin` only; at batch 3
@@ -146,17 +150,17 @@ a unit or excludes it with a reason. On this tree WP-7's `crates/squads-v4-ix` a
 
 **What is in scope** (owner decisions of 2026-10-02, Q2 and "Audit keeper scope"): the on-chain
 core and the keeper's core subset (its coverage budget, liquidation and settlement duties, and
-transaction building; ≈ 4.7k non-test nLOC). Line counts on this tree (`m10/ki65`, the KI-65
-batch; release ELF `386c5363…`):
+transaction building; ≈ 4.7k non-test nLOC). Line counts on this tree (`m10/ki65b`, the KI-65
+follow-up; release ELF `cdbd2e70…`):
 
 | Class | Unit | `.rs` files | tokei 14.0.0 "code" | non-test nLOC |
 |---|---|---|---|---|
-| core | `programs/shortwin` (without the TEST-ONLY `venues/mock.rs`) | 70 | 16,146 | 13,250 |
+| core | `programs/shortwin` (without the TEST-ONLY `venues/mock.rs`) | 70 | 16,226 | 13,269 |
 | core | `programs/complete_curve` | 1 | 293 | 213 |
 | core | `crates/shortwin-math` (`src/`) | 25 | 10,450 | 6,346 |
 | core | `crates/shortwin-venue-state` (`src/`, without the TEST-ONLY `mock_cpamm.rs`) | 10 | 3,772 | 1,636 |
 | core | build pins: `Cargo.toml`, `Cargo.lock`, `Anchor.toml`, `rust-toolchain.toml` | — | — | — |
-| **core** | **total** | **106** | **30,661** | **21,445** |
+| **core** | **total** | **106** | **30,741** | **21,464** |
 | **keeper** (in scope) | keeper core: exit and crank decisions, coverage and budget, the instructions and account lists it sends (`decide`, `coverage`, `budget`, `fees`, `graduation`, `ixs`, `venue`, `view`, `pda`, `sweep`, `monitor`, `pool_monitor`; `services/common` `tx`, `chain`) | 14 | 7,759 | **4,692** |
 | context | keeper rest: the loop (`keeper.rs`, 3,231 non-test nLOC), config, metrics, alerts, the RPC backend, the ALT and v1-probe tools | 12 | 6,316 | 5,821 |
 | context | governance: `shortwin-gov` (`services/ops`) and its Squads v4 encoders (`crates/squads-v4-ix`); host-only, never on-chain | 16 | 4,661 | 4,124 |
@@ -166,7 +170,9 @@ Since the M10 skeleton (`e857a2a`: core 21,117 nLOC), the three program batches 
 non-test nLOC to the core: `security.txt` and the AUD-10 lints (batch 1), SQ-G8, M10-8C-1 and
 the version (batch 2), and the extras denylist (batch 3). The KI-65 batch adds 177 more
 (`programs/shortwin` +45, `crates/shortwin-math` +132: `conv_rem`, `store_records`, the
-commit pass; batch 4's tree counted 21,268). The keeper core is unchanged since
+commit pass; batch 4's tree counted 21,268), and its follow-up 19 more (`programs/shortwin`:
+the `owner` account, `reads_rebase` and its check; tokei "code" +80 there, inline tests
+included, counted with tokei 12.1.2 on the changed files). The keeper core is unchanged since
 the skeleton; batch 3's `DeniedAccount` fallback is in `keeper.rs` (keeper rest).
 
 **How the lines were counted:**
@@ -395,12 +401,12 @@ bound is wrong or can be exceeded. Summary:
 
 | Section | Rows | What |
 |---|---|---|
-| §1 | KI-01 … KI-15, KI-52, KI-53, KI-65 | Economic residuals (O19): the 2 % exit bound and the held model, with the real-venue figures accepted on 2026-10-03 (AMM v4 +61.27, CPMM +37.33 / atomic extra +5.34, PumpSwap +10.20 SOL); no liquidation reserve; baskets; settlement push and deferral; degraded-mode S2→S1; the sale-wrapped open's notional (accepted); the run residual; gap risk; creator self-dealing; **M10-8C-1 (fixed)**; the **late-depositor shortfall** (accepted, with the deposit warning at 1 % / 1 SOL); the **rebase-orphan vest** (found by the final tree's 24 h fuzz; **fixed in the program**, KI-65: cumulative conversion rounding, no rebase orphans; KI-11 with it) |
+| §1 | KI-01 … KI-15, KI-52, KI-53, KI-65, KI-66 | Economic residuals (O19): the 2 % exit bound and the held model, with the real-venue figures accepted on 2026-10-03 (AMM v4 +61.27, CPMM +37.33 / atomic extra +5.34, PumpSwap +10.20 SOL); no liquidation reserve; baskets; settlement push and deferral; degraded-mode S2→S1; the sale-wrapped open's notional (accepted); the run residual; gap risk; creator self-dealing; **M10-8C-1 (fixed)**; the **late-depositor shortfall** (accepted, with the deposit warning at 1 % / 1 SOL); the **rebase-orphan vest** (found by the final tree's 24 h fuzz; **fixed in the program**, KI-65: cumulative conversion rounding, no rebase orphans; KI-11 with it); the pot behind a rebase record (KI-66, the owner-signed rule's price; disclosed, owner item open) |
 | §2 | KI-16 … KI-29 | Pool switches and third-party LP (O18; ECON §12.12 residuals 1–17), graduation delays |
 | §3 | KI-30 … KI-41 | Keeper coverage and budget (O17, OWNER-M7-*), transaction sizes |
 | §4 | KI-42 … KI-46, KI-54 … KI-64 | Trust: the venue guard window, halted venues, upgradeable venues and programs (with the pump venues' 2026-10-02 redeploy), admin powers; the **extras-denylist residuals** (batch 3); the **CPMM creator-fee share**; the Squads source; the **Squads semantics** |
 | §5 | KI-47 … KI-51 | Platform facts relied on (U16's 40 M limit, U17, U25, U29, log events) |
-| §6 | — | M10 findings: M10-8C-1, B2-2, the extras denylist, PUMP-2026-10-1 … -3 (the pump venues' redeploy), the 24 h fuzz findings, FUZZ-M10-1, the WP-1 / WP-10 doc findings, GC-F1 |
+| §6 | — | M10 findings: M10-8C-1, B2-2, the extras denylist, PUMP-2026-10-1 … -3 (the pump venues' redeploy), the 24 h fuzz findings, FUZZ-M10-1, the KI-65 batch's review findings (KI65-REV-SEC1: owner-signed rebase conversions; KI65-REV-CU: `MAX_RECORDS` 8) and its follow-up's (KI65-REV-POT: the pot behind a rebase record, KI-66; KI65B-REV-LOW), the WP-1 / WP-10 doc findings, GC-F1 |
 
 **Status by owner decision** (SPEC §14, ARCH §10):
 - **Accepted by the owner:** the real-venue held sandwich (KI-01's and KI-02's figures,
@@ -411,10 +417,20 @@ bound is wrong or can be exceeded. Summary:
   rows marked accepted (KI-12, KI-22 … KI-24, KI-27, KI-28's M6R-4, KI-29, KI-30, KI-35).
 - **Fixed:** M10-8C-1 (KI-52), the extras denylist hardening (batch 3), PUMP-2026-10-1 (batch 4:
   PumpSwap's fee buckets are not payable SOL), the rebase-orphan vest and dust (KI-65, KI-11:
-  the KI-65 program batch, cumulative conversion rounding through each rebase record), and the
-  harness and doc findings of the register's §6.
+  the KI-65 program batch, cumulative conversion rounding through each rebase record), the
+  third-party conversion order (KI65-REV-SEC1: only a position's owner converts it through a
+  rebase record, the KI-65 follow-up batch, owner decision of 2026-10-07), and the harness and
+  doc findings of the register's §6.
+- **Disclosed** (owner decision of 2026-10-07): KI-65's remaining conversion-order residual — a
+  party ordering its own conversions (Sybils placed before the roll, a tuned residue) and
+  converting after honest lenders' own conversions, at any later time (no atomicity needed;
+  an honest sub-unit lender loses its latent unit at its first own conversion during a vest) —
+  with its figures, pinned in `ki65_it`.
+- **Disclosed, owner item open** (§7): KI-66, the rule's price for the pot — a surplus held by
+  a lender behind a rebase record reaches the pot (R3A-2) only when its owner returns, so
+  deficit lenders may wait indefinitely for an absent surplus holder (KI65-REV-POT).
 - **Open** (build default in force; §7): the rest of O19 (KI-03 … KI-10 are disclosed but not
-  signed off; KI-65's conversion-order residual), O18 (§2) and the M7 keeper items.
+  signed off), O18 (§2) and the M7 keeper items.
 
 ---
 
@@ -433,13 +449,16 @@ signing (2026-10-03, third round); B2-2 kept as built, the extras-denylist resid
 KI-57 accepted, the deposit-warning thresholds (1 % / 1 SOL) confirmed, the `SECURITY.md` /
 `/security` policy defaults kept (2026-10-03, fourth round); PUMP-2026-10-1 fixed and
 PUMP-2026-10-2 disclosed after the pump venues' 2026-10-02 redeploys were re-dumped and
-revalidated (2026-10-03, fifth round). All the program-affecting ones are built (batches 2, 3
-and 4).
+revalidated (2026-10-03, fifth round); KI-65 fixed in the program (2026-10-07, sixth round:
+cumulative conversion rounding), conversions through a rebase record owner-signed
+(KI65-REV-SEC1) and `MAX_RECORDS` = 8 accepted (2026-10-07, sixth round). All the
+program-affecting ones are built (batches 2, 3 and 4, the KI-65 batch and its follow-up).
 
 | Item | Decision needed | Build default (in force) | Changes program code? |
 |---|---|---|---|
 | **O19** (the rest) | Sign off the disclosed residuals of known-issues §1 (KI-01, KI-03 … KI-11); the real-venue figures are already accepted | Accept and disclose; no liquidation reserve | No; the alternative (a rent-only liquidation reserve) is **program** |
-| **Rebase-orphan vest** (KI-65; O19; FUZZ-M10-24H-A) | **Decided (2026-10-07): fixed in the program by cumulative conversion rounding** — each rebase record carries `conv_rem` and a lender's conversion mints `⌊(conv_rem + s)/1,000^k⌋`, so the old epoch's lenders end with exactly the new `S` and the last real lender is paid the vest (ECON §9.5, KI-65). What remains for the owner: the conversion-order residual (KI-65). Permissionless `sync_lender` lets anyone order other lenders' conversions, so a party with `m` positions (or a tuned residue) collects up to `m` of a record's ≤ `n − 1` rounding units, never pushing anyone below its floor; where that leaves every other holder below one post-rebase share, the party holds all of `S` and its last burn is paid the whole unreleased vest and later lumps (R3B-2), a JIT depositor's too with one Sybil placed before the roll (`ki65_it` `order_*`). Honest lenders never get less than their floor or than v0.4.1 gave them (that SOL was stranded). Accept as by design, or require the position owner's signature on a `sync_lender` that converts through a rebase record (keeps the permissionless jump/park; a latent honest unit then blocks the flush, W3 holds; back-running a lender's own conversion stays possible) | Built (the KI-65 program batch) | **Program** (built; new hashes, §0) |
+| **Rebase-orphan vest** (KI-65; O19; FUZZ-M10-24H-A) and the conversion order (KI65-REV-SEC1) | **Decided (2026-10-07): fixed in the program by cumulative conversion rounding** — each rebase record carries `conv_rem` and a lender's conversion mints `⌊(conv_rem + s)/1,000^k⌋`, so the old epoch's lenders end with exactly the new `S` and the last real lender is paid the vest (ECON §9.5, KI-65). **Decided (2026-10-07, sixth round): owner-signed conversions** — `sync_lender` converts a position through a rebase record only with the owner's signature (`RebaseNeedsOwner` 6107; plain catch-up, the V2-12 jump, the parking and `sync_lender(0)` stay permissionless; every other lender instruction is the owner's), so no third party orders an honest lender's conversion and a latent honest unit blocks the flush (W3). Disclosed, not closed: a party ordering its own conversions and converting after honest lenders' own conversions (at any later time) still collects up to one unit per position and, where every honest holder converted to 0 shares, the whole unreleased vest (KI-65's figures: +4,007,334,855 vs 369,862 lamports; a JIT depositor 3,000,000,000 of a 3,000,000,000 lump). **Decided (2026-10-07): `MAX_RECORDS` = 8** per lender transaction (worst case `cover_deficit` 54,549 CU of 60,000; a lender further behind catches up over several transactions) | Built (the KI-65 program batch and its follow-up) | **Program** (built; new hashes, §0) |
+| **KI-66** (KI65-REV-POT; O19) | A surplus held by a lender behind a rebase record reaches the pot only when its owner returns (third-party syncs through the record are refused since KI65-REV-SEC1), so deficit lenders wait for that owner: (a) accept and disclose, or (b) a pot-only touch — a third party's `sync_lender` that stops before a rebase record accrues `pending` / `real` to the record's `acc_end` / `acc_r_end` and moves the surplus to the pot, converting no shares, writing no `conv_rem` and leaving the epoch (it cannot order conversions) | (a): disclosed; `ki65_it` pins the wait (A short 2,827,173,914 lamports until C's own sync fills the pot with 4,434,782,609) | (b) is **program** (math crate `pool`, `sync_lender`, the sim's touch) |
 | **O18** with the SPEC §14 "Delegated, proposed" rows **10** (collateral and liquidation by tier), **13** (dynamic rent) and **18** (fee split) | Confirm the PROPOSED parameters and venue rules: ARCH §2.3.3, §10 O18; ECON §14 lists 32 PROPOSED rows | As built | No if accepted; **program** for any rule the owner rejects |
 | **O9** (ECON G37, U21) | The calibrated gap frequencies per tier and the pre-committed rule (if the 95 % upper bound of λ_up exceeds a tier's break-even, raise CR_open or rent, or cut caps), after ≥ 30 days of the public-RPC crawl | Uncalibrated Monte Carlo (ECON §11.6, illustrative); the crawl runs | Parameters through governance; **program** only if a value leaves its compiled bounds |
 | **M6D residual 16** (ECON §12.12; KI-26) | Accept the margin of a position opened while a deposit is held, or price the open's margin on the burned depth | Accept (margin on the pool as it is) | The alternative is **program** |
@@ -616,9 +635,63 @@ The full gate (G-full in the M10 plan; CI's `ci.yml`) also runs fmt and clippy w
   only), and then the **KI-65 batch**, which changes the program (`ShareEpoch.conv_rem`,
   `store_records`, error 6106; the new hashes of §0), the math crate, the normative sim and
   vectors, the JS client (writable records, the 143-byte codec), the web (`convRem` in the
-  previews, `MAX_RECORDS`), the indexer's recorded sessions, the tests and the benches. CI
-  has not run on any of it. The next push to `main` (owner decision Q1: `main` is
+  previews, `MAX_RECORDS`), the indexer's recorded sessions, the tests and the benches; then
+  the **KI-65 follow-up** (`m10/ki65b`), which changes the program again (`sync_lender`'s
+  `owner` account, error 6107 `RebaseNeedsOwner`; the hashes of §0), the JS client (the IDL, a
+  Codama `before` visitor), the web, the fuzzer, the tests and the benches. CI has not run on
+  any of it. The next push to `main` (owner decision Q1: `main` is
   fast-forwarded after each verified step) runs CI on it; its URL goes here at the tag.
+
+**The KI-65 follow-up's gate** (2026-10-07, on `m10/ki65b`, the program from `79cacd9`: owner
+decision of 2026-10-07, KI65-REV-SEC1 — only a position's owner converts it through a rebase
+record; the machine's 3-slot wrapper; logs `~/.cache/shortwin-work/m10/ki65/gateb/logs`). Every
+step of CI's jobs:
+
+| Step (CI job) | Result |
+|---|---|
+| anchor build + `scripts/build-test-venue.sh` | `shortwin.so` `cdbd2e70…c50a` (1,583,624 B, +1,600), `complete_curve.so` `f3a47201…6d42` (unchanged), test-venue `shortwin.so` `0d8cc621…a1fd`, `mock_cpamm.so` `4cf17007…7ab9` |
+| A49; security.txt | `A49-OK`; `SECTXT-OK` (`--forbid-placeholders --source-release v1.0.0`) |
+| fmt; clippy `-D warnings` on the workspace, `-p shortwin`, `-p shortwin-math`, the benches | clean |
+| lockfiles | no change (no dependency added; the Codama visitor is the pinned `codama` package's own); `cargo deny` / `cargo audit` not re-run (tools absent locally; the lockfiles are those of batch 4's results) |
+| vectors / sim; T-CONFIG | `pool_model.py` reproduces `out/pool_model.txt` byte-identically (its edits are comments); `config_check.py` OK, `test_config_gate.py` 8 tests |
+| wasm | `shortwin-math` and the facade on `wasm32-unknown-unknown`; `cargo check -p shortwin` there |
+| `cargo test -p shortwin-math -p shortwin-math-wasm -p squads-v4-ix`, then `PROPTEST_CASES=2000 cargo test -p shortwin-math` | 350 passed, then 316 at 2,000 cases; 0 failed |
+| **`cargo test --workspace --locked`** | **1,577 passed, 0 failed, 4 ignored** (113 result blocks; incl. `ki65_it` 16/16, the program's `reads_rebase` test against the math crate, `lender_it` 49/49), 1,457 s |
+| T-POT (`SHORTWIN_TRACES=full`), T-SIZE, cu-math | 5 (the R3A-2 row exact: 40 seeds, 19,887 lamports, worst 582); 11; 2 passed |
+| benches m1, m2, m3, m5, m6 | every figure within its budget; m1's `sync_lender` rows re-measured (owner-signed behind records): 14,127 on the current epoch (+341), 19,017 / 28,463 / 52,206 at 1 / 3 / 8 rebase records (+326), 62,496 / 71,974 at 10 / 12 (beyond the web's cap of 8); `claim_sol` / `cover_deficit` unchanged (54,194 / 54,549 at 8); the other rows PDA-bump noise only (not committed) |
+| m7-keeper-bench; `keeper_cost.py` | 3 passed (re-written, noise; `results.json` names `cdbd2e70`); `out/keeper_cost.txt` regenerated (its cross-check comment names the build) |
+| codama; client check; fixtures | the IDL gains `sync_lender`'s `owner` and error 6107; the regenerated client (with `codama.json`'s `before` visitor: `owner` an either-signer) has no diff; 29 client tests; `dump-fixtures.py check` 265 entries, `SHA256SUMS` OK |
+| web: build, lint, typecheck, Vitest; **web E2E** (all specs, under the E2E lock) | clean (2 existing lint warnings); 570 passed, 1 skipped (the own sync's `owner` a `READONLY_SIGNER`, the claim-time syncs' owners `READONLY`, error 6107's copy); **58 passed** (6.4 min) |
+| **services tests** | fmt, clippy clean; `cargo test --manifest-path services/Cargo.toml --workspace`: **351 passed, 0 failed, 6 ignored** (keeper, LiteSVM scenarios with the M5 rebase sync now signed by the lender, T-OPS, indexer with embedded Postgres); the two committed sessions re-recorded on this program (same 836 / 138 transactions; the indexer's 117 tests pass on them); the `ingest_rpc_validator` test (`--ignored`, a local validator) not run |
+| fuzz crate tests | 25 passed (the KI-65 regression: run B's three reproducers and the curve corpus file at 126 / 198 / 495 / 50 lamports) |
+| **fuzz, 10 min each** (`sync_lender` now by the owner or a third party; the `KI65-REV-SEC1` oracle) | `--profile all --seed 65107000 --jobs 4`: 582 runs, 1,092,707 transactions; mock `--seed 31013600`, cpmm `--seed 31005900`, pumpswap `--seed 31016900` (`--jobs 3`): 747 / 776 / 345 runs; **0 failures, 0 anomalies**; 25 / 27 / 31 / 19 epoch rolls, `sync_lender` landed 560 / 658 / 672 / 392 and refused `RebaseNeedsOwner` 2 / 1 / 1 / 2 times (each as the oracle predicted); at most 1,615 lamports of `lender_sol` and 0 owed after the second claim pass |
+| the owner-check mutant (`sync_lender`'s `require!` made `true`) | `ki65_it` fails 5 of 16 (the refusal test, W2 and three `order_*`), `lender_it` `flows::` 1 of 15; the 10-minute mock fuzz (`--seed 31013600`, the test-venue mutant) fails `FUZZ-ORACLE KI65-REV-SEC1` once (run 31013907) |
+| verifiable build (`--local --compare`) | byte-identical for both programs at `9612471` (the hashes of §0; solana-verify 0.5.2, the pinned image) |
+| **mutants** (`scripts/mutants.sh`) | **7 / 7 killed**, by the tests and by a 3-minute fuzz each (1,868 s) |
+| `python3 scripts/audit_scope.py check` | ok |
+
+**The KI-65 follow-up's review round** (2026-10-07, same branch; no program, math-crate or client
+change, so the release ELF is unchanged, `cdbd2e70…`): the security review confirmed the rule
+(no path by which a third party converts another owner's position through a rebase record) and
+found that the residual needs no atomicity — a Sybil converted an hour after the honest claim
+takes the same, so KI-65 now says "converts after", and an honest sub-unit lender loses its
+latent unit at its first own conversion during a vest; the spec review found the rule's price
+for the pot (KI-66, KI65-REV-POT: a surplus holder behind a rebase record that never returns
+can no longer be touched by a third party; disclosed, owner item open in §7). `ki65_it` now pins
+every residual figure with `assert_eq!` and adds the delayed conversion and the pot case
+(18 passed); the fuzz's `KI65-REV-SEC1` oracle predicts the conversion and the touch after it;
+the claim-time E2E checks the other lender's `owner` rides unsigned; `scripts/mutants.sh` gains
+the skip-`store_records` and owner-check mutants (killed by `ki65_it` alone). Re-run (logs
+`~/.cache/shortwin-work/m10/ki65/gatec/logs`): fmt and clippy `--workspace --all-targets -D
+warnings` clean; `ki65_it` 18 passed, `lender_it` 49; the fuzz crate's 25; two 10-minute fuzz runs
+(`--profile all --seed 65107000 --jobs 4`: 608 runs, 26 epoch rolls, `sync_lender` 583 landed and
+2 refused; mock `--seed 31013600 --jobs 3`: 783 runs, 27 rolls, 693 and 1), **0 failures, 0
+anomalies**, at most 1,138 lamports of `lender_sol` and 0 owed after the second claim pass; web
+lint (2 existing warnings) and typecheck clean, the `lend-` E2E specs 14 passed (4.0 min);
+**`scripts/mutants.sh` 9 / 9 killed** (the seven by their tests and a 3-minute fuzz: 10 / 6 / 10 /
+125 failures on `mock`, 37 for the clear delay, 16 on `curve`, 2 on `pumpswap`; the KI-65 two by
+`ki65_it`, 12 and 6 of 18 tests; 2,121 s). Not re-run (no program, client or service change): the
+workspace and services tests, the full E2E, the benches and the verifiable build.
 
 **The KI-65 batch's gate** (2026-10-07, on `m10/ki65`, the program from `3c7c689`; the
 machine's 3-slot wrapper; logs `~/.cache/shortwin-work/m10/ki65/logs`). Every step of CI's jobs:
@@ -754,7 +827,8 @@ trace, stack depth); `tests/litesvm/README.md` (the suites and their figures);
   0.054 and 0.012–0.100 SOL are examples, not the bound. KI-65 is fixed in the program since
   (no rebase orphans): run B's three largest orphan-credit wind-downs (19,131,900,419 /
   890,963,742 / 552,350,825 lamports on the mock / CPMM / PumpSwap) and the curve corpus file
-  now end with 125 / 198 / 495 / 50 lamports (`tests/fuzz/tests/smoke.rs`). Runs 3 and 4 predate
+  now end with 126 / 198 / 495 / 50 lamports on the KI-65 follow-up (125 / 198 / 495 / 50 on
+  the KI-65 batch; `tests/fuzz/tests/smoke.rs`). Runs 3 and 4 predate
   the fix: the final tree's ≥ 24 h fuzz must be repeated on it.
   Run 4 is not independent coverage: seeds are `base + job + k·jobs` per job and a run's
   profile and length derive from its seed, so on 4 jobs run 4's stream (base 20261005) is

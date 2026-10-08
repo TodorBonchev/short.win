@@ -115,6 +115,7 @@ describe('pickSyncs', () => {
         const others = [other(0, 110n), other(1, 510n), other(2, 10n), other(3, 310n)];
         const pick = pickSyncs(m, pool, others, 0n, 600n);
         expect(pick.syncs.map((s) => s.lender)).toEqual([others[1]?.address, others[3]?.address]);
+        expect(pick.syncs.map((s) => s.owner)).toEqual([others[1]?.lender.owner, others[3]?.lender.owner]);
         expect(pick.gain).toBe(800n);
     });
 

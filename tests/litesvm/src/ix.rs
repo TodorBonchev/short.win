@@ -437,16 +437,27 @@ pub fn cover_deficit(owner: &Pubkey, market: &Pubkey, lamports: u64) -> Instruct
     )
 }
 
-/// `sync_lender(max_epochs)` for `owner`'s position (no signer).
+/// `sync_lender(max_epochs)` for `owner`'s position, sent by anyone (`owner` does not sign):
+/// refused with `RebaseNeedsOwner` if the conversion reads a rebase record (KI65-REV-SEC1).
 pub fn sync_lender(owner: &Pubkey, market: &Pubkey, max_epochs: u8) -> Instruction {
     build(
         shortwin::accounts::SyncLender {
             market: *market,
             market_vault: pda::market_vault(market).0,
             lender: pda::lender(market, owner).0,
+            owner: *owner,
             event_authority: pda::event_authority(),
             program: shortwin::ID,
         },
         shortwin::instruction::SyncLender { max_epochs },
     )
+}
+
+/// [`sync_lender`] signed by `owner`: it may convert the position through rebase records.
+pub fn sync_lender_signed(owner: &Pubkey, market: &Pubkey, max_epochs: u8) -> Instruction {
+    let mut ix = sync_lender(owner, market, max_epochs);
+    for m in ix.accounts.iter_mut().filter(|m| m.pubkey == *owner) {
+        m.is_signer = true;
+    }
+    ix
 }

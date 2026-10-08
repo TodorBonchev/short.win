@@ -1998,16 +1998,57 @@ impl World {
         true
     }
 
+    /// `sync_lender` of lender `a % n` through the records it is behind on, signed by its owner
+    /// when bit 16 of `a` is set, else sent by a third party.
     fn sync_lender(&mut self, si: usize, a: u32) -> bool {
         let li = a as usize % self.slots[si].lenders.len();
-        let owner = self.slots[si].lenders[li].kp.pubkey();
+        self.sync_lender_by(si, li, a >> 16 & 1 == 1)
+    }
+
+    /// `sync_lender` of lender `li`, signed by its owner or (`owner_signs` false) sent by a third
+    /// party. Oracle (KI65-REV-SEC1): only the owner converts a position through a rebase
+    /// record — a third party's call is refused with `RebaseNeedsOwner` exactly when the
+    /// conversion (by the math crate, on the pre-state) reads a rebase record, and the owner's
+    /// call never is.
+    fn sync_lender_by(&mut self, si: usize, li: usize, owner_signs: bool) -> bool {
+        use shortwin_litesvm_tests::invariants::lender::{PoolState, sync_reads_rebase};
+        let kp = self.slots[si].lenders[li].kp.insecure_clone();
+        let owner = kp.pubkey();
         let market = self.market_key(si);
         if self.env.lender(&market, &owner).is_none() {
             return false;
         }
         let metas = self.epoch_metas(si, &owner);
-        let ix = ix::with_remaining(ix::sync_lender(&owner, &market, metas.len() as u8), &metas);
-        self.send(&[ix], &[]);
+        let reads = PoolState::load(&self.env.svm, &market)
+            .and_then(|st| sync_reads_rebase(&st, &owner, metas.len()));
+        let n = metas.len() as u8;
+        let ixs = [ix::with_remaining(
+            if owner_signs {
+                ix::sync_lender_signed(&owner, &market, n)
+            } else {
+                ix::sync_lender(&owner, &market, n)
+            },
+            &metas,
+        )];
+        let res = self.send(&ixs, &[&kp]);
+        let refused = shortwin_code(&ixs, &res) == Some(u32::from(E::RebaseNeedsOwner));
+        if let Some(reads) = reads {
+            let want = reads && !owner_signs;
+            if refused != want {
+                panic!(
+                    "{ORACLE} KI65-REV-SEC1: sync_lender of {owner} on {market} (owner signs: \
+                     {owner_signs}, reads a rebase record: {reads}) {}",
+                    if refused {
+                        "refused with RebaseNeedsOwner".to_string()
+                    } else {
+                        format!(
+                            "was not refused with RebaseNeedsOwner: {:?}",
+                            res.as_ref().err()
+                        )
+                    }
+                );
+            }
+        }
         true
     }
 
@@ -2036,7 +2077,8 @@ impl World {
             for _ in 0..8 {
                 match self.env.lender(&market, &k.owner) {
                     Some(l) if l.epoch < self.env.market(&market).share_epoch => {
-                        self.sync_lender(si, li as u32);
+                        // The lender's own sync: it may convert through rebase records.
+                        self.sync_lender_by(si, li, true);
                     }
                     _ => break,
                 }

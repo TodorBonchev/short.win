@@ -1143,6 +1143,8 @@ jobs:
     # cap removed, Tier C as B, the coverage clear immediate, the curve caps on the live reserves,
     # the pump caps at the live fee), and requires the mutant's named tests and a 3-minute fuzz of
     # its profile to fail against it: a surviving mutant is a missing oracle and fails the job.
+    # M10 KI-65 adds two mutants checked by `ki65_it` alone (no fuzz: their oracles need a share
+    # rebase): claim_sol without `store_records`, and sync_lender without the owner check.
     # Nightly with fuzz-nightly (the schedule trigger, main; opt-in, FUZZ_NIGHTLY) and on demand
     # (workflow_dispatch).
     if: (github.event_name == 'schedule' && vars.FUZZ_NIGHTLY == 'true') || github.event_name == 'workflow_dispatch'

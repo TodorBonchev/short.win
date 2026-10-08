@@ -81,14 +81,18 @@ export function pickSyncs(
 ): SyncPick {
     const judged = others
         .filter((o) => o.lender.epoch === base.market.shareEpoch)
-        .map((o) => ({ address: o.address, gain: potGainOfTouch(m, { ...base, lender: o.lender, records: [] }, now) }))
+        .map((o) => ({
+            address: o.address,
+            owner: o.lender.owner,
+            gain: potGainOfTouch(m, { ...base, lender: o.lender, records: [] }, now),
+        }))
         .filter((o) => o.gain > 0n)
         .sort((a, b) => (a.gain > b.gain ? -1 : a.gain < b.gain ? 1 : 0));
     const syncs: SyncTarget[] = [];
     let gain = 0n;
     for (const o of judged) {
         if (gain >= shortfall || syncs.length >= MAX_SYNCS_PER_CLAIM) break;
-        syncs.push({ lender: o.address });
+        syncs.push({ lender: o.address, owner: o.owner });
         gain += o.gain;
     }
     return { syncs, gain };

@@ -20,6 +20,7 @@ import {
   SolanaError,
   transformEncoder,
   type AccountMeta,
+  type AccountSignerMeta,
   type Address,
   type FixedSizeCodec,
   type FixedSizeDecoder,
@@ -28,6 +29,7 @@ import {
   type InstructionWithAccounts,
   type InstructionWithData,
   type ReadonlyAccount,
+  type ReadonlySignerAccount,
   type ReadonlyUint8Array,
   type WritableAccount,
 } from "@solana/kit";
@@ -36,10 +38,11 @@ import {
   getAddressFromResolvedInstructionAccount,
   type InstructionAccountInput,
   type InstructionAccountInputAddress,
+  type InstructionSignerInput,
   type ResolvedInstructionAccount,
   type ResolvedInstructionAccountMeta,
 } from "@solana/kit/program-client-core";
-import { findMarketVaultPda } from "../pdas/index.ts";
+import { findLenderPda, findMarketVaultPda } from "../pdas/index.ts";
 import { SHORTWIN_PROGRAM_ADDRESS } from "../programs/index.ts";
 
 export const SYNC_LENDER_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
@@ -55,6 +58,7 @@ export type SyncLenderInstruction<
   TAccountMarket extends string | AccountMeta<string> = string,
   TAccountMarketVault extends string | AccountMeta<string> = string,
   TAccountLender extends string | AccountMeta<string> = string,
+  TAccountOwner extends string | AccountMeta<string> = string,
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -71,6 +75,9 @@ export type SyncLenderInstruction<
       TAccountLender extends string
         ? WritableAccount<TAccountLender>
         : TAccountLender,
+      TAccountOwner extends string
+        ? ReadonlyAccount<TAccountOwner>
+        : TAccountOwner,
       TAccountEventAuthority extends string
         ? ReadonlyAccount<TAccountEventAuthority>
         : TAccountEventAuthority,
@@ -119,6 +126,8 @@ export type SyncLenderAsyncInput<
   TAccountMarket extends InstructionAccountInput = InstructionAccountInput,
   TAccountMarketVault extends InstructionAccountInput = InstructionAccountInput,
   TAccountLender extends InstructionAccountInput = InstructionAccountInput,
+  TAccountOwner extends InstructionAccountInput | InstructionSignerInput =
+    InstructionAccountInput | InstructionSignerInput,
   TAccountEventAuthority extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
@@ -129,7 +138,12 @@ export type SyncLenderAsyncInput<
    */
   market: TAccountMarket;
   marketVault?: TAccountMarketVault;
-  lender: TAccountLender;
+  lender?: TAccountLender;
+  /**
+   * The position's owner. A signer only when the conversion reads a rebase record
+   * (`RebaseNeedsOwner`, KI65-REV-SEC1); otherwise anyone may send the instruction.
+   */
+  owner: TAccountOwner;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
   maxEpochs: SyncLenderInstructionDataArgs["maxEpochs"];
@@ -139,6 +153,7 @@ export async function getSyncLenderInstructionAsync<
   TAccountMarket extends InstructionAccountInput,
   TAccountMarketVault extends InstructionAccountInput,
   TAccountLender extends InstructionAccountInput,
+  TAccountOwner extends InstructionAccountInput | InstructionSignerInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof SHORTWIN_PROGRAM_ADDRESS,
@@ -147,6 +162,7 @@ export async function getSyncLenderInstructionAsync<
     TAccountMarket,
     TAccountMarketVault,
     TAccountLender,
+    TAccountOwner,
     TAccountEventAuthority,
     TAccountProgram
   >,
@@ -165,6 +181,12 @@ export async function getSyncLenderInstructionAsync<
     ResolvedInstructionAccountMeta<
       TAccountLender,
       InstructionAccountInputAddress<TAccountLender>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountOwner,
+      InstructionAccountInputAddress<TAccountOwner>,
+      ReadonlySignerAccount<InstructionAccountInputAddress<TAccountOwner>> &
+        AccountSignerMeta<InstructionAccountInputAddress<TAccountOwner>>
     >,
     ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
@@ -191,6 +213,11 @@ export async function getSyncLenderInstructionAsync<
       isWritable: true,
     },
     lender: { value: input.lender ?? null, isSigner: false, isWritable: true },
+    owner: {
+      value: input.owner ?? null,
+      isSigner: "either",
+      isWritable: false,
+    },
     eventAuthority: {
       value: input.eventAuthority ?? null,
       isSigner: false,
@@ -222,12 +249,28 @@ export async function getSyncLenderInstructionAsync<
       { programAddress },
     );
   }
+  if (!accounts.lender.value) {
+    accounts.lender.value = await findLenderPda(
+      {
+        market: getAddressFromResolvedInstructionAccount(
+          "market",
+          accounts.market.value,
+        ),
+        owner: getAddressFromResolvedInstructionAccount(
+          "owner",
+          accounts.owner.value,
+        ),
+      },
+      { programAddress },
+    );
+  }
 
   return Object.freeze({
     accounts: [
       getAccountMeta("market", accounts.market),
       getAccountMeta("marketVault", accounts.marketVault),
       getAccountMeta("lender", accounts.lender),
+      getAccountMeta("owner", accounts.owner),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
@@ -250,6 +293,12 @@ export async function getSyncLenderInstructionAsync<
       InstructionAccountInputAddress<TAccountLender>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountOwner,
+      InstructionAccountInputAddress<TAccountOwner>,
+      ReadonlySignerAccount<InstructionAccountInputAddress<TAccountOwner>> &
+        AccountSignerMeta<InstructionAccountInputAddress<TAccountOwner>>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
       InstructionAccountInputAddress<TAccountEventAuthority>
     >,
@@ -264,6 +313,8 @@ export type SyncLenderInput<
   TAccountMarket extends InstructionAccountInput = InstructionAccountInput,
   TAccountMarketVault extends InstructionAccountInput = InstructionAccountInput,
   TAccountLender extends InstructionAccountInput = InstructionAccountInput,
+  TAccountOwner extends InstructionAccountInput | InstructionSignerInput =
+    InstructionAccountInput | InstructionSignerInput,
   TAccountEventAuthority extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
@@ -275,6 +326,11 @@ export type SyncLenderInput<
   market: TAccountMarket;
   marketVault: TAccountMarketVault;
   lender: TAccountLender;
+  /**
+   * The position's owner. A signer only when the conversion reads a rebase record
+   * (`RebaseNeedsOwner`, KI65-REV-SEC1); otherwise anyone may send the instruction.
+   */
+  owner: TAccountOwner;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
   maxEpochs: SyncLenderInstructionDataArgs["maxEpochs"];
@@ -284,6 +340,7 @@ export function getSyncLenderInstruction<
   TAccountMarket extends InstructionAccountInput,
   TAccountMarketVault extends InstructionAccountInput,
   TAccountLender extends InstructionAccountInput,
+  TAccountOwner extends InstructionAccountInput | InstructionSignerInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof SHORTWIN_PROGRAM_ADDRESS,
@@ -292,6 +349,7 @@ export function getSyncLenderInstruction<
     TAccountMarket,
     TAccountMarketVault,
     TAccountLender,
+    TAccountOwner,
     TAccountEventAuthority,
     TAccountProgram
   >,
@@ -309,6 +367,12 @@ export function getSyncLenderInstruction<
   ResolvedInstructionAccountMeta<
     TAccountLender,
     InstructionAccountInputAddress<TAccountLender>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountOwner,
+    InstructionAccountInputAddress<TAccountOwner>,
+    ReadonlySignerAccount<InstructionAccountInputAddress<TAccountOwner>> &
+      AccountSignerMeta<InstructionAccountInputAddress<TAccountOwner>>
   >,
   ResolvedInstructionAccountMeta<
     TAccountEventAuthority,
@@ -334,6 +398,11 @@ export function getSyncLenderInstruction<
       isWritable: true,
     },
     lender: { value: input.lender ?? null, isSigner: false, isWritable: true },
+    owner: {
+      value: input.owner ?? null,
+      isSigner: "either",
+      isWritable: false,
+    },
     eventAuthority: {
       value: input.eventAuthority ?? null,
       isSigner: false,
@@ -358,6 +427,7 @@ export function getSyncLenderInstruction<
       getAccountMeta("market", accounts.market),
       getAccountMeta("marketVault", accounts.marketVault),
       getAccountMeta("lender", accounts.lender),
+      getAccountMeta("owner", accounts.owner),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
@@ -378,6 +448,12 @@ export function getSyncLenderInstruction<
     ResolvedInstructionAccountMeta<
       TAccountLender,
       InstructionAccountInputAddress<TAccountLender>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountOwner,
+      InstructionAccountInputAddress<TAccountOwner>,
+      ReadonlySignerAccount<InstructionAccountInputAddress<TAccountOwner>> &
+        AccountSignerMeta<InstructionAccountInputAddress<TAccountOwner>>
     >,
     ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
@@ -403,8 +479,13 @@ export type ParsedSyncLenderInstruction<
     market: TAccountMetas[0];
     marketVault: TAccountMetas[1];
     lender: TAccountMetas[2];
-    eventAuthority: TAccountMetas[3];
-    program: TAccountMetas[4];
+    /**
+     * The position's owner. A signer only when the conversion reads a rebase record
+     * (`RebaseNeedsOwner`, KI65-REV-SEC1); otherwise anyone may send the instruction.
+     */
+    owner: TAccountMetas[3];
+    eventAuthority: TAccountMetas[4];
+    program: TAccountMetas[5];
   };
   data: SyncLenderInstructionData;
 };
@@ -417,12 +498,12 @@ export function parseSyncLenderInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedSyncLenderInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 5) {
+  if (instruction.accounts.length < 6) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 5,
+        expectedAccountMetas: 6,
       },
     );
   }
@@ -438,6 +519,7 @@ export function parseSyncLenderInstruction<
       market: getNextAccount(),
       marketVault: getNextAccount(),
       lender: getNextAccount(),
+      owner: getNextAccount(),
       eventAuthority: getNextAccount(),
       program: getNextAccount(),
     },

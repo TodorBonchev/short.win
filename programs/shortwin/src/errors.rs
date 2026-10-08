@@ -329,6 +329,19 @@ pub enum ShortwinError {
     /// §6.2). A record the conversion does not change may stay read-only.
     #[msg("A ShareEpoch record the lender converts through must be passed writable")]
     EpochRecordReadOnly,
+
+    // ---- Appended by M10 KI-65, owner-signed rebase conversions (6107; group in brackets) ----
+    /// [Lender] `sync_lender` would convert the lender through a rebase record (it enters a
+    /// `1/1,000^k` record holding shares, a lock or a lock term) and the position's owner did
+    /// not sign (owner decision of 2026-10-07, KI65-REV-SEC1; ECON §9.5; ARCH §3.3): the order
+    /// of the conversions through a rebase record decides who receives its rounding units, so
+    /// a third party may not choose it for another owner's position. Plain catch-up through no
+    /// rebase record, the V2-12 jump of an empty lender and the parking on a live full-wipe
+    /// record stay permissionless (`engine::lender::reads_rebase`).
+    #[msg(
+        "Only the position's owner may convert it through a rebase record: sync_lender must be signed by the owner"
+    )]
+    RebaseNeedsOwner,
 }
 
 impl From<MathError> for ShortwinError {
@@ -425,6 +438,7 @@ mod tests {
             (ShortwinError::GraduationHalted, 6104),
             (ShortwinError::AuthoritiesNotDistinct, 6105),
             (ShortwinError::EpochRecordReadOnly, 6106),
+            (ShortwinError::RebaseNeedsOwner, 6107),
         ];
         for (e, c) in pins {
             assert_eq!(code(e), c, "{e:?}");

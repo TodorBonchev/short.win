@@ -25,7 +25,7 @@ Compute units of every M1 instruction (ARCH §9 M1) on the SBF program (`anchor 
 | `withdraw` | half the shares, SPL Token | 31483 | 31483 | 100000 | §6.1 `deposit` / `withdraw` |
 | `claim_sol` | pays a covered balance | 16099 | 16099 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |
 | `cover_deficit` | 1,000,000 lamports | 16454 | 16454 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |
-| `sync_lender` | lender on the current epoch | 13786 | 13786 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |
+| `sync_lender` | lender on the current epoch | 14127 | 14127 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |
 | `deposit` | 1 rebase record behind, written | 32912 | 32912 | 100000 | §6.1 `deposit` / `withdraw` |
 | `deposit` | 3 rebase records behind, written | 42358 | 42358 | 100000 | §6.1 `deposit` / `withdraw` |
 | `deposit` | 8 rebase records behind, written | 66101 | 66101 | 100000 | §6.1 `deposit` / `withdraw` |
@@ -44,11 +44,11 @@ Compute units of every M1 instruction (ARCH §9 M1) on the SBF program (`anchor 
 | `cover_deficit` | 8 rebase records behind, written | 54549 | 54549 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |
 | `cover_deficit` | 10 rebase records behind, written | 64839 | 64839 | 1400000 | transaction limit; beyond the web's 8-record cap (§6.1's 60,000 holds to 8) |
 | `cover_deficit` | 12 rebase records behind, written | 74317 | 74317 | 1400000 | transaction limit; beyond the web's 8-record cap (§6.1's 60,000 holds to 8) |
-| `sync_lender` | 1 rebase record behind, written | 18691 | 18691 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |
-| `sync_lender` | 3 rebase records behind, written | 28137 | 28137 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |
-| `sync_lender` | 8 rebase records behind, written | 51880 | 51880 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |
-| `sync_lender` | 10 rebase records behind, written | 62170 | 62170 | 1400000 | transaction limit; beyond the web's 8-record cap (§6.1's 60,000 holds to 8) |
-| `sync_lender` | 12 rebase records behind, written | 71648 | 71648 | 1400000 | transaction limit; beyond the web's 8-record cap (§6.1's 60,000 holds to 8) |
+| `sync_lender` | 1 rebase record behind, written | 19017 | 19017 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |
+| `sync_lender` | 3 rebase records behind, written | 28463 | 28463 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |
+| `sync_lender` | 8 rebase records behind, written | 52206 | 52206 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |
+| `sync_lender` | 10 rebase records behind, written | 62496 | 62496 | 1400000 | transaction limit; beyond the web's 8-record cap (§6.1's 60,000 holds to 8) |
+| `sync_lender` | 12 rebase records behind, written | 71974 | 71974 | 1400000 | transaction limit; beyond the web's 8-record cap (§6.1's 60,000 holds to 8) |
 | `sweep_protocol_fees` | the market creation fee | 11747 | 11747 | 60000 | no §6.1 row; crank class (§6.1 `crank_price`) |
 | `crank_sol_usd` | mainnet dump, empty cache | 6146 | 6146 | 60000 | no §6.1 row; crank class (§6.1 `crank_price`) |
 | `crank_sol_usd` | 55 s later, step checked | 6556 | 6556 | 60000 | no §6.1 row; crank class (§6.1 `crank_price`) |

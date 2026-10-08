@@ -1,5 +1,6 @@
 //! `sync_lender(max_epochs)` (ARCH §3.3; C0-6): **anyone** advances a lender through up to
-//! `max_epochs` share epochs and touches it.
+//! `max_epochs` share epochs and touches it — but only the position's **owner** may convert it
+//! through a rebase record (owner decision of 2026-10-07, KI65-REV-SEC1).
 //!
 //! `pool::convert` with the first `max_epochs` `ShareEpoch` records of `remaining_accounts`
 //! (key-checked): value moves only into that lender's own `pending` / `real`; its shares, lock
@@ -11,10 +12,23 @@
 //! next call continues it. `sync_lender(0)` is a plain touch. Does not write `Market`
 //! (C0-17). Event `LenderSynced`.
 //!
+//! **Owner-signed rebase conversions (KI65-REV-SEC1).** The order of the conversions through
+//! a rebase record decides who receives its rounding units (KI-65, below): with a
+//! permissionless conversion a party could order other owners' conversions around its own
+//! positions and collect every unit, and with them, where that left every other holder at 0
+//! shares, the whole unreleased vest (ECON §9.5). So a conversion that reads a rebase record
+//! (`engine::lender::reads_rebase`: the lender enters a `1/1,000^k` record holding shares, a
+//! lock or a lock term) needs `owner`'s signature, else `RebaseNeedsOwner`. Without it the
+//! instruction stays permissionless for plain catch-up through full-wipe records, the V2-12
+//! jump of an empty lender, the parking on a live wipe record and the touch of a current
+//! lender (the web's claim-time `sync_lender(0)` of other lenders). `deposit`, `withdraw`,
+//! `claim_sol` and `cover_deficit` are always signed by the owner (their lender PDA is
+//! derived from the signer), and no other instruction converts a lender.
+//!
 //! Remaining accounts: up to `max_epochs` `ShareEpoch` records, in epoch order, starting at or
 //! before the lender's epoch; extra accounts are ignored. A rebase record the lender converts
 //! through must be writable: the conversion rounds cumulatively and writes the record's
-//! `conv_rem` (KI-65, no rebase orphans: the order in which lenders are synced decides only
+//! `conv_rem` (KI-65, no rebase orphans: the order in which lenders convert decides only
 //! who receives each record's rounding units, never below a lender's floor;
 //! `engine::lender::store_records`, else `EpochRecordReadOnly`). Apart from those records
 //! it writes only the lender and `MarketVault`.
@@ -48,11 +62,16 @@ pub struct SyncLender<'info> {
     pub market_vault: AccountLoader<'info, MarketVault>,
     #[account(
         mut,
-        seeds = [LenderPosition::SEED, market.key().as_ref(), lender.owner.as_ref()],
+        seeds = [LenderPosition::SEED, market.key().as_ref(), owner.key().as_ref()],
         bump = lender.bump,
+        has_one = owner @ ShortwinError::Unauthorized,
         has_one = market @ ShortwinError::AccountMismatch
     )]
     pub lender: Box<Account<'info, LenderPosition>>,
+    /// CHECK: key-checked by `has_one` on `lender` and by the lender's seeds; never written.
+    /// The position's owner. A signer only when the conversion reads a rebase record
+    /// (`RebaseNeedsOwner`, KI65-REV-SEC1); otherwise anyone may send the instruction.
+    pub owner: UncheckedAccount<'info>,
 }
 
 pub fn handler<'info>(ctx: Context<'info, SyncLender<'info>>, max_epochs: u8) -> Result<()> {
@@ -69,11 +88,17 @@ pub fn handler<'info>(ctx: Context<'info, SyncLender<'info>>, max_epochs: u8) ->
             lender::load_records(&market_key, ctx.remaining_accounts, usize::from(max_epochs))?;
         let loaded = records.clone();
         let position = &mut ctx.accounts.lender;
-        let mut l = position.lender();
+        let before = position.lender();
+        let mut l = before;
         let standing = pool::convert(&pool_state, &mut l, &mut records).math()?;
         if standing != Standing::Behind {
             pool::touch(&pool_state, &mut vault, &mut l, &mut records, now).math()?;
         }
+        // KI65-REV-SEC1: only the owner converts its position through a rebase record.
+        require!(
+            ctx.accounts.owner.is_signer || !lender::reads_rebase(&before, &l, &loaded),
+            ShortwinError::RebaseNeedsOwner
+        );
         lender::store_records(ctx.remaining_accounts, &loaded, &records)?;
 
         vault_acc.set_vault(&vault);

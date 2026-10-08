@@ -318,6 +318,8 @@ export interface LandedTransaction {
     readonly logs: readonly string[];
     /** Top-level instructions in order (program ids resolved through the loaded addresses). */
     readonly instructions: readonly LandedInstruction[];
+    /** The transaction's signers (the message's first `numRequiredSignatures` account keys). */
+    readonly signers: readonly Address[];
     /** The SetComputeUnitPrice value, if any (µlamports per CU). */
     readonly computeUnitPrice: bigint | null;
     /** The SetComputeUnitLimit value, if any. */
@@ -357,6 +359,7 @@ export async function landedTransaction(signature: Signature | string): Promise<
         err: t.meta?.err ?? null,
         logs: t.meta?.logMessages ?? [],
         instructions,
+        signers: t.transaction.message.accountKeys.slice(0, t.transaction.message.header.numRequiredSignatures),
         computeUnitPrice,
         computeUnitLimit,
     };
@@ -617,6 +620,7 @@ export async function simulateSyncLender(owner: WalletName, m: MarketInfo): Prom
     const ix = await getSyncLenderInstructionAsync({
         market: m.market,
         lender: await lenderPositionAddress(m.market, o.address),
+        owner: o.address,
         eventAuthority: await eventAuthority(),
         program: SHORTWIN_PROGRAM_ADDRESS,
         maxEpochs: 0,

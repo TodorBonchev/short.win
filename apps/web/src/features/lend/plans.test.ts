@@ -50,6 +50,7 @@ const VAULT = address('Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB');
 const LENDER = address('mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So');
 const SOURCE = address('4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R');
 const OTHER = address('JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN');
+const OTHER_OWNER = address('So11111111111111111111111111111111111111112');
 const signer = createNoopSigner(OWNER);
 
 const ctx = (o: Partial<LendContext> = {}): LendContext => ({
@@ -266,12 +267,14 @@ describe('withdraw plans', () => {
 
 describe('claim, cover and sync plans', () => {
     it('prepend sync_lender(0) of other lenders (at most 4) before claim_sol', async () => {
-        const syncs = Array.from({ length: 6 }, () => ({ lender: OTHER }));
+        const syncs = Array.from({ length: 6 }, () => ({ lender: OTHER, owner: OTHER_OWNER }));
         const plan = await buildClaimPlan({ ...ctx(), syncs, expected: 5_000n });
         expect(kinds(plan.instructions)).toEqual([...Array(MAX_SYNCS_PER_CLAIM).fill('SyncLender'), 'ClaimSol']);
         const sync = plan.instructions[0];
         expect(getSyncLenderInstructionDataDecoder().decode(data(sync)).maxEpochs).toBe(0);
         expect(sync?.accounts?.map((a) => a.address)).toContain(OTHER);
+        // The other lender's owner rides along unsigned: a plain touch reads no rebase record.
+        expect(sync?.accounts?.[3]).toMatchObject({ address: OTHER_OWNER, role: AccountRole.READONLY });
         const claim = plan.instructions[MAX_SYNCS_PER_CLAIM];
         expect(getClaimSolInstructionDataDecoder().decode(data(claim))).toBeTruthy();
         expect(claim?.accounts?.[0]).toMatchObject({ address: OWNER, role: AccountRole.WRITABLE_SIGNER });
@@ -291,6 +294,9 @@ describe('claim, cover and sync plans', () => {
         const plan = await buildSyncPlan(ctx({ lenderEpoch: 1, shareEpoch: 30 }));
         const ix = plan.instructions[0];
         expect(getSyncLenderInstructionDataDecoder().decode(data(ix)).maxEpochs).toBe(MAX_RECORDS);
+        // Signed by the owner: it may convert through rebase records (KI65-REV-SEC1).
+        expect(ix?.accounts?.[2]).toMatchObject({ address: LENDER, role: AccountRole.WRITABLE });
+        expect(ix?.accounts?.[3]).toMatchObject({ address: OWNER, role: AccountRole.READONLY_SIGNER });
         expect(tail(ix, MAX_RECORDS)[0]?.address).toBe((await findShareEpochPda({ market: MARKET, epoch: 1 }))[0]);
     });
 

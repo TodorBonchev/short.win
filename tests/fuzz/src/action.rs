@@ -60,7 +60,9 @@ kinds! {
     ClaimSol = "claim_sol",
     /// `cover_deficit` by lender `a`.
     CoverDeficit = "cover_deficit",
-    /// `sync_lender` of lender `a`.
+    /// `sync_lender` of lender `a % n`, through the records it is behind on: signed by its owner
+    /// when bit 16 of `a` is set, else sent by a third party (KI65-REV-SEC1; `a` is uniform, so
+    /// the two choices are independent up to a bias of order `n/2³²`).
     SyncLender = "sync_lender",
     /// `sweep_trader`.
     SweepTrader = "sweep_trader",

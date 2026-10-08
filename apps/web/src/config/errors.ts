@@ -345,6 +345,12 @@ const ROWS: readonly Row[] = [
         'retry',
         'A share-epoch record your position converts through was passed read-only. A new review passes it writable.',
     ],
+    [
+        6107,
+        'RebaseNeedsOwner',
+        'blocked',
+        'Only the position’s owner can sync it through a share rebase. Connect the wallet that owns the position.',
+    ],
 ];
 
 export const PROGRAM_ERRORS: ReadonlyMap<number, ProgramErrorInfo> = new Map(

@@ -16,6 +16,8 @@
 //! - [`store_records`]: writes back the conversion remainder `conv_rem` of every record the
 //!   lender converted through (KI-65: cumulative rebase rounding, no orphan shares); such a
 //!   record must have been passed writable.
+//! - [`reads_rebase`]: whether a conversion read a rebase record, which `sync_lender` lets
+//!   only the position's owner do (KI65-REV-SEC1, `RebaseNeedsOwner`).
 //! - [`init_if_new`]: the fields of a `LenderPosition` that `deposit` just created.
 //! - [`rewards_required`]: which post-wipe sweeps a deposit into a live wipe record waits for
 //!   (R4A-7).
@@ -106,6 +108,26 @@ pub fn store_records(
         field.copy_from_slice(&a.conv_rem.to_le_bytes());
     }
     Ok(())
+}
+
+/// Whether the conversion that took the lender from `before` to `after` read a rebase record
+/// (`num = 1`, `1/1,000^k`) of `records`, which `sync_lender` lets only the position's owner
+/// do (owner decision of 2026-10-07, KI65-REV-SEC1; `RebaseNeedsOwner`): the order of the
+/// conversions through a rebase record decides who receives its rounding units (ECON §9.5).
+///
+/// `pool::convert` reads the record of the lender's epoch unless the lender is empty (no
+/// shares, lock or lock term: the V2-12 jump reads no record). A full-wipe record leaves the
+/// lender empty, so it then jumps over every later record (or parks on the live wipe record)
+/// and reads no rebase record after it. Hence a conversion read a rebase record iff it moved
+/// the lender's epoch, the lender was not empty, and the record of its starting epoch is a
+/// rebase. Plain catch-up, the jump and the parking are not conversions through a rebase.
+pub fn reads_rebase(before: &Lender, after: &Lender, records: &[MathShareEpoch]) -> bool {
+    let empty = before.shares == 0 && before.lock == 0 && before.lock_term == 0;
+    after.epoch > before.epoch
+        && !empty
+        && records
+            .iter()
+            .any(|r| r.epoch == before.epoch && !r.is_full_wipe())
 }
 
 /// Fills a `LenderPosition` that `deposit` created in this instruction (`init_if_needed`
@@ -240,6 +262,73 @@ mod tests {
         p.acc = 9;
         assert!(!init_if_new(&mut pos, &owner, &market, 254, &p));
         assert_eq!(pos.snap, 7);
+    }
+
+    /// `reads_rebase` against the math crate itself: a conversion reads a rebase record iff,
+    /// given only the records before the first rebase record, it stops `Behind` (it needed that
+    /// record), while with every record it moved the lender's epoch. Every pattern of wipe and
+    /// rebase records up to three epochs behind (the last one live or not), every starting
+    /// epoch, and lenders with and without shares (a dust holding, a multiple of the unit and
+    /// more), a lock and a lock term.
+    #[test]
+    fn reads_rebase_is_the_conversion_reading_a_rebase_record() {
+        use shortwin_math::pool::{convert, Standing};
+        let rec = |epoch: u32, rebase: bool| MathShareEpoch {
+            acc_end: 0,
+            acc_r_end: 0,
+            s_old: 1_000_000_000,
+            carry: 0,
+            carry_r: 0,
+            conv_rem: 0,
+            epoch,
+            num: u8::from(rebase),
+            den_log1000: u8::from(rebase),
+            _pad: [0; 10],
+        };
+        let mut seen = [0usize; 2];
+        for n in 1..=3u32 {
+            for kinds in 0..(1u32 << n) {
+                let recs: Vec<_> = (0..n).map(|e| rec(e, kinds >> e & 1 == 1)).collect();
+                let last_wipe = recs.last().is_some_and(MathShareEpoch::is_full_wipe);
+                for live in [false, true] {
+                    if live && !last_wipe {
+                        continue;
+                    }
+                    let mut p = Pool::new();
+                    p.share_epoch = n;
+                    p.wipe_live = u8::from(live);
+                    for from in 0..n {
+                        for shares in [0, 1, 999, 1_000, 1_000_123] {
+                            for (lock, lock_term) in [(0, 0), (5, 0), (0, 7), (5, 7)] {
+                                let mut before = Lender::new(&p);
+                                before.epoch = from;
+                                (before.snap, before.snap_r) = (0, 0);
+                                (before.shares, before.lock, before.lock_term) =
+                                    (shares, lock, lock_term);
+                                let tail = &recs[from as usize..];
+                                let mut after = before;
+                                convert(&p, &mut after, &mut tail.to_vec()).unwrap();
+                                let first = tail
+                                    .iter()
+                                    .position(|r| !r.is_full_wipe())
+                                    .unwrap_or(tail.len());
+                                let mut cut = before;
+                                let st =
+                                    convert(&p, &mut cut, &mut tail[..first].to_vec()).unwrap();
+                                let want = st == Standing::Behind && after.epoch > before.epoch;
+                                assert_eq!(
+                                    reads_rebase(&before, &after, tail),
+                                    want,
+                                    "kinds {kinds:b} live {live} from {from} {before:?}"
+                                );
+                                seen[usize::from(want)] += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert!(seen[0] > 100 && seen[1] > 100, "{seen:?}");
     }
 
     #[test]

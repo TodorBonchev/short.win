@@ -548,14 +548,16 @@ pub fn mock_lifecycle() -> Session {
         env.market(&m5.market()).share_epoch > 0,
         "a rebase rolled the epoch"
     );
+    // Through the rebase record: signed by the lender (KI65-REV-SEC1).
     let owner5 = m5.lender_keys().owner;
     let sync5 = with_records(
         &env,
         &m5.market(),
         &owner5,
-        ix::sync_lender(&owner5, &m5.market(), 8),
+        ix::sync_lender_signed(&owner5, &m5.market(), 8),
     );
-    ok(env.send(&[sync5], &[]));
+    let kp5 = m5.lender.insecure_clone();
+    ok(env.send(&[sync5], &[&kp5]));
 
     // ---- M1: the mint turns unsafe (a freeze authority appears) --------------------------------
     let mint = m1.mint();

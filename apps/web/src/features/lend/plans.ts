@@ -303,6 +303,11 @@ export function solPaidFrom(
 export interface SyncTarget {
     /** Another lender's `LenderPosition` whose touch moves a surplus to the pot. */
     readonly lender: Address;
+    /**
+     * Its owner (`LenderPosition.owner`; the instruction's `owner` account, not a signer here: a
+     * plain touch reads no rebase record, KI65-REV-SEC1).
+     */
+    readonly owner: Address;
 }
 
 export interface ClaimPlanInput extends LendContext {
@@ -322,6 +327,7 @@ export async function buildClaimPlan(i: ClaimPlanInput): Promise<TxPlan> {
                 market: i.marketAddress,
                 marketVault: i.vaultAddress,
                 lender: s.lender,
+                owner: s.owner,
                 eventAuthority: ea,
                 program,
                 maxEpochs: 0,
@@ -378,7 +384,11 @@ export async function buildCoverPlan(i: CoverPlanInput): Promise<TxPlan> {
     };
 }
 
-/** `sync_lender(n)` of the owner's own position through its next `n ≤ MAX_RECORDS` records. */
+/**
+ * `sync_lender(n)` of the owner's own position through its next `n ≤ MAX_RECORDS` records, signed
+ * by the owner: only the owner may convert its position through a rebase record (KI65-REV-SEC1,
+ * `RebaseNeedsOwner`).
+ */
 export async function buildSyncPlan(i: LendContext): Promise<TxPlan> {
     const metas = await recordMetas(i.marketAddress, i.lenderEpoch, i.shareEpoch);
     const ix = withRemaining(
@@ -386,6 +396,7 @@ export async function buildSyncPlan(i: LendContext): Promise<TxPlan> {
             market: i.marketAddress,
             marketVault: i.vaultAddress,
             lender: i.lenderAddress,
+            owner: i.signer,
             eventAuthority: await eventAuthority(),
             program,
             maxEpochs: metas.length,

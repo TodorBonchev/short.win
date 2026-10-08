@@ -1190,7 +1190,9 @@ fn touch_in(
 /// have, they hold exactly the new `S = ⌊s_old/den⌋` (by induction from `S = 0`: every
 /// share of `s_old` was held). Each lender gets `⌊s/den⌋` or one more; the order only
 /// decides who receives the record's at most `n − 1` rounding units (one per position: a
-/// party with several positions, or a tuned residue, can receive several). Hence ECON §13
+/// party with several positions, or a tuned residue, can receive several; the program lets
+/// only a position's owner convert it through a rebase record, KI65-REV-SEC1, so a party
+/// orders only its own conversions). Hence ECON §13
 /// I-P1′, recursive over the records `0..N` behind the current epoch `N`:
 /// `S = Σ current shares + L_{N−1}`, where `L_e = ⌊(conv_rem_e + U_e)/den_e⌋` through a
 /// rebase record (0 through a full wipe), `U_e` = the epoch-`e` shares of the lenders still

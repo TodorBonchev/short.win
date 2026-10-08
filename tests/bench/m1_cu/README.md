@@ -39,11 +39,15 @@ every step, so every record's `conv_rem` is written, the worst case per record; 
 credits the lender about 1 SOL through nonzero `acc_end` / `acc_r_end` deltas, funded in
 `lender_sol`, so `claim_sol` pays: the unit test `a_claim_behind_pays_what_the_records_credit`).
 Each such record costs ≈ 4.7–5.2k CU. `claim_sol` / `cover_deficit` / `sync_lender` stay within
-§6.1's 60,000 CU up to 8 records (54,194 / 54,549 / 51,880), the web's cap per lender
+§6.1's 60,000 CU up to 8 records (54,194 / 54,549 / 52,206), the web's cap per lender
 transaction (`MAX_RECORDS`); at 9 `cover_deficit` is 59,694 (measured once, not a row), and the
 10- and 12-record rows are reported against the transaction limit only
-(`LENDER_SOL_BEYOND_CAP`). Every case is measured and within budget (`results.md`; only the
-KI-65 rows were rewritten at the KI-65 batch, the others vary by PDA-bump noise between runs). A case whose Mollusk or LiteSVM run fails, or whose
+(`LENDER_SOL_BEYOND_CAP`). The `sync_lender` rows behind rebase records are signed by the owner:
+since KI65-REV-SEC1 only the owner converts its position through a rebase record (the account
+`owner` and the check `engine::lender::reads_rebase`, +326 CU behind records, +341 on the current
+epoch). Every case is measured and within budget (`results.md`; only the
+KI-65 rows were rewritten at the KI-65 batch and the `sync_lender` rows at its follow-up, the
+others vary by PDA-bump noise between runs). A case whose Mollusk or LiteSVM run fails, or whose
 Mollusk figure exceeds its budget, fails the test.
 
 ## Workspace and pins

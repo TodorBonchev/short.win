@@ -188,7 +188,7 @@ pub mod shortwin {
         instructions::cover_deficit::handler(ctx, lamports)
     }
 
-    /// Anyone advances a lender through share epochs.
+    /// Anyone advances a lender through share epochs; through a rebase record only its owner.
     pub fn sync_lender<'info>(
         ctx: Context<'info, SyncLender<'info>>,
         max_epochs: u8,

@@ -22,7 +22,9 @@ Model (all integers; rounding in favour of the pool):
       - v0.4 (R3A-2): a lender's realised allocation beyond its entitlement (surplus)
         goes, at its next touch, to a MarketVault-level pot `unmatched`; a claim may
         draw from the pot up to the lender's own entitlement deficit.  O(1), no
-        division, no keeper recycling duty (sync_lender stays permissionless);
+        division, no keeper recycling duty (sync_lender stays permissionless for plain
+        catch-up; since KI65-REV-SEC1 only the owner converts its position through a rebase
+        record -- the model does not check signatures);
         liveness invariant: after all positions resolve, the vest is released and
         every lender is synced, sequential claims pay out lender_sol - dust;
       - v0.4 (R3B-2): LUMP credits (lender half of the penalty, expiry fee, penalty
@@ -1507,7 +1509,10 @@ def whale_order_demo():
         (latent): S counts H's share, so the whale's exit never takes all of S and it realises 0.
     W2: the whale bundles [settlement (3 SOL vest + rebase) -> sync in either order -> exit] while H
         holds 600 old shares (dust below one new share).  The record's rounding unit goes to the
-        second converter; nobody gets less than its floor (H's floor is 0 shares).
+        second converter; nobody gets less than its floor (H's floor is 0 shares).  Since
+        KI65-REV-SEC1 each lender converts only itself (the owner signs a conversion through a
+        rebase record), so order H then W is the whale converting after H's own conversion (at
+        any later time: no atomicity needed).
     W3: after the roll the other holder G leaves; H's unconverted share keeps S at 1; a whale
         deposits, a 3 SOL sweep vests, the whale leaves: no flush (S > the whale's shares), and H,
         converting later, is paid the vest.
@@ -1531,7 +1536,7 @@ def whale_order_demo():
         for order in (("H", "W"), ("W", "H")):
             p = _rebased_pair(cum, 600, 600)
             for w in order:
-                p._touch(w)                                  # sync_lender, permissionless
+                p._touch(w)                                  # sync_lender, by w's owner
             w_got = p.claim_sol("W")
             exit_all(p, "W")
             w_got += p.claim_sol("W")

@@ -127,6 +127,20 @@ fn only_the_owner_moves_its_position() {
         &lab.env.send(&[ix], &[&thief]),
         AnchorErrorCode::ConstraintSeeds,
     );
+    // Every lender instruction that converts a position is the owner's (KI65-REV-SEC1): the
+    // thief cannot claim or deposit through A's position either (sync_lender: `ki65_it`).
+    let mut ix = ix::claim_sol(&thief.pubkey(), &lab.k.market);
+    ix.accounts[2].pubkey = pda::lender(&lab.k.market, &a).0;
+    assert_anchor_err(
+        &lab.env.send(&[ix], &[&thief]),
+        AnchorErrorCode::ConstraintSeeds,
+    );
+    let mut ix = ix::deposit(&lk, 1, 0);
+    ix.accounts[4].pubkey = pda::lender(&lab.k.market, &a).0;
+    assert_anchor_err(
+        &lab.env.send(&[ix], &[&thief]),
+        AnchorErrorCode::ConstraintSeeds,
+    );
     // A user without a position cannot withdraw or claim.
     let res = lab.env.send(&[ix::withdraw(&lk, 1, 0)], &[&thief]);
     assert_anchor_err(&res, AnchorErrorCode::AccountNotInitialized);
@@ -252,8 +266,12 @@ fn records_must_be_consecutive() {
     assert_eq!(lab.position("A").unwrap().epoch, 2);
 }
 
+/// `sync_lender` in `sync_lender(1)` steps through three rebase records. Converting through a
+/// rebase record needs the owner's signature (KI65-REV-SEC1): sent by a third party the first
+/// step is refused (`RebaseNeedsOwner`, nothing written); signed by A each step converts. The
+/// plain touch `sync_lender(0)` of a current lender stays permissionless.
 #[test]
-fn sync_lender_is_permissionless_and_goes_step_by_step() {
+fn sync_lender_goes_step_by_step_and_only_the_owner_converts_through_a_rebase() {
     let mut lab = Lab::with_cap(TokenProgram::Token2022, 10_000);
     // Three settlements that extinguish all but one token: each time S + VS > R_MAX·(T + ΣB_Q +
     // VA) forces a rebase (C0-6). A deposits once and is never touched in between; K deposits
@@ -272,11 +290,15 @@ fn sync_lender_is_permissionless_and_goes_step_by_step() {
     let e = lab.market().share_epoch;
     let before = lab.position("A").unwrap();
     assert_eq!(before.epoch, 0);
-    // One record at a time: Behind until the last, then touched (sync_lender needs no owner
-    // signature; the lab signs with the fee payer only).
+    // A third party may not convert A through a rebase record.
+    let records = lab.state().records;
+    assert_eq!(lab.sync("A", 1), Err(code(ShortwinError::RebaseNeedsOwner)));
+    assert_eq!(lab.position("A").unwrap(), before, "nothing written");
+    assert_eq!(lab.state().records, records, "no record written");
+    // One record at a time, signed by A: Behind until the last, then touched.
     let mut steps = 0;
     loop {
-        let st = lab.sync("A", 1).unwrap();
+        let st = lab.sync_signed("A", 1).unwrap();
         steps += 1;
         if st != Standing::Behind {
             break;
@@ -288,7 +310,7 @@ fn sync_lender_is_permissionless_and_goes_step_by_step() {
     assert_eq!(after.epoch, e);
     assert!(after.shares < before.shares);
     assert!(after.pending > 0);
-    // sync_lender(0) is a plain touch.
+    // sync_lender(0) is a plain touch, by anyone.
     assert_eq!(lab.sync("A", 0), Ok(Standing::Current));
 }
 

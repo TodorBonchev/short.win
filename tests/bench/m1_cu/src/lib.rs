@@ -612,14 +612,15 @@ fn claim_sol_behind(n: u32) -> Prepared {
     s.prepared(ix)
 }
 
+/// Signed by the owner: a conversion through rebase records needs it (KI65-REV-SEC1).
 fn sync_lender_behind(n: u32) -> Prepared {
     let s = behind(n);
     let max = u8::try_from(n).expect("u8");
     let ix = ix::with_remaining(
-        ix::sync_lender(&s.h.owner.pubkey(), &s.k.market, max),
+        ix::sync_lender_signed(&s.h.owner.pubkey(), &s.k.market, max),
         &records(&s, n),
     );
-    prepared(s.env, ix, &[])
+    s.prepared(ix)
 }
 
 fn withdraw_behind(n: u32) -> Prepared {
