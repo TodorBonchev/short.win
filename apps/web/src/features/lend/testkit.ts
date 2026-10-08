@@ -54,7 +54,32 @@ export type VectorExpect =
                     readonly epoch: number;
                 };
       }
-    | { readonly op: 'lockUntil' | 'release'; readonly result: string };
+    | { readonly op: 'lockUntil' | 'release'; readonly result: string }
+    | {
+          readonly op: 'touchPot';
+          readonly lender: string;
+          readonly result:
+              | string
+              | {
+                    readonly potGain: string;
+                    readonly standing: string;
+                    readonly pending: string;
+                    readonly real: string;
+                    readonly shares: string;
+                    readonly epoch: number;
+                    readonly snap: string;
+                    readonly snapR: string;
+                    readonly fwd: number;
+                    readonly fwdEpoch: number;
+                    readonly fwdShares: string;
+                    readonly fwdLag: number;
+                };
+      }
+    | {
+          readonly op: 'claimOutcome';
+          readonly lender: string;
+          readonly result: string | { readonly sol: string; readonly closes: boolean };
+      };
 
 const big = (v: string | number | undefined): bigint => BigInt(v ?? 0);
 
@@ -108,6 +133,10 @@ export function lenderOf(l: Record<string, string | number>): LenderFields {
         lockEpoch: Number(l.lockEpoch),
         lockTerm: big(l.lockTerm),
         lockUntil: big(l.lockUntil),
+        fwd: Number(l.fwd ?? 0),
+        fwdEpoch: Number(l.fwdEpoch ?? 0),
+        fwdShares: big(l.fwdShares),
+        fwdLag: Number(l.fwdLag ?? 0),
     };
 }
 
@@ -201,6 +230,10 @@ export function simpleLender(shares: bigint, o: Partial<LenderFields> = {}): Len
         lockEpoch: NO_LOCK_EPOCH,
         lockTerm: 0n,
         lockUntil: 0n,
+        fwd: 0,
+        fwdEpoch: 0,
+        fwdShares: 0n,
+        fwdLag: 0,
         ...o,
     };
 }

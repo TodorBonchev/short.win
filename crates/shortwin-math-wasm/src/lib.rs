@@ -3,7 +3,8 @@
 //! fee, the exit bounds, the settlement box, rent due, waterfall previews (keeper floor,
 //! vesting lumps), caps, tiers, the open guards, pool selection (`λ`, the locked depth and
 //! its floor), lender-pool previews (locks with `lock_until`, the vest, a withdrawal's SOL
-//! part), the parameter checks, and the create-market mint filter
+//! part, a third party's pot-only touch with its forward chain, a claim that closes the
+//! position), the parameter checks, and the create-market mint filter
 //! (`shortwin_venue_state::mint::check`).
 //!
 //! The frontend never re-implements protocol math (ARCH §7.3); every export here is a
@@ -33,7 +34,7 @@ mod risk;
 mod settle;
 mod waterfall;
 
-pub use lender::{LenderState, PoolState, ShareEpochs, Withdrawal};
+pub use lender::{ClaimOutcome, LenderState, PoolState, PotTouch, ShareEpochs, Withdrawal};
 pub use mint::MintVerdict;
 pub use quotes::{
     BuyQuote, CurveSchedule, CurveState, Fees, PammSchedule, Reserves, SellQuote, Venue,

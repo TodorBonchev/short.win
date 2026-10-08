@@ -86,8 +86,10 @@ export function useLenderRows(owner: Address | null, math: MathModule | undefine
         // Display only, and only a detail about this very mint (M9-SEC-3).
         const served = details[i]?.data?.data;
         const detail = served && served.mint === b.mint ? served : undefined;
-        // A closed position (withdrawn and claimed) has no account and no shares on either side.
-        if (c && !c.lender && (!b.api || BigInt(b.api.shares) === 0n)) return;
+        // A closed position has no account: `withdraw` of everything or, since KI-67, a `claim_sol`
+        // that left it with nothing (a wiped or sub-unit position) closes it. The chain decides
+        // (FE-D1): an indexer row that still shows shares is behind on the close.
+        if (c && !c.lender) return;
         const loaded = c?.market && c.vault ? (c as LoadedChain) : undefined;
         const pos =
             math && loaded?.lender

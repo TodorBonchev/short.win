@@ -68,8 +68,9 @@ export interface E2EState {
     /**
      * `main` (mock venue: trading), `move` (mock: the price-move specs), `paused` (mock, coverage
      * paused), `t22` (list-only Token-2022: CPI Guard and memo), `wipe` and `pot` (mock, each lent by
-     * one spec wallet alone: the FE-18 full wipe and the claim-time pot). On a release-build run the
-     * mock markets are list-only (`venue: 'none'`) and nothing is shorted.
+     * one spec wallet alone: the FE-18 full wipe and the claim-time pot), `chain` (mock, lent by
+     * `chainAbsent` alone: KI66-R4's rebase and the claim-time pot-only sync). On a release-build
+     * run the mock markets are list-only (`venue: 'none'`) and nothing is shorted.
      */
     readonly markets: {
         readonly main: MarketInfo;
@@ -78,6 +79,7 @@ export interface E2EState {
         readonly t22: MarketInfo;
         readonly wipe: MarketInfo;
         readonly pot: MarketInfo;
+        readonly chain: MarketInfo;
     };
     /** Mints without a market for create-market (§3.5): safe, freeze authority, a disallowed extension. */
     readonly createMints: {
@@ -97,6 +99,8 @@ export interface E2EState {
         readonly wipe: PositionInfo;
         /** `potBorrower` on `pot`: its rent is credited to `potClaimer` alone until `potLate` lends. */
         readonly pot: PositionInfo;
+        /** `chainBorrower` on `chain`: the borrowed tokens whose S1 settlement rebases the shares. */
+        readonly chain: PositionInfo;
     } | null;
     /** Token accounts of the wallets (FRONTEND.md §10.3). */
     readonly tokenAccounts: {
@@ -110,6 +114,8 @@ export interface E2EState {
         readonly wipe: { readonly lender: Address; readonly rejoin: Address };
         /** `pot`: the late lender's ATA, with the tokens it lends. */
         readonly pot: { readonly late: Address };
+        /** `chain`: the absent lender's ATA (empty: its tokens are lent) and the claimer's, with tokens. */
+        readonly chain: { readonly absent: Address; readonly claimer: Address };
     };
     /** Dumped mainnet mints present on the validator (SHORTWIN_E2E_VENUES=1), for venue detection. */
     readonly venueMints: {

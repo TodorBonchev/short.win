@@ -615,7 +615,9 @@ describe('Lend → a sub-unit conversion while income vests (KI-65; the owner’
         await waitFor(() => expect(started).toHaveLength(1));
         const plan = started[0] as TxPlan;
         expect(plan.kind).toBe('claim_sol');
-        expect(plan.disclosures).toEqual(['lender.subUnitConversion']);
+        // Converted to 0 shares and paid in full, the position closes (KI-67): said before the
+        // sub-unit warning, which stays last.
+        expect(plan.disclosures).toEqual(['lender.claimCloses', 'lender.subUnitConversion']);
         const vestEnd = formatUtc(21_600n);
         expect(plan.disclosureVars?.['lender.subUnitConversion']).toEqual({ vestEnd });
         // The review renders it, the vest's end filled in.

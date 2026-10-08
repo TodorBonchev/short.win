@@ -13,7 +13,7 @@ import { formatUtc } from '../../lib/time.ts';
 import type { MathModule } from '../../math/load.ts';
 import type { AppRpc } from '../../rpc/client.ts';
 import type { TxFlow } from '../../tx/useTxFlow.ts';
-import { type LendChain, marketNow } from './chain.ts';
+import { type LendChain, marketNow, recordLimitOf } from './chain.ts';
 import type { LendContext } from './plans.ts';
 import type { LendState, SubUnitConversion, UnpaidRentView } from './previews.ts';
 
@@ -68,6 +68,7 @@ export function planContextFor(
         lenderAddress: c.lenderAddress,
         lenderEpoch: c.lender ? c.lender.epoch : null,
         shareEpoch: c.market.shareEpoch,
+        recordLimit: recordLimitOf(c.lender),
     };
 }
 

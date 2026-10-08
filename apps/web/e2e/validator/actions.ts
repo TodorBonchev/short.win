@@ -320,6 +320,8 @@ export interface LandedTransaction {
     readonly instructions: readonly LandedInstruction[];
     /** The transaction's signers (the message's first `numRequiredSignatures` account keys). */
     readonly signers: readonly Address[];
+    /** The accounts the message makes writable (its header's static keys, then the loaded writable ones). */
+    readonly writable: readonly Address[];
     /** The SetComputeUnitPrice value, if any (µlamports per CU). */
     readonly computeUnitPrice: bigint | null;
     /** The SetComputeUnitLimit value, if any. */
@@ -354,12 +356,20 @@ export async function landedTransaction(signature: Signature | string): Promise<
         if (ix.data[0] === 3 && ix.data.length === 9) computeUnitPrice = v.getBigUint64(1, true);
         if (ix.data[0] === 2 && ix.data.length === 5) computeUnitLimit = v.getUint32(1, true);
     }
+    const { header, accountKeys } = t.transaction.message;
+    const signed = header.numRequiredSignatures;
+    const writable = [
+        ...accountKeys.slice(0, signed - header.numReadonlySignedAccounts),
+        ...accountKeys.slice(signed, accountKeys.length - header.numReadonlyUnsignedAccounts),
+        ...(t.meta?.loadedAddresses?.writable ?? []),
+    ] as Address[];
     return {
         fee: BigInt(t.meta?.fee ?? 0),
         err: t.meta?.err ?? null,
         logs: t.meta?.logMessages ?? [],
         instructions,
-        signers: t.transaction.message.accountKeys.slice(0, t.transaction.message.header.numRequiredSignatures),
+        signers: accountKeys.slice(0, signed),
+        writable,
         computeUnitPrice,
         computeUnitLimit,
     };
@@ -457,11 +467,26 @@ function mockReadSet(m: MarketInfo): AccountMeta[] {
  * VS)⌋ ≤ T`, with `min_tokens = T` so the burn pays exactly `T`. Returns the tokens withdrawn.
  */
 export async function withdrawAllFree(owner: WalletName, m: MarketInfo, destination: Address): Promise<bigint> {
+    return withdrawFreeDownTo(owner, m, destination, 0n);
+}
+
+/**
+ * The lender withdraws the free tokens of `m` down to `keep` raw tokens (`T = keep` after it; its
+ * allowance must cover them: the only unlocked lender's does), as `withdrawAllFree`. Returns the
+ * tokens withdrawn.
+ */
+export async function withdrawFreeDownTo(
+    owner: WalletName,
+    m: MarketInfo,
+    destination: Address,
+    keep: bigint,
+): Promise<bigint> {
     const o = await signerFor(owner);
     const mk = await marketAccount(m);
     const lp = await lenderPosition(m.market, o.address);
     if (!lp) throw new Error(`${owner} does not lend in ${m.symbol}`);
-    const want = mk.tokensFree;
+    if (mk.tokensFree <= keep) throw new Error(`${m.symbol}: only ${mk.tokensFree} free tokens, keeping ${keep}`);
+    const want = mk.tokensFree - keep;
     const claims = mk.tokensFree + mk.borrowedQ + VIRTUAL_ASSETS;
     const sharesVs = podU128ToBigInt(mk.totalShares) + VIRTUAL_SHARES;
     let shares = ((want + 1n) * sharesVs - 1n) / claims;
@@ -481,8 +506,38 @@ export async function withdrawAllFree(owner: WalletName, m: MarketInfo, destinat
         }),
     ]);
     const left = (await marketAccount(m)).tokensFree;
-    if (left !== 0n) throw new Error(`${m.symbol}: ${left} free tokens left after the withdrawal`);
+    if (left !== keep) throw new Error(`${m.symbol}: ${left} free tokens left after the withdrawal, not ${keep}`);
     return want;
+}
+
+/**
+ * `withdraw(shares)` of `owner` for about `tokens` raw tokens (the shares whose burn pays at most
+ * that; `min_tokens = 0`, `min_sol = 0`), from Node: a lender leaving part of its position.
+ */
+export async function withdrawTokensFromNode(
+    owner: WalletName,
+    m: MarketInfo,
+    destination: Address,
+    tokens: bigint,
+): Promise<Signature> {
+    const o = await signerFor(owner);
+    const mk = await marketAccount(m);
+    const claims = mk.tokensFree + mk.borrowedQ + VIRTUAL_ASSETS;
+    const shares = (tokens * (podU128ToBigInt(mk.totalShares) + VIRTUAL_SHARES)) / claims;
+    return send(o, [
+        await getWithdrawInstructionAsync({
+            owner: o,
+            mint: m.mint,
+            ownerTokenAccount: destination,
+            tokenProgram: m.tokenProgram,
+            memoProgram: m.tokenProgram === PROGRAMS.token2022 ? PROGRAMS.memo : PROGRAMS.shortwin,
+            eventAuthority: await eventAuthority(),
+            program: SHORTWIN_PROGRAM_ADDRESS,
+            shares,
+            minTokens: 0n,
+            minSol: 0n,
+        }),
+    ]);
 }
 
 /**
@@ -529,9 +584,16 @@ export async function settleUntilClosed(
 }
 
 /** What `fullWipe` did. */
-export interface WipeOutcome {
+export interface WipeOutcome extends GapSettlement {
     /** Tokens the only lender withdrew (every free token). */
     readonly withdrawn: bigint;
+}
+
+/** A spot move far beyond any tier's S1 boundary (`cr_open` ≤ 4×: the buyback alone exceeds `V`). */
+export const WIPE_GAP_BPS = 90_000;
+
+/** What `gapSettle` did. */
+export interface GapSettlement {
     /** The settling `sol_settle`'s events and signature. */
     readonly settle: SolSettleEvent;
     readonly rolled: EpochRolledEvent;
@@ -539,8 +601,19 @@ export interface WipeOutcome {
     readonly rounds: number;
 }
 
-/** A spot move far beyond any tier's S1 boundary (`cr_open` ≤ 4×: the buyback alone exceeds `V`). */
-export const WIPE_GAP_BPS = 90_000;
+/**
+ * A gap of `bps` on mock market `m`'s pool, then keeper seconds until position `p` — the last
+ * borrowed tokens — settles S1, which rolls the share epoch (a full wipe with no free tokens left, a
+ * rebase with fewer than a thousandth of the claims left).
+ */
+export async function gapSettle(m: MarketInfo, p: PositionInfo, bps = WIPE_GAP_BPS): Promise<GapSettlement> {
+    await movePrice(m, bps);
+    const { signature, rounds } = await settleUntilClosed(m, p);
+    const [settle] = await eventsOf(signature, SOL_SETTLE_EVENT_DISCRIMINATOR, getSolSettleEventDecoder());
+    const [rolled] = await eventsOf(signature, EPOCH_ROLLED_EVENT_DISCRIMINATOR, getEpochRolledEventDecoder());
+    if (!settle || !rolled) throw new Error(`the settlement ${signature} did not roll the epoch`);
+    return { settle, rolled, signature, rounds };
+}
 
 /**
  * An organic full wipe of mock market `m` (settle_it.rs `a_full_wipe_rolls_the_epoch_into_a_live_
@@ -555,12 +628,41 @@ export async function fullWipe(
     p: PositionInfo,
 ): Promise<WipeOutcome> {
     const withdrawn = await withdrawAllFree(lender, m, destination);
-    await movePrice(m, WIPE_GAP_BPS);
-    const { signature, rounds } = await settleUntilClosed(m, p);
-    const [settle] = await eventsOf(signature, SOL_SETTLE_EVENT_DISCRIMINATOR, getSolSettleEventDecoder());
-    const [rolled] = await eventsOf(signature, EPOCH_ROLLED_EVENT_DISCRIMINATOR, getEpochRolledEventDecoder());
-    if (!settle || !rolled) throw new Error(`the settlement ${signature} did not roll the epoch`);
-    return { withdrawn, settle, rolled, signature, rounds };
+    return { withdrawn, ...(await gapSettle(m, p)) };
+}
+
+/** `crank_price` of mock market `m` by the seeding payer (an EMA observation now). */
+export async function crankPrice(m: MarketInfo): Promise<Signature> {
+    const crank = await getCrankPriceInstructionAsync({
+        mint: m.mint,
+        eventAuthority: await eventAuthority(),
+        program: SHORTWIN_PROGRAM_ADDRESS,
+    });
+    return send(await signerFor('payer'), [{ ...crank, accounts: [...crank.accounts, ...mockReadSet(m)] }]);
+}
+
+/**
+ * `open_short` once the market admits it (after a gap the EMA must come within
+ * `open_ema_dev_bps` of the spot): a crank, then the open, every 2 s until it lands or
+ * `timeoutMs` passes.
+ */
+export async function openShortWhenAllowed(
+    borrower: KeyPairSigner,
+    m: MarketInfo,
+    q: bigint,
+    nonce: bigint,
+    timeoutMs = 240_000,
+): Promise<PositionInfo> {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+        await crankPrice(m);
+        try {
+            return await openShortFromNode(borrower, m, q, nonce);
+        } catch (e) {
+            if (Date.now() > deadline) throw e;
+        }
+        await sleep(2_000);
+    }
 }
 
 /**
@@ -626,6 +728,42 @@ export async function simulateSyncLender(owner: WalletName, m: MarketInfo): Prom
         maxEpochs: 0,
     });
     return getMarketVaultDecoder().decode(await simulateAccount(await signerFor('payer'), ix, m.marketVault));
+}
+
+/**
+ * The market vault and the lender after a third party's `sync_lender(n)` of `owner`'s position in
+ * `m` — unsigned by the owner (the payer signs): the pot-only touch, KI-66 full — with the `n`
+ * records of `epochs`, read-only (simulated, not sent): the vault's `unmatched` less the current
+ * one is what that sync moves to the pot.
+ */
+export async function simulatePotSync(
+    owner: WalletName,
+    m: MarketInfo,
+    epochs: readonly number[],
+): Promise<{ vault: MarketVault; lender: LenderPosition }> {
+    const o = await signerFor(owner);
+    const lender = await lenderPositionAddress(m.market, o.address);
+    const ix = await getSyncLenderInstructionAsync({
+        market: m.market,
+        lender,
+        owner: o.address,
+        eventAuthority: await eventAuthority(),
+        program: SHORTWIN_PROGRAM_ADDRESS,
+        maxEpochs: epochs.length,
+    });
+    const records: AccountMeta[] = await Promise.all(
+        epochs.map(async (epoch) => ({
+            address: (await findShareEpochPda({ market: m.market, epoch }))[0],
+            role: AccountRole.READONLY,
+        })),
+    );
+    const payer = await signerFor('payer');
+    const full = { ...ix, accounts: [...ix.accounts, ...records] };
+    const [vault, after] = await Promise.all([
+        simulateAccount(payer, full, m.marketVault),
+        simulateAccount(payer, full, lender),
+    ]);
+    return { vault: getMarketVaultDecoder().decode(vault), lender: getLenderPositionDecoder().decode(after) };
 }
 
 const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';

@@ -16,7 +16,9 @@
  *    sweep notice, the review lists `SweepTrader` then `Deposit`, the landed transaction is exactly
  *    that bundle, `TraderSwept` credits the wipe record, and the deposit mints at the initial rate
  *    and finalises the record.
- * 4. `wiped` claims the swept SOL through the final record.
+ * 4. `wiped` claims the swept SOL through the final record: converted to no shares and paid
+ *    everything, its position closes and its rent returns to the wallet (KI-67; the review shows
+ *    `lender.claimCloses`).
  *
  * A reused validator whose `wipe` market is already spent skips the group (run without
  * SHORTWIN_E2E_REUSE).
@@ -52,7 +54,7 @@ import {
     shortPosition,
     type WipeOutcome,
 } from '../validator/actions.ts';
-import { getBalance, getTokenAmount, LAMPORTS_PER_SOL, send } from '../validator/chain.ts';
+import { getAccount, getBalance, getTokenAmount, LAMPORTS_PER_SOL, send } from '../validator/chain.ts';
 import { signerFor } from '../validator/keys.ts';
 
 /** `Market.flags` bits (programs/shortwin/src/state/market.rs). */
@@ -73,8 +75,17 @@ test.describe.configure({ mode: 'serial' });
 let wipe: WipeOutcome | null = null;
 let swept: bigint | null = null;
 
-/** Claims in the claim tab of `mint` as the connected wallet; returns the landed `ClaimSol` and the panel's preview. */
-async function claimInApp(app: App, mint: Address, market: Address): Promise<{ ev: ClaimSolEvent; shown: bigint }> {
+/**
+ * Claims in the claim tab of `mint` as the connected wallet; returns the landed `ClaimSol`, the
+ * panel's preview and whether the claim closed the position (KI-67: the review said so with
+ * `lender.claimCloses`, and the account is gone with its rent returned to the wallet).
+ */
+async function claimInApp(
+    app: App,
+    mint: Address,
+    market: Address,
+    vault: Address,
+): Promise<{ ev: ClaimSolEvent; shown: bigint; closed: boolean }> {
     await app.goto(`/m/${mint}?panel=lend&action=claim`, 'market');
     await app.connectWallet();
     const panel = app.id(T.lendPanel);
@@ -89,7 +100,11 @@ async function claimInApp(app: App, mint: Address, market: Address): Promise<{ e
     await expect(app.inModal(T.txInstruction('0'))).toHaveAttribute('data-name', 'ClaimSol');
     await expect(app.inModal(T.txInstruction('1'))).toHaveCount(0);
     const lenderPda = await lenderPositionAddress(market, app.walletAddress);
-    const simClaimed = await app.delta(lenderPda, 'claimed');
+    const closes = (await app.inModal(T.disclosure('lender.claimCloses')).count()) > 0;
+    // A closing claim leaves no account to read `claimed` from: the market vault pays the claim.
+    const simClaimed = closes ? -(await app.delta(vault, 'lamports')) : await app.delta(lenderPda, 'claimed');
+    const wallet0 = await getBalance(app.walletAddress);
+    const rent = need(await getAccount(lenderPda), 'wiped lender position account').lamports;
     const signature = await app.signAndConfirm();
     await app.closeModal();
 
@@ -102,11 +117,18 @@ async function claimInApp(app: App, mint: Address, market: Address): Promise<{ e
     expect(claim?.accounts.at(-1)).toBe(record);
     const [ev] = await eventsOf(signature, CLAIM_SOL_EVENT_DISCRIMINATOR, getClaimSolEventDecoder());
     const e = need(ev, 'ClaimSol event');
-    const after = need(await lenderPosition(market, app.walletAddress), 'wiped lender position');
     expect(e.owner).toBe(app.walletAddress);
-    expect(e.solPaid).toBe(after.claimed - before.claimed);
     expect(e.solPaid).toBe(simClaimed);
-    return { ev: e, shown };
+    const after = await lenderPosition(market, app.walletAddress);
+    if (closes) {
+        // KI-67: closed, its rent back in the wallet with the SOL paid (less the fee).
+        expect(after).toBeNull();
+        expect(rent).toBe(2_568_240n);
+        expect(await getBalance(app.walletAddress)).toBe(wallet0 + e.solPaid + rent - landed.fee);
+    } else {
+        expect(need(after, 'wiped lender position').claimed - before.claimed).toBe(e.solPaid);
+    }
+    return { ev: e, shown, closed: closes };
 }
 
 test.describe('lend: the post-wipe sweep bundle and claims through the wipe record (FE-18)', { tag: '@lend' }, () => {
@@ -156,7 +178,9 @@ test.describe('lend: the post-wipe sweep bundle and claims through the wipe reco
             requireTrading(state);
             const w = need(wipe, 'the wipe of the first test');
             const m = state.markets.wipe;
-            const { ev, shown } = await claimInApp(app, m.mint, m.market);
+            const { ev, shown, closed } = await claimInApp(app, m.mint, m.market, m.marketVault);
+            // Parked on the live record (not current): the position stays (KI-67).
+            expect(closed).toBe(false);
             // The settlement's whole lender amount, less the per-share floor of its allocation.
             expect(ev.solPaid).toBeLessThanOrEqual(w.settle.lenderAmount);
             expect(ev.solPaid).toBeGreaterThanOrEqual(w.settle.lenderAmount - 1_000n);
@@ -252,14 +276,17 @@ test.describe('lend: the post-wipe sweep bundle and claims through the wipe reco
             requireTrading(state);
             const sweptSol = need(swept, 'the sweep of the third test');
             const m = state.markets.wipe;
-            const { ev, shown } = await claimInApp(app, m.mint, m.market);
+            const { ev, shown, closed } = await claimInApp(app, m.mint, m.market, m.marketVault);
             expect(ev.solPaid).toBeLessThanOrEqual(sweptSol);
             expect(ev.solPaid).toBeGreaterThanOrEqual(sweptSol - 1_000n);
             expect(ev.solPaid).toBe(shown);
-            // Converted through the record: no shares left, in the current epoch.
-            const lp = need(await lenderPosition(m.market, app.walletAddress), 'wiped lender position');
-            expect(lp.shares).toBe(0n);
-            expect(lp.epoch).toBe((await marketAccount(m)).shareEpoch);
+            // Converted through the record to no shares, in the current epoch, and paid everything
+            // it was credited: the claim closed the position (KI-67; checked in claimInApp).
+            expect(closed).toBe(true);
+            expect(await lenderPosition(m.market, app.walletAddress)).toBeNull();
+            // A second claim has no position to claim from: the tab says so.
+            await app.goto(`/m/${m.mint}?panel=lend&action=claim`, 'market');
+            await expect(app.id(T.lendPanel)).toContainText('You have no lender position in this market.');
         });
     });
 });

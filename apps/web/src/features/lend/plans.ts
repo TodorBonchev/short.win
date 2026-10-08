@@ -2,7 +2,9 @@
  * `TxPlan` builders of the lender flows (FRONTEND.md §3.6, §5.1, §5.7, §5.10): `deposit` (with the
  * CPI Guard bracket of FE-1 and the post-wipe sweep bundle), `withdraw` (an idempotent ATA for a
  * missing destination; `memo_program` for a memo-required one), `claim_sol` (other lenders'
- * `sync_lender` first when the pot cannot pay), `cover_deficit` and `sync_lender`. Instructions come
+ * `sync_lender` first when the pot cannot pay: unsigned, so the pot-only touch with its forward
+ * chain for a lender behind a rebase record, KI-66 full / KI66-R4), `cover_deficit` and
+ * `sync_lender`. Instructions come
  * only from the Codama builders of `@shortwin/client`, `@solana-program/token(-2022)` and the
  * keeper-ported sweep bundle (`sweep.ts`); every signer input is the connected wallet's signer.
  *
@@ -11,6 +13,7 @@
  * disclosures it needs acknowledged, and the queries to refresh once it lands.
  */
 import {
+    findShareEpochPda,
     getClaimSolInstructionAsync,
     getCoverDeficitInstructionAsync,
     getDepositInstructionAsync,
@@ -19,7 +22,7 @@ import {
     getSyncLenderInstructionAsync,
     getWithdrawInstructionAsync,
 } from '@shortwin/client';
-import type { AccountMeta, Address, Instruction, TransactionSigner } from '@solana/kit';
+import { type AccountMeta, AccountRole, type Address, type Instruction, type TransactionSigner } from '@solana/kit';
 import {
     getCreateAssociatedTokenIdempotentInstruction,
     getDisableCpiGuardInstruction,
@@ -53,6 +56,12 @@ export interface LendContext {
     readonly lenderEpoch: number | null;
     readonly shareEpoch: number;
     /**
+     * The records the owner's own conversion carries per transaction (`recordLimitOf`):
+     * `MAX_RECORDS`, or `MAX_RECORDS_CHAINED` while the position has a forward chain (KI-66 full;
+     * the lag-1 CU case, ARCH §6.1). Omitted: `MAX_RECORDS`.
+     */
+    readonly recordLimit?: number;
+    /**
      * `lender.subUnitConversion`'s variables when the plan's own conversion takes the position to 0
      * shares while the pool's income vests (`previewSubUnitConversion`): the review shows the
      * disclosure. Omitted otherwise.
@@ -76,14 +85,33 @@ function disclosuresOf(
 /**
  * The `ShareEpoch` records a lender at `fromEpoch` is behind on, as writable remaining accounts: the
  * lender's conversion through a rebase record writes its `conv_rem` (KI-65; `EpochRecordReadOnly`).
+ * At most `limit` (`MAX_RECORDS`; `MAX_RECORDS_CHAINED` for an owner settling a forward chain).
  */
 export async function recordMetas(
     market: Address,
     fromEpoch: number | null,
     shareEpoch: number,
+    limit = MAX_RECORDS,
 ): Promise<AccountMeta[]> {
     if (fromEpoch === null || fromEpoch >= shareEpoch) return [];
-    return getShareEpochAccountMetas({ market, fromEpoch, shareEpoch, limit: MAX_RECORDS });
+    return getShareEpochAccountMetas({ market, fromEpoch, shareEpoch, limit: Math.min(limit, MAX_RECORDS) });
+}
+
+/** The owner's own records for plan `c` (its `recordLimit`). */
+const ownRecords = (c: LendContext) =>
+    recordMetas(c.marketAddress, c.lenderEpoch, c.shareEpoch, c.recordLimit ?? MAX_RECORDS);
+
+/**
+ * The records of `epochs` as **read-only** remaining accounts: a third party's `sync_lender` is the
+ * pot-only touch, which writes no record (KI-66 full; the program requires them back unchanged).
+ */
+export async function readonlyRecordMetas(market: Address, epochs: readonly number[]): Promise<AccountMeta[]> {
+    const metas: AccountMeta[] = [];
+    for (const epoch of epochs) {
+        const [address] = await findShareEpochPda({ market, epoch });
+        metas.push({ address, role: AccountRole.READONLY });
+    }
+    return metas;
 }
 
 function withRemaining(ix: Instruction, extra: readonly AccountMeta[]): Instruction {
@@ -182,7 +210,7 @@ export async function buildDepositPlan(i: DepositPlanInput): Promise<TxPlan> {
             amount: i.amount,
             minShares: i.minShares,
         }),
-        await recordMetas(i.marketAddress, i.lenderEpoch, i.shareEpoch),
+        await ownRecords(i),
     );
     const bracket = i.bracket && i.sourceCpiGuard;
     const instructions: Instruction[] = [
@@ -276,7 +304,7 @@ export async function buildWithdrawPlan(i: WithdrawPlanInput): Promise<TxPlan> {
             minTokens: i.minTokens,
             minSol: i.minSol,
         }),
-        await recordMetas(i.marketAddress, i.lenderEpoch, i.shareEpoch),
+        await ownRecords(i),
     );
     const disclosures: DisclosureId[] = [
         ...(i.vestingForfeit > 0n ? (['lender.exitForfeitsVest'] as const) : []),
@@ -321,39 +349,68 @@ export function solPaidFrom(
 // ---- claim, cover, sync -----------------------------------------------------------------
 
 export interface SyncTarget {
-    /** Another lender's `LenderPosition` whose touch moves a surplus to the pot. */
+    /** Another lender's `LenderPosition` whose sync moves a surplus to the pot. */
     readonly lender: Address;
     /**
-     * Its owner (`LenderPosition.owner`; the instruction's `owner` account, not a signer here: the
-     * plain touch of a current lender, which reads no rebase record, KI65-REV-SEC1).
+     * Its owner (`LenderPosition.owner`; the instruction's `owner` account, **not a signer**: the
+     * claimant sends it, so the program runs the pot-only touch `pool::touch_pot`, which never
+     * converts through a rebase record, KI65-REV-SEC1 / KI-66 full).
      */
     readonly owner: Address;
+    /**
+     * The epochs of the records it carries, read-only (`potEpochs`: from its `fwdEpoch` once it has
+     * a forward chain, else from its `epoch`; ≤ `MAX_RECORDS`): `sync_lender(epochs.length)`.
+     */
+    readonly epochs: readonly number[];
+    /** What it moves to the pot (`previewTouchPot`), lamports. */
+    readonly gain: bigint;
 }
 
 export interface ClaimPlanInput extends LendContext {
-    /** `sync_lender(0)` (a plain touch) of these lenders first, ≤ 4 (FRONTEND.md §3.6). */
+    /** Other lenders' unsigned `sync_lender` first, ≤ 4, largest gain first (FRONTEND.md §3.6). */
     readonly syncs: readonly SyncTarget[];
     /** The previewed payout (title only; the review shows the simulated one). */
     readonly expected: bigint;
+    /**
+     * The claim leaves the position closable (`previewClaimOutcome`, KI-67): the program closes it and
+     * returns its rent; the review says so (`lender.claimCloses`, `{rent}` in SOL).
+     */
+    readonly closes?: { readonly rent: bigint };
+    /**
+     * Syncs the claim needs that this transaction does not carry (the 4-sync cap or the 1,232-byte
+     * limit): the review says how many and what they would move (`lender.potSyncsDeferred`).
+     */
+    readonly deferred?: { readonly count: number; readonly gain: bigint };
 }
 
 export const MAX_SYNCS_PER_CLAIM = 4;
 
+/** A third party's `sync_lender(epochs.length)` of `s`, its owner unsigned, its records read-only. */
+export async function potSyncInstruction(
+    market: Address,
+    vault: Address,
+    s: SyncTarget,
+    ea?: Address,
+): Promise<Instruction> {
+    const records = s.epochs.slice(0, MAX_RECORDS);
+    return withRemaining(
+        await getSyncLenderInstructionAsync({
+            market,
+            marketVault: vault,
+            lender: s.lender,
+            owner: s.owner,
+            eventAuthority: ea ?? (await eventAuthority()),
+            program,
+            maxEpochs: records.length,
+        }),
+        await readonlyRecordMetas(market, records),
+    );
+}
+
 export async function buildClaimPlan(i: ClaimPlanInput): Promise<TxPlan> {
     const ea = await eventAuthority();
-    const syncs = await Promise.all(
-        i.syncs.slice(0, MAX_SYNCS_PER_CLAIM).map((s) =>
-            getSyncLenderInstructionAsync({
-                market: i.marketAddress,
-                marketVault: i.vaultAddress,
-                lender: s.lender,
-                owner: s.owner,
-                eventAuthority: ea,
-                program,
-                maxEpochs: 0,
-            }),
-        ),
-    );
+    const targets = i.syncs.slice(0, MAX_SYNCS_PER_CLAIM);
+    const syncs = await Promise.all(targets.map((s) => potSyncInstruction(i.marketAddress, i.vaultAddress, s, ea)));
     const claim = withRemaining(
         await getClaimSolInstructionAsync({
             owner: i.signer,
@@ -363,14 +420,42 @@ export async function buildClaimPlan(i: ClaimPlanInput): Promise<TxPlan> {
             eventAuthority: ea,
             program,
         }),
-        await recordMetas(i.marketAddress, i.lenderEpoch, i.shareEpoch),
+        await ownRecords(i),
     );
+    const potGain = targets.reduce((x, s) => x + s.gain, 0n);
+    const disclosures: DisclosureId[] = [
+        ...(syncs.length ? (['lender.potSyncs'] as const) : []),
+        ...(i.deferred && i.deferred.count > 0 ? (['lender.potSyncsDeferred'] as const) : []),
+        ...(i.closes ? (['lender.claimCloses'] as const) : []),
+    ];
+    const vars: NonNullable<TxPlan['disclosureVars']> = {
+        ...(syncs.length
+            ? {
+                  'lender.potSyncs': {
+                      count: String(syncs.length),
+                      lenders: syncs.length === 1 ? 'lender' : 'lenders',
+                      gain: formatSol(potGain, 9),
+                  },
+              }
+            : {}),
+        ...(i.deferred && i.deferred.count > 0
+            ? {
+                  'lender.potSyncsDeferred': {
+                      count: String(i.deferred.count),
+                      lenders: i.deferred.count === 1 ? 'lender' : 'lenders',
+                      gain: formatSol(i.deferred.gain, 9),
+                  },
+              }
+            : {}),
+        ...(i.closes ? { 'lender.claimCloses': { rent: formatSol(i.closes.rent, 9) } } : {}),
+    };
     return {
         kind: 'claim_sol',
-        title: `Claim ${formatSol(i.expected, 9)} SOL · ${tokenLabel(i.symbol, i.mint)}${syncs.length ? ` · ${syncs.length} lender sync${syncs.length > 1 ? 's' : ''} first` : ''}`,
+        title: `Claim ${formatSol(i.expected, 9)} SOL · ${tokenLabel(i.symbol, i.mint)}${syncs.length ? ` · ${syncs.length} lender sync${syncs.length > 1 ? 's' : ''} first` : ''}${i.closes ? ' · closes the position' : ''}`,
         instructions: [...syncs, claim],
+        // A claim that closes the position (KI-67) leaves no account: its fields read "—" after.
         watch: [walletWatch(i), lenderWatch(i, ['claimed', 'pending']), vaultWatch(i)],
-        ...disclosuresOf(i, []),
+        ...disclosuresOf(i, disclosures, Object.keys(vars).length ? vars : undefined),
         invalidate: lendInvalidations(i.mint, i.signer.address),
     };
 }
@@ -392,7 +477,7 @@ export async function buildCoverPlan(i: CoverPlanInput): Promise<TxPlan> {
             program,
             lamports: i.lamports,
         }),
-        await recordMetas(i.marketAddress, i.lenderEpoch, i.shareEpoch),
+        await ownRecords(i),
     );
     return {
         kind: 'cover_deficit',
@@ -410,7 +495,7 @@ export async function buildCoverPlan(i: CoverPlanInput): Promise<TxPlan> {
  * unsigned, the program would stop there with the pot-only touch (KI-66).
  */
 export async function buildSyncPlan(i: LendContext): Promise<TxPlan> {
-    const metas = await recordMetas(i.marketAddress, i.lenderEpoch, i.shareEpoch);
+    const metas = await ownRecords(i);
     const ix = withRemaining(
         await getSyncLenderInstructionAsync({
             market: i.marketAddress,

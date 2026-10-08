@@ -276,21 +276,82 @@ describe('withdraw plans', () => {
 });
 
 describe('claim, cover and sync plans', () => {
-    it('prepend sync_lender(0) of other lenders (at most 4) before claim_sol', async () => {
-        const syncs = Array.from({ length: 6 }, () => ({ lender: OTHER, owner: OTHER_OWNER }));
+    it('prepend other lenders’ unsigned sync_lender (at most 4) before claim_sol', async () => {
+        const syncs = Array.from({ length: 6 }, () => ({ lender: OTHER, owner: OTHER_OWNER, epochs: [], gain: 1n }));
         const plan = await buildClaimPlan({ ...ctx(), syncs, expected: 5_000n });
         expect(kinds(plan.instructions)).toEqual([...Array(MAX_SYNCS_PER_CLAIM).fill('SyncLender'), 'ClaimSol']);
         const sync = plan.instructions[0];
         expect(getSyncLenderInstructionDataDecoder().decode(data(sync)).maxEpochs).toBe(0);
         expect(sync?.accounts?.map((a) => a.address)).toContain(OTHER);
-        // The other lender's owner rides along unsigned: a plain touch reads no rebase record.
+        // The other lender's owner rides along unsigned: the program runs the pot-only touch.
         expect(sync?.accounts?.[3]).toMatchObject({ address: OTHER_OWNER, role: AccountRole.READONLY });
         const claim = plan.instructions[MAX_SYNCS_PER_CLAIM];
         expect(getClaimSolInstructionDataDecoder().decode(data(claim))).toBeTruthy();
         expect(claim?.accounts?.[0]).toMatchObject({ address: OWNER, role: AccountRole.WRITABLE_SIGNER });
         expect(claim?.accounts?.[1]).toMatchObject({ address: MARKET, role: AccountRole.READONLY });
         expect(plan.title).toContain('4 lender syncs first');
+        expect(plan.disclosures).toEqual(['lender.potSyncs']);
+        expect(plan.disclosureVars?.['lender.potSyncs']).toEqual({
+            count: '4',
+            lenders: 'lenders',
+            gain: '0.000000004',
+        });
         expect(() => assertAllowedInstructions(plan.instructions)).not.toThrow();
+    });
+
+    it('give a pot-only sync its records read-only, from where its walk starts, with maxEpochs = their count (KI66-R4)', async () => {
+        const epochs = [3, 4, 5, 6, 7, 8, 9, 10, 11];
+        const plan = await buildClaimPlan({
+            ...ctx({ lenderEpoch: 2, shareEpoch: 12 }),
+            syncs: [{ lender: OTHER, owner: OTHER_OWNER, epochs, gain: 7n }],
+            expected: 1n,
+        });
+        const [sync, claim] = plan.instructions;
+        expect(kinds(plan.instructions)).toEqual(['SyncLender', 'ClaimSol']);
+        // At most MAX_RECORDS: the next claim continues the walk.
+        expect(getSyncLenderInstructionDataDecoder().decode(data(sync)).maxEpochs).toBe(MAX_RECORDS);
+        const recs = tail(sync, MAX_RECORDS);
+        expect(recs.map((a) => a.role)).toEqual(Array(MAX_RECORDS).fill(AccountRole.READONLY));
+        expect(recs[0]?.address).toBe((await findShareEpochPda({ market: MARKET, epoch: 3 }))[0]);
+        expect(recs[MAX_RECORDS - 1]?.address).toBe((await findShareEpochPda({ market: MARKET, epoch: 10 }))[0]);
+        // The claimant's own conversion keeps writable records (it writes `conv_rem`).
+        expect(tail(claim, MAX_RECORDS).map((a) => a.role)).toEqual(Array(MAX_RECORDS).fill(AccountRole.WRITABLE));
+        expect(plan.title).toMatch(/^Claim 0\.000000001 SOL · TKN .* · 1 lender sync first$/);
+    });
+
+    it('cap a chained owner’s own records at 7 (the lag-1 CU case) and keep 8 for everyone else', async () => {
+        const chained = await buildClaimPlan({
+            ...ctx({ lenderEpoch: 0, shareEpoch: 20, recordLimit: 7 }),
+            syncs: [],
+            expected: 1n,
+        });
+        expect((chained.instructions[0]?.accounts ?? []).length).toBe(
+            ((await buildClaimPlan({ ...ctx(), syncs: [], expected: 1n })).instructions[0]?.accounts ?? []).length + 7,
+        );
+        const sync = await buildSyncPlan(ctx({ lenderEpoch: 0, shareEpoch: 20, recordLimit: 7 }));
+        expect(getSyncLenderInstructionDataDecoder().decode(data(sync.instructions[0])).maxEpochs).toBe(7);
+        expect(await recordMetas(MARKET, 0, 20, 7)).toHaveLength(7);
+        expect(await recordMetas(MARKET, 0, 20, 12)).toHaveLength(MAX_RECORDS);
+    });
+
+    it('disclose a closing claim and syncs left for the next claim', async () => {
+        const plan = await buildClaimPlan({
+            ...ctx(),
+            syncs: [{ lender: OTHER, owner: OTHER_OWNER, epochs: [], gain: 5n }],
+            expected: 1n,
+            closes: { rent: 2_568_240n },
+            deferred: { count: 1, gain: 1_000_000_000n },
+        });
+        expect(plan.disclosures).toEqual(['lender.potSyncs', 'lender.potSyncsDeferred', 'lender.claimCloses']);
+        expect(plan.disclosureVars?.['lender.claimCloses']).toEqual({ rent: '0.00256824' });
+        expect(plan.disclosureVars?.['lender.potSyncsDeferred']).toEqual({
+            count: '1',
+            lenders: 'lender',
+            gain: '1',
+        });
+        expect(plan.title).toContain('closes the position');
+        const plain = await buildClaimPlan({ ...ctx(), syncs: [], expected: 1n, deferred: { count: 0, gain: 0n } });
+        expect(plain.disclosures).toEqual([]);
     });
 
     it('cover the exact deficit', async () => {

@@ -53,7 +53,11 @@ export type VaultPoolFields = Pick<
     'lenderSol' | 'unmatched' | 'protocolFees' | 'pi' | 'lockNorm' | 'bMin' | 'piEpoch' | 'calDay' | 'lockCal'
 >;
 
-/** A `LenderPosition`'s math state (ARCH §2.3.6). */
+/**
+ * A `LenderPosition`'s math state (ARCH §2.3.6), its forward chain included (KI-66 full: `fwd`,
+ * `fwdEpoch`, `fwdShares`, `fwdLag`). While a chain is active, `snap` / `snapR` are the chain's
+ * snapshots in `fwdEpoch`, not the lender's own: every preview reads the four fields too.
+ */
 export type LenderFields = Pick<
     LenderPosition,
     | 'shares'
@@ -68,7 +72,14 @@ export type LenderFields = Pick<
     | 'lockEpoch'
     | 'lockTerm'
     | 'lockUntil'
+    | 'fwd'
+    | 'fwdEpoch'
+    | 'fwdShares'
+    | 'fwdLag'
 >;
+
+/** `LenderPosition.fwd` (`shortwin_math::pool::FWD_*`; KI-66 full). */
+export const FWD = { none: 0, hold: 1, open: 2 } as const;
 
 /**
  * A `ShareEpoch` record (`@shortwin/client` helpers; ARCH §2.3.6, A39), its conversion remainder
@@ -207,6 +218,10 @@ export function toLenderState(m: MathModule, pool: Pool, lender: LenderFields | 
         l.epoch = lender.epoch;
         l.lockEpoch = lender.lockEpoch;
         l.lockUntil = lender.lockUntil;
+        l.fwd = lender.fwd;
+        l.fwdEpoch = lender.fwdEpoch;
+        l.fwdShares = lender.fwdShares;
+        l.fwdLag = lender.fwdLag;
         return l;
     } catch (e) {
         l.free();
@@ -853,19 +868,78 @@ export function previewClaimView(m: MathModule, s: LendState, now: bigint): Resu
     );
 }
 
+/** Where another lender stands after a third party's `sync_lender` (`pool::touch_pot`). */
+export type PotStanding = 'current' | 'parked' | 'behind';
+
+/** What a third party's `sync_lender` (unsigned) does to another lender (KI-66 full). */
+export interface PotTouchView {
+    /** Lamports it moves to the pot (`MarketVault.unmatched` after − before; R3A-2). */
+    readonly potGain: bigint;
+    /** `behind` for a lender held at a rebase record or walking its forward chain. */
+    readonly standing: PotStanding;
+    /**
+     * The lender afterwards, as the program stores it: its shares, lock and epoch unchanged behind a
+     * rebase record; `pending`, `real`, the snapshots and the forward chain (`fwd*`) moved.
+     */
+    readonly lender: LenderFields;
+}
+
+/** The stored fields of a WASM `LenderState` (frees nothing). */
+function fieldsOf(l: Lender): LenderFields {
+    return {
+        shares: l.shares,
+        snap: l.snap,
+        pending: l.pending,
+        snapR: l.snapR,
+        real: l.real,
+        claimed: l.claimed,
+        epoch: l.epoch,
+        lock: l.lock,
+        lockPi: l.lockPi,
+        lockEpoch: l.lockEpoch,
+        lockTerm: l.lockTerm,
+        lockUntil: l.lockUntil,
+        fwd: l.fwd,
+        fwdEpoch: l.fwdEpoch,
+        fwdShares: l.fwdShares,
+        fwdLag: l.fwdLag,
+    };
+}
+
 /**
- * What touching another lender would add to the pot (R3A-2: its realised SOL beyond its
- * entitlement moves to `unmatched` at its touch). Measured with the facade: the lender's
- * `real` after a touch that cannot move anything (its entitlement raised out of reach) minus
- * its `real` after the real touch.
+ * `sync_lender` of another lender without its owner's signature, on copies (`pool::touch_pot`,
+ * the WASM `previewTouchPot`; ECON §9.4 R3A-2, §9.5; FRONTEND.md §3.6): a lender behind a rebase
+ * record is held there and its forward chain walked through `s.records` — from its `fwdEpoch` for a
+ * chained lender, else from its `epoch` (`potEpochs`) — and the surplus moves to the pot; any other
+ * lender is touched as by its owner. Nothing about who sends it matters to the program but the
+ * signature, so this is what the claim's prepended syncs do.
  */
-export function potGainOfTouch(m: MathModule, s: LendState, now: bigint): bigint {
+export function previewTouchPot(m: MathModule, s: LendState, now: bigint): Result<PotTouchView> {
+    return attempt(() =>
+        session(m, s, (pool, lender, records) => {
+            const t = m.previewTouchPot(pool, lender, records, now);
+            try {
+                const l = t.lender;
+                try {
+                    return { potGain: t.potGain, standing: t.standing as PotStanding, lender: fieldsOf(l) };
+                } finally {
+                    l.free();
+                }
+            } finally {
+                t.free();
+            }
+        }),
+    );
+}
+
+/**
+ * What another lender's `sync_lender` (sent by the claimant, unsigned) adds to the pot: its
+ * `previewTouchPot` gain, 0 where the facade refuses (the program would refuse the sync too).
+ */
+export function potGainOfSync(m: MathModule, s: LendState, now: bigint): bigint {
     if (!s.lender) return 0n;
-    const actual = previewTouched(m, s, now);
-    const lifted = previewTouched(m, { ...s, lender: { ...s.lender, pending: 1n << 61n } }, now);
-    if (!actual.ok || !lifted.ok) return 0n;
-    const gain = lifted.value.real - actual.value.real;
-    return gain > 0n ? gain : 0n;
+    const t = previewTouchPot(m, s, now);
+    return t.ok ? t.value.potGain : 0n;
 }
 
 /** `previewClaim` with the pot raised by `extraPot` (other lenders synced first in the same transaction). */
@@ -875,4 +949,41 @@ export function previewClaimWithPot(m: MathModule, s: LendState, now: bigint, ex
             m.previewClaim(pool, lender, records, now),
         ),
     );
+}
+
+/** What `claim_sol` pays and whether it then closes the position (KI-67). */
+export interface ClaimOutcomeView {
+    readonly sol: bigint;
+    /** The claim leaves the position closable (`pool::closable`): the program closes it and returns its rent. */
+    readonly closes: boolean;
+}
+
+/**
+ * `claim_sol` on copies (the WASM `previewClaimOutcome`), with the pot raised by `extraPot`: what it
+ * pays and whether the position closes afterwards (KI-67: current, no shares, `pending` 0, no lock,
+ * no forward chain; `claim_sol` then closes it and returns its rent to the owner).
+ */
+export function previewClaimOutcome(m: MathModule, s: LendState, now: bigint, extraPot = 0n): Result<ClaimOutcomeView> {
+    return attempt(() =>
+        session(
+            m,
+            { ...s, vault: { ...s.vault, unmatched: s.vault.unmatched + extraPot } },
+            (pool, lender, records) => {
+                const o = m.previewClaimOutcome(pool, lender, records, now);
+                try {
+                    const sol = o.sol;
+                    const closes = o.closes;
+                    return { sol, closes };
+                } finally {
+                    o.free();
+                }
+            },
+        ),
+    );
+}
+
+/** Whether the stored position is closable as it is (`pool::closable`, KI-67). */
+export function closable(m: MathModule, s: Pick<LendState, 'market' | 'vault' | 'lender'>): boolean {
+    if (!s.lender) return false;
+    return session(m, { ...s, records: [] }, (pool, lender) => m.closable(pool, lender));
 }

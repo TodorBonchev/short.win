@@ -19,6 +19,9 @@ export type DisclosureId =
     | 'lender.residuals'
     | 'lender.unpaidRent'
     | 'lender.subUnitConversion'
+    | 'lender.potSyncs'
+    | 'lender.potSyncsDeferred'
+    | 'lender.claimCloses'
     | 'borrower.liquidation'
     | 'borrower.residuals'
     | 'market.creatorSelfDealing'
@@ -155,6 +158,37 @@ export const DISCLOSURES: Readonly<Record<DisclosureId, Disclosure>> = {
         ack: null,
         severity: 'warn',
         source: 'ECON §9.5 (KI-65, KI65-REV-SEC1); the owner’s decision of 2026-10-07 (seventh round)',
+    }),
+    'lender.potSyncs': d({
+        id: 'lender.potSyncs',
+        title: 'Other lenders are synced first',
+        body: [
+            'This market’s pot cannot pay all of the SOL credited to you yet. This transaction first syncs {count} other {lenders} of this market whose realised SOL is more than their own credit; the excess, {gain} SOL by this review, moves to the pot and your claim draws on it.',
+            'A sync you send for another lender never converts its shares through a share rebase: behind one it only books what the position has earned and moves the excess, and the conversion stays with its owner. A sync that finds nothing more to move moves nothing.',
+        ],
+        ack: null,
+        severity: 'info',
+        source: 'ECON §9.4 R3A-2, §9.5; ARCH I-P6, §3.3 sync_lender (KI-66 full, KI66-R4); the owner’s decision of 2026-10-08 (eighth round)',
+    }),
+    'lender.potSyncsDeferred': d({
+        id: 'lender.potSyncsDeferred',
+        title: 'Not every sync fits this transaction',
+        body: [
+            'Syncing {count} more {lenders} would move about {gain} SOL more to the pot, but one transaction carries at most four syncs within its size limit. This claim pays what it can now; claim again once it has landed, and the next claim syncs them first.',
+        ],
+        ack: null,
+        severity: 'info',
+        source: 'FRONTEND.md §3.6 (KI66-R4: at most 4 syncs per claim, 1,232 bytes per transaction)',
+    }),
+    'lender.claimCloses': d({
+        id: 'lender.claimCloses',
+        title: 'This claim closes your position',
+        body: [
+            'After this claim your position in this market holds no shares and no SOL, so the claim closes it and returns its account rent ({rent} SOL) to your wallet. Depositing here again later opens a new position.',
+        ],
+        ack: null,
+        severity: 'info',
+        source: 'ARCH §3.3 claim_sol (KI-67); the owner’s decision of 2026-10-08 (eighth round)',
     }),
     'borrower.liquidation': d({
         id: 'borrower.liquidation',

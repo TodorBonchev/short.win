@@ -3,26 +3,34 @@
  * states of `vectors/lend_vectors.json` go through the panel's own conversion (`previews.ts`) into
  * `@shortwin/math-wasm`, which must return exactly the model's deposits, withdrawals (tokens and
  * the SOL part, `previewWithdrawal`), claims, allowances, touches, token values, locks, lock ends
- * and vest releases.
+ * and vest releases; a third party's sync of each lender (`previewTouchPot`: the pot-only touch and
+ * its forward chain, KI-66 full, on the records from where its walk starts) and whether its claim
+ * closes the position (`previewClaimOutcome`, KI-67).
  */
 
-import { bigIntToPodU128 } from '@shortwin/client';
+import { bigIntToPodI128, bigIntToPodU128 } from '@shortwin/client';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { UNPAID_RENT_WARN_BPS, UNPAID_RENT_WARN_LAMPORTS } from '../../config/disclosures.ts';
 import { initMathSync, type MathModule } from '../../math/load.ts';
 import { readRepo, readRepoBytes } from '../../test/repo.ts';
+import { potEpochs } from './chain.ts';
 import {
+    closable,
+    FWD,
+    type LendState,
     lamportsAtPrice,
     lessBps,
     MARKET_FLAG,
     pendingLenderCredit,
-    potGainOfTouch,
+    potGainOfSync,
+    previewClaimOutcome,
     previewClaimView,
     previewClaimWithPot,
     previewDepositView,
     previewPosition,
     previewSubUnitConversion,
     previewTouched,
+    previewTouchPot,
     previewUnpaidRent,
     previewWithdrawLimits,
     previewWithdrawView,
@@ -35,7 +43,7 @@ import {
     wipeLive,
     wipeSweepPending,
 } from './previews.ts';
-import { fakeMarket, simpleLender, simplePool, stateOf, type VectorCase } from './testkit.ts';
+import { fakeMarket, recordOf, simpleLender, simplePool, stateOf, type VectorCase } from './testkit.ts';
 
 let m: MathModule;
 let cases: VectorCase[];
@@ -164,6 +172,66 @@ describe('pool_model vectors through the WASM facade', () => {
             }
         }
         expect(n).toBeGreaterThan(300);
+    });
+
+    it('a third party’s sync (the pot-only touch, its forward chain) and a claim’s close equal the model (KI-66 full, KI-67)', () => {
+        let pot = 0;
+        let chained = 0;
+        let open = 0;
+        let closes = 0;
+        for (const c of cases) {
+            const now = BigInt(c.now);
+            const shareEpoch = Number(c.market.shareEpoch);
+            for (const e of c.expect) {
+                if (e.op !== 'touchPot' && e.op !== 'claimOutcome') continue;
+                const s = stateOf(c, e.lender);
+                const label = `${c.name} ${e.op} ${e.lender}`;
+                if (e.op === 'claimOutcome') {
+                    const r = previewClaimOutcome(m, s, now);
+                    const got = r.ok ? { sol: r.value.sol.toString(), closes: r.value.closes } : `!${r.refusal.name}`;
+                    expect(got, label).toEqual(e.result);
+                    closes += r.ok && r.value.closes ? 1 : 0;
+                    continue;
+                }
+                // The records the claim's sync carries: from fwdEpoch (chained) or epoch, at most 8.
+                const l = s.lender;
+                if (!l) continue;
+                const window = new Set(potEpochs(l, shareEpoch));
+                const r = previewTouchPot(m, { ...s, records: s.records.filter((x) => window.has(x.epoch)) }, now);
+                if (typeof e.result === 'string') {
+                    expect(resultOf(r), label).toBe(e.result);
+                    continue;
+                }
+                expect(r.ok, label).toBe(true);
+                if (!r.ok) continue;
+                const t = r.value;
+                expect(
+                    {
+                        potGain: t.potGain.toString(),
+                        standing: t.standing,
+                        pending: t.lender.pending.toString(),
+                        real: t.lender.real.toString(),
+                        shares: t.lender.shares.toString(),
+                        epoch: t.lender.epoch,
+                        snap: t.lender.snap.toString(),
+                        snapR: t.lender.snapR.toString(),
+                        fwd: t.lender.fwd,
+                        fwdEpoch: t.lender.fwdEpoch,
+                        fwdShares: t.lender.fwdShares.toString(),
+                        fwdLag: t.lender.fwdLag,
+                    },
+                    label,
+                ).toEqual(e.result);
+                pot += t.potGain > 0n ? 1 : 0;
+                chained += l.fwd !== FWD.none ? 1 : 0;
+                open += l.fwd === FWD.open ? 1 : 0;
+            }
+        }
+        // Coverage: syncs that move SOL, chains continued (owners stopped inside them too), closes.
+        expect(pot).toBeGreaterThan(5);
+        expect(chained).toBeGreaterThan(20);
+        expect(open).toBeGreaterThan(5);
+        expect(closes).toBeGreaterThan(30);
     });
 
     it('lock ends and vest releases equal the model', () => {
@@ -331,7 +399,7 @@ describe('lend previews on simple pools', () => {
         const pool = simplePool({ tokensFree: 1_000n, totalShares: 1_000_000n, lenderSol: 1_000n });
         // A lender with 300 realised but only 100 entitled: its touch moves 200 to the pot.
         const rich = { ...pool, lender: simpleLender(500_000n, { pending: 100n, real: 300n }), records: [] };
-        expect(potGainOfTouch(m, rich, 0n)).toBe(200n);
+        expect(potGainOfSync(m, rich, 0n)).toBe(200n);
         // A lender entitled to 250 with nothing realised: the pot pays it.
         const me = { ...pool, lender: simpleLender(500_000n, { pending: 250n }), records: [] };
         const view = previewClaimView(m, me, 0n);
@@ -517,5 +585,149 @@ describe('a sub-unit conversion while income vests (lender.subUnitConversion; KI
         expect(previewSubUnitConversion(m, state(0n), 1_000n)).toBeNull();
         expect(previewSubUnitConversion(m, { ...state(600n), records: [] }, 1_000n)).toBeNull();
         expect(previewSubUnitConversion(m, { ...state(600n), lender: null }, 1_000n)).toBeNull();
+    });
+});
+
+const WAD = 10n ** 18n;
+
+/**
+ * A pool one rebase (`1/1,000`) past epoch 0 whose record froze 2 SOL of entitlement and 3 of
+ * realised SOL per 10⁹ shares; the current epoch has credited 3 and realised 2 per share so far.
+ * Lender C never converted: 1,000,000,001 shares of epoch 0 (the chain's floor is 1,000,000).
+ */
+function rebased(): LendState {
+    const base = simplePool({ shareEpoch: 1, totalShares: 2_000_000n, lenderSol: 10_000_000_000n, unmatched: 7n });
+    return {
+        market: { ...base.market, acc: bigIntToPodI128(3n * WAD), accR: bigIntToPodU128(2n * WAD) },
+        vault: base.vault,
+        lender: simpleLender(1_000_000_001n),
+        records: [
+            recordOf({
+                epoch: 0,
+                accEnd: String(2n * WAD),
+                accREnd: String(3n * WAD),
+                sOld: '2000000000',
+                carry: '0',
+                carryR: '0',
+                num: 1,
+                denLog1000: 1,
+                convRem: '0',
+            }),
+        ],
+    };
+}
+
+describe('a third party’s sync of another lender: the pot-only touch and its forward chain (KI-66 full)', () => {
+    it('holds a lender behind a rebase record there, walks its chain and moves the surplus to the pot', () => {
+        const s = rebased();
+        const t = previewTouchPot(m, s, 0n);
+        expect(t.ok).toBe(true);
+        if (!t.ok) return;
+        expect(t.value.standing).toBe('behind');
+        const l = t.value.lender;
+        // Not converted: shares and epoch stay; the chain holds ⌊s/1,000⌋ in epoch 1.
+        expect([l.shares, l.epoch, l.fwd, l.fwdEpoch, l.fwdShares, l.fwdLag]).toEqual([
+            1_000_000_001n,
+            0,
+            FWD.hold,
+            1,
+            1_000_000n,
+            0,
+        ]);
+        // Held: 2,000,000,002 credited and 3,000,000,003 realised at the record; the chain's
+        // 10⁶ shares then 3,000,000 and 2,000,000 in epoch 1. The excess realised moves.
+        expect(l.pending).toBe(2_003_000_002n);
+        expect(t.value.potGain).toBe(3_002_000_003n - 2_003_000_002n);
+        expect(l.real).toBe(2_003_000_002n);
+        expect(potGainOfSync(m, s, 0n)).toBe(t.value.potGain);
+        // Idempotent: a second sync of the result moves nothing.
+        const again = previewTouchPot(m, { ...s, lender: l }, 0n);
+        expect(again.ok && again.value.potGain).toBe(0n);
+        expect(again.ok && again.value.lender).toEqual(l);
+    });
+
+    it('reads the chain: the owner’s own touch afterwards ends as if it had converted first (no double count)', () => {
+        const s = rebased();
+        const t = previewTouchPot(m, s, 0n);
+        if (!t.ok) throw new Error('refused');
+        const after = previewTouched(m, { ...s, lender: t.value.lender }, 0n);
+        const alone = previewTouched(m, s, 0n);
+        expect(after.ok && alone.ok).toBe(true);
+        if (!after.ok || !alone.ok) return;
+        expect(after.value.pending).toBe(alone.value.pending);
+        expect([after.value.shares, after.value.epoch]).toEqual([alone.value.shares, alone.value.epoch]);
+        // What the sync moved to the pot is what the owner's own touch moves.
+        expect(t.value.lender.real).toBe(alone.value.real);
+        // Without the fwd fields the chain's snapshots would read as the lender's own: wrong.
+        const blind = previewTouched(
+            m,
+            { ...s, lender: { ...t.value.lender, fwd: 0, fwdEpoch: 0, fwdShares: 0n } },
+            0n,
+        );
+        expect(blind.ok && blind.value.pending).not.toBe(alone.value.pending);
+    });
+
+    it('continues a chain from fwdEpoch, and judges a current lender as a plain touch', () => {
+        const s = rebased();
+        const t = previewTouchPot(m, s, 0n);
+        if (!t.ok) throw new Error('refused');
+        // The chain reached the share epoch: no record needed any more, and nothing more moves.
+        const chained = previewTouchPot(m, { ...s, lender: t.value.lender, records: [] }, 0n);
+        expect(chained.ok && chained.value.potGain).toBe(0n);
+        expect(chained.ok && chained.value.standing).toBe('behind');
+        // More credit and realised SOL in epoch 1 later: the chain alone (no record) moves its part.
+        const later = {
+            ...s,
+            market: { ...s.market, acc: bigIntToPodI128(3n * WAD), accR: bigIntToPodU128(5n * WAD) },
+            lender: t.value.lender,
+            records: [],
+        };
+        expect(potGainOfSync(m, later, 0n)).toBe(3_000_000n);
+        const cur = { ...simplePool(), lender: simpleLender(500_000n, { pending: 100n, real: 300n }), records: [] };
+        const c = previewTouchPot(m, cur, 0n);
+        expect(c.ok && [c.value.standing, c.value.potGain]).toEqual(['current', 200n]);
+    });
+
+    it('moves nothing without the record (a lender behind is judged on the records at hand)', () => {
+        const s = rebased();
+        expect(potGainOfSync(m, { ...s, records: [] }, 0n)).toBe(0n);
+        expect(potGainOfSync(m, { ...s, lender: null }, 0n)).toBe(0n);
+    });
+});
+
+describe('a claim that empties the position closes it (KI-67)', () => {
+    it('says so when the claim leaves no shares, nothing owed, no lock and no chain', () => {
+        const pool = simplePool({ lenderSol: 1_000n, totalShares: 0n, tokensFree: 0n });
+        const wiped = { ...pool, lender: simpleLender(0n, { pending: 400n, real: 400n }), records: [] };
+        expect(previewClaimOutcome(m, wiped, 0n)).toEqual({ ok: true, value: { sol: 400n, closes: true } });
+        expect(closable(m, wiped)).toBe(false);
+        expect(closable(m, { ...wiped, lender: simpleLender(0n) })).toBe(true);
+        // A dead lock term (no lock) does not keep it open.
+        expect(closable(m, { ...wiped, lender: simpleLender(0n, { lockTerm: 5n }) })).toBe(true);
+        // Short of SOL: part paid, the rest owed — open; with the pot raised by syncs first — closes.
+        const short = { ...wiped, lender: simpleLender(0n, { pending: 400n, real: 100n }) };
+        expect(previewClaimOutcome(m, short, 0n)).toEqual({ ok: true, value: { sol: 100n, closes: false } });
+        expect(previewClaimOutcome(m, { ...short, vault: { ...short.vault, unmatched: 300n } }, 0n)).toEqual({
+            ok: true,
+            value: { sol: 400n, closes: true },
+        });
+        expect(previewClaimOutcome(m, short, 0n, 300n)).toEqual({ ok: true, value: { sol: 400n, closes: true } });
+    });
+
+    it('stays open with shares, a lock, a deficit, a forward chain, or behind the share epoch', () => {
+        const pool = simplePool({ lenderSol: 1_000n, shareEpoch: 2 });
+        const at = (o: Parameters<typeof simpleLender>[1]) => ({
+            ...pool,
+            lender: simpleLender(0n, { epoch: 2, ...o }),
+            records: [],
+        });
+        expect(closable(m, at({}))).toBe(true);
+        expect(closable(m, at({ shares: 1n }))).toBe(false);
+        expect(closable(m, at({ lock: 1n }))).toBe(false);
+        expect(closable(m, at({ pending: -1n }))).toBe(false);
+        expect(closable(m, at({ pending: 1n }))).toBe(false);
+        expect(closable(m, at({ fwd: FWD.open, fwdEpoch: 2 }))).toBe(false);
+        expect(closable(m, at({ epoch: 1 }))).toBe(false);
+        expect(closable(m, { ...pool, lender: null })).toBe(false);
     });
 });

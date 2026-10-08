@@ -29,7 +29,7 @@ import { TxReviewModal } from '../../tx/TxReviewModal.tsx';
 import { useTxFlow } from '../../tx/useTxFlow.ts';
 import { useWallet } from '../../wallet/useWallet.ts';
 import { syncPlanFrom } from './build.ts';
-import { chainNowSeconds, lendKeys, MAX_RECORDS } from './chain.ts';
+import { chainNowSeconds, lendKeys, recordLimitOf } from './chain.ts';
 import { ClaimForm } from './claim/ClaimForm.tsx';
 import { type LendCtx, type LoadedChain, lendEnvOf, lendStateOf, nowFor } from './ctx.ts';
 import { DepositForm } from './deposit/DepositForm.tsx';
@@ -229,8 +229,8 @@ function SyncNotice({ ctx }: { ctx: LendCtx }) {
     };
     return (
         <Blocked code="LenderBehindEpochs">
-            Your position is {behind} share epochs behind this market. Sync it first ({MAX_RECORDS} epochs per
-            transaction); then deposit, withdraw and claim work as usual.
+            Your position is {behind} share epochs behind this market. Sync it first ({recordLimitOf(ctx.chain.lender)}{' '}
+            epochs per transaction); then deposit, withdraw and claim work as usual.
             <div>
                 <Button
                     size="sm"

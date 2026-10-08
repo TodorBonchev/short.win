@@ -1,9 +1,11 @@
 //! Lender-pool previews: shares, allowance, locks, withdrawals, deposits and claims on
-//! copies of the on-chain state (`shortwin_math::pool`; ECON §9; ARCH §3.3). Nothing
+//! copies of the on-chain state (`shortwin_math::pool`; ECON §9; ARCH §3.3), and a third
+//! party's pot-only touch of another lender with its forward chain (`pool::touch_pot`,
+//! KI-66 full) and whether a claim closes the position (`pool::closable`, KI-67). Nothing
 //! here changes the caller's objects.
 
 use shortwin_math::pool::{
-    self as mpool, LOCK_BUCKETS, Lender, NO_LOCK_EPOCH, Pool, ShareEpoch, Vault,
+    self as mpool, LOCK_BUCKETS, Lender, NO_LOCK_EPOCH, Pool, ShareEpoch, Standing, Vault,
 };
 use wasm_bindgen::JsError;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -158,6 +160,19 @@ pub struct LenderState {
     /// When the lock expires.
     #[wasm_bindgen(js_name = lockUntil)]
     pub lock_until: i64,
+    /// KI-66 full: the epoch the forward chain reached (0 without a chain).
+    #[wasm_bindgen(js_name = fwdEpoch)]
+    pub fwd_epoch: u32,
+    /// KI-66 full: 0 no chain, 1 held at its rebase record, 2 the owner converted part of the
+    /// way into the chain (`pool::FWD_*`). While a chain is active `snap` / `snapR` are the
+    /// chain's snapshots in `fwdEpoch`, not the lender's own.
+    pub fwd: u8,
+    /// KI-66 full: the owner's shares minus the chain's in `epoch` (0 or 1; with `fwd` 2).
+    #[wasm_bindgen(js_name = fwdLag)]
+    pub fwd_lag: u8,
+    /// KI-66 full: the chain's shares in `fwdEpoch` (0 without a chain).
+    #[wasm_bindgen(js_name = fwdShares)]
+    pub fwd_shares: u128,
 }
 
 impl LenderState {
@@ -175,11 +190,11 @@ impl LenderState {
             epoch: self.epoch,
             lock_epoch: self.lock_epoch,
             lock_until: self.lock_until,
-            fwd_epoch: 0,
-            fwd: 0,
-            fwd_lag: 0,
+            fwd_epoch: self.fwd_epoch,
+            fwd: self.fwd,
+            fwd_lag: self.fwd_lag,
             _pad: [0; 2],
-            fwd_shares: 0,
+            fwd_shares: self.fwd_shares,
         }
     }
 
@@ -197,6 +212,10 @@ impl LenderState {
             epoch: l.epoch,
             lock_epoch: l.lock_epoch,
             lock_until: l.lock_until,
+            fwd_epoch: l.fwd_epoch,
+            fwd: l.fwd,
+            fwd_lag: l.fwd_lag,
+            fwd_shares: l.fwd_shares,
         }
     }
 }
@@ -461,6 +480,96 @@ pub fn preview_claim(
     )?)
 }
 
+/// What `claim_sol` does to the lender (`pool::claim` after its touch, as the handler), and
+/// whether the program then closes the position and returns its rent to the owner
+/// (`pool::closable`, KI-67).
+#[wasm_bindgen]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ClaimOutcome {
+    /// Lamports paid (pot draw included).
+    pub sol: u64,
+    /// The lender afterwards.
+    pub lender: LenderState,
+    /// The claim leaves the position closable: `claim_sol` closes it (KI-67).
+    pub closes: bool,
+}
+
+/// [`ClaimOutcome`] of `claim_sol` at `now` on the stored state.
+#[wasm_bindgen(js_name = previewClaimOutcome)]
+pub fn preview_claim_outcome(
+    pool: &PoolState,
+    lender: &LenderState,
+    records: &ShareEpochs,
+    now: i64,
+) -> Result<ClaimOutcome, JsError> {
+    let p = pool.pool();
+    let (mut v, mut l) = (pool.vault(), lender.lender());
+    let sol = mpool::claim(&p, &mut v, &mut l, &mut records.0.clone(), now)?;
+    Ok(ClaimOutcome {
+        sol,
+        lender: LenderState::of(&l),
+        closes: mpool::closable(&p, &l),
+    })
+}
+
+/// Whether a `LenderPosition` in this state closes (`pool::closable`, KI-67): current, no
+/// shares, `pending` 0, no lock and no forward chain.
+#[wasm_bindgen]
+pub fn closable(pool: &PoolState, lender: &LenderState) -> bool {
+    mpool::closable(&pool.pool(), &lender.lender())
+}
+
+/// What a third party's `sync_lender` (unsigned) does to another lender: `pool::touch_pot`
+/// (KI-66 full) on copies — the hold at its first rebase record and the forward chain after
+/// it, or the plain touch of a lender that needs no rebase record — with `records` from where
+/// the walk starts (`fwdEpoch` for a chained lender, else its `epoch`).
+#[wasm_bindgen]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PotTouch {
+    /// The lender afterwards.
+    pub lender: LenderState,
+    /// Lamports the touch moves to the pot (`MarketVault.unmatched` after − before; R3A-2).
+    #[wasm_bindgen(js_name = potGain)]
+    pub pot_gain: u64,
+    standing: Standing,
+}
+
+#[wasm_bindgen]
+impl PotTouch {
+    /// Where the lender stands afterwards: `"current"`, `"parked"` or `"behind"` (held,
+    /// chained, or records missing).
+    #[wasm_bindgen(getter)]
+    pub fn standing(&self) -> String {
+        match self.standing {
+            Standing::Current => "current",
+            Standing::Parked => "parked",
+            Standing::Behind => "behind",
+        }
+        .into()
+    }
+}
+
+/// [`PotTouch`] at `now`; throws `touch_pot`'s refusals.
+#[wasm_bindgen(js_name = previewTouchPot)]
+pub fn preview_touch_pot(
+    pool: &PoolState,
+    lender: &LenderState,
+    records: &ShareEpochs,
+    now: i64,
+) -> Result<PotTouch, JsError> {
+    let (mut v, mut l) = (pool.vault(), lender.lender());
+    let standing = mpool::touch_pot(&pool.pool(), &mut v, &mut l, &records.0, now)?;
+    let pot_gain = v
+        .unmatched
+        .checked_sub(pool.unmatched)
+        .ok_or(shortwin_math::MathError::Invariant)?;
+    Ok(PotTouch {
+        lender: LenderState::of(&l),
+        pot_gain,
+        standing,
+    })
+}
+
 #[wasm_bindgen]
 impl PoolState {
     /// A new market's pool (`Π = WAD`, nothing deposited).
@@ -517,6 +626,9 @@ impl Default for PoolState {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    const WAD_U: u128 = 1_000_000_000_000_000_000;
+    const WAD_I: i128 = 1_000_000_000_000_000_000;
 
     #[test]
     fn previews_leave_the_state_alone() {
@@ -579,6 +691,87 @@ mod tests {
         assert_eq!(recs.0, before.0);
         recs.0[0].conv_rem = 0;
         assert_eq!(preview_touch(&pool, &lender, &recs, 0).unwrap().shares, 0);
+    }
+
+    /// KI-66 full: a third party's touch of a lender behind a rebase record holds it there
+    /// and walks its forward chain on copies; the fwd fields map both ways; a second touch of
+    /// the result moves nothing; the owner's later touch drops the chain.
+    #[test]
+    fn the_pot_only_touch_holds_and_walks_on_copies() {
+        // Epoch 0 rebased 1/1,000 (acc_end 2 SOL per 10⁹ shares, acc_r_end 3: a surplus);
+        // epoch 1 credits 1 and realises 2 more per share.
+        let mut pool = PoolState::new();
+        (pool.share_epoch, pool.total_shares) = (1, 2_000_000);
+        (pool.acc, pool.acc_r) = (WAD_I + 2 * WAD_I, 2 * WAD_U);
+        (pool.lender_sol, pool.unmatched) = (10_000_000_000, 7);
+        let mut recs = ShareEpochs::new();
+        recs.push(0, 2 * WAD_I, 3 * WAD_U, 2_000_000_000, 0, 0, 1, 1, 0);
+        let mut c = LenderState::new_in(&pool);
+        (c.epoch, c.shares, c.snap, c.snap_r) = (0, 1_000_000_001, 0, 0);
+        let before = (pool.clone(), c, recs.clone());
+        let t = preview_touch_pot(&pool, &c, &recs, 0).unwrap();
+        assert_eq!(
+            (pool.clone(), c, recs.0.clone()),
+            (before.0, before.1, before.2.0)
+        );
+        assert_eq!(t.standing(), "behind");
+        let l = t.lender;
+        assert_eq!(
+            (
+                l.shares,
+                l.epoch,
+                l.fwd,
+                l.fwd_epoch,
+                l.fwd_shares,
+                l.fwd_lag
+            ),
+            (1_000_000_001, 0, mpool::FWD_HOLD, 1, 1_000_000, 0)
+        );
+        // Held: 2 and 3 SOL per 10⁹ shares at the record; the chain's 10⁶ shares then 3 and 2.
+        assert_eq!((l.snap, l.snap_r), (pool.acc, pool.acc_r));
+        let (mut v, mut m) = (pool.vault(), c.lender());
+        mpool::touch_pot(&pool.pool(), &mut v, &mut m, &recs.0, 0).unwrap();
+        assert_eq!(LenderState::of(&m), l, "the facade is touch_pot");
+        assert_eq!(t.pot_gain, v.unmatched - pool.unmatched);
+        assert!(t.pot_gain > 0);
+        let again = preview_touch_pot(&pool, &l, &recs, 0).unwrap();
+        assert_eq!((again.lender, again.pot_gain), (l, 0), "idempotent");
+        // The owner's own touch converts and drops the chain.
+        let owner = preview_touch(&pool, &l, &recs, 0).unwrap();
+        assert_eq!(
+            (owner.epoch, owner.fwd, owner.fwd_shares),
+            (1, mpool::FWD_NONE, 0)
+        );
+        // A current lender: the plain touch, standing "current", nothing to walk.
+        let cur = preview_touch_pot(&pool, &owner, &ShareEpochs::new(), 0).unwrap();
+        assert_eq!(cur.standing(), "current");
+    }
+
+    /// KI-67: `claim_sol` of a fully paid empty position closes it; one with shares, a chain or
+    /// SOL owed does not.
+    #[test]
+    fn a_claim_that_empties_the_position_closes_it() {
+        let mut pool = PoolState::new();
+        pool.lender_sol = 1_000;
+        let mut l = LenderState::new_in(&pool);
+        (l.pending, l.real) = (400, 400);
+        assert!(!closable(&pool, &l));
+        let out = preview_claim_outcome(&pool, &l, &ShareEpochs::new(), 0).unwrap();
+        assert_eq!((out.sol, out.lender.claimed, out.closes), (400, 400, true));
+        assert!(closable(&pool, &out.lender));
+        l.real = 100;
+        let out = preview_claim_outcome(&pool, &l, &ShareEpochs::new(), 0).unwrap();
+        assert_eq!((out.sol, out.lender.pending, out.closes), (100, 300, false));
+        l.real = 400;
+        l.shares = 1;
+        assert!(
+            !preview_claim_outcome(&pool, &l, &ShareEpochs::new(), 0)
+                .unwrap()
+                .closes
+        );
+        l.shares = 0;
+        l.fwd = mpool::FWD_OPEN;
+        assert!(!closable(&pool, &LenderState { pending: 0, ..l }));
     }
 
     #[test]

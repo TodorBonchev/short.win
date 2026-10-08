@@ -7,10 +7,12 @@
  * Retry re-reads the chain, re-quotes and re-derives the steps; inputs that no longer fit (a
  * balance gone, a source now behind CPI Guard) end in a `PlanError` the review shows.
  */
-import { findShareEpochPda } from '@shortwin/client';
+import { findShareEpochPda, getLenderPositionSize } from '@shortwin/client';
 import type { Address, Instruction, TransactionSigner } from '@solana/kit';
 import type { MathModule } from '../../math/load.ts';
 import type { AppRpc } from '../../rpc/client.ts';
+import { LEADING_BUDGET_INSTRUCTIONS, MAX_TRANSACTION_BYTES, wireSizeOf } from '../../tx/message.ts';
+import { simulatePlan } from '../../tx/simulate.ts';
 import type { TxPlan } from '../../tx/types.ts';
 import { chainNowSeconds, liveWipeRecordEpoch, marketNow, readLendChain } from './chain.ts';
 import { type LoadedChain, lendStateOf, lockGraceOf, planContextFor, subUnitVarsOf, unpaidRentVarsOf } from './ctx.ts';
@@ -26,8 +28,8 @@ import {
 import {
     hasFlag,
     MARKET_FLAG,
+    previewClaimOutcome,
     previewClaimView,
-    previewClaimWithPot,
     previewDepositView,
     previewSubUnitConversion,
     previewUnpaidRent,
@@ -35,7 +37,7 @@ import {
     type Refusal,
     wipeSweepPending,
 } from './previews.ts';
-import { pickSyncs, quoteWithdrawSol, readOtherLenders } from './quote.ts';
+import { pickPotSyncs, quoteWithdrawSol, readOtherLenders, readPotRecords, type Simulate } from './quote.ts';
 import { postWipeSweepIxs, readSweepFacts } from './sweep.ts';
 
 /** What every lender plan builder needs besides the chain read. */
@@ -46,6 +48,8 @@ export interface LendEnv {
     readonly signer: TransactionSigner;
     /** Display only (titles, units). */
     readonly symbol: string;
+    /** The claim's check of its prepended syncs (tests inject one; default `simulatePlan`). */
+    readonly simulate?: Simulate;
 }
 
 /** A fresh read of the market for the connected wallet (the review's Retry). */
@@ -204,6 +208,29 @@ export async function withdrawPlanFrom(
 /** Other lenders of the market (owners) a claim may sync first; the indexer lists them. */
 export type OtherLenders = () => Promise<readonly Address[]>;
 
+/** The most other lenders a claim reads and judges (FRONTEND.md §3.6). */
+export const MAX_SYNC_CANDIDATES = 24;
+
+/**
+ * `LenderPosition`'s rent-exempt minimum, `(128 + 241)·3,480·2` = 2,568,240 lamports (the account's
+ * size, ARCH §2.3.6, and the cluster's default rent), which `claim_sol` returns to the owner when it
+ * closes the position (KI-67): what the review's `lender.claimCloses` names.
+ */
+export const LENDER_POSITION_RENT = (128n + BigInt(getLenderPositionSize())) * 3_480n * 2n;
+
+/**
+ * The claim (FRONTEND.md §3.6; KI66-R4, KI-67). When the pot cannot pay the claimant's entitlement,
+ * other lenders' unsigned `sync_lender` go first — the pot-only touch (`pool::touch_pot`), which
+ * holds a lender behind a rebase record there and walks its forward chain — picked by
+ * `pickPotSyncs` from the indexer's list (≤ 24 read, ≤ 4 synced, largest gain first until the
+ * shortfall is covered). They are fitted to the transaction: while the compiled transaction (no
+ * lookup tables: an upper bound) is over 1,232 bytes, the smallest-gain sync is dropped, and the
+ * expected payout is recomputed with the pot the rest moves. A plan with syncs is simulated here
+ * once more: a sync that fails (its position closed or changed since the read) is dropped and the
+ * plan rebuilt, so one stale target never blocks the claim; the review simulates the result again
+ * before anything is signed. Syncs left out (by the cap or the size) are named in the review
+ * (`lender.potSyncsDeferred`): the next claim picks them. Without the indexer, no syncs.
+ */
 export async function claimPlanFrom(
     env: LendEnv,
     chain: LoadedChain,
@@ -211,31 +238,66 @@ export async function claimPlanFrom(
     otherLenders: OtherLenders | null,
 ): Promise<TxPlan> {
     needRecords(chain);
+    if (!chain.lender) {
+        throw new PlanError(
+            'You have no lender position in this market (a claim or withdrawal that emptied it closed it).',
+        );
+    }
     const now = BigInt(nowS);
-    const view = previewClaimView(env.math, lendStateOf(chain), now);
+    const state = lendStateOf(chain);
+    const view = previewClaimView(env.math, state, now);
     if (!view.ok) throw refused(view.refusal);
     const v = view.value;
     let syncs: SyncTarget[] = [];
-    let expected = v.claimable;
+    let more = { count: 0, gain: 0n };
     if (v.shortfall > 0n && otherLenders) {
         try {
-            const owners = (await otherLenders()).filter((o) => o !== env.signer.address).slice(0, 24);
+            const owners = (await otherLenders()).filter((o) => o !== env.signer.address).slice(0, MAX_SYNC_CANDIDATES);
             const others = await readOtherLenders(env.rpc, chain.marketAddress, owners);
-            const pick = pickSyncs(env.math, { market: chain.market, vault: chain.vault }, others, now, v.shortfall);
+            const records = await readPotRecords(env.rpc, chain.marketAddress, chain.market.shareEpoch, others);
+            const pick = pickPotSyncs(
+                env.math,
+                { market: chain.market, vault: chain.vault },
+                others,
+                records,
+                now,
+                v.shortfall,
+            );
             syncs = [...pick.syncs];
-            if (syncs.length) {
-                const r = previewClaimWithPot(env.math, lendStateOf(chain), now, pick.gain);
-                if (r.ok) expected = r.value;
-            }
+            more = pick.more;
         } catch {
-            // the indexer is unavailable: claim what the pot pays now
+            // the indexer (or the reads) unavailable: claim what the pot pays now
         }
     }
-    const plan = await buildClaimPlan({
-        ...contextAt(env, chain, now),
-        syncs,
-        expected,
-    });
+    const ctx = contextAt(env, chain, now);
+    const make = async (kept: readonly SyncTarget[]): Promise<TxPlan> => {
+        const gain = kept.reduce((x, s) => x + s.gain, 0n);
+        const out = previewClaimOutcome(env.math, state, now, gain);
+        const left = syncs.filter((s) => !kept.includes(s));
+        const deferred = {
+            count: more.count + left.length,
+            gain: more.gain + left.reduce((x, s) => x + s.gain, 0n),
+        };
+        return buildClaimPlan({
+            ...ctx,
+            syncs: kept,
+            expected: out.ok ? out.value.sol : v.claimable,
+            ...(out.ok && out.value.closes ? { closes: { rent: LENDER_POSITION_RENT } } : {}),
+            ...(deferred.count > 0 && v.shortfall > gain ? { deferred } : {}),
+        });
+    };
+    let kept: SyncTarget[] = [...syncs];
+    let plan = await make(kept);
+    while (kept.length && wireSizeOf(plan.instructions, env.signer) > MAX_TRANSACTION_BYTES) {
+        kept = kept.slice(0, -1);
+        plan = await make(kept);
+    }
+    for (let tries = kept.length; tries > 0 && kept.length; tries--) {
+        const failed = await failingSync(env, plan, kept.length);
+        if (failed === null) break;
+        kept = kept.filter((_, i) => i !== failed);
+        plan = await make(kept);
+    }
     return {
         ...plan,
         rebuild: async () => {
@@ -243,6 +305,29 @@ export async function claimPlanFrom(
             return claimPlanFrom(env, f.chain, f.nowS, otherLenders);
         },
     };
+}
+
+/**
+ * The index of the prepended sync a simulation of `plan` fails on (`null`: none failed, or the
+ * simulation could not run — the review's own simulation then decides).
+ */
+async function failingSync(env: LendEnv, plan: TxPlan, count: number): Promise<number | null> {
+    try {
+        const { report } = await (env.simulate ?? simulatePlan)({
+            rpc: env.rpc,
+            plan,
+            feePayer: env.signer,
+            lookupTables: {},
+            version: 0,
+            priorityFeeMicroLamports: 0n,
+        });
+        const at = report.error?.instructionIndex;
+        if (report.ok || at === undefined) return null;
+        const i = at - LEADING_BUDGET_INSTRUCTIONS;
+        return i >= 0 && i < count ? i : null;
+    } catch {
+        return null;
+    }
 }
 
 export async function coverPlanFrom(env: LendEnv, chain: LoadedChain, nowS: number): Promise<TxPlan> {

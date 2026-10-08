@@ -49,6 +49,19 @@ import { wipeLive } from './previews.ts';
  */
 export const MAX_RECORDS = 8;
 
+/**
+ * The most records an owner's own transaction carries while its position has a forward chain
+ * (`LenderPosition.fwd ≠ 0`, KI-66 full): settling the chain at a lag of 1 at every record costs
+ * `lag_part`'s product twice per record, 64,355 CU for `cover_deficit` over 8 records and 58,229
+ * over 7 (ARCH §6.1, `tests/bench/m1_cu` `behind_lag1`), so a chained owner settles 7 at a time.
+ */
+export const MAX_RECORDS_CHAINED = 7;
+
+/** The records the owner's own transaction carries for `lender` (`MAX_RECORDS`, 7 with a forward chain). */
+export function recordLimitOf(lender: Pick<LenderPosition, 'fwd'> | null): number {
+    return lender && lender.fwd !== 0 ? MAX_RECORDS_CHAINED : MAX_RECORDS;
+}
+
 const COMMITMENT = { commitment: 'confirmed' } as const;
 const b64 = getBase64Encoder();
 
@@ -70,7 +83,7 @@ export interface LendChain {
     readonly owner: Address | null;
     readonly lenderAddress: Address | null;
     readonly lender: LenderPosition | null;
-    /** The records from the lender's epoch on (at most `MAX_RECORDS`), in order. */
+    /** The records from the lender's epoch on (at most `recordLimitOf(lender)`), in order. */
     readonly records: readonly ShareEpoch[];
     /** Whether `records` reaches the market's current epoch (else `sync_lender` first). */
     readonly recordsComplete: boolean;
@@ -117,6 +130,17 @@ export function neededEpochs(fromEpoch: number, shareEpoch: number, limit = MAX_
     const out: number[] = [];
     for (let e = fromEpoch; e < shareEpoch && out.length < limit; e++) out.push(e);
     return out;
+}
+
+/**
+ * The records a third party's `sync_lender` of `l` carries (KI-66 full; ARCH §3.3, ops item 13): from
+ * its `fwdEpoch` once it has a forward chain (the pot-only touch continues the chain there), else
+ * from its `epoch`, at most `MAX_RECORDS` (the pot-only touch writes no record, so the owner's lag-1
+ * cost does not apply). Empty for a current lender or a chain that reached the share epoch: the
+ * touch still accrues the current epoch.
+ */
+export function potEpochs(l: Pick<LenderPosition, 'fwd' | 'fwdEpoch' | 'epoch'>, shareEpoch: number): number[] {
+    return neededEpochs(l.fwd !== 0 ? l.fwdEpoch : l.epoch, shareEpoch);
 }
 
 /** Reads the `ShareEpoch` records of `epochs` (missing or foreign accounts are dropped). */
@@ -168,7 +192,7 @@ export async function readLendChain(
     let records: ShareEpoch[] = [];
     let recordsComplete = true;
     if (market && lender && lender.epoch < market.shareEpoch) {
-        const epochs = neededEpochs(lender.epoch, market.shareEpoch);
+        const epochs = neededEpochs(lender.epoch, market.shareEpoch, recordLimitOf(lender));
         records = await readRecords(rpc, marketAddress, epochs);
         recordsComplete = records.length === epochs.length && epochs[epochs.length - 1] === market.shareEpoch - 1;
     }

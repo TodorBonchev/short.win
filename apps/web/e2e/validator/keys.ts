@@ -101,6 +101,11 @@ export const KEY_NAMES = {
         'potClaimer',
         'potLate',
         'potBorrower',
+        // KI66-R4: lend-claim-pot-chain (the claiming lender, the absent lender behind the rebase
+        // record, the borrower whose S1 settlement rebases the shares and who borrows again after).
+        'chainClaimer',
+        'chainAbsent',
+        'chainBorrower',
     ],
 } as const;
 

@@ -24,6 +24,11 @@ import {
 export const MAX_TRANSACTION_BYTES = 1232;
 /** The compute-unit ceiling used while simulating (the simulation measures, the real limit follows). */
 export const SIMULATION_CU_LIMIT = 1_400_000;
+/**
+ * Compute-budget instructions `buildMessage` puts before the plan's (limit, price): a simulation
+ * error's `instructionIndex` minus this is the index in `TxPlan.instructions`.
+ */
+export const LEADING_BUDGET_INSTRUCTIONS = 2;
 
 export interface Lifetime {
     readonly blockhash: Blockhash;
@@ -70,6 +75,25 @@ export function wireOf(message: BuiltMessage): {
 } {
     const tx = compileTransaction(message);
     return { base64: getBase64EncodedWireTransaction(tx), size: getTransactionSize(tx) };
+}
+
+/**
+ * The wire size of `instructions` as the pipeline would compile them for `feePayer` **without
+ * lookup tables** — what a legacy-only wallet signs, and an upper bound of the v0 message with the
+ * protocol ALT (FRONTEND.md §5.2) — for a plan that must fit `MAX_TRANSACTION_BYTES` before it is
+ * simulated (the claim's prepended syncs). The blockhash is a placeholder of the same size.
+ */
+export function wireSizeOf(instructions: readonly Instruction[], feePayer: TransactionSigner): number {
+    const message = buildMessage({
+        instructions,
+        feePayer,
+        lifetime: { blockhash: '11111111111111111111111111111111' as Blockhash, lastValidBlockHeight: 0n },
+        computeUnitLimit: SIMULATION_CU_LIMIT,
+        computeUnitPrice: 1n,
+        lookupTables: {},
+        version: 0,
+    });
+    return wireOf(message).size;
 }
 
 /** The final compute-unit limit from a simulation: +15 % and +10,000 headroom, within [20,000, 1,400,000]. */

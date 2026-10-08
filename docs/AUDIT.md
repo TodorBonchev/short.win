@@ -684,7 +684,7 @@ and the math crate from `6aad5a5`: owner decisions of 2026-10-08, eighth round �
 pot-only touch walks the lender's forward chain, `claim_sol` closes an empty position; the
 machine's 3-slot wrapper; logs `~/.cache/shortwin-work/m10/ki67-gate/gate/logs`, the drivers
 `gate1.sh` … `gate5.sh` and `SUMMARY`). Every step of CI's jobs except the web's (the web batch,
-KI66-R4):
+KI66-R4, gated below):
 
 | Step (CI job) | Result |
 |---|---|
@@ -710,7 +710,19 @@ KI66-R4):
 | `python3 scripts/audit_scope.py check` | ok |
 
 Not run: CI (nothing pushed), the ≥ 24 h fuzz on this head (started after the gate; §10's run
-list), the web's steps (the web batch).
+list), the web's steps (the web batch, below).
+
+**The web batch's gate** (KI66-R4 and KI-67 in the web, 2026-10-08, on `m10/ki67` at `a3b678d`;
+no program, math-crate or client change — the WASM facade only; logs
+`~/.cache/shortwin-work/m10/ki67-gate/web-logs`, driver `webgate.sh`, `GATE`):
+
+| Step (CI job) | Result |
+|---|---|
+| `pnpm install --frozen-lockfile`; `pnpm -r build` | no lockfile change; built |
+| web: lint, typecheck, Vitest | clean (the 2 existing lint warnings); **596 passed, 1 skipped** (60 files; new `build.test.ts`; `previews.test.ts`'s vectors add `touchPot` and `claimOutcome` against `pool_model` — `gen_lend_vectors.py` regenerates `lend_vectors.json` with no diff) |
+| codama / client check | the IDL equals the build's; the regenerated client has no diff; typecheck; 29 tests |
+| the facade | fmt, clippy `-D warnings`, 23 tests (`the_pot_only_touch_holds_and_walks_on_copies`, `a_claim_that_empties_the_position_closes_it`), `wasm32-unknown-unknown` check |
+| **web E2E** (all specs, under the E2E lock) | **60 passed** (9.9 min; the test-venue `shortwin.so` `8cea17e1…bb98`): `lend-claim-pot-chain` lands `[sync_lender(absent, 1), claim_sol]` after an organic rebase — the claim alone 10,345 lamports, the absent lender's surplus 493, the pot draw 471, paid 10,816, nothing left owed — and `lend-post-wipe`'s last claim closes the position (its 2,568,240 lamports of rent back) |
 
 **The KI-66 batch's gate** (2026-10-07/08, on `m10/ki66`, the program from `e19e0c8` and the
 math crate from `e639558`: owner decision of 2026-10-07, seventh round — anyone else's

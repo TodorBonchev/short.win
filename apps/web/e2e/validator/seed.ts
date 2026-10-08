@@ -18,9 +18,11 @@
  * 5. Mints without a market for create-market: safe (two), freeze authority, a disallowed extension.
  * 6. Two more mock markets for FE-18, each lent by one spec wallet alone: `wipe` (wallet `wiped`;
  *    lend-post-wipe drives its full wipe) and `pot` (wallet `potClaimer`; lend-claim-sync), with the
- *    tokens their other lenders deposit later (`rejoin`, `potLate`).
- * 7. After the 50 s market warm-up: five open positions (`margin` on main, `closer` and `holder`
- *    on move, `wipeBorrower` on wipe, `potBorrower` on pot) with generous bounds.
+ *    tokens their other lenders deposit later (`rejoin`, `potLate`); and for KI66-R4 `chain`, lent
+ *    by `chainAbsent` alone (lend-claim-pot-chain rebases it), with `chainClaimer`'s tokens.
+ * 7. After the 50 s market warm-up: six open positions (`margin` on main, `closer` and `holder`
+ *    on move, `wipeBorrower` on wipe, `potBorrower` on pot, `chainBorrower` on chain) with
+ *    generous bounds.
  *
  * Run standalone: `node e2e/validator/seed.ts` (against a running E2E validator).
  */
@@ -517,6 +519,16 @@ export async function seed(): Promise<E2EState> {
         600_000n * TOKEN,
         await w('potClaimer'),
     );
+    // KI66-R4: `chain` at `main`'s price and four times its depth (its wallet cap admits the 15M-token
+    // position whose S1 settlement rebases the pool's shares), lent by `chainAbsent` alone.
+    const chain = await mockMarket(
+        c,
+        { symbol: 'E2ECHAIN', name: 'ShortWin E2E Chain' },
+        4_000_000_000n * TOKEN,
+        4_000n,
+        50_000_000n * TOKEN,
+        await w('chainAbsent'),
+    );
     const createdAt = (await clock()).unixTimestamp;
 
     const t22Mint = await createT22Mint(c, (mint) => ({
@@ -620,6 +632,12 @@ export async function seed(): Promise<E2EState> {
     await mintTo(c, wipe.mint, wipeAccounts.rejoin, PROGRAMS.token, 1_000_000n * TOKEN);
     const potAccounts = { late: await ensureAta(c, (await w('potLate')).address, pot.mint, PROGRAMS.token) };
     await mintTo(c, pot.mint, potAccounts.late, PROGRAMS.token, 5_400_000n * TOKEN);
+    // KI66-R4: the absent lender withdraws into its ATA before the rebase; the claimer lends after it.
+    const chainAccounts = {
+        absent: await ata((await w('chainAbsent')).address, chain.mint, PROGRAMS.token),
+        claimer: await ensureAta(c, (await w('chainClaimer')).address, chain.mint, PROGRAMS.token),
+    };
+    await mintTo(c, chain.mint, chainAccounts.claimer, PROGRAMS.token, 1_000_000n * TOKEN);
     log('wallet token accounts ready');
 
     // create-market mints (§3.5): two safe, one with a freeze authority, one with a disallowed extension.
@@ -647,7 +665,7 @@ export async function seed(): Promise<E2EState> {
     for (const seedName of ['config', 'venue_guard', 'sol_usd'])
         altAddresses.push(await pda(PROGRAMS.shortwin, [seedName]));
     if (ENV.program === 'test-venue') altAddresses.push(PROGRAMS.mock);
-    for (const m of [main, move, paused, t22, wipe, pot]) {
+    for (const m of [main, move, paused, t22, wipe, pot, chain]) {
         altAddresses.push(m.market, m.marketVault, m.poolVault, m.trader, m.traderWsol, m.mint);
         if (m.pool) altAddresses.push(m.pool.pool, m.pool.baseVault, m.pool.quoteVault, m.pool.authority);
     }
@@ -667,6 +685,8 @@ export async function seed(): Promise<E2EState> {
             // 100M-token pool, ≈ 469k tokens); ≈ 5 SOL at 83 %.
             wipe: await openShortFromNode(await w('wipeBorrower'), wipe, 300_000n * TOKEN, 1n),
             pot: await openShortFromNode(await w('potBorrower'), pot, 500_000n * TOKEN, 1n),
+            // ≈ 15 SOL of notional at 30 % utilisation.
+            chain: await openShortFromNode(await w('chainBorrower'), chain, 15_000_000n * TOKEN, 1n),
         };
         log('seeded positions open');
     }
@@ -716,7 +736,7 @@ export async function seed(): Promise<E2EState> {
         protocolAlt,
         admin,
         wallets,
-        markets: { main, move, paused, t22, wipe, pot },
+        markets: { main, move, paused, t22, wipe, pot, chain },
         createMints,
         positions,
         tokenAccounts: {
@@ -727,6 +747,7 @@ export async function seed(): Promise<E2EState> {
             errors: { t22Ata: errorsT22, race: errorsRace },
             wipe: wipeAccounts,
             pot: potAccounts,
+            chain: chainAccounts,
         },
         venueMints,
     };

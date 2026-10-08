@@ -1,8 +1,10 @@
 /**
  * Lend → Claim (FRONTEND.md §3.6): what `claim_sol` pays now (`previewClaim`, pot draw included),
  * the credited entitlement, the vesting income, the pot and a deficit. When the pot cannot pay the
- * entitlement, other lenders whose touch moves a surplus to the pot are synced first in the same
- * transaction (`quote.ts` `pickSyncs`, ≤ 4). A negative balance is covered with `cover_deficit`.
+ * entitlement, other lenders whose sync moves a surplus to the pot are synced first in the same
+ * transaction (`quote.ts` `pickPotSyncs`, ≤ 4; unsigned, so the pot-only touch with its forward
+ * chain for a lender behind a rebase record: KI-66 full, KI66-R4). A claim that leaves the position
+ * empty closes it (KI-67; the review says so). A negative balance is covered with `cover_deficit`.
  */
 import { type Address, isAddress } from '@solana/kit';
 import { useQueryClient } from '@tanstack/react-query';

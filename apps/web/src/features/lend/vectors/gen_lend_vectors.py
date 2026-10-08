@@ -4,7 +4,12 @@ against pool_model-derived vectors through the WASM").
 
 Drives the normative lender-pool model `docs/design/sim/pool_model.py` v0.4.2 (default switches,
 continuous rent) through a lazy op mix — lenders are never touched by a `check()`, so they fall
-share epochs behind, their locks expire untouched and full wipes leave parked lenders — and, at
+share epochs behind, their locks expire untouched and full wipes leave parked lenders; third parties'
+pot-only syncs (KI-66 full) start and walk forward chains, and owners' own partial syncs stop inside
+them (`FWD_OPEN`), from a second random stream (`POT_SEED`); plus the end states of
+`pool_model._diff_world`'s rebase-heavy pools (`fwd_differential`'s world B) that leave a forward
+chain open (the first `CHAIN_CASES` of them, then those with an owner stopped inside its chain up
+to `OPEN_CASES`, within `CHAIN_SEEDS` seeds) — and, at
 sampled points, writes the state **as the program stores it** (the `Market` lender-pool fields
 and flags, `MarketVault`, every `LenderPosition`, every `ShareEpoch` record) together with what
 the model answers for each preview the lend panel shows, computed on deep copies:
@@ -19,6 +24,12 @@ the model answers for each preview the lend panel shows, computed on deep copies
   lock               _touch, then _lock_of             -> shares
   lockUntil          Pool.lock_until_for               -> unix seconds
   release            Pool._release                     -> lamports released at `now`
+  touchPot           Pool.sync_lender(w, 8, signed=False) -> a third party's sync of the lender (KI-66
+                     full: the pot-only touch, its forward chain) with the 8 records from where its
+                     walk starts (`fwd_epoch` for a chained lender, else `epoch`): the pot's gain, the
+                     standing and the lender afterwards (fwd fields included)
+  claimOutcome       Pool.claim_sol, then the KI-67 predicate on the lender afterwards (current, no
+                     shares, pending 0, no lock, no forward chain) -> lamports, closes
 
 `apps/web/src/features/lend/previews.test.ts` rebuilds `PoolState` / `LenderState` /
 `ShareEpochs` from these account-shaped records with the panel's own conversion
@@ -40,6 +51,7 @@ Run from anywhere (deterministic), then format with Biome:
     python3 apps/web/src/features/lend/vectors/gen_lend_vectors.py
     pnpm --filter web exec biome format --write src/features/lend/vectors/lend_vectors.json
 """
+import collections
 import copy
 import json
 import random
@@ -53,6 +65,10 @@ sys.path.insert(0, str(ROOT / "docs" / "design" / "sim"))
 import pool_model as pm  # noqa: E402  (v0.4.2)
 
 SEED = 20261001
+POT_SEED = 20261008
+CHAIN_SEEDS = 3_000
+CHAIN_CASES = 12
+OPEN_CASES = 10
 OPS = 1_200
 SAMPLE_EVERY = 100
 OUT = HERE / "lend_vectors.json"
@@ -166,6 +182,10 @@ def dump_state(p: pm.Pool) -> dict:
             "lockEpoch": U32_MAX if L.lock_epoch == -1 else L.lock_epoch,
             "lockTerm": u(L.lock_term, U128),
             "lockUntil": s(L.lock_until, I64),
+            "fwd": L.fwd,
+            "fwdEpoch": L.fwd_epoch,
+            "fwdShares": u(L.fwd_shares, U128),
+            "fwdLag": L.fwd_lag,
         }
     records = []
     need = min([L.epoch for L in p.lenders.values()] + [p.epoch - 1 if p.wipe_live else p.epoch])
@@ -217,6 +237,34 @@ def expectations(p: pm.Pool, rng: random.Random) -> list:
         out.append({"lender": who, "op": "value",
                     "result": run(lambda q, w=who: str(pm.token_value(q, q._touch(w))))})
         out.append({"lender": who, "op": "lock", "result": run(lambda q, w=who: str(q._lock_of(q._touch(w))))})
+
+        def touch_pot(q, w=who):
+            pot = q.unmatched
+            behind = q.sync_lender(w, 8, signed=False)
+            T = q.lenders[w]
+            if T.fwd or behind:
+                standing = "behind"
+            elif T.epoch == q.epoch:
+                standing = "current"
+            elif q.wipe_live and T.epoch == q.epoch - 1:
+                standing = "parked"
+            else:
+                standing = "behind"
+            return {"potGain": str(q.unmatched - pot), "standing": standing, "pending": str(T.pending),
+                    "real": str(T.real), "shares": str(T.shares), "epoch": T.epoch, "snap": str(T.snap),
+                    "snapR": str(T.snap_r), "fwd": T.fwd, "fwdEpoch": T.fwd_epoch,
+                    "fwdShares": str(T.fwd_shares), "fwdLag": T.fwd_lag}
+
+        out.append({"lender": who, "op": "touchPot", "result": run(touch_pot)})
+
+        def claim_outcome(q, w=who):
+            sol = q.claim_sol(w)
+            T = q.lenders[w]
+            closes = (T.epoch == q.epoch and T.shares == 0 and T.pending == 0 and T.lock == 0
+                      and T.fwd == pm.FWD_NONE)
+            return {"sol": str(sol), "closes": closes}
+
+        out.append({"lender": who, "op": "claimOutcome", "result": run(claim_outcome)})
         if L.shares:
             cands = {1, L.shares, max(1, L.shares // 2)}
             q0 = copy.deepcopy(p)
@@ -320,8 +368,27 @@ def step(p: pm.Pool, rng: random.Random, users, pid):
         pass
 
 
+def pot_step(p: pm.Pool, prng: random.Random) -> None:
+    """A third party's pot-only sync (KI-66 full) of a lender behind a rebase record or walking its
+    chain, with a random window of 1-8 records from where its walk starts; or the owner's own partial
+    sync of a lender behind (1-3 records), which can stop it inside its chain (FWD_OPEN)."""
+    if not p.lenders or prng.random() >= 0.35:
+        return
+    w = prng.choice(sorted(p.lenders))
+    L = p.lenders[w]
+    try:
+        if L.fwd or (L.epoch < p.epoch and p.epochs[L.epoch][1] and (L.shares or L.lock or L.lock_term)):
+            if L.fwd and prng.random() < 0.4:
+                p.sync_lender(w, prng.randrange(1, 4), signed=True)
+            else:
+                p.sync_lender(w, prng.randrange(1, 9), signed=False)
+    except ValueError:
+        pass
+
+
 def main():
     rng = random.Random(SEED)
+    prng = random.Random(POT_SEED)
     cases = []
     skipped = 0
     for run_i in range(3):
@@ -330,6 +397,7 @@ def main():
         pid = [0]
         wipe_seen = False
         for n in range(OPS):
+            pot_step(p, prng)
             step(p, rng, users, pid)
             # every SAMPLE_EVERY ops, and once right after each full wipe (parked lenders, the
             # post-wipe deposit gate)
@@ -348,16 +416,49 @@ def main():
                     **state,
                     "expect": expectations(p, rng),
                 })
+    # Forward chains (KI-66 full): the end states of pool_model.fwd_differential's rebase-heavy pools
+    # with third-party pot-only syncs (_diff_world, world B), those that leave a chain open.
+    stats = collections.Counter()
+    chained_cases = open_cases = 0
+    for seed in range(CHAIN_SEEDS):
+        try:
+            p = pm._diff_world(seed, True, stats)
+        except ValueError:
+            continue
+        opened = any(L.fwd == pm.FWD_OPEN for L in p.lenders.values())
+        if not opened and (chained_cases >= CHAIN_CASES or not any(L.fwd for L in p.lenders.values())):
+            continue
+        try:
+            state = dump_state(p)
+        except OutOfRange:
+            skipped += 1
+            continue
+        cases.append({"name": f"chain_seed{seed}", "now": str(p.now), "lockGraceS": p.lock_grace_s, **state,
+                      "expect": expectations(p, rng)})
+        chained_cases += 1
+        open_cases += opened
+        if chained_cases >= CHAIN_CASES and open_cases >= OPEN_CASES:
+            break
     behind = sum(1 for c in cases for L in c["lenders"].values() if L["epoch"] < c["market"]["shareEpoch"])
     wipes = sum(1 for c in cases if c["market"]["flags"] & FLAG_WIPE_LIVE)
     locks = sum(1 for c in cases if c["vault"]["lockCal"])
     vests = sum(1 for c in cases if c["market"]["vestBal"] != "0")
+    chains = sum(1 for c in cases for L in c["lenders"].values() if L["fwd"])
+    opens = sum(1 for c in cases for L in c["lenders"].values() if L["fwd"] == pm.FWD_OPEN)
+    pot_gains = sum(1 for c in cases for e in c["expect"]
+                    if e["op"] == "touchPot" and isinstance(e["result"], dict) and e["result"]["potGain"] != "0")
+    held = sum(1 for c in cases for e in c["expect"]
+               if e["op"] == "touchPot" and isinstance(e["result"], dict) and e["result"]["fwd"]
+               and not c["lenders"][e["lender"]]["fwd"])
+    closes = sum(1 for c in cases for e in c["expect"]
+                 if e["op"] == "claimOutcome" and isinstance(e["result"], dict) and e["result"]["closes"])
     doc = {
         "generator": "apps/web/src/features/lend/vectors/gen_lend_vectors.py",
-        "source": "docs/design/sim/pool_model.py v0.4.2 (default switches, continuous rent), lazy op mix",
+        "source": "docs/design/sim/pool_model.py v0.4.2 (default switches, continuous rent, the forward chain), lazy op mix with pot-only syncs",
         "seed": SEED,
         "stats": {"cases": len(cases), "skipped": skipped, "lendersBehind": behind, "wipeLive": wipes,
-                  "withLocks": locks, "withVest": vests},
+                  "withLocks": locks, "withVest": vests, "chained": chains, "fwdOpen": opens,
+                  "potGains": pot_gains, "potHolds": held, "claimCloses": closes},
         "cases": cases,
     }
     OUT.write_text(json.dumps(doc, separators=(",", ":")) + "\n")
