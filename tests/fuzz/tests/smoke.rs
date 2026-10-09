@@ -488,6 +488,62 @@ fn absent_owners_at_the_wind_down() {
     ABSENT_OWNERS.with(|c| c.set(None));
 }
 
+/// FUZZ-M10-24H-D-B (KI-53 behind a rebase record): in the never-returns wind-down an absent
+/// lender held at a rebase record owes a deficit — the record's own shortfall debit, pro rata to
+/// the shares holding when the receivable the S3 settlement did not realise was debited — that
+/// backs the present lenders' positive `pending`. Only its owner's `cover_deficit` pays that in,
+/// so `World::absent_owners_out` bounds the present lenders' unpaid total by the absent
+/// lenders' surplus moves plus their deficits, less what they are owed themselves beyond their
+/// realised SOL (`wind-down-absent-deficit`); without the deficits the bound was the anomaly
+/// `wind-down-absent-owed-above-residual` (owed 322,230,772 lamports, bound 1,002). When the
+/// owners return they cover, and the second claim pass pays every lender. The bound stays tight
+/// (3,111 lamports above the owed total here): a leak of 10,000 lamports beyond what the absent
+/// owners' return brings (`ABSENT_OWED_LEAK`) fires it.
+#[test]
+fn absent_deficit_backs_the_present_lenders() {
+    use shortwin_fuzz::world::{ABSENT_OWED_LEAK, CLAIM_DUST};
+    const CLASS: &str = "wind-down-absent-owed-above-residual";
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("corpus/fuzz-m10-24h-d-b-curve-absent-deficit.json");
+    let c = runner::read_crash(&path).expect("corpus file");
+    let o = runner::run(c.profile, c.seed, Some(&c.actions), 0, c.opts);
+    if let Some(f) = &o.failure {
+        panic!("{}\n{}", f.signature, f.message);
+    }
+    let ev = |k: &str| o.stats.events.get(k).copied().unwrap_or(0);
+    println!(
+        "absent {} deficit markets {} present owed max {} (unpaid after the return {}); deficits \
+         {:?}",
+        ev("wind-down-absent-owner"),
+        ev("wind-down-absent-deficit"),
+        o.stats.wind_down_absent_owed_max,
+        o.stats.wind_down_unpaid_max,
+        o.stats.deficits
+    );
+    assert!(o.stats.anomalies.is_empty(), "{:?}", o.stats.anomalies);
+    assert!(ev("wind-down-absent-deficit") > 0, "no absent deficit");
+    assert!(
+        o.stats.wind_down_absent_owed_max > 100_000_000,
+        "the present lenders are not owed the deficit: {}",
+        o.stats.wind_down_absent_owed_max
+    );
+    assert!(
+        o.stats.deficits.checked > 0,
+        "the returning owner's deficit was not checked"
+    );
+    assert!(o.stats.wind_down_unpaid_max <= CLAIM_DUST);
+
+    ABSENT_OWED_LEAK.with(|l| l.set(10_000));
+    let o = runner::run(c.profile, c.seed, Some(&c.actions), 0, c.opts);
+    ABSENT_OWED_LEAK.with(|l| l.set(0));
+    assert!(o.failure.is_none());
+    assert!(
+        o.stats.anomalies.contains_key(CLASS),
+        "a 10,000-lamport leak passed the bound: {:?}",
+        o.stats.anomalies
+    );
+}
+
 /// M10: `stale_receivable` (FUZZ-M7-24H-3's shape) reaches the deficit tripwire on both Raydium
 /// programs: a near-cap short left unattended for days, a late depositor of three times the
 /// pool, the price steered until `B̂_live` lies in `(V − R_due, V − K_s − ert]`, keeper seconds — a
@@ -535,4 +591,31 @@ fn stale_receivable_reaches_the_tripwire() {
             profile.name()
         );
     }
+}
+
+/// FUZZ-24D-A (run D): PumpSwap's cached expiry prediction does not outlive its action. The
+/// reproducer halts PumpSwap, has a liquidation refused `NoRoute` (which caches the expiry's
+/// `NoRoute`), and lifts the halt by a direct VM write (the undo, no transaction) before the
+/// expiry: the expiry must be predicted afresh — refused `NotExpired` on the executable pool,
+/// as the program does — and both decisions must have been checked.
+#[test]
+fn pswap_expire_cache_fuzz24d_a() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("corpus/fuzz-24d-a-pumpswap-expire-stale-prediction.json");
+    let c = runner::read_crash(&path).expect("corpus file");
+    let o = runner::run(c.profile, c.seed, Some(&c.actions), 0, c.opts);
+    if let Some(f) = &o.failure {
+        panic!("{}\n{}", f.signature, f.message);
+    }
+    let ev = |k: &str| o.stats.events.get(k).copied().unwrap_or(0);
+    assert!(
+        ev("liquidate:pswap-differential-refused:NoRoute") > 0,
+        "{:?}",
+        o.stats.events
+    );
+    assert!(
+        ev("expire:pswap-differential-refused:NotExpired") > 0,
+        "{:?}",
+        o.stats.events
+    );
 }

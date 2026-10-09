@@ -211,7 +211,8 @@ fn report(s: &Stats, secs: f64, failures: &[(String, String)]) -> serde_json::Va
          smallest {}\n  after the second claim pass: \
          largest unpaid pending {} lamports, largest lender_sol {} lamports\n  with absent \
          owners held behind a rebase record (KI-66): {} markets, {} lenders, {} held \
-         third-party syncs; present lenders owed above dust {} times, at most {} lamports\n  \
+         third-party syncs; present lenders owed above dust {} times, at most {} lamports; \
+         absent lenders left owing a deficit {} times\n  \
          forward chain (KI-66 full): {} started, {} walked further by a third party, owners \
          stopping inside one {} and settling one {}\n  KI-67: {} claims closed a position \
          ({} claim bundles refused after the close), {} deposits re-created one",
@@ -236,6 +237,7 @@ fn report(s: &Stats, secs: f64, failures: &[(String, String)]) -> serde_json::Va
             .copied()
             .unwrap_or(0),
         s.wind_down_absent_owed_max,
+        ev("wind-down-absent-deficit"),
         ev("pot-chain-hold"),
         ev("pot-chain-walk"),
         ev("owner-stops-in-chain"),
@@ -287,6 +289,7 @@ fn report(s: &Stats, secs: f64, failures: &[(String, String)]) -> serde_json::Va
             "largest_unpaid_pending_lamports": s.wind_down_unpaid_max,
             "largest_lender_sol_lamports": s.wind_down_lender_sol_max,
             "largest_absent_owed_lamports": s.wind_down_absent_owed_max,
+            "absent_deficit_markets": s.events.get("wind-down-absent-deficit").copied().unwrap_or(0),
             "claim_dust_lamports": shortwin_fuzz::world::CLAIM_DUST,
         },
         "coverage": {

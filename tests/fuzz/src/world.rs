@@ -54,7 +54,8 @@
 //!   never-returns model, [`World::absent_owners_out`]) the lenders held behind a rebase record
 //!   stay away first, reached only by third parties' pot-only touches and their forward chains
 //!   (KI-66 full), while the others exit and claim; the present lenders may then stay owed only
-//!   the latent rounding units' residual. KI-67: a `claim_sol` closes the position exactly when the
+//!   the latent rounding units' residual and what the absent lenders' deficits back (KI-53: only
+//!   a deficit's owner covers it; FUZZ-M10-24H-D-B). KI-67: a `claim_sol` closes the position exactly when the
 //!   math crate leaves it `pool::closable`, and a re-created position starts clean.
 
 use anchor_lang::prelude::Pubkey;
@@ -204,6 +205,23 @@ thread_local! {
     /// [`World::absent_owners`] forced on or off (`tests/smoke.rs` replays the KI-65
     /// reproducers with absent owners); `None`: from the seed.
     pub static ABSENT_OWNERS: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+    /// Lamports added to the present lenders' unpaid total [`World::absent_owners_out`] bounds —
+    /// SOL the program would owe them beyond anything the absent lenders' return brings
+    /// (`tests/smoke.rs` shows `wind-down-absent-owed-above-residual` catches a 10,000-lamport
+    /// leak on FUZZ-M10-24H-D-B's reproducer, 0.32 SOL owed; 0 otherwise).
+    pub static ABSENT_OWED_LEAK: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+/// What an absent lender's return would bring to the pot and take from it
+/// ([`World::absent_returns`]): its owner's touch's surplus move; the deficit that touch leaves
+/// it, which the owner's `cover_deficit` pays in (KI-53) and its next touch moves to the pot;
+/// and its own need, `max(0, pending) − (real − claimed)`, which its claim draws from the pot
+/// as the present lenders' do.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct AbsentReturn {
+    pub moved: u64,
+    pub deficit: u64,
+    pub need: u64,
 }
 
 /// An open position: its borrower (index into the slot's borrowers) and nonce.
@@ -260,6 +278,10 @@ pub struct World {
     pub ledger: Ledger,
     /// PumpSwap's expiry prediction made with a liquidation's (`(now, position, transactions
     /// landed)` it holds for), reused when the keeper's expiry follows a refused liquidation.
+    /// It serves only the **next** `keeper_exit` of the **same action** (FUZZ-24D-A): the key
+    /// cannot see the VM writes made without a transaction — a due undo lifting a venue halt,
+    /// a fee shock, a planted token amount — so an action boundary or any other exit in between
+    /// drops it.
     pub pswap_expire: Option<((i64, Pubkey, u64), crate::pswap_exit::Prediction)>,
     /// Per slot, `(share epoch, the largest S seen in it, the sum of the earlier epochs'
     /// largest S)`, sampled after every [`World::send`]: what bounds the accumulators' carry
@@ -948,6 +970,9 @@ impl World {
     /// A keeper exit on position `k` of slot `si`: `which` 0 liquidate, 1 expire, 2 sol_settle.
     /// Returns whether the position is gone.
     pub fn keeper_exit(&mut self, si: usize, k: usize, which: u32) -> bool {
+        // A liquidation's cached expiry prediction holds for this call only
+        // ([`World::pswap_expire`]).
+        let pswap_cached = self.pswap_expire.take();
         let Some(p) = self.slots[si].positions.get(k).copied() else {
             return false;
         };
@@ -1085,7 +1110,7 @@ impl World {
             );
             // The expiry right after a refused liquidation of the same position in the same
             // second: nothing landed since, so the state is the one both were predicted on.
-            match self.pswap_expire.take() {
+            match pswap_cached {
                 Some((k, pred)) if k == key && w == crate::curve_exit::Which::Expire => Some(pred),
                 _ => {
                     let both = {
@@ -1199,6 +1224,9 @@ impl World {
             panic!("{INJECTED}: `{act}`");
         }
         self.step += 1;
+        // FUZZ-24D-A: no PumpSwap expiry prediction crosses an action (the due undos below and
+        // the action itself may write the VM directly, which the cache's key cannot see).
+        self.pswap_expire = None;
         self.run_undos(false);
         let si = self.slot_index(act.m);
         let (a, b) = (act.a, act.b);
@@ -4431,8 +4459,18 @@ impl World {
     /// disclosed residual, the latent rounding units: at most what the absent lenders' own
     /// touches would still move to the pot after their chains (`pool::touch` of the chained
     /// lenders on copies of the state, through the records in turn: the owner's conversion takes
-    /// the chain's accruals back, so this is exactly what the chain could not move), plus
-    /// [`CLAIM_DUST`] per present lender and the carries' bound ([`World::carry_gap_bound`]).
+    /// the chain's accruals back, so this is exactly what the chain could not move), plus what
+    /// those touches leave the absent lenders owing — their deficits, `max(0, −pending)` (KI-53:
+    /// a shortfall is debited pro rata to the shares holding when it lands, so a lender behind a
+    /// rebase record can owe SOL that backs the present lenders' positive `pending`; only its
+    /// owner's `cover_deficit` pays it in, and that cover reaches the pot at the owner's next
+    /// touch; FUZZ-M10-24H-D-B) — plus what the pot holds, less what the absent lenders are
+    /// owed beyond their own realised SOL (their claims draw the same inflows), plus
+    /// [`CLAIM_DUST`] per lender and the carries' bound ([`World::carry_gap_bound`]): what every
+    /// owner's return leaves unpaid is then rounding, as the second claim pass requires. The deficits are the owners' to bring, not SOL the
+    /// program holds: the deficit tripwire bounds each by its pro-rata share of the realised
+    /// shortfall when the owner returns ([`crate::shortfall`]), and the second claim pass then
+    /// requires every lender paid and `lender_sol` within the dust cap.
     /// That take-back is itself checked right after the chains, against the spec's formula
     /// computed without it — Σ max(0, the owner's touch on the state before any chain − what
     /// its chain moved) — the anomaly `absent-residual-mismatch` above [`CLAIM_DUST`] (the
@@ -4559,7 +4597,7 @@ impl World {
                 self.send(&[ix], &[&kp]);
             }
         }
-        let mut owed: u64 = 0;
+        let mut owed: u64 = ABSENT_OWED_LEAK.with(std::cell::Cell::get);
         for &li in &present {
             let owner = self.slots[si].lenders[li].kp.pubkey();
             if let Some(l) = self.touched_lender(si, &owner) {
@@ -4576,9 +4614,32 @@ impl World {
             .events
             .entry("wind-down-absent-present-owed".into())
             .or_default() += 1;
-        let residual = self.absent_residual(si, &absent);
-        let bound = residual.map(|r| {
-            r.saturating_add(dust)
+        let returns = self.absent_returns(si, &absent);
+        let residual = returns
+            .as_ref()
+            .map(|m| m.iter().fold(0u64, |a, x| a.saturating_add(x.moved)));
+        let deficits = returns
+            .as_ref()
+            .map(|m| m.iter().fold(0u64, |a, x| a.saturating_add(x.deficit)));
+        let needs = returns
+            .as_ref()
+            .map(|m| m.iter().fold(0u64, |a, x| a.saturating_add(x.need)));
+        let pot = self.env.market_vault(&market).vault().unmatched;
+        if deficits.is_some_and(|d| d > 0) {
+            *self
+                .stats
+                .events
+                .entry("wind-down-absent-deficit".into())
+                .or_default() += 1;
+        }
+        // Every lender's claim may stay short by rounding (as the second claim pass allows),
+        // the absent lenders' needs included.
+        let dust_all = CLAIM_DUST.saturating_mul(self.slots[si].lenders.len() as u64);
+        let bound = residual.zip(deficits).zip(needs).map(|((r, d), n)| {
+            r.saturating_add(d)
+                .saturating_add(pot)
+                .saturating_sub(n)
+                .saturating_add(dust_all)
                 .saturating_add(self.carry_gap_bound(si))
         });
         if bound.is_none_or(|b| owed > b) {
@@ -4593,25 +4654,27 @@ impl World {
                 format!(
                     "market {market}: the present lenders are owed {owed} lamports with absent \
                      lenders {absent:?} held behind a rebase record; their touches would move \
-                     {residual:?} to the pot (bound {bound:?})\nvault: {vault:?}\nlenders:\n{}",
+                     {residual:?} to the pot and leave them owing deficits of {deficits:?} and \
+                     owed {needs:?} beyond their own realised SOL, with {pot} in the pot (bound \
+                     {bound:?})\nvault: {vault:?}\nlenders:\n{}",
                     lenders.join("\n")
                 ),
             );
         }
     }
 
-    /// What the touches of lenders `absent` (by their owners) would move to the pot now:
-    /// `pool::touch` of each in turn on copies of the vault and the records. `None` when a touch
-    /// fails.
-    fn absent_residual(&self, si: usize, absent: &[usize]) -> Option<u64> {
-        self.absent_moves(si, absent)
-            .map(|m| m.iter().fold(0u64, |a, x| a.saturating_add(*x)))
+    /// Per lender of `absent`, what its owner's touch would move to the pot now
+    /// ([`World::absent_returns`]).
+    fn absent_moves(&self, si: usize, absent: &[usize]) -> Option<Vec<u64>> {
+        self.absent_returns(si, absent)
+            .map(|m| m.into_iter().map(|r| r.moved).collect())
     }
 
-    /// Per lender of `absent`, what its owner's touch would move to the pot now, as
-    /// [`World::absent_residual`] (in turn, on one copy of the vault and the records; 0 for a
-    /// lender without a position).
-    fn absent_moves(&self, si: usize, absent: &[usize]) -> Option<Vec<u64>> {
+    /// Per lender of `absent`, what its owner's return would bring to the pot now and take from
+    /// it: the touch's surplus move, the deficit the touch leaves it and its own need beyond its
+    /// realised SOL (`pool::touch` of each in turn on one copy of the vault and the records;
+    /// nothing for a lender without a position). `None` when a touch fails.
+    fn absent_returns(&self, si: usize, absent: &[usize]) -> Option<Vec<AbsentReturn>> {
         use shortwin_litesvm_tests::invariants::lender::{PoolState, epoch_records};
         let market = self.market_key(si);
         let pool = self.env.market(&market).pool();
@@ -4621,14 +4684,19 @@ impl World {
         for &li in absent {
             let owner = self.slots[si].lenders[li].kp.pubkey();
             let Some(lp) = self.env.lender(&market, &owner) else {
-                out.push(0);
+                out.push(AbsentReturn::default());
                 continue;
             };
             let mut l = lp.lender();
             let before = vault.unmatched;
             let recs = PoolState::records_from_mut(&mut records, l.epoch);
             shortwin_math::pool::touch(&pool, &mut vault, &mut l, recs, self.env.now()).ok()?;
-            out.push(vault.unmatched.checked_sub(before)?);
+            let own = l.real.checked_sub(l.claimed)?;
+            out.push(AbsentReturn {
+                moved: vault.unmatched.checked_sub(before)?,
+                deficit: l.pending.min(0).unsigned_abs(),
+                need: l.pending.max(0).unsigned_abs().saturating_sub(own),
+            });
         }
         Some(out)
     }
