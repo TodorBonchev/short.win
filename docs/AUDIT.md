@@ -433,7 +433,11 @@ bound is wrong or can be exceeded. Summary:
   floor of a current or parked lender (KI-68, 2026-10-08, ninth round: at most 1 lamport of
   entitlement and 1 of realised SOL per third-party touch, each touch costing its sender a
   transaction fee; the cumulative-floor alternative, a program change, not taken), and the earlier
-  rows marked accepted (KI-12, KI-22 … KI-24, KI-27, KI-28's M6R-4, KI-29, KI-30, KI-35).
+  rows marked accepted (KI-12, KI-22 … KI-24, KI-27, KI-28's M6R-4, KI-29, KI-30, KI-35), and
+  the margin of a PumpSwap position opened while a deposit is held (KI-26, M6D residual 16,
+  2026-10-09, eleventh round: as built; pricing it on the burned depth, a program change, not
+  taken), and O18's residuals as disclosed (KI-16 … KI-21, KI-25, 2026-10-09, eleventh round,
+  with O18's rules).
 - **Fixed:** M10-8C-1 (KI-52), the extras denylist hardening (batch 3), PUMP-2026-10-1 (batch 4:
   PumpSwap's fee buckets are not payable SOL), the rebase-orphan vest and dust (KI-65, KI-11:
   the KI-65 program batch, cumulative conversion rounding through each rebase record), the
@@ -443,7 +447,8 @@ bound is wrong or can be exceeded. Summary:
   record is the pot-only touch, the KI-66 batch, owner decision of 2026-10-07, seventh round;
   and what the absent lender's shares earn after the record, KI66-R3: the pot-only touch walks
   its forward chain, the KI-66 full batch, eighth round, 2026-10-08), the open empty position
-  (KI-67: `claim_sol` closes it, eighth round), and the harness and doc findings of the
+  (KI-67: `claim_sol` closes it, eighth round; its `lock_term` detail confirmed as built on
+  2026-10-09, eleventh round), and the harness and doc findings of the
   register's §6.
 - **Disclosed** (owner decision of 2026-10-07): KI-65's remaining conversion-order residual — a
   party ordering its own conversions (Sybils placed before the roll, a tuned residue) and
@@ -467,7 +472,9 @@ bound is wrong or can be exceeded. Summary:
   floor away up to 1 lamport of that lender's entitlement and of its realised SOL, left in
   `lender_sol` as rounding) is accepted since the ninth round (above).
 - **Open** (build default in force; §7): the rest of O19 (KI-03 … KI-10 are disclosed but not
-  signed off), O18 (§2) and the M7 keeper items.
+  signed off), OWNER-M6SK-1 (KI-28) and the M7 keeper items. O18 is decided (2026-10-09,
+  eleventh round: its rules accepted as the v1.0.0 design and the §2 residuals it disclosed,
+  KI-16 … KI-21 and KI-25, accepted as disclosed; §7).
 
 ---
 
@@ -497,20 +504,26 @@ paged further, ranked by the simulated gain — the indexer's `epoch` parameter 
 4 pages × 50 lenders confirmed by the owner on 2026-10-09 (tenth round), with the indexer's
 `max_page_limit` floor of 200; short.win's
 3007 on a lender position rebuilt like 3012) and the four lender texts of the seventh and eighth rounds approved as written
-(2026-10-08, ninth round). All the program-affecting ones are built (batches 2, 3 and 4, the KI-65 batch, its follow-up, the KI-66
-batch and the KI-66 full / KI-67 batch).
+(2026-10-08, ninth round); in the eleventh round (2026-10-09, the pre-freeze sign-off) O18
+accepted as the v1.0.0 design (ECON §14's 37 PROPOSED rows ADOPTED, N25's keeper-budget defaults
+among them, SPEC §14 rows 10, 13 and 18 adopted; the parameter values stay governance-tunable
+within the compiled bounds; O18's residuals KI-16 … KI-21 and KI-25 accepted as disclosed), KI-67's
+`lock_term` detail confirmed as built, M6D residual 16 accepted as built (KI-26) and IX-1 / IX-11
+deferred to a 1.0.x batch after the audit tag. All the program-affecting ones are built
+(batches 2, 3 and 4, the KI-65 batch, its follow-up, the KI-66
+batch and the KI-66 full / KI-67 batch); the deferred IX-1 / IX-11 are not.
 
 | Item | Decision needed | Build default (in force) | Changes program code? |
 |---|---|---|---|
 | **O19** (the rest) | Sign off the disclosed residuals of known-issues §1 (KI-01, KI-03 … KI-11); the real-venue figures are already accepted | Accept and disclose; no liquidation reserve | No; the alternative (a rent-only liquidation reserve) is **program** |
 | **Rebase-orphan vest** (KI-65; O19; FUZZ-M10-24H-A) and the conversion order (KI65-REV-SEC1) | **Decided (2026-10-07): fixed in the program by cumulative conversion rounding** — each rebase record carries `conv_rem` and a lender's conversion mints `⌊(conv_rem + s)/1,000^k⌋`, so the old epoch's lenders end with exactly the new `S` and the last real lender is paid the vest (ECON §9.5, KI-65). **Decided (2026-10-07, sixth round): owner-signed conversions** — `sync_lender` converts a position through a rebase record only with the owner's signature (unsigned it stops at the record: since the KI-66 batch the pot-only touch, with `RebaseNeedsOwner` 6107 its post-condition; plain catch-up, the V2-12 jump, the parking and `sync_lender(0)` stay permissionless; every other lender instruction is the owner's), so no third party orders an honest lender's conversion and a latent honest unit blocks the flush (W3). Disclosed, not closed: a party ordering its own conversions and converting after honest lenders' own conversions (at any later time) still collects up to one unit per position and, where every honest holder converted to 0 shares, the whole unreleased vest (KI-65's figures: +4,007,334,855 vs 369,862 lamports; a JIT depositor 3,000,000,000 of a 3,000,000,000 lump). **Decided (2026-10-07): `MAX_RECORDS` = 8** per lender transaction (worst case `cover_deficit` 54,549 CU of 60,000; a lender further behind catches up over several transactions) | Built (the KI-65 program batch and its follow-up) | **Program** (built; new hashes, §0) |
 | **KI-66** (KI65-REV-POT; O19) | **Decided (2026-10-07, seventh round): the pot-only touch** — anyone's `sync_lender` without the owner's signature that reaches a rebase record accrues the lender's `pending` / `real` to the record's `acc_end` / `acc_r_end` and moves its surplus to the pot, converting no shares, writing no `conv_rem` and leaving the epoch (it cannot order conversions; idempotent; the owner's later conversion counts nothing twice). `ki65_it` pins the deficit lender paid in full without the holder's owner (pot 4,434,782,609 lamports; A's next claim 2,957,608,696, nothing left owed). Then disclosed: what the unconverted shares earn after the record waited for the owner (KI66-R3) — **fixed in full in the eighth round** (2026-10-08: the forward chain; the next row). **Decided (seventh round): the web's sub-unit conversion warning** (`lender.subUnitConversion`, the vest's end) and the `lender.residuals` sentence | Built (the KI-66 batch, `m10/ki66`) | **Program** (built; new hashes, §0) |
-| **KI-67** (KI66-REV-LOW; latent since M1) | **Decided (2026-10-08, eighth round): `claim_sol` closes the position** when the claim leaves it current with no shares, `pending` 0 and no lock (and no forward chain); a second claim of it then fails with `AccountNotInitialized` (3012). **Confirm the `lock_term` condition:** the owner's text says "no lock term (withdraw's conditions)", but `withdraw` never checked `lock_term`, and a term with `lock == 0` is never read again (the calendar keeps its own copy); requiring `lock_term == 0` would leave KI-67's own "rebase floors a sub-unit position" case open (6 of 4,839 closable positions in 5,000 of `pool_model`'s differential pools once every lender has claimed; `pool_model.py`'s output, `out/pool_model.txt`) | Built without the `lock_term` condition (`pool::closable`); one line to add it | **Program** (built; new hashes, §0) |
+| **KI-67** (KI66-REV-LOW; latent since M1) | **Decided (2026-10-08, eighth round): `claim_sol` closes the position** when the claim leaves it current with no shares, `pending` 0 and no lock (and no forward chain); a second claim of it then fails with `AccountNotInitialized` (3012). **The `lock_term` detail confirmed by the owner (2026-10-09, eleventh round): kept as built** — the close ignores a dead lock term when `lock == 0`. The owner's text said "no lock term (withdraw's conditions)", but `withdraw` never checked `lock_term`, and a term with `lock == 0` is never read again (the calendar keeps its own copy); requiring `lock_term == 0` would leave KI-67's own "rebase floors a sub-unit position" case open (6 of 4,839 closable positions in 5,000 of `pool_model`'s differential pools once every lender has claimed; `pool_model.py`'s output, `out/pool_model.txt`) | Built without the `lock_term` condition (`pool::closable`); confirmed | **Program** (built; new hashes, §0) |
 | **KI-66 full residual and the chained settlement cap** (KI66-R3; O19) | **Decided (2026-10-08, eighth round): the full fix** (the forward chain; built). **Accept** the latent-unit residual (worst 727,760 lamports measured on residue-tuned pools, 374,750 beyond every owner returning on adversarial ones; no general bound when `S` is tiny) and the chain's over-move bound `(σ − q)·max(0, a − r)` per epoch (smaller than the held-only touch's `σ·(…)`; measured: 4 of 16,056 pot-only touches moved more than the owner's own touch would, 1 lamport each, `pool_model.py`'s 5,000-pool differential line). **Accept** the CU consequence: an owner settling its forward chain at a lag of 1 at every record costs 64,355 CU over 8 records (60,000 budget) and 58,229 over 7, so the web caps a chained owner's settlement at 7 records per transaction; `MAX_RECORDS` stays 8 for every other lender transaction | Accept and disclose (known-issues KI-66; ARCH §6.1) | No (the cap is the web's) |
 | **KI-68** (the per-touch floor of a current or parked lender; predates KI-66) | **Decided (2026-10-08, ninth round): accept and disclose** (known-issues KI-68, accepted): at most 1 lamport of entitlement and 1 of realised SOL per third-party touch, each touch costing its sender a 5,000-lamport fee. Not taken: accruing current and parked lenders by cumulative floor (`⌊s·end/WAD⌋ − ⌊s·snap/WAD⌋`, as the forward chain does), with exact parity in `pool_model` and regenerated vectors | As built (accepted) | No (the alternative not taken was **program**) |
-| **O18** with the SPEC §14 "Delegated, proposed" rows **10** (collateral and liquidation by tier), **13** (dynamic rent) and **18** (fee split) | Confirm the PROPOSED parameters and venue rules: ARCH §2.3.3, §10 O18; ECON §14 lists 32 PROPOSED rows | As built | No if accepted; **program** for any rule the owner rejects |
+| **O18** with the SPEC §14 delegated rows **10** (collateral and liquidation by tier), **13** (dynamic rent) and **18** (fee split) | **Decided (2026-10-09, eleventh round): accepted as the v1.0.0 design** — the PROPOSED parameters and venue rules (ARCH §2.3.3, §10 O18): ECON §14's 37 PROPOSED rows read ADOPTED (owner, 2026-10-09, O18), SPEC §14 rows 10, 13 and 18 are adopted by the owner. The parameter values stay governance-tunable within the compiled bounds (ECON §15, ARCH §2.3.3). N25's keeper-budget defaults are among the 37 (OWNER-M7-17's options (3) and (4) stay open, below). **O18's residuals accepted as disclosed** (2026-10-09, eleventh round): known-issues KI-16 … KI-21 and KI-25 (ECON §12.12 residuals 1–4 and 13, ARCH §2.6). OWNER-M6SK-1 is its own row below | As built (adopted; residuals accepted) | No |
 | **O9** (ECON G37, U21) | The calibrated gap frequencies per tier and the pre-committed rule (if the 95 % upper bound of λ_up exceeds a tier's break-even, raise CR_open or rent, or cut caps), after ≥ 30 days of the public-RPC crawl | Uncalibrated Monte Carlo (ECON §11.6, illustrative); the crawl runs | Parameters through governance; **program** only if a value leaves its compiled bounds |
-| **M6D residual 16** (ECON §12.12; KI-26) | Accept the margin of a position opened while a deposit is held, or price the open's margin on the burned depth | Accept (margin on the pool as it is) | The alternative is **program** |
+| **M6D residual 16** (ECON §12.12; KI-26) | **Decided (2026-10-09, eleventh round): accepted as built** — a position opened while a deposit is held is margined on the pool as it is (known-issues KI-26, accepted). Not taken: pricing the open's margin on the burned depth | As built (accepted) | No (the alternative not taken was **program**) |
 | **OWNER-M6SK-1** (KI-28) | The keeper's tx3 records the new pool's first bucket (+9 → +16 s tracking after a ×3 pump) | As built | Keeper core |
 | OWNER-M7-1 (KI-41) | The build-alt table as the normative A28 | Adopt; per-market table as fallback | No (ALT) |
 | OWNER-M7-2 (KI-31) | (a) accept the free-pool drain, or (d) a per-market hourly cap on liquidity-anomaly coverage | (a) | Keeper core |
@@ -520,8 +533,8 @@ batch and the KI-66 full / KI-67 batch).
 | OWNER-M7-7 | `per_market_daily_lamports` | Superseded by OWNER-M7-17 (decision A) | — |
 | OWNER-M7-8 (KI-36) | T-CASCADE defaults (12 M / 20 M) and the fee-payer residual | Confirm; separate crank payer not built | Keeper core |
 | OWNER-M7-9 (KI-38) | Keeper load: sequential RPC | Accept for the beta | Keeper / ops |
-| **OWNER-M7-17 (3)** and its defaults (KI-33, KI-34) | `G` 1 SOL, floor 1 SOL, margin 10,000 bps, tail 2,000 bps; (3) the drainable free pool, (a) accept or (b) confine bursts; (4) idle cadence below the floor | As built, (a) | Keeper core (budget logic and config) |
-| **M8: IX-1, IX-11** (INDEXER.md §14) | Add `rent_protocol`, `q` and `ema_price` to the `Liquidate` / `Expire` / `SolSettle` events, and `record_donation` to `EpochRolled`, so the indexer need not derive them | Not added; the indexer derives them | **Program** (IDL, CU, trace): after the tag only as a 1.0.x batch |
+| **OWNER-M7-17 (3), (4)** (KI-33, KI-34); its defaults adopted with O18 (2026-10-09) | (3) the drainable free pool, (a) accept or (b) confine bursts; (4) idle cadence below the floor. The defaults (`G` 1 SOL, floor 1 SOL, margin 10,000 bps, tail 2,000 bps) are adopted by the owner as v1.0.0's (2026-10-09, eleventh round, O18; ECON §14 N25) | As built, (a) | Keeper core (budget logic and config) |
+| **M8: IX-1, IX-11** (INDEXER.md §14) | Add `rent_protocol`, `q` and `ema_price` to the `Liquidate` / `Expire` / `SolSettle` events, and `record_donation` to `EpochRolled`, so the indexer need not derive them. **Deferred (2026-10-09, eleventh round) to a 1.0.x batch** after the audit tag; not before the freeze | Not added; the indexer derives them | **Program** (IDL, CU, trace): a 1.0.x batch after the tag |
 | M8: IX-9, IX-10, IX-14, IX-15, IX-18 | Off-chain indexer items (deployment, fee-sharing attribution, harness coverage, versioned decoders) | Open, out of scope | Indexer only |
 | FE-21 | Refuse sending-only wallets for writes, or keep the post hoc check | Post hoc check | Web only |
 | FE-23 | Source maps: upload to a private error tracker, or publish | Built hidden, not deployed | Web / ops only |

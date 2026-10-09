@@ -5,7 +5,8 @@ integrated (§13.5) — the exit criteria are met (ARCH §9 M8; evidence in §13
 M8 security review's fixes (M8-SEC-1 … -15; regressions §11.5a, open items §14); v1.3 (2026-10-03)
 folds in M10: the venue trades' post-trade reserves are the venues' pricing reserves (GC-F1, §7.2,
 §7.3, §11.5), checked on recorded mainnet transactions, and IX-16's decoder half is closed (§14);
-2026-10-08 (M10, FE-30): `/v1/markets/{mint}/lenders` takes an additive `epoch` filter (§9.2)*
+2026-10-08 (M10, FE-30): `/v1/markets/{mint}/lenders` takes an additive `epoch` filter (§9.2);
+2026-10-09: the owner deferred IX-1 and IX-11 to a 1.0.x batch after the audit tag (§14)*
 
 This document turns ARCHITECTURE §7.2 ("Indexer and API") and the M8 row of ARCH §9 into a buildable
 specification: the ingest pipeline, its correctness rules (commitment, reorgs, idempotency, ordering,
@@ -1386,7 +1387,7 @@ track reads (§9.2's read model, §6's projections) needs that track's agreement
 
 | # | Item | Status |
 |---|---|---|
-| IX-1 | `Liquidate` and `Expire` carry `rent` but not its protocol share; `SolSettle` carries neither `q` nor `P_ema`; `Liquidate`/`Expire` lack `q`. The indexer derives them (§6.5, §8.4: exact rent split from locked terms; `q` from `Open`; `P_ref` bounded by the box). Adding `rent_protocol`, `q` and `ema_price` to those events would remove the derivations — a program change (IDL, CU, trace) for the owner to weigh after the 24-hour fuzz run | open (owner) |
+| IX-1 | `Liquidate` and `Expire` carry `rent` but not its protocol share; `SolSettle` carries neither `q` nor `P_ema`; `Liquidate`/`Expire` lack `q`. The indexer derives them (§6.5, §8.4: exact rent split from locked terms; `q` from `Open`; `P_ref` bounded by the box). Adding `rent_protocol`, `q` and `ema_price` to those events would remove the derivations — a program change (IDL, CU, trace) for the owner to weigh after the 24-hour fuzz run | deferred (owner, 2026-10-09): to a 1.0.x batch after the audit tag; until then the indexer derives them |
 | IX-2 | Price state, `tier` and route chains change silently in other instructions' prologues ([E\*]); exact current values need the refresher (live) | by design |
 | IX-3 | `CoverageGap` and exit-path `MintSafetyTripped` are log events: lost if logs truncate (flagged per transaction) | by design (ARCH A69) |
 | IX-4 | Yellowstone gRPC source: built only if `yellowstone-grpc-client` resolves on the Agave 4.2.2 line without changing existing lockfile entries. Checked: 14.0.1 changes no version but adds 33 packages (tonic, prost, vendored protoc) and changes the dependency lists of 6 existing entries (hashbrown ×3, rustls, tokio-stream, tower); `live_source = "yellowstone"` is a start-up error | deferred to v1.1 |
@@ -1396,7 +1397,7 @@ track reads (§9.2's read model, §6's projections) needs that track's agreement
 | IX-8 | `yoke-derive 0.8.3` in `services/Cargo.lock` was yanked upstream (2026-09-30; pre-existing, not from M8): `cargo deny` / `cargo audit` failed on it | fixed at integration: `cargo update -p yoke-derive --precise 0.8.4` (that one entry) |
 | IX-9 | The docker-compose deployment is not run on the development machine (no Docker); CI validates the compose file (`docker compose config`) and the roles script's syntax, and the image's build context excludes `target/` and the keys (`Dockerfile.dockerignore`); nothing builds the image or runs the stack yet | open (M11 deployment) |
 | IX-10 | Fee-sharing pump coins report their sharing-config PDA as `coin_creator` (SPEC R1 attribution then needs the sharing config's recipients) | open |
-| IX-11 | Two `lender_sol` flows have no event field: the `ShareEpoch` record-address donation a rolling `sol_settle` sweeps (decoded from its System transfer into `events.derived`, §5.4, §6.4) and an `accrue` credit while `S = 0` (dust edge case). An `EpochRolled.record_donation` field would make the first explicit | open (owner, with IX-1) |
+| IX-11 | Two `lender_sol` flows have no event field: the `ShareEpoch` record-address donation a rolling `sol_settle` sweeps (decoded from its System transfer into `events.derived`, §5.4, §6.4) and an `accrue` credit while `S = 0` (dust edge case). An `EpochRolled.record_donation` field would make the first explicit | deferred (owner, 2026-10-09), with IX-1: to a 1.0.x batch after the audit tag; until then the indexer decodes the donation |
 | IX-12 | `markets.pool_d` is [E\*] (every observation's prologue refreshes it); not asserted, the refresher's value is the current one | by design |
 | IX-13 | No event carries the record donation (§6.4). REPLAY proposed a `share_epochs.record_donation` column; INGEST's `events.derived.record_donation` (on the rolling `EpochRolled`) does the same job, and assertion 6 reads it — no column added | closed (integration) |
 | IX-14 | Raydium S2 on the fork is not in the session set: it needs `raydium_v4_support.rs`'s `s2_corner` init arguments, `hold_unlocked_lp` and `remove_liquidity`, which live in a test-only module of `tests/litesvm/tests`. S2 is covered on the mock venue (`mock_lifecycle`) | open (move those helpers into `tests/litesvm/src`) |
