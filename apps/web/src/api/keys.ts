@@ -17,6 +17,14 @@ export interface MarketsParams {
     readonly cursor?: string;
 }
 
+/** A page of `/v1/markets/{mint}/lenders` by the lender's epoch against the market's share epoch. */
+export interface LendersPageParams {
+    readonly epoch: 'behind' | 'current';
+    readonly limit: number;
+    /** Keyset paging: the previous page's `next_cursor` (`null` on the first page). */
+    readonly cursor: string | null;
+}
+
 export const qk = {
     indexer: ['indexer'] as const,
     status: () => ['indexer', 'status'] as const,
@@ -27,6 +35,9 @@ export const qk = {
     marketPositions: (mint: string, status?: PositionStatus | 'all', borrower?: string) =>
         ['indexer', 'market', mint, 'positions', status ?? 'all', borrower ?? null] as const,
     marketLenders: (mint: string) => ['indexer', 'market', mint, 'lenders'] as const,
+    /** One page of the lenders filtered by `epoch` (the claim's candidates; under `marketLenders`). */
+    marketLendersPage: (mint: string, p: LendersPageParams) =>
+        ['indexer', 'market', mint, 'lenders', p.epoch, p.limit, p.cursor] as const,
     marketPools: (mint: string) => ['indexer', 'market', mint, 'pools'] as const,
     marketCoverage: (mint: string) => ['indexer', 'market', mint, 'coverage'] as const,
     marketLiquidations: (mint: string) => ['indexer', 'market', mint, 'liquidations'] as const,

@@ -693,6 +693,18 @@ async fn responses_carry_the_seeded_values() {
         10_000,
         "converted across the rebase"
     );
+    // FE-30: `epoch` splits by the lender's epoch against the market's share epoch (TB rolled
+    // to 1 with L1 still at 0; TA never rolled).
+    let r = get(&app, &format!("/v1/markets/{TB}/lenders?epoch=behind")).await;
+    assert_eq!(ids(&r, "owner"), vec![L1]);
+    let r = get(&app, &format!("/v1/markets/{TB}/lenders?epoch=current")).await;
+    assert!(r.data().is_empty());
+    let r = get(&app, &format!("/v1/markets/{TA}/lenders?epoch=behind")).await;
+    assert!(r.data().is_empty());
+    let r = get(&app, &format!("/v1/markets/{TA}/lenders?epoch=current")).await;
+    assert_eq!(ids(&r, "owner"), vec![L1, L2, COIN_CREATOR_A]);
+    let r = get(&app, &format!("/v1/markets/{TA}/lenders?epoch=late")).await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST);
     let r = get(&app, &format!("/v1/lenders/{L1}")).await;
     assert_eq!(r.body["totals"]["markets"], 2);
     assert_eq!(r.body["totals"]["sol_paid"], "15000");
@@ -977,6 +989,8 @@ async fn lists_page_without_gaps_or_repeats() {
         "/v1/markets?q=j".to_string(),
         format!("/v1/markets/{TA}/positions"),
         format!("/v1/markets/{TA}/lenders"),
+        format!("/v1/markets/{TA}/lenders?epoch=current"),
+        format!("/v1/markets/{TB}/lenders?epoch=behind"),
         format!("/v1/markets/{TA}/liquidations"),
         format!("/v1/markets/{TA}/events"),
         format!("/v1/markets/{TA}/snapshots"),

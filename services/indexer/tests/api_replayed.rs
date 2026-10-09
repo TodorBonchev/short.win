@@ -216,18 +216,31 @@ async fn every_operation_conforms_on_replayed_sessions_and_serves_the_chain_stat
             }
             let r = run.ok("search", &format!("/v1/search?q={mint}")).await;
             assert_eq!(text(&r.data()[0]["mint"]), *mint, "{name}: search by mint");
-            run.ok("getMarket", &format!("/v1/markets/{mint}")).await;
+            let detail = run.ok("getMarket", &format!("/v1/markets/{mint}")).await;
             run.list(
                 "listMarketPositions",
                 &format!("/v1/markets/{mint}/positions"),
             )
             .await;
+            let share_epoch = detail.body["share_epoch"].as_i64().expect("share_epoch");
             for active in ["true", "false"] {
-                run.list(
-                    "listMarketLenders",
-                    &format!("/v1/markets/{mint}/lenders?active={active}"),
-                )
-                .await;
+                let uri = format!("/v1/markets/{mint}/lenders?active={active}");
+                let all = run.list("listMarketLenders", &uri).await;
+                // FE-30: `epoch=behind` / `current` split the list by the lender's epoch
+                // against the market's share epoch, in the same order.
+                let behind = run
+                    .list("listMarketLenders", &format!("{uri}&epoch=behind"))
+                    .await;
+                let current = run
+                    .list("listMarketLenders", &format!("{uri}&epoch=current"))
+                    .await;
+                let is_behind = |l: &Value| l["epoch"].as_i64().expect("epoch") < share_epoch;
+                let want_behind: Vec<Value> =
+                    all.iter().filter(|l| is_behind(l)).cloned().collect();
+                let want_current: Vec<Value> =
+                    all.iter().filter(|l| !is_behind(l)).cloned().collect();
+                assert_eq!(behind, want_behind, "{name}: {uri}&epoch=behind");
+                assert_eq!(current, want_current, "{name}: {uri}&epoch=current");
             }
             run.ok("getMarketPools", &format!("/v1/markets/{mint}/pools"))
                 .await;

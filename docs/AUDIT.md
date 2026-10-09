@@ -16,15 +16,15 @@ to build and test the code, what the code relies on, and what we already know ab
   web included, is green and the verifiable build reproduces the hashes of §0 there)).
 - The ≥ 24 h fuzz run and CI were clean on batch 4's head `4f4849e` (§10). The KI-65 batch,
   its follow-up, the KI-66 batch and the KI-66 full / KI-67 batch changed the program after
-  them: their local gates are green (§10), and **the ≥ 24 h fuzz and CI must be repeated on the
-  head that carries them** (pending; the owner's seventh round asks for a fresh 24 h fuzz; a
-  run on `f48e75d`, whose program bytes are the head's, started on 2026-10-08).
+  them: their local gates are green (§10), and CI passed on the head that carries them,
+  `55b3e23` (run 37816833577, 2026-10-08, as the owner's ninth round records it; §10). **The
+  ≥ 24 h fuzz on the KI-66 full / KI-67 program bytes is still pending** (the owner's seventh
+  round asks for a fresh 24 h fuzz; a run on `f48e75d`, whose program bytes are the head's,
+  started on 2026-10-08).
 - What is still pending is named where it applies: the owner's review of this package and the
-  tag (§0), CI on the head that carries this file (§10; the KI-65 batch, its follow-up, the
-  KI-66 batch and the KI-66 full / KI-67 batch changed the program, the math crate, the JS
-  client and the web after `4f4849e`, and CI has not run on them),
-  the open owner items (§7), the calibration results (KI-14) and the external audit itself
-  (§12).
+  tag (§0), the ≥ 24 h fuzz above, CI on the FE-30 batch (`m10/fe30`: the web and the indexer
+  only, the program bytes unchanged; CI has not run on it, §10), the open owner items (§7), the
+  calibration results (KI-14) and the external audit itself (§12).
 - Normative sources:
   - the design documents `docs/SPEC.md`, `docs/design/ARCHITECTURE.md` (ARCH) and
     `docs/design/ECONOMICS.md` (ECON);
@@ -47,7 +47,7 @@ to build and test the code, what the code relies on, and what we already know ab
 
 | Item | Value |
 |---|---|
-| Audit commit / tag | the head of `m1-core` that carries this file: the M10 tree (`98b1181`, batch 3 from `391aed3`, the doc sync and this package; program batch 4 — the program change `1e4a273`, `3b33ab7` bytecode-neutral — with its docs and gate up to `4f4849e`), then the final tree's fuzz fixes `997c730` and `945d45a` (`tests/fuzz` and one test-harness doc comment only) and this evidence sync; then the **KI-65 program batch** (branch `m10/ki65`, 2026-10-07: `ShareEpoch.conv_rem`, cumulative conversion rounding; its program commit `3c7c689` on `m10/ki65`), then the **KI-65 follow-up** (branch `m10/ki65b`, 2026-10-07: owner-signed conversions through a rebase record, `sync_lender`'s `owner` account and `RebaseNeedsOwner`, KI65-REV-SEC1; its program commit `79cacd9` on `m10/ki65b`), then the **KI-66 batch** (branch `m10/ki66`, 2026-10-07/08: the pot-only touch, `pool::touch_pot` and `sync_lender`'s path selection, owner decision of 2026-10-07, seventh round; its math and program commits `e639558` and `e19e0c8` on `m10/ki66`), then the **KI-66 full / KI-67 batch** (branch `m10/ki67`, 2026-10-08: the forward chain, `claim_sol`'s close, owner decisions of the eighth round; its math and program commits `6aad5a5` and `f47b0d8` on `m10/ki67`; the ids change if the branches are rebased at integration); the program bytes are those of the KI-66 full / KI-67 batch. **To be tagged `audit-1` / `v1.0.0` by the owner** (owner decision of 2026-10-02: release 1.0.0 at the audit tag; post-audit fixes are 1.0.x). The tag goes on the commit whose hashes match the table below |
+| Audit commit / tag | the head of `m1-core` that carries this file: the M10 tree (`98b1181`, batch 3 from `391aed3`, the doc sync and this package; program batch 4 — the program change `1e4a273`, `3b33ab7` bytecode-neutral — with its docs and gate up to `4f4849e`), then the final tree's fuzz fixes `997c730` and `945d45a` (`tests/fuzz` and one test-harness doc comment only) and this evidence sync; then the **KI-65 program batch** (branch `m10/ki65`, 2026-10-07: `ShareEpoch.conv_rem`, cumulative conversion rounding; its program commit `3c7c689` on `m10/ki65`), then the **KI-65 follow-up** (branch `m10/ki65b`, 2026-10-07: owner-signed conversions through a rebase record, `sync_lender`'s `owner` account and `RebaseNeedsOwner`, KI65-REV-SEC1; its program commit `79cacd9` on `m10/ki65b`), then the **KI-66 batch** (branch `m10/ki66`, 2026-10-07/08: the pot-only touch, `pool::touch_pot` and `sync_lender`'s path selection, owner decision of 2026-10-07, seventh round; its math and program commits `e639558` and `e19e0c8` on `m10/ki66`), then the **KI-66 full / KI-67 batch** (branch `m10/ki67`, 2026-10-08: the forward chain, `claim_sol`'s close, owner decisions of the eighth round; its math and program commits `6aad5a5` and `f47b0d8` on `m10/ki67`; the ids change if the branches are rebased at integration), then the **FE-30 batch** (branch `m10/fe30`, 2026-10-08: the web and the indexer only, owner decisions of the ninth round; the program bytes unchanged); the program bytes are those of the KI-66 full / KI-67 batch. **To be tagged `audit-1` / `v1.0.0` by the owner** (owner decision of 2026-10-02: release 1.0.0 at the audit tag; post-audit fixes are 1.0.x). The tag goes on the commit whose hashes match the table below |
 | Package version | `shortwin` and `complete_curve` are both 1.0.0 (`programs/*/Cargo.toml`); `security.txt`'s `source_release` reads `v1.0.0` |
 | `shortwin` program id | `5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK` (`programs/shortwin/src/lib.rs` `declare_id!`) |
 | `complete_curve` program id | `4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ` (`programs/complete_curve/src/lib.rs`) |
@@ -417,7 +417,7 @@ bound is wrong or can be exceeded. Summary:
 
 | Section | Rows | What |
 |---|---|---|
-| §1 | KI-01 … KI-15, KI-52, KI-53, KI-65 … KI-68 | Economic residuals (O19) (★eighth round: KI-66 fixed in full by the forward chain, its latent-unit residual disclosed; KI-67 fixed in the program; KI-68, a touch's per-touch floor, disclosed): the 2 % exit bound and the held model, with the real-venue figures accepted on 2026-10-03 (AMM v4 +61.27, CPMM +37.33 / atomic extra +5.34, PumpSwap +10.20 SOL); no liquidation reserve; baskets; settlement push and deferral; degraded-mode S2→S1; the sale-wrapped open's notional (accepted); the run residual; gap risk; creator self-dealing; **M10-8C-1 (fixed)**; the **late-depositor shortfall** (accepted, with the deposit warning at 1 % / 1 SOL); the **rebase-orphan vest** (found by the final tree's 24 h fuzz; **fixed in the program**, KI-65: cumulative conversion rounding, no rebase orphans; KI-11 with it); the pot behind a rebase record (KI-66, the owner-signed rule's price; **fixed in the program** by the pot-only touch, its post-record residual disclosed); a position paid by `claim_sol` after its owner's exit stayed open with its rent (KI-67, latent since M1; **fixed**: `claim_sol` closes it); a touch of a current or parked lender floors per touch, ≤ 1 lamport (KI-68, predates KI-66, disclosed) |
+| §1 | KI-01 … KI-15, KI-52, KI-53, KI-65 … KI-68 | Economic residuals (O19) (★eighth round: KI-66 fixed in full by the forward chain, its latent-unit residual disclosed; KI-67 fixed in the program; KI-68, a touch's per-touch floor, disclosed; ninth round: KI-68 accepted): the 2 % exit bound and the held model, with the real-venue figures accepted on 2026-10-03 (AMM v4 +61.27, CPMM +37.33 / atomic extra +5.34, PumpSwap +10.20 SOL); no liquidation reserve; baskets; settlement push and deferral; degraded-mode S2→S1; the sale-wrapped open's notional (accepted); the run residual; gap risk; creator self-dealing; **M10-8C-1 (fixed)**; the **late-depositor shortfall** (accepted, with the deposit warning at 1 % / 1 SOL); the **rebase-orphan vest** (found by the final tree's 24 h fuzz; **fixed in the program**, KI-65: cumulative conversion rounding, no rebase orphans; KI-11 with it); the pot behind a rebase record (KI-66, the owner-signed rule's price; **fixed in the program** by the pot-only touch, its post-record residual disclosed); a position paid by `claim_sol` after its owner's exit stayed open with its rent (KI-67, latent since M1; **fixed**: `claim_sol` closes it); a touch of a current or parked lender floors per touch, ≤ 1 lamport (KI-68, predates KI-66; accepted 2026-10-08) |
 | §2 | KI-16 … KI-29 | Pool switches and third-party LP (O18; ECON §12.12 residuals 1–17), graduation delays |
 | §3 | KI-30 … KI-41 | Keeper coverage and budget (O17, OWNER-M7-*), transaction sizes |
 | §4 | KI-42 … KI-46, KI-54 … KI-64 | Trust: the venue guard window, halted venues, upgradeable venues and programs (with the pump venues' 2026-10-02 redeploy), admin powers; the **extras-denylist residuals** (batch 3); the **CPMM creator-fee share**; the Squads source; the **Squads semantics** |
@@ -429,7 +429,10 @@ bound is wrong or can be exceeded. Summary:
   2026-10-03), the late-depositor shortfall as designed with the warning's 1 % / 1 SOL
   thresholds (KI-53, 2026-10-03), B2-2 kept as built (KI-52, 2026-10-03), the extras-denylist
   residuals (KI-54 … KI-57, 2026-10-03), the first-trade venue rent on short pump accounts
-  (KI-64, PUMP-2026-10-2, 2026-10-03), the Squads layout (KI-45, 2026-10-02), and the earlier
+  (KI-64, PUMP-2026-10-2, 2026-10-03), the Squads layout (KI-45, 2026-10-02), the per-touch
+  floor of a current or parked lender (KI-68, 2026-10-08, ninth round: at most 1 lamport of
+  entitlement and 1 of realised SOL per third-party touch, each touch costing its sender a
+  transaction fee; the cumulative-floor alternative, a program change, not taken), and the earlier
   rows marked accepted (KI-12, KI-22 … KI-24, KI-27, KI-28's M6R-4, KI-29, KI-30, KI-35).
 - **Fixed:** M10-8C-1 (KI-52), the extras denylist hardening (batch 3), PUMP-2026-10-1 (batch 4:
   PumpSwap's fee buckets are not payable SOL), the rebase-orphan vest and dust (KI-65, KI-11:
@@ -459,10 +462,10 @@ bound is wrong or can be exceeded. Summary:
   pools, 374,750 beyond every owner returning on adversarial ones; no general small bound when
   `S` is tiny) — and the chain's over-move, at most `(σ − q)·max(0, a − r)` per epoch (smaller
   than the held-only touch's); owner item (§7). KI-68 (predates KI-66; found by the KI-66 full
-  security review): a touch of a current lender, or of one parked on a live full-wipe record,
+  security review: a touch of a current lender, or of one parked on a live full-wipe record,
   accrues `⌊s·(end − snap)/WAD⌋` per touch, so each third-party touch between two credits may
-  floor away up to 1 lamport of that lender's entitlement and of its realised SOL (left in
-  `lender_sol` as rounding); each such touch costs its sender a transaction fee; owner item (§7).
+  floor away up to 1 lamport of that lender's entitlement and of its realised SOL, left in
+  `lender_sol` as rounding) is accepted since the ninth round (above).
 - **Open** (build default in force; §7): the rest of O19 (KI-03 … KI-10 are disclosed but not
   signed off), O18 (§2) and the M7 keeper items.
 
@@ -488,8 +491,13 @@ cumulative conversion rounding), conversions through a rebase record owner-signe
 (KI65-REV-SEC1) and `MAX_RECORDS` = 8 accepted (2026-10-07, sixth round); KI-66 fixed by the
 pot-only touch and the web's sub-unit conversion warning, with the `lender.residuals` sentence
 approved (2026-10-07, seventh round); KI-67 fixed in the program, KI-66 fixed in full (the
-forward chain) and the web's claim-time auto-touch (2026-10-08, eighth round). All the
-program-affecting ones are built (batches 2, 3 and 4, the KI-65 batch, its follow-up, the KI-66
+forward chain) and the web's claim-time auto-touch (2026-10-08, eighth round); KI-68 accepted
+and disclosed, FE-30 (the claim's pot-sync candidates: the lenders behind the share epoch first,
+paged further, ranked by the simulated gain — the indexer's `epoch` parameter and the bound of
+4 pages × 50 lenders confirmed by the owner on 2026-10-09 (tenth round), with the indexer's
+`max_page_limit` floor of 200; short.win's
+3007 on a lender position rebuilt like 3012) and the four lender texts of the seventh and eighth rounds approved as written
+(2026-10-08, ninth round). All the program-affecting ones are built (batches 2, 3 and 4, the KI-65 batch, its follow-up, the KI-66
 batch and the KI-66 full / KI-67 batch).
 
 | Item | Decision needed | Build default (in force) | Changes program code? |
@@ -499,7 +507,7 @@ batch and the KI-66 full / KI-67 batch).
 | **KI-66** (KI65-REV-POT; O19) | **Decided (2026-10-07, seventh round): the pot-only touch** — anyone's `sync_lender` without the owner's signature that reaches a rebase record accrues the lender's `pending` / `real` to the record's `acc_end` / `acc_r_end` and moves its surplus to the pot, converting no shares, writing no `conv_rem` and leaving the epoch (it cannot order conversions; idempotent; the owner's later conversion counts nothing twice). `ki65_it` pins the deficit lender paid in full without the holder's owner (pot 4,434,782,609 lamports; A's next claim 2,957,608,696, nothing left owed). Then disclosed: what the unconverted shares earn after the record waited for the owner (KI66-R3) — **fixed in full in the eighth round** (2026-10-08: the forward chain; the next row). **Decided (seventh round): the web's sub-unit conversion warning** (`lender.subUnitConversion`, the vest's end) and the `lender.residuals` sentence | Built (the KI-66 batch, `m10/ki66`) | **Program** (built; new hashes, §0) |
 | **KI-67** (KI66-REV-LOW; latent since M1) | **Decided (2026-10-08, eighth round): `claim_sol` closes the position** when the claim leaves it current with no shares, `pending` 0 and no lock (and no forward chain); a second claim of it then fails with `AccountNotInitialized` (3012). **Confirm the `lock_term` condition:** the owner's text says "no lock term (withdraw's conditions)", but `withdraw` never checked `lock_term`, and a term with `lock == 0` is never read again (the calendar keeps its own copy); requiring `lock_term == 0` would leave KI-67's own "rebase floors a sub-unit position" case open (6 of 4,839 closable positions in 5,000 of `pool_model`'s differential pools once every lender has claimed; `pool_model.py`'s output, `out/pool_model.txt`) | Built without the `lock_term` condition (`pool::closable`); one line to add it | **Program** (built; new hashes, §0) |
 | **KI-66 full residual and the chained settlement cap** (KI66-R3; O19) | **Decided (2026-10-08, eighth round): the full fix** (the forward chain; built). **Accept** the latent-unit residual (worst 727,760 lamports measured on residue-tuned pools, 374,750 beyond every owner returning on adversarial ones; no general bound when `S` is tiny) and the chain's over-move bound `(σ − q)·max(0, a − r)` per epoch (smaller than the held-only touch's `σ·(…)`; measured: 4 of 16,056 pot-only touches moved more than the owner's own touch would, 1 lamport each, `pool_model.py`'s 5,000-pool differential line). **Accept** the CU consequence: an owner settling its forward chain at a lag of 1 at every record costs 64,355 CU over 8 records (60,000 budget) and 58,229 over 7, so the web caps a chained owner's settlement at 7 records per transaction; `MAX_RECORDS` stays 8 for every other lender transaction | Accept and disclose (known-issues KI-66; ARCH §6.1) | No (the cap is the web's) |
-| **KI-68** (the per-touch floor of a current or parked lender; predates KI-66) | Accept and disclose, or accrue current and parked lenders by cumulative floor (`⌊s·end/WAD⌋ − ⌊s·snap/WAD⌋`, as the forward chain does), with exact parity in `pool_model` and regenerated vectors | Accept and disclose (known-issues KI-68): at most 1 lamport of entitlement and 1 of realised SOL per third-party touch, each touch costing its sender a 5,000-lamport fee | No; the alternative is **program** (every lender's accrual) |
+| **KI-68** (the per-touch floor of a current or parked lender; predates KI-66) | **Decided (2026-10-08, ninth round): accept and disclose** (known-issues KI-68, accepted): at most 1 lamport of entitlement and 1 of realised SOL per third-party touch, each touch costing its sender a 5,000-lamport fee. Not taken: accruing current and parked lenders by cumulative floor (`⌊s·end/WAD⌋ − ⌊s·snap/WAD⌋`, as the forward chain does), with exact parity in `pool_model` and regenerated vectors | As built (accepted) | No (the alternative not taken was **program**) |
 | **O18** with the SPEC §14 "Delegated, proposed" rows **10** (collateral and liquidation by tier), **13** (dynamic rent) and **18** (fee split) | Confirm the PROPOSED parameters and venue rules: ARCH §2.3.3, §10 O18; ECON §14 lists 32 PROPOSED rows | As built | No if accepted; **program** for any rule the owner rejects |
 | **O9** (ECON G37, U21) | The calibrated gap frequencies per tier and the pre-committed rule (if the 95 % upper bound of λ_up exceeds a tier's break-even, raise CR_open or rent, or cut caps), after ≥ 30 days of the public-RPC crawl | Uncalibrated Monte Carlo (ECON §11.6, illustrative); the crawl runs | Parameters through governance; **program** only if a value leaves its compiled bounds |
 | **M6D residual 16** (ECON §12.12; KI-26) | Accept the margin of a position opened while a deposit is held, or price the open's margin on the burned depth | Accept (margin on the pool as it is) | The alternative is **program** |
@@ -517,8 +525,8 @@ batch and the KI-66 full / KI-67 batch).
 | M8: IX-9, IX-10, IX-14, IX-15, IX-18 | Off-chain indexer items (deployment, fee-sharing attribution, harness coverage, versioned decoders) | Open, out of scope | Indexer only |
 | FE-21 | Refuse sending-only wallets for writes, or keep the post hoc check | Post hoc check | Web only |
 | FE-23 | Source maps: upload to a private error tracker, or publish | Built hidden, not deployed | Web / ops only |
-| FE-30 (FRONTEND §13; KI66-R4) | The claim's size trim (a conservative bound: the compiled message without lookup tables) and the claim-time candidates (the indexer's first page of active lenders, largest raw share count first: a large current lender can push an absent surplus holder out of the 24); whether to page further or rank by `epoch < share_epoch` | As built: the conservative bound; the first 24; a sync target or the claimant's own position closed meanwhile fails the review's simulation with 3012, which the review's Retry now rebuilds (the closed target dropped, a closed own position refused with a plain message) | Web only |
-| The eighth round's web wording | Review the new user-facing copy: `lender.potSyncs`, `lender.potSyncsDeferred` and `lender.claimCloses` (FRONTEND §4.2) | As written in FRONTEND §4.2 | Web only |
+| FE-30 (FRONTEND §13; KI66-R4) | **Decided (2026-10-08, ninth round): prefer behind and chained lenders.** The claim-time candidates were the indexer's first page of active lenders, largest raw share count first (not comparable across share epochs: a large current lender could push an absent surplus holder out of the 24). Built: the indexer's lenders behind the share epoch first (its new additive `epoch=behind` / `current` filter of `/v1/markets/{mint}/lenders`; a lender with a forward chain is behind, except one whose owner's own conversion reached the share epoch inside the chain: that one is current and comes with the current lenders), then the current ones, 50 a page, paged further until the best ≤ 4 cover the shortfall, at most 4 pages (≤ 200 lenders: three sequential reads a page while the review waits), ranked by `previewTouchPot`'s gain, every row of either list read whatever its epoch (an indexer lagging or leading the RPC's share epoch only reorders the reads); the size trim stays the conservative bound (no lookup tables). A sync target or the claimant's own position closed meanwhile fails the review's simulation with 3012 — or, once someone funded the closed address, short.win's `AccountOwnedByWrongProgram` (3007) on the `lender` account — and the review's Retry rebuilds both. **Confirmed by the owner (2026-10-09, tenth round):** the builder's choices under the "Web only" decision, the indexer's `epoch` parameter (a client-side scan of the raw-share list would have no bound) and the bound of 4 pages × 50 lenders; the indexer also refuses to start with `max_page_limit` below 200, the web's largest page request (`WEB_MIN_PAGE_LIMIT`, INDEXER §9.1) | Built (FRONTEND §3.6, §13 FE-30); confirmed | Web, indexer (an additive query parameter; the page-limit floor) |
+| The seventh and eighth rounds' web wording | **Decided (2026-10-08, ninth round): approved as written** — `lender.potSyncs`, `lender.potSyncsDeferred`, `lender.claimCloses` and `lender.subUnitConversion` (FRONTEND §4.2) | As written in FRONTEND §4.2 | Web only |
 | Other M10 items | The G-H10 reading of a zero-lamport borrower ((A) reaped after the open, (B) emptied inside the exit's transaction; both tested); the fuzzer's PumpSwap weights (`fee_shock` 3, `open_near_cap` 6); whether to publish the private audit report (recommended, before the beta) | As built; publication undecided | No |
 | Scope note | `shortwin-gov` and `crates/squads-v4-ix` are out of scope under the owner's scope decision (programs plus keeper core). They prepare the transactions the members sign; add them to the RFQ if the owner wants them reviewed | Out of scope (§2) | No |
 
@@ -690,8 +698,13 @@ The full gate (G-full in the M10 plan; CI's `ci.yml`) also runs fmt and clippy w
   `LenderPosition`, `claim_sol`'s close; the hashes of §0), the math crate, the normative sim
   and vectors, the JS client (the IDL's `fwd*` fields), the WASM facade and the web (the
   claim's pot-only syncs, the closing claim), the fuzzer, the tests, the benches and the
-  indexer's recorded sessions. CI has not run on any of it. The next push to `main` (owner decision Q1: `main` is
-  fast-forwarded after each verified step) runs CI on it; its URL goes here at the tag.
+  indexer's recorded sessions. CI on that batch's head `55b3e23`: run 37816833577
+  (2026-10-08), all 24 jobs a push runs succeeded (as the owner's ninth round records it;
+  `fuzz-nightly` and `mutants` are opt-in). Then the **FE-30 batch** (`m10/fe30`: the web's
+  claim candidates and its 3007 mapping, the indexer's additive `epoch` parameter, the docs; no
+  program, IDL, math, sim or client change), on which CI has not run. The next push to `main`
+  (owner decision Q1: `main` is fast-forwarded after each verified step) runs CI on it; its URL
+  goes here at the tag.
 
 **The review fix round's gate** (2026-10-08, on `m10/ki67` at `6e724b5`, then `182e104` /
 `b72b3a3` for the steps after the new park test and the fuzzer's overflow fix; logs

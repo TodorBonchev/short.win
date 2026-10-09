@@ -37,7 +37,7 @@ import {
     type Refusal,
     wipeSweepPending,
 } from './previews.ts';
-import { pickPotSyncs, quoteWithdrawSol, readOtherLenders, readPotRecords, type Simulate } from './quote.ts';
+import { gatherPotSyncs, type OtherLenders, quoteWithdrawSol, type Simulate } from './quote.ts';
 import { postWipeSweepIxs, readSweepFacts } from './sweep.ts';
 
 /** What every lender plan builder needs besides the chain read. */
@@ -205,11 +205,7 @@ export async function withdrawPlanFrom(
 
 // ---- claim, cover, sync -------------------------------------------------------------------
 
-/** Other lenders of the market (owners) a claim may sync first; the indexer lists them. */
-export type OtherLenders = () => Promise<readonly Address[]>;
-
-/** The most other lenders a claim reads and judges (FRONTEND.md §3.6). */
-export const MAX_SYNC_CANDIDATES = 24;
+export type { OtherLenders } from './quote.ts';
 
 /**
  * `LenderPosition`'s rent-exempt minimum, `(128 + 241)·3,480·2` = 2,568,240 lamports (the account's
@@ -222,8 +218,9 @@ export const LENDER_POSITION_RENT = (128n + BigInt(getLenderPositionSize())) * 3
  * The claim (FRONTEND.md §3.6; KI66-R4, KI-67). When the pot cannot pay the claimant's entitlement,
  * other lenders' unsigned `sync_lender` go first — the pot-only touch (`pool::touch_pot`), which
  * holds a lender behind a rebase record there and walks its forward chain — picked by
- * `pickPotSyncs` from the indexer's list (≤ 24 read, ≤ 4 synced, largest gain first until the
- * shortfall is covered). They are fitted to the transaction: while the compiled transaction (no
+ * `gatherPotSyncs` from the indexer's lists (FE-30: the lenders behind the share epoch first,
+ * then the current ones, 50 a page, ≤ 4 pages, until the best cover the shortfall; ≤ 4 synced,
+ * largest gain first). They are fitted to the transaction: while the compiled transaction (no
  * lookup tables: an upper bound) is over 1,232 bytes, the smallest-gain sync is dropped, and the
  * expected payout is recomputed with the pot the rest moves. A plan with syncs is simulated here
  * once more: a sync that fails (its position closed or changed since the read) is dropped and the
@@ -252,17 +249,16 @@ export async function claimPlanFrom(
     let more = { count: 0, gain: 0n };
     if (v.shortfall > 0n && otherLenders) {
         try {
-            const owners = (await otherLenders()).filter((o) => o !== env.signer.address).slice(0, MAX_SYNC_CANDIDATES);
-            const others = await readOtherLenders(env.rpc, chain.marketAddress, owners);
-            const records = await readPotRecords(env.rpc, chain.marketAddress, chain.market.shareEpoch, others);
-            const pick = pickPotSyncs(
-                env.math,
-                { market: chain.market, vault: chain.vault },
-                others,
-                records,
+            const pick = await gatherPotSyncs({
+                rpc: env.rpc,
+                math: env.math,
+                market: chain.marketAddress,
+                base: { market: chain.market, vault: chain.vault },
+                claimant: env.signer.address,
+                source: otherLenders,
                 now,
-                v.shortfall,
-            );
+                shortfall: v.shortfall,
+            });
             syncs = [...pick.syncs];
             more = pick.more;
         } catch {

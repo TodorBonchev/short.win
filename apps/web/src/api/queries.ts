@@ -8,7 +8,7 @@ import { queryOptions } from '@tanstack/react-query';
 import { config } from '../config/env.ts';
 import { createStore } from '../lib/store.ts';
 import { ApiError, type ApiMeta, type ApiResult, createApiClient, keySegment, signatureSegment } from './client.ts';
-import { type MarketsParams, qk } from './keys.ts';
+import { type LendersPageParams, type MarketsParams, qk } from './keys.ts';
 import type {
     ExitEvent,
     GlobalStats,
@@ -109,6 +109,17 @@ export const indexerQueries = {
             queryKey: qk.marketLenders(mint),
             queryFn: ({ signal }) =>
                 api.get<Page<LenderPosition>>(`/v1/markets/${keySegment(mint)}/lenders`, undefined, signal),
+        }),
+    marketLendersPage: (mint: string, p: LendersPageParams) =>
+        queryOptions({
+            ...base,
+            queryKey: qk.marketLendersPage(mint, p),
+            queryFn: ({ signal }) =>
+                api.get<Page<LenderPosition>>(
+                    `/v1/markets/${keySegment(mint)}/lenders`,
+                    { epoch: p.epoch, limit: p.limit, cursor: p.cursor ?? undefined },
+                    signal,
+                ),
         }),
     marketPools: (mint: string) =>
         queryOptions({

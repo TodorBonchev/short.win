@@ -4,7 +4,8 @@
 integrated (§13.5) — the exit criteria are met (ARCH §9 M8; evidence in §13.5); v1.2 folds in the
 M8 security review's fixes (M8-SEC-1 … -15; regressions §11.5a, open items §14); v1.3 (2026-10-03)
 folds in M10: the venue trades' post-trade reserves are the venues' pricing reserves (GC-F1, §7.2,
-§7.3, §11.5), checked on recorded mainnet transactions, and IX-16's decoder half is closed (§14)*
+§7.3, §11.5), checked on recorded mainnet transactions, and IX-16's decoder half is closed (§14);
+2026-10-08 (M10, FE-30): `/v1/markets/{mint}/lenders` takes an additive `epoch` filter (§9.2)*
 
 This document turns ARCHITECTURE §7.2 ("Indexer and API") and the M8 row of ARCH §9 into a buildable
 specification: the ingest pipeline, its correctness rules (commitment, reorgs, idempotency, ordering,
@@ -891,8 +892,13 @@ in SQL only): `v_market_creator.venue_creator_fees_lamports` and `listed_by` (= 
   invalid_pubkey, invalid_signature, invalid_cursor, limit_out_of_range, range_too_large, not_found,
   rate_limited, timeout, unavailable, internal}`.
 - **Numbers:** §4.2 (u64/u128/i128 as strings; slots and seconds as numbers).
-- **Pagination:** keyset only. `limit` 1–500 (default 100); `cursor` = URL-safe base64 of the last
-  row's sort key (e.g. `(slot, tx_index, ix_index, ev_source, ev_seq)` for events, `(sort value,
+- **Pagination:** keyset only. `limit` 1–500 (default 100; `[api] default_page_limit` /
+  `max_page_limit`, configurable within 1–500 and 200–500; a request above `max_page_limit` is
+  `limit_out_of_range`). The web asks for up to 200 a page (a borrower's positions; 100 for a
+  market's events, 50 for a claim's sync candidates, FRONTEND §3.6) and does not retry with a
+  smaller one, so `max_page_limit` must be at least 200: the config check refuses to start below
+  it (`WEB_MIN_PAGE_LIMIT`; the owner's decision of 2026-10-09, FE-30). `cursor` =
+  URL-safe base64 of the last row's sort key (e.g. `(slot, tx_index, ix_index, ev_source, ev_seq)` for events, `(sort value,
   market)` for markets), validated on decode (`invalid_cursor`); body `{data: [...], next_cursor}`.
 - **Headers:** `X-Indexer-Slot`, `X-Indexer-Finalized-Slot`, `RateLimit-Limit/-Remaining/-Reset`;
   `Retry-After` on 429/503; `Cache-Control: public, max-age=2` on lists, `max-age=3600` on a
@@ -913,7 +919,7 @@ in SQL only): `v_market_creator.venue_creator_fees_lamports` and `listed_by` (= 
 | `GET /v1/markets` (q, venue, tier, has_positions, sort, order) | `v_market_overview` + `v_sol_usd` |
 | `GET /v1/markets/{mint}` | `v_market_overview`, `v_market_fees`, `v_market_exits`, `v_market_lender_loss`, `v_market_creator` (`market_trade_totals`), `sw_market_coverage(market)`, `protocol_params_history` (tier terms), `ingest_quarantine` (`quarantined_events`) |
 | `GET /v1/markets/{mint}/positions` | `positions` |
-| `GET /v1/markets/{mint}/lenders` | `lender_positions` (+ `share_epochs` for `share_bps`) |
+| `GET /v1/markets/{mint}/lenders` (active; *M10, FE-30:* `epoch` = `behind` / `current`: `lender_positions.epoch` before / at `markets.share_epoch`, same order and cursor; the web's claim reads the behind lenders first, FRONTEND §3.6) | `lender_positions` ⋈ `markets` (+ `share_epochs` for `share_bps`) |
 | `GET /v1/markets/{mint}/pools` | `pools`, `pool_events`, `markets.fp_*` |
 | `GET /v1/markets/{mint}/coverage` | `sw_market_coverage(market)`, `coverage_events`, `v_coverage_pauses` |
 | `GET /v1/markets/{mint}/liquidations`, `GET /v1/liquidations` | `positions` (liquidated / expired / settled) + `settlements` |

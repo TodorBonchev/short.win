@@ -70,6 +70,7 @@ ws_max_inbound_per_s = 10
 ws_heartbeat_s = 20
 ws_stats_interval_s = 10
 default_page_limit = 100
+# At least 200 (the web's largest page request; the indexer refuses to start below it, INDEXER.md §9.1).
 max_page_limit = 500
 statement_timeout_ms = 2000
 request_timeout_ms = 5000

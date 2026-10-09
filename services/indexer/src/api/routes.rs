@@ -617,12 +617,18 @@ const Q_MARKET_LENDERS: &str = concat!(
     ", lp.owner::text \
      FROM lender_positions lp JOIN markets m ON m.market = lp.market \
      WHERE lp.market = $1 AND (NOT $2 OR lp.shares > 0) \
+       AND ($6::text IS NULL OR ($6::text = 'behind') = (lp.epoch < m.share_epoch)) \
        AND ($3::text IS NULL OR (lp.shares::numeric, lp.owner::text COLLATE \"C\") \
             < ($3::numeric, $4::text COLLATE \"C\")) \
      ORDER BY lp.shares::numeric DESC, lp.owner::text COLLATE \"C\" DESC LIMIT $5"
 );
 
 type LenderRow = (Value, String, String, i64, i64, String, String);
+
+/// `epoch` of `listMarketLenders`: lenders behind the market's share epoch (a rebase or full-wipe
+/// record they have not converted through, parked lenders included) or at it. The web's claim
+/// reads the behind lenders first for its pot-only syncs (FRONTEND.md §3.6, FE-30).
+const LENDER_EPOCHS: [&str; 2] = ["behind", "current"];
 
 async fn list_market_lenders(
     State(st): State<AppState>,
@@ -631,6 +637,7 @@ async fn list_market_lenders(
 ) -> ApiResult {
     let mint = path_key(mint, "mint")?;
     let active = q.boolean("active")?.unwrap_or(true);
+    let epoch = q.choice("epoch", &LENDER_EPOCHS)?;
     let limit = q.limit(st.cfg.default_page_limit, st.cfg.max_page_limit)?;
     let after = match q.cursor()? {
         Some(raw) => {
@@ -647,6 +654,7 @@ async fn list_market_lenders(
         .bind(after_s)
         .bind(after_o)
         .bind(limit + 1)
+        .bind(epoch)
         .fetch_all(&st.pool)
         .await?;
     let mut objs = Vec::with_capacity(rows.len());

@@ -210,6 +210,30 @@ describe('readPotRecords', () => {
         await readPotRecords(rpc, VAULT, 12, [l(12)]);
         expect(getMultipleAccounts).toHaveBeenCalledTimes(1);
     });
+
+    it('skips the epochs already read and splits more than 100 into reads of 100 (FE-30)', async () => {
+        const send = vi.fn(async () => ({ value: [] }));
+        const getMultipleAccounts = vi.fn(() => ({ send }));
+        const rpc = { getMultipleAccounts } as unknown as AppRpc;
+        const l = (epoch: number) =>
+            ({ address: VAULT, lender: { epoch, fwd: 0, fwdEpoch: 0 } }) as unknown as OtherLender;
+        // A later page: 3..10 needed, 3..6 read by an earlier one.
+        await readPotRecords(rpc, VAULT, 12, [l(3)], new Set([3, 4, 5, 6]));
+        expect((getMultipleAccounts.mock.calls[0] as unknown as [string[]])[0]).toHaveLength(4);
+        // Every needed epoch known: no read.
+        await readPotRecords(rpc, VAULT, 12, [l(3)], new Set([3, 4, 5, 6, 7, 8, 9, 10]));
+        expect(getMultipleAccounts).toHaveBeenCalledTimes(1);
+        // 30 lenders 8 apart, 8 records each: 240 epochs in reads of 100, 100 and 40.
+        await readPotRecords(
+            rpc,
+            VAULT,
+            300,
+            Array.from({ length: 30 }, (_, i) => l(i * 8)),
+        );
+        expect(getMultipleAccounts.mock.calls.slice(1).map((c) => (c as unknown as [string[]])[0].length)).toEqual([
+            100, 100, 40,
+        ]);
+    });
 });
 
 describe('readOtherLenders', () => {

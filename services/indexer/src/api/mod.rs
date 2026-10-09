@@ -119,6 +119,11 @@ impl Default for ApiConfig {
     }
 }
 
+/// The web's largest page request (a borrower's positions; FRONTEND.md §3.6), which it does not
+/// retry with less: the floor of `max_page_limit` (INDEXER.md §9.1; the owner's decision of
+/// 2026-10-09, FE-30).
+pub const WEB_MIN_PAGE_LIMIT: u32 = 200;
+
 impl ApiConfig {
     /// Rejects a configuration the API cannot honour (`serve` checks it at start).
     pub fn check(&self) -> anyhow::Result<()> {
@@ -136,6 +141,12 @@ impl ApiConfig {
             || !(1..=self.max_page_limit).contains(&self.default_page_limit)
         {
             bail!("api: need 1 <= default_page_limit <= max_page_limit <= 500 (openapi.yaml)");
+        }
+        if self.max_page_limit < WEB_MIN_PAGE_LIMIT {
+            bail!(
+                "api.max_page_limit must be at least {WEB_MIN_PAGE_LIMIT}: the web asks for up to \
+                 {WEB_MIN_PAGE_LIMIT} a page and does not retry with less (INDEXER.md §9.1)"
+            );
         }
         if self.max_concurrent_queries == 0 || self.ws_outbound_buffer == 0 {
             bail!("api: max_concurrent_queries and ws_outbound_buffer must be positive");
@@ -487,6 +498,17 @@ mod tests {
             ..ApiConfig::default()
         };
         assert!(bad.check().is_err());
+        // Below the web's largest page request (FE-30), and at it.
+        let bad = ApiConfig {
+            max_page_limit: WEB_MIN_PAGE_LIMIT - 1,
+            ..ApiConfig::default()
+        };
+        assert!(bad.check().is_err());
+        let ok = ApiConfig {
+            max_page_limit: WEB_MIN_PAGE_LIMIT,
+            ..ApiConfig::default()
+        };
+        ok.check().expect("max_page_limit at the web's floor");
         let bad = ApiConfig {
             ipv6_bucket_prefix: 129,
             ..ApiConfig::default()

@@ -33,16 +33,38 @@ const TOKEN_ERRORS: Readonly<Record<number, string>> = {
  * plan built before such a close fails here: the claimant's own position closed by a claim from
  * another tab or the dashboard, or a lender the claim syncs first closed meanwhile (FE-30). A new
  * plan re-reads the chain (`plan.rebuild`): it leaves a closed sync target out, and a claim of a
- * closed position is refused with a plain message.
+ * closed position is refused with a plain message. `AccountOwnedByWrongProgram` (3007) is the same
+ * close seen after someone sent lamports to the closed position's address (a system account there,
+ * not a missing one; FE-30): mapped alike, but only when the account the error names is `lender` —
+ * the instruction's `LenderPosition`, the claimant's own in `claim_sol` or a sync target's in
+ * `sync_lender` — since another account owned by the wrong program is not fixed by a new plan.
  */
-const ANCHOR_ERRORS: Readonly<Record<number, Pick<TxError, 'name' | 'message' | 'action'>>> = {
+const ANCHOR_ERRORS: Readonly<
+    Record<number, Pick<TxError, 'name' | 'message' | 'action'> & { readonly account?: string }>
+> = {
     3012: {
         name: 'AccountNotInitialized',
         action: 'retry',
         message:
             'An account in this transaction no longer exists (for example a lender position closed by a claim or withdrawal). A new review re-reads the chain.',
     },
+    3007: {
+        name: 'AccountOwnedByWrongProgram',
+        action: 'retry',
+        account: 'lender',
+        message:
+            'A lender position in this transaction no longer exists (closed by a claim or withdrawal; its address has since received SOL). A new review re-reads the chain.',
+    },
 };
+
+/** The account an Anchor account error names ("AnchorError caused by account: <name>."), if any. */
+export function anchorErrorAccount(logs: readonly string[]): string | null {
+    for (const line of logs) {
+        const m = /AnchorError caused by account: (\w+)\./.exec(line);
+        if (m?.[1]) return m[1];
+    }
+    return null;
+}
 
 const TX_LEVEL: Readonly<Record<string, Pick<TxError, 'kind' | 'message' | 'action'>>> = {
     InsufficientFundsForFee: { kind: 'funds', action: 'adjust', message: 'Not enough SOL to pay the transaction fee.' },
@@ -116,8 +138,13 @@ export function mapTransactionError(err: unknown, logs: readonly string[] = []):
                     }
                 }
                 const anchor = ANCHOR_ERRORS[code];
-                if (anchor && failed === SHORTWIN_PROGRAM) {
-                    return { kind: 'program', code, ...anchor, instructionIndex: index, logs };
+                if (
+                    anchor &&
+                    failed === SHORTWIN_PROGRAM &&
+                    (anchor.account === undefined || anchorErrorAccount(logs) === anchor.account)
+                ) {
+                    const { account: _, ...mapped } = anchor;
+                    return { kind: 'program', code, ...mapped, instructionIndex: index, logs };
                 }
                 const tokenMsg = TOKEN_ERRORS[code];
                 if (token && tokenMsg) {

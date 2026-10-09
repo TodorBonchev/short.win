@@ -322,8 +322,14 @@ export class IndexerMock {
                             q,
                         ),
                     );
-                case 'lenders':
-                    return ok({ data: this.lendersOf(s, row), next_cursor: null } satisfies ApiPage<LenderPosition>);
+                case 'lenders': {
+                    // `epoch` (FE-30): behind the market's share epoch, or at it; paged like the indexer.
+                    const epoch = q.get('epoch');
+                    const rows = this.lendersOf(s, row).filter(
+                        (l) => epoch === null || l.epoch < row.m.shareEpoch === (epoch === 'behind'),
+                    );
+                    return ok(this.page(rows, q) satisfies ApiPage<LenderPosition>);
+                }
                 case 'pools':
                     return ok(this.pools(row));
                 case 'coverage':

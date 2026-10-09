@@ -54,6 +54,56 @@ describe('transaction error mapping', () => {
         expect(other).toMatchObject({ kind: 'unknown', action: 'report' });
     });
 
+    it('maps short.win’s AccountOwnedByWrongProgram (3007) on a lender position like 3012', () => {
+        // FE-30: a position closed by a claim or withdrawal (KI-67) whose address someone then
+        // funded is a system account there: Anchor's `Account<LenderPosition>` refuses it with
+        // 3007, not 3012. A fresh plan reads it as no position (`lenderPositionOf`).
+        const lenderLogs = (account: string, program: string = SHORTWIN_PROGRAM) => [
+            `Program ${program} invoke [1]`,
+            `Program log: AnchorError caused by account: ${account}. Error Code: AccountOwnedByWrongProgram. Error Number: 3007. Error Message: The given account is owned by a different program than expected.`,
+            'Program log: Left:',
+            'Program log: 11111111111111111111111111111111',
+            'Program log: Right:',
+            `Program log: ${SHORTWIN_PROGRAM}`,
+            `Program ${program} failed: custom program error: 0xbbf`,
+        ];
+        const plan = { rebuild: async () => ({}) as TxPlan } as unknown as TxPlan;
+        // The claimant's own position (claim_sol, after the two compute-budget instructions) and a
+        // sync target's (sync_lender at index 2): both rebuild.
+        for (const index of [3, 2]) {
+            const e = mapTransactionError({ InstructionError: [index, { Custom: 3007 }] }, lenderLogs('lender'));
+            expect(e).toMatchObject({
+                kind: 'program',
+                code: 3007,
+                name: 'AccountOwnedByWrongProgram',
+                action: 'retry',
+                instructionIndex: index,
+            });
+            expect(e.message).toMatch(/no longer exists/);
+            const state = { stage: 'failed', plan, error: e, signature: null } as unknown as TxFlowState;
+            expect(retryMode(state)).toBe('rebuild');
+        }
+        // 3012 still rebuilds whatever account it names.
+        expect(
+            mapTransactionError({ InstructionError: [3, { Custom: 3012 }] }, [
+                `Program ${SHORTWIN_PROGRAM} failed: custom program error: 0xbc4`,
+            ]),
+        ).toMatchObject({ kind: 'program', name: 'AccountNotInitialized', action: 'retry' });
+        // short.win's 3007 on another account is not a closed position: a new plan would not fix it.
+        expect(
+            mapTransactionError({ InstructionError: [3, { Custom: 3007 }] }, lenderLogs('token_program')),
+        ).toMatchObject({ kind: 'unknown', action: 'report', code: 3007 });
+        expect(
+            mapTransactionError({ InstructionError: [3, { Custom: 3007 }] }, [
+                `Program ${SHORTWIN_PROGRAM} failed: custom program error: 0xbbf`,
+            ]),
+        ).toMatchObject({ kind: 'unknown', action: 'report' });
+        // Another program's 3007 (an Anchor venue's own `lender`-named account included) stays unknown.
+        expect(
+            mapTransactionError({ InstructionError: [3, { Custom: 3007 }] }, lenderLogs('lender', TOKEN_2022_PROGRAM)),
+        ).toMatchObject({ kind: 'unknown', action: 'report' });
+    });
+
     it('attributes token-program errors raised inside short.win’s CPI (CPI Guard, memo)', () => {
         // The innermost failing program raised the error (the validator logs it first).
         expect(failingProgram(logs(TOKEN_2022_PROGRAM))).toBe(TOKEN_2022_PROGRAM);

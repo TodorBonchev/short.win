@@ -187,6 +187,14 @@ paths:
           in: query
           description: Only lenders with shares > 0.
           schema: { type: boolean, default: true }
+        - name: epoch
+          in: query
+          description: |
+            Only lenders whose `epoch` is before the market's share epoch (`behind`: a rebase or
+            full-wipe record they have not converted through, parked lenders included) or at it
+            (`current`); absent, both. The order and the cursor are the same either way. The web's
+            claim reads the `behind` lenders first for its pot-only syncs (FRONTEND §3.6, FE-30).
+          schema: { type: string, enum: [behind, current] }
         - { $ref: '#/components/parameters/Limit' }
         - { $ref: '#/components/parameters/Cursor' }
       responses:
