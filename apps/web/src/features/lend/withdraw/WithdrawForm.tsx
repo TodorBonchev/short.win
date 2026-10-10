@@ -8,16 +8,18 @@
  * included: `quote.ts`).
  */
 import type { Address } from '@solana/kit';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Button } from '../../../components/Button.tsx';
 import { Disclosure } from '../../../components/Disclosure.tsx';
 import { AmountInput } from '../../../components/Field.tsx';
+import { FormFoot } from '../../../components/FormFoot.tsx';
 import { Sol, Tokens } from '../../../components/Num.tsx';
 import { Kv } from '../../../components/States.tsx';
 import { T } from '../../../config/testids.ts';
 import { parseAmount } from '../../../lib/amount.ts';
 import { formatSol, formatTokens } from '../../../lib/format.ts';
 import { formatUtc } from '../../../lib/time.ts';
+import { ConnectCta } from '../../../wallet/ConnectCta.tsx';
 import { withdrawPlanFrom } from '../build.ts';
 import {
     DEFAULT_TOLERANCE,
@@ -30,7 +32,18 @@ import {
     toInputText,
 } from '../ctx.ts';
 import { previewWithdrawLimits, previewWithdrawView, standingOf } from '../previews.ts';
-import { type AccountOption, AccountSelect, accountLabel, RefusalLine, ToleranceInput } from '../ui.tsx';
+import {
+    type AccountOption,
+    AccountSelect,
+    AckTarget,
+    accountLabel,
+    type Reason,
+    RefusalLine,
+    ToleranceInput,
+} from '../ui.tsx';
+
+/** The quick shares of the holding (chips); Max — what may be withdrawn now — sits in the field. */
+const PERCENTS = ['25', '50', '75'] as const;
 
 export function WithdrawForm({ ctx, onCoverDeficit }: { ctx: LendCtx; onCoverDeficit: () => void }) {
     const { chain, math, decimals, symbol, signer, flow } = ctx;
@@ -40,6 +53,7 @@ export function WithdrawForm({ ctx, onCoverDeficit }: { ctx: LendCtx; onCoverDef
     const [ack, setAck] = useState(false);
     const [building, setBuilding] = useState(false);
     const [buildError, setBuildError] = useState<string | null>(null);
+    const ackId = useId();
 
     const stage = flow.state.stage;
     const planKind = flow.state.plan?.kind;
@@ -74,16 +88,20 @@ export function WithdrawForm({ ctx, onCoverDeficit }: { ctx: LendCtx; onCoverDef
     const memo = destInfo?.memoRequired ?? false;
     const forfeit = view?.ok ? view.value.vestingForfeit : 0n;
 
-    const ready =
-        !!signer &&
-        !!dest &&
-        chain.recordsComplete &&
-        shares !== null &&
-        !overHolding &&
-        !!view?.ok &&
-        (forfeit === 0n || ack) &&
-        !ctx.stale &&
-        !building;
+    // Why the review cannot open yet: the same predicates as `ready`, first unmet first (§7.6).
+    const blocker = ((): Reason | null => {
+        if (!signer) return { text: 'Connect a wallet first' };
+        if (!dest) return { text: 'No account to receive the tokens' };
+        if (!chain.recordsComplete) return { text: 'Sync your position first (above)' };
+        if (ctx.stale) return { text: 'Waiting for a fresh chain read' };
+        if (shares === null) return { text: 'Enter the shares to withdraw' };
+        if (overHolding) return { text: 'More shares than you hold' };
+        if (tolBps === null) return { text: 'Set a tolerance from 0.1 to 50 %' };
+        if (!view?.ok) return { text: 'The program would refuse this withdrawal (see above)' };
+        if (forfeit > 0n && !ack) return { text: 'Tick the acknowledgement above to continue', target: ackId };
+        return null;
+    })();
+    const ready = blocker === null && !building;
 
     const submit = async () => {
         if (!signer || !dest || shares === null || !view?.ok || tolBps === null) return;
@@ -106,6 +124,14 @@ export function WithdrawForm({ ctx, onCoverDeficit }: { ctx: LendCtx; onCoverDef
         }
     };
 
+    if (!signer) {
+        return (
+            <div className="stack lend-form">
+                <div className="muted">Connect a wallet to see your shares in this market.</div>
+                <ConnectCta surface="lend" />
+            </div>
+        );
+    }
     if (!chain.lender || (limits.ok && limits.value.shares === 0n && chain.lender.shares === 0n)) {
         return <div className="muted lend-form">You have no shares in this market.</div>;
     }
@@ -119,6 +145,7 @@ export function WithdrawForm({ ctx, onCoverDeficit }: { ctx: LendCtx; onCoverDef
     }
     const lim = limits.ok ? limits.value : null;
     const solShown = view?.ok ? view.value.solAtLeast : null;
+    const percentText = (pct: (typeof PERCENTS)[number]) => toInputText((holding * BigInt(pct)) / 100n, decimals);
 
     return (
         <div className="stack lend-form">
@@ -140,20 +167,27 @@ export function WithdrawForm({ ctx, onCoverDeficit }: { ctx: LendCtx; onCoverDef
                         : undefined
                 }
             />
-            <div className="row lend-quick">
-                {(['25', '50'] as const).map((pct) => (
-                    <Button
+            {view?.ok && (
+                <div className="lend-approx" data-testid={T.withdrawApprox}>
+                    ≈ <Tokens raw={view.value.tokens} decimals={decimals} symbol={symbol} />
+                </div>
+            )}
+            <fieldset className="chip-group lend-quick">
+                <legend className="visually-hidden">Share of your holding</legend>
+                {PERCENTS.map((pct) => (
+                    <button
                         key={pct}
-                        size="sm"
-                        variant="ghost"
-                        disabled={!signer || !lim}
+                        type="button"
+                        className="chip hit"
+                        aria-pressed={sharesText !== '' && sharesText === percentText(pct)}
+                        disabled={!lim}
                         data-testid={T.withdrawPercent(pct)}
-                        onClick={() => setSharesText(toInputText((holding * BigInt(pct)) / 100n, decimals))}
+                        onClick={() => setSharesText(percentText(pct))}
                     >
                         {pct}%
-                    </Button>
+                    </button>
                 ))}
-            </div>
+            </fieldset>
             <ToleranceInput
                 label="Min tokens tolerance"
                 value={tolText}
@@ -229,9 +263,16 @@ export function WithdrawForm({ ctx, onCoverDeficit }: { ctx: LendCtx; onCoverDef
                                 data-value={view.value.lockAfter.toString()}
                                 data-until={view.value.lockUntilAfter.toString()}
                             >
-                                {view.value.lockAfter > 0n
-                                    ? `${formatTokens(view.value.lockAfter, decimals)} until ${formatUtc(view.value.lockUntilAfter)}`
-                                    : 'none'}
+                                {view.value.lockAfter > 0n ? (
+                                    <>
+                                        {formatTokens(view.value.lockAfter, decimals)}{' '}
+                                        <span className="lend-nowrap">
+                                            until {formatUtc(view.value.lockUntilAfter)}
+                                        </span>
+                                    </>
+                                ) : (
+                                    'none'
+                                )}
                             </span>
                         ) : (
                             '—'
@@ -289,28 +330,32 @@ export function WithdrawForm({ ctx, onCoverDeficit }: { ctx: LendCtx; onCoverDef
                 </div>
             )}
             {forfeit > 0n && view?.ok && (
-                <Disclosure
-                    id="lender.exitForfeitsVest"
-                    vars={{ vesting: formatSol(view.value.vesting, 6) }}
-                    acknowledged={ack}
-                    onAcknowledge={setAck}
-                />
+                <AckTarget id={ackId}>
+                    <Disclosure
+                        id="lender.exitForfeitsVest"
+                        vars={{ vesting: formatSol(view.value.vesting, 6) }}
+                        acknowledged={ack}
+                        onAcknowledge={setAck}
+                    />
+                </AckTarget>
             )}
             {buildError && (
                 <div className="field-error" role="alert">
                     {buildError}
                 </div>
             )}
-            <Button
-                variant="primary"
-                block
-                busy={building}
-                disabled={!ready}
-                onClick={() => void submit()}
-                data-testid={T.withdrawSubmit}
-            >
-                {building ? 'Quoting…' : 'Review withdrawal'}
-            </Button>
+            <FormFoot reason={blocker?.text ?? null} reasonTestId={T.lendWithdrawReason} reasonTarget={blocker?.target}>
+                <Button
+                    variant="primary"
+                    block
+                    busy={building}
+                    disabled={!ready}
+                    onClick={() => void submit()}
+                    data-testid={T.withdrawSubmit}
+                >
+                    {building ? 'Quoting…' : 'Review withdrawal'}
+                </Button>
+            </FormFoot>
         </div>
     );
 }

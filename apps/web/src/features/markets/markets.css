@@ -14,7 +14,20 @@
 }
 
 .mk-search {
-    width: 300px;
+    width: min(380px, 100%);
+}
+
+/* Desktop and tablet: the filters sit in the toolbar's row; a phone folds them behind a toggle. */
+.mk-filters {
+    display: contents;
+}
+
+.mk-filters-toggle {
+    display: none;
+}
+
+.mk-count {
+    margin-left: auto;
 }
 
 .mk-toolbar .checkbox {
@@ -36,12 +49,178 @@
     border-top: 1px solid var(--line);
 }
 
+.mk-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-3);
+}
+
+.mk-empty p {
+    margin: 0;
+}
+
 .mk-open-mint {
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
     max-width: 560px;
     margin: 0 auto;
+    width: 100%;
+}
+
+.mk-open-mint-row {
+    display: flex;
+    gap: var(--sp-3);
+}
+
+.mk-open-mint-row > .input-wrap {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Every MARKETS DataTable (`.mk-tbl`). As cards, a card in an already padded box (a panel or tab
+   body) does not indent a second time. */
+@container tbl (max-width: 559.98px) {
+    :is(.panel-body:not(.flush), .mk-tabs-body:not(.flush), .mk-creator, .mk-overview-fees)
+        .mk-tbl
+        > .tbl
+        > tbody
+        > tr {
+        padding-inline: 0;
+    }
+}
+
+/* A tablet's markets table (priority mode): the flags wrap rather than widen the table. */
+@container tbl (max-width: 959.98px) {
+    .mk-markets-tbl td[data-col="flags"] {
+        white-space: normal;
+        min-width: 96px;
+    }
+
+    .mk-markets-tbl .mk-flags {
+        flex-wrap: wrap;
+    }
+
+    .mk-markets-tbl .mk-flags .badge {
+        white-space: normal;
+    }
+}
+
+/* The markets list as cards (its table under 560 px): symbol and mint, then venue and tier at the
+   right; price / TVL, utilisation / OI, positions / flags below. */
+@container tbl (max-width: 559.98px) {
+    .mk-markets-tbl > .tbl > tbody > tr {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+        grid-template-areas:
+            "token venue tier"
+            "price tvl tvl"
+            "util oi oi"
+            "positions flags flags";
+        align-items: start;
+    }
+
+    .mk-markets-tbl > .tbl > tbody > tr > td[data-col="token"] {
+        grid-area: token;
+    }
+
+    .mk-markets-tbl > .tbl > tbody > tr > td[data-col="venue"] {
+        grid-area: venue;
+        justify-self: end;
+    }
+
+    .mk-markets-tbl > .tbl > tbody > tr > td[data-col="tier"] {
+        grid-area: tier;
+        justify-self: end;
+    }
+
+    .mk-markets-tbl > .tbl > tbody > tr > td[data-col="price"] {
+        grid-area: price;
+    }
+
+    .mk-markets-tbl > .tbl > tbody > tr > td[data-col="tvl"] {
+        grid-area: tvl;
+    }
+
+    .mk-markets-tbl > .tbl > tbody > tr > td[data-col="util"] {
+        grid-area: util;
+    }
+
+    .mk-markets-tbl > .tbl > tbody > tr > td[data-col="oi"] {
+        grid-area: oi;
+    }
+
+    .mk-markets-tbl > .tbl > tbody > tr > td[data-col="open_positions"] {
+        grid-area: positions;
+    }
+
+    .mk-markets-tbl > .tbl > tbody > tr > td[data-col="flags"] {
+        grid-area: flags;
+    }
+
+    .mk-tbl .mk-token {
+        flex-wrap: wrap;
+        column-gap: var(--sp-2);
+        row-gap: 0;
+        max-width: none;
+    }
+
+    /* A symbol breaks only when it cannot fit a line of its own. */
+    .mk-tbl .mk-token-symbol {
+        max-width: 100%;
+        overflow-wrap: normal;
+    }
+
+    .mk-markets-tbl .mk-flags {
+        flex-wrap: wrap;
+    }
+}
+
+@media (max-width: 639.98px) {
+    .mk-open-mint-row > .input-wrap {
+        flex: none;
+    }
+
+    .mk-page-head .btn {
+        padding-inline: var(--sp-3);
+    }
+
+    .mk-toolbar {
+        padding: var(--sp-3);
+        gap: var(--sp-2) var(--sp-3);
+    }
+
+    .mk-search {
+        flex: 1 0 100%;
+    }
+
+    .mk-filters-toggle {
+        display: inline-flex;
+    }
+
+    .mk-filters {
+        display: none;
+        flex: 1 0 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--sp-2);
+    }
+
+    .mk-filters[data-open] {
+        display: flex;
+    }
+
+    .mk-filters .select {
+        width: 100%;
+    }
+
+    .mk-more .btn {
+        width: 100%;
+    }
+
+    .mk-open-mint-row {
+        flex-direction: column;
+    }
 }
 
 .mk-token {
@@ -112,23 +291,55 @@
 }
 
 /* ---- market page ---------------------------------------------------------------------------- */
+/* The header (D9): the title line (symbol, tier, venue, flags, freshness) and the name · mint line,
+   with the prices straight after them at the large size; on a phone the three stack. */
 .mk-head {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-3) var(--sp-4);
+    align-items: flex-end;
+    gap: var(--sp-3) calc(2 * var(--sp-5));
+}
+
+.mk-head-main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    min-width: 0;
 }
 
 .mk-head-title {
     display: flex;
-    align-items: baseline;
-    gap: var(--sp-3);
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-3);
+    min-width: 0;
+}
+
+.mk-head-title h1 {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.mk-head-badges {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+}
+
+.mk-head-sub {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-1) var(--sp-3);
+    min-width: 0;
+    color: var(--text-1);
 }
 
 .mk-head-name {
     color: var(--text-1);
     font-size: var(--fs-md);
-    max-width: 280px;
+    max-width: min(320px, 100%);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -141,9 +352,21 @@
 
 .mk-head-prices {
     display: flex;
-    gap: var(--sp-4);
-    margin-left: auto;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--sp-2) var(--sp-6);
+}
+
+.mk-head-price {
+    display: flex;
+    flex-direction: column;
+    font-size: var(--fs-xl);
+    line-height: 1.15;
+}
+
+.mk-head-price[data-kind="spot"] {
     font-size: var(--fs-lg);
+    color: var(--text-1);
 }
 
 .mk-head-price-label {
@@ -154,15 +377,42 @@
     letter-spacing: 0.05em;
 }
 
+/* A mint as the page title (not listed, loading): it wraps rather than widen the page. */
+.mk-mint-title {
+    font-size: var(--fs-lg);
+    white-space: normal;
+    word-break: break-all;
+    min-width: 0;
+}
+
 .mk-tier-button {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
     padding: 0;
     border: 0;
     background: transparent;
     cursor: pointer;
+    border-radius: var(--radius-sm);
 }
 
 .mk-tier-button .badge {
     cursor: pointer;
+    gap: var(--sp-1);
+}
+
+/* The tier badge's info mark: an inline SVG (a font glyph read as "@" or a boxed zero). */
+.mk-tier-info {
+    flex: none;
+    width: 12px;
+    height: 12px;
+    margin-left: 2px;
+    opacity: 0.9;
+}
+
+.mk-anchor {
+    position: relative;
+    display: inline-flex;
 }
 
 .mk-popover {
@@ -170,7 +420,9 @@
     z-index: var(--z-menu);
     top: calc(100% + 6px);
     left: 0;
-    width: 440px;
+    width: min(440px, calc(100vw - 2 * var(--gutter)));
+    max-height: min(70dvh, 560px);
+    overflow-y: auto;
     padding: var(--sp-4);
     background: var(--bg-2);
     border: 1px solid var(--line-strong);
@@ -179,11 +431,29 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
+    text-align: left;
 }
 
-.mk-anchor {
-    position: relative;
-    display: inline-flex;
+.mk-popover-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+}
+
+.mk-popover-head h3 {
+    margin: 0;
+}
+
+.mk-popover-close {
+    flex: none;
+    width: max(32px, var(--tap-min));
+    height: max(32px, var(--tap-min));
+    padding: 0;
+}
+
+.mk-popover-scrim {
+    display: none;
 }
 
 .mk-banners {
@@ -197,8 +467,15 @@
     flex-direction: column;
 }
 
-.mk-stats > .stat {
-    flex-basis: 130px;
+/* The stat strip: the "More stats" toggle exists for a phone only. */
+.mk-stats-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+}
+
+.mk-stats-more {
+    display: none;
 }
 
 .mk-stat-sub {
@@ -212,6 +489,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-4);
+    min-width: 0;
 }
 
 .mk-tabs-body.flush {
@@ -222,9 +500,68 @@
     margin-bottom: var(--sp-2);
 }
 
+/* Overview (D10): key / value blocks in two columns (Market | Exits and the settlements) that share
+   the card's width — capped at 420 px they left a sixth of a 1,440 px card empty; the hairline rows
+   carry the eye from a key to its value. Fees runs under both (a third column held a one-liner
+   while the others wrapped). The Coverage tab's two blocks use the same grid. */
+.mk-overview {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-5) var(--sp-6);
+    align-items: start;
+}
+
+.mk-overview-col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
+    min-width: 0;
+}
+
+.mk-overview-fees {
+    grid-column: 1 / -1;
+    min-width: 0;
+}
+
+/* A copy button in a value (an address) keeps the 24 px floor beside the text; its invisible hit
+   area stays its own box, so it never reaches over a neighbouring target (the tablist above). */
+.mk-kv .address-text .btn {
+    flex: none;
+    min-width: 24px;
+    min-height: 24px;
+}
+
+.mk-kv .address-text .hit::after {
+    inset: 0;
+}
+
+/* A market link in a status card: at least 24 px tall. */
+.mk-tbl td[data-col="token"] > a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+}
+
+/* Hairline key / value rows: one unbroken line under the key and its value. */
+.mk-kv {
+    column-gap: 0;
+}
+
+.mk-kv dt {
+    padding-right: var(--sp-4);
+}
+
+.mk-none > summary {
+    color: var(--text-1);
+}
+
+.mk-none[open] > summary {
+    margin-bottom: var(--sp-2);
+}
+
 .mk-grid-2 {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
     gap: var(--sp-4) var(--sp-6);
 }
 
@@ -236,6 +573,11 @@
 .mk-tabs-body.flush > .mk-note {
     margin: 0;
     padding: 0 var(--sp-4) var(--sp-3);
+}
+
+.mk-creator-share {
+    flex-wrap: wrap;
+    row-gap: var(--sp-1);
 }
 
 .mk-why-list {
@@ -273,12 +615,96 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
+    min-width: 0;
+}
+
+/* The creator's figures span the box, like the wallet table under them. */
+.mk-creator .mk-kv {
+    max-width: none;
+}
+
+.mk-creator .tbl th {
+    background: var(--bg-3);
 }
 
 .mk-badges {
     display: inline-flex;
+    flex-wrap: wrap;
     gap: var(--sp-1);
     margin-left: var(--sp-2);
+}
+
+/* Tablet and phone: one column (layout-trade), the prices under the title. */
+@media (max-width: 1023.98px) {
+    .mk-head {
+        gap: var(--sp-2) var(--sp-6);
+    }
+}
+
+@media (max-width: 639.98px) {
+    .mk-head {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--sp-2);
+    }
+
+    .mk-head-title h1 {
+        font-size: var(--fs-xl);
+    }
+
+    .mk-head-prices {
+        gap: var(--sp-5);
+    }
+
+    .mk-stats-more {
+        display: inline-flex;
+        align-self: flex-start;
+    }
+
+    .mk-overview {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .mk-tabs-body {
+        padding: var(--sp-3);
+    }
+
+    .mk-why-list li {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0;
+    }
+
+    /* "Why this tier": a bottom sheet over a scrim, above the tab bar. */
+    .mk-popover {
+        position: fixed;
+        inset: auto 0 0;
+        z-index: var(--z-sheet);
+        width: auto;
+        max-height: 85dvh;
+        padding-bottom: calc(var(--sp-4) + var(--safe-b));
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        border-width: 1px 0 0;
+    }
+
+    .mk-popover-scrim {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: calc(var(--z-sheet) - 1);
+        background: var(--bg-overlay);
+    }
+
+    .mk-not-listed-cta {
+        width: 100%;
+        white-space: normal;
+    }
+}
+
+@media (pointer: coarse) {
+    .mk-popover-close {
+        width: 44px;
+        height: 44px;
+    }
 }
 
 /* ---- create market ------------------------------------------------------------------------- */
@@ -289,17 +715,37 @@
     align-items: start;
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1179.98px) {
     .mk-create {
         grid-template-columns: minmax(0, 1fr) 340px;
     }
 }
 
+/* Paste (a finger has no quick select-all and paste): only under a coarse pointer. */
+.mk-paste {
+    display: none;
+}
+
+@media (pointer: coarse) {
+    .mk-paste {
+        display: inline-flex;
+        flex: none;
+        height: 100%;
+        border-left: 1px solid var(--line);
+        border-radius: 0;
+    }
+}
+
 .mk-verdict {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-3);
     font-weight: var(--fw-bold);
+}
+
+.mk-verdict .badge {
+    white-space: normal;
 }
 
 .mk-reasons {
@@ -317,6 +763,7 @@
     padding: var(--sp-2) var(--sp-3);
     border-radius: var(--radius-sm);
     font-size: var(--fs-sm);
+    overflow-wrap: anywhere;
 }
 
 .mk-reason-code {
@@ -325,9 +772,23 @@
     color: var(--text-1);
 }
 
+.mk-cannot {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-2);
+}
+
+.mk-cannot p {
+    margin: 0;
+    font-size: var(--fs-sm);
+    color: var(--text-1);
+}
+
 .mk-ext-list {
     display: inline-flex;
     flex-wrap: wrap;
+    justify-content: flex-end;
     gap: var(--sp-1);
 }
 
@@ -335,6 +796,7 @@
     display: flex;
     align-items: center;
     gap: var(--sp-3);
+    min-height: var(--tap-min);
     padding: var(--sp-2) var(--sp-3);
     border: 1px solid var(--line);
     border-radius: var(--radius);
@@ -346,8 +808,29 @@
     background: var(--bg-2);
 }
 
-.mk-choice input[type="radio"] {
+.mk-choice input[type="radio"],
+.mk-pool-choice input[type="radio"] {
     accent-color: var(--accent);
+}
+
+.mk-pool-choice {
+    min-height: var(--tap-min);
+    cursor: pointer;
+}
+
+@media (pointer: coarse) {
+    .mk-choice input[type="radio"],
+    .mk-pool-choice input[type="radio"] {
+        width: 20px;
+        height: 20px;
+    }
+}
+
+/* A pool card: the eligibility (with its reasons) gets the whole width. */
+@container tbl (max-width: 559.98px) {
+    .mk-pools-tbl > .tbl > tbody > tr > td[data-col="eligible"] {
+        grid-column: 1 / -1;
+    }
 }
 
 .mk-cost-total {
@@ -355,12 +838,66 @@
     font-weight: var(--fw-bold);
 }
 
+/* Tablet and phone: one column in reading order (mint → verdict → venue → pools → cost). The foot
+   sticks above the bottom bars on a tablet; on a phone it is the page's action bar. */
+@media (max-width: 1023.98px) {
+    .mk-create {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .mk-create-foot .form-foot {
+        bottom: calc(var(--tabbar-h) + var(--statusbar-h) + var(--safe-b));
+    }
+}
+
+@media (max-width: 639.98px) {
+    :root:has(.mk-create-foot) {
+        --actionbar-h: 92px;
+    }
+
+    .mk-create-foot .form-foot {
+        position: fixed;
+        left: 0;
+        right: 0;
+        z-index: var(--z-bars);
+        margin: 0;
+        gap: var(--sp-1);
+        padding: var(--sp-2) max(var(--gutter), var(--safe-r)) var(--sp-2) max(var(--gutter), var(--safe-l));
+    }
+
+    .mk-create-foot .form-reason {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        font-size: var(--fs-xs);
+    }
+
+    .mk-create-foot .form-foot > .btn {
+        min-height: 44px;
+        white-space: normal;
+    }
+}
+
 /* ---- protocol status ----------------------------------------------------------------------- */
+/* Panels side by side where 420 px fit, one per row on a phone; a row's panels share its height. */
 .mk-status-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
     gap: var(--sp-3);
-    align-items: start;
+    align-items: stretch;
+}
+
+.mk-status-opens .panel-body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-6);
+}
+
+.mk-status-opens .panel-body > .mk-note {
+    margin: 0;
+    flex: 1 1 320px;
 }
 
 .mk-status-pause {
@@ -368,4 +905,14 @@
     align-items: center;
     gap: var(--sp-3);
     font-size: var(--fs-lg);
+}
+
+/* The market's open positions: from 560 px of table width (a laptop's market column too) every
+   column but the age ("Open for", priority 3: shown from 960 px; it would push State out of a
+   1,024 px screen's 680 px column); a phone's card keeps what a thumb decides by — the borrower and
+   entry price are a tap away, on the position's page. */
+@container tbl (max-width: 559.98px) {
+    .mk-positions-tbl > .tbl > tbody > tr > td:is([data-col="borrower"], [data-col="entry"]) {
+        display: none;
+    }
 }

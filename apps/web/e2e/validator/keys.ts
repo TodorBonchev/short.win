@@ -106,6 +106,8 @@ export const KEY_NAMES = {
         'chainClaimer',
         'chainAbsent',
         'chainBorrower',
+        // M10-RESP: the phone project's specs (mobile-*.spec.ts) sign only with it.
+        'phone',
     ],
 } as const;
 

@@ -22,9 +22,10 @@ const DIR =
 mkdirSync(DIR, { recursive: true });
 
 /**
- * Waits for the page to settle (no skeleton rows left), then saves `<name>.png`. The shell keeps
- * the header and the status bar fixed and scrolls `main` (FRONTEND.md §3.1), so a full capture
- * grows the viewport to `main`'s scroll height for the shot and restores it afterwards.
+ * Waits for the page to settle (no skeleton rows left), then saves `<name>.png`. The document
+ * scrolls under a sticky header and status bar (FRONTEND.md §3.1, §7.6), so a full capture grows
+ * the viewport to the document's scroll height for the shot (the sticky bars land at the top and
+ * the bottom, as on screen) and restores it afterwards.
  */
 async function shot(page: Page, name: string, opts: { fullPage?: boolean } = {}): Promise<void> {
     await expect(page.locator('.skeleton')).toHaveCount(0, { timeout: 20_000 });
@@ -32,10 +33,7 @@ async function shot(page: Page, name: string, opts: { fullPage?: boolean } = {})
     const extra =
         opts.fullPage === false || !size
             ? 0
-            : await page.evaluate(() => {
-                  const main = document.querySelector('main');
-                  return main ? Math.max(0, main.scrollHeight - main.clientHeight) : 0;
-              });
+            : await page.evaluate(() => Math.max(0, document.documentElement.scrollHeight - window.innerHeight));
     if (size && extra > 0)
         await page.setViewportSize({ width: size.width, height: Math.min(size.height + extra, 6_000) });
     await page.screenshot({ path: join(DIR, `${name}.png`), animations: 'disabled' });

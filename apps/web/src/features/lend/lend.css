@@ -1,4 +1,6 @@
-/* LEND track: the lend panel (360 px trade column) and the lender dashboard (FRONTEND.md §3.6, §3.8, §7). */
+/* LEND track: the lend panel (the 360 px trade column on a desktop, the trade sheet under 1024 px)
+   and the lender dashboard (FRONTEND.md §3.6, §3.8, §7, §7.6). Only the lend pieces are placed here;
+   the shared parts (form foot, chips, cards, action bar) are components.css's. */
 
 .lend {
     display: flex;
@@ -57,6 +59,27 @@
 
 .lend-quick {
     gap: var(--sp-2);
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+/* "≈ N TOKEN" under the withdraw shares input. */
+.lend-approx {
+    margin-top: calc(-1 * var(--sp-2));
+    font-size: var(--fs-sm);
+    color: var(--text-1);
+}
+
+/* A date stays on one line ("until 2026-10-18 00:00 UTC" never splits at its hyphen). */
+.lend-nowrap {
+    white-space: nowrap;
+}
+
+/* The wrapper a form-foot reason focuses (it hands the focus to the checkbox inside). */
+.lend-ack:focus {
+    outline: none;
 }
 
 .lend-tolerance {
@@ -65,6 +88,20 @@
 
 .lend-form .kv dd {
     white-space: nowrap;
+}
+
+/* A phone's sheet is narrow: a long value ("1,000 until 2026-10-16 10:45 UTC") wraps at its spaces
+   rather than squeezing its label to a word a line. */
+@media (max-width: 639.98px) {
+    .lend-form .kv,
+    .lend-position .kv {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    }
+
+    .lend-form .kv dd,
+    .lend-form .kv dd .num {
+        white-space: normal;
+    }
 }
 
 /* The deposit's part of the pool's unpaid rent once it is material (lender.unpaidRent). */
@@ -76,12 +113,195 @@
     margin-left: var(--sp-2);
 }
 
+/* The KPI strip: four in a row from a tablet up, two by two on a phone (the strip's own rules). */
 .lend-dashboard .stat-strip {
-    max-width: 720px;
+    max-width: 880px;
 }
 
-/* the token the panel lends (symbol and mint, M9-SEC-5) and the age of its chain read (§6.6) */
-.lend-token {
-    justify-content: space-between;
+.lend-kpi-note {
+    display: block;
+    font-size: var(--fs-xs);
+    color: var(--text-2);
+}
+
+.lend-kpi-approx > .lend-kpi-note {
+    margin-top: 2px;
+}
+
+/* "Claim all": one element — in the page header on a desktop (the action bar's box steps aside),
+   fixed in the action bar within thumb reach under 1024 px. */
+@media (min-width: 1024px) {
+    .lend-dashboard .page-head > .action-bar {
+        display: contents;
+    }
+}
+
+/* The market link is a whole target: 24 px with a mouse, 44 px with a finger. */
+.lend-table td[data-col="market"] a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-min);
+}
+
+/* Laptops: the lender table drops its priority-3 columns (lock ends, creator — both on the
+   market's lend panel) so the row and its actions fit without scrolling sideways. */
+@media (max-width: 1279.98px) {
+    .lend-table [data-priority="3"] {
+        display: none;
+    }
+}
+
+/* The row's actions: Withdraw and Deposit (into the market's lend panel) and Claim (or Sync), the
+   same small button; then, on the same line, why Claim is off. */
+.lend-table td[data-col="actions"] > .btn + .btn {
+    margin-left: var(--sp-2);
+}
+
+.lend-row-reason {
+    margin-left: var(--sp-3);
+    font-size: var(--fs-xs);
+    color: var(--text-2);
+}
+
+.lend-sync {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
     gap: var(--sp-2);
+}
+
+.lend-sync > span:empty {
+    display: none;
+}
+
+.lend-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-4);
+}
+
+/* Connect wallet (and the chooser it opens) a usable width, centred: the action row spans the
+   empty state rather than shrinking to the button. */
+.lend-dashboard .empty[data-layout="block"] > .empty-action {
+    align-self: stretch;
+}
+
+.lend-dashboard .empty-action > .connect-cta {
+    width: min(360px, 100%);
+}
+
+/* Cards under 960 px of table width — a tablet, a landscape phone, a phone: a lender row carries
+   nine fields and three actions, more than a table row of that width holds. The same card as the
+   shared one under 560 px (components.css, DataTable `card` places), from 960 px down for this
+   table: market and value on top, the labelled fields two by two, the actions a button row. */
+@container tbl (max-width: 959.98px) {
+    .lend-table > .tbl,
+    .lend-table > .tbl > tbody {
+        display: block;
+    }
+
+    /* The header leaves the screen, not the accessibility tree. */
+    .lend-table > .tbl > thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+
+    .lend-table > .tbl > tbody > tr {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--sp-2) var(--sp-3);
+        min-height: 64px;
+        padding: var(--sp-3) var(--sp-4);
+        border-bottom: 1px solid var(--line);
+    }
+
+    .lend-table > .tbl > tbody > tr > td {
+        display: block;
+        width: auto;
+        height: auto;
+        min-width: 0;
+        padding: 0;
+        border: 0;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        text-align: left;
+    }
+
+    .lend-table > .tbl > tbody > tr > td[data-card="title"] {
+        grid-column: 1;
+        align-self: baseline;
+        font-size: var(--fs-md);
+    }
+
+    /* A narrow card: the mint wraps under the symbol rather than run into the value. */
+    .lend-table td[data-card="title"] .token-id {
+        flex-wrap: wrap;
+        column-gap: 6px;
+        row-gap: 0;
+    }
+
+    .lend-table td[data-card="title"] a {
+        max-width: 100%;
+    }
+
+    .lend-table > .tbl > tbody > tr > td[data-card="aside"] {
+        grid-column: 2;
+        align-self: baseline;
+        justify-self: end;
+        text-align: right;
+    }
+
+    .lend-table > .tbl > tbody > tr > td[data-card="actions"] {
+        grid-column: 1 / -1;
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--sp-3);
+    }
+
+    .lend-table > .tbl > tbody > tr > td[data-card="actions"] > .btn {
+        flex: 1;
+        min-height: max(32px, var(--tap-min));
+        margin: 0;
+    }
+
+    .lend-table > .tbl > tbody > tr > td[data-card="actions"] > .lend-row-reason {
+        flex: 1 0 100%;
+        margin: 0;
+    }
+
+    .lend-table > .tbl > tbody > tr > td:not([data-card])[data-label]:not([data-label=""])::before {
+        content: attr(data-label) / "";
+        display: block;
+        margin-bottom: 1px;
+        font-family: var(--font-ui);
+        font-size: var(--fs-xs);
+        font-weight: var(--fw-medium);
+        letter-spacing: 0.04em;
+        color: var(--text-2);
+        text-transform: uppercase;
+    }
+
+    @supports not (content: "x" / "") {
+        .lend-table > .tbl > tbody > tr > td:not([data-card])[data-label]:not([data-label=""])::before {
+            content: attr(data-label);
+        }
+    }
+
+    /* Priority-3 fields (lock ends, creator) stay on the market's lend panel; a quiet "Current"
+       sync cell is dropped (a badge — behind, wiped, indexer behind / quarantined — always shows). */
+    .lend-table > .tbl > tbody > tr > td[data-priority="3"],
+    .lend-table > .tbl > tbody > tr > td[data-col="sync"]:not(:has(.badge)) {
+        display: none;
+    }
+}
+
+/* The total inside "Claim all" reads in the button's own colour (a muted unit fails contrast on the
+   accent). */
+.lend-claim-all-sum .unit {
+    color: inherit;
 }

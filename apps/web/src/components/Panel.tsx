@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 
 export interface PanelProps {
     readonly title?: ReactNode;
@@ -9,12 +9,17 @@ export interface PanelProps {
     readonly className?: string;
     /** Accessible name when the title is not plain text. */
     readonly label?: string;
+    /** The section element (a sheet host: `useSheetMode`, FRONTEND.md §7.6). */
+    readonly ref?: Ref<HTMLElement>;
+    /** Rendered first, before the panel's own head (a sheet's `SheetHead`). */
+    readonly head?: ReactNode;
 }
 
 /** A titled surface. Rendered as a `<section>` labelled by its title. */
-export function Panel({ title, actions, children, flush, testId, className, label }: PanelProps) {
+export function Panel({ title, actions, children, flush, testId, className, label, ref, head }: PanelProps) {
     return (
-        <section className={`panel ${className ?? ''}`.trim()} data-testid={testId} aria-label={label}>
+        <section ref={ref} className={`panel ${className ?? ''}`.trim()} data-testid={testId} aria-label={label}>
+            {head}
             {(title || actions) && (
                 <header className="panel-head">
                     {title && <h2 className="panel-title">{title}</h2>}

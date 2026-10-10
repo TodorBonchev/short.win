@@ -25,7 +25,7 @@ import { LENDER_SOL_REPAYMENT } from '../../config/disclosures.ts';
 import { config } from '../../config/env.ts';
 import { MEMO_PROGRAM, TOKEN_2022_PROGRAM } from '../../config/programs.ts';
 import { T } from '../../config/testids.ts';
-import { formatBps, formatSol } from '../../lib/format.ts';
+import { formatBps, formatSol, formatTokens } from '../../lib/format.ts';
 import { formatUtc } from '../../lib/time.ts';
 import { initMathSync, type MathModule } from '../../math/load.ts';
 import { createAppClient } from '../../rpc/client.ts';
@@ -672,5 +672,77 @@ describe('Lend panel', () => {
         fireEvent.click(screen.getByTestId(T.lendTab('withdraw')));
         expect(onAction).toHaveBeenCalledWith('withdraw');
         expect(screen.getByTestId(T.lendTab('deposit')).getAttribute('aria-selected')).toBe('true');
+    });
+});
+
+describe('Lend panel on any width (M10-RESP, FRONTEND.md §7.6)', () => {
+    const reasonText = (id: string) => screen.getByTestId(id).textContent;
+
+    it('deposit: the form foot says what is missing, first unmet first; its reason focuses the acknowledgement', () => {
+        renderPanel('deposit');
+        expect(reasonText(T.lendDepositReason)).toBe('Enter an amount');
+        fireEvent.change(screen.getByTestId(T.lendAmountInput), { target: { value: '1.5' } });
+        expect(reasonText(T.lendDepositReason)).toBe('Tick the acknowledgement above to continue');
+        // The reason is a button that hands the focus to the checkbox (FormFoot reasonTarget).
+        const ack = screen.getByTestId(T.disclosureAck('lender.solRepayment'));
+        fireEvent.click(within(screen.getByTestId(T.lendDepositReason)).getByRole('button'));
+        expect(document.activeElement).toBe(ack);
+        fireEvent.click(ack);
+        expect(reasonText(T.lendDepositReason)).toBe('');
+        expect(submit().disabled).toBe(false);
+        // Reason first, the submit last: the submit is the form foot's last child.
+        const foot = submit().closest('.form-foot');
+        expect(foot?.lastElementChild).toBe(submit());
+    });
+
+    it('deposit: a CPI-Guarded source points at the bracket box', () => {
+        setChain(chainOf({ accounts: [account(GUARDED, 5_000_000n, { cpiGuard: true })] }));
+        renderPanel('deposit');
+        fireEvent.change(screen.getByTestId(T.lendAmountInput), { target: { value: '1' } });
+        expect(reasonText(T.lendDepositReason)).toBe('Turn CPI Guard off for this deposit (above)');
+        fireEvent.click(within(screen.getByTestId(T.lendDepositReason)).getByRole('button'));
+        expect(document.activeElement).toBe(screen.getByTestId(T.lendCpiGuardBracket));
+    });
+
+    it('without a wallet: Connect wallet in the form foot above the disabled submit, on every tab', () => {
+        h.wallet.current = { ready: true, status: 'disconnected', connected: null };
+        const { unmount } = renderPanel('deposit');
+        expect(reasonText(T.lendDepositReason)).toBe('Connect a wallet first');
+        expect(screen.getByTestId(T.connectCta('lend'))).toBeTruthy();
+        expect(submit().disabled).toBe(true);
+        unmount();
+        const w = renderPanel('withdraw');
+        expect(screen.getByTestId(T.connectCta('lend'))).toBeTruthy();
+        expect(screen.queryByText('You have no shares in this market.')).toBeNull();
+        w.unmount();
+        renderPanel('claim');
+        expect(screen.getByTestId(T.connectCta('lend'))).toBeTruthy();
+    });
+
+    it('withdraw: the 25 / 50 / 75 chips fill a share of the holding, pressed while it is the input', () => {
+        setChain(chainOf({ lender: lenderAccount(simpleLender(500_000_000_000n)), accounts: [account(ATA, 0n)] }));
+        renderPanel('withdraw');
+        expect(reasonText(T.lendWithdrawReason)).toBe('Enter the shares to withdraw');
+        expect(screen.queryByTestId(T.withdrawApprox)).toBeNull();
+        const c75 = screen.getByTestId(T.withdrawPercent('75'));
+        fireEvent.click(c75);
+        expect(c75.getAttribute('aria-pressed')).toBe('true');
+        expect(screen.getByTestId(T.withdrawPercent('25')).getAttribute('aria-pressed')).toBe('false');
+        const input = screen.getByTestId(T.withdrawSharesInput) as HTMLInputElement;
+        // 75 % of 500,000,000,000 raw shares at 6 decimals.
+        expect(input.value).toBe('375000');
+        // "≈ N TOKEN" follows the preview's tokens.
+        const tokens = BigInt(screen.getByTestId(T.withdrawPreview('tokens')).dataset.value ?? '0');
+        expect(tokens > 0n).toBe(true);
+        expect(screen.getByTestId(T.withdrawApprox).textContent).toBe(`≈ ${formatTokens(tokens, 6)}EPjF…Dt1v`);
+        fireEvent.change(input, { target: { value: '1' } });
+        expect(c75.getAttribute('aria-pressed')).toBe('false');
+    });
+
+    it('claim: nothing to claim says so in the form foot', () => {
+        setChain(chainOf({ lender: lenderAccount(simpleLender(500_000_000_000n)) }));
+        renderPanel('claim');
+        expect(reasonText(T.lendClaimReason)).toBe('Nothing to claim yet');
+        expect((screen.getByTestId(T.claimSubmit) as HTMLButtonElement).disabled).toBe(true);
     });
 });

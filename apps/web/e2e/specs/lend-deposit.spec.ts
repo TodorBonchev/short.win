@@ -130,6 +130,9 @@ test.describe('lend: deposit', { tag: '@lend' }, () => {
         const lp = need(await lenderPosition(m.market, app.walletAddress), 'lender position');
         expect(lp.shares).toBeGreaterThanOrEqual((previewShares * 995n) / 1000n);
         await app.closeModal();
+        // Focus never falls to <body>: the Deposit submit, disabled once the form resets after the
+        // confirmed deposit, cannot take it back, so the page's main region does (Modal's focusBack).
+        await expect(app.page.locator('#main')).toBeFocused();
 
         await app.goto('/lend', 'lend');
         await expect(app.id(T.lenderDashboard)).toBeVisible();

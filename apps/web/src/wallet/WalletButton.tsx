@@ -1,5 +1,5 @@
 /**
- * Header wallet control: connect via any discovered Wallet Standard wallet; address + disconnect.
+ * Header wallet control: connect via any discovered Wallet Standard wallet; the account's menu.
  *
  * Wallet identity (M9-SEC-8): two registered wallets can announce the same name and icon (an
  * impostor extension next to the real one). Entries are keyed by object identity, a duplicated
@@ -7,32 +7,37 @@
  * plugin's auto-reconnect by the stored `name:address`) is undone when the name is ambiguous or the
  * wallet came back with another account — the user then picks the wallet explicitly. A wallet that
  * can only sign-and-send is labelled: the app cannot check its transaction before it is sent
- * (FRONTEND.md §5.4).
+ * (FRONTEND.md §5.4). The chooser itself is `WalletChooser.tsx` (shared with ConnectCta).
+ *
+ * Responsive (FRONTEND.md §7.6): on a phone the button reads "Connect" (" wallet" stays in its
+ * accessible name) and the menu is a bottom sheet over a scrim, with a visible title and a ✕, and
+ * history-backed like the trade sheet: opening it pushes a history entry (`state.walletSheet`), so
+ * the browser's / OS Back closes it; closing it any other way pops that entry, and a menu link
+ * replaces it. Without a wallet the popup is a dialog with the open-in-wallet links (mobile) or the
+ * install links (desktop); with wallets or an account, its entries are a `role="menu"`.
  */
-import {
-    useConnect,
-    useConnectedWallet,
-    useDisconnect,
-    useWalletStatus,
-    useWallets,
-} from '@solana/kit-plugin-wallet/react';
-import { useEffect, useRef, useState } from 'react';
+
+import type { Address } from '@solana/kit';
+import { useConnectedWallet, useDisconnect, useWalletStatus } from '@solana/kit-plugin-wallet/react';
+import { useQuery } from '@tanstack/react-query';
+import { Link, useRouter } from '@tanstack/react-router';
+import { useEffect, useId, useRef, useState } from 'react';
+import { qk } from '../api/keys.ts';
 import { Button } from '../components/Button.tsx';
+import { useSheetMode } from '../components/Sheet.tsx';
+import { explorerAddress } from '../config/env.ts';
 import { T } from '../config/testids.ts';
-import { shortAddress } from '../lib/format.ts';
+import { formatSol, shortAddress } from '../lib/format.ts';
+import { useStore } from '../lib/store.ts';
 import { useAppClient } from '../rpc/context.tsx';
+import { PHONE, useMedia } from '../styles/breakpoints.ts';
+import { NoWallet, useWalletList, WalletOptions } from './WalletChooser.tsx';
+import { walletChooser, walletNotice, wasChosen } from './walletUi.ts';
+
+export { sendsItselfFeatures, walletRanks } from './WalletChooser.tsx';
 
 /** The plugin's storage key (`rpc/client.ts`). */
 export const WALLET_STORAGE_KEY = 'shortwin:wallet';
-
-const SIGN_TX = 'solana:signTransaction';
-const SIGN_AND_SEND = 'solana:signAndSendTransaction';
-
-interface WalletLike {
-    readonly name: string;
-    readonly icon?: string;
-    readonly features: readonly string[];
-}
 
 /** The account the plugin will silently reconnect to, as stored before this page load. */
 function savedAtLoad(): { name: string; address: string } | null {
@@ -47,59 +52,215 @@ function savedAtLoad(): { name: string; address: string } | null {
 }
 const SAVED = savedAtLoad();
 
-/** Only `solana:signAndSendTransaction`: the wallet sends itself (no check before sending). */
-export function sendsItselfFeatures(features: readonly string[]): boolean {
-    return features.includes(SIGN_AND_SEND) && !features.includes(SIGN_TX);
-}
-
-/** Per entry: its 1-based rank among the wallets with the same name, and that name's count. */
-export function walletRanks(wallets: readonly WalletLike[]): { rank: number; of: number }[] {
-    const counts = new Map<string, number>();
-    for (const w of wallets) counts.set(w.name, (counts.get(w.name) ?? 0) + 1);
-    const seen = new Map<string, number>();
-    return wallets.map((w) => {
-        const rank = (seen.get(w.name) ?? 0) + 1;
-        seen.set(w.name, rank);
-        return { rank, of: counts.get(w.name) ?? 1 };
+/** The connected account's menu: who, how much SOL, where to go, Disconnect. */
+function AccountMenu({
+    walletName,
+    address,
+    replace,
+    onDone,
+    onDisconnect,
+}: {
+    walletName: string;
+    address: string;
+    /** The popup has its own history entry (a phone): a destination replaces it. */
+    replace: boolean;
+    onDone: () => void;
+    onDisconnect: () => void;
+}) {
+    const client = useAppClient();
+    const [copied, setCopied] = useState(false);
+    const balance = useQuery({
+        queryKey: qk.balance(address as Address),
+        queryFn: async () =>
+            (await client.rpc.getBalance(address as Address, { commitment: 'confirmed' }).send()).value,
+        staleTime: 5_000,
     });
+    const explorer = explorerAddress(address);
+    return (
+        <>
+            <div className="menu-label">
+                <bdi>{walletName}</bdi>
+            </div>
+            <span className="menu-address" data-value={address}>
+                {address}
+            </span>
+            <div className="menu-label">
+                Balance{' '}
+                <span className="num">{balance.data === undefined ? '—' : `${formatSol(balance.data, 4)} SOL`}</span>
+            </div>
+            <div className="menu-sep" />
+            <div role="menu" aria-label="Account">
+                <button
+                    type="button"
+                    role="menuitem"
+                    className="menu-item"
+                    data-testid={T.walletCopyAddress}
+                    onClick={() => {
+                        void navigator.clipboard?.writeText(address).then(() => {
+                            setCopied(true);
+                            setTimeout(() => setCopied(false), 1_200);
+                        });
+                    }}
+                >
+                    {copied ? 'Copied' : 'Copy address'}
+                </button>
+                {explorer && (
+                    <a
+                        role="menuitem"
+                        className="menu-item"
+                        href={explorer}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-testid={T.walletExplorer}
+                    >
+                        View on explorer <span aria-hidden="true">↗</span>
+                    </a>
+                )}
+                <Link
+                    to="/positions"
+                    replace={replace}
+                    role="menuitem"
+                    className="menu-item"
+                    data-testid={T.walletMyPositions}
+                    onClick={onDone}
+                >
+                    My positions
+                </Link>
+                <Link
+                    to="/lend"
+                    replace={replace}
+                    role="menuitem"
+                    className="menu-item"
+                    data-testid={T.walletMyLending}
+                    onClick={onDone}
+                >
+                    My lending
+                </Link>
+                <button
+                    type="button"
+                    role="menuitem"
+                    className="menu-item"
+                    data-testid={T.walletDisconnect}
+                    onClick={onDisconnect}
+                >
+                    Disconnect
+                </button>
+            </div>
+        </>
+    );
 }
 
-const ids = new WeakMap<object, number>();
-let nextId = 0;
-function identity(w: object): number {
-    let id = ids.get(w);
-    if (id === undefined) {
-        id = ++nextId;
-        ids.set(w, id);
-    }
-    return id;
-}
-
-function featureHint(features: readonly string[]): string {
-    if (sendsItselfFeatures(features)) return 'sends transactions itself';
-    if (features.includes(SIGN_TX)) return 'signs transactions';
-    return 'cannot sign transactions';
+/**
+ * The popup's title row: on a phone a visible title and a 44 px ✕ (the bottom sheet's); from 640 px
+ * up not shown, its title still naming the popup (`aria-labelledby`).
+ */
+function MenuHead({ titleId, title, onClose }: { titleId: string; title: string; onClose: () => void }) {
+    return (
+        <div className="menu-head">
+            <h2 id={titleId} className="menu-title">
+                {title}
+            </h2>
+            <button
+                type="button"
+                className="btn sheet-close"
+                data-variant="ghost"
+                aria-label="Close"
+                data-testid={T.walletSheetClose}
+                onClick={onClose}
+            >
+                ✕
+            </button>
+        </div>
+    );
 }
 
 export function WalletButton() {
     const client = useAppClient();
     const status = useWalletStatus(client);
-    const wallets = useWallets(client) as readonly (WalletLike & object)[];
+    const wallets = useWalletList();
     const connected = useConnectedWallet(client);
-    const connect = useConnect(client);
     const disconnect = useDisconnect(client);
-    const [open, setOpen] = useState(false);
-    const [notice, setNotice] = useState<string | null>(null);
-    const chosen = useRef(false);
+    const open = useStore(walletChooser) === 'header';
+    const router = useRouter({ warn: false }) as ReturnType<typeof useRouter> | undefined;
+    const phone = useMedia(PHONE);
+    /** Whether the current history entry is the popup's own (pushed on a phone). */
+    const backed = () => router?.history.location.state.walletSheet === true;
+    const setOpen = (v: boolean) => {
+        walletChooser.set(v ? 'header' : null);
+        if (v && phone && router && !backed()) {
+            void router.navigate({
+                href: router.history.location.href,
+                state: (prev) => ({ ...prev, walletSheet: true }),
+                resetScroll: false,
+            });
+        }
+    };
     const box = useRef<HTMLDivElement>(null);
+    const menu = useRef<HTMLDivElement>(null);
+    const titleId = useId();
+
+    // History-backed on a phone: Back pops the popup's entry → close; closed any other way (✕, the
+    // scrim, Escape, a pick, Disconnect) → pop it. A menu link has replaced it by then (no pop).
+    useEffect(() => {
+        if (!open || !router) return;
+        return router.history.subscribe(() => {
+            if (router.history.location.state.walletSheet !== true) {
+                walletChooser.set((o) => (o === 'header' ? null : o));
+            }
+        });
+    }, [open, router]);
+    const wasOpen = useRef(false);
+    // Picking a wallet closes the popup while the button is busy (disabled: it cannot take focus
+    // back yet); focus goes to it once the connection settles, if it went nowhere else.
+    const focusWhenReady = useRef(false);
+    useEffect(() => {
+        if (open) {
+            wasOpen.current = true;
+            return;
+        }
+        if (!wasOpen.current) return;
+        wasOpen.current = false;
+        const button = box.current?.querySelector<HTMLButtonElement>(`[data-testid="${T.walletButton}"]`);
+        focusWhenReady.current = !!button?.disabled;
+        if (router?.history.location.state.walletSheet === true) router.history.back();
+    }, [open, router]);
+    // The popup is modal at every width (the page behind it inert, focus inside, Escape, focus back
+    // to the button): a bottom sheet over a scrim on a phone; on a desktop it no longer leaves the
+    // page's controls under it half-covered yet live (axe target-size; FRONTEND.md §7.6).
+    useSheetMode(menu, {
+        open,
+        onClose: () => walletChooser.set(null),
+        query: 'all',
+        labelledBy: titleId,
+        // The first entry (not the phone's ✕): a menu is used from the keyboard by its items.
+        initialFocus: () =>
+            [...(menu.current?.querySelectorAll<HTMLElement>('a[href], button:not(:disabled)') ?? [])].find(
+                (e) => !e.closest('.menu-head'),
+            ) ?? null,
+    });
+    // The header chooser does not outlive the header.
+    useEffect(() => () => walletChooser.set((o) => (o === 'header' ? null : o)), []);
 
     useEffect(() => {
         if (!open) return;
-        const close = (e: MouseEvent) => {
-            if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+        // A press outside, or on the phone sheet's scrim (inside the anchor), closes it.
+        const close = (e: PointerEvent) => {
+            const t = e.target as Element | null;
+            if (!box.current || !t) return;
+            if (!box.current.contains(t) || t.classList?.contains('menu-scrim')) walletChooser.set(null);
         };
-        document.addEventListener('mousedown', close);
-        return () => document.removeEventListener('mousedown', close);
+        // Focus goes back to the button from the sheet hook once the popup is gone (the button is
+        // inert while it is open, so a focus call here would be lost).
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key !== 'Escape' || !box.current?.contains(document.activeElement)) return;
+            walletChooser.set(null);
+        };
+        document.addEventListener('pointerdown', close);
+        document.addEventListener('keydown', onKey);
+        return () => {
+            document.removeEventListener('pointerdown', close);
+            document.removeEventListener('keydown', onKey);
+        };
     }, [open]);
 
     // A silent reconnect picks the first wallet with the stored name and, when the stored account
@@ -108,7 +269,7 @@ export function WalletButton() {
     const connectedAddress = connected?.account.address ?? null;
     const sameName = connectedName ? wallets.filter((w) => w.name === connectedName).length : 0;
     useEffect(() => {
-        if (chosen.current || !connectedName || !connectedAddress) return;
+        if (wasChosen() || !connectedName || !connectedAddress) return;
         let reason: string | null = null;
         if (sameName > 1) {
             reason = `More than one installed wallet calls itself “${connectedName}”. Choose the one to use.`;
@@ -116,22 +277,30 @@ export function WalletButton() {
             reason = `“${connectedName}” reconnected with another account than last time. Choose it again to confirm.`;
         }
         if (reason) {
-            setNotice(reason);
+            walletNotice.set(reason);
             disconnect.dispatch();
         }
     }, [connectedName, connectedAddress, sameName, disconnect]);
 
-    const ranks = walletRanks(wallets);
     const warming = status === 'pending' || status === 'reconnecting';
+    const noWallet = !connected && wallets.length === 0;
+    const busy = warming || status === 'connecting';
+    useEffect(() => {
+        if (busy || !focusWhenReady.current) return;
+        focusWhenReady.current = false;
+        const a = document.activeElement;
+        if (a && a !== document.body) return;
+        box.current?.querySelector<HTMLElement>(`[data-testid="${T.walletButton}"]`)?.focus({ preventScroll: true });
+    }, [busy]);
     return (
-        <div ref={box} style={{ position: 'relative' }}>
+        <div ref={box} className="wallet-anchor">
             <Button
                 variant={connected ? 'default' : 'primary'}
-                busy={warming || status === 'connecting'}
+                busy={busy}
                 data-testid={T.walletButton}
-                aria-haspopup="menu"
+                aria-haspopup={noWallet ? 'dialog' : 'menu'}
                 aria-expanded={open}
-                onClick={() => setOpen((o) => !o)}
+                onClick={() => setOpen(!open)}
             >
                 {connected ? (
                     <span className="num" data-testid={T.walletAddress} data-value={connected.account.address}>
@@ -140,91 +309,49 @@ export function WalletButton() {
                 ) : warming ? (
                     'Wallet…'
                 ) : (
-                    'Connect wallet'
+                    <>
+                        Connect<span className="wallet-word"> wallet</span>
+                    </>
                 )}
             </Button>
             {open && (
-                <div
-                    className="menu"
-                    role="menu"
-                    data-testid={T.walletMenu}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Escape') setOpen(false);
-                    }}
-                >
-                    {notice && !connected && (
-                        <div className="banner" data-tone="warn" role="status" style={{ margin: 4 }}>
-                            {notice}
-                        </div>
-                    )}
-                    {connected ? (
-                        <>
-                            <div className="muted" style={{ padding: '4px 8px', fontSize: 11 }}>
-                                <bdi>{connected.wallet.name}</bdi>
-                            </div>
-                            <button
-                                type="button"
-                                role="menuitem"
-                                className="menu-item"
-                                data-testid={T.walletDisconnect}
-                                onClick={() => {
-                                    disconnect.dispatch();
-                                    setOpen(false);
-                                }}
-                            >
-                                Disconnect
-                            </button>
-                        </>
-                    ) : wallets.length === 0 ? (
-                        <div className="muted" style={{ padding: 8 }}>
-                            No Solana wallet found. Install a Wallet Standard wallet (for example Phantom, Solflare or
-                            Backpack).
+                <>
+                    <div className="menu-scrim" aria-hidden="true" data-sheet-keep="" />
+                    {noWallet ? (
+                        <div
+                            ref={menu}
+                            className="menu"
+                            role="dialog"
+                            aria-labelledby={titleId}
+                            data-testid={T.walletMenu}
+                        >
+                            <MenuHead titleId={titleId} title="Connect a wallet" onClose={() => setOpen(false)} />
+                            <NoWallet />
                         </div>
                     ) : (
-                        wallets.map((w, i) => {
-                            const { rank, of } = ranks[i] ?? { rank: 1, of: 1 };
-                            const selfSending = sendsItselfFeatures(w.features);
-                            return (
-                                <button
-                                    key={identity(w)}
-                                    type="button"
-                                    role="menuitem"
-                                    className="menu-item"
-                                    data-testid={T.walletOption(rank === 1 ? w.name : `${w.name} (${rank})`)}
-                                    data-duplicate={of > 1 ? String(rank) : undefined}
-                                    disabled={connect.isRunning}
-                                    title={
-                                        of > 1 ? `Registered ${rank} of ${of} · ${featureHint(w.features)}` : undefined
-                                    }
-                                    onClick={() => {
-                                        chosen.current = true;
-                                        setNotice(null);
-                                        connect.dispatch(w as Parameters<typeof connect.dispatch>[0]);
+                        <div ref={menu} className="menu" data-testid={T.walletMenu}>
+                            <MenuHead
+                                titleId={titleId}
+                                title={connected ? 'Wallet' : 'Connect a wallet'}
+                                onClose={() => setOpen(false)}
+                            />
+                            {connected ? (
+                                <AccountMenu
+                                    walletName={connected.wallet.name}
+                                    address={connected.account.address}
+                                    replace={backed()}
+                                    onDone={() => setOpen(false)}
+                                    onDisconnect={() => {
+                                        disconnect.dispatch();
                                         setOpen(false);
                                     }}
-                                >
-                                    {w.icon && <img src={w.icon} alt="" />}
-                                    <bdi>{w.name}</bdi>
-                                    {of > 1 && (
-                                        <span className="badge" data-tone="warn" data-testid={T.walletDuplicate}>
-                                            same name · {rank} of {of} · {featureHint(w.features)}
-                                        </span>
-                                    )}
-                                    {selfSending && (
-                                        <span
-                                            className="badge"
-                                            data-tone="warn"
-                                            data-testid={T.walletSendsItself}
-                                            title="This wallet sends transactions itself: the app cannot check them before they are sent, only after they land."
-                                        >
-                                            sends itself · checked after landing
-                                        </span>
-                                    )}
-                                </button>
-                            );
-                        })
+                                />
+                            ) : (
+                                <WalletOptions wallets={wallets} asMenu onPicked={() => setOpen(false)} />
+                            )}
+                        </div>
                     )}
-                </div>
+                </>
             )}
         </div>
     );

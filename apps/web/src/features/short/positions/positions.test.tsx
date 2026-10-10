@@ -7,6 +7,7 @@ import { type Address, createNoopSigner } from '@solana/kit';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Position } from '../../../api/types.ts';
+import { ToastProvider } from '../../../components/Toast.tsx';
 import { T } from '../../../config/testids.ts';
 import type { MathModule } from '../../../math/load.ts';
 import { positionMetrics } from '../previews.ts';
@@ -65,7 +66,7 @@ const { CloseForm } = await import('./CloseForm.tsx');
 const { AddMarginForm } = await import('./AddMarginForm.tsx');
 const { exitState } = await import('./SettlementRisk.tsx');
 const { buildRows } = await import('./data.ts');
-const { liveChannels } = await import('../PositionsPage.tsx');
+const { liveChannels, positionTotals } = await import('../PositionsPage.tsx');
 
 let math: MathModule;
 beforeAll(() => {
@@ -86,7 +87,11 @@ describe('close form', () => {
     it('previews exactly what close_short paid', async () => {
         const { c, s, pos } = await closeCase('spl-close-after-fall');
         wallet.address = c.borrower;
-        render(<CloseForm math={math} snapshot={s} position={c.position as Address} pos={pos} symbol="MOCK" />);
+        render(
+            <ToastProvider>
+                <CloseForm math={math} snapshot={s} position={c.position as Address} pos={pos} symbol="MOCK" />
+            </ToastProvider>,
+        );
         const e = c.result.event ?? {};
         expect(v(T.closePreview('buyback'))).toBe(String(e.buybackCost));
         expect(v(T.closePreview('rent'))).toBe(String(e.rent));
@@ -94,22 +99,35 @@ describe('close form', () => {
         expect(BigInt(v(T.closePreview('pnl')) ?? 0)).toBe(BigInt(String(e.borrowerPayout)) - pos.m - pos.feeOpen);
         expect(screen.queryByTestId(T.closeStraddleNotice)).toBeNull();
         expect((screen.getByTestId(T.closeSubmit) as HTMLButtonElement).disabled).toBe(false);
+        expect(screen.getByTestId(T.closeReason).textContent).toBe('');
     });
 
     it('is not offered to another wallet', async () => {
         const { c, s, pos } = await closeCase('spl-close-after-rise');
         wallet.address = 'BPFLoaderUpgradeab1e11111111111111111111111';
-        render(<CloseForm math={math} snapshot={s} position={c.position as Address} pos={pos} symbol="MOCK" />);
+        render(
+            <ToastProvider>
+                <CloseForm math={math} snapshot={s} position={c.position as Address} pos={pos} symbol="MOCK" />
+            </ToastProvider>,
+        );
         expect((screen.getByTestId(T.closeSubmit) as HTMLButtonElement).disabled).toBe(true);
+        expect(screen.getByTestId(T.closeReason).textContent).toBe('This position belongs to another wallet');
     });
 
     it('explains a vault that cannot pay the buyback', async () => {
         const { c, s, pos } = await closeCase('spl-close-after-rise');
         wallet.address = c.borrower;
         const thin = { ...pos, v: 1_000n };
-        render(<CloseForm math={math} snapshot={s} position={c.position as Address} pos={thin} symbol="MOCK" />);
+        render(
+            <ToastProvider>
+                <CloseForm math={math} snapshot={s} position={c.position as Address} pos={thin} symbol="MOCK" />
+            </ToastProvider>,
+        );
         expect(screen.getByText(/Add margin to close/)).toBeTruthy();
         expect((screen.getByTestId(T.closeSubmit) as HTMLButtonElement).disabled).toBe(true);
+        expect(screen.getByTestId(T.closeReason).textContent).toBe(
+            'Add margin first: the vault cannot cover the buyback',
+        );
     });
 });
 
@@ -120,14 +138,22 @@ describe('add margin form', () => {
         const pos = decodePosition(get(c.position as Address));
         if (!pos) throw new Error('position');
         wallet.address = c.borrower;
-        render(<AddMarginForm math={math} snapshot={s} position={c.position as Address} pos={pos} symbol="MOCK" />);
+        render(
+            <ToastProvider>
+                <AddMarginForm math={math} snapshot={s} position={c.position as Address} pos={pos} symbol="MOCK" />
+            </ToastProvider>,
+        );
         fireEvent.change(screen.getByTestId(T.addMarginInput), { target: { value: '1.5' } });
         const after = c.result.position ?? {};
         const want = positionMetrics(math, s, { ...pos, v: BigInt(String(after.v)), m: BigInt(String(after.m)) }).crBps;
         expect(v(T.addMarginPreviewCr)).toBe(want?.toString());
         expect((screen.getByTestId(T.addMarginSubmit) as HTMLButtonElement).disabled).toBe(false);
+        expect(screen.getByTestId(T.addMarginReason).textContent).toBe('');
         fireEvent.change(screen.getByTestId(T.addMarginInput), { target: { value: '100000' } });
         expect((screen.getByTestId(T.addMarginSubmit) as HTMLButtonElement).disabled).toBe(true);
+        expect(screen.getByTestId(T.addMarginReason).textContent).toBe('Above your SOL balance less 0.01 SOL for fees');
+        fireEvent.change(screen.getByTestId(T.addMarginInput), { target: { value: '' } });
+        expect(screen.getByTestId(T.addMarginReason).textContent).toBe('Enter an amount of SOL');
     });
 });
 
@@ -189,6 +215,11 @@ describe('exit state and the dashboard rows', () => {
         expect(rows[0]?.metrics?.payout).toBe(BigInt(String(c.result.event?.borrowerPayout)));
         expect(rows[1]?.metrics).toBeNull();
         expect(liveChannels(rows)).toEqual([`position:${c.position}`]);
+        // The totals line: the open vault and rent due; P&L of the rows that have one (the open row).
+        const t = positionTotals(rows);
+        expect(t).toMatchObject({ count: 2, open: 1, vault: pos.v, missingPnl: 1 });
+        expect(t.pnl).toBe(rows[0]?.metrics?.pnl);
+        expect(t.rent).toBe(rows[0]?.metrics?.rentDue);
         const many = Array.from({ length: 50 }, (_, i) => ({ ...rows[0], position: `p${i}` }) as (typeof rows)[number]);
         expect(liveChannels(many)).toHaveLength(40);
     });

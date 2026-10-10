@@ -278,6 +278,16 @@ export class App {
 
     /** WCAG 2.2 A/AA axe scan of the current page (or `scope`); fails on any violation. */
     async a11y(label: string, scope?: string): Promise<void> {
+        // A sheet that just opened still fades in (`--t-sheet`): axe would read its text half
+        // transparent (colour contrast). Measure the settled page: wait out running animations.
+        await this.page.evaluate(() =>
+            Promise.all(
+                document
+                    .getAnimations()
+                    .filter((a) => a.playState === 'running' && a.effect?.getTiming().iterations !== Infinity)
+                    .map((a) => a.finished.catch(() => undefined)),
+            ).then(() => undefined),
+        );
         let b = new AxeBuilder({ page: this.page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']);
         if (scope) b = b.include(scope);
         const r = await b.analyze();

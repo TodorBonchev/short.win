@@ -9,15 +9,17 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Button } from '../../../components/Button.tsx';
+import { FormFoot } from '../../../components/FormFoot.tsx';
 import { Sol } from '../../../components/Num.tsx';
 import { Kv } from '../../../components/States.tsx';
 import { lenderRiskVars } from '../../../config/disclosureVars.ts';
 import { T } from '../../../config/testids.ts';
 import { formatSol } from '../../../lib/format.ts';
+import { ConnectCta } from '../../../wallet/ConnectCta.tsx';
 import { claimPlanFrom, coverPlanFrom } from '../build.ts';
 import { type LendCtx, lendEnvOf, lendStateOf, nowFor } from '../ctx.ts';
 import { previewClaimView } from '../previews.ts';
-import { Blocked, RefusalLine } from '../ui.tsx';
+import { Blocked, RefusalLine, solFrac } from '../ui.tsx';
 import { indexerLenders } from './otherLenders.ts';
 
 /** SOL kept back in the wallet for fees when covering a deficit. */
@@ -31,6 +33,14 @@ export function ClaimForm({ ctx }: { ctx: LendCtx }) {
     const now = nowFor(ctx, 'clock');
     const view = previewClaimView(math, lendStateOf(chain), now);
 
+    if (!signer) {
+        return (
+            <div className="stack lend-form">
+                <div className="muted">Connect a wallet to see what you can claim in this market.</div>
+                <ConnectCta surface="lend" />
+            </div>
+        );
+    }
     if (!chain.lender) return <div className="muted lend-form">You have no lender position in this market.</div>;
     if (!view.ok) return <RefusalLine refusal={view.refusal} />;
     const v = view.value;
@@ -63,13 +73,24 @@ export function ClaimForm({ ctx }: { ctx: LendCtx }) {
     };
 
     const canCover = chain.walletLamports >= v.deficit + FEE_RESERVE;
+    // Why the claim cannot open yet: the same predicates as its `disabled` (§7.6).
+    const reason = ctx.stale
+        ? 'Waiting for a fresh chain read'
+        : v.claimable === 0n && v.shortfall === 0n
+          ? 'Nothing to claim yet'
+          : null;
     return (
         <div className="stack lend-form">
             <Kv
                 rows={[
                     [
                         'Claimable now',
-                        <Sol key="c" lamports={v.claimable} frac={6} testId={T.claimValue('claimable')} />,
+                        <Sol
+                            key="c"
+                            lamports={v.claimable}
+                            frac={solFrac(v.claimable)}
+                            testId={T.claimValue('claimable')}
+                        />,
                     ],
                     ['Credited to you', <Sol key="e" lamports={v.entitled} frac={6} />],
                     [
@@ -92,16 +113,18 @@ export function ClaimForm({ ctx }: { ctx: LendCtx }) {
                     {buildError}
                 </div>
             )}
-            <Button
-                variant="primary"
-                block
-                busy={building === 'claim'}
-                disabled={!signer || building !== null || !!ctx.stale || (v.claimable === 0n && v.shortfall === 0n)}
-                onClick={() => void claim()}
-                data-testid={T.claimSubmit}
-            >
-                {`Review claim · ${formatSol(v.claimable, 6)} SOL`}
-            </Button>
+            <FormFoot reason={reason} reasonTestId={T.lendClaimReason}>
+                <Button
+                    variant="primary"
+                    block
+                    busy={building === 'claim'}
+                    disabled={reason !== null || building !== null}
+                    onClick={() => void claim()}
+                    data-testid={T.claimSubmit}
+                >
+                    {`Review claim · ${formatSol(v.claimable, solFrac(v.claimable))} SOL`}
+                </Button>
+            </FormFoot>
             {v.deficit > 0n && (
                 <>
                     <Blocked code="NegativePending">

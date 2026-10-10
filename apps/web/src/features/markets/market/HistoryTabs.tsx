@@ -3,20 +3,33 @@
  * first, creator badges, the coin creator's share), Liquidations (kind, condition S1–S3, Q, buyback,
  * lender amount, keeper paid, borrower payout), Pools (current pool, candidates, the window,
  * adoption history), Coverage (gaps, pauses, observations) and Events.
+ *
+ * Every table is a DataTable (M10-RESP): it hides its secondary columns or becomes cards by the
+ * width it has (the 680 px market column at 1,024 px, a tablet, a phone), keeping its test ids and
+ * row state attributes.
  */
 import type { Address } from '@solana/kit';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useMemo } from 'react';
 import { indexerQueries } from '../../../api/queries.ts';
-import { big, type ExitEvent, type MarketDetail, type Position } from '../../../api/types.ts';
+import {
+    big,
+    type ExitEvent,
+    type IndexerEvent,
+    type LenderPosition,
+    type MarketCoverage,
+    type MarketDetail,
+    type MarketPools,
+    type Position,
+} from '../../../api/types.ts';
 import { AddressText } from '../../../components/Address.tsx';
 import { Badge, venueLabel } from '../../../components/Badge.tsx';
 import { Countdown } from '../../../components/Countdown.tsx';
 import { type Column, DataTable } from '../../../components/DataTable.tsx';
 import { Disclosure } from '../../../components/Disclosure.tsx';
 import { Bps, Price, Sol, Tokens } from '../../../components/Num.tsx';
-import { Empty, ErrorState, Kv, Skeleton } from '../../../components/States.tsx';
+import { ErrorState, Skeleton } from '../../../components/States.tsx';
 import { BREAK_EVEN_DAYS } from '../../../config/disclosures.ts';
 import { T } from '../../../config/testids.ts';
 import { formatDuration, formatFixed, shortAddress } from '../../../lib/format.ts';
@@ -25,6 +38,7 @@ import { useNow } from '../../../shell/freshness.tsx';
 import { useMarketPositionsLive } from '../../short/positions/data.ts';
 import { CrValue, RiskCell } from '../../short/ui.tsx';
 import { Age, SignatureLink } from '../shared/cells.tsx';
+import { KvLines } from '../shared/KvLines.tsx';
 import { CreatorBadges } from './CreatorDeposits.tsx';
 import type { MarketView } from './marketView.ts';
 
@@ -41,25 +55,37 @@ export function PositionsTab({ mint, decimals }: { mint: Address; decimals: numb
     const keys = useMemo(() => (q.data?.data.data ?? []).map((p) => p.position as Address), [q.data]);
     const live = useMarketPositionsLive(mint, keys);
     const cols: Column<Position>[] = [
-        { key: 'position', header: 'Position', render: (p) => <span className="num">{shortAddress(p.position)}</span> },
-        { key: 'borrower', header: 'Borrower', render: (p) => <span className="num">{shortAddress(p.borrower)}</span> },
+        {
+            key: 'position',
+            header: 'Position',
+            card: 'title',
+            render: (p) => <span className="num">{shortAddress(p.position)}</span>,
+        },
+        {
+            key: 'borrower',
+            header: 'Borrower',
+            priority: 2,
+            render: (p) => <span className="num">{shortAddress(p.borrower)}</span>,
+        },
         {
             key: 'q',
             header: 'Q owed',
             align: 'right',
             render: (p) => <Tokens raw={big(p.q)} decimals={decimals} />,
         },
-        { key: 'v', header: 'Vault', align: 'right', render: (p) => <Sol lamports={big(p.v)} /> },
+        { key: 'v', header: 'Vault', align: 'right', priority: 2, render: (p) => <Sol lamports={big(p.v)} /> },
         {
             key: 'm',
             header: 'Margin',
             align: 'right',
+            priority: 2,
             render: (p) => <Sol lamports={big(p.m) + big(p.margin_added)} />,
         },
         {
             key: 'entry',
             header: 'Entry (SOL)',
             align: 'right',
+            priority: 2,
             render: (p) => <Price wad={big(p.entry_price)} decimals={decimals} unit={false} />,
         },
         {
@@ -74,6 +100,7 @@ export function PositionsTab({ mint, decimals }: { mint: Address; decimals: numb
         {
             key: 'risk',
             header: 'Risk',
+            card: 'aside',
             render: (p) => {
                 const l = live.get(p.position as Address);
                 return l ? (
@@ -83,11 +110,24 @@ export function PositionsTab({ mint, decimals }: { mint: Address; decimals: numb
                 );
             },
         },
-        { key: 'opened', header: 'Open for', align: 'right', render: (p) => <Age ts={p.opened_ts} now={now} /> },
-        { key: 'left', header: 'Time left', align: 'right', render: (p) => <Countdown deadline={p.deadline} /> },
+        {
+            key: 'opened',
+            header: 'Open for',
+            align: 'right',
+            priority: 3,
+            render: (p) => <Age ts={p.opened_ts} now={now} />,
+        },
+        {
+            key: 'left',
+            header: 'Time left',
+            align: 'right',
+            priority: 2,
+            render: (p) => <Countdown deadline={p.deadline} />,
+        },
         {
             key: 'state',
             header: 'State',
+            priority: 2,
             render: (p) =>
                 p.armed ? (
                     <Badge tone="danger" title="A SOL settlement is armed for this position">
@@ -102,6 +142,7 @@ export function PositionsTab({ mint, decimals }: { mint: Address; decimals: numb
     return (
         <>
             <DataTable
+                className="mk-tbl mk-positions-tbl"
                 caption="Open positions"
                 testId={T.marketPositions}
                 columns={cols}
@@ -112,6 +153,7 @@ export function PositionsTab({ mint, decimals }: { mint: Address; decimals: numb
                 onRowActivate={(p) =>
                     void navigate({ to: '/positions/$position', params: { position: p.position as Address } })
                 }
+                skeletonRows={3}
                 empty="No open positions. Opened shorts appear here."
             />
             <p className="mk-note">
@@ -124,6 +166,64 @@ export function PositionsTab({ mint, decimals }: { mint: Address; decimals: numb
 
 // ---- Lenders -----------------------------------------------------------------------------------
 
+type Lender = LenderPosition;
+
+function lenderColumns(decimals: number, now: number): Column<Lender>[] {
+    return [
+        {
+            key: 'lender',
+            header: 'Lender',
+            card: 'title',
+            render: (l) => (
+                <>
+                    <AddressText address={l.owner} />
+                    <CreatorBadges l={l} />
+                </>
+            ),
+        },
+        {
+            key: 'share',
+            header: 'Share',
+            align: 'right',
+            card: 'aside',
+            render: (l) => (l.share_bps === null ? '—' : <Bps value={l.share_bps} />),
+        },
+        {
+            key: 'deposited',
+            header: 'Deposited',
+            align: 'right',
+            render: (l) => <Tokens raw={big(l.deposited_tokens)} decimals={decimals} />,
+        },
+        {
+            key: 'withdrawn',
+            header: 'Withdrawn',
+            align: 'right',
+            priority: 2,
+            render: (l) => <Tokens raw={big(l.withdrawn_tokens)} decimals={decimals} />,
+        },
+        {
+            key: 'paid',
+            header: 'SOL paid out',
+            align: 'right',
+            render: (l) => <Sol lamports={big(l.sol_paid)} />,
+        },
+        {
+            key: 'lock',
+            header: 'Locked until',
+            align: 'right',
+            priority: 2,
+            render: (l) => <span className="num">{l.lock_until > now ? formatUtc(l.lock_until) : '—'}</span>,
+        },
+        {
+            key: 'last',
+            header: 'Last activity',
+            align: 'right',
+            priority: 2,
+            render: (l) => <Age ts={l.last_ts} now={now} />,
+        },
+    ];
+}
+
 export function LendersTab({ mint, view, detail }: { mint: Address; view: MarketView; detail: MarketDetail }) {
     const q = useQuery(indexerQueries.marketLenders(mint));
     const now = useNowS();
@@ -131,10 +231,9 @@ export function LendersTab({ mint, view, detail }: { mint: Address; view: Market
     const exp = detail.creator_exposure;
     const loss = detail.lender_loss;
     if (q.isError) return <ErrorState error={q.error} retry={() => void q.refetch()} />;
-    const rows = q.data?.data.data;
     return (
         <>
-            <div className="row">
+            <div className="row mk-creator-share">
                 <span className="secondary">Coin creator’s share of the pool:</span>
                 <span data-testid={T.marketCreatorShare} data-value={exp.coin_creator_share_bps ?? ''}>
                     {exp.coin_creator_share_bps === null ? (
@@ -145,76 +244,22 @@ export function LendersTab({ mint, view, detail }: { mint: Address; view: Market
                 </span>
                 {exp.coin_creator && <AddressText address={exp.coin_creator} />}
             </div>
-            <div className="tbl-wrap">
-                <table className="tbl" data-testid={T.marketLenders} aria-busy={q.isPending || undefined}>
-                    <caption className="visually-hidden">Lenders, largest share first</caption>
-                    <thead>
-                        <tr>
-                            <th scope="col">Lender</th>
-                            <th scope="col" data-align="right">
-                                Share
-                            </th>
-                            <th scope="col" data-align="right">
-                                Deposited
-                            </th>
-                            <th scope="col" data-align="right">
-                                Withdrawn
-                            </th>
-                            <th scope="col" data-align="right">
-                                SOL paid out
-                            </th>
-                            <th scope="col" data-align="right">
-                                Locked until
-                            </th>
-                            <th scope="col" data-align="right">
-                                Last activity
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {q.isPending ? (
-                            <tr>
-                                <td colSpan={7}>
-                                    <Skeleton width={240} />
-                                </td>
-                            </tr>
-                        ) : (
-                            rows?.map((l) => (
-                                <tr
-                                    key={l.owner}
-                                    data-testid={T.marketLenderRow(l.owner)}
-                                    data-coin-creator={String(l.is_coin_creator)}
-                                    data-market-creator={String(l.is_market_creator)}
-                                >
-                                    <td>
-                                        <AddressText address={l.owner} />
-                                        <CreatorBadges l={l} />
-                                    </td>
-                                    <td data-align="right">
-                                        {l.share_bps === null ? '—' : <Bps value={l.share_bps} />}
-                                    </td>
-                                    <td data-align="right">
-                                        <Tokens raw={big(l.deposited_tokens)} decimals={decimals} />
-                                    </td>
-                                    <td data-align="right">
-                                        <Tokens raw={big(l.withdrawn_tokens)} decimals={decimals} />
-                                    </td>
-                                    <td data-align="right">
-                                        <Sol lamports={big(l.sol_paid)} />
-                                    </td>
-                                    <td data-align="right" className="num">
-                                        {l.lock_until > now ? formatUtc(l.lock_until) : '—'}
-                                    </td>
-                                    <td data-align="right">
-                                        <Age ts={l.last_ts} now={now} />
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-                {rows && rows.length === 0 && <Empty>No lenders yet. Deposits appear here.</Empty>}
-            </div>
+            <DataTable
+                className="mk-tbl"
+                caption="Lenders, largest share first"
+                testId={T.marketLenders}
+                columns={lenderColumns(decimals, now)}
+                rows={q.data?.data.data}
+                loading={q.isPending}
+                skeletonRows={3}
+                rowKey={(l) => l.owner}
+                rowTestId={(l) => T.marketLenderRow(l.owner)}
+                rowAttrs={(l) => ({
+                    'data-coin-creator': String(l.is_coin_creator),
+                    'data-market-creator': String(l.is_market_creator),
+                })}
+                empty="No lenders yet. Deposits appear here."
+            />
             <Disclosure
                 id="lender.lossHistory"
                 vars={{
@@ -236,110 +281,140 @@ const EXIT_TEXT: Readonly<Record<ExitEvent['kind'], string>> = {
     settlement: 'SOL settlement',
 };
 
+function solOrDash(v: string | null) {
+    return v === null ? <span className="muted">—</span> : <Sol lamports={big(v)} />;
+}
+
+function exitColumns(decimals: number, now: number): Column<ExitEvent>[] {
+    return [
+        { key: 'when', header: 'When', card: 'aside', render: (x) => <Age ts={x.ts} now={now} /> },
+        {
+            key: 'kind',
+            header: 'Kind',
+            card: 'title',
+            render: (x) => (
+                <>
+                    {EXIT_TEXT[x.kind]}
+                    {x.expired && x.kind !== 'expiry' && <span className="muted"> (expired)</span>}
+                </>
+            ),
+        },
+        {
+            key: 'condition',
+            header: 'Condition',
+            render: (x) =>
+                x.settle_condition ? (
+                    <Badge tone={x.settle_condition === 'S1' ? 'danger' : 'warn'}>{x.settle_condition}</Badge>
+                ) : (
+                    <span className="muted">—</span>
+                ),
+        },
+        { key: 'q', header: 'Q', align: 'right', render: (x) => <Tokens raw={big(x.q)} decimals={decimals} /> },
+        { key: 'buyback', header: 'Buyback', align: 'right', priority: 2, render: (x) => solOrDash(x.buyback_cost) },
+        { key: 'lenders', header: 'To lenders', align: 'right', render: (x) => solOrDash(x.lender_amount) },
+        {
+            key: 'keeper',
+            header: 'Keeper paid',
+            align: 'right',
+            priority: 2,
+            render: (x) => <Sol lamports={big(x.keeper_paid)} />,
+        },
+        {
+            key: 'borrower',
+            header: 'To borrower',
+            align: 'right',
+            priority: 2,
+            render: (x) => <Sol lamports={big(x.borrower_payout)} />,
+        },
+        {
+            key: 'position',
+            header: 'Position',
+            priority: 2,
+            render: (x) => <span className="num">{shortAddress(x.position)}</span>,
+        },
+        { key: 'tx', header: 'Transaction', render: (x) => <SignatureLink signature={x.signature} /> },
+    ];
+}
+
 export function LiquidationsTab({ mint, decimals }: { mint: Address; decimals: number }) {
     const q = useQuery(indexerQueries.marketLiquidations(mint));
     const now = useNowS();
     if (q.isError) return <ErrorState error={q.error} retry={() => void q.refetch()} />;
-    const rows = q.data?.data.data;
     return (
-        <div className="tbl-wrap">
-            <table className="tbl" data-testid={T.marketLiquidations} aria-busy={q.isPending || undefined}>
-                <caption className="visually-hidden">Recent liquidations, expiries and SOL settlements</caption>
-                <thead>
-                    <tr>
-                        <th scope="col">When</th>
-                        <th scope="col">Kind</th>
-                        <th scope="col">Condition</th>
-                        <th scope="col" data-align="right">
-                            Q
-                        </th>
-                        <th scope="col" data-align="right">
-                            Buyback
-                        </th>
-                        <th scope="col" data-align="right">
-                            To lenders
-                        </th>
-                        <th scope="col" data-align="right">
-                            Keeper paid
-                        </th>
-                        <th scope="col" data-align="right">
-                            To borrower
-                        </th>
-                        <th scope="col">Position</th>
-                        <th scope="col">Transaction</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {q.isPending ? (
-                        <tr>
-                            <td colSpan={10}>
-                                <Skeleton width={240} />
-                            </td>
-                        </tr>
-                    ) : (
-                        rows?.map((x) => (
-                            <tr
-                                key={`${x.signature}-${x.ix_index}`}
-                                data-testid={T.marketLiquidationRow(x.signature)}
-                                data-kind={x.kind}
-                                data-condition={x.settle_condition ?? undefined}
-                            >
-                                <td>
-                                    <Age ts={x.ts} now={now} />
-                                </td>
-                                <td>
-                                    {EXIT_TEXT[x.kind]}
-                                    {x.expired && x.kind !== 'expiry' && <span className="muted"> (expired)</span>}
-                                </td>
-                                <td>
-                                    {x.settle_condition ? (
-                                        <Badge tone={x.settle_condition === 'S1' ? 'danger' : 'warn'}>
-                                            {x.settle_condition}
-                                        </Badge>
-                                    ) : (
-                                        <span className="muted">—</span>
-                                    )}
-                                </td>
-                                <td data-align="right">
-                                    <Tokens raw={big(x.q)} decimals={decimals} />
-                                </td>
-                                <td data-align="right">
-                                    {x.buyback_cost === null ? (
-                                        <span className="muted">—</span>
-                                    ) : (
-                                        <Sol lamports={big(x.buyback_cost)} />
-                                    )}
-                                </td>
-                                <td data-align="right">
-                                    {x.lender_amount === null ? (
-                                        <span className="muted">—</span>
-                                    ) : (
-                                        <Sol lamports={big(x.lender_amount)} />
-                                    )}
-                                </td>
-                                <td data-align="right">
-                                    <Sol lamports={big(x.keeper_paid)} />
-                                </td>
-                                <td data-align="right">
-                                    <Sol lamports={big(x.borrower_payout)} />
-                                </td>
-                                <td className="num">{shortAddress(x.position)}</td>
-                                <td>
-                                    <SignatureLink signature={x.signature} />
-                                </td>
-                            </tr>
-                        ))
-                    )}
-                </tbody>
-            </table>
-            {rows && rows.length === 0 && (
-                <Empty>No liquidations, expiries or SOL settlements on this market yet.</Empty>
-            )}
-        </div>
+        <DataTable
+            className="mk-tbl"
+            caption="Recent liquidations, expiries and SOL settlements"
+            testId={T.marketLiquidations}
+            columns={exitColumns(decimals, now)}
+            rows={q.data?.data.data}
+            loading={q.isPending}
+            skeletonRows={3}
+            rowKey={(x) => `${x.signature}-${x.ix_index}`}
+            rowTestId={(x) => T.marketLiquidationRow(x.signature)}
+            rowAttrs={(x) => ({ 'data-kind': x.kind, 'data-condition': x.settle_condition ?? undefined })}
+            empty="No liquidations, expiries or SOL settlements on this market yet."
+        />
     );
 }
 
 // ---- Pools -------------------------------------------------------------------------------------
+
+type PoolRow = MarketPools['pools'][number];
+
+function poolColumns(now: number): Column<PoolRow>[] {
+    return [
+        {
+            key: 'pool',
+            header: 'Pool',
+            card: 'title',
+            render: (x) => (
+                <>
+                    <AddressText address={x.pool} />
+                    {x.is_current && (
+                        <span className="mk-badges">
+                            <Badge tone="ok">Current</Badge>
+                        </span>
+                    )}
+                </>
+            ),
+        },
+        { key: 'venue', header: 'Venue', card: 'aside', render: (x) => (x.venue ? venueLabel(x.venue) : '—') },
+        {
+            key: 'depth',
+            header: 'Locked depth D',
+            align: 'right',
+            render: (x) => (
+                <span className="num" data-value={x.last_d}>
+                    {x.last_d}
+                </span>
+            ),
+        },
+        {
+            key: 'proposals',
+            header: 'Proposals',
+            align: 'right',
+            priority: 2,
+            render: (x) => <span className="num">{x.proposals}</span>,
+        },
+        {
+            key: 'seen',
+            header: 'First seen',
+            align: 'right',
+            priority: 2,
+            render: (x) => <Age ts={x.first_seen_ts} now={now} />,
+        },
+        {
+            key: 'adopted',
+            header: 'Adopted / retired',
+            render: (x) => (
+                <span className="num">
+                    {x.adopted_ts ? formatUtc(x.adopted_ts) : '—'}
+                    {x.retired_ts ? ` → ${formatUtc(x.retired_ts)}` : ''}
+                </span>
+            ),
+        },
+    ];
+}
 
 export function PoolsTab({ mint, showPoolSwitch }: { mint: Address; showPoolSwitch: boolean }) {
     const q = useQuery(indexerQueries.marketPools(mint));
@@ -349,7 +424,7 @@ export function PoolsTab({ mint, showPoolSwitch }: { mint: Address; showPoolSwit
     return (
         <>
             {p ? (
-                <Kv
+                <KvLines
                     rows={[
                         [
                             'Current pool',
@@ -381,56 +456,15 @@ export function PoolsTab({ mint, showPoolSwitch }: { mint: Address; showPoolSwit
                 <Skeleton width={240} />
             )}
             {p && (
-                <div className="tbl-wrap">
-                    <table className="tbl" data-testid={T.marketPools}>
-                        <caption className="visually-hidden">Pools seen for this market</caption>
-                        <thead>
-                            <tr>
-                                <th scope="col">Pool</th>
-                                <th scope="col">Venue</th>
-                                <th scope="col" data-align="right">
-                                    Locked depth D
-                                </th>
-                                <th scope="col" data-align="right">
-                                    Proposals
-                                </th>
-                                <th scope="col" data-align="right">
-                                    First seen
-                                </th>
-                                <th scope="col">Adopted / retired</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {p.pools.map((x) => (
-                                <tr key={x.pool}>
-                                    <td>
-                                        <AddressText address={x.pool} />
-                                        {x.is_current && (
-                                            <span className="mk-badges">
-                                                <Badge tone="ok">Current</Badge>
-                                            </span>
-                                        )}
-                                    </td>
-                                    <td>{x.venue ? venueLabel(x.venue) : '—'}</td>
-                                    <td data-align="right" className="num" data-value={x.last_d}>
-                                        {x.last_d}
-                                    </td>
-                                    <td data-align="right" className="num">
-                                        {x.proposals}
-                                    </td>
-                                    <td data-align="right">
-                                        <Age ts={x.first_seen_ts} now={now} />
-                                    </td>
-                                    <td className="num">
-                                        {x.adopted_ts ? formatUtc(x.adopted_ts) : '—'}
-                                        {x.retired_ts ? ` → ${formatUtc(x.retired_ts)}` : ''}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                    {p.pools.length === 0 && <Empty>No pool proposals or adoptions yet.</Empty>}
-                </div>
+                <DataTable
+                    className="mk-tbl"
+                    caption="Pools seen for this market"
+                    testId={T.marketPools}
+                    columns={poolColumns(now)}
+                    rows={p.pools}
+                    rowKey={(x) => x.pool}
+                    empty="No pool proposals or adoptions yet."
+                />
             )}
             {showPoolSwitch && <Disclosure id="market.poolSwitch" />}
         </>
@@ -438,6 +472,50 @@ export function PoolsTab({ mint, showPoolSwitch }: { mint: Address; showPoolSwit
 }
 
 // ---- Coverage ----------------------------------------------------------------------------------
+
+type CoverageData = MarketCoverage;
+
+function gapColumns(now: number): Column<CoverageData['recent_gaps'][number]>[] {
+    return [
+        { key: 'when', header: 'When', card: 'title', render: (g) => <Age ts={g.ts} now={now} /> },
+        {
+            key: 'gap',
+            header: 'Gap',
+            align: 'right',
+            card: 'aside',
+            render: (g) => <span className="num">{formatDuration(g.gap_s)}</span>,
+        },
+        {
+            key: 'open',
+            header: 'Open positions',
+            align: 'right',
+            render: (g) => <span className="num">{g.open_positions}</span>,
+        },
+        { key: 'tx', header: 'Transaction', render: (g) => <SignatureLink signature={g.signature} /> },
+    ];
+}
+
+const PAUSE_COLUMNS: readonly Column<CoverageData['pauses'][number]>[] = [
+    {
+        key: 'paused',
+        header: 'Paused',
+        card: 'title',
+        render: (x) => <span className="num">{formatUtc(x.paused_at)}</span>,
+    },
+    {
+        key: 'duration',
+        header: 'Duration',
+        align: 'right',
+        card: 'aside',
+        render: (x) => <span className="num">{formatDuration(x.paused_s)}</span>,
+    },
+    {
+        key: 'resumed',
+        header: 'Resumed',
+        render: (x) =>
+            x.ongoing ? <Badge tone="warn">Ongoing</Badge> : <span className="num">{formatUtc(x.resumed_at)}</span>,
+    },
+];
 
 export function CoverageTab({ mint }: { mint: Address }) {
     const q = useQuery(indexerQueries.marketCoverage(mint));
@@ -448,8 +526,8 @@ export function CoverageTab({ mint }: { mint: Address }) {
     const s = c.stats;
     return (
         <div className="stack" data-testid={T.marketCoverage} data-paused={String(s.paused_coverage)}>
-            <div className="mk-grid-2">
-                <Kv
+            <div className="mk-overview">
+                <KvLines
                     rows={[
                         [
                             'Coverage now',
@@ -463,14 +541,18 @@ export function CoverageTab({ mint }: { mint: Address }) {
                                 </Badge>
                             ),
                         ],
-                        ['Gaps (all time)', `${s.gaps} · ${formatDuration(s.gap_s_total)}`],
+                        ['Gaps (all time)', `${s.gaps} · ${formatDuration(s.gap_s_total)}`, { zero: s.gaps === 0 }],
                         ['Longest gap', s.gap_s_max === null ? '—' : formatDuration(s.gap_s_max)],
-                        ['Gaps (24 h)', `${s.gaps_24h} · ${formatDuration(s.gap_s_24h)}`],
+                        ['Gaps (24 h)', `${s.gaps_24h} · ${formatDuration(s.gap_s_24h)}`, { zero: s.gaps_24h === 0 }],
                     ]}
                 />
-                <Kv
+                <KvLines
                     rows={[
-                        ['Coverage pauses', `${s.coverage_pauses} · ${formatDuration(s.coverage_paused_s)}`],
+                        [
+                            'Coverage pauses',
+                            `${s.coverage_pauses} · ${formatDuration(s.coverage_paused_s)}`,
+                            { zero: s.coverage_pauses === 0 },
+                        ],
                         ['Observations (24 h)', String(s.observations_24h)],
                         ['Failed observations (24 h)', String(s.failed_observations_24h)],
                     ]}
@@ -481,39 +563,13 @@ export function CoverageTab({ mint }: { mint: Address }) {
                 {c.recent_gaps.length === 0 ? (
                     <p className="muted">No coverage gaps recorded.</p>
                 ) : (
-                    <table className="tbl">
-                        <caption className="visually-hidden">Recent coverage gaps</caption>
-                        <thead>
-                            <tr>
-                                <th scope="col">When</th>
-                                <th scope="col" data-align="right">
-                                    Gap
-                                </th>
-                                <th scope="col" data-align="right">
-                                    Open positions
-                                </th>
-                                <th scope="col">Transaction</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {c.recent_gaps.map((g) => (
-                                <tr key={`${g.signature}-${g.ix_index}`}>
-                                    <td>
-                                        <Age ts={g.ts} now={now} />
-                                    </td>
-                                    <td data-align="right" className="num">
-                                        {formatDuration(g.gap_s)}
-                                    </td>
-                                    <td data-align="right" className="num">
-                                        {g.open_positions}
-                                    </td>
-                                    <td>
-                                        <SignatureLink signature={g.signature} />
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                    <DataTable
+                        className="mk-tbl"
+                        caption="Recent coverage gaps"
+                        columns={gapColumns(now)}
+                        rows={c.recent_gaps}
+                        rowKey={(g) => `${g.signature}-${g.ix_index}`}
+                    />
                 )}
             </section>
             <section aria-label="Coverage pauses">
@@ -521,31 +577,13 @@ export function CoverageTab({ mint }: { mint: Address }) {
                 {c.pauses.length === 0 ? (
                     <p className="muted">New shorts were never paused for coverage here.</p>
                 ) : (
-                    <table className="tbl">
-                        <caption className="visually-hidden">Coverage pauses</caption>
-                        <thead>
-                            <tr>
-                                <th scope="col">Paused</th>
-                                <th scope="col">Resumed</th>
-                                <th scope="col" data-align="right">
-                                    Duration
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {c.pauses.map((x) => (
-                                <tr key={x.paused_at}>
-                                    <td className="num">{formatUtc(x.paused_at)}</td>
-                                    <td className="num">
-                                        {x.ongoing ? <Badge tone="warn">Ongoing</Badge> : formatUtc(x.resumed_at)}
-                                    </td>
-                                    <td data-align="right" className="num">
-                                        {formatDuration(x.paused_s)}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                    <DataTable
+                        className="mk-tbl"
+                        caption="Coverage pauses"
+                        columns={PAUSE_COLUMNS}
+                        rows={c.pauses}
+                        rowKey={(x) => String(x.paused_at)}
+                    />
                 )}
             </section>
         </div>
@@ -554,54 +592,48 @@ export function CoverageTab({ mint }: { mint: Address }) {
 
 // ---- Events ------------------------------------------------------------------------------------
 
+type EventRow = IndexerEvent;
+
+function eventColumns(now: number): Column<EventRow>[] {
+    return [
+        { key: 'when', header: 'When', card: 'aside', render: (e) => <Age ts={e.ts} now={now} /> },
+        {
+            key: 'event',
+            header: 'Event',
+            card: 'title',
+            render: (e) => (
+                <>
+                    {e.kind}
+                    {!e.finalized && <span className="muted"> · confirmed</span>}
+                </>
+            ),
+        },
+        {
+            key: 'slot',
+            header: 'Slot',
+            align: 'right',
+            render: (e) => <span className="num">{e.slot.toLocaleString('en-US')}</span>,
+        },
+        { key: 'tx', header: 'Transaction', render: (e) => <SignatureLink signature={e.signature} /> },
+    ];
+}
+
 export function EventsTab({ mint }: { mint: Address }) {
     const q = useQuery(indexerQueries.marketEvents(mint));
     const now = useNowS();
     if (q.isError) return <ErrorState error={q.error} retry={() => void q.refetch()} />;
-    const rows = q.data?.data.data;
     return (
-        <div className="tbl-wrap">
-            <table className="tbl" data-testid={T.marketEvents} aria-busy={q.isPending || undefined}>
-                <caption className="visually-hidden">Events, newest first</caption>
-                <thead>
-                    <tr>
-                        <th scope="col">When</th>
-                        <th scope="col">Event</th>
-                        <th scope="col" data-align="right">
-                            Slot
-                        </th>
-                        <th scope="col">Transaction</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {q.isPending ? (
-                        <tr>
-                            <td colSpan={4}>
-                                <Skeleton width={240} />
-                            </td>
-                        </tr>
-                    ) : (
-                        rows?.map((e) => (
-                            <tr key={e.id} data-kind={e.kind}>
-                                <td>
-                                    <Age ts={e.ts} now={now} />
-                                </td>
-                                <td>
-                                    {e.kind}
-                                    {!e.finalized && <span className="muted"> · confirmed</span>}
-                                </td>
-                                <td data-align="right" className="num">
-                                    {e.slot.toLocaleString('en-US')}
-                                </td>
-                                <td>
-                                    <SignatureLink signature={e.signature} />
-                                </td>
-                            </tr>
-                        ))
-                    )}
-                </tbody>
-            </table>
-            {rows && rows.length === 0 && <Empty>No events yet.</Empty>}
-        </div>
+        <DataTable
+            className="mk-tbl"
+            caption="Events, newest first"
+            testId={T.marketEvents}
+            columns={eventColumns(now)}
+            rows={q.data?.data.data}
+            loading={q.isPending}
+            skeletonRows={3}
+            rowKey={(e) => String(e.id)}
+            rowAttrs={(e) => ({ 'data-kind': e.kind })}
+            empty="No events yet."
+        />
     );
 }

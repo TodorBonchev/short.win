@@ -1,10 +1,35 @@
 import type { ReactNode } from 'react';
 import { ApiError } from '../api/client.ts';
 
-export function Empty({ children, testId }: { children: ReactNode; testId?: string }) {
+/**
+ * An empty (or not-found) state: an optional title, one muted line, an optional action (a link or
+ * a button that gets the user out of it; FRONTEND.md §3.10).
+ */
+export function Empty({
+    title,
+    children,
+    action,
+    testId,
+    role,
+}: {
+    title?: ReactNode;
+    children?: ReactNode;
+    action?: ReactNode;
+    testId?: string;
+    role?: 'alert' | 'status';
+}) {
+    if (title === undefined && action === undefined) {
+        return (
+            <div className="empty" data-testid={testId} role={role}>
+                {children}
+            </div>
+        );
+    }
     return (
-        <div className="empty" data-testid={testId}>
-            {children}
+        <div className="empty" data-testid={testId} role={role} data-layout="block">
+            {title !== undefined && <div className="empty-title">{title}</div>}
+            {children !== undefined && <div className="empty-text">{children}</div>}
+            {action !== undefined && <div className="empty-action">{action}</div>}
         </div>
     );
 }
@@ -30,14 +55,28 @@ export function ErrorState({ error, retry }: { error: unknown; retry?: () => voi
     );
 }
 
+/** A loading placeholder; `width` is a computed CSSOM value (allowed under the CSP). */
 export function Skeleton({ width }: { width?: number }) {
     return <span className="skeleton" style={width ? { width } : undefined} aria-hidden="true" />;
 }
 
-/** A labelled statistic for stat strips. */
-export function Stat({ label, children, testId }: { label: string; children: ReactNode; testId?: string }) {
+/**
+ * A labelled statistic for stat strips. `priority` 2: on a phone it waits behind the strip's "More
+ * stats" toggle (`.stat-strip[data-expanded]`).
+ */
+export function Stat({
+    label,
+    children,
+    testId,
+    priority,
+}: {
+    label: string;
+    children: ReactNode;
+    testId?: string;
+    priority?: 1 | 2;
+}) {
     return (
-        <div className="stat" data-testid={testId}>
+        <div className="stat" data-testid={testId} data-priority={priority}>
             <div className="stat-label">{label}</div>
             <div className="stat-value">{children}</div>
         </div>
@@ -49,8 +88,7 @@ export function Kv({ rows, testId }: { rows: readonly (readonly [ReactNode, Reac
     return (
         <dl className="kv" data-testid={testId}>
             {rows.map(([k, v, id], i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: static row order
-                <div key={i} style={{ display: 'contents' }}>
+                <div key={i} className="kv-row">
                     <dt>{k}</dt>
                     <dd data-testid={id}>{v}</dd>
                 </div>

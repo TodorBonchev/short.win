@@ -3,17 +3,23 @@
  * exit counts and rates, realised lender loss by settlement condition, the creator-wallet deposits
  * (R1) and the venue trust assumptions (collapsed). From the chain alone (indexer down or unaware)
  * it shows the chain's state; history and analytics wait for the indexer.
+ *
+ * Layout (M10-RESP D10): hairline key / value blocks in two columns sharing the card's width from
+ * 640 px, one on a phone, Fees under both; zeros and dashes muted; an all-zero settlements block is
+ * one line ("No settlements yet") that opens to the figures. The fee lines are a DataTable (cards
+ * when narrow).
  */
 import type { Address } from '@solana/kit';
 import { big, type FeeType, type MarketDetail } from '../../../api/types.ts';
 import { AddressText } from '../../../components/Address.tsx';
 import { Badge, venueLabel } from '../../../components/Badge.tsx';
+import { type Column, DataTable } from '../../../components/DataTable.tsx';
 import { Disclosure } from '../../../components/Disclosure.tsx';
 import { Bps, Pnl, Sol, Tokens } from '../../../components/Num.tsx';
-import { Kv } from '../../../components/States.tsx';
 import { T } from '../../../config/testids.ts';
 import { formatDuration } from '../../../lib/format.ts';
 import { formatUtc } from '../../../lib/time.ts';
+import { KvLines } from '../shared/KvLines.tsx';
 import { CreatorDeposits } from './CreatorDeposits.tsx';
 import type { MarketView } from './marketView.ts';
 
@@ -40,6 +46,12 @@ const FEE_TEXT: Readonly<Record<FeeType, string>> = {
 
 const ts = (v: number | null) => (v === null || v <= 0 ? '—' : formatUtc(v));
 const bpsOrDash = (v: number | null) => (v === null ? <span className="muted">—</span> : <Bps value={v} />);
+/** An amount row: muted when zero. */
+const sol = (label: string, lamports: bigint) =>
+    [label, <Sol key={label} lamports={lamports} />, { zero: lamports === 0n }] as const;
+const pnl = (label: string, lamports: bigint) =>
+    [label, <Pnl key={label} lamports={lamports} />, { zero: lamports === 0n }] as const;
+const bpsRow = (label: string, v: number | null) => [label, bpsOrDash(v), { zero: v === null || v === 0 }] as const;
 
 function MarketState({ view }: { view: MarketView }) {
     const d = view.detail;
@@ -47,7 +59,7 @@ function MarketState({ view }: { view: MarketView }) {
     return (
         <section aria-label="Market state">
             <h3 className="mk-section-title">Market</h3>
-            <Kv
+            <KvLines
                 rows={[
                     ['Venue', venueLabel(view.venue)],
                     ['Tier', `Tier ${view.tier}`],
@@ -57,17 +69,25 @@ function MarketState({ view }: { view: MarketView }) {
                         'Token program',
                         view.tokenProgram ? <AddressText key="r58" address={view.tokenProgram} copy={false} /> : '—',
                     ],
-                    ['Tokens free (T)', <Tokens key="t" raw={view.tokensFree} decimals={decimals} />],
-                    ['Tokens borrowed (ΣQ)', <Tokens key="q" raw={view.borrowedQ} decimals={decimals} />],
+                    [
+                        'Tokens free (T)',
+                        <Tokens key="t" raw={view.tokensFree} decimals={decimals} />,
+                        { zero: view.tokensFree === 0n },
+                    ],
+                    [
+                        'Tokens borrowed (ΣQ)',
+                        <Tokens key="q" raw={view.borrowedQ} decimals={decimals} />,
+                        { zero: view.borrowedQ === 0n },
+                    ],
                     ['Open positions', String(view.openPositions)],
-                    ['Notional open', <Sol key="n" lamports={view.totalNotionalOpen} />],
+                    sol('Notional open', view.totalNotionalOpen),
                     ...(d
                         ? ([
-                              ['Collateral in open vaults', <Sol key="v" lamports={big(d.open_vault_lamports)} />],
-                              ['Lender SOL (vesting and claimable)', <Sol key="ls" lamports={big(d.lender_sol)} />],
-                              ['Lender value', <Sol key="lv" lamports={big(d.lender_value_lamports)} />],
-                              ['Inventory value', <Sol key="iv" lamports={big(d.inventory_value_lamports)} />],
-                              ['Protocol fees (unswept)', <Sol key="pf" lamports={big(d.protocol_fees)} />],
+                              sol('Collateral in open vaults', big(d.open_vault_lamports)),
+                              sol('Lender SOL (vesting and claimable)', big(d.lender_sol)),
+                              sol('Lender value', big(d.lender_value_lamports)),
+                              sol('Inventory value', big(d.inventory_value_lamports)),
+                              sol('Protocol fees (unswept)', big(d.protocol_fees)),
                               ['Share epoch', String(d.share_epoch)],
                               [
                                   'No route since',
@@ -82,6 +102,7 @@ function MarketState({ view }: { view: MarketView }) {
                                           '—'
                                       )}
                                   </span>,
+                                  { zero: d.route_chains.no_route_since <= 0 },
                               ],
                               [
                                   'Pool failing since',
@@ -96,6 +117,7 @@ function MarketState({ view }: { view: MarketView }) {
                                           '—'
                                       )}
                                   </span>,
+                                  { zero: d.route_chains.pool_fail_since <= 0 },
                               ],
                           ] as const)
                         : []),
@@ -111,44 +133,33 @@ function MarketState({ view }: { view: MarketView }) {
     );
 }
 
+type FeeLine = MarketDetail['fees'][number];
+
+const FEE_COLUMNS: readonly Column<FeeLine>[] = [
+    { key: 'fee', header: 'Fee', card: 'title', render: (f) => FEE_TEXT[f.fee_type] ?? f.fee_type },
+    {
+        key: 'total',
+        header: 'Total',
+        align: 'right',
+        card: 'aside',
+        render: (f) => <Sol lamports={big(f.total)} />,
+    },
+    { key: 'to', header: 'To', render: (f) => <span className="secondary">{f.recipient}</span> },
+    { key: 'n', header: 'Count', align: 'right', render: (f) => <span className="num">{f.n}</span> },
+    { key: 'day', header: '24 h', align: 'right', render: (f) => <Sol lamports={big(f.last_24h)} /> },
+];
+
 function Fees({ d }: { d: MarketDetail }) {
     if (d.fees.length === 0) return <p className="muted">No fees yet.</p>;
     return (
-        <table className="tbl" data-testid={T.marketFees}>
-            <caption className="visually-hidden">Fee lines</caption>
-            <thead>
-                <tr>
-                    <th scope="col">Fee</th>
-                    <th scope="col">To</th>
-                    <th scope="col" data-align="right">
-                        Count
-                    </th>
-                    <th scope="col" data-align="right">
-                        Total
-                    </th>
-                    <th scope="col" data-align="right">
-                        24 h
-                    </th>
-                </tr>
-            </thead>
-            <tbody>
-                {d.fees.map((f) => (
-                    <tr key={`${f.fee_type}-${f.recipient}`}>
-                        <td>{FEE_TEXT[f.fee_type] ?? f.fee_type}</td>
-                        <td className="secondary">{f.recipient}</td>
-                        <td data-align="right" className="num">
-                            {f.n}
-                        </td>
-                        <td data-align="right">
-                            <Sol lamports={big(f.total)} />
-                        </td>
-                        <td data-align="right">
-                            <Sol lamports={big(f.last_24h)} />
-                        </td>
-                    </tr>
-                ))}
-            </tbody>
-        </table>
+        <DataTable
+            caption="Fee lines"
+            testId={T.marketFees}
+            className="mk-tbl mk-fees-tbl"
+            columns={FEE_COLUMNS}
+            rows={d.fees}
+            rowKey={(f) => `${f.fee_type}-${f.recipient}`}
+        />
     );
 }
 
@@ -157,11 +168,11 @@ function Exits({ d }: { d: MarketDetail }) {
     return (
         <section aria-label="Exits">
             <h3 className="mk-section-title">Exits</h3>
-            <Kv
+            <KvLines
                 rows={[
                     ['Positions (open)', `${e.positions} (${e.open})`],
                     ['Closed by the borrower', String(e.closes)],
-                    ['Close rate', bpsOrDash(e.close_rate_bps)],
+                    bpsRow('Close rate', e.close_rate_bps),
                     ['Liquidated (CR)', String(e.liquidations_cr)],
                     ['Liquidated after expiry', String(e.liquidations_expired)],
                     ['Expired', String(e.expiries)],
@@ -169,13 +180,13 @@ function Exits({ d }: { d: MarketDetail }) {
                         'Settled in SOL (S1 / S2 / S3)',
                         `${e.settlements_s1} / ${e.settlements_s2} / ${e.settlements_s3}`,
                     ],
-                    ['Liquidation rate', bpsOrDash(e.liquidation_rate_bps)],
-                    ['Expiry rate', bpsOrDash(e.expiry_rate_bps)],
-                    ['Settlement rate', bpsOrDash(e.settlement_rate_bps)],
+                    bpsRow('Liquidation rate', e.liquidation_rate_bps),
+                    bpsRow('Expiry rate', e.expiry_rate_bps),
+                    bpsRow('Settlement rate', e.settlement_rate_bps),
                     ['Average duration', e.avg_duration_s === null ? '—' : formatDuration(e.avg_duration_s)],
-                    ['Average open impact', bpsOrDash(e.avg_open_impact_bps)],
-                    ['Average exit slippage', bpsOrDash(e.avg_exit_slippage_bps)],
-                    ['Borrowers’ P&L', <Pnl key="p" lamports={big(e.borrower_pnl)} />],
+                    bpsRow('Average open impact', e.avg_open_impact_bps),
+                    bpsRow('Average exit slippage', e.avg_exit_slippage_bps),
+                    pnl('Borrowers’ P&L', big(e.borrower_pnl)),
                 ]}
             />
         </section>
@@ -184,6 +195,31 @@ function Exits({ d }: { d: MarketDetail }) {
 
 function LenderLoss({ d }: { d: MarketDetail }) {
     const l = d.lender_loss;
+    const amounts = [
+        l.token_value,
+        l.lender_amount,
+        l.lender_pnl,
+        l.realised_lender_loss,
+        l.realised_lender_loss_s1,
+        l.realised_lender_loss_s2,
+        l.realised_lender_loss_s3,
+    ].map(big);
+    const none = l.settlements === 0 && amounts.every((a) => a === 0n);
+    const figures = (
+        <KvLines
+            rows={[
+                ['Settlements', String(l.settlements)],
+                sol('Token value owed', big(l.token_value)),
+                sol('Paid to lenders', big(l.lender_amount)),
+                pnl('Lenders’ P&L', big(l.lender_pnl)),
+                sol('Realised loss', big(l.realised_lender_loss)),
+                sol('  S1 — jumped past the vault', big(l.realised_lender_loss_s1)),
+                sol('  S2 — buyback above max slippage', big(l.realised_lender_loss_s2)),
+                sol('  S3 — no route', big(l.realised_lender_loss_s3)),
+                bpsRow('Loss / token value', l.loss_bps_of_value),
+            ]}
+        />
+    );
     return (
         <section
             aria-label="Realised lender loss"
@@ -191,19 +227,14 @@ function LenderLoss({ d }: { d: MarketDetail }) {
             data-value={big(l.realised_lender_loss).toString()}
         >
             <h3 className="mk-section-title">Lenders’ SOL settlements</h3>
-            <Kv
-                rows={[
-                    ['Settlements', String(l.settlements)],
-                    ['Token value owed', <Sol key="tv" lamports={big(l.token_value)} />],
-                    ['Paid to lenders', <Sol key="la" lamports={big(l.lender_amount)} />],
-                    ['Lenders’ P&L', <Pnl key="lp" lamports={big(l.lender_pnl)} />],
-                    ['Realised loss', <Sol key="rl" lamports={big(l.realised_lender_loss)} />],
-                    ['  S1 — jumped past the vault', <Sol key="s1" lamports={big(l.realised_lender_loss_s1)} />],
-                    ['  S2 — buyback above max slippage', <Sol key="s2" lamports={big(l.realised_lender_loss_s2)} />],
-                    ['  S3 — no route', <Sol key="s3" lamports={big(l.realised_lender_loss_s3)} />],
-                    ['Loss / token value', bpsOrDash(l.loss_bps_of_value)],
-                ]}
-            />
+            {none ? (
+                <details className="mk-none">
+                    <summary>No settlements yet</summary>
+                    {figures}
+                </details>
+            ) : (
+                figures
+            )}
         </section>
     );
 }
@@ -212,19 +243,23 @@ export function OverviewTab({ mint, view }: { mint: Address; view: MarketView })
     const d = view.detail;
     return (
         <>
-            <div className="mk-grid-2">
+            <div className="mk-overview">
                 <MarketState view={view} />
-                {d ? <Exits d={d} /> : <p className="muted">History and analytics return with the indexer.</p>}
-            </div>
-            {d && (
-                <div className="mk-grid-2">
-                    <section aria-label="Fees">
+                {d ? (
+                    <div className="mk-overview-col">
+                        <Exits d={d} />
+                        <LenderLoss d={d} />
+                    </div>
+                ) : (
+                    <p className="muted">History and analytics return with the indexer.</p>
+                )}
+                {d && (
+                    <section aria-label="Fees" className="mk-overview-fees">
                         <h3 className="mk-section-title">Fees</h3>
                         <Fees d={d} />
                     </section>
-                    <LenderLoss d={d} />
-                </div>
-            )}
+                )}
+            </div>
             <CreatorDeposits mint={mint} detail={d} />
             <Disclosure id="market.venueTrust" collapsible />
         </>

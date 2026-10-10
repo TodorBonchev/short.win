@@ -4,9 +4,11 @@
  * repository's `SECURITY.md` (scope, how to report, what happens next, safe harbour, audits); the
  * values come from `config/securityPolicy.ts`. Static: no chain or indexer read. Test ids: the page root
  * (`page-security`) and the status bar's `nav-security` link; each section is a region named by its
- * title (the E2E selects by role).
+ * title (the E2E selects by role). Centred at 920 px on a wide screen; full width on a phone, where
+ * the long identifiers and the address wrap anywhere (M10-RESP).
  */
 import { Link } from '@tanstack/react-router';
+import { type Column, DataTable } from '../../components/DataTable.tsx';
 import { Panel } from '../../components/Panel.tsx';
 import { COMPLETE_CURVE_PROGRAM, SHORTWIN_PROGRAM } from '../../config/programs.ts';
 import { SECURITY_EMAIL, SECURITY_TXT_CANONICAL } from '../../config/securityPolicy.ts';
@@ -19,6 +21,11 @@ const SCOPE: readonly (readonly [string, string])[] = [
     ['complete_curve helper program (Solana mainnet)', COMPLETE_CURVE_PROGRAM],
     ['Web app', 'https://short.win'],
     ['Keeper, indexer and API operated by short.win', 'in scope'],
+];
+
+const SCOPE_COLUMNS: readonly Column<readonly [string, string]>[] = [
+    { key: 'what', header: 'Component', card: 'title', render: ([what]) => what },
+    { key: 'id', header: 'Identifier', render: ([, id]) => <span className="num sec-id">{id}</span> },
 ];
 
 export function SecurityPolicyPage() {
@@ -34,25 +41,13 @@ export function SecurityPolicyPage() {
             </p>
             <div className="stack">
                 <Panel title="Scope" label="Scope">
-                    <div className="tbl-wrap">
-                        <table className="tbl">
-                            <caption className="visually-hidden">Components in scope</caption>
-                            <thead>
-                                <tr>
-                                    <th scope="col">Component</th>
-                                    <th scope="col">Identifier</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {SCOPE.map(([what, id]) => (
-                                    <tr key={what}>
-                                        <td>{what}</td>
-                                        <td className="num sec-id">{id}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    <DataTable
+                        caption="Components in scope"
+                        className="mk-tbl sec-scope"
+                        columns={SCOPE_COLUMNS}
+                        rows={SCOPE}
+                        rowKey={([what]) => what}
+                    />
                     <p className="sec-note">
                         Both programs embed a security.txt; read it with{' '}
                         <code>query-security-txt &lt;program id&gt;</code>.

@@ -18,6 +18,13 @@ async function connectWithKeyboard(app: App): Promise<void> {
     await app.tabTo(T.walletOption(E2E_WALLET_NAME));
     await app.page.keyboard.press('Enter');
     await expect(app.id(T.walletAddress)).toHaveAttribute('data-value', app.walletAddress);
+    // Focus comes back to the header button after a pick, and after Escape (never to <body>).
+    await expect(app.id(T.walletButton)).toBeFocused();
+    await app.page.keyboard.press('Enter');
+    await expect(app.id(T.walletMenu)).toBeVisible();
+    await app.page.keyboard.press('Escape');
+    await expect(app.id(T.walletMenu)).toHaveCount(0);
+    await expect(app.id(T.walletButton)).toBeFocused();
 }
 
 /** Inside the review: tick `ack`, then Sign — Tab, Space, Tab, Enter. */

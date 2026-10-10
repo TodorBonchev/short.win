@@ -45,8 +45,9 @@ export function exitShort(state: ExitState, pos: Pick<ShortPosition, 's3WaitS'>)
     return text[state];
 }
 
-const TONE: Record<ExitState, 'info' | 'warn' | 'danger'> = {
-    healthy: 'info',
+/** The banner's tone follows the risk (D16): healthy reads as good news, not as a notice. */
+const TONE: Record<ExitState, 'ok' | 'warn' | 'danger'> = {
+    healthy: 'ok',
     watch: 'warn',
     'spot-below': 'warn',
     liquidatable: 'danger',
@@ -55,20 +56,19 @@ const TONE: Record<ExitState, 'info' | 'warn' | 'danger'> = {
     armed: 'danger',
 };
 
-export function SettlementRisk({
+/** The position's health in one banner: its most pressing exit state, in plain words. */
+export function HealthBanner({
     pos,
     metrics,
     venue,
     market,
     now,
-    tier,
 }: {
     pos: ShortPosition;
     metrics: PositionMetrics;
     venue: VenueState;
     market: Market;
     now: bigint;
-    tier: TierParams | undefined;
 }) {
     const state = exitState(pos, metrics, venue, now);
     const liq = formatCr(pos.crLiqBps);
@@ -87,10 +87,36 @@ export function SettlementRisk({
         }). It settles only if the evidence persists.`,
     };
     return (
+        <div className="banner position-health" data-tone={TONE[state]} role="status" data-state={state}>
+            {text[state]}
+        </div>
+    );
+}
+
+/**
+ * How the position can end: its health banner (unless `banner={false}`: the position page shows
+ * it above everything), then the borrower disclosures with the terms locked into it (A26).
+ */
+export function SettlementRisk({
+    pos,
+    metrics,
+    venue,
+    market,
+    now,
+    tier,
+    banner = true,
+}: {
+    pos: ShortPosition;
+    metrics: PositionMetrics;
+    venue: VenueState;
+    market: Market;
+    now: bigint;
+    tier: TierParams | undefined;
+    banner?: boolean;
+}) {
+    return (
         <section className="stack" aria-label="How this short can end">
-            <div className="banner" data-tone={TONE[state]} role="status" data-state={state}>
-                {text[state]}
-            </div>
+            {banner && <HealthBanner pos={pos} metrics={metrics} venue={venue} market={market} now={now} />}
             <Disclosure id="borrower.liquidation" vars={positionDisclosureVars(pos, tier)} collapsible />
             <Disclosure id="borrower.residuals" vars={positionDisclosureVars(pos, tier)} collapsible />
         </section>

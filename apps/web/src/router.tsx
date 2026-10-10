@@ -54,10 +54,20 @@ export type MarketTab = 'overview' | 'positions' | 'lenders' | 'liquidations' | 
 export type MarketPanel = 'short' | 'lend';
 export type LendAction = 'deposit' | 'withdraw' | 'claim';
 
+/** M10-RESP: the market page's trade panel open as a sheet (under 1024 px; ignored above). */
+export type MarketSheet = 'trade';
+/** M10-RESP: a position's Manage panel open as a sheet, at that section. */
+export type PositionSheet = 'add-margin' | 'close';
+
 export interface MarketSearch {
     readonly tab?: MarketTab;
     readonly panel?: MarketPanel;
     readonly action?: LendAction;
+    readonly sheet?: MarketSheet;
+}
+
+export interface PositionSearch {
+    readonly sheet?: PositionSheet;
 }
 
 export interface PositionsSearch {
@@ -128,6 +138,7 @@ export const marketRoute = createRoute({
         tab: pick(s.tab, ['overview', 'positions', 'lenders', 'liquidations', 'pools', 'coverage', 'events'] as const),
         panel: pick(s.panel, ['short', 'lend'] as const),
         action: pick(s.action, ['deposit', 'withdraw', 'claim'] as const),
+        sheet: pick(s.sheet, ['trade'] as const),
     }),
     component: MarketRouteComponent,
     errorComponent: NotFound,
@@ -162,6 +173,9 @@ export const positionRoute = createRoute({
         },
         stringify: (p: { position: string }) => ({ position: p.position }),
     },
+    validateSearch: (s: Record<string, unknown>): PositionSearch => ({
+        sheet: pick(s.sheet, ['add-margin', 'close'] as const),
+    }),
     component: PositionRouteComponent,
     errorComponent: NotFound,
 });
@@ -203,11 +217,20 @@ export function createAppRouter(queryClient: QueryClient) {
         context: { queryClient },
         defaultPreload: 'intent',
         scrollRestoration: true,
+        // The page used to scroll inside `#main`: reset it on navigation as well as the document
+        // (M10-RESP §5.1; harmless once the document scrolls).
+        scrollToTopSelectors: ['#main'],
     });
 }
 
 declare module '@tanstack/react-router' {
     interface Register {
         router: ReturnType<typeof createAppRouter>;
+    }
+    /** M10-RESP: this history entry was pushed by opening a sheet (closing it goes back). */
+    interface HistoryState {
+        sheet?: boolean;
+        /** The header wallet popup's own entry on a phone (Back closes it; WalletButton). */
+        walletSheet?: boolean;
     }
 }

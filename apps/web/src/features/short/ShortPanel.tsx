@@ -13,10 +13,11 @@
 import { getShortPositionSize, getWalletExposureSize } from '@shortwin/client';
 import type { Address } from '@solana/kit';
 import { Link } from '@tanstack/react-router';
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useId, useMemo, useState } from 'react';
 import { Button } from '../../components/Button.tsx';
 import { Disclosure } from '../../components/Disclosure.tsx';
 import { AmountInput, Field } from '../../components/Field.tsx';
+import { FormFoot } from '../../components/FormFoot.tsx';
 import { Price, Sol, Tokens } from '../../components/Num.tsx';
 import { ErrorState, Skeleton } from '../../components/States.tsx';
 import { TokenId } from '../../components/TokenId.tsx';
@@ -28,11 +29,14 @@ import { formatUtc } from '../../lib/time.ts';
 import { useAppClient } from '../../rpc/context.tsx';
 import { ReadAgeView, useReadAge } from '../../shell/SlotAge.tsx';
 import { TxReviewModal } from '../../tx/TxReviewModal.tsx';
+import { ConnectCta } from '../../wallet/ConnectCta.tsx';
 import { useWallet } from '../../wallet/useWallet.ts';
+import { firstReason, REASON, useConfirmedToast } from './feedback.ts';
 import { useExposureQ, useRentExempt, useShortSnapshot, useTokenLabel } from './hooks.ts';
 import { borrowerDisclosureVars } from './plans.ts';
 import {
     assignTier,
+    type CapName,
     capsFor,
     DEFAULT_SLIPPAGE_BPS,
     MAX_SLIPPAGE_BPS,
@@ -69,6 +73,25 @@ function Row({
     );
 }
 
+/** Why a size does not parse, in the words of the reason line. */
+const SIZE_REASON = {
+    empty: 'Enter a size',
+    format: 'Enter the size as a plain number',
+    decimals: 'The size has more decimals than the token',
+    zero: 'Enter a size above zero',
+    range: 'The size is too large',
+} as const;
+
+/** The reason line while the acknowledgement is what blocks the submit (a button to the box). */
+const ACK_REASON = 'Tick “I understand…” above';
+
+/** The reason line for a size the program would refuse: a cap to stay under, or the minimum. */
+function refusalReason(refusal: string | null, cap: CapName | null): string {
+    if (cap) return `Lower the size: it is above the ${CAP_TEXT[cap].toLowerCase()}`;
+    if (refusal === 'BelowMinNotional') return 'Raise the size: it is below the minimum position value';
+    return `The program would refuse this size (${refusal ?? 'unknown'})`;
+}
+
 /** The default slippage as the input shows it ("1"). */
 const DEFAULT_SLIPPAGE_TEXT = String(DEFAULT_SLIPPAGE_BPS / 100);
 
@@ -95,6 +118,11 @@ export function ShortPanel({ mint }: { mint: Address }) {
     const client = useAppClient();
     // The age of the snapshot behind the preview (FRONTEND.md §6.6): shown; Submit waits when stale.
     const age = useReadAge(s?.slot ?? null, s?.fetchedAt ?? null);
+    // The reason line's button focuses the acknowledgement box (FRONTEND.md §7.6).
+    const ackId = useId();
+    useConfirmedToast(trade.flow, () =>
+        lastPosition ? [{ href: `/positions/${lastPosition}`, text: 'View position' }] : [],
+    );
 
     // Acknowledgements are per transaction (§4.1 rule 3): a confirmed open clears the box.
     const flowStage = trade.flow.state.stage;
@@ -150,15 +178,21 @@ export function ShortPanel({ mint }: { mint: Address }) {
     const totalCost = preview ? preview.margin + preview.openFee + rents : null;
     const refusalInfo = preview?.refusal ? errorByName(preview.refusal) : undefined;
     const stage = trade.flow.state.stage;
-    const canSubmit =
-        !!connected?.signer &&
-        !blocked &&
-        !!preview &&
-        !preview.refusal &&
-        ack &&
-        age.state !== 'stale' &&
-        !trade.building &&
-        (stage === 'idle' || stage === 'confirmed');
+    // The submit's reason line and its enabled state are one predicate list (FRONTEND.md §7.6).
+    const reason = firstReason([
+        [!connected, REASON.connect],
+        [!connected?.signer, REASON.signer],
+        [!!blocked, 'New shorts are unavailable on this market now'],
+        [!parsedQ.ok, parsedQ.ok ? '' : SIZE_REASON[parsedQ.error]],
+        [!slipOk, REASON.slippage],
+        [!preview, 'No quote for this size on the venue now'],
+        [!!preview?.refusal, refusalReason(preview?.refusal ?? null, preview?.refusalCap ?? null)],
+        [!ack, ACK_REASON],
+        [age.state === 'stale', REASON.stale],
+        [trade.building, REASON.building],
+        [stage !== 'idle' && stage !== 'confirmed', REASON.inReview],
+    ]);
+    const canSubmit = reason === null;
 
     const submit = async () => {
         if (!preview || !connected?.signer || !tp || slip === null) return;
@@ -231,9 +265,15 @@ export function ShortPanel({ mint }: { mint: Address }) {
                     </div>
 
                     <section className="short-preview" aria-label="Open preview">
-                        <h3 className="short-section-title row">
-                            Preview <TokenId symbol={symbol} mint={mint} /> <ReadAgeView age={age} />
-                        </h3>
+                        <div className="short-preview-head">
+                            <h3 className="short-section-title">
+                                Preview{' '}
+                                <span className="case-keep">
+                                    <TokenId symbol={symbol} mint={mint} />
+                                </span>
+                            </h3>
+                            <ReadAgeView age={age} />
+                        </div>
                         {q === null || !preview ? (
                             <p className="short-note">
                                 {q === null
@@ -385,7 +425,8 @@ export function ShortPanel({ mint }: { mint: Address }) {
                             data-cap={capWarning}
                         >
                             <div>
-                                <strong>{CAP_TEXT[capWarning]}.</strong> {refusalInfo?.message ?? preview.refusal}
+                                <strong>{preview.refusalCap ? `${CAP_TEXT[capWarning]}.` : 'Size refused.'}</strong>{' '}
+                                {refusalInfo?.message ?? preview.refusal}
                             </div>
                         </div>
                     )}
@@ -398,6 +439,7 @@ export function ShortPanel({ mint }: { mint: Address }) {
                             vars={borrowerDisclosureVars(tp, s.config.params)}
                             acknowledged={ack}
                             onAcknowledge={setAck}
+                            ackId={ackId}
                         />
                     )}
                     {tp && (
@@ -408,21 +450,28 @@ export function ShortPanel({ mint }: { mint: Address }) {
                         />
                     )}
 
-                    <Button
-                        variant="short"
-                        block
-                        disabled={!canSubmit}
-                        busy={trade.building}
-                        onClick={() => void submit()}
-                        data-testid={T.shortSubmit}
+                    <FormFoot
+                        reason={reason}
+                        reasonTestId={T.shortSubmitReason}
+                        reasonTarget={reason === ACK_REASON && tp ? ackId : undefined}
                     >
-                        {!connected ? 'Connect a wallet to short' : `Short ${tokenText}`}
-                    </Button>
-                    {(trade.buildError ?? submitError) && (
-                        <div className="banner" data-tone="danger" role="alert">
-                            {trade.buildError ?? submitError}
-                        </div>
-                    )}
+                        {(trade.buildError ?? submitError) && (
+                            <div className="banner" data-tone="danger" role="alert">
+                                {trade.buildError ?? submitError}
+                            </div>
+                        )}
+                        {!connected && <ConnectCta surface="short" />}
+                        <Button
+                            variant="short"
+                            block
+                            disabled={!canSubmit}
+                            busy={trade.building}
+                            onClick={() => void submit()}
+                            data-testid={T.shortSubmit}
+                        >
+                            {!connected ? 'Connect a wallet to short' : `Short ${tokenText}`}
+                        </Button>
+                    </FormFoot>
                     {trade.fallback && (
                         <p className="short-note" role="status">
                             The venue’s extra accounts changed; retried with the {trade.fallback} set.

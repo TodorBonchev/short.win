@@ -6,7 +6,7 @@
  * same size and slippage, from a fresh read — a new quote, new bounds, the venue accounts and
  * extras as they are now. A trade the fresh state refuses ends in a `PlanError` with the reason.
  */
-import { fetchMaybeShortPosition, type ShortPosition } from '@shortwin/client';
+import type { ShortPosition } from '@shortwin/client';
 import type { Address, TransactionSigner } from '@solana/kit';
 import type { MathModule } from '../../math/load.ts';
 import { readExposure } from '../../rpc/accounts.ts';
@@ -14,6 +14,7 @@ import type { AppRpc } from '../../rpc/client.ts';
 import { PlanError } from '../../tx/errors.ts';
 import type { ExtrasChoice } from '../../venues/lists.ts';
 import { extrasFor, planCloseShort, planOpenShort } from './plans.ts';
+import { readShortPosition } from './positionAccount.ts';
 import { assignTier, openBlocked, positionMetrics, previewCloseFor, previewOpen } from './previews.ts';
 import { type ChainSnapshot, loadSnapshot } from './snapshot.ts';
 import { errorByName } from './ui.tsx';
@@ -125,10 +126,7 @@ export async function closeTrade(
 
 /** The same close on a fresh read of the market and of the position. */
 export async function freshCloseTrade(rpc: AppRpc, math: MathModule, mint: Address, inp: CloseTradeInputs) {
-    const [s, acc] = await Promise.all([
-        freshSnapshot(rpc, math, mint),
-        fetchMaybeShortPosition(rpc, inp.position, { commitment: 'confirmed' }),
-    ]);
-    if (!acc.exists) throw new PlanError('This position is already closed.');
-    return closeTrade(math, s, acc.data, inp);
+    const [s, acc] = await Promise.all([freshSnapshot(rpc, math, mint), readShortPosition(rpc, inp.position)]);
+    if (!acc) throw new PlanError('This position is already closed.');
+    return closeTrade(math, s, acc, inp);
 }

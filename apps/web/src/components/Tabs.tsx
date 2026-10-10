@@ -1,5 +1,9 @@
-/** Accessible tabs (WAI-ARIA tabs pattern: arrow keys move, Home / End jump). */
-import { type KeyboardEvent, useRef } from 'react';
+/**
+ * Accessible tabs (WAI-ARIA tabs pattern: arrow keys move, Home / End jump). A tablist wider than
+ * its space scrolls sideways (FRONTEND.md §7.6): `data-overflow` fades its right edge while more
+ * tabs are out of view, and the selected tab is scrolled into view.
+ */
+import { type KeyboardEvent, useEffect, useRef } from 'react';
 
 export interface TabDef<K extends string> {
     readonly key: K;
@@ -22,6 +26,36 @@ export function Tabs<K extends string>({
     idPrefix: string;
 }) {
     const list = useRef<HTMLDivElement>(null);
+    // The fade while tabs are hidden to the right (no ResizeObserver in jsdom: no fade).
+    useEffect(() => {
+        const el = list.current;
+        if (!el || typeof ResizeObserver === 'undefined') return;
+        const update = () => {
+            const more = el.scrollWidth - el.clientWidth - el.scrollLeft > 4;
+            if (more) el.setAttribute('data-overflow', '');
+            else el.removeAttribute('data-overflow');
+        };
+        const ro = new ResizeObserver(update);
+        ro.observe(el);
+        el.addEventListener('scroll', update, { passive: true });
+        update();
+        return () => {
+            ro.disconnect();
+            el.removeEventListener('scroll', update);
+        };
+    }, []);
+    // The selected tab stays in view sideways (a deep link to the last tab, a key press). Only the
+    // tablist scrolls — never the page (a scrollIntoView on load would move the document).
+    // biome-ignore lint/correctness/useExhaustiveDependencies: re-runs when the selection changes (read from the DOM)
+    useEffect(() => {
+        const el = list.current;
+        const sel = el?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
+        if (!el || !sel || el.scrollWidth <= el.clientWidth) return;
+        const left = sel.offsetLeft - el.offsetLeft;
+        const right = left + sel.offsetWidth;
+        if (left < el.scrollLeft) el.scrollLeft = left;
+        else if (right > el.scrollLeft + el.clientWidth) el.scrollLeft = right - el.clientWidth;
+    }, [value]);
     const onKey = (e: KeyboardEvent) => {
         const i = tabs.findIndex((t) => t.key === value);
         let j = i;

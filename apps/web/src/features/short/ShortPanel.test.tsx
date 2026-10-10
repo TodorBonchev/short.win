@@ -8,6 +8,7 @@ import { getOpenShortInstructionDataDecoder } from '@shortwin/client';
 import { type Address, createNoopSigner } from '@solana/kit';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { ToastProvider } from '../../components/Toast.tsx';
 import { T } from '../../config/testids.ts';
 import type { MathModule } from '../../math/load.ts';
 import { MARKET_FLAG } from '../../venues/constants.ts';
@@ -89,7 +90,11 @@ async function show(name: string, patch?: (s: ChainSnapshot) => ChainSnapshot) {
     const fresh = { ...s, fetchedAt: Date.now() };
     state.snapshot = patch ? patch(fresh) : fresh;
     state.walletQ = 0n;
-    render(<ShortPanel mint={s.mint} />);
+    render(
+        <ToastProvider>
+            <ShortPanel mint={s.mint} />
+        </ToastProvider>,
+    );
     return s;
 }
 
@@ -114,8 +119,16 @@ describe('ShortPanel', () => {
         expect(screen.getByTestId(T.disclosure('borrower.liquidation')).textContent).toContain('both the live price');
         const submit = screen.getByTestId(T.shortSubmit) as HTMLButtonElement;
         expect(submit.disabled).toBe(true);
-        fireEvent.click(screen.getByTestId(T.disclosureAck('borrower.liquidation')));
+        // The reason line names the acknowledgement, as a button that focuses its box.
+        const reason = screen.getByTestId(T.shortSubmitReason);
+        expect(reason.textContent).toBe('Tick “I understand…” above');
+        const ack = screen.getByTestId(T.disclosureAck('borrower.liquidation'));
+        fireEvent.click(screen.getByRole('button', { name: 'Tick “I understand…” above' }));
+        expect(document.activeElement).toBe(ack);
+        fireEvent.click(ack);
         expect(submit.disabled).toBe(false);
+        expect(reason.textContent).toBe('');
+        expect(reason.dataset.reason).toBeUndefined();
         await act(async () => {
             fireEvent.click(submit);
         });
@@ -139,12 +152,29 @@ describe('ShortPanel', () => {
         expect(w.dataset.cap).toBe('position');
         fireEvent.click(screen.getByTestId(T.disclosureAck('borrower.liquidation')));
         expect((screen.getByTestId(T.shortSubmit) as HTMLButtonElement).disabled).toBe(true);
+        expect(screen.getByTestId(T.shortSubmitReason).textContent).toBe(
+            'Lower the size: it is above the position impact cap',
+        );
+    });
+
+    it('says why the submit waits: no size, a size that does not parse, a bad slippage', async () => {
+        await show('spl-open-0');
+        const reason = () => screen.getByTestId(T.shortSubmitReason).textContent;
+        expect(reason()).toBe('Enter a size');
+        fireEvent.change(screen.getByTestId(T.shortQInput), { target: { value: '1e6' } });
+        expect(reason()).toBe('Enter the size as a plain number');
+        fireEvent.change(screen.getByTestId(T.shortQInput), { target: { value: '1000' } });
+        fireEvent.change(screen.getByTestId(T.shortSlippageInput), { target: { value: '0' } });
+        expect(reason()).toBe('Set a slippage between 0.1% and 50%');
     });
 
     it('names a blocked market with its program error before any size', async () => {
         await show('warmup-open');
         expect(screen.getByTestId(T.shortBlocked).dataset.code).toBe('MarketWarmingUp');
         expect(screen.getByTestId(T.shortQInput)).toBeTruthy();
+        expect(screen.getByTestId(T.shortSubmitReason).textContent).toBe(
+            'New shorts are unavailable on this market now',
+        );
     });
 
     it('replaces the form while coverage is paused', async () => {

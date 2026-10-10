@@ -583,7 +583,7 @@ export async function seed(): Promise<E2EState> {
 
     // Wallet token accounts.
     const mainAta: Partial<Record<WalletName, Address>> = {};
-    for (const n of ['lender', 'keyboard', 'errors', 'claimer', 'trader'] as const) {
+    for (const n of ['lender', 'keyboard', 'errors', 'claimer', 'trader', 'phone'] as const) {
         const a = await ensureAta(c, (await w(n)).address, main.mint, PROGRAMS.token);
         await mintTo(c, main.mint, a, PROGRAMS.token, (n === 'claimer' ? 200_000_000n : 1_000_000n) * TOKEN);
         mainAta[n] = a;

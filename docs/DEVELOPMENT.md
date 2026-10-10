@@ -921,6 +921,11 @@ pnpm --filter web e2e --grep @scaffold      # the harness, smoke, wallet and fra
 SHORTWIN_E2E_KEEP=1 pnpm --filter web e2e   # leave the validator and the preview running, then…
 SHORTWIN_E2E_REUSE=1 pnpm --filter web e2e e2e/specs/smoke.spec.ts   # …rerun in seconds without reseeding
 SHORTWIN_E2E_SCREENSHOTS=update pnpm --filter web e2e e2e/specs/screens.spec.ts   # refresh e2e/screenshots/
+SHORTWIN_E2E_RESPONSIVE=1 pnpm --filter web e2e --grep @responsive   # eight viewports: .e2e/responsive/ PNGs + metrics.json
+SHORTWIN_E2E_RESPONSIVE=1 SHORTWIN_RESPONSIVE_GATE=1 pnpm --filter web e2e --grep @responsive   # M10-RESP: the same as a gate
+pnpm --filter web e2e --project chain-phone  # M10-RESP: the phone project alone (mobile-*.spec.ts)
+SHORTWIN_E2E_SCREENSHOTS=update pnpm --filter web e2e --project chain-phone   # refresh e2e/screenshots/phone/
+pnpm --filter web exec node e2e/responsive/summary.ts --pages        # its per-viewport counts and worst states
 pnpm --filter web exec playwright show-report .e2e/report
 ```
 
@@ -971,14 +976,49 @@ and flip CPI Guard or required memos for the race tests; since M10 also a full w
 `sync_lender` (`simulateClaimSol`, `simulateSyncLender`), emit_cpi event decoding (`eventsOf`) and
 an empty `sweep_trader` that credits a market's pending rent (`accrue`).
 
-**Specs** (22 files, 58 tests at M10): `harness`, `smoke`, `wallet`, `frame` (`@scaffold`); `markets`,
+**Specs** (22 files, 58 tests at M10; *M10-RESP:* 28 files with the four `mobile-*` specs (`responsive` is opt-in) — and a default run of 77 tests, 60 desktop and 17 phone): `harness`, `smoke`, `wallet`, `frame` (`@scaffold`); `markets`,
 `create-market`, `status`, `fallback` (`@markets`); `lend-deposit`, `lend-cpi-guard`,
 `lend-withdraw-memo`, `lend-claim`, `keyboard`, and since M10 (FE-18) `lend-post-wipe`,
 `lend-claim-sync`, `lend-sweep-cashback` (`@lend`); `short-open`, `short-close`,
 `add-margin`, `positions`, `tx-errors` (`@short`); `screens` (`@screens`: every page and state as
-a full-height PNG in `.e2e/screenshots/`, axe on each, the 1024 px minimum without sideways
-scroll; `SHORTWIN_E2E_SCREENSHOTS=update` writes the reviewed set in `e2e/screenshots/`). CI's
-`web-e2e` job runs them all and keeps the screenshots as an artifact.
+a full-height PNG in `.e2e/screenshots/`, axe on each, 1024 px without sideways scroll;
+`SHORTWIN_E2E_SCREENSHOTS=update` writes the reviewed set in `e2e/screenshots/`). *M10-RESP:* two
+Playwright projects — `<profile>` (the desktop, 1440 × 900: every spec above) and `<profile>-phone`
+(390 × 844, touch, DPR 3, an iPhone user agent: the `mobile-*.spec.ts` specs — `mobile-shell`
+from the foundation; `mobile-markets`, `mobile-trade`, `mobile-lend` from the page tracks), both
+in the default run (the phone project ≈ 6 min or less once complete); the phone specs tap, run axe
+at 0 on every state, sign only with the seeded `phone` wallet and write `e2e/screenshots/phone/`
+with `SHORTWIN_E2E_SCREENSHOTS=update` (an owner-reviewed set, like the desktop one). CI's
+`web-e2e` job runs them all and keeps the screenshots as an artifact. Not in the default run:
+`responsive` (`@responsive`; FRONTEND.md §10.5) — every page and state at eight viewports from a
+320 px phone (and a landscape phone) to a 1440 px desktop, a PNG each in `$SHORTWIN_SHOTS_DIR/<viewport>/` and the layout
+metrics (sideways overflow, touch targets under 44 px, text under 12 px, hover-only affordances,
+axe per viewport) in `metrics.json`; it runs with `SHORTWIN_E2E_RESPONSIVE=1` or a
+`SHORTWIN_SHOTS_DIR` (default `.e2e/responsive`), `SHORTWIN_SHOTS_VIEWPORTS=phone,desktop` limits
+the viewports, ≈ 6 × the screens spec. *M10-RESP:* `SHORTWIN_RESPONSIVE_GATE=1` makes it the
+responsive gate (FRONTEND.md §10.5: overflow, layout width, zoom, off-screen elements, axe, targets
+under 24 px, primary controls under 44 px with a coarse pointer, text under 12 px on phones, failed
+steps, DOM-click fallbacks), required before each responsive phase merges.
+
+**Running the responsive capture (M10-RESP).** A responsive change is checked in three steps, all
+under the E2E lock (one run per host):
+
+```sh
+cd apps/web
+pnpm --filter web e2e --project chain-phone                     # the phone flows (≈ 6 min)
+SHORTWIN_E2E_RESPONSIVE=1 SHORTWIN_RESPONSIVE_GATE=1 SHORTWIN_SHOTS_DIR=$PWD/.e2e/after \
+  pnpm --filter web e2e --grep @responsive                      # the gate at all eight viewports (≈ 30 min)
+node e2e/responsive/summary.ts .e2e/after --pages               # per viewport: overflow, targets, text, axe; the worst states
+node e2e/responsive/summary.ts .e2e/before .e2e/after           # two directories: BEFORE and AFTER side by side
+```
+
+A failing gate test lists each finding as `<viewport>/<state>: <what>`; the PNGs in
+`<dir>/<viewport>/` (`<state>.png` the whole page, `<state>-screen.png` the first screen on a phone
+or tablet) show it. Look at the PNGs, not only the counts: the gate cannot see a card whose values
+collide or a sheet that hides its submit. `SHORTWIN_SHOTS_VIEWPORTS=phone-s,tablet` narrows a rerun
+while fixing; the final run is always all viewports. After a reviewed visual change, refresh both
+reference sets: `SHORTWIN_E2E_SCREENSHOTS=update pnpm --filter web e2e e2e/specs/screens.spec.ts`
+(desktop) and `SHORTWIN_E2E_SCREENSHOTS=update pnpm --filter web e2e --project chain-phone` (phone).
 
 **Variables.** `SHORTWIN_CHROMIUM` (browser; default `/usr/bin/chromium` when present, `playwright`
 forces Playwright's own Chromium, installed once with `pnpm --filter web exec playwright install

@@ -219,7 +219,12 @@ describe('CreateMarketPage', () => {
         expect(reason.textContent).toContain(CREATOR);
         expect(screen.queryByTestId(T.createVenue)).toBeNull();
         expect(venuesLayer.detectVenue).not.toHaveBeenCalled();
-        expect(submit().disabled).toBe(true);
+        // D14: the cost says it cannot be listed, and there is no Review at all.
+        expect(screen.queryByTestId(T.createSubmit)).toBeNull();
+        expect(screen.getByText('Cannot be listed')).toBeTruthy();
+        expect(screen.getByText(/This token cannot be listed/).parentElement?.textContent).toContain(
+            programError(6018)?.message ?? 'missing',
+        );
         queryClient.clear();
     });
 
@@ -276,6 +281,7 @@ describe('CreateMarketPage', () => {
         await waitFor(() => expect(verdict()).toBe('existing'));
         expect(screen.getByTestId(T.createExisting).getAttribute('href')).toBe(`/m/${MINT_A}`);
         expect(submit().disabled).toBe(true);
+        expect(screen.getByTestId(T.createSubmitReason).textContent).toBe('This token already has a market.');
         queryClient.clear();
     });
 
@@ -338,7 +344,8 @@ describe('CreateMarketPage', () => {
         const reason = await screen.findByTestId(T.createReason('CurveMayhemUnsupported'));
         expect(reason.textContent).toContain(programError(6025)?.message ?? 'missing');
         expect(screen.queryByTestId(T.createChoice('auto'))).toBeNull();
-        expect(submit().disabled).toBe(true);
+        expect(screen.queryByTestId(T.createSubmit)).toBeNull();
+        expect(screen.getByText('Cannot be listed')).toBeTruthy();
         queryClient.clear();
     });
 
@@ -348,7 +355,9 @@ describe('CreateMarketPage', () => {
         await waitFor(() => expect(verdict()).toBe('ok'));
         await waitFor(() => expect(screen.getByTestId(T.createCost)).toBeTruthy());
         expect(submit().disabled).toBe(true);
-        expect(screen.getByText(/Connect a wallet/)).toBeTruthy();
+        expect(screen.getByTestId(T.createSubmitReason).textContent).toBe(
+            'Connect a wallet that can sign to create the market.',
+        );
         queryClient.clear();
     });
 });

@@ -14,6 +14,8 @@
  *                            and skip the SPL pin check (the built-in spl-memo v3 is mainnet's either way)
  * - `SHORTWIN_E2E_REUSE`     `1`: reuse a running E2E validator, its seed and the app build
  * - `SHORTWIN_E2E_KEEP`      `1`: leave the validator and the preview server running after the run
+ * - `SHORTWIN_E2E_RESPONSIVE` `1`: include the `@responsive` six-viewport capture (also on when
+ *                            `SHORTWIN_SHOTS_DIR` is set: its output directory; FRONTEND.md §10.5)
  * - `SHORTWIN_CHROMIUM`      browser executable (default `/usr/bin/chromium` when it exists, else
  *                            Playwright's own Chromium from the user cache); `playwright` forces the latter
  * - `SHORTWIN_SO`, `MOCK_CPAMM_SO`, `COMPLETE_CURVE_SO`  program ELFs (defaults under target/)
@@ -83,6 +85,7 @@ export const ENV = {
     bundledSpl: flag('SHORTWIN_BUNDLED_SPL', false),
     reuse: flag('SHORTWIN_E2E_REUSE', false),
     keep: flag('SHORTWIN_E2E_KEEP', false),
+    responsive: flag('SHORTWIN_E2E_RESPONSIVE', false) || !!process.env.SHORTWIN_SHOTS_DIR,
     ci: flag('CI', false),
 } as const;
 

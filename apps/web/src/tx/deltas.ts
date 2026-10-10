@@ -54,6 +54,7 @@ export function computeDeltas(
                         after: y,
                         unit: meta.unit,
                         scale: meta.scale,
+                        ...(meta.kind ? { kind: meta.kind } : {}),
                     });
                 }
                 return;

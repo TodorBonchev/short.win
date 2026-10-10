@@ -9,7 +9,10 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
     readonly busy?: boolean;
 }
 
-/** A button. `busy` disables it and sets `aria-busy`. Defaults to `type="button"`. */
+/**
+ * A button. `busy` disables it and sets `aria-busy`. Defaults to `type="button"`. A small one gets
+ * a larger invisible hit area (`.hit`: 44 px under a coarse pointer).
+ */
 export function Button({
     variant = 'default',
     size = 'md',
@@ -24,7 +27,7 @@ export function Button({
         <button
             {...rest}
             type={type === 'submit' ? 'submit' : type === 'reset' ? 'reset' : 'button'}
-            className={`btn ${rest.className ?? ''}`.trim()}
+            className={`btn${size === 'sm' ? ' hit' : ''} ${rest.className ?? ''}`.trim()}
             data-variant={variant}
             data-size={size}
             data-block={block ? 'true' : undefined}

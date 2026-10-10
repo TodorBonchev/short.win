@@ -10,6 +10,7 @@ import type { Address } from '@solana/kit';
 import { useState } from 'react';
 import { Button } from '../../../components/Button.tsx';
 import { Field } from '../../../components/Field.tsx';
+import { FormFoot } from '../../../components/FormFoot.tsx';
 import { Pnl, Sol, Tokens } from '../../../components/Num.tsx';
 import { T } from '../../../config/testids.ts';
 import { parseBps } from '../../../lib/amount.ts';
@@ -17,6 +18,7 @@ import type { MathModule } from '../../../math/load.ts';
 import { useAppClient } from '../../../rpc/context.tsx';
 import { TxReviewModal } from '../../../tx/TxReviewModal.tsx';
 import { useWallet } from '../../../wallet/useWallet.ts';
+import { firstReason, REASON, useConfirmedToast } from '../feedback.ts';
 import {
     DEFAULT_SLIPPAGE_BPS,
     MAX_SLIPPAGE_BPS,
@@ -58,13 +60,28 @@ export function CloseForm({
     const mine = owner === pos.borrower;
     const venueCannot = snapshot.kind === 'pump_migrating' || snapshot.kind === 'none' || !snapshot.venue.executable;
     const stage = trade.flow.state.stage;
-    const canSubmit =
-        !!connected?.signer &&
-        mine &&
-        !!preview &&
-        !stale &&
-        !trade.building &&
-        (stage === 'idle' || stage === 'confirmed');
+    // The reason line and the enabled state are one predicate list (FRONTEND.md §7.6).
+    const reason = firstReason([
+        [!connected, REASON.connect],
+        [!connected?.signer, REASON.signer],
+        [!mine, REASON.notMine],
+        [!slipOk, REASON.slippage],
+        [
+            !preview,
+            mx.straddle
+                ? 'Cannot close on the curve now'
+                : venueCannot
+                  ? 'The venue cannot trade now'
+                  : mx.insufficientVault
+                    ? 'Add margin first: the vault cannot cover the buyback'
+                    : 'No buyback quote now',
+        ],
+        [stale, REASON.stale],
+        [trade.building, REASON.building],
+        [stage !== 'idle' && stage !== 'confirmed', REASON.inReview],
+    ]);
+    const canSubmit = reason === null;
+    useConfirmedToast(trade.flow);
 
     const submit = async () => {
         if (!preview || !connected?.signer || slip === null) return;
@@ -81,7 +98,7 @@ export function CloseForm({
 
     return (
         <section className="stack" id="close" aria-labelledby="close-title">
-            <h3 id="close-title" className="short-section-title">
+            <h3 id="close-title" className="short-section-title" tabIndex={-1}>
                 Close
             </h3>
             {mx.straddle && (
@@ -158,21 +175,23 @@ export function CloseForm({
                     {preview ? <Pnl lamports={preview.pnl} /> : '—'}
                 </dd>
             </dl>
-            <Button
-                variant="danger"
-                block
-                disabled={!canSubmit}
-                busy={trade.building}
-                onClick={() => void submit()}
-                data-testid={T.closeSubmit}
-            >
-                {!connected ? 'Connect a wallet to close' : !mine ? 'Not your position' : 'Close position'}
-            </Button>
-            {(trade.buildError ?? submitError) && (
-                <div className="banner" data-tone="danger" role="alert">
-                    {trade.buildError ?? submitError}
-                </div>
-            )}
+            <FormFoot reason={reason} reasonTestId={T.closeReason}>
+                {(trade.buildError ?? submitError) && (
+                    <div className="banner" data-tone="danger" role="alert">
+                        {trade.buildError ?? submitError}
+                    </div>
+                )}
+                <Button
+                    variant="danger"
+                    block
+                    disabled={!canSubmit}
+                    busy={trade.building}
+                    onClick={() => void submit()}
+                    data-testid={T.closeSubmit}
+                >
+                    {!connected ? 'Connect a wallet to close' : !mine ? 'Not your position' : 'Close position'}
+                </Button>
+            </FormFoot>
             {trade.fallback && (
                 <p className="short-note" role="status">
                     The venue’s extra accounts changed; retried with the {trade.fallback} set.

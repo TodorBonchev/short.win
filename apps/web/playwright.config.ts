@@ -10,6 +10,13 @@
  * order (each spec group signs with its own seeded wallet), not of each other's chain writes to
  * the shared markets. Tags: `@scaffold` runs against the scaffold alone; `@markets`, `@lend`,
  * `@short` need that track's pages (FRONTEND.md §12.3) — `--grep @scaffold` before they land.
+ * `@responsive` (the six-viewport capture, FRONTEND.md §10.5) is left out of the default run; it runs
+ * with `SHORTWIN_E2E_RESPONSIVE=1` or a `SHORTWIN_SHOTS_DIR` (`--grep @responsive` for it alone).
+ *
+ * Projects (M10-RESP, FRONTEND.md §10.2): `<profile>` — the desktop (1440 × 900), every spec but
+ * `mobile-*.spec.ts`; `<profile>-phone` — a 390 × 844 phone (mobile viewport, touch, DPR 3, an iPhone
+ * user agent; Chromium's emulation), the `mobile-*.spec.ts` specs only (real taps, axe at 0). Both
+ * are in the default run; `--project <profile>` runs one.
  */
 import { defineConfig, devices } from '@playwright/test';
 import { chromiumPath, ENV, PATHS, URLS } from './e2e/env.ts';
@@ -23,6 +30,7 @@ export default defineConfig({
     globalTeardown: './e2e/global-teardown.ts',
     fullyParallel: false,
     workers: 1,
+    grepInvert: ENV.responsive ? undefined : /@responsive/,
     // Validator round trips, a 20 s stale-review wait and real confirmations: generous budgets.
     timeout: 180_000,
     expect: { timeout: 30_000 },
@@ -44,9 +52,23 @@ export default defineConfig({
     projects: [
         {
             name: ENV.profile,
+            testIgnore: /mobile-.*\.spec\.ts/,
             use: {
                 ...devices['Desktop Chrome'],
                 viewport: { width: 1440, height: 900 },
+                launchOptions: executablePath ? { executablePath } : {},
+            },
+        },
+        {
+            name: `${ENV.profile}-phone`,
+            testMatch: /mobile-.*\.spec\.ts/,
+            use: {
+                browserName: 'chromium',
+                viewport: { width: 390, height: 844 },
+                isMobile: true,
+                hasTouch: true,
+                deviceScaleFactor: 3,
+                userAgent: devices['iPhone 13'].userAgent,
                 launchOptions: executablePath ? { executablePath } : {},
             },
         },

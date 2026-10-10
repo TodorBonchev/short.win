@@ -7,14 +7,14 @@
  */
 import type { Address } from '@solana/kit';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import type { MarketsParams } from '../../api/keys.ts';
 import { useLiveChannels } from '../../api/live.tsx';
 import { big, type MarketSort, type MarketSummary, type TierName, type VenueName } from '../../api/types.ts';
 import { TierBadge, VenueBadge, venueLabel } from '../../components/Badge.tsx';
 import { Button } from '../../components/Button.tsx';
 import { type Column, DataTable } from '../../components/DataTable.tsx';
-import { Checkbox, Select } from '../../components/Field.tsx';
+import { addressInputProps, Checkbox, Select } from '../../components/Field.tsx';
 import { Price, Sol } from '../../components/Num.tsx';
 import { Panel } from '../../components/Panel.tsx';
 import { ErrorState } from '../../components/States.tsx';
@@ -49,6 +49,7 @@ function columns(now: number, dupSymbols: ReadonlySet<string>): Column<MarketSum
         {
             key: 'token',
             header: 'Token',
+            card: 'title',
             render: (m) => (
                 <TokenLabel
                     mint={m.mint}
@@ -58,11 +59,12 @@ function columns(now: number, dupSymbols: ReadonlySet<string>): Column<MarketSum
                 />
             ),
         },
-        { key: 'venue', header: 'Venue', render: (m) => <VenueBadge venue={m.venue} /> },
-        { key: 'tier', header: 'Tier', render: (m) => <TierBadge tier={m.tier} /> },
+        { key: 'venue', header: 'Venue', card: 'aside', render: (m) => <VenueBadge venue={m.venue} /> },
+        { key: 'tier', header: 'Tier', card: 'aside', render: (m) => <TierBadge tier={m.tier} /> },
         {
             key: 'price',
             header: 'Price (SOL)',
+            label: 'Price',
             align: 'right',
             render: (m) =>
                 m.ema_price !== null && m.decimals !== null ? (
@@ -87,6 +89,7 @@ function columns(now: number, dupSymbols: ReadonlySet<string>): Column<MarketSum
             key: 'inventory',
             header: 'Inventory · free',
             align: 'right',
+            priority: 3,
             render: (m) => (
                 <span className="mk-pair">
                     <CompactTokens raw={big(m.inventory_tokens)} decimals={m.decimals} />
@@ -100,7 +103,9 @@ function columns(now: number, dupSymbols: ReadonlySet<string>): Column<MarketSum
         {
             key: 'util',
             header: 'Util.',
+            label: 'Utilisation',
             align: 'right',
+            priority: 2,
             sortable: true,
             testId: T.marketsSort('util'),
             render: (m) => <UtilBar bps={m.util_bps} />,
@@ -109,6 +114,7 @@ function columns(now: number, dupSymbols: ReadonlySet<string>): Column<MarketSum
             key: 'oi',
             header: 'Open interest',
             align: 'right',
+            priority: 2,
             sortable: true,
             testId: T.marketsSort('oi'),
             render: (m) => <Sol lamports={big(m.oi_lamports)} frac={2} />,
@@ -117,6 +123,7 @@ function columns(now: number, dupSymbols: ReadonlySet<string>): Column<MarketSum
             key: 'open_positions',
             header: 'Positions',
             align: 'right',
+            priority: 2,
             sortable: true,
             testId: T.marketsSort('open_positions'),
             render: (m) => <span className="num">{m.open_positions}</span>,
@@ -124,23 +131,34 @@ function columns(now: number, dupSymbols: ReadonlySet<string>): Column<MarketSum
         {
             key: 'flags',
             header: 'Flags',
-            render: (m) => (
-                <span className="mk-flags">
-                    {rowFlags(m).map((f) => (
-                        <FlagBadge key={f} flag={f} />
-                    ))}
-                </span>
-            ),
+            priority: 2,
+            // Nothing at all without flags: a card leaves the empty cell out (`td:empty`).
+            render: (m) => {
+                const flags = rowFlags(m);
+                return flags.length === 0 ? null : (
+                    <span className="mk-flags">
+                        {flags.map((f) => (
+                            <FlagBadge key={f} flag={f} />
+                        ))}
+                    </span>
+                );
+            },
         },
         {
             key: 'created',
             header: 'Age',
             align: 'right',
+            priority: 3,
             sortable: true,
             testId: T.marketsSort('created'),
             render: (m) => <Age ts={m.created_ts} now={now} />,
         },
     ];
+}
+
+/** A mint-like filter (base58, 32+ characters): shown in the numeric (mono) face. */
+function looksLikeMint(text: string): boolean {
+    return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(text.trim());
 }
 
 /** "Open a mint": the list's replacement while the indexer is unreachable (FRONTEND.md §6.5). */
@@ -159,14 +177,13 @@ function OpenMint() {
             <label className="field-label" htmlFor="mk-open-mint">
                 Open a market by its mint (read from the chain)
             </label>
-            <div className="row">
-                <div className="input-wrap grow">
+            <div className="mk-open-mint-row">
+                <div className="input-wrap">
                     <input
+                        {...addressInputProps}
                         id="mk-open-mint"
                         className="input num"
                         value={text}
-                        spellCheck={false}
-                        autoComplete="off"
                         placeholder="Mint address"
                         data-testid={T.marketsOpenMint}
                         aria-invalid={text !== '' && !mint ? true : undefined}
@@ -189,6 +206,9 @@ export function MarketsPage() {
         (q) => void navigate({ search: (s) => ({ ...s, q: q === '' ? undefined : q }), replace: true }),
         (t) => t.trim().slice(0, 64),
     );
+    const filtersId = useId();
+    const [filtersOpen, setFiltersOpen] = useState(false);
+    const activeFilters = (search.venue ? 1 : 0) + (search.tier ? 1 : 0) + (search.active ? 1 : 0);
 
     const sort = search.sort ?? 'tvl';
     const order = search.order ?? 'desc';
@@ -223,10 +243,15 @@ export function MarketsPage() {
         const nextOrder = key === sort ? (order === 'desc' ? 'asc' : 'desc') : 'desc';
         void navigate({ search: (s) => ({ ...s, sort: key as MarketSort, order: nextOrder }) });
     };
+    const filtered = !!search.q || activeFilters > 0;
+    const clearFilters = () =>
+        void navigate({
+            search: (s) => ({ ...s, q: undefined, venue: undefined, tier: undefined, active: undefined }),
+        });
 
     return (
         <div className="page" data-testid={T.page('markets')}>
-            <div className="page-head">
+            <div className="page-head mk-page-head">
                 <h1>Markets</h1>
                 <FreshnessBadge />
                 <span className="grow" />
@@ -244,52 +269,64 @@ export function MarketsPage() {
                 <div className="mk-toolbar">
                     <div className="input-wrap mk-search">
                         <input
-                            className="input"
+                            {...addressInputProps}
+                            className={`input${looksLikeMint(text) ? ' num' : ''}`}
                             type="search"
-                            aria-label="Filter by mint, ticker or name"
-                            placeholder="Filter by mint, ticker or name"
+                            aria-label="Filter this list by mint, ticker or name"
+                            placeholder="Filter this list"
                             value={text}
                             maxLength={64}
-                            spellCheck={false}
-                            autoComplete="off"
+                            enterKeyHint="search"
                             data-testid={T.marketsSearch}
                             onChange={(e) => setText(e.target.value)}
                         />
                     </div>
-                    <Select<VenueName | 'all'>
-                        label="Venue"
-                        value={search.venue ?? 'all'}
-                        testId={T.marketsFilterVenue}
-                        options={[
-                            { value: 'all', label: 'All venues' },
-                            ...VENUE_OPTIONS.map((v) => ({ value: v, label: venueLabel(v) })),
-                        ]}
-                        onChange={(v) =>
-                            void navigate({ search: (s) => ({ ...s, venue: v === 'all' ? undefined : v }) })
-                        }
-                    />
-                    <Select<TierName | 'all'>
-                        label="Tier"
-                        value={search.tier ?? 'all'}
-                        testId={T.marketsFilterTier}
-                        options={[
-                            { value: 'all', label: 'All tiers' },
-                            ...TIER_OPTIONS.map((t) => ({ value: t, label: `Tier ${t}` })),
-                        ]}
-                        onChange={(t) =>
-                            void navigate({ search: (s) => ({ ...s, tier: t === 'all' ? undefined : t }) })
-                        }
-                    />
-                    <Checkbox
-                        checked={!!search.active}
-                        testId={T.marketsFilterActive}
-                        onChange={(v) => void navigate({ search: (s) => ({ ...s, active: v ? true : undefined }) })}
+                    <button
+                        type="button"
+                        className="btn mk-filters-toggle"
+                        aria-expanded={filtersOpen}
+                        aria-controls={filtersId}
+                        data-testid={T.marketsFiltersToggle}
+                        onClick={() => setFiltersOpen((o) => !o)}
                     >
-                        With open positions
-                    </Checkbox>
-                    <span className="grow" />
+                        Filters{activeFilters > 0 ? ` · ${activeFilters}` : ''}
+                        <span aria-hidden="true">{filtersOpen ? '▴' : '▾'}</span>
+                    </button>
+                    <div id={filtersId} className="mk-filters" data-open={filtersOpen ? '' : undefined}>
+                        <Select<VenueName | 'all'>
+                            label="Venue"
+                            value={search.venue ?? 'all'}
+                            testId={T.marketsFilterVenue}
+                            options={[
+                                { value: 'all', label: 'All venues' },
+                                ...VENUE_OPTIONS.map((v) => ({ value: v, label: venueLabel(v) })),
+                            ]}
+                            onChange={(v) =>
+                                void navigate({ search: (s) => ({ ...s, venue: v === 'all' ? undefined : v }) })
+                            }
+                        />
+                        <Select<TierName | 'all'>
+                            label="Tier"
+                            value={search.tier ?? 'all'}
+                            testId={T.marketsFilterTier}
+                            options={[
+                                { value: 'all', label: 'All tiers' },
+                                ...TIER_OPTIONS.map((t) => ({ value: t, label: `Tier ${t}` })),
+                            ]}
+                            onChange={(t) =>
+                                void navigate({ search: (s) => ({ ...s, tier: t === 'all' ? undefined : t }) })
+                            }
+                        />
+                        <Checkbox
+                            checked={!!search.active}
+                            testId={T.marketsFilterActive}
+                            onChange={(v) => void navigate({ search: (s) => ({ ...s, active: v ? true : undefined }) })}
+                        >
+                            With open positions
+                        </Checkbox>
+                    </div>
                     {pages.rows && (
-                        <span className="muted num" aria-live="polite">
+                        <span className="muted num mk-count" aria-live="polite">
                             {pages.rows.length} {pages.rows.length === 1 ? 'market' : 'markets'}
                             {pages.hasMore ? '+' : ''}
                         </span>
@@ -304,6 +341,8 @@ export function MarketsPage() {
                     <DataTable
                         caption="Markets"
                         testId={T.marketsTable}
+                        className="mk-tbl mk-markets-tbl"
+                        sortLabel="Sort by"
                         columns={cols}
                         rows={pages.rows}
                         loading={pages.loading}
@@ -313,13 +352,20 @@ export function MarketsPage() {
                         sort={{ key: sort, order }}
                         onSort={onSort}
                         empty={
-                            <span data-testid={T.marketsEmpty}>
-                                {search.q
-                                    ? mintWithoutMarket
-                                        ? 'This mint has no market yet. Anyone can create one: use “Create a market for this mint”.'
-                                        : 'No market matches this search.'
-                                    : 'No markets match these filters.'}
-                            </span>
+                            <div className="mk-empty">
+                                <p data-testid={T.marketsEmpty}>
+                                    {search.q
+                                        ? mintWithoutMarket
+                                            ? 'This mint has no market yet. Anyone can create one: use “Create a market for this mint”.'
+                                            : 'No market matches this search.'
+                                        : 'No markets match these filters.'}
+                                </p>
+                                {filtered && !mintWithoutMarket && (
+                                    <Button size="sm" onClick={clearFilters} data-testid={T.marketsClearFilters}>
+                                        Clear filters
+                                    </Button>
+                                )}
+                            </div>
                         }
                     />
                 )}

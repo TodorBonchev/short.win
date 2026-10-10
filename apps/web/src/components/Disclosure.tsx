@@ -16,9 +16,11 @@ export interface DisclosureProps {
     readonly onAcknowledge?: (v: boolean) => void;
     /** Collapsed into `<details>` (for long, non-blocking disclosures). */
     readonly collapsible?: boolean;
+    /** The acknowledgement checkbox's id (a FormFoot `reasonTarget` focuses it). */
+    readonly ackId?: string;
 }
 
-export function Disclosure({ id, vars, acknowledged, onAcknowledge, collapsible }: DisclosureProps) {
+export function Disclosure({ id, vars, acknowledged, onAcknowledge, collapsible, ackId }: DisclosureProps) {
     const d = DISCLOSURES[id];
     const body = renderDisclosure(id, vars);
     const withAck = !!d.ack && !!onAcknowledge;
@@ -35,7 +37,7 @@ export function Disclosure({ id, vars, acknowledged, onAcknowledge, collapsible 
                 </ul>
             )}
             {withAck && onAcknowledge && (
-                <Checkbox checked={!!acknowledged} onChange={onAcknowledge} testId={T.disclosureAck(id)}>
+                <Checkbox checked={!!acknowledged} onChange={onAcknowledge} testId={T.disclosureAck(id)} id={ackId}>
                     {d.ack}
                 </Checkbox>
             )}

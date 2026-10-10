@@ -5,10 +5,31 @@
     box-sizing: border-box;
 }
 
+/* The document scrolls at every width (FRONTEND.md §7.6): the sticky header and the fixed bars
+   leave room for a focused control (WCAG 2.2 2.4.11), via scroll-padding and scroll-margin. */
+html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    scroll-padding-top: calc(var(--header-h) + var(--sp-3));
+    scroll-padding-bottom: calc(
+        var(--tabbar-h) +
+        var(--statusbar-h) +
+        var(--actionbar-h) +
+        var(--safe-b) +
+        var(--sp-3)
+    );
+}
+
 html,
 body,
 #root {
-    height: 100%;
+    height: auto;
+}
+
+/* An open dialog or sheet holds the page still behind it. */
+html:has(dialog[open]),
+html[data-sheet-open] {
+    overflow: hidden;
 }
 
 body {
@@ -55,8 +76,10 @@ a {
     text-decoration: none;
 }
 
-a:hover {
-    text-decoration: underline;
+@media (hover: hover) {
+    a:hover {
+        text-decoration: underline;
+    }
 }
 
 button,
@@ -67,9 +90,66 @@ textarea {
     color: inherit;
 }
 
+/* 16 px under a coarse pointer (--fs-input): iOS zooms into a smaller focused input. */
+input,
+select,
+textarea,
+.input,
+.select {
+    font-size: var(--fs-input);
+}
+
+input[type="search"] {
+    appearance: none;
+}
+
 :focus-visible {
     outline: 2px solid var(--focus);
     outline-offset: 1px;
+    scroll-margin-top: calc(var(--header-h) + var(--sp-3));
+    scroll-margin-bottom: calc(var(--tabbar-h) + var(--statusbar-h) + var(--actionbar-h) + var(--safe-b) + var(--sp-3));
+}
+
+/* A touch press shows on the control itself, not as the browser's grey flash. */
+.btn,
+.tab,
+.nav a,
+.menu-item,
+.search-option,
+tr[data-interactive] {
+    -webkit-tap-highlight-color: transparent;
+}
+
+.btn:active:not(:disabled),
+.tab:active,
+.nav a:active,
+.menu-item:active,
+.search-option:active,
+tr[data-interactive]:active {
+    background: var(--bg-3);
+}
+
+/* A hit area larger than the visible control (WCAG 2.5.8 / 44 px under a coarse pointer). The
+   control keeps its look; the invisible ::after takes the touch. */
+/* Text that must not break (a shortened id "8oBK…6cTC" inside a sentence). */
+.nowrap {
+    white-space: nowrap;
+}
+
+.hit {
+    position: relative;
+}
+
+.hit::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+}
+
+@media (pointer: coarse) {
+    .hit::after {
+        inset: min(-4px, calc((100% - 44px) / 2));
+    }
 }
 
 ::selection {
@@ -131,5 +211,5 @@ textarea {
 }
 
 .skip-link:focus {
-    top: var(--sp-2);
+    top: calc(var(--sp-2) + var(--safe-t));
 }

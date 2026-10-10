@@ -10,7 +10,7 @@ import type { Address } from '@solana/kit';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { indexerQueries } from '../../../api/queries.ts';
 import type { LenderPosition as ApiLender, MarketDetail } from '../../../api/types.ts';
-import { shortAddress } from '../../../lib/format.ts';
+import { shortAddress, WAD } from '../../../lib/format.ts';
 import type { MathModule } from '../../../math/load.ts';
 import { useAppClient } from '../../../rpc/context.tsx';
 import { chainNowSeconds, type LendChain, lendKeys, readLendChain, readOnChainLenderMarkets } from '../chain.ts';
@@ -32,6 +32,23 @@ export interface LenderRow {
     readonly indexer: IndexerState;
     readonly isCoinCreator: boolean;
     readonly isMarketCreator: boolean;
+    /** The indexer's EMA price of this mint (WAD, lamports per raw unit; display only), else null. */
+    readonly emaPriceWad: bigint | null;
+}
+
+/**
+ * The SOL worth of the rows' token values at each market's EMA price (an estimate for the KPI strip;
+ * display only): the sum over the rows that have a position and a price, and how many those are.
+ */
+export function totalValueLamports(rows: readonly LenderRow[]): { lamports: bigint; priced: number } {
+    let lamports = 0n;
+    let priced = 0;
+    for (const r of rows) {
+        if (!r.position || r.emaPriceWad === null) continue;
+        lamports += (r.position.value * r.emaPriceWad) / WAD;
+        priced += 1;
+    }
+    return { lamports, priced };
 }
 
 /** How the indexer's row compares with the chain (display of "quarantined / unsynced" states). */
@@ -111,6 +128,7 @@ export function useLenderRows(owner: Address | null, math: MathModule | undefine
             indexer: indexerStateOf(b.api, c, detail),
             isCoinCreator: b.api?.is_coin_creator ?? false,
             isMarketCreator: b.api?.is_market_creator ?? false,
+            emaPriceWad: detail?.ema_price != null ? BigInt(detail.ema_price) : null,
         });
     });
     const indexerDown = idx.isError || (!idx.data && idx.failureCount > 0);

@@ -4,17 +4,21 @@
  * markets in degraded mode (coverage-paused) and with a broken route (FE-5: filtered client-side
  * from the first pages of `/v1/markets`), the indexer's health and the keeper's coverage totals.
  * While the indexer is unavailable the pause, the bits and the latch come from the chain.
+ *
+ * M10-RESP: "New shorts" (the pause) is a full-width row at the top; the panels below share rows of
+ * equal height; every table is a DataTable (cards on a phone).
  */
 import type { Address } from '@solana/kit';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useLiveChannels } from '../../api/live.tsx';
 import { indexerQueries } from '../../api/queries.ts';
-import type { MarketSummary } from '../../api/types.ts';
+import type { MarketSummary, VenueStatus } from '../../api/types.ts';
 import { Badge, TierBadge, VenueBadge, venueLabel } from '../../components/Badge.tsx';
 import { Button } from '../../components/Button.tsx';
+import { type Column, DataTable } from '../../components/DataTable.tsx';
 import { Panel } from '../../components/Panel.tsx';
-import { Empty, ErrorState, Kv, Skeleton } from '../../components/States.tsx';
+import { Empty, ErrorState, Skeleton } from '../../components/States.tsx';
 import { T } from '../../config/testids.ts';
 import { formatDuration } from '../../lib/format.ts';
 import { formatUtc } from '../../lib/time.ts';
@@ -22,6 +26,7 @@ import './markets.css';
 import { useChainConfig, useChainVenueGuard } from '../../rpc/queries.ts';
 import { FreshnessBadge, useIndexerFreshness } from '../../shell/freshness.tsx';
 import { TokenLabel } from './shared/cells.tsx';
+import { KvLines } from './shared/KvLines.tsx';
 import { CONFIG_FLAG_PAUSED_OPENS, venueName } from './shared/marketFlags.ts';
 import { useMarketPages } from './shared/useMarketPages.ts';
 import {
@@ -50,74 +55,110 @@ function YesNo({ v, yes, no, tone }: { v: boolean | null; yes: string; no: strin
     return v ? <Badge tone={tone}>{yes}</Badge> : <span className="secondary">{no}</span>;
 }
 
+const VENUE_COLUMNS: readonly Column<VenueProgramRow>[] = [
+    { key: 'program', header: 'Program', card: 'title', render: (r) => r.label },
+    {
+        key: 'opens',
+        header: 'Opens',
+        card: 'aside',
+        render: (r) =>
+            r.enabled === null ? (
+                <span className="muted">—</span>
+            ) : r.enabled ? (
+                <Badge tone="ok">Enabled</Badge>
+            ) : (
+                <Badge>Disabled</Badge>
+            ),
+    },
+    {
+        key: 'serves',
+        header: 'Serves',
+        priority: 2,
+        render: (r) => <span className="secondary">{r.serves.join(', ')}</span>,
+    },
+    { key: 'route', header: 'Route', render: (r) => <YesNo v={r.routeBroken} yes="Broken" no="OK" tone="danger" /> },
+    {
+        key: 'latch',
+        header: 'Upgrade latch',
+        render: (r) =>
+            r.upgraded ? (
+                <Badge tone="warn" title={r.flaggedAt ? `Flagged ${formatUtc(r.flaggedAt)}` : undefined}>
+                    Upgraded, under review
+                </Badge>
+            ) : (
+                <span className="secondary">Validated</span>
+            ),
+    },
+    {
+        key: 'guard',
+        header: 'Guard slot',
+        align: 'right',
+        priority: 2,
+        render: (r) => <span className="num">{r.guardSlot}</span>,
+    },
+    {
+        key: 'deploy',
+        header: 'Deploy slot',
+        align: 'right',
+        priority: 2,
+        render: (r) => <span className="num">{r.deploySlot}</span>,
+    },
+];
+
 function VenuesTable({ rows }: { rows: readonly VenueProgramRow[] }) {
     return (
-        <div className="tbl-wrap">
-            <table className="tbl" data-testid={T.statusVenues}>
-                <caption className="visually-hidden">Venue programs</caption>
-                <thead>
-                    <tr>
-                        <th scope="col">Program</th>
-                        <th scope="col">Serves</th>
-                        <th scope="col">Opens</th>
-                        <th scope="col">Route</th>
-                        <th scope="col">Upgrade latch</th>
-                        <th scope="col" data-align="right">
-                            Guard slot
-                        </th>
-                        <th scope="col" data-align="right">
-                            Deploy slot
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {rows.map((r) => (
-                        <tr
-                            key={r.name}
-                            data-testid={T.statusVenueRow(r.name)}
-                            data-upgraded={String(r.upgraded)}
-                            data-enabled={r.enabled === null ? 'unknown' : String(r.enabled)}
-                            data-route-broken={String(r.routeBroken)}
-                        >
-                            <td>{r.label}</td>
-                            <td className="secondary">{r.serves.join(', ')}</td>
-                            <td>
-                                {r.enabled === null ? (
-                                    <span className="muted">—</span>
-                                ) : r.enabled ? (
-                                    <Badge tone="ok">Enabled</Badge>
-                                ) : (
-                                    <Badge>Disabled</Badge>
-                                )}
-                            </td>
-                            <td>
-                                <YesNo v={r.routeBroken} yes="Broken" no="OK" tone="danger" />
-                            </td>
-                            <td>
-                                {r.upgraded ? (
-                                    <Badge
-                                        tone="warn"
-                                        title={r.flaggedAt ? `Flagged ${formatUtc(r.flaggedAt)}` : undefined}
-                                    >
-                                        Upgraded, under review
-                                    </Badge>
-                                ) : (
-                                    <span className="secondary">Validated</span>
-                                )}
-                            </td>
-                            <td data-align="right" className="num">
-                                {r.guardSlot}
-                            </td>
-                            <td data-align="right" className="num">
-                                {r.deploySlot}
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
+        <DataTable
+            className="mk-tbl"
+            caption="Venue programs"
+            testId={T.statusVenues}
+            columns={VENUE_COLUMNS}
+            rows={rows}
+            rowKey={(r) => r.name}
+            rowTestId={(r) => T.statusVenueRow(r.name)}
+            rowAttrs={(r) => ({
+                'data-upgraded': String(r.upgraded),
+                'data-enabled': r.enabled === null ? 'unknown' : String(r.enabled),
+                'data-route-broken': String(r.routeBroken),
+            })}
+        />
     );
 }
+
+type Extra = VenueStatus['extras'][number];
+
+const EXTRA_COLUMNS: readonly Column<Extra>[] = [
+    { key: 'venue', header: 'Venue', card: 'title', render: (x) => venueLabel(venueName(x.venue)) },
+    { key: 'ix', header: 'Instruction', align: 'right', render: (x) => <span className="num">{x.ix}</span> },
+    { key: 'version', header: 'Version', align: 'right', render: (x) => <span className="num">{x.version}</span> },
+    {
+        key: 'stable',
+        header: 'Stable version',
+        align: 'right',
+        render: (x) => <span className="num">{x.stable_version}</span>,
+    },
+    { key: 'keys', header: 'Accounts', align: 'right', render: (x) => <span className="num">{x.keys.length}</span> },
+];
+
+const MARKET_COLUMNS: readonly Column<MarketSummary>[] = [
+    {
+        key: 'token',
+        header: 'Token',
+        card: 'title',
+        render: (m) => (
+            <Link to="/m/$mint" params={{ mint: m.mint as Address }}>
+                <TokenLabel mint={m.mint} symbol={m.symbol} name={m.name} />
+            </Link>
+        ),
+    },
+    { key: 'venue', header: 'Venue', card: 'aside', render: (m) => <VenueBadge venue={m.venue} /> },
+    { key: 'tier', header: 'Tier', render: (m) => <TierBadge tier={m.tier} /> },
+    {
+        key: 'open',
+        header: 'Open positions',
+        align: 'right',
+        render: (m) => <span className="num">{m.open_positions}</span>,
+    },
+];
 
 function MarketList({
     rows,
@@ -133,42 +174,17 @@ function MarketList({
     caption: string;
 }) {
     return (
-        <div className="tbl-wrap">
-            <table className="tbl" data-testid={testId}>
-                <caption className="visually-hidden">{caption}</caption>
-                <thead>
-                    <tr>
-                        <th scope="col">Token</th>
-                        <th scope="col">Venue</th>
-                        <th scope="col">Tier</th>
-                        <th scope="col" data-align="right">
-                            Open positions
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {rows.map((m) => (
-                        <tr key={m.mint} data-testid={rowTestId(m)} data-kind="market">
-                            <td>
-                                <Link to="/m/$mint" params={{ mint: m.mint as Address }}>
-                                    <TokenLabel mint={m.mint} symbol={m.symbol} name={m.name} />
-                                </Link>
-                            </td>
-                            <td>
-                                <VenueBadge venue={m.venue} />
-                            </td>
-                            <td>
-                                <TierBadge tier={m.tier} />
-                            </td>
-                            <td data-align="right" className="num">
-                                {m.open_positions}
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-            {rows.length === 0 && <Empty>{empty}</Empty>}
-        </div>
+        <DataTable
+            className="mk-tbl"
+            caption={caption}
+            testId={testId}
+            columns={MARKET_COLUMNS}
+            rows={rows}
+            rowKey={(m) => m.mint}
+            rowTestId={rowTestId}
+            rowAttrs={() => ({ 'data-kind': 'market' })}
+            empty={empty}
+        />
     );
 }
 
@@ -205,26 +221,26 @@ export function ProtocolStatusPage() {
                 <FreshnessBadge />
             </div>
             <div className="stack" data-testid={T.statusPage}>
+                <Panel title="New shorts" className="mk-status-opens">
+                    <div
+                        className="mk-status-pause"
+                        data-testid={T.statusPausedOpens}
+                        data-value={pausedOpens === null ? 'unknown' : String(pausedOpens)}
+                    >
+                        {pausedOpens === null ? (
+                            <Skeleton width={160} />
+                        ) : pausedOpens ? (
+                            <Badge tone="danger">Paused on every market</Badge>
+                        ) : (
+                            <Badge tone="ok">Open</Badge>
+                        )}
+                    </div>
+                    <p className="mk-note">
+                        The emergency pause stops new shorts only; closes, liquidations, settlements, withdrawals and
+                        claims always continue.
+                    </p>
+                </Panel>
                 <div className="mk-status-grid">
-                    <Panel title="New shorts">
-                        <div
-                            className="mk-status-pause"
-                            data-testid={T.statusPausedOpens}
-                            data-value={pausedOpens === null ? 'unknown' : String(pausedOpens)}
-                        >
-                            {pausedOpens === null ? (
-                                <Skeleton width={160} />
-                            ) : pausedOpens ? (
-                                <Badge tone="danger">Paused on every market</Badge>
-                            ) : (
-                                <Badge tone="ok">Open</Badge>
-                            )}
-                        </div>
-                        <p className="mk-note">
-                            The emergency pause stops new shorts only; closes, liquidations, settlements, withdrawals
-                            and claims always continue.
-                        </p>
-                    </Panel>
                     <Panel title="Indexer">
                         <div className="stack">
                             <div className="row" data-testid={T.statusIndexerLag} data-state={fresh.state}>
@@ -241,7 +257,7 @@ export function ProtocolStatusPage() {
                                 <ErrorState error={status.error} retry={() => void status.refetch()} />
                             ) : s ? (
                                 <div data-testid={T.statusIndexerHealth}>
-                                    <Kv
+                                    <KvLines
                                         rows={[
                                             [
                                                 'Confirmed slot',
@@ -284,7 +300,7 @@ export function ProtocolStatusPage() {
                                 data-testid={T.statusCoverageGap}
                                 data-value={String(stats.data.data.coverage_gap_s)}
                             >
-                                <Kv
+                                <KvLines
                                     rows={[
                                         ['Coverage gaps (total)', formatDuration(stats.data.data.coverage_gap_s)],
                                         ['Markets in degraded mode', String(degraded.length)],
@@ -318,45 +334,14 @@ export function ProtocolStatusPage() {
                         {v.extras.length === 0 ? (
                             <Empty>No venue extras set.</Empty>
                         ) : (
-                            <table className="tbl" data-testid={T.statusExtras}>
-                                <caption className="visually-hidden">Venue extras sets</caption>
-                                <thead>
-                                    <tr>
-                                        <th scope="col">Venue</th>
-                                        <th scope="col" data-align="right">
-                                            Instruction
-                                        </th>
-                                        <th scope="col" data-align="right">
-                                            Version
-                                        </th>
-                                        <th scope="col" data-align="right">
-                                            Stable version
-                                        </th>
-                                        <th scope="col" data-align="right">
-                                            Accounts
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {v.extras.map((x) => (
-                                        <tr key={`${x.venue}-${x.ix}`}>
-                                            <td>{venueLabel(venueName(x.venue))}</td>
-                                            <td data-align="right" className="num">
-                                                {x.ix}
-                                            </td>
-                                            <td data-align="right" className="num">
-                                                {x.version}
-                                            </td>
-                                            <td data-align="right" className="num">
-                                                {x.stable_version}
-                                            </td>
-                                            <td data-align="right" className="num">
-                                                {x.keys.length}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                            <DataTable
+                                className="mk-tbl"
+                                caption="Venue extras sets"
+                                testId={T.statusExtras}
+                                columns={EXTRA_COLUMNS}
+                                rows={v.extras}
+                                rowKey={(x) => `${x.venue}-${x.ix}`}
+                            />
                         )}
                     </Panel>
                 )}

@@ -50,6 +50,37 @@ export const T = {
     /** The root element of every page; tracks keep it on their page (router smoke test, E2E). */
     page: p<'markets' | 'create-market' | 'market' | 'positions' | 'position' | 'lend' | 'status' | 'security'>('page'),
     routeStub: p('route-stub'),
+    // appended by the responsive foundation (M10-RESP; FRONTEND.md §7.6, §11.1)
+    /** The phone tab bar's fourth cell: opens the More sheet (`aria-expanded`). */
+    navMore: 'nav-more',
+    moreSheet: 'more-sheet',
+    moreStatus: 'more-status',
+    moreSecurity: 'more-security',
+    moreCreateMarket: 'more-create-market',
+    moreSolUsd: 'more-sol-usd',
+    /** Under 1024 px: the header's Search button, and the overlay's Cancel. */
+    searchToggle: 'search-toggle',
+    searchClose: 'search-close',
+    /** The phone's status strip: the worst state in words; `data-state` ok | warn | bad. */
+    statusSummary: 'status-summary',
+    notFoundCta: 'not-found-cta',
+    /** A DataTable's sort select / direction button (card mode), `<id>` = the table's test id. */
+    tableSort: p('table-sort'),
+    tableSortDir: p('table-sort-dir'),
+    /** An enabled "Connect wallet" where a form or page needs a wallet. */
+    connectCta: p<'short' | 'lend' | 'positions' | 'lend-dashboard' | 'position'>('connect-cta'),
+    /** A truncated value's full-text popover (mint, address, wallet). */
+    reveal: p('reveal'),
+    /** No wallet on a phone: open this page in a wallet app's browser (universal link). */
+    walletOpenIn: p<'backpack' | 'phantom' | 'solflare'>('wallet-open-in'),
+    walletInstall: p<'backpack' | 'phantom' | 'solflare'>('wallet-install'),
+    walletReload: 'wallet-reload',
+    walletCopyAddress: 'wallet-copy-address',
+    walletExplorer: 'wallet-explorer',
+    walletMyPositions: 'wallet-my-positions',
+    walletMyLending: 'wallet-my-lending',
+    /** The header wallet popup's ✕ (a phone's bottom sheet; hidden from 640 px up). */
+    walletSheetClose: 'wallet-sheet-close',
 
     // ---- markets table (MARKETS) ----------------------------------------------------------
     marketsTable: 'markets-table',
@@ -152,13 +183,32 @@ export const T = {
     lendSweepNotice: 'lend-sweep-notice',
     lendSyncSubmit: 'lend-sync-submit',
     withdrawDestination: 'withdraw-destination-select',
-    withdrawPercent: p<'25' | '50'>('withdraw-percent'),
+    withdrawPercent: p<'25' | '50' | '75'>('withdraw-percent'),
     lenderEpochs: p('lender-epochs'),
     lenderIndexer: p('lender-indexer'),
     lenderClaim: p('lender-claim'),
     lenderSync: p('lender-sync'),
     lenderClaimAll: 'lender-claim-all',
     lenderEmpty: 'lender-empty',
+
+    // ---- lend responsive (LEND, M10-RESP) -------------------------------------------------
+    /** Why the form's submit is disabled (FormFoot; empty while it is enabled). */
+    lendDepositReason: 'lend-deposit-reason',
+    lendWithdrawReason: 'lend-withdraw-reason',
+    lendClaimReason: 'lend-claim-reason',
+    /** "≈ N TOKEN" under the withdraw shares input (display only). */
+    withdrawApprox: 'withdraw-approx',
+    /** The dashboard's empty state: Browse markets. */
+    lendEmptyCta: 'lend-empty-cta',
+    /** The dashboard's KPI strip. */
+    lenderKpi: p<'markets' | 'value' | 'claimable' | 'credited'>('lender-kpi'),
+    /** The dashboard's data source while the indexer is unavailable (chain only). */
+    lenderSource: 'lender-source',
+    /** Per-row shortcuts to the market's lend panel (`sheet=trade` on a phone / tablet). */
+    lenderWithdraw: p('lender-withdraw'),
+    lenderDeposit: p('lender-deposit'),
+    /** Why a row's Claim is disabled, in text. */
+    lenderClaimReason: p('lender-claim-reason'),
 
     // ---- short (SHORT) --------------------------------------------------------------------
     shortPanel: 'short-panel',
@@ -201,6 +251,19 @@ export const T = {
     closePreview: p<'buyback' | 'rent' | 'payout' | 'pnl'>('close-preview'),
     closeStraddleNotice: 'close-straddle-notice',
     closeSubmit: 'close-submit',
+    // appended by TRADE (M10-RESP; FRONTEND.md §7.6, §11.4)
+    /** Why the Short submit is disabled, one line (`data-reason` while there is one). */
+    shortSubmitReason: 'short-submit-reason',
+    /** The positions page's totals line: count, vault, P&L, rent due. */
+    positionsTotals: 'positions-totals',
+    positionsEmptyCta: 'positions-empty-cta',
+    positionNotFoundCta: 'position-not-found-cta',
+    /** A position's action bar (under 1024 px): opens the Manage sheet at that section. */
+    positionActionAddMargin: 'position-action-add-margin',
+    positionActionClose: 'position-action-close',
+    manageSheetClose: 'manage-sheet-close',
+    addMarginReason: 'add-margin-reason',
+    closeReason: 'close-reason',
 
     // ---- protocol status (MARKETS) --------------------------------------------------------
     statusPage: 'status-page',
@@ -216,6 +279,25 @@ export const T = {
     statusIndexerHealth: 'status-indexer-health',
     statusCoverageGap: 'status-coverage-gap',
     statusExtras: 'status-extras-table',
+
+    // ---- responsive, MARKETS pages (M10-RESP; FRONTEND.md §7.6, §11.2) -----------------------
+    /** Phone: the markets list's filter group toggle ("Filters · n", `aria-expanded`). */
+    marketsFiltersToggle: 'markets-filters-toggle',
+    /** An empty filtered list: back to every market. */
+    marketsClearFilters: 'markets-clear-filters',
+    /** Under 1024 px: the market page's action bar, opening the trade sheet at Short / Lend. */
+    marketActionShort: 'market-action-short',
+    marketActionLend: 'market-action-lend',
+    /** The trade sheet's close button (under 1024 px). */
+    tradeSheetClose: 'trade-sheet-close',
+    /** Phone: the stat strip's "More stats" toggle (`aria-expanded`). */
+    marketStatsMore: 'market-stats-more',
+    /** The tier sheet's close button (the "Why this tier" popover). */
+    marketTierWhyClose: 'market-tier-why-close',
+    /** Coarse pointer: paste the mint from the clipboard. */
+    createMintPaste: 'create-mint-paste',
+    /** Why Review is disabled (the form foot's reason line). */
+    createSubmitReason: 'create-submit-reason',
 
     // ---- transaction review (scaffold; every flow) ----------------------------------------
     txModal: 'tx-modal',
@@ -238,6 +320,10 @@ export const T = {
     txRebuilt: 'tx-rebuilt-notice',
     /** `<i>` = the instruction's index in the plan (compute-budget instructions excluded). */
     txInstruction: p('tx-instruction'),
+    /** "Tick the acknowledgement above to sign": focuses the first unticked acknowledgement. */
+    txSignHint: 'tx-sign-hint',
+    /** After landing: View position / Open in explorer. */
+    txConfirmedLink: 'tx-confirmed-link',
 
     // ---- disclosures (scaffold) -----------------------------------------------------------
     disclosure: p<DisclosureId>('disclosure'),

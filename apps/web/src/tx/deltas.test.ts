@@ -62,3 +62,20 @@ describe('computeDeltas', () => {
         expect(d).toEqual([]);
     });
 });
+
+describe('timestamp deltas', () => {
+    it('carry the field kind through', () => {
+        const watch: WatchedAccount[] = [
+            {
+                kind: 'program',
+                address: A,
+                label: 'Position',
+                decode: (d) => ({ deadline: BigInt(d[0] ?? 0) * 1_000_000n }),
+                fields: { deadline: { label: 'Deadline', unit: '', scale: 0, kind: 'timestamp' } },
+            },
+        ];
+        const [d] = computeDeltas(watch, [null], [{ lamports: 0n, data: new Uint8Array([2]) }]);
+        expect(d?.kind).toBe('timestamp');
+        expect(d?.after).toBe(2_000_000n);
+    });
+});

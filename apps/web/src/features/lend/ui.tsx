@@ -1,5 +1,5 @@
 /** Small building blocks of the lend panel (LEND track; composed from the scaffold's components). */
-import { type ReactNode, useId } from 'react';
+import { type ReactNode, useEffect, useId, useRef } from 'react';
 import { Field } from '../../components/Field.tsx';
 import { T } from '../../config/testids.ts';
 import { formatTokens, shortAddress } from '../../lib/format.ts';
@@ -114,6 +114,41 @@ export function AccountSelect({
                     {hint}
                 </div>
             )}
+        </div>
+    );
+}
+
+/** SOL digits for a claimable amount: 6, or all 9 under 0.000001 SOL (a non-zero claim never reads "0"). */
+export function solFrac(lamports: bigint): number {
+    return lamports > 0n && lamports < 1_000n ? 9 : 6;
+}
+
+/** Why a form's submit is disabled (FormFoot): the text, and the control to fix when there is one. */
+export interface Reason {
+    readonly text: string;
+    readonly target?: string;
+}
+
+/**
+ * The control a FormFoot reason points at (`reasonTarget`): an acknowledgement or a CPI Guard box
+ * the shared components render without an id. The reason focuses this wrapper, which hands the
+ * focus on to the checkbox inside it, so a tap or Enter on the reason lands on the box to tick.
+ */
+export function AckTarget({ id, children }: { id: string; children: ReactNode }) {
+    const ref = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const handOn = (e: FocusEvent) => {
+            if (e.target !== el) return;
+            el.querySelector<HTMLInputElement>('input[type="checkbox"]')?.focus({ preventScroll: true });
+        };
+        el.addEventListener('focus', handOn);
+        return () => el.removeEventListener('focus', handOn);
+    }, []);
+    return (
+        <div ref={ref} id={id} className="lend-ack" tabIndex={-1}>
+            {children}
         </div>
     );
 }

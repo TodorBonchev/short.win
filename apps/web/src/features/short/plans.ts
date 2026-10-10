@@ -131,7 +131,8 @@ function positionWatch(
         s: { label: 'Sale proceeds', unit: 'SOL', scale: 9 },
         m: { label: 'Margin', unit: 'SOL', scale: 9 },
         v: { label: 'Vault', unit: 'SOL', scale: 9 },
-        deadline: { label: 'Deadline (unix)', unit: 's', scale: 0 },
+        // A date in the review (UTC), not a count of seconds (D4).
+        deadline: { label: 'Deadline', unit: '', scale: 0, kind: 'timestamp' },
     } as const;
     const decoder = getShortPositionDecoder();
     return {
@@ -226,6 +227,8 @@ export async function planOpenShort(
         disclosureVars: { 'borrower.liquidation': borrowerDisclosureVars(inp.tier, s.config.params) },
         invalidate: invalidations(s, inp.signer.address, position),
         ...growthRefinement(s),
+        // The review's confirmed banner leads to the new position (D4).
+        next: { href: `/positions/${position}`, text: 'View position' },
         position,
         nonce,
     };

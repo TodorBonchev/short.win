@@ -10,17 +10,19 @@
  */
 import { getLenderPositionSize } from '@shortwin/client';
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { qk } from '../../../api/keys.ts';
 import { Button } from '../../../components/Button.tsx';
 import { Disclosure } from '../../../components/Disclosure.tsx';
 import { AmountInput, Checkbox } from '../../../components/Field.tsx';
+import { FormFoot } from '../../../components/FormFoot.tsx';
 import { Bps, Sol, Tokens } from '../../../components/Num.tsx';
 import { Kv } from '../../../components/States.tsx';
 import { lenderRiskVars } from '../../../config/disclosureVars.ts';
 import { T } from '../../../config/testids.ts';
 import { parseAmount } from '../../../lib/amount.ts';
 import { formatTokens } from '../../../lib/format.ts';
+import { ConnectCta } from '../../../wallet/ConnectCta.tsx';
 import { depositPlanFrom } from '../build.ts';
 import {
     DEFAULT_TOLERANCE,
@@ -41,7 +43,7 @@ import {
     previewUnpaidRent,
     wipeSweepPending,
 } from '../previews.ts';
-import { AccountSelect, accountLabel, Blocked, RefusalLine, ToleranceInput } from '../ui.tsx';
+import { AccountSelect, AckTarget, accountLabel, Blocked, type Reason, RefusalLine, ToleranceInput } from '../ui.tsx';
 import { LenderRisks } from './LenderRisks.tsx';
 
 export function DepositForm({ ctx }: { ctx: LendCtx }) {
@@ -56,6 +58,8 @@ export function DepositForm({ ctx }: { ctx: LendCtx }) {
     const [tolText, setTolText] = useState(DEFAULT_TOLERANCE);
     const [building, setBuilding] = useState(false);
     const [buildError, setBuildError] = useState<string | null>(null);
+    const ackId = useId();
+    const bracketId = useId();
 
     // Acknowledgements are per transaction (FRONTEND.md §4.1 rule 3): a landed deposit clears them.
     const stage = flow.state.stage;
@@ -93,18 +97,22 @@ export function DepositForm({ ctx }: { ctx: LendCtx }) {
     const poolUnpaid = market.receivable + pendingLenderCredit(math, market, now);
     const unpaid = preview?.ok ? previewUnpaidRent(math, market, now, preview.value.shares, amount ?? 0n) : null;
 
-    const ready =
-        !!signer &&
-        !!source &&
-        !unsafe &&
-        chain.recordsComplete &&
-        amount !== null &&
-        !overBalance &&
-        !!preview?.ok &&
-        ack &&
-        (!guard || bracket) &&
-        !ctx.stale &&
-        !building;
+    // Why the review cannot open yet: the same predicates as `ready`, first unmet first (§7.6).
+    const blocker = ((): Reason | null => {
+        if (!signer) return { text: 'Connect a wallet first' };
+        if (unsafe) return { text: 'Deposits are blocked on this market' };
+        if (!source) return { text: `You hold no ${symbol} in this wallet` };
+        if (!chain.recordsComplete) return { text: 'Sync your position first (above)' };
+        if (ctx.stale) return { text: 'Waiting for a fresh chain read' };
+        if (amount === null) return { text: 'Enter an amount' };
+        if (overBalance) return { text: 'The amount is above the balance of this account' };
+        if (tolBps === null) return { text: 'Set a tolerance from 0.1 to 50 %' };
+        if (!preview?.ok) return { text: 'The program would refuse this deposit (see above)' };
+        if (guard && !bracket) return { text: 'Turn CPI Guard off for this deposit (above)', target: bracketId };
+        if (!ack) return { text: 'Tick the acknowledgement above to continue', target: ackId };
+        return null;
+    })();
+    const ready = blocker === null && !building;
 
     const submit = async () => {
         if (!signer || !source || amount === null || !preview?.ok || tolBps === null) return;
@@ -157,16 +165,20 @@ export function DepositForm({ ctx }: { ctx: LendCtx }) {
                     data-state={bracket ? 'bracket' : 'blocked'}
                 >
                     <Disclosure id="token.cpiGuard" />
-                    <Checkbox
-                        checked={bracket}
-                        onChange={(v) => setBracketFor(v ? source.address : null)}
-                        testId={T.lendCpiGuardBracket}
-                    >
-                        Turn CPI Guard off for this deposit only (off → deposit → on, in one transaction).
-                    </Checkbox>
+                    <AckTarget id={bracketId}>
+                        <Checkbox
+                            checked={bracket}
+                            onChange={(v) => setBracketFor(v ? source.address : null)}
+                            testId={T.lendCpiGuardBracket}
+                        >
+                            Turn CPI Guard off for this deposit only (off → deposit → on, in one transaction).
+                        </Checkbox>
+                    </AckTarget>
                 </div>
             )}
-            <Disclosure id="lender.solRepayment" acknowledged={ack} onAcknowledge={setAck} />
+            <AckTarget id={ackId}>
+                <Disclosure id="lender.solRepayment" acknowledged={ack} onAcknowledge={setAck} />
+            </AckTarget>
             <AmountInput
                 label="Amount"
                 value={amountText}
@@ -289,16 +301,19 @@ export function DepositForm({ ctx }: { ctx: LendCtx }) {
                     {buildError}
                 </div>
             )}
-            <Button
-                variant="primary"
-                block
-                busy={building}
-                disabled={!ready}
-                onClick={() => void submit()}
-                data-testid={T.lendSubmit}
-            >
-                {guard && bracket ? 'Review deposit (with CPI Guard bracket)' : 'Review deposit'}
-            </Button>
+            <FormFoot reason={blocker?.text ?? null} reasonTestId={T.lendDepositReason} reasonTarget={blocker?.target}>
+                {!signer && <ConnectCta surface="lend" />}
+                <Button
+                    variant="primary"
+                    block
+                    busy={building}
+                    disabled={!ready}
+                    onClick={() => void submit()}
+                    data-testid={T.lendSubmit}
+                >
+                    {guard && bracket ? 'Review deposit (with CPI Guard bracket)' : 'Review deposit'}
+                </Button>
+            </FormFoot>
             <LenderRisks owner={signer?.address ?? null} vars={lenderRiskVars(chain.config?.params)} />
             <Disclosure id="lender.lossHistory" vars={vars.lossHistory} collapsible />
             <Disclosure id="market.creatorSelfDealing" vars={vars.creatorSelfDealing} collapsible />

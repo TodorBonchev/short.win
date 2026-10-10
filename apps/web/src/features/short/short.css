@@ -1,5 +1,6 @@
 /* SHORT track — the Short panel, the positions dashboard and the position page (FRONTEND.md §3.7,
- * §3.8). Dense terminal layout on the design tokens of styles/tokens.css only. */
+ * §3.8). Dense terminal layout on the design tokens of styles/tokens.css only. Responsive
+ * (FRONTEND.md §7.6): one DOM; widths from the closed set; cards by the table's container width. */
 
 .short-panel {
     display: flex;
@@ -35,6 +36,23 @@
     overflow-wrap: anywhere;
 }
 
+.short-preview-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-1) var(--sp-3);
+    margin: 0 0 var(--sp-2);
+}
+
+/* The read age on its own line (it is long: "Chain data 3 slots, 1s old"); nothing while fresh. */
+.short-preview-head > .slot-age {
+    flex: 1 0 100%;
+}
+
+.short-preview-head > .slot-age:empty {
+    display: none;
+}
+
 .short-preview-sub {
     display: block;
     color: var(--text-2);
@@ -48,6 +66,12 @@
     letter-spacing: 0.05em;
     color: var(--text-1);
     margin: 0 0 var(--sp-2);
+}
+
+.short-preview-head > .short-section-title {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .short-caps {
@@ -137,9 +161,136 @@
     align-items: start;
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1179.98px) {
     .position-layout {
         grid-template-columns: minmax(0, 1fr) 320px;
+    }
+}
+
+/* Tablet and phone: one column; Manage is a sheet the action bar opens (`.sheet-host`). */
+@media (max-width: 1023.98px) {
+    .position-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* From 1024 px the Manage panel stays in view beside the position while the page scrolls. */
+@media (min-width: 1024px) {
+    .manage-panel {
+        position: sticky;
+        top: calc(var(--header-h) + var(--sp-3));
+        max-height: calc(100dvh - var(--header-h) - var(--statusbar-h) - 2 * var(--sp-3));
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable both-edges;
+        scrollbar-width: thin;
+    }
+}
+
+/* In the sheet its own title row (SheetHead) replaces the panel's. */
+.manage-panel[data-sheet="open"] > .panel-head {
+    display: none;
+}
+
+/* A form's heading scrolled to (the sheet opened at it) clears the sheet's sticky title row. */
+.manage-panel .short-section-title {
+    scroll-margin-top: calc(var(--header-h) + var(--sp-5));
+}
+
+.manage-panel .short-section-title:focus {
+    outline: none;
+}
+
+.manage-panel .short-section-title:focus-visible {
+    outline: 2px solid var(--focus);
+}
+
+/* A hairline between the two forms. */
+.manage-panel #close {
+    border-top: 1px solid var(--line);
+    padding-top: var(--sp-4);
+}
+
+.position-head h1 {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+/* The figures that matter first: CR (in its risk colour), P&L, time left. */
+.position-hero {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0;
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.position-hero-item {
+    min-width: 0;
+    padding: var(--sp-3) var(--sp-4);
+    box-shadow:
+        1px 0 0 var(--line),
+        0 1px 0 var(--line);
+}
+
+.position-hero-label {
+    font-size: var(--fs-xs);
+    color: var(--text-2);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.position-hero-value {
+    margin: var(--sp-1) 0 0;
+    font-size: var(--fs-lg);
+}
+
+.position-hero-cr .cr {
+    font-size: var(--fs-xl);
+    font-weight: var(--fw-bold);
+}
+
+.position-hero-sub {
+    display: block;
+    font-size: var(--fs-xs);
+    color: var(--text-2);
+}
+
+@media (max-width: 639.98px) {
+    .position-hero {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .position-hero-item:first-child {
+        grid-column: 1 / -1;
+    }
+}
+
+/* Key / value rows that flow into up to three columns, filled top to bottom (the rows come in
+   groups — size, risk now, rent and dates — so a column reads as one group): a value is never a
+   screen away from its label on a wide screen, and one column on a phone. */
+.kv.position-facts {
+    display: block;
+    columns: 3 260px;
+    column-gap: var(--sp-6);
+}
+
+.position-facts .kv-row {
+    break-inside: avoid;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: var(--sp-3);
+    padding: var(--sp-2) 0;
+    border-bottom: 1px solid var(--line);
+}
+
+@media (hover: hover) {
+    .position-facts .kv-row:hover {
+        background: var(--bg-2);
     }
 }
 
@@ -162,6 +313,190 @@
     border-bottom: 0;
 }
 
+/* Phone: two rows per event — the time, then what happened and its transaction (DOM order). */
+@media (max-width: 639.98px) {
+    .timeline li {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: var(--sp-1) var(--sp-3);
+    }
+
+    .timeline-time {
+        grid-column: 1 / -1;
+        font-size: var(--fs-xs);
+    }
+}
+
+/* ---- positions dashboard: totals, cards, the risk legend ----------------------------------- */
+
+.positions-toolbar {
+    flex-wrap: wrap;
+}
+
+.positions-totals {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-1) var(--sp-5);
+    margin: 0;
+    font-size: var(--fs-sm);
+    color: var(--text-1);
+}
+
+.positions-empty {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-4);
+}
+
+/* Desktop: the risk badge and the actions as narrow as their content; the numbers and the market
+   share the spare width (every column keeps its value on one line). */
+.positions-tbl > .tbl > thead > tr > th:is([data-col="risk"], [data-col="actions"]),
+.positions-tbl > .tbl > tbody > tr > td:is([data-col="risk"], [data-col="actions"]) {
+    width: 1%;
+}
+
+.positions-tbl > .tbl > thead > tr > th,
+.positions-tbl > .tbl > tbody > tr > td {
+    white-space: nowrap;
+}
+
+/* A card: the market and its risk on top, then the numbers in pairs, then the actions. */
+@container tbl (max-width: 559.98px) {
+    .positions-tbl[data-cards] > .tbl > tbody > tr {
+        grid-template-areas:
+            "market risk"
+            "cr liq"
+            "pnl left"
+            "vault q"
+            "actions actions";
+        row-gap: var(--sp-3);
+    }
+
+    .positions-tbl-status[data-cards] > .tbl > tbody > tr {
+        grid-template-areas:
+            "market risk"
+            "cr liq"
+            "pnl left"
+            "vault q"
+            "status status"
+            "actions actions";
+    }
+
+    .positions-tbl[data-cards] > .tbl > tbody > tr > td[data-col] {
+        width: auto;
+        white-space: normal;
+    }
+
+    .positions-tbl[data-cards] > .tbl > tbody > tr > td[data-col="market"] {
+        grid-area: market;
+        min-width: 0;
+        font-size: var(--fs-md);
+    }
+
+    .positions-tbl[data-cards] > .tbl > tbody > tr > td[data-col="risk"] {
+        grid-area: risk;
+    }
+
+    .positions-tbl[data-cards] > .tbl > tbody > tr > td[data-col="cr"] {
+        grid-area: cr;
+        font-size: var(--fs-lg);
+        font-weight: var(--fw-bold);
+    }
+
+    .positions-tbl[data-cards] > .tbl > tbody > tr > td[data-col="liq"] {
+        grid-area: liq;
+    }
+
+    .positions-tbl[data-cards] > .tbl > tbody > tr > td[data-col="pnl"] {
+        grid-area: pnl;
+    }
+
+    .positions-tbl[data-cards] > .tbl > tbody > tr > td[data-col="left"] {
+        grid-area: left;
+    }
+
+    .positions-tbl[data-cards] > .tbl > tbody > tr > td[data-col="vault"] {
+        grid-area: vault;
+    }
+
+    .positions-tbl[data-cards] > .tbl > tbody > tr > td[data-col="q"] {
+        grid-area: q;
+    }
+
+    .positions-tbl[data-cards] > .tbl > tbody > tr > td[data-col="status"] {
+        grid-area: status;
+    }
+
+    .positions-tbl[data-cards] > .tbl > tbody > tr > td[data-col="actions"] {
+        grid-area: actions;
+    }
+
+    .positions-tbl[data-cards] .position-actions {
+        flex: 1;
+        gap: var(--sp-3);
+    }
+
+    .positions-tbl[data-cards] .position-actions > .btn {
+        flex: 1;
+        justify-content: center;
+        min-height: var(--tap-min);
+    }
+}
+
+.risk-legend {
+    font-size: var(--fs-sm);
+    color: var(--text-1);
+}
+
+.risk-legend > summary {
+    cursor: pointer;
+    min-height: var(--tap-min);
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    width: fit-content;
+}
+
+.risk-legend > p {
+    margin: var(--sp-2) 0;
+    max-width: 72ch;
+}
+
+.risk-legend-grades {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: var(--sp-2) var(--sp-4);
+    align-items: baseline;
+    margin: 0;
+}
+
+.risk-legend-row {
+    display: contents;
+}
+
+.risk-legend .risk-legend-row > dd {
+    margin: 0;
+}
+
 .exit-badge {
     text-transform: capitalize;
+}
+
+/* A form's sticky foot spans its panel's padding, so nothing scrolls past at its sides. */
+.short-panel > .form-foot,
+.manage-panel .form-foot {
+    margin-inline: calc(-1 * var(--sp-4));
+    padding-inline: var(--sp-4);
+}
+
+/* An open wallet chooser in the foot is read in place, not pinned over the form. */
+.short-panel > .form-foot:has(.wallet-inline) {
+    position: static;
+}
+
+/* Manage's previews: a label keeps its line; a value's sub-line ("buys back … · at most …") wraps
+   under the value instead of squeezing the label to a word a line. */
+.manage-panel .kv {
+    grid-template-columns: max-content minmax(0, 1fr);
 }

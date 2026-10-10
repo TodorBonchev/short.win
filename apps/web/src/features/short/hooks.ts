@@ -4,7 +4,7 @@
  * which invalidates `qk.marketAccount(mint)`), the wallet's exposure and SOL balance, rent
  * exemptions, the token's display symbol, and a ticking estimate of the cluster clock.
  */
-import { fetchMaybeShortPosition, type ShortPosition } from '@shortwin/client';
+import type { ShortPosition } from '@shortwin/client';
 import type { Address } from '@solana/kit';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -15,6 +15,7 @@ import { shortAddress } from '../../lib/format.ts';
 import { useMath } from '../../math/useMath.ts';
 import { readExposure } from '../../rpc/accounts.ts';
 import { useAppClient } from '../../rpc/context.tsx';
+import { readShortPosition } from './positionAccount.ts';
 import { type ChainSnapshot, loadSnapshot } from './snapshot.ts';
 
 /** Previews re-read the chain this often while shown (§6.3: chain accounts behind a preview). */
@@ -89,8 +90,7 @@ export function usePositionAccount(position: Address) {
     return useQuery({
         queryKey: qk.positionAccount(position),
         queryFn: async (): Promise<ShortPosition | null> => {
-            const p = await fetchMaybeShortPosition(client.rpc, position, { commitment: 'confirmed' });
-            return p.exists ? p.data : null;
+            return readShortPosition(client.rpc, position);
         },
         staleTime: 0,
         refetchInterval: SNAPSHOT_REFRESH_MS * 2,

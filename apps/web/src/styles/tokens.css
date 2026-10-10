@@ -3,6 +3,22 @@
  * data-first. Every text/background pair below meets WCAG 2.2 AA (≥ 4.5:1 for text, ≥ 3:1 for
  * input borders and focus rings); the ratios are in FRONTEND.md §7.1. Colour never carries meaning
  * alone: P&L has a sign and an arrow, risk badges have a word.
+ *
+ * Breakpoints (FRONTEND.md §7.6, a closed set; `src/styles/breakpoints.ts` mirrors it and
+ * `breakpoints.test.ts` rejects anything else in the CSS under `src`). Desktop is the default cascade;
+ * narrower widths override with `max-width: N.98px`, never range syntax:
+ *   xs      (max-width: 399.98px)
+ *   phone   (max-width: 639.98px)   app shell: bottom tab bar, cards, sheets, action bar
+ *   compact (max-width: 1023.98px)  tablet and phone: one column, side / full sheets
+ *   laptop  (max-width: 1279.98px), (max-width: 1179.98px)
+ *   min     (min-width: 640px), (min-width: 1024px), (min-width: 1280px), (min-width: 1680px)
+ *   input   (pointer: coarse), (hover: hover), (prefers-reduced-motion: reduce); once,
+ *           (orientation: landscape) with coarse in the tablet tier = a landscape phone
+ * Containers, only on `.tbl-wrap` (named `tbl`) and `.modal-body` (named `dialog`):
+ *   @container tbl (max-width: 959.98px)    priority-3 columns hidden
+ *   @container tbl (max-width: 559.98px)    card mode
+ *   @container dialog (max-width: 479.98px) stacked review deltas
+ * Input decides density (coarse: 44 px targets, 16 px inputs); width decides layout.
  */
 :root {
     color-scheme: dark;
@@ -93,27 +109,74 @@
     --radius: 4px;
     --radius-lg: 6px;
 
+    /* Responsive shell (FRONTEND.md §7.6): set per breakpoint below */
+    --gutter: var(--sp-3); /* page side padding: 8 px desktop */
+    --tabbar-h: 0px; /* the phone's bottom tab bar */
+    --actionbar-h: 0px; /* set by :root:has(.action-bar) under compact (components.css) */
+    --sheet-w: 440px; /* the tablet's right-side sheet */
+    --tap-min: 24px; /* WCAG 2.5.8 floor with a mouse */
+    --tap-sm: 24px;
+    --fs-input: var(--fs-md);
+    --safe-t: env(safe-area-inset-top, 0px);
+    --safe-r: env(safe-area-inset-right, 0px);
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --safe-l: env(safe-area-inset-left, 0px);
+
     /* Motion */
     --t-fast: 80ms;
     --t: 140ms;
+    --t-sheet: 140ms;
 
     /* Layers */
     --z-header: 20;
+    --z-bars: 30; /* tab bar, status strip, action bar */
     --z-menu: 40;
+    --z-sheet: 50; /* trade / manage sheets, search overlay */
+    --z-wallet-sheet: 55;
     --z-modal: 60;
     --z-toast: 80;
 }
 
-/* Comfortable density (user preference, stored per viewer) */
-:root[data-density="comfortable"] {
-    --row-h: 34px;
-    --control-h: 34px;
-    --fs-md: 14px;
+/* Tablet and phone: a taller header, a wider gutter. */
+@media (max-width: 1023.98px) {
+    :root {
+        --header-h: 48px;
+        --gutter: 12px;
+    }
+}
+
+/* Phone: the bottom tab bar and the status strip, and the type scale one notch up (no fluid type;
+   nothing under 12 px). */
+@media (max-width: 639.98px) {
+    :root {
+        --gutter: clamp(12px, 3.5vw, 16px);
+        --tabbar-h: 56px;
+        --statusbar-h: 28px;
+        --fs-xs: 12px;
+        --fs-sm: 13px;
+        --fs-md: 14px;
+        --fs-lg: 16px;
+        --fs-xl: 20px;
+        --fs-2xl: 24px;
+    }
+}
+
+/* A finger, at any width: 44 px controls and rows, 16 px inputs (no zoom on focus in iOS). */
+@media (pointer: coarse) {
+    :root,
+    :root[data-density] {
+        --control-h: 44px;
+        --row-h: 44px;
+        --tap-min: 44px;
+        --tap-sm: 36px;
+        --fs-input: 16px;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
     :root {
         --t-fast: 0ms;
         --t: 0ms;
+        --t-sheet: 0ms;
     }
 }

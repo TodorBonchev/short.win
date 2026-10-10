@@ -1,9 +1,24 @@
 /**
  * Form inputs (FRONTEND.md §7.3, §9.5). `AmountInput` keeps the user's text and reports the
- * parsed raw `bigint` (strict: `lib/amount.ts`), with a Max button and a unit suffix.
+ * parsed raw `bigint` (strict: `lib/amount.ts`), with a unit suffix and a Max button inside the
+ * field's right edge (a 44 px hit under a coarse pointer).
  */
-import { type ReactNode, useId } from 'react';
+import { type InputHTMLAttributes, type ReactNode, useId } from 'react';
 import { AMOUNT_ERROR_TEXT, type ParsedAmount, parseAmount } from '../lib/amount.ts';
+
+/**
+ * For an input that takes a base58 address (a mint, a wallet) or a ticker (FRONTEND.md §7.6): no
+ * capitalisation, autocorrection, spell check or autofill — a phone keyboard would otherwise change
+ * the case of a case-sensitive mint. Spread it, then override `enterKeyHint` where it differs.
+ */
+export const addressInputProps = {
+    autoCapitalize: 'none',
+    autoCorrect: 'off',
+    spellCheck: false,
+    autoComplete: 'off',
+    inputMode: 'text',
+    enterKeyHint: 'go',
+} as const satisfies InputHTMLAttributes<HTMLInputElement>;
 
 export interface FieldProps {
     readonly label: ReactNode;
@@ -74,35 +89,14 @@ export function AmountInput({
     const own = value !== '' && !parsed.ok ? AMOUNT_ERROR_TEXT[parsed.error] : null;
     const shown = own ?? error ?? null;
     return (
-        <Field
-            label={label}
-            hint={hint}
-            error={shown}
-            aside={
-                max !== undefined && formatMax ? (
-                    <button
-                        type="button"
-                        className="btn"
-                        data-variant="ghost"
-                        data-size="sm"
-                        data-testid={maxTestId}
-                        disabled={disabled}
-                        onClick={() => {
-                            const text = formatMax(max);
-                            onChange(text, parseAmount(text, decimals));
-                        }}
-                    >
-                        Max
-                    </button>
-                ) : undefined
-            }
-        >
+        <Field label={label} hint={hint} error={shown}>
             {({ inputId, describedBy }) => (
                 <div className="input-wrap" data-invalid={shown ? 'true' : undefined}>
                     <input
                         id={inputId}
                         className="input num"
                         inputMode="decimal"
+                        enterKeyHint="done"
                         autoComplete="off"
                         spellCheck={false}
                         placeholder="0.00"
@@ -117,6 +111,22 @@ export function AmountInput({
                         }}
                     />
                     {unit && <span className="input-suffix">{unit}</span>}
+                    {max !== undefined && formatMax && (
+                        <button
+                            type="button"
+                            className="btn input-max hit"
+                            data-variant="ghost"
+                            data-size="sm"
+                            data-testid={maxTestId}
+                            disabled={disabled}
+                            onClick={() => {
+                                const text = formatMax(max);
+                                onChange(text, parseAmount(text, decimals));
+                            }}
+                        >
+                            Max
+                        </button>
+                    )}
                 </div>
             )}
         </Field>
@@ -129,16 +139,20 @@ export function Checkbox({
     children,
     testId,
     disabled,
+    id,
 }: {
     checked: boolean;
     onChange: (v: boolean) => void;
     children: ReactNode;
     testId?: string;
     disabled?: boolean;
+    /** For a FormFoot `reasonTarget` that focuses this box. */
+    id?: string;
 }) {
     return (
         <label className="checkbox">
             <input
+                id={id}
                 type="checkbox"
                 checked={checked}
                 disabled={disabled}

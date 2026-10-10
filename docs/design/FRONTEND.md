@@ -1,7 +1,8 @@
 # short.win — Web frontend (M9 contract)
 
-*v1.3 • 2026-10-03 • **as built** (M9 integrated, then the M9 security and UX review fixed — §13
-"Review fixes"; v1.3 folds in M10 — §13 "M10 changes"; v1.0 of 2026-10-01 was the contract the four
+*v1.4 • 2026-10-09 • **as built** (M9 integrated, then the M9 security and UX review fixed — §13
+"Review fixes"; v1.3 folds in M10 — §13 "M10 changes"; v1.4 makes the app responsive — phones,
+tablets and desktops, the owner's request of 2026-10-09, §7.6–§7.7 and §13 "M10-RESP changes"; v1.0 of 2026-10-01 was the contract the four
 parallel tracks — MARKETS, LEND, SHORT, E2E — built against, §12). Owner decision for the visual
 style: **dark trading terminal** — dense, dark, data-first, as memecoin traders know it from
 Photon / BullX / Axiom, and still accessible (§7, §8).*
@@ -43,7 +44,10 @@ the `/security` page and `/.well-known/security.txt` exist, the deposit shows th
 rent (`lender.unpaidRent`), a `DeniedAccount` extras set falls back to the next set, and error
 6105 is mapped (§13 "M10 changes"). *M10, eighth round (KI66-R4, KI-67, and the batch's review
 fixes):* `vitest run` 60 files, 599 tests passed, 1 opt-in file skipped; the E2E 60 tests pass
-(`lend-claim-pot-chain` and `lend-post-wipe` among them).
+(`lend-claim-pot-chain` and `lend-post-wipe` among them). **v1.4 (M10-RESP, 2026-10-09):** the app is responsive
+from 320 px (§7.6, §7.7, §13 "M10-RESP changes"); `vitest run` 68 files, 670 tests passed, 1
+opt-in file skipped; the default E2E run 77 tests (60 desktop, 17 phone) pass; the responsive gate
+(`SHORTWIN_RESPONSIVE_GATE=1`, eight viewports, 55 states each) 80 tests pass with no finding.
 
 ---
 
@@ -88,8 +92,9 @@ coverage-paused markets, the venue upgrade latch, route-broken); every disclosur
 **Not in M9:** liquidation, expiry and `sol_settle` buttons (keeper instructions; the UI shows the
 state and history, never sends them); governance / Emergency instructions; the borrower's straddle
 bundle (FE-3); Jupiter (v1.1); partial closes, limit orders, copy trading (SPEC §8 deferred);
-charts beyond a price sparkline from `/candles` (optional, MARKETS); mobile-first layouts (the app
-targets ≥ 1024 px laptops; §7.3).
+charts beyond a price sparkline from `/candles` (optional, MARKETS). *M10-RESP (owner, 2026-10-09):*
+the app is no longer laptop-only — phones, tablets and desktops are all targets (§7.6); the Mobile
+Wallet Adapter stays out until the owner decides (§5.4).
 
 ---
 
@@ -180,6 +185,29 @@ them deliberately (owner choice, §13 FE-23).
 - **Indexer-down banner**: while `/v1/status` fails, pages fall back to RPC reads (§6.5).
 - **Keyboard**: skip link to `#main`; `/` search; table rows reachable by Tab, moved with ↑ / ↓,
   opened with Enter; Escape closes menus and dismissible dialogs.
+- *M10-RESP — the document scrolls* (not `main`); the header is sticky, the status bar sticky at the
+  bottom. **Tablet (640–1023):** the text nav stays; the search folds into a Search button
+  (`search-toggle`) opening a full-screen overlay; the cluster leaves the status bar (the header
+  badge has it). **Phone (< 640):**
+
+```
+┌──────────────────────────────────┐ ← safe area
+│ ▼ ShortWin [LOCALNET]  (⌕) [Connect] │ 48 sticky ("ShortWin" visually hidden < 400)
+│  page (document scroll)          │
+│ [ ▼ Short ]       [  Lend  ]     │ 56 action bar (pages that have one), fixed
+│ ● All live · RPC 3,012        ⌃  │ 28 status strip (status-summary), fixed
+│  ▤        ◫        ⇅        ⋯    │ 56 + safe area: the same <nav> as a tab bar
+│ Markets Positions  Lend    More  │
+└──────────────────────────────────┘
+```
+
+  The tab bar's More (`nav-more`) opens a bottom sheet with Status, the security policy, Create
+  market and the network facts (SOL/USD, math, cluster). The status strip says the worst state in
+  words with a shape (● ok, ▲ warn, ✕ bad) and expands to every status item (Escape from inside
+  it returns focus to the strip). Toasts drop under the header. The wallet popup is a bottom sheet
+  with its title and a ✕ (`wallet-sheet-close`); like the trade sheet it has its own history entry
+  (`state.walletSheet`), so Back closes it, closing it any other way pops that entry, and its
+  My positions / My lending replace it.
 
 ### 3.2 Routes (`src/router.tsx`, frozen)
 
@@ -215,6 +243,13 @@ live from the `markets` channel (patched in place, §6.4). Duplicate symbols sho
 the token cell (two markets named BONK are visibly different). "Create market" links to
 `/markets/new?mint=<q>` when `q` is a mint without a market.
 
+*M10-RESP (§7.6):* columns by priority — token, venue, tier, price, TVL always; utilisation, OI,
+positions, flags (2); inventory · free and age (3, hidden under 960 px of table width). Under
+560 px each row is a card (symbol and mint, venue and tier at the right; price / TVL, utilisation /
+OI, positions / flags), sorted by the table's sort bar. The filter reads "Filter this list"
+(`min(380px, 100%)`, mono for a mint); on a phone venue, tier and open positions fold behind
+"Filters · n" (`markets-filters-toggle`); an empty filtered list offers Clear filters.
+
 ### 3.4 Market page (MARKETS; panels SHORT / LEND)
 
 Layout `.layout-trade`: left the market column, right the 360 px trade panel (tabs Short | Lend).
@@ -245,6 +280,26 @@ Layout `.layout-trade`: left the market column, right the 360 px trade panel (ta
   window); Coverage (`/coverage`: gaps, pauses, last 24 h observations); Events (`/events`).
 - **Live:** subscribes `market:<mint>` (and `trades:<mint>` if a sparkline is shown); the panels
   read the chain (FE-D1).
+- *M10-RESP (§7.6):* the header puts the prices (EMA, spot) right after the title at the large
+  size, the tier badge reads "Tier C ⓘ" (the mark an inline SVG, not a font glyph), the mint is a Reveal (full mint, Copy, Explorer), and a
+  flag that repeats the venue badge ("Lend only", "Migrating") is that badge. The stat strip
+  starts with rate, utilisation, TVL and size cap; inventory, OI and lenders are priority 2 (behind
+  "More stats" on a phone). Overview: hairline key / value blocks in two columns that share the
+  card's width (Market | Exits and the settlements; Fees under both — a third column held a one-liner
+  while the others wrapped), zeros muted, an all-zero settlements block as "No settlements yet";
+  the creator-wallet figures span their box like the wallet table under them. The Coverage tab's
+  key / value blocks use the same grid, so they share the card's width too. Every tab table is
+  a DataTable (priority columns, cards when narrow); the Positions tab's columns are priority 1–2
+  but the age ("Open for", priority 3: it would push State out of the 680 px column at 1,024 px),
+  so a laptop's market column shows borrower, margin and entry; its phone card leaves out the
+  borrower and entry (a tap opens the position). Under 1,024 px the page is
+  one column and the trade panel a sheet (`?sheet=trade`) opened by the action bar's Short / Lend;
+  ✕, Escape, the scrim and Back close it. "Why this tier" is a bottom sheet on a phone.
+  *Integration (v1.4):* the header, the action bar and the banners open the market column, so from
+  1,024 px the trade panel starts at the top of the page: its sticky top is where it rests, and its
+  sticky submit is above the status bar on the first screen (with the header above the panel, the
+  panel's viewport-high box reached under the status bar until the page scrolled). The app-wide
+  indexer-down banner still sits above both columns.
 
 ### 3.5 Create market (MARKETS)
 
@@ -269,9 +324,24 @@ Layout `.layout-trade`: left the market column, right the 360 px trade panel (ta
    `extend_account` prepended for a curve shorter than 115 B (`CurveNeedsExtend`); watched:
    the wallet's SOL. On confirmation, navigate to `/m/<mint>`.
 
+*M10-RESP:* a token the filter rejects (or a venue refuses) replaces the cost with "Cannot be
+listed" and its reason, and has no Review (D14). Review sits in a form foot with the reason it is
+disabled (`create-submit-reason`): sticky above the bottom bars on a tablet, the page's bottom bar
+on a phone. Under 1,024 px one column (mint → verdict → venue → pools as cards → cost); the mint
+input takes `addressInputProps` and, under a coarse pointer, Paste (`create-mint-paste`).
+
 ### 3.6 Lend panel (LEND)
 
 Tabs Deposit | Withdraw | Claim (`lendTab-*`, `?action=`).
+
+*M10-RESP (§7.6):* the panel lives in the market page's trade column on a desktop and in the trade
+sheet under 1024 px. Each form's submit sits in a sticky form foot with the reason it is disabled
+(`lend-deposit-reason`, `lend-withdraw-reason`, `lend-claim-reason`; computed from the same predicates
+as the submit, first unmet first; a reason that names an unticked acknowledgement or the CPI Guard
+box focuses it). Without a wallet the foot offers Connect wallet (`connect-cta-lend`) above the
+disabled submit. Withdraw has 25 / 50 / 75 % chips of the holding (Max, what may be withdrawn now,
+stays in the field) and a "≈ N TOKEN" line under the shares (display only). The deposit order and the
+Claim wording are unchanged (owner calls O-1, O-5).
 
 - **Deposit:** source token account select (`readOwnerTokenAccounts`, ATA first; balance; CPI
   Guard flag), amount (`AmountInput`, Max = balance), preview (shares minted
@@ -445,6 +515,15 @@ live tier terms), `borrower.residuals` (collapsed), `market.tierAge` (tier popov
 position PDA is `["position", market, borrower, nonce]`); watched: the wallet's SOL, the new
 position (`q`, `s`, `m`, `v`, deadline), the market's free tokens.
 
+*As built (M10-RESP, §7.6):* the submit sits in a sticky form foot (`FormFoot`) with the reason it
+is disabled in one line (`short-submit-reason`; computed from the same predicates as the enabled
+state: wallet, blocked market, size, slippage, quote, cap, acknowledgement, stale read, a review in
+progress); while the acknowledgement blocks it, the reason is a button that focuses the box.
+Disconnected, the foot offers `connect-cta-short` above the disabled submit. The preview header
+keeps the mint's case and wraps, the read age on its own line. The review's position deadline is a
+UTC date (`kind: 'timestamp'`) and its confirmed banner leads to the new position (`TxPlan.next`);
+a confirmed open, close or add margin also pushes a toast (View position / Explorer).
+
 ### 3.8 Positions, position detail, lender dashboard
 
 - **Positions** (SHORT; SPEC §8): one row per position (`positionRow-<pubkey>`): market, `Q` owed,
@@ -460,6 +539,22 @@ position (`q`, `s`, `m`, `v`, deadline), the market's free tokens.
   `addMarginPreviewCr`, `add_margin(amount)`); **close** (`closeSlippageInput`; preview buyback
   `B̂_live`, rent, payout, P&L; `close_short(max_buyback_cost = ⌈B̂·(1 + slippage)⌉)`; `InsufficientVault`
   → suggest add margin; `CurveStraddle` → `closeStraddleNotice`, FE-3).
+- **Positions and position detail as built (M10-RESP, §7.6):** the dashboard leads with a totals
+  line (`positions-totals`: count, vault, P&L, rent due) and folds the risk explanation into a
+  "How risk is graded" toggle with the real badges. Column priorities: 1 market, risk, CR, P&L,
+  actions; 2 liq. price, time left, vault, Q owed (and status for "All"); 3 rent (and status under a
+  single-status filter). Under 560 px of table width each row is a card (market and risk badge on
+  top, the numbers in pairs, Add margin / Close as a button row); the row actions link to the
+  position with `?sheet=add-margin|close`. Disconnected: an empty state with
+  `connect-cta-positions`, no table frame; no open positions: "Open a short"
+  (`positions-empty-cta`). The position page reads the position account only when it is a
+  short.win `ShortPosition` (owner, discriminator, size); otherwise a not-found state with "Back to
+  positions" (`position-not-found-cta`). It shows the health banner (its tone follows the risk) and a
+  hero line (CR, P&L, time left) before the details; under 1024 px the Manage panel is a sheet that
+  the action bar (`position-action-add-margin`, `position-action-close`) or `?sheet=` opens at the
+  chosen form with its heading focused, and ✕ (`manage-sheet-close`), Escape, the scrim or Back
+  close; from 1024 px it stays in view beside the details. Each form's submit is in a sticky foot
+  with its reason (`add-margin-reason`, `close-reason`).
 - **Lender dashboard** (LEND; `/lend`): per market (`lenderRow-<market>`): shares and share of the
   pool, token value (`previewTokenValue`), SOL claimable (`previewClaim`), vesting, lock and
   `lock_until`, creator badge; claim per row and "claim all" (one transaction per market; each
@@ -467,6 +562,16 @@ position (`q`, `s`, `m`, `v`, deadline), the market's free tokens.
   *As built:* plus the share-epoch standing and the indexer's view per row (`lender-epochs-*`,
   `lender-indexer-*`), a per-row `sync_lender`; while the indexer fails, the rows come from
   `getProgramAccounts` on the owner's `LenderPosition`s (memcmp on the owner, `dataSize` 241).
+  *M10-RESP (§7.6):* a KPI strip — markets, total value (≈ SOL at each market's indexer EMA price,
+  display only; "k of n priced" when a market has none), SOL claimable, rent credited (the
+  positions' credited entitlement); the data source is a badge (the freshness badge, or "Chain only"
+  while the indexer is unavailable). The epoch standing and the indexer's view share one "Sync"
+  cell that shows a badge only when one is not current (priority 2, never hidden). Each row links
+  Withdraw / Deposit to the market's lend panel (`?panel=lend&action=…&sheet=trade`: the trade sheet
+  under 1024 px), and a disabled Claim says why in text. "Claim all" (with the total) is shown only
+  when something is claimable: in the page header on a desktop, in the action bar under 1024 px. Under
+  560 px of table width the rows are cards (market and value on top, the actions a button row).
+  Without a wallet: Connect wallet; with no positions: Browse markets.
 - **Risk levels** (as built; *v1.2, M9-UX-4*): `riskLevel(crBps, crEmaBps, liqCrBps)` returns
   `safe` / `watch` / `danger` / `below` / `critical` — the values of `data-risk` — shown as Safe /
   Watch / At risk / At risk (live price below) / Liquidatable. It judges as the program does
@@ -488,6 +593,8 @@ upgraded latch, guard slot vs ProgramData slot, flagged at; enabled bit; route-b
 extras sets in force, markets in degraded mode (coverage-paused) and with route-broken or a running
 no-route chain (FE-5), the indexer's health (`/v1/status`: lag, quarantined, missing, truncated
 logs), the keeper coverage totals (`/v1/stats.coverage_gap_s`).
+*M10-RESP:* "New shorts" is a full-width row at the top; the other panels share rows of equal
+height (`minmax(min(420px, 100%), 1fr)`); the tables are DataTables (cards on a phone).
 
 ### 3.10 Loading, empty and error states
 
@@ -941,6 +1048,21 @@ the plugin never signs implicitly; the pipeline passes the connected `signer` as
    registration rank and feature set); a silent reconnect (the plugin's stored `name:address`) is
    undone when another installed wallet uses that name or the wallet came back with another
    account, and the user picks the wallet explicitly.
+6. *M10-RESP — mobile wallets.* A phone browser has no wallet extension; a page opened inside a
+   wallet app's own browser (Backpack, Phantom, Solflare) gets Wallet Standard injected and the path
+   above works unchanged. So on a mobile device (`isMobileDevice`: client hints, the UA, iPadOS's
+   Macintosh-with-touch, a coarse non-hovering pointer) without a wallet, the chooser
+   (`WalletChooser`, shared by the header and `ConnectCta`) offers "Open in <wallet>" — each
+   wallet's universal browse link to this very page, alphabetical (`src/wallet/deepLinks.ts`;
+   formats re-checked against the wallets' docs on 2026-10-09, re-check at each release):
+   `https://backpack.app/ul/v1/browse/<url>?ref=<origin>`, `https://phantom.com/ul/browse/<url>?ref=<origin>`,
+   `https://solflare.com/ul/v1/browse/<url>?ref=<origin>` (URL-encoded; rendered only as a tapped
+   `<a>`, never for pasting), off mainnet "Set your wallet to <cluster> first", the wallets' sites
+   and a Reload; a desktop without a wallet gets the sites and Reload. These are top-level,
+   user-initiated navigations: the CSP is unchanged. **Not built (owner call O-6):** the Mobile
+   Wallet Adapter (`@solana-mobile/wallet-standard-mobile`) — a new runtime dependency on the
+   signing path before the audit, a likely `ws://localhost` `connect-src` widening, Android only; a
+   spike would come on its own branch behind a flag defaulting off.
 
 ### 5.5 Send and confirm
 
@@ -951,6 +1073,13 @@ within the blockhash's `lastValidBlockHeight`; the signature is shown as soon as
 `expired` (Retry re-simulates and signs again: a new transaction, never a re-broadcast of an expired
 one). On confirmation: the plan's `invalidate` keys and the wallet balance are invalidated, a success
 toast is pushed, the modal shows Done. The modal cannot be dismissed while signing or confirming.
+*M10-RESP:* a flow inside a sheet (the trade sheet, Manage) passes `TxDoneContext`: closing a
+confirmed review there — Done, its ✕ or Escape — also closes the sheet (back or replace, like the
+sheet's ✕), so the user lands on the page with the toast whole; a review closed before it is
+confirmed (Cancel, a wallet cancel, a failure) leaves the sheet open. On a desktop nothing else
+closes. A wallet cancel's stage reads "Cancelled".
+The confirmed banner links the flow's next step (View position); the explorer link is the
+signature row's "Open in explorer" only.
 *v1.2 (M9-SEC-4):* the lifetime confirmed against is always explicit (`confirmationLifetime`): ours
 when the wallet kept our blockhash; when it chose its own, that one only while `isBlockhashValid`
 says so, bounded by the current block height + 151 (Kit would otherwise confirm a changed message
@@ -1212,15 +1341,30 @@ columns right-aligned; every number element carries `data-value` with the raw in
 
 ### 7.3 Density and layout
 
-Compact rows 28 px, controls 30 px (comfortable: 34 / 34 px via `data-density`); 4 px grid; header
-44 px, status bar 24 px; minimum width 1024 px; the trade layout is a fluid market column plus a
+Compact rows 28 px, controls 30 px; 4 px grid; header 44 px (48 under 1,024 px), status bar 24 px
+(a 28 px strip on a phone); *M10-RESP:* no minimum width (§7.6) and, under a coarse pointer at any
+width, 44 px controls and rows, 16 px inputs (the unused `data-density` block is gone; a density
+toggle is owner item O-4); `.page` stops at 1,680 px and centres; the trade layout is a fluid market column plus a
 360 px panel (320 px under 1,180 px). Panels: 6 px radius, hairline borders, uppercase 12 px titles.
 *As built (the visual pass, §10.2 `screens`):* the trade panel is sticky and scrolls on its own
 (its submit stays a short scroll from the inputs while the market column scrolls); table cells
 tighten to 4 px padding under 1,280 px so the markets table fits 1,024 px without sideways
 scroll; the stat strip wraps as flex rows that fill the width (no empty cells, no clipped values;
 the size cap is compact there, exact in its title and the panel); a ticker or a mint inside an
-uppercase label keeps its case (`.case-keep`: a mint is case-sensitive).
+uppercase label keeps its case (`.case-keep`: a mint is case-sensitive). *M10-RESP:* the stat strip
+on a desktop is a wrapping flex row: one row where the strip is ≥ 980 px wide, else four per row,
+and a short last row's cells grow to fill it — never an empty cell (seven stats: 4 + 3 at 1,024
+and 1,280 px, one row at 1,440, with or without a page scrollbar; the switch is a `clamp()` on the
+flex basis, not a container query); a tablet's strip is under 980 px, so the same rule gives
+4 + 3 there (the lender KPIs one row of four); 2-up on a phone. Numeric columns keep their
+value on one line and, from 1,280 px, 16 px from the column before (the spec's D15 `width: 1%`
+packed the numbers into one block and left the text columns empty: dropped, every column shares
+the spare width; the review's delta table keeps its numbers shrink-wrapped, and a date there may
+break between its day and its time). A position's facts fill up to three columns top to bottom, in groups (size,
+risk now, rent and dates). The trade and Manage panels reserve their scrollbar gutter on both
+edges (`stable both-edges`, thin), so the insets are symmetric. The status bar's top line is a
+shadow, so a 24 px target in it never makes a short page 1 px taller than the screen. A
+`details` summary has a bordered chevron (right / down) in `--text-1`.
 
 ### 7.4 Components (`src/components`, scaffold; tracks compose them)
 
@@ -1238,7 +1382,13 @@ uppercase label keeps its case (`.case-keep`: a mint is case-sensitive).
 | `Disclosure` | verbatim disclosure with optional acknowledgement, collapsible; a disclosure whose acknowledgement is its whole text (SPEC §5.3's sentence) shows it once, as the checkbox's label |
 | `Empty`, `ErrorState`, `Skeleton`, `Stat`, `Kv` | states, stat strips, key / value previews |
 | `AddressText`, `Countdown` | short address with copy; live time left |
-| `TxReviewModal` (`src/tx`) | the review of §5.3 |
+| `TxReviewModal` (`src/tx`) | the review of §5.3; *M10-RESP:* the error under the stage, the simulation badge gone once the wallet has it, "Cancelled in your wallet" + Try again, timestamp deltas as dates, the sign hint, the confirmed link (`TxPlan.next`); full screen on a phone |
+| *M10-RESP* `DataTable` | column `priority` (1–3), `label`, `card` (title / aside / actions); every cell `data-col`, `data-label`, `data-priority`, `data-card`; explicit table roles; a sort bar (`table-sort-<id>`, `table-sort-dir-<id>`) in card mode; `className`, `sortLabel` |
+| *M10-RESP* `useSheetMode`, `SheetHead`, `Scrim` (`Sheet.tsx`) | an element that becomes a modal sheet under a query (default compact) while open: dialog role, `aria-modal`, the rest inert (not `[data-sheet-keep]` / an open `<dialog>`), focus in and back, Escape; nothing on a desktop |
+| *M10-RESP* `FormFoot`, `ActionBar` | the sticky submit with a `role=status` reason (a button to the control to fix with `reasonTarget`); the page's fixed thumb bar under 1,024 px |
+| *M10-RESP* `Reveal` | a truncated value → popover with the full value, Copy, Explorer (`reveal-<kind>`); opt-in on `TokenId` / `AddressText` (`reveal`) |
+| *M10-RESP* `ConnectCta`, `WalletChooser` (`src/wallet`) | an enabled Connect wallet on a surface and the shared chooser (one open at a time, `walletUi.ts`); mobile without a wallet: open-in-wallet links (§5.4) |
+| *M10-RESP* `Modal` `variant`, `Empty` `title` / `action`, `Stat` `priority`, `Panel` `ref` / `head`, `AmountInput` Max in the field, `addressInputProps`, `Toast` kind word / `links`, `Tabs` sideways scroll | as §7.6 |
 
 Track-specific components live in the track's directory; a component two tracks need is proposed
 to the integrator for `src/components`.
@@ -1246,7 +1396,97 @@ to the integrator for `src/components`.
 ### 7.5 Motion
 
 Short transitions (80–140 ms) on hover and focus only; no number flashing or animated tickers
-by default; skeleton shimmer; everything off under `prefers-reduced-motion`.
+by default; skeleton shimmer; everything off under `prefers-reduced-motion`. *M10-RESP:* sheets
+slide in over `--t-sheet` (140 ms; 0 under reduced motion).
+
+### 7.6 Responsive conventions (M10-RESP)
+
+The owner's request (2026-10-09): "optimize the site for phone and make it look good and intuitive
+both on pc and phone", keeping the dark terminal. The rules every track follows:
+
+- **One DOM.** Every width switch is CSS; nothing renders twice, so every `data-testid` stays
+  unique. JavaScript reads a breakpoint only for behaviour (a sheet's inert / focus handling, the
+  mobile wallet links), through `src/styles/breakpoints.ts`; jsdom gets a desktop `matchMedia`
+  (`src/test/media.ts`, `setMedia()`).
+- **Three tiers.** Phone < 640 px: the app shell (tab bar, status strip), cards, full-screen
+  sheets, an action bar. Tablet 640–1,023: the text nav, one column, priority columns or cards by
+  container width, a right-side sheet. Desktop ≥ 1,024: the terminal as before.
+- **The closed breakpoint set** (top of `tokens.css`; `breakpoints.test.ts` rejects anything else):
+  `@media` `(max-width: 399.98px | 639.98px | 1023.98px | 1179.98px | 1279.98px)`,
+  `(min-width: 640px | 1024px | 1280px | 1680px)`, `(pointer: coarse)`, `(hover: hover)`,
+  `(prefers-reduced-motion: reduce)` — no range syntax; once, `(orientation: landscape)` with
+  coarse in the tablet tier: a landscape phone, whose side sheet keeps its form foot in the flow
+  (a ~390 px sheet cannot lift a sticky foot over a form that starts low; it covered the fields
+  and cut off the submit). **Containers only on `.tbl-wrap` (`tbl`:
+  960 / 560 px) and `.modal-body` (`dialog`: 480 px).**
+- **Input decides density, width decides layout.** 44 px controls / rows and 16 px inputs only
+  under `(pointer: coarse)`; hover styles only under `(hover: hover)`; WCAG 2.5.8's 24 px floor at
+  every width (`.hit` for a small control's larger hit area).
+- **Tokens first.** Breakpoints change tokens (`--gutter`, `--tabbar-h`, `--actionbar-h`,
+  `--sheet-w`, `--tap-min`, `--tap-sm`, `--fs-input`, `--safe-*`, `--z-bars` / `--z-sheet` /
+  `--z-wallet-sheet`, `--t-sheet`; the phone type scale one notch up: 12 / 13 / 14 / 16 / 20 / 24
+  px) and a few structural rules in `components.css`; feature CSS places only its own pieces; no
+  fixed width wider than the screen (`min(Npx, 100%)`).
+- **Reading order = DOM order.** No CSS `order`, no `row-reverse`; sheets leave the flow but are
+  never moved; an action bar follows the page header in the DOM. On a phone the review's Sign —
+  last in the DOM — gets the full-width bottom row.
+- **Sheets.** A page panel becomes a sheet with `useSheetMode` + `.sheet-host`, opened by
+  `?sheet=` (`MarketSearch.sheet` 'trade', `PositionSearch.sheet` 'add-margin' | 'close';
+  `useSheetParam`): opening pushes a history entry, so Back closes it; a deep link closes by
+  replacing the URL. A review `<dialog>` opened from a sheet stays visible even if Back drops the
+  key.
+- **Within thumb reach.** At most one `ActionBar` per page; every form submit in a sticky
+  `FormFoot` with a one-line reason while it is disabled.
+- **Never hide risk or staleness.** Disclosures verbatim and in place; simulate → review → sign
+  unchanged; staleness in words at every width (the status strip; panel badges).
+- **Focus Not Obscured (2.4.11).** `scroll-padding` / `scroll-margin` keep a focused control
+  clear of the sticky header and the fixed bars.
+- **Viewport.** `width=device-width, initial-scale=1, viewport-fit=cover` (safe areas); pinch zoom
+  never disabled; `theme-color` = `--bg-1`.
+- **Shared rules the pages rely on** (integration, v1.4): a card keeps priority-3 cells hidden; a
+  text field is 44 px inside its border under a coarse pointer; action-bar buttons are ≥ 44 px; a
+  `FormFoot` in the page sticks above the fixed bars under 1,024 px and at the bottom of an open
+  sheet; an open sheet's `scroll-padding` clears its head and its foot (2.4.11); on a phone, a toast
+  over an open sheet takes the sheet head's title strip (one line, 16 px clear of its ✕: it covers
+  text, never a control; a success or a note has no ✕ of its own there, an error keeps its
+  one-line reason and a "Dismiss" word); a toast's 6 s count only while it is in view (not under a
+  dialog or a sheet); the acknowledgement checkbox takes an id
+  (`Disclosure ackId`, `Checkbox id`) for `FormFoot reasonTarget`. *Fix round:* a card whose
+  title has no aside takes the whole first row; a card table's clipped header shows while focus is
+  in it (its sort buttons are never an invisible Tab stop); the sort bar's direction button names
+  the order ("↓ Descending" / "↑ Ascending", `data-order`), no pressed state; a sheet that
+  unmounts as it closes (the wallet popup) or has no opener (a deep link) returns focus to the
+  opener or `#main`, never `<body>`; a shortened id ("8oBK…6cTC") in a review title or account
+  label never splits across lines (`.nowrap`).
+
+### 7.7 Supported widths and the pages at each (M10-RESP, as built)
+
+There is no minimum width: the app is laid out from **320 px** up (the responsive gate's
+`phone-xs`), with no sideways document scroll at any width, and at 1,680 px and wider the page
+stops and centres. The tier is the viewport width; density is the pointer (§7.6).
+
+| Width | Shell | Tables | The trade panel / Manage | Type |
+|---|---|---|---|---|
+| **< 640 px** (phone; "ShortWin" hidden < 400) | 48 px header (brand, cluster, Search button, wallet), the `<nav>` as a bottom tab bar with More, the status strip (worst state in words, expands) | cards (container < 560 px), sort bar; priority-3 hidden | a full-screen sheet from the page's action bar (`?sheet=`), Back closes it | one notch up: 12–24 px |
+| **640–1,023 px** (tablet, landscape phone) | text nav, Search button → overlay, the status bar as on a desktop (no cluster) | priority mode (container < 960 px: p3 hidden), cards where the container is < 560 px | a right-side sheet (`min(440px, 100vw)`) over a scrim; on a landscape phone its submit sits under the fields, not sticky (usable, cramped: the header, action bar and status bar take a third of 390 px — a device check, §10.3) | as a desktop |
+| **≥ 1,024 px** (laptop, desktop) | the terminal header and status bar, inline search with `/` | full tables (the market page's 680 px column at 1,024 is a priority-mode container) | in the page: the sticky right column | 11–22 px |
+
+**Pages** (the §3 sections have the details):
+
+| Page | Phone | Tablet | Desktop |
+|---|---|---|---|
+| `/markets` (§3.3) | cards (symbol and mint, venue and tier; price / TVL, utilisation / OI, positions / flags), "Filters · n" toggle, sort bar | priority table | the table; "Filter this list" (mono for a mint), Clear filters |
+| `/m/$mint` (§3.4) | prices under the title, 2-up stats with "More stats", sideways tabs, tab tables as cards; action bar Short / Lend → trade sheet | one column, stats 4 + 3, side sheet | two columns, the trade panel sticky |
+| `/markets/new` (§3.5) | one column; Review is the page's bottom bar with its reason; Paste under a coarse pointer | one column, sticky foot | two columns; a rejected token says "Cannot be listed" and has no Review |
+| `/positions` (§3.8) | totals line, position cards with Add margin / Close | priority table | the table, "How risk is graded" |
+| `/positions/$position` (§3.8) | health banner, hero line (CR, P&L, time left), facts in one column; action bar → Manage sheet at the chosen form | facts in two columns, side sheet | Manage sticky beside the facts |
+| `/lend` (§3.8) | KPIs 2 × 2, lender cards with Withdraw / Deposit / Claim, Claim all in the action bar | cards (the lender table is cards under 960 px of container) | the table, Claim all in the header |
+| `/status`, `/security` (§3.9) | one column, tables as cards; identifiers wrap | one column | panels side by side; the policy centred at 920 px |
+
+**Mobile wallet entry** (§5.4): a phone browser without an injected wallet gets "Open in
+Backpack / Phantom / Solflare" universal links (alphabetical) to the same page, the cluster hint
+off mainnet, the install sites and Reload; inside a wallet's in-app browser Wallet Standard works
+unchanged. The Mobile Wallet Adapter is owner item O-6 (not built).
 
 ---
 
@@ -1255,7 +1495,9 @@ by default; skeleton shimmer; everything off under `prefers-reduced-motion`.
 - **Contrast:** the token table of §7.1 (text ≥ 4.5:1, input borders and focus ≥ 3:1).
 - **Keyboard:** every action reachable and operable; visible focus (`--focus` 2 px ring); skip
   link; `/` search; tables, tabs and menus follow the WAI-ARIA patterns; dialogs trap focus and
-  return it; no keyboard trap; Escape closes dismissible layers.
+  return it (to the opener; when it is gone or disabled — a submit after the form resets on a
+  confirmed send — to an open sheet's title, else `#main`, never `<body>`); no keyboard trap;
+  Escape closes dismissible layers.
 - **Semantics:** landmarks (`header`, `nav`, `main`, `footer`), headings per page, tables with
   captions and `scope`, sortable headers as buttons with `aria-sort`, the search as a combobox with
   `aria-activedescendant`, form controls with labels and `aria-describedby` for hints and errors,
@@ -1435,6 +1677,16 @@ price, caps), close / add-margin previews, P&L and risk.
   specs. Writes `apps/web/.e2e/state.json` (addresses and the generated keys' paths).
 - **App:** `vite build` with `VITE_CLUSTER=localnet`, `VITE_ENABLE_TEST_VENUE=true`, the E2E ports
   and the seeded ALT, served by `vite preview` (Playwright `webServer`).
+- *M10-RESP* **Projects:** `<profile>` (desktop 1440 × 900; every spec but `mobile-*.spec.ts`) and
+  `<profile>-phone` (390 × 844, `isMobile`, touch, DPR 3, an iPhone user agent, the same Chromium;
+  `mobile-*.spec.ts` only), both in the default run. Phone specs tap (`locator.tap()`, no DOM-click
+  fallback), run axe at 0 on every state, sign only with the seeded `phone` wallet (SOL and E2EMAIN
+  like `trader`) and write the reviewed phone PNG set `e2e/screenshots/phone/` (CSS scale) with
+  `SHORTWIN_E2E_SCREENSHOTS=update`. `mobile-shell.spec.ts` (foundation): the tab bar and More,
+  the status strip, the search overlay (a mixed-case mint kept as typed), the open-in-wallet hrefs
+  without a wallet (never followed), the connected wallet sheet, not found; `mobile-markets`,
+  `mobile-trade`, `mobile-lend` belong to the page tracks. `screens.spec` captures grow to the
+  document's scroll height (the document scrolls since M10-RESP).
 - **Indexer:** profile `chain` (CI): the indexer URL points at a Playwright-routed mock
   (`page.route`) that serves OpenAPI-shaped responses built from the seed's on-chain state, or at
   nothing for the fallback specs. Profile `full` (local, optional): `shortwin-indexer run` against
@@ -1505,7 +1757,7 @@ must refuse, §5.8), `raiseFeeNext(price)` (a compute-budget-only change — the
   restarts the preview.
 - The release program is optional (`SHORTWIN_E2E_PROGRAM=release`: the trading specs skip); the
   wallet's `tamperNext` takes `'data' | 'drop' | fn`; tags `@scaffold`, `@markets`, `@lend`,
-  `@short`, `@screens`.
+  `@short`, `@screens`, and `@responsive` (§10.5; not in the default run).
 - `screens.spec.ts` writes `.e2e/screenshots/`; `SHORTWIN_E2E_SCREENSHOTS=update` refreshes the
   reviewed set committed in `e2e/screenshots/`.
 - For manual work the same environment runs the app: `node e2e/validator/start.ts --env`,
@@ -1542,6 +1794,63 @@ Playwright's Chromium in the user cache; profile `chain`). *As built:* `web-e2e`
 (no tag filter since the integration) and uploads the `screens` PNGs on every run, the report,
 traces and logs on failure.
 
+### 10.5 Responsive capture (M10; `e2e/specs/responsive.spec.ts`, `@responsive`)
+
+A measuring pass over the same states as `screens` plus the ones it skips (the wallet menu
+disconnected, connected and with no wallet; the header search; the markets loading skeleton, a 500
+error state and an empty filter; the route 404 and an unlisted mint; the empty positions and lender
+pages; a position that does not exist; the pages that need a wallet, without one; the review after a
+wallet rejection, before Sign and confirmed; the success toast; the lender dashboard from the chain),
+at six Chromium-emulated viewports: `phone-s` 360×780 (mobile, touch, DPR 2), `phone` 390×844
+(mobile, touch, DPR 3), `tablet` 768×1024 (touch, DPR 2), `laptop-s` 1024×768, `laptop` 1280×800,
+`desktop` 1440×900 (phones and the tablet send a mobile user agent). Per state and viewport it
+writes `$SHORTWIN_SHOTS_DIR/<viewport>/<name>.png` (the page unrolled: `main`'s scroll height, then
+the full document, capped at 16,000 device px; on a phone also `<name>-screen`, the first screen
+at load; with a dialog open, the viewport plus `<name>-full` with the dialog body unrolled) and
+records in `$SHORTWIN_SHOTS_DIR/metrics.json` (`e2e/responsive/metrics.ts`). *M10-RESP:* the
+document scrolls (the capture grows to the larger of `main`'s and the document's scroll height),
+the tablet also writes `<name>-screen`, two more viewports run — `phone-xs` 320 × 640 and
+`phone-land` 844 × 390 (mobile) — and each state also records `matchMedia('(pointer: coarse)')`,
+the tab / action bar heights and the primary controls under 44 px with a coarse pointer:
+
+- **layout width:** a page wider than the phone is laid out wider (`innerWidth` > the screen) and
+  shown from its left edge at scale 1; sizes below are as seen (× `visualViewport.scale`);
+- **overflow:** the document's sideways scroll (against the screen width) and `main`'s, the
+  outermost elements past the viewport's edges (not inside a scrolling or clipping box), the boxes
+  that scroll sideways on their own and the `overflow-x: hidden` boxes that cut their content
+  (ellipsis counted);
+- **touch targets:** interactive elements under 44 × 44 CSS px and under WCAG 2.5.8's 24 × 24 (a
+  checkbox counts its label's box; links inside running text are exempt and counted apart), and
+  overlapping targets — inside the open dialog when there is one;
+- **text under 12 px**, grouped by element and size;
+- **hover-only affordances:** `title` tooltips, `cursor: help`, `:hover` rules that reveal
+  (display / visibility / opacity / size / transform without a `:focus` twin);
+- the header and status bar heights and the height left for content;
+- **axe** (WCAG 2.2 A/AA) violations per viewport (*v1.4:* on a full-page state, run on the unrolled
+  page — every target in view, the fixed bars past the content — so a target is not judged by
+  what scrolls under a fixed bar at one moment; a dialog or overlay state at the viewport's size).
+
+Findings never fail it (a step that cannot run is recorded with its error and a PNG of where it
+stopped; a control Playwright's tap cannot hit is clicked through the DOM and noted); only the
+fixtures' CSP check can. Writes on chain: the lend screens' `accrue` and one
+1-token deposit by the `errors` wallet per viewport (the confirmed review and its toast). It is left
+out of the default run (`grepInvert` unless `SHORTWIN_E2E_RESPONSIVE=1` or `SHORTWIN_SHOTS_DIR` is
+set); `SHORTWIN_SHOTS_VIEWPORTS=phone,desktop` limits the viewports; `node
+e2e/responsive/summary.ts <dir> [--pages]` prints the counts, the axe rules and the worst states.
+
+*M10-RESP — the gate.* With `SHORTWIN_RESPONSIVE_GATE=1` each test fails on a finding: sideways
+document overflow, a layout wider than the screen, a zoomed-out page, an element off screen (a
+tablist or a table still in table mode may scroll inside itself), an axe violation, a target under
+24 px, a primary control under 44 px with a coarse pointer, text under 12 px on a phone (`phone-xs`,
+`phone-s`, `phone`: the phone type scale is the < 640 px tier; the landscape phone is laid out
+and typed as a tablet), a failed step or a DOM-click fallback. Required before each responsive
+phase merges. *Integration (v1.4):* under 1,024 px the capture opens the trade panel as a user
+does — the page first (the header's wallet is outside the sheet), then the action bar — and adds
+two states there: `market-trade-sheet` and `position-manage-sheet`. A full-page screenshot clears Chromium's touch
+emulation (`(pointer: coarse)` then reads false until the page closes), so the capture turns it
+back on after every shot on a touch viewport; before v1.4 the tablet and the landscape phone were
+measured, and their later PNGs drawn, with a mouse's density after their first full-page shot.
+
 ---
 
 ## 11. `data-testid` contract
@@ -1564,7 +1873,7 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `search-results` | `T.searchResults` | listbox |
 | `search-result-<…>` | `T.searchResult` | `<mint>`; an option (a valid mint always yields one) |
 | `wallet-button` | `T.walletButton` | opens the wallet menu; `aria-expanded` |
-| `wallet-menu` | `T.walletMenu` | role=menu |
+| `wallet-menu` | `T.walletMenu` | role=menu when it lists wallets or account actions; *M10-RESP:* without a wallet, `role="dialog"` "Connect a wallet" (install / open-in links) |
 | `wallet-option-<…>` | `T.walletOption` | `<wallet name>` as the wallet reports it (the E2E wallet: `ShortWin E2E`); *v1.2:* a second wallet with the same name is `<name> (2)`, and so on (M9-SEC-8); `data-duplicate` = its rank |
 | `wallet-address` | `T.walletAddress` | connected address; `data-value` = full base58 |
 | `wallet-disconnect` | `T.walletDisconnect` | menu item |
@@ -1602,6 +1911,30 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `tx-instruction-<…>` | `T.txInstruction` | `<i>` = index in the plan (compute-budget instructions excluded); `data-program` (`short.win`, `Token-2022`, …), `data-name` (the program client's instruction name, e.g. `DisableCpiGuard`, `Deposit`) |
 | `disclosure-<…>` | `T.disclosure` | `<disclosure id>` (§4); rendered verbatim |
 | `disclosure-ack-<…>` | `T.disclosureAck` | `<disclosure id>`; the acknowledgement checkbox |
+| `nav-more` | `T.navMore` | *M10-RESP:* the phone tab bar's fourth cell (hidden from 640 px); opens the More sheet; `aria-haspopup="dialog"`, `aria-expanded` |
+| `more-sheet` | `T.moreSheet` | *M10-RESP:* the More bottom sheet (`<dialog>`) |
+| `more-status` | `T.moreStatus` | *M10-RESP:* More → `/status` |
+| `more-security` | `T.moreSecurity` | *M10-RESP:* More → `/security` |
+| `more-create-market` | `T.moreCreateMarket` | *M10-RESP:* More → `/markets/new` |
+| `more-sol-usd` | `T.moreSolUsd` | *M10-RESP:* More's network block: SOL/USD |
+| `search-toggle` | `T.searchToggle` | *M10-RESP:* under 1024 px, the header's Search button; opens the search overlay; `aria-expanded` |
+| `search-close` | `T.searchClose` | *M10-RESP:* the overlay's Cancel (focus returns to `search-toggle`) |
+| `status-summary` | `T.statusSummary` | *M10-RESP:* the phone's status strip (a button; hidden from 640 px): the worst state in words; `data-state` ∈ ok, warn, bad; `aria-expanded` shows every `status-*` item |
+| `not-found-cta` | `T.notFoundCta` | *M10-RESP:* "Browse markets" on the not-found page |
+| `table-sort-<…>` | `T.tableSort` | *M10-RESP:* `<table test id>`; a DataTable's sort select (shown in card mode, or while a sortable column is hidden) |
+| `table-sort-dir-<…>` | `T.tableSortDir` | *M10-RESP:* `<table test id>`; the sort direction button: its label names the order ("Descending" / "Ascending"), `data-order` ∈ desc, asc; a tap flips it |
+| `connect-cta-<…>` | `T.connectCta` | *M10-RESP:* `<surface>` ∈ short, lend, positions, lend-dashboard, position; an enabled "Connect wallet" that opens the inline chooser below it |
+| `reveal-<…>` | `T.reveal` | *M10-RESP:* `<kind>` (e.g. `mint`, `address`, `wallet`); a truncated value's popover with the full value, Copy and Explorer |
+| `wallet-open-in-<…>` | `T.walletOpenIn` | *M10-RESP:* `<wallet>` ∈ backpack, phantom, solflare; on a mobile device without a wallet: the wallet's universal "browse" link to this page (§5.4) |
+| `wallet-install-<…>` | `T.walletInstall` | *M10-RESP:* `<wallet>` as above; the wallet's website |
+| `wallet-reload` | `T.walletReload` | *M10-RESP:* "Already in a wallet's browser? Reload" / "I installed one: reload" |
+| `wallet-copy-address` | `T.walletCopyAddress` | *M10-RESP:* connected menu: copy the full address |
+| `wallet-explorer` | `T.walletExplorer` | *M10-RESP:* connected menu: the account on the explorer |
+| `wallet-my-positions` | `T.walletMyPositions` | *M10-RESP:* connected menu → `/positions` |
+| `wallet-my-lending` | `T.walletMyLending` | *M10-RESP:* connected menu → `/lend` |
+| `wallet-sheet-close` | `T.walletSheetClose` | *M10-RESP:* the header wallet popup's ✕ on a phone (its bottom sheet; Back closes it too) |
+| `tx-sign-hint` | `T.txSignHint` | *M10-RESP:* "Tick the acknowledgement above to sign" — a button that focuses the first unticked acknowledgement; only while one blocks signing |
+| `tx-confirmed-link` | `T.txConfirmedLink` | *M10-RESP:* after landing: the flow's next step (e.g. View position), when the plan has one (the explorer is `tx-explorer-link`) |
 
 ### 11.2 Markets table, market page, create market, protocol status (MARKETS)
 
@@ -1672,6 +2005,15 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `status-indexer-health` | `T.statusIndexerHealth` | `/v1/status` lag and data-quality counts |
 | `status-coverage-gap` | `T.statusCoverageGap` | keeper coverage gaps (`/v1/stats.coverage_gap_s`); `data-value` = seconds |
 | `status-extras-table` | `T.statusExtras` | the venue extras sets in force (`/v1/venues.extras`) |
+| `markets-filters-toggle` | `T.marketsFiltersToggle` | *M10-RESP:* phone: shows / hides the venue, tier and open-positions filters ("Filters · n" = active filters); `aria-expanded`; hidden from 640 px |
+| `markets-clear-filters` | `T.marketsClearFilters` | *M10-RESP:* in an empty filtered list: clears the text filter, venue, tier and open-positions filters |
+| `market-action-short` | `T.marketActionShort` | *M10-RESP:* under 1024 px, the market page's action bar: opens the trade sheet at Short (`?sheet=trade&panel=short`); accessible name "Short <symbol>" |
+| `market-action-lend` | `T.marketActionLend` | *M10-RESP:* as above, at Lend (`panel=lend`); "Lend <symbol>" |
+| `trade-sheet-close` | `T.tradeSheetClose` | *M10-RESP:* the trade sheet's close button (Back and Escape close it too) |
+| `market-stats-more` | `T.marketStatsMore` | *M10-RESP:* phone: shows the stat strip's secondary stats (inventory, open interest, lenders); `aria-expanded`; hidden from 640 px |
+| `market-tier-why-close` | `T.marketTierWhyClose` | *M10-RESP:* closes the "Why this tier" popover (a bottom sheet on a phone) |
+| `create-mint-paste` | `T.createMintPaste` | *M10-RESP:* coarse pointer only: pastes the mint from the clipboard (fails silently) |
+| `create-submit-reason` | `T.createSubmitReason` | *M10-RESP:* why Review is disabled, above it in the form foot; empty while it is enabled |
 
 ### 11.3 Lend panel and lender dashboard (LEND)
 
@@ -1703,13 +2045,23 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `lend-sweep-notice` | `T.lendSweepNotice` | the post-wipe sweep bundle will be prepended to the deposit |
 | `lend-sync-submit` | `T.lendSyncSubmit` | `sync_lender` of the own position when it is behind more share epochs than one transaction carries |
 | `withdraw-destination-select` | `T.withdrawDestination` | destination token account select (ATA first; a missing ATA is created idempotently); `data-memo` true/false |
-| `withdraw-percent-<…>` | `T.withdrawPercent` | `<pct>` ∈ 25, 50: fills that share of the holding |
+| `withdraw-percent-<…>` | `T.withdrawPercent` | `<pct>` ∈ 25, 50, 75 (*M10-RESP*: 75 added; a chip, `aria-pressed` while the input holds that share): fills that share of the holding |
 | `lender-epochs-<…>` | `T.lenderEpochs` | `<market>`; `data-state` ∈ current, behind, parked; `data-value` = epochs behind |
 | `lender-indexer-<…>` | `T.lenderIndexer` | `<market>`; `data-state` ∈ ok, unsynced (indexer shares ≠ chain), quarantined (the market has quarantined events), missing (chain only) |
 | `lender-claim-<…>` | `T.lenderClaim` | `<market>`; per-row claim |
 | `lender-sync-<…>` | `T.lenderSync` | `<market>`; per-row `sync_lender` when behind |
 | `lender-claim-all` | `T.lenderClaimAll` | claims every market with SOL claimable, one reviewed transaction per market |
 | `lender-empty` | `T.lenderEmpty` | empty state (no wallet / no positions) |
+| `lend-deposit-reason` | `T.lendDepositReason` | *M10-RESP:* the deposit's FormFoot reason (`role=status`; empty while the submit is enabled; a button that focuses the acknowledgement or the CPI Guard box when that is what is missing) |
+| `lend-withdraw-reason` | `T.lendWithdrawReason` | *M10-RESP:* the withdrawal's FormFoot reason (as above; focuses the vest acknowledgement) |
+| `lend-claim-reason` | `T.lendClaimReason` | *M10-RESP:* the claim's FormFoot reason |
+| `withdraw-approx` | `T.withdrawApprox` | *M10-RESP:* "≈ N TOKEN" under the shares input (the preview's tokens; display only) |
+| `lend-empty-cta` | `T.lendEmptyCta` | *M10-RESP:* the dashboard's empty state: Browse markets (→ `/markets`) |
+| `lender-kpi-<…>` | `T.lenderKpi` | *M10-RESP:* `<field>` ∈ markets, value (≈ SOL at each market's EMA price; `data-priced` = rows with a price), claimable, credited (`data-value` lamports) |
+| `lender-source` | `T.lenderSource` | *M10-RESP:* the dashboard's "Chain only" badge while the indexer is unavailable |
+| `lender-withdraw-<…>` | `T.lenderWithdraw` | *M10-RESP:* `<market>`; link to the market's Lend → Withdraw (`?panel=lend&action=withdraw&sheet=trade`) |
+| `lender-deposit-<…>` | `T.lenderDeposit` | *M10-RESP:* `<market>`; link to the market's Lend → Deposit (`sheet=trade` as above) |
+| `lender-claim-reason-<…>` | `T.lenderClaimReason` | *M10-RESP:* `<market>`; why that row's Claim is disabled, in text — after the row's buttons (Withdraw, Deposit, Claim: the same small button), on their line |
 
 ### 11.4 Short panel, positions and position detail (SHORT)
 
@@ -1737,6 +2089,15 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `close-preview-<…>` | `T.closePreview` | `<field>` ∈ buyback, rent, payout, pnl |
 | `close-straddle-notice` | `T.closeStraddleNotice` | CurveStraddle explanation (FE-3) |
 | `close-submit` | `T.closeSubmit` | opens the review |
+| `short-submit-reason` | `T.shortSubmitReason` | *M10-RESP:* why `short-submit` is disabled, one line in the form's sticky foot (`role=status`; `data-reason` while there is one); while the acknowledgement blocks it, a button that focuses the box |
+| `positions-totals` | `T.positionsTotals` | *M10-RESP:* the dashboard's totals line — count, vault, P&L (sign and arrow), rent due |
+| `positions-empty-cta` | `T.positionsEmptyCta` | *M10-RESP:* "Open a short" (to `/markets`) when there are no open positions |
+| `position-not-found-cta` | `T.positionNotFoundCta` | *M10-RESP:* "Back to positions" on a position page with no position at the address |
+| `position-action-add-margin` | `T.positionActionAddMargin` | *M10-RESP:* the position's action bar (under 1024 px; open positions): opens the Manage sheet at Add margin (`?sheet=add-margin`) |
+| `position-action-close` | `T.positionActionClose` | *M10-RESP:* the same, at Close (`?sheet=close`) |
+| `manage-sheet-close` | `T.manageSheetClose` | *M10-RESP:* the Manage sheet's close button (Back and Escape close it too) |
+| `add-margin-reason` | `T.addMarginReason` | *M10-RESP:* why `add-margin-submit` is disabled (as `short-submit-reason`) |
+| `close-reason` | `T.closeReason` | *M10-RESP:* why `close-submit` is disabled (as `short-submit-reason`) |
 
 ---
 
@@ -1828,6 +2189,26 @@ edits `disclosures.ts` (copy changes need the owner) or `errors.ts`.
 | FE-28 | `lender.risks` (§4.2) lists the one-off income that vests but not "rent paid above what accrued, such as the minimum rent of an early exit", which vests since M10-8C-1 (ECON §9.4; the Claim form's note already says it). The copy lives in `disclosures.ts` and this document together (`disclosures.test.ts` pins them verbatim), so both change in one commit | open (copy) |
 | FE-29 | `/.well-known/security.txt`'s `Expires` (2027-09-30) must be rotated before 2027-08-31: a mainnet build and `check:headers` refuse 30 days or less ahead | open (operations) |
 | FE-30 | The claim-time pot syncs (KI66-R4, §3.6): the size check compiles without lookup tables (an upper bound: a v0 wallet with the protocol ALT could carry a sync more), and a sync is dropped only when the claim's own pre-review simulation fails on it — a target that closes or changes between that simulation and a stale review's re-simulation at Sign fails the review with `AccountNotInitialized` (3012), or `AccountOwnedByWrongProgram` (3007) on the `lender` account once someone funded the closed address, both of which the review's Retry rebuilds (`tx/errors.ts`; the rebuild leaves the closed target out, or refuses a claim of the claimant's own closed position). The judgement covered the indexer's first 24 lenders, largest raw share count first, so a large current lender could push an absent surplus holder out. *Ninth round (owner, 2026-10-08):* the lenders behind the share epoch (or with a forward chain) first, then the rest, paged further than 24 when needed, ranked by the simulated gain; 3007 mapped like 3012. *As built (the builder's choices under that decision, confirmed by the owner on 2026-10-09, tenth round, with the indexer's `max_page_limit` floor of 200):* the indexer's additive `epoch=behind` / `current` filter (INDEXER §9.2), 50 a page, paged further while the best ≤ 4 do not cover the shortfall, ≤ 4 pages (≤ 200 lenders; the bound's reason in §3.6); every row of either list is read whatever its epoch, so an indexer lagging or leading the RPC's share epoch only reorders the reads. What stays: a market with more than 200 lenders behind its share epoch is judged on the first 200 of them (largest raw share count first); the behind list's request counts toward the 4 pages even when it is empty or unfiltered, so a market with no lender behind its share epoch is judged on at most 150 current lenders, and an indexer without the filter spends the pages on its whole list in raw share order; an indexer that has not ingested a rebase lists the newly behind lenders among its current ones; and a sync that moved a surplus leaves its lender listed as behind, so a later claim re-reads it at no gain | closed (owner, 2026-10-08; the filter, the bound and the page-limit floor confirmed 2026-10-09) |
+
+### M10-RESP changes (v1.3 → v1.4)
+
+The owner's request of 2026-10-09 — "optimize the site for phone and make it look good and
+intuitive both on pc and phone" — built as the M10-RESP spec: a foundation (shell, tokens, shared
+components, mobile wallet entry, router sheet keys, the phone E2E project and the responsive gate),
+then three page groups in parallel (MARKETS, TRADE, LEND), then an integration. The dark terminal,
+every `data-testid`, every flow (simulate → review → sign) and the disclosure texts are unchanged.
+
+| Item | Change | Tests |
+|---|---|---|
+| Scope (owner, 2026-10-09) | the "laptop-only / ≥ 1,024 px" non-goal and the 1,024 px minimum dropped: 320 px and up (§1, §7.3, §7.7) | `responsive.spec` (gate, eight viewports) |
+| Foundation | document scroll, the phone shell (tab bar, More, status strip, search overlay), tokens and the closed breakpoint set, `DataTable` priorities / cards / sort bar, sheets (`useSheetMode`, `?sheet=`), `FormFoot`, `ActionBar`, `ConnectCta`, `Reveal`, the review's D4 fixes, open-in-wallet links (§3.1, §5.4, §7.4, §7.6) | `breakpoints.test.ts`, `responsive.test.tsx`, `deepLinks.test.ts`, `wallet.test.tsx`, `StatusBar.test.ts`, `TxReviewModal.test.tsx`, `router.test.tsx`; E2E `mobile-shell` |
+| MARKETS | markets cards and filters toggle, the market page's header / stats / action bar / trade sheet, every raw table a `DataTable`, create market in one column with Review in a form foot (D14), status and security at every width (§3.3–§3.5, §3.9) | `markets/responsive.test.tsx`, `CreateMarketPage.test.tsx`; E2E `mobile-markets` |
+| TRADE | the short panel's form foot and reason, position cards and totals, the position page's hero line, Manage sheet and action bar, D8 (only ShortPosition accounts read as positions), toasts with links (§3.7, §3.8) | `ShortPanel.test.tsx`, `positions.test.tsx`, `positionAccount.test.ts`; E2E `mobile-trade` |
+| LEND | the lend forms' feet and reasons, withdraw chips and the ≈ line, lender KPIs, Sync cell, row links into the trade sheet, Claim all in the action bar (§3.6, §3.8) | `LendPanel.test.tsx`, `LenderDashboardPage.test.tsx`; E2E `mobile-lend` |
+| Integration | the groups' shared requests: priority-3 cells stay hidden on cards; 44 px text fields and action-bar buttons under a coarse pointer; the dialog / sheet close 44 px (a small button's min-height won before); `FormFoot` above the fixed bars in the page; an open sheet's scroll padding; a phone's toast over an open sheet in the sheet head's title strip; `Checkbox id` / `Disclosure ackId` (TRADE's DOM-set id removed); `.target-link` shared (the review's confirmed and explorer links ≥ 24 px); the lender table framed like the positions table; More marked current on /status and /security; the market page's header and banners open the market column so the trade panel starts at the top (its sticky submit clears the status bar on the first screen, §3.4); Manage's preview labels keep their line; the capture opens sheets as a user does, restores touch emulation after full-page shots and runs axe on the unrolled page; `summary.ts <before> <after>` (§7.6, §10.5) | `router.test.tsx`; E2E `responsive` (gate), `screens`, the phone project |
+| Fix round (desktop, phone, a11y reviews) | desktop: the stat strip never leaves an empty cell (4 + 3 / one row); the market Positions tab shows borrower, margin and entry from 560 px (age from 960); numeric columns share the spare width (D15's `width: 1%` dropped) with 16 px before each from 1,280 px; no 1 px document scroll (the status bar's line a shadow); symmetric gutters in the trade and Manage panels; "Cancelled" as a wallet cancel's stage; the tier's info mark an SVG; shortened ids never split, the review's numbers take only their width and its dates may break between day and time (the account label keeps the room); Overview in two columns with Fees under both; position facts in column groups; lender row actions one button style, the reason after them; install links as a list; a visible disclosure chevron; the `/` chip gone while the search is in use; one explorer link in a confirmed review. Phone: Done on a confirmed review closes the sheet (`TxDoneContext`); the wallet popup has a title and ✕ and is history-backed; the sort direction names its order; the toast strip has no second ✕ and keeps an error's reason; a toast's 6 s count only in view; a title alone takes a card's first row. Accessibility: focus returns to the opener when a popup unmounts (or to `#main` without one), from the status list on Escape; a card table's header shows while focused; More's `aria-current` (§3.1, §3.4, §5.3, §7.3, §7.6) | `responsive.test.tsx`, `TxReviewModal.test.tsx`, `wallet.test.tsx`, `router.test.tsx`; E2E `keyboard`, `mobile-shell`, `mobile-markets`, `mobile-trade`, `mobile-lend`, `responsive` (a short page does not scroll) |
+| Wrap-up (final re-review) | every way out of a confirmed review in a sheet (Done, ✕, Escape) closes the sheet, never one closed before confirmation; the tablet stat strip 4 + 3 (the desktop rule) instead of 3 + 3 + 1; the Overview's two columns share the card's width (no 420 px cap), and so do the Coverage tab's (the same grid); a dialog whose opener is disabled or gone on close (the lend and short submits after a confirmed send, on a desktop) returns focus to an open sheet's title or `#main`, never `<body>` (§3.4, §5.3, §7.6, §8) | `TxReviewModal.test.tsx`, `Modal.test.tsx`; E2E `mobile-lend` (Escape on the confirmed deposit), `lend-deposit` (focus after Done), `responsive` |
+| Owner calls, not built | O-1 deposit reorder, O-2 coverage de-duplication, O-3 intro / glossary, O-4 desktop 12 px floor or density toggle, O-5 Claim wording, O-6 Mobile Wallet Adapter | — |
 
 ### M10 changes (v1.2 → v1.3)
 

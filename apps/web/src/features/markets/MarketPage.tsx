@@ -6,17 +6,27 @@
  * panel composition are the contract: `ShortPanel` (SHORT) and `LendPanel` (LEND) take only the mint
  * and read their own data.
  *
+ * Under 1024 px (M10-RESP, FRONTEND.md §7.6) the page is one column and the trade panel is a sheet
+ * (`?sheet=trade`; full screen on a phone, at the right on a tablet), opened from the action bar's
+ * Short / Lend and closed by ✕, Escape, the scrim or Back. Same DOM at every width.
+ *
  * Sources (FE-D1): the indexer for analytics and history, the chain for the state that gates opens;
  * without the indexer (down, or a market it does not know yet) the page renders from the chain.
  */
 import type { Address } from '@solana/kit';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
+import { useId, useRef } from 'react';
 import { useLiveChannels } from '../../api/live.tsx';
+import { ActionBar } from '../../components/ActionBar.tsx';
 import { Panel } from '../../components/Panel.tsx';
+import { Scrim, SheetHead, useSheetMode } from '../../components/Sheet.tsx';
 import { ErrorState, Skeleton } from '../../components/States.tsx';
 import { type TabDef, TabPanel, Tabs } from '../../components/Tabs.tsx';
 import { T } from '../../config/testids.ts';
+import { shortAddress } from '../../lib/format.ts';
 import type { MarketTab } from '../../router.tsx';
+import { useSheetParam } from '../../shell/sheetParam.ts';
+import { TxDoneContext } from '../../tx/TxReviewModal.tsx';
 import { LendPanel } from '../lend/LendPanel.tsx';
 import { ShortPanel } from '../short/ShortPanel.tsx';
 import './markets.css';
@@ -82,47 +92,88 @@ export function MarketPage({ mint }: { mint: Address }) {
     const panel = search.panel ?? 'short';
     const data = useMarketData(mint);
     useLiveChannels([`market:${mint}`]);
+    const sheet = useSheetParam('/m/$mint');
+    const tradeRef = useRef<HTMLElement>(null);
+    const sheetTitleId = useId();
+    const inSheet = useSheetMode(tradeRef, {
+        open: sheet.open === 'trade' && data.status !== 'not-found',
+        onClose: sheet.closeSheet,
+        labelledBy: sheetTitleId,
+    });
 
     if (data.status === 'not-found') {
         return (
             <div className="page" data-testid={T.page('market')}>
-                <div className="page-head" data-testid={T.marketHeader}>
-                    <h1 className="num" data-testid={T.marketMint} data-value={mint}>
+                <div className="page-head mk-head" data-testid={T.marketHeader}>
+                    <h1 className="num mk-mint-title" data-testid={T.marketMint} data-value={mint}>
                         {mint}
                     </h1>
                 </div>
                 <Panel title="No market" testId={T.marketNotFound}>
-                    <p>This token has no short.win market yet. Anyone can create one: listing is permissionless.</p>
-                    <Link to="/markets/new" search={{ mint }} className="btn" data-variant="primary">
-                        Create a market for this mint
-                    </Link>
+                    <div className="stack">
+                        <p>This token has no short.win market yet. Anyone can create one: listing is permissionless.</p>
+                        <Link
+                            to="/markets/new"
+                            search={{ mint }}
+                            className="btn mk-not-listed-cta"
+                            data-variant="primary"
+                        >
+                            Create a market for this mint
+                        </Link>
+                    </div>
                 </Panel>
             </div>
         );
     }
 
     const view = data.view;
+    const symbol = view?.symbol ?? shortAddress(mint);
     return (
         <div className="page" data-testid={T.page('market')}>
-            {view ? (
-                <MarketHeader view={view} flags={data.flags} config={data.config} oracle={data.oracle} />
-            ) : (
-                <div className="page-head" data-testid={T.marketHeader}>
-                    <h1 className="num" data-testid={T.marketMint} data-value={mint}>
-                        {mint}
-                    </h1>
-                    {data.status === 'loading' && <Skeleton width={160} />}
-                </div>
-            )}
-            {data.indexerMismatch && (
-                <div className="banner" data-tone="danger" role="alert" data-testid={T.marketIndexerMismatch}>
-                    The indexer answered for this mint with another token’s data. This page shows the chain’s view of{' '}
-                    <span className="num">{mint}</span> only; history and analytics are hidden until the indexer agrees.
-                </div>
-            )}
-            {view && <MarketBanners flags={data.flags} config={data.config} />}
+            {/* The header, the action bar and the banners open the market column, so from 1024 px the
+                trade panel starts at the top of the page: its sticky top is where it rests, and its
+                submit stays above the status bar from the first screen (FRONTEND.md §3.4). */}
             <div className="layout-trade">
                 <div className="stack">
+                    {view ? (
+                        <MarketHeader view={view} flags={data.flags} config={data.config} oracle={data.oracle} />
+                    ) : (
+                        <div className="page-head mk-head" data-testid={T.marketHeader}>
+                            <h1 className="num mk-mint-title" data-testid={T.marketMint} data-value={mint}>
+                                {mint}
+                            </h1>
+                            {data.status === 'loading' && <Skeleton width={160} />}
+                        </div>
+                    )}
+                    <ActionBar label={`Trade ${symbol}`}>
+                        <button
+                            type="button"
+                            className="btn mk-action"
+                            data-variant="short"
+                            aria-label={`Short ${symbol}`}
+                            data-testid={T.marketActionShort}
+                            onClick={() => sheet.openSheet('trade', { panel: 'short' })}
+                        >
+                            <span aria-hidden="true">▼</span> Short
+                        </button>
+                        <button
+                            type="button"
+                            className="btn mk-action"
+                            aria-label={`Lend ${symbol}`}
+                            data-testid={T.marketActionLend}
+                            onClick={() => sheet.openSheet('trade', { panel: 'lend' })}
+                        >
+                            Lend
+                        </button>
+                    </ActionBar>
+                    {data.indexerMismatch && (
+                        <div className="banner" data-tone="danger" role="alert" data-testid={T.marketIndexerMismatch}>
+                            The indexer answered for this mint with another token’s data. This page shows the chain’s
+                            view of <span className="num">{mint}</span> only; history and analytics are hidden until the
+                            indexer agrees.
+                        </div>
+                    )}
+                    {view && <MarketBanners flags={data.flags} config={data.config} />}
                     {view ? (
                         <>
                             <StatStrip mint={mint} view={view} config={data.config} />
@@ -140,7 +191,7 @@ export function MarketPage({ mint }: { mint: Address }) {
                         </Panel>
                     ) : (
                         <div className="stat-strip mk-stats" aria-busy="true">
-                            {['Inventory', 'Utilisation', 'Rate', 'Open interest', 'TVL'].map((l) => (
+                            {['Rate', 'Utilisation', 'TVL', 'Size cap'].map((l) => (
                                 <div key={l} className="stat">
                                     <div className="stat-label">{l}</div>
                                     <div className="stat-value">
@@ -151,27 +202,53 @@ export function MarketPage({ mint }: { mint: Address }) {
                         </div>
                     )}
                 </div>
-                <Panel label="Trade" flush className="trade-panel">
+                <Panel
+                    ref={tradeRef}
+                    label="Trade"
+                    flush
+                    className="trade-panel sheet-host"
+                    head={
+                        <SheetHead
+                            title={`Trade ${symbol}`}
+                            titleId={sheetTitleId}
+                            onClose={sheet.closeSheet}
+                            testId={T.tradeSheetClose}
+                        />
+                    }
+                >
                     <Tabs
                         label="Trade"
                         idPrefix="trade"
                         value={panel}
-                        onChange={(p) => void navigate({ search: (s) => ({ ...s, panel: p }) })}
+                        onChange={(p) =>
+                            void navigate({
+                                search: (s) => ({ ...s, panel: p }),
+                                // In the sheet: switch in place, so Back still closes the sheet.
+                                replace: sheet.open === 'trade',
+                                state: (prev) => prev,
+                            })
+                        }
                         tabs={[
                             { key: 'short', label: 'Short', testId: T.marketPanelTab('short'), tone: 'short' },
                             { key: 'lend', label: 'Lend', testId: T.marketPanelTab('lend') },
                         ]}
                     />
                     <div className="panel-body">
-                        <TabPanel idPrefix="trade" tabKey={panel}>
-                            {panel === 'short' ? (
-                                <ShortPanel mint={mint} />
-                            ) : (
-                                <LendPanel mint={mint} action={search.action} />
-                            )}
-                        </TabPanel>
+                        {/* In the sheet, closing a confirmed review (Done, ✕, Escape) also closes the
+                            sheet: the user lands on the market page, the toast (View position,
+                            Explorer) whole. */}
+                        <TxDoneContext.Provider value={inSheet ? sheet.closeSheet : null}>
+                            <TabPanel idPrefix="trade" tabKey={panel}>
+                                {panel === 'short' ? (
+                                    <ShortPanel mint={mint} />
+                                ) : (
+                                    <LendPanel mint={mint} action={search.action} />
+                                )}
+                            </TabPanel>
+                        </TxDoneContext.Provider>
                     </div>
                 </Panel>
+                <Scrim onClick={sheet.closeSheet} />
             </div>
         </div>
     );

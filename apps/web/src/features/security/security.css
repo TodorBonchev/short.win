@@ -1,6 +1,31 @@
 /* The disclosure policy page (`/security`): readable prose on the app's panels. */
 .sec-page {
+    width: 100%;
     max-width: 920px;
+    margin-inline: auto;
+}
+
+/* The address, the program ids and URLs wrap anywhere rather than widen a phone's page. */
+.sec-page a,
+.sec-page code,
+.sec-id {
+    overflow-wrap: anywhere;
+}
+
+.sec-scope .tbl td[data-col="id"] {
+    white-space: normal;
+}
+
+.sec-id {
+    white-space: normal;
+    word-break: break-all;
+}
+
+/* A scope card: the identifier on its own full-width line. */
+@container tbl (max-width: 559.98px) {
+    .sec-scope > .tbl > tbody > tr > td[data-col="id"] {
+        grid-column: 1 / -1;
+    }
 }
 
 .sec-lede {
@@ -26,10 +51,6 @@
     color: var(--text-2);
 }
 
-.sec-id {
-    overflow-wrap: anywhere;
-}
-
 .sec-page h3 {
     margin: var(--sp-3) 0 var(--sp-2);
 }
@@ -39,4 +60,10 @@
 .sec-page p a,
 .sec-page li a {
     text-decoration: underline;
+}
+
+@media (max-width: 639.98px) {
+    .sec-list {
+        padding-left: var(--sp-4);
+    }
 }

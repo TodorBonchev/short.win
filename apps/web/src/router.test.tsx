@@ -13,6 +13,7 @@ import { T } from './config/testids.ts';
 import { routeTree } from './router.tsx';
 import { createAppClient } from './rpc/client.ts';
 import { AppClientProvider } from './rpc/context.tsx';
+import { closeMode } from './shell/sheetParam.ts';
 
 const MINT = 'So11111111111111111111111111111111111111112';
 const POSITION = '9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin';
@@ -94,6 +95,53 @@ describe('routes', () => {
         });
         expect(router.state.location.search).toEqual({ sort: 'tvl' });
         queryClient.clear();
+    });
+
+    it('validates the sheet keys (M10-RESP): known values kept, unknown ones dropped', async () => {
+        const { router, queryClient } = await renderAt(`/m/${MINT}?panel=lend&sheet=trade`);
+        expect(router.state.location.search).toEqual({ panel: 'lend', sheet: 'trade' });
+        await act(async () => {
+            await router.navigate({
+                to: '/m/$mint',
+                params: { mint: MINT as never },
+                search: { sheet: 'nope' as never },
+            });
+        });
+        expect(router.state.location.search).toEqual({});
+        await act(async () => {
+            await router.navigate({
+                to: '/positions/$position',
+                params: { position: POSITION as never },
+                search: { sheet: 'add-margin' },
+            });
+        });
+        expect(router.state.location.search).toEqual({ sheet: 'add-margin' });
+        await act(async () => {
+            await router.navigate({
+                to: '/positions/$position',
+                params: { position: POSITION as never },
+                search: { sheet: 'trade' as never },
+            });
+        });
+        expect(router.state.location.search).toEqual({});
+        queryClient.clear();
+    });
+
+    it.each([
+        ['/status', true],
+        ['/security', true],
+        ['/markets', false],
+    ])('the tab bar marks More as where %s is (%s)', async (path, current) => {
+        const { queryClient } = await renderAt(path);
+        expect(screen.getByTestId(T.navMore).hasAttribute('data-current')).toBe(current);
+        expect(screen.getByTestId(T.navMore).getAttribute('aria-current')).toBe(current ? 'true' : null);
+        queryClient.clear();
+    });
+
+    it('closes a sheet by going back only when opening it pushed the entry', () => {
+        expect(closeMode({ sheet: true })).toBe('back');
+        expect(closeMode({})).toBe('replace');
+        expect(closeMode(undefined)).toBe('replace');
     });
 
     it('passes the lend action through and shows not-found for a bad mint', async () => {

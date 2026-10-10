@@ -145,6 +145,7 @@ const row = (o: Partial<LenderRow> & Pick<LenderRow, 'market' | 'mint'>): Lender
     indexer: 'ok',
     isCoinCreator: false,
     isMarketCreator: false,
+    emaPriceWad: null,
     ...o,
 });
 
@@ -292,5 +293,100 @@ describe('LenderDashboardPage', () => {
     it('shows the empty state', async () => {
         await renderPage();
         expect(screen.getByTestId(T.lenderEmpty).textContent).toContain('You do not lend in any market yet');
+    });
+});
+
+describe('LenderDashboardPage on any width (M10-RESP, FRONTEND.md §3.8, §7.6)', () => {
+    it('without a wallet: Connect wallet, no KPI strip and no table', async () => {
+        h.wallet.current = { ready: true, status: 'disconnected', connected: null };
+        await renderPage();
+        expect(screen.getByTestId(T.connectCta('lend-dashboard'))).toBeTruthy();
+        expect(screen.queryByTestId(T.lenderDashboard)).toBeNull();
+        expect(screen.queryByTestId(T.lenderClaimAll)).toBeNull();
+    });
+
+    it('empty: Browse markets, and no Claim all', async () => {
+        await renderPage();
+        expect(screen.getByTestId(T.lendEmptyCta).getAttribute('href')).toBe('/markets');
+        expect(screen.queryByTestId(T.lenderClaimAll)).toBeNull();
+    });
+
+    it('the KPIs: markets, the value at the EMA price, SOL claimable and the rent credited', async () => {
+        h.rows.current = {
+            rows: [
+                // 1,000,000 raw units at 2 lamports per raw unit; the second has no price.
+                row({ market: M1, mint: MINT1, emaPriceWad: 2n * 10n ** 18n }),
+                row({ market: M2, mint: MINT2, position: position(2_000n) }),
+            ],
+            loading: false,
+            indexerDown: false,
+            error: null,
+        };
+        await renderPage();
+        expect(screen.getByTestId(T.lenderKpi('markets')).dataset.value).toBe('2');
+        const value = screen.getByTestId(T.lenderKpi('value'));
+        expect(value.dataset.value).toBe('2000000');
+        expect(value.dataset.priced).toBe('1');
+        expect(value.textContent).toContain('1 of 2 priced');
+        expect(screen.getByTestId(T.lenderKpi('claimable')).dataset.value).toBe('3000');
+        expect(screen.getByTestId(T.lenderKpi('credited')).dataset.value).toBe('3000');
+        expect(screen.queryByTestId(T.lenderSource)).toBeNull();
+    });
+
+    it('a row links into the market’s lend panel (the trade sheet under 1024 px) and says why Claim is off', async () => {
+        h.rows.current = {
+            rows: [row({ market: M1, mint: MINT1, position: position(0n) })],
+            loading: false,
+            indexerDown: true,
+            error: null,
+        };
+        await renderPage();
+        const r1 = screen.getByTestId(T.lenderRow(M1));
+        const withdraw = within(r1).getByTestId(T.lenderWithdraw(M1)).getAttribute('href') ?? '';
+        expect(withdraw).toContain(`/m/${MINT1}`);
+        expect(withdraw).toMatch(/action=withdraw/);
+        expect(withdraw).toMatch(/sheet=trade/);
+        expect(within(r1).getByTestId(T.lenderDeposit(M1)).getAttribute('href')).toMatch(/action=deposit/);
+        const claim = within(r1).getByTestId(T.lenderClaim(M1)) as HTMLButtonElement;
+        expect(claim.disabled).toBe(true);
+        const reason = within(r1).getByTestId(T.lenderClaimReason(M1));
+        expect(reason.textContent).toBe('Nothing to claim yet');
+        expect(claim.getAttribute('aria-describedby')).toBe(reason.id);
+        // Nothing claimable anywhere: no Claim all; the indexer is down: the data source says so.
+        expect(screen.queryByTestId(T.lenderClaimAll)).toBeNull();
+        expect(screen.getByTestId(T.lenderSource).textContent).toContain('Chain only');
+    });
+
+    it('one "Sync" cell: quiet while current, a badge when behind, wiped or the indexer disagrees', async () => {
+        h.rows.current = {
+            rows: [
+                row({ market: M1, mint: MINT1 }),
+                row({ market: M2, mint: MINT2, standing: { kind: 'parked' }, indexer: 'unsynced' }),
+            ],
+            loading: false,
+            indexerDown: false,
+            error: null,
+        };
+        await renderPage();
+        const r1 = screen.getByTestId(T.lenderRow(M1));
+        expect(r1.querySelector('td[data-col="sync"] .badge')).toBeNull();
+        const r2 = screen.getByTestId(T.lenderRow(M2));
+        const badges = Array.from(r2.querySelectorAll('td[data-col="sync"] .badge')).map((b) => b.textContent);
+        expect(badges).toEqual(['Pool wiped out', 'Indexer behind']);
+        // The wiped / indexer cell is never a priority-3 (hidden) column.
+        expect(r2.querySelector('td[data-col="sync"]')?.getAttribute('data-priority')).toBe('2');
+    });
+
+    it('Claim all: in an action bar, with the total', async () => {
+        h.rows.current = {
+            rows: [row({ market: M1, mint: MINT1 })],
+            loading: false,
+            indexerDown: false,
+            error: null,
+        };
+        await renderPage();
+        const all = screen.getByTestId(T.lenderClaimAll);
+        expect(all.closest('.action-bar')).toBeTruthy();
+        expect(all.textContent).toBe('Claim all · 0.000001SOL');
     });
 });

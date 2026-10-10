@@ -2,8 +2,12 @@
 <html lang="en" data-theme="dark">
     <head>
         <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <!-- viewport-fit=cover: the safe-area insets (notch, home indicator) reach the CSS (--safe-*).
+             Never maximum-scale / user-scalable=no: pinch-zoom stays (WCAG 1.4.4). -->
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="color-scheme" content="dark" />
+        <!-- --bg-1 (styles/tokens.css), hard-coded: a meta cannot read a CSS variable. -->
+        <meta name="theme-color" content="#12161b" />
         <meta name="referrer" content="no-referrer" />
         <meta name="description" content="ShortWin — short any Solana token by borrowing it from lenders who earn rent." />
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />

@@ -11,11 +11,13 @@ import { indexerQueries } from '../../../api/queries.ts';
 import { big, type LenderPosition, type MarketDetail } from '../../../api/types.ts';
 import { AddressText } from '../../../components/Address.tsx';
 import { Badge } from '../../../components/Badge.tsx';
+import { type Column, DataTable } from '../../../components/DataTable.tsx';
 import { Disclosure } from '../../../components/Disclosure.tsx';
 import { Bps, Sol, Tokens } from '../../../components/Num.tsx';
-import { Kv, Skeleton } from '../../../components/States.tsx';
+import { Skeleton } from '../../../components/States.tsx';
 import { T } from '../../../config/testids.ts';
 import { formatSol } from '../../../lib/format.ts';
+import { KvLines } from '../shared/KvLines.tsx';
 
 export function CreatorBadges({ l }: { l: Pick<LenderPosition, 'is_coin_creator' | 'is_market_creator'> }) {
     if (!l.is_coin_creator && !l.is_market_creator) return null;
@@ -35,6 +37,41 @@ export function CreatorBadges({ l }: { l: Pick<LenderPosition, 'is_coin_creator'
     );
 }
 
+function creatorColumns(decimals: number): Column<LenderPosition>[] {
+    return [
+        {
+            key: 'wallet',
+            header: 'Wallet',
+            card: 'title',
+            render: (l) => (
+                <>
+                    <AddressText address={l.owner} />
+                    <CreatorBadges l={l} />
+                </>
+            ),
+        },
+        {
+            key: 'share',
+            header: 'Share',
+            align: 'right',
+            card: 'aside',
+            render: (l) => (l.share_bps === null ? '—' : <Bps value={l.share_bps} />),
+        },
+        {
+            key: 'deposited',
+            header: 'Deposited',
+            align: 'right',
+            render: (l) => <Tokens raw={big(l.deposited_tokens)} decimals={decimals} />,
+        },
+        {
+            key: 'withdrawn',
+            header: 'Withdrawn',
+            align: 'right',
+            render: (l) => <Tokens raw={big(l.withdrawn_tokens)} decimals={decimals} />,
+        },
+    ];
+}
+
 export function CreatorDeposits({ mint, detail }: { mint: Address; detail: MarketDetail | null }) {
     const lenders = useQuery({ ...indexerQueries.marketLenders(mint), enabled: detail !== null });
     const decimals = detail?.decimals ?? 0;
@@ -45,7 +82,7 @@ export function CreatorDeposits({ mint, detail }: { mint: Address; detail: Marke
         <section className="mk-creator" data-testid={T.marketCreatorDeposits} aria-label="Creator-wallet deposits">
             <h3>Creator-wallet deposits</h3>
             {exp ? (
-                <Kv
+                <KvLines
                     rows={[
                         [
                             'Coin creator',
@@ -66,6 +103,7 @@ export function CreatorDeposits({ mint, detail }: { mint: Address; detail: Marke
                             ) : (
                                 <Bps key="r63" value={exp.coin_creator_share_bps} />
                             ),
+                            { zero: !exp.coin_creator_share_bps },
                         ],
                         [
                             'Tokens it deposited',
@@ -75,10 +113,12 @@ export function CreatorDeposits({ mint, detail }: { mint: Address; detail: Marke
                                 decimals={decimals}
                                 symbol={detail?.symbol}
                             />,
+                            { zero: big(exp.coin_creator_deposited_tokens) === 0n },
                         ],
                         [
                             'Creator fee from short.win trades',
                             <Sol key="f" lamports={big(exp.creator_fee_income_lamports)} />,
+                            { zero: big(exp.creator_fee_income_lamports) === 0n },
                         ],
                         ['Market created by', detail ? <AddressText key="r79" address={detail.creator} /> : '—'],
                     ]}
@@ -96,42 +136,13 @@ export function CreatorDeposits({ mint, detail }: { mint: Address; detail: Marke
                             lenders.
                         </p>
                     ) : (
-                        <table className="tbl">
-                            <caption className="visually-hidden">Deposits from creator wallets</caption>
-                            <thead>
-                                <tr>
-                                    <th scope="col">Wallet</th>
-                                    <th scope="col" data-align="right">
-                                        Share
-                                    </th>
-                                    <th scope="col" data-align="right">
-                                        Deposited
-                                    </th>
-                                    <th scope="col" data-align="right">
-                                        Withdrawn
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {rows.map((l) => (
-                                    <tr key={l.owner}>
-                                        <td>
-                                            <AddressText address={l.owner} />
-                                            <CreatorBadges l={l} />
-                                        </td>
-                                        <td data-align="right">
-                                            {l.share_bps === null ? '—' : <Bps value={l.share_bps} />}
-                                        </td>
-                                        <td data-align="right">
-                                            <Tokens raw={big(l.deposited_tokens)} decimals={decimals} />
-                                        </td>
-                                        <td data-align="right">
-                                            <Tokens raw={big(l.withdrawn_tokens)} decimals={decimals} />
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                        <DataTable
+                            caption="Deposits from creator wallets"
+                            className="mk-tbl mk-creator-tbl"
+                            columns={creatorColumns(decimals)}
+                            rows={rows}
+                            rowKey={(l) => l.owner}
+                        />
                     )}
                 </div>
             )}

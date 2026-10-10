@@ -1,11 +1,15 @@
-/* Shell and base components (FRONTEND.md §7.3). Class names are global and prefixed by role. */
+/* Shell and base components (FRONTEND.md §7.3, §7.6). Class names are global and prefixed by role.
+   One DOM at every width: the breakpoints (tokens.css) change tokens and a few structural rules
+   here; feature CSS places only its own pieces. Hover styles only under (hover: hover); touch
+   sizes only under (pointer: coarse). No `order`, no `row-reverse`: reading order = DOM order. */
 
 /* ---- shell ------------------------------------------------------------------------------- */
+/* The document scrolls; the header is sticky; the status bar is sticky at the bottom (a fixed
+   strip above the tab bar on a phone). */
 .app {
     display: grid;
-    grid-template-rows: var(--header-h) minmax(0, 1fr) var(--statusbar-h);
-    height: 100%;
-    min-width: 1024px;
+    grid-template-rows: auto 1fr auto;
+    min-height: 100dvh;
 }
 
 .app-header {
@@ -15,14 +19,28 @@
     display: flex;
     align-items: center;
     gap: var(--sp-5);
-    padding: 0 var(--sp-4);
+    height: calc(var(--header-h) + var(--safe-t));
+    padding: var(--safe-t) max(var(--gutter), var(--safe-r)) 0 max(var(--gutter), var(--safe-l));
     background: var(--bg-1);
     border-bottom: 1px solid var(--line);
+}
+
+/* The header is a stacking context (sticky): while its search overlay or wallet sheet is open it
+   rises above the page's bars and sheets. */
+.app-header:has(.search[data-open]) {
+    z-index: var(--z-sheet);
+}
+
+.app-header:has(.menu-scrim) {
+    z-index: var(--z-wallet-sheet);
 }
 
 .brand {
     display: flex;
     align-items: center;
+    justify-content: center;
+    min-width: var(--tap-min);
+    min-height: var(--tap-min);
     gap: var(--sp-2);
     font-weight: var(--fw-bold);
     font-size: var(--fs-lg);
@@ -30,8 +48,10 @@
     letter-spacing: 0.01em;
 }
 
-.brand:hover {
-    text-decoration: none;
+@media (hover: hover) {
+    .brand:hover {
+        text-decoration: none;
+    }
 }
 
 .brand-mark {
@@ -61,9 +81,11 @@
     border-bottom: 2px solid transparent;
 }
 
-.nav a:hover {
-    color: var(--text-0);
-    text-decoration: none;
+@media (hover: hover) {
+    .nav a:hover {
+        color: var(--text-0);
+        text-decoration: none;
+    }
 }
 
 .nav a[aria-current="page"],
@@ -72,30 +94,237 @@
     border-bottom-color: var(--accent);
 }
 
+/* Phone-only parts of the nav (the tab bar's icons and its More cell). */
+.nav-icon,
+.nav-more {
+    display: none;
+}
+
 .header-spacer {
     flex: 1;
 }
 
 .app-main {
-    overflow: auto;
-    padding: var(--sp-3);
+    min-width: 0;
+    overflow: visible;
+    padding: var(--sp-3) max(var(--gutter), var(--safe-r))
+        calc(var(--sp-3) + var(--tabbar-h) + var(--actionbar-h) + var(--safe-b)) max(var(--gutter), var(--safe-l));
 }
 
 .statusbar {
+    position: sticky;
+    bottom: 0;
+    z-index: var(--z-header);
     display: flex;
     align-items: center;
-    gap: var(--sp-5);
-    padding: 0 var(--sp-4);
+    height: calc(var(--statusbar-h) + var(--safe-b));
+    padding: 0 max(var(--sp-4), var(--safe-r)) var(--safe-b) max(var(--sp-4), var(--safe-l));
     background: var(--bg-1);
-    border-top: 1px solid var(--line);
+    /* The top line is a shadow, not a border: the bar's content box stays the full 24 px, so a 24 px
+       target in it (Security) does not push the document 1 px taller than the screen. */
+    box-shadow: 0 -1px 0 var(--line);
     font-size: var(--fs-xs);
     color: var(--text-1);
+}
+
+.statusbar-items {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: var(--sp-5);
+    min-width: 0;
 }
 
 .statusbar-item {
     display: inline-flex;
     align-items: center;
     gap: var(--sp-2);
+    white-space: nowrap;
+}
+
+a.statusbar-item {
+    min-height: 24px;
+}
+
+/* The phone's one-line summary (hidden from 640 px up). */
+.status-summary {
+    display: none;
+}
+
+.status-glyph[aria-hidden] {
+    width: 1em;
+    text-align: center;
+}
+
+.status-summary[data-state="ok"] .status-glyph {
+    color: var(--ok);
+}
+
+.status-summary[data-state="warn"] .status-glyph {
+    color: var(--warn);
+}
+
+.status-summary[data-state="bad"] .status-glyph {
+    color: var(--danger);
+}
+
+/* ---- shell: tablet (640–1023) -------------------------------------------------------------- */
+@media (max-width: 1023.98px) {
+    .app-header {
+        gap: var(--sp-3);
+    }
+
+    .nav a {
+        padding-inline: var(--sp-2);
+    }
+
+    /* The header badge already names the cluster. */
+    .statusbar-cluster {
+        display: none;
+    }
+
+    .statusbar-items {
+        gap: var(--sp-4);
+        overflow: hidden;
+    }
+}
+
+/* ---- shell: phone (< 640) ------------------------------------------------------------------ */
+@media (max-width: 639.98px) {
+    .app-main {
+        padding-bottom: calc(var(--sp-4) + var(--tabbar-h) + var(--statusbar-h) + var(--actionbar-h) + var(--safe-b));
+    }
+
+    /* The bottom tab bar: the same <nav>, fixed. */
+    .nav {
+        position: fixed;
+        inset: auto 0 0;
+        z-index: var(--z-bars);
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0;
+        height: calc(var(--tabbar-h) + var(--safe-b));
+        padding: 0 var(--safe-r) var(--safe-b) var(--safe-l);
+        background: var(--bg-1);
+        border-top: 1px solid var(--line);
+    }
+
+    .nav a,
+    .nav-more {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        height: var(--tabbar-h);
+        padding: 0 var(--sp-1);
+        font-size: var(--fs-xs);
+        color: var(--text-1);
+        background: transparent;
+        border: 0;
+        border-top: 2px solid transparent;
+        border-bottom: 0;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .nav a[aria-current="page"],
+    .nav a.active,
+    .nav-more[data-current] {
+        color: var(--text-0);
+        border-top-color: var(--accent);
+    }
+
+    .nav a[data-nav="status"] {
+        display: none;
+    }
+
+    .nav-icon {
+        display: block;
+        flex: none;
+    }
+
+    /* The status bar folds into a strip above the tab bar: the worst state, a tap for the rest. */
+    .statusbar {
+        position: fixed;
+        inset: auto 0 calc(var(--tabbar-h) + var(--safe-b));
+        z-index: var(--z-bars);
+        height: var(--statusbar-h);
+        padding: 0;
+    }
+
+    .status-summary {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-3);
+        width: 100%;
+        height: 100%;
+        padding: 0 max(var(--gutter), var(--safe-r)) 0 max(var(--gutter), var(--safe-l));
+        background: transparent;
+        border: 0;
+        color: var(--text-1);
+        font-size: var(--fs-xs);
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .status-chevron {
+        transition: transform var(--t);
+    }
+
+    .statusbar[data-expanded] .status-chevron {
+        transform: rotate(180deg);
+    }
+
+    .statusbar-items {
+        display: none;
+    }
+
+    .statusbar[data-expanded] .statusbar-items {
+        position: absolute;
+        inset: auto 0 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        max-height: calc(100dvh - var(--header-h) - var(--tabbar-h) - var(--statusbar-h) - var(--safe-b));
+        overflow-y: auto;
+        padding: var(--sp-2) 0;
+        background: var(--bg-2);
+        border-top: 1px solid var(--line-strong);
+        box-shadow: 0 -8px 24px rgb(0 0 0 / 50%);
+    }
+
+    .statusbar[data-expanded] .statusbar-item {
+        min-height: 44px;
+        padding: 0 var(--gutter);
+        font-size: var(--fs-sm);
+        border-bottom: 1px solid var(--line);
+    }
+
+    .statusbar[data-expanded] .statusbar-item:last-child {
+        border-bottom: 0;
+    }
+
+    .statusbar[data-expanded] .header-spacer {
+        display: none;
+    }
+
+    .statusbar-cluster {
+        display: inline-flex;
+    }
+}
+
+/* Under 400 px the wordmark goes (the ▼ mark and the link's name stay). */
+@media (max-width: 399.98px) {
+    .brand-word {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
 }
 
 .dot {
@@ -143,17 +372,46 @@
     border-color: var(--info);
 }
 
+.banner[data-tone="ok"] {
+    background: var(--ok-bg);
+    border-color: var(--ok);
+}
+
+@media (max-width: 639.98px) {
+    .banner {
+        flex-wrap: wrap;
+    }
+}
+
+/* Links inside running text are underlined: colour is not their only cue (WCAG 1.4.1). */
+:where(p, li, .empty-text, .banner, .field-hint, .disclosure) a:not(.btn),
+.empty > a:not(.btn) {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
 /* ---- layouts ----------------------------------------------------------------------------- */
 .page {
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
+    min-width: 0;
+}
+
+/* Wide screens: the page stops growing at 1680 px and centres. */
+@media (min-width: 1680px) {
+    .page {
+        width: 100%;
+        max-width: 1680px;
+        margin-inline: auto;
+    }
 }
 
 .page-head {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: var(--sp-4);
+    gap: var(--sp-3) var(--sp-4);
     min-height: 32px;
 }
 
@@ -164,19 +422,33 @@
     align-items: start;
 }
 
-/* The trade panel stays in view while the market column scrolls, and scrolls on its own, so its
-   submit button is never a page away from the inputs. */
-.layout-trade > .trade-panel {
-    position: sticky;
-    top: 0;
-    max-height: calc(100dvh - var(--header-h) - var(--statusbar-h) - 2 * var(--sp-3));
-    overflow-y: auto;
-    overscroll-behavior: contain;
+/* The trade panel stays in view under the sticky header while the document scrolls, and scrolls on
+   its own, so its submit button is never a page away from the inputs. */
+@media (min-width: 1024px) {
+    .layout-trade > .trade-panel {
+        position: sticky;
+        top: calc(var(--header-h) + var(--sp-3));
+        max-height: calc(100dvh - var(--header-h) - var(--statusbar-h) - 2 * var(--sp-3));
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        /* Both edges: a classic scrollbar's reserved gutter would otherwise leave the right inset
+           ~15 px wider than the left (content and dividers stopping short of the right border). */
+        scrollbar-gutter: stable both-edges;
+        scrollbar-width: thin;
+    }
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1179.98px) {
     .layout-trade {
         grid-template-columns: minmax(0, 1fr) 320px;
+    }
+}
+
+/* Tablet and phone: one column (the trade panel becomes a sheet where a page wires it, §7.6). */
+@media (max-width: 1023.98px) {
+    .layout-trade {
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 
@@ -252,24 +524,82 @@
 .kv dd {
     margin: 0;
     text-align: right;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
-/* Flex, not grid: a wrapped last row stretches to the edge (no empty hairline-coloured cells) and a
-   stat never clips its value (it grows to its content and wraps the strip instead). */
+/* A `<div>` around a dt / dd pair (valid in a <dl>) that does not break the grid. */
+.kv-row {
+    display: contents;
+}
+
+/* A zero or an absent value: present, but quieter than the numbers that matter. */
+.kv dd[data-zero] {
+    color: var(--text-2);
+}
+
+/* Hairline rows (opt-in): an overview's long key / value blocks. */
+.kv[data-lines] {
+    row-gap: 0;
+}
+
+.kv[data-lines] dt,
+.kv[data-lines] dd {
+    padding: var(--sp-2) 0;
+    border-bottom: 1px solid var(--line);
+}
+
+@media (hover: hover) {
+    .kv[data-lines] .kv-row:hover > * {
+        background: var(--bg-2);
+    }
+}
+
+/* A strip of stats with hairlines drawn by each cell (no line-coloured gaps where the last row is
+   short). Desktop: one row where the strip is at least 980 px wide (a seventh of it per stat), else
+   four per row; a short last row's cells grow to fill it, so no cell is ever left empty (seven
+   stats: 4 + 3 at 1,024 and 1,280 px, one row at 1,440, with or without a page scrollbar). The
+   switch is the clamp below: (980px - 100%) * 999 is hugely positive under 980 px (→ the 25 % cap)
+   and negative over it (→ the 1/7 floor) — no container query (FRONTEND.md §7.6 allowlist).
+   A tablet's strip is under 980 px, so the same rule makes it 4 + 3 (a 3-up grid left the seventh
+   stat alone on a row). Phone: 2-up, the priority-2 stats behind "More stats". */
 .stat-strip {
     display: flex;
     flex-wrap: wrap;
-    gap: 1px;
-    background: var(--line);
+    background: var(--bg-1);
     border: 1px solid var(--line);
     border-radius: var(--radius-lg);
     overflow: hidden;
 }
 
 .stat {
-    flex: 1 1 120px;
+    flex: 1 1 clamp(calc(100% / 7 - 1px), (980px - 100%) * 999, calc(25% - 1px));
+    min-width: 0;
     background: var(--bg-1);
     padding: var(--sp-3) var(--sp-4);
+    box-shadow:
+        1px 0 0 var(--line),
+        0 1px 0 var(--line);
+}
+
+@media (max-width: 639.98px) {
+    .stat-strip {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .stat-strip:not([data-expanded]) > .stat[data-priority="2"] {
+        display: none;
+    }
+
+    /* An odd stat out takes the whole last row (no half-empty row). */
+    .stat-strip > .stat:last-child:nth-child(odd) {
+        grid-column: 1 / -1;
+    }
+
+    .stat {
+        padding: var(--sp-3);
+    }
 }
 
 .stat-label {
@@ -281,6 +611,7 @@
 
 .stat-value {
     font-size: var(--fs-lg);
+    overflow-wrap: anywhere;
 }
 
 /* ---- buttons ----------------------------------------------------------------------------- */
@@ -301,13 +632,20 @@
     white-space: nowrap;
 }
 
-.btn:hover:not(:disabled) {
-    background: var(--bg-3);
-}
+@media (hover: hover) {
+    .btn:hover:not(:disabled) {
+        background: var(--bg-3);
+        text-decoration: none;
+    }
 
-.btn:disabled {
-    cursor: not-allowed;
-    opacity: 0.55;
+    .btn[data-variant="primary"]:hover:not(:disabled) {
+        background: var(--accent-hover);
+    }
+
+    .btn[data-variant="short"]:hover:not(:disabled) {
+        background: var(--loss);
+        filter: brightness(1.08);
+    }
 }
 
 .btn[data-variant="primary"] {
@@ -316,7 +654,7 @@
     color: var(--text-inverse);
 }
 
-.btn[data-variant="primary"]:hover:not(:disabled) {
+.btn[data-variant="primary"]:active:not(:disabled) {
     background: var(--accent-hover);
 }
 
@@ -339,13 +677,35 @@
 }
 
 .btn[data-size="sm"] {
-    height: 24px;
+    height: auto;
+    min-height: var(--tap-sm);
     padding: 0 var(--sp-3);
     font-size: var(--fs-sm);
 }
 
-.btn[data-block="true"] {
+/* A disabled button is neutral, whatever its variant: it never reads as the primary action. */
+.btn:disabled,
+.btn[data-variant]:disabled {
+    background: var(--bg-2);
+    border-color: var(--line);
+    color: var(--text-2);
+    opacity: 1;
+    cursor: not-allowed;
+}
+
+.btn[data-variant="ghost"]:disabled {
+    background: transparent;
+    border-color: transparent;
+}
+
+.btn[data-block="true"],
+.btn[data-block=""] {
     width: 100%;
+}
+
+/* A link styled as a button. */
+a.btn {
+    text-decoration: none;
 }
 
 /* ---- inputs ------------------------------------------------------------------------------ */
@@ -383,6 +743,13 @@
     border-radius: var(--radius);
 }
 
+/* A finger: the field itself is the 44 px target, inside the wrap's 1 px border. */
+@media (pointer: coarse) {
+    .input-wrap {
+        height: calc(var(--control-h) + 2px);
+    }
+}
+
 .input-wrap:focus-within {
     outline: 2px solid var(--focus);
     outline-offset: 0;
@@ -406,6 +773,20 @@
     padding: 0 var(--sp-3);
     color: var(--text-1);
     font-size: var(--fs-sm);
+    white-space: nowrap;
+}
+
+/* Max, at the field's right edge (after the unit). */
+.input-wrap .input-max {
+    flex: none;
+    margin-right: var(--sp-2);
+    border-left: 1px solid var(--line);
+    border-radius: 0;
+    color: var(--accent);
+}
+
+.input-wrap:has(.input-max) .input-suffix {
+    padding-right: var(--sp-2);
 }
 
 .select {
@@ -420,6 +801,7 @@
     display: flex;
     align-items: flex-start;
     gap: var(--sp-3);
+    min-height: var(--tap-min);
     font-size: var(--fs-sm);
     cursor: pointer;
 }
@@ -432,15 +814,47 @@
     flex: none;
 }
 
+/* A finger: the whole label row (≥ 44 px) is the target, with a 20 px box. */
+@media (pointer: coarse) {
+    .checkbox {
+        min-height: var(--tap-min);
+        align-items: center;
+        padding-block: var(--sp-2);
+    }
+
+    .checkbox input {
+        width: 20px;
+        height: 20px;
+        margin-top: 0;
+    }
+}
+
 /* ---- tabs -------------------------------------------------------------------------------- */
+/* A tablist that does not fit scrolls sideways (snapping, a fade at the edge while more is to the
+   right: `data-overflow`, set by Tabs). Never replaced by a select. */
 .tabs {
     display: flex;
     gap: var(--sp-1);
     border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    padding-block: 2px 0;
+}
+
+.tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.tabs[data-overflow] {
+    mask-image: linear-gradient(to right, #000 85%, transparent);
 }
 
 .tab {
-    height: 32px;
+    flex: none;
+    scroll-snap-align: start;
+    height: max(32px, var(--tap-min));
     padding: 0 var(--sp-4);
     background: transparent;
     border: 0;
@@ -460,8 +874,13 @@
 }
 
 /* ---- table ------------------------------------------------------------------------------- */
+/* A container (`tbl`): the same table collapses by the width it has, not the screen's — a phone and
+   the market page's 680 px column at 1024 alike (FRONTEND.md §7.6). Priority mode under 960 px
+   hides priority-3 columns; card mode under 560 px turns each row into a card (DataTable sets
+   `data-cards`; its cells carry `data-label`, `data-priority`, `data-card`). */
 .tbl-wrap {
     overflow: auto;
+    container: tbl / inline-size;
 }
 
 .tbl {
@@ -481,7 +900,7 @@
 
 /* Laptops (FRONTEND.md §7.3, ≥ 1024 px): tighter cells so the widest table, the markets list,
    fits without scrolling sideways. */
-@media (max-width: 1280px) {
+@media (max-width: 1279.98px) {
     .tbl th,
     .tbl td {
         padding: 0 var(--sp-2);
@@ -506,6 +925,10 @@
 
 .tbl th button {
     all: unset;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    min-height: var(--tap-min);
     cursor: pointer;
 }
 
@@ -513,8 +936,163 @@
     outline: 2px solid var(--focus);
 }
 
-.tbl tbody tr:hover {
-    background: var(--bg-2);
+.tbl th[aria-sort] button {
+    color: var(--text-1);
+}
+
+/* A sortable column that is not the sort: a faint ↕ says it can be. */
+.tbl .sort-hint {
+    opacity: 0.6;
+}
+
+@media (hover: hover) {
+    .tbl th button:hover {
+        color: var(--text-0);
+        text-decoration: underline;
+    }
+
+    .tbl tbody tr:hover {
+        background: var(--bg-2);
+    }
+}
+
+.tbl th button:focus-visible {
+    color: var(--text-0);
+    text-decoration: underline;
+}
+
+/* A numeric column keeps its value on one line and, from 1,280 px, at least 16 px from the column
+   before it, so right-aligned headers never run into each other. The table's spare width is shared
+   by every column (no column is shrunk to its content: that packed the numbers into one block and
+   left the text columns empty). */
+@media (min-width: 1280px) {
+    .tbl th[data-align="right"],
+    .tbl td[data-align="right"] {
+        padding-inline-start: var(--sp-5);
+    }
+}
+
+/* The sort control for card mode (and when the sorted column is hidden): hidden otherwise. */
+.tbl-sortbar {
+    display: none;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+    border-bottom: 1px solid var(--line);
+    font-size: var(--fs-sm);
+    color: var(--text-1);
+}
+
+.tbl-sortbar .select {
+    flex: 1;
+    min-width: 0;
+    max-width: 240px;
+}
+
+@container tbl (max-width: 959.98px) {
+    .tbl [data-priority="3"] {
+        display: none;
+    }
+
+    .tbl-sortbar[data-hidden-sort] {
+        display: flex;
+    }
+}
+
+@container tbl (max-width: 559.98px) {
+    .tbl-sortbar {
+        display: flex;
+    }
+
+    [data-cards] > .tbl,
+    [data-cards] > .tbl > tbody {
+        display: block;
+    }
+
+    /* The header leaves the screen, not the accessibility tree. Its sort buttons stay keyboard
+       reachable, so the header row shows while focus is in it (the skip-link technique: no Tab stop
+       is ever invisible, WCAG 2.4.7 / 2.4.11); the sort bar above is the usual way. */
+    [data-cards] > .tbl > thead:not(:focus-within) {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+
+    [data-cards] > .tbl > tbody > tr {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--sp-2) var(--sp-3);
+        min-height: 64px;
+        padding: var(--sp-3) var(--sp-4);
+        border-bottom: 1px solid var(--line);
+    }
+
+    [data-cards] > .tbl > tbody > tr > td {
+        display: block;
+        width: auto;
+        max-width: none;
+        height: auto;
+        min-width: 0;
+        padding: 0;
+        border: 0;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        text-align: left;
+    }
+
+    [data-cards] > .tbl > tbody > tr > td[data-card="title"] {
+        grid-column: 1;
+        font-size: var(--fs-md);
+    }
+
+    /* A title with nothing beside it takes the card's whole first row. */
+    [data-cards] > .tbl > tbody > tr:not(:has(> td[data-card="aside"])) > td[data-card="title"] {
+        grid-column: 1 / -1;
+    }
+
+    [data-cards] > .tbl > tbody > tr > td[data-card="aside"] {
+        grid-column: 2;
+        justify-self: end;
+        text-align: right;
+    }
+
+    [data-cards] > .tbl > tbody > tr > td[data-card="actions"] {
+        grid-column: 1 / -1;
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--sp-3);
+    }
+
+    [data-cards] > .tbl > tbody > tr > td[data-card="actions"] > :where(.btn, a.btn) {
+        flex: 1;
+        min-height: max(32px, var(--tap-min));
+    }
+
+    [data-cards] > .tbl > tbody > tr > td:empty,
+    [data-cards] > .tbl > tbody > tr > td[data-priority="3"] {
+        display: none;
+    }
+
+    [data-cards] > .tbl > tbody > tr > td:not([data-card])[data-label]:not([data-label=""])::before {
+        content: attr(data-label) / "";
+        display: block;
+        margin-bottom: 1px;
+        font-family: var(--font-ui);
+        font-size: var(--fs-xs);
+        font-weight: var(--fw-medium);
+        letter-spacing: 0.04em;
+        color: var(--text-2);
+        text-transform: uppercase;
+    }
+
+    @supports not (content: "x" / "") {
+        [data-cards] > .tbl > tbody > tr > td:not([data-card])[data-label]:not([data-label=""])::before {
+            content: attr(data-label);
+        }
+    }
 }
 
 .tbl tbody tr[data-interactive="true"] {
@@ -630,6 +1208,12 @@
     font-size: 0.9em;
 }
 
+@media (max-width: 639.98px) {
+    .unit {
+        font-size: max(0.9em, 12px);
+    }
+}
+
 /* ---- disclosure -------------------------------------------------------------------------- */
 .disclosure {
     border: 1px solid var(--line);
@@ -671,15 +1255,42 @@
     font-weight: var(--fw-medium);
 }
 
-details.disclosure > summary {
+details > summary {
     cursor: pointer;
     font-weight: var(--fw-bold);
+    min-height: var(--tap-min);
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    list-style: none;
+}
+
+/* A chevron drawn with borders (a font's small triangle read as a speck): points right closed,
+   down open; the turn is --t-fast, 0 under reduced motion. */
+details > summary::before {
+    content: "";
+    flex: none;
+    width: 0.42em;
+    height: 0.42em;
+    margin: 0 0.2em 0 0.05em;
+    border-right: 2px solid var(--text-1);
+    border-bottom: 2px solid var(--text-1);
+    transform: rotate(-45deg);
+    transition: transform var(--t-fast);
+}
+
+details[open] > summary::before {
+    transform: rotate(45deg);
+}
+
+details > summary::-webkit-details-marker {
+    display: none;
 }
 
 /* ---- modal ------------------------------------------------------------------------------- */
 .modal {
     width: min(560px, calc(100vw - 32px));
-    max-height: calc(100vh - 64px);
+    max-height: calc(100dvh - 64px);
     padding: 0;
     color: var(--text-0);
     background: var(--bg-1);
@@ -706,15 +1317,90 @@ details.disclosure > summary {
     gap: var(--sp-4);
     padding: var(--sp-4);
     overflow: auto;
-    max-height: calc(100vh - 200px);
+    overscroll-behavior: contain;
+    max-height: calc(100dvh - 200px);
+    container: dialog / inline-size;
 }
 
 .modal-foot {
     display: flex;
+    flex-wrap: wrap;
     justify-content: flex-end;
+    align-items: center;
     gap: var(--sp-3);
     padding: var(--sp-4);
     border-top: 1px solid var(--line);
+}
+
+.modal-close {
+    flex: none;
+}
+
+/* `.btn` too: a small button's own min-height (`[data-size="sm"]`) would otherwise win. */
+@media (pointer: coarse) {
+    .btn.modal-close,
+    .btn.sheet-close {
+        min-width: 44px;
+        min-height: 44px;
+    }
+}
+
+/* Phone: a dialog fills the screen (head and foot stay, the body scrolls; the primary action gets
+   its own full-width bottom row — DOM order unchanged); a sheet rises from the bottom edge. */
+@media (max-width: 639.98px) {
+    .modal[open] {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        max-width: none;
+        height: 100dvh;
+        max-height: none;
+        margin: 0;
+        border: 0;
+        border-radius: 0;
+    }
+
+    .modal-head {
+        position: sticky;
+        top: 0;
+        padding-top: calc(var(--sp-4) + var(--safe-t));
+        padding-inline: max(var(--sp-4), var(--safe-l)) max(var(--sp-4), var(--safe-r));
+        background: var(--bg-1);
+    }
+
+    .modal-body {
+        flex: 1;
+        max-height: none;
+        padding-inline: max(var(--sp-4), var(--safe-l)) max(var(--sp-4), var(--safe-r));
+    }
+
+    .modal-foot {
+        padding-bottom: calc(var(--sp-4) + var(--safe-b));
+        padding-inline: max(var(--sp-4), var(--safe-l)) max(var(--sp-4), var(--safe-r));
+    }
+
+    .modal-foot > .btn {
+        flex: 1;
+        min-height: max(40px, var(--tap-min));
+    }
+
+    .modal-foot > .btn[data-variant="primary"] {
+        flex: 1 0 100%;
+        min-height: 48px;
+    }
+
+    .modal[open][data-variant="sheet"] {
+        inset: auto 0 0;
+        height: auto;
+        max-height: 85dvh;
+        margin: auto 0 0;
+        border-top: 1px solid var(--line-strong);
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    }
+
+    .modal[data-variant="sheet"] .modal-body {
+        padding-bottom: calc(var(--sp-4) + var(--safe-b));
+    }
 }
 
 /* ---- review: the plan's instructions ------------------------------------------------------ */
@@ -731,22 +1417,105 @@ details.disclosure > summary {
     margin-top: var(--sp-1);
 }
 
+/* A link that is a target on its own, not inside running text (WCAG 2.5.8): 24 px, 36 px under a
+   coarse pointer (a position's market, the review's confirmed and explorer links). */
+.target-link {
+    display: inline-flex;
+    align-items: center;
+    column-gap: 0.35em; /* a flex box drops the space between words and a child element */
+    min-height: 24px;
+}
+
+@media (pointer: coarse) {
+    .target-link {
+        min-height: var(--tap-sm);
+    }
+}
+
 /* ---- toast ------------------------------------------------------------------------------- */
-/* Bottom-left: the trade panel (and its submit buttons) is the right column of the market page. */
+/* Bottom-left: the trade panel (and its submit buttons) is the right column of the market page.
+   On a phone: under the header, clear of the action bar and the thumb. */
 .toast-region {
     position: fixed;
-    left: var(--sp-4);
-    bottom: calc(var(--statusbar-h) + var(--sp-4));
+    left: max(var(--sp-4), var(--safe-l));
+    bottom: calc(var(--statusbar-h) + var(--sp-4) + var(--actionbar-h) + var(--safe-b));
     z-index: var(--z-toast);
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-    width: 360px;
+    width: min(360px, calc(100vw - 2 * var(--gutter)));
     pointer-events: none;
+}
+
+@media (max-width: 639.98px) {
+    .toast-region {
+        top: calc(var(--header-h) + var(--safe-t) + var(--sp-3));
+        left: var(--gutter);
+        right: var(--gutter);
+        bottom: auto;
+        width: auto;
+    }
+
+    /* A full-screen sheet covers the header and fills the screen with controls: a toast takes the
+       sheet head's title strip instead — one line, 16 px clear of the sheet's ✕ — so it covers
+       text, never a control. The newest of each kind shows. A success or a note has no ✕ of its
+       own there (it goes by itself, and its links wait for the full toast once the sheet closes;
+       the review dialog has them meanwhile); an error keeps its one-line reason and a "Dismiss"
+       word, never a second ✕ beside the sheet's. */
+    html[data-sheet-open] .toast-region {
+        top: calc(var(--safe-t) + 4px);
+        left: max(var(--sp-2), var(--safe-l));
+        right: calc(var(--gutter) + 44px + var(--sp-5));
+    }
+
+    html[data-sheet-open] .toast-region .toast:not(:last-child),
+    html[data-sheet-open] .toast-region .toast-links,
+    html[data-sheet-open] .toast-region .toast:not([data-kind="error"]) .secondary,
+    html[data-sheet-open] .toast-region .toast:not([data-kind="error"]) > .toast-dismiss,
+    html[data-sheet-open] .toast-region .toast-dismiss-x {
+        display: none;
+    }
+
+    html[data-sheet-open] .toast-region .toast-dismiss-word {
+        display: inline;
+    }
+
+    html[data-sheet-open] .toast-region .toast {
+        align-items: center;
+        padding-block: var(--sp-1);
+    }
+
+    html[data-sheet-open] .toast-region .toast > .grow {
+        display: flex;
+        align-items: baseline;
+        gap: var(--sp-2);
+        min-width: 0;
+        white-space: nowrap;
+    }
+
+    html[data-sheet-open] .toast-region .toast > .grow > strong {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    html[data-sheet-open] .toast-region .toast[data-kind="error"] > .grow {
+        flex-wrap: wrap;
+    }
+
+    html[data-sheet-open] .toast-region .toast[data-kind="error"] .secondary {
+        flex: 1 0 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
 }
 
 .toast {
     pointer-events: auto;
+}
+
+.toast-dismiss-word {
+    display: none;
 }
 
 .toast {
@@ -773,10 +1542,143 @@ details.disclosure > summary {
     border-left-color: var(--info);
 }
 
+/* The kind in words (colour is not the only cue). */
+.toast-kind {
+    display: block;
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.toast[data-kind="success"] .toast-kind {
+    color: var(--ok);
+}
+
+.toast[data-kind="error"] .toast-kind {
+    color: var(--danger);
+}
+
+.toast[data-kind="info"] .toast-kind {
+    color: var(--info);
+}
+
+.toast-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2) var(--sp-4);
+    margin-top: var(--sp-2);
+}
+
+.toast-links a {
+    text-decoration: underline;
+}
+
 /* ---- search ------------------------------------------------------------------------------ */
 .search {
     position: relative;
-    width: 340px;
+    width: clamp(220px, 28vw, 340px);
+}
+
+.search-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+}
+
+.search-row > .input-wrap {
+    flex: 1;
+    min-width: 0;
+}
+
+/* The "/" shortcut, at the field's right edge (no keyboard to press it on a touch screen). */
+.search-kbd {
+    flex: none;
+    margin-right: var(--sp-2);
+    padding: 0 var(--sp-2);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-num);
+    font-size: var(--fs-xs);
+    color: var(--text-2);
+}
+
+/* Gone on a touch screen (no keyboard to press it on), and once the field has focus or text. */
+.input-wrap:focus-within > .search-kbd,
+.input-wrap > .input:not(:placeholder-shown) ~ .search-kbd {
+    display: none;
+}
+
+@media (pointer: coarse) {
+    .search-kbd {
+        display: none;
+    }
+}
+
+.search-toggle,
+.search-close {
+    display: none;
+}
+
+/* Tablet and phone: a Search button opens the box as a full-screen overlay. */
+@media (max-width: 1023.98px) {
+    .search-toggle {
+        display: inline-flex;
+        flex: none;
+        width: max(36px, var(--tap-min));
+        height: max(36px, var(--tap-min));
+        padding: 0;
+        color: var(--text-1);
+    }
+
+    .search {
+        display: none;
+    }
+
+    .search[data-open] {
+        position: fixed;
+        inset: 0;
+        z-index: var(--z-sheet);
+        display: flex;
+        flex-direction: column;
+        width: auto;
+        padding-top: var(--safe-t);
+        background: var(--bg-0);
+    }
+
+    .search[data-open] .search-row {
+        flex: none;
+        padding: var(--sp-3) max(var(--gutter), var(--safe-r)) var(--sp-3) max(var(--gutter), var(--safe-l));
+        border-bottom: 1px solid var(--line);
+        background: var(--bg-1);
+    }
+
+    .search[data-open] .input-wrap {
+        height: max(40px, calc(var(--control-h) + 2px));
+    }
+
+    .search-close {
+        display: inline-flex;
+        min-height: max(40px, var(--tap-min));
+    }
+
+    .search[data-open] .search-results {
+        position: static;
+        flex: 1;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding: 0 0 var(--safe-b);
+        background: var(--bg-0);
+        border: 0;
+        border-radius: 0;
+    }
+
+    .search[data-open] .search-option {
+        flex-wrap: wrap;
+        min-height: 48px;
+        padding: var(--sp-3) max(var(--gutter), var(--safe-l));
+        border-bottom: 1px solid var(--line);
+    }
 }
 
 .search-results {
@@ -803,6 +1705,12 @@ details.disclosure > summary {
     background: var(--bg-3);
 }
 
+@media (hover: hover) {
+    .search-option:hover {
+        background: var(--bg-3);
+    }
+}
+
 /* ---- menus ------------------------------------------------------------------------------- */
 .menu {
     position: absolute;
@@ -810,6 +1718,7 @@ details.disclosure > summary {
     top: calc(100% + 4px);
     z-index: var(--z-menu);
     min-width: 220px;
+    max-width: calc(100vw - 2 * var(--gutter));
     padding: var(--sp-2);
     background: var(--bg-2);
     border: 1px solid var(--line-strong);
@@ -829,9 +1738,19 @@ details.disclosure > summary {
     cursor: pointer;
 }
 
-.menu-item:hover,
+.menu-item {
+    min-height: max(32px, var(--tap-min));
+}
+
 .menu-item:focus-visible {
     background: var(--bg-3);
+}
+
+@media (hover: hover) {
+    .menu-item:hover:not(:disabled) {
+        background: var(--bg-3);
+        text-decoration: none;
+    }
 }
 
 .menu-item img {
@@ -849,6 +1768,36 @@ details.disclosure > summary {
 
 .error-state {
     color: var(--danger);
+}
+
+.error-state .btn {
+    min-height: var(--tap-min);
+}
+
+/* An empty state with a title and a way out (Empty title / action). */
+.empty[data-layout="block"] {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-7) var(--sp-5);
+}
+
+.empty-title {
+    font-size: var(--fs-lg);
+    font-weight: var(--fw-bold);
+    color: var(--text-0);
+}
+
+.empty-text {
+    max-width: 52ch;
+}
+
+.empty-action {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--sp-3);
 }
 
 .skeleton {
@@ -920,14 +1869,14 @@ bdi,
 }
 
 .token-id .token-mint {
-    font-size: 11px;
+    font-size: var(--fs-xs);
 }
 
 /* ---- chain-read age (FRONTEND.md §6.6) ---------------------------------------------------- */
 .slot-age {
     display: inline-block;
     min-width: 1ch;
-    font-size: 11px;
+    font-size: var(--fs-xs);
 }
 
 /* The review's delta table: the account label wraps (it names the token by symbol and mint,
@@ -936,4 +1885,615 @@ bdi,
     white-space: normal;
     overflow-wrap: anywhere;
     min-width: 12ch;
+}
+
+/* …and the numbers take only their width: the account label gets the rest (a dialog is narrow; a
+   table's spare width elsewhere is shared, §7.3). `:where` keeps the narrow-dialog rows' own
+   `width: auto` in force. */
+.tbl.tx-deltas :where(th[data-align="right"], td[data-align="right"]) {
+    width: 1%;
+}
+
+.tbl.tx-deltas tr[data-kind="timestamp"] > td {
+    white-space: normal;
+}
+
+/* ---- responsive building blocks (FRONTEND.md §7.6) ---------------------------------------- */
+.stack-tight {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+}
+
+/* Sheets: a page element (`.sheet-host`: the trade panel, a position's Manage panel) that becomes a
+   modal sheet under 1024 px while `useSheetMode` has it open; full screen on a phone, a right-side
+   sheet on a tablet. Closed, it is not shown there — unless a review dialog it opened is still up. */
+.sheet-head,
+.scrim {
+    display: none;
+}
+
+@media (max-width: 1023.98px) {
+    .sheet-host:not([data-sheet="open"]):not(:has(dialog[open])) {
+        display: none;
+    }
+
+    .sheet-host[data-sheet="open"] {
+        position: fixed;
+        inset: 0;
+        z-index: var(--z-sheet);
+        display: flex;
+        flex-direction: column;
+        max-height: none;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding-top: var(--safe-t);
+        background: var(--bg-1);
+        border: 0;
+        border-radius: 0;
+        animation: sheet-in var(--t-sheet) ease-out;
+        scroll-padding-top: calc(var(--header-h) + var(--sp-3));
+        scroll-padding-bottom: calc(120px + var(--safe-b));
+    }
+
+    .sheet-host[data-sheet="open"] .sheet-head {
+        position: sticky;
+        top: calc(-1 * var(--safe-t));
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        gap: var(--sp-3);
+        min-height: calc(var(--header-h) + var(--sp-2));
+        padding: 0 var(--sp-2) 0 max(var(--sp-4), var(--safe-l));
+        background: var(--bg-1);
+        border-bottom: 1px solid var(--line);
+    }
+
+    .sheet-title {
+        flex: 1;
+        min-width: 0;
+        font-size: var(--fs-lg);
+        overflow-wrap: anywhere;
+    }
+
+    .sheet-title:focus {
+        outline: none;
+    }
+
+    .sheet-title:focus-visible {
+        outline: 2px solid var(--focus);
+    }
+
+    .sheet-close {
+        flex: none;
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    .sheet-host[data-sheet="open"] ~ .scrim,
+    .scrim[data-open] {
+        position: fixed;
+        inset: 0;
+        z-index: calc(var(--z-sheet) - 1);
+        display: block;
+        background: var(--bg-overlay);
+    }
+}
+
+@media (min-width: 640px) and (max-width: 1023.98px) {
+    .sheet-host[data-sheet="open"] {
+        inset: 0 0 0 auto;
+        width: min(var(--sheet-w), 100vw);
+        border-left: 1px solid var(--line-strong);
+        animation-name: sheet-in-side;
+    }
+}
+
+@keyframes sheet-in {
+    from {
+        transform: translateY(16px);
+        opacity: 0;
+    }
+}
+
+@keyframes sheet-in-side {
+    from {
+        transform: translateX(24px);
+        opacity: 0;
+    }
+}
+
+/* A form's submit, kept in reach: sticky at the bottom of its panel / sheet, with the reason it is
+   disabled in one line above it (reason first, submit last in the DOM). */
+.form-foot {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    padding: var(--sp-3) 0;
+    background: var(--bg-1);
+    border-top: 1px solid var(--line);
+}
+
+/* Under 1024 px a form in the page (not in an open sheet) keeps its foot above the fixed bars. */
+@media (max-width: 1023.98px) {
+    .form-foot {
+        bottom: calc(var(--tabbar-h) + var(--statusbar-h) + var(--actionbar-h) + var(--safe-b));
+    }
+}
+
+.sheet-host[data-sheet="open"] .form-foot {
+    bottom: 0;
+    padding-bottom: calc(var(--sp-3) + var(--safe-b));
+}
+
+/* A landscape phone (the tablet tier's width, a touch screen, wider than tall): the side sheet is
+   ~390 px tall, its head and tabs take half of it, and a form that starts low cannot lift a sticky
+   foot over its own fields (sticky stays inside its form) — the submit was cut off and covered the
+   inputs. There the foot stays in the flow, under the fields; the sheet scrolls to it. */
+@media (min-width: 640px) and (max-width: 1023.98px) and (pointer: coarse) and (orientation: landscape) {
+    .sheet-host[data-sheet="open"] .form-foot {
+        position: static;
+    }
+}
+
+.form-foot > .btn {
+    width: 100%;
+}
+
+@media (pointer: coarse) {
+    .form-foot > .btn {
+        min-height: 48px;
+    }
+}
+
+.form-reason {
+    margin: 0;
+    font-size: var(--fs-sm);
+    color: var(--text-1);
+}
+
+.form-reason:empty {
+    display: none;
+}
+
+/* A reason that points at the control to fix: a text button that focuses it. */
+button.form-reason {
+    padding: 0;
+    background: none;
+    border: 0;
+    text-align: left;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+    min-height: var(--tap-sm);
+}
+
+/* The page's primary actions within thumb reach (tablet and phone; hidden from 1024 px up). */
+.action-bar {
+    display: none;
+}
+
+@media (max-width: 1023.98px) {
+    /* On :root, not .app: the toast region (outside .app) and the html scroll-padding read it. */
+    :root:has(.action-bar) {
+        --actionbar-h: 56px;
+    }
+
+    .action-bar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: calc(var(--tabbar-h) + var(--statusbar-h) + var(--safe-b));
+        z-index: var(--z-bars);
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: 1fr;
+        gap: var(--sp-3);
+        height: 56px;
+        padding: 5px max(var(--gutter), var(--safe-r)) 5px max(var(--gutter), var(--safe-l));
+        background: var(--bg-1);
+        border-top: 1px solid var(--line);
+    }
+
+    .action-bar > .btn {
+        height: 100%;
+        min-height: 44px;
+    }
+}
+
+/* Chips (the withdraw shares 25 / 50 / 75 / Max). */
+.chip-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+}
+
+.chip {
+    min-height: var(--tap-sm);
+    padding: 0 var(--sp-3);
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-1);
+    font-size: var(--fs-sm);
+    cursor: pointer;
+}
+
+.chip[aria-pressed="true"] {
+    border-color: var(--accent);
+    color: var(--text-0);
+}
+
+@media (hover: hover) {
+    .chip:hover:not(:disabled) {
+        background: var(--bg-3);
+    }
+}
+
+/* Reveal: a truncated value whose full text, Copy and Explorer open in a popover (a bottom sheet
+   on a phone). */
+.reveal {
+    all: unset;
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--sp-1);
+    min-height: 24px;
+    cursor: pointer;
+    border-bottom: 1px dotted var(--line-strong);
+}
+
+.reveal:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+}
+
+.reveal-pop {
+    width: min(420px, calc(100vw - 2 * var(--gutter)));
+    margin: calc(var(--header-h) + var(--sp-5)) auto auto;
+    padding: var(--sp-4);
+    color: var(--text-0);
+    background: var(--bg-2);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 16px 48px rgb(0 0 0 / 60%);
+}
+
+.reveal-pop::backdrop {
+    background: rgb(5 7 9 / 40%);
+}
+
+.reveal-value {
+    display: block;
+    margin-bottom: var(--sp-3);
+    font-family: var(--font-num);
+    font-size: var(--fs-sm);
+    white-space: normal;
+    overflow-wrap: anywhere;
+    user-select: all;
+}
+
+.reveal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+}
+
+@media (max-width: 639.98px) {
+    .reveal-pop {
+        position: fixed;
+        inset: auto 0 0;
+        width: auto;
+        max-width: none;
+        margin: 0;
+        padding-bottom: calc(var(--sp-4) + var(--safe-b));
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    }
+
+    .reveal-actions > .btn {
+        flex: 1;
+    }
+}
+
+/* ---- the More sheet (phone) ---------------------------------------------------------------- */
+.more-links {
+    display: flex;
+    flex-direction: column;
+    margin: calc(-1 * var(--sp-4)) calc(-1 * var(--sp-4)) 0;
+}
+
+.more-row {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 48px;
+    padding: var(--sp-2) var(--sp-4);
+    color: var(--text-0);
+    font-weight: var(--fw-medium);
+    border-bottom: 1px solid var(--line);
+}
+
+.more-row .muted {
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-regular);
+}
+
+.more-network h3 {
+    margin-bottom: var(--sp-3);
+}
+
+/* ---- wallet -------------------------------------------------------------------------------- */
+.wallet-anchor {
+    position: relative;
+    flex: none;
+}
+
+.menu-label {
+    padding: var(--sp-2) var(--sp-3);
+    font-size: var(--fs-xs);
+    color: var(--text-2);
+}
+
+.menu-note {
+    padding: var(--sp-3);
+    color: var(--text-1);
+    font-size: var(--fs-sm);
+}
+
+.menu .banner {
+    margin: var(--sp-2);
+}
+
+.menu-sep {
+    height: 1px;
+    margin: var(--sp-2) 0;
+    background: var(--line);
+}
+
+.menu-address {
+    display: block;
+    padding: 0 var(--sp-3) var(--sp-2);
+    font-family: var(--font-num);
+    font-size: var(--fs-xs);
+    color: var(--text-1);
+    overflow-wrap: anywhere;
+}
+
+a.menu-item {
+    color: var(--text-0);
+}
+
+.menu-scrim {
+    display: none;
+}
+
+/* The wallet popup's title row: a phone's bottom sheet only (from 640 px up the title still names
+   the popup through aria-labelledby). */
+.menu-head {
+    display: none;
+}
+
+/* The wallet chooser without a wallet: text rows (no logos), the links a tap opens. */
+.wallet-chooser {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    padding: var(--sp-2);
+    font-size: var(--fs-sm);
+}
+
+.wallet-chooser p {
+    margin: 0;
+    color: var(--text-1);
+}
+
+.wallet-links {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+}
+
+.wallet-links .btn {
+    justify-content: space-between;
+    min-height: max(36px, var(--tap-min));
+}
+
+.wallet-install {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-1) var(--sp-5);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--text-2);
+}
+
+.wallet-install a {
+    text-decoration: underline;
+    min-height: 24px;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* The disconnected header button: "Connect" on a phone, " wallet" kept for the accessible name. */
+@media (max-width: 639.98px) {
+    .wallet-word {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+
+    /* The wallet menu is a bottom sheet over a scrim. */
+    .wallet-anchor > .menu {
+        position: fixed;
+        inset: auto 0 0;
+        z-index: var(--z-wallet-sheet);
+        width: auto;
+        max-width: none;
+        max-height: 85dvh;
+        overflow-y: auto;
+        padding: var(--sp-3) max(var(--sp-3), var(--safe-r)) calc(var(--sp-3) + var(--safe-b))
+            max(var(--sp-3), var(--safe-l));
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        box-shadow: 0 -12px 32px rgb(0 0 0 / 60%);
+    }
+
+    .menu-scrim {
+        position: fixed;
+        inset: 0;
+        z-index: calc(var(--z-wallet-sheet) - 1);
+        display: block;
+        background: var(--bg-overlay);
+    }
+
+    .wallet-anchor > .menu .menu-item {
+        min-height: 48px;
+    }
+
+    .wallet-anchor > .menu > .menu-head {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        gap: var(--sp-3);
+        margin: calc(-1 * var(--sp-3)) 0 var(--sp-2);
+        padding: var(--sp-1) 0 var(--sp-1) var(--sp-3);
+        background: var(--bg-2);
+        border-bottom: 1px solid var(--line);
+    }
+
+    .menu-title {
+        flex: 1;
+        min-width: 0;
+        margin: 0;
+        font-size: var(--fs-lg);
+    }
+}
+
+.wallet-inline {
+    display: flex;
+    flex-direction: column;
+    padding: var(--sp-2);
+}
+
+/* An inline wallet chooser under a ConnectCta. */
+.connect-cta {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+}
+
+.connect-cta > .wallet-chooser,
+.connect-cta > .wallet-inline {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--bg-2);
+}
+
+/* ---- review: deltas, sign hint (FRONTEND.md §5.3) ------------------------------------------ */
+.tx-sign-hint {
+    margin-right: auto;
+}
+
+@media (max-width: 639.98px) {
+    .modal-foot > .tx-sign-hint {
+        flex: 1 0 100%;
+    }
+}
+
+/* A narrow dialog: each delta row is two lines — the account, then before → after and the signed
+   change. The CHANGE cell stays in the DOM (visually hidden); the change is shown in the values. */
+.delta-inline {
+    display: none;
+}
+
+@container dialog (max-width: 479.98px) {
+    .tbl.tx-deltas,
+    .tbl.tx-deltas > tbody {
+        display: block;
+    }
+
+    .tbl.tx-deltas > thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+
+    .tbl.tx-deltas > tbody > tr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 2px var(--sp-3);
+        padding: var(--sp-2) 0;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .tbl.tx-deltas > tbody > tr > td {
+        display: block;
+        width: auto;
+        height: auto;
+        padding: 0;
+        border: 0;
+    }
+
+    .tbl.tx-deltas > tbody > tr > td:first-child {
+        grid-column: 1 / -1;
+        min-width: 0;
+    }
+
+    .tbl.tx-deltas .delta-vals {
+        grid-column: 1 / -1;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: var(--sp-1) var(--sp-2);
+        text-align: left;
+    }
+
+    .tbl.tx-deltas .delta-vals > .delta-inline.pnl {
+        margin-left: auto;
+    }
+
+    /* Long figures (compute units, fees) wrap rather than run out of a narrow dialog. */
+    .modal-body .kv dd {
+        white-space: normal;
+    }
+
+    .tbl.tx-deltas .delta-inline {
+        display: inline;
+    }
+
+    .tbl.tx-deltas .delta-inline.pnl {
+        font-weight: var(--fw-bold);
+    }
+
+    .tbl.tx-deltas .delta-before,
+    .tbl.tx-deltas .delta-change {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+}
+
+/* A toggle button (aria-pressed): pressed reads as selected. */
+.btn[aria-pressed="true"] {
+    border-color: var(--accent);
+    color: var(--text-0);
+}
+
+.address-text {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
 }

@@ -1,15 +1,22 @@
 /**
- * The app shell (FRONTEND.md §3.1): skip link, header (brand, nav, search, wallet), the routed
+ * The app shell (FRONTEND.md §3.1, §7.6): skip link, header (brand, nav, search, wallet), the routed
  * page, the status bar; plus the indexer-down banner when pages fall back to RPC reads.
+ *
+ * One DOM at every width; CSS places it. On a phone the `<nav>` is the bottom tab bar (icons, with
+ * Status moved into the More sheet that its fourth cell opens), the search folds into a button and
+ * the status bar into a one-line summary strip. The document scrolls (not `main`).
  */
 import { useQuery } from '@tanstack/react-query';
-import { Link, Outlet } from '@tanstack/react-router';
+import { Link, Outlet, useRouterState } from '@tanstack/react-router';
+import { useState } from 'react';
 import { indexerQueries } from '../api/queries.ts';
 import { config } from '../config/env.ts';
 import { T } from '../config/testids.ts';
 import { useAppClient } from '../rpc/context.tsx';
 import { useRpcSlotTracker } from '../rpc/slot.ts';
 import { WalletButton } from '../wallet/WalletButton.tsx';
+import { NavIcon } from './icons.tsx';
+import { MoreSheet } from './MoreSheet.tsx';
 import { SearchBox } from './SearchBox.tsx';
 import { StatusBar } from './StatusBar.tsx';
 
@@ -24,6 +31,10 @@ export function AppShell() {
     const client = useAppClient();
     useRpcSlotTracker(client);
     const status = useQuery(indexerQueries.status());
+    const [more, setMore] = useState(false);
+    // On a phone, Status and the security policy are reached through More: it marks where you are.
+    const pathname = useRouterState({ select: (s) => s.location.pathname });
+    const inMore = pathname.startsWith('/status') || pathname.startsWith('/security');
     return (
         <div className="app">
             <a className="skip-link" href="#main">
@@ -34,7 +45,7 @@ export function AppShell() {
                     <span className="brand-mark" aria-hidden="true">
                         ▼
                     </span>
-                    ShortWin
+                    <span className="brand-word">ShortWin</span>
                 </Link>
                 {config.cluster !== 'mainnet' && (
                     <span className="cluster-badge" data-testid={T.clusterBadge}>
@@ -43,10 +54,32 @@ export function AppShell() {
                 )}
                 <nav className="nav" aria-label="Main">
                     {NAV.map((n) => (
-                        <Link key={n.key} to={n.to} data-testid={T.nav(n.key)} activeProps={{ 'aria-current': 'page' }}>
-                            {n.label}
+                        <Link
+                            key={n.key}
+                            to={n.to}
+                            data-nav={n.key}
+                            data-testid={T.nav(n.key)}
+                            activeProps={{ 'aria-current': 'page' }}
+                        >
+                            <NavIcon name={n.key} />
+                            <span className="nav-label">{n.label}</span>
                         </Link>
                     ))}
+                    <button
+                        type="button"
+                        className="nav-more"
+                        data-testid={T.navMore}
+                        data-current={inMore ? '' : undefined}
+                        // The More tab stands for /status and /security on a phone (their own tab
+                        // links are hidden there): the current state, for assistive technology too.
+                        aria-current={inMore ? 'true' : undefined}
+                        aria-haspopup="dialog"
+                        aria-expanded={more}
+                        onClick={() => setMore(true)}
+                    >
+                        <NavIcon name="more" />
+                        <span className="nav-label">More</span>
+                    </button>
                 </nav>
                 <SearchBox />
                 <span className="header-spacer" />
@@ -61,6 +94,7 @@ export function AppShell() {
                 <Outlet />
             </main>
             <StatusBar />
+            <MoreSheet open={more} onClose={() => setMore(false)} />
         </div>
     );
 }

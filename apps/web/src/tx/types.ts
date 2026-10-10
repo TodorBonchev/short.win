@@ -43,7 +43,16 @@ export type WatchedAccount =
           readonly decode: (data: Uint8Array) => Readonly<Record<string, bigint>>;
           /** Per field: display unit and scale (`SOL` 9, a token's decimals, `bps` 2, `raw` 0). */
           readonly fields: Readonly<
-              Record<string, { readonly label: string; readonly unit: string; readonly scale: number }>
+              Record<
+                  string,
+                  {
+                      readonly label: string;
+                      readonly unit: string;
+                      readonly scale: number;
+                      /** `timestamp`: unix seconds, shown as a UTC date (no change column). */
+                      readonly kind?: DeltaKind;
+                  }
+              >
           >;
       };
 
@@ -74,7 +83,15 @@ export interface TxPlan {
      * its first trade grows, PUMP-2026-10-2). Never changes the kind, the code or the action.
      */
     readonly refineError?: (error: TxError) => TxError;
+    /**
+     * Where the user goes next once it is confirmed (e.g. "View position"), shown in the review's
+     * confirmed banner (`tx-confirmed-link`); without it the banner links the explorer.
+     */
+    readonly next?: { readonly href: string; readonly text: string };
 }
+
+/** `amount` (default): a scaled integer with a unit; `timestamp`: unix seconds, shown as a date. */
+export type DeltaKind = 'amount' | 'timestamp';
 
 export interface Delta {
     readonly key: string;
@@ -83,6 +100,7 @@ export interface Delta {
     readonly after: bigint | null;
     readonly unit: string;
     readonly scale: number;
+    readonly kind?: DeltaKind;
 }
 
 export type TxErrorKind =
