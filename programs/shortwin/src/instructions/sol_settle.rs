@@ -191,7 +191,8 @@ fn evaluate<'info>(
         MintPath::Exit,
     )?;
     let rem = venues::parse(&market, kind, ctx.remaining_accounts, Carry::ReadSet, &[])?;
-    let state = venues::read_state_boxed(
+    // AIR-10: on PumpSwap the risk view also at most φ at `P_ema` (`exit_risk_cap_bps`).
+    let state = venues::read_state_boxed_for_exit(
         &market,
         kind,
         rem.read,
@@ -202,7 +203,7 @@ fn evaluate<'info>(
         &market,
         &state,
         rem.read,
-        u64::from(pos.venue_fee_hard_cap_bps),
+        state.exit_risk_cap_bps(u64::from(pos.venue_fee_hard_cap_bps)),
     )
     .ok_or(ShortwinError::NoSupportedVenue)?;
     let mut vault = ctx.accounts.market_vault.load()?.vault();

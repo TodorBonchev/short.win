@@ -90,8 +90,11 @@ fn reference(
 ) -> Result<ExitBound> {
     let l_live = state.liquidity().unwrap_or(obs.ema.liq);
     let l_b = bounds::ref_liquidity(l_live, &obs.ema, &obs.ring, depth_cap).math()?;
+    // AIR-10: the risk fee at most φ at `P_ema` on PumpSwap (`VenueState::exit_risk_cap_bps`),
+    // so a sale earlier in the exit's transaction cannot lift `B̂_ref` and `max_in` either.
+    let cap = state.exit_risk_cap_bps(u64::from(pos.venue_fee_hard_cap_bps));
     let b_ref = state.quoter().and_then(|pr| {
-        pr.capped(u64::from(pos.venue_fee_hard_cap_bps))
+        pr.capped(cap)
             .buy_repriced(pos.q, l_b, p_ref)
             .map(|b| b.cost)
     });

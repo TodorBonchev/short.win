@@ -83,7 +83,8 @@ pub struct RiskQuotes<'a> {
 }
 
 impl<'a> RiskQuotes<'a> {
-    /// Risk quotes of `q` tokens at `quoter` (already capped at the position's hard cap).
+    /// Risk quotes of `q` tokens at `quoter` (already capped at the position's hard cap and, on
+    /// PumpSwap, at φ at `P_ema`: `VenueState::exit_risk_cap_bps`, AIR-10).
     pub const fn new(quoter: Quoter<'a>, q: u64) -> Self {
         Self { quoter, q }
     }

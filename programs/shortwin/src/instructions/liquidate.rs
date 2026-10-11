@@ -280,7 +280,8 @@ pub(crate) struct Assessment {
     pub fresh: bool,
     /// The execution quote `B̂_live(q)` at the live fee (`None`: undefined).
     pub b_live: Option<BuyQuote>,
-    /// `B̂_live` at the risk fee `min(φ_live, venue_fee_hard_cap_bps_pos)`.
+    /// `B̂_live` at the risk fee `min(φ_live, venue_fee_hard_cap_bps_pos)`, on PumpSwap also at
+    /// most φ at `P_ema` (`VenueState::exit_risk_cap_bps`, AIR-10).
     pub b_live_risk: Option<u64>,
     /// σ of the live buyback (`u64::MAX` if undefined).
     pub sigma_live: u64,
@@ -330,7 +331,9 @@ pub(crate) fn assess(
     let r_due = rent::due(&pos.pos_rent(), &market.basis()).math()?;
     let v_eff = risk::v_eff(pos.v, r_due);
     let k_s = risk::k_s(pos.v, &pos.settle_keeper_terms()).math()?;
-    let cap = u64::from(pos.venue_fee_hard_cap_bps);
+    // AIR-10: on PumpSwap the risk view at most φ at `P_ema`, so a sale earlier in this
+    // transaction cannot raise the fee of the spot and EMA legs (the execution quote stays live).
+    let cap = state.exit_risk_cap_bps(u64::from(pos.venue_fee_hard_cap_bps));
     let l_bps = pos.cr_liq_bps;
     let fresh = obs.last.is_fresh(now, pos.ref_max_age_s);
 
@@ -546,7 +549,8 @@ pub(crate) fn keeper_exit<'info>(
             },
             &deny,
         )?;
-        let state = venues::read_state_boxed(
+        // AIR-10: on PumpSwap also φ at `P_ema`, which caps the risk view (`assess`, `B̂_ref`).
+        let state = venues::read_state_boxed_for_exit(
             &market,
             kind,
             rem.read,

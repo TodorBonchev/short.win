@@ -21,6 +21,14 @@
 //!   (`VenueState::cap_fee_ppm`): on the PumpSwap fork with a tier boundary between the EMA's
 //!   market cap and a sale's, the open's caps (and the fee mark `min_open_fee_ppm` they set) are
 //!   the EMA tier's.
+//! - **AIR-10** (M7-SEC-5's rule on the exits): the keeper exits' and `sol_settle`'s risk view
+//!   priced at `min(φ_live, venue_fee_hard_cap_bps_pos)`, so a sale in the liquidation's own
+//!   transaction moved the pool into a higher-fee tier and liquidated a position the honest state
+//!   holds healthy. On PumpSwap the exit risk fee is now capped at φ at `P_ema` too
+//!   (`VenueState::exit_risk_cap_bps`): with the boundary between the EMA's market cap and the
+//!   sale's, `[sell, liquidate]` is refused `NotLiquidatable`. φ at `P_ema` is resolved on the
+//!   live mint supply, which a holder's burn lowers as well, so `[burn, liquidate]` still lands:
+//!   that residual is pinned here (the reviewers' Option B, a supply snapshot, would close it).
 
 #![allow(clippy::result_large_err)]
 
@@ -350,10 +358,12 @@ mod mock_venue {
     }
 }
 
-/// M7-SEC-5 on the PumpSwap fork.
+/// M7-SEC-5 and AIR-10 on the PumpSwap fork.
 mod pumpswap {
     use shortwin::constants::PUMP_AMM_FEE_CONFIG;
+    use shortwin_litesvm_tests::engine::add_margin_ix;
     use shortwin_math::caps;
+    use shortwin_math::num::WAD;
     use shortwin_venue_state::pump::{FEE_TIER_LEN, OFF_FEE_CONFIG_FEE_TIERS};
 
     use crate::pcommon::*;
@@ -520,6 +530,207 @@ mod pumpswap {
         println!(
             "M7-SEC-5: the largest sale-wrapped open, q {} (I19-checked at the EMA tier's fee)",
             o2.q
+        );
+    }
+
+    /// AIR-10's two tiers: 30 bps from the boundary up, 50 bps below it (pump-fees charges more
+    /// at a lower market cap).
+    const LO: (u64, u64, u64) = (22, 5, 3);
+    const HI: (u64, u64, u64) = (40, 7, 3);
+
+    /// What moves the pool into the higher-fee tier inside the liquidation's transaction.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    enum Lever {
+        /// A sale of 0.01 % of the base reserve: the spot and the market cap ≈ −2 bps.
+        Sale,
+        /// A holder's burn of 1 % of the mint's supply: the price unmoved.
+        Burn,
+    }
+
+    /// The tier schedule of one attempt.
+    #[derive(Clone, Copy, Debug)]
+    enum Schedule {
+        Uniform((u64, u64, u64)),
+        /// [`HI`] below the boundary, [`LO`] from it up.
+        Split(u128),
+    }
+
+    fn supply(env: &Env, pm: &PammMarket) -> u64 {
+        let a = read::account(&env.svm, &pm.pool.mint).expect("mint");
+        shortwin_venue_state::mint::read_base(&a.owner.to_bytes(), &a.data)
+            .expect("mint")
+            .supply
+    }
+
+    /// pump-fees' market cap at the stored `P_ema` on the pool's base reserve and the mint's
+    /// supply now (`pump_amm::read_state`'s φ at `P_ema`).
+    fn mcap_at_ema(env: &Env, pm: &PammMarket) -> u128 {
+        let r = pm.pool.reserves(&env.svm).expect("reserves");
+        let base = u128::from(r.base);
+        let quote = market(env, pm).ema_price.get() * base / WAD;
+        quote * u128::from(supply(env, pm)) / base
+    }
+
+    /// AIR-10's case on the mature pool: a position, the price pushed 5 % past its liquidation
+    /// boundary and held for 120 s (the EMA, the ring and the last bucket there), then margin
+    /// added halfway between the most at which a uniform 30-bps schedule and the most at which
+    /// a uniform 50-bps one still liquidate with the lever inside the liquidation's transaction
+    /// (bisections on clones): liquidatable at 50 bps, healthy at 30, ≈ 10 bps of CR from either
+    /// edge. Then the split schedule, its boundary between the lever's market cap and the honest
+    /// one (the spot's and the EMA's): the honest state alone is healthy, and the result of
+    /// `[lever, liquidate]` is returned.
+    fn exit_tier_case(lever: Lever) -> TxResult {
+        let (mut env, pm, q) = setup(PammCoin::Mature);
+        crank_secs(&mut env, &pm, 30);
+        let mut b = env.borrower();
+        let (_, nonce, _) = open_ok(&mut env, &pm, &mut b, q);
+        let pos = env.position(&pm, &b.key(), nonce);
+        // CR ≈ cr_open right after the open: the price × 1.05·cr_open/cr_liq puts it 5 % below L.
+        let factor = u128::from(pos.v) * 10_000 * 105 / u128::from(pos.n_open);
+        env.warp(1);
+        let buyer = PammUser::new(&mut env, &pm.pool, 20_000 * SOL);
+        ok(buyer.push_price(&mut env, &pm.pool, factor, u128::from(pos.cr_liq_bps) * 100));
+        // Two minutes held: P_ema within a fraction of a bp of the spot (its market cap above the
+        // sale's), the ring and the last bucket at the pushed price.
+        crank_secs(&mut env, &pm, 120);
+        let kp = keeper(&mut env);
+        let actor = PammUser::new(&mut env, &pm.pool, SOL);
+        let r = pm.pool.reserves(&env.svm).expect("reserves");
+        let lever_ix = match lever {
+            Lever::Sale => {
+                let d = r.base / 10_000;
+                fork::set_token_amount(&mut env.svm, &actor.base, d);
+                pamm::pamm_trade_ix(
+                    &env.svm,
+                    &pm.pool,
+                    pamm::PammTrade::Sell,
+                    &actor.kp.pubkey(),
+                    &actor.base,
+                    &actor.wsol,
+                    d,
+                    0,
+                )
+            }
+            Lever::Burn => {
+                let d = supply(&env, &pm) / 100;
+                fork::set_token_amount(&mut env.svm, &actor.base, d);
+                let mut data = vec![8u8];
+                data.extend_from_slice(&d.to_le_bytes());
+                Instruction {
+                    program_id: pm.keys.token_program,
+                    accounts: vec![
+                        AccountMeta::new(actor.base, false),
+                        AccountMeta::new(pm.keys.mint, false),
+                        AccountMeta::new_readonly(actor.kp.pubkey(), true),
+                    ],
+                    data,
+                }
+            }
+        };
+        let base_svm = env.svm.clone();
+        let (akp, bkp) = (actor.kp.insecure_clone(), b.kp.insecure_clone());
+        let attempt = |env: &mut Env, margin: u64, schedule: Schedule, with_lever: bool| {
+            env.svm = base_svm.clone();
+            match schedule {
+                Schedule::Uniform(f) => plant_tiers(env, 0, f, f),
+                Schedule::Split(boundary) => plant_tiers(env, boundary, HI, LO),
+            }
+            if margin > 0 {
+                ok(env.send(&[add_margin_ix(&pm, &b.key(), nonce, margin)], &[&bkp]));
+            }
+            let liq = liquidate_ix(&pm, &kp.pubkey(), &b.key(), nonce);
+            if with_lever {
+                env.send(
+                    &[cu_limit_ix(1_400_000), lever_ix.clone(), liq],
+                    &[&akp, &kp],
+                )
+            } else {
+                env.send(&[cu_limit_ix(1_400_000), liq], &[&kp])
+            }
+        };
+        let healthy = |r: &TxResult| custom_code(r) == Some(code(E::NotLiquidatable));
+        // The most margin at which a uniform `f` schedule still liquidates (liquidatable with
+        // none, healthy with the vault doubled; the bisection on clones with the hooks off).
+        let edge = |env: &mut Env, f: (u64, u64, u64)| {
+            assert!(!healthy(&attempt(env, 0, Schedule::Uniform(f), true)));
+            assert!(healthy(&attempt(env, pos.v, Schedule::Uniform(f), true)));
+            let (mut lo, mut hi) = (0u64, pos.v);
+            while hi - lo > 1 {
+                let mid = lo + (hi - lo) / 2;
+                if healthy(&attempt(env, mid, Schedule::Uniform(f), true)) {
+                    hi = mid;
+                } else {
+                    lo = mid;
+                }
+            }
+            lo
+        };
+        env.check_invariants = false;
+        let (m_lo, m_hi) = (edge(&mut env, LO), edge(&mut env, HI));
+        env.check_invariants = true;
+        assert!(m_lo < m_hi, "{m_lo} {m_hi}");
+        let m = m_lo + (m_hi - m_lo) / 2;
+        ok(attempt(&mut env, m, Schedule::Uniform(HI), true));
+        assert!(
+            healthy(&attempt(&mut env, m, Schedule::Uniform(LO), true)),
+            "at 30 bps the same position is healthy"
+        );
+
+        // The boundary: the market caps after the lever (live and at P_ema) below it, the honest
+        // ones (before it) from it up.
+        env.svm = base_svm.clone();
+        let (live0, ema0) = (mcap(&env, &pm), mcap_at_ema(&env, &pm));
+        ok(env.send(std::slice::from_ref(&lever_ix), &[&akp]));
+        let (live1, ema1) = (mcap(&env, &pm), mcap_at_ema(&env, &pm));
+        let (below, above) = match lever {
+            // A sale moves the spot only: the EMA's market cap stays above the boundary.
+            Lever::Sale => (live1, live0.min(ema0).min(ema1)),
+            // A burn lowers both: the supply they are resolved on.
+            Lever::Burn => (live1.max(ema1), live0.min(ema0)),
+        };
+        assert!(below < above, "{lever:?}: {below} vs {above}");
+        let boundary = below + (above - below) / 2;
+        println!(
+            "AIR-10 {lever:?}: market cap {live0} (at P_ema {ema0}) -> {live1} (at P_ema {ema1}), \
+             boundary {boundary}, margin {m} (edges {m_lo} / {m_hi})"
+        );
+        assert!(
+            healthy(&attempt(&mut env, m, Schedule::Split(boundary), false)),
+            "{lever:?}: the honest state alone is healthy"
+        );
+        attempt(&mut env, m, Schedule::Split(boundary), true)
+    }
+
+    /// AIR-10: a sale in the liquidation's own transaction moves the pool below a tier boundary
+    /// (50 bps live) while the EMA's market cap stays above it (30 bps). As built the exit risk
+    /// view priced at the live 50 bps and liquidated a position the honest state holds healthy;
+    /// with the risk fee capped at φ at `P_ema` it is refused `NotLiquidatable`.
+    #[test]
+    fn air_10_a_same_transaction_sale_does_not_raise_the_exit_risk_fee() {
+        let r = exit_tier_case(Lever::Sale);
+        assert_eq!(
+            custom_code(&r),
+            Some(code(E::NotLiquidatable)),
+            "the exit risk view at φ at P_ema: the sale-wrapped liquidation {}",
+            if r.is_ok() {
+                "landed"
+            } else {
+                "failed otherwise"
+            }
+        );
+    }
+
+    /// AIR-10's residual: a holder's burn lowers the mint supply, and so both the live market cap
+    /// and the one at `P_ema` that the cap is resolved on — `[burn, liquidate]` still liquidates
+    /// at the higher tier (the reviewers' Option B, φ at `P_ema` on a supply snapshot, would close
+    /// it). Pinned: the day it is refused, this test fails and the residual is gone.
+    #[test]
+    fn air_10_residual_a_same_transaction_burn_still_raises_the_exit_risk_fee() {
+        let r = exit_tier_case(Lever::Burn);
+        assert!(
+            r.is_ok(),
+            "a burn still raises the exit risk fee: {:?}",
+            custom_code(&r)
         );
     }
 }

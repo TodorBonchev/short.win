@@ -610,7 +610,9 @@ impl VenueState {
     /// The fee at `P_ema` rides in the pump views' padding (`pump_amm::PoolVenue`,
     /// [`CurvePricingInputs`]), so `VenueState` does not grow: the pool-selection instructions
     /// box several of them on the 32 KiB heap. It is resolved only by `open_short`'s pre-trade
-    /// read ([`read_state_boxed_for_open`]); elsewhere it reads `u32::MAX` and this is `φ_live`.
+    /// read ([`read_state_boxed_for_open`]) and, on PumpSwap, by the keeper exits' and
+    /// `sol_settle`'s ([`read_state_boxed_for_exit`], AIR-10); elsewhere it reads `u32::MAX` and
+    /// this is `φ_live`.
     pub fn cap_fee_ppm(&self) -> u32 {
         let at_ema = match self.kind {
             VenueKind::PumpSwap => self.pool.as_ref().map_or(u32::MAX, |p| p.fee_ppm_at_ema),
@@ -622,6 +624,28 @@ impl VenueState {
             _ => u32::MAX,
         };
         self.fee_ppm.min(at_ema)
+    }
+
+    /// The fee cap of the exit risk view — `liquidate::assess`, the keeper exits' `B̂_ref`
+    /// (`engine::bounds`) and `sol_settle`'s quotes (AIR-10): the position's locked
+    /// `hard_cap_bps` and, on PumpSwap once [`read_state_boxed_for_exit`] resolved it,
+    /// `⌈φ at P_ema / 100⌉` — M7-SEC-5's rule for the opens' caps. pump-fees picks the tier from
+    /// the live market cap and charges more as it falls, so a sale earlier in the exit's own
+    /// transaction moved the pool into a higher-fee tier and raised every risk quote at once (the
+    /// spot leg, the EMA leg on the ring, `B̂_ref`, the penalty base, the settlement box and
+    /// FV): a position the honest state holds healthy was liquidated. At the EMA's market cap a
+    /// same-transaction trade can only lower the fee the risk view takes; the execution quote
+    /// (`B̂_live`, the buyback itself) keeps the live fee. φ at `P_ema` is resolved on the live
+    /// mint supply, so a holder's burn earlier in the transaction still raises it (the
+    /// residual; a supply snapshot would close it). Elsewhere the hard cap alone: Raydium's fees
+    /// are fixed and the curve's single tier sits on a fixed supply.
+    pub fn exit_risk_cap_bps(&self, hard_cap_bps: u64) -> u64 {
+        match (self.kind, self.pool.as_ref()) {
+            (VenueKind::PumpSwap, Some(p)) if p.fee_ppm_at_ema != u32::MAX => {
+                hard_cap_bps.min(u64::from(p.fee_ppm_at_ema).div_ceil(100))
+            }
+            _ => hard_cap_bps,
+        }
     }
 
     /// Observed by the prologue's record (ARCH §3.0 step 7, A64): an executable venue, or a
@@ -863,6 +887,22 @@ pub fn read_state_boxed_for_open(
     Box::new(read_state_ema(market, kind, read, now, supply, true))
 }
 
+/// [`read_state_boxed`] for the keeper exits (`liquidate`, `expire`) and `sol_settle` (AIR-10):
+/// on PumpSwap the fee is also resolved at the stored `P_ema`'s market cap, which caps their
+/// risk view (`VenueState::exit_risk_cap_bps`; ≈ 1.3–1.6 k CU); the other venues read as
+/// [`read_state_boxed`].
+#[inline(never)]
+pub fn read_state_boxed_for_exit(
+    market: &Market,
+    kind: VenueKind,
+    read: &[AccountInfo],
+    now: i64,
+    supply: Option<u64>,
+) -> Box<VenueState> {
+    let ema_fee = kind == VenueKind::PumpSwap;
+    Box::new(read_state_ema(market, kind, read, now, supply, ema_fee))
+}
+
 /// The supply of a mint account (`supply` @36; SPL Token or Token-2022), `None` if it does not
 /// parse. The caller has checked the mint's key and program (the mint guard).
 pub fn mint_supply(mint: &AccountInfo) -> Option<u64> {
@@ -875,7 +915,8 @@ pub fn mint_supply(mint: &AccountInfo) -> Option<u64> {
 /// The quotes of the **risk** view on hypothetical states — the EMA leg on the ring's cached
 /// `(x, y)`, the settlement-box corners, the refutation, FV (ARCH §4.3 "two fee views", §4.5) —
 /// which `sol_settle` evaluates whether or not the venue can execute: `min(φ_live, cap_bps)`,
-/// the position's locked hard cap (V2-1, A43).
+/// `cap_bps` the position's locked hard cap (V2-1, A43) — on PumpSwap also φ at `P_ema`
+/// ([`VenueState::exit_risk_cap_bps`], AIR-10).
 ///
 /// - While the venue executes (or, on the curve, while its pricing accounts parse: a migrating
 ///   curve too): its live quotes, capped.
@@ -1273,6 +1314,45 @@ mod tests {
             len,
             bytes: b,
         }
+    }
+
+    /// AIR-10: the exit risk view's cap is the hard cap and, on PumpSwap once resolved, `⌈φ at
+    /// P_ema/100⌉` — also on a halted pool (its fee still resolves) — and the hard cap alone
+    /// without a fee at `P_ema` and on every other venue.
+    #[test]
+    fn exit_risk_cap_takes_the_fee_at_p_ema_on_pumpswap_only() {
+        let pool = |at_ema: u32| pump_amm::PoolVenue {
+            disable_flags: 0,
+            boost_amount: 0,
+            virtual_part: 0,
+            is_cashback: false,
+            fees: Some(FeeBps::new(40, 7, 3)),
+            fee_ppm_at_ema: at_ema,
+        };
+        let with = |kind: VenueKind, at_ema: u32| {
+            let mut st = VenueState::not_executable(kind);
+            st.pool = Some(pool(at_ema));
+            st
+        };
+        assert_eq!(with(VenueKind::PumpSwap, 3_000).exit_risk_cap_bps(500), 30);
+        assert_eq!(with(VenueKind::PumpSwap, 2_950).exit_risk_cap_bps(500), 30);
+        assert_eq!(with(VenueKind::PumpSwap, 3_000).exit_risk_cap_bps(25), 25);
+        assert_eq!(
+            with(VenueKind::PumpSwap, u32::MAX).exit_risk_cap_bps(500),
+            500
+        );
+        assert_eq!(
+            VenueState::not_executable(VenueKind::PumpSwap).exit_risk_cap_bps(500),
+            500
+        );
+        assert_eq!(
+            with(VenueKind::RaydiumCpmm, 3_000).exit_risk_cap_bps(500),
+            500
+        );
+        assert_eq!(
+            with(VenueKind::PumpCurve, 3_000).exit_risk_cap_bps(500),
+            500
+        );
     }
 
     /// `["extra", mint]` under `program`.

@@ -452,7 +452,7 @@ fn spot_legs(
         let p_rs = p_live.and_then(|p| observe::robust_spot(p, &obs.last, now, pos.ref_max_age_s));
         let b = match (l_spot, p_rs) {
             (Some(l), Some(p)) => pricing
-                .capped(u64::from(pos.venue_fee_hard_cap_bps))
+                .capped(exit_risk_cap(pos, mp.state.venue_kind(), &v))
                 .buy_repriced(pos.q, l, p)
                 .map(|b| b.cost),
             _ => None,
@@ -474,16 +474,30 @@ fn spot_legs(
     Ok(())
 }
 
+/// The exit risk view's fee cap the program takes (AIR-10, `VenueState::exit_risk_cap_bps`): the
+/// position's locked hard cap and, on PumpSwap, φ at the stored `P_ema` — an executable view's
+/// `cap_fee_ppm` is `min(φ_live, φ at P_ema)`, which caps the quotes exactly as the program's
+/// `min(hard cap, ⌈φ at P_ema/100⌉)` does.
+fn exit_risk_cap(pos: &ShortPosition, kind: Option<VenueKind>, v: &VenueView) -> u64 {
+    let hard = u64::from(pos.venue_fee_hard_cap_bps);
+    if kind == Some(VenueKind::PumpSwap) {
+        hard.min(u64::from(v.cap_fee_ppm).div_ceil(100))
+    } else {
+        hard
+    }
+}
+
 /// `B̂_ref` of `pos` at `p_ref` with the (guarded, on Raydium and PumpSwap capped) reference
-/// liquidity of `post` and the pre-trade venue `v` (V2-14, M4R, M4F-1, M6R-1). `cap` is
-/// `⌊pool_d·10⁴/λ_min⌋` on a Raydium or PumpSwap market (recomputed here from the market's
-/// `pool_d` and the config), `None` elsewhere.
+/// liquidity of `post` and the pre-trade venue `v` (V2-14, M4R, M4F-1, M6R-1) at the fee cap
+/// `fee_cap` ([`exit_risk_cap`]). `cap` is `⌊pool_d·10⁴/λ_min⌋` on a Raydium or PumpSwap market
+/// (recomputed here from the market's `pool_d` and the config), `None` elsewhere.
 fn b_ref_of(
     pos: &ShortPosition,
     obs: &Observation,
     v: &VenueView,
     p_ref: u128,
     cap: Option<u128>,
+    fee_cap: u64,
 ) -> Option<u64> {
     let (x, y) = v.reserves?;
     let l_live = liquidity(u128::from(x), u128::from(y)).ok()?;
@@ -499,7 +513,7 @@ fn b_ref_of(
         return None;
     }
     v.pricing?
-        .capped(u64::from(pos.venue_fee_hard_cap_bps))
+        .capped(fee_cap)
         .buy_repriced(pos.q, l_b, p_ref)
         .map(|b| b.cost)
 }
@@ -545,7 +559,8 @@ fn references(
         let Some(pos) = pos_of(&e.position) else {
             continue;
         };
-        let want = b_ref_of(&pos, &obs, &v, e.p_ref, cap);
+        let fee_cap = exit_risk_cap(&pos, mp.state.venue_kind(), &v);
+        let want = b_ref_of(&pos, &obs, &v, e.p_ref, cap, fee_cap);
         ensure(want == Some(e.b_ref), "I18", || {
             format!(
                 "market {market}: Liquidate {} b_ref {} at p_ref {}, want {want:?} (guard {}, \
@@ -562,7 +577,8 @@ fn references(
             bounds::expiry_reference(&obs.ema, &obs.ring, &obs.last, now, &pos.exit_params())
                 .ok()
                 .flatten();
-        let want = p_ref.and_then(|p| b_ref_of(&pos, &obs, &v, p, cap));
+        let fee_cap = exit_risk_cap(&pos, mp.state.venue_kind(), &v);
+        let want = p_ref.and_then(|p| b_ref_of(&pos, &obs, &v, p, cap, fee_cap));
         ensure(want == Some(e.b_ref), "I18", || {
             format!(
                 "market {market}: Expire {} b_ref {}, want {want:?} at P_ref {p_ref:?} (guard {})",
