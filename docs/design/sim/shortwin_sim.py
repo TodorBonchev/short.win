@@ -2112,8 +2112,10 @@ class Market:
             # immediate; the rest of the take (impact, fees, penalty) vests like a lump.  AIR-21: S1
             # too -- its legs need only B + ert > V - K_s, so V - K_s can exceed Q*P_ema + R_due by the
             # buyback's impact and fees, which a just-in-time deposit took at once; a genuine S1 loss
-            # (V - K_s <= Q*P_ema + R_due) vests nothing.
-            v_ema = pos.Q * self.ema // WAD
+            # (V - K_s <= Q*P_ema + R_due) vests nothing.  AIR-09: a venue that cannot execute records
+            # nothing, so P_ema is its pre-halt value and the tokens have no market value to pay at
+            # once: they count 0, all but the rent vests.
+            v_ema = pos.Q * self.ema // WAD if self.venue.has_route() else 0
             lump = take - min(take, v_ema + st["R"])
         res.update(kind=kind, keeper=K, lender_sol=take, lender_lump=lump, borrower=borrower, fv=fv)
         if self.P.check_invariants:

@@ -16,7 +16,8 @@ Market subclass are skipped):
   * liquidation (keeper floor) / expiry waterfalls          <- Market.check_exit
   * close waterfall                                         <- Market.try_exit(borrower_close=True)
   * FV and its p' at every evaluated (P, L)                <- Market.fv_parts
-  * settlement waterfall, its vesting lump (S1: AIR-21), K_s <- Market._settle
+  * settlement waterfall, its vesting lump (S1: AIR-21; tokens at 0 on a venue that cannot
+    execute: AIR-09), K_s                                   <- Market._settle
   * K_s and K_e on random amounts and locked terms         <- Market.settle_reward, expiry_keeper
 
 The settlement-box decisions themselves (legs, refutation, amount check, arming) belong to
@@ -220,7 +221,10 @@ def settle(self, res, kind, pos, K, st, box):
     if out is not None and default_model(self):
         assert out["fv"] == (None if fvp is None else fvp[0]) and K == self.settle_reward(pos.V)
         CAP["settle"].append(dict(
+            # executable: the program prices the immediate part at P_ema only on a venue that
+            # executes, at 0 otherwise (sol_settle; AIR-09)
             kind=kind, v=s(pos.V), k_s=s(K), q=s(pos.Q), p_ema=s(self.ema), r_due=s(st["R"]),
+            executable=self.venue.has_route(),
             expired=st["expired"], l_bps=s(pos.L), penalty_bps=s(pos.pen_bps),
             expiry_fee_bps=s(self.P.expiry_fee_bps), b_fv=None if fvp is None else s(fvp[1]),
             pprime=None if fvp is None else s(fvp[2]), fv=s(out["fv"]), keeper=s(out["keeper"]),
@@ -511,6 +515,9 @@ def main() -> None:
                  ("S3", False, False), ("S3", False, True)):
         assert any(k[:len(need)] == need for k in skinds), (need, sorted(skinds))
     assert any(k[3] for k in skinds if k[0] == "S3"), "an S3 at the expiry-fee p' (O15)"
+    # S3 on an executable venue (flag or fee cap: P_ema immediate) and on one that cannot execute
+    # (all but R_due vests, AIR-09)
+    assert {r["executable"] for r in out["settle"] if r["kind"] == "S3"} == {True, False}
     fkinds = {fv_class(r) for r in out["fv"]}
     assert (True, False, True) in fkinds and (True, False, False) in fkinds and (False, False, False) in fkinds
     for cat in ("spot_leg", "ema_leg", "buyback"):

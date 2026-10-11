@@ -2040,16 +2040,15 @@ pub fn settle_checked(
         };
     };
     let ev_s = ev.as_ref().map(clone_event).expect("a SolSettle event");
-    let payout = waterfall::settle(
-        pos.v,
-        s.kind,
-        s.k_s,
-        s.fv,
-        pos.q,
-        pred.inp.p_ema,
-        pred.inp.r_due,
-    )
-    .unwrap();
+    // AIR-09: a venue that cannot execute prices the extinguished tokens at 0 for the immediate
+    // part (its `P_ema` is the pre-halt mark): all but `R_due` vests.
+    let p_imm = if pred.inp.executable {
+        pred.inp.p_ema
+    } else {
+        0
+    };
+    let payout =
+        waterfall::settle(pos.v, s.kind, s.k_s, s.fv, pos.q, p_imm, pred.inp.r_due).unwrap();
     assert_eq!(ev_s.condition, s.kind as u8, "the settlement kind");
     assert_eq!(ev_s.k_s, s.k_s);
     assert_eq!(ev_s.lender_amount, s.lenders);

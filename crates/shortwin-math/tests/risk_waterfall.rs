@@ -120,6 +120,9 @@ struct Settle {
     q: Dec<u64>,
     p_ema: Dec<u128>,
     r_due: Dec<u64>,
+    /// The venue executes: the immediate part prices the tokens at `P_ema`, else at 0
+    /// (`sol_settle`; AIR-09).
+    executable: bool,
     expired: bool,
     l_bps: Dec<u32>,
     penalty_bps: Dec<u32>,
@@ -419,7 +422,8 @@ fn settlements_match_sim() {
             }
         };
         assert_eq!(fv, opt(&c.fv), "{ctx}: FV at (P_ema, L_ema)");
-        let p = waterfall::settle(c.v.0, kind, c.k_s.0, fv, c.q.0, c.p_ema.0, c.r_due.0).unwrap();
+        let p_imm = if c.executable { c.p_ema.0 } else { 0 };
+        let p = waterfall::settle(c.v.0, kind, c.k_s.0, fv, c.q.0, p_imm, c.r_due.0).unwrap();
         check_totals(&p, c.keeper.0, 0, c.lenders.0, c.borrower.0, c.v.0, &ctx);
         assert_eq!(p.lump, c.lump.0, "{ctx}: vesting lump");
         // I-E5: S1 takes V − K_s; S2/S3 take min(V − K_s, FV).

@@ -862,6 +862,59 @@ mod jit {
         );
     }
 
+    /// **AIR-09** (the regression). On a venue that cannot execute nothing is observed, `P_ema`
+    /// stays at its pre-halt value and the box collapses to the EMA point, so an S3 there values
+    /// the extinguished tokens at a price nothing checks against the market. `⌊Q·P_ema/WAD⌋ +
+    /// R_due` of the take was immediate there too, and a whale holding tokens bundled
+    /// `[deposit 9×, sol_settle (S3), claim_sol, withdraw]` to swap its share of `Q` for SOL at
+    /// the frozen price (I-09: a gain of `f·Q·(P_ema − P_true)`, out of the lenders' windfall).
+    /// Now the tokens count for nothing immediate on a venue that cannot execute: only `R_due`
+    /// does (its credited part; the top-up vests), the rest of the take vests like a lump, and
+    /// the whale realises 0 at `h = 0` — the vest pays only shares that hold through
+    /// `lump_vest_s`, and the honest lender loses nothing to the bundle.
+    #[test]
+    fn air_09_a_jit_whale_around_an_s3_on_a_halted_venue_realises_nothing() {
+        let mut sc = Sc::default_market();
+        sc.env.tick(&sc.mm, 5);
+        // An expired healthy position on a halted venue: S3 at the frozen EMA after the chain.
+        sc.warp_to_deadline(-700);
+        sc.knobs(|k| k.disabled = true);
+        sc.crank_every(30, 23);
+        to_the_settling_second(&mut sc, 30);
+        let w = settlement_whale(&mut sc);
+        assert_eq!(w.ctl.condition, 3, "S3");
+        assert!(w.ctl.ema_age_s > 600, "at the frozen pre-halt EMA");
+        let x = w.ctl.lender_amount;
+        let before_fix = share_of(u128::from(x.min(w.v_ema + w.r_due) - w.r_due), w.whale_frac);
+        eprintln!(
+            "S3 (halted): take {x}, ⌊Q·P_ema⌋ {} + R_due {} (credited {}), lump {}; whale h = 0 \
+             paid {} ({before_fix} with ⌊Q·P_ema⌋ immediate), tokens back {} of {}",
+            w.v_ema, w.r_due, w.credited, w.ctl.lump, w.whale, w.tokens_back, w.amount
+        );
+        assert!(x > w.r_due && w.v_ema > 0);
+        assert_eq!(
+            w.whale, 0,
+            "the JIT whale swaps nothing at the frozen P_ema (it would take {before_fix})"
+        );
+        let top = shortwin_math::pool::rent_top_up(w.r_due, w.r_due, w.credited);
+        assert_eq!(w.ctl.lump, x - w.r_due, "all but R_due vests");
+        assert_eq!(
+            w.vested,
+            w.ctl.lump + top,
+            "the lump and the rent top-up vest"
+        );
+        assert!(
+            w.tokens_back < w.amount,
+            "the whale's share of Q is gone with its unvested SOL"
+        );
+        assert!(
+            w.honest + 2 >= w.control_honest,
+            "the honest lender loses nothing to the bundle: {} vs {}",
+            w.honest,
+            w.control_honest
+        );
+    }
+
     /// The expiry at the deadline: the 2 % expiry fee vests (ECON §12.2's R3B-2 lump).
     #[test]
     fn a_jit_whale_around_a_real_expiry_realises_nothing() {

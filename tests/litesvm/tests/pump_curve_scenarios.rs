@@ -654,7 +654,12 @@ fn d50_stuck_migration_settles_s3_at_70_min() {
         ev.lender_amount, 2_873_769_555,
         "min(V − K_s, FV) = V − K_s"
     );
-    assert_eq!((ev.borrower_amount, ev.lump), (0, 0));
+    // A migrating curve cannot execute: the tokens count for nothing immediate, so all of the
+    // take above `R_due` vests (AIR-09).
+    assert_eq!(
+        (ev.borrower_amount, ev.lump),
+        (0, 2_873_769_555 - 2_514_563)
+    );
     assert_eq!(
         (ev.pprime_lo, ev.pprime_hi),
         (1_000, 1_000),
@@ -683,9 +688,9 @@ fn d50_stuck_migration_settles_s3_at_70_min() {
 /// ECON §10.1 `D@80% | graduation, migration stuck | S3 | +4200s | 2.53x / 2.53x | 0.00/1.60 |
 /// 2.683 | -2.0814 (-61% of M) | 0% + 3.0872 SOL | +0.4045 (+15.1%) | 0.0549`: here FV binds —
 /// the lenders take FV (the post-migration pool's cost at `P_ema`, the penalty and the rent),
-/// the borrower the rest of `V − K_s`, the premium over `Q·P_ema + R` vests. FV contains the
-/// rent, the sim's `R_min`, so the lenders' take and the borrower's remainder move by `ΔR`; the
-/// vesting lump does not.
+/// the borrower the rest of `V − K_s`, and all of FV above the rent vests (a migrating curve
+/// cannot execute, AIR-09). FV contains the rent, the sim's `R_min`, so the lenders' take and the
+/// borrower's remainder move by `ΔR`; the vesting lump does not.
 #[test]
 fn d80_stuck_migration_settles_s3_at_fair_value() {
     let (mut s, p) = open(&D80);
@@ -712,8 +717,9 @@ fn d80_stuck_migration_settles_s3_at_fair_value() {
         "borrower (rent adjusted)"
     );
     assert_eq!(
-        ev.lump, 402_532_971,
-        "the premium over Q·P_ema + R vests (rent-independent)"
+        ev.lump,
+        3_087_245_115 - sim_rent,
+        "all of FV above R_due vests (AIR-09; rent-independent)"
     );
     assert_eq!(market(&s.env, &s.pm).ema_price.get(), 410_880_168_127_897);
     assert_eq!(

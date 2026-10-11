@@ -46,7 +46,8 @@
 //!
 //! - `K_s` (locked terms) to the keeper; the lenders' `x` (S1 `V − K_s`; S2/S3 `x(P_ema,
 //!   L_ema)`, box-consistent) to `market_vault` through `pool::settle` — on every kind (S1
-//!   since AIR-21) the part above `⌊Q·P_ema/WAD⌋ + R_due` vests as a lump, the rest is
+//!   since AIR-21) the part above `⌊Q·P_ema/WAD⌋ + R_due` vests as a lump (on a venue that
+//!   cannot execute the part above `R_due`: `P_ema` is frozen there, AIR-09), the rest is
 //!   immediate (R4B-6) but for its rent top-up: the immediate part pays `R_due` first, and the
 //!   part of that above the rent credited while the position was open (`pool::rent_top_up`)
 //!   vests with the lump
@@ -260,8 +261,13 @@ fn evaluate<'info>(
             None
         }
         Some(s) => {
-            let payout = waterfall::settle(pos.v, s.kind, s.k_s, s.fv, pos.q, inp.p_ema, inp.r_due)
-                .math()?;
+            // AIR-09: a venue that cannot execute records nothing, so `P_ema` is its pre-halt
+            // value and the box its point: the extinguished tokens have no market value that
+            // could be paid at once. Priced at 0, the whole token part of the take vests and
+            // only `R_due` stays immediate (S1 and S2 run on an executable venue only).
+            let p_imm = if inp.executable { inp.p_ema } else { 0 };
+            let payout =
+                waterfall::settle(pos.v, s.kind, s.k_s, s.fv, pos.q, p_imm, inp.r_due).math()?;
             require!(
                 payout.keeper == s.k_s
                     && payout.lenders == s.lenders

@@ -91,7 +91,8 @@ pub struct Payout {
     pub lenders: u64,
     /// The part of `lenders` that vests over `lump_vest_s` (ECON §9.4): the lenders' share
     /// of the penalty (liquidation), the expiry fee (expiry), or a settlement's take above
-    /// `⌊Q·P_ema/WAD⌋ + R_due` (S1, S2 and S3; S1 since AIR-21). 0 for a close.
+    /// `⌊Q·P_ema/WAD⌋ + R_due` (S1, S2 and S3; S1 since AIR-21), above `R_due` alone on a venue
+    /// that cannot execute (AIR-09). 0 for a close.
     pub lump: u64,
     /// Borrower remainder (paid through the position close, A18).
     pub borrower: u64,
@@ -335,6 +336,11 @@ pub fn expire(
 /// its pro-rata share of that excess. A genuine S1 loss (`V − K_s ≤ ⌊q·p_ema/WAD⌋ + r_due`)
 /// vests nothing and stays immediate.
 ///
+/// **`p_ema` is the price the tokens count at once:** `P_ema` while the venue executes, and 0
+/// when it cannot (`sol_settle`, AIR-09): nothing is observed then, `P_ema` is the pre-halt
+/// mark and the settlement box its point, so an immediate `⌊q·P_ema/WAD⌋` would let a
+/// just-in-time deposit swap tokens for SOL at a stale price. At 0 only `r_due` is immediate.
+///
 /// `fv` of `None` (undefined `B̂_FV`) means the cap does not bind; `fv` is ignored for S1.
 /// Whether an S2/S3 amount may be paid at all (the settlement box's `fv_dev_bps` check) is
 /// `settle`'s decision, not this function's.
@@ -503,6 +509,10 @@ mod tests {
         // Nothing vests when the take is at most the market value plus rent ...
         let p = settle(1_000, SettleKind::S3, 20, Some(300), Q, p_ema, 7).unwrap();
         assert_eq!((p.lenders, p.lump), (300, 0));
+        // ... unless the venue cannot execute: the tokens count at 0, only R_due is immediate
+        // (AIR-09).
+        let p = settle(1_000, SettleKind::S3, 20, Some(300), Q, 0, 7).unwrap();
+        assert_eq!((p.lenders, p.lump), (300, 300 - 7));
         // ... nor when Q·P_ema leaves u128 (its value is above any u64 take).
         let p = settle(1_000, SettleKind::S3, 20, Some(900), u64::MAX, u128::MAX, 0).unwrap();
         assert_eq!((p.lenders, p.lump), (900, 0));

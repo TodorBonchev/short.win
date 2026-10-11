@@ -43049,6 +43049,7 @@
   {
    "b_fv": "2479286940",
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "2728031479",
@@ -43068,6 +43069,7 @@
   {
    "b_fv": "65180740728",
    "borrower": "58469604545",
+   "executable": true,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "69021636745",
@@ -43085,8 +43087,29 @@
    "v": "127741241290"
   },
   {
+   "b_fv": "103461642810",
+   "borrower": "0",
+   "executable": true,
+   "expired": false,
+   "expiry_fee_bps": "200",
+   "fv": "108635794943",
+   "k_s": "250000000",
+   "keeper": "250000000",
+   "kind": "S3",
+   "l_bps": "12500",
+   "lenders": "37620437682",
+   "lump": "0",
+   "p_ema": "90273274928033010",
+   "penalty_bps": "500",
+   "pprime": "500",
+   "q": "1124774998898",
+   "r_due": "1069992",
+   "v": "37870437682"
+  },
+  {
    "b_fv": "3840262542",
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "4147772712",
@@ -43106,6 +43129,7 @@
   {
    "b_fv": "7581938079",
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "8189071458",
@@ -43125,6 +43149,7 @@
   {
    "b_fv": "7585687801",
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "8193121158",
@@ -43144,6 +43169,7 @@
   {
    "b_fv": "8162769639",
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "8816369543",
@@ -43161,84 +43187,9 @@
    "v": "7885199457"
   },
   {
-   "b_fv": "130017419166",
-   "borrower": "0",
-   "expired": false,
-   "expiry_fee_bps": "200",
-   "fv": "136521813966",
-   "k_s": "250000000",
-   "keeper": "250000000",
-   "kind": "S3",
-   "l_bps": "12500",
-   "lenders": "127491241290",
-   "lump": "2841325159",
-   "p_ema": "33649458270966182",
-   "penalty_bps": "500",
-   "pprime": "500",
-   "q": "3704261485766",
-   "r_due": "3523841",
-   "v": "127741241290"
-  },
-  {
-   "b_fv": "64424181720",
-   "borrower": "0",
-   "expired": false,
-   "expiry_fee_bps": "200",
-   "fv": "68936693514",
-   "k_s": "250000000",
-   "keeper": "250000000",
-   "kind": "S3",
-   "l_bps": "13500",
-   "lenders": "63683922295",
-   "lump": "2345969908",
-   "p_ema": "12418494399200363",
-   "penalty_bps": "700",
-   "pprime": "700",
-   "q": "4939015257631",
-   "r_due": "2819073",
-   "v": "63933922295"
-  },
-  {
-   "b_fv": "7477676115",
-   "borrower": "0",
-   "expired": false,
-   "expiry_fee_bps": "200",
-   "fv": "8076468537",
-   "k_s": "88851994",
-   "keeper": "88851994",
-   "kind": "S3",
-   "l_bps": "15000",
-   "lenders": "7796347463",
-   "lump": "708356250",
-   "p_ema": "1674126050834487",
-   "penalty_bps": "800",
-   "pprime": "800",
-   "q": "4233500146546",
-   "r_due": "578332",
-   "v": "7885199457"
-  },
-  {
-   "b_fv": "949036727",
-   "borrower": "0",
-   "expired": false,
-   "expiry_fee_bps": "200",
-   "fv": "1025032417",
-   "k_s": "19619487",
-   "keeper": "19619487",
-   "kind": "S3",
-   "l_bps": "15000",
-   "lenders": "942329241",
-   "lump": "1032298",
-   "p_ema": "1213355870966935",
-   "penalty_bps": "800",
-   "pprime": "800",
-   "q": "775719815761",
-   "r_due": "72751",
-   "v": "961948728"
-  },
-  {
    "b_fv": "114536186672",
    "borrower": "7224721443",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "120266519847",
@@ -43258,6 +43209,7 @@
   {
    "b_fv": "120543609538",
    "borrower": "916927434",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "126574313856",
@@ -43277,6 +43229,7 @@
   {
    "b_fv": "1629312282",
    "borrower": "14951875",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "1793059356",
@@ -43296,6 +43249,7 @@
   {
    "b_fv": "2159226713",
    "borrower": "497326059",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "2376443496",
@@ -43315,6 +43269,7 @@
   {
    "b_fv": "31472959788",
    "borrower": "4572759912",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "33047677770",
@@ -43334,6 +43289,7 @@
   {
    "b_fv": "57304124358",
    "borrower": "2365690158",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "61318232137",
@@ -43353,6 +43309,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -43372,6 +43329,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -43391,6 +43349,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -43410,6 +43369,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -43429,6 +43389,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -43448,6 +43409,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -43467,6 +43429,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -43484,27 +43447,29 @@
    "v": "3893309718"
   },
   {
-   "b_fv": "103461642810",
+   "b_fv": "130017419166",
    "borrower": "0",
+   "executable": false,
    "expired": false,
    "expiry_fee_bps": "200",
-   "fv": "108635794943",
+   "fv": "136521813966",
    "k_s": "250000000",
    "keeper": "250000000",
    "kind": "S3",
    "l_bps": "12500",
-   "lenders": "37620437682",
-   "lump": "0",
-   "p_ema": "90273274928033010",
+   "lenders": "127491241290",
+   "lump": "127487717449",
+   "p_ema": "33649458270966182",
    "penalty_bps": "500",
    "pprime": "500",
-   "q": "1124774998898",
-   "r_due": "1069992",
-   "v": "37870437682"
+   "q": "3704261485766",
+   "r_due": "3523841",
+   "v": "127741241290"
   },
   {
    "b_fv": "155546490188",
    "borrower": "0",
+   "executable": false,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "163327338539",
@@ -43513,7 +43478,7 @@
    "kind": "S3",
    "l_bps": "12500",
    "lenders": "127491241290",
-   "lump": "0",
+   "lump": "127487717449",
    "p_ema": "40141646793952492",
    "penalty_bps": "500",
    "pprime": "500",
@@ -43524,6 +43489,7 @@
   {
    "b_fv": "167665603630",
    "borrower": "0",
+   "executable": false,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "176052407653",
@@ -43532,7 +43498,7 @@
    "kind": "S3",
    "l_bps": "12500",
    "lenders": "127491241290",
-   "lump": "0",
+   "lump": "127487717449",
    "p_ema": "43246804425831230",
    "penalty_bps": "500",
    "pprime": "500",
@@ -43543,6 +43509,7 @@
   {
    "b_fv": "39680309517",
    "borrower": "0",
+   "executable": false,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "41665394985",
@@ -43551,7 +43518,7 @@
    "kind": "S3",
    "l_bps": "12500",
    "lenders": "37620437682",
-   "lump": "0",
+   "lump": "37619367690",
    "p_ema": "34809022047529322",
    "penalty_bps": "500",
    "pprime": "500",
@@ -43562,6 +43529,7 @@
   {
    "b_fv": "47384326450",
    "borrower": "0",
+   "executable": false,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "49754612765",
@@ -43570,7 +43538,7 @@
    "kind": "S3",
    "l_bps": "12500",
    "lenders": "37620437682",
-   "lump": "0",
+   "lump": "37619367690",
    "p_ema": "41525317798951649",
    "penalty_bps": "500",
    "pprime": "500",
@@ -43581,6 +43549,7 @@
   {
    "b_fv": "51071772830",
    "borrower": "0",
+   "executable": false,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "53626431464",
@@ -43589,7 +43558,7 @@
    "kind": "S3",
    "l_bps": "12500",
    "lenders": "37620437682",
-   "lump": "0",
+   "lump": "37619367690",
    "p_ema": "44736494279804136",
    "penalty_bps": "500",
    "pprime": "500",
@@ -43598,8 +43567,29 @@
    "v": "37870437682"
   },
   {
+   "b_fv": "64424181720",
+   "borrower": "0",
+   "executable": false,
+   "expired": false,
+   "expiry_fee_bps": "200",
+   "fv": "68936693514",
+   "k_s": "250000000",
+   "keeper": "250000000",
+   "kind": "S3",
+   "l_bps": "13500",
+   "lenders": "63683922295",
+   "lump": "63681103222",
+   "p_ema": "12418494399200363",
+   "penalty_bps": "700",
+   "pprime": "700",
+   "q": "4939015257631",
+   "r_due": "2819073",
+   "v": "63933922295"
+  },
+  {
    "b_fv": "72719513015",
    "borrower": "0",
+   "executable": false,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "77812698000",
@@ -43608,7 +43598,7 @@
    "kind": "S3",
    "l_bps": "13500",
    "lenders": "63683922295",
-   "lump": "0",
+   "lump": "63681103222",
    "p_ema": "13989635843065784",
    "penalty_bps": "700",
    "pprime": "700",
@@ -43617,8 +43607,49 @@
    "v": "63933922295"
   },
   {
+   "b_fv": "7477676115",
+   "borrower": "0",
+   "executable": false,
+   "expired": false,
+   "expiry_fee_bps": "200",
+   "fv": "8076468537",
+   "k_s": "88851994",
+   "keeper": "88851994",
+   "kind": "S3",
+   "l_bps": "15000",
+   "lenders": "7796347463",
+   "lump": "7795769131",
+   "p_ema": "1674126050834487",
+   "penalty_bps": "800",
+   "pprime": "800",
+   "q": "4233500146546",
+   "r_due": "578332",
+   "v": "7885199457"
+  },
+  {
+   "b_fv": "949036727",
+   "borrower": "0",
+   "executable": true,
+   "expired": false,
+   "expiry_fee_bps": "200",
+   "fv": "1025032417",
+   "k_s": "19619487",
+   "keeper": "19619487",
+   "kind": "S3",
+   "l_bps": "15000",
+   "lenders": "942329241",
+   "lump": "1032298",
+   "p_ema": "1213355870966935",
+   "penalty_bps": "800",
+   "pprime": "800",
+   "q": "775719815761",
+   "r_due": "72751",
+   "v": "961948728"
+  },
+  {
    "b_fv": "108061500705",
    "borrower": "14023141708",
+   "executable": false,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "113468099582",
@@ -43627,7 +43658,7 @@
    "kind": "S3",
    "l_bps": "12500",
    "lenders": "113468099582",
-   "lump": "9692099971",
+   "lump": "113464575741",
    "p_ema": "28014349464594072",
    "penalty_bps": "500",
    "pprime": "500",
@@ -43638,6 +43669,7 @@
   {
    "b_fv": "112652759452",
    "borrower": "9202320024",
+   "executable": false,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "118288921266",
@@ -43646,7 +43678,7 @@
    "kind": "S3",
    "l_bps": "12500",
    "lenders": "118288921266",
-   "lump": "10125076588",
+   "lump": "118285397425",
    "p_ema": "29198889239649650",
    "penalty_bps": "500",
    "pprime": "500",
@@ -43657,6 +43689,7 @@
   {
    "b_fv": "1295321800",
    "borrower": "502760427",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "1399093046",
@@ -43676,6 +43709,7 @@
   {
    "b_fv": "15156625317",
    "borrower": "2750327633",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "15914991579",
@@ -43695,6 +43729,7 @@
   {
    "b_fv": "15293129820",
    "borrower": "2606997905",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "16058321307",
@@ -43714,6 +43749,7 @@
   {
    "b_fv": "32867637850",
    "borrower": "3108347947",
+   "executable": false,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "34512089735",
@@ -43722,7 +43758,7 @@
    "kind": "S3",
    "l_bps": "12500",
    "lenders": "34512089735",
-   "lump": "2048971602",
+   "lump": "34511019743",
    "p_ema": "28860926116672903",
    "penalty_bps": "500",
    "pprime": "500",
@@ -43733,6 +43769,7 @@
   {
    "b_fv": "33797947571",
    "borrower": "2131522740",
+   "executable": false,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "35488914942",
@@ -43741,7 +43778,7 @@
    "kind": "S3",
    "l_bps": "12500",
    "lenders": "35488914942",
-   "lump": "2111619352",
+   "lump": "35487844950",
    "p_ema": "29673690855155247",
    "penalty_bps": "500",
    "pprime": "500",
@@ -43752,6 +43789,7 @@
   {
    "b_fv": "35756922946",
    "borrower": "74598596",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "37545839086",
@@ -43771,6 +43809,7 @@
   {
    "b_fv": "48275081717",
    "borrower": "12026765784",
+   "executable": false,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "51657156511",
@@ -43779,7 +43818,7 @@
    "kind": "S3",
    "l_bps": "13500",
    "lenders": "51657156511",
-   "lump": "5470904794",
+   "lump": "51654337438",
    "p_ema": "9350736986013076",
    "penalty_bps": "700",
    "pprime": "700",
@@ -43790,6 +43829,7 @@
   {
    "b_fv": "5266411979",
    "borrower": "2108044193",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "5688303270",
@@ -43809,6 +43849,7 @@
   {
    "b_fv": "55088700182",
    "borrower": "4736194027",
+   "executable": false,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "58947728268",
@@ -43817,7 +43858,7 @@
    "kind": "S3",
    "l_bps": "13500",
    "lenders": "58947728268",
-   "lump": "6340822451",
+   "lump": "58944909195",
    "p_ema": "10650723676726425",
    "penalty_bps": "700",
    "pprime": "700",
@@ -43828,6 +43869,7 @@
   {
    "b_fv": "5873964958",
    "borrower": "1451886976",
+   "executable": false,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "6344460487",
@@ -43836,7 +43878,7 @@
    "kind": "S3",
    "l_bps": "15000",
    "lenders": "6344460487",
-   "lump": "752453917",
+   "lump": "6343882155",
    "p_ema": "1320757775977716",
    "penalty_bps": "800",
    "pprime": "800",
@@ -43847,6 +43889,7 @@
   {
    "b_fv": "6791903527",
    "borrower": "460513321",
+   "executable": false,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "7335834142",
@@ -43855,7 +43898,7 @@
    "kind": "S3",
    "l_bps": "15000",
    "lenders": "7335834142",
-   "lump": "885072047",
+   "lump": "7335255810",
    "p_ema": "1523605418699954",
    "penalty_bps": "800",
    "pprime": "800",
@@ -43866,6 +43909,7 @@
   {
    "b_fv": "695682844",
    "borrower": "1846444",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": "751395306",
@@ -43885,6 +43929,7 @@
   {
    "b_fv": "1266285855",
    "borrower": "2504185205",
+   "executable": true,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "1340191416",
@@ -43904,6 +43949,7 @@
   {
    "b_fv": "18656253738",
    "borrower": "17820665131",
+   "executable": true,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "19799772551",
@@ -43923,6 +43969,7 @@
   {
    "b_fv": "1875977869",
    "borrower": "1723315678",
+   "executable": true,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "1990536809",
@@ -43942,6 +43989,7 @@
   {
    "b_fv": "18888305947",
    "borrower": "17583796564",
+   "executable": false,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "20036641118",
@@ -43950,7 +43998,7 @@
    "kind": "S3",
    "l_bps": "12500",
    "lenders": "20036641118",
-   "lump": "566092383",
+   "lump": "19266072066",
    "p_ema": "16625529284922056",
    "penalty_bps": "500",
    "pprime": "200",
@@ -43961,6 +44009,7 @@
   {
    "b_fv": "1891022770",
    "borrower": "1707969875",
+   "executable": true,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "2005882612",
@@ -43980,6 +44029,7 @@
   {
    "b_fv": "20669908621",
    "borrower": "19280639579",
+   "executable": false,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "21920761761",
@@ -43988,7 +44038,7 @@
    "kind": "S3",
    "l_bps": "12500",
    "lenders": "21920761761",
-   "lump": "764488521",
+   "lump": "21083306794",
    "p_ema": "16621984388033441",
    "penalty_bps": "500",
    "pprime": "200",
@@ -43999,6 +44049,7 @@
   {
    "b_fv": "2502533417",
    "borrower": "5146603785",
+   "executable": true,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "2649743678",
@@ -44018,6 +44069,7 @@
   {
    "b_fv": "2505191400",
    "borrower": "5143892642",
+   "executable": true,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "2652454821",
@@ -44037,6 +44089,7 @@
   {
    "b_fv": "255836010",
    "borrower": "482573043",
+   "executable": true,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "270668707",
@@ -44056,6 +44109,7 @@
   {
    "b_fv": "255844188",
    "borrower": "482564702",
+   "executable": true,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "270677048",
@@ -44075,6 +44129,7 @@
   {
    "b_fv": "255977270",
    "borrower": "482428958",
+   "executable": true,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "270812792",
@@ -44094,6 +44149,7 @@
   {
    "b_fv": "256162316",
    "borrower": "482240210",
+   "executable": true,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "271001540",
@@ -44113,6 +44169,7 @@
   {
    "b_fv": "2607297586",
    "borrower": "5039649971",
+   "executable": false,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "2756697492",
@@ -44121,7 +44178,7 @@
    "kind": "S3",
    "l_bps": "15000",
    "lenders": "2756697492",
-   "lump": "146433472",
+   "lump": "2659443538",
    "p_ema": "593601034403776",
    "penalty_bps": "800",
    "pprime": "200",
@@ -44132,6 +44189,7 @@
   {
    "b_fv": "318051733",
    "borrower": "605694332",
+   "executable": true,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "336634909",
@@ -44151,6 +44209,7 @@
   {
    "b_fv": "318661347",
    "borrower": "605072525",
+   "executable": true,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "337256716",
@@ -44170,6 +44229,7 @@
   {
    "b_fv": "61168212912",
    "borrower": "62562499688",
+   "executable": true,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "64928741602",
@@ -44189,6 +44249,7 @@
   {
    "b_fv": "6191441926",
    "borrower": "5785626719",
+   "executable": true,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "6568987287",
@@ -44208,6 +44269,7 @@
   {
    "b_fv": "6212043014",
    "borrower": "5709387810",
+   "executable": false,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "6590571759",
@@ -44216,7 +44278,7 @@
    "kind": "S3",
    "l_bps": "12500",
    "lenders": "6590571759",
-   "lump": "155098059",
+   "lump": "6336283875",
    "p_ema": "16652989379404347",
    "penalty_bps": "500",
    "pprime": "200",
@@ -44227,6 +44289,7 @@
   {
    "b_fv": "6216355904",
    "borrower": "5760214452",
+   "executable": true,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "6594399554",
@@ -44246,6 +44309,7 @@
   {
    "b_fv": "6217514181",
    "borrower": "5759032815",
+   "executable": true,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "6595581191",
@@ -44265,6 +44329,7 @@
   {
    "b_fv": "63357833529",
    "borrower": "60328511848",
+   "executable": false,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "67162729442",
@@ -44273,7 +44338,7 @@
    "kind": "S3",
    "l_bps": "12500",
    "lenders": "67162729442",
-   "lump": "3376796443",
+   "lump": "64624990200",
    "p_ema": "16534522196298246",
    "penalty_bps": "500",
    "pprime": "200",
@@ -44284,6 +44349,7 @@
   {
    "b_fv": "63856905",
    "borrower": "112315665",
+   "executable": true,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "67578473",
@@ -44303,6 +44369,7 @@
   {
    "b_fv": "63963571",
    "borrower": "112206866",
+   "executable": true,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "67687272",
@@ -44322,6 +44389,7 @@
   {
    "b_fv": "850606811",
    "borrower": "1623408248",
+   "executable": false,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "899712920",
@@ -44330,7 +44398,7 @@
    "kind": "S3",
    "l_bps": "15000",
    "lenders": "899712920",
-   "lump": "33938937",
+   "lump": "867618948",
    "p_ema": "596740988899816",
    "penalty_bps": "800",
    "pprime": "200",
@@ -44341,6 +44409,7 @@
   {
    "b_fv": "9402628770",
    "borrower": "8689440964",
+   "executable": true,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "9975878248",
@@ -44360,6 +44429,7 @@
   {
    "b_fv": "9413300877",
    "borrower": "8678555415",
+   "executable": true,
    "expired": true,
    "expiry_fee_bps": "200",
    "fv": "9986763797",
@@ -44379,6 +44449,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44398,6 +44469,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44417,6 +44489,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44436,6 +44509,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44455,6 +44529,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44474,6 +44549,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44493,6 +44569,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44512,6 +44589,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44531,6 +44609,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44550,6 +44629,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44569,6 +44649,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44588,6 +44669,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44607,6 +44689,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44626,6 +44709,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44645,6 +44729,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44664,6 +44749,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44683,6 +44769,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44702,6 +44789,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44721,6 +44809,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44740,6 +44829,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44759,6 +44849,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44778,6 +44869,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44797,6 +44889,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44816,6 +44909,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44835,6 +44929,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44854,6 +44949,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44873,6 +44969,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44892,6 +44989,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44911,6 +45009,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44930,6 +45029,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44949,6 +45049,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44968,6 +45069,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -44987,6 +45089,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45006,6 +45109,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45025,6 +45129,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45044,6 +45149,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45063,6 +45169,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45082,6 +45189,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45101,6 +45209,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45120,6 +45229,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45139,6 +45249,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45158,6 +45269,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45177,6 +45289,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45196,6 +45309,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45215,6 +45329,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45234,6 +45349,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45253,6 +45369,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45272,6 +45389,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45291,6 +45409,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45310,6 +45429,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45329,6 +45449,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45348,6 +45469,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45367,6 +45489,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45386,6 +45509,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45405,6 +45529,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45424,6 +45549,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45443,6 +45569,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45462,6 +45589,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45481,6 +45609,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45500,6 +45629,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45519,6 +45649,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45538,6 +45669,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45557,6 +45689,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45576,6 +45709,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45595,6 +45729,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45614,6 +45749,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45633,6 +45769,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45652,6 +45789,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45671,6 +45809,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45690,6 +45829,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45709,6 +45849,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45728,6 +45869,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45747,6 +45889,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45766,6 +45909,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45785,6 +45929,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45804,6 +45949,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45823,6 +45969,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45842,6 +45989,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45861,6 +46009,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45880,6 +46029,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45899,6 +46049,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45918,6 +46069,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45937,6 +46089,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45956,6 +46109,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45975,6 +46129,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -45994,6 +46149,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46013,6 +46169,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46032,6 +46189,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46051,6 +46209,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46070,6 +46229,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46089,6 +46249,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46108,6 +46269,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46127,6 +46289,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46146,6 +46309,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46165,6 +46329,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46184,6 +46349,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46203,6 +46369,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46222,6 +46389,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46241,6 +46409,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46260,6 +46429,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46279,6 +46449,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46298,6 +46469,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46317,6 +46489,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46336,6 +46509,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46355,6 +46529,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46374,6 +46549,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46393,6 +46569,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46412,6 +46589,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46431,6 +46609,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46450,6 +46629,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46469,6 +46649,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46488,6 +46669,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46507,6 +46689,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46526,6 +46709,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46545,6 +46729,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46564,6 +46749,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46583,6 +46769,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46602,6 +46789,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46621,6 +46809,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46640,6 +46829,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46659,6 +46849,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46678,6 +46869,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46697,6 +46889,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46716,6 +46909,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46735,6 +46929,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46754,6 +46949,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46773,6 +46969,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46792,6 +46989,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46811,6 +47009,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46830,6 +47029,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46849,6 +47049,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46868,6 +47069,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46887,6 +47089,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46906,6 +47109,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46925,6 +47129,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46944,6 +47149,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46963,6 +47169,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -46982,6 +47189,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47001,6 +47209,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47020,6 +47229,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47039,6 +47249,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47058,6 +47269,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47077,6 +47289,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47096,6 +47309,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47115,6 +47329,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47134,6 +47349,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47153,6 +47369,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47172,6 +47389,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47191,6 +47409,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47210,6 +47429,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47229,6 +47449,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47248,6 +47469,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47267,6 +47489,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47286,6 +47509,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47305,6 +47529,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47324,6 +47549,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47343,6 +47569,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47362,6 +47589,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47381,6 +47609,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47400,6 +47629,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47419,6 +47649,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47438,6 +47669,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47457,6 +47689,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47476,6 +47709,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47495,6 +47729,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47514,6 +47749,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47533,6 +47769,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47552,6 +47789,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47571,6 +47809,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47590,6 +47829,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47609,6 +47849,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47628,6 +47869,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47647,6 +47889,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47666,6 +47909,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47685,6 +47929,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47704,6 +47949,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47723,6 +47969,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47742,6 +47989,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47761,6 +48009,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47780,6 +48029,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47799,6 +48049,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47818,6 +48069,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47837,6 +48089,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47856,6 +48109,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47875,6 +48129,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47894,6 +48149,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47913,6 +48169,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47932,6 +48189,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47951,6 +48209,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47970,6 +48229,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -47989,6 +48249,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48008,6 +48269,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48027,6 +48289,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48046,6 +48309,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48065,6 +48329,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48084,6 +48349,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48103,6 +48369,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48122,6 +48389,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48141,6 +48409,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48160,6 +48429,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48179,6 +48449,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48198,6 +48469,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48217,6 +48489,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48236,6 +48509,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48255,6 +48529,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48274,6 +48549,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48293,6 +48569,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48312,6 +48589,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48331,6 +48609,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48350,6 +48629,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48369,6 +48649,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48388,6 +48669,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48407,6 +48689,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48426,6 +48709,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48445,6 +48729,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48464,6 +48749,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48483,6 +48769,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48502,6 +48789,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48521,6 +48809,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48540,6 +48829,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48559,6 +48849,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48578,6 +48869,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48597,6 +48889,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48616,6 +48909,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48635,6 +48929,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48654,6 +48949,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48673,6 +48969,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48692,6 +48989,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48711,6 +49009,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,
@@ -48730,6 +49029,7 @@
   {
    "b_fv": null,
    "borrower": "0",
+   "executable": true,
    "expired": false,
    "expiry_fee_bps": "200",
    "fv": null,

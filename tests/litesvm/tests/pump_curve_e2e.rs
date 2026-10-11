@@ -167,10 +167,11 @@ fn crank_none(s: &mut Sim) {
 }
 
 /// Checks an S3 settlement paid at the EMA point: `x = min(V − K_s, FV(P_ema, L_ema))` to the
-/// lenders (the premium over `⌊Q·P_ema/WAD⌋ + R_due` vests), the rest of `V − K_s` to the
-/// borrower, the position closed; the settlement box (ARCH §3.8) is the EMA point once nothing
-/// was observed for more than `RING_LEN` seconds on a venue that cannot execute (a list-only
-/// market), else the EMA widened by the ring's medians (a migrating curve is still observed).
+/// lenders (the venue cannot execute, so all of `x` above `R_due` vests: AIR-09), the rest of
+/// `V − K_s` to the borrower, the position closed; the settlement box (ARCH §3.8) is the EMA
+/// point once nothing was observed for more than `RING_LEN` seconds on a venue that cannot
+/// execute (a list-only market), else the EMA widened by the ring's medians (a migrating curve
+/// is still observed).
 fn assert_s3(s: &Sim, ev: &SolSettle, pos: &ShortPosition, r_due: u64, fv: u64) {
     let m = market(&s.env, &s.pm);
     let obs = m.observation();
@@ -194,8 +195,9 @@ fn assert_s3(s: &Sim, ev: &SolSettle, pos: &ShortPosition, r_due: u64, fv: u64) 
     let x = fv.min(pos.v - k);
     assert_eq!(ev.lender_amount, x, "lenders: min(V − K_s, FV)");
     assert_eq!(ev.borrower_amount, pos.v - k - x);
-    let v_ema = u64::try_from(u128::from(pos.q) * p / W).unwrap();
-    assert_eq!(ev.lump, x - x.min(v_ema + r_due), "the premium vests");
+    // A migrating curve and a list-only market cannot execute: their `P_ema` is no market price
+    // the immediate part could pay at, so only `R_due` is immediate (AIR-09).
+    assert_eq!(ev.lump, x - x.min(r_due), "all of x above R_due vests");
     assert!(
         read::account(
             &s.env.svm,
