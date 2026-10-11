@@ -22,7 +22,7 @@ use shortwin_math::MathError;
 use shortwin_math::U256;
 use shortwin_math::bounds::{
     ExitParams, expiry_reference, liq_reference, max_in_exp, max_in_liq, pi_ref, ref_depth_cap,
-    ref_liquidity,
+    ref_liquidity, spot_liquidity,
 };
 use shortwin_math::observe::{
     Bucket, EmaParams, LastBucket, Observation, Ring, RingEntry, VenueChange, integrate,
@@ -438,6 +438,40 @@ fn max_in_matches_sim() {
 #[derive(Deserialize)]
 struct UnitsRef {
     ref_liquidity: Vec<String>,
+    spot_liquidity: Vec<String>,
+}
+
+/// `Market.spot_liquidity` (FITS-2 (a); AIR-17): `max(L_live, L_floor)`, `L_floor = min(L_ema,
+/// L_mhi)` — the upper median of the bucket liquidity highs — while the post-change guard is set,
+/// else `L_ema`, against `bounds::spot_liquidity`.
+///
+/// `l_live L_ema guard L_spot | ring`.
+#[test]
+fn spot_liquidity_matches_sim() {
+    let f: UnitsRef = common::load_vectors("oracle", "units_ref.json");
+    assert!(f.spot_liquidity.len() >= 300);
+    let (mut highs, mut ema, mut live) = (0, 0, 0);
+    for (i, line) in f.spot_liquidity.iter().enumerate() {
+        let ctx = format!("spot_liquidity case {i}: {line}");
+        let mut t = Toks::new(line);
+        let l_live: u128 = t.v();
+        let mut o = Observation::default();
+        o.ema.liq = t.v();
+        o.ema.guard = u8::from(t.b());
+        let want: u128 = t.v();
+        assert_eq!(t.s(), "|", "{ctx}");
+        o.ring = parse_ring(&mut t);
+        t.done();
+        assert_eq!(spot_liquidity(l_live, &o.ema, &o.ring), Ok(want), "{ctx}");
+        // Coverage: the highs' median binds under the guard, L_ema binds, the live depth binds.
+        highs += usize::from(o.ema.guard != 0 && want < o.ema.liq && want > l_live);
+        ema += usize::from(want == o.ema.liq && want > l_live);
+        live += usize::from(want == l_live);
+    }
+    assert!(
+        highs >= 30 && ema >= 30 && live >= 30,
+        "coverage: highs {highs}, ema {ema}, live {live}"
+    );
 }
 
 /// `L_b` of `Market.exit_reference` alone (M4F-1): the post-change guard on or off and, on a

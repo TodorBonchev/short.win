@@ -9,14 +9,17 @@
 //! track's; this module supplies `P_ref`, `L_b` ([`ref_liquidity`], on Raydium with the
 //! [`ref_depth_cap`] of M4F-1, `Market.ref_depth_cap` in the sim) and, from `B̂_ref`,
 //! the bounds [`max_in_liq`] and [`max_in_exp`]. It also supplies the liquidity the
-//! liquidation spot leg is judged at, `max(L_live, L_ema')` ([`spot_liquidity`], FITS-2). The keeper executes iff
+//! liquidation spot leg is judged at, `max(L_live, L_floor)` with `L_floor = L_ema`, or `min(L_ema,
+//! L_mhi)` while the post-change guard is set ([`spot_liquidity`], FITS-2, AIR-17). The keeper executes iff
 //! `B̂_live ≤ max_in`. δ is a fixed, locked term (`delta_liq_bps` / `delta_exp_bps`):
 //! v0.4 removed the Dutch clock (ECON #49).
 
 use crate::consts::EMA_TAU_S;
 use crate::error::MathError;
 use crate::num::{BPS, Rounding, mul_bps_u64, mul_div};
-use crate::observe::{Ema, LastBucket, Ring, ring_liq_lower_median, sustained_growth};
+use crate::observe::{
+    Ema, LastBucket, Ring, ring_liq_lower_median, ring_liq_upper_median, sustained_growth,
+};
 use crate::pool_select::depth_at_lambda;
 
 /// Exit-bound terms, locked per position (ARCH §2.3.3, §2.3.5 "locked exit-bound and
@@ -123,21 +126,35 @@ pub fn guarded_ema_liquidity(ema: &Ema, ring: &Ring) -> Result<u128, MathError> 
 }
 
 /// The liquidity the liquidation **spot leg** is judged at (FITS-2 (a), owner decision of
-/// 2026-09-29; ECON §5.5; ARCH §3.6 precondition 3, §4.5): `max(L_live, L_ema')`, `L_live` the
-/// venue's `√(X·Y)` on the pre-trade state (`L_ema` on a venue without a price) and `L_ema'`
-/// [`guarded_ema_liquidity`]. The spot leg's risk quote is `B̂(Q; reprice(max(L_live, L_ema'),
-/// P_rs))`.
+/// 2026-09-29; ECON §5.5; ARCH §3.6 precondition 3, §4.5): `max(L_live, L_floor)`, `L_live` the
+/// venue's `√(X·Y)` on the pre-trade state (`L_ema` on a venue without a price) and `L_floor =
+/// L_ema`, except while the post-change guard is set (`ema.guard = 1`), when it is `min(L_ema,
+/// L_mhi)`, `L_mhi` the upper median of the ring's bucket liquidity **highs**
+/// ([`ring_liq_upper_median`]; AIR-17). The spot leg's risk quote is `B̂(Q; reprice(max(L_live,
+/// L_floor), P_rs))`.
 ///
 /// Why: `L_live` alone is the one input of "CR-liquidatable" a transaction can move by itself —
 /// an unlocked LP's `[withdraw, liquidate, deposit]` drains it inside the bundle and turns the
 /// spot leg true at a depth nobody trades at (FITS-2: a position below about half its open cap
-/// force-liquidated in a narrow band under its honest threshold). `L_ema'` is the post-roll EMA,
-/// which no instruction's own observation enters, so a withdrawal in the same transaction cannot
-/// lower the maximum below the EMA's depth. A deposit raises `L_live` and only makes the leg
+/// force-liquidated in a narrow band under its honest threshold). `L_floor` comes from the
+/// post-roll state, which no instruction's own observation enters, so a withdrawal in the same
+/// transaction cannot lower the maximum below it. A deposit raises `L_live` and only makes the leg
 /// harder to meet (as before). A pushed `L_ema` makes it harder too, but wherever `P_rs ≥ P_ema`
 /// (a pump) only where the EMA leg — judged on the ring's cached `reprice(L_ema, P_ema)`, the same
 /// pushed `L_ema` in its newest entry — is false already: `B̂` rises with `P` and falls with `L`,
-/// and `L_ema' ≤ L_ema`.
+/// and `L_floor ≤ L_ema`.
+///
+/// AIR-17, the guard: the floor used to be [`guarded_ema_liquidity`], `min(L_ema, L_mlo)`, the
+/// lower median of the bucket liquidity **lows** — the exit reference's guard. A bucket low is the
+/// minimum of its second, so an unlocked LP's `[withdraw, crank_price, deposit]` in 4 of every 8
+/// seconds set `L_mlo` to the drained depth even with the keeper observing every second, and the
+/// same wraps kept the guard from clearing: a liquidation wrapped in the LP's withdrawal was judged
+/// at the drained depth, which forced positions in the spike-and-retreat band (the EMA leg true,
+/// `P_rs < P_ema`). A bucket high is the maximum of its second: one honest observation in it
+/// keeps it at the pool's depth, and lowering `L_mhi` takes 5 of 8 attacker-only seconds, which
+/// the keeper's per-second coverage while the guard is set denies. A deposit-wrapped crank in 4 of
+/// every 8 seconds can raise `L_mhi`, so the floor rises to at most `L_ema` (`min`): such a push
+/// defers, never forces, and in a pump defers nothing the EMA leg does not.
 ///
 /// What it does not stop (FITX-1, ECON §12.12 residual 10; owner item O18): a low `L_ema` reached
 /// **genuinely** — the unlocked LP withdraws for real for a few seconds, then re-deposits and
@@ -145,16 +162,21 @@ pub fn guarded_ema_liquidity(ema: &Ema, ring: &Ring) -> Result<u128, MathError> 
 /// cannot lift — is read here like any other, and forces exactly the liquidations the same LP's
 /// withdrawal for good forces.
 ///
-/// A genuinely withdrawn pool: the spot leg waits until `L_ema` (τ = `EMA_TAU_S` = 5 s) has
-/// decayed toward the new depth. The EMA leg reads the same decayed `L_ema` in its newest ring
+/// A genuinely withdrawn pool: the spot leg waits at most until `L_ema` (τ = `EMA_TAU_S` = 5 s)
+/// has decayed toward the new depth. The EMA leg reads the same decayed `L_ema` in its newest ring
 /// entry, so wherever `P_rs ≥ P_ema` (a pump, the case liquidations are for) the spot leg at
-/// `L_ema'` holds whenever the EMA leg's newest entry does: the new rule adds no delay beyond the
-/// EMA leg's own `liq_persist_n`-entry lag. The exit bound's `L_b` ([`ref_liquidity`]) is
-/// unchanged.
+/// `L_ema` holds whenever the EMA leg's newest entry does: the rule adds no delay beyond the EMA
+/// leg's own `liq_persist_n`-entry lag. The exit bound's `L_b` ([`ref_liquidity`]) keeps the guard
+/// on the lows.
 ///
-/// Errors: as [`guarded_ema_liquidity`].
+/// Errors: `InvalidInput` for a corrupted ring while the guard is set.
 pub fn spot_liquidity(l_live: u128, ema: &Ema, ring: &Ring) -> Result<u128, MathError> {
-    Ok(l_live.max(guarded_ema_liquidity(ema, ring)?))
+    let floor = if ema.guard != 0 {
+        ema.liq.min(ring_liq_upper_median(ring)?)
+    } else {
+        ema.liq
+    };
+    Ok(l_live.max(floor))
 }
 
 /// The Raydium (M4F-1) and PumpSwap (M6R-1) cap of [`ref_liquidity`]'s EMA terms:
@@ -501,14 +523,18 @@ mod tests {
         assert_eq!(ref_liquidity(50, &ema, &ring, None), Ok(120));
     }
 
-    /// FITS-2 (a): the spot leg's liquidity is `max(L_live, L_ema')` — a drained `L_live` never
-    /// takes it below the (guarded) EMA's depth; a deeper `L_live` is kept; `L_slow` and the depth
-    /// cap do not enter.
+    /// FITS-2 (a): the spot leg's liquidity is `max(L_live, L_floor)` — a drained `L_live` never
+    /// takes it below the EMA's depth (under the guard `min(L_ema, L_mhi)`, AIR-17); a deeper
+    /// `L_live` is kept; `L_slow` and the depth cap do not enter.
     #[test]
     fn spot_liquidity_is_the_live_depth_floored_at_the_guarded_ema() {
         let (mut ema, mut ring, _) = state(&[(0, WAD), (1, WAD), (2, WAD)], (2, WAD));
-        for (e, llo) in ring.entries.iter_mut().zip([300u128, 200, 100]) {
-            e.llo = llo;
+        for (e, (llo, lhi)) in
+            ring.entries
+                .iter_mut()
+                .zip([(300u128, 1_000u128), (200, 700), (100, 600)])
+        {
+            (e.llo, e.lhi) = (llo, lhi);
         }
         ema.liq = 900;
         ema.liq_slow = 5_000;
@@ -516,11 +542,17 @@ mod tests {
         assert_eq!(guarded_ema_liquidity(&ema, &ring), Ok(900));
         assert_eq!(spot_liquidity(50, &ema, &ring), Ok(900));
         assert_eq!(spot_liquidity(1_200, &ema, &ring), Ok(1_200));
-        // Under the guard, L_ema' = min(L_ema, L_mlo) = 200.
+        // Under the guard the floor is min(L_ema, L_mhi) = 700, the upper median of the highs
+        // (AIR-17); the exit reference's L_ema' = min(L_ema, L_mlo) = 200.
         ema.guard = 1;
         assert_eq!(guarded_ema_liquidity(&ema, &ring), Ok(200));
-        assert_eq!(spot_liquidity(50, &ema, &ring), Ok(200));
-        assert_eq!(spot_liquidity(250, &ema, &ring), Ok(250));
+        assert_eq!(spot_liquidity(50, &ema, &ring), Ok(700));
+        assert_eq!(spot_liquidity(250, &ema, &ring), Ok(700));
+        assert_eq!(spot_liquidity(800, &ema, &ring), Ok(800));
+        // Highs above L_ema (a deposit push): never above L_ema.
+        ema.liq = 650;
+        assert_eq!(spot_liquidity(50, &ema, &ring), Ok(650));
+        ema.liq = 900;
         // The exit bound keeps its own terms (L_slow, the cap).
         assert_eq!(ref_liquidity(50, &ema, &ring, None), Ok(5_000));
         ring.head = 9;
@@ -530,6 +562,82 @@ mod tests {
         );
         ema.guard = 0;
         assert_eq!(spot_liquidity(50, &ema, &ring), Ok(900));
+    }
+
+    /// AIR-17: a Raydium adoption (the anchor, `L_slow ≤ D`, marked), then the keeper's honest
+    /// observation at the pool's depth `H` in every second and an unlocked LP's `[withdraw,
+    /// crank_price, deposit]` — a record at the drained depth `D` — in 4 of every 8 seconds
+    /// (`wrapped`), or a deposit-wrapped crank (a record at `pushed`) in every second.
+    fn guarded_pool(wrapped: Option<u128>, pushed: Option<u128>) -> crate::observe::Observation {
+        const U: u128 = 1_000_000_000;
+        let prm = crate::observe::EmaParams::DEFAULT;
+        let mut o = crate::observe::Observation::new(0, 2 * WAD, 3_000 * U).unwrap();
+        for t in 1..4i64 {
+            o.record(t, 2 * WAD, 3_000 * U).unwrap();
+            o.roll(t + 1, &prm).unwrap();
+        }
+        o.rewrite_liquidity(
+            4_000 * U,
+            crate::observe::VenueChange::RaydiumLocked {
+                slow_cap: 1_500 * U,
+            },
+        )
+        .unwrap();
+        o.mark_restart();
+        for t in 20..60i64 {
+            o.record(t, 2 * WAD, 3_000 * U).unwrap();
+            if let Some(d) = wrapped.filter(|_| t % 8 < 4) {
+                o.record(t, 2 * WAD, d).unwrap();
+            }
+            if let Some(e) = pushed {
+                o.record(t, 2 * WAD, e).unwrap();
+            }
+            o.roll(t + 1, &prm).unwrap();
+        }
+        o
+    }
+
+    /// AIR-17: while the post-change guard is set, the spot leg's floor is `min(L_ema, L_mhi)` —
+    /// the upper median of the bucket liquidity **highs**, which a withdrawal in a second the
+    /// keeper also observes cannot lower — not the lower median of the lows, which the wraps set
+    /// to the drained depth. A liquidation wrapped in the same LP's withdrawal (`L_live = D`) is
+    /// judged at the pool's depth, not at `D`; a deposit push can lift the floor no higher than
+    /// `L_ema` (the bound FITS-2's argument needs) and, as before, forces nothing.
+    #[test]
+    fn withdraw_wrapped_cranks_do_not_lower_the_guarded_spot_floor() {
+        const U: u128 = 1_000_000_000;
+        let (h, d) = (3_000 * U, 1_500 * U);
+        let o = guarded_pool(Some(d), None);
+        assert_eq!((o.ema.warm, o.ema.guard), (0, 1));
+        let (_, _, l_mlo, l_mhi) = crate::observe::ring_medians(&o.ring).unwrap();
+        assert_eq!((l_mlo, l_mhi), (d, h));
+        assert!(o.ema.liq * 100 > h * 99, "{}", o.ema.liq);
+        // The withdraw-wrapped liquidation: L_live drained to D.
+        let l_spot = spot_liquidity(d, &o.ema, &o.ring).unwrap();
+        assert_eq!(
+            l_spot,
+            o.ema.liq.min(h),
+            "the spot leg judged at {l_spot}, D = {d}"
+        );
+        // A position the pool keeps 1 % above its liquidation CR (q 2 % of the token reserve at
+        // H) is CR-liquidatable at D; at the floor its spot leg stays false.
+        let pr = crate::quote::Pricing::RayV4(crate::fees::ray_v4(25, 10_000).unwrap());
+        let p = 2 * WAD;
+        let (x_h, _) = crate::quote::reprice(h, p).unwrap();
+        let q = u64::try_from(x_h / 50).unwrap();
+        let b = |l: u128| pr.buy_repriced(q, l, p).map(|b| b.cost);
+        let l_bps = 12_500u32;
+        let v_eff = u64::try_from(u128::from(b(h).unwrap()) * 12_625 / 10_000).unwrap();
+        let leg = |l: u128| crate::risk::spot_leg(true, true, v_eff, b(l), l_bps).unwrap();
+        assert!(!leg(h) && leg(d));
+        assert!(!leg(l_spot));
+        // The exit reference keeps its guard on the lows (M4R).
+        assert_eq!(guarded_ema_liquidity(&o.ema, &o.ring), Ok(d));
+        // A deposit freeze: the floor follows the pushed highs only up to L_ema.
+        let o = guarded_pool(None, Some(9_000 * U));
+        assert_eq!(o.ema.guard, 1);
+        let l_spot = spot_liquidity(d, &o.ema, &o.ring).unwrap();
+        assert!(l_spot <= o.ema.liq, "{l_spot} > {}", o.ema.liq);
     }
 
     /// M4F-1: on Raydium the EMA terms are capped at `⌊D·10⁴/λ_min⌋`; `L_live` never is, and

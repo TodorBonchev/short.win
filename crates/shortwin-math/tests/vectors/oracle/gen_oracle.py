@@ -30,6 +30,9 @@ extremes, adversarial ring shapes, stale buckets, the reference caps):
                Raydium venue, Market.ref_depth_cap = floor(D*1e4/lambda_min) binding or not
                (none on another venue); drawn after units_bounds, so the other files keep
                their random stream.
+    spot_liquidity Market.spot_liquidity (FITS-2 (a); AIR-17): max(L_live, L_floor), L_floor
+               = min(L_ema, L_mhi) while the guard is set, else L_ema; its own random stream
+               (SEED + 2), so ref_liquidity keeps its cases.
 
 Ranges. (x, y) is compared exactly, so every reprojection in these vectors lies where the
 u128 forms of ECON §2.1 are exact for any correct implementation: L*10^9 <= u128::MAX and
@@ -435,6 +438,24 @@ def unit_ref_liquidity(rng, n):
     return cases
 
 
+def unit_spot_liquidity(rng, n):
+    """Market.spot_liquidity (FITS-2 (a); AIR-17): the guard on or off, L_live drawn around the
+    floor (a withdraw-drained pool below it, a deposit above it), L_ema around the ring's highs.
+
+      spot_liquidity  l_live L_ema guard L_spot | ring"""
+    cases = []
+    for _ in range(n):
+        ring = rnd_ring(rng, rng.randrange(1, 9))
+        m = bare()
+        m.ring = ring
+        highs = sorted(e[8] for e in ring)
+        m.liq = rnd_liq(rng) if rng.random() < 0.5 else max(1, rng.choice(highs) * rng.randrange(5_000, 15_000) // 10_000)
+        m.guard = rng.random() < 0.6
+        ll = rnd_liq(rng) if rng.random() < 0.4 else max(1, m.liq * rng.randrange(1_000, 13_000) // 10_000)
+        cases.append(line(ll, m.liq, m.guard, M.spot_liquidity(m, ll), "|", *ring_tokens(ring)))
+    return cases
+
+
 def max_in_exp(b_ref, delta, eps, fee_bps, V, K, R, ert):
     """Transcription of Market._buyback_exit, exp_reserve = "rent+fee"."""
     senior = R + sim.cdiv(fee_bps * b_ref, BPS)
@@ -480,7 +501,9 @@ def main():
         "units_persist.json": dump("units_persist.json", {"persist": unit_persist(rng, 600)}),
         "units_bounds.json": dump("units_bounds.json", {
             "reference": unit_reference(rng, 600), "max_in": unit_max_in(rng, 500)}),
-        "units_ref.json": dump("units_ref.json", {"ref_liquidity": unit_ref_liquidity(rng, 500)}),
+        "units_ref.json": dump("units_ref.json", {
+            "ref_liquidity": unit_ref_liquidity(rng, 500),
+            "spot_liquidity": unit_spot_liquidity(random.Random(SEED + 2), 400)}),
     }
     for k, v in sizes.items():
         print(f"{k}: {v:,} bytes")

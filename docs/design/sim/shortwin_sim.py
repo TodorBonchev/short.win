@@ -127,8 +127,9 @@ What it models (integer math wherever the on-chain program uses integers):
     only a candidate whose locked depth covers the incumbent's L_slow: FAST_SCENARIOS' 50 % and 25 % candidates no
     longer carry it and its 120 % candidate does.  Zero-position adoptions and listings are unaffected.
   * The liquidation spot leg at the guarded EMA liquidity (FITS-2 (a), ECONOMICS.md changelog #101; PROPOSED, owner
-    item O18): the CR-liquidatability spot leg is judged at L_spot = max(L_live, L_ema') (Market.spot_liquidity;
-    L_ema' = min(L_ema, L_mlo) while ema_guard = 1, else L_ema; uncapped), so an LP withdrawal in the same
+    item O18): the CR-liquidatability spot leg is judged at L_spot = max(L_live, L_floor) (Market.spot_liquidity;
+    L_floor = min(L_ema, L_mhi) while ema_guard = 1 -- AIR-17: the upper median of the bucket liquidity highs, not
+    L_ema' = min(L_ema, L_mlo), whose lows withdraw-wrapped cranks set -- else L_ema; uncapped), so an LP withdrawal in the same
     transaction cannot make it true -- a withdraw-wrapped liquidation or expiry of a position healthy at the pool's
     depth needs L_ema itself dragged down first, which the keeper's per-second liquidity-anomaly coverage denies to
     attacker-only seconds (ECON §5.8 duty 2; attacks/switch_warmup.py part 5b) -- not to a genuine held withdrawal:
@@ -1737,19 +1738,26 @@ class Market:
 
     def spot_liquidity(self, L_live: int) -> int:
         """FITS-2 (a) (#101; PROPOSED; ECON §5.5, §8.2; ARCH §3.6-§3.8): the liquidity the CR-liquidatability spot
-        leg is judged at, L_spot = max(L_live, L_ema') -- the robust spot P_rs repriced on the deeper of the live pool
-        and the guarded EMA liquidity (uncapped: the reference cap binds L_b's EMA terms only).  An LP withdrawal in
-        the same transaction lowers L_live but not L_ema', so it cannot make the spot leg true; the leg then needs the
-        EMA liquidity itself to have fallen -- genuinely (after a held withdrawal each integrated second closes 1/6 of
-        the gap L_ema - L_live, tau = 5 s at dt = 1, the clamp at most halving L_ema: if the spot leg binds, the
-        liquidation waits until the gap is small enough) or by attacker-only seconds, which the keeper's per-second
-        liquidity-anomaly coverage denies after the first (ECON §5.8 duty 2).  The coverage holds L_ema but cannot lift
-        it: a low reached by a genuine held withdrawal and then frozen by withdraw-wrapped cranks stays in the leg and
-        forces what the same LP's withdrawal for good forces (FITX-1, #102; switch_warmup.py part 5b (vii); ECON §12.12
-        residual 10).  A deposit can raise L_ema' and so delay
-        the leg by at most the position's own depth effect, ~ (1 - L_live/L_ema')*q/x in price.  The EMA leg (the
-        ring's cached reprojections at L_ema) and L_b are unchanged."""
-        return max(L_live, self.ema_liquidity())
+        leg is judged at, L_spot = max(L_live, L_floor) -- the robust spot P_rs repriced on the deeper of the live pool
+        and the EMA liquidity (uncapped: the reference cap binds L_b's EMA terms only).  L_floor = L_ema, except while
+        the post-change guard is set: then min(L_ema, L_mhi), L_mhi the upper median of the ring's bucket liquidity
+        highs (AIR-17; bounds::spot_liquidity).  It used to be L_ema' = min(L_ema, L_mlo), the reference's guard: a
+        bucket low is the minimum of its second, so an unlocked LP's [withdraw, crank_price, deposit] in 4 of every 8
+        seconds set L_mlo to the drained depth even with the keeper observing each second, and a liquidation wrapped
+        in the same withdrawal was judged there (positions in the spike-and-retreat band forced); one honest
+        observation keeps a bucket high at the pool's depth.  An LP withdrawal in the same transaction lowers L_live
+        but not L_floor, so it cannot make the spot leg true; the leg then needs the EMA liquidity itself to have
+        fallen -- genuinely (after a held withdrawal each integrated second closes 1/6 of the gap L_ema - L_live,
+        tau = 5 s at dt = 1, the clamp at most halving L_ema: if the spot leg binds, the liquidation waits until the
+        gap is small enough) or by attacker-only seconds, which the keeper's per-second liquidity-anomaly coverage
+        denies after the first (ECON §5.8 duty 2).  The coverage holds L_ema but cannot lift it: a low reached by a
+        genuine held withdrawal and then frozen by withdraw-wrapped cranks stays in the leg and forces what the same
+        LP's withdrawal for good forces (FITX-1, #102; switch_warmup.py part 5b (vii); ECON §12.12 residual 10).  A
+        deposit can raise L_floor (at most to L_ema) and so delay the leg by at most the position's own depth effect,
+        ~ (1 - L_live/L_floor)*q/x in price.  The EMA leg (the ring's cached reprojections at L_ema) and L_b are
+        unchanged."""
+        floor = min(self.liq, self.ring_medians()[3]) if self.guard else self.liq
+        return max(L_live, floor)
 
     def ema_growth_bps(self) -> int:
         """Sustained EMA growth g: the LOWER MEDIAN (index (n - 1) // 2 of the sorted values) of the

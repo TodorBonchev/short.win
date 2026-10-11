@@ -748,6 +748,22 @@ pub fn ring_liq_lower_median(ring: &Ring) -> Result<u128, MathError> {
     lower_median(lows.get_mut(..n).ok_or(MathError::InvalidInput)?)
 }
 
+/// `L_mhi`, the upper median (index `⌊n/2⌋` of the sorted values) of the ring entries' bucket
+/// liquidity highs `lhi` — the fourth value of [`ring_medians`], alone (AIR-17: the spot leg's
+/// floor while the post-change guard is set, `bounds::spot_liquidity`). Errors: `InvalidInput` for
+/// a corrupted or empty ring.
+pub fn ring_liq_upper_median(ring: &Ring) -> Result<u128, MathError> {
+    ring.check()?;
+    let mut highs = [0u128; RING_LEN];
+    let n = ring.len();
+    for (slot, e) in highs.iter_mut().zip(ring.iter()) {
+        *slot = e.lhi;
+    }
+    let highs = highs.get_mut(..n).ok_or(MathError::InvalidInput)?;
+    highs.sort_unstable();
+    highs.get(n / 2).copied().ok_or(MathError::InvalidInput)
+}
+
 /// Whether an integration with pre-roll gap `gap_s` ([`integrate`]) emits `CoverageGap`:
 /// the market has open positions and `gap_s > COVERAGE_GAP_S` (ARCH §4.4, A69).
 pub const fn coverage_gap(gap_s: i64, open_positions: u64) -> bool {
@@ -1115,6 +1131,13 @@ mod tests {
                 .unwrap();
         }
         assert_eq!(ring_medians(&r).unwrap(), (13, 24, 26, 37));
+        // The liquidity medians alone (the reference guard; AIR-17's guarded spot floor).
+        assert_eq!(ring_liq_lower_median(&r), Ok(26));
+        assert_eq!(ring_liq_upper_median(&r), Ok(37));
+        assert_eq!(
+            ring_liq_upper_median(&Ring::default()),
+            Err(MathError::InvalidInput)
+        );
     }
 
     /// A genuine 1 %/s pump observed every second by the keeper; in every second `t` with
