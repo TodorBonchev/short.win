@@ -539,6 +539,7 @@ fn econ_demos_round_3_and_round_4_cases() {
         "pot_chain_demo",
         "rebase_vest_demo",
         "empty_pool_gate_demo",
+        "lock_era_demo",
         "pool_edge",
     ] {
         assert!(

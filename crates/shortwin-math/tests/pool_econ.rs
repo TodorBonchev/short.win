@@ -734,3 +734,43 @@ fn stuck_lock_clears_at_lock_until() {
         assert_eq!(got, cells, "growing {growing}");
     }
 }
+
+/// AIR-12 (I-12): a lock era ends when every lock has expired (`lock_norm` back to 0) while
+/// borrowing goes on (a small position stays open, so `ΣB_Q` never reaches 0 and the `Π` epoch
+/// never rolls). The next lock restarted `b_min` at `ΣB_Q` but kept `Π`, so every era's decay
+/// multiplied into the next: with a 1/1,001 repay per era `Π` fell 10¹⁸ → 10¹⁵ → … → 1 by the
+/// sixth era, after which a lock no longer shrank when its borrowers repaid (`⌈lock·1/1⌉`), only
+/// at `lock_until` (`pool_model.lock_era_demo`). Now `Π` restarts at `WAD` with `b_min`, and
+/// every era's lock decays as the first one did.
+#[test]
+fn lock_decay_restarts_with_every_lock_era() {
+    let mut s = Model::new(9_000);
+    s.deposit(A, 1_000_000_000_000).expect("A");
+    s.deposit(B, 1_000_000_000_000).expect("B");
+    s.borrow(1_000_000_000, 3_600, S3_TAIL_S)
+        .expect("the small position, kept open");
+    for era in 0..8 {
+        let big = s
+            .borrow(1_000_000_000_000, 3_600, S3_TAIL_S)
+            .expect("an open");
+        let a = s.free_allowance(A).expect("allowance");
+        let sh = (s.shares_at(a) / 2).max(1);
+        s.withdraw(A, sh)
+            .expect("A takes half its free part: a lock");
+        let set = s.m.lock_of(A).expect("lock");
+        assert!(set > 0, "era {era}");
+        assert_eq!(s.m.vault.pi, WAD, "era {era}: Π restarts with the lock era");
+        s.repay(big, 0, 0)
+            .expect("the open closes: ΣB_Q falls by 1,000/1,001");
+        let left = s.m.lock_of(A).expect("lock");
+        assert!(
+            left <= set / 1_000 + 1,
+            "era {era}: the lock decays with the repay ({set} -> {left})"
+        );
+        // Past A's lock_until: the lock expires and its bucket leaves lock_norm.
+        let until = s.touch(A).lock_until;
+        s.advance(until - s.m.now + 1, 0);
+        s.m.cal_advance().expect("calendar");
+        assert_eq!(s.m.vault.lock_norm, 0, "era {era}: the era ends");
+    }
+}

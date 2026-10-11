@@ -43,8 +43,9 @@ Model (all integers; rounding in favour of the pool):
     Pool(mode="release") comparison model (owner option, ECON §9.4).
   * Withdrawals (SPEC §2.4, C0-9): pro-rata part of unborrowed inventory; the borrowed
     part of what a lender withdrew is locked (survival index PI decaying only below
-    the running minimum b_min of B, V2-3) and, v0.4 (R3B-1), every lock expires at
-    lock_until.  v0.4.1: lock_until = ceil((max(now, max_release) + lock_grace_s) / 1 d) * 1 d,
+    the running minimum b_min of B, V2-3; AIR-12: PI restarts at WAD with b_min at the first
+    lock of every lock era, so the eras' decays no longer compound) and, v0.4 (R3B-1), every
+    lock expires at lock_until.  v0.4.1: lock_until = ceil((max(now, max_release) + lock_grace_s) / 1 d) * 1 d,
     max_release = latest (deadline + that position's own S3 tail) of any position opened so
     far (R4A-8 / R4B-8); the aggregate lock term lives in a day-bucket expiry calendar, so an
     expired lock leaves the aggregate at its lock_until without its holder being touched
@@ -142,7 +143,7 @@ class Pool:
                  lock_expiry: bool = True, lock_calendar: bool = True, vest_weighted: bool = True,
                  wipe_sweep_gate: bool = True, exit_flush_bps: int = 0, lock_floor: bool = True,
                  cum_convert: bool = True, fwd_chain: bool = True, vest_floor: bool = True,
-                 dust_flush: bool = True, empty_sweep_gate: bool = True):
+                 dust_flush: bool = True, empty_sweep_gate: bool = True, pi_era_reset: bool = True):
         assert mode in ("continuous", "release")
         self.mode = mode
         self.util_cap = util_cap_bps
@@ -167,6 +168,8 @@ class Pool:
                                                 #   full wipe, T + B == 0; comparison rows)
         self.empty_sweep_gate = empty_sweep_gate  # False: v0.4.2 behaviour before AIR-08 (after the last lender's exit
                                                 #   a deposit needs no sweep first; comparison rows)
+        self.pi_era_reset = pi_era_reset        # False: v0.4.2 behaviour before AIR-12 (a new lock era restarts b_min
+                                                #   but keeps PI, which compounds across eras; comparison rows)
         self.now = 0
         self.T = 0
         self.B = 0
@@ -668,6 +671,10 @@ class Pool:
             new_lock = min(cur + add, L.shares - shares)
             if new_lock and self.lock_norm == 0:
                 self.b_min = self.B
+                if self.pi_era_reset:
+                    # AIR-12: the first lock of a lock era (no lock is live, so none reads PI) restarts PI with b_min;
+                    # kept, every era's decay multiplied into the next and PI fell to 1 while B stayed above 0
+                    self.pi = WAD
             if L.lock_epoch == self.pi_epoch and (cur or not self.lock_expiry or not self.lock_calendar):
                 self._cal_sub(L.lock_until, L.lock_term)      # a live lock leaves its bucket
             # v0.4.1: floor, so the aggregate locked <= sum of the lenders' own (ceil) locks and the
@@ -1561,6 +1568,33 @@ def lock_tail_demo():
         p.withdraw("A", min(p._touch("A").shares, a * (p.S + VS) // (p.T + p.B + VA)))
         out.append((label, p._touch("A").lock_until / D, (30 * D + tail) / D))
     return out
+
+
+def lock_era_demo(eras: int = 8):
+    """AIR-12 (I-12): lock eras while borrowing never stops (a small position stays open, so B never reaches 0 and
+    the PI epoch never rolls).  Each era a large position opens, A withdraws half its free part (a lock: b_min =
+    B), the large position closes (B falls by 1,000/1,001) and A's lock expires at lock_until (lock_norm back to
+    0).  Before the fix the next era restarted b_min but kept PI, so the eras' decays multiplied: PI fell to 1 by
+    the sixth era and A's lock no longer shrank when the borrowers repaid.  Rows (model, era, PI when A's lock is
+    set, PI after the repay, A's lock after the repay in permille of its lock when set)."""
+    rows = []
+    for label, reset in (("v0.4.2 (PI kept across lock eras)", False), ("AIR-12 (PI restarts with every lock era)", True)):
+        p = Pool("continuous", util_cap_bps=9_000, pi_era_reset=reset)
+        p.deposit("A", 10**12)
+        p.deposit("B", 10**12)
+        p.borrow("small", 10**9, 3_600)
+        for era in range(1, eras + 1):
+            p.borrow(f"big{era}", 10**12, 3_600)
+            a = p.free_allowance("A")
+            p.withdraw("A", max(1, a * (p.S + VS) // (p.T + p.B + VA) // 2))
+            pi_set = p.pi
+            lock_set = p._lock_of(p._touch("A"))
+            p.repay(f"big{era}", 0, 0)
+            left = p._lock_of(p._touch("A"))
+            rows.append((label, era, pi_set, p.pi, 1000 * left // lock_set))
+            p.advance(p._touch("A").lock_until - p.now + 1)
+            p._cal_advance()
+    return rows
 
 
 def wipe_gate_demo():
@@ -2527,6 +2561,12 @@ def main():
     print("|---|---|---|")
     for label, lu, rel in lock_tail_demo():
         print(f"| {label} | {lu:.2f} | {rel:.2f} |")
+    print("\nAIR-12 lock eras while a small position keeps B above 0: each era a large position opens, A withdraws "
+          "half its free part, the large position closes (B falls by 1,000/1,001) and A's lock expires:")
+    print("| model | era | PI when A's lock is set | PI after the repay | A's lock left (permille) |")
+    print("|---|---|---|---|---|")
+    for label, era, pi_set, pi_after, left in lock_era_demo():
+        print(f"| {label} | {era} | {pi_set:,} | {pi_after:,} | {left} |")
     print("\nR4A-7 the keeper that executes the wiping sol_settle bundles [sol_settle -> deposit(2 raw units) -> "
           "claim_venue_rewards (1 SOL of pre-wipe cashback)]:")
     print("| model | first step after the wipe | dust depositor gets (lamports) | wiped lenders get (lamports) |")

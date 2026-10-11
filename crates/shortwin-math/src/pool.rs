@@ -165,7 +165,8 @@ pub struct Vault {
     /// Lock expiry calendar: bucket `d mod LOCK_BUCKETS` holds the lock terms whose
     /// `lock_until` ends day `d`, for the days `cal_day .. cal_day + LOCK_BUCKETS`.
     pub lock_cal: [u128; LOCK_BUCKETS],
-    /// `Π`: borrowed-inventory survival index (WAD; ECON §9.3, C0-9).
+    /// `Π`: borrowed-inventory survival index (WAD; ECON §9.3, C0-9); back to `WAD` at a `Π`
+    /// epoch roll and, since AIR-12, at the first lock of every lock era.
     pub pi: u128,
     /// Σ of the live calendar buckets (the aggregate lock term).
     pub lock_norm: u128,
@@ -177,7 +178,8 @@ pub struct Vault {
     /// Protocol fees. The pool adds lender credits that find no lender (`S = 0`, no live
     /// wipe record, R3A-10); every other protocol income is added by the program.
     pub protocol_fees: u64,
-    /// Running minimum of `ΣB_Q` since the first lock of the `Π` epoch (V2-3).
+    /// Running minimum of `ΣB_Q` since the first lock of the lock era — the first lock taken
+    /// while no lock is live; it restarts `Π` at `WAD` too (V2-3, AIR-12).
     pub b_min: u64,
     /// Oldest calendar day not yet dropped.
     pub cal_day: i64,
@@ -1818,7 +1820,12 @@ fn withdraw_in(
     let remaining = sub_u128(l.shares, shares)?;
     let new_lock = add_u128(cur, add)?.min(remaining);
     if new_lock != 0 && v.lock_norm == 0 {
+        // The first lock of a lock era: no lock is live (every term has left the calendar), so
+        // none reads `Π`. `b_min` restarts at `ΣB_Q` and, since AIR-12, `Π` at `WAD` with it:
+        // kept, every era's decay multiplied into the next (`Π` fell to 1 across eras while
+        // `ΣB_Q` stayed above 0, and locks stopped decaying).
         v.b_min = p.borrowed_q;
+        v.pi = WAD;
     }
     if l.lock_epoch == v.pi_epoch && cur != 0 {
         // A live lock leaves its bucket (an expired one's bucket is already gone).
@@ -1869,8 +1876,9 @@ fn withdraw_in(
 /// the current epoch, and the tokens are `≤ T` and `≤` [`allowance`]. The borrowed part
 /// of the withdrawn fraction becomes a lock: `lock_i + ⌈min(shares, b_max)·(u −
 /// b_max)/b_max⌉` (capped at the remaining shares; none while `ΣB_Q = 0`), `b_max =
-/// ⌈allowance·(S + VS)/(T + ΣB_Q + VA)⌉`, `u = shares_i − lock_i`; the first lock of a
-/// `Π` epoch sets `b_min = ΣB_Q` (V2-3). A live lock's term leaves its calendar bucket;
+/// ⌈allowance·(S + VS)/(T + ΣB_Q + VA)⌉`, `u = shares_i − lock_i`; the first lock taken
+/// while no lock is live (`lock_norm = 0`: a new `Π` epoch, or every lock expired) sets
+/// `b_min = ΣB_Q` (V2-3) and `Π = WAD` (AIR-12). A live lock's term leaves its calendar bucket;
 /// the new term `⌊new_lock·WAD/Π⌋` (floor) enters the bucket of `lock_until`, which a
 /// lock increase moves to `max(lock_until, lock_until_for(now))` (R3B-1, R4A-2, R4A-8).
 /// If the burn takes `S` to 0 the unreleased vest is released to the lender first (R3B-2);
@@ -1883,8 +1891,9 @@ fn withdraw_in(
 /// # Errors
 /// In the model's order: `NegativePending`, `InsufficientShares`,
 /// `InsufficientInventory`, `AboveAllowance`; `Overflow` if a lock term `⌊lock·WAD/Π⌋` or
-/// `lock_norm` exceeds `u128` (possible only while `Π` is tiny; the withdrawal is then
-/// refused until `ΣB_Q` reaches 0, ARCH §9 M0b note 1); as [`touch`] and [`release`].
+/// `lock_norm` exceeds `u128` (possible only while `Π` is tiny within one lock era; the
+/// withdrawal is then refused until `ΣB_Q` reaches 0 or every lock has expired, ARCH §9 M0b
+/// note 1, AIR-12); as [`touch`] and [`release`].
 pub fn withdraw(
     pool: &mut Pool,
     vault: &mut Vault,
