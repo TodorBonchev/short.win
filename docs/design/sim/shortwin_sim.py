@@ -798,7 +798,7 @@ class Params:
     exit_ref: str = "fresh"                # liquidation reference "fresh" | "ema" (analysis row only)
     kappa_liq_bps: int = 2500              # fresh reference capped at P_ema*(1 + kappa_eff),
     kappa_base_bps: int = 0                #   kappa_eff = min(kappa, kappa_base + (tau+1)*g)
-    kappa_growth_n: int = 3                #   g = min per-second EMA growth (bps/s, floor) over 3 steps
+    kappa_growth_n: int = 3                #   g = lower-median per-second EMA growth (bps/s) over 3 steps (AIR-22)
     delta_liq_bps: int = 200               # FIXED liquidation bound over the reference (v0.4; was Dutch 1->5 %)
     delta_exp_bps: int = 100               # expiry bound over min(EMA, ring min, last bucket low)
     exec_tol_bps: int = 10                 # epsilon: venue rounding drift
@@ -1752,19 +1752,23 @@ class Market:
         return max(L_live, self.ema_liquidity())
 
     def ema_growth_bps(self) -> int:
-        """Sustained EMA growth g: the MINIMUM per-second growth (bps/s, floor) over the
-        last kappa_growth_n integrations (a single held-pump second cannot open the cap)."""
+        """Sustained EMA growth g: the LOWER MEDIAN (index (n - 1) // 2 of the sorted values) of the
+        per-second growth rates (bps/s, floor) over the last n = kappa_growth_n integrations, floored at 0
+        (a single held-pump second cannot open the cap; a majority of flat or falling steps keeps it shut).
+        AIR-22: the minimum used before let one flat step in every n -- a low at or below P_ema recorded in a
+        pump's bucket ([sell, crank_price, buy back]), which the directional aggregation turns into obs = P_ema
+        -- hold g, and with it kappa_eff, at 0 through a genuine pump (observe::sustained_growth)."""
         n = self.P.kappa_growth_n
-        if len(self.ring) < n + 1:
+        if n == 0 or len(self.ring) < n + 1:
             return 0
-        g = None
+        rates = []
         for (t0, p0, *_r0), (t1, p1, *_r1) in zip(self.ring[-n - 1:-1], self.ring[-n:]):
             dt = t1 - t0
             if dt <= 0 or p0 <= 0:
                 return 0
-            gi = (p1 - p0) * BPS // (p0 * dt)
-            g = gi if g is None else min(g, gi)
-        return max(0, g or 0)
+            rates.append((p1 - p0) * BPS // (p0 * dt))
+        rates.sort()
+        return max(0, rates[(n - 1) // 2])
 
     def kappa_eff(self) -> int:
         P = self.P

@@ -280,12 +280,13 @@ proptest! {
         }
     }
 
-    /// Sustained growth (ECON §5.4): 0 unless every one of the last n steps rose; never above
-    /// the slowest step.
+    /// Sustained growth (ECON §5.4; AIR-22): 0 unless the last n steps are in time order; then
+    /// the lower median of their rates, a flat step's rate 0 — so 0 iff more than ⌊(n − 1)/2⌋ of
+    /// them are flat (2 of 3, 2 of 4), and one flat step among 3 or more never zeroes it.
     #[test]
-    fn sustained_growth_is_the_slowest_step(p0 in 1_000u128..10u128.pow(30),
-                                            steps in prop::collection::vec((0u128..3_000, 0i64..4), 0..8),
-                                            n in 0u8..9) {
+    fn sustained_growth_is_the_lower_median_step(p0 in 1_000u128..10u128.pow(30),
+                                                 steps in prop::collection::vec((0u128..3_000, 0i64..4), 0..8),
+                                                 n in 0u8..9) {
         let mut ring = Ring::new(0, p0, 1).unwrap();
         let (mut p, mut ts) = (p0, 0i64);
         for &(bps, dt) in &steps {
@@ -296,17 +297,25 @@ proptest! {
         let g = sustained_growth(&ring, n).unwrap();
         let ents: Vec<RingEntry> = ring.iter().copied().collect();
         let n = usize::from(n);
-        if n == 0 || ents.len() <= n {
+        if n == 0 || ents.len() <= n || (0..n).any(|k| ents[k].ts <= ents[k + 1].ts) {
             prop_assert_eq!(g, 0);
         } else {
-            for k in 0..n {
-                let (new, old) = (ents[k], ents[k + 1]);
-                if new.ts <= old.ts || new.p <= old.p {
-                    prop_assert_eq!(g, 0);
-                } else {
-                    let rate = (new.p - old.p) * 10_000 / old.p / u128::try_from(new.ts - old.ts).unwrap();
-                    prop_assert!(u128::from(g) <= rate);
-                }
+            let mut rates: Vec<u128> = (0..n)
+                .map(|k| {
+                    let (new, old) = (ents[k], ents[k + 1]);
+                    if new.p <= old.p {
+                        0
+                    } else {
+                        (new.p - old.p) * 10_000 / old.p / u128::try_from(new.ts - old.ts).unwrap()
+                    }
+                })
+                .collect();
+            rates.sort_unstable();
+            prop_assert_eq!(u128::from(g), rates[(n - 1) / 2]);
+            let zero = rates.iter().filter(|&&r| r == 0).count();
+            prop_assert_eq!(g == 0, zero > (n - 1) / 2);
+            if n >= 3 && zero == 1 {
+                prop_assert!(g > 0);
             }
         }
     }

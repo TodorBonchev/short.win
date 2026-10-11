@@ -29,7 +29,7 @@ reads state and calls pure sim functions) and the sim then runs its own code:
                       A lineage forked from another (copy.deepcopy in the attack scripts) is
                       exported as a suffix with "base" naming the trace it continues.
 * fuzz_*.json         ECON §13's exit fuzz, fuzz_exits(1000, 20260927) (its statistics are
-                      asserted against ECON §13): decision-only lines, each self-contained
+                      asserted against ECON_13_EXIT_FUZZ): decision-only lines, each self-contained
                       (box, legs, quotes, arm state before and after, outcome): every
                       arming, re-arming, disarm, settlement and
                       amount wait, every evaluation of an armed position whose legs do not
@@ -109,12 +109,14 @@ BPS = sim.BPS
 WAD = sim.WAD
 M = sim.Market
 MAX_FILE = 950_000
-# ECON §13 "Fuzz results" (v0.4.1): the exit fuzz whose decisions fuzz_*.json holds.
-ECON_13_EXIT_FUZZ = {'runs': 1000, 'exits': 709, 'sandwich_attempts': 8191, 'bundles': 256972,
-                     'attacker_only_seconds': 817, 'blocker_runs': 196, 'noisy_runs': 519, 'freezer_runs': 246,
-                     'frozen_seconds': 1907, 'penalty_truncated_by_sandwich': 22, 'max_loss_over_bref_bps': 103,
-                     'max_settle_box_bps': 95, 'reserve_waits_liq': 0, 'reserve_waits_exp': 0,
-                     'kinds': {'liquidation': 213, 'expiry': 286, 'S1': 174, 'S2': 8, 'S3': 28}}
+# ECON §13 "Fuzz results" (v0.4.1): the exit fuzz whose decisions fuzz_*.json holds, as AIR-22 (the
+# sustained growth as the lower median of the newest kappa_growth_n step rates) moved it from ECON's
+# published row (gen_exits.py's ECON_13_EXIT_FUZZ lists both).
+ECON_13_EXIT_FUZZ = {'runs': 1000, 'exits': 697, 'sandwich_attempts': 8948, 'bundles': 253491,
+                     'attacker_only_seconds': 772, 'blocker_runs': 192, 'noisy_runs': 490, 'freezer_runs': 267,
+                     'frozen_seconds': 2905, 'penalty_truncated_by_sandwich': 22, 'max_loss_over_bref_bps': 102,
+                     'max_settle_box_bps': 94, 'reserve_waits_liq': 0, 'reserve_waits_exp': 0,
+                     'kinds': {'liquidation': 224, 'expiry': 281, 'S1': 147, 'S2': 10, 'S3': 35}}
 ORIG = {name: getattr(M, name) for name in (
     "__init__", "observe", "_integrate", "_switch_to_pool", "_graduate", "_warmup_slow_cap", "fast_switch",
     "adopt_pool", "reset_ema_to_spot", "open", "status", "exit_reference", "_buyback_exit", "try_exit", "settle_box",

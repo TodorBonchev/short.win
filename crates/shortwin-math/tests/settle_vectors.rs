@@ -1119,7 +1119,8 @@ fn random_traces_match_sim() {
 
 /// ECON §13's exit fuzz, 1,000 paths (`fuzz_exits(1000, 20260927)`): every settlement,
 /// wait, arming and disarm, the vetoes and a sample of the clock's ticks, each decision
-/// checked on the sim's box and quotes. The totals equal ECON §13's.
+/// checked on the sim's box and quotes. The totals are the sim's since AIR-22's lower-median
+/// growth (S1 / S2 / S3 = 147 / 10 / 35; ECON §13 published 174 / 8 / 28 before it).
 #[test]
 fn exit_fuzz_decisions_match_sim() {
     let (c, traces) = replay("fuzz");
@@ -1130,7 +1131,7 @@ fn exit_fuzz_decisions_match_sim() {
             n(&c, SettleKind::S2),
             n(&c, SettleKind::S3)
         ),
-        (174, 8, 28),
+        (147, 10, 35),
         "ECON §13 exit fuzz kinds"
     );
     assert!(c.waits_s2 + c.waits_s3 >= 100, "{c:?}");
@@ -1138,10 +1139,15 @@ fn exit_fuzz_decisions_match_sim() {
     assert!(c.maxin.values().sum::<usize>() >= 4_000, "{c:?}");
     // M0B-S-2 (review; owner item O15): the sim's `fv_parts` takes the expiry fee for any
     // S2 or S3 of an expired position that is not CR-liquidatable at the evaluated state;
-    // SPEC §0 / §5.3 and ARCH §10 record O15 for S3 only. One fuzz path reaches the S2 case.
+    // SPEC §0 / §5.3 and ARCH §10 record O15 for S3 only. Three fuzz paths reach the S2 case
+    // (one before AIR-22 redrew the fuzz's later runs; run 52 is unchanged).
     assert_eq!(
         c.s2_expiry_fee,
-        ["fuzz_1.json / fuzz/52 / op 119"],
+        [
+            "fuzz_1.json / fuzz/52 / op 119",
+            "fuzz_1.json / fuzz/99 / op 89",
+            "fuzz_1.json / fuzz/327 / op 75"
+        ],
         "S2 at the expiry fee"
     );
 }

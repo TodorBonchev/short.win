@@ -3,8 +3,8 @@
 
 The sim's own Market methods are wrapped (never modified) to record their inputs and
 outputs while it runs the scenario library (every market x SCENARIOS, GRAD_SCENARIOS,
-FAST_SCENARIOS), ECON §13's exit fuzz (fuzz_exits(1000, 20260927), asserted against its
-published statistics), attack scripts of sim/attacks/ and a few branch-targeted runs.
+FAST_SCENARIOS), ECON §13's exit fuzz (fuzz_exits(1000, 20260927), its statistics asserted
+against ECON_13_EXIT_FUZZ), attack scripts of sim/attacks/ and a few branch-targeted runs.
 Only the default switches are recorded (rows from markets with an analysis switch or a
 Market subclass are skipped):
 
@@ -53,13 +53,19 @@ U64 = 2**64 - 1
 SEED = 20260927
 BPS, WAD = sim.BPS, sim.WAD
 M = sim.Market
-# ECON §13 "Fuzz results" (v0.4.1): the exit fuzz whose rows this generator samples.
+# ECON §13 "Fuzz results" (v0.4.1): the exit fuzz whose rows this generator samples. AIR-22 (the
+# sustained growth g as the lower median of the newest kappa_growth_n step rates, not their minimum)
+# moves it from ECON's published row (exits 709, sandwich attempts 8,191, bundles 256,972,
+# attacker-only seconds 817, blocker runs 196, noisy runs 519, freezer runs 246, frozen seconds
+# 1,907, max loss over B_ref 103 bps, max settle box 95 bps; liquidation 213, expiry 286, S1 174,
+# S2 8, S3 28): the fuzz draws from one random stream, so every run after the first changed exit
+# draws differently.
 ECON_13_EXIT_FUZZ = {
-    "runs": 1000, "exits": 709, "sandwich_attempts": 8191, "bundles": 256972, "attacker_only_seconds": 817,
-    "blocker_runs": 196, "noisy_runs": 519, "freezer_runs": 246, "frozen_seconds": 1907,
-    "penalty_truncated_by_sandwich": 22, "max_loss_over_bref_bps": 103, "max_settle_box_bps": 95,
+    "runs": 1000, "exits": 697, "sandwich_attempts": 8948, "bundles": 253491, "attacker_only_seconds": 772,
+    "blocker_runs": 192, "noisy_runs": 490, "freezer_runs": 267, "frozen_seconds": 2905,
+    "penalty_truncated_by_sandwich": 22, "max_loss_over_bref_bps": 102, "max_settle_box_bps": 94,
     "reserve_waits_liq": 0, "reserve_waits_exp": 0,
-    "kinds": {"liquidation": 213, "expiry": 286, "S1": 174, "S2": 8, "S3": 28}}
+    "kinds": {"liquidation": 224, "expiry": 281, "S1": 147, "S2": 10, "S3": 35}}
 CAP = defaultdict(list)
 CASCADE = [False]   # while True, buyback exits go to CAP["exit_cascade"] with their bounds
 

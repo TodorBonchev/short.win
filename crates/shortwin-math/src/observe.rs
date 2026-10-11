@@ -798,42 +798,47 @@ pub fn robust_spot(p_live: u128, last: &LastBucket, now: i64, max_age_s: u8) -> 
 }
 
 /// Sustained EMA growth `g` in bps per second (ECON §2.1, §5.4; ARCH §4.4):
-/// `max(0, min over the newest n ring steps of ⌊(P_i − P_{i−1})·10⁴/(P_{i−1}·Δt_i)⌋)`.
+/// `max(0, lower median over the newest n ring steps of ⌊(P_i − P_{i−1})·10⁴/(P_{i−1}·Δt_i)⌋)`,
+/// the lower median the value at index `⌊(n − 1)/2⌋` of the sorted rates.
 ///
-/// 0 if the ring has fewer than `n + 1` entries, if `n` is 0, or if any of those steps is
-/// flat or falling or has `Δt ≤ 0` (sim `ema_growth_bps`). A single held-pump second
-/// produces one step; only a genuine trend produces `n`. Saturates at `u64::MAX` bps/s
-/// (the sim's integer is unbounded); an integrated step grows at most ×(1 + C) ≤ ×2, so
-/// rings built by [`integrate`] stay orders of magnitude below it. Errors: `InvalidInput`
-/// for a corrupted ring.
+/// 0 if the ring has fewer than `n + 1` entries, if `n` is 0, if any of those steps has `Δt ≤ 0`
+/// or a zero price, or if more than `⌊(n − 1)/2⌋` of them (2 of 3, 2 of 4) rate 0 or less —
+/// flat, falling or rising by under 1 bp/s (sim `ema_growth_bps`). A single held-pump second
+/// produces one step; only a trend over a majority of the window opens the cap. AIR-22: the
+/// minimum read before let one flat step in
+/// every `n` — a low recorded at or below `P_ema` in a pump's bucket, which the directional
+/// aggregation turns into `obs = P_ema` — hold `g`, and with it `κ_eff`, at 0 through a genuine
+/// pump. Saturates at `u64::MAX` bps/s (the sim's integer is unbounded); an integrated step grows
+/// at most ×(1 + C) ≤ ×2, so rings built by [`integrate`] stay orders of magnitude below it.
+/// Errors: `InvalidInput` for a corrupted ring.
 pub fn sustained_growth(ring: &Ring, n: u8) -> Result<u64, MathError> {
     ring.check()?;
     let n = usize::from(n);
     if n == 0 || ring.len() <= n {
         return Ok(0);
     }
-    let step = |k: usize| -> Option<(&RingEntry, &RingEntry)> {
-        Some((ring.get(k.checked_add(1)?)?, ring.get(k)?))
-    };
-    // Any non-positive step makes the minimum ≤ 0, whatever the other steps are.
-    for k in 0..n {
-        let (old, new) = step(k).ok_or(MathError::InvalidInput)?;
-        if new.ts <= old.ts || old.p == 0 || new.p <= old.p {
+    // `n < ring.len() ≤ RING_LEN`.
+    let mut rates = [0u128; RING_LEN];
+    for (k, slot) in rates.iter_mut().enumerate().take(n) {
+        let old = ring
+            .get(k.checked_add(1).ok_or(MathError::Overflow)?)
+            .ok_or(MathError::InvalidInput)?;
+        let new = ring.get(k).ok_or(MathError::InvalidInput)?;
+        if new.ts <= old.ts || old.p == 0 {
             return Ok(0);
         }
-    }
-    let mut g = u128::MAX;
-    for k in 0..n {
-        let (old, new) = step(k).ok_or(MathError::InvalidInput)?;
-        let rise = new.p.checked_sub(old.p).ok_or(MathError::Underflow)?;
+        // A flat or falling step's rate is ≤ 0; as 0 it orders the same under `max(0, ·)`.
+        let Some(rise) = new.p.checked_sub(old.p).filter(|r| *r > 0) else {
+            continue;
+        };
         let dt = u128::try_from(i128::from(new.ts).saturating_sub(i128::from(old.ts)))
             .map_err(|_| MathError::Underflow)?;
-        // ⌊⌊a/b⌋/c⌋ = ⌊a/(b·c)⌋, and a rate past u128 cannot be the minimum of a finite one.
-        let rate = overflow_to_max(mul_div(rise, u128::from(BPS), old.p, Rounding::Floor))?
+        // ⌊⌊a/b⌋/c⌋ = ⌊a/(b·c)⌋; a rate past u128 orders above every finite one.
+        *slot = overflow_to_max(mul_div(rise, u128::from(BPS), old.p, Rounding::Floor))?
             .checked_div(dt)
             .ok_or(MathError::DivByZero)?;
-        g = g.min(rate);
     }
+    let g = lower_median(rates.get_mut(..n).ok_or(MathError::InvalidInput)?)?;
     Ok(saturating_u64(g))
 }
 
@@ -1095,8 +1100,9 @@ mod tests {
         for (ts, p) in [(1i64, 110u128), (2, 121), (4, 145)] {
             r.push(entry(ts, p, p, p, 1, 1)).unwrap();
         }
-        // Steps: +1,000 bps/1 s, +1,000 bps/1 s, ⌊2,396/2⌋ = 991 bps/s.
-        assert_eq!(sustained_growth(&r, 3).unwrap(), 991);
+        // Steps: +1,000 bps/1 s, +1,000 bps/1 s, ⌊2,396/2⌋ = 991 bps/s: the lower median 1,000
+        // (AIR-22; the minimum, 991, before).
+        assert_eq!(sustained_growth(&r, 3).unwrap(), 1_000);
         assert_eq!(sustained_growth(&r, 4).unwrap(), 0);
         assert_eq!(sustained_growth(&r, 0).unwrap(), 0);
         // Lows 100, 110, 121, 145: lower median 110; highs alike: upper median 121.
@@ -1109,6 +1115,76 @@ mod tests {
                 .unwrap();
         }
         assert_eq!(ring_medians(&r).unwrap(), (13, 24, 26, 37));
+    }
+
+    /// A genuine 1 %/s pump observed every second by the keeper; in every second `t` with
+    /// `flat(t)` a second record at `P_ema` — the attacker's `[sell to P_ema, crank_price, buy
+    /// back]` — makes the bucket straddle `P_ema`, which the directional aggregation turns into an
+    /// exactly flat step. Returns the observation state after `secs` seconds and how many of the
+    /// windows read after the first ten seconds had `sustained_growth(ring, 3) == 0`.
+    fn pump_with_flat_steps(secs: i64, flat: impl Fn(i64) -> bool) -> (Observation, usize) {
+        let prm = EmaParams::DEFAULT;
+        let mut o = Observation::new(0, 100 * WAD, 1_000).unwrap();
+        let mut spot = 100 * WAD;
+        let mut zeroed = 0;
+        for t in 1..secs {
+            spot = spot * 101 / 100;
+            o.record(t, spot, 1_000).unwrap();
+            if flat(t) {
+                let p_ema = o.ema.price;
+                o.record(t, p_ema, 1_000).unwrap();
+            }
+            o.roll(t + 1, &prm).unwrap();
+            if t > 10 {
+                zeroed += usize::from(sustained_growth(&o.ring, 3).unwrap() == 0);
+            }
+        }
+        (o, zeroed)
+    }
+
+    /// AIR-22: one flat step in every three no longer zeroes the sustained growth — `g` is the
+    /// lower median of the newest `n` step rates, not their minimum, so `κ_eff` and with it the
+    /// liquidation reference keep following a genuine pump; a majority of flat steps (a genuine
+    /// stall, or a pump that stopped) still gives 0.
+    #[test]
+    fn one_flat_step_in_three_keeps_the_sustained_growth() {
+        let (honest, zeroed) = pump_with_flat_steps(60, |_| false);
+        assert_eq!(zeroed, 0);
+        let g_honest = sustained_growth(&honest.ring, 3).unwrap();
+        assert!(g_honest > 50, "{g_honest}");
+        let (o, zeroed) = pump_with_flat_steps(60, |t| t % 3 == 0);
+        assert_eq!(
+            zeroed, 0,
+            "a flat step every 3 s zeroed g in {zeroed} windows"
+        );
+        let g = sustained_growth(&o.ring, 3).unwrap();
+        assert!(g > 50, "{g}");
+        // The liquidation reference opens up with the growth (κ_eff = 6·g > 0): above the
+        // `min(P_ema, lb_lo)` a zero `g` leaves.
+        let prm = crate::bounds::ExitParams::DEFAULT;
+        let now = o.last.sec + 1;
+        let p_ref = crate::bounds::liq_reference(&o.ema, &o.ring, &o.last, now, &prm)
+            .unwrap()
+            .unwrap();
+        assert!(p_ref > o.ema.price.min(o.last.lo), "{p_ref}");
+        // Two flat steps in every three still zero it (a majority of the window), as does a pump
+        // that stopped: the newest two steps flat (the keeper's records at the frozen P_ema).
+        let (_, zeroed) = pump_with_flat_steps(60, |t| t % 3 != 0);
+        assert_eq!(zeroed, 49);
+        let mut stalled = o;
+        for t in 60..62i64 {
+            let p_ema = stalled.ema.price;
+            stalled.record(t, p_ema, 1_000).unwrap();
+            stalled.roll(t + 1, &EmaParams::DEFAULT).unwrap();
+        }
+        assert_eq!(sustained_growth(&stalled.ring, 3).unwrap(), 0);
+        // A genuine stall: a flat market.
+        let mut flat = Observation::new(0, 100 * WAD, 1_000).unwrap();
+        for t in 1..20i64 {
+            flat.record(t, 100 * WAD, 1_000).unwrap();
+            flat.roll(t + 1, &EmaParams::DEFAULT).unwrap();
+        }
+        assert_eq!(sustained_growth(&flat.ring, 3).unwrap(), 0);
     }
 
     #[test]

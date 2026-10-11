@@ -146,14 +146,15 @@ fn opt<T: Copy>(v: &Option<Dec<T>>) -> Option<T> {
     v.as_ref().map(|d| d.0)
 }
 
-/// ARCH §8.1: the rows come from ECON §13's v0.4.1 exit fuzz (1,000 runs, 709 exits, 22
-/// rent/penalty/fee truncations by a sandwich), not a shorter run (review F-S6).
+/// ARCH §8.1: the rows come from ECON §13's v0.4.1 exit fuzz (1,000 runs, 697 exits — 709 as
+/// ECON §13 published it, before AIR-22's lower-median growth — 22 rent/penalty/fee truncations
+/// by a sandwich), not a shorter run (review F-S6).
 #[test]
 fn rows_come_from_the_econ_13_exit_fuzz() {
     let s = load().exit_fuzz;
     assert_eq!(
         (s.runs.0, s.exits.0, s.penalty_truncated_by_sandwich.0),
-        (1_000, 709, 22)
+        (1_000, 697, 22)
     );
 }
 
