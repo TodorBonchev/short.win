@@ -7,15 +7,15 @@
 //! |---|---|
 //! | §12.2 `sandwich.py`, expiry, atomic: D@50% honest `0.707 / 0.0226 / 0.0141 / 2.168`, attacked `0.713 / … / 2.161`, attacker `+0.003`, borrower `−0.006`, lenders `+0.0000` | [`sandwich_expiry_d50`] |
 //! | §12.2 the same, D@90%: `1.331 → 1.343`, attacker `+0.004`, borrower `−0.012` | [`sandwich_expiry_d90`] |
-//! | §12.2 `sandwich.py` / `fixed_delta.py` (d), liquidation, atomic, keeper at once and after 4 s: D@50% `1.678 → 1.709` (`+0.064`, extra `+0.014`, borrower `−0.031`) and `1.711` after 4 s (`+0.065`, `+0.015`, `−0.033`) | [`sandwich_liquidation_d50`] |
+//! | §12.2 `sandwich.py` / `fixed_delta.py` (d), liquidation, atomic, keeper at once and after 4 s: D@50% `1.678 → 1.709` (`+0.064`, extra `+0.014`, borrower `−0.031`) and `1.713` after 4 s (`+0.066`, `+0.016`, `−0.035`; under the minimum growth rule before AIR-22 `1.711`, `+0.065`, `+0.015`, `−0.033`) | [`sandwich_liquidation_d50`] |
 //! | §12.4 `ema_atomic.py`, atomic `[pump, crank, dump]` every second against a fresh position: "not liquidatable within 60 s at any push level" (D@50%) | [`atomic_pushes_never_liquidate_a_fresh_position`] |
-//! | §12.4 the held model (every observation of the second pumped): D@50% `x3, 11 s`, push cost `9.439`, final sandwich `+0.655`, attacker net `−8.785` | [`held_pushes_liquidate_a_fresh_position_at_a_loss`] |
+//! | §12.4 the held model (every observation of the second pumped): D@50% `x3, 11 s`, push cost `9.439`, final sandwich `+0.663`, attacker net `−8.776` (AIR-22; `+0.655` / `−8.785` under the minimum) | [`held_pushes_liquidate_a_fresh_position_at_a_loss`] |
 //! | §12.5 `ema_atomic_multi.py` (a), atomic, the OI-cap basket: "no exit forced within 120 s at any push level" (D@50%) | [`atomic_pushes_force_no_exit_on_the_oi_basket`] |
 //! | §12.5 `ema_atomic_multi.py` (b), atomic, S1 forcing on the OI-cap basket at ×4.4 / ×5.2 / ×6.4 with `sol_settle` on every position inside the pumped transaction each second: "no exit forced within 120 s" (D@50%) — no clock arms | [`atomic_pushes_cannot_force_s1_on_the_oi_basket`] (M10) |
 //! | §12.5 `ema_atomic_multi.py` (b), held: D@50% `4 / 7.11 | x4.40 | 58 | 72.31 | −51.12 | … | 0 / 1 | −123.04`; on the program's basket (its fourth position smaller, [`oi_basket`]) the bundles start at 18 s, the first S1 at 58 s, best net `−123.14` | [`held_pushes_forcing_s1_on_the_oi_basket_lose`] (M10) |
 //! | §12.3 `ema_near.py`, atomic, D@50% (the script's functions on `D@50%`): after honest rises ×1.82 … ×2.17 (`CR_ema` 1.29 … 1.08 × `L`, the sim's to the bps) "not reached within 30 s" at every push ×1.02 … ×2; the final bundle `NotLiquidatable` | [`atomic_pushes_never_liquidate_a_near_threshold_position`] (M10) |
-//! | §12.3 `ema_near.py`, held, D@50% ×2.17: `x1.15, 7 s | 0.875 | +0.180 | −0.694` | [`held_pushes_near_the_threshold_do_not_pay`] (M10) |
-//! | §12.6 / `sandwich.py` held liquidation, D@50%: best plan "none" (`+0.064`); the plans 1 s at +2.5 % (`−0.017` push, `+0.068`, net `+0.051`) and 3 s at +30 % (`−0.790`, `+0.427`, net `−0.363`) to the lamport, the lenders' legs above the honest ones | [`held_pushes_before_a_liquidation_sandwich_do_not_pay`] (M10) |
+//! | §12.3 `ema_near.py`, held, D@50% ×2.17: `x1.15, 7 s | 0.875 | +0.182 | −0.693` (AIR-22; `+0.180 | −0.694` under the minimum) | [`held_pushes_near_the_threshold_do_not_pay`] (M10) |
+//! | §12.6 / `sandwich.py` held liquidation, D@50%: best plan "none" (`+0.064`); the plans 1 s at +2.5 % (`−0.017` push, `+0.069`, net `+0.052`) and 3 s at +30 % (`−0.790`, `+0.441`, net `−0.350`; AIR-22, `+0.068` / `+0.427` under the minimum) to the lamport, the lenders' legs above the honest ones | [`held_pushes_before_a_liquidation_sandwich_do_not_pay`] (M10) |
 //!
 //! The sandwich and held-push figures are the scripts' own (`sandwich.setup_expiry`,
 //! `sandwich.setup_liq`, `sandwich.attack(…, "atomic", wait)`, `common.sandwich_exit`,
@@ -360,10 +360,12 @@ fn assert_liq(ev: &Liquidate, sim: &SimLiq, v: u64) -> u64 {
 /// `sandwich.py` liquidation rows and `fixed_delta.py` (d), `D@50%`, model atomic: the honest
 /// keeper at the first liquidatable second, and the attacker-keeper's best sandwich at once and
 /// after waiting 4 s with nobody exiting. The fixed 2 % bound over the reference caps the
-/// front-run: the extraction over an honest keeper is `+0.014` SOL at once and `+0.015` after
-/// 4 s (ECON; v0.3's Dutch clock widened with waiting), the borrower loses `0.031` / `0.033`,
+/// front-run: the extraction over an honest keeper is `+0.014` SOL at once and `+0.016` after
+/// 4 s (the sim; v0.3's Dutch clock widened with waiting), the borrower loses `0.031` / `0.035`,
 /// and the penalty — the lenders' and protocol's legs — is the honest one (`+0.0000`; after 4 s
-/// the reference moved up, so the penalty slightly more).
+/// the reference moved up, so the penalty slightly more). AIR-22: the sustained growth is the
+/// lower median of the newest steps, so after the ramp `P_ref` keeps rising a little longer than
+/// under the minimum (ECON: `+0.015` / `0.033` after 4 s).
 #[test]
 fn sandwich_liquidation_d50() {
     let (mut s, p, t) = setup_liq();
@@ -426,26 +428,28 @@ fn sandwich_liquidation_d50() {
         s.step_to(tt);
     }
     let a = Attacker::new(&mut s);
-    let (meta, pnl4) = sandwich(&mut s, &a, &p, 4_249_870_733_551, false);
+    let (meta, pnl4) = sandwich(&mut s, &a, &p, 4_473_548_140_580, false);
     let ev4: Liquidate = events::one(&meta);
     assert_liq(
         &ev4,
         &SimLiq {
-            b: 1_710_779_532,
-            pen: 167_825_393,
-            keeper: 50_347_617,
-            borrower: 1_032_999_504,
-            b_ref: 1_678_253_929,
-            max_in: 1_711_819_007,
+            b: 1_712_528_146,
+            pen: 167_907_691,
+            keeper: 50_372_307,
+            borrower: 1_031_168_592,
+            b_ref: 1_679_076_902,
+            max_in: 1_712_658_440,
         },
         D50_V,
     );
-    assert_eq!(pnl4, 65_007_345, "ECON +0.065 after 4 s");
+    assert_eq!(pnl4, 65_820_219, "the sim: +0.066 after 4 s");
     assert_eq!(ev4.delta_bps, 200, "the fixed δ");
     let extra4 = pnl4 - i128::from(h.penalty_keeper);
-    assert_eq!(sol4(extra4), "+0.0147", "ECON +0.015 after 4 s");
+    assert_eq!(sol4(extra4), "+0.0155", "the sim: +0.016 after 4 s");
+    // The δ stays 200 bps; the extra grows only with the reference, which rises with the EMA's
+    // catch-up after the ramp (+11.8 % over these 4 s since AIR-22, +5.9 % under the minimum).
     assert!(
-        extra4 * 100 <= extra * 110,
+        extra4 * 100 <= extra * 120,
         "waiting does not widen the bound"
     );
 }
@@ -558,12 +562,13 @@ fn atomic_pushes_never_liquidate_a_fresh_position() {
     assert_eq!(market(&s.env, &s.pm).open_positions, 1);
 }
 
-/// `ema_atomic.py`, model held, `D@50%` (ECON §12.4: `x3, 11 s | 9.439 | +0.655 | -8.785`): with
+/// `ema_atomic.py`, model held, `D@50%` (ECON §12.4: `x3, 11 s | 9.439 | +0.655 | -8.785`; the sim
+/// since AIR-22's lower-median growth: `+0.663 | -8.776`): with
 /// every observation of each second pumped to 3× (a degraded-mode market: no honest observer),
 /// the EMA leg holds after 11 s; the attacker then sandwiches the liquidation in the next
 /// second with the script's optimal `dX`. The push costs 9.439 SOL of round-trip fees (the
-/// sim's, to the lamport), the final bundle earns 0.655 SOL including the keeper share: net
-/// −8.785 SOL. The liquidation's legs are the sim's (rent adjusted).
+/// sim's, to the lamport), the final bundle earns 0.663 SOL including the keeper share: net
+/// −8.776 SOL. The liquidation's legs are the sim's (rent adjusted).
 #[test]
 fn held_pushes_liquidate_a_fresh_position_at_a_loss() {
     let (mut s, p, p_true) = fresh_position();
@@ -590,7 +595,7 @@ fn held_pushes_liquidate_a_fresh_position_at_a_loss() {
         "push cost: 11 round trips of 0.858 SOL (ECON 9.439)"
     );
     s.at(t0 + n + 1);
-    let (meta, pnl) = sandwich(&mut s, &a, &p, 297_950_448_145_567, false);
+    let (meta, pnl) = sandwich(&mut s, &a, &p, 299_323_491_685_409, false);
     let ev: Liquidate = events::one(&meta);
     let d = D50_RMIN - ev.rent;
     assert_eq!(
@@ -602,20 +607,20 @@ fn held_pushes_liquidate_a_fresh_position_at_a_loss() {
             ev.penalty_keeper
         ),
         (
-            2_231_956_319,
-            2_198_650_783,
-            2_242_623_798,
-            219_865_079,
-            65_959_523
+            2_248_025_988,
+            2_211_506_763,
+            2_255_736_898,
+            221_150_677,
+            66_345_203
         )
     );
     assert_eq!(
         ev.borrower_payout,
-        459_783_031 + d,
+        442_427_764 + d,
         "borrower (rent adjusted)"
     );
-    assert_eq!(pnl, 654_566_714, "final sandwich + keeper (ECON +0.655)");
-    assert_eq!(sol4(pnl - cost), "-8.7848", "attacker net (ECON -8.785)");
+    assert_eq!(pnl, 663_281_138, "final sandwich + keeper (the sim +0.663)");
+    assert_eq!(sol4(pnl - cost), "-8.7760", "attacker net (the sim -8.776)");
 }
 
 /// `ema_atomic_multi.fill(m)` on ECON's `D@50%` market, printed by the script: positions at
@@ -1017,11 +1022,12 @@ fn atomic_pushes_never_liquidate_a_near_threshold_position() {
 }
 
 /// `ema_near.py`, model held, `D@50%`, the closest rise (×2.17, `CR_ema` 1.077 × `L`) at the
-/// script's best push (×1.15; the sim: `x1.15, 7 s | 0.875 | +0.180 | −0.694 | 0.904`): seven
+/// script's best push (×1.15; the sim: `x1.15, 7 s | 0.875 | +0.182 | −0.693 | 0.901`; before AIR-22's
+/// lower-median growth `+0.180 | −0.694 | 0.904`): seven
 /// held seconds (every observation of each second pumped) make the position liquidatable, the
 /// attacker sandwiches the liquidation in the next second with the script's optimal `dX`. The
-/// pushes cost 0.875 SOL of round-trip fees, the final bundle earns 0.180 SOL including the
-/// keeper share: net −0.694 SOL — and −1.09 … −2.46 SOL at the other rises (sim). The
+/// pushes cost 0.875 SOL of round-trip fees, the final bundle earns 0.182 SOL including the
+/// keeper share: net −0.693 SOL — and −1.09 … −2.46 SOL at the other rises (sim). The
 /// liquidation's legs are the sim's (rent adjusted); the spend stays within the fixed δ. The
 /// figures: `python3 tests/litesvm/sim/curve_ema_near_d50.py`.
 #[test]
@@ -1053,7 +1059,7 @@ fn held_pushes_near_the_threshold_do_not_pay() {
         "push cost: 7 round trips of 0.125 SOL (sim 0.875)"
     );
     s.at(t0 + n + 1);
-    let (meta, pnl) = sandwich(&mut s, &a, &p, 37_283_307_563_761, false);
+    let (meta, pnl) = sandwich(&mut s, &a, &p, 37_516_328_236_034, false);
     let ev: Liquidate = events::one(&meta);
     let d = D50_RMIN - ev.rent;
     assert_eq!(
@@ -1065,22 +1071,22 @@ fn held_pushes_near_the_threshold_do_not_pay() {
             ev.penalty_keeper + ev.keeper_topup
         ),
         (
-            1_828_608_841,
-            1_792_893_568,
-            1_828_751_439,
-            179_289_357,
-            53_786_807
+            1_830_622_026,
+            1_795_886_107,
+            1_831_803_829,
+            179_588_611,
+            53_876_583
         ),
         "B, B̂_ref, max_in, penalty, keeper: the sim's"
     );
     assert_eq!(
         ev.borrower_payout,
-        903_706_231 + d,
+        901_393_792 + d,
         "borrower (rent adjusted)"
     );
     assert!(u128::from(ev.buyback_cost) * 10_000 <= u128::from(ev.b_ref) * 10_200);
-    assert_eq!(pnl, 180_470_750, "final sandwich + keeper (sim +0.180)");
-    assert_eq!(sol4(pnl - cost), "-0.6944", "attacker net (sim −0.694)");
+    assert_eq!(pnl, 181_503_377, "final sandwich + keeper (sim +0.182)");
+    assert_eq!(sol4(pnl - cost), "-0.6934", "attacker net (sim −0.693)");
 }
 
 // ---- §12.6: the held model around a liquidation ---------------------------------------------
@@ -1110,30 +1116,30 @@ fn held_pushes_before_a_liquidation_sandwich_do_not_pay() {
             h: 1,
             x_bps: 250,
             pre: 16_908_239,
-            dx: 5_144_580_361_667,
-            pnl: 68_388_465,
+            dx: 5_368_257_768_696,
+            pnl: 69_213_955,
             liq: SimLiq {
-                b: 1_717_790_101,
-                pen: 168_552_835,
-                keeper: 50_565_850,
-                borrower: 1_025_261_493,
-                b_ref: 1_685_528_341,
-                max_in: 1_719_238_907,
+                b: 1_719_549_478,
+                pen: 168_654_582,
+                keeper: 50_596_374,
+                borrower: 1_023_400_369,
+                b_ref: 1_686_545_815,
+                max_in: 1_720_276_731,
             },
         },
         Plan {
             h: 3,
             x_bps: 3_000,
             pre: 790_464_615,
-            dx: 72_471_479_877_398,
-            pnl: 427_424_364,
+            dx: 74_260_899_133_630,
+            pnl: 440_635_196,
             liq: SimLiq {
-                b: 2_400_253_313,
-                pen: 236_071_879,
-                keeper: 70_821_563,
-                borrower: 275_279_237,
-                b_ref: 2_360_718_790,
-                max_in: 2_407_933_165,
+                b: 2_423_653_463,
+                pen: 238_352_653,
+                keeper: 71_505_795,
+                borrower: 249_598_313,
+                b_ref: 2_383_526_521,
+                max_in: 2_431_197_051,
             },
         },
     ];

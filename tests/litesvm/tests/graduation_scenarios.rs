@@ -35,7 +35,7 @@
 //! whose creation LP is all burned) and M6-SEC-1's fall bound (the seed rises here) change no row;
 //! ★T-SEED-FALL's rows ([`t_seed_fall_a_recorded_low_in_the_warm_up_delays_the_exit_by_the_fall_bound`],
 //! [`t_seed_fall_a_genuine_dump_after_the_graduation_forces_nothing`]) reproduce
-//! `attacks/pumpswap_lp.py` part 1 (+14 / +22 / +28 s).
+//! `attacks/pumpswap_lp.py` part 1 (+13 / +22 / +28 s; +14 s for the 8th second before AIR-22).
 //!
 //! | ECON §10.1 row (v0.4.1; the as-built column since #105) | M6 on the fork (this binary) | Test |
 //! |---|---|---|
@@ -448,8 +448,8 @@ fn d90_graduation_gap_is_liquidated_by_the_boost_push() {
         cr: (17_299, 17_410),
         want: Want::Liq {
             b: 3_170_506_871,
-            b_ref: 3_173_276_488,
-            max_in: 3_236_742_017,
+            b_ref: 3_175_337_266,
+            max_in: 3_238_844_011,
             rent: 690_973,
             pen: 317_050_688,
             keeper: 95_115_206,
@@ -473,8 +473,8 @@ fn d90_graduation_then_2x_is_liquidated_on_the_pool() {
         cr: (15_589, 16_791),
         want: Want::Liq {
             b: 3_518_341_773,
-            b_ref: 3_521_477_277,
-            max_in: 3_591_906_822,
+            b_ref: 3_523_535_042,
+            max_in: 3_594_005_742,
             rent: 609_853,
             pen: 351_834_178,
             keeper: 105_550_253,
@@ -498,8 +498,8 @@ fn d90_graduation_then_3x_is_liquidated_on_the_pool() {
         cr: (14_761, 16_487),
         want: Want::Liq {
             b: 3_715_550_355,
-            b_ref: 3_716_516_421,
-            max_in: 3_790_846_749,
+            b_ref: 3_718_899_017,
+            max_in: 3_793_276_997,
             rent: 609_255,
             pen: 371_555_036,
             keeper: 111_466_510,
@@ -542,8 +542,8 @@ fn d97_graduation_then_2x_is_liquidated_on_the_pool() {
         cr: (15_600, 16_790),
         want: Want::Liq {
             b: 4_158_633_058,
-            b_ref: 4_163_088_887,
-            max_in: 4_246_350_664,
+            b_ref: 4_163_935_706,
+            max_in: 4_247_214_420,
             rent: 726_150,
             pen: 415_863_306,
             keeper: 124_758_991,
@@ -567,8 +567,8 @@ fn d97_graduation_then_3x_is_liquidated_on_the_pool() {
         cr: (14_627, 16_342),
         want: Want::Liq {
             b: 4_435_173_921,
-            b_ref: 4_437_347_300,
-            max_in: 4_526_094_246,
+            b_ref: 4_439_614_323,
+            max_in: 4_528_406_609,
             rent: 720_630,
             pen: 443_517_393,
             keeper: 133_055_217,
@@ -650,7 +650,8 @@ fn the_elf_prices_a_boost_chunk_at_one_lamport_less() {
 /// crank_price, buy back]` next to the keeper's crank — and the warm-up price seed falls by at most
 /// one v0.4.1 step per integration (M6-SEC-1; as built it took the low at once and kept it until the
 /// gate). The carried position is still liquidated on the pool with the lenders whole (their tokens
-/// back plus SOL): a low in the 8th post-change second delays the exit from +12 s to +14 s and in
+/// back plus SOL): a low in the 8th post-change second delays the exit from +12 s to +13 s (+14 s
+/// before AIR-22's lower-median growth) and in
 /// the 4th to +22 s (as built +28 s either way); in the 1st second the carried seed already lies at
 /// 0.55× the new pool, so the low is reached anyway (+28 s: the disclosed residual, ECON §12.12
 /// residual 17). The attacker's round trip is printed.
@@ -682,8 +683,9 @@ fn t_seed_fall_a_recorded_low_in_the_warm_up_delays_the_exit_by_the_fall_bound()
 }
 
 /// `(post-change second of the low, the liquidation's second after the completion)` on the fork
-/// (`attacks/pumpswap_lp.py` part 1, #105: +14 / +22 / +28 s).
-const SEED_FALL_ROWS: [(i64, i64); 3] = [(8, 14), (4, 22), (1, 28)];
+/// (`attacks/pumpswap_lp.py` part 1, #105: +13 / +22 / +28 s; +14 s in the 8th second under the
+/// minimum growth rule, before AIR-22's lower median).
+const SEED_FALL_ROWS: [(i64, i64); 3] = [(8, 13), (4, 22), (1, 28)];
 
 /// ★T-SEED-FALL, the other side (`attacks/pumpswap_lp.py` part 1, "the genuine dump"): other users
 /// dump the pool to 0.25× in the first post-change second and hold it there. The price seed falls

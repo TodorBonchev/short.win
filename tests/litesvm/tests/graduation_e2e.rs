@@ -728,8 +728,10 @@ fn m6_sec_1_a_low_recorded_in_the_warm_up_after_the_atomic_attack_is_bounded() {
     );
     // (post-change second of the low, the liquidation's seconds after the transition): the
     // undisturbed run is 9 s; as built each low set the seed to 0.1× the pool until the gate, and
-    // its climb back at ×7/6 a second took ≈ 15 s more.
-    for (k, want) in [(1i64, 23i64), (4, 17), (8, 12)] {
+    // its climb back at ×7/6 a second took ≈ 15 s more. AIR-22: with the sustained growth the lower
+    // median of the newest steps, the 8th-second low's exit comes after 10 s (12 s under the
+    // minimum); the 1st and 4th seconds' are unchanged.
+    for (k, want) in [(1i64, 23i64), (4, 17), (8, 10)] {
         let a = atomic_complete_and_migrate(Some((k, 1_000)));
         // The low's bucket is integrated in second k + 1 and stays in the warm-up's running minimum
         // through the gate's integration in second 9: 9 − k integrations, the first with `dt = 2`
