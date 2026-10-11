@@ -195,9 +195,11 @@ fn a_lock_outlives_a_position_stuck_in_migration() {
     assert!(l.lock > 0);
 }
 
-/// `pool_model.restart_grief_table()`, v0.4.1 row k = 60 (R4B-5): a 10 SOL lump, then a
-/// 1-lamport sweep every minute for a day. With the value-weighted vest end, 98.4 % of the lump
-/// is released after 6 h (v0.4 restarted the window: 63.3 %), and the lender is paid all of it.
+/// `pool_model.restart_grief_table()`, AIR-02 row k = 60 (R4B-5): a 10 SOL lump, then a
+/// 1-lamport sweep every minute for a day. With the value-weighted vest end rounded down, a dust
+/// lump leaves the end where it is: the whole lump is released at 6 h, only the latest minute's
+/// lamport is still vesting (rounded up, each sweep moved the end 1 s: 98.4 %, 155,270,942
+/// lamports left; v0.4 restarted the window: 63.3 %), and the lender is paid all of it.
 #[test]
 fn one_lamport_sweeps_every_minute_cannot_stall_the_vest() {
     let mut lab = Lab::new(TokenProgram::Spl);
@@ -213,10 +215,10 @@ fn one_lamport_sweeps_every_minute_cannot_stall_the_vest() {
             at.insert(t / 3_600, lab.market().vest_bal);
         }
     }
-    assert_eq!((at[&6], at[&24]), (155_270_942, 241));
-    assert!(
-        10 * U - at[&6] >= 98 * (10 * U) / 100,
-        "≥ 98 % released after 6 h"
+    assert_eq!(
+        (at[&6], at[&24]),
+        (1, 241),
+        "AIR-02: the whole lump released at 6 h"
     );
     // The last lender out is paid everything, the unreleased rest included (R3B-2).
     let shares = lab.position("H").unwrap().shares;

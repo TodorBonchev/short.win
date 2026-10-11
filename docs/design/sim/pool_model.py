@@ -51,7 +51,9 @@ Model (all integers; rounding in favour of the pool):
     (R4A-2 / R4B-3); lock terms are floored so the aggregate never exceeds the lenders' own
     locks; check() asserts I-P4 on the state the program sees (only the withdrawer touched).
   * v0.4.1 lumps: value-weighted vest end (a lump no longer restarts the window, R4B-5); a
-    deposit while a full-wipe record is live waits for the post-wipe sweep (R4A-7).
+    deposit while a full-wipe record is live waits for the post-wipe sweep (R4A-7).  AIR-02: the
+    value-weighted end is rounded down, so a dust lump leaves it where it is (rounded up, repeated
+    1-lamport sweeps held it lump_vest_s away).
   * Share epochs (C0-6), 0-share jump and post-wipe record (V2-12) unchanged.
   * v0.4.2 (KI-65): no rebase orphans.  A rebase record (1/den) carries a conversion remainder
     conv_rem in [0, den); a lender's conversion through it mints floor((conv_rem + shares)/den)
@@ -132,7 +134,7 @@ class Pool:
                  lump_vest_s: int = LUMP_VEST_S, lock_grace_s: int = LOCK_GRACE_S, pi_decay: bool = True,
                  lock_expiry: bool = True, lock_calendar: bool = True, vest_weighted: bool = True,
                  wipe_sweep_gate: bool = True, exit_flush_bps: int = 0, lock_floor: bool = True,
-                 cum_convert: bool = True, fwd_chain: bool = True):
+                 cum_convert: bool = True, fwd_chain: bool = True, vest_floor: bool = True):
         assert mode in ("continuous", "release")
         self.mode = mode
         self.util_cap = util_cap_bps
@@ -151,6 +153,8 @@ class Pool:
                                                 #   up to n - 1 orphan shares nobody holds; KI-65 comparison rows)
         self.fwd_chain = fwd_chain              # False: KI-66 as of the seventh round (the pot-only touch holds at
                                                 #   the rebase record only; KI-66 full comparison rows)
+        self.vest_floor = vest_floor            # False: v0.4.2 behaviour before AIR-02 (the value-weighted vest end
+                                                #   rounded up: every dust lump moved it 1 s; comparison rows)
         self.now = 0
         self.T = 0
         self.B = 0
@@ -228,10 +232,12 @@ class Pool:
             return
         if self.vest_weighted and self.vest_bal and self.vest_end > self.now:
             # v0.4.1 (R4B-5): value-weighted end time.  While lump_vest_s >= vest_end - now the end never
-            # moves earlier and a dust lump moves it at most 1 s later (ceil); after a governance decrease of
-            # lump_vest_s below the remaining span a lump pulls the end earlier, towards now + lump_vest_s
-            span = cdiv(self.vest_bal * (self.vest_end - self.now) + lamports * self.lump_vest_s,
-                        self.vest_bal + lamports)
+            # moves earlier; after a governance decrease of lump_vest_s below the remaining span a lump pulls
+            # the end earlier, towards now + lump_vest_s.  AIR-02: rounded down, so a dust lump leaves the end
+            # where it is (rounded up, each 1-lamport sweep_trader moved it 1 s, any number per transaction)
+            num = self.vest_bal * (self.vest_end - self.now) + lamports * self.lump_vest_s
+            den = self.vest_bal + lamports
+            span = num // den if self.vest_floor else cdiv(num, den)
         else:
             span = self.lump_vest_s
         self.vest_bal += lamports
@@ -1550,11 +1556,15 @@ def vest_exit_demo():
 
 
 def restart_grief_table():
-    """R4B-5 (reviewer's lender_r4.py part 3): a 10 SOL lump, then a 1-lamport sweep every k seconds."""
+    """R4B-5 (reviewer's lender_r4.py part 3): a 10 SOL lump, then a 1-lamport sweep every k seconds.  AIR-02: the
+    value-weighted end rounded up moved 1 s per dust lump (at one sweep a second, or many per transaction, it stayed
+    lump_vest_s away); rounded down a dust lump leaves it where it is."""
     rows = []
-    for label, weighted in (("v0.4 (every lump restarts the window)", False), ("v0.4.1 (value-weighted end)", True)):
+    for label, kw in (("v0.4 (every lump restarts the window)", dict(vest_weighted=False)),
+                      ("v0.4.1 (value-weighted end, rounded up)", dict(vest_floor=False)),
+                      ("AIR-02 (value-weighted end, rounded down)", {})):
         for per in (3600, 600, 60):
-            p = Pool("continuous", util_cap_bps=9000, vest_weighted=weighted)
+            p = Pool("continuous", util_cap_bps=9000, **kw)
             p.deposit("H", 10**12)
             p.sweep_sol(10 * 10**9)
             t = 0

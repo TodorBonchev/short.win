@@ -208,9 +208,16 @@ fn exits_and_the_unreleased_vest() {
 
 #[test]
 fn dust_sweeps_cannot_restart_the_vest() {
-    // ECON §9.4 / R4B-5, v0.4.1 rows: a 10 SOL lump, then a 1-lamport sweep every k s;
-    // share released after 6 h: 100.0 %, 99.8 %, 98.4 %; after 24 h: 100.0 %.
-    for (per, at6) in [(3_600, "100.0%"), (600, "99.8%"), (60, "98.4%")] {
+    // ECON §9.4 / R4B-5, AIR-02 rows: a 10 SOL lump, then a 1-lamport sweep every k s; share
+    // released after 6 h: 100.0 % for every k, one sweep a second included (the vest end rounded
+    // up moved 1 s per dust lump: 100.0 / 99.8 / 98.4 % at k = 3,600 / 600 / 60, and 63.2 % at
+    // one a second, which held the end 6 h away); after 24 h: 100.0 %.
+    for (per, at6) in [
+        (3_600, "100.0%"),
+        (600, "100.0%"),
+        (60, "100.0%"),
+        (1, "100.0%"),
+    ] {
         let mut s = Model::new(9_000);
         s.deposit(A, 1_000_000_000_000).expect("H");
         s.sweep(10_000_000_000);

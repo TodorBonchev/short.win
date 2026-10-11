@@ -223,7 +223,8 @@ MODEL_ERRORS = {
 # pools built with any of them are not recorded.
 DEFAULT_SWITCHES = {"mode": "continuous", "prorata": True, "pi_decay": True, "lock_expiry": True,
                     "lock_calendar": True, "vest_weighted": True, "wipe_sweep_gate": True,
-                    "exit_flush_bps": 0, "lock_floor": True, "cum_convert": True, "fwd_chain": True}
+                    "exit_flush_bps": 0, "lock_floor": True, "cum_convert": True, "fwd_chain": True,
+                    "vest_floor": True}
 
 BasePool = pm.Pool
 REGISTRY: list = []

@@ -61,9 +61,9 @@
 //! not fit the account field (ARCH §2.3.4, §2.3.6).
 //!
 //! Rounding follows ECON §2.1: shares minted, tokens paid, SOL credits, claims, vest
-//! releases, lock terms and the aggregate `locked` down; a lender's own lock, `Π`, the
-//! value-weighted vest end, `lock_until` and the rent true-up (`credited`, computed by the
-//! caller) up.
+//! releases, lock terms, the aggregate `locked` and (AIR-02) the value-weighted vest end
+//! down; a lender's own lock, `Π`, `lock_until` and the rent true-up (`credited`, computed
+//! by the caller) up.
 
 use core::mem::{offset_of, size_of};
 
@@ -922,11 +922,12 @@ fn vest_in(
     }
     let x = u128::from(lamports);
     let span: u128 = if p.vest_bal != 0 && p.vest_end > now {
-        // Value-weighted end (R4B-5): the end moves by ⌈x·(lump_vest_s − left)/(bal + x)⌉
+        // Value-weighted end (R4B-5): the end moves by ⌊x·(lump_vest_s − left)/(bal + x)⌋
         // s. Never earlier while `lump_vest_s ≥ left` (absent a governance decrease of
         // `lump_vest_s` below the remaining span; after one, a lump pulls the end earlier,
-        // as in pool_model), and at most 1 s later when `x·(lump_vest_s − left) ≤ bal + x`
-        // (a dust lump against a running vest) (M0B-A-2).
+        // as in pool_model) (M0B-A-2). Rounded down (AIR-02): a dust lump against a running
+        // vest (`x·(lump_vest_s − left) < bal + x`) leaves the end where it is; rounded up,
+        // every 1-lamport `sweep_trader` moved it 1 s, any number of times per transaction.
         let left =
             u128::try_from(ovf(p.vest_end.checked_sub(now))?).map_err(|_| MathError::Underflow)?;
         let bal = u128::from(p.vest_bal);
@@ -934,7 +935,7 @@ fn vest_in(
             ovf(bal.checked_mul(left))?,
             ovf(x.checked_mul(u128::from(lump_vest_s)))?,
         )?;
-        mul_div(num, 1, add_u128(bal, x)?, Rounding::Ceil)?
+        mul_div(num, 1, add_u128(bal, x)?, Rounding::Floor)?
     } else {
         u128::from(lump_vest_s)
     };
@@ -948,14 +949,16 @@ fn vest_in(
 /// `pool_model.Pool._vest` (ECON §9.4; ARCH §3.3 `vest`): a lump of `lamports`, already in
 /// `lender_sol`, released linearly: first the release due at `now`; then, if `S = 0`, a
 /// realised credit (to the live wipe record or the protocol, see [`credit`]); otherwise
-/// `vest_end = now + ⌈(vest_bal·(vest_end − now) + x·lump_vest_s)/(vest_bal + x)⌉` while a
-/// vest runs (value-weighted, R4B-5), else `now + lump_vest_s`, and `vest_bal += x`,
-/// `vest_last = now`. Nothing happens for 0 lamports (not even the release).
+/// `vest_end = now + ⌊(vest_bal·(vest_end − now) + x·lump_vest_s)/(vest_bal + x)⌋` while a
+/// vest runs (value-weighted, R4B-5; floor, AIR-02), else `now + lump_vest_s`, and
+/// `vest_bal += x`, `vest_last = now`. Nothing happens for 0 lamports (not even the release).
 ///
-/// A lump moves a running vest's end by `⌈x·(lump_vest_s − left)/(vest_bal + x)⌉` seconds
+/// A lump moves a running vest's end by `⌊x·(lump_vest_s − left)/(vest_bal + x)⌋` seconds
 /// (`left = vest_end − now`): never earlier while `lump_vest_s ≥ left`, which holds unless
 /// governance lowered `lump_vest_s` below the remaining span; after such a decrease a small
 /// lump pulls the end earlier (by days at the compiled extremes), exactly as `pool_model`.
+/// A dust lump (`x·(lump_vest_s − left) < vest_bal + x`) leaves the end where it is, so
+/// repeated 1-lamport sweeps cannot hold the end `lump_vest_s` away (AIR-02).
 ///
 /// # Errors
 /// As [`release`] and [`credit`]; `Overflow` if `vest_bal` or `vest_end` leave their types.
@@ -2682,18 +2685,61 @@ mod tests {
         assert_eq!((p.vest_bal, p.vest_end), (6_000, 21_600));
         assert_eq!(release(&mut p, 3_600), Ok(1_000));
         assert_eq!(release(&mut p, 3_600), Ok(0), "idempotent at one time");
-        // A dust lump moves the end by at most 1 s (ceil), never earlier (lump_vest_s
+        // A dust lump leaves the end where it is (floor, AIR-02), never earlier (lump_vest_s
         // unchanged, so lump_vest_s ≥ vest_end − now).
         sweep(&mut p, &mut v, None, 3_600, VEST, 1, SweepSource::Trader).unwrap();
-        assert_eq!(p.vest_end, 21_601);
+        assert_eq!(p.vest_end, 21_600);
         // A lump as large as the balance moves the end half way.
         let bal = p.vest_bal;
         sweep(&mut p, &mut v, None, 3_600, VEST, bal, SweepSource::Trader).unwrap();
-        assert_eq!(p.vest_end, 3_600 + 19_801); // ⌈(18,001 + 21,600)/2⌉
+        assert_eq!(p.vest_end, 3_600 + 19_800); // ⌊(18,000 + 21,600)/2⌋
         assert_eq!(release(&mut p, 1_000_000), Ok(2 * bal));
         assert_eq!(p.vest_bal, 0);
         assert_eq!(release(&mut p, 5), Ok(0), "no vest: vest_last follows now");
         assert_eq!(p.vest_last, 5);
+    }
+
+    /// AIR-02 (I-02): `sweep_trader` is permissionless and has no minimum, and rent is checked
+    /// per transaction, so `[1 lamport to the trader PDA, sweep_trader]` repeats freely. With the
+    /// end rounded up, every 1-lamport lump against a running vest moved `vest_end` 1 s later:
+    /// 1,000 in one transaction moved it 1,000 s, and one a second held it `lump_vest_s` away
+    /// (the release decays exponentially, 63 % after 6 h: v0.4's behaviour that R4B-5 fixed).
+    /// Rounded down, a dust lump moves the end 0 s and the 6 h window holds.
+    #[test]
+    fn dust_lumps_do_not_push_the_vest_end() {
+        let (mut p, mut v) = (Pool::new(), Vault::new());
+        let mut h = Lender::new(&p);
+        deposit(&mut p, &mut v, &mut h, &mut [], 0, 1_000_000, false).unwrap();
+        let lump = 10_000_000_000;
+        sweep(&mut p, &mut v, None, 0, VEST, lump, SweepSource::Trader).unwrap();
+        assert_eq!(p.vest_end, 21_600);
+        for _ in 0..1_000 {
+            sweep(&mut p, &mut v, None, 3_600, VEST, 1, SweepSource::Trader).unwrap();
+        }
+        assert_eq!(p.vest_end, 21_600, "1,000 dust lumps in one transaction");
+        // One 1-lamport sweep a second until the original end: the whole lump (and the dust)
+        // is released at 21,600; only the last second's lamport starts a new vest.
+        let mut t = 3_600;
+        while t < 21_600 {
+            t += 1;
+            sweep(&mut p, &mut v, None, t, VEST, 1, SweepSource::Trader).unwrap();
+        }
+        assert_eq!((p.vest_bal, p.vest_end), (1, 21_600 + i64::from(VEST)));
+        // A real lump still moves a running vest's end later, never earlier (lump_vest_s ≥
+        // vest_end − now), at most to now + lump_vest_s.
+        sweep(&mut p, &mut v, None, t, VEST, lump, SweepSource::Trader).unwrap();
+        let end = p.vest_end;
+        sweep(
+            &mut p,
+            &mut v,
+            None,
+            t + 3_600,
+            VEST,
+            lump,
+            SweepSource::Trader,
+        )
+        .unwrap();
+        assert!(p.vest_end > end && p.vest_end <= t + 3_600 + i64::from(VEST));
     }
 
     /// M10-8C-1: the rent an exit pays above what was credited while the position was open
