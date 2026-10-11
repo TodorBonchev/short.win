@@ -1010,6 +1010,77 @@ fn disable_is_immediate_and_enable_is_timelocked() {
     );
 }
 
+/// ★ AIR-24 (leads L-8). `disable_venue` cleared only the enabled bit and left a pending
+/// `EnableVenues` change in place, which anyone could apply at `not_before`
+/// (`[apply_config, open_short…]`): the Emergency's disable was undone unless it also cancelled the
+/// change in time. Reproduced on the pre-fix build: the re-enable Governance proposed before a
+/// second incident was applied after the Emergency disabled the venue again. Now `disable_venue`
+/// cancels a pending `EnableVenues` change that would set the bit it clears (`ConfigCancelled`, by
+/// the Emergency): the venue comes back only through a new proposal and its full timelock. A
+/// pending change that does not set that bit stays pending and applies.
+#[test]
+fn air24_disable_venue_cancels_a_pending_enable_of_that_venue() {
+    let mut env = Env::initialized();
+    let pause = env.pause_authority.insecure_clone();
+    let timelock = i64::from(DEFAULT_TIMELOCK_S);
+    let bit = VENUE_BIT_PUMP_SWAP.trailing_zeros() as u8;
+    let disable = |env: &mut Env| {
+        let pause = env.pause_authority.insecure_clone();
+        ok(env.send(&[ix::disable_venue(&pause.pubkey(), bit)], &[&pause]))
+    };
+
+    // An incident: the Emergency disables PumpSwap; Governance proposes re-enabling it.
+    disable(&mut env);
+    let enable = ConfigChange::EnableVenues {
+        bits: VENUE_BIT_PUMP_SWAP | VENUE_BIT_JUPITER,
+    };
+    ok(propose(&mut env, enable.clone()));
+    let pending = env.config().pending.hash();
+    // A second incident before `not_before`: the Emergency disables PumpSwap again.
+    env.warp(timelock / 2);
+    let meta = disable(&mut env);
+    // `not_before` passes: anyone's `apply_config` finds nothing to re-enable the venue with.
+    env.warp(timelock);
+    assert_err(&apply(&mut env), ShortwinError::NoPendingChange);
+    assert_eq!(env.config().venue_enabled & VENUE_BIT_PUMP_SWAP, 0);
+    let _: VenueDisabled = events::one(&meta);
+    let cancelled: ConfigCancelled = events::one(&meta);
+    assert_eq!(
+        (cancelled.kind, cancelled.hash, cancelled.by),
+        (enable.kind(), pending, pause.pubkey())
+    );
+
+    // A pending change that does not set the disabled bit is left alone.
+    let other = ConfigChange::EnableVenues {
+        bits: VENUE_BIT_JUPITER,
+    };
+    ok(propose(&mut env, other.clone()));
+    let meta = disable(&mut env);
+    assert!(events::of::<ConfigCancelled>(&meta).is_empty());
+    assert!(env.config().pending.change().ok() == Some(other));
+    env.warp(timelock);
+    ok(apply(&mut env));
+    let c = env.config();
+    assert_eq!(c.venue_enabled & VENUE_BIT_JUPITER, VENUE_BIT_JUPITER);
+    assert_eq!(c.venue_enabled & VENUE_BIT_PUMP_SWAP, 0);
+
+    // The venue comes back through a new proposal and its full timelock.
+    ok(propose(
+        &mut env,
+        ConfigChange::EnableVenues {
+            bits: VENUE_BIT_PUMP_SWAP,
+        },
+    ));
+    env.warp(timelock - 1);
+    assert_err(&apply(&mut env), ShortwinError::TimelockNotElapsed);
+    env.warp(1);
+    ok(apply(&mut env));
+    assert_eq!(
+        env.config().venue_enabled & VENUE_BIT_PUMP_SWAP,
+        VENUE_BIT_PUMP_SWAP
+    );
+}
+
 #[test]
 fn admin_instructions_never_move_funds() {
     // I4 runs inside Env::send for every admin-signed instruction; drive every admin power

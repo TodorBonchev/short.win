@@ -674,6 +674,9 @@ impl ConfigChange {
     pub const KIND_AUTHORITIES: u8 = 4;
     /// `kind` of [`ConfigChange::Timelock`].
     pub const KIND_TIMELOCK: u8 = 5;
+    /// `kind` of [`ConfigChange::EnableVenues`] (`disable_venue` cancels a pending one that would
+    /// set the bit it clears, AIR-24).
+    pub const KIND_ENABLE_VENUES: u8 = 6;
 
     /// `kind` of this change (variant index + 1).
     pub fn kind(&self) -> u8 {
@@ -683,7 +686,7 @@ impl ConfigChange {
             Self::Kink { .. } => 3,
             Self::Authorities { .. } => Self::KIND_AUTHORITIES,
             Self::Timelock { .. } => Self::KIND_TIMELOCK,
-            Self::EnableVenues { .. } => 6,
+            Self::EnableVenues { .. } => Self::KIND_ENABLE_VENUES,
             Self::OracleFeed { .. } => 7,
         }
     }
