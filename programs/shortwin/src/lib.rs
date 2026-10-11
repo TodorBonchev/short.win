@@ -123,13 +123,15 @@ pub mod shortwin {
         instructions::flag_venue_upgraded::handler(ctx, venue)
     }
 
-    /// The Emergency vault re-validates an upgraded venue program at `expected_slot`.
+    /// The Emergency vault re-validates an upgraded venue program at `expected_slot`, naming
+    /// the sha256 of the trimmed ELF it reviewed (AIR-01; all zero: the slot alone).
     pub fn revalidate_venue(
         ctx: Context<RevalidateVenue>,
         venue: u8,
         expected_slot: u64,
+        expected_elf_hash: [u8; 32],
     ) -> Result<()> {
-        instructions::revalidate_venue::handler(ctx, venue, expected_slot)
+        instructions::revalidate_venue::handler(ctx, venue, expected_slot, expected_elf_hash)
     }
 
     /// Anyone moves a market's protocol fees to the configured recipient.

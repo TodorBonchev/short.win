@@ -34,7 +34,12 @@
 //! - the residual the design discloses (ARCH §3.1, §8.5): an open that lands after the upgrade
 //!   and before the flag is accepted; `[flag, open]` in one transaction is not;
 //! - U5: `flag_venue_upgraded` and `revalidate_venue` cost the same CU on the real 1.4 MB and
-//!   0.79 MB accounts and on a 10 MiB ProgramData (pump's size), far inside §6.1's 400 k.
+//!   0.79 MB accounts and on a 10 MiB ProgramData (pump's size), far inside §6.1's 400 k;
+//! - AIR-01: the loader's permissionless `ExtendProgram` (a stranger's, alone or bundled with the
+//!   flag) is not an upgrade once the Emergency revalidated the deploy naming its trimmed ELF's
+//!   sha256 (the fixtures' OtterSec hashes), and does not refuse a revalidation staged before it;
+//!   an upgrade next to an extension (a same-size changed ELF, CPMM's larger 2026-10 ELF) still
+//!   latches; the hash path's CU (≈ ELF/2 + tail/250) stays inside the transaction limit.
 //!
 //! Every transaction goes through `Env::send` (or `fork::admin_send`): the invariant hooks run
 //! after each one (I17 reads each `Open` against the latch just before its instruction).
@@ -54,6 +59,7 @@ use shortwin::errors::ShortwinError as E;
 use shortwin::events::{
     Close, Expire, Liquidate, MarginAdded, Open, VenueRevalidated, VenueUpgradeFlagged,
 };
+use shortwin::instructions::flag_venue_upgraded::trimmed_elf_hash_of;
 use shortwin_litesvm_tests::engine::{
     Borrower, VenueMarket, add_margin_ix, expire_ix, liquidate_ix, open_short_ix, sol_settle_ix,
 };
@@ -117,13 +123,18 @@ const SYSVAR_CLOCK: Pubkey = Pubkey::from_str_const("SysvarC1ock1111111111111111
 /// (bincode tag 3, the loader's account order) signed by the program's upgrade authority, whose
 /// signature is forged (`fork::admin_send`). Returns the result and the buffer.
 fn send_upgrade(env: &mut Env, program: RaydiumProgram) -> (TxResult, Pubkey) {
+    send_upgrade_elf(env, program, program.elf())
+}
+
+/// [`send_upgrade`] to `elf` instead of the dumped ELF.
+fn send_upgrade_elf(env: &mut Env, program: RaydiumProgram, elf: &[u8]) -> (TxResult, Pubkey) {
     let authority = header(env, program)
         .upgrade_authority
         .map(Pubkey::new_from_array)
         .expect("an upgradeable program");
     let mut data = vec![1, 0, 0, 0, 1];
     data.extend_from_slice(authority.as_ref());
-    data.extend_from_slice(program.elf());
+    data.extend_from_slice(elf);
     let buffer = Pubkey::new_unique();
     let lamports = env.svm.minimum_balance_for_rent_exemption(data.len());
     env.svm
@@ -158,19 +169,34 @@ fn send_upgrade(env: &mut Env, program: RaydiumProgram) -> (TxResult, Pubkey) {
 /// A **real** upgrade of `program` by the upgradeable loader ([`send_upgrade`]): the loader
 /// writes the current slot into the ProgramData header and the ELF after it. Returns that slot.
 fn loader_upgrade(env: &mut Env, program: RaydiumProgram) -> u64 {
+    loader_upgrade_elf(env, program, program.elf())
+}
+
+/// [`loader_upgrade`] to `elf` instead of the dumped ELF (the loader zeroes the rest of the
+/// account).
+fn loader_upgrade_elf(env: &mut Env, program: RaydiumProgram, elf: &[u8]) -> u64 {
     let slot = env.clock().slot;
     let authority = header(env, program).upgrade_authority;
-    let (res, buffer) = send_upgrade(env, program);
+    let len = read::account(&env.svm, &program.program_data().address)
+        .unwrap()
+        .data
+        .len();
+    let (res, buffer) = send_upgrade_elf(env, program, elf);
     ok(res);
     let h = header(env, program);
     assert_eq!(h.slot, slot, "the loader records the upgrade's slot");
     assert_eq!(h.upgrade_authority, authority, "the authority is kept");
     let pd = read::account(&env.svm, &program.program_data().address).unwrap();
+    assert_eq!(pd.data.len(), len, "an upgrade never resizes the account");
     let start = program_data::HEADER_LEN;
     assert_eq!(
-        &pd.data[start..start + program.elf().len()],
-        program.elf(),
+        &pd.data[start..start + elf.len()],
+        elf,
         "the redeployed ELF"
+    );
+    assert!(
+        pd.data[start + elf.len()..].iter().all(|&b| b == 0),
+        "the rest of the account zeroed"
     );
     assert!(
         read::account(&env.svm, &buffer).is_none_or(|b| b.data.len() <= start),
@@ -186,6 +212,88 @@ fn flag(env: &mut Env, venue: u8) -> TxResult {
 fn revalidate(env: &mut Env, venue: u8, slot: u64) -> TxResult {
     let ea = env.pause_authority.insecure_clone();
     env.send(&[ix::revalidate_venue(&ea.pubkey(), venue, slot)], &[&ea])
+}
+
+/// `SetComputeUnitLimit(1.4 M)`, then `ix`: once the account grew since the review, the latch
+/// instructions hash the venue's trimmed ELF (AIR-01; half a CU per byte, CPMM's 0.72 MB ELF
+/// ≈ 0.36 M CU), above the 200 k default.
+fn with_hash_budget(ix: Instruction) -> Vec<Instruction> {
+    vec![shortwin_litesvm_tests::pump::cu_limit_ix(1_400_000), ix]
+}
+
+/// `flag_venue_upgraded(venue)` with [`with_hash_budget`].
+fn flag_hashing(env: &mut Env, venue: u8) -> TxResult {
+    env.send(&with_hash_budget(ix::flag_venue_upgraded(venue)), &[])
+}
+
+/// The sha256 of `program`'s trimmed ELF as its ProgramData holds it now — what
+/// `solana-verify get-program-hash` prints, and what the Emergency names when it revalidates the
+/// deploy it reviewed (AIR-01).
+fn reviewed_hash(env: &Env, program: RaydiumProgram) -> [u8; 32] {
+    let a = read::account(&env.svm, &program.program_data().address).expect("ProgramData");
+    trimmed_elf_hash_of(&a.owner.to_bytes(), &a.data)
+        .expect("a ProgramData")
+        .expect("small enough to hash")
+}
+
+/// Lower-case hex of `bytes`.
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// The Emergency's `revalidate_venue` of the deploy at `slot` whose trimmed ELF hashes to
+/// `reviewed` ([`reviewed_hash`]), with [`with_hash_budget`].
+fn revalidate_reviewed(
+    env: &mut Env,
+    program: RaydiumProgram,
+    slot: u64,
+    reviewed: [u8; 32],
+) -> TxResult {
+    let ea = env.pause_authority.insecure_clone();
+    let ix = ix::revalidate_venue_reviewed(&ea.pubkey(), guard_index(program), slot, reviewed);
+    env.send(&with_hash_budget(ix), &[&ea])
+}
+
+/// A stranger's `ExtendProgram` of `program`'s ProgramData by `additional_bytes` (≥ 10 KiB under
+/// SIMD-0431; `fork::extend_program_ix`): the loader appends zeros, keeps the ELF and writes the
+/// current slot into the header. Returns that slot.
+fn stranger_extends(env: &mut Env, program: RaydiumProgram, additional_bytes: u32) -> u64 {
+    let key = program.program_data().address;
+    let before = read::account(&env.svm, &key).unwrap().data;
+    let slot = env.clock().slot;
+    let stranger = env.funded_keypair();
+    let extend = fork::extend_program_ix(&program.id(), &stranger.pubkey(), additional_bytes);
+    ok(env.send(&[extend], &[&stranger]));
+    let after = read::account(&env.svm, &key).unwrap().data;
+    assert_eq!(
+        after.len(),
+        before.len() + additional_bytes as usize,
+        "the account grew"
+    );
+    assert_eq!(header(env, program).slot, slot, "the extension's slot");
+    let start = program_data::HEADER_LEN;
+    assert_eq!(
+        &after[start..before.len()],
+        &before[start..],
+        "the ELF untouched"
+    );
+    assert!(after[before.len()..].iter().all(|&b| b == 0), "zeros");
+    slot
+}
+
+/// AMM v4's dumped ELF with one byte of a panic-location string in `.rodata` changed
+/// (`program/src/math.rs` → `program/src/meth.rs`): another build of the same size, which the
+/// loader deploys (it verifies the code, not the read-only data).
+fn v4_elf_one_byte_changed() -> Vec<u8> {
+    let mut elf = RaydiumProgram::AmmV4.elf().to_vec();
+    let at = elf
+        .windows(19)
+        .position(|w| w == b"program/src/math.rs")
+        .expect("the string")
+        + 13;
+    assert_eq!(elf[at], b'a');
+    elf[at] = b'e';
+    elf
 }
 
 /// The position size of `ray_it`: `min(X/400, 2 SOL of notional)`.
@@ -707,7 +815,8 @@ fn a_flag_and_an_open_in_one_transaction() {
 
 /// U5 (ARCH §6.1, §6.5): the latch instructions cost the same on the real 1.4 MB AMM v4 and
 /// 0.79 MB CPMM ProgramData as on a 10 MiB one (pump's size): the input-region copy is not
-/// metered in CU. Each stays far inside §6.1's 400 k.
+/// metered in CU. Each stays far inside §6.1's 400 k. (Without an extension nothing is hashed;
+/// `air01_the_hash_path_fits_the_compute_budget` measures the AIR-01 path.)
 #[test]
 fn u5_latch_cost_does_not_grow_with_the_program_data() {
     let mut env = Env::ray_fork();
@@ -726,28 +835,34 @@ fn u5_latch_cost_does_not_grow_with_the_program_data() {
             cu(&ok(revalidate(&mut env, venue, s))),
         ));
     }
-    // Pump's ProgramData size, synthetic (not dumped): header ‖ zeros.
-    let pump = VENUE_PROGRAM_DATA[usize::from(GUARD_PUMP)];
-    let s = FIXTURE_GUARD_SLOTS[usize::from(GUARD_PUMP)] + 1;
-    fixtures::set_program_data(
-        &mut env.svm,
-        &pump,
-        s,
-        Some(&Pubkey::new_unique()),
-        PUMP_PROGRAM_DATA_LEN - program_data::HEADER_LEN,
-    );
-    assert_eq!(
-        read::account(&env.svm, &pump).unwrap().data.len(),
-        PUMP_PROGRAM_DATA_LEN
-    );
-    flags.push(("pump (10 MiB)".into(), cu(&ok(flag(&mut env, GUARD_PUMP)))));
-    revals.push((
-        "pump (10 MiB)".into(),
-        cu(&ok(env.send(
-            &[ix::revalidate_venue(&ea.pubkey(), GUARD_PUMP, s)],
-            &[&ea],
-        ))),
-    ));
+    // Pump's ProgramData size, synthetic (not dumped): header ‖ zeros — at Jupiter's address
+    // too, which takes the Raydium programs' path (an AIR-01 fingerprint slot, none recorded).
+    for (venue, name) in [
+        (GUARD_JUPITER, "jupiter (10 MiB)"),
+        (GUARD_PUMP, "pump (10 MiB)"),
+    ] {
+        let key = VENUE_PROGRAM_DATA[usize::from(venue)];
+        let s = FIXTURE_GUARD_SLOTS[usize::from(venue)] + 1;
+        fixtures::set_program_data(
+            &mut env.svm,
+            &key,
+            s,
+            Some(&Pubkey::new_unique()),
+            PUMP_PROGRAM_DATA_LEN - program_data::HEADER_LEN,
+        );
+        assert_eq!(
+            read::account(&env.svm, &key).unwrap().data.len(),
+            PUMP_PROGRAM_DATA_LEN
+        );
+        flags.push((name.into(), cu(&ok(flag(&mut env, venue)))));
+        revals.push((
+            name.into(),
+            cu(&ok(env.send(
+                &[ix::revalidate_venue(&ea.pubkey(), venue, s)],
+                &[&ea],
+            ))),
+        ));
+    }
     for (what, list) in [
         ("flag_venue_upgraded", &flags),
         ("revalidate_venue", &revals),
@@ -756,9 +871,15 @@ fn u5_latch_cost_does_not_grow_with_the_program_data() {
             println!("{what} on the {name} ProgramData: {units} CU");
             assert!(*units <= LATCH_CU_LIMIT, "{what} {name}: {units} CU");
         }
+        // 1.4 MB, 0.79 MB and 10 MiB on one path: equal to the unit.
         assert!(
-            list.iter().all(|(_, u)| *u == list[0].1),
+            list[..3].iter().all(|(_, u)| *u == list[0].1),
             "{what}: {list:?} — the cost must not depend on the account size"
+        );
+        // Pump has no fingerprint slot: it skips the lookup's few instructions (AIR-01).
+        assert!(
+            list[3].1 <= list[0].1 && list[0].1 - list[3].1 <= 32,
+            "{what}: {list:?}"
         );
     }
 }
@@ -887,4 +1008,273 @@ fn the_2026_10_cpmm_redeploy_latches_until_revalidated() {
     // A direct user swap executes on the redeploy.
     whale_buy(&mut env, useless, 1_000_000_000);
     assert_eq!(cpmm_build_running(&mut env), CpmmDeploy::Oct2026);
+}
+
+// ---- AIR-01: an extension is not an upgrade ----------------------------------------------------
+
+/// ★ AIR-01 (I-01). The loader's `ExtendProgram` is permissionless (Agave 4.2) and rewrites the
+/// ProgramData deploy slot without touching the ELF, while `flag_venue_upgraded` latched on any
+/// slot change: anyone stopped every Raydium open with `[ExtendProgram(venue),
+/// flag_venue_upgraded(venue)]` for ≈ 0.07 SOL of rent a trip. Reproduced on the pre-fix build:
+/// the flag after a stranger's 10 KiB extension set the bit. Now, once the Emergency has
+/// revalidated the deploy naming the sha256 of its trimmed ELF, an extension — alone, bundled
+/// with the flag, or again in a later slot — is `VenueNotUpgraded` and writes nothing, and opens
+/// keep landing on every Raydium market.
+#[test]
+fn air01_an_extension_is_not_an_upgrade() {
+    for program in RaydiumProgram::ALL {
+        let venue = guard_index(program);
+        let dumped = FIXTURE_GUARD_SLOTS[usize::from(venue)];
+        let (mut env, markets) = three_markets();
+        // The deploy runbook's first revalidation: the reviewed ELF's hash goes on chain.
+        let reviewed = reviewed_hash(&env, program);
+        ok(revalidate_reviewed(&mut env, program, dumped, reviewed));
+
+        env.warp(1);
+        let e = stranger_extends(&mut env, program, 10_240);
+        assert_ne!(e, dumped, "the deploy slot moved");
+        env.warp(1);
+        let before = read::account(&env.svm, &pda::venue_guard()).unwrap().data;
+        assert_err(&flag_hashing(&mut env, venue), E::VenueNotUpgraded);
+        assert_eq!(
+            read::account(&env.svm, &pda::venue_guard()).unwrap().data,
+            before,
+            "{program:?}: nothing written"
+        );
+        // The attack in one transaction, then the extension alone again in later slots.
+        for _ in 0..2 {
+            env.warp(1);
+            let stranger = env.funded_keypair();
+            let mut ixs = vec![fork::extend_program_ix(
+                &program.id(),
+                &stranger.pubkey(),
+                10_240,
+            )];
+            ixs.extend(with_hash_budget(ix::flag_venue_upgraded(venue)));
+            assert_err(&env.send(&ixs, &[&stranger]), E::VenueNotUpgraded);
+            stranger_extends(&mut env, program, 20_480);
+            env.warp(1);
+            assert_err(&flag_hashing(&mut env, venue), E::VenueNotUpgraded);
+        }
+        assert_eq!(env.venue_guard().upgraded, 0, "{program:?}: never latched");
+        crank_all(&mut env, &markets);
+        for (rm, q) in &markets {
+            ok(try_open(&mut env, rm, *q));
+        }
+    }
+}
+
+/// ★ AIR-01: an extension landing between the Emergency's review of an upgrade and its
+/// transaction no longer refuses the revalidation. Reproduced on the pre-fix build:
+/// `revalidate_venue(venue, s)` after a stranger's extension failed `VenueSlotMismatch` (exact
+/// slot), and the stranger could re-extend before every attempt. Now the revalidation names the
+/// reviewed trimmed ELF, and a later deploy slot is accepted while the account holds exactly that
+/// ELF: the bit clears, `guard_slot` records the extension's slot, and the next extension latches
+/// nothing (the reviewed fingerprint is on chain).
+#[test]
+fn air01_an_extension_during_review_does_not_block_the_revalidation() {
+    for program in RaydiumProgram::ALL {
+        let venue = guard_index(program);
+        let i = usize::from(venue);
+        let (mut env, markets) = three_markets();
+        env.warp(1);
+        let s = loader_upgrade(&mut env, program);
+        env.warp(1);
+        ok(flag(&mut env, venue));
+        // The Emergency reviews the deploy at `s`; two extensions land before its transaction.
+        let reviewed = reviewed_hash(&env, program);
+        env.warp(1);
+        stranger_extends(&mut env, program, 10_240);
+        env.warp(1);
+        let e = stranger_extends(&mut env, program, 10_240);
+        env.warp(1);
+        let meta = ok(revalidate_reviewed(&mut env, program, s, reviewed));
+        let ev: VenueRevalidated = events::one(&meta);
+        assert_eq!((ev.expected_slot, ev.programdata_slot), (s, e));
+        let g = env.venue_guard();
+        assert!(!g.is_flagged(venue), "{program:?}: cleared");
+        assert_eq!(
+            g.guard_slot[i], e,
+            "the deploy slot the account carries now"
+        );
+        crank_all(&mut env, &markets);
+        for (rm, q) in &markets {
+            ok(try_open(&mut env, rm, *q));
+        }
+        env.warp(1);
+        stranger_extends(&mut env, program, 10_240);
+        env.warp(1);
+        assert_err(&flag_hashing(&mut env, venue), E::VenueNotUpgraded);
+    }
+}
+
+/// AIR-01, the other half: an upgrade next to an extension still latches — the case the deploy
+/// slot cannot tell from a pure extension. AMM v4 is upgraded to its own ELF with one byte
+/// changed (same size, inside the old account), once after a stranger's extension and once
+/// before one: each time the flag sets the bit, the old ELF's hash no longer revalidates a later
+/// slot, and only the new deploy clears it.
+#[test]
+fn air01_an_upgrade_next_to_an_extension_still_latches() {
+    let program = RaydiumProgram::AmmV4;
+    let venue = guard_index(program);
+    let dumped = FIXTURE_GUARD_SLOTS[usize::from(venue)];
+    let changed = v4_elf_one_byte_changed();
+    for extend_first in [true, false] {
+        let (mut env, markets) = three_markets();
+        let old = reviewed_hash(&env, program);
+        ok(revalidate_reviewed(&mut env, program, dumped, old));
+        env.warp(1);
+        if extend_first {
+            stranger_extends(&mut env, program, 10_240);
+            env.warp(1);
+        }
+        let s = loader_upgrade_elf(&mut env, program, &changed);
+        env.warp(1);
+        if !extend_first {
+            stranger_extends(&mut env, program, 10_240);
+            env.warp(1);
+        }
+        let meta = ok(flag_hashing(&mut env, venue));
+        let _: VenueUpgradeFlagged = events::one(&meta);
+        assert!(
+            env.venue_guard().is_flagged(venue),
+            "extend first: {extend_first}"
+        );
+        crank_all(&mut env, &markets);
+        for (rm, q) in &markets {
+            assert_err(&try_open(&mut env, rm, *q), E::VenueUpgraded);
+        }
+        // The old ELF's hash cannot revalidate the new deploy at a later slot.
+        let now = header(&env, program).slot;
+        env.warp(1);
+        stranger_extends(&mut env, program, 10_240);
+        env.warp(1);
+        assert_err(
+            &revalidate_reviewed(&mut env, program, s, old),
+            E::VenueSlotMismatch,
+        );
+        assert_ne!(now, header(&env, program).slot);
+        let new = reviewed_hash(&env, program);
+        assert_ne!(new, old, "another build");
+        let current = header(&env, program).slot;
+        ok(revalidate_reviewed(&mut env, program, current, new));
+        assert_eq!(env.venue_guard().upgraded, 0);
+        for (rm, q) in &markets {
+            ok(try_open(&mut env, rm, *q / 2));
+        }
+    }
+}
+
+/// AIR-01, the compute budget: once the account grew since the review, `flag_venue_upgraded` and
+/// `revalidate_venue` hash the trimmed ELF (`sol_sha256`: half a CU per byte) after finding its
+/// end in the zero tail (`sol_memcmp_`: about 1 CU per 250 bytes). Measured on AMM v4 (0.31 MB
+/// ELF) after a stranger extended its ProgramData to 1 KiB under the 10 MiB cap — 9 MB of zero
+/// tail — and on CPMM (0.72 MB ELF) after a 10 KiB extension: each stays near `ELF/2 + tail/250`
+/// over the cheap path and inside the 1.4 M CU transaction limit (pump-fees' 0.85 MB ELF: see
+/// `latch_pump_it`). Without an extension nothing is hashed.
+#[test]
+fn air01_the_hash_path_fits_the_compute_budget() {
+    let mut env = Env::ray_fork();
+    let cu = |meta: &TransactionMetadata| meta.compute_units_consumed;
+    for program in RaydiumProgram::ALL {
+        let venue = guard_index(program);
+        let dumped = FIXTURE_GUARD_SLOTS[usize::from(venue)];
+        let key = program.program_data().address;
+        let reviewed = reviewed_hash(&env, program);
+        let cheap = cu(&ok(revalidate_reviewed(
+            &mut env, program, dumped, reviewed,
+        )));
+        let a = read::account(&env.svm, &key).unwrap();
+        let elf = program_data::trimmed_elf(&a.owner.to_bytes(), &a.data)
+            .unwrap()
+            .len() as u64;
+        let extra = match program {
+            RaydiumProgram::AmmV4 => (PUMP_PROGRAM_DATA_LEN - a.data.len() - 1_024) as u32,
+            RaydiumProgram::Cpmm => 10_240,
+        };
+        env.warp(1);
+        stranger_extends(&mut env, program, extra);
+        let len = read::account(&env.svm, &key).unwrap().data.len() as u64;
+        let tail = len - program_data::HEADER_LEN as u64 - elf;
+        env.warp(1);
+        let refused = flag_hashing(&mut env, venue).expect_err("an extension");
+        let flag = refused.meta.compute_units_consumed;
+        let reval = cu(&ok(revalidate_reviewed(
+            &mut env, program, dumped, reviewed,
+        )));
+        println!(
+            "{program:?}: trimmed ELF {elf} B, zero tail {tail} B — flag_venue_upgraded \
+             {flag} CU (refused: an extension), revalidate_venue at a later slot {reval} CU \
+             (exact slot: {cheap} CU)"
+        );
+        for units in [flag, reval] {
+            assert!(units > elf / 2 + 5_000, "{program:?}: the ELF was hashed");
+            assert!(
+                units < cheap + elf / 2 + tail / 200 + 10_000,
+                "{program:?}: {units} CU"
+            );
+            assert!(units < 1_400_000);
+        }
+    }
+}
+
+/// AIR-01 on CPMM's real 2026-10 redeploy (a larger ELF): replayed after a stranger extended the
+/// 2026-09 build's ProgramData, so that the new ELF lands inside an account whose length the
+/// extension already changed. The extension alone latches nothing; the redeploy does; the
+/// 2026-09 ELF's hash no longer revalidates a later slot, the redeploy's does.
+#[test]
+fn air01_the_2026_10_cpmm_redeploy_latches_after_an_extension() {
+    let program = RaydiumProgram::Cpmm;
+    let venue = GUARD_RAYDIUM_CPMM;
+    let old = VENUE_GUARD_SLOTS_2026_09_27[usize::from(venue)];
+    let mut env = Env::new();
+    let mut args = env.default_init_args();
+    args.guard_slot = VENUE_GUARD_SLOTS_2026_09_27;
+    ok(env.initialize_config(args));
+    fork::load_program(&mut env.svm, RaydiumProgram::AmmV4);
+    fork::load_cpmm_deploy(&mut env.svm, CpmmDeploy::Sep2026);
+    env.set_fork_clock();
+    let markets = [add_market(&mut env, FART), add_market(&mut env, USELESS)];
+    // The program hashes exactly what `solana-verify` / OtterSec hash (the fixtures' pins,
+    // `tests/fixtures/README.md`).
+    let sep = reviewed_hash(&env, program);
+    assert!(hex(&sep).starts_with("bdaff73e") && hex(&sep).ends_with("f8cc"));
+    ok(revalidate_reviewed(&mut env, program, old, sep));
+
+    env.warp(1);
+    stranger_extends(&mut env, program, 10_240);
+    env.warp(1);
+    assert_err(&flag_hashing(&mut env, venue), E::VenueNotUpgraded);
+
+    env.warp(1);
+    let s = loader_upgrade(&mut env, program);
+    assert!(
+        program.elf().len() > CpmmDeploy::Sep2026.elf().len(),
+        "the redeploy's ELF is larger"
+    );
+    env.warp(1);
+    assert_eq!(cpmm_build_running(&mut env), CpmmDeploy::Oct2026);
+    let meta = ok(flag_hashing(&mut env, venue));
+    let ev: VenueUpgradeFlagged = events::one(&meta);
+    assert_eq!((ev.guard_slot, ev.programdata_slot), (old, s));
+    crank_all(&mut env, &markets);
+    for (rm, q) in &markets {
+        assert_err(&try_open(&mut env, rm, *q), E::VenueUpgraded);
+    }
+    env.warp(1);
+    let e = stranger_extends(&mut env, program, 10_240);
+    env.warp(1);
+    assert_err(
+        &revalidate_reviewed(&mut env, program, s, sep),
+        E::VenueSlotMismatch,
+    );
+    let oct = reviewed_hash(&env, program);
+    assert!(hex(&oct).starts_with("93cad245") && hex(&oct).ends_with("a0d2"));
+    let meta = ok(revalidate_reviewed(&mut env, program, s, oct));
+    let ev: VenueRevalidated = events::one(&meta);
+    assert_eq!((ev.expected_slot, ev.programdata_slot), (s, e));
+    crank_all(&mut env, &markets);
+    for (rm, q) in &markets {
+        ok(try_open(&mut env, rm, *q / 2));
+    }
 }

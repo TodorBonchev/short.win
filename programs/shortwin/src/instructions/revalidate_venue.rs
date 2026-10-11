@@ -1,11 +1,26 @@
-//! `revalidate_venue(venue, expected_slot)` (ARCH §3.1, A7; R4B-7): the Emergency vault clears
-//! the latch for a venue program after reviewing the upgrade.
+//! `revalidate_venue(venue, expected_slot, expected_elf_hash)` (ARCH §3.1, A7; R4B-7; AIR-01):
+//! the Emergency vault clears the latch for a venue program after reviewing the upgrade.
 //!
-//! Requires the ProgramData's current deploy slot to equal `expected_slot` (the slot the
-//! Emergency signers reviewed), else `VenueSlotMismatch`, so an upgrade that lands while the
-//! Squads proposal collects signatures cannot be validated silently. Then `guard_slot[venue] =
-//! expected_slot` and bit `venue` is cleared. Same address and owner checks as
-//! `flag_venue_upgraded`.
+//! `expected_slot` is the deploy slot the Emergency signers reviewed and `expected_elf_hash` the
+//! sha256 of that deploy's trimmed ELF (`shortwin_venue_state::program_data::trimmed_elf`, what
+//! `solana-verify get-program-hash` prints; all zero: no hash). The ProgramData's current deploy
+//! slot must equal `expected_slot` — or, for a fingerprinted venue (pump-fees, AMM v4, CPMM,
+//! Jupiter) and a hash, the current trimmed ELF must hash to `expected_elf_hash` — else
+//! `VenueSlotMismatch`, so an upgrade that lands while the Squads proposal collects signatures
+//! cannot be validated silently. Then `guard_slot[venue]` = the current deploy slot and bit
+//! `venue` is cleared; for a fingerprinted venue the guard records the ProgramData's length and
+//! the hash's first 12 bytes (`VenueGuard::guard_len` / `guard_elf`), or clears them without a
+//! hash. Same address and owner checks as `flag_venue_upgraded`.
+//!
+//! **Extensions during review (AIR-01).** The loader's permissionless `ExtendProgram` moves the
+//! deploy slot without touching the ELF, so with the exact slot alone anyone could refuse every
+//! revalidation by extending the venue before the Emergency's transaction executed. A later slot
+//! is therefore accepted when the account still holds exactly the reviewed ELF; the check hashes
+//! it (half a CU per trimmed-ELF byte: the executor requests the compute budget). With the slot
+//! unchanged nothing is hashed and the hash is recorded as given: a wrong one can only make a
+//! later extension count as an upgrade (fail-safe), never hide an ELF the Emergency did not name.
+//! Pump and PumpSwap (no fingerprint; their ProgramData sit at the 10 MiB cap, which no extension
+//! can pass) keep the exact slot.
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::bpf_loader_upgradeable;
@@ -13,8 +28,8 @@ use anchor_lang::solana_program::bpf_loader_upgradeable;
 use crate::constants::{venue_program_data, CONFIG_VERSION, VENUE_GUARD_VERSION, VENUE_PROGRAMS};
 use crate::errors::ShortwinError;
 use crate::events::VenueRevalidated;
-use crate::instructions::flag_venue_upgraded::read_deploy_slot;
-use crate::state::{GlobalConfig, VenueGuard};
+use crate::instructions::flag_venue_upgraded::{read_deploy_slot, trimmed_elf_hash};
+use crate::state::{elf_fingerprint_of, GlobalConfig, VenueGuard};
 
 #[event_cpi]
 #[derive(Accounts)]
@@ -39,7 +54,7 @@ pub struct RevalidateVenue<'info> {
     )]
     pub venue_guard: AccountLoader<'info, VenueGuard>,
     /// CHECK: the venue program's ProgramData: key == the compile-time constant, owner == the
-    /// upgradeable loader; only its header is read.
+    /// upgradeable loader; its header is read, and its ELF when the slot moved (AIR-01).
     #[account(
         address = venue_program_data(venue).unwrap_or_default()
             @ ShortwinError::VenueAccountMismatch,
@@ -48,9 +63,25 @@ pub struct RevalidateVenue<'info> {
     pub program_data: UncheckedAccount<'info>,
 }
 
-pub fn handler(ctx: Context<RevalidateVenue>, venue: u8, expected_slot: u64) -> Result<()> {
+pub fn handler(
+    ctx: Context<RevalidateVenue>,
+    venue: u8,
+    expected_slot: u64,
+    expected_elf_hash: [u8; 32],
+) -> Result<()> {
     let slot = read_deploy_slot(&ctx.accounts.program_data)?;
-    require_eq!(slot, expected_slot, ShortwinError::VenueSlotMismatch);
+    let hashed = expected_elf_hash != [0u8; 32];
+    let fingerprinted = VenueGuard::elf_index(venue).is_some();
+    if slot != expected_slot {
+        // AIR-01: the reviewed deploy, only extended since, still holds the reviewed ELF.
+        require!(hashed && fingerprinted, ShortwinError::VenueSlotMismatch);
+        require!(
+            trimmed_elf_hash(&ctx.accounts.program_data)? == Some(expected_elf_hash),
+            ShortwinError::VenueSlotMismatch
+        );
+    }
+    let len = u32::try_from(ctx.accounts.program_data.data_len())
+        .map_err(|_| error!(ShortwinError::VenueAccountMismatch))?;
     let clock = Clock::get()?;
     let i = usize::from(venue);
     let bit = 1u32
@@ -69,7 +100,11 @@ pub fn handler(ctx: Context<RevalidateVenue>, venue: u8, expected_slot: u64) -> 
             .get_mut(i)
             .ok_or_else(|| error!(ShortwinError::InvalidParams))?;
         let old = *slot_ref;
-        *slot_ref = expected_slot;
+        *slot_ref = slot;
+        g.set_elf_fingerprint(
+            venue,
+            hashed.then(|| (len, elf_fingerprint_of(&expected_elf_hash))),
+        );
         g.upgraded &= !bit;
         (old, flagged_at)
     };

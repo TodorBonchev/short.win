@@ -1531,6 +1531,33 @@ pub fn set_cpmm_config_rates(
     });
 }
 
+// ---- the upgradeable loader's permissionless extension ------------------------------------------
+
+/// The upgradeable loader's `ExtendProgram { additional_bytes }` (bincode tag 6) of `program`'s
+/// ProgramData, `payer` paying the rent: permissionless since Agave 4.2 (agave
+/// `common_extend_program` checks no authority; at least 10 KiB under SIMD-0431, one per program
+/// per slot, up to the 10 MiB account cap). The loader appends `additional_bytes` zeros, redeploys
+/// the same ELF and writes the current slot into the header (AIR-01: the venue latch's deploy
+/// slot moves although the program did not change).
+pub fn extend_program_ix(program: &Pubkey, payer: &Pubkey, additional_bytes: u32) -> Instruction {
+    use anchor_lang::solana_program::bpf_loader_upgradeable;
+    let mut data = 6u32.to_le_bytes().to_vec();
+    data.extend_from_slice(&additional_bytes.to_le_bytes());
+    Instruction {
+        program_id: bpf_loader_upgradeable::ID,
+        accounts: vec![
+            AccountMeta::new(
+                bpf_loader_upgradeable::get_program_data_address(program),
+                false,
+            ),
+            AccountMeta::new(*program, false),
+            AccountMeta::new_readonly(anchor_lang::system_program::ID, false),
+            AccountMeta::new(*payer, true),
+        ],
+        data,
+    }
+}
+
 // ---- real admin instructions (forged admin signature) -----------------------------------------
 
 /// Sends `ix` with its signer metas `forged` signed by nobody: LiteSVM's signature check is off

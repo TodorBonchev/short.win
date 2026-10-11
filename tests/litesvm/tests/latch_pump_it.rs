@@ -37,7 +37,11 @@
 //! - the residual the design discloses (ARCH §3.1, §8.5): an open that lands after the upgrade
 //!   and before the flag is accepted; `[flag, open]` in one transaction is not;
 //! - U5: `flag_venue_upgraded` and `revalidate_venue` cost the same CU on the real 10 MiB pump
-//!   and PumpSwap ProgramData as on pump-fees' 0.95 MB, far inside §6.1's 400 k.
+//!   and PumpSwap ProgramData as on pump-fees' 0.95 MB, far inside §6.1's 400 k;
+//! - AIR-01: pump and PumpSwap (at the 10 MiB cap) cannot be extended; a stranger's extension of
+//!   pump-fees is not an upgrade once the Emergency revalidated it naming its trimmed ELF's sha256
+//!   (the fixture's pin), curve opens keep landing, and the hash path costs ≈ 0.44 M CU; an
+//!   upgrade of pump-fees after an extension still latches.
 //!
 //! Every transaction goes through `Env::send` (or `fork::admin_send`): the invariant hooks run
 //! after each one (I17 reads each `Open` against the latch just before its instruction).
@@ -103,13 +107,18 @@ const SYSVAR_CLOCK: Pubkey = Pubkey::from_str_const("SysvarC1ock1111111111111111
 /// (bincode tag 3, the loader's account order) signed by the program's upgrade authority, whose
 /// signature is forged (`fork::admin_send`). Returns the result and the buffer.
 fn send_upgrade(env: &mut Env, program: PumpProgram) -> (TxResult, Pubkey) {
+    send_upgrade_elf(env, program, program.elf())
+}
+
+/// [`send_upgrade`] to `elf` instead of the dumped ELF.
+fn send_upgrade_elf(env: &mut Env, program: PumpProgram, elf: &[u8]) -> (TxResult, Pubkey) {
     let authority = header(env, program)
         .upgrade_authority
         .map(Pubkey::new_from_array)
         .expect("an upgradeable program");
     let mut data = vec![1, 0, 0, 0, 1];
     data.extend_from_slice(authority.as_ref());
-    data.extend_from_slice(program.elf());
+    data.extend_from_slice(elf);
     let buffer = Pubkey::new_unique();
     let lamports = env.svm.minimum_balance_for_rent_exemption(data.len());
     env.svm
@@ -177,6 +186,106 @@ fn flag(env: &mut Env, venue: u8) -> TxResult {
 fn revalidate(env: &mut Env, venue: u8, slot: u64) -> TxResult {
     let ea = env.pause_authority.insecure_clone();
     env.send(&[ix::revalidate_venue(&ea.pubkey(), venue, slot)], &[&ea])
+}
+
+/// [`send_upgrade_elf`], checked as [`loader_upgrade`] checks it (an upgrade never resizes the
+/// account; the loader zeroes everything after the ELF). Returns the upgrade's slot.
+fn loader_upgrade_elf(env: &mut Env, program: PumpProgram, elf: &[u8]) -> u64 {
+    let slot = env.clock().slot;
+    let key = program.program_data().address;
+    let len = read::account(&env.svm, &key).unwrap().data.len();
+    let (res, _) = send_upgrade_elf(env, program, elf);
+    ok(res);
+    assert_eq!(header(env, program).slot, slot);
+    let pd = read::account(&env.svm, &key).unwrap();
+    assert_eq!(pd.data.len(), len, "an upgrade never resizes the account");
+    let start = program_data::HEADER_LEN;
+    assert_eq!(
+        &pd.data[start..start + elf.len()],
+        elf,
+        "the redeployed ELF"
+    );
+    assert!(pd.data[start + elf.len()..].iter().all(|&b| b == 0));
+    slot
+}
+
+/// `SetComputeUnitLimit(1.4 M)`, then `ix`: once the account grew since the review, the latch
+/// instructions hash the venue's trimmed ELF (AIR-01; half a CU per byte, pump-fees' 0.85 MB
+/// ELF ≈ 0.43 M CU), above the 200 k default.
+fn with_hash_budget(ix: Instruction) -> Vec<Instruction> {
+    vec![pump::cu_limit_ix(1_400_000), ix]
+}
+
+/// `flag_venue_upgraded(venue)` with [`with_hash_budget`].
+fn flag_hashing(env: &mut Env, venue: u8) -> TxResult {
+    env.send(&with_hash_budget(ix::flag_venue_upgraded(venue)), &[])
+}
+
+/// The sha256 of `program`'s trimmed ELF as its ProgramData holds it now — what
+/// `solana-verify get-program-hash` prints, and what the Emergency names when it revalidates the
+/// deploy it reviewed (AIR-01).
+fn reviewed_hash(env: &Env, program: PumpProgram) -> [u8; 32] {
+    let a = read::account(&env.svm, &program.program_data().address).expect("ProgramData");
+    shortwin::instructions::flag_venue_upgraded::trimmed_elf_hash_of(&a.owner.to_bytes(), &a.data)
+        .expect("a ProgramData")
+        .expect("small enough to hash")
+}
+
+/// The Emergency's `revalidate_venue` of the deploy at `slot` whose trimmed ELF hashes to
+/// `reviewed` ([`reviewed_hash`]), with [`with_hash_budget`].
+fn revalidate_reviewed(
+    env: &mut Env,
+    program: PumpProgram,
+    slot: u64,
+    reviewed: [u8; 32],
+) -> TxResult {
+    let ea = env.pause_authority.insecure_clone();
+    let ix = ix::revalidate_venue_reviewed(&ea.pubkey(), program.guard(), slot, reviewed);
+    env.send(&with_hash_budget(ix), &[&ea])
+}
+
+/// A stranger's `ExtendProgram` of `program`'s ProgramData by `additional_bytes`
+/// (`fork::extend_program_ix`; a result, since pump and PumpSwap sit at the 10 MiB cap).
+fn extend(env: &mut Env, program: PumpProgram, additional_bytes: u32) -> TxResult {
+    let stranger = env.funded_keypair();
+    let ix = fork::extend_program_ix(&program.id(), &stranger.pubkey(), additional_bytes);
+    env.send(&[ix], &[&stranger])
+}
+
+/// [`extend`], which lands: the loader appends zeros, keeps the ELF and writes the current slot
+/// into the header. Returns that slot.
+fn stranger_extends(env: &mut Env, program: PumpProgram, additional_bytes: u32) -> u64 {
+    let key = program.program_data().address;
+    let before = read::account(&env.svm, &key).unwrap().data;
+    let slot = env.clock().slot;
+    ok(extend(env, program, additional_bytes));
+    let after = read::account(&env.svm, &key).unwrap().data;
+    assert_eq!(after.len(), before.len() + additional_bytes as usize);
+    assert_eq!(header(env, program).slot, slot, "the extension's slot");
+    let start = program_data::HEADER_LEN;
+    assert_eq!(
+        &after[start..before.len()],
+        &before[start..],
+        "the ELF untouched"
+    );
+    assert!(after[before.len()..].iter().all(|&b| b == 0), "zeros");
+    slot
+}
+
+/// pump-fees' dumped ELF with one byte of a source-path string in `.rodata` changed
+/// (`programs/pump-fees/src/state.rs` → `…/stete.rs`): another build of the same size, which the
+/// loader deploys (it verifies the code, not the read-only data).
+fn fees_elf_one_byte_changed() -> Vec<u8> {
+    const PATH: &[u8] = b"programs/pump-fees/src/state.rs";
+    let mut elf = PumpProgram::Fees.elf().to_vec();
+    let at = elf
+        .windows(PATH.len())
+        .position(|w| w == PATH)
+        .expect("the string")
+        + 25;
+    assert_eq!(elf[at], b'a');
+    elf[at] = b'e';
+    elf
 }
 
 /// `vT/200`, the `pump_it` position size.
@@ -650,7 +759,8 @@ fn a_flag_and_an_open_in_one_transaction() {
 
 /// U5 (ARCH §6.1, §6.5) on the real accounts: after real upgrades, the latch instructions cost
 /// the same on the 10 MiB pump and PumpSwap ProgramData as on pump-fees' 0.95 MB: the
-/// input-region copy is not metered in CU. Each stays far inside §6.1's 400 k.
+/// input-region copy is not metered in CU (pump-fees, which has an AIR-01 fingerprint slot, pays
+/// only the few instructions of its lookup). Each stays far inside §6.1's 400 k.
 #[test]
 fn u5_latch_cost_does_not_grow_with_the_program_data() {
     let (mut env, _) = Env::fork_pump_coin(T22);
@@ -674,12 +784,21 @@ fn u5_latch_cost_does_not_grow_with_the_program_data() {
             println!("{what} on the {name} ProgramData: {units} CU");
             assert!(*units <= LATCH_CU_LIMIT, "{what} {name}: {units} CU");
         }
+        // Pump and PumpSwap (10 MiB each) take the same path: equal to the unit.
+        assert_eq!(list[0].1, list[2].1, "{what}: {list:?}");
+        let (lo, hi) = list
+            .iter()
+            .fold((u64::MAX, 0), |(lo, hi), (_, u)| (lo.min(*u), hi.max(*u)));
         assert!(
-            list.iter().all(|(_, u)| *u == list[0].1),
+            hi - lo <= AIR01_LOOKUP_CU,
             "{what}: {list:?} — the cost must not depend on the account size"
         );
     }
 }
+
+/// The most the AIR-01 fingerprint lookup adds on a venue that has a fingerprint slot (pump-fees,
+/// AMM v4, CPMM, Jupiter) over one that has none (pump, PumpSwap), with nothing recorded.
+const AIR01_LOOKUP_CU: u64 = 32;
 
 /// The loader's own rule the latch relies on: one upgrade per slot per program, so a flagged
 /// slot names exactly one deployment (on the 10 MiB pump ProgramData).
@@ -909,4 +1028,110 @@ fn the_2026_10_pump_redeploys_latch_until_revalidated() {
         env.pump_build_running(PumpProgram::Pump),
         PumpDeploy::Oct2026
     );
+}
+
+// ---- AIR-01: an extension is not an upgrade ----------------------------------------------------
+
+/// ★ AIR-01 (I-01) on the pump side. pump and PumpSwap sit at the loader's 10 MiB cap, so no one
+/// can extend them; pump-fees (0.95 MB) can be, and its bit is in both pump masks: a stranger's
+/// `[ExtendProgram(pump-fees), flag_venue_upgraded]` stopped every curve and PumpSwap open.
+/// Reproduced on the pre-fix build: the flag after the extension set the bit. Now, once the
+/// Emergency has revalidated pump-fees naming the sha256 of its trimmed ELF, the extension —
+/// alone or bundled with the flag — is `VenueNotUpgraded` and writes nothing, and curve opens keep
+/// landing.
+#[test]
+fn air01_an_extension_of_pump_fees_is_not_an_upgrade() {
+    let (mut env, markets) = two_markets();
+    for program in [PumpProgram::Pump, PumpProgram::Amm] {
+        assert_eq!(size_of(program), 10 * 1024 * 1024);
+        assert!(
+            extend(&mut env, program, 10_240).is_err(),
+            "{program:?}: at the cap, no extension"
+        );
+    }
+    let fees = PumpProgram::Fees;
+    let venue = fees.guard();
+    let dumped = fork::FIXTURE_GUARD_SLOTS[usize::from(venue)];
+    // The program hashes exactly what `solana-verify` hashes (the fixture's pin,
+    // `tests/fixtures/README.md`: `f166c296…62fd`).
+    let reviewed = reviewed_hash(&env, fees);
+    let hex: String = reviewed.iter().map(|b| format!("{b:02x}")).collect();
+    assert!(
+        hex.starts_with("f166c296") && hex.ends_with("62fd"),
+        "{hex}"
+    );
+    ok(revalidate_reviewed(&mut env, fees, dumped, reviewed));
+
+    env.warp(1);
+    stranger_extends(&mut env, fees, 10_240);
+    env.warp(1);
+    let before = read::account(&env.svm, &pda::venue_guard()).unwrap().data;
+    let res = flag_hashing(&mut env, venue);
+    assert_err(&res, E::VenueNotUpgraded);
+    assert_eq!(
+        read::account(&env.svm, &pda::venue_guard()).unwrap().data,
+        before,
+        "nothing written"
+    );
+    // The compute budget of the hash path on the largest fingerprinted ELF.
+    let units = res.expect_err("refused").meta.compute_units_consumed;
+    let elf = fees.elf().len() as u64;
+    println!("pump-fees: flag_venue_upgraded after an extension: {units} CU (trimmed ELF {elf} B)");
+    assert!(units > elf / 2 && units < elf / 2 + 30_000, "{units} CU");
+    env.warp(1);
+    let stranger = env.funded_keypair();
+    let mut ixs = vec![fork::extend_program_ix(
+        &fees.id(),
+        &stranger.pubkey(),
+        10_240,
+    )];
+    ixs.extend(with_hash_budget(ix::flag_venue_upgraded(venue)));
+    assert_err(&env.send(&ixs, &[&stranger]), E::VenueNotUpgraded);
+    assert_eq!(env.venue_guard().upgraded, 0);
+    env.warp(1);
+    crank_all(&mut env, &markets);
+    for (pm, q) in &markets {
+        ok(try_open(&mut env, pm, *q));
+    }
+}
+
+/// AIR-01, the other half on pump-fees: an upgrade next to an extension still latches. pump-fees
+/// upgraded to its own ELF with one byte changed (same size, inside the old account) after a
+/// stranger's extension sets the bit and refuses curve opens; the old ELF's hash no longer
+/// revalidates a later slot, the new one does, and opens resume.
+#[test]
+fn air01_a_pump_fees_upgrade_after_an_extension_still_latches() {
+    let (mut env, markets) = two_markets();
+    let fees = PumpProgram::Fees;
+    let venue = fees.guard();
+    let dumped = fork::FIXTURE_GUARD_SLOTS[usize::from(venue)];
+    let old = reviewed_hash(&env, fees);
+    ok(revalidate_reviewed(&mut env, fees, dumped, old));
+    env.warp(1);
+    stranger_extends(&mut env, fees, 10_240);
+    env.warp(1);
+    let s = loader_upgrade_elf(&mut env, fees, &fees_elf_one_byte_changed());
+    env.warp(1);
+    let meta = ok(flag_hashing(&mut env, venue));
+    let ev: VenueUpgradeFlagged = events::one(&meta);
+    assert_eq!((ev.guard_slot, ev.programdata_slot), (dumped, s));
+    crank_all(&mut env, &markets);
+    for (pm, q) in &markets {
+        assert_err(&try_open(&mut env, pm, *q), E::VenueUpgraded);
+    }
+    env.warp(1);
+    stranger_extends(&mut env, fees, 10_240);
+    env.warp(1);
+    assert_err(
+        &revalidate_reviewed(&mut env, fees, s, old),
+        E::VenueSlotMismatch,
+    );
+    let new = reviewed_hash(&env, fees);
+    assert_ne!(new, old, "another build");
+    ok(revalidate_reviewed(&mut env, fees, s, new));
+    assert_eq!(env.venue_guard().upgraded, 0);
+    crank_all(&mut env, &markets);
+    for (pm, q) in &markets {
+        ok(try_open(&mut env, pm, *q));
+    }
 }

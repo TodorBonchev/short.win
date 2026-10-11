@@ -203,9 +203,16 @@ pub fn disable_venue(pause_authority: &Pubkey, bit: u8) -> Instruction {
     )
 }
 
-/// `revalidate_venue(venue, expected_slot)`, signed by `pause_authority`, with the venue's
-/// ProgramData.
-pub fn revalidate_venue(pause_authority: &Pubkey, venue: u8, expected_slot: u64) -> Instruction {
+/// `revalidate_venue(venue, expected_slot, expected_elf_hash)`, signed by `pause_authority`, with
+/// the venue's ProgramData: `expected_elf_hash` is the sha256 of the reviewed deploy's trimmed ELF
+/// ([`trimmed_elf_sha256`]; AIR-01: it lets the revalidation survive extensions landing before it
+/// executes, and records the fingerprint that tells a later extension from an upgrade).
+pub fn revalidate_venue(
+    pause_authority: &Pubkey,
+    venue: u8,
+    expected_slot: u64,
+    expected_elf_hash: [u8; 32],
+) -> Instruction {
     let program_data = shortwin::constants::venue_program_data(venue).unwrap_or_default();
     build(
         shortwin::accounts::RevalidateVenue {
@@ -219,8 +226,19 @@ pub fn revalidate_venue(pause_authority: &Pubkey, venue: u8, expected_slot: u64)
         shortwin::instruction::RevalidateVenue {
             venue,
             expected_slot,
+            expected_elf_hash,
         },
     )
+}
+
+/// The sha256 of a ProgramData account's trimmed ELF (`shortwin_venue_state::program_data::
+/// trimmed_elf`: the bytes after the 45-byte header without the zero tail — what `solana-verify
+/// get-program-hash` prints and `revalidate_venue` checks; AIR-01). `None` if the account is not a
+/// ProgramData.
+pub fn trimmed_elf_sha256(owner: &Pubkey, data: &[u8]) -> Option<[u8; 32]> {
+    use sha2::{Digest, Sha256};
+    let elf = shortwin_venue_state::program_data::trimmed_elf(&owner.to_bytes(), data).ok()?;
+    Some(Sha256::digest(elf).into())
 }
 
 /// `set_coverage_pause(false, COVERAGE_REASON_KEEPER)` on `market`: the Emergency vault's clear
@@ -594,8 +612,13 @@ fn shortwin_detail(name: &str, ix: &Instruction) -> Option<String> {
         }
         "revalidate_venue" => {
             let a = i::RevalidateVenue::try_from_slice(args).ok()?;
+            let hash: String = a
+                .expected_elf_hash
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect();
             format!(
-                "venue-guard index {}, expected_slot {}, ProgramData {}",
+                "venue-guard index {}, expected_slot {}, trimmed-ELF sha256 {hash}, ProgramData {}",
                 a.venue,
                 a.expected_slot,
                 ix.accounts.get(3)?.pubkey
@@ -871,8 +894,12 @@ mod tests {
         );
         let d = describe(&disable_venue(&a, 0));
         assert!(d.ends_with("bit 0 (pump_curve)"), "{d}");
-        let d = describe(&revalidate_venue(&a, 2, 77));
+        let d = describe(&revalidate_venue(&a, 2, 77, [0xab; 32]));
         assert!(d.contains("venue-guard index 2, expected_slot 77"), "{d}");
+        assert!(
+            d.contains(&format!("trimmed-ELF sha256 {}", "ab".repeat(32))),
+            "{d}"
+        );
         let d = describe(&clear_coverage_pause(&a, &market));
         assert!(d.contains(&format!("market {market}, paused false")), "{d}");
         let prog = Pubkey::new_unique();

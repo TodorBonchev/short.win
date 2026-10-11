@@ -778,7 +778,27 @@ async fn stage_admin<C: Chain>(ops: &Ops<'_, C>, l: &Layout, a: &Args) -> anyhow
                 VENUE_PROGRAMS - 1
             );
             let slot: u64 = arg(1)?.parse().context("slot")?;
-            ixs::revalidate_venue(&vault, venue, slot)
+            // AIR-01: the revalidation names the reviewed deploy's trimmed-ELF sha256, read from
+            // the ProgramData now (an extension landing before the execution then no longer
+            // refuses it, and the guard records the fingerprint that tells extensions apart).
+            let pd = VENUE_PROGRAM_DATA[usize::from(venue)];
+            let acc = account(ops.chain, &pd)
+                .await?
+                .with_context(|| format!("venue ProgramData {pd} not found"))?;
+            let deployed = verify::deploy_slot(&acc)
+                .with_context(|| format!("{pd} is not a ProgramData account"))?;
+            let hash = ixs::trimmed_elf_sha256(&acc.owner, &acc.data)
+                .with_context(|| format!("{pd} is not a ProgramData account"))?;
+            let hex: String = hash.iter().map(|b| format!("{b:02x}")).collect();
+            ops.say(format!(
+                "venue-guard index {venue}: ProgramData {pd} deployed at slot {deployed}, \
+                 trimmed-ELF sha256 {hex} (compare with the reviewed build)"
+            ));
+            ensure!(
+                deployed == slot,
+                "the ProgramData's deploy slot is {deployed}, not {slot}: review that deploy"
+            );
+            ixs::revalidate_venue(&vault, venue, slot, hash)
         }
         "clear-coverage-pause" => {
             ixs::clear_coverage_pause(&vault, &config::pubkey(arg(0)?, "market")?)

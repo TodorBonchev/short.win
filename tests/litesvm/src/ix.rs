@@ -189,7 +189,8 @@ pub fn flag_venue_upgraded(venue: u8) -> Instruction {
     flag_venue_upgraded_with(venue, venue_program_data_key(venue))
 }
 
-/// `revalidate_venue(venue, expected_slot)` with an explicit ProgramData account.
+/// `revalidate_venue(venue, expected_slot, [0; 32])` (no ELF hash: the exact slot) with an
+/// explicit ProgramData account.
 pub fn revalidate_venue_with(
     pause_authority: &Pubkey,
     venue: u8,
@@ -208,17 +209,44 @@ pub fn revalidate_venue_with(
         shortwin::instruction::RevalidateVenue {
             venue,
             expected_slot,
+            expected_elf_hash: [0; 32],
         },
     )
 }
 
-/// `revalidate_venue(venue, expected_slot)`, signed by `pause_authority`.
+/// `revalidate_venue(venue, expected_slot, [0; 32])`, signed by `pause_authority`.
 pub fn revalidate_venue(pause_authority: &Pubkey, venue: u8, expected_slot: u64) -> Instruction {
     revalidate_venue_with(
         pause_authority,
         venue,
         expected_slot,
         venue_program_data_key(venue),
+    )
+}
+
+/// `revalidate_venue(venue, expected_slot, expected_elf_hash)` with the venue's ProgramData,
+/// signed by `pause_authority`: the review names the sha256 of the deploy's trimmed ELF (AIR-01;
+/// `shortwin::instructions::flag_venue_upgraded::trimmed_elf_hash_of`).
+pub fn revalidate_venue_reviewed(
+    pause_authority: &Pubkey,
+    venue: u8,
+    expected_slot: u64,
+    expected_elf_hash: [u8; 32],
+) -> Instruction {
+    build(
+        shortwin::accounts::RevalidateVenue {
+            pause_authority: *pause_authority,
+            config: pda::config(),
+            venue_guard: pda::venue_guard(),
+            program_data: venue_program_data_key(venue),
+            event_authority: pda::event_authority(),
+            program: shortwin::ID,
+        },
+        shortwin::instruction::RevalidateVenue {
+            venue,
+            expected_slot,
+            expected_elf_hash,
+        },
     )
 }
 

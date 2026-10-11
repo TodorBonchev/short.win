@@ -411,8 +411,17 @@ fn u5_flag_and_revalidate_cost_the_same_whatever_the_programdata_size() {
         f_amm < LATCH_CU_LIMIT && r_amm < LATCH_CU_LIMIT,
         "within §6.1's 400 k"
     );
-    assert_eq!(f_amm, f_fees, "flag: the copy is not metered");
-    assert_eq!(r_amm, r_fees, "revalidate: the copy is not metered");
+    // The copy is not metered: the 10 MiB account costs no more than the 0.95 MB one, which pays
+    // only the few instructions of its AIR-01 fingerprint lookup (pump-fees has a fingerprint
+    // slot, PumpSwap — at the 10 MiB cap — none; nothing is recorded, nothing hashed).
+    assert!(
+        f_amm <= f_fees && f_fees - f_amm <= 32,
+        "flag: the copy is not metered"
+    );
+    assert!(
+        r_amm <= r_fees && r_fees - r_amm <= 32,
+        "revalidate: the copy is not metered"
+    );
     // The PumpSwap ProgramData is the ARCH §6.5 size.
     let (env, _) = Env::fork_pamm_coin(MATURE);
     assert_eq!(

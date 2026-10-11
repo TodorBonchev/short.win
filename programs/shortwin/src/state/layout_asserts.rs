@@ -26,7 +26,7 @@ use crate::state::pod::{PodI128, PodU128};
 use crate::state::position::ShortPosition;
 use crate::state::vault::MarketVault;
 use crate::state::venue_extras::{ExtraEntry, ExtrasSet, IxExtras, SeedPart, VenueExtras};
-use crate::state::venue_guard::VenueGuard;
+use crate::state::venue_guard::{VenueGuard, GUARD_ELF_FIRST, GUARD_ELF_LEN, GUARD_ELF_VENUES};
 
 /// Asserts `size_of` (account types: + 8 for the discriminator) and each field offset.
 macro_rules! layout {
@@ -98,11 +98,19 @@ const _: () = assert!(
         && size_of::<Params>() + 4 * size_of::<TierParams>() == PENDING_PAYLOAD_LEN
 );
 
-// ---- VenueGuard (224 B) ----
+// ---- VenueGuard (224 B; AIR-01: `guard_len` and `guard_elf` from `_reserved`) ----
 layout!(acct VenueGuard, 224, {
     version @ 8, bump @ 10, _pad0 @ 11, upgraded @ 12, guard_slot @ 16, flagged_slot @ 64,
-    flagged_at @ 112, _reserved @ 160,
+    flagged_at @ 112, guard_len @ 160, guard_elf @ 176,
 });
+// The literal array lengths of `guard_len` / `guard_elf` are the module's constants.
+#[allow(clippy::arithmetic_side_effects)]
+const _: () = assert!(
+    offset_of!(VenueGuard, guard_elf) - offset_of!(VenueGuard, guard_len) == 4 * GUARD_ELF_VENUES
+        && size_of::<VenueGuard>() - offset_of!(VenueGuard, guard_elf)
+            == GUARD_ELF_LEN * GUARD_ELF_VENUES
+        && GUARD_ELF_FIRST as usize + GUARD_ELF_VENUES == crate::constants::VENUE_PROGRAMS
+);
 
 // ---- VenueExtras (6,512 B; 4,352 B before M2-SEC-2 added `stable` and `current_since`) ----
 layout!(acct VenueExtras, 6_512, {
