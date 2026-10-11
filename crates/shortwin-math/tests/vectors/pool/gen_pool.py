@@ -83,7 +83,9 @@ writes, next to itself:
                        premium_jit_table), KI-66's pot_touch_demo and KI-66 full's
                        pot_chain_demo (its held-only comparison pool is not recorded), and
                        AIR-07's rebase_vest_demo (the settlement that leaves dust token
-                       claims; its pre-fix comparison pools are not recorded).
+                       claims) and AIR-08's empty_pool_gate_demo (a deposit after the last
+                       exit waits for the sweep); their pre-fix comparison pools are not
+                       recorded.
 
 Line format (parsed by tests/pool_vectors.rs). Each trace is a list of lines; a line
 holds one or more pool operations separated by ";" and ends with " #cccccccc", the
@@ -226,7 +228,7 @@ MODEL_ERRORS = {
 DEFAULT_SWITCHES = {"mode": "continuous", "prorata": True, "pi_decay": True, "lock_expiry": True,
                     "lock_calendar": True, "vest_weighted": True, "wipe_sweep_gate": True,
                     "exit_flush_bps": 0, "lock_floor": True, "cum_convert": True, "fwd_chain": True,
-                    "vest_floor": True, "dust_flush": True}
+                    "vest_floor": True, "dust_flush": True, "empty_sweep_gate": True}
 
 BasePool = pm.Pool
 REGISTRY: list = []
@@ -798,8 +800,10 @@ class Ext:
 
     def op_dep(self):
         p = self.p
-        if p.wipe_live and not p.wipe_swept and self.rng.random() < 0.6:
-            p.sweep_sol(self.amt("sweep"))              # the depositor bundles the post-wipe sweep
+        if p.S == 0 and not p.wipe_swept and self.rng.random() < 0.6:
+            # the depositor bundles the sweep a pool without shares waits for: after a full wipe
+            # (R4A-7) and, since AIR-08, after the last lender's exit (else wipe_sweep_pending)
+            p.sweep_sol(self.amt("sweep"))
         p.deposit(self.who(), self.amt("dep"))
 
     def op_wd(self):
@@ -1289,6 +1293,7 @@ def scripted_no_shares() -> dict:
         p.repay(1, 0, 0)                             # credited 11 > the protocol's 10: refused
     except ValueError:
         pass
+    p.sweep_sol(0)                                   # AIR-08: a deposit after the last exit waits for it
     p.deposit("b", 10**6)                            # S > 0 again (no wipe record)
     p.repay(1, 0, 0)                                 # the shortfall debits b
     p._touch("b")
@@ -1436,7 +1441,8 @@ def orphan_demo_traces() -> list:
 DEMOS = ["jit_demo", "jit_hold_table", "inflation_demo", "run_demo", "claim_loop_demo", "run_util_table",
          "wipe_demo", "wipe_tail_demo", "zero_share_demo", "protocol_change_demo", "escape_demo",
          "stuck_lock_table", "stale_lock_demo", "lock_tail_demo", "wipe_gate_demo", "vest_exit_demo",
-         "restart_grief_table", "premium_jit_table", "pot_touch_demo", "pot_chain_demo", "rebase_vest_demo"]
+         "restart_grief_table", "premium_jit_table", "pot_touch_demo", "pot_chain_demo", "rebase_vest_demo",
+         "empty_pool_gate_demo"]
 PATCHED = ("_resolve", "_maybe_roll", "claim_sol", "_touch", "withdraw", "deposit", "_credit")
 
 

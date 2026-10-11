@@ -102,11 +102,11 @@ pub const FWD_OPEN: u8 = 2;
 /// The lock calendar's bucket length and ring size (ECON §9.3, §15; ARCH §2.3.6, A75),
 /// defined with the other compile-time constants.
 pub use crate::consts::{LOCK_BUCKET_S, LOCK_BUCKETS};
-/// `Pool::wipe_swept` bit: `sweep_trader` ran since the last full wipe (`Market.flags`
-/// bit 7 `wipe_trader_swept`; R4A-7).
+/// `Pool::wipe_swept` bit: `sweep_trader` ran since `S` last reached 0 — a full wipe, or since
+/// AIR-08 the last lender's exit (`Market.flags` bit 7 `wipe_trader_swept`; R4A-7).
 pub const WIPE_TRADER_SWEPT: u8 = 1;
-/// `Pool::wipe_swept` bit: `claim_venue_rewards` ran since the last full wipe
-/// (`Market.flags` bit 8 `wipe_rewards_claimed`; R4A-7).
+/// `Pool::wipe_swept` bit: `claim_venue_rewards` ran since `S` last reached 0 — a full wipe,
+/// or since AIR-08 the last lender's exit (`Market.flags` bit 8 `wipe_rewards_claimed`; R4A-7).
 pub const WIPE_REWARDS_CLAIMED: u8 = 2;
 
 const LOCK_BUCKETS_I64: i64 = LOCK_BUCKETS as i64;
@@ -149,8 +149,9 @@ pub struct Pool {
     pub share_epoch: u32,
     /// Non-zero while the latest record is a full wipe still open for top-ups (V2-12).
     pub wipe_live: u8,
-    /// Post-wipe sweeps done since the last full wipe: [`WIPE_TRADER_SWEPT`] |
-    /// [`WIPE_REWARDS_CLAIMED`] (R4A-7). Read only while `wipe_live`.
+    /// Sweeps done since `S` last reached 0 (a full wipe, or since AIR-08 the last lender's
+    /// exit): [`WIPE_TRADER_SWEPT`] | [`WIPE_REWARDS_CLAIMED`] (R4A-7). Read only while `S = 0`
+    /// (a deposit into a pool without shares waits for them).
     pub wipe_swept: u8,
     /// Explicit padding (zero).
     pub _pad: [u8; 2],
@@ -1852,6 +1853,11 @@ fn withdraw_in(
     }
     l.shares = sub_u128(l.shares, shares)?;
     p.total_shares = sub_u128(p.total_shares, shares)?;
+    if p.total_shares == 0 {
+        // AIR-08: the market has no lender again; SOL that reaches the trader from now on is
+        // the protocol's (KI-10), so the next deposit waits for the sweeps, as after a wipe.
+        p.wipe_swept = 0;
+    }
     let amount = to_u64(amount)?;
     p.tokens_free = sub_u64(p.tokens_free, amount)?;
     Ok(amount)
@@ -1869,7 +1875,8 @@ fn withdraw_in(
 /// lock increase moves to `max(lock_until, lock_until_for(now))` (R3B-1, R4A-2, R4A-8).
 /// If the burn takes `S` to 0 the unreleased vest is released to the lender first (R3B-2);
 /// the burn takes `S` to 0 only when no other position holds or will hold a share (no
-/// rebase orphans, KI-65: a lender behind still counts in `S`, see [`convert`]). The
+/// rebase orphans, KI-65: a lender behind still counts in `S`, see [`convert`]), and it clears
+/// the sweep bits, so the next deposit waits for the sweeps (AIR-08, see [`deposit`]). The
 /// program pays SOL with [`claim`] afterwards. The lender's conversion writes `conv_rem`
 /// into `records` ([`convert`]).
 ///
@@ -1949,7 +1956,11 @@ fn deposit_in(
         return Err(MathError::DepositTooSmall);
     }
     let total = add_u128(p.total_shares, minted)?;
-    if p.total_shares == 0 && p.is_wipe_live() {
+    if p.total_shares == 0 {
+        // R4A-7, and since AIR-08 also after the last lender's exit: SOL that reaches the
+        // trader while `S = 0` is the wiped lenders' (the live wipe record) or the protocol's
+        // (KI-10, R3A-10). A first deposit would make the sweep vest it to the new shares (and
+        // the last-lender flush pay it back at once), so the sweeps that book it come first.
         let need = if rewards_required {
             WIPE_TRADER_SWEPT | WIPE_REWARDS_CLAIMED
         } else {
@@ -1958,9 +1969,11 @@ fn deposit_in(
         if p.wipe_swept & need != need {
             return Err(MathError::WipeSweepPending);
         }
-        // V2-12: the full-wipe record is final from now on; a parked depositor converts.
-        p.wipe_live = 0;
-        touch_in(p, v, l, records, now)?;
+        if p.is_wipe_live() {
+            // V2-12: the full-wipe record is final from now on; a parked depositor converts.
+            p.wipe_live = 0;
+            touch_in(p, v, l, records, now)?;
+        }
     }
     l.shares = add_u128(l.shares, minted)?;
     p.total_shares = total;
@@ -1970,16 +1983,18 @@ fn deposit_in(
 
 /// `pool_model.Pool.deposit` (ECON §9.2; ARCH §3.3 `deposit`): releases the vest, touches
 /// the lender, mints `⌊amount·(S + VS)/(T + ΣB_Q + VA)⌋` shares (returned) and adds
-/// `amount` to `T`. The first deposit after a full wipe needs the post-wipe sweeps
-/// (R4A-7): the trader sweep and, if `rewards_required` (a pump venue that can execute),
-/// the venue-reward claim; it then finalises the wipe record (clears `wipe_live`) and
-/// touches again, so a parked depositor converts through it. The lender's conversion
-/// writes `conv_rem` into `records` ([`convert`]).
+/// `amount` to `T`. A deposit into a pool without shares — after a full wipe (R4A-7) or,
+/// since AIR-08, after the last lender's exit — needs the sweeps since `S` reached 0: the
+/// trader sweep and, if `rewards_required` (a pump venue that can execute), the venue-reward
+/// claim (a new market starts with both bits set: nothing can have reached its trader). After
+/// a full wipe it then finalises the wipe record (clears `wipe_live`) and touches again, so a
+/// parked depositor converts through it. The lender's conversion writes `conv_rem` into
+/// `records` ([`convert`]).
 ///
 /// # Errors
 /// `DepositTooSmall` if nothing would be minted; `Overflow` if `S` or `T` would leave
-/// `u128` / `u64`; `WipeSweepPending` if a wipe record is live and a required sweep has not
-/// run since the wipe; as [`touch`] and [`release`].
+/// `u128` / `u64`; `WipeSweepPending` if `S = 0` and a required sweep has not run since `S`
+/// reached 0; as [`touch`] and [`release`].
 pub fn deposit(
     pool: &mut Pool,
     vault: &mut Vault,
@@ -2109,10 +2124,11 @@ pub fn accrue(
 }
 
 /// Trader sweep or venue cashback to lenders (`pool_model.Pool.sweep_sol`; ARCH §3.3,
-/// §3.9; A44, V2-12, R3A-10, R4A-7): `lender_sol += lamports`; while a full-wipe record is
-/// live (`S = 0`), the post-wipe bit of `source` is set (even for 0 lamports); then
-/// [`vest`] (with `S > 0` the SOL vests over `lump_vest_s`; with `S = 0` it tops up the
-/// live wipe record — pass it — or goes to the protocol).
+/// §3.9; A44, V2-12, R3A-10, R4A-7): `lender_sol += lamports`; while `S = 0` (a live full-wipe
+/// record or, since AIR-08, after the last lender's exit) the bit of `source` that a deposit
+/// waits for is set (even for 0 lamports); then [`vest`] (with `S > 0` the SOL vests over
+/// `lump_vest_s`; with `S = 0` it tops up the live wipe record — pass it — or goes to the
+/// protocol).
 ///
 /// # Errors
 /// As [`vest`]; `Overflow` if `lender_sol` leaves `u64`.
@@ -2128,7 +2144,9 @@ pub fn sweep(
     let (mut p, mut v) = (*pool, *vault);
     let mut rec = wipe_record.as_deref().copied();
     v.lender_sol = add_u64(v.lender_sol, lamports)?;
-    if p.total_shares == 0 && p.is_wipe_live() {
+    if p.total_shares == 0 {
+        // R4A-7; AIR-08: with no live wipe record the SOL goes to the protocol (KI-10), and the
+        // bit lets the next deposit in.
         p.wipe_swept |= source.bit();
     }
     vest_in(&mut p, &mut v, rec.as_mut(), now, lump_vest_s, lamports)?;

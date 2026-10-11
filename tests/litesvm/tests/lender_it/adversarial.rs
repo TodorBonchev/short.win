@@ -336,6 +336,39 @@ fn r3a_10_sol_without_lenders_goes_to_the_protocol() {
     );
 }
 
+/// AIR-08 (I-08), `pool_model.empty_pool_gate_demo()`, on the program: the same market with
+/// the deposit first. Every lender left by ordinary withdrawals (`S = 0`, no wipe record) and
+/// 1 SOL sits on the trader PDA (a donation, or venue cashback claimed into it). Before the fix
+/// `[deposit(1,000), sweep_trader, withdraw]` vested it to the dust shares and the last-lender
+/// flush paid it back at once; now the deposit waits for `sweep_trader` (the real instruction
+/// here), which books the SOL to the protocol (KI-10, R3A-10).
+#[test]
+fn air_08_a_deposit_after_the_last_exit_waits_for_the_sweep() {
+    let mut lab = Lab::new(TokenProgram::Spl);
+    lab.deposit("A", 1_000_000_000_000).unwrap();
+    let shares = lab.position("A").unwrap().shares;
+    lab.withdraw("A", shares).unwrap();
+    let market = lab.k.market;
+    lab.env
+        .fund(&shortwin_litesvm_tests::pda::trader(&market).0, U);
+    assert_eq!(
+        lab.deposit("ATT", 1_000),
+        Err(code(ShortwinError::WipeSweepPending)),
+        "the deposit first"
+    );
+    ok(lab.env.send(
+        &[shortwin_litesvm_tests::engine::sweep_trader_ix(
+            &market, None,
+        )],
+        &[],
+    ));
+    assert_eq!(lab.vault().protocol_fees, U, "KI-10: the protocol's");
+    lab.deposit("ATT", 1_000).unwrap();
+    let shares = lab.position("ATT").unwrap().shares;
+    assert_eq!(lab.withdraw("ATT", shares), Ok((1_000, 0)));
+    assert_eq!(lab.vault().lender_sol, 0);
+}
+
 /// AIR-07 (I-07), `pool_model.rebase_vest_demo()` attack row, on the program: every token is
 /// lent, an attacker deposits 1 raw unit before the last settlement, which therefore leaves
 /// 1 raw token (a rebase, not a full wipe). Before the fix its 5 SOL lump stayed vesting and a

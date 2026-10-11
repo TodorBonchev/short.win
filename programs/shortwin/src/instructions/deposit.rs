@@ -2,8 +2,9 @@
 //!
 //! Checks: `amount > 0` (`ZeroAmount`); the mint guard on the entry path (`mint_unsafe` refuses
 //! with `MintUnsafeFlagged`, then `check_mint_safety`); `minted > 0` (`ZeroAmount`); `minted ≥
-//! min_shares` (`SharesBelowMin`); `S + minted ≤ u128::MAX` (`MathOverflow`); while a full-wipe
-//! record is live, the post-wipe sweeps (`WipeSweepPending`, R4A-7).
+//! min_shares` (`SharesBelowMin`); `S + minted ≤ u128::MAX` (`MathOverflow`); while the pool has
+//! no shares — a live full-wipe record (R4A-7) or, since AIR-08, a market every lender left —
+//! the sweeps since `S` reached 0 (`WipeSweepPending`).
 //!
 //! Effects, in order (ARCH §3.0 A16: prologue steps 1–5, then 10–11):
 //! 1. the prologue (`engine::prologue`): the Accounts constraints; params-version sync; the

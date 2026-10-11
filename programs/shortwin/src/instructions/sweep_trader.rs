@@ -79,13 +79,15 @@
 //!    to be the trader's, with no delegate and no close authority, `TraderStateInvalid`).
 //! 2. The market prologue of a lender instruction (ARCH §3.0 steps 1–5, A16: params-version
 //!    sync, accrue with the vest release, roll a completed bucket; no ReadSet, so no record).
-//! 3. `pool::sweep(…, SweepSource::Trader)`: `lender_sol += swept`; while a full-wipe record is
-//!    live `wipe_trader_swept` is set **even when nothing moved** and the SOL tops up the
-//!    record; with `S > 0` it vests over `lump_vest_s`; with `S = 0` and no live wipe it goes
-//!    to `protocol_fees` (R3A-10). On the curve kinds, and off the pump venues on a market with a
-//!    pump UVA (AIR-05), while a full-wipe record is live and the trader's pump UVA holds no
-//!    claimable cashback, `pool::sweep(…, 0, SweepSource::VenueRewards)` also sets
-//!    `wipe_rewards_claimed` (M5-SEC-1, above).
+//! 3. `pool::sweep(…, SweepSource::Trader)`: `lender_sol += swept`; while `S = 0` (a live
+//!    full-wipe record or, since AIR-08, a market every lender left) `wipe_trader_swept` is set
+//!    **even when nothing moved**; the SOL tops up a live record, vests over `lump_vest_s` with
+//!    `S > 0`, and goes to `protocol_fees` with `S = 0` and no live wipe (R3A-10). On the pump
+//!    venues, and off them on a market with a pump UVA (AIR-05), while `S = 0` and the trader
+//!    holds no claimable cashback, `pool::sweep(…, 0, SweepSource::VenueRewards)` also sets
+//!    `wipe_rewards_claimed` (M5-SEC-1, above; AIR-08: a deposit into a market every lender left
+//!    waits for both bits too, so the next depositor cannot take the cashback of the earlier
+//!    lenders' trading that KI-10 gives the protocol).
 //! 4. Post-conditions (step 10): `trader` and `trader_wsol` hold 0 lamports; `market_vault`
 //!    holds rent + `lender_sol + protocol_fees` (I2).
 //! 5. Event `TraderSwept{lamports, tokens, to, wipe_bits}` (`wipe_bits`: the math crate's
@@ -372,6 +374,21 @@ pub fn handler<'info>(ctx: Context<'info, SweepTrader<'info>>) -> Result<()> {
                 SweepSource::Trader,
             )
             .math()?;
+            if rewards_clear && pool.total_shares == 0 {
+                // AIR-08: after the last lender's exit a deposit waits for the sweeps too, the
+                // venue-reward bit on a pump venue included: set it as after a full wipe
+                // (M5-SEC-1), once the trader holds no claimable cashback.
+                pool::sweep(
+                    &mut pool,
+                    &mut vault,
+                    None,
+                    now,
+                    config.params.lump_vest_s,
+                    0,
+                    SweepSource::VenueRewards,
+                )
+                .math()?;
+            }
         }
         market.set_pool(&pool);
         vault_acc.set_vault(&vault);

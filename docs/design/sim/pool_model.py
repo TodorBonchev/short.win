@@ -51,7 +51,9 @@ Model (all integers; rounding in favour of the pool):
     (R4A-2 / R4B-3); lock terms are floored so the aggregate never exceeds the lenders' own
     locks; check() asserts I-P4 on the state the program sees (only the withdrawer touched).
   * v0.4.1 lumps: value-weighted vest end (a lump no longer restarts the window, R4B-5); a
-    deposit while a full-wipe record is live waits for the post-wipe sweep (R4A-7).  AIR-02: the
+    deposit while a full-wipe record is live waits for the post-wipe sweep (R4A-7); AIR-08: so does a
+    deposit after the last lender's exit (S == 0 without a wipe record: the sweep books the SOL that
+    arrived meanwhile to the protocol, KI-10, instead of the next depositor's shares).  AIR-02: the
     value-weighted end is rounded down, so a dust lump leaves it where it is (rounded up, repeated
     1-lamport sweeps held it lump_vest_s away).
   * Share epochs (C0-6), 0-share jump and post-wipe record (V2-12) unchanged.  AIR-07: a settlement that
@@ -140,7 +142,7 @@ class Pool:
                  lock_expiry: bool = True, lock_calendar: bool = True, vest_weighted: bool = True,
                  wipe_sweep_gate: bool = True, exit_flush_bps: int = 0, lock_floor: bool = True,
                  cum_convert: bool = True, fwd_chain: bool = True, vest_floor: bool = True,
-                 dust_flush: bool = True):
+                 dust_flush: bool = True, empty_sweep_gate: bool = True):
         assert mode in ("continuous", "release")
         self.mode = mode
         self.util_cap = util_cap_bps
@@ -163,6 +165,8 @@ class Pool:
                                                 #   rounded up: every dust lump moved it 1 s; comparison rows)
         self.dust_flush = dust_flush            # False: v0.4.2 behaviour before AIR-07 (the vest is flushed only at a
                                                 #   full wipe, T + B == 0; comparison rows)
+        self.empty_sweep_gate = empty_sweep_gate  # False: v0.4.2 behaviour before AIR-08 (after the last lender's exit
+                                                #   a deposit needs no sweep first; comparison rows)
         self.now = 0
         self.T = 0
         self.B = 0
@@ -618,11 +622,15 @@ class Pool:
             raise ValueError("deposit too small")
         if self.S + minted > U128:
             raise ValueError("share overflow")
-        if self.S == 0 and self.wipe_live:
+        if self.S == 0:
+            # R4A-7 after a full wipe; AIR-08 also after the last lender's exit (wipe_swept is cleared then): SOL
+            # that reaches the trader while S == 0 is the wiped lenders' or the protocol's (KI-10), so the sweep
+            # that books it comes before the first deposit
             if not self.wipe_swept:
-                raise ValueError("WipeSweepPending: sweep_trader / claim_venue_rewards first")   # R4A-7
-            self.wipe_live = False             # V2-12: the full-wipe record is final from now on
-            L = self._touch(who)
+                raise ValueError("WipeSweepPending: sweep_trader / claim_venue_rewards first")
+            if self.wipe_live:
+                self.wipe_live = False         # V2-12: the full-wipe record is final from now on
+                L = self._touch(who)
         L.shares += minted
         self.S += minted
         self.T += amount
@@ -677,6 +685,8 @@ class Pool:
         L.shares -= shares
         L.withdrawn += amount
         self.S -= shares
+        if self.S == 0 and self.empty_sweep_gate:
+            self.wipe_swept = False            # AIR-08: no lender again; the next deposit waits for the sweep
         self.T -= amount
         self.vault_token_balance -= amount
         return amount
@@ -700,11 +710,12 @@ class Pool:
         return pay
 
     def sweep_sol(self, lamports: int):
-        """Trader sweep / venue cashback: a lump (vests).  While a wipe record is live (S == 0) it
-        tops up the record and marks the post-wipe sweep done (R4A-7: deposits wait for it)."""
+        """Trader sweep / venue cashback: a lump (vests).  While S == 0 it marks the sweep done (R4A-7, AIR-08:
+        a deposit into a pool without shares waits for it) and tops up the live wipe record, or, with none (every
+        lender left), goes to the protocol (R3A-10)."""
         self.sol_vault += lamports
         self.inflow += lamports
-        if self.S == 0 and self.wipe_live:
+        if self.S == 0:
             self.wipe_swept = True
         self._vest(lamports)
 
@@ -878,6 +889,14 @@ def token_value(p: "Pool", L: "Lender") -> int:
     return L.shares * (p.T + p.B + VA) // (p.S + VS) if L.epoch == p.epoch else 0
 
 
+def sweep_if_emptied(p: "Pool"):
+    """AIR-08: a depositor into a pool every lender left (S == 0, no live wipe record) bundles the sweep the
+    deposit waits for -- here of 0 lamports, and no RNG is drawn, so the random histories and the documented
+    tables run as before the gate.  Live wipes keep each driver's own post-wipe bundle."""
+    if p.S == 0 and not getattr(p, "wipe_live", True) and not getattr(p, "wipe_swept", True):
+        p.sweep_sol(0)
+
+
 def fuzz(ops: int, seed: int, mode: str = "continuous", util_cap_bps: int = 9_000, liveness_every: int = 2000):
     rng = random.Random(seed)
     p = Pool(mode, util_cap_bps=util_cap_bps)
@@ -892,6 +911,7 @@ def fuzz(ops: int, seed: int, mode: str = "continuous", util_cap_bps: int = 9_00
             if op == "dep":
                 if p.wipe_live and not p.wipe_swept and rng.random() < 0.7:
                     p.sweep_sol(rng.choice([0, rng.randrange(1, 10**9)]))   # the depositor bundles the post-wipe sweep
+                sweep_if_emptied(p)            # AIR-08: after the last exit too (no RNG drawn: the ECON §9.6 run stays)
                 p.deposit(rng.choice(users), rng.choice([1, 7, 10**6, 10**9, 10**12, rng.randrange(1, 10**13)]))
             elif op == "wd":
                 u = rng.choice(users)
@@ -1000,6 +1020,7 @@ def stranded_table(seeds: int = 40, ops: int = 3000):
                 op = rng.choice(["dep", "dep", "wd", "wd", "borrow", "accrue", "repay", "claim", "sweep"])
                 try:
                     if op == "dep":
+                        sweep_if_emptied(p)
                         p.deposit(rng.choice(users), rng.choice([10**6, 10**9, 10**12, rng.randrange(1, 10**13)]))
                     elif op == "wd":
                         u = rng.choice(users)
@@ -1341,6 +1362,32 @@ def zero_share_demo():
     return rows
 
 
+def empty_pool_gate_demo():
+    """AIR-08 (I-08): every lender left a market by ordinary withdrawals (S == 0, no wipe record) while 1 SOL of
+    the earlier lenders' venue cashback was still unclaimed.  An attacker bundles [deposit(1,000 raw units), claim
+    the cashback into the trader, sweep_trader, withdraw everything]: with the deposit first the sweep vested the
+    SOL to its shares and the last-lender flush (R3B-2) paid it back at once, SOL that KI-10 / R3A-10 give the
+    protocol.  Now a deposit into a pool without shares waits for the sweep, which books the SOL to the protocol.
+    Rows (model, first step, attacker gets (lamports), protocol gets (lamports))."""
+    rows = []
+    for label, gate in (("v0.4.2 (no gate after the last exit)", False),
+                        ("AIR-08 (a deposit waits for the sweep after the last exit)", True)):
+        p = Pool(empty_sweep_gate=gate)
+        p.deposit("A", 10**12)
+        p.withdraw("A", p.lenders["A"].shares)
+        try:
+            p.deposit("ATT", 1_000)
+            first = "the dust deposit lands first"
+        except ValueError:
+            first = "deposit refused (WipeSweepPending)"
+        p.sweep_sol(10**9)
+        if first.startswith("deposit refused"):
+            p.deposit("ATT", 1_000)
+        p.withdraw("ATT", p.lenders["ATT"].shares)
+        rows.append((label, first, p.claim_sol("ATT"), p.protocol))
+    return rows
+
+
 def protocol_change_demo():
     """R3B-9 / R3A-5: rent_protocol_bps rises 15 % -> 30 % halfway through a position's life."""
     rows = []
@@ -1429,6 +1476,7 @@ def lock_fuzz(ops: int, seed: int, sample_every: int = 25, **kw):
         op = rng.choice(["dep", "dep", "wd", "wd", "borrow", "adv", "repay", "claim"])
         try:
             if op == "dep":
+                sweep_if_emptied(p)
                 p.deposit(rng.choice(users), rng.choice([10**9, 10**12, rng.randrange(10**6, 10**13)]))
             elif op == "wd":
                 u = rng.choice(users)
@@ -1646,6 +1694,7 @@ def exit_all(p, who, max_burns: int = 64) -> int:
 def dust_shares(p, who, amount: int, rem: int):
     """`who` deposits `amount` tokens, then burns (for 0 tokens) what puts its shares at `rem`
     modulo 1,000, below a multiple of the next rebase's denominator (a 0-token burn is allowed)."""
+    sweep_if_emptied(p)
     p.deposit(who, amount)
     extra = (p._touch(who).shares - rem) % REBASE
     if extra:
@@ -1975,6 +2024,7 @@ def pot_liveness_table(seeds: int = 2_000):
                     q, io, _pr, _dl = p.positions[k]
                     p.repay(k, cdiv(q * (p.index - io), WAD), rng.choice([0, rng.randrange(0, 10**9)]))
                 elif r < 0.65:
+                    sweep_if_emptied(p)
                     p.deposit(rng.choice(users), rng.randrange(10**6, 10**12))   # late joiners
                 elif r < 0.75:
                     u = rng.choice(users)                                       # early leavers
@@ -2153,6 +2203,7 @@ def _diff_world(seed: int, with_pot: bool, stats: dict):
                 p.repay(k, cdiv(q * (p.index - io), WAD) // rng.choice([1, 1, 3]),
                         rng.choice([0, rng.randrange(0, 10**9)]))
             elif r < 0.5:
+                sweep_if_emptied(p)
                 p.deposit(rng.choice(users), rng.choice([rng.randrange(10**6, 10**12), rng.randrange(1, 5000)]))
             elif r < 0.58:
                 u = rng.choice(users)
@@ -2266,6 +2317,7 @@ def _latent_tuned(rng):
         r = rng.random()
         try:
             if r < 0.3:
+                sweep_if_emptied(p)
                 p.deposit(rng.choice(present + ["j"]), rng.randrange(1, 10**6))
             elif r < 0.5:
                 p.advance(rng.choice([3_600, 86_400]), rng.randrange(0, 10**27))
@@ -2315,6 +2367,7 @@ def _latent_adversarial(rng):
                 if rng.random() < 0.5:
                     dust_shares(p, u, rng.choice([1, rng.randrange(1, 100), rng.randrange(1, 10**6)]), rng.randrange(REBASE))
                 else:
+                    sweep_if_emptied(p)
                     p.deposit(u, rng.randrange(10**6, 10**12))
             elif r < 0.68:
                 u = rng.choice(users)
@@ -2593,6 +2646,12 @@ def main():
     print("|---|---|---|---|")
     for label, d, aa, pr in zero_share_demo():
         print(f"| {label} | {d:,} | {aa:,} | {pr:,} |")
+    print("\nAIR-08 the same market, deposit first: [deposit(1,000 raw units), sweep 1 SOL of earlier cashback, "
+          "withdraw everything] in one transaction:")
+    print("| model | first step | attacker gets (lamports) | to protocol (lamports) |")
+    print("|---|---|---|---|")
+    for label, first, att, pr in empty_pool_gate_demo():
+        print(f"| {label} | {first} | {att:,} | {pr:,} |")
     print("\nR3B-9 / R3A-5 rent_protocol_bps raised 15 % -> 30 % halfway through the only position's life:")
     print("| model | receivable after the position closed | lender pending | sol_vault |")
     print("|---|---|---|---|")

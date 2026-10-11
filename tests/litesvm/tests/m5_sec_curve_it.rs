@@ -249,6 +249,89 @@ fn m5_sec_1_pre_wipe_cashback_reaches_the_wiped_lenders() {
     assert!(!s.env.market(&market).has_flag(MARKET_FLAG_WIPE_LIVE));
 }
 
+/// AIR-08 (I-08) on a live legacy cashback coin: the trader's own trades (the open's sale and
+/// the close's buy) paid cashback into its pump UVA; the position closes and the only lender
+/// withdraws everything (`S = 0`, no wipe record). Before the fix a deposit landed at once, so
+/// `[deposit(dust), pump claim_cashback(user = trader), sweep_trader, withdraw]` vested the
+/// cashback to the dust shares and the last-lender flush paid it back: SOL that KI-10 / R3A-10
+/// give the protocol. Now a deposit into a pool every lender left waits for both bits, as after
+/// a full wipe: the sweep alone sets only the trader bit while cashback is outstanding, and
+/// `[claim_cashback, sweep_trader]` books the cashback to `protocol_fees` and sets both.
+#[test]
+fn air_08_after_the_last_exit_the_cashback_goes_to_the_protocol() {
+    let mut s = Sim::d_market(SOLD_D50, lend_for_80(D50_Q));
+    fork::patch(&mut s.env.svm, &s.pm.curve.curve, |d| {
+        d[vpump_off_is_cashback()] = 1
+    });
+    let p = s.open(D50_Q);
+    assert!(s.borrower_close(&p).is_some(), "the borrower closes");
+    let market = s.pm.market();
+    let trader = s.pm.trader();
+    let cashback = claimable_cashback(&s.env, &trader);
+    assert!(cashback > 0, "the trader's trades paid cashback");
+    let shares = s
+        .env
+        .lender(&market, &s.pm.lender.pubkey())
+        .expect("lender")
+        .shares;
+    let kp = s.pm.lender.insecure_clone();
+    ok(s.env
+        .send(&[ix::withdraw(&s.pm.lender_keys(), shares, 0)], &[&kp]));
+    let m = s.env.market(&market);
+    assert_eq!(m.total_shares.get(), 0, "every lender left");
+    assert!(!m.has_flag(MARKET_FLAG_WIPE_LIVE), "no wipe record");
+
+    // The dust deposit first: refused.
+    let amount = 1_000_000_000u64;
+    let (whale, k) = new_lender(&mut s, amount);
+    let d0 = deposit_ix(&s.env, &s.pm, &k, amount);
+    assert_err(
+        &s.env.send(std::slice::from_ref(&d0), &[&whale.kp]),
+        E::WipeSweepPending,
+    );
+    // The sweep alone: the trader bit, not the venue-reward bit (cashback outstanding).
+    let meta = ok(s
+        .env
+        .send(&[pump::sweep_trader_pump_ix(&s.env, &s.pm)], &[]));
+    let ev: TraderSwept = events::one(&meta);
+    assert_eq!(
+        ev.wipe_bits & (WIPE_TRADER_SWEPT | WIPE_REWARDS_CLAIMED),
+        WIPE_TRADER_SWEPT
+    );
+    assert_err(
+        &s.env.send(std::slice::from_ref(&d0), &[&whale.kp]),
+        E::WipeSweepPending,
+    );
+    // The claim and the sweep: the cashback to the protocol, both bits.
+    let fees0 = s.env.market_vault(&market).protocol_fees;
+    let meta = ok(s.env.send(
+        &[
+            pump::claim_cashback_ix(&trader),
+            pump::sweep_trader_pump_ix(&s.env, &s.pm),
+        ],
+        &[],
+    ));
+    let ev: TraderSwept = events::one(&meta);
+    assert_eq!(
+        (ev.lamports, ev.to),
+        (cashback, shortwin::events::SWEEP_TO_PROTOCOL)
+    );
+    assert_eq!(
+        ev.wipe_bits & (WIPE_TRADER_SWEPT | WIPE_REWARDS_CLAIMED),
+        WIPE_TRADER_SWEPT | WIPE_REWARDS_CLAIMED
+    );
+    assert_eq!(
+        s.env.market_vault(&market).protocol_fees - fees0,
+        cashback,
+        "KI-10"
+    );
+    // Now the deposit lands, and there is no cashback left for it to take.
+    let d1 = deposit_ix(&s.env, &s.pm, &k, amount);
+    ok(s.env.send(std::slice::from_ref(&d1), &[&whale.kp]));
+    assert_eq!(claimable_cashback(&s.env, &trader), 0);
+    assert_eq!(s.env.market(&market).vest_bal, 0);
+}
+
 /// `is_cashback_coin`'s offset in a `BondingCurve`.
 fn vpump_off_is_cashback() -> usize {
     shortwin_venue_state::pump::OFF_IS_CASHBACK_COIN

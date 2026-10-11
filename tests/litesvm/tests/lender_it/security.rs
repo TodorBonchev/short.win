@@ -99,6 +99,12 @@ fn sec_3_the_last_shares_stay_while_tokens_are_borrowed() {
         (m.total_shares.get(), m.borrowed_q, m.tokens_free),
         (0, 0, 1)
     );
-    // A new lender deposits as usual.
+    // A new lender deposits as usual, after the sweep a deposit into a pool every lender left
+    // waits for (AIR-08).
+    assert_eq!(
+        lab.deposit("B", 1_000_000),
+        Err(code(ShortwinError::WipeSweepPending))
+    );
+    lab.sweep_sol(0);
     lab.deposit("B", 1_000_000).unwrap();
 }

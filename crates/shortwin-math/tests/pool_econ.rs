@@ -308,6 +308,49 @@ fn sol_without_lenders_goes_to_the_protocol() {
     assert_eq!(s.m.vault.protocol_fees, 1_000_000_000);
 }
 
+/// AIR-08 (I-08): the same market in the other order. With the deposit first, the dust shares
+/// were the market's only shares, `sweep_trader` vested the swept SOL (venue cashback claimed
+/// into the trader, donations) to them instead of booking it to the protocol (KI-10, R3A-10),
+/// and the last-lender flush (R3B-2) paid all of it back in the same transaction:
+/// `[deposit(dust), sweep_trader, withdraw]` took 1 SOL. A deposit into a pool without shares
+/// now waits for the sweeps since the last shares left, as after a full wipe (R4A-7); the sweep
+/// before it books the SOL to the protocol. A fresh market needs none (nothing to sweep).
+#[test]
+fn a_deposit_into_an_emptied_pool_waits_for_the_sweep() {
+    let mut s = Model::new(9_000);
+    s.deposit(A, 1_000_000_000_000).expect("A");
+    let shares = s.shares(A);
+    s.withdraw(A, shares).expect("the last lender leaves");
+    assert_eq!(
+        s.deposit(B, 1_000),
+        Err(MathError::WipeSweepPending),
+        "the deposit before the sweep"
+    );
+    s.sweep(1_000_000_000);
+    assert_eq!(s.m.vault.protocol_fees, 1_000_000_000, "KI-10");
+    s.deposit(B, 1_000).expect("after the sweep");
+    let shares = s.shares(B);
+    s.withdraw(B, shares).expect("the dust leaves at once");
+    assert_eq!(s.claim(B), Ok(0));
+    // On a pump venue (rewards_required) the venue-reward bit is needed too; the last exit
+    // clears both bits again.
+    let shares = s.shares(B);
+    assert_eq!(shares, 0);
+    assert_eq!(
+        s.m.deposit_with(B, 1_000, true),
+        Err(MathError::WipeSweepPending)
+    );
+    s.m.sweep_from(0, SweepSource::Trader)
+        .expect("sweep_trader");
+    assert_eq!(
+        s.m.deposit_with(B, 1_000, true),
+        Err(MathError::WipeSweepPending)
+    );
+    s.m.sweep_from(0, SweepSource::VenueRewards)
+        .expect("the venue-reward sweep");
+    assert_eq!(s.m.deposit_with(B, 1_000, true), Ok(1_000_000));
+}
+
 #[test]
 fn governance_change_of_the_protocol_share() {
     // ECON §9.4 / R3B-9, R3A-5, v0.4 row: rent_protocol_bps 15 % -> 30 % halfway through

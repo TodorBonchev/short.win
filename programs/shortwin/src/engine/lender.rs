@@ -20,8 +20,9 @@
 //!   only the position's owner do (KI65-REV-SEC1; anyone else's sync is the pot-only touch,
 //!   KI-66, and `RebaseNeedsOwner` its post-condition).
 //! - [`init_if_new`]: the fields of a `LenderPosition` that `deposit` just created.
-//! - [`rewards_required`]: which post-wipe sweeps a deposit into a live wipe record waits for
-//!   (R4A-7; on every market with the trader's pump UVA, AIR-05).
+//! - [`rewards_required`]: which sweeps a deposit into a pool without shares waits for (a live
+//!   wipe record, R4A-7; a market every lender left, AIR-08; on every market with the trader's
+//!   pump UVA, AIR-05).
 //! - [`pay_sol`], [`check_vault_floor`]: lender SOL out of `MarketVault`, never below its I2
 //!   floor.
 //!
@@ -157,12 +158,14 @@ pub fn init_if_new(
     true
 }
 
-/// Whether a deposit into a live full-wipe record also waits for `wipe_rewards_claimed`
-/// (R4A-7; ARCH §3.3 `deposit`): on the pump venues, which pay venue cashback, and on every
-/// market that has the trader's pump UVA (AIR-05). The trader sweep is always required. ARCH
-/// exempts a pump venue that cannot execute; telling that needs the venue's ReadSet, which
-/// `deposit` does not carry, so the bit is required on every `PumpCurve`, `PumpMigrating` and
-/// `PumpSwap` market.
+/// Whether a deposit into a pool without shares — a live full-wipe record (R4A-7) or, since
+/// AIR-08, a market every lender left — also waits for `wipe_rewards_claimed` (ARCH §3.3
+/// `deposit`): on the pump venues, which pay venue cashback, and on every market that has the
+/// trader's pump UVA (AIR-05). The trader sweep is always required. ARCH exempts a pump venue
+/// that cannot execute; telling that needs the venue's ReadSet, which `deposit` does not carry,
+/// so the bit is required on every `PumpCurve`, `PumpMigrating` and `PumpSwap` market
+/// (`sweep_trader` sets it whenever `S = 0` and nothing is claimable, so the deadlock argument
+/// below holds in both cases).
 ///
 /// **A market that left pump (AIR-05).** A curve market moves to `None` when its curve graduates
 /// elsewhere and may then adopt a Raydium pool. `Market.pump_uva` survives both moves, and so does

@@ -461,7 +461,8 @@ fn a_deficit_lender_converts_through_cover_and_blocks_the_flush() {
 }
 
 /// Spec (8): after the last exit flushed the vest (`S = 0`), a new depositor is a first
-/// depositor (virtual shares only, `vest_bal = 0`), with nothing of the old epoch's SOL.
+/// depositor (virtual shares only, `vest_bal = 0`), with nothing of the old epoch's SOL. Since
+/// AIR-08 it bundles the sweep a deposit after the last exit waits for.
 #[test]
 fn re_entry_after_the_flush_is_a_first_deposit() {
     let mut lab = rebased_pair(TokenProgram::Spl);
@@ -472,6 +473,11 @@ fn re_entry_after_the_flush_is_a_first_deposit() {
     assert_eq!((m.total_shares.get(), m.vest_bal), (0, 0));
     let p = m.pool();
     let want = pool::shares_for_tokens(&p, 1_000_000).unwrap();
+    assert_eq!(
+        lab.deposit("N", 1_000_000),
+        Err(code(ShortwinError::WipeSweepPending))
+    );
+    lab.sweep_sol(0);
     assert_eq!(lab.deposit("N", 1_000_000), Ok(want));
     assert_eq!(lab.market().vest_bal, 0);
     lab.advance(i64::from(lab.lump_vest_s) + 1, 0);

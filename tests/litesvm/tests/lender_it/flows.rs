@@ -61,7 +61,14 @@ fn deposit_and_withdraw_round_trip_on_both_token_programs() {
         assert_eq!((tok, sol), (3_000_000, 0));
         let m = lab.market();
         assert_eq!((m.tokens_free, m.total_shares.get()), (0, 0));
-        // A new deposit into the empty pool works again and the position is re-created.
+        // A new deposit into the empty pool waits for the trader sweep (AIR-08: what reached the
+        // trader meanwhile is the protocol's, KI-10), then works again and the position is
+        // re-created.
+        assert_eq!(
+            lab.deposit("A", 10),
+            Err(code(ShortwinError::WipeSweepPending))
+        );
+        lab.sweep_sol(0);
         assert!(lab.deposit("A", 10).is_ok());
         assert!(lab.position("A").is_some());
     }

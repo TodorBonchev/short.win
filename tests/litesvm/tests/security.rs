@@ -1022,7 +1022,9 @@ fn ok_prefunded_lender_pda_and_no_reinit() {
     assert_eq!(lp.owner, owner.pubkey());
 }
 
-/// Closing and re-opening a lender position in one transaction cannot duplicate SOL.
+/// Closing and re-opening a lender position in one transaction cannot duplicate SOL. The
+/// owner is the only lender, so since AIR-08 the re-deposit waits for `sweep_trader` (a deposit
+/// into a pool every lender left), which the transaction carries.
 #[test]
 fn ok_close_and_reopen_in_one_transaction() {
     let mut env = Env::initialized();
@@ -1036,9 +1038,18 @@ fn ok_close_and_reopen_in_one_transaction() {
     ));
     let shares = env.lender(&l.k.market, &owner.pubkey()).unwrap().shares;
     let before = read::lamports(&env.svm, &owner.pubkey());
+    let sweep = shortwin_litesvm_tests::engine::sweep_trader_ix(&l.k.market, None);
+    assert_err(
+        &env.send(
+            &[ix::withdraw(&lk, shares, 0), ix::deposit(&lk, 1_000, 0)],
+            &[&owner],
+        ),
+        ShortwinError::WipeSweepPending,
+    );
     ok(env.send(
         &[
             ix::withdraw(&lk, shares, 0),
+            sweep,
             ix::deposit(&lk, 1_000, 0),
             ix::claim_sol(&owner.pubkey(), &l.k.market),
         ],

@@ -383,8 +383,9 @@ impl Driver {
     fn step(&mut self, op: &Op) -> Result<(), TestCaseError> {
         match *op {
             Op::Deposit(u, a, rewards) => {
-                if self.m().pool.is_wipe_live() && self.m().pool.wipe_swept == 0 && a % 3 != 0 {
-                    // The depositor bundles the post-wipe sweeps (R4A-7).
+                if self.m().pool.total_shares == 0 && self.m().pool.wipe_swept == 0 && a % 3 != 0 {
+                    // The depositor bundles the sweeps a deposit into a pool without shares
+                    // waits for (after a full wipe, R4A-7; after the last exit, AIR-08).
                     self.s
                         .m
                         .sweep_from(a % 1_000, SweepSource::Trader)
