@@ -31,13 +31,24 @@
 //! expired: no S1/S2 evaluation) and the "liquidatable" of the S3 timer — is judged at
 //! `max(L_live, L_ema')`: it is what `liquidate` and `expire` decide on, and a withdrawal inside a
 //! `[withdraw, sol_settle, deposit]` bundle must not open a gate the honest state keeps shut (an
-//! S2 at fair value pays the penalty in `p'` like a liquidation). The rest keeps `L_live`, and
-//! needs no floor: the S1 / S2 legs are conjunctions with the box corner `(P_lo, L_hi)` — the
-//! corner least favourable to them, on the post-roll EMA and ring medians no transaction moves —
-//! so a drained `L_live` cannot make them hold alone; the refutation reads `min(L_live, L_lo)`
-//! against deposits (a withdrawal only makes it harder, and an unrefuted clock still needs the
-//! corner's S1 / S2 legs to execute); "not liquidatable" (the disarm) reads only the box corner
-//! `(P_hi, L_lo)` and the EMA leg.
+//! S2 at fair value pays the penalty in `p'` like a liquidation). The rest keeps `L_live`: the
+//! S1 / S2 legs are conjunctions with the box corner `(P_lo, L_hi)` — the corner least favourable
+//! to them, on the post-roll EMA and ring medians no transaction moves — so a drained `L_live`
+//! cannot make them hold alone; the refutation reads `min(L_live, L_lo)` against deposits (a
+//! withdrawal only makes it harder, and an unrefuted clock still needs the corner's S1 / S2 legs
+//! to execute); "not liquidatable" (the disarm) reads only the box corner `(P_hi, L_lo)` and the
+//! EMA leg. What the drain does do (AIR-20, kept): inside such a bundle the live and robust-spot
+//! S1 / S2 legs read the drained pool, so the box corner is their only veto. It vetoes whatever
+//! the honest robust spot `(P_rs, L_live)` vetoes while that lies in the box, not once the honest
+//! state has left it — a reversal below `P_lo`, or depth above `L_hi` (a deposit the medians and
+//! `L_ema` have not followed yet, or third-party depth above the depth cap) — and there an
+//! unlocked LP can arm an S1 / S2 the honest live legs veto, and execute it if the state is
+//! still outside the box `settle_persist_n` updates later. In AIR-20's model runs at the default
+//! parameters the borrower loses nothing by it (where it bites, the honest liquidation leaves the
+//! borrower nothing either; the protocol's rent and penalty share go to the lenders, `K_s` to the
+//! keeper); a loss of up to about 1.2 % of `B̂` needs `pool_lock_min_bps` at its 20 % floor and a
+//! 1 % fee. Flooring these legs at `max(L_live, L_ema')` would change ECON §5.6's leg definitions
+//! and the curve's live quote.
 //! - [`terms`]: the position's locked settlement terms (A26).
 //! - [`create_pda_account`]: the grief-proof PDA creation of ARCH §2.4.1.
 //!

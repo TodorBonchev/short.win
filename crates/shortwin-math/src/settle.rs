@@ -952,6 +952,38 @@ mod tests {
         assert_eq!(s1_legs(&mut q, &budget, None, p, 1_000, &pswap), Ok(true));
     }
 
+    /// AIR-20 (kept; `engine::arming` module docs): the S1 legs read the raw `L_live`, so inside
+    /// an unlocked LP's `[withdraw, sol_settle, deposit]` the live and robust-spot legs read the
+    /// drained pool and the box corner `(P_lo, L_hi)` is the only veto. It vetoes whatever the
+    /// honest robust spot vetoes while that lies in the box, and nothing once the honest state has
+    /// left it (here depth above `L_hi` that the medians have not followed yet).
+    #[test]
+    fn a_drained_live_state_leaves_the_box_corner_as_the_only_s1_veto() {
+        let budget = Budget {
+            v: 1_000,
+            k_s: 20,
+            ert: 0,
+        };
+        let mut q = toy();
+        // The corner B̂(10, 10) = 1,000 > V − K_s = 980: S1 holds there.
+        let bx = SettleBox {
+            p_lo: 10,
+            p_hi: 10,
+            l_lo: 8,
+            l_hi: 10,
+        };
+        // The honest pool is deeper than L_hi (L_live = 20): B̂ = 500, a buyback the vault pays.
+        assert_eq!(s1_legs(&mut q, &budget, Some(500), 10, 20, &bx), Ok(false));
+        // Drained to L = 5 inside the bundle: B̂ = 2,000 live and at the robust spot.
+        assert_eq!(s1_legs(&mut q, &budget, Some(2_000), 10, 5, &bx), Ok(true));
+        // Once the medians follow the depth (L_hi = 20), the corner vetoes the drain too.
+        let followed = SettleBox { l_hi: 20, ..bx };
+        assert_eq!(
+            s1_legs(&mut q, &budget, Some(2_000), 10, 5, &followed),
+            Ok(false)
+        );
+    }
+
     #[test]
     fn predicates_read_their_corners() {
         let bx = SettleBox {
