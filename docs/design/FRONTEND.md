@@ -49,7 +49,8 @@ fixes):* `vitest run` 60 files, 599 tests passed, 1 opt-in file skipped; the E2E
 (`lend-claim-pot-chain` and `lend-post-wipe` among them). **v1.4 (M10-RESP, 2026-10-09):** the app is responsive
 from 320 px (§7.6, §7.7, §13 "M10-RESP changes"); `vitest run` 68 files, 670 tests passed, 1
 opt-in file skipped; the default E2E run 77 tests (60 desktop, 17 phone) pass; the responsive gate
-(`SHORTWIN_RESPONSIVE_GATE=1`, eight viewports, 55 states each) 80 tests pass with no finding. **v1.5 (the owner's
+(`SHORTWIN_RESPONSIVE_GATE=1`, eight viewports, 55 states each) 80 tests pass with no finding; approved as built by the
+owner on 2026-10-10 (thirteenth round). **v1.5 (the owner's
 thirteenth round, 2026-10-10):** newcomer help (the intro strip, the glossary, How it works), the
 deposit order, one coverage notice, the Claim wording and the 12 px floor (§13 "Thirteenth round");
 `vitest run` 75 files, 721 tests passed, 1 opt-in file skipped; the default E2E 87 tests (65 desktop,
@@ -1598,7 +1599,8 @@ the plugin never signs implicitly; the pipeline passes the connected `signer` as
    `https://solflare.com/ul/v1/browse/<url>?ref=<origin>` (URL-encoded; rendered only as a tapped
    `<a>`, never for pasting), off mainnet "Set your wallet to <cluster> first", the wallets' sites
    and a Reload; a desktop without a wallet gets the sites and Reload. These are top-level,
-   user-initiated navigations: the CSP is unchanged. **Not built (owner call O-6):** the Mobile
+   user-initiated navigations: the CSP is unchanged. **Not built (owner call O-6; decided 2026-10-10, thirteenth round: after the
+   audit, off by default):** the Mobile
    Wallet Adapter (`@solana-mobile/wallet-standard-mobile`) — a new runtime dependency on the
    signing path before the audit, a likely `ws://localhost` `connect-src` widening, Android only; a
    spike would come on its own branch behind a flag defaulting off.
@@ -2101,7 +2103,7 @@ stops and centres. The tier is the viewport width; density is the pointer (§7.6
 **Mobile wallet entry** (§5.4): a phone browser without an injected wallet gets "Open in
 Backpack / Phantom / Solflare" universal links (alphabetical) to the same page, the cluster hint
 off mainnet, the install sites and Reload; inside a wallet's in-app browser Wallet Standard works
-unchanged. The Mobile Wallet Adapter is owner item O-6 (not built).
+unchanged. The Mobile Wallet Adapter is owner item O-6 (not built; the owner's decision of 2026-10-10: after the audit, off by default).
 
 ---
 
@@ -3010,6 +3012,10 @@ intuitive both on pc and phone" — built as the M10-RESP spec: a foundation (sh
 components, mobile wallet entry, router sheet keys, the phone E2E project and the responsive gate),
 then three page groups in parallel (MARKETS, TRADE, LEND), then an integration. The dark terminal,
 every `data-testid`, every flow (simulate → review → sign) and the disclosure texts are unchanged.
+**Approved as built by the owner on 2026-10-10 (thirteenth round)**, with the page groups' earlier
+deviations (the stat-strip order, Review hidden on a venue refusal, TRADE keeping Status under a
+single-status filter, LEND's Sync at priority 2, cards from 960 px, no Max chip and Total value at the
+indexer's EMA price, the modal wallet menu on a desktop).
 
 | Item | Change | Tests |
 |---|---|---|
@@ -3021,7 +3027,7 @@ every `data-testid`, every flow (simulate → review → sign) and the disclosur
 | Integration | the groups' shared requests: priority-3 cells stay hidden on cards; 44 px text fields and action-bar buttons under a coarse pointer; the dialog / sheet close 44 px (a small button's min-height won before); `FormFoot` above the fixed bars in the page; an open sheet's scroll padding; a phone's toast over an open sheet in the sheet head's title strip; `Checkbox id` / `Disclosure ackId` (TRADE's DOM-set id removed); `.target-link` shared (the review's confirmed and explorer links ≥ 24 px); the lender table framed like the positions table; More marked current on /status and /security; the market page's header and banners open the market column so the trade panel starts at the top (its sticky submit clears the status bar on the first screen, §3.4); Manage's preview labels keep their line; the capture opens sheets as a user does, restores touch emulation after full-page shots and runs axe on the unrolled page; `summary.ts <before> <after>` (§7.6, §10.5) | `router.test.tsx`; E2E `responsive` (gate), `screens`, the phone project |
 | Fix round (desktop, phone, a11y reviews) | desktop: the stat strip never leaves an empty cell (4 + 3 / one row); the market Positions tab shows borrower, margin and entry from 560 px (age from 960); numeric columns share the spare width (D15's `width: 1%` dropped) with 16 px before each from 1,280 px; no 1 px document scroll (the status bar's line a shadow); symmetric gutters in the trade and Manage panels; "Cancelled" as a wallet cancel's stage; the tier's info mark an SVG; shortened ids never split, the review's numbers take only their width and its dates may break between day and time (the account label keeps the room); Overview in two columns with Fees under both; position facts in column groups; lender row actions one button style, the reason after them; install links as a list; a visible disclosure chevron; the `/` chip gone while the search is in use; one explorer link in a confirmed review. Phone: Done on a confirmed review closes the sheet (`TxDoneContext`); the wallet popup has a title and ✕ and is history-backed; the sort direction names its order; the toast strip has no second ✕ and keeps an error's reason; a toast's 6 s count only in view; a title alone takes a card's first row. Accessibility: focus returns to the opener when a popup unmounts (or to `#main` without one), from the status list on Escape; a card table's header shows while focused; More's `aria-current` (§3.1, §3.4, §5.3, §7.3, §7.6) | `responsive.test.tsx`, `TxReviewModal.test.tsx`, `wallet.test.tsx`, `router.test.tsx`; E2E `keyboard`, `mobile-shell`, `mobile-markets`, `mobile-trade`, `mobile-lend`, `responsive` (a short page does not scroll) |
 | Wrap-up (final re-review) | every way out of a confirmed review in a sheet (Done, ✕, Escape) closes the sheet, never one closed before confirmation; the tablet stat strip 4 + 3 (the desktop rule) instead of 3 + 3 + 1; the Overview's two columns share the card's width (no 420 px cap), and so do the Coverage tab's (the same grid); a dialog whose opener is disabled or gone on close (the lend and short submits after a confirmed send, on a desktop) returns focus to an open sheet's title or `#main`, never `<body>` (§3.4, §5.3, §7.6, §8) | `TxReviewModal.test.tsx`, `Modal.test.tsx`; E2E `mobile-lend` (Escape on the confirmed deposit), `lend-deposit` (focus after Done), `responsive` |
-| Owner calls, not built | O-1 deposit reorder, O-2 coverage de-duplication, O-3 intro / glossary, O-4 desktop 12 px floor or density toggle, O-5 Claim wording, O-6 Mobile Wallet Adapter | — |
+| Owner calls, not built (decided 2026-10-10, thirteenth round: O-1 … O-5 built, §13 "Thirteenth round"; O-6 after the audit, off by default) | O-1 deposit reorder, O-2 coverage de-duplication, O-3 intro / glossary, O-4 desktop 12 px floor or density toggle, O-5 Claim wording, O-6 Mobile Wallet Adapter | — |
 
 ### M10 changes (v1.2 → v1.3)
 

@@ -18,13 +18,17 @@ to build and test the code, what the code relies on, and what we already know ab
   its follow-up, the KI-66 batch and the KI-66 full / KI-67 batch changed the program after
   them: their local gates are green (§10), and CI passed on the head that carries them,
   `55b3e23` (run 37816833577, 2026-10-08, as the owner's ninth round records it; §10). **The
-  ≥ 24 h fuzz on the KI-66 full / KI-67 program bytes is still pending** (the owner's seventh
-  round asks for a fresh 24 h fuzz; a run on `f48e75d`, whose program bytes are the head's,
-  started on 2026-10-08).
+  ≥ 24 h fuzz on the final program bytes is done** (release `4d19c582…`; §10 "Fuzz", the owner's
+  seventh round asked for it): run C on `f48e75d` and run E on `9861c5a` (the fixed fuzzer) were
+  clean, 0 failures and 0 anomalies; run D on `55b3e23` held every program invariant and found
+  two fuzz-oracle bugs, FUZZ-24D-A and FUZZ-M10-24H-D-B, fixed in `9861c5a` (known-issues §6).
+- After the program: the FE-30 batch (the web and the indexer), the fuzzer fix `9861c5a`, the
+  M10-RESP batch (`acbe323`, phone and tablet layouts) and the round-13 UX batch (`7a64dcd`) — the
+  web, the indexer, the fuzzer and docs only, the program bytes unchanged (§0, §10).
 - What is still pending is named where it applies: the owner's review of this package and the
-  tag (§0), the ≥ 24 h fuzz above, CI on the FE-30 batch (`m10/fe30`: the web and the indexer
-  only, the program bytes unchanged; CI has not run on it, §10), the open owner items (§7), the
-  calibration results (KI-14) and the external audit itself (§12).
+  tag (§0), **CI on the final head: pending (this push)** — it covers the FE-30 batch, the fuzzer
+  fix and both web batches, on none of which CI has run yet (§10) —, the open owner items (§7),
+  the calibration results (KI-14) and the external audit itself (§12).
 - Normative sources:
   - the design documents `docs/SPEC.md`, `docs/design/ARCHITECTURE.md` (ARCH) and
     `docs/design/ECONOMICS.md` (ECON);
@@ -47,7 +51,7 @@ to build and test the code, what the code relies on, and what we already know ab
 
 | Item | Value |
 |---|---|
-| Audit commit / tag | the head of `m1-core` that carries this file: the M10 tree (`98b1181`, batch 3 from `391aed3`, the doc sync and this package; program batch 4 — the program change `1e4a273`, `3b33ab7` bytecode-neutral — with its docs and gate up to `4f4849e`), then the final tree's fuzz fixes `997c730` and `945d45a` (`tests/fuzz` and one test-harness doc comment only) and this evidence sync; then the **KI-65 program batch** (branch `m10/ki65`, 2026-10-07: `ShareEpoch.conv_rem`, cumulative conversion rounding; its program commit `3c7c689` on `m10/ki65`), then the **KI-65 follow-up** (branch `m10/ki65b`, 2026-10-07: owner-signed conversions through a rebase record, `sync_lender`'s `owner` account and `RebaseNeedsOwner`, KI65-REV-SEC1; its program commit `79cacd9` on `m10/ki65b`), then the **KI-66 batch** (branch `m10/ki66`, 2026-10-07/08: the pot-only touch, `pool::touch_pot` and `sync_lender`'s path selection, owner decision of 2026-10-07, seventh round; its math and program commits `e639558` and `e19e0c8` on `m10/ki66`), then the **KI-66 full / KI-67 batch** (branch `m10/ki67`, 2026-10-08: the forward chain, `claim_sol`'s close, owner decisions of the eighth round; its math and program commits `6aad5a5` and `f47b0d8` on `m10/ki67`; the ids change if the branches are rebased at integration), then the **FE-30 batch** (branch `m10/fe30`, 2026-10-08: the web and the indexer only, owner decisions of the ninth round; the program bytes unchanged); the program bytes are those of the KI-66 full / KI-67 batch. **To be tagged `audit-1` / `v1.0.0` by the owner** (owner decision of 2026-10-02: release 1.0.0 at the audit tag; post-audit fixes are 1.0.x). The tag goes on the commit whose hashes match the table below |
+| Audit commit / tag | the head of `m1-core` that carries this file: the M10 tree (`98b1181`, batch 3 from `391aed3`, the doc sync and this package; program batch 4 — the program change `1e4a273`, `3b33ab7` bytecode-neutral — with its docs and gate up to `4f4849e`), then the final tree's fuzz fixes `997c730` and `945d45a` (`tests/fuzz` and one test-harness doc comment only) and this evidence sync; then the **KI-65 program batch** (branch `m10/ki65`, 2026-10-07: `ShareEpoch.conv_rem`, cumulative conversion rounding; its program commit `3c7c689` on `m10/ki65`), then the **KI-65 follow-up** (branch `m10/ki65b`, 2026-10-07: owner-signed conversions through a rebase record, `sync_lender`'s `owner` account and `RebaseNeedsOwner`, KI65-REV-SEC1; its program commit `79cacd9` on `m10/ki65b`), then the **KI-66 batch** (branch `m10/ki66`, 2026-10-07/08: the pot-only touch, `pool::touch_pot` and `sync_lender`'s path selection, owner decision of 2026-10-07, seventh round; its math and program commits `e639558` and `e19e0c8` on `m10/ki66`), then the **KI-66 full / KI-67 batch** (branch `m10/ki67`, 2026-10-08: the forward chain, `claim_sol`'s close, owner decisions of the eighth round; its math and program commits `6aad5a5` and `f47b0d8` on `m10/ki67`; the ids change if the branches are rebased at integration), then the **FE-30 batch** (branch `m10/fe30`, 2026-10-08: the web and the indexer only, owner decisions of the ninth round; the program bytes unchanged), then the fuzzer fix `9861c5a` (run D's two oracle findings, FUZZ-24D-A and FUZZ-M10-24H-D-B: `tests/fuzz` and docs), then the **M10-RESP batch** (m1-core `acbe323`, 2026-10-09/10: phone and tablet layouts, the desktop terminal's fixes; the owner's twelfth round; approved as built in the thirteenth round, 2026-10-10) and the **round-13 UX batch** (m1-core `7a64dcd`, 2026-10-11: O-1 lend order, O-2 coverage notice once, O-3 newcomer help, O-4 12 px floor, O-5 Claim wording; its 143 new strings and the `borrower.liquidation` ¶3 amendment approved by the owner on 2026-10-11) — the web only; the program bytes are those of the KI-66 full / KI-67 batch. **To be tagged `audit-1` / `v1.0.0` by the owner** (owner decision of 2026-10-02: release 1.0.0 at the audit tag; post-audit fixes are 1.0.x). The tag goes on the commit whose hashes match the table below |
 | Package version | `shortwin` and `complete_curve` are both 1.0.0 (`programs/*/Cargo.toml`); `security.txt`'s `source_release` reads `v1.0.0` |
 | `shortwin` program id | `5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK` (`programs/shortwin/src/lib.rs` `declare_id!`) |
 | `complete_curve` program id | `4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ` (`programs/complete_curve/src/lib.rs`) |
@@ -422,7 +426,7 @@ bound is wrong or can be exceeded. Summary:
 | §3 | KI-30 … KI-41 | Keeper coverage and budget (O17, OWNER-M7-*), transaction sizes |
 | §4 | KI-42 … KI-46, KI-54 … KI-64 | Trust: the venue guard window, halted venues, upgradeable venues and programs (with the pump venues' 2026-10-02 redeploy), admin powers; the **extras-denylist residuals** (batch 3); the **CPMM creator-fee share**; the Squads source; the **Squads semantics** |
 | §5 | KI-47 … KI-51 | Platform facts relied on (U16's 40 M limit, U17, U25, U29, log events) |
-| §6 | — | M10 findings: M10-8C-1, B2-2, the extras denylist, PUMP-2026-10-1 … -3 (the pump venues' redeploy), the 24 h fuzz findings, FUZZ-M10-1, the KI-65 batch's review findings (KI65-REV-SEC1: owner-signed rebase conversions; KI65-REV-CU: `MAX_RECORDS` 8) and its follow-up's (KI65-REV-POT: the pot behind a rebase record, KI-66, fixed by the pot-only touch; KI65B-REV-LOW) and the KI-66 batch's (KI66-REV-LOW: the surplus move checked by the math properties, the fuzz's never-returns model, the sub-unit warning judged on the worst case, KI-67) and the KI-66 full / KI-67 batch's (KI67-REV: the web's read of a funded lender PDA, the 3012 retry, the fuzz's chain coverage and residual cross-check, the withdrawal close hook, the park mutant, KI-68), the WP-1 / WP-10 doc findings, GC-F1 |
+| §6 | — | M10 findings: M10-8C-1, B2-2, the extras denylist, PUMP-2026-10-1 … -3 (the pump venues' redeploy), the 24 h fuzz findings (runs 1 and 3: FUZZ-M7-24H-1 … -3, FUZZ-M10-24H-A, -B; run D on the final program bytes: FUZZ-24D-A, FUZZ-M10-24H-D-B — all the harness's), FUZZ-M10-1, the KI-65 batch's review findings (KI65-REV-SEC1: owner-signed rebase conversions; KI65-REV-CU: `MAX_RECORDS` 8) and its follow-up's (KI65-REV-POT: the pot behind a rebase record, KI-66, fixed by the pot-only touch; KI65B-REV-LOW) and the KI-66 batch's (KI66-REV-LOW: the surplus move checked by the math properties, the fuzz's never-returns model, the sub-unit warning judged on the worst case, KI-67) and the KI-66 full / KI-67 batch's (KI67-REV: the web's read of a funded lender PDA, the 3012 retry, the fuzz's chain coverage and residual cross-check, the withdrawal close hook, the park mutant, KI-68), the WP-1 / WP-10 doc findings, GC-F1 |
 
 **Status by owner decision** (SPEC §14, ARCH §10):
 - **Accepted by the owner:** the real-venue held sandwich (KI-01's and KI-02's figures,
@@ -509,9 +513,14 @@ accepted as the v1.0.0 design (ECON §14's 37 PROPOSED rows ADOPTED, N25's keepe
 among them, SPEC §14 rows 10, 13 and 18 adopted; the parameter values stay governance-tunable
 within the compiled bounds; O18's residuals KI-16 … KI-21 and KI-25 accepted as disclosed), KI-67's
 `lock_term` detail confirmed as built, M6D residual 16 accepted as built (KI-26) and IX-1 / IX-11
-deferred to a 1.0.x batch after the audit tag. All the program-affecting ones are built
-(batches 2, 3 and 4, the KI-65 batch, its follow-up, the KI-66
-batch and the KI-66 full / KI-67 batch); the deferred IX-1 / IX-11 are not.
+deferred to a 1.0.x batch after the audit tag; the web on phones (2026-10-09, twelfth round: the
+M10-RESP redesign); in the thirteenth round (2026-10-10) the redesign approved as built and
+O-1 … O-6 decided (O-1 … O-5 built in the round-13 UX batch; O-6, the Mobile Wallet Adapter, deferred
+until after the audit, off by default), and on 2026-10-11 the round's 143 strings approved word for
+word, `borrower.liquidation` ¶3 amended and the copy review's questions decided (its ten items and
+one follow-up; the table below). All the program-affecting ones are built (batches 2, 3 and 4, the
+KI-65 batch, its follow-up, the KI-66 batch and the KI-66 full / KI-67 batch); the deferred IX-1 /
+IX-11 are not.
 
 | Item | Decision needed | Build default (in force) | Changes program code? |
 |---|---|---|---|
@@ -540,6 +549,7 @@ batch and the KI-66 full / KI-67 batch); the deferred IX-1 / IX-11 are not.
 | FE-23 | Source maps: upload to a private error tracker, or publish | Built hidden, not deployed | Web / ops only |
 | FE-30 (FRONTEND §13; KI66-R4) | **Decided (2026-10-08, ninth round): prefer behind and chained lenders.** The claim-time candidates were the indexer's first page of active lenders, largest raw share count first (not comparable across share epochs: a large current lender could push an absent surplus holder out of the 24). Built: the indexer's lenders behind the share epoch first (its new additive `epoch=behind` / `current` filter of `/v1/markets/{mint}/lenders`; a lender with a forward chain is behind, except one whose owner's own conversion reached the share epoch inside the chain: that one is current and comes with the current lenders), then the current ones, 50 a page, paged further until the best ≤ 4 cover the shortfall, at most 4 pages (≤ 200 lenders: three sequential reads a page while the review waits), ranked by `previewTouchPot`'s gain, every row of either list read whatever its epoch (an indexer lagging or leading the RPC's share epoch only reorders the reads); the size trim stays the conservative bound (no lookup tables). A sync target or the claimant's own position closed meanwhile fails the review's simulation with 3012 — or, once someone funded the closed address, short.win's `AccountOwnedByWrongProgram` (3007) on the `lender` account — and the review's Retry rebuilds both. **Confirmed by the owner (2026-10-09, tenth round):** the builder's choices under the "Web only" decision, the indexer's `epoch` parameter (a client-side scan of the raw-share list would have no bound) and the bound of 4 pages × 50 lenders; the indexer also refuses to start with `max_page_limit` below 200, the web's largest page request (`WEB_MIN_PAGE_LIMIT`, INDEXER §9.1) | Built (FRONTEND §3.6, §13 FE-30); confirmed | Web, indexer (an additive query parameter; the page-limit floor) |
 | The seventh and eighth rounds' web wording | **Decided (2026-10-08, ninth round): approved as written** — `lender.potSyncs`, `lender.potSyncsDeferred`, `lender.claimCloses` and `lender.subUnitConversion` (FRONTEND §4.2) | As written in FRONTEND §4.2 | Web only |
+| The web on phones and the thirteenth round's UX items (M10-RESP; O-1 … O-6; FRONTEND §13) | **Decided (2026-10-10, thirteenth round): the M10-RESP redesign approved as built** (the twelfth round's request of 2026-10-09: phones, tablets and desktops in the dark terminal style), with **O-1** the lend deposit order, **O-2** the coverage notice once, **O-3** newcomer help (the intro strip, the glossary, How it works), **O-4** a 12 px text floor and **O-5** the Claim wording to build, and **O-6** the Mobile Wallet Adapter after the audit, off by default (the "Open in Backpack / Phantom / Solflare" links stay). **Decided (2026-10-11): the round's 143 new or changed strings approved word for word** (FRONTEND §4.3), with recommendations 6–10 (Tier C as How it works' example, the risk texts there without tick boxes, "short.win" in running text and "ShortWin" as the brand mark, the glossary cuts, "Lending page") approved; **`borrower.liquidation` ¶3 amended** (the expiry fee made conditional: "Expiry: after {maxDuration} the position can be closed by anyone. Unless it can be liquidated at that point, you pay a {expiryFee} expiry fee instead of the penalty."; SPEC §5.3, `expire.rs`'s `UseLiquidate`; FRONTEND §4.2); and the round's questions: a Claim shortfall under 10,000 lamports counts as none (`CLAIM_DUST_LAMPORTS`), the Lending page's Claim is the market panel's claim with its pot syncs, and a Claim is enabled with something claimable now or syncs that can pay, the short-phone breakpoint approved, the lone header ⓘ accepted until a design pass after the audit | Built (`acbe323`, `7a64dcd`); O-6 not built | Web only |
 | Other M10 items | The G-H10 reading of a zero-lamport borrower ((A) reaped after the open, (B) emptied inside the exit's transaction; both tested); the fuzzer's PumpSwap weights (`fee_shock` 3, `open_near_cap` 6); whether to publish the private audit report (recommended, before the beta) | As built; publication undecided | No |
 | Scope note | `shortwin-gov` and `crates/squads-v4-ix` are out of scope under the owner's scope decision (programs plus keeper core). They prepare the transactions the members sign; add them to the RFQ if the owner wants them reviewed | Out of scope (§2) | No |
 
@@ -696,28 +706,57 @@ The full gate (G-full in the M10 plan; CI's `ci.yml`) also runs fmt and clippy w
   `cbde0ec`) failed only that job, on a full runner disk.
 - **The head that carries this file:** pending. The commits after `4f4849e` are `997c730`
   and `945d45a` (`tests/fuzz` and one test-harness doc comment), the evidence sync (docs
-  only), and then the **KI-65 batch**, which changes the program (`ShareEpoch.conv_rem`,
-  `store_records`, error 6106; the new hashes of §0), the math crate, the normative sim and
-  vectors, the JS client (writable records, the 143-byte codec), the web (`convRem` in the
-  previews, `MAX_RECORDS`), the indexer's recorded sessions, the tests and the benches; then
-  the **KI-65 follow-up** (`m10/ki65b`), which changes the program again (`sync_lender`'s
-  `owner` account, error 6107 `RebaseNeedsOwner`; the hashes of §0), the JS client (the IDL, a
-  Codama `before` visitor), the web, the fuzzer, the tests and the benches; then the **KI-66
-  batch** (`m10/ki66`), which changes the program again (`sync_lender`'s path selection, the
-  pot-only touch; the hashes of §0), the math crate (`pool::touch_pot`), the normative sim and
+  only) and `c6a9480` (`tests/fuzz`: the summary records every orphan-credit wind-down) — CI on
+  `c6a9480`: run 37402221870 (2026-10-06), green, all 24 jobs a push runs succeeded (`fuzz-nightly`
+  and `mutants` are opt-in) —, and then the **KI-65 batch**, which changes the program
+  (`ShareEpoch.conv_rem`, `store_records`, error 6106; the new hashes of §0), the math crate, the
+  normative sim and vectors, the JS client (writable records, the 143-byte codec), the web
+  (`convRem` in the previews, `MAX_RECORDS`), the indexer's recorded sessions, the tests and the
+  benches; then the **KI-65 follow-up** (`m10/ki65b`), which changes the program again
+  (`sync_lender`'s `owner` account, error 6107 `RebaseNeedsOwner`; the hashes of §0), the JS client
+  (the IDL, a Codama `before` visitor), the web, the fuzzer, the tests and the benches; then the
+  **KI-66 batch** (`m10/ki66`), which changes the program again (`sync_lender`'s path selection,
+  the pot-only touch; the hashes of §0), the math crate (`pool::touch_pot`), the normative sim and
   vectors, the JS client (IDL docs only), the web (`lender.subUnitConversion`), the fuzzer's
-  oracle, the tests, the benches and the indexer's recorded sessions; then the **KI-66 full /
-  KI-67 batch** (`m10/ki67`), which changes the program again (the forward chain in
-  `LenderPosition`, `claim_sol`'s close; the hashes of §0), the math crate, the normative sim
-  and vectors, the JS client (the IDL's `fwd*` fields), the WASM facade and the web (the
-  claim's pot-only syncs, the closing claim), the fuzzer, the tests, the benches and the
-  indexer's recorded sessions. CI on that batch's head `55b3e23`: run 37816833577
-  (2026-10-08), all 24 jobs a push runs succeeded (as the owner's ninth round records it;
-  `fuzz-nightly` and `mutants` are opt-in). Then the **FE-30 batch** (`m10/fe30`: the web's
-  claim candidates and its 3007 mapping, the indexer's additive `epoch` parameter, the docs; no
-  program, IDL, math, sim or client change), on which CI has not run. The next push to `main`
-  (owner decision Q1: `main` is fast-forwarded after each verified step) runs CI on it; its URL
-  goes here at the tag.
+  oracle, the tests, the benches and the indexer's recorded sessions; then the **KI-66 full / KI-67
+  batch** (`m10/ki67`), which changes the program again (the forward chain in `LenderPosition`,
+  `claim_sol`'s close; the hashes of §0), the math crate, the normative sim and vectors, the JS
+  client (the IDL's `fwd*` fields), the WASM facade and the web (the claim's pot-only syncs, the
+  closing claim), the fuzzer, the tests, the benches and the indexer's recorded sessions. CI on
+  that batch's head `55b3e23`: run 37816833577 (2026-10-08), all 24 jobs a push runs succeeded (as
+  the owner's ninth round records it; `fuzz-nightly` and `mutants` are opt-in). Then the **FE-30
+  batch** (`m10/fe30`: the web's claim candidates and its 3007 mapping, the indexer's additive
+  `epoch` parameter, the docs; no program, IDL, math, sim or client change), the owner's
+  eleventh-round docs, the fuzzer fix `9861c5a` (run D's FUZZ-24D-A and FUZZ-M10-24H-D-B;
+  `tests/fuzz` and docs), the **M10-RESP batch** (`acbe323`: the web's phone and tablet layouts)
+  and the **round-13 UX batch** (`7a64dcd`: the web) — no program change after `55b3e23`, and CI
+  has run on none of them yet. **CI on the final head: pending (this push)** (owner decision Q1:
+  `main` is fast-forwarded after each verified step); its run id goes here when it finishes.
+
+**The web batches after FE-30** (the web only; the program bytes, the IDL, the client and the
+indexer unchanged; each batch's gate as its commit message records it):
+- **The M10-RESP batch** (m1-core `acbe323`, 2026-10-09/10, the tree of `m10/resp` `2cff70b`: phone
+  and tablet layouts and the desktop terminal's fixes, the owner's twelfth-round request; approved as
+  built by the owner in the thirteenth round, 2026-10-10): biome, typecheck, Vitest **681 passed**,
+  the build (0 `<style>` tags, 0 `style` attributes); the web **E2E 77 / 77** (the desktop and phone
+  projects); the **responsive gate 80 / 80** at 8 viewports (320 × 693 to 1440 × 900): 0 document
+  overflow, 0 targets under 24 px, 0 phone text under 12 px, 0 axe violations. The approved
+  disclosure texts, every `data-testid`, simulate → review → sign and the CSP unchanged.
+- **The round-13 UX batch** (m1-core `7a64dcd`, 2026-10-11, the tree of `m10/ux` `1405e74`: O-1 lend
+  order, O-2 coverage notice once, O-3 newcomer help, O-4 12 px floor, O-5 Claim wording; the
+  owner's approval and decisions of 2026-10-11 — the 143 new strings approved word for word, one
+  sentence of the approved disclosure `borrower.liquidation` ¶3 amended (the expiry fee made
+  conditional, SPEC §5.3), the Claim's 10,000-lamport dust threshold, the Lending page's Claim
+  with the pot syncs): biome, typecheck, Vitest **760 passed** (78 files, 1 opt-in skipped), the
+  build (0 `<style>` tags, 0 `style` attributes), CI's four web commands on `1405e74`; the web
+  **E2E 95 / 95** (69 desktop, 26 phone) on `59ea55c`'s code (the commits after it change no app
+  code); the **responsive gate 96 / 96** at 8 viewports on `487e737`'s code (63–65 states each: 0
+  document overflow, 0 off screen, axe 0, 0 targets under 24 px, 0 text under 12 px, 0 tap covers;
+  11,520 controls judged). Every `data-testid` (one added, `tx-sign-hold`), simulate → review →
+  sign, the approved disclosure texts but ¶3, the CSP and the breakpoint set unchanged; no new
+  dependency.
+
+Not run on either: CI (**CI on the final head: pending (this push)**, above).
 
 **The review fix round's gate** (2026-10-08, on `m10/ki67` at `6e724b5`, then `182e104` /
 `b72b3a3` for the steps after the new park test and the fuzzer's overflow fix; logs
@@ -744,9 +783,10 @@ not the program, so the full gate's SBF builds (`target/gate-sbf`, `target/gate-
 
 Not run in the fix round: CI (nothing pushed); the verifiable build, A49, the benches, services,
 codama, `cargo deny` / `cargo audit` (no program, IDL, service or lockfile change); the other 18
-mutants. **The ≥ 24 h fuzz still running on `f48e75d` covers this head's program bytes but not its
+mutants. **The ≥ 24 h fuzz then running on `f48e75d` covers this head's program bytes but not its
 fuzzer or hooks** (the windowed syncs, the residual cross-check, the withdrawal replay, the
-overflow fix: FUZZ-KI67-FIX-1 can stop one of its runs); a ≥ 24 h run on this head is still owed.
+overflow fix: FUZZ-KI67-FIX-1 can stop one of its runs); a ≥ 24 h run on this head was owed
+(since done: run D on `55b3e23`, then run E on `9861c5a` after run D's fixes; "Fuzz" below).
 
 **The batch's full gate** (2026-10-08, on `m10/ki67` at `36f43cc`: the KI-66 full / KI-67
 batch and the web batch together, every step of CI's jobs, web and E2E included; the machine's
@@ -780,9 +820,9 @@ to those ELFs:
 | **web E2E** (all specs, under the E2E lock, the test-venue build above) | **60 passed** (12.0 min); no validator left running |
 | `python3 scripts/audit_scope.py check` | ok |
 
-Not run: CI (nothing pushed); the ≥ 24 h fuzz finishes after this gate (it runs on `f48e75d`,
-whose program, fuzzer and harness bytes are this head's: the commits after it change the WASM
-facade, the web, the E2E and docs).
+Not run: CI (nothing pushed); the ≥ 24 h fuzz finished after this gate (run C, "Fuzz" below: on
+`f48e75d`, whose program, fuzzer and harness bytes are this head's: the commits after it change the
+WASM facade, the web, the E2E and docs).
 
 **The KI-66 full / KI-67 batch's gate** (2026-10-08, on `m10/ki67`, the program from `f47b0d8`
 and the math crate from `6aad5a5`: owner decisions of 2026-10-08, eighth round — a third party's
@@ -1063,7 +1103,7 @@ trace, stack depth); `tests/litesvm/README.md` (the suites and their figures);
   890,963,742 / 552,350,825 lamports on the mock / CPMM / PumpSwap) and the curve corpus file
   now end with 126 / 198 / 495 / 50 lamports on the KI-65 follow-up (125 / 198 / 495 / 50 on
   the KI-65 batch; `tests/fuzz/tests/smoke.rs`). Runs 3 and 4 predate
-  the fix: the final tree's ≥ 24 h fuzz must be repeated on it.
+  the fix: the final tree's ≥ 24 h fuzz must be repeated on it (done: runs C, D and E below).
   Run 4 is not independent coverage: seeds are `base + job + k·jobs` per job and a run's
   profile and length derive from its seed, so on 4 jobs run 4's stream (base 20261005) is
   run 3's (base 20261004) shifted by one. It re-executed essentially all of run 3's 52,272
@@ -1072,6 +1112,32 @@ trace, stack depth); `tests/litesvm/README.md` (the suites and their figures);
   on run 3's cases and adds almost no new coverage. Runs 1 and 2 (bases 20261001 and
   20261002) overlap the same way. A confirmation run meant to add coverage takes a widely
   spaced base seed.
+- **The final program bytes** (release `shortwin.so` `4d19c582…`; KI-65 fixed, so no rebase orphans):
+  three more 24 h runs, `run --profile all --duration 24h --jobs 4 --minimize`, named by letter after
+  run 4 as run D's finding ids are (`tests/fuzz/README.md` "Runs so far" has their rows; base seeds
+  far apart, so each adds coverage):
+  - **24 h run C**, at `f48e75d` (`m10/ki67`: the final program bytes; the fuzzer before the KI-67
+    review round's harness changes): seed 67300000, `--actions` 300 (the default), 86,418 s
+    (2026-10-08T11:50:02Z → 2026-10-09T11:50:20Z); 43,833 runs, 6,405,217 actions, 84,950,438
+    transactions, 165,759,524 hook checkpoints, 43,833 wind-downs. **0 failures, 0 anomalies.**
+  - **24 h run D**, at `55b3e23` (the final head then): seed 71000000, `--actions 400`, 86,445 s
+    (2026-10-08T17:29:26Z → 2026-10-09T17:30Z); 31,389 runs, 6,083,510 actions, 78,948,599
+    transactions, 152,298,767 hook checkpoints. The program's invariant hooks held; two fuzz-oracle
+    findings, both harness bugs, fixed in `9861c5a` (known-issues §6, `tests/fuzz/README.md`
+    "Findings"): **FUZZ-24D-A** (1 failure: the PumpSwap exit oracle reused a stale expiry
+    prediction after a direct VM write lifted a venue halt) and **FUZZ-M10-24H-D-B** (1 anomaly:
+    the never-returns oracle ignored the absent lenders' KI-53 deficits; present lenders owed
+    73,744,534,723 lamports backed only by an absent lender's `cover_deficit` — the economics are
+    KI-53's, accepted by the owner on 2026-10-03).
+  - **24 h run E**, at `9861c5a` (the final program bytes and the fixed fuzzer): seed 75000000,
+    `--actions 400`, 86,415 s (2026-10-09T19:45:29Z → 2026-10-10T19:45:44Z); 44,988 runs,
+    8,773,451 actions, 114,792,804 transactions (14,965,581 failed), 221,932,740 hook
+    checkpoints, 44,988 wind-downs; 28 of 30 instructions landed, 69 of 108 error codes returned.
+    **0 failures, 0 anomalies: M10's "fuzz clean ≥ 24 h" is met on the final program bytes.**
+    The deficit tripwire checked 634 deficits in 621 runs (the largest share of its bound
+    1,000,000 ppm, as run C); the second claim pass left at most 112 lamports owed and
+    `lender_sol` at most 2,335 lamports; the never-returns wind-down reached 310 markets (621
+    absent lenders), no present lender owed above dust, no absent lender left owing a deficit.
 - This gate's 10-minute smoke on this tree is in the table above.
 
 **M10 evidence** (ARCH §9 M10 row and §8.2 are normative):

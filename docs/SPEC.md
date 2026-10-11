@@ -385,6 +385,13 @@ Lendable inventory; utilization; unique lenders/borrowers; OI; rental fees; prot
 - **A position opened while a third party's deposit sits in a PumpSwap pool** keeps its margin priced on the pool as it is (accepted as built; the economics document's §12.12 residual 16, the audit's known issues KI-26). Pricing it on the permanently locked liquidity only, a program change, is not taken.
 - **Extra event fields for the indexer** (IX-1: the protocol's rent share, the position size and the smoothed price on the liquidation, expiry and SOL-settlement events; IX-11: the record donation on the epoch-roll event) are deferred to a 1.0.x batch after the audit tag; until then the indexer derives them (INDEXER §14).
 
+**Twelfth and thirteenth rounds (2026-10-09 … 2026-10-11, the web only; no program change):**
+
+- **The web on phones** (twelfth round, 2026-10-09): the site works and looks good on phones and tablets as well as on a computer, keeping the dark trading-terminal style. Approved as built on 2026-10-10 (thirteenth round).
+- **Newcomer help and four smaller changes** (thirteenth round, 2026-10-10): an introduction above the markets list, a glossary of the jargon and a "How it works" page; the lending form in the order of the short form; the keeper-coverage notice shown once; a Claim button that says what it pays; no text under 12 px. Connecting a phone wallet app through the Mobile Wallet Adapter waits until after the audit, and will be off by default.
+- **The new texts** (2026-10-11): all 143 approved as written (the frontend document's §4.3). One sentence of the approved disclosure "How this short can end" is amended, because a position past its deadline that can be liquidated is liquidated (§5.3): "Expiry: after {maxDuration} the position can be closed by anyone. Unless it can be liquidated at that point, you pay a {expiryFee} expiry fee instead of the penalty."
+- **Claims** (2026-10-11): a shortfall under 10,000 lamports counts as none, and the Lending page's Claim works as the market page's does, syncing other lenders when that pays.
+
 ---
 
 ## 15. Agent implementation brief

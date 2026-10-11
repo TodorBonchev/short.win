@@ -14,11 +14,11 @@ Raydium AMM v4 and CPMM). When a buyback is impossible, lenders are repaid in SO
 - For auditors: [`docs/AUDIT.md`](docs/AUDIT.md) (scope, threat model, known issues);
   reporting a vulnerability: [`SECURITY.md`](SECURITY.md)
 
-Status: milestones M0–M10 built (the ≥ 24-hour fuzz criterion met for M7 by run 2 and on the
-final tree by run 4, [`tests/fuzz/README.md`](tests/fuzz/README.md)): the program with every
-venue (pump.fun curve, PumpSwap, Raydium AMM v4 and CPMM), the keeper, the indexer and API, and
-the web frontend (`apps/web`, with its Playwright E2E on a local validator). Pending: M10's
-external audit (`docs/AUDIT.md`). Not deployed.
+Status: milestones M0–M10 built (the ≥ 24-hour fuzz criterion met for M7 by run 2, for M10 by
+run 4 and on the final program bytes by run E, [`tests/fuzz/README.md`](tests/fuzz/README.md)):
+the program with every venue (pump.fun curve, PumpSwap, Raydium AMM v4 and CPMM), the keeper, the
+indexer and API, and the web frontend (`apps/web`, with its Playwright E2E on a local validator).
+Pending: M10's external audit (`docs/AUDIT.md`). Not deployed.
 
 ## Layout
 
