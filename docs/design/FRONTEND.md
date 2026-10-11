@@ -3005,6 +3005,15 @@ eight viewports (63–65 states each): 0 document overflow, 0 elements off scree
 under 24 px, 0 text under 12 px, 0 tap covers with 11,520 controls judged (11,470 before; the side
 trade panel's lower controls at `laptop-s`, `laptop` and `desktop`).
 
+*CI on the merged head (2026-10-11).* CI's lint (run 38123721574, on `04c5236`) failed on 7 errors
+the local gates had passed: under a path with a `.cache` segment, where the work clones live, Biome
+2.5.14 does not apply its `react` and `test` domains, so `noArrayIndexKey` and
+`useJsxKeyInIterable` never ran there, and the M10-RESP batch had dropped the suppressions of
+`DataTable`'s placeholder rows and `Kv`'s rows. `7b2121d`: `biome.json` enables both domains; the
+suppressions are back with their reasons (and on `KvLines`, How it works' blocks and `keepIds`'
+parts: fixed lists in a fixed order), and the Position panel's Q owed value has its key; no
+rendering or text change. CI on `7b2121d`: run 38125079869, green (known-issues M10-CI-LINT).
+
 ### M10-RESP changes (v1.3 → v1.4)
 
 The owner's request of 2026-10-09 — "optimize the site for phone and make it look good and

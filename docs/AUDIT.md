@@ -23,12 +23,14 @@ to build and test the code, what the code relies on, and what we already know ab
   clean, 0 failures and 0 anomalies; run D on `55b3e23` held every program invariant and found
   two fuzz-oracle bugs, FUZZ-24D-A and FUZZ-M10-24H-D-B, fixed in `9861c5a` (known-issues §6).
 - After the program: the FE-30 batch (the web and the indexer), the fuzzer fix `9861c5a`, the
-  M10-RESP batch (`acbe323`, phone and tablet layouts) and the round-13 UX batch (`7a64dcd`) — the
-  web, the indexer, the fuzzer and docs only, the program bytes unchanged (§0, §10).
+  M10-RESP batch (`acbe323`, phone and tablet layouts), the round-13 UX batch (`7a64dcd`) and the
+  lint fix `7b2121d` — the web, the indexer, the fuzzer and docs only, the program bytes unchanged
+  (§0, §10). **CI passed on `7b2121d`** (run 38125079869, 2026-10-11: all 24 jobs a push runs;
+  the first push's run failed only the web lint, which `7b2121d` fixed; the commits after it are
+  docs only; §10).
 - What is still pending is named where it applies: the owner's review of this package and the
-  tag (§0), **CI on the final head: pending (this push)** — it covers the FE-30 batch, the fuzzer
-  fix and both web batches, on none of which CI has run yet (§10) —, the open owner items (§7),
-  the calibration results (KI-14) and the external audit itself (§12).
+  tag (§0), the open owner items (§7), the calibration results (KI-14) and the external audit
+  itself (§12).
 - Normative sources:
   - the design documents `docs/SPEC.md`, `docs/design/ARCHITECTURE.md` (ARCH) and
     `docs/design/ECONOMICS.md` (ECON);
@@ -426,7 +428,7 @@ bound is wrong or can be exceeded. Summary:
 | §3 | KI-30 … KI-41 | Keeper coverage and budget (O17, OWNER-M7-*), transaction sizes |
 | §4 | KI-42 … KI-46, KI-54 … KI-64 | Trust: the venue guard window, halted venues, upgradeable venues and programs (with the pump venues' 2026-10-02 redeploy), admin powers; the **extras-denylist residuals** (batch 3); the **CPMM creator-fee share**; the Squads source; the **Squads semantics** |
 | §5 | KI-47 … KI-51 | Platform facts relied on (U16's 40 M limit, U17, U25, U29, log events) |
-| §6 | — | M10 findings: M10-8C-1, B2-2, the extras denylist, PUMP-2026-10-1 … -3 (the pump venues' redeploy), the 24 h fuzz findings (runs 1 and 3: FUZZ-M7-24H-1 … -3, FUZZ-M10-24H-A, -B; run D on the final program bytes: FUZZ-24D-A, FUZZ-M10-24H-D-B — all the harness's), FUZZ-M10-1, the KI-65 batch's review findings (KI65-REV-SEC1: owner-signed rebase conversions; KI65-REV-CU: `MAX_RECORDS` 8) and its follow-up's (KI65-REV-POT: the pot behind a rebase record, KI-66, fixed by the pot-only touch; KI65B-REV-LOW) and the KI-66 batch's (KI66-REV-LOW: the surplus move checked by the math properties, the fuzz's never-returns model, the sub-unit warning judged on the worst case, KI-67) and the KI-66 full / KI-67 batch's (KI67-REV: the web's read of a funded lender PDA, the 3012 retry, the fuzz's chain coverage and residual cross-check, the withdrawal close hook, the park mutant, KI-68), the WP-1 / WP-10 doc findings, GC-F1 |
+| §6 | — | M10 findings: M10-8C-1, B2-2, the extras denylist, PUMP-2026-10-1 … -3 (the pump venues' redeploy), the 24 h fuzz findings (runs 1 and 3: FUZZ-M7-24H-1 … -3, FUZZ-M10-24H-A, -B; run D on the final program bytes: FUZZ-24D-A, FUZZ-M10-24H-D-B — all the harness's), FUZZ-M10-1, the KI-65 batch's review findings (KI65-REV-SEC1: owner-signed rebase conversions; KI65-REV-CU: `MAX_RECORDS` 8) and its follow-up's (KI65-REV-POT: the pot behind a rebase record, KI-66, fixed by the pot-only touch; KI65B-REV-LOW) and the KI-66 batch's (KI66-REV-LOW: the surplus move checked by the math properties, the fuzz's never-returns model, the sub-unit warning judged on the worst case, KI-67) and the KI-66 full / KI-67 batch's (KI67-REV: the web's read of a funded lender PDA, the 3012 retry, the fuzz's chain coverage and residual cross-check, the withdrawal close hook, the park mutant, KI-68), the WP-1 / WP-10 doc findings, GC-F1, M10-CI-LINT |
 
 **Status by owner decision** (SPEC §14, ARCH §10):
 - **Accepted by the owner:** the real-venue held sandwich (KI-01's and KI-02's figures,
@@ -729,15 +731,26 @@ The full gate (G-full in the M10 plan; CI's `ci.yml`) also runs fmt and clippy w
   `epoch` parameter, the docs; no program, IDL, math, sim or client change), the owner's
   eleventh-round docs, the fuzzer fix `9861c5a` (run D's FUZZ-24D-A and FUZZ-M10-24H-D-B;
   `tests/fuzz` and docs), the **M10-RESP batch** (`acbe323`: the web's phone and tablet layouts)
-  and the **round-13 UX batch** (`7a64dcd`: the web) — no program change after `55b3e23`, and CI
-  has run on none of them yet. **CI on the final head: pending (this push)** (owner decision Q1:
-  `main` is fast-forwarded after each verified step); its run id goes here when it finishes.
+  and the **round-13 UX batch** (`7a64dcd`: the web) — no program change after `55b3e23`. CI on
+  them (owner decision Q1: `main` is fast-forwarded after each verified step): the first push
+  (`04c5236`, run 38123721574, 2026-10-11) failed only the `web` job's lint, on 7 errors in the
+  M10-RESP and round-13 code (6 `noArrayIndexKey`, 1 `useJsxKeyInIterable`) that the local gates
+  had passed — Biome 2.5.14 does not apply its `react` and `test` domains under a path with a
+  `.cache` segment, where the work clones live, and the M10-RESP batch had dropped two suppressions
+  `55b3e23` carried (M10-CI-LINT, known-issues §6); every other job that finished was green
+  (`web-e2e` and `indexer` among them), and the run was cancelled after `web-e2e` to save Actions
+  minutes (`program-tests` and `services` stopped). The **lint fix `7b2121d`**: `biome.json`
+  enables both domains, so every checkout lints as CI does; the suppressions are back with their
+  reasons, and one missing key is added (no rendering or text change). **CI on `7b2121d`: run
+  38125079869 (2026-10-11), green, all 24 jobs a push runs succeeded** (`fuzz-nightly` and
+  `mutants` are opt-in); the commits after it are docs only.
 
 **The web batches after FE-30** (the web only; the program bytes, the IDL, the client and the
 indexer unchanged; each batch's gate as its commit message records it):
 - **The M10-RESP batch** (m1-core `acbe323`, 2026-10-09/10, the tree of `m10/resp` `2cff70b`: phone
   and tablet layouts and the desktop terminal's fixes, the owner's twelfth-round request; approved as
-  built by the owner in the thirteenth round, 2026-10-10): biome, typecheck, Vitest **681 passed**,
+  built by the owner in the thirteenth round, 2026-10-10): biome (in a work clone under `~/.cache`,
+  which skips Biome's React rules: the lint fix above), typecheck, Vitest **681 passed**,
   the build (0 `<style>` tags, 0 `style` attributes); the web **E2E 77 / 77** (the desktop and phone
   projects); the **responsive gate 80 / 80** at 8 viewports (320 × 693 to 1440 × 900): 0 document
   overflow, 0 targets under 24 px, 0 phone text under 12 px, 0 axe violations. The approved
@@ -747,8 +760,9 @@ indexer unchanged; each batch's gate as its commit message records it):
   owner's approval and decisions of 2026-10-11 — the 143 new strings approved word for word, one
   sentence of the approved disclosure `borrower.liquidation` ¶3 amended (the expiry fee made
   conditional, SPEC §5.3), the Claim's 10,000-lamport dust threshold, the Lending page's Claim
-  with the pot syncs): biome, typecheck, Vitest **760 passed** (78 files, 1 opt-in skipped), the
-  build (0 `<style>` tags, 0 `style` attributes), CI's four web commands on `1405e74`; the web
+  with the pot syncs): biome (in work clones under `~/.cache`, which skip Biome's React rules: the
+  lint fix above), typecheck, Vitest **760 passed** (78 files, 1 opt-in skipped), the build (0
+  `<style>` tags, 0 `style` attributes); the web
   **E2E 95 / 95** (69 desktop, 26 phone) on `59ea55c`'s code (the commits after it change no app
   code); the **responsive gate 96 / 96** at 8 viewports on `487e737`'s code (63–65 states each: 0
   document overflow, 0 off screen, axe 0, 0 targets under 24 px, 0 text under 12 px, 0 tap covers;
@@ -756,7 +770,7 @@ indexer unchanged; each batch's gate as its commit message records it):
   sign, the approved disclosure texts but ¶3, the CSP and the breakpoint set unchanged; no new
   dependency.
 
-Not run on either: CI (**CI on the final head: pending (this push)**, above).
+CI on both: green on `7b2121d` (run 38125079869, above), after the lint fix.
 
 **The review fix round's gate** (2026-10-08, on `m10/ki67` at `6e724b5`, then `182e104` /
 `b72b3a3` for the steps after the new park test and the fuzzer's overflow fix; logs
