@@ -37,14 +37,20 @@ use shortwin_math::pool::{self, Standing, VIRTUAL_ASSETS, VIRTUAL_SHARES};
 
 const U: u64 = 1_000_000_000;
 
+/// `ki65_it::rebase`: everything but one raw token settled (`sol − lump` of it), a rebase, then
+/// a `lump` swept into the rebased pool in the same second (since AIR-07 a lump that arrives with
+/// such a settlement is flushed to the old shares at once).
 fn rebase(lab: &mut Lab, pid: &str, sol: u64, lump: u64) {
     let e = lab.market().share_epoch;
     let t = lab.market().tokens_free;
     lab.borrow30(pid, t - 1).unwrap();
-    lab.settle(pid, sol, lump);
+    lab.settle(pid, sol - lump, 0);
     assert_eq!(lab.market().share_epoch, e + 1, "{pid}: the epoch rolled");
     let r = *lab.state().records.last().unwrap();
     assert_eq!(r.num, 1, "{pid}: a rebase, not a wipe");
+    if lump > 0 {
+        lab.sweep_sol(lump);
+    }
 }
 
 fn exit_all(lab: &mut Lab, name: &str) {

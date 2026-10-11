@@ -57,10 +57,16 @@
 //! - the position's aggregates leave the market (`open_positions`, `ΣB_Q` by tier, `A_j`,
 //!   notional), the exposure falls by `q` (closed at 0), and the position — with the borrower's
 //!   `V − K_s − x` and its rent — is closed to the borrower (A18);
+//! - a settlement that leaves at most 1/1,000 of the token claims it found (a full wipe, or
+//!   the dust a run or a deposit before it leaves; AIR-07, `pool::VEST_FLUSH_RATIO`) releases
+//!   the unreleased vest, its own lump included, to the shares that held them inside
+//!   `pool::settle`;
 //! - `pool::maybe_roll` inside `pool::settle`: when the epoch rolls (a full wipe, or a rebase),
 //!   the `ShareEpoch` record is created with the grief-proof helper (payer keeper; lamports a
 //!   third party pre-funded are swept to `market_vault` and credited to lenders as a lump —
-//!   the live wipe record's own top-up when the roll is a full wipe) and `EpochRolled` emitted.
+//!   the live wipe record's own top-up when the roll is a full wipe) and `EpochRolled` emitted
+//!   (`vest_flushed`: the vest the settlement flushed, 0 when it did not; a flush without a
+//!   roll emits no `EpochRolled`).
 //!
 //! Lamport moves out of the position are direct (no CPI) and come after every CPI that names
 //! the keeper or `market_vault` (a direct move is visible to the runtime's per-CPI balance
@@ -152,10 +158,13 @@ struct Booked {
     pool: pool::Pool,
     vault: Box<pool::Vault>,
     rec: Option<pool::ShareEpoch>,
-    /// `vest_bal` before `pool::settle` (a full wipe flushes it plus `vested`).
+    /// `vest_bal` before `pool::settle` (a flush releases it plus `vested`).
     vest_before: u64,
     /// What `pool::settle` vested (`Settled::vested`): the lump and the rent top-up.
     vested: u64,
+    /// Whether `pool::settle` flushed the vest (`Settled::flushed`: a full wipe, or AIR-07's
+    /// dust).
+    flushed: bool,
     lump_vest_s: u32,
 }
 
@@ -313,6 +322,7 @@ fn evaluate<'info>(
                 rec: settled.rec,
                 vest_before,
                 vested: settled.vested,
+                flushed: settled.flushed,
                 lump_vest_s: config.params.lump_vest_s,
             })
         }
@@ -449,7 +459,9 @@ pub fn handler<'info>(ctx: Context<'info, SolSettle<'info>>) -> Result<()> {
             let mut w: &mut [u8] = &mut data;
             record.try_serialize(&mut w)?;
         }
-        let vest_flushed = if rec.is_full_wipe() {
+        // A full wipe always flushes; since AIR-07 so does a rebase after a settlement that
+        // left dust.
+        let vest_flushed = if b.flushed {
             b.vest_before.checked_add(b.vested).or_math()?
         } else {
             0

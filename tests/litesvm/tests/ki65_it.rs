@@ -76,16 +76,22 @@ fn dust(lab: &mut Lab, name: &str, amount: u64, rem: u128) -> u128 {
     lab.position(name).unwrap().shares
 }
 
-/// A settlement of everything but one raw token: `sol` reaches the lenders, `lump` of it
-/// vests, and the shares rebase (the share price falls below `R_MAX`'s bound).
+/// A settlement of everything but one raw token that rebases the shares (the share price falls
+/// below `R_MAX`'s bound), then a `lump` that vests in the rebased pool: `sol` reaches the
+/// lenders in all. The lump is swept in the same second after the roll: since AIR-07 a lump
+/// that arrives with a settlement leaving at most 1/1,000 of the claims is flushed to the old
+/// shares at once, and these tests need a vest that runs in the rebased pool.
 fn rebase(lab: &mut Lab, pid: &str, sol: u64, lump: u64) {
     let e = lab.market().share_epoch;
     let t = lab.market().tokens_free;
     lab.borrow30(pid, t - 1).unwrap();
-    lab.settle(pid, sol, lump);
+    lab.settle(pid, sol - lump, 0);
     assert_eq!(lab.market().share_epoch, e + 1, "{pid}: the epoch rolled");
     let r = *lab.state().records.last().unwrap();
     assert_eq!(r.num, 1, "{pid}: a rebase, not a wipe");
+    if lump > 0 {
+        lab.sweep_sol(lump);
+    }
 }
 
 /// The shares every lender holds once touched on copies, through one shared copy of the

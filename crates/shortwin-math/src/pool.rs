@@ -79,6 +79,16 @@ pub const VIRTUAL_ASSETS: u128 = 1;
 pub const R_MAX: u128 = 1_000_000;
 /// Rebase factor: a rebase divides shares by `REBASE^k` (ECON §9.5).
 pub const REBASE: u128 = 1_000;
+/// A settlement that leaves at most `1/VEST_FLUSH_RATIO` of the token claims it found
+/// (`T + ΣB_Q` before it) flushes the unreleased vest to the shares that held them, as a full
+/// wipe does (AIR-07; ECON §9.5: "the wiped lenders keep their unreleased lumps"). A run
+/// leaves the allowance's floor (1 raw token) and a dust deposit before the last settlement
+/// leaves its own, so `T + ΣB_Q = 0` alone missed the wipes that leave dust, and the vest went
+/// to whoever deposited next. A just-in-time deposit before the settlement shares in the flush,
+/// but its tokens stay as claims, so it takes at most `1/VEST_FLUSH_RATIO` of the vest (R4B-6),
+/// whatever the pool's history (a rebase test would not bound it: a pool near the `R_MAX` bound
+/// rebases after a small settlement).
+pub const VEST_FLUSH_RATIO: u128 = 1_000;
 /// `lock_epoch` of a lender without a lock (`pool_model.Lender`: −1).
 pub const NO_LOCK_EPOCH: u32 = u32::MAX;
 /// `Lender::fwd`: no forward chain (KI-66 full; `pool_model.FWD_NONE`).
@@ -2267,8 +2277,11 @@ pub fn repay(
 /// pays `rent` (the position's `R_due`, all of it the lenders' in a settlement) first, and
 /// the part of that above `credited` ([`rent_top_up`]; finding M10-8C-1) vests with the
 /// lump; the entitlement is trued up by `principal − top-up − credited` and that much is
-/// allocated as realised SOL; then [`maybe_roll`]. Returns [`Settled`]: the new share-epoch
-/// record if the epoch rolled (the program writes it) and the SOL vested.
+/// allocated as realised SOL; if the settlement leaves at most `1/`[`VEST_FLUSH_RATIO`] of
+/// the token claims it found (a full wipe included), the unreleased vest — this settlement's
+/// part included — is released to the current shares at once (AIR-07); then [`maybe_roll`].
+/// Returns [`Settled`]: the new share-epoch record if the epoch rolled (the program writes
+/// it), the SOL vested and whether the vest was flushed.
 ///
 /// # Errors
 /// `InvalidInput` if `q = 0` or `q > ΣB_Q`; `Overflow`/`Underflow` if a counter leaves
@@ -2283,6 +2296,8 @@ pub fn settle(
     rent: u64,
 ) -> Result<Settled, MathError> {
     let (mut p, mut v) = (*pool, *vault);
+    // AIR-07: the token claims the settlement finds.
+    let claims = p.token_claims()?;
     close_pos(&mut p, &mut v, now, res)?;
     p.borrowed_q = sub_u64(p.borrowed_q, res.q)?;
     let lump = res.lump.min(sol_in);
@@ -2291,10 +2306,21 @@ pub fn settle(
     let top = true_up(&mut p, &mut v, principal, rent, res.credited)?;
     let vested = add_u64(lump, top)?;
     vest_in(&mut p, &mut v, None, now, lump_vest_s, vested)?;
+    // AIR-07: the old shares' token claims are (nearly) wiped: they keep their unreleased
+    // lumps, as at a full wipe (`T + ΣB_Q = 0`), instead of leaving them to the next depositor.
+    let flushed =
+        p.total_shares != 0 && ovf(p.token_claims()?.checked_mul(VEST_FLUSH_RATIO))? <= claims;
+    if flushed {
+        flush_vest_in(&mut p, now)?;
+    }
     let rec = maybe_roll_in(&mut p, &mut v, now)?;
     *pool = p;
     *vault = v;
-    Ok(Settled { rec, vested })
+    Ok(Settled {
+        rec,
+        vested,
+        flushed,
+    })
 }
 
 /// What [`settle`] booked.
@@ -2304,9 +2330,26 @@ pub struct Settled {
     /// The new share-epoch record if the epoch rolled (the program writes it).
     pub rec: Option<ShareEpoch>,
     /// The SOL the settlement added to the vest: `min(lump, sol_in)` and the rent top-up
-    /// ([`rent_top_up`]; finding M10-8C-1). A full wipe flushes it with the vest before
+    /// ([`rent_top_up`]; finding M10-8C-1). A flush releases it with the vest before
     /// (`EpochRolled.vest_flushed`).
     pub vested: u64,
+    /// Whether the settlement left at most `1/`[`VEST_FLUSH_RATIO`] of the token claims it
+    /// found — a full wipe, or since AIR-07 dust — and so released the whole unreleased vest
+    /// to the current shares.
+    pub flushed: bool,
+}
+
+/// The release due at `now`, then the rest of the unreleased vest to the current shares at
+/// once (realised): the flush of a full wipe and of a settlement that leaves dust (AIR-07).
+/// `S > 0` (the caller checks).
+fn flush_vest_in(p: &mut Pool, now: i64) -> Result<(), MathError> {
+    release_in(p, now)?;
+    let vb = p.vest_bal;
+    p.vest_bal = 0;
+    if vb != 0 {
+        credit_pos(p, i128::from(vb), true)?;
+    }
+    Ok(())
 }
 
 // ---- share epochs (ECON §9.5; C0-6) -----------------------------------------------------------
@@ -2317,13 +2360,8 @@ fn maybe_roll_in(p: &mut Pool, v: &mut Vault, now: i64) -> Result<Option<ShareEp
     }
     let claims = p.token_claims()?;
     let (num, k) = if claims == 0 {
-        // The wiped epoch's lenders get the unreleased vest.
-        release_in(p, now)?;
-        let vb = p.vest_bal;
-        p.vest_bal = 0;
-        if vb != 0 {
-            credit_pos(p, i128::from(vb), true)?;
-        }
+        // The wiped epoch's lenders get the unreleased vest (in `settle` already flushed).
+        flush_vest_in(p, now)?;
         (0u8, 0u8)
     } else {
         let cap = ovf(R_MAX.checked_mul(add_u128(claims, VIRTUAL_ASSETS)?))?;
@@ -2808,7 +2846,8 @@ mod tests {
             settle(&mut p, &mut v, 60, VEST, &res, 900, 200),
             Ok(Settled {
                 rec: None,
-                vested: 220
+                vested: 220,
+                flushed: false
             })
         );
         assert_eq!(p.vest_bal, 220, "the vest booked is the one returned");

@@ -525,18 +525,23 @@ fn a_chained_dust_position_closes_and_is_recreated_clean_in_one_transaction() {
 /// The lumps of `ki65_it`'s whale tests: 3 SOL.
 const LUMP: u64 = 3 * U;
 
-/// `ki65_it::rebase`: everything but one raw token settled, `lump` of `sol` vests.
+/// `ki65_it::rebase`: everything but one raw token settled (`sol − lump` of it), a rebase, then
+/// a `lump` swept into the rebased pool in the same second (since AIR-07 a lump that arrives with
+/// such a settlement is flushed to the old shares at once).
 fn rebase(lab: &mut Lab, pid: &str, sol: u64, lump: u64) {
     let e = lab.market().share_epoch;
     let t = lab.market().tokens_free;
     lab.borrow30(pid, t - 1).unwrap();
-    lab.settle(pid, sol, lump);
+    lab.settle(pid, sol - lump, 0);
     assert_eq!(lab.market().share_epoch, e + 1, "{pid}: the epoch rolled");
     assert_eq!(
         lab.state().records.last().unwrap().num,
         1,
         "{pid}: a rebase"
     );
+    if lump > 0 {
+        lab.sweep_sol(lump);
+    }
 }
 
 /// `ki65_it::w1_a_jit_whale_takes_nothing_while_a_share_is_latent` with the forward chain: H's

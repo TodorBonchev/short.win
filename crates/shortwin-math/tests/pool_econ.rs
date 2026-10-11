@@ -29,6 +29,29 @@ fn withdraw_max(s: &mut Model, u: usize) -> u64 {
     }
 }
 
+/// `pool_model.exit_all(p, u, max_burns)`: `u` withdraws every share in the largest burns it may —
+/// its allowance or, while that is 0, the largest burn that pays 0 tokens; stops at a refusal.
+fn exit_all(s: &mut Model, u: usize, max_burns: usize) -> u64 {
+    let mut got = 0;
+    for _ in 0..max_burns {
+        let l = s.touch(u);
+        let p = s.m.pool;
+        if l.shares == 0 || l.epoch != p.share_epoch {
+            break;
+        }
+        let allow = s.free_allowance(u).expect("allowance");
+        let c = u128::from(p.tokens_free) + u128::from(p.borrowed_q) + pool::VIRTUAL_ASSETS;
+        let zero = (p.total_shares + pool::VIRTUAL_SHARES).div_ceil(c) - 1;
+        match s.withdraw(u, l.shares.min(s.shares_at(allow).max(zero).max(1))) {
+            Ok(t) => got += t,
+            Err(_) => break,
+        }
+    }
+    got
+}
+
+const SOL: u64 = 1_000_000_000;
+
 #[test]
 fn first_depositor_attack() {
     // ECON §9.2: "victim deposits 1e9, receives 1,000,000,000,000 shares, redeems 1,000,000,000".
@@ -493,6 +516,98 @@ fn post_wipe_credits_and_the_epoch_jump() {
         Ok(pool::Standing::Current)
     );
     assert_eq!((l.epoch, l.shares), (s.m.pool.share_epoch, 0));
+}
+
+/// AIR-07 (I-07), the attack: every token is lent and an attacker deposits 1 raw unit before the
+/// last settlement, so the settlement leaves 1 raw token instead of 0: the epoch rebases instead
+/// of wiping, the flush of the unreleased vest (ECON §9.5: "the wiped lenders keep their
+/// unreleased lumps") is skipped, and a depositor of 10⁶ raw units right after held nearly every
+/// share and took 4,999,993,333 lamports of the 5 SOL lump. A settlement that leaves at most
+/// 1/1,000 of the token claims it found flushes the vest to the shares that held them.
+#[test]
+fn a_dust_deposit_before_the_last_settlement_takes_no_vest() {
+    let mut s = Model::new(10_000);
+    s.deposit(A, 1_000_000_000_000).expect("A");
+    s.deposit(B, 1_000_000_000_000).expect("B");
+    let t = s.m.pool.tokens_free;
+    let pos = s.borrow30(t);
+    s.deposit(2, 1).expect("the dust deposit");
+    s.settle(pos, 50 * SOL, 5 * SOL)
+        .expect("the last settlement");
+    assert_eq!(s.m.records[0].num, 1, "a rebase, not a wipe");
+    assert_eq!(
+        s.m.pool.vest_bal, 0,
+        "the vest is flushed to the old shares"
+    );
+    s.deposit(3, 1_000_000).expect("the newcomer");
+    s.advance(VEST + 1, 0);
+    assert_eq!(s.claim(3), Ok(0), "the newcomer");
+    let old = s.claim(A).expect("A") + s.claim(B).expect("B");
+    assert_eq!(
+        old, 49_999_999_998,
+        "the old lenders (before: 45,000,006,664)"
+    );
+}
+
+/// AIR-07, the organic case (no attacker): two lenders withdraw everything they can while 90 %
+/// is borrowed; the allowance's floor leaves 1 raw token free, so the last settlement rebased and
+/// a newcomer's 10⁶ raw units took 3,999,992,004 lamports of its 4 SOL lump (the impact
+/// reviewer's 300 random pools all ended at T = 1). Now the run's dust counts as a wipe.
+#[test]
+fn the_dust_a_run_leaves_counts_as_a_wipe_for_the_vest() {
+    let mut s = Model::new(9_000);
+    s.deposit(A, 1_000_000_000_000).expect("A");
+    s.deposit(B, 1_000_000_000_000).expect("B");
+    let pos = s.borrow30(s.m.pool.tokens_free * 9 / 10);
+    exit_all(&mut s, A, 8);
+    exit_all(&mut s, B, 8);
+    assert_eq!(s.m.pool.tokens_free, 1, "the allowance's floor");
+    s.advance(60, 0);
+    s.settle(pos, 50 * SOL, 4 * SOL)
+        .expect("the last settlement");
+    assert_eq!(s.m.records[0].num, 1, "a rebase, not a wipe");
+    assert_eq!(
+        s.m.pool.vest_bal, 0,
+        "the vest is flushed to the old shares"
+    );
+    s.deposit(2, 1_000_000).expect("the newcomer");
+    s.advance(VEST + 1, 0);
+    assert_eq!(s.claim(2), Ok(0), "the newcomer");
+    let old = s.claim(A).expect("A") + s.claim(B).expect("B");
+    assert_eq!(
+        old, 49_999_999_999,
+        "the old lenders (before: 46,000,007,993)"
+    );
+}
+
+/// AIR-07 against R4B-6 (the flush is at the settlement, so a just-in-time deposit shares in
+/// it): the flush needs the settlement to leave at most 1/1,000 of the claims, and the
+/// deposit's own tokens stay as claims, so a bundle `[deposit x, sol_settle, withdraw, claim]`
+/// takes at most `x/claims` ≤ 0.1 % of the vest (4,995,003 lamports of a 5 SOL lump for
+/// x = 10⁹ around the settlement of 10¹²); a larger deposit keeps the lump vesting and takes 0
+/// of it at once (the R4B-6 rows hold; `premium_jit_table`).
+#[test]
+fn a_jit_deposit_around_a_wiping_settlement_takes_at_most_a_thousandth() {
+    for (x, gain) in [
+        (1_000_000u64, 4_998i128),
+        (1_000_000_000, 4_995_003),
+        (10_000_000_000, -2),
+    ] {
+        let mut s = Model::new(10_000);
+        s.deposit(A, 1_000_000_000_000).expect("H");
+        let t = s.m.pool.tokens_free;
+        let pos = s.borrow30(t);
+        s.deposit(B, x).expect("the JIT deposit");
+        // S2/S3 at P_ema = 1 lamport per raw unit: Q·P_ema immediate, a 5 SOL lump vests.
+        s.settle(pos, t + 5 * SOL, 5 * SOL).expect("settle");
+        let tok = withdraw_max(&mut s, B);
+        let sol = s.claim(B).expect("claim");
+        let left = s.token_value(B);
+        let g =
+            i128::from(tok) + i128::from(sol) + i128::try_from(left).expect("fits") - i128::from(x);
+        assert_eq!(g, gain, "x = {x}");
+        assert!(g <= i128::from(5 * SOL) / 1_000);
+    }
 }
 
 #[test]

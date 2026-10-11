@@ -336,6 +336,32 @@ fn r3a_10_sol_without_lenders_goes_to_the_protocol() {
     );
 }
 
+/// AIR-07 (I-07), `pool_model.rebase_vest_demo()` attack row, on the program: every token is
+/// lent, an attacker deposits 1 raw unit before the last settlement, which therefore leaves
+/// 1 raw token (a rebase, not a full wipe). Before the fix its 5 SOL lump stayed vesting and a
+/// depositor of 10⁶ raw units right after took 4,999,993,333 lamports of it; now a settlement
+/// that leaves at most 1/1,000 of the claims it found flushes the vest to the old shares.
+#[test]
+fn air_07_a_dust_deposit_before_the_last_settlement_takes_no_vest() {
+    let mut lab = Lab::with_cap(TokenProgram::Spl, 10_000);
+    lab.deposit("A", 1_000_000_000_000).unwrap();
+    lab.deposit("B", 1_000_000_000_000).unwrap();
+    let t = lab.market().tokens_free;
+    lab.borrow30("1", t).unwrap();
+    lab.deposit("ATT", 1).unwrap();
+    lab.settle("1", 50 * U, 5 * U);
+    assert_eq!(lab.state().records[0].num, 1, "a rebase, not a wipe");
+    assert_eq!(lab.market().vest_bal, 0, "flushed to the old shares");
+    lab.deposit("NEW", 1_000_000).unwrap();
+    lab.advance(i64::from(lab.lump_vest_s) + 1, 0);
+    assert_eq!(lab.claim("NEW"), Ok(0));
+    let old = lab.claim("A").unwrap() + lab.claim("B").unwrap();
+    assert_eq!(
+        old, 49_999_999_998,
+        "the old lenders (before: 45,000,006,664)"
+    );
+}
+
 /// R3B-1: steady borrowing after a withdrawal. The lock A takes never decreases while the
 /// market stays busy (open/close churn below the running minimum cannot release it, V2-3),
 /// and it clears at its `lock_until` without A being touched in between.

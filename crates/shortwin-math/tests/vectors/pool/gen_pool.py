@@ -81,7 +81,9 @@ writes, next to itself:
                        and the round-4 cases (stale_lock_demo, lock_tail_demo,
                        wipe_gate_demo, vest_exit_demo, restart_grief_table,
                        premium_jit_table), KI-66's pot_touch_demo and KI-66 full's
-                       pot_chain_demo (its held-only comparison pool is not recorded).
+                       pot_chain_demo (its held-only comparison pool is not recorded), and
+                       AIR-07's rebase_vest_demo (the settlement that leaves dust token
+                       claims; its pre-fix comparison pools are not recorded).
 
 Line format (parsed by tests/pool_vectors.rs). Each trace is a list of lines; a line
 holds one or more pool operations separated by ";" and ends with " #cccccccc", the
@@ -224,7 +226,7 @@ MODEL_ERRORS = {
 DEFAULT_SWITCHES = {"mode": "continuous", "prorata": True, "pi_decay": True, "lock_expiry": True,
                     "lock_calendar": True, "vest_weighted": True, "wipe_sweep_gate": True,
                     "exit_flush_bps": 0, "lock_floor": True, "cum_convert": True, "fwd_chain": True,
-                    "vest_floor": True}
+                    "vest_floor": True, "dust_flush": True}
 
 BasePool = pm.Pool
 REGISTRY: list = []
@@ -1434,7 +1436,7 @@ def orphan_demo_traces() -> list:
 DEMOS = ["jit_demo", "jit_hold_table", "inflation_demo", "run_demo", "claim_loop_demo", "run_util_table",
          "wipe_demo", "wipe_tail_demo", "zero_share_demo", "protocol_change_demo", "escape_demo",
          "stuck_lock_table", "stale_lock_demo", "lock_tail_demo", "wipe_gate_demo", "vest_exit_demo",
-         "restart_grief_table", "premium_jit_table", "pot_touch_demo", "pot_chain_demo"]
+         "restart_grief_table", "premium_jit_table", "pot_touch_demo", "pot_chain_demo", "rebase_vest_demo"]
 PATCHED = ("_resolve", "_maybe_roll", "claim_sol", "_touch", "withdraw", "deposit", "_credit")
 
 

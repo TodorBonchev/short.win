@@ -378,7 +378,10 @@ mod epochs {
     }
 
     /// ECON §9.5 (C0-6): a settlement that leaves `S + VS > R_MAX·(T + ΣB_Q + VA)` rebases
-    /// the shares by `1/1,000^k` (a record with `num = 1`).
+    /// the shares by `1/1,000^k` (a record with `num = 1`). AIR-07: it leaves 10⁹ of the
+    /// 3.001·10¹² token claims it found (at most 1/1,000), so the old shares also keep the
+    /// unreleased vest — here the S1's rent top-up — at once, as at a full wipe
+    /// (`vest_flushed`), instead of the next depositor taking it.
     #[test]
     fn a_rebase_rolls_the_epoch() {
         let mut sc = Sc::default_market();
@@ -386,13 +389,21 @@ mod epochs {
         withdraw_down_to(&mut sc, 1_000_000_000);
         let epoch = sc.market().share_epoch;
         let s_old = sc.market().total_shares.get();
+        let (pos, vest0) = (sc.pos(), sc.market().vest_bal);
         sc.gap_and_arm(1.05);
         let (_s, out) = sc.run_until_settled_out(80).expect("settled");
+        let ev = out.settled.expect("SolSettle");
         let rolled = out.rolled.expect("EpochRolled");
+        let basis = sc.market().basis();
+        let r_due = shortwin_math::rent::due(&pos.pos_rent(), &basis).unwrap();
+        let credited = shortwin_math::rent::credited_for(&pos.pos_rent(), &basis).unwrap();
+        let top = shortwin_math::pool::rent_top_up(ev.lender_amount - ev.lump, r_due, credited);
+        assert!(top > 0);
         assert_eq!(
             (rolled.epoch, rolled.num, rolled.vest_flushed),
-            (epoch, 1, 0)
+            (epoch, 1, vest0 + ev.lump + top)
         );
+        assert_eq!(sc.market().vest_bal, 0, "AIR-07: flushed to the old shares");
         let rec = record(&sc, epoch);
         assert!(rec.den_log1000 >= 1 && rec.s_old == s_old);
         assert_eq!(rolled.den, 1_000u128.pow(u32::from(rec.den_log1000)));

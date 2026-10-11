@@ -537,6 +537,7 @@ fn econ_demos_round_3_and_round_4_cases() {
         "premium_jit_table",
         "pot_touch_demo",
         "pot_chain_demo",
+        "rebase_vest_demo",
         "pool_edge",
     ] {
         assert!(

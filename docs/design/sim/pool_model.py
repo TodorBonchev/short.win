@@ -54,7 +54,11 @@ Model (all integers; rounding in favour of the pool):
     deposit while a full-wipe record is live waits for the post-wipe sweep (R4A-7).  AIR-02: the
     value-weighted end is rounded down, so a dust lump leaves it where it is (rounded up, repeated
     1-lamport sweeps held it lump_vest_s away).
-  * Share epochs (C0-6), 0-share jump and post-wipe record (V2-12) unchanged.
+  * Share epochs (C0-6), 0-share jump and post-wipe record (V2-12) unchanged.  AIR-07: a settlement that
+    leaves at most 1/VEST_FLUSH_RATIO (1/1,000) of the token claims it found flushes the unreleased vest to the
+    shares that held them, as a full wipe does (a run leaves the allowance's floor, 1 raw token, and a dust
+    deposit before the last settlement its own, so the full-wipe test T + B == 0 missed them and the vest went to
+    the next depositor); a just-in-time deposit before such a settlement takes at most 1/1,000 of the vest.
   * v0.4.2 (KI-65): no rebase orphans.  A rebase record (1/den) carries a conversion remainder
     conv_rem in [0, den); a lender's conversion through it mints floor((conv_rem + shares)/den)
     and leaves the remainder there, so the conversions of every old-epoch holder sum to
@@ -89,6 +93,7 @@ VS = 1_000        # virtual shares (decimals offset 3)
 VA = 1            # virtual token unit
 R_MAX = 1_000_000   # max shares per raw token unit before a rebase
 REBASE = 1_000
+VEST_FLUSH_RATIO = 1_000   # AIR-07: a settlement leaving <= 1/1,000 of the token claims it found flushes the vest
 U128 = 2**128 - 1
 LUMP_VEST_S = 6 * 3600       # PROPOSED lump_vest_s (ECON §15)
 LOCK_GRACE_S = 86_400        # PROPOSED lock_grace_s (ECON §15)
@@ -134,7 +139,8 @@ class Pool:
                  lump_vest_s: int = LUMP_VEST_S, lock_grace_s: int = LOCK_GRACE_S, pi_decay: bool = True,
                  lock_expiry: bool = True, lock_calendar: bool = True, vest_weighted: bool = True,
                  wipe_sweep_gate: bool = True, exit_flush_bps: int = 0, lock_floor: bool = True,
-                 cum_convert: bool = True, fwd_chain: bool = True, vest_floor: bool = True):
+                 cum_convert: bool = True, fwd_chain: bool = True, vest_floor: bool = True,
+                 dust_flush: bool = True):
         assert mode in ("continuous", "release")
         self.mode = mode
         self.util_cap = util_cap_bps
@@ -155,6 +161,8 @@ class Pool:
                                                 #   the rebase record only; KI-66 full comparison rows)
         self.vest_floor = vest_floor            # False: v0.4.2 behaviour before AIR-02 (the value-weighted vest end
                                                 #   rounded up: every dust lump moved it 1 s; comparison rows)
+        self.dust_flush = dust_flush            # False: v0.4.2 behaviour before AIR-07 (the vest is flushed only at a
+                                                #   full wipe, T + B == 0; comparison rows)
         self.now = 0
         self.T = 0
         self.B = 0
@@ -507,14 +515,19 @@ class Pool:
             self.unmatched += surplus
 
     # ---- C0-6 share epochs ----------------------------------------------------------
+    def _flush_vest(self):
+        """The release due now, then the rest of the unreleased vest to the current shares at once (realised): a
+        full wipe's flush, and since AIR-07 a settlement's that leaves dust token claims."""
+        self._release()
+        vb, self.vest_bal = self.vest_bal, 0
+        if vb:
+            self._credit(vb, realised=True)
+
     def _maybe_roll(self):
         if self.S == 0:
             return
         if self.T + self.B == 0:
-            self._release()
-            vb, self.vest_bal = self.vest_bal, 0          # the wiped epoch's lenders get the unreleased vest
-            if vb:
-                self._credit(vb, realised=True)
+            self._flush_vest()                             # the wiped epoch's lenders get the unreleased vest
             self._roll(0, 1)
         elif self.S + VS > R_MAX * (self.T + self.B + VA):
             den = REBASE
@@ -767,6 +780,7 @@ class Pool:
         if rent is None:
             q, i_open, _p, _dl = self.positions[pid]
             rent = cdiv(q * (self.index - i_open), WAD)
+        claims = self.T + self.B                # AIR-07: the token claims the settlement finds
         q, i_open, p, credited = self._close_pos(pid)
         self.B -= q
         lump = min(lump, sol_in)
@@ -778,6 +792,12 @@ class Pool:
         else:
             self._credit(principal, realised=True)
         self._vest(lump)
+        if self.dust_flush and self.S and (self.T + self.B) * VEST_FLUSH_RATIO <= claims:
+            # AIR-07: the settlement left at most 1/1,000 of the claims it found (the allowance's floor after a run,
+            # or a dust deposit before it): the old shares keep their unreleased lumps, as at a full wipe, instead of
+            # the next depositor taking them.  A just-in-time deposit before it shares the flush, but its tokens
+            # stay as claims: at most 1/1,000 of the vest (R4B-6)
+            self._flush_vest()
         self._maybe_roll()
 
     # ---- invariants -----------------------------------------------------------------
@@ -1635,11 +1655,81 @@ def dust_shares(p, who, amount: int, rem: int):
             pass
 
 
+def rebase_vest_demo():
+    """AIR-07 (I-07): the last SOL settlement of a run leaves dust token claims instead of 0, so the epoch rebases
+    instead of wiping and, before the fix, the unreleased vest (here the settlement's own 5 SOL / 4 SOL lump) went
+    to whoever deposited next.  Rows (case, model, outsider gets, old lenders get), lamports:
+      attack   - every token lent, 1 raw unit deposited before the settlement, 10^6 just after, claims after 6 h;
+      organic  - two lenders withdrew all they could at 90 % utilisation (the allowance's floor leaves 1 raw token),
+                 a newcomer deposits 10^6 right after the settlement;
+      JIT x    - a deposit of x just before the settlement of 10^12 (S2/S3 at P_ema = 1 lamport per raw unit, Q*P_ema
+                 immediate, a 5 SOL lump), withdrawn and claimed at once: the outsider column is its atomic gain
+                 beyond the value of its tokens (at most x/claims of the vest when x <= 1/1,000 of the claims, else
+                 the lump keeps vesting: R4B-6);
+      residual - a deposit above 1/1,000 of the claims before the settlement keeps the vest vesting, so a larger
+                 deposit after it dilutes the old lenders by token claims as any lender does (the outsider's SOL:
+                 its pre-deposit's part of the immediate SOL plus its part of the lump, held 6 h)."""
+    sol = 10**9
+    rows = []
+    for label, flush in (("v0.4.2 (flush at a full wipe only)", False),
+                         ("AIR-07 (flush when at most 1/1,000 of the claims is left)", True)):
+        p = Pool(util_cap_bps=10_000, dust_flush=flush)
+        p.deposit("A", 10**12)
+        p.deposit("B", 10**12)
+        p.borrow(1, p.T)
+        p.deposit("ATT", 1)
+        p.settle(1, 50 * sol, 5 * sol)
+        p.deposit("NEW", 10**6)
+        p.advance(p.lump_vest_s + 1)
+        out = p.claim_sol("NEW") + p.claim_sol("ATT")
+        rows.append(("attack: 1 raw unit deposited before the last settlement, 10^6 after", label, out,
+                     p.claim_sol("A") + p.claim_sol("B")))
+        p = Pool(util_cap_bps=9_000, dust_flush=flush)
+        p.deposit("A", 10**12)
+        p.deposit("B", 10**12)
+        p.borrow(1, p.T * 9 // 10)
+        exit_all(p, "A", max_burns=8)
+        exit_all(p, "B", max_burns=8)
+        assert p.T == 1, p.T
+        p.advance(60)
+        p.settle(1, 50 * sol, 4 * sol, 0)
+        p.deposit("NEW", 10**6)
+        p.advance(p.lump_vest_s + 1)
+        rows.append(("organic: two lenders withdrew all they could at 90 % (1 raw token left), 10^6 deposited after",
+                     label, p.claim_sol("NEW"), p.claim_sol("A") + p.claim_sol("B")))
+        for x in (10**9, 10**10):
+            p = Pool(util_cap_bps=10_000, dust_flush=flush)
+            p.deposit("H", 10**12)
+            p.borrow(1, p.T)
+            p.deposit("W", x)
+            p.settle(1, 10**12 + 5 * sol, 5 * sol)
+            a = p.free_allowance("W")
+            Lw = p._touch("W")
+            tok = p.withdraw("W", min(Lw.shares, a * (p.S + VS) // (p.T + p.B + VA)))
+            gain = tok + p.claim_sol("W") + token_value(p, p._touch("W")) - x
+            p.advance(p.lump_vest_s + 1)
+            rows.append((f"JIT: {x:.0e} deposited just before the settlement of 1e12, out at once", label, gain,
+                         p.claim_sol("H")))
+        p = Pool(util_cap_bps=10_000, dust_flush=flush)
+        p.deposit("A", 10**12)
+        p.deposit("B", 10**12)
+        p.borrow(1, p.T)
+        p.deposit("ATT", 3 * 10**9)              # above (Q + itself)/1,000: the settlement leaves more
+        p.settle(1, 50 * sol, 5 * sol)
+        p.deposit("NEW", 3 * 10**10)
+        p.advance(p.lump_vest_s + 1)
+        out = p.claim_sol("NEW") + p.claim_sol("ATT")
+        rows.append(("residual: 3e9 (above 1/1,000) deposited before, 3e10 after, held 6 h", label, out,
+                     p.claim_sol("A") + p.claim_sol("B")))
+    return rows
+
+
 def orphan_vest_demo(seeds: int = 200):
-    """KI-65 (FUZZ-M10-24H-A): three lenders, a settlement that vests a 3 SOL lump and rebases the
-    shares (1/1,000), then every lender exits during the vest -- each converts lazily at its own exit --
-    and claims again after it.  v0.4.1 floors each lender alone: the orphan shares keep S above 0, the
-    R3B-2 flush (a withdrawal of all of S) never fires and the vest is released to shares nobody holds.
+    """KI-65 (FUZZ-M10-24H-A): three lenders, a settlement that rebases the shares (1/1,000) and a 3 SOL lump that
+    vests (a sweep in the same second: since AIR-07 a lump that arrives with a settlement leaving at most 1/1,000 of
+    the claims is flushed to the old shares at once), then every lender exits during the vest -- each converts
+    lazily at its own exit -- and claims again after it.  v0.4.1 floors each lender alone: the orphan shares keep S
+    above 0, the R3B-2 flush (a withdrawal of all of S) never fires and the vest is released to shares nobody holds.
     Returns rows (model, runs that rolled, runs with S > 0 after every exit, worst stranded, its seed)."""
     rows = []
     for label, cum in (("v0.4.1 (each lender floored alone)", False),
@@ -1656,7 +1746,8 @@ def orphan_vest_demo(seeds: int = 200):
                 p.deposit(f"u{i}", rng.randrange(100, 2000))
             p.borrow(2, p.T - 1)
             e0 = p.epoch
-            p.settle(2, 10**9 + 3 * 10**9, 3 * 10**9)    # 3 SOL vest, then (mostly) a rebase
+            p.settle(2, 10**9)                           # (mostly) a rebase ...
+            p.sweep_sol(3 * 10**9)                       # ... then a 3 SOL vest
             rolled = p.epoch > e0
             for w in list(p.lenders):                     # everyone leaves while the vest runs
                 exit_all(p, w)
@@ -1677,14 +1768,16 @@ def orphan_vest_demo(seeds: int = 200):
 
 def _rebased_pair(cum: bool, h_rem: int, w_rem: int, w_amount: int = 9_000):
     """H (1 token) and W (`w_amount` tokens) hold `h_rem`, `w_rem` shares modulo 1,000; a settlement
-    of everything but one raw token pays 1 SOL immediately and vests a 3 SOL lump, and the shares
-    rebase by 1/1,000 (H's old shares are dust below one new share)."""
+    of everything but one raw token pays 1 SOL and the shares rebase by 1/1,000 (H's old shares are
+    dust below one new share); then a 3 SOL lump vests (a sweep in the same second: since AIR-07 a
+    lump that arrives with such a settlement is flushed to the old shares at once)."""
     p = Pool(util_cap_bps=10_000, cum_convert=cum)
     dust_shares(p, "H", 1, h_rem)
     dust_shares(p, "W", w_amount, w_rem)
     p.borrow(1, p.T - 1)
-    p.settle(1, 10**9 + 3 * 10**9, 3 * 10**9)
+    p.settle(1, 10**9)
     assert p.epoch == 1 and p.epochs[0][2] == REBASE, (p.epoch, p.epochs)
+    p.sweep_sol(3 * 10**9)
     return p
 
 
@@ -2489,6 +2582,12 @@ def main():
           f"1 SOL post-wipe sweep); dust depositor that arrives first and triggers a 1 SOL sweep: {now_dust:,} "
           f"at once, {dust_total:,} in total after a lender joins a minute later (that lender: {late:,}); a lender "
           f"with 0 shares {behind} epochs behind caught up in one touch: {jumped}")
+    print("\nAIR-07 the last settlement of a run leaves dust token claims (a rebase, not a full wipe); its 5 SOL / 4 SOL "
+          "lump and the vest before it (lamports; JIT rows: the deposit's atomic gain beyond its tokens' value):")
+    print("| case | model | outsider gets | old lenders get |")
+    print("|---|---|---|---|")
+    for case, label, out, old in rebase_vest_demo():
+        print(f"| {case} | {label} | {out:,} | {old:,} |")
     print("\nR3A-10 all lenders withdrew (no wipe), then a 1 SOL sweep, then a dust deposit:")
     print("| model | dust depositor claims | former lender claims | to protocol |")
     print("|---|---|---|---|")
