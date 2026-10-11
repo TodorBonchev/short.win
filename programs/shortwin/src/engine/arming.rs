@@ -172,8 +172,9 @@ fn nonzero(t: i64) -> Option<i64> {
     (t != 0).then_some(t)
 }
 
-/// The market's S3 chain as the prologue left it (ARCH §3.0 step 8, §5.3), with
-/// `s3_no_route` of this instruction's observation (the **global** hard cap, R3A-4 c).
+/// The market's S3 chain as the prologue left it (ARCH §3.0 step 8, §5.3), with the position's
+/// `s3_no_route` of this instruction's observation (`engine::route::position_no_route`: the
+/// lower of the global hard cap and the position's locked cap, AIR-19; R3A-4 c).
 pub fn s3_chain(market: &Market, s3_no_route: bool) -> S3Chain {
     S3Chain {
         no_route_now: s3_no_route,

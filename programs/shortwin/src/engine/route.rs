@@ -7,13 +7,22 @@
 //!   venue-state account parses, A63). Only it drives `B̂_live`, closes, liquidations,
 //!   expiries, the "no route ⇒ spot leg true" rule and observation recording.
 //! - **`s3_no_route`** = `!venue_executable ∨ market.route_broken ∨ venue_route_broken[venue] ∨
-//!   φ_live > config.venue_fee_hard_cap_bps` ([`s3_no_route`]): the S3 chain, `sol_settle`'s
-//!   "no route now" and the open gate only.
+//!   φ_live > min(config.venue_fee_hard_cap_bps, market.min_open_hard_cap_bps)`
+//!   ([`s3_no_route`]): the S3 chain and the open gate only. `sol_settle`'s "no route now" is
+//!   the position's own ([`position_no_route`]: the same with the position's locked cap in place
+//!   of the market's mark).
 //! - **`pool_fail`** = `!venue_executable ∨ φ_live > config.venue_fee_hard_cap_bps`
 //!   ([`pool_fail`]): the Raydium fast-path chain only. It never reads the Emergency flag
 //!   (T-S3-BROKEN).
 //!
-//! Both market-level predicates use the **global** hard cap (R3A-4 c). The formulas are
+//! `pool_fail` uses the **global** hard cap (R3A-4 c). The S3 predicates also count a live fee
+//! above the cap the position locked (AIR-19): under a global cap raised above it, a fee between
+//! the two leaves the position no forced exit — its keeper exits are bounded at its own cap and
+//! its S1 legs priced there — so that fee must start the chain (`Market.min_open_hard_cap_bps`,
+//! the lowest cap an open position locked; 0 on existing accounts, the global cap alone) and be
+//! "no route" for that position. A fee under a position's own cap stays a route for it, however
+//! low the mark. The opens are unchanged: their gate also requires `φ ≤ venue_fee_cap_bps`
+//! (at most 300 bps), below any locked hard cap (at least 300). The formulas are
 //! `shortwin_math::settle::{s3_no_route, pool_fail, chain_step}`.
 
 use shortwin_math::settle;
@@ -28,13 +37,43 @@ pub fn route_broken(config: &GlobalConfig, market: &Market, kind: VenueKind) -> 
         || (kind.venue_bit() != 0 && config.venue_route_broken & kind.venue_bit() != 0)
 }
 
-/// `s3_no_route` of the market now (module docs).
+/// The hard cap the market's S3 chain judges the live fee against (AIR-19; module docs): the
+/// global `venue_fee_hard_cap_bps`, or the lowest cap an open position locked
+/// (`Market.min_open_hard_cap_bps`, 0 = unset) when that is lower.
+pub fn chain_hard_cap_bps(config: &GlobalConfig, market: &Market) -> u64 {
+    let global = u64::from(config.params.venue_fee_hard_cap_bps);
+    match market.min_open_hard_cap_bps {
+        0 => global,
+        mark => global.min(u64::from(mark)),
+    }
+}
+
+/// `s3_no_route` of the market now (module docs): the S3 chain's predicate.
 pub fn s3_no_route(config: &GlobalConfig, market: &Market, state: &VenueState) -> bool {
     settle::s3_no_route(
         state.executable,
         route_broken(config, market, state.kind),
         state.fee_ppm,
-        u64::from(config.params.venue_fee_hard_cap_bps),
+        chain_hard_cap_bps(config, market),
+    )
+}
+
+/// `s3_no_route` of one position now, `sol_settle`'s "no route now" (AIR-19; module docs): the
+/// market's predicate with the position's locked `venue_fee_hard_cap_bps` (`pos_cap_bps`) in
+/// place of the mark, so a live fee above that cap is no route for the position under any
+/// global cap, and a fee within it is a route for the position whatever others locked.
+pub fn position_no_route(
+    config: &GlobalConfig,
+    market: &Market,
+    state: &VenueState,
+    pos_cap_bps: u16,
+) -> bool {
+    let cap = u64::from(config.params.venue_fee_hard_cap_bps).min(u64::from(pos_cap_bps));
+    settle::s3_no_route(
+        state.executable,
+        route_broken(config, market, state.kind),
+        state.fee_ppm,
+        cap,
     )
 }
 
@@ -83,5 +122,64 @@ pub fn observe_chains(
         s3_no_route: s3,
         pool_fail: pf,
         changed: before != after,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bytemuck::Zeroable;
+
+    fn state(fee_ppm: u32, executable: bool) -> VenueState {
+        VenueState {
+            kind: VenueKind::RaydiumCpmm,
+            executable,
+            x: 0,
+            y: 0,
+            r: 0,
+            pricing: None,
+            fee_ppm,
+            locked_depth: 0,
+            curve: None,
+            pool: None,
+        }
+    }
+
+    /// AIR-19: the S3 chain judges the live fee at the lower of the global cap and the lowest
+    /// cap an open position locked, a position at the lower of the global cap and its own;
+    /// `pool_fail` keeps the global cap.
+    #[test]
+    fn a_fee_above_a_locked_cap_is_no_route_under_a_raised_global_cap() {
+        let mut config = GlobalConfig::zeroed();
+        config.params.venue_fee_hard_cap_bps = 1_000;
+        let mut market = Market::zeroed();
+        // A live fee of 8 %: between a locked 500 and the global 1,000 bps.
+        let band = state(80_000, true);
+        // No mark (no position open, or an account from before AIR-19): the global cap alone.
+        assert_eq!(chain_hard_cap_bps(&config, &market), 1_000);
+        assert!(!s3_no_route(&config, &market, &band));
+        market.min_open_hard_cap_bps = 500;
+        assert_eq!(chain_hard_cap_bps(&config, &market), 500);
+        assert!(s3_no_route(&config, &market, &band));
+        assert!(position_no_route(&config, &market, &band, 500));
+        assert!(!position_no_route(&config, &market, &band, 1_000));
+        assert!(!pool_fail(&config, &band));
+        // A global cap lowered below a position's cap binds it too (G-G3), and a venue that
+        // cannot execute is no route for every position.
+        config.params.venue_fee_hard_cap_bps = 300;
+        assert_eq!(chain_hard_cap_bps(&config, &market), 300);
+        assert!(position_no_route(
+            &config,
+            &market,
+            &state(40_000, true),
+            1_000
+        ));
+        assert!(position_no_route(&config, &market, &state(0, false), 1_000));
+        assert!(!position_no_route(
+            &config,
+            &market,
+            &state(30_000, true),
+            1_000
+        ));
     }
 }

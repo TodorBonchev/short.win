@@ -16,9 +16,10 @@
 //!
 //! **Exits never read the latch, the oracle, a pause flag or the route-broken flag as a gate**
 //! (I10): none of those accounts is passed. The Emergency flag reaches this instruction only
-//! as S3 evidence, through the prologue's `s3_no_route` (the S3 chain and "no route now",
-//! V2-1): it never makes the spot leg true and never enters a quote, the box, the arming clock
-//! or `pool_fail` (T-S3-BROKEN).
+//! as S3 evidence, through `s3_no_route` (the prologue's S3 chain, and the position's "no route
+//! now", `engine::route::position_no_route`, which also counts a live fee above the position's
+//! locked hard cap, AIR-19; V2-1): it never makes the spot leg true and never enters a quote,
+//! the box, the arming clock or `pool_fail` (T-S3-BROKEN).
 //!
 //! **Steps** (ARCH §3.8; the order equals `shortwin_sim.Market.try_exit(settle_only = True)`):
 //!
@@ -228,13 +229,22 @@ fn evaluate<'info>(
     // AIR-15: the box's `L_mhi` is capped where the exit reference's EMA terms are (M4F-1,
     // M6R-1: `pool_d` just refreshed by the prologue over `λ_min`; `None` without a locked depth).
     let depth_cap = bounds::ref_depth_cap(&config, &market, kind);
+    // AIR-19: "no route now" is the position's own — a live fee above the cap it locked is no
+    // route for it under any global cap (its keeper exits are bounded at that cap); the
+    // prologue's chain ran at the lowest cap an open position locked.
+    let pos_s3_no_route = crate::engine::route::position_no_route(
+        &config,
+        &market,
+        &state,
+        pos.venue_fee_hard_cap_bps,
+    );
     let (inp, facts) = arming::inputs(
         pos,
         &market,
         &obs,
         &state,
         &mut quotes,
-        pro.s3_no_route,
+        pos_s3_no_route,
         depth_cap,
         now,
     )?;

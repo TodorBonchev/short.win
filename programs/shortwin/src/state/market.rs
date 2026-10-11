@@ -25,7 +25,8 @@
 //! | derived keys (`trader_wsol_ata` @2,864, `pump_pool_authority` @2,896; M5-SEC-6, from `_reserved`) | 2,864 | 64 |
 //! | `coverage_cleared_at` (M7-SEC-3, from `_reserved`) | 2,928 | 8 |
 //! | `lender_credit_rem` (AIR-03, from `_reserved`) | 2,936 | 16 |
-//! | `_reserved` | 2,952 | 152 |
+//! | `min_open_hard_cap_bps` @2,952 (AIR-19, from `_reserved`) | 2,952 | 8 |
+//! | `_reserved` | 2,960 | 144 |
 //!
 //! The math crate's state types (`pool::Pool`, `rent::{Basis, Aggr}`, `observe::*`) hold native
 //! `u128`/`i128`; the conversions below ([`Market::pool`], [`Market::set_pool`], …) copy field by
@@ -442,7 +443,18 @@ pub struct Market {
     /// market cranked every second lost up to a lamport a second, which the exits' true-ups
     /// left in `lender_sol`). Always below that denominator; 0 on existing accounts.
     pub lender_credit_rem: PodU128,
-    pub _reserved: [u8; 152],
+    /// AIR-19 (was `_reserved[16..18]`): low-water mark of the `venue_fee_hard_cap_bps` the
+    /// positions opened since `open_positions` last returned to 0 locked — set by the first open
+    /// after the market emptied, lowered by every later one (`engine::waterfall::add_position`),
+    /// reset to 0 by the exit that takes `open_positions` to 0 (`remove_position`), so it is at
+    /// most every open position's locked cap (conservative by design: a position that has
+    /// closed may have set it). The market's S3 chain counts a live fee above
+    /// `min(global cap, this mark)` as no route (`engine::route::s3_no_route`), so a position
+    /// whose locked cap is below a raised global cap reaches S3 when the fee passes its own cap.
+    /// 0 (unset) on existing accounts: the global cap alone, as before.
+    pub min_open_hard_cap_bps: u16,
+    pub _pad6: [u8; 6],
+    pub _reserved: [u8; 144],
 }
 
 impl Market {

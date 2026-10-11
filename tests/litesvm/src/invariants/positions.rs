@@ -14,7 +14,7 @@
 //! | I12 | `check_ix` (event part and the state around it) | S1 take `= V − K_s`; an S2/S3 take inside `[x_lo, x_hi]` (±2) with the corners within `fv_dev_bps`; `K_s` = the locked terms' reward; a liquidation that leaves the borrower equity pays the keeper `≥ K_s`; S1/S2 only on a live clock (armed, last evaluation within `settle_arm_gap_s`) that has run `settle_persist_n` EMA updates (the position's `s_count` before, the market's `ema_count` after); S3 only on a continuous no-route chain observed now and at least `s3_wait_s` (and the graduation / migration timers) long, with the position's locked terms; `p'` per corner: the penalty on both corners of a position not expired, and on an expired one the expiry fee at the dearer corner `(P_hi, L_lo)` only if the cheaper corner has it too |
 //! | I13 | `check_all` + `check_ix` | every ring entry's `(x, y) = reprice(l, p)`; the newest ring entry is the EMA state (`ts = ema_ts`, `p = P_ema`, `l = L_ema`); no decision state holds the current second (`lb_sec <` now, `b_sec ≤` now, `ema_ts ≤` now, with now = `max(clock, last_accrual_ts)`: the one-second lag); a venue charge ∈ `[B̂ − 5, B̂]` for `Close`, `Liquidate`, `Expire` (on the curve `B` less the venue-side rent of the pre-state — pump's creator-vault top-up and a short curve's growth to the size of the build pump's ProgramData holds — 141 bytes since its 2026-10-02 redeploy, 125 before, `fork::PumpDeploy::held` —, ≤ `ert`, `VenueView::venue_rent` — T-RENT); on every venue the harness has a view of — the mock, the Raydium venues, the curve and PumpSwap (M6) — an `Open`'s proceeds ∈ `[S_exp, S_exp + 5]` (the curve: `S` + that rent; PumpSwap: `S` + the rent of a pool's growth to 287 bytes — 271 on the 2026-09 build, by the build PumpSwap's ProgramData holds —, which `Open.venue_rent` reports, R-VEN H8) and a `Close`'s `b_live` = `B̂_live(q)` (the curve: up to `rT`), both re-quoted (`quote::cpmm` / `quote::ray_v4` / `quote::sol_leg` on the readers' state, `venue_view`) on the venue just before the instruction; one EMA integration of a confirmed state (`ema_warm = 0`, M4R) moves `P_ema` and `L_ema` within their single-step bounds |
 //! | I14 | structural tests (`tests/engine_it/structure.rs`; `tests/add_margin_it.rs`; `tests/liquidate_it.rs` `remaining_accounts_are_strict` / `named_accounts_are_checked`; `tests/settle_it.rs` account checks) | every ReadSet / TradeExtras slot is mandatory and key-checked on `open_short`, `close_short`, `crank_price`, `liquidate`, `expire` and `sol_settle` (omitted, replaced, swapped, appended); the named accounts of every M2 instruction |
-//! | I16 | `check_ix` | no observation is recorded while the (mock, Raydium, curve or PumpSwap) venue is not executable (a migrating curve is still observed, A64); the route chains are sound (A40, V2-1, R3A-4): a hit of the S3 chain only when `s3_no_route` held on the state just before the instruction, a clear only when it did not (a `None →` pump re-detection clears both chains, M5); a hit of the `pool_fail` chain only when `pool_fail` held (not executable or fee above the **global** hard cap — never because of the route-broken flag), a clear only when it did not; the risk-quote part (every CR leg, box corner, `B̂_ref` and FV at `min(φ_live, venue_fee_hard_cap_bps_pos)`) is checked by scenario: `tests/route_it.rs` `fee_hike` (FV exactly at the locked cap under a 6 % live fee), `tests/expire_it.rs` `a_fee_far_above_the_hard_cap_holds_expiries_for_s3`, `tests/liquidate_it.rs` `liquidations_ignore_…_fee_cap_…` (the oracle prices at the capped fee) |
+//! | I16 | `check_ix` | no observation is recorded while the (mock, Raydium, curve or PumpSwap) venue is not executable (a migrating curve is still observed, A64); the route chains are sound (A40, V2-1, R3A-4): a hit of the S3 chain only when `s3_no_route` (at `min(global hard cap, min_open_hard_cap_bps)`, AIR-19) held on the state just before the instruction, a clear only when it did not (a `None →` pump re-detection clears both chains, M5); a hit of the `pool_fail` chain only when `pool_fail` held (not executable or fee above the **global** hard cap — never because of the route-broken flag), a clear only when it did not; the risk-quote part (every CR leg, box corner, `B̂_ref` and FV at `min(φ_live, venue_fee_hard_cap_bps_pos)`) is checked by scenario: `tests/route_it.rs` `fee_hike` (FV exactly at the locked cap under a 6 % live fee), `tests/expire_it.rs` `a_fee_far_above_the_hard_cap_holds_expiries_for_s3`, `tests/liquidate_it.rs` `liquidations_ignore_…_fee_cap_…` (the oracle prices at the capped fee) |
 //!
 //! Every check reads the state the program sees, before and after the instruction.
 
@@ -917,7 +917,8 @@ fn graduation(svm: &LiteSVM, mp: &MarketPositions, post: &Market) -> Result<(), 
 /// (the mock, Raydium; a list-only market is never executable), a route chain that was stepped by this
 /// instruction with a hit (`last_*_obs` moved to a non-zero second) had its predicate true on
 /// the state just before, and one that was cleared had it false. `s3_no_route = ¬executable ∨
-/// route_broken(market or venue bit) ∨ φ > global hard cap`; `pool_fail = ¬executable ∨ φ >
+/// route_broken(market or venue bit) ∨ φ > min(global hard cap, min_open_hard_cap_bps)` (the
+/// lowest cap an open position locked, 0 = unset: AIR-19); `pool_fail = ¬executable ∨ φ >
 /// global hard cap` — the flag is not an input.
 fn route_chains(
     config: &GlobalConfig,
@@ -935,7 +936,13 @@ fn route_chains(
     let flag = pre.has_flag(MARKET_FLAG_ROUTE_BROKEN)
         || kind
             .is_some_and(|k| k.venue_bit() != 0 && config.venue_route_broken & k.venue_bit() != 0);
-    let s3 = settle::s3_no_route(view.executable, flag, view.fee_ppm, cap);
+    // AIR-19: the S3 chain also counts a fee above the lowest cap an open position locked (the
+    // mark as the prologue read it, before this instruction's open or exit moved it).
+    let s3_cap = match pre.min_open_hard_cap_bps {
+        0 => cap,
+        mark => cap.min(u64::from(mark)),
+    };
+    let s3 = settle::s3_no_route(view.executable, flag, view.fee_ppm, s3_cap);
     let pf = settle::pool_fail(view.executable, view.fee_ppm, cap);
     let market = mp.market;
     for (what, holds, (s0, l0), (s1, l1)) in [

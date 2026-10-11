@@ -2,7 +2,8 @@
 //! §3.5 steps 6–7, §5.2): applies the pure `shortwin_math::waterfall` payouts as lamport moves
 //! and lender-pool calls, and keeps the market's position aggregates (`ΣB_Q` by tier,
 //! `A_j`, `open_positions`, `total_notional_open`; I6), the high-water mark `max_q_hwm` and the
-//! low-water mark `min_open_fee_ppm` ("switch only if all fit" reads both).
+//! low-water mark `min_open_fee_ppm` ("switch only if all fit" reads both), and the low-water
+//! mark `min_open_hard_cap_bps` (the S3 chain reads it, AIR-19).
 //!
 //! The math crate decides every amount (`waterfall::{close, liquidate, expire, settle}`: legs
 //! non-negative, summing to `V`, I9); this module only moves them:
@@ -31,8 +32,11 @@ use crate::state::{Market, ShortPosition};
 /// venue's one-way fee the open's caps were computed at (set to it by the first open after the
 /// market emptied; `shortwin_math::caps::open_fee_mark`): the fee the open positions posted
 /// their margin at, which the carried fit's fee-scaled caps take when it is below the candidate's
-/// (FIT-2; `shortwin_math::caps::carried_phi`). `pool::borrow` (`T`, `ΣB_Q`, `max_release`) is
-/// the caller's.
+/// (FIT-2; `shortwin_math::caps::carried_phi`); and `min_open_hard_cap_bps` lowered to the
+/// position's locked `venue_fee_hard_cap_bps` (set to it by the first open after the market
+/// emptied): the cap the market's S3 chain judges the live fee against, with the global one
+/// (AIR-19; `engine::route::s3_no_route`). `pool::borrow` (`T`, `ΣB_Q`, `max_release`) is the
+/// caller's.
 pub fn add_position(
     market: &mut Market,
     aggr: &mut Aggr,
@@ -53,13 +57,19 @@ pub fn add_position(
         .or_math()?;
     market.max_q_hwm = market.max_q_hwm.max(pos.q);
     market.min_open_fee_ppm = caps::open_fee_mark(market.min_open_fee_ppm, phi_ppm);
+    let cap = pos.venue_fee_hard_cap_bps;
+    market.min_open_hard_cap_bps = match market.min_open_hard_cap_bps {
+        0 => cap,
+        mark => mark.min(cap),
+    };
     Ok(())
 }
 
 /// The inverse of [`add_position`] at every exit (ARCH §3.5 step 7, §3.8 "Effects"): the exit
-/// that takes `open_positions` to 0 also resets `max_q_hwm` and `min_open_fee_ppm` to 0 (the marks
-/// change nowhere else, so `max_q_hwm` stays at or above every open `q` and `min_open_fee_ppm`
-/// at or below every open position's open fee).
+/// that takes `open_positions` to 0 also resets `max_q_hwm`, `min_open_fee_ppm` and
+/// `min_open_hard_cap_bps` to 0 (the marks change nowhere else, so `max_q_hwm` stays at or above
+/// every open `q`, `min_open_fee_ppm` at or below every open position's open fee and
+/// `min_open_hard_cap_bps` at or below every open position's locked hard cap).
 pub fn remove_position(market: &mut Market, aggr: &mut Aggr, pos: &ShortPosition) -> Result<()> {
     aggr.sub(pos.q, &pos.rent_terms(), u32::from(pos.rent_protocol_bps))
         .math()?;
@@ -76,6 +86,7 @@ pub fn remove_position(market: &mut Market, aggr: &mut Aggr, pos: &ShortPosition
     if market.open_positions == 0 {
         market.max_q_hwm = 0;
         market.min_open_fee_ppm = 0;
+        market.min_open_hard_cap_bps = 0;
     }
     Ok(())
 }

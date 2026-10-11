@@ -171,8 +171,10 @@ layout!(acct Market, 3_104, {
     min_open_fee_ppm @ 2_856, _pad5 @ 2_860,
     // derived keys (M5-SEC-6)
     trader_wsol_ata @ 2_864, pump_pool_authority @ 2_896,
-    // misc (M7-SEC-3: `coverage_cleared_at` from `_reserved`; AIR-03: `lender_credit_rem`)
-    coverage_cleared_at @ 2_928, lender_credit_rem @ 2_936, _reserved @ 2_952,
+    // misc (M7-SEC-3: `coverage_cleared_at` from `_reserved`; AIR-03: `lender_credit_rem` from
+    // `_reserved[0..16]`; AIR-19: `min_open_hard_cap_bps` from `_reserved[16..24]`)
+    coverage_cleared_at @ 2_928, lender_credit_rem @ 2_936, min_open_hard_cap_bps @ 2_952,
+    _pad6 @ 2_954, _reserved @ 2_960,
 });
 layout!(nested RingEntry, 136, {
     ts @ 0, p @ 8, l @ 24, x @ 40, y @ 56, lo @ 72, hi @ 88, llo @ 104, lhi @ 120,

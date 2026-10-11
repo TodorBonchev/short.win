@@ -148,7 +148,9 @@ pub trait BoxQuotes {
 /// All S1 legs hold (ECON §5.6; ARCH §4.5): `B̂ + ert > V − K_s` on the live state
 /// (`b_live`, the risk quote on the live reserves), at the robust spot
 /// `reprice(L_live, P_rs)` and at the box corner `reprice(L_hi, P_lo)`. `ert` enters so
-/// that no band exists where neither a buyback nor S1 is possible.
+/// that no band exists where neither a buyback nor S1 is possible — at a live fee within the
+/// position's locked hard cap; above it the buyback's bound and these legs stay at the cap, and
+/// the fee is no route for the position, which S3 settles after `s3_wait_s` (AIR-19).
 ///
 /// Errors: `InvalidInput` if `K_s > V`; those of `quotes`.
 pub fn s1_legs<Q: BoxQuotes>(
@@ -329,8 +331,9 @@ impl S3Terms {
 /// The market's S3 chain as the prologue left it (ARCH §3.0, §5.3; ECON §10.3).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct S3Chain {
-    /// `s3_no_route` holds now (`!venue_executable ∨ route-broken flag ∨ φ_live >` the
-    /// **global** hard cap).
+    /// `s3_no_route` holds now for the position (`!venue_executable ∨ route-broken flag ∨
+    /// φ_live > min(global hard cap, the position's locked cap)`; the program's
+    /// `engine::route::position_no_route`, AIR-19).
     pub no_route_now: bool,
     /// Start of the continuous no-route chain (`no_route_since`); `None` when no chain runs.
     pub no_route_since: Option<i64>,
@@ -711,8 +714,10 @@ const _: () = assert!(core::mem::size_of::<ArmState>() == 32);
 // ---- route predicates and chains (ARCH §3.0 step 8, §5.3; ECON §10.3) -------------------
 
 /// `s3_no_route = !venue_executable ∨ route-broken flag ∨ φ_live > hard cap` (ARCH §5.3;
-/// sim `Market.s3_no_route`), with the **global** `venue_fee_hard_cap_bps` (R3A-4 c). It
-/// feeds only the S3 chain, `sol_settle`'s "no route now" and the open gate (V2-1).
+/// sim `Market.s3_no_route`). It feeds only the S3 chain, `sol_settle`'s "no route now" and
+/// the open gate (V2-1). The caller picks the cap: for the market's chain the lower of the
+/// global `venue_fee_hard_cap_bps` (R3A-4 c) and the lowest cap an open position locked, for a
+/// position the lower of the global cap and its own (AIR-19; the program's `engine::route`).
 pub fn s3_no_route(executable: bool, route_broken: bool, phi_ppm: u32, hard_cap_bps: u64) -> bool {
     !executable || route_broken || crate::fees::exceeds_cap(phi_ppm, hard_cap_bps)
 }

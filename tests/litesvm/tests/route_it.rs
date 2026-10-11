@@ -814,4 +814,113 @@ mod hard_cap {
         );
         assert!(sc.settle_ok().settled.is_none());
     }
+
+    /// The raised global hard cap of the AIR-19 scenario, and the live fee inside the band
+    /// between it and the 500 bps the first position locked.
+    const RAISED_BPS: u32 = 1_000;
+    const BAND_FEE_PPM: u32 = 80_000;
+
+    /// **AIR-19** (the regression): Governance raises the global hard cap from 500 to 1,000 bps
+    /// with a position open at its locked 500 bps; a second position opens under the raised cap
+    /// (it locks 1,000 bps); then the pool's admin raises the fee to 8 %, inside the band
+    /// between the two caps. The first position's keeper exits judge the buyback at the live fee
+    /// but bound it at its locked cap, so its `expire` refuses `ExitBoundNotMet`. Before the fix
+    /// the S3 chain compared the fee with the global cap only, saw a route, and the expired
+    /// position had no exit at all. Now the market's chain runs at the lowest cap an open
+    /// position locked, and a fee above a position's own cap is "no route" for that position:
+    /// the first position settles S3 once the chain has run `s3_wait_s`, FV at its own cap; the
+    /// second keeps its route — `sol_settle` leaves it alone at its deadline (the chain still
+    /// runs: the mark is the lowest cap locked since the market last emptied) and its `expire`
+    /// lands; with no position open the mark resets and the next observation clears the chain.
+    #[test]
+    fn air_19_a_fee_above_the_locked_cap_is_no_route_for_that_position() {
+        let mut sc = Sc::default_market();
+        sc.env.tick(&sc.mm, 5);
+        propose_hard_cap(&mut sc, RAISED_BPS);
+        sc.env.warp(i64::from(sc.env.config().timelock_s) - 600);
+        sc.crank_every(30, 20);
+        sc.env.tick(&sc.mm, 5);
+        apply(&mut sc);
+        assert_eq!(sc.env.config().params.venue_fee_hard_cap_bps, RAISED_BPS);
+        let mut b2 = sc.env.borrower();
+        let (_open, n2, _) = open_ok(&mut sc.env, &sc.mm, &mut b2, Q / 2);
+        let p2 = sc.env.position(&sc.mm, &b2.key(), n2);
+        assert_eq!(
+            (sc.pos().venue_fee_hard_cap_bps, p2.venue_fee_hard_cap_bps),
+            (500, 1_000),
+            "each position keeps the cap of its open"
+        );
+        sc.knobs(|k| k.fee_ppm = BAND_FEE_PPM);
+
+        // The first position: the chain runs at its 500 bps, S3 at the timer.
+        sc.warp_to_deadline(-700);
+        for _ in 0..23 {
+            sc.env.warp(30);
+            sc.crank();
+            assert!(
+                sc.settle_ok().settled.is_none(),
+                "not expired, not liquidatable"
+            );
+        }
+        let m = sc.market();
+        assert!(
+            m.no_route_since > 0,
+            "a fee above an open position's locked cap starts the S3 chain"
+        );
+        assert!(sc.env.now() - m.no_route_since >= i64::from(sc.pos().s3_wait_s));
+        assert_eq!(m.pool_fail_since, 0, "pool_fail keeps the global cap");
+        sc.warp_to_deadline(-5);
+        sc.env.tick(&sc.mm, 5);
+        let pos = sc.pos();
+        let keeper = sc.env.funded_keypair();
+        let expire = |sc: &mut Sc, b: &anchor_lang::prelude::Pubkey, nonce: u64| {
+            let ix = shortwin_litesvm_tests::engine::expire_ix(&sc.mm, &keeper.pubkey(), b, nonce);
+            sc.env.send(&[ix], &[&keeper])
+        };
+        let (b1, n1) = (sc.b.key(), sc.nonce);
+        assert_err(&expire(&mut sc, &b1, n1), E::ExitBoundNotMet);
+        let (_s, ev) = sc.run_until_settled(10).expect("S3");
+        assert_eq!(ev.condition, 3);
+        assert_eq!(ev.pprime_lo, pos.expiry_fee_bps, "O15");
+        let m = sc.market();
+        let (p, l) = (m.ema_price.get(), m.ema_liq.get());
+        let r_due = rent::due(&pos.pos_rent(), &m.basis()).unwrap();
+        let fv = fair_value(pos.q, p, l, 50_000, ev.pprime_lo, r_due);
+        assert_eq!(ev.fv, fv, "FV at the position's own 500 bps cap");
+        assert_eq!(m.open_positions, 1);
+        assert_eq!(
+            m.min_open_hard_cap_bps, 500,
+            "the mark keeps the lowest cap locked since the market last emptied"
+        );
+
+        // The second position keeps its route under its own 1,000 bps cap.
+        (sc.b, sc.nonce, sc.q) = (b2, n2, Q / 2);
+        sc.warp_to_deadline(-700);
+        sc.crank_every(30, 23);
+        let m = sc.market();
+        assert!(
+            m.no_route_since > 0 && sc.env.now() - m.no_route_since >= 600,
+            "the chain still runs at the lowest cap locked since the market emptied"
+        );
+        sc.warp_to_deadline(-5);
+        sc.env.tick(&sc.mm, 5);
+        assert_eq!(sc.env.now(), sc.pos().deadline);
+        assert!(
+            sc.settle_ok().settled.is_none(),
+            "a fee under the position's own cap is a route: no S3"
+        );
+        let (b2, n2) = (sc.b.key(), sc.nonce);
+        let exp: shortwin::events::Expire = events::one(&ok(expire(&mut sc, &b2, n2)));
+        assert!(exp.buyback_cost > 0 && sc.pos_opt().is_none());
+        assert_eq!(
+            sc.market().min_open_hard_cap_bps,
+            0,
+            "the exit that empties the market resets the mark"
+        );
+
+        // No position open: the next observation, at the global cap, clears the chain.
+        sc.env.warp(1);
+        sc.crank();
+        assert_eq!(sc.market().no_route_since, 0, "the chain clears");
+    }
 }
