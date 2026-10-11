@@ -19,7 +19,9 @@
 //! attacker P&L exactly. The constants below were printed by the scripts' own functions
 //! (`sandwich.setup_liq("RA")`, `setup_expiry`, `attack`, `sandwich_exit`, `push_second`,
 //! `shortwin_sim.run(new_market("RA"), 1.0, Scenario(..), keeper_latency=1)`,
-//! `cascade.run_basket` / `run_single`) and match `docs/design/sim/out/attacks/*.out`.
+//! `cascade.run_basket` / `run_single`) and match `docs/design/sim/out/attacks/*.out` — except
+//! where AIR-22 (the sustained growth's lower median) moved them, which the `.out` files and
+//! ECON §12 follow when the docs are regenerated.
 //!
 //! **One modelled difference: `R_min`.** The sim prices every position's minimum rent at its
 //! fixed 80 % utilisation; the program prices `r_min` at the pre-open utilisation (ARCH §4.5
@@ -293,10 +295,12 @@ fn attacker(s: &mut Sim) -> Actor {
 
 /// `sandwich.py`, liquidation, model atomic, RA, keeper waits 0 s and 4 s after arming
 /// (`fixed_delta.py` (d), v0.4.1 row): the honest keeper's exit and the attacker-keeper's best
-/// sandwich, to the lamport. ECON's table: honest `30.566 / 0.0011 / 1.5274 / 5.776`, attacked
-/// `31.127 / … / 5.215`, extra over an honest keeper `+0.415`, borrower loss `0.561`, lenders
-/// `+0.0000`; after 4 s `+0.439 / 0.594` — the fixed δ does not widen with waiting (v0.3's
-/// Dutch clock: `+3.855` for Tier A after 4 s).
+/// sandwich, to the lamport. The sim: honest `30.566 / 0.0011 / 1.5283 / 5.775`, attacked
+/// `31.159 / … / 5.182`, extra over an honest keeper `+0.439`, borrower loss `0.593`, lenders
+/// `+0.0000`; after 4 s `+0.463 / 0.625` — the fixed δ does not widen with waiting (v0.3's
+/// Dutch clock: `+3.855` for Tier A after 4 s). AIR-22 (the sustained growth's lower median)
+/// lifted `P_ref` a little on this rise; ECON's table has the minimum's `1.5274 / 5.776`,
+/// `31.127 / … / 5.215`, `+0.415 / 0.561`, `+0.439 / 0.594`.
 #[test]
 fn sandwich_liquidation_atomic_ra() {
     let (mut s, b, nonce, t) = setup_liq_ra(0);
@@ -314,43 +318,43 @@ fn sandwich_liquidation_atomic_ra() {
         &SimExit {
             b: 30_566_119_890,
             rent: SIM_RMIN,
-            pen: 1_527_390_110,
-            borrower: 5_775_857_690,
-            b_ref: 30_547_802_182,
-            max_in: 31_158_758_225,
+            pen: 1_528_305_995,
+            borrower: 5_774_941_805,
+            b_ref: 30_566_120_174,
+            max_in: 31_177_442_577,
         },
         v,
     );
-    assert_eq!(h.penalty_keeper, 458_217_033);
+    assert_eq!(h.penalty_keeper, 458_491_798);
 
-    // The attacker-keeper at t: the sim's grid optimum dX = X·17/2000.
+    // The attacker-keeper at t: the sim's grid optimum dX = X·19/2000.
     s.env.svm = saved.clone();
     let a = attacker(&mut s);
-    let (ex, pnl) = sandwich_exit(&mut s, &a, &b, nonce, 1_063_926_202_943);
+    let (ex, pnl) = sandwich_exit(&mut s, &a, &b, nonce, 1_123_033_214_218);
     let ev = ex.liquidated().clone_event();
     assert_sim_liquidation(
         &ev,
         &SimExit {
-            b: 31_127_161_101,
+            b: 31_158_781_576,
             rent: SIM_RMIN,
-            pen: 1_527_389_964,
-            borrower: 5_214_816_625,
-            b_ref: 30_547_799_270,
-            max_in: 31_158_755_255,
+            pen: 1_528_305_855,
+            borrower: 5_182_280_259,
+            b_ref: 30_566_117_098,
+            max_in: 31_177_439_439,
         },
         v,
     );
-    // The sim's attacker net 873,403,121 includes a keeper share of 458,216,989.
+    // The sim's attacker net 897,190,041 includes a keeper share of 458,491,756.
     assert_eq!(
         pnl - i128::from(ev.penalty_keeper),
-        873_403_121 - 458_216_989
+        897_190_041 - 458_491_756
     );
     let extra = pnl - i128::from(h.penalty_keeper);
-    assert_eq!(extra, 415_186_088, "extra over an honest keeper (+0.415)");
+    assert_eq!(extra, 438_698_243, "extra over an honest keeper (+0.439)");
     assert_eq!(
         h.borrower_payout - ev.borrower_payout,
-        561_041_065,
-        "borrower loss (0.561)"
+        592_661_546,
+        "borrower loss (0.593)"
     );
     let lenders = |e: &Liquidate| e.penalty_lender + e.penalty_protocol + e.rent;
     assert!(
@@ -366,36 +370,39 @@ fn sandwich_liquidation_atomic_ra() {
         s.step_to(tt);
     }
     let a = attacker(&mut s);
-    let (ex, pnl) = sandwich_exit(&mut s, &a, &b, nonce, 1_123_033_214_218);
+    let (ex, pnl) = sandwich_exit(&mut s, &a, &b, nonce, 1_182_140_225_492);
     let ev = ex.liquidated().clone_event();
     assert_sim_liquidation(
         &ev,
         &SimExit {
-            b: 31_158_781_576,
+            b: 31_190_450_224,
             rent: SIM_RMIN,
-            pen: 1_528_482_613,
-            borrower: 5_182_103_501,
-            b_ref: 30_569_652_247,
-            max_in: 31_181_045_291,
+            pen: 1_529_227_236,
+            borrower: 5_149_690_230,
+            b_ref: 30_584_544_715,
+            max_in: 31_196_235_609,
         },
         v,
     );
     assert_eq!(
         pnl - i128::from(ev.penalty_keeper),
-        897_243_068 - 458_544_783
+        921_026_219 - 458_768_170
     );
     assert_eq!(ev.delta_bps, 200);
     let extra4 = pnl - i128::from(h.penalty_keeper);
-    // ECON: +0.439 after 4 s against +0.415 at once.
+    // The sim: +0.463 after 4 s against +0.439 at once.
     assert!(extra4 * 100 <= extra * 110, "{extra4} vs {extra}");
 }
 
 /// `sandwich.py`, liquidation, model held, RA, keeper waits 0 s: the attacker holds the pool at
-/// `P_ema·1.15` for 3 whole seconds (every observation sees it, no arbitrage), then sandwiches
-/// the liquidation the next second. ECON: attacked `37.156 / 0.0011 / 0.7135 / 0.000`, attacker
-/// net `+1.981`, extra `+1.523`, borrower loss `5.776` (everything), lenders + protocol lose
-/// `+0.5697` — v0.4.1's no-reserve bound lets the held attacker buy the vault down to
-/// `V − K_s − ert` (ECON §12.6; ARCH §8.5 residual risk, O19).
+/// `P_ema·1.15` for 2 whole seconds (every observation sees it, no arbitrage), then sandwiches
+/// the liquidation the next second. The sim: attacked `36.412 / 0.0011 / 1.4577 / 0.000`,
+/// attacker net `+2.839`, extra `+2.381`, borrower loss `5.775` (everything), lenders + protocol
+/// lose `+0.0495` — v0.4.1's no-reserve bound lets the held attacker buy the vault down to
+/// `V − K_s − ert` (ECON §12.6; ARCH §8.5 residual risk, O19). AIR-22: the sustained growth is
+/// the lower median of the newest 3 steps, so two held steps open `κ_eff` — the best plan was
+/// 3 s at +15 % under the minimum (ECON: `37.156 / 0.0011 / 0.7135 / 0.000`, net `+1.981`, extra
+/// `+1.523`, lenders `+0.5697`), a push 1.22 SOL dearer.
 #[test]
 fn sandwich_liquidation_held_ra() {
     let (mut s, b, nonce, t) = setup_liq_ra(0);
@@ -404,7 +411,7 @@ fn sandwich_liquidation_held_ra() {
     let kp = a.kp.insecure_clone();
     let mut pre: i128 = 0;
     let mut tt = t;
-    for _ in 0..3 {
+    for _ in 0..2 {
         tt += 1;
         let target = s.env.market(&s.mm.market()).ema_price.get() * 11_500 / 10_000;
         let d = s.move_size(target);
@@ -416,37 +423,38 @@ fn sandwich_liquidation_held_ra() {
         ok(s.env.send(&ixs, &[&kp]));
         pre += w0 - i128::from(read::token_amount(&s.env.svm, &a.wsol).unwrap());
     }
-    assert_eq!(pre, 3_289_262_974, "the sim's held-pump cost");
+    assert_eq!(pre, 2_070_437_831, "the sim's held-pump cost");
     s.at(tt + 1);
-    let (ex, pnl) = sandwich_exit(&mut s, &a, &b, nonce, 10_875_018_017_208);
+    let (ex, pnl) = sandwich_exit(&mut s, &a, &b, nonce, 9_811_382_041_799);
     let ev = ex.liquidated().clone_event();
     assert_sim_liquidation(
         &ev,
         &SimExit {
-            b: 37_155_893_603,
+            b: 36_411_710_437,
             rent: SIM_RMIN,
-            pen: 713_474_087,
+            pen: 1_457_657_253,
             borrower: 0,
-            b_ref: 36_467_134_723,
-            max_in: 37_196_477_417,
+            b_ref: 35_706_129_862,
+            max_in: 36_420_252_459,
         },
         v,
     );
     // The sandwich's trade P&L equals the sim's (its keeper share moves with the rent).
     let trade = pnl - i128::from(ev.penalty_keeper + ev.keeper_topup);
-    assert_eq!(trade, 5_270_634_856 - 214_042_226);
+    assert_eq!(trade, 4_909_750_103 - 437_297_175);
     assert_eq!(ev.borrower_payout, 0, "the borrower loses everything");
     assert!(
-        ev.penalty < 1_527_390_110,
+        ev.penalty < 1_528_305_995,
         "lenders and protocol lose part of the penalty"
     );
-    assert_eq!(ev.max_in, 37_196_477_417);
+    assert_eq!(ev.max_in, 36_420_252_459);
 }
 
 /// `sandwich.py`'s last table, RA aged 25 days at 90 % utilisation, rule "none" (v0.4.1): the
 /// rent due (1.898 SOL) exceeds `K_s`, and the held attacker's buyback leaves only part of it —
-/// ECON: lenders + protocol `+2.272` SOL, borrower loss `5.512` (the held-model disclosure on
-/// aged positions, ECON §12.6, O19).
+/// the sim: lenders + protocol `+1.257` SOL, borrower loss `5.512` (the held-model disclosure on
+/// aged positions, ECON §12.6, O19). AIR-22: the best plan holds 2 s at +20 % (attacker net
+/// `+2.892`); under the minimum it held 3 s (ECON: net `+2.150`, lenders + protocol `+2.272`).
 #[test]
 fn sandwich_liquidation_held_aged_ra() {
     // Exactly 90 %: T = ⌈Q/9⌉.
@@ -497,12 +505,12 @@ fn sandwich_liquidation_held_aged_ra() {
         v,
     );
     s.env.svm = saved;
-    // The sim's best plan: 3 s held at +20 %, then the sandwich.
+    // The sim's best plan: 2 s held at +20 %, then the sandwich.
     let a = attacker(&mut s);
     let kp = a.kp.insecure_clone();
     let mut tt = t;
     let mut pre: i128 = 0;
-    for _ in 0..3 {
+    for _ in 0..2 {
         tt += 1;
         let target = s.env.market(&s.mm.market()).ema_price.get() * 12_000 / 10_000;
         let d = u64::try_from(s.move_size(target)).unwrap();
@@ -512,25 +520,25 @@ fn sandwich_liquidation_held_aged_ra() {
         ok(s.env.send(&ixs, &[&kp]));
         pre += w0 - i128::from(read::token_amount(&s.env.svm, &a.wsol).unwrap());
     }
-    assert_eq!(pre, 4_181_621_946, "the sim's held-pump cost");
+    assert_eq!(pre, 2_632_800_861, "the sim's held-pump cost");
     s.at(tt + 1);
     // The sim's grid optimum is the largest front-run that still executes.
     let dx = best_dx(&mut s, &b, nonce);
-    assert_eq!(dx, 14_072_316_978_004, "the sim's dX");
+    assert_eq!(dx, 12_616_935_838_115, "the sim's dX");
     let (ex, pnl) = sandwich_exit(&mut s, &a, &b, nonce, dx);
     let ev = ex.liquidated().clone_event();
     assert_eq!(
-        pnl, 6_331_399_104,
+        pnl, 5_524_795_782,
         "the sim's sandwich P&L (keeper share 0)"
     );
-    assert_eq!(ev.buyback_cost, 37_229_334_562, "B");
-    assert_eq!(ev.rent, 641_103_120, "rent truncated to V − B");
+    assert_eq!(ev.buyback_cost, 36_214_682_559, "B");
+    assert_eq!(ev.rent, 1_655_755_123, "rent truncated to V − B");
     assert_eq!((ev.penalty, ev.keeper_topup, ev.borrower_payout), (0, 0, 0));
     let lenders = |e: &Liquidate| e.penalty_lender + e.penalty_protocol + e.rent;
     assert_eq!(
         lenders(&h) - lenders(&ev),
-        (2_338_113_260 + 574_630_885) - (544_937_652 + 96_165_468),
-        "lenders + protocol lose 2.272 SOL"
+        (2_338_113_260 + 574_630_885) - (1_407_391_855 + 248_363_268),
+        "lenders + protocol lose 1.257 SOL"
     );
     assert_eq!(h.borrower_payout - ev.borrower_payout, 5_511_877_747);
 }
@@ -787,26 +795,27 @@ fn block_spot_ra(
 }
 
 /// `block_spot.py` (a), RA, v0.4.1 rows: blocking for 1 / 4 / 8 s costs 0.094 / 0.423 / 0.974
-/// SOL and the exit bound stays the fixed 2 % (ECON: "delta at the exit 2.00 % / 1.99 % /
-/// 1.99 %"; v0.2's clock reached 4.99 %): the extra over an honest keeper is +0.178 / −0.196 /
-/// −0.815 SOL — the V1-1 attack class is gone.
+/// SOL and the exit bound stays the fixed 2 % (the sim: "delta at the exit 1.99 % / 1.99 % /
+/// 1.99 %"; v0.2's clock reached 4.99 %): the extra over an honest keeper is +0.321 / −0.197 /
+/// −0.816 SOL — the V1-1 attack class is gone. AIR-22 (the sustained growth's lower median)
+/// moved the 1-s row's sandwich (ECON: +0.178 at 2.00 %, the minimum's).
 #[test]
 fn blocking_the_spot_leg_cannot_widen_the_bound_ra() {
     block_spot_ra(
         1,
         93_923_030,
         612,
-        709_293_364_672,
+        1_063_940_047_008,
         SimExit {
-            b: 30_938_440_527,
+            b: 31_127_157_175,
             rent: SIM_RMIN,
-            pen: 1_517_877_513,
-            borrower: 5_413_049_650,
-            b_ref: 30_357_550_250,
-            max_in: 30_964_701_255,
+            pen: 1_527_028_508,
+            borrower: 5_215_182_007,
+            b_ref: 30_540_570_159,
+            max_in: 31_151_381_562,
         },
-        730_469_627,
-        455_363_253,
+        873_292_718,
+        458_108_552,
     );
     block_spot_ra(
         4,
@@ -950,8 +959,8 @@ fn a_borrower_veto_defers_its_liquidation_at_the_sims_cost_ra() {
             rent: SIM_RMIN,
             pen: 1_525_239_341,
             borrower: 5_839_341_540,
-            b_ref: 30_524_351_635,
-            max_in: 31_134_838_667,
+            b_ref: 30_535_438_220,
+            max_in: 31_146_146_984,
         },
         v,
     );
@@ -1845,9 +1854,10 @@ fn held_pushes_on_a_fresh_position_do_not_pay_ra() {
 }
 
 /// `ema_near.py`, model held, RA rows: after an honest rise (×1.30 … ×1.55, EMA caught up) the
-/// attacker holds the pool high until the position is liquidatable and sandwiches it. ECON (RA):
-/// ×1.30 → ×1.5 for 7 s, net −8.023; ×1.40 → ×1.3 for 8 s, −7.200; ×1.50 → ×1.3 for 5 s,
-/// −1.979; ×1.55 → ×1.15 for 5 s, −0.657 — never profitable on RA.
+/// attacker holds the pool high until the position is liquidatable and sandwiches it. The sim
+/// (RA): ×1.30 → ×1.5 for 7 s, net −8.023; ×1.40 → ×1.3 for 8 s, −7.198; ×1.50 → ×1.3 for 5 s,
+/// −1.979; ×1.55 → ×1.15 for 5 s, −0.567 — never profitable on RA. AIR-22 (the sustained
+/// growth's lower median) lifted the references a little (ECON, the minimum's: −7.200, −0.657).
 #[test]
 fn held_pushes_near_the_threshold_do_not_pay_ra() {
     #[allow(clippy::type_complexity)]
@@ -1863,7 +1873,7 @@ fn held_pushes_near_the_threshold_do_not_pay_ra() {
                 rent: SIM_RMIN,
                 pen: 345_602_881,
                 borrower: 0,
-                b_ref: 37_263_617_198,
+                b_ref: 37_453_561_978,
                 max_in: 37_620_437_682,
             },
             10_362_168_547,
@@ -1879,14 +1889,14 @@ fn held_pushes_near_the_threshold_do_not_pay_ra() {
             SimExit {
                 b: 35_111_760_112,
                 rent: SIM_RMIN,
-                pen: 1_721_789_173,
-                borrower: 1_035_818_405,
-                b_ref: 34_435_783_445,
-                max_in: 35_124_499_113,
+                pen: 1_726_736_614,
+                borrower: 1_030_870_964,
+                b_ref: 34_534_732_277,
+                max_in: 35_225_426_922,
             },
-            7_304_548_885,
-            516_536_751,
-            -7_199_511_823,
+            7_306_033_118,
+            518_020_984,
+            -7_198_027_590,
         ),
         (
             1.50,
@@ -1899,7 +1909,7 @@ fn held_pushes_near_the_threshold_do_not_pay_ra() {
                 rent: SIM_RMIN,
                 pen: 302_226_290,
                 borrower: 0,
-                b_ref: 37_255_742_977,
+                b_ref: 37_450_569_102,
                 max_in: 37_620_437_682,
             },
             7_427_752_820,
@@ -1911,18 +1921,18 @@ fn held_pushes_near_the_threshold_do_not_pay_ra() {
             1.15,
             5,
             5_224_020_770,
-            9_770_593_926_498,
+            9_952_654_682_893,
             SimExit {
-                b: 34_367_259_131,
+                b: 34_480_349_840,
                 rent: SIM_RMIN,
-                pen: 1_685_486_189,
-                borrower: 1_816_622_370,
-                b_ref: 33_709_723_777,
-                max_in: 34_383_918_252,
+                pen: 1_690_455_200,
+                borrower: 1_698_562_650,
+                b_ref: 33_809_103_993,
+                max_in: 34_485_286_072,
             },
-            4_566_603_130,
-            505_645_856,
-            -657_417_640,
+            4_657_209_535,
+            507_136_560,
+            -566_811_235,
         ),
     ];
     for (k0, mult, secs, cost, dx, sim, pnl, keeper_sim, net_sim) in rows {
@@ -2236,7 +2246,7 @@ fn fixed_bound_on_genuine_paths_ra() {
             SIM_RMIN,
             445_758_923,
             0,
-            38_242_482_989,
+            38_439_528_132,
             37_620_437_682,
         ),
     );
@@ -2264,7 +2274,7 @@ fn fixed_bound_on_genuine_paths_ra() {
             SIM_RMIN,
             445_780_920,
             0,
-            38_264_680_760,
+            38_473_372_894,
             37_620_437_682,
         ),
     );
@@ -2278,7 +2288,7 @@ fn fixed_bound_on_genuine_paths_ra() {
             SIM_RMIN,
             445_777_129,
             0,
-            38_316_733_665,
+            38_541_112_728,
             37_620_437_682,
         ),
     );
@@ -2299,8 +2309,8 @@ fn fixed_bound_near_the_band_ra() {
             SIM_RMIN,
             1_589_185_471,
             4_496_472_817,
-            31_956_159_438,
-            32_595_282_626,
+            31_994_514_843,
+            32_634_405_139,
         ),
     );
     run_ra(
@@ -2319,8 +2329,8 @@ fn fixed_bound_near_the_band_ra() {
             SIM_RMIN,
             1_683_144_611,
             2_523_330_878,
-            34_021_387_608,
-            34_701_815_360,
+            34_095_970_796,
+            34_777_890_211,
         ),
     );
     run_ra(
@@ -2339,8 +2349,8 @@ fn fixed_bound_near_the_band_ra() {
             SIM_RMIN,
             1_777_143_275,
             549_358_915,
-            36_136_238_855,
-            36_858_963_632,
+            36_278_900_966,
+            37_004_478_985,
         ),
     );
     run_ra(
