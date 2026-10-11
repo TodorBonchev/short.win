@@ -27,6 +27,7 @@
 //! | `m4f1_a_deposit_freeze_on_a_fitting_carried_position_only_delays_the_liquidation` | M4F-1 (keeper), restated by "switch only if all fit" (owner decision of 2026-09-29): as found, attacker-only `[deposit 7·LP, crank_price, withdraw]` seconds in the keeper's idle cadence cleared the guard, froze `L_ema` at 8× the depth and turned the genuine 4× pump into S1 (lenders −10.056 SOL) on a position of ≈ 3.1 % of the new pool's `X`, which is no longer carried. A position that fits the 320-SOL candidate (95 % of its per-position cap, q/x ≈ 0.71 %) is liquidated in every run — the freeze from the adoption with the shipped keeper (`KeeperModel`: per second while the guard is set; per-slot bursts on prices only, the M4F-1 liquidity bursts reverted; per-second coverage for 10 s after a foreign liquidity on a market with positions, FITS-2 (b)), from +40 s (no burst; the foreign liquidity keeps the keeper per second from the first wrap, so only that one second is the attacker's; `L_b` within the depth cap), and under the finding's cadence — at the control's second (+0 s: the pushes only delay, and here not measurably) |
 //! | `m4f1_the_depth_cap_bounds_the_frozen_reference_at_the_live_pool` | M4F-1 (on chain, defense in depth, kept): under the finding's keeper cadence (`L_ema` = `L_mlo` = 8× the depth, the guard cleared) the reference liquidity is capped at the pool's locked depth `D` (AIR-14; `⌊D·10⁴/λ_min⌋` as built, ≈ 2.0× on the λ 99.78 % candidate): `L_b = L_live` on the λ 99.78 % and the λ 50 % candidates; with the carried position within the candidate's caps both pumps are liquidated |
 //! | `air14_a_deposit_pulled_at_the_deadline_does_not_hold_a_raydium_expiry` | AIR-14 (the program's `engine::bounds` on a synthetic state): a 1 % CPMM pool wholly locked, a position at 95 % of the 2.47 % impact cap, a deposit of 2× the pool held 62 min into the deadline and pulled there; the cap at `⌊D·10⁴/λ_min⌋` = 2D read `L_b/L_live` 2.000 and refused the expiry (`B̂_live` 2,430,862,647 > `max_in` 2,425,980,014); at `D` it executes |
+//! | `air23_a_governed_pool_lock_min_bps_moves_no_open_positions_exit_bound` | AIR-23 (the same synthetic state): the exit cap read `pool_lock_min_bps` at every exit, so a Governance change moved the exit bound of positions already open (2D → 5D at 2,000) against A26; since AIR-14 it reads no governed parameter, and `(L_b, B̂_ref, max_in, B̂_live)` is the same at `pool_lock_min_bps` 2,000, 3,500, 7,500 and 10,000 |
 //! | `m4f1_an_oversized_carried_position_is_not_adopted_and_settles_in_s3` | M4F-1 / M4G-3, restated by "switch only if all fit": the finding's market (a position at the 2,500-SOL incumbent's size cap, 3.12 % of the 320-SOL candidate's `X`, its cap 0.75 %) halts 900 s before the deadline; every proposal of the CPMM candidate and of a 400-SOL AMM v4 sibling is refused `CarriedPositionsTooLarge`, also after an LP's real 7× deposit held in the candidate (`D` does not move); no window opens; at the deadline `sol_settle` settles S3 at fair value on the failed pool: the lenders get `FV(P_ema, L_ema)` in full (10.327 SOL for `q` worth 9.937 at `P_ema`), the borrower the rest; the mark resets at 0 |
 
 #![allow(clippy::result_large_err)]
@@ -1807,7 +1808,7 @@ fn m4f1_an_oversized_carried_position_is_not_adopted_and_settles_in_s3() {
     );
 }
 
-/// The AIR-14 shape, on the program's own exit-bound functions (`engine::bounds`, as
+/// The AIR-14 / AIR-23 shape, on the program's own exit-bound functions (`engine::bounds`, as
 /// `liquidate::plan`'s expiry branch and the keeper call them): a 1 % Raydium CPMM pool (100 SOL,
 /// `X` = 10¹⁵) whose LP is wholly burned (λ 100 %: `D = √(X·Y)`), a position at 95 % of the
 /// 2.47 % impact cap (q/X 2.35 %), and the observation state a deposit of twice the pool, held for
@@ -1938,4 +1939,24 @@ fn air14_a_deposit_pulled_at_the_deadline_does_not_hold_a_raydium_expiry() {
         l_b as f64 / l_live as f64
     );
     assert_eq!(l_b, l_live, "the reference reads the drained pool");
+}
+
+/// **AIR-23** (the review's lead L-7): the exit cap read `config.params.pool_lock_min_bps` at every
+/// liquidation and expiry, so a Governance change (bounds 2,000–10,000) moved the reference of
+/// positions already open — 2D → 5D at 2,000 — though their exit terms are locked at open (A26).
+/// The cap reads no governed parameter now (`D` itself): the same position's exit bound is the
+/// same whatever `pool_lock_min_bps` is.
+#[test]
+fn air23_a_governed_pool_lock_min_bps_moves_no_open_positions_exit_bound() {
+    use held_deposit::*;
+    let (mut config, market, pos, st, now) = setup();
+    let at_open = expiry(&config, &market, &pos, &st, now);
+    for lam in [2_000u32, 3_500, 7_500, 10_000] {
+        config.params.pool_lock_min_bps = lam;
+        assert_eq!(
+            expiry(&config, &market, &pos, &st, now),
+            at_open,
+            "pool_lock_min_bps {lam}: (L_b, B_ref, max_in, B_live)"
+        );
+    }
 }

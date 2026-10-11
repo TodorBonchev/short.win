@@ -58,8 +58,12 @@ const REF_CAP_LAMBDA_BPS: u32 = 10_000;
 /// withdrawal is priced on the drained pool, at worst at `D`, while Raydium sizing may have credited
 /// the position up to `D/λ_min`.
 ///
-/// `_config` is not read (the cap divides `D` by 100 %, not by `pool_lock_min_bps`); the parameter
-/// stays for the callers (the keeper, the exits, the settlement box).
+/// AIR-23: the cap reads no governed parameter — `_config` stays for the callers (the keeper, the
+/// exits, the settlement box) but is not read — so a later `pool_lock_min_bps` change cannot move
+/// the exit bound of a position already open (A26: its exit terms are locked at open). Before
+/// AIR-14 it read `pool_lock_min_bps` live at every exit: lowering it to 2,000 took an open
+/// position's cap from 2D to 5D. No per-position `λ_min` is needed (`ShortPosition._reserved` is
+/// untouched).
 pub fn ref_depth_cap(_config: &GlobalConfig, market: &Market, kind: VenueKind) -> Option<u128> {
     kind.has_locked_depth()
         .then(|| bounds::ref_depth_cap(market.pool_d.get(), REF_CAP_LAMBDA_BPS))
