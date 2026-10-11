@@ -164,6 +164,9 @@ export function lendInvalidations(mint: Address, owner: Address): QueryKey[] {
         qk.market(mint),
         qk.marketLenders(mint),
         lendKeys.onChainPositions(owner),
+        // The Claim button's search for syncs (`claim/syncSearch.ts`): a landed claim, deposit or
+        // withdrawal of this market searches again.
+        lendKeys.claimSyncs(mint, owner),
     ];
 }
 
@@ -346,6 +349,24 @@ export function solPaidFrom(
     return paid > 0n ? paid : 0n;
 }
 
+/**
+ * The SOL a simulated claim pays: the rise of the position's `claimed` (cumulative SOL paid to it,
+ * which only the owner's own claim or withdrawal moves), so a read of the position before and the
+ * simulation after that land on different slots cannot make a claim that pays 0 look paying (rent
+ * paid into the vault in between moves the vault's lamports, not `claimed`). A claim that closes
+ * the position (KI-67) leaves no `claimed` after it: the vault's delta then (`solPaidFrom`).
+ */
+export function claimPaidFrom(
+    deltas: readonly { key: string; before: bigint | null; after: bigint | null }[],
+    lender: Address,
+    vault: Address,
+): bigint | null {
+    const d = deltas.find((x) => x.key === `${lender}:claimed`);
+    if (!d || d.before === null || d.after === null) return solPaidFrom(deltas, vault);
+    const paid = d.after - d.before;
+    return paid > 0n ? paid : 0n;
+}
+
 // ---- claim, cover, sync -----------------------------------------------------------------
 
 export interface SyncTarget {
@@ -457,6 +478,10 @@ export async function buildClaimPlan(i: ClaimPlanInput): Promise<TxPlan> {
         watch: [walletWatch(i), lenderWatch(i, ['claimed', 'pending']), vaultWatch(i)],
         ...disclosuresOf(i, disclosures, Object.keys(vars).length ? vars : undefined),
         invalidate: lendInvalidations(i.mint, i.signer.address),
+        // The owner's decision of 2026-10-11 (FRONTEND.md §3.6): a claim whose simulation pays 0
+        // lamports is not offered for signing (`claimPaidFrom`).
+        holdSign: (report) =>
+            claimPaidFrom(report.deltas, i.lenderAddress, i.vaultAddress) === 0n ? 'Nothing to claim yet' : null,
     };
 }
 

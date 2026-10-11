@@ -1,0 +1,144 @@
+/* How it works (`/how-it-works`, FRONTEND.md §3.11): readable prose on the terminal's surfaces,
+   centred at 760 px on a wide screen (a reading measure, not the table width); full width on a
+   phone. The embedded disclosures keep their own styles. */
+.guide-page {
+    width: 100%;
+    max-width: 760px;
+    margin-inline: auto;
+}
+
+/* The lede at the body's size, a step quieter: the section headings outrank it. */
+.guide-lede {
+    max-width: 68ch;
+    margin: var(--sp-3) 0 var(--sp-4);
+    font-size: var(--fs-md);
+    line-height: var(--lh);
+    color: var(--text-1);
+}
+
+.guide-toc {
+    margin: 0 0 var(--sp-5);
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+}
+
+h2.guide-toc-title {
+    margin: 0 0 var(--sp-2);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-1);
+}
+
+.guide-toc ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2) var(--sp-5);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* A 24 px target (WCAG 2.5.8); 44 px under a finger. */
+.guide-toc a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-min);
+}
+
+.guide-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    line-height: var(--lh);
+}
+
+.guide-body p {
+    margin: 0;
+    color: var(--text-0);
+}
+
+/* A reading measure for the prose (about 70 characters a line); the disclosures keep the column. */
+.guide-body > p,
+.guide-body > ul {
+    max-width: 68ch;
+}
+
+.guide-error {
+    margin: 0 0 var(--sp-4);
+}
+
+.guide-body p.guide-missing {
+    padding: var(--sp-3) 0;
+    color: var(--text-1);
+}
+
+.guide-body h2 {
+    margin-top: var(--sp-5);
+    padding-top: var(--sp-4);
+    border-top: 1px solid var(--line);
+}
+
+.guide-body h3 {
+    margin-top: var(--sp-3);
+}
+
+.guide-body h2:focus,
+.guide-body h3:focus {
+    outline: none;
+}
+
+.guide-body h2:focus-visible,
+.guide-body h3:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+}
+
+.guide-body p.guide-caption {
+    font-size: var(--fs-sm);
+    color: var(--text-1);
+}
+
+.guide-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    margin: 0;
+    padding-left: var(--sp-5);
+}
+
+.guide-loading {
+    padding: var(--sp-3) 0;
+}
+
+.guide-foot {
+    margin: var(--sp-5) 0 0;
+}
+
+/* A standalone link: a 24 px target (WCAG 2.5.8), 44 px under a finger. */
+.guide-foot a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-min);
+}
+
+/* Links inside prose are underlined: colour alone does not set them apart (WCAG 1.4.1). */
+.guide-body p a,
+.guide-body li a,
+.guide-page .guide-foot a {
+    text-decoration: underline;
+}
+
+@media (max-width: 639.98px) {
+    .guide-list {
+        padding-left: var(--sp-4);
+    }
+
+    .guide-toc ul {
+        flex-direction: column;
+        gap: 0;
+    }
+}

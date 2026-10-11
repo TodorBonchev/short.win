@@ -78,6 +78,12 @@ export const lendKeys = {
     state: (mint: string, owner: string | null) => [...qk.marketAccount(mint), 'lend', owner ?? 'none'] as const,
     lenders: (mint: string) => [...qk.marketAccount(mint), 'lend', 'lenders'] as const,
     onChainPositions: (owner: string) => [...qk.chain, 'lender-positions', owner] as const,
+    /**
+     * The Claim button's search for syncs (`claim/syncSearch.ts`). Outside `qk.marketAccount`, so
+     * the account subscriptions' refetches (every market change, a price crank included) do not
+     * search again; `lendInvalidations` does, when a lender transaction of the market lands.
+     */
+    claimSyncs: (mint: string, owner: string | null) => ['lend-claim-syncs', mint, owner ?? 'none'] as const,
 };
 
 export interface LendChain {

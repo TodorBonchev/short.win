@@ -9,6 +9,7 @@
 import type { GlobalConfig } from '@shortwin/client';
 import { useState } from 'react';
 import { Badge, VenueBadge, venueLabel } from '../../../components/Badge.tsx';
+import { Term } from '../../../components/Glossary.tsx';
 import { Price } from '../../../components/Num.tsx';
 import { Reveal } from '../../../components/Reveal.tsx';
 import { explorerAddress } from '../../../config/env.ts';
@@ -129,7 +130,9 @@ export function MarketHeader({ view, flags, config, oracle }: MarketHeaderProps)
             </div>
             <div className="mk-head-prices">
                 <span className="mk-head-price">
-                    <span className="mk-head-price-label">Price (EMA)</span>
+                    <span className="mk-head-price-label">
+                        <Term>Price (EMA)</Term>
+                    </span>
                     {view.emaPriceWad !== null && decimals !== null ? (
                         <span data-testid={T.marketStat('price')} data-value={view.emaPriceWad.toString()}>
                             <Price wad={view.emaPriceWad} decimals={decimals} />
@@ -141,7 +144,9 @@ export function MarketHeader({ view, flags, config, oracle }: MarketHeaderProps)
                     )}
                 </span>
                 <span className="mk-head-price" data-kind="spot">
-                    <span className="mk-head-price-label">Spot</span>
+                    <span className="mk-head-price-label">
+                        <Term>Spot</Term>
+                    </span>
                     {view.spotWad !== null && decimals !== null ? (
                         <span data-testid={T.marketSpotPrice} data-value={view.spotWad.toString()}>
                             <Price wad={view.spotWad} decimals={decimals} />

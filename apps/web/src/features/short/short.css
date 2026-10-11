@@ -11,8 +11,38 @@
 .short-inputs {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 96px;
-    gap: var(--sp-3);
-    align-items: start;
+    grid-template-rows: auto auto auto;
+    gap: var(--sp-1) var(--sp-3);
+}
+
+/* The two inputs on one line when one label wraps (Size's carries the token and its mint): each
+   field spans the three shared rows — label, input, hint or error — so the labels sit on the
+   input row's top edge, the boxes line up, and a hint or an error still starts right under its own
+   box. */
+.short-inputs > .field {
+    display: grid;
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+}
+
+.short-inputs > .field > :first-child {
+    align-self: end;
+}
+
+/* The desktop's side panel (320–338 px) leaves the size box too little room beside Slippage once
+   its unit and Max take their share: at 1,024 px the field cut the first digit of "250000" (the
+   second approval pass's review). There Slippage goes under Size and the size box takes the
+   panel's width. Layout only. */
+@media (min-width: 1024px) {
+    .short-inputs {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .short-inputs > .field + .field {
+        margin-top: var(--sp-2);
+    }
 }
 
 .short-preview {
@@ -78,7 +108,10 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     column-gap: var(--sp-4);
-    row-gap: var(--sp-1);
+    /* Rows 24 px apart at least (a 12 px row is 17.4 px), as a key / value list with ⓘ: each cap's
+       24 px ⓘ (its touch area grows sideways only) then never reaches the next row's — the round-13
+       review measured the position impact cap's ⓘ 19 px above the open-interest cap's. */
+    row-gap: max(var(--sp-1), calc(24px - 1lh));
     font-size: var(--fs-xs);
     color: var(--text-1);
     margin: var(--sp-2) 0 0;
@@ -356,7 +389,8 @@
     width: 1%;
 }
 
-.positions-tbl > .tbl > thead > tr > th,
+/* Values on one line; headers wrap like every table's (components.css), so the header ⓘ do not
+   push the actions out of view. */
 .positions-tbl > .tbl > tbody > tr > td {
     white-space: nowrap;
 }
@@ -490,13 +524,20 @@
     padding-inline: var(--sp-4);
 }
 
-/* An open wallet chooser in the foot is read in place, not pinned over the form. */
+/* An open wallet chooser in the foot is read in place, not pinned over the form (nor stacked over
+   the sheet's head: a flex item's z-index applies in the flow too). */
 .short-panel > .form-foot:has(.wallet-inline) {
     position: static;
+    z-index: auto;
 }
 
 /* Manage's previews: a label keeps its line; a value's sub-line ("buys back … · at most …") wraps
    under the value instead of squeezing the label to a word a line. */
 .manage-panel .kv {
     grid-template-columns: max-content minmax(0, 1fr);
+}
+
+/* O-2: the link to the page's coverage banner, under the "New shorts unavailable" note. */
+.short-coverage-link {
+    align-self: flex-start;
 }

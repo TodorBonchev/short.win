@@ -9,6 +9,7 @@
 import type { GlobalConfig } from '@shortwin/client';
 import type { Address } from '@solana/kit';
 import { type ReactNode, useId, useState } from 'react';
+import { Term } from '../../../components/Glossary.tsx';
 import { Sol, Tokens } from '../../../components/Num.tsx';
 import { Skeleton } from '../../../components/States.tsx';
 import { T } from '../../../config/testids.ts';
@@ -37,7 +38,9 @@ function StatBox({
 }) {
     return (
         <div className="stat" data-testid={testId} data-value={value} data-priority={priority}>
-            <div className="stat-label">{label}</div>
+            <div className="stat-label">
+                <Term>{label}</Term>
+            </div>
             <div className="stat-value">{children}</div>
             {sub && <span className="mk-stat-sub">{sub}</span>}
         </div>

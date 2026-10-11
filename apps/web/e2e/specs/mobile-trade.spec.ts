@@ -62,6 +62,16 @@ async function openShortPanel(app: App): Promise<Locator> {
     await expect(app.page.locator('.trade-panel')).toHaveAttribute('data-sheet', 'open');
     const panel = app.id(T.shortPanel);
     await expect(panel).toBeVisible();
+    // The sheet slides in (`--t-sheet`): a tap while it moves is aimed at a moving box, and
+    // Playwright then scrolls the sheet to reach it (the fields' labels under the sheet head).
+    await app.page.evaluate(() =>
+        Promise.all(
+            document
+                .getAnimations()
+                .filter((a) => a.playState === 'running' && a.effect?.getTiming().iterations !== Infinity)
+                .map((a) => a.finished.catch(() => undefined)),
+        ).then(() => undefined),
+    );
     return panel;
 }
 

@@ -4,10 +4,13 @@
  * live updates from the `markets` channel (rows patched in place), keyset paging ("Load more").
  * While the indexer is unreachable the list is replaced by "open a mint" (§6.5): the market page
  * then reads the chain.
+ *
+ * Above the list, the newcomer's intro strip (`MarketsIntro`, the owner's thirteenth round O-3): once
+ * hidden, a polite status message says where How it works is, and focus moves to the page heading.
  */
 import type { Address } from '@solana/kit';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import type { MarketsParams } from '../../api/keys.ts';
 import { useLiveChannels } from '../../api/live.tsx';
 import { big, type MarketSort, type MarketSummary, type TierName, type VenueName } from '../../api/types.ts';
@@ -18,10 +21,12 @@ import { addressInputProps, Checkbox, Select } from '../../components/Field.tsx'
 import { Price, Sol } from '../../components/Num.tsx';
 import { Panel } from '../../components/Panel.tsx';
 import { ErrorState } from '../../components/States.tsx';
+import { copy } from '../../config/copy.ts';
 import { T } from '../../config/testids.ts';
 import { parseAddress } from '../../lib/address.ts';
 import './markets.css';
 import { FreshnessBadge, useNow } from '../../shell/freshness.tsx';
+import { MarketsIntro } from './MarketsIntro.tsx';
 import { Age, CompactTokens, FlagBadge, formatUsd, TokenLabel, UtilBar } from './shared/cells.tsx';
 import { type MarketFlagKey, marketFlags } from './shared/marketFlags.ts';
 import { useMarketPages } from './shared/useMarketPages.ts';
@@ -208,6 +213,8 @@ export function MarketsPage() {
     );
     const filtersId = useId();
     const [filtersOpen, setFiltersOpen] = useState(false);
+    const heading = useRef<HTMLHeadingElement>(null);
+    const [introNote, setIntroNote] = useState('');
     const activeFilters = (search.venue ? 1 : 0) + (search.tier ? 1 : 0) + (search.active ? 1 : 0);
 
     const sort = search.sort ?? 'tvl';
@@ -252,7 +259,9 @@ export function MarketsPage() {
     return (
         <div className="page" data-testid={T.page('markets')}>
             <div className="page-head mk-page-head">
-                <h1>Markets</h1>
+                <h1 ref={heading} tabIndex={-1}>
+                    Markets
+                </h1>
                 <FreshnessBadge />
                 <span className="grow" />
                 <Link
@@ -265,6 +274,16 @@ export function MarketsPage() {
                     {mintWithoutMarket ? 'Create a market for this mint' : 'Create market'}
                 </Link>
             </div>
+            <MarketsIntro
+                onHide={() => {
+                    setIntroNote(copy('intro.dismissed.note'));
+                    // The Hide button is gone: focus the page's heading, never <body> (WCAG 2.4.3).
+                    heading.current?.focus();
+                }}
+            />
+            <p className="visually-hidden" role="status">
+                {introNote}
+            </p>
             <Panel flush label="Markets">
                 <div className="mk-toolbar">
                     <div className="input-wrap mk-search">

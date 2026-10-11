@@ -6,7 +6,8 @@
  *    position equals the preview (`q`, `s` = proceeds, `m` = margin, `v` = proceeds + margin) and the
  *    market's free tokens drop by `q`; the borrower disclosure's checkbox gates Sign; the open lands.
  * 2. Blocked state: on the coverage-paused market the panel shows `short-blocked-reason` with
- *    `data-code="CoveragePaused"` and the `market.coveragePause` disclosure, and nothing opens.
+ *    `data-code="CoveragePaused"` and the `market.coveragePause` disclosure (the page's banner; the
+ *    panel links to it, O-2), and nothing opens.
  */
 import { DISCLOSURES } from '../../src/config/disclosures.ts';
 import { dataValue, expect, need, requireTrading, T, test } from '../fixtures.ts';
@@ -113,6 +114,9 @@ test.describe('short: open', { tag: '@short' }, () => {
         await expect(app.id(T.disclosure('market.coveragePause')).first()).toContainText(
             DISCLOSURES['market.coveragePause'].body[0] ?? '',
         );
+        // Shown once, as the page's banner; the panel links to it (the thirteenth round, O-2).
+        await expect(panel.getByTestId(T.disclosure('market.coveragePause'))).toHaveCount(0);
+        await expect(panel.getByTestId(T.shortCoverageLink)).toBeVisible();
         const submit = panel.getByTestId(T.shortSubmit);
         if (await submit.count()) await expect(submit).toBeDisabled();
         await app.a11y('short panel, coverage paused');

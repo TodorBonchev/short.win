@@ -27,7 +27,7 @@ import type { LendChain } from './chain.ts';
 import type { LoadedChain } from './ctx.ts';
 import { indexerStateOf, type LenderRow } from './dashboard/rows.ts';
 import { LenderDashboardPage } from './LenderDashboardPage.tsx';
-import type { PositionView } from './previews.ts';
+import type { ClaimView, PositionView } from './previews.ts';
 import { fakeMarket, simpleLender, simplePool } from './testkit.ts';
 
 const h = vi.hoisted(() => ({
@@ -35,10 +35,49 @@ const h = vi.hoisted(() => ({
     rows: { current: null as unknown },
     started: [] as unknown[],
     setStage: { current: (_s: string) => {} },
+    /** The math module the page sees (undefined: the fallback plan without syncs). */
+    math: { current: undefined as unknown },
+    /** `claimPlanFrom`'s calls while `math` is set: [market, otherLenders given, the row's pick reused]. */
+    claims: [] as [string, boolean, boolean][],
+    /** The rows' searches for syncs (`searchPotSyncs`): the gain per market (absent: none found). */
+    gains: new Map<string, bigint>(),
+    /** Searches wait for this (in flight) until the test's end releases them. */
+    hold: { current: null as Promise<void> | null, release: () => {} },
+    /** Searches running now, and the most at once. */
+    running: { now: 0, max: 0 },
 }));
 
 vi.mock('../../wallet/useWallet.ts', () => ({ useWallet: () => h.wallet.current }));
-vi.mock('../../math/useMath.ts', () => ({ useMath: () => ({ math: undefined, error: null }) }));
+vi.mock('../../math/useMath.ts', () => ({ useMath: () => ({ math: h.math.current, error: null }) }));
+vi.mock('./build.ts', async (orig) => ({
+    ...(await orig<typeof import('./build.ts')>()),
+    // The panel's builder (Lend → Claim), recorded: the row's claim is the same call.
+    claimPlanFrom: async (_env: unknown, c: LoadedChain, _now: number, others: unknown, pick?: unknown) => {
+        h.claims.push([c.marketAddress, others !== null, pick !== undefined]);
+        const plan: TxPlan = {
+            kind: 'claim_sol',
+            title: `Claim ${c.marketAddress}`,
+            instructions: [],
+            watch: [],
+            disclosures: [],
+            invalidate: [],
+        };
+        return plan;
+    },
+    // The rows' searches for syncs: a gain per market, or held in flight.
+    searchPotSyncs: async (a: { chain: LoadedChain }) => {
+        h.running.now++;
+        h.running.max = Math.max(h.running.max, h.running.now);
+        try {
+            if (h.hold.current) await h.hold.current;
+            await new Promise((r) => setTimeout(r, 5));
+            const gain = h.gains.get(a.chain.marketAddress) ?? 0n;
+            return { syncs: [], gain, more: { count: 0, gain: 0n } };
+        } finally {
+            h.running.now--;
+        }
+    },
+}));
 vi.mock('./dashboard/rows.ts', async (orig) => ({
     ...(await orig<typeof import('./dashboard/rows.ts')>()),
     useLenderRows: () => h.rows.current,
@@ -83,6 +122,8 @@ const M1 = address('7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE');
 const M2 = address('8sLbNZoA1cfnvMJLPfp98ZLAnFSYCFApfJKMbiXNLwxj');
 const MINT1 = address('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
 const MINT2 = address('JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN');
+const M3 = address('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+const MINT3 = address('So11111111111111111111111111111111111111112');
 
 const started = h.started as TxPlan[];
 const drive = (stage: TxStage) => act(() => h.setStage.current(stage));
@@ -135,19 +176,34 @@ const position = (claimable: bigint): PositionView => ({
     standing: { kind: 'current' },
 });
 
-const row = (o: Partial<LenderRow> & Pick<LenderRow, 'market' | 'mint'>): LenderRow => ({
-    symbol: 'TKN',
-    decimals: 6,
-    chain: chain(o.mint, o.market),
-    chainError: null,
-    position: position(1_000n),
-    standing: { kind: 'current' },
-    indexer: 'ok',
-    isCoinCreator: false,
-    isMarketCreator: false,
-    emaPriceWad: null,
-    ...o,
+/** The panel's claim view of a row: `claimable` now and the shortfall its syncs may add. */
+const claimView = (claimable: bigint, shortfall = 0n): ClaimView => ({
+    claimable,
+    entitled: claimable + shortfall,
+    vesting: 5n,
+    pot: 0n,
+    deficit: 0n,
+    shortfall,
 });
+
+/** A row; its claim view follows its position's claimable unless given. */
+const row = (o: Partial<LenderRow> & Pick<LenderRow, 'market' | 'mint'>): LenderRow => {
+    const pos = o.position === undefined ? position(1_000n) : o.position;
+    return {
+        symbol: 'TKN',
+        decimals: 6,
+        chain: chain(o.mint, o.market),
+        chainError: null,
+        position: pos,
+        claim: pos ? claimView(pos.claimable) : null,
+        standing: { kind: 'current' },
+        indexer: 'ok',
+        isCoinCreator: false,
+        isMarketCreator: false,
+        emaPriceWad: null,
+        ...o,
+    };
+};
 
 class NoSocket {
     readyState = 0;
@@ -159,6 +215,12 @@ class NoSocket {
 
 beforeEach(() => {
     started.length = 0;
+    h.claims.length = 0;
+    h.math.current = undefined;
+    h.gains.clear();
+    h.hold.current = null;
+    h.running.now = 0;
+    h.running.max = 0;
     vi.stubGlobal('fetch', () => new Promise(() => {}));
     vi.stubGlobal('WebSocket', NoSocket);
     h.wallet.current = {
@@ -170,6 +232,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    // Held searches end (the app-wide search slots are module state, shared by the tests).
+    h.hold.release();
     vi.unstubAllGlobals();
 });
 
@@ -388,5 +452,215 @@ describe('LenderDashboardPage on any width (M10-RESP, FRONTEND.md §3.8, §7.6)'
         const all = screen.getByTestId(T.lenderClaimAll);
         expect(all.closest('.action-bar')).toBeTruthy();
         expect(all.textContent).toBe('Claim all · 0.000001SOL');
+    });
+});
+
+describe('LenderDashboardPage: a row claims like Lend → Claim (the owner’s decision of 2026-10-11, D-21)', () => {
+    it('labels each row’s Claim with the panel’s words, and opens it on a shortfall the syncs can pay', async () => {
+        h.math.current = {};
+        h.gains.set(M2, 10n ** 9n);
+        h.rows.current = {
+            rows: [
+                // Claimable now, nothing out of reach: one line.
+                row({ market: M1, mint: MINT1 }),
+                // Nothing claimable now, 25,000 lamports the syncs can add: enabled, two lines.
+                row({ market: M2, mint: MINT2, position: position(0n), claim: claimView(0n, 25_000n) }),
+            ],
+            loading: false,
+            indexerDown: false,
+            error: null,
+        };
+        await renderPage();
+        const c1 = screen.getByTestId(T.lenderClaim(M1)) as HTMLButtonElement;
+        expect(c1.textContent).toBe('Review claim · 0.000001 SOL');
+        expect(c1.dataset.lines).toBeUndefined();
+        expect(c1.disabled).toBe(false);
+        const r2 = screen.getByTestId(T.lenderRow(M2));
+        const c2 = within(r2).getByTestId(T.lenderClaim(M2)) as HTMLButtonElement;
+        await waitFor(() => expect(c2.textContent).toBe('Review claim · 0 SOL now · syncs may add up to 0.000025 SOL'));
+        expect(within(r2).getByTestId(T.claimSubmitSyncs).textContent).toBe('syncs may add up to 0.000025 SOL');
+        expect(c2.dataset.lines).toBe('2');
+        expect(c2.disabled).toBe(false);
+        expect(within(r2).queryByTestId(T.lenderClaimReason(M2))).toBeNull();
+        // "Claim all" keeps its label and counts both rows; its total is what is claimable now.
+        expect(screen.getByTestId(T.lenderClaimAll).textContent).toBe('Claim all (2 markets) · 0.000001SOL');
+    });
+
+    it('only when syncs can pay (owner, 2026-10-11): {g} = min(shortfall, gain); none, dust or in flight is off', async () => {
+        h.math.current = {};
+        const M4 = address('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
+        const MINT4 = address('Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB');
+        // M1: no sync funds it (the only lender); M2: 9,999 lamports (dust); M3: 12,000 of 25,000;
+        // M4: 1 SOL, more than its 25,000-lamport shortfall.
+        h.gains.set(M2, 9_999n);
+        h.gains.set(M3, 12_000n);
+        h.gains.set(M4, 10n ** 9n);
+        const short = (market: Address, mint: Address) =>
+            row({
+                market,
+                mint,
+                chain: chain(mint, market),
+                position: position(0n),
+                claim: claimView(0n, 25_000n),
+            });
+        h.rows.current = {
+            rows: [short(M1, MINT1), short(M2, MINT2), short(M3, MINT3), short(M4, MINT4)],
+            loading: false,
+            indexerDown: false,
+            error: null,
+        };
+        await renderPage();
+        const claim = (m: Address) => screen.getByTestId(T.lenderClaim(m)) as HTMLButtonElement;
+        await waitFor(() => expect(claim(M4).disabled).toBe(false));
+        for (const m of [M1, M2]) {
+            await waitFor(() =>
+                expect(screen.getByTestId(T.lenderClaimReason(m)).textContent).toBe('Nothing to claim yet'),
+            );
+            expect(claim(m).textContent).toBe('Review claim · 0 SOL');
+            expect(claim(m).disabled).toBe(true);
+            expect(claim(m).dataset.lines).toBeUndefined();
+        }
+        expect(claim(M3).textContent).toBe('Review claim · 0 SOL now · syncs may add up to 0.000012 SOL');
+        expect(claim(M4).textContent).toBe('Review claim · 0 SOL now · syncs may add up to 0.000025 SOL');
+        // Claim all counts, totals and claims exactly the enabled rows: 0 SOL claimable now.
+        expect(screen.getByTestId(T.lenderClaimAll).textContent).toBe('Claim all (2 markets) · 0SOL');
+        expect(screen.getByTestId(T.lenderKpi('claimable')).dataset.value).toBe('0');
+        fireEvent.click(screen.getByTestId(T.lenderClaimAll));
+        await waitFor(() => expect(h.claims).toHaveLength(1));
+        drive('confirmed');
+        drive('idle');
+        await waitFor(() => expect(h.claims.map(([m]) => m)).toEqual([M3, M4]));
+        // Each claim took its row's fresh pick.
+        expect(h.claims.every(([, others, reused]) => others && reused)).toBe(true);
+        // At most two searches at once (a lender in many markets: no request storm).
+        expect(h.running.max).toBeLessThanOrEqual(2);
+    });
+
+    it('while a row’s search runs: busy and off without a reason, not in Claim all; a claimable row stays on', async () => {
+        h.math.current = {};
+        h.hold.current = new Promise<void>((r) => {
+            h.hold.release = r;
+        });
+        h.rows.current = {
+            rows: [
+                row({ market: M1, mint: MINT1, position: position(0n), claim: claimView(0n, 25_000n) }),
+                row({ market: M2, mint: MINT2, position: position(2_000n), claim: claimView(2_000n, 25_000n) }),
+            ],
+            loading: false,
+            indexerDown: false,
+            error: null,
+        };
+        await renderPage();
+        const c1 = screen.getByTestId(T.lenderClaim(M1)) as HTMLButtonElement;
+        expect(c1.textContent).toBe('Review claim · 0 SOL');
+        expect(c1.disabled).toBe(true);
+        expect(c1.getAttribute('aria-busy')).toBe('true');
+        expect(screen.queryByTestId(T.lenderClaimReason(M1))).toBeNull();
+        const c2 = screen.getByTestId(T.lenderClaim(M2)) as HTMLButtonElement;
+        expect(c2.textContent).toBe('Review claim · 0.000002 SOL');
+        expect(c2.disabled).toBe(false);
+        expect(c2.getAttribute('aria-busy')).toBeNull();
+        expect(screen.getByTestId(T.lenderClaimAll).textContent).toBe('Claim all · 0.000002SOL');
+    });
+
+    it('with the indexer down, no row searches for syncs: a shortfall row is off at once, with its reason', async () => {
+        h.math.current = {};
+        h.gains.set(M1, 25_000n);
+        h.rows.current = {
+            rows: [row({ market: M1, mint: MINT1, position: position(0n), claim: claimView(0n, 25_000n) })],
+            loading: false,
+            indexerDown: true,
+            error: null,
+        };
+        await renderPage();
+        const claim = screen.getByTestId(T.lenderClaim(M1)) as HTMLButtonElement;
+        expect(claim.textContent).toBe('Review claim · 0 SOL');
+        expect(claim.disabled).toBe(true);
+        expect(claim.getAttribute('aria-busy')).toBeNull();
+        expect(screen.getByTestId(T.lenderClaimReason(M1)).textContent).toBe('Nothing to claim yet');
+        await act(() => new Promise((r) => setTimeout(r, 30)));
+        expect(h.running.max).toBe(0);
+        expect(claim.disabled).toBe(true);
+    });
+
+    it('a row with nothing claimable and no shortfall (a dust one counts as none) is off, as in the panel', async () => {
+        h.rows.current = {
+            rows: [row({ market: M1, mint: MINT1, position: position(0n), claim: claimView(0n, 0n) })],
+            loading: false,
+            indexerDown: false,
+            error: null,
+        };
+        await renderPage();
+        const claim = screen.getByTestId(T.lenderClaim(M1)) as HTMLButtonElement;
+        expect(claim.textContent).toBe('Review claim · 0 SOL');
+        expect(claim.disabled).toBe(true);
+        expect(screen.getByTestId(T.lenderClaimReason(M1)).textContent).toBe('Nothing to claim yet');
+        expect(screen.queryByTestId(T.lenderClaimAll)).toBeNull();
+    });
+
+    it('Claim all counts every row whose Claim is enabled: one behind the share epoch with its records read too', async () => {
+        h.rows.current = {
+            rows: [
+                row({ market: M1, mint: MINT1 }),
+                // Behind, every record read: its own Claim is enabled (the claim walks the records).
+                row({
+                    market: M2,
+                    mint: MINT2,
+                    position: position(2_000n),
+                    chain: { ...chain(MINT2, M2, 3), recordsComplete: true } as LoadedChain,
+                    standing: { kind: 'behind', epochs: 3 },
+                }),
+                // Behind with records still to read: Sync, not Claim, and not in Claim all.
+                row({
+                    market: M3,
+                    mint: MINT3,
+                    position: position(4_000n),
+                    chain: chain(MINT3, M3, 3),
+                    standing: { kind: 'behind', epochs: 3 },
+                }),
+            ],
+            loading: false,
+            indexerDown: false,
+            error: null,
+        };
+        await renderPage();
+        const c2 = screen.getByTestId(T.lenderClaim(M2)) as HTMLButtonElement;
+        expect(c2.disabled).toBe(false);
+        expect(c2.textContent).toBe('Review claim · 0.000002 SOL');
+        expect(screen.queryByTestId(T.lenderClaim(M3))).toBeNull();
+        expect(screen.getByTestId(T.lenderSync(M3))).toBeTruthy();
+        expect(screen.getByTestId(T.lenderClaimAll).textContent).toBe('Claim all (2 markets) · 0.000003SOL');
+        expect(screen.getByTestId(T.lenderKpi('claimable')).dataset.value).toBe('3000');
+    });
+
+    it('builds the panel’s claim (with the indexer’s lenders for the syncs), per row and for Claim all', async () => {
+        h.math.current = {};
+        h.gains.set(M1, 10n ** 9n);
+        h.rows.current = {
+            rows: [
+                row({ market: M1, mint: MINT1, position: position(0n), claim: claimView(0n, 25_000n) }),
+                row({ market: M2, mint: MINT2 }),
+            ],
+            loading: false,
+            indexerDown: false,
+            error: null,
+        };
+        await renderPage();
+        await waitFor(() => expect((screen.getByTestId(T.lenderClaim(M1)) as HTMLButtonElement).disabled).toBe(false));
+        fireEvent.click(screen.getByTestId(T.lenderClaim(M1)));
+        await waitFor(() => expect(h.claims).toEqual([[M1, true, true]]));
+        drive('idle');
+        fireEvent.click(screen.getByTestId(T.lenderClaimAll));
+        await waitFor(() => expect(h.claims).toHaveLength(2));
+        drive('confirmed');
+        drive('idle');
+        await waitFor(() =>
+            // The shortfall row reuses its search's pick; the claimable one has none to reuse.
+            expect(h.claims).toEqual([
+                [M1, true, true],
+                [M1, true, true],
+                [M2, true, false],
+            ]),
+        );
     });
 });

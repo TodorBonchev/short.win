@@ -57,7 +57,8 @@ function accountJson(pubkey: string, lamports: bigint, owner: string, data: Uint
 /** SOL each generated key starts with. */
 export const FUNDING_SOL: Readonly<Record<string, bigint>> = {
     authority: 100n,
-    payer: 100_000n,
+    // lend-claim-pot-chain's 1,000× gap buys ≈ 122,500 SOL into the chain market's pool.
+    payer: 400_000n,
     mintAuthority: 10n,
     poolAdmin: 10n,
     seedLender: 100n,

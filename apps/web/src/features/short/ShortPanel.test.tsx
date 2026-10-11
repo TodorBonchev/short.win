@@ -8,6 +8,7 @@ import { getOpenShortInstructionDataDecoder } from '@shortwin/client';
 import { type Address, createNoopSigner } from '@solana/kit';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { PageBannersContext } from '../../components/PageBanners.tsx';
 import { ToastProvider } from '../../components/Toast.tsx';
 import { T } from '../../config/testids.ts';
 import type { MathModule } from '../../math/load.ts';
@@ -185,6 +186,50 @@ describe('ShortPanel', () => {
         expect(screen.getByTestId(T.shortBlocked).dataset.code).toBe('CoveragePaused');
         expect(screen.getByTestId(T.disclosure('market.coveragePause'))).toBeTruthy();
         expect(screen.queryByTestId(T.shortQInput)).toBeNull();
+    });
+
+    it('links to the page’s coverage banner instead of repeating it (O-2), in words that fit a sheet', async () => {
+        const focus = vi.fn();
+        const paused = (x: ChainSnapshot) => ({
+            ...x,
+            market: { ...x.market, flags: x.market.flags | MARKET_FLAG.pausedCoverage },
+        });
+        // Beside the page (≥ 1,024 px): the banner is above.
+        const { s } = await vectorSnapshot(vectorCase('spl-open-0'));
+        state.snapshot = paused({ ...s, fetchedAt: Date.now() });
+        const view = render(
+            <PageBannersContext.Provider value={{ shown: new Set(['coverage-paused']), inSheet: false, focus }}>
+                <ToastProvider>
+                    <ShortPanel mint={s.mint} />
+                </ToastProvider>
+            </PageBannersContext.Provider>,
+        );
+        // The note stays; the disclosure the banner already shows does not.
+        expect(screen.getByTestId(T.shortBlocked).dataset.code).toBe('CoveragePaused');
+        expect(screen.queryByTestId(T.disclosure('market.coveragePause'))).toBeNull();
+        const link = screen.getByTestId(T.shortCoverageLink);
+        expect(link.textContent).toBe('Read the full coverage notice');
+        fireEvent.click(link);
+        expect(focus).toHaveBeenCalledWith('coverage-paused');
+        // In the trade sheet the banner is behind it: the link says it closes the sheet.
+        view.rerender(
+            <PageBannersContext.Provider value={{ shown: new Set(['coverage-paused']), inSheet: true, focus }}>
+                <ToastProvider>
+                    <ShortPanel mint={s.mint} />
+                </ToastProvider>
+            </PageBannersContext.Provider>,
+        );
+        expect(screen.getByTestId(T.shortCoverageLink).textContent).toBe('Close and read the full coverage notice');
+        // No banner to link to (the clear delay, the indexer's flags missing): the disclosure stays.
+        view.rerender(
+            <PageBannersContext.Provider value={{ shown: new Set(), inSheet: false, focus }}>
+                <ToastProvider>
+                    <ShortPanel mint={s.mint} />
+                </ToastProvider>
+            </PageBannersContext.Provider>,
+        );
+        expect(screen.getByTestId(T.disclosure('market.coveragePause'))).toBeTruthy();
+        expect(screen.queryByTestId(T.shortCoverageLink)).toBeNull();
     });
 
     it('fills Max with the binding cap, in a form the input parses back', async () => {

@@ -36,7 +36,7 @@ import type { AppRpc } from '../../rpc/client.ts';
 import { readRepoBytes } from '../../test/repo.ts';
 import { MAX_TRANSACTION_BYTES, wireSizeOf } from '../../tx/message.ts';
 import type { SimulationReport, TxError } from '../../tx/types.ts';
-import { claimPlanFrom, LENDER_POSITION_RENT, type LendEnv } from './build.ts';
+import { claimPlanFrom, LENDER_POSITION_RENT, type LendEnv, NO_SYNCS, searchPotSyncs } from './build.ts';
 import type { LoadedChain } from './ctx.ts';
 import { MAX_SYNCS_PER_CLAIM } from './plans.ts';
 import { FWD, type LenderFields } from './previews.ts';
@@ -44,6 +44,7 @@ import {
     type LenderPage,
     MAX_SYNC_CANDIDATE_PAGES,
     type OtherLenders,
+    type SearchProgress,
     type Simulate,
     SYNC_CANDIDATE_PAGE,
 } from './quote.ts';
@@ -373,6 +374,39 @@ describe('claimPlanFrom: the claim-time pot-only syncs (KI66-R4)', () => {
         expect(listed.calls).toEqual([]);
     });
 
+    it('looks for no syncs under the 10,000-lamport dust threshold, and does from it (owner, 2026-10-11)', async () => {
+        const accounts: Accounts = new Map();
+        // Another lender with 1 SOL realised beyond its credit: a sync would move it to the pot.
+        await putLender(accounts, OTHERS[0] as Address, simpleLender(1n, { epoch: 3, real: 10n ** 9n }));
+        const { rpc, getMultipleAccounts } = rpcOf(accounts);
+        const rows = OTHERS.slice(0, 1).map((o): Row => [o, 3]);
+        // 9,999 lamports credited, nothing realised, an empty pot: dust (ECON §9.4), so no syncs.
+        for (const pending of [9_999n, 9_999n + 300_000n]) {
+            const dust = indexer(rows, 3);
+            const real = pending - 9_999n;
+            const plan = await claimPlanFrom(
+                env(rpc),
+                claimant({ shareEpoch: 3, lender: { pending, real } }),
+                0,
+                dust.source,
+            );
+            expect(kinds(plan.instructions), String(pending)).toEqual(['ClaimSol']);
+            expect(dust.calls, String(pending)).toEqual([]);
+            expect(plan.disclosures).toEqual([]);
+        }
+        expect(getMultipleAccounts).not.toHaveBeenCalled();
+        // 10,000 lamports: the claim syncs the lender first.
+        const at = indexer(rows, 3);
+        const plan = await claimPlanFrom(
+            env(rpc),
+            claimant({ shareEpoch: 3, lender: { pending: 10_000n } }),
+            0,
+            at.source,
+        );
+        expect(kinds(plan.instructions)).toEqual(['SyncLender', 'ClaimSol']);
+        expect(at.calls.length).toBeGreaterThan(0);
+    });
+
     it('finds a lender behind the share epoch past the first page of raw share counts (FE-30)', async () => {
         const accounts: Accounts = new Map();
         await putRecords(accounts, 0, 3);
@@ -555,5 +589,121 @@ describe('claimPlanFrom: a claim that empties the position (KI-67)', () => {
         await expect(claimPlanFrom(env(rpc), claimant({ shareEpoch: 3, lender: null }), 0, null)).rejects.toThrow(
             /no lender position/,
         );
+    });
+});
+
+describe('the Claim button’s search and the review (the owner’s decision of 2026-10-11, “only when syncs can pay”)', () => {
+    it('searchPotSyncs is the review’s search: the same pick for a shortfall, none without one, a source or on a failure', async () => {
+        const accounts: Accounts = new Map();
+        // Another lender with 1 SOL realised beyond its credit: its sync moves it to the pot.
+        await putLender(accounts, OTHERS[0] as Address, simpleLender(1n, { epoch: 3, real: 10n ** 9n }));
+        const { rpc } = rpcOf(accounts);
+        const rows = OTHERS.slice(0, 1).map((o): Row => [o, 3]);
+        const chain = claimant({ shareEpoch: 3 });
+        const a = { rpc, math: m, chain, claimant: OWNER, nowS: 0 };
+        const pick = await searchPotSyncs({ ...a, source: indexer(rows, 3).source });
+        expect(pick.syncs.map((x) => x.owner)).toEqual([OTHERS[0]]);
+        expect(pick.gain).toBe(10n ** 9n);
+        // The review's own search finds the same sync.
+        const plan = await claimPlanFrom(env(rpc), chain, 0, indexer(rows, 3).source);
+        expect(kinds(plan.instructions)).toEqual(['SyncLender', 'ClaimSol']);
+        // No source (no indexer), a failing one, a dust shortfall, no shortfall, no position: none.
+        expect(await searchPotSyncs({ ...a, source: null })).toEqual(NO_SYNCS);
+        expect(await searchPotSyncs({ ...a, source: indexer(rows, 3, { failAt: 1 }).source })).toEqual(NO_SYNCS);
+        const dust = indexer(rows, 3);
+        const dustChain = claimant({ shareEpoch: 3, lender: { pending: 9_999n } });
+        expect(await searchPotSyncs({ ...a, chain: dustChain, source: dust.source })).toEqual(NO_SYNCS);
+        expect(dust.calls).toEqual([]);
+        const paid = claimant({ shareEpoch: 3, lender: { pending: 5n, real: 5n } });
+        expect(await searchPotSyncs({ ...a, chain: paid, source: indexer(rows, 3).source })).toEqual(NO_SYNCS);
+        const gone = claimant({ shareEpoch: 3, lender: null });
+        expect(await searchPotSyncs({ ...a, chain: gone, source: indexer(rows, 3).source })).toEqual(NO_SYNCS);
+    });
+
+    it('reports its pick as it goes, and whether a failed page or an abort cut it short (the button’s timeout keeps it)', async () => {
+        const accounts: Accounts = new Map();
+        const rows: Row[] = [];
+        for (let i = 0; i < 120; i++) {
+            await putLender(accounts, ownerAt(i), simpleLender(1n, { epoch: 3, real: BigInt(i + 1) * 10n ** 6n }));
+            rows.push([ownerAt(i), 3]);
+        }
+        // A shortfall no page covers: the search pages on.
+        const chain = claimant({ shareEpoch: 3, lender: { pending: 10n ** 18n } });
+        const a = { rpc: rpcOf(accounts).rpc, math: m, chain, claimant: OWNER, nowS: 0 };
+        // Run to its end: whole, and the progress holds the pick returned.
+        const whole: SearchProgress = { pick: NO_SYNCS, cut: false };
+        const all = await searchPotSyncs({ ...a, source: indexer(rows, 3).source, progress: whole });
+        expect(whole).toEqual({ pick: all, cut: false });
+        expect(all.gain).toBeGreaterThan(0n);
+        // A failing page: what the pages before found, cut short.
+        const failed: SearchProgress = { pick: NO_SYNCS, cut: false };
+        const some = await searchPotSyncs({ ...a, source: indexer(rows, 3, { failAt: 3 }).source, progress: failed });
+        expect(failed.cut).toBe(true);
+        expect(failed.pick).toBe(some);
+        expect(some.gain).toBeGreaterThan(0n);
+        // A page that never answers (a slow indexer): the progress already holds the first pages'
+        // pick for the caller that stops waiting (the button's timeout); the abort cuts it short.
+        const slow = indexer(rows, 3);
+        const stop = new AbortController();
+        const hung: SearchProgress = { pick: NO_SYNCS, cut: false };
+        let reached!: () => void;
+        const third = new Promise<void>((r) => {
+            reached = r;
+        });
+        const source: OtherLenders = async (q) => {
+            if (slow.calls.length >= 2) {
+                reached();
+                await new Promise((r) => setTimeout(r, 20));
+            }
+            return slow.source(q);
+        };
+        const out = searchPotSyncs({ ...a, source, signal: stop.signal, progress: hung });
+        await third;
+        expect(hung.pick.gain).toBe(some.gain);
+        expect(hung.cut).toBe(false);
+        stop.abort();
+        await out;
+        expect(hung.cut).toBe(true);
+    });
+
+    it('the review takes the button’s fresh pick instead of searching again', async () => {
+        const accounts: Accounts = new Map();
+        await putLender(accounts, OTHERS[0] as Address, simpleLender(1n, { epoch: 3, real: 10n ** 9n }));
+        const { rpc } = rpcOf(accounts);
+        const rows = OTHERS.slice(0, 1).map((o): Row => [o, 3]);
+        const chain = claimant({ shareEpoch: 3 });
+        const pick = await searchPotSyncs({
+            rpc,
+            math: m,
+            chain,
+            claimant: OWNER,
+            nowS: 0,
+            source: indexer(rows, 3).source,
+        });
+        const again = indexer(rows, 3);
+        const plan = await claimPlanFrom(env(rpc), chain, 0, again.source, pick);
+        expect(again.calls).toEqual([]);
+        expect(kinds(plan.instructions)).toEqual(['SyncLender', 'ClaimSol']);
+        // A pick of none: the claim alone, still without a search.
+        const none = indexer(rows, 3);
+        expect(kinds((await claimPlanFrom(env(rpc), chain, 0, none.source, NO_SYNCS)).instructions)).toEqual([
+            'ClaimSol',
+        ]);
+        expect(none.calls).toEqual([]);
+    });
+
+    it('a claim whose simulation pays 0 lamports is not offered for signing: “Nothing to claim yet”', async () => {
+        const { rpc } = rpcOf(new Map());
+        const plan = await claimPlanFrom(env(rpc), claimant({ shareEpoch: 3 }), 0, null);
+        const hold = plan.holdSign;
+        expect(hold).toBeDefined();
+        const vault = (before: bigint, after: bigint): SimulationReport => ({
+            ...report(null),
+            deltas: [{ key: `${VAULT}:lamports`, label: 'Market SOL vault', before, after, unit: 'SOL', scale: 9 }],
+        });
+        expect(hold?.(vault(5_000_000n, 5_000_000n))).toBe('Nothing to claim yet');
+        expect(hold?.(vault(5_000_000n, 4_999_999n))).toBeNull();
+        // Without the vault's delta the review's own figures decide (no hold).
+        expect(hold?.(report(null))).toBeNull();
     });
 });

@@ -7,7 +7,8 @@
  * M10-RESP (§5.3, §7.6): the error sits right under the stage; the simulation badge goes once the
  * wallet has it; a wallet rejection reads "Cancelled in your wallet" with one way on (Try again);
  * a timestamp delta is a UTC date; while an acknowledgement blocks Sign a hint says so and takes
- * focus to it; once confirmed, the flow's next step (or the explorer). On a phone the dialog fills
+ * focus to it; a simulation the plan holds (`TxPlan.holdSign`, a claim that pays 0) says why
+ * beside the disabled Sign; once confirmed, the flow's next step (or the explorer). On a phone the dialog fills
  * the screen and Sign — last in the DOM — has the full-width bottom row; in a narrow dialog each
  * delta is two lines.
  */
@@ -27,7 +28,15 @@ import { change } from './deltas.ts';
 import { describeInstruction } from './describe.ts';
 import type { FeeSpeed } from './priorityFee.ts';
 import type { Delta } from './types.ts';
-import { canSign, type RetryMode, requiredAcks, retryMode, type SigningWallet, type TxFlow } from './useTxFlow.ts';
+import {
+    canSign,
+    type RetryMode,
+    requiredAcks,
+    retryMode,
+    type SigningWallet,
+    signHold,
+    type TxFlow,
+} from './useTxFlow.ts';
 
 const RETRY_TEXT: Record<Exclude<RetryMode, 'none'>, string> = {
     resimulate: 'Retry',
@@ -163,7 +172,11 @@ export function TxReviewModal({ flow }: { flow: TxFlow }) {
     const showSim =
         !!report &&
         (stage === 'simulating' || stage === 'review' || (stage === 'failed' && !error?.kind.startsWith('wallet')));
-    const ackBlocks = stage === 'review' && !!report?.ok && requiredAcks(plan).some((id) => !state.acks.has(id));
+    // A simulation the plan itself refuses to sign (`holdSign`: a claim that pays 0) says why
+    // beside the disabled Sign; it outranks an unticked acknowledgement (ticking would not help).
+    const hold = signHold(state);
+    const ackBlocks =
+        hold === null && stage === 'review' && !!report?.ok && requiredAcks(plan).some((id) => !state.acks.has(id));
     const open = stage !== 'idle';
     // Every way out of a confirmed review ends in the same place (Done, ✕, Escape).
     const close =
@@ -210,6 +223,11 @@ export function TxReviewModal({ flow }: { flow: TxFlow }) {
                     </Button>
                 ) : (
                     <>
+                        {hold !== null && (
+                            <p className="form-reason tx-sign-hint" role="status" data-testid={T.txSignHold}>
+                                {hold}
+                            </p>
+                        )}
                         {ackBlocks && (
                             <button
                                 type="button"

@@ -64,7 +64,7 @@ function idleFlow() {
 
 const { CloseForm } = await import('./CloseForm.tsx');
 const { AddMarginForm } = await import('./AddMarginForm.tsx');
-const { exitState } = await import('./SettlementRisk.tsx');
+const { exitShort, exitState, HealthBanner } = await import('./SettlementRisk.tsx');
 const { buildRows } = await import('./data.ts');
 const { liveChannels, positionTotals } = await import('../PositionsPage.tsx');
 
@@ -167,6 +167,52 @@ describe('exit state and the dashboard rows', () => {
         expect(exitState(pos, mx, s.venue, pos.deadline)).toBe('expired');
         expect(exitState({ ...pos, sArmed: 1 }, mx, s.venue, s.now)).toBe('armed');
         expect(exitState(pos, mx, { ...s.venue, executable: false }, s.now)).toBe('no-route');
+    });
+
+    it('past the deadline names the exit the program takes (expire.rs UseLiquidate, NoRoute; sol_settle)', async () => {
+        const { s, pos } = await closeCase('spl-close-after-fall');
+        const mx = positionMetrics(math, s, pos);
+        const liq = BigInt(pos.crLiqBps);
+        const at = pos.deadline;
+        const crit = { ...mx, crBps: liq - 1n, crEmaBps: liq - 1n };
+        // One second before the deadline: the CR states as ever.
+        expect(exitState(pos, crit, s.venue, at - 1n)).toBe('liquidatable');
+        expect(exitState(pos, mx, s.venue, at - 1n)).toBe('healthy');
+        // At and after it, healthy: expire, with the expiry fee.
+        expect(exitState(pos, mx, s.venue, at)).toBe('expired');
+        expect(exitState(pos, mx, s.venue, at + 3_600n)).toBe('expired');
+        // Both legs strictly below the line: expire refuses (UseLiquidate), liquidate takes it.
+        expect(exitState(pos, crit, s.venue, at)).toBe('liquidatable');
+        // Exactly at the line on both legs, or below on the live leg only: not CR-liquidatable.
+        expect(exitState(pos, { ...mx, crBps: liq, crEmaBps: liq }, s.venue, at)).toBe('expired');
+        expect(exitState(pos, { ...mx, crBps: liq - 1n, crEmaBps: liq * 2n }, s.venue, at)).toBe('expired');
+        expect(exitState(pos, { ...mx, crBps: null }, s.venue, at)).toBe('expired');
+        // No route: neither liquidate nor expire can run (NoRoute); S3 after the wait.
+        const none = { ...s.venue, executable: false };
+        expect(exitState(pos, mx, none, at)).toBe('no-route');
+        expect(exitState(pos, crit, none, at)).toBe('no-route');
+        expect(exitState({ ...pos, sArmed: 1 }, crit, none, at)).toBe('no-route');
+        // Armed (S1 / S2 evidence) on an executable venue: the settlement clock keeps running.
+        expect(exitState({ ...pos, sArmed: 1 }, mx, s.venue, at)).toBe('armed');
+        expect(exitState({ ...pos, sArmed: 1 }, crit, s.venue, at)).toBe('armed');
+        // Before the deadline the order is unchanged: armed before no route.
+        expect(exitState({ ...pos, sArmed: 1 }, mx, none, at - 1n)).toBe('armed');
+        expect(exitState(pos, crit, none, at - 1n)).toBe('no-route');
+    });
+
+    it('past the deadline the banner and the dashboard line read the state’s existing text', async () => {
+        const { s, pos } = await closeCase('spl-close-after-fall');
+        const mx = positionMetrics(math, s, pos);
+        const liq = BigInt(pos.crLiqBps);
+        const crit = { ...mx, crBps: liq - 1n, crEmaBps: liq - 1n };
+        expect(exitShort(exitState(pos, crit, s.venue, pos.deadline), pos)).toBe('Liquidatable now');
+        expect(exitShort(exitState(pos, mx, s.venue, pos.deadline), pos)).toBe('Past its deadline: closable by anyone');
+        render(<HealthBanner pos={pos} metrics={crit} venue={s.venue} market={s.market} now={pos.deadline} />);
+        const banner = document.querySelector('.position-health') as HTMLElement;
+        expect(banner.dataset.state).toBe('liquidatable');
+        expect(banner.textContent).toMatch(
+            /^Liquidatable: your CR is below .* Anyone can liquidate this position now\.$/,
+        );
     });
 
     it('builds live rows for open positions and exit rows for closed ones', async () => {

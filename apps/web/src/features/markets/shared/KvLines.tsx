@@ -5,6 +5,7 @@
  * stand out. Plain-text values are judged here; a rendered amount says so with `{ zero }`.
  */
 import type { ReactNode } from 'react';
+import { Term } from '../../../components/Glossary.tsx';
 
 export interface KvOpts {
     /** The value is zero or absent (muted). */
@@ -24,7 +25,9 @@ export function KvLines({ rows, testId }: { rows: readonly KvLine[]; testId?: st
         <dl className="kv mk-kv" data-lines="" data-testid={testId}>
             {rows.map(([k, v, o], i) => (
                 <div key={i} className="kv-row">
-                    <dt>{k}</dt>
+                    <dt>
+                        <Term>{k}</Term>
+                    </dt>
                     <dd data-testid={o?.testId} data-zero={(o?.zero ?? zeroText(v)) ? '' : undefined}>
                         {v}
                     </dd>

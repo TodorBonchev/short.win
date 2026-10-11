@@ -86,6 +86,12 @@ export interface LayoutMetrics {
     };
     /** Pairs of interactive elements whose boxes overlap (neither contains the other). */
     readonly overlaps: { readonly count: number; readonly items: readonly (readonly [string, string])[] };
+    /**
+     * The thirteenth round: controls whose tap area another control covers — a point of the 5 × 5
+     * grid (`collectTapCovers`) that hits a different interactive control outside the page's bars
+     * (header, tab bar, status bar, action bar, form foot, sheet / dialog / menu head, toasts). Measured on the unrolled page with the touch emulation on (absent before).
+     */
+    readonly tapCovers?: TapCovers;
     /** Text nodes rendered under 12 px, grouped by element and size. */
     readonly smallText: { readonly nodes: number; readonly groups: readonly SmallText[] };
     /** Affordances that need a hover: `title` tooltips, `cursor: help`, `:hover`-only reveals. */
@@ -114,6 +120,18 @@ export interface LayoutMetrics {
     readonly primaryUnder44?: { readonly count: number; readonly items: readonly SmallTarget[] };
     /** Measurement was scoped to the open dialog (the background is inert). */
     readonly scopedToDialog: boolean;
+}
+
+export interface TapCovers {
+    /**
+     * Controls judged (visible, in the open dialog when there is one, wholly in the viewport, a
+     * point in view); over scroll steps, each control once.
+     */
+    readonly judged: number;
+    /** Controls with at least one point on another control. */
+    readonly count: number;
+    /** `[covered, covering, points]` (points of 25 per line box), at most 40. */
+    readonly items: readonly (readonly [string, string, number])[];
 }
 
 export interface AxeSummary {
@@ -159,6 +177,8 @@ export interface ViewportSummary {
     readonly smallTextNodes: number;
     readonly titles: number;
     readonly overlaps: number;
+    /** Controls whose tap area another control covers (`LayoutMetrics.tapCovers`). */
+    readonly tapCovers: number;
     readonly axeViolations: number;
     readonly axeNodes: number;
     readonly axeRules: readonly string[];
@@ -186,6 +206,7 @@ export function score(r: ShotRecord): number {
         l.targets.under24 * 2 +
         l.targets.under44 * 0.5 +
         l.overlaps.count * 3 +
+        (l.tapCovers?.count ?? 0) * 5 +
         l.smallText.nodes * 0.1 +
         r.axe.reduce((s, v) => s + 5 * v.nodes, 0) +
         (r.error ? 50 : 0)
@@ -216,6 +237,7 @@ export function summarise(shots: MetricsFile['shots']): Pick<MetricsFile, 'summa
             smallTextNodes: ls.reduce((s, l) => s + l.smallText.nodes, 0),
             titles: ls.reduce((s, l) => s + l.hover.titles.length, 0),
             overlaps: ls.reduce((s, l) => s + l.overlaps.count, 0),
+            tapCovers: ls.reduce((s, l) => s + (l.tapCovers?.count ?? 0), 0),
             axeViolations: rs.reduce((s, r) => s + r.axe.length, 0),
             axeNodes: rs.reduce((s, r) => s + r.axe.reduce((t, v) => t + v.nodes, 0), 0),
             axeRules: [...rules].sort(),
@@ -489,4 +511,181 @@ export function collectLayout(deviceWidth: number): LayoutMetrics {
         primaryUnder44: { count: primaryCount, items: primaryItems },
         scopedToDialog: !!dialog,
     };
+}
+
+/**
+ * Tap areas that cover a neighbour (runs in the browser; the thirteenth round, FRONTEND.md §7.6,
+ * §10.5): every visible interactive control wholly inside the viewport (in the open `<dialog>` when
+ * there is one; not one clipped away, like a card table's header row) is sampled at the focus
+ * check's 5 × 5 grid on each of its line boxes (15 % to 85 % of each side, `e2e/focus-obscured.ts`),
+ * the points inside the box it can be seen in (`clipBox`: the boxes that clip it on its
+ * containing-block chain, up to the top layer) judged, and `document.elementFromPoint` must not
+ * land on a **different** interactive control — one that is neither the control, its ancestor or
+ * descendant nor its `<label>` — outside the page's bars while they are over the page (the header,
+ * the tab bar, the status bar, an action bar, a form foot, a sheet's head and the toasts, each
+ * exempt only while fixed or sticky away from its place in the flow: the page scrolls under them by
+ * design and 2.4.11 keeps focus clear of them; any other fixed or sticky box — an open sheet, the
+ * sticky trade panel, a sticky table header, a dialog — is judged) and outside an open popup
+ * layered over the page (a popover's or a menu's own controls). An enlarged hit area
+ * (`.hit::after`) counts as its control's. The capture runs it on the unrolled page (every control
+ * in view, the fixed bars past the content's end), or, where unrolling would change the layout (a
+ * landscape phone grown taller than wide, a short phone grown past 700 px), at the real size in
+ * scroll steps (`responsive.spec.ts`); in an open dialog or overlay, and in a page that fits its
+ * screen, at the real size; in each case with every box that scrolls its own content (a dialog's
+ * body, an open sheet, the side trade panel) stepped, and with the touch emulation on, so the
+ * coarse-pointer hit areas are the ones measured.
+ */
+export function collectTapCovers(): TapCovers {
+    const INTERACTIVE =
+        'a[href], button, input:not([type="hidden"]), select, textarea, summary, [role="button"], [role="tab"], ' +
+        '[role="menuitem"], [role="link"], [role="checkbox"], [role="radio"], [role="switch"], [role="option"], ' +
+        '[tabindex]:not([tabindex="-1"])';
+    const MAX_ITEMS = 40;
+    const testIdOf = (el: Element | null): string | null => el?.getAttribute('data-testid') ?? null;
+    const describe = (el: Element): string => {
+        const tag = el.tagName.toLowerCase();
+        const tid = testIdOf(el);
+        let s = tid ? `${tag}[data-testid="${tid}"]` : tag;
+        if (!tid) {
+            const cls = [...el.classList].slice(0, 3);
+            if (cls.length) s += `.${cls.join('.')}`;
+            let a = el.parentElement;
+            while (a && !testIdOf(a)) a = a.parentElement;
+            if (a) s = `[data-testid="${testIdOf(a)}"] ${s}`;
+        }
+        const label = (el.getAttribute('aria-label') ?? el.textContent ?? '').replace(/\s+/g, ' ').trim();
+        if (label) s += ` «${label.slice(0, 32)}»`;
+        return s;
+    };
+    const isVisible = (el: Element): boolean => {
+        if (!el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return false;
+        const r = el.getBoundingClientRect();
+        return r.width > 1 && r.height > 1;
+    };
+    // The page's bars only (the same list and rule as focus-obscured.ts): a control in another fixed
+    // or sticky box — an open trade or Manage sheet, the sticky trade panel, a sticky table header, a
+    // modal dialog — is judged like any other (the round-13 review). A bar is exempt only while it is
+    // over the page: fixed, or sticky and stuck away from its place in the flow (the second approval
+    // pass's review: a form foot in the flow, as in a landscape phone's sheet, is judged).
+    const BARS = '.app-header, .nav, .statusbar, .action-bar, .form-foot, .sheet-head, .toast-region';
+    const overPage = new Map<Element, boolean>();
+    const isOverPage = (bar: Element): boolean => {
+        const known = overPage.get(bar);
+        if (known !== undefined) return known;
+        const pos = getComputedStyle(bar).position;
+        let over = pos === 'fixed';
+        if (pos === 'sticky' && bar instanceof HTMLElement) {
+            // Where the flow would put it: the same box without the sticky offset (CSSOM, not an
+            // inline style attribute: the CSP allows it), then restored.
+            const at = bar.getBoundingClientRect();
+            const was = bar.style.getPropertyValue('position');
+            const prio = bar.style.getPropertyPriority('position');
+            bar.style.setProperty('position', 'static', 'important');
+            const flow = bar.getBoundingClientRect();
+            if (was) bar.style.setProperty('position', was, prio);
+            else bar.style.removeProperty('position');
+            over = Math.abs(at.top - flow.top) > 0.5 || Math.abs(at.left - flow.left) > 0.5;
+        }
+        overPage.set(bar, over);
+        return over;
+    };
+    const inBar = (el: Element): boolean => {
+        for (let b = el.closest(BARS); b; b = b.parentElement?.closest(BARS) ?? null) if (isOverPage(b)) return true;
+        return false;
+    };
+    const dialog = document.querySelector('dialog[open]');
+    const scope: ParentNode = dialog ?? document;
+    const vw = document.documentElement.clientWidth;
+    const vh = window.innerHeight;
+    /** Inside a `clip: rect(0 0 0 0)` box (a card table's header row, a skip link before it shows). */
+    const clipped = (e: Element): boolean => {
+        for (let n: Element | null = e; n; n = n.parentElement) {
+            if (/^rect\(0(px)?,? 0(px)?,? 0(px)?,? 0(px)?\)$/.test(getComputedStyle(n).clip)) return true;
+        }
+        return false;
+    };
+    const controls = [...scope.querySelectorAll(INTERACTIVE)].filter(
+        (el) => isVisible(el) && !el.closest('.skip-link, .visually-hidden, [inert]') && !clipped(el),
+    );
+    /**
+     * The box the control can be seen in: the viewport cut by every box that clips it — the
+     * ancestors with a non-visible overflow on its containing-block chain (an absolutely positioned
+     * box escapes an unpositioned scroller, a fixed one every box without a transform, filter or
+     * containment), up to the top layer (an open modal `<dialog>` or popover is clipped by its own
+     * overflow, never by the panel or sheet it sits in in the DOM: the second approval pass's
+     * review). Points outside it land on what is drawn there (a dialog's foot past its scrolled
+     * body, a sideways strip's edge): a scroll position, not a touch area over the control, so only
+     * the points inside are judged.
+     */
+    const clipBox = (e: Element): { left: number; top: number; right: number; bottom: number } => {
+        const box = { left: 0, top: 0, right: vw, bottom: vh };
+        const fixedCb = (cs: CSSStyleDeclaration): boolean =>
+            cs.transform !== 'none' ||
+            cs.filter !== 'none' ||
+            cs.perspective !== 'none' ||
+            /paint|layout|strict|content/.test(cs.contain) ||
+            /transform|filter|perspective/.test(cs.willChange);
+        if (e.matches(':modal, :popover-open')) return box;
+        let pos = getComputedStyle(e).position;
+        for (let n = e.parentElement; n && n !== document.documentElement; n = n.parentElement) {
+            const cs = getComputedStyle(n);
+            const contains =
+                pos === 'fixed' ? fixedCb(cs) : pos === 'absolute' ? cs.position !== 'static' || fixedCb(cs) : true;
+            if (contains) {
+                if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible') {
+                    const b = n.getBoundingClientRect();
+                    const left = b.left + n.clientLeft;
+                    const top = b.top + n.clientTop;
+                    box.left = Math.max(box.left, left);
+                    box.top = Math.max(box.top, top);
+                    box.right = Math.min(box.right, left + n.clientWidth);
+                    box.bottom = Math.min(box.bottom, top + n.clientHeight);
+                }
+                pos = cs.position;
+            }
+            if (n.matches(':modal, :popover-open')) break;
+        }
+        return box;
+    };
+    const F = [0.15, 0.325, 0.5, 0.675, 0.85];
+    // Across one capture's scroll steps (`responsive.spec.ts` sets it): each control counted once.
+    const counted = (window as unknown as { __tapCounted?: WeakSet<Element> }).__tapCounted;
+    const items: [string, string, number][] = [];
+    let judged = 0;
+    let count = 0;
+    for (const el of controls) {
+        // Each line box of the control (a link wrapped over two lines has two), as the focus check.
+        const rects = Array.from(el.getClientRects()).filter((r) => r.width >= 1 && r.height >= 1);
+        if (!rects.length || rects.some((r) => r.left < 0 || r.top < 0 || r.right > vw || r.bottom > vh)) continue;
+        const clip = clipBox(el);
+        let seen = 0;
+        let on = 0;
+        let by: Element | null = null;
+        for (const r of rects)
+            for (const fx of F)
+                for (const fy of F) {
+                    const x = r.left + r.width * fx;
+                    const y = r.top + r.height * fy;
+                    if (x < clip.left || x > clip.right || y < clip.top || y > clip.bottom) continue;
+                    seen++;
+                    const hit = document.elementFromPoint(x, y);
+                    if (!hit || hit === el || el.contains(hit)) continue;
+                    const label = hit.closest('label');
+                    if (label && (label.contains(el) || (label as HTMLLabelElement).control === el)) continue;
+                    const other = hit.closest(INTERACTIVE);
+                    if (!other || other === el || other.contains(el) || el.contains(other) || inBar(other)) continue;
+                    // An open popup over the page (the tier popover, a menu): a layer, not a touch area.
+                    const layer = other.closest('[role="dialog"], [role="menu"], [role="listbox"], [popover]');
+                    if (layer && !layer.contains(el)) continue;
+                    on++;
+                    by ??= other;
+                }
+        if (seen === 0) continue;
+        if (!counted?.has(el)) judged++;
+        counted?.add(el);
+        if (on === 0 || !by) continue;
+        count++;
+        if (items.length < MAX_ITEMS) items.push([describe(el), describe(by), on]);
+    }
+    return { judged, count, items };
 }

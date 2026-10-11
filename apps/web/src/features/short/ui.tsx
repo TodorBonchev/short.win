@@ -1,7 +1,9 @@
 /** SHORT track — small presentational pieces shared by the Short panel and the position pages. */
 import type { Params, TierParams } from '@shortwin/client';
+import type { ReactNode } from 'react';
 import { crBand, RiskBadge, riskLevel } from '../../components/Badge.tsx';
 import { Disclosure } from '../../components/Disclosure.tsx';
+import { Term } from '../../components/Glossary.tsx';
 import { PROGRAM_ERRORS, type ProgramErrorInfo } from '../../config/errors.ts';
 import { T } from '../../config/testids.ts';
 import { formatBps, formatCr, formatDuration, formatFixed, formatSol } from '../../lib/format.ts';
@@ -73,8 +75,20 @@ export function RiskCell({
     );
 }
 
-/** Why opens are refused now (`shortBlocked`, `data-code` = the program error name) and its disclosure. */
-export function BlockedNotice({ blocked, vars }: { blocked: Blocked; vars?: Readonly<Record<string, string>> }) {
+/**
+ * Why opens are refused now (`shortBlocked`, `data-code` = the program error name) and its
+ * disclosure — or, when the page's banner already shows that disclosure in full, `instead` (the
+ * link to the banner, the owner's thirteenth round O-2).
+ */
+export function BlockedNotice({
+    blocked,
+    vars,
+    instead,
+}: {
+    blocked: Blocked;
+    vars?: Readonly<Record<string, string>>;
+    instead?: ReactNode;
+}) {
     const info = errorByName(blocked.code);
     return (
         <div className="short-blocked">
@@ -92,7 +106,7 @@ export function BlockedNotice({ blocked, vars }: { blocked: Blocked; vars?: Read
                     )}
                 </div>
             </div>
-            {blocked.disclosure && <Disclosure id={blocked.disclosure} vars={vars} />}
+            {instead ?? (blocked.disclosure && <Disclosure id={blocked.disclosure} vars={vars} />)}
         </div>
     );
 }
@@ -124,7 +138,9 @@ export function TierTerms({ tier, tp, params }: { tier: TierIndex; tp: TierParam
             <dl className="kv">
                 {rows.map(([k, v]) => (
                     <div key={k} style={{ display: 'contents' }}>
-                        <dt>{k}</dt>
+                        <dt>
+                            <Term>{k}</Term>
+                        </dt>
                         <dd className="num">{v}</dd>
                     </div>
                 ))}

@@ -907,6 +907,15 @@ a.btn {
     }
 }
 
+/* A header may wrap (thirteenth round): with the 12 px floor and the glossary's ⓘ, a header row no
+   longer fits on one line in every table at every width (the markets list at 1,024 px; the market
+   tabs beside the trade panel and the lender dashboard at 1,280 px). The table's auto layout wraps
+   a header only when the table would not fit otherwise — at 1,440 px every header is one line —
+   and values stay on one line. Not by viewport width: the table's own width is what runs out. */
+.tbl th {
+    white-space: normal;
+}
+
 .tbl th {
     position: sticky;
     top: 0;
@@ -1205,13 +1214,8 @@ a.btn {
     margin-left: 0.3em;
     color: var(--text-2);
     font-family: var(--font-ui);
-    font-size: 0.9em;
-}
-
-@media (max-width: 639.98px) {
-    .unit {
-        font-size: max(0.9em, 12px);
-    }
+    /* A notch under its number, never under the 12 px floor (O-4: at every width). */
+    font-size: max(0.9em, 12px);
 }
 
 /* ---- disclosure -------------------------------------------------------------------------- */
@@ -2032,10 +2036,13 @@ bdi,
 /* A landscape phone (the tablet tier's width, a touch screen, wider than tall): the side sheet is
    ~390 px tall, its head and tabs take half of it, and a form that starts low cannot lift a sticky
    foot over its own fields (sticky stays inside its form) — the submit was cut off and covered the
-   inputs. There the foot stays in the flow, under the fields; the sheet scrolls to it. */
+   inputs. There the foot stays in the flow, under the fields; the sheet scrolls to it — and under
+   the sheet's sticky head: a flex item's z-index applies even in the flow, so the foot's would
+   paint it over the head's title and ✕ at the end of the Manage sheet (the fix round's review). */
 @media (min-width: 640px) and (max-width: 1023.98px) and (pointer: coarse) and (orientation: landscape) {
     .sheet-host[data-sheet="open"] .form-foot {
         position: static;
+        z-index: auto;
     }
 }
 
@@ -2496,4 +2503,256 @@ a.menu-item {
     display: inline-flex;
     align-items: center;
     gap: var(--sp-2);
+}
+
+/* ---- glossary (FRONTEND.md §4.3; the owner's thirteenth round, O-3 (b)) ---------------------
+   The ⓘ beside a jargon label: a 24 px box (WCAG 2.5.8, the hit test's own size) that overhangs
+   its line rather than grow it: -5 px block margins leave a 14 px margin box, inside the smallest
+   line (12 px × 1.25), so a label with an ⓘ is exactly as tall as one without (one rhythm for
+   hairline rows and stat labels), and its text keeps the line's own baseline (a taller line box put
+   the label's last word, the one beside the ⓘ, a pixel lower than the rest). The icon's centre sits
+   on the capitals' centre: 0.36 em above the baseline, less half the 13 px icon. Where rows sit
+   closer than 24 px, the list spaces them (`.kv` below) so two rows' ⓘ never overlap; 44 px of
+   touch area under a finger (`.hit`). The definition is fixed-position (placed from the ⓘ by JavaScript, CSSOM)
+   on a tablet and a desktop, a bottom sheet over a scrim on a phone. */
+/* Inline: a label that wraps keeps its ⓘ after its last word. */
+.term {
+    display: inline;
+}
+
+.glossary-tip {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    margin-block: -5px;
+    padding: 0;
+    color: var(--text-2);
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    vertical-align: calc(0.36em - 6.5px);
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.term > .glossary-tip {
+    margin-left: 2px;
+}
+
+/* A key / value list with ⓘ: rows 24 px apart at least (a 12 px row is 17.4 px plus a 4 px gap), so
+   the ⓘ of two rows never overlap — every row, so the list keeps one rhythm. Hairline rows are
+   taller already. */
+.kv:has(.glossary-tip):not([data-lines]) {
+    row-gap: max(var(--sp-2), calc(24px - 1lh));
+}
+
+.glossary-tip[aria-expanded="true"] {
+    color: var(--info);
+}
+
+@media (hover: hover) {
+    .glossary-tip:hover {
+        color: var(--text-0);
+        background: var(--bg-3);
+    }
+}
+
+.glossary-tip-icon {
+    width: 13px;
+    height: 13px;
+}
+
+.glossary-popover {
+    position: fixed;
+    z-index: var(--z-menu);
+    width: min(360px, calc(100vw - 16px));
+    max-height: min(60dvh, 420px);
+    overflow-y: auto;
+    padding: var(--sp-3) var(--sp-4) var(--sp-4);
+    background: var(--bg-2);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 55%);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-regular);
+    line-height: var(--lh);
+    color: var(--text-0);
+    text-align: left;
+    text-transform: none;
+    letter-spacing: 0;
+    white-space: normal;
+}
+
+/* Not placed yet (the first frame): measured but not seen. */
+.glossary-popover:not([data-placed]) {
+    opacity: 0;
+}
+
+.glossary-popover:focus {
+    outline: none;
+}
+
+.glossary-popover:focus-visible {
+    outline: 2px solid var(--focus);
+}
+
+.glossary-popover p {
+    margin: 0;
+}
+
+.glossary-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-2);
+}
+
+h2.glossary-title {
+    margin: 0;
+    font-size: var(--fs-md);
+    font-weight: var(--fw-bold);
+}
+
+.btn.glossary-close {
+    flex: none;
+    width: max(28px, var(--tap-min));
+    height: max(28px, var(--tap-min));
+    padding: 0;
+}
+
+.glossary-scrim {
+    display: none;
+}
+
+@media (max-width: 639.98px) {
+    .glossary-popover {
+        inset: auto 0 0;
+        z-index: calc(var(--z-modal) + 1);
+        width: auto;
+        max-height: 70dvh;
+        padding-bottom: calc(var(--sp-4) + var(--safe-b));
+        border-width: 1px 0 0;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        font-size: var(--fs-md);
+    }
+
+    .glossary-scrim {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: var(--z-modal);
+        background: var(--bg-overlay);
+    }
+}
+
+/* A header's ⓘ: the sort button's `all: unset` reaches it too (same element type); restore its box
+   — and `position: relative`, or its `.hit` area would cover the whole header cell (the sort button
+   under it). */
+.tbl th button.glossary-tip {
+    position: relative;
+    flex: none;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    min-height: 0;
+    /* No negative block margins here: a wrapped header puts the ⓘ under its sort button, and the
+       two 24 px targets must not overlap. */
+    margin: 0 0 0 2px;
+    color: var(--text-2);
+    vertical-align: middle;
+    border-radius: var(--radius-sm);
+}
+
+@media (hover: hover) {
+    .tbl th button.glossary-tip:hover {
+        color: var(--text-0);
+        text-decoration: none;
+        background: var(--bg-3);
+    }
+}
+
+/* A field label with its glossary ⓘ (outside the <label>). */
+.field-head {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+}
+
+/* The ⓘ never makes the label row taller than the label (a form keeps its geometry). */
+.field-head > .glossary-tip {
+    margin-block: -4px;
+}
+
+/* Beside a badge (flags, creator, epoch, settlement badges) the ⓘ takes its full 24 px in the line:
+   badges sit in wrapping rows and table cells whose neighbours are controls (a copy button, the
+   next row), which an overhanging ⓘ would reach. */
+.term:has(> .badge) > .glossary-tip {
+    margin-block: 0;
+    vertical-align: middle;
+}
+
+/* A button that reads as a link (an in-page action: "Read the full coverage notice"); a 24 px
+   target, 44 px under a finger, underlined (not colour alone). */
+.link-button {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-min);
+    padding: 0;
+    color: var(--info);
+    font: inherit;
+    text-align: left;
+    text-decoration: underline;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+}
+
+.link-button:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+}
+
+/* The ⓘ's hit area grows sideways only: 32 × 24 px with a mouse, 44 × 24 px under a finger (the
+   thirteenth round's last reviews). Grown on all sides (`.hit`: 4 px, or to 44 × 44 px under a
+   finger) it reached past the 24 px box over the ⓘ of the next row in a key / value list (rows
+   24–28 px apart: the lend position, the Claim tab, the Short preview) and over a Copy button or a
+   field just above or below (the market header's mint, the creator's address, the withdraw
+   amount), so a click or a tap near that edge hit the wrong control. Above and below an ⓘ sit other
+   rows; beside it, its label and free space. 24 px tall is WCAG 2.5.8's floor, which the box alone
+   meets. */
+.glossary-tip.hit::after {
+    inset: 0 -4px;
+}
+
+@media (pointer: coarse) {
+    .glossary-tip.hit::after {
+        inset: 0 -10px;
+    }
+}
+
+/* The status bar's ⓘ: a hit area that grows sideways only. Its full-height `.hit` would reach below
+   the bar (the page's bottom edge) and make a short page scroll. */
+.statusbar .glossary-tip.hit::after {
+    inset: 0 -4px;
+}
+
+/* A table header's ⓘ sits 2 px beside its sort button: no growth at all (its own 24 px box), with a
+   mouse as under a finger. */
+.tbl th .glossary-tip.hit::after {
+    inset: 0;
+}
+
+/* Card mode: the header row is clipped (the cells carry their labels), so a header's ⓘ would be an
+   invisible Tab stop over the first card. The cards' own ⓘ (flags, badges) stay; the stat strips
+   and the market page carry the columns' terms. */
+@container tbl (max-width: 559.98px) {
+    .tbl thead .glossary-tip {
+        display: none;
+    }
 }

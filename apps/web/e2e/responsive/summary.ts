@@ -34,6 +34,7 @@ const cols = [
     ['targetsUnder44', '<44px'],
     ['targetsUnder24', '<24px'],
     ['overlaps', 'overlaps'],
+    ['tapCovers', 'tap-cover'],
     ['smallTextNodes', 'text<12'],
     ['titles', 'title-tips'],
     ['axeViolations', 'axe'],
@@ -50,7 +51,7 @@ if (dirs.length >= 2) {
     for (const vp of all) {
         const b = m.summary[vp];
         const a = after.summary[vp];
-        const cell = (k: (typeof keep)[number][0]) => `${b ? String(b[k]) : '–'} → ${a ? String(a[k]) : '–'}`;
+        const cell = (k: (typeof keep)[number][0]) => `${String(b?.[k] ?? '–')} → ${String(a?.[k] ?? '–')}`;
         console.log([vp.padEnd(10), ...keep.map(([k]) => cell(k).padStart(13))].join(''));
     }
     console.log('\naxe rules after:');
@@ -63,7 +64,7 @@ console.log(['viewport'.padEnd(10), ...cols.map(([, h]) => h.padStart(11))].join
 for (const vp of vps) {
     const s = m.summary[vp];
     if (!s) continue;
-    console.log([vp.padEnd(10), ...cols.map(([k]) => String(s[k]).padStart(11))].join(''));
+    console.log([vp.padEnd(10), ...cols.map(([k]) => String(s[k] ?? '–').padStart(11))].join(''));
 }
 console.log('\naxe rules per viewport:');
 for (const vp of vps) console.log(`  ${vp}: ${m.summary[vp]?.axeRules.join(', ') || '—'}`);

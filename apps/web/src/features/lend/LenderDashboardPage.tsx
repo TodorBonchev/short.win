@@ -4,7 +4,13 @@
  * `lock_until`, the share-epoch standing (current / behind / parked on a wipe record), whether the
  * indexer's view is in sync (unsynced / quarantined), creator badges — with a claim per row and
  * "claim all" (one reviewed transaction per market, in turn; each claim syncs the other lenders
- * whose touch funds the pot first, as Lend → Claim does, KI66-R4). Numbers come from the chain through
+ * whose touch funds the pot first, as Lend → Claim does, KI66-R4). A row's Claim is the panel's
+ * (the owner's decision of 2026-10-11; audit finding D-21): the same claim (`claimPlanFrom`, the
+ * syncs gathered for a shortfall of 10,000 lamports or more), enabled whenever the panel's would be
+ * — something claimable now, or syncs that can add 10,000 lamports or more (the owner's decision of
+ * 2026-10-11, "only when syncs can pay": each row's search runs in the background, at most two at
+ * once, `claim/syncSearch.ts`) — and labelled like it (`ClaimLabel`); "Claim all" claims the same
+ * rows. Numbers come from the chain through
  * the WASM previews (FE-D1); the indexer lists the markets (or `getProgramAccounts` while it is
  * unavailable).
  */
@@ -18,6 +24,7 @@ import { Badge } from '../../components/Badge.tsx';
 import { Button } from '../../components/Button.tsx';
 import { type Column, DataTable } from '../../components/DataTable.tsx';
 import { Disclosure } from '../../components/Disclosure.tsx';
+import { Term } from '../../components/Glossary.tsx';
 import { Bps, Sol, Tokens } from '../../components/Num.tsx';
 import { Panel } from '../../components/Panel.tsx';
 import { Empty, ErrorState, Stat } from '../../components/States.tsx';
@@ -37,7 +44,9 @@ import { ConnectCta } from '../../wallet/ConnectCta.tsx';
 import { useWallet } from '../../wallet/useWallet.ts';
 import { claimPlanFrom, syncPlanFrom } from './build.ts';
 import { chainNowSeconds } from './chain.ts';
+import { ClaimLabel } from './claim/ClaimLabel.tsx';
 import { indexerLenders } from './claim/otherLenders.ts';
+import { type ClaimOffer, claimOffer, SEARCH_OFF, type SyncSearch, useClaimSyncSearches } from './claim/syncSearch.ts';
 import { planContextFor } from './ctx.ts';
 import { type IndexerState, type LenderRow, totalValueLamports, useLenderRows } from './dashboard/rows.ts';
 import { useNowSeconds } from './hooks.ts';
@@ -69,8 +78,23 @@ export function LenderDashboardPage() {
     const [planError, setPlanError] = useState<string | null>(null);
     /** "Claim all": the markets still to claim, by market address. */
     const queue = useRef<string[]>([]);
+    // What each row's syncs can add, searched before its Claim offers them (`syncSearch.ts`); none
+    // while the indexer is down (its lenders list is where the syncs come from).
+    const searchList = useClaimSyncSearches(
+        rows.map((r) => ({
+            chain: r.chain,
+            shortfall: indexerDown ? 0n : (r.claim?.shortfall ?? 0n),
+            claimable: r.claim?.claimable ?? 0n,
+        })),
+        math,
+        owner,
+        qc,
+    );
+    const searches = new Map(rows.map((r, i) => [r.market, searchList[i] ?? SEARCH_OFF] as const));
+    const offerOf = (r: LenderRow): ClaimOffer | null =>
+        r.claim ? claimOffer(r.claim, searches.get(r.market) ?? SEARCH_OFF) : null;
 
-    const start = async (row: LenderRow, make: 'claim' | 'sync') => {
+    const start = async (row: LenderRow, make: 'claim' | 'sync', search: SyncSearch = SEARCH_OFF) => {
         if (!signer || !row.chain) return;
         setBusy(`${make}:${row.market}`);
         setPlanError(null);
@@ -78,8 +102,10 @@ export function LenderDashboardPage() {
             let plan: TxPlan;
             if (math) {
                 // The builders the review's Retry re-runs on a fresh read (`build.ts`, M9-UX-1). A
-                // claim syncs the other lenders it needs first, as Lend → Claim does (KI66-R4).
+                // claim syncs the other lenders it needs first, as Lend → Claim does (KI66-R4): the
+                // row's own pick while it is fresh, else the review searches again.
                 const env = { rpc: client.rpc, math, mint: row.mint, signer, symbol: row.symbol };
+                const pick = search.status === 'done' && search.fresh && search.pick ? search.pick : undefined;
                 plan =
                     make === 'claim'
                         ? await claimPlanFrom(
@@ -87,6 +113,7 @@ export function LenderDashboardPage() {
                               row.chain,
                               chainNowSeconds(row.chain, Date.now()),
                               indexerLenders(qc, row.mint),
+                              pick,
                           )
                         : await syncPlanFrom(env, row.chain);
             } else {
@@ -104,8 +131,8 @@ export function LenderDashboardPage() {
             setBusy(null);
         }
     };
-    const latest = useRef({ rows, start });
-    latest.current = { rows, start };
+    const latest = useRef({ rows, start, searches });
+    latest.current = { rows, start, searches };
 
     // One review per market; the next opens when the previous one is done, and a review closed
     // without landing stops the queue.
@@ -123,17 +150,20 @@ export function LenderDashboardPage() {
         }
         const next = queue.current.shift();
         const row = next ? latest.current.rows.find((r) => r.market === next) : undefined;
-        if (row) void latest.current.start(row, 'claim');
+        if (row) void latest.current.start(row, 'claim', latest.current.searches.get(row.market));
     }, [stage, title, toast]);
 
-    const claimable = rows.filter((r) => (r.position?.claimable ?? 0n) > 0n && r.standing.kind !== 'behind');
+    // The rows "Claim all" claims: each one whose own Claim button is enabled (`canClaim`, the same
+    // predicate as the row's), so the count, the total and the KPI match the enabled buttons. The
+    // total is what is claimable now: with only rows that pay through their syncs it reads 0 SOL.
+    const claimable = rows.filter((r) => canClaim(r, offerOf(r)));
     const totalClaimable = claimable.reduce((s, r) => s + (r.position?.claimable ?? 0n), 0n);
 
     const claimAll = () => {
         const [first, ...rest] = claimable;
         if (!first) return;
         queue.current = rest.map((r) => r.market);
-        void start(first, 'claim');
+        void start(first, 'claim', searches.get(first.market));
     };
 
     const busyFlow = flow.state.stage !== 'idle';
@@ -247,8 +277,16 @@ export function LenderDashboardPage() {
             priority: 3,
             render: (r) => (
                 <span data-testid={T.lenderCell('creator')} data-value={String(r.isCoinCreator || r.isMarketCreator)}>
-                    {r.isCoinCreator && <Badge tone="warn">Coin creator</Badge>}{' '}
-                    {r.isMarketCreator && <Badge tone="info">Market creator</Badge>}
+                    {r.isCoinCreator && (
+                        <Term id="coinCreator">
+                            <Badge tone="warn">Coin creator</Badge>
+                        </Term>
+                    )}{' '}
+                    {r.isMarketCreator && (
+                        <Term id="marketCreator">
+                            <Badge tone="info">Market creator</Badge>
+                        </Term>
+                    )}
                 </span>
             ),
         },
@@ -259,8 +297,9 @@ export function LenderDashboardPage() {
             align: 'right',
             card: 'actions',
             render: (r) => {
-                const sync = r.standing.kind === 'behind' && r.chain && !r.chain.recordsComplete;
-                const reason = sync ? null : claimReason(r);
+                const sync = needsSync(r);
+                const offer = offerOf(r);
+                const reason = sync ? null : claimReason(r, offer);
                 const reasonId = `lender-claim-reason-${r.market}`;
                 return (
                     <>
@@ -300,13 +339,17 @@ export function LenderDashboardPage() {
                             <Button
                                 size="sm"
                                 variant="primary"
-                                disabled={!signer || reason !== null || busyFlow}
-                                busy={busy === `claim:${r.market}`}
-                                onClick={() => void start(r, 'claim')}
+                                disabled={!signer || !canClaim(r, offer) || busyFlow}
+                                busy={busy === `claim:${r.market}` || !!offer?.waiting}
+                                onClick={() => void start(r, 'claim', searches.get(r.market))}
                                 data-testid={T.lenderClaim(r.market)}
                                 aria-describedby={reason ? reasonId : undefined}
+                                className="lend-claim-submit"
+                                data-lines={offer && offer.syncs > 0n ? '2' : undefined}
                             >
-                                Claim
+                                {/* The panel's label (Lend → Claim): what this claim pays now and
+                                    what its syncs can add; "Claim" until the chain is read. */}
+                                {offer ? <ClaimLabel claimable={offer.claimable} syncs={offer.syncs} /> : 'Claim'}
                             </Button>
                         )}
                         {reason && (
@@ -334,8 +377,10 @@ export function LenderDashboardPage() {
                         <FreshnessBadge />
                     ))}
                 <span className="grow" />
-                {/* "Claim all" only when something is claimable: in the header on a desktop, in the
-                    action bar within thumb reach under 1024 px (one element; lend.css). */}
+                {/* "Claim all" when a row's Claim is open (something claimable, or syncs that can
+                    add to it: its total, what is claimable now, can then read 0 SOL): in the header
+                    on a desktop, in the action bar within thumb reach under 1024 px (one element;
+                    lend.css). */}
                 {owner && claimable.length > 0 && (
                     <ActionBar label="Lending actions">
                         <Button
@@ -444,11 +489,31 @@ export function LenderDashboardPage() {
     );
 }
 
-/** Why a row's Claim is disabled, in text (null when it is enabled, or only busy). */
-function claimReason(r: LenderRow): string | null {
+/** A row behind the share epoch with records still to read: it shows Sync instead of Claim. */
+function needsSync(r: LenderRow): boolean {
+    return r.standing.kind === 'behind' && !!r.chain && !r.chain.recordsComplete;
+}
+
+/**
+ * Whether a row's Claim button is enabled (a signer and no review open aside): the one predicate
+ * for the button and for "Claim all" (its count, its total, the SOL claimable KPI). It opens as
+ * Lend → Claim's does (`claimOffer`): something claimable now, or syncs that can add 10,000 lamports
+ * or more (the owner's decision of 2026-10-11) — not while that search still runs. A row behind the
+ * share epoch with every record read claims (the claim walks the records) and counts.
+ */
+function canClaim(r: LenderRow, offer: ClaimOffer | null): boolean {
+    return !needsSync(r) && claimReason(r, offer) === null && !!offer?.open;
+}
+
+/**
+ * Why a row's Claim is disabled, in text (null when it is enabled, or only busy — its search for
+ * syncs still running with nothing claimable now: no reason until it ends, so none flips).
+ */
+function claimReason(r: LenderRow, offer: ClaimOffer | null): string | null {
     if (r.chainError) return 'Chain read failed';
     if (!r.position) return r.chain ? 'Nothing to claim' : 'Reading the chain…';
-    if (r.position.claimable === 0n) return 'Nothing to claim yet';
+    if (offer?.waiting) return null;
+    if (!offer?.open) return 'Nothing to claim yet';
     return null;
 }
 
@@ -465,9 +530,13 @@ function SyncCell({ row: r }: { row: LenderRow }) {
                 data-value={String(s.kind === 'behind' ? s.epochs : 0)}
             >
                 {s.kind === 'behind' ? (
-                    <Badge tone="warn">{`${s.epochs} epochs behind`}</Badge>
+                    <Term id="shareEpoch">
+                        <Badge tone="warn">{`${s.epochs} epochs behind`}</Badge>
+                    </Term>
                 ) : s.kind === 'parked' ? (
-                    <Badge tone="danger">Pool wiped out</Badge>
+                    <Term id="poolWiped">
+                        <Badge tone="danger">Pool wiped out</Badge>
+                    </Term>
                 ) : null}
             </span>
             <span data-testid={T.lenderIndexer(r.market)} data-state={r.indexer}>

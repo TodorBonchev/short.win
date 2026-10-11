@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SimulationReport, TxPlan } from './types.ts';
-import { canSign, requiredAcks, type TxFlowState, txReducer } from './useTxFlow.ts';
+import { canSign, requiredAcks, signHold, type TxFlowState, txReducer } from './useTxFlow.ts';
 
 const plan: TxPlan = {
     kind: 'deposit',
@@ -48,6 +48,25 @@ describe('transaction flow', () => {
         expect(canSign(s)).toBe(true);
         s = txReducer(s, { t: 'ack', id: 'lender.solRepayment', v: false });
         expect(canSign(s)).toBe(false);
+    });
+
+    it('never offers Sign for a simulation the plan holds (a claim that pays 0: “Nothing to claim yet”)', () => {
+        const claim: TxPlan = {
+            ...plan,
+            kind: 'claim_sol',
+            disclosures: [],
+            holdSign: (r) => (r.deltas.length === 0 ? 'Nothing to claim yet' : null),
+        };
+        let s = txReducer(idle, { t: 'start', plan: claim });
+        expect(signHold(s)).toBeNull();
+        s = txReducer(s, { t: 'simulated', report: ok });
+        expect(s.stage).toBe('review');
+        expect(signHold(s)).toBe('Nothing to claim yet');
+        expect(canSign(s)).toBe(false);
+        const paid = { key: 'v:lamports', label: 'Market SOL vault', before: 2n, after: 1n, unit: 'SOL', scale: 9 };
+        s = txReducer(s, { t: 'simulated', report: { ...ok, deltas: [paid] } });
+        expect(signHold(s)).toBeNull();
+        expect(canSign(s)).toBe(true);
     });
 
     it('never offers Sign after a failed simulation', () => {

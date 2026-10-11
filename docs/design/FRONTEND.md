@@ -2,7 +2,9 @@
 
 *v1.4 • 2026-10-09 • **as built** (M9 integrated, then the M9 security and UX review fixed — §13
 "Review fixes"; v1.3 folds in M10 — §13 "M10 changes"; v1.4 makes the app responsive — phones,
-tablets and desktops, the owner's request of 2026-10-09, §7.6–§7.7 and §13 "M10-RESP changes"; v1.0 of 2026-10-01 was the contract the four
+tablets and desktops, the owner's request of 2026-10-09, §7.6–§7.7 and §13 "M10-RESP changes"; v1.5 adds the
+owner's thirteenth-round UX items — newcomer help, the deposit order, one coverage notice, the Claim
+wording and the 12 px floor, §13 "Thirteenth round"; v1.0 of 2026-10-01 was the contract the four
 parallel tracks — MARKETS, LEND, SHORT, E2E — built against, §12). Owner decision for the visual
 style: **dark trading terminal** — dense, dark, data-first, as memecoin traders know it from
 Photon / BullX / Axiom, and still accessible (§7, §8).*
@@ -47,7 +49,21 @@ fixes):* `vitest run` 60 files, 599 tests passed, 1 opt-in file skipped; the E2E
 (`lend-claim-pot-chain` and `lend-post-wipe` among them). **v1.4 (M10-RESP, 2026-10-09):** the app is responsive
 from 320 px (§7.6, §7.7, §13 "M10-RESP changes"); `vitest run` 68 files, 670 tests passed, 1
 opt-in file skipped; the default E2E run 77 tests (60 desktop, 17 phone) pass; the responsive gate
-(`SHORTWIN_RESPONSIVE_GATE=1`, eight viewports, 55 states each) 80 tests pass with no finding.
+(`SHORTWIN_RESPONSIVE_GATE=1`, eight viewports, 55 states each) 80 tests pass with no finding. **v1.5 (the owner's
+thirteenth round, 2026-10-10):** newcomer help (the intro strip, the glossary, How it works), the
+deposit order, one coverage notice, the Claim wording and the 12 px floor (§13 "Thirteenth round");
+`vitest run` 75 files, 721 tests passed, 1 opt-in file skipped; the default E2E 87 tests (65 desktop,
+22 phone) pass; the responsive gate (eight viewports, 59–61 states each, text ≥ 12 px at every
+viewport, the first market on the first screen) 80 tests pass. The new copy was approved as written
+by the owner on 2026-10-11 (thirteenth round, §4.3). *The owner's approval and decisions of 2026-10-11*
+(§13 "Thirteenth round: the owner's approval and decisions"; with the round-13 review's fixes):
+`vitest run` 75 files, 731 tests passed, 1 opt-in file skipped; the default E2E 95 tests (69
+desktop, 26 phone) pass; the responsive gate (eight viewports, 61–63 states each, the tap covers
+a finding, judged in sheets, sticky panels and dialogs too) 88 tests pass. *The second approval pass
+(2026-10-11; §13 "Thirteenth round: the second approval pass"):* the Claim only when syncs can pay,
+and the exit state past the deadline as the program takes it; `vitest run` 76 files, 748 tests
+passed, 1 opt-in file skipped; the default E2E 95 tests (69 desktop, 26 phone) pass; the responsive
+gate (eight viewports, 63–65 states each) 96 tests pass.
 
 ---
 
@@ -182,6 +198,8 @@ them deliberately (owner choice, §13 FE-23).
 - **Status bar** (`StatusBar`): RPC slot and health, indexer freshness and lag (§6.6), live-feed
   state, SOL/USD (from `/v1/stats`), the math module's state and version, cluster, and (*M10*) a
   "Security" link to `/security` (`nav-security`). Always visible: stale data is never silent.
+  *Thirteenth round:* a "How it works" link before Security (`nav-how-it-works`, §3.11), and a
+  glossary ⓘ on the RPC, indexer, live-feed and math items (§4.3).
 - **Indexer-down banner**: while `/v1/status` fails, pages fall back to RPC reads (§6.5).
 - **Keyboard**: skip link to `#main`; `/` search; table rows reachable by Tab, moved with ↑ / ↓,
   opened with Enter; Escape closes menus and dismissible dialogs.
@@ -201,8 +219,9 @@ them deliberately (owner choice, §13 FE-23).
 └──────────────────────────────────┘
 ```
 
-  The tab bar's More (`nav-more`) opens a bottom sheet with Status, the security policy, Create
-  market and the network facts (SOL/USD, math, cluster). The status strip says the worst state in
+  The tab bar's More (`nav-more`) opens a bottom sheet with How it works (`more-how-it-works`,
+  first; thirteenth round), Status, the security policy, Create market and the network facts
+  (SOL/USD, math, cluster). The status strip says the worst state in
   words with a shape (● ok, ▲ warn, ✕ bad) and expands to every status item (Escape from inside
   it returns focus to the strip). Toasts drop under the header. The wallet popup is a bottom sheet
   with its title and a ✕ (`wallet-sheet-close`); like the trade sheet it has its own history entry
@@ -222,6 +241,7 @@ them deliberately (owner choice, §13 FE-23).
 | `/lend` | — | `LenderDashboardPage` | LEND | `/v1/lenders/{owner}`; RPC `LenderPosition`, `Market`, `MarketVault`, `ShareEpoch` |
 | `/status` | — | `ProtocolStatusPage` | MARKETS | `/v1/venues`, `/v1/admin/config`, `/v1/status`, markets flags |
 | `/security` | — | `SecurityPolicyPage` (*M10*, owner decision Q3 of 2026-10-02: the vulnerability disclosure policy that security.txt's `Policy` names, §9.3) | SCAFFOLD | static |
+| `/how-it-works` | — (an anchor: `#short-risks`, `#lend-risks`, …) | `HowItWorksPage` (*thirteenth round*, O-3 (c): §3.11) | GUIDE (`features/guide`) | `GlobalConfig` (the governable numbers) |
 
 A path parameter that is not a base58 address renders Not found. Tracks implement the components
 with exactly these props and never edit `router.tsx`; a new search parameter is a contract change.
@@ -250,6 +270,23 @@ OI, positions / flags), sorted by the table's sort bar. The filter reads "Filter
 (`min(380px, 100%)`, mono for a mint); on a phone venue, tier and open positions fold behind
 "Filters · n" (`markets-filters-toggle`); an empty filtered list offers Clear filters.
 
+*Thirteenth round (O-3 (a), audit finding D-03):* above the list, the **intro strip**
+(`markets-intro`, `MarketsIntro`): a heading row ("New to short.win?", How it works, Hide) and three
+parts — "Short a token", "Lend a token", "What can go wrong" — of one sentence each, side by side from
+1,024 px and stacked under it; the last links to How it works `#short-risks` and `#lend-risks`, where
+`borrower.liquidation` and `lender.risks` are rendered verbatim (§3.11). The strip is compact: on a
+short phone (under 400 × 700 px) and a phone held sideways (§7.6's landscape-phone tier) it keeps
+only the heading row and "What can go wrong" with its sentence and its links (sideways, the title
+on the left, the sentence beside it and the links under the sentence), so the first market shows
+on the first screen (held sideways, the list's filter: a 390 px screen has no room for a row) —
+the responsive gate checks that at every viewport (§10.5); How it works explains the other two
+parts. Hide
+(`markets-intro-dismiss`) is remembered in `localStorage` (`shortwin:markets-intro:hidden`, inside try
+/ catch); where storage throws the strip still renders and Hide hides it for the page session. After
+Hide a polite status message says where How it works is, and focus moves to the "Markets" heading.
+Its text is §4.3's (`config/copy.ts`). The table's jargon headers carry a glossary ⓘ (§4.3) beside
+the header text, never inside its sort button; the flag badges carry one with the banner's text.
+
 ### 3.4 Market page (MARKETS; panels SHORT / LEND)
 
 Layout `.layout-trade`: left the market column, right the 360 px trade panel (tabs Short | Lend).
@@ -262,7 +299,16 @@ Layout `.layout-trade`: left the market column, right the 360 px trade panel (ta
   reads "No reading yet".
 - **Banners** in severity order: `market.mintUnsafe`, `market.routeBroken`, `market.coveragePause`,
   `market.venueUpgraded`, `market.migrating`, `market.graduationHalted`, `market.listOnly`; a
-  collection window or a warm-up (`ema_warm > 0`) shows `market.poolSwitch`.
+  collection window or a warm-up (`ema_warm > 0`) shows `market.poolSwitch`. *Thirteenth round (O-2,
+  audit finding D-23):* the page tells its panels which banners it shows (`PageBannersContext`), and
+  each banner is focusable from script (`tabIndex = -1`, a focus ring). On a coverage-paused market the
+  Short panel keeps its note ("New shorts unavailable. …", error 6051) and, in place of a second copy
+  of `market.coveragePause`, shows a link to the banner (`short-coverage-link`): beside the page "Read
+  the full coverage notice" scrolls to the banner (smoothly unless reduced motion) and focuses it; in
+  the trade sheet "Close and read the full coverage notice" closes the sheet (as ✕ does), then
+  scrolls to and focuses the banner. Without that banner — the 5 s after a clear (the chain's
+  `CoveragePaused` with `waitS`, the flag already off) or the indexer's flags missing while the chain
+  says paused — the panel keeps the disclosure and shows no link.
 - **Stat strip** (SPEC §8): inventory (`inventory_tokens`, free `tokens_free`), utilisation
   (`util_bps`), rate (the APR a new open pays now: `rateBps(base, slope1, slope2, util, kink)` with
   the live tier terms), open interest (`oi_lamports`, `open_positions`, `total_notional_open`), caps
@@ -340,8 +386,9 @@ sheet under 1024 px. Each form's submit sits in a sticky form foot with the reas
 as the submit, first unmet first; a reason that names an unticked acknowledgement or the CPI Guard
 box focuses it). Without a wallet the foot offers Connect wallet (`connect-cta-lend`) above the
 disabled submit. Withdraw has 25 / 50 / 75 % chips of the holding (Max, what may be withdrawn now,
-stays in the field) and a "≈ N TOKEN" line under the shares (display only). The deposit order and the
-Claim wording are unchanged (owner calls O-1, O-5).
+stays in the field) and a "≈ N TOKEN" line under the shares (display only). *Thirteenth round:* the
+deposit follows the Short form's order (O-1, below) and the Claim button says what it does (O-5,
+below).
 
 - **Deposit:** source token account select (`readOwnerTokenAccounts`, ATA first; balance; CPI
   Guard flag), amount (`AmountInput`, Max = balance), preview (shares minted
@@ -358,9 +405,16 @@ Claim wording are unchanged (owner calls O-1, O-5).
   value at `P_ema` (⌊amount·P_ema/WAD⌋) or ≥ `UNPAID_RENT_WARN_LAMPORTS` (1 SOL; the only threshold
   without a price): `lender.unpaidRent` expanded and repeated in the review (`TxPlan.disclosures`);
   otherwise collapsed and not in the review. The owner confirmed these thresholds on 2026-10-03
-  (fourth round; FE-27 closed). Disclosures: `lender.solRepayment` **inline above the amount and
-  again in the review, with its required checkbox** (SPEC §5.3), `lender.risks`, `lender.lossHistory`,
-  `market.creatorSelfDealing` (collapsed), `lender.residuals` (collapsed), `lender.unpaidRent` (M10). A source with CPI Guard
+  (fourth round; FE-27 closed). Disclosures: `lender.solRepayment` **on the deposit screen, after
+  the risks and right before the sticky submit, and again in the review, with its required
+  checkbox** (SPEC §5.3; before signing), `lender.risks`, `lender.lossHistory`,
+  `market.creatorSelfDealing` (collapsed), `lender.residuals` (collapsed), `lender.unpaidRent` (M10).
+  *Thirteenth round (O-1, audit finding D-09):* the form's order is the Short form's — account (and
+  the CPI Guard notice of that account) → amount → tolerance → preview (with the unpaid-rent rows,
+  `lender.unpaidRent` and the sweep notice) → the risks (`lender.risks`, expanded on a wallet's first
+  deposit; then `lender.lossHistory`, `market.creatorSelfDealing`, `lender.residuals`, collapsed) →
+  the "You may be repaid in SOL" acknowledgement → the sticky submit. The texts are verbatim: only
+  their place moved (v1.4 had the acknowledgement above the amount and the risks below the submit). A source with CPI Guard
   shows `token.cpiGuard` (`lendCpiGuardNotice`, plain deposit disabled) and the opt-in bracket
   (`lendCpiGuardBracket`, FE-1). `deposit(amount, min_shares)`; `WipeSweepPending` → prepend the
   permissionless sweep bundle (ARCH §3.3, §3.9: `sweep_trader`, on pump venues pump's
@@ -387,7 +441,60 @@ Claim wording are unchanged (owner calls O-1, O-5).
   (`withdraw-preview-lock-until`, the end a new lock would get); the vest-forfeit box is ticked in the panel and again in the review;
   the destination select is `withdraw-destination-select`.
 - **Claim:** claimable now (`previewClaim`), vesting (`previewVestRelease` share), the pot, a
-  deficit (`claimValue-*`); `claim_sol()`; when the pot cannot cover the claim, prepend
+  deficit (`claimValue-*`); `claim_sol()`; *thirteenth round (O-5, audit finding D-21):* the button
+  says what the claim does — "Review claim · {c} SOL now · syncs may add up to {g} SOL" on two lines
+  (the second from "syncs", `claim-submit-syncs`; one accessible name) when the syncs the search
+  picks can add 10,000 lamports or more, {g} = min(shortfall, their gain) with the shortfall
+  max(0, pending − own − pot) — credited = claimable + shortfall, so the claim never pays more than
+  the two together; else "Review claim · {c} SOL" (the owner's decision below); both amounts with
+  `solFrac`; the note above it explains the shortfall (§4.3
+  `claim.note.shortfall`). *The dust threshold (the owner's decision of 2026-10-11, thirteenth
+  round):* a shortfall under 10,000 lamports (`CLAIM_DUST_LAMPORTS`, `previews.ts`; ECON §9.4's
+  rounding dust) counts as none — `previewClaimView` reports it as 0, so with nothing claimable the
+  button is the disabled "Review claim · 0 SOL" with "Nothing to claim yet", with something
+  claimable it reads "Review claim · {c} SOL" without the note, and the claim gathers no syncs
+  (`previews.test.ts`, `LendPanel.test.tsx` and `build.test.ts` at 0, 9,999 and 10,000 lamports, with
+  nothing and something claimable; so credited = claimable + shortfall + under 10,000 lamports of
+  dust). *Only when syncs can pay (the owner's decision of 2026-10-11, asked after the approval's
+  review: "Only when syncs can pay"):* the button works from what the syncs can actually move.
+  Before it offers them it runs, in the background, the search the review runs
+  (`claim/syncSearch.ts`: `searchPotSyncs` in `build.ts`, `gatherPotSyncs` with `claimPlanFrom`'s
+  inputs), only for a shortfall of 10,000 lamports or more, cached by react-query under
+  `lendKeys.claimSyncs(mint, owner)` plus the stored state the pick comes from that a price crank
+  leaves alone (`searchInputs`: the claimant's own lender fields, the pot, the share epoch and the
+  total shares). *Second approval pass's review:* the key held the realised-rent index (`acc_r`),
+  which a crank's accrual raises while a vest runs (its release moves `acc` and `acc_r` together,
+  so no lender's surplus changes), so every crank searched again and the button fell back to its
+  in-flight state; the index and the lenders' SOL (moved by sweeps; a sync's gain does not read it)
+  left the key, and so did the view's per-second figures. Searched again when that state changes,
+  when a claim, deposit or withdrawal of the market lands (`lendInvalidations`), on a remount after
+  15 s and, with nothing claimable now (where the search decides whether the Claim opens), about
+  every 60 s while the page is visible — 45–75 s, the period fixed per market so a Lending page's
+  rows do not search together (rent paid in raises `acc_r` alone and can give another lender a
+  surplus) — never on a price crank. While a new search runs for the same market, owner and own
+  position the last result stays (a placeholder from the cache; not fresh, so the review searches
+  again): no flicker; after the user's own claim, deposit or withdrawal (whose syncs the claim may
+  have run) the first search shows the in-flight state. At most two searches at once app-wide; a
+  search whose query is dropped (its inputs replaced, its page left) leaves the queue without
+  running, or stops before its next indexer page and frees its slot (react-query's `signal`). A
+  search cut short — still running after 20 s (it stops), or a failed read (indexer or RPC down;
+  the background search asks for each indexer page once, without the retries) — keeps what its
+  pages found, shown but never fresh, so the review searches again; the Lending page runs none while
+  it knows the indexer is down. The label's {g} is min(shortfall, the picked syncs' gain); under 10,000 lamports it
+  counts as none, so a shortfall no sync can fund (rent the open shorts have not paid in; a market
+  whose only lender is you) gives "Review claim · {c} SOL" when something is claimable now, else the
+  disabled "Review claim · 0 SOL" with "Nothing to claim yet". The shortfall note keeps the whole
+  shortfall as its {g} (what is out of reach, and why). *While a first search runs* nothing more than is
+  known is shown: with something claimable now the button is enabled with "Review claim · {c} SOL"
+  (its second line appears once the gain is known); with nothing claimable it is disabled and busy
+  (`aria-busy`), "Review claim · 0 SOL" with no reason yet — then either the two-line label (enabled)
+  or "Nothing to claim yet", so no reason shows that then flips. *The review* takes the button's
+  pick while it is fresh, else searches again (as before; Retry always does), and the review's
+  simulation decides: one that pays 0 lamports out of the market's SOL vault is not offered for
+  signing — Sign stays disabled with "Nothing to claim yet" beside it (`TxPlan.holdSign`,
+  `tx-sign-hold`; no new words) and Refresh simulates again (`syncSearch.test.ts`,
+  `LendPanel.test.tsx`, `build.test.ts`, `useTxFlow.test.ts`, `TxReviewModal.test.tsx`; E2E
+  `lend-claim-sync`). When the pot cannot cover the claim, prepend
   `sync_lender` for other lenders whose touch moves a surplus to the pot (from
   `/v1/markets/{mint}/lenders`, each judged on its on-chain state; ≤ 4 per transaction);
   **cover deficit** (`cover_deficit(lamports)`) when pending < 0. *As built:* the claim tab shows
@@ -568,10 +675,49 @@ a confirmed open, close or add margin also pushes a toast (View position / Explo
   while the indexer is unavailable). The epoch standing and the indexer's view share one "Sync"
   cell that shows a badge only when one is not current (priority 2, never hidden). Each row links
   Withdraw / Deposit to the market's lend panel (`?panel=lend&action=…&sheet=trade`: the trade sheet
-  under 1024 px), and a disabled Claim says why in text. "Claim all" (with the total) is shown only
-  when something is claimable: in the page header on a desktop, in the action bar under 1024 px. Under
+  under 1024 px), and a disabled Claim says why in text. "Claim all" (with the total) is shown when
+  a row's Claim is open (something claimable, or syncs that can add 10,000 lamports or more since
+  the thirteenth round's decisions): in the page header on a desktop, in the action bar under 1024 px. Under
   560 px of table width the rows are cards (market and value on top, the actions a button row).
   Without a wallet: Connect wallet; with no positions: Browse markets.
+  *Thirteenth round (the owner's decision of 2026-10-11; audit finding D-21):* **a row's Claim is
+  the Lend → Claim tab's.** Each row carries the panel's claim view (`previewClaimView`:
+  claimable now and the shortfall, 0 under the 10,000-lamport dust threshold, §3.6) and runs the
+  panel's search for syncs (`claim/syncSearch.ts`; the same cache, so a row and the tab share a
+  market's result; at most two searches at once app-wide, so a lender in many markets queues them
+  instead of a request storm; none while the indexer is down); its Claim is enabled whenever the panel's would be — something
+  claimable now **or** syncs that can add 10,000 lamports or more (*only when syncs can pay*, the
+  owner's decision of 2026-10-11, §3.6) —, builds the same claim (`claimPlanFrom` with the indexer's
+  lenders, taking the row's pick while it is fresh) and reads the panel's label (`ClaimLabel`:
+  "Review claim · {c} SOL", or the two lines of `claim.label.syncs` with {g} = min(shortfall, the
+  syncs' gain) and `claim-submit-syncs` inside the row), "Claim" only until the row's chain is read;
+  while its search runs with nothing claimable now it is disabled and busy without a reason; when
+  disabled, "Nothing to claim yet" says why, as before. "Claim all" keeps
+  its label and its total and claims the same rows, each the same way: one predicate decides both
+  a row's Claim and Claim all's count — the Claim is open and the row is not behind the share epoch
+  with records still to read (such a row shows Sync instead; one behind with every record read
+  claims, and counts) — so a row whose shortfall no sync can fund, or whose search still runs with
+  nothing claimable now, is neither counted nor claimed. The total (and the SOL claimable KPI) is
+  what is claimable now, so when every enabled row pays only through its syncs the enabled button
+  reads "Claim all · 0 SOL" — a known consequence of the decisions (it does not overstate what is
+  paid; the syncs add to it, and each review shows what its claim pays). No new string. The action cell fits at every width:
+  the two-line label made it the row's widest cell, and on one line it pushed the table past its
+  frame (32 px at 1,024 px, 40 px at 1,280 px, the Claim clipped), so where the table runs out of
+  width the actions wrap — Claim under Withdraw and Deposit, each label line kept whole — and at
+  1,440 px they stay on one line; on a card (under 960 px of table width) the button row wraps as
+  it needs (a phone puts Claim on a row of its own). The responsive gate measures the dashboard with that label at all eight
+  viewports (`lender-dashboard-syncs`, a second lender with a surplus; and
+  `lender-dashboard-shortfall`, the pot market's only lender, now the disabled state; §10.5: no
+  table scrolls sideways or clips); E2E `lend-claim-sync` shows the only lender's shortfall as the
+  disabled "Review claim · 0 SOL", then claims a row with nothing claimable through the syncs.
+  *The owner's decision (2026-10-11, after the approval's review): only when syncs can pay.* The
+  shortfall (pending − own − pot) also counts rent credited but not yet paid in by open shorts,
+  which no other lender's sync can fund; where no other lender holds a surplus — always for a
+  market's only lender — a row and Lend → Claim with nothing claimable now used to show the enabled
+  two-line label once the shortfall passed 10,000 lamports, and the claim then paid 0. The owner
+  chose to cap {g} by what the syncs the search picks can move: such a claim is now the disabled
+  "Review claim · 0 SOL" with "Nothing to claim yet" (§3.6), and a review whose simulation would
+  still pay 0 is not offered for signing.
 - **Risk levels** (as built; *v1.2, M9-UX-4*): `riskLevel(crBps, crEmaBps, liqCrBps)` returns
   `safe` / `watch` / `danger` / `below` / `critical` — the values of `data-risk` — shown as Safe /
   Watch / At risk / At risk (live price below) / Liquidatable. It judges as the program does
@@ -580,6 +726,29 @@ a confirmed open, close or add margin also pushes a toast (View position / Explo
   within 10 % / 30 % above it on the live leg. The exit state (`SettlementRisk` `exitState`, the
   badge's tooltip) is derived from the same function, so the two never disagree. A single CR figure
   (a preview's CR at open) is coloured by `crBand` and never reads "Liquidatable".
+  *Past the deadline (the second approval pass, 2026-10-11):* the exit state names the exit the
+  program would take now, as `borrower.liquidation` ¶3 as amended says (SPEC §5.1, §5.3; `expire.rs`
+  and `liquidate.rs` `plan`, `sol_settle.rs`). It used to return `expired` before checking anything
+  else, so a position past its deadline that can be liquidated read "Past its deadline: anyone can
+  close this position now, with a {X} expiry fee instead of the penalty." while the program
+  liquidates it with the penalty. Now, past the deadline: no route (`!venue.executable`) →
+  `no-route` (`liquidate` and `expire` both refuse first with `NoRoute`; S3 counts the expiry as
+  liquidatable, `settle::s3_due`); armed (`pos.sArmed`, the S1 / S2 clock `sol_settle` persisted, on
+  an executable venue) → `armed` (`sol_settle` keeps that clock past the deadline: it disarms only a
+  position neither expired nor liquidatable). The arm is persisted evidence, not the program's live
+  refusal: `liquidate` and `expire` refuse with `UseSolSettle` only while the live buyback check fails
+  (`B̂_live + ert ≤ V − K_s ∧ σ_live ≤ σ_max`, computed at the call, `s_armed` never read), so a
+  keeper may still expire or liquidate an armed position whose live buyback is allowed again. The
+  client keeps `armed` first (the choice of the second approval pass's review): it cannot judge S2's
+  live slippage, the banner's "Settlement in SOL being considered" stays true while the clock runs,
+  and a proxy on S1 alone (`!insufficientVault`) would name an exit the program may still refuse;
+  CR-liquidatable on both legs (`riskLevel` `critical`) → `liquidatable`
+  (`expire` refuses with `UseLiquidate`, `liquidate` takes the penalty); otherwise `expired`. Before
+  the deadline the order is unchanged (armed, no route, then the CR states). No string changed:
+  only which existing text shows — the position page's health banner and the Positions page's badge
+  tooltip (`exitShort`) follow the same function; the Positions page's status filter reads the
+  indexer's status of closed positions (`expired` = closed by `expire`) and does not use it
+  (`positions.test.tsx` at each boundary).
 - **Which market prices a position** (*v1.2, M9-SEC-2*): the chain's. The live columns use the
   snapshot of the mint of the `Market` the position account names (read from the chain); a
   snapshot of another market is refused. When the indexer's market or mint for a row disagrees,
@@ -601,6 +770,24 @@ height (`minmax(min(420px, 100%), 1fr)`); the tables are DataTables (cards on a 
 Skeleton rows while loading (never a spinner over a table); empty states say what would fill them
 and offer the next action; errors show the mapped message with Retry (`ErrorState`); 404 from the
 indexer for a market that exists on chain renders the chain view (FE-D1).
+
+### 3.11 How it works (GUIDE; the owner's thirteenth round, O-3 (c))
+
+`/how-it-works`, `HowItWorksPage` (`features/guide`), its own chunk; no wallet. Centred at 760 px.
+The page is `config/copy.ts`'s `HOW_IT_WORKS`, top to bottom: the lead, an "On this page" contents
+nav, then Shorting a token (`#shorting`), Lending a token (`#lending`), What can go wrong
+(`#what-can-go-wrong`: If you short `#short-risks` — `borrower.liquidation` expanded with Tier C's live
+terms and a caption, `borrower.residuals` collapsed `#borrower-limits`; If you lend `#lend-risks` —
+`lender.risks` and `lender.solRepayment` expanded, the late-depositor shortfall, `lender.residuals`
+collapsed `#lender-limits`; In every market — `market.coveragePause`, `market.venueTrust` collapsed),
+Fees and rent (`#fees`), Before you sign (`#before-you-sign`) and Read more (`#read-more`). The
+embedded disclosures are verbatim, without a checkbox (nothing is signed there; §4.1 rule 3).
+Governable numbers are placeholders filled from `GlobalConfig` (`guideVars`: the open fee, the rent's
+protocol share, the penalty split, the expiry fee, the settlement keeper reward, the creation fee,
+Tier C's opening CR, the tiers' shortest and longest duration); until it is read each shows a
+skeleton, never a word. An anchor in the URL (the intro strip's risk links) scrolls to its heading
+and focuses it once the numbers are in; a link to a collapsed disclosure opens it. Linked from the
+intro strip, the status bar and the phone's More sheet (`page-how-it-works`, `how-it-works-section-<anchor>`).
 
 ---
 
@@ -631,7 +818,7 @@ indexer for a market that exists on chain renders the chain view (FE-D1).
 #### `lender.solRepayment` — You may be repaid in SOL
 
 *Severity:* danger · *Acknowledgement:* required · *Source:* SPEC §5.3 (verbatim, required checkbox)
-*Shown:* Lend → Deposit, inline above the amount, and in the review modal (required checkbox before signing)
+*Shown:* Lend → Deposit, after the preview and the risks, right before the submit (thirteenth round, O-1), and in the review modal (required checkbox before signing)
 
 > If a borrower can't be bought back, you will be repaid in SOL, which may be worth less than the tokens you lent.
 
@@ -740,14 +927,14 @@ Checkbox: “I understand I give up my unvested income.”
 
 #### `borrower.liquidation` — How this short can end
 
-*Severity:* danger · *Acknowledgement:* required · *Source:* SPEC §4, §5, §6.1; ARCH §3.4–§3.8
+*Severity:* danger · *Acknowledgement:* required · *Source:* SPEC §4, §5, §5.3, §6.1; ARCH §3.4–§3.8; ¶3: `expire.rs` (precondition: **not** CR-liquidatable, else `UseLiquidate` — an expired position that can be liquidated pays the penalty through `liquidate`, ECON §8.4); *¶3 amended by the owner on 2026-10-11 (thirteenth round)*: "Unless it can be liquidated at that point," added before the expiry fee (it read "You pay a {expiryFee} expiry fee instead of the penalty."); the amended text approved as written
 *Shown:* Short panel above the submit button and in the review modal (required checkbox); placeholders from the live tier terms and parameters (`GlobalConfig`: `{expiryFee}` = `expiry_fee_bps`, `{s3Wait}` = `s3_wait_s`); on the position page from the position's locked terms (its `expiry_fee_bps`, `s3_wait_s`, `{maxDuration}` = `deadline − t_open`)
 
 > Your collateral is your margin plus the sale proceeds, locked in the position’s vault. Collateral ratio (CR) = vault SOL ÷ the SOL needed to buy the tokens back now, including price impact.
 >
 > Liquidation: if CR falls below {liqCr} on both the live price and the smoothed price, anyone can liquidate. The tokens are bought back with your vault SOL, a {penalty} penalty is taken, and the rest comes back to you.
 >
-> Expiry: after {maxDuration} the position can be closed by anyone. You pay a {expiryFee} expiry fee instead of the penalty.
+> Expiry: after {maxDuration} the position can be closed by anyone. Unless it can be liquidated at that point, you pay a {expiryFee} expiry fee instead of the penalty.
 >
 > Settlement in SOL, when the tokens cannot be bought back:
 >
@@ -803,7 +990,7 @@ Checkbox: “I understand my position can be liquidated or settled in SOL.”
 #### `market.coveragePause` — New shorts paused: keeper coverage
 
 *Severity:* warn · *Acknowledgement:* none · *Source:* SPEC §11 (O17, M7-3, M7-13/14)
-*Shown:* Market page banner and Short panel (replaces the form) while `flags.paused_coverage`; status page
+*Shown:* Market page banner and Short panel (replaces the form; while the page shows the banner, the panel links to it instead of repeating it — thirteenth round, O-2) while `flags.paused_coverage`; status page
 
 > short.win’s keeper cannot currently cover this market (degraded mode), so new shorts are paused.
 >
@@ -912,6 +1099,358 @@ Checkbox: “I understand my position can be liquidated or settled in SOL.”
 *Shown:* Every review modal (collapsed)
 
 > These changes come from simulating the transaction against the current chain state. The result can differ if the market moves before it lands; the limits you set protect you.
+
+### 4.3 Newcomer copy and the glossary (thirteenth round)
+
+The owner's thirteenth round (2026-10-10; audit findings D-03, D-21, D-23) adds copy that is not a
+disclosure: the markets list's intro strip (§3.3), the glossary, How it works (§3.11), the links to
+it, the Short panel's link to the coverage banner (O-2, §3.4) and the Claim button (O-5, §3.6).
+**Every string below — all 143 — was approved as written by the owner on 2026-10-11 (thirteenth
+round)**, word for word, as the file `apps/web/scripts/owner-copy.ts` prints it (with each string's
+id, where it shows and the sources of each claim). Like an approved disclosure's text (§4.1), a
+string changes only with the owner's approval, and the code and this section change together.
+
+Rules (as §4.1 for disclosures): the text has one home — `src/config/copy.ts` (`COPY`, each string
+with its id, where and sources; `HOW_IT_WORKS`, the page's order) and `src/config/glossary.ts`
+(`GLOSSARY`); components render it through `copy()` / the glossary control and never retype it;
+`copy.test.ts` and `glossary.test.ts` fail unless this section carries every string verbatim
+(regenerate it with `node scripts/owner-copy.ts --doc` after a change, in the same change). A
+governable number is a `{placeholder}` filled from `GlobalConfig`. A glossary entry that says the
+same as an approved disclosure quotes its paragraphs (`quote`), rendered from `disclosures.ts`;
+the catalogue prints the quoted words under the entry's reference, so a paragraph added, dropped or
+moved in the disclosure changes this section too (the round-13 review).
+
+**The glossary control** (`components/Glossary.tsx`): `GlossaryTip` is an ⓘ button (24 px box, the
+tier badge's inline-SVG mark; 44 px touch area under a coarse pointer) beside a label —
+`aria-label` "What is {term}?", `aria-expanded`, `aria-controls` — that opens the definition on a
+click, a tap, or Enter / Space with focus on it, never on hover. The definition is a non-modal
+`role="dialog"` named by its title, rendered in a portal (the open sheet or dialog it sits in, else
+`<body>`) at a fixed position computed from the ⓘ (CSSOM), so a table's or a panel's overflow never
+clips it; on a phone a bottom sheet over a scrim. Focus moves into it; Escape and ✕ close it and
+return focus to the ⓘ, a tap outside closes it, Shift+Tab or Tab past ✕ leaves it from the ⓘ.
+Its own clicks, pointer presses and keys (but Tab) stop at it: a portal's events still bubble
+through the React tree, and a table row that opens on a click, Enter or an arrow key must not see
+them. On a phone the scrim closes the sheet on its own click (not on the press: the tap's click
+would land on the card under it) and returns focus to the ⓘ.
+`Term` is a label with its ⓘ when the glossary knows that exact label: the shared renderers use it —
+`Kv`, `KvLines`, `Stat`, the stat strip, `Field` (the ⓘ outside the `<label>`, so the input's name
+stays the label), `DataTable` headers (beside the sort button, never in it; `Column.term` overrides; not in card mode, whose header row is clipped — the cards' badges keep theirs),
+the Short preview rows, the size caps, the tier terms, the position's facts — and the flag, creator,
+epoch and settlement badges and the status bar name their entry.
+
+**The Claim label (O-5)** — what its figures are (from the code; the owner file's §6): *credited*
+is the lender's `pending` after a touch; *claimable now* what `claim_sol` pays with the pot as it
+stands (`previewClaim`, no syncs); the *shortfall* max(0, pending − own − pot), the credited SOL
+that neither the SOL allocated to the lender's shares nor the pot covers. *The owner's decision of
+2026-10-11:* a shortfall under 10,000 lamports (`CLAIM_DUST_LAMPORTS`) is rounding dust (ECON §9.4)
+and counts as none — no `claim.label.syncs`, no `claim.note.shortfall`, no syncs gathered, and with
+nothing claimable the disabled "Review claim · 0 SOL" with "Nothing to claim yet" (§3.6); and the
+Lending page's row Claim shows the same label for the same claim (§3.8). *Only when syncs can pay
+(the owner's decision of 2026-10-11, after the approval's review):* `claim.label.syncs`'s {g} is
+min(shortfall, what the syncs the search picks move to the pot), run before the button offers them;
+under 10,000 lamports it counts as none, so a shortfall no sync can fund (unpaid rent; a market's
+only lender) shows `claim.label.full`, or with nothing claimable the disabled "Review claim · 0 SOL"
+with "Nothing to claim yet"; `claim.note.shortfall`'s {g} stays the whole shortfall; a review whose
+simulation would pay 0 is held with "Nothing to claim yet" (§3.6). No string changed or added.
+
+<!-- copy:begin (generated by apps/web/scripts/owner-copy.ts --doc; do not edit by hand) -->
+
+**Intro strip, How it works, links, O-2, O-5** (`src/config/copy.ts`):
+
+- `intro.heading` (Intro strip: heading (an h2)):
+  > New to short.win?
+- `intro.short.title` (Intro strip: part 1 title):
+  > Short a token
+- `intro.short.body` (Intro strip: part 1):
+  > Borrow a token and sell it. You gain if the price falls by more than the rent, fees and price impact; if it rises, you can lose all your margin and the fees you paid.
+- `intro.lend.title` (Intro strip: part 2 title):
+  > Lend a token
+- `intro.lend.body` (Intro strip: part 2):
+  > Lend your tokens for rent paid by the people who short them. It is not staking, and not risk-free.
+- `intro.risks.title` (Intro strip: part 3 title):
+  > What can go wrong
+- `intro.risks.body` (Intro strip: part 3):
+  > A short can be liquidated or settled in SOL. Lenders can be repaid in SOL worth less than the tokens they lent, and can owe SOL for rent borrowers never pay.
+- `intro.risks.linkShort` (Intro strip: part 3, link 1 → How it works #short-risks (D:borrower.liquidation verbatim)):
+  > How a short can end
+- `intro.risks.linkLend` (Intro strip: part 3, link 2 → How it works #lend-risks (D:lender.risks verbatim)):
+  > How lending works here
+- `intro.more` (Intro strip: link in the heading row → /how-it-works):
+  > How it works
+- `intro.dismiss` (Intro strip: the dismiss button (visible text)):
+  > Hide
+- `intro.dismiss.aria` (Intro strip: the dismiss button’s accessible name (contains the visible “Hide”, WCAG 2.5.3)):
+  > Hide the introduction
+- `intro.dismissed.note` (Markets page: a polite status message after hiding (screen readers; focus moves to the “Markets” heading)):
+  > Introduction hidden. You can still open How it works from the status bar or the More menu.
+- `howItWorks.title` (How it works: h1):
+  > How it works
+- `howItWorks.lead` (How it works: lead paragraph):
+  > short.win lets you short a Solana token by borrowing it from the people who lend it, and lets holders lend their tokens for rent. Both sides carry real risk. This page covers the basics; each market shows its own terms before you sign.
+- `howItWorks.toc.aria` (How it works: the contents nav (accessible name and visible heading)):
+  > On this page
+- `howItWorks.short.h` (How it works: h2 #shorting):
+  > Shorting a token
+- `howItWorks.short.p1` (How it works: Shorting ¶1):
+  > You choose a size in tokens and a slippage limit. In one transaction, short.win borrows the tokens from the market’s lending pool and sells them on the token’s venue: the Pump.fun bonding curve, PumpSwap or Raydium.
+- `howItWorks.short.p2` (How it works: Shorting ¶2):
+  > The sale proceeds stay locked in your position’s vault together with the margin you post. You never hold the borrowed tokens or the proceeds.
+- `howItWorks.short.p3` (How it works: Shorting ¶3):
+  > Your margin is the SOL it takes to bring your collateral ratio (CR) up to the market’s opening CR, for example {exCrOpen} in Tier {exTier}. The preview shows the exact margin, fee and costs before you sign.
+- `howItWorks.short.p4` (How it works: Shorting ¶4):
+  > To close, short.win buys the tokens back with your vault’s SOL, returns them to the pool, pays the rent, and sends you the rest. You gain only if the price has fallen by more than the venue fees, price impact, rent and the open fee together; otherwise you get back less than you put in.
+- `howItWorks.short.p5` (How it works: Shorting ¶5):
+  > A position pays rent every second and can stay open up to the market’s maximum duration ({durMin} to {durMax} depending on the tier). After that, anyone can close it: if it is still above its liquidation CR, you pay an expiry fee and a small keeper reward instead of the liquidation penalty.
+- `howItWorks.lend.h` (How it works: h2 #lending):
+  > Lending a token
+- `howItWorks.lend.p1` (How it works: Lending ¶1):
+  > You deposit tokens into the market’s pool and receive pool shares. Every lender in a market shares the same pool, so income and losses are shared pro-rata.
+- `howItWorks.lend.p2` (How it works: Lending ¶2):
+  > Borrowers pay rent on the tokens they borrow. Your share is credited to you as it accrues and is paid in when their positions end (closed, liquidated, expired or settled in SOL); rent a position never pays is taken back (see What can go wrong). You claim it on the market’s Lend → Claim tab or on the Lending page.
+- `howItWorks.lend.p3` (How it works: Lending ¶3):
+  > Before you deposit into a pool with unpaid rent, the Lend tab shows that rent. It also shows how much of it your deposit would carry if it is never paid.
+- `howItWorks.lend.more` (How it works: Lending, last line):
+  > The rules for withdrawals, locks and income are under What can go wrong, below.
+- `howItWorks.risk.h` (How it works: h2 #what-can-go-wrong):
+  > What can go wrong
+- `howItWorks.risk.lead` (How it works: What can go wrong, lead):
+  > Below are the main risk texts the app shows on its market pages and before you sign, word for word, with short notes on others. Each market page and each review shows every text that applies there; read them before you trade or lend.
+- `howItWorks.risk.short.h` (How it works: h3 #short-risks):
+  > If you short
+- `howItWorks.risk.shortCaption` (How it works: caption above the embedded borrower.liquidation):
+  > Shown with Tier {exTier}’s current terms as an example. Each market’s Short panel shows the same text with that market’s terms.
+- `howItWorks.risk.lend.h` (How it works: h3 #lend-risks):
+  > If you lend
+- `howItWorks.risk.lend.p2` (How it works: If you lend, after the embedded lender.solRepayment):
+  > Rent that borrowers never pay is taken from the lenders who hold shares when the position ends, including lenders who deposited after that rent was credited. Such a loss is taken from your SOL balance in this pool. If it leaves that balance below zero, you must pay the difference in SOL (Cover deficit, on the Claim tab) before you can withdraw your tokens. The amount is not limited to what you have received from the pool; a market’s Lend tab shows any unpaid rent before you deposit.
+- `howItWorks.risk.lend.p1` (How it works: If you lend, before the collapsed lender.residuals):
+  > Each market’s Lend tab also shows what price gaps cost lenders in its tier, and the losses that market has had so far.
+- `howItWorks.risk.all.h` (How it works: h3):
+  > In every market
+- `howItWorks.risk.all.p1` (How it works: In every market ¶1):
+  > A token’s creator can lend and short its own token from different wallets — in effect selling into the market — and the per-wallet cap does not stop one person from using several wallets. Each market’s Overview shows the deposits made from the creator’s wallet.
+- `howItWorks.fees.h` (How it works: h2 #fees):
+  > Fees and rent
+- `howItWorks.fees.open` (How it works: Fees list):
+  > Open fee: {openFee} of the position’s notional, to the protocol. There is no close fee.
+- `howItWorks.fees.venue` (How it works: Fees list):
+  > Venue fees: the venue charges its own trading fee on the sale when you open and on the buyback when the position ends; on some venues part of it goes to the token’s creator. The preview’s figures include it.
+- `howItWorks.fees.rent` (How it works: Fees list):
+  > Rent: a yearly rate on the value of the borrowed tokens, charged every second. It rises with the market’s utilisation along the tier’s curve: gently at first, steeply once most of the pool is lent out. Every position pays at least its minimum rent. Lenders receive the rent less the protocol’s share ({rentProtocol}).
+- `howItWorks.fees.rate` (How it works: Fees list):
+  > The Rate (APR) on each market page is what a new short pays at the market’s utilisation now.
+- `howItWorks.fees.penalty` (How it works: Fees list):
+  > Liquidation penalty: set by the tier and split between the lenders ({penLender}), the protocol ({penProtocol}) and the keeper that liquidates ({penKeeper}). If the keeper’s share is less than the settlement keeper reward, the difference comes out of what would come back to you.
+- `howItWorks.fees.expiry` (How it works: Fees list):
+  > Expiry fee: {expiryFee} of the buyback cost, paid instead of the penalty by a position closed after its deadline while still above its liquidation CR, all to the lenders. The keeper that closes it is also paid a small, capped reward from the position.
+- `howItWorks.fees.settle` (How it works: Fees list):
+  > Settlement in SOL: the keeper is paid {keeperReward}; the lenders take the rest of the vault, capped at fair value in S2 and S3.
+- `howItWorks.fees.network` (How it works: Fees list):
+  > Network fees and account deposits: every transaction pays Solana’s network fee. A new position, or your first deposit in a market, also pays a refundable deposit for a new account (Solana’s account rent, not the rent lenders earn). It comes back when that account closes.
+- `howItWorks.fees.create` (How it works: Fees list):
+  > Creating a market: a creation fee of {creationFee} plus Solana’s account rent for the market’s accounts, which stays in the accounts.
+- `howItWorks.sign.h` (How it works: h2 #before-you-sign):
+  > Before you sign
+- `howItWorks.sign.p1` (How it works: Before you sign ¶1):
+  > Every transaction is first simulated against the chain as it is now. You review what it will change before your wallet asks you to sign. If the market moves before the transaction is confirmed, it can still go through at a worse price, up to the limits you set (slippage and tolerances); beyond them it fails instead.
+- `howItWorks.more.h` (How it works: h2 #read-more):
+  > Read more
+- `howItWorks.more.security` (How it works: Read more list):
+  > [Security policy](/security): how to report a vulnerability, and the audit reports once they are published.
+- `howItWorks.more.limits` (How it works: Read more list (the links open the two collapsed disclosures above)):
+  > Known limits: the residual risks the protocol accepts, [for lenders](#lender-limits) and [for borrowers](#borrower-limits).
+- `howItWorks.more.status` (How it works: Read more list):
+  > [Status](/status): the indexer, the venues and any markets with paused shorts.
+- `howItWorks.more.glossary` (How it works: Read more list):
+  > Terms: tap or click ⓘ next to a label for a short definition.
+- `howItWorks.back` (How it works: the foot link → /markets):
+  > Back to markets
+- `howItWorks.configError` (How it works: an alert above the sections when the GlobalConfig read fails or finds no account (with Retry); also in place of the risk texts that need those numbers):
+  > The protocol’s current numbers could not be read, so they are missing on this page.
+- `nav.howItWorks` (Status bar (the app’s footer; desktop and tablet, and the phone’s expanded status list), before “Security”):
+  > How it works
+- `more.howItWorks.title` (Phone: the More sheet’s first row):
+  > How it works
+- `more.howItWorks.sub` (Phone: the More sheet row’s muted subtitle):
+  > Shorting, lending and the risks
+- `coverage.link.inline` (Short panel beside the page (≥ 1,024 px), under the “New shorts unavailable” note: scrolls to the banner and focuses it):
+  > Read the full coverage notice
+- `coverage.link.sheet` (Trade sheet (< 1,024 px), under the same note: closes the sheet, then scrolls to the banner and focuses it):
+  > Close and read the full coverage notice
+- `claim.label.full` (Lend → Claim submit and each Lending page row’s Claim when the syncs cannot add 10,000 lamports or more (no shortfall, dust under 10,000 lamports, or a shortfall no sync can fund; the owner’s, 2026-10-11), or while the search for syncs runs with something claimable now (unchanged; also “Review claim · 0 SOL”, disabled, with “Nothing to claim yet”)):
+  > Review claim · {c} SOL
+- `claim.label.syncs` (Lend → Claim submit and each Lending page row’s Claim when the syncs the search picks can add 10,000 lamports or more of what is credited but not claimable now (CLAIM_DUST_LAMPORTS; the owner’s, 2026-10-11: only when syncs can pay); two lines, the second from “syncs”):
+  > Review claim · {c} SOL now · syncs may add up to {g} SOL
+- `claim.note.shortfall` (Lend → Claim: the note above the button, appended when there is a shortfall (10,000 lamports or more: CLAIM_DUST_LAMPORTS, owner, 2026-10-11) (replaces “{g} SOL credited to you is not paid in yet. A claim first syncs other lenders whose surplus can fund it, where there are any.”)):
+  > {g} SOL of what is credited to you cannot be claimed now. Some of it may be rent that open positions still owe: it is paid when they end, and taken back from the lenders if it never is. Some may be allocated to other lenders’ shares beyond their own credit. A claim first syncs those lenders where it finds any, which moves that excess to the pot; the review shows what the claim will pay.
+
+**The glossary control** (`src/config/glossary.ts` `GLOSSARY_UI`):
+
+- `glossary.trigger.aria` (the ⓘ):
+  > What is {term}?
+- `glossary.popover.close` (the ⓘ):
+  > Close
+
+**Glossary entries** (`src/config/glossary.ts`; *beside*: the labels it attaches to):
+
+- `glossary.cr` (CR (the collateral ratio); beside “CR”, “CR now”, “CR after”, “CR (spot)”, “CR (EMA)”, “CR at open (spot)”, “CR at open (EMA)”):
+  > Collateral ratio (CR) = vault SOL ÷ the SOL needed to buy the tokens back now, including price impact. If it falls below the position’s liquidation CR on both the live and the smoothed price, anyone can liquidate the position.
+- `glossary.crOpen` (the opening CR; beside “Opening CR (D4)”):
+  > The CR a new position must have when it opens, checked at both the live and the smoothed price. The tier sets it; your margin is the SOL it takes to reach it.
+- `glossary.crLiq` (the liquidation CR; beside “Liquidation CR”):
+  > The CR below which the position can be liquidated, on both the live and the smoothed price. It is set by the market’s tier and locked into the position when it opens.
+- `glossary.ema` (the smoothed price (EMA); beside “Price (EMA)”):
+  > The smoothed price: an average that follows the live price over a few seconds, updated on every trade and by the keeper. A liquidation needs both prices past the line, so a brief spike in the live price cannot by itself liquidate a position whose smoothed price is still healthy.
+- `glossary.spot` (the spot price; beside “Spot”):
+  > The live price on the token’s venue now, as short.win reads it from the curve or pool.
+- `glossary.liqPrice` (the liquidation price; beside “Liquidation price”, “Liq. price (SOL)”, “Liq. price”):
+  > The token price at which this position’s CR would reach its liquidation CR. Liquidation also needs the smoothed price to cross, and rent accruing over time moves this price closer.
+- `glossary.risk` (the risk grade; beside “Risk”):
+  > How close the CR is to the liquidation CR: Safe, Watch, At risk, At risk (live price below), or Liquidatable.
+- `glossary.q` (Q (tokens owed); beside “Q”, “Q owed”, “Borrow”):
+  > The number of tokens a short borrowed and must give back to the pool. Closing buys exactly this many back.
+- `glossary.sumQ` (ΣQ (tokens borrowed); beside “Tokens borrowed (ΣQ)”):
+  > All the tokens currently borrowed by the open shorts in this market.
+- `glossary.tokensFree` (free tokens; beside “Tokens free (T)”, “Free inventory”):
+  > The pool’s tokens that are not lent out. New shorts borrow from them and lenders withdraw from them.
+- `glossary.inventory` (inventory; beside “Inventory”, “Inventory · free”, “Inventory value”):
+  > All the tokens lenders have in this pool: the free ones plus the ones lent out.
+- `glossary.saleProceeds` (sale proceeds; beside “Sale proceeds (S)”, “Sale proceeds”):
+  > The SOL the borrowed tokens sold for. It stays locked in the position’s vault until the position ends.
+- `glossary.margin` (margin; beside “Margin (D4)”, “Margin”, “Margin (incl. added)”):
+  > The SOL you post when you open, plus any margin you add later. The tier’s opening CR sets how much you need.
+- `glossary.vault` (the vault; beside “Vault”):
+  > The position’s own SOL account: your margin plus the sale proceeds. Only a close, a liquidation, an expiry or a settlement in SOL can move this SOL out.
+- `glossary.notional` (notional; beside “Notional open”):
+  > A position’s size in SOL: what buying its tokens back would cost right after it opened. The open fee is charged on it.
+- `glossary.slippage` (slippage; beside “Slippage”):
+  > How much worse than the quote a trade may execute before it fails instead. A wider limit fails less often but can cost more.
+- `glossary.openFee` (the open fee; beside “Open fee”):
+  > A fee to the protocol on the position’s notional, paid when it opens. There is no close fee.
+- `glossary.totalCost` (the total cost; beside “Total cost”):
+  > Margin, open fee and refundable deposits for the position’s accounts (Solana’s account rent, not the rent paid to lenders). The deposits come back when the position ends, or when your last position in this market ends. The network fee is shown in the review.
+- `glossary.rentApr` (the rent rate (APR); beside “Rate (APR)”, “Rent rate (APR)”, “Rate”):
+  > The yearly rent rate a short pays on the value of its borrowed tokens. It rises with utilisation along the tier’s curve: gently at first, steeply once most of the pool is lent out.
+- `glossary.rentCurve` (the rent curve; beside “Rent: base / slope 1 / slope 2”):
+  > The three numbers of the rent curve: the rate at zero utilisation, how fast it rises up to a set utilisation (the kink), and how fast it rises above it. A position keeps the curve it opened with; its rate still moves with the market’s utilisation.
+- `glossary.minRent` (the minimum rent; beside “Minimum rent”):
+  > The least rent a position pays, counted as a stretch of time at its rate, even if it closes sooner.
+- `glossary.rentDue` (rent due; beside “Rent due”):
+  > Rent this position owes so far; it is paid when the position ends.
+- `glossary.rentProtocol` (the protocol’s rent share; beside “Rent to the protocol”):
+  > The protocol’s share of the rent; the lenders receive the rest.
+- `glossary.maxDuration` (the maximum duration; beside “Max duration”, “Deadline”, “Time left”):
+  > How long a position may stay open; the tier sets it. After the deadline anyone can close it: if it is still above its liquidation CR, you pay the expiry fee and a small keeper reward instead of the liquidation penalty; if it is below, it is liquidated and pays the penalty.
+- `glossary.expiryFee` (the expiry fee; beside “Expiry fee”):
+  > What a position pays when it is closed after its deadline while still above its liquidation CR, in place of the liquidation penalty. It goes to the lenders; the keeper that closes it is also paid a small, capped reward from the position.
+- `glossary.penalty` (the liquidation penalty; beside “Liquidation penalty”, “Penalty”):
+  > Taken from the vault when a position is liquidated, and split between the lenders, the protocol and the keeper that liquidated.
+- `glossary.maxLiqSlippage` (the maximum liquidation slippage; beside “Max liquidation slippage (S2)”, “Max liquidation slippage”):
+  > The most a liquidation’s buyback may move the price. If buying back would move it more, the position settles in SOL instead (S2).
+- `glossary.buyback` (the buyback; beside “Buyback”):
+  > The SOL it costs to buy the borrowed tokens back.
+- `glossary.keeper` (a keeper; beside “Keeper paid”):
+  > A bot that liquidates, expires and settles positions. Anyone can run one; short.win runs its own as a backstop and is paid like any other keeper.
+- `glossary.keeperReward` (the settlement keeper reward; beside “Keeper reward (settlement)”, “Settlement keeper reward”):
+  > What the keeper that settles a position in SOL is paid from the vault: a fixed amount plus a share of the vault, capped.
+- `glossary.venueFeeHardCap` (the venue fee hard cap; beside “Venue fee hard cap”):
+  > The venue trading fee above which short.win treats the venue as unusable for buying back, which can lead to a settlement in SOL (S3). This position’s risk figures count the venue fee at no more than the cap locked when it opened.
+- `glossary.settlement` (a settlement in SOL (S1, S2, S3); beside “Settled in SOL (S1 / S2 / S3)”, “Condition”):
+  > When the tokens cannot be bought back, the position settles in SOL: the lenders take SOL from its vault instead of tokens. S1: the price jumped past what the vault can pay. S2: buying back would move the price too far. S3: there has been no way to buy back for a while. “How this short can end” has the exact rules.
+- `glossary.armed` (an armed settlement; beside “Settlement watch”, “Settlement armed”, “Settlement in SOL being considered (S1 / S2)”):
+  > The program has started collecting the price observations an S1 or S2 settlement needs. It is not a settlement yet, and it can still be cleared.
+- `glossary.pnl` (P&L; beside “P&L”, “P&L if closed now”):
+  > Profit or loss in SOL: what you would get back by closing now (or got back), less your margin, any added margin and the open fee.
+- `glossary.tier` (the tier; beside “Tier”):
+  > Tiers A to D set a market’s terms: margin, liquidation CR, penalty, maximum duration, rent curve and size caps. Tiers are set automatically from on-chain liquidity and pool age, and checked again on every trade. A position keeps the terms it opened with.
+- `glossary.venue` (the venue; beside “Venue”):
+  > Where short.win trades the token: the Pump.fun bonding curve, PumpSwap, or Raydium AMM v4 or CPMM.
+- `glossary.poolAge` (the pool age; beside “Pool age from”):
+  > When short.win starts counting the pool’s age for its tier: the graduation it saw, the listing time, or the pool’s own recorded creation time.
+- `glossary.utilisation` (utilisation; beside “Utilisation”, “Util.”, “Utilisation cap”):
+  > The share of this pool’s tokens that is lent out now. Rent rises with it, and a new short may not take it above the protocol’s utilisation cap.
+- `glossary.tvl` (TVL (total value locked); beside “TVL”):
+  > Total value in the market, in SOL: the free tokens at the smoothed price, the SOL held for lenders, and the SOL in open positions’ vaults.
+- `glossary.oi` (open interest; beside “Open interest”, “Market open-interest cap”):
+  > The value of all borrowed tokens in this market at the smoothed price. The market’s open-interest cap keeps the tokens borrowed small enough that buying them all back would move the price by no more than the tier allows.
+- `glossary.sizeCap` (the size cap; beside “Size cap”, “Size caps”):
+  > The largest short you can open right now. Several caps apply (price impact, the market’s open interest, utilisation, your wallet, free inventory, the curve guard on Tier D, and a new market’s notional cap); the smallest, marked “binding”, sets it.
+- `glossary.positionImpactCap` (the position impact cap; beside “Position impact cap”):
+  > A single position may not be so large that buying it back would move the price more than the tier allows.
+- `glossary.walletCap` (the per-wallet cap; beside “Per-wallet cap”):
+  > The most one wallet may hold of the market’s open-interest cap. It counts each wallet address separately, so it does not stop one person from using several wallets.
+- `glossary.notionalCap` (the market notional cap; beside “Market notional cap”):
+  > The limit on how much can be shorted while a market is new.
+- `glossary.curveGuard` (the curve graduation guard; beside “Curve graduation guard”):
+  > On a token still on the Pump.fun bonding curve, the open shorts together may borrow only a set share of the tokens the curve still has for sale, so that buying them back never needs more tokens than the curve holds.
+- `glossary.lockedDepth` (locked depth; beside “Locked depth D”):
+  > The part of the pool’s liquidity that cannot be withdrawn, because its LP tokens (the pool’s receipts) are burned or locked. short.win bases its size caps on this part, not on the whole pool.
+- `glossary.coinCreator` (the coin creator; beside “Coin creator”):
+  > This wallet created the token. It can lend and short its own token, so it can be on both sides of this market.
+- `glossary.marketCreator` (the market creator; beside “Market creator”):
+  > This wallet created the short.win market. That gives it no special rights.
+- `glossary.flagMintUnsafe` — Mint unsafe; beside “Mint unsafe”: *verbatim, D:market.mintUnsafe ¶1*
+  > This token no longer passes the safety filter (freeze authority, permanent delegate, transfer hook or transfer fee). Deposits and new shorts are blocked; withdrawals, claims and exits continue.
+- `glossary.flagRouteBroken` — Route broken; beside “Route broken”: *verbatim, D:market.routeBroken ¶1*
+  > The emergency multisig marked this market’s trading route as broken. New shorts are refused.
+- `glossary.flagOpensPaused` (Opens paused; beside “Opens paused”):
+  > New shorts are paused (on this market or globally). Exits continue.
+- `glossary.flagCoveragePaused` — Coverage paused; beside “Coverage paused”, “Markets in degraded mode”: *verbatim, D:market.coveragePause ¶1, ¶2, ¶3*
+  > short.win’s keeper cannot currently cover this market (degraded mode), so new shorts are paused. Closing, adding margin, liquidations, settlements, withdrawals and claims continue. New shorts resume automatically once coverage is back. While coverage is degraded, positions here may be liquidated later than usual.
+- `glossary.flagVenueUpgraded` — Venue upgraded; beside “Venue upgraded”: *verbatim, D:market.venueUpgraded ¶1*
+  > A venue program this market trades on was upgraded and has not been re-validated yet. New shorts wait for the review; exits are never blocked by it.
+- `glossary.flagMigrating` — Migrating; beside “Migrating”: *verbatim, D:market.migrating ¶1*
+  > This token is migrating from the Pump.fun curve to its pool. Closes and liquidations pause during the migration and resume once the pool’s prices are confirmed.
+- `glossary.flagGraduationHalted` — Graduation halted; beside “Graduation halted”: *verbatim, D:market.graduationHalted ¶1*
+  > PumpSwap pool creation is disabled, so this curve cannot graduate. New curve positions are refused until it is re-enabled; open positions are unaffected.
+- `glossary.flagListOnly` — Lend only; beside “Lend only”: *verbatim, D:market.listOnly ¶1*
+  > This token has no pool short.win can price on-chain yet (for example it trades only on Orca, Meteora DLMM or Raydium CLMM). It can be listed and lent, but not shorted.
+- `glossary.flagWarmingUp` (Warming up; beside “Warming up”):
+  > The market’s prices are being confirmed after a listing, a graduation or a pool change; keeper liquidations and new shorts wait until they are, and you can still close your own position.
+- `glossary.flagPoolWindow` — Pool switch window; beside “Pool switch window”: *verbatim, D:market.poolSwitch ¶1, ¶2*
+  > If the current pool fails (halted, drained or too expensive), short.win can move this market to a deeper pool. Open positions move only if each one fits the new pool’s normal opening limits. Otherwise they stay and settle in SOL at fair value at their deadline (S3).
+- `glossary.shares` (pool shares; beside “Shares”, “Your shares”, “Shares minted”):
+  > A deposit receives pool shares; they are your part of the pool’s tokens and SOL.
+- `glossary.poolShare` (the pool share; beside “Pool share”, “Your share of the pool”, “Share”, “Its share of the pool”):
+  > Your shares as a percentage of all of this pool’s shares. Income and losses are shared in this proportion.
+- `glossary.tokenValue` (the token value; beside “Token value”, “Value”, “Total value”):
+  > What your shares are worth in tokens now. On the dashboard, total value is in SOL at each market’s smoothed price and is for display only.
+- `glossary.minSharesTolerance` (the tolerance; beside “Min shares tolerance”, “Min tokens tolerance”):
+  > How many fewer shares (or tokens) than the quote you accept. If the pool changes more than this before the transaction is confirmed, it fails instead.
+- `glossary.credited` (credited SOL; beside “Credited to you”, “Rent credited”):
+  > Rent and released income credited to your shares that you have not claimed yet. Credited rent is not guaranteed: rent a position never pays is taken back from the lenders who hold shares at that moment.
+- `glossary.claimable` (claimable SOL; beside “Claimable now”, “SOL claimable”, “Claimable”):
+  > What a claim would pay you now, from the SOL allocated to your shares and the market’s pot as they stand. Rent is paid in only when borrowers’ positions end, so rent credited to you may not be claimable yet. A claim that first syncs other lenders (see Market pot) can pay more.
+- `glossary.vesting` (vesting; beside “Still vesting (your share)”, “Vesting”, “Vest you give up”):
+  > Income credited to you bit by bit over {vestPeriod} instead of all at once: one-off income, such as your share of liquidation penalties and expiry fees, and rent paid above what accrued (the minimum rent of an early exit). If you withdraw before it has vested, the unvested part stays with the lenders who remain.
+- `glossary.pot` (the market pot; beside “Market pot”):
+  > Spare SOL in this market: SOL allocated to other lenders’ shares beyond their own credit, moved here when they are synced. When the SOL allocated to your shares does not cover what is credited to you, a claim can draw on the pot, and it can first sync such lenders.
+- `glossary.deficit` (a deficit; beside “Deficit”):
+  > A negative SOL balance in this pool: rent that borrowers never paid was taken from the lenders, and your part was more than your SOL balance here. You must pay the difference in SOL (Cover deficit, on the Claim tab) before you can withdraw your tokens.
+- `glossary.locked` — locked shares; beside “Locked”, “Locked shares now”, “Locked shares after”, “Lock ends”, “Current lock ends”, “Locked until”, “A new lock would end”: *verbatim, D:lender.risks ¶3*
+  > You can withdraw only from tokens that are not lent out, as a pro-rata mix of tokens and SOL. While tokens are borrowed, part of your shares can stay locked until the positions they stand for have expired, plus up to {lockGrace}.
+- `glossary.unpaidRent` (unpaid rent; beside “Unpaid rent in the pool”, “This deposit’s part if it is never paid”):
+  > Rent the pool has credited that borrowers have not paid yet. If a position ends without enough SOL to pay it, the unpaid part is taken from the lenders who hold shares at that moment. That includes new deposits.
+- `glossary.shareEpoch` (the share epoch; beside “Share epoch”):
+  > How many times this pool’s shares have been reissued at a new scale. That happens after settlements in SOL, when each share stands for very few tokens or the pool has none left. Your position converts to the new shares at your next claim, deposit or withdrawal.
+- `glossary.sync` (a sync; beside “Sync”):
+  > Brings your position up to date with the pool’s latest share epoch and income. Your own claim, deposit or withdrawal does this too.
+- `glossary.poolWiped` (a wiped-out pool; beside “Pool wiped out”):
+  > Every token in this pool was lost to settlements in SOL; its lenders now hold SOL only, which they can claim.
+- `glossary.realisedLoss` (the realised loss; beside “Realised loss”, “Loss / token value”):
+  > What lenders lost in this market’s settlements in SOL: for each settlement that paid them less than the tokens’ value at settlement, the difference, added up.
+- `glossary.lendersPnl` (the lenders’ P&L; beside “Lenders’ P&L”):
+  > The SOL paid to lenders in this market’s settlements in SOL, less the value of the tokens they gave up at settlement; negative when they lost.
+- `glossary.rpc` (the RPC; beside its status bar item):
+  > Your connection to a Solana node, with the latest slot it has seen. Every amount you sign is read from the chain through it.
+- `glossary.indexer` (the indexer; beside its status bar item):
+  > short.win’s database of markets and history. Live means at most 10 seconds behind the chain, lagging at most 60, stale beyond; when it is unavailable, lists and history pause and the app reads the chain only.
+- `glossary.liveFeed` (the live feed; beside its status bar item):
+  > The live feed that pushes market updates from the indexer to this page. “open” means connected, “idle” that this page needs no live updates; pages also refresh on a timer, so they keep updating while it reconnects.
+- `glossary.math` (the math version; beside “Math”):
+  > The version of the calculation module that runs in your browser. It is the protocol’s own Rust code compiled for the web, so previews use the same calculations as the on-chain program.
+
+<!-- copy:end -->
 
 
 ---
@@ -1301,6 +1840,13 @@ flag and timer guards and the boost gate, which the facade does not export, stay
 
 ## 7. Design system — dark trading terminal
 
+**The product's name** (the owner's decision of 2026-10-11, thirteenth round): running text says
+**short.win**, as the disclosures (§4.2) and the copy of §4.3 ("New to short.win?") spell it;
+**ShortWin** is the brand mark only: the header's wordmark (`AppShell`, "ShortWin home"), the tab
+title and the page description (`index.html`), and the start-up messages — `index.html`'s
+`<noscript>` ("ShortWin needs JavaScript."), `main.tsx`'s "ShortWin could not start." and
+`FrameGuard.tsx`'s "ShortWin does not run inside another page.". No string changed with the rule.
+
 ### 7.1 Colour tokens (`src/styles/tokens.css`)
 
 | Token | Value | Use | Contrast (on `--bg-0` / `--bg-1` / `--bg-3`) |
@@ -1333,7 +1879,33 @@ screen-reader text; *v1.2, M9-UX-8*).
 
 UI: system stack (`Inter` if installed); numbers: monospace stack (`JetBrains Mono`, `IBM Plex
 Mono`, `ui-monospace`, …) with `font-variant-numeric: tabular-nums slashed-zero` (`.num`). Base
-13 px (`--fs-md`), 11–22 px scale. Number rules (`lib/format.ts`, `components/Num.tsx`): amounts
+13 px (`--fs-md`), 12–22 px scale. *Thirteenth round (O-4):* **no text under 12 px at any width** —
+`--fs-xs` is 12 px from 640 px up as it already was on a phone (so `--fs-xs` = `--fs-sm` = 12 px on a
+tablet and a desktop), and a unit after a number is `max(0.9em, 12px)`; no density switch, and no
+other size changed (the terminal stays dense). The responsive gate checks it at every viewport
+(§10.5). What it costs on a desktop: a table header may wrap (`.tbl th` `white-space: normal` at
+every width; the values stay on one line): the table's auto layout wraps a header only when the
+table would not fit otherwise — the markets list at 1,024 px (two or three header lines), the market
+tabs beside the trade panel and the lender dashboard at 1,280 px; at 1,440 px the headers are one
+line. Where a table is at its narrowest a header's ⓘ may take a line of its own under the label —
+at 1,280 px (the market tabs beside the trade panel, the lender dashboard), 1,024 px (every table)
+and 768 px; at 1,440 px none does. Keeping the ⓘ with the header's last word (or beside the sort
+button) widens each such column by the ⓘ, and the verification round measured what that costs
+(responsive gate at 768, 1,024 and 1,280 px): a table scrolls sideways in seven page states — at 768 px the markets
+list by 66 px (its Flags column, with the "Coverage paused" badge, clipped) and the positions table
+by 62 px; at 1,024 px the market's Positions tab by 17 px, its Liquidations tab by 59 px and the
+lender dashboard by 3 px; at 1,280 px the lender dashboard by 14 px (its action cell clipped). So
+the column fit wins: a header's ⓘ alone on its line is an accepted, cosmetic cost — *accepted by
+the owner on 2026-10-11 (thirteenth round) as built, to revisit in a design pass after the
+audit*.
+The ⓘ overhangs its line instead
+of growing it (a 24 px box with −5 px block margins, centred on the capitals), so a label with an ⓘ
+is as tall as one without and keeps the line's baseline; a key / value list with an ⓘ spaces its
+rows 24 px apart so two rows' ⓘ never overlap. The positions table's headers wrap like the others'
+(only its values stay on one line). The market's stat strip keeps each label on one line from
+1,280 px: in its one-row case (≥ 980 px wide) a cell is at least as wide as its label, so the
+values share one line. Every table fits its width without sideways scroll at 1,024, 1,280 and
+1,440 px with the trade panel where the base did (the responsive gate's h-scroll counts, §10.5). Number rules (`lib/format.ts`, `components/Num.tsx`): amounts
 are `bigint` end to end and formatted once; balances truncate (never round up); SOL 4 decimals in
 tables; tokens by their decimals (≤ 4 shown); tiny prices with subscript zeros (`0.0₅1234`), the
 plain value in `title` and for screen readers; P&L always signed with U+2212 and ▲ / ▼; numeric
@@ -1389,6 +1961,9 @@ shadow, so a 24 px target in it never makes a short page 1 px taller than the sc
 | *M10-RESP* `Reveal` | a truncated value → popover with the full value, Copy, Explorer (`reveal-<kind>`); opt-in on `TokenId` / `AddressText` (`reveal`) |
 | *M10-RESP* `ConnectCta`, `WalletChooser` (`src/wallet`) | an enabled Connect wallet on a surface and the shared chooser (one open at a time, `walletUi.ts`); mobile without a wallet: open-in-wallet links (§5.4) |
 | *M10-RESP* `Modal` `variant`, `Empty` `title` / `action`, `Stat` `priority`, `Panel` `ref` / `head`, `AmountInput` Max in the field, `addressInputProps`, `Toast` kind word / `links`, `Tabs` sideways scroll | as §7.6 |
+| *Thirteenth round* `GlossaryTip`, `Term` (`Glossary.tsx`) | the glossary control (§4.3) |
+| *Thirteenth round* `PageBannersContext`, `focusBanner` (`PageBanners.tsx`) | which banners the page shows, whether its panel is a sheet, and a way to a banner (O-2, §3.4) |
+| *Thirteenth round* `.link-button` | a button that reads as a link (an in-page action), 24 px target, underlined |
 
 Track-specific components live in the track's directory; a component two tracks need is proposed
 to the integrator for `src/components`.
@@ -1414,14 +1989,32 @@ both on pc and phone", keeping the dark terminal. The rules every track follows:
 - **The closed breakpoint set** (top of `tokens.css`; `breakpoints.test.ts` rejects anything else):
   `@media` `(max-width: 399.98px | 639.98px | 1023.98px | 1179.98px | 1279.98px)`,
   `(min-width: 640px | 1024px | 1280px | 1680px)`, `(pointer: coarse)`, `(hover: hover)`,
-  `(prefers-reduced-motion: reduce)` — no range syntax; once, `(orientation: landscape)` with
-  coarse in the tablet tier: a landscape phone, whose side sheet keeps its form foot in the flow
+  `(prefers-reduced-motion: reduce)` — no range syntax; `(orientation: landscape)` only with
+  coarse in the tablet tier — a landscape phone: its side sheet keeps its form foot in the flow
   (a ~390 px sheet cannot lift a sticky foot over a form that starts low; it covered the fields
-  and cut off the submit). **Containers only on `.tbl-wrap` (`tbl`:
+  and cut off the submit; *the fix round's review:* with `z-index: auto` too, as a flex item's
+  z-index stacks in the flow and the Manage sheet's Add margin foot painted over the sticky head
+  and its ✕), and (thirteenth round) the markets intro strip is compact (§3.3);
+  *thirteenth round:* once, `(max-height: 699.98px)` with
+  `(max-width: 399.98px)`: a short phone (320 × 640, 375 × 667), where the markets list's intro strip
+  keeps only its heading row and "What can go wrong" (§3.3) — `MEDIA_HEIGHTS`, the only height
+  allowed, always with a width; the whole query, `(max-width: 399.98px) and (max-height: 699.98px)`,
+  **approved by the owner on 2026-10-11 (thirteenth round)** and pinned as `SHORT_PHONE`
+  (`breakpoints.ts`; `breakpoints.test.ts` refuses a height in any other query). **Containers only on `.tbl-wrap` (`tbl`:
   960 / 560 px) and `.modal-body` (`dialog`: 480 px).**
 - **Input decides density, width decides layout.** 44 px controls / rows and 16 px inputs only
   under `(pointer: coarse)`; hover styles only under `(hover: hover)`; WCAG 2.5.8's 24 px floor at
-  every width (`.hit` for a small control's larger hit area).
+  every width (`.hit` for a small control's larger hit area). *Thirteenth round (the last review):*
+  **a control's touch area never covers another control.** The glossary ⓘ's hit area grows
+  sideways only — 44 × 24 px under a finger, 32 × 24 px with a mouse (grown on all sides it reached
+  the ⓘ of the next key / value row, a Copy button or a field above or below it — the market
+  header's mint, the creator's address, the withdraw amount — so a tap or a click near that edge hit
+  the wrong control); a table header's ⓘ, 2 px beside its sort button, keeps its own 24 px box with
+  any pointer; the Short preview's size caps are rows 24 px apart, like a key / value list with ⓘ.
+  The focus walk fails on a sample point that lands on another control outside the page's bars
+  (below), and the responsive gate measures every control's touch area at all eight viewports
+  (`tapCovers`, §10.5) — inside an open sheet, the sticky trade panel, a sticky table header and a
+  dialog too (the round-13 review: exempting every fixed or sticky box had hidden the covers there).
 - **Tokens first.** Breakpoints change tokens (`--gutter`, `--tabbar-h`, `--actionbar-h`,
   `--sheet-w`, `--tap-min`, `--tap-sm`, `--fs-input`, `--safe-*`, `--z-bars` / `--z-sheet` /
   `--z-wallet-sheet`, `--t-sheet`; the phone type scale one notch up: 12 / 13 / 14 / 16 / 20 / 24
@@ -1436,11 +2029,33 @@ both on pc and phone", keeping the dark terminal. The rules every track follows:
   replacing the URL. A review `<dialog>` opened from a sheet stays visible even if Back drops the
   key.
 - **Within thumb reach.** At most one `ActionBar` per page; every form submit in a sticky
-  `FormFoot` with a one-line reason while it is disabled.
+  `FormFoot` with a one-line reason while it is disabled. A submit that is only busy — the Claim
+  while its first search for syncs runs with nothing claimable now — shows no reason until the
+  result is known, so no reason appears and then flips (§3.6).
 - **Never hide risk or staleness.** Disclosures verbatim and in place; simulate → review → sign
   unchanged; staleness in words at every width (the status strip; panel badges).
 - **Focus Not Obscured (2.4.11).** `scroll-padding` / `scroll-margin` keep a focused control
-  clear of the sticky header and the fixed bars.
+  clear of the sticky header and the fixed bars. *Thirteenth round:* `focus.spec.ts` (desktop) and
+  `mobile-focus.spec.ts` (phone) walk the markets list (intro strip shown), a market's Overview
+  (on the phone with its action bar), Lending and How it works with Tab and then Shift+Tab, and
+  fail when a focused control is entirely hidden (`elementFromPoint` at a 5 × 5 grid of its
+  on-screen rects hits nothing of it; partial covers are annotations; `e2e/focus-obscured.ts`).
+  *Thirteenth round, the last review:* they also fail when a sample point lands on a **different
+  interactive control** outside the page's bars — another control's touch area over this one;
+  covers by the header (with the phone's tab bar), the status bar, an action bar, a sticky form
+  foot, a sheet's head or the toasts stay annotations (only those: a control in another fixed or
+  sticky box — an open sheet, the sticky trade panel, a sticky table header, a dialog — is judged,
+  the round-13 review). *Second approval pass's review:* a bar counts only while it is over the
+  page (fixed, or sticky and stuck away from its place in the flow), the same rule as the tap-cover
+  check (§10.5), and the dialog and menu heads left the list; no walk currently lands a point on a
+  bar's control, so the list has no current case — it keeps a scroll-under from failing a walk. Run on the CSS before the ⓘ fix, the phone's market Overview failed at 4
+  stops (the venue ⓘ under the tier ⓘ's area, 4 of 25 points; the creator's Copy under the market
+  creator ⓘ's, 5 of 25; each by Tab and by Shift+Tab); after it, every walk passes.
+  Either guard alone passes the walk (the html `scroll-padding` without the `:focus-visible`
+  `scroll-margin`, and the reverse); with both removed it fails on the market page (desktop and
+  phone), and in one of two runs also on the phone's markets list (not every run leaves a control
+  there entirely hidden; in the other, its covers were partial). Both stay: the `scroll-padding`
+  also serves anchor jumps and a focus that is not `:focus-visible`.
 - **Viewport.** `width=device-width, initial-scale=1, viewport-fit=cover` (safe areas); pinch zoom
   never disabled; `theme-color` = `--bg-1`.
 - **Shared rules the pages rely on** (integration, v1.4): a card keeps priority-3 cells hidden; a
@@ -1469,7 +2084,7 @@ stops and centres. The tier is the viewport width; density is the pointer (§7.6
 |---|---|---|---|---|
 | **< 640 px** (phone; "ShortWin" hidden < 400) | 48 px header (brand, cluster, Search button, wallet), the `<nav>` as a bottom tab bar with More, the status strip (worst state in words, expands) | cards (container < 560 px), sort bar; priority-3 hidden | a full-screen sheet from the page's action bar (`?sheet=`), Back closes it | one notch up: 12–24 px |
 | **640–1,023 px** (tablet, landscape phone) | text nav, Search button → overlay, the status bar as on a desktop (no cluster) | priority mode (container < 960 px: p3 hidden), cards where the container is < 560 px | a right-side sheet (`min(440px, 100vw)`) over a scrim; on a landscape phone its submit sits under the fields, not sticky (usable, cramped: the header, action bar and status bar take a third of 390 px — a device check, §10.3) | as a desktop |
-| **≥ 1,024 px** (laptop, desktop) | the terminal header and status bar, inline search with `/` | full tables (the market page's 680 px column at 1,024 is a priority-mode container) | in the page: the sticky right column | 11–22 px |
+| **≥ 1,024 px** (laptop, desktop) | the terminal header and status bar, inline search with `/` | full tables (the market page's 680 px column at 1,024 is a priority-mode container) | in the page: the sticky right column | 12–22 px (thirteenth round; 11–22 before) |
 
 **Pages** (the §3 sections have the details):
 
@@ -1497,7 +2112,9 @@ unchanged. The Mobile Wallet Adapter is owner item O-6 (not built).
   link; `/` search; tables, tabs and menus follow the WAI-ARIA patterns; dialogs trap focus and
   return it (to the opener; when it is gone or disabled — a submit after the form resets on a
   confirmed send — to an open sheet's title, else `#main`, never `<body>`); no keyboard trap;
-  Escape closes dismissible layers.
+  Escape closes dismissible layers. *Thirteenth round:* the glossary's ⓘ opens on click, tap, Enter
+  or Space (never hover-only) and returns focus on Escape / ✕ (§4.3); a dismissed intro strip moves
+  focus to the page heading; the coverage link moves focus to the banner it names.
 - **Semantics:** landmarks (`header`, `nav`, `main`, `footer`), headings per page, tables with
   captions and `scope`, sortable headers as buttons with `aria-sort`, the search as a combobox with
   `aria-activedescendant`, form controls with labels and `aria-describedby` for hints and errors,
@@ -1685,7 +2302,8 @@ price, caps), close / add-margin previews, P&L and risk.
   `SHORTWIN_E2E_SCREENSHOTS=update`. `mobile-shell.spec.ts` (foundation): the tab bar and More,
   the status strip, the search overlay (a mixed-case mint kept as typed), the open-in-wallet hrefs
   without a wallet (never followed), the connected wallet sheet, not found; `mobile-markets`,
-  `mobile-trade`, `mobile-lend` belong to the page tracks. `screens.spec` captures grow to the
+  `mobile-trade`, `mobile-lend` belong to the page tracks; *thirteenth round:* `mobile-guide` and
+  `mobile-focus` (2.4.11, §7.6). `screens.spec` captures grow to the
   document's scroll height (the document scrolls since M10-RESP).
 - **Indexer:** profile `chain` (CI): the indexer URL points at a Playwright-routed mock
   (`page.route`) that serves OpenAPI-shaped responses built from the seed's on-chain state, or at
@@ -1717,8 +2335,8 @@ must refuse, §5.8), `raiseFeeNext(price)` (a compute-budget-only change — the
 | `lend-withdraw-memo.spec.ts` | **memo UX** (§10.3) |
 | `lend-claim.spec.ts` | claimable after rent accrues, claim, vest-forfeit warning on a partial exit |
 | `lend-post-wipe.spec.ts` | *M10 (FE-18):* an organic full wipe on the mock venue (every free token withdrawn, a 10× gap, keeper seconds until S1 rolls `num = 0`); a plain deposit refused `WipeSweepPending`; the wiped lender's claim through the live record; a new lender's deposit lands exactly `[sweep_trader, deposit]` (the sweep notice, the review's steps, `TraderSwept` to the record, initial-rate shares); the swept SOL claimed through the final record — *KI-67:* that claim closes the position (`lender.claimCloses` in the review, the account gone, its 2,568,240 lamports of rent back in the wallet with the SOL paid, less the fee; the claim tab then says there is no position) |
-| `lend-claim-sync.spec.ts` | *M10 (FE-18):* a claim the pot cannot pay lands `[sync_lender(other lender), claim_sol]`: `pot_draw > 0`; paid = the claim alone (simulated) + the draw; the pot afterwards = before + the other lender's surplus (simulated `sync_lender` alone) − the draw |
-| `lend-claim-pot-chain.spec.ts` | *M10 (KI66-R4, KI-66 full):* on mock market `chain` the absent lender `chainAbsent` keeps a thousandth of the claims free, a 100× gap settles the borrowed tokens S1 and rolls a **rebase** record (`num = 1`, `1/1,000`); `chainClaimer` lends in the new epoch, a position borrows again, rent is credited for 90 s, the claimer takes part out and the rent is paid in — the absent lender's unconverted shares hold realised SOL beyond its credit. The claim lands exactly `[sync_lender(absent, 1), claim_sol]`: `max_epochs = 1`, the absent owner unsigned, the record read-only (not writable in the message); `lender.potSyncs` in the review; paid = the claim alone + the pot draw, `pending` ≤ 2 lamports after it; the absent lender's shares, epoch, lock and the record's `conv_rem` unchanged, `fwd = 1` with `fwdEpoch` the share epoch; a second sync moves nothing |
+| `lend-claim-sync.spec.ts` | *M10 (FE-18):* a claim the pot cannot pay lands `[sync_lender(other lender), claim_sol]`: `pot_draw > 0`; paid = the claim alone (simulated) + the draw; the pot afterwards = before + the other lender's surplus (simulated `sync_lender` alone) − the draw. *Thirteenth round (owner, 2026-10-11):* the claimer's credit is first booked to ≥ 40,000 lamports (its shortfall stays above the 10,000-lamport dust threshold); Lend → Claim shows the two-line label; the claim alone lands from Node, and then the **Lending page's row** — nothing claimable, the shortfall only — claims through the syncs: exactly `[sync_lender(other), claim_sol]`, paid = the review's simulated `claimed` = the pot draw. *Second approval pass (owner, 2026-10-11, "only when syncs can pay"):* first, while the claimer is the market's only lender, its shortfall gives the disabled "Review claim · 0 SOL" with "Nothing to claim yet" on Lend → Claim and on the Lending page's row, and no Claim all |
+| `lend-claim-pot-chain.spec.ts` | *M10 (KI66-R4, KI-66 full):* on mock market `chain` the absent lender `chainAbsent` keeps a thousandth of the claims free, a 100× gap settles the borrowed tokens S1 and rolls a **rebase** record (`num = 1`, `1/1,000`); `chainClaimer` lends in the new epoch, a position borrows again, rent is credited for 90 s (*thirteenth round:* a 1,000× gap and 300 s, so the claimer's shortfall — ≈ 470 lamports before — clears the 10,000-lamport dust threshold; the seeding payer is funded with 400,000 SOL for the gap's buy), the claimer takes part out and the rent is paid in — the absent lender's unconverted shares hold realised SOL beyond its credit. The claim lands exactly `[sync_lender(absent, 1), claim_sol]`: `max_epochs = 1`, the absent owner unsigned, the record read-only (not writable in the message); `lender.potSyncs` in the review; paid = the claim alone + the pot draw, `pending` ≤ 2 lamports after it; the absent lender's shares, epoch, lock and the record's `conv_rem` unchanged, `fwd = 1` with `fwdEpoch` the share epoch; a second sync moves nothing |
 | `lend-sweep-cashback.spec.ts` | *M10 (FE-18):* the bundle's pump / PumpSwap cashback claims built by `sweep.ts` (`readSweepFacts` / `cashbackClaimIxs`: pump and PumpSwap `claim_cashback`, pAMM `init_user_volume_accumulator`), landed by themselves on the dumped ELFs on an unused trader PDA — no wipe, sweep or deposit |
 | `short-open.spec.ts` | every preview field present and equal to the simulated position (`q`, `s`, `m`, `v`), the borrower disclosure gate, blocked states (coverage pause) |
 | `short-close.spec.ts` | P&L after a mock price move, close, payout delta |
@@ -1728,6 +2346,7 @@ must refuse, §5.8), `raiseFeeNext(price)` (a compute-budget-only change — the
 | `tx-errors.spec.ts` | wallet rejection, a failing simulation (Sign never enabled, mapped message, `data-code`), a stale review refreshed at Sign, `tamperNext` refused, `raiseFeeNext` accepted (*v1.2:* the review names the signing wallet, `tx-wallet`, and shows the fee as signed, `tx-final-fee`) |
 | `fallback.spec.ts` | indexer down: banner, market page from the chain, a deposit still works |
 | `keyboard.spec.ts` | deposit and open completed with the keyboard only |
+| `focus.spec.ts` | *thirteenth round:* Focus Not Obscured (WCAG 2.2 2.4.11, §7.6): Tab and Shift+Tab walks over the markets list (intro strip shown), a market's Overview, Lending and How it works; no focused control entirely under the sticky header or the status bar, and none partly under another control's touch area outside the page's bars (the phone's walk, with the tab bar, the status strip and the action bar: `mobile-focus.spec.ts`) |
 | `harness.spec.ts` | *as built:* the seeded scenario is on chain; the routed indexer's REST and WebSocket shapes; the Node-side actions |
 | `wallet.spec.ts` | *as built:* the injected wallet's Wallet Standard features, reject / tamper / raise-fee controls |
 | `frame.spec.ts` | *v1.2 (M9-SEC-6):* the preview sends `X-Frame-Options: DENY` and `frame-ancestors 'none'`; a framing page gets no app — the browser refuses it, and with the headers stripped (a host ignoring `_headers`) the app renders `frame-guard` instead; *M10 (SECTXT-4):* it GETs `/.well-known/security.txt` (200, `text/plain`, valid; the preview server only — `vite preview` ignores `_headers`) |
@@ -1821,14 +2440,45 @@ the tab / action bar heights and the primary controls under 44 px with a coarse 
   (ellipsis counted);
 - **touch targets:** interactive elements under 44 × 44 CSS px and under WCAG 2.5.8's 24 × 24 (a
   checkbox counts its label's box; links inside running text are exempt and counted apart), and
-  overlapping targets — inside the open dialog when there is one;
+  overlapping targets — inside the open dialog when there is one; *thirteenth round:* **tap
+  covers** (`collectTapCovers`, `tap-cover` in `summary.ts`) — each visible control wholly in view,
+  sampled at the focus check's 5 × 5 grid per line box, whose point lands on a different control
+  outside the page's bars (the focus check's list; an enlarged `.hit` area counts as its control's),
+  measured on the unrolled page with the touch emulation on; a gate finding. *Second approval
+  pass's review:* only the points inside the box a control can be seen in are judged (`clipBox`:
+  the boxes that clip it on its containing-block chain, up to the top layer — the review dialog
+  sits in the DOM inside the trade panel or sheet, whose box clipped nothing it draws, and had
+  skipped every dialog control at 768 px and wider); a bar is exempt only while it is over the page
+  (fixed, or sticky and stuck away from its place in the flow: a form foot in the flow is judged),
+  and the dialog and menu heads, which never covered a point, left the list. Where unrolling would
+  change the layout — a landscape phone grown taller than wide turns portrait, a 640 px phone
+  grown past 700 px loses the short-phone rules (`phone-land`, `phone-xs` on a tall page; the
+  queries compared are the short-phone one and the landscape-phone rules' own, so a laptop or
+  desktop page taller than wide is still unrolled) — the page is not unrolled: its `<name>.png` is
+  Chromium's full-page capture at the real size (the orientation and height queries kept, but the
+  capture drops the touch emulation, so it draws the fine pointer's sizes and the sticky form foot,
+  and the fixed bars sit where they are on the first screen), and `<name>-scroll-N.png` slices
+  (touch on) show what the device shows: an open sheet's body, else the document, scrolled 75 % of
+  what shows between the bars fixed or stuck over its top and bottom per slice, so the slices
+  overlap by a quarter of that; the tap covers are measured at the real size in half-screen scroll
+  steps (the document, then each box that scrolls on its own, such as an open sheet's body), and
+  axe runs at the real size. *The pass's second review:* a dialog or overlay state (the review
+  dialog, the Manage and trade sheets captured as the viewport) is measured at the real size with
+  each box that scrolls in it stepped too (a dialog's body, half its height at a time when lower
+  than half a screen; an open sheet's body; in an open dialog only its own), and an open sheet's
+  slices are written there as well, so a control below the fold of a dialog's body or a sheet is
+  judged and pictured; over the steps `judged` counts each control once. *The verification after
+  it:* the unrolled page, and a page that fits its screen, step each box that scrolls its own
+  content too (the side trade panel from 1,024 px, whose end, where its form foot is no longer
+  stuck, was otherwise never judged);
 - **text under 12 px**, grouped by element and size;
 - **hover-only affordances:** `title` tooltips, `cursor: help`, `:hover` rules that reveal
   (display / visibility / opacity / size / transform without a `:focus` twin);
 - the header and status bar heights and the height left for content;
 - **axe** (WCAG 2.2 A/AA) violations per viewport (*v1.4:* on a full-page state, run on the unrolled
   page — every target in view, the fixed bars past the content — so a target is not judged by
-  what scrolls under a fixed bar at one moment; a dialog or overlay state at the viewport's size).
+  what scrolls under a fixed bar at one moment; a dialog or overlay state, or a page whose layout
+  unrolling would change, at the viewport's size).
 
 Findings never fail it (a step that cannot run is recorded with its error and a PNG of where it
 stopped; a control Playwright's tap cannot hit is clicked through the DOM and noted); only the
@@ -1841,15 +2491,28 @@ e2e/responsive/summary.ts <dir> [--pages]` prints the counts, the axe rules and 
 *M10-RESP — the gate.* With `SHORTWIN_RESPONSIVE_GATE=1` each test fails on a finding: sideways
 document overflow, a layout wider than the screen, a zoomed-out page, an element off screen (a
 tablist or a table still in table mode may scroll inside itself), an axe violation, a target under
-24 px, a primary control under 44 px with a coarse pointer, text under 12 px on a phone (`phone-xs`,
-`phone-s`, `phone`: the phone type scale is the < 640 px tier; the landscape phone is laid out
-and typed as a tablet), a failed step or a DOM-click fallback. Required before each responsive
+24 px, a primary control under 44 px with a coarse pointer, text under 12 px — *thirteenth round
+(O-4):* at **every** viewport (v1.4 checked the phones only, `phone-xs`, `phone-s`, `phone`, while
+the 640 px-and-up type scale went down to 11 px) —, a control under another control's touch area
+(*thirteenth round*, the tap covers above), a failed step or a DOM-click fallback. Required before each responsive
 phase merges. *Integration (v1.4):* under 1,024 px the capture opens the trade panel as a user
 does — the page first (the header's wallet is outside the sheet), then the action bar — and adds
 two states there: `market-trade-sheet` and `position-manage-sheet`. A full-page screenshot clears Chromium's touch
 emulation (`(pointer: coarse)` then reads false until the page closes), so the capture turns it
 back on after every shot on a touch viewport; before v1.4 the tablet and the landscape phone were
 measured, and their later PNGs drawn, with a mouse's density after their first full-page shot.
+*Thirteenth round:* new states — `markets` now shows the intro strip; `markets-intro-hidden` (after
+Hide), `glossary-open` (a market page's "Rate (APR)" ⓘ open; on a phone the bottom sheet),
+`how-it-works` and `how-it-works-risks` (the page at `#short-risks`), `short-coverage-link` (the
+paused market's Short panel with its link; under 1,024 px in the trade sheet) and
+`coverage-banner-focused` (after the link: the banner focused, the sheet closed). *The owner's
+decisions of 2026-10-11:* `lender-dashboard-shortfall` and `lend-claim-shortfall` (wallet
+`potClaimer`, the pot market's only lender, whose rent credited is not paid in yet: since "only when
+syncs can pay" the disabled "Review claim · 0 SOL" with "Nothing to claim yet"), and — in a second
+pass over all eight viewports, after every viewport's first (it changes the pot market: `potLate`
+lends there and `potBorrower` closes, so `potLate` holds a surplus its sync can move) —
+`lender-dashboard-syncs` and `lend-claim-syncs` (the row's and the panel's two-line Claim label), so
+the Lending page's action cell is still measured with its widest label at every viewport.
 
 ---
 
@@ -1934,6 +2597,7 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `wallet-my-lending` | `T.walletMyLending` | *M10-RESP:* connected menu → `/lend` |
 | `wallet-sheet-close` | `T.walletSheetClose` | *M10-RESP:* the header wallet popup's ✕ on a phone (its bottom sheet; Back closes it too) |
 | `tx-sign-hint` | `T.txSignHint` | *M10-RESP:* "Tick the acknowledgement above to sign" — a button that focuses the first unticked acknowledgement; only while one blocks signing |
+| `tx-sign-hold` | `T.txSignHold` | *Thirteenth round (second approval pass, 2026-10-11):* why a successful simulation is not offered for signing (`TxPlan.holdSign`) — a claim whose simulation pays 0 lamports reads "Nothing to claim yet" (§3.6); beside the disabled Sign, in place of `tx-sign-hint` |
 | `tx-confirmed-link` | `T.txConfirmedLink` | *M10-RESP:* after landing: the flow's next step (e.g. View position), when the plan has one (the explorer is `tx-explorer-link`) |
 
 ### 11.2 Markets table, market page, create market, protocol status (MARKETS)
@@ -2048,9 +2712,9 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `withdraw-percent-<…>` | `T.withdrawPercent` | `<pct>` ∈ 25, 50, 75 (*M10-RESP*: 75 added; a chip, `aria-pressed` while the input holds that share): fills that share of the holding |
 | `lender-epochs-<…>` | `T.lenderEpochs` | `<market>`; `data-state` ∈ current, behind, parked; `data-value` = epochs behind |
 | `lender-indexer-<…>` | `T.lenderIndexer` | `<market>`; `data-state` ∈ ok, unsynced (indexer shares ≠ chain), quarantined (the market has quarantined events), missing (chain only) |
-| `lender-claim-<…>` | `T.lenderClaim` | `<market>`; per-row claim |
+| `lender-claim-<…>` | `T.lenderClaim` | `<market>`; per-row claim — *thirteenth round (owner, 2026-10-11):* the Lend → Claim tab's claim and label, enabled with SOL claimable or syncs that can add 10,000 lamports or more (only when syncs can pay; disabled and `aria-busy` while its search runs with nothing claimable, §3.8) |
 | `lender-sync-<…>` | `T.lenderSync` | `<market>`; per-row `sync_lender` when behind |
-| `lender-claim-all` | `T.lenderClaimAll` | claims every market with SOL claimable, one reviewed transaction per market |
+| `lender-claim-all` | `T.lenderClaimAll` | claims every market with SOL claimable (*thirteenth round:* or syncs that can add 10,000 lamports or more — the rows whose own Claim is enabled, not behind the share epoch), one reviewed transaction per market |
 | `lender-empty` | `T.lenderEmpty` | empty state (no wallet / no positions) |
 | `lend-deposit-reason` | `T.lendDepositReason` | *M10-RESP:* the deposit's FormFoot reason (`role=status`; empty while the submit is enabled; a button that focuses the acknowledgement or the CPI Guard box when that is what is missing) |
 | `lend-withdraw-reason` | `T.lendWithdrawReason` | *M10-RESP:* the withdrawal's FormFoot reason (as above; focuses the vest acknowledgement) |
@@ -2098,6 +2762,24 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `manage-sheet-close` | `T.manageSheetClose` | *M10-RESP:* the Manage sheet's close button (Back and Escape close it too) |
 | `add-margin-reason` | `T.addMarginReason` | *M10-RESP:* why `add-margin-submit` is disabled (as `short-submit-reason`) |
 | `close-reason` | `T.closeReason` | *M10-RESP:* why `close-submit` is disabled (as `short-submit-reason`) |
+
+### 11.5 Newcomer help, the coverage link and the Claim label (the owner's thirteenth round)
+
+| id | constant | element and state |
+|---|---|---|
+| `markets-intro` | `T.marketsIntro` | the intro strip above the markets list (absent once hidden) |
+| `markets-intro-dismiss` | `T.marketsIntroDismiss` | its Hide button (remembered in `localStorage`; for the session where storage throws) |
+| `markets-intro-link-<…>` | `T.marketsIntroLink` | `<link>` ∈ how-it-works, short-risks, lend-risks (to `/how-it-works`, `#short-risks`, `#lend-risks`) |
+| `glossary-tip-<…>` | `T.glossaryTip` | `<id>` = the glossary entry: the ⓘ beside a label; `aria-expanded`, `aria-controls` while open |
+| `glossary-popover-<…>` | `T.glossaryPopover` | `<id>` = the glossary entry: its open definition (`role=dialog`; `data-placed` once positioned) |
+| `glossary-close` | `T.glossaryClose` | the open definition's ✕ |
+| `nav-how-it-works` | `T.nav('how-it-works')` | the status bar's How it works link (`nav-<…>`, §11.1) |
+| `more-how-it-works` | `T.moreHowItWorks` | the phone More sheet's How it works row |
+| `page-how-it-works` | `T.page('how-it-works')` | the How it works page root (`page-<…>`, §11.1) |
+| `how-it-works-section-<…>` | `T.howItWorksSection` | `<anchor>` ∈ shorting, lending, what-can-go-wrong, short-risks, lend-risks, every-market, fees, before-you-sign, read-more: a section heading (focusable from script) |
+| `how-it-works-config-error` | `T.howItWorksConfigError` | How it works: the alert with Retry when the GlobalConfig read fails or finds no account (the governable numbers show a dash, the borrower disclosures the same sentence) |
+| `short-coverage-link` | `T.shortCoverageLink` | the Short panel's link to the page's coverage banner (O-2): "Read the full coverage notice", or in the trade sheet "Close and read the full coverage notice" |
+| `claim-submit-syncs` | `T.claimSubmitSyncs` | the Claim button's second line, "syncs may add up to {g} SOL", while the syncs the search picks can add 10,000 lamports or more ({g} = min(shortfall, their gain); O-5 and the owner's decisions of 2026-10-11, §3.6) — in Lend → Claim and, inside its row, in each Lending page row's Claim (`lender-claim-<market>`, §3.8) |
 
 ---
 
@@ -2189,6 +2871,137 @@ edits `disclosures.ts` (copy changes need the owner) or `errors.ts`.
 | FE-28 | `lender.risks` (§4.2) lists the one-off income that vests but not "rent paid above what accrued, such as the minimum rent of an early exit", which vests since M10-8C-1 (ECON §9.4; the Claim form's note already says it). The copy lives in `disclosures.ts` and this document together (`disclosures.test.ts` pins them verbatim), so both change in one commit | open (copy) |
 | FE-29 | `/.well-known/security.txt`'s `Expires` (2027-09-30) must be rotated before 2027-08-31: a mainnet build and `check:headers` refuse 30 days or less ahead | open (operations) |
 | FE-30 | The claim-time pot syncs (KI66-R4, §3.6): the size check compiles without lookup tables (an upper bound: a v0 wallet with the protocol ALT could carry a sync more), and a sync is dropped only when the claim's own pre-review simulation fails on it — a target that closes or changes between that simulation and a stale review's re-simulation at Sign fails the review with `AccountNotInitialized` (3012), or `AccountOwnedByWrongProgram` (3007) on the `lender` account once someone funded the closed address, both of which the review's Retry rebuilds (`tx/errors.ts`; the rebuild leaves the closed target out, or refuses a claim of the claimant's own closed position). The judgement covered the indexer's first 24 lenders, largest raw share count first, so a large current lender could push an absent surplus holder out. *Ninth round (owner, 2026-10-08):* the lenders behind the share epoch (or with a forward chain) first, then the rest, paged further than 24 when needed, ranked by the simulated gain; 3007 mapped like 3012. *As built (the builder's choices under that decision, confirmed by the owner on 2026-10-09, tenth round, with the indexer's `max_page_limit` floor of 200):* the indexer's additive `epoch=behind` / `current` filter (INDEXER §9.2), 50 a page, paged further while the best ≤ 4 do not cover the shortfall, ≤ 4 pages (≤ 200 lenders; the bound's reason in §3.6); every row of either list is read whatever its epoch, so an indexer lagging or leading the RPC's share epoch only reorders the reads. What stays: a market with more than 200 lenders behind its share epoch is judged on the first 200 of them (largest raw share count first); the behind list's request counts toward the 4 pages even when it is empty or unfiltered, so a market with no lender behind its share epoch is judged on at most 150 current lenders, and an indexer without the filter spends the pages on its whole list in raw share order; an indexer that has not ingested a rebase lists the newly behind lenders among its current ones; and a sync that moved a surplus leaves its lender listed as behind, so a later claim re-reads it at no gain | closed (owner, 2026-10-08; the filter, the bound and the page-limit floor confirmed 2026-10-09) |
+
+### Thirteenth round (v1.4 → v1.5)
+
+The owner's decisions of 2026-10-10 (binding), on the M10-RESP redesign's audit (D-03, D-09, D-21,
+D-23). Every `data-testid` kept (new ones in §11.5), every flow and every approved disclosure text
+unchanged; the new copy is §4.3's, approved as written by the owner on 2026-10-11 (thirteenth round).
+
+| Item | Change | Tests |
+|---|---|---|
+| O-3 newcomer help (D-03) | the markets list's intro strip (§3.3); the glossary — `config/glossary.ts`, the ⓘ control and its attachment through the shared label renderers (§4.3); How it works, a new code-split route linked from the strip, the status bar and the More sheet (§3.2, §3.11) | `Glossary.test.tsx`, `glossary.test.ts`, `copy.test.ts`, `MarketsIntro.test.tsx`, `HowItWorksPage.test.tsx`, `router.test.tsx`; E2E `guide`, `mobile-guide`, `responsive` |
+| O-1 deposit order (D-09) | account → amount → tolerance → preview → risks → the SOL-repayment acknowledgement → the sticky submit; texts verbatim (§3.6, §4.2) | `LendPanel.test.tsx` (DOM order); E2E `lend-deposit`, `mobile-lend`, `screens` |
+| O-2 coverage notice once (D-23) | the Short panel links to the page's coverage banner instead of repeating `market.coveragePause`; from the trade sheet the link closes it and focuses the banner; without the banner the disclosure stays (§3.4, §4.2) | `ShortPanel.test.tsx`, `coverageLink.test.tsx`; E2E `guide`, `mobile-guide` |
+| O-5 Claim wording (D-21) | "Review claim · {c} SOL now · syncs may add up to {g} SOL" on two lines while there is a shortfall, and the shortfall note rewritten; {g} with `solFrac` (§3.6, §4.3) | `LendPanel.test.tsx` (four states), `copy.test.ts` |
+| Focus Not Obscured (2.4.11) | an E2E check of the `scroll-padding` / `scroll-margin` the build relied on untested (§7.6) | E2E `focus`, `mobile-focus` |
+| O-4 12 px floor | `--fs-xs` 12 px from 640 px up (phones had it), `.unit` never under 12 px; no density switch; the responsive gate checks text ≥ 12 px at every viewport (§7.2, §7.7, §10.5) | E2E `responsive` (gate) |
+| Not built | O-6 Mobile Wallet Adapter (after the audit) | — |
+
+### Thirteenth round: the owner's approval and decisions (2026-10-11)
+
+The owner approved the thirteenth round's copy on 2026-10-11 and took the recommended option on all
+four questions: the 143 strings of §4.3 approved as written, with recommendations 6–10 — Tier C stays
+How it works' example, the risk texts render there without tick boxes, the short.win / ShortWin rule
+is recorded (§7), the glossary cuts stand, "Lending page" stays —; `borrower.liquidation` ¶3 amended
+as proposed; both Claim changes built (the dust threshold, the Lending page's Claim); the short-phone
+height breakpoint approved; the lone header ⓘ accepted until a design pass after the audit. No other
+user-facing string changed or was added; every `data-testid` kept (none new), simulate → review →
+sign, the CSP, the breakpoint set and code splitting unchanged. Gates: biome, typecheck,
+`vitest run` (75 files, 731 passed, 1 opt-in file skipped; with the round-13 review's fixes), `pnpm build` (no `<style>` tag or
+`style` attribute in `dist/index.html`); the default E2E 95 passed (69 desktop, 26 phone); the
+responsive gate 88 passed at all eight viewports (61–63 states each, two new) — against the round's
+earlier capture: 0 document overflow, 0 elements off screen, axe 0, 0 targets under 24 px, 0 text
+under 12 px, 0 tap covers (judged in the open sheets, the sticky trade panel, the sticky table
+headers and dialogs too; 62 on the CSS before the review's fix); the sideways scrollers unchanged (the market page's tab strip on the
+phones, which scrolls by design, and the Pools tab's table at 320 px, 21 px — both as before).
+
+| Item | Change | Tests |
+|---|---|---|
+| Copy approval | §4.3's heading drops the *pending owner approval* marker and its text says "approved as written by the owner on 2026-10-11 (thirteenth round)", like §4.2's approved disclosures; the v1.5 status and the round's log likewise; `scripts/owner-copy.ts` prints the approved state and its §7 records the decisions (the owner file regenerated); a string changes only with the owner's approval, code and §4.3 together | `copy.test.ts` (each string under its id and `where`, exactly; §4.3's catalogue equals `owner-copy.ts --doc`'s block; 63 + 2 + 78 = 143 strings), `glossary.test.ts` (the control's two strings; each entry's term, labels and text, or the disclosure and paragraphs it quotes and, under it, the quoted words as the entry shows them — so a paragraph added, dropped or moved in the disclosure fails until §4.3 changes too —, with §4.2 carrying those paragraphs verbatim) |
+| `borrower.liquidation` ¶3 amended (owner, 2026-10-11) | "Expiry: after {maxDuration} the position can be closed by anyone. Unless it can be liquidated at that point, you pay a {expiryFee} expiry fee instead of the penalty." — the expiry fee only when the position cannot be liquidated (SPEC §5.3; `expire.rs`'s `UseLiquidate` precondition); `disclosures.ts` (its source line) and §4.2 together; no glossary entry quotes ¶3 | `disclosures.test.ts` (¶3 pinned; §4.2 verbatim), `m9-review/positions.test.tsx` (the locked 5 % fee in the amended sentence) |
+| The Claim's dust threshold (owner, 2026-10-11) | a shortfall under 10,000 lamports counts as none: `CLAIM_DUST_LAMPORTS` beside `previewClaimView` (`previews.ts`; ECON §9.4's rounding dust), so the label, the note and the syncs all follow — with nothing claimable the disabled "Review claim · 0 SOL" with "Nothing to claim yet", with something claimable "Review claim · {c} SOL" without the note, no syncs gathered (§3.6, §4.3) | `previews.test.ts`, `LendPanel.test.tsx`, `build.test.ts` (0, 9,999 and 10,000 lamports, with nothing and something claimable) |
+| The Lending page's Claim (owner, 2026-10-11; audit D-21) | a row's Claim is the Lend → Claim tab's: the same claim (`claimPlanFrom`, the syncs for a shortfall), enabled with something claimable or a shortfall, the panel's label (`ClaimLabel`, now its own module; two lines with `claim-submit-syncs` in the row); "Claim all" keeps its label and claims the same rows — one predicate (`canClaim`) for a row's button and Claim all's count, total and the SOL claimable KPI, so a row behind the share epoch with every record read counts; with only shortfall rows the total reads 0 SOL (a known consequence). A shortfall no sync can fund (unpaid rent, no other lender with a surplus) still enabled a claim that paid 0 — put to the owner, who decided "only when syncs can pay" (the second approval pass, below) | `LenderDashboardPage.test.tsx` (labels, enabled on a shortfall alone, the builder per row and for Claim all, a behind row with its records read counted); E2E `lend-claim-sync` (after the claim alone lands, the row claims `[sync_lender, claim_sol]` and pays what the review simulated), `mobile-lend` |
+| The short-phone breakpoint (owner, 2026-10-11) | `(max-width: 399.98px) and (max-height: 699.98px)` approved; `SHORT_PHONE` in `breakpoints.ts` (§7.6) | `breakpoints.test.ts` (a height only in that query) |
+| The product's name (owner, 2026-10-11) | running text says short.win; ShortWin is the brand mark (header, tab title and description, start-up messages); recorded in §7, no string changed | — |
+| The lone header ⓘ (owner, 2026-10-11) | accepted as built, to revisit in a design pass after the audit (§7.2) | — |
+| The E2E scenarios above the dust threshold | the claim-time sync scenarios produced shortfalls of a few hundred lamports, now dust: `lend-claim-sync` books ≥ 40,000 lamports of credit first; `lend-claim-pot-chain` gaps 1,000× (not 100×) and credits rent for 300 s (not 90), a ≈ 12,000–15,000-lamport shortfall, the seeding payer funded with 400,000 SOL; `mobile-trade` waits for the trade sheet's slide-in before its first tap (in two runs after other specs the sheet was found scrolled at the axe check, its first labels under the sheet head, and axe's target-size judged the Slippage ⓘ obscured by the sheet's ✕; with the wait it was not — a likely race, not proven) (§10.2) | E2E `lend-claim-sync`, `lend-claim-pot-chain`, `mobile-trade` |
+| Touch areas over a neighbour (the round's last two reviews) | the glossary ⓘ's hit area grows sideways only at every pointer (44 × 24 px under a finger, 32 × 24 px with a mouse; a table header's ⓘ keeps its 24 px box with any pointer); the Short preview's size caps are rows 24 px apart: grown on all sides an ⓘ covered the ⓘ of the next row, a Copy button or a field above or below; the focus walk fails on a point that lands on another control outside the page's bars (the header and tab bar, status bar, action bar, form foot, a sheet's, dialog's or menu's head, the toasts — no longer every fixed or sticky box, which had exempted the open sheets, the sticky trade panel, the sticky table headers and dialogs); the responsive capture measures every control's touch area (`collectTapCovers`, a gate finding; a control partly scrolled out of a dialog's body is not judged) (§7.6, §10.2, §10.5) | E2E `focus`, `mobile-focus` (before the first fix: the phone's market Overview failed at 4 stops; after: pass; with the page-bars list they pass before and after the second fix, whose covers sit in the trade sheet and panel the walks do not open); the responsive gate with the final check — on the CSS before the second fix 25 of 88 failed, 62 controls covered (3 at each phone and the tablet: the cap rows' ⓘ; 15–17 at 1,024–1,440 px: the lend position's, the Claim tab's and the Short preview's ⓘ rows, the withdraw amount under the shares ⓘ, the TVL sort button under its ⓘ), after it 88 of 88 passed, 0 tap covers at all eight viewports |
+
+### Thirteenth round: the second approval pass (2026-10-11)
+
+After the approval's review the owner decided the question it left open — "Only when syncs can
+pay" — and the review's finding on the expired banner was fixed. No user-facing string changed or
+was added (§4.3's 143 strings byte-identical; the owner file and §4.3 regenerated for their notes);
+one `data-testid` added (`tx-sign-hold`, §11); simulate → review → sign, the CSP, the breakpoint
+set and code splitting unchanged; no new dependency. Gates: biome, typecheck, `vitest run` (76 files, 748 passed, 1 opt-in
+file skipped), `pnpm build` (no `<style>` tag or `style` attribute in `dist/index.html`); the
+default E2E 95 passed (69 desktop, 26 phone; the reference screenshots refreshed); the responsive
+gate 96 passed at all eight viewports (63–65 states each, two new: the second lender's pass) —
+against the approval's capture: 0 document overflow, 0 elements off screen, axe 0, 0 targets under
+24 px, 0 text under 12 px, 0 tap covers; the sideways scrollers unchanged (the market page's tab
+strip on the phones, by design, and the Pools tab's table at 320 px).
+
+| Item | Change | Tests |
+|---|---|---|
+| The Claim only when syncs can pay (owner, 2026-10-11) | the Claim works from what the syncs can move: before the button offers them, the review's search (`searchPotSyncs`, `gatherPotSyncs` with `claimPlanFrom`'s inputs) runs in the background (`claim/syncSearch.ts`) for a shortfall of 10,000 lamports or more — react-query under `lendKeys.claimSyncs`, keyed by the stored state the pick comes from that a price crank leaves alone (not the per-second figures; the realised-rent index left the key in the review below), 15 s fresh, searched again when a claim, deposit or withdrawal of the market lands and every 60 s while shown, at most two at once app-wide, 20 s timeout, a failure counted as no syncs; {g} = min(shortfall, the picked syncs' gain), none under 10,000 lamports, so a shortfall no sync can fund (unpaid rent; a market's only lender) is `claim.label.full` or the disabled "Review claim · 0 SOL" with "Nothing to claim yet"; the note keeps the whole shortfall; while the search runs, the full label if something is claimable now, else disabled and busy with no reason (none flips); the review takes the fresh pick, else searches again, and a simulation that pays 0 lamports is not offered for signing (`TxPlan.holdSign`: "Nothing to claim yet" beside the disabled Sign, `tx-sign-hold`); the Lending page's rows and Claim all on the same offer — Claim all counts, totals and claims exactly the enabled rows, and reads 0 SOL when every enabled row pays only through its syncs (§3.6, §3.8, §4.3, §10.5, §11) | `syncSearch.test.ts` (gain 0, under 10,000, from 10,000, above the shortfall; in flight; a failed search; two at once; the timeout), `LendPanel.test.tsx` (the tab's states, in flight with and without something claimable, a failed search, the review taking the fresh pick and holding a 0 payout), `LenderDashboardPage.test.tsx` (the rows' states, in flight, Claim all's rows, count and total, each claim with its row's pick, the concurrency), `build.test.ts` (the shared search; the pick reused without a second search; the hold), `useTxFlow.test.ts`, `TxReviewModal.test.tsx`; E2E `lend-claim-sync` (the only lender's disabled state first; then `[sync_lender, claim_sol]` paying exactly the review's simulated amount), `mobile-lend`, `screens`, the responsive gate (`lender-dashboard-shortfall` / `lend-claim-shortfall` now disabled; `lender-dashboard-syncs` / `lend-claim-syncs`, a second lender's surplus, at all eight viewports) |
+| The expired banner matches the program | `exitState` returned `expired` before checking anything else, so a liquidatable position past its deadline read "… with a {X} expiry fee instead of the penalty." while the program liquidates it (`expire.rs` `UseLiquidate`, SPEC §5.3; the inaccuracy ¶3's amendment fixed). Past the deadline now: no route → `no-route` (`liquidate` and `expire` refuse with `NoRoute`; S3 counts the expiry), armed → `armed` (`sol_settle`'s persisted clock runs on; the program refuses with `UseSolSettle` only while its live buyback check fails, so a keeper may still close an armed position; kept first, as S2's slippage cannot be judged by the client), both legs below → `liquidatable`, else `expired`; before the deadline unchanged; only which existing text shows (the health banner, the Positions page's tooltip; the status filter reads the indexer's status and is unaffected) (§3.8) | `positions.test.tsx` (each boundary: one second before, at and after the deadline; at the line, the live leg only, no CR; no route; armed; the banner's and the tooltip's text) |
+
+
+*The pass's review (2026-10-11).* Three reviewers (claim, taps, words) read the pass; the fixes
+below. Gates on the fixed tree: biome, typecheck, `vitest run` (76 files, 751 passed, 1 opt-in file
+skipped), `pnpm build` (no `<style>` tag or `style` attribute in `dist/index.html`); the default E2E
+95 passed (69 desktop, 26 phone; the reference screenshots refreshed); the responsive gate 96 passed
+at all eight viewports (63–65 states each) — against the pass's capture: 0 document overflow, 0
+elements off screen, axe 0, 0 targets under 24 px, 0 text under 12 px, 0 tap covers with 18,631
+controls judged (11,190 before: the dialogs and the controls partly inside a clipping box now
+count, and the stepped captures count a control once per scroll step — `phone-land` and `phone-xs`,
+but by the bare `(orientation: landscape)` query also 16, 14 and 1 states of `laptop-s`, `laptop`
+and `desktop`; the next review counts each control once and compares the landscape-phone query
+itself); the sideways scrollers
+unchanged. The review's constructed cover (an `::after` grown over the dialog's foot at `laptop`)
+fails the gate ("tx-cancel under tx-retry (10/25), tx-retry under tx-sign (10/25)").
+
+| Item | Change | Tests |
+|---|---|---|
+| The search for syncs and the price crank | the search's key held the market's realised-rent index (`acc_r`), which a crank's accrual raises while a vest runs, so every crank searched again, the Claim fell back to its in-flight state (disabled, busy) and the superseded searches queued behind the two slots, never cancelled. The key now holds only what changes the pick and a crank leaves alone (the claimant's lender fields, the pot, the share epoch, the total shares; a vest's release moves `acc` and `acc_r` together, so no lender's surplus moves; the lenders' SOL, moved by sweeps, is not read by a sync's gain); a search runs again every 60 s while shown (rent paid in raises `acc_r` alone); while a new search runs for the same market and owner the last result stays (a placeholder from the cache: `useQueries` gives a new key a new observer, so `keepPreviousData` would not carry it; not fresh, so the review searches again); react-query's `signal` reaches the queue (a dropped query leaves it without running) and the search (it stops before its next indexer page; the 20 s timeout stops it too) (§3.6) | `syncSearch.test.ts` (dropped searches leave the queue, the latest runs first; a running one stops on a drop and on the timeout), `LendPanel.test.tsx` (six `acc`/`acc_r`-only reads: no second search, the button never busy; a pool change searches again with the last label kept) |
+| The armed state past the deadline | the record and `exitState`'s comment said `liquidate` and `expire` refuse while the position is armed; they refuse (`UseSolSettle`) only while the live buyback check fails, and `s_armed` is the persisted S1 / S2 clock — a keeper may still close an armed position whose live buyback is allowed again. Reworded; `armed` stays first by choice (S2's live slippage cannot be judged by the client, an S1-only proxy could name an exit the program refuses, and "Settlement in SOL being considered" stays true while the clock runs) (§3.8) | — (wording) |
+| The tap-cover check in dialogs | the clip rule walked DOM ancestors, and the review `<dialog>` sits in the DOM inside the trade panel or sheet (overflow hidden / auto) while drawn in the top layer, so at 768 px and wider every dialog control was skipped (157 skipped in a full run). Now the clip box follows the containing-block chain up to the top layer (`:modal`, `:popover-open`), and only the points inside it are judged instead of skipping the control (§10.5) | the responsive gate (the review's constructed `::after` cover over the dialog's foot now fails, as its probe showed) |
+| Measured in a layout the device never shows | unrolling made `phone-land` portrait on any page taller than 844 px (its landscape rules off: the sheet's static form foot, the compact intro) and `phone-xs` taller than 700 px (the short-phone rules off). Where the unroll would change those media queries the page is not unrolled: the PNG is a full-page capture at the real size (drawn with the fine pointer: the capture drops the touch emulation) plus `-scroll-N` slices of the device's view, the tap covers are measured at the real size in half-screen scroll steps (the document, then each box that scrolls on its own), axe runs at the real size (§10.5) | the responsive gate |
+| The bars' exemption | a bar was exempt by its class alone; now only while it is over the page (fixed, or sticky and stuck away from its place in the flow), so a form foot in the flow is judged; `.modal-head` and `.menu-head`, which never exempted a point, left the list (the focus walk's too; its list has no current case) (§7.6, §10.5) | the responsive gate, E2E `focus`, `mobile-focus` |
+| The Short size field at 1,024 px | beside Slippage, the unit and Max, the size box cut the first digit of "250000" (since before the round); in the desktop side panel (from 1,024 px) Slippage now goes under Size. Layout only | the responsive gate (`short-preview` at `laptop-s`, `laptop`, `desktop`) |
+| Records | the Claim's two-line condition in §3.6 (when the picked syncs can add 10,000 lamports or more, not "while there is a shortfall"); §7.6's busy submit without a reason; `claim.label.full`'s note (also while the search runs with something claimable now; copy.ts, owner-copy.ts §6, §4.3 regenerated, the 143 strings unchanged); `lend.css`'s comment on the two-line Claim | `copy.test.ts` (§4.3 against the generated block) |
+
+*The fix round's review (2026-10-11).* Two reviewers (search, gate) read the fixes above; the
+changes below. Gates on the fixed tree: biome, typecheck, `vitest run` (78 files, 760 passed, 1
+opt-in file skipped), `pnpm build` (no `<style>` tag or `style` attribute in `dist/index.html`);
+the default E2E 95 passed (69 desktop, 26 phone; the reference screenshots refreshed); the
+responsive gate 96 passed at all eight viewports (63–65 states each): 0 document overflow, 0
+elements off screen, axe 0, 0 targets under 24 px, 0 text under 12 px, 0 tap covers with 11,470
+controls judged — now each control once per state (18,631 before, which counted a control once per
+scroll step: laptops and desktop unroll again, and the stepped states count each control once).
+The reviewers' two passing probes now fail the gate: the review dialog's "Simulated result" pulled
+over the acknowledgement at `laptop` ("disclosure-ack-borrower.liquidation under … «Simulated
+result» (25/25)"), and the Close slippage field moved onto Close position at `phone-land` ("close-submit
+under close-slippage-input (25/25)"). The stepped Manage sheet's first full run found a real cover
+(below).
+
+| Item | Change | Tests |
+|---|---|---|
+| A timed-out search | the 20 s timeout dropped the syncs a slow indexer's first pages had found and cached "no syncs" as fresh, so the Claim read "Nothing to claim yet" and a click within 15 s built the claim without syncs. `gatherPotSyncs` now reports its pick and whether a failed read or an abort cut it short (`SearchProgress`); the timeout keeps that pick, and a search cut short is shown but never fresh, so the review searches again (§3.6) | `syncSearch.hook.test.tsx` (the timeout keeps 15,000 lamports, not fresh; a cut search not fresh, a whole one fresh), `build.test.ts` (the progress per page, cut by a failed page and by an abort), `syncSearch.test.ts` |
+| The indexer down or slow | each background search's indexer page went through the indexer queries' retries (≈ 15 s before an unreachable indexer counted as none), two at a time. The background search asks for each page once (a failure cuts it short, so the review searches again with the retries), and the Lending page runs none while it knows the indexer is down (§3.6, §3.8) | `syncSearch.hook.test.tsx` (`retry: false` for the button's search only), `LenderDashboardPage.test.tsx` (indexer down: no search, the reason at once) |
+| The refresh's load | every shown search ran again every 60 s, all of a page's rows together. Now only with nothing claimable now (where it decides whether the Claim opens), every 45–75 s, fixed per market (§3.6) | `syncSearch.hook.test.tsx` (no refresh with something claimable; the market's period) |
+| Spent syncs carried over | after the user's own claim the last result (whose syncs that claim ran) stayed while the new search ran: the two-line label for syncs gone. The placeholder now comes only from a result for the same own position (§3.6) | `syncSearch.hook.test.tsx` (the pot moved: carried over; the user's `claimed` moved: in flight) |
+| The 0-pay hold's two reads | `holdSign` compared the vault's lamports from a read before and from the simulation, two RPC calls that may land on different slots. It now holds on the rise of the position's `claimed` (cumulative SOL paid, which only the owner's claim or withdrawal moves; `claimPaidFrom`), the vault's delta only when the claim closes the position | `plans.test.ts` (a vault that seems to pay 50,000 lamports while `claimed` stays: held) |
+| The dialog's body and the sheets | a dialog's tap covers were measured once with its body at the top, and the sheets captured as the viewport (the Manage sheet, the trade sheet) once, so a cover below the fold passed. A dialog or overlay state is now measured with each box that scrolls in it stepped at the real size, and an open sheet is also sliced there (§10.5) | the responsive gate (the two probes above) |
+| The bare orientation query | `(orientation: landscape)` alone stopped laptop and desktop pages taller than wide from unrolling (16, 14 and 1 states); the check now compares the landscape-phone rules' own query (§10.5) | the responsive gate (`laptop-s`, `laptop`, `desktop`: no `-scroll-N` slices) |
+| The slices | a slice scrolled 75 % of the viewport, more than shows between the bars at `phone-xs` and `phone-land` (rows fell between slices), and in a sheet scrolled the inert page. A slice now scrolls 75 % of what shows between the bars, and an open sheet's body (§10.5) | the responsive gate (`phone-xs` `market-overview`'s Tier row; the sheets' lower parts pictured) |
+| The Manage sheet's head on a landscape phone | the stepped gate found the ✕ under Add margin at `phone-land`: the side sheet's form foot is in the flow there but kept the sticky foot's `z-index: 1`, which a flex item honours without a position, so at the sheet's end the Add margin foot painted over the sticky head's title and ✕ and took its taps. The foot in the flow resets its z-index (as does the trade panel's foot with the wallet chooser open) (§7.6) | `stacking.test.ts`, the responsive gate |
+
+*The verification after it (2026-10-11).* The three earlier probes, re-run on the fixed gate: the
+review dialog's Sign pulled over Refresh at `laptop` fails ("tx-retry «Refresh» under tx-sign «Sign
+in wallet» (20/25)"), and the Short submit pulled over the landscape trade sheet at `phone-land`
+fails ("short-submit-reason … under short-submit (10/25)"); the same submit pulled 70 px over the
+side trade panel at `laptop-s` passed once laptops unrolled again — the unrolled page was measured
+once, the panel's own scroll at its top and its stuck form foot exempt, so the panel's end was never
+judged. The unrolled page, and a page that fits its screen, now step each box that scrolls its own
+content, as dialogs and sheets already did (§10.5); the probe fails ("disclosure-borrower.residuals
+summary «Known limits…» under short-submit (15/25)"). The fix round's four test files are formatted
+as Biome wants (`pnpm --filter web lint`, as CI runs it, failed on them). Gates: biome, typecheck,
+`vitest run` (78 files, 760 passed, 1 opt-in file skipped); the responsive gate 96 passed at all
+eight viewports (63–65 states each): 0 document overflow, 0 elements off screen, axe 0, 0 targets
+under 24 px, 0 text under 12 px, 0 tap covers with 11,520 controls judged (11,470 before; the side
+trade panel's lower controls at `laptop-s`, `laptop` and `desktop`).
 
 ### M10-RESP changes (v1.3 → v1.4)
 

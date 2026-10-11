@@ -28,6 +28,7 @@ import { Badge, venueLabel } from '../../../components/Badge.tsx';
 import { Countdown } from '../../../components/Countdown.tsx';
 import { type Column, DataTable } from '../../../components/DataTable.tsx';
 import { Disclosure } from '../../../components/Disclosure.tsx';
+import { Term } from '../../../components/Glossary.tsx';
 import { Bps, Price, Sol, Tokens } from '../../../components/Num.tsx';
 import { ErrorState, Skeleton } from '../../../components/States.tsx';
 import { BREAK_EVEN_DAYS } from '../../../config/disclosures.ts';
@@ -130,9 +131,11 @@ export function PositionsTab({ mint, decimals }: { mint: Address; decimals: numb
             priority: 2,
             render: (p) =>
                 p.armed ? (
-                    <Badge tone="danger" title="A SOL settlement is armed for this position">
-                        Settlement armed
-                    </Badge>
+                    <Term id="armed">
+                        <Badge tone="danger" title="A SOL settlement is armed for this position">
+                            Settlement armed
+                        </Badge>
+                    </Term>
                 ) : (
                     <Badge>Open</Badge>
                 ),

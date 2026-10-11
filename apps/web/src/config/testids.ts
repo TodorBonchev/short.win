@@ -10,6 +10,7 @@
  * `data-value` with the raw integer), never through the text alone.
  */
 import type { DisclosureId } from './disclosures.ts';
+import type { GlossaryId } from './glossary.ts';
 
 const p =
     <K extends string = string>(prefix: string) =>
@@ -20,7 +21,7 @@ export const T = {
     // ---- shell ----------------------------------------------------------------------------
     header: 'app-header',
     clusterBadge: 'cluster-badge',
-    nav: p<'markets' | 'positions' | 'lend' | 'status' | 'security'>('nav'),
+    nav: p<'markets' | 'positions' | 'lend' | 'status' | 'security' | 'how-it-works'>('nav'),
     searchInput: 'search-input',
     searchResults: 'search-results',
     searchResult: p('search-result'),
@@ -48,7 +49,17 @@ export const T = {
     toastRegion: 'toast-region',
     toast: 'toast',
     /** The root element of every page; tracks keep it on their page (router smoke test, E2E). */
-    page: p<'markets' | 'create-market' | 'market' | 'positions' | 'position' | 'lend' | 'status' | 'security'>('page'),
+    page: p<
+        | 'markets'
+        | 'create-market'
+        | 'market'
+        | 'positions'
+        | 'position'
+        | 'lend'
+        | 'status'
+        | 'security'
+        | 'how-it-works'
+    >('page'),
     routeStub: p('route-stub'),
     // appended by the responsive foundation (M10-RESP; FRONTEND.md §7.6, §11.1)
     /** The phone tab bar's fourth cell: opens the More sheet (`aria-expanded`). */
@@ -322,10 +333,33 @@ export const T = {
     txInstruction: p('tx-instruction'),
     /** "Tick the acknowledgement above to sign": focuses the first unticked acknowledgement. */
     txSignHint: 'tx-sign-hint',
+    /** Why a successful simulation is not offered for signing (`TxPlan.holdSign`: a claim that pays 0). */
+    txSignHold: 'tx-sign-hold',
     /** After landing: View position / Open in explorer. */
     txConfirmedLink: 'tx-confirmed-link',
 
     // ---- disclosures (scaffold) -----------------------------------------------------------
     disclosure: p<DisclosureId>('disclosure'),
     disclosureAck: p<DisclosureId>('disclosure-ack'),
+
+    // ---- newcomer help (the owner's thirteenth round, O-3 / O-2 / O-5; FRONTEND.md §4.3, §11.5) ----
+    /** The intro strip above the markets list (dismissible; remembered in this browser). */
+    marketsIntro: 'markets-intro',
+    marketsIntroDismiss: 'markets-intro-dismiss',
+    /** The strip's links: How it works, and its two risk sections. */
+    marketsIntroLink: p<'how-it-works' | 'short-risks' | 'lend-risks'>('markets-intro-link'),
+    /** A glossary entry's ⓘ beside a label (`aria-expanded`, `aria-controls`), its definition, its ✕. */
+    glossaryTip: p<GlossaryId>('glossary-tip'),
+    glossaryPopover: p<GlossaryId>('glossary-popover'),
+    glossaryClose: 'glossary-close',
+    /** Phone: the More sheet's How it works row. */
+    moreHowItWorks: 'more-how-it-works',
+    /** A How it works section, `<id>` = its anchor (`shorting`, `lending`, `what-can-go-wrong`, …). */
+    howItWorksSection: p('how-it-works-section'),
+    /** How it works: the alert (with Retry) when the GlobalConfig read fails or finds no account. */
+    howItWorksConfigError: 'how-it-works-config-error',
+    /** O-2: the Short panel's link to the page's coverage banner (in the trade sheet: closes it first). */
+    shortCoverageLink: 'short-coverage-link',
+    /** O-5: the Claim button's second line, when syncs may add to what it pays now. */
+    claimSubmitSyncs: 'claim-submit-syncs',
 } as const;

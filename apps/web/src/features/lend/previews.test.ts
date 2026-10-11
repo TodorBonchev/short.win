@@ -15,6 +15,8 @@ import { initMathSync, type MathModule } from '../../math/load.ts';
 import { readRepo, readRepoBytes } from '../../test/repo.ts';
 import { potEpochs } from './chain.ts';
 import {
+    CLAIM_DUST_LAMPORTS,
+    claimShortfall,
     closable,
     FWD,
     type LendState,
@@ -396,16 +398,39 @@ describe('lend previews on simple pools', () => {
     });
 
     it('measures what another lender’s touch adds to the pot and claims against it', () => {
-        const pool = simplePool({ tokensFree: 1_000n, totalShares: 1_000_000n, lenderSol: 1_000n });
-        // A lender with 300 realised but only 100 entitled: its touch moves 200 to the pot.
-        const rich = { ...pool, lender: simpleLender(500_000n, { pending: 100n, real: 300n }), records: [] };
-        expect(potGainOfSync(m, rich, 0n)).toBe(200n);
-        // A lender entitled to 250 with nothing realised: the pot pays it.
-        const me = { ...pool, lender: simpleLender(500_000n, { pending: 250n }), records: [] };
+        const pool = simplePool({ tokensFree: 1_000n, totalShares: 1_000_000n, lenderSol: 1_000_000n });
+        // A lender with 300,000 realised but only 100,000 entitled: its touch moves 200,000 to the pot.
+        const rich = { ...pool, lender: simpleLender(500_000n, { pending: 100_000n, real: 300_000n }), records: [] };
+        expect(potGainOfSync(m, rich, 0n)).toBe(200_000n);
+        // A lender entitled to 250,000 with nothing realised: the pot pays it.
+        const me = { ...pool, lender: simpleLender(500_000n, { pending: 250_000n }), records: [] };
         const view = previewClaimView(m, me, 0n);
         expect(view.ok && view.value.claimable).toBe(0n);
-        expect(view.ok && view.value.shortfall).toBe(250n);
-        expect(previewClaimWithPot(m, me, 0n, 200n)).toEqual({ ok: true, value: 200n });
+        expect(view.ok && view.value.shortfall).toBe(250_000n);
+        expect(previewClaimWithPot(m, me, 0n, 200_000n)).toEqual({ ok: true, value: 200_000n });
+    });
+
+    it('counts a shortfall under 10,000 lamports as none (rounding dust; the owner’s decision of 2026-10-11)', () => {
+        expect(CLAIM_DUST_LAMPORTS).toBe(10_000n);
+        expect([0n, 1n, 9_999n, 10_000n, 10_001n].map(claimShortfall)).toEqual([0n, 0n, 0n, 10_000n, 10_001n]);
+        const pool = simplePool({ tokensFree: 1_000n, totalShares: 1_000_000n, lenderSol: 1_000_000n });
+        const view = (pending: bigint, real: bigint) => {
+            const v = previewClaimView(
+                m,
+                { ...pool, lender: simpleLender(500_000n, { pending, real }), records: [] },
+                0n,
+            );
+            if (!v.ok) throw new Error('refused');
+            return [v.value.claimable, v.value.shortfall, v.value.entitled];
+        };
+        // Claimable 0: nothing short, dust, the threshold.
+        expect(view(0n, 0n)).toEqual([0n, 0n, 0n]);
+        expect(view(9_999n, 0n)).toEqual([0n, 0n, 9_999n]);
+        expect(view(10_000n, 0n)).toEqual([0n, 10_000n, 10_000n]);
+        // Claimable > 0: the same edges above it.
+        expect(view(300_000n, 300_000n)).toEqual([300_000n, 0n, 300_000n]);
+        expect(view(309_999n, 300_000n)).toEqual([300_000n, 0n, 309_999n]);
+        expect(view(310_000n, 300_000n)).toEqual([300_000n, 10_000n, 310_000n]);
     });
 
     it('knows where a lender stands against the share epoch', () => {

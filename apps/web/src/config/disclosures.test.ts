@@ -32,6 +32,13 @@ describe('disclosures', () => {
         expect(acked).toEqual(['lender.solRepayment', 'lender.exitForfeitsVest', 'borrower.liquidation']);
     });
 
+    it('carries borrower.liquidation ¶3 as the owner amended it on 2026-10-11 (thirteenth round)', () => {
+        // The expiry fee only when the position cannot be liquidated (SPEC §5.3; expire.rs UseLiquidate).
+        expect(DISCLOSURES['borrower.liquidation'].body[2]).toBe(
+            'Expiry: after {maxDuration} the position can be closed by anyone. Unless it can be liquidated at that point, you pay a {expiryFee} expiry fee instead of the penalty.',
+        );
+    });
+
     it('fills placeholders and refuses to render a missing one', () => {
         expect(placeholders('borrower.liquidation')).toEqual([
             'liqCr',

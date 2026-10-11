@@ -3,7 +3,7 @@
  * places JavaScript needs a width or an input type: a sheet's inert / focus handling, the tablist's
  * `scrollIntoView`, the mobile wallet links. Layout itself is CSS only (one DOM: nothing renders
  * twice per width). `breakpoints.test.ts` checks every `@media` / `@container` width in `src` against
- * {@link MEDIA_WIDTHS} and {@link CONTAINER_WIDTHS}.
+ * {@link MEDIA_WIDTHS} and {@link CONTAINER_WIDTHS}, and a height only in {@link SHORT_PHONE}.
  */
 import { useSyncExternalStore } from 'react';
 
@@ -21,6 +21,20 @@ export const MEDIA_WIDTHS = {
     max: ['399.98px', '639.98px', '1023.98px', '1179.98px', '1279.98px'],
     min: ['640px', '1024px', '1280px', '1680px'],
 } as const;
+
+/**
+ * The one height an `@media` condition may name (`max-height`, with `max-width: 399.98px`): a short
+ * phone (320 × 640, 375 × 667), where the markets list's intro strip keeps only its heading row and
+ * "What can go wrong" so the first market is on the first screen (the thirteenth round's review).
+ */
+export const MEDIA_HEIGHTS = { max: ['699.98px'] } as const;
+
+/**
+ * The one query that names a height ({@link MEDIA_HEIGHTS}): a short phone, where the markets list's
+ * intro strip is compact (FRONTEND.md §3.3, §7.6). Approved by the owner on 2026-10-11 (thirteenth
+ * round); `breakpoints.test.ts` holds the CSS to exactly this query wherever a height appears.
+ */
+export const SHORT_PHONE = '(max-width: 399.98px) and (max-height: 699.98px)';
 
 /** Container queries: the name, and the `max-width`s it may use (no other element is a container). */
 export const CONTAINER_WIDTHS = {

@@ -3,6 +3,126 @@
  * protocol status. Tokens only (styles/tokens.css); class names are prefixed `mk-`.
  */
 
+/* ---- the intro strip (the owner's thirteenth round, O-3 (a)) ------------------------------- */
+/* A compact band above the list: heading row (How it works, Hide), then three parts side by side
+   from 1,024 px, stacked under it. */
+.mk-intro {
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--info);
+    border-radius: var(--radius-lg);
+}
+
+.mk-intro-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-4);
+}
+
+h2.mk-intro-title {
+    font-size: var(--fs-md);
+}
+
+.mk-intro-parts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--sp-2) var(--sp-5);
+    margin-top: var(--sp-2);
+}
+
+.mk-intro-part h3 {
+    margin: 0 0 var(--sp-1);
+    font-size: var(--fs-sm);
+}
+
+.mk-intro-risk-title {
+    color: var(--warn);
+}
+
+.mk-intro-part p:not(.mk-intro-links) {
+    margin: 0;
+    font-size: var(--fs-sm);
+    line-height: var(--lh);
+    color: var(--text-0);
+}
+
+.mk-intro-part .mk-intro-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 var(--sp-4);
+    margin: var(--sp-1) 0 0;
+}
+
+/* Standalone links: a 24 px target (WCAG 2.5.8), 44 px under a finger; underlined (not colour alone). */
+.mk-intro-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-min);
+    font-size: var(--fs-sm);
+    text-decoration: underline;
+}
+
+.mk-page-head h1:focus {
+    outline: none;
+}
+
+.mk-page-head h1:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+}
+
+@media (max-width: 1023.98px) {
+    .mk-intro-parts {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 639.98px) {
+    .mk-intro {
+        padding: var(--sp-3);
+    }
+}
+
+/* A short screen — a small phone (under 400 px wide and 700 px tall: 320 × 640, 375 × 667) or a
+   phone held sideways (the landscape-phone tier, tokens.css) — keeps the strip compact enough that
+   the first market (sideways: the list's filter; a 390 px screen has no room for a row) shows on
+   the first screen: the heading row (How it works, Hide) and "What can go wrong" with its sentence
+   and its two links. "Short a token" and "Lend a token" are what How it works explains, one tap
+   away. Layout only: no text changes. */
+@media (max-width: 399.98px) and (max-height: 699.98px),
+    (min-width: 640px) and (max-width: 1023.98px) and (pointer: coarse) and (orientation: landscape) {
+    .mk-intro-part:not([data-tone="risk"]) {
+        display: none;
+    }
+}
+
+/* Sideways, the newcomer's only risk summary stays: the title on the left, the sentence beside
+   it and the two links under the sentence (the source order: title, sentence, links), so the
+   part is about two lines plus the links' row tall and the list's filter stays on the first
+   screen (the responsive gate checks it under 500 px of height). */
+@media (min-width: 640px) and (max-width: 1023.98px) and (pointer: coarse) and (orientation: landscape) {
+    .mk-intro-part[data-tone="risk"] {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: baseline;
+        gap: 0 var(--sp-4);
+    }
+
+    .mk-intro-part[data-tone="risk"] > h3 {
+        margin: 0;
+    }
+
+    .mk-intro-part[data-tone="risk"] > p {
+        grid-column: 2;
+    }
+
+    .mk-intro-part .mk-intro-links {
+        margin: 0;
+    }
+}
+
 /* ---- markets table ------------------------------------------------------------------------ */
 .mk-toolbar {
     display: flex;
@@ -91,7 +211,10 @@
     }
 }
 
-/* A tablet's markets table (priority mode): the flags wrap rather than widen the table. */
+/* A tablet's markets table (priority mode): the flags wrap rather than widen the table. A badge
+   whose words wrap grows to hold them (its text never leaves its box); its ⓘ sits beside it,
+   centred, and under it only where the column has no room (keeping it beside widened the column
+   and the table scrolled sideways on a landscape phone). */
 @container tbl (max-width: 959.98px) {
     .mk-markets-tbl td[data-col="flags"] {
         white-space: normal;
@@ -102,7 +225,17 @@
         flex-wrap: wrap;
     }
 
+    .mk-markets-tbl .mk-flags .term {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
     .mk-markets-tbl .mk-flags .badge {
+        height: auto;
+        min-height: 18px;
+        padding-block: 1px;
+        line-height: var(--lh-tight);
         white-space: normal;
     }
 }
@@ -467,6 +600,13 @@
     flex-direction: column;
 }
 
+/* Focused from a panel's link (O-2): the ring says "you are here", even after a mouse click. */
+.mk-banner:focus {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: var(--radius);
+}
+
 /* The stat strip: the "More stats" toggle exists for a phone only. */
 .mk-stats-wrap {
     display: flex;
@@ -476,6 +616,23 @@
 
 .mk-stats-more {
     display: none;
+}
+
+/* From 1,280 px the strip is one row where it is 980 px wide or more (components.css): a seventh of
+   it is too narrow for "Open interest" and its ⓘ on one line, and a two-line label set its value
+   below the others'. There each label keeps one line: a cell starts from nothing (the same clamp's
+   one-row case) and is at least as wide as its content, the spare width shared evenly, so the
+   cells stay about a seventh each and "Open interest" takes what Lenders and TVL leave. Under
+   980 px (four per row) nothing changes. Values share one line across the strip. */
+@media (min-width: 1280px) {
+    .mk-stats > .stat {
+        flex-basis: clamp(0px, (980px - 100%) * 999, calc(25% - 1px));
+        min-width: auto;
+    }
+
+    .mk-stats .stat-label {
+        white-space: nowrap;
+    }
 }
 
 .mk-stat-sub {

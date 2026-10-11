@@ -81,6 +81,16 @@ export interface SyncPick {
     readonly more: { readonly count: number; readonly gain: bigint };
 }
 
+/**
+ * A search's state as it goes (`gatherPotSyncs`'s `progress`): the pick so far, and whether the
+ * search was cut short — a failed read or an aborted `signal` — so its pick may miss syncs a whole
+ * search would find (the Claim button's search keeps it, but the review searches again).
+ */
+export interface SearchProgress {
+    pick: SyncPick;
+    cut: boolean;
+}
+
 /** One page of a market's lenders, as the indexer lists them (`/v1/markets/{mint}/lenders`). */
 export interface LenderPage {
     /** Owners with the epoch the indexer holds for them (`LenderPosition.epoch`). */
@@ -235,7 +245,9 @@ export function pickPotSyncs(
  * the first pass (the current pass then finds nothing new) — so a lag only reorders the reads,
  * and the judgement (on the chain's state) does not depend on the split. A failed read (the
  * indexer or the RPC down) ends the search with what the pages before it found: nothing when the
- * first fails, and the claim then pays what the pot holds.
+ * first fails, and the claim then pays what the pot holds. An aborted `signal` (the Claim
+ * button's background search dropped or timed out, `claim/syncSearch.ts`) ends it the same way;
+ * `progress` gives the pick so far to a caller that stops waiting first (the timeout).
  */
 export async function gatherPotSyncs(a: {
     readonly rpc: AppRpc;
@@ -246,6 +258,10 @@ export async function gatherPotSyncs(a: {
     readonly source: OtherLenders;
     readonly now: bigint;
     readonly shortfall: bigint;
+    /** Aborted: the search ends with what the pages before found (no further page is read). */
+    readonly signal?: AbortSignal;
+    /** Kept up to date: the pick after each page, and `cut` once a read fails or `signal` aborts. */
+    readonly progress?: SearchProgress;
 }): Promise<SyncPick> {
     const shareEpoch = a.base.market.shareEpoch;
     const seen = new Set<string>([a.claimant]);
@@ -253,9 +269,14 @@ export async function gatherPotSyncs(a: {
     const judged: SyncTarget[] = [];
     let pick = choosePotSyncs([], a.shortfall);
     let pages = 0;
+    const cut = (): SyncPick => {
+        if (a.progress) a.progress.cut = true;
+        return pick;
+    };
     for (const epoch of ['behind', 'current'] as const) {
         let cursor: string | null = null;
         do {
+            if (a.signal?.aborted) return cut();
             if (pages >= MAX_SYNC_CANDIDATE_PAGES) return pick;
             try {
                 const page: LenderPage = await a.source({ epoch, cursor, limit: SYNC_CANDIDATE_PAGE });
@@ -275,9 +296,10 @@ export async function gatherPotSyncs(a: {
                 for (const r of read) records.set(r.epoch, r);
                 judged.push(...judgePotSyncs(a.math, a.base, others, [...records.values()], a.now));
                 pick = choosePotSyncs(judged, a.shortfall);
+                if (a.progress) a.progress.pick = pick;
                 if (pick.gain >= a.shortfall) return pick;
             } catch {
-                return pick;
+                return cut();
             }
         } while (cursor !== null);
     }

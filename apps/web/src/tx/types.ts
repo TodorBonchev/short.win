@@ -84,6 +84,12 @@ export interface TxPlan {
      */
     readonly refineError?: (error: TxError) => TxError;
     /**
+     * Why a successful simulation must still not be signed (one line beside the disabled Sign; the
+     * review's Refresh simulates again), or `null`: e.g. a claim whose simulation pays 0 lamports
+     * reads "Nothing to claim yet" (the owner's decision of 2026-10-11, FRONTEND.md §3.6).
+     */
+    readonly holdSign?: (report: SimulationReport) => string | null;
+    /**
      * Where the user goes next once it is confirmed (e.g. "View position"), shown in the review's
      * confirmed banner (`tx-confirmed-link`); without it the banner links the explorer.
      */

@@ -6,6 +6,7 @@
  * Chain reads, the wallet and the transaction flow are stubbed; the previews run the real WASM.
  */
 import {
+    bigIntToPodI128,
     bigIntToPodU128,
     findShareEpochPda,
     getCoverDeficitInstructionDataDecoder,
@@ -13,11 +14,13 @@ import {
     identifyShortwinInstruction,
     type LenderPosition,
     type MarketVault,
+    podI128ToBigInt,
+    podU128ToBigInt,
     ShortwinInstruction,
 } from '@shortwin/client';
 import { AccountRole, address, createNoopSigner } from '@solana/kit';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastProvider } from '../../components/Toast.tsx';
@@ -35,9 +38,11 @@ import { TxReviewModal } from '../../tx/TxReviewModal.tsx';
 import type { TokenAccountInfo } from '../../tx/tokenAccount.ts';
 import type { TxPlan } from '../../tx/types.ts';
 import type { TxFlow } from '../../tx/useTxFlow.ts';
+import { NO_SYNCS } from './build.ts';
 import type { LendChain } from './chain.ts';
 import { LendPanelView } from './LendPanel.tsx';
 import { MARKET_FLAG, previewClaimView, previewDepositView, unpaidRentExposure } from './previews.ts';
+import type { SyncPick } from './quote.ts';
 import { fakeMarket, simpleLender, simplePool } from './testkit.ts';
 
 const h = vi.hoisted(() => ({
@@ -46,6 +51,8 @@ const h = vi.hoisted(() => ({
     math: { current: undefined as unknown },
     flow: { current: null as unknown },
     simulate: { current: null as unknown },
+    /** The Claim button's search for syncs (`searchPotSyncs`); the review's own search is the real one. */
+    search: { current: null as unknown },
 }));
 
 vi.mock('../../wallet/useWallet.ts', () => ({ useWallet: () => h.wallet.current }));
@@ -58,6 +65,10 @@ vi.mock('./hooks.ts', () => ({
 vi.mock('../../tx/useTxFlow.ts', async (orig) => ({
     ...(await orig<typeof import('../../tx/useTxFlow.ts')>()),
     useTxFlow: () => h.flow.current,
+}));
+vi.mock('./build.ts', async (orig) => ({
+    ...(await orig<typeof import('./build.ts')>()),
+    searchPotSyncs: (...args: unknown[]) => (h.search.current as (...a: unknown[]) => unknown)(...args),
 }));
 vi.mock('../../tx/simulate.ts', () => ({
     simulatePlan: (...args: unknown[]) => (h.simulate.current as (...a: unknown[]) => unknown)(...args),
@@ -187,6 +198,8 @@ beforeEach(() => {
     h.simulate.current = async () => {
         throw new Error('no simulation in this test');
     };
+    // By default the search finds no lender whose sync funds the pot.
+    h.search.current = async () => NO_SYNCS;
     setChain(chainOf({}));
 });
 
@@ -203,11 +216,28 @@ function renderPanel(action: 'deposit' | 'withdraw' | 'claim', onAction = vi.fn(
             </QueryClientProvider>
         </AppClientProvider>
     );
-    const r = render(wrap(<LendPanelView mint={MINT} action={action} onAction={onAction} />));
-    return { ...r, onAction, panel: () => screen.getByTestId(T.lendPanel) };
+    const view = () => wrap(<LendPanelView mint={MINT} action={action} onAction={onAction} />);
+    const r = render(view());
+    return {
+        ...r,
+        onAction,
+        panel: () => screen.getByTestId(T.lendPanel),
+        /** Renders again on the chain read `setChain` set (a refetched read). */
+        reread: () => r.rerender(view()),
+    };
 }
 
 const submit = () => screen.getByTestId(T.lendSubmit) as HTMLButtonElement;
+
+/** A search result whose one sync (another lender) moves `gain` lamports to the pot. */
+const pickOf = (gain: bigint): SyncPick =>
+    gain === 0n
+        ? NO_SYNCS
+        : {
+              syncs: [{ lender: GUARDED, owner: MEMO_DEST, epochs: [], gain }],
+              gain,
+              more: { count: 0, gain: 0n },
+          };
 
 describe('Lend → Deposit', () => {
     it('shows the SPEC §5.3 sentence verbatim and keeps the review closed until it is ticked', async () => {
@@ -241,6 +271,61 @@ describe('Lend → Deposit', () => {
         expect(plan.kind).toBe('deposit');
         expect(plan.disclosures).toEqual(['lender.solRepayment']);
         expect(plan.instructions).toHaveLength(1);
+    });
+
+    it('follows the Short form’s order: account, amount, tolerance, preview, risks, acknowledgement, submit (O-1)', () => {
+        // A wallet's first deposit (nothing remembered from the tests before).
+        globalThis.localStorage.clear();
+        renderPanel('deposit');
+        fireEvent.change(screen.getByTestId(T.lendAmountInput), { target: { value: '1.5' } });
+        const order = [
+            screen.getByTestId(T.lendTokenAccount),
+            screen.getByTestId(T.lendAmountInput),
+            screen.getByTestId(T.lendSlippageInput),
+            screen.getByTestId(T.lendPreview('shares')),
+            screen.getByTestId(T.disclosure('lender.risks')),
+            screen.getByTestId(T.disclosure('lender.residuals')),
+            screen.getByTestId(T.disclosure('lender.solRepayment')),
+            screen.getByTestId(T.disclosureAck('lender.solRepayment')),
+            screen.getByTestId(T.lendDepositReason),
+            submit(),
+        ];
+        for (let i = 1; i < order.length; i++) {
+            const [a, b] = [order[i - 1] as HTMLElement, order[i] as HTMLElement];
+            expect(
+                a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING,
+                `${a.dataset.testid} before ${b.dataset.testid}`,
+            ).toBeTruthy();
+        }
+        // The texts are the approved ones, verbatim; only their place moved.
+        expect(screen.getByTestId(T.disclosure('lender.solRepayment')).textContent).toBe(
+            `You may be repaid in SOL${LENDER_SOL_REPAYMENT}`,
+        );
+        // The risks are expanded on a wallet's first deposit.
+        expect(screen.getByTestId(T.disclosure('lender.risks')).tagName).toBe('SECTION');
+        // The reason still points up at the box, and focuses it.
+        expect(screen.getByTestId(T.lendDepositReason).textContent).toBe('Tick the acknowledgement above to continue');
+    });
+
+    it('shows a review that could not be built at the submit: after the acknowledgement, before the button (O-1)', async () => {
+        globalThis.localStorage.clear();
+        h.flow.current = {
+            ...flowStub(),
+            start: () => {
+                throw new Error('The deposit could not be built.');
+            },
+        };
+        renderPanel('deposit');
+        fireEvent.change(screen.getByTestId(T.lendAmountInput), { target: { value: '1.5' } });
+        fireEvent.click(screen.getByTestId(T.disclosureAck('lender.solRepayment')));
+        fireEvent.click(submit());
+        const alert = await screen.findByText('The deposit could not be built.');
+        expect(alert.getAttribute('role')).toBe('alert');
+        const ack = screen.getByTestId(T.disclosureAck('lender.solRepayment'));
+        expect(ack.compareDocumentPosition(alert) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(alert.compareDocumentPosition(submit()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        // In the sticky foot, beside the submit.
+        expect(alert.closest('.form-foot')).toBe(submit().closest('.form-foot'));
     });
 
     it('fills Max from the source balance and refuses more than it', () => {
@@ -408,7 +493,12 @@ describe('Lend → Deposit', () => {
         fireEvent.change(screen.getByTestId(T.lendAmountInput), { target: { value: '1.5' } });
         const shares = BigInt(screen.getByTestId(T.lendPreview('shares')).dataset.value ?? '0');
         const expected = unpaidRentExposure(pool.receivable, pool.totalShares, shares, 1_500_000n, 0n);
-        expect(screen.getByText('This deposit’s part if it is never paid')).toBeTruthy();
+        // The label carries a glossary ⓘ after its last word (its text is split around it).
+        expect(
+            screen.getByText(
+                (_, el) => el?.tagName === 'DT' && el.textContent === 'This deposit’s part if it is never paid',
+            ),
+        ).toBeTruthy();
         expect(screen.getByTestId(T.lendPreview('unpaid-rent-share')).dataset.value).toBe(expected.exposure.toString());
         // The position's share counts the old shares too; the disclosure's share is this deposit's.
         const whole = Number(screen.getByTestId(T.lendPreview('share-bps')).dataset.value);
@@ -567,6 +657,254 @@ describe('Lend → Claim', () => {
         fireEvent.click(screen.getByTestId(T.claimSubmit));
         await waitFor(() => expect(started).toHaveLength(1));
         expect((started[0] as TxPlan).kind).toBe('claim_sol');
+    });
+
+    it('says what the claim does: claimable now, credited only, both, neither (O-5)', async () => {
+        const label = () => screen.getByTestId(T.claimSubmit) as HTMLButtonElement;
+        const at = (pending: bigint, real: bigint) => {
+            setChain(chainOf({ lender: lenderAccount(simpleLender(500_000_000_000n, { pending, real })) }));
+            return renderPanel('claim');
+        };
+        // The syncs found move 1 SOL to the pot: more than any shortfall below.
+        h.search.current = async () => pickOf(10n ** 9n);
+        // Claimable now, nothing out of reach: one line, as before; no search.
+        let r = at(300_000n, 300_000n);
+        expect(label().textContent).toBe('Review claim · 0.0003 SOL');
+        expect(screen.queryByTestId(T.claimSubmitSyncs)).toBeNull();
+        expect(label().dataset.lines).toBeUndefined();
+        r.unmount();
+        // Credited only (nothing paid in for it yet): 0 now, the syncs add up to the credit.
+        r = at(25_000n, 0n);
+        await waitFor(() =>
+            expect(label().textContent).toBe('Review claim · 0 SOL now · syncs may add up to 0.000025 SOL'),
+        );
+        expect(screen.getByTestId(T.claimSubmitSyncs).textContent).toBe('syncs may add up to 0.000025 SOL');
+        expect(label().dataset.lines).toBe('2');
+        expect(label().disabled).toBe(false);
+        expect(screen.getByText(/of what is credited to you cannot be claimed now/).textContent).toContain(
+            '0.000025 SOL of what is credited to you cannot be claimed now.',
+        );
+        r.unmount();
+        // Both: part now, the rest through syncs.
+        r = at(300_000n, 100_000n);
+        await waitFor(() =>
+            expect(label().textContent).toBe('Review claim · 0.0001 SOL now · syncs may add up to 0.0002 SOL'),
+        );
+        r.unmount();
+        // Neither: nothing to claim, the button disabled with its reason.
+        r = at(0n, 0n);
+        expect(label().textContent).toBe('Review claim · 0 SOL');
+        expect(label().disabled).toBe(true);
+        expect(screen.getByTestId(T.lendClaimReason).textContent).toBe('Nothing to claim yet');
+        r.unmount();
+    });
+
+    it('counts a shortfall under 10,000 lamports as none (the owner’s decision of 2026-10-11)', async () => {
+        const label = () => screen.getByTestId(T.claimSubmit) as HTMLButtonElement;
+        const note = () => screen.queryByText(/of what is credited to you cannot be claimed now/);
+        const searched: bigint[] = [];
+        h.search.current = async () => {
+            searched.push(1n);
+            return pickOf(10n ** 9n);
+        };
+        const at = (pending: bigint, real: bigint) => {
+            setChain(chainOf({ lender: lenderAccount(simpleLender(500_000_000_000n, { pending, real })) }));
+            return renderPanel('claim');
+        };
+        // Claimable 0, a 9,999-lamport shortfall (rounding dust): nothing to claim yet, no search.
+        let r = at(9_999n, 0n);
+        expect(label().textContent).toBe('Review claim · 0 SOL');
+        expect(label().disabled).toBe(true);
+        expect(screen.getByTestId(T.lendClaimReason).textContent).toBe('Nothing to claim yet');
+        expect(screen.queryByTestId(T.claimSubmitSyncs)).toBeNull();
+        expect(note()).toBeNull();
+        expect(searched).toEqual([]);
+        r.unmount();
+        // Claimable 0, 10,000 lamports short, syncs that cover it: the syncs may add it.
+        r = at(10_000n, 0n);
+        await waitFor(() =>
+            expect(label().textContent).toBe('Review claim · 0 SOL now · syncs may add up to 0.00001 SOL'),
+        );
+        expect(label().disabled).toBe(false);
+        expect(note()).not.toBeNull();
+        r.unmount();
+        // Claimable > 0 with a dust shortfall: the full label, no note, no second line.
+        r = at(309_999n, 300_000n);
+        expect(label().textContent).toBe('Review claim · 0.0003 SOL');
+        expect(label().dataset.lines).toBeUndefined();
+        expect(label().disabled).toBe(false);
+        expect(note()).toBeNull();
+        r.unmount();
+        // Claimable > 0 and 10,000 lamports short: two lines.
+        at(310_000n, 300_000n);
+        await waitFor(() =>
+            expect(label().textContent).toBe('Review claim · 0.0003 SOL now · syncs may add up to 0.00001 SOL'),
+        );
+        expect(label().dataset.lines).toBe('2');
+    });
+
+    it('only when syncs can pay: {g} is min(shortfall, their gain), none under 10,000 lamports (owner, 2026-10-11)', async () => {
+        const label = () => screen.getByTestId(T.claimSubmit) as HTMLButtonElement;
+        const reason = () => screen.getByTestId(T.lendClaimReason).textContent;
+        const note = () => screen.queryByText(/of what is credited to you cannot be claimed now/)?.textContent;
+        // Nothing claimable now, 25,000 lamports credited and not paid in (the only lender: no sync).
+        const only = () => {
+            setChain(chainOf({ lender: lenderAccount(simpleLender(500_000_000_000n, { pending: 25_000n })) }));
+            return renderPanel('claim');
+        };
+        for (const [gain, want] of [
+            // No lender whose sync funds the pot, or less than the dust threshold: disabled.
+            [0n, null],
+            [9_999n, null],
+            // From 10,000 lamports: {g} is the gain while it is below the shortfall …
+            [10_000n, '0.00001'],
+            [12_000n, '0.000012'],
+            // … and the shortfall when the syncs could move more (a claim pays at most what is credited).
+            [50_000n, '0.000025'],
+        ] as const) {
+            h.search.current = async () => pickOf(gain);
+            const r = only();
+            if (want === null) {
+                await waitFor(() => expect(reason()).toBe('Nothing to claim yet'));
+                expect(label().textContent).toBe('Review claim · 0 SOL');
+                expect(label().disabled).toBe(true);
+                expect(label().getAttribute('aria-busy')).toBeNull();
+                expect(label().dataset.lines).toBeUndefined();
+            } else {
+                await waitFor(() =>
+                    expect(label().textContent).toBe(`Review claim · 0 SOL now · syncs may add up to ${want} SOL`),
+                );
+                expect(label().disabled).toBe(false);
+                expect(label().dataset.lines).toBe('2');
+                expect(reason()).toBe('');
+            }
+            // The note keeps the whole shortfall: what is out of reach, and why.
+            expect(note()).toContain('0.000025 SOL of what is credited to you cannot be claimed now.');
+            r.unmount();
+        }
+    });
+
+    it('while the search runs: never more than is known, and no reason that then flips', async () => {
+        let release: (p: SyncPick) => void = () => {};
+        h.search.current = () =>
+            new Promise<SyncPick>((r) => {
+                release = r;
+            });
+        const label = () => screen.getByTestId(T.claimSubmit) as HTMLButtonElement;
+        // Nothing claimable now: disabled and busy, the full label, no reason yet.
+        setChain(chainOf({ lender: lenderAccount(simpleLender(500_000_000_000n, { pending: 25_000n })) }));
+        let r = renderPanel('claim');
+        expect(label().textContent).toBe('Review claim · 0 SOL');
+        expect(label().disabled).toBe(true);
+        expect(label().getAttribute('aria-busy')).toBe('true');
+        expect(screen.getByTestId(T.lendClaimReason).textContent).toBe('');
+        expect(screen.queryByTestId(T.claimSubmitSyncs)).toBeNull();
+        await act(async () => release(pickOf(30_000n)));
+        await waitFor(() => expect(label().disabled).toBe(false));
+        expect(label().getAttribute('aria-busy')).toBeNull();
+        expect(label().textContent).toBe('Review claim · 0 SOL now · syncs may add up to 0.000025 SOL');
+        r.unmount();
+        // Something claimable now: enabled with the full label; the second line once the gain is known.
+        setChain(
+            chainOf({ lender: lenderAccount(simpleLender(500_000_000_000n, { pending: 125_000n, real: 100_000n })) }),
+        );
+        r = renderPanel('claim');
+        expect(label().textContent).toBe('Review claim · 0.0001 SOL');
+        expect(label().disabled).toBe(false);
+        expect(label().getAttribute('aria-busy')).toBeNull();
+        await act(async () => release(pickOf(30_000n)));
+        await waitFor(() =>
+            expect(label().textContent).toBe('Review claim · 0.0001 SOL now · syncs may add up to 0.000025 SOL'),
+        );
+        r.unmount();
+    });
+
+    it('a price crank (the realised-rent index alone) neither searches again nor flips the button', async () => {
+        let searches = 0;
+        let release: (p: SyncPick) => void = () => {};
+        h.search.current = () => {
+            searches++;
+            if (searches === 1) return Promise.resolve(pickOf(30_000n));
+            return new Promise<SyncPick>((r) => {
+                release = r;
+            });
+        };
+        const label = () => screen.getByTestId(T.claimSubmit) as HTMLButtonElement;
+        const lender = lenderAccount(simpleLender(500_000_000_000n, { pending: 25_000n }));
+        const base = chainOf({ lender });
+        setChain(base);
+        const r = renderPanel('claim');
+        const want = 'Review claim · 0 SOL now · syncs may add up to 0.000025 SOL';
+        await waitFor(() => expect(label().textContent).toBe(want));
+        expect(searches).toBe(1);
+        // A vest's release on each crank moves `acc` and `acc_r` together (here by 1 unit: no
+        // lamport accrues to this lender, the claim view stays); six cranks in a row.
+        const market = base.market as NonNullable<LendChain['market']>;
+        for (let k = 1n; k <= 6n; k++) {
+            const acc = bigIntToPodI128(podI128ToBigInt(market.acc) + k);
+            const accR = bigIntToPodU128(podU128ToBigInt(market.accR) + k);
+            setChain({ ...base, market: { ...market, acc, accR }, readAt: Date.now() });
+            r.reread();
+            expect(label().textContent).toBe(want);
+            expect(label().disabled).toBe(false);
+            expect(label().getAttribute('aria-busy')).toBeNull();
+        }
+        await act(async () => {});
+        expect(searches).toBe(1);
+        // An input of the pick that does change (here the pool's shares: a deposit) searches again,
+        // and the last result stays while it runs (no flicker; the review would search again).
+        const totalShares = bigIntToPodU128(podU128ToBigInt(market.totalShares) + 1n);
+        setChain({ ...base, market: { ...market, totalShares }, readAt: Date.now() });
+        r.reread();
+        await waitFor(() => expect(searches).toBe(2));
+        expect(label().textContent).toBe(want);
+        expect(label().disabled).toBe(false);
+        expect(label().getAttribute('aria-busy')).toBeNull();
+        await act(async () => release(NO_SYNCS));
+        await waitFor(() => expect(screen.getByTestId(T.lendClaimReason).textContent).toBe('Nothing to claim yet'));
+        expect(label().textContent).toBe('Review claim · 0 SOL');
+    });
+
+    it('a failed search counts as no syncs', async () => {
+        h.search.current = async () => {
+            throw new Error('indexer down');
+        };
+        setChain(chainOf({ lender: lenderAccount(simpleLender(500_000_000_000n, { pending: 25_000n })) }));
+        renderPanel('claim');
+        await waitFor(() => expect(screen.getByTestId(T.lendClaimReason).textContent).toBe('Nothing to claim yet'));
+        expect((screen.getByTestId(T.claimSubmit) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it('the review takes the button’s fresh pick (no second search) and holds a claim that pays 0', async () => {
+        h.search.current = async () => pickOf(30_000n);
+        setChain(chainOf({ lender: lenderAccount(simpleLender(500_000_000_000n, { pending: 25_000n })) }));
+        renderPanel('claim');
+        const submit = screen.getByTestId(T.claimSubmit) as HTMLButtonElement;
+        await waitFor(() => expect(submit.disabled).toBe(false));
+        // The review's own search would wait on the (stubbed, never answering) indexer: the plan
+        // comes from the button's pick.
+        fireEvent.click(submit);
+        await waitFor(() => expect(started).toHaveLength(1));
+        const plan = started[0] as TxPlan;
+        expect(plan.instructions.map((ix) => identifyShortwinInstruction(ix.data as Uint8Array))).toEqual([
+            ShortwinInstruction.SyncLender,
+            ShortwinInstruction.ClaimSol,
+        ]);
+        // Its simulation decides: one that pays 0 out of the vault is held.
+        const paying = (after: bigint) => ({
+            ok: true,
+            unitsConsumed: 1n,
+            computeUnitLimit: 1,
+            priorityFeeMicroLamports: 0n,
+            feeLamports: 5_000n,
+            sizeBytes: 1,
+            deltas: [{ key: `${VAULT}:lamports`, label: 'Market SOL vault', before: 9n, after, unit: 'SOL', scale: 9 }],
+            logs: [],
+            error: null,
+            simulatedAt: 0,
+        });
+        expect(plan.holdSign?.(paying(9n))).toBe('Nothing to claim yet');
+        expect(plan.holdSign?.(paying(8n))).toBeNull();
     });
 
     it('covers a deficit exactly', async () => {

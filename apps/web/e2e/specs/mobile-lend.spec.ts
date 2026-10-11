@@ -10,7 +10,8 @@
  *    chip fills a share of the holding and the "≈ tokens" line follows.
  * 2. The lender dashboard shows the position as a card with Withdraw / Deposit links into the
  *    market's trade sheet; Claim says why it is disabled and "Claim all" is not offered while
- *    nothing is claimable.
+ *    nothing is claimable (or, when another lender's sync can fund a shortfall, the row's Claim is
+ *    the panel's, on two lines, and "Claim all" counts it), once the row's search has ended.
  * 3. With SOL claimable (rent paid in), "Claim all" sits in the action bar, on the first screen
  *    (the `claimer` wallet, read only: nothing is signed with it here).
  * 4. Without a wallet: the dashboard's and the panel's Connect wallet.
@@ -186,10 +187,21 @@ test.describe('phone lending', { tag: '@lend' }, () => {
             const claimable = BigInt(
                 need(await app.id(T.lenderKpi('claimable')).getAttribute('data-value'), 'claimable'),
             );
-            if (claimable === 0n) {
+            // Nothing claimable now: the row's Claim is off — unless another lender's sync can fund
+            // 10,000 lamports or more of what is credited, when it is the panel's claim, on two lines
+            // (the owner's decisions of 2026-10-11, FRONTEND.md §3.8).
+            const claim = row.getByTestId(T.lenderClaim(main.market));
+            // The row's search for syncs has ended (owner, 2026-10-11: only when syncs can pay).
+            await expect(claim).not.toHaveAttribute('aria-busy', 'true', { timeout: 30_000 });
+            if (claimable === 0n && (await row.getByTestId(T.claimSubmitSyncs).count()) === 0) {
                 await expect(app.id(T.lenderClaimAll)).toHaveCount(0);
                 await expect(row.getByTestId(T.lenderClaimReason(main.market))).toHaveText('Nothing to claim yet');
-                await expect(row.getByTestId(T.lenderClaim(main.market))).toBeDisabled();
+                await expect(claim).toBeDisabled();
+                await expect(claim).toHaveText('Review claim · 0 SOL');
+            } else if (claimable === 0n) {
+                await expect(claim).toBeEnabled();
+                await expect(claim).toContainText('Review claim · 0 SOL now');
+                await expect(app.id(T.lenderClaimAll)).toBeVisible();
             }
             await app.a11y('phone lender dashboard');
             await shot(page, 'lend-dashboard');

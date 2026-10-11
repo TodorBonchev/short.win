@@ -5,7 +5,9 @@
  */
 import type { ReactNode } from 'react';
 import { Badge } from '../../../components/Badge.tsx';
+import { Term } from '../../../components/Glossary.tsx';
 import { explorerTx } from '../../../config/env.ts';
+import { glossaryFor } from '../../../config/glossary.ts';
 import { formatBps, formatCompact, formatDuration, formatFixed, shortAddress } from '../../../lib/format.ts';
 import { formatUtc } from '../../../lib/time.ts';
 import { FLAG_META, type MarketFlagKey } from './marketFlags.ts';
@@ -56,12 +58,15 @@ export function UtilBar({ bps, testId }: { bps: number | null; testId?: string }
     );
 }
 
+/** A state flag's badge, with its glossary ⓘ (the flag's approved banner text; FRONTEND.md §4.3). */
 export function FlagBadge({ flag, testId }: { flag: MarketFlagKey; testId?: string }) {
     const meta = FLAG_META[flag];
     return (
-        <Badge tone={meta.tone} testId={testId}>
-            {meta.label}
-        </Badge>
+        <Term id={glossaryFor(meta.label)}>
+            <Badge tone={meta.tone} testId={testId}>
+                {meta.label}
+            </Badge>
+        </Term>
     );
 }
 

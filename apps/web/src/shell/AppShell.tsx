@@ -32,9 +32,10 @@ export function AppShell() {
     useRpcSlotTracker(client);
     const status = useQuery(indexerQueries.status());
     const [more, setMore] = useState(false);
-    // On a phone, Status and the security policy are reached through More: it marks where you are.
+    // On a phone, Status, the security policy and How it works are reached through More: it marks
+    // where you are.
     const pathname = useRouterState({ select: (s) => s.location.pathname });
-    const inMore = pathname.startsWith('/status') || pathname.startsWith('/security');
+    const inMore = ['/status', '/security', '/how-it-works'].some((p) => pathname.startsWith(p));
     return (
         <div className="app">
             <a className="skip-link" href="#main">
@@ -70,7 +71,7 @@ export function AppShell() {
                         className="nav-more"
                         data-testid={T.navMore}
                         data-current={inMore ? '' : undefined}
-                        // The More tab stands for /status and /security on a phone (their own tab
+                        // The More tab stands for /status, /security and /how-it-works on a phone (their own tab
                         // links are hidden there): the current state, for assistive technology too.
                         aria-current={inMore ? 'true' : undefined}
                         aria-haspopup="dialog"

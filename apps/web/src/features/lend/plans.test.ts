@@ -35,6 +35,7 @@ import {
     buildDepositPlan,
     buildSyncPlan,
     buildWithdrawPlan,
+    claimPaidFrom,
     type LendContext,
     lendInvalidations,
     MAX_SYNCS_PER_CLAIM,
@@ -276,6 +277,24 @@ describe('withdraw plans', () => {
 });
 
 describe('claim, cover and sync plans', () => {
+    it('hold a claim on what its simulation adds to the position’s claimed, not on two reads of the vault', async () => {
+        const plan = await buildClaimPlan({ ...ctx(), syncs: [], expected: 5_000n });
+        const report = (deltas: { key: string; before: bigint | null; after: bigint | null }[]) =>
+            ({ deltas: deltas.map((d) => ({ ...d, label: '', unit: 'SOL', scale: 9 })) }) as never;
+        const vault = { key: `${VAULT}:lamports`, before: 1_050_000n, after: 1_000_000n };
+        // The read before landed after rent was paid into the vault, the simulation before it: the
+        // vault seems to pay 50,000 lamports, but the position's claimed does not move.
+        const claimed = (before: bigint, after: bigint | null) => ({ key: `${LENDER}:claimed`, before, after });
+        expect(plan.holdSign?.(report([claimed(7n, 7n), vault]))).toBe('Nothing to claim yet');
+        expect(claimPaidFrom([claimed(7n, 7n), vault], LENDER, VAULT)).toBe(0n);
+        expect(plan.holdSign?.(report([claimed(7n, 9n), vault]))).toBeNull();
+        // A claim that closes the position leaves no claimed after it: the vault decides.
+        expect(claimPaidFrom([claimed(7n, null), vault], LENDER, VAULT)).toBe(50_000n);
+        expect(plan.holdSign?.(report([claimed(7n, null), { ...vault, after: vault.before }]))).toBe(
+            'Nothing to claim yet',
+        );
+    });
+
     it('prepend other lenders’ unsigned sync_lender (at most 4) before claim_sol', async () => {
         const syncs = Array.from({ length: 6 }, () => ({ lender: OTHER, owner: OTHER_OWNER, epochs: [], gain: 1n }));
         const plan = await buildClaimPlan({ ...ctx(), syncs, expected: 5_000n });

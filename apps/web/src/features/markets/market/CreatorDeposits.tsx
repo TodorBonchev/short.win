@@ -13,6 +13,7 @@ import { AddressText } from '../../../components/Address.tsx';
 import { Badge } from '../../../components/Badge.tsx';
 import { type Column, DataTable } from '../../../components/DataTable.tsx';
 import { Disclosure } from '../../../components/Disclosure.tsx';
+import { Term } from '../../../components/Glossary.tsx';
 import { Bps, Sol, Tokens } from '../../../components/Num.tsx';
 import { Skeleton } from '../../../components/States.tsx';
 import { T } from '../../../config/testids.ts';
@@ -24,14 +25,18 @@ export function CreatorBadges({ l }: { l: Pick<LenderPosition, 'is_coin_creator'
     return (
         <span className="mk-badges">
             {l.is_coin_creator && (
-                <Badge tone="warn" title="This wallet created the token (SPEC R1)">
-                    Coin creator
-                </Badge>
+                <Term id="coinCreator">
+                    <Badge tone="warn" title="This wallet created the token (SPEC R1)">
+                        Coin creator
+                    </Badge>
+                </Term>
             )}
             {l.is_market_creator && (
-                <Badge tone="info" title="This wallet created the short.win market">
-                    Market creator
-                </Badge>
+                <Term id="marketCreator">
+                    <Badge tone="info" title="This wallet created the short.win market">
+                        Market creator
+                    </Badge>
+                </Term>
             )}
         </span>
     );

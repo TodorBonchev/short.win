@@ -4,7 +4,9 @@
  * field's right edge (a 44 px hit under a coarse pointer).
  */
 import { type InputHTMLAttributes, type ReactNode, useId } from 'react';
+import { glossaryFor } from '../config/glossary.ts';
 import { AMOUNT_ERROR_TEXT, type ParsedAmount, parseAmount } from '../lib/amount.ts';
+import { GlossaryTip } from './Glossary.tsx';
 
 /**
  * For an input that takes a base58 address (a mint, a wallet) or a ticker (FRONTEND.md §7.6): no
@@ -33,12 +35,24 @@ export function Field({ label, hint, error, aside, children }: FieldProps) {
     const hintId = useId();
     const errId = useId();
     const describedBy = [hint ? hintId : null, error ? errId : null].filter(Boolean).join(' ') || undefined;
+    // A glossary label's ⓘ sits beside the <label>, not in it: the input's name stays the label.
+    const term = glossaryFor(label);
+    const labelEl = (
+        <label className="field-label" htmlFor={inputId}>
+            <span>{label}</span>
+            {aside}
+        </label>
+    );
     return (
         <div className="field">
-            <label className="field-label" htmlFor={inputId}>
-                <span>{label}</span>
-                {aside}
-            </label>
+            {term ? (
+                <div className="field-head">
+                    {labelEl}
+                    <GlossaryTip id={term} />
+                </div>
+            ) : (
+                labelEl
+            )}
             {children({ inputId, describedBy })}
             {hint && !error && (
                 <div id={hintId} className="field-hint">

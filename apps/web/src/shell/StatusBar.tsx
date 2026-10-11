@@ -13,6 +13,8 @@ import { useEffect, useRef, useState } from 'react';
 import { wsState } from '../api/live.tsx';
 import { indexerQueries } from '../api/queries.ts';
 import type { WsState } from '../api/ws.ts';
+import { GlossaryTip } from '../components/Glossary.tsx';
+import { NAV_COPY } from '../config/copyNav.ts';
 import { config } from '../config/env.ts';
 import { T } from '../config/testids.ts';
 import type { Freshness } from '../lib/staleness.ts';
@@ -65,6 +67,8 @@ export function StatusBar() {
     useEffect(() => {
         if (!expanded) return;
         const onDown = (e: PointerEvent) => {
+            // A glossary definition opened from an item renders outside the bar: not "outside".
+            if ((e.target as Element).closest?.('.glossary-popover, .glossary-scrim')) return;
             if (bar.current && !bar.current.contains(e.target as Node)) setExpanded(false);
         };
         // Escape from inside the list: focus back to the summary first (the list is about to hide).
@@ -106,6 +110,7 @@ export function StatusBar() {
                 <span className="statusbar-item" data-testid={T.statusRpc} data-state={slot.ok ? 'ok' : 'bad'}>
                     <span className="dot" data-state={slot.ok ? 'ok' : 'bad'} aria-hidden="true" />
                     RPC <span className="num">{slot.slot?.toString() ?? '—'}</span>
+                    <GlossaryTip id="rpc" />
                 </span>
                 <span className="statusbar-item stale-badge" data-testid={T.statusIndexer} data-state={fresh}>
                     <span
@@ -115,6 +120,7 @@ export function StatusBar() {
                     />
                     Indexer {fresh === 'down' ? 'unavailable' : fresh}
                     {lag !== null && fresh !== 'down' && <span className="num"> +{lag}s</span>}
+                    <GlossaryTip id="indexer" />
                 </span>
                 <span className="statusbar-item" data-testid={T.statusWs} data-state={ws}>
                     <span
@@ -123,6 +129,7 @@ export function StatusBar() {
                         aria-hidden="true"
                     />
                     Live {ws}
+                    <GlossaryTip id="liveFeed" />
                 </span>
                 <span className="header-spacer" />
                 <span className="statusbar-item" data-testid={T.statusSolUsd}>
@@ -134,8 +141,17 @@ export function StatusBar() {
                     data-state={math ? 'ready' : mathError ? 'error' : 'loading'}
                 >
                     math {math ? math.version() : mathError ? 'unavailable' : '…'}
+                    <GlossaryTip id="math" />
                 </span>
                 <span className="statusbar-item statusbar-cluster muted">{config.cluster}</span>
+                <Link
+                    to="/how-it-works"
+                    className="statusbar-item"
+                    data-testid={T.nav('how-it-works')}
+                    onClick={() => setExpanded(false)}
+                >
+                    {NAV_COPY['nav.howItWorks'].text}
+                </Link>
                 <Link
                     to="/security"
                     className="statusbar-item"

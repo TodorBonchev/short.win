@@ -199,6 +199,16 @@ export const securityRoute = createRoute({
     component: lazyRouteComponent(() => import('./features/security/SecurityPolicyPage.tsx'), 'SecurityPolicyPage'),
 });
 
+/**
+ * How it works (the owner's thirteenth round, O-3 (c)): shorting, lending and what can go wrong, for
+ * newcomers; linked from the markets list's intro strip, the status bar and the phone's More sheet.
+ */
+export const howItWorksRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/how-it-works',
+    component: lazyRouteComponent(() => import('./features/guide/HowItWorksPage.tsx'), 'HowItWorksPage'),
+});
+
 export const routeTree = rootRoute.addChildren([
     indexRoute,
     marketsRoute,
@@ -209,6 +219,7 @@ export const routeTree = rootRoute.addChildren([
     lendRoute,
     statusRoute,
     securityRoute,
+    howItWorksRoute,
 ]);
 
 export function createAppRouter(queryClient: QueryClient) {

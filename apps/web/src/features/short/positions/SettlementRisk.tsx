@@ -17,14 +17,40 @@ import type { PositionMetrics } from '../previews.ts';
 export type ExitState = 'healthy' | 'watch' | 'spot-below' | 'liquidatable' | 'expired' | 'no-route' | 'armed';
 
 /**
- * The most pressing exit state of an open position now. Its CR part is `riskLevel` (both legs,
- * strictly below, as the program), so the dashboard's badge and this line never disagree (M9-UX-4).
+ * The most pressing exit state of an open position now: the exit the program would take. Its CR
+ * part is `riskLevel` (both legs, strictly below, as the program), so the dashboard's badge and
+ * this line never disagree (M9-UX-4).
+ *
+ * Past the deadline (FRONTEND.md §3.8; SPEC §5.1 "liquidatable := both legs ∨ now ≥ deadline",
+ * §5.3; `expire.rs` and `liquidate.rs` `plan`, `sol_settle.rs`), in this order:
+ * - **no route** (`!venue.executable`): `liquidate` and `expire` both refuse first (`NoRoute`), so
+ *   nobody can close it now; `sol_settle` settles it in SOL (S3) once the venue has had no route
+ *   for the S3 wait, the expiry counting as liquidatable (`settle::s3_due`) → `no-route`;
+ * - **armed** (`pos.sArmed`, the S1 / S2 clock `sol_settle` persisted, on an executable venue):
+ *   `sol_settle` keeps that clock past the deadline (it disarms only a position neither expired
+ *   nor liquidatable) and settles once the evidence persists — a buyback the vault cannot fund
+ *   (S1: `B̂ + ert > V − K_s`) or one above the slippage cap (S2) → `armed`, as before the
+ *   deadline. The arm is persisted evidence, not the program's live refusal: `liquidate` and
+ *   `expire` refuse with `UseSolSettle` only while the live check (`buyback_allowed`, computed at
+ *   the call; `s_armed` is not read) fails, so a keeper may still close an armed position whose
+ *   live buyback is allowed again. Kept first by choice: the client cannot judge S2's live
+ *   slippage, an S1-only proxy (`!mx.insufficientVault`) could name an exit the program refuses,
+ *   and "Settlement in SOL being considered" stays true while the clock runs;
+ * - **CR-liquidatable on both legs** (`riskLevel` `critical`): `expire` refuses (`UseLiquidate`)
+ *   and `liquidate` takes it with the penalty (ECON §8.4; `borrower.liquidation` ¶3 as amended)
+ *   → `liquidatable`;
+ * - otherwise `expire` closes it with the expiry fee instead of the penalty → `expired`.
+ * Before the deadline the order is unchanged: armed, no route, then the CR states.
  */
 export function exitState(pos: ShortPosition, mx: PositionMetrics, venue: VenueState, now: bigint): ExitState {
-    if (now >= pos.deadline) return 'expired';
+    const risk = mx.crBps === null ? null : riskLevel(mx.crBps, mx.crEmaBps, pos.crLiqBps);
+    if (now >= pos.deadline) {
+        if (!venue.executable) return 'no-route';
+        if (pos.sArmed !== 0) return 'armed';
+        return risk === 'critical' ? 'liquidatable' : 'expired';
+    }
     if (pos.sArmed !== 0) return 'armed';
     if (!venue.executable) return 'no-route';
-    const risk = mx.crBps === null ? null : riskLevel(mx.crBps, mx.crEmaBps, pos.crLiqBps);
     if (risk === 'critical') return 'liquidatable';
     if (risk === 'below') return 'spot-below';
     if (risk === 'danger' || risk === 'watch') return 'watch';

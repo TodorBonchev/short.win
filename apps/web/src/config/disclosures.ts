@@ -196,7 +196,9 @@ export const DISCLOSURES: Readonly<Record<DisclosureId, Disclosure>> = {
         body: [
             'Your collateral is your margin plus the sale proceeds, locked in the position’s vault. Collateral ratio (CR) = vault SOL ÷ the SOL needed to buy the tokens back now, including price impact.',
             'Liquidation: if CR falls below {liqCr} on both the live price and the smoothed price, anyone can liquidate. The tokens are bought back with your vault SOL, a {penalty} penalty is taken, and the rest comes back to you.',
-            'Expiry: after {maxDuration} the position can be closed by anyone. You pay a {expiryFee} expiry fee instead of the penalty.',
+            // ¶3 amended by the owner on 2026-10-11 (thirteenth round): the expiry fee only when the
+            // position cannot be liquidated (SPEC §5.3; expire.rs's `UseLiquidate` precondition).
+            'Expiry: after {maxDuration} the position can be closed by anyone. Unless it can be liquidated at that point, you pay a {expiryFee} expiry fee instead of the penalty.',
             'Settlement in SOL, when the tokens cannot be bought back:',
             'S1 — the price jumped past your vault: the lenders take all vault SOL minus the keeper reward. You receive nothing.',
             'S2 — buying back would exceed the maximum liquidation slippage ({maxSlippage}): the lenders take the vault SOL minus the keeper reward, but no more than fair value (the buyback at the smoothed price plus the penalty and rent; the {expiryFee} expiry fee instead of the penalty for an expired position). Anything above that comes back to you.',
@@ -205,7 +207,7 @@ export const DISCLOSURES: Readonly<Record<DisclosureId, Disclosure>> = {
         ],
         ack: 'I understand my position can be liquidated or settled in SOL.',
         severity: 'danger',
-        source: 'SPEC §4, §5, §6.1; ARCH §3.4–§3.8',
+        source: 'SPEC §4, §5, §5.3, §6.1; ARCH §3.4–§3.8; ¶3: expire.rs (precondition: not CR-liquidatable, else `UseLiquidate`: the penalty through liquidate, ECON §8.4), amended by the owner on 2026-10-11 (thirteenth round)',
     }),
     'borrower.residuals': d({
         id: 'borrower.residuals',

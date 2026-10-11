@@ -13,14 +13,13 @@ import {
     getMarketDecoder,
     getOpenShortInstructionAsync,
     getShortPositionDecoder,
-    type Params,
     type ShortPosition,
     type TierParams,
 } from '@shortwin/client';
 import type { AccountMeta, Address, Instruction, TransactionSigner } from '@solana/kit';
 import { qk } from '../../api/keys.ts';
 import type { DisclosureId } from '../../config/disclosures.ts';
-import { keeperRewardText, percent, proseDuration } from '../../config/disclosureVars.ts';
+import { borrowerDisclosureVars, keeperRewardText, percent, proseDuration } from '../../config/disclosureVars.ts';
 import { SHORTWIN_PROGRAM } from '../../config/programs.ts';
 import { cleanSymbol, tokenLabel } from '../../lib/displayText.ts';
 import { formatBps, formatSol, formatTokens, shortAddress } from '../../lib/format.ts';
@@ -51,27 +50,7 @@ export function randomNonce(): bigint {
     return v;
 }
 
-export { proseDuration };
-
-/**
- * The `borrower.liquidation` / `borrower.residuals` placeholders from the live tier terms and
- * `GlobalConfig` parameters (§4.2; M9-UX-3): what an open would lock.
- */
-export function borrowerDisclosureVars(
-    tp: TierParams,
-    p: Pick<Params, 'expiryFeeBps' | 's3WaitS' | 'settleKeeperFixed' | 'settleKeeperBps' | 'settleKeeperCap'>,
-): Record<string, string> {
-    return {
-        liqCr: formatBps(tp.crLiqBps, 2),
-        penalty: formatBps(tp.penaltyBps, 2),
-        maxDuration: proseDuration(tp.maxDurationS),
-        maxSlippage: formatBps(tp.maxLiqSlipBps, 2),
-        minRent: proseDuration(tp.minRentS),
-        expiryFee: percent(p.expiryFeeBps),
-        s3Wait: proseDuration(p.s3WaitS),
-        keeperReward: keeperRewardText(p.settleKeeperFixed, p.settleKeeperBps, p.settleKeeperCap),
-    };
-}
+export { borrowerDisclosureVars, proseDuration };
 
 /**
  * The same placeholders from the terms locked into an open position (A26): its own expiry fee, S3

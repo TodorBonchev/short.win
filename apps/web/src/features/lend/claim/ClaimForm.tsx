@@ -5,6 +5,19 @@
  * transaction (`quote.ts` `gatherPotSyncs`, ≤ 4; unsigned, so the pot-only touch with its forward
  * chain for a lender behind a rebase record: KI-66 full, KI66-R4). A claim that leaves the position
  * empty closes it (KI-67; the review says so). A negative balance is covered with `cover_deficit`.
+ *
+ * The button says what the claim does (the owner's thirteenth round, O-5; audit finding D-21): what
+ * it pays now and, when the syncs can add to it, how much — {g} = min(shortfall, what the syncs the
+ * search picked move to the pot), never more than is credited (= claimable + shortfall). The owner's
+ * decision of 2026-10-11 ("only when syncs can pay"): the search the review runs runs first, in the
+ * background (`syncSearch.ts`); with nothing claimable now the claim opens only when the syncs add
+ * `CLAIM_DUST_LAMPORTS` (10,000 lamports) or more — a shortfall no sync can fund (rent the open
+ * shorts have not paid in; a market whose only lender is you) leaves the disabled "Review claim ·
+ * 0 SOL" with "Nothing to claim yet". While the search runs, nothing more than is known is shown:
+ * the full label when something is claimable now, else the disabled, busy button without a reason.
+ * A shortfall under the threshold is rounding dust and counts as none (`previews.ts`). The note
+ * keeps the whole shortfall (what is out of reach, and why). Text: `config/copy.ts`; the label:
+ * `ClaimLabel.tsx` (the Lending page's rows use it too).
  */
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -12,6 +25,7 @@ import { Button } from '../../../components/Button.tsx';
 import { FormFoot } from '../../../components/FormFoot.tsx';
 import { Sol } from '../../../components/Num.tsx';
 import { Kv } from '../../../components/States.tsx';
+import { copy } from '../../../config/copy.ts';
 import { lenderRiskVars } from '../../../config/disclosureVars.ts';
 import { T } from '../../../config/testids.ts';
 import { formatSol } from '../../../lib/format.ts';
@@ -20,7 +34,9 @@ import { claimPlanFrom, coverPlanFrom } from '../build.ts';
 import { type LendCtx, lendEnvOf, lendStateOf, nowFor } from '../ctx.ts';
 import { previewClaimView } from '../previews.ts';
 import { Blocked, RefusalLine, solFrac } from '../ui.tsx';
+import { ClaimLabel } from './ClaimLabel.tsx';
 import { indexerLenders } from './otherLenders.ts';
+import { claimOffer, SEARCH_OFF, useClaimSyncSearches } from './syncSearch.ts';
 
 /** SOL kept back in the wallet for fees when covering a deficit. */
 const FEE_RESERVE = 10_000_000n;
@@ -32,6 +48,13 @@ export function ClaimForm({ ctx }: { ctx: LendCtx }) {
     const [buildError, setBuildError] = useState<string | null>(null);
     const now = nowFor(ctx, 'clock');
     const view = previewClaimView(math, lendStateOf(chain), now);
+    // What the syncs can add, searched before the button offers them (`syncSearch.ts`).
+    const [search] = useClaimSyncSearches(
+        [{ chain, shortfall: view.ok ? view.value.shortfall : 0n, claimable: view.ok ? view.value.claimable : 0n }],
+        math,
+        signer?.address ?? null,
+        qc,
+    );
 
     if (!signer) {
         return (
@@ -44,14 +67,19 @@ export function ClaimForm({ ctx }: { ctx: LendCtx }) {
     if (!chain.lender) return <div className="muted lend-form">You have no lender position in this market.</div>;
     if (!view.ok) return <RefusalLine refusal={view.refusal} />;
     const v = view.value;
+    const offer = claimOffer(v, search ?? SEARCH_OFF);
 
     const claim = async () => {
         if (!signer) return;
         setBuilding('claim');
         setBuildError(null);
         try {
-            // Other lenders whose touch can fund the pot come from the indexer's list (§3.6).
-            flow.start(await claimPlanFrom(lendEnvOf(ctx, signer), chain, ctx.nowS, indexerLenders(qc, ctx.mint)));
+            // Other lenders whose touch can fund the pot come from the indexer's list (§3.6): the
+            // button's own pick while it is fresh, else the review searches again.
+            const pick = search?.status === 'done' && search.fresh && search.pick ? search.pick : undefined;
+            flow.start(
+                await claimPlanFrom(lendEnvOf(ctx, signer), chain, ctx.nowS, indexerLenders(qc, ctx.mint), pick),
+            );
         } catch (e) {
             setBuildError(e instanceof Error ? e.message : String(e));
         } finally {
@@ -73,10 +101,11 @@ export function ClaimForm({ ctx }: { ctx: LendCtx }) {
     };
 
     const canCover = chain.walletLamports >= v.deficit + FEE_RESERVE;
-    // Why the claim cannot open yet: the same predicates as its `disabled` (§7.6).
+    // Why the claim cannot open yet: the same predicates as its `disabled` (§7.6). While the search
+    // for syncs runs with nothing claimable now, the button waits (busy) without a reason yet.
     const reason = ctx.stale
         ? 'Waiting for a fresh chain read'
-        : v.claimable === 0n && v.shortfall === 0n
+        : !offer.open && !offer.waiting
           ? 'Nothing to claim yet'
           : null;
     return (
@@ -106,7 +135,7 @@ export function ClaimForm({ ctx }: { ctx: LendCtx }) {
                 rent paid above what accrued (the minimum rent of an early exit), vests over{' '}
                 {lenderRiskVars(chain.config?.params).vestPeriod}.
                 {v.shortfall > 0n &&
-                    ` ${formatSol(v.shortfall, 6)} SOL credited to you is not paid in yet. A claim first syncs other lenders whose surplus can fund it, where there are any.`}
+                    ` ${copy('claim.note.shortfall', { g: formatSol(v.shortfall, solFrac(v.shortfall)) })}`}
             </div>
             {buildError && (
                 <div className="field-error" role="alert">
@@ -117,12 +146,14 @@ export function ClaimForm({ ctx }: { ctx: LendCtx }) {
                 <Button
                     variant="primary"
                     block
-                    busy={building === 'claim'}
-                    disabled={reason !== null || building !== null}
+                    busy={building === 'claim' || (offer.waiting && !ctx.stale)}
+                    disabled={reason !== null || !offer.open || building !== null}
                     onClick={() => void claim()}
                     data-testid={T.claimSubmit}
+                    className="lend-claim-submit"
+                    data-lines={offer.syncs > 0n ? '2' : undefined}
                 >
-                    {`Review claim · ${formatSol(v.claimable, solFrac(v.claimable))} SOL`}
+                    <ClaimLabel claimable={offer.claimable} syncs={offer.syncs} />
                 </Button>
             </FormFoot>
             {v.deficit > 0n && (

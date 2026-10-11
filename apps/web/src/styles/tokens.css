@@ -14,6 +14,7 @@
  *   min     (min-width: 640px), (min-width: 1024px), (min-width: 1280px), (min-width: 1680px)
  *   input   (pointer: coarse), (hover: hover), (prefers-reduced-motion: reduce); once,
  *           (orientation: landscape) with coarse in the tablet tier = a landscape phone
+ *   height  once, (max-height: 699.98px) with xs = a short phone (the markets intro strip)
  * Containers, only on `.tbl-wrap` (named `tbl`) and `.modal-body` (named `dialog`):
  *   @container tbl (max-width: 959.98px)    priority-3 columns hidden
  *   @container tbl (max-width: 559.98px)    card mode
@@ -81,7 +82,9 @@
     /* Typography: system stacks (no third-party font requests; CSP font-src 'self') */
     --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     --font-num: "JetBrains Mono", "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    --fs-xs: 11px;
+    /* The smallest text: 12 px at every width (the owner's thirteenth round, O-4; phones already had
+       it). --fs-xs and --fs-sm are both 12 px from 640 px up; the rest stays dense. */
+    --fs-xs: 12px;
     --fs-sm: 12px;
     --fs-md: 13px; /* base */
     --fs-lg: 15px;
@@ -146,7 +149,7 @@
 }
 
 /* Phone: the bottom tab bar and the status strip, and the type scale one notch up (no fluid type;
-   nothing under 12 px). */
+   nothing under 12 px, as at every width). */
 @media (max-width: 639.98px) {
     :root {
         --gutter: clamp(12px, 3.5vw, 16px);

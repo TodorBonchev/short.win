@@ -9,10 +9,10 @@
  * claim in the app sends C's pot-only sync first:
  *
  * 1. From Node: C withdraws the free tokens down to 12,000 (fewer than a thousandth of the claims);
- *    a 100× gap settles the borrowed tokens S1, which rolls the epoch with a rebase record
+ *    a 1,000× gap settles the borrowed tokens S1, which rolls the epoch with a rebase record
  *    (`num = 1`, `1/1,000`): C now holds old-epoch shares behind it and never converts them.
  * 2. A lends as many tokens in the new epoch (worth C's at the new price); the borrower borrows
- *    again (once the EMA admits an open); rent is credited to A's shares and C's for 90 s; A takes
+ *    again (once the EMA admits an open); rent is credited to A's shares and C's for 300 s; A takes
  *    part of its tokens out; the borrower closes and pays the rent in, realised on the shares still
  *    there: C's unconverted shares get more than C's credit (a surplus after the record), A less
  *    (a shortfall the empty pot cannot pay).
@@ -59,13 +59,18 @@ import { signerFor } from '../validator/keys.ts';
 
 /** Free tokens C leaves in the pool before the gap: < 15M/1,000 of the borrowed, so the shares rebase. */
 const KEEP_TOKENS = 12_000n;
-/** A 100× gap: S1 for the borrowed tokens, and C's 12,000 tokens worth ≈ 1.2 SOL after it. */
-const GAP_BPS = 990_000;
+/**
+ * A 1,000× gap: S1 for the borrowed tokens, and C's 12,000 tokens worth ≈ 12 SOL after it — dear
+ * enough that the rent of the second position leaves A a shortfall above the claim's 10,000-lamport
+ * dust threshold (`CLAIM_DUST_LAMPORTS`, the owner's decision of 2026-10-11; at 100× and 90 s it was ≈ 470, at
+ * 1,000× and 240 s ≈ 12,000).
+ */
+const GAP_BPS = 9_990_000;
 /** A's deposit after the rebase (as many tokens as C kept) and the position borrowed again (87.5 %). */
 const CLAIMER_TOKENS = 12_000n;
 const BORROW_TOKENS = 21_000n;
 /** Seconds of rent credited to A and C's unconverted shares before A takes tokens out. */
-const RENT_S = 90n;
+const RENT_S = 300n;
 /** What A takes out before the rent is paid in (within its allowance). */
 const WITHDRAW_TOKENS = 1_000n;
 /** `FWD_HOLD` (`shortwin_math::pool`): held at the record, the forward chain walked. */
@@ -100,7 +105,7 @@ test.describe('lend: a claim syncs an absent lender behind a rebase record first
             state,
         }) => {
             requireTrading(state);
-            test.setTimeout(600_000);
+            test.setTimeout(900_000);
             const m = state.markets.chain;
             const p = need(state.positions?.chain, 'chain position');
             const unit = 10n ** BigInt(m.decimals);
@@ -125,7 +130,7 @@ test.describe('lend: a claim syncs an absent lender behind a rebase record first
             const borrower = await signerFor('chainBorrower');
             const p2 = await openShortWhenAllowed(borrower, m, BORROW_TOKENS * unit, 2n);
             const open = need(await shortPosition(p2.position), 'the second position');
-            await waitForClock(open.tOpen + RENT_S);
+            await waitForClock(open.tOpen + RENT_S, (Number(RENT_S) + 120) * 1_000);
             await withdrawTokensFromNode('chainClaimer', m, state.tokenAccounts.chain.claimer, WITHDRAW_TOKENS * unit);
             await closeShortFromNode(borrower, m, p2);
             expect(await shortPosition(p2.position)).toBeNull();
@@ -137,6 +142,12 @@ test.describe('lend: a claim syncs an absent lender behind a rebase record first
             expect(vault.unmatched).toBe(0n);
             // A's claim alone pays its own realised SOL; C's sync would move a surplus to the pot.
             const alone = await simulateClaimSol('chainClaimer', m);
+            // A's shortfall (credited, neither its own realised SOL nor the empty pot pays it): above
+            // the claim's 10,000-lamport dust threshold, so the claim looks for syncs.
+            const touchedA = (await simulatePotSync('chainClaimer', m, [])).lender;
+            const shortA = BigInt(touchedA.pending) - (touchedA.real - touchedA.claimed);
+            console.log(`[lend-claim-pot-chain] A's credit ${touchedA.pending}, alone ${alone}, shortfall ${shortA}`);
+            expect(shortA).toBeGreaterThanOrEqual(10_000n);
             const sim = await simulatePotSync('chainAbsent', m, [epoch0]);
             const surplus = sim.vault.unmatched - vault.unmatched;
             expect(surplus).toBeGreaterThan(0n);

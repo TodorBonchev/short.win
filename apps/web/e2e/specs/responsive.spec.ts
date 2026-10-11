@@ -13,7 +13,9 @@
  * `SHORTWIN_RESPONSIVE_GATE=1` it is the M10-RESP gate (FRONTEND.md §10.5): each test fails on any
  * state with sideways document overflow, a layout wider than the screen, a zoomed-out phone, an
  * element off screen, an axe violation, a target under 24 px, a primary control under 44 px with a
- * coarse pointer, text under 12 px on a phone, a failed step or a DOM-click fallback. The
+ * coarse pointer, text under 12 px (at every viewport since the thirteenth round's O-4), a control
+ * under another control's tap area (`collectTapCovers`, the thirteenth round's last review), a failed
+ * step or a DOM-click fallback. The
  * viewports also include 320 × 640 and a landscape phone (844 × 390). Excluded from the default
  * run (`@responsive`; playwright.config.ts) — it takes ≈ 6 × the screens spec:
  *
@@ -22,25 +24,39 @@
  * `SHORTWIN_SHOTS_DIR` defaults to `apps/web/.e2e/responsive`; `SHORTWIN_SHOTS_VIEWPORTS=phone,desktop`
  * limits the viewports. `node e2e/responsive/summary.ts <dir>` prints the per-viewport counts.
  *
- * Chain writes: the lend screens' `accrue` (as the screens spec) and one 1-token deposit by the
- * `errors` wallet per viewport (the confirmed review and its toast); everything else is opened and
- * cancelled.
+ * Chain writes: the lend screens' `accrue` (as the screens spec; on the pot market too, for the
+ * shortfall states), and one 1-token deposit by the `errors` wallet per viewport (the confirmed review
+ * and its toast); once every viewport has captured the pot market with its only lender, a second
+ * pass (all viewports again, after the first) has `potLate` lend there and `potBorrower` close, so a
+ * second lender's surplus can fund `potClaimer`'s shortfall (the two-line Claim label); everything
+ * else is opened and cancelled.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { type CDPSession, devices, type Locator, type Page, type Route } from '@playwright/test';
+import { SHORT_PHONE } from '../../src/styles/breakpoints.ts';
 import { E2E_DIR, URLS } from '../env.ts';
 import { type App, E2E_WALLET_NAME, expect, need, T, test } from '../fixtures.ts';
 import {
     type AxeSummary,
     collectLayout,
+    collectTapCovers,
     type MetricsFile,
     type ShotRecord,
     summarise,
+    type TapCovers,
     type Viewport,
 } from '../responsive/metrics.ts';
-import { accrue } from '../validator/actions.ts';
+import {
+    accrue,
+    closeShortFromNode,
+    lenderPosition,
+    lendFromNode,
+    shortPosition,
+    simulatePotSync,
+} from '../validator/actions.ts';
+import { signerFor } from '../validator/keys.ts';
 import type { E2EState } from '../validator/state.ts';
 
 export const VIEWPORTS: readonly Viewport[] = [
@@ -104,13 +120,59 @@ const METRICS = join(DIR, 'metrics.json');
 const GATE = process.env.SHORTWIN_RESPONSIVE_GATE === '1';
 /** The gate's findings in the running test (one worker: a module-level list is safe). */
 const gateFindings: string[] = [];
-/**
- * Phones: text under 12 px is a finding (FRONTEND.md §7.6: the phone type scale is a width tier,
- * < 640 px). A landscape phone (844 px) gets the tablet layout and type, like a tablet.
- */
-const PHONES = new Set(['phone-xs', 'phone-s', 'phone']);
 /** Chromium's capture limit is ~16k device px: the tallest full-page PNG per DPR. */
 const MAX_DEVICE_PX = 16_000;
+/**
+ * The media queries that name a height or an orientation (`src/styles/breakpoints.ts` SHORT_PHONE
+ * and the landscape-phone rules of components.css and markets.css, as they are written: the
+ * orientation only counts in the tablet tier with a coarse pointer): the unrolled capture must
+ * leave them as they were. A laptop or desktop page taller than wide is still unrolled.
+ */
+const LANDSCAPE_PHONE =
+    '(min-width: 640px) and (max-width: 1023.98px) and (pointer: coarse) and (orientation: landscape)';
+const HEIGHT_QUERIES = [SHORT_PHONE, LANDSCAPE_PHONE];
+const heightQueries = (qs: readonly string[]): string => qs.map((q) => (matchMedia(q).matches ? 1 : 0)).join('');
+/** In the page: an open sheet (`Sheet.tsx`) whose body scrolls (its lower part is out of view). */
+const openSheetScrolls = (): boolean => {
+    const sheet = document.querySelector('.sheet-host[data-sheet="open"]');
+    return !!sheet && sheet.scrollHeight > sheet.clientHeight + 1;
+};
+
+/**
+ * In the page: a device-view slice's step, 75 % of what the scrolled box shows between its bars —
+ * the open sheet (else the viewport) less the page's bars (the list of `collectTapCovers`) fixed
+ * or stuck over its top or its bottom.
+ */
+const sliceStep = (): number => {
+    const sheet = document.querySelector('.sheet-host[data-sheet="open"]');
+    const box = sheet?.getBoundingClientRect() ?? { top: 0, bottom: window.innerHeight };
+    let top = box.top;
+    let bottom = box.bottom;
+    const BARS = '.app-header, .nav, .statusbar, .action-bar, .form-foot, .sheet-head, .toast-region';
+    for (const b of document.querySelectorAll(BARS)) {
+        const pos = getComputedStyle(b).position;
+        if ((pos !== 'fixed' && pos !== 'sticky') || !b.checkVisibility()) continue;
+        const r = b.getBoundingClientRect();
+        if (r.height < 1 || r.bottom <= box.top || r.top >= box.bottom) continue;
+        if (r.top <= box.top + 1) top = Math.max(top, r.bottom);
+        else if (r.bottom >= box.bottom - 1) bottom = Math.min(bottom, r.top);
+    }
+    return Math.max(40, Math.floor((bottom - top) * 0.75));
+};
+
+/** In the page: scrolls the open sheet's body (else the document) to `y`, clamped. */
+const scrollSliceTo = (y: number): { at: number; max: number } => {
+    const sheet = document.querySelector('.sheet-host[data-sheet="open"]');
+    if (sheet) {
+        const max = Math.max(0, sheet.scrollHeight - sheet.clientHeight);
+        sheet.scrollTo({ top: Math.min(y, max), behavior: 'instant' });
+        return { at: sheet.scrollTop, max };
+    }
+    const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    window.scrollTo({ top: Math.min(y, max), behavior: 'instant' });
+    return { at: window.scrollY, max };
+};
+
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
 function loadMetrics(): MetricsFile {
@@ -185,8 +247,15 @@ class Capture {
         let truncated = false;
         const dialogOpen = (await page.locator('dialog[open]').count()) > 0;
         let unrolledAxe: AxeSummary[] | null = null;
+        let tapCovers: TapCovers | null = null;
 
+        /**
+         * A dialog or an overlay, or a page that fits its screen: tap covers at the real size, each
+         * box that scrolls its own content stepped (below).
+         */
+        let stepScrollers = false;
         if (dialogOpen || opts.viewportOnly) {
+            stepScrollers = true;
             await page.screenshot({ path: this.png(name), animations: 'disabled' });
             if (dialogOpen) {
                 // The dialog scrolls its body: unroll it into a second, taller capture.
@@ -205,6 +274,9 @@ class Capture {
                     await page.setViewportSize(size);
                     extraPngs.push(`${name}-full.png`);
                 }
+            } else if (await page.evaluate(openSheetScrolls)) {
+                // An open sheet's lower part (its form foot, its submit), as the device shows it.
+                extraPngs.push(...(await this.slices(name)));
             }
         } else {
             // A phone or a tablet: also what the first screen shows at load (the visual viewport).
@@ -222,26 +294,51 @@ class Capture {
             });
             const h = size.height + extra;
             truncated = h > maxH;
+            if (extra === 0) stepScrollers = true;
+            // Unrolling must not change the layout: a landscape phone grown taller than wide turns
+            // portrait, a short phone grown past 700 px stops being short (the second approval
+            // pass's review). There the page is captured and measured at its real size instead.
+            const before = extra > 0 ? await page.evaluate(heightQueries, HEIGHT_QUERIES) : '';
             if (extra > 0) await page.setViewportSize({ width: size.width, height: Math.min(h, maxH) });
+            const unrolled = extra > 0 && (await page.evaluate(heightQueries, HEIGHT_QUERIES)) === before;
+            if (extra > 0 && !unrolled) await page.setViewportSize(size);
             const docH = await page.evaluate(() => document.documentElement.scrollHeight);
             truncated ||= docH > maxH;
+            // Not unrolled: Chromium's full-page capture keeps the layout viewport (the orientation
+            // and height queries) but drops the touch emulation, so it draws the fine pointer's
+            // sizes, and the fixed bars sit where they are on the first screen. The device's own view
+            // follows as `-scroll-N` slices (below).
             await page.screenshot({ path: this.png(name), animations: 'disabled', fullPage: docH <= maxH });
             // axe on the unrolled page: every target in view and the fixed bars past the content's
             // end, so a target is never judged by what happens to scroll under a bar at one moment
             // (a page scrolls under its fixed bars by design; 2.4.11 keeps focus clear of them).
-            if (extra > 0) {
+            if (unrolled) {
                 await this.retouch();
                 // On a failure the page is measured again below, at its own size.
                 unrolledAxe = await this.axe().catch(() => null);
+                // Tap areas likewise: every control in view, none under a fixed bar; each box that
+                // scrolls its own content (the side trade panel from 1,024 px) stepped, so its end,
+                // where its form foot is no longer stuck, is judged too.
+                tapCovers = await this.tapCoversInSteps(false).catch(() => null);
                 await page.setViewportSize(size);
+            } else if (extra > 0) {
+                await this.retouch();
+                extraPngs.push(...(await this.slices(name)));
+                tapCovers = await this.tapCoversInSteps().catch(() => null);
             }
         }
         await this.retouch();
+        // A dialog's or a sheet's body below its fold (the unrolled `-full` capture is a picture
+        // only: its taller viewport changes the dvh sizes), or a box that scrolls in a page that fits
+        // its screen: stepped at the real size.
+        if (stepScrollers) tapCovers = await this.tapCoversInSteps(false).catch(() => null);
 
         let layout: ShotRecord['layout'] = null;
         let axe: AxeSummary[] = unrolledAxe ?? [];
         try {
             layout = await page.evaluate(collectLayout, this.vp.width);
+            tapCovers ??= await page.evaluate(collectTapCovers);
+            layout = { ...layout, tapCovers };
         } catch (e) {
             error = `${error ? `${error}; ` : ''}metrics: ${(e as Error).message}`;
         }
@@ -267,6 +364,130 @@ class Capture {
     }
 
     private notes: string[] = [];
+
+    /**
+     * The page at its real size, one screen at a time (`<name>-scroll-N.png`, N from 1): what the
+     * device shows where the unrolled capture would change the layout, or an open sheet's lower
+     * part. The open sheet's body (else the document) scrolls 75 % of its content's height — the
+     * box less the bars fixed or stuck over its top and bottom — per slice, so slices overlap by a
+     * quarter of what is visible between the bars; the scroll position is restored.
+     */
+    private async slices(name: string): Promise<string[]> {
+        const { page } = this;
+        const out: string[] = [];
+        const step = await page.evaluate(sliceStep);
+        for (let y = 0, k = 1; k <= 40; y += step, k++) {
+            const { at, max } = await page.evaluate(scrollSliceTo, y);
+            await page.evaluate(
+                () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))),
+            );
+            const file = `${name}-scroll-${k}.png`;
+            await page.screenshot({ path: this.png(`${name}-scroll-${k}`), animations: 'disabled' });
+            out.push(file);
+            if (at >= max - 1) break;
+        }
+        await page.evaluate(scrollSliceTo, 0);
+        return out;
+    }
+
+    /**
+     * Tap covers scrolled in steps of half a screen: the document (unless `withDocument` is false:
+     * a dialog or an overlay, which the page does not scroll under, the unrolled page, every control
+     * already in view, or a page that fits its screen), then each box that scrolls its own content
+     * (an open sheet's body, the side trade panel; in an open dialog only its own, the dialog's
+     * body), so every control is wholly in view at one step at least; the covers of all steps
+     * merged (the same pair once, its most points), each control judged counted once. Scroll
+     * positions are restored.
+     */
+    private async tapCoversInSteps(withDocument = true): Promise<TapCovers> {
+        const { page } = this;
+        await page.evaluate(() => {
+            (window as unknown as { __tapCounted?: WeakSet<Element> }).__tapCounted = new WeakSet();
+        });
+        try {
+            return await this.tapCoverSteps(withDocument);
+        } finally {
+            await page.evaluate(() => {
+                delete (window as unknown as { __tapCounted?: WeakSet<Element> }).__tapCounted;
+            });
+        }
+    }
+
+    private async tapCoverSteps(withDocument: boolean): Promise<TapCovers> {
+        const { page } = this;
+        const pairs = new Map<string, readonly [string, string, number]>();
+        let judged = 0;
+        let most = 0;
+        const measure = async (): Promise<void> => {
+            await page.evaluate(
+                () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))),
+            );
+            const t = await page.evaluate(collectTapCovers);
+            judged += t.judged;
+            most = Math.max(most, t.count);
+            for (const it of t.items) {
+                const k = `${it[0]} | ${it[1]}`;
+                const was = pairs.get(k);
+                if (!was || was[2] < it[2]) pairs.set(k, it);
+            }
+        };
+        const scrollers = await page.evaluate(() => {
+            const out: [number, number][] = [];
+            const all = [...document.querySelectorAll('body *')];
+            const dialog = document.querySelector('dialog[open]');
+            all.forEach((el, i) => {
+                const cs = getComputedStyle(el);
+                if (!/auto|scroll/.test(cs.overflowY) || el.scrollHeight <= el.clientHeight + 1) return;
+                if (!el.checkVisibility() || el.closest('[inert]')) return;
+                if (dialog && !dialog.contains(el)) return;
+                out.push([i, el.clientHeight]);
+            });
+            return out;
+        });
+        const half = Math.max(80, Math.floor(this.vp.height / 2));
+        /**
+         * Scrolls to `y` (clamped) and measures, until the furthest position has been measured: half
+         * a screen at a time, or half the box when it is lower (a dialog's body on a landscape phone).
+         */
+        const steps = async (
+            scroll: (y: number) => Promise<{ at: number; max: number }>,
+            step = half,
+        ): Promise<void> => {
+            for (let y = 0, k = 0; k < 200; y += step, k++) {
+                const { at, max } = await scroll(y);
+                await measure();
+                if (at >= max - 1) break;
+            }
+            await scroll(0);
+        };
+        // The document, then each box that scrolls its own content (instant: no smooth scrolling).
+        if (withDocument)
+            await steps((y) =>
+                page.evaluate((v) => {
+                    const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+                    window.scrollTo({ top: Math.min(v, max), behavior: 'instant' });
+                    return { at: window.scrollY, max };
+                }, y),
+            );
+        else if (!scrollers.length) await measure();
+        for (const [i, h] of scrollers)
+            await steps(
+                (y) =>
+                    page.evaluate(
+                        ([idx, v]) => {
+                            const el = document.querySelectorAll('body *')[idx];
+                            if (!el) return { at: 0, max: 0 };
+                            const max = Math.max(0, el.scrollHeight - el.clientHeight);
+                            el.scrollTo({ top: Math.min(v, max), behavior: 'instant' });
+                            return { at: el.scrollTop, max };
+                        },
+                        [i, y] as const,
+                    ),
+                Math.max(40, Math.min(half, Math.floor(h / 2))),
+            );
+        const items = [...pairs.values()];
+        return { judged, count: Math.max(most, items.length), items: items.slice(0, 40) };
+    }
 
     /** axe (WCAG 2.2 A/AA) on the page as it is now. */
     private async axe(): Promise<AxeSummary[]> {
@@ -318,8 +539,16 @@ class Capture {
             f(
                 `${l.primaryUnder44.count} primary controls under 44px: ${l.primaryUnder44.items.map((t) => `${t.sel} ${t.w}×${t.h}`).join(', ')}`,
             );
-        if (PHONES.has(this.vp.name) && l.smallText.nodes > 0)
+        // Text under 12 px is a finding at every viewport (the owner's thirteenth round, O-4: the
+        // 12 px floor from 640 px up too; FRONTEND.md §7.2). Until then it was phones only.
+        if (l.smallText.nodes > 0)
             f(`text under 12px: ${l.smallText.groups.map((g) => `${g.sel} ${g.px}px`).join(', ')}`);
+        // A control's tap area over another control (the thirteenth round's last review: an ⓘ's
+        // 44 px area over the Copy button or the ⓘ beside it; FRONTEND.md §7.6).
+        if (l.tapCovers && l.tapCovers.count > 0)
+            f(
+                `${l.tapCovers.count} controls under another's tap area: ${l.tapCovers.items.map(([a, b, n]) => `${a} under ${b} (${n}/25)`).join(', ')}`,
+            );
     }
 
     /** A note for the next shot (what a step had to work around). */
@@ -473,22 +702,27 @@ async function depositForm(cap: Capture, app: App, mint: string, source: string,
 
 const tradingSeeded = (state: E2EState) => state.program === 'test-venue' && !!state.positions;
 
+/** A viewport's tests (inside its describe): the gate's check after each, the device, the timeout. */
+function atViewport(vp: Viewport): void {
+    test.afterEach(() => {
+        const found = gateFindings.splice(0);
+        if (GATE) expect(found, `M10-RESP responsive gate at ${vp.name}`).toEqual([]);
+    });
+    test.use({
+        viewport: { width: vp.width, height: vp.height },
+        isMobile: vp.isMobile,
+        hasTouch: vp.hasTouch,
+        deviceScaleFactor: vp.deviceScaleFactor,
+        ...(vp.userAgent ? { userAgent: vp.userAgent } : {}),
+    });
+    test.describe.configure({ timeout: 900_000 });
+}
+
 for (const vp of VIEWPORTS) {
     if (ONLY.length && !ONLY.includes(vp.name)) continue;
 
     test.describe(`responsive ${vp.name}`, { tag: '@responsive' }, () => {
-        test.afterEach(() => {
-            const found = gateFindings.splice(0);
-            if (GATE) expect(found, `M10-RESP responsive gate at ${vp.name}`).toEqual([]);
-        });
-        test.use({
-            viewport: { width: vp.width, height: vp.height },
-            isMobile: vp.isMobile,
-            hasTouch: vp.hasTouch,
-            deviceScaleFactor: vp.deviceScaleFactor,
-            ...(vp.userAgent ? { userAgent: vp.userAgent } : {}),
-        });
-        test.describe.configure({ timeout: 900_000 });
+        atViewport(vp);
 
         test.describe('browsing', () => {
             test.use({ wallet: 'trader' });
@@ -502,7 +736,53 @@ for (const vp of VIEWPORTS) {
                 await cap.step('markets', async () => {
                     await app.goto('/markets', 'markets');
                     await expect(app.id(T.marketsRow(state.markets.main.mint))).toBeVisible();
+                    // The intro strip stays compact (O-3 (a)): the first market shows on the first
+                    // screen — at least its first 16 px above the bars fixed at the screen's foot
+                    // (the phone's tab bar and status strip). A phone held sideways (390 px tall)
+                    // has no room for a row under the page head and the list's own filter and sort
+                    // bars even without the strip; there the list's filter must show.
+                    await expect(app.id(T.marketsIntro)).toBeVisible();
+                    const room = await page.evaluate(() => {
+                        const vh = window.innerHeight;
+                        const short = vh < 500;
+                        const first = short
+                            ? document.querySelector('[data-testid="markets-search"]')
+                            : document.querySelector('[data-testid^="markets-row-"]');
+                        let floor = vh;
+                        for (const el of document.querySelectorAll<HTMLElement>('body *')) {
+                            const cs = getComputedStyle(el);
+                            if (cs.position !== 'fixed' && cs.position !== 'sticky') continue;
+                            const r = el.getBoundingClientRect();
+                            if (r.height > 0 && r.height < vh / 2 && Math.round(r.bottom) >= vh)
+                                floor = Math.min(floor, r.top);
+                        }
+                        return { short, top: first?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY, floor };
+                    });
+                    expect(
+                        room.top + 16,
+                        `the first market row (sideways: the filter) on the first screen (${JSON.stringify(room)})`,
+                    ).toBeLessThanOrEqual(room.floor);
                     await cap.shot('markets');
+                });
+                // The thirteenth round (O-3): the strip hidden, and How it works (its own page, and at
+                // the intro's risk anchor).
+                await cap.step('markets-intro-hidden', async () => {
+                    await app.goto('/markets', 'markets');
+                    await cap.tap(app.id(T.marketsIntroDismiss));
+                    await expect(app.id(T.marketsIntro)).toHaveCount(0);
+                    await cap.shot('markets-intro-hidden');
+                    // The next visits show the strip again (it is per browser; this one remembers it).
+                    await page.evaluate(() => window.localStorage.removeItem('shortwin:markets-intro:hidden'));
+                });
+                await cap.step('how-it-works', async () => {
+                    await app.goto('/how-it-works', 'how-it-works');
+                    await expect(app.id(T.howItWorksSection('fees'))).toBeVisible();
+                    await cap.shot('how-it-works');
+                });
+                await cap.step('how-it-works-risks', async () => {
+                    await app.goto('/how-it-works#short-risks', 'how-it-works');
+                    await expect(app.id(T.howItWorksSection('short-risks'))).toBeFocused();
+                    await cap.shot('how-it-works-risks', { viewportOnly: true });
                 });
                 await cap.step('markets-search-no-market', async () => {
                     await app.goto(`/markets?q=${state.createMints.ok}`, 'markets');
@@ -660,6 +940,14 @@ for (const vp of VIEWPORTS) {
                     await cap.shot('market-tier-why', { viewportOnly: true });
                     await page.keyboard.press('Escape');
                 });
+                await cap.step('glossary-open', async () => {
+                    await app.goto(`/m/${main.mint}`, 'market');
+                    await cap.tap(app.id(T.glossaryTip('rentApr')).first());
+                    await expect(app.id(T.glossaryPopover('rentApr'))).toBeVisible();
+                    await cap.shot('glossary-open', { viewportOnly: true });
+                    await page.keyboard.press('Escape');
+                    await expect(app.id(T.glossaryPopover('rentApr'))).toHaveCount(0);
+                });
                 await cap.step('market-coverage-paused', async () => {
                     await app.goto(`/m/${state.markets.paused.mint}`, 'market');
                     await expect(app.id(T.marketBanner('coverage-paused'))).toBeVisible();
@@ -695,6 +983,16 @@ for (const vp of VIEWPORTS) {
                     await tradePanel(cap, app, state.markets.paused.mint, 'panel=short', 'short');
                     await expect(app.id(T.shortBlocked)).toHaveAttribute('data-code', 'CoveragePaused');
                     await cap.shot('short-blocked');
+                });
+                // O-2: the panel links to the page's banner (from the sheet: it closes it first).
+                await cap.step('short-coverage-link', async () => {
+                    await expect(app.id(T.shortCoverageLink)).toBeVisible();
+                    await cap.shot('short-coverage-link', { viewportOnly: true });
+                });
+                await cap.step('coverage-banner-focused', async () => {
+                    await cap.tap(app.id(T.shortCoverageLink));
+                    await expect(app.id(T.marketBanner('coverage-paused'))).toBeFocused();
+                    await cap.shot('coverage-banner-focused', { viewportOnly: true });
                 });
             });
         });
@@ -798,15 +1096,66 @@ for (const vp of VIEWPORTS) {
                         await tradePanel(cap, app, main.mint, `panel=lend&action=${action}`, 'lend');
                         await expect(app.id(T.lendPanel)).toHaveAttribute('data-action', action);
                         if (action === 'deposit') await app.id(T.lendAmountInput).fill('1000');
-                        if (action === 'claim')
+                        if (action === 'claim') {
                             await expect(app.id(T.claimValue('claimable'))).toHaveAttribute('data-value', /^\d+$/);
+                            // The search for syncs has ended: the settled label (owner, 2026-10-11).
+                            await expect(app.id(T.claimSubmit)).not.toHaveAttribute('aria-busy', 'true', {
+                                timeout: 30_000,
+                            });
+                        }
                         await cap.shot(`lend-${action}`);
                     });
                 }
                 await cap.step('lender-dashboard', async () => {
                     await app.goto('/lend', 'lend');
                     await expect(app.id(T.lenderRow(main.market))).toBeVisible();
+                    await expect(app.id(T.lenderClaim(main.market))).not.toHaveAttribute('aria-busy', 'true', {
+                        timeout: 30_000,
+                    });
                     await cap.shot('lender-dashboard');
+                });
+            });
+        });
+
+        test.describe('lend: a shortfall', () => {
+            test.use({ wallet: 'potClaimer' });
+
+            // The thirteenth round (the owner's decisions of 2026-10-11, FRONTEND.md §3.6, §3.8): rent
+            // credited to the pot market's only lender and not paid in yet is a shortfall no sync can
+            // fund ("only when syncs can pay") — the Lending page's row and Lend → Claim are the
+            // disabled "Review claim · 0 SOL" with "Nothing to claim yet" once the search has run.
+            test('the Lending page and Lend → Claim with credit not paid in yet', async ({ app, page, state }) => {
+                test.skip(!tradingSeeded(state), 'needs the test-venue build (mock venue)');
+                const cap = new Capture(page, vp);
+                const pot = state.markets.pot;
+                // The market's prologue books the rent credited so far (the previews read the stored
+                // index): at least 20,000 lamports, well above the 10,000-lamport dust threshold.
+                await expect
+                    .poll(
+                        async () => {
+                            await accrue(pot);
+                            return BigInt((await simulatePotSync('potClaimer', pot, [])).lender.pending);
+                        },
+                        { timeout: 120_000, intervals: [5_000] },
+                    )
+                    .toBeGreaterThanOrEqual(20_000n);
+                await cap.step('lender-dashboard-shortfall', async () => {
+                    await app.goto('/lend', 'lend');
+                    await cap.connect(app);
+                    const row = app.id(T.lenderRow(pot.market));
+                    await expect(row.getByTestId(T.lenderClaimReason(pot.market))).toHaveText('Nothing to claim yet', {
+                        timeout: 90_000,
+                    });
+                    await expect(row.getByTestId(T.lenderClaim(pot.market))).toBeDisabled();
+                    await expect(row.getByTestId(T.claimSubmitSyncs)).toHaveCount(0);
+                    await cap.shot('lender-dashboard-shortfall');
+                });
+                await cap.step('lend-claim-shortfall', async () => {
+                    await tradePanel(cap, app, pot.mint, 'panel=lend&action=claim', 'lend');
+                    await expect(app.id(T.lendPanel)).toHaveAttribute('data-action', 'claim');
+                    await expect(app.id(T.lendClaimReason)).toHaveText('Nothing to claim yet', { timeout: 30_000 });
+                    await expect(app.id(T.claimSubmit)).toBeDisabled();
+                    await cap.shot('lend-claim-shortfall');
                 });
             });
         });
@@ -905,6 +1254,63 @@ for (const vp of VIEWPORTS) {
                     await expect(app.id(T.lenderRow(state.markets.main.market))).toBeVisible();
                     await cap.shot('fallback-lender-dashboard');
                 });
+            });
+        });
+    });
+}
+
+/**
+ * The second pass (after every viewport's first): `potLate` lends nine times `potClaimer`'s tokens
+ * into the pot market and `potBorrower` closes, so the rent paid in is realised across both
+ * lenders' shares — `potLate` holds a surplus its sync moves to the pot, `potClaimer` a shortfall it
+ * can fund (as lend-claim-sync). Nothing claims here, so the state holds for every viewport: the
+ * two-line label ("… now · syncs may add up to …") on the Lending page's row and Lend → Claim.
+ */
+for (const vp of VIEWPORTS) {
+    if (ONLY.length && !ONLY.includes(vp.name)) continue;
+
+    test.describe(`responsive ${vp.name}: a second lender`, { tag: '@responsive' }, () => {
+        atViewport(vp);
+        test.use({ wallet: 'potClaimer' });
+
+        test('the Lending page and Lend → Claim when another lender’s sync can pay', async ({ app, page, state }) => {
+            test.skip(!tradingSeeded(state), 'needs the test-venue build (mock venue)');
+            const cap = new Capture(page, vp);
+            const pot = state.markets.pot;
+            if (!(await lenderPosition(pot.market, state.wallets.potLate.address))) {
+                // potClaimer's credit first (rent accrues to it alone), well above the dust threshold.
+                await expect
+                    .poll(
+                        async () => {
+                            await accrue(pot);
+                            return BigInt((await simulatePotSync('potClaimer', pot, [])).lender.pending);
+                        },
+                        { timeout: 120_000, intervals: [5_000] },
+                    )
+                    .toBeGreaterThanOrEqual(40_000n);
+                await lendFromNode(
+                    'potLate',
+                    pot,
+                    state.tokenAccounts.pot.late,
+                    5_400_000n * 10n ** BigInt(pot.decimals),
+                );
+                const p = need(state.positions?.pot, 'pot position');
+                if (await shortPosition(p.position)) await closeShortFromNode(await signerFor('potBorrower'), pot, p);
+            }
+            await cap.step('lender-dashboard-syncs', async () => {
+                await app.goto('/lend', 'lend');
+                await cap.connect(app);
+                const row = app.id(T.lenderRow(pot.market));
+                await expect(row.getByTestId(T.claimSubmitSyncs)).toBeVisible({ timeout: 90_000 });
+                await expect(row.getByTestId(T.lenderClaim(pot.market))).toBeEnabled();
+                await cap.shot('lender-dashboard-syncs');
+            });
+            await cap.step('lend-claim-syncs', async () => {
+                await tradePanel(cap, app, pot.mint, 'panel=lend&action=claim', 'lend');
+                await expect(app.id(T.lendPanel)).toHaveAttribute('data-action', 'claim');
+                await expect(app.id(T.claimSubmitSyncs)).toBeVisible({ timeout: 30_000 });
+                await expect(app.id(T.claimSubmit)).toBeEnabled();
+                await cap.shot('lend-claim-syncs');
             });
         });
     });

@@ -9,10 +9,15 @@
  * top left, `'aside'` top right, `'actions'` a full-width button row, every other cell labelled by
  * its header (`label`). A sort bar (a select and a direction button) replaces the header buttons
  * there. Explicit table roles keep the semantics a CSS display change drops in some browsers.
+ *
+ * A header the glossary knows (`config/glossary.ts`, by its text or `label`) gets its ⓘ beside the
+ * header text — outside the sort button, which it must not nest in (FRONTEND.md §4.3).
  */
 /* biome-ignore-all lint/a11y/noRedundantRoles: CSS display change; roles restore semantics */
 import { type KeyboardEvent, type MouseEvent, type ReactNode, useId, useRef } from 'react';
+import { type GlossaryId, glossaryFor } from '../config/glossary.ts';
 import { T } from '../config/testids.ts';
+import { GlossaryTip } from './Glossary.tsx';
 
 /** Whether the event started on a control inside the row (which then handles it itself). */
 function fromControl(e: KeyboardEvent<HTMLTableRowElement> | MouseEvent<HTMLTableRowElement>): boolean {
@@ -39,6 +44,13 @@ export interface Column<T> {
     readonly label?: string;
     /** Its place on a card: `title` (top left), `aside` (top right), `actions` (a button row). */
     readonly card?: 'title' | 'aside' | 'actions';
+    /** The header's glossary entry (default: the one its text or `label` attaches to; `false`: none). */
+    readonly term?: GlossaryId | false;
+}
+
+function termOf<T>(c: Column<T>): GlossaryId | undefined {
+    if (c.term === false) return undefined;
+    return c.term ?? glossaryFor(c.header) ?? glossaryFor(c.label);
 }
 
 export interface SortState {
@@ -159,6 +171,7 @@ export function DataTable<T>({
                     <tr role="row">
                         {columns.map((c) => {
                             const active = sort?.key === c.key;
+                            const term = termOf(c);
                             return (
                                 <th
                                     key={c.key}
@@ -185,6 +198,7 @@ export function DataTable<T>({
                                     ) : (
                                         c.header
                                     )}
+                                    {term && <GlossaryTip id={term} className="th-tip" />}
                                 </th>
                             );
                         })}

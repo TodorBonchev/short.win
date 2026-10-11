@@ -713,6 +713,25 @@ export async function simulateClaimSol(owner: WalletName, m: MarketInfo): Promis
 }
 
 /**
+ * `claim_sol` of `owner` in `m`, landed from Node with the epoch records it is behind on — the claim
+ * alone (no other lender synced first): it pays what the pot as it stands allows.
+ */
+export async function claimSolFromNode(owner: WalletName, m: MarketInfo): Promise<Signature> {
+    const o = await signerFor(owner);
+    const lp = await lenderPosition(m.market, o.address);
+    if (!lp) throw new Error(`${owner} does not lend in ${m.symbol}`);
+    const { shareEpoch } = await marketAccount(m);
+    const records = await getShareEpochAccountMetas({ market: m.market, fromEpoch: lp.epoch, shareEpoch });
+    const ix = await getClaimSolInstructionAsync({
+        owner: o,
+        market: m.market,
+        eventAuthority: await eventAuthority(),
+        program: SHORTWIN_PROGRAM_ADDRESS,
+    });
+    return send(o, [{ ...ix, accounts: [...ix.accounts, ...records] }]);
+}
+
+/**
  * The market vault after a plain touch of `owner`'s lender position in `m` (`sync_lender(0)`,
  * signed by the payer, simulated, not sent): its `unmatched` less the current one is the
  * surplus that touch moves to the pot (R3A-2).

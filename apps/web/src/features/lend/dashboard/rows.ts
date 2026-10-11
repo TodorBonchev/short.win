@@ -15,7 +15,14 @@ import type { MathModule } from '../../../math/load.ts';
 import { useAppClient } from '../../../rpc/context.tsx';
 import { chainNowSeconds, type LendChain, lendKeys, readLendChain, readOnChainLenderMarkets } from '../chain.ts';
 import type { LoadedChain } from '../ctx.ts';
-import { type PositionView, previewPosition, type Standing, standingOf } from '../previews.ts';
+import {
+    type ClaimView,
+    type PositionView,
+    previewClaimView,
+    previewPosition,
+    type Standing,
+    standingOf,
+} from '../previews.ts';
 
 export type IndexerState = 'ok' | 'unsynced' | 'quarantined' | 'missing';
 
@@ -28,6 +35,13 @@ export interface LenderRow {
     readonly chain: LoadedChain | undefined;
     readonly chainError: unknown;
     readonly position: PositionView | null;
+    /**
+     * What the row's Claim does — the panel's Lend → Claim view (`previewClaimView`): claimable now
+     * and the shortfall (0 under the 10,000-lamport dust threshold) the claim's syncs may fund; the
+     * page searches for them before it offers them (`claim/syncSearch.ts`; the owner's decisions of
+     * 2026-10-11; FRONTEND.md §3.8). Null while the chain or the math loads.
+     */
+    readonly claim: ClaimView | null;
     readonly standing: Standing;
     readonly indexer: IndexerState;
     readonly isCoinCreator: boolean;
@@ -108,14 +122,12 @@ export function useLenderRows(owner: Address | null, math: MathModule | undefine
         // (FE-D1): an indexer row that still shows shares is behind on the close.
         if (c && !c.lender) return;
         const loaded = c?.market && c.vault ? (c as LoadedChain) : undefined;
-        const pos =
-            math && loaded?.lender
-                ? previewPosition(
-                      math,
-                      { market: loaded.market, vault: loaded.vault, lender: loaded.lender, records: loaded.records },
-                      BigInt(chainNowSeconds(loaded, wallMs)),
-                  )
-                : null;
+        const state = loaded?.lender
+            ? { market: loaded.market, vault: loaded.vault, lender: loaded.lender, records: loaded.records }
+            : null;
+        const now = loaded ? BigInt(chainNowSeconds(loaded, wallMs)) : 0n;
+        const pos = math && state ? previewPosition(math, state, now) : null;
+        const claim = math && state ? previewClaimView(math, state, now) : null;
         rows.push({
             market: b.market,
             mint: b.mint,
@@ -124,6 +136,7 @@ export function useLenderRows(owner: Address | null, math: MathModule | undefine
             chain: loaded,
             chainError: chains[i]?.error ?? null,
             position: pos?.ok ? pos.value : null,
+            claim: pos?.ok && claim?.ok ? claim.value : null,
             standing: loaded ? standingOf(loaded.market, loaded.lender) : { kind: 'none' },
             indexer: indexerStateOf(b.api, c, detail),
             isCoinCreator: b.api?.is_coin_creator ?? false,

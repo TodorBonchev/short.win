@@ -24,7 +24,14 @@ export function MarketBanners({
     return (
         <div className="mk-banners">
             {banners.map((b) => (
-                <div key={b.key} className="mk-banner" data-testid={T.marketBanner(b.key)} data-severity={b.severity}>
+                // Focusable from script (a panel's link to it, O-2), not a Tab stop.
+                <div
+                    key={b.key}
+                    className="mk-banner"
+                    data-testid={T.marketBanner(b.key)}
+                    data-severity={b.severity}
+                    tabIndex={-1}
+                >
                     {b.disclosure ? (
                         <Disclosure id={b.disclosure} vars={routeBrokenVars(config?.params)} />
                     ) : (

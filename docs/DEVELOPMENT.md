@@ -848,7 +848,16 @@ pnpm --filter web test                    # vitest run (jsdom)
 pnpm --filter web build                   # wasm (skipped when current) + tsc + vite build -> apps/web/dist (+ _headers; source maps -> apps/web/dist-sourcemaps, not deployed)
 pnpm -r build                             # every workspace package that has a build (math-wasm, web)
 pnpm --filter web check:headers https://<origin>   # after a deploy: X-Frame-Options, frame-ancestors, nosniff, HSTS; no public source maps; /.well-known/security.txt
+pnpm --filter web exec node scripts/owner-copy.ts <out.md>   # the thirteenth round's new copy, every string with its id and sources (the owner's approval file)
+pnpm --filter web exec node scripts/owner-copy.ts --doc      # regenerate FRONTEND.md §4.3's catalogue after changing src/config/copy.ts or glossary.ts
 ```
+
+**New copy (the owner's thirteenth round).** The intro strip, How it works, the glossary, the
+coverage link and the Claim label have one home each — `src/config/copy.ts` (with `copyNav.ts`, the
+shell's links) and `src/config/glossary.ts` (sources in `glossarySources.ts`, the text resolution in
+`glossaryText.ts`) — and `copy.test.ts` / `glossary.test.ts` fail until FRONTEND.md §4.3 carries every
+string verbatim: after a change run `node scripts/owner-copy.ts --doc` in the same change. Every
+string there is *pending owner approval* until the owner signs it off word for word.
 
 **security.txt (M10 SECTXT-4).** `apps/web/public/.well-known/security.txt` (RFC 9116: the owner's
 contact and policy, `Expires` 2027-09-30, rotate it before 2027-08-31) is checked by
@@ -976,7 +985,7 @@ and flip CPI Guard or required memos for the race tests; since M10 also a full w
 `sync_lender` (`simulateClaimSol`, `simulateSyncLender`), emit_cpi event decoding (`eventsOf`) and
 an empty `sweep_trader` that credits a market's pending rent (`accrue`).
 
-**Specs** (22 files, 58 tests at M10; *M10-RESP:* 28 files with the four `mobile-*` specs (`responsive` is opt-in) — and a default run of 77 tests, 60 desktop and 17 phone): `harness`, `smoke`, `wallet`, `frame` (`@scaffold`); `markets`,
+**Specs** (22 files, 58 tests at M10; *M10-RESP:* 28 files with the four `mobile-*` specs (`responsive` is opt-in) — and a default run of 77 tests, 60 desktop and 17 phone; *thirteenth round:* 30 files with `guide` and `mobile-guide`, a default run of 87 tests, 65 desktop and 22 phone): `harness`, `smoke`, `wallet`, `frame` (`@scaffold`); `markets`,
 `create-market`, `status`, `fallback` (`@markets`); `lend-deposit`, `lend-cpi-guard`,
 `lend-withdraw-memo`, `lend-claim`, `keyboard`, and since M10 (FE-18) `lend-post-wipe`,
 `lend-claim-sync`, `lend-sweep-cashback` (`@lend`); `short-open`, `short-close`,
@@ -997,8 +1006,9 @@ axe per viewport) in `metrics.json`; it runs with `SHORTWIN_E2E_RESPONSIVE=1` or
 `SHORTWIN_SHOTS_DIR` (default `.e2e/responsive`), `SHORTWIN_SHOTS_VIEWPORTS=phone,desktop` limits
 the viewports, ≈ 6 × the screens spec. *M10-RESP:* `SHORTWIN_RESPONSIVE_GATE=1` makes it the
 responsive gate (FRONTEND.md §10.5: overflow, layout width, zoom, off-screen elements, axe, targets
-under 24 px, primary controls under 44 px with a coarse pointer, text under 12 px on phones, failed
-steps, DOM-click fallbacks), required before each responsive phase merges.
+under 24 px, primary controls under 44 px with a coarse pointer, text under 12 px — at every
+viewport since the thirteenth round's O-4, on phones only before —, failed steps, DOM-click
+fallbacks), required before each responsive phase merges.
 
 **Running the responsive capture (M10-RESP).** A responsive change is checked in three steps, all
 under the E2E lock (one run per host):

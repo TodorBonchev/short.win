@@ -7,7 +7,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { CONTAINER_SELECTORS, CONTAINER_WIDTHS, MEDIA_WIDTHS } from './breakpoints.ts';
+import { CONTAINER_SELECTORS, CONTAINER_WIDTHS, MEDIA_HEIGHTS, MEDIA_WIDTHS, SHORT_PHONE } from './breakpoints.ts';
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -51,6 +51,43 @@ describe('breakpoints (FRONTEND.md §7.6)', () => {
             }
         }
         expect(bad).toEqual([]);
+    });
+
+    it('uses only the closed set of media heights (one max-height), always with a width', () => {
+        const bad: string[] = [];
+        for (const { name, css } of FILES) {
+            for (const p of preludes(css, 'media')) {
+                for (const m of p.matchAll(/\(\s*((?:max|min)-height)\s*:\s*([^)]+?)\s*\)/g)) {
+                    const allowed: readonly string[] = m[1] === 'max-height' ? MEDIA_HEIGHTS.max : [];
+                    if (!allowed.includes(m[2] ?? '')) bad.push(`${name}: @media ${p}`);
+                }
+                // Each comma-separated query naming a height also names a width.
+                for (const q of p.split(',')) {
+                    if (/-height\s*:/.test(q) && widths(q).length === 0)
+                        bad.push(`${name}: height alone in @media ${p}`);
+                }
+            }
+        }
+        expect(bad).toEqual([]);
+    });
+
+    it('names a height only in the owner-approved short-phone query (2026-10-11)', () => {
+        expect(SHORT_PHONE).toBe('(max-width: 399.98px) and (max-height: 699.98px)');
+        expect(SHORT_PHONE).toContain(`(max-height: ${MEDIA_HEIGHTS.max[0]})`);
+        const found: string[] = [];
+        const bad: string[] = [];
+        for (const { name, css } of FILES) {
+            for (const p of preludes(css, 'media')) {
+                for (const q of p.split(',').map((x) => x.replace(/\s+/g, ' ').trim())) {
+                    if (!/-height\s*:/.test(q)) continue;
+                    if (q === SHORT_PHONE) found.push(name);
+                    else bad.push(`${name}: @media ${q}`);
+                }
+            }
+        }
+        expect(bad).toEqual([]);
+        // The markets intro strip's compact layout uses it (FRONTEND.md §3.3).
+        expect(found).toContain(join('features', 'markets', 'markets.css'));
     });
 
     it('uses only the named containers and their widths', () => {

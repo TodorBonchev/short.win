@@ -2,7 +2,8 @@
  * The transaction lifecycle as a React state machine (FRONTEND.md §5):
  *
  *   idle → simulating → review ⇄ simulating (refresh, or a stale quote at Sign)
- *                         ↓ Sign (only with a successful simulation and every ack ticked)
+ *                         ↓ Sign (only with a successful simulation the plan does not hold
+ *                           (`holdSign`) and every ack ticked)
  *                      signing → confirming → confirmed
  *   any step → failed (mapped error; Retry per `retryMode`)
  *
@@ -129,8 +130,22 @@ export function requiredAcks(plan: TxPlan | null): DisclosureId[] {
     return (plan?.disclosures ?? []).filter((id) => DISCLOSURES[id].ack !== null);
 }
 
+/**
+ * Why the plan's successful simulation must not be signed (`TxPlan.holdSign`, e.g. a claim that
+ * would pay 0 lamports), or `null`.
+ */
+export function signHold(s: Pick<TxFlowState, 'stage' | 'plan' | 'report'>): string | null {
+    if (s.stage !== 'review' || !s.report?.ok || !s.plan?.holdSign) return null;
+    return s.plan.holdSign(s.report);
+}
+
 export function canSign(s: TxFlowState): boolean {
-    return s.stage === 'review' && !!s.report?.ok && requiredAcks(s.plan).every((id) => s.acks.has(id));
+    return (
+        s.stage === 'review' &&
+        !!s.report?.ok &&
+        signHold(s) === null &&
+        requiredAcks(s.plan).every((id) => s.acks.has(id))
+    );
 }
 
 /**

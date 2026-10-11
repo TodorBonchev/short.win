@@ -18,10 +18,13 @@ import { Button } from '../../components/Button.tsx';
 import { Disclosure } from '../../components/Disclosure.tsx';
 import { AmountInput, Field } from '../../components/Field.tsx';
 import { FormFoot } from '../../components/FormFoot.tsx';
+import { Term } from '../../components/Glossary.tsx';
 import { Price, Sol, Tokens } from '../../components/Num.tsx';
+import { usePageBanners } from '../../components/PageBanners.tsx';
 import { ErrorState, Skeleton } from '../../components/States.tsx';
 import { TokenId } from '../../components/TokenId.tsx';
 import { routeBrokenVars } from '../../config/disclosureVars.ts';
+import { glossaryFor } from '../../config/glossary.ts';
 import { T } from '../../config/testids.ts';
 import { parseAmount, parseBps } from '../../lib/amount.ts';
 import { formatBps, formatDuration, formatTokens } from '../../lib/format.ts';
@@ -31,6 +34,7 @@ import { ReadAgeView, useReadAge } from '../../shell/SlotAge.tsx';
 import { TxReviewModal } from '../../tx/TxReviewModal.tsx';
 import { ConnectCta } from '../../wallet/ConnectCta.tsx';
 import { useWallet } from '../../wallet/useWallet.ts';
+import { CoverageLink } from './CoverageLink.tsx';
 import { firstReason, REASON, useConfirmedToast } from './feedback.ts';
 import { useExposureQ, useRentExempt, useShortSnapshot, useTokenLabel } from './hooks.ts';
 import { borrowerDisclosureVars } from './plans.ts';
@@ -64,7 +68,9 @@ function Row({
 }) {
     return (
         <div style={{ display: 'contents' }}>
-            <dt>{label}</dt>
+            <dt>
+                <Term>{label}</Term>
+            </dt>
             <dd data-testid={testId} data-value={value}>
                 {children}
                 {sub && <span className="short-preview-sub">{sub}</span>}
@@ -95,9 +101,33 @@ function refusalReason(refusal: string | null, cap: CapName | null): string {
 /** The default slippage as the input shows it ("1"). */
 const DEFAULT_SLIPPAGE_TEXT = String(DEFAULT_SLIPPAGE_BPS / 100);
 
+/** A UTC time that may break between its date and its time, never inside either (a 320 px sheet). */
+function UtcParts({ unix }: { unix: bigint }) {
+    const text = formatUtc(unix);
+    const at = text.indexOf(' ');
+    return (
+        <>
+            <span className="num">{text.slice(0, at)}</span> <span className="num">{text.slice(at + 1)}</span>
+        </>
+    );
+}
+
+/** A token label whose shortened mint ("CMer…rrRZ", after the last " · ") never breaks at its "…". */
+function keepMintWhole(label: string): ReactNode {
+    const at = label.lastIndexOf(' · ');
+    const mint = at < 0 ? label : label.slice(at + 3);
+    return (
+        <>
+            {at < 0 ? null : label.slice(0, at + 3)}
+            <span className="nowrap">{mint}</span>
+        </>
+    );
+}
+
 export function ShortPanel({ mint }: { mint: Address }) {
     const { connected } = useWallet();
     const owner = connected?.address ?? null;
+    const pageBanners = usePageBanners();
     const snap = useShortSnapshot(mint);
     const s = snap.data ?? null;
     const math = snap.math;
@@ -172,6 +202,7 @@ export function ShortPanel({ mint }: { mint: Address }) {
     }
 
     const { blocked, tier, tp, caps, preview } = view;
+    const coverageLinked = blocked?.code === 'CoveragePaused' && !!pageBanners?.shown.has('coverage-paused');
     // A coverage pause replaces the form (§4 `market.coveragePause`); so does a list-only venue.
     const replaceForm = blocked?.code === 'CoveragePaused' || blocked?.code === 'NoSupportedVenue';
     const rents = (positionRent ?? 0n) + (walletQ > 0n ? 0n : (exposureRent ?? 0n));
@@ -218,14 +249,20 @@ export function ShortPanel({ mint }: { mint: Address }) {
 
     return (
         <div className="short-panel" data-testid={T.shortPanel} data-mint={mint}>
-            {blocked && <BlockedNotice blocked={blocked} vars={routeBrokenVars(s.config.params)} />}
+            {blocked && (
+                <BlockedNotice
+                    blocked={blocked}
+                    vars={routeBrokenVars(s.config.params)}
+                    instead={coverageLinked ? <CoverageLink /> : undefined}
+                />
+            )}
             {!replaceForm && (
                 <>
                     <div className="short-inputs">
                         <AmountInput
                             label={
                                 <>
-                                    Size (<bdi className="case-keep">{tokenText}</bdi>)
+                                    Size (<bdi className="case-keep">{keepMintWhole(tokenText)}</bdi>)
                                 </>
                             }
                             value={qText}
@@ -382,7 +419,7 @@ export function ShortPanel({ mint }: { mint: Address }) {
                                     testId={T.shortPreview('deadline')}
                                     value={preview.deadline.toString()}
                                 >
-                                    <span className="num">{formatUtc(preview.deadline)}</span>
+                                    <UtcParts unix={preview.deadline} />
                                 </Row>
                             </dl>
                         )}
@@ -402,8 +439,10 @@ export function ShortPanel({ mint }: { mint: Address }) {
                                         return (
                                             <div key={k} style={{ display: 'contents' }}>
                                                 <dt data-binding={binding}>
-                                                    {CAP_TEXT[k]}
-                                                    {binding ? ' (binding)' : ''}
+                                                    {/* One string: a wrapped label keeps its ⓘ on its last word. */}
+                                                    <Term id={glossaryFor(CAP_TEXT[k])}>
+                                                        {`${CAP_TEXT[k]}${binding ? ' (binding)' : ''}`}
+                                                    </Term>
                                                 </dt>
                                                 <dd className="num short-cap-value" data-binding={binding}>
                                                     {formatTokens(v, decimals)}

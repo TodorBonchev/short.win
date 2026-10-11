@@ -163,6 +163,26 @@
     color: var(--text-2);
 }
 
+/* Thirteenth round (the owner's decisions of 2026-10-11): Claim reads the panel's label, on two lines
+   while the syncs the search picked can add 10,000 lamports or more ("Review claim · 0 SOL now" /
+   "syncs may add up to 0.000034 SOL"; a shortfall no sync can fund is the one-line label) — the
+   widest cell of the row. Where the table runs out of width (1,024 and 1,280 px) the actions wrap,
+   Claim under Withdraw and Deposit, rather than push the table past its frame; each label line keeps
+   its words together. At 1,440 px they stay on one line. */
+.lend-table td[data-col="actions"] {
+    white-space: normal;
+}
+
+.lend-table td[data-col="actions"] > :is(.btn, .lend-row-reason) {
+    margin-block: 2px;
+    vertical-align: middle;
+}
+
+.lend-table td[data-col="actions"] > .lend-row-reason,
+.lend-table td[data-col="actions"] .claim-label > span {
+    white-space: nowrap;
+}
+
 .lend-sync {
     display: inline-flex;
     flex-wrap: wrap;
@@ -209,6 +229,12 @@
         overflow: hidden;
         clip: rect(0 0 0 0);
         white-space: nowrap;
+    }
+
+    /* …and its glossary ⓘ with it: a header ⓘ would be an invisible Tab stop over the first card
+       (as in every card table, components.css). The cards' own ⓘ (badges) stay. */
+    .lend-table > .tbl > thead .glossary-tip {
+        display: none;
     }
 
     .lend-table > .tbl > tbody > tr {
@@ -304,4 +330,26 @@
    accent). */
 .lend-claim-all-sum .unit {
     color: inherit;
+}
+
+/* O-5: the Claim button on two lines when syncs may add to what it pays now ("Review claim · 0 SOL
+   now" / "syncs may add up to 0.000025 SOL"); one line otherwise. */
+.btn.lend-claim-submit[data-lines="2"] {
+    height: auto;
+    min-height: var(--control-h);
+    padding-block: var(--sp-1);
+    white-space: normal;
+}
+
+.claim-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: var(--lh-tight);
+    text-align: center;
+}
+
+.claim-label-sub {
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-regular);
 }

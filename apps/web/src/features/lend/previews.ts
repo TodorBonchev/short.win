@@ -826,6 +826,20 @@ export function previewWithdrawView(
 
 // ---- claim ------------------------------------------------------------------------------
 
+/**
+ * A claim shortfall under this many lamports counts as none (the owner's decision of 2026-10-11,
+ * thirteenth round; FRONTEND.md §3.6, §4.3): rounding dust (ECON §9.4 — the pro-rata indices round
+ * down, so a few lamports of what is credited can stay out of reach of the SOL allocated to the
+ * shares). Below it the Claim button reads "Review claim · {c} SOL" (disabled, "Nothing to claim
+ * yet", when {c} is 0), the shortfall note is not shown and no other lender's sync is looked for.
+ */
+export const CLAIM_DUST_LAMPORTS = 10_000n;
+
+/** The shortfall a claim acts on: `raw`, or 0 under {@link CLAIM_DUST_LAMPORTS}. */
+export function claimShortfall(raw: bigint): bigint {
+    return raw >= CLAIM_DUST_LAMPORTS ? raw : 0n;
+}
+
 export interface ClaimView {
     /** Lamports `claim_sol` pays now (`previewClaim`, pot draw included). */
     readonly claimable: bigint;
@@ -837,7 +851,10 @@ export interface ClaimView {
     readonly pot: bigint;
     /** A negative balance after a shortfall debit (`−pending`), else 0: `cover_deficit` it to withdraw. */
     readonly deficit: bigint;
-    /** Entitlement not yet realised that the pot cannot cover now: other lenders' touches may fund it. */
+    /**
+     * Entitlement not yet realised that the pot cannot cover now (max(0, pending − own − pot)):
+     * other lenders' touches may fund it. 0 under {@link CLAIM_DUST_LAMPORTS} (rounding dust).
+     */
     readonly shortfall: bigint;
 }
 
@@ -862,7 +879,7 @@ export function previewClaimView(m: MathModule, s: LendState, now: bigint): Resu
                 vesting: proRata(pool.vestBal, shares, pool.totalShares),
                 pot: pool.unmatched,
                 deficit: pending < 0n ? -pending : 0n,
-                shortfall: need > pool.unmatched ? need - pool.unmatched : 0n,
+                shortfall: claimShortfall(need > pool.unmatched ? need - pool.unmatched : 0n),
             };
         }),
     );

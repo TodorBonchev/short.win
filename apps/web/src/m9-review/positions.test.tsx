@@ -216,7 +216,7 @@ describe('M9-UX-3: a position’s copy uses the terms it locked at open', () => 
             positionDisclosureVars({ ...locked, deadline: locked.tOpen + 3n * 86_400n }, undefined).maxDuration,
         ).toBe('3 days');
         const text = renderDisclosure('borrower.liquidation', vars).join(' ');
-        expect(text).toContain('You pay a 5% expiry fee');
+        expect(text).toContain('Unless it can be liquidated at that point, you pay a 5% expiry fee');
         expect(text).toContain('no route to buy back for 20 minutes');
         expect(exitShort('no-route', locked)).toContain('20 minutes');
     });

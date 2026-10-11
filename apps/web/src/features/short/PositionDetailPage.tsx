@@ -18,6 +18,7 @@ import { ActionBar } from '../../components/ActionBar.tsx';
 import { Badge, RiskBadge, riskLevel } from '../../components/Badge.tsx';
 import { Button } from '../../components/Button.tsx';
 import { Countdown } from '../../components/Countdown.tsx';
+import { Term } from '../../components/Glossary.tsx';
 import { Pnl, Price, Sol, Tokens } from '../../components/Num.tsx';
 import { Panel } from '../../components/Panel.tsx';
 import { Scrim, SheetHead, useSheetMode } from '../../components/Sheet.tsx';
@@ -93,7 +94,9 @@ function Facts({ rows }: { rows: readonly (readonly [string, ReactNode, boolean?
         <dl className="kv position-facts">
             {rows.map(([k, v, quiet]) => (
                 <div key={k} className="kv-row">
-                    <dt>{k}</dt>
+                    <dt>
+                        <Term>{k}</Term>
+                    </dt>
                     <dd data-zero={quiet ? '' : undefined}>{v}</dd>
                 </div>
             ))}
@@ -264,7 +267,9 @@ export function PositionDetailPage({ position }: { position: Address }) {
                         <HealthBanner pos={pos} metrics={metrics} venue={s.venue} market={s.market} now={now} />
                         <dl className="position-hero">
                             <div className="position-hero-item">
-                                <dt className="position-hero-label">CR now</dt>
+                                <dt className="position-hero-label">
+                                    <Term>CR now</Term>
+                                </dt>
                                 <dd className="position-hero-value position-hero-cr">
                                     <CrValue bps={metrics.crBps} liqBps={pos.crLiqBps} />
                                     <span className="position-hero-sub">
@@ -273,7 +278,9 @@ export function PositionDetailPage({ position }: { position: Address }) {
                                 </dd>
                             </div>
                             <div className="position-hero-item">
-                                <dt className="position-hero-label">P&amp;L if closed now</dt>
+                                <dt className="position-hero-label">
+                                    <Term>P&L if closed now</Term>
+                                </dt>
                                 <dd className="position-hero-value">
                                     {metrics.pnl === null ? (
                                         <span className="muted">—</span>
@@ -283,7 +290,9 @@ export function PositionDetailPage({ position }: { position: Address }) {
                                 </dd>
                             </div>
                             <div className="position-hero-item">
-                                <dt className="position-hero-label">Time left</dt>
+                                <dt className="position-hero-label">
+                                    <Term>Time left</Term>
+                                </dt>
                                 <dd className="position-hero-value">
                                     <Countdown deadline={Number(pos.deadline)} />
                                 </dd>

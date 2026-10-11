@@ -1,12 +1,15 @@
 /**
  * The phone tab bar's "More" (FRONTEND.md §7.6): the destinations that do not fit four tabs —
- * protocol status, the security policy, create a market — and the network facts the desktop status
+ * How it works (the owner's thirteenth round, O-3), protocol status, the security policy, create a
+ * market — and the network facts the desktop status
  * bar shows on its right (SOL/USD, math version, cluster). A bottom sheet on the native `<dialog>`.
  */
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { indexerQueries } from '../api/queries.ts';
+import { Term } from '../components/Glossary.tsx';
 import { Modal } from '../components/Modal.tsx';
+import { NAV_COPY } from '../config/copyNav.ts';
 import { config } from '../config/env.ts';
 import { T } from '../config/testids.ts';
 import { useMath } from '../math/useMath.ts';
@@ -18,6 +21,10 @@ export function MoreSheet({ open, onClose }: { open: boolean; onClose: () => voi
     return (
         <Modal open={open} onClose={onClose} title="More" testId={T.moreSheet} variant="sheet">
             <nav aria-label="More" className="more-links">
+                <Link to="/how-it-works" className="more-row" data-testid={T.moreHowItWorks} onClick={onClose}>
+                    {NAV_COPY['more.howItWorks.title'].text}
+                    <span className="muted">{NAV_COPY['more.howItWorks.sub'].text}</span>
+                </Link>
                 <Link to="/status" className="more-row" data-testid={T.moreStatus} onClick={onClose}>
                     Status
                     <span className="muted">Indexer, venues, paused markets</span>
@@ -41,7 +48,9 @@ export function MoreSheet({ open, onClose }: { open: boolean; onClose: () => voi
                         </dd>
                     </div>
                     <div className="kv-row">
-                        <dt>Math</dt>
+                        <dt>
+                            <Term>Math</Term>
+                        </dt>
                         <dd className="num">{math ? math.version() : mathError ? 'unavailable' : '…'}</dd>
                     </div>
                     <div className="kv-row">

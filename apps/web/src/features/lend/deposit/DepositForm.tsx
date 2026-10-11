@@ -1,10 +1,12 @@
 /**
- * Lend → Deposit (FRONTEND.md §3.6): source account (ATA first; CPI Guard detected per account),
- * the SPEC §5.3 disclosure inline above the amount with its required checkbox, the amount (Max =
- * the source's balance), the preview (shares minted, share of the pool, token value; WASM on the
- * chain state), the pool's unpaid rent — the stored receivable plus the rent the deposit's own
- * prologue credits first — and this deposit's part of it (`lender.unpaidRent`: collapsed, or expanded
- * and repeated in the review when material; ECON §9.4) and the review. A CPI-Guarded
+ * Lend → Deposit (FRONTEND.md §3.6), in the Short form's order (the owner's thirteenth round, O-1;
+ * audit finding D-09): source account (ATA first; CPI Guard detected per account), the amount (Max =
+ * the source's balance), the tolerance, the preview (shares minted, share of the pool, token value;
+ * WASM on the chain state), the pool's unpaid rent — the stored receivable plus the rent the deposit's
+ * own prologue credits first — and this deposit's part of it (`lender.unpaidRent`: collapsed, or
+ * expanded and repeated in the review when material; ECON §9.4), then the risks (`lender.risks`,
+ * expanded on a wallet's first deposit, and the collapsed ones), the SPEC §5.3 disclosure with its
+ * required checkbox — still before signing, and again in the review — and the sticky submit. A CPI-Guarded
  * source blocks the plain deposit and offers the opt-in bracket (FE-1); a live wipe record
  * prepends the post-wipe sweep bundle; a mint flagged unsafe blocks deposits.
  */
@@ -176,9 +178,6 @@ export function DepositForm({ ctx }: { ctx: LendCtx }) {
                     </AckTarget>
                 </div>
             )}
-            <AckTarget id={ackId}>
-                <Disclosure id="lender.solRepayment" acknowledged={ack} onAcknowledge={setAck} />
-            </AckTarget>
             <AmountInput
                 label="Amount"
                 value={amountText}
@@ -296,12 +295,23 @@ export function DepositForm({ ctx }: { ctx: LendCtx }) {
                     cashback claims and sweep_trader), so the old lenders receive what is left on the trader.
                 </div>
             )}
-            {buildError && (
-                <div className="field-error" role="alert">
-                    {buildError}
-                </div>
-            )}
+            {/* The risks, then SPEC §5.3's acknowledgement, right before the submit (the Short form's
+                order, the owner's thirteenth round O-1): the texts verbatim, only their place moved. */}
+            <LenderRisks owner={signer?.address ?? null} vars={lenderRiskVars(chain.config?.params)} />
+            <Disclosure id="lender.lossHistory" vars={vars.lossHistory} collapsible />
+            <Disclosure id="market.creatorSelfDealing" vars={vars.creatorSelfDealing} collapsible />
+            <Disclosure id="lender.residuals" collapsible />
+            <AckTarget id={ackId}>
+                <Disclosure id="lender.solRepayment" acknowledged={ack} onAcknowledge={setAck} />
+            </AckTarget>
             <FormFoot reason={blocker?.text ?? null} reasonTestId={T.lendDepositReason} reasonTarget={blocker?.target}>
+                {/* A review that could not be built says so at the submit just tapped (the Short
+                    form's place), not a screen of risks above it. */}
+                {buildError && (
+                    <div className="field-error" role="alert">
+                        {buildError}
+                    </div>
+                )}
                 {!signer && <ConnectCta surface="lend" />}
                 <Button
                     variant="primary"
@@ -314,10 +324,6 @@ export function DepositForm({ ctx }: { ctx: LendCtx }) {
                     {guard && bracket ? 'Review deposit (with CPI Guard bracket)' : 'Review deposit'}
                 </Button>
             </FormFoot>
-            <LenderRisks owner={signer?.address ?? null} vars={lenderRiskVars(chain.config?.params)} />
-            <Disclosure id="lender.lossHistory" vars={vars.lossHistory} collapsible />
-            <Disclosure id="market.creatorSelfDealing" vars={vars.creatorSelfDealing} collapsible />
-            <Disclosure id="lender.residuals" collapsible />
         </div>
     );
 }

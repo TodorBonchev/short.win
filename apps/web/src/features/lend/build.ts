@@ -37,7 +37,14 @@ import {
     type Refusal,
     wipeSweepPending,
 } from './previews.ts';
-import { gatherPotSyncs, type OtherLenders, quoteWithdrawSol, type Simulate } from './quote.ts';
+import {
+    gatherPotSyncs,
+    type OtherLenders,
+    quoteWithdrawSol,
+    type SearchProgress,
+    type Simulate,
+    type SyncPick,
+} from './quote.ts';
 import { postWipeSweepIxs, readSweepFacts } from './sweep.ts';
 
 /** What every lender plan builder needs besides the chain read. */
@@ -214,25 +221,76 @@ export type { OtherLenders } from './quote.ts';
  */
 export const LENDER_POSITION_RENT = (128n + BigInt(getLenderPositionSize())) * 3_480n * 2n;
 
+/** No syncs: nothing to look for, no source, or a failed search. */
+export const NO_SYNCS: SyncPick = { syncs: [], gain: 0n, more: { count: 0, gain: 0n } };
+
+/**
+ * The claim's search for other lenders whose pot-only sync funds the pot (FRONTEND.md §3.6):
+ * `gatherPotSyncs` on the claim view's shortfall at `nowS` (0 under `CLAIM_DUST_LAMPORTS`), with
+ * the inputs `claimPlanFrom` gives it. The review runs it, and — the owner's decision of 2026-10-11
+ * ("only when syncs can pay") — so does the Claim button beforehand, in the background
+ * (`claim/syncSearch.ts`), to say what the syncs can add. No shortfall, no source (no indexer), a
+ * refused view or a failed read: no syncs ({@link NO_SYNCS}), as `gatherPotSyncs` treats a failure.
+ */
+export async function searchPotSyncs(a: {
+    readonly rpc: AppRpc;
+    readonly math: MathModule;
+    readonly chain: LoadedChain;
+    readonly claimant: Address;
+    readonly nowS: number;
+    readonly source: OtherLenders | null;
+    /** Stops the search before its next indexer page (the Claim button's search dropped or timed out). */
+    readonly signal?: AbortSignal;
+    /** The pick so far and whether the search was cut short (`gatherPotSyncs`; a failure cuts it too). */
+    readonly progress?: SearchProgress;
+}): Promise<SyncPick> {
+    if (!a.chain.lender || !a.source) return NO_SYNCS;
+    try {
+        const now = BigInt(a.nowS);
+        const view = previewClaimView(a.math, lendStateOf(a.chain), now);
+        if (!view.ok || view.value.shortfall === 0n) return NO_SYNCS;
+        return await gatherPotSyncs({
+            rpc: a.rpc,
+            math: a.math,
+            market: a.chain.marketAddress,
+            base: { market: a.chain.market, vault: a.chain.vault },
+            claimant: a.claimant,
+            source: a.source,
+            now,
+            shortfall: view.value.shortfall,
+            ...(a.signal ? { signal: a.signal } : {}),
+            ...(a.progress ? { progress: a.progress } : {}),
+        });
+    } catch {
+        // the indexer (or the reads) unavailable: no syncs; the claim pays what the pot holds
+        if (a.progress) a.progress.cut = true;
+        return NO_SYNCS;
+    }
+}
+
 /**
  * The claim (FRONTEND.md §3.6; KI66-R4, KI-67). When the pot cannot pay the claimant's entitlement,
  * other lenders' unsigned `sync_lender` go first — the pot-only touch (`pool::touch_pot`), which
  * holds a lender behind a rebase record there and walks its forward chain — picked by
  * `gatherPotSyncs` from the indexer's lists (FE-30: the lenders behind the share epoch first,
  * then the current ones, 50 a page, ≤ 4 pages, until the best cover the shortfall; ≤ 4 synced,
- * largest gain first). They are fitted to the transaction: while the compiled transaction (no
+ * largest gain first), or `pick`, the Claim button's own search when it is still fresh (the
+ * owner's decision of 2026-10-11; `claim/syncSearch.ts`). They are fitted to the transaction: while the compiled transaction (no
  * lookup tables: an upper bound) is over 1,232 bytes, the smallest-gain sync is dropped, and the
  * expected payout is recomputed with the pot the rest moves. A plan with syncs is simulated here
  * once more: a sync that fails (its position closed or changed since the read) is dropped and the
  * plan rebuilt, so one stale target never blocks the claim; the review simulates the result again
- * before anything is signed. Syncs left out (by the cap or the size) are named in the review
- * (`lender.potSyncsDeferred`): the next claim picks them. Without the indexer, no syncs.
+ * before anything is signed, and does not offer Sign when that simulation pays 0 lamports
+ * (`buildClaimPlan`'s `holdSign`). Syncs left out (by the cap or the size) are named in the review
+ * (`lender.potSyncsDeferred`): the next claim picks them. Without the indexer, no syncs. Retry
+ * (`rebuild`) searches again on a fresh read.
  */
 export async function claimPlanFrom(
     env: LendEnv,
     chain: LoadedChain,
     nowS: number,
     otherLenders: OtherLenders | null,
+    pick?: SyncPick,
 ): Promise<TxPlan> {
     needRecords(chain);
     if (!chain.lender) {
@@ -248,22 +306,18 @@ export async function claimPlanFrom(
     let syncs: SyncTarget[] = [];
     let more = { count: 0, gain: 0n };
     if (v.shortfall > 0n && otherLenders) {
-        try {
-            const pick = await gatherPotSyncs({
+        const found =
+            pick ??
+            (await searchPotSyncs({
                 rpc: env.rpc,
                 math: env.math,
-                market: chain.marketAddress,
-                base: { market: chain.market, vault: chain.vault },
+                chain,
                 claimant: env.signer.address,
+                nowS,
                 source: otherLenders,
-                now,
-                shortfall: v.shortfall,
-            });
-            syncs = [...pick.syncs];
-            more = pick.more;
-        } catch {
-            // the indexer (or the reads) unavailable: claim what the pot pays now
-        }
+            }));
+        syncs = [...found.syncs];
+        more = found.more;
     }
     const ctx = contextAt(env, chain, now);
     // Syncs the pre-review simulation failed on (their position closed or changed meanwhile):

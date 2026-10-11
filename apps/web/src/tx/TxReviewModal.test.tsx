@@ -108,6 +108,16 @@ describe('TxReviewModal (M10-RESP)', () => {
         expect(screen.queryByTestId(T.txSignHint)).toBeNull();
     });
 
+    it('a simulation the plan holds: Sign disabled with its reason beside it, no acknowledgement hint', () => {
+        const held = plan({ kind: 'claim_sol', title: 'Claim 0 SOL', holdSign: () => 'Nothing to claim yet' });
+        render(<TxReviewModal flow={flowFor({}, held)} />);
+        expect(screen.getByTestId(T.txSignHold).textContent).toBe('Nothing to claim yet');
+        expect((screen.getByTestId(T.txSign) as HTMLButtonElement).disabled).toBe(true);
+        expect(screen.queryByTestId(T.txSignHint)).toBeNull();
+        // Refresh simulates again.
+        expect(screen.getByTestId(T.txRetry).dataset.mode).toBe('resimulate');
+    });
+
     it('a wallet rejection: "Cancelled in your wallet", Try again, no Sign, no simulation badge', () => {
         render(
             <TxReviewModal

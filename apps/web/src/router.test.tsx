@@ -73,6 +73,7 @@ describe('routes', () => {
         ['/lend', T.page('lend')],
         ['/status', T.page('status')],
         ['/security', T.page('security')],
+        ['/how-it-works', T.page('how-it-works')],
         [`/positions/${POSITION}`, T.page('position')],
         [`/m/${MINT}`, T.shortPanel],
         [`/m/${MINT}?panel=lend&action=withdraw`, T.lendPanel],

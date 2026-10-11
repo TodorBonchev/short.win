@@ -93,7 +93,8 @@ test.describe('phone markets', { tag: '@markets' }, () => {
                 clip: head ? getComputedStyle(head).clip : 'auto',
             };
         });
-        expect(focused.testId).toMatch(/^markets-sort-/);
+        // A sort button, or (since the thirteenth round) a header's glossary ⓘ before it.
+        expect(focused.testId).toMatch(/^(markets-sort-|glossary-tip-)/);
         expect(focused.w).toBeGreaterThan(8);
         expect(focused.h).toBeGreaterThan(8);
         expect(focused.clip).toBe('auto');

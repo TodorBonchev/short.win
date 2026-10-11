@@ -341,6 +341,33 @@ export function globalConfig(over: Partial<GlobalConfig> = {}): GlobalConfig {
     } as unknown as GlobalConfig;
 }
 
+/** `globalConfig()` with every parameter the How it works page and the disclosures quote. */
+export function fullGlobalConfig(): GlobalConfig {
+    const base = globalConfig();
+    return {
+        ...base,
+        params: {
+            ...base.params,
+            openFeeBps: 10,
+            rentProtocolBps: 1_000,
+            penaltyLenderBps: 6_000,
+            penaltyProtocolBps: 1_000,
+            penaltyKeeperBps: 3_000,
+            expiryFeeBps: 100,
+            settleKeeperFixed: 10_000_000n,
+            settleKeeperBps: 100,
+            settleKeeperCap: 500_000_000n,
+            s3WaitS: 600,
+            lockGraceS: 86_400,
+            lumpVestS: 259_200,
+        },
+        tiers: base.tiers.map((t, i) => ({
+            ...t,
+            maxDurationS: [2_592_000, 1_209_600, 604_800, 259_200][i] ?? 604_800,
+        })),
+    } as GlobalConfig;
+}
+
 export function oracleCache(): OracleCache {
     return {
         price: 14_000_000_000n,

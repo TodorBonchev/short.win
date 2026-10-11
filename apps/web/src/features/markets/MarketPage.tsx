@@ -10,14 +10,19 @@
  * (`?sheet=trade`; full screen on a phone, at the right on a tablet), opened from the action bar's
  * Short / Lend and closed by ✕, Escape, the scrim or Back. Same DOM at every width.
  *
+ * The page tells its panels which banners it shows (`PageBannersContext`, the owner's thirteenth
+ * round O-2): the Short panel links to the coverage banner instead of repeating it, and from the
+ * trade sheet that link closes the sheet, then scrolls to the banner and focuses it.
+ *
  * Sources (FE-D1): the indexer for analytics and history, the chain for the state that gates opens;
  * without the indexer (down, or a market it does not know yet) the page renders from the chain.
  */
 import type { Address } from '@solana/kit';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
-import { useId, useRef } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef } from 'react';
 import { useLiveChannels } from '../../api/live.tsx';
 import { ActionBar } from '../../components/ActionBar.tsx';
+import { focusBanner, type PageBanners, PageBannersContext } from '../../components/PageBanners.tsx';
 import { Panel } from '../../components/Panel.tsx';
 import { Scrim, SheetHead, useSheetMode } from '../../components/Sheet.tsx';
 import { ErrorState, Skeleton } from '../../components/States.tsx';
@@ -37,7 +42,7 @@ import type { MarketView } from './market/marketView.ts';
 import { OverviewTab } from './market/OverviewTab.tsx';
 import { StatStrip } from './market/StatStrip.tsx';
 import { useMarketData } from './market/useMarketData.ts';
-import type { MarketFlagKey } from './shared/marketFlags.ts';
+import { type MarketFlagKey, marketBanners } from './shared/marketFlags.ts';
 
 const TABS: readonly TabDef<MarketTab>[] = [
     { key: 'overview', label: 'Overview', testId: T.marketTab('overview') },
@@ -100,6 +105,33 @@ export function MarketPage({ mint }: { mint: Address }) {
         onClose: sheet.closeSheet,
         labelledBy: sheetTitleId,
     });
+
+    // O-2: a panel's link to a banner. From the sheet, the sheet closes first (its own focus return
+    // runs as it closes); the banner is focused once it has.
+    const pendingBanner = useRef<string | null>(null);
+    const closeSheet = sheet.closeSheet;
+    const goToBanner = useCallback(
+        (key: string) => {
+            if (inSheet) {
+                pendingBanner.current = key;
+                closeSheet();
+            } else focusBanner(T.marketBanner(key));
+        },
+        [inSheet, closeSheet],
+    );
+    useEffect(() => {
+        const key = pendingBanner.current;
+        if (inSheet || key === null) return;
+        pendingBanner.current = null;
+        const raf = requestAnimationFrame(() => focusBanner(T.marketBanner(key)));
+        return () => cancelAnimationFrame(raf);
+    }, [inSheet]);
+    const bannerKeys = data.view ? marketBanners(data.flags).map((b) => b.key) : [];
+    const bannerSig = bannerKeys.join(',');
+    const banners = useMemo<PageBanners>(
+        () => ({ shown: new Set(bannerSig ? bannerSig.split(',') : []), inSheet, focus: goToBanner }),
+        [bannerSig, inSheet, goToBanner],
+    );
 
     if (data.status === 'not-found') {
         return (
@@ -238,13 +270,15 @@ export function MarketPage({ mint }: { mint: Address }) {
                             sheet: the user lands on the market page, the toast (View position,
                             Explorer) whole. */}
                         <TxDoneContext.Provider value={inSheet ? sheet.closeSheet : null}>
-                            <TabPanel idPrefix="trade" tabKey={panel}>
-                                {panel === 'short' ? (
-                                    <ShortPanel mint={mint} />
-                                ) : (
-                                    <LendPanel mint={mint} action={search.action} />
-                                )}
-                            </TabPanel>
+                            <PageBannersContext.Provider value={banners}>
+                                <TabPanel idPrefix="trade" tabKey={panel}>
+                                    {panel === 'short' ? (
+                                        <ShortPanel mint={mint} />
+                                    ) : (
+                                        <LendPanel mint={mint} action={search.action} />
+                                    )}
+                                </TabPanel>
+                            </PageBannersContext.Provider>
                         </TxDoneContext.Provider>
                     </div>
                 </Panel>

@@ -213,12 +213,18 @@ test.describe('screens: lend', { tag: ['@screens', '@lend'] }, () => {
                         /^[1-9]\d*$/,
                     );
             }
-            if (action === 'claim')
+            if (action === 'claim') {
                 await expect(app.id(T.claimValue('claimable'))).toHaveAttribute('data-value', /^\d+$/);
+                // The search for syncs has ended (the owner's decision of 2026-10-11): a settled label.
+                await expect(app.id(T.claimSubmit)).not.toHaveAttribute('aria-busy', 'true', { timeout: 30_000 });
+            }
             await shot(page, `40-lend-${action}`);
         }
         await app.goto('/lend', 'lend');
         await expect(app.id(T.lenderRow(main.market))).toBeVisible();
+        await expect(app.id(T.lenderClaim(main.market))).not.toHaveAttribute('aria-busy', 'true', {
+            timeout: 30_000,
+        });
         await shot(page, '41-lender-dashboard');
     });
 });

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { ApiError } from '../api/client.ts';
+import { Term } from './Glossary.tsx';
 
 /**
  * An empty (or not-found) state: an optional title, one muted line, an optional action (a link or
@@ -77,19 +78,23 @@ export function Stat({
 }) {
     return (
         <div className="stat" data-testid={testId} data-priority={priority}>
-            <div className="stat-label">{label}</div>
+            <div className="stat-label">
+                <Term>{label}</Term>
+            </div>
             <div className="stat-value">{children}</div>
         </div>
     );
 }
 
-/** A definition list row set: `[["Margin", <Sol …/>], …]`. */
+/** A definition list row set: `[["Margin", <Sol …/>], …]`; a glossary label gets its ⓘ. */
 export function Kv({ rows, testId }: { rows: readonly (readonly [ReactNode, ReactNode, string?])[]; testId?: string }) {
     return (
         <dl className="kv" data-testid={testId}>
             {rows.map(([k, v, id], i) => (
                 <div key={i} className="kv-row">
-                    <dt>{k}</dt>
+                    <dt>
+                        <Term>{k}</Term>
+                    </dt>
                     <dd data-testid={id}>{v}</dd>
                 </div>
             ))}
