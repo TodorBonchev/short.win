@@ -254,9 +254,9 @@ pub enum Alert {
     /// market's exits refuse (`VenueMigrating` before the transition, `VenueAccountMismatch`
     /// without the accounts) until it lands. Retried every second; alerted once per detail.
     TransitionFailed { market: Pubkey, detail: String },
-    /// Duties 6 and 13: a `sweep_trader` (with the venue cashback claims) failed. After a full
-    /// wipe the market takes no deposit — and hence no open — until it lands (R4A-7). Alerted once
-    /// per market and detail.
+    /// Duties 6 and 13: a `sweep_trader` (with the venue cashback claims) failed. While `S = 0` —
+    /// after a full wipe or, since AIR-08, after the last lender's exit — the market takes no
+    /// deposit, and hence no open, until it lands (R4A-7). Alerted once per market and detail.
     SweepFailed {
         market: Pubkey,
         post_wipe: bool,
