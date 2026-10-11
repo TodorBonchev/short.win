@@ -136,11 +136,10 @@ mod more {
     /// running; an evaluation with the legs holding more than `settle_arm_gap_s` after the
     /// last one re-arms it (a new `s_count`, so persistence restarts).
     ///
-    /// The sims' order (and `settle::evaluate`'s) also keeps an armed clock whenever an
-    /// evaluation lands in step 2 (not CR-liquidatable, e.g. a stale bucket fails the spot
-    /// leg) and the box does not say "not liquidatable" — without the arm-gap test, so such an
-    /// evaluation after a long pause revives a lapsed clock (pinned here; see the track's
-    /// design notes).
+    /// AIR-16 (ECON §5.6): an evaluation that lands in step 2 (not CR-liquidatable, e.g. a
+    /// stale bucket fails the spot leg) while the box does not say "not liquidatable" keeps a
+    /// live clock running, but leaves a lapsed one as it is: it is not revived with its old
+    /// count, so the next evaluation with the legs holding re-arms it.
     #[test]
     fn a_stale_bucket_keeps_the_clock_and_a_long_gap_re_arms() {
         let mut sc = Sc::default_market();
@@ -162,13 +161,19 @@ mod more {
         let a = out.armed.expect("re-armed");
         assert!(a.s_count > a0.count && a.s_since > a0.since);
         assert_eq!(sc.arm().count, a.s_count);
-        // The revive (step 2 keeps without the gap test): 11 s later, a lone call with a
-        // stale bucket keeps the lapsed clock instead of leaving it to re-arm.
+        // AIR-16: 12 s later (> settle_arm_gap_s), a lone call with a stale bucket lands in
+        // step 2 and leaves the lapsed clock as it is (no revive with the old count); the next
+        // keeper second with a fresh bucket re-arms it, so persistence restarts.
+        let a2 = sc.arm();
         sc.env.warp(12);
         let out = sc.settle_ok();
-        assert!(out.armed.is_none());
-        let a2 = sc.arm();
-        assert_eq!((a2.count, a2.last), (a.s_count, sc.env.now()));
+        assert!(out.armed.is_none() && out.disarmed.is_none() && out.settled.is_none());
+        assert_eq!(sc.arm(), a2, "step 2 does not revive a lapsed clock");
+        sc.crank();
+        let out = sc.second();
+        let r = out.armed.expect("the lapsed clock re-arms");
+        assert!(out.settled.is_none() && r.s_count > a.s_count && r.s_since > a.s_since);
+        assert_eq!(sc.arm().count, r.s_count);
     }
 
     /// Only box-robust evidence disarms (ARCH §3.8 steps 2 and 3): a genuine partial reversal

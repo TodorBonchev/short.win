@@ -207,7 +207,8 @@ proptest! {
             let live_before = before.is_live(now, gap);
             match e.arm {
                 ArmChange::None => prop_assert_eq!(st, before),
-                ArmChange::Kept => prop_assert!(live_before || (before.armed == 1 && !liq && !inp.expired())),
+                // AIR-16 (ECON §5.6): only a live clock keeps running; a lapsed one re-arms.
+                ArmChange::Kept => prop_assert!(live_before),
                 ArmChange::Armed => prop_assert!(!live_before && st.count == count && st.since == now),
                 ArmChange::Disarmed(DisarmReason::Refuted) => {
                     prop_assert!(exec && before.armed == 1);

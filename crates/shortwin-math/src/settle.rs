@@ -355,8 +355,8 @@ pub struct ArmState {
     pub since: i64,
     /// Last evaluation that kept the clock running (`s_last`).
     pub last: i64,
-    /// 1 while armed (`s_armed`; a lapsed arm keeps 1 until re-armed or refuted, see
-    /// [`ArmState::is_live`]).
+    /// 1 while armed (`s_armed`; a lapsed arm keeps 1 until re-armed or disarmed on the box,
+    /// and no evaluation revives it, see [`ArmState::is_live`]).
     pub armed: u8,
     pub _pad: [u8; 7],
 }
@@ -509,7 +509,8 @@ pub struct Evaluation {
 ///
 /// 2. Not CR-liquidatable and not expired: an armed position is disarmed only if
 ///    [`not_liquidatable`] holds on the box (`SettleDisarmed{NotLiquidatable}`); otherwise
-///    its clock keeps running (`last = now`). Nothing else happens.
+///    a live clock keeps running (`last = now`) and a lapsed one is left as it is, for
+///    step 3 to re-arm (AIR-16; ECON §5.6). Nothing else happens.
 /// 3. If the venue is executable: `live = armed ∧ now − last ≤ arm_gap_s`.
 ///    - Armed (live or lapsed) and [`refuted`] on the box: disarm (`Refuted`).
 ///    - Else, with a fresh completed bucket (`p_rs` set): if the [`s1_legs`] or the
@@ -558,7 +559,9 @@ pub fn evaluate<Q: BoxQuotes>(
             if not_liquidatable(quotes, expired, inp.ema_leg, v_eff, terms.cr_liq_bps, bx)? {
                 state.armed = 0;
                 out.arm = ArmChange::Disarmed(DisarmReason::NotLiquidatable);
-            } else {
+            } else if state.is_live(now, terms.arm_gap_s) {
+                // AIR-16: only a live clock keeps running; a lapsed one is left for step 3 to
+                // re-arm (ECON §5.6), never revived with its old count.
                 state.last = now;
                 out.arm = ArmChange::Kept;
             }
@@ -1031,6 +1034,64 @@ mod tests {
             evaluate(&mut bad, &inp, &TERMS, &mut q),
             Err(MathError::Underflow)
         );
+    }
+
+    /// AIR-16 (ECON §5.6: evaluations more than `settle_arm_gap_s` apart re-arm the clock): a
+    /// clock that lapsed (no evaluation for more than `arm_gap_s`) is not revived by a step-2
+    /// evaluation (not CR-liquidatable, the box does not say "not liquidatable"), so the next
+    /// step-3 evaluation re-arms it and the persistence window restarts, as step 3 does for a
+    /// lapsed clock itself; it never settles at once on the old count.
+    #[test]
+    fn step_2_does_not_revive_a_lapsed_clock() {
+        let bx = SettleBox::point(10, 2);
+        let mut q = toy();
+        // Armed at t = 10 on count 100 (S1 legs hold).
+        let mut st = ArmState::default();
+        let mut inp = inputs(10, bx);
+        assert_eq!(
+            evaluate(&mut st, &inp, &TERMS, &mut q).unwrap().arm,
+            ArmChange::Armed
+        );
+        let armed = st;
+        // 15 s without an evaluation (> arm_gap_s = 10), then a call in step 2: the spot leg
+        // fails (e.g. a stale bucket or a same-transaction dump), the EMA leg holds, so the box
+        // cannot say "not liquidatable".
+        inp.now = 25;
+        inp.ema_count = 120;
+        inp.cr_liquidatable = false;
+        let step2 = evaluate(&mut st, &inp, &TERMS, &mut q).unwrap();
+        let after_step2 = st;
+        // The next second, in step 3 with the legs holding and 20 ≥ persist_n updates since the
+        // old arm.
+        inp.now = 26;
+        inp.cr_liquidatable = true;
+        let step3 = evaluate(&mut st, &inp, &TERMS, &mut q).unwrap();
+        assert!(
+            step3.settlement.is_none(),
+            "a lapsed clock must re-arm, not settle at once on its old count: {step3:?}"
+        );
+        assert_eq!(step3.arm, ArmChange::Armed);
+        assert_eq!((st.armed, st.count, st.since, st.last), (1, 120, 26, 26));
+        assert_eq!(
+            step2,
+            Evaluation::default(),
+            "step 2 leaves a lapsed clock alone"
+        );
+        assert_eq!(after_step2, armed);
+        // A live clock in step 2 still keeps running.
+        inp.now = 30;
+        inp.cr_liquidatable = false;
+        assert_eq!(
+            evaluate(&mut st, &inp, &TERMS, &mut q).unwrap().arm,
+            ArmChange::Kept
+        );
+        assert_eq!((st.count, st.since, st.last), (120, 26, 30));
+        // Persistence restarted at 120: S1 once 3 more updates have passed, within the gap.
+        inp.now = 31;
+        inp.ema_count = 123;
+        inp.cr_liquidatable = true;
+        let e = evaluate(&mut st, &inp, &TERMS, &mut q).unwrap();
+        assert_eq!(e.settlement.map(|s| s.kind), Some(SettleKind::S1));
     }
 
     /// M4R: in the post-change warm-up an executable venue's evaluation decides nothing (no

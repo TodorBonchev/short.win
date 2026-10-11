@@ -1953,11 +1953,13 @@ class Market:
         box = self.settle_box(t)
         if not (st["liq"] or st["expired"]):
             # R3A-6b / V2-4: a non-liquidatable evaluation disarms only on box-robust
-            # evidence; otherwise an armed clock keeps running.
+            # evidence; otherwise a live clock keeps running.  AIR-16 (ECON §5.6): a lapsed
+            # clock (no evaluation for more than settle_arm_gap_s) is not revived here with its
+            # old count -- _settlement re-arms it.
             if pos.armed:
                 if self._not_liq_box(pos, st, box):
                     pos.disarm()
-                else:
+                elif t - pos.s_last <= P.settle_arm_gap_s:
                     pos.s_last = t
             return None
 
