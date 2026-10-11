@@ -34,8 +34,9 @@ contest, are **not verified**.
      with its Squads encoders (4,124). A quote may price them as options.
 2. The stack: Anchor 1.2.0, Agave 4.1.2, SBPF v3. The CPI targets: pump.fun, PumpSwap,
    pump-fees, Raydium AMM v4 and CPMM, Token / Token-2022, memo. Governance through Squads v4.
-3. The audit commit: the `audit-1` / `v1.0.0` tag (AUDIT.md §0), with the verified hashes.
-   The code freeze date and the requested window: set by the owner.
+3. The audit commit: the `audit-1` / `v1.0.0` tag on `e4895c2` (AUDIT.md §0), with the
+   verified hashes. The code freeze starts at the tag (2026-10-11; AUDIT.md §12); the requested
+   window: set by the owner.
 4. Repository access. The repository is private until it goes public (or gets a public
    mirror) before mainnet (owner decision Q3): access by invitation, or a snapshot of the tag.
 5. What the quote should state:
