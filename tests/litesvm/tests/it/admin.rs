@@ -474,6 +474,28 @@ fn proposals_are_validated_against_the_compiled_bounds() {
     assert_eq!(env.config().pending.kind, 1);
 }
 
+/// AIR-06 (ECON §5.7, #77): Governance cannot set `min_notional` below the floor at which every
+/// tier keeps buyback room at the liquidation boundary (0.053 SOL, `params::MIN_NOTIONAL_FLOOR`):
+/// the old compiled floor of 0.01 SOL — where a Tier A–C position had none, so `liquidate` and
+/// `expire` refused `UseSolSettle` and every exit ended in S1 — and one lamport under the floor
+/// are refused at `propose_config`; the floor itself is accepted.
+#[test]
+fn min_notional_below_the_buyback_room_floor_is_refused() {
+    let mut env = Env::initialized();
+    for v in [10_000_000, 52_999_999] {
+        let mut ps = ParamSet::DEFAULT;
+        ps.params.min_notional = v;
+        assert_err(
+            &propose(&mut env, params_change(&ps)),
+            ShortwinError::InvalidParams,
+        );
+    }
+    let mut ps = ParamSet::DEFAULT;
+    ps.params.min_notional = 53_000_000;
+    ok(propose(&mut env, params_change(&ps)));
+    assert_eq!(env.config().pending.kind, 1);
+}
+
 /// The EMA fields of `ps` as `EmaParamsArgs`.
 fn ema_args(ps: &ParamSet) -> EmaParamsArgs {
     EmaParamsArgs {

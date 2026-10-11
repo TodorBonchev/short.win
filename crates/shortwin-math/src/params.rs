@@ -13,8 +13,9 @@
 //! The ECON §15 bounds of the parameters the sim does not model at all (market sizing and
 //! creation fee, boost, warm-up (`≥ 10·EMA_TAU_S`), the EMA force delay, lender timing, θ
 //! and `θ_B < θ_A`, oracle, Raydium pool selection and `pool_fast_min_bps`) are the other
-//! rules (`in_sim() == false`), transcribed from the ECON §15 table: [`check_econ`] /
-//! [`validate_econ`] make them. [`check`] reports both sets, the sim's first.
+//! rules (`in_sim() == false`), transcribed from the ECON §15 table — but for the floor of
+//! `min_notional`, derived from the other compiled bounds ([`MIN_NOTIONAL_FLOOR`], AIR-06):
+//! [`check_econ`] / [`validate_econ`] make them. [`check`] reports both sets, the sim's first.
 //!
 //! The program (`initialize_config`, `propose_config`), the keeper, the WASM facade and
 //! T-CONFIG share these functions (ARCH §2.3.3, §3.1, §9 M0b): the program runs
@@ -527,6 +528,48 @@ const MARKET_WARMUP_MIN_S: u64 = 10 * EMA_TAU_S as u64;
 pub const POOL_FAST_MAX_S: u64 = 540;
 const _: () = assert!(POOL_FAST_MAX_S as i64 + S3_OBS_GAP_S == Rule::S3WaitS.bounds().0 as i64);
 
+/// The compiled floor of `min_notional`, lamports (AIR-06; ECON §5.7, #77: no in-bounds value
+/// may lose liquidations). An open locks `V ≥ ⌈cr_open·N_open/10⁴⌉` (D4) with `N_open ≥
+/// min_notional`; at the liquidation boundary the cheapest CR-liquidatable buyback is
+/// `⌊V·10⁴/cr_liq⌋ + 1` (`risk::cr_below`, `R_due = 0`), and `liquidate` / `expire` buy back
+/// only while `B̂ + ert ≤ V − K_s` (`risk::buyback_allowed`) with `K_s ≤ settle_keeper_fixed +
+/// ⌊V·settle_keeper_bps/10⁴⌋`. `V·(10⁴·cr_liq − 10⁸ − bps·cr_liq) ≥ (fixed + ert + 1)·10⁴·cr_liq`
+/// is therefore enough, and it is hardest at the tiers' SPEC minima (governance may only raise
+/// them) with the keeper terms and `exec_rent_tol` at their compiled maxima:
+/// [`MIN_NOTIONAL_BUYBACK_ROOM`] = 52,631,582 lamports (Tier A), rounded up to 0.053 SOL. The
+/// floor was 10⁷ (ECON §15): there a Tier A–C position had no buyback room at the boundary, so
+/// `liquidate` and `expire` refused `UseSolSettle` and every exit ended in S1, which pays the
+/// keeper `K_s` (up to 51 % of `V`) and the lenders `V − K_s`.
+pub const MIN_NOTIONAL_FLOOR: u64 = 53_000_000;
+
+/// The smallest notional at which every configuration inside the compiled bounds keeps buyback
+/// room at the liquidation boundary in every tier ([`MIN_NOTIONAL_FLOOR`]'s derivation): the
+/// largest over the tiers of `⌈(fixed + ert + 1)·10⁸·cr_liq / (cr_open·(10⁴·cr_liq − 10⁸ −
+/// bps·cr_liq))⌉` at the SPEC minima and the compiled maxima of `settle_keeper_fixed`,
+/// `settle_keeper_bps` and `exec_rent_tol`, lamports.
+pub const MIN_NOTIONAL_BUYBACK_ROOM: u128 = {
+    let fixed = Rule::SettleKeeperFixed.bounds().1 as u128;
+    let bps = Rule::SettleKeeperBps.bounds().1 as u128;
+    let ert = Rule::ExecRentTol.bounds().1 as u128;
+    let mut floor = 0u128;
+    let mut i = 0;
+    while i < Tier::ALL.len() {
+        let (open, liq) = spec_cr(Tier::ALL[i]);
+        let (open, liq) = (open as u128, liq as u128);
+        let room = 10_000 * liq - 100_000_000 - bps * liq;
+        let n = ((fixed + ert + 1) * 100_000_000 * liq).div_ceil(open * room);
+        if n > floor {
+            floor = n;
+        }
+        i += 1;
+    }
+    floor
+};
+const _: () = assert!(
+    MIN_NOTIONAL_BUYBACK_ROOM <= MIN_NOTIONAL_FLOOR as u128
+        && MIN_NOTIONAL_FLOOR as u128 - MIN_NOTIONAL_BUYBACK_ROOM < 1_000_000
+);
+
 /// One check of [`check`]: a compiled hard bound (named after its parameter) or a
 /// relational check. Codes are stable; new rules are appended. [`Rule::in_sim`] tells the
 /// rules of `shortwin_sim.validate_params` ([`check_sim`] / [`validate`]) from the bounds
@@ -651,7 +694,8 @@ pub enum Rule {
     /// `penalty_keeper_bps ≤ 5,000` (sim `pen_keeper_bps`).
     PenaltyKeeperBps,
     // ---- ECON §15 bounds of parameters the sim does not model ([`check_econ`]) ----
-    /// `min_notional` ∈ [10⁷, 10⁹].
+    /// `min_notional` ∈ [[`MIN_NOTIONAL_FLOOR`], 10⁹] (5.3·10⁷ since AIR-06, derived so that
+    /// every tier keeps buyback room at the liquidation boundary; ECON §15's 10⁷ did not).
     MinNotional,
     /// `market_max_notional` ∈ [10⁹, 10¹⁴].
     MarketMaxNotional,
@@ -995,7 +1039,7 @@ impl Rule {
             Self::EmaDtmaxS => (1, 2),
             Self::EmaClampBps => (5_000, 10_000),
             Self::PenaltyProtocolBps | Self::PenaltyKeeperBps => (0, 5_000),
-            Self::MinNotional => (10_000_000, 1_000_000_000),
+            Self::MinNotional => (MIN_NOTIONAL_FLOOR, 1_000_000_000),
             Self::MarketMaxNotional => (1_000_000_000, 100_000_000_000_000),
             Self::MarketCreationFee => (0, 100_000_000),
             Self::BoostDustLamports => (0, 1_000_000_000),
@@ -1284,6 +1328,58 @@ mod tests {
         assert_eq!(validate(&ParamSet::DEFAULT), Ok(()));
         assert_eq!(validate_econ(&ParamSet::DEFAULT), Ok(()));
         assert!(violations(&ParamSet::DEFAULT).is_empty());
+    }
+
+    /// AIR-06 (ECON §5.7, #77: no in-bounds value loses liquidations): at the compiled floor of
+    /// `min_notional`, with the keeper terms and `exec_rent_tol` at their compiled maxima and
+    /// every tier at its SPEC minima (its worst in-bounds CRs), the smallest vault an open can
+    /// lock (`⌈cr_open·min_notional/10⁴⌉`, D4) and every larger one still pays the cheapest
+    /// buyback that is CR-liquidatable (`risk::cr_below` at `cr_liq`), `ert` and `K_s`
+    /// (`risk::buyback_allowed`). As built the floor was 10⁷: Tiers A–C had no such room, so
+    /// `liquidate` and `expire` refused `UseSolSettle` and every exit ended in S1.
+    #[test]
+    fn min_notional_floor_keeps_buyback_room_at_the_liquidation_boundary() {
+        use crate::risk::{self, Budget};
+        // The derivation's figure: Tier A binds (B 32,095,099, C 20,618,558, D 11,945,394).
+        assert_eq!(MIN_NOTIONAL_BUYBACK_ROOM, 52_631_582);
+        let n = Rule::MinNotional.bounds().0;
+        let terms = SettleKeeperTerms {
+            fixed: Rule::SettleKeeperFixed.bounds().1,
+            bps: u32::try_from(Rule::SettleKeeperBps.bounds().1).unwrap(),
+            cap: Rule::SettleKeeperCap.bounds().1,
+        };
+        let ert = Rule::ExecRentTol.bounds().1;
+        for tier in Tier::ALL {
+            let (cr_open, cr_liq) = spec_cr(tier);
+            let v0 = (u64::from(cr_open) * n).div_ceil(10_000);
+            for v in (v0..v0 + 20_000).chain([v0 + 1_000_000, 2 * v0, 10 * v0]) {
+                // The cheapest buyback at which the position is CR-liquidatable (R_due = 0).
+                let b = v * 10_000 / u64::from(cr_liq) + 1;
+                assert!(risk::cr_below(v, Some(b), cr_liq).unwrap());
+                assert!(!risk::cr_below(v, Some(b - 1), cr_liq).unwrap());
+                let budget = Budget {
+                    v,
+                    k_s: risk::k_s(v, &terms).unwrap(),
+                    ert,
+                };
+                assert!(
+                    risk::buyback_allowed(&budget, Some(b), 0, u32::MAX).unwrap(),
+                    "{tier:?}: no buyback room at the liquidation boundary, V = {v}"
+                );
+            }
+        }
+        // The floor is what validate_econ enforces.
+        let mut ps = ParamSet::DEFAULT;
+        ps.params.min_notional = n;
+        assert_eq!(validate_econ(&ps), Ok(()));
+        ps.params.min_notional = n - 1;
+        assert_eq!(
+            validate_econ(&ps),
+            Err(Violation {
+                rule: Rule::MinNotional,
+                tier: None
+            })
+        );
     }
 
     /// `validate` makes exactly the sim's rules and `validate_econ` exactly the others
