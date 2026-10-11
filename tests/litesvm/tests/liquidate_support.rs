@@ -1144,15 +1144,16 @@ pub fn scale(x: u128, num: u128, den: u128) -> u128 {
 }
 
 /// The liquidity the liquidation spot leg is judged at (FITS-2 (a); an independent spelling of
-/// `shortwin_math::bounds::spot_liquidity`): `max(L_live, L_ema')`, `L_ema' = min(L_ema, L_mlo)`
-/// while the post-change guard is set, else `L_ema`.
+/// `shortwin_math::bounds::spot_liquidity`): `max(L_live, L_floor)`, `L_floor = min(L_ema,
+/// L_mhi)` — the upper median of the bucket liquidity highs (AIR-17) — while the post-change guard
+/// is set, else `L_ema`.
 pub fn spot_liquidity_of(l_live: u128, obs: &shortwin_math::observe::Observation) -> u128 {
-    let l_ema = if obs.ema.guard != 0 {
-        let mut lows: Vec<u128> = obs.ring.iter().map(|e| e.llo).collect();
-        lows.sort_unstable();
-        obs.ema.liq.min(lows[(lows.len() - 1) / 2])
+    let l_floor = if obs.ema.guard != 0 {
+        let mut highs: Vec<u128> = obs.ring.iter().map(|e| e.lhi).collect();
+        highs.sort_unstable();
+        obs.ema.liq.min(highs[highs.len() / 2])
     } else {
         obs.ema.liq
     };
-    l_live.max(l_ema)
+    l_live.max(l_floor)
 }

@@ -10,9 +10,10 @@
 //! | (c) gate | no `Liquidate` or `Expire` event, no `SolSettle` of S1/S2 and no `SettleArmed` / `SettleDisarmed` on a market whose post-instruction `ema_warm ≠ 0` while its venue is executable; no Raydium or PumpSwap `Open` with `ema_warm ≠ 0` |
 //! | (d) guard | `ema_guard` goes 1 → 0 only at an integration with `ema_warm = 0` after it and `L_ema·10⁴ ≤ L_mlo·10,100` (and does so at every such integration); an integration after the warm-up with the guard set never lifts `L_slow` above `max(L_slow before, L_mlo after)` (M4X-2: `L_slow` integrates `min(lobs, L_mlo)`); on a Raydium or PumpSwap market, and on any market while the guard is set, `Liquidate.b_ref` / `Expire.b_ref` are the risk quote at `reprice(max(L_live, min(max(L_ema', L_slow), cap)), P_ref)`, `L_ema' = min(L_ema, L_mlo)` while the guard is set, else `L_ema` (V2-14), `cap = ⌊pool_d·10⁴/λ_min⌋` on Raydium (M4F-1, `λ_min = pool_lock_min_bps`) and — since the owner's decision of 2026-09-30, M6R-1 — PumpSwap at `λ_min` = 100 % (OWNER-M6D-1 / M6E-1: `cap = pool_d`, so `L_b = L_live`), none elsewhere. On the mock, which never restarts, the guard-clear case is the exit predictors' (`liquidate_support`), and the hook tests' synthetic exits there carry arbitrary references |
 //!
-//! | (e) spot leg | FITS-2 (a): every `Liquidate` on an executable Raydium or (M6R-1) PumpSwap venue is CR-liquidatable, and its spot leg is judged at `max(L_live, L_ema')` — `Liquidate.cr_spot_bps` is `⌊V_eff·10⁴/B̂⌋` of the risk quote `B̂ = B̂(Q; reprice(max(L_live, L_ema'), P_rs))` (recomputed here: `L_live` the pre-trade venue's `√(X·Y)`, `L_ema' = min(L_ema, L_mlo)` while the guard is set, else `L_ema`, `P_rs = min(P_live, lb_lo)` fresh within `ref_max_age_s`, `V_eff = V − R_due`) and it is below the position's `L` — so no liquidation lands on a spot leg that only a drained `L_live` makes true. On the mock the exit predictors (`liquidate_support`, the same rule) check it, and the hook tests' synthetic exits there carry arbitrary figures |
+//! | (e) spot leg | FITS-2 (a): every `Liquidate` on an executable Raydium or (M6R-1) PumpSwap venue is CR-liquidatable, and its spot leg is judged at `max(L_live, L_floor)` — `Liquidate.cr_spot_bps` is `⌊V_eff·10⁴/B̂⌋` of the risk quote `B̂ = B̂(Q; reprice(max(L_live, L_floor), P_rs))` (recomputed here: `L_live` the pre-trade venue's `√(X·Y)`, `L_floor = min(L_ema, L_mhi)` while the guard is set (AIR-17), else `L_ema`, `P_rs = min(P_live, lb_lo)` fresh within `ref_max_age_s`, `V_eff = V − R_due`) and it is below the position's `L` — so no liquidation lands on a spot leg that only a drained `L_live` makes true. On the mock the exit predictors (`liquidate_support`, the same rule) check it, and the hook tests' synthetic exits there carry arbitrary figures |
 //!
-//! `L_mlo` is the lower median of the ring's bucket liquidity lows. A market that never saw a
+//! `L_mlo` is the lower median of the ring's bucket liquidity lows, `L_mhi` the upper median of
+//! their highs. A market that never saw a
 //! restart has `ema_warm = ema_guard = 0` throughout and integrates exactly as before M4R.
 
 use litesvm::LiteSVM;
@@ -206,6 +207,12 @@ fn warm_up_depth(mp: &MarketPositions, post: &Market) -> Result<(), Violation> {
 fn lomed(mut vals: Vec<u128>) -> u128 {
     vals.sort_unstable();
     vals[(vals.len() - 1) / 2]
+}
+
+/// The upper median of `vals` (index `⌊n/2⌋` of the sorted values).
+fn upmed(mut vals: Vec<u128>) -> u128 {
+    vals.sort_unstable();
+    vals[vals.len() / 2]
 }
 
 /// (a) and (b) on an instruction without `PoolSwitched`.
@@ -410,7 +417,7 @@ fn gate(mp: &MarketPositions, post: &Market, ix: &ConfirmFacts<'_>) -> Result<()
     })
 }
 
-/// (e) FITS-2 (a): a liquidation's spot leg holds at `max(L_live, L_ema')` (module docs).
+/// (e) FITS-2 (a): a liquidation's spot leg holds at `max(L_live, L_floor)` (module docs).
 fn spot_legs(
     svm: &LiteSVM,
     mp: &MarketPositions,
@@ -437,10 +444,12 @@ fn spot_legs(
     let (x, y) = (u128::from(x), u128::from(y));
     let l_live = liquidity(x, y).ok();
     let p_live = shortwin_math::risk::price_wad(x, y).ok();
-    let l_ema = if obs.ema.guard != 0 {
+    // AIR-17: under the guard the floor is min(L_ema, L_mhi), the upper median of the bucket
+    // liquidity highs (not the lows' L_mlo, which withdraw-wrapped cranks set).
+    let l_floor = if obs.ema.guard != 0 {
         obs.ema
             .liq
-            .min(lomed(obs.ring.iter().map(|e| e.llo).collect()))
+            .min(upmed(obs.ring.iter().map(|e| e.lhi).collect()))
     } else {
         obs.ema.liq
     };
@@ -448,7 +457,7 @@ fn spot_legs(
         let Some((_, pos, _)) = mp.positions.iter().find(|(pk, _, _)| *pk == e.position) else {
             continue;
         };
-        let l_spot = l_live.map(|l| l.max(l_ema));
+        let l_spot = l_live.map(|l| l.max(l_floor));
         let p_rs = p_live.and_then(|p| observe::robust_spot(p, &obs.last, now, pos.ref_max_age_s));
         let b = match (l_spot, p_rs) {
             (Some(l), Some(p)) => pricing
@@ -465,7 +474,7 @@ fn spot_legs(
             "I18",
             || {
                 format!(
-                    "market {market}: Liquidate {} cr_spot_bps {}, want {want} < L {} at                      max(L_live {l_live:?}, L_ema' {l_ema}) and P_rs {p_rs:?} (FITS-2)",
+                    "market {market}: Liquidate {} cr_spot_bps {}, want {want} < L {} at                      max(L_live {l_live:?}, L_floor {l_floor}) and P_rs {p_rs:?} (FITS-2)",
                     e.position, e.cr_spot_bps, pos.cr_liq_bps
                 )
             },
