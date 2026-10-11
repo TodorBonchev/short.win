@@ -14,8 +14,8 @@ Per-call compute units of `shortwin-math` on SBF v3 (platform-tools v1.57, Mollu
 | `reprice(L, P)` | 843 | 985 | 1012 |
 | `liquidity` = `isqrt(X·Y)` u128 | 734 | 692 | 881 |
 | `sqrt_u256` (off the on-chain paths since v0.4) | 624 | 670 | 749 |
-| `rent::due` | 1287 | 1420 | 1545 |
-| `rent::credited_for` | 2637 | 2991 | 3165 |
+| `rent::due` | 1287 | 1416 | 1545 |
+| `rent::credited_for` | 2637 | 2988 | 3165 |
 | `rent::accrue` | 1109 | 608 | 1331 |
 | `record` + `integrate` (one EMA roll incl. the cached `reprice`) | 3833 | 4387 | 4600 |
 | `ring_medians` (4 × 8 bucket extremes) | 3208 | 3484 | 3850 |
@@ -24,5 +24,5 @@ Per-call compute units of `shortwin-math` on SBF v3 (platform-tools v1.57, Mollu
 | repriced quote + CR (v0.3 EMA-leg entry; a box corner) | 2289 | 1910 | 2747 |
 | `settle::box_of` (full ring) | — | 3575 | 4307 |
 | `persist::liq_ema_leg(3)`, every entry below `L` (PumpSwap quote + CR each) | — | 2908 | 3490 |
-| `sustained_growth(3)` (full ring, a pump) | — | 1475 | 1770 |
+| `sustained_growth(3)` (full ring, a pump) | — | 1518 | 1770 |
 | `pool::cal_advance` (one day elapsed) | — | 261 | 314 |

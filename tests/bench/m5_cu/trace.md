@@ -8,28 +8,28 @@ T-STRADDLE's curve part (ARCH §5.4): tx1 is the `complete-curve` helper (A66, `
 
 | Transaction | Entries | Expected | Peak height | CU | CU limit | Legacy B / accounts | v0 + ALT B / accounts | ARCH §6.2 |
 |---|---|---|---|---|---|---|---|---|
-| SPL Token, 115 B curve, no creator (legacy115): ComputeBudget ×2 + open_short, first open, normalising | 19 | 19 | 3 | 179003 | 250000 | **1628** / 42 | 1044 / 42 | 2 + ≤ 15 (§6.2 curve `open_short` max) |
-| SPL Token, 115 B curve, no creator (legacy115): ComputeBudget ×2 + close_short, normalising | 17 | 17 | 3 | 157625 | 250000 | **1530** / 40 | 1008 / 40 | 2 + ≤ 15 (§6.2 curve exit max) |
-| Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + open_short, first open, normalising | 19 | 19 | 3 | 191287 | 250000 | **1660** / 43 | 1045 / 43 | 2 + ≤ 15 (§6.2 curve `open_short` max) |
-| Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + close_short, normalising | 18 | 18 | 3 | 170176 | 250000 | **1562** / 41 | 1009 / 41 | 2 + ≤ 15 (§6.2 curve exit max) |
-| Token-2022, 151 B curve near completion (near): ComputeBudget ×2 + the costliest open (first, normalising, creator change into an empty vault, last recipients) | 20 | 20 | 3 | 202431 | 250000 | **1660** / 43 | 1045 / 43 | 2 + ≤ 15 (§6.2 curve `open_short` max) |
-| Token-2022, 151 B curve near completion (near): ComputeBudget ×2 + the costliest close (normalising, creator change into an empty vault, last recipients) | 19 | 19 | 3 | 181856 | 250000 | **1562** / 41 | 1009 / 41 | 2 + ≤ 15 (§6.2 curve exit max) |
-| Token-2022, 151 B curve near completion (near): ComputeBudget ×2 + completing close (`→ PumpMigrating` in the instruction) | 17 | 17 | 3 | 175544 | 250000 | **1562** / 41 | 1009 / 41 | 2 + ≤ 15 (§6.2 curve exit max) |
-| SPL Token, 115 B curve, no creator (legacy115): ComputeBudget ×2 + [pump buy_v2, open_short normalising, pump sell_v2] | 30 | 30 | 3 | 332498 | 1400000 | **2087** / 51 | **1410** / 51 | no row (an attacker's atomic sandwich, §8.2; v1: it does not fit v0 through the protocol ALT) |
-| Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + [pump buy_v2, open_short normalising, pump sell_v2] | 31 | 31 | 3 | 357743 | 1400000 | **2119** / 52 | **1411** / 52 | no row (an attacker's atomic sandwich, §8.2; v1: it does not fit v0 through the protocol ALT) |
-| Token-2022, 151 B curve near completion (near): ComputeBudget ×2 + four opens of one wallet (the most that fit: 2 + 14 + 3·13) | 55 | 55 | 3 | 732396 | 1400000 | **2050** / 46 | **1435** / 46 | no row (v1: four do not fit v0 through the protocol ALT; `t_trace::opens_per_v0_transaction`) |
-| ComputeBudget ×2 + crank_price ×4 on four curve markets, each just completed (`→ PumpMigrating`) | 18 | 18 | 2 | 145663 | 250000 | 1178 / 30 | 997 / 30 | 2 + 2k = 10 (§6.2, k = 4) |
-| SPL Token, 115 B curve, no creator (legacy115): ComputeBudget ×2 + crank_price + liquidate (keeper) | 16 | 16 | 3 | 203534 | 300000 | **1611** / 42 | 1058 / 42 | 2 + 2 + ≤ 15 on the curve (§6.2) |
-| SPL Token, 115 B curve, no creator (legacy115): ComputeBudget ×2 + crank_price + expire (keeper) | 16 | 16 | 3 | 199685 | 300000 | **1611** / 42 | 1058 / 42 | 2 + 2 + ≤ 15 on the curve (§6.2) |
-| Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + crank_price + liquidate (keeper) | 17 | 17 | 3 | 213203 | 300000 | **1643** / 43 | 1059 / 43 | 2 + 2 + ≤ 15 on the curve (§6.2) |
-| Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + crank_price + expire (keeper) | 17 | 17 | 3 | 209944 | 300000 | **1643** / 43 | 1059 / 43 | 2 + 2 + ≤ 15 on the curve (§6.2) |
-| Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + crank_price + the costliest liquidate (keeper) | 21 | 21 | 3 | 230681 | 300000 | **1643** / 43 | 1059 / 43 | 2 + 2 + ≤ 15 on the curve (§6.2) |
-| ComputeBudget ×2 + crank_price + sol_settle S3 (keeper; `PumpMigrating`, 70 min) | 6 | 6 | 2 | 97252 | 150000 | 944 / 22 | 732 / 22 | 2 + 2 + 2 (§6.2) |
-| ComputeBudget ×2 + crank_price + sol_settle S3 (keeper; `None`, detection set) | 6 | 6 | 2 | 62824 | 150000 | 774 / 17 | 686 / 17 | 2 + 2 + 2 (§6.2) |
-| ComputeBudget ×2 + flag_venue_upgraded ×3 (pump, pump-fees, PumpSwap; the dumped ProgramData) | 8 | 8 | 2 | 18384 | 400000 | 426 / 8 | 400 / 8 | 2 + 2 + 2 + 2 (§6.2) |
+| SPL Token, 115 B curve, no creator (legacy115): ComputeBudget ×2 + open_short, first open, normalising | 19 | 19 | 3 | 178888 | 250000 | **1628** / 42 | 1044 / 42 | 2 + ≤ 15 (§6.2 curve `open_short` max) |
+| SPL Token, 115 B curve, no creator (legacy115): ComputeBudget ×2 + close_short, normalising | 17 | 17 | 3 | 157470 | 250000 | **1530** / 40 | 1008 / 40 | 2 + ≤ 15 (§6.2 curve exit max) |
+| Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + open_short, first open, normalising | 19 | 19 | 3 | 191172 | 250000 | **1660** / 43 | 1045 / 43 | 2 + ≤ 15 (§6.2 curve `open_short` max) |
+| Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + close_short, normalising | 18 | 18 | 3 | 170021 | 250000 | **1562** / 41 | 1009 / 41 | 2 + ≤ 15 (§6.2 curve exit max) |
+| Token-2022, 151 B curve near completion (near): ComputeBudget ×2 + the costliest open (first, normalising, creator change into an empty vault, last recipients) | 20 | 20 | 3 | 202316 | 250000 | **1660** / 43 | 1045 / 43 | 2 + ≤ 15 (§6.2 curve `open_short` max) |
+| Token-2022, 151 B curve near completion (near): ComputeBudget ×2 + the costliest close (normalising, creator change into an empty vault, last recipients) | 19 | 19 | 3 | 181701 | 250000 | **1562** / 41 | 1009 / 41 | 2 + ≤ 15 (§6.2 curve exit max) |
+| Token-2022, 151 B curve near completion (near): ComputeBudget ×2 + completing close (`→ PumpMigrating` in the instruction) | 17 | 17 | 3 | 175439 | 250000 | **1562** / 41 | 1009 / 41 | 2 + ≤ 15 (§6.2 curve exit max) |
+| SPL Token, 115 B curve, no creator (legacy115): ComputeBudget ×2 + [pump buy_v2, open_short normalising, pump sell_v2] | 30 | 30 | 3 | 332383 | 1400000 | **2087** / 51 | **1410** / 51 | no row (an attacker's atomic sandwich, §8.2; v1: it does not fit v0 through the protocol ALT) |
+| Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + [pump buy_v2, open_short normalising, pump sell_v2] | 31 | 31 | 3 | 357628 | 1400000 | **2119** / 52 | **1411** / 52 | no row (an attacker's atomic sandwich, §8.2; v1: it does not fit v0 through the protocol ALT) |
+| Token-2022, 151 B curve near completion (near): ComputeBudget ×2 + four opens of one wallet (the most that fit: 2 + 14 + 3·13) | 55 | 55 | 3 | 732012 | 1400000 | **2050** / 46 | **1435** / 46 | no row (v1: four do not fit v0 through the protocol ALT; `t_trace::opens_per_v0_transaction`) |
+| ComputeBudget ×2 + crank_price ×4 on four curve markets, each just completed (`→ PumpMigrating`) | 18 | 18 | 2 | 145011 | 250000 | 1178 / 30 | 997 / 30 | 2 + 2k = 10 (§6.2, k = 4) |
+| SPL Token, 115 B curve, no creator (legacy115): ComputeBudget ×2 + crank_price + liquidate (keeper) | 16 | 16 | 3 | 203383 | 300000 | **1611** / 42 | 1058 / 42 | 2 + 2 + ≤ 15 on the curve (§6.2) |
+| SPL Token, 115 B curve, no creator (legacy115): ComputeBudget ×2 + crank_price + expire (keeper) | 16 | 16 | 3 | 199528 | 300000 | **1611** / 42 | 1058 / 42 | 2 + 2 + ≤ 15 on the curve (§6.2) |
+| Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + crank_price + liquidate (keeper) | 17 | 17 | 3 | 213053 | 300000 | **1643** / 43 | 1059 / 43 | 2 + 2 + ≤ 15 on the curve (§6.2) |
+| Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + crank_price + expire (keeper) | 17 | 17 | 3 | 209791 | 300000 | **1643** / 43 | 1059 / 43 | 2 + 2 + ≤ 15 on the curve (§6.2) |
+| Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + crank_price + the costliest liquidate (keeper) | 21 | 21 | 3 | 230441 | 300000 | **1643** / 43 | 1059 / 43 | 2 + 2 + ≤ 15 on the curve (§6.2) |
+| ComputeBudget ×2 + crank_price + sol_settle S3 (keeper; `PumpMigrating`, 70 min) | 6 | 6 | 2 | 96238 | 150000 | 944 / 22 | 732 / 22 | 2 + 2 + 2 (§6.2) |
+| ComputeBudget ×2 + crank_price + sol_settle S3 (keeper; `None`, detection set) | 6 | 6 | 2 | 61794 | 150000 | 774 / 17 | 686 / 17 | 2 + 2 + 2 (§6.2) |
+| ComputeBudget ×2 + flag_venue_upgraded ×3 (pump, pump-fees, PumpSwap; the dumped ProgramData) | 8 | 8 | 2 | 18418 | 400000 | 426 / 8 | 400 / 8 | 2 + 2 + 2 + 2 (§6.2) |
 | SPL Token, 115 B curve, no creator (legacy115): ComputeBudget ×2 + create_market (Auto, `PumpCurve`, init set) | 17 | 17 | 3 | 141730 | 250000 | 897 / 21 | 685 / 21 | no row |
 | Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + create_market (Auto, `PumpCurve`, init set) | 17 | 17 | 3 | 170153 | 250000 | 897 / 21 | 685 / 21 | no row |
-| Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + sweep_trader (token leg) | 6 | 6 | 2 | 24953 | 60000 | 692 / 17 | 573 / 17 | no row |
+| Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + sweep_trader (token leg) | 6 | 6 | 2 | 24813 | 60000 | 692 / 17 | 573 / 17 | no row |
 | Token-2022, 151 B curve near completion (near): straddle tx1 — ComputeBudget ×2 + complete_curve (helper → pump buy_v2(rT at execution)) | 12 | 12 | 3 | 110718 | 1400000 | 1192 / 30 | 763 / 30 | ≈ 11 (§6.2 `complete_curve`, ComputeBudget ×2 included) |
 | Token-2022, 151 B curve near completion (near): straddle tx1 ★ — a third party's curve buy landed between the keeper's read and the bundle | 12 | 12 | 3 | 110719 | 1400000 | 1192 / 30 | 763 / 30 | ≈ 11 (§6.2 `complete_curve`; §5.4: tx1 reads `rT` at execution) |
 | Token-2022, 151 B curve near completion (near): straddle tx1 — complete_curve on a curve a third party completed (no-op) | 3 | 3 | 1 | 10702 | 1400000 | 1192 / 30 | 763 / 30 | no row (§5.4: tx1 is a no-op on a complete curve) |
