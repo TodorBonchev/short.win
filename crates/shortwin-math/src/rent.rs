@@ -8,12 +8,14 @@
 //! (R3A-5, R3B-9) and owes `⌈Q·(base·ΔJ0 + slope1·ΔJ1 + slope2·ΔJ2)/(10⁴·31,536,000·WAD)⌉`.
 //!
 //! The lenders' part of the rent is credited continuously from the aggregate
-//! `A_j = Σ_open Q·coef_j·(10⁴ − rent_protocol_bps_pos)` ([`Aggr`], [`lender_credit`],
-//! floor) and trued up per position at its exit ([`credited_for`], ceil), so both describe
-//! the same money whatever governance does to `rent_protocol_bps` (ECON I-P7).
+//! `A_j = Σ_open Q·coef_j·(10⁴ − rent_protocol_bps_pos)` ([`Aggr`], [`lender_credit_carried`],
+//! floor, the remainder carried to the next accrual since AIR-03) and trued up per position at
+//! its exit ([`credited_for`], ceil), so both describe the same money whatever governance does
+//! to `rent_protocol_bps` (ECON I-P7).
 //!
 //! Rounding follows the ECON §2.1 table: index increments, rent due, the true-up and
-//! minimum rent up; the continuous lender credit down. Products that ECON §2.2 lets exceed
+//! minimum rent up; the continuous lender credit down (its remainder carried, so the credits
+//! of all accruals sum to the floor of their exact total). Products that ECON §2.2 lets exceed
 //! 2¹²⁸ (`Q·coef·ΔJ`, `A_j·δJ_j`, `Q·P_ema·r·T_min`) take a 256-bit intermediate only when
 //! the u128 product overflows.
 
@@ -242,8 +244,8 @@ fn bps_part_ceil(a: u128, u: u32) -> Result<u128, MathError> {
 /// `p_ema` is the EMA price **before** this instruction's EMA roll (the clamp to
 /// [`P_ACC_MAX`] is applied here), `util_bps` the utilisation of the pre-instruction
 /// counters ([`utilization_bps`]) and `kink_bps` the market-level `util_kink_bps`. Returns
-/// the increments `δJ`, which [`lender_credit`] turns into the lenders' continuous rent
-/// credit. `dt = 0` changes nothing.
+/// the increments `δJ`, which [`lender_credit_carried`] turns into the lenders' continuous
+/// rent credit. `dt = 0` changes nothing.
 ///
 /// Errors: `InvalidInput` if `util_bps` or `kink_bps` exceeds 10⁴; `Overflow`. On error
 /// `basis` is unchanged.
@@ -349,8 +351,8 @@ pub fn due(pos: &PosRent, basis: &Basis) -> Result<u64, MathError> {
 /// §7; ARCH §4.5; `pool_model._credited_for`). The caller then applies
 /// `receivable −= min(credited_for, receivable)` (the clamp ARCH §4.5 states). Rounding
 /// up means the true-up never leaves lenders credited with more than was paid in, and
-/// because [`lender_credit`] floors the aggregate, `receivable` returns to 0 whenever no
-/// position is open (ECON I-P7).
+/// because [`lender_credit_carried`] credits the floor of the aggregate's exact total,
+/// `receivable` returns to 0 whenever no position is open (ECON I-P7).
 ///
 /// Errors: `InvalidInput` if `pos.rent_protocol_bps > 10⁴`; as [`accrued`].
 pub fn credited_for(pos: &PosRent, basis: &Basis) -> Result<u64, MathError> {
@@ -364,14 +366,56 @@ pub fn credited_for(pos: &PosRent, basis: &Basis) -> Result<u64, MathError> {
     )
 }
 
-/// Continuous lender rent credit of one accrual (the `receivable` increment):
+/// Continuous lender rent credit of one accrual from a zero remainder:
 /// `⌊(A0·δJ0 + A1·δJ1 + A2·δJ2)/(10⁴·10⁴·31,536,000·WAD)⌋` with the protocol share
-/// already folded into `A_j` ([`Aggr`]; ECON §2.1, §7, §9.4; ARCH §4.5;
-/// `pool_model.Pool.advance`), `delta` the increments returned by [`accrue`].
+/// already folded into `A_j` ([`Aggr`]; ECON §2.1, §7, §9.4; ARCH §4.5), `delta` the
+/// increments returned by [`accrue`]. The program credits [`lender_credit_carried`] with the
+/// market's remainder; this is that credit for `rem = 0` (a preview of one accrual).
 ///
 /// Errors: `Overflow`.
 pub fn lender_credit(aggr: &Aggr, delta: &[u128; 3]) -> Result<u64, MathError> {
-    dot_div(aggr.a, *delta, 1, RENT_DEN_BPS, Rounding::Floor)
+    lender_credit_carried(aggr, delta, 0).map(|(credit, _)| credit)
+}
+
+/// Continuous lender rent credit of one accrual (the `receivable` increment) with the
+/// market's carried remainder `rem` (AIR-03; `Market.lender_credit_rem`;
+/// `pool_model.Pool.advance`, `credit_rem`):
+/// `⌊(A0·δJ0 + A1·δJ1 + A2·δJ2 + rem)/(10⁴·10⁴·31,536,000·WAD)⌋` and the new remainder, in
+/// `[0, 10⁴·10⁴·31,536,000·WAD)`. The credits of any number of accruals therefore sum to the
+/// floor of their exact total: a market accrued every second no longer floors away up to a
+/// lamport per accrual (as built each accrual floored alone and kept no remainder). Since
+/// `Σ_k A·δJ_k = Σ_pos Q·coef·ΔJ·(10⁴ − p_pos)`, that floor never exceeds the positions'
+/// ceiled true-ups ([`credited_for`]): `receivable` stays at or below them and, with the clamp,
+/// returns to 0 whenever no position is open (ECON I-P7); a remainder left then credits nothing
+/// (`A_j = 0`) until the next position's accruals.
+///
+/// Errors: `InvalidInput` if `rem` is not below the denominator; `Overflow`.
+pub fn lender_credit_carried(
+    aggr: &Aggr,
+    delta: &[u128; 3],
+    rem: u128,
+) -> Result<(u64, u128), MathError> {
+    if rem >= RENT_DEN_BPS {
+        return Err(MathError::InvalidInput);
+    }
+    let dot = aggr.a.iter().zip(delta).try_fold(rem, |acc, (&x, &y)| {
+        x.checked_mul(y).and_then(|p| acc.checked_add(p))
+    });
+    if let Some(n) = dot {
+        let q = n.checked_div(RENT_DEN_BPS).ok_or(MathError::DivByZero)?;
+        let r = n.checked_rem(RENT_DEN_BPS).ok_or(MathError::DivByZero)?;
+        return Ok((to_u64(q)?, r));
+    }
+    let n = aggr
+        .a
+        .into_iter()
+        .zip(*delta)
+        .try_fold(U256::from_u128(rem), |acc, (x, y)| {
+            acc.checked_add(U256::from_product(x, y))
+        })
+        .ok_or(MathError::Overflow)?;
+    let (q, r) = n.div_rem_u128(RENT_DEN_BPS).ok_or(MathError::DivByZero)?;
+    Ok((q.to_u64().ok_or(MathError::Overflow)?, r))
 }
 
 /// Minimum rent fixed at open:
@@ -479,6 +523,57 @@ mod tests {
         assert_eq!(ag, Aggr::default());
         assert_eq!(ag.sub(1, &A, 0), Err(MathError::Underflow));
         assert_eq!(ag.add(1, &A, 10_001), Err(MathError::InvalidInput));
+    }
+
+    /// AIR-03: the carried credit of `n` accruals sums to the floor of their exact total (each
+    /// accrual floored alone loses its fraction), the remainder stays below the denominator, a
+    /// remainder alone credits nothing, and the 256-bit path carries the same way.
+    #[test]
+    fn carried_credit_sums_to_the_floor_of_the_exact_total() {
+        let terms = RentTerms {
+            base_bps: 1_000,
+            slope1_bps: 0,
+            slope2_bps: 0,
+        };
+        let mut ag = Aggr::default();
+        // 0.4 lamports a second: q·1,000·8,500·10¹⁵/RENT_DEN_BPS with q = 1.5·10¹¹.
+        ag.add(150_000_000_000, &terms, 1_500).unwrap();
+        let d = [WAD / 1_000, 0, 0];
+        let one = ag.a[0] * d[0];
+        let (mut sum, mut rem) = (0u64, 0u128);
+        for _ in 0..1_000 {
+            let (c, r) = lender_credit_carried(&ag, &d, rem).unwrap();
+            assert!(r < RENT_DEN_BPS);
+            sum += c;
+            rem = r;
+        }
+        assert_eq!(lender_credit(&ag, &d), Ok(0), "one accrual floored alone");
+        assert_eq!(u128::from(sum), one * 1_000 / RENT_DEN_BPS);
+        assert_eq!(rem, one * 1_000 % RENT_DEN_BPS);
+        assert!(sum > 400);
+        // No position: the remainder credits nothing and stays.
+        assert_eq!(
+            lender_credit_carried(&Aggr::default(), &d, rem),
+            Ok((0, rem))
+        );
+        assert_eq!(
+            lender_credit_carried(&ag, &d, RENT_DEN_BPS),
+            Err(MathError::InvalidInput)
+        );
+        // The 256-bit path (A·δJ > 2¹²⁸) carries exactly as the u128 one.
+        let big = Aggr {
+            a: [u128::MAX / 3, 0, 0],
+        };
+        let dj = [7, 0, 0];
+        let r0 = RENT_DEN_BPS - 1;
+        let n = U256::from_product(big.a[0], 7)
+            .checked_add(U256::from_u128(r0))
+            .unwrap();
+        let (q, r) = n.div_rem_u128(RENT_DEN_BPS).unwrap();
+        assert_eq!(
+            lender_credit_carried(&big, &dj, r0),
+            Ok((q.to_u64().unwrap(), r))
+        );
     }
 
     #[test]

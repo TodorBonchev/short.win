@@ -10,7 +10,9 @@ the crate must match it exactly (no tolerance):
     locked rate curve, `p_rent` (the per-position rent_protocol_bps snapshot, R3A-5) and
     R_min; `Market.rent_accrued` / `Market.rent_due` give its rent at its close. The
     continuous lender credit of each accrual and each position's true-up are ECON §2.1 /
-    §7's forms (A_j = sum q*coef_j*(1e4 - p_pos), floor; credited_for, ceil), written
+    §7's forms (A_j = sum q*coef_j*(1e4 - p_pos), floor with the remainder carried into the
+    next accrual since AIR-03, as pool_model.Pool.advance's credit_rem: `lender_credit_rem`
+    after each step, left as it was by a credit beyond u64; credited_for, ceil), written
     here in exact integers because shortwin_sim.py does not credit lenders; `receivable`
     follows ARCH §4.5's clamp, and ECON I-P7 is asserted (receivable and A_j return to 0
     once every position has closed). Positions open at time `open_step` (before step
@@ -20,11 +22,12 @@ the crate must match it exactly (no tolerance):
   * `pool_trace`: `pool_model.Pool` (v0.4.1, continuous mode) under random opens with
     governance changes of rent_protocol_bps (new positions only), accruals and closes
     (repay / settle): its `receivable` after every operation, each accrual's credit and
-    each close's `_credited_for`. pool_model keeps one index; with every position on a
-    base-only curve (coef = (c, 0, 0)) and accruals whose c*dJ0 is a multiple of 1e4*YEAR,
-    `d_index = c*dJ0/(1e4*YEAR)` makes its formulas the three-index ones (asserted here),
-    so the Rust replay (rent::accrue, Aggr, lender_credit, credited_for) must reproduce
-    pool_model's receivable exactly.
+    remainder (`credit_rem`, in the three-index denominator) and each close's
+    `_credited_for`. pool_model keeps one index; with every position on a base-only curve
+    (coef = (c, 0, 0)) and accruals whose c*dJ0 is a multiple of 1e4*YEAR,
+    `d_index = c*dJ0/(1e4*YEAR)` makes its formulas the three-index ones (asserted here, its
+    remainder times 1e4*YEAR too), so the Rust replay (rent::accrue, Aggr,
+    lender_credit_carried, credited_for) must reproduce pool_model's receivable exactly.
   * `min_rent`: `Market.open`'s R_min expression (the exact kinked rate).
   * `rate`: the sims' display-only `rate_bps` (each slope term floored).
   * `utilization`: ECON §2.1's U = ceil(B_Q*1e4/(T + B_Q)).
@@ -123,7 +126,7 @@ def gen_paths(rng):
 
         # The sim's market, driven step by step (Market.accrue clamps at P_ACC_MAX).
         m = sim.Market(sim.venue_tier_A(), sim.TIERS["A"], replace(sim.DEFAULT, util_kink_bps=kink), util_bps=0)
-        st = dict(receivable=0, A=[0, 0, 0], open={})
+        st = dict(receivable=0, A=[0, 0, 0], open={}, rem=0)
         t = m.index_t
 
         def at_time(k):
@@ -162,7 +165,10 @@ def gen_paths(rng):
             assert max(m.J) <= U128
             d = [a - b for a, b in zip(m.J, before)]
             aggr = list(st["A"])
-            credit = sum(a * x for a, x in zip(aggr, d)) // RENT_DEN_BPS
+            # AIR-03: the market's remainder carried in; a credit beyond u64 leaves it unchanged
+            credit, rem = divmod(sum(a * x for a, x in zip(aggr, d)) + st["rem"], RENT_DEN_BPS)
+            if credit <= U64:
+                st["rem"] = rem
             if st["receivable"] is not None:
                 st["receivable"] += credit
                 if st["receivable"] > U64:                      # the u64 receivable: Overflow
@@ -171,7 +177,7 @@ def gen_paths(rng):
             rec = st["receivable"]
             out_steps.append(dict(dt=s(dt), p_ema=s(p), util_bps=s(u), delta=[s(x) for x in d],
                                   j=[s(x) for x in m.J], aggr=[s(x) for x in aggr], lender_credit=opt64(credit),
-                                  receivable=None if rec is None else s(rec)))
+                                  lender_credit_rem=s(st["rem"]), receivable=None if rec is None else s(rec)))
         assert not st["open"] and st["A"] == [0, 0, 0]
         assert st["receivable"] in (0, None), "ECON I-P7"
         paths.append(dict(
@@ -193,6 +199,7 @@ def gen_pool_trace(rng):
         p = pool_model.Pool(mode="continuous")
         p.deposit("L", 10**15)
         ops, open_ids, pid = [], [], 0
+        rem = 0                       # the three-index remainder (AIR-03), = p.credit_rem * 1e4*YEAR
 
         def close(i):
             q, io, pr, _dl = p.positions[i]
@@ -228,9 +235,10 @@ def gen_pool_trace(rng):
                 before, a_pm = p.receivable, p.A
                 p.advance(dt, d_index)
                 credit = p.receivable - before
-                assert credit == (c * a_pm) * d0 // RENT_DEN_BPS        # A_0 = c*A_pm, dJ0 = price*dt
+                want, rem = divmod((c * a_pm) * d0 + rem, RENT_DEN_BPS)  # A_0 = c*A_pm, dJ0 = price*dt
+                assert credit == want and rem == p.credit_rem * BPS * YEAR_S
                 ops.append(dict(op="accrue", dt=s(dt), p_ema=s(price), util_bps=s(rand_util(rng)),
-                                credit=s(credit), receivable=s(p.receivable)))
+                                credit=s(credit), credit_rem=s(rem), receivable=s(p.receivable)))
             elif open_ids:
                 close(open_ids.pop(rng.randrange(len(open_ids))))
         while open_ids:
@@ -288,12 +296,16 @@ def main() -> None:
     assert sum(p["steps"][-1]["receivable"] == "0" for p in paths) >= 30
     assert any(ps["accrued"] is None for ps in all_pos) and sum(ps["accrued"] is not None for ps in all_pos) > 100
     assert any(len({ps["rent_protocol_bps"] for ps in p["positions"]}) > 2 for p in paths)
+    # AIR-03: the carried remainder is exercised on both tracks.
+    assert sum(st["lender_credit_rem"] != "0" for st in all_steps) > 100
+    assert sum(op.get("credit_rem", "0") != "0" for tr in pool_trace for op in tr["ops"]) > 100
     out = {
         "generator": Path(__file__).name,
         "source": "docs/design/sim/shortwin_sim.py v0.4.1 (Market.accrue with P_ACC_MAX, Market.rent_accrued, "
                   "Market.rent_due, Market.open R_min, rate_bps); docs/design/sim/pool_model.py v0.4.1 "
-                  "(Pool.advance, borrow, repay, settle, _credited_for, receivable); ECONOMICS.md v0.4.1 §2.1 / §7 "
-                  "lender credit and true-up (A_j folds 1e4 - p_pos)",
+                  "(Pool.advance with credit_rem, borrow, repay, settle, _credited_for, receivable); ECONOMICS.md "
+                  "v0.4.1 §2.1 / §7 lender credit and true-up (A_j folds 1e4 - p_pos; the credit's remainder carried, "
+                  "AIR-03)",
         "paths": paths,
         "pool_trace": pool_trace,
         "min_rent": min_rent,

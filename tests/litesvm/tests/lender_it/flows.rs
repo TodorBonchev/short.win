@@ -495,7 +495,9 @@ fn prologue_accrues_rent_from_the_aggregate() {
         u64::try_from(now - m0.last_accrual_ts).unwrap(),
     )
     .unwrap();
-    let credit = rent::lender_credit(&m0.aggr(), &delta).unwrap();
+    // AIR-03: the credit carries the market's remainder, and the new remainder is stored.
+    let (credit, rem) =
+        rent::lender_credit_carried(&m0.aggr(), &delta, m0.lender_credit_rem.get()).unwrap();
     assert!(credit > 0);
     let lk = lender_keys(&mut lab, "A");
     let owner = lab.users["A"].kp.insecure_clone();
@@ -504,6 +506,7 @@ fn prologue_accrues_rent_from_the_aggregate() {
     assert_eq!(m1.basis(), basis);
     assert_eq!(m1.last_accrual_ts, now);
     assert_eq!(m1.receivable, p0.receivable + credit);
+    assert_eq!(m1.lender_credit_rem.get(), rem);
     let mut p = p0;
     let mut v = lab.state().vault;
     pool::accrue(&mut p, &mut v, now, credit).unwrap();

@@ -282,6 +282,39 @@ fn accrual_and_the_vest_release() {
     assert!(m0.ema_price.get() < WAD);
 }
 
+/// AIR-03 through `crank_price`: a market cranked every second credits its lenders the rent of
+/// a small position. As built each accrual floored its credit and kept no remainder, so a
+/// position crediting a fraction of a lamport a second lost that fraction at every crank, and
+/// the exit's true-up (`credited_for`, ceil) left the difference in `lender_sol` unclaimable.
+/// With the remainder carried (`Market.lender_credit_rem`) ten minutes of per-second cranks
+/// credit the position's exact share within one lamport, and its close still takes
+/// `receivable` back to 0 (ECON I-P7).
+#[test]
+fn per_second_cranks_credit_a_small_positions_rent() {
+    let (mut env, mm) = setup();
+    let mut b = env.borrower();
+    let (_, nonce, _) = open_ok(&mut env, &mm, &mut b, Q / 20);
+    let m0 = env.market(&mm.market());
+    for _ in 0..600 {
+        env.warp(1);
+        env.crank(&mm);
+    }
+    let m1 = env.market(&mm.market());
+    let pos = env.position(&mm, &b.key(), nonce);
+    let credited = shortwin_math::rent::credited_for(&pos.pos_rent(), &m1.basis()).unwrap();
+    let credits = m1.receivable - m0.receivable;
+    println!(
+        "AIR-03: 600 per-second cranks credited {credits} of the position's {credited} lamports"
+    );
+    assert!(credited > 600, "a fraction of a lamport or more a second");
+    assert!(
+        credits <= credited && credited - credits <= 1,
+        "per-second cranks credited {credits} of the position's {credited} lamports"
+    );
+    close_ok(&mut env, &mm, &b, nonce);
+    assert_eq!(env.market(&mm.market()).receivable, 0, "ECON I-P7");
+}
+
 /// `crank_price` on a list-only market: the detection set only (key-checked), no record, the S3
 /// chain runs (a `None` market has no route).
 #[test]

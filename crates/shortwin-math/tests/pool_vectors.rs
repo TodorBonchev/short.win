@@ -378,14 +378,16 @@ fn lock_heavy_mix_untouched_ip4() {
 #[test]
 fn stranded_sol_after_an_honest_wind_down() {
     // ECON §9.4 / R3A-2 (reviewer's r3_stranded.py), v0.4 row: 40 seeds × 3,000 operations;
-    // stranded 0.000020 SOL in total, worst seed 0.000001 SOL, no seed above 0.01 SOL.
+    // stranded 0.000015 SOL in total (15,058 lamports), worst seed 440 lamports, no seed above
+    // 0.01 SOL. AIR-03's carried rent-credit remainder took it from 19,887 / 582 lamports
+    // (0.000020 / 0.000001 SOL): an accrual's floored fraction no longer stays in `lender_sol`.
     let runs = replay_group("pool_stranded", 120_000);
     assert_eq!(runs.len(), 40);
     let stranded: Vec<u64> = runs.iter().map(|(_, s)| s.final_lender_sol).collect();
     let total: u64 = stranded.iter().sum();
     let worst = *stranded.iter().max().expect("seeds");
-    assert_eq!(format!("{:.6}", total as f64 / 1e9), "0.000020");
-    assert_eq!(format!("{:.6}", worst as f64 / 1e9), "0.000001");
+    assert_eq!((total, worst), (15_058, 440));
+    assert_eq!(format!("{:.6}", total as f64 / 1e9), "0.000015");
     assert_eq!(stranded.iter().filter(|&&s| s > 10_000_000).count(), 0);
 }
 

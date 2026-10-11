@@ -80,10 +80,12 @@ pub fn sync_market_params(config: &GlobalConfig, market: &mut Market, now: i64) 
 /// ARCH §3.0 step 4, accrue (ECON §7, §9.4): the rent basis indices advance over
 /// `now − last_accrual_ts` at `P̃ = min(P_ema, P_ACC_MAX)` (the EMA **before** this
 /// instruction's roll) and the utilisation of the pre-instruction counters (`rent::accrue`);
-/// the lenders' credit `⌊Σ_j A_j·δJ_j/(10⁴·10⁴·31,536,000·WAD)⌋` (`rent::lender_credit`) goes
-/// to `acc` and `receivable` after the vest release (`pool::accrue` releases first). On a
-/// list-only market (no price) and with no open position both are 0 and only the vest is
-/// released. Returns the lender credit.
+/// the lenders' credit `⌊(Σ_j A_j·δJ_j + rem)/(10⁴·10⁴·31,536,000·WAD)⌋` goes to `acc` and
+/// `receivable` after the vest release (`pool::accrue` releases first), and its remainder is
+/// stored for the next accrual (`rent::lender_credit_carried`, `Market.lender_credit_rem`;
+/// AIR-03: as built each accrual floored alone, so a market cranked every second lost up to a
+/// lamport a second of lender rent). On a list-only market (no price) and with no open position
+/// both are 0 and only the vest is released. Returns the lender credit.
 pub fn accrue(market: &mut Market, pool: &mut Pool, vault: &mut Vault, now: i64) -> Result<u64> {
     let dt = u64::try_from(now.saturating_sub(market.last_accrual_ts)).unwrap_or(0);
     let util = rent::utilization_bps(pool.tokens_free, pool.borrowed_q).math()?;
@@ -96,9 +98,12 @@ pub fn accrue(market: &mut Market, pool: &mut Pool, vault: &mut Vault, now: i64)
         dt,
     )
     .math()?;
-    let credit = rent::lender_credit(&market.aggr(), &delta).math()?;
+    let (credit, rem) =
+        rent::lender_credit_carried(&market.aggr(), &delta, market.lender_credit_rem.get())
+            .math()?;
     pool::accrue(pool, vault, now, credit).math()?;
     market.set_basis(&basis);
+    market.lender_credit_rem.set(rem);
     market.last_accrual_ts = market.last_accrual_ts.max(now);
     Ok(credit)
 }
@@ -238,7 +243,7 @@ pub fn roll_only(market_key: &Pubkey, market: &mut Market, now: i64, slot: u64) 
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[allow(clippy::unwrap_used, clippy::arithmetic_side_effects)]
 mod tests {
     use super::*;
     use bytemuck::Zeroable;
@@ -326,5 +331,56 @@ mod tests {
         assert_eq!(u128::from(credit), expected);
         assert_eq!(p.receivable, credit);
         assert_eq!(m.basis().j[0], WAD * 86_400);
+    }
+
+    /// AIR-03: a market accrued every second (a `crank_price` each second) credits its lenders
+    /// the rent of a small position. A 0.1 SOL Tier A position at 15 % APR (U = 10 %) and the
+    /// 15 % protocol share credits ≈ 0.40 lamports a second: as built each accrual floored its
+    /// credit to 0 and kept no remainder, so a day of one-second accruals credited nothing
+    /// while the exit's true-up (`credited_for`, ceil) removes the position's whole exact share,
+    /// and the difference stayed in `lender_sol` unclaimable. With the remainder carried in
+    /// `Market.lender_credit_rem` the credits sum to the floor of their exact total: at most
+    /// one lamport below the true-up, never above it (ECON I-P7).
+    #[test]
+    fn per_second_accruals_credit_the_rent_of_a_small_position() {
+        let terms = rent::RentTerms {
+            base_bps: 1_000,
+            slope1_bps: 5_000,
+            slope2_bps: 100_000,
+        };
+        let q = 100_000_000_000u64;
+        let mut m = Market::zeroed();
+        m.util_kink_bps = 8_000;
+        // P_ema = 10⁻³ lamports per raw unit: q is worth 0.1 SOL.
+        m.ema_price.set(WAD / 1_000);
+        let mut aggr = rent::Aggr::default();
+        aggr.add(q, &terms, 1_500).unwrap();
+        m.set_aggr(&aggr);
+        let mut p = Pool::new();
+        p.total_shares = 10_000_000_000_000;
+        p.tokens_free = 9 * q;
+        p.borrowed_q = q;
+        let mut v = Vault::new();
+        let mut credits = 0u64;
+        for now in 1..=86_400 {
+            credits += accrue(&mut m, &mut p, &mut v, now).unwrap();
+        }
+        let pos = rent::PosRent {
+            q,
+            j_open: [0; 3],
+            terms,
+            rent_protocol_bps: 1_500,
+            r_min: 0,
+        };
+        let credited = rent::credited_for(&pos, &m.basis()).unwrap();
+        assert_eq!(p.receivable, credits);
+        assert!(
+            credited > 34_000,
+            "a day of 0.1 SOL at 15 % APR: {credited}"
+        );
+        assert!(
+            credits <= credited && credited - credits <= 1,
+            "per-second accruals credited {credits} of the position's {credited} lamports"
+        );
     }
 }

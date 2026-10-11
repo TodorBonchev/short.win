@@ -42,8 +42,10 @@ fn first_depositor_attack() {
 
 #[test]
 fn jit_rent_capture() {
-    // ECON §9.4 JIT table, (a) continuous: rent 36,986,302; attacker 0; honest 31,438,350
-    // (85.0 %); attacker tokens back 9,000,000,000.
+    // ECON §9.4 JIT table, (a) continuous: rent 36,986,302; attacker 0; honest 31,438,356
+    // (85.0 %; 31,438,350 before AIR-03 carried the credit's remainder: the 30 daily credits
+    // floored 6 lamports away, now only the true-up's ceil leaves 1); attacker tokens back
+    // 9,000,000,000.
     let mut s = Model::new(9_000);
     s.deposit(A, 1_000_000_000).expect("honest");
     let pos = s.borrow30(900_000_000);
@@ -59,7 +61,7 @@ fn jit_rent_capture() {
     assert_eq!(s.withdraw(B, shares), Ok(9_000_000_000));
     assert_eq!(s.claim(B), Ok(0));
     s.advance(VEST + 1, 0);
-    assert_eq!(s.claim(A), Ok(31_438_350));
+    assert_eq!(s.claim(A), Ok(31_438_356));
 }
 
 #[test]

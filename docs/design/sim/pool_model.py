@@ -164,6 +164,7 @@ class Pool:
         self.unmatched = 0       # MarketVault pot: realised SOL beyond its receivers' entitlement (R3A-2)
         self.protocol = 0        # lender credits that found no lender (S == 0, no live wipe record)
         self.receivable = 0      # rent credited to lenders, not yet paid in
+        self.credit_rem = 0      # AIR-03: remainder of the floored lender credit, in [0, WAD*BPS)
         self.index = 0           # market rent index (lamports per raw token, WAD)
         self.A = 0               # sum over open positions of q*(1e4 - p_pos)
         self.rent_protocol_bps = RENT_PROTOCOL_BPS   # current governance value (new positions only)
@@ -194,7 +195,10 @@ class Pool:
         if d_index:
             self.index += d_index
             if self.mode == "continuous":
-                credited = self.A * d_index // (WAD * BPS)          # floor; A folds (1e4 - p_pos)
+                # floor; A folds (1e4 - p_pos).  AIR-03: the remainder is carried into the next
+                # accrual (Market.lender_credit_rem), so the credits of any number of accruals sum to
+                # the floor of their exact total instead of flooring each one alone.
+                credited, self.credit_rem = divmod(self.A * d_index + self.credit_rem, WAD * BPS)
                 self.receivable += credited
                 self._credit(credited)
 

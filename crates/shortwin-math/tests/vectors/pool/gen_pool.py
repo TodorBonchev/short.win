@@ -109,7 +109,8 @@ starts at 0. Operations:
                     utilisation cap: the model releases before it refuses)
   b Q RELEASE_AT    pool::borrow (RELEASE_AT = deadline + the position's S3 tail)
   x DT LAMPORTS     now += DT, then pool::accrue(now, LAMPORTS) (LAMPORTS = the lender
-                    rent credit A·dI/(WAD·10^4)); refused as a whole, time included
+                    rent credit ⌊(A·dI + rem)/(WAD·10^4)⌋ with the model's carried remainder
+                    rem, AIR-03); refused as a whole, time included
   r Q RENT P CREDITED LUMP
                     pool::repay (RENT = rent paid, P = the position's rent_protocol_bps,
                     CREDITED = rent::credited_for, LUMP = lender lump that vests; the
@@ -530,7 +531,9 @@ class RecPool(BasePool):
         if self.rec_depth:
             return BasePool.advance(self, dt, d_index)
         assert dt >= 0
-        c = self.A * d_index // (pm.WAD * pm.BPS) if d_index and self.mode == "continuous" else 0
+        # The model's credit with its carried remainder (AIR-03, Pool.credit_rem).
+        c = (self.A * d_index + self.credit_rem) // (pm.WAD * pm.BPS) \
+            if d_index and self.mode == "continuous" else 0
         return self.rec_call(f"x {dt} {c}", lambda: BasePool.advance(self, dt, d_index))
 
     def borrow(self, pid, q, duration: int = 30 * 86400, tail: int = pm.S3_TAIL_S):

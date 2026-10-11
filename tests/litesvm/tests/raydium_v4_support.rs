@@ -489,7 +489,9 @@ pub fn prologue(env: &Env, rm: &RayMarket) -> Prologue {
     let util = rent::utilization_bps(pool.tokens_free, pool.borrowed_q).unwrap();
     let mut basis = m0.basis();
     let delta = rent::accrue(&mut basis, m0.ema_price.get(), util, m0.util_kink_bps, dt).unwrap();
-    let credit = rent::lender_credit(&m0.aggr(), &delta).unwrap();
+    // AIR-03: the credit with the market's carried remainder.
+    let (credit, _) =
+        rent::lender_credit_carried(&m0.aggr(), &delta, m0.lender_credit_rem.get()).unwrap();
     pool::accrue(&mut pool, &mut vault, now, credit).unwrap();
     let mut obs = *m0.observation();
     obs.roll(now, &m0.ema_params()).unwrap();

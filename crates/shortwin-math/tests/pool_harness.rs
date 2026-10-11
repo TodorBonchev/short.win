@@ -14,12 +14,12 @@
 
 use std::fmt::Write as _;
 
-use shortwin_math::MathError;
 use shortwin_math::num::{Rounding, WAD, mul_div};
 use shortwin_math::pool::{
     self, Lender, Pool, R_MAX, Resolution, ShareEpoch, Standing, SweepSource, VIRTUAL_ASSETS,
     VIRTUAL_SHARES, Vault, WIPE_TRADER_SWEPT,
 };
+use shortwin_math::{MathError, U256};
 
 /// `pool_model.BPS`.
 pub const BPS: u128 = 10_000;
@@ -838,11 +838,14 @@ pub struct Pos {
 }
 
 /// Rent emulation of `pool_model` (harness state, not pool state): the market rent index,
-/// the aggregate `A = Σ q·(10⁴ − p)` and the open positions.
+/// the aggregate `A = Σ q·(10⁴ − p)`, the carried credit remainder and the open positions.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Rent {
     pub index: u128,
     pub a: u128,
+    /// `pool_model.Pool.credit_rem` (AIR-03): the remainder of the last credit, in
+    /// `[0, WAD·10⁴)`.
+    pub rem: u128,
     /// Governance value for new positions.
     pub protocol_bps: u32,
     pub positions: Vec<Pos>,
@@ -854,6 +857,7 @@ impl Default for Rent {
         Self {
             index: 0,
             a: 0,
+            rem: 0,
             protocol_bps: RENT_PROTOCOL_BPS,
             positions: Vec::new(),
             next_id: 0,
@@ -862,11 +866,16 @@ impl Default for Rent {
 }
 
 impl Rent {
-    /// `pool_model.Pool.advance`'s credit: `⌊A·dI/(WAD·10⁴)⌋`.
+    /// `pool_model.Pool.advance`'s credit: `⌊(A·dI + rem)/(WAD·10⁴)⌋`, its remainder carried
+    /// into the next accrual (AIR-03).
     pub fn accrue(&mut self, d_index: u128) -> u64 {
         self.index += d_index;
-        let c = mul_div(self.a, d_index, WAD * BPS, Rounding::Floor).expect("credit");
-        u64::try_from(c).expect("credit fits u64")
+        let n = U256::from_product(self.a, d_index)
+            .checked_add(U256::from_u128(self.rem))
+            .expect("credit");
+        let (c, rem) = n.div_rem_u128(WAD * BPS).expect("credit");
+        self.rem = rem;
+        c.to_u64().expect("credit fits u64")
     }
 
     /// `pool_model.Pool._credited_for`: `⌈q·(I − I_open)·(10⁴ − p)/(WAD·10⁴)⌉`.

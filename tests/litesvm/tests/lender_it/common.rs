@@ -124,6 +124,8 @@ pub struct Lab {
     pub index: u128,
     /// `Σ q·(10⁴ − p)` over the positions.
     pub a: u128,
+    /// `pool_model.Pool.credit_rem` (AIR-03): the carried remainder of the last credit.
+    pub credit_rem: u128,
     /// The `rent_protocol_bps` new positions snapshot.
     pub rent_protocol_bps: u32,
     /// `pool_model`'s utilisation cap for [`Lab::borrow`].
@@ -166,6 +168,7 @@ impl Lab {
             positions: BTreeMap::new(),
             index: 0,
             a: 0,
+            credit_rem: 0,
             rent_protocol_bps: config.params.rent_protocol_bps,
             util_cap_bps,
             lump_vest_s: config.params.lump_vest_s,
@@ -894,13 +897,16 @@ impl Lab {
     }
 
     /// `pool_model.advance(dt, d_index)`: time passes, the vest releases, and the rent index
-    /// grows by `d_index`, crediting `A·d_index/(WAD·10⁴)` to lenders (as the prologue of any
-    /// `Market`-writing instruction at that time would).
+    /// grows by `d_index`, crediting `⌊(A·d_index + rem)/(WAD·10⁴)⌋` to lenders with the
+    /// remainder carried (AIR-03; as the prologue of any `Market`-writing instruction at that
+    /// time would).
     pub fn advance(&mut self, dt: i64, d_index: u128) {
         self.env.warp(dt);
         let credited = if d_index > 0 {
             self.index += d_index;
-            u64::try_from(self.a * d_index / (WAD * BPS)).expect("credit")
+            let n = self.a * d_index + self.credit_rem;
+            self.credit_rem = n % (WAD * BPS);
+            u64::try_from(n / (WAD * BPS)).expect("credit")
         } else {
             0
         };

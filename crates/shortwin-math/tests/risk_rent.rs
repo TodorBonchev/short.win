@@ -1,9 +1,11 @@
 //! `rent` against `tests/vectors/risk/rent.json` (`gen_rent.py`: `shortwin_sim.py` v0.4.1's
 //! basis indices with the `P_ACC_MAX` clamp and per-position rent, ECON §7's lender
-//! credit and true-up with per-position `rent_protocol_bps`, and `pool_model.py` v0.4.1's
-//! `receivable` under governance changes — all exact, no tolerance), plus properties:
-//! kinked-rate continuity, basis-index rent equals the direct integral, continuous credits
-//! never exceed the true-ups and `receivable` returns to 0 (ECON I-P7).
+//! credit (its remainder carried from accrual to accrual since AIR-03) and true-up with
+//! per-position `rent_protocol_bps`, and `pool_model.py` v0.4.1's `receivable` under
+//! governance changes — all exact, no tolerance), plus properties: kinked-rate continuity,
+//! basis-index rent equals the direct integral, continuous credits never exceed the true-ups
+//! (and, carried, fall short of them by at most one lamport) and `receivable` returns to 0
+//! (ECON I-P7).
 
 mod common;
 
@@ -44,6 +46,7 @@ struct Step {
     j: [Dec<u128>; 3],
     aggr: [Dec<u128>; 3],
     lender_credit: Option<Dec<u64>>,
+    lender_credit_rem: Dec<u128>,
     receivable: Option<Dec<u64>>,
 }
 
@@ -78,6 +81,7 @@ struct Op {
     p_ema: Option<Dec<u128>>,
     util_bps: Option<Dec<u32>>,
     credit: Option<Dec<u64>>,
+    credit_rem: Option<Dec<u128>>,
     credited_for: Option<Dec<u64>>,
     receivable: Dec<u64>,
 }
@@ -137,11 +141,13 @@ fn load() -> File {
 }
 
 /// The program's rent bookkeeping on one market (ARCH §3.0 step 4, §3.4 step 13, §3.5,
-/// §4.5): the basis, `rent_aggr` and `receivable` with the true-up clamp. `receivable`
-/// is `None` once the program would have refused an instruction (`Overflow`).
+/// §4.5): the basis, `rent_aggr`, the carried credit remainder (`Market.lender_credit_rem`,
+/// AIR-03) and `receivable` with the true-up clamp. `receivable` is `None` once the program
+/// would have refused an instruction (`Overflow`); a refused credit leaves the remainder.
 struct Books {
     basis: Basis,
     aggr: Aggr,
+    rem: u128,
     receivable: Option<u64>,
 }
 
@@ -150,6 +156,7 @@ impl Books {
         Self {
             basis: Basis::default(),
             aggr: Aggr::default(),
+            rem: 0,
             receivable: Some(0),
         }
     }
@@ -177,7 +184,10 @@ impl Books {
         dt: u64,
     ) -> ([u128; 3], Result<u64, MathError>) {
         let d = rent::accrue(&mut self.basis, p, u, kink, dt).expect("accrue");
-        let credit = rent::lender_credit(&self.aggr, &d);
+        let credit = rent::lender_credit_carried(&self.aggr, &d, self.rem).map(|(c, rem)| {
+            self.rem = rem;
+            c
+        });
         self.receivable = match (self.receivable, credit) {
             (Some(r), Ok(c)) => r.checked_add(c),
             _ => None,
@@ -258,6 +268,10 @@ fn basis_paths_match_sim() {
                 or_overflow(&st.lender_credit),
                 "{ctx}: lender credit"
             );
+            assert_eq!(
+                books.rem, st.lender_credit_rem.0,
+                "{ctx}: carried remainder"
+            );
             if st.p_ema.0 > P_ACC_MAX && st.dt.0 > 0 {
                 clamped += 1;
                 assert_eq!(d[0], P_ACC_MAX * u128::from(st.dt.0), "{ctx}: clamp");
@@ -315,6 +329,7 @@ fn pool_model_receivable_matches() {
                         get(&op.dt, &ctx),
                     );
                     assert_eq!(credit, Ok(get(&op.credit, &ctx)), "{ctx}: credit");
+                    assert_eq!(books.rem, get(&op.credit_rem, &ctx), "{ctx}: remainder");
                 }
                 "close" => {
                     let pos = open.remove(&get(&op.id, &ctx)).expect("open");
@@ -455,14 +470,16 @@ proptest! {
         let mut aggr = Aggr::default();
         aggr.add(q, &t, rp).unwrap();
         let mut exact = BigUint::ZERO;
-        let mut credits = 0u128;
+        let (mut credits, mut rem) = (0u128, 0u128);
         for &(dt, p, u) in &steps {
             let d = rent::accrue(&mut basis, p, u, kink, dt).unwrap();
             let rate = u128::from(t.base_bps) * 10_000
                 + u128::from(t.slope1_bps) * u128::from(u.min(kink))
                 + u128::from(t.slope2_bps) * u128::from(u.saturating_sub(kink));
             exact += big(p) * big(u128::from(dt)) * big(rate);
-            credits += u128::from(rent::lender_credit(&aggr, &d).unwrap());
+            let (c, r) = rent::lender_credit_carried(&aggr, &d, rem).unwrap();
+            credits += u128::from(c);
+            rem = r;
         }
         let pos = PosRent { q, j_open: [0; 3], terms: t, rent_protocol_bps: rp, r_min: 0 };
         let den = big(10_000) * big(10_000) * big(u128::from(YEAR_S)) * big(WAD);
@@ -472,11 +489,13 @@ proptest! {
         let ceil = if &floor * &den == integral { floor.clone() } else { &floor + 1u8 };
         prop_assert!(big(u128::from(accrued)) >= ceil);
         prop_assert!(big(u128::from(accrued)) <= ceil + 1u8);
-        // Continuous credits (floored per accrual) never exceed the true-up (rounded up),
-        // and the true-up never exceeds the lenders' share of the rent paid in full.
+        // Continuous credits (the floor of their exact total, the remainder carried from
+        // accrual to accrual: AIR-03) never exceed the true-up (rounded up) and fall short of
+        // it by at most one lamport, however many accruals; the true-up never exceeds the
+        // lenders' share of the rent paid in full.
         let credited = rent::credited_for(&pos, &basis).unwrap();
         prop_assert!(credits <= u128::from(credited));
-        prop_assert!(u128::from(credited) <= credits + steps.len() as u128 + 1);
+        prop_assert!(u128::from(credited) <= credits + 1);
         let paid = waterfall::close(u64::MAX, 0, accrued, rp).unwrap();
         prop_assert!(paid.rent_lenders >= credited);
     }

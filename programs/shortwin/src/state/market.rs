@@ -24,7 +24,8 @@
 //! | OI (`max_q_hwm` @2,848 and `min_open_fee_ppm` @2,856, from `_reserved`) | 2,832 | 32 |
 //! | derived keys (`trader_wsol_ata` @2,864, `pump_pool_authority` @2,896; M5-SEC-6, from `_reserved`) | 2,864 | 64 |
 //! | `coverage_cleared_at` (M7-SEC-3, from `_reserved`) | 2,928 | 8 |
-//! | `_reserved` | 2,936 | 168 |
+//! | `lender_credit_rem` (AIR-03, from `_reserved`) | 2,936 | 16 |
+//! | `_reserved` | 2,952 | 152 |
 //!
 //! The math crate's state types (`pool::Pool`, `rent::{Basis, Aggr}`, `observe::*`) hold native
 //! `u128`/`i128`; the conversions below ([`Market::pool`], [`Market::set_pool`], …) copy field by
@@ -434,7 +435,14 @@ pub struct Market {
     /// transaction or one second — and the flag stays visibly cleared for the keeper's reads
     /// before any open can land. 0 on existing accounts (no delay).
     pub coverage_cleared_at: i64,
-    pub _reserved: [u8; 168],
+    /// AIR-03 (was `_reserved[0..16]`): the remainder of the last accrual's lender rent credit,
+    /// `(Σ_j A_j·δJ_j + rem) mod (10⁴·10⁴·31,536,000·WAD)` (`shortwin_math::rent::
+    /// lender_credit_carried`, `engine::prologue::accrue`), carried into the next accrual so the
+    /// credits sum to the floor of their exact total instead of flooring each accrual alone (a
+    /// market cranked every second lost up to a lamport a second, which the exits' true-ups
+    /// left in `lender_sol`). Always below that denominator; 0 on existing accounts.
+    pub lender_credit_rem: PodU128,
+    pub _reserved: [u8; 152],
 }
 
 impl Market {
