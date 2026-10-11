@@ -416,9 +416,9 @@ pub fn list_checked(env: &mut Env, pool: &AnyPool) -> MarketCreated {
     let cap = pool_select::depth_at_lambda(d, u64::from(env.config().params.pool_lock_min_bps));
     assert_eq!(
         *m.observation(),
-        Observation::new_raydium(now, price, liq, cap).unwrap(),
-        "the observation state starts at the pool's spot and min(√(X·Y), D/λ_min), marked for \
-         the post-change warm-up (M4R)"
+        Observation::new_raydium(now, price, liq, cap, d).unwrap(),
+        "the observation state starts at the pool's spot and min(√(X·Y), D/λ_min), L_slow at most \
+         D (AIR-13), marked for the post-change warm-up (M4R)"
     );
     ev
 }

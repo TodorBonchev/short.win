@@ -77,11 +77,15 @@ pub fn initial(now: i64, state: &VenueState) -> Result<Box<Observation>> {
 
 /// A Raydium price start (M4R, **PROPOSED**, owner item O18; ARCH §3.2, §4.4: a Raydium listing, a
 /// list-only market's first adoption): [`initial`] with `L = min(√(X·Y), cap)`, `cap =
-/// ⌊D·10⁴/λ_min⌋` the pool's anchor, marked for the post-change warm-up
-/// (`Observation::new_raydium`: `ema_warm = EMA_WARMUP_BUCKETS`, `ema_guard = 1`).
+/// ⌊D·10⁴/λ_min⌋` the pool's anchor, and `L_slow = min(L, D)`, `D = state.locked_depth` — an
+/// adoption's `L_slow ≤ D` (AIR-13: a deposit wrapped around the start seeded `L_slow` at up to
+/// `cap`) — marked for the post-change warm-up (`Observation::new_raydium`: `ema_warm =
+/// EMA_WARMUP_BUCKETS`, `ema_guard = 1`).
 pub fn initial_raydium(now: i64, state: &VenueState, cap: u128) -> Result<Box<Observation>> {
     let (p, l) = spot(state)?;
-    Ok(Box::new(Observation::new_raydium(now, p, l, cap).math()?))
+    Ok(Box::new(
+        Observation::new_raydium(now, p, l, cap, state.locked_depth).math()?,
+    ))
 }
 
 /// The pool's pre-trade `(P_spot, √(X·Y))`, `PoolIneligible` if either is undefined.

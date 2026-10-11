@@ -393,10 +393,25 @@ impl Observation {
 
     /// A Raydium price start (M4R; ARCH §3.2, §4.4: a Raydium listing, a list-only market's
     /// first adoption): [`Observation::new`] at the pool's spot `p` with `L = min(l_sample,
-    /// cap)` — `cap = ⌊D·10⁴/λ_min⌋` the anchor, which one wrapped deposit cannot exceed — then
-    /// [`mark_restart`]. `InvalidInput` if `p`, `l_sample` or `cap` is 0.
-    pub fn new_raydium(now: i64, p: u128, l_sample: u128, cap: u128) -> Result<Self, MathError> {
+    /// cap)` — `cap = ⌊D·10⁴/λ_min⌋` the anchor, which one wrapped deposit cannot exceed — and
+    /// `L_slow = min(L, slow_cap)`, `slow_cap` the pool's locked depth `D`, as an adoption's
+    /// [`VenueChange::RaydiumLocked`] leaves it; then [`mark_restart`]. AIR-13: `L_slow` started
+    /// at `L`, so a deposit wrapped around the start seeded it at up to `D/λ_min` (2D at the
+    /// default `λ_min`); the warm-up re-seeds `L_ema` from the pool's own buckets but leaves
+    /// `L_slow`, which sizing, the tier and the exit reference read, to decay at `τ_slow`.
+    /// `InvalidInput` if `p`, `l_sample`, `cap` or `slow_cap` is 0.
+    pub fn new_raydium(
+        now: i64,
+        p: u128,
+        l_sample: u128,
+        cap: u128,
+        slow_cap: u128,
+    ) -> Result<Self, MathError> {
+        if slow_cap == 0 {
+            return Err(MathError::InvalidInput);
+        }
         let mut o = Self::new(now, p, l_sample.min(cap))?;
+        o.ema.liq_slow = o.ema.liq_slow.min(slow_cap);
         mark_restart(&mut o.ema);
         Ok(o)
     }
@@ -1358,8 +1373,9 @@ mod tests {
         mark_restart(&mut e);
         assert_eq!((e.warm, e.guard), (EMA_WARMUP_BUCKETS, 1));
         assert!(!warmed(&e));
-        // A price start: L = min(sample, anchor), marked; the mock / pump start is unmarked.
-        let o = Observation::new_raydium(9, 2 * WAD, 1_000, 700).unwrap();
+        // A price start: L = min(sample, anchor), L_slow = min(L, D) (AIR-13), marked; the mock /
+        // pump start is unmarked.
+        let o = Observation::new_raydium(9, 2 * WAD, 1_000, 700, 900).unwrap();
         assert_eq!(
             (o.ema.liq, o.ema.liq_slow, o.ema.warm, o.ema.guard),
             (700, 700, 8, 1)
@@ -1369,10 +1385,19 @@ mod tests {
             (e0.l, e0.llo, e0.lhi, e0.lo, e0.hi),
             (700, 700, 700, 2 * WAD, 2 * WAD)
         );
-        let o = Observation::new_raydium(9, 2 * WAD, 600, 700).unwrap();
-        assert_eq!(o.ema.liq, 600);
+        let o = Observation::new_raydium(9, 2 * WAD, 600, 700, 900).unwrap();
+        assert_eq!((o.ema.liq, o.ema.liq_slow), (600, 600));
+        // A deposit-wrapped sample over a fully locked pool (2D, the anchor at λ_min = 50 %):
+        // L_ema and the ring take it, L_slow the locked depth.
+        let o = Observation::new_raydium(9, 2 * WAD, 1_000, 1_000, 500).unwrap();
+        assert_eq!((o.ema.liq, o.ema.liq_slow), (1_000, 500));
+        assert_eq!(o.ring.newest().unwrap().l, 1_000);
         assert_eq!(
-            Observation::new_raydium(9, 2 * WAD, 600, 0),
+            Observation::new_raydium(9, 2 * WAD, 600, 0, 900),
+            Err(MathError::InvalidInput)
+        );
+        assert_eq!(
+            Observation::new_raydium(9, 2 * WAD, 600, 700, 0),
             Err(MathError::InvalidInput)
         );
         let o = Observation::new(9, 2 * WAD, 600).unwrap();

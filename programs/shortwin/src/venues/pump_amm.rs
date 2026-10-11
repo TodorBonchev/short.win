@@ -861,7 +861,7 @@ pub fn priced(obs: &Observation) -> bool {
 /// A PumpSwap market without a price state starts it at its first executable observation
 /// (a PumpSwap listing, a `None →` PumpSwap re-detection: neither carries the pool's vaults, ARCH
 /// §3.2's init set) exactly as a Raydium price start does (since M6R-1, owner decision of
-/// 2026-09-30): `Observation::new_raydium(now, P_spot, √(X·(Y + VQR)), ⌊D·10⁴/λ_min⌋)` —
+/// 2026-09-30): `Observation::new_raydium(now, P_spot, √(X·(Y + VQR)), ⌊D·10⁴/λ_min⌋, D)` —
 /// `P_ema = P_spot`, `L_ema = L_slow = min(√(X·(Y + VQR)), ⌊D·10⁴/λ_min⌋)` with `D` the pool's
 /// locked depth, one ring entry, **marked for the post-change warm-up** (a pushed spot seeds
 /// nothing an open reads before eight integrations of the pool's own buckets). `λ_min` is
@@ -884,7 +884,8 @@ pub fn start_price(obs: &mut Observation, state: &VenueState, now: i64) -> Resul
     if cap == 0 {
         return Ok(false);
     }
-    *obs = Observation::new_raydium(now, p, l, cap).math()?;
+    // `cap = D` here, so the `L_slow ≤ D` cap (AIR-13's, for a Raydium start) never binds.
+    *obs = Observation::new_raydium(now, p, l, cap, state.locked_depth).math()?;
     Ok(true)
 }
 

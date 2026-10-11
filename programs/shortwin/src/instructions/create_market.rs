@@ -653,7 +653,8 @@ pub fn handler<'info>(
         if let Some(a) = adoption.as_ref() {
             // ARCH §3.2 "Effects" for a Raydium pool (module docs): the pool cache, the SOL
             // side, `pool_d`, `graduated_at` (O13), `pool_seen_at`, and the price state
-            // `P_ema = P_spot`, `L_ema = L_slow = min(√(X·Y), ⌊D·10⁴/λ_min⌋)`, one ring entry,
+            // `P_ema = P_spot`, `L_ema = min(√(X·Y), ⌊D·10⁴/λ_min⌋)`, `L_slow = min(L_ema, D)`
+            // (AIR-13: `observe::initial_raydium`), one ring entry,
             // an empty bucket, marked for the post-change warm-up (M4R: `ema_warm`, `ema_guard`).
             // The tier stays the conservative C until the first open or crank reads the oracle
             // (`create_market` does not carry `oracle_cache`).

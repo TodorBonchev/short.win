@@ -108,7 +108,8 @@
 //! cannot force an exit, opens and keeper exits wait for them, and the exit reference reads the
 //! ring's liquidity lows until they agree with `L_ema`. A list-only market that never had a price
 //! starts the price state of the pool (`observe::initial_raydium`: its spot, `min(√(X·Y), cap)`,
-//! marked) as a listing does; both route chains and the collection window cleared;
+//! `L_slow ≤ D` (AIR-13), marked) as a listing does; both route chains and the collection window
+//! cleared;
 //! `graduated_at` kept (age is the token's time on an eligible pool), except that a `None` market
 //! takes the candidate's `age_start` as a listing would (O13, O13b); `pool_seen_at = now` only if
 //! the market is not already inside a listing window.
@@ -407,14 +408,15 @@ impl<'a> FitContext<'a> {
 }
 
 /// `L_slow` as [`adopt`] leaves it for candidate `a`: `min(L_slow, D)` on a market with a price;
-/// a market that never had one starts at the pool's `min(√(X·Y), ⌊D·10⁴/λ_min⌋)`.
+/// a market that never had one starts at the pool's `min(√(X·Y), ⌊D·10⁴/λ_min⌋, D)`
+/// (`observe::initial_raydium`; AIR-13).
 fn adopted_l_slow(market: &Market, a: &Adoption, lambda_min_bps: u32) -> u128 {
     let d = a.state.locked_depth;
     if market.ring_count > 0 && market.ema_price.get() > 0 {
         market.liq_slow.get().min(d)
     } else {
         let cap = depth_at_lambda(d, u64::from(lambda_min_bps));
-        a.state.liquidity().unwrap_or(0).min(cap)
+        a.state.liquidity().unwrap_or(0).min(cap).min(d)
     }
 }
 
@@ -573,7 +575,8 @@ pub fn record_window(market: &mut Market, a: &Adoption, now: i64, open: bool) {
 /// Adopts `a` on `market` at `now` (module docs, ARCH §2.6 rule 4 as amended by M4R): the pool;
 /// on a market with a price the liquidity rewrite to the anchor `cap = ⌊D·10⁴/λ_min⌋` with `L_slow
 /// ≤ D`, then the restart marks (`ema_warm`, `ema_guard`); on a list-only market that never had a
-/// price a fresh, marked price state at the pool's spot with `L = min(√(X·Y), cap)`; both route
+/// price a fresh, marked price state at the pool's spot with `L = min(√(X·Y), cap)` and `L_slow =
+/// min(L, D)` (AIR-13); both route
 /// chains and the collection window cleared, `graduated_at` kept (a `None` market: the pool's
 /// `age_start`), `pool_seen_at = now` unless the market is inside a listing window.
 /// `lambda_min_bps` is `pool_lock_min_bps`. The priced path reads no liquidity of the pool.
@@ -961,10 +964,14 @@ mod tests {
     }
 
     /// M4R: a list-only market's first adoption starts the pool's price state at its spot with
-    /// `L = min(√(X·Y), ⌊D·10⁴/λ_min⌋)`, marked for the post-change warm-up.
+    /// `L = min(√(X·Y), ⌊D·10⁴/λ_min⌋)` and `L_slow = min(L, D)` (AIR-13), marked for the
+    /// post-change warm-up.
     #[test]
     fn a_list_only_market_starts_the_pools_price_state() {
-        for (d, want_l) in [(1_900_000u128, 2_000_000u128), (900_000, 1_800_000)] {
+        for (d, want_l, want_slow) in [
+            (1_900_000u128, 2_000_000u128, 1_900_000u128),
+            (900_000, 1_800_000, 900_000),
+        ] {
             let mut m = Market::zeroed();
             m.venue = VenueKind::None as u8;
             m.no_route_since = 50;
@@ -975,7 +982,7 @@ mod tests {
             assert_eq!((m.graduated_at, m.pool_seen_at), (77, 100));
             assert_eq!(m.pool_d.get(), d);
             assert_eq!(m.ema_price.get(), WAD / 4);
-            assert_eq!((m.ema_liq.get(), m.liq_slow.get()), (want_l, want_l));
+            assert_eq!((m.ema_liq.get(), m.liq_slow.get()), (want_l, want_slow));
             assert_eq!((m.ring_count, m.ema_ts), (1, 100));
             assert_eq!((m.ema_warm, m.ema_guard), (8, 1), "marked");
             assert_eq!(
@@ -984,6 +991,28 @@ mod tests {
             );
             assert_eq!(m.fp_t0, 0);
         }
+    }
+
+    /// AIR-13: a deposit wrapped around a Raydium price start — a list-only market's first
+    /// adoption here, a listing through `create_market` (`observe::initial_raydium` too) — lifts
+    /// the candidate's `√(X·Y)` to twice its locked depth on a fully locked pool; `L_ema` may start
+    /// at that sample up to the anchor `⌊D·10⁴/λ_min⌋` (the warm-up re-seeds it), but `L_slow`,
+    /// which sizing, the tier and the exit reference read and nothing re-seeds, starts at no more
+    /// than `D`, as a priced market's adoption leaves it.
+    #[test]
+    fn a_price_start_seeds_l_slow_at_most_the_locked_depth() {
+        let d = 1_000_000u128;
+        // √(4·10⁶·10⁶) = 2·10⁶ = 2D: the pool's own depth D doubled by the wrapped deposit.
+        let a = adoption(VenueKind::RaydiumCpmm, 4_000_000, 1_000_000, d, 77);
+        let mut m = Market::zeroed();
+        m.venue = VenueKind::None as u8;
+        adopt(&mut m, &a, 100, 3_600, 5_000).unwrap();
+        assert_eq!(m.ema_liq.get(), 2 * d, "L_ema: min(√(X·Y), 2D)");
+        assert_eq!(m.liq_slow.get(), d, "L_slow: at most D");
+        let obs = observe::initial_raydium(100, &a.state, 2 * d).unwrap();
+        assert_eq!((obs.ema.liq, obs.ema.liq_slow), (2 * d, d));
+        // The fit check of a list-only market's adoption reads the same L_slow.
+        assert_eq!(adopted_l_slow(&Market::zeroed(), &a, 5_000), d);
     }
 
     /// M4R: every Raydium adoption of a priced market writes the anchor `⌊D·10⁴/λ_min⌋` into
