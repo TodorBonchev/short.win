@@ -159,6 +159,17 @@ struct Switched {
     q: u64,
 }
 
+/// AIR-13: a Raydium listing starts `L_slow` at the pool's locked depth `D` — half a λ 50 % pool's
+/// `√(X·Y)` — and sizing and the tier read it, so an open at the old sizes waits for it: four
+/// hours of the keeper's 60-s observations bring `L_slow` within 2 % of the pool (τ_slow 1 h).
+fn slow_catch_up(env: &mut Env, rm: &RayMarket) {
+    for _ in 0..240 {
+        env.warp(60);
+        env.crank(rm);
+    }
+    env.fresh_oracle();
+}
+
 /// The M4X-2 incumbent, its halt and the 320-SOL candidate, with a position of `q`: the first
 /// size of [`OPEN_BPS`] that opens, capped at `cap(env, candidate)` (the candidate is planted
 /// before the open). The real Fartcoin pool, deeper than both planted pools, is halted so no
@@ -177,6 +188,7 @@ fn halted_with_a_position(
         env.warp(1);
         env.crank(&rm);
     }
+    slow_catch_up(&mut env, &rm);
     let cand = sized(&mut env, false, &base, 9_978, 320_000_000_000);
     let cap = cap(&env, &cand);
     let (x_inc, _) = inc
@@ -652,6 +664,7 @@ fn fee_market(
         env.warp(1);
         env.crank(&rm);
     }
+    slow_catch_up(&mut env, &rm);
     let cand = sized(&mut env, false, &base, 9_978, 320_000_000_000);
     let AnyPool::Cpmm(cp) = cand else {
         unreachable!()
@@ -1713,6 +1726,7 @@ fn contest_market(fee: u64, lmin: u16, add_pct: u64, qpm: u64) -> ContestMarket 
         env.warp(1);
         env.crank(&rm);
     }
+    slow_catch_up(&mut env, &rm);
     let params = env.config().params;
     let m = env.market(&rm.market());
     let (x, _) = pool
