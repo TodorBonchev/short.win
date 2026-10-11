@@ -259,6 +259,7 @@ fn refusal(e: MathError) -> Result<(), TestCaseError> {
             e,
             MathError::DepositTooSmall
                 | MathError::WipeSweepPending
+                | MathError::PoolDrained
                 | MathError::NegativePending
                 | MathError::InsufficientShares
                 | MathError::InsufficientInventory

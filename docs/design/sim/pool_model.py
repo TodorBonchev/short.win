@@ -61,7 +61,10 @@ Model (all integers; rounding in favour of the pool):
     leaves at most 1/VEST_FLUSH_RATIO (1/1,000) of the token claims it found flushes the unreleased vest to the
     shares that held them, as a full wipe does (a run leaves the allowance's floor, 1 raw token, and a dust
     deposit before the last settlement its own, so the full-wipe test T + B == 0 missed them and the vest went to
-    the next depositor); a just-in-time deposit before such a settlement takes at most 1/1,000 of the vest.
+    the next depositor).  AIR-07's residual: no deposit while the pool is drained (S > 0, B > 0 and
+    VEST_FLUSH_RATIO * T <= T + B, the only states a flushing settlement can start from): a deposit there keeps
+    its own tokens as claims, so above 1/999 of them it stopped the flush and left the vest to a later deposit at
+    the collapsed share price (about 91 % of a lump in rebase_vest_demo's residual row).
   * v0.4.2 (KI-65): no rebase orphans.  A rebase record (1/den) carries a conversion remainder
     conv_rem in [0, den); a lender's conversion through it mints floor((conv_rem + shares)/den)
     and leaves the remainder there, so the conversions of every old-epoch holder sum to
@@ -143,7 +146,8 @@ class Pool:
                  lock_expiry: bool = True, lock_calendar: bool = True, vest_weighted: bool = True,
                  wipe_sweep_gate: bool = True, exit_flush_bps: int = 0, lock_floor: bool = True,
                  cum_convert: bool = True, fwd_chain: bool = True, vest_floor: bool = True,
-                 dust_flush: bool = True, empty_sweep_gate: bool = True, pi_era_reset: bool = True):
+                 dust_flush: bool = True, empty_sweep_gate: bool = True, pi_era_reset: bool = True,
+                 drain_gate: bool = True):
         assert mode in ("continuous", "release")
         self.mode = mode
         self.util_cap = util_cap_bps
@@ -170,6 +174,8 @@ class Pool:
                                                 #   a deposit needs no sweep first; comparison rows)
         self.pi_era_reset = pi_era_reset        # False: v0.4.2 behaviour before AIR-12 (a new lock era restarts b_min
                                                 #   but keeps PI, which compounds across eras; comparison rows)
+        self.drain_gate = drain_gate            # False: before AIR-07's residual fix (a deposit is taken while the pool
+                                                #   is drained, S > 0, B > 0 and 1,000 * T <= T + B; comparison rows)
         self.now = 0
         self.T = 0
         self.B = 0
@@ -625,6 +631,12 @@ class Pool:
             raise ValueError("deposit too small")
         if self.S + minted > U128:
             raise ValueError("share overflow")
+        if self.drain_gate and self.S and self.B and self.T * VEST_FLUSH_RATIO <= self.T + self.B:
+            # AIR-07's residual: from a drained pool a settlement can leave <= 1/1,000 of the claims and flush the vest
+            # to the shares that held them; a deposit now keeps its tokens as claims, so above 1/999 of them it would
+            # stop the flush and a later deposit at the collapsed price would take the vest (with S == 0 there is no vest
+            # to keep, and a deposit is what brings S back: ARCH §9 M0b note 4)
+            raise ValueError("PoolDrained: no deposit while T <= (T + B) / 1,000 with tokens lent out")
         if self.S == 0:
             # R4A-7 after a full wipe; AIR-08 also after the last lender's exit (wipe_swept is cleared then): SOL
             # that reaches the trader while S == 0 is the wiped lenders' or the protocol's (KI-10), so the sweep
@@ -1751,23 +1763,40 @@ def rebase_vest_demo():
                  the lump keeps vesting: R4B-6);
       residual - a deposit above 1/1,000 of the claims before the settlement keeps the vest vesting, so a larger
                  deposit after it dilutes the old lenders by token claims as any lender does (the outsider's SOL:
-                 its pre-deposit's part of the immediate SOL plus its part of the lump, held 6 h)."""
+                 its pre-deposit's part of the immediate SOL plus its part of the lump, held 6 h).
+    Since the residual fix no deposit is taken while the pool is drained (B > 0 and 1,000 * T <= T + B): the
+    deposits made before the settlement are refused (PoolDrained), so the settlement wipes and the vest is the old
+    lenders' (the newcomer then deposits after the post-wipe sweep)."""
     sol = 10**9
     rows = []
-    for label, flush in (("v0.4.2 (flush at a full wipe only)", False),
-                         ("AIR-07 (flush when at most 1/1,000 of the claims is left)", True)):
-        p = Pool(util_cap_bps=10_000, dust_flush=flush)
+
+    def dep(p, who, amount):                      # a deposit the drained-pool gate may refuse
+        try:
+            p.deposit(who, amount)
+            return True
+        except ValueError:                        # PoolDrained (gen_pool records it as pool_drained)
+            return False
+
+    def claim(p, who):
+        return p.claim_sol(who) if who in p.lenders else 0
+
+    for label, flush, gate in (("v0.4.2 (flush at a full wipe only)", False, False),
+                               ("AIR-07 (flush when at most 1/1,000 of the claims is left)", True, False),
+                               ("AIR-07 + no deposit while drained (residual fix)", True, True)):
+        p = Pool(util_cap_bps=10_000, dust_flush=flush, drain_gate=gate)
         p.deposit("A", 10**12)
         p.deposit("B", 10**12)
         p.borrow(1, p.T)
-        p.deposit("ATT", 1)
+        dep(p, "ATT", 1)
         p.settle(1, 50 * sol, 5 * sol)
+        if p.S == 0:
+            p.sweep_sol(0)                        # the post-wipe sweep the newcomer's deposit waits for
         p.deposit("NEW", 10**6)
         p.advance(p.lump_vest_s + 1)
-        out = p.claim_sol("NEW") + p.claim_sol("ATT")
+        out = p.claim_sol("NEW") + claim(p, "ATT")
         rows.append(("attack: 1 raw unit deposited before the last settlement, 10^6 after", label, out,
                      p.claim_sol("A") + p.claim_sol("B")))
-        p = Pool(util_cap_bps=9_000, dust_flush=flush)
+        p = Pool(util_cap_bps=9_000, dust_flush=flush, drain_gate=gate)
         p.deposit("A", 10**12)
         p.deposit("B", 10**12)
         p.borrow(1, p.T * 9 // 10)
@@ -1781,27 +1810,31 @@ def rebase_vest_demo():
         rows.append(("organic: two lenders withdrew all they could at 90 % (1 raw token left), 10^6 deposited after",
                      label, p.claim_sol("NEW"), p.claim_sol("A") + p.claim_sol("B")))
         for x in (10**9, 10**10):
-            p = Pool(util_cap_bps=10_000, dust_flush=flush)
+            p = Pool(util_cap_bps=10_000, dust_flush=flush, drain_gate=gate)
             p.deposit("H", 10**12)
             p.borrow(1, p.T)
-            p.deposit("W", x)
+            jit = dep(p, "W", x)
             p.settle(1, 10**12 + 5 * sol, 5 * sol)
-            a = p.free_allowance("W")
-            Lw = p._touch("W")
-            tok = p.withdraw("W", min(Lw.shares, a * (p.S + VS) // (p.T + p.B + VA)))
-            gain = tok + p.claim_sol("W") + token_value(p, p._touch("W")) - x
+            gain = 0
+            if jit:
+                a = p.free_allowance("W")
+                Lw = p._touch("W")
+                tok = p.withdraw("W", min(Lw.shares, a * (p.S + VS) // (p.T + p.B + VA)))
+                gain = tok + p.claim_sol("W") + token_value(p, p._touch("W")) - x
             p.advance(p.lump_vest_s + 1)
             rows.append((f"JIT: {x:.0e} deposited just before the settlement of 1e12, out at once", label, gain,
                          p.claim_sol("H")))
-        p = Pool(util_cap_bps=10_000, dust_flush=flush)
+        p = Pool(util_cap_bps=10_000, dust_flush=flush, drain_gate=gate)
         p.deposit("A", 10**12)
         p.deposit("B", 10**12)
         p.borrow(1, p.T)
-        p.deposit("ATT", 3 * 10**9)              # above (Q + itself)/1,000: the settlement leaves more
+        dep(p, "ATT", 3 * 10**9)                 # above (Q + itself)/1,000: the settlement leaves more
         p.settle(1, 50 * sol, 5 * sol)
+        if p.S == 0:
+            p.sweep_sol(0)
         p.deposit("NEW", 3 * 10**10)
         p.advance(p.lump_vest_s + 1)
-        out = p.claim_sol("NEW") + p.claim_sol("ATT")
+        out = p.claim_sol("NEW") + claim(p, "ATT")
         rows.append(("residual: 3e9 (above 1/1,000) deposited before, 3e10 after, held 6 h", label, out,
                      p.claim_sol("A") + p.claim_sol("B")))
     return rows

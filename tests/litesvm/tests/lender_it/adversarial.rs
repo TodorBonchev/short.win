@@ -370,10 +370,12 @@ fn air_08_a_deposit_after_the_last_exit_waits_for_the_sweep() {
 }
 
 /// AIR-07 (I-07), `pool_model.rebase_vest_demo()` attack row, on the program: every token is
-/// lent, an attacker deposits 1 raw unit before the last settlement, which therefore leaves
+/// lent, an attacker deposits 1 raw unit before the last settlement, which therefore left
 /// 1 raw token (a rebase, not a full wipe). Before the fix its 5 SOL lump stayed vesting and a
-/// depositor of 10⁶ raw units right after took 4,999,993,333 lamports of it; now a settlement
-/// that leaves at most 1/1,000 of the claims it found flushes the vest to the old shares.
+/// depositor of 10⁶ raw units right after took 4,999,993,333 lamports of it. A settlement that
+/// leaves at most 1/1,000 of the claims it found flushes the vest to the old shares, and since
+/// AIR-07's residual fix the dust deposit itself is refused (`PoolDrained`: every token is
+/// lent), so the settlement wipes and the wipe record carries the vest.
 #[test]
 fn air_07_a_dust_deposit_before_the_last_settlement_takes_no_vest() {
     let mut lab = Lab::with_cap(TokenProgram::Spl, 10_000);
@@ -381,18 +383,47 @@ fn air_07_a_dust_deposit_before_the_last_settlement_takes_no_vest() {
     lab.deposit("B", 1_000_000_000_000).unwrap();
     let t = lab.market().tokens_free;
     lab.borrow30("1", t).unwrap();
-    lab.deposit("ATT", 1).unwrap();
+    assert_eq!(
+        lab.deposit("ATT", 1),
+        Err(code(ShortwinError::PoolDrained)),
+        "the dust deposit"
+    );
     lab.settle("1", 50 * U, 5 * U);
-    assert_eq!(lab.state().records[0].num, 1, "a rebase, not a wipe");
-    assert_eq!(lab.market().vest_bal, 0, "flushed to the old shares");
+    assert_eq!(lab.state().records[0].num, 0, "a full wipe");
+    assert_eq!(lab.market().vest_bal, 0, "flushed into the wipe record");
+    lab.sweep_sol(0); // the post-wipe sweep the newcomer's deposit waits for
     lab.deposit("NEW", 1_000_000).unwrap();
     lab.advance(i64::from(lab.lump_vest_s) + 1, 0);
     assert_eq!(lab.claim("NEW"), Ok(0));
     let old = lab.claim("A").unwrap() + lab.claim("B").unwrap();
+    assert_eq!(old, 50 * U, "the old lenders (before: 45,000,006,664)");
+}
+
+/// AIR-07's residual, `pool_model.rebase_vest_demo()` residual row, on the program: a deposit
+/// above 1/999 of the claims before the last settlement kept its own tokens as claims, so the
+/// settlement left more than 1/1,000 of them, the vest kept vesting, and a 3·10¹⁰ deposit after
+/// it took 4,613,534,243 lamports of the 5 SOL lump by holding through the vest. No deposit is
+/// taken while the pool is drained (tokens lent out, at most 1/1,000 of the claims unborrowed).
+#[test]
+fn air_07_residual_a_drained_pool_takes_no_deposit() {
+    let mut lab = Lab::with_cap(TokenProgram::Spl, 10_000);
+    lab.deposit("A", 1_000_000_000_000).unwrap();
+    lab.deposit("B", 1_000_000_000_000).unwrap();
+    let t = lab.market().tokens_free;
+    lab.borrow30("1", t).unwrap();
     assert_eq!(
-        old, 49_999_999_998,
-        "the old lenders (before: 45,000,006,664)"
+        lab.deposit("ATT", 3_000_000_000),
+        Err(code(ShortwinError::PoolDrained)),
+        "the pre-deposit"
     );
+    lab.settle("1", 50 * U, 5 * U);
+    assert_eq!(lab.state().records[0].num, 0, "a full wipe");
+    lab.sweep_sol(0);
+    lab.deposit("NEW", 30_000_000_000).unwrap();
+    lab.advance(i64::from(lab.lump_vest_s) + 1, 0);
+    assert_eq!(lab.claim("NEW"), Ok(0));
+    let old = lab.claim("A").unwrap() + lab.claim("B").unwrap();
+    assert_eq!(old, 50 * U, "the old lenders (before: 45,386,465,756)");
 }
 
 /// R3B-1: steady borrowing after a withdrawal. The lock A takes never decreases while the

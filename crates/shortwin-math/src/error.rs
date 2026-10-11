@@ -4,9 +4,9 @@ use core::fmt;
 
 /// Why a `shortwin-math` computation failed.
 ///
-/// Codes 0–5 are arithmetic and domain failures. Codes 6–12 are lender-pool rule
-/// refusals (`pool`), one per program error of ARCH §3.11's lender group, so the program
-/// maps them one to one without re-deriving the reason.
+/// Codes 0–5 are arithmetic and domain failures. Codes 6–13 are lender-pool rule
+/// refusals (`pool`), one per program error (6–12 ARCH §3.11's lender group, 13 appended
+/// for AIR-07), so the program maps them one to one without re-deriving the reason.
 ///
 /// Codes are stable: the program maps them to its own error enum and the keeper and
 /// frontend log them. Append new variants at the end with the next code; never
@@ -47,15 +47,23 @@ pub enum MathError {
     LenderBehind = 10,
     /// Lender pool: a deposit that would mint 0 shares (ECON §9.2).
     DepositTooSmall = 11,
-    /// Lender pool: a deposit into a live full-wipe record before the post-wipe sweeps
-    /// ran (`sweep_trader`, and `claim_venue_rewards` on a pump venue that can execute;
-    /// R4A-7; program `WipeSweepPending`).
+    /// Lender pool: a deposit into a pool without shares (a live full-wipe record or, since
+    /// AIR-08, after the last lender's exit) before the sweeps since `S` reached 0 ran
+    /// (`sweep_trader`, and `claim_venue_rewards` on a pump venue that can execute; R4A-7;
+    /// program `WipeSweepPending`).
     WipeSweepPending = 12,
+    /// Lender pool: a deposit while the pool is drained: lenders hold shares, tokens are lent
+    /// out (`ΣB_Q > 0`) and at most `1/VEST_FLUSH_RATIO` of the token claims is unborrowed
+    /// (`1,000·T ≤ T + ΣB_Q`). A settlement from that state can leave at most 1/1,000 of the
+    /// claims and flush the vest to the shares that held them; a deposit made before it would
+    /// keep its own tokens as claims and stop the flush (AIR-07's residual; program
+    /// `PoolDrained`).
+    PoolDrained = 13,
 }
 
 impl MathError {
     /// Every variant, in code order.
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 14] = [
         Self::Overflow,
         Self::Underflow,
         Self::DivByZero,
@@ -69,6 +77,7 @@ impl MathError {
         Self::LenderBehind,
         Self::DepositTooSmall,
         Self::WipeSweepPending,
+        Self::PoolDrained,
     ];
 
     /// Stable numeric code of the variant.
@@ -92,6 +101,7 @@ impl MathError {
             10 => Some(Self::LenderBehind),
             11 => Some(Self::DepositTooSmall),
             12 => Some(Self::WipeSweepPending),
+            13 => Some(Self::PoolDrained),
             _ => None,
         }
     }
@@ -112,6 +122,7 @@ impl MathError {
             Self::LenderBehind => "lender behind share epochs",
             Self::DepositTooSmall => "deposit too small",
             Self::WipeSweepPending => "post-wipe sweep pending",
+            Self::PoolDrained => "pool drained",
         }
     }
 }
@@ -144,6 +155,7 @@ mod tests {
             (MathError::LenderBehind, 10),
             (MathError::DepositTooSmall, 11),
             (MathError::WipeSweepPending, 12),
+            (MathError::PoolDrained, 13),
         ];
         assert_eq!(all.len(), MathError::ALL.len());
         for ((e, code), listed) in all.into_iter().zip(MathError::ALL) {
@@ -152,7 +164,7 @@ mod tests {
             assert_eq!(MathError::from_code(code), Some(e));
             assert!(!e.as_str().is_empty());
         }
-        assert_eq!(MathError::from_code(13), None);
+        assert_eq!(MathError::from_code(14), None);
         let names: std::collections::BTreeSet<_> =
             MathError::ALL.iter().map(|e| e.as_str()).collect();
         assert_eq!(names.len(), MathError::ALL.len());

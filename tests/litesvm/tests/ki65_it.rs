@@ -428,7 +428,9 @@ fn a_record_that_needs_writing_must_be_writable() {
 fn a_deficit_lender_converts_through_cover_and_blocks_the_flush() {
     let mut lab = Lab::with_cap(TokenProgram::Token2022, 10_000);
     lab.deposit("B", 1_000_000_000_000).unwrap();
-    lab.borrow30("1", 1_000_000_000_000).unwrap();
+    // 90 % lent, not all of it: since AIR-07's residual fix a drained pool takes no deposit,
+    // and A must join late, after the rent it then shares the shortfall of.
+    lab.borrow30("1", 900_000_000_000).unwrap();
     lab.advance(20 * common::D, 10u128.pow(17));
     dust(&mut lab, "A", 6_000_000_000_000, 321);
     lab.repay("1", 0, 0); // the whole credited rent is debited pro-rata, A included

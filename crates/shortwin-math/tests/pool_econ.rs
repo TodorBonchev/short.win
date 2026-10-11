@@ -566,7 +566,11 @@ fn post_wipe_credits_and_the_epoch_jump() {
 /// of wiping, the flush of the unreleased vest (ECON §9.5: "the wiped lenders keep their
 /// unreleased lumps") is skipped, and a depositor of 10⁶ raw units right after held nearly every
 /// share and took 4,999,993,333 lamports of the 5 SOL lump. A settlement that leaves at most
-/// 1/1,000 of the token claims it found flushes the vest to the shares that held them.
+/// 1/1,000 of the token claims it found flushes the vest to the shares that held them; since
+/// AIR-07's residual fix the dust deposit itself is refused (every token lent: the pool is
+/// drained), so the settlement wipes and the vest goes with the wipe record (49,999,999,998
+/// through the flush of a rebase before that fix; the rebase case stays covered by the organic
+/// test below, where a run leaves the dust).
 #[test]
 fn a_dust_deposit_before_the_last_settlement_takes_no_vest() {
     let mut s = Model::new(10_000);
@@ -574,22 +578,24 @@ fn a_dust_deposit_before_the_last_settlement_takes_no_vest() {
     s.deposit(B, 1_000_000_000_000).expect("B");
     let t = s.m.pool.tokens_free;
     let pos = s.borrow30(t);
-    s.deposit(2, 1).expect("the dust deposit");
+    assert_eq!(
+        s.deposit(2, 1),
+        Err(MathError::PoolDrained),
+        "the dust deposit"
+    );
     s.settle(pos, 50 * SOL, 5 * SOL)
         .expect("the last settlement");
-    assert_eq!(s.m.records[0].num, 1, "a rebase, not a wipe");
+    assert_eq!(s.m.records[0].num, 0, "a full wipe");
     assert_eq!(
         s.m.pool.vest_bal, 0,
-        "the vest is flushed to the old shares"
+        "the vest is flushed into the wipe record"
     );
+    s.sweep(0); // the post-wipe sweep the newcomer's deposit waits for
     s.deposit(3, 1_000_000).expect("the newcomer");
     s.advance(VEST + 1, 0);
     assert_eq!(s.claim(3), Ok(0), "the newcomer");
     let old = s.claim(A).expect("A") + s.claim(B).expect("B");
-    assert_eq!(
-        old, 49_999_999_998,
-        "the old lenders (before: 45,000,006,664)"
-    );
+    assert_eq!(old, 50 * SOL, "the old lenders (before: 45,000,006,664)");
 }
 
 /// AIR-07, the organic case (no attacker): two lenders withdraw everything they can while 90 %
@@ -623,34 +629,68 @@ fn the_dust_a_run_leaves_counts_as_a_wipe_for_the_vest() {
     );
 }
 
-/// AIR-07 against R4B-6 (the flush is at the settlement, so a just-in-time deposit shares in
-/// it): the flush needs the settlement to leave at most 1/1,000 of the claims, and the
-/// deposit's own tokens stay as claims, so a bundle `[deposit x, sol_settle, withdraw, claim]`
-/// takes at most `x/claims` ≤ 0.1 % of the vest (4,995,003 lamports of a 5 SOL lump for
-/// x = 10⁹ around the settlement of 10¹²); a larger deposit keeps the lump vesting and takes 0
-/// of it at once (the R4B-6 rows hold; `premium_jit_table`).
+/// AIR-07 against R4B-6 (the flush is at the settlement, so a just-in-time deposit would share in
+/// it): the flush needs the settlement to leave at most 1/1,000 of the claims and the deposit's
+/// own tokens stay as claims, so a bundle `[deposit x, sol_settle, withdraw, claim]` took at most
+/// `x/claims` ≤ 0.1 % of the vest (4,995,003 lamports of a 5 SOL lump for x = 10⁹ around the
+/// settlement of 10¹²; a larger deposit kept the lump vesting and took 0 of it at once). A
+/// flushing settlement starts only from a drained pool, where AIR-07's residual fix refuses every
+/// deposit: the JIT deposit is refused for each `x` and the lender keeps the whole lump (a
+/// deposit allowed with more than 1/1,000 unborrowed can never be followed by a flush from the
+/// same state). The R4B-6 rows hold (`premium_jit_table`).
 #[test]
 fn a_jit_deposit_around_a_wiping_settlement_takes_at_most_a_thousandth() {
-    for (x, gain) in [
-        (1_000_000u64, 4_998i128),
-        (1_000_000_000, 4_995_003),
-        (10_000_000_000, -2),
-    ] {
+    for x in [1_000_000u64, 1_000_000_000, 10_000_000_000] {
         let mut s = Model::new(10_000);
         s.deposit(A, 1_000_000_000_000).expect("H");
         let t = s.m.pool.tokens_free;
         let pos = s.borrow30(t);
-        s.deposit(B, x).expect("the JIT deposit");
+        assert_eq!(
+            s.deposit(B, x),
+            Err(MathError::PoolDrained),
+            "the JIT deposit, x = {x}"
+        );
         // S2/S3 at P_ema = 1 lamport per raw unit: Q·P_ema immediate, a 5 SOL lump vests.
         s.settle(pos, t + 5 * SOL, 5 * SOL).expect("settle");
-        let tok = withdraw_max(&mut s, B);
-        let sol = s.claim(B).expect("claim");
-        let left = s.token_value(B);
-        let g =
-            i128::from(tok) + i128::from(sol) + i128::try_from(left).expect("fits") - i128::from(x);
-        assert_eq!(g, gain, "x = {x}");
-        assert!(g <= i128::from(5 * SOL) / 1_000);
+        s.advance(VEST + 1, 0);
+        assert_eq!(s.claim(A), Ok(t + 5 * SOL), "the lender, x = {x}");
     }
+}
+
+/// AIR-07's residual: a deposit above 1/999 of the claims made just before the settlement keeps
+/// its own tokens as claims, so the settlement leaves more than 1/1,000 of them and the vest is
+/// not flushed; a deposit after it, at the collapsed share price, then held most of the shares
+/// and took 4,613,534,243 lamports of the old lenders' 5 SOL lump by holding through the vest
+/// (`rebase_vest_demo`'s residual row: 3·10⁹ before, 3·10¹⁰ after, on 2·10¹² lent). No deposit
+/// is taken while the pool is drained (`ΣB_Q > 0`, `1,000·T ≤ T + ΣB_Q`), the only states a
+/// flushing settlement starts from: the pre-deposit is refused, the settlement wipes, and the
+/// later deposit (after the post-wipe sweep) takes none of the vest.
+#[test]
+fn a_deposit_above_a_thousandth_cannot_keep_the_vest_from_the_old_lenders() {
+    let mut s = Model::new(10_000);
+    s.deposit(A, 1_000_000_000_000).expect("A");
+    s.deposit(B, 1_000_000_000_000).expect("B");
+    let t = s.m.pool.tokens_free;
+    let pos = s.borrow30(t);
+    let pre = s.deposit(2, 3_000_000_000);
+    s.settle(pos, 50 * SOL, 5 * SOL)
+        .expect("the last settlement");
+    if s.m.pool.total_shares == 0 {
+        s.sweep(0); // the post-wipe sweep the later deposit waits for
+    }
+    s.deposit(3, 30_000_000_000).expect("the later deposit");
+    s.advance(VEST + 1, 0);
+    let mut out = s.claim(3).expect("the later depositor");
+    if pre.is_ok() {
+        out += s.claim(2).expect("the pre-depositor");
+    }
+    assert!(
+        out <= 5 * SOL / 1_000,
+        "the outsiders took {out} lamports of the 5 SOL lump"
+    );
+    assert_eq!(pre, Err(MathError::PoolDrained), "the pre-deposit");
+    let old = s.claim(A).expect("A") + s.claim(B).expect("B");
+    assert_eq!(old, 50 * SOL, "the old lenders (before: 45,386,465,756)");
 }
 
 #[test]

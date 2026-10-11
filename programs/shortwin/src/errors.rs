@@ -12,7 +12,8 @@
 //! was removed with the keeper's refresh duty, before any deployment: `ReservedScanOutOfOrder`
 //! keeps the slot so no later code moves, and nothing returns it; the owner's M6-SEC-3 decision
 //! of 2026-09-30 appended `GraduationHalted` = 6104, and M10's SQ-G8 (owner decision of
-//! 2026-10-02) `AuthoritiesNotDistinct` = 6105).
+//! 2026-10-02) `AuthoritiesNotDistinct` = 6105; M10's KI-65 work `EpochRecordReadOnly` = 6106
+//! and `RebaseNeedsOwner` = 6107; AIR-07's residual `PoolDrained` = 6108).
 //! `tests::codes_are_stable` pins every code.
 
 use anchor_lang::prelude::*;
@@ -343,12 +344,26 @@ pub enum ShortwinError {
         "Only the position's owner may convert it through a rebase record: sync_lender must be signed by the owner"
     )]
     RebaseNeedsOwner,
+
+    // ---- Appended for AIR-07's residual (6108; group in brackets) ----
+    /// [Lender] `deposit` while the pool is drained: lenders hold shares, tokens are lent out
+    /// and at most 1/1,000 of the token claims is unborrowed (`S > 0 ∧ ΣB_Q > 0 ∧ 1,000·T ≤ T +
+    /// ΣB_Q`; `MathError::PoolDrained`).
+    /// A settlement from that state can leave at most 1/1,000 of the claims, which flushes the
+    /// unreleased vest to the lenders that held them (`pool::VEST_FLUSH_RATIO`); a deposit before
+    /// it would keep its own tokens as claims, stop the flush and leave the vest to a later
+    /// deposit at the collapsed share price. Deposits resume once repayments or settlements
+    /// bring the unborrowed part above 1/1,000.
+    #[msg(
+        "The pool is drained (at most 1/1,000 of its tokens unborrowed): deposits wait until repayments or settlements free more"
+    )]
+    PoolDrained,
 }
 
 impl From<MathError> for ShortwinError {
     /// `shortwin-math` refusals map one to one onto the lender codes (the crate's codes 6–12
-    /// mirror ARCH §3.11's lender group); arithmetic and domain failures are `MathOverflow`,
-    /// malformed inputs `InvalidParams`.
+    /// mirror ARCH §3.11's lender group, 13 the appended `PoolDrained`); arithmetic and domain
+    /// failures are `MathOverflow`, malformed inputs `InvalidParams`.
     fn from(e: MathError) -> Self {
         match e {
             MathError::Overflow
@@ -364,6 +379,7 @@ impl From<MathError> for ShortwinError {
             MathError::LenderBehind => Self::LenderBehindEpochs,
             MathError::DepositTooSmall => Self::ZeroAmount,
             MathError::WipeSweepPending => Self::WipeSweepPending,
+            MathError::PoolDrained => Self::PoolDrained,
         }
     }
 }
@@ -440,6 +456,7 @@ mod tests {
             (ShortwinError::AuthoritiesNotDistinct, 6105),
             (ShortwinError::EpochRecordReadOnly, 6106),
             (ShortwinError::RebaseNeedsOwner, 6107),
+            (ShortwinError::PoolDrained, 6108),
         ];
         for (e, c) in pins {
             assert_eq!(code(e), c, "{e:?}");
@@ -453,6 +470,8 @@ mod tests {
             match e.code() {
                 0..=2 | 4 | 5 => assert_eq!(mapped, ShortwinError::MathOverflow),
                 3 => assert_eq!(mapped, ShortwinError::InvalidParams),
+                // AIR-07's residual, appended after the lender group.
+                13 => assert_eq!(mapped, ShortwinError::PoolDrained),
                 _ => assert!(code(mapped) >= 6076 && code(mapped) <= 6084, "{e:?}"),
             }
         }

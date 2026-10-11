@@ -2,9 +2,13 @@
 //!
 //! Checks: `amount > 0` (`ZeroAmount`); the mint guard on the entry path (`mint_unsafe` refuses
 //! with `MintUnsafeFlagged`, then `check_mint_safety`); `minted > 0` (`ZeroAmount`); `minted ≥
-//! min_shares` (`SharesBelowMin`); `S + minted ≤ u128::MAX` (`MathOverflow`); while the pool has
-//! no shares — a live full-wipe record (R4A-7) or, since AIR-08, a market every lender left —
-//! the sweeps since `S` reached 0 (`WipeSweepPending`).
+//! min_shares` (`SharesBelowMin`); `S + minted ≤ u128::MAX` (`MathOverflow`); the pool is not
+//! drained — with shares held and tokens lent out, more than 1/1,000 of the token claims is
+//! unborrowed
+//! (`PoolDrained`, AIR-07's residual: a deposit before a settlement that leaves dust would stop
+//! the vest flush, `pool::VEST_FLUSH_RATIO`); while the pool has no shares — a live full-wipe
+//! record (R4A-7) or, since AIR-08, a market every lender left — the sweeps since `S` reached 0
+//! (`WipeSweepPending`).
 //!
 //! Effects, in order (ARCH §3.0 A16: prologue steps 1–5, then 10–11):
 //! 1. the prologue (`engine::prologue`): the Accounts constraints; params-version sync; the

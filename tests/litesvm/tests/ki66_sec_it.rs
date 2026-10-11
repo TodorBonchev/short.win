@@ -318,7 +318,9 @@ fn a_deficit_lender_behind_a_rebase_record() {
     let run = |third_party: bool| -> (Vec<u64>, u64, u64, i64) {
         let mut lab = Lab::with_cap(TokenProgram::Token2022, 10_000);
         lab.deposit("B", 1_000_000_000_000).unwrap();
-        lab.borrow30("1", 1_000_000_000_000).unwrap();
+        // 90 % lent: since AIR-07's residual fix a drained pool takes no deposit, and A joins
+        // late, after the rent it then shares the shortfall of.
+        lab.borrow30("1", 900_000_000_000).unwrap();
         lab.advance(20 * common::D, 10u128.pow(17));
         lab.deposit("A", 6_000_000_000_000).unwrap();
         lab.repay("1", 0, 0);

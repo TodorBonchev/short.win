@@ -51,7 +51,8 @@
 //! arguments unchanged. A refusal by a pool rule has its own [`MathError`] variant, one per
 //! program error of ARCH §3.11 (`pool_model`'s messages in brackets):
 //! [`MathError::DepositTooSmall`] ("deposit too small"), [`MathError::WipeSweepPending`]
-//! ("WipeSweepPending"), [`MathError::NegativePending`] ("negative SOL balance: cover it
+//! ("WipeSweepPending"), [`MathError::PoolDrained`] ("PoolDrained", AIR-07, appended after
+//! ARCH §3.11's group), [`MathError::NegativePending`] ("negative SOL balance: cover it
 //! first"), [`MathError::InsufficientShares`] ("not enough shares"),
 //! [`MathError::InsufficientInventory`] ("insufficient unborrowed inventory"),
 //! [`MathError::AboveAllowance`] ("above pro-rata share of unborrowed inventory") and
@@ -84,10 +85,12 @@ pub const REBASE: u128 = 1_000;
 /// wipe does (AIR-07; ECON §9.5: "the wiped lenders keep their unreleased lumps"). A run
 /// leaves the allowance's floor (1 raw token) and a dust deposit before the last settlement
 /// leaves its own, so `T + ΣB_Q = 0` alone missed the wipes that leave dust, and the vest went
-/// to whoever deposited next. A just-in-time deposit before the settlement shares in the flush,
-/// but its tokens stay as claims, so it takes at most `1/VEST_FLUSH_RATIO` of the vest (R4B-6),
-/// whatever the pool's history (a rebase test would not bound it: a pool near the `R_MAX` bound
-/// rebases after a small settlement).
+/// to whoever deposited next. A deposit before the settlement keeps its own tokens as claims,
+/// so above `1/(VEST_FLUSH_RATIO − 1)` of the claims it would stop the flush and leave the vest
+/// to a later deposit at the collapsed price (AIR-07's residual): [`deposit`] is therefore
+/// refused while the pool is drained (`S > 0`, `ΣB_Q > 0` and `VEST_FLUSH_RATIO·T ≤ T + ΣB_Q`, the
+/// only states a flushing settlement can start from; `MathError::PoolDrained`). A rebase test would
+/// not do: a pool near the `R_MAX` bound rebases after a small settlement.
 pub const VEST_FLUSH_RATIO: u128 = 1_000;
 /// `lock_epoch` of a lender without a lock (`pool_model.Lender`: −1).
 pub const NO_LOCK_EPOCH: u32 = u32::MAX;
@@ -1965,6 +1968,18 @@ fn deposit_in(
         return Err(MathError::DepositTooSmall);
     }
     let total = add_u128(p.total_shares, minted)?;
+    if p.total_shares != 0
+        && p.borrowed_q != 0
+        && ovf(u128::from(p.tokens_free).checked_mul(VEST_FLUSH_RATIO))? <= p.token_claims()?
+    {
+        // AIR-07's residual: from a drained pool a settlement can leave at most
+        // 1/VEST_FLUSH_RATIO of the claims and flush the vest to the shares that held them. A
+        // deposit now keeps its tokens as claims, so above 1/999 of them it would stop the flush
+        // and a later deposit at the collapsed price would take the vest: none while drained.
+        // Without shares there is no vest to keep (credits go to the protocol, R3A-10), and a
+        // deposit is what brings `S` back (ARCH §9 M0b note 4), so `S = 0` is not drained.
+        return Err(MathError::PoolDrained);
+    }
     if p.total_shares == 0 {
         // R4A-7, and since AIR-08 also after the last lender's exit: SOL that reaches the
         // trader while `S = 0` is the wiped lenders' (the live wipe record) or the protocol's
@@ -1997,13 +2012,16 @@ fn deposit_in(
 /// trader sweep and, if `rewards_required` (a pump venue that can execute), the venue-reward
 /// claim (a new market starts with both bits set: nothing can have reached its trader). After
 /// a full wipe it then finalises the wipe record (clears `wipe_live`) and touches again, so a
-/// parked depositor converts through it. The lender's conversion writes `conv_rem` into
-/// `records` ([`convert`]).
+/// parked depositor converts through it. No deposit is taken while the pool is drained —
+/// shares held, tokens lent out and at most `1/`[`VEST_FLUSH_RATIO`] of the token claims
+/// unborrowed — the only states a settlement that flushes the vest can start from (AIR-07's
+/// residual). The lender's conversion writes `conv_rem` into `records` ([`convert`]).
 ///
 /// # Errors
 /// `DepositTooSmall` if nothing would be minted; `Overflow` if `S` or `T` would leave
-/// `u128` / `u64`; `WipeSweepPending` if `S = 0` and a required sweep has not run since `S`
-/// reached 0; as [`touch`] and [`release`].
+/// `u128` / `u64`; `PoolDrained` if `S > 0`, `ΣB_Q > 0` and `VEST_FLUSH_RATIO·T ≤ T + ΣB_Q`;
+/// `WipeSweepPending` if `S = 0` and a required sweep has not run since `S` reached 0; as
+/// [`touch`] and [`release`].
 pub fn deposit(
     pool: &mut Pool,
     vault: &mut Vault,

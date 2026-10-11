@@ -82,6 +82,7 @@ pub fn code(e: MathError) -> &'static str {
         MathError::LenderBehind => "lender_behind",
         MathError::DepositTooSmall => "deposit_too_small",
         MathError::WipeSweepPending => "wipe_sweep_pending",
+        MathError::PoolDrained => "pool_drained",
     }
 }
 

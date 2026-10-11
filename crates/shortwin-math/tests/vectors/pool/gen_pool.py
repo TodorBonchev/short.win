@@ -83,7 +83,8 @@ writes, next to itself:
                        premium_jit_table), KI-66's pot_touch_demo and KI-66 full's
                        pot_chain_demo (its held-only comparison pool is not recorded), and
                        AIR-07's rebase_vest_demo (the settlement that leaves dust token
-                       claims), AIR-08's empty_pool_gate_demo (a deposit after the last
+                       claims; since the residual fix the deposits before it are refused,
+                       PoolDrained), AIR-08's empty_pool_gate_demo (a deposit after the last
                        exit waits for the sweep) and AIR-12's lock_era_demo (Π restarts with
                        every lock era); their pre-fix comparison pools are not recorded.
 
@@ -182,16 +183,19 @@ SEED = 20260927
 PM_OPS = 60_000          # the whole ECON §9.6 fuzz run (ARCH §8.1: 60,000 ops per rent mode)
 FUZZ_PARTS = 3           # files per run, each under 1 MB (tests/vectors/README.md)
 MAX_FILE_BYTES = 990_000
-# ECON §9.6: share epochs rolled and op counts of the two option-(a) runs.
+# ECON §9.6: share epochs rolled and op counts of the two option-(a) runs. Since AIR-07's residual
+# fix a deposit into a drained pool is refused (PoolDrained): 26 of the 90 % run's 6,653 deposits
+# and 234 of the 100 % run's 6,607, which moves every later count (before: 1020 and 1930 epochs).
 ECON_9_6 = {
-    9_000: (1020, {'accrue': 3381, 'adv': 3331, 'borrow': 2822, 'borrow!': 524, 'churn': 3163,
-                   'churn!': 261, 'claim': 3394, 'claimN': 3392, 'cover': 3404, 'dep': 6623,
-                   'donate': 3335, 'gov': 3286, 'repay': 3257, 'settle': 3371, 'sweep': 3317,
-                   'wd': 6279, 'wd!': 248, 'wdall': 2877, 'wdall!': 386, 'wipe': 3349}),
-    10_000: (1930, {'accrue': 3345, 'adv': 3340, 'borrow': 3372, 'churn': 3466, 'claim': 3378,
-                    'claimN': 3459, 'cover': 3407, 'dep': 6100, 'dep!': 504, 'donate': 3299,
-                    'gov': 3305, 'repay': 3275, 'settle': 3322, 'sweep': 3279, 'wd': 5558,
-                    'wd!': 988, 'wdall': 2834, 'wdall!': 474, 'wipe': 3295}),
+    9_000: (1021, {'accrue': 3395, 'adv': 3287, 'borrow': 2835, 'borrow!': 518, 'churn': 3168,
+                   'churn!': 252, 'claim': 3378, 'claimN': 3416, 'cover': 3384, 'dep': 6627,
+                   'dep!': 26, 'donate': 3329, 'gov': 3302, 'repay': 3246, 'settle': 3342,
+                   'sweep': 3304, 'wd': 6315, 'wd!': 239, 'wdall': 2896, 'wdall!': 367,
+                   'wipe': 3374}),
+    10_000: (1941, {'accrue': 3344, 'adv': 3344, 'borrow': 3358, 'churn': 3467, 'claim': 3377,
+                    'claimN': 3462, 'cover': 3396, 'dep': 5862, 'dep!': 745, 'donate': 3305,
+                    'gov': 3303, 'repay': 3302, 'settle': 3325, 'sweep': 3264, 'wd': 5574,
+                    'wd!': 966, 'wdall': 2848, 'wdall!': 458, 'wipe': 3300}),
 }
 # ECON §9.3: the lock-heavy mix, v0.4.1 row (sampled states, states above T + dust).
 ECON_LOCK_FUZZ = (954, 0)
@@ -218,6 +222,7 @@ MODEL_ERRORS = {
     "deposit too small": "deposit_too_small",
     "share overflow": "overflow",
     "WipeSweepPending: sweep_trader / claim_venue_rewards first": "wipe_sweep_pending",
+    "PoolDrained: no deposit while T <= (T + B) / 1,000 with tokens lent out": "pool_drained",
     "negative SOL balance: cover it first": "negative_pending",
     "not enough shares": "insufficient_shares",
     "insufficient unborrowed inventory": "insufficient_inventory",
@@ -229,7 +234,7 @@ DEFAULT_SWITCHES = {"mode": "continuous", "prorata": True, "pi_decay": True, "lo
                     "lock_calendar": True, "vest_weighted": True, "wipe_sweep_gate": True,
                     "exit_flush_bps": 0, "lock_floor": True, "cum_convert": True, "fwd_chain": True,
                     "vest_floor": True, "dust_flush": True, "empty_sweep_gate": True,
-                    "pi_era_reset": True}
+                    "pi_era_reset": True, "drain_gate": True}
 
 BasePool = pm.Pool
 REGISTRY: list = []
@@ -820,7 +825,12 @@ class Ext:
         at = max(1, allow * (p.S + pm.VS) // (p.T + p.B + pm.VA))
         s = (self.rng.randrange(1, L.shares + 1) if r < 0.4 else at if r < 0.8
              else L.shares if r < 0.9 else 1)
-        got = p.withdraw(u, min(s, L.shares))
+        s = min(s, L.shares)
+        if burn_takes_the_last_share(p, u, s):
+            s -= 1
+            if s == 0:
+                return
+        got = p.withdraw(u, s)
         assert pend >= 0 and got <= allow, ("ghost C0-9/C0-13", pend, got, allow)
 
     def op_run(self):
@@ -835,6 +845,10 @@ class Ext:
                 return
             pend = L.pending
             s = min(max(1, a * (p.S + pm.VS) // (p.T + p.B + pm.VA)), L.shares)
+            if burn_takes_the_last_share(p, u, s):
+                s -= 1
+                if s == 0:
+                    return
             got = p.withdraw(u, s)
             assert pend >= 0 and got <= a
 
@@ -1112,6 +1126,30 @@ def last_shares_kept(p, shares: int) -> int:
     return shares - 1 if shares == p.S and p.B > 0 else shares
 
 
+def burn_takes_the_last_share(p, who, shares: int) -> bool:
+    """Whether `w who shares` would succeed and leave S = 0 while tokens are borrowed: the burn the
+    program refuses (`LastSharesBorrowed`) and pool_model does not model (`last_shares_kept`). The
+    random withdrawals (`op_wd`, `op_run`) then keep one share. The burn is tried exactly as
+    `rec_call` runs it and rolled back, so nothing is recorded; a burn the model refuses anyway
+    stays in the trace as a refusal."""
+    if shares != p.S or p.B == 0:
+        return False
+    snap = p.rec_snapshot()
+    p.rec_depth += 1
+    try:
+        BasePool._release(p)
+        BasePool._touch(p, who)
+        if p.rec_violation():
+            return False
+        BasePool.withdraw(p, who, shares)
+        return not p.rec_violation() and p.S == 0 and p.B > 0
+    except ValueError:
+        return False
+    finally:
+        p.rec_depth -= 1
+        p.rec_restore(snap)
+
+
 def normal_amounts():
     return {
         "dep": lambda r, p: r.choice([1, 7, 10**6, 10**9, 10**12, r.randrange(1, 10**13)]),
@@ -1213,7 +1251,9 @@ def ext_profiles() -> list:
             "KI-66: lazy lenders and third-party syncs (pot-only touches: a lender behind a rebase record "
             "is accrued to its ends and its surplus moves to the pot, unconverted), some repeated, then "
             "claims; late joiners and early leavers around deep rebases, rent paid across them"),
-        Ext("ext_pot_dust_100", 17, 4_000, 10_000, 8, POT, dust_amounts(),
+        # Seeds 82 and 26 (were 17 and 20): since AIR-07's residual fix a deposit into a drained
+        # pool is refused, which left the old seeds 8 and 5 pot-only holds (26 and 17 before).
+        Ext("ext_pot_dust_100", 82, 4_000, 10_000, 8, POT, dust_amounts(),
             "KI-66: pot-only touches with dust amounts (1..40 raw tokens, 0..11 lamports)"),
         Ext("ext_pot_continuous_90", 18, 4_000, 9_000, 6, POT, normal_amounts(),
             "KI-66: pot-only touches, 90 % cap: positions stay open across rebases"),
@@ -1223,7 +1263,7 @@ def ext_profiles() -> list:
         Ext("ext_pot_fwd_deep_100", 21, 4_000, 10_000, 4, FWD_DEEP, normal_amounts(),
             "KI-66 full: four lenders, frequent deep rebases: chains through several records, owners "
             "stopping inside them"),
-        Ext("ext_pot_fwd_dust_100", 20, 4_000, 10_000, 8, FWD, dust_amounts(),
+        Ext("ext_pot_fwd_dust_100", 26, 4_000, 10_000, 8, FWD, dust_amounts(),
             "KI-66 full: the forward chain with dust amounts (most chains floor to 0 shares)"),
         Ext("ext_pot_fwd_open_100", 22, 4_000, 10_000, 6, FWD_OPEN, normal_amounts(),
             "KI-66 full: owners stopping inside forward chains (sync_lender(1) of a chained lender: "
