@@ -891,6 +891,19 @@ async fn load_position(
     }))
 }
 
+/// `vest_bal` after an `EpochRolled`: a flush pays the whole unreleased vest out — at every full
+/// wipe and, since AIR-07, at a rebase after a settlement that left at most 1/1,000 of the token
+/// claims (`vest_flushed > 0`; `pool::settle`'s `Settled::flushed`, which `sol_settle` reports as
+/// `vest_flushed`). A flush without a roll emits no `EpochRolled`; the next `PriceCranked`
+/// snapshot then corrects `vest_bal`.
+fn vest_after_roll(vest_bal: Option<u64>, full_wipe: bool, vest_flushed: u64) -> Option<u64> {
+    if full_wipe || vest_flushed > 0 {
+        Some(0)
+    } else {
+        vest_bal
+    }
+}
+
 /// The inverse of an open at an exit (`engine::waterfall::remove_position`).
 fn remove_position(m: &mut MarketRow, pos: &OpenPosition) {
     let tier = usize::from(pos.tier.min(3));
@@ -1137,9 +1150,7 @@ async fn apply_to_market(
             m.total_shares = formulas::convert_shares(m.total_shares, num, den);
             m.share_epoch = epoch.saturating_add(1);
             m.wipe_live = full_wipe;
-            if full_wipe {
-                m.vest_bal = Some(0);
-            }
+            m.vest_bal = vest_after_roll(m.vest_bal, full_wipe, u64_field(d, "vest_flushed"));
             let donation = ev
                 .derived
                 .as_ref()
@@ -2552,6 +2563,24 @@ mod tests {
             &json!({"Params": {"params": {"rent_protocol_bps": 1}, "tiers": [1]}}),
         );
         assert_eq!(s.params["rent_protocol_bps"], 1);
+    }
+
+    /// AIR-07: a rebase that flushed the vest (`vest_flushed > 0`) leaves `vest_bal` at 0, as a
+    /// full wipe does; a rebase without a flush leaves it as it was.
+    #[test]
+    fn a_flushing_roll_zeroes_the_vest() {
+        assert_eq!(vest_after_roll(Some(7), true, 0), Some(0), "a full wipe");
+        assert_eq!(
+            vest_after_roll(Some(7), false, 7),
+            Some(0),
+            "a rebase that flushed"
+        );
+        assert_eq!(
+            vest_after_roll(Some(7), false, 0),
+            Some(7),
+            "a rebase without a flush"
+        );
+        assert_eq!(vest_after_roll(None, false, 0), None);
     }
 
     #[test]
