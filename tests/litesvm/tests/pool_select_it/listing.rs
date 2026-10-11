@@ -16,14 +16,18 @@ use shortwin_math::tier::Tier;
 use crate::common::*;
 use crate::support::*;
 
-/// The price state a listing starts on `pool`: `P_ema = P_spot`, `L_ema = L_slow = √(X·Y)`,
-/// one ring entry at `now`, an empty bucket.
+/// The price state a listing starts on `pool`: `P_ema = P_spot`, `L_ema = √(X·Y)` (under the
+/// anchor `D/λ_min` on these pools), `L_slow = min(√(X·Y), D)` (AIR-13), one ring entry at `now`,
+/// an empty bucket.
 fn assert_fresh_price_state(env: &Env, pool: &AnyPool) {
     let m = market_of(env, pool);
     let (x, y) = pool.io_reserves(&env.svm, Direction::Sell).unwrap();
     let l = (u128::from(x) * u128::from(y)).isqrt();
     assert_eq!(m.ema_price.get(), u128::from(y) * WAD / u128::from(x));
-    assert_eq!((m.ema_liq.get(), m.liq_slow.get()), (l, l));
+    assert_eq!(
+        (m.ema_liq.get(), m.liq_slow.get()),
+        (l, l.min(m.pool_d.get()))
+    );
     assert_eq!((m.ring_count, m.ema_ts), (1, env.now()));
     assert_eq!((m.b_sec, m.b_lo.get()), (0, 0));
 }

@@ -2407,6 +2407,14 @@ pub fn thin_pool_market() -> ThinPool {
         lp_acc = hold_unlocked_lp(env, p, &holder_key, 2_000).0;
     });
     assert_eq!(lambda_bps(&f.env, &f.rm), 2_000);
+    // AIR-13: the listing started `L_slow` at the pool's locked depth `D`, 20 % of its √(X·Y)
+    // here; five hours of the keeper's 60-s observations bring it within 1 % of the pool
+    // (τ_slow 1 h) before the open at the fee-scaled cap, which `X₀ = min(X, L_slow/√P_ema, …)`
+    // bounds.
+    for _ in 0..300 {
+        f.env.warp(60);
+        crank_checked(&mut f.env, &f.rm);
+    }
     let q = max_open_q(&mut f);
     let (x, _) = reserves(&f.env, &f.rm).unwrap();
     assert!(

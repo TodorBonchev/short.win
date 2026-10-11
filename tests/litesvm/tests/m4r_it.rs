@@ -1693,18 +1693,27 @@ fn m4f1_an_oversized_carried_position_is_not_adopted_and_settles_in_s3() {
     let rm = env.ray_market_listed(RaySpec::new(FART, q0.saturating_mul(60)), inc);
     env.crank(&rm);
     crank_every(&mut env, &rm, 1, 5);
+    // AIR-13: a Raydium listing starts `L_slow` at the pool's locked depth `D` — half this λ 50 %
+    // pool's √(X·Y) — so the size cap waits for it: four hours of the keeper's 60-s observations
+    // bring `L_slow` within 2 % of the pool (τ_slow 1 h) before the open at the cap.
+    crank_every(&mut env, &rm, 60, 240);
+    env.fresh_oracle();
     let (x_inc, _) = inc
         .io_reserves(&env.svm, shortwin_math::fees::Direction::Sell)
         .unwrap();
     let mut b = env.borrower();
+    let mut refused = Vec::new();
     let nonce = OPEN_BPS
         .into_iter()
         .find_map(|bps| {
             let q = (u128::from(x_inc) * u128::from(bps) / 10_000) as u64;
             let (res, nonce) = env.open(&rm, &mut b, q);
+            if let Err(e) = &res {
+                refused.push((bps, format!("{:?}", e.err)));
+            }
             res.is_ok().then_some(nonce)
         })
-        .expect("an open at the size cap");
+        .unwrap_or_else(|| panic!("an open at the size cap: {refused:?}"));
     crank_every(&mut env, &rm, 1, 3);
     let pos = env.position(&rm, &b.key(), nonce);
     assert_eq!(env.market(&rm.market()).max_q_hwm, pos.q, "the mark");

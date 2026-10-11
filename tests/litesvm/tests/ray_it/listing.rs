@@ -106,12 +106,16 @@ fn assert_listed(env: &Env, pool: &AnyPool, fixture: RayFixture, meta: &Transact
         Tier::C as u8,
         "C until the first tiering with an oracle"
     );
-    // Price state: P_ema = P_spot, L_ema = L_slow = √(X·Y), one ring entry, empty bucket.
+    // Price state: P_ema = P_spot, L_ema = √(X·Y), L_slow = min(√(X·Y), D) (AIR-13), one ring
+    // entry, empty bucket.
     let (x, y) = pool.io_reserves(&env.svm, Direction::Sell).unwrap();
     let p_spot = u128::from(y) * WAD / u128::from(x);
     let l = (u128::from(x) * u128::from(y)).isqrt();
     assert_eq!(m.ema_price.get(), p_spot);
-    assert_eq!((m.ema_liq.get(), m.liq_slow.get()), (l, l));
+    assert_eq!(
+        (m.ema_liq.get(), m.liq_slow.get()),
+        (l, l.min(m.pool_d.get()))
+    );
     assert_eq!((m.ring_count, m.ema_ts, m.slow_ts), (1, now, now));
     assert_eq!((m.b_lo.get(), m.b_sec), (0, 0));
     let ev: MarketCreated = events::one(meta);

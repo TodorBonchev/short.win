@@ -361,6 +361,7 @@ pub fn carried_caps(
     let l_slow = if priced {
         m.liq_slow.get().min(d)
     } else {
+        // AIR-13: a price start's `L_slow` is at most `D`, as an adoption's.
         let (x, y) = read.view.reserves?;
         liquidity(u128::from(x), u128::from(y))
             .ok()?
@@ -368,6 +369,7 @@ pub fn carried_caps(
                 d,
                 u64::from(config.params.pool_lock_min_bps),
             ))
+            .min(d)
     };
     let age = if m.venue_kind() == Some(VenueKind::None) {
         match kind {
@@ -626,21 +628,23 @@ fn listing(svm: &LiteSVM, config: &GlobalConfig, c: &MarketCreated) -> Result<()
             p.depth()
         )
     })?;
-    // M4R: a Raydium price start is marked, with `L = min(√(X·Y), ⌊D·10⁴/λ_min⌋)`.
+    // M4R: a Raydium price start is marked, with `L = min(√(X·Y), ⌊D·10⁴/λ_min⌋)` and — AIR-13 —
+    // `L_slow = min(L, D)`.
     let (x, y) = p.view.reserves.unwrap_or((0, 0));
     let l_live = liquidity(u128::from(x), u128::from(y)).unwrap_or(0);
     let want = l_live.min(depth_at_lambda(
         p.depth(),
         u64::from(config.params.pool_lock_min_bps),
     ));
+    let want_slow = want.min(p.depth());
     ensure(
         (m.ema_liq.get(), m.liq_slow.get(), m.ema_warm, m.ema_guard)
-            == (want, want, EMA_WARMUP_BUCKETS, 1),
+            == (want, want_slow, EMA_WARMUP_BUCKETS, 1),
         "I15",
         || {
             format!(
                 "listing of {}: L_ema {} / L_slow {} / ema_warm {} / ema_guard {}, want {want}, \
-                 {want}, {EMA_WARMUP_BUCKETS}, 1 (M4R)",
+                 {want_slow}, {EMA_WARMUP_BUCKETS}, 1 (M4R, AIR-13)",
                 c.market,
                 m.ema_liq.get(),
                 m.liq_slow.get(),
@@ -882,7 +886,8 @@ fn adoption(
     let integrated = post.ema_ts != pre.ema_ts;
     let want_l = if priced { cap } else { l_live.min(cap) };
     let slow_ok = if !priced {
-        slow == want_l
+        // AIR-13: a price start's `L_slow` is at most `D` too.
+        slow == want_l.min(d)
     } else if integrated {
         slow <= d
     } else {
@@ -1096,8 +1101,8 @@ fn window(
         })?;
         let list_only = pre.venue_kind() == Some(VenueKind::None);
         // Switch only if all fit, as the adoption would leave the market: `L_slow' = min(L_slow,
-        // D)` (a market without a price: the pool's `min(√(X·Y), D/λ_min)`); the age kept (a
-        // list-only market: the candidate's age start, O13).
+        // D)` (a market without a price: the pool's `min(√(X·Y), D/λ_min, D)`, AIR-13); the age
+        // kept (a list-only market: the candidate's age start, O13).
         let d = read.depth();
         let priced = post.ring_count > 0 && p_ema > 0;
         let l_slow = if priced {
@@ -1107,6 +1112,7 @@ fn window(
             liquidity(u128::from(x), u128::from(y))
                 .unwrap_or(0)
                 .min(depth_at_lambda(d, u64::from(params.pool_lock_min_bps)))
+                .min(d)
         };
         let age = if list_only {
             match kind {
