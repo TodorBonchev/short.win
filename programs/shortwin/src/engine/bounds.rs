@@ -5,8 +5,9 @@
 //! bound is `min(max_buyback_cost, V − R − ert)` ([`close_max_in`]).
 //!
 //! The reference liquidity of a Raydium market — and since the owner's decision of 2026-09-30
-//! (M6R-1) of a PumpSwap market — is capped at the depth its sizing credits (M4F-1,
-//! [`ref_depth_cap`]; on PumpSwap the burned LP's `D` itself since OWNER-M6D-1 / M6E-1).
+//! (M6R-1) of a PumpSwap market — is capped at the pool's locked depth `D` (M4F-1,
+//! [`ref_depth_cap`]; on PumpSwap the burned LP's `D` since OWNER-M6D-1 / M6E-1, on Raydium since
+//! AIR-14).
 //!
 //! Used by `close_short` (M2 foundation) and by the `liquidate` / `expire` tracks.
 
@@ -25,29 +26,43 @@ pub struct ExitBound {
     pub p_ref: u128,
     /// `L_b = max(L_live, min(max(L_ema', L_slow), cap))` (V2-14), `L_ema' = min(L_ema, L_mlo)`
     /// while the post-change reference guard is set (M4R), `cap` = [`ref_depth_cap`] on Raydium
-    /// (M4F-1) and PumpSwap (M6R-1; `D` there, so `L_b = L_live`).
+    /// (M4F-1, AIR-14) and PumpSwap (M6R-1): `D`, so `L_b = L_live`.
     pub l_b: u128,
     /// `B̂_ref = B̂(Q; reprice(L_b, P_ref))` at the risk fee; `None` if undefined.
     pub b_ref: Option<u64>,
 }
 
-/// The cap on the reference liquidity's EMA terms (M4F-1; ECON §8.2): `⌊D·10⁴/λ_min⌋`
-/// (`shortwin_math::bounds::ref_depth_cap`) with `D = pool_d` — the locked depth at the last
-/// executable observation, which the exit's own prologue has just refreshed — and `λ_min` =
-/// `VenueKind::lock_min_bps`: never more depth than the open caps and the tier credit the pool
-/// with (V2-8). On a Raydium market `λ_min = pool_lock_min_bps`, so a deposit-inflated `L_ema` /
-/// `L_slow` lifts the reference by at most `λ/λ_min` over the live depth. On a PumpSwap market
-/// (M6R-1, ARCH §3.6, changelog 56; ECON #105) `D` is the canonical pool's burned-LP depth and
-/// `λ_min` = `PUMPSWAP_LOCK_MIN_BPS` = 100 % (OWNER-M6D-1, ARCH changelog 57, ECON #106 (2);
-/// M6E-1): the cap is `D` itself, the depth PumpSwap sizing credits, and since `D ≤ L_live` on a
-/// canonical pool the reference reads the live pool, `L_b = L_live`. Its EMA terms credit a
-/// third-party deposit to no exit: at `2D` (`pool_lock_min_bps`, as first kept) a deposit held into
-/// a deadline and pulled there held a D-sized position's expiry up for up to an hour (`δ_exp` 1 %
-/// < the buyback's 1.2 % over a reference at twice the drained depth; `pamm_it::lock::part_3f`).
-/// `None` on the curve and the mock (no locked depth; `VenueKind::has_locked_depth`).
-pub fn ref_depth_cap(config: &GlobalConfig, market: &Market, kind: VenueKind) -> Option<u128> {
-    kind.lock_min_bps(config.params.pool_lock_min_bps)
-        .map(|lambda_min| bounds::ref_depth_cap(market.pool_d.get(), lambda_min))
+/// The `λ` the reference cap divides `D` by: 100 % on every venue with a locked depth (M6E-1 on
+/// PumpSwap, AIR-14 on Raydium), so the cap is `D` itself.
+const REF_CAP_LAMBDA_BPS: u32 = 10_000;
+
+/// The cap on the reference liquidity's EMA terms (M4F-1; ECON §8.2): `D = pool_d` — the locked
+/// depth at the last executable observation, which the exit's own prologue has just refreshed —
+/// itself (`shortwin_math::bounds::ref_depth_cap(D, 10⁴)`) on a Raydium or PumpSwap market, `None`
+/// on the curve and the mock (no locked depth; `VenueKind::has_locked_depth`). `D` is deposit- and
+/// withdraw-invariant and `D ≤ L_live` on the pre-trade pool the exit reads, so the reference
+/// reads the live pool: `L_b = L_live`, and the EMA terms credit a third-party deposit to no exit.
+///
+/// PumpSwap (M6R-1, ARCH §3.6, changelog 56; ECON #105): `D` is the canonical pool's burned-LP
+/// depth, credited at `λ_min` = `PUMPSWAP_LOCK_MIN_BPS` = 100 % (OWNER-M6D-1, ARCH changelog 57,
+/// ECON #106 (2); M6E-1). Raydium (AIR-14): the cap was `⌊D·10⁴/pool_lock_min_bps⌋` = 2D, the most
+/// depth Raydium sizing ever credits, so on a pool locked above `λ_min` (a λ ≈ 1 pool: honest depth
+/// `D`) a deposit held into a deadline and pulled there left `L_b` at up to 2D over a drained pool
+/// at `D`, and held the expiry of a position at more than ≈ 80 % of its impact cap up for tens of
+/// minutes (`δ_exp` 1 % < the buyback's ≈ 1.2 % over a reference at twice the drained depth; the
+/// PumpSwap twin was M6E-1, `pamm_it::lock::part_3f`). Capping at `⌊D·10⁴/max(λ_min, λ_live)⌋`
+/// instead reads the same here — `λ_live` comes from the same pre-trade reserves as `D`, so
+/// `D·10⁴/λ_live ≤ L_live` — and a `λ_live` read before the exit would be moved by any deposit- or
+/// withdraw-wrapped crank. What it gives up, as M6E-1 did on PumpSwap, is V2-14's layer above `D`
+/// (quiet-second withdrawals cannot lower the reference): a buyback wrapped in an unlocked LP's own
+/// withdrawal is priced on the drained pool, at worst at `D`, while Raydium sizing may have credited
+/// the position up to `D/λ_min`.
+///
+/// `_config` is not read (the cap divides `D` by 100 %, not by `pool_lock_min_bps`); the parameter
+/// stays for the callers (the keeper, the exits, the settlement box).
+pub fn ref_depth_cap(_config: &GlobalConfig, market: &Market, kind: VenueKind) -> Option<u128> {
+    kind.has_locked_depth()
+        .then(|| bounds::ref_depth_cap(market.pool_d.get(), REF_CAP_LAMBDA_BPS))
 }
 
 /// The liquidation reference (ARCH §3.6 step 6; v0.4.1 with the `lo_x·(1 + κ_eff)` cap):

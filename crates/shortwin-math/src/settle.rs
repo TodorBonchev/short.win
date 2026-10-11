@@ -86,18 +86,18 @@ pub fn box_of(ema: &Ema, ring: &Ring, now: i64, executable: bool) -> Result<Sett
 /// `RING_LEN + 1` quiet seconds would otherwise collapse the box onto the pushed EMA. `ema`
 /// and `ring` are the post-roll state (ARCH §3.0).
 ///
-/// `depth_cap` (AIR-15) is the market's [`crate::bounds::ref_depth_cap`], `Some(⌊D·10⁴/λ_min⌋)`
-/// on a Raydium market and a canonical PumpSwap pool (`D` itself there) — the depth sizing
-/// credits the pool with, at which [`crate::bounds::ref_liquidity`] caps the exit reference's
-/// EMA terms (M4F-1) — and `None` on the other venues. A deposit wrapped around any record
+/// `depth_cap` (AIR-15) is the market's [`crate::bounds::ref_depth_cap`], `Some(D)` — the locked
+/// depth, `⌊D·10⁴/λ⌋` at `λ` = 100 % since AIR-14 — on a Raydium market and a canonical PumpSwap
+/// pool, at which [`crate::bounds::ref_liquidity`] caps the exit reference's EMA terms (M4F-1),
+/// and `None` on the other venues. A deposit wrapped around any record
 /// raises that second's liquidity high, which honest records in the same second cannot lower,
 /// so deposit-wrapped cranks in 4 of the 8 seconds would otherwise set `L_mhi` at will, widen
 /// the box and defer the S1/S2 legs and the S2/S3 amount check for no swap fee. `L_ema` is
 /// never capped (the box keeps the EMA point), so `L_hi` never falls below `L_ema` or below
 /// `min(L_mhi, cap)`, which only attacker-only seconds lower and no capital-only bundle moves
-/// (`D` is deposit- and withdraw-invariant). Depth above the cap — third-party liquidity beyond
-/// what sizing credits (a PumpSwap pool's unburned LP, a Raydium pool whose locked share fell
-/// below `λ_min`) — is guarded by `L_ema` alone, as in the exit reference.
+/// (`D` is deposit- and withdraw-invariant). Depth above the cap — liquidity beyond the locked
+/// depth (a PumpSwap pool's unburned LP, a Raydium pool's unlocked LP) — is guarded by `L_ema`
+/// alone, as in the exit reference.
 ///
 /// Errors: `InvalidInput` for a corrupted or empty ring.
 pub fn box_of_capped(

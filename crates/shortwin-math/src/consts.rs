@@ -71,7 +71,8 @@ pub const CARRIED_FEE_CAP_PPM: u32 = 2_500;
 /// deposit held into a deadline and pulled there hold a `D`-sized expiry up for up to an hour
 /// (M6E-1, part 3 (f) (iv): the buyback on the drained pool ≈ 1.2 % above a reference at twice its
 /// depth, over `δ_exp` = 1 %). Compiled, not a parameter: a governed PumpSwap `λ_min` below 100 %
-/// would credit held deposits again. Raydium keeps `pool_lock_min_bps` everywhere. The sim's
+/// would credit held deposits again. Raydium keeps `pool_lock_min_bps` for its sizing, its tier
+/// and its price start's anchor; its exits' reference cap is `D` too since AIR-14. The sim's
 /// `shortwin_sim.PUMPSWAP_LOCK_MIN_BPS` (`Market.lock_min_bps`); the program's
 /// `VenueKind::lock_min_bps`.
 pub const PUMPSWAP_LOCK_MIN_BPS: u32 = 10_000;

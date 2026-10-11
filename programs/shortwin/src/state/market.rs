@@ -127,8 +127,9 @@ impl VenueKind {
     }
 
     /// Whether the venue has a locked depth `D` (`Market.pool_d`, refreshed at every executable
-    /// observation) that bounds the size cap's `X₀`, the tier's `R_eff` and the exit reference's
-    /// EMA terms at `D/λ_min` (ARCH §2.6, §3.6, §4.6, §4.7; `λ_min` = [`Self::lock_min_bps`]):
+    /// observation) that bounds the size cap's `X₀` and the tier's `R_eff` at `D/λ_min` (ARCH §2.6,
+    /// §4.6, §4.7; `λ_min` = [`Self::lock_min_bps`]) and the exit reference's EMA terms at `D`
+    /// itself (§3.6; `engine::bounds::ref_depth_cap`, AIR-14):
     /// the Raydium kinds (V2-8, M4F-1) and — since the owner's decision of 2026-09-30 (M6R-1, ARCH
     /// changelog 56, ECON #105) — PumpSwap, whose `D` is the depth of its burned creation LP
     /// (credited at `λ_min` = 100 % since OWNER-M6D-1, ARCH changelog 57, ECON #106). Not the
@@ -138,9 +139,10 @@ impl VenueKind {
     }
 
     /// The `λ_min` that divides this venue's locked depth `D` (`Market.pool_d`) wherever the
-    /// program credits it (ARCH §2.3.3, §2.5, §3.6, §4.6, §4.7): `X₀`'s `D` term and with it every
-    /// cap on `X₀ + q` (`open_short`), the tier's `R_eff` (`engine::tier`), the exit reference's
-    /// cap `⌊D·10⁴/λ_min⌋` (`engine::bounds::ref_depth_cap`) and a price start's anchor. Raydium:
+    /// program credits it to a size or a tier (ARCH §2.3.3, §2.5, §4.6, §4.7): `X₀`'s `D` term and
+    /// with it every cap on `X₀ + q` (`open_short`), the tier's `R_eff` (`engine::tier`) and a
+    /// price start's anchor. The exit reference's cap is `D` itself on both venues (AIR-14:
+    /// `engine::bounds::ref_depth_cap`, at `λ` = 100 %). Raydium:
     /// the config's `pool_lock_min_bps`. PumpSwap: [`PUMPSWAP_LOCK_MIN_BPS`] = 10,000 (100 %)
     /// whatever `pool_lock_min_bps` is — the owner's decision of 2026-09-30 (OWNER-M6D-1, option
     /// (a); ARCH changelog 57, ECON #106): a canonical pool's lock is its burned creation LP, so

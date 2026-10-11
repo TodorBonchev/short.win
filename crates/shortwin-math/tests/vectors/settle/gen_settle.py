@@ -63,11 +63,11 @@ recorded; tests/settle_vectors.rs documents each layout next to its parser):
                                            (flags: EMA-leg predicate on each ring entry's
                                             cached (x, y), newest first)
   ref     t pid is_liq l_live L_b P_ref cap
-                                           (cap: Market.ref_depth_cap, floor(D*1e4/lambda_min) on a Raydium
-                                            venue (lambda_min = pool_lock_min_bps) and a canonical PumpSwap
-                                            pool (M6R-1; lambda_min = PUMPSWAP_LOCK_MIN_BPS since OWNER-M6D-1 /
-                                            M6E-1: D itself), "-" elsewhere; M4F-1: L_b = max(L_live,
-                                            min(max(L_ema', L_slow), cap)))
+                                           (cap: Market.ref_depth_cap, the pool's locked depth D on a Raydium
+                                            venue (since AIR-14; floor(D*1e4/pool_lock_min_bps) before) and a
+                                            canonical PumpSwap pool (M6R-1; lambda_min = PUMPSWAP_LOCK_MIN_BPS
+                                            since OWNER-M6D-1 / M6E-1: D itself), "-" elsewhere; M4F-1: L_b =
+                                            max(L_live, min(max(L_ema', L_slow), cap)))
   maxin   liq b_ref delta V K_s ert max_in | exp b_ref delta eps fee V K_s R ert pi max_in
   settle  t pid path deadline | ema_count P_ema L_ema ema_ts | P_lo P_hi L_lo L_hi
           | R cr_liq ema_leg exec p_rs L_live b_live sigma_live

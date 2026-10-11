@@ -25,7 +25,8 @@
 //! | `m4x2_a_held_deposit_freeze_no_longer_lifts_l_slow` | M4X-2: under the capital deposit freeze (`[deposit 7·LP, crank_price, withdraw]` every second from the adoption) `L_slow` integrated the frozen `L_ema` while the guard was set, reached 2.62× the pool's depth after 900 s, and the unguarded `L_slow` term of `L_b` turned a genuine 4× pump into S1 (lenders −10.056 SOL, borrower 0) instead of a liquidation. Now `L_slow` integrates `min(lobs, L_mlo)` while the guard is set: ≤ 1.0× at the ramp, and the position — the largest the candidate takes (switch only if all fit: q/x ≈ 0.71 %, the size cap's 3.1 % no longer carried) — liquidated with the lenders' `q` bought back; an `L_slow` lifted above the lows is an I18 violation |
 //! | `m4x3_a_dump_inside_the_window_is_adopted_at_p_ema_then_re_seeded` | M4X-3 (a documentation finding): a genuine 4× dump 5 s into the collection window, after the proposal that opened it, is judged only by the execution at `P_ema` and adopted (the docs had claimed any honest dump is refused; disclosed with O18 residual 4); the warm-up then lowers `P_ema` towards the live price — since M6-SEC-1 by at most one v0.4.1 step per integration, ≈ 1.7× the pool at the gate, on it a minute later —, an open meanwhile waits out the adopted pool's listing window (`PoolListWindow`), and after it a new open is refused `PoolTooThin` |
 //! | `m4f1_a_deposit_freeze_on_a_fitting_carried_position_only_delays_the_liquidation` | M4F-1 (keeper), restated by "switch only if all fit" (owner decision of 2026-09-29): as found, attacker-only `[deposit 7·LP, crank_price, withdraw]` seconds in the keeper's idle cadence cleared the guard, froze `L_ema` at 8× the depth and turned the genuine 4× pump into S1 (lenders −10.056 SOL) on a position of ≈ 3.1 % of the new pool's `X`, which is no longer carried. A position that fits the 320-SOL candidate (95 % of its per-position cap, q/x ≈ 0.71 %) is liquidated in every run — the freeze from the adoption with the shipped keeper (`KeeperModel`: per second while the guard is set; per-slot bursts on prices only, the M4F-1 liquidity bursts reverted; per-second coverage for 10 s after a foreign liquidity on a market with positions, FITS-2 (b)), from +40 s (no burst; the foreign liquidity keeps the keeper per second from the first wrap, so only that one second is the attacker's; `L_b` within the depth cap), and under the finding's cadence — at the control's second (+0 s: the pushes only delay, and here not measurably) |
-//! | `m4f1_the_depth_cap_bounds_the_frozen_reference_at_lambda_over_lambda_min` | M4F-1 (on chain, defense in depth, kept): under the finding's keeper cadence (`L_ema` = `L_mlo` = 8× the depth, the guard cleared) the reference liquidity is capped at `⌊D·10⁴/λ_min⌋`: ≈ 2.0 on the λ 99.78 % candidate, 1.0 on a λ 50 % one; with the carried position within the candidate's caps both pumps are liquidated |
+//! | `m4f1_the_depth_cap_bounds_the_frozen_reference_at_the_live_pool` | M4F-1 (on chain, defense in depth, kept): under the finding's keeper cadence (`L_ema` = `L_mlo` = 8× the depth, the guard cleared) the reference liquidity is capped at the pool's locked depth `D` (AIR-14; `⌊D·10⁴/λ_min⌋` as built, ≈ 2.0× on the λ 99.78 % candidate): `L_b = L_live` on the λ 99.78 % and the λ 50 % candidates; with the carried position within the candidate's caps both pumps are liquidated |
+//! | `air14_a_deposit_pulled_at_the_deadline_does_not_hold_a_raydium_expiry` | AIR-14 (the program's `engine::bounds` on a synthetic state): a 1 % CPMM pool wholly locked, a position at 95 % of the 2.47 % impact cap, a deposit of 2× the pool held 62 min into the deadline and pulled there; the cap at `⌊D·10⁴/λ_min⌋` = 2D read `L_b/L_live` 2.000 and refused the expiry (`B̂_live` 2,430,862,647 > `max_in` 2,425,980,014); at `D` it executes |
 //! | `m4f1_an_oversized_carried_position_is_not_adopted_and_settles_in_s3` | M4F-1 / M4G-3, restated by "switch only if all fit": the finding's market (a position at the 2,500-SOL incumbent's size cap, 3.12 % of the 320-SOL candidate's `X`, its cap 0.75 %) halts 900 s before the deadline; every proposal of the CPMM candidate and of a 400-SOL AMM v4 sibling is refused `CarriedPositionsTooLarge`, also after an LP's real 7× deposit held in the candidate (`D` does not move); no window opens; at the deadline `sol_settle` settles S3 at fair value on the failed pool: the lenders get `FV(P_ema, L_ema)` in full (10.327 SOL for `q` worth 9.937 at `P_ema`), the borrower the rest; the mark resets at 0 |
 
 #![allow(clippy::result_large_err)]
@@ -1321,8 +1322,8 @@ struct FreezeRun {
     liquidated: Option<(i64, u64)>,
     /// A settlement instead (S1 / S2).
     settled: Option<i64>,
-    /// Seconds whose reference liquidity the Raydium depth cap lowered (`bounds::ref_liquidity`
-    /// with and without it on the pool's depth after the second).
+    /// Seconds after the warm-up whose reference liquidity the Raydium depth cap lowered
+    /// (`bounds::ref_liquidity` with and without it on the pool's depth after the second).
     capped_seconds: usize,
     /// The first second with `ema_warm = 0` and the guard clear.
     guard_clear: Option<i64>,
@@ -1405,7 +1406,8 @@ fn cadence_freeze_run(
     let (sol, tok) = lp_needed(&env, &cp, k * cp.state(&env.svm).lp_supply);
     let who = lp::provider(&mut env, &cp, 6 * sol, 6 * tok, 0);
     let signer = who.owner.insecure_clone();
-    let lam_min = env.config().params.pool_lock_min_bps;
+    // AIR-14: the reference cap is `D` itself (`⌊D·10⁴/λ⌋` at λ = 100 %), as the program's.
+    let cap_lambda = 10_000;
     let p0 = helpers::spot(&env, &cand);
     let adopted_at = env.now();
     let mut model = KeeperModel::new(cadence);
@@ -1453,9 +1455,13 @@ fn cadence_freeze_run(
         {
             let o = m.observation();
             let root = helpers::root_xy(&env, &cand);
-            let cap = shortwin_math::bounds::ref_depth_cap(m.pool_d.get(), lam_min);
+            let cap = shortwin_math::bounds::ref_depth_cap(m.pool_d.get(), cap_lambda);
             let l_b = |c| shortwin_math::bounds::ref_liquidity(root, &o.ema, &o.ring, c).unwrap();
-            run.capped_seconds += usize::from(l_b(Some(cap)) != l_b(None));
+            // Only where an exit can read it: during the warm-up the anchor `⌊D·10⁴/λ_min⌋` sits
+            // above the pool and the cap at `D` lowers it, but every exit waits for the gate.
+            if m.ema_warm == 0 {
+                run.capped_seconds += usize::from(l_b(Some(cap)) != l_b(None));
+            }
         }
         if run.guard_clear.is_none() && m.ema_warm == 0 && m.ema_guard == 0 {
             run.guard_clear = Some(s);
@@ -1464,7 +1470,7 @@ fn cadence_freeze_run(
             let o = m.observation();
             let root = helpers::root_xy(&env, &cand);
             let l_mlo = shortwin_math::observe::ring_liq_lower_median(&o.ring).unwrap();
-            let cap = shortwin_math::bounds::ref_depth_cap(m.pool_d.get(), lam_min);
+            let cap = shortwin_math::bounds::ref_depth_cap(m.pool_d.get(), cap_lambda);
             let l_b =
                 shortwin_math::bounds::ref_liquidity(root, &o.ema, &o.ring, Some(cap)).unwrap();
             let r = |x: u128| x as f64 / root as f64;
@@ -1546,7 +1552,8 @@ fn cadence_freeze_run(
 ///   from +40 s (after the honest clear) nothing starts a per-slot burst, but the foreign
 ///   liquidity starts per-second coverage (FITS-2 (b)): after the first attacker-only second
 ///   every second carries the keeper's honest extreme, so `L_ema` stays where that one second
-///   left it, bounded on chain by the depth cap `⌊D·10⁴/λ_min⌋`;
+///   left it, which the reference no longer reads: its depth cap is `D` (AIR-14; `⌊D·10⁴/λ_min⌋`
+///   as built), so `L_b = L_live`;
 /// - under the finding's cadence ([`Cadence::PreM4f`]) too.
 ///
 /// Every run is liquidated with the lenders' `q` bought back; the pushes only delay the exit
@@ -1558,7 +1565,8 @@ fn m4f1_a_deposit_freeze_on_a_fitting_carried_position_only_delays_the_liquidati
     println!("M4F-1 control (no freeze): {}", control.report);
     let (c_at, _) = control.liquidated.expect("control liquidated");
     assert!(control.bursts.is_empty(), "{}", control.report);
-    // An honest switch: the depth cap never lowers the reference (the exits are unchanged).
+    // An honest switch: after the warm-up the depth cap never lowers the reference (the exits are
+    // unchanged).
     assert_eq!(control.capped_seconds, 0, "{}", control.report);
 
     let early = cadence_freeze_run(320, 9_978, W, 7, Some(1), Cadence::Shipped);
@@ -1586,12 +1594,9 @@ fn m4f1_a_deposit_freeze_on_a_fitting_carried_position_only_delays_the_liquidati
         control.liq_covers.is_empty() && early.liq_covers.iter().all(|&t| t >= 1),
         "honest depths start nothing"
     );
-    let (_, _, l_b, cap, _) = late.at_ramp;
-    assert!(
-        l_b <= cap * 1.001,
-        "L_b within the depth cap: {}",
-        late.report
-    );
+    // The depth cap at `D` (AIR-14): the reference is the live pool, the freeze reaches none of it.
+    let (_, _, l_b, _, _) = late.at_ramp;
+    assert!(l_b <= 1.001, "L_b = L_live: {}", late.report);
 
     let found = cadence_freeze_run(320, 9_978, W, 7, Some(1), Cadence::PreM4f);
     println!(
@@ -1624,17 +1629,18 @@ fn m4f1_a_deposit_freeze_on_a_fitting_carried_position_only_delays_the_liquidati
 }
 
 /// **M4F-1** (on-chain defense in depth, `bounds::ref_liquidity`): the reference liquidity's EMA
-/// terms are capped at `⌊D·10⁴/λ_min⌋`, the most depth sizing credits the pool with, so under the
-/// keeper cadence of the finding ([`Cadence::PreM4f`]: the guard cleared by attacker-only
-/// seconds, `L_ema` frozen at 8× the pool's depth) the reference credits at most `λ/λ_min` of it:
-/// ≈ 2.0 on the λ 99.78 % candidate, 1.0 — the freeze neutralised — on a λ 50 % one. With the
-/// carried position within the candidate's caps (switch only if all fit) both pumps are
-/// liquidated. (The I18 hook checks every liquidation's `b_ref` at the capped `L_b`.)
+/// terms are capped at the pool's locked depth `D` (AIR-14; `⌊D·10⁴/λ_min⌋`, the most depth
+/// sizing credits the pool with, as built), so under the keeper cadence of the finding
+/// ([`Cadence::PreM4f`]: the guard cleared by attacker-only seconds, `L_ema` frozen at 8× the
+/// pool's depth) the reference reads the live pool, `L_b = L_live` — the freeze neutralised on the
+/// λ 99.78 % candidate as on a λ 50 % one (the cap at `λ/λ_min` let it credit ≈ 2.0× on the
+/// first). With the carried position within the candidate's caps (switch only if all fit) both
+/// pumps are liquidated. (The I18 hook checks every liquidation's `b_ref` at the capped `L_b`.)
 #[test]
-fn m4f1_the_depth_cap_bounds_the_frozen_reference_at_lambda_over_lambda_min() {
+fn m4f1_the_depth_cap_bounds_the_frozen_reference_at_the_live_pool() {
     const W: i64 = 120;
     for (sol, lam) in [(320u64, 9_978u64), (640, 5_000)] {
-        let bound = lam as f64 / 5_000.0;
+        let bound = lam as f64 / 10_000.0;
         let run = cadence_freeze_run(sol, lam, W, 7, Some(1), Cadence::PreM4f);
         println!(
             "M4F-1 finding's cadence, candidate {sol} SOL λ {lam}: {}",
@@ -1656,14 +1662,8 @@ fn m4f1_the_depth_cap_bounds_the_frozen_reference_at_lambda_over_lambda_min() {
             "the freeze as found: {}",
             run.report
         );
-        assert!(
-            cap <= bound * 1.001 && l_b <= bound * 1.001,
-            "L_b ≤ λ/λ_min: {}",
-            run.report
-        );
-        if lam == 5_000 {
-            assert!(l_b <= 1.001, "{}", run.report);
-        }
+        assert!(cap <= bound * 1.001, "cap = D = λ·√(X·Y): {}", run.report);
+        assert!(l_b <= 1.001, "L_b = L_live: {}", run.report);
         assert!(run.liquidated.is_some(), "{}", run.report);
     }
 }
@@ -1805,4 +1805,137 @@ fn m4f1_an_oversized_carried_position_is_not_adopted_and_settles_in_s3() {
         (0, 0),
         "the mark reset at 0"
     );
+}
+
+/// The AIR-14 shape, on the program's own exit-bound functions (`engine::bounds`, as
+/// `liquidate::plan`'s expiry branch and the keeper call them): a 1 % Raydium CPMM pool (100 SOL,
+/// `X` = 10¹⁵) whose LP is wholly burned (λ 100 %: `D = √(X·Y)`), a position at 95 % of the
+/// 2.47 % impact cap (q/X 2.35 %), and the observation state a deposit of twice the pool, held for
+/// the last 62 min before the deadline (a crank every 60 s) and pulled in the deadline second,
+/// leaves: `L_slow` ≈ 2.28 D, the live pool back at `D`. Returns the config (`pool_lock_min_bps`
+/// at its default 5,000), the market, the position, the pool and the first second after the
+/// deadline.
+mod held_deposit {
+    use anchor_lang::AccountDeserialize;
+    use bytemuck::Zeroable;
+    use shortwin::engine::bounds;
+    use shortwin::state::{GlobalConfig, Market, ShortPosition, VenueKind};
+    use shortwin::venues::VenueState;
+    use shortwin_math::fees::CpmmFees;
+    use shortwin_math::num::WAD;
+    use shortwin_math::observe::{EmaParams, Observation};
+    use shortwin_math::quote::Pricing;
+
+    pub const X: u64 = 1_000_000_000_000_000;
+    pub const Y: u64 = 100_000_000_000;
+    /// `√(X·Y)`: the pool's depth, all of it locked.
+    pub const D: u128 = 10_000_000_000_000;
+
+    pub fn setup() -> (GlobalConfig, Market, ShortPosition, VenueState, i64) {
+        let p = u128::from(Y) * WAD / u128::from(X);
+        let prm = EmaParams::DEFAULT;
+        let mut obs = Observation::new(0, p, D).unwrap();
+        let crank = |obs: &mut Observation, t: i64, l: u128| {
+            obs.record(t, p, l).unwrap();
+            obs.roll(t + 1, &prm).unwrap();
+        };
+        // Two honest hours at the pool's depth, then the deposit (3·D) for 62 cranks 60 s apart.
+        let mut t = 60;
+        while t < 7_200 {
+            crank(&mut obs, t, D);
+            t += 60;
+        }
+        for _ in 0..62 {
+            crank(&mut obs, t, 3 * D);
+            t += 60;
+        }
+        // The deadline second: the deposit is pulled, the keeper observes the drained pool.
+        let deadline = t;
+        crank(&mut obs, deadline, D);
+        let mut market = Market::zeroed();
+        market.venue = VenueKind::RaydiumCpmm as u8;
+        market.pool_d.set(D);
+        market.set_observation(&obs);
+        let mut config = GlobalConfig::zeroed();
+        config.params.pool_lock_min_bps = 5_000;
+        let mut pos = ShortPosition::try_deserialize_unchecked(&mut &[0u8; 384][..]).unwrap();
+        pos.q = X / 10_000 * 235;
+        pos.v = 5_000_000_000;
+        pos.deadline = deadline;
+        pos.delta_exp_bps = 100;
+        pos.exec_tol_bps = 10;
+        pos.expiry_fee_bps = 200;
+        pos.venue_fee_hard_cap_bps = 500;
+        pos.ref_max_age_s = 2;
+        pos.kappa_growth_n = 3;
+        pos.kappa_liq_bps = 2_500;
+        let fee = CpmmFees {
+            trade: 10_000,
+            creator: 0,
+            creator_on_input: false,
+            protocol: 0,
+            fund: 0,
+        };
+        let st = VenueState {
+            kind: VenueKind::RaydiumCpmm,
+            executable: true,
+            x: X,
+            y: Y,
+            r: Y,
+            pricing: Some(Pricing::Cpmm {
+                buy: fee,
+                sell: fee,
+            }),
+            fee_ppm: 10_000,
+            locked_depth: D,
+            curve: None,
+            pool: None,
+        };
+        (config, market, pos, st, deadline + 1)
+    }
+
+    /// The expiry's `(L_b, B̂_ref, max_in)` and the live buyback `B̂_live`, as `liquidate::plan`
+    /// computes them (`R_due` and `K_s` 0 here).
+    pub fn expiry(
+        config: &GlobalConfig,
+        market: &Market,
+        pos: &ShortPosition,
+        st: &VenueState,
+        now: i64,
+    ) -> (u128, u64, u64, u64) {
+        let obs = market.observation();
+        let cap = bounds::ref_depth_cap(config, market, VenueKind::RaydiumCpmm);
+        let bound = bounds::expiry_reference(pos, &obs, st, now, cap)
+            .unwrap()
+            .expect("a fresh bucket");
+        let b_ref = bound.b_ref.expect("B_ref");
+        let max_in = bounds::max_in_exp(pos, b_ref, 0, 0)
+            .unwrap()
+            .expect("max_in");
+        let b_live = st.buy(pos.q).expect("B_live").cost;
+        (bound.l_b, b_ref, max_in, b_live)
+    }
+}
+
+/// **AIR-14** (the review's I-14; the Raydium side of M6E-1): the exit reference capped its EMA
+/// terms at `⌊D·10⁴/pool_lock_min_bps⌋` = 2D on Raydium, so a deposit held into a position's
+/// deadline and pulled there left `L_b` at twice the drained pool — the buyback ≈ 1.2 % above the
+/// reference, over `δ_exp` = 1 % — and the expiry was refused `ExitBoundNotMet` until `L_slow`
+/// decayed (tens of minutes). The cap is now `D` on Raydium as on PumpSwap (`D ≤ L_live`, so
+/// `L_b = L_live`): the expiry executes in the deadline's next second.
+#[test]
+fn air14_a_deposit_pulled_at_the_deadline_does_not_hold_a_raydium_expiry() {
+    use held_deposit::*;
+    let (config, market, pos, st, now) = setup();
+    let obs = market.observation();
+    assert!(obs.ema.liq_slow > 2 * D, "L_slow {}", obs.ema.liq_slow);
+    let l_live = st.liquidity().unwrap();
+    assert_eq!(l_live, D);
+    let (l_b, b_ref, max_in, b_live) = expiry(&config, &market, &pos, &st, now);
+    assert!(
+        b_live <= max_in,
+        "ExitBoundNotMet: B_live {b_live} > max_in {max_in} (B_ref {b_ref} at L_b/L_live {:.3})",
+        l_b as f64 / l_live as f64
+    );
+    assert_eq!(l_b, l_live, "the reference reads the drained pool");
 }

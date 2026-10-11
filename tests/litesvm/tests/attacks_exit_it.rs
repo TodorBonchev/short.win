@@ -2370,7 +2370,11 @@ fn fixed_bound_near_the_band_ra() {
 
 /// `fixed_delta.py` (c), RA: a 50 % LP drain (all unlocked LP at λ_min) then a pump. ECON:
 /// liquidated at ×1.62 / ×1.69 / ×1.63 with the lenders up — a fixed 1 % bound would turn the
-/// second into S1; the fixed 2 % liquidates.
+/// second into S1; the fixed 2 % liquidates. The mock has no locked depth, so the program caps no
+/// reference here: the figures are the sim's with `Market.ref_depth_cap` lifted — exactly its
+/// output while its Raydium cap was `2D`, the pool before the drain, which never bound. Since
+/// AIR-14 the sim's RA (a λ 50 % pool) caps the reference at `D`, the drained pool: the same
+/// seconds and prices, `B̂_ref` 0.9–1.0 % higher, the borrower's remainder 0.014–0.015 SOL lower.
 #[test]
 fn fixed_bound_after_a_drain_ra() {
     let te = 3_600;

@@ -634,9 +634,6 @@ pub struct MarketView {
     /// Lamports the trader normalisation sweeps (`trader` + the `trader_wsol` address).
     pub donated: u64,
     pub s3_no_route: bool,
-    /// `pool_lock_min_bps` (`λ_min`): with the market's `pool_d`, the M4F-1 cap
-    /// `⌊D·10⁴/λ_min⌋` on the reference liquidity's EMA terms.
-    pub lambda_min_bps: u32,
     /// PumpSwap (AIR-10): the one-way fee (ppm) at the stored `P_ema`'s market cap as the exit
     /// reads it before its prologue rolls the EMA, which caps the risk view
     /// (`VenueState::exit_risk_cap_bps`); `None` on the venues without one (Raydium, the mock).
@@ -696,7 +693,6 @@ pub fn read_market_view(env: &Env, rm: &RayMarket) -> MarketView {
         donated: lamports(env, &market.trader) + lamports(env, &market.trader_wsol),
         venue,
         s3_no_route: s3,
-        lambda_min_bps: env.config().params.pool_lock_min_bps,
         ema_fee_ppm: None,
         market,
     }
@@ -1259,8 +1255,9 @@ pub fn predict(v: &View) -> Predicted {
     .unwrap();
     let newest = obs.ring.newest().copied().unwrap_or_default();
     let cr_ema_bps = risk::cr_bps(v_eff, quote_at(newest.x, newest.y)).unwrap_or(u64::MAX);
-    // M4F-1: a Raydium market's reference credits at most ⌊D·10⁴/λ_min⌋ through its EMA terms.
-    let cap = bounds::ref_depth_cap(v.market().pool_d.get(), v.m.lambda_min_bps);
+    // M4F-1: a Raydium market's reference credits at most its locked depth D through its EMA terms
+    // (AIR-14: `⌊D·10⁴/λ⌋` at λ = 100 %; `λ_min` before).
+    let cap = bounds::ref_depth_cap(v.market().pool_d.get(), 10_000);
     let l_b = bounds::ref_liquidity(l_live, &obs.ema, &obs.ring, Some(cap)).unwrap();
     let prm = pos.exit_params();
     let liq_p = bounds::liq_reference(&obs.ema, &obs.ring, &obs.last, now, &prm).unwrap();
@@ -1932,8 +1929,9 @@ pub fn predict_settle(v: &View) -> SettlePrediction {
         )
         .unwrap()
     };
-    // AIR-15: the box's L_mhi is capped at ⌊D·10⁴/λ_min⌋, as the reference's EMA terms are.
-    let cap = bounds::ref_depth_cap(market.pool_d.get(), v.m.lambda_min_bps);
+    // AIR-15: the box's L_mhi is capped at the locked depth D, as the reference's EMA terms are
+    // (AIR-14: `⌊D·10⁴/λ⌋` at λ = 100 %).
+    let cap = bounds::ref_depth_cap(market.pool_d.get(), 10_000);
     let bx = settle::box_of_capped(&obs.ema, &obs.ring, now, exec, Some(cap)).unwrap();
     let nz = |t: i64| (t != 0).then_some(t);
     let inp = SettleInputs {

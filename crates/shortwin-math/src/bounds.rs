@@ -78,26 +78,20 @@ impl Default for ExitParams {
 /// liquidity, and so from blocking the exit bound, until `L_ema` agrees with the lows within
 /// `REF_GUARD_TOL_BPS` (an honest switch: at the end of the warm-up).
 ///
-/// `depth_cap` (M4F-1, defense in depth) is `Some(⌊D·10⁴/λ_min⌋)` ([`ref_depth_cap`]: the pool's
-/// locked depth over `λ_min`, the most depth sizing ever credits the pool with —
-/// `caps::conservative_x0`, `tier`'s `R_eff`, the adoption anchor) on a Raydium market, `λ_min` =
-/// `pool_lock_min_bps`, and — since M6R-1 (ECON #105) — on a canonical PumpSwap pool, whose
-/// `λ_min` is [`PUMPSWAP_LOCK_MIN_BPS`](crate::consts::PUMPSWAP_LOCK_MIN_BPS) = 100 % since
-/// OWNER-M6D-1 (ECON #106; the cap too since M6E-1): the cap is `D` itself, and as `D ≤ L_live`
-/// on a canonical pool, `L_b = L_live` there — a third-party deposit is credited to no exit, as to
-/// no size (at `2D` a deposit pulled at a deadline held a `D`-sized expiry up for up to an hour).
-/// `None` on the other venues. After a switch, attacker-only seconds of deposit-wrapped cranks can
-/// lift `L_ema` (and `L_slow`) to the deposit's depth once the guard has cleared; the cap keeps
-/// the EMA terms from crediting more than sizing does, so such a push lifts the reference by at
-/// most `λ/λ_min` over the pool's own depth (≤ 2× at the default `λ_min` of 50 %). `D` is
-/// deposit- and withdraw-invariant up to the whole-bps floor of `λ` (at most 1 bp of the pool's
-/// `√(X·Y)` in that instruction), so no capital-only bundle moves the cap materially. It
-/// narrows the exposure, it does not close it: the keeper denies the attacker-only seconds
-/// themselves — per second while the guard is set (duty 5), and on a market with open positions
-/// per second for a short window after any foreign bucket liquidity off its own `√(X·Y)` (duty
-/// 2's liquidity trigger, FITS-2; the per-slot liquidity bursts of M4F-1 stay reverted, M4G-2:
-/// duty-2 bursts are price-only). The pump venues and the mock have no locked depth and no pool
-/// selection (no switch, no guard): `None`, as before.
+/// `depth_cap` (M4F-1, defense in depth) is the pool's locked depth `D` itself
+/// ([`ref_depth_cap`] at `λ` = 100 %) on a canonical PumpSwap pool — since M6R-1 (ECON #105) and
+/// M6E-1, its `λ_min` being [`PUMPSWAP_LOCK_MIN_BPS`](crate::consts::PUMPSWAP_LOCK_MIN_BPS) = 100 %
+/// since OWNER-M6D-1 (ECON #106) — and, since AIR-14, on a Raydium market, whose cap was
+/// `⌊D·10⁴/pool_lock_min_bps⌋` (2D at the default), the most depth Raydium sizing credits. As
+/// `D ≤ L_live` on the pool the exit reads, `L_b = L_live` there: a third-party deposit is credited
+/// to no exit (at `2D` a deposit held into a deadline and pulled there held a position's expiry up
+/// for tens of minutes: M6E-1 on PumpSwap, AIR-14 on Raydium), and a push of `L_ema` or `L_slow`
+/// by deposit-wrapped cranks reaches no reference. What the cap gives up is V2-14's layer above
+/// `D`: a buyback wrapped in an unlocked LP's own withdrawal is priced on the drained pool, at
+/// worst at `D`. `D` is deposit- and withdraw-invariant up to the whole-bps floor of `λ` (at most
+/// 1 bp of the pool's `√(X·Y)` in that instruction), so no capital-only bundle moves the cap
+/// materially. `None` on the pump curve and the mock, which have no locked depth and no pool
+/// selection (no switch, no guard), as before.
 ///
 /// Errors: `InvalidInput` for a corrupted ring while the guard is set.
 pub fn ref_liquidity(
@@ -180,11 +174,11 @@ pub fn spot_liquidity(l_live: u128, ema: &Ema, ring: &Ring) -> Result<u128, Math
 }
 
 /// The Raydium (M4F-1) and PumpSwap (M6R-1) cap of [`ref_liquidity`]'s EMA terms:
-/// `⌊D·10⁴/λ_min⌋` ([`depth_at_lambda`]), `D` the pool's locked depth (`Market.pool_d`, refreshed
-/// at every executable observation) and `λ_min` the venue's: Raydium `pool_lock_min_bps`, PumpSwap
-/// [`PUMPSWAP_LOCK_MIN_BPS`](crate::consts::PUMPSWAP_LOCK_MIN_BPS) = 100 % (OWNER-M6D-1, ECON
-/// #106; M6E-1), i.e. `D` itself; 0 for `λ_min = 0` (outside the compiled bounds), which leaves
-/// `L_b = L_live`.
+/// `⌊D·10⁴/λ⌋` ([`depth_at_lambda`]), `D` the pool's locked depth (`Market.pool_d`, refreshed
+/// at every executable observation). The program passes `λ` = 100 % on both venues, i.e. `D`
+/// itself (PumpSwap: [`PUMPSWAP_LOCK_MIN_BPS`](crate::consts::PUMPSWAP_LOCK_MIN_BPS), OWNER-M6D-1,
+/// ECON #106, M6E-1; Raydium since AIR-14, `pool_lock_min_bps` before); 0 for `λ = 0`, which
+/// leaves `L_b = L_live`.
 pub fn ref_depth_cap(locked_depth: u128, lambda_min_bps: u32) -> u128 {
     depth_at_lambda(locked_depth, u64::from(lambda_min_bps))
 }

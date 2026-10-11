@@ -1833,13 +1833,13 @@ pub type LpWrap = dyn Fn(&mut Lab, Instruction) -> (Vec<Instruction>, Keypair);
 ///   `P_hi`, `L_lo`, `L_hi`, within 1 bp: the round trips leave dust in the pool) and amounts;
 /// - every 20 s and in each of the 5 seconds before the honest S1 (7 bundles): 5 of the 8
 ///   buckets' highs hold the doubled depth, so their upper median `L_mhi` doubles, but the box
-///   reads `L_hi = max(L_ema, min(L_mhi, cap))` with the venue's depth cap `⌊D·10⁴/λ_min⌋`
-///   (AIR-15; `bounds::ref_depth_cap`, which no capital-only bundle moves). On PumpSwap the cap
-///   is the burned depth `D`, at or below the live depth: the wraps widen nothing, and the S1
-///   lands in the honest second with the honest box. On Raydium (`λ_min` = `pool_lock_min_bps`)
-///   `L_hi` widens at most to the cap — ECON §5.6's disclosed residual "deferral by widening",
-///   which can only defer: the S1 lands at most 4 s late, its price side and amounts the honest
-///   ones.
+///   reads `L_hi = max(L_ema, min(L_mhi, cap))` with the venue's depth cap, the locked depth `D`
+///   on PumpSwap and, since AIR-14, on Raydium (AIR-15; `bounds::ref_depth_cap`, which no
+///   capital-only bundle moves). `D` is at or below the live depth: the wraps widen nothing, and
+///   the S1 lands in the honest second with the honest box. Were the cap above the honest
+///   `L_hi` (Raydium's `⌊D·10⁴/λ_min⌋` before AIR-14), `L_hi` would widen at most to the cap —
+///   ECON §5.6's disclosed residual "deferral by widening", which can only defer: the S1 lands at
+///   most 4 s late, its price side and amounts the honest ones.
 pub fn lp_around_settle(make: &dyn Fn() -> Lab, label: &str, wrap: &LpWrap) {
     let (hs, h) = {
         let (mut lab, b, nonce) = s1_gap(make, label, 1.05);
@@ -1917,12 +1917,13 @@ pub fn lp_around_settle(make: &dyn Fn() -> Lab, label: &str, wrap: &LpWrap) {
         } else {
             // AIR-15: the program's `L_hi` from the state the settling call evaluated (its
             // post-roll EMA and ring, and the `pool_d` its prologue refreshed).
+            // The cap is the locked depth `D` on either venue (AIR-14: `⌊D·10⁴/λ⌋` at λ = 100 %).
             let m = lab.market();
-            let lambda_min = m
-                .venue_kind()
-                .and_then(|k| k.lock_min_bps(lab.env.config().params.pool_lock_min_bps))
-                .expect("a venue with a locked depth");
-            let cap = shortwin_math::bounds::ref_depth_cap(m.pool_d.get(), lambda_min);
+            assert!(
+                m.venue_kind().is_some_and(|k| k.has_locked_depth()),
+                "a venue with a locked depth"
+            );
+            let cap = shortwin_math::bounds::ref_depth_cap(m.pool_d.get(), 10_000);
             let l_mhi = shortwin_math::observe::ring_medians(&m.ring_math())
                 .unwrap()
                 .3;

@@ -475,10 +475,11 @@ fn spot_liquidity_matches_sim() {
 }
 
 /// `L_b` of `Market.exit_reference` alone (M4F-1): the post-change guard on or off and, on a
-/// Raydium venue, the cap `Market.ref_depth_cap = ⌊D·10⁴/λ_min⌋` on the EMA terms (binding or
-/// not; `L_live` never capped), against `bounds::{ref_depth_cap, ref_liquidity}`.
+/// Raydium venue, the cap `Market.ref_depth_cap = ⌊D·10⁴/λ⌋` on the EMA terms — `λ` = 100 %, the
+/// pool's `D` itself, since AIR-14 — (binding or not; `L_live` never capped), against
+/// `bounds::{ref_depth_cap, ref_liquidity}`.
 ///
-/// `l_live L_ema L_slow guard λ_min D L_b | ring` (`λ_min`, `D` `-` off Raydium).
+/// `l_live L_ema L_slow guard λ D L_b | ring` (`λ`, `D` `-` off Raydium).
 #[test]
 fn reference_liquidity_matches_sim() {
     let f: UnitsRef = common::load_vectors("oracle", "units_ref.json");

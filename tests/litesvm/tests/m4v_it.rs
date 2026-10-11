@@ -678,12 +678,10 @@ fn m4v_2c_a_deposit_freeze_does_not_block_the_liquidation() {
                     .buy_repriced(pos.q, l_b, e.p_ref)
                     .map(|b| b.cost)
             };
-            // M4F-1: the EMA terms capped at ⌊D·10⁴/λ_min⌋ on Raydium.
+            // M4F-1: the EMA terms capped at the pool's locked depth D on Raydium (AIR-14;
+            // ⌊D·10⁴/λ_min⌋ before).
             let m_now = env.market(&rm.market());
-            let cap = shortwin_math::bounds::ref_depth_cap(
-                m_now.pool_d.get(),
-                env.config().params.pool_lock_min_bps,
-            );
+            let cap = shortwin_math::bounds::ref_depth_cap(m_now.pool_d.get(), 10_000);
             let guarded = l_live.max(obs.ema.liq.min(l_mlo).max(obs.ema.liq_slow).min(cap));
             let pushed = l_live.max(obs.ema.liq).max(obs.ema.liq_slow);
             assert_eq!(

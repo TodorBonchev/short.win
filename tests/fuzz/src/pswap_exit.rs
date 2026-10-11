@@ -18,7 +18,6 @@ use shortwin::state::{ShortPosition, VenueKind};
 use shortwin_litesvm_tests::engine::{VenueMarket, crank_price_ix};
 use shortwin_litesvm_tests::invariants::venue_view;
 use shortwin_litesvm_tests::{Env, pda, read};
-use shortwin_math::consts::PUMPSWAP_LOCK_MIN_BPS;
 use shortwin_math::fees::FeeBps;
 use shortwin_math::quote::Pricing;
 
@@ -110,7 +109,6 @@ fn decide(
             live,
             donated: 0,
             s3_no_route: false,
-            lambda_min_bps: PUMPSWAP_LOCK_MIN_BPS,
             ema_fee_ppm,
             market: m,
         },

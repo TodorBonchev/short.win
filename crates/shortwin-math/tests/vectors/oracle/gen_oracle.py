@@ -27,9 +27,9 @@ extremes, adversarial ring shapes, stale buckets, the reference caps):
                traces assert the transcription against every exit the sim executes.
 * units_ref.json
     ref_liquidity  Market.exit_reference's L_b alone (M4F-1): the guard on or off and, on a
-               Raydium venue, Market.ref_depth_cap = floor(D*1e4/lambda_min) binding or not
-               (none on another venue); drawn after units_bounds, so the other files keep
-               their random stream.
+               Raydium venue, Market.ref_depth_cap = D (floor(D*1e4/lambda) at lambda = 100 %
+               since AIR-14) binding or not (none on another venue); drawn after units_bounds,
+               so the other files keep their random stream.
     spot_liquidity Market.spot_liquidity (FITS-2 (a); AIR-17): max(L_live, L_floor), L_floor
                = min(L_ema, L_mhi) while the guard is set, else L_ema; its own random stream
                (SEED + 2), so ref_liquidity keeps its cases.
@@ -396,10 +396,12 @@ class FakeRay(FakeVenue):
 
 def unit_ref_liquidity(rng, n):
     """L_b of Market.exit_reference (expiry; the reference quote replaced by a capture) with the
-    post-change guard on or off and, on a Raydium venue, the M4F-1 cap floor(D*1e4/lambda_min)
-    around the EMA terms (so it binds about half the time); lambda_min over its compiled range.
+    post-change guard on or off and, on a Raydium venue, the M4F-1 cap: the pool's locked depth D
+    itself since AIR-14 (floor(D*1e4/lambda) at lambda = 100 %, the lambda recorded), drawn around
+    the EMA terms (so it binds about half the time); pool_lock_min_bps over its compiled range,
+    which the cap no longer reads (AIR-14).
 
-      ref_liquidity  l_live L_ema L_slow guard lambda_min D L_b | ring      (lambda_min, D "-" off Raydium)"""
+      ref_liquidity  l_live L_ema L_slow guard lambda D L_b | ring      (lambda, D "-" off Raydium)"""
     cases = []
     for _ in range(n):
         ring = rnd_ring(rng, rng.randrange(1, 9))
@@ -417,12 +419,12 @@ def unit_ref_liquidity(rng, n):
         ray = rng.random() < 0.75
         if ray:
             pick = rng.random()
-            if pick < 0.6:                           # cap = D*1e4/lambda_min around the EMA terms
-                d = max(0, top * rng.randrange(3_000, 16_000) // 10_000 * lam // BPS)
+            if pick < 0.6:                           # cap = D around the EMA terms
+                d = max(0, top * rng.randrange(3_000, 16_000) // 10_000)
             elif pick < 0.8:
                 d = rnd_liq(rng)
             else:
-                d = rng.choice([0, 1, top * lam // BPS, U128 // BPS + 1, U128])
+                d = rng.choice([0, 1, top, U128 // BPS + 1, U128])
             m.venue = FakeRay(10**18, ll, d)
         else:
             d = None
@@ -433,7 +435,7 @@ def unit_ref_liquidity(rng, n):
         m.quote_repriced = lambda Q, pp, L, c=cap: (c.append((pp, L)) or (0, 1))
         r = M.exit_reference(m, sim.Position(Q=1), {"lo_ok": True, "L_live": ll}, now, False)
         assert r is not None and len(cap) == 1
-        cases.append(line(ll, m.liq, m.liq_slow, m.guard, lam if ray else None, d, cap[0][1], "|",
+        cases.append(line(ll, m.liq, m.liq_slow, m.guard, BPS if ray else None, d, cap[0][1], "|",
                           *ring_tokens(ring)))
     return cases
 
