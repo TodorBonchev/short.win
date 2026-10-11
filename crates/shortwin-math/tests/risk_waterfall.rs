@@ -587,9 +587,9 @@ proptest! {
         }
     }
 
-    /// ECON §8.6, §9.4, I-E5: settlement legs sum to V; S1 is never capped and nothing
-    /// vests; S2/S3 take x = min(V − K_s, FV), of which x − min(x, ⌊Q·P_ema/WAD⌋ + R_due)
-    /// vests; the protocol gets nothing.
+    /// ECON §8.6, §9.4, I-E5: settlement legs sum to V; S1 is never capped; S2/S3 take
+    /// x = min(V − K_s, FV); on every kind x − min(x, ⌊Q·P_ema/WAD⌋ + R_due) vests (S1 since
+    /// AIR-21); the protocol gets nothing.
     #[test]
     fn settlement_conserves(v in any::<u64>(), fv in prop::option::of(any::<u64>()), k in 0u8..3,
                             fixed in 0u64..=50_000_000, bps in 0u32..=500, cap in 0u64..=1_000_000_000,
@@ -607,13 +607,9 @@ proptest! {
             (SettleKind::S1, _) | (_, None) => prop_assert_eq!(p.lenders, take),
             (_, Some(fv)) => prop_assert_eq!(p.lenders, take.min(fv)),
         }
-        if kind == SettleKind::S1 {
-            prop_assert_eq!(p.lump, 0);
-        } else {
-            let value = num_bigint::BigUint::from(q) * p_ema / WAD + r_due;
-            let x = num_bigint::BigUint::from(p.lenders);
-            let immediate = if value < x { value } else { x.clone() };
-            prop_assert_eq!(num_bigint::BigUint::from(p.lump), x - immediate);
-        }
+        let value = num_bigint::BigUint::from(q) * p_ema / WAD + r_due;
+        let x = num_bigint::BigUint::from(p.lenders);
+        let immediate = if value < x { value } else { x.clone() };
+        prop_assert_eq!(num_bigint::BigUint::from(p.lump), x - immediate);
     }
 }

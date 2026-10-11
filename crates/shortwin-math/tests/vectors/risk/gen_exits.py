@@ -16,7 +16,7 @@ Market subclass are skipped):
   * liquidation (keeper floor) / expiry waterfalls          <- Market.check_exit
   * close waterfall                                         <- Market.try_exit(borrower_close=True)
   * FV and its p' at every evaluated (P, L)                <- Market.fv_parts
-  * settlement waterfall, S2/S3 vesting lump, K_s           <- Market._settle
+  * settlement waterfall, its vesting lump (S1: AIR-21), K_s <- Market._settle
   * K_s and K_e on random amounts and locked terms         <- Market.settle_reward, expiry_keeper
 
 The settlement-box decisions themselves (legs, refutation, amount check, arming) belong to
@@ -505,9 +505,10 @@ def main() -> None:
                  ("exp", False, False), ("exp", False, True)):
         assert any(k[:len(need)] == need for k in kinds), (need, sorted(kinds))
     skinds = {settle_class(r) for r in out["settle"]}
-    # (a capped take always vests something: FV = B_FV(1 + p') + R_due > Q*P_ema + R_due)
-    for need in (("S1", False, False), ("S2", True, True), ("S3", True, True), ("S3", False, False),
-                 ("S3", False, True)):
+    # (a capped take always vests something: FV = B_FV(1 + p') + R_due > Q*P_ema + R_due; an S1
+    # vests its take above Q*P_ema + R_due, AIR-21, and a genuine S1 loss nothing)
+    for need in (("S1", False, False), ("S1", False, True), ("S2", True, True), ("S3", True, True),
+                 ("S3", False, False), ("S3", False, True)):
         assert any(k[:len(need)] == need for k in skinds), (need, sorted(skinds))
     assert any(k[3] for k in skinds if k[0] == "S3"), "an S3 at the expiry-fee p' (O15)"
     fkinds = {fv_class(r) for r in out["fv"]}

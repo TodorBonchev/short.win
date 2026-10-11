@@ -38,7 +38,8 @@ mod basics {
 
     /// S1 (SPEC §5.3): a genuine gap beyond the S1 boundary arms the clock; after
     /// `settle_persist_n` EMA updates the keeper's call settles with lenders taking `V − K_s`,
-    /// never capped; the borrower gets only its account's rent back (A18).
+    /// never capped; the borrower gets only its account's rent back (A18). The take is below
+    /// `⌊Q·P_ema/WAD⌋ + R_due` (a genuine loss), so nothing vests (AIR-21).
     #[test]
     fn s1_after_a_gap_pays_v_minus_k_s() {
         let mut sc = Sc::default_market();
@@ -122,9 +123,10 @@ mod more {
         assert_eq!(m.borrowed_q_by_tier, [0; 4]);
         assert_eq!(m.total_notional_open, 0);
         assert_eq!(m.aggr().a, [0; 3]);
-        // S1 has no lump; its SOL is immediate but for the rent top-up (M10-8C-1): `R_due` above
-        // the rent credited while the position was open (here `R_min`, the gap a minute after
-        // the open) vests like a lump.
+        // This S1 has no lump (a gap far beyond the boundary: its take is below `⌊Q·P_ema/WAD⌋ +
+        // R_due`, a genuine loss; AIR-21 vests only a take above it); its SOL is immediate but
+        // for the rent top-up (M10-8C-1): `R_due` above the rent credited while the position was
+        // open (here `R_min`, the gap a minute after the open) vests like a lump.
         let r_due = shortwin_math::rent::due(&pos.pos_rent(), &m.basis()).unwrap();
         let credited = shortwin_math::rent::credited_for(&pos.pos_rent(), &m.basis()).unwrap();
         let top = shortwin_math::pool::rent_top_up(pos.v - k, r_due, credited);

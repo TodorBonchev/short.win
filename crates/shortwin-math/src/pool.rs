@@ -357,8 +357,8 @@ pub struct Resolution {
     /// (`rent::credited_for`, ceil; `pool_model._credited_for`).
     pub credited: u64,
     /// Lender lump that vests: the lender part of the penalty or the expiry fee
-    /// (`repay`); the part of an S2/S3 take above `⌊Q·P_ema/WAD⌋ + R_due` (`settle`,
-    /// `waterfall::settle`; 0 for S1).
+    /// (`repay`); the part of a settlement's take above `⌊Q·P_ema/WAD⌋ + R_due` (`settle`,
+    /// `waterfall::settle`; S1, S2 and S3, S1 since AIR-21).
     pub lump: u64,
 }
 

@@ -90,8 +90,8 @@ pub struct Payout {
     /// Lender total (credited to `market_vault`).
     pub lenders: u64,
     /// The part of `lenders` that vests over `lump_vest_s` (ECON §9.4): the lenders' share
-    /// of the penalty (liquidation), the expiry fee (expiry), or an S2/S3 take above
-    /// `⌊Q·P_ema/WAD⌋ + R_due` (settlement). 0 for a close and for S1.
+    /// of the penalty (liquidation), the expiry fee (expiry), or a settlement's take above
+    /// `⌊Q·P_ema/WAD⌋ + R_due` (S1, S2 and S3; S1 since AIR-21). 0 for a close.
     pub lump: u64,
     /// Borrower remainder (paid through the position close, A18).
     pub borrower: u64,
@@ -322,16 +322,22 @@ pub fn expire(
 /// `Market._settle`):
 ///
 /// 1. `K_s` to the keeper;
-/// 2. lenders `x`: S1 `V − K_s` (never capped, nothing vests); S2/S3 `x = min(V − K_s, FV)`
-///    with `fv` = FV at `(P_ema, L_ema)` ([`risk::fair_value`]), of which the part above
-///    the zero-impact value of the extinguished tokens plus the rent due vests:
+/// 2. lenders `x`: S1 `V − K_s` (never capped); S2/S3 `x = min(V − K_s, FV)` with `fv` = FV
+///    at `(P_ema, L_ema)` ([`risk::fair_value`]); on every kind the part of `x` above the
+///    zero-impact value of the extinguished tokens plus the rent due vests:
 ///    `lump = x − min(x, ⌊q·p_ema/WAD⌋ + r_due)` ([`Payout::lump`]; v0.4.1, R4B-6, no
 ///    `B̂_FV` reconstruction, R4A-5);
 /// 3. `V − K_s − x` to the borrower. The protocol gets nothing.
 ///
-/// `fv` of `None` (undefined `B̂_FV`) means the cap does not bind. `fv`, `q`, `p_ema` and
-/// `r_due` are ignored for S1. Whether an S2/S3 amount may be paid at all (the settlement
-/// box's `fv_dev_bps` check) is `settle`'s decision, not this function's.
+/// **S1 vests its excess too (AIR-21).** The S1 legs require only `B̂ + ert > V − K_s`, and
+/// `B̂` carries the buyback's impact and fees, so an S1 take can exceed the tokens' value at
+/// `P_ema` plus the rent; credited at once, a just-in-time deposit bundled around the S1 took
+/// its pro-rata share of that excess. A genuine S1 loss (`V − K_s ≤ ⌊q·p_ema/WAD⌋ + r_due`)
+/// vests nothing and stays immediate.
+///
+/// `fv` of `None` (undefined `B̂_FV`) means the cap does not bind; `fv` is ignored for S1.
+/// Whether an S2/S3 amount may be paid at all (the settlement box's `fv_dev_bps` check) is
+/// `settle`'s decision, not this function's.
 ///
 /// Errors: `InvalidInput` if `K_s > V`.
 pub fn settle(
@@ -344,14 +350,12 @@ pub fn settle(
     r_due: u64,
 ) -> Result<Payout, MathError> {
     let take = v.checked_sub(k_s).ok_or(MathError::InvalidInput)?;
-    let (lenders, lump) = match kind {
-        SettleKind::S1 => (take, 0),
-        SettleKind::S2 | SettleKind::S3 => {
-            let x = fv.map_or(take, |fv| take.min(fv));
-            let immediate = to_u64(immediate_cap(q, p_ema, r_due)?.min(u128::from(x)))?;
-            (x, x.checked_sub(immediate).ok_or(MathError::Underflow)?)
-        }
+    let lenders = match kind {
+        SettleKind::S1 => take,
+        SettleKind::S2 | SettleKind::S3 => fv.map_or(take, |fv| take.min(fv)),
     };
+    let immediate = to_u64(immediate_cap(q, p_ema, r_due)?.min(u128::from(lenders)))?;
+    let lump = lenders.checked_sub(immediate).ok_or(MathError::Underflow)?;
     Payout {
         keeper: k_s,
         lenders,
@@ -362,9 +366,10 @@ pub fn settle(
     .conserved(v)
 }
 
-/// `⌊q·p_ema/WAD⌋ + r_due` (ECON §2.1 "S2/S3 immediate part"), saturated: when `q·p_ema`
-/// leaves `u128` the value exceeds `2¹²⁸/10¹⁸ > u64::MAX`, above any take, so the
-/// saturated bound gives the same `min(x, ·)` without a 256-bit intermediate.
+/// `⌊q·p_ema/WAD⌋ + r_due` (ECON §2.1 "S2/S3 immediate part", S1's too since AIR-21),
+/// saturated: when `q·p_ema` leaves `u128` the value exceeds `2¹²⁸/10¹⁸ > u64::MAX`, above
+/// any take, so the saturated bound gives the same `min(x, ·)` without a 256-bit
+/// intermediate.
 fn immediate_cap(q: u64, p_ema: u128, r_due: u64) -> Result<u128, MathError> {
     let v_ema = match u128::from(q).checked_mul(p_ema) {
         Some(n) => div(n, WAD, Rounding::Floor)?,
@@ -478,8 +483,16 @@ mod tests {
     fn settlement_caps_and_lump() {
         const Q: u64 = 1_000;
         let p_ema = 300_000_000_000_000_000; // 0.3 lamport per raw unit: ⌊Q·P/WAD⌋ = 300
+        // S1 is never capped; its take above ⌊Q·P_ema/WAD⌋ + R_due vests (AIR-21) ...
         let p = settle(1_000, SettleKind::S1, 20, Some(500), Q, p_ema, 7).unwrap();
-        assert_eq!((p.keeper, p.lenders, p.borrower, p.lump), (20, 980, 0, 0));
+        assert_eq!(
+            (p.keeper, p.lenders, p.borrower, p.lump),
+            (20, 980, 0, 980 - 307)
+        );
+        // ... and a genuine S1 loss (the take at most the tokens' value plus rent) stays
+        // immediate.
+        let p = settle(300, SettleKind::S1, 20, None, Q, p_ema, 7).unwrap();
+        assert_eq!((p.lenders, p.borrower, p.lump), (280, 0, 0));
         let p = settle(1_000, SettleKind::S2, 20, Some(500), Q, p_ema, 7).unwrap();
         assert_eq!((p.keeper, p.lenders, p.borrower), (20, 500, 480));
         assert_eq!(p.lump, 500 - 307);

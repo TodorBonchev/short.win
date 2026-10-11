@@ -45,10 +45,11 @@
 //! **An executing settlement** (waterfall `settle`, ARCH §5.2):
 //!
 //! - `K_s` (locked terms) to the keeper; the lenders' `x` (S1 `V − K_s`; S2/S3 `x(P_ema,
-//!   L_ema)`, box-consistent) to `market_vault` through `pool::settle` — for S2/S3 the part
-//!   above `⌊Q·P_ema/WAD⌋ + R_due` vests as a lump, the rest is immediate (R4B-6) but for its
-//!   rent top-up: the immediate part pays `R_due` first, and the part of that above the rent
-//!   credited while the position was open (`pool::rent_top_up`) vests with the lump
+//!   L_ema)`, box-consistent) to `market_vault` through `pool::settle` — on every kind (S1
+//!   since AIR-21) the part above `⌊Q·P_ema/WAD⌋ + R_due` vests as a lump, the rest is
+//!   immediate (R4B-6) but for its rent top-up: the immediate part pays `R_due` first, and the
+//!   part of that above the rent credited while the position was open (`pool::rent_top_up`)
+//!   vests with the lump
 //!   (finding M10-8C-1, every kind); the token debt is extinguished; the protocol gets nothing
 //!   (SPEC §6.3);
 //! - the position's aggregates leave the market (`open_positions`, `ΣB_Q` by tier, `A_j`,

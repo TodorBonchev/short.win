@@ -671,6 +671,197 @@ mod jit {
         assert_zero_at_zero_positions(&sc.env, &market);
     }
 
+    /// What a whale's `[deposit 9×, sol_settle, claim_sol, withdraw]` around a settlement did,
+    /// against the settlement alone from the same state ([`settlement_whale`]).
+    struct SettleWhale {
+        /// The settlement alone (the control).
+        ctl: SolSettleEv,
+        /// `R_due` and the rent credited while the position was open, on the settlement's basis.
+        r_due: u64,
+        credited: u64,
+        /// `⌊Q·P_ema/WAD⌋` at the settlement's `P_ema`.
+        v_ema: u64,
+        /// What the control put into the vest (lump and rent top-up).
+        vested: u64,
+        /// The whale's SOL paid in its bundle (h = 0), and its shares over the pool's.
+        whale: u64,
+        whale_frac: (u128, u128),
+        /// The whale's tokens back, of `amount` deposited.
+        tokens_back: u64,
+        amount: u64,
+        /// The honest lender's SOL after the vest: without the whale, and with it.
+        control_honest: u64,
+        honest: u64,
+    }
+
+    use shortwin::events::SolSettle as SolSettleEv;
+
+    /// From the state just before a settlement executes (the keeper's crank of the second
+    /// done): the settlement alone, then — from the same state — the whale's bundle at `h = 0`;
+    /// each run followed by `lump_vest_s + 1` seconds and every lender's claims.
+    fn settlement_whale(sc: &mut Sc) -> SettleWhale {
+        let market = sc.mm.market();
+        let pos = sc.pos();
+        let lend = sc.mm.spec.lend;
+        let jit = sc.env.actor(&sc.mm, 9 * lend, 0);
+        let ready = sc.env.svm.clone();
+        let (kp, wk) = (sc.keeper.insecure_clone(), jit.kp.insecure_clone());
+        let honest = sc.mm.lender.insecure_clone();
+        let vest_before = sc.market().vest_bal;
+        let settle_once = |sc: &mut Sc, ixs: &[Instruction], signers: &[&Keypair]| {
+            let meta = ok(sc.env.send(ixs, signers));
+            let ev = Outcome::of(&meta).settled.expect("settles");
+            let m = sc.market();
+            let basis = m.basis();
+            let r_due = shortwin_math::rent::due(&pos.pos_rent(), &basis).unwrap();
+            let credited = shortwin_math::rent::credited_for(&pos.pos_rent(), &basis).unwrap();
+            let v_ema = u128::from(pos.q) * m.ema_price.get() / shortwin_math::num::WAD;
+            (meta, ev, r_due, credited, u64::try_from(v_ema).unwrap())
+        };
+        let six = sc.settle_ix();
+        let (_m, ctl, r_due, credited, v_ema) = settle_once(sc, &[six], &[&kp]);
+        let vested = sc.market().vest_bal - vest_before;
+        sc.env.warp(vest_s(&sc.env) + 1);
+        sc.crank();
+        let control_honest = claim_all(&mut sc.env, &market, &[&honest])[0];
+
+        sc.env.svm = ready;
+        let keys = keys_of(&sc.mm, &jit);
+        let amount = 9 * lend;
+        let minted = shortwin_math::pool::shares_for_tokens(&sc.market().pool(), amount).unwrap();
+        let ixs = [
+            ix::deposit(&keys, amount, minted),
+            sc.settle_ix(),
+            ix::claim_sol(&jit.key(), &market),
+            ix::withdraw(&keys, minted, 0),
+        ];
+        let (meta, ev, r_due2, credited2, v_ema2) = settle_once(sc, &ixs, &[&kp, &wk]);
+        assert_eq!(
+            (ev.lender_amount, ev.lump, r_due2, credited2, v_ema2),
+            (ctl.lender_amount, ctl.lump, r_due, credited, v_ema),
+            "the whale does not change the settlement"
+        );
+        assert_eq!(
+            sc.market().vest_bal - vest_before,
+            vested,
+            "the whale bundle vests the same"
+        );
+        let dep: DepositEv = events::one(&meta);
+        let whale = sol_paid(&meta, &jit.key());
+        let tokens_back = tokens_withdrawn(&meta, &jit.key());
+        sc.env.warp(vest_s(&sc.env) + 1);
+        sc.crank();
+        let paid = claim_all(&mut sc.env, &market, &[&wk, &honest]);
+        assert_eq!(paid[0], 0, "the whale left with nothing owed");
+        assert_zero_at_zero_positions(&sc.env, &market);
+        SettleWhale {
+            ctl,
+            r_due,
+            credited,
+            v_ema,
+            vested,
+            whale,
+            whale_frac: (minted, dep.s_after),
+            tokens_back,
+            amount,
+            control_honest,
+            honest: paid[1],
+        }
+    }
+
+    /// Keeper seconds up to the one whose `sol_settle` executes; returns with that second's
+    /// crank done and the settlement not yet sent.
+    fn to_the_settling_second(sc: &mut Sc, max_s: u32) {
+        for _ in 0..max_s {
+            let saved = sc.env.svm.clone();
+            if sc.second().settled.is_some() {
+                sc.env.svm = saved;
+                sc.env.warp(1);
+                sc.crank();
+                return;
+            }
+        }
+        panic!("no settlement within {max_s} s");
+    }
+
+    /// **AIR-21** (the regression). An S1 pays the lenders `V − K_s`, never capped, and its legs
+    /// require only `B̂ + ert > V − K_s` — `B̂` carries the buyback's impact and fees — so the take
+    /// can sit above the zero-impact value of the extinguished tokens plus the rent,
+    /// `⌊Q·P_ema/WAD⌋ + R_due`. S1 credited the whole take at once to the shares holding at the
+    /// settlement, so a whale's `[deposit 9×, sol_settle (S1), claim_sol, withdraw]` took its
+    /// share of that excess atomically. Now S1 splits its take as S2/S3 do (R4B-6): the part above
+    /// `⌊Q·P_ema/WAD⌋ + R_due` vests, and the whale is paid at most its share of the tokens' value
+    /// at `P_ema` (for the tokens it gave up) and none of the excess or the rent; what it takes
+    /// the honest lender loses, and the honest lender gets the whole vest.
+    #[test]
+    fn air_21_a_jit_whale_around_an_s1_takes_none_of_its_excess() {
+        let mut sc = Sc::default_market();
+        sc.env.tick(&sc.mm, 5);
+        // A genuine rise to just below the S1 boundary, the EMA left to follow, then a slow
+        // ramp (0.02 %/s, a keeper second each) until the S1 clock arms, and the price held
+        // there: the S1 executes once its legs have persisted `settle_persist_n` EMA updates,
+        // with the take above `⌊Q·P_ema/WAD⌋ + R_due` by about the buyback's impact and fee (a
+        // gap far beyond the boundary leaves the take below the tokens' value: a genuine S1
+        // loss, which stays immediate).
+        let kb = sc.s1_boundary();
+        sc.move_by(kb * 0.995);
+        sc.env.tick(&sc.mm, 30);
+        let mut armed = false;
+        for _ in 0..600 {
+            sc.move_by(1.0002);
+            let out = sc.second();
+            assert!(out.settled.is_none());
+            if out.armed.is_some() {
+                armed = true;
+                break;
+            }
+        }
+        assert!(armed, "the S1 clock arms on the ramp");
+        to_the_settling_second(&mut sc, 120);
+        let w = settlement_whale(&mut sc);
+        assert_eq!(w.ctl.condition, 1, "S1");
+        let take = w.ctl.lender_amount;
+        let cap = w.v_ema + w.r_due;
+        let excess = take.saturating_sub(cap);
+        // The whale's realised SOL: its share of the immediate entitlement, the principal less
+        // the rent it pays first (the credited rent was entitled to the lenders who held while
+        // it accrued; its top-up vests, M10-8C-1).
+        let principal = take.min(cap);
+        let top = shortwin_math::pool::rent_top_up(principal, w.r_due, w.credited);
+        let bound = share_of(u128::from(principal - top - w.credited), w.whale_frac) + 2;
+        let before_fix = share_of(u128::from(take - w.r_due), w.whale_frac);
+        eprintln!(
+            "S1: take {take}, ⌊Q·P_ema⌋ {} + R_due {} (credited {}): excess {excess}, lump {}; \
+             whale h = 0 paid {} (bound {bound}; {before_fix} with the whole take immediate), \
+             tokens back {} of {}",
+            w.v_ema, w.r_due, w.credited, w.ctl.lump, w.whale, w.tokens_back, w.amount
+        );
+        assert!(excess > 0, "the S1 take exceeds ⌊Q·P_ema/WAD⌋ + R_due");
+        assert!(
+            u128::from(w.whale) <= bound,
+            "the whale takes none of the S1 excess: {} > {bound}",
+            w.whale
+        );
+        assert!(before_fix > bound, "the bound separates the fix");
+        assert_eq!(w.ctl.lump, excess, "the excess vests");
+        assert_eq!(
+            w.vested,
+            excess + top,
+            "the excess and the rent top-up vest"
+        );
+        assert!(
+            (w.whale + w.honest).abs_diff(w.control_honest) <= 2,
+            "what the whale takes the honest lender loses: {} + {} vs {}",
+            w.whale,
+            w.honest,
+            w.control_honest
+        );
+        assert!(
+            w.honest >= w.vested,
+            "the honest lender gets the whole vest"
+        );
+    }
+
     /// The expiry at the deadline: the 2 % expiry fee vests (ECON §12.2's R3B-2 lump).
     #[test]
     fn a_jit_whale_around_a_real_expiry_realises_nothing() {

@@ -2107,8 +2107,12 @@ class Market:
             res["dev_bps"] = (x_hi - x_lo) * BPS // max(x_lo, 1)
             if self.P.check_invariants and not (x_lo - 2 <= take <= x_hi + 2):   # +-2: reprice rounding
                 raise InvariantError(("S2/S3 amount outside the box", x_lo, take, x_hi))  # I-E5
+        if kind == "S1" or (kind in ("S2", "S3") and self.P.fv_cap):
             # v0.4.1 (R4B-6, R4A-5): only the zero-impact value of Q at P_ema plus the rent due is
-            # immediate; the rest of an S2/S3 take (impact, fees, penalty) vests like a lump.
+            # immediate; the rest of the take (impact, fees, penalty) vests like a lump.  AIR-21: S1
+            # too -- its legs need only B + ert > V - K_s, so V - K_s can exceed Q*P_ema + R_due by the
+            # buyback's impact and fees, which a just-in-time deposit took at once; a genuine S1 loss
+            # (V - K_s <= Q*P_ema + R_due) vests nothing.
             v_ema = pos.Q * self.ema // WAD
             lump = take - min(take, v_ema + st["R"])
         res.update(kind=kind, keeper=K, lender_sol=take, lender_lump=lump, borrower=borrower, fv=fv)

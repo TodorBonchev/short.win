@@ -1287,11 +1287,13 @@ fn fvcap_ra(drain_bps: u64, k: f64) -> (Option<(i64, SolSettle)>, u64, ShortPosi
 /// `fvcap.py` on RA (ECON §8.6's drained-pool cases, C0-7 / D3): with 80 % of the LP pulled, a
 /// ×1.9 move settles nothing within 200 s (nor do ×1.6 … ×1.8 in the sim) and ×2.0 settles
 /// **S1** in second 821 — the lenders take exactly `V − K_s` = 37.620 SOL, never capped (FV at
-/// EMA would be 41.069); with 95 % pulled, ×1.2 settles nothing (nor does ×1.0 in the sim) and
-/// ×1.4 settles **S2** in second 821, capped at fair value: lenders 33.048 SOL (of which 7.182
-/// SOL vest as a lump), borrower 4.573 SOL. Every figure to the lamport once the rent is the
-/// program's (the sim prices `R_min` at 80 % utilisation, module docs): FV and the borrower's
-/// part move by that difference, the lump does not.
+/// EMA would be 41.069), of which the 0.658 SOL above `⌊Q·P_ema/WAD⌋ + R_due` (the drained
+/// pool's impact) vests (AIR-21); with 95 % pulled, ×1.2 settles nothing (nor does ×1.0 in the
+/// sim) and ×1.4 settles **S2** in second 821, capped at fair value: lenders 33.048 SOL (of
+/// which 7.182 SOL vest as a lump), borrower 4.573 SOL. Every figure to the lamport once the
+/// rent is the program's (the sim prices `R_min` at 80 % utilisation, module docs): FV and the
+/// borrower's part move by that difference, and so does the S1 lump (a lower `R_due` leaves
+/// more of the take above the immediate part); the S2 lump does not.
 #[test]
 fn the_fair_value_cap_binds_in_s2_never_in_s1_ra() {
     for (drain, k) in [(8_000, 1.9), (9_500, 1.2)] {
@@ -1301,13 +1303,17 @@ fn the_fair_value_cap_binds_in_s2_never_in_s1_ra() {
         );
     }
     let v = 37_870_437_682u64;
-    let (s1, _, pos) = fvcap_ra(8_000, 2.0);
+    let (s1, r_due1, pos) = fvcap_ra(8_000, 2.0);
     let (t, ev) = s1.expect("S1");
     assert_eq!(pos.v, v);
     assert_eq!((t, ev.condition), (821, 1), "S1 in the sim's second");
     assert_eq!(ev.k_s, 250_000_000);
     assert_eq!(ev.lender_amount, 37_620_437_682, "S1: V − K_s, uncapped");
-    assert_eq!((ev.borrower_amount, ev.lump), (0, 0));
+    assert_eq!(
+        (ev.borrower_amount, ev.lump),
+        (0, 658_250_579 + (SIM_RMIN - r_due1)),
+        "S1's take above ⌊Q·P_ema/WAD⌋ + R_due vests (AIR-21; rent adjusted)"
+    );
     let (s2, r_due, _) = fvcap_ra(9_500, 1.4);
     let (t, ev) = s2.expect("S2");
     assert_eq!((t, ev.condition), (821, 2), "S2 in the sim's second");
