@@ -207,6 +207,7 @@ export function DataTable<T>({
                 <tbody ref={body} role="rowgroup">
                     {loading && !rows?.length
                         ? Array.from({ length: skeletonRows }, (_, i) => (
+                              // biome-ignore lint/suspicious/noArrayIndexKey: placeholder rows have no identity
                               <tr key={i} role="row">
                                   {columns.map((c) => (
                                       <td key={c.key} role="cell" {...cellAttrs(c)} data-align={c.align}>

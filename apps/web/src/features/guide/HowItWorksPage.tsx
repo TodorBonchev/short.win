@@ -241,6 +241,7 @@ export function HowItWorksPage() {
             )}
             <article className="guide-body">
                 {HOW_IT_WORKS.map((b, i) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: a fixed list of blocks in a fixed order
                     <Block key={i} b={b} vars={vars} failed={failed} disclosureVars={disclosureVars} />
                 ))}
             </article>

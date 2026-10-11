@@ -91,6 +91,7 @@ export function Kv({ rows, testId }: { rows: readonly (readonly [ReactNode, Reac
     return (
         <dl className="kv" data-testid={testId}>
             {rows.map(([k, v, id], i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: static row order
                 <div key={i} className="kv-row">
                     <dt>
                         <Term>{k}</Term>

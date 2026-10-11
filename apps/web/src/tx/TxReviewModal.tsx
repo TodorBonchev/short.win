@@ -87,10 +87,12 @@ export function keepIds(text: string): ReactNode {
     if (parts.length === 1) return text;
     return parts.map((part, i) =>
         i % 2 === 1 ? (
+            // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one string, in their order
             <span key={i} className="nowrap">
                 {part}
             </span>
         ) : (
+            // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one string, in their order
             <Fragment key={i}>{part}</Fragment>
         ),
     );

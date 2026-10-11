@@ -309,6 +309,7 @@ export function PositionDetailPage({ position }: { position: Address }) {
                                                     pos.q.toString()
                                                 ) : (
                                                     <Tokens
+                                                        key="q"
                                                         raw={pos.q}
                                                         decimals={decimals}
                                                         symbol={symbol}

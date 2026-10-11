@@ -24,6 +24,7 @@ export function KvLines({ rows, testId }: { rows: readonly KvLine[]; testId?: st
     return (
         <dl className="kv mk-kv" data-lines="" data-testid={testId}>
             {rows.map(([k, v, o], i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: static row order
                 <div key={i} className="kv-row">
                     <dt>
                         <Term>{k}</Term>
