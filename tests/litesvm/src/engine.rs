@@ -626,13 +626,26 @@ pub fn sweep_trader_ix(market: &Pubkey, wipe_record: Option<Pubkey>) -> Instruct
     ix::with_remaining(ix, &extra)
 }
 
-/// [`sweep_trader_ix`] with the record the market's state asks for: the latest `ShareEpoch`
-/// record while a full-wipe record is live, none otherwise.
+/// [`sweep_trader_ix`] with the remaining accounts the market's state asks for: off the pump
+/// venues, the trader's pump UVA when the market has one (AIR-05: a curve market that left pump;
+/// the pump venues' token legs are `pump::sweep_trader_pump_ix` / `pamm::sweep_trader_pamm_ix`);
+/// then the latest `ShareEpoch` record while a full-wipe record is live.
 pub fn sweep_trader_ix_for(env: &Env, market: &Pubkey) -> Instruction {
+    use shortwin::state::VenueKind;
     let m = env.market(market);
     let live = m.total_shares.get() == 0 && m.has_flag(shortwin::state::MARKET_FLAG_WIPE_LIVE);
     let rec = live.then(|| pda::share_epoch(market, m.share_epoch.saturating_sub(1)).0);
-    sweep_trader_ix(market, rec)
+    let pump = matches!(
+        m.venue_kind(),
+        Some(VenueKind::PumpCurve | VenueKind::PumpMigrating | VenueKind::PumpSwap)
+    );
+    let mut ix = sweep_trader_ix(market, None);
+    if !pump && m.pump_uva != Pubkey::default() {
+        ix.accounts
+            .push(AccountMeta::new_readonly(m.pump_uva, false));
+    }
+    ix.accounts.extend(rec.map(|k| AccountMeta::new(k, false)));
+    ix
 }
 
 /// `ix` preceded by `SetComputeUnitLimit(mm.cu_limit())` when the venue asks for one

@@ -848,6 +848,142 @@ fn m6_sec_5_a_full_wipe_during_the_migration_pause_waits_for_the_curve_cashback(
     assert!(!market(&env, &pm).has_flag(MARKET_FLAG_WIPE_LIVE));
 }
 
+/// ★ AIR-05 (I-05). `engine::lender::rewards_required` read the market's current venue kind, so a
+/// curve market that left pump — `→ None` once its curve graduated elsewhere, then onto a Raydium
+/// pool — dropped the `wipe_rewards_claimed` requirement while the trader's curve-era cashback still
+/// sat in its pump UVA (`Market.pump_uva` survives both moves; pump's `claim_cashback` is
+/// permissionless), and `sweep_trader` stopped reading that UVA. A full wipe settled on `None` (S3)
+/// was ended by anyone's `[sweep_trader, deposit]`, and the cashback claimed afterwards vested to the
+/// new lenders instead of the wiped ones. Reproduced on the pre-fix build: the deposit below landed
+/// right after the wipe, with the cashback unclaimed. Now every market with a pump UVA requires the
+/// venue-reward sweep and `sweep_trader` reads the UVA there (it alone is the token leg off the pump
+/// venues): the deposit waits on `None` and still after the Raydium adoption, until `[pump
+/// claim_cashback(user = trader), sweep_trader]` credits the cashback to the wiped epoch's record.
+#[test]
+fn air05_a_full_wipe_after_the_market_left_pump_waits_for_the_curve_cashback() {
+    let (mut env, pm, q) = setup(PumpCoin::Near);
+    let market_key = pm.market();
+    fork::patch(&mut env.svm, &pm.curve.curve, |d| {
+        d[vpump::OFF_IS_CASHBACK_COIN] = 1
+    });
+    let mut b = env.borrower();
+    let (_, nonce, _) = open_ok(&mut env, &pm, &mut b, q);
+    let trader = pm.trader();
+    assert!(
+        claimable_cashback(&env, &trader) > 0,
+        "the open's sale paid cashback into the trader's pump UVA"
+    );
+    withdraw_all_free(&mut env, &pm);
+    // The position expires; the curve completes and pump migrates it elsewhere: `→ None`.
+    let kp = keeper(&mut env);
+    warp_to_deadline(&mut env, &pm, &b.key(), nonce, 1);
+    crank(&mut env, &pm);
+    env.warp(1);
+    buy_down_to(&mut env, &pm, 0);
+    env.warp(1);
+    venue_changed(
+        &crank(&mut env, &pm),
+        VenueKind::PumpCurve,
+        VenueKind::PumpMigrating,
+    );
+    let pool = plant_at_spot(&mut env, &pm, 1_200 * q);
+    fork::set_curve_reserves(&mut env.svm, &pm.curve.curve, 0, 0, 0, 0);
+    env.warp(1);
+    venue_changed(
+        &crank(&mut env, &pm),
+        VenueKind::PumpMigrating,
+        VenueKind::None,
+    );
+    // The S3 chain on `None` settles the last borrowed tokens: a full wipe.
+    let none = AsNone(&pm);
+    let ev = loop {
+        env.warp(30);
+        crank(&mut env, &none);
+        let meta = ok(settle(&mut env, &none, &kp, &b.key(), nonce));
+        if let Some(ev) = settled(&meta) {
+            break ev;
+        }
+    };
+    assert_eq!(ev.condition, 3);
+    let m = market(&env, &pm);
+    assert_eq!(m.venue_kind(), Some(VenueKind::None));
+    assert!(m.has_flag(MARKET_FLAG_GRADUATED_ELSEWHERE));
+    assert_eq!(m.pump_uva, fork::pump_user_volume_accumulator(&trader));
+    assert_eq!(m.total_shares.get(), 0);
+    assert!(m.has_flag(MARKET_FLAG_WIPE_LIVE), "a full wipe");
+    let cashback = claimable_cashback(&env, &trader);
+    assert!(cashback > 0, "the curve-era cashback is still in the UVA");
+
+    // A new lender, and the trader sweep anyone can send first.
+    let amount = q;
+    let lender2 = env.funded_keypair();
+    let acc = fork::fund_token(
+        &mut env,
+        &lender2.pubkey(),
+        &pm.keys.mint,
+        pm.curve.token_program,
+        amount,
+    );
+    let k = ix::LenderKeys {
+        owner: lender2.pubkey(),
+        mint: pm.keys.mint,
+        token_program: pm.keys.token_program,
+        owner_token_account: acc,
+    };
+    let deposit = |env: &Env| {
+        let m = env.market(&market_key);
+        ix::with_remaining(
+            ix::deposit(&k, amount, 0),
+            &ix::epoch_records(&market_key, 0, m.share_epoch),
+        )
+    };
+    let sweep = |env: &Env| shortwin_litesvm_tests::engine::sweep_trader_ix_for(env, &market_key);
+    let meta = ok(env.send(&[sweep(&env)], &[]));
+    let ev: TraderSwept = events::one(&meta);
+    assert_eq!(ev.wipe_bits & WIPE_TRADER_SWEPT, WIPE_TRADER_SWEPT);
+    assert_eq!(
+        ev.wipe_bits & WIPE_REWARDS_CLAIMED,
+        0,
+        "cashback outstanding"
+    );
+    // The fix: the deposit waits for the venue-reward bit on `None` …
+    let d = deposit(&env);
+    assert_err(&env.send(&[d], &[&lender2]), E::WipeSweepPending);
+
+    // … and still once the market has adopted a Raydium pool of its mint (list-only, no
+    // position left: adopted at once).
+    env.warp(1);
+    ok(env.propose(None, &pool));
+    assert_eq!(market(&env, &pm).venue_kind(), Some(VenueKind::RaydiumCpmm));
+    let meta = ok(env.send(&[sweep(&env)], &[]));
+    let ev: TraderSwept = events::one(&meta);
+    assert_eq!(ev.wipe_bits & WIPE_REWARDS_CLAIMED, 0);
+    let d = deposit(&env);
+    assert_err(&env.send(&[d], &[&lender2]), E::WipeSweepPending);
+
+    // The unlocking bundle, signed by the fee payer only: the cashback reaches the wiped record.
+    let lender_sol0 = env.market_vault(&market_key).lender_sol;
+    let meta = ok(env.send(&[pump::claim_cashback_ix(&trader), sweep(&env)], &[]));
+    let ev: TraderSwept = events::one(&meta);
+    assert_eq!(
+        ev.lamports, cashback,
+        "the whole cashback, through the trader"
+    );
+    assert_eq!(
+        ev.wipe_bits & (WIPE_TRADER_SWEPT | WIPE_REWARDS_CLAIMED),
+        WIPE_TRADER_SWEPT | WIPE_REWARDS_CLAIMED
+    );
+    assert_eq!(claimable_cashback(&env, &trader), 0);
+    assert_eq!(
+        env.market_vault(&market_key).lender_sol - lender_sol0,
+        cashback,
+        "credited to the wiped epoch's record"
+    );
+    let d = deposit(&env);
+    ok(env.send(&[d], &[&lender2]));
+    assert!(!market(&env, &pm).has_flag(MARKET_FLAG_WIPE_LIVE));
+}
+
 /// M6-SEC-5, no deadlock: on a non-cashback curve the same S3 wipe during the migration pause is
 /// unlocked by `sweep_trader` alone (the pump UVA holds nothing claimable: both bits at once).
 #[test]

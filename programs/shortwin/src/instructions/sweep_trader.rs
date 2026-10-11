@@ -19,11 +19,20 @@
 //! market (`PumpCurve`, `PumpMigrating`, `PumpSwap`) first its token leg `[trader_base_ata (W),
 //! pool_vault (W), mint, the mint's token program, the trader's pump UVA]` (M5; ARCH §3.9 "the
 //! pump venues add `trader_base_ata` and `pool_vault`"; the UVA since M5-SEC-1; each key-checked
-//! against the market) — on PumpSwap followed by `ATA(pAMM UVA(trader), WSOL)` (M6, below) —,
-//! then the latest `ShareEpoch` record (`["share_epoch", market,
-//! share_epoch − 1]`, key-checked with its stored bump) exactly while a full-wipe record is live
-//! (`S = 0 ∧ wipe_live`), nothing otherwise (`BadRemainingAccounts`). The mock and Raydium
-//! markets have no trader base ATA and pass no token leg.
+//! against the market) — on PumpSwap followed by `ATA(pAMM UVA(trader), WSOL)` (M6, below) —;
+//! on any other market that has the trader's pump UVA (`Market.pump_uva` set: a curve market
+//! that left pump, AIR-05, below) the UVA alone; then the latest `ShareEpoch` record
+//! (`["share_epoch", market, share_epoch − 1]`, key-checked with its stored bump) exactly while a
+//! full-wipe record is live (`S = 0 ∧ wipe_live`), nothing otherwise (`BadRemainingAccounts`).
+//! The mock markets and the markets listed on Raydium have no trader base ATA and no pump UVA and
+//! pass no token leg.
+//!
+//! **A market that left pump (AIR-05).** A curve market that graduated elsewhere (`→ None`, then
+//! possibly a Raydium pool) keeps its trader's pump UVA, and the curve-era cashback in it stays
+//! claimable; `engine::lender::rewards_required` keeps the venue-reward bit required there, and
+//! this instruction reads the UVA (its one-account token leg, key-checked against
+//! `Market.pump_uva`) and sets the bit when it holds nothing claimable, as on the curve kinds
+//! below. Its base ATA is not touched off the pump venues (no leg there uses it).
 //!
 //! **The venue-reward bit on the curve (M5-SEC-1; a deviation from ARCH §3.3 / §3.9, flagged).**
 //! A deposit into a live full-wipe record of a `PumpCurve` market waits for
@@ -73,9 +82,10 @@
 //! 3. `pool::sweep(…, SweepSource::Trader)`: `lender_sol += swept`; while a full-wipe record is
 //!    live `wipe_trader_swept` is set **even when nothing moved** and the SOL tops up the
 //!    record; with `S > 0` it vests over `lump_vest_s`; with `S = 0` and no live wipe it goes
-//!    to `protocol_fees` (R3A-10). On the curve kinds, while a full-wipe record is live and the
-//!    trader's pump UVA holds no claimable cashback, `pool::sweep(…, 0,
-//!    SweepSource::VenueRewards)` also sets `wipe_rewards_claimed` (M5-SEC-1, above).
+//!    to `protocol_fees` (R3A-10). On the curve kinds, and off the pump venues on a market with a
+//!    pump UVA (AIR-05), while a full-wipe record is live and the trader's pump UVA holds no
+//!    claimable cashback, `pool::sweep(…, 0, SweepSource::VenueRewards)` also sets
+//!    `wipe_rewards_claimed` (M5-SEC-1, above).
 //! 4. Post-conditions (step 10): `trader` and `trader_wsol` hold 0 lamports; `market_vault`
 //!    holds rent + `lender_sol + protocol_fees` (I2).
 //! 5. Event `TraderSwept{lamports, tokens, to, wipe_bits}` (`wipe_bits`: the math crate's
@@ -105,6 +115,11 @@ pub const TOKEN_LEG_LEN: usize = 5;
 /// Length of a PumpSwap market's token leg (M6): the curve's five, then `ATA(pAMM UVA(trader),
 /// WSOL)` — where PumpSwap accrues the trader's cashback.
 pub const TOKEN_LEG_LEN_PAMM: usize = 6;
+/// Length of the token leg of a market off the pump venues that has the trader's pump UVA
+/// (AIR-05: a curve market that left pump): the UVA alone.
+pub const TOKEN_LEG_LEN_UVA: usize = 1;
+/// Index of the trader's pump UVA in a pump market's token leg (and in the market's leg keys).
+const LEG_PUMP_UVA: usize = 4;
 
 /// The cashback pump's `claim_cashback` would pay the trader now (module docs, M5-SEC-1): the
 /// lamports of its pump UVA above the account's rent-exempt minimum; 0 for an account pump does
@@ -167,7 +182,7 @@ pub struct SweepTrader<'info> {
 pub fn handler<'info>(ctx: Context<'info, SweepTrader<'info>>) -> Result<()> {
     let clock = Clock::get()?;
     let market_key = ctx.accounts.market.key();
-    let (trader_bump, trader_wsol_bump, pump, pamm, token_keys, decimals, wsol_ata) = {
+    let (trader_bump, trader_wsol_bump, pump, pamm, uva_only, token_keys, decimals, wsol_ata) = {
         let m = ctx.accounts.market.load()?;
         let kind = m.venue_kind();
         let pump = matches!(
@@ -175,11 +190,14 @@ pub fn handler<'info>(ctx: Context<'info, SweepTrader<'info>>) -> Result<()> {
             Some(VenueKind::PumpCurve | VenueKind::PumpMigrating | VenueKind::PumpSwap)
         );
         let pamm = kind == Some(VenueKind::PumpSwap);
+        // AIR-05: off the pump venues, a market that kept its trader's pump UVA reads it.
+        let uva_only = !pump && m.pump_uva != Pubkey::default();
         (
             m.trader_bump,
             m.trader_wsol_bump,
             pump,
             pamm,
+            uva_only,
             [
                 m.trader_base_ata,
                 m.pool_vault,
@@ -192,19 +210,24 @@ pub fn handler<'info>(ctx: Context<'info, SweepTrader<'info>>) -> Result<()> {
             pump_curve::trader_wsol_ata(&m),
         )
     };
-    // A pump market's token leg comes first in the remaining accounts (module docs).
-    let leg_len = if pamm {
-        TOKEN_LEG_LEN_PAMM
+    // A token leg comes first in the remaining accounts (module docs): a pump market's, or off
+    // the pump venues the trader's pump UVA alone (AIR-05).
+    let (leg_len, first_key) = if pamm {
+        (TOKEN_LEG_LEN_PAMM, 0)
+    } else if pump {
+        (TOKEN_LEG_LEN, 0)
+    } else if uva_only {
+        (TOKEN_LEG_LEN_UVA, LEG_PUMP_UVA)
     } else {
-        TOKEN_LEG_LEN
+        (0, 0)
     };
-    let (token_leg, rem) = if pump {
+    let (token_leg, rem) = if leg_len > 0 {
         require!(
             ctx.remaining_accounts.len() >= leg_len,
             ShortwinError::BadRemainingAccounts
         );
         let (leg, rest) = ctx.remaining_accounts.split_at(leg_len);
-        for (info, key) in leg.iter().zip(token_keys.iter()) {
+        for (info, key) in leg.iter().zip(token_keys.iter().skip(first_key)) {
             require_keys_eq!(info.key(), *key, ShortwinError::AccountMismatch);
         }
         (Some(leg), rest)
@@ -216,12 +239,19 @@ pub fn handler<'info>(ctx: Context<'info, SweepTrader<'info>>) -> Result<()> {
         wsol_ata,
         ShortwinError::AccountMismatch
     );
-    // M5-SEC-1 (the curve kinds) and its M6 remainder (PumpSwap): whether the trader holds no
-    // claimable venue cashback — its pump UVA's lamports above rent, and on PumpSwap also the
-    // WSOL of its pAMM UVA's ATA (read before anything moves; nothing below touches either).
+    // M5-SEC-1 (the curve kinds), its M6 remainder (PumpSwap) and AIR-05 (a market that left
+    // pump): whether the trader holds no claimable venue cashback — its pump UVA's lamports above
+    // rent, and on PumpSwap also the WSOL of its pAMM UVA's ATA (read before anything moves;
+    // nothing below touches either).
     let rewards_clear = match token_leg {
+        Some(leg) if uva_only => {
+            let pump_uva = leg.first().ok_or(ShortwinError::BadRemainingAccounts)?;
+            pump_cashback_claimable(pump_uva)? == 0
+        }
         Some(leg) => {
-            let pump_uva = leg.get(4).ok_or(ShortwinError::BadRemainingAccounts)?;
+            let pump_uva = leg
+                .get(LEG_PUMP_UVA)
+                .ok_or(ShortwinError::BadRemainingAccounts)?;
             let pamm_clear = match leg.get(5) {
                 Some(ata) => pump_amm::cashback_claimable(ata) == 0,
                 None => true,
@@ -251,7 +281,7 @@ pub fn handler<'info>(ctx: Context<'info, SweepTrader<'info>>) -> Result<()> {
     })?;
     require_gte!(swept, from_ata, ShortwinError::TraderStateInvalid);
     let tokens = match token_leg {
-        Some([ata, pool_vault, mint, program, ..]) => sweep_base_ata(
+        Some([ata, pool_vault, mint, program, ..]) if pump => sweep_base_ata(
             &market_key,
             &accs.trader.to_account_info(),
             trader_bump,

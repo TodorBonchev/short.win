@@ -21,7 +21,7 @@
 //!   KI-66, and `RebaseNeedsOwner` its post-condition).
 //! - [`init_if_new`]: the fields of a `LenderPosition` that `deposit` just created.
 //! - [`rewards_required`]: which post-wipe sweeps a deposit into a live wipe record waits for
-//!   (R4A-7).
+//!   (R4A-7; on every market with the trader's pump UVA, AIR-05).
 //! - [`pay_sol`], [`check_vault_floor`]: lender SOL out of `MarketVault`, never below its I2
 //!   floor.
 //!
@@ -158,10 +158,23 @@ pub fn init_if_new(
 }
 
 /// Whether a deposit into a live full-wipe record also waits for `wipe_rewards_claimed`
-/// (R4A-7; ARCH §3.3 `deposit`): on the pump venues, which pay venue cashback. The trader
-/// sweep is always required. ARCH exempts a pump venue that cannot execute; telling that needs
-/// the venue's ReadSet, which `deposit` does not carry, so the bit is required on every
-/// `PumpCurve`, `PumpMigrating` and `PumpSwap` market.
+/// (R4A-7; ARCH §3.3 `deposit`): on the pump venues, which pay venue cashback, and on every
+/// market that has the trader's pump UVA (AIR-05). The trader sweep is always required. ARCH
+/// exempts a pump venue that cannot execute; telling that needs the venue's ReadSet, which
+/// `deposit` does not carry, so the bit is required on every `PumpCurve`, `PumpMigrating` and
+/// `PumpSwap` market.
+///
+/// **A market that left pump (AIR-05).** A curve market moves to `None` when its curve graduates
+/// elsewhere and may then adopt a Raydium pool. `Market.pump_uva` survives both moves, and so does
+/// the trader's curve-era cashback in that UVA: pump's `claim_cashback` is permissionless and does
+/// not depend on the market's venue. Decided from the current venue kind, the requirement dropped
+/// with the move, so a deposit (anyone's `[sol_settle (wiping), sweep_trader, deposit]`) ended the
+/// wipe record before the cashback was swept, and it vested to the next epoch's lenders instead of
+/// the wiped ones. The requirement therefore follows the UVA: `sweep_trader` reads the UVA on every
+/// market that has one (off the pump venues the UVA alone is its token leg) and sets the bit when
+/// it holds nothing claimable, so it is met exactly as on the curve — `[pump claim_cashback(user =
+/// trader), sweep_trader]`, no venue CPI, no M1-FID-12 deadlock. A market listed on Raydium or
+/// PumpSwap never had a pump UVA and is unchanged.
 ///
 /// **`PumpMigrating` (M6-SEC-5).** A full wipe can settle during the migration pause (S3 is the
 /// only settlement there, ARCH §5.3), with the trader's curve-era pump cashback still in its pump
@@ -183,10 +196,11 @@ pub fn init_if_new(
 /// credits (`instructions::sweep_trader` module docs). No PumpSwap CPI either, so the requirement
 /// can always be met, whether or not the venue executes.
 pub fn rewards_required(market: &Market) -> bool {
-    matches!(
-        market.venue_kind(),
-        Some(VenueKind::PumpCurve | VenueKind::PumpMigrating | VenueKind::PumpSwap)
-    )
+    market.pump_uva != Pubkey::default()
+        || matches!(
+            market.venue_kind(),
+            Some(VenueKind::PumpCurve | VenueKind::PumpMigrating | VenueKind::PumpSwap)
+        )
 }
 
 /// `lender_sol + protocol_fees` of `vault`: the lamports `MarketVault` must hold above its

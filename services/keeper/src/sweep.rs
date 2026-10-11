@@ -5,8 +5,10 @@
 //!
 //! **The post-wipe bundle** (duty 6, [`wipe_pending`], [`post_wipe_ixs`]). After a full wipe
 //! (`S = 0` with a live wipe record) a deposit waits for `wipe_trader_swept` and, on the pump
-//! venues (`PumpCurve`, `PumpSwap`: `engine::lender::rewards_required`), `wipe_rewards_claimed`
-//! (R4A-7) — until then the market takes no deposit and hence no open. Both are set by
+//! venues (`PumpCurve`, `PumpMigrating`, `PumpSwap`) and on every market that has the trader's pump
+//! UVA (a curve market that left pump, AIR-05; `engine::lender::rewards_required`),
+//! `wipe_rewards_claimed` (R4A-7) — until then the market takes no deposit and hence no open. Off
+//! the pump venues the sweep's token leg is that UVA alone ([`sweep_trader_ix`]). Both are set by
 //! `sweep_trader` (the program's `claim_venue_rewards` is not built: M5-SEC-1 and M6's
 //! UVA-reading pattern, ARCH §3.9): the trader bit always, the rewards bit when the trader's venue
 //! cashback is not claimable — the pump UVA's lamports above its rent-exempt minimum, and on
@@ -85,13 +87,11 @@ pub fn rent_minimum(data: &[u8], len: usize) -> Option<u64> {
 }
 
 /// A full-wipe record is live and a deposit still waits for a post-wipe sweep (R4A-7): the
-/// trader bit, or — on a pump venue, `PumpMigrating` included (M6-SEC-5) — the rewards bit is clear
-/// (the program's `deposit` check, `engine::lender::rewards_required`, `WipeSweepPending`).
+/// trader bit, or — on a pump venue, `PumpMigrating` included (M6-SEC-5), and on any market with
+/// the trader's pump UVA (AIR-05) — the rewards bit is clear (the program's `deposit` check,
+/// `engine::lender::rewards_required`, `WipeSweepPending`).
 pub fn wipe_pending(market: &Market) -> bool {
-    let rewards = matches!(
-        market.venue_kind(),
-        Some(VenueKind::PumpCurve | VenueKind::PumpMigrating | VenueKind::PumpSwap)
-    );
+    let rewards = shortwin::engine::lender::rewards_required(market);
     market.total_shares.get() == 0
         && market.has_flag(MARKET_FLAG_WIPE_LIVE)
         && (!market.has_flag(MARKET_FLAG_WIPE_TRADER_SWEPT)
@@ -124,8 +124,9 @@ pub fn pamm_cashback_ata(market: &Market) -> Pubkey {
 
 /// `sweep_trader()` of `market_key` (ARCH §3.9 as built): the fixed accounts, then on a pump venue
 /// its token leg `[trader_base_ata W, pool_vault W, mint, token program, the trader's pump UVA]`
-/// (+ on PumpSwap `ATA(pAMM UVA(trader), WSOL)`, M6), then the latest `ShareEpoch` record (W)
-/// while a full-wipe record is live.
+/// (+ on PumpSwap `ATA(pAMM UVA(trader), WSOL)`, M6) — off the pump venues the trader's pump UVA
+/// alone when the market has one (AIR-05) —, then the latest `ShareEpoch` record (W) while a
+/// full-wipe record is live.
 pub fn sweep_trader_ix(market_key: &Pubkey, market: &Market) -> Instruction {
     let mut metas = shortwin::accounts::SweepTrader {
         config: pda::config(),
@@ -151,6 +152,9 @@ pub fn sweep_trader_ix(market_key: &Pubkey, market: &Market) -> Instruction {
         if market.venue_kind() == Some(VenueKind::PumpSwap) {
             metas.push(AccountMeta::new_readonly(pamm_cashback_ata(market), false));
         }
+    } else if market.pump_uva != Pubkey::default() {
+        // AIR-05: a market that left pump keeps its trader's pump UVA (curve-era cashback).
+        metas.push(AccountMeta::new_readonly(market.pump_uva, false));
     }
     if wipe_live(market) {
         metas.push(AccountMeta::new(
@@ -399,12 +403,31 @@ mod tests {
     }
 
     /// The program's `sweep_trader` account list (ARCH §3.9 as built): 10 fixed, the token leg on
-    /// the pump venues (5, PumpSwap 6), the wipe record while a full wipe is live.
+    /// the pump venues (5, PumpSwap 6) — off them the trader's pump UVA alone where the market has
+    /// one (AIR-05) —, the wipe record while a full wipe is live.
     #[test]
     fn sweep_trader_names_the_token_leg_and_the_wipe_record() {
         let key = Pubkey::new_unique();
-        let m = market(VenueKind::RaydiumCpmm);
-        assert_eq!(sweep_trader_ix(&key, &m).accounts.len(), 10);
+        let mut m = market(VenueKind::RaydiumCpmm);
+        m.pump_uva = Pubkey::default();
+        assert_eq!(
+            sweep_trader_ix(&key, &m).accounts.len(),
+            10,
+            "listed on Raydium"
+        );
+        // AIR-05: a curve market that left pump (None, then Raydium) keeps its pump UVA.
+        for kind in [VenueKind::None, VenueKind::RaydiumCpmm] {
+            let mut m = market(kind);
+            let ix = sweep_trader_ix(&key, &m);
+            assert_eq!(ix.accounts.len(), 11, "{kind:?}");
+            assert_eq!(ix.accounts[10].pubkey, m.pump_uva);
+            assert!(!ix.accounts[10].is_writable);
+            m.flags |= MARKET_FLAG_WIPE_LIVE;
+            m.share_epoch = 1;
+            let ix = sweep_trader_ix(&key, &m);
+            assert_eq!(ix.accounts.len(), 12);
+            assert_eq!(ix.accounts[11].pubkey, pda::share_epoch(&key, 0));
+        }
         let m = market(VenueKind::PumpCurve);
         let ix = sweep_trader_ix(&key, &m);
         assert_eq!(ix.accounts.len(), 15);
@@ -424,19 +447,28 @@ mod tests {
         assert!(ix.accounts.iter().all(|a| !a.is_signer));
     }
 
-    /// R4A-7: pending until the trader bit and, on the pump venues, the rewards bit are set.
+    /// R4A-7: pending until the trader bit and, on the pump venues and on any market with the
+    /// trader's pump UVA (AIR-05), the rewards bit are set.
     #[test]
     fn wipe_pending_follows_the_deposit_check() {
-        for (kind, rewards) in [
-            (VenueKind::PumpSwap, true),
-            (VenueKind::PumpCurve, true),
+        for (kind, uva, rewards) in [
+            (VenueKind::PumpSwap, true, true),
+            (VenueKind::PumpSwap, false, true),
+            (VenueKind::PumpCurve, true, true),
             // M6-SEC-5: a full wipe settled during the migration pause waits for the curve-era
             // cashback as well.
-            (VenueKind::PumpMigrating, true),
-            (VenueKind::RaydiumV4, false),
-            (VenueKind::None, false),
+            (VenueKind::PumpMigrating, true, true),
+            // AIR-05: so does one on a curve market that left pump.
+            (VenueKind::RaydiumV4, true, true),
+            (VenueKind::None, true, true),
+            // Markets that never had a pump UVA.
+            (VenueKind::RaydiumV4, false, false),
+            (VenueKind::None, false, false),
         ] {
             let mut m = market(kind);
+            if !uva {
+                m.pump_uva = Pubkey::default();
+            }
             assert!(!wipe_pending(&m), "no wipe");
             m.flags |= MARKET_FLAG_WIPE_LIVE;
             assert!(wipe_pending(&m));
