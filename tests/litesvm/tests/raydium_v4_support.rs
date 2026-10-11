@@ -637,6 +637,10 @@ pub struct MarketView {
     /// `pool_lock_min_bps` (`λ_min`): with the market's `pool_d`, the M4F-1 cap
     /// `⌊D·10⁴/λ_min⌋` on the reference liquidity's EMA terms.
     pub lambda_min_bps: u32,
+    /// PumpSwap (AIR-10): the one-way fee (ppm) at the stored `P_ema`'s market cap as the exit
+    /// reads it before its prologue rolls the EMA, which caps the risk view
+    /// (`VenueState::exit_risk_cap_bps`); `None` on the venues without one (Raydium, the mock).
+    pub ema_fee_ppm: Option<u32>,
 }
 
 /// A position's view: the market's and the position's accounts.
@@ -666,11 +670,15 @@ impl View {
             .reserves
             .map_or((0, 0), |(x, y)| (u128::from(x), u128::from(y)))
     }
-    /// Risk pricing at the position's locked hard cap.
+    /// Risk pricing at the position's locked hard cap — on PumpSwap at most the fee at `P_ema`
+    /// (AIR-10, `VenueState::exit_risk_cap_bps`).
     pub fn risky(&self) -> Pricing {
-        self.m
-            .live
-            .capped(u64::from(self.pos.venue_fee_hard_cap_bps))
+        let hard = u64::from(self.pos.venue_fee_hard_cap_bps);
+        let cap = self
+            .m
+            .ema_fee_ppm
+            .map_or(hard, |f| hard.min(u64::from(f).div_ceil(100)));
+        self.m.live.capped(cap)
     }
 }
 
@@ -689,6 +697,7 @@ pub fn read_market_view(env: &Env, rm: &RayMarket) -> MarketView {
         venue,
         s3_no_route: s3,
         lambda_min_bps: env.config().params.pool_lock_min_bps,
+        ema_fee_ppm: None,
         market,
     }
 }

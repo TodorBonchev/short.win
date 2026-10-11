@@ -3,7 +3,8 @@
 //! `raydium_v4_support`'s venue-generic predictor ([`crate::v4::predict`]: the robust-spot and
 //! EMA legs, "normal buyback allowed", the references and `max_in` of `shortwin_math::bounds`, in
 //! the program's order) on a view built here from the hooks' PumpSwap venue view — its pricing
-//! reserves `(base vault, quote vault + VQR)` and `Pricing::PumpSwap` at the live tier's fees —
+//! reserves `(base vault, quote vault + VQR)` and `Pricing::PumpSwap` at the live tier's fees, the
+//! risk view capped at the hard cap and (AIR-10) the fee at `P_ema` read before the crank —
 //! with the reference liquidity capped at the burned-LP depth `D` itself (`λ_min` =
 //! `PUMPSWAP_LOCK_MIN_BPS` = 100 %, OWNER-M6D-1 / M6R-1), on the state after a same-second
 //! `crank_price` on a clone of the VM (sent without the hooks: a measurement). The exit must then land with the predicted `b_live`,
@@ -44,6 +45,12 @@ pub fn predict(
     borrower: &Pubkey,
     nonce: u64,
 ) -> Option<(Prediction, Prediction)> {
+    // AIR-10: the exit reads the fee at `P_ema` (which caps its risk view) before its prologue
+    // rolls the EMA, so on the state before the crank.
+    let pre = env.market(&vm.market());
+    let ema_fee_ppm = venue_view::view(&env.svm, &pre)
+        .filter(|v| v.executable)
+        .map(|v| v.cap_fee_ppm);
     // The crank on the clone is the exit's own prologue, a measurement: sent without the hooks
     // (the real exit goes through `Env::send`), as `World::observe_exits` cranks its pre-state.
     let saved = env.svm.clone();
@@ -52,20 +59,37 @@ pub fn predict(
         shortwin_litesvm_tests::env::send_direct(&mut env.svm, |svm| svm.send_transaction(tx));
     let p = crank.is_ok().then(|| {
         Some((
-            decide(env, &vm.market(), borrower, nonce, Which::Liquidate)?,
-            decide(env, &vm.market(), borrower, nonce, Which::Expire)?,
+            decide(
+                env,
+                &vm.market(),
+                borrower,
+                nonce,
+                Which::Liquidate,
+                ema_fee_ppm,
+            )?,
+            decide(
+                env,
+                &vm.market(),
+                borrower,
+                nonce,
+                Which::Expire,
+                ema_fee_ppm,
+            )?,
         ))
     });
     env.svm = saved;
     p.flatten()
 }
 
+/// `ema_fee_ppm`: the pre-crank view's `min(φ_live, φ at P_ema)`, which caps the risk quotes
+/// exactly as the program's `min(hard cap, ⌈φ at P_ema/100⌉)` does on an executable pool.
 fn decide(
     env: &Env,
     market: &Pubkey,
     borrower: &Pubkey,
     nonce: u64,
     which: Which,
+    ema_fee_ppm: Option<u32>,
 ) -> Option<Prediction> {
     let m = env.market(market);
     if m.venue_kind() != Some(VenueKind::PumpSwap) {
@@ -87,6 +111,7 @@ fn decide(
             donated: 0,
             s3_no_route: false,
             lambda_min_bps: PUMPSWAP_LOCK_MIN_BPS,
+            ema_fee_ppm,
             market: m,
         },
         pos,
