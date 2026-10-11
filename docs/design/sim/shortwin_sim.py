@@ -1669,13 +1669,23 @@ class Market:
         can have been pushed since), the box is the EMA point alone.  On an executable venue a
         stale integration proves nothing -- the program's lender instructions roll a pushed
         bucket without recording (ARCH A16), so the pushed EMA can age past ring_len with no
-        honest observation after it -- and the ring medians always apply (M2-SEC-1)."""
+        honest observation after it -- and the ring medians always apply (M2-SEC-1).
+        AIR-15: L_mhi is capped at ref_depth_cap() (Raydium, canonical PumpSwap; M4F-1's cap of the exit
+        reference's EMA terms): a deposit wrapped around any record raises that second's liquidity high, which
+        honest records in the same second cannot lower, so wraps in 4 of the 8 seconds would otherwise widen L_hi
+        at will and defer S1 / S2 and the S2 / S3 amount check.  L_hi = max(L_ema, min(L_mhi, cap)): L_ema is never
+        capped (the box keeps the EMA point), and the S1 / S2 corner never reads less depth than min(L_mhi, cap),
+        which only attacker-only seconds lower (5 of 8) and no capital-only bundle moves (D is deposit- and
+        withdraw-invariant)."""
         if t - self.ema_t > self.P.ring_len and not self.venue.has_route():
             return self.ema, self.ema, self.liq, self.liq
         if self.P.box_obs:                     # v0.4 comparison rows: lower medians of the clamped obs / lobs
             pm, lm = lower_median([e[9] for e in self.ring]), lower_median([e[10] for e in self.ring])
             return min(self.ema, pm), max(self.ema, pm), min(self.liq, lm), max(self.liq, lm)
         plo, phi, llo, lhi = self.ring_medians()
+        cap = self.ref_depth_cap()
+        if cap is not None:
+            lhi = min(lhi, cap)
         return min(self.ema, plo), max(self.ema, phi), min(self.liq, llo), max(self.liq, lhi)
 
     def status(self, pos: Position, t: int) -> dict:

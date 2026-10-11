@@ -9,7 +9,8 @@ reads state and calls pure sim functions) and the sim then runs its own code:
 
 * units_settle.json   the sim's settle_box and _s3_due on synthetic states (settle_box on a
                       venue that cannot execute, `box`, and on an executable one, `box_exec`:
-                      only the former collapses to the EMA point, M2-SEC-1);
+                      only the former collapses to the EMA point, M2-SEC-1; `box_cap`: with
+                      a depth cap on L_mhi, AIR-15);
   units_evaluate_*.json  try_exit(settle_only=True) on synthetic states (stubbed venue quotes drawn around every decision
                       boundary: the S1 budget, sigma_max, the liquidation CR, fv_dev_bps, the
                       arm gap and settle_persist_n, a migrating venue's FV pool).
@@ -77,6 +78,9 @@ recorded; tests/settle_vectors.rs documents each layout next to its parser):
           | armed count since last  | armed count since last       (before | after)
           | kind lenders borrower fv p' x_lo fv_lo p'_lo x_hi fv_hi p'_hi | wait_s2 wait_s3
           path N: the not-liquidatable branch of an armed position; S: _settlement.
+  dcap    t cap                            (AIR-15: Market.ref_depth_cap, the cap of the box's L_mhi, for the
+                                            settle line that follows at the same t; emitted in the full-replay
+                                            traces only, and only when it binds: L_hi < max(L_ema, L_mhi))
   state   P_ema L_ema L_slow ema_ts slow_ts count | b_sec b_lo b_hi b_llo b_lhi
           | lb_sec lb_lo lb_hi | n | n x (ts p l x y lo hi llo lhi)
 
@@ -399,10 +403,23 @@ def p_buyback(self, pos, st, t, res, K):
     return r
 
 
+def binding_cap(m, t, b):
+    """AIR-15: Market.ref_depth_cap() if it binds on the box b that settle_box(t) returned (b's L_hi below the
+    uncapped max(L_ema, L_mhi)), else None (no cap, a cap above L_mhi or L_ema, or the EMA point)."""
+    if hasattr(m, "_stub_box") or (t - m.ema_t > m.P.ring_len and not m.venue.has_route()):
+        return None
+    cap = m.ref_depth_cap()
+    if cap is None or b[3] == max(m.liq, m.ring_medians()[3]):
+        return None
+    assert b[3] == max(m.liq, cap) < max(m.liq, m.ring_medians()[3]), (b, cap)
+    return cap
+
+
 def p_settle_box(self, t):
     b = self._stub_box if hasattr(self, "_stub_box") else ORIG["settle_box"](self, t)
     if self._ctx is not None and self._ctx["box"] is None:
         self._ctx["box"] = b
+        self._ctx["dcap"] = binding_cap(self, t, b)
     return b
 
 
@@ -528,7 +545,8 @@ def p_try_exit(self, pos, t, borrower_close=False, borrower_limit=None, settle_o
     if borrower_close:
         return ORIG["try_exit"](self, pos, t, borrower_close, borrower_limit, settle_only)
     before = arm(pos)
-    ctx = {"st": None, "box": None, "path": None, "nl": None, "refuted": None, "legs": None, "settles": []}
+    ctx = {"st": None, "box": None, "dcap": None, "path": None, "nl": None, "refuted": None, "legs": None,
+           "settles": []}
     prev, self._ctx = self._ctx, ctx
     try:
         r = ORIG["try_exit"](self, pos, t, borrower_close, borrower_limit, settle_only)
@@ -542,6 +560,8 @@ def p_try_exit(self, pos, t, borrower_close=False, borrower_limit=None, settle_o
         return r
     if not MODE["full"] and path == "S" and not keep_line(before, after, ctx):
         return r
+    if MODE["full"] and ctx["dcap"] is not None:
+        emit(self, line("dcap", t, ctx["dcap"]))
     emit(self, settle_line(self, pos, t, path, st, ctx["box"], ctx, before, after))
     return r
 
@@ -899,6 +919,45 @@ def unit_box(rng, n, executable=False):
     return cases
 
 
+def unit_box_cap(rng, n):
+    """AIR-15: settle_box with a depth cap (Market.ref_depth_cap stubbed on the bare market) on synthetic rings whose
+    liquidity highs are often deposit-wrapped (up to 3x), on a venue that can execute now or not: caps below L_ema,
+    at L_mhi and around it."""
+    cases = []
+    for _ in range(n):
+        m = bare()
+        executable = rng.random() < 0.7
+        m.venue = FakeVenue(executable, False, 1, None)
+        size = rng.randrange(1, 9)
+        t = rng.randrange(0, 10**6)
+        ring = []
+        base = rng.randrange(10**9, 10**24)
+        for j in range(size):
+            p = base * rng.randrange(8_000, 12_500) // 10_000
+            L = rng.randrange(10**9, 10**13)
+            lo = p * rng.randrange(7_000, 10_001) // 10_000 if rng.random() < 0.7 else p
+            hi = p * rng.randrange(10_000, 14_000) // 10_000 if rng.random() < 0.7 else p
+            llo = L * rng.randrange(9_000, 10_001) // 10_000
+            lhi = L * rng.randrange(10_000, 30_000) // 10_000 if rng.random() < 0.5 else L
+            ring.append(M._entry(t + j, p, L, lo, hi, llo, lhi))
+        m.ring = ring
+        m.ema = base * rng.randrange(7_000, 14_000) // 10_000
+        m.liq = rng.randrange(10**9, 10**13)
+        m.ema_t = t + size - 1 - rng.choice([0, 0, 0, 3])
+        now = m.ema_t + rng.choice([0, 1, 2, 7, 8, 9, 10, 100])
+        l_mhi = sim.upper_median([e[8] for e in ring])
+        k = rng.random()
+        if k < 0.25:
+            cap = m.liq * rng.randrange(1_000, 10_000) // 10_000
+        elif k < 0.4:
+            cap = l_mhi + rng.choice([-1, 0, 1])
+        else:
+            cap = l_mhi * rng.randrange(5_000, 15_000) // 10_000
+        m.ref_depth_cap = lambda c=cap: c
+        cases.append(line(now, executable, cap, m.ema, m.liq, m.ema_t, *M.settle_box(m, now), *ring_tokens(ring)))
+    return cases
+
+
 def unit_s3(rng, n):
     cases = []
     for _ in range(n):
@@ -1095,7 +1154,9 @@ def main():
     MODE["full"], MODE["sample"] = False, None      # units: every evaluation
     units = {"box": unit_box(rng, 300), "s3": unit_s3(rng, 400),
              # its own stream, so the other files keep theirs (M2-SEC-1)
-             "box_exec": unit_box(random.Random(SEED + 1), 300, executable=True)}
+             "box_exec": unit_box(random.Random(SEED + 1), 300, executable=True),
+             # likewise (AIR-15)
+             "box_cap": unit_box_cap(random.Random(SEED + 2), 300)}
     sizes["units_settle.json"] = dump("units_settle.json", units)
     sizes.update(dump_split("units_evaluate", unit_evaluate(rng, 1500)))
     MODE["full"] = True

@@ -10,7 +10,7 @@
 //! **One rule.** A settlement decision may rest on EMA evidence only if manipulated
 //! seconds could not have produced it, so every EMA-based decision must come out the same
 //! on the whole box spanned by `(P_ema, L_ema)` and the ring medians of the bucket
-//! extremes ([`box_of`]). `B̂` and σ increase with `P` and decrease with `L`, so "the same
+//! extremes ([`box_of_capped`]). `B̂` and σ increase with `P` and decrease with `L`, so "the same
 //! everywhere" is the corner least favourable to the decision: the S1/S2 legs at
 //! `(P_lo, L_hi)`, the refutation and "not liquidatable" at `(P_hi, L_lo)`, and an S2/S3
 //! amount must agree within `fv_dev_bps` between those two corners, each with its own
@@ -35,7 +35,7 @@ pub struct SettleBox {
     pub p_hi: u128,
     /// `min(L_ema, L_mlo)`.
     pub l_lo: u128,
-    /// `max(L_ema, L_mhi)`.
+    /// `max(L_ema, min(L_mhi, cap))`, `cap` the market's depth cap if it has one (AIR-15).
     pub l_hi: u128,
 }
 
@@ -61,11 +61,20 @@ impl SettleBox {
     }
 }
 
+/// The settlement box of a market without a locked depth (the curve, the mock):
+/// [`box_of_capped`] with no depth cap.
+///
+/// Errors: as [`box_of_capped`].
+pub fn box_of(ema: &Ema, ring: &Ring, now: i64, executable: bool) -> Result<SettleBox, MathError> {
+    box_of_capped(ema, ring, now, executable, None)
+}
+
 /// The settlement box of a market (ECON §5.6; ARCH §3.8; sim `Market.settle_box`):
 ///
 /// ```text
 /// (P_mlo, P_mhi, L_mlo, L_mhi) = ring_medians(ring)
-/// P_lo = min(P_ema, P_mlo), P_hi = max(P_ema, P_mhi), L_lo = min(L_ema, L_mlo), L_hi = max(L_ema, L_mhi)
+/// P_lo = min(P_ema, P_mlo), P_hi = max(P_ema, P_mhi), L_lo = min(L_ema, L_mlo)
+/// L_hi = max(L_ema, min(L_mhi, cap))                cap = depth_cap, or no cap for None
 /// ```
 ///
 /// or the EMA point `(P_ema, L_ema)` alone if `now − ema_ts > RING_LEN` seconds **and the
@@ -77,14 +86,34 @@ impl SettleBox {
 /// `RING_LEN + 1` quiet seconds would otherwise collapse the box onto the pushed EMA. `ema`
 /// and `ring` are the post-roll state (ARCH §3.0).
 ///
+/// `depth_cap` (AIR-15) is the market's [`crate::bounds::ref_depth_cap`], `Some(⌊D·10⁴/λ_min⌋)`
+/// on a Raydium market and a canonical PumpSwap pool (`D` itself there) — the depth sizing
+/// credits the pool with, at which [`crate::bounds::ref_liquidity`] caps the exit reference's
+/// EMA terms (M4F-1) — and `None` on the other venues. A deposit wrapped around any record
+/// raises that second's liquidity high, which honest records in the same second cannot lower,
+/// so deposit-wrapped cranks in 4 of the 8 seconds would otherwise set `L_mhi` at will, widen
+/// the box and defer the S1/S2 legs and the S2/S3 amount check for no swap fee. `L_ema` is
+/// never capped (the box keeps the EMA point), so `L_hi` never falls below `L_ema` or below
+/// `min(L_mhi, cap)`, which only attacker-only seconds lower and no capital-only bundle moves
+/// (`D` is deposit- and withdraw-invariant). Depth above the cap — third-party liquidity beyond
+/// what sizing credits (a PumpSwap pool's unburned LP, a Raydium pool whose locked share fell
+/// below `λ_min`) — is guarded by `L_ema` alone, as in the exit reference.
+///
 /// Errors: `InvalidInput` for a corrupted or empty ring.
-pub fn box_of(ema: &Ema, ring: &Ring, now: i64, executable: bool) -> Result<SettleBox, MathError> {
+pub fn box_of_capped(
+    ema: &Ema,
+    ring: &Ring,
+    now: i64,
+    executable: bool,
+    depth_cap: Option<u128>,
+) -> Result<SettleBox, MathError> {
     let age = i128::from(now).saturating_sub(i128::from(ema.ts));
     let ring_len = i128::try_from(RING_LEN).map_err(|_| MathError::Overflow)?;
     if !executable && age > ring_len {
         return Ok(SettleBox::point(ema.price, ema.liq));
     }
     let (p_mlo, p_mhi, l_mlo, l_mhi) = ring_medians(ring)?;
+    let l_mhi = depth_cap.map_or(l_mhi, |cap| l_mhi.min(cap));
     Ok(SettleBox {
         p_lo: ema.price.min(p_mlo),
         p_hi: ema.price.max(p_mhi),
@@ -427,7 +456,7 @@ pub struct SettleInputs {
     pub p_ema: u128,
     /// `L_ema` after the roll.
     pub l_ema: u128,
-    /// [`box_of`] on the post-roll state.
+    /// [`box_of_capped`] on the post-roll state, with the market's depth cap.
     pub bx: SettleBox,
     /// `V`, `K_s` (locked terms, `K_s ≤ V`) and the effective `ert`.
     pub budget: Budget,
@@ -504,7 +533,7 @@ pub struct Evaluation {
 }
 
 /// One `sol_settle` evaluation after the prologue (ARCH §3.8 step 1: the caller computes
-/// `R_due`, `K_s`, the legs and [`box_of`]), in ARCH §3.8's order, which equals the sim's
+/// `R_due`, `K_s`, the legs and [`box_of_capped`]), in ARCH §3.8's order, which equals the sim's
 /// `try_exit(settle_only = True)` step for step:
 ///
 /// 2. Not CR-liquidatable and not expired: an armed position is disarmed only if
@@ -857,6 +886,70 @@ mod tests {
         let bx = box_of(&o.ema, &o.ring, now, true).unwrap();
         assert_eq!((bx.p_lo, bx.p_hi), (100 * WAD, pushed));
         assert!(!bx.is_point());
+    }
+
+    /// AIR-15: a deposit wrapped around a crank raises that second's liquidity high, which the
+    /// honest record in the same second cannot lower, so wraps in 5 of the 8 seconds double the
+    /// upper median `L_mhi` (`L_ema` does not move) and, uncapped, widen `L_hi`: the S1 corner
+    /// `(P_lo, L_hi)` then fails where the honest depth holds S1 — a deferral bought with no swap
+    /// fee. With the market's depth cap `L_hi = max(L_ema, min(L_mhi, cap))`.
+    #[test]
+    fn deposit_wrapped_highs_widen_l_hi_only_up_to_the_depth_cap() {
+        let prm = EmaParams::DEFAULT;
+        let p = 1_000_000;
+        let mut o = Observation::new(0, p, 1_000).unwrap();
+        for t in 1..=8 {
+            o.record(t, p, 1_000).unwrap();
+            if t >= 4 {
+                o.record(t, p, 2_000).unwrap();
+            }
+            o.roll(t + 1, &prm).unwrap();
+        }
+        assert_eq!(o.ema.liq, 1_000, "a covered second does not move L_ema");
+        let wide = box_of(&o.ema, &o.ring, 9, true).unwrap();
+        assert_eq!((wide.l_lo, wide.l_hi), (1_000, 2_000), "L_mhi doubled");
+        assert_eq!(box_of_capped(&o.ema, &o.ring, 9, true, None), Ok(wide));
+        // PumpSwap: the cap is the burned depth D, here the honest depth: no widening at all.
+        let pswap = box_of_capped(&o.ema, &o.ring, 9, true, Some(1_000)).unwrap();
+        assert_eq!(
+            pswap,
+            SettleBox {
+                l_hi: 1_000,
+                ..wide
+            }
+        );
+        // Raydium, λ 75 % over λ_min 50 %: ⌊D·10⁴/λ_min⌋ = 1.5× the depth.
+        let ray = box_of_capped(&o.ema, &o.ring, 9, true, Some(1_500)).unwrap();
+        assert_eq!(
+            ray,
+            SettleBox {
+                l_hi: 1_500,
+                ..wide
+            }
+        );
+        // A cap at or above L_mhi changes nothing; one below L_ema keeps the EMA point inside.
+        assert_eq!(
+            box_of_capped(&o.ema, &o.ring, 9, true, Some(2_000)),
+            Ok(wide)
+        );
+        let low = box_of_capped(&o.ema, &o.ring, 9, true, Some(10)).unwrap();
+        assert!(low.l_hi == o.ema.liq && low.contains(o.ema.price, o.ema.liq));
+        // The EMA point of a halted venue after RING_LEN seconds, cap or not.
+        let far = o.ema.ts + 9;
+        assert_eq!(
+            box_of_capped(&o.ema, &o.ring, far, false, Some(1_500)),
+            Ok(SettleBox::point(p, 1_000))
+        );
+        // B̂ = 10⁹/L at the S1 corner: S1 holds at the honest depth (10⁶ > V − K_s) but not at
+        // the doubled one (5·10⁵); capped, the wraps cannot defer it.
+        let budget = Budget {
+            v: 800_000,
+            k_s: 20,
+            ert: 0,
+        };
+        let mut q = toy();
+        assert_eq!(s1_legs(&mut q, &budget, None, p, 1_000, &wide), Ok(false));
+        assert_eq!(s1_legs(&mut q, &budget, None, p, 1_000, &pswap), Ok(true));
     }
 
     #[test]

@@ -1921,7 +1921,9 @@ pub fn predict_settle(v: &View) -> SettlePrediction {
         )
         .unwrap()
     };
-    let bx = settle::box_of(&obs.ema, &obs.ring, now, exec).unwrap();
+    // AIR-15: the box's L_mhi is capped at ⌊D·10⁴/λ_min⌋, as the reference's EMA terms are.
+    let cap = bounds::ref_depth_cap(market.pool_d.get(), v.m.lambda_min_bps);
+    let bx = settle::box_of_capped(&obs.ema, &obs.ring, now, exec, Some(cap)).unwrap();
     let nz = |t: i64| (t != 0).then_some(t);
     let inp = SettleInputs {
         now,

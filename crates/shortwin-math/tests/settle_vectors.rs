@@ -3,7 +3,8 @@
 //! `shortwin_sim.py` v0.4.1 with its default switches and the attack scripts of
 //! `sim/attacks/` (ARCHITECTURE §8.1, §9 M0b).
 //!
-//! * `units_settle.json`: the sim's `settle_box` and `_s3_due` on synthetic states.
+//! * `units_settle.json`: the sim's `settle_box` (also with a depth cap, AIR-15) and `_s3_due`
+//!   on synthetic states.
 //! * `units_evaluate_*.json`: the sim's `try_exit(settle_only = True)` on synthetic states
 //!   with quotes drawn around every decision boundary.
 //! * `trace_{attacks,scenarios,random}_*.json`: full replays of one market lineage each —
@@ -39,7 +40,8 @@ use shortwin_math::persist::liq_ema_leg;
 use shortwin_math::risk::{Budget, SettleKind};
 use shortwin_math::settle::{
     ArmChange, ArmState, BoxQuotes, DisarmReason, S3Chain, S3Terms, SettleBox, SettleInputs,
-    SettleTerms, box_of, evaluate, not_liquidatable, refuted, s1_legs, s2_legs, s3_due,
+    SettleTerms, box_of, box_of_capped, evaluate, not_liquidatable, refuted, s1_legs, s2_legs,
+    s3_due,
 };
 use shortwin_math::{MathError, U256};
 
@@ -343,6 +345,8 @@ struct Coverage {
     stale_refs: usize,
     /// References on a Raydium venue (the M4F-1 depth cap in `L_b`).
     capped_refs: usize,
+    /// Settlement boxes whose `L_mhi` the depth cap bound (AIR-15).
+    capped_boxes: usize,
     legs: [usize; 4],
 }
 
@@ -364,11 +368,15 @@ struct Replay {
     arms: HashMap<i64, ArmState>,
     /// Per position: `(t, EMA leg)` of its last persistence check.
     chk: HashMap<i64, (i64, bool)>,
+    /// `(t, cap)` of a `dcap` op: the depth cap of the box of the settle line that follows
+    /// (AIR-15; emitted only where it binds, so every other box is the uncapped one).
+    box_cap: Option<(i64, u128)>,
 }
 
 impl Replay {
     fn new() -> Self {
         Self {
+            box_cap: None,
             full: false,
             obs: Observation::default(),
             ema_prm: EmaParams::DEFAULT,
@@ -390,6 +398,10 @@ impl Replay {
         let mut t = Toks::new(line);
         let kind = t.s();
         let ctx = format!("{ctx} [{line}]");
+        assert!(
+            self.box_cap.is_none() || kind == "settle",
+            "a dcap not followed by its settle line, {ctx}"
+        );
         let key: &'static str = match kind {
             // prm dtmax clamp slow_tau slow_dtmax | 6 exit terms | liq_n eps fee | settle_n arm_gap fv_dev | s3 terms
             "prm" => {
@@ -567,6 +579,12 @@ impl Replay {
                     .or_default() += 1;
                 "maxin"
             }
+            // dcap t cap (AIR-15: `Market.ref_depth_cap`, binding on the next settle line's box)
+            "dcap" => {
+                assert!(self.full, "dcap in a decision-only trace, {ctx}");
+                self.box_cap = Some((t.v(), t.v()));
+                "dcap"
+            }
             "settle" => {
                 self.settle(&mut t, &ctx, cov);
                 "settle"
@@ -654,6 +672,10 @@ impl Replay {
             k_s: p.k_s,
             ert: p.ert,
         };
+        let cap = self.box_cap.take().map(|(at, cap)| {
+            assert_eq!(at, now, "the dcap of another second, {ctx}");
+            cap
+        });
         if self.full {
             let o = &self.obs;
             assert_eq!(
@@ -662,10 +684,15 @@ impl Replay {
                 "EMA state at the evaluation, {ctx}"
             );
             assert_eq!(
-                box_of(&o.ema, &o.ring, now, exec),
+                box_of_capped(&o.ema, &o.ring, now, exec, cap),
                 Ok(bx),
                 "settlement box, {ctx}"
             );
+            if cap.is_some() {
+                // AIR-15: the cap binds (only then does the generator emit it).
+                assert_ne!(box_of(&o.ema, &o.ring, now, exec), Ok(bx), "{ctx}");
+                cov.capped_boxes += 1;
+            }
             assert_eq!(self.chk.get(&pid), Some(&(now, ema_leg)), "EMA leg, {ctx}");
             let tracked = self.arms.get(&pid).copied().unwrap_or_default();
             assert_eq!(tracked, before, "arm state before, {ctx}");
@@ -885,12 +912,14 @@ struct UnitsSettle {
     #[serde(rename = "box")]
     box_: Vec<String>,
     box_exec: Vec<String>,
+    box_cap: Vec<String>,
     s3: Vec<String>,
 }
 
 /// `Market.settle_box` on synthetic rings: the medians of the bucket extremes and, on a
 /// venue that cannot execute (`box`), the EMA point after `RING_LEN` seconds without an
-/// integration; on an executable venue (`box_exec`) never the EMA point alone (M2-SEC-1).
+/// integration; on an executable venue (`box_exec`) never the EMA point alone (M2-SEC-1);
+/// with a depth cap on `L_mhi` (`box_cap`, AIR-15).
 #[test]
 fn settle_box_matches_sim() {
     let f: UnitsSettle = common::load_vectors("settle", "units_settle.json");
@@ -925,6 +954,47 @@ fn settle_box_matches_sim() {
             assert_eq!(stale_wide, 0);
         }
     }
+    // AIR-15: `L_hi = max(L_ema, min(L_mhi, cap))`, the rest of the box unchanged.
+    assert!(f.box_cap.len() >= 200);
+    let (mut binding, mut below_ema) = (0, 0);
+    for (i, line) in f.box_cap.iter().enumerate() {
+        let ctx = format!("capped box case {i}: {line}");
+        let mut t = Toks::new(line);
+        let now: i64 = t.v();
+        let exec = t.b();
+        let cap: u128 = t.v();
+        let mut o = Observation::default();
+        o.ema.price = t.v();
+        o.ema.liq = t.v();
+        o.ema.ts = t.v();
+        let want = parse_box(&mut t);
+        o.ring = parse_ring(&mut t);
+        t.done();
+        assert_eq!(
+            box_of_capped(&o.ema, &o.ring, now, exec, Some(cap)),
+            Ok(want),
+            "{ctx}"
+        );
+        let plain = box_of(&o.ema, &o.ring, now, exec).unwrap();
+        assert_eq!(
+            SettleBox {
+                l_hi: plain.l_hi,
+                ..want
+            },
+            plain,
+            "{ctx}"
+        );
+        assert!(
+            want.l_hi <= plain.l_hi && want.contains(o.ema.price, o.ema.liq),
+            "{ctx}"
+        );
+        binding += usize::from(want.l_hi < plain.l_hi);
+        below_ema += usize::from(!want.is_point() && cap < o.ema.liq);
+    }
+    assert!(
+        binding >= 60 && below_ema >= 20,
+        "{binding} binding, {below_ema} below L_ema"
+    );
 }
 
 /// `Market._s3_due` on synthetic chains (graduation grace, migration pause, a broken or
@@ -1012,6 +1082,8 @@ fn attack_traces_match_sim() {
     assert!(c.ops.get("state").copied().unwrap_or(0) >= 100, "{c:?}");
     // M4F-1: references on Raydium markets carry the depth cap.
     assert!(c.capped_refs >= 5, "{c:?}");
+    // AIR-15: boxes whose L_mhi the depth cap bound (the RA markets; widen-LP's wrapped highs).
+    assert!(c.capped_boxes >= 300, "{c:?}");
 }
 
 /// ECON §11.2 scenarios (gaps, a fast pump, a drain then a pump, a spike, a disabled pool,
@@ -1032,6 +1104,7 @@ fn scenario_traces_match_sim() {
     assert!(c.point_boxes >= 100 && c.rolls >= 2_000, "{c:?}");
     assert!(c.maxin.get("exp").copied().unwrap_or(0) >= 2, "{c:?}");
     assert!(c.capped_refs >= 2, "{c:?}");
+    assert!(c.capped_boxes >= 50, "{c:?}");
 }
 
 /// The first six runs of ECON §13's exit fuzz, replayed whole (attacker bundles, blockers,

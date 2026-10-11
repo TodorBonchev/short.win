@@ -3,8 +3,9 @@
 //! settlement may roll (ARCH §2.1 `engine/settle.rs` — built as this module; §2.4.1, §3.8,
 //! §4.5, §5.3; ECON §5.6, §8.6, §10.3; A65).
 //!
-//! **Every decision is `shortwin_math::settle`'s**: [`settle::box_of`] (the box on the ring's
-//! bucket extremes), [`settle::evaluate`] (ARCH §3.8 steps 2–4 in the sim's order: "not
+//! **Every decision is `shortwin_math::settle`'s**: [`settle::box_of_capped`] (the box on the
+//! ring's bucket extremes, its `L_mhi` capped at the market's depth cap, AIR-15),
+//! [`settle::evaluate`] (ARCH §3.8 steps 2–4 in the sim's order: "not
 //! liquidatable" disarms only on the box, refutation on the box, the S1 / S2 legs on the live
 //! state, the robust spot and the box corner, one arming clock, the kind chosen at execution,
 //! S3 on the market's chain), [`settle::settlement`] (S1 `V − K_s`, never capped; S2 / S3
@@ -173,8 +174,10 @@ pub fn s3_chain(market: &Market, s3_no_route: bool) -> S3Chain {
 
 /// ARCH §3.8 step 1 after the prologue: `R_due`, `V_eff`, `K_s`, the legs of §4.5 and the
 /// box, as `settle::evaluate` reads them (module docs). `obs` is the market's post-roll
-/// observation state, `state` the venue's pre-trade state this instruction observed, `now` the
-/// prologue's time.
+/// observation state, `state` the venue's pre-trade state this instruction observed,
+/// `depth_cap` the market's `engine::bounds::ref_depth_cap` (the cap of the box's `L_mhi`,
+/// AIR-15), `now` the prologue's time.
+#[allow(clippy::too_many_arguments)]
 pub fn inputs(
     pos: &ShortPosition,
     market: &Market,
@@ -182,6 +185,7 @@ pub fn inputs(
     state: &VenueState,
     quotes: &mut RiskQuotes<'_>,
     s3_no_route: bool,
+    depth_cap: Option<u128>,
     now: i64,
 ) -> Result<(SettleInputs, Facts)> {
     let r_due = rent::due(&pos.pos_rent(), &market.basis()).math()?;
@@ -216,8 +220,10 @@ pub fn inputs(
     };
     // The box collapses to the EMA point only on a venue that cannot execute now (M2-SEC-1):
     // on an executable venue `deposit` / `withdraw` roll a pushed bucket without recording
-    // (A16), so an aged EMA is no evidence that nothing was pushed.
-    let bx = settle::box_of(&obs.ema, &obs.ring, now, executable).math()?;
+    // (A16), so an aged EMA is no evidence that nothing was pushed. AIR-15: its `L_mhi` credits
+    // no more depth than sizing does (the exit reference's M4F-1 cap), so deposit-wrapped
+    // cranks cannot widen `L_hi` at will.
+    let bx = settle::box_of_capped(&obs.ema, &obs.ring, now, executable, depth_cap).math()?;
     let inp = SettleInputs {
         now,
         deadline: pos.deadline,

@@ -1832,10 +1832,14 @@ pub type LpWrap = dyn Fn(&mut Lab, Instruction) -> (Vec<Instruction>, Keypair);
 ///   cannot move the box's medians — S1 lands in the honest second with the honest box (`P_lo`,
 ///   `P_hi`, `L_lo`, `L_hi`, within 1 bp: the round trips leave dust in the pool) and amounts;
 /// - every 20 s and in each of the 5 seconds before the honest S1 (7 bundles): 5 of the 8
-///   buckets' highs hold the doubled depth, so the box's `L_hi` widens — ECON §5.6's disclosed
-///   residual "deferral by widening" (a contrary observation every second; on Raydium an LP
-///   round trip), which can only defer: the S1 lands at most 4 s late (the sim's `widen_s1` with
-///   the LP side: +2 s on RA and RC), its price side and amounts the honest ones.
+///   buckets' highs hold the doubled depth, so their upper median `L_mhi` doubles, but the box
+///   reads `L_hi = max(L_ema, min(L_mhi, cap))` with the venue's depth cap `⌊D·10⁴/λ_min⌋`
+///   (AIR-15; `bounds::ref_depth_cap`, which no capital-only bundle moves). On PumpSwap the cap
+///   is the burned depth `D`, at or below the live depth: the wraps widen nothing, and the S1
+///   lands in the honest second with the honest box. On Raydium (`λ_min` = `pool_lock_min_bps`)
+///   `L_hi` widens at most to the cap — ECON §5.6's disclosed residual "deferral by widening",
+///   which can only defer: the S1 lands at most 4 s late, its price side and amounts the honest
+///   ones.
 pub fn lp_around_settle(make: &dyn Fn() -> Lab, label: &str, wrap: &LpWrap) {
     let (hs, h) = {
         let (mut lab, b, nonce) = s1_gap(make, label, 1.05);
@@ -1911,14 +1915,38 @@ pub fn lp_around_settle(make: &dyn Fn() -> Lab, label: &str, wrap: &LpWrap) {
                 "{label} {what}: the honest box"
             );
         } else {
-            assert!(
-                s >= hs && s <= hs + 4,
-                "{label} {what}: a deferral of at most 4 s"
+            // AIR-15: the program's `L_hi` from the state the settling call evaluated (its
+            // post-roll EMA and ring, and the `pool_d` its prologue refreshed).
+            let m = lab.market();
+            let lambda_min = m
+                .venue_kind()
+                .and_then(|k| k.lock_min_bps(lab.env.config().params.pool_lock_min_bps))
+                .expect("a venue with a locked depth");
+            let cap = shortwin_math::bounds::ref_depth_cap(m.pool_d.get(), lambda_min);
+            let l_mhi = shortwin_math::observe::ring_medians(&m.ring_math())
+                .unwrap()
+                .3;
+            assert_eq!(
+                ev.l_hi,
+                m.ema_liq.get().max(l_mhi.min(cap)),
+                "{label} {what}: L_hi = max(L_ema, min(L_mhi, cap)), L_mhi {l_mhi}, cap {cap}"
             );
-            assert!(
-                near(ev.l_lo, h.l_lo) && ev.l_hi >= h.l_hi,
-                "{label} {what}: only L_hi widens"
-            );
+            if cap <= h.l_hi {
+                assert_eq!(s, hs, "{label} {what}: S1 in the honest second");
+                assert!(
+                    near(ev.l_lo, h.l_lo) && near(ev.l_hi, h.l_hi),
+                    "{label} {what}: the honest box"
+                );
+            } else {
+                assert!(
+                    s >= hs && s <= hs + 4,
+                    "{label} {what}: a deferral of at most 4 s"
+                );
+                assert!(
+                    near(ev.l_lo, h.l_lo) && ev.l_hi >= h.l_hi,
+                    "{label} {what}: only L_hi widens"
+                );
+            }
         }
     }
 }

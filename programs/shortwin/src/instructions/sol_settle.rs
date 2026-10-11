@@ -78,7 +78,7 @@ use shortwin_math::waterfall::{self, Payout};
 use crate::constants::{CONFIG_VERSION, MARKET_VERSION};
 use crate::engine::arming::{self, Facts, RiskQuotes};
 use crate::engine::guard::{mint_guard, MintPath};
-use crate::engine::{lender, prologue, waterfall as engine_waterfall};
+use crate::engine::{bounds, lender, prologue, waterfall as engine_waterfall};
 use crate::errors::{CheckedExt, MathResultExt, ShortwinError};
 use crate::events::{
     EpochRolled, MintSafetyTripped, SettleArmed, SettleDisarmed, SolSettle as SolSettleEvent,
@@ -222,6 +222,9 @@ fn evaluate<'info>(
         .map(|t| venues::pump_curve::transition_event(&market, t, market_key, clock));
     let obs = market.observation();
     let mut quotes = RiskQuotes::new(risk, pos.q);
+    // AIR-15: the box's `L_mhi` is capped where the exit reference's EMA terms are (M4F-1,
+    // M6R-1: `pool_d` just refreshed by the prologue over `λ_min`; `None` without a locked depth).
+    let depth_cap = bounds::ref_depth_cap(&config, &market, kind);
     let (inp, facts) = arming::inputs(
         pos,
         &market,
@@ -229,6 +232,7 @@ fn evaluate<'info>(
         &state,
         &mut quotes,
         pro.s3_no_route,
+        depth_cap,
         now,
     )?;
     let mut arm = pos.arm_state();
