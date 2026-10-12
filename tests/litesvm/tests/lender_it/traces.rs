@@ -19,11 +19,20 @@
 //!   touched on copies).
 //!
 //! The program's `withdraw` pays the SOL part at once (`pool_model`'s `withdraw` does not);
-//! that moves SOL from the vault to the lender earlier than the model does, never tokens or
-//! shares. Where it leaves an on-chain lender's `pending` below 0 while the model's is not,
-//! the lender covers the difference first (`cover_deficit`) so the token side stays the
-//! model's. A refused `d` / `w` keeps the model's committed release and touch
-//! ([`Lab::commit_pre`]).
+//! that moves SOL from the vault, and from the pot (`unmatched`), to the lender earlier than
+//! the model does, never tokens or shares. The SOL sides then drift apart, either way, and a
+//! withdrawal's `pending ≥ 0` check (C0-13) reads them:
+//! - an on-chain lender's `pending` below 0 while the model's is not (the program paid it
+//!   earlier): the lender covers the difference first (`cover_deficit`);
+//! - the model's `pending` below 0 while the on-chain lender's is not (an earlier claim paid
+//!   it less on chain: another lender's withdrawal had already drawn the pot or `lender_sol`
+//!   that the claim drew in the model): the model refuses `NegativePending` where the program
+//!   would carry the withdrawal out. It is sent with an unreachable `min_sol` (`u64::MAX`): the
+//!   program runs it on its own state, checked against the math crate like any refusal, and
+//!   reverts at the SOL bound (`SolBelowMin`) ([`Stats::sol_gaps`]).
+//!
+//! Either way the token side stays the model's. A refused `d` / `w` keeps the model's
+//! committed release and touch ([`Lab::commit_pre`]).
 //!
 //! `cargo test` replays a quick subset; `SHORTWIN_TRACES=full` (best with `--release`, about
 //! four minutes) replays every trace except the u64-extreme amounts and the u128 lock-term
@@ -327,6 +336,9 @@ struct Stats {
     ops: usize,
     txs_refused: usize,
     covers_added: usize,
+    /// Withdrawals the model refused with `NegativePending` while the on-chain lender's
+    /// `pending` was not below 0 (sent with `min_sol = u64::MAX`, see the module docs).
+    sol_gaps: usize,
     final_lender_sol: u64,
     final_unallocated: u64,
     /// The host model's own unallocated realised SOL at the same point (rounding; since KI-65
@@ -393,6 +405,18 @@ fn n<T: std::str::FromStr>(args: &[&str], i: usize) -> T {
     args[i]
         .parse()
         .unwrap_or_else(|_| panic!("bad arg {i} in {args:?}"))
+}
+
+/// `name`'s on-chain `pending` as the program's `withdraw` finds it: after its own vest release
+/// and touch (on copies).
+fn chain_pending(lab: &Lab, name: &str) -> i64 {
+    let st = lab.state();
+    let mut l = st.lender_of(&lab.users[name].pubkey()).unwrap().lender();
+    let (mut p, mut v) = (st.pool, st.vault.clone());
+    pool::release(&mut p, st.now).unwrap();
+    let e = l.epoch;
+    pool::touch(&p, &mut v, &mut l, &mut st.records_from(e).to_vec(), st.now).unwrap();
+    l.pending
 }
 
 /// The program's error for a model refusal.
@@ -597,6 +621,21 @@ fn replay(trace: &Value, program: TokenProgram, max_lines: usize) -> Stats {
                             "{ctx}: model withdrew without a position on chain"
                         );
                         lab.release();
+                    } else if r == Err(MathError::NegativePending) && chain_pending(&lab, &nm) >= 0
+                    {
+                        // The model's deficit is its own: an earlier claim paid this lender less
+                        // on chain (module docs). The program would burn; with an unreachable
+                        // `min_sol` it runs the withdrawal and reverts at the SOL bound, and at
+                        // nothing earlier (any other refusal, `NegativePending` included, means
+                        // `chain_pending` missed the program's view).
+                        let chain = lab.withdraw_bounded(&nm, shares, 0, u64::MAX);
+                        assert_eq!(
+                            chain,
+                            Err(code(ShortwinError::SolBelowMin)),
+                            "{ctx}: program {chain:?}"
+                        );
+                        stats.sol_gaps += 1;
+                        lab.commit_pre(&nm).unwrap();
                     } else {
                         if r != Err(MathError::NegativePending) {
                             // The program paid SOL earlier than the model: cover a deficit that
@@ -949,6 +988,11 @@ fn extended_profiles_replay() {
             lines,
         );
         println!("{nm}: {s:?}");
+        if nm == "ext_pot_fwd_dust_100" {
+            // Seed 66: withdrawals the model refuses on its own SOL side (module docs), at
+            // lines 208, 304, 457 and 464 (all within the quick subset).
+            assert_eq!(s.sol_gaps, 4, "{nm}");
+        }
     }
     for t in load("pool_ext_extreme_1.json") {
         let nm = t["name"].as_str().unwrap();

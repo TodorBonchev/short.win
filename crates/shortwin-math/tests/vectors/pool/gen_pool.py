@@ -1251,8 +1251,10 @@ def ext_profiles() -> list:
             "KI-66: lazy lenders and third-party syncs (pot-only touches: a lender behind a rebase record "
             "is accrued to its ends and its surplus moves to the pot, unconverted), some repeated, then "
             "claims; late joiners and early leavers around deep rebases, rent paid across them"),
-        # Seeds 82 and 26 (were 17 and 20): since AIR-07's residual fix a deposit into a drained
-        # pool is refused, which left the old seeds 8 and 5 pot-only holds (26 and 17 before).
+        # Seeds 82 and 66 (were 17 and 20): since AIR-07's residual fix a deposit into a drained
+        # pool is refused, which left the old seeds 8 and 5 pot-only holds (22 and 17 before).
+        # Seed 66 (23 holds) also reaches withdrawals the model refuses with negative_pending
+        # while the program's lender is not short (lender_it traces.rs, `sol_gaps`).
         Ext("ext_pot_dust_100", 82, 4_000, 10_000, 8, POT, dust_amounts(),
             "KI-66: pot-only touches with dust amounts (1..40 raw tokens, 0..11 lamports)"),
         Ext("ext_pot_continuous_90", 18, 4_000, 9_000, 6, POT, normal_amounts(),
@@ -1263,7 +1265,7 @@ def ext_profiles() -> list:
         Ext("ext_pot_fwd_deep_100", 21, 4_000, 10_000, 4, FWD_DEEP, normal_amounts(),
             "KI-66 full: four lenders, frequent deep rebases: chains through several records, owners "
             "stopping inside them"),
-        Ext("ext_pot_fwd_dust_100", 26, 4_000, 10_000, 8, FWD, dust_amounts(),
+        Ext("ext_pot_fwd_dust_100", 66, 4_000, 10_000, 8, FWD, dust_amounts(),
             "KI-66 full: the forward chain with dust amounts (most chains floor to 0 shares)"),
         Ext("ext_pot_fwd_open_100", 22, 4_000, 10_000, 6, FWD_OPEN, normal_amounts(),
             "KI-66 full: owners stopping inside forward chains (sync_lender(1) of a chained lender: "
