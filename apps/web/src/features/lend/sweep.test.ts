@@ -156,6 +156,25 @@ describe('post-wipe sweep bundle', () => {
         expect(existing).toHaveLength(2);
     });
 
+    it('sweeps a pool every lender left, which has no wipe record to name (AIR-08)', async () => {
+        // S = 0 after the last exit: `withdraw` cleared both bits and no record is live.
+        const ixs = await postWipeSweepIxs(PAYER, MARKET, wiped(6, 0), NO_CASHBACK, null);
+        expect(ixs).toHaveLength(1);
+        expect(identifyShortwinInstruction(ixs[0]?.data as Uint8Array)).toBe(ShortwinInstruction.SweepTrader);
+        expect(ixs[0]?.accounts).toHaveLength(10);
+        // On the curve: the pump claim while cashback is outstanding, then the sweep with its token leg.
+        const curve = await postWipeSweepIxs(PAYER, MARKET, wiped(1, 0), { ...NO_CASHBACK, pumpClaimable: 5n }, null);
+        expect(curve.map((i) => i.programAddress)).toEqual([PUMP_PROGRAM, SHORTWIN_PROGRAM]);
+        expect(curve[1]?.accounts).toHaveLength(15);
+        // The trader bit is enough off the pump venues; the curve also waits for the rewards bit.
+        expect(await postWipeSweepIxs(PAYER, MARKET, wiped(6, MARKET_FLAG.wipeTraderSwept), NO_CASHBACK, null)).toEqual(
+            [],
+        );
+        expect(
+            await postWipeSweepIxs(PAYER, MARKET, wiped(1, MARKET_FLAG.wipeTraderSwept), NO_CASHBACK, null),
+        ).toHaveLength(1);
+    });
+
     it('builds nothing when no sweep is pending', async () => {
         const swept = wiped(6, MARKET_FLAG.wipeLive | MARKET_FLAG.wipeTraderSwept);
         expect(await postWipeSweepIxs(PAYER, MARKET, swept, NO_CASHBACK, null)).toEqual([]);

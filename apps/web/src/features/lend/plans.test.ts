@@ -168,6 +168,20 @@ describe('deposit plans', () => {
         expect(kinds(plan.instructions.slice(1))).toEqual(['Deposit']);
         expect(plan.title).toContain('post-wipe sweep');
         expect(plan.disclosures).toEqual(['lender.solRepayment']);
+        // AIR-08: after the last lender's exit (no wipe record) the review names that sweep instead.
+        const exit = await buildDepositPlan({
+            ...ctx(),
+            source: SOURCE,
+            sourceCpiGuard: false,
+            amount: 5n,
+            minShares: 1n,
+            bracket: false,
+            sweep: [sweep],
+            sweepAfterExit: true,
+        });
+        expect(exit.instructions[0]).toBe(sweep);
+        expect(exit.title).toContain('· sweep after the last exit');
+        expect(exit.title).not.toContain('post-wipe');
     });
 
     it('passes the ShareEpoch records a lender is behind on, in order and writable (KI-65)', async () => {

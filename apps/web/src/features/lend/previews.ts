@@ -129,12 +129,15 @@ export function wipeLive(market: MarketPoolFields): boolean {
 }
 
 /**
- * A deposit would be refused `WipeSweepPending` until the permissionless post-wipe sweeps run
- * (R4A-7; the keeper's `sweep::wipe_pending`): the trader bit, and on a pump venue the
- * venue-reward bit.
+ * A deposit would be refused `WipeSweepPending` until the permissionless sweeps run: the pool has
+ * no shares (`S = 0`) and the trader bit, or on a pump venue the venue-reward bit, is clear — the
+ * program's `deposit` check (`pool::deposit`; the keeper's `sweep::wipe_pending`). Since AIR-08
+ * that holds after the last lender's exit as well as after a full wipe (R4A-7): `withdraw` clears
+ * both bits when `S` reaches 0, so the gate is `S = 0`, not the wipe record. A new market starts
+ * with both bits set and is not pending.
  */
 export function wipeSweepPending(market: MarketPoolFields & Pick<Market, 'venue'>): boolean {
-    if (!wipeLive(market)) return false;
+    if (podU128ToBigInt(market.totalShares) !== 0n) return false;
     if (!hasFlag(market, MARKET_FLAG.wipeTraderSwept)) return true;
     return rewardsRequired(market.venue) && !hasFlag(market, MARKET_FLAG.wipeRewardsClaimed);
 }
@@ -525,8 +528,9 @@ export interface DepositView {
 }
 
 /**
- * `deposit(amount)` on the stored state. `sweepBundled`: the post-wipe sweeps run first in the same
- * transaction (FRONTEND.md §3.6), so the preview reads the pool with both sweep bits set.
+ * `deposit(amount)` on the stored state. `sweepBundled`: the sweeps a pool without shares waits for
+ * (after a full wipe, or since AIR-08 after the last lender's exit; `wipeSweepPending`) run first in
+ * the same transaction (FRONTEND.md §3.6), so the preview reads the pool with both sweep bits set.
  */
 export function previewDepositView(
     m: MathModule,

@@ -35,6 +35,7 @@ import {
     previewUnpaidRent,
     previewWithdrawView,
     type Refusal,
+    wipeLive,
     wipeSweepPending,
 } from './previews.ts';
 import {
@@ -139,6 +140,8 @@ export async function depositPlanFrom(
         minShares: preview.value.minShares,
         bracket: inp.bracket,
         sweep: sweepIxs,
+        // AIR-08: no wipe record, so every lender left (the sweep books to the protocol).
+        sweepAfterExit: sweep && !wipeLive(market),
         ...(unpaid.level === 'warn' ? { unpaidRent: unpaidRentVarsOf(unpaid) } : {}),
     });
     return {

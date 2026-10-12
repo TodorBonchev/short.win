@@ -1,8 +1,10 @@
 /**
- * The post-wipe sweep bundle a depositor prepends (FRONTEND.md §3.6; ARCH §3.3, §3.9; R4A-7): after
- * a full wipe (`S = 0` with a live wipe record) `deposit` refuses `WipeSweepPending` until
- * `sweep_trader` has run — and, on the pump venues, until the trader's venue cashback is claimed.
- * Every step is permissionless, so the depositor bundles them in its own transaction.
+ * The post-wipe sweep bundle a depositor prepends (FRONTEND.md §3.6; ARCH §3.3, §3.9; R4A-7): while
+ * the pool has no shares — after a full wipe (`S = 0` with a live wipe record) or, since AIR-08,
+ * after the last lender's exit, which clears both sweep bits — `deposit` refuses `WipeSweepPending`
+ * until `sweep_trader` has run — and, on the pump venues, until the trader's venue cashback is
+ * claimed (`wipeSweepPending`). Every step is permissionless, so the depositor bundles them in its
+ * own transaction; `sweep_trader` names the wipe record only while one is live.
  *
  * A TypeScript port of the keeper's `services/keeper/src/sweep.rs` (`post_wipe_ixs`, `claim_ixs`,
  * `sweep_trader_ix`, the pump / PumpSwap `claim_cashback` and PumpSwap's

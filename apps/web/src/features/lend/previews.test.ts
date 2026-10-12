@@ -332,6 +332,36 @@ describe('lend previews on simple pools', () => {
         expect([0, 1, 2, 3, 4, 5, 6].map(rewardsRequired)).toEqual([false, true, true, true, false, false, false]);
     });
 
+    it('waits for the sweep after the last lender’s exit too (AIR-08: the gate is S = 0, not the wipe record)', () => {
+        // Every lender withdrew: S = 0, no wipe record, `withdraw` cleared both bits.
+        const emptied = {
+            ...simplePool({ tokensFree: 0n, totalShares: 0n, flags: 0, shareEpoch: 3 }),
+            lender: null,
+            records: [],
+        };
+        expect(wipeLive(emptied.market)).toBe(false);
+        expect(wipeSweepPending(emptied.market)).toBe(true);
+        const refused = previewDepositView(m, emptied, 0n, 10n ** 9n, 50);
+        expect(!refused.ok && refused.refusal.name).toBe('WipeSweepPending');
+        const bundled = previewDepositView(m, emptied, 0n, 10n ** 9n, 50, true);
+        expect(bundled.ok && bundled.value.shares).toBe(10n ** 12n);
+        // The trader bit is enough off the pump venues, as after a wipe; a pump venue needs both.
+        const swept = { ...emptied.market, flags: MARKET_FLAG.wipeTraderSwept };
+        expect(wipeSweepPending(swept)).toBe(false);
+        expect(wipeSweepPending({ ...swept, venue: 3 })).toBe(true);
+        expect(
+            wipeSweepPending({
+                ...swept,
+                venue: 3,
+                flags: MARKET_FLAG.wipeTraderSwept | MARKET_FLAG.wipeRewardsClaimed,
+            }),
+        ).toBe(false);
+        // A new market starts with both bits set; a pool with shares never waits, whatever its bits.
+        const fresh = { ...emptied.market, flags: MARKET_FLAG.wipeTraderSwept | MARKET_FLAG.wipeRewardsClaimed };
+        expect(wipeSweepPending({ ...fresh, venue: 1 })).toBe(false);
+        expect(wipeSweepPending(simplePool({ flags: 0, venue: 1 }).market)).toBe(false);
+    });
+
     it('splits a withdrawal into the allowance, the lock and the forfeited vest', () => {
         // 1,000 tokens lent, 500 borrowed; this lender holds half the shares; 1 SOL vesting half-way.
         const pool = simplePool({

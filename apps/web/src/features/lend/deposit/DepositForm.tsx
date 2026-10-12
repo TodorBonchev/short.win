@@ -7,8 +7,9 @@
  * expanded and repeated in the review when material; ECON §9.4), then the risks (`lender.risks`,
  * expanded on a wallet's first deposit, and the collapsed ones), the SPEC §5.3 disclosure with its
  * required checkbox — still before signing, and again in the review — and the sticky submit. A CPI-Guarded
- * source blocks the plain deposit and offers the opt-in bracket (FE-1); a live wipe record
- * prepends the post-wipe sweep bundle; a mint flagged unsafe blocks deposits.
+ * source blocks the plain deposit and offers the opt-in bracket (FE-1); a pool without shares — a
+ * live wipe record, or since AIR-08 a pool every lender left — prepends the sweep bundle while the
+ * sweeps are pending (`wipeSweepPending`); a mint flagged unsafe blocks deposits.
  */
 import { getLenderPositionSize } from '@shortwin/client';
 import { useQuery } from '@tanstack/react-query';
@@ -43,6 +44,7 @@ import {
     pendingLenderCredit,
     previewDepositView,
     previewUnpaidRent,
+    wipeLive,
     wipeSweepPending,
 } from '../previews.ts';
 import { AccountSelect, AckTarget, accountLabel, Blocked, type Reason, RefusalLine, ToleranceInput } from '../ui.tsx';
@@ -289,12 +291,31 @@ export function DepositForm({ ctx }: { ctx: LendCtx }) {
                     collapsible={unpaid.level !== 'warn'}
                 />
             )}
-            {sweep && (
-                <div className="banner" data-tone="info" role="status" data-testid={T.lendSweepNotice}>
-                    This pool was wiped out. Your deposit first runs the permissionless post-wipe sweep (the venue
-                    cashback claims and sweep_trader), so the old lenders receive what is left on the trader.
-                </div>
-            )}
+            {sweep &&
+                (wipeLive(market) ? (
+                    <div
+                        className="banner"
+                        data-tone="info"
+                        role="status"
+                        data-testid={T.lendSweepNotice}
+                        data-kind="wipe"
+                    >
+                        This pool was wiped out. Your deposit first runs the permissionless post-wipe sweep (the venue
+                        cashback claims and sweep_trader), so the old lenders receive what is left on the trader.
+                    </div>
+                ) : (
+                    // AIR-08: every lender left by withdrawals; what reached the trader since is the protocol's.
+                    <div
+                        className="banner"
+                        data-tone="info"
+                        role="status"
+                        data-testid={T.lendSweepNotice}
+                        data-kind="emptied"
+                    >
+                        Every lender has left this pool. Your deposit first runs the permissionless sweep (the venue
+                        cashback claims and sweep_trader), which books what is left on the trader to the protocol.
+                    </div>
+                ))}
             {/* The risks, then SPEC §5.3's acknowledgement, right before the submit (the Short form's
                 order, the owner's thirteenth round O-1): the texts verbatim, only their place moved. */}
             <LenderRisks owner={signer?.address ?? null} vars={lenderRiskVars(chain.config?.params)} />

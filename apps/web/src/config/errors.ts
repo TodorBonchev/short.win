@@ -282,7 +282,7 @@ const ROWS: readonly Row[] = [
         6084,
         'WipeSweepPending',
         'retry',
-        'This pool was fully settled and must be swept before new deposits. A new review adds that step.',
+        'This pool has no lenders (it was fully settled, or every lender left) and must be swept before new deposits. A new review adds that step.',
     ],
     [6085, 'OracleOwner', 'admin', 'The SOL/USD price account has the wrong owner.'],
     [6086, 'OracleFeed', 'admin', 'The SOL/USD price update is for the wrong feed.'],

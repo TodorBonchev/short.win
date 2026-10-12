@@ -378,7 +378,7 @@ describe('Lend → Deposit', () => {
     it('prepends the post-wipe sweep bundle to the first deposit after a full wipe', async () => {
         setChain(chainOf({ pool: { tokensFree: 0n, totalShares: 0n, flags: MARKET_FLAG.wipeLive, shareEpoch: 2 } }));
         renderPanel('deposit');
-        expect(screen.getByTestId(T.lendSweepNotice)).toBeTruthy();
+        expect(screen.getByTestId(T.lendSweepNotice).dataset.kind).toBe('wipe');
         fireEvent.change(screen.getByTestId(T.lendAmountInput), { target: { value: '1' } });
         // The preview reads the pool with the sweep done: 10⁶ raw tokens × 1,000 virtual shares.
         expect(screen.getByTestId(T.lendPreview('shares')).dataset.value).toBe('1000000000');
@@ -393,6 +393,28 @@ describe('Lend → Deposit', () => {
         const [record] = await findShareEpochPda({ market: MARKET, epoch: 1 });
         expect(sweep?.accounts?.[sweep.accounts.length - 1]).toEqual({ address: record, role: AccountRole.WRITABLE });
         expect(plan.title).toContain('post-wipe sweep');
+    });
+
+    it('prepends the sweep to the first deposit after the last lender’s exit (AIR-08: no wipe record)', async () => {
+        // S = 0 without a wipe record: `withdraw` cleared both sweep bits when the last lender left.
+        setChain(chainOf({ pool: { tokensFree: 0n, totalShares: 0n, flags: 0, shareEpoch: 2 } }));
+        renderPanel('deposit');
+        expect(screen.getByTestId(T.lendSweepNotice).dataset.kind).toBe('emptied');
+        fireEvent.change(screen.getByTestId(T.lendAmountInput), { target: { value: '1' } });
+        expect(screen.getByTestId(T.lendPreview('shares')).dataset.value).toBe('1000000000');
+        fireEvent.click(screen.getByTestId(T.disclosureAck('lender.solRepayment')));
+        fireEvent.click(submit());
+        await waitFor(() => expect(started).toHaveLength(1));
+        const plan = started[0] as TxPlan;
+        expect(plan.instructions).toHaveLength(2);
+        const [sweep, deposit] = plan.instructions;
+        expect(identifyShortwinInstruction(sweep?.data as Uint8Array)).toBe(ShortwinInstruction.SweepTrader);
+        // No live record: the sweep names none (the program would refuse it, BadRemainingAccounts).
+        expect(sweep?.accounts).toHaveLength(10);
+        expect(identifyShortwinInstruction(deposit?.data as Uint8Array)).toBe(ShortwinInstruction.Deposit);
+        // The review says which sweep it is: no wipe here.
+        expect(plan.title).toContain('· sweep after the last exit');
+        expect(plan.title).not.toContain('post-wipe');
     });
 
     it('shows no unpaid-rent rows on a pool whose rent is all paid in', () => {

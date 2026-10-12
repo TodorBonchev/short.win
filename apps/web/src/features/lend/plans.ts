@@ -185,6 +185,11 @@ export interface DepositPlanInput extends LendContext {
     /** The post-wipe sweep bundle (`sweep.ts`), when a deposit would otherwise wait for it. */
     readonly sweep: readonly Instruction[];
     /**
+     * The pool has no lenders because every lender left (AIR-08: no wipe record), so the review
+     * names the step "sweep after the last exit" rather than "post-wipe sweep". Omitted: a wipe.
+     */
+    readonly sweepAfterExit?: boolean;
+    /**
      * `lender.unpaidRent`'s variables when the deposit's part of the pool's unpaid rent is material
      * (`previewUnpaidRent` level `warn`): the review repeats the disclosure. Omitted otherwise.
      */
@@ -225,7 +230,7 @@ export async function buildDepositPlan(i: DepositPlanInput): Promise<TxPlan> {
     // The token by symbol AND mint (M9-SEC-5): a symbol alone can impersonate a ticker.
     const amount = `${formatTokens(i.amount, i.decimals)} ${tokenLabel(i.symbol, i.mint)}`;
     const steps = [
-        ...(i.sweep.length ? ['post-wipe sweep'] : []),
+        ...(i.sweep.length ? [i.sweepAfterExit ? 'sweep after the last exit' : 'post-wipe sweep'] : []),
         ...(bracket ? ['CPI Guard off', 'deposit', 'CPI Guard on'] : []),
     ];
     const disclosures: DisclosureId[] = [
