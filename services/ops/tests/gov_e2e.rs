@@ -55,6 +55,7 @@ fn outcome_of(meta: &litesvm::types::TransactionMetadata, err: Option<TxError>) 
         units_consumed: meta.compute_units_consumed,
         fee: meta.fee,
         inner: Vec::new(),
+        slot: 0,
     }
 }
 

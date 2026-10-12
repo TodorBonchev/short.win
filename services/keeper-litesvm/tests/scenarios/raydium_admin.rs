@@ -603,7 +603,7 @@ fn stranger_extends(env: &mut Env, program: &Pubkey) -> u64 {
 /// What the loader's `Upgrade` of `program` to `elf` leaves in its ProgramData (T-LATCH's
 /// `fork::set_deploy_slot` with the new ELF): the current slot in the header, `elf` after it, the
 /// rest of the account zeroed, its length kept. Returns that slot.
-fn upgrade_in_place(env: &mut Env, program: &Pubkey, elf: &[u8]) -> u64 {
+pub fn upgrade_in_place(env: &mut Env, program: &Pubkey, elf: &[u8]) -> u64 {
     let key = monitor::program_data_address(program);
     let slot = env.clock().slot;
     let mut acc = env.svm.get_account(&key).unwrap();
@@ -645,7 +645,7 @@ fn flags_sent(h: &Harness) -> usize {
 /// AMM v4's dumped ELF with one byte of a panic-location string in `.rodata` changed
 /// (`program/src/math.rs` → `…/meth.rs`, as `latch_raydium_it`): another build of the same size
 /// the loader would deploy.
-fn v4_elf_one_byte_changed() -> Vec<u8> {
+pub fn v4_elf_one_byte_changed() -> Vec<u8> {
     let mut elf = RaydiumProgram::AmmV4.elf().to_vec();
     let at = elf
         .windows(19)
@@ -848,7 +848,7 @@ fn air01_a_keeper_restarted_during_a_review_does_not_page_an_extension_of_its_de
 
 /// Revalidates AMM v4 at its fixture deploy with its trimmed ELF's hash (the ops runbook): the
 /// latch then holds its fingerprint. Returns that deploy slot.
-fn revalidate_v4_with_hash(h: &Harness) -> u64 {
+pub fn revalidate_v4_with_hash(h: &Harness) -> u64 {
     let venue = GUARD_RAYDIUM_V4;
     let slot0 = FIXTURE_GUARD_SLOTS[usize::from(venue)];
     h.with_env(|env| {

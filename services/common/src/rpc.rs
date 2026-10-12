@@ -292,25 +292,16 @@ impl Chain for RpcChain {
         keys: &[Pubkey],
         len: usize,
     ) -> anyhow::Result<Vec<Option<AccountData>>> {
-        let config = RpcAccountInfoConfig {
-            encoding: Some(UiAccountEncoding::Base64),
-            data_slice: Some(solana_account_decoder_client_types::UiDataSliceConfig {
-                offset: 0,
-                length: len,
-            }),
-            commitment: Some(self.commitment),
-            min_context_slot: None,
-        };
-        let mut out = Vec::with_capacity(keys.len());
-        for chunk in keys.chunks(MULTIPLE_ACCOUNTS_MAX) {
-            let res = self
-                .client
-                .get_multiple_ui_accounts_with_config(chunk, config.clone())
-                .await
-                .context("getMultipleAccounts (dataSlice)")?;
-            out.extend(res.value.into_iter().map(|a| a.and_then(Self::account_of)));
-        }
-        Ok(out)
+        self.headers(keys, len, None).await
+    }
+
+    async fn account_headers_at(
+        &self,
+        keys: &[Pubkey],
+        len: usize,
+        min_context_slot: u64,
+    ) -> anyhow::Result<Vec<Option<AccountData>>> {
+        self.headers(keys, len, Some(min_context_slot)).await
     }
 
     async fn program_accounts(
@@ -352,12 +343,12 @@ impl Chain for RpcChain {
             min_context_slot: None,
             inner_instructions: true,
         };
-        let res = match self
+        let (slot, res) = match self
             .client
             .simulate_transaction_with_config(tx, config)
             .await
         {
-            Ok(r) => r.value,
+            Ok(r) => (r.context.slot, r.value),
             Err(e) => {
                 if let Some(msg) = is_rejection(&e) {
                     return Ok(TxOutcome {
@@ -377,6 +368,7 @@ impl Chain for RpcChain {
             units_consumed: res.units_consumed.unwrap_or(0),
             fee: res.fee.unwrap_or(0),
             inner: inner_of(res.inner_instructions, &keys, n_top),
+            slot,
         })
     }
 
@@ -467,6 +459,36 @@ impl Chain for RpcChain {
 }
 
 impl RpcChain {
+    /// `getMultipleAccounts` of `keys` sliced to their first `len` bytes (`dataSlice`), at the
+    /// chain's commitment and, with `min_context_slot`, from a node that has reached that slot
+    /// (one behind refuses: an error).
+    async fn headers(
+        &self,
+        keys: &[Pubkey],
+        len: usize,
+        min_context_slot: Option<u64>,
+    ) -> anyhow::Result<Vec<Option<AccountData>>> {
+        let config = RpcAccountInfoConfig {
+            encoding: Some(UiAccountEncoding::Base64),
+            data_slice: Some(solana_account_decoder_client_types::UiDataSliceConfig {
+                offset: 0,
+                length: len,
+            }),
+            commitment: Some(self.commitment),
+            min_context_slot,
+        };
+        let mut out = Vec::with_capacity(keys.len());
+        for chunk in keys.chunks(MULTIPLE_ACCOUNTS_MAX) {
+            let res = self
+                .client
+                .get_multiple_ui_accounts_with_config(chunk, config.clone())
+                .await
+                .context("getMultipleAccounts (dataSlice)")?;
+            out.extend(res.value.into_iter().map(|a| a.and_then(Self::account_of)));
+        }
+        Ok(out)
+    }
+
     /// Polls the signatures of `txs` until every one is confirmed at the chain's commitment or
     /// `deadline` passes (the ones still missing are `Dropped`), then fetches each confirmed
     /// transaction's meta (logs, fee, compute units, inner instructions).
@@ -508,6 +530,7 @@ impl RpcChain {
             let mut outcome = TxOutcome {
                 signature: *signature,
                 err: status.err.map(TxError::from_transaction_error),
+                slot: status.slot,
                 ..TxOutcome::default()
             };
             let cfg = RpcTransactionConfig {

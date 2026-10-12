@@ -39,7 +39,10 @@
 //! verification of decision A, fixed: below the floor an exit lands the second after the idle
 //! crank that makes it possible, a cascade whose value at risk crosses the floor is liquidated,
 //! that crank is exit-critical, a burst charges one exit-critical crank a second, a keeper start
-//! funds its markets at the batched estimate).
+//! funds its markets at the batched estimate), and `redeploy` (AIR-18: short.win or a venue not
+//! deployed for a slot — a stranger's `ExtendProgram` — and the refused exit, crank, latch flag,
+//! S3 probe or sweep sent again the next slot, nothing alerted; a venue extended in every slot
+//! for 30 s paged once; a venue that stays undeployable refused and alerted).
 //! Every keeper transaction runs the harness's invariant hooks after every instruction
 //! (`shortwin_keeper_litesvm`).
 //!
@@ -77,6 +80,7 @@ mod priority;
 mod raydium;
 mod raydium_admin;
 mod raydium_alt;
+mod redeploy;
 mod s3;
 mod selection;
 mod settle;

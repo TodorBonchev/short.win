@@ -123,6 +123,10 @@ pub struct TxOutcome {
     /// The inner instructions of each top-level instruction, in order (index = top-level
     /// instruction index; empty lists where there were none).
     pub inner: Vec<Vec<InnerIx>>,
+    /// The slot it comes from: a simulation's context slot (the bank it ran on), a landed
+    /// transaction's slot; 0 when unknown (refused before it ran, dropped, or a backend that does
+    /// not say).
+    pub slot: u64,
 }
 
 impl TxOutcome {
@@ -176,6 +180,21 @@ pub trait Chain {
             a.data.truncate(len);
         }
         Ok(out)
+    }
+
+    /// [`Chain::account_headers`] as of slot `min_context_slot` or later: a node of an RPC pool
+    /// that has not reached it refuses the read (an error) rather than answer from an older
+    /// state — the keeper's AIR-18 check reads the ProgramData of a program refused in a slot,
+    /// which only a read at or after that slot shows. The default ignores it: an in-process
+    /// backend is never behind.
+    async fn account_headers_at(
+        &self,
+        keys: &[Pubkey],
+        len: usize,
+        min_context_slot: u64,
+    ) -> anyhow::Result<Vec<Option<AccountData>>> {
+        let _ = min_context_slot;
+        self.account_headers(keys, len).await
     }
 
     /// Every account of `program` matching all `filters`.
@@ -262,6 +281,18 @@ mod tests {
             InstructionError::InvalidAccountData,
         ));
         assert_eq!((e.custom_code(), e.instruction()), (None, Some(1)));
+        // AIR-18: the loader's "Program is not deployed" (a program deployed, upgraded or
+        // extended in this slot) keeps its name, which the keeper tells transient by.
+        assert_eq!(
+            TxError::from_transaction_error(TransactionError::InstructionError(
+                0,
+                InstructionError::UnsupportedProgramId,
+            )),
+            TxError::Instruction {
+                index: 0,
+                detail: "UnsupportedProgramId".into(),
+            }
+        );
         for pre in [
             TransactionError::BlockhashNotFound,
             TransactionError::UnsupportedVersion,

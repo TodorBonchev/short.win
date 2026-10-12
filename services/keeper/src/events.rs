@@ -7,7 +7,7 @@
 use anchor_lang::__private::base64::{self, Engine};
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::{AnchorDeserialize, Discriminator, Event};
-use shortwin_services_common::TxOutcome;
+use shortwin_services_common::{TxError, TxOutcome};
 
 fn decode<T: Event + Discriminator + AnchorDeserialize>(payload: &[u8]) -> Option<T> {
     let body = payload.strip_prefix(T::DISCRIMINATOR)?;
@@ -58,6 +58,41 @@ pub fn failing_program(out: &TxOutcome) -> Option<anchor_lang::prelude::Pubkey> 
             .then(|| id.parse().ok())
             .flatten()
     })
+}
+
+/// AIR-18 (KI-63; leads.md L-2): whether the transaction failed because the loader would not run
+/// one of its programs — `InstructionError::UnsupportedProgramId` ("Program is not deployed").
+/// The loader answers so for a program deployed, upgraded or extended in the current slot until
+/// the next slot makes the new deployment visible (Agave's `DelayVisibility`): its `ExtendProgram`
+/// is permissionless (once a slot per program), so anyone can do this to short.win — every
+/// instruction fails — or to a venue — every exit buying on it fails — for the rest of a slot.
+/// But it gives the same log and error for a program that does not come back by itself: closed,
+/// failing verification (an ELF a feature gate retired, as SBPFv0's would every venue fixture),
+/// or not cached. [`failing_program`] names the program (the innermost failing one: a venue behind
+/// short.win's CPI); [`deployed_in_refused_slot`] tells the transient case by its ProgramData.
+pub fn not_deployed(out: &TxOutcome) -> bool {
+    matches!(
+        &out.err,
+        Some(TxError::Instruction { detail, .. }) if detail == "UnsupportedProgramId"
+    )
+}
+
+/// AIR-18: slots a deploy may precede the slot a refusal is dated by and still be judged by
+/// [`deployed_in_refused_slot`]'s bound below. A refusal is dated by its own slot (a simulation's
+/// bank, a failed transaction's block), which is the deploy's; when the backend does not say, by
+/// the clock read of the tick that sent it, which the nodes of an RPC pool can serve a slot or
+/// two apart (all at `confirmed`).
+pub const DEPLOY_SLOT_SLACK: u64 = 2;
+
+/// AIR-18: whether a refusal of [`not_deployed`] dated by slot `refused_slot` can be the loader's
+/// one-slot `DelayVisibility`, given the deploy slot the refused program's ProgramData header
+/// shows as of that slot or later (`None`: no ProgramData — closed, or a program not under the
+/// upgradeable loader). That refusal comes in the slot of the deploy, upgrade or extension
+/// (within [`DEPLOY_SLOT_SLACK`] of the slot it is dated by); a deploy slot only grows. An older
+/// deploy slot means the program does not come back by itself (failing verification, a stale
+/// cache entry): the keeper handles it as any refusal, alerted.
+pub fn deployed_in_refused_slot(deploy_slot: Option<u64>, refused_slot: u64) -> bool {
+    deploy_slot.is_some_and(|d| d.saturating_add(DEPLOY_SLOT_SLACK) >= refused_slot)
 }
 
 /// Which pool-selection event (ARCH §3.10; M4).
@@ -153,6 +188,86 @@ mod tests {
     use anchor_lang::{AnchorSerialize, Discriminator};
     use shortwin::events::{POOL_KIND_FAST, PoolSwitched};
     use shortwin_services_common::InnerIx;
+
+    /// AIR-18: the loader's refusal of a program deployed in this slot — at the top level, or
+    /// behind short.win's CPI (the venue, the innermost failing program, is named) — is told
+    /// from every other failure.
+    #[test]
+    fn a_program_not_deployed_in_this_slot_is_told_and_named() {
+        let venue = Pubkey::new_unique();
+        let refused = |index: u8, logs: Vec<String>| TxOutcome {
+            err: Some(TxError::Instruction {
+                index,
+                detail: "UnsupportedProgramId".into(),
+            }),
+            logs,
+            ..TxOutcome::default()
+        };
+        let cpi = refused(
+            1,
+            vec![
+                format!("Program {} invoke [1]", shortwin::ID),
+                format!("Program {venue} invoke [2]"),
+                "Program is not deployed".into(),
+                format!("Program {venue} failed: Unsupported program id"),
+                format!(
+                    "Program {} consumed 41200 of 200000 compute units",
+                    shortwin::ID
+                ),
+                format!("Program {} failed: Unsupported program id", shortwin::ID),
+            ],
+        );
+        assert!(not_deployed(&cpi));
+        assert_eq!(failing_program(&cpi), Some(venue));
+        let top = refused(
+            0,
+            vec![
+                format!("Program {} invoke [1]", shortwin::ID),
+                "Program is not deployed".into(),
+                format!("Program {} failed: Unsupported program id", shortwin::ID),
+            ],
+        );
+        assert!(not_deployed(&top));
+        assert_eq!(failing_program(&top), Some(shortwin::ID));
+        assert_eq!(failing_program(&refused(0, Vec::new())), None);
+        for err in [
+            TxError::Custom {
+                index: 0,
+                code: 6_071,
+            },
+            TxError::Instruction {
+                index: 0,
+                detail: "InvalidAccountData".into(),
+            },
+            TxError::Execution("InsufficientFundsForFee".into()),
+            TxError::Rejected("BlockhashNotFound".into()),
+            TxError::Dropped("not confirmed".into()),
+        ] {
+            let out = TxOutcome {
+                err: Some(err),
+                ..TxOutcome::default()
+            };
+            assert!(!not_deployed(&out), "{:?}", out.err);
+        }
+        assert!(!not_deployed(&TxOutcome::default()), "a success");
+    }
+
+    /// AIR-18: a refusal is the one-slot `DelayVisibility` only when the refused program's
+    /// ProgramData shows a deploy in the refused slot or later (within the slack); an older deploy
+    /// (a program failing verification) or none (closed, not upgradeable) is a refusal that stays.
+    #[test]
+    fn only_a_deploy_in_the_refused_slot_makes_a_refusal_transient() {
+        let tick = 452_376_460;
+        for d in [tick, tick + 1, tick + 7, tick - DEPLOY_SLOT_SLACK] {
+            assert!(deployed_in_refused_slot(Some(d), tick), "{d}");
+        }
+        for d in [tick - DEPLOY_SLOT_SLACK - 1, tick - 1_000, 0] {
+            assert!(!deployed_in_refused_slot(Some(d), tick), "{d}");
+        }
+        assert!(!deployed_in_refused_slot(None, tick), "no ProgramData");
+        assert!(deployed_in_refused_slot(Some(0), 0));
+        assert!(deployed_in_refused_slot(Some(u64::MAX), tick));
+    }
 
     /// An `emit_cpi!` payload decodes into the keeper's copy with every field.
     #[test]

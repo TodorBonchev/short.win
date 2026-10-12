@@ -183,6 +183,19 @@ pub enum Alert {
     },
     /// A watched ProgramData account is missing or no longer a ProgramData account.
     ProgramDataUnreadable { program: Pubkey },
+    /// AIR-18: the keeper's sends naming `program` (short.win, a venue, Token-2022) have been
+    /// refused "Program is not deployed", each in a slot `program` was deployed, upgraded or
+    /// extended in, since `since`, with no pause longer than `NOT_DEPLOYED_RUN_GAP_S` (5 s), for
+    /// `NOT_DEPLOYED_ALERT_S` (30 s; `refusals` so far): someone deploys or extends it in
+    /// nearly every slot — the loader's permissionless `ExtendProgram`, the griefing the owner
+    /// accepted as bounded, running long — and every exit, crank or flag that needs it waits
+    /// meanwhile (each is sent again every slot, no other alert). Once per run. Check the
+    /// program's ProgramData (its growth toward the 10 MiB cap) and whether exits land.
+    ProgramNotDeployed {
+        program: Pubkey,
+        since: i64,
+        refusals: u64,
+    },
     /// Duty 10: an admin action changed a market's pool (a Raydium `SetParams`,
     /// `update_pool_status` or `update_amm_config`, seen as the account change it makes;
     /// [`crate::monitor`]).
@@ -289,7 +302,8 @@ impl Alert {
             Self::VenueUpgraded { .. }
             | Self::VenueFlagFailed { .. }
             | Self::ProgramUpgraded { .. }
-            | Self::ProgramDataUnreadable { .. } => {
+            | Self::ProgramDataUnreadable { .. }
+            | Self::ProgramNotDeployed { .. } => {
                 tracing::error!(alert = ?self, "venue program alert");
             }
             Self::VenueAdmin { change, .. } if change.is_severe() => {

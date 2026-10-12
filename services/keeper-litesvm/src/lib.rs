@@ -18,10 +18,11 @@
 //! A violation panics with the transaction's logs. Knobs for the scenarios: refuse v1
 //! transactions ([`LiteSvmChain::set_v1`], to exercise the v0 fallback), the recent
 //! priority fees the backend reports ([`LiteSvmChain::set_priority_fees`]), whole-account
-//! reads of a key that fail ([`LiteSvmChain::fail_reads_of`]) and simulations that fail
-//! ([`LiteSvmChain::fail_simulations`]); every backend call
-//! is logged ([`LiteSvmChain::rpc_log`], M4-SEC-7: the keeper's RPC work per tick). **Timing**
-//! (M7-SEC-1, M7-SEC-6): the keeper's transactions can land seconds after the clock it read
+//! reads of a key that fail ([`LiteSvmChain::fail_reads_of`]), simulations that fail
+//! ([`LiteSvmChain::fail_simulations`]) and header reads of a node lagging the last deploy
+//! ([`LiteSvmChain::lag_headers_of`]); every backend call is logged ([`LiteSvmChain::rpc_log`],
+//! M4-SEC-7: the keeper's RPC work per tick). **Timing** (M7-SEC-1, M7-SEC-6): the keeper's
+//! transactions can land seconds after the clock it read
 //! ([`LiteSvmChain::set_landing_delays`]), its clock can lag the chain's
 //! ([`LiteSvmChain::set_clock_lag`]), and a trade can land between its read and its transaction
 //! ([`LiteSvmChain::before_next_send`]); [`Harness::second_slow`] models a tick that waited for
@@ -91,6 +92,9 @@ pub struct LiteSvmChain {
     fail_reads: Cell<Option<(Pubkey, usize)>>,
     /// The next this many simulations fail ([`LiteSvmChain::fail_simulations`]).
     fail_sims: Cell<usize>,
+    /// Header reads naming no context slot answer this key with this deploy slot this many more
+    /// times ([`LiteSvmChain::lag_headers_of`]).
+    lag_headers: Cell<Option<(Pubkey, u64, usize)>>,
 }
 
 /// A source of landing delays (seconds) for [`LiteSvmChain::set_landing_delays`].
@@ -231,7 +235,16 @@ impl LiteSvmChain {
             landing: RefCell::new(None),
             fail_reads: Cell::new(None),
             fail_sims: Cell::new(0),
+            lag_headers: Cell::new(None),
         }
+    }
+
+    /// The next `times` header reads naming no context slot (`account_headers`) answer
+    /// ProgramData `key` as a node of an RPC pool still behind its last deploy would: with
+    /// `stale` as its deploy slot. A read as of a context slot (`account_headers_at`) is answered
+    /// by a node that has reached it: the account as it is (AIR-18).
+    pub fn lag_headers_of(&self, key: Pubkey, stale: u64, times: usize) {
+        self.lag_headers.set(Some((key, stale, times)));
     }
 
     /// The next `times` simulations (`simulate`) fail with a transport error — a node that
@@ -348,11 +361,13 @@ fn lookup_tables(env: &Env, tx: &VersionedTransaction) -> Vec<AddressLookupTable
         .collect()
 }
 
+/// The outcome of `tx` run in `slot` (its metadata `meta`, its failure `err`).
 fn outcome(
     tx: &VersionedTransaction,
     alts: &[AddressLookupTableAccount],
     meta: &TransactionMetadata,
     err: Option<TxError>,
+    slot: u64,
 ) -> TxOutcome {
     let keys =
         tx::account_keys(tx, alts).unwrap_or_else(|_| tx.message.static_account_keys().to_vec());
@@ -377,6 +392,7 @@ fn outcome(
         units_consumed: meta.compute_units_consumed,
         fee: meta.fee,
         inner,
+        slot,
     }
 }
 
@@ -539,6 +555,32 @@ impl Chain for LiteSvmChain {
         for a in out.iter_mut().flatten() {
             a.data.truncate(len);
         }
+        if let Some((key, stale, times)) = self.lag_headers.get()
+            && times > 0
+            && let Some(i) = keys.iter().position(|k| *k == key)
+        {
+            self.lag_headers.set(Some((key, stale, times - 1)));
+            if let Some(slot) = out
+                .get_mut(i)
+                .and_then(Option::as_mut)
+                .and_then(|a| a.data.get_mut(4..12))
+            {
+                slot.copy_from_slice(&stale.to_le_bytes());
+            }
+        }
+        Ok(out)
+    }
+
+    async fn account_headers_at(
+        &self,
+        keys: &[Pubkey],
+        len: usize,
+        _min_context_slot: u64,
+    ) -> anyhow::Result<Vec<Option<AccountData>>> {
+        let mut out = self.read(keys);
+        for a in out.iter_mut().flatten() {
+            a.data.truncate(len);
+        }
         Ok(out)
     }
 
@@ -588,13 +630,15 @@ impl Chain for LiteSvmChain {
         }
         let env = self.env.borrow();
         let alts = lookup_tables(&env, tx);
+        let slot = env.clock().slot;
         Ok(match env.svm.simulate_transaction(tx.clone()) {
-            Ok(info) => outcome(tx, &alts, &info.meta, None),
+            Ok(info) => outcome(tx, &alts, &info.meta, None, slot),
             Err(f) => outcome(
                 tx,
                 &alts,
                 &f.meta,
                 Some(TxError::from_transaction_error(f.err)),
+                slot,
             ),
         })
     }
@@ -615,20 +659,21 @@ impl Chain for LiteSvmChain {
             let alts = lookup_tables(&env, tx);
             (send_with_hooks(&mut env, tx), alts)
         };
+        let slot = self.env.borrow().clock().slot;
         let out = match &res {
-            Ok(meta) => outcome(tx, &alts, meta, None),
+            Ok(meta) => outcome(tx, &alts, meta, None, slot),
             Err(f) => outcome(
                 tx,
                 &alts,
                 &f.meta,
                 Some(TxError::from_transaction_error(f.err.clone())),
+                slot,
             ),
         };
         let ixs = tx::decompile(tx, &alts).unwrap_or_default();
         self.rpc.borrow_mut().push(Rpc::Send {
             instructions: ixs.iter().filter(|i| i.program_id == shortwin::ID).count(),
         });
-        let slot = self.env.borrow().clock().slot;
         self.sent
             .borrow_mut()
             .push(sent_record(tx, &ixs, &out, slot));
@@ -682,9 +727,10 @@ impl Chain for LiteSvmChain {
         for (i, tx) in txs.iter().enumerate() {
             let alts = lookup_tables(&env, tx);
             let res = send_with_hooks(&mut env, tx);
+            let slot = env.clock().slot;
             let (out, trace) = match &res {
                 Ok(meta) => (
-                    outcome(tx, &alts, meta, None),
+                    outcome(tx, &alts, meta, None, slot),
                     tx.message.instructions().len()
                         + meta.inner_instructions.iter().map(Vec::len).sum::<usize>(),
                 ),
@@ -694,12 +740,12 @@ impl Chain for LiteSvmChain {
                         &alts,
                         &f.meta,
                         Some(TxError::from_transaction_error(f.err.clone())),
+                        slot,
                     ),
                     0,
                 ),
             };
             let ixs = tx::decompile(tx, &alts).unwrap_or_default();
-            let slot = env.clock().slot;
             record.txs.push(sent_record(tx, &ixs, &out, slot));
             record.top.push(tx.message.instructions().len());
             record.trace.push(trace);
@@ -764,13 +810,15 @@ impl Chain for LiteSvmChain {
                 break;
             }
             let alts = lookup_tables(&env, tx);
+            let slot = env.clock().slot;
             let out = match svm.send_transaction(tx.clone()) {
-                Ok(meta) => outcome(tx, &alts, &meta, None),
+                Ok(meta) => outcome(tx, &alts, &meta, None, slot),
                 Err(f) => outcome(
                     tx,
                     &alts,
                     &f.meta,
                     Some(TxError::from_transaction_error(f.err)),
+                    slot,
                 ),
             };
             let ok = out.ok();

@@ -157,6 +157,11 @@ pub struct Metrics {
     /// AIR-01: watched ProgramData extensions seen, the venues' and Token-2022's (the loader's
     /// `ExtendProgram`: the deploy slot moved, the ELF did not) — neither flagged nor paged.
     pub venue_extensions: u64,
+    /// AIR-18: sends refused (in simulation or on chain) because a program of the transaction was
+    /// deployed, upgraded or extended in the slot ("Program is not deployed", the deploy shown by
+    /// its ProgramData): retried the next slot, not alerted (a run of them lasting 30 s is). The
+    /// same refusal of a program that stays undeployable is not counted here: it is alerted.
+    pub not_deployed: u64,
     /// Raydium pool discoveries run (duty 12; four `getProgramAccounts` calls each).
     pub pool_discoveries: u64,
     /// O17: `set_coverage_pause` attempts refused or failed.
@@ -261,6 +266,13 @@ impl Metrics {
             "Venue and Token-2022 ProgramData extensions seen, not upgrades: nothing flagged or \
              paged (AIR-01).",
             self.venue_extensions,
+        );
+        g(
+            &mut s,
+            "shortwin_keeper_not_deployed_total",
+            "Sends refused because a program was deployed, upgraded or extended in the slot \
+             (AIR-18; its ProgramData shows the deploy): retried the next slot.",
+            self.not_deployed,
         );
         g(
             &mut s,

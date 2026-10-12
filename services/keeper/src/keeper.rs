@@ -74,6 +74,13 @@
 //!
 //! Every transaction: simulated first, compute-unit limit `⌈simulated × 1.1⌉`, priority price
 //! from recent per-account fees, escalated after misses, capped at the O17 ceiling (duty 14).
+//! A refusal because one of its programs was deployed, upgraded or extended in the slot ("Program
+//! is not deployed": AIR-18 — the loader's permissionless `ExtendProgram` blocks short.win or a
+//! venue for the rest of a slot) is transient ([`ExitResult::NotDeployed`]) when the program's
+//! ProgramData, read as of the refused slot, shows that deploy: no alert, no back-off; the next
+//! tick, the next slot, sends again — a run of them lasting [`NOT_DEPLOYED_ALERT_S`] is paged once
+//! ([`Alert::ProgramNotDeployed`]). The loader's same answer for a program that stays
+//! undeployable (closed, failing verification) is handled as any refusal, alerted.
 //! Duty 3's Jito bundle path for ordinary exits is not built yet (see the crate README); the
 //! straddle's bundle is duty 6's.
 
@@ -167,6 +174,14 @@ pub enum ExitResult {
     /// T-CASCADE: simulated, but its compute-unit limit would take the market's requests this
     /// slot above `budget.market_cu_per_slot`; not sent (retried next slot).
     Deferred { unit_limit: u32 },
+    /// AIR-18: the cluster would not run a program of the transaction this slot ("Program is not
+    /// deployed", [`events::not_deployed`]), in simulation or on chain, and `program` — the one
+    /// the logs name, short.win or the venue — was deployed, upgraded or extended in that slot
+    /// (its ProgramData shows it, [`events::deployed_in_refused_slot`]; the loader's
+    /// `ExtendProgram` is permissionless). Transient: not alerted, no back-off, retried in the
+    /// next tick (slot). The same refusal of a program that stays undeployable is `Refused` or
+    /// `Failed`.
+    NotDeployed { program: Pubkey, outcome: TxOutcome },
     /// A transport or building error.
     Error(String),
 }
@@ -225,6 +240,9 @@ pub enum PoolResult {
     Failed { outcome: TxOutcome },
     /// Dry run: simulated only.
     DryRun { outcome: TxOutcome },
+    /// AIR-18: a program of the transaction could not run this slot, deployed in it (as
+    /// [`ExitResult::NotDeployed`]): no alert, no back-off, retried in the next tick (slot).
+    NotDeployed { program: Pubkey, outcome: TxOutcome },
     /// A transport or building error.
     Error(String),
 }
@@ -412,6 +430,57 @@ enum Sent {
     Deferred {
         unit_limit: u32,
     },
+    /// AIR-18: refused in simulation or failed on chain because a program of the transaction
+    /// could not run this slot ([`events::not_deployed`]) — `program`, the one the logs name,
+    /// deployed in it ([`Keeper::deployed_this_slot`]).
+    NotDeployed {
+        out: TxOutcome,
+        program: Pubkey,
+    },
+}
+
+/// AIR-18: a refusal more than this many seconds after the program's last one starts a new run
+/// ([`NotDeployedRun`]).
+pub const NOT_DEPLOYED_RUN_GAP_S: i64 = 5;
+
+/// AIR-18: a run of transient refusals of one program that has lasted this many seconds is paged
+/// ([`Alert::ProgramNotDeployed`]), once per run.
+pub const NOT_DEPLOYED_ALERT_S: i64 = 30;
+
+/// AIR-18: a run of transient "Program is not deployed" refusals of one program (the program
+/// deployed, upgraded or extended in each refused slot): refusals at most
+/// [`NOT_DEPLOYED_RUN_GAP_S`] apart.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct NotDeployedRun {
+    /// The second of the run's first refusal.
+    pub since: i64,
+    /// The second of its last refusal.
+    pub last: i64,
+    /// Refusals in the run.
+    pub refusals: u64,
+    /// Paged ([`Alert::ProgramNotDeployed`]).
+    pub alerted: bool,
+}
+
+impl NotDeployedRun {
+    /// Books a refusal at `now`; `true` when the run has now lasted [`NOT_DEPLOYED_ALERT_S`] and
+    /// was not paged yet (the caller pages it).
+    pub fn note(&mut self, now: i64) -> bool {
+        if self.refusals == 0
+            || now < self.last
+            || now.saturating_sub(self.last) > NOT_DEPLOYED_RUN_GAP_S
+        {
+            *self = Self {
+                since: now,
+                ..Self::default()
+            };
+        }
+        self.last = now;
+        self.refusals = self.refusals.saturating_add(1);
+        let due = !self.alerted && now.saturating_sub(self.since) >= NOT_DEPLOYED_ALERT_S;
+        self.alerted |= due;
+        due
+    }
 }
 
 /// What became of a `flag_venue_upgraded` attempt ([`Keeper::send_flag`]).
@@ -427,6 +496,10 @@ enum FlagSent {
     NotUpgraded,
     /// Attempted for this deploy already this second.
     Throttled,
+    /// AIR-18: refused because short.win was deployed, upgraded or extended in the slot
+    /// ([`Sent::NotDeployed`]): nothing judged, nothing alerted; the next tick (the next slot)
+    /// tries again.
+    NotDeployed,
     /// Not sent, or refused otherwise (the detail).
     Failed(String),
 }
@@ -571,6 +644,12 @@ pub struct Keeper<C: Chain> {
     oracle_aging_alerted: Option<(i64, i64)>,
     /// The slot of the tick in progress.
     tick_slot: u64,
+    /// AIR-18: this tick's ProgramData header reads of the programs a refusal named
+    /// ([`Self::deployed_this_slot`]): the slot each was read as of, and the deploy slot it showed
+    /// (`None`: no ProgramData). A read answers the program's refusals at or before that slot.
+    deploy_slots: BTreeMap<Pubkey, (u64, Option<u64>)>,
+    /// AIR-18: each program's run of transient "not deployed" refusals.
+    not_deployed_runs: BTreeMap<Pubkey, NotDeployedRun>,
     /// Decision A (2026-10-01; ARCH §7.1 duty 8): the global keeper budget ([`crate::budget`]).
     budget: GlobalBudget,
     /// The charge class of each market's crank queued this tick ([`crate::budget::ChargeReq`]):
@@ -651,6 +730,8 @@ impl<C: Chain> Keeper<C> {
             oracle_alerted: HashSet::new(),
             oracle_aging_alerted: None,
             tick_slot: 0,
+            deploy_slots: BTreeMap::new(),
+            not_deployed_runs: BTreeMap::new(),
             budget: GlobalBudget::default(),
             crank_charges: BTreeMap::new(),
             free_cranks: HashSet::new(),
@@ -960,6 +1041,9 @@ impl<C: Chain> Keeper<C> {
                 return Ok(Sent::TooLarge);
             }
             if sim.err.is_some() {
+                if let Some(program) = self.deployed_this_slot(&sim, now).await {
+                    return Ok(Sent::NotDeployed { out: sim, program });
+                }
                 return Ok(Sent::SimFailed { out: sim, format });
             }
             if self.cfg.dry_run {
@@ -994,6 +1078,9 @@ impl<C: Chain> Keeper<C> {
                 }
                 Some(_) => {
                     self.metrics.tx_failed += 1;
+                    if let Some(program) = self.deployed_this_slot(&out, now).await {
+                        return Ok(Sent::NotDeployed { out, program });
+                    }
                     return Ok(Sent::Failed { out });
                 }
                 None => {}
@@ -1014,6 +1101,102 @@ impl<C: Chain> Keeper<C> {
         Err(anyhow!(
             "the cluster refused the transaction in both formats"
         ))
+    }
+
+    /// AIR-18: whether `out`, refused "Program is not deployed" ([`events::not_deployed`]), is the
+    /// loader's one-slot refusal of a program deployed, upgraded or extended in the refused slot:
+    /// the program the logs name ([`events::failing_program`]) shows that deploy in its
+    /// ProgramData header ([`events::deployed_in_refused_slot`]). The refused slot is the
+    /// outcome's own (a simulation's bank, a failed transaction's block; the tick's clock when
+    /// the backend does not say), and the header is read as of that slot or later
+    /// ([`Self::program_deploy_slot`]). One read answers the program's refusals at or before its
+    /// slot for the rest of the tick: at most one read per program and refused slot. Then the
+    /// refusal is booked — counted (`Metrics::not_deployed`), logged, its run tracked (a run
+    /// lasting [`NOT_DEPLOYED_ALERT_S`] is paged once, [`Alert::ProgramNotDeployed`]) — and the
+    /// program returned: no other alert, no back-off, the next tick (the next slot) sends again.
+    /// `None` for any other failure, and for the loader's same answer about a program that does
+    /// not come back by itself — closed, failing verification (an ELF a feature gate retired),
+    /// not under the upgradeable loader, not named in the logs — or whose header cannot be read:
+    /// the caller handles it as any refusal, alerted.
+    async fn deployed_this_slot(&mut self, out: &TxOutcome, now: i64) -> Option<Pubkey> {
+        if !events::not_deployed(out) {
+            return None;
+        }
+        let slot = if out.slot > 0 {
+            out.slot
+        } else {
+            self.tick_slot
+        };
+        let Some(program) = events::failing_program(out) else {
+            tracing::warn!(
+                slot,
+                "program not deployed, none named (AIR-18): handled as a refusal"
+            );
+            return None;
+        };
+        let deploy = match self.deploy_slots.get(&program) {
+            Some((read_at, deploy)) if *read_at >= slot => *deploy,
+            _ => match self.program_deploy_slot(&program, slot).await {
+                Some(deploy) => {
+                    self.deploy_slots.insert(program, (slot, deploy));
+                    deploy
+                }
+                None => None,
+            },
+        };
+        if !events::deployed_in_refused_slot(deploy, slot) {
+            tracing::warn!(
+                %program,
+                deploy_slot = ?deploy,
+                slot,
+                "program not deployed, and not deployed in this slot (AIR-18): handled as a \
+                 refusal"
+            );
+            return None;
+        }
+        self.metrics.not_deployed += 1;
+        tracing::info!(
+            %program,
+            deploy_slot = ?deploy,
+            slot,
+            "program deployed, upgraded or extended in this slot (AIR-18): retried in the next \
+             slot"
+        );
+        let run = self.not_deployed_runs.entry(program).or_default();
+        if run.note(now) {
+            let (since, refusals) = (run.since, run.refusals);
+            self.alerts.push(Alert::ProgramNotDeployed {
+                program,
+                since,
+                refusals,
+            });
+        }
+        Some(program)
+    }
+
+    /// AIR-18: the deploy slot `program`'s ProgramData header shows as of slot `slot` or later —
+    /// `Some(None)`: no ProgramData (closed, or not under the upgradeable loader); `None`: not
+    /// read. The read names `slot` as its minimum context slot: a node of an RPC pool that has not
+    /// reached the refused slot refuses it rather than show the deploy before it, which would
+    /// make a one-slot refusal look like one that stays; the read is tried twice (the pool's next
+    /// node).
+    async fn program_deploy_slot(&mut self, program: &Pubkey, slot: u64) -> Option<Option<u64>> {
+        let pd = monitor::program_data_address(program);
+        let mut failure = None;
+        for _ in 0..2 {
+            match self
+                .chain
+                .account_headers_at(&[pd], monitor::HEADER_LEN, slot)
+                .await
+            {
+                Ok(v) => return Some(monitor::deploy_slot(v.first().and_then(Option::as_ref))),
+                Err(e) => failure = Some(e),
+            }
+        }
+        if let Some(e) = failure {
+            tracing::warn!(%program, slot, "ProgramData header (AIR-18): {e:#}");
+        }
+        None
     }
 
     async fn discover(&mut self, now: i64) -> anyhow::Result<()> {
@@ -1046,6 +1229,7 @@ impl<C: Chain> Keeper<C> {
         let mut view = view::load_with_positions(&self.chain, &read, &positions).await?;
         let now = view.clock.unix_timestamp;
         self.tick_slot = view.clock.slot;
+        self.deploy_slots.clear();
         self.crank_charges.clear();
         self.free_cranks.clear();
         self.refused.clear();
@@ -1637,6 +1821,8 @@ impl<C: Chain> Keeper<C> {
                     continue;
                 }
             }
+            // The S3 probe's previous second, while this attempt holds the throttle.
+            let mut probed_before: Option<Option<i64>> = None;
             if kind == ExitKind::SolSettle {
                 let track = self.tracks.entry(key).or_default();
                 if track.settle_sent.get(&pv.key) == Some(&now) {
@@ -1649,10 +1835,20 @@ impl<C: Chain> Keeper<C> {
                     if throttled && !ev.expired {
                         continue;
                     }
-                    track.s3_probe.insert(pv.key, now);
+                    probed_before = Some(track.s3_probe.insert(pv.key, now));
                 }
             }
             let result = self.attempt(&mv, &pv, kind, ev.plan, now).await;
+            // AIR-18: a refusal in this slot is no probe: the next tick (slot) probes again.
+            if matches!(result, ExitResult::NotDeployed { .. })
+                && let Some(before) = probed_before
+            {
+                let probes = &mut self.tracks.entry(key).or_default().s3_probe;
+                match before {
+                    Some(t) => probes.insert(pv.key, t),
+                    None => probes.remove(&pv.key),
+                };
+            }
             if matches!(result, ExitResult::Deferred { .. }) {
                 // T-CASCADE: the market's exit budget for this slot is spent; the rest (most
                 // under-collateralised first: `evaluate_all`'s order) goes out next slot.
@@ -1813,6 +2009,9 @@ impl<C: Chain> Keeper<C> {
         let result = self.send_exit(&ixs, key, ExtrasSel::NONE, now).await;
         if result.landed().is_some() {
             self.curve_ready.insert(key);
+        } else if matches!(result, ExitResult::NotDeployed { .. }) {
+            // AIR-18: transient; the next tick (slot) tries again.
+            self.curve_prepare_tried.remove(&key);
         }
         report.curve_accounts.push((key, result));
         Ok(())
@@ -1874,6 +2073,9 @@ impl<C: Chain> Keeper<C> {
         let result = self.send_exit(&ixs, key, ExtrasSel::NONE, now).await;
         if result.landed().is_some() {
             self.pamm_ready.insert(key, list);
+        } else if matches!(result, ExitResult::NotDeployed { .. }) {
+            // AIR-18: transient; the next tick (slot) tries again, nothing alerted.
+            self.pamm_prepare_tried.remove(&key);
         } else if !matches!(result, ExitResult::DryRun { .. }) {
             let detail = format!("pool accounts: {result:?}");
             self.graduation_alert(
@@ -1925,6 +2127,10 @@ impl<C: Chain> Keeper<C> {
             Some(out) => {
                 self.on_landed(key, out, now, slot, false);
                 self.metrics.market(key).transitions += 1;
+            }
+            // AIR-18: transient; the next tick (slot) tries again, nothing alerted.
+            None if matches!(result, ExitResult::NotDeployed { .. }) => {
+                self.transition_tried.remove(&key);
             }
             None if !matches!(result, ExitResult::DryRun { .. }) => {
                 let detail = format!("transition: {result:?}");
@@ -1981,9 +2187,9 @@ impl<C: Chain> Keeper<C> {
         if !post_wipe && !check {
             return Ok(());
         }
-        if check {
-            self.sweep_checked.insert(key, now);
-        }
+        // The cadences this attempt holds, as they were (AIR-18: a refusal in this slot gives
+        // them back, so the next tick tries again).
+        let checked_before = check.then(|| self.sweep_checked.insert(key, now));
         // M7-SEC-8: the tick's prefetched facts, unless this is a post-wipe sweep or an exit
         // landed on the market this tick (the trader side may have moved).
         let exited = report
@@ -2005,6 +2211,7 @@ impl<C: Chain> Keeper<C> {
                 .cashback_claimed
                 .get(&key)
                 .is_none_or(|t| now.saturating_sub(*t) >= cfg.cashback_interval_s || now < *t);
+        let mut claimed_before = None;
         let (kind, ixs) = if post_wipe {
             self.post_wipe_tried.insert(key, now);
             (
@@ -2012,7 +2219,7 @@ impl<C: Chain> Keeper<C> {
                 sweep::post_wipe_ixs(&payer, &key, m, &facts),
             )
         } else if check && claim_due {
-            self.cashback_claimed.insert(key, now);
+            claimed_before = Some(self.cashback_claimed.insert(key, now));
             (
                 SweepKind::Cashback,
                 sweep::post_wipe_ixs(&payer, &key, m, &facts),
@@ -2032,6 +2239,26 @@ impl<C: Chain> Keeper<C> {
                 }
             }
             ExitResult::DryRun { .. } | ExitResult::NoOp | ExitResult::Deferred { .. } => {}
+            // AIR-18: transient; the next tick (slot) sends it again, nothing alerted.
+            ExitResult::NotDeployed { .. } => {
+                if kind == SweepKind::PostWipe {
+                    self.post_wipe_tried.remove(&key);
+                }
+                for (map, before) in [
+                    (&mut self.sweep_checked, checked_before),
+                    (&mut self.cashback_claimed, claimed_before),
+                ] {
+                    match before {
+                        Some(Some(t)) => {
+                            map.insert(key, t);
+                        }
+                        Some(None) => {
+                            map.remove(&key);
+                        }
+                        None => {}
+                    }
+                }
+            }
             other => {
                 let detail = match other {
                     ExitResult::Refused { outcome, .. } | ExitResult::Failed { outcome } => {
@@ -2093,6 +2320,10 @@ impl<C: Chain> Keeper<C> {
         match &result {
             ExitResult::Landed { .. } => self.metrics.market(key).migrations += 1,
             ExitResult::DryRun { .. } | ExitResult::NoOp | ExitResult::Deferred { .. } => {}
+            // AIR-18: transient; the next tick (slot) tries again, nothing alerted.
+            ExitResult::NotDeployed { .. } => {
+                self.migrate_tried.remove(&key);
+            }
             other => {
                 let detail = match other {
                     ExitResult::Refused { outcome, .. } | ExitResult::Failed { outcome } => {
@@ -2187,7 +2418,21 @@ impl<C: Chain> Keeper<C> {
             }
             _ => None,
         };
+        // AIR-18: the pre-flight refused because a program of the bundle was deployed in this
+        // slot: no alert, the next tick (slot) sends the bundle again. A bundle that did not land
+        // is not judged so: a block engine drops a Jito bundle whole and hands back no outcome to
+        // read, so it is handled as any bundle that did not land.
+        let not_deployed = match &result {
+            StraddleResult::Refused { outcome, .. } => {
+                self.deployed_this_slot(outcome, now).await.is_some()
+            }
+            _ => false,
+        };
+        if not_deployed {
+            self.straddle_tried.remove(&mv.key);
+        }
         let reason = match &result {
+            _ if not_deployed => None,
             StraddleResult::Waiting { reason } => Some(reason.clone()),
             StraddleResult::Refused { tx, outcome } => Some(format!(
                 "tx{} refused in pre-flight: {:?}",
@@ -2435,7 +2680,11 @@ impl<C: Chain> Keeper<C> {
                 });
             }
             ExitResult::Error(e) => report.errors.push(format!("{key}/{}: {e}", pv.key)),
-            ExitResult::DryRun { .. } | ExitResult::NoOp | ExitResult::Deferred { .. } => {}
+            // AIR-18: transient (not alerted): the next tick (slot) sends it again.
+            ExitResult::DryRun { .. }
+            | ExitResult::NoOp
+            | ExitResult::Deferred { .. }
+            | ExitResult::NotDeployed { .. } => {}
         }
         report.exits.push(ExitRecord {
             market: key,
@@ -2508,6 +2757,12 @@ impl<C: Chain> Keeper<C> {
                             return ExitResult::NoOp;
                         }
                         Ok((sim, _, _)) if sim.err.is_some() => {
+                            if let Some(program) = self.deployed_this_slot(&sim, now).await {
+                                return ExitResult::NotDeployed {
+                                    program,
+                                    outcome: sim,
+                                };
+                            }
                             return ExitResult::Refused {
                                 code: sim.err.as_ref().and_then(TxError::custom_code),
                                 outcome: sim,
@@ -2548,7 +2803,8 @@ impl<C: Chain> Keeper<C> {
                     // `DeniedAccount` (raised only by `venues::parse_extras`; since M10 batch 3
                     // also for a set naming the adopted pool's accounts or the borrower, so a
                     // hostile `current` must not stall the exit — M2-SEC-2). The program's other
-                    // refusals do not depend on the set.
+                    // refusals do not depend on the set, nor does a program not deployed this
+                    // slot (AIR-18, `ExitResult::NotDeployed`: retried the next slot).
                     let retry = match &r {
                         ExitResult::Refused { outcome, .. } => {
                             let code = outcome.err.as_ref().and_then(TxError::custom_code);
@@ -2634,6 +2890,10 @@ impl<C: Chain> Keeper<C> {
                 }
             }
             Ok(Sent::Deferred { unit_limit }) => ExitResult::Deferred { unit_limit },
+            Ok(Sent::NotDeployed { out, program }) => ExitResult::NotDeployed {
+                program,
+                outcome: out,
+            },
             Ok(Sent::SimFailed { out, .. }) => ExitResult::Refused {
                 code: out.err.as_ref().and_then(TxError::custom_code),
                 outcome: out,
@@ -3065,6 +3325,10 @@ impl<C: Chain> Keeper<C> {
                 },
                 Ok(Sent::Failed { out }) => PoolResult::Failed { outcome: out },
                 Ok(Sent::DryRun { out }) => PoolResult::DryRun { outcome: out },
+                Ok(Sent::NotDeployed { out, program }) => PoolResult::NotDeployed {
+                    program,
+                    outcome: out,
+                },
                 Ok(Sent::TooLarge) => PoolResult::Error("transaction too large".into()),
                 Ok(Sent::Deferred { .. }) => PoolResult::Error("deferred".into()),
                 Err(e) => PoolResult::Error(format!("{e:#}")),
@@ -3195,6 +3459,11 @@ impl<C: Chain> Keeper<C> {
                 // Simulated only: the same cadence as a refusal, without an alert.
                 let t = self.pool_tracks.entry(key).or_default();
                 t.backoff_until = now.saturating_add(backoff);
+                false
+            }
+            // AIR-18: transient: no back-off, no alert; the next tick (slot) acts again.
+            PoolResult::NotDeployed { .. } => {
+                self.pool_tracks.entry(key).or_default().tried = None;
                 false
             }
         }
@@ -3393,7 +3662,8 @@ impl<C: Chain> Keeper<C> {
                         }
                         FlagSent::DryRun => self.page_upgrade(w, venue, slot, known),
                         FlagSent::NotUpgraded => self.note_extension(w, slot, report),
-                        FlagSent::Throttled => {}
+                        // AIR-18: not judged yet; nothing can open while short.win is refused.
+                        FlagSent::Throttled | FlagSent::NotDeployed => {}
                         FlagSent::Failed(failure) => {
                             items.push((*w, slot, Inspection::Unjudged { venue, failure }));
                         }
@@ -3588,7 +3858,10 @@ impl<C: Chain> Keeper<C> {
             FlagSent::Landed => self.flag_landed(venue, slot, report),
             FlagSent::Failed(detail) => self.flag_failed(venue, slot, detail),
             // `NotUpgraded`: someone flagged it first (the latch already holds this slot).
-            FlagSent::DryRun | FlagSent::NotUpgraded | FlagSent::Throttled => {}
+            FlagSent::DryRun
+            | FlagSent::NotUpgraded
+            | FlagSent::Throttled
+            | FlagSent::NotDeployed => {}
         }
     }
 
@@ -3658,6 +3931,11 @@ impl<C: Chain> Keeper<C> {
                 ) =>
             {
                 FlagSent::NotUpgraded
+            }
+            // AIR-18: short.win runs again from the next slot: the next tick tries again.
+            Ok(Sent::NotDeployed { .. }) => {
+                self.flag_tried.remove(&(venue, slot));
+                FlagSent::NotDeployed
             }
             Ok(Sent::SimFailed { out, .. }) | Ok(Sent::Failed { out }) => {
                 FlagSent::Failed(format!("{:?}", out.err))
@@ -3830,6 +4108,10 @@ impl<C: Chain> Keeper<C> {
             Ok(Sent::DryRun { out }) => ExitResult::DryRun { outcome: out },
             Ok(Sent::TooLarge) => ExitResult::Error("transaction too large".into()),
             Ok(Sent::Deferred { unit_limit }) => ExitResult::Deferred { unit_limit },
+            Ok(Sent::NotDeployed { out, program }) => ExitResult::NotDeployed {
+                program,
+                outcome: out,
+            },
             Err(e) => ExitResult::Error(format!("{e:#}")),
         };
         match &result {
@@ -3848,6 +4130,8 @@ impl<C: Chain> Keeper<C> {
                     self.oracle_next = now.saturating_add(1);
                 }
             }
+            // AIR-18: transient (not alerted); the next tick (slot) cranks again.
+            ExitResult::NotDeployed { .. } => self.oracle_next = now,
             ExitResult::Failed { .. } | ExitResult::Error(_) => {
                 self.oracle_next = now.saturating_add(1);
             }
@@ -3971,6 +4255,10 @@ impl<C: Chain> Keeper<C> {
                 Ok(Sent::DryRun { out }) => ExitResult::DryRun { outcome: out },
                 Ok(Sent::TooLarge) => ExitResult::Error("transaction too large".into()),
                 Ok(Sent::Deferred { unit_limit }) => ExitResult::Deferred { unit_limit },
+                Ok(Sent::NotDeployed { out, program }) => ExitResult::NotDeployed {
+                    program,
+                    outcome: out,
+                },
                 Err(e) => ExitResult::Error(format!("{e:#}")),
             };
             let failure = match &result {
@@ -3982,6 +4270,11 @@ impl<C: Chain> Keeper<C> {
                     format!("failed on chain: {:?}", outcome.err),
                 )),
                 ExitResult::Error(e) => Some((None, e.clone())),
+                // AIR-18: transient (not alerted); the next tick (slot) sends it again.
+                ExitResult::NotDeployed { .. } => {
+                    self.pause_tried.remove(&key);
+                    None
+                }
                 _ => None,
             };
             if let Some((code, detail)) = failure {
@@ -4216,6 +4509,17 @@ impl<C: Chain> Keeper<C> {
                         report.crank_failed.push((k, "deferred".into()));
                     }
                 }
+                // AIR-18: short.win is not deployed this slot (`crank_price` makes no venue CPI):
+                // every crank left goes out in the next tick (slot), none alone now.
+                Ok(Sent::NotDeployed { out, .. }) => {
+                    let why = format!("program not deployed this slot: {:?}", out.err);
+                    for k in batch.into_iter().chain(pending.drain(..)) {
+                        report.crank_failed.push((k, why.clone()));
+                    }
+                    for k in alone.drain(..) {
+                        report.crank_failed.push((k, why.clone()));
+                    }
+                }
                 Err(e) => {
                     for k in batch {
                         report.crank_failed.push((k, format!("{e:#}")));
@@ -4223,7 +4527,8 @@ impl<C: Chain> Keeper<C> {
                 }
             }
         }
-        for k in alone {
+        let mut alone = alone.into_iter();
+        while let Some(k) = alone.next() {
             let Some(mv) = view.market(&k) else { continue };
             let ix = ixs::crank_price(mv);
             match self.send_ixs(&[ix], &[k], false, now).await {
@@ -4261,6 +4566,14 @@ impl<C: Chain> Keeper<C> {
                     .push((k, "transaction too large".into())),
                 Ok(Sent::Deferred { .. }) => report.crank_failed.push((k, "deferred".into())),
                 Ok(Sent::DryRun { .. }) => {}
+                // AIR-18: as in a batch: the rest goes out in the next tick (slot).
+                Ok(Sent::NotDeployed { out, .. }) => {
+                    let why = format!("program not deployed this slot: {:?}", out.err);
+                    report.crank_failed.push((k, why.clone()));
+                    for k in alone.by_ref() {
+                        report.crank_failed.push((k, why.clone()));
+                    }
+                }
                 Err(e) => report.crank_failed.push((k, format!("{e:#}"))),
             }
         }
@@ -4268,5 +4581,45 @@ impl<C: Chain> Keeper<C> {
         for (_, r) in held {
             self.budget.release(r);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// AIR-18: refusals at most `NOT_DEPLOYED_RUN_GAP_S` apart are one run, paged once when it has
+    /// lasted `NOT_DEPLOYED_ALERT_S`; a longer pause starts a new run, paged again only when it too
+    /// lasts that long.
+    #[test]
+    fn a_run_of_refusals_is_paged_once_after_it_lasted_the_alert_time() {
+        let mut run = NotDeployedRun::default();
+        let t0 = 1_790_000_000;
+        let paged: Vec<i64> = (0..=NOT_DEPLOYED_ALERT_S + 10)
+            .filter(|s| run.note(t0 + s))
+            .collect();
+        assert_eq!(paged, vec![NOT_DEPLOYED_ALERT_S]);
+        assert_eq!(run.since, t0);
+        assert_eq!(
+            run.refusals,
+            u64::try_from(NOT_DEPLOYED_ALERT_S).unwrap() + 11
+        );
+        // Refusals `NOT_DEPLOYED_RUN_GAP_S` apart keep the run; one more second of pause ends it.
+        let last = run.last;
+        assert!(!run.note(last + NOT_DEPLOYED_RUN_GAP_S));
+        assert_eq!(run.since, t0, "the same run");
+        let later = run.last + NOT_DEPLOYED_RUN_GAP_S + 1;
+        assert!(!run.note(later));
+        assert_eq!((run.since, run.refusals, run.alerted), (later, 1, false));
+        // A new run is paged when it too lasts the alert time; a clock going back restarts it.
+        let mut paged = Vec::new();
+        for s in (0..=NOT_DEPLOYED_ALERT_S).step_by(5) {
+            if run.note(later + s) {
+                paged.push(s);
+            }
+        }
+        assert_eq!(paged, vec![NOT_DEPLOYED_ALERT_S]);
+        assert!(!run.note(later));
+        assert_eq!((run.since, run.refusals), (later, 1));
     }
 }

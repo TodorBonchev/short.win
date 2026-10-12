@@ -6,7 +6,8 @@
 //!   cargo test --manifest-path services/Cargo.toml -p shortwin-services-common --test rpc_local -- --ignored
 //! ```
 //!
-//! Clock, accounts, account headers (`dataSlice`), the finalized slot, program accounts, recent
+//! Clock, accounts, account headers (`dataSlice`, also as of a minimum context slot), the
+//! finalized slot, the slots of a simulation and a landed transaction, program accounts, recent
 //! fees, and a system transfer simulated and sent in both formats: v1 where the cluster accepts it (else the refusal must come back as
 //! `TxError::Rejected`, which the keeper's v0 fallback keys on), and v0.
 
@@ -82,6 +83,8 @@ async fn the_rpc_backend_reads_simulates_and_sends() {
         }
         assert!(sim.ok(), "{sim:?}");
         assert!(sim.units_consumed > 0 && !sim.logs.is_empty());
+        // The bank it ran on (AIR-18 dates a refusal by it).
+        assert!(sim.slot > 0, "{sim:?}");
         let budget = ComputeBudget {
             unit_limit: tx::cu_limit(sim.units_consumed),
             unit_price: price,
@@ -90,6 +93,8 @@ async fn the_rpc_backend_reads_simulates_and_sends() {
         let out = chain.send(&t).await.unwrap();
         assert!(out.ok(), "{out:?}");
         assert!(out.fee >= 5_000, "{out:?}");
+        // The block it landed in.
+        assert!(out.slot >= sim.slot, "{out:?}");
         expected += lamports;
         formats.push((format, true));
     }
@@ -132,4 +137,16 @@ async fn the_rpc_backend_reads_simulates_and_sends() {
     );
     assert!(heads[2].is_none());
     assert!(chain.finalized_slot().await.unwrap() <= chain.clock().await.unwrap().slot);
+
+    // AIR-18: a header read as of a slot the node has reached is answered; as of one it has not,
+    // refused rather than answered from the older state.
+    let now = chain.clock().await.unwrap().slot;
+    let heads = chain.account_headers_at(&keys, 12, now).await.unwrap();
+    assert_eq!(heads[1].as_ref().map(|a| a.data.len()), Some(0));
+    assert!(
+        chain
+            .account_headers_at(&keys, 12, now + 1_000_000)
+            .await
+            .is_err()
+    );
 }
