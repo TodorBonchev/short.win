@@ -100,6 +100,29 @@ pub fn position_key(mm: &MockMarket, borrower: &Pubkey, nonce: u64) -> Pubkey {
     pda::position(&mm.market(), borrower, nonce).0
 }
 
+/// The keeper's own evaluation of `position` on `market` now — its view, projection and decision
+/// (`view::load`, `decide::project`, `decide::evaluate`) on the state its next tick reads (a tick's
+/// report keeps the evaluations after its exits, which may have closed the position) — with the
+/// projection and the venue state it read; `None` when the position is not open.
+pub fn keeper_eval(
+    h: &Harness,
+    market: Pubkey,
+    position: Pubkey,
+) -> Option<(
+    shortwin_keeper::decide::PositionEval,
+    shortwin_keeper::decide::Projection,
+    shortwin::venues::VenueState,
+)> {
+    use shortwin_keeper::config::CoverageConfig;
+    use shortwin_keeper::{decide, view};
+    let cv = shortwin_keeper_litesvm::block_on(view::load(h.chain(), &[market])).expect("view");
+    let mv = cv.markets.first()?;
+    let proj = decide::project(&cv.config, mv, cv.clock).expect("projection");
+    let pv = mv.positions.iter().find(|p| p.key == position)?;
+    let ev = decide::evaluate(mv, &proj, pv, &CoverageConfig::default()).expect("evaluation");
+    Some((ev, proj, mv.state.clone()))
+}
+
 /// The exits of `kind` that landed in `r`, for `position`.
 pub fn landed_for<'a>(
     r: &'a TickReport,

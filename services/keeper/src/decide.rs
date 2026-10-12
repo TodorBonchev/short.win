@@ -31,16 +31,26 @@
 //! | liquidatable, normal buyback allowed, expired and not CR-liquidatable | `Expire` / `ExpireWait` |
 //! | liquidatable, normal buyback allowed | `Liquidate` / `LiquidateWait` (fixed δ; retry next second) |
 //! | liquidatable, no normal buyback (S1/S2 legs may hold), or armed | `SolSettle` |
-//! | a `*Wait` while the market's S3 is due on an executable venue (flag, fee cap) | `SolSettle` |
+//! | a `*Wait` while the position's S3 is due on an executable venue (flag, a fee above its cap) | `SolSettle` |
+//!
+//! **The S3 chain and a position's own route (AIR-19).** The market's chain (`no_route`,
+//! `start_chain`) is the prologue's: `s3_no_route` with the fee judged at the lower of the global
+//! `venue_fee_hard_cap_bps` and `Market.min_open_hard_cap_bps`, the lowest cap a position open since
+//! the market last emptied locked (`engine::route::s3_no_route`). A position's S3 timer takes its
+//! own "no route now", as `sol_settle` does: the fee judged at the lower of the global cap and the
+//! cap the position locked ([`Projection::position_no_route`], `engine::route::position_no_route`),
+//! so a fee between the mark and a position's own cap runs the chain without making that position
+//! S3-due.
 
 use anchor_lang::prelude::Pubkey;
 use anyhow::anyhow;
-use shortwin::engine::{bounds, prologue};
+use shortwin::engine::{arming, bounds, prologue, route};
 use shortwin::state::{GlobalConfig, Market, VenueKind};
+use shortwin::venues::VenueState;
 use shortwin_math::bounds as bounds_math;
 use shortwin_math::observe::{self, Observation};
 use shortwin_math::risk::{self, Budget};
-use shortwin_math::settle::{self, S3Chain};
+use shortwin_math::settle;
 use shortwin_math::{persist, rent};
 use shortwin_services_common::ChainClock;
 
@@ -55,7 +65,8 @@ pub struct Projection {
     pub slot: u64,
     pub market: Box<Market>,
     pub obs: Box<Observation>,
-    /// `s3_no_route` now (ARCH §5.3).
+    /// `s3_no_route` now (ARCH §5.3): the market's S3-chain predicate, at the lower of the global
+    /// hard cap and `min_open_hard_cap_bps` (AIR-19; the program's prologue).
     pub s3_no_route: bool,
     /// `pool_fail` now (ARCH §2.6 rule 3: the Raydium fast path's own predicate, venue-side
     /// evidence only); the projected market's `pool_fail_since` is the chain after this
@@ -66,6 +77,20 @@ pub struct Projection {
     /// M6R-1, at `λ_min` = 100 % since OWNER-M6D-1 / M6E-1 —, `None` elsewhere) on the projected
     /// market.
     pub depth_cap: Option<u128>,
+    /// The global config the prologue ran with (a position's route predicate reads its hard cap
+    /// and route-broken bits).
+    pub config: Box<GlobalConfig>,
+}
+
+impl Projection {
+    /// AIR-19: `s3_no_route` of one position now — `sol_settle`'s "no route now", the input of
+    /// its S3 timer (`engine::route::position_no_route` on the projected market): the market's
+    /// predicate with the position's locked `pos_cap_bps` in place of the market's mark, so a
+    /// live fee above that cap is no route for the position under any global cap, and a fee
+    /// within it a route whatever the others locked.
+    pub fn position_no_route(&self, state: &VenueState, pos_cap_bps: u16) -> bool {
+        route::position_no_route(&self.config, &self.market, state, pos_cap_bps)
+    }
 }
 
 /// Runs the program's market prologue on a copy of `mv` at `clock` ([module docs](self)).
@@ -94,6 +119,7 @@ pub fn project(
         market,
         s3_no_route: pro.s3_no_route,
         pool_fail: pro.pool_fail,
+        config: Box::new(*config),
     })
 }
 
@@ -169,7 +195,9 @@ pub struct PositionEval {
     /// `R_due`, `K_s`.
     pub r_due: u64,
     pub k_s: u64,
-    /// The market's S3 timer is due for this position (flag, fee cap or no route).
+    /// The market's S3 timer is due for this position on its own "no route now" (no route, the
+    /// route-broken flag, or a live fee above the lower of the global hard cap and the cap the
+    /// position locked: AIR-19, [`Projection::position_no_route`]).
     pub s3_due: bool,
     /// On a live pump curve, `Q` exceeds the curve's real token reserves `rT` (no buy on the
     /// curve can close it: the straddle of ARCH §5.4).
@@ -235,17 +263,6 @@ pub struct MarketNeeds {
 /// `EMA_WARMUP_BUCKETS + 2`, so at the window's end the post-change warm-up of a listing or an
 /// adoption is over (8 integrations of the last seconds' honest buckets).
 pub const LISTING_WARMUP_S: i64 = shortwin_math::consts::EMA_WARMUP_BUCKETS as i64 + 2;
-
-fn s3_chain(m: &Market, kind: VenueKind, no_route_now: bool) -> S3Chain {
-    let opt = |t: i64| (t != 0).then_some(t);
-    S3Chain {
-        no_route_now,
-        no_route_since: opt(m.no_route_since),
-        graduated_at: opt(m.graduated_at),
-        migrating: kind == VenueKind::PumpMigrating,
-        migration_seen_at: opt(m.migration_seen_at),
-    }
-}
 
 /// Evaluates one position on the projection ([module docs](self)).
 pub fn evaluate(
@@ -329,8 +346,9 @@ pub fn evaluate(
         && risk::buyback_allowed(&budget, b_live, sigma_live, u32::from(pos.max_liq_slip_bps))
             .map_err(math)?;
 
-    // The S3 timer (market-level chain, the position's locked timers).
-    let chain = s3_chain(m, mv.kind, proj.s3_no_route);
+    // The S3 timer (the market's chain, the position's own "no route now" — AIR-19: the fee
+    // judged at its locked cap, as `sol_settle` passes it — and its locked timers).
+    let chain = arming::s3_chain(m, proj.position_no_route(st, pos.venue_fee_hard_cap_bps));
     let s3_timer = settle::s3_due(&chain, &pos.s3_terms(), now, true);
     let s3_due = s3_timer && (liquidatable || !st.executable);
 
@@ -524,13 +542,15 @@ mod tests {
     use anchor_lang::AnchorDeserialize;
     use bytemuck::Zeroable;
     use shortwin::state::ShortPosition;
-    use shortwin::venues::VenueState;
     use shortwin::venues::pump_amm::PoolVenue;
     use shortwin_math::fees::FeeBps;
     use shortwin_math::quote::Pricing;
 
-    /// The projection of a market as read (no prologue: the test sets what it reads).
+    /// The projection of a market as read (no prologue: the test sets what it reads), under a
+    /// global hard cap of 1,000 bps.
     fn projection(market: Market) -> Projection {
+        let mut config = GlobalConfig::zeroed();
+        config.params.venue_fee_hard_cap_bps = 1_000;
         Projection {
             now: 1_000,
             slot: 0,
@@ -539,6 +559,7 @@ mod tests {
             s3_no_route: false,
             pool_fail: false,
             depth_cap: None,
+            config: Box::new(config),
         }
     }
 
@@ -628,5 +649,49 @@ mod tests {
             assert_eq!(e.cr_live_bps, cr(b50), "{at_ema}: the live tier");
             assert_eq!((e.plan, e.near), (Plan::Watch, true), "{at_ema}");
         }
+    }
+
+    /// AIR-19: the market's S3 chain judges the live fee at the lower of the global hard cap and
+    /// the lowest cap an open position locked (the prologue's `s3_no_route`); a position's own
+    /// "no route now" at the lower of the global cap and its own locked cap, whatever the mark —
+    /// `sol_settle`'s input of the S3 timer, which the keeper's projection now takes.
+    #[test]
+    fn a_positions_own_route_takes_its_locked_cap() {
+        let mut config = GlobalConfig::zeroed();
+        config.params.venue_fee_hard_cap_bps = 1_000;
+        let mut market = Market::zeroed();
+        market.min_open_hard_cap_bps = 500;
+        let proj = Projection {
+            now: 0,
+            slot: 0,
+            obs: market.observation(),
+            market: Box::new(market),
+            s3_no_route: true,
+            pool_fail: false,
+            depth_cap: None,
+            config: Box::new(config),
+        };
+        let mut st = VenueState::not_executable(VenueKind::RaydiumCpmm);
+        st.executable = true;
+        // 8 %: above the mark and a 500-bps position's cap, under the global 1,000 bps.
+        st.fee_ppm = 80_000;
+        assert!(
+            route::s3_no_route(&proj.config, &proj.market, &st),
+            "the market's chain runs at the mark"
+        );
+        assert!(proj.position_no_route(&st, 500));
+        assert!(
+            !proj.position_no_route(&st, 1_000),
+            "a route for the position that locked 1,000 bps"
+        );
+        st.fee_ppm = 120_000;
+        assert!(proj.position_no_route(&st, 1_000), "above the global cap");
+        st.fee_ppm = 40_000;
+        assert!(!proj.position_no_route(&st, 500), "within both caps");
+        st.executable = false;
+        assert!(
+            proj.position_no_route(&st, 1_000),
+            "a venue that cannot execute is no route for every position"
+        );
     }
 }

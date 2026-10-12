@@ -52,8 +52,10 @@
 //! `AmmConfig` (both are in the ReadSet it reads every tick) — and reports every change of the
 //! swap route, the status field, the open time and the one-way fee ([`PoolSnapshot`],
 //! [`diff`]), with the instruction that writes that field and whether the new fee crosses the
-//! opens cap (`venue_fee_cap_bps`: opens refused) or the hard cap (`venue_fee_hard_cap_bps`:
-//! `s3_no_route`, the S3 chain). Every field is read with the program's own readers
+//! opens cap (`venue_fee_cap_bps`: opens refused) or the market's S3-chain hard cap
+//! (`venue_fee_hard_cap_bps`, or the lowest cap an open position locked when lower — AIR-19's
+//! `min_open_hard_cap_bps`, [`FeeCaps::of_market`]: `s3_no_route`, the S3 chain). Every field
+//! is read with the program's own readers
 //! (`shortwin_venue_state::raydium_v4` / `raydium_cpmm`), so a halted pool still reports its
 //! fee and a pool that stops parsing (a layout change, "not executable" per A63) is reported as
 //! such. The duties themselves need no extra action: the program's route predicates already
@@ -73,7 +75,7 @@ use shortwin::constants::{
     TOKEN_2022_PROGRAM_ID, VENUE_PROGRAM_DATA, VENUE_PROGRAM_IDS, VENUE_PROGRAMS,
 };
 use shortwin::instructions::flag_venue_upgraded::trimmed_elf_hash_of;
-use shortwin::state::{GUARD_ELF_LEN, VenueGuard, VenueKind, elf_fingerprint_of};
+use shortwin::state::{GUARD_ELF_LEN, Market, VenueGuard, VenueKind, elf_fingerprint_of};
 use shortwin_services_common::AccountData;
 use shortwin_venue_state::{program_data, raydium_cpmm, raydium_v4};
 
@@ -350,10 +352,13 @@ impl PoolSnapshot {
 }
 
 /// The fee caps a fee change is measured against, in ppm (the config's `venue_fee_cap_bps` and
-/// `venue_fee_hard_cap_bps` × 100; ARCH §4.2 "Units").
+/// the S3 chain's hard cap × 100; ARCH §4.2 "Units").
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FeeCaps {
     pub open_ppm: u64,
+    /// The hard cap the S3 chain judges the live fee against: `venue_fee_hard_cap_bps`
+    /// ([`FeeCaps::of`]), or on a market the lowest cap an open position locked when lower
+    /// ([`FeeCaps::of_market`], AIR-19).
     pub hard_ppm: u64,
 }
 
@@ -363,6 +368,18 @@ impl FeeCaps {
         Self {
             open_ppm: u64::from(config.params.venue_fee_cap_bps).saturating_mul(100),
             hard_ppm: u64::from(config.params.venue_fee_hard_cap_bps).saturating_mul(100),
+        }
+    }
+
+    /// The caps of `market` (AIR-19): the opens cap, and the hard cap its S3 chain runs at — the
+    /// global `venue_fee_hard_cap_bps`, or `Market.min_open_hard_cap_bps` (the lowest cap a
+    /// position open since the market last emptied locked) when lower: the program's
+    /// `engine::route::chain_hard_cap_bps`, which its prologue's `s3_no_route` takes.
+    pub fn of_market(config: &shortwin::state::GlobalConfig, market: &Market) -> Self {
+        Self {
+            hard_ppm: shortwin::engine::route::chain_hard_cap_bps(config, market)
+                .saturating_mul(100),
+            ..Self::of(config)
         }
     }
 }
@@ -395,8 +412,10 @@ pub enum AdminChange {
         to_ppm: u32,
         /// Above `venue_fee_cap_bps`: opens are refused.
         above_open_cap: bool,
-        /// Above `venue_fee_hard_cap_bps`: `s3_no_route` (the S3 chain; risk quotes stay at the
-        /// locked cap).
+        /// Above the market's S3-chain hard cap — `venue_fee_hard_cap_bps`, or the lowest cap an
+        /// open position locked when lower (AIR-19, [`FeeCaps::of_market`]): `s3_no_route` (the
+        /// S3 chain; risk quotes stay at the locked cap, and a position whose own cap the fee
+        /// exceeds becomes S3-due).
         above_hard_cap: bool,
         via: &'static str,
     },
@@ -906,6 +925,57 @@ mod tests {
         open_ppm: 15_000,
         hard_ppm: 50_000,
     };
+
+    /// AIR-19: a market's S3 chain judges the live fee at the lower of the global hard cap and
+    /// the lowest cap an open position locked (`min_open_hard_cap_bps`, 0 = unset), so a fee
+    /// between the two starts the chain and is reported above the hard cap; against the global
+    /// cap alone (the monitor before AIR-19) it was not.
+    #[test]
+    fn air19_the_hard_cap_is_the_markets_chain_cap() {
+        let mut config: shortwin::state::GlobalConfig = bytemuck::Zeroable::zeroed();
+        config.params.venue_fee_cap_bps = 150;
+        config.params.venue_fee_hard_cap_bps = 1_000;
+        let mut m: Market = bytemuck::Zeroable::zeroed();
+        let global = FeeCaps {
+            open_ppm: 15_000,
+            hard_ppm: 100_000,
+        };
+        assert_eq!(FeeCaps::of(&config), global);
+        assert_eq!(FeeCaps::of_market(&config, &m), global, "no mark");
+        m.min_open_hard_cap_bps = 2_000;
+        assert_eq!(FeeCaps::of_market(&config, &m), global, "a mark above");
+        m.min_open_hard_cap_bps = 500;
+        let caps = FeeCaps::of_market(&config, &m);
+        assert_eq!(
+            caps,
+            FeeCaps {
+                open_ppm: 15_000,
+                hard_ppm: 50_000,
+            }
+        );
+        // A CPMM fee raised to 8 %: above the chain's 5 %, under the global 10 %.
+        let k = VenueKind::RaydiumCpmm;
+        let mut w = PoolWatch::default();
+        assert!(w.observe(k, snap(true, 0, 2_500), caps).is_empty());
+        let c = w.observe(k, snap(true, 0, 80_000), caps);
+        assert_eq!(
+            c,
+            vec![AdminChange::FeeChanged {
+                from_ppm: Some(2_500),
+                to_ppm: 80_000,
+                above_open_cap: true,
+                above_hard_cap: true,
+                via: "CPMM update_amm_config (every pool on the config)",
+            }]
+        );
+        assert!(matches!(
+            fee_change(k, Some(2_500), 80_000, global),
+            AdminChange::FeeChanged {
+                above_hard_cap: false,
+                ..
+            }
+        ));
+    }
 
     #[test]
     fn a_halt_a_fee_hike_and_a_resume_are_reported_once_each() {

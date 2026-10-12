@@ -255,30 +255,6 @@ enum Schedule {
     Split(u128),
 }
 
-/// The keeper's evaluation of `position` on `market` now, and the venue state it read: its own
-/// view and projection (`view::load`, `decide::project`, `decide::evaluate`).
-fn keeper_eval(
-    h: &Harness,
-    market: Pubkey,
-    position: Pubkey,
-) -> (
-    shortwin_keeper::decide::PositionEval,
-    shortwin::venues::VenueState,
-) {
-    use shortwin_keeper::config::CoverageConfig;
-    use shortwin_keeper::{decide, view};
-    let cv = shortwin_keeper_litesvm::block_on(view::load(h.chain(), &[market])).expect("view");
-    let mv = &cv.markets[0];
-    let proj = decide::project(&cv.config, mv, cv.clock).expect("projection");
-    let pv = mv
-        .positions
-        .iter()
-        .find(|p| p.key == position)
-        .expect("position");
-    let ev = decide::evaluate(mv, &proj, pv, &CoverageConfig::default()).expect("evaluation");
-    (ev, mv.state.clone())
-}
-
 /// AIR-10 (the TODO.md keeper item on the exit predictions on PumpSwap). The program's exits price
 /// their risk view at `min(φ_live, the locked hard cap)` and on PumpSwap at most at the tier of
 /// `P_ema`'s market cap (`VenueState::exit_risk_cap_bps` on `read_state_boxed_for_exit`), which a
@@ -407,7 +383,7 @@ fn air10_pumpswap_exits_are_judged_at_the_tier_at_p_ema() {
     // The split schedule: 50 bps live, 30 at P_ema. The program and the keeper: healthy.
     h.with_env(|env| state(env, m, Schedule::Split(boundary)));
     assert_eq!(h.with_env(|env| liquidation(env)), healthy);
-    let (ev, st) = keeper_eval(&h, market, position);
+    let (ev, _, st) = keeper_eval(&h, market, position).expect("open");
     let hard = u64::from(pos.venue_fee_hard_cap_bps);
     let live_bps = u64::from(st.fee_ppm).div_ceil(100);
     let cap = st.exit_risk_cap_bps(hard);
@@ -439,7 +415,7 @@ fn air10_pumpswap_exits_are_judged_at_the_tier_at_p_ema() {
     // The same state at a uniform 50 bps (the live tier's fee everywhere): liquidatable for both.
     h.with_env(|env| state(env, m, Schedule::Uniform(HI)));
     assert_eq!(h.with_env(|env| liquidation(env)), Ok(()));
-    let (ev, st) = keeper_eval(&h, market, position);
+    let (ev, _, st) = keeper_eval(&h, market, position).expect("open");
     assert_eq!(
         u64::from(st.fee_ppm).div_ceil(100),
         live_bps,

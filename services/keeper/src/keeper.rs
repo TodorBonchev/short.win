@@ -3671,8 +3671,9 @@ impl<C: Chain> Keeper<C> {
     /// Duty 10, pool admin actions ([`crate::monitor`]): every covered market's pool against
     /// the last tick; each change is an alert.
     fn watch_pools(&mut self, view: &ChainView) {
-        let caps = FeeCaps::of(&view.config);
         for mv in &view.markets {
+            // AIR-19: the hard cap of this market's S3 chain (its mark, when below the global).
+            let caps = FeeCaps::of_market(&view.config, &mv.market);
             // The pump curve has no pool admin: its fee tier moves with its market cap and its
             // end is graduation (duty 6), not a lost route. A list-only market has no pool.
             if matches!(
