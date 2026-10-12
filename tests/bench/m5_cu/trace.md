@@ -24,8 +24,8 @@ T-STRADDLE's curve part (ARCH §5.4): tx1 is the `complete-curve` helper (A66, `
 | Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + crank_price + liquidate (keeper) | 17 | 17 | 3 | 213053 | 300000 | **1643** / 43 | 1059 / 43 | 2 + 2 + ≤ 15 on the curve (§6.2) |
 | Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + crank_price + expire (keeper) | 17 | 17 | 3 | 209791 | 300000 | **1643** / 43 | 1059 / 43 | 2 + 2 + ≤ 15 on the curve (§6.2) |
 | Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + crank_price + the costliest liquidate (keeper) | 21 | 21 | 3 | 230441 | 300000 | **1643** / 43 | 1059 / 43 | 2 + 2 + ≤ 15 on the curve (§6.2) |
-| ComputeBudget ×2 + crank_price + sol_settle S3 (keeper; `PumpMigrating`, 70 min) | 6 | 6 | 2 | 96238 | 150000 | 944 / 22 | 732 / 22 | 2 + 2 + 2 (§6.2) |
-| ComputeBudget ×2 + crank_price + sol_settle S3 (keeper; `None`, detection set) | 6 | 6 | 2 | 61794 | 150000 | 774 / 17 | 686 / 17 | 2 + 2 + 2 (§6.2) |
+| ComputeBudget ×2 + crank_price + sol_settle S3 (keeper; `PumpMigrating`, 70 min) | 6 | 6 | 2 | 96323 | 150000 | 944 / 22 | 732 / 22 | 2 + 2 + 2 (§6.2) |
+| ComputeBudget ×2 + crank_price + sol_settle S3 (keeper; `None`, detection set) | 6 | 6 | 2 | 61879 | 150000 | 774 / 17 | 686 / 17 | 2 + 2 + 2 (§6.2) |
 | ComputeBudget ×2 + flag_venue_upgraded ×3 (pump, pump-fees, PumpSwap; the dumped ProgramData) | 8 | 8 | 2 | 18418 | 400000 | 426 / 8 | 400 / 8 | 2 + 2 + 2 + 2 (§6.2) |
 | SPL Token, 115 B curve, no creator (legacy115): ComputeBudget ×2 + create_market (Auto, `PumpCurve`, init set) | 17 | 17 | 3 | 141730 | 250000 | 897 / 21 | 685 / 21 | no row |
 | Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + create_market (Auto, `PumpCurve`, init set) | 17 | 17 | 3 | 170153 | 250000 | 897 / 21 | 685 / 21 | no row |

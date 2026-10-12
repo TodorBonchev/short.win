@@ -19,9 +19,9 @@ The graduation transition (§2.5) is the crank that detects the migration and re
 | SPL Token, 261 B (legacy261): ComputeBudget ×2 + crank_price + liquidate (keeper) | 21 | 21 | 3 | 209321 | 300000 | **1578** / 41 | 1087 / 41 | 2 + 2 + 17 (≤ 19 on PumpSwap; §6.2) |
 | SPL Token, 261 B (legacy261): ComputeBudget ×2 + crank_price + expire (keeper) | 21 | 21 | 3 | 207788 | 300000 | **1578** / 41 | 1087 / 41 | 2 + 2 + 17 (≤ 19 on PumpSwap; §6.2) |
 | Token-2022, 301 B, boost spent (mature): ComputeBudget ×2 + crank_price + the costliest liquidate (keeper) | 24 | 24 | 3 | 228168 | 300000 | **1610** / 42 | 1088 / 42 | 2 + 2 + 20 (above §6.2's ≤ 19; creator change and normalisation) |
-| ComputeBudget ×2 + crank_price + sol_settle S3 (keeper; the buy halt) | 6 | 6 | 2 | 86363 | 150000 | 944 / 22 | 794 / 22 | 2 + 2 + 2 (§6.2) |
+| ComputeBudget ×2 + crank_price + sol_settle S3 (keeper; the buy halt) | 6 | 6 | 2 | 86448 | 150000 | 944 / 22 | 794 / 22 | 2 + 2 + 2 (§6.2) |
 | ComputeBudget ×2 + crank_price (graduation transition → PumpSwap) | 6 | 6 | 2 | 32285 | 250000 | 626 / 15 | 445 / 15 | no row (§2.5; the ring rewrite, VenueStateChanged + RouteChainChanged) |
-| ComputeBudget ×2 + crank_price (→ PumpSwap) + close_short (straddle tx3, borrower) | 23 | 23 | 3 | 207425 | 400000 | **1713** / 45 | 1129 / 45 | no row (§5.4 tx3; the transition crank then the borrower's close on the pool) |
+| ComputeBudget ×2 + crank_price (→ PumpSwap) + close_short (straddle tx3, borrower) | 23 | 23 | 3 | 207444 | 400000 | **1713** / 45 | 1129 / 45 | no row (§5.4 tx3; the transition crank then the borrower's close on the pool) |
 | Token-2022, 301 B, boost spent (mature): ComputeBudget ×2 + create_market (Auto, PumpSwap, init set) | 17 | 17 | 3 | 134877 | 250000 | 897 / 21 | 685 / 21 | no row |
 | SPL Token, 261 B (legacy261): ComputeBudget ×2 + create_market (Auto, PumpSwap, init set) | 17 | 17 | 3 | 113821 | 250000 | 897 / 21 | 685 / 21 | no row |
 | Token-2022, 301 B, boost spent (mature): ComputeBudget ×2 + sweep_trader (token leg) | 6 | 6 | 2 | 24642 | 60000 | 725 / 18 | 606 / 18 | no row (§3.9; the post-wipe token leg) |

@@ -39,10 +39,10 @@ Compute units of every curve-path instruction (ARCH §9 M5: T-CU) of the **relea
 | `expire` | Token-2022, 151 B curve near completion (near): past the deadline, healthy | 179859 | 179859 | 92739 | 300000 | §6.1 `liquidate` / `expire` curve | 13 | 12 (≤ 15) | 3 |
 | `expire` | Token-2022, 151 B curve near completion (near): costliest — normalising, creator change into an empty vault, last recipients | 198747 | 198747 | 96494 | 300000 | §6.1 `liquidate` / `expire` curve | 17 | 12 (≤ 15) | 3 |
 | `expire` | Token-2022, 151 B curve near completion (near): completing buyback (q = rT; `PumpCurve → PumpMigrating`) | 189432 | 189432 | 98196 | 300000 | §6.1 `liquidate` / `expire` curve | 15 | 12 (≤ 15) | 3 |
-| `sol_settle` | SPL Token, 115 B curve, no creator (legacy115): healthy, the no-change call | 42428 | 42428 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
-| `sol_settle` | Token-2022, 115 B curve (t22_115): healthy, the no-change call | 42817 | 42817 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
-| `sol_settle` | `PumpMigrating` (stuck migration): S3 at migration_seen_at + 70 min, FV on the post-migration pool | 64131 | 64131 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
-| `sol_settle` | `None` (graduated elsewhere; the detection set as ReadSet): S3 after s3_wait_s (M2-SEC-5) | 44705 | 44705 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
+| `sol_settle` | SPL Token, 115 B curve, no creator (legacy115): healthy, the no-change call | 42424 | 42424 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
+| `sol_settle` | Token-2022, 115 B curve (t22_115): healthy, the no-change call | 42813 | 42813 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
+| `sol_settle` | `PumpMigrating` (stuck migration): S3 at migration_seen_at + 70 min, FV on the post-migration pool | 64216 | 64216 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
+| `sol_settle` | `None` (graduated elsewhere; the detection set as ReadSet): S3 after s3_wait_s (M2-SEC-5) | 44790 | 44790 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
 | `crank_price` | SPL Token, 115 B curve, no creator (legacy115): roll + record (first crank of a second) | 31448 | 31448 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |
 | `crank_price` | Token-2022, 115 B curve (t22_115): roll + record (first crank of a second) | 31475 | 31475 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |
 | `crank_price` | Token-2022, 125 B curve (fresh): roll + record (first crank of a second) | 31705 | 31705 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |

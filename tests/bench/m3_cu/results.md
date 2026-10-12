@@ -31,12 +31,12 @@ Compute units of every Raydium-path instruction (ARCH §9 M3: T-RAY-CU, T-CU; M4
 | `expire` | AMM v4, SPL (Fartcoin): past the deadline, healthy | 86995 | 86995 | 15900 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
 | `expire` | CPMM, SPL (USELESS): past the deadline, healthy | 101980 | 101980 | 25189 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
 | `expire` | CPMM, Token-2022 base: past the deadline, healthy | 105523 | 105523 | 28100 | 200000 | §6.1 `liquidate` / `expire` Raydium | 9 | 9 (≤ 11) | 3 |
-| `sol_settle` | AMM v4, SPL (Fartcoin): healthy, the no-change call | 39279 | 39279 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
-| `sol_settle` | AMM v4, SPL (Fartcoin): S3 on a halted pool at the deadline, chain run s3_wait_s | 47315 | 47315 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
-| `sol_settle` | CPMM, SPL (USELESS): healthy, the no-change call | 41663 | 41663 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
-| `sol_settle` | CPMM, SPL (USELESS): S3 on a halted pool at the deadline, chain run s3_wait_s | 52662 | 52662 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
-| `sol_settle` | CPMM, Token-2022 base: healthy, the no-change call | 42015 | 42015 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
-| `sol_settle` | CPMM, Token-2022 base: S3 on a halted pool at the deadline, chain run s3_wait_s | 52991 | 52991 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
+| `sol_settle` | AMM v4, SPL (Fartcoin): healthy, the no-change call | 39275 | 39275 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
+| `sol_settle` | AMM v4, SPL (Fartcoin): S3 on a halted pool at the deadline, chain run s3_wait_s | 47400 | 47400 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
+| `sol_settle` | CPMM, SPL (USELESS): healthy, the no-change call | 41659 | 41659 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
+| `sol_settle` | CPMM, SPL (USELESS): S3 on a halted pool at the deadline, chain run s3_wait_s | 52747 | 52747 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
+| `sol_settle` | CPMM, Token-2022 base: healthy, the no-change call | 42011 | 42011 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
+| `sol_settle` | CPMM, Token-2022 base: S3 on a halted pool at the deadline, chain run s3_wait_s | 53076 | 53076 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
 | `crank_price` | AMM v4, SPL (Fartcoin): roll + record (first crank of a second) | 27953 | 27953 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |
 | `crank_price` | AMM v4, SPL (Fartcoin): pool halted by its admin: roll, no record, both chains start | 26717 | 26717 | — | 60000 | §6.1 `crank_price` | 3 | 2 (≤ 2) | 2 |
 | `crank_price` | CPMM, SPL (USELESS): roll + record (first crank of a second) | 28012 | 28012 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |

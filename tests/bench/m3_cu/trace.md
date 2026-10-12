@@ -21,13 +21,13 @@ Sizes (T-SIZE preview, ARCH §6.4): the legacy wire size (no lookup table) and t
 | ComputeBudget ×2 + crank_price ×6 on six Raydium markets, every pool just halted (a v1 keeper batch) | 20 | 20 | 2 | 158929 | **1661** / 44 | **1542** / 44 | 2 + 2k = 14 (§6.2, k = 6) |
 | AMM v4, SPL (Fartcoin): ComputeBudget ×2 + crank_price + liquidate (keeper) | 13 | 13 | 3 | 119396 | 1047 / 25 | 835 / 25 | 2 + 2 + 11 on Raydium (§6.2) |
 | AMM v4, SPL (Fartcoin): ComputeBudget ×2 + crank_price + expire (keeper) | 13 | 13 | 3 | 115242 | 1047 / 25 | 835 / 25 | 2 + 2 + 11 on Raydium (§6.2) |
-| AMM v4, SPL (Fartcoin): ComputeBudget ×2 + crank_price + sol_settle S3 (keeper, halted pool) | 6 | 6 | 2 | 67644 | 842 / 19 | 754 / 19 | 2 + 2 + 2 (§6.2) |
+| AMM v4, SPL (Fartcoin): ComputeBudget ×2 + crank_price + sol_settle S3 (keeper, halted pool) | 6 | 6 | 2 | 67729 | 842 / 19 | 754 / 19 | 2 + 2 + 2 (§6.2) |
 | CPMM, SPL (USELESS): ComputeBudget ×2 + crank_price + liquidate (keeper) | 13 | 13 | 3 | 136143 | 1115 / 27 | 872 / 27 | 2 + 2 + 11 on Raydium (§6.2) |
 | CPMM, SPL (USELESS): ComputeBudget ×2 + crank_price + expire (keeper) | 13 | 13 | 3 | 130292 | 1115 / 27 | 872 / 27 | 2 + 2 + 11 on Raydium (§6.2) |
-| CPMM, SPL (USELESS): ComputeBudget ×2 + crank_price + sol_settle S3 (keeper, halted pool) | 6 | 6 | 2 | 73646 | 876 / 20 | 757 / 20 | 2 + 2 + 2 (§6.2) |
+| CPMM, SPL (USELESS): ComputeBudget ×2 + crank_price + sol_settle S3 (keeper, halted pool) | 6 | 6 | 2 | 73731 | 876 / 20 | 757 / 20 | 2 + 2 + 2 (§6.2) |
 | CPMM, Token-2022 base: ComputeBudget ×2 + crank_price + liquidate (keeper) | 13 | 13 | 3 | 140593 | 1147 / 28 | 873 / 28 | 2 + 2 + 11 on Raydium (§6.2) |
 | CPMM, Token-2022 base: ComputeBudget ×2 + crank_price + expire (keeper) | 13 | 13 | 3 | 133847 | 1147 / 28 | 873 / 28 | 2 + 2 + 11 on Raydium (§6.2) |
-| CPMM, Token-2022 base: ComputeBudget ×2 + crank_price + sol_settle S3 (keeper, halted pool) | 6 | 6 | 2 | 73955 | 876 / 20 | 757 / 20 | 2 + 2 + 2 (§6.2) |
+| CPMM, Token-2022 base: ComputeBudget ×2 + crank_price + sol_settle S3 (keeper, halted pool) | 6 | 6 | 2 | 74040 | 876 / 20 | 757 / 20 | 2 + 2 + 2 (§6.2) |
 | ComputeBudget ×2 + flag_venue_upgraded ×2 (both Raydium programs, the dumped ProgramData) | 6 | 6 | 2 | 12392 | 378 / 7 | 352 / 7 | 2 + 2 + 2 (§6.2) |
 | AMM v4, SPL (Fartcoin): ComputeBudget ×2 + propose_pool (zero-position adoption, ring rewritten) | 4 | 4 | 2 | 42453 | 726 / 18 | 607 / 18 | 2 + 2 (§6.2 `propose_pool`) |
 | AMM v4, SPL (Fartcoin): ComputeBudget ×2 + execute_pool_switch (fast adoption, a position open) | 4 | 4 | 2 | 47986 | 725 / 18 | 606 / 18 | 2 + 2 (no row; as `propose_pool`) |
