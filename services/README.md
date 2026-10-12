@@ -251,13 +251,17 @@ What it does, per tick (one per slot; `keeper/src/keeper.rs`):
   - **Upgrades.** Every tick the keeper reads the 45-byte headers (`getMultipleAccounts` with
     `dataSlice`: the accounts are up to 10 MiB) of the six ProgramData accounts the `VenueGuard`
     latch indexes (pump, pAMM, pfee, AMM v4, CPMM, Jupiter) and compares their deploy slots with
-    the latch, by the program's own rule: bit clear and slot ≠ `guard_slot` → flag; bit set and
-    slot ≠ `flagged_slot` → a second upgrade during review, refresh. It then sends
+    the latch by v1.0's slot-only rule: bit clear and slot ≠ `guard_slot` → flag; bit set and
+    slot ≠ `flagged_slot` → a second upgrade during review, refresh. (Since AIR-01 the program
+    also tells a pure extension of a fingerprinted venue apart and answers `VenueNotUpgraded`,
+    KI-69.) It then sends
     `flag_venue_upgraded(venue)` in that slot at the exit priority ceiling (simulated first; a
     latch someone else already set is not repeated; an unflagged upgrade is retried every second)
     and raises `Alert::VenueUpgraded` once per upgrade and `Alert::VenueUpgradeFlagged` when its
     flag lands — page the Emergency multisig to run the fork suite against the new binary and
-    `revalidate_venue(venue, slot)`. Either Raydium program's upgrade blocks opens on every
+    `revalidate_venue(venue, slot, elf_hash)` (the hashed revalidation of
+    [Venue fingerprints after `init-config`](#venue-fingerprints-after-init-config-air-01)).
+    Either Raydium program's upgrade blocks opens on every
     Raydium market (one mask). Token-2022's ProgramData is watched too, alert only
     (`Alert::ProgramUpgraded`).
   - **Pool admin actions.** Raydium's pool admin (a 2-of-3 Squads v3 vault with no timelock) can
@@ -537,7 +541,9 @@ $G close-buffer --ms emergency --config gov.toml --rpc <url> --key member.json [
   (a command of several transactions stops after its first). A sent transaction is awaited for
   90 s (`--confirm-timeout <s>`), past its blockhash's lifetime, so one reported as not
   confirmed has expired; the error says to check `status` before rerunning. There is no priority
-  fee yet.
+  fee yet, and no compute-budget instruction: a transaction gets the runtime's default limit,
+  200,000 CU per instruction of a non-builtin program such as Squads (a bare `execute` 200,000,
+  `approve --execute` 400,000; see the revalidation after an extension, below).
 - **Staging** is one transaction (`vault_transaction_create` + `proposal_create` + the stager's
   approval). A message above about 700 bytes (the transaction would exceed 1,232 B; T-SQ-3's
   worst-case `set_venue_extras` is 1,243 B staged directly) goes through the stager's
@@ -579,6 +585,110 @@ $G close-buffer --ms emergency --config gov.toml --rpc <url> --key member.json [
 Tests: unit tests per module, and `ops/tests/gov_e2e.rs` (T-OPS-1/2): the whole sequence through
 the command line on the mainnet Squads ELF, every transaction replayed through the program
 harness's `Env::send` ([`tests/litesvm/README.md`](../tests/litesvm/README.md)).
+
+### Venue fingerprints after `init-config` (AIR-01)
+
+`initialize_config` records each venue program's deploy slot in the `VenueGuard` latch, but no
+ELF fingerprint, and without one the slot alone decides. The loader's `ExtendProgram`, which
+anyone can send, moves that slot without touching the ELF, so one extension lets anyone latch
+the venue and stop its opens until the Emergency revalidates it (known-issues KI-69). **Right
+after `init-config`, the Emergency runs one `revalidate_venue` with the expected ELF hash for
+each venue whose ProgramData can still grow.** pump (index 0) and PumpSwap (1) sit at the
+loader's 10 MiB cap, no extension can move their slot, and they keep the slot-only rule.
+
+| Venue | `VenueGuard` index |
+|---|---|
+| pump-fees | 2 |
+| Raydium AMM v4 | 3 |
+| Raydium CPMM | 4 |
+| Jupiter | 5 |
+
+```sh
+$G stage revalidate-venue 2 <deploy-slot> --config gov.toml --rpc <url> --key emg-member.json
+$G status  --ms emergency --index <n> --config gov.toml --rpc <url>
+$G approve --ms emergency --index <n> --config gov.toml --rpc <url> --key emg-member2.json --execute
+# then indices 3, 4 and 5 the same way
+```
+
+- `stage revalidate-venue <index> <slot>` reads the venue's ProgramData and refuses unless its
+  deploy slot is `<slot>`. It prints that slot and the sha256 of the account's trimmed ELF (the
+  bytes after the 45-byte header without the zero tail: what `solana-verify get-program-hash`
+  prints), and stages `revalidate_venue(index, slot, hash)`. Before approving, compare all 64
+  hex digits with the trimmed ELF the fork suites ran on. The full hashes are pinned in
+  [`scripts/dump-fixtures.py`](../scripts/dump-fixtures.py) (AMM v4 in `PROGRAMS`, CPMM in
+  `CPMM_PROGRAMS_2026_10`, pump-fees in `PUMP_PROGRAMS_2026_10`) and recorded as
+  `elf_trimmed_sha256` in [`tests/fixtures/manifest.json`](../tests/fixtures/manifest.json)
+  (`raydium_amm_v4_program_data`, `raydium_cpmm_2026_10_program_data`,
+  `pump_fees_2026_10_program_data`). [`tests/fixtures/README.md`](../tests/fixtures/README.md)
+  shortens them to 12 digits and gives none for AMM v4. The execution records the account's
+  length and the hash's first 12 bytes. From then on a pure extension of that venue is
+  `VenueNotUpgraded`; a moved deploy slot latches it only if the account kept the recorded
+  length (an `Upgrade`, even of the same ELF) or its trimmed ELF no longer matches or is above
+  2 MiB, which is never hashed (KI-69).
+- **Jupiter (index 5)** has no fixture, no pinned hash and no fork suite, so there is no
+  reviewed build to compare the printed hash with: it fingerprints the ELF of the deploy staged
+  (`dump-fixtures.py check --live` compares that deploy slot with the newest
+  `VENUE_GUARD_SLOTS_YYYY_MM_DD`). Its ELF size and the hash path's cost on it are not
+  measured: size the compute-unit limit of an execution after an extension by simulation
+  (≤ 1.4 M). A trimmed ELF above 2 MiB is never hashed: its revalidation then needs the exact
+  slot, and an extension still latches it (KI-69). In v1.0 Jupiter's bit is in no market's
+  latch mask, so its latch blocks nothing yet.
+- **After an extension, request ≥ 0.5 M CU.** Executed at the staged slot, the revalidation
+  hashes nothing (a few thousand CU). If the venue was extended after the staging, its deploy
+  slot has moved: the program then hashes the trimmed ELF and accepts the later slot only if it
+  is still the named one, which costs up to ≈ 0.44 M CU on its own (measured: pump-fees
+  438,358, CPMM 369,393, AMM v4 210,386), before Squads' own cost. Execute such a revalidation
+  with a compute-unit limit of at least 500,000 (`SetComputeUnitLimit` before
+  `vault_transaction_execute`). `shortwin-gov` sets no limit, so it gets the runtime's default:
+  200,000 CU for a bare `execute`, 400,000 for `approve --execute` (two Squads instructions,
+  the approval's cost included). pump-fees exceeds both and AMM v4 exceeds a bare `execute`;
+  whether CPMM, or AMM v4 under `approve --execute`, fits depends on Squads' cost, which is not
+  measured. A transaction whose simulation runs out of compute units is not sent.
+  - **Reliable:** execute from a client that sets the limit.
+  - **Fallback:** stage a new revalidation at the current deploy slot (the same ELF, so the same
+    hash; at the exact slot nothing is hashed). Anyone can defeat it again by extending the
+    venue before that execution, at ≈ 0.052 SOL a round (KI-73), which puts it back on the
+    hash path.
+- Every later revalidation after a venue upgrade works the same way: stage it at the deploy slot
+  the fork suite ran on, and check the printed hash against the reviewed ELF. Anyone's
+  `flag_venue_upgraded` on an extended venue with a fingerprint hashes the trimmed ELF too and
+  needs the same compute budget.
+
+### `ExtendProgram` griefing (AIR-18; accepted by the owner on 2026-10-12)
+
+Anyone can send the loader's `ExtendProgram` for a program whose ProgramData is below the 10 MiB
+cap: at least 10 KiB, once per program per slot. It redeploys the program, which is unusable for
+the rest of that slot: every invoke or CPI of it fails with `UnsupportedProgramId` ("Program is
+not deployed"). The owner accepted this bounded griefing (known-issues KI-73: ≈ 0.052 SOL of the
+attacker's rent per blocked slot until the program reaches the cap, ≈ 45 SOL for short.win), so
+short.win's and complete_curve's ProgramData are **not** pre-extended to 10 MiB at deployment.
+What operators see:
+
+- **A venue extended** (pump-fees, which pump and PumpSwap call; AMM v4; CPMM; Token-2022; pump
+  and PumpSwap themselves are at the cap): every exit that buys on it fails for the rest of that
+  slot. The keeper's `liquidate` or `expire` fails in simulation or on chain, and the keeper
+  raises `Alert::ExitRefused` with `UnsupportedProgramId` in its detail. `crank_price` and
+  `sol_settle` make no venue CPI and keep landing.
+- **short.win extended:** every short.win instruction fails for the rest of the slot (the
+  keeper's cranks and exits, users' transactions). **complete_curve extended:** the straddle
+  bundle fails for the rest of the slot.
+- **No action is needed.** The keeper ticks once a slot by default (`--tick-ms 400`) and sends a
+  blocked crank or exit again at its next tick, in a later slot; each further blocked slot costs
+  the attacker another extension, and the griefing ends for good when the program reaches the
+  cap (≈ 870–950 slots).
+- The extension also moves the deploy slot. On a venue with a recorded fingerprint it does not
+  latch (above).
+
+The upgrade step stays: **extend ProgramData before staging an upgrade to a larger ELF.**
+`stage-upgrade` refuses an ELF that does not fit and names the `solana program extend <program>
+<bytes>` to run first. That extension, like anyone's, blocks the program for the rest of its slot.
+
+### Disabling a venue (AIR-24)
+
+`stage disable-venue <venue>` (Emergency) also cancels a pending `EnableVenues` change whose bits
+include that venue's, as `cancel_config` would (`ConfigCancelled`): the whole change, so
+Governance proposes its other bits again, and the venue comes back only through a new proposal
+and its full timelock.
 
 ## Tests
 
