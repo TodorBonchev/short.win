@@ -18,6 +18,10 @@
 //! - **`None → PumpSwap` re-detection**: a graduated coin listed list-only (its pool unreadable at
 //!   the listing) is cranked onto its pool; the keeper then creates the trader's base ATA and pAMM
 //!   UVA (neither a list-only listing nor the crank creates them), once; an open lands.
+//! - **AIR-10**: the exits price their risk view at most at the fee tier of `P_ema`'s market cap;
+//!   with the live market cap in a higher-fee tier than `P_ema`'s, the keeper's projection takes
+//!   the same view as the program — no liquidation the program refuses — and under a uniform
+//!   schedule at the higher fee it liquidates the same position.
 
 use anchor_lang::prelude::Pubkey;
 use shortwin::errors::ShortwinError;
@@ -191,6 +195,270 @@ fn a_pumpswap_listing_is_warmed_up_and_a_pump_is_liquidated_on_the_pool() {
     assert!(
         h.with_env(|env| read::borsh::<shortwin::state::ShortPosition>(&env.svm, &position))
             .is_none()
+    );
+}
+
+/// AIR-10's two tiers (as `m7_sec_it`): 30 bps from the boundary up, 50 bps below it (pump-fees
+/// charges more at a lower market cap).
+const LO: (u64, u64, u64) = (22, 5, 3);
+const HI: (u64, u64, u64) = (40, 7, 3);
+
+/// Rewrites PumpSwap's `FeeConfig.fee_tiers` in place (same length; as `m7_sec_it`): tier 0 from
+/// 0 at `hi`, tier 1 from `boundary` at `lo`, the rest at `u128::MAX` (never chosen).
+fn plant_tiers(env: &mut Env, boundary: u128, hi: (u64, u64, u64), lo: (u64, u64, u64)) {
+    use shortwin::constants::PUMP_AMM_FEE_CONFIG;
+    use shortwin_venue_state::pump::{FEE_TIER_LEN, OFF_FEE_CONFIG_FEE_TIERS};
+    let mut acc = env
+        .svm
+        .get_account(&PUMP_AMM_FEE_CONFIG)
+        .expect("FeeConfig");
+    let at = OFF_FEE_CONFIG_FEE_TIERS;
+    let len = u32::from_le_bytes(acc.data[at..at + 4].try_into().unwrap()) as usize;
+    assert!(len >= 2, "{len} tiers");
+    for i in 0..len {
+        let o = at + 4 + i * FEE_TIER_LEN;
+        let (threshold, f) = match i {
+            0 => (0u128, hi),
+            1 => (boundary, lo),
+            _ => (u128::MAX, lo),
+        };
+        acc.data[o..o + 16].copy_from_slice(&threshold.to_le_bytes());
+        acc.data[o + 16..o + 24].copy_from_slice(&f.0.to_le_bytes());
+        acc.data[o + 24..o + 32].copy_from_slice(&f.1.to_le_bytes());
+        acc.data[o + 32..o + 40].copy_from_slice(&f.2.to_le_bytes());
+    }
+    env.svm
+        .set_account(PUMP_AMM_FEE_CONFIG, acc)
+        .expect("set FeeConfig");
+}
+
+/// The pool's market cap now and at the stored `P_ema` (pump-fees' tier input
+/// `quote·supply/base`; `pump_amm::read_state`'s two fees).
+fn mcaps(env: &Env, pm: &PammMarket) -> (u128, u128) {
+    let r = pm.pool.reserves(&env.svm).expect("reserves");
+    let mint = env.svm.get_account(&pm.pool.mint).expect("mint");
+    let supply = u128::from(
+        shortwin_venue_state::mint::read_base(&mint.owner.to_bytes(), &mint.data)
+            .expect("mint")
+            .supply,
+    );
+    let base = u128::from(r.base);
+    let at_ema = env.market(&pm.market()).ema_price.get() * base / shortwin_math::num::WAD;
+    (r.effective_quote * supply / base, at_ema * supply / base)
+}
+
+/// A tier schedule of one state.
+#[derive(Clone, Copy)]
+enum Schedule {
+    Uniform((u64, u64, u64)),
+    /// [`HI`] below the boundary, [`LO`] from it up.
+    Split(u128),
+}
+
+/// The keeper's evaluation of `position` on `market` now, and the venue state it read: its own
+/// view and projection (`view::load`, `decide::project`, `decide::evaluate`).
+fn keeper_eval(
+    h: &Harness,
+    market: Pubkey,
+    position: Pubkey,
+) -> (
+    shortwin_keeper::decide::PositionEval,
+    shortwin::venues::VenueState,
+) {
+    use shortwin_keeper::config::CoverageConfig;
+    use shortwin_keeper::{decide, view};
+    let cv = shortwin_keeper_litesvm::block_on(view::load(h.chain(), &[market])).expect("view");
+    let mv = &cv.markets[0];
+    let proj = decide::project(&cv.config, mv, cv.clock).expect("projection");
+    let pv = mv
+        .positions
+        .iter()
+        .find(|p| p.key == position)
+        .expect("position");
+    let ev = decide::evaluate(mv, &proj, pv, &CoverageConfig::default()).expect("evaluation");
+    (ev, mv.state.clone())
+}
+
+/// AIR-10 (the TODO.md keeper item on the exit predictions on PumpSwap). The program's exits price
+/// their risk view at `min(φ_live, the locked hard cap)` and on PumpSwap at most at the tier of
+/// `P_ema`'s market cap (`VenueState::exit_risk_cap_bps` on `read_state_boxed_for_exit`), which a
+/// same-transaction sale cannot raise. On the mature pool a position pushed 5 % past its
+/// liquidation boundary and held 120 s gets the margin halfway between the most at which a
+/// uniform 30-bps and a uniform 50-bps schedule still liquidate after a sale of 0.01 % of the
+/// base (bisections on clones). With the tier boundary between that sale's market cap and
+/// `P_ema`'s (50 bps live, 30 at `P_ema`) the program refuses the liquidation
+/// (`NotLiquidatable`), and so does the keeper's projection: its risk cap is 30 bps, its plan not
+/// `Liquidate`, and its tick sends no liquidation. At the live 50 bps — the keeper's risk fee
+/// before this change — the same state is liquidatable: under a uniform 50-bps schedule both
+/// the program and the keeper's plan say so, and the keeper's tick liquidates it.
+#[test]
+fn air10_pumpswap_exits_are_judged_at_the_tier_at_p_ema() {
+    use shortwin_keeper::decide::Plan;
+    use shortwin_litesvm_tests::engine::{add_margin_ix, liquidate_ix};
+
+    let (mut env, p) = Env::fork_pamm_coin(PammCoin::Mature);
+    let q = q_for(&env, &p);
+    ok(env.list_pamm(&p.mint, &p.base_program));
+    let pm = env.pamm_market_listed(&p.mint, q * 40, 60);
+    let market = pm.market();
+    for _ in 0..30 {
+        env.warp(1);
+        env.crank(&pm);
+    }
+    let q = q_for(&env, &pm.pool);
+    let mut b = env.borrower();
+    let (res, nonce) = env.open(&pm, &mut b, q);
+    ok(res);
+    let position = pda::position(&market, &b.key(), nonce).0;
+    let pos = env.position(&pm, &b.key(), nonce);
+    // CR ≈ cr_open after the open: the price × 1.05·cr_open/cr_liq puts it 5 % below L; held 120 s.
+    let factor = u128::from(pos.v) * 10_000 * 105 / u128::from(pos.n_open);
+    env.warp(1);
+    let buyer = PammUser::new(&mut env, &pm.pool, 20_000 * SOL);
+    ok(buyer.push_price(&mut env, &pm.pool, factor, u128::from(pos.cr_liq_bps) * 100));
+    for _ in 0..120 {
+        env.warp(1);
+        env.crank(&pm);
+    }
+    let seller = PammUser::new(&mut env, &pm.pool, SOL);
+    let d = pm.pool.reserves(&env.svm).expect("reserves").base / 10_000;
+    fork::set_token_amount(&mut env.svm, &seller.base, d);
+    let sale = pamm::pamm_trade_ix(
+        &env.svm,
+        &pm.pool,
+        pamm::PammTrade::Sell,
+        &seller.kp.pubkey(),
+        &seller.base,
+        &seller.wsol,
+        d,
+        0,
+    );
+    let outsider = env.funded_keypair();
+    let mut h = Harness::new(env, covering_all(KeeperConfig::default()));
+    let base = h.with_env(|env| env.svm.clone());
+    let (bkp, skp) = (b.kp.insecure_clone(), seller.kp.insecure_clone());
+    // One state: the schedule planted, the margin added, the sale landed (its own transaction).
+    let state = |env: &mut Env, margin: u64, schedule: Schedule| {
+        env.svm = base.clone();
+        match schedule {
+            Schedule::Uniform(f) => plant_tiers(env, 0, f, f),
+            Schedule::Split(boundary) => plant_tiers(env, boundary, HI, LO),
+        }
+        if margin > 0 {
+            ok(env.send(&[add_margin_ix(&pm, &b.key(), nonce, margin)], &[&bkp]));
+        }
+        ok(env.send(std::slice::from_ref(&sale), &[&skp]));
+    };
+    let liquidation = |env: &Env| {
+        let tx = Transaction::new_signed_with_payer(
+            &[
+                cu_limit_ix(1_400_000),
+                liquidate_ix(&pm, &outsider.pubkey(), &b.key(), nonce),
+            ],
+            Some(&outsider.pubkey()),
+            &[&outsider],
+            env.svm.latest_blockhash(),
+        );
+        env.svm
+            .simulate_transaction(tx)
+            .map(|_| ())
+            .map_err(|f| shortwin_litesvm_tests::errors::custom_code(&Err(f)))
+    };
+    let healthy = Err(Some(u32::from(ShortwinError::NotLiquidatable)));
+    // The most margin at which a uniform `f` schedule still liquidates.
+    let edge = |env: &mut Env, f: (u64, u64, u64)| {
+        state(env, 0, Schedule::Uniform(f));
+        assert_ne!(liquidation(env), healthy);
+        state(env, pos.v, Schedule::Uniform(f));
+        assert_eq!(liquidation(env), healthy);
+        let (mut lo, mut hi) = (0u64, pos.v);
+        while hi - lo > 1 {
+            let mid = lo + (hi - lo) / 2;
+            state(env, mid, Schedule::Uniform(f));
+            if liquidation(env) == healthy {
+                hi = mid;
+            } else {
+                lo = mid;
+            }
+        }
+        lo
+    };
+    let (m, boundary) = h.with_env(|env| {
+        env.check_invariants = false;
+        let (m_lo, m_hi) = (edge(env, LO), edge(env, HI));
+        env.check_invariants = true;
+        assert!(m_lo < m_hi, "{m_lo} {m_hi}");
+        // The boundary between the sale's market cap and the honest ones (the spot's before it,
+        // `P_ema`'s before and after it).
+        env.svm = base.clone();
+        let (live0, ema0) = mcaps(env, &pm);
+        ok(env.send(std::slice::from_ref(&sale), &[&skp]));
+        let (live1, ema1) = mcaps(env, &pm);
+        let above = live0.min(ema0).min(ema1);
+        assert!(live1 < above, "{live1} vs {above}");
+        let m = m_lo + (m_hi - m_lo) / 2;
+        println!(
+            "AIR-10: market cap {live0} (at P_ema {ema0}) -> {live1} after the sale; margin {m} \
+             (edges {m_lo} / {m_hi})"
+        );
+        (m, live1 + (above - live1) / 2)
+    });
+
+    // The split schedule: 50 bps live, 30 at P_ema. The program and the keeper: healthy.
+    h.with_env(|env| state(env, m, Schedule::Split(boundary)));
+    assert_eq!(h.with_env(|env| liquidation(env)), healthy);
+    let (ev, st) = keeper_eval(&h, market, position);
+    let hard = u64::from(pos.venue_fee_hard_cap_bps);
+    let live_bps = u64::from(st.fee_ppm).div_ceil(100);
+    let cap = st.exit_risk_cap_bps(hard);
+    println!(
+        "AIR-10: live fee {} ppm, exit risk cap {cap} bps, the keeper's plan {:?} (legs {} {})",
+        st.fee_ppm, ev.plan, ev.spot_leg, ev.ema_leg
+    );
+    assert_ne!(ev.plan, Plan::Liquidate, "{ev:?}");
+    assert!(!(ev.spot_leg && ev.ema_leg), "{ev:?}");
+    assert!(
+        cap < live_bps && cap < hard,
+        "the exit risk cap is P_ema's lower tier: {cap} bps, live {live_bps}"
+    );
+    let r = h.tick().clone();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert!(
+        r.exits.iter().all(|e| e.kind != ExitKind::Liquidate),
+        "{:?}",
+        r.exits
+    );
+    assert!(
+        !r.alerts
+            .iter()
+            .any(|a| matches!(a, Alert::ExitRefused { .. })),
+        "{:?}",
+        r.alerts
+    );
+
+    // The same state at a uniform 50 bps (the live tier's fee everywhere): liquidatable for both.
+    h.with_env(|env| state(env, m, Schedule::Uniform(HI)));
+    assert_eq!(h.with_env(|env| liquidation(env)), Ok(()));
+    let (ev, st) = keeper_eval(&h, market, position);
+    assert_eq!(
+        u64::from(st.fee_ppm).div_ceil(100),
+        live_bps,
+        "the same live fee"
+    );
+    assert_eq!(
+        st.exit_risk_cap_bps(hard),
+        live_bps,
+        "P_ema's tier is the live one"
+    );
+    assert_eq!(ev.plan, Plan::Liquidate, "{ev:?}");
+    let r = h.tick().clone();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert!(
+        r.exits
+            .iter()
+            .any(|e| e.kind == ExitKind::Liquidate && e.result.landed().is_some()),
+        "{:?}",
+        r.exits
     );
 }
 

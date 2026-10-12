@@ -10,7 +10,9 @@
 //! `bounds::spot_liquidity`, FITS-2 (a) —, `persist::liq_ema_leg`,
 //! `engine::bounds::{liq_reference, max_in_liq, expiry_reference, max_in_exp}`,
 //! `settle::s3_due`), with the position's locked terms and the risk fee
-//! `min(φ_live, venue_fee_hard_cap_bps_pos)` (V2-1), through the venue's own quoter
+//! `min(φ_live, venue_fee_hard_cap_bps_pos)` (V2-1) — on PumpSwap also at most φ at `P_ema`, the
+//! tier a same-transaction trade cannot raise (AIR-10: `VenueState::exit_risk_cap_bps` on the
+//! exits' venue read, [`crate::view::venue_state`]) —, through the venue's own quoter
 //! (`VenueState::quoter`: a constant-product pool, or the pump curve with `B̂_str` above `rT`,
 //! ARCH §4.3) — the program's `engine::bounds` and `engine::arming` quote the same way. The
 //! keeper therefore acts at the first second the program would accept; every send is still
@@ -258,7 +260,11 @@ pub fn evaluate(
     let obs = &proj.obs;
     let now = proj.now;
     let q = pos.q;
-    let cap = u64::from(pos.venue_fee_hard_cap_bps);
+    // AIR-10: the program's exit risk fee (`liquidate::assess`, `sol_settle`): the locked hard cap
+    // and, on PumpSwap, the tier at `P_ema`'s market cap. At the live tier alone the keeper would
+    // see liquidations the program refuses (`NotLiquidatable`) whenever the live market cap sits
+    // in a higher-fee tier than `P_ema`'s.
+    let cap = st.exit_risk_cap_bps(u64::from(pos.venue_fee_hard_cap_bps));
     let l_bps = pos.cr_liq_bps;
     let math = |e: shortwin_math::MathError| anyhow!("math: {e:?}");
 
@@ -509,5 +515,118 @@ pub fn market_needs(
         warming,
         guarded,
         liq_covered,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anchor_lang::AnchorDeserialize;
+    use bytemuck::Zeroable;
+    use shortwin::state::ShortPosition;
+    use shortwin::venues::VenueState;
+    use shortwin::venues::pump_amm::PoolVenue;
+    use shortwin_math::fees::FeeBps;
+    use shortwin_math::quote::Pricing;
+
+    /// The projection of a market as read (no prologue: the test sets what it reads).
+    fn projection(market: Market) -> Projection {
+        Projection {
+            now: 1_000,
+            slot: 0,
+            obs: market.observation(),
+            market: Box::new(market),
+            s3_no_route: false,
+            pool_fail: false,
+            depth_cap: None,
+        }
+    }
+
+    /// AIR-10: on PumpSwap the exits' risk fee is the position's locked hard cap and at most the
+    /// tier at `P_ema`'s market cap (`VenueState::exit_risk_cap_bps`), as `liquidate::assess` and
+    /// `sol_settle` price it. A pool whose live tier is 50 bps and whose tier at `P_ema` is 30: the
+    /// keeper's live CR at the risk fee is the 30-bps quote's and the position, 0.2 % over the
+    /// near-threshold CR there, is `Idle`; at the live 50 bps it would be near (`Watch`). With the
+    /// fee at `P_ema` unresolved (`u32::MAX`), or above the live tier, the hard cap alone applies:
+    /// the live 50 bps. At the hard cap alone (the keeper before AIR-10) the first case is `Watch`.
+    #[test]
+    fn air10_pumpswap_exits_are_judged_at_most_at_the_tier_at_p_ema() {
+        let fees = FeeBps::new(20, 5, 25);
+        let mut st = VenueState::not_executable(VenueKind::PumpSwap);
+        st.executable = true;
+        st.x = 1_000_000_000_000_000;
+        st.y = 100_000_000_000;
+        st.r = st.y;
+        st.pricing = Some(Pricing::PumpSwap(fees));
+        st.fee_ppm = 5_000;
+        st.pool = Some(PoolVenue {
+            disable_flags: 0,
+            boost_amount: 0,
+            virtual_part: 0,
+            is_cashback: false,
+            fees: Some(fees),
+            fee_ppm_at_ema: 3_000,
+        });
+        let hard_cap = 1_000u16;
+        assert_eq!(st.exit_risk_cap_bps(u64::from(hard_cap)), 30);
+        let q = st.x / 1_000;
+        let cov = CoverageConfig::default();
+        let cost = |st: &VenueState, cap: u64| st.buy_risk(q, cap).expect("a quote").cost;
+        let (b30, b50) = (cost(&st, 30), cost(&st, 50));
+        assert!(b30 < b50 && b50 == cost(&st, u64::from(hard_cap)));
+        // `L` 100 %: near below a live CR of 13,000 bps (`near_cr_bps` 130 %); `v` the smallest
+        // that holds 13,000 bps at the 30-bps quote.
+        let l_bps = 10_000u32;
+        let near = u128::from(l_bps) * u128::from(cov.near_cr_bps) / 10_000;
+        let v = u64::try_from((near * u128::from(b30)).div_ceil(10_000)).unwrap();
+        let mut pos = ShortPosition::deserialize(&mut &[0u8; 1_024][..]).unwrap();
+        pos.q = q;
+        pos.v = v;
+        pos.cr_liq_bps = l_bps;
+        pos.venue_fee_hard_cap_bps = hard_cap;
+        pos.deadline = 1_000_000;
+        pos.liq_persist_n = 3;
+        pos.ref_max_age_s = 2;
+        pos.max_liq_slip_bps = 1_000;
+        let pv = PositionView {
+            key: Pubkey::new_unique(),
+            pos,
+            lamports: 0,
+        };
+        let proj = projection(Market::zeroed());
+        let eval = |st: &VenueState| {
+            let mv = MarketView {
+                key: Pubkey::new_unique(),
+                market: proj.market.clone(),
+                vault: Box::new(shortwin_math::pool::Vault::new()),
+                kind: VenueKind::PumpSwap,
+                read_keys: Vec::new(),
+                read_accounts: Vec::new(),
+                state: st.clone(),
+                positions: vec![pv.clone()],
+                extras: None,
+                supply: None,
+            };
+            evaluate(&mv, &proj, &pv, &cov).expect("an evaluation")
+        };
+        let cr = |b: u64| risk::cr_bps(v, Some(b)).unwrap();
+        assert!(u128::from(cr(b30)) >= near && u128::from(cr(b50)) < near);
+
+        let e = eval(&st);
+        assert_eq!(e.cr_live_bps, cr(b30), "the risk fee is the tier at P_ema");
+        assert_eq!(e.plan, Plan::Idle);
+        assert!(!e.near && !e.spot_leg && !e.ema_leg);
+
+        // Unresolved: the hard cap; a tier at `P_ema` above the live one caps nothing.
+        for (at_ema, risk_cap) in [(u32::MAX, 1_000), (8_000, 80)] {
+            let mut st = st.clone();
+            if let Some(p) = st.pool.as_mut() {
+                p.fee_ppm_at_ema = at_ema;
+            }
+            assert_eq!(st.exit_risk_cap_bps(u64::from(hard_cap)), risk_cap);
+            let e = eval(&st);
+            assert_eq!(e.cr_live_bps, cr(b50), "{at_ema}: the live tier");
+            assert_eq!((e.plan, e.near), (Plan::Watch, true), "{at_ema}");
+        }
     }
 }

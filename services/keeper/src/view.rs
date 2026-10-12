@@ -23,8 +23,10 @@
 //!
 //! **PumpSwap** (M6): the fee tier is chosen on the market cap `effective_quote·supply/base`
 //! (ARCH §4.2), so the keeper also reads the market's **mint** and hands its live supply to the
-//! program's reader (`venues::read_state_with`, as the program's prologue does with the named
-//! mint); without it a PumpSwap market would read as not executable.
+//! program's reader (`venues::read_state_boxed_for_exit`, as the program's exits do with the named
+//! mint); without it a PumpSwap market would read as not executable. That reader also resolves
+//! the fee at the stored `P_ema`'s market cap, which caps the exits' risk view (AIR-10;
+//! [`venue_state`]).
 
 use std::collections::HashMap;
 
@@ -155,10 +157,15 @@ pub fn with_account_infos<R>(
     f(&infos)
 }
 
-/// The venue state the program computes from a ReadSet (`venues::read_state_with` on host-side
-/// `AccountInfo`s built from the fetched accounts, with the mint's `supply` — PumpSwap's fee tier;
-/// a missing account reads as an empty System-owned one, which no reader accepts: "not
-/// executable", A63).
+/// The venue state the program's keeper exits and `sol_settle` compute from a ReadSet
+/// (`venues::read_state_boxed_for_exit` on host-side `AccountInfo`s built from the fetched
+/// accounts, with the mint's `supply` — PumpSwap's fee tier; a missing account reads as an empty
+/// System-owned one, which no reader accepts: "not executable", A63). It is
+/// `venues::read_state_with`'s state except that on PumpSwap the fee at the stored `P_ema`'s
+/// market cap is resolved too: the exits cap their risk view there (AIR-10,
+/// `VenueState::exit_risk_cap_bps`), so the keeper's projection judges them as the program does
+/// ([`crate::decide`]). Nothing else reads that fee: the prologue, the route predicates and the
+/// monitor's fee take the live one.
 pub fn venue_state(
     market: &Market,
     kind: VenueKind,
@@ -168,7 +175,7 @@ pub fn venue_state(
     supply: Option<u64>,
 ) -> VenueState {
     with_account_infos(keys, accounts, |infos| {
-        shortwin::venues::read_state_with(market, kind, infos, now, supply)
+        *shortwin::venues::read_state_boxed_for_exit(market, kind, infos, now, supply)
     })
 }
 
