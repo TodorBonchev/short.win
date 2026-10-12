@@ -211,7 +211,54 @@ fn the_mock_lifecycle_covers_its_flows() {
     );
     let nums: Vec<u8> = m.share_epochs.values().map(|(n, _)| *n).collect();
     assert!(nums.contains(&0) && nums.contains(&1), "{nums:?}");
-    assert_eq!(m.donations.values().sum::<u64>(), 7_000_000);
+    // The record donations: M4's full wipe and M5's flushing rebase.
+    assert_eq!(
+        m.donations.values().sum::<u64>(),
+        7_000_000 + scenarios::M5_DONATION
+    );
+    assert!(
+        m.donations.iter().any(|(market, d)| {
+            *d == scenarios::M5_DONATION
+                && m.share_epochs
+                    .iter()
+                    .any(|((mk, _), (num, _))| mk == market && *num > 0)
+                && m.settlements
+                    .iter()
+                    .any(|s| s.market == *market && s.vest_flushed > 0)
+        }),
+        "mock_lifecycle: no flushing rebase with a record donation"
+    );
+    // AIR-07: a settlement flushed the vest on a market that never rolled its epoch (M6), and
+    // the contract's `vest_bal` followed it (checked against the chain at every checkpoint).
+    assert!(
+        m.settlements
+            .iter()
+            .any(|s| s.vest_flushed > 0
+                && !m.share_epochs.keys().any(|(market, _)| *market == s.market)),
+        "mock_lifecycle: no vest flush without a roll"
+    );
+    // The flushed vests are still there at the end (M6; M7, where the last shares left a running
+    // vest and were paid it, R3B-2), so the DB-side assertions check a flushed
+    // `markets.vest_bal` on the end state too (`assert::projections_vs_chain`).
+    let end_state = ChainState::from_checkpoint(end).expect("end state");
+    let flushed: Vec<_> = end_state
+        .markets
+        .values()
+        .filter(|mk| mk.vest_bal == 0 && mk.vest_end > mk.vest_last)
+        .collect();
+    assert!(
+        flushed
+            .iter()
+            .any(|mk| mk.share_epoch == 0 && mk.total_shares.get() > 0),
+        "mock_lifecycle: no flush without a roll left at the end"
+    );
+    assert!(
+        flushed
+            .iter()
+            .any(|mk| mk.total_shares.get() == 0
+                && !mk.has_flag(shortwin::state::MARKET_FLAG_WIPE_LIVE)),
+        "mock_lifecycle: the last shares did not leave a running vest"
+    );
     // An S1 gap settlement realised a loss for the lenders (SPEC §13).
     assert!(
         m.settlements
@@ -263,6 +310,10 @@ fn the_assertions_hold_on_a_faithful_database_and_catch_tampering() {
             );
             fails(name, &check::quarantined(&pool).await.expect("12"));
             fails(name, &check::read_model(&pool).await.expect("read model"));
+            fails(
+                name,
+                &check::vest_vs_model(&pool, &model).await.expect("vest_bal"),
+            );
             // A rebuild-free equality check of the dump with itself is trivial; a dump differs
             // once a row changes.
             let before = check::dump(&pool).await.expect("dump");
@@ -291,6 +342,39 @@ fn the_assertions_hold_on_a_faithful_database_and_catch_tampering() {
                 .execute(&pool)
                 .await
                 .expect("untamper");
+            // AIR-07: a stale `vest_bal` after a flush is caught against the chain and against the
+            // model (mock_lifecycle ends with M6's flushed vest).
+            let flushed = end
+                .markets
+                .iter()
+                .find(|(_, m)| m.vest_bal == 0 && m.vest_end > m.vest_last)
+                .map(|(k, _)| k.to_string());
+            assert!(
+                flushed.is_some() || name != "mock_lifecycle",
+                "{name}: no flushed vest at the end"
+            );
+            if let Some(mk) = flushed {
+                sqlx::query("UPDATE markets SET vest_bal = 1 WHERE market = $1")
+                    .bind(&mk)
+                    .execute(&pool)
+                    .await
+                    .expect("tamper vest_bal");
+                let d = check::projections_vs_chain(&pool, &end).await.expect("1");
+                assert!(
+                    d.iter().any(|x| x.contains("vest_bal (flushed)")),
+                    "{name}: a stale vest_bal went unnoticed: {d:?}"
+                );
+                let d = check::vest_vs_model(&pool, &model).await.expect("vest_bal");
+                assert!(
+                    d.iter().any(|x| x.contains(&mk)),
+                    "{name}: a stale vest_bal went unnoticed by the model check: {d:?}"
+                );
+                sqlx::query("UPDATE markets SET vest_bal = 0 WHERE market = $1")
+                    .bind(&mk)
+                    .execute(&pool)
+                    .await
+                    .expect("untamper vest_bal");
+            }
             sqlx::query(
                 "UPDATE fees SET amount = amount + 1 WHERE ctid = \
                  (SELECT ctid FROM fees WHERE recipient = 'protocol' LIMIT 1)",

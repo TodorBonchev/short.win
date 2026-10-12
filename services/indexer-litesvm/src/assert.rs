@@ -7,6 +7,7 @@
 //! | §11.4 | Function |
 //! |---|---|
 //! | 1 markets, 2 vaults, 3 positions, 4 lenders and share epochs, 5 admin | [`projections_vs_chain`] |
+//! | 1 markets' `vest_bal` ([E\*]) against the model at every checkpoint | [`vest_vs_model`] |
 //! | 6 ledger identities, fees by type | [`ledgers`] |
 //! | 7 analytics (views vs `formulas` on the accounts; settlements, exits, lender loss) | [`analytics`] |
 //! | 7 rollups reproduce the views' end state | [`rollups`] |
@@ -86,7 +87,7 @@ pub async fn projections_vs_chain(pool: &PgPool, c: &ChainState) -> anyhow::Resu
                 COALESCE(coverage_cleared_at, 0) AS coverage_cleared_at, mint_unsafe, \
                 route_broken, wipe_live, ray_pool, COALESCE(pool_d, 0)::text AS pool_d, \
                 fp_candidate, open_vault_lamports::text, lender_sol::text, protocol_fees::text, \
-                lender_count \
+                lender_count, vest_bal::text \
          FROM markets",
     )
     .fetch_all(pool)
@@ -208,6 +209,16 @@ pub async fn projections_vs_chain(pool: &PgPool, c: &ChainState) -> anyhow::Resu
             })
             .count();
         d.eq(|| s("lender_count"), r.try_get::<i64, _>(25)?, lenders);
+        // `vest_bal` is [E*], exact where a flush left none (AIR-07): a vest at 0 before its end
+        // was flushed with nothing vested since, and every flush is reported
+        // (`SolSettle.vest_flushed`, `EpochRolled`, a lender event with `s_after = 0`).
+        if m.vest_bal == 0 && m.vest_end > m.vest_last {
+            d.eq(
+                || s("vest_bal (flushed)"),
+                opt(r.try_get::<Option<String>, _>(26)?),
+                0,
+            );
+        }
     }
     for k in c.markets.keys() {
         if !seen.contains(k) {
@@ -514,6 +525,31 @@ async fn admin(pool: &PgPool, c: &ChainState, d: &mut Diff) -> anyhow::Result<()
         );
     }
     Ok(())
+}
+
+/// `markets.vest_bal` ([E\*], INDEXER.md §6.2) against the harness's model of the same events
+/// (`MarketModel::vest_bal`: the last `PriceCranked` snapshot, 0 after every reported flush, a
+/// flushing rebase's record donation, AIR-07): INGEST's projection and the contract's rule,
+/// applied independently, agree for every market; the model is held to the chain wherever the
+/// rule is exact (`Model::check_against`).
+pub async fn vest_vs_model(pool: &PgPool, model: &Model) -> anyhow::Result<Vec<String>> {
+    let mut d = Diff(Vec::new());
+    let rows: Vec<(String, Option<String>)> =
+        sqlx::query_as("SELECT market, vest_bal::text FROM markets")
+            .fetch_all(pool)
+            .await
+            .context("markets.vest_bal")?;
+    for (market, vest) in rows {
+        let mk: Pubkey = market.parse().map_err(|e| anyhow::anyhow!("{e:?}"))?;
+        if let Some(m) = model.markets.get(&mk) {
+            d.eq(
+                || format!("market {market} vest_bal vs the model"),
+                opt(vest),
+                opt(m.vest_bal),
+            );
+        }
+    }
+    Ok(d.0)
 }
 
 // ---- 6: ledgers -----------------------------------------------------------------------------------
@@ -1290,6 +1326,11 @@ pub async fn replay_session(
         let state = ChainState::from_checkpoint(c)?;
         report.checkpoints += 1;
         for f in projections_vs_chain(&pool, &state).await? {
+            report
+                .failures
+                .push(format!("checkpoint after tx {k}: {f}"));
+        }
+        for f in vest_vs_model(&pool, &model).await? {
             report
                 .failures
                 .push(format!("checkpoint after tx {k}: {f}"));

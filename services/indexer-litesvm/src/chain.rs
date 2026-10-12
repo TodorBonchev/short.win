@@ -885,8 +885,23 @@ pub struct MarketModel {
     pub ema_price: Option<u128>,
     pub ema_ts: Option<i64>,
     pub spot_wad: Option<u128>,
+    /// `vest_bal` ([E\*]): the last `PriceCranked` snapshot, and 0 after every reported flush
+    /// (AIR-07): `SolSettle.vest_flushed > 0`, a full wipe's `EpochRolled` (a flushing rebase's
+    /// leaves the record donation it vested anew), a lender event with `s_after = 0`.
+    pub vest_bal: Option<u64>,
+    /// The event whose rule last set `vest_bal` (each rule gives the program's vest as of its
+    /// event): `vest_bal` is exact at a checkpoint taken right after it ([`Model::check_against`]).
+    pub vest_set: Option<Key>,
     /// The watermark: the key of the last event applied.
     pub last: Key,
+}
+
+impl MarketModel {
+    /// `vest_bal = vest` by the rule of the event at `key`.
+    fn set_vest(&mut self, vest: u64, key: &Key) {
+        self.vest_bal = Some(vest);
+        self.vest_set = Some(key.clone());
+    }
 }
 
 /// A position as projected (INDEXER.md §6.5).
@@ -1011,6 +1026,8 @@ pub struct SettlementModel {
     pub lump: u64,
     pub borrower_amount: u64,
     pub ema_age_s: i64,
+    /// The vest the settlement flushed (AIR-07; not a `settlements` column: `events.data`).
+    pub vest_flushed: u64,
     pub q: u64,
     pub n_open: u64,
     pub tier: u8,
@@ -1163,6 +1180,8 @@ pub struct Model {
     pub problems: Vec<String>,
     /// Transactions applied.
     pub applied: usize,
+    /// The signature of the last transaction applied (failed or not).
+    pub last_tx: Option<String>,
     /// The rows of [`Rows`], when collecting.
     pub rows: Option<Rows>,
     /// Locked terms by position, from the checkpoints' `ShortPosition` accounts.
@@ -1331,6 +1350,16 @@ impl Model {
         });
     }
 
+    /// R3B-2: a lender event that leaves `S = 0` reports a flush (the last shares were paid the
+    /// vest first; the program holds no vest while `S = 0`).
+    fn last_shares(&mut self, market: &Pubkey, s_after: u128, key: &Key) {
+        if s_after == 0
+            && let Some(m) = self.markets.get_mut(market)
+        {
+            m.set_vest(0, key);
+        }
+    }
+
     fn lender_event(
         &mut self,
         t: &ChainTx,
@@ -1433,6 +1462,7 @@ impl Model {
     /// Applies one transaction's events (a failed transaction has none).
     pub fn apply(&mut self, t: &ChainTx) {
         self.applied += 1;
+        self.last_tx = Some(t.signature.clone());
         if !t.ok {
             return;
         }
@@ -1495,6 +1525,7 @@ impl Model {
                 );
             }
             Ev::Deposit(x) => {
+                self.last_shares(&x.market, x.s_after, &key);
                 if let Some(m) = self.markets.get_mut(&x.market) {
                     m.tokens_free = x.t_after;
                     m.total_shares = x.s_after;
@@ -1509,6 +1540,7 @@ impl Model {
                 );
             }
             Ev::Withdraw(x) => {
+                self.last_shares(&x.market, x.s_after, &key);
                 if let Some(m) = self.markets.get_mut(&x.market) {
                     m.tokens_free = x.t_after;
                     m.total_shares = x.s_after;
@@ -1522,6 +1554,7 @@ impl Model {
                 );
             }
             Ev::ClaimSol(x) => {
+                self.last_shares(&x.market, x.s_after, &key);
                 self.lender_event(
                     t,
                     x.market,
@@ -1531,6 +1564,7 @@ impl Model {
                 );
             }
             Ev::DeficitCovered(x) => {
+                self.last_shares(&x.market, x.s_after, &key);
                 if let Some(m) = self.markets.get_mut(&x.market) {
                     m.lender_sol += i128::from(x.amount);
                 }
@@ -1543,6 +1577,7 @@ impl Model {
                 );
             }
             Ev::LenderSynced(x) => {
+                self.last_shares(&x.market, x.s_after, &key);
                 self.lender_event(
                     t,
                     x.market,
@@ -1781,6 +1816,7 @@ impl Model {
                         lump: x.lump,
                         borrower_amount: x.borrower_amount,
                         ema_age_s: x.ema_age_s,
+                        vest_flushed: x.vest_flushed,
                         q: p.q,
                         n_open: p.n_open,
                         tier: p.tier,
@@ -1805,6 +1841,10 @@ impl Model {
                 }
                 if let Some(m) = self.markets.get_mut(&x.market) {
                     m.lender_sol += i128::from(x.lender_amount);
+                    // AIR-07: the settlement flushed the vest, with or without a roll.
+                    if x.vest_flushed > 0 {
+                        m.set_vest(0, &key);
+                    }
                 }
                 let f = FeeX::new(x.market, x.ts, x.k_s)
                     .position(x.position)
@@ -1855,6 +1895,13 @@ impl Model {
                     m.share_epoch = x.epoch + 1;
                     m.wipe_live = x.num == 0;
                     m.lender_sol += i128::from(donation);
+                    // A full wipe holds no vest (its donation tops up the wipe record); a rebase
+                    // after a flush holds only the donation it vested anew.
+                    if x.num == 0 {
+                        m.set_vest(0, &key);
+                    } else if x.vest_flushed > 0 {
+                        m.set_vest(donation, &key);
+                    }
                 }
                 if let Some(rows) = self.rows.as_mut() {
                     rows.epochs.push(EpochRow {
@@ -1892,6 +1939,7 @@ impl Model {
                 if let Some(m) = self.markets.get_mut(&x.market) {
                     m.spot_wad = Some(x.spot_wad);
                     m.tier = x.tier;
+                    m.set_vest(x.vest_bal, &key);
                     if x.ema_price > 0 {
                         m.ema_price = Some(x.ema_price);
                         m.ema_ts = Some(x.ts);
@@ -2232,6 +2280,33 @@ impl Model {
                 mm.coverage_cleared_at.to_string(),
                 m.coverage_cleared_at.to_string(),
             );
+            // `vest_bal` is [E*]. Exact right after the event whose rule set it (a crank's
+            // snapshot, a reported flush, a flushing rebase's record donation vested anew): the
+            // checkpoint follows that event's transaction, and no later event of the market came
+            // in it (a release at the same second is a no-op; every lump comes with an event).
+            let vest_exact = mm
+                .vest_set
+                .as_ref()
+                .is_some_and(|k| *k == mm.last && self.last_tx.as_ref() == Some(&k.signature));
+            if vest_exact {
+                eq(
+                    s("vest_bal (as of the event that set it)"),
+                    format!("{:?}", mm.vest_bal),
+                    format!("{:?}", Some(m.vest_bal)),
+                );
+            }
+            // Exact also where a flush left none (AIR-07): a vest at 0 before its end was
+            // flushed — a settlement that left at most 1/1,000 of the token claims, a full wipe,
+            // or the last shares leaving — and nothing has vested since (a release that reaches
+            // the end leaves `vest_last ≥ vest_end`). Every flush is reported, so the contract's
+            // `vest_bal` is 0 too.
+            if m.vest_bal == 0 && m.vest_end > m.vest_last {
+                eq(
+                    s("vest_bal (flushed)"),
+                    format!("{:?}", mm.vest_bal),
+                    format!("{:?}", Some(0u64)),
+                );
+            }
             // `pool_d` is not compared: every observation's prologue refreshes it from the
             // incumbent's locked depth (`engine/prologue.rs`), so it is [E*] (exact only as of a
             // PoolProposed / PoolSwitched), not [E] as INDEXER.md §6.2 lists it.

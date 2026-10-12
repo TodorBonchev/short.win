@@ -431,12 +431,12 @@ async fn market_row(
          share_epoch, open_positions, total_notional_open, max_q_hwm, open_vault_lamports, \
          lender_sol, protocol_fees, lender_count, spot_wad, ema_price, price_ts, price_source, \
          fp_candidate, fp_venue, pool_d, last_slot, last_tx_index, last_ix_index, \
-         last_ev_source, last_ev_seq) \
+         last_ev_source, last_ev_seq, vest_bal) \
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8::numeric, $9, $10, $11, $12, $13, $14, $15, $16, \
                  $17, $18, $19, $20, $21, $22::numeric, $23::numeric, $24::numeric, $25::numeric, \
                  $26::numeric, $27::numeric, $28::numeric, $29, $30, $31::numeric, $32::numeric, \
                  $33::numeric, $34::numeric, $35::numeric, $36, $37::numeric, $38::numeric, $39, \
-                 'event', $40, $41, $42::numeric, $43, $44, $45, $46, $47)",
+                 'event', $40, $41, $42::numeric, $43, $44, $45, $46, $47, $48::numeric)",
     )
     .bind(k(&m.market))
     .bind(k(&m.mint))
@@ -485,6 +485,7 @@ async fn market_row(
     .bind(i16::try_from(last.ix_index)?)
     .bind(small(last.ev_source))
     .bind(i32::try_from(last.ev_seq)?)
+    .bind(m.vest_bal.map(n))
     .execute(&mut **db)
     .await
     .with_context(|| format!("markets {}", m.market))?;

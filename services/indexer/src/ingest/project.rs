@@ -891,17 +891,39 @@ async fn load_position(
     }))
 }
 
-/// `vest_bal` after an `EpochRolled`: a flush pays the whole unreleased vest out — at every full
-/// wipe and, since AIR-07, at a rebase after a settlement that left at most 1/1,000 of the token
-/// claims (`vest_flushed > 0`; `pool::settle`'s `Settled::flushed`, which `sol_settle` reports as
-/// `vest_flushed`). A flush without a roll emits no `EpochRolled`; the next `PriceCranked`
-/// snapshot then corrects `vest_bal`.
-fn vest_after_roll(vest_bal: Option<u64>, full_wipe: bool, vest_flushed: u64) -> Option<u64> {
-    if full_wipe || vest_flushed > 0 {
-        Some(0)
-    } else {
-        vest_bal
+/// `vest_bal` after event `kind` with fields `d` (INDEXER.md §6.2, [E\*]): the last
+/// `PriceCranked` snapshot, and 0 after every flush, which pays the whole unreleased vest to the
+/// shares at once:
+/// - `SolSettle.vest_flushed > 0`: a settlement that left at most 1/1,000 of the token claims it
+///   found, a full wipe included (AIR-07; `pool::settle`'s `Settled::flushed`), with or without an
+///   epoch roll;
+/// - a lender event with `s_after = 0`: the last shares left, and their lender was paid the vest
+///   first (R3B-2); the program holds no vest while `S = 0`;
+/// - `EpochRolled` (after its settlement's `SolSettle`): a full wipe holds no vest (the record's
+///   donation tops up the wipe record); a rebase that flushed (`vest_flushed > 0`) holds only the
+///   record's donation, vested anew (`record_donation`, §6.4); a rebase without a flush keeps
+///   the snapshot.
+fn vest_after(vest_bal: Option<u64>, kind: &str, d: &Value, record_donation: u64) -> Option<u64> {
+    match kind {
+        "PriceCranked" => Some(u64_field(d, "vest_bal")),
+        "SolSettle" if u64_field(d, "vest_flushed") > 0 => Some(0),
+        "Deposit" | "Withdraw" | "ClaimSol" | "DeficitCovered" | "LenderSynced"
+            if u128_field(d, "s_after") == 0 =>
+        {
+            Some(0)
+        }
+        "EpochRolled" if u8_field(d, "num") == 0 => Some(0),
+        "EpochRolled" if u64_field(d, "vest_flushed") > 0 => Some(record_donation),
+        _ => vest_bal,
     }
+}
+
+/// The `ShareEpoch` record donation a rolling `sol_settle` swept into `lender_sol` (§6.4;
+/// `events.derived` of its `EpochRolled`), 0 elsewhere.
+fn record_donation(ev: &EventIn) -> u64 {
+    ev.derived
+        .as_ref()
+        .map_or(0, |x| u64_field(x, "record_donation"))
 }
 
 /// The inverse of an open at an exit (`engine::waterfall::remove_position`).
@@ -1150,12 +1172,7 @@ async fn apply_to_market(
             m.total_shares = formulas::convert_shares(m.total_shares, num, den);
             m.share_epoch = epoch.saturating_add(1);
             m.wipe_live = full_wipe;
-            m.vest_bal = vest_after_roll(m.vest_bal, full_wipe, u64_field(d, "vest_flushed"));
-            let donation = ev
-                .derived
-                .as_ref()
-                .map_or(0, |x| u64_field(x, "record_donation"));
-            m.lender_sol = m.lender_sol.saturating_add(donation);
+            m.lender_sol = m.lender_sol.saturating_add(record_donation(ev));
             m.lender_count = count_lenders(conn, market, m.share_epoch).await?;
         }
         "ProtocolFeesSwept" => {
@@ -1243,7 +1260,6 @@ async fn apply_to_market(
             m.lb_lo = Some(u128_field(d, "lb_lo"));
             m.lb_hi = Some(u128_field(d, "lb_hi"));
             m.util_bps = Some(u32_field(d, "util_bps"));
-            m.vest_bal = Some(u64_field(d, "vest_bal"));
             m.rent_basis = [Some(basis[0]), Some(basis[1]), Some(basis[2])];
             m.tier = u8_field(d, "tier");
             m.price_slot = Some(ev.key.slot);
@@ -1323,6 +1339,8 @@ async fn apply_to_market(
             tracing::debug!(kind = other, market = %market, "no market projection");
         }
     }
+    // `vest_bal` ([E*]): the crank's snapshot, 0 after a reported flush (AIR-07).
+    m.vest_bal = vest_after(m.vest_bal, kind, d, record_donation(ev));
     Ok(())
 }
 
@@ -2565,22 +2583,160 @@ mod tests {
         assert_eq!(s.params["rent_protocol_bps"], 1);
     }
 
-    /// AIR-07: a rebase that flushed the vest (`vest_flushed > 0`) leaves `vest_bal` at 0, as a
-    /// full wipe does; a rebase without a flush leaves it as it was.
+    /// An event's §4.2 JSON as the decoder renders it from the program's own type.
+    fn decoded<T: anchor_lang::AnchorSerialize + anchor_lang::Discriminator>(ev: &T) -> Value {
+        let mut payload = T::DISCRIMINATOR.to_vec();
+        payload.extend(crate::ingest::decode::borsh_bytes(ev));
+        crate::ingest::decode::shortwin_events::decode_shortwin_event(&payload)
+            .expect("decodes")
+            .data
+    }
+
+    fn sol_settle(vest_flushed: u64) -> Value {
+        decoded(&shortwin::events::SolSettle {
+            market: Pubkey::new_from_array([1; 32]),
+            slot: 1,
+            ts: 2,
+            position: Pubkey::new_from_array([2; 32]),
+            keeper: Pubkey::new_from_array([3; 32]),
+            condition: 1,
+            b_live: 0,
+            b_rs: 0,
+            b_ema: 0,
+            p_lo: 0,
+            p_hi: 0,
+            l_lo: 0,
+            l_hi: 0,
+            x_lo: 0,
+            x_hi: 0,
+            pprime_lo: 0,
+            pprime_hi: 0,
+            fv: 0,
+            k_s: 5,
+            lender_amount: 900,
+            lump: 100,
+            borrower_amount: 0,
+            ema_age_s: 0,
+            vest_flushed,
+        })
+    }
+
+    fn rolled(num: u8, vest_flushed: u64) -> Value {
+        decoded(&shortwin::events::EpochRolled {
+            market: Pubkey::new_from_array([1; 32]),
+            slot: 1,
+            ts: 2,
+            epoch: 0,
+            acc_end: 0,
+            num,
+            den: if num == 0 { 1 } else { 1_000 },
+            vest_flushed,
+        })
+    }
+
+    /// AIR-07, the flush without a roll: a settlement that flushed the vest
+    /// (`SolSettle.vest_flushed > 0`) leaves `vest_bal` at 0 whether or not an `EpochRolled`
+    /// follows (before the field, nothing reported the flush without a roll and `vest_bal` kept
+    /// the last crank's value until the next `PriceCranked`); a settlement that did not flush
+    /// keeps the snapshot.
+    #[test]
+    fn a_flush_without_a_roll_zeroes_the_vest() {
+        let crank = decoded(&shortwin::events::PriceCranked {
+            market: Pubkey::new_from_array([1; 32]),
+            slot: 1,
+            ts: 2,
+            spot_wad: 1,
+            ema_price: 1,
+            ema_liq: 1,
+            liq_slow: 1,
+            ema_count: 1,
+            lb_lo: 1,
+            lb_hi: 1,
+            tier: 3,
+            util_bps: 9_000,
+            rent_basis: [0; 3],
+            vest_bal: 5_000_000,
+        });
+        let snap = vest_after(None, "PriceCranked", &crank, 0);
+        assert_eq!(snap, Some(5_000_000), "the crank's snapshot");
+        assert_eq!(
+            vest_after(snap, "SolSettle", &sol_settle(5_000_100), 0),
+            Some(0),
+            "a settlement that flushed, no roll"
+        );
+        assert_eq!(
+            vest_after(None, "SolSettle", &sol_settle(1), 0),
+            Some(0),
+            "a flush is exact even with no snapshot yet"
+        );
+        assert_eq!(
+            vest_after(snap, "SolSettle", &sol_settle(0), 0),
+            snap,
+            "no flush: the snapshot stands"
+        );
+        for kind in ["Close", "Liquidate", "Expire", "SettleArmed", "TraderSwept"] {
+            assert_eq!(vest_after(snap, kind, &Value::Null, 0), snap, "{kind}");
+        }
+    }
+
+    /// AIR-07: a roll after a flushing settlement (`vest_flushed > 0`) holds no vest but what the
+    /// record's donation vested anew on a rebase; a full wipe holds none (the donation tops up
+    /// the wipe record); a rebase without a flush keeps the snapshot.
     #[test]
     fn a_flushing_roll_zeroes_the_vest() {
-        assert_eq!(vest_after_roll(Some(7), true, 0), Some(0), "a full wipe");
         assert_eq!(
-            vest_after_roll(Some(7), false, 7),
+            vest_after(Some(7), "EpochRolled", &rolled(0, 7), 0),
+            Some(0)
+        );
+        assert_eq!(
+            vest_after(Some(7), "EpochRolled", &rolled(0, 0), 7_000_000),
+            Some(0),
+            "a full wipe; its donation tops up the wipe record"
+        );
+        assert_eq!(
+            vest_after(Some(0), "EpochRolled", &rolled(1, 7), 0),
             Some(0),
             "a rebase that flushed"
         );
         assert_eq!(
-            vest_after_roll(Some(7), false, 0),
+            vest_after(Some(0), "EpochRolled", &rolled(1, 7), 7_000_000),
+            Some(7_000_000),
+            "a rebase that flushed vests the record's donation anew"
+        );
+        assert_eq!(
+            vest_after(Some(7), "EpochRolled", &rolled(1, 0), 7_000_000),
             Some(7),
             "a rebase without a flush"
         );
-        assert_eq!(vest_after_roll(None, false, 0), None);
+        assert_eq!(vest_after(None, "EpochRolled", &rolled(1, 0), 0), None);
+    }
+
+    /// R3B-2: the last shares leaving are paid the unreleased vest first, and the program holds
+    /// no vest while `S = 0`: a lender event with `s_after = 0` leaves `vest_bal` at 0.
+    #[test]
+    fn the_last_shares_leaving_zero_the_vest() {
+        let ev = |s_after: u128| {
+            decoded(&shortwin::events::Withdraw {
+                market: Pubkey::new_from_array([1; 32]),
+                slot: 1,
+                ts: 2,
+                owner: Pubkey::new_from_array([4; 32]),
+                amount: 10,
+                shares: 10_000,
+                t_after: 0,
+                s_after,
+                sol_paid: 3,
+                pot_draw: 0,
+                lock: 0,
+                lock_until: 0,
+                epoch: 0,
+            })
+        };
+        assert_eq!(vest_after(Some(9), "Withdraw", &ev(0), 0), Some(0));
+        assert_eq!(vest_after(Some(9), "Withdraw", &ev(1), 0), Some(9));
+        for kind in ["Deposit", "ClaimSol", "DeficitCovered", "LenderSynced"] {
+            assert_eq!(vest_after(Some(9), kind, &ev(0), 0), Some(0), "{kind}");
+        }
     }
 
     #[test]

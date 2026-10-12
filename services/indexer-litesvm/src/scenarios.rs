@@ -16,7 +16,7 @@
 //!
 //! | Session | Build, venue | Covers |
 //! |---|---|---|
-//! | [`mock_lifecycle`] | test-venue, mock | lenders, close, `add_margin`, CR liquidation, S1, S2, S3, expiry, `CoverageGap`, fee sweep, `claim_sol` / `withdraw` / `cover_deficit` / `sync_lender`, a full wipe with the record donation and `sweep_trader`, a rebase, pauses, route-broken flags, the latch, `disable_venue`, `flag_unsafe_mint` |
+//! | [`mock_lifecycle`] | test-venue, mock | lenders, close, `add_margin`, CR liquidation, S1, S2, S3, expiry, `CoverageGap`, fee sweep, `claim_sol` / `withdraw` / `cover_deficit` / `sync_lender`, a full wipe with the record donation and `sweep_trader`, a flushing rebase with the record donation, a vest flush without a roll, the last shares leaving a running vest, pauses, route-broken flags, the latch, `disable_venue`, `flag_unsafe_mint` |
 //! | [`mock_admin`] | test-venue, mock | every `ConfigChange` kind through the timelock, a cancel, locked terms across a `Params` change, `disable_venue` followed by an unrelated change (the bit stays cleared) then `EnableVenues`, the coverage key's pause / clear and the Emergency's clear, `set_venue_extras`, `SettleArmed` → `SettleDisarmed` |
 //! | [`keeper_liquidation`] | test-venue, mock | the keeper's v1 batches, per-second cranks, its liquidation |
 //! | [`keeper_coverage_pause`] | test-venue, mock | O17's drill: an outage, the keeper's pause, a liquidation under it, the automatic unpause |
@@ -320,6 +320,10 @@ pub fn settle_until(
     .unwrap_or_else(|| panic!("position {bk}/{nonce} never settled"))
 }
 
+/// The lamports `mock_lifecycle` sends to M5's rebase record address before the rebase (M4's
+/// full wipe gets 7,000,000).
+pub const M5_DONATION: u64 = 2_000_000;
+
 /// The `mock_lifecycle` session (INDEXER.md §11.3): one scripted run on the test-venue build
 /// and the mock venue through real instructions only.
 ///
@@ -329,7 +333,9 @@ pub fn settle_until(
 /// | M2 | S2: a 98.5 % LP drain, a ×1.8 pump, the capped settlement |
 /// | M3 | S3: the Emergency's route-broken flag, the 30 s chain, an expired position settled at the timer |
 /// | M4 | a full wipe (`EpochRolled` num 0) with a pre-funded record address (the donation of §6.4), `sweep_trader` into the wipe record, a deposit after it, the wiped lender's `sync_lender`, then its `claim_sol`, which closes the position (KI-67) |
-/// | M5 | a rebase (`EpochRolled` num 1) and the lender's `sync_lender` across it |
+/// | M5 | a rebase (`EpochRolled` num 1) that flushes the vest, with a pre-funded record address whose donation vests anew ([`M5_DONATION`]), and the lender's `sync_lender` across it |
+/// | M6 | a vest flush without an epoch roll (AIR-07): a trader sweep vests, then an S1 leaves ⌊Q/999⌋ free tokens, at most 1/1,000 of the claims, and no rebase; `SolSettle.vest_flushed` reports it |
+/// | M7 | the last shares leave a running vest (R3B-2): a trader sweep vests, then the only lender withdraws every share and is paid the vest; `Withdraw.s_after = 0` reports it |
 #[allow(clippy::too_many_lines)]
 pub fn mock_lifecycle() -> Session {
     let mut env = test_venue_env(CheckpointPolicy::AfterEvents);
@@ -547,19 +553,27 @@ pub fn mock_lifecycle() -> Session {
     );
     let _ = late;
 
-    // ---- M5: a rebase ------------------------------------------------------------------------
+    // ---- M5: a rebase, its record pre-funded ---------------------------------------------------
     let m5 = env.mock_market(MarketSpec::default());
     let w5 = whale(&mut env, &m5);
     env.tick(&m5, 5);
     let (e5, n5) = open(&mut env, &m5, Q);
     env.tick(&m5, 5);
     withdraw_down_to(&mut env, &m5, 1_000_000_000);
+    // The settlement leaves 10⁹ of the token claims (at most 1/1,000): it flushes the vest, then
+    // vests the record's donation anew for the rebased shares (settle_it
+    // `a_flushing_rebase_vests_a_prefunded_record_anew`).
+    let epoch5 = env.market(&m5.market()).share_epoch;
+    env.fund(&pda::share_epoch(&m5.market(), epoch5).0, M5_DONATION);
     move_by(&mut env, &m5, &w5, 4.0);
     let rb = settle_until(&mut env, &m5, &keeper, &e5, n5, 120);
     assert_eq!(rb.condition, 1);
-    assert!(
-        env.market(&m5.market()).share_epoch > 0,
-        "a rebase rolled the epoch"
+    assert!(rb.vest_flushed > 0, "a flushing rebase");
+    let m = env.market(&m5.market());
+    assert_eq!(
+        (m.share_epoch, m.vest_bal),
+        (epoch5 + 1, M5_DONATION),
+        "a rebase rolled the epoch; its donation vests anew"
     );
     // Through the rebase record: signed by the lender (KI65-REV-SEC1).
     let owner5 = m5.lender_keys().owner;
@@ -571,6 +585,56 @@ pub fn mock_lifecycle() -> Session {
     );
     let kp5 = m5.lender.insecure_clone();
     ok(env.send(&[sync5], &[&kp5]));
+
+    // ---- M6: a vest flush without a roll (AIR-07, `SolSettle.vest_flushed`) --------------------
+    let m6 = env.mock_market(MarketSpec::default());
+    let w6 = whale(&mut env, &m6);
+    env.tick(&m6, 5);
+    let (e6, n6) = open(&mut env, &m6, Q);
+    env.tick(&m6, 5);
+    // ⌊Q/999⌋ free tokens: the settlement leaves at most 1/1,000 of the token claims (a flush),
+    // and the shares stay within `R_MAX` of them (no rebase; settle_it
+    // `a_flush_without_a_roll_is_reported_in_sol_settle`). A trader sweep's lamports vest first,
+    // so a crank reports a running vest before the flush.
+    withdraw_down_to(&mut env, &m6, Q / 999);
+    env.fund(&m6.keys.trader, 3_000_000);
+    ok(env.send(&[sweep_trader_ix_for(&env, &m6.market())], &[]));
+    env.tick(&m6, 2);
+    assert!(env.market(&m6.market()).vest_bal > 0, "a running vest");
+    move_by(&mut env, &m6, &w6, 4.0);
+    let fl = settle_until(&mut env, &m6, &keeper, &e6, n6, 120);
+    assert_eq!(fl.condition, 1);
+    assert!(fl.vest_flushed > 0, "the flush is reported");
+    let m = env.market(&m6.market());
+    assert_eq!(
+        (m.share_epoch, m.vest_bal),
+        (0, 0),
+        "flushed without an epoch roll"
+    );
+
+    // ---- M7: the last shares leave a running vest (R3B-2; `s_after = 0`) -----------------------
+    let m7 = env.mock_market(MarketSpec::default());
+    env.tick(&m7, 5);
+    env.fund(&m7.keys.trader, 3_000_000);
+    ok(env.send(&[sweep_trader_ix_for(&env, &m7.market())], &[]));
+    env.tick(&m7, 2);
+    assert!(env.market(&m7.market()).vest_bal > 0, "a running vest");
+    let owner7 = m7.lender_keys().owner;
+    let shares7 = env.lender(&m7.market(), &owner7).expect("lender").shares;
+    let w = with_records(
+        &env,
+        &m7.market(),
+        &owner7,
+        ix::withdraw(&m7.lender_keys(), shares7, 0),
+    );
+    let kp7 = m7.lender.insecure_clone();
+    ok(env.send(&[w], &[&kp7]));
+    let m = env.market(&m7.market());
+    assert_eq!(
+        (m.total_shares.get(), m.vest_bal),
+        (0, 0),
+        "the last shares were paid the vest"
+    );
 
     // ---- M1: the mint turns unsafe (a freeze authority appears) --------------------------------
     let mint = m1.mint();
