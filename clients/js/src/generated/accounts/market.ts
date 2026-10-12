@@ -239,6 +239,28 @@ export type Market = {
    * before any open can land. 0 on existing accounts (no delay).
    */
   coverageClearedAt: bigint;
+  /**
+   * AIR-03 (was `_reserved[0..16]`): the remainder of the last accrual's lender rent credit,
+   * `(Σ_j A_j·δJ_j + rem) mod (10⁴·10⁴·31,536,000·WAD)` (`shortwin_math::rent::
+   * lender_credit_carried`, `engine::prologue::accrue`), carried into the next accrual so the
+   * credits sum to the floor of their exact total instead of flooring each accrual alone (a
+   * market cranked every second lost up to a lamport a second, which the exits' true-ups
+   * left in `lender_sol`). Always below that denominator; 0 on existing accounts.
+   */
+  lenderCreditRem: PodU128;
+  /**
+   * AIR-19 (was `_reserved[16..18]`): low-water mark of the `venue_fee_hard_cap_bps` the
+   * positions opened since `open_positions` last returned to 0 locked — set by the first open
+   * after the market emptied, lowered by every later one (`engine::waterfall::add_position`),
+   * reset to 0 by the exit that takes `open_positions` to 0 (`remove_position`), so it is at
+   * most every open position's locked cap (conservative by design: a position that has
+   * closed may have set it). The market's S3 chain counts a live fee above
+   * `min(global cap, this mark)` as no route (`engine::route::s3_no_route`), so a position
+   * whose locked cap is below a raised global cap reaches S3 when the fee passes its own cap.
+   * 0 (unset) on existing accounts: the global cap alone, as before.
+   */
+  minOpenHardCapBps: number;
+  pad6: ReadonlyUint8Array;
   reserved: ReadonlyUint8Array;
 };
 
@@ -411,6 +433,28 @@ export type MarketArgs = {
    * before any open can land. 0 on existing accounts (no delay).
    */
   coverageClearedAt: number | bigint;
+  /**
+   * AIR-03 (was `_reserved[0..16]`): the remainder of the last accrual's lender rent credit,
+   * `(Σ_j A_j·δJ_j + rem) mod (10⁴·10⁴·31,536,000·WAD)` (`shortwin_math::rent::
+   * lender_credit_carried`, `engine::prologue::accrue`), carried into the next accrual so the
+   * credits sum to the floor of their exact total instead of flooring each accrual alone (a
+   * market cranked every second lost up to a lamport a second, which the exits' true-ups
+   * left in `lender_sol`). Always below that denominator; 0 on existing accounts.
+   */
+  lenderCreditRem: PodU128Args;
+  /**
+   * AIR-19 (was `_reserved[16..18]`): low-water mark of the `venue_fee_hard_cap_bps` the
+   * positions opened since `open_positions` last returned to 0 locked — set by the first open
+   * after the market emptied, lowered by every later one (`engine::waterfall::add_position`),
+   * reset to 0 by the exit that takes `open_positions` to 0 (`remove_position`), so it is at
+   * most every open position's locked cap (conservative by design: a position that has
+   * closed may have set it). The market's S3 chain counts a live fee above
+   * `min(global cap, this mark)` as no route (`engine::route::s3_no_route`), so a position
+   * whose locked cap is below a raised global cap reaches S3 when the fee passes its own cap.
+   * 0 (unset) on existing accounts: the global cap alone, as before.
+   */
+  minOpenHardCapBps: number;
+  pad6: ReadonlyUint8Array;
   reserved: ReadonlyUint8Array;
 };
 
@@ -520,7 +564,10 @@ export function getMarketEncoder(): FixedSizeEncoder<MarketArgs> {
       ["traderWsolAta", getAddressEncoder()],
       ["pumpPoolAuthority", getAddressEncoder()],
       ["coverageClearedAt", getI64Encoder()],
-      ["reserved", fixEncoderSize(getBytesEncoder(), 168)],
+      ["lenderCreditRem", getPodU128Encoder()],
+      ["minOpenHardCapBps", getU16Encoder()],
+      ["pad6", fixEncoderSize(getBytesEncoder(), 6)],
+      ["reserved", fixEncoderSize(getBytesEncoder(), 144)],
     ]),
     (value) => ({ ...value, discriminator: MARKET_DISCRIMINATOR }),
   );
@@ -631,7 +678,10 @@ export function getMarketDecoder(): FixedSizeDecoder<Market> {
     ["traderWsolAta", getAddressDecoder()],
     ["pumpPoolAuthority", getAddressDecoder()],
     ["coverageClearedAt", getI64Decoder()],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 168)],
+    ["lenderCreditRem", getPodU128Decoder()],
+    ["minOpenHardCapBps", getU16Decoder()],
+    ["pad6", fixDecoderSize(getBytesDecoder(), 6)],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 144)],
   ]);
 }
 

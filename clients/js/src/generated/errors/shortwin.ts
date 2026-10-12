@@ -230,6 +230,8 @@ export const SHORTWIN_ERROR__AUTHORITIES_NOT_DISTINCT = 0x17d9; // 6105
 export const SHORTWIN_ERROR__EPOCH_RECORD_READ_ONLY = 0x17da; // 6106
 /** RebaseNeedsOwner: Only the position's owner may convert it through a rebase record: sync_lender must be signed by the owner */
 export const SHORTWIN_ERROR__REBASE_NEEDS_OWNER = 0x17db; // 6107
+/** PoolDrained: The pool is drained (at most 1/1,000 of its tokens unborrowed): deposits wait until repayments or settlements free more */
+export const SHORTWIN_ERROR__POOL_DRAINED = 0x17dc; // 6108
 
 export type ShortwinError =
   | typeof SHORTWIN_ERROR__ABOVE_PRO_RATA_ALLOWANCE
@@ -299,6 +301,7 @@ export type ShortwinError =
   | typeof SHORTWIN_ERROR__ORACLE_STEP
   | typeof SHORTWIN_ERROR__ORACLE_VERIFICATION
   | typeof SHORTWIN_ERROR__PENDING_CHANGE_EXPIRED
+  | typeof SHORTWIN_ERROR__POOL_DRAINED
   | typeof SHORTWIN_ERROR__POOL_INELIGIBLE
   | typeof SHORTWIN_ERROR__POOL_LIST_WINDOW
   | typeof SHORTWIN_ERROR__POOL_LOCK_TOO_LOW
@@ -411,6 +414,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [SHORTWIN_ERROR__ORACLE_STEP]: `Oracle price step too large`,
     [SHORTWIN_ERROR__ORACLE_VERIFICATION]: `Oracle update is not fully verified`,
     [SHORTWIN_ERROR__PENDING_CHANGE_EXPIRED]: `The pending config change expired; propose it again`,
+    [SHORTWIN_ERROR__POOL_DRAINED]: `The pool is drained (at most 1/1,000 of its tokens unborrowed): deposits wait until repayments or settlements free more`,
     [SHORTWIN_ERROR__POOL_INELIGIBLE]: `Pool is not eligible`,
     [SHORTWIN_ERROR__POOL_LIST_WINDOW]: `Opens wait for the pool listing window`,
     [SHORTWIN_ERROR__POOL_LOCK_TOO_LOW]: `Locked LP share is too low`,

@@ -95,11 +95,13 @@ export type RevalidateVenueInstructionData = {
   discriminator: ReadonlyUint8Array;
   venue: number;
   expectedSlot: bigint;
+  expectedElfHash: ReadonlyUint8Array;
 };
 
 export type RevalidateVenueInstructionDataArgs = {
   venue: number;
   expectedSlot: number | bigint;
+  expectedElfHash: ReadonlyUint8Array;
 };
 
 export function getRevalidateVenueInstructionDataEncoder(): FixedSizeEncoder<RevalidateVenueInstructionDataArgs> {
@@ -108,6 +110,7 @@ export function getRevalidateVenueInstructionDataEncoder(): FixedSizeEncoder<Rev
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
       ["venue", getU8Encoder()],
       ["expectedSlot", getU64Encoder()],
+      ["expectedElfHash", fixEncoderSize(getBytesEncoder(), 32)],
     ]),
     (value) => ({ ...value, discriminator: REVALIDATE_VENUE_DISCRIMINATOR }),
   );
@@ -118,6 +121,7 @@ export function getRevalidateVenueInstructionDataDecoder(): FixedSizeDecoder<Rev
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
     ["venue", getU8Decoder()],
     ["expectedSlot", getU64Decoder()],
+    ["expectedElfHash", fixDecoderSize(getBytesDecoder(), 32)],
   ]);
 }
 
@@ -144,12 +148,13 @@ export type RevalidateVenueAsyncInput<
   pauseAuthority: TAccountPauseAuthority;
   config?: TAccountConfig;
   venueGuard?: TAccountVenueGuard;
-  /** upgradeable loader; only its header is read. */
+  /** upgradeable loader; its header is read, and its ELF when the slot moved (AIR-01). */
   programData: TAccountProgramData;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
   venue: RevalidateVenueInstructionDataArgs["venue"];
   expectedSlot: RevalidateVenueInstructionDataArgs["expectedSlot"];
+  expectedElfHash: RevalidateVenueInstructionDataArgs["expectedElfHash"];
 };
 
 export async function getRevalidateVenueInstructionAsync<
@@ -305,12 +310,13 @@ export type RevalidateVenueInput<
   pauseAuthority: TAccountPauseAuthority;
   config: TAccountConfig;
   venueGuard: TAccountVenueGuard;
-  /** upgradeable loader; only its header is read. */
+  /** upgradeable loader; its header is read, and its ELF when the slot moved (AIR-01). */
   programData: TAccountProgramData;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
   venue: RevalidateVenueInstructionDataArgs["venue"];
   expectedSlot: RevalidateVenueInstructionDataArgs["expectedSlot"];
+  expectedElfHash: RevalidateVenueInstructionDataArgs["expectedElfHash"];
 };
 
 export function getRevalidateVenueInstruction<
@@ -452,7 +458,7 @@ export type ParsedRevalidateVenueInstruction<
     pauseAuthority: TAccountMetas[0];
     config: TAccountMetas[1];
     venueGuard: TAccountMetas[2];
-    /** upgradeable loader; only its header is read. */
+    /** upgradeable loader; its header is read, and its ELF when the slot moved (AIR-01). */
     programData: TAccountMetas[3];
     eventAuthority: TAccountMetas[4];
     program: TAccountMetas[5];

@@ -119,7 +119,10 @@ export type FlagVenueUpgradedAsyncInput<
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
   venueGuard?: TAccountVenueGuard;
-  /** upgradeable loader; only its 12-byte header is read (`shortwin_venue_state`). */
+  /**
+   * upgradeable loader; its header is read (`shortwin_venue_state`), and its ELF when the
+   * account grew since a fingerprinted revalidation (AIR-01).
+   */
   programData: TAccountProgramData;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
@@ -243,7 +246,10 @@ export type FlagVenueUpgradedInput<
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
   venueGuard: TAccountVenueGuard;
-  /** upgradeable loader; only its 12-byte header is read (`shortwin_venue_state`). */
+  /**
+   * upgradeable loader; its header is read (`shortwin_venue_state`), and its ELF when the
+   * account grew since a fingerprinted revalidation (AIR-01).
+   */
   programData: TAccountProgramData;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
@@ -359,7 +365,10 @@ export type ParsedFlagVenueUpgradedInstruction<
   programAddress: Address<TProgram>;
   accounts: {
     venueGuard: TAccountMetas[0];
-    /** upgradeable loader; only its 12-byte header is read (`shortwin_venue_state`). */
+    /**
+     * upgradeable loader; its header is read (`shortwin_venue_state`), and its ELF when the
+     * account grew since a fingerprinted revalidation (AIR-01).
+     */
     programData: TAccountMetas[1];
     eventAuthority: TAccountMetas[2];
     program: TAccountMetas[3];

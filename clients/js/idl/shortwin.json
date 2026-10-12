@@ -1698,7 +1698,8 @@
         {
           "name": "program_data",
           "docs": [
-            "upgradeable loader; only its 12-byte header is read (`shortwin_venue_state`)."
+            "upgradeable loader; its header is read (`shortwin_venue_state`), and its ELF when the",
+            "account grew since a fingerprinted revalidation (AIR-01)."
           ]
         },
         {
@@ -2735,7 +2736,8 @@
     {
       "name": "revalidate_venue",
       "docs": [
-        "The Emergency vault re-validates an upgraded venue program at `expected_slot`."
+        "The Emergency vault re-validates an upgraded venue program at `expected_slot`, naming",
+        "the sha256 of the trimmed ELF it reviewed (AIR-01; all zero: the slot alone)."
       ],
       "discriminator": [
         172,
@@ -2797,7 +2799,7 @@
         {
           "name": "program_data",
           "docs": [
-            "upgradeable loader; only its header is read."
+            "upgradeable loader; its header is read, and its ELF when the slot moved (AIR-01)."
           ]
         },
         {
@@ -2815,6 +2817,15 @@
         {
           "name": "expected_slot",
           "type": "u64"
+        },
+        {
+          "name": "expected_elf_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
         }
       ]
     },
@@ -4937,6 +4948,11 @@
       "code": 6107,
       "name": "RebaseNeedsOwner",
       "msg": "Only the position's owner may convert it through a rebase record: sync_lender must be signed by the owner"
+    },
+    {
+      "code": 6108,
+      "name": "PoolDrained",
+      "msg": "The pool is drained (at most 1/1,000 of its tokens unborrowed): deposits wait until repayments or settlements free more"
     }
   ],
   "types": [
@@ -7356,11 +7372,51 @@
             "type": "i64"
           },
           {
+            "name": "lender_credit_rem",
+            "docs": [
+              "AIR-03 (was `_reserved[0..16]`): the remainder of the last accrual's lender rent credit,",
+              "`(Σ_j A_j·δJ_j + rem) mod (10⁴·10⁴·31,536,000·WAD)` (`shortwin_math::rent::",
+              "lender_credit_carried`, `engine::prologue::accrue`), carried into the next accrual so the",
+              "credits sum to the floor of their exact total instead of flooring each accrual alone (a",
+              "market cranked every second lost up to a lamport a second, which the exits' true-ups",
+              "left in `lender_sol`). Always below that denominator; 0 on existing accounts."
+            ],
+            "type": {
+              "defined": {
+                "name": "PodU128"
+              }
+            }
+          },
+          {
+            "name": "min_open_hard_cap_bps",
+            "docs": [
+              "AIR-19 (was `_reserved[16..18]`): low-water mark of the `venue_fee_hard_cap_bps` the",
+              "positions opened since `open_positions` last returned to 0 locked — set by the first open",
+              "after the market emptied, lowered by every later one (`engine::waterfall::add_position`),",
+              "reset to 0 by the exit that takes `open_positions` to 0 (`remove_position`), so it is at",
+              "most every open position's locked cap (conservative by design: a position that has",
+              "closed may have set it). The market's S3 chain counts a live fee above",
+              "`min(global cap, this mark)` as no route (`engine::route::s3_no_route`), so a position",
+              "whose locked cap is below a raised global cap reaches S3 when the fee passes its own cap.",
+              "0 (unset) on existing accounts: the global cap alone, as before."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "_pad6",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
+          },
+          {
             "name": "_reserved",
             "type": {
               "array": [
                 "u8",
-                168
+                144
               ]
             }
           }
@@ -9449,11 +9505,33 @@
             }
           },
           {
-            "name": "_reserved",
+            "name": "guard_len",
+            "docs": [
+              "AIR-01: the ProgramData data length at the last revalidation with a hash, per venue from",
+              "[`GUARD_ELF_FIRST`]; 0 = no fingerprint."
+            ],
             "type": {
               "array": [
-                "u8",
-                64
+                "u32",
+                4
+              ]
+            }
+          },
+          {
+            "name": "guard_elf",
+            "docs": [
+              "AIR-01: the first [`GUARD_ELF_LEN`] bytes of the sha256 of the reviewed trimmed ELF, per",
+              "venue from [`GUARD_ELF_FIRST`] (meaningful while `guard_len` is not 0)."
+            ],
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    12
+                  ]
+                },
+                4
               ]
             }
           }

@@ -71,6 +71,13 @@ export type SolSettleEvent = {
   borrowerAmount: bigint;
   /** `now − ema_ts` (V2-5). */
   emaAgeS: bigint;
+  /**
+   * The unreleased vest the settlement paid to the shares at once, its own lump and rent
+   * top-up included: it left at most 1/1,000 of the token claims it found, a full wipe
+   * included (AIR-07). Reported with or without an epoch roll (`EpochRolled.vest_flushed`
+   * repeats it); 0 when nothing was flushed.
+   */
+  vestFlushed: bigint;
 };
 
 export type SolSettleEventArgs = {
@@ -99,6 +106,13 @@ export type SolSettleEventArgs = {
   borrowerAmount: number | bigint;
   /** `now − ema_ts` (V2-5). */
   emaAgeS: number | bigint;
+  /**
+   * The unreleased vest the settlement paid to the shares at once, its own lump and rent
+   * top-up included: it left at most 1/1,000 of the token claims it found, a full wipe
+   * included (AIR-07). Reported with or without an epoch roll (`EpochRolled.vest_flushed`
+   * repeats it); 0 when nothing was flushed.
+   */
+  vestFlushed: number | bigint;
 };
 
 /** Gets the encoder for {@link SolSettleEventArgs} event data. */
@@ -128,6 +142,7 @@ export function getSolSettleEventEncoder(): FixedSizeEncoder<SolSettleEventArgs>
       ["lump", getU64Encoder()],
       ["borrowerAmount", getU64Encoder()],
       ["emaAgeS", getI64Encoder()],
+      ["vestFlushed", getU64Encoder()],
     ]),
     [getConstantEncoder(SOL_SETTLE_EVENT_DISCRIMINATOR)],
   );
@@ -160,6 +175,7 @@ export function getSolSettleEventDecoder(): FixedSizeDecoder<SolSettleEvent> {
       ["lump", getU64Decoder()],
       ["borrowerAmount", getU64Decoder()],
       ["emaAgeS", getI64Decoder()],
+      ["vestFlushed", getU64Decoder()],
     ]),
     [getConstantDecoder(SOL_SETTLE_EVENT_DISCRIMINATOR)],
   );

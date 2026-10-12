@@ -68,7 +68,16 @@ export type VenueGuard = {
   flaggedSlot: Array<bigint>;
   /** When `flagged_slot` was last recorded (unix seconds). */
   flaggedAt: Array<bigint>;
-  reserved: ReadonlyUint8Array;
+  /**
+   * AIR-01: the ProgramData data length at the last revalidation with a hash, per venue from
+   * [`GUARD_ELF_FIRST`]; 0 = no fingerprint.
+   */
+  guardLen: Array<number>;
+  /**
+   * AIR-01: the first [`GUARD_ELF_LEN`] bytes of the sha256 of the reviewed trimmed ELF, per
+   * venue from [`GUARD_ELF_FIRST`] (meaningful while `guard_len` is not 0).
+   */
+  guardElf: Array<ReadonlyUint8Array>;
 };
 
 export type VenueGuardArgs = {
@@ -85,7 +94,16 @@ export type VenueGuardArgs = {
   flaggedSlot: Array<number | bigint>;
   /** When `flagged_slot` was last recorded (unix seconds). */
   flaggedAt: Array<number | bigint>;
-  reserved: ReadonlyUint8Array;
+  /**
+   * AIR-01: the ProgramData data length at the last revalidation with a hash, per venue from
+   * [`GUARD_ELF_FIRST`]; 0 = no fingerprint.
+   */
+  guardLen: Array<number>;
+  /**
+   * AIR-01: the first [`GUARD_ELF_LEN`] bytes of the sha256 of the reviewed trimmed ELF, per
+   * venue from [`GUARD_ELF_FIRST`] (meaningful while `guard_len` is not 0).
+   */
+  guardElf: Array<ReadonlyUint8Array>;
 };
 
 /** Gets the encoder for {@link VenueGuardArgs} account data. */
@@ -100,7 +118,11 @@ export function getVenueGuardEncoder(): FixedSizeEncoder<VenueGuardArgs> {
       ["guardSlot", getArrayEncoder(getU64Encoder(), { size: 6 })],
       ["flaggedSlot", getArrayEncoder(getU64Encoder(), { size: 6 })],
       ["flaggedAt", getArrayEncoder(getI64Encoder(), { size: 6 })],
-      ["reserved", fixEncoderSize(getBytesEncoder(), 64)],
+      ["guardLen", getArrayEncoder(getU32Encoder(), { size: 4 })],
+      [
+        "guardElf",
+        getArrayEncoder(fixEncoderSize(getBytesEncoder(), 12), { size: 4 }),
+      ],
     ]),
     (value) => ({ ...value, discriminator: VENUE_GUARD_DISCRIMINATOR }),
   );
@@ -117,7 +139,11 @@ export function getVenueGuardDecoder(): FixedSizeDecoder<VenueGuard> {
     ["guardSlot", getArrayDecoder(getU64Decoder(), { size: 6 })],
     ["flaggedSlot", getArrayDecoder(getU64Decoder(), { size: 6 })],
     ["flaggedAt", getArrayDecoder(getI64Decoder(), { size: 6 })],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 64)],
+    ["guardLen", getArrayDecoder(getU32Decoder(), { size: 4 })],
+    [
+      "guardElf",
+      getArrayDecoder(fixDecoderSize(getBytesDecoder(), 12), { size: 4 }),
+    ],
   ]);
 }
 
