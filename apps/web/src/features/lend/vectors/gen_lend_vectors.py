@@ -9,14 +9,21 @@ pot-only syncs (KI-66 full) start and walk forward chains, and owners' own parti
 them (`FWD_OPEN`), from a second random stream (`POT_SEED`); plus the end states of
 `pool_model._diff_world`'s rebase-heavy pools (`fwd_differential`'s world B) that leave a forward
 chain open (the first `CHAIN_CASES` of them, then those with an owner stopped inside its chain up
-to `OPEN_CASES`, within `CHAIN_SEEDS` seeds) — and, at
+to `OPEN_CASES`, within `CHAIN_SEEDS` seeds), two scripted states of a pool every lender left by
+withdrawals (AIR-08: right after the last exit and after the sweep, `emptied_states`) and one of a
+sole lender whose whole stake the unborrowed tokens pay while a token is lent (M1-SEC-3,
+`last_share_state`) — and, at
 sampled points, writes the state **as the program stores it** (the `Market` lender-pool fields
 and flags, `MarketVault`, every `LenderPosition`, every `ShareEpoch` record) together with what
 the model answers for each preview the lend panel shows, computed on deep copies:
 
-  deposit AMOUNT     Pool.deposit                      -> shares minted (or the refusal)
+  deposit AMOUNT     Pool.deposit                      -> shares minted (or the refusal: since the AI
+                     review also `PoolDrained`, AIR-07, and `WipeSweepPending` after the last
+                     lender's exit, AIR-08)
   withdraw SHARES    Pool.withdraw                     -> tokens (or the refusal), and `sol`:
-                     Pool.claim_sol right after it (the SOL part `withdraw` pays)
+                     Pool.claim_sol right after it (the SOL part `withdraw` pays); a burn that
+                     leaves S = 0 while tokens are borrowed is the program's own refusal
+                     `LastSharesBorrowed` (M1-SEC-3), which pool_model does not model
   claim              Pool.claim_sol                    -> lamports
   allowance          Pool.allowance_view               -> tokens
   touch              Pool._touch                       -> pending, real, claimed, shares, lock, epoch
@@ -38,7 +45,8 @@ the model answers for each preview the lend panel shows, computed on deep copies
 Mapping of the model to the accounts (ARCH §2.3.4, §2.3.6; `crates/shortwin-math/src/pool.rs`):
 `sol_vault` -> `MarketVault.lender_sol`, `protocol` -> `protocol_fees`, `epoch` -> `share_epoch`,
 `wipe_live` -> `Market.flags` bit 5, `wipe_swept` -> bit 7 (the model has no venue-reward bit:
-`rewards_required = false`), `epochs[e] = [acc_end, num, den, acc_r_end, s_old, carry,
+`rewards_required = false`; since AIR-08 the last lender's exit clears it, as `withdraw` clears both
+bits when `S` reaches 0), `epochs[e] = [acc_end, num, den, acc_r_end, s_old, carry,
 carry_r, conv_rem]` -> `ShareEpoch` with `den_log1000 = log_1000(den)` (`conv_rem`: KI-65's
 conversion remainder, which a lender's conversion through a rebase record reads and writes), the lock calendar `{day: term}` ->
 `lock_cal[day mod 128]` with `cal_day` = the oldest bucket day (or today + 1 without buckets: the
@@ -65,7 +73,9 @@ sys.path.insert(0, str(ROOT / "docs" / "design" / "sim"))
 import pool_model as pm  # noqa: E402  (v0.4.2)
 
 SEED = 20261001
-POT_SEED = 20261008
+# 20261008 until the AI-review fixes moved the op stream (AIR-07's drained-pool gate, AIR-08's sweep after
+# the last exit): it fell to 5 pot-moving syncs, under previews.test.ts's coverage floor; 20261009 has 8
+POT_SEED = 20261009
 CHAIN_SEEDS = 3_000
 CHAIN_CASES = 12
 OPEN_CASES = 10
@@ -88,6 +98,7 @@ REFUSALS = [
     ("deposit too small", "ZeroAmount"),
     ("share overflow", "MathOverflow"),
     ("WipeSweepPending", "WipeSweepPending"),
+    ("PoolDrained", "PoolDrained"),        # AIR-07's residual (MathError::PoolDrained, 6108)
     ("negative SOL balance", "NegativePending"),
     ("not enough shares", "InsufficientShares"),
     ("insufficient unborrowed inventory", "InsufficientFreeInventory"),
@@ -117,6 +128,13 @@ def refusal(e: ValueError) -> str:
         if needle in msg:
             return "!" + name
     raise e
+
+
+def last_shares_kept(p: pm.Pool, shares: int) -> int:
+    """`shares`, less the one share a burn of all of S must keep while tokens are borrowed: the
+    program refuses that burn (`LastSharesBorrowed`, M1-SEC-3) and pool_model does not model the
+    rule, so the op mix never asks for it (gen_pool.py's helper of the same name)."""
+    return shares - 1 if shares == p.S and p.B > 0 else shares
 
 
 def den_log(den: int) -> int:
@@ -274,6 +292,9 @@ def expectations(p: pm.Pool, rng: random.Random) -> list:
             for sh in sorted(cands):
                 def wd(q, w=who, n=sh):
                     tokens = q.withdraw(w, n)
+                    if q.S == 0 and q.B > 0:
+                        # the program's own check after the burn, before the SOL part (M1-SEC-3)
+                        return "!LastSharesBorrowed"
                     sol = q.claim_sol(w)
                     return {"tokens": str(tokens), "sol": str(sol)}
                 out.append({"lender": who, "op": "withdraw", "shares": str(sh), "result": run(wd)})
@@ -292,7 +313,9 @@ def step(p: pm.Pool, rng: random.Random, users, pid):
                      "repay", "settle", "claim", "cover", "sweep", "wipe", "drain"])
     try:
         if op == "dep":
-            if p.wipe_live and not p.wipe_swept and rng.random() < 0.6:
+            # the depositor bundles the sweep a pool without shares waits for: after a full wipe
+            # (R4A-7) and, since AIR-08, after the last lender's exit
+            if p.S == 0 and not p.wipe_swept and rng.random() < 0.6:
                 p.sweep_sol(rng.choice([0, rng.randrange(1, 10**9)]))
             p.deposit(rng.choice(users), rng.choice([10**6, 10**9, 10**12, rng.randrange(1, 10**13)]))
         elif op in ("wd", "wdmax"):
@@ -304,7 +327,9 @@ def step(p: pm.Pool, rng: random.Random, users, pid):
                 else:
                     allow = copy.deepcopy(p).free_allowance(w)
                     n = max(1, min(L.shares, allow * (p.S + pm.VS) // (p.T + p.B + pm.VA)))
-                p.withdraw(w, n)
+                n = last_shares_kept(p, n)
+                if n:
+                    p.withdraw(w, n)
         elif op == "borrow" and p.T > 0:
             pid[0] += 1
             p.borrow(pid[0], rng.randrange(1, p.T + 1), rng.choice([3600, 86400, 7 * 86400, 30 * 86400]))
@@ -341,7 +366,7 @@ def step(p: pm.Pool, rng: random.Random, users, pid):
                 L = p.lenders[w]
                 if L.shares and p.T:
                     allow = copy.deepcopy(p).free_allowance(w)
-                    n = min(L.shares, allow * (p.S + pm.VS) // (p.T + p.B + pm.VA))
+                    n = last_shares_kept(p, min(L.shares, allow * (p.S + pm.VS) // (p.T + p.B + pm.VA)))
                     if n:
                         try:
                             p.withdraw(w, n)
@@ -356,7 +381,7 @@ def step(p: pm.Pool, rng: random.Random, users, pid):
                 L = p.lenders[w]
                 if L.shares:
                     allow = copy.deepcopy(p).free_allowance(w)
-                    n = min(L.shares, allow * (p.S + pm.VS) // (p.T + p.B + pm.VA))
+                    n = last_shares_kept(p, min(L.shares, allow * (p.S + pm.VS) // (p.T + p.B + pm.VA)))
                     if n:
                         try:
                             p.withdraw(w, n)
@@ -384,6 +409,47 @@ def pot_step(p: pm.Pool, prng: random.Random) -> None:
                 p.sync_lender(w, prng.randrange(1, 9), signed=False)
     except ValueError:
         pass
+
+
+def emptied_states():
+    """AIR-08: a pool every lender left by withdrawals (S = 0, no wipe record; `withdraw` cleared the
+    sweep bits) waits for the sweep before a deposit (`WipeSweepPending`); the sweep (of 0 lamports
+    here: the bundle the app prepends) lets deposits in again. Yields (name, pool) right after the last
+    exit, with a lender still owed SOL, and after the sweep. The random op mix rarely reaches it."""
+    p = pm.Pool("continuous", util_cap_bps=9_000)
+    p.deposit("u0", 10**12)
+    p.deposit("u1", 3 * 10**9)
+    p.borrow(1, 10**11, 86400)
+    p.advance(3_600, 10**15)
+    q, io, _pr, _dl = p.positions[1]
+    p.repay(1, pm.cdiv(q * (p.index - io), pm.WAD), 10**8)
+    p.sweep_sol(5 * 10**8)
+    p.advance(600)
+    p.withdraw("u1", p._touch("u1").shares)
+    p.claim_sol("u1")
+    p.withdraw("u0", p._touch("u0").shares)        # the last exit: paid the unreleased vest (R3B-2)
+    assert p.S == 0 and not p.wipe_live and not p.wipe_swept, "AIR-08: the last exit clears the bits"
+    yield "emptied_after_last_exit", p
+    p.advance(60)
+    p.sweep_sol(0)
+    assert p.wipe_swept
+    yield "emptied_after_sweep", p
+
+
+def last_share_state():
+    """M1-SEC-3: a sole lender whose whole stake the unborrowed tokens pay while a token is lent, so a
+    burn of all of S passes every check of the model and reaches the program's own
+    `LastSharesBorrowed` (the `withdraw` expectation records it). That burn fits in T only when
+    S * B < VS * (T + 1): the share price must have risen above its start by more than the borrowed
+    tokens' worth, and only rounding raises it, so the op mix never gets there. Here a withdrawal of
+    1,999 shares that pays 1 token lifts it, then 1 token is lent. Yields (name, pool)."""
+    p = pm.Pool("continuous", util_cap_bps=9_000)
+    p.deposit("u0", 10**6)
+    p.withdraw("u0", 1_999)                    # floor(1,999 * (T + B + VA) / (S + VS)) = 1 token
+    p.borrow(1, 1, 86400)
+    p.advance(600)
+    assert p.S * p.B < pm.VS * (p.T + 1), "M1-SEC-3: the whole burn fits in T"
+    yield "last_share_borrowed", p
 
 
 def main():
@@ -439,6 +505,10 @@ def main():
         open_cases += opened
         if chained_cases >= CHAIN_CASES and open_cases >= OPEN_CASES:
             break
+    for scripted in (emptied_states, last_share_state):
+        for name, p in scripted():
+            cases.append({"name": name, "now": str(p.now), "lockGraceS": p.lock_grace_s, **dump_state(p),
+                          "expect": expectations(p, rng)})
     behind = sum(1 for c in cases for L in c["lenders"].values() if L["epoch"] < c["market"]["shareEpoch"])
     wipes = sum(1 for c in cases if c["market"]["flags"] & FLAG_WIPE_LIVE)
     locks = sum(1 for c in cases if c["vault"]["lockCal"])
@@ -452,13 +522,21 @@ def main():
                and not c["lenders"][e["lender"]]["fwd"])
     closes = sum(1 for c in cases for e in c["expect"]
                  if e["op"] == "claimOutcome" and isinstance(e["result"], dict) and e["result"]["closes"])
+    # the deposit gates of the AI review: a drained pool (AIR-07) and a pool every lender left (AIR-08)
+    drained = sum(1 for c in cases for e in c["expect"] if e["op"] == "deposit" and e["result"] == "!PoolDrained")
+    emptied = sum(1 for c in cases for e in c["expect"]
+                  if e["op"] == "deposit" and e["result"] == "!WipeSweepPending"
+                  and not c["market"]["flags"] & FLAG_WIPE_LIVE)
+    kept = sum(1 for c in cases for e in c["expect"] if e["op"] == "withdraw" and e["result"] == "!LastSharesBorrowed")
     doc = {
         "generator": "apps/web/src/features/lend/vectors/gen_lend_vectors.py",
-        "source": "docs/design/sim/pool_model.py v0.4.2 (default switches, continuous rent, the forward chain), lazy op mix with pot-only syncs",
+        "source": "docs/design/sim/pool_model.py v0.4.2 with the AI-review fixes (AIR-02, -03, -07, -08, -12; default "
+                  "switches, continuous rent, the forward chain), lazy op mix with pot-only syncs",
         "seed": SEED,
         "stats": {"cases": len(cases), "skipped": skipped, "lendersBehind": behind, "wipeLive": wipes,
                   "withLocks": locks, "withVest": vests, "chained": chains, "fwdOpen": opens,
-                  "potGains": pot_gains, "potHolds": held, "claimCloses": closes},
+                  "potGains": pot_gains, "potHolds": held, "claimCloses": closes, "poolDrained": drained,
+                  "sweepAfterExit": emptied, "lastSharesBorrowed": kept},
         "cases": cases,
     }
     OUT.write_text(json.dumps(doc, separators=(",", ":")) + "\n")

@@ -1,5 +1,6 @@
 /**
- * The lend previews against pool_model.py v0.4.1 (FRONTEND.md §10.1, LEND): the account-shaped
+ * The lend previews against pool_model.py v0.4.2 with the AI-review fixes (FRONTEND.md §10.1, LEND;
+ * AIR-02, -03, -07, -08, -12: `gen_lend_vectors.py` regenerates the vectors): the account-shaped
  * states of `vectors/lend_vectors.json` go through the panel's own conversion (`previews.ts`) into
  * `@shortwin/math-wasm`, which must return exactly the model's deposits, withdrawals (tokens and
  * the SOL part, `previewWithdrawal`), claims, allowances, touches, token values, locks, lock ends
@@ -76,6 +77,8 @@ describe('pool_model vectors through the WASM facade', () => {
 
     it('deposits mint what the model mints (or refuse as it does)', () => {
         let n = 0;
+        let drained = 0;
+        let emptied = 0;
         for (const c of cases) {
             for (const e of c.expect) {
                 if (e.op !== 'deposit') continue;
@@ -84,13 +87,20 @@ describe('pool_model vectors through the WASM facade', () => {
                 const got = r.ok ? r.value.shares.toString() : `!${r.refusal.name}`;
                 expect(got, `${c.name} deposit ${e.lender} ${e.amount}`).toBe(e.result);
                 n++;
+                drained += got === '!PoolDrained' ? 1 : 0;
+                // AIR-08: a pool every lender left (no wipe record) waits for the sweep too.
+                emptied += got === '!WipeSweepPending' && !wipeLive(s.market) ? 1 : 0;
             }
         }
         expect(n).toBeGreaterThan(50);
+        // The deposit gates of the AI review are covered: a drained pool (AIR-07) and an emptied one.
+        expect(drained).toBeGreaterThan(5);
+        expect(emptied).toBeGreaterThan(0);
     });
 
     it('withdrawals pay the model’s tokens and SOL (previewWithdrawal: claim right after, vest flush included)', () => {
         let n = 0;
+        let lastShares = 0;
         for (const c of cases) {
             const now = BigInt(c.now);
             const pool = toPoolState(m, stateOf(c, null).market, stateOf(c, null).vault);
@@ -104,6 +114,8 @@ describe('pool_model vectors through the WASM facade', () => {
                 const label = `${c.name} withdraw ${e.lender} ${e.shares}`;
                 if (typeof e.result === 'string') {
                     expect(r.ok ? 'ok' : `!${r.refusal.name}`, label).toBe(e.result);
+                    // M1-SEC-3: the program's own refusal of a burn that leaves S = 0 with tokens lent.
+                    lastShares += e.result === '!LastSharesBorrowed' ? 1 : 0;
                 } else {
                     expect(r.ok, label).toBe(true);
                     if (!r.ok) continue;
@@ -117,6 +129,8 @@ describe('pool_model vectors through the WASM facade', () => {
             }
         }
         expect(n).toBeGreaterThan(50);
+        // The burn of the last shares while a token is lent (the generator's `last_share_state`).
+        expect(lastShares).toBeGreaterThan(0);
     });
 
     it('claims, allowances, touches, token values and locks equal the model', () => {
@@ -272,7 +286,9 @@ describe('pool_model vectors through the WASM facade', () => {
 
 describe('lend previews on simple pools', () => {
     it('quotes a first deposit with the virtual shares and the tolerance', () => {
-        const s = { ...simplePool({ tokensFree: 0n, totalShares: 0n }), lender: null, records: [] };
+        // A new market starts with both sweep bits set (AIR-08: an emptied pool clears them).
+        const flags = MARKET_FLAG.wipeTraderSwept | MARKET_FLAG.wipeRewardsClaimed;
+        const s = { ...simplePool({ tokensFree: 0n, totalShares: 0n, flags }), lender: null, records: [] };
         const r = previewDepositView(m, s, 100n, 1_000_000_000n, 50);
         expect(r.ok).toBe(true);
         if (!r.ok) return;

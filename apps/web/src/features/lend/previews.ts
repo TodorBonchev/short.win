@@ -8,7 +8,7 @@
  *
  * Every function here is pure: it creates the WASM objects, reads what it needs and frees them
  * before returning plain `bigint`s. `previews.test.ts` holds the results to `pool_model.py`
- * v0.4.1 (`vectors/lend_vectors.json`).
+ * v0.4.2 with the AI-review fixes (`vectors/lend_vectors.json`).
  *
  * `now` is the program's `market_now`: `max(clock, Market.last_accrual_ts)` for `deposit` /
  * `withdraw` (`engine::prologue::market_now`); `claim_sol`, `cover_deficit` and `sync_lender`
@@ -260,6 +260,8 @@ const MATH_ERRORS: Readonly<Record<string, string>> = {
     'lender behind share epochs': 'LenderBehindEpochs',
     'deposit too small': 'ZeroAmount',
     'post-wipe sweep pending': 'WipeSweepPending',
+    // AIR-07's residual: no deposit while at most 1/1,000 of the token claims is unborrowed.
+    'pool drained': 'PoolDrained',
 };
 
 const BY_NAME: ReadonlyMap<string, ProgramErrorInfo> = new Map(
