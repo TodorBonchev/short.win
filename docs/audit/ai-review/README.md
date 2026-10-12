@@ -89,6 +89,9 @@ commit carries the reconciliation:
 
 ## Decisions for the owner
 
+The owner resolved decisions 1–7 on 2026-10-12. Each item keeps its analysis and ends with the
+resolution; item 8 lists the interface changes and needs no decision.
+
 1. **AIR-22, sustained growth.** The fix ends the flat-step veto: a straddle crank every 3 s no
    longer blocks liquidation through a pump. The cost is that one non-rising step in three is
    now tolerated, so the sim's held-sandwich plan against a liquidatable borrower needs 2 held
@@ -97,6 +100,9 @@ commit carries the reconciliation:
    instead of 0.570 / 2.272). Keeping 3 s needs `kappa_growth_n` ≥ 5, which is outside its
    current box. To keep the old trade-off, revert `6c39e58`, `03b7762` and `8a4df78` and
    regenerate the vectors.
+
+   **Resolved (owner, 2026-10-12): keep the lower median.** The trade-off is known-issues KI-76.
+
 2. **AIR-07, the drained-pool deposit gate.** The base fix flushes the vest when a settlement
    leaves at most 1/1,000 of the token claims it found. That left a residual: an outsider who
    deposited more than that before the last settlement kept the vest vesting and diluted the
@@ -107,10 +113,18 @@ commit carries the reconciliation:
    lock-heavy mix and 378 of 26,749 in the stranding table are refused, and while a pool is
    drained no newcomer can supply exit liquidity. To accept the residual instead, revert
    `00d3772` and regenerate the vectors.
+
+   **Resolved (owner, 2026-10-12): keep the gate** (`PoolDrained` = 6108). Its cost to honest
+   depositors is known-issues KI-71.
+
 3. **AIR-10, burns.** A holder's burn earlier in the same transaction still raises the
    PumpSwap tier, because the fee at `P_ema` is resolved on the live mint supply. A test pins
    this. Closing it needs a per-second supply snapshot in `Market` (reserved bytes). Accept it
    with a known-issues row, or add the snapshot.
+
+   **Resolved (owner, 2026-10-12): accept the burn residual** with known-issues KI-72; no
+   snapshot.
+
 4. **AIR-18, `ExtendProgram` griefing.** No program change can stop third-party extensions.
    Anyone can extend `shortwin` (or `complete_curve`) once per slot and block it for the rest
    of that slot, at ≈ 0.052 SOL of rent per slot at mainnet's 5,080 lamports/byte. The griefing
@@ -119,17 +133,41 @@ commit carries the reconciliation:
    - extend `shortwin`'s ProgramData to 10 MiB at deployment (≈ 45 SOL of extra rent);
    - or accept the bounded griefing, have the keeper retry in the next slot, and correct
      KI-63 ("harmless").
+
+   **Resolved (owner, 2026-10-12): accept the bounded griefing.** No pre-extension to 10 MiB.
+   The keeper ticks once a slot by default, so it sends a blocked exit again at its next tick,
+   in a later slot. KI-63 is corrected, the bounds are known-issues KI-73, and
+   `services/README.md` "Governance" says what operators see.
+
 5. **AIR-01, operations.** After `initialize_config`, run one `revalidate_venue` with the
    expected ELF hash for each venue whose ProgramData can still grow (pump-fees, AMM v4, CPMM,
    Jupiter). This records the fingerprints. Until then, one extension can still latch a venue.
-   `shortwin-ops revalidate-venue` prints and stages the hash. A flag or revalidation after an
-   extension hashes the trimmed ELF: request ≥ 0.5 M CU (≤ 0.44 M measured).
+   `shortwin-gov stage revalidate-venue` (package `shortwin-ops`) prints and stages the hash. A
+   flag or revalidation after an extension hashes the trimmed ELF: request ≥ 0.5 M CU (≤ 0.44 M
+   measured).
+
+   **Resolved (owner, 2026-10-12): the runbook step**, in `services/README.md` "Governance".
+   `shortwin-gov` sets no compute-unit limit, so it gets the runtime's default: 200,000 CU for
+   a bare `execute`, 400,000 for `approve --execute` (two Squads instructions). Neither covers
+   pump-fees' hash path, so an execution after an extension goes through a client that
+   requests ≥ 0.5 M CU (Jupiter's cost is not measured: sized by simulation). A new staging at
+   the current deploy slot also works, unless another extension lands before it executes. The
+   residuals are known-issues KI-69 and are accepted.
+
 6. **AIR-19, the market mark.** `min_open_hard_cap_bps` stays at the lowest cap any position
    locked since the market last emptied. This is conservative: a closed position may have set
    it. Accept it, or track each cap exactly, which needs more state.
+
+   **Resolved (owner, 2026-10-12): accept the conservative mark** (known-issues KI-74).
+
 7. **No behaviour change: AIR-04, AIR-11, AIR-20.** [`DOC-FOLLOWUPS.md`](DOC-FOLLOWUPS.md) has
    the known-issues rows and doc wording for each. AIR-20 also has an optional code fix in
    [`leads.md`](leads.md).
+
+   **Resolved (owner, 2026-10-12): no behaviour change.** Known-issues KI-70 (AIR-04), the
+   lock-decay sentence of KI-13 (AIR-11) and KI-75 (AIR-20); AIR-20's optional fix is not
+   taken, and its residual stays pinned.
+
 8. **Interface changes.** The account sizes are unchanged; the new fields take reserved bytes.
    - `Market.lender_credit_rem` (AIR-03, @2,936) and `Market.min_open_hard_cap_bps` (AIR-19,
      @2,952).
