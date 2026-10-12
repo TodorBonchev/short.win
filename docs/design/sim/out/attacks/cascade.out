@@ -4,7 +4,7 @@
 | A | pump 2x/60s | 5 | {'liquidation': 5} | {'liquidation': 5} | 1 |
 | A | pump 3x/10min | 5 | {'liquidation': 5} | {'liquidation': 5} | 1 |
 | A | pump 10x/10min | 5 | {'liquidation': 5} | {'liquidation': 5} | 1 |
-| RA | gap 1.8x | 4 | {'liquidation': 4} | {'liquidation': 4} | 1 |
+| RA | gap 1.8x | 4 | {'liquidation': 4} | {'liquidation': 4} | 0 |
 | RA | pump 2x/60s | 4 | {'liquidation': 4} | {'liquidation': 4} | 1 |
 | RA | pump 3x/10min | 4 | {'liquidation': 4} | {'liquidation': 4} | 0 |
 | RA | pump 10x/10min | 4 | {'liquidation': 4} | {'liquidation': 4} | 1 |

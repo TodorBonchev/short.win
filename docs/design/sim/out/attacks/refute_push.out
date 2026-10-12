@@ -141,7 +141,7 @@
 | RA | S3 on an executable venue (Emergency flag), due at the deadline | round trip -1 % | none in 300 s |  | 0.0601 |
 | RA | S1, 2 % beyond the boundary | round trip -3 % | S1 | 188 | 0.2710 |
 | RA | S3 on an executable venue (Emergency flag), due at the deadline | round trip -3 % | none in 300 s |  | 0.1826 |
-| RA | S1, 2 % beyond the boundary | LP add/remove x2 L (Raydium) | S1 | 61 | 0.0000 |
+| RA | S1, 2 % beyond the boundary | LP add/remove x2 L (Raydium) | S1 | 59 | 0.0000 |
 | RA | S3 on an executable venue (Emergency flag), due at the deadline | LP add/remove x2 L (Raydium) | S3 | 0 | 0.0000 |
 | RC | S1, 2 % beyond the boundary | none | S1 | 62 | 0.0000 |
 | RC | S3 on an executable venue (Emergency flag), due at the deadline | none | S3 | 0 | 0.0000 |
@@ -149,7 +149,7 @@
 | RC | S3 on an executable venue (Emergency flag), due at the deadline | round trip -1 % | none in 300 s |  | 0.0020 |
 | RC | S1, 2 % beyond the boundary | round trip -3 % | S1 | 188 | 0.0112 |
 | RC | S3 on an executable venue (Emergency flag), due at the deadline | round trip -3 % | none in 300 s |  | 0.0062 |
-| RC | S1, 2 % beyond the boundary | LP add/remove x2 L (Raydium) | S1 | 64 | 0.0000 |
+| RC | S1, 2 % beyond the boundary | LP add/remove x2 L (Raydium) | S1 | 62 | 0.0000 |
 | RC | S3 on an executable venue (Emergency flag), due at the deadline | LP add/remove x2 L (Raydium) | S3 | 0 | 0.0000 |
 
 === (b) spot-leg veto for w seconds, starting 20 s after arming ===

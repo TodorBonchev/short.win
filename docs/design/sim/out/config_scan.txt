@@ -59,7 +59,7 @@ battery for the scan: 695 runs per value (core, noise +-0.3/1 %, aged)
 | `ema_clamp_bps` | 5000 | none |
 | `ema_clamp_bps` | 10000 | none |
 | `cr_liq_bps` | 10500 | (rejected by validate_params: tier A: cr_open >= 20,000 and cr_liq >= 12,500 (SPEC minima)) |
-| `cr_liq_bps` | 100000 | 0 liveness / 117 lender -1 %: B pump 3x/60s -> liquidation; C pump 3x/60s -> liquidation; D@0% pump 3x/60s -> liquidation (+114 more) |
+| `cr_liq_bps` | 100000 | 0 liveness / 118 lender -1 %: B pump 3x/60s -> liquidation; C pump 3x/60s -> liquidation; D@0% pump 3x/60s -> liquidation (+115 more) |
 | `penalty_bps` | 0 | 0 liveness / 306 lender -1 %: A gap 2x -> liquidation; A pump 3x/60s -> liquidation; A pump 2x/20s -> liquidation (+303 more) |
 | `penalty_bps` | 2000 | none |
 | `max_liq_slip_bps` | 500 | none |

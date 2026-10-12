@@ -159,7 +159,7 @@ S3 with observation-gap rule 60 s: first S3 1020 s after the first outage (route
 | RA | spike 10x/5s | open | +600s | 1.00x / 1.00x | 2.03/2.03 | 18.469 | -0.1409 (-1% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
 | RA | drain all unlocked LP (50%) | open | +600s | 1.00x / 1.00x | 2.01/2.01 | 18.469 | -0.2820 (-1% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
 | RA | drain 50% + x1.5 | open | +600s | 1.50x / 1.50x | 1.34/1.34 | 27.703 | -9.7754 (-51% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
-| RA | drain 50% + pump 2x/120s | liquidation | +151s | 1.69x / 2.00x | 1.19/1.23 | 36.937 | -15.0049 (-78% of M) | 100% + 0.7913 SOL | +0.7913 (+2.1%) | 0.4742 |
+| RA | drain 50% + pump 2x/120s | liquidation | +151s | 1.69x / 2.00x | 1.19/1.23 | 36.937 | -15.0201 (-78% of M) | 100% + 0.7989 SOL | +0.7989 (+2.2%) | 0.4788 |
 | RA | pool disabled | open | +3600s | 1.00x / 1.00x | 0.00/2.03 | 18.469 | - | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
 | RA | route flagged (Emergency) + gap 2x | liquidation | +10s | 2.00x / 2.00x | 1.01/1.12 | 36.937 | -19.3565 (-100% of M) | 100% + 0.2238 SOL | +0.2238 (+0.6%) | 0.1337 |
 | RA | dump -50%, close | close | +3600s | 0.50x / 0.50x | 4.07/4.06 | 9.234 | +9.2057 (+48% of M) | 100% + 0.0015 SOL | +0.0015 (+0.0%) | 0.0000 |
@@ -173,7 +173,7 @@ S3 with observation-gap rule 60 s: first S3 1020 s after the first outage (route
 | RB | spike 10x/5s | open | +600s | 1.00x / 1.00x | 2.54/2.54 | 7.389 | -0.0569 (-0% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
 | RB | drain all unlocked LP (50%) | open | +600s | 1.00x / 1.00x | 2.52/2.52 | 7.389 | -0.1133 (-1% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
 | RB | drain 50% + x1.5 | open | +600s | 1.50x / 1.50x | 1.67/1.67 | 11.083 | -3.9115 (-34% of M) | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
-| RB | drain 50% + pump 2x/120s | liquidation | +176s | 1.95x / 2.00x | 1.28/1.33 | 14.778 | -8.4018 (-73% of M) | 100% + 0.5126 SOL | +0.5126 (+3.5%) | 0.3071 |
+| RB | drain 50% + pump 2x/120s | liquidation | +176s | 1.95x / 2.00x | 1.28/1.33 | 14.778 | -8.4124 (-73% of M) | 100% + 0.5179 SOL | +0.5179 (+3.5%) | 0.3103 |
 | RB | pool disabled | open | +3600s | 1.00x / 1.00x | 0.00/2.54 | 7.389 | - | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
 | RB | route flagged (Emergency) + gap 2x | liquidation | +16s | 2.00x / 2.00x | 1.26/1.31 | 14.778 | -8.6143 (-75% of M) | 100% + 0.5248 SOL | +0.5248 (+3.6%) | 0.3144 |
 | RB | dump -50%, close | close | +3600s | 0.50x / 0.50x | 5.09/5.08 | 3.694 | +3.6823 (+32% of M) | 100% + 0.0012 SOL | +0.0012 (+0.0%) | 0.0000 |
@@ -230,7 +230,7 @@ S3 with observation-gap rule 60 s: first S3 1020 s after the first outage (route
 | D@80% | graduation, then +2x on AMM over 60s | liquidation | +12s | 2.58x / 2.58x | 1.57/1.58 | 2.738 | -2.0880 (-61% of M) | 100% + 0.1434 SOL | +0.1434 (+5.2%) | 0.0850 |
 | D@80% | graduation, then +3x on AMM over 60s | liquidation | +12s | 2.58x / 2.58x | 1.57/1.58 | 2.738 | -2.0880 (-61% of M) | 100% + 0.1434 SOL | +0.1434 (+5.2%) | 0.0850 |
 | D@80% | graduation, migration stuck | S3 | +4200s | 2.53x / 2.53x | 0.00/1.60 | 2.683 | -2.0814 (-61% of M) | 0% + 3.0872 SOL | +0.4045 (+15.1%) | 0.0549 |
-| D@90% | graduation gap (1 buy completes curve) | liquidation | +302s | 2.34x / 2.34x | 1.73/1.74 | 3.038 | -2.1934 (-52% of M) | 100% + 0.1598 SOL | +0.1598 (+5.3%) | 0.0946 |
+| D@90% | graduation gap (1 buy completes curve) | liquidation | +302s | 2.34x / 2.34x | 1.73/1.74 | 3.038 | -2.1951 (-52% of M) | 100% + 0.1606 SOL | +0.1606 (+5.3%) | 0.0951 |
 | D@90% | graduation, then +2x on AMM over 60s | liquidation | +60s | 2.60x / 2.60x | 1.56/1.68 | 3.365 | -2.5777 (-62% of M) | 100% + 0.1780 SOL | +0.1780 (+5.3%) | 0.1056 |
 | D@90% | graduation, then +3x on AMM over 60s | liquidation | +52s | 2.74x / 2.74x | 1.48/1.65 | 3.551 | -2.7946 (-67% of M) | 100% + 0.1878 SOL | +0.1878 (+5.3%) | 0.1115 |
 | D@90% | graduation, migration stuck | open | +10800s | 1.70x / 1.70x | 0.00/2.40 | 2.198 | - | 100% + 0.0000 SOL | +0.0000 (+0.0%) | 0.0000 |
@@ -396,4 +396,4 @@ price = GBM(sigma) x Poisson up/down gaps with Pareto(alpha, 1.5x) multiples (<=
 
 ### Exit fuzz (attacker bundles, attacker-only seconds, sandwiches; invariants asserted)
 
-{'runs': 1000, 'exits': 709, 'sandwich_attempts': 8191, 'bundles': 256972, 'attacker_only_seconds': 817, 'blocker_runs': 196, 'noisy_runs': 519, 'freezer_runs': 246, 'frozen_seconds': 1907, 'penalty_truncated_by_sandwich': 22, 'max_loss_over_bref_bps': 103, 'max_settle_box_bps': 95, 'reserve_waits_liq': 0, 'reserve_waits_exp': 0, 'kinds': {'liquidation': 213, 'expiry': 286, 'S1': 174, 'S2': 8, 'S3': 28}}
+{'runs': 1000, 'exits': 697, 'sandwich_attempts': 8948, 'bundles': 253491, 'attacker_only_seconds': 772, 'blocker_runs': 192, 'noisy_runs': 490, 'freezer_runs': 267, 'frozen_seconds': 2905, 'penalty_truncated_by_sandwich': 22, 'max_loss_over_bref_bps': 102, 'max_settle_box_bps': 94, 'reserve_waits_liq': 0, 'reserve_waits_exp': 0, 'kinds': {'liquidation': 224, 'expiry': 281, 'S1': 147, 'S2': 10, 'S3': 35}}
