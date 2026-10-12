@@ -8992,7 +8992,8 @@
     {
       "name": "SolSettle",
       "docs": [
-        "`sol_settle` (an executing settlement)."
+        "`sol_settle` (an executing settlement). `vest_flushed` (AIR-07) is an addition to ARCH",
+        "§3.10's field list."
       ],
       "type": {
         "kind": "struct",
@@ -9094,6 +9095,16 @@
               "`now − ema_ts` (V2-5)."
             ],
             "type": "i64"
+          },
+          {
+            "name": "vest_flushed",
+            "docs": [
+              "The unreleased vest the settlement paid to the shares at once, its own lump and rent",
+              "top-up included: it left at most 1/1,000 of the token claims it found, a full wipe",
+              "included (AIR-07). Reported with or without an epoch roll (`EpochRolled.vest_flushed`",
+              "repeats it); 0 when nothing was flushed."
+            ],
+            "type": "u64"
           }
         ]
       }

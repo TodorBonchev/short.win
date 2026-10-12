@@ -291,6 +291,7 @@ fn exit_event_checks_on_synthetic_exits() {
         lump: 0,
         borrower_amount: pos.v - k_s - lenders,
         ema_age_s: 0,
+        vest_flushed: 0,
     };
     let ev = IxEvents {
         settlements: vec![settle(1, pos.v - k_s, 0, 0)],

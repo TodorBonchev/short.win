@@ -547,6 +547,7 @@ pub(crate) mod tests {
                     lump: 15,
                     borrower_amount: 16,
                     ema_age_s: 17,
+                    vest_flushed: 18,
                 },
             ),
             enc(

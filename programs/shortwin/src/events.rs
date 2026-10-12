@@ -186,7 +186,8 @@ pub struct Expire {
     pub token_surplus: u64,
 }
 
-/// `sol_settle` (an executing settlement).
+/// `sol_settle` (an executing settlement). `vest_flushed` (AIR-07) is an addition to ARCH
+/// §3.10's field list.
 #[event]
 pub struct SolSettle {
     pub market: Pubkey,
@@ -214,6 +215,11 @@ pub struct SolSettle {
     pub borrower_amount: u64,
     /// `now − ema_ts` (V2-5).
     pub ema_age_s: i64,
+    /// The unreleased vest the settlement paid to the shares at once, its own lump and rent
+    /// top-up included: it left at most 1/1,000 of the token claims it found, a full wipe
+    /// included (AIR-07). Reported with or without an epoch roll (`EpochRolled.vest_flushed`
+    /// repeats it); 0 when nothing was flushed.
+    pub vest_flushed: u64,
 }
 
 /// `SettleDisarmed.reason` / `SettleArmed.reason`: refuted on the settlement box.

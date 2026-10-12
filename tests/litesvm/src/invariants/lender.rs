@@ -50,7 +50,10 @@
 //!   M1-FID-9); and **a `LenderPosition` disappears only in `withdraw` or `claim_sol`** of its
 //!   owner, with a post-state `pool::closable` recomputed on the pre-state (a withdrawal's
 //!   after its handler's prologue), its rent going to the owner, and a claim or withdrawal
-//!   whose recomputed post-state is closable closed it (KI-67; [`closes_only_when_empty`]).
+//!   whose recomputed post-state is closable closed it (KI-67; [`closes_only_when_empty`]);
+//!   and **every vest flush is reported** (AIR-07, the indexer's `vest_bal`): an instruction
+//!   that takes a running vest to 0 before its end emits `SolSettle.vest_flushed > 0` or a
+//!   lender event with `s_after = 0` ([`vest_flushes_are_reported`]).
 
 use std::cell::Cell;
 
@@ -879,8 +882,61 @@ pub fn check_ix(
         empty_pool_holds_no_new_tokens(st, &post)?;
         let withdrawer = withdraws.first().map(|w| w.owner);
         locks_never_decrease(st, &post, withdrawer.as_ref())?;
+        vest_flushes_are_reported(st, &post, ev)?;
     }
     Ok(())
+}
+
+/// AIR-07's flush report (the indexer's `vest_bal`, INDEXER.md §5.3): an instruction that takes
+/// a running vest to 0 before its end — a flush: a settlement that left at most 1/1,000 of the
+/// token claims it found (a full wipe included), or the last shares leaving (R3B-2) — says so
+/// in an event the indexer projects: `SolSettle.vest_flushed > 0` (with or without an epoch
+/// roll), or a lender event with `s_after = 0`. A release that reaches the end leaves
+/// `vest_last ≥ vest_end`; a flush leaves `vest_end` ahead of `vest_last`. Conversely a reported
+/// flush leaves no vest, unless the settlement rolled the epoch (a rebase vests a pre-funded
+/// record's lamports anew, ARCH §2.4.1).
+pub fn vest_flushes_are_reported(
+    pre: &PoolState,
+    post: &PoolState,
+    ev: &super::IxEvents,
+) -> Result<(), Violation> {
+    let market = pre.market;
+    let (p0, p1) = (&pre.pool, &post.pool);
+    let reported = ev
+        .settlements
+        .iter()
+        .filter(|e| e.market == market)
+        .map(|e| e.vest_flushed)
+        .max()
+        .unwrap_or(0);
+    let last_shares = ev
+        .withdraws
+        .iter()
+        .map(|e| (e.market, e.s_after))
+        .chain(ev.claims.iter().map(|e| (e.market, e.s_after)))
+        .chain(ev.deposits.iter().map(|e| (e.market, e.s_after)))
+        .chain(ev.covers.iter().map(|e| (e.market, e.s_after)))
+        .chain(ev.syncs.iter().map(|e| (e.market, e.s_after)))
+        .any(|(m, s_after)| m == market && s_after == 0);
+    let flushed = p0.vest_bal > 0 && p1.vest_bal == 0 && p1.vest_end > p1.vest_last;
+    ensure(!flushed || reported > 0 || last_shares, "I8", || {
+        format!(
+            "market {market}: the vest ({} lamports, ending at {}) was flushed at {} and no \
+             event reports it (AIR-07: SolSettle.vest_flushed, or a lender event's s_after = 0)",
+            p0.vest_bal, p1.vest_end, p1.vest_last
+        )
+    })?;
+    ensure(
+        reported == 0 || p1.vest_bal == 0 || p1.share_epoch != p0.share_epoch,
+        "I8",
+        || {
+            format!(
+                "market {market}: SolSettle reports a flush of {reported} lamports and leaves a \
+                 vest of {} without an epoch roll",
+                p1.vest_bal
+            )
+        },
+    )
 }
 
 /// C0-9 / I-P4: `w` took at most `allow`, the allowance its lender had just before it.

@@ -60,23 +60,24 @@
 //! - a settlement that leaves at most 1/1,000 of the token claims it found (a full wipe, or
 //!   the dust a run or a deposit before it leaves; AIR-07, `pool::VEST_FLUSH_RATIO`) releases
 //!   the unreleased vest, its own lump included, to the shares that held them inside
-//!   `pool::settle`;
+//!   `pool::settle`, and `SolSettle.vest_flushed` reports it, with or without a roll (the
+//!   indexer's `vest_bal`);
 //! - `pool::maybe_roll` inside `pool::settle`: when the epoch rolls (a full wipe, or a rebase),
 //!   the `ShareEpoch` record is created with the grief-proof helper (payer keeper; lamports a
 //!   third party pre-funded are swept to `market_vault` and credited to lenders as a lump —
 //!   the live wipe record's own top-up when the roll is a full wipe) and `EpochRolled` emitted
-//!   (`vest_flushed`: the vest the settlement flushed, 0 when it did not; a flush without a
-//!   roll emits no `EpochRolled`).
+//!   (`vest_flushed`: the vest the settlement flushed, as in `SolSettle`; 0 when it did not).
 //!
 //! Lamport moves out of the position are direct (no CPI) and come after every CPI that names
 //! the keeper or `market_vault` (a direct move is visible to the runtime's per-CPI balance
 //! check only once both accounts are in a CPI).
 //!
 //! **Event:** `SolSettle{condition, b_live, b_rs, b_ema, p_lo, p_hi, l_lo, l_hi, x_lo, x_hi,
-//! pprime_lo, pprime_hi, fv, k_s, lender_amount, lump, borrower_amount, ema_age_s}` — the box
-//! corners' amounts and `p'` for S2/S3 (0 for S1), `fv = 0` for S1 or when undefined, `b_* = 0`
-//! when undefined; `ema_age_s = now − ema_ts` (V2-5). `SettleArmed.reason` is 0 (armed on the
-//! S1 or the S2 legs; the kind is chosen at execution).
+//! pprime_lo, pprime_hi, fv, k_s, lender_amount, lump, borrower_amount, ema_age_s,
+//! vest_flushed}` — the box corners' amounts and `p'` for S2/S3 (0 for S1), `fv = 0` for S1 or
+//! when undefined, `b_* = 0` when undefined; `ema_age_s = now − ema_ts` (V2-5); `vest_flushed`
+//! the vest the settlement flushed (AIR-07), 0 when it did not. `SettleArmed.reason` is 0
+//! (armed on the S1 or the S2 legs; the kind is chosen at execution).
 
 use anchor_lang::prelude::*;
 use shortwin_math::pool::{self, Resolution};
@@ -158,13 +159,10 @@ struct Booked {
     pool: pool::Pool,
     vault: Box<pool::Vault>,
     rec: Option<pool::ShareEpoch>,
-    /// `vest_bal` before `pool::settle` (a flush releases it plus `vested`).
-    vest_before: u64,
-    /// What `pool::settle` vested (`Settled::vested`): the lump and the rent top-up.
-    vested: u64,
-    /// Whether `pool::settle` flushed the vest (`Settled::flushed`: a full wipe, or AIR-07's
-    /// dust).
-    flushed: bool,
+    /// The vest `pool::settle` flushed (`Settled::flushed`: a full wipe, or AIR-07's dust):
+    /// `vest_bal` before it plus what it vested (`Settled::vested`, the lump and the rent
+    /// top-up); 0 when it did not flush. `SolSettle` and `EpochRolled` report it.
+    vest_flushed: u64,
     lump_vest_s: u32,
 }
 
@@ -310,6 +308,14 @@ fn evaluate<'info>(
                 inp.r_due,
             )
             .math()?;
+            // A flush releases the vest the settlement found and its own vest at once (a full
+            // wipe always flushes; since AIR-07 so does a settlement that left dust, with or
+            // without a roll).
+            let vest_flushed = if settled.flushed {
+                vest_before.checked_add(settled.vested).or_math()?
+            } else {
+                0
+            };
             let mut aggr = market.aggr();
             engine_waterfall::remove_position(&mut market, &mut aggr, pos)?;
             market.set_aggr(&aggr);
@@ -320,9 +326,7 @@ fn evaluate<'info>(
                 pool,
                 vault,
                 rec: settled.rec,
-                vest_before,
-                vested: settled.vested,
-                flushed: settled.flushed,
+                vest_flushed,
                 lump_vest_s: config.params.lump_vest_s,
             })
         }
@@ -459,13 +463,6 @@ pub fn handler<'info>(ctx: Context<'info, SolSettle<'info>>) -> Result<()> {
             let mut w: &mut [u8] = &mut data;
             record.try_serialize(&mut w)?;
         }
-        // A full wipe always flushes; since AIR-07 so does a rebase after a settlement that
-        // left dust.
-        let vest_flushed = if b.flushed {
-            b.vest_before.checked_add(b.vested).or_math()?
-        } else {
-            0
-        };
         rolled = Some(EpochRolled {
             market: market_key,
             slot: clock.slot,
@@ -474,7 +471,7 @@ pub fn handler<'info>(ctx: Context<'info, SolSettle<'info>>) -> Result<()> {
             acc_end: rec.acc_end,
             num: rec.num,
             den: rec.den().math()?,
-            vest_flushed,
+            vest_flushed: b.vest_flushed,
         });
     }
 
@@ -536,6 +533,7 @@ pub fn handler<'info>(ctx: Context<'info, SolSettle<'info>>) -> Result<()> {
         lump: b.payout.lump,
         borrower_amount: b.payout.borrower,
         ema_age_s: e.ema_age_s,
+        vest_flushed: b.vest_flushed,
     });
     if let Some(ev) = rolled {
         emit_cpi!(ev);

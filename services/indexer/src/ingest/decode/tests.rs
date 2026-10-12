@@ -404,3 +404,54 @@ fn a_v1_transaction_converts() {
     let d = decode_plain(&r);
     assert_eq!(d.invocations[0].name, "crank_price");
 }
+
+/// Every committed LiteSVM session (INGEST's `tests/data/ingest/`, REPLAY's
+/// `tests/data/sessions/`; INDEXER.md §11.3) decodes without a short.win payload refused or
+/// read on a prefix: its events have the program's current layouts. A layout change (an
+/// appended event field, as `SolSettle.vest_flushed`) must migrate or re-record them, or the
+/// ingest tests quarantine their events. No database needed.
+#[test]
+fn the_committed_sessions_decode_with_the_current_layouts() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data");
+    let mut files = 0;
+    let mut events = 0;
+    for dir in ["ingest", "sessions"] {
+        let mut paths: Vec<_> = std::fs::read_dir(root.join(dir))
+            .expect("tests/data")
+            .map(|e| e.expect("entry").path())
+            .filter(|p| p.extension().is_some_and(|x| x == "jsonl"))
+            .collect();
+        paths.sort();
+        for path in paths {
+            let s = crate::ingest::session::read(&path).expect("session");
+            let ids = crate::ingest::replay::program_ids(&s).expect("program ids");
+            for t in &s.txs {
+                let r = crate::ingest::rpc::to_raw_tx(
+                    &t.transaction,
+                    t.tx_index,
+                    Commitment::Finalized,
+                )
+                .expect("converts");
+                let d = decode(&r, &ids, &venue::PoolCtx::default(), &|_| None);
+                let refused: Vec<&str> = d
+                    .quarantine
+                    .iter()
+                    .filter(|q| q.program == ids.shortwin)
+                    .map(|q| q.reason.as_str())
+                    .collect();
+                assert!(
+                    refused.is_empty(),
+                    "{}: {}: {refused:?}",
+                    path.display(),
+                    r.signature
+                );
+                events += d.events.len();
+            }
+            files += 1;
+        }
+    }
+    assert!(
+        files >= 16 && events > 1_000,
+        "{files} sessions, {events} events"
+    );
+}

@@ -2376,7 +2376,8 @@ pub struct Settled {
     pub rec: Option<ShareEpoch>,
     /// The SOL the settlement added to the vest: `min(lump, sol_in)` and the rent top-up
     /// ([`rent_top_up`]; finding M10-8C-1). A flush releases it with the vest before
-    /// (`EpochRolled.vest_flushed`).
+    /// (`SolSettle.vest_flushed`, with or without a roll; `EpochRolled.vest_flushed` too when
+    /// the epoch rolls).
     pub vested: u64,
     /// Whether the settlement left at most `1/`[`VEST_FLUSH_RATIO`] of the token claims it
     /// found — a full wipe, or since AIR-07 dust — and so released the whole unreleased vest

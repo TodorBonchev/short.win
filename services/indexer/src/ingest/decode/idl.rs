@@ -524,6 +524,7 @@ mod tests {
             lump: 15,
             borrower_amount: 16,
             ema_age_s: 17,
+            vest_flushed: 18,
         };
         let bytes = crate::ingest::decode::borsh_bytes(&ev);
         let mut body = bytes.as_slice();
@@ -535,6 +536,7 @@ mod tests {
         assert_eq!(v["condition"], 2);
         assert_eq!(v["p_lo"], u128::MAX.to_string());
         assert_eq!(v["pprime_hi"], 11);
+        assert_eq!(v["vest_flushed"], "18");
         assert_eq!(v["keeper"], Pubkey::new_from_array([9; 32]).to_string());
         assert_eq!(
             <shortwin::events::SolSettle as Discriminator>::DISCRIMINATOR,

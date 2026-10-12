@@ -290,7 +290,7 @@ mod epochs {
     use shortwin::errors::ShortwinError as E;
     use shortwin::state::ShareEpoch;
     use shortwin_litesvm_tests::ix;
-    use shortwin_math::pool::{R_MAX, VIRTUAL_ASSETS, VIRTUAL_SHARES};
+    use shortwin_math::pool::{R_MAX, VEST_FLUSH_RATIO, VIRTUAL_ASSETS, VIRTUAL_SHARES};
     use solana_signer::Signer;
 
     /// The only lender withdraws free tokens down to `keep` (the largest share amount whose
@@ -351,6 +351,10 @@ mod epochs {
         assert_eq!(ev.condition, 1);
         let rolled = out.rolled.expect("EpochRolled");
         assert_eq!((rolled.epoch, rolled.num, rolled.den), (epoch, 0, 1));
+        assert_eq!(
+            ev.vest_flushed, rolled.vest_flushed,
+            "both events report the flush"
+        );
         let rec = record(&sc, epoch);
         assert_eq!(
             (rec.epoch, rec.num, rec.den_log1000, rec.s_old),
@@ -403,6 +407,10 @@ mod epochs {
             (rolled.epoch, rolled.num, rolled.vest_flushed),
             (epoch, 1, vest0 + ev.lump + top)
         );
+        assert_eq!(
+            ev.vest_flushed, rolled.vest_flushed,
+            "both events report the flush"
+        );
         assert_eq!(sc.market().vest_bal, 0, "AIR-07: flushed to the old shares");
         let rec = record(&sc, epoch);
         assert!(rec.den_log1000 >= 1 && rec.s_old == s_old);
@@ -412,6 +420,98 @@ mod epochs {
         assert_eq!(m.total_shares.get(), s_old / rolled.den);
         let claims = u128::from(m.tokens_free) + u128::from(m.borrowed_q);
         assert!(m.total_shares.get() + VIRTUAL_SHARES <= R_MAX * (claims + VIRTUAL_ASSETS));
+    }
+
+    /// AIR-07, the flush without a roll (the indexer's `vest_bal`): a settlement that leaves at
+    /// most 1/1,000 of the token claims it found flushes the vest even when the pool needs no
+    /// rebase, so no `EpochRolled` is emitted; `SolSettle.vest_flushed` reports the flush (before
+    /// it, no event did, and the indexer kept the last crank's `vest_bal`). A running vest — a
+    /// trader sweep's 3,000,000 lamports — is there before. The window, with the only lender's
+    /// shares at ≈ `VS/VA` = 1,000 a token: `T = ⌊q/999⌋` free tokens give `999·T ≤ q` (a flush)
+    /// and `S + VS ≤ R_MAX·(T + VA)` (no rebase). One free token more leaves more than 1/1,000
+    /// of the claims: no flush, `vest_flushed = 0`, and the vest keeps vesting. The report costs
+    /// no instruction-trace entry: the instruction and its one event, as without it. Without the
+    /// report the `Env::send` hook (`lender::vest_flushes_are_reported`) fails the flush.
+    #[test]
+    fn a_flush_without_a_roll_is_reported_in_sol_settle() {
+        use shortwin_litesvm_tests::engine::sweep_trader_ix_for;
+        use shortwin_litesvm_tests::invariants::IxEvents;
+        use shortwin_litesvm_tests::invariants::lender::{PoolState, vest_flushes_are_reported};
+        for extra in [0u64, 1] {
+            let mut sc = Sc::default_market();
+            sc.env.tick(&sc.mm, 5);
+            let q = sc.q;
+            withdraw_down_to(&mut sc, q / 999 + extra);
+            sc.env.fund(&sc.mm.keys.trader, 3_000_000);
+            ok(sc
+                .env
+                .send(&[sweep_trader_ix_for(&sc.env, &sc.mm.market())], &[]));
+            let m = sc.market();
+            assert_eq!(m.vest_bal, 3_000_000, "the sweep vests");
+            let (epoch, s_old) = (m.share_epoch, m.total_shares.get());
+            let t = u128::from(m.tokens_free);
+            assert_eq!(m.borrowed_q, q, "the only position");
+            let flush = VEST_FLUSH_RATIO * t <= t + u128::from(q);
+            assert_eq!(flush, extra == 0, "T = {t}");
+            assert!(
+                s_old + VIRTUAL_SHARES <= R_MAX * (t + VIRTUAL_ASSETS),
+                "the pool needs no rebase after the settlement: S {s_old}, T {t}"
+            );
+            let pos = sc.pos();
+            sc.gap_and_arm(1.05);
+            // Keeper seconds; the vest the settlement finds is the one the second's crank left
+            // (its prologue released the vest at this second; the settlement's releases nothing
+            // more).
+            let mut settled = None;
+            for _ in 0..80 {
+                sc.env.warp(1);
+                sc.crank();
+                let pre = PoolState::load(&sc.env.svm, &sc.mm.market()).expect("pool");
+                let out = sc.settle_ok();
+                if out.settled.is_some() {
+                    settled = Some((out, pre));
+                    break;
+                }
+            }
+            let (out, pre) = settled.expect("settled");
+            let vest_before = pre.pool.vest_bal;
+            assert!(vest_before > 0, "a running vest before the settlement");
+            // The hook `Env::send` ran on this settlement (lender::check_ix) flags a flush that no
+            // event reports — the program before `SolSettle.vest_flushed`.
+            let post = PoolState::load(&sc.env.svm, &sc.mm.market()).expect("pool");
+            assert_eq!(
+                vest_flushes_are_reported(&pre, &post, &IxEvents::default()).is_err(),
+                flush,
+                "the hook flags an unreported flush"
+            );
+            let ev = out.settled.expect("SolSettle");
+            assert_eq!(ev.condition, 1);
+            assert!(out.rolled.is_none(), "no epoch roll, no EpochRolled");
+            assert_eq!(out.trace, 2, "the instruction and SolSettle");
+            let basis = sc.market().basis();
+            let r_due = shortwin_math::rent::due(&pos.pos_rent(), &basis).unwrap();
+            let credited = shortwin_math::rent::credited_for(&pos.pos_rent(), &basis).unwrap();
+            let top = shortwin_math::pool::rent_top_up(ev.lender_amount - ev.lump, r_due, credited);
+            let vest = vest_before + ev.lump + top;
+            let m = sc.market();
+            assert_eq!(
+                (m.share_epoch, m.total_shares.get(), m.tokens_free),
+                (epoch, s_old, q / 999 + extra),
+                "no roll: the epoch and the shares stay"
+            );
+            if flush {
+                assert_eq!(ev.vest_flushed, vest, "the flush is reported");
+                assert_eq!(m.vest_bal, 0, "flushed to the shares");
+            } else {
+                assert_eq!(ev.vest_flushed, 0, "no flush, none reported");
+                assert_eq!(m.vest_bal, vest, "the vest keeps vesting");
+            }
+            eprintln!(
+                "T = q/999 + {extra}: vest {vest_before} before, vest_flushed {}, {} trace \
+                 entries, {} CU",
+                ev.vest_flushed, out.trace, out.cu
+            );
+        }
     }
 
     /// ARCH §2.4.1 grief-proof creation: a third party pre-funds the record's address (it cannot
@@ -464,6 +564,79 @@ mod epochs {
             acc_end[1] > acc_end[0],
             "credited to the wiped lenders' record"
         );
+    }
+
+    /// AIR-07 with ARCH §2.4.1's donation, on a rebase (what the indexer's `vest_bal` rule for
+    /// `EpochRolled` with `num > 0` and `vest_flushed > 0` — `vest_bal := record_donation` — rests
+    /// on): a third party pre-funds the record's address of a rebase that flushes the vest. The
+    /// settlement flushes the vest to the old shares first (`vest_flushed`, the same with or
+    /// without the donation, in `SolSettle` and `EpochRolled` alike), then sweeps the donation
+    /// into `market_vault` (one more trace entry) and vests it anew for the rebased shares: the
+    /// market's vest is then exactly the donation, from the settlement's second over
+    /// `lump_vest_s`, and the old shares' record does not see it. Without the donation the vest
+    /// is 0.
+    #[test]
+    fn a_flushing_rebase_vests_a_prefunded_record_anew() {
+        let donation = 7_000_000;
+        let mut flushed = [0u64; 2];
+        let mut acc_end = [0i128; 2];
+        for (i, donate) in [false, true].into_iter().enumerate() {
+            let mut sc = Sc::default_market();
+            sc.env.tick(&sc.mm, 5);
+            withdraw_down_to(&mut sc, 1_000_000_000);
+            let epoch = sc.market().share_epoch;
+            let addr = pda::share_epoch(&sc.mm.market(), epoch).0;
+            if donate {
+                sc.env.fund(&addr, donation);
+            }
+            let vault0 = sc.env.market_vault(&sc.mm.market()).lender_sol;
+            sc.gap_and_arm(1.05);
+            let (_s, out) = sc.run_until_settled_out(80).expect("settled");
+            assert_eq!(out.trace, if donate { 7 } else { 6 });
+            let ev = out.settled.expect("SolSettle");
+            let rolled = out.rolled.expect("EpochRolled");
+            assert_eq!((rolled.epoch, rolled.num), (epoch, 1), "a rebase");
+            assert!(rolled.vest_flushed > 0, "a flushing rebase");
+            assert_eq!(
+                ev.vest_flushed, rolled.vest_flushed,
+                "both events report the flush"
+            );
+            let swept = sc.env.market_vault(&sc.mm.market()).lender_sol - vault0 - ev.lender_amount;
+            assert_eq!(swept, if donate { donation } else { 0 }, "the sweep");
+            assert_eq!(
+                lamports(&sc.env, &addr),
+                sc.env
+                    .svm
+                    .minimum_balance_for_rent_exemption(ShareEpoch::SPACE),
+                "the donation left the record's address"
+            );
+            let m = sc.market();
+            assert_eq!(m.vest_bal, swept, "the vest after the roll is the donation");
+            if donate {
+                let lump_vest_s = i64::from(sc.env.config().params.lump_vest_s);
+                assert_eq!(
+                    (m.vest_last, m.vest_end),
+                    (ev.ts, ev.ts + lump_vest_s),
+                    "vested anew from the settlement's second"
+                );
+            }
+            eprintln!(
+                "a flushing rebase, record pre-funded with {}: vest_flushed {}, vest_bal {}, {} \
+                 trace entries, {} CU",
+                if donate { donation } else { 0 },
+                ev.vest_flushed,
+                m.vest_bal,
+                out.trace,
+                out.cu
+            );
+            flushed[i] = ev.vest_flushed;
+            acc_end[i] = record(&sc, epoch).acc_end;
+        }
+        assert_eq!(
+            flushed[0], flushed[1],
+            "the donation is not part of the flush"
+        );
+        assert_eq!(acc_end[0], acc_end[1], "nor of the old shares' record");
     }
 
     /// The record's key is checked when it is used: a settlement that rolls the epoch fails

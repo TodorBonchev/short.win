@@ -294,6 +294,7 @@ fn settle(c: &Case, p: &ShortPosition, condition: u8, lenders: u64, lo: u64, hi:
         lump: 0,
         borrower_amount: p.v - k_s(p) - lenders,
         ema_age_s: 0,
+        vest_flushed: 0,
     }
 }
 
