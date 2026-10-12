@@ -62,7 +62,7 @@ describe('program error messages', () => {
     });
 
     it('covers every error code of the generated client, by name', () => {
-        expect(constants.length).toBeGreaterThanOrEqual(108);
+        expect(constants.length).toBeGreaterThanOrEqual(109);
         for (const [k, code] of constants) {
             const info = programError(code);
             expect(info, k).toBeDefined();
@@ -70,14 +70,9 @@ describe('program error messages', () => {
             // Codama renders S3TimerRunning as S3_TIMER_RUNNING and EmaWarmingUp as EMA_WARMING_UP.
             expect(info?.name.toLowerCase(), k).toBe(name.toLowerCase());
         }
-        // A row the client lacks can only be a code the program appended after the client was last
-        // generated from its IDL (`pnpm --filter @shortwin/client idl:sync && … generate`): the
-        // previous test holds it to the program's enum until then.
-        const codes = new Set(constants.map(([, code]) => code));
-        const last = Math.max(...codes);
-        for (const code of PROGRAM_ERRORS.keys()) {
-            if (!codes.has(code)) expect(code, `${code} is not in the client`).toBeGreaterThan(last);
-        }
+        // The client is generated from the program's IDL (CI's `codama` job keeps it current), so
+        // it has a constant for every row: no row is ahead of it.
+        expect(PROGRAM_ERRORS.size).toBe(constants.length);
     });
 
     it('has a non-empty message and a known action for each code, numbered from 6000 without gaps', () => {
