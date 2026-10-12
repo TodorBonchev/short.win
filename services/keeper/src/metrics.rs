@@ -154,6 +154,9 @@ pub struct Metrics {
     pub v1_rejections: u64,
     /// `flag_venue_upgraded` calls landed (duty 10).
     pub venue_flags: u64,
+    /// AIR-01: watched ProgramData extensions seen, the venues' and Token-2022's (the loader's
+    /// `ExtendProgram`: the deploy slot moved, the ELF did not) — neither flagged nor paged.
+    pub venue_extensions: u64,
     /// Raydium pool discoveries run (duty 12; four `getProgramAccounts` calls each).
     pub pool_discoveries: u64,
     /// O17: `set_coverage_pause` attempts refused or failed.
@@ -251,6 +254,13 @@ impl Metrics {
             "shortwin_keeper_venue_flags_total",
             "flag_venue_upgraded calls landed.",
             self.venue_flags,
+        );
+        g(
+            &mut s,
+            "shortwin_keeper_venue_extensions_total",
+            "Venue and Token-2022 ProgramData extensions seen, not upgrades: nothing flagged or \
+             paged (AIR-01).",
+            self.venue_extensions,
         );
         g(
             &mut s,

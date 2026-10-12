@@ -16,8 +16,10 @@
 //!    all the others; a failed transaction is checked for committing nothing.
 //!
 //! A violation panics with the transaction's logs. Knobs for the scenarios: refuse v1
-//! transactions ([`LiteSvmChain::set_v1`], to exercise the v0 fallback) and the recent
-//! priority fees the backend reports ([`LiteSvmChain::set_priority_fees`]); every backend call
+//! transactions ([`LiteSvmChain::set_v1`], to exercise the v0 fallback), the recent
+//! priority fees the backend reports ([`LiteSvmChain::set_priority_fees`]), whole-account
+//! reads of a key that fail ([`LiteSvmChain::fail_reads_of`]) and simulations that fail
+//! ([`LiteSvmChain::fail_simulations`]); every backend call
 //! is logged ([`LiteSvmChain::rpc_log`], M4-SEC-7: the keeper's RPC work per tick). **Timing**
 //! (M7-SEC-1, M7-SEC-6): the keeper's transactions can land seconds after the clock it read
 //! ([`LiteSvmChain::set_landing_delays`]), its clock can lag the chain's
@@ -84,6 +86,11 @@ pub struct LiteSvmChain {
     /// the keeper's transaction lands later than the clock it read — as a `confirmed` read plus
     /// 1–3 slots of send latency do on mainnet.
     landing: RefCell<Option<LandingDelays>>,
+    /// Whole-account reads naming this key fail this many more times
+    /// ([`LiteSvmChain::fail_reads_of`]).
+    fail_reads: Cell<Option<(Pubkey, usize)>>,
+    /// The next this many simulations fail ([`LiteSvmChain::fail_simulations`]).
+    fail_sims: Cell<usize>,
 }
 
 /// A source of landing delays (seconds) for [`LiteSvmChain::set_landing_delays`].
@@ -222,7 +229,38 @@ impl LiteSvmChain {
             clock_lag: Cell::new(0),
             before_send: RefCell::new(None),
             landing: RefCell::new(None),
+            fail_reads: Cell::new(None),
+            fail_sims: Cell::new(0),
         }
+    }
+
+    /// The next `times` simulations (`simulate`) fail with a transport error — a node that
+    /// could not simulate (AIR-01: the flag's simulation unable to judge a moved deploy slot).
+    pub fn fail_simulations(&self, times: usize) {
+        self.fail_sims.set(times);
+    }
+
+    /// The next `times` whole-account reads (`accounts`) naming `key` fail with a transport
+    /// error; header reads (`account_headers`, JSON-RPC's `dataSlice`) are unaffected — AIR-01's
+    /// whole ProgramData read failing while the latch's header read works.
+    pub fn fail_reads_of(&self, key: Pubkey, times: usize) {
+        self.fail_reads.set(Some((key, times)));
+    }
+
+    /// The accounts at `keys` as the VM holds them (one logged `getMultipleAccounts`).
+    fn read(&self, keys: &[Pubkey]) -> Vec<Option<AccountData>> {
+        self.rpc.borrow_mut().push(Rpc::Accounts(keys.to_vec()));
+        let env = self.env.borrow();
+        keys.iter()
+            .map(|k| {
+                env.svm.get_account(k).map(|a| AccountData {
+                    lamports: a.lamports,
+                    owner: a.owner,
+                    executable: a.executable,
+                    data: a.data,
+                })
+            })
+            .collect()
     }
 
     /// The keeper reads a clock `s` seconds behind the chain's (its transactions still land at
@@ -481,19 +519,27 @@ impl Chain for LiteSvmChain {
     }
 
     async fn accounts(&self, keys: &[Pubkey]) -> anyhow::Result<Vec<Option<AccountData>>> {
-        self.rpc.borrow_mut().push(Rpc::Accounts(keys.to_vec()));
-        let env = self.env.borrow();
-        Ok(keys
-            .iter()
-            .map(|k| {
-                env.svm.get_account(k).map(|a| AccountData {
-                    lamports: a.lamports,
-                    owner: a.owner,
-                    executable: a.executable,
-                    data: a.data,
-                })
-            })
-            .collect())
+        if let Some((key, times)) = self.fail_reads.get()
+            && times > 0
+            && keys.contains(&key)
+        {
+            self.fail_reads.set(Some((key, times - 1)));
+            self.rpc.borrow_mut().push(Rpc::Accounts(keys.to_vec()));
+            anyhow::bail!("getMultipleAccounts: injected failure reading {key}");
+        }
+        Ok(self.read(keys))
+    }
+
+    async fn account_headers(
+        &self,
+        keys: &[Pubkey],
+        len: usize,
+    ) -> anyhow::Result<Vec<Option<AccountData>>> {
+        let mut out = self.read(keys);
+        for a in out.iter_mut().flatten() {
+            a.data.truncate(len);
+        }
+        Ok(out)
     }
 
     async fn program_accounts(
@@ -535,6 +581,10 @@ impl Chain for LiteSvmChain {
     async fn simulate(&self, tx: &VersionedTransaction) -> anyhow::Result<TxOutcome> {
         if let Some(r) = self.refused(tx) {
             return Ok(r);
+        }
+        if let Some(left) = self.fail_sims.get().checked_sub(1) {
+            self.fail_sims.set(left);
+            anyhow::bail!("simulateTransaction: injected failure");
         }
         let env = self.env.borrow();
         let alts = lookup_tables(&env, tx);

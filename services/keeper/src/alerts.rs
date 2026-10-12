@@ -148,10 +148,16 @@ pub enum Alert {
         detail: String,
     },
     /// Duty 10: venue program `venue` (a `VenueGuard` index) was upgraded — its ProgramData
-    /// deploy slot is no longer the one the latch validated (or flagged). The keeper flags it
-    /// (`flag_venue_upgraded`); page the Emergency multisig to run the fork suite against the
-    /// new binary, then `revalidate_venue(venue, deploy_slot)`, publish an extras set or (once
-    /// O6 is signed) set the route-broken flag.
+    /// deploy slot is no longer the one the latch validated (or flagged), and the program would
+    /// count the change as an upgrade (AIR-01: a fingerprinted venue's ProgramData that only grew
+    /// with the reviewed ELF was extended, which is not alerted, nor is an extension of the
+    /// deploy already reported during its review; with the bit clear the flag's simulation
+    /// judges it, and when it cannot, the keeper's whole read of the account after its exits,
+    /// or — that read failing too — the slot alone). The keeper flags it (`flag_venue_upgraded`);
+    /// page the Emergency multisig to run the fork suite against the new binary, then
+    /// `revalidate_venue(venue, deploy_slot, expected_elf_hash)` naming the reviewed trimmed
+    /// ELF's sha256 (`shortwin-ops revalidate-venue`), publish an extras set or (once O6 is
+    /// signed) set the route-broken flag.
     VenueUpgraded {
         venue: u8,
         program: Pubkey,
@@ -167,7 +173,9 @@ pub enum Alert {
     /// flagged"); retried every second while the upgrade stands unflagged.
     VenueFlagFailed { venue: u8, detail: String },
     /// A watched upgradeable program without a latch index (Token-2022) was upgraded: alert
-    /// only (ARCH §7.1 duty 10).
+    /// only (ARCH §7.1 duty 10). AIR-01: judged by the program's rule against the keeper's last
+    /// whole read of its ProgramData (a stranger's `ExtendProgram` is not alerted); before its
+    /// first whole read, or when the read fails, any deploy-slot change is.
     ProgramUpgraded {
         program: Pubkey,
         previous_slot: u64,

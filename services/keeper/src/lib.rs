@@ -56,10 +56,13 @@
 //!    and pages `CoveragePauseForeign` on a set it did not send.
 //! 10. **Venue drift monitor** ([`monitor`]): the six venue ProgramData deploy slots against the
 //!     `VenueGuard` latch — an upgrade is flagged with `flag_venue_upgraded` in the slot it is
-//!     seen, once, and refreshed when a second upgrade lands during review; Token-2022's upgrade
-//!     is alerted — and every covered market's pool and CPMM config (Raydium `SetParams`,
-//!     `update_pool_status`, `update_amm_config`, seen as the account changes they make):
-//!     route lost / restored, status, open time and fee against the opens and hard caps.
+//!     seen, once, and refreshed when a second upgrade lands during review; a fingerprinted
+//!     venue's ProgramData that only grew (the loader's `ExtendProgram`) is told from an upgrade
+//!     by the program's own rule — the flag's simulation, before the exits — and neither flagged
+//!     nor paged (AIR-01); Token-2022's upgrade is alerted, its extension is not — and every
+//!     covered market's pool and CPMM config (Raydium `SetParams`, `update_pool_status`,
+//!     `update_amm_config`, seen as the account changes they make): route lost / restored,
+//!     status, open time and fee against the opens and hard caps.
 //! 11. **The SOL/USD cache** (M7): `crank_sol_usd` of every newer Pyth update the program's rules
 //!     accept, read every ≤ 30 s (the USD tiers; a cache older than `oracle_stale_s` — 600 s
 //!     since 2026-10-01 — tiers every graduated market C); refusals and an aging cache (300 s)

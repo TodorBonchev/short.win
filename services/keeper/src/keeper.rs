@@ -38,6 +38,13 @@
 //! `flag_venue_upgraded` in the slot the keeper sees it, at the exit priority ceiling — and
 //! every covered market's pool and CPMM config against the last tick (Raydium admin actions:
 //! route lost or restored, status, open time, fee against the opens and hard caps), as alerts.
+//! A moved slot the header cannot judge (AIR-01: a fingerprinted venue's with its latch bit clear)
+//! is judged by the flag's own simulation — the program's rule on the whole account — so an
+//! upgrade is still flagged before the exits, and the loader's permissionless `ExtendProgram`
+//! (`VenueNotUpgraded`) is neither flagged nor paged. What needs the whole ProgramData (a slot
+//! that simulation could not judge, a move during a review, the record of the deploy under
+//! review, Token-2022's changes) is read after the exits and cranks, all in one read, and judged
+//! by the same rule.
 //!
 //! **List-only markets** (M5): covered like any market with their detection set as ReadSet — one
 //! with positions open (a curve that graduated elsewhere) is observed on the no-route cadence and
@@ -300,6 +307,10 @@ pub struct TickReport {
     pub liq_covers: Vec<(Pubkey, i64)>,
     /// `flag_venue_upgraded` calls that landed this tick: (venue, deploy slot) (duty 10).
     pub flagged: Vec<(u8, u64)>,
+    /// AIR-01: watched ProgramData extensions first seen this tick — the loader's
+    /// `ExtendProgram` moved the deploy slot, the ELF is the one the latch (or, for Token-2022,
+    /// the keeper's last read) knows: (program, deploy slot). Neither flagged nor paged (duty 10).
+    pub extended: Vec<(Pubkey, u64)>,
     /// Pool selection (duty 5's fast path, duty 12): the plan of every market whose candidates
     /// were evaluated this tick.
     pub pool_plans: BTreeMap<Pubkey, PoolPlan>,
@@ -403,6 +414,55 @@ enum Sent {
     },
 }
 
+/// What became of a `flag_venue_upgraded` attempt ([`Keeper::send_flag`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum FlagSent {
+    /// It landed: the latch holds the deploy.
+    Landed,
+    /// Simulated only (`dry_run`): the program would flag it.
+    DryRun,
+    /// The program answered `VenueNotUpgraded` in simulation: the latch already holds this
+    /// deploy slot (someone flagged it first), or — a moved slot the keeper leaves to the
+    /// program (AIR-01) — the loader's `ExtendProgram`.
+    NotUpgraded,
+    /// Attempted for this deploy already this second.
+    Throttled,
+    /// Not sent, or refused otherwise (the detail).
+    Failed(String),
+}
+
+/// AIR-01: what a moved ProgramData deploy slot needs from the whole account, judged after the
+/// tick's exits and cranks ([`Keeper::inspect_programs`]): none of it holds an open back — a
+/// review blocks opens already, Token-2022 is alert only, and a record or the keeper's own
+/// judgment follows a flag already attempted.
+#[derive(Clone, Debug)]
+enum Inspection {
+    /// Latch venue `venue`, its bit clear and a fingerprint recorded, whose flag's simulation
+    /// could not judge the moved slot (`failure`): the keeper's own judgment, by the program's
+    /// rule on the whole account.
+    Unjudged { venue: u8, failure: String },
+    /// Latch venue `venue` during a review, moved past the deploy the keeper recorded: another
+    /// upgrade, or an extension of the recorded deploy ([`Keeper::judge_review`]).
+    Review(u8),
+    /// Latch venue `venue`: the record of the deploy at the header's slot — the one the keeper
+    /// reported as an upgrade, or found under review unrecorded (a restart) — for its review.
+    Record(u8),
+    /// Token-2022 (alert only): moved from deploy `previous`, last read whole with `before`.
+    Alert {
+        previous: u64,
+        before: monitor::ElfFacts,
+    },
+    /// Token-2022 not read whole yet: the deploy its next change is judged against.
+    Baseline,
+}
+
+/// AIR-01: the moved deploy slots [`Keeper::watch_programs`] leaves to the whole account
+/// (program, header deploy slot, what is needed), with the latch as it read it.
+struct Inspections {
+    guard: VenueGuard,
+    items: Vec<(monitor::WatchedProgram, u64, Inspection)>,
+}
+
 /// Custom errors that are the program's normal "not now" answers (no alert).
 fn benign(code: u32) -> bool {
     [
@@ -451,6 +511,19 @@ pub struct Keeper<C: Chain> {
     /// The second of the last `flag_venue_upgraded` attempt per (venue, deploy slot): at most
     /// one a second for the same upgrade; a new deploy slot is attempted at once.
     flag_tried: BTreeMap<(u8, u64), i64>,
+    /// AIR-01: per watched ProgramData address, the deploy slot and [`monitor::ElfFacts`] of the
+    /// account as the keeper last read it whole ([`Self::read_whole`]); for Token-2022, the deploy
+    /// its next change is judged against.
+    program_elf: BTreeMap<Pubkey, (u64, monitor::ElfFacts)>,
+    /// AIR-01: per venue whose latch bit is set, the `(len, fingerprint)` record of the deploy the
+    /// keeper reported as an upgrade (flag or refresh) or found flagged: an extension of it during
+    /// the review is not another upgrade.
+    flagged_elf: BTreeMap<u8, (u32, [u8; shortwin::state::GUARD_ELF_LEN])>,
+    /// AIR-01: per watched program, the deploy slot of the last extension reported (once per
+    /// slot; a latch venue's slot judged an extension is not simulated again).
+    extension_seen: BTreeMap<Pubkey, u64>,
+    /// AIR-01: Token-2022 changes already alerted (program, deploy slot).
+    programs_alerted: HashSet<(Pubkey, u64)>,
     /// Duties 5 and 12: each covered Raydium or list-only market's pool-selection state.
     pool_tracks: BTreeMap<Pubkey, PoolTrack>,
     /// The chain the pool discovery's `getProgramAccounts` calls go to (`None`: `chain`).
@@ -551,6 +624,10 @@ impl<C: Chain> Keeper<C> {
             upgrades_alerted: HashSet::new(),
             flag_failures_alerted: HashSet::new(),
             flag_tried: BTreeMap::new(),
+            program_elf: BTreeMap::new(),
+            flagged_elf: BTreeMap::new(),
+            extension_seen: BTreeMap::new(),
+            programs_alerted: HashSet::new(),
             pool_tracks: BTreeMap::new(),
             discovery: None,
             migrate_tried: BTreeMap::new(),
@@ -1015,11 +1092,15 @@ impl<C: Chain> Keeper<C> {
             track.advance(*key, now, open, &self.cfg.coverage, &mut self.alerts);
         }
 
-        // Duty 10: the latch first (an upgrade is flagged in the slot it is seen), then the
-        // markets' pools.
-        if self.cfg.venue_watch.flag_upgrades {
-            self.watch_programs(now, &mut report).await;
-        }
+        // Duty 10: the latch first (an upgrade is flagged in the slot it is seen, before any exit
+        // or crank; AIR-01: a moved slot the header cannot judge is judged by the flag's own
+        // simulation), then the markets' pools. What needs a whole ProgramData read (AIR-01: a
+        // review, a record, Token-2022) waits for the end of duties 1–4.
+        let inspections = if self.cfg.venue_watch.flag_upgrades {
+            self.watch_programs(now, &mut report).await
+        } else {
+            None
+        };
         if self.cfg.venue_watch.pool_admin {
             self.watch_pools(&view);
         }
@@ -1043,6 +1124,10 @@ impl<C: Chain> Keeper<C> {
         }
         self.send_cranks(&view, crank_queue, &mut report, true)
             .await;
+        // AIR-01: the whole ProgramData reads (up to 10 MiB each) after the exits and cranks.
+        if let Some(inspections) = inspections {
+            self.inspect_programs(inspections, now, &mut report).await;
+        }
         // Pool selection after this second's observations and exits (M4-SEC-7): its RPC work —
         // discovery, ranking, the best candidates' accounts — never delays duties 1–4; the
         // cranks it asks for (a failing market's `pool_fail` chain) go out in a batch of their
@@ -3140,13 +3225,81 @@ impl<C: Chain> Keeper<C> {
         });
     }
 
+    /// AIR-01: the deploy slot and [`monitor::ElfFacts`] of each ProgramData of `wanted` (its
+    /// address, the deploy slot its header showed), read whole — all in one read; the keeper's
+    /// last read of an account stands in while its deploy slot is unchanged. The loader deploys a
+    /// program at most once a slot (`Upgrade` and `ExtendProgram` both refuse while the
+    /// ProgramData's slot is the current one: "Program was deployed in this block already",
+    /// "Program was extended in this block already"), so a deploy slot names the account's
+    /// contents. Per entry: `Ok(Some(_))` at the slot the account holds now (a later deploy than
+    /// its header's may have landed since: it is judged as read); `Ok(None)` when the account is
+    /// gone, is no ProgramData or the read lags its header; `Err` when the read failed (each
+    /// caller's fail-safe).
+    async fn read_whole(
+        &mut self,
+        wanted: &[(Pubkey, u64)],
+        report: &mut TickReport,
+    ) -> Vec<Result<Option<(u64, monitor::ElfFacts)>, ()>> {
+        let mut fetch: Vec<Pubkey> = Vec::new();
+        for (k, slot) in wanted {
+            let hit = self.program_elf.get(k).is_some_and(|(s, _)| s == slot);
+            if !hit && !fetch.contains(k) {
+                fetch.push(*k);
+            }
+        }
+        let mut read: BTreeMap<Pubkey, Option<(u64, monitor::ElfFacts)>> = BTreeMap::new();
+        if !fetch.is_empty() {
+            match self.chain.accounts(&fetch).await {
+                Ok(accs) => {
+                    for (k, acc) in fetch.iter().zip(accs) {
+                        let facts = acc.as_ref().and_then(|a| {
+                            Some((monitor::deploy_slot(Some(a))?, monitor::ElfFacts::of(a)?))
+                        });
+                        if let Some((s, f)) = facts
+                            && self.program_elf.get(k).is_none_or(|(old, _)| *old <= s)
+                        {
+                            self.program_elf.insert(*k, (s, f));
+                        }
+                        read.insert(*k, facts);
+                    }
+                }
+                Err(e) => report
+                    .errors
+                    .push(format!("ProgramData {fetch:?} (whole): {e:#}")),
+            }
+        }
+        wanted
+            .iter()
+            .map(|(k, slot)| {
+                let facts = if fetch.contains(k) {
+                    *read.get(k).ok_or(())?
+                } else {
+                    self.program_elf.get(k).copied()
+                };
+                Ok(facts.filter(|(s, _)| s >= slot))
+            })
+            .collect()
+    }
+
     /// Duty 10, upgrades ([`crate::monitor`]): reads the latch and the watched ProgramData
-    /// headers in one call; flags every upgrade the program would accept
-    /// (`flag_venue_upgraded`, simulated first, at the exit priority ceiling) and alerts once
-    /// per upgrade; Token-2022's changes are alerted only. The same upgrade is attempted at most
+    /// headers in one call, before the markets; flags every upgrade the program would accept
+    /// (`flag_venue_upgraded`, simulated first, at the exit priority ceiling) and pages it once
+    /// per deploy; Token-2022's changes are alerted only. The same upgrade is attempted at most
     /// once a second (an unflagged one is retried every second); a new deploy slot is attempted
     /// at once.
-    async fn watch_programs(&mut self, now: i64, report: &mut TickReport) {
+    ///
+    /// AIR-01: a moved slot the header cannot judge with the venue's bit clear
+    /// ([`LatchAction::Inspect`]: a fingerprint recorded) is judged here too, by the program: the
+    /// flag's simulation is its rule on the whole account, once per deploy slot. An upgrade
+    /// passes — paged, and flagged in the slot it is seen, before the tick's exits and cranks;
+    /// the loader's `ExtendProgram` answers `VenueNotUpgraded` — booked
+    /// ([`Self::note_extension`]), neither flagged nor paged. What needs the whole account is
+    /// returned for [`Self::inspect_programs`], after the exits and cranks, where it holds no
+    /// open back: a slot the flag's simulation could not judge (the keeper's own judgment, the
+    /// flag tried again the next second), a move during a review past the deploy the keeper
+    /// recorded (opens are blocked already), the record of the deploy the keeper reports or
+    /// finds under review (a restart), and Token-2022 (alert only).
+    async fn watch_programs(&mut self, now: i64, report: &mut TickReport) -> Option<Inspections> {
         let watched = monitor::watched_programs();
         let guard_key = pda::venue_guard();
         // One read: the latch whole, the ProgramData accounts sliced to (at least) their header.
@@ -3159,7 +3312,7 @@ impl<C: Chain> Keeper<C> {
                 report
                     .errors
                     .push(format!("venue guard / ProgramData: {e:#}"));
-                return;
+                return None;
             }
         };
         let Some(guard) = accs
@@ -3168,8 +3321,9 @@ impl<C: Chain> Keeper<C> {
             .and_then(view::decode_zc::<VenueGuard>)
         else {
             report.errors.push("VenueGuard not found".into());
-            return;
+            return None;
         };
+        let mut items = Vec::new();
         let headers = accs.get(1..).unwrap_or(&[]);
         for (w, acc) in watched.iter().zip(headers.iter()) {
             let slot = monitor::deploy_slot(acc.as_ref());
@@ -3186,78 +3340,331 @@ impl<C: Chain> Keeper<C> {
                 continue;
             };
             let Some(venue) = w.guard else {
-                if let Some(Some(p)) = prev
-                    && p != slot
-                {
-                    self.alerts.push(Alert::ProgramUpgraded {
-                        program: w.program,
-                        previous_slot: p,
-                        deploy_slot: slot,
-                    });
+                // Token-2022 (alert only), against the deploy the keeper last read whole.
+                match self.program_elf.get(&w.program_data).copied() {
+                    Some((judged, _)) if judged >= slot => {}
+                    Some((judged, before)) => items.push((
+                        *w,
+                        slot,
+                        Inspection::Alert {
+                            previous: judged,
+                            before,
+                        },
+                    )),
+                    None => {
+                        // Not read whole yet: the header alone (fail-safe), and a first read.
+                        if let Some(Some(p)) = prev
+                            && p != slot
+                        {
+                            self.program_upgraded(w, p, slot);
+                        }
+                        items.push((*w, slot, Inspection::Baseline));
+                    }
                 }
                 continue;
             };
-            let action = monitor::latch_action(&guard, venue, slot);
+            let flagged = guard.is_flagged(venue);
+            if !flagged {
+                self.flagged_elf.remove(&venue);
+            }
             let i = usize::from(venue);
-            let known = match action {
-                LatchAction::Nothing => continue,
-                LatchAction::Flag => guard.guard_slot.get(i).copied().unwrap_or(0),
-                LatchAction::Refresh => guard.flagged_slot.get(i).copied().unwrap_or(0),
-            };
-            if self.upgrades_alerted.insert((venue, slot)) {
-                self.alerts.push(Alert::VenueUpgraded {
-                    venue,
-                    program: w.program,
-                    known_slot: known,
-                    deploy_slot: slot,
-                });
+            // AIR-01: the venues whose reported deploy the keeper records for its review (pump
+            // and PumpSwap have no fingerprint: they sit at the 10 MiB cap, so only `Upgrade`
+            // moves their slot).
+            let recorded = VenueGuard::elf_index(venue).is_some();
+            match monitor::latch_action(&guard, venue, slot) {
+                // AIR-01: under a review the keeper did not report itself (a restart), the record
+                // of the deploy under review.
+                LatchAction::Nothing => {
+                    if flagged && recorded && !self.flagged_elf.contains_key(&venue) {
+                        items.push((*w, slot, Inspection::Record(venue)));
+                    }
+                }
+                // AIR-01: a deploy slot the program already judged an extension.
+                LatchAction::Inspect if self.extension_seen.get(&w.program) == Some(&slot) => {}
+                // AIR-01: the flag's simulation is the program's own rule on the whole account.
+                LatchAction::Inspect => {
+                    let known = guard.guard_slot.get(i).copied().unwrap_or(0);
+                    match self.send_flag(venue, slot, now, report).await {
+                        FlagSent::Landed => {
+                            self.page_upgrade(w, venue, slot, known);
+                            self.flag_landed(venue, slot, report);
+                            items.push((*w, slot, Inspection::Record(venue)));
+                        }
+                        FlagSent::DryRun => self.page_upgrade(w, venue, slot, known),
+                        FlagSent::NotUpgraded => self.note_extension(w, slot, report),
+                        FlagSent::Throttled => {}
+                        FlagSent::Failed(failure) => {
+                            items.push((*w, slot, Inspection::Unjudged { venue, failure }));
+                        }
+                    }
+                }
+                LatchAction::Refresh if self.flagged_elf.contains_key(&venue) => {
+                    items.push((*w, slot, Inspection::Review(venue)));
+                }
+                LatchAction::Flag | LatchAction::Refresh => {
+                    let known = if flagged {
+                        guard.flagged_slot.get(i)
+                    } else {
+                        guard.guard_slot.get(i)
+                    };
+                    self.report_upgrade(w, venue, slot, known.copied().unwrap_or(0), now, report)
+                        .await;
+                    if recorded {
+                        items.push((*w, slot, Inspection::Record(venue)));
+                    }
+                }
+                LatchAction::Extended => {}
             }
-            if self.flag_tried.get(&(venue, slot)) == Some(&now) {
-                continue;
+        }
+        (!items.is_empty()).then_some(Inspections { guard, items })
+    }
+
+    /// AIR-01 (duty 10): what [`Self::watch_programs`] left to the whole account, after the
+    /// tick's exits and cranks: the ProgramData accounts read whole in one read
+    /// ([`Self::read_whole`]), each judged at the slot it holds now.
+    ///
+    /// - A slot the flag's simulation could not judge: the program's rule against the latch's
+    ///   fingerprint ([`monitor::latch_action_with`]) — an upgrade is paged with the flag's
+    ///   failure (`VenueFlagFailed`; the next second flags again), an extension booked.
+    /// - A move during a review past the recorded deploy ([`Self::judge_review`]).
+    /// - The record of a deploy under review, while the account still holds it (else the next
+    ///   change is refreshed and paged, as the program would accept it).
+    /// - Token-2022, against the deploy the keeper last read whole ([`monitor::upgraded_since`]):
+    ///   an upgrade is alerted (`ProgramUpgraded`), the loader's `ExtendProgram` only logged and
+    ///   counted.
+    ///
+    /// When the whole read fails, a moved slot counts as an upgrade (fail-safe: paged; during a
+    /// review the refresh is the program's to accept).
+    async fn inspect_programs(
+        &mut self,
+        inspections: Inspections,
+        now: i64,
+        report: &mut TickReport,
+    ) {
+        let Inspections { guard, items } = inspections;
+        let wanted: Vec<(Pubkey, u64)> = items
+            .iter()
+            .map(|(w, slot, _)| (w.program_data, *slot))
+            .collect();
+        let read = self.read_whole(&wanted, report).await;
+        for ((w, header_slot, what), read) in items.into_iter().zip(read) {
+            // The deploy slot judged and the account's facts (`None`: the read failed).
+            let (slot, facts) = match read {
+                Ok(Some((slot, facts))) => (slot, Some(facts)),
+                // Gone, no ProgramData or a lagging read: the next tick.
+                Ok(None) => continue,
+                Err(()) => (header_slot, None),
+            };
+            match what {
+                // A first read: kept by `read_whole`.
+                Inspection::Baseline => {}
+                Inspection::Record(venue) => {
+                    if slot == header_slot
+                        && let Some(reported) = facts.as_ref().and_then(monitor::ElfFacts::record)
+                    {
+                        self.flagged_elf.insert(venue, reported);
+                    }
+                }
+                Inspection::Unjudged { venue, failure } => {
+                    let upgrade = match &facts {
+                        Some(f) => match monitor::latch_action_with(&guard, venue, slot, f) {
+                            LatchAction::Flag => Some(true),
+                            LatchAction::Extended => Some(false),
+                            _ => None,
+                        },
+                        None => Some(true),
+                    };
+                    match upgrade {
+                        Some(true) => {
+                            let known = guard.guard_slot.get(usize::from(venue));
+                            self.page_upgrade(&w, venue, slot, known.copied().unwrap_or(0));
+                            self.flag_failed(venue, slot, failure);
+                        }
+                        Some(false) => self.note_extension(&w, slot, report),
+                        None => {}
+                    }
+                }
+                Inspection::Review(venue) => {
+                    self.judge_review(&guard, &w, venue, slot, facts.as_ref(), now, report)
+                        .await;
+                }
+                Inspection::Alert { previous, before } => match facts {
+                    Some(facts) if slot > previous => {
+                        if monitor::upgraded_since(&before, &facts) {
+                            self.program_upgraded(&w, previous, slot);
+                        } else {
+                            self.note_extension(&w, slot, report);
+                        }
+                    }
+                    // The deploy already judged (a read lagging the last one).
+                    Some(_) => {}
+                    None => self.program_upgraded(&w, previous, header_slot),
+                },
             }
-            self.flag_tried.retain(|(v, _), _| *v != venue);
-            self.flag_tried.insert((venue, slot), now);
-            let ix = match ixs::flag_venue_upgraded(venue) {
-                Ok(ix) => ix,
-                Err(e) => {
-                    report
-                        .errors
-                        .push(format!("flag_venue_upgraded({venue}): {e:#}"));
-                    continue;
-                }
-            };
-            let failure = match self.send_ixs(&[ix], &[guard_key], true, now).await {
-                Ok(Sent::Landed { .. }) => {
-                    self.metrics.venue_flags += 1;
-                    report.flagged.push((venue, slot));
-                    self.alerts.push(Alert::VenueUpgradeFlagged {
-                        venue,
-                        deploy_slot: slot,
-                    });
-                    None
-                }
-                // Someone flagged it first (the latch already records this slot).
-                Ok(Sent::SimFailed { out, .. })
-                    if is(
-                        out.err.as_ref().and_then(TxError::custom_code),
-                        ShortwinError::VenueNotUpgraded,
-                    ) =>
-                {
-                    None
-                }
-                Ok(Sent::DryRun { .. }) => None,
-                Ok(Sent::SimFailed { out, .. }) | Ok(Sent::Failed { out }) => {
-                    Some(format!("{:?}", out.err))
-                }
-                Ok(Sent::TooLarge) => Some("transaction too large".into()),
-                Ok(Sent::Deferred { .. }) => Some("deferred".into()),
-                Err(e) => Some(format!("{e:#}")),
-            };
-            if let Some(detail) = failure
-                && self.flag_failures_alerted.insert((venue, slot))
+        }
+    }
+
+    /// AIR-01: latch venue `venue`'s ProgramData moved to deploy `slot` during its review, past
+    /// the deploy the keeper recorded; `facts`: the whole account (`None`: unread). The program
+    /// refreshes the flag on any later slot; the keeper refreshes and pages only another upgrade
+    /// — the account no longer holds the recorded deploy ([`monitor::ElfFacts::is_upgrade_since`]),
+    /// or it could not be read (fail-safe) — and records that deploy instead (unread: the next
+    /// tick records the deploy under review). An extension of the recorded deploy, which anyone
+    /// can repeat every slot, is only booked ([`Self::note_extension`]).
+    #[allow(clippy::too_many_arguments)]
+    async fn judge_review(
+        &mut self,
+        guard: &VenueGuard,
+        w: &monitor::WatchedProgram,
+        venue: u8,
+        slot: u64,
+        facts: Option<&monitor::ElfFacts>,
+        now: i64,
+        report: &mut TickReport,
+    ) {
+        if monitor::latch_action(guard, venue, slot) != LatchAction::Refresh {
+            return;
+        }
+        let upgrade = match (facts, self.flagged_elf.get(&venue)) {
+            (Some(f), Some(reported)) => f.is_upgrade_since(*reported),
+            _ => true,
+        };
+        if !upgrade {
+            self.note_extension(w, slot, report);
+            return;
+        }
+        match facts.and_then(monitor::ElfFacts::record) {
+            Some(reported) => self.flagged_elf.insert(venue, reported),
+            None => self.flagged_elf.remove(&venue),
+        };
+        let known = guard.flagged_slot.get(usize::from(venue));
+        self.report_upgrade(w, venue, slot, known.copied().unwrap_or(0), now, report)
+            .await;
+    }
+
+    /// AIR-01: books the loader's `ExtendProgram` of `w`'s ProgramData at deploy `slot` (the ELF
+    /// is the one known), once per slot: logged and counted (`TickReport::extended`,
+    /// `Metrics::venue_extensions`), neither flagged nor paged.
+    fn note_extension(&mut self, w: &monitor::WatchedProgram, slot: u64, report: &mut TickReport) {
+        if self.extension_seen.insert(w.program, slot) != Some(slot) {
+            self.metrics.venue_extensions += 1;
+            report.extended.push((w.program, slot));
+            tracing::info!(
+                program = %w.program,
+                deploy_slot = slot,
+                "ProgramData extended, not upgraded (AIR-01): nothing to flag or page"
+            );
+        }
+    }
+
+    /// Duty 10: alerts, once per deploy, that a watched program without a latch index
+    /// (Token-2022) changed from deploy `previous` to deploy `slot` (alert only).
+    fn program_upgraded(&mut self, w: &monitor::WatchedProgram, previous: u64, slot: u64) {
+        if self.programs_alerted.insert((w.program, slot)) {
+            self.alerts.push(Alert::ProgramUpgraded {
+                program: w.program,
+                previous_slot: previous,
+                deploy_slot: slot,
+            });
+        }
+    }
+
+    /// Duty 10: pages the upgrade of latch venue `venue` to deploy `slot` — judged by the keeper,
+    /// on the header or during a review — once per deploy (`known`: the slot the latch validated,
+    /// or the one flagged during a review), and flags it ([`Self::send_flag`]); a failure to flag
+    /// is alerted once per deploy.
+    async fn report_upgrade(
+        &mut self,
+        w: &monitor::WatchedProgram,
+        venue: u8,
+        slot: u64,
+        known: u64,
+        now: i64,
+        report: &mut TickReport,
+    ) {
+        self.page_upgrade(w, venue, slot, known);
+        match self.send_flag(venue, slot, now, report).await {
+            FlagSent::Landed => self.flag_landed(venue, slot, report),
+            FlagSent::Failed(detail) => self.flag_failed(venue, slot, detail),
+            // `NotUpgraded`: someone flagged it first (the latch already holds this slot).
+            FlagSent::DryRun | FlagSent::NotUpgraded | FlagSent::Throttled => {}
+        }
+    }
+
+    /// Duty 10: pages the upgrade of latch venue `venue` to deploy `slot`, once per deploy
+    /// (`known`: the slot the latch validated, or the one flagged during a review).
+    fn page_upgrade(&mut self, w: &monitor::WatchedProgram, venue: u8, slot: u64, known: u64) {
+        if self.upgrades_alerted.insert((venue, slot)) {
+            self.alerts.push(Alert::VenueUpgraded {
+                venue,
+                program: w.program,
+                known_slot: known,
+                deploy_slot: slot,
+            });
+        }
+    }
+
+    /// Duty 10: books the keeper's `flag_venue_upgraded(venue)` of deploy `slot`, landed.
+    fn flag_landed(&mut self, venue: u8, slot: u64, report: &mut TickReport) {
+        self.metrics.venue_flags += 1;
+        report.flagged.push((venue, slot));
+        self.alerts.push(Alert::VenueUpgradeFlagged {
+            venue,
+            deploy_slot: slot,
+        });
+    }
+
+    /// Duty 10: alerts, once per deploy, that the upgrade of latch venue `venue` to deploy `slot`
+    /// could not be flagged (`detail`).
+    fn flag_failed(&mut self, venue: u8, slot: u64, detail: String) {
+        if self.flag_failures_alerted.insert((venue, slot)) {
+            self.alerts.push(Alert::VenueFlagFailed { venue, detail });
+        }
+    }
+
+    /// Duty 10: `flag_venue_upgraded(venue)` for deploy `slot`, simulated first and sent at the
+    /// exit priority ceiling, at most once a second per deploy (a new deploy slot at once). Its
+    /// simulation is the program's own judgment of the moved slot ([`FlagSent::NotUpgraded`]:
+    /// not an upgrade it would flag — AIR-01).
+    async fn send_flag(
+        &mut self,
+        venue: u8,
+        slot: u64,
+        now: i64,
+        report: &mut TickReport,
+    ) -> FlagSent {
+        if self.flag_tried.get(&(venue, slot)) == Some(&now) {
+            return FlagSent::Throttled;
+        }
+        self.flag_tried.retain(|(v, _), _| *v != venue);
+        self.flag_tried.insert((venue, slot), now);
+        let ix = match ixs::flag_venue_upgraded(venue) {
+            Ok(ix) => ix,
+            Err(e) => {
+                let detail = format!("flag_venue_upgraded({venue}): {e:#}");
+                report.errors.push(detail.clone());
+                return FlagSent::Failed(detail);
+            }
+        };
+        let guard_key = pda::venue_guard();
+        match self.send_ixs(&[ix], &[guard_key], true, now).await {
+            Ok(Sent::Landed { .. }) => FlagSent::Landed,
+            Ok(Sent::DryRun { .. }) => FlagSent::DryRun,
+            Ok(Sent::SimFailed { out, .. })
+                if is(
+                    out.err.as_ref().and_then(TxError::custom_code),
+                    ShortwinError::VenueNotUpgraded,
+                ) =>
             {
-                self.alerts.push(Alert::VenueFlagFailed { venue, detail });
+                FlagSent::NotUpgraded
             }
+            Ok(Sent::SimFailed { out, .. }) | Ok(Sent::Failed { out }) => {
+                FlagSent::Failed(format!("{:?}", out.err))
+            }
+            Ok(Sent::TooLarge) => FlagSent::Failed("transaction too large".into()),
+            Ok(Sent::Deferred { .. }) => FlagSent::Failed("deferred".into()),
+            Err(e) => FlagSent::Failed(format!("{e:#}")),
         }
     }
 

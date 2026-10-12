@@ -20,8 +20,19 @@
 //!   refused), once; a second upgrade during review refreshes the flag; after
 //!   `revalidate_venue` nothing is sent; a flag someone else sent first is not repeated;
 //!   Token-2022's upgrade is alerted only.
+//! - AIR-01: once the Emergency revalidated AMM v4 naming its trimmed ELF's sha256, a stranger's
+//!   `ExtendProgram` (the loader's own instruction) is neither flagged nor paged — the flag's
+//!   simulation answers `VenueNotUpgraded`, once per deploy slot — and Raydium opens keep
+//!   landing; an upgrade after the extensions is flagged in the tick it is seen, as that tick's
+//!   first transaction, before its crank; an extension of that deploy during its review is
+//!   neither refreshed nor paged; the revalidation of the new ELF ends the review. A keeper
+//!   restarted during a review records the deploy under review, so an extension of it is not
+//!   paged either. When the flag's simulation fails, the account read whole after the exits
+//!   decides (an extension is not paged, an upgrade is, with `VenueFlagFailed`), and when that
+//!   read fails too the moved slot is paged; Token-2022's extension is not paged, its upgrade is.
 
 use anchor_lang::prelude::Pubkey;
+use anchor_lang::solana_program::instruction::Instruction;
 use shortwin::constants::{GUARD_RAYDIUM_CPMM, GUARD_RAYDIUM_V4, TOKEN_2022_PROGRAM_ID};
 use shortwin::errors::ShortwinError;
 use shortwin::events::SolSettle;
@@ -30,7 +41,8 @@ use shortwin_keeper::monitor::{self, AdminChange};
 use shortwin_litesvm_tests::engine::VenueMarket;
 use shortwin_litesvm_tests::errors::custom_code;
 use shortwin_litesvm_tests::fork::{self, FIXTURE_GUARD_SLOTS, RaydiumProgram, V4Fees};
-use shortwin_litesvm_tests::{fixtures, ix};
+use shortwin_litesvm_tests::{fixtures, ix, read};
+use shortwin_venue_state::program_data;
 use solana_signer::Signer;
 
 use crate::common::*;
@@ -552,6 +564,512 @@ fn upgrades_are_flagged_in_the_slot_they_are_seen_once_and_refreshed_during_revi
         r.alerts
     );
     assert!(r.flagged.is_empty());
+}
+
+/// `SetComputeUnitLimit(1.4 M)`, then `ix`: once a fingerprinted venue's ProgramData grew, the
+/// latch instructions hash its trimmed ELF (AIR-01; half a CU per byte).
+fn with_hash_budget(ix: Instruction) -> Vec<Instruction> {
+    vec![shortwin_litesvm_tests::pump::cu_limit_ix(1_400_000), ix]
+}
+
+/// The sha256 of `program`'s trimmed ELF as its ProgramData holds it now: what
+/// `solana-verify get-program-hash` prints and the Emergency names in `revalidate_venue`.
+fn reviewed_hash(env: &Env, program: RaydiumProgram) -> [u8; 32] {
+    let a = read::account(&env.svm, &program.program_data().address).expect("ProgramData");
+    shortwin::instructions::flag_venue_upgraded::trimmed_elf_hash_of(&a.owner.to_bytes(), &a.data)
+        .expect("a ProgramData")
+        .expect("small enough to hash")
+}
+
+/// A stranger's `ExtendProgram` of `program`'s ProgramData by 10 KiB (the loader's own
+/// permissionless instruction, `fork::extend_program_ix`): zeros appended, the ELF kept, the
+/// current slot in the header. Returns that slot.
+fn stranger_extends(env: &mut Env, program: &Pubkey) -> u64 {
+    let key = monitor::program_data_address(program);
+    let before = read::account(&env.svm, &key).unwrap().data;
+    let slot = env.clock().slot;
+    let stranger = env.funded_keypair();
+    let ix = fork::extend_program_ix(program, &stranger.pubkey(), 10_240);
+    ok(env.send(&[ix], &[&stranger]));
+    let after = read::account(&env.svm, &key).unwrap().data;
+    assert_eq!(after.len(), before.len() + 10_240);
+    assert_eq!(
+        &after[program_data::HEADER_LEN..before.len()],
+        &before[program_data::HEADER_LEN..]
+    );
+    slot
+}
+
+/// What the loader's `Upgrade` of `program` to `elf` leaves in its ProgramData (T-LATCH's
+/// `fork::set_deploy_slot` with the new ELF): the current slot in the header, `elf` after it, the
+/// rest of the account zeroed, its length kept. Returns that slot.
+fn upgrade_in_place(env: &mut Env, program: &Pubkey, elf: &[u8]) -> u64 {
+    let key = monitor::program_data_address(program);
+    let slot = env.clock().slot;
+    let mut acc = env.svm.get_account(&key).unwrap();
+    let start = program_data::HEADER_LEN;
+    acc.data[4..12].copy_from_slice(&slot.to_le_bytes());
+    acc.data[start..].fill(0);
+    acc.data[start..start + elf.len()].copy_from_slice(elf);
+    env.svm.set_account(key, acc).unwrap();
+    slot
+}
+
+/// Whether backend call `c` reads ProgramData `key` whole: a `getMultipleAccounts` naming it
+/// without the `VenueGuard` (the latch's header read names both; the keeper reads the accounts
+/// it inspects after its exits in one call).
+fn reads_whole(c: &shortwin_keeper_litesvm::Rpc, key: &Pubkey) -> bool {
+    let guard = shortwin_keeper::pda::venue_guard();
+    matches!(c, shortwin_keeper_litesvm::Rpc::Accounts(k) if k.contains(key) && !k.contains(&guard))
+}
+
+/// The whole-account reads of ProgramData `key` the keeper made so far ([`reads_whole`]).
+fn whole_reads(h: &Harness, key: Pubkey) -> usize {
+    h.chain()
+        .rpc_log()
+        .iter()
+        .filter(|c| reads_whole(c, &key))
+        .count()
+}
+
+/// The latch transactions (`flag_venue_upgraded`: they write the `VenueGuard`) the keeper sent.
+fn flags_sent(h: &Harness) -> usize {
+    let guard = shortwin_keeper::pda::venue_guard();
+    h.chain()
+        .sent()
+        .iter()
+        .filter(|t| t.writable.contains(&guard))
+        .count()
+}
+
+/// AMM v4's dumped ELF with one byte of a panic-location string in `.rodata` changed
+/// (`program/src/math.rs` → `…/meth.rs`, as `latch_raydium_it`): another build of the same size
+/// the loader would deploy.
+fn v4_elf_one_byte_changed() -> Vec<u8> {
+    let mut elf = RaydiumProgram::AmmV4.elf().to_vec();
+    let at = elf
+        .windows(19)
+        .position(|w| w == b"program/src/math.rs")
+        .expect("the string")
+        + 13;
+    assert_eq!(elf[at], b'a');
+    elf[at] = b'e';
+    elf
+}
+
+/// AIR-01 (the TODO.md keeper item on `latch_action` and a pure `ExtendProgram`). The ops
+/// runbook's revalidation records AMM v4's fingerprint (its dumped deploy, naming the trimmed
+/// ELF's sha256). A stranger's `ExtendProgram` then moves the deploy slot: the keeper lets the
+/// flag's simulation judge it — the program's rule answers `VenueNotUpgraded`, once for that
+/// slot, no whole read — and neither flags nor pages it, and Raydium opens keep landing. A second
+/// extension likewise. An upgrade in the grown account (one ELF byte changed) is flagged in the
+/// tick it is seen and paged once, and its deploy read whole once (after the exits) for the
+/// review; a stranger's extension of that unreviewed deploy during the review — which the program
+/// would still refresh — is neither refreshed nor paged; the Emergency's revalidation of the new
+/// ELF, in a later slot, ends the review.
+#[test]
+fn air01_extensions_are_neither_flagged_nor_paged_and_an_upgrade_after_them_is() {
+    let (mut h, ms) = ray_setup(&[FART], KeeperConfig::default());
+    let (rm, q) = &ms[0];
+    let venue = GUARD_RAYDIUM_V4;
+    let v4 = RaydiumProgram::AmmV4;
+    let id = v4.id();
+    let pd = v4.program_data().address;
+    let slot0 = FIXTURE_GUARD_SLOTS[usize::from(venue)];
+    let reviewed = h.with_env(|env| reviewed_hash(env, v4));
+    h.with_env(|env| {
+        let ea = env.pause_authority.insecure_clone();
+        let ix = ix::revalidate_venue_reviewed(&ea.pubkey(), venue, slot0, reviewed);
+        ok(env.send(&[ix], &[&ea]));
+    });
+    assert!(
+        h.with_env(|env| env.venue_guard())
+            .elf_fingerprint(venue)
+            .is_some()
+    );
+    let r = h.slot().clone();
+    assert!(r.flagged.is_empty() && r.extended.is_empty() && venue_alerts(&r).is_empty());
+
+    // A stranger extends AMM v4: seen and counted in the next slot, nothing sent, nothing paged.
+    let ext = h.with_env(|env| stranger_extends(env, &id));
+    let sent = h.chain().sent().len();
+    let refused = h.keeper.metrics.simulation_failures;
+    let r = h.slot().clone();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert_eq!(r.extended, vec![(id, ext)]);
+    assert!(
+        r.flagged.is_empty() && venue_alerts(&r).is_empty(),
+        "{:?}",
+        r.alerts
+    );
+    for _ in 0..3 {
+        let r = h.slot().clone();
+        assert!(r.flagged.is_empty() && r.extended.is_empty() && venue_alerts(&r).is_empty());
+    }
+    assert_eq!(h.chain().sent().len(), sent, "nothing sent");
+    assert_eq!(
+        h.keeper.metrics.simulation_failures,
+        refused + 1,
+        "the flag simulated once for that deploy slot (VenueNotUpgraded)"
+    );
+    assert_eq!(whole_reads(&h, pd), 0, "no whole read");
+    assert_eq!(h.keeper.metrics.venue_extensions, 1);
+    // The program's own answer to the flag the keeper simulated and did not send.
+    h.with_env(|env| {
+        let res = env.send(&with_hash_budget(ix::flag_venue_upgraded(venue)), &[]);
+        assert_eq!(
+            custom_code(&res),
+            Some(u32::from(ShortwinError::VenueNotUpgraded))
+        );
+    });
+    let _ = ray_open(&h, rm, *q);
+    let ext2 = h.with_env(|env| stranger_extends(env, &id));
+    let r = h.slot().clone();
+    assert_eq!(r.extended, vec![(id, ext2)]);
+    assert!(
+        r.flagged.is_empty() && venue_alerts(&r).is_empty(),
+        "{:?}",
+        r.alerts
+    );
+
+    // An upgrade in the grown account: flagged in the next slot, paged once; its deploy read
+    // whole once, after the exits, for the review.
+    h.slot();
+    let up = h.with_env(|env| upgrade_in_place(env, &id, &v4_elf_one_byte_changed()));
+    let r = h.slot().clone();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert_eq!(r.flagged, vec![(venue, up)], "{:?}", r.alerts);
+    assert!(venue_alerts(&r).contains(&Alert::VenueUpgraded {
+        venue,
+        program: shortwin::constants::RAYDIUM_V4_PROGRAM_ID,
+        known_slot: slot0,
+        deploy_slot: up,
+    }));
+    assert_eq!(whole_reads(&h, pd), 1, "the deploy flagged, recorded");
+    let mut b = h.with_env(|env| env.borrower());
+    let res = h.with_env(|env| env.open(rm, &mut b, *q).0);
+    assert_eq!(
+        custom_code(&res),
+        Some(u32::from(ShortwinError::VenueUpgraded))
+    );
+
+    // During the review a stranger extends the unreviewed deploy: no refresh, no page.
+    h.slot();
+    let ext3 = h.with_env(|env| stranger_extends(env, &id));
+    let sent = h.chain().sent().len();
+    let r = h.slot().clone();
+    assert_eq!(r.extended, vec![(id, ext3)]);
+    assert!(
+        r.flagged.is_empty() && venue_alerts(&r).is_empty(),
+        "{:?}",
+        r.alerts
+    );
+    assert_eq!(h.chain().sent().len(), sent, "no refresh");
+    assert_eq!(
+        whole_reads(&h, pd),
+        2,
+        "the moved slot read whole, after the exits"
+    );
+    let g = h.with_env(|env| env.venue_guard());
+    assert!(g.is_flagged(venue));
+    assert_eq!(g.flagged_slot[usize::from(venue)], up);
+
+    // The Emergency revalidates the new ELF after the extension: the review ends.
+    h.with_env(|env| {
+        let ea = env.pause_authority.insecure_clone();
+        let new = reviewed_hash(env, v4);
+        assert_ne!(new, reviewed);
+        let ix = ix::revalidate_venue_reviewed(&ea.pubkey(), venue, up, new);
+        ok(env.send(&with_hash_budget(ix), &[&ea]));
+    });
+    let r = h.slot().clone();
+    assert!(r.flagged.is_empty() && r.extended.is_empty() && venue_alerts(&r).is_empty());
+    assert!(!h.with_env(|env| env.venue_guard()).is_flagged(venue));
+    let _ = ray_open(&h, rm, *q);
+    assert_eq!(h.keeper.metrics.venue_extensions, 3);
+    assert_eq!(h.keeper.metrics.venue_flags, 1);
+}
+
+/// AIR-01, a keeper restarted during a review: AMM v4 is upgraded (no fingerprint: the header
+/// decides) and flagged; the keeper restarts with no record of that deploy. Its first tick finds
+/// the venue flagged at the deploy slot the account holds, reads it whole once and records it —
+/// nothing sent, nothing paged. A stranger's extension of the deploy under review is then neither
+/// refreshed nor paged (before the fix the restarted keeper refreshed and paged it as a new
+/// upgrade); a second upgrade during the review (the old ELF back) is.
+#[test]
+fn air01_a_keeper_restarted_during_a_review_does_not_page_an_extension_of_its_deploy() {
+    let (mut h, _ms) = ray_setup(&[FART], KeeperConfig::default());
+    let venue = GUARD_RAYDIUM_V4;
+    let id = RaydiumProgram::AmmV4.id();
+    let pd = RaydiumProgram::AmmV4.program_data().address;
+    h.slot();
+    let up = h.with_env(|env| upgrade_in_place(env, &id, &v4_elf_one_byte_changed()));
+    let r = h.slot().clone();
+    assert_eq!(r.flagged, vec![(venue, up)], "{:?}", r.alerts);
+
+    let cfg = h.keeper.config().clone();
+    h.restart(cfg);
+    let r = h.slot().clone();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert!(
+        r.flagged.is_empty() && r.extended.is_empty() && venue_alerts(&r).is_empty(),
+        "{:?}",
+        r.alerts
+    );
+    assert_eq!(whole_reads(&h, pd), 1, "the deploy under review, read once");
+    assert_eq!(flags_sent(&h), 0, "nothing flagged");
+
+    h.slot();
+    let ext = h.with_env(|env| stranger_extends(env, &id));
+    let r = h.slot().clone();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert_eq!(r.extended, vec![(id, ext)]);
+    assert!(
+        r.flagged.is_empty() && venue_alerts(&r).is_empty(),
+        "{:?}",
+        r.alerts
+    );
+    assert_eq!(flags_sent(&h), 0, "no refresh");
+    let g = h.with_env(|env| env.venue_guard());
+    assert!(g.is_flagged(venue));
+    assert_eq!(g.flagged_slot[usize::from(venue)], up);
+
+    h.slot();
+    let up2 = h.with_env(|env| upgrade_in_place(env, &id, RaydiumProgram::AmmV4.elf()));
+    let r = h.slot().clone();
+    assert_eq!(r.flagged, vec![(venue, up2)], "{:?}", r.alerts);
+    assert!(venue_alerts(&r).contains(&Alert::VenueUpgraded {
+        venue,
+        program: id,
+        known_slot: up,
+        deploy_slot: up2,
+    }));
+}
+
+/// Revalidates AMM v4 at its fixture deploy with its trimmed ELF's hash (the ops runbook): the
+/// latch then holds its fingerprint. Returns that deploy slot.
+fn revalidate_v4_with_hash(h: &Harness) -> u64 {
+    let venue = GUARD_RAYDIUM_V4;
+    let slot0 = FIXTURE_GUARD_SLOTS[usize::from(venue)];
+    h.with_env(|env| {
+        let reviewed = reviewed_hash(env, RaydiumProgram::AmmV4);
+        let ea = env.pause_authority.insecure_clone();
+        let ix = ix::revalidate_venue_reviewed(&ea.pubkey(), venue, slot0, reviewed);
+        ok(env.send(&[ix], &[&ea]));
+    });
+    assert!(
+        h.with_env(|env| env.venue_guard())
+            .elf_fingerprint(venue)
+            .is_some()
+    );
+    slot0
+}
+
+/// AIR-01 keeps the latch first (ARCH §7.1 duty 10: the flag in the slot the upgrade is seen,
+/// at the exit priority ceiling): AMM v4 revalidated with its fingerprint and a position open on
+/// its market; an upgrade lands before the keeper's tick. The flag's simulation judges the moved
+/// slot and the flag is the tick's first transaction, before its crank; the whole read of the
+/// ProgramData — the record of the flagged deploy for its review — comes after them. As first
+/// built the keeper read the account and flagged only after the tick's exits and cranks.
+#[test]
+fn air01_an_upgrade_is_flagged_before_the_ticks_exits_and_cranks() {
+    let (mut h, ms) = ray_setup(&[FART], KeeperConfig::default());
+    let (rm, q) = &ms[0];
+    let venue = GUARD_RAYDIUM_V4;
+    let id = RaydiumProgram::AmmV4.id();
+    let pd = RaydiumProgram::AmmV4.program_data().address;
+    let slot0 = revalidate_v4_with_hash(&h);
+    let _ = ray_open(&h, rm, *q);
+    let up = h.with_env(|env| upgrade_in_place(env, &id, &v4_elf_one_byte_changed()));
+    let (rpc0, sent0) = (h.chain().rpc_log().len(), h.chain().sent().len());
+    let r = h.second().clone();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert_eq!(r.flagged, vec![(venue, up)], "{:?}", r.alerts);
+    assert!(venue_alerts(&r).contains(&Alert::VenueUpgraded {
+        venue,
+        program: id,
+        known_slot: slot0,
+        deploy_slot: up,
+    }));
+    assert!(r.cranked.contains(&rm.market()), "{:?}", r.crank_failed);
+    let guard = shortwin_keeper::pda::venue_guard();
+    let sent = &h.chain().sent()[sent0..];
+    assert!(sent.len() >= 2, "{sent:?}");
+    assert!(
+        sent[0].writable.contains(&guard),
+        "the flag first: {sent:?}"
+    );
+    assert!(sent[1..].iter().all(|t| !t.writable.contains(&guard)));
+    let log = &h.chain().rpc_log()[rpc0..];
+    let sends: Vec<usize> = log
+        .iter()
+        .enumerate()
+        .filter(|(_, c)| matches!(c, shortwin_keeper_litesvm::Rpc::Send { .. }))
+        .map(|(i, _)| i)
+        .collect();
+    let whole = log
+        .iter()
+        .position(|c| reads_whole(c, &pd))
+        .expect("the record's whole read");
+    assert!(sends.len() >= 2 && sends[1] < whole, "{log:?}");
+    let mut b = h.with_env(|env| env.borrower());
+    let res = h.with_env(|env| env.open(rm, &mut b, *q).0);
+    assert_eq!(
+        custom_code(&res),
+        Some(u32::from(ShortwinError::VenueUpgraded))
+    );
+}
+
+/// AIR-01, when the flag's simulation cannot judge (a node that could not simulate), the keeper
+/// judges by the program's rule on the account read whole after its exits. AMM v4 revalidated
+/// with its fingerprint. A stranger extends it and the simulation fails: the whole account shows
+/// an extension — counted, nothing paged. A second extension whose simulation and whole read both
+/// fail counts as an upgrade (fail-safe): paged once with the flag's failure (`VenueFlagFailed`);
+/// the next second the flag's simulation answers `VenueNotUpgraded` — counted as an extension,
+/// nothing flagged, nothing more paged. An upgrade whose simulation fails is paged by the whole
+/// read with the flag's failure, and flagged the next second.
+#[test]
+fn air01_a_slot_the_flags_simulation_cannot_judge_is_judged_on_the_whole_account() {
+    let (mut h, _ms) = ray_setup(&[FART], KeeperConfig::default());
+    let venue = GUARD_RAYDIUM_V4;
+    let id = RaydiumProgram::AmmV4.id();
+    let pd = RaydiumProgram::AmmV4.program_data().address;
+    let slot0 = revalidate_v4_with_hash(&h);
+    let flag_failed = |r: &TickReport| {
+        r.alerts
+            .iter()
+            .any(|a| matches!(a, Alert::VenueFlagFailed { venue: v, .. } if *v == venue))
+    };
+    h.slot();
+
+    // The simulation fails: the whole account shows an extension.
+    let ext = h.with_env(|env| stranger_extends(env, &id));
+    h.chain().fail_simulations(1);
+    let r = h.slot().clone();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert_eq!(r.extended, vec![(id, ext)]);
+    assert!(
+        r.flagged.is_empty() && venue_alerts(&r).is_empty(),
+        "{:?}",
+        r.alerts
+    );
+    assert_eq!(whole_reads(&h, pd), 1);
+
+    // The simulation and the whole read fail: paged (fail-safe), with the flag's failure.
+    h.slot();
+    let ext2 = h.with_env(|env| stranger_extends(env, &id));
+    h.chain().fail_simulations(1);
+    h.chain().fail_reads_of(pd, 1);
+    let r = h.slot().clone();
+    assert!(
+        r.errors.iter().any(|e| e.contains("(whole)")),
+        "{:?}",
+        r.errors
+    );
+    assert!(r.flagged.is_empty() && r.extended.is_empty());
+    let a = venue_alerts(&r);
+    assert!(
+        a.contains(&Alert::VenueUpgraded {
+            venue,
+            program: id,
+            known_slot: slot0,
+            deploy_slot: ext2,
+        }),
+        "{a:?}"
+    );
+    assert!(flag_failed(&r), "{a:?}");
+    // The next second the program judges it: an extension.
+    let r = h.second().clone();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert_eq!(r.extended, vec![(id, ext2)]);
+    assert!(
+        r.flagged.is_empty() && venue_alerts(&r).is_empty(),
+        "{:?}",
+        r.alerts
+    );
+    assert_eq!(flags_sent(&h), 0, "nothing flagged");
+
+    // An upgrade whose simulation fails: paged on the whole account, flagged the next second.
+    h.slot();
+    let up = h.with_env(|env| upgrade_in_place(env, &id, &v4_elf_one_byte_changed()));
+    h.chain().fail_simulations(1);
+    let r = h.slot().clone();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert!(r.flagged.is_empty() && r.extended.is_empty());
+    assert!(
+        venue_alerts(&r).contains(&Alert::VenueUpgraded {
+            venue,
+            program: id,
+            known_slot: slot0,
+            deploy_slot: up,
+        }),
+        "{:?}",
+        r.alerts
+    );
+    assert!(flag_failed(&r), "{:?}", r.alerts);
+    let r = h.second().clone();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert_eq!(r.flagged, vec![(venue, up)], "{:?}", r.alerts);
+    assert!(
+        !venue_alerts(&r)
+            .iter()
+            .any(|a| matches!(a, Alert::VenueUpgraded { .. })),
+        "paged once: {:?}",
+        r.alerts
+    );
+    assert!(h.with_env(|env| env.venue_guard()).is_flagged(venue));
+    assert_eq!(h.keeper.metrics.venue_extensions, 2);
+}
+
+/// AIR-01 for Token-2022 (alert only; the mainnet program, extendable like any upgradeable
+/// program): the keeper's first tick reads its ProgramData whole once, the deploy its changes are
+/// judged against. A stranger's `ExtendProgram` of it is not paged — counted as an extension;
+/// before the fix every extension paged `ProgramUpgraded` — and an upgrade (one ELF byte changed,
+/// in the grown account) is alerted once.
+#[test]
+fn air01_token_2022_is_paged_for_an_upgrade_not_for_an_extension() {
+    let (mut h, _ms) = ray_setup(&[FART], KeeperConfig::default());
+    let t22 = TOKEN_2022_PROGRAM_ID;
+    let t22_pd = monitor::program_data_address(&t22);
+    let r = h.slot().clone();
+    assert!(r.errors.is_empty() && venue_alerts(&r).is_empty(), "{r:?}");
+    assert_eq!(whole_reads(&h, t22_pd), 1, "the first read");
+
+    h.slot();
+    let ext = h.with_env(|env| stranger_extends(env, &t22));
+    let r = h.slot().clone();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert_eq!(r.extended, vec![(t22, ext)]);
+    assert!(venue_alerts(&r).is_empty(), "{:?}", r.alerts);
+    for _ in 0..2 {
+        let r = h.slot().clone();
+        assert!(r.extended.is_empty() && venue_alerts(&r).is_empty());
+    }
+    assert_eq!(whole_reads(&h, t22_pd), 2, "once per deploy slot");
+
+    h.slot();
+    let up = h.with_env(|env| {
+        let data = read::account(&env.svm, &t22_pd).unwrap().data;
+        let elf = &data[program_data::HEADER_LEN..];
+        let end = elf.iter().rposition(|&b| b != 0).expect("an ELF") + 1;
+        let mut changed = elf[..end].to_vec();
+        changed[end / 2] ^= 0x01;
+        upgrade_in_place(env, &t22, &changed)
+    });
+    let r = h.slot().clone();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert!(r.extended.is_empty());
+    assert_eq!(
+        venue_alerts(&r),
+        vec![Alert::ProgramUpgraded {
+            program: t22,
+            previous_slot: ext,
+            deploy_slot: up,
+        }]
+    );
+    let r = h.slot().clone();
+    assert!(venue_alerts(&r).is_empty(), "once: {:?}", r.alerts);
+    assert_eq!(h.keeper.metrics.venue_extensions, 1);
 }
 
 #[test]

@@ -16,6 +16,31 @@
 //! both Raydium programs share one latch mask, so an upgrade of either blocks opens on every
 //! Raydium market (ARCH §3.1, R4B-7).
 //!
+//! **An extension is not an upgrade (AIR-01).** The loader's `ExtendProgram` is permissionless
+//! (Agave 4.2): it appends zeros, keeps the ELF and writes the current slot into the header, so
+//! the header alone cannot tell it from an `Upgrade`. The program tells them apart for the venues
+//! whose ProgramData can still grow (pump-fees, AMM v4, CPMM, Jupiter) once `revalidate_venue`
+//! recorded a fingerprint (`VenueGuard::guard_len` / `guard_elf`): with the bit clear, a moved
+//! slot is an upgrade if the account kept the recorded length or its trimmed ELF's sha256 no
+//! longer starts with the fingerprint (or is too large to hash), and a grown account with the
+//! reviewed ELF is `VenueNotUpgraded`. The keeper mirrors it: [`latch_action`] answers
+//! [`LatchAction::Inspect`] when only the whole account can decide. Then the flag's simulation
+//! decides, before the keeper's exits — the program's rule, so an upgrade is flagged in the slot
+//! it is seen and an extension answers `VenueNotUpgraded`: nothing flagged, nothing paged. When
+//! that simulation cannot judge (it fails otherwise), [`latch_action_with`] decides on the whole
+//! account's [`ElfFacts`] with the program's own hash (`trimmed_elf_hash_of`,
+//! `elf_fingerprint_of`) — [`LatchAction::Extended`] for an extension. Without a fingerprint
+//! (pump and PumpSwap, which sit at the 10 MiB cap, and any venue before its first revalidation
+//! with a hash) the slot alone decides, as on chain. While the bit is set the program refreshes
+//! on any later slot; the keeper refreshes and pages only when the account no longer holds the
+//! deploy it reported ([`ElfFacts::is_upgrade_since`] against its own record of that deploy,
+//! read whole after it reports it or, after a restart, when it first finds the review), so an
+//! extension of the unreviewed ELF during review is not another upgrade either. Token-2022 (alert
+//! only) has no latch record: the keeper judges its change by the same rule against the deploy it
+//! last read whole ([`upgraded_since`]), so a stranger's extension of it is not paged either. The
+//! keeper reads these accounts whole only after its exits and cranks (they reach 10 MiB), where
+//! nothing waits on them: opens are blocked during a review, and Token-2022 is alert only.
+//!
 //! **Pool admin actions.** The Raydium pool admin (`GThUX1…`, a 2-of-3 Squads v3 vault with no
 //! timelock, R-RAY §5) can, per AMM v4 pool, disable swaps (`SetParams` status 2–5, or 7 with a
 //! future open time) or set its swap fee to anything below 100 % (`SetParams` fees); per CPMM
@@ -47,7 +72,8 @@ use anchor_lang::prelude::Pubkey;
 use shortwin::constants::{
     TOKEN_2022_PROGRAM_ID, VENUE_PROGRAM_DATA, VENUE_PROGRAM_IDS, VENUE_PROGRAMS,
 };
-use shortwin::state::{VenueGuard, VenueKind};
+use shortwin::instructions::flag_venue_upgraded::trimmed_elf_hash_of;
+use shortwin::state::{GUARD_ELF_LEN, VenueGuard, VenueKind, elf_fingerprint_of};
 use shortwin_services_common::AccountData;
 use shortwin_venue_state::{program_data, raydium_cpmm, raydium_v4};
 
@@ -110,10 +136,20 @@ pub enum LatchAction {
     /// The bit is set and the deploy slot is not `flagged_slot`: a second upgrade during
     /// review, whose flag refreshes `flagged_slot` / `flagged_at`.
     Refresh,
+    /// AIR-01: the bit is clear, the deploy slot is not `guard_slot` and the guard holds an ELF
+    /// fingerprint of the venue (`VenueGuard::elf_fingerprint`): the header cannot tell an
+    /// `Upgrade` from an `ExtendProgram`, so the whole ProgramData decides — the flag's own
+    /// simulation, or [`latch_action_with`] on the account read whole.
+    Inspect,
+    /// AIR-01: the ProgramData moved its deploy slot by growing while it still holds the ELF the
+    /// latch knows — an extension, not an upgrade (with the bit clear `flag_venue_upgraded`
+    /// answers `VenueNotUpgraded`): nothing to flag or page.
+    Extended,
 }
 
-/// The program's `flag_venue_upgraded` rule for venue `venue` at ProgramData `deploy_slot`
-/// ([module docs](self)).
+/// The program's `flag_venue_upgraded` rule for venue `venue` at ProgramData `deploy_slot`, as
+/// far as the header can tell ([module docs](self)): [`LatchAction::Inspect`] where the program
+/// reads the rest of the account (AIR-01).
 pub fn latch_action(guard: &VenueGuard, venue: u8, deploy_slot: u64) -> LatchAction {
     let i = usize::from(venue);
     if i >= VENUE_PROGRAMS {
@@ -127,8 +163,78 @@ pub fn latch_action(guard: &VenueGuard, venue: u8, deploy_slot: u64) -> LatchAct
         }
     } else if guard.guard_slot.get(i) == Some(&deploy_slot) {
         LatchAction::Nothing
+    } else if guard.elf_fingerprint(venue).is_some() {
+        LatchAction::Inspect
     } else {
         LatchAction::Flag
+    }
+}
+
+/// What the AIR-01 rule reads of a whole ProgramData account: its data length and the
+/// `VenueGuard` fingerprint (the first `GUARD_ELF_LEN` bytes) of its trimmed ELF's sha256 —
+/// the program's own `trimmed_elf_hash_of` and `elf_fingerprint_of`, so `None` above
+/// `ELF_HASH_MAX_LEN` (not hashed).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ElfFacts {
+    /// The account's data length (`None` past `u32`, which no ProgramData reaches).
+    pub len: Option<u32>,
+    pub fingerprint: Option<[u8; GUARD_ELF_LEN]>,
+}
+
+impl ElfFacts {
+    /// The facts of a fetched ProgramData account (the whole account, not a header slice);
+    /// `None` when its header does not parse.
+    pub fn of(acc: &AccountData) -> Option<Self> {
+        let hash = trimmed_elf_hash_of(&acc.owner.to_bytes(), &acc.data).ok()?;
+        Some(Self {
+            len: u32::try_from(acc.data.len()).ok(),
+            fingerprint: hash.map(|h| elf_fingerprint_of(&h)),
+        })
+    }
+
+    /// The program's `is_upgrade` (`flag_venue_upgraded`, AIR-01): whether a ProgramData with
+    /// these facts, whose deploy slot moved since the deploy recorded as `(len, fingerprint)`,
+    /// holds an upgrade — it kept the recorded length (only `Upgrade` moves the slot without
+    /// resizing the account; `ExtendProgram` always grows it), or its trimmed ELF no longer
+    /// matches the fingerprint (or is too large to hash: fail-safe).
+    pub fn is_upgrade_since(&self, (len, fingerprint): (u32, [u8; GUARD_ELF_LEN])) -> bool {
+        self.len == Some(len) || self.fingerprint != Some(fingerprint)
+    }
+
+    /// The `(len, fingerprint)` record of this deploy — what `revalidate_venue` naming its
+    /// trimmed-ELF hash records — or `None` when its ELF is not hashed.
+    pub fn record(&self) -> Option<(u32, [u8; GUARD_ELF_LEN])> {
+        Some((self.len?, self.fingerprint?))
+    }
+}
+
+/// AIR-01 for a watched program without a latch index (Token-2022, alert only): whether its
+/// ProgramData, whose deploy slot moved since the keeper read it whole holding `before`, now
+/// holding `after`, was upgraded — the program's rule ([`ElfFacts::is_upgrade_since`]) against
+/// the keeper's own read; without a record of `before` (its ELF not hashed), an upgrade
+/// (fail-safe).
+pub fn upgraded_since(before: &ElfFacts, after: &ElfFacts) -> bool {
+    before
+        .record()
+        .is_none_or(|reported| after.is_upgrade_since(reported))
+}
+
+/// The program's `flag_venue_upgraded` rule for venue `venue` on the whole ProgramData at
+/// `deploy_slot` with `facts` (AIR-01): [`latch_action`], an [`LatchAction::Inspect`] resolved
+/// against the guard's fingerprint — [`LatchAction::Flag`] for an upgrade,
+/// [`LatchAction::Extended`] for an extension.
+pub fn latch_action_with(
+    guard: &VenueGuard,
+    venue: u8,
+    deploy_slot: u64,
+    facts: &ElfFacts,
+) -> LatchAction {
+    match latch_action(guard, venue, deploy_slot) {
+        LatchAction::Inspect => match guard.elf_fingerprint(venue) {
+            Some(fp) if !facts.is_upgrade_since(fp) => LatchAction::Extended,
+            _ => LatchAction::Flag,
+        },
+        a => a,
     }
 }
 
@@ -603,6 +709,161 @@ mod tests {
             LatchAction::Nothing
         );
         assert_eq!(latch_action(&g, 6, 1), LatchAction::Nothing);
+    }
+
+    /// A ProgramData account at `slot` holding `elf`, zero-padded to `len` data bytes.
+    fn program_data_account(slot: u64, elf: &[u8], len: usize) -> AccountData {
+        let mut data = program_data::encode_header(slot, Some(&[7u8; 32])).to_vec();
+        data.extend_from_slice(elf);
+        data.resize(len, 0);
+        AccountData {
+            lamports: 1,
+            owner: Pubkey::new_from_array(program_data::LOADER_UPGRADEABLE),
+            executable: false,
+            data,
+        }
+    }
+
+    fn facts(acc: &AccountData) -> ElfFacts {
+        ElfFacts::of(acc).expect("a ProgramData")
+    }
+
+    /// AIR-01, the program's `flag_venue_upgraded` rule on whole accounts: once CPMM was
+    /// revalidated naming its trimmed ELF's sha256 (the guard records the length and the
+    /// fingerprint), the loader's `ExtendProgram` — the slot moved, the account grew, the ELF
+    /// kept — is no upgrade, every changed ELF is (in place, in an extended account, a larger one,
+    /// one too large to hash), and so is a redeploy in place (the length decides). Without a
+    /// fingerprint, and on pump (no fingerprint slot), the slot alone decides. During a review the
+    /// keeper's own record of the deploy it reported tells an extension of it from another
+    /// upgrade, and Token-2022's last whole read its extension from its upgrade.
+    #[test]
+    fn air01_an_extension_is_not_an_upgrade_and_every_changed_elf_is() {
+        use shortwin::constants::GUARD_PUMP;
+        use shortwin::instructions::flag_venue_upgraded::ELF_HASH_MAX_LEN;
+
+        let v = GUARD_RAYDIUM_CPMM;
+        let i = usize::from(v);
+        let elf: Vec<u8> = (0..5_000u32).map(|k| (k % 251) as u8 | 1).collect();
+        let s0 = 452_376_460;
+        // The deploy's own zero tail past the ELF.
+        let len0 = program_data::HEADER_LEN + elf.len() + 300;
+        let reviewed = program_data_account(s0, &elf, len0);
+        let hash = trimmed_elf_hash_of(&reviewed.owner.to_bytes(), &reviewed.data)
+            .unwrap()
+            .unwrap();
+        // What `solana-verify get-program-hash` prints: the sha256 of the ELF without its tail.
+        assert_eq!(hash, solana_sha256_hasher::hashv(&[&elf]).to_bytes());
+        let mut g = guard();
+        g.guard_slot[i] = s0;
+        let ext = program_data_account(s0 + 10, &elf, len0 + 10_240);
+        // Before a revalidation with a hash the slot alone decides (an extension is flagged, as
+        // on chain: the ops runbook revalidates every growable venue after `initialize_config`).
+        assert_eq!(latch_action(&g, v, s0 + 10), LatchAction::Flag);
+        assert_eq!(
+            latch_action_with(&g, v, s0 + 10, &facts(&ext)),
+            LatchAction::Flag
+        );
+        g.set_elf_fingerprint(
+            v,
+            Some((u32::try_from(len0).unwrap(), elf_fingerprint_of(&hash))),
+        );
+        assert_eq!(latch_action(&g, v, s0), LatchAction::Nothing);
+        assert_eq!(latch_action(&g, v, s0 + 10), LatchAction::Inspect);
+        assert_eq!(
+            latch_action_with(&g, v, s0 + 10, &facts(&ext)),
+            LatchAction::Extended
+        );
+        let ext2 = program_data_account(s0 + 20, &elf, len0 + 20_480);
+        assert_eq!(
+            latch_action_with(&g, v, s0 + 20, &facts(&ext2)),
+            LatchAction::Extended,
+            "a second extension"
+        );
+        assert_eq!(
+            latch_action_with(&g, v, s0, &facts(&ext)),
+            LatchAction::Nothing,
+            "the validated slot"
+        );
+        let upgrade = |elf: &[u8], len: usize| {
+            latch_action_with(
+                &g,
+                v,
+                s0 + 30,
+                &facts(&program_data_account(s0 + 30, elf, len)),
+            )
+        };
+        let mut changed = elf.clone();
+        changed[17] ^= 0x40;
+        assert_eq!(upgrade(&changed, len0), LatchAction::Flag, "in place");
+        assert_eq!(
+            upgrade(&elf, len0),
+            LatchAction::Flag,
+            "redeployed in place"
+        );
+        assert_eq!(
+            upgrade(&changed, len0 + 10_240),
+            LatchAction::Flag,
+            "after an extension"
+        );
+        let mut larger = elf.clone();
+        larger.extend(std::iter::repeat_n(3u8, 8_000));
+        assert_eq!(
+            upgrade(&larger, len0 + 10_240),
+            LatchAction::Flag,
+            "a larger ELF in the extension"
+        );
+        let huge = vec![1u8; ELF_HASH_MAX_LEN + 1];
+        let big = program_data_account(s0 + 40, &huge, program_data::HEADER_LEN + huge.len() + 64);
+        assert_eq!(facts(&big).fingerprint, None, "not hashed");
+        assert_eq!(
+            latch_action_with(&g, v, s0 + 40, &facts(&big)),
+            LatchAction::Flag,
+            "too large to hash: an upgrade (fail-safe)"
+        );
+        // Pump: no fingerprint slot.
+        let p = usize::from(GUARD_PUMP);
+        assert_eq!(
+            latch_action(&g, GUARD_PUMP, g.guard_slot[p] + 1),
+            LatchAction::Flag
+        );
+        // Flagged at the in-place upgrade: the program refreshes on any later slot; against the
+        // keeper's record of that deploy an extension of it is no new upgrade, another ELF is.
+        g.upgraded |= 1 << v;
+        g.flagged_slot[i] = s0 + 30;
+        assert_eq!(latch_action(&g, v, s0 + 50), LatchAction::Refresh);
+        let reported = facts(&program_data_account(s0 + 30, &changed, len0))
+            .record()
+            .unwrap();
+        assert!(
+            !facts(&program_data_account(s0 + 50, &changed, len0 + 10_240))
+                .is_upgrade_since(reported)
+        );
+        assert!(
+            facts(&program_data_account(s0 + 50, &elf, len0 + 10_240)).is_upgrade_since(reported)
+        );
+        assert_eq!(facts(&big).record(), None, "no record without a hash");
+        // Token-2022 (no latch record): the same rule against the keeper's last whole read.
+        let t22 = facts(&program_data_account(s0, &elf, len0));
+        assert!(!upgraded_since(
+            &t22,
+            &facts(&program_data_account(s0 + 60, &elf, len0 + 10_240))
+        ));
+        assert!(upgraded_since(
+            &t22,
+            &facts(&program_data_account(s0 + 60, &changed, len0 + 10_240))
+        ));
+        assert!(
+            upgraded_since(&t22, &facts(&program_data_account(s0 + 60, &elf, len0))),
+            "redeployed in place"
+        );
+        assert!(
+            upgraded_since(&facts(&big), &facts(&big)),
+            "no record of the last read: an upgrade"
+        );
+        // A header that does not parse has no facts.
+        let mut bad = ext;
+        bad.data[0] = 2;
+        assert_eq!(ElfFacts::of(&bad), None);
     }
 
     #[test]
