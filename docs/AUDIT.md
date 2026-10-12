@@ -31,6 +31,13 @@ to build and test the code, what the code relies on, and what we already know ab
 - **Tagged `audit-1` / `v1.0.0` on `e4895c2`** (2026-10-11, owner decision; §0). What is still
   pending is named where it applies: the owner's review of this package (§0), the open owner
   items (§7), the calibration results (KI-14) and the external audit itself (§12).
+- **After the tag, the AI review of v1.0.0** ([`audit/ai-review/`](audit/ai-review/README.md);
+  not a formal audit): 17 issues and 7 confirmed leads (AIR-01 … AIR-24), fixed by a program
+  batch after the tag (with the math crate, the normative sims and vectors, the keeper and the
+  indexer) or disclosed. The fixes have passed a local run of the CI gate but have not yet been
+  through CI, a ≥ 24 h fuzz run or a fix review (§12). The owner decided its open points on
+  2026-10-12 (§7); its residuals are known-issues KI-69 … KI-76 (and sentences in older rows),
+  and the register's §7 maps every finding.
 - Normative sources:
   - the design documents `docs/SPEC.md`, `docs/design/ARCHITECTURE.md` (ARCH) and
     `docs/design/ECONOMICS.md` (ECON);
@@ -43,6 +50,7 @@ to build and test the code, what the code relies on, and what we already know ab
 | `docs/AUDIT.md` | this guide |
 | [`docs/audit/scope.txt`](audit/scope.txt) | the in-scope files, generated from `git ls-files` (`scripts/audit_scope.py`) |
 | [`docs/audit/known-issues.md`](audit/known-issues.md) | the known-issues register (KI-01 …): accepted and disclosed residuals, each with its bound |
+| [`docs/audit/ai-review/`](audit/ai-review/README.md) | the AI-assisted review of v1.0.0 (not a formal audit): its issues and leads (AIR-01 … AIR-24), their fixes and regression tests, and the owner's decisions of 2026-10-12 |
 | [`docs/audit/findings.md`](audit/findings.md) | the findings tracker (the auditors' findings and their resolution) |
 | [`docs/audit/README.md`](audit/README.md) | the folder index and the RFQ log |
 | [`SECURITY.md`](../SECURITY.md) | the vulnerability disclosure policy |
@@ -143,7 +151,8 @@ A market moves between venues on graduation and on Raydium pool switches (ARCH �
   instruction can move pool or position funds** (I4; ARCH §3.1 "What admins cannot do").
 - **Venue guard.** A permissionless latch records a venue program upgrade. New opens on that
   venue are refused until the Emergency multisig revalidates it; exits never check the guard
-  (ARCH §3.1).
+  (ARCH §3.1). Since AIR-01 a ProgramData extension alone does not count as an upgrade once a
+  revalidation has recorded the venue's ELF fingerprint (known-issues KI-69).
 - **Keepers.** Anyone can run the exits and the price cranks. The in-house keeper covers
   markets with open positions, within a global daily budget. A market it cannot cover has its
   opens paused through the `coverage_authority` (degraded mode; ARCH §7.1, ECON §5.8).
@@ -314,7 +323,7 @@ skipped). It is checked in `initialize_config` and, for an `Authorities` change,
 |---|---|---|---|
 | Upgrade authority | Governance vault 0, after the deployer moves it with the checked `SetAuthorityChecked` (staged by `shortwin-gov`; the deployer runs `initialize_config` once, before) | upgrade `shortwin` and `complete_curve` after the 48 h Squads time lock | — (the upgrade is the trust assumption; ARCH §8.5, KI-45, KI-62) |
 | `governance` | Governance vault 0 | `propose_config` (timelocked, within compiled bounds, `params::validate` + `validate_econ`), `cancel_config`, `set_pause`, `set_route_broken`, `set_venue_extras` (pins `stable`) | move funds; change a venue program id; skip the timelock |
-| `pause_authority` | Emergency vault 0 | `set_pause`, `disable_venue`, `revalidate_venue(venue, expected_slot)`, `set_route_broken`, `set_venue_extras`, `cancel_config` (not `Authorities` or `Timelock` changes), clear (never set) `paused_coverage` | move funds; re-enable a venue (timelocked); veto an upgrade (KI-62) |
+| `pause_authority` | Emergency vault 0 | `set_pause`, `disable_venue` (which also cancels a pending `EnableVenues` change that would set the venue's bit, AIR-24), `revalidate_venue(venue, expected_slot, expected_elf_hash)` (the hash of the reviewed trimmed ELF lets a later deploy slot from an extension through and records the venue's fingerprint, AIR-01; KI-69), `set_route_broken`, `set_venue_extras`, `cancel_config` (not `Authorities` or `Timelock` changes), clear (never set) `paused_coverage` | move funds; re-enable a venue (timelocked); veto an upgrade (KI-62) |
 | `coverage_authority` | the keeper's hot key | set or clear one market's `paused_coverage` (opens only) | anything else (I4: byte for byte) |
 | `fee_recipient` | Governance vault 1 (no spending limits) | receive `sweep_protocol_fees` | — |
 | Anyone | — | `crank_price`, `crank_sol_usd`, `liquidate`, `expire`, `sol_settle`, `flag_venue_upgraded`, `flag_unsafe_mint`, `sweep_trader`, `sweep_protocol_fees`, `propose_pool`, `execute_pool_switch`, `create_market`, `apply_config` (after the timelock) | change locked position terms; take any amount but the bounded keeper reward |
@@ -331,7 +340,9 @@ KI-45, KI-59 … KI-63):
   and never an `Authorities` or `Timelock` change.
 - The Emergency **cannot veto an upgrade**; its members cannot vote on Governance proposals.
 - A refused vault execution stays Approved and can be re-executed.
-- `ExtendProgram` is permissionless: an upgrade to a larger ELF needs it first.
+- `ExtendProgram` is permissionless: an upgrade to a larger ELF needs it first, and anyone's
+  extension redeploys the program, which is unusable for the rest of that slot (KI-63, KI-73;
+  the bounded griefing accepted by the owner on 2026-10-12, with no pre-extension to 10 MiB).
 - **No spending limits** exist on either multisig (`shortwin-gov verify` checks the config
   authority is unset).
 - Members approve and execute **in the Squads app**; `shortwin-gov` only stages and verifies,
@@ -416,19 +427,20 @@ invariants.
 
 ## 6. Known issues
 
-[`docs/audit/known-issues.md`](audit/known-issues.md) is the single register: 68 rows (KI-01 …
-KI-68), each with its bound, the decision that covers it and its status, plus the M10
-findings and their resolution (its §6). Do not report these as findings unless the stated
-bound is wrong or can be exceeded. Summary:
+[`docs/audit/known-issues.md`](audit/known-issues.md) is the single register: 76 rows (KI-01 …
+KI-76), each with its bound, the decision that covers it and its status, plus the M10
+findings and their resolution (its §6) and the AI review's findings and theirs (its §7). Do
+not report these as findings unless the stated bound is wrong or can be exceeded. Summary:
 
 | Section | Rows | What |
 |---|---|---|
-| §1 | KI-01 … KI-15, KI-52, KI-53, KI-65 … KI-68 | Economic residuals (O19) (★eighth round: KI-66 fixed in full by the forward chain, its latent-unit residual disclosed; KI-67 fixed in the program; KI-68, a touch's per-touch floor, disclosed; ninth round: KI-68 accepted): the 2 % exit bound and the held model, with the real-venue figures accepted on 2026-10-03 (AMM v4 +61.27, CPMM +37.33 / atomic extra +5.34, PumpSwap +10.20 SOL); no liquidation reserve; baskets; settlement push and deferral; degraded-mode S2→S1; the sale-wrapped open's notional (accepted); the run residual; gap risk; creator self-dealing; **M10-8C-1 (fixed)**; the **late-depositor shortfall** (accepted, with the deposit warning at 1 % / 1 SOL); the **rebase-orphan vest** (found by the final tree's 24 h fuzz; **fixed in the program**, KI-65: cumulative conversion rounding, no rebase orphans; KI-11 with it); the pot behind a rebase record (KI-66, the owner-signed rule's price; **fixed in the program** by the pot-only touch, its post-record residual disclosed); a position paid by `claim_sol` after its owner's exit stayed open with its rent (KI-67, latent since M1; **fixed**: `claim_sol` closes it); a touch of a current or parked lender floors per touch, ≤ 1 lamport (KI-68, predates KI-66; accepted 2026-10-08) |
+| §1 | KI-01 … KI-15, KI-52, KI-53, KI-65 … KI-68, KI-71, KI-72, KI-75, KI-76 | Economic residuals (O19) (★eighth round: KI-66 fixed in full by the forward chain, its latent-unit residual disclosed; KI-67 fixed in the program; KI-68, a touch's per-touch floor, disclosed; ninth round: KI-68 accepted): the 2 % exit bound and the held model, with the real-venue figures accepted on 2026-10-03 (AMM v4 +61.27, CPMM +37.33 / atomic extra +5.34, PumpSwap +10.20 SOL); no liquidation reserve; baskets; settlement push and deferral; degraded-mode S2→S1; the sale-wrapped open's notional (accepted); the run residual; gap risk; creator self-dealing; **M10-8C-1 (fixed)**; the **late-depositor shortfall** (accepted, with the deposit warning at 1 % / 1 SOL); the **rebase-orphan vest** (found by the final tree's 24 h fuzz; **fixed in the program**, KI-65: cumulative conversion rounding, no rebase orphans; KI-11 with it); the pot behind a rebase record (KI-66, the owner-signed rule's price; **fixed in the program** by the pot-only touch, its post-record residual disclosed); a position paid by `claim_sol` after its owner's exit stayed open with its rent (KI-67, latent since M1; **fixed**: `claim_sol` closes it); a touch of a current or parked lender floors per touch, ≤ 1 lamport (KI-68, predates KI-66; accepted 2026-10-08); the AI review's, accepted on 2026-10-12: the **drained-pool deposit gate**'s refusals of honest deposits (KI-71, AIR-07), a same-transaction burn's PumpSwap exit tier (KI-72, AIR-10), the box corner as the only S1/S2 veto inside an LP's withdrawal (KI-75, AIR-20), the sustained growth's trade-off (KI-76, AIR-22: a 2-s held sandwich, the two-in-three flat-step veto) |
 | §2 | KI-16 … KI-29 | Pool switches and third-party LP (O18; ECON §12.12 residuals 1–17), graduation delays |
 | §3 | KI-30 … KI-41 | Keeper coverage and budget (O17, OWNER-M7-*), transaction sizes |
-| §4 | KI-42 … KI-46, KI-54 … KI-64 | Trust: the venue guard window, halted venues, upgradeable venues and programs (with the pump venues' 2026-10-02 redeploy), admin powers; the **extras-denylist residuals** (batch 3); the **CPMM creator-fee share**; the Squads source; the **Squads semantics** |
+| §4 | KI-42 … KI-46, KI-54 … KI-64, KI-69, KI-70, KI-73, KI-74 | Trust: the venue guard window, halted venues, upgradeable venues and programs (with the pump venues' 2026-10-02 redeploy), admin powers; the **extras-denylist residuals** (batch 3); the **CPMM creator-fee share**; the Squads source; the **Squads semantics** (KI-63 corrected: an extension blocks the program for the rest of its slot); the AI review's, accepted on 2026-10-12: the **venue latch's extension test** and its residuals (KI-69, AIR-01), new authority keys installed unsigned (KI-70, AIR-04), **`ExtendProgram`'s one-slot block** (KI-73, AIR-18), the conservative S3-chain mark (KI-74, AIR-19) |
 | §5 | KI-47 … KI-51 | Platform facts relied on (U16's 40 M limit, U17, U25, U29, log events) |
 | §6 | — | M10 findings: M10-8C-1, B2-2, the extras denylist, PUMP-2026-10-1 … -3 (the pump venues' redeploy), the 24 h fuzz findings (runs 1 and 3: FUZZ-M7-24H-1 … -3, FUZZ-M10-24H-A, -B; run D on the final program bytes: FUZZ-24D-A, FUZZ-M10-24H-D-B — all the harness's), FUZZ-M10-1, the KI-65 batch's review findings (KI65-REV-SEC1: owner-signed rebase conversions; KI65-REV-CU: `MAX_RECORDS` 8) and its follow-up's (KI65-REV-POT: the pot behind a rebase record, KI-66, fixed by the pot-only touch; KI65B-REV-LOW) and the KI-66 batch's (KI66-REV-LOW: the surplus move checked by the math properties, the fuzz's never-returns model, the sub-unit warning judged on the worst case, KI-67) and the KI-66 full / KI-67 batch's (KI67-REV: the web's read of a funded lender PDA, the 3012 retry, the fuzz's chain coverage and residual cross-check, the withdrawal close hook, the park mutant, KI-68), the WP-1 / WP-10 doc findings, GC-F1, M10-CI-LINT |
+| §7 | — | The AI review of v1.0.0: AIR-01 … AIR-24 and the refuted lead L-1, each with its fix commit or the row that discloses it |
 
 **Status by owner decision** (SPEC §14, ARCH §10):
 - **Accepted by the owner:** the real-venue held sandwich (KI-01's and KI-02's figures,
@@ -443,7 +455,13 @@ bound is wrong or can be exceeded. Summary:
   the margin of a PumpSwap position opened while a deposit is held (KI-26, M6D residual 16,
   2026-10-09, eleventh round: as built; pricing it on the burned depth, a program change, not
   taken), and O18's residuals as disclosed (KI-16 … KI-21, KI-25, 2026-10-09, eleventh round,
-  with O18's rules).
+  with O18's rules), and the AI review's residuals (KI-69 … KI-76, 2026-10-12, recorded in the
+  review's README: the venue latch's extension residuals, new authority keys installed
+  unsigned, the honest deposits the drained-pool gate refuses, a same-transaction burn's
+  PumpSwap exit tier, `ExtendProgram`'s one-slot block with no pre-extension to 10 MiB, the
+  conservative S3-chain mark, the box corner as the only S1/S2 veto inside an LP's withdrawal,
+  the sustained growth's trade-off) and KI-13's lock decay (AIR-11, intended design,
+  2026-10-12).
 - **Fixed:** M10-8C-1 (KI-52), the extras denylist hardening (batch 3), PUMP-2026-10-1 (batch 4:
   PumpSwap's fee buckets are not payable SOL), the rebase-orphan vest and dust (KI-65, KI-11:
   the KI-65 program batch, cumulative conversion rounding through each rebase record), the
@@ -455,7 +473,10 @@ bound is wrong or can be exceeded. Summary:
   its forward chain, the KI-66 full batch, eighth round, 2026-10-08), the open empty position
   (KI-67: `claim_sol` closes it, eighth round; its `lock_term` detail confirmed as built on
   2026-10-09, eleventh round), and the harness and doc findings of the
-  register's §6.
+  register's §6. After the tag: the AI review's findings but AIR-04, AIR-11, AIR-18 and AIR-20
+  (the register's §7; the fixes' commits and regression tests are in the review's README),
+  built and through a local run of the CI gate but not yet through CI, a ≥ 24 h fuzz run or a
+  fix review (§12).
 - **Disclosed** (owner decision of 2026-10-07): KI-65's remaining conversion-order residual — a
   party ordering its own conversions (Sybils placed before the roll, a tuned residue) and
   converting after honest lenders' own conversions, at any later time (no atomicity needed;
@@ -524,8 +545,12 @@ one follow-up; the table below). All the program-affecting ones are built (batch
 KI-65 batch, its follow-up, the KI-66 batch and the KI-66 full / KI-67 batch); the deferred IX-1 /
 IX-11 are not.
 
+**Decided after the tag** (2026-10-12; the AI review's README, "Decisions for the owner", records
+them): the AI review's open points (the table's first row). Its program fixes are built.
+
 | Item | Decision needed | Build default (in force) | Changes program code? |
 |---|---|---|---|
+| **The AI review of v1.0.0** (AIR-01 … AIR-24; [`audit/ai-review/README.md`](audit/ai-review/README.md); known-issues §7) | **Decided (2026-10-12):** **AIR-22** keep the lower-median sustained growth (`6c39e58`, `03b7762`, `8a4df78`; its trade-off KI-76); **AIR-07** keep the drained-pool deposit gate (`PoolDrained` = 6108, `00d3772`; the refused honest deposits KI-71); **AIR-10** accept the burn residual (KI-72), no per-second supply snapshot; **AIR-18** accept the bounded `ExtendProgram` griefing, the keeper retrying in a later slot, no pre-extension of short.win's ProgramData to 10 MiB (KI-73; KI-63's "harmless" corrected); **AIR-19** accept the conservative `min_open_hard_cap_bps` mark (KI-74), no exact cap tracking; **AIR-01** the hashed `revalidate_venue` of pump-fees, AMM v4, CPMM and Jupiter after `initialize_config` (`services/README.md` "Governance"), its residuals accepted (KI-69); **AIR-04, AIR-11, AIR-20** no behaviour change, known-issues rows and doc wording only (KI-70, KI-13, KI-75; AIR-20's optional fix in `leads.md` not taken) | As decided: the fixes built (the AI review's batch after the tag) | **Program** (built: the AIR fixes, a batch after the tag; the alternatives not taken — reverting AIR-22 or the gate, the supply snapshot, exact cap tracking, AIR-20's fix — would be program changes too; pre-extending ProgramData is a deployment step) |
 | **O19** (the rest) | Sign off the disclosed residuals of known-issues §1 (KI-01, KI-03 … KI-11); the real-venue figures are already accepted | Accept and disclose; no liquidation reserve | No; the alternative (a rent-only liquidation reserve) is **program** |
 | **Rebase-orphan vest** (KI-65; O19; FUZZ-M10-24H-A) and the conversion order (KI65-REV-SEC1) | **Decided (2026-10-07): fixed in the program by cumulative conversion rounding** — each rebase record carries `conv_rem` and a lender's conversion mints `⌊(conv_rem + s)/1,000^k⌋`, so the old epoch's lenders end with exactly the new `S` and the last real lender is paid the vest (ECON §9.5, KI-65). **Decided (2026-10-07, sixth round): owner-signed conversions** — `sync_lender` converts a position through a rebase record only with the owner's signature (unsigned it stops at the record: since the KI-66 batch the pot-only touch, with `RebaseNeedsOwner` 6107 its post-condition; plain catch-up, the V2-12 jump, the parking and `sync_lender(0)` stay permissionless; every other lender instruction is the owner's), so no third party orders an honest lender's conversion and a latent honest unit blocks the flush (W3). Disclosed, not closed: a party ordering its own conversions and converting after honest lenders' own conversions (at any later time) still collects up to one unit per position and, where every honest holder converted to 0 shares, the whole unreleased vest (KI-65's figures: +4,007,334,855 vs 369,862 lamports; a JIT depositor 3,000,000,000 of a 3,000,000,000 lump). **Decided (2026-10-07): `MAX_RECORDS` = 8** per lender transaction (worst case `cover_deficit` 54,549 CU of 60,000; a lender further behind catches up over several transactions) | Built (the KI-65 program batch and its follow-up) | **Program** (built; new hashes, §0) |
 | **KI-66** (KI65-REV-POT; O19) | **Decided (2026-10-07, seventh round): the pot-only touch** — anyone's `sync_lender` without the owner's signature that reaches a rebase record accrues the lender's `pending` / `real` to the record's `acc_end` / `acc_r_end` and moves its surplus to the pot, converting no shares, writing no `conv_rem` and leaving the epoch (it cannot order conversions; idempotent; the owner's later conversion counts nothing twice). `ki65_it` pins the deficit lender paid in full without the holder's owner (pot 4,434,782,609 lamports; A's next claim 2,957,608,696, nothing left owed). Then disclosed: what the unconverted shares earn after the record waited for the owner (KI66-R3) — **fixed in full in the eighth round** (2026-10-08: the forward chain; the next row). **Decided (seventh round): the web's sub-unit conversion warning** (`lender.subUnitConversion`, the vest's end) and the `lender.residuals` sentence | Built (the KI-66 batch, `m10/ki66`) | **Program** (built; new hashes, §0) |
@@ -576,7 +601,7 @@ are historical: where they disagree with ARCH §12 or the code, ARCH §12 and th
 | U1 | PDA `user` under CPI (pump buy, PumpSwap buy) | VERIFIED on the dumped ELFs (M5, M6). A PumpSwap buy by a third-party PDA is unseen on mainnet | — |
 | U2, U3, U6, U7, U9, U11, U24 | Non-ATA WSOL, `disable_flags` bits, rent debits, ATA depth, unsigned `claim_cashback`, CPMM exact-out creator fee, trailing accounts | VERIFIED / RESOLVED (M3–M6) | — |
 | U4 | Whole-instruction CU, trace and size figures | **VERIFIED (measured)** for every instruction class (`m1_cu`, `m2_cu`, `m3_cu`, `m5_cu`, `m6_cu`, `m7_keeper`), within the PROPOSED limits, re-baselined after each M10 batch | — |
-| U5 | Copying a 10 MiB ProgramData | VERIFIED for CU (not metered). Latency and fee are unmeasured | M11 (mainnet) |
+| U5 | Copying a 10 MiB ProgramData | VERIFIED for CU (not metered). Latency and fee are unmeasured. Since AIR-01 a flag or a revalidation after an extension also hashes the trimmed ELF: ≤ 0.44 M CU measured on pump-fees, CPMM and AMM v4 (`latch_raydium_it`, `latch_pump_it` `air01_*`), so its sender requests ≥ 0.5 M CU; Jupiter's is not measured and is sized by simulation (KI-69) | M11 (mainnet) |
 | U8, U22, U25 | The straddle bundle's pre-flight and a live block engine; Jito semantics; v1 transactions landing | Fork parts VERIFIED; the live parts **UNVERIFIED**: no mainnet spend before the audit (owner default Q6) | M11 probes |
 | U10 | Delegated `pool_vault` sell; direct delivery for Token-2022 CPMM | **VERIFIED** on the dumped ELFs, re-run on the 452,376,460 CPMM ELF | a mainnet example in M11 |
 | U12 | Raydium deployed binaries vs public source | **CPMM closed:** the redeploy is `raydium-cp-swap@bdeee23`, rebuilt byte for byte (the manifest's `source.status` text still says UNVERIFIED; ARCH §12 is normative). **AMM v4:** a behavioural match only | — |
@@ -1220,8 +1245,11 @@ These are where we would look first. They are not limits on the scope.
    - the timelock and the apply window;
    - `Authorities` changes, the fee-recipient rule and SQ-G8's distinct-authorities check
      (`config::check_authorities`, at `initialize_config`, `propose_config` and `apply_config`);
-   - Emergency limits (what it cannot cancel);
-   - `revalidate_venue`'s `expected_slot`;
+   - Emergency limits (what it cannot cancel), and `disable_venue`'s cancel of a pending
+     `EnableVenues` change (AIR-24);
+   - `revalidate_venue`'s `expected_slot` and `expected_elf_hash`, and `flag_venue_upgraded`'s
+     test of an extension (AIR-01: the ProgramData's length and the trimmed-ELF fingerprint,
+     `shortwin-venue-state`'s `program_data::trimmed_elf`; KI-69);
    - the coverage pause and its 5-s clear delay;
    - compiled parameter bounds (`params::validate`, `validate_econ`).
 9. **The mint filter** (`mint_filter.rs`, venue-state `mint.rs`). Check Token-2022 extensions,
