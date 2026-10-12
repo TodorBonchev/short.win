@@ -1,5 +1,6 @@
 import * as client from '@shortwin/client';
 import { describe, expect, it } from 'vitest';
+import { readRepo } from '../test/repo.ts';
 import { PROGRAM_ERRORS, programError } from './errors.ts';
 
 const pascal = (snake: string) =>
@@ -9,11 +10,59 @@ const pascal = (snake: string) =>
         .map((w) => (w ? (w[0]?.toUpperCase() ?? '') + w.slice(1) : ''))
         .join('');
 
+/** Rust source without its line comments and with every string literal emptied (`""`). */
+function stripRust(src: string): string {
+    let out = '';
+    let i = 0;
+    while (i < src.length) {
+        if (src[i] === '"') {
+            i++;
+            while (i < src.length && src[i] !== '"') i += src[i] === '\\' ? 2 : 1;
+            i++;
+            out += '""';
+        } else if (src[i] === '/' && src[i + 1] === '/') {
+            while (i < src.length && src[i] !== '\n') i++;
+        } else {
+            out += src[i];
+            i++;
+        }
+    }
+    return out;
+}
+
+/**
+ * The variants of the program's `ShortwinError` (`programs/shortwin/src/errors.rs`), in declaration
+ * order: Anchor's `#[error_code]` numbers them from 6000. Comments, string literals and attributes
+ * (`#[msg(…)]`) are dropped first, so only the variant names are left between the commas.
+ */
+function programVariants(): string[] {
+    const src = stripRust(readRepo('programs/shortwin/src/errors.rs'));
+    const head = 'pub enum ShortwinError {';
+    const start = src.indexOf(head);
+    expect(start).toBeGreaterThan(0);
+    return src
+        .slice(start + head.length, src.indexOf('\n}', start))
+        .replace(/#\[[^\]]*\]/g, '')
+        .split(',')
+        .map((v) => v.trim())
+        .filter((v) => v.length > 0);
+}
+
 describe('program error messages', () => {
     const constants = Object.entries(client).filter(([k]) => k.startsWith('SHORTWIN_ERROR__')) as [string, number][];
 
+    it('has one row per variant of the program’s ShortwinError, by code and name', () => {
+        const variants = programVariants();
+        expect(variants.length).toBeGreaterThanOrEqual(109);
+        for (const v of variants) expect(v, v).toMatch(/^[A-Z][A-Za-z0-9]*$/);
+        variants.forEach((name, i) => {
+            expect(programError(6000 + i)?.name, `${6000 + i}`).toBe(name);
+        });
+        expect(PROGRAM_ERRORS.size).toBe(variants.length);
+    });
+
     it('covers every error code of the generated client, by name', () => {
-        expect(constants.length).toBeGreaterThanOrEqual(106);
+        expect(constants.length).toBeGreaterThanOrEqual(108);
         for (const [k, code] of constants) {
             const info = programError(code);
             expect(info, k).toBeDefined();
@@ -21,7 +70,14 @@ describe('program error messages', () => {
             // Codama renders S3TimerRunning as S3_TIMER_RUNNING and EmaWarmingUp as EMA_WARMING_UP.
             expect(info?.name.toLowerCase(), k).toBe(name.toLowerCase());
         }
-        expect(PROGRAM_ERRORS.size).toBe(constants.length);
+        // A row the client lacks can only be a code the program appended after the client was last
+        // generated from its IDL (`pnpm --filter @shortwin/client idl:sync && … generate`): the
+        // previous test holds it to the program's enum until then.
+        const codes = new Set(constants.map(([, code]) => code));
+        const last = Math.max(...codes);
+        for (const code of PROGRAM_ERRORS.keys()) {
+            if (!codes.has(code)) expect(code, `${code} is not in the client`).toBeGreaterThan(last);
+        }
     });
 
     it('has a non-empty message and a known action for each code, numbered from 6000 without gaps', () => {
@@ -46,6 +102,9 @@ describe('program error messages', () => {
         expect(programError(6106)?.action).toBe('retry');
         expect(programError(6107)?.name).toBe('RebaseNeedsOwner');
         expect(programError(6107)?.action).toBe('blocked');
+        // AIR-07: a drained pool takes deposits again once repayments or settlements free tokens.
+        expect(programError(6108)?.name).toBe('PoolDrained');
+        expect(programError(6108)?.action).toBe('wait');
         expect(programError(5999)).toBeUndefined();
     });
 });

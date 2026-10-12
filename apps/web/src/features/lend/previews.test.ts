@@ -462,7 +462,48 @@ describe('lend previews on simple pools', () => {
         expect(refusalOf(new Error('above pro-rata allowance'))).toMatchObject({ name: 'AboveProRataAllowance' });
         expect(refusalOf(new Error('lender behind share epochs'))).toMatchObject({ name: 'LenderBehindEpochs' });
         expect(refusalOf(new Error('post-wipe sweep pending'))).toMatchObject({ name: 'WipeSweepPending' });
+        expect(refusalOf(new Error('pool drained'))).toMatchObject({ name: 'PoolDrained', code: 6108 });
         expect(refusalOf(new Error('something else'))).toMatchObject({ name: 'MathOverflow', code: 6000 });
+    });
+
+    it('maps every MathError text as the program converts it (errors.rs From<MathError>)', () => {
+        // `MathError::as_str()`, the message the facade throws (crates/shortwin-math/src/error.rs).
+        const math = readRepo('crates/shortwin-math/src/error.rs');
+        const at = math.indexOf('fn as_str');
+        const asStr = math.slice(at, math.indexOf('\n    }', at));
+        const texts = new Map(
+            [...asStr.matchAll(/Self::(\w+) => "([^"]+)"/g)].map(([, v = '', text = '']) => [v, text] as const),
+        );
+        // The program's `impl From<MathError> for ShortwinError` (programs/shortwin/src/errors.rs).
+        const prog = readRepo('programs/shortwin/src/errors.rs');
+        const from = prog.slice(prog.indexOf('impl From<MathError> for ShortwinError'));
+        const to = new Map<string, string>();
+        const arms = from.slice(0, from.indexOf('\n}')).matchAll(/((?:\s*\|?\s*MathError::\w+)+)\s*=> Self::(\w+)/g);
+        for (const [, lhs = '', target = ''] of arms) {
+            for (const [, variant = ''] of lhs.matchAll(/MathError::(\w+)/g)) to.set(variant, target);
+        }
+        expect(texts.size).toBeGreaterThanOrEqual(14);
+        expect([...texts.keys()].sort()).toEqual([...to.keys()].sort());
+        for (const [variant, text] of texts) {
+            const r = refusalOf(new Error(text));
+            expect(r.name, variant).toBe(to.get(variant));
+            expect(r.code, variant).not.toBeNull();
+        }
+    });
+
+    it('refuses a deposit into a drained pool (AIR-07: at most 1/1,000 of the claims unborrowed)', () => {
+        const at = (tokensFree: bigint, borrowedQ: bigint, totalShares: bigint) => ({
+            ...simplePool({ tokensFree, borrowedQ, totalShares }),
+            lender: null,
+            records: [],
+        });
+        // 1,000·T = 10,000 ≤ T + ΣB_Q = 10,000, shares held, tokens lent out: PoolDrained (6108).
+        const r = previewDepositView(m, at(10n, 9_990n, 10_000_000n), 0n, 10n ** 9n, 50);
+        expect(!r.ok && [r.refusal.name, r.refusal.code]).toEqual(['PoolDrained', 6108]);
+        // One more unborrowed token (11,000 > 10,001): deposits are taken again.
+        expect(previewDepositView(m, at(11n, 9_990n, 10_000_000n), 0n, 10n ** 9n, 50).ok).toBe(true);
+        // Nothing lent out: never drained.
+        expect(previewDepositView(m, at(1n, 0n, 1_000n), 0n, 10n ** 9n, 50).ok).toBe(true);
     });
 });
 

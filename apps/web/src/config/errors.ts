@@ -1,8 +1,9 @@
 /**
  * Human messages for every short.win program error (FRONTEND.md §5.9). Codes are stable
  * (ARCH §3.11: numbered from 6000 in declaration order, appended only). `errors.test.ts` checks
- * this table against `@shortwin/client`'s `SHORTWIN_ERROR__*` constants, so a new program error
- * fails CI until it has a message here.
+ * this table against the program's `ShortwinError` enum (`programs/shortwin/src/errors.rs`) and
+ * `@shortwin/client`'s `SHORTWIN_ERROR__*` constants, so a new program error fails CI until it has
+ * a message here.
  *
  * `action` tells the UI what to offer: `retry` (transient, or fixed by a new plan: the review's Retry
  * re-simulates a transient failure and rebuilds the plan from the chain — a new quote, new bounds,
@@ -350,6 +351,12 @@ const ROWS: readonly Row[] = [
         'RebaseNeedsOwner',
         'blocked',
         'Only the position’s owner can sync it through a share rebase. Connect the wallet that owns the position.',
+    ],
+    [
+        6108,
+        'PoolDrained',
+        'wait',
+        'This pool is drained: at most 1/1,000 of its tokens are unborrowed. Deposits wait until repayments or settlements free more.',
     ],
 ];
 
