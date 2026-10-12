@@ -5,7 +5,7 @@
  */
 import { createHash } from 'node:crypto';
 import { findShareEpochPda, identifyShortwinInstruction, ShortwinInstruction } from '@shortwin/client';
-import { AccountRole, address, createNoopSigner, getProgramDerivedAddress } from '@solana/kit';
+import { AccountRole, type Address, address, createNoopSigner, getProgramDerivedAddress } from '@solana/kit';
 import { describe, expect, it } from 'vitest';
 import {
     ASSOCIATED_TOKEN_PROGRAM,
@@ -35,7 +35,7 @@ import {
     userVolumeAccumulator,
     wsolAta,
 } from './sweep.ts';
-import { fakeMarket } from './testkit.ts';
+import { fakeMarket, NO_UVA } from './testkit.ts';
 
 const MARKET = address('8sLbNZoA1cfnvMJLPfp98ZLAnFSYCFApfJKMbiXNLwxj');
 const PAYER = createNoopSigner(address('9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin'));
@@ -173,6 +173,63 @@ describe('post-wipe sweep bundle', () => {
         expect(
             await postWipeSweepIxs(PAYER, MARKET, wiped(1, MARKET_FLAG.wipeTraderSwept), NO_CASHBACK, null),
         ).toHaveLength(1);
+    });
+
+    it('passes the pump UVA alone as the token leg off the pump venues where the market kept one (AIR-05)', async () => {
+        // The program's TOKEN_LEG_LEN_UVA; the keeper's sweep_trader_names_the_token_leg_and_the_wipe_record.
+        const [record] = await findShareEpochPda({ market: MARKET, epoch: 2 });
+        const uva = await userVolumeAccumulator(PUMP_PROGRAM, fakeMarket().trader);
+        for (const venue of [0, 4, 5, 6]) {
+            const left = fakeMarket({ tokensFree: 0n, totalShares: 0n, flags: 0, venue, shareEpoch: 3, pumpUva: uva });
+            const ix = await sweepTraderIx(MARKET, left, null);
+            expect(ix.accounts, `venue ${venue}`).toHaveLength(11);
+            expect(ix.accounts?.[10]).toEqual({ address: uva, role: AccountRole.READONLY });
+            const live = await sweepTraderIx(MARKET, { ...left, flags: MARKET_FLAG.wipeLive }, record);
+            expect(live.accounts?.slice(10)).toEqual([
+                { address: uva, role: AccountRole.READONLY },
+                { address: record, role: AccountRole.WRITABLE },
+            ]);
+            // Listed off pump (no pump UVA): no token leg.
+            expect((await sweepTraderIx(MARKET, { ...left, pumpUva: NO_UVA }, null)).accounts).toHaveLength(10);
+        }
+    });
+
+    it('claims the curve-era pump cashback before the sweep of a market that left pump (AIR-05)', async () => {
+        const uva = await userVolumeAccumulator(PUMP_PROGRAM, fakeMarket().trader);
+        // A full wipe on Raydium after the curve: the trader bit alone does not let a deposit in.
+        const flags = MARKET_FLAG.wipeLive | MARKET_FLAG.wipeTraderSwept;
+        const left = fakeMarket({ tokensFree: 0n, totalShares: 0n, flags, venue: 4, shareEpoch: 3, pumpUva: uva });
+        const [record] = await findShareEpochPda({ market: MARKET, epoch: 2 });
+        const ixs = await postWipeSweepIxs(PAYER, MARKET, left, { ...NO_CASHBACK, pumpClaimable: 7n }, record);
+        expect(ixs.map((i) => i.programAddress)).toEqual([PUMP_PROGRAM, SHORTWIN_PROGRAM]);
+        // The claim drains the UVA the sweep then reads (pump's claim is venue-independent).
+        expect(ixs[0]?.accounts?.[1]).toEqual({ address: uva, role: AccountRole.WRITABLE });
+        expect(ixs[1]?.accounts?.slice(10).map((a) => a.address)).toEqual([uva, record]);
+        // The facts: off the pump venues only the pump UVA is read, its lamports above rent.
+        const reads: Address[][] = [];
+        const b64 = (bytes: number[]) => Buffer.from(bytes).toString('base64');
+        const rpc = {
+            getMultipleAccounts: (keys: Address[]) => {
+                reads.push(keys);
+                return {
+                    send: async () => ({
+                        value: [
+                            { owner: PUMP_PROGRAM, lamports: 2_000_000n, data: [b64(new Array(40).fill(1)), 'base64'] },
+                        ],
+                    }),
+                };
+            },
+            getMinimumBalanceForRentExemption: (len: bigint) => ({ send: async () => (len === 40n ? 1_169_280n : 0n) }),
+        } as unknown as AppRpc;
+        expect(await readSweepFacts(rpc, left)).toEqual({
+            pumpClaimable: 830_720n,
+            pammClaimable: 0n,
+            pammUvaExists: true,
+        });
+        expect(reads).toEqual([[uva]]);
+        // A market without a pump UVA off the pump venues has nothing to read.
+        expect(await readSweepFacts(rpc, { ...left, pumpUva: NO_UVA })).toEqual(NO_CASHBACK);
+        expect(reads).toHaveLength(1);
     });
 
     it('builds nothing when no sweep is pending', async () => {

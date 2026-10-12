@@ -4,11 +4,13 @@
  * handful of numbers. Test-only (imported by `*.test.ts(x)`).
  */
 import { bigIntToPodI128, bigIntToPodU128, type Market } from '@shortwin/client';
-import { address } from '@solana/kit';
-import type { LenderFields, LendState, MarketPoolFields, RecordFields, VaultPoolFields } from './previews.ts';
+import { type Address, address } from '@solana/kit';
+import type { LenderFields, LendState, RecordFields, VaultPoolFields } from './previews.ts';
 
 const WAD = 10n ** 18n;
 export const NO_LOCK_EPOCH = 4_294_967_295;
+/** The default (all-zero) key: an unset `Pubkey` field. */
+const ZERO = '11111111111111111111111111111111';
 
 export interface VectorCase {
     readonly name: string;
@@ -83,7 +85,7 @@ export type VectorExpect =
 
 const big = (v: string | number | undefined): bigint => BigInt(v ?? 0);
 
-export function marketOf(m: VectorCase['market'], venue = 0): MarketPoolFields & { venue: number } {
+export function marketOf(m: VectorCase['market'], venue = 0): LendState['market'] {
     return {
         tokensFree: big(m.tokensFree),
         borrowedQ: big(m.borrowedQ),
@@ -101,6 +103,8 @@ export function marketOf(m: VectorCase['market'], venue = 0): MarketPoolFields &
         shareEpoch: Number(m.shareEpoch),
         flags: Number(m.flags),
         venue,
+        // pool_model has no venue-reward bit (`rewards_required = false`): no pump UVA.
+        pumpUva: NO_UVA,
     };
 }
 
@@ -164,7 +168,19 @@ export function stateOf(c: VectorCase, who: string | null): LendState {
     };
 }
 
-/** A simple pool: `T` free tokens, `B` borrowed, `S` shares, nothing accrued, no locks. */
+/** The trader's pump UVA of a fixture market on a pump venue (any non-default key). */
+export const PUMP_UVA = address('So11111111111111111111111111111111111111112');
+/** `Market.pump_uva` of a market listed off pump (Raydium, the mock): unset. */
+export const NO_UVA = address(ZERO);
+
+/**
+ * A simple pool: `T` free tokens, `B` borrowed, `S` shares, nothing accrued, no locks. On a pump
+ * venue (1–3) the market has the trader's pump UVA: the curve's venue cache sets
+ * `Market.pump_uva` (`pump_curve::write_cache`) and the PumpSwap cache sets it when it is unset
+ * (`pump_amm::write_cache`, at a PumpSwap listing or graduation) — on a market listed on PumpSwap
+ * the UVA holds no curve-era cashback. Elsewhere none (a Raydium or mock listing), unless `pumpUva`
+ * gives one (a curve market that left pump, AIR-05).
+ */
 export function simplePool(
     o: {
         tokensFree?: bigint;
@@ -175,6 +191,7 @@ export function simplePool(
         vestEnd?: bigint;
         flags?: number;
         venue?: number;
+        pumpUva?: Address;
         shareEpoch?: number;
         lenderSol?: bigint;
         unmatched?: bigint;
@@ -182,6 +199,7 @@ export function simplePool(
         receivable?: bigint;
     } = {},
 ): Pick<LendState, 'market' | 'vault'> {
+    const venue = o.venue ?? 0;
     return {
         market: {
             tokensFree: o.tokensFree ?? 1_000_000_000n,
@@ -199,7 +217,8 @@ export function simplePool(
             vestEnd: o.vestEnd ?? 0n,
             shareEpoch: o.shareEpoch ?? 0,
             flags: o.flags ?? 0,
-            venue: o.venue ?? 0,
+            venue,
+            pumpUva: o.pumpUva ?? (venue >= 1 && venue <= 3 ? PUMP_UVA : NO_UVA),
         },
         vault: {
             lenderSol: o.lenderSol ?? 0n,
@@ -237,8 +256,6 @@ export function simpleLender(shares: bigint, o: Partial<LenderFields> = {}): Len
         ...o,
     };
 }
-
-const ZERO = '11111111111111111111111111111111';
 
 /** A `Market` with the fields the lend panel reads (the rest is never read by it). */
 export function fakeMarket(
@@ -279,7 +296,6 @@ export function fakeMarket(
         traderWsol: address('mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So'),
         traderWsolAta: address(ZERO),
         traderBaseAta: address('JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN'),
-        pumpUva: address('So11111111111111111111111111111111111111112'),
         poolCache: Array.from({ length: 10 }, () => address(ZERO)),
         // No open position: nothing accrues.
         rentBasis: [0n, 0n, 0n].map(bigIntToPodU128),

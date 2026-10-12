@@ -2,9 +2,10 @@
  * The post-wipe sweep bundle a depositor prepends (FRONTEND.md §3.6; ARCH §3.3, §3.9; R4A-7): while
  * the pool has no shares — after a full wipe (`S = 0` with a live wipe record) or, since AIR-08,
  * after the last lender's exit, which clears both sweep bits — `deposit` refuses `WipeSweepPending`
- * until `sweep_trader` has run — and, on the pump venues, until the trader's venue cashback is
- * claimed (`wipeSweepPending`). Every step is permissionless, so the depositor bundles them in its
- * own transaction; `sweep_trader` names the wipe record only while one is live.
+ * until `sweep_trader` has run — and, on the pump venues and on every market with the trader's
+ * pump UVA (a curve market that left pump, AIR-05; `rewardsRequired`), until the trader's venue
+ * cashback is claimed (`wipeSweepPending`). Every step is permissionless, so the depositor bundles
+ * them in its own transaction; `sweep_trader` names the wipe record only while one is live.
  *
  * A TypeScript port of the keeper's `services/keeper/src/sweep.rs` (`post_wipe_ixs`, `claim_ixs`,
  * `sweep_trader_ix`, the pump / PumpSwap `claim_cashback` and PumpSwap's
@@ -13,8 +14,8 @@
  * | trader side | instructions |
  * |---|---|
  * | nothing claimable | `sweep_trader` |
- * | pump UVA above rent | pump `claim_cashback(user = trader)`, `sweep_trader` |
- * | pAMM UVA's WSOL ATA non-empty | [pAMM `init_user_volume_accumulator` if the UVA is missing], `create_idempotent(ATA(trader, WSOL))`, pAMM `claim_cashback`, `sweep_trader` |
+ * | pump UVA above rent (any venue: pump's claim is venue-independent) | pump `claim_cashback(user = trader)`, `sweep_trader` |
+ * | pAMM UVA's WSOL ATA non-empty (PumpSwap) | [pAMM `init_user_volume_accumulator` if the UVA is missing], `create_idempotent(ATA(trader, WSOL))`, pAMM `claim_cashback`, `sweep_trader` |
  *
  * The venue instructions are hand-encoded as the keeper's are (pump and PumpSwap have no Codama
  * client here); these instructions are in `tx/allowlist.ts` for exactly this bundle.
@@ -49,7 +50,7 @@ import {
     PUMP_AMM_EVENT_AUTHORITY,
     PUMP_EVENT_AUTHORITY,
 } from '../../venues/constants.ts';
-import { wipeSweepPending } from './previews.ts';
+import { rewardsRequired, wipeSweepPending } from './previews.ts';
 
 export { IX_CLAIM_CASHBACK, IX_INIT_USER_VOLUME_ACCUMULATOR, PUMP_AMM_EVENT_AUTHORITY, PUMP_EVENT_AUTHORITY };
 
@@ -109,11 +110,17 @@ export interface SweepFacts {
 
 export const NO_CASHBACK: SweepFacts = { pumpClaimable: 0n, pammClaimable: 0n, pammUvaExists: true };
 
-/** Reads the cashback facts of a pump-venue market (nothing to read elsewhere). */
+/**
+ * Reads the cashback facts of a market that waits for the venue-reward sweep (`rewardsRequired`: a
+ * pump venue, or since AIR-05 a market that kept the trader's pump UVA after leaving pump; nothing
+ * to read elsewhere). Off the pump venues only that UVA is read (the keeper's `SweepFacts::of`
+ * reads its claimable cashback on any venue; PumpSwap's only on PumpSwap).
+ */
 export async function readSweepFacts(rpc: AppRpc, market: Market): Promise<SweepFacts> {
-    if (!PUMP_KINDS.has(market.venue)) return NO_CASHBACK;
+    if (!rewardsRequired(market)) return NO_CASHBACK;
+    const pump = PUMP_KINDS.has(market.venue);
     const pamm = market.venue === VENUE_PUMP_SWAP;
-    const keys = [market.pumpUva, await pammUva(market), await pammCashbackAta(market)];
+    const keys = pump ? [market.pumpUva, await pammUva(market), await pammCashbackAta(market)] : [market.pumpUva];
     const { value } = await rpc.getMultipleAccounts(keys, { encoding: 'base64', commitment: 'confirmed' }).send();
     const [pumpUva, uva, ata] = value;
     let pumpClaimable = 0n;
@@ -127,7 +134,9 @@ export async function readSweepFacts(rpc: AppRpc, market: Market): Promise<Sweep
     if (pamm && ata && ata.owner === TOKEN_PROGRAM) {
         pammClaimable = tokenAmount(new Uint8Array(getBase64Encoder().encode(ata.data[0]))) ?? 0n;
     }
-    const pammUvaExists = !!uva && uva.owner === PUMP_AMM_PROGRAM && getBase64Encoder().encode(uva.data[0]).length > 0;
+    // Off the pump venues no PumpSwap account is read, and no PumpSwap claim is built.
+    const pammUvaExists =
+        !pump || (!!uva && uva.owner === PUMP_AMM_PROGRAM && getBase64Encoder().encode(uva.data[0]).length > 0);
     return { pumpClaimable, pammClaimable, pammUvaExists };
 }
 
@@ -187,7 +196,10 @@ export async function pammClaimCashbackIx(user: Address, uva: Address, userWsol:
 /**
  * `sweep_trader()` of the market (`sweep::sweep_trader_ix`): the fixed accounts, then on a pump
  * venue its token leg `[trader_base_ata W, pool_vault W, mint, token program, pump UVA]` (+ on
- * PumpSwap `ATA(pAMM UVA(trader), WSOL)`), then the live wipe record (W) while one is live.
+ * PumpSwap `ATA(pAMM UVA(trader), WSOL)`) — off the pump venues the trader's pump UVA alone (read
+ * only) when the market has one (AIR-05: a curve market that left pump; the program's
+ * `TOKEN_LEG_LEN_UVA`, key-checked against `Market.pump_uva`) —, then the live wipe record (W)
+ * while one is live.
  */
 export async function sweepTraderIx(
     marketAddress: Address,
@@ -213,6 +225,9 @@ export async function sweepTraderIx(
             ro(market.pumpUva),
         );
         if (market.venue === VENUE_PUMP_SWAP) extra.push(ro(await pammCashbackAta(market)));
+    } else if (!isDefault(market.pumpUva)) {
+        // AIR-05: a market that left pump keeps its trader's pump UVA (curve-era cashback).
+        extra.push(ro(market.pumpUva));
     }
     if (liveRecord) extra.push(rw(liveRecord));
     return { ...ix, accounts: [...ix.accounts, ...extra] };

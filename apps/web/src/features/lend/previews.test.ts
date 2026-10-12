@@ -46,7 +46,16 @@ import {
     wipeLive,
     wipeSweepPending,
 } from './previews.ts';
-import { fakeMarket, recordOf, simpleLender, simplePool, stateOf, type VectorCase } from './testkit.ts';
+import {
+    fakeMarket,
+    NO_UVA,
+    PUMP_UVA,
+    recordOf,
+    simpleLender,
+    simplePool,
+    stateOf,
+    type VectorCase,
+} from './testkit.ts';
 
 let m: MathModule;
 let cases: VectorCase[];
@@ -324,12 +333,49 @@ describe('lend previews on simple pools', () => {
         expect(!refused.ok && refused.refusal.name).toBe('WipeSweepPending');
         const bundled = previewDepositView(m, curve, 0n, 10n ** 9n, 50, true);
         expect(bundled.ok && bundled.value.shares).toBe(10n ** 12n);
-        // The trader bit is enough off the pump venues; pump venues also need the rewards bit.
+        // The trader bit is enough off the pump venues on a market without a pump UVA; pump venues
+        // also need the rewards bit.
         const swept = { ...curve.market, flags: flags | MARKET_FLAG.wipeTraderSwept };
         expect(wipeSweepPending(swept)).toBe(true);
-        expect(wipeSweepPending({ ...swept, venue: 6 })).toBe(false);
+        expect(wipeSweepPending({ ...swept, venue: 6, pumpUva: NO_UVA })).toBe(false);
         expect(wipeSweepPending({ ...swept, flags: swept.flags | MARKET_FLAG.wipeRewardsClaimed })).toBe(false);
-        expect([0, 1, 2, 3, 4, 5, 6].map(rewardsRequired)).toEqual([false, true, true, true, false, false, false]);
+        // AIR-05: a curve market that left pump (None, then Raydium) keeps its pump UVA, and with it the gate.
+        expect(wipeSweepPending({ ...swept, venue: 0 })).toBe(true);
+        expect(wipeSweepPending({ ...swept, venue: 4 })).toBe(true);
+        expect(wipeSweepPending({ ...swept, venue: 4, flags: swept.flags | MARKET_FLAG.wipeRewardsClaimed })).toBe(
+            false,
+        );
+    });
+
+    it('requires the venue-reward sweep on the pump venues and on every market with a pump UVA (AIR-05)', () => {
+        const venues = [0, 1, 2, 3, 4, 5, 6];
+        // engine::lender::rewards_required: pump kinds, or Market.pump_uva set.
+        expect(venues.map((venue) => rewardsRequired({ venue, pumpUva: NO_UVA }))).toEqual([
+            false,
+            true,
+            true,
+            true,
+            false,
+            false,
+            false,
+        ]);
+        expect(venues.map((venue) => rewardsRequired({ venue, pumpUva: PUMP_UVA }))).toEqual(venues.map(() => true));
+        // The deposit preview passes it to the facade: off pump with a UVA the trader bit alone is not enough.
+        const left = {
+            ...simplePool({
+                tokensFree: 0n,
+                totalShares: 0n,
+                flags: MARKET_FLAG.wipeTraderSwept,
+                venue: 4,
+                pumpUva: PUMP_UVA,
+            }),
+            lender: null,
+            records: [],
+        };
+        const refused = previewDepositView(m, left, 0n, 10n ** 9n, 50);
+        expect(!refused.ok && refused.refusal.name).toBe('WipeSweepPending');
+        const raydium = { ...left, market: { ...left.market, pumpUva: NO_UVA } };
+        expect(previewDepositView(m, raydium, 0n, 10n ** 9n, 50).ok).toBe(true);
     });
 
     it('waits for the sweep after the last lender’s exit too (AIR-08: the gate is S = 0, not the wipe record)', () => {

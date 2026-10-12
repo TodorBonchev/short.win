@@ -111,16 +111,21 @@ const WIPE_REWARDS_CLAIMED = 2;
 /** `VenueKind` codes that pay venue cashback (`engine::lender::rewards_required`). */
 const PUMP_VENUES = new Set([1, 2, 3]);
 
+/** The default (all-zero) key: an unset `Pubkey` field of an account. */
+const DEFAULT_ADDRESS = '11111111111111111111111111111111';
+
 export function hasFlag(market: Pick<Market, 'flags'>, flag: number): boolean {
     return (market.flags & flag) !== 0;
 }
 
 /**
- * Whether a deposit into a live full-wipe record also waits for the venue-reward sweep
- * (`engine::lender::rewards_required`: every pump-curve, migrating and PumpSwap market; R4A-7).
+ * Whether a deposit into a pool without shares also waits for the venue-reward sweep
+ * (`engine::lender::rewards_required`; R4A-7): every pump-curve, migrating and PumpSwap market and,
+ * since AIR-05, every market that has the trader's pump UVA (`Market.pump_uva` set) — a curve market
+ * that left pump (→ `None`, then possibly a Raydium pool) keeps its curve-era cashback there.
  */
-export function rewardsRequired(venue: number): boolean {
-    return PUMP_VENUES.has(venue);
+export function rewardsRequired(market: Pick<Market, 'venue' | 'pumpUva'>): boolean {
+    return market.pumpUva !== DEFAULT_ADDRESS || PUMP_VENUES.has(market.venue);
 }
 
 /** A full-wipe record is live (`S = 0` and `wipe_live`): the next deposit finalises it. */
@@ -130,16 +135,17 @@ export function wipeLive(market: MarketPoolFields): boolean {
 
 /**
  * A deposit would be refused `WipeSweepPending` until the permissionless sweeps run: the pool has
- * no shares (`S = 0`) and the trader bit, or on a pump venue the venue-reward bit, is clear — the
- * program's `deposit` check (`pool::deposit`; the keeper's `sweep::wipe_pending`). Since AIR-08
+ * no shares (`S = 0`) and the trader bit, or where {@link rewardsRequired} (a pump venue, or since
+ * AIR-05 any market with the trader's pump UVA) the venue-reward bit, is clear — the program's
+ * `deposit` check (`pool::deposit`; the keeper's `sweep::wipe_pending`). Since AIR-08
  * that holds after the last lender's exit as well as after a full wipe (R4A-7): `withdraw` clears
  * both bits when `S` reaches 0, so the gate is `S = 0`, not the wipe record. A new market starts
  * with both bits set and is not pending.
  */
-export function wipeSweepPending(market: MarketPoolFields & Pick<Market, 'venue'>): boolean {
+export function wipeSweepPending(market: MarketPoolFields & Pick<Market, 'venue' | 'pumpUva'>): boolean {
     if (podU128ToBigInt(market.totalShares) !== 0n) return false;
     if (!hasFlag(market, MARKET_FLAG.wipeTraderSwept)) return true;
-    return rewardsRequired(market.venue) && !hasFlag(market, MARKET_FLAG.wipeRewardsClaimed);
+    return rewardsRequired(market) && !hasFlag(market, MARKET_FLAG.wipeRewardsClaimed);
 }
 
 // ---- conversions (the program's `Market::pool`, `MarketVault::vault`, `LenderPosition::lender`) ----
@@ -320,7 +326,7 @@ function attempt<T>(fn: () => T): Result<T> {
 
 /** The inputs every lender preview reads. */
 export interface LendState {
-    readonly market: MarketPoolFields & Pick<Market, 'venue'>;
+    readonly market: MarketPoolFields & Pick<Market, 'venue' | 'pumpUva'>;
     readonly vault: VaultPoolFields;
     readonly lender: LenderFields | null;
     /** The `ShareEpoch` records from the lender's epoch on (empty for a current lender). */
@@ -545,8 +551,7 @@ export function previewDepositView(
         session(
             m,
             s,
-            (pool, lender, records) =>
-                m.previewDeposit(pool, lender, records, now, amount, rewardsRequired(s.market.venue)),
+            (pool, lender, records) => m.previewDeposit(pool, lender, records, now, amount, rewardsRequired(s.market)),
             o,
         ),
     );
