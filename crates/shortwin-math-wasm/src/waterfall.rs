@@ -181,7 +181,12 @@ pub fn preview_expiry(
 }
 
 /// SOL settlement `kind` 1 = S1, 2 = S2, 3 = S3 with keeper reward `K_s` and fair value
-/// `fv` (`undefined`: the cap does not bind) (ECON §8.6).
+/// `fv` (`undefined`: the cap does not bind) (ECON §8.6), composed as `sol_settle` composes
+/// it: on every kind (S1 too since AIR-21) the part of the lenders' take above
+/// `⌊q·P_ema/WAD⌋ + R_due` vests (`lump`), and on a venue that cannot execute
+/// (`executable = false`: halted, layout change, list-only, migrating) the tokens count at 0,
+/// so all but `R_due` vests (AIR-09: `P_ema` is the frozen pre-halt mark there).
+#[allow(clippy::too_many_arguments)]
 #[wasm_bindgen(js_name = previewSettlement)]
 pub fn preview_settlement(
     v: u64,
@@ -191,6 +196,7 @@ pub fn preview_settlement(
     q: u64,
     p_ema: u128,
     r_due: u64,
+    executable: bool,
 ) -> Result<Payout, JsError> {
     let kind = match kind {
         1 => SettleKind::S1,
@@ -198,7 +204,9 @@ pub fn preview_settlement(
         3 => SettleKind::S3,
         _ => return Err(MathError::InvalidInput.into()),
     };
-    Ok(Payout(mwf::settle(v, kind, k_s, fv, q, p_ema, r_due)?))
+    // `sol_settle` (AIR-09): the price the extinguished tokens count at once.
+    let p_imm = if executable { p_ema } else { 0 };
+    Ok(Payout(mwf::settle(v, kind, k_s, fv, q, p_imm, r_due)?))
 }
 
 #[cfg(test)]
@@ -225,8 +233,46 @@ mod tests {
         );
         let e = preview_expiry(1_000, 600, 100, 500, 550, 1_500, 100, 1, 10, 50).unwrap();
         assert_eq!(e.expiry_fee(), 5);
-        let s = preview_settlement(1_000, 2, 20, Some(700), 500, 10u128.pow(18), 50).unwrap();
+        let s = preview_settlement(1_000, 2, 20, Some(700), 500, 10u128.pow(18), 50, true).unwrap();
         assert_eq!((s.keeper(), s.lenders(), s.borrower()), (20, 700, 280));
         assert_eq!(s.lump(), 150);
+    }
+
+    /// AIR-21: an S1 take above the tokens' value at `P_ema` plus `R_due` vests its excess; a
+    /// genuine S1 loss (take at or below that value) vests nothing.
+    #[test]
+    fn an_s1_take_above_the_tokens_value_vests_the_excess() {
+        let wad = 10u128.pow(18);
+        // V − K_s = 980 against ⌊500·P/WAD⌋ + 50 = 550: 430 vests, the borrower gets nothing.
+        let s = preview_settlement(1_000, 1, 20, None, 500, wad, 50, true).unwrap();
+        assert_eq!(
+            (s.keeper(), s.lenders(), s.lump(), s.borrower()),
+            (20, 980, 430, 0)
+        );
+        // FV is ignored for S1 (never capped).
+        let capped = preview_settlement(1_000, 1, 20, Some(700), 500, wad, 50, true).unwrap();
+        assert_eq!((capped.lenders(), capped.lump()), (980, 430));
+        // ⌊1,000·P/WAD⌋ + 50 = 1,050 ≥ 980: a loss, all of it immediate.
+        let loss = preview_settlement(1_000, 1, 20, None, 1_000, wad, 50, true).unwrap();
+        assert_eq!((loss.lenders(), loss.lump()), (980, 0));
+    }
+
+    /// AIR-09: on a venue that cannot execute the tokens count at 0 (`sol_settle`'s `p_imm`):
+    /// only `R_due` is immediate and the rest of the take vests.
+    #[test]
+    fn a_settlement_on_a_venue_that_cannot_execute_prices_the_tokens_at_0() {
+        let wad = 10u128.pow(18);
+        let live = preview_settlement(1_000, 3, 20, Some(700), 500, wad, 50, true).unwrap();
+        let halted = preview_settlement(1_000, 3, 20, Some(700), 500, wad, 50, false).unwrap();
+        assert_eq!((live.lenders(), live.lump()), (700, 150));
+        assert_eq!((halted.lenders(), halted.lump()), (700, 650));
+        // Who gets what does not change, only what vests.
+        assert_eq!(
+            (halted.keeper(), halted.borrower()),
+            (live.keeper(), live.borrower())
+        );
+        // R_due above the take: nothing vests.
+        let rent = preview_settlement(1_000, 3, 20, Some(700), 500, wad, 800, false).unwrap();
+        assert_eq!(rent.lump(), 0);
     }
 }

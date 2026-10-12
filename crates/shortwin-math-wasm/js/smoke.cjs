@@ -83,9 +83,12 @@ assert.equal(liq.keeper, 20n);
 assert.equal(liq.keeperTopup, 5n);
 assert.equal(liq.lump, 25n);
 assert.throws(() => m.previewClose(100n, 90n, 20n, 1_500), /underflow/);
-assert.equal(m.previewSettlement(1_000n, 1, 20n, 5n, 500n, WAD, 50n).lenders, 980n);
-// S2: the part above ⌊Q·P_ema/WAD⌋ + R_due vests.
-assert.equal(m.previewSettlement(1_000n, 2, 20n, 700n, 500n, WAD, 50n).lump, 150n);
+assert.equal(m.previewSettlement(1_000n, 1, 20n, 5n, 500n, WAD, 50n, true).lenders, 980n);
+// The part above ⌊Q·P_ema/WAD⌋ + R_due vests: S2, and S1 since AIR-21.
+assert.equal(m.previewSettlement(1_000n, 2, 20n, 700n, 500n, WAD, 50n, true).lump, 150n);
+assert.equal(m.previewSettlement(1_000n, 1, 20n, undefined, 500n, WAD, 50n, true).lump, 430n);
+// AIR-09: on a venue that cannot execute the tokens count at 0, so all but R_due vests.
+assert.equal(m.previewSettlement(1_000n, 3, 20n, 700n, 500n, WAD, 50n, false).lump, 650n);
 
 // Exit bounds (v0.4.1): no liquidation reserve; expiry keeps rent and fee senior.
 assert.equal(m.maxInLiq(1_000n, 200, 10_000n, 100n, 0n), 1_020n);
