@@ -11,10 +11,12 @@
 //! - **buys**: the same top-up comes out of the leg's funding (`max_in + ert`), so `B` = pump's
 //!   charge + 650,240, within the bound;
 //! - the pump UVA was created at listing (`create_market`), so no leg pays its 1,346,200;
-//! - **growth** (pump's 2026-10-02 redeploy): a curve under 141 bytes grows to 141 on short.win's
-//!   first v2 trade, its rent reserve (`lamports − rQ`) topped up to `Rent.minimum_balance(141)`
-//!   from the trader the same way — out of `S` on a sale (125 bytes before the redeploy, which
-//!   no curve of the dump needed: they are over-funded).
+//! - **growth** (pump's 2026-10-08 redeploy; 141 bytes on the 2026-10-02 one): a curve under 166
+//!   bytes grows to 166 on short.win's first v2 trade, its rent reserve (`lamports − rQ −` the fee
+//!   buckets, `fork::curve_growth_top_up`) topped up to `Rent.minimum_balance(166)` from the
+//!   trader the same way — out of `S` on a sale (125 bytes before the 2026-10-02 redeploy, which
+//!   no curve of the dump needed: they are over-funded; the 151-byte `near` curve's reserve is
+//!   exactly `minimum_balance(151)`, so it pays 76,200).
 //!
 //! The empty creator vault is planted on pump's side (the vault PDA's lamports removed), as
 //! `pump_math_it::an_empty_creator_vault_is_topped_up_by_the_user` does for a normal user.
@@ -48,10 +50,17 @@ fn a_sale_pays_the_creator_vault_top_up_out_of_its_proceeds() {
     let fee = pm.curve.fees(&env.svm).unwrap();
     assert!(fee.creator > 0, "a creator fee: pump tops the vault up");
     empty_creator_vault(&mut env, &pm);
+    // The 151-byte curve's growth to 166 (the 2026-10-08 build) comes out of `S` the same way.
+    let growth = pm.curve.growth_top_up(&env.svm);
+    assert_eq!(growth, 76_200);
     let mut b = env.borrower();
     let b0 = lamports(&env, &b.key());
     let (open, nonce, _) = open_ok(&mut env, &pm, &mut b, q);
-    assert_eq!(open.s, sale.proceeds - TOP_UP, "S = proceeds − the top-up");
+    assert_eq!(
+        open.s,
+        sale.proceeds - TOP_UP - growth,
+        "S = proceeds − the top-up − the growth"
+    );
     assert!(
         lamports(&env, &pm.creator_vault) >= TOP_UP,
         "the vault is rent-exempt"
@@ -136,20 +145,19 @@ fn the_uva_created_at_listing_is_never_paid_by_a_leg() {
 }
 
 /// A sale on a 115-byte curve whose rent reserve is planted down to `minimum_balance(115)` (the
-/// dump's is over-funded at the old rent): pump's 2026-10-02 redeploy grows it to 141 bytes and
-/// tops the reserve up to `minimum_balance(141)` — 132,080 lamports — from the trader before the
-/// proceeds, so `S` = the quote less the growth; the curve is 141 bytes after it, the borrower got
-/// `ert` back, the trader is clean.
+/// dump's is over-funded at the old rent): pump's 2026-10-08 redeploy grows it to 166 bytes (141
+/// on the 2026-10-02 build) and tops the reserve up to `minimum_balance(166)` — 259,080 lamports
+/// (132,080 to 141) — from the trader before the proceeds, so `S` = the quote less the growth;
+/// the curve is 166 bytes after it, the borrower got `ert` back, the trader is clean.
 #[test]
 fn a_sale_pays_a_short_curves_growth_out_of_its_proceeds() {
     let (mut env, pm, _) = setup(PumpCoin::T22_115);
     assert_eq!(pm.curve.data_len(&env.svm), 115);
+    let grows_to = fork::PumpDeploy::CURRENT.curve_len();
     let min115 = env.svm.minimum_balance_for_rent_exemption(115);
-    let min141 = env
-        .svm
-        .minimum_balance_for_rent_exemption(fork::CURVE_LEN_2026_10);
-    let growth = min141 - min115;
-    assert_eq!(growth, 132_080);
+    let min_new = env.svm.minimum_balance_for_rent_exemption(grows_to);
+    let growth = min_new - min115;
+    assert_eq!(growth, 259_080);
     let rq = pm.curve.state(&env.svm).real_quote_reserves;
     let mut acc = env.svm.get_account(&pm.curve.curve).unwrap();
     acc.lamports = rq + min115;
@@ -168,10 +176,10 @@ fn a_sale_pays_a_short_curves_growth_out_of_its_proceeds() {
     let (open, _, _) = open_ok(&mut env, &pm, &mut b, q);
     assert_eq!(open.s, sale.proceeds - growth, "S = proceeds − the growth");
     let acc = env.svm.get_account(&pm.curve.curve).unwrap();
-    assert_eq!(acc.data.len(), fork::CURVE_LEN_2026_10);
+    assert_eq!(acc.data.len(), grows_to);
     assert_eq!(
         acc.lamports - pm.curve.state(&env.svm).real_quote_reserves,
-        min141
+        min_new
     );
     assert_trader_clean(&env, &pm);
 }

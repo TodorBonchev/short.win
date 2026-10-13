@@ -43,14 +43,19 @@
 //!   [`cpmm_swap_events`] CPMM's `SwapEvent` (`emit!`, "Program data:").
 //!
 //! **The pump fork (M5, appended below the Raydium part).** Groups `pump_programs`,
-//! `pump_programs_2026_10` and `pump_state` of the same manifest: the pump, pump-fees and
-//! PumpSwap ELFs (deployed from their dumped ProgramData, sha256-checked like the Raydium ones,
-//! so the latch reads the real deploy slots: since the M10 pump revalidation the 2026-10-02
-//! redeploys 452,654,932 / 452,655,002 / 452,654,882, [`PumpDeploy::CURRENT`]; the 2026-09
-//! builds of `pump_programs` stay loadable as [`PumpDeploy::Sep2026`] through
-//! [`load_pump_deploy`] for T-LATCH), and pump's statics and one set of accounts
-//! per coin **role** ([`PumpCoin`]) at one mainnet slot, loaded on first use apart from the
-//! Raydium fixtures. [`Env::fork_pump`] / [`Env::fork_pump_coin`], or piecewise
+//! `pump_programs_2026_10`, `pump_programs_2026_10_13`, `pump_state` and `pump_state_2026_10_13`
+//! of the same manifest: the pump, pump-fees and PumpSwap ELFs (deployed from their dumped
+//! ProgramData, sha256-checked like the Raydium ones, so the latch reads the real deploy slots:
+//! since the 2026-10-13 re-pin the redeploys of 2026-10-08 (pump 454,596,459, PumpSwap
+//! 454,596,406) and 2026-10-12 (pump-fees 456,132,171), [`PumpDeploy::CURRENT`] =
+//! [`PumpDeploy::Oct2026Synth`]; the 2026-10-02 builds of `pump_programs_2026_10`
+//! ([`PumpDeploy::Oct2026`]) and the 2026-09 builds of `pump_programs` ([`PumpDeploy::Sep2026`])
+//! stay loadable through [`load_pump_deploy`] for T-LATCH), and pump's statics and one set of
+//! accounts per coin **role** ([`PumpCoin`]) at one mainnet slot per state group (`pump_state`'s
+//! roles for the older suites, `pump_state_2026_10_13`'s 166-byte curves, synthetic completions
+//! and the rest; an address both groups hold — pump's `Global`, now 1,088 bytes, both
+//! `FeeConfig`s, PumpSwap's `GlobalConfig` — resolves to the newer group), loaded on first use
+//! apart from the Raydium fixtures. [`Env::fork_pump`] / [`Env::fork_pump_coin`], or piecewise
 //! [`Env::load_pump_programs`], [`Env::load_pump_statics`], [`Env::load_pump_coin`],
 //! [`Env::set_pump_rent`] (mainnet's Rent sysvar, dumped with the state) and
 //! [`Env::set_pump_clock`]; [`PumpCurve`] reads a curve with the `shortwin-venue-state` readers,
@@ -90,7 +95,8 @@ use shortwin::constants::{
     PUMP_AMM_PROGRAM_ID, PUMP_EVENT_AUTHORITY, PUMP_FEE_CONFIG, PUMP_FEES_PROGRAM_ID, PUMP_GLOBAL,
     PUMP_GLOBAL_VOLUME_ACCUMULATOR, PUMP_PROGRAM_ID, RAYDIUM_CPMM_AUTHORITY,
     RAYDIUM_CPMM_PROGRAM_ID, RAYDIUM_V4_AUTHORITY, RAYDIUM_V4_PROGRAM_ID, TOKEN_2022_PROGRAM_ID,
-    TOKEN_PROGRAM_ID, VENUE_GUARD_SLOTS_2026_09_27, VENUE_PROGRAMS, WSOL_MINT,
+    TOKEN_PROGRAM_ID, VENUE_GUARD_SLOTS_2026_09_27, VENUE_GUARD_SLOTS_2026_10_03, VENUE_PROGRAMS,
+    WSOL_MINT,
 };
 use shortwin::state::Market;
 use shortwin_math::fees::{
@@ -128,9 +134,20 @@ pub fn fixtures_dir() -> PathBuf {
 pub const RAYDIUM_GROUPS: [&str; 3] = ["raydium_programs", "raydium_cpmm_2026_10", "raydium_state"];
 /// The manifest groups of the pump fork (loaded separately, on first use of a pump fixture, so
 /// the Raydium tests never rebuild the 10 MiB pump ProgramData accounts). The three programs'
-/// addresses are in both program groups; [`pump_fixture_at`] resolves them to the later one,
-/// `pump_programs_2026_10` ([`PumpDeploy::CURRENT`]), and the loaders pick a deploy by name.
-pub const PUMP_GROUPS: [&str; 3] = ["pump_programs", "pump_programs_2026_10", "pump_state"];
+/// addresses are in every program group; [`pump_fixture_at`] resolves them to the latest one,
+/// `pump_programs_2026_10_13` ([`PumpDeploy::CURRENT`]), and the loaders pick a deploy by name.
+/// The statics both state groups hold resolve to `pump_state_2026_10_13` the same way.
+pub const PUMP_GROUPS: [&str; 5] = [
+    "pump_programs",
+    "pump_programs_2026_10",
+    "pump_state",
+    "pump_programs_2026_10_13",
+    "pump_state_2026_10_13",
+];
+/// The pump fork's state groups, each one `getMultipleAccounts` snapshot with its coin roles:
+/// `pump_state` (the older suites' roles and T-LATCH) and `pump_state_2026_10_13` (the state the
+/// 2026-10-08/12 redeploys introduced).
+pub const PUMP_STATE_GROUPS: [&str; 2] = ["pump_state", "pump_state_2026_10_13"];
 /// The manifest groups of the PumpSwap state (M6; R-VEN Update 2026-09-30 H10): `pamm_state` (one
 /// `getMultipleAccounts` at slot 451,784,607: PumpSwap's statics and five canonical-pool roles)
 /// and `pamm_synthetic` (pools derived offline from `pamm_state` bytes, marked `synthetic`: the
@@ -170,9 +187,12 @@ struct Fixtures {
     by_address: HashMap<Pubkey, String>,
     /// Accounts the dump recorded as absent (`"absent": true`; pump groups only).
     absent: std::collections::HashSet<Pubkey>,
-    /// The state group's snapshot.
+    /// The (first) state group's snapshot.
     state: Snapshot,
-    /// `pump_state`'s coin roles: role → mint (empty for the Raydium fork).
+    /// Every state group's snapshot, by group.
+    snapshots: HashMap<String, Snapshot>,
+    /// The state groups' coin (or pool) roles: role → mint (empty for the Raydium fork). Role
+    /// names are unique across the state groups.
     coins: HashMap<String, Pubkey>,
 }
 
@@ -277,38 +297,46 @@ fn load_entries(m: &serde_json::Value, groups: &[&str]) -> Entries {
     (by_name, by_address, absent)
 }
 
-/// Loads the entries of `groups` and the snapshot of `state_group`, rebuilding and
-/// sha256-checking every account.
-fn load_fixtures(groups: &[&str], state_group: &str) -> Fixtures {
+/// Loads the entries of `groups` and the snapshots of `state_groups` (the first is
+/// [`Fixtures::state`]), rebuilding and sha256-checking every account.
+fn load_fixtures(groups: &[&str], state_groups: &[&str]) -> Fixtures {
     let m = manifest();
     let (by_name, by_address, absent) = load_entries(&m, groups);
-    let snap = m["snapshots"]
-        .as_array()
-        .expect("snapshots")
-        .iter()
-        .find(|s| s["group"] == state_group)
-        .unwrap_or_else(|| panic!("no `{state_group}` snapshot (scripts/dump-fixtures.py fetch)"));
-    let coins = snap["coins"]
-        .as_object()
-        .or_else(|| snap["pools"].as_object())
-        .map(|coins| {
-            coins
-                .iter()
-                .map(|(role, mint)| {
-                    let mint = Pubkey::from_str(mint.as_str().expect("mint")).expect("mint");
-                    (role.clone(), mint)
-                })
-                .collect()
-        })
-        .unwrap_or_default();
+    let mut snapshots = HashMap::new();
+    let mut coins = HashMap::new();
+    for state_group in state_groups {
+        let snap = m["snapshots"]
+            .as_array()
+            .expect("snapshots")
+            .iter()
+            .find(|s| s["group"] == *state_group)
+            .unwrap_or_else(|| {
+                panic!("no `{state_group}` snapshot (scripts/dump-fixtures.py fetch)")
+            });
+        for (role, mint) in snap["coins"]
+            .as_object()
+            .or_else(|| snap["pools"].as_object())
+            .into_iter()
+            .flatten()
+        {
+            let mint = Pubkey::from_str(mint.as_str().expect("mint")).expect("mint");
+            let prev = coins.insert(role.clone(), mint);
+            assert!(prev.is_none(), "coin role `{role}` in two state groups");
+        }
+        snapshots.insert(
+            (*state_group).to_owned(),
+            Snapshot {
+                slot: snap["slot"].as_u64().expect("slot"),
+                block_time: snap["block_time"].as_i64().expect("block_time"),
+            },
+        );
+    }
     Fixtures {
         by_name,
         by_address,
         absent,
-        state: Snapshot {
-            slot: snap["slot"].as_u64().expect("slot"),
-            block_time: snap["block_time"].as_i64().expect("block_time"),
-        },
+        state: snapshots[state_groups[0]],
+        snapshots,
         coins,
     }
 }
@@ -316,19 +344,19 @@ fn load_fixtures(groups: &[&str], state_group: &str) -> Fixtures {
 /// The Raydium fork's fixtures.
 fn fixtures() -> &'static Fixtures {
     static F: OnceLock<Fixtures> = OnceLock::new();
-    F.get_or_init(|| load_fixtures(&RAYDIUM_GROUPS, "raydium_state"))
+    F.get_or_init(|| load_fixtures(&RAYDIUM_GROUPS, &["raydium_state"]))
 }
 
 /// The pump fork's fixtures.
 fn pump_fixtures() -> &'static Fixtures {
     static F: OnceLock<Fixtures> = OnceLock::new();
-    F.get_or_init(|| load_fixtures(&PUMP_GROUPS, "pump_state"))
+    F.get_or_init(|| load_fixtures(&PUMP_GROUPS, &PUMP_STATE_GROUPS))
 }
 
 /// The PumpSwap state's fixtures (M6).
 fn pamm_fixtures() -> &'static Fixtures {
     static F: OnceLock<Fixtures> = OnceLock::new();
-    F.get_or_init(|| load_fixtures(&PAMM_GROUPS, "pamm_state"))
+    F.get_or_init(|| load_fixtures(&PAMM_GROUPS, &["pamm_state"]))
 }
 
 /// The fixture named `name`, Raydium, pump or PumpSwap (panics if the manifest has no such
@@ -448,17 +476,18 @@ pub const CPMM_DEPLOY_SLOT_2026_10: u64 = 452_376_460;
 
 /// The venue deploy slots the harness's ProgramData carry and [`Env::default_init_args`] records
 /// as `guard_slot` (A7; by `VenueGuard` index): `VENUE_GUARD_SLOTS_2026_09_27` with CPMM at
-/// [`CPMM_DEPLOY_SLOT_2026_10`] and pump, PumpSwap and pump-fees at their 2026-10-02 redeploys
-/// ([`PumpDeploy::Oct2026`]), the builds every fork loads ([`CpmmDeploy::CURRENT`],
-/// [`PumpDeploy::CURRENT`]). The tests use it wherever they mean "the deploy slot the fork
-/// holds"; `VENUE_GUARD_SLOTS_2026_09_27` stays the 2026-09-27 baseline, which T-LATCH's old→new
-/// upgrades start from ([`CpmmDeploy::Sep2026`], [`PumpDeploy::Sep2026`]).
+/// [`CPMM_DEPLOY_SLOT_2026_10`], pump and PumpSwap at their 2026-10-08 redeploys and pump-fees at
+/// its 2026-10-12 one ([`PumpDeploy::Oct2026Synth`]), the builds every fork loads
+/// ([`CpmmDeploy::CURRENT`], [`PumpDeploy::CURRENT`]). The tests use it wherever they mean "the
+/// deploy slot the fork holds"; `VENUE_GUARD_SLOTS_2026_09_27` stays the 2026-09-27 baseline and
+/// `VENUE_GUARD_SLOTS_2026_10_03` the 2026-10-02 builds', which T-LATCH's old→new upgrades start
+/// from ([`CpmmDeploy::Sep2026`], [`PumpDeploy::Sep2026`], [`PumpDeploy::Oct2026`]).
 pub const FIXTURE_GUARD_SLOTS: [u64; VENUE_PROGRAMS] = {
     let mut s = VENUE_GUARD_SLOTS_2026_09_27;
     s[GUARD_RAYDIUM_CPMM as usize] = CPMM_DEPLOY_SLOT_2026_10;
-    s[GUARD_PUMP as usize] = PUMP_DEPLOY_SLOT_2026_10;
-    s[GUARD_PUMP_AMM as usize] = PUMP_AMM_DEPLOY_SLOT_2026_10;
-    s[GUARD_PUMP_FEES as usize] = PUMP_FEES_DEPLOY_SLOT_2026_10;
+    s[GUARD_PUMP as usize] = PUMP_DEPLOY_SLOT_2026_10_08;
+    s[GUARD_PUMP_AMM as usize] = PUMP_AMM_DEPLOY_SLOT_2026_10_08;
+    s[GUARD_PUMP_FEES as usize] = PUMP_FEES_DEPLOY_SLOT_2026_10_12;
     s
 };
 
@@ -2030,8 +2059,55 @@ pub const PUMP_FEES_DEPLOY_SLOT_2026_10: u64 = 452_655_002;
 /// fee buckets `creator_fee` @125 and `protocol_fees` @133; `shortwin_venue_state::pump::
 /// CURVE_LEN_V2` = 125, the 2026-09 build's target, is the reader's layout and stays).
 pub const CURVE_LEN_2026_10: usize = 141;
+/// pump's deploy slot since its 2026-10-08 redeploy (group `pump_programs_2026_10_13`).
+pub const PUMP_DEPLOY_SLOT_2026_10_08: u64 = 454_596_459;
+/// PumpSwap's deploy slot since its 2026-10-08 redeploy (group `pump_programs_2026_10_13`).
+pub const PUMP_AMM_DEPLOY_SLOT_2026_10_08: u64 = 454_596_406;
+/// pump-fees' deploy slot since its 2026-10-12 redeploy (group `pump_programs_2026_10_13`; an
+/// unexamined 2026-10-08 build at 454,596,501 preceded it).
+pub const PUMP_FEES_DEPLOY_SLOT_2026_10_12: u64 = 456_132_171;
+/// What `create_v2` allocates and every v2 / v3 trade grows a shorter curve to since pump's
+/// 2026-10-08 redeploy (the layout through `post_complete_quote_in` @158: the fee buckets @125 /
+/// @133, `depth` @141, `initial_virtual_quote_reserves` @142, `post_complete_base_out` @150).
+pub const CURVE_LEN_2026_10_08: usize = 166;
 
-/// The builds of the three pump programs the fixtures hold, each pair at the same program and
+/// A curve's fee buckets `(creator_fee @125, protocol_fees @133)` from its data (0 past the
+/// account's end: a curve shorter than 141 bytes carries none).
+pub fn curve_fee_buckets(data: &[u8]) -> (u64, u64) {
+    let at = |o: usize| {
+        data.get(o..o + 8)
+            .map_or(0, |b| u64::from_le_bytes(b.try_into().expect("8 bytes")))
+    };
+    (at(125), at(133))
+}
+
+/// The rent pump takes from a trading user to grow a curve of `len` bytes, holding `lamports`,
+/// `rq` = `real_quote_reserves` and `buckets` = `creator_fee + protocol_fees`, to `grows_to`
+/// bytes: its rent reserve `lamports − rQ − buckets` topped up to
+/// `Rent.minimum_balance(grows_to)`; 0 on a curve at that length or with the reserve already
+/// there (the dump's over-funded 115-byte curves). The harness's one model of the growth
+/// ([`PumpCurve::growth_top_up`], the I13 hook's `venue_rent`, T-PUMP-MATH's checks); pump's
+/// 2026-10-08 build counts the reserve without the buckets on v2 and v3 trades alike
+/// (`pump_math_it::a_bucketed_short_curve_grows_with_its_reserve_net_of_the_buckets`). The
+/// older builds' targets (141, 125) lie at or before the buckets' end, so no curve they grow
+/// carries any.
+pub fn curve_growth_top_up(
+    svm: &LiteSVM,
+    len: usize,
+    lamports: u64,
+    rq: u64,
+    buckets: u64,
+    grows_to: usize,
+) -> u64 {
+    if len >= grows_to {
+        return 0;
+    }
+    let reserve = lamports.saturating_sub(rq).saturating_sub(buckets);
+    svm.minimum_balance_for_rent_exemption(grows_to)
+        .saturating_sub(reserve)
+}
+
+/// The builds of the three pump programs the fixtures hold, each at the same program and
 /// ProgramData addresses with the same upgrade authority (`7gZufw…`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PumpDeploy {
@@ -2039,16 +2115,27 @@ pub enum PumpDeploy {
     /// R-PUMP, R-VEN and `VENUE_GUARD_SLOTS_2026_09_27` name, on which M5 and M6 were built.
     Sep2026,
     /// The 2026-10-02 redeploys ([`PUMP_DEPLOY_SLOT_2026_10`], [`PUMP_AMM_DEPLOY_SLOT_2026_10`],
-    /// [`PUMP_FEES_DEPLOY_SLOT_2026_10`]; group `pump_programs_2026_10`): the release whose
-    /// unreleased artifacts `pump-rust-client` 0.2.0 shipped (v2 PumpSwap and v3 curve trades
-    /// with fee buckets; `tests/fixtures/README.md`). short.win's instructions and account lists
-    /// are unchanged.
+    /// [`PUMP_FEES_DEPLOY_SLOT_2026_10`]; group `pump_programs_2026_10`;
+    /// `VENUE_GUARD_SLOTS_2026_10_03`): the release whose unreleased artifacts `pump-rust-client`
+    /// 0.2.0 shipped (v2 PumpSwap and v3 curve trades with fee buckets; `tests/fixtures/
+    /// README.md`). short.win's instructions and account lists are unchanged.
     Oct2026,
+    /// pump / PumpSwap 2026-10-08, pump-fees 2026-10-12 ([`PUMP_DEPLOY_SLOT_2026_10_08`],
+    /// [`PUMP_AMM_DEPLOY_SLOT_2026_10_08`], [`PUMP_FEES_DEPLOY_SLOT_2026_10_12`]; group
+    /// `pump_programs_2026_10_13`; `VENUE_GUARD_SLOTS_2026_10_13`): the synthetic migration (a
+    /// `buy_v3` past `rT` completes the curve and buys the rest from the would-be pool),
+    /// `multi_hop_curve_swap` and PumpSwap's `multi_hop_swap`, the 166-byte curve
+    /// ([`CURVE_LEN_2026_10_08`]), the 1,088-byte `Global`, and pump-fees' undocumented
+    /// `withdraw`. short.win's instructions and account lists are unchanged.
+    Oct2026Synth,
 }
 
 impl PumpDeploy {
     /// The builds every fork loads ([`PumpProgram`], [`Env::load_pump_programs`]).
-    pub const CURRENT: Self = Self::Oct2026;
+    pub const CURRENT: Self = Self::Oct2026Synth;
+
+    /// Every build the fixtures hold, oldest first.
+    pub const ALL: [Self; 3] = [Self::Sep2026, Self::Oct2026, Self::Oct2026Synth];
 
     fn prefix(self, program: PumpProgram) -> &'static str {
         match (self, program) {
@@ -2058,14 +2145,19 @@ impl PumpDeploy {
             (Self::Oct2026, PumpProgram::Pump) => "pump_2026_10",
             (Self::Oct2026, PumpProgram::Fees) => "pump_fees_2026_10",
             (Self::Oct2026, PumpProgram::Amm) => "pump_amm_2026_10",
+            (Self::Oct2026Synth, PumpProgram::Pump) => "pump_2026_10_08",
+            (Self::Oct2026Synth, PumpProgram::Fees) => "pump_fees_2026_10_12",
+            (Self::Oct2026Synth, PumpProgram::Amm) => "pump_amm_2026_10_08",
         }
     }
 
     /// The deploy slot `program`'s ProgramData header carries in this build.
     pub fn deploy_slot(self, program: PumpProgram) -> u64 {
+        let g = usize::from(program.guard());
         match self {
-            Self::Sep2026 => VENUE_GUARD_SLOTS_2026_09_27[usize::from(program.guard())],
-            Self::Oct2026 => FIXTURE_GUARD_SLOTS[usize::from(program.guard())],
+            Self::Sep2026 => VENUE_GUARD_SLOTS_2026_09_27[g],
+            Self::Oct2026 => VENUE_GUARD_SLOTS_2026_10_03[g],
+            Self::Oct2026Synth => FIXTURE_GUARD_SLOTS[g],
         }
     }
 
@@ -2099,53 +2191,55 @@ impl PumpDeploy {
             .accounts_db()
             .get_account_ref(&program.program_data().address)?;
         let held = acc.data().get(start..start + ELF_HEADER)?;
-        [Self::Sep2026, Self::Oct2026]
+        Self::ALL
             .into_iter()
             .find(|d| &d.elf(program)[..ELF_HEADER] == held)
     }
 
-    /// The size this build's v2 trades grow a shorter curve to (rent topped up from the trader):
-    /// 125 (`shortwin_venue_state::pump::CURVE_LEN_V2`, R-PUMP U10), 141 since the 2026-10-02
-    /// redeploy ([`CURVE_LEN_2026_10`]).
+    /// The size this build's trades grow a shorter curve to (rent topped up from the trader): 125
+    /// (`shortwin_venue_state::pump::CURVE_LEN_V2`, R-PUMP U10), 141 since the 2026-10-02
+    /// redeploy ([`CURVE_LEN_2026_10`]), 166 since the 2026-10-08 one ([`CURVE_LEN_2026_10_08`]).
     pub fn curve_len(self) -> usize {
         match self {
             Self::Sep2026 => pump::CURVE_LEN_V2,
             Self::Oct2026 => CURVE_LEN_2026_10,
+            Self::Oct2026Synth => CURVE_LEN_2026_10_08,
         }
     }
 
     /// The size this build's trades grow a shorter PumpSwap pool to (rent topped up from the
     /// trader): 271 (`shortwin_venue_state::pump_amm::POOL_LEN_CREATE`, R-VEN H8), 287 since the
-    /// 2026-10-02 redeploy ([`crate::pamm::POOL_LEN_2026_10`]).
+    /// 2026-10-02 redeploy ([`crate::pamm::POOL_LEN_2026_10`]; the 2026-10-08 one keeps it).
     pub fn pool_len(self) -> usize {
         match self {
             Self::Sep2026 => pump_amm::POOL_LEN_CREATE,
-            Self::Oct2026 => crate::pamm::POOL_LEN_2026_10,
+            Self::Oct2026 | Self::Oct2026Synth => crate::pamm::POOL_LEN_2026_10,
         }
     }
 }
 
 /// pump's `buy_v3` (`07051dc4…`), new in its 2026-10-02 redeploy.
 pub const PUMP_BUY_V3: [u8; 8] = [0x07, 0x05, 0x1d, 0xc4, 0xf5, 0x17, 0x65, 0x50];
+/// pump's `multi_hop_curve_swap` (`e19a7516…`), new in its 2026-10-08 redeploy.
+pub const PUMP_MULTI_HOP_CURVE_SWAP: [u8; 8] = [0xe1, 0x9a, 0x75, 0x16, 0xd7, 0x56, 0xf6, 0x67];
+/// pump's `set_max_curve_depth` (`209a98db…`), new in its 2026-10-08 redeploy (an admin
+/// instruction: the fallback probe if Anchor ever checks a signer before the key count).
+pub const PUMP_SET_MAX_CURVE_DEPTH: [u8; 8] = [0x20, 0x9a, 0x98, 0xdb, 0x8e, 0x6c, 0xda, 0xa5];
+/// PumpSwap's `multi_hop_swap` (`2b644913…`), new in its 2026-10-08 redeploy.
+pub const PAMM_MULTI_HOP_SWAP: [u8; 8] = [0x2b, 0x64, 0x49, 0x13, 0xe9, 0xf6, 0x6f, 0x94];
+/// pump-fees' undocumented `withdraw` (`b712469c…`, `sha256("global:withdraw")[..8]`), new in its
+/// 2026-10-12 redeploy (in no IDL; PDA seed `referral-vault`).
+pub const PUMP_FEES_WITHDRAW: [u8; 8] = [0xb7, 0x12, 0x46, 0x9c, 0x94, 0x6d, 0xa1, 0x22];
 /// Anchor's `InstructionFallbackNotFound`: the discriminator names no instruction.
 pub const ANCHOR_INSTRUCTION_FALLBACK_NOT_FOUND: u32 = 101;
 /// Anchor's `AccountNotEnoughKeys`.
 pub const ANCHOR_ACCOUNT_NOT_ENOUGH_KEYS: u32 = 3005;
 
 impl Env {
-    /// Which build of pump or PumpSwap **executes** (not only what its ProgramData holds,
-    /// [`PumpDeploy::held`]), asked of the program: an instruction new in the 2026-10-02 redeploy
-    /// — pump's `buy_v3`, PumpSwap's `buy_v2` ([`crate::pamm::PAMM_BUY_V2`]) — sent without
-    /// accounts fails `InstructionFallbackNotFound` on the 2026-09 build and
-    /// `AccountNotEnoughKeys` on the redeploy, which dispatches it and then finds no accounts.
-    /// pump-fees added no instruction, so it is not asked (panics). Callers warp a slot between
-    /// two probes of one program (the same transaction would be a duplicate).
-    pub fn pump_build_running(&mut self, program: PumpProgram) -> PumpDeploy {
-        let disc = match program {
-            PumpProgram::Pump => PUMP_BUY_V3,
-            PumpProgram::Amm => crate::pamm::PAMM_BUY_V2,
-            PumpProgram::Fees => panic!("pump-fees' builds share their instructions"),
-        };
+    /// The Anchor error `program` answers instruction `disc` with when it is sent without any
+    /// account: [`ANCHOR_INSTRUCTION_FALLBACK_NOT_FOUND`] if the build has no such instruction,
+    /// [`ANCHOR_ACCOUNT_NOT_ENOUGH_KEYS`] if it dispatches it and then finds no accounts.
+    pub fn pump_probe(&mut self, program: PumpProgram, disc: [u8; 8]) -> Option<u32> {
         let mut data = disc.to_vec();
         data.extend_from_slice(&[0; 16]);
         let probe = Instruction {
@@ -2154,11 +2248,41 @@ impl Env {
             data,
         };
         let res = self.send(&[probe], &[]);
-        match crate::errors::custom_code(&res) {
-            Some(ANCHOR_INSTRUCTION_FALLBACK_NOT_FOUND) => PumpDeploy::Sep2026,
-            Some(ANCHOR_ACCOUNT_NOT_ENOUGH_KEYS) => PumpDeploy::Oct2026,
-            other => panic!("unexpected {program:?} answer {other:?}: {res:?}"),
+        crate::errors::custom_code(&res)
+    }
+
+    /// Which build of `program` **executes** (not only what its ProgramData holds,
+    /// [`PumpDeploy::held`]), asked of the program with instructions each build added, sent
+    /// without accounts ([`Env::pump_probe`]: 101 = absent, 3005 = dispatched):
+    ///
+    /// | Program | First probe | Then |
+    /// |---|---|---|
+    /// | pump | `buy_v3`: 101 → `Sep2026` | `multi_hop_curve_swap`: 101 → `Oct2026`, 3005 → `Oct2026Synth` |
+    /// | PumpSwap | `buy_v2` ([`crate::pamm::PAMM_BUY_V2`]): 101 → `Sep2026` | `multi_hop_swap`: 101 → `Oct2026`, 3005 → `Oct2026Synth` |
+    /// | pump-fees | `withdraw`: 101 → `Oct2026` (the 2026-09 and 2026-10-02 builds share their instructions), 3005 → `Oct2026Synth` | — |
+    ///
+    /// The probes of one call differ, so no two are duplicates; callers warp a slot between two
+    /// calls on one program (the same transaction would be a duplicate).
+    pub fn pump_build_running(&mut self, program: PumpProgram) -> PumpDeploy {
+        let answer = |code: Option<u32>, absent: PumpDeploy, present: PumpDeploy| match code {
+            Some(ANCHOR_INSTRUCTION_FALLBACK_NOT_FOUND) => absent,
+            Some(ANCHOR_ACCOUNT_NOT_ENOUGH_KEYS) => present,
+            other => panic!("unexpected {program:?} answer {other:?}"),
+        };
+        let (first, then) = match program {
+            PumpProgram::Pump => (PUMP_BUY_V3, PUMP_MULTI_HOP_CURVE_SWAP),
+            PumpProgram::Amm => (crate::pamm::PAMM_BUY_V2, PAMM_MULTI_HOP_SWAP),
+            PumpProgram::Fees => {
+                let code = self.pump_probe(program, PUMP_FEES_WITHDRAW);
+                return answer(code, PumpDeploy::Oct2026, PumpDeploy::Oct2026Synth);
+            }
+        };
+        let code = self.pump_probe(program, first);
+        if answer(code, PumpDeploy::Sep2026, PumpDeploy::Oct2026) == PumpDeploy::Sep2026 {
+            return PumpDeploy::Sep2026;
         }
+        let code = self.pump_probe(program, then);
+        answer(code, PumpDeploy::Oct2026, PumpDeploy::Oct2026Synth)
     }
 }
 
@@ -2184,7 +2308,8 @@ pub fn set_pump_deploy_slot(svm: &mut LiteSVM, program: PumpProgram, slot: u64) 
     });
 }
 
-/// The pump coin roles of the dump (`scripts/dump-fixtures.py` `PUMP_COINS`).
+/// The pump coin roles of the dump (`scripts/dump-fixtures.py` `PUMP_COINS`, group `pump_state`,
+/// and `PUMP_COINS_2026_10_13`, group `pump_state_2026_10_13`: [`PumpCoin::ALL_2026_10_13`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PumpCoin {
     /// A live Token-2022 curve minutes old (125 bytes, the `create_v2` allocation at the dump).
@@ -2209,9 +2334,37 @@ pub enum PumpCoin {
     Legacy150,
     /// Fartcoin: graduated to Raydium before PumpSwap (no canonical pool).
     Fartcoin,
+    // ---- group `pump_state_2026_10_13` (the 2026-10-08/12 redeploys) ----
+    /// A live SOL, non-cashback, non-mayhem 166-byte curve near completion (`rT ≤ 100 M` tokens)
+    /// carrying both fee buckets: v3 synthetic exits past `rT`, the differential.
+    Near166,
+    /// A `create_v2` curve minutes old (166 bytes, Token-2022, `ivqr` 30e9 = `vQ − rQ`).
+    Fresh166,
+    /// A live 166-byte SOL curve carrying large fee buckets (@125, @133).
+    Buckets166,
+    /// A dormant live SOL curve of 141 bytes (last traded on the 2026-10-02 build): the next
+    /// trade grows it to 166.
+    Grow141,
+    /// A dormant live SOL curve of 151 bytes: the next trade grows it to 166.
+    Grow151,
+    /// Curve `E1bYRCNq…`: complete and unmigrated after a synthetic completion, depth 1 (quoted
+    /// in a pump coin), `post_complete_base_out` / `quote_in` set (refused by short.win,
+    /// `CurveQuoteNotSol`).
+    SyntheticStuck,
+    /// 98u8RJ: a curve a synthetic buy completed (`2vVRr9eg…`), migrated, with the canonical pool
+    /// `D4PACvyr…` `migrate_v2` created; the `pc*` fields stay on the curve.
+    GraduatedSynthetic,
+    /// Curve `8oe1sfhK…`: a live 166-byte SOL cashback coin (v3 refuses it, 6094).
+    Cashback166,
+    /// Curve `5jQXNPKb…`: a live 166-byte mayhem-mode curve whose `vQ − rQ` differs from its
+    /// `ivqr`.
+    Mayhem166,
+    /// Pool `ERtQ5Uhn…`: a migrated coin whose canonical WSOL pool carries both fee buckets.
+    WsolPoolBuckets,
 }
 
 impl PumpCoin {
+    /// The roles of group `pump_state` (the older suites').
     pub const ALL: [Self; 10] = [
         Self::Fresh,
         Self::Near,
@@ -2225,13 +2378,36 @@ impl PumpCoin {
         Self::Fartcoin,
     ];
 
-    /// The live SOL curves a normal user trades.
+    /// The roles of group `pump_state_2026_10_13`.
+    pub const ALL_2026_10_13: [Self; 10] = [
+        Self::Near166,
+        Self::Fresh166,
+        Self::Buckets166,
+        Self::Grow141,
+        Self::Grow151,
+        Self::SyntheticStuck,
+        Self::GraduatedSynthetic,
+        Self::Cashback166,
+        Self::Mayhem166,
+        Self::WsolPoolBuckets,
+    ];
+
+    /// The live SOL curves a normal user trades (group `pump_state`).
     pub const LIVE_SOL: [Self; 5] = [
         Self::Fresh,
         Self::Near,
         Self::T22_115,
         Self::Legacy115,
         Self::Legacy49,
+    ];
+
+    /// The live SOL, non-cashback, non-mayhem curves of group `pump_state_2026_10_13`.
+    pub const LIVE_SOL_2026_10_13: [Self; 5] = [
+        Self::Near166,
+        Self::Fresh166,
+        Self::Buckets166,
+        Self::Grow141,
+        Self::Grow151,
     ];
 
     /// The manifest role.
@@ -2247,10 +2423,34 @@ impl PumpCoin {
             Self::Usdc => "usdc",
             Self::Legacy150 => "legacy150",
             Self::Fartcoin => "fartcoin",
+            Self::Near166 => "near166",
+            Self::Fresh166 => "fresh166",
+            Self::Buckets166 => "buckets166",
+            Self::Grow141 => "grow141",
+            Self::Grow151 => "grow151",
+            Self::SyntheticStuck => "synthetic_stuck",
+            Self::GraduatedSynthetic => "graduated_synthetic",
+            Self::Cashback166 => "cashback166",
+            Self::Mayhem166 => "mayhem166",
+            Self::WsolPoolBuckets => "wsol_pool_buckets",
         }
     }
 
-    /// The role's mint (the `pump_state` snapshot's `coins`).
+    /// The state group that holds the role (`pump_state` or `pump_state_2026_10_13`).
+    pub fn group(self) -> &'static str {
+        if Self::ALL_2026_10_13.contains(&self) {
+            PUMP_STATE_GROUPS[1]
+        } else {
+            PUMP_STATE_GROUPS[0]
+        }
+    }
+
+    /// The slot and block time the role's state group was read at.
+    pub fn snapshot(self) -> Snapshot {
+        pump_fixtures().snapshots[self.group()]
+    }
+
+    /// The role's mint (its state group snapshot's `coins`).
     pub fn mint(self) -> Pubkey {
         *pump_fixtures()
             .coins
@@ -2325,6 +2525,10 @@ pub const PUMP_BUY_V2: [u8; 8] = [0xb8, 0x17, 0xee, 0x61, 0x67, 0xc5, 0xd3, 0x3d
 pub const PUMP_SELL_V2: [u8; 8] = [0x5d, 0xf6, 0x82, 0x3c, 0xe7, 0xe9, 0x40, 0xb2];
 /// `sha256("global:buy_exact_quote_in_v2")[..8]`.
 pub const PUMP_BUY_EXACT_QUOTE_IN_V2: [u8; 8] = [0xc2, 0xab, 0x1c, 0x46, 0x68, 0x4d, 0x5b, 0x2f];
+/// `sha256("global:sell_v3")[..8]` (2026-10-02).
+pub const PUMP_SELL_V3: [u8; 8] = [0x1c, 0x92, 0xde, 0x77, 0x26, 0xc4, 0x69, 0xd5];
+/// `sha256("global:buy_exact_quote_in_v3")[..8]` (2026-10-02).
+pub const PUMP_BUY_EXACT_QUOTE_IN_V3: [u8; 8] = [0xe1, 0xf7, 0x50, 0x1e, 0xd5, 0xb3, 0x84, 0x88];
 /// `sha256("global:init_user_volume_accumulator")[..8]`.
 pub const PUMP_INIT_USER_VOLUME_ACCUMULATOR: [u8; 8] =
     [0x5e, 0x06, 0xca, 0x73, 0xff, 0x60, 0xe8, 0xb7];
@@ -2347,6 +2551,34 @@ pub const PUMP_ERR_BUY_SLIPPAGE_BELOW_MIN_TOKENS_OUT: u32 = 6042;
 pub const PUMP_ERR_NOT_AUTHORIZED: u32 = 6000;
 /// pump `BuybackFeeRecipientNotAuthorized`.
 pub const PUMP_ERR_BUYBACK_FEE_RECIPIENT_NOT_AUTHORIZED: u32 = 6057;
+
+/// pump `CashbackCoinNotSupported` (a v3 trade on a cashback coin; 2026-10-08).
+pub const PUMP_ERR_CASHBACK_COIN_NOT_SUPPORTED: u32 = 6094;
+
+/// Which v3 trade instruction (pump's 2026-10-02 redeploy; pump-public-docs `2293f9a6`'s IDL):
+/// one 17-account list for all three, data `disc ‖ u64 ‖ u64`, the buys with an optional
+/// trailing `partial_fill` (`OptionBool`, one byte).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PumpV3 {
+    /// `buy_v3(amount, max_sol_cost[, partial_fill])`: exact tokens out; past `rT` on the
+    /// 2026-10-08 build the synthetic migration buys the rest from the would-be pool.
+    Buy,
+    /// `sell_v3(amount, min_sol_output)`: exact tokens in.
+    Sell,
+    /// `buy_exact_quote_in_v3(spendable_quote_in, min_tokens_out[, partial_fill])`.
+    BuyExactQuoteIn,
+}
+
+impl PumpV3 {
+    /// The discriminator.
+    pub fn disc(self) -> [u8; 8] {
+        match self {
+            Self::Buy => PUMP_BUY_V3,
+            Self::Sell => PUMP_SELL_V3,
+            Self::BuyExactQuoteIn => PUMP_BUY_EXACT_QUOTE_IN_V3,
+        }
+    }
+}
 
 /// Which v2 trade instruction (R-PUMP §3.5).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -2474,6 +2706,27 @@ impl PumpCurve {
     /// The curve account's data length now.
     pub fn data_len(&self, svm: &LiteSVM) -> usize {
         svm.get_account(&self.curve).expect("curve").data.len()
+    }
+
+    /// What pump takes from the trading user to grow this curve on its next trade: a curve
+    /// shorter than the layout of the build pump's ProgramData holds (166 bytes since the
+    /// 2026-10-08 redeploy, 141 on the 2026-10-02 build, [`PumpDeploy::held`]) grows to it, its
+    /// rent reserve topped up to `Rent.minimum_balance(len)` ([`curve_growth_top_up`]). As the
+    /// I13 hook's `venue_rent` counts it.
+    pub fn growth_top_up(&self, svm: &LiteSVM) -> u64 {
+        let grows_to = PumpDeploy::held(svm, PumpProgram::Pump)
+            .unwrap_or(PumpDeploy::CURRENT)
+            .curve_len();
+        let acc = svm.get_account(&self.curve).expect("curve");
+        let (creator_fee, protocol_fees) = curve_fee_buckets(&acc.data);
+        curve_growth_top_up(
+            svm,
+            acc.data.len(),
+            acc.lamports,
+            self.state(svm).real_quote_reserves,
+            creator_fee + protocol_fees,
+            grows_to,
+        )
     }
 
     /// `(vT, vQ, rT, rQ, complete)` as `shortwin-math`'s `CurveState`.
@@ -2675,6 +2928,71 @@ impl PumpCurve {
             data,
         }
     }
+
+    /// The v3 trade accounts (`buy_v3`, `sell_v3`, `buy_exact_quote_in_v3`: one list) in the
+    /// IDL's exact order and flags (pump-public-docs `2293f9a6`): `global`, `base_mint`,
+    /// `quote_mint`, both token programs, the curve (W), its base and quote ATAs (W), `user` (S W),
+    /// the user's base and quote ATAs (W), the user's UVA (W), pump's `FeeConfig`, the buyback
+    /// recipient (W), System, the event authority and pump itself. No fee recipient, creator
+    /// vault or pump-fees account: v3 keeps the protocol and creator fees in the curve's buckets
+    /// and reads `FeeConfig` itself.
+    pub fn v3_accounts(
+        &self,
+        user: &Pubkey,
+        user_base_ata: &Pubkey,
+        buyback_fee_recipient: &Pubkey,
+    ) -> Vec<AccountMeta> {
+        let qp = self.quote_token_program();
+        let q = self.quote_mint;
+        let ata = |owner: &Pubkey| crate::pda::ata(owner, &q, &qp);
+        vec![
+            AccountMeta::new_readonly(PUMP_GLOBAL, false),
+            AccountMeta::new_readonly(self.mint, false),
+            AccountMeta::new_readonly(q, false),
+            AccountMeta::new_readonly(self.token_program.id(), false),
+            AccountMeta::new_readonly(qp, false),
+            AccountMeta::new(self.curve, false),
+            AccountMeta::new(self.curve_base_ata, false),
+            AccountMeta::new(ata(&self.curve), false),
+            AccountMeta::new(*user, true),
+            AccountMeta::new(*user_base_ata, false),
+            AccountMeta::new(ata(user), false),
+            AccountMeta::new(pump_user_volume_accumulator(user), false),
+            AccountMeta::new_readonly(PUMP_FEE_CONFIG, false),
+            AccountMeta::new(*buyback_fee_recipient, false),
+            AccountMeta::new_readonly(anchor_lang::system_program::ID, false),
+            AccountMeta::new_readonly(PUMP_EVENT_AUTHORITY, false),
+            AccountMeta::new_readonly(PUMP_PROGRAM_ID, false),
+        ]
+    }
+
+    /// A v3 trade instruction: `(disc | a u64 | b u64)` with `a, b` = `(amount, max_sol_cost)` /
+    /// `(amount, min_sol_output)` / `(spendable_quote_in, min_tokens_out)` — 24 bytes; on a buy,
+    /// `partial_fill = Some(flag)` appends the optional `OptionBool` byte (25 bytes).
+    #[allow(clippy::too_many_arguments)]
+    pub fn v3_ix(
+        &self,
+        kind: PumpV3,
+        user: &Pubkey,
+        user_base_ata: &Pubkey,
+        buyback_fee_recipient: &Pubkey,
+        a: u64,
+        b: u64,
+        partial_fill: Option<bool>,
+    ) -> Instruction {
+        let mut data = kind.disc().to_vec();
+        data.extend_from_slice(&a.to_le_bytes());
+        data.extend_from_slice(&b.to_le_bytes());
+        if let Some(flag) = partial_fill {
+            assert_ne!(kind, PumpV3::Sell, "sell_v3 has no partial_fill");
+            data.push(u8::from(flag));
+        }
+        Instruction {
+            program_id: PUMP_PROGRAM_ID,
+            accounts: self.v3_accounts(user, user_base_ata, buyback_fee_recipient),
+            data,
+        }
+    }
 }
 
 /// `init_user_volume_accumulator` (`[payer S W, user, uva W, system, event_authority,
@@ -2791,15 +3109,22 @@ impl Env {
     /// Loads every pump-state account that belongs to no coin role: pump's `Global`, both
     /// `FeeConfig`s, PumpSwap's `GlobalConfig`, the volume accumulators, the fee, buyback and
     /// withdraw authorities, WSOL and USDC, PumpSwap's protocol-fee and buyback WSOL ATAs (the
-    /// event authorities were absent at the snapshot and stay so). The dumped Rent sysvar is
-    /// installed by [`Env::set_pump_rent`], not here.
+    /// event authorities were absent at the snapshot and stay so). An address both state groups
+    /// hold is loaded from the newer, `pump_state_2026_10_13` ([`pump_fixture_at`]): pump's
+    /// `Global` is the 1,088-byte one of the 2026-10-08 redeploy (`max_curve_depth` @1087 = 1;
+    /// its first 1,087 bytes, both `FeeConfig`s and PumpSwap's `GlobalConfig` equal
+    /// `pump_state`'s). The dumped Rent sysvar is installed by [`Env::set_pump_rent`], not here.
     pub fn load_pump_statics(&mut self) {
-        let names: Vec<String> = all_pump_fixtures()
-            .filter(|f| f.group == "pump_state" && f.role.is_none() && f.name != "sysvar_rent")
-            .map(|f| f.name.clone())
+        let addresses: Vec<Pubkey> = all_pump_fixtures()
+            .filter(|f| {
+                PUMP_STATE_GROUPS.contains(&f.group.as_str())
+                    && f.role.is_none()
+                    && f.name != "sysvar_rent"
+            })
+            .map(|f| f.address)
             .collect();
-        for name in names {
-            load(&mut self.svm, &name);
+        for address in addresses {
+            load_pump_at(&mut self.svm, &address);
         }
     }
 
@@ -2816,7 +3141,7 @@ impl Env {
     /// vault if another role holds it. Returns the curve's keys.
     pub fn load_pump_coin(&mut self, coin: PumpCoin) -> PumpCurve {
         let names: Vec<String> = all_pump_fixtures()
-            .filter(|f| f.group == "pump_state" && f.role.as_deref() == Some(coin.role()))
+            .filter(|f| f.group == coin.group() && f.role.as_deref() == Some(coin.role()))
             .map(|f| f.name.clone())
             .collect();
         for name in names {
@@ -2828,7 +3153,7 @@ impl Env {
         c
     }
 
-    /// Sets the clock to the pump snapshot's slot and block time.
+    /// Sets the clock to the pump snapshot's slot and block time (group `pump_state`).
     pub fn set_pump_clock(&mut self) {
         let s = pump_snapshot();
         self.set_clock(s.block_time, s.slot);
@@ -2836,14 +3161,16 @@ impl Env {
 
     /// [`Env::initialized`] (release short.win at the harness's default config, whose venue
     /// deploy slots are the dumped ones), the three pump programs, the pump statics, `coin`'s
-    /// accounts, mainnet's Rent ([`Env::set_pump_rent`]) and the clock at the pump snapshot.
+    /// accounts, mainnet's Rent ([`Env::set_pump_rent`]) and the clock at the snapshot of
+    /// `coin`'s state group ([`PumpCoin::snapshot`]).
     pub fn fork_pump_coin(coin: PumpCoin) -> (Self, PumpCurve) {
         let mut env = Self::initialized();
         env.load_pump_programs();
         env.load_pump_statics();
         let c = env.load_pump_coin(coin);
         env.set_pump_rent();
-        env.set_pump_clock();
+        let s = coin.snapshot();
+        env.set_clock(s.block_time, s.slot);
         (env, c)
     }
 
@@ -3067,6 +3394,82 @@ pub fn pump_trade_events(meta: &TransactionMetadata) -> Vec<PumpTradeEvent> {
         .collect()
 }
 
+/// `sha256("event:CompleteEvent")[..8]`.
+pub const PUMP_COMPLETE_EVENT: [u8; 8] = [0x5f, 0x72, 0x61, 0x9c, 0xd4, 0x2e, 0x98, 0x08];
+/// `sha256("event:PostCompleteBuyEvent")[..8]` (pump's 2026-10-08 redeploy).
+pub const PUMP_POST_COMPLETE_BUY_EVENT: [u8; 8] = [0x6f, 0xb0, 0x6d, 0x8b, 0x31, 0x6c, 0xd5, 0xfb];
+
+/// pump's `PostCompleteBuyEvent` (2026-10-08): the synthetic migration's pool part of a buy past
+/// `rT` (IDL `types.PostCompleteBuyEvent`, 224 bytes).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PumpPostCompleteBuyEvent {
+    pub user: Pubkey,
+    pub mint: Pubkey,
+    pub bonding_curve: Pubkey,
+    pub quote_mint: Pubkey,
+    pub timestamp: i64,
+    /// Tokens bought from the would-be pool (`post_complete_base_out`).
+    pub base_out: u64,
+    /// The pool part's pre-fee quote (`post_complete_quote_in`).
+    pub quote_in: u64,
+    pub fee_basis_points: u64,
+    /// The protocol fee on `quote_in` (the buyback included).
+    pub fee: u64,
+    pub creator_fee_basis_points: u64,
+    pub creator_fee: u64,
+    pub buyback_fee: u64,
+    pub pool_base_reserves_before: u64,
+    pub pool_quote_reserves_before: u64,
+    pub pool_base_reserves_after: u64,
+    pub pool_quote_reserves_after: u64,
+}
+
+/// Every pump `PostCompleteBuyEvent` a transaction emitted.
+pub fn pump_post_complete_buy_events(meta: &TransactionMetadata) -> Vec<PumpPostCompleteBuyEvent> {
+    crate::events::raw(meta)
+        .iter()
+        .filter_map(|p| p.strip_prefix(&PUMP_POST_COMPLETE_BUY_EVENT[..]))
+        .map(|b| {
+            let mut c = Cursor { b, o: 0 };
+            PumpPostCompleteBuyEvent {
+                user: c.key(),
+                mint: c.key(),
+                bonding_curve: c.key(),
+                quote_mint: c.key(),
+                timestamp: c.i64(),
+                base_out: c.u64(),
+                quote_in: c.u64(),
+                fee_basis_points: c.u64(),
+                fee: c.u64(),
+                creator_fee_basis_points: c.u64(),
+                creator_fee: c.u64(),
+                buyback_fee: c.u64(),
+                pool_base_reserves_before: c.u64(),
+                pool_quote_reserves_before: c.u64(),
+                pool_base_reserves_after: c.u64(),
+                pool_quote_reserves_after: c.u64(),
+            }
+        })
+        .collect()
+}
+
+/// The pump events a transaction emitted, in order, by name (`TradeEvent`, `CompleteEvent`,
+/// `PostCompleteBuyEvent`; any other pump event as `"other"`).
+pub fn pump_event_names(meta: &TransactionMetadata) -> Vec<&'static str> {
+    crate::events::raw(meta)
+        .iter()
+        .filter_map(|p| {
+            let d: [u8; 8] = p.get(..8)?.try_into().ok()?;
+            Some(match d {
+                PUMP_TRADE_EVENT => "TradeEvent",
+                PUMP_COMPLETE_EVENT => "CompleteEvent",
+                PUMP_POST_COMPLETE_BUY_EVENT => "PostCompleteBuyEvent",
+                _ => "other",
+            })
+        })
+        .collect()
+}
+
 // ---- the mainnet SPL programs (M10, T-MEMO) ---------------------------------------------------
 
 /// The manifest group of the mainnet SPL programs (M10): Token-2022 as deployed (upgradeable;
@@ -3254,6 +3657,50 @@ mod tests {
             sha256_hex(b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"),
             "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1"
         );
+    }
+
+    /// T-REPIN-2: the build probe tells the three builds of pump and PumpSwap apart (`buy_v3` /
+    /// `buy_v2`, then `multi_hop_curve_swap` / `multi_hop_swap`) and pump-fees' 2026-10-12 build
+    /// from the older ones (`withdraw`), on every build the fixtures hold, loaded as the loader
+    /// would (ProgramData, then the program account). It also settles each probe's error order:
+    /// an instruction a build lacks is `InstructionFallbackNotFound` (101), one it has is
+    /// `AccountNotEnoughKeys` (3005) without accounts — before any signer check, so the admin
+    /// `set_max_curve_depth` answers 3005 on the 2026-10-08 pump too.
+    #[test]
+    fn pump_build_running_tells_three_builds() {
+        let (mut env, _) = Env::fork_pump_coin(PumpCoin::Fresh166);
+        let (absent, present) = (
+            Some(ANCHOR_INSTRUCTION_FALLBACK_NOT_FOUND),
+            Some(ANCHOR_ACCOUNT_NOT_ENOUGH_KEYS),
+        );
+        for deploy in PumpDeploy::ALL.into_iter().rev() {
+            for p in PumpProgram::ALL {
+                load_pump_deploy(&mut env.svm, p, deploy);
+                assert_eq!(
+                    PumpDeploy::held(&env.svm, p),
+                    Some(deploy),
+                    "{deploy:?} {p:?}"
+                );
+            }
+            env.warp(1);
+            assert_eq!(env.pump_build_running(PumpProgram::Pump), deploy);
+            assert_eq!(env.pump_build_running(PumpProgram::Amm), deploy);
+            let fees = if deploy == PumpDeploy::Oct2026Synth {
+                PumpDeploy::Oct2026Synth
+            } else {
+                PumpDeploy::Oct2026
+            };
+            assert_eq!(
+                env.pump_build_running(PumpProgram::Fees),
+                fees,
+                "{deploy:?}"
+            );
+            let synth = deploy == PumpDeploy::Oct2026Synth;
+            let code = env.pump_probe(PumpProgram::Pump, PUMP_SET_MAX_CURVE_DEPTH);
+            assert_eq!(code, if synth { present } else { absent }, "{deploy:?}");
+            let code = env.pump_probe(PumpProgram::Amm, PUMP_MULTI_HOP_CURVE_SWAP);
+            assert_eq!(code, absent, "{deploy:?}: pump's discriminator on PumpSwap");
+        }
     }
 
     #[test]

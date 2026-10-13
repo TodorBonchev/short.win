@@ -448,13 +448,14 @@ fn fork_with_helper(coin: PumpCoin) -> (Env, PumpCurve) {
 
 /// What `buy_v2(rT)` charges on the live curve (pump's own formula, `PumpCurve::charge_buy`), plus
 /// the creator-vault top-up pump takes first when the vault is below `Rent.minimum_balance(0)`
-/// (R-PUMP Update U6).
+/// (R-PUMP Update U6) and the curve's growth to 166 bytes on the 2026-10-08 build (76,200 on the
+/// 151-byte `near` curve, `PumpCurve::growth_top_up`).
 fn completion_cost(env: &Env, c: &PumpCurve) -> u64 {
     let rt = c.state(&env.svm).real_token_reserves;
     let charge = c.charge_buy(&env.svm, rt).expect("a live curve").cost;
     let vault = c.creator_vault(&env.svm);
     let min = fork::pump_rent().minimum_balance(0);
-    charge + min.saturating_sub(read::lamports(&env.svm, &vault))
+    charge + min.saturating_sub(read::lamports(&env.svm, &vault)) + c.growth_top_up(&env.svm)
 }
 
 /// An external user buys until `rt_left` real tokens remain (0 completes the curve).
@@ -485,8 +486,8 @@ fn lamports(env: &Env, key: &Pubkey) -> u64 {
 
 /// tx1 on a live curve: `complete_curve` buys the `rT` it reads **when it runs**, by the signer
 /// (pump's `user`), and the curve is complete; the completer holds exactly those tokens and paid
-/// `buy_v2(rT)`'s charge (plus the creator-vault top-up if due, plus its pump UVA's rent when pump
-/// creates it); `CurveCompleted` reports both. The helper's one CPI is pump's `buy_v2(rT, max)`,
+/// `buy_v2(rT)`'s charge (plus the creator-vault top-up if due and the curve's growth to 166
+/// bytes, plus its pump UVA's rent when pump creates it); `CurveCompleted` reports both. The helper's one CPI is pump's `buy_v2(rT, max)`,
 /// 24 bytes (no cap byte), at height 2; nothing runs deeper than 3.
 #[test]
 fn tx1_completes_a_live_curve_at_the_rt_it_reads() {
@@ -1462,7 +1463,8 @@ fn short_win_s_trader_cannot_be_the_helpers_user() {
 /// `-- --nocapture`):
 ///
 /// - tx1 (`complete_curve`, the completing `buy_v2` below it): peak height 3; ≤ ARCH §6.2's
-///   11 entries + 1 for pump's `CompleteEvent` self-CPI;
+///   11 entries + 1 for pump's `CompleteEvent` self-CPI + 1 for the 151-byte `near` curve's
+///   growth to 166 bytes on the 2026-10-08 build (pump's System transfer from the completer);
 /// - tx1 with the completer's ATA created in it and its pump UVA created by pump;
 /// - tx1 as a no-op: 3 entries;
 /// - tx2 (`migrate_v2` top-level + the tip): 2 + 51 + 1 = 54 entries — `migrate_v2` stays alone
@@ -1489,8 +1491,8 @@ fn trace_cu_and_size_per_transaction() {
     row("tx2 migrate_v2 + tip", &s2);
     assert_eq!(s1.height, 3);
     assert!(
-        s1.trace <= 12,
-        "ARCH §6.2: ≈ 1 + 8 + 2, + pump's CompleteEvent CPI"
+        s1.trace <= 13,
+        "ARCH §6.2: ≈ 1 + 8 + 2, + pump's CompleteEvent CPI, + the 151-byte curve's growth"
     );
     assert_eq!(
         s2.trace,

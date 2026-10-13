@@ -3,9 +3,10 @@
 //! legacy SPL-Token curve of 115 bytes without a creator (creator fee 0).
 //!
 //! Each round trip asserts: `S` = `quote_sell(q)` on the pre-trade state exactly (the creator
-//! vaults of the dumped coins are funded, so pump takes no venue-side rent); the lending vault
-//! loses exactly `q`, the curve's base ATA gains it, and the curve's lamports fall by the gross
-//! `g`; the borrower pays the position's and the exposure record's rent, `M` and the open fee, and
+//! vaults of the dumped coins are funded, so pump takes no venue-side rent but a short curve's
+//! growth: `S` is net of it, `PumpCurve::growth_top_up`); the lending vault loses exactly `q`,
+//! the curve's base ATA gains it, and the curve's lamports fall by the gross `g` (less that
+//! growth); the borrower pays the position's and the exposure record's rent, `M` and the open fee, and
 //! gets its `ert` back (it funds the trader for the leg); `trader` and `trader_base_ata` hold
 //! nothing; `N_open` = `B̂` on the post-open state. At close: the venue charges exactly pump's
 //! `curve_charge_exact_out(q)` (≤ short.win's quote `B̂_live(q)`, by at most `1 + #fees`), the
@@ -45,11 +46,13 @@ pub fn round_trip(env: &mut Env, pm: &PumpMarket, q: u64) -> (u64, u64) {
     let gross = vq0 - u64::try_from(sale.sol_after).unwrap();
     let first_exposure =
         read::account(&env.svm, &pda::exposure(&pm.market(), &b.key()).0).is_none();
+    let growth = pm.curve.growth_top_up(&env.svm);
     let (open, nonce, _) = open_ok(env, pm, &mut b, q);
     let s1 = snap(env, pm, &b.key());
     assert_eq!(
-        open.s, sale.proceeds,
-        "S = the sale quote on the pre-trade state"
+        open.s,
+        sale.proceeds - growth,
+        "S = the sale quote on the pre-trade state (less the curve's growth)"
     );
     assert_eq!(
         s0.pool_vault - s1.pool_vault,
@@ -57,7 +60,11 @@ pub fn round_trip(env: &mut Env, pm: &PumpMarket, q: u64) -> (u64, u64) {
         "the lending vault spent exactly q"
     );
     assert_eq!(s1.curve_tokens - s0.curve_tokens, q, "the curve received q");
-    assert_eq!(s0.curve - s1.curve, gross, "the curve paid the gross g");
+    assert_eq!(
+        s0.curve + growth - s1.curve,
+        gross,
+        "the curve paid the gross g (and took the growth)"
+    );
     assert_trader_clean(env, pm);
     let n_open = pm
         .curve
@@ -129,16 +136,16 @@ pub fn round_trip(env: &mut Env, pm: &PumpMarket, q: u64) -> (u64, u64) {
 }
 
 /// A Token-2022 curve of 115 bytes (the first v2 trade — the listing's warm-up already — grows it
-/// to 141 bytes since the 2026-10-02 redeploy, 125 before; its rent reserve already covers that,
-/// so no top-up).
+/// to the current layout, 166 bytes since the 2026-10-08 redeploy, 141 since the 2026-10-02 one,
+/// 125 before; its rent reserve already covers that, so no top-up).
 #[test]
 fn round_trip_t22_115() {
     let (mut env, pm, q) = setup(PumpCoin::T22_115);
     round_trip(&mut env, &pm, q);
     assert_eq!(
         pm.curve.data_len(&env.svm),
-        fork::CURVE_LEN_2026_10,
-        "the curve grew to 141 bytes"
+        fork::PumpDeploy::CURRENT.curve_len(),
+        "the curve grew to the current layout"
     );
 }
 
@@ -152,22 +159,33 @@ fn round_trip_legacy_spl_without_creator() {
     round_trip(&mut env, &pm, q);
 }
 
-/// A fresh `create_v2` curve (125 bytes, Token-2022) after 5 SOL of buys (which grow it to 141
-/// bytes since the 2026-10-02 redeploy).
+/// A fresh `create_v2` curve (125 bytes, Token-2022) after 5 SOL of buys (which grow it to the
+/// current layout: 166 bytes since the 2026-10-08 redeploy).
 #[test]
 fn round_trip_fresh_125() {
     let (mut env, pm, q) = setup(PumpCoin::Fresh);
-    assert_eq!(pm.curve.data_len(&env.svm), fork::CURVE_LEN_2026_10);
+    assert_eq!(
+        pm.curve.data_len(&env.svm),
+        fork::PumpDeploy::CURRENT.curve_len()
+    );
     round_trip(&mut env, &pm, q);
 }
 
 /// The near-complete 151-byte curve, twice (the second open reuses the exposure record... after
-/// the first closed it; each round trip is exact on its own pre-state).
+/// the first closed it; each round trip is exact on its own pre-state). Its rent reserve is
+/// `minimum_balance(151)`, so the first open's sale grows it to 166 bytes on the 2026-10-08
+/// build and pays the 76,200 of rent out of `S`; the second pays none.
 #[test]
 fn round_trip_near_151_twice() {
     let (mut env, pm, q) = setup(PumpCoin::Near);
     assert_eq!(pm.curve.data_len(&env.svm), 151);
+    assert_eq!(pm.curve.growth_top_up(&env.svm), 76_200);
     round_trip(&mut env, &pm, q);
+    assert_eq!(
+        pm.curve.data_len(&env.svm),
+        fork::PumpDeploy::CURRENT.curve_len()
+    );
+    assert_eq!(pm.curve.growth_top_up(&env.svm), 0);
     env.warp(3);
     round_trip(&mut env, &pm, q / 2);
 }

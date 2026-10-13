@@ -20,12 +20,13 @@
 //!   `FeeConfig` and `GlobalConfig` parse; pricing `(vT, vQ)` with `fees::pump_curve` on the
 //!   live tier; the quotes `quote::sol_leg` (ε₁ = 1) up to `rT` (the straddle above it is not
 //!   re-quoted here), the sale capped by `rQ`. `venue_rent`: the creator-vault top-up and a curve
-//!   under the build's growth size growing to it on the trade, its rent reserve (`lamports − rQ`)
-//!   topped up to the size's minimum balance from the trader: 141 bytes since pump's 2026-10-02
-//!   redeploy (`fork::CURVE_LEN_2026_10`), 125 on the 2026-09 build (R-PUMP Update U10) — the
-//!   build pump's ProgramData holds, `fork::PumpDeploy::held` (T-LATCH replays the upgrade). A
-//!   migrating curve (complete, `vT > 0`) is not executable but still **observed** (ARCH §3.0
-//!   step 7).
+//!   under the build's growth size growing to it on the trade, its rent reserve (`lamports − rQ −`
+//!   the fee buckets, `fork::curve_growth_top_up`) topped up to the size's minimum balance from
+//!   the trader: 166 bytes since pump's 2026-10-08 redeploy (`fork::CURVE_LEN_2026_10_08`), 141
+//!   on the 2026-10-02 build (`fork::CURVE_LEN_2026_10`), 125 on the 2026-09 build (R-PUMP Update
+//!   U10) — the build pump's ProgramData holds, `fork::PumpDeploy::held` (T-LATCH replays the
+//!   upgrades). A migrating curve (complete, `vT > 0`) is not executable but still **observed**
+//!   (ARCH §3.0 step 7).
 //!
 //! - **PumpSwap** (M6; ARCH §3.12 PumpSwap, §4.1–§4.2, §5.3): the market's canonical pool parses
 //!   (owner, discriminator, bools), is the mint's valid canonical pool (index 0, created by pump's
@@ -81,8 +82,8 @@ pub struct VenueView {
     /// The venue-side rent a trade on this state takes from `user` (the trader) besides its
     /// charge: pump's creator-vault top-up to `Rent.minimum_balance(0)` when the curve charges a
     /// creator fee and the vault holds less (R-PUMP U6, Update 2026-09-29; T-RENT) plus the
-    /// curve's growth to 141 bytes (125 on the 2026-09 build); a short PumpSwap pool's growth to
-    /// 287 bytes (271). 0 elsewhere.
+    /// curve's growth to 166 bytes (141 on the 2026-10-02 build, 125 on the 2026-09 one); a short
+    /// PumpSwap pool's growth to 287 bytes (271). 0 elsewhere.
     pub venue_rent: u64,
     /// PumpSwap (M6R-1, owner decision of 2026-09-30): the canonical pool's locked depth `D =
     /// ⌊λ_bps·isqrt(X·(Y + VQR))/10⁴⌋`, `λ_bps = ⌊(Pool.lp_supply − lp_mint.supply)·10⁴/lp_supply⌋`
@@ -375,12 +376,15 @@ fn pump_curve(svm: &LiteSVM, m: &Market) -> VenueView {
     let grows_to = PumpDeploy::held(svm, PumpProgram::Pump)
         .unwrap_or(PumpDeploy::CURRENT)
         .curve_len();
-    let growth = if acc.data.len() < grows_to {
-        svm.minimum_balance_for_rent_exemption(grows_to)
-            .saturating_sub(acc.lamports.saturating_sub(c.real_quote_reserves))
-    } else {
-        0
-    };
+    let (creator_fee, protocol_fees) = crate::fork::curve_fee_buckets(&acc.data);
+    let growth = crate::fork::curve_growth_top_up(
+        svm,
+        acc.data.len(),
+        acc.lamports,
+        c.real_quote_reserves,
+        creator_fee.saturating_add(protocol_fees),
+        grows_to,
+    );
     let venue_rent = vault_top_up + growth;
     VenueView {
         executable: true,

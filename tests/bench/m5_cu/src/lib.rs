@@ -77,6 +77,12 @@ pub const FRESH: PumpCoin = PumpCoin::Fresh;
 /// migration and the straddle.
 pub const NEAR: PumpCoin = PumpCoin::Near;
 
+/// The trace entries of pump's growth of [`NEAR`] on its first trade since the dump: its rent
+/// reserve is `minimum_balance(151)`, and the 2026-10-08 build grows a curve to 166 bytes with
+/// one System transfer from the trader at height 3 (`PumpCurve::growth_top_up`; the 115-byte
+/// curves' reserves already cover it).
+pub const NEAR_GROWTH: usize = 1;
+
 /// Both token programs: SPL Token and Token-2022.
 pub const VARIANTS: [PumpCoin; 2] = [SPL, T22];
 /// Every live SOL curve layout a market can list (115, 125 and 151 bytes; SPL and Token-2022).
@@ -1778,7 +1784,7 @@ pub fn worst_case_transactions() -> Vec<TraceTx> {
             label(NEAR)
         ),
         arch: "2 + ≤ 15 (§6.2 curve `open_short` max)",
-        expected: 2 + 18,
+        expected: 2 + 18 + NEAR_GROWTH,
         peak: 3,
         v1: false,
         cu_limit: CURVE_TRADE,
@@ -1825,11 +1831,11 @@ pub fn worst_case_transactions() -> Vec<TraceTx> {
     }
     v.push(TraceTx {
         name: format!(
-            "{}: ComputeBudget ×2 + four opens of one wallet (the most that fit: 2 + 14 + 3·13)",
+            "{}: ComputeBudget ×2 + four opens of one wallet (the most that fit: 2 + 14 + 1 + 3·13, the first sale growing the curve)",
             label(NEAR)
         ),
         arch: "no row (v1: four do not fit v0 through the protocol ALT; `t_trace::opens_per_v0_transaction`)",
-        expected: 2 + 14 + 3 * 13,
+        expected: 2 + 14 + NEAR_GROWTH + 3 * 13,
         peak: 3,
         v1: true,
         cu_limit: 1_400_000,

@@ -35,6 +35,20 @@
 //! - venue-side rent (T-RENT's curve part): a creator vault that does not exist is topped up to
 //!   `Rent.minimum_balance(0)` from the user on buys and sells alike, with mainnet's Rent.
 //!
+//! Since the 2026-10-13 re-pin every test runs pump's 2026-10-08 build (`PumpDeploy::CURRENT`):
+//! its v2 trades charge and pay exactly as before; a curve shorter than 166 bytes grows to 166 on
+//! its next trade, the user topping its rent reserve — `lamports − rQ −` the fee buckets — up to
+//! `minimum_balance(166)`. **T-PUMP-MATH-V3** (`v3_*`, gate G0) runs pump's own v3 trades as a
+//! third party, no short.win instruction involved: (a) `buy_v3` / `sell_v3` on 200 random states
+//! per live curve against the v3 model (`n = ⌈q·vQ/(vT − q)⌉`, the fees `⌈⌉` per component into
+//! the buckets less the buyback, `vQ − rQ` unchanged; exact divisions recorded); (b) the synthetic
+//! migration — `buy_v3(rT + δ)` charged `F(n₁) + F(n₂)` on the live `X_s = curve_base_ata − rT`,
+//! the events `TradeEvent`, `CompleteEvent`, `PostCompleteBuyEvent`, short.win's `B̂_v3` within
+//! the spec's bound of the charge; (b′) the same after a token donation to `curve_base_ata`;
+//! (c) `buy_exact_quote_in_v3` past `rT`; (d) `migrate_v2` seeding exactly the live
+//! `curve_base_ata` and `rQ + pcQ − fee`; (e) the pool part's fee-tier tripwire; (f) the cashback
+//! refusal 6094; (g) no synthetic path on the 2026-10-02 build.
+//!
 //! Every transaction goes through `Env::send` (the invariant hooks run after every
 //! instruction). `PUMP_MATH_SEQ` sets the random sequence length per curve (default 30) and
 //! `PUMP_MATH_SEED` its seed.
@@ -51,11 +65,12 @@ use shortwin::constants::{
 };
 use shortwin_litesvm_tests::errors::custom_code;
 use shortwin_litesvm_tests::fork::{
-    self, PumpCoin, PumpCurve, PumpPool, PumpProgram, PumpTradeEvent, PumpV2,
+    self, PumpCoin, PumpCurve, PumpDeploy, PumpPool, PumpProgram, PumpTradeEvent, PumpV2,
 };
+use shortwin_litesvm_tests::pump::{self as spump, CurveUser};
 use shortwin_litesvm_tests::{Env, TxResult, pda, read};
 use shortwin_math::fees::{self as mfees, FeeBps, FeeTier as MathFeeTier};
-use shortwin_math::quote::sol_leg;
+use shortwin_math::quote::{CurveState, MigrationParams, migrated_pool, sol_leg};
 use shortwin_venue_state::{program_data, pump, pump_amm};
 use solana_keypair::Keypair;
 use solana_signer::Signer;
@@ -182,11 +197,12 @@ fn one_trade(meta: &litesvm::types::TransactionMetadata) -> PumpTradeEvent {
     ev.remove(0)
 }
 
-/// The curve's growth on a v2 trade, as the deployed ELF does it: a curve shorter than the
-/// current layout grows to [`fork::CURVE_LEN_2026_10`] (141 bytes since the 2026-10-02 redeploy,
-/// the fee buckets included; 125 before — not the docs' 115), and the user tops its rent reserve
-/// (`lamports − rQ`) up to `Rent.minimum_balance(141)`; a longer curve is left alone. Returns the
-/// expected top-up.
+/// The curve's growth on a trade, as the deployed ELF does it: a curve shorter than the current
+/// layout grows to [`PumpDeploy::CURRENT`]'s length (166 bytes since the 2026-10-08 redeploy, the
+/// fee buckets and the post-completion fields included; 141 on the 2026-10-02 build, 125 before
+/// — not the docs' 115), and the user tops its rent reserve (`lamports − rQ −` the fee buckets,
+/// `fork::curve_growth_top_up`) up to `Rent.minimum_balance(len)`; a longer curve is left alone.
+/// Returns the expected top-up.
 #[track_caller]
 fn curve_growth(
     svm: &LiteSVM,
@@ -195,17 +211,22 @@ fn curve_growth(
     len_after: usize,
     lamports_before: u64,
     rq_before: u64,
+    buckets_before: (u64, u64),
 ) -> u64 {
+    let grows_to = PumpDeploy::CURRENT.curve_len();
     assert_eq!(
         len_after,
-        len_before.max(fork::CURVE_LEN_2026_10),
-        "{ctx}: a v2 trade leaves the curve at max(len, 141)"
+        len_before.max(grows_to),
+        "{ctx}: a trade leaves the curve at max(len, {grows_to})"
     );
-    if len_before >= fork::CURVE_LEN_2026_10 {
-        return 0;
-    }
-    svm.minimum_balance_for_rent_exemption(fork::CURVE_LEN_2026_10)
-        .saturating_sub(lamports_before - rq_before)
+    fork::curve_growth_top_up(
+        svm,
+        len_before,
+        lamports_before,
+        rq_before,
+        buckets_before.0 + buckets_before.1,
+        grows_to,
+    )
 }
 
 /// The reader's curve state after a trade equals the quote's and the event's post-state.
@@ -304,7 +325,7 @@ fn exact_buy(env: &mut Env, c: &PumpCurve, u: &User, q: u64, k: u64) -> bool {
         describe(&res)
     );
 
-    let len_before = c.data_len(&env.svm);
+    let (len_before, buckets_before) = (c.data_len(&env.svm), buckets(&env.svm, c));
     let b0 = balances(&env.svm, c, u, k);
     let top_up = creator_top_up(&env.svm, b0.creator_vault, creator);
     let meta = ok(trade(env, c, u, PumpV2::Buy, q, ch.cost, k), &ctx);
@@ -319,6 +340,7 @@ fn exact_buy(env: &mut Env, c: &PumpCurve, u: &User, q: u64, k: u64) -> bool {
         len_after,
         b0.curve,
         before.real_quote_reserves,
+        buckets_before,
     );
     assert_eq!(
         b1.curve - b0.curve,
@@ -413,7 +435,7 @@ fn exact_sell(env: &mut Env, c: &PumpCurve, u: &User, q: u64, k: u64) -> bool {
         describe(&res)
     );
 
-    let len_before = c.data_len(&env.svm);
+    let (len_before, buckets_before) = (c.data_len(&env.svm), buckets(&env.svm, c));
     let b0 = balances(&env.svm, c, u, k);
     let top_up = creator_top_up(&env.svm, b0.creator_vault, creator);
     let meta = ok(trade(env, c, u, PumpV2::Sell, q, sq.proceeds, k), &ctx);
@@ -427,6 +449,7 @@ fn exact_sell(env: &mut Env, c: &PumpCurve, u: &User, q: u64, k: u64) -> bool {
         c.data_len(&env.svm),
         b0.curve,
         before.real_quote_reserves,
+        buckets_before,
     );
     assert_eq!(
         b1.curve + g,
@@ -539,7 +562,7 @@ fn exact_quote_in(env: &mut Env, c: &PumpCurve, u: &User, spendable: u64, k: u64
         describe(&res)
     );
 
-    let len_before = c.data_len(&env.svm);
+    let (len_before, buckets_before) = (c.data_len(&env.svm), buckets(&env.svm, c));
     let b0 = balances(&env.svm, c, u, k);
     let top_up = creator_top_up(&env.svm, b0.creator_vault, r.creator_fee);
     let meta = ok(
@@ -556,6 +579,7 @@ fn exact_quote_in(env: &mut Env, c: &PumpCurve, u: &User, spendable: u64, k: u64
         c.data_len(&env.svm),
         b0.curve,
         before.real_quote_reserves,
+        buckets_before,
     );
     assert_eq!(
         b1.curve - b0.curve,
@@ -703,12 +727,14 @@ fn legacy_spl_115_byte_curve_without_a_creator() {
     assert!(grid(PumpCoin::Legacy115) >= 30);
 }
 
-/// The 2024 layout: the first v2 trade grows the curve to 141 bytes (125 before the 2026-10-02
-/// redeploy; the fields past the old end zero), the user paying its rent reserve up to
-/// `minimum_balance(141)` — 134,600 lamports here (53,320 to 125 bytes before): the reserve was
-/// the old rent of 49 bytes —, and every trade after it is exact.
+/// The 2024 layout: the first v2 trade grows the curve to the current layout — 166 bytes since
+/// the 2026-10-08 redeploy (141 on the 2026-10-02 build, 125 before; the fields past the old end
+/// zero) —, the user paying its rent reserve up to `minimum_balance(166)` = 1,493,520: 261,600
+/// lamports here (134,600 to 141 bytes, 53,320 to 125), since the reserve was the old rent of 49
+/// bytes, not the (166 − 49)·5,080 = 594,360 of a reserve at today's rent —, and every trade
+/// after it is exact.
 #[test]
-fn legacy_spl_49_byte_curve_grows_to_141() {
+fn legacy_spl_49_byte_curve_grows_to_the_current_layout() {
     let (mut env, c) = Env::fork_pump_coin(PumpCoin::Legacy49);
     assert_eq!(c.data_len(&env.svm), pump::CURVE_LEN_ORIGINAL);
     let s = c.state(&env.svm);
@@ -717,24 +743,119 @@ fn legacy_spl_49_byte_curve_grows_to_141() {
         reserve, 1_231_920,
         "the rent of 49 bytes at the old 6,960 lamports per byte"
     );
+    let grows_to = PumpDeploy::CURRENT.curve_len();
+    assert_eq!(grows_to, fork::CURVE_LEN_2026_10_08);
     let u = user(&mut env, &c);
     let u0 = read::lamports(&env.svm, &u.kp.pubkey());
     let ch = c.charge_buy(&env.svm, 1_000_000_000_000).unwrap();
     assert!(exact_buy(&mut env, &c, &u, 1_000_000_000_000, 0));
-    assert_eq!(c.data_len(&env.svm), fork::CURVE_LEN_2026_10);
+    assert_eq!(c.data_len(&env.svm), grows_to);
     assert_eq!(
         u0 - read::lamports(&env.svm, &u.kp.pubkey()),
-        ch.cost + 134_600
+        ch.cost + 261_600
     );
     let acc = env.svm.get_account(&c.curve).unwrap();
     assert!(acc.data[pump::CURVE_LEN_ORIGINAL..].iter().all(|&b| b == 0));
     assert_eq!(
         acc.lamports - c.state(&env.svm).real_quote_reserves,
-        env.svm
-            .minimum_balance_for_rent_exemption(fork::CURVE_LEN_2026_10)
+        env.svm.minimum_balance_for_rent_exemption(grows_to)
     );
     drop(env);
     assert!(grid(PumpCoin::Legacy49) >= 30);
+}
+
+/// A curve shorter than 166 bytes that carries fee buckets (the 2026-10-02 build's v3 trades
+/// left them on 141- and 151-byte curves: the 2026-10-03 census, README, counted 627 and 904,
+/// every one quoted in another token than SOL; a 2026-10-13 sample of 15 live SOL curves of those
+/// lengths held none, which proves nothing for the rest) grows on its next v2 or v3 trade, and
+/// pump counts its rent reserve without the buckets: the user tops `lamports − rQ − creator_fee −
+/// protocol_fees` up to `minimum_balance(166)`, as the harness's one model of the growth
+/// (`fork::curve_growth_top_up`: `PumpCurve::growth_top_up`, the I13 hook's `venue_rent`, and
+/// this file's `curve_growth` and `growth`) has it. With the reserve planted at
+/// `minimum_balance(len)` and unequal buckets on top, below the shortfall, this is told apart
+/// from a reserve counted with both buckets, or without only one of them; such a curve pays the
+/// §3.5 table's amount for its length, as a curve without buckets does.
+#[test]
+fn a_bucketed_short_curve_grows_with_its_reserve_net_of_the_buckets() {
+    const CREATOR_FEE: u64 = 20_000;
+    const PROTOCOL_FEES: u64 = 30_000;
+    for coin in [PumpCoin::Grow141, PumpCoin::Grow151] {
+        for v3 in [false, true] {
+            let ctx = format!("{coin:?} {}", if v3 { "buy_v3" } else { "buy_v2" });
+            let (mut env, c) = Env::fork_pump_coin(coin);
+            let len0 = c.data_len(&env.svm);
+            assert!(len0 < fork::CURVE_LEN_2026_10_08, "{ctx}");
+            assert_eq!(buckets(&env.svm, &c), (0, 0), "{ctx}: none at the dump");
+            // The reserve at its length's rent (the dumped 151-byte curve holds more), the
+            // buckets on top of it.
+            let st = c.state(&env.svm);
+            let mut acc = env.svm.get_account(&c.curve).unwrap();
+            let dumped = acc.lamports - st.real_quote_reserves;
+            let reserve = env.svm.minimum_balance_for_rent_exemption(len0);
+            acc.data[125..133].copy_from_slice(&CREATOR_FEE.to_le_bytes());
+            acc.data[133..141].copy_from_slice(&PROTOCOL_FEES.to_le_bytes());
+            acc.lamports = st.real_quote_reserves + reserve + CREATOR_FEE + PROTOCOL_FEES;
+            env.svm.set_account(c.curve, acc).unwrap();
+            let lam0 = read::lamports(&env.svm, &c.curve);
+            let need = env
+                .svm
+                .minimum_balance_for_rent_exemption(fork::CURVE_LEN_2026_10_08);
+            assert!(
+                need > reserve + CREATOR_FEE + PROTOCOL_FEES,
+                "{ctx}: the buckets sit below the shortfall"
+            );
+            let model = c.growth_top_up(&env.svm);
+            assert_eq!(model, need - reserve, "{ctx}: the harness's model");
+            let u = CurveUser::new(&mut env, &c);
+            let vault = c.creator_vault(&env.svm);
+            let (user0, vault0) = (
+                read::lamports(&env.svm, &u.kp.pubkey()),
+                read::lamports(&env.svm, &vault),
+            );
+            let q = st.real_token_reserves / 100;
+            let meta = if v3 {
+                let ix = u.buy_v3_ix(&env.svm, &c, q, u64::MAX);
+                ok(u.send(&mut env, ix), &ctx)
+            } else {
+                ok(u.buy(&mut env, &c, q, u64::MAX), &ctx)
+            };
+            let ev = one_trade(&meta);
+            let st1 = c.state(&env.svm);
+            let b1 = buckets(&env.svm, &c);
+            assert_eq!(c.data_len(&env.svm), fork::CURVE_LEN_2026_10_08, "{ctx}");
+            // The curve's side: what it gained beyond `rQ` and the buckets.
+            let top_up = read::lamports(&env.svm, &c.curve)
+                - lam0
+                - (st1.real_quote_reserves - st.real_quote_reserves)
+                - (b1.0 + b1.1 - CREATOR_FEE - PROTOCOL_FEES);
+            // The user's side: v2 pays the fees out (the creator's into its vault, topped up to
+            // rent if short), v3 into the buckets.
+            let paid = user0 - read::lamports(&env.svm, &u.kp.pubkey());
+            let fees_out = if v3 {
+                ev.fee + ev.creator_fee
+            } else {
+                ev.fee + (read::lamports(&env.svm, &vault) - vault0)
+            };
+            println!(
+                "{ctx}: {len0} → 166 bytes, buckets ({CREATOR_FEE}, {PROTOCOL_FEES}), reserve \
+                 {reserve} (dumped {dumped}): the user topped up {top_up} (paid {paid} = n {} + \
+                 fees {fees_out} + growth); without the buckets {}, with both {}, with the \
+                 protocol fees only {}, with the creator fee only {}",
+                ev.sol_amount,
+                need - reserve,
+                need - reserve - CREATOR_FEE - PROTOCOL_FEES,
+                need - reserve - CREATOR_FEE,
+                need - reserve - PROTOCOL_FEES
+            );
+            assert_eq!(paid - ev.sol_amount - fees_out, top_up, "{ctx}: user side");
+            assert_eq!(top_up, need - reserve, "{ctx}: reserve net of the buckets");
+            assert_eq!(
+                read::lamports(&env.svm, &c.curve) - st1.real_quote_reserves - b1.0 - b1.1,
+                need,
+                "{ctx}: the reserve is minimum_balance(166) after"
+            );
+        }
+    }
 }
 
 // ---- beyond rT, completion, complete curves ----------------------------------------------------
@@ -861,11 +982,29 @@ fn the_trailing_cap_byte_fills_exactly_rt() {
     );
     let before = c.state(&env.svm);
     let u0 = read::lamports(&env.svm, &u.kp.pubkey());
+    let (len0, curve0, buckets0) = (
+        c.data_len(&env.svm),
+        read::lamports(&env.svm, &c.curve),
+        buckets(&env.svm, &c),
+    );
     let meta = ok(env.send(&[ix(Some(1))], &[&signer]), "capped buy");
     let ev = one_trade(&meta);
     let after = c.state(&env.svm);
     assert_eq!((ev.token_amount, ev.sol_amount), (rt, ch.net));
-    assert_eq!(u0 - read::lamports(&env.svm, &u.kp.pubkey()), ch.cost);
+    // The 151-byte curve grows to 166 on the 2026-10-08 build (76,200 lamports from the user).
+    let growth = curve_growth(
+        &env.svm,
+        "capped buy",
+        len0,
+        c.data_len(&env.svm),
+        curve0,
+        before.real_quote_reserves,
+        buckets0,
+    );
+    assert_eq!(
+        u0 - read::lamports(&env.svm, &u.kp.pubkey()),
+        ch.cost + growth
+    );
     assert!(after.complete && after.real_token_reserves == 0);
     assert_eq!(
         after.virtual_quote_reserves,
@@ -1026,8 +1165,20 @@ fn tripwire_the_curve_tier_market_cap_uses_the_live_mint_supply() {
             Some(fork::PUMP_ERR_TOO_MUCH_SOL_REQUIRED)
         );
         let u0 = read::lamports(&env.svm, &u.kp.pubkey());
+        let (len0, curve0, rq0, buckets0) = (
+            c.data_len(&env.svm),
+            read::lamports(&env.svm, &c.curve),
+            c.state(&env.svm).real_quote_reserves,
+            buckets(&env.svm, &c),
+        );
         let meta = ok(trade(&mut env, &c, &u, PumpV2::Buy, q, ch.cost, 0), "buy");
-        assert_eq!(u0 - read::lamports(&env.svm, &u.kp.pubkey()), ch.cost);
+        // A curve under 166 bytes grows on the 2026-10-08 build (the user tops its rent up).
+        let len1 = c.data_len(&env.svm);
+        let growth = curve_growth(&env.svm, "buy", len0, len1, curve0, rq0, buckets0);
+        assert_eq!(
+            u0 - read::lamports(&env.svm, &u.kp.pubkey()),
+            ch.cost + growth
+        );
         let ev = one_trade(&meta);
         assert_eq!((ev.fee_basis_points, ev.sol_amount), (95, ch.net));
         // At a threshold ≤ the live cap both agree again.
@@ -1235,16 +1386,19 @@ fn random_sequences_on_every_live_curve() {
 
 // ---- fixtures, programs, readers ---------------------------------------------------------------------
 
-/// The dumped programs are mainnet's, in both builds the fixtures hold: the 2026-09 deploys ARCH
-/// §8.2 names (deploy slots = `VENUE_GUARD_SLOTS_2026_09_27`, kept for T-LATCH) and the 2026-10-02
-/// redeploys every fork loads ([`PumpDeploy::CURRENT`], slots = [`fork::FIXTURE_GUARD_SLOTS`]):
-/// trimmed-ELF sha256 as pinned by `scripts/dump-fixtures.py`, SBPF v0, one upgrade authority, the
-/// ProgramData rebuilt to the mainnet sha256 when loaded. Every pump-state account is one
-/// snapshot, the reader constants equal the program's, the statics sit at their PDAs, and every
-/// role holds what the dump script expects of it.
+/// The dumped programs are mainnet's, in the three builds the fixtures hold: the 2026-09 deploys
+/// ARCH §8.2 names (deploy slots = `VENUE_GUARD_SLOTS_2026_09_27`), the 2026-10-02 redeploys
+/// (`VENUE_GUARD_SLOTS_2026_10_03`; both kept for T-LATCH) and the 2026-10-08/12 redeploys every
+/// fork loads ([`PumpDeploy::CURRENT`], slots = [`fork::FIXTURE_GUARD_SLOTS`] =
+/// `VENUE_GUARD_SLOTS_2026_10_13`'s): trimmed-ELF sha256 as pinned by `scripts/dump-fixtures.py`,
+/// SBPF v0, one upgrade authority, ELF headers that tell the builds apart
+/// ([`PumpDeploy::held`]), the ProgramData rebuilt to the mainnet sha256 when loaded. Every
+/// pump-state account of a group is one snapshot, the reader constants equal the program's, the
+/// statics sit at their PDAs (pump's `Global` the 1,088-byte one of the 2026-10-08 redeploy:
+/// `pump_state`'s 1,087 bytes, then `max_curve_depth` = 1), and every role of both state groups
+/// holds what the dump script expects of it.
 #[test]
 fn fixtures_programs_and_readers() {
-    use fork::PumpDeploy;
     let authority = Pubkey::from_str_const("7gZufwwAo17y5kg8FMyJy2phgpvv9RSdzWtdXiWHjFr8");
     let trimmed = |deploy, p| match (deploy, p) {
         (PumpDeploy::Sep2026, PumpProgram::Pump) => {
@@ -1265,10 +1419,23 @@ fn fixtures_programs_and_readers() {
         (PumpDeploy::Oct2026, PumpProgram::Amm) => {
             "015570358c672ae42e5706daa87eb67d4c45e8fd8afec80c66bd85b9f9333cc3"
         }
+        (PumpDeploy::Oct2026Synth, PumpProgram::Pump) => {
+            "6956c2f83297b6f7f06bbe8033241589c39da9650597dc5c59fb5a431906bf6f"
+        }
+        (PumpDeploy::Oct2026Synth, PumpProgram::Fees) => {
+            "8ad2ca93c7ae97a7fb0de8a99de4d8825ccfdf89f73138cd49bda948e124b8b8"
+        }
+        (PumpDeploy::Oct2026Synth, PumpProgram::Amm) => {
+            "3ffd5e3b5a31ccc86b434405e8a1876926da1e8685f891dc964b7f919c172ee1"
+        }
     };
     for (deploy, slots) in [
         (PumpDeploy::Sep2026, VENUE_GUARD_SLOTS_2026_09_27),
-        (PumpDeploy::Oct2026, fork::FIXTURE_GUARD_SLOTS),
+        (
+            PumpDeploy::Oct2026,
+            shortwin::constants::VENUE_GUARD_SLOTS_2026_10_03,
+        ),
+        (PumpDeploy::Oct2026Synth, fork::FIXTURE_GUARD_SLOTS),
     ] {
         for p in PumpProgram::ALL {
             let pd = deploy.program_data(p);
@@ -1303,12 +1470,12 @@ fn fixtures_programs_and_readers() {
             assert_eq!(prog.account.data[4..36], pd.address.to_bytes());
         }
     }
-    assert_eq!(PumpDeploy::CURRENT, PumpDeploy::Oct2026);
+    assert_eq!(PumpDeploy::CURRENT, PumpDeploy::Oct2026Synth);
     for p in PumpProgram::ALL {
         let g = usize::from(p.guard());
         assert_eq!(
             fork::FIXTURE_GUARD_SLOTS[g],
-            shortwin::constants::VENUE_GUARD_SLOTS_2026_10_03[g],
+            shortwin::constants::VENUE_GUARD_SLOTS_2026_10_13[g],
             "{p:?}: the fork's slot is the newest baseline's"
         );
         assert_eq!(p.elf(), PumpDeploy::CURRENT.elf(p));
@@ -1317,14 +1484,47 @@ fn fixtures_programs_and_readers() {
                 .unwrap()
                 .name,
             p.program_data().name,
-            "an address lookup resolves to the redeploy"
+            "an address lookup resolves to the latest redeploy"
         );
+        // The builds' ELF headers differ pairwise (what `PumpDeploy::held` reads).
+        for (i, a) in PumpDeploy::ALL.into_iter().enumerate() {
+            for b in &PumpDeploy::ALL[i + 1..] {
+                assert_ne!(a.elf(p)[..64], b.elf(p)[..64], "{p:?}: {a:?} vs {b:?}");
+            }
+        }
     }
     let s = fork::pump_snapshot();
     for f in fork::all_pump_fixtures().filter(|f| f.group == "pump_state") {
         assert_eq!(f.slot, s.slot, "{}", f.name);
     }
     assert!(s.block_time > 1_790_600_000);
+    let s13 = PumpCoin::Near166.snapshot();
+    for f in fork::all_pump_fixtures().filter(|f| f.group == "pump_state_2026_10_13") {
+        assert_eq!(f.slot, s13.slot, "{}", f.name);
+    }
+    assert!(s13.slot > 456_132_171 && s13.block_time > s.block_time);
+    // The statics both state groups hold resolve to the newer one: the 1,088-byte Global.
+    let g13 = fork::pump_fixture_at(&PUMP_GLOBAL).unwrap();
+    let g_old = fork::fixture("pump_global");
+    assert_eq!(
+        (g13.name.as_str(), g13.account.data.len()),
+        ("pump_global_1088", 1_088)
+    );
+    assert_eq!(
+        g13.account.data[..1_087],
+        g_old.account.data[..],
+        "bytes 0..1087"
+    );
+    assert_eq!(g13.account.data[1_087], 1, "max_curve_depth");
+    for (key, old) in [
+        (PUMP_FEE_CONFIG, "pump_fee_config"),
+        (PUMP_AMM_GLOBAL_CONFIG, "pamm_global_config"),
+        (PUMP_AMM_FEE_CONFIG, "pamm_fee_config"),
+    ] {
+        let new = fork::pump_fixture_at(&key).unwrap();
+        assert_eq!(new.group, "pump_state_2026_10_13", "{old}");
+        assert_eq!(new.account.data, fork::fixture(old).account.data, "{old}");
+    }
     assert_eq!(pump::PROGRAM, PUMP_PROGRAM_ID.to_bytes());
     assert_eq!(pump::FEE_PROGRAM, PUMP_FEES_PROGRAM_ID.to_bytes());
     assert_eq!(pump_amm::PROGRAM, PUMP_AMM_PROGRAM_ID.to_bytes());
@@ -1356,12 +1556,28 @@ fn fixtures_programs_and_readers() {
         pda(&[pump::GLOBAL_VOLUME_ACCUMULATOR_SEED], &PUMP_PROGRAM_ID),
         shortwin::constants::PUMP_GLOBAL_VOLUME_ACCUMULATOR
     );
-    // Every role at its keys, with the expected shape.
-    for coin in PumpCoin::ALL {
+    // Every role of both state groups at its keys, with the expected shape.
+    let raw = |env: &Env, c: &PumpCurve, off: usize| -> u64 {
+        let d = env.svm.get_account(&c.curve).unwrap().data;
+        d.get(off..off + 8)
+            .map_or(0, |b| u64::from_le_bytes(b.try_into().unwrap()))
+    };
+    for coin in PumpCoin::ALL.into_iter().chain(PumpCoin::ALL_2026_10_13) {
         let (env, c) = Env::fork_pump_coin(coin);
         assert_eq!(c.curve, pda::bonding_curve(&c.mint));
         let st = c.state(&env.svm);
         let len = c.data_len(&env.svm);
+        let d = env.svm.get_account(&c.curve).unwrap().data;
+        // The 2026-10-08 fields (raw: the reader learns them in P1): buckets @125 / @133,
+        // `depth` @141, `ivqr` @142, `pcB` @150, `pcQ` @158.
+        let (buckets, depth) = (
+            (raw(&env, &c, 125), raw(&env, &c, 133)),
+            d.get(141).copied().unwrap_or(0),
+        );
+        let (ivqr, pcb, pcq) = (raw(&env, &c, 142), raw(&env, &c, 150), raw(&env, &c, 158));
+        let offset = st
+            .virtual_quote_reserves
+            .checked_sub(st.real_quote_reserves);
         match coin {
             PumpCoin::Fresh => assert!(st.is_live() && len == pump::CURVE_LEN_V2),
             PumpCoin::Near => {
@@ -1401,6 +1617,80 @@ fn fixtures_programs_and_readers() {
                 assert!(st.is_migrated());
                 assert!(env.svm.get_account(&pda::canonical_pool(&c.mint)).is_none());
             }
+            PumpCoin::Near166 => {
+                assert!(st.is_live() && st.is_sol_quote() && len == fork::CURVE_LEN_2026_10_08);
+                assert!(!st.is_mayhem_mode && !st.is_cashback_coin && depth == 0);
+                assert!(st.real_token_reserves <= 100_000_000_000_000);
+                assert!(buckets.0 > 0 && buckets.1 > 0, "{buckets:?}");
+                assert_eq!((ivqr, offset), (30_000_000_000, Some(30_000_000_000)));
+            }
+            PumpCoin::Fresh166 => {
+                assert!(st.is_live() && st.is_sol_quote() && len == fork::CURVE_LEN_2026_10_08);
+                assert_eq!(
+                    c.token_program.id(),
+                    shortwin::constants::TOKEN_2022_PROGRAM_ID
+                );
+                assert!(!st.is_mayhem_mode && !st.is_cashback_coin && depth == 0);
+                assert_eq!((ivqr, offset), (30_000_000_000, Some(30_000_000_000)));
+            }
+            PumpCoin::Buckets166 => {
+                assert!(st.is_live() && st.is_sol_quote() && len == fork::CURVE_LEN_2026_10_08);
+                assert!(
+                    buckets.0 > 100_000_000 && buckets.1 > 100_000_000,
+                    "{buckets:?}"
+                );
+            }
+            PumpCoin::Grow141 | PumpCoin::Grow151 => {
+                let want = if coin == PumpCoin::Grow141 { 141 } else { 151 };
+                assert!(st.is_live() && st.is_sol_quote() && len == want);
+                assert!(!st.is_mayhem_mode && !st.is_cashback_coin);
+                assert_eq!(offset, Some(30_000_000_000));
+            }
+            PumpCoin::SyntheticStuck => {
+                assert!(st.complete && st.virtual_token_reserves > 0 && !st.is_sol_quote());
+                assert_eq!(
+                    c.curve.to_string(),
+                    "E1bYRCNq72Tyos6tsiMRokitMDJtzcPoKmkmdX8PdCHg"
+                );
+                assert_eq!(depth, 1);
+                assert_eq!(
+                    (ivqr, pcb, pcq),
+                    (4_975_123_817_261, 125_468_585_973_711, 21_720_607_727_767)
+                );
+                assert_eq!(offset, Some(ivqr), "consistent");
+            }
+            PumpCoin::GraduatedSynthetic => {
+                assert!(st.is_migrated() && st.is_sol_quote());
+                assert_eq!((pcb, pcq), (6_238_850_918_425, 2_642_475_552));
+                let p = PumpPool::of(coin);
+                assert_eq!(
+                    p.pool.to_string(),
+                    "D4PACvyrY7uYmxUmQZYRUDsSjywJUg4Eq5RT8E53BN4o"
+                );
+                assert_eq!(p.state(&env.svm).base_mint, c.mint.to_bytes());
+            }
+            PumpCoin::Cashback166 => {
+                assert!(st.is_live() && st.is_cashback_coin && st.is_sol_quote());
+                assert!(!st.is_mayhem_mode && len == fork::CURVE_LEN_2026_10_08);
+            }
+            PumpCoin::Mayhem166 => {
+                assert!(st.is_live() && st.is_mayhem_mode && len == fork::CURVE_LEN_2026_10_08);
+                assert!(ivqr != 0 && offset != Some(ivqr), "vQ − rQ ≠ ivqr");
+            }
+            PumpCoin::WsolPoolBuckets => {
+                assert!(st.is_migrated() && st.is_sol_quote());
+                let p = PumpPool::of(coin);
+                assert_eq!(
+                    p.pool.to_string(),
+                    "ERtQ5UhnSHJWb8exNA1BYumVnr27huYRhx3Ni2NFh88S"
+                );
+                let pd = env.svm.get_account(&p.pool).unwrap().data;
+                let at = |o: usize| u64::from_le_bytes(pd[o..o + 8].try_into().unwrap());
+                assert!(
+                    pd.len() >= 287 && at(271) > 0 && at(279) > 0,
+                    "pool buckets"
+                );
+            }
         }
     }
 }
@@ -1436,4 +1726,1310 @@ fn reader_tier_selection_matches_shortwin_math() {
             );
         }
     }
+}
+
+// ---- T-PUMP-MATH-V3: v3 trades and the synthetic migration (pump 2026-10-08) -------------------
+
+/// The curve's fee buckets `(creator_fee @125, protocol_fees @133)` (0 past the account's end).
+fn buckets(svm: &LiteSVM, c: &PumpCurve) -> (u64, u64) {
+    let d = svm.get_account(&c.curve).expect("curve").data;
+    let at = |o: usize| {
+        d.get(o..o + 8)
+            .map_or(0, |b| u64::from_le_bytes(b.try_into().unwrap()))
+    };
+    (at(125), at(133))
+}
+
+/// The 2026-10-08 curve fields `(depth @141, ivqr @142, pcB @150, pcQ @158)`, read raw (the
+/// reader learns them later; 0 past the account's end).
+fn pc_fields(svm: &LiteSVM, c: &PumpCurve) -> (u8, u64, u64, u64) {
+    let d = svm.get_account(&c.curve).expect("curve").data;
+    let at = |o: usize| {
+        d.get(o..o + 8)
+            .map_or(0, |b| u64::from_le_bytes(b.try_into().unwrap()))
+    };
+    (d.get(141).copied().unwrap_or(0), at(142), at(150), at(158))
+}
+
+/// pump's v3 exact-out input (C3): `n = ⌈q·y/(x − q)⌉`, and whether the division is exact (v2's
+/// `⌊⌋ + 1` is one more there, equal elsewhere).
+fn ceil_n(q: u64, x: u64, y: u64) -> (u64, bool) {
+    let num = u128::from(q) * u128::from(y);
+    let den = u128::from(x) - u128::from(q);
+    (u64::try_from(num.div_ceil(den)).unwrap(), num % den == 0)
+}
+
+/// `(n + ⌈n·p/10⁴⌉ + ⌈n·c/10⁴⌉, ⌈n·p/10⁴⌉, ⌈n·c/10⁴⌉)`: a curve-fee charge on `n`.
+fn charged(n: u64, fees: &FeeBps) -> (u64, u64, u64) {
+    let (p, c) = (fee_up(n, fees.protocol), fee_up(n, fees.creator));
+    (n + p + c, p, c)
+}
+
+/// What a v3 trade moves.
+#[derive(Clone, Copy, Debug)]
+struct Snap {
+    user: u64,
+    user_tokens: u64,
+    curve: u64,
+    curve_tokens: u64,
+    buyback: u64,
+    buckets: (u64, u64),
+    uva: u64,
+    uva_len: usize,
+    len: usize,
+    st: pump::BondingCurve,
+}
+
+fn snap(svm: &LiteSVM, c: &PumpCurve, u: &CurveUser, bb: &Pubkey) -> Snap {
+    let uva = svm
+        .get_account(&fork::pump_user_volume_accumulator(&u.kp.pubkey()))
+        .expect("UVA");
+    Snap {
+        user: read::lamports(svm, &u.kp.pubkey()),
+        user_tokens: read::token_amount(svm, &u.ata).unwrap_or(0),
+        curve: read::lamports(svm, &c.curve),
+        curve_tokens: read::token_amount(svm, &c.curve_base_ata).unwrap_or(0),
+        buyback: read::lamports(svm, bb),
+        buckets: buckets(svm, c),
+        uva: uva.lamports,
+        uva_len: uva.data.len(),
+        len: c.data_len(svm),
+        st: c.state(svm),
+    }
+}
+
+/// The rent a trade on `s`'s curve takes from the user to grow it to the current layout (166
+/// bytes; 0 at it): the reserve `lamports − rQ − buckets` raised to `minimum_balance(166)`
+/// (`fork::curve_growth_top_up`).
+fn growth(svm: &LiteSVM, s: &Snap) -> u64 {
+    fork::curve_growth_top_up(
+        svm,
+        s.len,
+        s.curve,
+        s.st.real_quote_reserves,
+        s.buckets.0 + s.buckets.1,
+        PumpDeploy::CURRENT.curve_len(),
+    )
+}
+
+/// How pump charged the exact-division states the v3 probes met (recorded, not a G0 stop: §5.2's
+/// `+1` covers either).
+#[derive(Clone, Copy, Debug, Default)]
+struct ExactDivision {
+    states: u32,
+    ceil: u32,
+    floor_plus_one: u32,
+}
+
+impl ExactDivision {
+    fn record(&mut self, took_ceil: bool) {
+        self.states += 1;
+        if took_ceil {
+            self.ceil += 1;
+        } else {
+            self.floor_plus_one += 1;
+        }
+    }
+}
+
+/// `Global.pool_migration_fee` and `buyback_basis_points` now.
+fn migration_fee(svm: &LiteSVM) -> u64 {
+    let g = svm.get_account(&PUMP_GLOBAL).unwrap();
+    pump::read_global(&g.owner.to_bytes(), &g.data)
+        .unwrap()
+        .pool_migration_fee()
+}
+
+/// The curve's state after a trade, from the reader and the `TradeEvent`.
+#[track_caller]
+fn check_v3_post(
+    ctx: &str,
+    after: &pump::BondingCurve,
+    ev: &PumpTradeEvent,
+    want: (u64, u64, u64, u64),
+) {
+    let got = (
+        after.virtual_token_reserves,
+        after.virtual_quote_reserves,
+        after.real_token_reserves,
+        after.real_quote_reserves,
+    );
+    assert_eq!(got, want, "{ctx}: the curve after the trade");
+    assert_eq!(
+        (
+            ev.virtual_token_reserves,
+            ev.virtual_sol_reserves,
+            ev.real_token_reserves,
+            ev.real_sol_reserves
+        ),
+        want,
+        "{ctx}: the TradeEvent's post-state"
+    );
+}
+
+/// A third party's `buy_v3(q)` (`q < rT`) checked against the v3 model (T-PUMP-MATH-V3 (a)):
+/// `n = ⌈q·vQ/(vT − q)⌉` (on an exact division pump may take `⌊⌋ + 1`: recorded), each fee
+/// `⌈n·b/10⁴⌉`, the buyback `⌊protocol·buyback_bps/10⁴⌋` paid out, the rest of the protocol fee
+/// and the creator fee kept in the curve's buckets outside `rQ`, `vQ − rQ` unchanged, the
+/// curve grown to 166 bytes at the user's expense, the UVA untouched; one lamport under the
+/// charge fails 6002.
+#[track_caller]
+fn v3_buy(env: &mut Env, c: &PumpCurve, u: &CurveUser, q: u64, ed: &mut ExactDivision) {
+    let ctx = format!("{:?} buy_v3 q {q}", c.coin);
+    let bb = CurveUser::v3_buyback_recipient(&env.svm);
+    let fees = c.fees(&env.svm).expect("fees");
+    let s0 = snap(&env.svm, c, u, &bb);
+    let st = s0.st;
+    assert!(q > 0 && q < st.real_token_reserves, "{ctx}");
+    let (n_ceil, exact) = ceil_n(q, st.virtual_token_reserves, st.virtual_quote_reserves);
+    let cost_ceil = charged(n_ceil, &fees).0;
+    let ix = u.buy_v3_ix(&env.svm, c, q, cost_ceil - 1);
+    let res = u.send(env, ix);
+    assert_eq!(
+        custom_code(&res),
+        Some(fork::PUMP_ERR_TOO_MUCH_SOL_REQUIRED),
+        "{ctx}: one lamport under the ⌈⌉ charge; {}",
+        describe(&res)
+    );
+    let mut n = n_ceil;
+    let ix = u.buy_v3_ix(&env.svm, c, q, cost_ceil);
+    let mut res = u.send(env, ix);
+    if exact {
+        let took_ceil = custom_code(&res) != Some(fork::PUMP_ERR_TOO_MUCH_SOL_REQUIRED);
+        ed.record(took_ceil);
+        if !took_ceil {
+            n += 1;
+            let ix = u.buy_v3_ix(&env.svm, c, q, charged(n, &fees).0);
+            res = u.send(env, ix);
+        }
+    }
+    let meta = ok(res, &ctx);
+    let (cost, protocol, creator) = charged(n, &fees);
+    let buyback = buyback_share(&env.svm, protocol);
+    let s1 = snap(&env.svm, c, u, &bb);
+    let grow = growth(&env.svm, &s0);
+    let ev = one_trade(&meta);
+    assert_eq!(
+        (
+            ev.sol_amount,
+            ev.token_amount,
+            ev.fee,
+            ev.creator_fee,
+            ev.buyback_fee
+        ),
+        (n, q, protocol, creator, buyback),
+        "{ctx}: TradeEvent"
+    );
+    assert!(
+        ev.is_buy && ev.ix_name == "buy" && ev.mint == c.mint,
+        "{ctx}: {ev:?}"
+    );
+    assert_eq!(
+        ev.fee_recipient,
+        Pubkey::default(),
+        "{ctx}: no fee recipient"
+    );
+    assert_eq!(ev.fee_basis_points, fees.protocol, "{ctx}");
+    // A coin without a creator pays no creator fee; its event still names the tier's bps.
+    if !st.creator_is_default() {
+        assert_eq!(ev.creator_fee_basis_points, fees.creator, "{ctx}");
+    }
+    assert_eq!(s1.len, s0.len.max(PumpDeploy::CURRENT.curve_len()), "{ctx}");
+    assert_eq!((s1.uva, s1.uva_len), (s0.uva, s0.uva_len), "{ctx}: the UVA");
+    assert_eq!(s0.user - s1.user, cost + grow, "{ctx}: user paid");
+    assert_eq!(s1.user_tokens - s0.user_tokens, q, "{ctx}: user received");
+    assert_eq!(s0.curve_tokens - s1.curve_tokens, q, "{ctx}: curve tokens");
+    assert_eq!(s1.buyback - s0.buyback, buyback, "{ctx}: buyback recipient");
+    assert_eq!(
+        s1.buckets,
+        (s0.buckets.0 + creator, s0.buckets.1 + protocol - buyback),
+        "{ctx}: the buckets grow by creator_fee / fee − buyback"
+    );
+    assert_eq!(
+        s1.curve - s0.curve,
+        n + protocol - buyback + creator + grow,
+        "{ctx}: curve lamports"
+    );
+    check_v3_post(
+        &ctx,
+        &s1.st,
+        &ev,
+        (
+            st.virtual_token_reserves - q,
+            st.virtual_quote_reserves + n,
+            st.real_token_reserves - q,
+            st.real_quote_reserves + n,
+        ),
+    );
+    assert!(!s1.st.complete, "{ctx}");
+}
+
+/// A third party's `sell_v3(q)` checked against the model (T-PUMP-MATH-V3 (a)): proceeds `g =
+/// ⌊q·vQ/(vT + q)⌋` less each fee `⌈g·b/10⁴⌉` (the v2 quote), the fees into the buckets and the
+/// buyback out as on a buy; one lamport over the proceeds fails 6003. Returns whether it
+/// executed (`false` where the quote is undefined: then pump refuses too).
+#[track_caller]
+fn v3_sell(env: &mut Env, c: &PumpCurve, u: &CurveUser, q: u64) -> bool {
+    let ctx = format!("{:?} sell_v3 q {q}", c.coin);
+    u.plant(env, q);
+    let bb = CurveUser::v3_buyback_recipient(&env.svm);
+    let fees = c.fees(&env.svm).expect("fees");
+    let s0 = snap(&env.svm, c, u, &bb);
+    let st = s0.st;
+    let Some(sq) = sol_leg::sell_exact_in(
+        q,
+        u128::from(st.virtual_token_reserves),
+        u128::from(st.virtual_quote_reserves),
+        &fees,
+        st.real_quote_reserves,
+    ) else {
+        let ix = u.sell_v3_ix(&env.svm, c, q, 0);
+        let res = u.send(env, ix);
+        assert!(
+            res.is_err(),
+            "{ctx}: no quote, but the venue {}",
+            describe(&res)
+        );
+        return false;
+    };
+    let g = st.virtual_quote_reserves - u64::try_from(sq.sol_after).unwrap();
+    let (protocol, creator) = (fee_up(g, fees.protocol), fee_up(g, fees.creator));
+    assert_eq!(sq.proceeds, g - protocol - creator);
+    let ix = u.sell_v3_ix(&env.svm, c, q, sq.proceeds + 1);
+    let res = u.send(env, ix);
+    assert_eq!(
+        custom_code(&res),
+        Some(fork::PUMP_ERR_TOO_LITTLE_SOL_RECEIVED),
+        "{ctx}: one lamport over the proceeds; {}",
+        describe(&res)
+    );
+    let ix = u.sell_v3_ix(&env.svm, c, q, sq.proceeds);
+    let meta = ok(u.send(env, ix), &ctx);
+    let buyback = buyback_share(&env.svm, protocol);
+    let s1 = snap(&env.svm, c, u, &bb);
+    let grow = growth(&env.svm, &s0);
+    let ev = one_trade(&meta);
+    assert_eq!(
+        (
+            ev.sol_amount,
+            ev.token_amount,
+            ev.fee,
+            ev.creator_fee,
+            ev.buyback_fee
+        ),
+        (g, q, protocol, creator, buyback),
+        "{ctx}: TradeEvent"
+    );
+    assert!(!ev.is_buy && ev.ix_name == "sell", "{ctx}: {ev:?}");
+    assert_eq!(s1.len, s0.len.max(PumpDeploy::CURRENT.curve_len()), "{ctx}");
+    assert_eq!((s1.uva, s1.uva_len), (s0.uva, s0.uva_len), "{ctx}: the UVA");
+    assert_eq!(
+        i128::from(s1.user) - i128::from(s0.user),
+        i128::from(sq.proceeds) - i128::from(grow),
+        "{ctx}: user received"
+    );
+    assert_eq!(s0.user_tokens - s1.user_tokens, q, "{ctx}: user sold");
+    assert_eq!(s1.curve_tokens - s0.curve_tokens, q, "{ctx}: curve tokens");
+    assert_eq!(s1.buyback - s0.buyback, buyback, "{ctx}: buyback recipient");
+    assert_eq!(
+        s1.buckets,
+        (s0.buckets.0 + creator, s0.buckets.1 + protocol - buyback),
+        "{ctx}: buckets"
+    );
+    assert_eq!(
+        i128::from(s1.curve) - i128::from(s0.curve),
+        i128::from(protocol - buyback + creator + grow) - i128::from(g),
+        "{ctx}: curve lamports"
+    );
+    check_v3_post(
+        &ctx,
+        &s1.st,
+        &ev,
+        (
+            st.virtual_token_reserves + q,
+            st.virtual_quote_reserves - g,
+            st.real_token_reserves + q,
+            st.real_quote_reserves - g,
+        ),
+    );
+    true
+}
+
+/// Moves `c` to the point of its own curve where `rT = rt`: `vT·vQ` and the offsets `vT − rT`,
+/// `vQ − rQ` (= `ivqr`) kept, the curve's lamports and base ATA following (its rent reserve, its
+/// buckets and the would-be pool's tokens kept). `vq` overrides the constant-product `vQ`.
+fn set_state(env: &mut Env, c: &PumpCurve, rt: u64, vq: Option<u64>) {
+    let st = c.state(&env.svm);
+    let (ot, oq) = (
+        st.virtual_token_reserves - st.real_token_reserves,
+        st.virtual_quote_reserves - st.real_quote_reserves,
+    );
+    let k = u128::from(st.virtual_token_reserves) * u128::from(st.virtual_quote_reserves);
+    let vt = rt + ot;
+    let vq = vq.unwrap_or_else(|| u64::try_from(k.div_ceil(u128::from(vt))).unwrap().max(oq));
+    let rq = vq - oq;
+    let (b0, b1) = buckets(&env.svm, c);
+    let mut acc = env.svm.get_account(&c.curve).unwrap();
+    let reserve = acc.lamports - st.real_quote_reserves - b0 - b1;
+    acc.lamports = reserve + rq + b0 + b1;
+    env.svm.set_account(c.curve, acc).unwrap();
+    fork::set_curve_reserves(&mut env.svm, &c.curve, vt, vq, rt, rq);
+    let ata = read::token_amount(&env.svm, &c.curve_base_ata).unwrap();
+    fork::set_token_amount(
+        &mut env.svm,
+        &c.curve_base_ata,
+        rt + (ata - st.real_token_reserves),
+    );
+}
+
+/// Moves `c` to a random point of its curve where a buy of the returned `q` divides exactly:
+/// `vT − q = e·2²⁰` with `q = e·j`, and `vQ` (the constant product's) rounded up to a multiple
+/// of 2²⁰, so that `q·vQ/(vT − q) = j·vQ/2²⁰`.
+fn exact_state(env: &mut Env, c: &PumpCurve, rng: &mut Rng) -> u64 {
+    const F: u64 = 1 << 20;
+    const RT_MAX: u64 = 793_100_000_000_000;
+    let st = c.state(&env.svm);
+    let (ot, oq) = (
+        st.virtual_token_reserves - st.real_token_reserves,
+        st.virtual_quote_reserves - st.real_quote_reserves,
+    );
+    let k = u128::from(st.virtual_token_reserves) * u128::from(st.virtual_quote_reserves);
+    let e = ot / F + 1 + rng.next() % (RT_MAX / F);
+    let d = e * F;
+    let room = RT_MAX.saturating_sub(d - ot) / e;
+    let q = e * (1 + rng.next() % room.max(1));
+    let vt = d + q;
+    let vq = u64::try_from(k.div_ceil(u128::from(vt)))
+        .unwrap()
+        .max(oq)
+        .div_ceil(F)
+        * F;
+    set_state(env, c, vt - ot, Some(vq));
+    q
+}
+
+/// T-PUMP-MATH-V3 (a): a third party's `buy_v3` and `sell_v3` on `PUMP_MATH_V3_STATES` (200)
+/// seeded random states of every live SOL curve of both state groups (the 2026-10-08 build grows
+/// the shorter ones to 166 bytes on their first trade), each checked end to end against the v3
+/// model; every fifth state is an exact division by construction, and how pump charged those is
+/// recorded (`⌈⌉` or v2's `⌊⌋ + 1`; either is within §5.2's bound, neither stops G0).
+#[test]
+fn v3_buys_and_sells_follow_the_v3_model_on_every_live_curve() {
+    let n = env_u64("PUMP_MATH_V3_STATES", 200);
+    let seed = env_u64("PUMP_MATH_SEED", 0x5eed_c0de_0005);
+    let mut ed = ExactDivision::default();
+    let mut sells = 0;
+    let coins: Vec<PumpCoin> = PumpCoin::LIVE_SOL
+        .into_iter()
+        .chain(PumpCoin::LIVE_SOL_2026_10_13)
+        .collect();
+    for (i, coin) in coins.into_iter().enumerate() {
+        let (mut env, c) = Env::fork_pump_coin(coin);
+        let u = CurveUser::new(&mut env, &c);
+        let mut acc = env.svm.get_account(&u.kp.pubkey()).unwrap();
+        acc.lamports = 1_000_000_000_000_000;
+        env.svm.set_account(u.kp.pubkey(), acc).unwrap();
+        let mut rng = Rng(seed ^ (i as u64 + 17).wrapping_mul(0x9e37_79b9_7f4a_7c15));
+        for k in 0..n {
+            let q = if k % 5 == 4 {
+                exact_state(&mut env, &c, &mut rng)
+            } else {
+                let rt = rng.amount(793_100_000_000_000).max(1_000);
+                set_state(&mut env, &c, rt, None);
+                rng.amount(rt - 1)
+            };
+            v3_buy(&mut env, &c, &u, q, &mut ed);
+            let s = c.state(&env.svm);
+            let sold = rng.amount(s.virtual_token_reserves);
+            sells += usize::from(v3_sell(&mut env, &c, &u, sold));
+        }
+        assert_eq!(c.data_len(&env.svm), fork::CURVE_LEN_2026_10_08, "{coin:?}");
+    }
+    println!(
+        "T-PUMP-MATH-V3 (a): {} buys, {sells} sells; exact divisions {}: pump charged ⌈⌉ on {}, \
+         ⌊⌋ + 1 on {}",
+        10 * n,
+        ed.states,
+        ed.ceil,
+        ed.floor_plus_one
+    );
+    assert!(ed.states >= 10 * u32::try_from(n / 5).unwrap());
+    assert!(sells * 2 >= 10 * usize::try_from(n).unwrap());
+}
+
+/// The model's charge of a synthetic `buy_v3(rT + δ)` (§5.2, V3) on the state before it.
+#[derive(Clone, Copy, Debug)]
+struct Synthetic {
+    /// `n₁ᵖ`: the curve part's input (`⌈rT·vQ/(vT − rT)⌉`, or `⌊⌋ + 1` where pump took it).
+    n1: u64,
+    /// `n₂ᵖ = ⌈Y_s·δ/(X_s − δ)⌉` (or `⌊⌋ + 1` where pump took it).
+    n2: u64,
+    /// `X_s = curve_base_ata − rT` (donations included), `Y_s = rQ + n₁ − fee_m`.
+    x_s: u64,
+    y_s: u64,
+    /// Each part's `(protocol, creator)` fees and the total charge.
+    fees1: (u64, u64),
+    fees2: (u64, u64),
+    charge: u64,
+}
+
+/// The model with `n₁ = n1` and `n₂ = ⌈Y_s·δ/(X_s − δ)⌉ + up2` (`up2` = 1: v2's `⌊⌋ + 1` on an
+/// exact division); also whether `n₂`'s division is exact.
+fn synthetic_model(
+    st: &pump::BondingCurve,
+    ata: u64,
+    fee_m: u64,
+    delta: u64,
+    fees: &FeeBps,
+    n1: u64,
+    up2: u64,
+) -> (Synthetic, bool) {
+    let x_s = ata - st.real_token_reserves;
+    let y_s = st.real_quote_reserves + n1 - fee_m;
+    let (n2, exact2) = ceil_n(delta, x_s, y_s);
+    let n2 = n2 + up2;
+    let (c1, p1, cr1) = charged(n1, fees);
+    let (c2, p2, cr2) = charged(n2, fees);
+    (
+        Synthetic {
+            n1,
+            n2,
+            x_s,
+            y_s,
+            fees1: (p1, cr1),
+            fees2: (p2, cr2),
+            charge: c1 + c2,
+        },
+        exact2,
+    )
+}
+
+/// `B̂_v3(rT + δ)` (§5.2): the curve leg `sol_leg::buy_exact_out(rT, vT, vQ, ε₁ = 1, φ)` plus the
+/// synthetic-pool leg `buy_exact_out(δ, X_s, Y_s, ε₁ = 1, φ)` on `migrated_pool`'s `(X_s, Y_s)`
+/// with `pool_tokens = curve_base_ata − rT` — today's primitives (`curve_synthetic` is P1's).
+fn b_hat_v3(st: &pump::BondingCurve, ata: u64, fee_m: u64, delta: u64, fees: &FeeBps) -> u64 {
+    let s = CurveState {
+        vt: u128::from(st.virtual_token_reserves),
+        vq: u128::from(st.virtual_quote_reserves),
+        rt: u128::from(st.real_token_reserves),
+        rq: u128::from(st.real_quote_reserves),
+        complete: false,
+    };
+    let leg1 = sol_leg::buy_exact_out(st.real_token_reserves, s.vt, s.vq, true, fees).unwrap();
+    let (xs, ys) = migrated_pool(
+        &s,
+        &MigrationParams {
+            migration_fee: fee_m,
+            pool_tokens: u128::from(ata - st.real_token_reserves),
+        },
+    )
+    .unwrap();
+    let leg2 = sol_leg::buy_exact_out(delta, xs, ys, true, fees).unwrap();
+    leg1.cost + leg2.cost
+}
+
+/// §5.2's general bound on `B̂_v3 − charge`: `(1 + Σ⌈bᵢ/10⁴⌉) + (Δ₂ + Σ⌈Δ₂·bᵢ/10⁴⌉)` with
+/// `Δ₂ = 1 + ⌈q₂/(X_s − q₂)⌉` over the non-zero fee components.
+fn v3_bound(delta: u64, x_s: u64, fees: &FeeBps) -> u64 {
+    let d2 = 1 + delta.div_ceil(x_s - delta);
+    let b: Vec<u64> = [fees.protocol, fees.creator]
+        .into_iter()
+        .filter(|&b| b > 0)
+        .collect();
+    (1 + b.iter().map(|&b| b.div_ceil(10_000)).sum::<u64>())
+        + (d2 + b.iter().map(|&b| fee_up(d2, b)).sum::<u64>())
+}
+
+/// A third party's synthetic `buy_v3(rT + δ)` (T-PUMP-MATH-V3 (b), (b′)): the charge is
+/// `F(n₁ᵖ) + F(n₂ᵖ)` with `X_s` the live `curve_base_ata − rT` (a donation included); one lamport
+/// under fails 6002; the events are `TradeEvent` (the curve part), `CompleteEvent`,
+/// `PostCompleteBuyEvent` (the pool part, its `pool_base_reserves_after` = the live
+/// `curve_base_ata`); the curve completes with `pcB = δ`, `pcQ = n₂ᵖ`, `rQ = rQ₀ + n₁ᵖ` and
+/// `vQ − rQ = ivqr`; and `0 ≤ B̂_v3 − charge ≤` §5.2's bound (≤ 7 for `δ ≤ X_s/2`). `partial`
+/// appends the optional `partial_fill` byte (25 bytes; else the 24-byte form). Returns the model.
+#[track_caller]
+fn synthetic_buy(
+    env: &mut Env,
+    c: &PumpCurve,
+    u: &CurveUser,
+    delta: u64,
+    partial: Option<bool>,
+    ed: &mut ExactDivision,
+) -> Synthetic {
+    let ctx = format!("{:?} synthetic buy_v3 rT + {delta}", c.coin);
+    let bb = CurveUser::v3_buyback_recipient(&env.svm);
+    let fees = c.fees(&env.svm).expect("fees");
+    let fee_m = migration_fee(&env.svm);
+    let s0 = snap(&env.svm, c, u, &bb);
+    let st = s0.st;
+    let (_, ivqr, pcb0, pcq0) = pc_fields(&env.svm, c);
+    assert_eq!((pcb0, pcq0), (0, 0), "{ctx}: a live curve");
+    let rt = st.real_token_reserves;
+    let q = rt + delta;
+    let ix = |svm: &LiteSVM, bound: u64| {
+        let ix = u.buy_v3_ix(svm, c, q, bound);
+        match partial {
+            Some(flag) => spump::with_partial_fill(ix, flag),
+            None => ix,
+        }
+    };
+    let (n1_ceil, exact1) = ceil_n(rt, st.virtual_token_reserves, st.virtual_quote_reserves);
+    let model = |up1: u64, up2: u64| {
+        synthetic_model(
+            &st,
+            s0.curve_tokens,
+            fee_m,
+            delta,
+            &fees,
+            n1_ceil + up1,
+            up2,
+        )
+    };
+    let (mut m, _) = model(0, 0);
+    let under = ix(&env.svm, m.charge - 1);
+    let res = u.send(env, under);
+    assert_eq!(
+        custom_code(&res),
+        Some(fork::PUMP_ERR_TOO_MUCH_SOL_REQUIRED),
+        "{ctx}: one lamport under the ⌈⌉ model; {}",
+        describe(&res)
+    );
+    // On an exact division of a part pump may take v2's `⌊⌋ + 1`: the candidates in charge order.
+    let mut res = None;
+    for (up1, up2) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
+        let (cand, exact2) = model(up1, 0);
+        if (up1 == 1 && !exact1) || (up2 == 1 && !exact2) {
+            continue;
+        }
+        let cand = if up2 == 1 { model(up1, 1).0 } else { cand };
+        let attempt = ix(&env.svm, cand.charge);
+        let r = u.send(env, attempt);
+        if custom_code(&r) == Some(fork::PUMP_ERR_TOO_MUCH_SOL_REQUIRED) {
+            continue;
+        }
+        let took = |up: u64| if up == 0 { "⌈⌉" } else { "⌊⌋ + 1" };
+        if exact1 {
+            ed.record(up1 == 0);
+            println!("{ctx}: an exact curve part; pump charged {}", took(up1));
+        }
+        if exact2 {
+            ed.record(up2 == 0);
+            println!("{ctx}: an exact pool part; pump charged {}", took(up2));
+        }
+        m = cand;
+        res = Some(r);
+        break;
+    }
+    let meta = ok(res.expect("a candidate charge executes"), &ctx);
+    assert_eq!(
+        fork::pump_event_names(&meta)
+            .into_iter()
+            .filter(|n| *n != "other")
+            .collect::<Vec<_>>(),
+        ["TradeEvent", "CompleteEvent", "PostCompleteBuyEvent"],
+        "{ctx}: the events, in order"
+    );
+    let (bb1, bb2) = (
+        buyback_share(&env.svm, m.fees1.0),
+        buyback_share(&env.svm, m.fees2.0),
+    );
+    let ev = one_trade(&meta);
+    assert_eq!(
+        (
+            ev.sol_amount,
+            ev.token_amount,
+            ev.fee,
+            ev.creator_fee,
+            ev.buyback_fee
+        ),
+        (m.n1, rt, m.fees1.0, m.fees1.1, bb1),
+        "{ctx}: the curve part's TradeEvent"
+    );
+    assert!(ev.is_buy && ev.ix_name == "buy", "{ctx}: {ev:?}");
+    let post = fork::pump_post_complete_buy_events(&meta);
+    assert_eq!(post.len(), 1, "{ctx}");
+    let post = &post[0];
+    assert_eq!(
+        (post.mint, post.bonding_curve, post.user, post.quote_mint),
+        (c.mint, c.curve, u.kp.pubkey(), Pubkey::default()),
+        "{ctx}"
+    );
+    assert_eq!(
+        (
+            post.base_out,
+            post.quote_in,
+            post.fee,
+            post.creator_fee,
+            post.buyback_fee
+        ),
+        (delta, m.n2, m.fees2.0, m.fees2.1, bb2),
+        "{ctx}: the pool part"
+    );
+    assert_eq!(
+        (post.fee_basis_points, post.creator_fee_basis_points),
+        (fees.protocol, fees.creator),
+        "{ctx}"
+    );
+    assert_eq!(
+        (
+            post.pool_base_reserves_before,
+            post.pool_quote_reserves_before,
+            post.pool_base_reserves_after,
+            post.pool_quote_reserves_after
+        ),
+        (m.x_s, m.y_s, m.x_s - delta, m.y_s + m.n2),
+        "{ctx}: the would-be pool"
+    );
+    let s1 = snap(&env.svm, c, u, &bb);
+    assert_eq!(
+        post.pool_base_reserves_after, s1.curve_tokens,
+        "{ctx}: the pool part leaves the live curve_base_ata"
+    );
+    assert_eq!(
+        s0.user - s1.user,
+        m.charge + growth(&env.svm, &s0),
+        "{ctx}: user paid"
+    );
+    assert_eq!(s1.user_tokens - s0.user_tokens, q, "{ctx}");
+    assert_eq!(s0.curve_tokens - s1.curve_tokens, q, "{ctx}");
+    assert_eq!(
+        s1.buyback - s0.buyback,
+        bb1 + bb2,
+        "{ctx}: buyback recipient"
+    );
+    assert_eq!(
+        s1.buckets,
+        (
+            s0.buckets.0 + m.fees1.1 + m.fees2.1,
+            s0.buckets.1 + m.fees1.0 - bb1 + m.fees2.0 - bb2
+        ),
+        "{ctx}: buckets"
+    );
+    assert_eq!(
+        s1.curve - s0.curve,
+        m.n1 + m.n2 + m.fees1.0 - bb1 + m.fees1.1 + m.fees2.0 - bb2
+            + m.fees2.1
+            + growth(&env.svm, &s0),
+        "{ctx}: curve lamports"
+    );
+    let after = s1.st;
+    assert!(
+        after.complete && after.is_migrating(),
+        "{ctx}: complete, not migrated"
+    );
+    assert_eq!(
+        (
+            after.virtual_token_reserves,
+            after.virtual_quote_reserves,
+            after.real_token_reserves,
+            after.real_quote_reserves
+        ),
+        (
+            st.virtual_token_reserves - rt,
+            st.virtual_quote_reserves + m.n1,
+            0,
+            st.real_quote_reserves + m.n1
+        ),
+        "{ctx}: rQ excludes the pool part"
+    );
+    let (_, ivqr1, pcb, pcq) = pc_fields(&env.svm, c);
+    assert_eq!(
+        (pcb, pcq),
+        (delta, m.n2),
+        "{ctx}: post_complete_base_out / quote_in"
+    );
+    assert_eq!(ivqr1, ivqr);
+    assert_eq!(
+        after.virtual_quote_reserves - after.real_quote_reserves,
+        ivqr,
+        "{ctx}: vQ − rQ = ivqr"
+    );
+    // §5.2: short.win's B̂_v3 covers the charge, by at most the bound.
+    let b = b_hat_v3(&st, s0.curve_tokens, fee_m, delta, &fees);
+    let bound = v3_bound(delta, m.x_s, &fees);
+    assert!(
+        b >= m.charge && b - m.charge <= bound,
+        "{ctx}: B̂_v3 {b} vs charge {} (bound {bound})",
+        m.charge
+    );
+    if 2 * delta <= m.x_s {
+        assert!(b - m.charge <= 7, "{ctx}: ≤ 7 for δ ≤ X_s/2");
+    }
+    println!(
+        "{ctx}: charge {}, B̂_v3 {b} (+{}, bound {bound}); X_s {}, Y_s {}, n1 {}, n2 {}",
+        m.charge,
+        b - m.charge,
+        m.x_s,
+        m.y_s,
+        m.n1,
+        m.n2
+    );
+    m
+}
+
+/// A token donation of `d` to `c`'s `curve_base_ata`: a planted holder's real `TransferChecked`.
+fn donate(env: &mut Env, c: &PumpCurve, d: u64) {
+    let holder = env.funded_keypair();
+    let program = c.token_program.id();
+    let payer = env.payer.pubkey();
+    ok(
+        env.send(
+            &[fork::create_ata_idempotent_ix(
+                &payer,
+                &holder.pubkey(),
+                &c.mint,
+                &program,
+            )],
+            &[],
+        ),
+        "holder ATA",
+    );
+    let src = pda::ata(&holder.pubkey(), &c.mint, &program);
+    fork::set_token_amount(&mut env.svm, &src, d);
+    let decimals = env.svm.get_account(&c.mint).unwrap().data[44];
+    let mut data = vec![12u8];
+    data.extend_from_slice(&d.to_le_bytes());
+    data.push(decimals);
+    let ix = anchor_lang::solana_program::instruction::Instruction {
+        program_id: program,
+        accounts: vec![
+            anchor_lang::solana_program::instruction::AccountMeta::new(src, false),
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(c.mint, false),
+            anchor_lang::solana_program::instruction::AccountMeta::new(c.curve_base_ata, false),
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                holder.pubkey(),
+                true,
+            ),
+        ],
+        data,
+    };
+    let before = read::token_amount(&env.svm, &c.curve_base_ata).unwrap();
+    ok(env.send(&[ix], &[&holder]), "donation");
+    assert_eq!(
+        read::token_amount(&env.svm, &c.curve_base_ata).unwrap(),
+        before + d
+    );
+}
+
+/// T-PUMP-MATH-V3 (d): `migrate_v2` creates exactly `(curve_base_ata, rQ + pcQ − fee_m)` — the
+/// `curve_base_ata` read just before it, donations included — with the boost `VQR = ⌊(Y −
+/// pcQ)·2069/10⁴⌋`; the curve keeps `pcB` / `pcQ`.
+#[track_caller]
+fn migrate_and_check(env: &mut Env, c: &PumpCurve, ctx: &str) {
+    let a = read::token_amount(&env.svm, &c.curve_base_ata).unwrap();
+    let st = c.state(&env.svm);
+    let (_, _, pcb, pcq) = pc_fields(&env.svm, c);
+    let fee_m = migration_fee(&env.svm);
+    let migrator = env.funded_keypair();
+    let mig = spump::migrate_v2_ix(&env.svm, &migrator.pubkey(), c);
+    ok(
+        env.send(&[spump::cu_limit_ix(600_000), mig], &[&migrator]),
+        &format!("{ctx}: migrate_v2"),
+    );
+    let np = spump::NewPool::of(c);
+    let y = st.real_quote_reserves + pcq - fee_m;
+    let (base, vault) = (
+        fork::vault_amount(&env.svm, &np.base_vault),
+        fork::vault_amount(&env.svm, &np.quote_vault),
+    );
+    let pool = np.state(&env.svm).expect("the canonical pool");
+    let vqr = pool.virtual_quote_reserves;
+    let spec = i128::try_from(u128::from(y - pcq) * 2_069 / 10_000).unwrap();
+    // The boost is `⌊X₁·Y₁/10¹⁵⌋` (the created pool's effective reserves, the 10¹⁵ supply): the
+    // spec's `⌊(Y − pcQ)·2069/10⁴⌋` (+1 at most, the pool part's rounding up keeping
+    // `X₁·Y₁ ≥ 206.9e12·(Y − pcQ)`) only while no token was donated to curve_base_ata.
+    let boost = i128::try_from(u128::from(y) * u128::from(a) / 1_000_000_000_000_000).unwrap();
+    println!(
+        "{ctx}: migrate_v2 created base {base} (curve_base_ata {a}), quote vault {vault} + VQR \
+         {vqr} = {} (rQ + pcQ − fee = {y}); ⌊X₁·Y₁/10¹⁵⌋ = {boost}, ⌊(Y − pcQ)·2069/10⁴⌋ = \
+         {spec}",
+        i128::from(vault) + vqr
+    );
+    assert_eq!(base, a, "{ctx}: X₁ = the live curve_base_ata");
+    assert_eq!(
+        i128::from(vault) + vqr,
+        i128::from(y),
+        "{ctx}: Y₁ = rQ + pcQ − fee (vault + VQR)"
+    );
+    assert_eq!(vqr, boost, "{ctx}: the boost VQR = ⌊X₁·Y₁/10¹⁵⌋");
+    if a + pcb == 206_900_000_000_000 {
+        assert!(
+            (spec..=spec + 1).contains(&vqr),
+            "{ctx}: without a donation, ⌊(Y − pcQ)·2069/10⁴⌋ (+1)"
+        );
+    }
+    assert!(c.state(&env.svm).is_migrated(), "{ctx}");
+    let (_, _, pcb1, pcq1) = pc_fields(&env.svm, c);
+    assert_eq!((pcb1, pcq1), (pcb, pcq), "{ctx}: the curve keeps pc*");
+}
+
+/// A third party on `Near166` funded for the largest synthetic parts.
+fn near166_user() -> (Env, PumpCurve, CurveUser) {
+    let (mut env, c) = Env::fork_pump_coin(PumpCoin::Near166);
+    let u = CurveUser::new(&mut env, &c);
+    env.fund(&u.kp.pubkey(), 2_000_000_000_000);
+    (env, c, u)
+}
+
+/// T-PUMP-MATH-V3 (b) and (d), no donation: a third party's `buy_v3(rT + δ)` on `near166` for δ
+/// from one raw unit to 100e12 (24-byte data, and the 25-byte `partial_fill = [false]` form on
+/// every other δ) follows §5.2's v3 charge model, then `migrate_v2` creates the pool `(X₁, Y₁)`.
+#[test]
+fn v3_synthetic_buy_past_rt_follows_the_charge_model() {
+    let mut ed = ExactDivision::default();
+    for (i, delta) in [
+        1,
+        1_000_000_000,
+        1_000_000_000_000,
+        10_000_000_000_000,
+        50_000_000_000_000,
+        100_000_000_000_000,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let (mut env, c, u) = near166_user();
+        let partial = (i % 2 == 1).then_some(false);
+        synthetic_buy(&mut env, &c, &u, delta, partial, &mut ed);
+        migrate_and_check(&mut env, &c, &format!("(d) δ {delta}, no donation"));
+    }
+    // Exact divisions by construction: the pool part at δ = X_s/2 (`Y_s·δ/(X_s − δ) = Y_s`), and
+    // the curve part at `rT` a multiple of 279.9e12/2¹¹ with `vQ` a multiple of 2¹¹.
+    let (mut env, c, u) = near166_user();
+    let st = c.state(&env.svm);
+    let x_s = read::token_amount(&env.svm, &c.curve_base_ata).unwrap() - st.real_token_reserves;
+    synthetic_buy(&mut env, &c, &u, x_s / 2, None, &mut ed);
+    let (mut env, c, u) = near166_user();
+    let st = c.state(&env.svm);
+    let ot = st.virtual_token_reserves - st.real_token_reserves;
+    assert_eq!(ot % 2_048, 0);
+    let rt = (st.real_token_reserves / (ot / 2_048)) * (ot / 2_048);
+    let k = u128::from(st.virtual_token_reserves) * u128::from(st.virtual_quote_reserves);
+    let vq = u64::try_from(k.div_ceil(u128::from(rt + ot)))
+        .unwrap()
+        .div_ceil(2_048)
+        * 2_048;
+    set_state(&mut env, &c, rt, Some(vq));
+    assert!(ceil_n(rt, rt + ot, vq).1, "an exact curve part");
+    synthetic_buy(&mut env, &c, &u, 10_000_000_000_000, None, &mut ed);
+    println!(
+        "T-PUMP-MATH-V3 (b): exact divisions {} (pump charged ⌈⌉ on {}, ⌊⌋ + 1 on {})",
+        ed.states, ed.ceil, ed.floor_plus_one
+    );
+    assert_eq!(ed.states, 2);
+}
+
+/// T-PUMP-MATH-V3 (b′) and (d): a token donation `D` to `curve_base_ata` before the synthetic
+/// buy (a planted holder's `TransferChecked`) — `D` = 1e12, and `D` = 206.9e12 with `δ` >
+/// 206.9e12 so that `pcB ≥ 206.9e12` — is priced on `X_s = curve_base_ata − rT`, donation
+/// included; `migrate_v2` then seeds the live `curve_base_ata`. A donation after the completion
+/// (no pool part priced on it) is seeded too.
+#[test]
+fn v3_synthetic_buy_prices_a_donated_curve_base_ata() {
+    let mut ed = ExactDivision::default();
+    for (d, delta) in [
+        (1_000_000_000_000, 10_000_000_000_000),
+        (206_900_000_000_000, 250_000_000_000_000),
+    ] {
+        let (mut env, c, u) = near166_user();
+        let rt = c.state(&env.svm).real_token_reserves;
+        let a0 = read::token_amount(&env.svm, &c.curve_base_ata).unwrap();
+        donate(&mut env, &c, d);
+        let m = synthetic_buy(&mut env, &c, &u, delta, None, &mut ed);
+        assert_eq!(
+            u128::from(m.x_s),
+            u128::from(a0 + d - rt),
+            "X_s counts the donation"
+        );
+        let (_, _, pcb, _) = pc_fields(&env.svm, &c);
+        if d == 206_900_000_000_000 {
+            assert!(pcb >= 206_900_000_000_000, "pcB {pcb} ≥ 206.9e12");
+        }
+        migrate_and_check(&mut env, &c, &format!("(d) D {d} before, δ {delta}"));
+    }
+    // A donation after the completion.
+    let (mut env, c, u) = near166_user();
+    synthetic_buy(&mut env, &c, &u, 10_000_000_000_000, None, &mut ed);
+    donate(&mut env, &c, 3_000_000_000_000);
+    migrate_and_check(&mut env, &c, "(d) D 3e12 after the completion");
+    // Control: a donation and a completing buy of exactly rT (no pool part): `pc* = 0`, and
+    // migrate_v2 seeds the live curve_base_ata (the donation included), as before the redeploy.
+    let (mut env, c, u) = near166_user();
+    donate(&mut env, &c, 2_000_000_000_000);
+    let rt = c.state(&env.svm).real_token_reserves;
+    let ix = u.buy_v3_ix(&env.svm, &c, rt, u64::MAX);
+    let meta = ok(u.send(&mut env, ix), "buy_v3(rT)");
+    assert_eq!(
+        fork::pump_event_names(&meta)
+            .into_iter()
+            .filter(|n| *n != "other")
+            .collect::<Vec<_>>(),
+        ["TradeEvent", "CompleteEvent"],
+        "no pool part"
+    );
+    let (_, _, pcb, pcq) = pc_fields(&env.svm, &c);
+    assert_eq!((pcb, pcq), (0, 0), "no pool part");
+    migrate_and_check(&mut env, &c, "(d) D 2e12, no pool part");
+    println!("T-PUMP-MATH-V3 (b′): exact divisions {ed:?}");
+}
+
+/// T-PUMP-MATH-V3 (c) and (d): `buy_exact_quote_in_v3` with more than the curve's remainder buys
+/// `rT` on the curve and, with the rest, `out = ⌊(in − 1)·X_s/(Y_s + in − 1)⌋` from the
+/// would-be pool (`in` = the pool part's `quote_in`); then `migrate_v2` creates `(X₁, Y₁)`.
+#[test]
+fn v3_buy_exact_quote_in_past_rt_buys_the_rest_from_the_would_be_pool() {
+    for extra in [50_000_000, 5_000_000_000, 40_000_000_000] {
+        let (mut env, c, u) = near166_user();
+        let ctx = format!("buy_exact_quote_in_v3 rT's charge + {extra}");
+        let bb = CurveUser::v3_buyback_recipient(&env.svm);
+        let fees = c.fees(&env.svm).unwrap();
+        let fee_m = migration_fee(&env.svm);
+        let s0 = snap(&env.svm, &c, &u, &bb);
+        let st = s0.st;
+        let rt = st.real_token_reserves;
+        let (n1, _) = ceil_n(rt, st.virtual_token_reserves, st.virtual_quote_reserves);
+        let spend = charged(n1, &fees).0 + extra;
+        let ix = u.buy_exact_quote_in_v3_ix(&env.svm, &c, spend, 1);
+        let meta = ok(u.send(&mut env, ix), &ctx);
+        let ev = one_trade(&meta);
+        assert_eq!(ev.token_amount, rt, "{ctx}: the curve part buys rT");
+        assert_eq!(ev.ix_name, "buy_exact_quote_in", "{ctx}");
+        let n1 = ev.sol_amount;
+        let (c1, p1, cr1) = charged(n1, &fees);
+        assert_eq!((ev.fee, ev.creator_fee), (p1, cr1), "{ctx}");
+        let post = fork::pump_post_complete_buy_events(&meta).remove(0);
+        let (x_s, y_s) = (s0.curve_tokens - rt, st.real_quote_reserves + n1 - fee_m);
+        assert_eq!(
+            (
+                post.pool_base_reserves_before,
+                post.pool_quote_reserves_before
+            ),
+            (x_s, y_s),
+            "{ctx}"
+        );
+        let qin = post.quote_in;
+        let out = u128::from(qin - 1) * u128::from(x_s) / u128::from(y_s + qin - 1);
+        assert_eq!(
+            u128::from(post.base_out),
+            out,
+            "{ctx}: out = ⌊(in−1)·X_s/(Y_s+in−1)⌋"
+        );
+        let (c2, p2, cr2) = charged(qin, &fees);
+        assert_eq!((post.fee, post.creator_fee), (p2, cr2), "{ctx}");
+        let s1 = snap(&env.svm, &c, &u, &bb);
+        assert_eq!(s0.user - s1.user, c1 + c2, "{ctx}: user paid both parts");
+        assert!(c1 + c2 <= spend, "{ctx}");
+        assert_eq!(s1.user_tokens - s0.user_tokens, rt + post.base_out, "{ctx}");
+        let (_, _, pcb, pcq) = pc_fields(&env.svm, &c);
+        assert_eq!((pcb, pcq), (post.base_out, qin), "{ctx}");
+        // How `in` follows from the remainder: v2's exact-quote-in rule on it (recorded).
+        let rest = spend - c1;
+        let model = fork::pump_exact_quote_in(rest, x_s, y_s, &fees);
+        println!(
+            "{ctx}: remainder {rest}, quote_in {qin} (v2 exact-in rule on the remainder: {:?}), \
+             out {}, unspent {}",
+            model.map(|m| (m.net, m.tokens)),
+            post.base_out,
+            spend - c1 - c2
+        );
+        migrate_and_check(&mut env, &c, &format!("(d) after (c) {extra}"));
+    }
+}
+
+/// T-PUMP-MATH-V3 (e), the tier tripwire. The market caps a synthetic buy could rate its parts at
+/// — the curve before the trade, the curve at completion, the would-be pool before and after the
+/// pool part, each at the mint's live supply, and the curve before the trade at the fixed 10¹⁵
+/// supply where the supply was burned — each get a tier of their own in a synthetic pump
+/// `FeeConfig`: thresholds at the midpoints between neighbouring candidates and as far below the
+/// lowest and above the highest again, so that a bottom tier (from 0) and a top tier hold no
+/// candidate. Every tier, the stable tiers (the same thresholds, other bps), `flat_fees` and
+/// `exotic_flat_fees` carry a protocol bps no other entry carries, so the bps each part's event
+/// names tells which schedule and which market cap pump rated it at. The curve part is charged at
+/// the curve's pre-trade tier (as v2), the pool part at the candidate pinned here; the user pays
+/// exactly the charge, and `B̂_v3` with that one schedule on both legs covers it within §5.2's
+/// bound. short.win's `φ` (§5.2: `fees::pump_curve`) resolves the same pre-trade curve at the
+/// fixed 10¹⁵ supply instead: on this burned coin that is another tier, and `B̂_v3` at it falls
+/// below the charge — the M5 live-supply deviation, now on the synthetic leg too, pinned here as
+/// a tripwire (no quote differs under the live single flat tier).
+#[test]
+fn v3_tier_tripwire_pins_the_pool_parts_market_cap() {
+    let (mut env, c, u) = near166_user();
+    let bb = CurveUser::v3_buyback_recipient(&env.svm);
+    let st = c.state(&env.svm);
+    let fee_m = migration_fee(&env.svm);
+    let supply = {
+        let m = env.svm.get_account(&c.mint).unwrap();
+        u128::from(
+            shortwin_venue_state::mint::read_base(&m.owner.to_bytes(), &m.data)
+                .unwrap()
+                .supply,
+        )
+    };
+    let a = read::token_amount(&env.svm, &c.curve_base_ata).unwrap();
+    let rt = st.real_token_reserves;
+    let delta = 50_000_000_000_000;
+    let (n1, exact1) = ceil_n(rt, st.virtual_token_reserves, st.virtual_quote_reserves);
+    let (x_s, y_s) = (a - rt, st.real_quote_reserves + n1 - fee_m);
+    let (n2, _) = ceil_n(delta, x_s, y_s);
+    let cap = |y: u64, x: u64| u128::from(y) * supply / u128::from(x);
+    let mut cands = vec![
+        (
+            "curve before",
+            cap(st.virtual_quote_reserves, st.virtual_token_reserves),
+        ),
+        (
+            "curve at completion",
+            cap(
+                st.virtual_quote_reserves + n1,
+                st.virtual_token_reserves - rt,
+            ),
+        ),
+        ("pool before", cap(y_s, x_s)),
+        ("pool after", cap(y_s + n2, x_s - delta)),
+    ];
+    let fixed = mcap(&st);
+    if fixed != cands[0].1 {
+        cands.push(("curve before at 10¹⁵", fixed));
+    }
+    let mut sorted: Vec<u128> = cands.iter().map(|(_, m)| *m).collect();
+    sorted.sort_unstable();
+    sorted.dedup();
+    assert_eq!(sorted.len(), cands.len(), "distinct candidates: {cands:?}");
+    let (lo, hi) = (sorted[0], sorted[sorted.len() - 1]);
+    // A tier holds the caps from its threshold up to the next one's: each candidate alone.
+    let mut thresholds = vec![0, lo - (sorted[1] - lo).min(lo) / 2];
+    thresholds.extend(sorted.windows(2).map(|w| (w[0] + w[1]).div_ceil(2)));
+    thresholds.push(hi + (hi - sorted[sorted.len() - 2]) / 2 + 1);
+    let tiers: Vec<fork::TierSpec> = thresholds
+        .iter()
+        .enumerate()
+        .map(|(i, t)| {
+            let i = u64::try_from(i).unwrap();
+            (*t, [0, 90 - 10 * i, 28 - 3 * i])
+        })
+        .collect();
+    let stable: Vec<fork::TierSpec> = tiers
+        .iter()
+        .map(|(t, f)| (*t, [f[0], f[1] - 5, f[2] - 1]))
+        .collect();
+    let (flat, exotic) = ([0, 99, 33], [0, 97, 31]);
+    fork::set_fee_config(
+        &mut env.svm,
+        &PUMP_FEE_CONFIG,
+        flat,
+        &tiers,
+        &stable,
+        exotic,
+    );
+    let tier_of = |m: u128| {
+        tiers
+            .iter()
+            .rev()
+            .find(|(t, _)| *t <= m)
+            .map(|(_, f)| FeeBps::new(f[0], f[1], f[2]))
+            .unwrap()
+    };
+    let mut protocol_bps: Vec<u64> = tiers
+        .iter()
+        .chain(&stable)
+        .map(|(_, f)| f[1])
+        .chain([flat[1], exotic[1]])
+        .collect();
+    protocol_bps.sort_unstable();
+    protocol_bps.dedup();
+    assert_eq!(protocol_bps.len(), 2 * tiers.len() + 2, "one bps per entry");
+    // What a part's protocol bps says it was rated at.
+    let named = |bps: u64| -> String {
+        if bps == flat[1] {
+            return "flat_fees".into();
+        }
+        if bps == exotic[1] {
+            return "exotic_flat_fees".into();
+        }
+        if let Some(i) = stable.iter().position(|(_, f)| f[1] == bps) {
+            return format!("stable tier {i}");
+        }
+        let names: Vec<&str> = cands
+            .iter()
+            .filter(|(_, m)| tier_of(*m).protocol == bps)
+            .map(|(n, _)| *n)
+            .collect();
+        match tiers.iter().position(|(_, f)| f[1] == bps) {
+            Some(0) => "the bottom tier (below every candidate)".into(),
+            Some(i) if i == tiers.len() - 1 => "the top tier (above every candidate)".into(),
+            Some(i) => format!("tier {i} ({names:?})"),
+            None => format!("no entry of the FeeConfig ({bps} bps)"),
+        }
+    };
+    // short.win's `φ` on the pre-trade curve under these tiers (`PumpCurve::fees` =
+    // `fees::pump_curve`, the market cap at the fixed 10¹⁵ supply).
+    let phi = c.fees(&env.svm).expect("φ");
+    let s0 = snap(&env.svm, &c, &u, &bb);
+    let ix = u.buy_v3_ix(&env.svm, &c, rt + delta, u64::MAX);
+    let meta = ok(
+        u.send(&mut env, ix),
+        "synthetic buy under the tripwire tiers",
+    );
+    let s1 = snap(&env.svm, &c, &u, &bb);
+    let ev = one_trade(&meta);
+    let post = fork::pump_post_complete_buy_events(&meta).remove(0);
+    println!(
+        "T-PUMP-MATH-V3 (e): supply {supply}; candidates {cands:?}; tiers {tiers:?}; stable \
+         {stable:?}; flat {flat:?}; exotic {exotic:?}; the curve part at {} / {} bps ({}), the \
+         pool part at {} / {} bps ({})",
+        ev.fee_basis_points,
+        ev.creator_fee_basis_points,
+        named(ev.fee_basis_points),
+        post.fee_basis_points,
+        post.creator_fee_basis_points,
+        named(post.fee_basis_points)
+    );
+    // The curve part: the pre-trade curve's tier at the live supply, as v2.
+    let curve_fees = tier_of(cands[0].1);
+    assert_eq!(
+        (ev.fee_basis_points, ev.creator_fee_basis_points),
+        (curve_fees.protocol, curve_fees.creator),
+        "the curve part's tier is {}'s",
+        cands[0].0
+    );
+    // The pool part: pinned (the tripwire flips if pump changes the market cap it rates it at).
+    let pool_fees = tier_of(cands[POOL_PART_TIER_CANDIDATE].1);
+    assert_eq!(
+        (post.fee_basis_points, post.creator_fee_basis_points),
+        (pool_fees.protocol, pool_fees.creator),
+        "the pool part's tier is {}'s",
+        cands[POOL_PART_TIER_CANDIDATE].0
+    );
+    // The quote follows.
+    assert!(
+        ev.sol_amount == n1 || (exact1 && ev.sol_amount == n1 + 1),
+        "n₁ {} vs ⌈⌉ {n1}",
+        ev.sol_amount
+    );
+    let n1 = ev.sol_amount;
+    let y_s = st.real_quote_reserves + n1 - fee_m;
+    let (n2, exact2) = ceil_n(delta, x_s, y_s);
+    assert!(
+        post.quote_in == n2 || (exact2 && post.quote_in == n2 + 1),
+        "n₂ {} vs ⌈⌉ {n2}",
+        post.quote_in
+    );
+    let n2 = post.quote_in;
+    let charge = charged(n1, &curve_fees).0 + charged(n2, &pool_fees).0;
+    assert_eq!(
+        (ev.fee, ev.creator_fee, post.fee, post.creator_fee),
+        (
+            fee_up(n1, curve_fees.protocol),
+            fee_up(n1, curve_fees.creator),
+            fee_up(n2, pool_fees.protocol),
+            fee_up(n2, pool_fees.creator)
+        )
+    );
+    assert_eq!(
+        s0.user - s1.user,
+        charge + growth(&env.svm, &s0),
+        "the user paid the charge"
+    );
+    // §5.2: one schedule prices both legs of B̂_v3. At pump's (the tier of the curve's pre-trade
+    // market cap at the live supply) it covers the charge within the bound.
+    let b = b_hat_v3(&st, a, fee_m, delta, &curve_fees);
+    let bound = v3_bound(delta, x_s, &curve_fees);
+    assert!(
+        b >= charge && b - charge <= bound,
+        "B̂_v3 at pump's tier {b} vs charge {charge} (bound {bound})"
+    );
+    println!(
+        "T-PUMP-MATH-V3 (e): charge {charge}, the user paid {}; B̂_v3 at pump's tier {b} (+{}, \
+         bound {bound})",
+        s0.user - s1.user,
+        b - charge
+    );
+    // Tripwire, the M5 live-supply deviation on both legs: short.win's `φ` rates the same
+    // pre-trade curve at the fixed 10¹⁵ supply, which on this burned coin falls in another tier,
+    // and `B̂_v3` at it can then undercut pump's charge (an exit's `max_in` below it: 6002).
+    // The live curve `FeeConfig` is one flat tier, so no quote differs today. Flips when the
+    // math resolves the tier at the live supply.
+    let at_fixed = cands
+        .iter()
+        .find(|(n, _)| *n == "curve before at 10¹⁵")
+        .map(|(_, m)| tier_of(*m));
+    match at_fixed {
+        Some(tier) => {
+            assert_eq!(phi, tier, "φ is the 10¹⁵ market cap's tier");
+            assert_ne!(phi, curve_fees, "φ is not the tier pump charged");
+            let b_phi = b_hat_v3(&st, a, fee_m, delta, &phi);
+            println!(
+                "T-PUMP-MATH-V3 (e): short.win's φ {} / {} bps (the 10¹⁵ market cap's tier): \
+                 B̂_v3 {b_phi}, {} under the charge",
+                phi.protocol,
+                phi.creator,
+                i128::from(charge) - i128::from(b_phi)
+            );
+            assert!(
+                b_phi < charge,
+                "B̂_v3 at φ {b_phi} vs charge {charge}: the deviation is gone, update the tripwire"
+            );
+        }
+        None => assert_eq!(phi, curve_fees, "an unburned supply: one market cap"),
+    }
+}
+
+/// Which of (e)'s candidate market caps rates the pool part (index into its `cands`): the curve's
+/// own pre-trade market cap, the curve part's.
+const POOL_PART_TIER_CANDIDATE: usize = 0;
+
+/// T-PUMP-MATH-V3 (f): every v3 trade — `buy_v3`, `buy_exact_quote_in_v3`, `sell_v3` — refuses a
+/// cashback coin (6094 `CashbackCoinNotSupported`).
+#[test]
+fn v3_trades_refuse_a_cashback_coin() {
+    let (mut env, c) = Env::fork_pump_coin(PumpCoin::Cashback166);
+    assert!(c.state(&env.svm).is_cashback_coin);
+    let u = CurveUser::new(&mut env, &c);
+    let ix = u.buy_v3_ix(&env.svm, &c, 1_000_000_000_000, u64::MAX);
+    let res = u.send(&mut env, ix);
+    assert_eq!(
+        custom_code(&res),
+        Some(fork::PUMP_ERR_CASHBACK_COIN_NOT_SUPPORTED),
+        "buy_v3: {}",
+        describe(&res)
+    );
+    let ix = u.buy_exact_quote_in_v3_ix(&env.svm, &c, 100_000_000, 1);
+    let res = u.send(&mut env, ix);
+    assert_eq!(
+        custom_code(&res),
+        Some(fork::PUMP_ERR_CASHBACK_COIN_NOT_SUPPORTED),
+        "buy_exact_quote_in_v3: {}",
+        describe(&res)
+    );
+    u.plant(&mut env, 1_000_000_000);
+    let ix = u.sell_v3_ix(&env.svm, &c, 1_000_000_000, 0);
+    let res = u.send(&mut env, ix);
+    assert_eq!(
+        custom_code(&res),
+        Some(fork::PUMP_ERR_CASHBACK_COIN_NOT_SUPPORTED),
+        "sell_v3: {}",
+        describe(&res)
+    );
+}
+
+/// T-PUMP-MATH-V3 (g): the synthetic path is a 2026-10-08 dependency — on pump's 2026-10-02
+/// build a `buy_v3` past `rT` reverts with `NotEnoughTokensToBuy` (6021).
+#[test]
+fn v3_buy_past_rt_reverts_on_the_2026_10_02_build() {
+    let (mut env, c, u) = near166_user();
+    fork::load_pump_deploy(&mut env.svm, PumpProgram::Pump, PumpDeploy::Oct2026);
+    env.warp(1);
+    assert_eq!(
+        env.pump_build_running(PumpProgram::Pump),
+        PumpDeploy::Oct2026
+    );
+    let rt = c.state(&env.svm).real_token_reserves;
+    let ix = u.buy_v3_ix(&env.svm, &c, rt + 1_000_000_000_000, u64::MAX);
+    let res = u.send(&mut env, ix);
+    assert_eq!(
+        custom_code(&res),
+        Some(fork::PUMP_ERR_NOT_ENOUGH_TOKENS_TO_BUY),
+        "{}",
+        describe(&res)
+    );
 }

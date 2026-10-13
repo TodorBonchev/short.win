@@ -138,14 +138,15 @@ fn worst_case_transactions_fit_the_trace() {
     assert!(failures.is_empty(), "{}", failures.join("\n\n"));
 }
 
-/// Five opens of one wallet are one entry-set too many (2 + 14 + 4·13 = 68): the runtime refuses
-/// the transaction with `MaxInstructionTraceLengthExceeded`, before any hook could blame
-/// short.win; four fit (55, `worst_case_transactions_fit_the_trace`).
+/// Five opens of one wallet are one entry-set too many (2 + 14 + 1 + 4·13 = 69, the 1 being the
+/// first sale's growth of the 151-byte curve, `NEAR_GROWTH`): the runtime refuses the transaction
+/// with `MaxInstructionTraceLengthExceeded`, before any hook could blame short.win; four fit (56,
+/// `worst_case_transactions_fit_the_trace`).
 #[test]
 fn five_opens_exceed_the_trace() {
     let (mut env, ixs, signers) = opens_of_one_wallet(5);
     let refs: Vec<&Keypair> = signers.iter().collect();
-    let err = env.send(&ixs, &refs).expect_err("68 entries");
+    let err = env.send(&ixs, &refs).expect_err("69 entries");
     assert!(
         format!("{:?}", err.err).contains("MaxInstructionTraceLengthExceeded"),
         "{:?}",
@@ -226,7 +227,7 @@ fn crank_batches_fit_through_the_protocol_alt() {
 
 /// How many opens of one wallet a **v0** transaction through the protocol ALT holds on the curve
 /// (a curve open names ≈ 20 inline keys: the ReadSet's per-market accounts and the TradeExtras
-/// the table does not hold). Four fit the trace (55 entries) but not v0: they need a v1
+/// the table does not hold). Four fit the trace (56 entries) but not v0: they need a v1
 /// transaction (`worst_case_transactions`); the table's figures are printed.
 #[test]
 fn opens_per_v0_transaction() {

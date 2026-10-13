@@ -84,14 +84,14 @@ fn size_of(program: PumpProgram) -> usize {
     }
 }
 
-fn send_upgrade(env: &mut Env, program: PumpProgram) -> (TxResult, Pubkey) {
+fn send_upgrade(env: &mut Env, program: PumpProgram, elf: &[u8]) -> (TxResult, Pubkey) {
     let authority = header(env, program)
         .upgrade_authority
         .map(Pubkey::new_from_array)
         .expect("an upgradeable program");
     let mut data = vec![1, 0, 0, 0, 1];
     data.extend_from_slice(authority.as_ref());
-    data.extend_from_slice(program.elf());
+    data.extend_from_slice(elf);
     let buffer = Pubkey::new_unique();
     let lamports = env.svm.minimum_balance_for_rent_exemption(data.len());
     env.svm
@@ -123,10 +123,16 @@ fn send_upgrade(env: &mut Env, program: PumpProgram) -> (TxResult, Pubkey) {
     (fork::admin_send(env, upgrade, &[authority]), buffer)
 }
 
-/// A **real** upgrade of `program` by the loader; returns the slot it recorded.
+/// A **real** upgrade of `program` by the loader to its dumped ELF (`PumpDeploy::CURRENT`'s);
+/// returns the slot it recorded.
 fn loader_upgrade(env: &mut Env, program: PumpProgram) -> u64 {
+    loader_upgrade_to(env, program, program.elf())
+}
+
+/// [`loader_upgrade`] to `elf`.
+fn loader_upgrade_to(env: &mut Env, program: PumpProgram, elf: &[u8]) -> u64 {
     let slot = env.clock().slot;
-    let (res, _) = send_upgrade(env, program);
+    let (res, _) = send_upgrade(env, program, elf);
     ok(res);
     let h = header(env, program);
     assert_eq!(h.slot, slot, "the loader records the upgrade's slot");
@@ -138,8 +144,8 @@ fn loader_upgrade(env: &mut Env, program: PumpProgram) -> u64 {
     );
     let start = program_data::HEADER_LEN;
     assert_eq!(
-        &pd.data[start..start + program.elf().len()],
-        program.elf(),
+        &pd.data[start..start + elf.len()],
+        elf,
         "the redeployed ELF"
     );
     slot
@@ -568,7 +574,8 @@ fn the_2026_10_pumpswap_redeploy_latches_until_revalidated() {
     let mut slots = Vec::new();
     for program in [PumpProgram::Amm, PumpProgram::Pump, PumpProgram::Fees] {
         env.warp(1);
-        let s = loader_upgrade(&mut env, program);
+        // The 2026-10-02 ELFs, not `PumpDeploy::CURRENT`'s (the 2026-10-08/12 builds).
+        let s = loader_upgrade_to(&mut env, program, PumpDeploy::Oct2026.elf(program));
         assert_ne!(s, old(program));
         assert_eq!(
             PumpDeploy::held(&env.svm, program),

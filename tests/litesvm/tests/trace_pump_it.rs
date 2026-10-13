@@ -24,7 +24,8 @@
 //! Figures against ARCH §6.2's curve column (open 9 + 1 + 2 = 12, ≤ 15; exits 11 + 1 = 12,
 //! ≤ 15): an open is 14 entries for a wallet's first position (the table omits the position
 //! `init` and the exposure `init_if_needed`, as on Raydium), 13 for a repeat borrower, 17 with
-//! normalisation and 18 with the creator-vault top-up; an exit is 12 on a curve without a
+//! normalisation and 18 with the creator-vault top-up (19 when the sale is also a 151-byte
+//! curve's first trade on pump's 2026-10-08 build, which grows it to 166 bytes); an exit is 12 on a curve without a
 //! creator fee and 13 with one (pump's creator-vault transfer), 15 / 16 normalising, 17 with the
 //! top-up; a crank that moves the venue is 3–4 (its `VenueStateChanged` and chain events). The
 //! table's maxima of 15 are exceeded by the normalising and top-up paths.
@@ -225,6 +226,21 @@ fn open_shape(inits: usize, normalise: bool, top_up: bool) -> Vec<(P, u8)> {
     v.extend(sell_leg(top_up));
     v.extend([(P::System, 2), (P::System, 2), (P::Own, 2)]);
     v
+}
+
+/// `s` with pump's growth of a short curve on its first trade (the 151-byte `near` curve to 166
+/// bytes on the 2026-10-08 build, `PumpCurve::growth_top_up`): the trader's rent top-up of the
+/// curve, one System transfer at height 3 right after pump's own entry, before its fee lookup.
+fn with_growth(mut s: Vec<(P, u8)>, grow: bool) -> Vec<(P, u8)> {
+    if grow {
+        let at = s
+            .iter()
+            .position(|&e| e == (P::Pump, 2))
+            .expect("a pump CPI")
+            + 1;
+        s.insert(at, (P::System, 3));
+    }
+    s
 }
 
 /// An exit: the normalisation if any, the buy leg, a completing buyback's `VenueStateChanged`
@@ -740,7 +756,9 @@ fn crank_price() {
 }
 
 /// `open_short` on the curve: 14 entries for a wallet's first position, 13 for a repeat, 17
-/// normalising, 18 with pump's top-up of an empty creator vault; one pump CPI, peak 3.
+/// normalising, 18 with pump's top-up of an empty creator vault, 19 when that sale is also the
+/// 151-byte curve's first trade on the 2026-10-08 build (its growth to 166 bytes); one pump CPI,
+/// peak 3.
 #[test]
 fn open_short() {
     for coin in VARIANTS {
@@ -790,18 +808,21 @@ fn open_short() {
     env.tick(&pm, 1);
     donate_to_trader(&mut env, &pm);
     let b = env.borrower();
+    // The curve's first trade since the dump: the 2026-10-08 build grows it to 166 bytes.
+    assert!(pm.curve.growth_top_up(&env.svm) > 0);
     let ixs = client(open_ix(&pm, &b.key(), 0, q));
     let meta = send(&mut env, &ixs, &[&b.kp]);
     let s = shown(
         &env,
-        "open (normalising, creator-vault top-up)",
+        "open (normalising, creator-vault top-up, growth)",
         &ixs,
         &meta,
         1,
     );
-    assert_eq!(s, open_shape(2, true, true));
-    assert_eq!((entries(&meta, 1), peak(&meta)), (18, 3));
+    assert_eq!(s, with_growth(open_shape(2, true, true), true));
+    assert_eq!((entries(&meta, 1), peak(&meta)), (18 + 1, 3));
     assert!(read_lamports(&env, &pm.creator_vault) > 0, "topped up");
+    assert_eq!(pm.curve.growth_top_up(&env.svm), 0, "grown");
 }
 
 /// Exits on the curve: a close is its buy leg and event — 12 entries without a creator fee, 13
@@ -1023,9 +1044,9 @@ fn worst(env: &mut Env, what: &str, ixs: &[Instruction], signers: &[&Keypair], d
 }
 
 /// The largest client transactions: a wallet's first open, normalising, with the creator-vault
-/// top-up (2 + 18) and a normalising close with the top-up (2 + 17); an atomic sandwich of a
-/// normalising open with the curve's own trades (a user's `buy_v2` 7 entries, 8 with a creator
-/// fee; `sell_v2` 4).
+/// top-up and the 151-byte curve's growth to 166 bytes (2 + 19) and a normalising close with the
+/// top-up (2 + 17); an atomic sandwich of a normalising open with the curve's own trades (a
+/// user's `buy_v2` 7 entries, 8 with a creator fee; `sell_v2` 4).
 #[test]
 fn worst_case_client_transactions() {
     let (mut env, mut pm, _) = setup(NEAR);
@@ -1033,16 +1054,20 @@ fn worst_case_client_transactions() {
     change_creator(&mut env, &mut pm);
     env.tick(&pm, 1);
     donate_to_trader(&mut env, &pm);
+    assert!(
+        pm.curve.growth_top_up(&env.svm) > 0,
+        "the first trade grows it"
+    );
     let b = env.borrower();
     let ixs = with_cb(vec![open_ix(&pm, &b.key(), 0, q)]);
     let n = worst(
         &mut env,
-        "CB×2 + open (normalising, top-up)",
+        "CB×2 + open (normalising, top-up, growth)",
         &ixs,
         &[&b.kp],
         3,
     );
-    assert_eq!(n, 2 + 18);
+    assert_eq!(n, 2 + 18 + 1);
     env.tick(&pm, 1);
     change_creator(&mut env, &mut pm);
     donate_to_trader(&mut env, &pm);
@@ -1095,25 +1120,28 @@ fn worst_case_client_transactions() {
     }
 }
 
-/// Four opens of one wallet fit the trace (2 + 14 + 3·13 = 55); a fifth (68) is refused by the
-/// runtime itself with `MaxInstructionTraceLengthExceeded`, before any hook could blame
+/// Four opens of one wallet fit the trace (2 + 14 + 3·13 = 55, + 1 for the 151-byte curve's
+/// growth to 166 bytes in the first sale on the 2026-10-08 build: 56); a fifth (69) is refused by
+/// the runtime itself with `MaxInstructionTraceLengthExceeded`, before any hook could blame
 /// short.win. (Each of `vT/800` on the near-complete curve: four stay under the wallet cap.)
 #[test]
 fn the_most_opens_of_one_wallet() {
     let (mut env, pm, _) = setup(NEAR);
     let q = pm.curve.state(&env.svm).virtual_token_reserves / 800;
     env.tick(&pm, 1);
+    let grow = usize::from(pm.curve.growth_top_up(&env.svm) > 0);
+    assert_eq!(grow, 1);
     let b = env.borrower();
     let opens = |k: u64| with_cb((0..k).map(|n| open_ix(&pm, &b.key(), n, q)).collect());
     let res = env.send(&opens(5), &[&b.kp]);
-    let err = res.expect_err("68 entries");
+    let err = res.expect_err("69 entries");
     assert!(
         format!("{:?}", err.err).contains("MaxInstructionTraceLengthExceeded"),
         "{:?}",
         err.err
     );
     let n = worst(&mut env, "CB×2 + open ×4", &opens(4), &[&b.kp], 3);
-    assert_eq!(n, 2 + 14 + 3 * 13);
+    assert_eq!(n, 2 + 14 + grow + 3 * 13);
 }
 
 /// A keeper batch of four cranks on the four live curves of the dump, each just completed by a

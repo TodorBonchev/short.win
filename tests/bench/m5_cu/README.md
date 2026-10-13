@@ -159,7 +159,9 @@ host.
   re-detects a curve (`VenueStateChanged`, `RouteChainChanged`) and 3 for `PumpMigrating → None`:
   a keeper batch of `k` curve cranks is up to `2 + 4k` entries. A curve listing is 15 (peak 3);
   `sol_settle` S3 is 2, the no-op 1; `sweep_trader`'s token leg 4. Four opens of one wallet are
-  55 entries; a fifth (68) is refused by the runtime.
+  55 entries; a fifth (68) is refused by the runtime. Since pump's 2026-10-08 build the first
+  sale on the 151-byte curve also grows it to 166 bytes (one System transfer more,
+  `NEAR_GROWTH`): the costliest open is 2 + 19, four opens 56 and five 69.
 - **Sizes** (v0 through A28 with its pump part; the largest-extras worst case is
   `tx_size_pump_it`'s): a client open is 1,044–1,045 B / 42–43 accounts with its two
   ComputeBudget instructions (§6.4 estimated ≈ 900–980 B); a close 1,008–1,009 B; the keeper's

@@ -175,10 +175,11 @@ fn v2_trades_keep_their_fees_in_the_pool_buckets() {
 
 /// On a pool carrying buckets (planted as v2 trades leave them: half the vault), a v1 `sell` whose
 /// payout lies between `vault − buckets` and the vault fails 6063 `InsufficientRealQuoteReserves`
-/// on the redeploy and executes on the 2026-09 build, which ignores bytes 271–287.
+/// on the redeploys (2026-10-02 and 2026-10-08) and executes on the 2026-09 build, which ignores
+/// bytes 271–287.
 #[test]
 fn a_v1_sale_is_paid_from_the_vault_less_the_buckets() {
-    for deploy in [PumpDeploy::Sep2026, PumpDeploy::Oct2026] {
+    for deploy in PumpDeploy::ALL {
         let (mut env, p) = Env::fork_pamm_coin(PammCoin::Mature);
         fork::load_pump_deploy(&mut env.svm, PumpProgram::Amm, deploy);
         let vault = tokens(&env, &p.quote_vault);
@@ -192,8 +193,12 @@ fn a_v1_sale_is_paid_from_the_vault_less_the_buckets() {
             PumpDeploy::Sep2026 => {
                 ok(res);
             }
-            PumpDeploy::Oct2026 => {
-                assert_eq!(custom_code(&res), Some(PAMM_ERR_INSUFFICIENT_REAL_QUOTE));
+            PumpDeploy::Oct2026 | PumpDeploy::Oct2026Synth => {
+                assert_eq!(
+                    custom_code(&res),
+                    Some(PAMM_ERR_INSUFFICIENT_REAL_QUOTE),
+                    "{deploy:?}"
+                );
             }
         }
     }

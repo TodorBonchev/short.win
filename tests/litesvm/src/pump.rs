@@ -19,7 +19,9 @@
 //!   pump UVA, M5-SEC-1); [`claim_cashback_ix`]: pump's permissionless `claim_cashback` for a
 //!   user who does not sign (T-CASHBACK, pump part).
 //! - [`CurveUser`]: a normal user of the curve (its base ATA and pump UVA created first), for
-//!   moving the curve with real `buy_v2` / `sell_v2` trades.
+//!   moving the curve with real `buy_v2` / `sell_v2` trades, and building pump's v3 trades
+//!   (`buy_v3`, `sell_v3`, `buy_exact_quote_in_v3`; [`with_partial_fill`] for the optional
+//!   trailing byte) — the third-party moves of the 2026-10-08 build's synthetic migration.
 //! - Graduation on the real ELFs: [`migrate_v2_ix`] (27 IDL accounts + the two boost accounts,
 //!   `idl/pump.json` of pump-public-docs), [`NewPool`] (the canonical pool it creates, derived),
 //!   [`pamm_extend_account_ix`] and [`pamm_buy_ix`] (PumpSwap `buy` with its remaining
@@ -50,7 +52,7 @@ use solana_signer::Signer;
 
 use crate::engine::VenueMarket;
 use crate::fixtures::MarketKeys;
-use crate::fork::{self, PumpCoin, PumpCurve, PumpV2};
+use crate::fork::{self, PumpCoin, PumpCurve, PumpV2, PumpV3};
 use crate::ix::{self, LenderKeys};
 use crate::{Env, TxResult, errors, pda};
 
@@ -361,6 +363,80 @@ impl CurveUser {
         let signer = self.kp.insecure_clone();
         env.send(&[ix], &[&signer])
     }
+
+    /// The buyback recipient the v3 builders name: the second of the live `Global` (as the v2
+    /// trades').
+    pub fn v3_buyback_recipient(svm: &LiteSVM) -> Pubkey {
+        fork::pump_buyback_fee_recipient(svm, 1)
+    }
+
+    fn v3_ix(&self, svm: &LiteSVM, c: &PumpCurve, kind: PumpV3, a: u64, b: u64) -> Instruction {
+        let bb = Self::v3_buyback_recipient(svm);
+        c.v3_ix(kind, &self.kp.pubkey(), &self.ata, &bb, a, b, None)
+    }
+
+    /// pump `buy_v3(amount, max_sol_cost)` by this user (17 accounts, 24 bytes: no
+    /// `partial_fill`); past `rT` on the 2026-10-08 build it completes the curve and buys the
+    /// rest from the would-be pool (the synthetic migration).
+    pub fn buy_v3_ix(
+        &self,
+        svm: &LiteSVM,
+        c: &PumpCurve,
+        amount: u64,
+        max_sol_cost: u64,
+    ) -> Instruction {
+        self.v3_ix(svm, c, PumpV3::Buy, amount, max_sol_cost)
+    }
+
+    /// pump `sell_v3(amount, min_sol_output)` by this user (24 bytes).
+    pub fn sell_v3_ix(
+        &self,
+        svm: &LiteSVM,
+        c: &PumpCurve,
+        amount: u64,
+        min_out: u64,
+    ) -> Instruction {
+        self.v3_ix(svm, c, PumpV3::Sell, amount, min_out)
+    }
+
+    /// pump `buy_exact_quote_in_v3(spendable_quote_in, min_tokens_out)` by this user (24 bytes).
+    pub fn buy_exact_quote_in_v3_ix(
+        &self,
+        svm: &LiteSVM,
+        c: &PumpCurve,
+        spend: u64,
+        min_out: u64,
+    ) -> Instruction {
+        self.v3_ix(svm, c, PumpV3::BuyExactQuoteIn, spend, min_out)
+    }
+
+    /// Sends `ix` signed by this user (for a sale, plant the balance first: [`CurveUser::plant`]).
+    pub fn send(&self, env: &mut Env, ix: Instruction) -> TxResult {
+        let signer = self.kp.insecure_clone();
+        env.send(&[ix], &[&signer])
+    }
+
+    /// Plants a token balance of at least `q` in the user's base ATA (these mints have no mint
+    /// authority; pump reads only the account).
+    pub fn plant(&self, env: &mut Env, q: u64) {
+        let have = crate::read::token_amount(&env.svm, &self.ata).unwrap_or(0);
+        if have < q {
+            fork::set_token_amount(&mut env.svm, &self.ata, q);
+        }
+    }
+}
+
+/// `ix` (a v3 buy, 24 bytes) with the optional trailing `partial_fill` byte set to `flag` (25
+/// bytes; pump ignores it on non-mayhem coins).
+pub fn with_partial_fill(mut ix: Instruction, flag: bool) -> Instruction {
+    assert_eq!(ix.data.len(), 24, "a v3 trade without partial_fill");
+    assert_ne!(
+        ix.data[..8],
+        fork::PUMP_SELL_V3,
+        "sell_v3 has no partial_fill"
+    );
+    ix.data.push(u8::from(flag));
+    ix
 }
 
 // ---- graduation on the real ELFs (the execution path `B̂_str` prices, ARCH §4.3, §5.4) ------

@@ -104,20 +104,26 @@ fn held_above_rq(env: &Env, c: &PumpCurve) -> u64 {
 }
 
 /// A third party's `buy_v3` and `sell_v3` on the 151-byte `near` curve: each costs / pays the v2
-/// quote (a buy one lamport less: no ε₁), the fees stay in the curve outside `rQ` (its lamports above rent and `rQ` grow by
-/// exactly the buckets), and the 2026-09 build has no `buy_v3` (101).
+/// quote (a buy one lamport less: no ε₁; the first trade also pays the curve's growth to 166
+/// bytes on the 2026-10-08 build, 76,200), the fees stay in the curve outside `rQ` (its lamports
+/// above rent and `rQ` grow by exactly the buckets), and the 2026-09 build has no `buy_v3` (101).
 #[test]
 fn v3_trades_keep_their_fees_in_the_curve() {
     let (mut env, c) = Env::fork_pump_coin(PumpCoin::Near);
     let u = CurveUser::new(&mut env, &c);
     assert_eq!(curve_buckets(&env, &c), (0, 0), "none at the dump");
+    assert_eq!(c.data_len(&env.svm), 151);
     let above0 = held_above_rq(&env, &c);
+    assert_eq!(above0, 0, "the reserve is minimum_balance(151)");
+    let growth = c.growth_top_up(&env.svm);
+    assert_eq!(growth, 15 * 5_080, "151 → 166 bytes");
     let q = c.state(&env.svm).real_token_reserves / 10;
 
     let quote = c.quote_buy(&env.svm, q).expect("quote");
     let user0 = lamports(&env, &u.kp.pubkey());
     let rq0 = c.state(&env.svm).real_quote_reserves;
     let meta = ok(send_v3(&mut env, &c, true, &u, q, quote.cost));
+    assert_eq!(c.data_len(&env.svm), 166, "grown by the trade");
     assert_eq!(tokens(&env, &u.ata), q);
     let (cf, pf) = curve_buckets(&env, &c);
     // v3 credits the curve `n(q)`, without the v2 buy's ε₁ = +1 lamport (`quote::sol_leg`'s
@@ -127,8 +133,8 @@ fn v3_trades_keep_their_fees_in_the_curve() {
     assert_eq!(ev.sol_amount + 1, quote.net, "n(q) without ε₁");
     assert_eq!(
         user0 - lamports(&env, &u.kp.pubkey()),
-        quote.cost - 1,
-        "v3 costs the v2 quote less ε₁"
+        quote.cost - 1 + growth,
+        "v3 costs the v2 quote less ε₁ (and the growth)"
     );
     assert_eq!(c.state(&env.svm).real_quote_reserves, rq0 + ev.sol_amount);
     assert_eq!(held_above_rq(&env, &c) - above0, cf + pf, "outside rQ");

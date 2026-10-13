@@ -2,7 +2,8 @@
 //! §8.2, §9 M5; A7, R4B-7; I17; U5), on the pump fork of `shortwin_litesvm_tests::fork`: the
 //! real pump (10,485,760 B), pump-fees (948,989 B) and PumpSwap (10,485,760 B) ProgramData
 //! accounts, dumped at their mainnet deploy slots, which `initialize_config` recorded as
-//! `guard_slot` (`fork::FIXTURE_GUARD_SLOTS`: the 2026-10-02 redeploys).
+//! `guard_slot` (`fork::FIXTURE_GUARD_SLOTS`: the 2026-10-08/12 redeploys since the 2026-10-13
+//! re-pin).
 //!
 //! The upgrade mainnet itself made is replayed too (M10 pump revalidation): the 2026-09 builds
 //! (`fork::PumpDeploy::Sep2026`, the slots `VENUE_GUARD_SLOTS_2026_09_27` names) upgraded by the
@@ -918,11 +919,12 @@ fn the_2026_10_pump_redeploys_latch_until_revalidated() {
         rent(&env, PumpDeploy::Sep2026.curve_len())
     );
 
-    // The redeploys, in mainnet's order: the loader writes each slot and the 2026-10-02 ELF.
+    // The redeploys, in mainnet's order: the loader writes each slot and the 2026-10-02 ELF
+    // (not `PumpDeploy::CURRENT`'s, the 2026-10-08/12 builds since the 2026-10-13 re-pin).
     let mut slots = Vec::new();
     for program in [PumpProgram::Amm, PumpProgram::Pump, PumpProgram::Fees] {
         env.warp(1);
-        let s = loader_upgrade(&mut env, program);
+        let s = loader_upgrade_elf(&mut env, program, PumpDeploy::Oct2026.elf(program));
         assert_ne!(s, old(program));
         assert_eq!(
             PumpDeploy::held(&env.svm, program),
@@ -1053,11 +1055,12 @@ fn air01_an_extension_of_pump_fees_is_not_an_upgrade() {
     let venue = fees.guard();
     let dumped = fork::FIXTURE_GUARD_SLOTS[usize::from(venue)];
     // The program hashes exactly what `solana-verify` hashes (the fixture's pin,
-    // `tests/fixtures/README.md`: `f166c296…62fd`).
+    // `tests/fixtures/README.md`: `8ad2ca93…b8b8`, the 2026-10-12 build since the 2026-10-13
+    // re-pin; `f166c296…62fd` on the 2026-10-02 one).
     let reviewed = reviewed_hash(&env, fees);
     let hex: String = reviewed.iter().map(|b| format!("{b:02x}")).collect();
     assert!(
-        hex.starts_with("f166c296") && hex.ends_with("62fd"),
+        hex.starts_with("8ad2ca93") && hex.ends_with("b8b8"),
         "{hex}"
     );
     ok(revalidate_reviewed(&mut env, fees, dumped, reviewed));
