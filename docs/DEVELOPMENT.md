@@ -846,6 +846,8 @@ eval "$(mise activate bash)"
 cargo install wasm-bindgen-cli --version =0.2.129 --locked   # once: the crate's exact pin
 pnpm install --frozen-lockfile
 pnpm --filter @shortwin/math-wasm build   # cargo build (wasm32, release) + wasm-bindgen --target web -> packages/math-wasm/pkg
+wasm-bindgen --target nodejs --out-dir target/wasm-pkg target/wasm32-unknown-unknown/release/shortwin_math_wasm.wasm
+node crates/shortwin-math-wasm/js/smoke.cjs target/wasm-pkg   # the facade's JS interface from Node (CI's web job)
 pnpm --filter web lint                    # biome check . (root biome.json)
 pnpm --filter web typecheck               # tsc --noEmit (strict; includes e2e/ and playwright.config.ts)
 pnpm --filter web test                    # vitest run (jsdom)

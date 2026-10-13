@@ -52,3 +52,9 @@ cargo install wasm-bindgen-cli --version =0.2.129 --locked
 wasm-bindgen --target nodejs --out-dir target/wasm-pkg target/wasm32-unknown-unknown/release/shortwin_math_wasm.wasm
 node crates/shortwin-math-wasm/js/smoke.cjs target/wasm-pkg   # BigInt ABI, undefined, thrown errors, worked examples
 ```
+
+CI's `web` job builds the `.wasm`, binds it for Node and runs the smoke test, after
+`pnpm --filter @shortwin/math-wasm build`. A
+`bool` argument the caller leaves out reaches the facade as `false` (wasm-bindgen does not check
+it); the generated `.d.ts` marks every argument required, so the type check catches it in
+TypeScript callers.

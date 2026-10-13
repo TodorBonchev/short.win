@@ -495,8 +495,10 @@ jobs:
 
   web:
     # M9 web frontend (docs/design/FRONTEND.md §10.4): the WASM math package built from
-    # crates/shortwin-math-wasm (wasm-bindgen =0.2.129, the crate's pin), then Biome, the type
-    # check, Vitest and the production build of apps/web (`web-e2e` runs the Playwright suite).
+    # crates/shortwin-math-wasm (wasm-bindgen =0.2.129, the crate's pin) and the facade's JS
+    # interface checked from Node (js/smoke.cjs on a --target nodejs build: BigInt arguments,
+    # undefined results, thrown errors, the worked examples), then Biome, the type check, Vitest
+    # and the production build of apps/web (`web-e2e` runs the Playwright suite).
     if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     steps:
@@ -509,6 +511,12 @@ jobs:
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @shortwin/math-wasm build
+      - name: The WASM facade from Node (crates/shortwin-math-wasm/js/smoke.cjs)
+        run: |
+          cargo build -p shortwin-math-wasm --target wasm32-unknown-unknown --release --locked
+          wasm-bindgen --target nodejs --out-dir target/wasm-pkg \
+            target/wasm32-unknown-unknown/release/shortwin_math_wasm.wasm
+          node crates/shortwin-math-wasm/js/smoke.cjs target/wasm-pkg
       - run: pnpm --filter web lint
       - run: pnpm --filter web typecheck
       - run: pnpm --filter web test

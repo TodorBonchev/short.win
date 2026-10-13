@@ -2426,7 +2426,11 @@ The scaffold adds the `web` job to `.github/workflows/ci.yml`: install wasm-bind
 `web-e2e` (needs `anchor-build` and the test-venue build; Agave 4.1.2 for `solana-test-validator`;
 Playwright's Chromium in the user cache; profile `chain`). *As built:* `web-e2e` runs every spec
 (no tag filter since the integration) and uploads the `screens` PNGs on every run, the report,
-traces and logs on failure.
+traces and logs on failure. *Since 2026-10-13* the `web` job also runs the facade's Node smoke
+test after the math-wasm build (`crates/shortwin-math-wasm/js/smoke.cjs` on a `wasm-bindgen
+--target nodejs` build of the same `.wasm`): until then only the type check guarded the facade's
+JS interface, e.g. `previewSettlement`'s trailing `executable`, which a JS caller that leaves it
+out passes as `false`.
 
 ### 10.5 Responsive capture (M10; `e2e/specs/responsive.spec.ts`, `@responsive`)
 
