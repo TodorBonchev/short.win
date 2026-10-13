@@ -34,13 +34,15 @@ to build and test the code, what the code relies on, and what we already know ab
 - **After the tag, the AI review of v1.0.0** ([`audit/ai-review/`](audit/ai-review/README.md);
   not a formal audit): 17 issues and 7 confirmed leads (AIR-01 … AIR-24), fixed by a program
   batch after the tag (with the math crate, the normative sims and vectors, the keeper and the
-  indexer) or disclosed. The owner decided its open points on 2026-10-12 (§7); its residuals are
-  known-issues KI-69 … KI-76 (and sentences in older rows), and the register's §7 maps every
-  finding. Its follow-ups (branch `air-followups`, 2026-10-12/13: `SolSettle.vest_flushed`, the
-  keeper, the indexer, the web, the IDL and client, the fuzz corpus and the docs) change the
-  program once more (§0's AI-review build). The fixes and their follow-ups have passed local
-  runs of the CI gate (the latest on 2026-10-13, §10) but have not yet been through CI, a ≥ 24 h
-  fuzz run or a fix review (§12).
+  indexer) or disclosed. The owner decided its open points on 2026-10-12 and confirmed the
+  rest on 2026-10-13 (AIR-21's S1 vest, AIR-09's zero token value, AIR-14's widening of ECON
+  §12.12 residual 10; §7); its residuals are known-issues KI-69 … KI-76 (and sentences in older
+  rows), and the register's §7 maps every finding. Its follow-ups (branch `air-followups`,
+  2026-10-12/13: `SolSettle.vest_flushed`, the keeper, the indexer, the web, the IDL and client,
+  the fuzz corpus and the docs) change the program once more (§0's AI-review build). The fixes
+  and their follow-ups have passed local runs of the CI gate (the latest on 2026-10-13, §10)
+  but have not yet been through CI or an external fix review; the owner waived the ≥ 24 h fuzz
+  run for this batch on 2026-10-13, so none was run on its program (§12).
 - Normative sources:
   - the design documents `docs/SPEC.md`, `docs/design/ARCHITECTURE.md` (ARCH) and
     `docs/design/ECONOMICS.md` (ECON);
@@ -473,14 +475,15 @@ not report these as findings unless the stated bound is wrong or can be exceeded
 - **Accepted by the owner:** the real-venue held sandwich (KI-01's and KI-02's figures,
   2026-10-03), the late-depositor shortfall as designed with the warning's 1 % / 1 SOL
   thresholds (KI-53, 2026-10-03), B2-2 kept as built (KI-52, 2026-10-03; AIR-21's change to S1
-  not yet confirmed), the extras-denylist
+  confirmed on 2026-10-13), the extras-denylist
   residuals (KI-54 … KI-57, 2026-10-03), the first-trade venue rent on short pump accounts
   (KI-64, PUMP-2026-10-2, 2026-10-03), the Squads layout (KI-45, 2026-10-02), the per-touch
   floor of a current or parked lender (KI-68, 2026-10-08, ninth round: at most 1 lamport of
   entitlement and 1 of realised SOL per third-party touch, each touch costing its sender a
   transaction fee; the cumulative-floor alternative, a program change, not taken), and the earlier
-  rows marked accepted (KI-12, KI-22 … KI-24 (KI-23 on the figures before AIR-14, KI-24 on the
-  behaviour before AIR-09), KI-27, KI-28's M6R-4, KI-29, KI-30, KI-35), and
+  rows marked accepted (KI-12, KI-22 … KI-24 (KI-23 with AIR-14's widening and KI-24 with
+  AIR-09's zero token value, both confirmed on 2026-10-13), KI-27, KI-28's M6R-4, KI-29, KI-30,
+  KI-35), and
   the margin of a PumpSwap position opened while a deposit is held (KI-26, M6D residual 16,
   2026-10-09, eleventh round: as built; pricing it on the burned depth, a program change, not
   taken), and O18's residuals as disclosed (KI-16 … KI-21, KI-25, 2026-10-09, eleventh round,
@@ -504,8 +507,8 @@ not report these as findings unless the stated bound is wrong or can be exceeded
   2026-10-09, eleventh round), and the harness and doc findings of the
   register's §6. After the tag: the AI review's findings but AIR-04, AIR-11, AIR-18 and AIR-20
   (the register's §7; the fixes' commits and regression tests are in the review's README),
-  built and through a local run of the CI gate but not yet through CI, a ≥ 24 h fuzz run or a
-  fix review (§12).
+  built and through a local run of the CI gate but not yet through CI or an external fix
+  review; the ≥ 24 h fuzz run waived by the owner for this batch (2026-10-13; §12).
 - **Disclosed** (owner decision of 2026-10-07): KI-65's remaining conversion-order residual — a
   party ordering its own conversions (Sybils placed before the roll, a tuned residue) and
   converting after honest lenders' own conversions, at any later time (no atomicity needed;
@@ -528,10 +531,10 @@ not report these as findings unless the stated bound is wrong or can be exceeded
   floor away up to 1 lamport of that lender's entitlement and of its realised SOL, left in
   `lender_sol` as rounding) is accepted since the ninth round (above).
 - **Open** (build default in force; §7): the rest of O19 (KI-03 … KI-10 are disclosed but not
-  signed off), OWNER-M6SK-1 (KI-28), the M7 keeper items, and the three confirmations the AI
-  review's fixes ask for (SPEC §14 fourteenth round): AIR-21's S1 vest, which changes B2-2
-  (KI-52); AIR-09's zero token value on a venue that cannot execute (KI-24); and AIR-14's
-  widening of ECON §12.12 residual 10 (KI-23). O18 is decided (2026-10-09,
+  signed off), OWNER-M6SK-1 (KI-28) and the M7 keeper items. The three confirmations the AI
+  review's fixes asked for (SPEC §14 fourteenth round) were given on 2026-10-13: AIR-21's S1
+  vest, which changes B2-2 (KI-52); AIR-09's zero token value on a venue that cannot execute
+  (KI-24); and AIR-14's widening of ECON §12.12 residual 10 (KI-23). O18 is decided (2026-10-09,
   eleventh round: its rules accepted as the v1.0.0 design and the §2 residuals it disclosed,
   KI-16 … KI-21 and KI-25, accepted as disclosed; §7).
 
@@ -577,12 +580,13 @@ one follow-up; the table below). All the program-affecting ones are built (batch
 KI-65 batch, its follow-up, the KI-66 batch and the KI-66 full / KI-67 batch); the deferred IX-1 /
 IX-11 are not.
 
-**Decided after the tag** (2026-10-12; the AI review's README, "Decisions for the owner", records
-them): the AI review's open points (the table's first row). Its program fixes are built.
+**Decided after the tag** (2026-10-12 and 2026-10-13; the AI review's README, "Decisions for the
+owner", records them): the AI review's open points (the table's first row). Its program fixes
+are built.
 
 | Item | Decision needed | Build default (in force) | Changes program code? |
 |---|---|---|---|
-| **The AI review of v1.0.0** (AIR-01 … AIR-24; [`audit/ai-review/README.md`](audit/ai-review/README.md); known-issues §7) | **Decided (2026-10-12):** **AIR-22** keep the lower-median sustained growth (`6c39e58`, `03b7762`, `8a4df78`; its trade-off KI-76); **AIR-07** keep the drained-pool deposit gate (`PoolDrained` = 6108, `00d3772`; the refused honest deposits KI-71); **AIR-10** accept the burn residual (KI-72), no per-second supply snapshot; **AIR-18** accept the bounded `ExtendProgram` griefing, the keeper retrying in a later slot, no pre-extension of short.win's ProgramData to 10 MiB (KI-73; KI-63's "harmless" corrected); **AIR-19** accept the conservative `min_open_hard_cap_bps` mark (KI-74), no exact cap tracking; **AIR-01** the hashed `revalidate_venue` of pump-fees, AMM v4, CPMM and Jupiter after `initialize_config` (`services/README.md` "Governance"), its residuals accepted (KI-69); **AIR-04, AIR-11, AIR-20** no behaviour change, known-issues rows and doc wording only (KI-70, KI-13, KI-75; AIR-20's optional fix in `leads.md` not taken). **Still for the owner** (SPEC §14 fourteenth round): confirm AIR-21's S1 vest (known-issues KI-52 and its B2-2 row) and AIR-09's zero token value on a venue that cannot execute (KI-24), and review AIR-14's widening of ECON §12.12 residual 10 (KI-23) | As decided: the fixes built (the AI review's batch after the tag) | **Program** (built: the AIR fixes, a batch after the tag; the alternatives not taken — reverting AIR-22 or the gate, the supply snapshot, exact cap tracking, AIR-20's fix — would be program changes too; pre-extending ProgramData is a deployment step) |
+| **The AI review of v1.0.0** (AIR-01 … AIR-24; [`audit/ai-review/README.md`](audit/ai-review/README.md); known-issues §7) | **Decided (2026-10-12):** **AIR-22** keep the lower-median sustained growth (`6c39e58`, `03b7762`, `8a4df78`; its trade-off KI-76); **AIR-07** keep the drained-pool deposit gate (`PoolDrained` = 6108, `00d3772`; the refused honest deposits KI-71); **AIR-10** accept the burn residual (KI-72), no per-second supply snapshot; **AIR-18** accept the bounded `ExtendProgram` griefing, the keeper retrying in a later slot, no pre-extension of short.win's ProgramData to 10 MiB (KI-73; KI-63's "harmless" corrected); **AIR-19** accept the conservative `min_open_hard_cap_bps` mark (KI-74), no exact cap tracking; **AIR-01** the hashed `revalidate_venue` of pump-fees, AMM v4, CPMM and Jupiter after `initialize_config` (`services/README.md` "Governance"), its residuals accepted (KI-69); **AIR-04, AIR-11, AIR-20** no behaviour change, known-issues rows and doc wording only (KI-70, KI-13, KI-75; AIR-20's optional fix in `leads.md` not taken). **Decided (2026-10-13, SPEC §14 fourteenth round):** AIR-21's S1 vest confirmed (known-issues KI-52 and its B2-2 row), AIR-09's zero token value on a venue that cannot execute confirmed (KI-24), and AIR-14's widening of ECON §12.12 residual 10 accepted (KI-23); the ≥ 24 h fuzz run waived for this batch (§12) | As decided: the fixes built (the AI review's batch after the tag) | **Program** (built: the AIR fixes, a batch after the tag; the alternatives not taken — reverting AIR-22 or the gate, the supply snapshot, exact cap tracking, AIR-20's fix — would be program changes too; pre-extending ProgramData is a deployment step) |
 | **O19** (the rest) | Sign off the disclosed residuals of known-issues §1 (KI-01, KI-03 … KI-11); the real-venue figures are already accepted | Accept and disclose; no liquidation reserve | No; the alternative (a rent-only liquidation reserve) is **program** |
 | **Rebase-orphan vest** (KI-65; O19; FUZZ-M10-24H-A) and the conversion order (KI65-REV-SEC1) | **Decided (2026-10-07): fixed in the program by cumulative conversion rounding** — each rebase record carries `conv_rem` and a lender's conversion mints `⌊(conv_rem + s)/1,000^k⌋`, so the old epoch's lenders end with exactly the new `S` and the last real lender is paid the vest (ECON §9.5, KI-65). **Decided (2026-10-07, sixth round): owner-signed conversions** — `sync_lender` converts a position through a rebase record only with the owner's signature (unsigned it stops at the record: since the KI-66 batch the pot-only touch, with `RebaseNeedsOwner` 6107 its post-condition; plain catch-up, the V2-12 jump, the parking and `sync_lender(0)` stay permissionless; every other lender instruction is the owner's), so no third party orders an honest lender's conversion and a latent honest unit blocks the flush (W3). Disclosed, not closed: a party ordering its own conversions and converting after honest lenders' own conversions (at any later time) still collects up to one unit per position and, where every honest holder converted to 0 shares, the whole unreleased vest (KI-65's figures: +4,007,334,855 vs 369,862 lamports; a JIT depositor 3,000,000,000 of a 3,000,000,000 lump). **Decided (2026-10-07): `MAX_RECORDS` = 8** per lender transaction (worst case `cover_deficit` 54,549 CU of 60,000; a lender further behind catches up over several transactions) | Built (the KI-65 program batch and its follow-up) | **Program** (built; new hashes, §0) |
 | **KI-66** (KI65-REV-POT; O19) | **Decided (2026-10-07, seventh round): the pot-only touch** — anyone's `sync_lender` without the owner's signature that reaches a rebase record accrues the lender's `pending` / `real` to the record's `acc_end` / `acc_r_end` and moves its surplus to the pot, converting no shares, writing no `conv_rem` and leaving the epoch (it cannot order conversions; idempotent; the owner's later conversion counts nothing twice). `ki65_it` pins the deficit lender paid in full without the holder's owner (pot 4,434,782,609 lamports; A's next claim 2,957,608,696, nothing left owed). Then disclosed: what the unconverted shares earn after the record waited for the owner (KI66-R3) — **fixed in full in the eighth round** (2026-10-08: the forward chain; the next row). **Decided (seventh round): the web's sub-unit conversion warning** (`lender.subUnitConversion`, the vest's end) and the `lender.residuals` sentence | Built (the KI-66 batch, `m10/ki66`) | **Program** (built; new hashes, §0) |
@@ -802,8 +806,9 @@ The full gate (G-full in the M10 plan; CI's `ci.yml`) also runs fmt and clippy w
   38125079869 (2026-10-11), green, all 24 jobs a push runs succeeded** (`fuzz-nightly` and
   `mutants` are opt-in); the commits after it are docs only.
 - **After the tag, the AI review's fixes and follow-ups** (`ai-review-fixes` = `main` @
-  `4497ea6`; `air-followups`): no CI run, as nothing is pushed. Their local gates: the review's
-  README "Local gate", and the integrated branch's below.
+  `4497ea6`; `air-followups`): no CI run; the owner has the branch pushed with `[skip ci]`
+  (2026-10-13). Their local gates: the review's README "Local gate", and the integrated
+  branch's below.
 
 **The AI review follow-ups' gate** (2026-10-13, a local run, not CI; `air-followups` at
 `621f8e1`: the AI review's fixes and their follow-ups `cb756ca` … `621f8e1`, the program from
@@ -841,7 +846,7 @@ verified); the `indexer` job's PostgreSQL tests (no embedded PostgreSQL here) an
 keeper track ran it against a local `solana-test-validator` at `8945087`, 1 passed, and
 `services/common` has not changed since); `web-e2e` (no Playwright browser); a
 timed fuzz run (the ≥ 24 h run on these bytes is not done: the owner did not ask for one on
-2026-10-12) and `mutants`.
+2026-10-12 and waived it for this batch on 2026-10-13) and `mutants`.
 
 After this gate, the final review of the follow-ups changed only the web, the WASM facade and
 CI's `web` job (`ed014ce` AIR-10's exit risk cap in a position's risk view, `b1d86d4` AIR-03's
@@ -1370,6 +1375,10 @@ in a program batch, one commit per finding where practical. Each fix comes with:
 - the full gate (G-full) green on the fix commit;
 - a ≥ 24 h fuzz run on the fix commit;
 - the auditors' fix review.
+
+*(2026-10-13: the owner waived the ≥ 24 h fuzz run for the AI review's fix batch, AIR-01 …
+AIR-24; no such run was made on its program. The rule stands for the audit's findings. That
+batch still needs CI and an external fix review.)*
 
 A finding may instead be acknowledged with a written rationale; it then becomes a row in
 `known-issues.md`.

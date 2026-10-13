@@ -5,9 +5,11 @@ branch of proposed fixes. The review used Claude Opus 5.5 with the `rust-auditor
 skill.
 
 **This is not a formal audit.** The fixes on `ai-review-fixes`, and their follow-ups on
-`air-followups`, are proposals for the owner's review. They passed local runs of the CI gate
-(below), but none has run in CI, had a 24 h fuzz run or an external fix review, which
-[`../findings.md`](../findings.md) requires before a finding counts as fixed.
+`air-followups`, were proposals for the owner's review; the owner decided them on 2026-10-12
+and 2026-10-13 ("Decisions for the owner"). They passed local runs of the CI gate (below), but
+none has run in CI or had an external fix review, which [`../findings.md`](../findings.md)
+requires before a finding counts as fixed. The ≥ 24 h fuzz run that file also requires was
+waived by the owner for this batch on 2026-10-13; none was run on the fixed program.
 
 ## Scope and method
 
@@ -89,8 +91,9 @@ commit carries the reconciliation:
 
 ## Decisions for the owner
 
-The owner resolved decisions 1–7 on 2026-10-12. Each item keeps its analysis and ends with the
-resolution; item 8 lists the interface changes and needs no decision.
+The owner resolved decisions 1–7 on 2026-10-12 and decisions 9–12 on 2026-10-13. Each item
+keeps its analysis and ends with the resolution; item 8 lists the interface changes and needs no
+decision.
 
 1. **AIR-22, sustained growth.** The fix ends the flat-step veto: a straddle crank every 3 s no
    longer blocks liquidation through a pump. The cost is that one non-rising step in three is
@@ -191,6 +194,39 @@ resolution; item 8 lists the interface changes and needs no decision.
      left pump (AIR-05).
    - `disable_venue` can now emit `ConfigCancelled` (AIR-24).
 
+9. **SPEC §14 fourteenth round: AIR-21, AIR-09 and AIR-14's widening.** Three fixes change
+   what an owner decision covered, and were drafted from the code and the sims, not from a
+   decision. AIR-21 changes B2-2: an S1 now vests its take above `⌊Q·P_ema/WAD⌋ + R_due`; a
+   genuine S1 loss still vests only its rent top-up. AIR-09 counts the tokens at 0 on a venue
+   that cannot execute, so of an S3 there only `R_due` stays immediate (KI-24 was accepted on
+   the behaviour before it). AIR-14 widens ECON §12.12 residual 10, which O18 accepted on the
+   `9aade3e` figures: a held drain, frozen, forces 181 levels in the sim instead of 69, each
+   still one the LP's withdrawal for good liquidates.
+
+   **Resolved (owner, 2026-10-13): AIR-21 and AIR-09 confirmed; AIR-14's widening accepted**
+   (known-issues KI-52 and its B2-2 row, KI-24, KI-23; SPEC §14 fourteenth round).
+
+10. **FE-31, the `lender.residuals` copy.** The approved disclosure quoted the held model's
+    Tier A loss to lenders and the protocol from before AIR-22 (about 2.06 SOL fresh, 8.02 SOL
+    aged 25 days at 90 %). Under AIR-22's lower-median growth `sandwich.out` gives +3.340 and
+    +4.543 SOL.
+
+    **Resolved (owner, 2026-10-13): approved** with about 3.34 SOL fresh and 4.54 SOL aged
+    (FRONTEND §13 FE-31).
+
+11. **The ≥ 24 h fuzz run.** [`../findings.md`](../findings.md) counts a fix as done only after
+    a ≥ 24 h fuzz run on it; the owner did not ask for one on 2026-10-12.
+
+    **Resolved (owner, 2026-10-13): waived for this batch.** No such run was made on the fixed
+    program; CI and an external fix review are still owed (AUDIT.md §12).
+
+12. **Pre-AIR-01 `revalidate_venue`.** The indexer decodes instructions against the IDL it
+    embeds, so it can no longer decode the two-argument `revalidate_venue` of a build before
+    AIR-01; a backfill of such a build's history would quarantine that call.
+
+    **Resolved (owner, 2026-10-13): accepted, no legacy decoder** (INDEXER §3.6). It matters
+    only if such a build was deployed and its history must be indexed.
+
 ## Follow-ups
 
 The fixes left the follow-ups below. They are done on the branch `air-followups` (`main` @
@@ -248,17 +284,19 @@ open is at the end of this list and in [`TODO.md`](../../../TODO.md).
   L-2's erratum).
 - **Release evidence: partly done.** The integrated branch passed a local run of the CI gate on
   2026-10-13 (below), and AUDIT.md §0 records its build's hashes, marked as not verified. Still
-  open: a CI run (it needs a push), the verifiable build, a ≥ 24 h fuzz run (the owner did not
-  ask for one on 2026-10-12), the PostgreSQL and E2E jobs, and an external fix review.
-- **Still for the owner:** AIR-21 changes the B2-2 decision, AIR-09 counts a venue's tokens at 0
-  when it cannot execute, and AIR-14 widens residual 10, which O18 accepted on older figures
-  (SPEC §14, fourteenth round; known-issues KI-23, KI-24, KI-52; AUDIT.md §7); FE-31, the copy
-  of `lender.residuals` (FRONTEND §13).
+  open: a CI run (the owner has the branch pushed with `[skip ci]`, 2026-10-13, so CI has not
+  run), the verifiable build, the PostgreSQL and E2E jobs, and an external fix review. The
+  ≥ 24 h fuzz run is waived by the owner for this batch (2026-10-13, decision 11); none was run.
+- **The owner's items: decided** (2026-10-13, decisions 9–12): AIR-21 and AIR-09 confirmed and
+  AIR-14's widening of residual 10 accepted (SPEC §14, fourteenth round; known-issues KI-23,
+  KI-24, KI-52; AUDIT.md §7); FE-31's copy of `lender.residuals` approved (FRONTEND §13); the
+  24 h fuzz waived; no legacy decoder for the pre-AIR-01 `revalidate_venue` (INDEXER §3.6).
 
 ## Local gate
 
-CI has not run on these branches: nothing is pushed. The CI jobs ran locally instead, in WSL
-(Ubuntu 24.04) with the pinned toolchain.
+CI has not run on these branches: nothing was pushed before 2026-10-13, and the owner has
+`air-followups` pushed with `[skip ci]`. The CI jobs ran locally instead, in WSL (Ubuntu 24.04)
+with the pinned toolchain.
 
 **The integrated branch** (2026-10-13, `air-followups` at `621f8e1`: the fixes and every
 follow-up above; test binaries at 4 threads; AUDIT.md §10 has the same run):

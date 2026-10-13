@@ -304,6 +304,11 @@ account read.
   prefix and **applied**, and recorded in `ingest_quarantine` with `applied = TRUE`
   (`/v1/status.layout_warnings`: upgrade the indexer). A shorter payload (an older layout replayed
   on a newer indexer) still quarantines: versioned decoders are an open item (§14 IX-18).
+  *AIR-01 (`caa5852`):* instructions decode against the embedded IDL too, and
+  `revalidate_venue` gained `expected_elf_hash`, so the two-argument call of a build before
+  AIR-01 no longer parses and a backfill of such a build's history quarantines it (the
+  committed recordings were migrated, §11.3). No legacy decoder: the owner accepted this on
+  2026-10-13; it matters only if such a build was deployed and its history must be indexed.
 - **Absent logs:** a `getTransaction` response without `logMessages` is read as a cut log stream
   (`ingest_txs.logs_truncated`; `/v1/status.logs_truncated` counts the last day's).
 - **RPC errors:** retried with backoff inside the source (a permanent JSON-RPC code — a bound or a
