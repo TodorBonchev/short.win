@@ -2,9 +2,17 @@
 //!
 //! - pump `TradeEvent` (an `emit_cpi!` of the pump program): mint, sol_amount, token_amount,
 //!   is_buy, user, the post-trade virtual / real reserves, fee, creator, creator_fee (the later
-//!   fields are decoded tolerantly: known prefix, trailing bytes ignored);
+//!   fields are decoded tolerantly: known prefix, trailing bytes ignored). Its `ix_name` is a
+//!   label, never a dispatch key: v3 trades emit `buy` / `sell` / `buy_exact_quote_in` (not the
+//!   `*_v3` names pump's docs give), multi-hop ones `multi_hop_swap`; the `fee_recipient` of a v3
+//!   trade is the zero key;
+//! - pump `PostCompleteBuyEvent` (pump's 2026-10-08 redeploy): the synthetic-migration part of a
+//!   buy past `rT` — the tokens a completing buy takes from the would-be pool — as a second pump
+//!   trade row of the same instruction, on a SOL-quoted curve only ([`pump_post_complete_buy`]);
 //! - PumpSwap `BuyEvent` / `SellEvent` (`emit_cpi!` of pAMM): base / quote amounts, lp_fee,
-//!   protocol_fee, pool, user, coin_creator, coin_creator_fee, pool reserves;
+//!   protocol_fee, pool, user, coin_creator, coin_creator_fee, pool reserves; the pool's mints
+//!   from the emitting instruction ([`pump_amm_trade_mints`]: accounts 3 and 4 of a `buy` /
+//!   `sell` / `buy_v2` / `sell_v2`, the event pool's hop group of a `multi_hop_swap`);
 //! - Raydium CPMM `SwapEvent` (`emit!`, discriminator `40c6cde8260871e2`, **only from the CPMM
 //!   program**: CLMM and others emit an event of the same name and discriminator);
 //! - Raydium AMM v4 `ray_log` (base64 bincode `SwapBaseInLog` log_type 3 / `SwapBaseOutLog`
@@ -82,6 +90,8 @@ const PUMP_EVENTS: &[&str] = &[
     "SyncUserVolumeAccumulatorEvent",
     // pump's 2026-10-02 redeploy (v3 trades keep their fees in the curve's buckets).
     "SweepBondingCurveFeeEvent",
+    // pump's 2026-10-08 redeploy: the synthetic migration's pool part of a completing buy.
+    "PostCompleteBuyEvent",
 ];
 const PUMP_AMM_EVENTS: &[&str] = &[
     "BuyEvent",
@@ -276,6 +286,59 @@ pub fn pump_trade(body: &[u8]) -> Option<Trade> {
     })
 }
 
+/// pump `PostCompleteBuyEvent` (pump's 2026-10-08 redeploy; body after the discriminator, 224
+/// bytes: `user` @0, `mint` @32, `bonding_curve` @64, `quote_mint` @96, `timestamp` @128,
+/// `base_out` @136, `quote_in` @144, `fee_basis_points` @152, `fee` @160,
+/// `creator_fee_basis_points` @168, `creator_fee` @176, `buyback_fee` @184, the would-be pool's
+/// `pool_base_reserves_before` / `pool_quote_reserves_before` @192 / @200 and `*_after` @208 /
+/// @216). A buy past `rT` (the synthetic migration) completes the curve with its `TradeEvent`, then
+/// buys `base_out` from the pool `migrate_v2` will create, paying `quote_in` plus the curve's fees
+/// on it: a second pump trade row of the same instruction (`ev_seq` keeps the two apart), a buy of
+/// `base_out` for `quote_in + fee + creator_fee` lamports (the buyback is inside `fee`), its
+/// post-trade reserves the would-be pool's `*_after` pair. `None` unless the curve is SOL-quoted
+/// (`quote_mint` the zero key, as pump writes it for a SOL curve, or WSOL): synthetic
+/// completions happen on curves quoted in another token too (e.g. `E1bYRCNq…`, quoted in a pump
+/// coin), whose quote amounts are not lamports (M8-SEC-6, as [`pump_amm_trade`]).
+pub fn pump_post_complete_buy(body: &[u8]) -> Option<Trade> {
+    let mut r = Rd(body);
+    let user = r.key()?;
+    let mint = r.key()?;
+    let bonding_curve = r.key()?;
+    let quote_mint = r.key()?;
+    if quote_mint != Pubkey::default() && quote_mint != WSOL {
+        return None;
+    }
+    let _timestamp = r.i64()?;
+    let base_out = r.u64()?;
+    let quote_in = r.u64()?;
+    let _fee_bps = r.u64()?;
+    let fee = r.u64()?;
+    let _creator_fee_bps = r.u64()?;
+    let creator_fee = r.u64()?;
+    let _buyback_fee = r.u64()?;
+    let _pool_base_before = r.u64()?;
+    let _pool_quote_before = r.u64()?;
+    let pool_base_after = r.u64()?;
+    let pool_quote_after = r.u64()?;
+    Some(Trade {
+        venue: "pump_curve",
+        program: PUMP,
+        pool: bonding_curve,
+        mint: Some(mint),
+        side: Side::Buy,
+        token_amount: base_out,
+        sol_amount: quote_in.saturating_add(fee).saturating_add(creator_fee),
+        fee_lp: None,
+        fee_protocol: Some(fee),
+        fee_creator: Some(creator_fee),
+        fee_creator_lamports: Some(creator_fee),
+        creator: None,
+        user,
+        pool_token_reserve: Some(pool_base_after),
+        pool_sol_reserve: Some(pool_quote_after),
+    })
+}
+
 /// The `virtual_quote_reserves` of a pAMM `BuyEvent` / `SellEvent`, read from the fields after
 /// `coin_creator_fee` (pAMM IDL 2026-09): a `BuyEvent`'s `track_volume`, five u64 / i64 volume
 /// fields and `ix_name` (a Borsh string), then on both `cashback_fee_basis_points`, `cashback`,
@@ -399,6 +462,48 @@ pub fn pump_amm_trade(
         pool_token_reserve: tok_res,
         pool_sol_reserve: sol_res,
     })
+}
+
+/// PumpSwap `multi_hop_swap`'s discriminator (`sha256("global:multi_hop_swap")[..8]`, PumpSwap's
+/// 2026-10-08 redeploy).
+pub const PUMP_AMM_MULTI_HOP_SWAP: [u8; 8] = [0x2b, 0x64, 0x49, 0x13, 0xe9, 0xf6, 0x6f, 0x94];
+/// `multi_hop_swap`'s fixed accounts (user … `pump_event_authority`); the hop groups follow.
+pub const MULTI_HOP_FIXED_ACCOUNTS: usize = 16;
+/// Accounts per `multi_hop_swap` hop group: `[base_mint, quote_mint, pool (or curve), base vault,
+/// quote vault]` (pump-public-docs `MULTI_HOP_SWAP.md`).
+pub const MULTI_HOP_GROUP: usize = 5;
+
+/// The `pool` of a pAMM `BuyEvent` / `SellEvent` body (after the 14 u64 fields).
+pub fn pump_amm_event_pool(body: &[u8]) -> Option<Pubkey> {
+    let mut r = Rd(body);
+    r.take(14 * 8)?;
+    r.key()
+}
+
+/// `(base_mint, quote_mint)` of the pool a pAMM `BuyEvent` / `SellEvent` names, from the emitting
+/// instruction (`data`, `accounts`): a `multi_hop_swap` holds one group per hop after its 16 fixed
+/// accounts, and the event's pool is the group's third account — the mints are the group's first
+/// two (`(None, None)` when no group names the pool); a `buy` / `sell` / `buy_v2` / `sell_v2` has
+/// them at accounts 3 and 4. The caller falls back to `venue_pools` for a pool it cannot place.
+pub fn pump_amm_trade_mints(
+    data: &[u8],
+    accounts: &[Pubkey],
+    body: &[u8],
+) -> (Option<Pubkey>, Option<Pubkey>) {
+    if !data.starts_with(&PUMP_AMM_MULTI_HOP_SWAP) {
+        return (accounts.get(3).copied(), accounts.get(4).copied());
+    }
+    let Some(pool) = pump_amm_event_pool(body) else {
+        return (None, None);
+    };
+    accounts
+        .get(MULTI_HOP_FIXED_ACCOUNTS..)
+        .unwrap_or_default()
+        .as_chunks::<MULTI_HOP_GROUP>()
+        .0
+        .iter()
+        .find(|g| g[2] == pool)
+        .map_or((None, None), |g| (Some(g[0]), Some(g[1])))
 }
 
 /// The shares of a CPMM trade fee that leave the pricing reserves: `AmmConfig.protocol_fee_rate`
@@ -923,6 +1028,459 @@ mod tests {
         let ev = lifecycle(&PUMP_AMM, "SweepPoolFeeEvent", &b[..40]);
         assert_eq!((ev.pool, ev.mint), (None, None));
         assert!(ev.data.get("amount").is_none());
+    }
+
+    fn unhex(s: &str) -> Vec<u8> {
+        (0..s.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&s[i..i + 2], 16).expect("hex"))
+            .collect()
+    }
+
+    fn key(s: &str) -> Pubkey {
+        s.parse().expect("a base58 key")
+    }
+
+    /// A dumped pump ELF of `tests/fixtures/programs`.
+    fn elf(name: &str) -> Vec<u8> {
+        std::fs::read(format!(
+            "{}/../../tests/fixtures/programs/{name}.so",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .expect("a dumped ELF")
+    }
+
+    /// The discriminator as bytes, or split over an `lddw` (imm32 at +4 and +12).
+    fn emits(elf: &[u8], d: &[u8; 8]) -> bool {
+        elf.windows(8).any(|w| w == d)
+            || elf
+                .windows(16)
+                .any(|w| w[4..8] == d[..4] && w[12..16] == d[4..])
+    }
+
+    /// Mainnet transaction `2vVRr9eg…` (slot 456,311,576): a `buy_exact_quote_in_v3` that
+    /// completed 98u8RJ's curve by the synthetic migration. Its pump events, discriminator ‖
+    /// body, in emission order: `TradeEvent` (the curve part; `ix_name` "buy_exact_quote_in", the
+    /// zero `fee_recipient`, 117 bytes after `ix_name` up to `creator_fee_unclaimed`), then
+    /// `CompleteEvent`, then `PostCompleteBuyEvent` (the pool part).
+    const SYNTH_TRADE: &str = concat!(
+        "bddb7fd34ee661ee78e380968c2d567a4f249d6af042c1fd47eff2f8c76970980592f0a059faf59f21efcc49",
+        "0000000066918142c502000001bb7dbbb7571973ec7aa5a970693da98d5e264a865b9371564c1933f48e5b4c",
+        "e0bab4cd6a000000005684dac61a0000000098124c91fe000056d8b6ca130000000000000000000000000000",
+        "00000000000000000000000000000000000000000000000000000000005f000000000000009e7bb300000000",
+        "00bd65312ad6f576e789e7ea65ecc229335cc0458a1faee981cf69a0d422b0f7ee1e00000000000000c6ad38",
+        "0000000000000000000000000000000000000000000000000000000000000000000000000000120000006275",
+        "795f65786163745f71756f74655f696e00000000000000000000000000000000008813000000000000cfbd59",
+        "000000000000000000000000000000000000000000000000000000000000000000000000000000000021efcc",
+        "49000000005684dac61a00000056d8b6ca1300000000000000000000000000000000000000203db410000000",
+        "00",
+    );
+    const SYNTH_POST: &str = concat!(
+        "6fb06d8b316cd5fbbb7dbbb7571973ec7aa5a970693da98d5e264a865b9371564c1933f48e5b4ce078e38096",
+        "8c2d567a4f249d6af042c1fd47eff2f8c76970980592f0a059faf59f1a8b113188240c560a9f8f8eca444fdb",
+        "b9662a3053663c678662ad6b3446036900000000000000000000000000000000000000000000000000000000",
+        "00000000bab4cd6a0000000019287e98ac05000020fa809d000000005f000000000000009e0c7f0100000000",
+        "1e0000000000000083f67800000000004f86bf0000000000000801a92cbc000095f6d1c913000000e7df8210",
+        "80b60000b5f0526714000000",
+    );
+
+    /// T-INDEXER `post_complete_buy_event_row`: `2vVRr9eg…`'s `PostCompleteBuyEvent` is named on
+    /// pump only (its discriminator in the 2026-10-08 ELF, not the 2026-10-02 one) and becomes a
+    /// second pump trade row: a buy of `base_out` = 6,238,850,918,425 for `quote_in + fee +
+    /// creator_fee` = 2,642,475,552 + 25,103,518 + 7,927,427 lamports, on the curve's key, priced
+    /// on the would-be pool's reserves after the buy (200,661,149,081,575, 87,632,834,741) — the
+    /// pool `migrate_v2` then created; the curve part's `TradeEvent` row bought `rT` before it.
+    /// The same event with a non-SOL `quote_mint` gives no row.
+    #[test]
+    fn post_complete_buy_event_row() {
+        let d = anchor_event_discriminator("PostCompleteBuyEvent");
+        assert_eq!(d, [0x6f, 0xb0, 0x6d, 0x8b, 0x31, 0x6c, 0xd5, 0xfb]);
+        assert!(emits(&elf("pump_2026_10_08"), &d));
+        assert!(!emits(&elf("pump_2026_10"), &d));
+        let post = unhex(SYNTH_POST);
+        assert_eq!(venue_event_name(&PUMP, &post), Some("PostCompleteBuyEvent"));
+        assert_eq!(venue_event_name(&PUMP_AMM, &post), None);
+        assert_eq!(post.len(), 8 + 224);
+        let t = pump_post_complete_buy(&post[8..]).expect("a row");
+        let (mint, curve) = (
+            key("98u8RJzuhezFwkCFVdSe1bPoQ6e2DdRG79kQ19vkpump"),
+            key("2ncbKy3KtAhiG2gWR2y6Mu5AtujUJMM8VAtpnwQFWJnC"),
+        );
+        assert_eq!(
+            (t.venue, t.program, t.pool, t.mint, t.side),
+            ("pump_curve", PUMP, curve, Some(mint), Side::Buy)
+        );
+        assert_eq!(t.pool, bonding_curve_of(&mint));
+        assert_eq!(t.user, key("DctSSWvMLboJzaf96L9fKzFYrP1KgjY5CqYno4aQcTz7"));
+        assert_eq!(t.token_amount, 6_238_850_918_425);
+        assert_eq!(t.sol_amount, 2_642_475_552 + 25_103_518 + 7_927_427);
+        assert_eq!(
+            (
+                t.fee_lp,
+                t.fee_protocol,
+                t.fee_creator,
+                t.fee_creator_lamports
+            ),
+            (None, Some(25_103_518), Some(7_927_427), Some(7_927_427))
+        );
+        assert_eq!(
+            (t.pool_token_reserve, t.pool_sol_reserve),
+            (Some(200_661_149_081_575), Some(87_632_834_741))
+        );
+        assert_eq!(
+            t.price_wad(),
+            Some(u128::from(t.sol_amount) * WAD / 6_238_850_918_425)
+        );
+        assert!(
+            pump_post_complete_buy(&post[8..8 + 223]).is_none(),
+            "truncated"
+        );
+        // A SOL curve's event names the zero key as its `quote_mint` (@96). A curve quoted in
+        // another token completes the same way (`E1bYRCNq…`, quoted in the pump coin
+        // `W5vQGEpV…pump`), but its amounts are not lamports: no row (M8-SEC-6). WSOL is SOL.
+        assert_eq!(post[8 + 96..8 + 128], [0u8; 32]);
+        let quoted = |m: &Pubkey| {
+            let mut p = post.clone();
+            p[8 + 96..8 + 128].copy_from_slice(m.as_ref());
+            pump_post_complete_buy(&p[8..])
+        };
+        assert_eq!(
+            quoted(&key("W5vQGEpVR9wmWjWdKuEug1GmfwrUio44365KrDupump")),
+            None
+        );
+        assert_eq!(quoted(&WSOL), Some(t.clone()));
+        // The curve part, the same instruction's TradeEvent: `rT` = 3,046,247,600,486 tokens.
+        let trade = unhex(SYNTH_TRADE);
+        assert_eq!(venue_event_name(&PUMP, &trade), Some("TradeEvent"));
+        let c = pump_trade(&trade[8..]).expect("the curve part");
+        assert_eq!(
+            (c.pool, c.side, c.token_amount),
+            (curve, Side::Buy, 3_046_247_600_486)
+        );
+        assert_eq!(c.sol_amount, 1_238_167_329 + 11_762_590 + 3_714_502);
+    }
+
+    /// Mainnet transaction `2b9feozi…` (slot 456,312,196): a PumpSwap `multi_hop_swap` (data and
+    /// its 26 accounts: 16 fixed, then two hop groups — a pump-curve hop `[CKL7…, H6Jj…, curve
+    /// 5rw8…, …]` and a pool hop `[H6Jj…, PUMP pumpCmXq…, pool 8KPE…, …]`), the pool hop's
+    /// `SellEvent`, and the curve hop's pump `TradeEvent` (`ix_name` "multi_hop_swap").
+    const MULTI_HOP_DATA: &str = "2b644913e9f66f9415695644c62800000100000000000000";
+    const MULTI_HOP_ACCOUNTS: [&str; 26] = [
+        "3muYDxhtxKLvBvmwxo2DNVNsjG38LLWMmvhuewvyYPnK",
+        "FMWFYnZGCNRMaUa9A2Wod4578DLsHwYt2Jers97bhm19",
+        "5Mz744qqtHomwPraYiApeU4W8yUTVpjEETV1Lg7mDvMD",
+        "ADyA8hdefvWN2dbGGWFotbzWxrAvLW83WG6QCVXvJKqw",
+        "5PHirr8joyTMp9JMm6nW7hNDVyEYdkzDqazxPD7RaTjx",
+        "5vik3ikcH7cdgZpJK7CJNpfQ7vjGCRDZiPVdnwXySr6h",
+        "GXiV2QopYESCgVAVBQZkotmMTRNGCKQddfg8Uabz8L9c",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "11111111111111111111111111111111",
+        "GS4CU59F31iL7aR2Q8zVS8DRrcRnXX1yjQ66TqNVQnaR",
+        "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+        "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+        "4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf",
+        "8Wf5TiAheLUqBrKXeYg2JtAFFMWtKdG2BSFgqUcPVwTt",
+        "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1",
+        "CKL7wxBLZsBvH5PEvTkNPSUxX9NRfPv2qhhjW6SZpump",
+        "H6JjfjdR1X4ANrmMEVoXJ5LecWcVtETbY1ncYQn4pump",
+        "5rw8nszaTWWPjNbiRbm63UgrkUADpCq7Bjb3uPFTQguy",
+        "99WtMX9uSCnSVYx6Fdxo5egeg3YJbiA3cUfqqiN9hv2C",
+        "FhRTm9gEJftEXMMa6DW6uB4ZHXMmT8LBc5mHqbdh4NMM",
+        "H6JjfjdR1X4ANrmMEVoXJ5LecWcVtETbY1ncYQn4pump",
+        "pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn",
+        "8KPEBDrQrYgp7A6KE1VTPbc6LpqW3EAo6vNxcE5GTzYn",
+        "A5hPoqGB3h2fbuSst2ENqkhrgepkFAgTzL46Xo2zNdAf",
+        "FeG2m8fwYhNaQ3YzRzyncndFJevGmofqEdqe3DTVK6Wg",
+    ];
+    const MULTI_HOP_SELL: &str = concat!(
+        "3e2f370aa503dc2a42b5cd6a000000001bd5f51c9500000001000000000000000000000000000000925c11e8",
+        "02000000db739b945d67000092817912f7020000f37f8fab0400000000000000000000000000000000000000",
+        "05000000000000002108990000000000f37f8fab04000000d277f6aa040000006cb76538b20d94d4affdbfb0",
+        "8c91836abf8214f338c0aa64bc7f7ff1cdf4ac77293855b157a619774a0e2851f39f9708f358a41e4499c829",
+        "20320d2fc32359d4000000000000000000000000000000000000000000000000000000000000000040ceee97",
+        "0cd0fe2570a2cfd11c8944e1495eed1eafddb1131b9453b99c5ccaa800000000000000000000000000000000",
+        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "00000000a287a4321962feede3b599cf034da82ce463855169260b2d9a992b3d978bcafb0000000000000000",
+        "000000000000000000000000000000000000000000000000881300000000000010844c0000000000541dfb5c",
+        "4a00000000000000000000000123061d7ab873030000000000000000000000000000000000c6e7c7eb0d0000",
+        "00",
+    );
+    const MULTI_HOP_TRADE: &str = concat!(
+        "bddb7fd34ee661eea822a12aecd83b1d66ba38d7c144014861a5685a68604e81a8bebfac4a94db2f00000000",
+        "0000000015695644c628000000293855b157a619774a0e2851f39f9708f358a41e4499c82920320d2fc32359",
+        "d442b5cd6a000000000000000000000000c0a61206cea203000000000000000000c00e00ba3ca40200000000",
+        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "0090cfe4c0976e994deab13ac9ad0550141b5767fb2179bac36829d060e7bde4fa64000000000000008ae095",
+        "81010000000000000000000000000000000000000000000000000000000000000000000000000e0000006d75",
+        "6c74695f686f705f737761700000000000000000000000000000000000881300000000000000000000000000",
+        "0000000000ef16f2d9a04b264a137105a2e9135dabd6cd28874d94d7a9232d10fbd533995fa5b58b9e960000",
+        "006edc9cbcd70c000097f525e29700000064000000000000008ae095810100000062e6a5ea17000000",
+    );
+
+    /// T-INDEXER `multi_hop_swap_pool_hop_mints`: a pAMM event emitted by `multi_hop_swap` takes
+    /// its pool's mints from the hop group whose third account is the event's pool (`2b9feozi…`:
+    /// pool `8KPE…` → H6Jj… / PUMP), not from accounts 3 and 4 (there the `GlobalConfig` and
+    /// `FeeConfig`, which made every multi-hop pAMM event undecodable); that pool is not a SOL
+    /// pool, so it gives no trade row (M8-SEC-6), while the same hop paired with WSOL does. A
+    /// `buy_v2` / `sell_v2` keeps accounts 3 and 4; a pool no group names is left to `venue_pools`.
+    #[test]
+    fn multi_hop_swap_pool_hop_mints() {
+        let data = unhex(MULTI_HOP_DATA);
+        let mut accounts: Vec<Pubkey> = MULTI_HOP_ACCOUNTS.iter().map(|s| key(s)).collect();
+        let sell = unhex(MULTI_HOP_SELL);
+        assert_eq!(venue_event_name(&PUMP_AMM, &sell), Some("SellEvent"));
+        assert!(data.starts_with(&PUMP_AMM_MULTI_HOP_SWAP));
+        assert!(emits(&elf("pump_amm_2026_10_08"), &PUMP_AMM_MULTI_HOP_SWAP));
+        assert!(!emits(&elf("pump_amm_2026_10"), &PUMP_AMM_MULTI_HOP_SWAP));
+        let body = &sell[8..];
+        let pool = key("8KPEBDrQrYgp7A6KE1VTPbc6LpqW3EAo6vNxcE5GTzYn");
+        assert_eq!(pump_amm_event_pool(body), Some(pool));
+        let (h6, pump_mint) = (
+            key("H6JjfjdR1X4ANrmMEVoXJ5LecWcVtETbY1ncYQn4pump"),
+            key("pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn"),
+        );
+        assert_eq!(
+            pump_amm_trade_mints(&data, &accounts, body),
+            (Some(h6), Some(pump_mint))
+        );
+        assert_eq!(
+            (accounts[3], accounts[4]),
+            (
+                shortwin::constants::PUMP_AMM_GLOBAL_CONFIG,
+                shortwin::constants::PUMP_AMM_FEE_CONFIG
+            ),
+            "what the decoder read as the mints before"
+        );
+        assert!(pump_amm_trade(false, body, Some(h6), Some(pump_mint)).is_none());
+        // The same hop against WSOL: a sale of H6Jj… on the hop's pool.
+        accounts[16 + 5 + 1] = WSOL;
+        let (base, quote) = pump_amm_trade_mints(&data, &accounts, body);
+        let t = pump_amm_trade(false, body, base, quote).expect("a SOL pool");
+        assert_eq!((t.pool, t.mint, t.side), (pool, Some(h6), Side::Sell));
+        // A pool no hop group names; a single-pool instruction.
+        accounts[16 + 5 + 2] = Pubkey::new_unique();
+        assert_eq!(pump_amm_trade_mints(&data, &accounts, body), (None, None));
+        let mut buy_v2 = data.clone();
+        buy_v2[..8].copy_from_slice(&[0xb8, 0x17, 0xee, 0x61, 0x67, 0xc5, 0xd3, 0x3d]);
+        assert_eq!(
+            pump_amm_trade_mints(&buy_v2, &accounts, body),
+            (Some(accounts[3]), Some(accounts[4]))
+        );
+    }
+
+    /// `2b9feozi…`'s invocation tree as `getTransaction` returns it (slot 456,312,196): four
+    /// top-level instructions; in the third, an aggregator (`FLASHX8D…`) invokes PumpSwap's
+    /// `multi_hop_swap` as inner instruction 0 (height 2: the data and 26 accounts above), which
+    /// invokes pump's `multi_hop_curve_swap` (height 3; its `TradeEvent` self-CPI at height 4)
+    /// and emits its `SellEvent` by self-CPI at height 3, then a Whirlpool swap (height 2). The
+    /// program ids, heights and both event payloads are the transaction's; the token
+    /// transfers' and the other calls' data and accounts are left out (the decoder reads only
+    /// the venue events and their parent nodes). `hop` replaces the pool hop group (accounts
+    /// 21..26) before the transaction is built.
+    fn multi_hop_tx(hop: impl FnOnce(&mut [Pubkey])) -> crate::ingest::raw::RawTx {
+        use crate::ingest::raw::{Commitment, RawIx, RawTopIx, RawTx};
+        let (flash, whirlpool, token, token22, system) = (
+            key("FLASHX8DrLbgeR8FcfNV1F5krxYcYMUdBkrP1EPBtxB9"),
+            key("whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"),
+            key("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
+            key("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"),
+            key("11111111111111111111111111111111"),
+        );
+        let node = |program: Pubkey, h: u32, data: Vec<u8>, accounts: Vec<Pubkey>| RawIx {
+            program_id: program,
+            accounts,
+            data,
+            stack_height: h,
+        };
+        let bare = |program: Pubkey, h: u32| node(program, h, vec![], vec![]);
+        let event = |program: Pubkey, h: u32, hex: &str| {
+            let mut data = anchor_lang::event::EVENT_IX_TAG_LE.to_vec();
+            data.extend(unhex(hex));
+            node(program, h, data, vec![])
+        };
+        let mut accounts: Vec<Pubkey> = MULTI_HOP_ACCOUNTS.iter().map(|s| key(s)).collect();
+        hop(&mut accounts[MULTI_HOP_FIXED_ACCOUNTS + MULTI_HOP_GROUP..]);
+        let top = |ix: RawIx, inner: Vec<RawIx>| RawTopIx { ix, inner };
+        RawTx {
+            signature: solana_signature::Signature::from([9u8; 64]),
+            slot: 456_312_196,
+            tx_index: 0,
+            block_time: Some(1_791_866_178),
+            commitment: Commitment::Finalized,
+            fee_payer: key(MULTI_HOP_ACCOUNTS[0]),
+            fee: 5_000,
+            compute_units: Some(181_393),
+            err: None,
+            account_keys: vec![],
+            instructions: vec![
+                top(bare(flash, 1), vec![bare(system, 2), bare(token, 2)]),
+                top(bare(flash, 1), vec![]),
+                top(
+                    bare(flash, 1),
+                    vec![
+                        node(PUMP_AMM, 2, unhex(MULTI_HOP_DATA), accounts),
+                        node(
+                            PUMP,
+                            3,
+                            unhex("e19a7516d756f66715695644c62800000100000002"),
+                            vec![],
+                        ),
+                        bare(token22, 4),
+                        bare(token22, 4),
+                        event(PUMP, 4, MULTI_HOP_TRADE),
+                        bare(token22, 3),
+                        bare(token22, 3),
+                        event(PUMP_AMM, 3, MULTI_HOP_SELL),
+                        bare(whirlpool, 2),
+                        bare(token22, 3),
+                        bare(token, 3),
+                        bare(token, 2),
+                        bare(flash, 2),
+                        bare(system, 2),
+                    ],
+                ),
+                top(bare(system, 1), vec![]),
+            ],
+            logs: vec![],
+        }
+    }
+
+    /// T-INDEXER `multi_hop_swap_decodes_through_the_aggregator_tree`: `decode()` on
+    /// `2b9feozi…`'s tree ([`multi_hop_tx`]). The pool hop's `SellEvent` takes the data and
+    /// accounts of its parent node (the inner `multi_hop_swap`, not the aggregator's top-level
+    /// instruction): its pool `8KPE…` resolves to the hop's H6Jj… / PUMP mints, no SOL pool, so
+    /// no PumpSwap row, although `venue_pools` here knows `8KPE…` as an H6Jj… / WSOL pool (the hop
+    /// group wins over the fallback). With the hop paired with WSOL, the sale of H6Jj… on `8KPE…`.
+    /// With a pool no hop group names, the fallback to `venue_pools`: the same sale, and no row
+    /// when `venue_pools` does not know the pool either. The curve hop's pump `TradeEvent` (a
+    /// curve quoted in H6Jj…, not SOL) still gives a `pump_curve` row in every case: a v3
+    /// `TradeEvent` carries its `quote_mint` only after the variable-length shareholders vector,
+    /// and the SOL-only filter for it is the indexer phase's (open).
+    #[test]
+    fn multi_hop_swap_decodes_through_the_aggregator_tree() {
+        use crate::model::EvSource;
+        let ids = crate::ingest::ProgramIds::default();
+        let (pool, h6) = (
+            key("8KPEBDrQrYgp7A6KE1VTPbc6LpqW3EAo6vNxcE5GTzYn"),
+            key("H6JjfjdR1X4ANrmMEVoXJ5LecWcVtETbY1ncYQn4pump"),
+        );
+        let known = PoolCtx {
+            pools: HashMap::from([(
+                pool,
+                PoolInfo {
+                    mint: h6,
+                    market: None,
+                    sol_is_first: Some(false),
+                },
+            )]),
+            ..PoolCtx::default()
+        };
+        let decode = |t: &crate::ingest::raw::RawTx, pools: &PoolCtx| {
+            let d = super::super::decode(t, &ids, pools, &|_| None);
+            assert!(d.quarantine.is_empty(), "{:?}", d.quarantine);
+            let (amm, curve): (Vec<_>, Vec<_>) = d
+                .trades
+                .into_iter()
+                .partition(|r| r.trade.program == PUMP_AMM);
+            (amm, curve)
+        };
+        // The curve hop's row, the same in every case (the indexer phase's open filter).
+        let trade = unhex(MULTI_HOP_TRADE);
+        let curve_hop = pump_trade(&trade[8..]).expect("the curve hop");
+        let curve_row = |rows: &[super::super::TradeRow]| {
+            assert_eq!(rows.len(), 1, "{rows:?}");
+            let r = &rows[0];
+            assert_eq!(
+                (r.ix_index, r.ev_source, r.ev_seq, r.is_shortwin, r.market),
+                (2, EvSource::Cpi, 4, false, None)
+            );
+            assert_eq!(r.trade, curve_hop);
+            assert_eq!(
+                r.trade.mint,
+                Some(key("CKL7wxBLZsBvH5PEvTkNPSUxX9NRfPv2qhhjW6SZpump"))
+            );
+        };
+
+        // As on mainnet: no PumpSwap row, the fallback not taken.
+        let real = multi_hop_tx(|_| {});
+        for pools in [&known, &PoolCtx::default()] {
+            let (amm, curve) = decode(&real, pools);
+            assert!(amm.is_empty(), "{amm:?}");
+            curve_row(&curve);
+        }
+
+        // The hop paired with WSOL: the sale, from the hop group's mints.
+        let (amm, curve) = decode(&multi_hop_tx(|g| g[1] = WSOL), &PoolCtx::default());
+        curve_row(&curve);
+        assert_eq!(amm.len(), 1, "{amm:?}");
+        let sale = &amm[0];
+        assert_eq!(
+            (sale.ix_index, sale.ev_source, sale.ev_seq, sale.is_shortwin),
+            (2, EvSource::Cpi, 7, false)
+        );
+        assert_eq!(
+            (
+                sale.trade.venue,
+                sale.trade.pool,
+                sale.trade.mint,
+                sale.trade.side
+            ),
+            ("pump_swap", pool, Some(h6), Side::Sell)
+        );
+        let sell = unhex(MULTI_HOP_SELL);
+        assert_eq!(
+            Some(sale.trade.clone()),
+            pump_amm_trade(false, &sell[8..], Some(h6), Some(WSOL))
+        );
+
+        // A pool no hop group names: `venue_pools` places it, or no row.
+        let unnamed = multi_hop_tx(|g| g[2] = Pubkey::new_unique());
+        let (amm, curve) = decode(&unnamed, &known);
+        curve_row(&curve);
+        assert_eq!(amm.len(), 1, "{amm:?}");
+        assert_eq!(amm[0].trade, sale.trade, "the venue_pools fallback");
+        let (amm, curve) = decode(&unnamed, &PoolCtx::default());
+        curve_row(&curve);
+        assert!(amm.is_empty(), "{amm:?}");
+    }
+
+    /// T-INDEXER (trailing bytes, `ix_name`, `fee_recipient`): the v3 `TradeEvent`s decode on
+    /// their known prefix whatever their `ix_name` ("buy_exact_quote_in" of a v3 buy, not the
+    /// docs' `*_v3`; "multi_hop_swap" of a multi-hop hop; any other label), with the zero
+    /// `fee_recipient` v3 trades carry and the trailing fields up to `creator_fee_unclaimed`
+    /// ignored; a body cut inside the prefix does not decode.
+    #[test]
+    fn trade_events_decode_on_their_prefix_whatever_the_ix_name() {
+        // The prefix ends with creator_fee; ix_name follows 1 + 4 × 8 bytes later.
+        let prefix = 32 + 8 + 8 + 1 + 32 + 8 + 4 * 8 + 32 + 8 + 8 + 32 + 8 + 8;
+        let fee_recipient = 32 + 8 + 8 + 1 + 32 + 8 + 4 * 8;
+        let name_at = prefix + 1 + 4 * 8;
+        for (hex, name) in [
+            (SYNTH_TRADE, "buy_exact_quote_in"),
+            (MULTI_HOP_TRADE, "multi_hop_swap"),
+        ] {
+            let payload = unhex(hex);
+            let body = &payload[8..];
+            assert_eq!(body[fee_recipient..fee_recipient + 32], [0u8; 32], "{name}");
+            let n = u32::from_le_bytes(body[name_at..name_at + 4].try_into().unwrap()) as usize;
+            assert_eq!(&body[name_at + 4..name_at + 4 + n], name.as_bytes());
+            assert!(body.len() > name_at + 4 + n + 8, "{name}: trailing fields");
+            let t = pump_trade(body).expect("decodes");
+            assert_eq!(
+                pump_trade(&body[..prefix]),
+                Some(t.clone()),
+                "{name}: prefix only"
+            );
+            assert!(pump_trade(&body[..prefix - 1]).is_none());
+            for other in ["buy_v3", "sell_v3", "buy_exact_quote_in_v3", "buy", "x"] {
+                let mut b = body[..name_at].to_vec();
+                b.extend(u32::try_from(other.len()).unwrap().to_le_bytes());
+                b.extend(other.as_bytes());
+                b.extend(&body[name_at + 4 + n..]);
+                assert_eq!(pump_trade(&b), Some(t.clone()), "{name} as {other}");
+            }
+        }
     }
 
     #[test]

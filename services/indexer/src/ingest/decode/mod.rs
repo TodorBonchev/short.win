@@ -364,10 +364,26 @@ pub fn decode(
                     frame.and_then(|(n, d)| sw::account_of(&d.name, "mint", accounts_of(k, n)));
                 let venue_accounts = accounts_of(k, parent);
                 let trade = match (ix.program_id == venue::PUMP, name) {
+                    // `TradeEvent.ix_name` is a label only (v3 trades carry `buy` / `sell` /
+                    // `buy_exact_quote_in`, multi-hop ones `multi_hop_swap`): never dispatched on.
                     (true, "TradeEvent") => venue::pump_trade(body),
+                    (true, "PostCompleteBuyEvent") => venue::pump_post_complete_buy(body),
                     (false, "BuyEvent" | "SellEvent") => {
-                        let base = venue_accounts.get(3).copied();
-                        let quote = venue_accounts.get(4).copied();
+                        let data = node_ix(top, parent).map_or(&[][..], |p| p.data.as_slice());
+                        let (mut base, mut quote) =
+                            venue::pump_amm_trade_mints(data, venue_accounts, body);
+                        if base.is_none() && quote.is_none() {
+                            // A pool no hop group names: the known pool's mint against WSOL.
+                            let known =
+                                venue::pump_amm_event_pool(body).and_then(|p| pools.pools.get(&p));
+                            if let Some(info) = known {
+                                (base, quote) = if info.sol_is_first == Some(true) {
+                                    (Some(venue::WSOL), Some(info.mint))
+                                } else {
+                                    (Some(info.mint), Some(venue::WSOL))
+                                };
+                            }
+                        }
                         venue::pump_amm_trade(name == "BuyEvent", body, base, quote)
                     }
                     _ => {
