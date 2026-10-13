@@ -7,6 +7,7 @@ import { config } from './config/env.ts';
 import { createAppRouter } from './router.tsx';
 import { createAppClient } from './rpc/client.ts';
 import { AppClientProvider } from './rpc/context.tsx';
+import { registerMobileWalletAdapter } from './wallet/mobileWalletAdapter.ts';
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -14,6 +15,8 @@ const queryClient = new QueryClient({
     },
 });
 const client = createAppClient(config);
+// Android browsers only, lazily (FRONTEND §5.4 (6)); a framed page never imports this module.
+void registerMobileWalletAdapter(config, client);
 const router = createAppRouter(queryClient);
 
 export function App() {

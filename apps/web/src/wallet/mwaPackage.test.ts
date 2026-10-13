@@ -12,6 +12,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { MWA_SPINNER_ATTR_HASH, MWA_SPINNER_STYLE_HASH } from '../config/csp.ts';
 import { REPO } from '../test/repo.ts';
+import { MWA_WALLET_NAME } from './mwa.ts';
 
 const WEB = resolve(REPO, 'apps', 'web');
 const WSM = realpathSync(join(WEB, 'node_modules', '@solana-mobile', 'wallet-standard-mobile'));
@@ -163,9 +164,21 @@ describe('the Mobile Wallet Adapter package (drift test)', () => {
         expect(WSM_JS).toContain('onWalletNotFound = createDefaultWalletNotFoundHandler()');
     });
 
-    it('names its wallet "Mobile Wallet Adapter"', () => {
-        expect(/const SolanaMobileWalletAdapterWalletName = "([^"]+)";/.exec(WSM_JS)?.[1]).toBe(
-            'Mobile Wallet Adapter',
+    it('names its wallet MWA_WALLET_NAME ("Mobile Wallet Adapter")', () => {
+        expect(MWA_WALLET_NAME).toBe('Mobile Wallet Adapter');
+        expect(/const SolanaMobileWalletAdapterWalletName = "([^"]+)";/.exec(WSM_JS)?.[1]).toBe(MWA_WALLET_NAME);
+    });
+
+    it('uses the WebView test platform.ts copies (mwaEligible)', () => {
+        const lib = /function isWebView\(userAgentString\) \{\s*return (\/.*\/i)\.test\(userAgentString\);/.exec(
+            WSM_JS,
+        );
+        expect(lib?.[1]).toBe(
+            '/(WebView|Version\\/.+(Chrome)\\/(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)|; wv\\).+(Chrome)\\/(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+))/i',
+        );
+        expect(readFileSync(join(WEB, 'src', 'wallet', 'platform.ts'), 'utf8')).toContain(lib?.[1] ?? '∅');
+        expect(WSM_JS).toContain(
+            'return typeof window !== "undefined" && window.isSecureContext && typeof document !== "undefined" && /android/i.test(navigator.userAgent);',
         );
     });
 
