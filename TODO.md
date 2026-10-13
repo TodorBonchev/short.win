@@ -4,9 +4,9 @@ The AI-review fixes (AIR-01 … AIR-24) are merged. Details, commits and tests f
 [`docs/audit/ai-review/README.md`](docs/audit/ai-review/README.md); design-doc wording is in
 [`docs/audit/ai-review/DOC-FOLLOWUPS.md`](docs/audit/ai-review/DOC-FOLLOWUPS.md).
 
-The follow-ups are done on the branch `air-followups` (2026-10-12/13; pushed with `[skip ci]` at
-the owner's request, so not through CI). Each ticked item names its commits; what is still open
-is under [What remains](#what-remains).
+The follow-ups are done on the branch `air-followups` (2026-10-12/13; the owner asked for it to
+be pushed with `[skip ci]`, so it has not been through CI). Each ticked item names its commits;
+what is still open is under [What remains](#what-remains).
 
 ## Decisions (owner)
 
@@ -91,8 +91,8 @@ the register's rows in `18b65e2`).
         CI only) ran CI's web job, the facade's tests and its smoke test (their commit messages).
   - [x] The build's hashes in AUDIT.md §0, marked as not verified (local `anchor build`; no
         verifiable build, no CI). `11d359b`
-  - [ ] CI on GitHub: the branch is pushed with `[skip ci]` at the owner's request (2026-10-13),
-        so CI has not run.
+  - [ ] CI on GitHub: the owner asked for the branch to be pushed with `[skip ci]`
+        (2026-10-13), so CI has not run.
   - [x] A ≥ 24 h fuzz run: **waived** for the AI-review batch, not deferred (approved by the
         owner 2026-10-13; the owner did not ask for one on 2026-10-12). No such run was made.
         `255ce60`
@@ -110,7 +110,8 @@ Gathered from the follow-up tracks' reports and the integrated gate of 2026-10-1
       which O18 accepted on the `9aade3e` figures (a held drain now forces 181 levels instead of
       69; known-issues KI-23, KI-52; AUDIT.md §7). **Approved by the owner 2026-10-13:** AIR-21
       and AIR-09 confirmed, AIR-14's widening accepted; SPEC §14, known-issues, AUDIT.md §6/§7,
-      the review's README (decision 9), ECON and ARCH say so. `255ce60`
+      the review's README (decision 9), ECON and ARCH say so. `255ce60`; the changelog rows
+      (ECON #118, ARCH 79) `4b4041d`
 - [x] FE-31: approve the `lender.residuals` copy (≈ 3.34 SOL fresh, ≈ 4.54 SOL aged, from 2.06 /
       8.02); then `apps/web/src/config/disclosures.ts`, `ux.test.tsx` and FRONTEND.md change
       together. **Approved by the owner 2026-10-13;** the three changed together, the figures
@@ -130,7 +131,7 @@ Gathered from the follow-up tracks' reports and the integrated gate of 2026-10-1
       `255ce60`
 
 **Release evidence (needs CI or tools not on the local machine)**
-- [ ] CI on GitHub: the branch is pushed with `[skip ci]` at the owner's request (2026-10-13),
+- [ ] CI on GitHub: the owner asked for the branch to be pushed with `[skip ci]` (2026-10-13),
       so CI has not run. The jobs not run locally: `deny` (`cargo deny`, `cargo audit`;
       no lockfile changed since v1.0.0), `verifiable-build` (Docker), `web-e2e` (Playwright on a
       validator), `indexer`'s PostgreSQL and validator tests.
