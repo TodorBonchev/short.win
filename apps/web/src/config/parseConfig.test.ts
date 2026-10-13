@@ -9,6 +9,7 @@ describe('parseConfig', () => {
         expect(c.rpcUrl).toBe('http://127.0.0.1:8899');
         expect(c.indexerWsUrl).toBe('ws://127.0.0.1:8080/v1/ws');
         expect(c.enableTestVenue).toBe(false);
+        expect(c.enableMobileWalletAdapter).toBe(true);
         expect(c.protocolAlt).toBeNull();
     });
 
@@ -46,6 +47,43 @@ describe('parseConfig', () => {
             expect(p).toContain('VITE_PROTOCOL_ALT is not a base58 address');
             expect(p).toContain('VITE_ENABLE_TEST_VENUE is TEST-ONLY and requires VITE_CLUSTER=localnet');
         }
+    });
+
+    it('turns the Mobile Wallet Adapter on by default and refuses anything but true or false', () => {
+        expect(parseConfig({}).enableMobileWalletAdapter).toBe(true);
+        for (const v of ['true', ' true ', '', true] as const) {
+            expect(parseConfig({ VITE_ENABLE_MOBILE_WALLET_ADAPTER: v }).enableMobileWalletAdapter, String(v)).toBe(
+                true,
+            );
+        }
+        for (const v of ['false', ' false', false] as const) {
+            expect(parseConfig({ VITE_ENABLE_MOBILE_WALLET_ADAPTER: v }).enableMobileWalletAdapter, String(v)).toBe(
+                false,
+            );
+        }
+        for (const v of ['off', '0', 'yes', 'TRUE']) {
+            try {
+                parseConfig({ VITE_ENABLE_MOBILE_WALLET_ADAPTER: v });
+                expect.unreachable(v);
+            } catch (e) {
+                expect(e, v).toBeInstanceOf(ConfigError);
+                expect((e as ConfigError).problems).toEqual([
+                    'VITE_ENABLE_MOBILE_WALLET_ADAPTER must be true or false',
+                ]);
+            }
+        }
+        // Every cluster accepts both values, mainnet included.
+        const mainnet = {
+            VITE_CLUSTER: 'mainnet',
+            VITE_RPC_URL: 'https://rpc.example',
+            VITE_RPC_WS_URL: 'wss://rpc.example',
+            VITE_INDEXER_URL: 'https://api.short.win',
+            VITE_INDEXER_WS_URL: 'wss://api.short.win/v1/ws',
+        };
+        expect(parseConfig(mainnet).enableMobileWalletAdapter).toBe(true);
+        expect(parseConfig({ ...mainnet, VITE_ENABLE_MOBILE_WALLET_ADAPTER: 'false' }).enableMobileWalletAdapter).toBe(
+            false,
+        );
     });
 
     it('parses the priority-fee ceiling and the test venue on localnet', () => {

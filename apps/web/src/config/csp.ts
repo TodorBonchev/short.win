@@ -8,23 +8,55 @@
 import type { AppConfig } from './parseConfig.ts';
 import { SECURITY_TXT_CONTENT_TYPE, SECURITY_TXT_PATH } from './securityTxt.ts';
 
-type CspSources = Pick<AppConfig, 'rpcUrl' | 'rpcWsUrl' | 'indexerUrl' | 'indexerWsUrl' | 'cluster'>;
+type CspSources = Pick<
+    AppConfig,
+    'rpcUrl' | 'rpcWsUrl' | 'indexerUrl' | 'indexerWsUrl' | 'cluster' | 'enableMobileWalletAdapter'
+>;
+
+/**
+ * wallet-standard-mobile 0.7.0's loading spinner (EmbeddedLoadingSpinner): its <style> text and its one
+ * style attribute. The app removes the spinner's host as it is inserted (`removeLibraryUi`); the
+ * hashes only keep that insertion free of CSP violations. `mwaPackage.test.ts` recomputes both from
+ * the installed package.
+ */
+export const MWA_SPINNER_STYLE_HASH = "'sha256-9y+0omBcAXmVSpYuadfUp/k8GxCIDiw2wrEyqM1cQnc='";
+export const MWA_SPINNER_ATTR_HASH = "'sha256-fpg83YZxyBh7zNCICwdKi5D7eUkxQ9wk3mpUiNPhP3g='";
+/**
+ * The association socket (`ws://localhost:<random 49152–65535>/solana-wallet`) and the request that
+ * raises Chrome's local-network ("Apps on device") prompt (`requestLocalNetwork`).
+ */
+export const MWA_CONNECT_SOURCES = ['ws://localhost:*', 'http://localhost'] as const;
 
 function origin(u: string): string {
     const x = new URL(u);
     return `${x.protocol}//${x.host}`;
 }
 
-/** The policy's directives, in order. `header` adds the header-only directives. */
+/**
+ * The policy's directives, in order. `header` adds the header-only directives. With the Mobile
+ * Wallet Adapter off the policy is exactly the one before it existed; on, `connect-src` adds
+ * {@link MWA_CONNECT_SOURCES} and `style-src-elem` / `style-src-attr` one hash each (§9.3).
+ */
 export function cspDirectives(c: CspSources, header: boolean): [string, string[]][] {
+    const mwa = c.enableMobileWalletAdapter;
     const connect = Array.from(
-        new Set(["'self'", ...[c.rpcUrl, c.rpcWsUrl, c.indexerUrl, c.indexerWsUrl].map(origin)]),
+        new Set([
+            "'self'",
+            ...[c.rpcUrl, c.rpcWsUrl, c.indexerUrl, c.indexerWsUrl].map(origin),
+            ...(mwa ? MWA_CONNECT_SOURCES : []),
+        ]),
     );
     const d: [string, string[]][] = [
         ['default-src', ["'none'"]],
         // 'wasm-unsafe-eval' compiles @shortwin/math-wasm; nothing else is evaluated.
         ['script-src', ["'self'", "'wasm-unsafe-eval'"]],
         ['style-src', ["'self'"]],
+        ...(mwa
+            ? ([
+                  ['style-src-elem', ["'self'", MWA_SPINNER_STYLE_HASH]],
+                  ['style-src-attr', ["'unsafe-hashes'", MWA_SPINNER_ATTR_HASH]],
+              ] as [string, string[]][])
+            : []),
         ['img-src', ["'self'", 'data:']],
         ['font-src', ["'self'"]],
         ['connect-src', connect],

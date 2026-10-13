@@ -18,6 +18,11 @@ export interface AppConfig {
     readonly protocolAlt: Address | null;
     readonly priorityFeeMaxMicroLamports: bigint;
     readonly enableTestVenue: boolean;
+    /**
+     * The Mobile Wallet Adapter on Android browsers and its CSP sources (FRONTEND.md §5.4 (6), §9.3):
+     * on unless `VITE_ENABLE_MOBILE_WALLET_ADAPTER=false`.
+     */
+    readonly enableMobileWalletAdapter: boolean;
     readonly explorerTxUrl: string;
 }
 
@@ -91,6 +96,14 @@ export function parseConfig(env: Readonly<Record<string, string | boolean | unde
     if (enableTestVenue && cluster !== 'localnet') {
         problems.push('VITE_ENABLE_TEST_VENUE is TEST-ONLY and requires VITE_CLUSTER=localnet');
     }
+    // Default on, parsed strictly: a typo must fail the build, never read as "on" by accident.
+    const mwaRaw = env.VITE_ENABLE_MOBILE_WALLET_ADAPTER;
+    const mwaText = typeof mwaRaw === 'string' ? mwaRaw.trim() : mwaRaw;
+    let enableMobileWalletAdapter = true;
+    if (mwaText === false || mwaText === 'false') enableMobileWalletAdapter = false;
+    else if (!(mwaText === undefined || mwaText === '' || mwaText === true || mwaText === 'true')) {
+        problems.push('VITE_ENABLE_MOBILE_WALLET_ADAPTER must be true or false');
+    }
     const explorerTxUrl = s('VITE_EXPLORER_TX_URL') ?? 'https://explorer.solana.com/tx/{sig}';
     if (!explorerTxUrl.includes('{sig}')) problems.push('VITE_EXPLORER_TX_URL must contain {sig}');
     if (problems.length > 0 || !cluster) throw new ConfigError(problems);
@@ -104,6 +117,7 @@ export function parseConfig(env: Readonly<Record<string, string | boolean | unde
         protocolAlt,
         priorityFeeMaxMicroLamports,
         enableTestVenue,
+        enableMobileWalletAdapter,
         explorerTxUrl,
     };
 }

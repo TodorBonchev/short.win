@@ -4,3 +4,44 @@ packages:
   - "packages/*"
   - "apps/*"
   - "clients/*"
+
+# pnpm 12 reads overrides only here (it no longer reads package.json's "pnpm" field). The Mobile
+# Wallet Adapter's protocol is pinned exactly, and its own `@solana/kit: ^8.3.0` is held at the
+# app's Kit 8.3.0 (without it pnpm would add Kit 8.4.x for the protocol) (FRONTEND.md §9.6).
+overrides:
+  "@solana-mobile/mobile-wallet-adapter-protocol": "3.0.0"
+  "@solana-mobile/mobile-wallet-adapter-protocol>@solana/kit": "8.3.0"
+
+# Supply chain: nothing published less than 14 days ago is resolved, repo-wide. pnpm 12 also
+# checks every entry already in the lockfile, a --frozen-lockfile install included: CI fetches
+# every entry's metadata and fails on any locked version under 14 days old. The exclusions are
+# exact versions:
+# - the two packages the owner chose to install now (published 2026-10-07): remove after
+#   2026-10-21;
+# - the 21 versions locked before this gate existed (published 2026-09-29/30): not the owner's
+#   exclusions, needed only until they are 14 days old; remove from 2026-10-15, before the release.
+minimumReleaseAge: 20160
+minimumReleaseAgeExclude:
+  - "@solana-mobile/wallet-standard-mobile@0.7.0"
+  - "@solana-mobile/mobile-wallet-adapter-protocol@3.0.0"
+  - "@rolldown/binding-android-arm-eabi@1.2.12"
+  - "@rolldown/binding-android-arm64@1.2.12"
+  - "@rolldown/binding-darwin-arm64@1.2.12"
+  - "@rolldown/binding-darwin-x64@1.2.12"
+  - "@rolldown/binding-freebsd-x64@1.2.12"
+  - "@rolldown/binding-linux-arm-gnueabihf@1.2.12"
+  - "@rolldown/binding-linux-arm64-gnu@1.2.12"
+  - "@rolldown/binding-linux-arm64-musl@1.2.12"
+  - "@rolldown/binding-linux-ppc64-gnu@1.2.12"
+  - "@rolldown/binding-linux-s390x-gnu@1.2.12"
+  - "@rolldown/binding-linux-x64-gnu@1.2.12"
+  - "@rolldown/binding-linux-x64-musl@1.2.12"
+  - "@rolldown/binding-openharmony-arm64@1.2.12"
+  - "@rolldown/binding-win32-arm64-msvc@1.2.12"
+  - "@rolldown/binding-win32-x64-msvc@1.2.12"
+  - "rolldown@1.2.12"
+  - "@tanstack/react-router@1.170.41"
+  - "@tanstack/router-core@1.171.34"
+  - "chai@6.3.0"
+  - "source-map-js@1.2.2"
+  - "std-env@4.3.0"

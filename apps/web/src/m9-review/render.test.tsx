@@ -214,8 +214,12 @@ describe('M9-SEC-6: the app never runs framed; hosts must send the anti-framing 
             rpcWsUrl: 'wss://rpc.example',
             indexerUrl: 'https://api.example',
             indexerWsUrl: 'wss://api.example/v1/ws',
+            enableMobileWalletAdapter: true,
         };
         expect(missingSecurityHeaders(new Headers(securityHeaders(cfg)))).toEqual([]);
+        expect(
+            missingSecurityHeaders(new Headers(securityHeaders({ ...cfg, enableMobileWalletAdapter: false }))),
+        ).toEqual([]);
         expect(missingSecurityHeaders(new Headers({}))).toHaveLength(4);
         expect(ANTI_FRAMING_HEADERS['X-Frame-Options']).toBe('DENY');
         expect(ANTI_FRAMING_HEADERS['Content-Security-Policy']).toBe("frame-ancestors 'none'");
