@@ -1124,7 +1124,7 @@ takes a query permit. Unknown routes are rate-limited.
 
 | Session | From | Covers |
 |---|---|---|
-| `mock_lifecycle` (committed, thinned to its first and last checkpoints) | a scripted `Env` scenario on the mock venue, 836 transactions, 62 checkpoints (*AIR-07, `590e724`:* recorded at test time 966 transactions and 74 checkpoints; the committed copy is the older recording, migrated to `SolSettle.vest_flushed`, not re-recorded) | S1, S2, S3, CR liquidation, expiry, a wipe with a donation and a trader sweep, a flushing rebase whose pre-funded record's donation vests anew (M5), a vest flush without an epoch roll (M6), the last shares leaving a running vest (M7), every lender instruction, the Emergency's powers, the latch, the unsafe-mint flag |
+| `mock_lifecycle` (committed, thinned to its first and last checkpoints) | a scripted `Env` scenario on the mock venue, 966 transactions, 74 checkpoints (*AIR-07:* 836 and 62 before M5–M7, `590e724`; the committed copy re-recorded on the AI review's build in `5c4488f`, with `mock_admin`) | S1, S2, S3, CR liquidation, expiry, a wipe with a donation and a trader sweep, a flushing rebase whose pre-funded record's donation vests anew (M5), a vest flush without an epoch roll (M6), the last shares leaving a running vest (M7), every lender instruction, the Emergency's powers, the latch, the unsafe-mint flag |
 | `mock_admin` (committed, thinned) | `Env` on the mock | every `ConfigChange` kind through the timelock, a cancel, locked terms across a `Params` change, the coverage pause and the Emergency's clear, extras, an arm then a disarm |
 | `keeper_liquidation`, `keeper_coverage_pause` | `services/keeper-litesvm` (`Harness`) | the keeper's v1 / v0 batches; the O17 drill with the coverage key installed through the real timelock |
 | `raydium_lifecycle`, `pool_switch` | the Raydium fork | AMM v4 and CPMM, a close, keeper liquidations on both, S3 on an admin-halted pool; `PoolProposed`, `PoolSwitchCancelled`, `PoolSwitched` |
@@ -1135,7 +1135,11 @@ takes a query permit. Unknown routes are rate-limited.
   never emits. Regenerate REPLAY's with `SHORTWIN_RECORD_SESSIONS=<dir> cargo test -p
   shortwin-indexer-litesvm`, then copy `<dir>/committed/*.jsonl` (not byte-reproducible: random
   keypairs). Two of INGEST's fixtures hold a resent duplicate transaction (a test artifact; ingested
-  once, idempotently).
+  once, idempotently). INGEST's fourteen fixtures have no recording procedure; a layout change
+  migrates them in place: `SolSettle.vest_flushed` (`cb756ca`), and AIR-01's `revalidate_venue`
+  `expected_elf_hash` (`caa5852`: an all-zero hash, the old exact-slot check, appended to the one
+  call in `raydium_fast_path_venue_review.jsonl`, whose recorded signature therefore no longer
+  signs its message; nothing verifies it).
 
 Surfpool sessions (a `recorder = "surfpool"` header, transactions fetched by signature from the local
 validator) are optional and use the same format.

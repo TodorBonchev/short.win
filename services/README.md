@@ -265,21 +265,40 @@ What it does, per tick (one every `--tick-ms`, 400 ms by default, about a slot;
     the latch, before the tick's markets. Without a recorded fingerprint (pump, PumpSwap, and
     every venue before its hashed revalidation) the slot decides: bit clear and slot ≠
     `guard_slot` → flag; bit set and slot ≠ `flagged_slot` → a second upgrade during review,
-    refresh. With one (AIR-01, KI-69; `d2bb168`), a moved slot with the bit clear is judged by
-    `flag_venue_upgraded`'s own simulation, the program's rule on the whole account:
-    - An upgrade passes. It is paged and flagged in the slot it is seen, before any exit or crank.
-    - The loader's `ExtendProgram` answers `VenueNotUpgraded`. It is neither flagged nor paged,
-      only logged and counted (`TickReport::extended`, `shortwin_keeper_venue_extensions_total`),
-      and that deploy slot is not simulated again.
-    - If the simulation fails for another reason, the keeper reads the account whole after its
-      exits and cranks and applies the same rule: an upgrade is paged with `VenueFlagFailed` and
-      flagged the next second, an extension is counted, and if that read fails too, the slot is
-      paged (fail-safe).
+    refresh. With one (AIR-01, KI-69; `d2bb168`, `a1edf78`, `bf037ef`), a moved slot with the
+    bit clear is judged by `flag_venue_upgraded`'s own simulation, the program's rule on the
+    whole account, before the tick's markets. All such venues of a tick are simulated together:
+    one priority-fee read (`getRecentPrioritizationFees`) and one blockhash, read at the same
+    time, then the simulations in parallel, so two round trips in a row before the exits for
+    any number of moved venues. Each simulation also hashes the venue's trimmed ELF on the RPC
+    node (the latch instruction after an extension: pump-fees 438,358 CU, CPMM 369,393, AMM v4
+    210,386; Jupiter not measured).
+    - An upgrade passes. It is paged and flagged (simulated again, then sent) in the slot it is
+      seen, before any exit or crank.
+    - `VenueNotUpgraded` from a simulation whose context slot is at or past the header's deploy
+      slot is the loader's `ExtendProgram`. It is neither flagged nor paged, only logged and
+      counted (`TickReport::extended`, `shortwin_keeper_venue_extensions_total`), and that
+      deploy slot is not simulated again.
+    - `VenueNotUpgraded` from an earlier context slot comes from an RPC node behind the header
+      read: it still holds the previous deploy, where the program gives the same answer for an
+      upgrade. The keeper does not take it as an extension. It reads the account whole after its
+      exits and cranks and applies the program's rule: an upgrade is paged with
+      `VenueFlagFailed` ("simulated on slot …, before deploy slot …"), an extension is counted,
+      and the flag is simulated again the next tick.
+    - If the simulation fails for another reason, the same whole read decides: an upgrade is
+      paged with `VenueFlagFailed` and flagged again the next second, an extension is counted,
+      and if that read fails too, the slot is paged (fail-safe).
+    - If short.win itself refuses the simulation as not deployed in that slot (AIR-18), the same
+      whole read decides: an upgrade is paged in that slot, without `VenueFlagFailed`, and
+      flagged in the first slot where short.win runs again; an extension is counted. A stranger
+      who extends short.win in every slot delays the flag, not the page; opens ordered before
+      each extension in its slot still run.
 
-    During a review, a move past the deploy the keeper recorded is read whole after the exits:
-    an extension of the recorded deploy is neither refreshed nor paged, another upgrade is. The
-    deploy the keeper flags, or finds under review after a restart, is read whole once after the
-    exits and recorded. The keeper sends `flag_venue_upgraded(venue)` at the exit priority
+    The keeper reads a deploy slot's whole account once. During a review, a move past the
+    deploy the keeper recorded is read whole after the exits: an extension of the recorded
+    deploy is neither refreshed nor paged, another upgrade is. The deploy the keeper flags, or
+    finds under review after a restart, is read whole once after the exits and recorded. The
+    keeper sends `flag_venue_upgraded(venue)` at the exit priority
     ceiling (simulated first; a latch someone else already set is not repeated; an unflagged
     upgrade is retried every second) and raises `Alert::VenueUpgraded` once per upgrade and
     `Alert::VenueUpgradeFlagged` when its flag lands — page the Emergency multisig to run the
@@ -735,9 +754,10 @@ What the keeper does (AIR-18, `8945087`):
 - The header is read as of that slot (`minContextSlot`), so a node of an RPC pool still behind
   refuses the read instead of answering stale. The read is tried twice, at most once per
   program and refused slot in a tick.
-- A refused crank batch defers the rest of the queue to the next tick. A flag refused so leaves
-  an AIR-01 slot unjudged until the next slot. The straddle's pre-flight is judged the same way;
-  a bundle the block engine drops is not, because it returns no outcome.
+- A refused crank batch defers the rest of the queue to the next tick. A flag refused this way
+  is sent again the next tick; for an AIR-01 slot the account is read whole after the exits, so
+  an upgrade is paged at once, without `VenueFlagFailed` (`a1edf78`). The straddle's pre-flight
+  is judged the same way; a bundle the block engine drops is not, because it returns no outcome.
 
 The upgrade step stays: **extend ProgramData before staging an upgrade to a larger ELF.**
 `stage-upgrade` refuses an ELF that does not fit and names the `solana program extend <program>
@@ -880,8 +900,12 @@ Raydium scenarios (`raydium*.rs`, the dumped AMM v4 and CPMM programs and pools)
   transaction, before its crank, and the whole read comes after both; a keeper restarted during
   a review records the deploy under review and pages no extension of it, only a second upgrade;
   a slot the flag's simulation cannot judge is judged on the account read whole (an extension
-  counted; a failed read paged as an upgrade, fail-safe); Token-2022 is paged for an upgrade,
-  not for an extension.
+  counted; a failed read paged as an upgrade, fail-safe); an upgrade whose flag a node behind
+  the header read simulates (`VenueNotUpgraded` on an earlier context slot) is not booked as an
+  extension but paged once, with the flag's failure, after the exits and flagged the next slot;
+  AMM v4 and CPMM extended in one slot are simulated together (one priority-fee read, one
+  blockhash read, two simulations); Token-2022 is paged for an upgrade, not for an extension.
+  Seven scenarios.
 - `raydium_alt`: the protocol ALT created, extended with the recipients (from the committed
   mainnet dumps), frozen, through the keeper's own chain backend and `alt` module; it holds every
   address the program tests' T-SIZE table assumes; the keeper's v0 crank batch and a liquidation
@@ -964,21 +988,26 @@ Raydium scenarios (`raydium*.rs`, the dumped AMM v4 and CPMM programs and pools)
   without positions, and no per-slot burst, while the price-wrapped control still starts bursts
   (`m4g2_*`).
 
-Redeploy scenarios (`redeploy.rs`, AIR-18, 9 scenarios; LiteSVM reloads a program at once after
+Redeploy scenarios (`redeploy.rs`, AIR-18, 10 scenarios; LiteSVM reloads a program at once after
 an extension, so each installs the refusal the cluster gives for the rest of that slot and lifts
 it at the next): short.win, then the mock venue, not deployed in the second a liquidation first
 becomes possible — refused, nothing alerted, the liquidation lands in the next slot of the same
 second; the same judged through an RPC pool whose header reads lag behind short.win's last
 deploy (`lag_headers_of`), still transient because the keeper reads as of the refused slot; a
 Raydium flag, an S3 probe and a sweep refused while short.win is not deployed, each sent again
-the next slot; an upgrade of a fingerprinted venue seen while short.win is not deployed, left
-unjudged and flagged and paged once the next slot; a venue deployed in every slot for 30 s, its
+the next slot; an upgrade of a fingerprinted venue seen while short.win is not deployed for four
+slots, judged on the account read whole and paged in the first of them, once, and flagged when
+short.win runs again; an extension of a fingerprinted venue seen while short.win is not
+deployed, booked at once; a venue deployed in every slot for 30 s, its
 liquidation sent again every second and `ProgramNotDeployed` paged once; a venue that stays
 undeployable, refused and alerted (`ExitRefused`) every tick, never counted as transient.
 
 The in-process chain's failure knobs (`LiteSvmChain::fail_simulations`, `fail_reads_of`,
-`lag_headers_of`) serve the AIR-01 and AIR-18 scenarios. The scenario binary holds 139
-scenarios; two, the release measurements of `cascade` and `m7_cost`, are ignored by default.
+`lag_headers_of`, and `lag_simulations`: simulations answered from an earlier copy of the VM,
+with that copy's slot as their context slot) and its call counter (`other_calls`: blockhash,
+priority-fee and simulation calls) serve the AIR-01 and AIR-18 scenarios. The scenario binary
+holds 142 scenarios; two, the release measurements of `cascade` and `m7_cost`, are ignored by
+default.
 
 The JSON-RPC backend has its own check against a live local cluster (`common/tests/rpc_local.rs`,
 ignored by default): clock, accounts, program accounts, recent fees, and a transfer simulated and

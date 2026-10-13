@@ -2898,7 +2898,11 @@ The web side of the AI review's fixes (`docs/audit/ai-review/`; `3f224c2` … `a
   `pump_uva` is set (§3.6).
 - AIR-09 (`abce2b1`): the WASM `previewSettlement` prices the tokens at 0 on a venue that cannot
   execute (its new `executable` argument has no caller yet); AIR-21's S1 vest was already in it.
-- Open: the generated client (`clients/js`) is not regenerated; FE-31.
+- The generated client (`clients/js`) is regenerated from this branch's build (`caa5852`:
+  `PoolDrained` 6108, `SolSettle.vestFlushed`, `revalidate_venue`'s `expectedElfHash`, the new
+  `VenueGuard` and `Market` fields), and `errors.test.ts` again requires one table row per
+  client constant (`2fea2c5`).
+- Open: FE-31.
 
 ### Thirteenth round (v1.4 → v1.5)
 
