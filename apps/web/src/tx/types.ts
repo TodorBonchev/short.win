@@ -123,6 +123,18 @@ export type TxErrorKind =
     | 'unknown-outcome'
     /** The plan could not be rebuilt from the chain as it is now (the inputs no longer fit). */
     | 'plan'
+    /**
+     * The Mobile Wallet Adapter could not launch the wallet app at Sign (the review stays open
+     * with a retry notice; never a `failed` state).
+     */
+    | 'wallet-launch'
+    /** Chrome's local-network permission is missing for the Mobile Wallet Adapter (a notice, as above). */
+    | 'local-network'
+    /**
+     * The connected Mobile Wallet Adapter account changed or disconnected while it signed (R-S2):
+     * "Connect a wallet that can sign.", retried by closing the review.
+     */
+    | 'wallet-changed'
     | 'unknown';
 
 export interface TxError {

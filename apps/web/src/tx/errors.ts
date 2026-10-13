@@ -4,8 +4,10 @@
  * and the transaction-level variants), the program logs (which program failed), Kit's
  * `SolanaError`s, and Wallet Standard rejections.
  */
+import { walletCopy } from '../config/copyWallet.ts';
 import { programError } from '../config/errors.ts';
 import { SHORTWIN_PROGRAM, TOKEN_2022_PROGRAM, TOKEN_PROGRAM } from '../config/programs.ts';
+import { localNetwork } from '../wallet/localNetwork.ts';
 import { TOKEN_ERROR_CPI_GUARD_TRANSFER_BLOCKED, TOKEN_ERROR_NO_MEMO } from './tokenAccount.ts';
 import type { TxError } from './types.ts';
 
@@ -202,6 +204,86 @@ function isRejection(e: unknown): boolean {
     return /reject|denied|declined|cancel/i.test(String(err.message ?? ''));
 }
 
+/** An error of the Mobile Wallet Adapter's protocol (`@solana-mobile/mobile-wallet-adapter-protocol`). */
+interface MwaError {
+    readonly name: 'SolanaMobileWalletAdapterError' | 'SolanaMobileWalletAdapterProtocolError';
+    readonly code: unknown;
+    readonly data?: unknown;
+    readonly message?: string;
+}
+
+/**
+ * The first Mobile Wallet Adapter error on a cause chain (at most 6 levels). The library wraps its
+ * errors as `new Error(message, { cause })` and `send.ts` wraps that again; the package is lazy, so
+ * the match is on `name` and `code`, never `instanceof`.
+ */
+function mwaCause(e: unknown): MwaError | null {
+    let x: unknown = e;
+    for (let depth = 0; depth < 6 && x && typeof x === 'object'; depth++) {
+        const name = (x as { name?: unknown }).name;
+        if (name === 'SolanaMobileWalletAdapterError' || name === 'SolanaMobileWalletAdapterProtocolError') {
+            return x as MwaError;
+        }
+        x = (x as { cause?: unknown }).cause;
+    }
+    return null;
+}
+
+/** The transport failed: the session closed, timed out, or broke (the wallet may have acted). */
+const MWA_TRANSPORT = new Set(['ERROR_SESSION_CLOSED', 'ERROR_SESSION_TIMEOUT', 'ERROR_ILLEGAL_TRANSPORT_STATE']);
+
+/**
+ * The Mobile Wallet Adapter's errors at Sign (FRONTEND.md §5.9; mobile.md §1.8), found on the
+ * wallet call's cause chain. `null` when none is there (other wallets map as before).
+ */
+function mapMwa(wallet: { readonly cause?: unknown; readonly sending?: boolean }): TxError | null {
+    const m = mwaCause(wallet.cause);
+    if (!m) return null;
+    const generic = (): TxError => {
+        const inner = String((wallet.cause as { message?: string } | null)?.message ?? m.message ?? m.code);
+        return { kind: 'wallet', action: 'retry', message: `Your wallet could not sign: ${inner.slice(0, 240)}` };
+    };
+    if (m.name === 'SolanaMobileWalletAdapterProtocolError') {
+        // −3 (ERROR_NOT_SIGNED): declined in the wallet. −1 at Sign comes only from the
+        // reauthorization, which never reaches here (the library hangs; R-S2 ends the sign), and the
+        // others (−2, −4, −5, −100) are the wallet's own failures.
+        return m.code === -3
+            ? { kind: 'wallet-rejected', action: 'retry', message: 'You rejected the request in your wallet.' }
+            : generic();
+    }
+    const code = String(m.code);
+    // The sending path (unused for MWA by the signer policy): the wallet may already have sent it.
+    if (wallet.sending && MWA_TRANSPORT.has(code)) {
+        return {
+            kind: 'unknown-outcome',
+            action: 'report',
+            message:
+                'Your wallet sent this transaction itself and it has not been seen on chain. It may still land. Check the explorer before trying again: a new attempt would be a second transaction.',
+        };
+    }
+    switch (code) {
+        case 'ERROR_WALLET_NOT_FOUND':
+            // The launch did not leave the page: no wallet app, or Android blocked it. Nothing reached
+            // the wallet (no socket exists yet); the review stays with the retry notice.
+            return { kind: 'wallet-launch', action: 'retry', message: walletCopy('wallet.mwa.retry') };
+        case 'ERROR_LOOPBACK_ACCESS_BLOCKED':
+            return { kind: 'local-network', action: 'retry', message: walletCopy('wallet.mwa.localNetwork') };
+        case 'ERROR_SESSION_TIMEOUT':
+            // No socket within 30 s: Chrome's permission may have blocked it.
+            return localNetwork.get() !== 'ready'
+                ? { kind: 'local-network', action: 'retry', message: walletCopy('wallet.mwa.localNetwork') }
+                : generic();
+        case 'ERROR_ASSOCIATION_CANCELLED':
+            // With an event: the user closed one of the library's modals (Escape in the LNA race).
+            // Without: the library's association timer, which is not a safe launch retry.
+            return (m.data as { event?: unknown } | undefined)?.event
+                ? { kind: 'wallet-rejected', action: 'retry', message: 'You rejected the request in your wallet.' }
+                : generic();
+        default:
+            return generic();
+    }
+}
+
 /** Kit's RPC transport error (`SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR`) carries the HTTP status. */
 function httpStatus(e: unknown): number | null {
     const ctx = (e as { context?: Record<string, unknown> } | null)?.context;
@@ -237,6 +319,10 @@ export function mapThrown(e: unknown): TxError {
         return { kind: 'plan', action: 'adjust', message: msg };
     }
     if (err?.name === 'WalletCallError') {
+        // The Mobile Wallet Adapter first: its messages ("…permission denied", "…cancelled by user")
+        // must not read as a rejection by the generic test below.
+        const mwa = mapMwa(err as { cause?: unknown; sending?: boolean });
+        if (mwa) return mwa;
         const cause = err.cause;
         if (isRejection(cause)) {
             return { kind: 'wallet-rejected', action: 'retry', message: 'You rejected the request in your wallet.' };

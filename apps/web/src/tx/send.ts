@@ -1,6 +1,8 @@
 /**
  * Sign, send, confirm (FRONTEND.md §5.4–§5.5). The message is rebuilt with the measured compute
- * limit and a fresh blockhash and signed through Wallet Standard:
+ * limit and the review's blockhash (fetched with the simulation, refreshed while the review waits;
+ * `lifetime`) — nothing awaits the network between the Sign tap and the wallet — and signed through
+ * Wallet Standard:
  *
  * - **A signing wallet** (`solana:signTransaction`, Kit's `TransactionModifyingSigner`): the signed
  *   bytes are checked by `assertSameIntent` before anything is sent. A wallet may change the
@@ -46,14 +48,24 @@ export const CONFIRM_TIMEOUT_MS = 120_000;
 /** How long the landed transaction of a sending-only wallet is polled for (post hoc check). */
 const LANDED_READ_TRIES = 10;
 const POLL_MS = 1_000;
+/** A sending-only wallet's transaction whose landing the app has not seen. */
+const SENT_BY_WALLET_UNSEEN =
+    'Your wallet sent this transaction itself and it has not been seen on chain. It may still land.';
 
 /** Something the wallet threw (rejection, a wallet bug, its own RPC): never an RPC error of the app. */
 export class WalletCallError extends Error {
     override readonly cause: unknown;
-    constructor(cause: unknown) {
+    /**
+     * The call was the sending path (`solana:signAndSendTransaction`): the wallet may already have
+     * sent the transaction when it failed (`errors.ts` maps a Mobile Wallet Adapter transport error
+     * there to "outcome unknown").
+     */
+    readonly sending: boolean;
+    constructor(cause: unknown, opts: { readonly sending?: boolean } = {}) {
         super((cause as { message?: string } | null)?.message ?? String(cause));
         this.name = 'WalletCallError';
         this.cause = cause;
+        this.sending = opts.sending ?? false;
     }
 }
 
@@ -99,8 +111,22 @@ export interface SendArgs {
     readonly priorityFeeMicroLamports: bigint;
     /** The highest compute-unit price a wallet may set when it edits the fee (FE-2). */
     readonly maxComputeUnitPrice: bigint;
-    /** Called once the signature is known, before confirmation. */
+    /**
+     * The blockhash to build with: the review's, fetched with the simulation and refreshed while it
+     * waits (`useTxFlow`), so nothing awaits the network between the Sign tap and the wallet (an
+     * Android wallet app opens only within the tap's user activation). Without it one is fetched.
+     */
+    readonly lifetime?: Lifetime;
+    /**
+     * Called once the signature is known, before confirmation. A signing wallet's: never after an
+     * abort. A sending wallet's: always once it answered (it has sent the transaction).
+     */
     readonly onSigned?: (info: SignedInfo) => void;
+    /**
+     * A signing wallet: aborting before `onSigned` drops the transaction, nothing is sent. A sending
+     * wallet: an abort before its call sends nothing; its call is not aborted (it sends itself), and
+     * an abort meanwhile ends in `OutcomeUnknownError` with the signature, never a drop.
+     */
     readonly abortSignal?: AbortSignal;
     /** Overrides `CONFIRM_TIMEOUT_MS` (tests). */
     readonly confirmTimeoutMs?: number;
@@ -118,11 +144,11 @@ export function sendsItself(signer: TransactionSigner | null | undefined): boole
     );
 }
 
-async function walletCall<T>(f: () => Promise<T>): Promise<T> {
+async function walletCall<T>(f: () => Promise<T>, opts: { readonly sending?: boolean } = {}): Promise<T> {
     try {
         return await f();
     } catch (e) {
-        throw new WalletCallError(e);
+        throw new WalletCallError(e, opts);
     }
 }
 
@@ -166,11 +192,12 @@ export async function confirmationLifetime(
 }
 
 export async function signSendConfirm(a: SendArgs): Promise<Signature> {
-    const { value: lifetime } = await a.client.rpc.getLatestBlockhash({ commitment: 'confirmed' }).send();
+    const lifetime: Lifetime =
+        a.lifetime ?? ((await a.client.rpc.getLatestBlockhash({ commitment: 'confirmed' }).send()).value as Lifetime);
     const message = buildMessage({
         instructions: a.plan.instructions,
         feePayer: a.feePayer,
-        lifetime: lifetime as Lifetime,
+        lifetime,
         computeUnitLimit: a.computeUnitLimit,
         computeUnitPrice: a.priorityFeeMicroLamports,
         lookupTables: a.lookupTables,
@@ -187,11 +214,14 @@ export async function signSendConfirm(a: SendArgs): Promise<Signature> {
             maxComputeUnitPrice: a.maxComputeUnitPrice,
             allowLifetimeChange: true,
         });
-        const confirmLifetime = await confirmationLifetime(a.client.rpc, check, lifetime as Lifetime);
+        const confirmLifetime = await confirmationLifetime(a.client.rpc, check, lifetime);
         const feeChanged =
             check.modified &&
             (check.computeUnitPrice !== a.priorityFeeMicroLamports || check.computeUnitLimit !== a.computeUnitLimit);
         const signature = getSignatureFromTransaction(signed);
+        // A Cancel that landed after the wallet answered (the review's way out of an MWA call that
+        // never settles): the signed transaction is dropped, nothing is sent.
+        a.abortSignal?.throwIfAborted();
         a.onSigned?.({
             signature,
             finalFeeLamports: feeChanged ? signedFee(check, a.plan.instructions.length) : null,
@@ -232,9 +262,19 @@ export async function signSendConfirm(a: SendArgs): Promise<Signature> {
     }
 
     if (isTransactionSendingSigner(signer)) {
-        const bytes = await walletCall(() => signAndSendTransactionMessageWithSigners(message, opts));
+        // An abort before the call sends nothing. The call itself gets no abort signal: a sending
+        // wallet cannot be stopped once asked, and Kit checks the signal again after the wallet
+        // answered and would then throw its signature away.
+        a.abortSignal?.throwIfAborted();
+        const bytes = await walletCall(() => signAndSendTransactionMessageWithSigners(message), {
+            sending: true,
+        });
         const signature = getBase58Decoder().decode(bytes) as Signature;
+        // The wallet has sent it: an abort that landed meanwhile cannot unsend it, so the signature
+        // is reported and the outcome is unknown (R6: never dropped silently, never a blind
+        // retry). Only the signing branch drops a transaction after an abort.
         a.onSigned?.({ signature, finalFeeLamports: null, sentByWallet: true });
+        if (a.abortSignal?.aborted) throw new OutcomeUnknownError(signature, SENT_BY_WALLET_UNSEEN);
         // The wallet chose the blockhash it sent with; ours bounds it only loosely (it fetched its own
         // no earlier than we did, but possibly later), so running out of time is "unknown", not "expired".
         await waitForSignature(a.client, signature, {
@@ -272,10 +312,7 @@ export async function waitForSignature(
         if (s && (s.confirmationStatus === 'confirmed' || s.confirmationStatus === 'finalized')) return;
         const height = await client.rpc.getBlockHeight({ commitment: 'confirmed' }).send();
         if (height > opts.giveUpAfterHeight || Date.now() > until) {
-            throw new OutcomeUnknownError(
-                signature,
-                'Your wallet sent this transaction itself and it has not been seen on chain. It may still land.',
-            );
+            throw new OutcomeUnknownError(signature, SENT_BY_WALLET_UNSEEN);
         }
         await sleep(opts.pollMs ?? POLL_MS, opts.abortSignal);
     }

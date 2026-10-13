@@ -41,6 +41,7 @@ import { buildMessage } from '../tx/message.ts';
 import {
     confirmationLifetime,
     MAX_BLOCKHASH_AGE,
+    OutcomeUnknownError,
     type SignedInfo,
     signSendConfirm,
     WalletCallError,
@@ -286,6 +287,207 @@ describe('M9-SEC-4: a wallet-changed blockhash is validated and bounded; a raise
         expect(mapThrown(e).kind).toBe('unknown-outcome');
         // FE-2: the fee as the wallet signed it is reported (5,000 + ⌈200,000 · 5,000 / 10⁶⌉).
         expect((info as SignedInfo | null)?.finalFeeLamports).toBe(6_000n);
+    });
+});
+
+describe('O-6: the review’s blockhash at Sign, and no send after an abort (FRONTEND §5.4 step 2)', () => {
+    /** A modifying wallet that echoes the transaction signed, and an RPC that counts what it is asked. */
+    function signing(onWallet?: () => void) {
+        const calls: string[] = [];
+        const signer = {
+            address: WALLET,
+            async modifyAndSignTransactions(txs: readonly Transaction[]) {
+                calls.push('wallet');
+                onWallet?.();
+                return txs.map((tx) => ({
+                    ...tx,
+                    signatures: { ...tx.signatures, [WALLET]: new Uint8Array(64).fill(3) },
+                }));
+            },
+        };
+        const rpc = {
+            getLatestBlockhash: () => ({
+                send: async () => {
+                    calls.push('getLatestBlockhash');
+                    return { value: { blockhash: BH_A, lastValidBlockHeight: 100n } };
+                },
+            }),
+            sendTransaction: () => ({
+                send: async () => {
+                    calls.push('sendTransaction');
+                    return 'sig';
+                },
+            }),
+        };
+        return { signer, calls, client: { rpc, rpcSubscriptions: {} } as never };
+    }
+
+    it('with the review’s lifetime nothing is fetched before the wallet; without it, as before', async () => {
+        const ctl = new AbortController();
+        const withLifetime = signing(() => ctl.abort());
+        await signSendConfirm({
+            ...args(withLifetime.client, withLifetime.signer),
+            lifetime: { blockhash: BH_B, lastValidBlockHeight: 90n },
+            abortSignal: ctl.signal,
+        }).catch(() => {});
+        expect(withLifetime.calls[0]).toBe('wallet');
+        expect(withLifetime.calls).not.toContain('getLatestBlockhash');
+        const ctl2 = new AbortController();
+        const without = signing(() => ctl2.abort());
+        await signSendConfirm({ ...args(without.client, without.signer), abortSignal: ctl2.signal }).catch(() => {});
+        expect(without.calls.slice(0, 2)).toEqual(['getLatestBlockhash', 'wallet']);
+    });
+
+    it('signs the message with the given blockhash', async () => {
+        const ctl = new AbortController();
+        let seen: Uint8Array | null = null;
+        const s = signing(() => ctl.abort());
+        const inner = s.signer.modifyAndSignTransactions.bind(s.signer);
+        s.signer.modifyAndSignTransactions = async (txs: readonly Transaction[]) => {
+            seen = Uint8Array.from(txs[0]?.messageBytes ?? []);
+            return inner(txs);
+        };
+        await signSendConfirm({
+            ...args(s.client, s.signer),
+            lifetime: { blockhash: BH_B, lastValidBlockHeight: 90n },
+            abortSignal: ctl.signal,
+        }).catch(() => {});
+        expect(seen).toEqual(Uint8Array.from(messageBytes(BH_B)));
+    });
+
+    it('a signing wallet: an abort that lands after the wallet answered drops the transaction', async () => {
+        // The wallet answered with its own blockhash, so the app checks it (isBlockhashValid) before
+        // onSigned; the review's Cancel lands meanwhile.
+        const ctl = new AbortController();
+        const calls: string[] = [];
+        const signer = {
+            address: WALLET,
+            async modifyAndSignTransactions(txs: readonly Transaction[]) {
+                calls.push('wallet');
+                return txs.map(() => ({
+                    messageBytes: messageBytes(BH_B),
+                    signatures: { [WALLET]: new Uint8Array(64).fill(3) },
+                    lifetimeConstraint: { blockhash: BH_B, lastValidBlockHeight: 100n },
+                }));
+            },
+        };
+        const rpc = {
+            isBlockhashValid: () => ({
+                send: async () => {
+                    calls.push('isBlockhashValid');
+                    ctl.abort(new DOMException('Cancelled at the review', 'AbortError'));
+                    return { value: true };
+                },
+            }),
+            getBlockHeight: () => ({ send: async () => 50n }),
+            sendTransaction: () => ({
+                send: async () => {
+                    calls.push('sendTransaction');
+                    return 'sig';
+                },
+            }),
+        };
+        let signed: SignedInfo | null = null;
+        const e = await signSendConfirm({
+            ...args({ rpc, rpcSubscriptions: {} } as never, signer, (i) => {
+                signed = i;
+            }),
+            lifetime: { blockhash: BH_A, lastValidBlockHeight: 100n },
+            abortSignal: ctl.signal,
+        }).catch((x: unknown) => x);
+        // send.ts's own check (after confirmationLifetime), not the wallet call's.
+        expect((e as Error).name).toBe('AbortError');
+        expect((e as Error).message).toBe('Cancelled at the review');
+        expect(signed).toBeNull();
+        expect(calls).toEqual(['wallet', 'isBlockhashValid']);
+    });
+
+    it('an abort while the wallet is asked: nothing is signed for the app, nothing sent', async () => {
+        const ctl = new AbortController();
+        const s = signing(() => ctl.abort(new DOMException('Cancelled at the review', 'AbortError')));
+        let signed: SignedInfo | null = null;
+        const e = await signSendConfirm({
+            ...args(s.client, s.signer, (i) => {
+                signed = i;
+            }),
+            lifetime: { blockhash: BH_A, lastValidBlockHeight: 100n },
+            abortSignal: ctl.signal,
+        }).catch((x: unknown) => x);
+        expect(e).toBeInstanceOf(Error);
+        expect(signed).toBeNull();
+        expect(s.calls).toEqual(['wallet']);
+    });
+
+    it('a sending-only wallet: an abort after it sent is "outcome unknown" with the signature, never a drop', async () => {
+        // The wallet sends itself, so the abort cannot unsend anything: the app reports the
+        // signature and never offers a retry (R6), instead of dropping a transaction that may land.
+        const ctl = new AbortController();
+        const sent: Transaction[] = [];
+        const wallet = sendingOnly(sent);
+        const sendAndAbort = {
+            address: WALLET,
+            async signAndSendTransactions(txs: readonly Transaction[]) {
+                const out = await wallet.signAndSendTransactions(txs);
+                ctl.abort(new DOMException('Cancelled at the review', 'AbortError'));
+                return out;
+            },
+        };
+        const { client, calls } = fakeClient({ landed: 'ok', height: 1n, transaction: wire(messageBytes(BH_A)) });
+        let signed: SignedInfo | null = null;
+        const e = await signSendConfirm({
+            ...args(client, sendAndAbort, (i) => {
+                signed = i;
+            }),
+            abortSignal: ctl.signal,
+        }).catch((x: unknown) => x);
+        expect(e).toBeInstanceOf(OutcomeUnknownError);
+        expect(sent).toHaveLength(1);
+        expect(signed).toMatchObject({ sentByWallet: true, finalFeeLamports: null });
+        expect((e as OutcomeUnknownError).signature).toBe((signed as SignedInfo | null)?.signature);
+        expect(mapThrown(e)).toMatchObject({ kind: 'unknown-outcome', action: 'report' });
+        expect(mapThrown(e).message).toMatch(/^Your wallet sent this transaction itself .* It may still land\./);
+        expect(calls).toEqual([]); // no status polling, no read-back
+    });
+
+    it('a sending-only wallet: an abort before the call asks nothing, sends nothing', async () => {
+        const ctl = new AbortController();
+        ctl.abort(new DOMException('Cancelled at the review', 'AbortError'));
+        const sent: Transaction[] = [];
+        const { client, calls } = fakeClient({ landed: 'ok', height: 1n });
+        let signed: SignedInfo | null = null;
+        const e = await signSendConfirm({
+            ...args(client, sendingOnly(sent), (i) => {
+                signed = i;
+            }),
+            lifetime: { blockhash: BH_A, lastValidBlockHeight: 100n },
+            abortSignal: ctl.signal,
+        }).catch((x: unknown) => x);
+        expect((e as Error).name).toBe('AbortError');
+        expect(e).not.toBeInstanceOf(WalletCallError);
+        expect(sent).toHaveLength(0);
+        expect(signed).toBeNull();
+        expect(calls).toEqual([]);
+    });
+
+    it('a sending-only wallet’s failure is marked as the sending branch', async () => {
+        const failing = {
+            address: WALLET,
+            async signAndSendTransactions(): Promise<Uint8Array[]> {
+                throw new Error('session closed');
+            },
+        };
+        const { client } = fakeClient({ landed: 'ok', height: 1n });
+        const e = await signSendConfirm(args(client, failing)).catch((x: unknown) => x);
+        expect(e).toBeInstanceOf(WalletCallError);
+        expect((e as WalletCallError).sending).toBe(true);
+        const rejecting = {
+            address: WALLET,
+            async modifyAndSignTransactions(): Promise<Transaction[]> {
+                throw new Error('session closed');
+            },
+        };
+        const e2 = await signSendConfirm(args(client, rejecting)).catch((x: unknown) => x);
+        expect((e2 as WalletCallError).sending).toBe(false);
     });
 });
 

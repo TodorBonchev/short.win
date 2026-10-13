@@ -11,6 +11,10 @@
  * beside the disabled Sign; once confirmed, the flow's next step (or the explorer). On a phone the dialog fills
  * the screen and Sign — last in the DOM — has the full-width bottom row; in a narrow dialog each
  * delta is two lines.
+ *
+ * The Mobile Wallet Adapter (O-6, §5.4 (6)): its notices beside an enabled Sign (`tx-sign-notice`:
+ * the local-network permission, or a launch to retry), and its way out of a call that never
+ * settles: Cancel, ✕ and Escape work while signing once `signCancellable` (R-S1).
  */
 /* biome-ignore-all lint/a11y/noRedundantRoles: CSS display change (narrow dialog); roles restore semantics */
 import { useRouter } from '@tanstack/react-router';
@@ -20,6 +24,7 @@ import { Disclosure } from '../components/Disclosure.tsx';
 import { Select } from '../components/Field.tsx';
 import { Modal } from '../components/Modal.tsx';
 import { Reveal } from '../components/Reveal.tsx';
+import { walletCopy } from '../config/copyWallet.ts';
 import { explorerAddress, explorerTx } from '../config/env.ts';
 import { T } from '../config/testids.ts';
 import { formatFixed, MINUS, shortAddress } from '../lib/format.ts';
@@ -180,6 +185,9 @@ export function TxReviewModal({ flow }: { flow: TxFlow }) {
     const ackBlocks =
         hold === null && stage === 'review' && !!report?.ok && requiredAcks(plan).some((id) => !state.acks.has(id));
     const open = stage !== 'idle';
+    // Never closable while confirming, nor while the wallet is asked to sign — except the Mobile
+    // Wallet Adapter's way out of a call that never settles (R-S1: Cancel, ✕, Escape after 5 s).
+    const locked = stage === 'confirming' || (stage === 'signing' && !state.signCancellable);
     // Every way out of a confirmed review ends in the same place (Done, ✕, Escape).
     const close =
         stage === 'confirmed'
@@ -215,7 +223,7 @@ export function TxReviewModal({ flow }: { flow: TxFlow }) {
         <Modal
             open={open}
             onClose={close}
-            dismissible={!(stage === 'signing' || stage === 'confirming')}
+            dismissible={!locked}
             testId={T.txModal}
             title={keepIds(plan?.title ?? 'Transaction')}
             footer={
@@ -240,11 +248,26 @@ export function TxReviewModal({ flow }: { flow: TxFlow }) {
                                 Tick the acknowledgement above to sign
                             </button>
                         )}
+                        {state.signNotice && (
+                            <p
+                                className="form-reason tx-sign-hint"
+                                role="status"
+                                data-testid={T.txSignNotice}
+                                data-reason={state.signNotice}
+                            >
+                                {walletCopy(
+                                    state.signNotice === 'local-network'
+                                        ? 'wallet.mwa.localNetwork'
+                                        : 'wallet.mwa.retry',
+                                )}
+                            </p>
+                        )}
                         <Button
                             variant="ghost"
                             onClick={flow.close}
-                            disabled={stage === 'signing' || stage === 'confirming'}
+                            disabled={locked}
                             data-testid={T.txCancel}
+                            data-cancellable={String(!locked)}
                         >
                             {stage === 'failed' && retry === 'none' ? 'Close' : 'Cancel'}
                         </Button>

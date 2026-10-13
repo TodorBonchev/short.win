@@ -2606,7 +2606,7 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `tx-cu` | `T.txCu` | `data-value` = compute-unit limit |
 | `tx-fee` | `T.txFee` | `data-value` = fee lamports |
 | `tx-sign` | `T.txSign` | enabled only after a successful simulation and every required acknowledgement |
-| `tx-cancel` | `T.txCancel` | disabled while signing / confirming |
+| `tx-cancel` | `T.txCancel` | disabled while signing / confirming; *O-6 (2026-10-13):* enabled 5 s after a Mobile Wallet Adapter wallet call starts, closing the review (nothing is sent); `data-cancellable` ∈ true, false |
 | `tx-retry` | `T.txRetry` | Refresh (review) / Retry (failed); *v1.2:* `data-mode` ∈ resimulate, rebuild ("Retry with a new quote"), close ("Close and review again") — `retryMode`, §5.3; absent when the outcome is unknown or the transaction landed |
 | `tx-error` | `T.txError` | `data-kind` (TxErrorKind), `data-code` (custom error code) |
 | `tx-signature` | `T.txSignature` | `data-value` = signature |

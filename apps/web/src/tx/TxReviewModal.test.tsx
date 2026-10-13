@@ -232,6 +232,71 @@ describe('TxReviewModal (M10-RESP)', () => {
         expect(done).not.toHaveBeenCalled();
     });
 
+    it('O-6: the Mobile Wallet Adapter’s notices sit beside an enabled Sign, word for word', () => {
+        const acked = { acks: new Set(['lender.solRepayment'] as const) };
+        const { rerender } = render(<TxReviewModal flow={flowFor({ ...acked, signNotice: 'local-network' })} />);
+        const notice = screen.getByTestId(T.txSignNotice);
+        expect(notice.dataset.reason).toBe('local-network');
+        expect(notice.textContent).toBe("Allow 'Apps on device' so this page can reach your wallet app");
+        expect(notice.getAttribute('role')).toBe('status');
+        expect((screen.getByTestId(T.txSign) as HTMLButtonElement).disabled).toBe(false);
+        // Beside Sign, in the footer, before Cancel.
+        const cancel = screen.getByTestId(T.txCancel);
+        expect(notice.compareDocumentPosition(cancel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        rerender(<TxReviewModal flow={flowFor({ ...acked, signNotice: 'launch' })} />);
+        expect(screen.getByTestId(T.txSignNotice).dataset.reason).toBe('launch');
+        expect(screen.getByTestId(T.txSignNotice).textContent).toBe("Couldn't open your wallet app. Tap Sign again");
+        expect((screen.getByTestId(T.txSign) as HTMLButtonElement).disabled).toBe(false);
+        rerender(<TxReviewModal flow={flowFor(acked)} />);
+        expect(screen.queryByTestId(T.txSignNotice)).toBeNull();
+    });
+
+    it('O-6 (R-S1): while signing, Cancel and ✕ appear only once the way out is open', () => {
+        const close = vi.fn();
+        const { rerender } = render(<TxReviewModal flow={{ ...flowFor({ stage: 'signing' }), close }} />);
+        const cancel = screen.getByTestId(T.txCancel) as HTMLButtonElement;
+        expect(cancel.disabled).toBe(true);
+        expect(cancel.dataset.cancellable).toBe('false');
+        expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
+        fireEvent(screen.getByTestId(T.txModal), new Event('cancel', { cancelable: true }));
+        expect(close).not.toHaveBeenCalled();
+        rerender(<TxReviewModal flow={{ ...flowFor({ stage: 'signing', signCancellable: true }), close }} />);
+        const open = screen.getByTestId(T.txCancel) as HTMLButtonElement;
+        expect(open.disabled).toBe(false);
+        expect(open.dataset.cancellable).toBe('true');
+        expect(open.textContent).toBe('Cancel');
+        fireEvent.click(open);
+        expect(close).toHaveBeenCalledOnce();
+        fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+        fireEvent(screen.getByTestId(T.txModal), new Event('cancel', { cancelable: true }));
+        expect(close).toHaveBeenCalledTimes(3);
+        // Confirming stays locked whatever the flag says.
+        rerender(<TxReviewModal flow={{ ...flowFor({ stage: 'confirming', signCancellable: true }), close }} />);
+        expect((screen.getByTestId(T.txCancel) as HTMLButtonElement).disabled).toBe(true);
+        expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
+        // A review in its normal state: cancellable.
+        rerender(<TxReviewModal flow={{ ...flowFor(), close }} />);
+        expect(screen.getByTestId(T.txCancel).dataset.cancellable).toBe('true');
+    });
+
+    it('O-6 (R-S2): the connected wallet changed mid-sign: "Connect a wallet that can sign." and "Close and review again"', () => {
+        render(
+            <TxReviewModal
+                flow={flowFor({
+                    stage: 'failed',
+                    error: { kind: 'wallet-changed', action: 'blocked', message: 'Connect a wallet that can sign.' },
+                })}
+            />,
+        );
+        const err = screen.getByTestId(T.txError);
+        expect(err.dataset.kind).toBe('wallet-changed');
+        expect(err.textContent).toContain('Connect a wallet that can sign.');
+        const retry = screen.getByTestId(T.txRetry);
+        expect(retry.dataset.mode).toBe('close');
+        expect(retry.textContent).toBe('Close and review again');
+        expect(screen.queryByTestId(T.txSimStatus)).toBeNull();
+    });
+
     it('once confirmed, links the next step; the explorer link is the signature row’s only', () => {
         const { rerender } = render(
             <TxReviewModal

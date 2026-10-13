@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { SHORTWIN_PROGRAM, TOKEN_2022_PROGRAM } from '../config/programs.ts';
+import { localNetwork } from '../wallet/localNetwork.ts';
 import { failingProgram, mapThrown, mapTransactionError } from './errors.ts';
 import { WalletCallError } from './send.ts';
 import type { TxPlan } from './types.ts';
@@ -141,5 +142,141 @@ describe('transaction error mapping', () => {
         expect(mapThrown(new Error('block height exceeded'))).toMatchObject({ kind: 'expired' });
         const tampered = Object.assign(new Error('the wallet changed instruction 2'), { name: 'IntegrityError' });
         expect(mapThrown(tampered)).toMatchObject({ kind: 'integrity', action: 'report' });
+    });
+});
+
+describe('the Mobile Wallet Adapter’s errors at Sign (FRONTEND §5.9; mobile.md §1.8)', () => {
+    /** As the library throws them: its own error, wrapped `new Error(message, { cause })`. */
+    const adapterError = (code: string, message: string, data?: unknown) =>
+        Object.assign(new Error(message), { name: 'SolanaMobileWalletAdapterError', code, data });
+    const protocolError = (code: number, message: string) =>
+        Object.assign(new Error(message), {
+            name: 'SolanaMobileWalletAdapterProtocolError',
+            code,
+            jsonRpcMessageId: 3,
+        });
+    const wrapped = (inner: Error) => new Error(inner.message, { cause: inner });
+    const atSign = (inner: Error, sending = false) => new WalletCallError(wrapped(inner), { sending });
+    afterEach(() => localNetwork.set('ready'));
+
+    it('−3 on sign_transactions: declined in the wallet (Cancelled in your wallet)', () => {
+        expect(mapThrown(atSign(protocolError(-3, 'transaction not signed')))).toMatchObject({
+            kind: 'wallet-rejected',
+            action: 'retry',
+        });
+    });
+
+    it.each([
+        [-1, 'authorization failed'],
+        [-2, 'invalid payloads'],
+        [-4, 'not submitted'],
+        [-5, 'too many payloads'],
+        [-100, 'origin attestation failed'],
+    ])('protocol code %i: the generic wallet error', (code, message) => {
+        const m = mapThrown(atSign(protocolError(code, message)));
+        expect(m).toMatchObject({ kind: 'wallet', action: 'retry' });
+        expect(m.message).toBe(`Your wallet could not sign: ${message}`);
+    });
+
+    it('ERROR_WALLET_NOT_FOUND: a launch to retry (the review stays), never "no wallet"', () => {
+        const m = mapThrown(atSign(adapterError('ERROR_WALLET_NOT_FOUND', 'Found no installed wallet')));
+        expect(m).toMatchObject({ kind: 'wallet-launch', action: 'retry' });
+        expect(m.message).toBe("Couldn't open your wallet app. Tap Sign again");
+    });
+
+    it('ERROR_LOOPBACK_ACCESS_BLOCKED: the local-network notice (its "denied" never reads as a rejection)', () => {
+        const m = mapThrown(
+            atSign(adapterError('ERROR_LOOPBACK_ACCESS_BLOCKED', 'Local Network Access permission denied')),
+        );
+        expect(m).toMatchObject({ kind: 'local-network', action: 'retry' });
+        expect(m.message).toBe("Allow 'Apps on device' so this page can reach your wallet app");
+    });
+
+    it('ERROR_SESSION_TIMEOUT: the local-network notice while the permission is missing, else generic', () => {
+        const timeout = () =>
+            atSign(adapterError('ERROR_SESSION_TIMEOUT', 'Failed to connect to the wallet websocket'));
+        localNetwork.set('denied');
+        expect(mapThrown(timeout()).kind).toBe('local-network');
+        localNetwork.set('prompt');
+        expect(mapThrown(timeout()).kind).toBe('local-network');
+        localNetwork.set('ready');
+        expect(mapThrown(timeout())).toMatchObject({ kind: 'wallet', action: 'retry' });
+    });
+
+    it('ERROR_ASSOCIATION_CANCELLED: a closed library modal (with its event) is a cancel; the timer is generic', () => {
+        const closed = adapterError('ERROR_ASSOCIATION_CANCELLED', 'Wallet connection cancelled by user', {
+            event: { type: 'click' },
+        });
+        expect(mapThrown(atSign(closed)).kind).toBe('wallet-rejected');
+        const timer = adapterError('ERROR_ASSOCIATION_CANCELLED', 'Wallet connection timed out', { event: undefined });
+        // Not a launch retry: an unfinished inner flow could still reach the wallet.
+        expect(mapThrown(atSign(timer))).toMatchObject({ kind: 'wallet', action: 'retry' });
+    });
+
+    it.each([
+        'ERROR_SESSION_CLOSED',
+        'ERROR_ILLEGAL_TRANSPORT_STATE',
+        'ERROR_INVALID_PROTOCOL_VERSION',
+        'ERROR_FORBIDDEN_WALLET_BASE_URL',
+        'ERROR_SECURE_CONTEXT_REQUIRED',
+    ])('%s: the generic wallet error, with Retry', (code) => {
+        const m = mapThrown(atSign(adapterError(code, 'The wallet session was closed')));
+        expect(m).toMatchObject({ kind: 'wallet', action: 'retry' });
+        expect(m.message).toMatch(/^Your wallet could not sign: /);
+    });
+
+    it('walks the cause chain (up to 6 levels) and matches on name and code, never instanceof', () => {
+        let e: Error = adapterError('ERROR_WALLET_NOT_FOUND', 'x');
+        for (let i = 0; i < 4; i++) e = new Error('outer', { cause: e });
+        expect(mapThrown(new WalletCallError(e)).kind).toBe('wallet-launch');
+        // Deeper than 6 levels: not found (an ordinary wallet error).
+        let deep: Error = adapterError('ERROR_WALLET_NOT_FOUND', 'x');
+        for (let i = 0; i < 7; i++) deep = new Error('outer', { cause: deep });
+        expect(mapThrown(new WalletCallError(deep)).kind).toBe('wallet');
+        // A plain object with the name works too (the package is loaded lazily).
+        const plain = new Error('m', { cause: { name: 'SolanaMobileWalletAdapterProtocolError', code: -3 } });
+        expect(mapThrown(new WalletCallError(plain)).kind).toBe('wallet-rejected');
+    });
+
+    it('the same objects outside a wallet call never map to a rejection or a notice', () => {
+        for (const inner of [
+            protocolError(-3, 'transaction not signed'),
+            adapterError('ERROR_WALLET_NOT_FOUND', 'Found no installed wallet'),
+            adapterError('ERROR_LOOPBACK_ACCESS_BLOCKED', 'Local Network Access permission denied'),
+            adapterError('ERROR_ASSOCIATION_CANCELLED', 'Wallet connection cancelled by user', { event: {} }),
+        ]) {
+            const m = mapThrown(wrapped(inner));
+            expect(['wallet-rejected', 'wallet-launch', 'local-network'], inner.message).not.toContain(m.kind);
+        }
+    });
+
+    it('a transport error on the sending branch: the outcome is unknown (no blind retry)', () => {
+        for (const code of ['ERROR_SESSION_CLOSED', 'ERROR_SESSION_TIMEOUT', 'ERROR_ILLEGAL_TRANSPORT_STATE']) {
+            const m = mapThrown(atSign(adapterError(code, 'closed'), true));
+            expect(m, code).toMatchObject({ kind: 'unknown-outcome', action: 'report' });
+            expect(m.message).toContain('Your wallet sent this transaction itself and it has not been seen on chain.');
+            expect(m.message).toContain('Check the explorer before trying again');
+            const plan = { rebuild: undefined } as unknown as TxPlan;
+            const state = { stage: 'failed', plan, error: m, signature: null } as unknown as TxFlowState;
+            expect(retryMode(state), code).toBe('none');
+            // The same on the signing branch: generic, with Retry.
+            expect(mapThrown(atSign(adapterError(code, 'closed'), false)).kind, code).toBe('wallet');
+        }
+        // A non-MWA error on the sending branch maps as before.
+        expect(mapThrown(new WalletCallError(new Error('internal'), { sending: true })).kind).toBe('wallet');
+        expect(
+            mapThrown(new WalletCallError(Object.assign(new Error('no'), { code: 4001 }), { sending: true })).kind,
+        ).toBe('wallet-rejected');
+    });
+
+    it('wallet-changed (R-S2) is retried by closing the review, never by re-simulating', () => {
+        const plan = { rebuild: async () => ({}) as TxPlan } as unknown as TxPlan;
+        const state = {
+            stage: 'failed',
+            plan,
+            error: { kind: 'wallet-changed', action: 'blocked', message: 'Connect a wallet that can sign.' },
+            signature: null,
+        } as unknown as TxFlowState;
+        expect(retryMode(state)).toBe('close');
     });
 });
