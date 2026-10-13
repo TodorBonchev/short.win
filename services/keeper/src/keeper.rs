@@ -41,10 +41,11 @@
 //! A moved slot the header cannot judge (AIR-01: a fingerprinted venue's with its latch bit clear)
 //! is judged by the flag's own simulation — the program's rule on the whole account — so an
 //! upgrade is still flagged before the exits, and the loader's permissionless `ExtendProgram`
-//! (`VenueNotUpgraded`) is neither flagged nor paged. What needs the whole ProgramData (a slot
-//! that simulation could not judge, a move during a review, the record of the deploy under
-//! review, Token-2022's changes) is read after the exits and cranks, all in one read, and judged
-//! by the same rule.
+//! (`VenueNotUpgraded`, from a bank that holds the deploy the header showed) is neither flagged
+//! nor paged. What needs the whole ProgramData (a slot that simulation could not judge —
+//! refused, answered from a bank before the deploy, or short.win not deployed in that slot —, a
+//! move during a review, the record of the deploy under review, Token-2022's changes) is read
+//! after the exits and cranks, all in one read, and judged by the same rule.
 //!
 //! **List-only markets** (M5): covered like any market with their detection set as ReadSet — one
 //! with positions open (a curve that graduated elsewhere) is observed on the no-route cadence and
@@ -490,10 +491,13 @@ enum FlagSent {
     Landed,
     /// Simulated only (`dry_run`): the program would flag it.
     DryRun,
-    /// The program answered `VenueNotUpgraded` in simulation: the latch already holds this
-    /// deploy slot (someone flagged it first), or — a moved slot the keeper leaves to the
-    /// program (AIR-01) — the loader's `ExtendProgram`.
-    NotUpgraded,
+    /// The program answered `VenueNotUpgraded` in simulation, on the bank of slot `at` (the
+    /// simulation's context slot; 0: unknown): the latch already holds this deploy slot
+    /// (someone flagged it first), or — a moved slot the keeper leaves to the program (AIR-01) —
+    /// the loader's `ExtendProgram`. Only a bank at or past the deploy slot the header showed
+    /// holds that deploy: an earlier one (a node of an RPC pool behind the header read) still
+    /// holds the deploy before it, and its answer is not this deploy's judgment.
+    NotUpgraded { at: u64 },
     /// Attempted for this deploy already this second.
     Throttled,
     /// AIR-18: refused because short.win was deployed, upgraded or extended in the slot
@@ -505,15 +509,18 @@ enum FlagSent {
 }
 
 /// AIR-01: what a moved ProgramData deploy slot needs from the whole account, judged after the
-/// tick's exits and cranks ([`Keeper::inspect_programs`]): none of it holds an open back — a
-/// review blocks opens already, Token-2022 is alert only, and a record or the keeper's own
-/// judgment follows a flag already attempted.
+/// tick's exits and cranks ([`Keeper::inspect_programs`]): nothing before the exits waits on it —
+/// a review blocks opens already, Token-2022 is alert only, and a record or the keeper's own
+/// judgment follows a flag already attempted this tick.
 #[derive(Clone, Debug)]
 enum Inspection {
     /// Latch venue `venue`, its bit clear and a fingerprint recorded, whose flag's simulation
-    /// could not judge the moved slot (`failure`): the keeper's own judgment, by the program's
-    /// rule on the whole account.
-    Unjudged { venue: u8, failure: String },
+    /// could not judge the moved slot: the keeper's own judgment, by the program's rule on the
+    /// whole account. `failure`: why the flag did not go out, alerted with an upgrade
+    /// (`VenueFlagFailed`) — a refusal, or an answer from a bank before the deploy; `None` when
+    /// short.win itself was not deployed in that slot (AIR-18: the upgrade is paged, and the
+    /// flag goes out in a later slot without a failure alert).
+    Unjudged { venue: u8, failure: Option<String> },
     /// Latch venue `venue` during a review, moved past the deploy the keeper recorded: another
     /// upgrade, or an extension of the recorded deploy ([`Keeper::judge_review`]).
     Review(u8),
@@ -3554,20 +3561,23 @@ impl<C: Chain> Keeper<C> {
     /// headers in one call, before the markets; flags every upgrade the program would accept
     /// (`flag_venue_upgraded`, simulated first, at the exit priority ceiling) and pages it once
     /// per deploy; Token-2022's changes are alerted only. The same upgrade is attempted at most
-    /// once a second (an unflagged one is retried every second); a new deploy slot is attempted
-    /// at once.
+    /// once a second (an unflagged one is retried every second; one whose simulation ran on a
+    /// bank before it, or which short.win refused as not deployed, the next tick); a new deploy
+    /// slot is attempted at once.
     ///
     /// AIR-01: a moved slot the header cannot judge with the venue's bit clear
     /// ([`LatchAction::Inspect`]: a fingerprint recorded) is judged here too, by the program: the
-    /// flag's simulation is its rule on the whole account, once per deploy slot. An upgrade
-    /// passes — paged, and flagged in the slot it is seen, before the tick's exits and cranks;
-    /// the loader's `ExtendProgram` answers `VenueNotUpgraded` — booked
-    /// ([`Self::note_extension`]), neither flagged nor paged. What needs the whole account is
-    /// returned for [`Self::inspect_programs`], after the exits and cranks, where it holds no
-    /// open back: a slot the flag's simulation could not judge (the keeper's own judgment, the
-    /// flag tried again the next second), a move during a review past the deploy the keeper
-    /// recorded (opens are blocked already), the record of the deploy the keeper reports or
-    /// finds under review (a restart), and Token-2022 (alert only).
+    /// flag's simulation is its rule on the whole account, once the other venues are done
+    /// ([`Self::judge_inspected`]). An upgrade passes — paged, and flagged in the slot it is
+    /// seen, before the tick's exits and cranks; the loader's `ExtendProgram` answers
+    /// `VenueNotUpgraded` from a bank that holds the deploy — booked
+    /// ([`Self::note_extension`]), neither flagged nor paged, and that deploy slot not simulated
+    /// again. What needs the whole account is returned for [`Self::inspect_programs`], after the
+    /// exits and cranks, where nothing before the exits waits on it: a slot the flag's
+    /// simulation could not judge (the keeper's own judgment; the flag tried again), a move
+    /// during a review past the deploy the keeper recorded (opens are blocked already), the
+    /// record of the deploy the keeper reports or finds under review (a restart), and
+    /// Token-2022 (alert only).
     async fn watch_programs(&mut self, now: i64, report: &mut TickReport) -> Option<Inspections> {
         let watched = monitor::watched_programs();
         let guard_key = pda::venue_guard();
@@ -3593,6 +3603,8 @@ impl<C: Chain> Keeper<C> {
             return None;
         };
         let mut items = Vec::new();
+        // AIR-01: the moved slots the flag's simulation judges, after the loop.
+        let mut inspect = Vec::new();
         let headers = accs.get(1..).unwrap_or(&[]);
         for (w, acc) in watched.iter().zip(headers.iter()) {
             let slot = monitor::deploy_slot(acc.as_ref());
@@ -3654,20 +3666,7 @@ impl<C: Chain> Keeper<C> {
                 // AIR-01: the flag's simulation is the program's own rule on the whole account.
                 LatchAction::Inspect => {
                     let known = guard.guard_slot.get(i).copied().unwrap_or(0);
-                    match self.send_flag(venue, slot, now, report).await {
-                        FlagSent::Landed => {
-                            self.page_upgrade(w, venue, slot, known);
-                            self.flag_landed(venue, slot, report);
-                            items.push((*w, slot, Inspection::Record(venue)));
-                        }
-                        FlagSent::DryRun => self.page_upgrade(w, venue, slot, known),
-                        FlagSent::NotUpgraded => self.note_extension(w, slot, report),
-                        // AIR-18: not judged yet; nothing can open while short.win is refused.
-                        FlagSent::Throttled | FlagSent::NotDeployed => {}
-                        FlagSent::Failed(failure) => {
-                            items.push((*w, slot, Inspection::Unjudged { venue, failure }));
-                        }
-                    }
+                    inspect.push((*w, venue, slot, known));
                 }
                 LatchAction::Refresh if self.flagged_elf.contains_key(&venue) => {
                     items.push((*w, slot, Inspection::Review(venue)));
@@ -3687,7 +3686,94 @@ impl<C: Chain> Keeper<C> {
                 LatchAction::Extended => {}
             }
         }
+        if !inspect.is_empty() {
+            self.judge_inspected(inspect, now, report, &mut items).await;
+        }
         (!items.is_empty()).then_some(Inspections { guard, items })
+    }
+
+    /// AIR-01 (duty 10): the moved slots of [`Self::watch_programs`] the header cannot judge
+    /// (`todo`: the program, its latch venue, the header's deploy slot, the latch's
+    /// `guard_slot`), judged before the tick's exits by the flag's own simulation
+    /// ([`Self::send_flag`]), each at most once a second per deploy.
+    ///
+    /// - The program would flag it: paged, flagged (sent at the exit priority ceiling) and,
+    ///   landed, its record read after the exits.
+    /// - `VenueNotUpgraded` from a bank at or past the header's deploy slot — a bank that holds
+    ///   that deploy: the loader's `ExtendProgram`, booked ([`Self::note_extension`]).
+    /// - `VenueNotUpgraded` from a bank before it — a node of an RPC pool behind the header
+    ///   read still holds the deploy before (the validated one, or an earlier extension), where
+    ///   the program answers the same for an upgrade —, or any other failure: not this deploy's
+    ///   judgment. The whole account decides after the exits ([`Inspection::Unjudged`]: an
+    ///   upgrade is paged with the flag's failure), and the flag is tried again — the next tick
+    ///   after a lagging answer, the next second after a failure.
+    /// - Refused because short.win was deployed in that slot (AIR-18): the whole account decides
+    ///   too, an upgrade paged without a flag failure, and the flag goes out in a later slot. A
+    ///   stranger extending short.win in every slot thus holds the flag back, not the page (opens
+    ///   ordered before the slot's extension still run).
+    async fn judge_inspected(
+        &mut self,
+        todo: Vec<(monitor::WatchedProgram, u8, u64, u64)>,
+        now: i64,
+        report: &mut TickReport,
+        items: &mut Vec<(monitor::WatchedProgram, u64, Inspection)>,
+    ) {
+        for (w, venue, slot, known) in todo {
+            match self.send_flag(venue, slot, now, report).await {
+                FlagSent::Landed => {
+                    self.page_upgrade(&w, venue, slot, known);
+                    self.flag_landed(venue, slot, report);
+                    items.push((w, slot, Inspection::Record(venue)));
+                }
+                FlagSent::DryRun => self.page_upgrade(&w, venue, slot, known),
+                FlagSent::NotUpgraded { at } if at >= slot => {
+                    self.note_extension(&w, slot, report);
+                }
+                FlagSent::NotUpgraded { at } => {
+                    let failure = format!(
+                        "VenueNotUpgraded simulated on slot {at}, before deploy slot {slot} (a \
+                         node behind the header read); flagged again the next tick"
+                    );
+                    tracing::info!(
+                        program = %w.program,
+                        deploy_slot = slot,
+                        context_slot = at,
+                        "the flag's simulation ran before the deploy (AIR-01): judged on the \
+                         whole account after the exits"
+                    );
+                    items.push((
+                        w,
+                        slot,
+                        Inspection::Unjudged {
+                            venue,
+                            failure: Some(failure),
+                        },
+                    ));
+                }
+                FlagSent::NotDeployed => {
+                    items.push((
+                        w,
+                        slot,
+                        Inspection::Unjudged {
+                            venue,
+                            failure: None,
+                        },
+                    ));
+                }
+                // Attempted for this deploy this second already.
+                FlagSent::Throttled => {}
+                FlagSent::Failed(failure) => {
+                    items.push((
+                        w,
+                        slot,
+                        Inspection::Unjudged {
+                            venue,
+                            failure: Some(failure),
+                        },
+                    ));
+                }
+            }
+        }
     }
 
     /// AIR-01 (duty 10): what [`Self::watch_programs`] left to the whole account, after the
@@ -3695,8 +3781,9 @@ impl<C: Chain> Keeper<C> {
     /// ([`Self::read_whole`]), each judged at the slot it holds now.
     ///
     /// - A slot the flag's simulation could not judge: the program's rule against the latch's
-    ///   fingerprint ([`monitor::latch_action_with`]) — an upgrade is paged with the flag's
-    ///   failure (`VenueFlagFailed`; the next second flags again), an extension booked.
+    ///   fingerprint ([`monitor::latch_action_with`]) — an upgrade is paged, with the flag's
+    ///   failure if it has one (`VenueFlagFailed`; the flag is tried again: the next tick or
+    ///   second), an extension booked.
     /// - A move during a review past the recorded deploy ([`Self::judge_review`]).
     /// - The record of a deploy under review, while the account still holds it (else the next
     ///   change is refreshed and paged, as the program would accept it).
@@ -3749,7 +3836,10 @@ impl<C: Chain> Keeper<C> {
                         Some(true) => {
                             let known = guard.guard_slot.get(usize::from(venue));
                             self.page_upgrade(&w, venue, slot, known.copied().unwrap_or(0));
-                            self.flag_failed(venue, slot, failure);
+                            // AIR-18: none when short.win refused the flag as not deployed.
+                            if let Some(failure) = failure {
+                                self.flag_failed(venue, slot, failure);
+                            }
                         }
                         Some(false) => self.note_extension(&w, slot, report),
                         None => {}
@@ -3857,9 +3947,11 @@ impl<C: Chain> Keeper<C> {
         match self.send_flag(venue, slot, now, report).await {
             FlagSent::Landed => self.flag_landed(venue, slot, report),
             FlagSent::Failed(detail) => self.flag_failed(venue, slot, detail),
-            // `NotUpgraded`: someone flagged it first (the latch already holds this slot).
+            // `NotUpgraded`: someone flagged it first (the latch already holds this slot), or —
+            // answered from a bank before the deploy — the next tick asks again
+            // ([`Self::flag_outcome`]).
             FlagSent::DryRun
-            | FlagSent::NotUpgraded
+            | FlagSent::NotUpgraded { .. }
             | FlagSent::Throttled
             | FlagSent::NotDeployed => {}
         }
@@ -3897,9 +3989,10 @@ impl<C: Chain> Keeper<C> {
     }
 
     /// Duty 10: `flag_venue_upgraded(venue)` for deploy `slot`, simulated first and sent at the
-    /// exit priority ceiling, at most once a second per deploy (a new deploy slot at once). Its
-    /// simulation is the program's own judgment of the moved slot ([`FlagSent::NotUpgraded`]:
-    /// not an upgrade it would flag — AIR-01).
+    /// exit priority ceiling, at most once a second per deploy (a new deploy slot at once;
+    /// [`Self::flag_due`]). Its simulation is the program's own judgment of the moved slot when
+    /// it ran on a bank that holds that deploy ([`FlagSent::NotUpgraded`]: not an upgrade it
+    /// would flag — AIR-01).
     async fn send_flag(
         &mut self,
         venue: u8,
@@ -3907,11 +4000,31 @@ impl<C: Chain> Keeper<C> {
         now: i64,
         report: &mut TickReport,
     ) -> FlagSent {
-        if self.flag_tried.get(&(venue, slot)) == Some(&now) {
+        if !self.flag_due(venue, slot, now) {
             return FlagSent::Throttled;
+        }
+        self.send_flag_now(venue, slot, now, report).await
+    }
+
+    /// Duty 10: whether `flag_venue_upgraded(venue)` of deploy `slot` may be attempted at `now`
+    /// — not attempted for that deploy this second yet — and, if so, books the attempt.
+    fn flag_due(&mut self, venue: u8, slot: u64, now: i64) -> bool {
+        if self.flag_tried.get(&(venue, slot)) == Some(&now) {
+            return false;
         }
         self.flag_tried.retain(|(v, _), _| *v != venue);
         self.flag_tried.insert((venue, slot), now);
+        true
+    }
+
+    /// [`Self::send_flag`] without the once-a-second check (the caller booked the attempt).
+    async fn send_flag_now(
+        &mut self,
+        venue: u8,
+        slot: u64,
+        now: i64,
+        report: &mut TickReport,
+    ) -> FlagSent {
         let ix = match ixs::flag_venue_upgraded(venue) {
             Ok(ix) => ix,
             Err(e) => {
@@ -3921,7 +4034,17 @@ impl<C: Chain> Keeper<C> {
             }
         };
         let guard_key = pda::venue_guard();
-        match self.send_ixs(&[ix], &[guard_key], true, now).await {
+        let sent = self.send_ixs(&[ix], &[guard_key], true, now).await;
+        self.flag_outcome(venue, slot, sent)
+    }
+
+    /// Duty 10: what an attempt `sent` of `flag_venue_upgraded(venue)` for deploy `slot` came to.
+    /// An attempt that cannot have judged that deploy is not throttled — the next tick (the next
+    /// slot) tries again: `VenueNotUpgraded` from a bank before the deploy (AIR-01: a node behind
+    /// the header read, where the deploy before it still stands), and a refusal because
+    /// short.win was deployed in the slot (AIR-18).
+    fn flag_outcome(&mut self, venue: u8, slot: u64, sent: anyhow::Result<Sent>) -> FlagSent {
+        match sent {
             Ok(Sent::Landed { .. }) => FlagSent::Landed,
             Ok(Sent::DryRun { .. }) => FlagSent::DryRun,
             Ok(Sent::SimFailed { out, .. })
@@ -3930,7 +4053,10 @@ impl<C: Chain> Keeper<C> {
                     ShortwinError::VenueNotUpgraded,
                 ) =>
             {
-                FlagSent::NotUpgraded
+                if out.slot < slot {
+                    self.flag_tried.remove(&(venue, slot));
+                }
+                FlagSent::NotUpgraded { at: out.slot }
             }
             // AIR-18: short.win runs again from the next slot: the next tick tries again.
             Ok(Sent::NotDeployed { .. }) => {

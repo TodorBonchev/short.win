@@ -30,6 +30,9 @@
 //!   paged either. When the flag's simulation fails, the account read whole after the exits
 //!   decides (an extension is not paged, an upgrade is, with `VenueFlagFailed`), and when that
 //!   read fails too the moved slot is paged; Token-2022's extension is not paged, its upgrade is.
+//!   A `VenueNotUpgraded` answered by a node behind the header read (a context slot before the
+//!   deploy) is not booked as an extension: the whole account pages the upgrade and the next
+//!   slot flags it.
 
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::Instruction;
@@ -584,7 +587,7 @@ fn reviewed_hash(env: &Env, program: RaydiumProgram) -> [u8; 32] {
 /// A stranger's `ExtendProgram` of `program`'s ProgramData by 10 KiB (the loader's own
 /// permissionless instruction, `fork::extend_program_ix`): zeros appended, the ELF kept, the
 /// current slot in the header. Returns that slot.
-fn stranger_extends(env: &mut Env, program: &Pubkey) -> u64 {
+pub fn stranger_extends(env: &mut Env, program: &Pubkey) -> u64 {
     let key = monitor::program_data_address(program);
     let before = read::account(&env.svm, &key).unwrap().data;
     let slot = env.clock().slot;
@@ -624,7 +627,7 @@ fn reads_whole(c: &shortwin_keeper_litesvm::Rpc, key: &Pubkey) -> bool {
 }
 
 /// The whole-account reads of ProgramData `key` the keeper made so far ([`reads_whole`]).
-fn whole_reads(h: &Harness, key: Pubkey) -> usize {
+pub fn whole_reads(h: &Harness, key: Pubkey) -> usize {
     h.chain()
         .rpc_log()
         .iter()
@@ -633,7 +636,7 @@ fn whole_reads(h: &Harness, key: Pubkey) -> usize {
 }
 
 /// The latch transactions (`flag_venue_upgraded`: they write the `VenueGuard`) the keeper sent.
-fn flags_sent(h: &Harness) -> usize {
+pub fn flags_sent(h: &Harness) -> usize {
     let guard = shortwin_keeper::pda::venue_guard();
     h.chain()
         .sent()
@@ -1019,6 +1022,80 @@ fn air01_a_slot_the_flags_simulation_cannot_judge_is_judged_on_the_whole_account
     );
     assert!(h.with_env(|env| env.venue_guard()).is_flagged(venue));
     assert_eq!(h.keeper.metrics.venue_extensions, 2);
+}
+
+/// AIR-01 through an RPC pool whose simulations come from a node behind its header reads: the
+/// flag's simulation judges the deploy the header showed only on a bank that holds it. AMM v4
+/// revalidated with its fingerprint; a node of the pool stays at a slot
+/// (`LiteSvmChain::lag_simulations`) and AMM v4 is upgraded in the next one. The keeper's header
+/// read shows the upgrade; the flag's simulation, served by the node behind, answers
+/// `VenueNotUpgraded` — the validated deploy still stands there — on a context slot before the
+/// deploy. That answer is not booked as an extension: the account read whole after the exits
+/// judges the slot — an upgrade, paged once, with the flag's failure — and the next slot's
+/// simulation, on the chain as it is, flags it; opens are then refused. As first built the
+/// keeper booked the stale answer as an extension, skipped that deploy slot from then on, and
+/// neither flagged nor paged the upgrade while opens on it passed the latch.
+#[test]
+fn air01_an_upgrade_a_lagging_node_simulates_is_still_flagged_and_paged() {
+    let (mut h, ms) = ray_setup(&[FART], KeeperConfig::default());
+    let (rm, q) = &ms[0];
+    let venue = GUARD_RAYDIUM_V4;
+    let id = RaydiumProgram::AmmV4.id();
+    let pd = RaydiumProgram::AmmV4.program_data().address;
+    let slot0 = revalidate_v4_with_hash(&h);
+    h.slot();
+    // A node of the pool stays at this slot; the upgrade lands in the next one.
+    h.chain().lag_simulations(1);
+    let up = h.with_env(|env| {
+        let c = env.clock();
+        env.set_clock(c.unix_timestamp, c.slot + 1);
+        upgrade_in_place(env, &id, &v4_elf_one_byte_changed())
+    });
+    let r = h.slot().clone();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert!(
+        r.flagged.is_empty() && r.extended.is_empty(),
+        "not booked as an extension: {r:?}"
+    );
+    let a = venue_alerts(&r);
+    assert!(
+        a.contains(&Alert::VenueUpgraded {
+            venue,
+            program: id,
+            known_slot: slot0,
+            deploy_slot: up,
+        }),
+        "{a:?}"
+    );
+    assert!(
+        a.iter().any(|x| matches!(
+            x,
+            Alert::VenueFlagFailed { venue: v, detail }
+                if *v == venue && detail.contains("before deploy slot")
+        )),
+        "{a:?}"
+    );
+    assert_eq!(whole_reads(&h, pd), 1, "judged on the whole account");
+    assert_eq!(h.keeper.metrics.venue_extensions, 0);
+
+    // The next slot's simulation holds the deploy: flagged, not paged again.
+    let r = h.slot().clone();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert_eq!(r.flagged, vec![(venue, up)], "{:?}", r.alerts);
+    assert!(
+        !venue_alerts(&r)
+            .iter()
+            .any(|a| matches!(a, Alert::VenueUpgraded { .. })),
+        "paged once: {:?}",
+        r.alerts
+    );
+    assert_eq!(h.keeper.metrics.venue_extensions, 0);
+    let mut b = h.with_env(|env| env.borrower());
+    let res = h.with_env(|env| env.open(rm, &mut b, *q).0);
+    assert_eq!(
+        custom_code(&res),
+        Some(u32::from(ShortwinError::VenueUpgraded))
+    );
 }
 
 /// AIR-01 for Token-2022 (alert only; the mainnet program, extendable like any upgradeable

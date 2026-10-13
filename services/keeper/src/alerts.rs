@@ -170,7 +170,11 @@ pub enum Alert {
     /// refused until `revalidate_venue`.
     VenueUpgradeFlagged { venue: u8, deploy_slot: u64 },
     /// `flag_venue_upgraded(venue)` could not be sent or was refused (other than "already
-    /// flagged"); retried every second while the upgrade stands unflagged.
+    /// flagged"), or — AIR-01 — its simulation ran on a bank before the deploy (a node behind the
+    /// keeper's header read); retried every second while the upgrade stands unflagged (after a
+    /// lagging simulation, the next tick). Not raised when short.win itself refused it as not
+    /// deployed in the slot (AIR-18: tried again the next slot; a long run is
+    /// `ProgramNotDeployed`).
     VenueFlagFailed { venue: u8, detail: String },
     /// A watched upgradeable program without a latch index (Token-2022) was upgraded: alert
     /// only (ARCH §7.1 duty 10). AIR-01: judged by the program's rule against the keeper's last

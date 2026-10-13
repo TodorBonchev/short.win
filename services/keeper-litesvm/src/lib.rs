@@ -19,10 +19,11 @@
 //! transactions ([`LiteSvmChain::set_v1`], to exercise the v0 fallback), the recent
 //! priority fees the backend reports ([`LiteSvmChain::set_priority_fees`]), whole-account
 //! reads of a key that fail ([`LiteSvmChain::fail_reads_of`]), simulations that fail
-//! ([`LiteSvmChain::fail_simulations`]) and header reads of a node lagging the last deploy
-//! ([`LiteSvmChain::lag_headers_of`]); every backend call is logged ([`LiteSvmChain::rpc_log`],
-//! M4-SEC-7: the keeper's RPC work per tick). **Timing** (M7-SEC-1, M7-SEC-6): the keeper's
-//! transactions can land seconds after the clock it read
+//! ([`LiteSvmChain::fail_simulations`]), header reads of a node lagging the last deploy
+//! ([`LiteSvmChain::lag_headers_of`]) and simulations served by a node that stays behind
+//! ([`LiteSvmChain::lag_simulations`]); every read and send is logged
+//! ([`LiteSvmChain::rpc_log`], M4-SEC-7: the keeper's RPC work per tick). **Timing** (M7-SEC-1,
+//! M7-SEC-6): the keeper's transactions can land seconds after the clock it read
 //! ([`LiteSvmChain::set_landing_delays`]), its clock can lag the chain's
 //! ([`LiteSvmChain::set_clock_lag`]), and a trade can land between its read and its transaction
 //! ([`LiteSvmChain::before_next_send`]); [`Harness::second_slow`] models a tick that waited for
@@ -95,6 +96,9 @@ pub struct LiteSvmChain {
     /// Header reads naming no context slot answer this key with this deploy slot this many more
     /// times ([`LiteSvmChain::lag_headers_of`]).
     lag_headers: Cell<Option<(Pubkey, u64, usize)>>,
+    /// Simulations answered from a copy of the VM ([`LiteSvmChain::lag_simulations`]): the copy,
+    /// its slot, how many more.
+    stale_sims: RefCell<Option<(litesvm::LiteSVM, u64, usize)>>,
 }
 
 /// A source of landing delays (seconds) for [`LiteSvmChain::set_landing_delays`].
@@ -236,7 +240,23 @@ impl LiteSvmChain {
             fail_reads: Cell::new(None),
             fail_sims: Cell::new(0),
             lag_headers: Cell::new(None),
+            stale_sims: RefCell::new(None),
         }
+    }
+
+    /// The next `times` simulations (`simulate`) are answered from the VM as it is now, with
+    /// this slot as their context slot — a node of an RPC pool that stays behind the chain
+    /// (AIR-01: the flag's simulation served from a bank before the deploy the keeper's header
+    /// read showed). The copy checks no signature and no blockhash (the keeper's blockhash is
+    /// newer than it).
+    pub fn lag_simulations(&self, times: usize) {
+        let env = self.env.borrow();
+        let svm = env
+            .svm
+            .clone()
+            .with_sigverify(false)
+            .with_blockhash_check(false);
+        *self.stale_sims.borrow_mut() = Some((svm, env.clock().slot, times));
     }
 
     /// The next `times` header reads naming no context slot (`account_headers`) answer
@@ -627,6 +647,22 @@ impl Chain for LiteSvmChain {
         if let Some(left) = self.fail_sims.get().checked_sub(1) {
             self.fail_sims.set(left);
             anyhow::bail!("simulateTransaction: injected failure");
+        }
+        if let Some((svm, slot, times)) = self.stale_sims.borrow_mut().as_mut()
+            && *times > 0
+        {
+            *times -= 1;
+            let alts = lookup_tables(&self.env.borrow(), tx);
+            return Ok(match svm.simulate_transaction(tx.clone()) {
+                Ok(info) => outcome(tx, &alts, &info.meta, None, *slot),
+                Err(f) => outcome(
+                    tx,
+                    &alts,
+                    &f.meta,
+                    Some(TxError::from_transaction_error(f.err)),
+                    *slot,
+                ),
+            });
         }
         let env = self.env.borrow();
         let alts = lookup_tables(&env, tx);

@@ -26,9 +26,13 @@
 //! reviewed ELF is `VenueNotUpgraded`. The keeper mirrors it: [`latch_action`] answers
 //! [`LatchAction::Inspect`] when only the whole account can decide. Then the flag's simulation
 //! decides, before the keeper's exits — the program's rule, so an upgrade is flagged in the slot
-//! it is seen and an extension answers `VenueNotUpgraded`: nothing flagged, nothing paged. When
-//! that simulation cannot judge (it fails otherwise), [`latch_action_with`] decides on the whole
-//! account's [`ElfFacts`] with the program's own hash (`trimmed_elf_hash_of`,
+//! it is seen and an extension answers `VenueNotUpgraded`: nothing flagged, nothing paged. That
+//! answer counts only from a bank that holds the deploy the header showed (the simulation's
+//! context slot at or past it): a node behind the header read still holds the deploy before, and
+//! answers `VenueNotUpgraded` for an upgrade too. When that simulation cannot judge (it fails
+//! otherwise, ran on such a bank, or short.win itself is not deployed in that slot, AIR-18),
+//! [`latch_action_with`] decides on the whole account's [`ElfFacts`] with the program's own hash
+//! (`trimmed_elf_hash_of`,
 //! `elf_fingerprint_of`) — [`LatchAction::Extended`] for an extension. Without a fingerprint
 //! (pump and PumpSwap, which sit at the 10 MiB cap, and any venue before its first revalidation
 //! with a hash) the slot alone decides, as on chain. While the bit is set the program refreshes

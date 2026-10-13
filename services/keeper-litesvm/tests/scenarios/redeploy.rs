@@ -29,9 +29,13 @@
 //! - short.win not deployed in the slot the keeper first flags a Raydium upgrade: the upgrade is
 //!   paged, the flag is refused without `VenueFlagFailed`, and it lands in the next slot.
 //! - short.win not deployed in the slot the keeper first sees an upgrade of a fingerprinted
-//!   venue (AIR-01: the flag's simulation judges it): not judged, so neither paged nor flagged
-//!   nor alerted (no open passes the latch while short.win is refused); the next slot flags it and
-//!   pages it once.
+//!   venue (AIR-01: the flag's simulation judges it), and in the next three (a stranger extending
+//!   it every slot): the refused simulation judges nothing, so the account read whole after the
+//!   exits does — the upgrade is paged in the first slot, once, without `VenueFlagFailed` (an
+//!   open ordered before a slot's extension still runs, and the latch is clear) and read whole
+//!   once; the flag goes out in the first slot short.win runs again.
+//! - The same for a fingerprinted venue's extension: booked from the whole account in the
+//!   refused slot, nothing paged, nothing flagged later.
 //! - short.win not deployed in the slot the keeper first probes a position's S3 (its pool halted,
 //!   the chain run `s3_wait_s`): the probe is refused, and sent again in the next slot instead of
 //!   `s3_probe_interval_s` later.
@@ -59,7 +63,10 @@ use solana_signer::Signer;
 
 use crate::common::*;
 use crate::raydium::{FART, ray_setup};
-use crate::raydium_admin::{revalidate_v4_with_hash, upgrade_in_place, v4_elf_one_byte_changed};
+use crate::raydium_admin::{
+    flags_sent, revalidate_v4_with_hash, stranger_extends, upgrade_in_place,
+    v4_elf_one_byte_changed, whole_reads,
+};
 
 /// Writes `slot` into `program`'s ProgramData header: what a deploy, an upgrade or the loader's
 /// `ExtendProgram` in that slot leaves.
@@ -320,40 +327,110 @@ fn a_venue_flag_refused_while_short_win_is_not_deployed_lands_the_next_slot() {
     assert!(h.with_env(|env| env.venue_guard()).is_flagged(venue));
 }
 
-/// short.win not deployed in the slot the keeper first sees an upgrade of a fingerprinted venue
-/// (module docs): AMM v4 revalidated with its trimmed ELF's hash, then upgraded in place.
+/// short.win not deployed in the slot the keeper first sees an upgrade of a fingerprinted venue,
+/// and in the next three (module docs): AMM v4 revalidated with its trimmed ELF's hash, then
+/// upgraded in place. As first built the refused slots judged and paged nothing, so a stranger
+/// extending short.win in every slot kept the upgrade unpaged for the whole run.
 #[test]
-fn a_fingerprinted_venues_upgrade_seen_while_short_win_is_not_deployed_is_judged_the_next_slot() {
+fn a_fingerprinted_venues_upgrade_seen_while_short_win_is_not_deployed_is_paged_at_once() {
     let (mut h, _ms) = ray_setup(&[FART], KeeperConfig::default());
     let venue = GUARD_RAYDIUM_V4;
     let id = RaydiumProgram::AmmV4.id();
+    let pd = RaydiumProgram::AmmV4.program_data().address;
     let slot0 = revalidate_v4_with_hash(&h);
     let r = h.slot().clone();
     assert!(r.flagged.is_empty() && r.errors.is_empty());
     let up = h.with_env(|env| upgrade_in_place(env, &id, &v4_elf_one_byte_changed()));
     let saved = not_deployed_this_slot(&h, &shortwin::ID);
-    let r = h.tick().clone();
-    assert!(r.errors.is_empty(), "{:?}", r.errors);
-    assert!(r.flagged.is_empty() && r.extended.is_empty(), "{r:?}");
-    assert!(
-        !r.alerts
-            .iter()
-            .any(|a| matches!(a, Alert::VenueUpgraded { .. })),
-        "not judged yet: {:?}",
-        r.alerts
+    let mut paged = Vec::new();
+    for s in 0..4 {
+        if s > 0 {
+            // The next slot of the same second, short.win extended again.
+            h.with_env(|env| {
+                let c = env.clock();
+                env.set_clock(c.unix_timestamp, c.slot + 1);
+                set_deploy_slot(env, &shortwin::ID, c.slot + 1);
+            });
+        }
+        let r = h.tick().clone();
+        assert!(r.errors.is_empty(), "slot {s}: {:?}", r.errors);
+        assert!(
+            r.flagged.is_empty() && r.extended.is_empty(),
+            "slot {s}: {r:?}"
+        );
+        assert!(failure_alerts(&r).is_empty(), "slot {s}: {:?}", r.alerts);
+        paged.extend(
+            r.alerts
+                .iter()
+                .filter(|a| matches!(a, Alert::VenueUpgraded { .. }))
+                .map(|a| (s, a.clone())),
+        );
+    }
+    assert_eq!(
+        paged,
+        vec![(
+            0,
+            Alert::VenueUpgraded {
+                venue,
+                program: RAYDIUM_V4_PROGRAM_ID,
+                known_slot: slot0,
+                deploy_slot: up,
+            }
+        )]
     );
-    assert!(failure_alerts(&r).is_empty(), "{:?}", r.alerts);
+    assert_eq!(whole_reads(&h, pd), 1, "that deploy read whole once");
+    assert!(!h.with_env(|env| env.venue_guard()).is_flagged(venue));
 
     let r = next_slot(&mut h, &shortwin::ID, saved);
     assert!(r.errors.is_empty(), "{:?}", r.errors);
     assert_eq!(r.flagged, vec![(venue, up)], "{:?}", r.alerts);
-    assert!(r.alerts.contains(&Alert::VenueUpgraded {
-        venue,
-        program: RAYDIUM_V4_PROGRAM_ID,
-        known_slot: slot0,
-        deploy_slot: up,
-    }));
     assert!(failure_alerts(&r).is_empty(), "{:?}", r.alerts);
+    assert!(
+        !r.alerts
+            .iter()
+            .any(|a| matches!(a, Alert::VenueUpgraded { .. })),
+        "paged once: {:?}",
+        r.alerts
+    );
+    assert!(h.with_env(|env| env.venue_guard()).is_flagged(venue));
+}
+
+/// A fingerprinted venue's extension seen while short.win is not deployed (module docs): AMM v4
+/// revalidated with its trimmed ELF's hash, then extended by a stranger in the slot short.win
+/// is refused.
+#[test]
+fn a_fingerprinted_venues_extension_seen_while_short_win_is_not_deployed_is_booked_at_once() {
+    let (mut h, _ms) = ray_setup(&[FART], KeeperConfig::default());
+    let id = RaydiumProgram::AmmV4.id();
+    revalidate_v4_with_hash(&h);
+    let r = h.slot().clone();
+    assert!(r.flagged.is_empty() && r.errors.is_empty());
+    let ext = h.with_env(|env| stranger_extends(env, &id));
+    let saved = not_deployed_this_slot(&h, &shortwin::ID);
+    let r = h.tick().clone();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert_eq!(r.extended, vec![(id, ext)], "{:?}", r.alerts);
+    assert!(r.flagged.is_empty());
+    let venue_pages = |r: &TickReport| {
+        r.alerts
+            .iter()
+            .filter(|a| {
+                matches!(
+                    a,
+                    Alert::VenueUpgraded { .. } | Alert::VenueFlagFailed { .. }
+                )
+            })
+            .count()
+    };
+    assert_eq!(venue_pages(&r), 0, "{:?}", r.alerts);
+    assert!(failure_alerts(&r).is_empty(), "{:?}", r.alerts);
+
+    let r = next_slot(&mut h, &shortwin::ID, saved);
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert!(r.extended.is_empty() && r.flagged.is_empty(), "{r:?}");
+    assert_eq!(venue_pages(&r), 0, "{:?}", r.alerts);
+    assert_eq!(flags_sent(&h), 0);
+    assert_eq!(h.keeper.metrics.venue_extensions, 1);
 }
 
 /// The S3 probes of `position` in `r` (`sol_settle` simulated alone: `Plan::S3Probe`).

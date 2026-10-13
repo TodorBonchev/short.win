@@ -58,8 +58,9 @@
 //!     `VenueGuard` latch — an upgrade is flagged with `flag_venue_upgraded` in the slot it is
 //!     seen, once, and refreshed when a second upgrade lands during review; a fingerprinted
 //!     venue's ProgramData that only grew (the loader's `ExtendProgram`) is told from an upgrade
-//!     by the program's own rule — the flag's simulation, before the exits — and neither flagged
-//!     nor paged (AIR-01); Token-2022's upgrade is alerted, its extension is not — and every
+//!     by the program's own rule — the flag's simulation before the exits, from a bank that
+//!     holds the deploy, else the whole account after them — and neither flagged nor paged
+//!     (AIR-01); Token-2022's upgrade is alerted, its extension is not — and every
 //!     covered market's pool and CPMM config (Raydium `SetParams`, `update_pool_status`,
 //!     `update_amm_config`, seen as the account changes they make): route lost / restored,
 //!     status, open time and fee against the opens and hard caps.
