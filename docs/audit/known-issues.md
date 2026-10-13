@@ -197,9 +197,9 @@ and its regression test, which fails on v1.0.0 (AIR-20's pins its residual inste
 passed a local run of the CI gate, but no CI run or external fix review yet, so "fixed" below
 does not yet meet `findings.md`'s definition for an audit finding (the README says the same).
 The owner waived that definition's ≥ 24 h fuzz run for this batch on 2026-10-13; no such run
-was made on the fixed program. The owner decided the review's open points on 2026-10-12 and
-confirmed the rest (AIR-21, AIR-09, AIR-14's widening) on 2026-10-13 (the README's "Decisions
-for the owner"). A finding that leaves a residual has a row above.
+was made on the fixed program. The owner decided the review's open points on 2026-10-12, and
+on 2026-10-13 confirmed AIR-21 and AIR-09 and accepted AIR-14's widening (the README's
+"Decisions for the owner"). A finding that leaves a residual has a row above.
 
 | ID | Finding | Resolution | Status |
 |---|---|---|---|

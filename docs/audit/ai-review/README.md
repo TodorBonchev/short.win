@@ -284,9 +284,10 @@ open is at the end of this list and in [`TODO.md`](../../../TODO.md).
   L-2's erratum).
 - **Release evidence: partly done.** The integrated branch passed a local run of the CI gate on
   2026-10-13 (below), and AUDIT.md §0 records its build's hashes, marked as not verified. Still
-  open: a CI run (the owner has the branch pushed with `[skip ci]`, 2026-10-13, so CI has not
-  run), the verifiable build, the PostgreSQL and E2E jobs, and an external fix review. The
-  ≥ 24 h fuzz run is waived by the owner for this batch (2026-10-13, decision 11); none was run.
+  open: a CI run (the owner asked for the branch to be pushed with `[skip ci]`, 2026-10-13, so
+  CI has not run), the verifiable build, the PostgreSQL and E2E jobs, and an external fix
+  review. The ≥ 24 h fuzz run is waived by the owner for this batch (2026-10-13, decision 11);
+  none was run.
 - **The owner's items: decided** (2026-10-13, decisions 9–12): AIR-21 and AIR-09 confirmed and
   AIR-14's widening of residual 10 accepted (SPEC §14, fourteenth round; known-issues KI-23,
   KI-24, KI-52; AUDIT.md §7); FE-31's copy of `lender.residuals` approved (FRONTEND §13); the
@@ -294,9 +295,9 @@ open is at the end of this list and in [`TODO.md`](../../../TODO.md).
 
 ## Local gate
 
-CI has not run on these branches: nothing was pushed before 2026-10-13, and the owner has
-`air-followups` pushed with `[skip ci]`. The CI jobs ran locally instead, in WSL (Ubuntu 24.04)
-with the pinned toolchain.
+CI has not run on these branches: nothing was pushed before 2026-10-13, and the owner asked for
+`air-followups` to be pushed with `[skip ci]`. The CI jobs ran locally instead, in WSL (Ubuntu
+24.04) with the pinned toolchain.
 
 **The integrated branch** (2026-10-13, `air-followups` at `621f8e1`: the fixes and every
 follow-up above; test binaries at 4 threads; AUDIT.md §10 has the same run):
@@ -332,7 +333,8 @@ Not run here:
 - `web-e2e` (Playwright on a validator);
 - the verifiable build (Docker);
 - a fuzz run beyond the smoke tests (no ≥ 24 h run: the owner did not ask for one on
-  2026-10-12), and the opt-in `mutants`.
+  2026-10-12 and waived it for this batch on 2026-10-13, decision 11), and the opt-in
+  `mutants`.
 
 The build's hashes: `shortwin.so` `fba9dd75…` (1,634,936 B); `complete_curve.so` `f3a47201…`
 (unchanged from v1.0.0); AUDIT.md §0 has them in full, marked as not verified.

@@ -55,7 +55,7 @@ to build and test the code, what the code relies on, and what we already know ab
 | `docs/AUDIT.md` | this guide |
 | [`docs/audit/scope.txt`](audit/scope.txt) | the in-scope files, generated from `git ls-files` (`scripts/audit_scope.py`) |
 | [`docs/audit/known-issues.md`](audit/known-issues.md) | the known-issues register (KI-01 …): accepted and disclosed residuals, each with its bound |
-| [`docs/audit/ai-review/`](audit/ai-review/README.md) | the AI-assisted review of v1.0.0 (not a formal audit): its issues and leads (AIR-01 … AIR-24), their fixes and regression tests, and the owner's decisions of 2026-10-12 |
+| [`docs/audit/ai-review/`](audit/ai-review/README.md) | the AI-assisted review of v1.0.0 (not a formal audit): its issues and leads (AIR-01 … AIR-24), their fixes and regression tests, and the owner's decisions of 2026-10-12 and 2026-10-13 |
 | [`docs/audit/findings.md`](audit/findings.md) | the findings tracker (the auditors' findings and their resolution) |
 | [`docs/audit/README.md`](audit/README.md) | the folder index and the RFQ log |
 | [`SECURITY.md`](../SECURITY.md) | the vulnerability disclosure policy |
@@ -481,9 +481,9 @@ not report these as findings unless the stated bound is wrong or can be exceeded
   floor of a current or parked lender (KI-68, 2026-10-08, ninth round: at most 1 lamport of
   entitlement and 1 of realised SOL per third-party touch, each touch costing its sender a
   transaction fee; the cumulative-floor alternative, a program change, not taken), and the earlier
-  rows marked accepted (KI-12, KI-22 … KI-24 (KI-23 with AIR-14's widening and KI-24 with
-  AIR-09's zero token value, both confirmed on 2026-10-13), KI-27, KI-28's M6R-4, KI-29, KI-30,
-  KI-35), and
+  rows marked accepted (KI-12, KI-22 … KI-24 (KI-23 with AIR-14's widening accepted and KI-24
+  with AIR-09's zero token value confirmed, both on 2026-10-13), KI-27, KI-28's M6R-4, KI-29,
+  KI-30, KI-35), and
   the margin of a PumpSwap position opened while a deposit is held (KI-26, M6D residual 16,
   2026-10-09, eleventh round: as built; pricing it on the burned depth, a program change, not
   taken), and O18's residuals as disclosed (KI-16 … KI-21, KI-25, 2026-10-09, eleventh round,
@@ -806,8 +806,8 @@ The full gate (G-full in the M10 plan; CI's `ci.yml`) also runs fmt and clippy w
   38125079869 (2026-10-11), green, all 24 jobs a push runs succeeded** (`fuzz-nightly` and
   `mutants` are opt-in); the commits after it are docs only.
 - **After the tag, the AI review's fixes and follow-ups** (`ai-review-fixes` = `main` @
-  `4497ea6`; `air-followups`): no CI run; the owner has the branch pushed with `[skip ci]`
-  (2026-10-13). Their local gates: the review's README "Local gate", and the integrated
+  `4497ea6`; `air-followups`): no CI run; the owner asked for the branch to be pushed with
+  `[skip ci]` (2026-10-13). Their local gates: the review's README "Local gate", and the integrated
   branch's below.
 
 **The AI review follow-ups' gate** (2026-10-13, a local run, not CI; `air-followups` at
