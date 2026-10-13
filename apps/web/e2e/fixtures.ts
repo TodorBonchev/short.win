@@ -5,23 +5,42 @@
  * profile `full`), and `app`, a small driver over the §11 `data-testid` contract: navigation,
  * wallet connection, the transaction review (stage, deltas, acknowledgements, Sign), keyboard focus
  * and axe. Specs select only by `T` (src/config/testids.ts) — never by text or CSS.
+ *
+ * O-6 (FRONTEND.md §5.4 (6), §10.2): `test.use({ mwa: {…} })` installs the Mobile Wallet Adapter
+ * harness — the init-script hooks that stand in for Android's app switch (`wallet/mwa-hooks.js`) and
+ * the protocol-level fake wallet app answering the association socket (`wallet/fake-mwa.ts`, signing
+ * as the seeded `android` wallet; the `fakeMwa` fixture). `allowCsp` lets one probe expect CSP
+ * violations (the flag-off build's); any other violation still fails the test.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { test as base, expect, type Locator, type Page } from '@playwright/test';
-import type { Address } from '@solana/kit';
+import type { Address, Base64EncodedWireTransaction } from '@solana/kit';
 import type { DisclosureId } from '../src/config/disclosures.ts';
 import { T } from '../src/config/testids.ts';
 import type { TxStage } from '../src/tx/types.ts';
 import { ENV, WEB_DIR } from './env.ts';
 import { IndexerMock, type IndexerMode } from './indexer-mock.ts';
+import { rpc } from './validator/chain.ts';
 import { loadSecretKey, type WalletName } from './validator/keys.ts';
 import { type E2EState, loadState } from './validator/state.ts';
+import { FakeMwa, MWA_SOCKET_URL, type MwaLaunch } from './wallet/fake-mwa.ts';
 
 export { expect, T };
 
 const WALLET_SOURCE = readFileSync(join(WEB_DIR, 'e2e', 'wallet', 'injected-wallet.js'), 'utf8');
+const MWA_HOOKS_SOURCE = readFileSync(join(WEB_DIR, 'e2e', 'wallet', 'mwa-hooks.js'), 'utf8');
+/** The seeded wallet the fake Mobile Wallet Adapter wallet signs as. */
+export const MWA_E2E_WALLET: WalletName = 'android';
+
+/** The fake MWA wallet's variants (`fake-mwa.ts`); `{}` is a wallet that signs. */
+export interface MwaOptions {
+    /** `false`: no `solana:signTransactions` in its capabilities (a sending-only wallet). */
+    readonly signFeature?: boolean;
+    /** Per-account `features` on the accounts it authorizes. */
+    readonly accountFeatures?: readonly string[];
+}
 /** The name the injected wallet registers under (`wallet-option-<name>`). */
 export const E2E_WALLET_NAME = 'ShortWin E2E';
 
@@ -36,12 +55,18 @@ export interface E2EOptions {
     readonly wallet: WalletName | null;
     /** `mock` (profile `chain`), `down` (the indexer is unreachable: RPC fallback), `real` (profile `full`). */
     readonly indexer: IndexerMode | 'real';
+    /** O-6: the Mobile Wallet Adapter harness (hooks and fake wallet app); `null` installs none. */
+    readonly mwa: MwaOptions | null;
+    /** CSP console errors this test expects (matching it); any other one still fails the test. */
+    readonly allowCsp: RegExp | null;
 }
 
 export interface E2EFixtures {
     readonly state: E2EState;
     /** The routed indexer (`null` when `indexer` is `real`). */
     readonly indexerMock: IndexerMock | null;
+    /** The fake MWA wallet app (`mwa` set), else `null`. */
+    readonly fakeMwa: FakeMwa | null;
     readonly app: App;
 }
 
@@ -219,6 +244,25 @@ export class App {
         return this.page.evaluate(() => window.__shortwinE2E?.signed() ?? []);
     }
 
+    // ---- the Mobile Wallet Adapter harness (`mwa`; wallet/mwa-hooks.js) ---------------------
+
+    /** The associations the page launched (the intents), in order. */
+    async mwaLaunches(): Promise<MwaLaunch[]> {
+        return this.page.evaluate(() => window.__mwaE2E?.launches ?? []);
+    }
+
+    /** `'not-found'`: no wallet app comes to the front after the next intents (until set back). */
+    async mwaLaunch(mode: 'ok' | 'not-found'): Promise<void> {
+        await this.page.evaluate((m) => {
+            if (window.__mwaE2E) window.__mwaE2E.launch = m;
+        }, mode);
+    }
+
+    /** The browser comes back to the front without the wallet answering (`focus`). */
+    async mwaReturnToPage(): Promise<void> {
+        await this.page.evaluate(() => window.__mwaE2E?.returnToPage());
+    }
+
     // ---- inputs ----------------------------------------------------------------------------
 
     /**
@@ -321,9 +365,14 @@ declare global {
     }
 }
 
+/** The fake MWA wallet of each page (created by the `page` fixture, which routes its socket). */
+const fakeOf = new WeakMap<Page, FakeMwa>();
+
 export const test = base.extend<E2EOptions & E2EFixtures>({
     wallet: ['trader', { option: true }],
     indexer: [ENV.profile === 'full' ? 'real' : 'mock', { option: true }],
+    mwa: [null, { option: true }],
+    allowCsp: [null, { option: true }],
     // biome-ignore lint/correctness/noEmptyPattern: Playwright's fixture signature
     state: async ({}, use) => {
         await use(loadState());
@@ -333,19 +382,46 @@ export const test = base.extend<E2EOptions & E2EFixtures>({
         await use(mock);
         mock?.dispose();
     },
-    page: async ({ page, wallet, indexerMock }, use) => {
+    page: async ({ page, wallet, indexerMock, mwa, allowCsp }, use) => {
         if (wallet) await page.addInitScript({ content: walletInitScript(wallet) });
         if (indexerMock) await indexerMock.install(page);
+        let fake: FakeMwa | null = null;
+        if (mwa) {
+            const f = new FakeMwa({
+                secretKey: loadSecretKey(MWA_E2E_WALLET),
+                launches: () => page.evaluate(() => window.__mwaE2E?.launches ?? []),
+                sendTransaction: (wire) =>
+                    rpc()
+                        .sendTransaction(wire as Base64EncodedWireTransaction, {
+                            encoding: 'base64',
+                            preflightCommitment: 'confirmed',
+                        })
+                        .send(),
+                signFeature: mwa.signFeature,
+                accountFeatures: mwa.accountFeatures,
+            });
+            fake = f;
+            fakeOf.set(page, f);
+            await page.addInitScript({ content: MWA_HOOKS_SOURCE });
+            await page.routeWebSocket(MWA_SOCKET_URL, (ws) => f.session(ws));
+        }
         const errors: string[] = [];
         page.on('console', (m) => {
-            if (m.type() === 'error' && /Content Security Policy|Refused to/.test(m.text())) errors.push(m.text());
+            if (m.type() !== 'error' || !/Content Security Policy|Refused to/.test(m.text())) return;
+            if (allowCsp?.test(m.text())) return;
+            errors.push(m.text());
         });
         await use(page);
         // The production CSP (§9.3) must never block the app (a violation is a defect, not noise).
         expect(errors, 'CSP violations').toEqual([]);
+        // The fake wallet app understood every message the page's library sent it.
+        if (fake) expect(fake.errors, 'fake MWA wallet errors').toEqual([]);
     },
-    app: async ({ page, state, wallet }, use) => {
-        await use(new App(page, state, wallet));
+    fakeMwa: async ({ page }, use) => {
+        await use(fakeOf.get(page) ?? null);
+    },
+    app: async ({ page, state, wallet, mwa }, use) => {
+        await use(new App(page, state, wallet ?? (mwa ? MWA_E2E_WALLET : null)));
     },
 });
 

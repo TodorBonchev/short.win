@@ -527,7 +527,9 @@ jobs:
     # 1.63 on a local solana-test-validator (Agave 4.1.2) loading the anchor-build artifact's
     # test-venue shortwin.so, mock_cpamm.so and complete_curve.so plus the dumped venue fixtures of
     # tests/fixtures, seeded by e2e/validator/seed.ts (Kit + @shortwin/client); the production build
-    # of apps/web served by vite preview; the injected "ShortWin E2E" Wallet Standard wallet; the
+    # of apps/web served by vite preview; the injected "ShortWin E2E" Wallet Standard wallet (and, in
+    # the Android project, the protocol-level fake Mobile Wallet Adapter wallet, O-6, then again
+    # with the adapter built off); the
     # indexer as a Playwright-routed mock built from the chain. Playwright's own Chromium, installed
     # into the runner user's cache (`SHORTWIN_CHROMIUM=playwright`; the hosted image carries its
     # system libraries). Every spec runs (the M9 exit, FRONTEND.md §12.3: incl. lend-cpi-guard and
@@ -575,6 +577,12 @@ jobs:
         run: pnpm --filter web exec playwright install chromium
       - name: E2E (profile chain)
         run: pnpm --filter web e2e
+      # Its mobile-shell PNGs go to .e2e/screenshots/android-mwa-off/: the artifact below keeps the
+      # default build's android/ set.
+      - name: E2E, the Mobile Wallet Adapter built off (O-6; the Android project, a rebuilt app)
+        env:
+          SHORTWIN_E2E_MWA: '0'
+        run: pnpm --filter web e2e --project chain-android
       - name: Screenshots of every page (e2e/specs/screens.spec.ts)
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

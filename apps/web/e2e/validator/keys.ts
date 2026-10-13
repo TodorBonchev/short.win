@@ -108,6 +108,9 @@ export const KEY_NAMES = {
         'chainBorrower',
         // M10-RESP: the phone project's specs (mobile-*.spec.ts) sign only with it.
         'phone',
+        // O-6: the Android project's Mobile Wallet Adapter specs (mobile-mwa.spec.ts): only the fake
+        // MWA wallet (e2e/wallet/fake-mwa.ts) signs as it.
+        'android',
     ],
 } as const;
 

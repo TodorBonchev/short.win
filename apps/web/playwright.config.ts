@@ -15,8 +15,10 @@
  *
  * Projects (M10-RESP, FRONTEND.md §10.2): `<profile>` — the desktop (1440 × 900), every spec but
  * `mobile-*.spec.ts`; `<profile>-phone` — a 390 × 844 phone (mobile viewport, touch, DPR 3, an iPhone
- * user agent; Chromium's emulation), the `mobile-*.spec.ts` specs only (real taps, axe at 0). Both
- * are in the default run; `--project <profile>` runs one.
+ * user agent; Chromium's emulation), the `mobile-*.spec.ts` specs but `mobile-mwa` (real taps, axe at
+ * 0); *O-6:* `<profile>-android` — a Pixel 7 (412 × 839, DPR 2.625, touch, an Android Chrome user
+ * agent), `mobile-shell` and `mobile-mwa` (the Mobile Wallet Adapter against the protocol-level fake
+ * wallet `e2e/wallet/fake-mwa.ts`). All three are in the default run; `--project <name>` runs one.
  */
 import { defineConfig, devices } from '@playwright/test';
 import { chromiumPath, ENV, PATHS, URLS } from './e2e/env.ts';
@@ -62,6 +64,8 @@ export default defineConfig({
         {
             name: `${ENV.profile}-phone`,
             testMatch: /mobile-.*\.spec\.ts/,
+            // O-6: the Mobile Wallet Adapter registers on Android only (the Android project's spec).
+            testIgnore: /mobile-mwa\.spec\.ts/,
             use: {
                 browserName: 'chromium',
                 viewport: { width: 390, height: 844 },
@@ -69,6 +73,15 @@ export default defineConfig({
                 hasTouch: true,
                 deviceScaleFactor: 3,
                 userAgent: devices['iPhone 13'].userAgent,
+                launchOptions: executablePath ? { executablePath } : {},
+            },
+        },
+        {
+            name: `${ENV.profile}-android`,
+            testMatch: /mobile-(shell|mwa)\.spec\.ts/,
+            use: {
+                ...devices['Pixel 7'], // 412 × 839, DPR 2.625, isMobile, hasTouch, an Android Chrome UA
+                browserName: 'chromium',
                 launchOptions: executablePath ? { executablePath } : {},
             },
         },

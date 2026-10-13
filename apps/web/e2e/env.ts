@@ -16,6 +16,9 @@
  * - `SHORTWIN_E2E_KEEP`      `1`: leave the validator and the preview server running after the run
  * - `SHORTWIN_E2E_RESPONSIVE` `1`: include the `@responsive` six-viewport capture (also on when
  *                            `SHORTWIN_SHOTS_DIR` is set: its output directory; FRONTEND.md §10.5)
+ * - `SHORTWIN_E2E_MWA`       `1` (default): build the app with the Mobile Wallet Adapter on
+ *                            (`VITE_ENABLE_MOBILE_WALLET_ADAPTER`, FRONTEND.md §5.4 (6)); `0` builds it
+ *                            off (the app is rebuilt: `sourceFingerprint` hashes the build's `VITE_*`)
  * - `SHORTWIN_CHROMIUM`      browser executable (default `/usr/bin/chromium` when it exists, else
  *                            Playwright's own Chromium from the user cache); `playwright` forces the latter
  * - `SHORTWIN_SO`, `MOCK_CPAMM_SO`, `COMPLETE_CURVE_SO`  program ELFs (defaults under target/)
@@ -86,6 +89,8 @@ export const ENV = {
     reuse: flag('SHORTWIN_E2E_REUSE', false),
     keep: flag('SHORTWIN_E2E_KEEP', false),
     responsive: flag('SHORTWIN_E2E_RESPONSIVE', false) || !!process.env.SHORTWIN_SHOTS_DIR,
+    /** O-6: the Mobile Wallet Adapter in the app build (`SHORTWIN_E2E_MWA=0`: the flag-off build). */
+    mwa: flag('SHORTWIN_E2E_MWA', true),
     ci: flag('CI', false),
 } as const;
 
@@ -133,6 +138,7 @@ export function appBuildEnv(protocolAlt: string | null): Record<string, string> 
         VITE_PROTOCOL_ALT: protocolAlt ?? '',
         VITE_PRIORITY_FEE_MAX_MICROLAMPORTS: '1000000',
         VITE_ENABLE_TEST_VENUE: ENV.program === 'test-venue' ? 'true' : 'false',
+        VITE_ENABLE_MOBILE_WALLET_ADAPTER: ENV.mwa ? 'true' : 'false',
         VITE_EXPLORER_TX_URL: `https://explorer.solana.com/tx/{sig}?cluster=custom&customUrl=${encodeURIComponent(URLS.rpc)}`,
     };
 }

@@ -2,7 +2,8 @@
  * The injected test wallet itself (harness self-test; `@scaffold`): it registers through Wallet
  * Standard, its in-browser Ed25519 signatures land on the E2E validator, and its test controls do
  * what the pipeline specs rely on — `rejectNext` rejects with 4001, `tamperNext` signs a changed
- * instruction, `raiseFeeNext` changes only the compute-unit price.
+ * instruction, `raiseFeeNext` changes only the compute-unit price. O-6: on the desktop the Mobile
+ * Wallet Adapter is never registered (Android browsers only), even with it on in the build.
  */
 
 import {
@@ -23,7 +24,8 @@ import {
     setTransactionMessageLifetimeUsingBlockhash,
 } from '@solana/kit';
 import { getTransferSolInstruction } from '@solana-program/system';
-import { expect, test } from '../fixtures.ts';
+import { MWA_WALLET_NAME } from '../../src/wallet/mwa.ts';
+import { E2E_WALLET_NAME, expect, T, test } from '../fixtures.ts';
 import { getBalance, PROGRAMS, rpc } from '../validator/chain.ts';
 
 test.use({ wallet: 'trader' });
@@ -53,6 +55,15 @@ function messageOf(wireBase64: string) {
 }
 
 test.describe('injected wallet', { tag: '@scaffold' }, () => {
+    test('the desktop wallet menu lists the injected wallet and no Mobile Wallet Adapter', async ({ app }) => {
+        await app.goto('/markets', 'markets');
+        await app.id(T.walletButton).click();
+        await expect(app.id(T.walletMenu)).toBeVisible();
+        await expect(app.id(T.walletOption(E2E_WALLET_NAME))).toBeVisible();
+        await expect(app.id(T.walletOption(MWA_WALLET_NAME))).toHaveCount(0);
+        await expect(app.id(T.walletOpenElsewhere)).toHaveCount(0);
+    });
+
     test('registers, connects and signs a transaction that lands', async ({ app, page, state }) => {
         await app.goto('/markets', 'markets');
         await app.connectWallet();

@@ -5,7 +5,8 @@ export default defineConfig({
     plugins: [react()],
     test: {
         environment: 'jsdom',
-        include: ['src/**/*.test.{ts,tsx}'],
+        // e2e/**: the E2E harness's own unit tests (the fake MWA wallet against the real library).
+        include: ['src/**/*.test.{ts,tsx}', 'e2e/**/*.test.ts'],
         setupFiles: ['src/test/setup.ts'],
         env: {
             VITE_CLUSTER: 'localnet',

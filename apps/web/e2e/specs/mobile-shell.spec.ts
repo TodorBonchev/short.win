@@ -1,38 +1,58 @@
 /**
- * mobile-shell — the app shell on a phone (M10-RESP; FRONTEND.md §7.6, §10.2): project
- * `<profile>-phone` (390 × 844, touch, DPR 3, an iPhone user agent). Every step is a real tap
- * (`locator.tap()`, no DOM-click fallback) and axe (WCAG 2.2 A/AA) runs at 0 on every state visited.
+ * mobile-shell — the app shell on a phone (M10-RESP; FRONTEND.md §7.6, §10.2): projects
+ * `<profile>-phone` (390 × 844, touch, DPR 3, an iPhone user agent) and, since O-6,
+ * `<profile>-android` (a Pixel 7: 412 × 839, touch, DPR 2.625, an Android Chrome user agent). Every
+ * step is a real tap (`locator.tap()`, no DOM-click fallback) and axe (WCAG 2.2 A/AA) runs at 0 on
+ * every state visited.
  *
  * - the bottom tab bar reaches Markets, Positions and Lend (`aria-current` follows), More reaches
  *   Status and the security policy;
  * - the status strip expands to every status item;
  * - the search overlay keeps a mixed-case mint as typed and its result opens the market;
  * - without a wallet, the wallet popup offers the three open-in-wallet links for this very page
- *   (hrefs only: never followed); connected, the menu has Copy and Explorer.
+ *   (hrefs only: never followed) — on the iPhone as a dialog without a menu; on Android with the
+ *   Mobile Wallet Adapter on, after its entry ("Use installed wallet", the menu's only item) as the
+ *   open-elsewhere block (FRONTEND.md §5.4 (6)); connected, the menu has Copy and Explorer (on
+ *   Android the injected `ShortWin E2E` is tapped, the adapter being a second entry).
  *
- * Writes the shell's phone PNGs (CSS scale) to `.e2e/screenshots/phone/`, or to the reviewed set
- * `e2e/screenshots/phone/` with `SHORTWIN_E2E_SCREENSHOTS=update`. Signs nothing; connects as
- * `phone` (the phone project's own wallet).
+ * Writes the shell's PNGs (CSS scale) to `.e2e/screenshots/phone/` or `.e2e/screenshots/android/`
+ * by project, or to the reviewed sets under `e2e/screenshots/` with `SHORTWIN_E2E_SCREENSHOTS=update`;
+ * an Android run with the adapter built off writes `.e2e/screenshots/android-mwa-off/` only.
+ * Signs nothing; connects as `phone` (the phone project's own wallet).
  */
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Page } from '@playwright/test';
+import { walletCopy } from '../../src/config/copyWallet.ts';
 import { browseLink, MOBILE_WALLETS } from '../../src/wallet/deepLinks.ts';
-import { E2E_DIR, WEB_DIR } from '../env.ts';
+import { MWA_WALLET_NAME } from '../../src/wallet/mwa.ts';
+import { E2E_DIR, ENV, WEB_DIR } from '../env.ts';
 import { type App, E2E_WALLET_NAME, expect, T, test } from '../fixtures.ts';
 
-const DIR = join(
+const ROOT =
     process.env.SHORTWIN_E2E_SCREENSHOTS === 'update'
         ? join(WEB_DIR, 'e2e', 'screenshots')
-        : join(E2E_DIR, 'screenshots'),
-    'phone',
-);
-mkdirSync(DIR, { recursive: true });
+        : join(E2E_DIR, 'screenshots');
 
-/** The first screen, at CSS scale (what the user sees). */
+/** This test's project is the Android one (`<profile>-android`). */
+const android = (): boolean => test.info().project.name.endsWith('-android');
+
+/**
+ * Where this project's PNGs go: `phone/` or `android/`. An Android run with the adapter built off
+ * (`SHORTWIN_E2E_MWA=0`) writes `.e2e/screenshots/android-mwa-off/` instead, never the reviewed
+ * set: its chooser is not the shipped default's, and CI keeps both runs' PNGs in one artifact.
+ */
+function shotDir(): string {
+    if (!android()) return join(ROOT, 'phone');
+    return ENV.mwa ? join(ROOT, 'android') : join(E2E_DIR, 'screenshots', 'android-mwa-off');
+}
+
+/** The first screen, at CSS scale (what the user sees), in {@link shotDir}. */
 async function shot(page: Page, name: string): Promise<void> {
+    const dir = shotDir();
+    mkdirSync(dir, { recursive: true });
     await expect(page.locator('.skeleton')).toHaveCount(0, { timeout: 20_000 });
-    await page.screenshot({ path: join(DIR, `${name}.png`), animations: 'disabled', scale: 'css' });
+    await page.screenshot({ path: join(dir, `${name}.png`), animations: 'disabled', scale: 'css' });
 }
 
 /** Connects the injected wallet through the header popup, by taps. */
@@ -196,14 +216,30 @@ test.describe('phone without a wallet', { tag: '@scaffold' }, () => {
         await app.id(T.walletButton).tap();
         const menu = app.id(T.walletMenu);
         await expect(menu).toBeVisible();
-        await expect(menu).toHaveAttribute('role', 'dialog');
-        await expect(menu.locator('[role="menu"]')).toHaveCount(0);
         const url = page.url();
         const origin = new URL(url).origin;
-        for (const w of MOBILE_WALLETS) {
-            await expect(app.id(T.walletOpenIn(w))).toHaveAttribute('href', browseLink(w, url, origin));
+        const mwa = app.id(T.walletOption(MWA_WALLET_NAME));
+        if (android() && ENV.mwa) {
+            // O-6: the Mobile Wallet Adapter is the menu's only entry; the open-in links follow it.
+            await expect(mwa).toContainText(walletCopy('wallet.mwa.label'));
+            await expect(mwa.getByTestId(T.walletMwaHint)).toHaveText(walletCopy('wallet.mwa.hint'));
+            await expect(menu.getByRole('menuitem')).toHaveCount(1);
+            const block = app.id(T.walletOpenElsewhere);
+            await expect(block).toContainText(walletCopy('wallet.openIn.more'));
+            for (const w of MOBILE_WALLETS) {
+                await expect(block.getByTestId(T.walletOpenIn(w))).toHaveAttribute('href', browseLink(w, url, origin));
+            }
+            await expect(app.id(T.walletReload)).toHaveCount(0);
+        } else {
+            // The iPhone (no adapter there), or Android with it built off: the no-wallet dialog.
+            await expect(mwa).toHaveCount(0);
+            await expect(menu).toHaveAttribute('role', 'dialog');
+            await expect(menu.locator('[role="menu"]')).toHaveCount(0);
+            for (const w of MOBILE_WALLETS) {
+                await expect(app.id(T.walletOpenIn(w))).toHaveAttribute('href', browseLink(w, url, origin));
+            }
+            await expect(app.id(T.walletReload)).toBeVisible();
         }
-        await expect(app.id(T.walletReload)).toBeVisible();
         await app.a11y('phone wallet without a wallet');
         await shot(page, 'wallet-no-wallet');
     });
