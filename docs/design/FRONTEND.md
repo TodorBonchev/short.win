@@ -4,7 +4,9 @@
 "Review fixes"; v1.3 folds in M10 — §13 "M10 changes"; v1.4 makes the app responsive — phones,
 tablets and desktops, the owner's request of 2026-10-09, §7.6–§7.7 and §13 "M10-RESP changes"; v1.5 adds the
 owner's thirteenth-round UX items — newcomer help, the deposit order, one coverage notice, the Claim
-wording and the 12 px floor, §13 "Thirteenth round"; v1.0 of 2026-10-01 was the contract the four
+wording and the 12 px floor, §13 "Thirteenth round"; 2026-10-13 adds the Mobile Wallet Adapter,
+O-6 lifted by the owner — §5.4 (6), §9.3, §10.2 and §13 "Mobile wallets", its E2E run and the
+owner's device test still pending; v1.0 of 2026-10-01 was the contract the four
 parallel tracks — MARKETS, LEND, SHORT, E2E — built against, §12). Owner decision for the visual
 style: **dark trading terminal** — dense, dark, data-first, as memecoin traders know it from
 Photon / BullX / Axiom, and still accessible (§7, §8).*
@@ -64,7 +66,14 @@ a finding, judged in sheets, sticky panels and dialogs too) 88 tests pass. *The 
 (2026-10-11; §13 "Thirteenth round: the second approval pass"):* the Claim only when syncs can pay,
 and the exit state past the deadline as the program takes it; `vitest run` 76 files, 748 tests
 passed, 1 opt-in file skipped; the default E2E 95 tests (69 desktop, 26 phone) pass; the responsive
-gate (eight viewports, 63–65 states each) 96 tests pass.
+gate (eight viewports, 63–65 states each) 96 tests pass. *The Mobile Wallet Adapter (O-6, lifted by
+the owner on 2026-10-13; §5.4 (6), §9.3, §10.2, §13 "Mobile wallets" and FE-32):* built and on by
+default behind `VITE_ENABLE_MOBILE_WALLET_ADAPTER`, the library loaded on eligible Android browsers
+only; `vitest run` 87 files, 963 tests passed, 1 opt-in file skipped (the fake MWA wallet against the
+real library among them). The Android E2E project and its specs are written (the default run lists
+123 tests: 70 desktop, 26 phone, 27 Android), but no browser run has passed yet: the first E2E run,
+the responsive gate and the reviewed `android/` screenshots are pending (§13 "Mobile wallets"), and
+the owner's real-device test precedes the release (FE-32).
 
 ---
 
@@ -110,8 +119,9 @@ coverage-paused markets, the venue upgrade latch, route-broken); every disclosur
 state and history, never sends them); governance / Emergency instructions; the borrower's straddle
 bundle (FE-3); Jupiter (v1.1); partial closes, limit orders, copy trading (SPEC §8 deferred);
 charts beyond a price sparkline from `/candles` (optional, MARKETS). *M10-RESP (owner, 2026-10-09):*
-the app is no longer laptop-only — phones, tablets and desktops are all targets (§7.6); the Mobile
-Wallet Adapter stays out until the owner decides (§5.4).
+the app is no longer laptop-only — phones, tablets and desktops are all targets (§7.6). *O-6 lifted
+(2026-10-13):* the Mobile Wallet Adapter is built and on by default on Android browsers (§5.4 (6));
+the owner's real-device test precedes the release (§13 FE-32).
 
 ---
 
@@ -122,7 +132,7 @@ Wallet Adapter stays out until the owner decides (§5.4).
 | Runtime | Node 24.21.0, pnpm 12.7.0 (`mise.toml`) | `eval "$(mise activate bash)"` |
 | Build | Vite **8.3.1**, `@vitejs/plugin-react` 6.1.1, TypeScript 5.9.3 (strict) | `tsc --noEmit` then `vite build` |
 | UI | React **19.3.0**, TanStack Router **1.170.41** (code-based routes), TanStack Query **5.104.0** | no CSS framework; plain CSS with tokens (§7) |
-| Solana | `@solana/kit` **8.3.0**, `@solana/react` 8.3.0, `@solana/kit-plugin-wallet` **0.20.0**, `@solana/kit-plugin-rpc` **0.19.0**, `@solana-program/token` 0.17.0, `@solana-program/token-2022` 0.19.0 | **no** web3.js v1, wallet-adapter or `@anchor-lang/core` (ARCH §1.1) |
+| Solana | `@solana/kit` **8.3.0**, `@solana/react` 8.3.0, `@solana/kit-plugin-wallet` **0.20.0**, `@solana/kit-plugin-rpc` **0.19.0**, `@solana-program/token` 0.17.0, `@solana-program/token-2022` 0.19.0; *O-6:* `@solana-mobile/wallet-standard-mobile` **0.7.0** (a Wallet Standard wallet, not wallet-adapter; protocol **3.0.0** pinned through `pnpm-workspace.yaml` overrides; a lazy chunk, §2.2) | **no** web3.js v1, wallet-adapter or `@anchor-lang/core` (ARCH §1.1) |
 | Program client | `@shortwin/client` (workspace, Codama) | instruction builders, account decoders, PDAs, error codes |
 | Math | `@shortwin/math-wasm` (workspace, `packages/math-wasm`) | wasm-bindgen `--target web` build of `crates/shortwin-math-wasm` (§6.7) |
 | Lint / format | Biome **2.5.14** (`biome.json` at the root, scoped to `apps/web` and `packages/math-wasm`) | 4 spaces, single quotes, width 120; a11y rules on |
@@ -159,6 +169,7 @@ cargo nor wasm-bindgen once `pkg/` is current. wasm-bindgen must be the crate's 
 | `VITE_PROTOCOL_ALT` | none | base58; the protocol lookup table (ARCH §6.4 A28) |
 | `VITE_PRIORITY_FEE_MAX_MICROLAMPORTS` | `1000000` | integer µlamports/CU (FE-6) |
 | `VITE_ENABLE_TEST_VENUE` | `false` | TEST-ONLY mock venue adapter; refused unless `VITE_CLUSTER=localnet` (FE-D7) |
+| `VITE_ENABLE_MOBILE_WALLET_ADAPTER` | `true` | `true` \| `false` (anything else fails the build); the Mobile Wallet Adapter on Android browsers and its CSP sources (§5.4 (6), §9.3). *O-6, 2026-10-13* |
 | `VITE_EXPLORER_TX_URL` | Solana Explorer | must contain `{sig}` |
 
 `parseConfig` is pure and lists every problem at once (`ConfigError`); `vite.config.ts` runs it at
@@ -173,7 +184,12 @@ host (the header form of the CSP with `frame-ancestors`, and the other security 
 is inlined (`assetsInlineLimit: 0`), so nothing needs `data:` scripts. *v1.2 (M9-SEC-6):* source
 maps are generated `hidden` (no `sourceMappingURL`) and moved out of `dist/` into
 `apps/web/dist-sourcemaps/` (gitignored) — upload them privately to an error tracker, or publish
-them deliberately (owner choice, §13 FE-23).
+them deliberately (owner choice, §13 FE-23). *O-6 (2026-10-13):* the Mobile Wallet Adapter
+(`@solana-mobile/wallet-standard-mobile` 0.7.0 with its protocol and their in-page dependencies) is
+a lazy chunk of its own (`index.browser-<hash>.js`, measured 137,863 bytes, 42,677 gzip), imported
+only by `src/wallet/mobileWalletAdapter.ts`; only an eligible Android browser with the flag on
+fetches it, never a desktop, iOS, a WebView or Firefox. It carries the library's dead QR and nostr
+code (`qrcode`, `@noble/curves/secp256k1`; mobile.md R10).
 
 ---
 
@@ -1599,7 +1615,11 @@ the plugin never signs implicitly; the pipeline passes the connected `signer` as
 
 1. If the review is older than `STALE_REVIEW_MS` (20 s), re-simulate and return to the review with a
    notice; the user signs only numbers they saw.
-2. Rebuild the message with the measured compute limit and a fresh `confirmed` blockhash.
+2. Rebuild the message with the measured compute limit and the review's `confirmed` blockhash:
+   fetched with the simulation and refreshed every 10 s while the review waits
+   (`LIFETIME_REFRESH_MS`; never older than the 20 s review); the lookup tables are the
+   simulation's. *2026-10-13:* nothing awaits the network between the Sign tap and the wallet —
+   Android launches a wallet app (the Mobile Wallet Adapter) only within the tap's user activation.
 3. A wallet with `solana:signTransaction` (Kit `TransactionModifyingSigner`) signs through
    `signTransactionMessageWithSigners`; the returned message is checked by `assertSameIntent` (§5.8)
    before anything is sent. A wallet with only `solana:signAndSendTransaction` sends itself
@@ -1624,22 +1644,60 @@ the plugin never signs implicitly; the pipeline passes the connected `signer` as
    registration rank and feature set); a silent reconnect (the plugin's stored `name:address`) is
    undone when another installed wallet uses that name or the wallet came back with another
    account, and the user picks the wallet explicitly.
-6. *M10-RESP — mobile wallets.* A phone browser has no wallet extension; a page opened inside a
-   wallet app's own browser (Backpack, Phantom, Solflare) gets Wallet Standard injected and the path
-   above works unchanged. So on a mobile device (`isMobileDevice`: client hints, the UA, iPadOS's
-   Macintosh-with-touch, a coarse non-hovering pointer) without a wallet, the chooser
-   (`WalletChooser`, shared by the header and `ConnectCta`) offers "Open in <wallet>" — each
-   wallet's universal browse link to this very page, alphabetical (`src/wallet/deepLinks.ts`;
-   formats re-checked against the wallets' docs on 2026-10-09, re-check at each release):
-   `https://backpack.app/ul/v1/browse/<url>?ref=<origin>`, `https://phantom.com/ul/browse/<url>?ref=<origin>`,
-   `https://solflare.com/ul/v1/browse/<url>?ref=<origin>` (URL-encoded; rendered only as a tapped
-   `<a>`, never for pasting), off mainnet "Set your wallet to <cluster> first", the wallets' sites
-   and a Reload; a desktop without a wallet gets the sites and Reload. These are top-level,
-   user-initiated navigations: the CSP is unchanged. **Not built (owner call O-6; decided 2026-10-10, thirteenth round: after the
-   audit, off by default):** the Mobile
-   Wallet Adapter (`@solana-mobile/wallet-standard-mobile`) — a new runtime dependency on the
-   signing path before the audit, a likely `ws://localhost` `connect-src` widening, Android only; a
-   spike would come on its own branch behind a flag defaulting off.
+6. *Mobile wallets (M10-RESP; O-6 lifted by the owner on 2026-10-13).*
+
+   - **In-app browsers.** Inside a wallet app's own browser (Backpack, Phantom, Solflare), Wallet
+     Standard is injected and the path above works unchanged.
+   - **Open-in links.** On a mobile device (`isMobileDevice`: client hints, the UA, iPadOS's
+     Macintosh-with-touch, a coarse non-hovering pointer) the chooser (`WalletChooser`, shared by
+     the header and `ConnectCta`) offers "Open in <wallet>". Each is the wallet's universal browse
+     link to this very page, listed alphabetically (`src/wallet/deepLinks.ts`; formats re-checked
+     on 2026-10-13, re-check at each release): `https://backpack.app/ul/v1/browse/<url>?ref=<origin>`,
+     `https://phantom.com/ul/browse/<url>?ref=<origin>`, `https://solflare.com/ul/v1/browse/<url>?ref=<origin>`
+     (URL-encoded; rendered only as a tapped `<a>`, never for pasting).
+     - Without a wallet, they are the dialog's content, with the cluster hint off mainnet ("Set
+       your wallet to <cluster> first."), the wallets' sites and Reload. A desktop without a wallet
+       gets the sites and Reload.
+     - With wallets listed, they form a block after the entries under "Or open this page in a
+       wallet app" (`wallet-open-elsewhere`), so the route survives a wallet registering.
+     - In a social app's in-app browser without a wallet (`isInAppBrowser`, FE-33), the chooser
+       first says "Open this page in your browser", with "Copy link".
+     - These are top-level, user-initiated navigations.
+   - **The Mobile Wallet Adapter** (`@solana-mobile/wallet-standard-mobile` 0.7.0, protocol 3.0.0).
+     - It is on by default; `VITE_ENABLE_MOBILE_WALLET_ADAPTER=false` turns it off (§2.1).
+     - It registers a Wallet Standard wallet in a secure context on Android browsers that are
+       neither a WebView nor Firefox (`mwaEligible`). The package is loaded lazily by
+       `src/wallet/mobileWalletAdapter.ts`, from `App.tsx` (a framed page never registers it).
+     - It uses `appIdentity` ShortWin, the origin and `/icon-192.png`, the build's chain, and a
+       chain-scoped authorization cache. It has no remote / QR association and no library dialogs.
+     - Its entry reads "Use installed wallet" over "Opens your wallet app on this phone". Chrome's
+       "Apps on device" permission is asked by the app from a tap, before Connect and before Sign
+       (`src/wallet/localNetwork.ts`; while it is missing the entry and the review say "Allow 'Apps
+       on device' so this page can reach your wallet app").
+     - The library's own UI is never shown: its spinner and modal hosts are removed as they are
+       inserted (`removeLibraryUi`), and the app passes its own `onWalletNotFound` (no library
+       error modal; the header chooser reopens with the open-in links instead).
+     - A reload reconnects silently from the cached authorization (local storage only; the wallet
+       is not asked), without opening the wallet app. An account changed in the wallet shows up at
+       the next Sign, which then ends with "Connect a wallet that can sign." Disconnect forgets the
+       authorization locally; the wallet's token stays valid until it expires or is revoked in the
+       wallet.
+     - An MWA wallet signs only through `solana:signTransaction`, checked by `assertSameIntent`
+       before anything is sent. One that cannot (no `solana:signTransactions`, an MWA 1.x wallet
+       without sign-and-send, or per-account features that hide `signTransaction` from Kit) gets
+       no signer, like a read-only wallet (`mwaSignerOk`, `useWallet`). The sending-only path
+       (FE-11, FE-21) is never used for MWA, and its entry never carries the "sends itself" badge.
+     - The tap reaches the wallet with no network call in between (step 2). If Android still
+       refuses the launch, the review stays open with "Couldn't open your wallet app. Tap Sign
+       again".
+     - The library has calls that never settle (FE-35). While the review waits for an MWA wallet,
+       Cancel is enabled after 5 s and closes the review (nothing is sent); a connect the wallet
+       never answers is ended 10 s after the page is back in front (at most 120 s), and the
+       library's connect lock is reset (`src/wallet/mwaCall.ts`).
+     - Errors are as in §5.9.
+     - The owner's real-device test precedes the release (§13 FE-32; the checklist is in
+       DEVELOPMENT.md "Mobile wallets on a real device").
+   - No WalletConnect / Reown.
 
 ### 5.5 Send and confirm
 
@@ -1725,6 +1783,7 @@ byte 2 at 165, TLV from 166): `CpiGuard` (extension 11, `lock_cpi`) and `MemoTra
 | wallet | rejection (`4001`, "rejected", `AbortError` — *v1.2:* only from the wallet call, `WalletCallError`) → `wallet-rejected`; another wallet failure → `wallet`; a refused intent check (`IntegrityError`, §5.8) → `integrity` (`report`); a landed transaction that differs → `integrity` (no Retry) |
 | transport | network, HTTP status, "denied" / "cancelled" / rate limit outside the wallet → `rpc` (retry); block height exceeded → `expired`; *v1.2:* no confirmation in time, or a sending wallet's signature not seen → `unknown-outcome` (no Retry) |
 | plan | *v1.2:* a rebuild that the fresh chain refuses (`PlanError`) → `plan` (`adjust`) |
+| the Mobile Wallet Adapter (*O-6, 2026-10-13*; §5.4 (6)) | found on the wallet call's `cause` chain (at most 6 levels, by `name` and `code`, never `instanceof`: the package is lazy), first in the `WalletCallError` branch. `SolanaMobileWalletAdapterProtocolError` −3 (`ERROR_NOT_SIGNED`) on `sign_transactions` → `wallet-rejected`; its other codes (−2, −4, −5, −100), `ERROR_SESSION_CLOSED`, `ERROR_ILLEGAL_TRANSPORT_STATE`, `ERROR_INVALID_PROTOCOL_VERSION`, `ERROR_FORBIDDEN_WALLET_BASE_URL`, `ERROR_SECURE_CONTEXT_REQUIRED` → `wallet` (generic, Retry: the signing path sends nothing itself); `ERROR_ASSOCIATION_CANCELLED` with an event (a library modal closed, reachable only in the local-network race) → `wallet-rejected`, without one → `wallet`; `ERROR_WALLET_NOT_FOUND` → `wallet-launch`; `ERROR_LOOPBACK_ACCESS_BLOCKED` → `local-network`; `ERROR_SESSION_TIMEOUT` → `local-network` while Chrome's permission is missing, else `wallet`. `wallet-launch` and `local-network` never reach the failed state: the review stays open, Sign enabled, with its notice beside Sign (`tx-sign-notice` `data-reason` ∈ `launch` "Couldn't open your wallet app. Tap Sign again", `local-network` "Allow 'Apps on device' so this page can reach your wallet app"). A failed *reauthorization* at Sign never reaches the app as an error (the library disconnects and its call never settles): the connected MWA account changing or disconnecting mid-sign ends the sign at once as `wallet-changed` (`blocked`, "Connect a wallet that can sign.", retry mode `close`: "Close and review again"; R-S2). Any MWA transport error on the sending branch (`WalletCallError.sending`) → `unknown-outcome` (unreachable: MWA never sends itself). While the review waits for an MWA wallet, Cancel (and ✕, Escape) is enabled 5 s after the wallet call starts and closes the review; the abort is not reported as a rejection (R-S1) |
 | Anchor framework errors, failing program short.win | *M10:* 3012 `AccountNotInitialized` (a lender position closed meanwhile, KI-67) → `program`, `retry` (the review rebuilds the plan); *ninth round (FE-30):* 3007 `AccountOwnedByWrongProgram` when the logs name the `lender` account (a closed position's address someone funded) → the same; 3007 on another account, or either code from another program → `unknown` (`report`) |
 
 The `txError` element carries `data-kind` and `data-code`. `action` drives the UI: `retry` →
@@ -2136,10 +2195,13 @@ stops and centres. The tier is the viewport width; density is the pointer (§7.6
 | `/lend` (§3.8) | KPIs 2 × 2, lender cards with Withdraw / Deposit / Claim, Claim all in the action bar | cards (the lender table is cards under 960 px of container) | the table, Claim all in the header |
 | `/status`, `/security` (§3.9) | one column, tables as cards; identifiers wrap | one column | panels side by side; the policy centred at 920 px |
 
-**Mobile wallet entry** (§5.4): a phone browser without an injected wallet gets "Open in
-Backpack / Phantom / Solflare" universal links (alphabetical) to the same page, the cluster hint
-off mainnet, the install sites and Reload; inside a wallet's in-app browser Wallet Standard works
-unchanged. The Mobile Wallet Adapter is owner item O-6 (not built; the owner's decision of 2026-10-10: after the audit, off by default).
+**Mobile wallet entry** (§5.4 (6)): on a phone or tablet the chooser offers "Open in Backpack /
+Phantom / Solflare" universal links (alphabetical) to the same page — the content without a wallet
+(with the cluster hint off mainnet, the install sites and Reload), a block after the entries with
+wallets listed, and after "Open this page in your browser" with Copy link in a social app's in-app
+browser; inside a wallet's in-app browser Wallet Standard works unchanged. On Android browsers the
+Mobile Wallet Adapter (O-6, on by default since 2026-10-13) adds the entry "Use installed wallet" /
+"Opens your wallet app on this phone", which opens the wallet app installed on the phone.
 
 ---
 
@@ -2201,6 +2263,26 @@ Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
 Cross-Origin-Opener-Policy: same-origin · Strict-Transport-Security: max-age=63072000; includeSubDomains
 ```
 
+*With the Mobile Wallet Adapter on (the default since 2026-10-13; `VITE_ENABLE_MOBILE_WALLET_ADAPTER`,
+§2.1):* `style-src-elem 'self' 'sha256-9y+0omBcAXmVSpYuadfUp/k8GxCIDiw2wrEyqM1cQnc='`,
+`style-src-attr 'unsafe-hashes' 'sha256-fpg83YZxyBh7zNCICwdKi5D7eUkxQ9wk3mpUiNPhP3g='` (the library's
+loading spinner, which the app removes as it is inserted: the hashes only keep its insertion free of
+violations; recomputed from the installed package by `mwaPackage.test.ts`) and `connect-src …
+ws://localhost:* http://localhost` (the association socket, random port 49152–65535, and the request
+that raises Chrome's "Apps on device" prompt). Any same-origin script may then reach any loopback
+port, on every platform; only Chrome gates it (its local-network permission); accepted because
+`script-src 'self'` holds and the app has no HTML sinks. The MWA transport authenticates no wallet
+end (a local app on the port can answer as the wallet; encryption guards against passive observers
+only): the wallet's own UI for each signature and `assertSameIntent` on what comes back are the
+defences. The library's other UIs are never shown (the app's own `onWalletNotFound` and
+local-network step, and the host observer), so no `'unsafe-inline'`, font or image host; no
+`frame-src` (Firefox for Android unsupported, FE-34); Permissions-Policy and COOP unchanged — never
+list `local-network-access` / `loopback-network` (their default allowlist, `'self'`, is what the
+adapter needs). `upgrade-insecure-requests` kept (Chromium does not upgrade localhost; the E2E's
+T-UIR probe is to check Blink, its first browser run pending (§13 "Mobile wallets"); a device
+check is §13 FE-32). Flag off: the policy is byte for byte the one above. `csp.test.ts` pins both,
+in full.
+
 No inline scripts or styles in the HTML, no `eval`, no third-party scripts, fonts or images (wallet
 icons are `data:` URIs from the Wallet Standard registry). **Clickjacking:** `frame-ancestors 'none'`
 and `X-Frame-Options: DENY`; the app never renders inside a frame. *As built v1.2 (M9-SEC-6):* a
@@ -2259,6 +2341,22 @@ Exact versions in `package.json`; the lockfile is the workspace's (`pnpm install
 in CI); pnpm's supply-chain policy applies; no `postinstall` downloads (Playwright browsers are
 installed explicitly into the user cache, never as root).
 
+*O-6 (2026-10-13):* `@solana-mobile/wallet-standard-mobile` **0.7.0** is the one new runtime
+dependency; it and all its imports run only in its lazy chunk (§2.2). pnpm 12 reads overrides only
+from `pnpm-workspace.yaml` (it ignores package.json's `pnpm` field), which pins the protocol,
+`@solana-mobile/mobile-wallet-adapter-protocol` **3.0.0**, and the protocol's own `@solana/kit` to
+8.3.0 (one Kit in the lockfile). `minimumReleaseAge: 20160` (14 days, repo-wide) keeps every install
+from resolving anything younger, verified by a probe at install (a young version is refused, an
+older one resolved); the two `@solana-mobile` versions the owner chose to install now are excluded
+by exact version until 2026-10-21 (remove both exclusions then), and 21 versions locked before the
+gate and published 2026-09-29/30 by exact version until 2026-10-15 (pnpm 12 also verifies the
+existing lockfile against the gate). Every new lockfile entry was reviewed with its publish date (M1's
+commit lists them). `src/wallet/mwaPackage.test.ts` is the drift test: the package files' sha256
+(wallet-standard-mobile's `index.browser.js`, the protocol's `index.browser.js` and both encoding
+files), the in-page transitive versions, the two CSP hashes recomputed from the package, the one
+interpolated `innerHTML` inside `populateError`, the host shapes the app removes and the library
+facts the way out relies on — a package update fails it until someone re-reads the library.
+
 ---
 
 ## 10. Test plan
@@ -2290,6 +2388,23 @@ batch 3: `features/lend/previews.test.ts` "the pool’s unpaid rent at a deposit
 thresholds, the prologue's pending credit), `LendPanel.test.tsx` (no rows on a paid-in pool, info
 collapsed, warn expanded and in the plan, a stored-zero accruing pool, a top-up's labels) and
 `features/short/plans.test.ts`'s extras fallback (`EXTRAS_RETRY_CODES` is exactly 6003–6005).
+
+*O-6 (the Mobile Wallet Adapter, 2026-10-13):* new files `wallet/platform.test.ts` (the
+`isMobileDevice` matrix, `isInAppBrowser`, `mwaEligible`), `wallet/mwaEligible.agree.test.ts` (the
+real package registers exactly where `mwaEligible` says, Firefox for Android the one intended
+difference), `wallet/mobileWalletAdapter.test.ts` (gating, `registerMwa`'s arguments, verification
+against the plugin's list, `onWalletNotFound`, `chainScopedCache`, `removeLibraryUi`, the icon's
+pixels), `wallet/mwaPackage.test.ts` (the drift test, §9.6), `wallet/mwaSigner.agree.test.ts` (the
+signer policy with the real package and plugin), `wallet/mwaCall.test.ts` (R-C1 on fake timers),
+`wallet/mwaConnect.agree.test.ts` (R-C1 with the real plugin), `wallet/localNetwork.test.ts`; and
+extended `parseConfig`, `csp` (both flag states, in full), `wallet.test.tsx` (the chooser states
+(a)–(l)), `useTxFlow` (no awaited I/O before the wallet, the 10 s refresh, the notices, R-S1, R-S2,
+the signer policy), `errors` (every MWA row of §5.9), `m9-review/tx` (the lifetime path, no send
+after an abort), `TxReviewModal` (the notices, Cancel while signing) and `copy` (70 ids, 150
+strings). Vitest also runs `e2e/**/*.test.ts`: `e2e/wallet/fake-mwa.test.ts` holds the E2E's fake
+MWA wallet (§10.2) to the real wallet-standard-mobile 0.7.0 and protocol 3.0.0, in-process — the
+handshake and its key derivation, the encrypted framing and sequence numbers, connect, sign after
+the reauthorization, and every behaviour and variant the Android specs use.
 
 Each track adds, at minimum: MARKETS — the safety verdict for every rule (one fixture per rejected
 extension and for freeze authority / native mints), the market page's mapping of API fields, the
@@ -2343,6 +2458,76 @@ price, caps), close / add-margin previews, P&L and risk.
   `mobile-trade`, `mobile-lend` belong to the page tracks; *thirteenth round:* `mobile-guide` and
   `mobile-focus` (2.4.11, §7.6). `screens.spec` captures grow to the
   document's scroll height (the document scrolls since M10-RESP).
+- *O-6 (2026-10-13)* **The Android project** `<profile>-android` (`devices['Pixel 7']`: 412 × 839,
+  DPR 2.625, `isMobile`, touch, an Android Chrome user agent; the same Chromium): `mobile-shell`
+  and `mobile-mwa` (the phone project ignores `mobile-mwa.spec.ts`), in the default run. The app
+  is built with `VITE_ENABLE_MOBILE_WALLET_ADAPTER` from `SHORTWIN_E2E_MWA` (default `1`; `0`
+  builds it off — the build's `VITE_*` are in `sourceFingerprint`, so switching rebuilds). A seeded
+  wallet `android` (SOL and E2EMAIN, like `phone`) is signed with only by the fake MWA wallet.
+  `mobile-shell` runs there too: without an injected wallet its chooser shows the adapter's entry
+  and the open-elsewhere block (with the flag off, the iPhone's dialog); its PNGs go to
+  `e2e/screenshots/android/` (with the flag off, to `.e2e/screenshots/android-mwa-off/` only, so
+  CI's artifact keeps the default build's set). *Status (2026-10-13):* written, but not yet run in
+  a browser (§13 "Mobile wallets"): what follows says what the specs assert, not what a run showed.
+  - **The intent and the app switch** (`e2e/wallet/mwa-hooks.js`, an init script the `mwa` fixture
+    installs): `URLSearchParams.prototype.set` is wrapped to record each association as the
+    protocol builds the intent (`association`, `port`, `navigator.userActivation.isActive`,
+    `performance.now()`); `window.addEventListener` is wrapped so that the first `blur` listener
+    after an association (the protocol's 3 s launch detection) is followed 50 ms later by a
+    synthetic `blur` — the wallet app coming to the front — unless `__mwaE2E.launch =
+    'not-found'`; `__mwaE2E.returnToPage()` dispatches `focus`. Headless Chromium has no app for
+    `solana-wallet:`, so the page should stay (M2 asserts the URL unchanged after the intent; were
+    it to navigate, CDP's `Page.frameRequestedNavigation` would stand in for the hooks).
+  - **The wallet** (`e2e/wallet/fake-mwa.ts`): a protocol-level MWA wallet app in Node behind
+    `page.routeWebSocket(/^ws:\/\/localhost:\d+\/solana-wallet$/)`, with `node:crypto` only:
+    HELLO_REQ verified against the launched association key (ECDSA P-256, IEEE-P1363) and port,
+    ECDH P-256 and HKDF-SHA-256 to an AES-128-GCM session key, HELLO_RSP with the session
+    properties `{"v":"v1"}`, then encrypted JSON-RPC (4-byte sequence number as the AAD, 12-byte
+    IV): `get_capabilities` (`features: ['solana:signTransactions']`), `authorize` (fresh, or with
+    the `auth_token` of the reauthorization before each sign), `sign_transactions` (Kit's
+    `partiallySignTransaction` with `android`'s key), `sign_and_send_transactions` (never called:
+    the specs assert it), `deauthorize`. One-shot behaviours on the call they name: `decline`
+    (−3), `tamper` (the first data byte XOR 1 of the last instruction that is neither
+    compute-budget nor without data — not simply the last instruction: a compute-budget change is
+    one the app accepts, §5.8, and an empty one has no byte), `close`, `silent` (on
+    `sign_transactions`); `reauthDecline` (−1),
+    `reauthClose`, `reauthSwitch` (another account; the next sign declined −2) on the
+    reauthorization; `silentConnect`. Variants: `signFeature: false`, `accountFeatures`. It
+    records every call (`fakeMwa.calls`), session and signature; a message it cannot understand
+    fails the test. The routed socket is a page-side mock that bypasses `connect-src`, so the CSP's
+    MWA sources are probed natively (M11).
+  - **`mobile-mwa.spec.ts`** (`wallet: null`: the adapter is the only wallet; axe at 0 on each
+    state; the zero-CSP guard, which takes `allowCsp` for the flag-off probe only): M1 the chooser
+    (`android/wallet-mwa.png`), M2 connect (one association with the tap's activation still
+    active; the library's spinner host inserted and removed at once), M3 the silent reconnect (no
+    association) and Disconnect, M4 sign and confirm (a new association, the reauthorization, then
+    `sign_transactions`; the signature lands; `tx-wallet` names the adapter), M5 the activation
+    reaches the wallet although every `getLatestBlockhash` is held 6 s (the prefetch, §5.4 step 2),
+    M6 decline, M7 tamper (`integrity`, nothing lands), M8 a launch nobody answers (the `launch`
+    notice, Sign again confirms; then a second unanswered launch on a new page load, Cancel, and
+    Disconnect: the chooser stays closed, and the test asserts that Disconnect came within the
+    10 s for which a recorded not-found would reopen it, so a slow run cannot pass vacuously), M9
+    the session closed (`wallet`, Retry), M10 / M10b a sending-only wallet and per-account
+    features in MWA ids (connected, no signer: the deposit form's no-signer state; no "sends itself" badge; neither
+    sign call made), M11 the CSP probes, M12 a Telegram in-app browser (no entry; Copy link writes
+    the page's URL; `android/wallet-in-app-browser.png`), M13 / M14 the reauthorization declined or
+    closed (`wallet-changed` within 1 s of the wallet's answer — the fake's `answeredAt` against
+    the page's `performance.timeOrigin + performance.now()`, one clock —, "Close and review
+    again", the header "Connect wallet"), M15 the wallet never answers the sign (Cancel enabled
+    after 5 s; a new Sign confirms), M16 / M17 the
+    wallet never answers the connect (the button enabled 10 s after `returnToPage()`, a new
+    association after; meanwhile a tap mid-screen changes nothing and no spinner host is in the
+    DOM), M18 another account at the reauthorization (`wallet-changed`; the header shows the new
+    account), T-UIR (Blink keeps `ws://localhost` and `http://localhost` under
+    `upgrade-insecure-requests` on a route-fulfilled `https://` page; its `fetch` is bounded at
+    2 s in case Chromium's own local-network check holds it, and whether that check interferes —
+    then the test gets `--disable-features=LocalNetworkAccessChecks`, or Playwright 1.63's
+    `local-network-access` permission — is decided on the first browser run). Flag off
+    (`SHORTWIN_E2E_MWA=0 pnpm --filter web e2e --project chain-android`): no entry, today's
+    no-wallet dialog, no script
+    carrying the library (its cache key, `SolanaMobileWalletAdapterDefaultAuthorizationCache`, not
+    the wallet name, which the app's own bundle carries), and the M11 probes refused (`connect-src`).
+    `wallet.spec.ts` (desktop): no adapter entry with the flag on.
 - **Indexer:** profile `chain` (CI): the indexer URL points at a Playwright-routed mock
   (`page.route`) that serves OpenAPI-shaped responses built from the seed's on-chain state, or at
   nothing for the fallback specs. Profile `full` (local, optional): `shortwin-indexer run` against
@@ -2386,7 +2571,8 @@ must refuse, §5.8), `raiseFeeNext(price)` (a compute-budget-only change — the
 | `keyboard.spec.ts` | deposit and open completed with the keyboard only |
 | `focus.spec.ts` | *thirteenth round:* Focus Not Obscured (WCAG 2.2 2.4.11, §7.6): Tab and Shift+Tab walks over the markets list (intro strip shown), a market's Overview, Lending and How it works; no focused control entirely under the sticky header or the status bar, and none partly under another control's touch area outside the page's bars (the phone's walk, with the tab bar, the status strip and the action bar: `mobile-focus.spec.ts`) |
 | `harness.spec.ts` | *as built:* the seeded scenario is on chain; the routed indexer's REST and WebSocket shapes; the Node-side actions |
-| `wallet.spec.ts` | *as built:* the injected wallet's Wallet Standard features, reject / tamper / raise-fee controls |
+| `wallet.spec.ts` | *as built:* the injected wallet's Wallet Standard features, reject / tamper / raise-fee controls; *O-6:* no Mobile Wallet Adapter entry on the desktop |
+| `mobile-mwa.spec.ts` | *O-6 (the Android project):* the Mobile Wallet Adapter against the fake wallet app, M1–M18 and T-UIR, and the flag-off build (above) |
 | `frame.spec.ts` | *v1.2 (M9-SEC-6):* the preview sends `X-Frame-Options: DENY` and `frame-ancestors 'none'`; a framing page gets no app — the browser refuses it, and with the headers stripped (a host ignoring `_headers`) the app renders `frame-guard` instead; *M10 (SECTXT-4):* it GETs `/.well-known/security.txt` (200, `text/plain`, valid; the preview server only — `vite preview` ignores `_headers`) |
 | `screens.spec.ts` | *as built:* every page and state (markets, search, create market ok / rejected / pump curve, every market tab, the tier popover, coverage-paused and list-only markets, 1,024 px, the short preview and its review, the blocked panel, positions, a position, deposit / withdraw / claim, the lender dashboard, the CPI Guard notice and the bracket's review, the indexer-down views; *M10:* the `/security` page, `60-security`) saved as PNGs with axe on each; asserts no sideways scroll at 1,024 px |
 
@@ -2398,7 +2584,8 @@ must refuse, §5.8), `raiseFeeNext(price)` (a compute-budget-only change — the
   of history, which breaks profile `full`'s backfill).
 - One seeded wallet per independent spec group (`trader`, `lender`, `guard`, `memo`, `memoRace`,
   `claimer`, `creator`, `closer`, `margin`, `holder`, `errors`, `keyboard`; *M10, FE-18:* `wiped`,
-  `wipeBorrower`, `rejoin`, `potClaimer`, `potLate`, `potBorrower`), so specs do not depend
+  `wipeBorrower`, `rejoin`, `potClaimer`, `potLate`, `potBorrower`; *M10-RESP:* `phone`; *O-6:*
+  `android`), so specs do not depend
   on their order; one worker (one validator); specs that change shared state undo it.
 - *M10 (FE-18):* two more seeded mock markets, `wipe` and `pot`, each lent by one spec wallet
   alone, with positions after the warm-up (five SPL mock markets, five open positions). Under
@@ -2454,7 +2641,11 @@ test after the math-wasm build (`crates/shortwin-math-wasm/js/smoke.cjs` on a `w
 --target nodejs` build of the same `.wasm`). The app's own facade calls run under Vitest, which
 loads the real `.wasm`; a facade function no app code calls, such as `previewSettlement` (whose
 trailing `executable` a JS caller that leaves it out passes as `false`), was until then checked
-from JS only by the smoke test, which no job ran.
+from JS only by the smoke test, which no job ran. *O-6 (2026-10-13):* after the full run,
+`web-e2e` runs the Android project again with `SHORTWIN_E2E_MWA=0` (the app rebuilt with the Mobile
+Wallet Adapter off: `mobile-mwa`'s flag-off describe and `mobile-shell`'s iPhone-like no-wallet
+dialog); the `web` job's Vitest also runs `e2e/**/*.test.ts` (the fake MWA wallet against the real
+library, §10.1).
 
 ### 10.5 Responsive capture (M10; `e2e/specs/responsive.spec.ts`, `@responsive`)
 
@@ -2556,6 +2747,15 @@ pass over all eight viewports, after every viewport's first (it changes the pot 
 lends there and `potBorrower` closes, so `potLate` holds a surplus its sync can move) —
 `lender-dashboard-syncs` and `lend-claim-syncs` (the row's and the panel's two-line Claim label), so
 the Lending page's action cell is still measured with its widest label at every viewport.
+*O-6 (2026-10-13):* `phone-s` (360) and `phone-xs` (320) send the Pixel 7 user agent, so with the
+Mobile Wallet Adapter on (the default build) their `wallet-menu-disconnected` and
+`wallet-menu-no-wallet` states show its entry ("Use installed wallet" over its second line, a
+row at least 48 px tall in the phone's sheet) and the open-elsewhere block — the Android wallet states at 320 and 360 px, with the
+Android project's at 412 px (§10.2); `phone` (390, iPhone) keeps the iOS states. The gate must
+stay at zero findings on them (44 px rows under a coarse pointer, text ≥ 12 px — the hint is
+`--fs-xs`, the O-4 floor —, no tap covers); their PNGs are new baselines (the capture's, in
+`$SHORTWIN_SHOTS_DIR`: no committed set). The gate's first run on the flag-on build is pending
+(§13 "Mobile wallets").
 
 ---
 
@@ -2920,6 +3120,31 @@ edits `disclosures.ts` (copy changes need the owner) or `errors.ts`.
 | FE-29 | `/.well-known/security.txt`'s `Expires` (2027-09-30) must be rotated before 2027-08-31: a mainnet build and `check:headers` refuse 30 days or less ahead | open (operations) |
 | FE-30 | The claim-time pot syncs (KI66-R4, §3.6): the size check compiles without lookup tables (an upper bound: a v0 wallet with the protocol ALT could carry a sync more), and a sync is dropped only when the claim's own pre-review simulation fails on it — a target that closes or changes between that simulation and a stale review's re-simulation at Sign fails the review with `AccountNotInitialized` (3012), or `AccountOwnedByWrongProgram` (3007) on the `lender` account once someone funded the closed address, both of which the review's Retry rebuilds (`tx/errors.ts`; the rebuild leaves the closed target out, or refuses a claim of the claimant's own closed position). The judgement covered the indexer's first 24 lenders, largest raw share count first, so a large current lender could push an absent surplus holder out. *Ninth round (owner, 2026-10-08):* the lenders behind the share epoch (or with a forward chain) first, then the rest, paged further than 24 when needed, ranked by the simulated gain; 3007 mapped like 3012. *As built (the builder's choices under that decision, confirmed by the owner on 2026-10-09, tenth round, with the indexer's `max_page_limit` floor of 200):* the indexer's additive `epoch=behind` / `current` filter (INDEXER §9.2), 50 a page, paged further while the best ≤ 4 do not cover the shortfall, ≤ 4 pages (≤ 200 lenders; the bound's reason in §3.6); every row of either list is read whatever its epoch, so an indexer lagging or leading the RPC's share epoch only reorders the reads. What stays: a market with more than 200 lenders behind its share epoch is judged on the first 200 of them (largest raw share count first); the behind list's request counts toward the 4 pages even when it is empty or unfiltered, so a market with no lender behind its share epoch is judged on at most 150 current lenders, and an indexer without the filter spends the pages on its whole list in raw share order; an indexer that has not ingested a rebase lists the newly behind lenders among its current ones; and a sync that moved a surplus leaves its lender listed as behind, so a later claim re-reads it at no gain | closed (owner, 2026-10-08; the filter, the bound and the page-limit floor confirmed 2026-10-09) |
 | FE-31 | `lender.residuals` (§4.2) quotes the held-model loss to lenders and the protocol from before AIR-22 ("about 2.06 SOL on a fresh position and about 8.02 SOL on one open for 25 days"); under AIR-22's lower-median growth the sim gives about 3.34 and 4.54 SOL (ECON §8.2, §12.6; known-issues KI-03). The copy lives in `disclosures.ts` and this document together (`disclosures.test.ts`; `m9-review/ux.test.tsx` pins the two figures) and a copy change needs the owner (§12.2), so the three change in one commit once the owner approves the new figures. *Approved by the owner on 2026-10-13:* the paragraph now reads "about 3.34 SOL on a fresh position and about 4.54 SOL on one open for 25 days at 90% utilisation" in `disclosures.ts` and §4.2, and `ux.test.tsx` pins the new figures and that the old ones are gone | closed (owner, 2026-10-13) |
+| FE-32 | **The Mobile Wallet Adapter** (O-6 lifted on 2026-10-13): built, and on by default (`VITE_ENABLE_MOBILE_WALLET_ADAPTER`).<br>**Playwright is to cover it with a protocol-level fake wallet** (§10.2): the specs are written and the fake is held to the real library in Vitest, but no browser run has passed yet (§13 "Mobile wallets", the E2E row).<br>**What only a phone shows:** the Android intent and the app switch, Chrome's "Apps on device" prompt, `upgrade-insecure-requests` on `ws://localhost`, a discarded background tab, which real wallets implement MWA and which signer row each is in (only the `solana:signTransaction` path signs, §5.4 (6)), how wallets answer a revoked token or a switched account at the reauthorization, and returning to Chrome without deciding. This is the owner's device test (DEVELOPMENT "Mobile wallets on a real device"; record the devices, versions and date here and in the AUDIT O-6 row). It needs HTTPS devnet and mainnet builds of the flag-on app; who hosts them, and where, is still the owner's decision. | **open: the first E2E run, then the owner's device test, before the release** |
+| FE-33 | **Social-app in-app browsers** are detected by user agent only (`; wv)`, Telegram, Twitter, Instagram, FBAN / FBAV / FB_IAB, Line). Apps that open links in SFSafariViewController or Custom Tabs are not detected, but those handle universal links. A universal link may not leave a WebView, so the app offers Copy link. MWA does not register in WebViews. | by design |
+| FE-34 | **Firefox for Android:** MWA is not registered there, because its protocol frames a `solana-wallet:` URL that the CSP refuses (no `frame-src`). The open-in links remain. | by design |
+| FE-35 | **MWA library calls that never settle** (wallet-standard-mobile 0.7.0): a failed reauthorization at Sign, a wallet that never answers after the association, the library spinner closed after the handshake, a Disconnect during a sign. The app bounds each one: Cancel while signing (after 5 s), the sign ended when the connected MWA account changes, the connect ended 10 s after the page is back in front (at most 120 s) with MWA's connect lock reset, and the library's hosts removed at insertion. The abandoned library call keeps its socket until the wallet closes it or the page unloads. Re-check at each package update (the drift test forces it). | mitigated; upstream fix wanted |
+
+### Mobile wallets (2026-10-13; O-6 lifted)
+
+The owner lifted O-6 on 2026-10-13 (decided, not reopened; design: the mobile track's design,
+revision 2, after its security review): build the Mobile Wallet Adapter and switch it on (default
+on, a build flag to turn it off; the owner's real-device test precedes the release), install
+`@solana-mobile/wallet-standard-mobile` 0.7.0 with the protocol pinned to 3.0.0 through pnpm
+overrides (Kit stays 8.3.0), ship the mobile chooser fixes with the drafted strings as they are
+(§4.3's mobile group), no WalletConnect / Reown. The review's safeguards are taken as decided: the
+adapter signs only through `solana:signTransaction`, a repo-wide 14-day `minimumReleaseAge` with the
+two packages excluded until 2026-10-21, Disconnect local only, and the `ws://localhost` CSP residual
+accepted (§9.3). Web only: no program, keeper, indexer or client change.
+
+| Item | Change | Tests |
+|---|---|---|
+| Dependency, flag, CSP | the package (a lazy chunk, §2.2), the overrides and the release-age gate in `pnpm-workspace.yaml` (§9.6); `VITE_ENABLE_MOBILE_WALLET_ADAPTER` (strict `true` / `false`, §2.1, `.env.example`); flag on: `connect-src` + `ws://localhost:*` `http://localhost` and the spinner's two style hashes (§9.3), flag off byte for byte the old policy | `parseConfig`, `csp` (both states, in full), `mwaPackage` (the drift test) |
+| Registration | `wallet/platform.ts` (`mwaEligible`, `isInAppBrowser`), `mwa.ts`, `localNetwork.ts` (Chrome's local-network permission, asked from a tap), `mwaCall.ts` (R-C1), `mobileWalletAdapter.ts` (`registerMwa` once from `App.tsx`, verified against the plugin's list; the chain-scoped cache; the app's `onWalletNotFound`; `removeLibraryUi`); `public/icon-192.png` (`scripts/icon-192.ts`) | `platform`, `mwaEligible.agree`, `mobileWalletAdapter`, `mwaCall`, `localNetwork` |
+| The chooser and the copy | `copyWallet.ts` (the 7 strings, §4.3), "Use installed wallet" (unique name only), the open-elsewhere block, the in-app-browser block with Copy link, the not-found reopen, no "sends itself" badge for MWA, the connect guard; five test ids (§11.1) | `wallet.test.tsx` (a)–(l), `mwaConnect.agree`, `copy` (70 / 150) |
+| Sign path, way out, errors | the prefetch for every wallet (§5.4 step 2); the local-network and launch notices (`tx-sign-notice`); R-S1 (Cancel after 5 s), R-S2 (`wallet-changed`), no send after an abort; the signer policy (`mwaSignerOk`, `useWallet`, asserted again at Sign); the MWA error rows (§5.9); `WalletCallError.sending` | `useTxFlow`, `errors`, `m9-review/tx`, `TxReviewModal`, `mwaSigner.agree` |
+| E2E | the `<profile>-android` project, `SHORTWIN_E2E_MWA`, the seeded `android` wallet, the init-script hooks and the protocol-level fake wallet app, `mobile-mwa.spec.ts` (M1–M18, T-UIR, the flag-off describe), `mobile-shell` on Android, `wallet.spec.ts` on the desktop; CI's `web-e2e` adds the flag-off Android run (§10.2, §10.4) | `e2e/wallet/fake-mwa.test.ts` (the fake against the real library, Vitest); the E2E runs themselves were not run on M2's host, whose Chromium cannot start (its system libraries `libnspr4`, `libnss3`, `libasound2` are not installed, and that host's network policy does not reach the Ubuntu archive to install them): **pending** — the Android run, the flag-off Android run, the whole suite and the responsive gate (§10.5), then the reviewed `e2e/screenshots/android/` set |
+| Docs | §1, §2, §2.1, §2.2, §5.4 step 2 and (6), §5.9, §7.7, §9.3, §9.6, §10.1, §10.2, §10.5, §11.1, §13 FE-32 … FE-35; AUDIT §7's O-6 row; ARCHITECTURE §1.1; DEVELOPMENT "Web E2E" and "Mobile wallets on a real device" (the owner's checklist) | `copy.test.ts`, `testids.test.ts` |
 
 ### AI review follow-ups (2026-10-12/13; one approved text changed, FE-31, with the owner's approval)
 
@@ -2968,7 +3193,7 @@ unchanged; the new copy is §4.3's, approved as written by the owner on 2026-10-
 | O-5 Claim wording (D-21) | "Review claim · {c} SOL now · syncs may add up to {g} SOL" on two lines while there is a shortfall, and the shortfall note rewritten; {g} with `solFrac` (§3.6, §4.3) | `LendPanel.test.tsx` (four states), `copy.test.ts` |
 | Focus Not Obscured (2.4.11) | an E2E check of the `scroll-padding` / `scroll-margin` the build relied on untested (§7.6) | E2E `focus`, `mobile-focus` |
 | O-4 12 px floor | `--fs-xs` 12 px from 640 px up (phones had it), `.unit` never under 12 px; no density switch; the responsive gate checks text ≥ 12 px at every viewport (§7.2, §7.7, §10.5) | E2E `responsive` (gate) |
-| Not built | O-6 Mobile Wallet Adapter (after the audit) | — |
+| Not built | O-6 Mobile Wallet Adapter (after the audit; *lifted by the owner on 2026-10-13: built and on by default, §13 "Mobile wallets"*) | — |
 
 ### Thirteenth round: the owner's approval and decisions (2026-10-11)
 
@@ -3116,7 +3341,7 @@ indexer's EMA price, the modal wallet menu on a desktop).
 | Integration | the groups' shared requests: priority-3 cells stay hidden on cards; 44 px text fields and action-bar buttons under a coarse pointer; the dialog / sheet close 44 px (a small button's min-height won before); `FormFoot` above the fixed bars in the page; an open sheet's scroll padding; a phone's toast over an open sheet in the sheet head's title strip; `Checkbox id` / `Disclosure ackId` (TRADE's DOM-set id removed); `.target-link` shared (the review's confirmed and explorer links ≥ 24 px); the lender table framed like the positions table; More marked current on /status and /security; the market page's header and banners open the market column so the trade panel starts at the top (its sticky submit clears the status bar on the first screen, §3.4); Manage's preview labels keep their line; the capture opens sheets as a user does, restores touch emulation after full-page shots and runs axe on the unrolled page; `summary.ts <before> <after>` (§7.6, §10.5) | `router.test.tsx`; E2E `responsive` (gate), `screens`, the phone project |
 | Fix round (desktop, phone, a11y reviews) | desktop: the stat strip never leaves an empty cell (4 + 3 / one row); the market Positions tab shows borrower, margin and entry from 560 px (age from 960); numeric columns share the spare width (D15's `width: 1%` dropped) with 16 px before each from 1,280 px; no 1 px document scroll (the status bar's line a shadow); symmetric gutters in the trade and Manage panels; "Cancelled" as a wallet cancel's stage; the tier's info mark an SVG; shortened ids never split, the review's numbers take only their width and its dates may break between day and time (the account label keeps the room); Overview in two columns with Fees under both; position facts in column groups; lender row actions one button style, the reason after them; install links as a list; a visible disclosure chevron; the `/` chip gone while the search is in use; one explorer link in a confirmed review. Phone: Done on a confirmed review closes the sheet (`TxDoneContext`); the wallet popup has a title and ✕ and is history-backed; the sort direction names its order; the toast strip has no second ✕ and keeps an error's reason; a toast's 6 s count only in view; a title alone takes a card's first row. Accessibility: focus returns to the opener when a popup unmounts (or to `#main` without one), from the status list on Escape; a card table's header shows while focused; More's `aria-current` (§3.1, §3.4, §5.3, §7.3, §7.6) | `responsive.test.tsx`, `TxReviewModal.test.tsx`, `wallet.test.tsx`, `router.test.tsx`; E2E `keyboard`, `mobile-shell`, `mobile-markets`, `mobile-trade`, `mobile-lend`, `responsive` (a short page does not scroll) |
 | Wrap-up (final re-review) | every way out of a confirmed review in a sheet (Done, ✕, Escape) closes the sheet, never one closed before confirmation; the tablet stat strip 4 + 3 (the desktop rule) instead of 3 + 3 + 1; the Overview's two columns share the card's width (no 420 px cap), and so do the Coverage tab's (the same grid); a dialog whose opener is disabled or gone on close (the lend and short submits after a confirmed send, on a desktop) returns focus to an open sheet's title or `#main`, never `<body>` (§3.4, §5.3, §7.6, §8) | `TxReviewModal.test.tsx`, `Modal.test.tsx`; E2E `mobile-lend` (Escape on the confirmed deposit), `lend-deposit` (focus after Done), `responsive` |
-| Owner calls, not built (decided 2026-10-10, thirteenth round: O-1 … O-5 built, §13 "Thirteenth round"; O-6 after the audit, off by default) | O-1 deposit reorder, O-2 coverage de-duplication, O-3 intro / glossary, O-4 desktop 12 px floor or density toggle, O-5 Claim wording, O-6 Mobile Wallet Adapter | — |
+| Owner calls, not built (decided 2026-10-10, thirteenth round: O-1 … O-5 built, §13 "Thirteenth round"; O-6 after the audit, off by default — *lifted 2026-10-13, §13 "Mobile wallets"*) | O-1 deposit reorder, O-2 coverage de-duplication, O-3 intro / glossary, O-4 desktop 12 px floor or density toggle, O-5 Claim wording, O-6 Mobile Wallet Adapter | — |
 
 ### M10 changes (v1.2 → v1.3)
 

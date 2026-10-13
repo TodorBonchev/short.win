@@ -864,7 +864,10 @@ coverage link and the Claim label have one home each — `src/config/copy.ts` (w
 shell's links) and `src/config/glossary.ts` (sources in `glossarySources.ts`, the text resolution in
 `glossaryText.ts`) — and `copy.test.ts` / `glossary.test.ts` fail until FRONTEND.md §4.3 carries every
 string verbatim: after a change run `node scripts/owner-copy.ts --doc` in the same change. Every
-string there is *pending owner approval* until the owner signs it off word for word.
+string there is *pending owner approval* until the owner signs it off word for word. The
+mobile-wallet strings (O-6, approved as drafted on 2026-10-13) live in `src/config/copyWallet.ts`,
+which `copy.ts` spreads into `COPY` (the owner file's section 8); the same §4.3 check and `--doc`
+regeneration apply.
 
 **security.txt (M10 SECTXT-4).** `apps/web/public/.well-known/security.txt` (RFC 9116: the owner's
 contact and policy, `Expires` 2027-09-30, rotate it before 2027-08-31) is checked by
@@ -939,8 +942,11 @@ SHORTWIN_E2E_REUSE=1 pnpm --filter web e2e e2e/specs/smoke.spec.ts   # …rerun 
 SHORTWIN_E2E_SCREENSHOTS=update pnpm --filter web e2e e2e/specs/screens.spec.ts   # refresh e2e/screenshots/
 SHORTWIN_E2E_RESPONSIVE=1 pnpm --filter web e2e --grep @responsive   # eight viewports: .e2e/responsive/ PNGs + metrics.json
 SHORTWIN_E2E_RESPONSIVE=1 SHORTWIN_RESPONSIVE_GATE=1 pnpm --filter web e2e --grep @responsive   # M10-RESP: the same as a gate
-pnpm --filter web e2e --project chain-phone  # M10-RESP: the phone project alone (mobile-*.spec.ts)
+pnpm --filter web e2e --project chain-phone  # M10-RESP: the phone project alone (mobile-*.spec.ts but mobile-mwa)
 SHORTWIN_E2E_SCREENSHOTS=update pnpm --filter web e2e --project chain-phone   # refresh e2e/screenshots/phone/
+pnpm --filter web e2e --project chain-android   # O-6: the Android project (mobile-shell and mobile-mwa: the Mobile Wallet Adapter against the fake wallet app)
+SHORTWIN_E2E_MWA=0 pnpm --filter web e2e --project chain-android   # the same with the adapter built off (the app rebuilds automatically)
+SHORTWIN_E2E_SCREENSHOTS=update pnpm --filter web e2e --project chain-android   # refresh e2e/screenshots/android/
 pnpm --filter web exec node e2e/responsive/summary.ts --pages        # its per-viewport counts and worst states
 pnpm --filter web exec playwright show-report .e2e/report
 ```
@@ -992,7 +998,7 @@ and flip CPI Guard or required memos for the race tests; since M10 also a full w
 `sync_lender` (`simulateClaimSol`, `simulateSyncLender`), emit_cpi event decoding (`eventsOf`) and
 an empty `sweep_trader` that credits a market's pending rent (`accrue`).
 
-**Specs** (22 files, 58 tests at M10; *M10-RESP:* 28 files with the four `mobile-*` specs (`responsive` is opt-in) — and a default run of 77 tests, 60 desktop and 17 phone; *thirteenth round:* 30 files with `guide` and `mobile-guide`, a default run of 87 tests, 65 desktop and 22 phone): `harness`, `smoke`, `wallet`, `frame` (`@scaffold`); `markets`,
+**Specs** (22 files, 58 tests at M10; *M10-RESP:* 28 files with the four `mobile-*` specs (`responsive` is opt-in) — and a default run of 77 tests, 60 desktop and 17 phone; *thirteenth round:* 30 files with `guide` and `mobile-guide`, a default run of 87 tests, 65 desktop and 22 phone; *O-6 (`playwright test --list`, 2026-10-13):* 32 files with `focus`, `mobile-focus` and `mobile-mwa` (33 with the opt-in `responsive`), a default run of 123 tests, 70 desktop, 26 phone and 27 Android — `mobile-mwa`'s 21 include its two flag-off tests, skipped in a flag-on run as its 19 flag-on tests are with `SHORTWIN_E2E_MWA=0`): `harness`, `smoke`, `wallet`, `frame` (`@scaffold`); `markets`,
 `create-market`, `status`, `fallback` (`@markets`); `lend-deposit`, `lend-cpi-guard`,
 `lend-withdraw-memo`, `lend-claim`, `keyboard`, and since M10 (FE-18) `lend-post-wipe`,
 `lend-claim-sync`, `lend-sweep-cashback` (`@lend`); `short-open`, `short-close`,
@@ -1004,7 +1010,16 @@ Playwright projects — `<profile>` (the desktop, 1440 × 900: every spec above)
 from the foundation; `mobile-markets`, `mobile-trade`, `mobile-lend` from the page tracks), both
 in the default run (the phone project ≈ 6 min or less once complete); the phone specs tap, run axe
 at 0 on every state, sign only with the seeded `phone` wallet and write `e2e/screenshots/phone/`
-with `SHORTWIN_E2E_SCREENSHOTS=update` (an owner-reviewed set, like the desktop one). CI's
+with `SHORTWIN_E2E_SCREENSHOTS=update` (an owner-reviewed set, like the desktop one). *O-6
+(2026-10-13):* a third project, also in the default run, `<profile>-android` (a Pixel 7: 412 × 839,
+an Android Chrome user agent), runs `mobile-shell` and `mobile-mwa` — the Mobile Wallet Adapter
+against a protocol-level fake wallet app (`e2e/wallet/fake-mwa.ts`, behind `page.routeWebSocket`,
+signing as the seeded `android` wallet) with init-script hooks standing in for Android's app
+switch (`e2e/wallet/mwa-hooks.js`) — and writes `e2e/screenshots/android/`; `SHORTWIN_E2E_MWA=0`
+builds the app with the adapter off for `mobile-mwa`'s flag-off tests (its `mobile-shell` PNGs go
+to `.e2e/screenshots/android-mwa-off/` only; FRONTEND.md §10.2). The fake is also held to the real
+library by Vitest (`e2e/wallet/fake-mwa.test.ts`, in `pnpm --filter web test`); the Android
+project's first browser run is still pending (FRONTEND.md §13 "Mobile wallets"). CI's
 `web-e2e` job runs them all and keeps the screenshots as an artifact. Not in the default run:
 `responsive` (`@responsive`; FRONTEND.md §10.5) — every page and state at eight viewports from a
 320 px phone (and a landscape phone) to a 1440 px desktop, a PNG each in `$SHORTWIN_SHOTS_DIR/<viewport>/` and the layout
@@ -1052,6 +1067,14 @@ skip the SPL pin check); `SOLANA_BIN`, `SHORTWIN_SO`, `MOCK_CPAMM_SO`, `COMPLETE
 - System Chromium 152 (Arch) renderer crashes (SIGTRAP) failed every page spec on the M10
   development machine; `SHORTWIN_CHROMIUM=playwright` (Playwright's own Chromium) is the
   workaround.
+- Playwright's own Chromium (`pnpm --filter web exec playwright install chromium`, the user cache)
+  still needs the system's NSS, NSPR and ALSA libraries. A bare Ubuntu 24.04 (a fresh WSL distro
+  among them) lacks them, and every test then fails at launch with `error while loading shared
+  libraries: libnspr4.so` (global setup, which needs no browser, still succeeds). The machine's
+  administrator installs them once: `sudo apt-get install libnss3 libnspr4 libasound2t64` (or
+  `sudo pnpm --filter web exec playwright install-deps chromium`, which installs Playwright's whole
+  list); the hosted CI image already has them. `ldd ~/.cache/ms-playwright/chromium*/chrome-*/chrome*
+  | grep 'not found'` lists what is missing.
 - The E2E ports are fixed (above), so one run per host: a second run, or a run beside a
   `start.ts` session, collides. Serialize them, e.g.
   `flock ~/.cache/shortwin/e2e.lock pnpm --filter web e2e`, and stop a validator you started
@@ -1071,6 +1094,79 @@ serves the app, or writes `.env.e2e.local` for the dev server) and leaves it run
 `node e2e/validator/fund.ts <address>` funds a browser wallet; `node e2e/validator/stop.ts` stops
 everything. The seeded addresses are in `.e2e/state.json`, the generated (throwaway) keys in
 `.e2e/keys/`.
+
+### Mobile wallets on a real device (O-6; the owner's checklist)
+
+The Mobile Wallet Adapter is on by default since 2026-10-13 (FRONTEND.md §5.4 (6)); the owner's
+real-device test precedes the release (FRONTEND.md §13 FE-32). Playwright is to cover it against
+a protocol-level fake wallet (Web E2E above; its first browser run is pending, FRONTEND.md §13
+"Mobile wallets"); only a phone shows the Android intent and the app switch, Chrome's "Apps on
+device" prompt, `upgrade-insecure-requests` on `ws://localhost`, a discarded tab and what real
+wallets do. This is the checklist: record each result in the Result
+column (or a copy of the table, linked from FE-32), then the devices, versions and date in
+FRONTEND.md §13 FE-32 and in the AUDIT.md §7 O-6 row ("device test passed on <date>").
+
+**Prerequisites.** Who hosts the P1 and P2 builds, and where, is still the owner's decision
+(FRONTEND.md §13 FE-32): until it is made, neither exists.
+- **P1.** A `VITE_CLUSTER=devnet` build with the flag on, served over **HTTPS** (a preview
+  deploy), with short.win deployed on devnet and one market seeded. The Sign tests need it.
+- **P2.** A `VITE_CLUSTER=mainnet` build over HTTPS, for **connect only** (F1); no transaction is
+  sent.
+- **P3.** An Android phone with Chrome ≥ 147 (and one with Chrome 145–146 if available), Samsung
+  Internet, Brave and Firefox.
+- **P4.** Phantom, Solflare and Backpack set to devnet, plus Seed Vault on a Seeker or Saga if
+  available.
+- **P5.** USB remote debugging to read the console: on the phone, Developer options → USB
+  debugging; on the computer, Chrome at `chrome://inspect/#devices`, the phone's tab → Inspect.
+  Watch for CSP errors ("Refused to …"), "MWA not registered" and "Mobile Wallet Adapter not
+  loaded" warnings. DevTools' Network panel there also throttles the phone's tab (E2: Slow 3G).
+
+| # | Step | Expected | Result |
+|---|---|---|---|
+| A1 | Open the devnet build in Chrome and tap Connect | The sheet lists "Use installed wallet" / "Opens your wallet app on this phone", then "Or open this page in a wallet app" with three links and "Set your wallet to devnet first." | |
+| A2 | Remote console | No CSP violation, no "MWA not registered" | |
+| B1 | First visit (permission never decided): tap the entry | Chrome's local-network prompt appears **at once**, while still in Chrome; the entry's line reads "Allow 'Apps on device' so this page can reach your wallet app". **Record Chrome's exact name for the permission**; if it is not "Apps on device", report it to the owner (the string is approved as drafted) | |
+| B2 | Allow | The line returns to "Opens your wallet app on this phone"; tap again → the connect flow (C1) | |
+| B3 | In a fresh profile: Deny | The permission text stays; taps do nothing else; allow "Apps on device" in site settings → the entry is ready **without a reload** | |
+| B4 | Chrome 145–146 (if available) | The same flow (`fetch`-gated permission) | |
+| C1 | Connect with one MWA wallet installed; then with several | One wallet opens directly; with several, Android's chooser lists them. The authorize screen shows "ShortWin", the origin and the PNG icon. Approve → back in Chrome → the header shows the address | |
+| C2 | Decline in the wallet | Back in Chrome: "Connect wallet", no dialog, no overlay (dimmed or not) | |
+| C3 | Cancel Android's app chooser | About 10 s after Chrome is back (at most 30 s) the button is "Connect wallet" again | |
+| C4 | A phone with no MWA wallet | About 3 s after the tap the wallet sheet reopens with the open-in links; no library modal, no redirect to solanamobile.com | |
+| C5 | Tap the entry, then go back to Chrome **through Recents** without deciding in the wallet; tap anywhere on the page | The page is not dimmed and a tap does nothing unexpected (no library overlay); the header button is busy, and about 10 s after Chrome is back it reads "Connect wallet"; tapping the entry opens the wallet again (record whether the wallet still shows the first request) | |
+| D1 | Reload after C1 | The address returns **without** the wallet app opening | |
+| D2 | Disconnect, reload | Disconnected; Connect opens the wallet again. Record whether the wallet still lists short.win as connected (Disconnect is local only) | |
+| D3 | Change the active account in the wallet, then reload | The reload shows the **old** address, with no notice (the silent reconnect reads only this browser's cache); the change appears at the next Sign (E10) | |
+| E1 | Devnet deposit: Review → Sign in wallet | The wallet opens **immediately** and shows the transaction; approve → "Confirming…" → Confirmed; the explorer shows the signature | |
+| E2 | The same with a throttled network (remote DevTools, Slow 3G) | The wallet still opens at once (the prefetch); no "Couldn't open your wallet app" | |
+| E3 | Decline in the wallet | "Cancelled in your wallet. Nothing was sent." + Try again | |
+| E4 | Leave the wallet open for more than 60 s, then approve | Either confirmed or "The transaction expired before it landed. Try again." (record which) | |
+| E5 | After Sign, return to Chrome (back or Recents) without acting in the wallet | Either the wallet closes the session and the review shows "Your wallet could not sign: …" with Retry, or the review still waits: then Cancel is enabled (from 5 s after the tap) and closes the review. Nothing is sent either way. Record which | |
+| E6 | Developer option "Don't keep activities" (Chrome discarded while in the wallet) | Record the behaviour; the app sends nothing it did not see signed | |
+| E7 | A wallet that returns `wallet_uri_base` (second sign over an https App Link) | Chrome stays on the page (not navigated to the wallet's site) | |
+| E8 | A wallet without `solana:signTransactions` (if any) | It connects; the forms show their no-signer state (as for a read-only wallet: e.g. "Connect a wallet to lend this token."); no "sends itself" badge or banner; nothing is sent | |
+| E9 | Revoke short.win in the wallet's connected-apps list after C1 (or wait for the token to expire), then Sign | The wallet opens and refuses or asks again; back in Chrome the review shows "Connect a wallet that can sign." with "Close and review again", and the header shows "Connect wallet". Nothing is sent. Reconnect → a new authorization in the wallet | |
+| E10 | After C1, switch the active account in the wallet, then Sign | Record what the wallet does: it signs with the connected account (then E1's result), or it answers with the new account, and the review then shows "Connect a wallet that can sign." with "Close and review again" while the header shows the new address (or, after a reload, the M9-SEC-8 notice). Nothing is signed for the wrong account | |
+| E11 | For each wallet (Phantom, Solflare, Backpack, Seed Vault) | Record its signer path (FRONTEND.md §5.4 (6)): the forms are enabled after Connect and the review opens with no "sends itself" banner = the `solana:signTransaction` path. A no-signer state after a successful Connect (no `solana:signTransactions` in its capabilities, MWA 1.x without sign-and-send, or per-account features that hide `solana:signTransaction` from Kit) is a finding for the owner | |
+| F1 | Mainnet build: connect through MWA (no signing) | Connect succeeds, so `upgrade-insecure-requests` did not upgrade `ws://localhost`. If it times out, look for `wss://localhost` in the remote console → the owner decides (drop the directive from flag-on mainnet builds, or release mainnet with the flag off) | |
+| G1 | Samsung Internet, Brave | The entry is present; connect and one devnet sign; record the local-network behaviour | |
+| G2 | Firefox for Android | No "Use installed wallet"; the open-in links work | |
+| H1 | Telegram, X, Instagram, Facebook in-app browsers (Android and iOS): open a short.win link | The sheet starts with "Open this page in your browser" and Copy link; the pasted URL equals the page's (path, query, hash) | |
+| H2 | From those, tap Open in Phantom / Solflare / Backpack | Record whether the app opens or the wallet's website loads | |
+| H3 | iOS Safari, and SFSafariViewController (Telegram iOS) | Each open-in link opens the wallet's browser on the same URL | |
+| H4 | Inside each wallet's in-app browser (iOS and Android) | Connect (on Android, the open-elsewhere block also shows), a devnet sign, `assertSameIntent` passes; with the wallet set to mainnet, record its mismatch behaviour | |
+| I1 | TalkBack | The entry reads "Use installed wallet, Opens your wallet app on this phone"; the links are reachable; while signing, the enabled Cancel is announced | |
+| I2 | An Android tablet (if available) | The same entry; record whether "Opens your wallet app on this phone" reads acceptably on a tablet (wording feedback for the owner; the string ships as approved) | |
+
+**Release criterion.**
+- A–E and I pass in Chrome with at least Phantom and Solflare.
+- **E11: Phantom and Solflare both take the `solana:signTransaction` path.** If either does not, the
+  adapter cannot sign with it and the owner decides: ship with the flag off until a follow-up
+  app-built signer is reviewed, or allow the post hoc path for MWA (with its double-send hazard).
+- F1 passes, or the owner decides the `upgrade-insecure-requests` fallback.
+- G and H are recorded; they block only on a regression against today's links.
+- A release that must not wait ships with `VITE_ENABLE_MOBILE_WALLET_ADAPTER=false` (the CSP then
+  drops the adapter's sources too).
 
 ## Codama client
 
