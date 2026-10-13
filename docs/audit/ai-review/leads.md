@@ -57,6 +57,24 @@ keypair can later turn that address into an executable account. But crediting it
   the bounded griefing; correct KI-63 and add a known-issues row with these bounds; have the keeper
   retry in the next slot.
 
+**Erratum (2026-10-13).** The time and 60-s figures above assumed about 215 ms a slot. Recomputed
+from the fixtures' ProgramData sizes and balances and the agave 4.2.2 loader (:877-898 the 10 KiB
+minimum, :913 one extension per slot, :944-951 the payment, the shortfall below rent exemption):
+- About 0.052 SOL of rent per blocked slot, plus the transaction fee: about 7.8 SOL to block a
+  venue's exits for 60 s (150 slots at 400 ms; 171 slots, ≈ 8.9 SOL, at the 350-ms slots of
+  SIMD-0525, active since slot 440,208,000 per LiteSVM 0.16's mainnet feature list).
+- AMM v4's and Token-2022's ProgramData hold ≈ 1.76 / ≈ 2.60 SOL above rent exemption, which pays
+  their first ≈ 34 / ≈ 50 extensions; pump-fees' and CPMM's hold exactly the minimum.
+- Each venue's budget is 887–947 slots (≈ 5.9–6.3 min at 400 ms, ≈ 5.2–5.5 min at 350 ms;
+  ≈ 44–49 SOL) and is spent for good once the program hits 10 MiB. short.win: ≈ 867 slots,
+  ≈ 45 SOL; complete_curve: ≈ 1,013 slots, ≈ 53 SOL; each if its ProgramData is allocated at its
+  v1.0.0 ELF size (no `--max-len`).
+- These bounds rest on SIMD-0431's 10 KiB minimum (feature
+  `loader_v3_minimum_extend_program_size`, active since slot 432,864,000 per the same list); with
+  1-byte extensions they would be ≈ 8.9–10.4 M slots per program.
+
+The slot and SOL figures above stand, rounded. Known-issues KI-73 carries the corrected bounds.
+
 ## L-3 · AIR-19 · A fee inside the cap band strands forced exits
 
 - Keeper exits judge "buyback allowed" on the live-fee quote (`liquidate.rs:337, 371-377`;

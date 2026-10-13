@@ -58,6 +58,12 @@ AUD = `docs/AUDIT.md`.
 - E:111, A:1238, E:1424: add "a settlement that leaves ≤ 1/1,000 of the token claims it found pays
   the whole vest to the current shares".
 - A:1274 (`vest_flushed`): "also on a rebase; a flush without a roll emits no event".
+  *Superseded by `cb756ca` (`SolSettle.vest_flushed`, appended last), which reports every flush,
+  with or without a roll:* A:1272 (`SolSettle` row) gains "vest_flushed (the vest this
+  settlement flushed, with or without an epoch roll; else 0)"; A:1274 reads "the vest the
+  settlement flushed: a full wipe, or a rebase after a settlement that left ≤ 1/1,000 of the
+  token claims; equal to `SolSettle.vest_flushed`"; A:59, A:1236, A:1240 and E:91 name
+  `SolSettle.vest_flushed` beside `EpochRolled.vest_flushed`.
 - E:1429: add "deposit while S > 0, ΣB_Q > 0 and 1,000·T ≤ T + ΣB_Q: refused (`PoolDrained`)".
   A:1048: the same check in `deposit`'s effects. A:1299 (error table): 6108 `PoolDrained`.
 - E:109 stays as written: with the drained-pool gate a just-in-time deposit captures nothing.

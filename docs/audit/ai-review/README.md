@@ -128,16 +128,19 @@ resolution; item 8 lists the interface changes and needs no decision.
 4. **AIR-18, `ExtendProgram` griefing.** No program change can stop third-party extensions.
    Anyone can extend `shortwin` (or `complete_curve`) once per slot and block it for the rest
    of that slot, at ≈ 0.052 SOL of rent per slot at mainnet's 5,080 lamports/byte. The griefing
-   ends for good once the program reaches the 10 MiB cap, after ≈ 870 slots (≈ 45 SOL, paid by
-   the attacker). The options are:
+   ends for good once the program reaches the 10 MiB cap, after ≈ 870 slots for `shortwin`
+   (≈ 45 SOL, paid by the attacker; ≈ 1,010 slots, ≈ 53 SOL, for `complete_curve`, each if
+   deployed at its v1.0.0 ELF size). The options are:
    - extend `shortwin`'s ProgramData to 10 MiB at deployment (≈ 45 SOL of extra rent);
    - or accept the bounded griefing, have the keeper retry in the next slot, and correct
      KI-63 ("harmless").
 
    **Resolved (owner, 2026-10-12): accept the bounded griefing.** No pre-extension to 10 MiB.
-   The keeper ticks once a slot by default, so it sends a blocked exit again at its next tick,
-   in a later slot. KI-63 is corrected, the bounds are known-issues KI-73, and
-   `services/README.md` "Governance" says what operators see.
+   The keeper ticks every 400 ms by default, about one slot, so it sends a blocked exit again
+   at its next tick, in a later slot (since `8945087` with no alert; a 30-s run of such
+   refusals is paged once). KI-63 is corrected, the bounds are known-issues KI-73 (recomputed
+   on 2026-10-13: `leads.md` L-2's erratum), and `services/README.md` "Governance" says what
+   operators see.
 
 5. **AIR-01, operations.** After `initialize_config`, run one `revalidate_venue` with the
    expected ELF hash for each venue whose ProgramData can still grow (pump-fees, AMM v4, CPMM,
@@ -153,6 +156,11 @@ resolution; item 8 lists the interface changes and needs no decision.
    requests ≥ 0.5 M CU (Jupiter's cost is not measured: sized by simulation). A new staging at
    the current deploy slot also works, unless another extension lands before it executes. The
    residuals are known-issues KI-69 and are accepted.
+
+   *2026-10-13:* the runbook now asks for ≥ 0.6 M CU, or a limit sized by simulation. The
+   0.44 M were measured after one 10 KiB extension; the hash path also scans the zero tail
+   (≈ 1 CU per 250 B), so pump-fees grown near the 10 MiB cap by a griefer's extensions needs
+   ≈ 0.48 M before Squads' own cost (estimated with the tests' cost model; KI-69 (e)).
 
 6. **AIR-19, the market mark.** `min_open_hard_cap_bps` stays at the lowest cap any position
    locked since the market last emptied. This is conservative: a closed position may have set
@@ -176,7 +184,9 @@ resolution; item 8 lists the interface changes and needs no decision.
    - `min_notional` has a compiled floor of 53,000,000 lamports (AIR-06), so Governance can no
      longer set it below 0.053 SOL.
    - A new error, `PoolDrained` = 6108 (AIR-07); the existing codes keep their numbers.
-   - `EpochRolled.vest_flushed` is also reported on a rebase that flushed (AIR-07).
+   - `SolSettle` gains `vest_flushed: u64` (appended last, `cb756ca`): the vest the settlement
+     flushed, with or without an epoch roll. `EpochRolled.vest_flushed` is also reported on a
+     rebase that flushed (AIR-07).
    - `sweep_trader` takes the trader's pump UVA as a one-account token leg on a market that
      left pump (AIR-05).
    - `disable_venue` can now emit `ConfigCancelled` (AIR-24).
