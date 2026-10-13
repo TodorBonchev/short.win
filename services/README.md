@@ -15,7 +15,8 @@ workspace's lockfile.
 
 ## Keeper
 
-What it does, per tick (one per slot; `keeper/src/keeper.rs`):
+What it does, per tick (one every `--tick-ms`, 400 ms by default, about a slot;
+`keeper/src/keeper.rs`):
 
 - **Reads** (`view.rs`; M7-SEC-8): the open positions first (one `getProgramAccounts`), then in
   full every market with positions, every PumpSwap and Raydium market, a curve within
@@ -95,14 +96,24 @@ What it does, per tick (one per slot; `keeper/src/keeper.rs`):
   the pool's live coin creator is not the market's cached one (anyone can change it through
   pAMM; the next `crank_price` re-caches it), the exit's transaction starts with
   `create_idempotent` of the new creator vault's WSOL ATA (T11), which the program's existence
-  requirement needs (M6-SEC-4).
+  requirement needs (M6-SEC-4). The exit projection's risk fee (the live CR of duty 1, the spot
+  and EMA legs) is `min(φ_live, cap)` with the program's own cap: the position's hard cap, and
+  on PumpSwap at most the tier of `P_ema`'s market cap, which a same-transaction trade cannot
+  raise (AIR-10, `VenueState::exit_risk_cap_bps` on the exits' venue read,
+  `read_state_boxed_for_exit`; `2c1fce9`). A live market cap in a higher-fee tier than
+  `P_ema`'s no longer makes the keeper send liquidations the program refuses.
 - **Duty 4, `sol_settle`**: at most once per second for armed positions and for liquidatable
   positions without a normal buyback (it arms, keeps the clock, disarms on box evidence, or
   settles), and for positions whose S3 is due (on a halted venue: probed by simulation, sent
   only when it settles).
 - **Duty 5, no route**: a halted venue (a Raydium admin halt, a CPMM status bit, a pool that stops
-  parsing) or a fee above the hard cap starts the S3 chain at the keeper's next tick and is
-  observed every 30 s after, so the chain never restarts.
+  parsing) or a fee above the market's S3-chain cap (the lower of `venue_fee_hard_cap_bps` and
+  `Market.min_open_hard_cap_bps`, the lowest cap a position locked since the market last
+  emptied: AIR-19) starts the S3 chain at the keeper's next tick and is observed every 30 s
+  after, so the chain never restarts. A position's S3 timer follows its own route, the fee
+  against the lower of the global cap and its own locked cap (`route::position_no_route`), as
+  `sol_settle` does (`6a46cde`): a fee between the mark and a position's own cap runs the chain
+  without making that position S3-due.
 - **Duty 7, batching**: an exit is the market's observation for the second (no separate crank);
   the remaining cranks share transactions, up to 6 per v1 transaction and 4 per v0 transaction
   where the cluster refuses v1 (re-probed hourly), each batch **cut where its transaction would
@@ -251,19 +262,34 @@ What it does, per tick (one per slot; `keeper/src/keeper.rs`):
   - **Upgrades.** Every tick the keeper reads the 45-byte headers (`getMultipleAccounts` with
     `dataSlice`: the accounts are up to 10 MiB) of the six ProgramData accounts the `VenueGuard`
     latch indexes (pump, pAMM, pfee, AMM v4, CPMM, Jupiter) and compares their deploy slots with
-    the latch by v1.0's slot-only rule: bit clear and slot ≠ `guard_slot` → flag; bit set and
-    slot ≠ `flagged_slot` → a second upgrade during review, refresh. (Since AIR-01 the program
-    also tells a pure extension of a fingerprinted venue apart and answers `VenueNotUpgraded`,
-    KI-69.) It then sends
-    `flag_venue_upgraded(venue)` in that slot at the exit priority ceiling (simulated first; a
-    latch someone else already set is not repeated; an unflagged upgrade is retried every second)
-    and raises `Alert::VenueUpgraded` once per upgrade and `Alert::VenueUpgradeFlagged` when its
-    flag lands — page the Emergency multisig to run the fork suite against the new binary and
-    `revalidate_venue(venue, slot, elf_hash)` (the hashed revalidation of
+    the latch, before the tick's markets. Without a recorded fingerprint (pump, PumpSwap, and
+    every venue before its hashed revalidation) the slot decides: bit clear and slot ≠
+    `guard_slot` → flag; bit set and slot ≠ `flagged_slot` → a second upgrade during review,
+    refresh. With one (AIR-01, KI-69; `d2bb168`), a moved slot with the bit clear is judged by
+    `flag_venue_upgraded`'s own simulation, the program's rule on the whole account:
+    - An upgrade passes. It is paged and flagged in the slot it is seen, before any exit or crank.
+    - The loader's `ExtendProgram` answers `VenueNotUpgraded`. It is neither flagged nor paged,
+      only logged and counted (`TickReport::extended`, `shortwin_keeper_venue_extensions_total`),
+      and that deploy slot is not simulated again.
+    - If the simulation fails for another reason, the keeper reads the account whole after its
+      exits and cranks and applies the same rule: an upgrade is paged with `VenueFlagFailed` and
+      flagged the next second, an extension is counted, and if that read fails too, the slot is
+      paged (fail-safe).
+
+    During a review, a move past the deploy the keeper recorded is read whole after the exits:
+    an extension of the recorded deploy is neither refreshed nor paged, another upgrade is. The
+    deploy the keeper flags, or finds under review after a restart, is read whole once after the
+    exits and recorded. The keeper sends `flag_venue_upgraded(venue)` at the exit priority
+    ceiling (simulated first; a latch someone else already set is not repeated; an unflagged
+    upgrade is retried every second) and raises `Alert::VenueUpgraded` once per upgrade and
+    `Alert::VenueUpgradeFlagged` when its flag lands — page the Emergency multisig to run the
+    fork suite against the new binary and `revalidate_venue(venue, slot, elf_hash)` (the hashed
+    revalidation of
     [Venue fingerprints after `init-config`](#venue-fingerprints-after-init-config-air-01)).
     Either Raydium program's upgrade blocks opens on every
-    Raydium market (one mask). Token-2022's ProgramData is watched too, alert only
-    (`Alert::ProgramUpgraded`).
+    Raydium market (one mask). Token-2022's ProgramData is watched too, alert only: it is read
+    whole once at start, each later change is judged against the last whole read, and only an
+    upgrade raises `Alert::ProgramUpgraded` (an extension is counted, not alerted).
   - **Pool admin actions.** Raydium's pool admin (a 2-of-3 Squads v3 vault with no timelock) can
     halt a pool (AMM v4 `SetParams` status 2–5 or 7 with a future open time; CPMM
     `update_pool_status` bit 2) and raise fees (AMM v4 `SetParams` fees per pool; CPMM
@@ -271,8 +297,10 @@ What it does, per tick (one per slot; `keeper/src/keeper.rs`):
     instructions write — each market's pool and CPMM config, already in the ReadSet it reads —
     and raises `Alert::VenueAdmin` for every change: route lost / restored (with the status),
     status, open time, and the one-way fee measured against `venue_fee_cap_bps` (opens refused)
-    and `venue_fee_hard_cap_bps` (`s3_no_route`), naming the instruction that writes the field. A
-    pool that stops parsing is reported as such ("not executable", A63).
+    and against the market's S3-chain cap (`s3_no_route`): `venue_fee_hard_cap_bps`, or
+    `Market.min_open_hard_cap_bps` when lower (AIR-19, `FeeCaps::of_market`), naming the
+    instruction that writes the field. A pool that stops parsing is reported as such ("not
+    executable", A63).
 - **Duty 12, the Raydium pool monitor, and duty 5's Raydium fast path** (`pool_monitor.rs`,
   config `[pool_select]`; ARCH §2.5 `None`, §2.6):
   - **Discovery.** Every Raydium SOL pool of each covered Raydium or list-only market's mint,
@@ -336,17 +364,22 @@ What it does, per tick (one per slot; `keeper/src/keeper.rs`):
   bursts, gaps, venue admin changes, pool proposals / executions / switches, migrations,
   straddles, transitions, sweeps, cashback claims, exits deferred, coverage pauses and unpauses,
   budget degradations, the `paused_coverage` flag, degraded) and `venue_flags`,
+  `venue_extensions` (a venue's or Token-2022's ProgramData extended, not upgraded: AIR-01),
+  `not_deployed` (refusals of a program deployed in the refused slot: AIR-18),
   `pool_discoveries`, `coverage_pause_failures`, `oracle_{cranks,reads,refusals,lamports}` in the
-  Prometheus text format (`--metrics`).
+  Prometheus text format (`--metrics`; each global counter as `shortwin_keeper_<name>_total`).
 
 **The program's own code decides.** The keeper links the `shortwin` crate (account types,
-instruction builders, the venue reader `venues::read_state` and the adapters' account lists, the
-market prologue `engine::prologue::run`, the exit references `engine::bounds`, the pool
-selection's `engine::pool_select::{verify_candidate, decide}` and `venues::detect::classify_pump`),
-`shortwin-venue-state` (the AMM v4 / CPMM / ProgramData readers) and `shortwin-math` (legs, CR,
-buyback test, S3 timer): each decision is the program's on a copy of the market projected to
-the cluster's clock. Every send is still simulated first, and the simulation is the final word
-(a program refusal is reported, never retried blindly).
+instruction builders, the venue reader — `venues::read_state_boxed_for_exit`, the exits' reader,
+which also resolves PumpSwap's fee at `P_ema` for AIR-10's cap — and the adapters' account
+lists, the market prologue `engine::prologue::run`, the exit references `engine::bounds`, the
+pool selection's `engine::pool_select::{verify_candidate, decide}` and
+`venues::detect::classify_pump`), `shortwin-venue-state` (the AMM v4 / CPMM / ProgramData
+readers) and `shortwin-math` (legs, CR, buyback test, S3 timer): each decision is the program's
+on a copy of the market projected to the cluster's clock. Every send is still simulated first,
+and the simulation is the final word (a program refusal is reported, never retried blindly; the
+loader's one-slot "Program is not deployed" is told apart by the program's ProgramData header,
+AIR-18, [below](#extendprogram-griefing-air-18-accepted-by-the-owner-on-2026-10-12)).
 
 Not yet (later milestones, ARCH §7.1): Jito bundles with tips for liquidations (the priority-fee
 RPC path is built; T-SIZE shows a tip transfer fits the worst Raydium exit; the straddle's bundle
@@ -633,12 +666,16 @@ $G approve --ms emergency --index <n> --config gov.toml --rpc <url> --key emg-me
   (≤ 1.4 M). A trimmed ELF above 2 MiB is never hashed: its revalidation then needs the exact
   slot, and an extension still latches it (KI-69). In v1.0 Jupiter's bit is in no market's
   latch mask, so its latch blocks nothing yet.
-- **After an extension, request ≥ 0.5 M CU.** Executed at the staged slot, the revalidation
-  hashes nothing (a few thousand CU). If the venue was extended after the staging, its deploy
-  slot has moved: the program then hashes the trimmed ELF and accepts the later slot only if it
-  is still the named one, which costs up to ≈ 0.44 M CU on its own (measured: pump-fees
-  438,358, CPMM 369,393, AMM v4 210,386), before Squads' own cost. Execute such a revalidation
-  with a compute-unit limit of at least 500,000 (`SetComputeUnitLimit` before
+- **After an extension, request ≥ 0.6 M CU, or size the limit by simulation.** Executed at the
+  staged slot, the revalidation hashes nothing (a few thousand CU). If the venue was extended
+  after the staging, its deploy slot has moved: the program then hashes the trimmed ELF and
+  accepts the later slot only if it is still the named one, which costs up to ≈ 0.44 M CU on
+  its own (measured: pump-fees 438,358 and CPMM 369,393 after one 10 KiB extension, AMM v4
+  210,386 with a 9.7 MB zero tail), before Squads' own cost. The scan for the ELF's end in the
+  zero tail adds ≈ 1 CU per 250 B, so pump-fees grown near the 10 MiB cap by a stranger's
+  extensions (KI-73; [below](#extendprogram-griefing-air-18-accepted-by-the-owner-on-2026-10-12))
+  needs ≈ 0.48 M (estimated with the tests' cost model, not measured). Execute such a
+  revalidation with a compute-unit limit of at least 600,000 (`SetComputeUnitLimit` before
   `vault_transaction_execute`). `shortwin-gov` sets no limit, so it gets the runtime's default:
   200,000 CU for a bare `execute`, 400,000 for `approve --execute` (two Squads instructions,
   the approval's cost included). pump-fees exceeds both and AMM v4 exceeds a bare `execute`;
@@ -660,24 +697,47 @@ Anyone can send the loader's `ExtendProgram` for a program whose ProgramData is 
 cap: at least 10 KiB, once per program per slot. It redeploys the program, which is unusable for
 the rest of that slot: every invoke or CPI of it fails with `UnsupportedProgramId` ("Program is
 not deployed"). The owner accepted this bounded griefing (known-issues KI-73: ≈ 0.052 SOL of the
-attacker's rent per blocked slot until the program reaches the cap, ≈ 45 SOL for short.win), so
-short.win's and complete_curve's ProgramData are **not** pre-extended to 10 MiB at deployment.
-What operators see:
+attacker's rent per blocked slot until the program reaches the cap, ≈ 45 SOL for short.win and
+≈ 53 SOL for complete_curve if deployed at their v1.0.0 ELF sizes), so short.win's and
+complete_curve's ProgramData are **not** pre-extended to 10 MiB at deployment. What operators
+see:
 
 - **A venue extended** (pump-fees, which pump and PumpSwap call; AMM v4; CPMM; Token-2022; pump
   and PumpSwap themselves are at the cap): every exit that buys on it fails for the rest of that
-  slot. The keeper's `liquidate` or `expire` fails in simulation or on chain, and the keeper
-  raises `Alert::ExitRefused` with `UnsupportedProgramId` in its detail. `crank_price` and
-  `sol_settle` make no venue CPI and keep landing.
+  slot. The keeper's `liquidate` or `expire` fails in simulation or on chain with
+  `UnsupportedProgramId`. The keeper reads the named program's ProgramData header as of the
+  refused slot; when it shows a deploy in that slot (two slots of slack) it counts the refusal
+  (`shortwin_keeper_not_deployed_total`) and sends again at its next tick, with no alert or
+  back-off. `crank_price` and `sol_settle` make no venue CPI and keep landing.
 - **short.win extended:** every short.win instruction fails for the rest of the slot (the
-  keeper's cranks and exits, users' transactions). **complete_curve extended:** the straddle
-  bundle fails for the rest of the slot.
-- **No action is needed.** The keeper ticks once a slot by default (`--tick-ms 400`) and sends a
-  blocked crank or exit again at its next tick, in a later slot; each further blocked slot costs
-  the attacker another extension, and the griefing ends for good when the program reaches the
-  cap (≈ 870–950 slots).
+  keeper's cranks and exits, users' transactions), and the keeper treats its refusals the same
+  way. **complete_curve extended:** the straddle bundle fails for the rest of the slot.
+- **No action is needed** unless `Alert::ProgramNotDeployed` pages. The keeper ticks every
+  400 ms by default (`--tick-ms 400`, about one slot), so its next tick is always in a later
+  slot; each further blocked slot costs the attacker another extension, and the griefing ends
+  for good when the program reaches the cap (≈ 867 slots for short.win, ≈ 887–947 for the
+  venues, ≈ 1,013 for complete_curve at their current sizes: ≈ 5.8–6.8 min of slots at
+  400 ms).
+- **`Alert::ProgramNotDeployed`:** such refusals of one program, at most 5 s apart, have lasted
+  30 s (paged once per run). Someone is extending that program every slot or nearly: check its
+  ProgramData's growth toward the 10 MiB cap and whether exits land in between.
+- **A program that stays undeployable** (an old deploy slot, or no ProgramData: closed, or
+  failing verification after a feature gate) gets the same answer from the loader. Its refusals,
+  and those whose header cannot be read, are handled as any refusal: `Alert::ExitRefused`,
+  `VenueFlagFailed` and so on.
 - The extension also moves the deploy slot. On a venue with a recorded fingerprint it does not
   latch (above).
+
+What the keeper does (AIR-18, `8945087`):
+
+- The refused slot is the outcome's own: the simulation's context slot, or the failed
+  transaction's slot. The tick's slot is used only when the backend gives none.
+- The header is read as of that slot (`minContextSlot`), so a node of an RPC pool still behind
+  refuses the read instead of answering stale. The read is tried twice, at most once per
+  program and refused slot in a tick.
+- A refused crank batch defers the rest of the queue to the next tick. A flag refused so leaves
+  an AIR-01 slot unjudged until the next slot. The straddle's pre-flight is judged the same way;
+  a bundle the block engine drops is not, because it returns no outcome.
 
 The upgrade step stays: **extend ProgramData before staging an upgrade to a larger ELF.**
 `stage-upgrade` refuses an ELF that does not fit and names the `solana program extend <program>
@@ -740,7 +800,10 @@ first second an outside oracle's simulation accepts, a spike above the bound wai
 mock pool (continuous chain; an expired position settles, a healthy one stays frozen), S1 after
 arming with one `sol_settle` per second, and extras (a published template, a hostile `current`
 bypassed with `previous`, a `current` the program denies — a borrower's wallet, the mock pool —
-bypassed with `none`).
+bypassed with `none`). AIR-19 (`s3::air19_*`): with one position at the 500-bps cap and one
+opened after Governance raised it to 1,000 bps, an 8 % fee starts the market's chain (its mark;
+the global cap alone would not) and settles the first in S3 once expired, while the second is
+never S3-due and expires.
 
 Pump-curve and graduation scenarios (`graduation.rs`, duty 6, M5 and M6; the dumped pump,
 pump-fees and PumpSwap programs and the near-complete curve): an outside buy completes a covered
@@ -772,7 +835,9 @@ second the program accepts it; `disable_flags` bit 0 is reported (severe; opens 
 `VenueFlagged`), the buy bit as a lost route as well, clearing both as restored; a cashback coin
 listed without the trader's cashback ATA gets it created once; a graduated coin listed list-only is
 cranked onto its pool (`None → PumpSwap`), its trader base ATA and pAMM UVA are created once, and
-an open lands.
+an open lands; AIR-10 (`pamm::air10_*`): with the live market cap in the 50-bps tier and `P_ema`'s
+in the 30-bps one, the program refuses a liquidation (`NotLiquidatable`) and the keeper's
+projection sends none, while under a uniform 50-bps schedule both liquidate it.
 
 PumpSwap third-party LP (`pamm_lp.rs`, M6R-1, the owner's decision of 2026-09-30; the `legacy261`
 pool with as much third-party LP again, λ 50 %, pAMM's own `deposit` / `withdraw`): duty 2's
@@ -809,6 +874,14 @@ Raydium scenarios (`raydium*.rs`, the dumped AMM v4 and CPMM programs and pools)
   CPMM status bits (swap = lost route, deposit = status only); upgrades of either program flagged
   in the slot they are seen, once, refreshed during review, nothing after `revalidate_venue`, not
   repeated when someone else flagged first; Token-2022 alerted only; the watch switched off.
+  AIR-01 (`air01_*`, AMM v4 revalidated with its fingerprint): a stranger's extensions are
+  neither flagged nor paged (the flag's simulation answers `VenueNotUpgraded`, once per slot,
+  no whole read) and an upgrade after them is; the upgrade's flag is the tick's first
+  transaction, before its crank, and the whole read comes after both; a keeper restarted during
+  a review records the deploy under review and pages no extension of it, only a second upgrade;
+  a slot the flag's simulation cannot judge is judged on the account read whole (an extension
+  counted; a failed read paged as an upgrade, fail-safe); Token-2022 is paged for an upgrade,
+  not for an extension.
 - `raydium_alt`: the protocol ALT created, extended with the recipients (from the committed
   mainnet dumps), frozen, through the keeper's own chain backend and `alt` module; it holds every
   address the program tests' T-SIZE table assumes; the keeper's v0 crank batch and a liquidation
@@ -891,9 +964,27 @@ Raydium scenarios (`raydium*.rs`, the dumped AMM v4 and CPMM programs and pools)
   without positions, and no per-slot burst, while the price-wrapped control still starts bursts
   (`m4g2_*`).
 
+Redeploy scenarios (`redeploy.rs`, AIR-18, 9 scenarios; LiteSVM reloads a program at once after
+an extension, so each installs the refusal the cluster gives for the rest of that slot and lifts
+it at the next): short.win, then the mock venue, not deployed in the second a liquidation first
+becomes possible — refused, nothing alerted, the liquidation lands in the next slot of the same
+second; the same judged through an RPC pool whose header reads lag behind short.win's last
+deploy (`lag_headers_of`), still transient because the keeper reads as of the refused slot; a
+Raydium flag, an S3 probe and a sweep refused while short.win is not deployed, each sent again
+the next slot; an upgrade of a fingerprinted venue seen while short.win is not deployed, left
+unjudged and flagged and paged once the next slot; a venue deployed in every slot for 30 s, its
+liquidation sent again every second and `ProgramNotDeployed` paged once; a venue that stays
+undeployable, refused and alerted (`ExitRefused`) every tick, never counted as transient.
+
+The in-process chain's failure knobs (`LiteSvmChain::fail_simulations`, `fail_reads_of`,
+`lag_headers_of`) serve the AIR-01 and AIR-18 scenarios. The scenario binary holds 139
+scenarios; two, the release measurements of `cascade` and `m7_cost`, are ignored by default.
+
 The JSON-RPC backend has its own check against a live local cluster (`common/tests/rpc_local.rs`,
 ignored by default): clock, accounts, program accounts, recent fees, and a transfer simulated and
-sent as v1 and as v0 (both accepted by an Agave 4.1.2 `solana-test-validator`):
+sent as v1 and as v0 (both accepted by an Agave 4.1.2 `solana-test-validator`); since AIR-18 also
+the outcomes' slots and `account_headers_at` (`minContextSlot`: answered at the current slot,
+refused far ahead):
 
 ```sh
 solana-test-validator --reset --quiet &
