@@ -16,7 +16,10 @@ import { PAMM_POOL_OFF_CREATOR_FEES, PAMM_POOL_OFF_PROTOCOL_FEES, type RawAccoun
 import {
     afterSale,
     capFeePpm,
+    exitRiskCapBps,
     liquidityOf,
+    notExecutable,
+    type PoolView,
     quoteBuy,
     quoteBuyAt,
     quoteSell,
@@ -255,6 +258,36 @@ describe('PumpSwap', () => {
             );
         });
     }
+});
+
+describe('the exit risk cap (AIR-10)', () => {
+    // The program's `venues::tests::exit_risk_cap_takes_the_fee_at_p_ema_on_pumpswap_only`: the hard
+    // cap and, on PumpSwap once resolved, ⌈φ at P_ema/100⌉ — also on a halted pool — and the hard cap
+    // alone without a fee at P_ema and on every other venue.
+    const pool = (feePpmAtEma: number): PoolView => ({
+        disableFlags: 0,
+        boostAmount: 0n,
+        virtualPart: 0n,
+        isCashback: false,
+        coinCreator: D,
+        fees: { lp: 40, protocol: 7, creator: 3 },
+        feePpmAtEma,
+        schedule: null,
+    });
+    const withPool = (kind: 'pump_swap' | 'raydium_cpmm' | 'pump_curve', atEma: number) => ({
+        ...notExecutable(kind),
+        pool: pool(atEma),
+    });
+
+    it('takes the fee at P_ema on PumpSwap only', () => {
+        expect(exitRiskCapBps(withPool('pump_swap', 3_000), 500)).toBe(30);
+        expect(exitRiskCapBps(withPool('pump_swap', 2_950), 500)).toBe(30);
+        expect(exitRiskCapBps(withPool('pump_swap', 3_000), 25)).toBe(25);
+        expect(exitRiskCapBps(withPool('pump_swap', 0xffff_ffff), 500)).toBe(500);
+        expect(exitRiskCapBps(notExecutable('pump_swap'), 500)).toBe(500);
+        expect(exitRiskCapBps(withPool('raydium_cpmm', 3_000), 500)).toBe(500);
+        expect(exitRiskCapBps(withPool('pump_curve', 3_000), 500)).toBe(500);
+    });
 });
 
 describe('Raydium', () => {

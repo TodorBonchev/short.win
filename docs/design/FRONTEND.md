@@ -644,7 +644,10 @@ a confirmed open, close or add margin also pushes a toast (View position / Explo
 ### 3.8 Positions, position detail, lender dashboard
 
 - **Positions** (SHORT; SPEC §8): one row per position (`positionRow-<pubkey>`): market, `Q` owed,
-  vault SOL (`v`), CR now (`crBps(vEff(v, R_due), B̂_live(q))`), liquidation price, P&L if closed now
+  vault SOL (`v`), CR now (`crBps(vEff(v, R_due), B̂_live(q))` at the exit risk fee `min(φ_live, cap)`,
+  `exitRiskCapBps`: the position's locked hard cap, on PumpSwap at most the tier at `P_ema` as the
+  program's `liquidate` and `sol_settle` price it, AIR-10; the CR on the ring and the liquidation
+  price take the same cap), liquidation price, P&L if closed now
   (`previewClose(v, B̂_live, R_due, rent_protocol_bps).borrower − (m + margin_added + fee_open)`),
   rent accrued (`PositionRent.due`), time left (`Countdown` to `deadline`), risk badge
   (`riskLevel(CR, CR_ema, cr_liq_bps)`: safe / watch / at risk / at risk (live price below) /
@@ -2902,6 +2905,11 @@ The web side of the AI review's fixes (`docs/audit/ai-review/`; `3f224c2` … `a
   `PoolDrained` 6108, `SolSettle.vestFlushed`, `revalidate_venue`'s `expectedElfHash`, the new
   `VenueGuard` and `Market` fields), and `errors.test.ts` again requires one table row per
   client constant (`2fea2c5`).
+- AIR-10 (the final review of the follow-ups, 2026-10-13): a position's risk view — the CR, the
+  CR on the ring, the liquidation price, and the open preview's liquidation price — takes the
+  program's exit risk cap (`exitRiskCapBps` = `VenueState::exit_risk_cap_bps`: on PumpSwap at most
+  the tier at `P_ema`), so a PumpSwap position below a tier boundary no longer reads riskier than
+  `liquidate` judges it (§3.8; `state.test.ts`, `previews.test.ts`).
 - Open: FE-31.
 
 ### Thirteenth round (v1.4 → v1.5)

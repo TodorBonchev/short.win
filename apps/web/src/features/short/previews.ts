@@ -39,6 +39,7 @@ import {
     afterSale,
     type Buy,
     capFeePpm,
+    exitRiskCapBps,
     liquidityOf,
     quoteBuy,
     quoteBuyAt,
@@ -507,15 +508,17 @@ export function previewOpen(math: MathModule, s: MarketSnapshot, inp: OpenInputs
     );
     const crOpenBps = math.crBps(math.vEff(vault, 0n), nOpen.cost);
     const crEmaBps = bEma === null ? null : math.crBps(vault, bEma);
-    // The spot leg's liquidation price at open: the risk view at the position's hard cap, the
-    // post-open liquidity, from the post-open spot; the vault net of the rent always due (r_min).
+    // The spot leg's liquidation price at open: the exit risk view (the position's hard cap; on
+    // PumpSwap at most the tier at `P_ema`, AIR-10), the post-open liquidity, from the post-open
+    // spot; the vault net of the rent always due (r_min).
     const lPost = liquidityOf(math, post);
     const pPost = spotPrice(math, post);
     const vEffOpen = math.vEff(vault, minRent);
+    const riskCapBps = exitRiskCapBps(post, p.venueFeeHardCapBps);
     const liqPriceWad =
         lPost === null || pPost === null
             ? null
-            : (withVenue(math, post, { live: false, capBps: p.venueFeeHardCapBps }, (v) =>
+            : (withVenue(math, post, { live: false, capBps: riskCapBps }, (v) =>
                   v.liquidationPrice(q, vEffOpen, tp.crLiqBps, lPost, pPost),
               ) ?? null);
     const tAfter = s.market.tokensFree - q;
@@ -586,7 +589,10 @@ export interface PositionMetrics {
     readonly rentDue: bigint;
     readonly rentAccrued: bigint;
     readonly vEff: bigint;
-    /** The live buyback quote at the live fee (closes) and at the position's risk fee (liquidation). */
+    /**
+     * The live buyback quote at the live fee (closes) and at the position's exit risk fee
+     * (liquidation; `exitRiskCapBps`, which the CRs and the liquidation price take too).
+     */
     readonly buyback: bigint | null;
     readonly buybackRisk: bigint | null;
     readonly crBps: bigint | null;
@@ -627,9 +633,12 @@ export function positionMetrics(math: MathModule, s: MarketSnapshot, pos: ShortP
     }
     const vEff = math.vEff(pos.v, rentDue);
     const live = quoteBuy(math, s.venue, pos.q)?.cost ?? null;
-    const risk = quoteBuy(math, s.venue, pos.q, pos.venueFeeHardCapBps)?.cost ?? null;
+    // The exit risk view at the program's cap: the position's locked hard cap and, on PumpSwap,
+    // at most the tier at `P_ema` (`liquidate::assess`, `sol_settle`, the keeper; AIR-10).
+    const capBps = exitRiskCapBps(s.venue, pos.venueFeeHardCapBps);
+    const risk = quoteBuy(math, s.venue, pos.q, capBps)?.cost ?? null;
     const [ex, ey] = newestRingXy(s.market);
-    const emaRisk = quoteBuyAt(math, s.venue, pos.q, ex, ey, pos.venueFeeHardCapBps)?.cost ?? null;
+    const emaRisk = quoteBuyAt(math, s.venue, pos.q, ex, ey, capBps)?.cost ?? null;
     const crBps = risk === null ? null : math.crBps(vEff, risk);
     const crEmaBps = emaRisk === null ? null : math.crBps(vEff, emaRisk);
     const l = liquidityOf(math, s.venue);
@@ -637,7 +646,7 @@ export function positionMetrics(math: MathModule, s: MarketSnapshot, pos: ShortP
     const liqPriceWad =
         l === null || pSpot === null
             ? null
-            : (withVenue(math, s.venue, { live: false, capBps: pos.venueFeeHardCapBps }, (v) =>
+            : (withVenue(math, s.venue, { live: false, capBps }, (v) =>
                   v.liquidationPrice(pos.q, vEff, pos.crLiqBps, l, pSpot),
               ) ?? null);
     const insufficientVault = live === null || live + rentDue + pos.ert > pos.v;

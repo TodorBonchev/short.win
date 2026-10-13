@@ -645,6 +645,18 @@ export function capFeePpm(s: VenueState): number {
     return Math.min(s.feePpm, atEma);
 }
 
+/**
+ * `VenueState::exit_risk_cap_bps` (AIR-10): the fee cap of a position's exit risk view, which
+ * `liquidate`'s assessment, the keeper exits' `B̂_ref` and `sol_settle` price at — the position's
+ * locked `hardCapBps` and, on PumpSwap once the fee at the stored `P_ema`'s market cap resolved,
+ * at most `⌈φ(P_ema)/100⌉` bps (a sale earlier in the exit's transaction raises the live tier, not
+ * that one). Elsewhere the hard cap alone. The execution quote keeps the live fee.
+ */
+export function exitRiskCapBps(s: VenueState, hardCapBps: number): number {
+    const atEma = s.kind === 'pump_swap' ? (s.pool?.feePpmAtEma ?? U32_MAX) : U32_MAX;
+    return atEma === U32_MAX ? hardCapBps : Math.min(hardCapBps, Math.ceil(atEma / 100));
+}
+
 type WasmVenue = MathModule['Venue']['prototype'];
 
 function poolVenue(m: MathModule, p: PoolPricing): WasmVenue {

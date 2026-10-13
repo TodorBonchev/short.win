@@ -11,6 +11,7 @@ import type { Address } from '@solana/kit';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { programError } from '../../config/errors.ts';
 import type { MathModule } from '../../math/load.ts';
+import { type FeeBps, notExecutable, quoteBuy } from '../../venues/state.ts';
 import {
     assignTier,
     capsFor,
@@ -152,6 +153,75 @@ describe('the close preview equals close_short', () => {
         };
         expect((await pnl(rise)) < 0n).toBe(true);
         expect((await pnl(fall)) > 0n).toBe(true);
+    });
+});
+
+describe('AIR-10: a PumpSwap position is judged at most at the tier at P_ema', () => {
+    // As `liquidate::assess`, `sol_settle` and the keeper (`decide::tests::air10_*`): a pool whose
+    // live tier is 50 bps and whose tier at `P_ema`'s market cap is 30 bps prices the exit risk view
+    // (the CR legs, the liquidation price) at 30; the execution quote keeps the live 50.
+    it('the risk quote, both CR legs and the liquidation price take the exit risk cap', async () => {
+        const c = vectors.cases.find((x) => x.kind === 'close');
+        if (!c) throw new Error('vector');
+        const { s, get } = await snapshotOf(c);
+        const pos0 = decodePosition(get(c.position as Address));
+        if (!pos0) throw new Error('position');
+        // The vector's own reserves, priced as a PumpSwap pool (20 + 5 + 25 bps).
+        const fees: FeeBps = { lp: 20, protocol: 5, creator: 25 };
+        const onPool = (feePpmAtEma: number) => ({
+            ...s,
+            kind: 'pump_swap' as const,
+            venue: {
+                ...notExecutable('pump_swap'),
+                executable: true,
+                x: s.venue.x,
+                y: s.venue.y,
+                r: s.venue.r,
+                pricing: { type: 'pumpSwap' as const, fees },
+                feePpm: 5_000,
+                pool: {
+                    disableFlags: 0,
+                    boostAmount: 0n,
+                    virtualPart: 0n,
+                    isCashback: false,
+                    coinCreator: pos0.borrower,
+                    fees,
+                    feePpmAtEma,
+                    schedule: null,
+                },
+            },
+        });
+        const atEma = onPool(3_000);
+        expect(pos0.venueFeeHardCapBps).toBeGreaterThanOrEqual(50);
+        const quote = (cap?: number) => quoteBuy(math, atEma.venue, pos0.q, cap)?.cost ?? 0n;
+        const [b30, b50] = [quote(30), quote(50)];
+        expect(b30 > 0n && b30 < b50).toBe(true);
+        expect(quote()).toBe(b50);
+        // The smallest vault whose CR at the 30-bps quote is the position's `L`: healthy at the
+        // tier at `P_ema`, below `L` at the live tier.
+        const L = BigInt(pos0.crLiqBps);
+        const due = positionMetrics(math, atEma, pos0).rentDue;
+        const vEff = (L * b30 + 9_999n) / 10_000n;
+        const edge = { ...pos0, v: vEff + due };
+        const mx = positionMetrics(math, atEma, edge);
+        expect(mx.buyback).toBe(b50);
+        expect(mx.buybackRisk).toBe(b30);
+        expect(mx.crBps).toBe(math.crBps(vEff, b30));
+        expect(mx.crBps !== null && mx.crBps >= L).toBe(true);
+        const healthy = positionMetrics(math, atEma, pos0);
+        // The fee at `P_ema` unresolved (no price, a schedule that does not resolve), or above the
+        // live tier: the hard cap alone, i.e. the live 50 bps here (the web before this fix).
+        for (const other of [0xffff_ffff, 8_000]) {
+            const at = onPool(other);
+            const m50 = positionMetrics(math, at, edge);
+            expect(m50.buybackRisk).toBe(b50);
+            expect(m50.crBps !== null && m50.crBps < L).toBe(true);
+            const h50 = positionMetrics(math, at, pos0);
+            expect(h50.crEmaBps !== null && healthy.crEmaBps !== null && h50.crEmaBps < healthy.crEmaBps).toBe(true);
+            expect(
+                h50.liqPriceWad !== null && healthy.liqPriceWad !== null && h50.liqPriceWad < healthy.liqPriceWad,
+            ).toBe(true);
+        }
     });
 });
 
