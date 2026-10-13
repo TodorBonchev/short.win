@@ -100,9 +100,9 @@ export function fixtureAddress(name: string): Address {
 /**
  * Groups deployed as programs (or not deployed at all), never loaded as accounts. The M10 groups
  * (scripts/dump-fixtures.py `M10_PROGRAM_GROUPS`: the CPMM redeploy, the mainnet SPL programs,
- * Squads v4, the pump redeploys of 2026-10-02 and 2026-10-08/12) hold program accounts at
- * genesis-program or venue addresses; a validator that runs them deploys them itself (the SPL
- * programs: splPrograms()).
+ * Squads v4, the pump redeploys of 2026-10-02, 2026-10-08/12 and pump's of 2026-10-13) hold
+ * program accounts at genesis-program or venue addresses; a validator that runs them deploys them
+ * itself (the SPL programs: splPrograms()).
  */
 const PROGRAM_GROUPS = new Set([
     'raydium_programs',
@@ -112,6 +112,7 @@ const PROGRAM_GROUPS = new Set([
     'squads_programs',
     'pump_programs_2026_10',
     'pump_programs_2026_10_13',
+    'pump_programs_2026_10_13b',
 ]);
 const SYSVAR_PREFIX = 'Sysvar';
 

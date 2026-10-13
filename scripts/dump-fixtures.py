@@ -50,8 +50,12 @@ Writes, under ``tests/fixtures/``:
   (``programs/{pump,pump_amm}_2026_10_08.so``, ``programs/pump_fees_2026_10_12.so`` and
   ``accounts/pump_2026_10_13/*.bin``: the pump and PumpSwap redeploys of 2026-10-08 at slots
   454,596,459 / 454,596,406 and pump-fees' of 2026-10-12 at 456,132,171, the 2026-10-13 re-pin; the
-  2026-10-02 group stays T-LATCH's "before"). Each of them is pinned (deploy slot, trimmed-ELF or
-  account sha256) and a fetch that reads anything else stops before it writes a file;
+  2026-10-02 group stays T-LATCH's "before"); ``pump_programs_2026_10_13b``
+  (``programs/pump_2026_10_13.so`` and ``accounts/pump_2026_10_13b/*.bin``: pump alone as
+  redeployed on 2026-10-13 at slot 456,494,698, the re-pin moved to it; PumpSwap and pump-fees
+  stay ``pump_programs_2026_10_13``'s, and that group keeps pump's 2026-10-08 build). Each of them
+  is pinned (deploy slot, trimmed-ELF or account sha256) and a fetch that reads anything else
+  stops before it writes a file;
 - ``accounts/pump_2026_10_13/*.bin`` (group ``pump_state_2026_10_13``): the state the 2026-10-08/12
   builds introduced, in one ``getMultipleAccounts`` call: pump's 1,088-byte ``Global``, both
   ``FeeConfig`` accounts and PumpSwap's ``GlobalConfig`` (re-dumped so the group is self-contained),
@@ -1997,6 +2001,21 @@ PUMP_PROGRAMS_2026_10_13 = [
         456_132_171,
     ),
 ]
+# pump's redeploy of 2026-10-13 15:40:41 UTC (the nested quote chain: `create_v2` requires a
+# bonding curve account for every coin down to the depth-0 root, `QuoteChainAccountsRequired`,
+# and caps the depth at 5); the re-pin moved to it. The trimmed hash is the ELF read at slot
+# 456,519,827. PumpSwap and pump-fees were not redeployed: they stay `pump_programs_2026_10_13`'s,
+# which keeps pump's 2026-10-08 build (the differential `pump_math_it` runs against it).
+PUMP_2026_10_13B_ACCOUNT_DIR = "accounts/pump_2026_10_13b"
+PUMP_PROGRAMS_2026_10_13B = [
+    (
+        "pump_2026_10_13",
+        PUMP,
+        "B5MvUwXdiW1NMM6QFFD3ssPKBujD4zMohncbM73Z2BQu",
+        "e202096978d8f20935153a4271938fd9f0a421d64c1749986b4c5c20ca2a52be",
+        456_494_698,
+    ),
+]
 SPL_PROGRAMS = [
     (
         "token_2022",
@@ -2074,6 +2093,16 @@ PROGRAM_SOURCES = {
         }
         for name in ("pump_2026_10_08", "pump_amm_2026_10_08", "pump_fees_2026_10_12")
     },
+    "pump_2026_10_13": {
+        "repository": "https://crates.io/crates/pump-rust-client (no public program source)",
+        "commit": None,
+        "status": "UNVERIFIED: no published source or verified build. The interface is the "
+        "2026-10-08 build's (the same instructions, account, event and instruction "
+        "discriminators; the on-chain IDL unchanged); the error enum appends "
+        "QuoteChainAccountsRequired (6109). Against the 2026-10-08 ELF only create_v2 and its quote "
+        "derivation changed; the other instructions differ in the error tables and source line "
+        "numbers alone (tests/fixtures/README.md)",
+    },
     "squads_v4": {
         "repository": "https://github.com/Squads-Protocol/v4",
         "commit": "64af7330413d5c85cbbccfd8c27a05d45b6e666f",
@@ -2110,6 +2139,13 @@ M10_GROUP_USE = {
         "(166-byte curves, the 1,088-byte Global, synthetic completions) is group "
         "`pump_state_2026_10_13`'s; `pump_programs_2026_10` keeps the 2026-10-02 deploys for "
         "T-LATCH",
+    ),
+    "pump_programs_2026_10_13b": (
+        "pump's redeploy of 2026-10-13 15:40 UTC (the nested quote chain; the re-pin moved to it); "
+        "every curve suite runs it, with PumpSwap and pump-fees of `pump_programs_2026_10_13`",
+        "the ELF as redeployed on 2026-10-13 at 456,494,698 (UNVERIFIED source, see `source`). The "
+        "ELF only: the state stays `pump_state_2026_10_13`'s (no layout changed), and "
+        "`pump_programs_2026_10_13` keeps the 2026-10-08 build",
     ),
     "spl_programs": (
         "The deployed mainnet program, so T-MEMO and the suites run the mainnet build instead of "
@@ -2254,7 +2290,8 @@ def check_m10(m, only=None):
     for group, programs in (("raydium_cpmm_2026_10", CPMM_PROGRAMS_2026_10),
                             ("spl_programs", SPL_PROGRAMS), ("squads_programs", SQUADS_PROGRAMS),
                             ("pump_programs_2026_10", PUMP_PROGRAMS_2026_10),
-                            ("pump_programs_2026_10_13", PUMP_PROGRAMS_2026_10_13)):
+                            ("pump_programs_2026_10_13", PUMP_PROGRAMS_2026_10_13),
+                            ("pump_programs_2026_10_13b", PUMP_PROGRAMS_2026_10_13B)):
         if only not in (None, group):
             continue
         by_name = in_group(group)
@@ -2308,15 +2345,17 @@ PUMP_GROUPS = ("pump_programs", "pump_state")
 # `pamm_synthetic` is derived from `pamm_state` and must follow it.
 PAMM_GROUPS = ("pamm_state", "pamm_synthetic")
 M10_PROGRAM_GROUPS = ("raydium_cpmm_2026_10", "spl_programs", "squads_programs",
-                      "pump_programs_2026_10", "pump_programs_2026_10_13")
+                      "pump_programs_2026_10", "pump_programs_2026_10_13",
+                      "pump_programs_2026_10_13b")
 # The state the 2026-10-08/12 redeploys introduced (the 2026-10-13 re-pin), after its programs.
 PUMP_STATE_2026_10_13_GROUPS = ("pump_state_2026_10_13",)
 GROUPS = (RAYDIUM_GROUPS + PUMP_GROUPS + PAMM_GROUPS + M10_PROGRAM_GROUPS
           + PUMP_STATE_2026_10_13_GROUPS)
 # Every directory whose files are all managed (SHA256SUMS lines outside them are kept verbatim).
 MANAGED_DIRS = (ACCOUNT_DIR, PUMP_ACCOUNT_DIR, PAMM_ACCOUNT_DIR, CPMM_2026_10_ACCOUNT_DIR,
-                PUMP_2026_10_ACCOUNT_DIR, PUMP_2026_10_13_ACCOUNT_DIR, SPL_ACCOUNT_DIR,
-                SQUADS_ACCOUNT_DIR, PROGRAM_DIR, IDL_DIR)
+                PUMP_2026_10_ACCOUNT_DIR, PUMP_2026_10_13_ACCOUNT_DIR,
+                PUMP_2026_10_13B_ACCOUNT_DIR, SPL_ACCOUNT_DIR, SQUADS_ACCOUNT_DIR, PROGRAM_DIR,
+                IDL_DIR)
 
 
 def managed(entry):
@@ -2695,6 +2734,9 @@ def cmd_fetch(args):
         elif g == "pump_programs_2026_10_13":
             entries, files, snap = fetch_programs(rpc, PUMP_PROGRAMS_2026_10_13, g,
                                                   PUMP_2026_10_13_ACCOUNT_DIR)
+        elif g == "pump_programs_2026_10_13b":
+            entries, files, snap = fetch_programs(rpc, PUMP_PROGRAMS_2026_10_13B, g,
+                                                  PUMP_2026_10_13B_ACCOUNT_DIR)
         elif g == PUMP_STATE_2026_10_13:
             entries, files, snap = fetch_pump_state_2026_10_13(
                 rpc, pump_coins_2026_10_13(args.coin, rpc), m)
@@ -2717,7 +2759,8 @@ def cmd_fetch(args):
         "the CPMM redeploy; spl_programs: the mainnet Token-2022 and spl-memo; squads_programs: "
         "Squads v4, its ProgramConfig and the vendored IDL; pump_programs_2026_10: the pump, "
         "pump-fees and PumpSwap redeploys of 2026-10-02; pump_programs_2026_10_13: those of "
-        "2026-10-08/12) and the state those introduced (group pump_state_2026_10_13) are written "
+        "2026-10-08/12; pump_programs_2026_10_13b: pump's of 2026-10-13) and the state those "
+        "introduced (group pump_state_2026_10_13) are written "
         "by scripts/dump-fixtures.py; `snapshots` records the slot and RPC of each group "
         "(`vendored`: files taken from a pinned source)."
     )
@@ -2916,7 +2959,8 @@ def cmd_check_live(args):
     targets = [(lb, p, pd_, sl) for lb, p, pd_, sl in venues]
     seen = {p for _, p, _, _ in targets}
     for name, program, program_data, _, _ in (CPMM_PROGRAMS_2026_10 + SPL_PROGRAMS + SQUADS_PROGRAMS
-                                              + PUMP_PROGRAMS_2026_10 + PUMP_PROGRAMS_2026_10_13):
+                                              + PUMP_PROGRAMS_2026_10 + PUMP_PROGRAMS_2026_10_13
+                                              + PUMP_PROGRAMS_2026_10_13B):
         if program not in seen:
             targets.append((name, program, program_data, None))
             seen.add(program)

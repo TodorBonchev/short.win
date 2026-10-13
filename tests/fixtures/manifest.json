@@ -1,5 +1,5 @@
 {
-  "description": "Mainnet accounts, programs and transactions dumped for the program tests (ARCHITECTURE §1.2, §8.2). Each entry records how it was fetched; SHA256SUMS pins the bytes (CI: cd tests/fixtures && sha256sum -c SHA256SUMS). The Raydium entries (groups raydium_programs and raydium_state), the pump entries (groups pump_programs and pump_state) and the PumpSwap entries (group pamm_state, and pamm_synthetic: pools derived offline from pamm_state bytes, marked `synthetic`) and the M10 program groups (raydium_cpmm_2026_10: the CPMM redeploy; spl_programs: the mainnet Token-2022 and spl-memo; squads_programs: Squads v4, its ProgramConfig and the vendored IDL; pump_programs_2026_10: the pump, pump-fees and PumpSwap redeploys of 2026-10-02; pump_programs_2026_10_13: those of 2026-10-08/12) and the state those introduced (group pump_state_2026_10_13) are written by scripts/dump-fixtures.py; `snapshots` records the slot and RPC of each group (`vendored`: files taken from a pinned source).",
+  "description": "Mainnet accounts, programs and transactions dumped for the program tests (ARCHITECTURE §1.2, §8.2). Each entry records how it was fetched; SHA256SUMS pins the bytes (CI: cd tests/fixtures && sha256sum -c SHA256SUMS). The Raydium entries (groups raydium_programs and raydium_state), the pump entries (groups pump_programs and pump_state) and the PumpSwap entries (group pamm_state, and pamm_synthetic: pools derived offline from pamm_state bytes, marked `synthetic`) and the M10 program groups (raydium_cpmm_2026_10: the CPMM redeploy; spl_programs: the mainnet Token-2022 and spl-memo; squads_programs: Squads v4, its ProgramConfig and the vendored IDL; pump_programs_2026_10: the pump, pump-fees and PumpSwap redeploys of 2026-10-02; pump_programs_2026_10_13: those of 2026-10-08/12; pump_programs_2026_10_13b: pump's of 2026-10-13) and the state those introduced (group pump_state_2026_10_13) are written by scripts/dump-fixtures.py; `snapshots` records the slot and RPC of each group (`vendored`: files taken from a pinned source).",
   "accounts": [
     {
       "name": "pyth_sol_usd_shard0",
@@ -8573,6 +8573,56 @@
         "state": 1,
         "is_native": 1488440
       }
+    },
+    {
+      "name": "pump_2026_10_13_program",
+      "group": "pump_programs_2026_10_13b",
+      "purpose": "the pump_2026_10_13 program account (upgradeable loader; names its ProgramData). pump's redeploy of 2026-10-13 15:40 UTC (the nested quote chain; the re-pin moved to it); every curve suite runs it, with PumpSwap and pump-fees of `pump_programs_2026_10_13`",
+      "address": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "lamports": 9693912471,
+      "executable": true,
+      "rent_epoch": 18446744073709551615,
+      "space": 36,
+      "slot": 456535056,
+      "sha256": "8101492b544ce08703d5de95363bf796e7e4cd17d03639cfe603071fb59652eb",
+      "file": "accounts/pump_2026_10_13b/pump_2026_10_13_program.bin",
+      "decoded": {
+        "program_data": "B5MvUwXdiW1NMM6QFFD3ssPKBujD4zMohncbM73Z2BQu"
+      }
+    },
+    {
+      "name": "pump_2026_10_13_program_data",
+      "group": "pump_programs_2026_10_13b",
+      "purpose": "pump_2026_10_13 ProgramData: the ELF as redeployed on 2026-10-13 at 456,494,698 (UNVERIFIED source, see `source`). The ELF only: the state stays `pump_state_2026_10_13`'s (no layout changed), and `pump_programs_2026_10_13` keeps the 2026-10-08 build. Stored as header ‖ ELF; the account is header ‖ ELF ‖ zeros up to `space`, whose sha256 is `sha256` (fork.rs rebuilds and checks it)",
+      "address": "B5MvUwXdiW1NMM6QFFD3ssPKBujD4zMohncbM73Z2BQu",
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "lamports": 53268311040,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 10485760,
+      "slot": 456535057,
+      "sha256": "ba1f91ac91dd8c578fd069230601f090775b88acbeecd680bde10d90e3606671",
+      "files": {
+        "header": "accounts/pump_2026_10_13b/pump_2026_10_13_program_data_header.bin",
+        "elf": "programs/pump_2026_10_13.so"
+      },
+      "elf_len": 1899448,
+      "elf_sha256": "692b19d0242b906d73764c41d30f7b61816c1c6f30a0164e09a20adf9578c092",
+      "elf_trimmed_len": 1899433,
+      "elf_trimmed_sha256": "e202096978d8f20935153a4271938fd9f0a421d64c1749986b4c5c20ca2a52be",
+      "elf_trimmed_sha256_expected": "e202096978d8f20935153a4271938fd9f0a421d64c1749986b4c5c20ca2a52be",
+      "deploy_slot_expected": 456494698,
+      "source": {
+        "repository": "https://crates.io/crates/pump-rust-client (no public program source)",
+        "commit": null,
+        "status": "UNVERIFIED: no published source or verified build. The interface is the 2026-10-08 build's (the same instructions, account, event and instruction discriminators; the on-chain IDL unchanged); the error enum appends QuoteChainAccountsRequired (6109). Against the 2026-10-08 ELF only create_v2 and its quote derivation changed; the other instructions differ in the error tables and source line numbers alone (tests/fixtures/README.md)"
+      },
+      "decoded": {
+        "deploy_slot": 456494698,
+        "upgrade_authority": "7gZufwwAo17y5kg8FMyJy2phgpvv9RSdzWtdXiWHjFr8",
+        "e_flags": 0
+      }
     }
   ],
   "snapshots": [
@@ -8714,6 +8764,13 @@
         "pump_pamm_global_config_2026_10_13": "equal to pamm_global_config (pump_state, slot 451,675,432)",
         "pump_pamm_fee_config_2026_10_13": "equal to pamm_fee_config (pump_state, slot 451,675,432)"
       }
+    },
+    {
+      "group": "pump_programs_2026_10_13b",
+      "slot": 456535056,
+      "fetched_at": "2026-10-13T18:08:31Z",
+      "rpc": "https://api.mainnet-beta.solana.com",
+      "method": "getAccountInfo (base64) of each program and ProgramData account; `solana program dump -um <program> out.so` gives the same ELF bytes followed by the zero padding"
     }
   ]
 }
