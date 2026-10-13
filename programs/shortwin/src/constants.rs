@@ -218,6 +218,19 @@ pub const VENUE_GUARD_SLOTS_2026_10_03: [u64; VENUE_PROGRAMS] = [
     451_957_263,
 ];
 
+/// Deploy slots read on mainnet on 2026-10-13 (`check --live`): pump 454,596,459 and PumpSwap
+/// 454,596,406 (2026-10-08), pump-fees 456,132,171 (2026-10-12; an unexamined 10-08 build at
+/// 454,596,501 preceded it), Raydium AMM v4 and CPMM unchanged, Jupiter 454,465,850. A test and
+/// `check --live` baseline only (the program never reads it).
+pub const VENUE_GUARD_SLOTS_2026_10_13: [u64; VENUE_PROGRAMS] = [
+    454_596_459,
+    454_596_406,
+    456_132_171,
+    445_763_204,
+    452_376_460,
+    454_465_850,
+];
+
 /// The ProgramData address of venue program `venue` (a `VenueGuard` index), or `None`.
 pub const fn venue_program_data(venue: u8) -> Option<Pubkey> {
     let i = venue as usize;
