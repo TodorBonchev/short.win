@@ -34,10 +34,13 @@ to build and test the code, what the code relies on, and what we already know ab
 - **After the tag, the AI review of v1.0.0** ([`audit/ai-review/`](audit/ai-review/README.md);
   not a formal audit): 17 issues and 7 confirmed leads (AIR-01 … AIR-24), fixed by a program
   batch after the tag (with the math crate, the normative sims and vectors, the keeper and the
-  indexer) or disclosed. The fixes have passed a local run of the CI gate but have not yet been
-  through CI, a ≥ 24 h fuzz run or a fix review (§12). The owner decided its open points on
-  2026-10-12 (§7); its residuals are known-issues KI-69 … KI-76 (and sentences in older rows),
-  and the register's §7 maps every finding.
+  indexer) or disclosed. The owner decided its open points on 2026-10-12 (§7); its residuals are
+  known-issues KI-69 … KI-76 (and sentences in older rows), and the register's §7 maps every
+  finding. Its follow-ups (branch `air-followups`, 2026-10-12/13: `SolSettle.vest_flushed`, the
+  keeper, the indexer, the web, the IDL and client, the fuzz corpus and the docs) change the
+  program once more (§0's AI-review build). The fixes and their follow-ups have passed local
+  runs of the CI gate (the latest on 2026-10-13, §10) but have not yet been through CI, a ≥ 24 h
+  fuzz run or a fix review (§12).
 - Normative sources:
   - the design documents `docs/SPEC.md`, `docs/design/ARCHITECTURE.md` (ARCH) and
     `docs/design/ECONOMICS.md` (ECON);
@@ -103,6 +106,28 @@ built both programs from a fresh clone of `HEAD`, and each output is byte-identi
   `1970661a…2bd` / `8cbeaea8…6f43`. Batches 1–3 changed both programs (`security.txt` and the
   version), and `shortwin` also by SQ-G8, M10-8C-1 and the extras denylist; batch 4 changed
   `shortwin`'s PumpSwap adapter.
+
+**After the tag: the AI review's branch** (`air-followups` at `621f8e1`, 2026-10-13: the fixes of
+`ai-review-fixes` and their follow-ups; §10's latest gate). A local `anchor build` with the
+pinned toolchain gives the bytes below. **They are not verified:** no verifiable build ran
+(Docker is not available on the machine that built them) and no CI run, so they are the
+proposed fixes' bytes, not release hashes:
+
+| Program | sha256 of the `.so` file | executable hash (trailing zeros trimmed) | bytes |
+|---|---|---|---|
+| `shortwin.so` | `fba9dd7567512dfcd96d81290a8d67ee10e8601afe232c3bce8d403b3c4fdf55` | `9e4f5ea5f805a16efbd9be2ab9bbaec3a15b74b3fe435cb031e55d7259ceb4b8` | 1,634,936 |
+| `complete_curve.so` | `f3a47201738fd72d4dd02f756ba3c17f241dc2bedde1c9d25f63eccaaafc6d42` | `2f2ef7da92c7b8dffc57bd7ae9bf33f64c8dbc09dc552c401742ad85f45382ab` | 122,264 |
+
+- `shortwin` grows by 25,320 B over v1.0.0; `complete_curve` is byte-identical to v1.0.0's. The
+  test-venue build is `63ee71aa…b05c` (1,670,064 B) and `mock_cpamm.so` `4cf17007…7ab9`
+  (281,240 B, unchanged). Both release ELFs have `e_flags` 0x3 and pass A49 and the
+  `security.txt` check (`--source-release v1.0.0`).
+- The program last changed in `cb756ca` (`SolSettle.vest_flushed`, AIR-07); the AI review's
+  README records the build before it (`eafc9833…`). No later commit changes program source, and
+  builds at `63b673c` and at `621f8e1` gave the same bytes.
+- The package version is still 1.0.0. A release of these fixes as 1.0.x (owner decision of
+  2026-10-02) changes the version, which `security.txt`'s `source_release` carries, and so
+  these hashes.
 
 ---
 
@@ -771,6 +796,45 @@ The full gate (G-full in the M10 plan; CI's `ci.yml`) also runs fmt and clippy w
   reasons, and one missing key is added (no rendering or text change). **CI on `7b2121d`: run
   38125079869 (2026-10-11), green, all 24 jobs a push runs succeeded** (`fuzz-nightly` and
   `mutants` are opt-in); the commits after it are docs only.
+- **After the tag, the AI review's fixes and follow-ups** (`ai-review-fixes` = `main` @
+  `4497ea6`; `air-followups`): no CI run, as nothing is pushed. Their local gates: the review's
+  README "Local gate", and the integrated branch's below.
+
+**The AI review follow-ups' gate** (2026-10-13, a local run, not CI; `air-followups` at
+`621f8e1`: the AI review's fixes and their follow-ups `cb756ca` … `621f8e1`, the program from
+`cb756ca`; WSL Ubuntu 24.04 on a 12-core, 6 GB machine, test binaries at 4 threads; a local
+stand-in for CI's jobs, `gate.sh`, plus the codama, web, fuzz-smoke, m7-keeper-bench and
+indexer steps; logs `~/.agent-logs/gt`). The SBF builds ran in place (`shortwin`, its
+test-venue build and `mock_cpamm` recompiled; `complete_curve` was fresh) and every test loaded
+them:
+
+| Step (CI job) | Result |
+|---|---|
+| anchor build + `scripts/build-test-venue.sh` | `shortwin.so` `fba9dd75…4fdf55` (1,634,936 B), `complete_curve.so` `f3a47201…6d42` (unchanged), test-venue `shortwin.so` `63ee71aa…b05c` (1,670,064 B), `mock_cpamm.so` `4cf17007…7ab9`: each byte-identical to the build at `63b673c`; both IDLs equal the committed copies (§0's AI-review table) |
+| SBPF v3; A49; security.txt | `e_flags` 0x3 on all three release ELFs; A49 ok (the test-venue build carries its marker and the mock id, the release builds neither); `security.txt` valid (`--forbid-placeholders --source-release v1.0.0`), none in the test-venue build |
+| fmt (with cu-math's); `shortwin-math`'s deny lints, `no_std`, no runtime dependency; clippy `-D warnings` on `-p shortwin-math`, the workspace, `-p shortwin`, the services and the keeper alone, the benches | clean |
+| lockfiles | no change since v1.0.0 (`Cargo.lock`, `services/Cargo.lock`, the six bench lockfiles, `pnpm-lock.yaml`) |
+| `cargo test -p shortwin-math -p shortwin-math-wasm -p squads-v4-ix` (`PROPTEST_CASES=2000`, as CI's test job) | 376 passed, 0 failed |
+| vectors; T-CONFIG; wasm | every `gen_*.py` regenerates the committed vectors with no diff; `config_check.py` OK, `test_config_gate.py` 8 tests; `wasm32-unknown-unknown` builds and `cargo check -p shortwin` there |
+| audit scope; fixtures | `scope.txt` matches; `SHA256SUMS` OK, `dump-fixtures.py check` 265 entries |
+| `cargo test -p shortwin` (the release feature set) | 75 passed |
+| **program-tests: `cargo test -p shortwin -p shortwin-venue-state -p shortwin-litesvm-tests`** (T-SIZE's 11 among them) | **1,252 passed, 0 failed, 4 ignored** (78 result blocks; the four ignored on `main` too) |
+| T-POT (`SHORTWIN_TRACES=full`); `build-alt.sh print` | 5 passed (stranding table: 40 seeds, 15,044 lamports, worst 435; `ext_pot_fwd_dust_100`'s 4 withdrawals replayed as `SolBelowMin` refusals, `251d6e8`); the ALT's static part 49 addresses |
+| **services tests** | **252 passed, 0 failed, 3 ignored**: keeper lib 86, keeper scenarios 140 (2 ignored: the release measurements), `shortwin-ops` 15, T-OPS `gov_e2e` 2, services-common 9 (`rpc_local` ignored); keeper A49 (the scenario binary embeds the mock id, the release keeper does not) |
+| indexer, without PostgreSQL | the unit and decoder tests 66 passed (`the_committed_sessions_decode_with_the_current_layouts` among them); the replay harness's 5 tests that need no database passed; the production indexer links no embedded Postgres |
+| benches cu-math, m1, m2, m3, m5, m6 (after the CPI wrappers' SBF builds) | every figure within its budget; fmt and clippy clean. The re-written `results.md` / `trace.md` of m1, m2 and m6 differ by run-to-run noise on the bytes `fb60d70` measured: multiples of ≈ 1.5 k CU (the PDA bump search of fresh keys) and 19–40 CU on other rows; committed in `f33edf0`. cu-math, m3 and m5 unchanged |
+| m7-keeper-bench (cost, PumpSwap ALT, cascade; release) | 3 passed. The committed `tests/bench/m7_keeper` and `m7_cascade` figures still name v1.0.0's build (`4d19c582…`); the re-written ones move the requested CU by up to +2,547 (PumpSwap's settling `sol_settle`, 74,445 → 76,992) and fail `keeper_cost.py`'s cross-check of its constants, so they are not committed: the sim, `out/keeper_cost.txt` and ECON §5.8 must move with them (TODO.md). The committed figures reproduce `out/keeper_cost.txt` |
+| **fuzz-smoke** (`cargo test --release --locked -p shortwin-fuzz`, LTO off and 16 codegen units as CI) | **12 + 16 passed** (`corpus_replays` included); with `FUZZ_VERBOSE=1` FUZZ-M7-24H-3's deficit is 1,028,407,941,046 lamports against a bound of 1,028,409,223,206 (999,998 ppm), and FUZZ-M10-24H-A's CPMM lender stays owed 2,149 lamports (`lender_sol` 2,332), the shapes `621f8e1` and `70ac76e` revised the reproducers for |
+| codama; client check | both IDLs equal the build's; `generate` leaves no diff and no untracked file; typecheck; 29 client tests |
+| web: `pnpm install --frozen-lockfile --offline`, the math-wasm build, lint, typecheck, Vitest, the build | no lockfile change; the math-wasm `pkg/` up to date with its inputs' hash; Biome 334 files clean; typecheck clean; **769 passed, 1 skipped** (78 files, 1 skipped); built |
+
+Not run: CI (nothing pushed); `cargo deny` and `cargo audit` (not installed here, and the
+advisory database needs a download; no lockfile changed since v1.0.0, whose CI run 38125079869
+passed both); the verifiable build (Docker is not available here: §0's AI-review hashes are not
+verified); the `indexer` job's PostgreSQL tests (no embedded PostgreSQL here) and its
+`ingest_rpc_validator`, and `rpc_local` (no validator); `web-e2e` (no Playwright browser); a
+timed fuzz run (the ≥ 24 h run on these bytes is not done: the owner did not ask for one on
+2026-10-12) and `mutants`.
 
 **The web batches after FE-30** (the web only; the program bytes, the IDL, the client and the
 indexer unchanged; each batch's gate as its commit message records it):

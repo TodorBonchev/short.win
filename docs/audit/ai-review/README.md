@@ -4,10 +4,10 @@ An AI-assisted security review of short.win's on-chain core, the triage of its l
 branch of proposed fixes. The review used Claude Opus 5.5 with the `rust-auditor` Claude Code
 skill.
 
-**This is not a formal audit.** The fixes on `ai-review-fixes` are proposals for the owner's
-review. They passed a local run of the CI gate (below), but none has run in CI, had a 24 h fuzz
-run or an external fix review, which [`../findings.md`](../findings.md) requires before a
-finding counts as fixed.
+**This is not a formal audit.** The fixes on `ai-review-fixes`, and their follow-ups on
+`air-followups`, are proposals for the owner's review. They passed local runs of the CI gate
+(below), but none has run in CI, had a 24 h fuzz run or an external fix review, which
+[`../findings.md`](../findings.md) requires before a finding counts as fixed.
 
 ## Scope and method
 
@@ -191,77 +191,112 @@ resolution; item 8 lists the interface changes and needs no decision.
      left pump (AIR-05).
    - `disable_venue` can now emit `ConfigCancelled` (AIR-24).
 
-## Follow-ups not done on this branch
+## Follow-ups
 
-- **IDL and `clients/js`.** These are not regenerated, so CI's `codama` job fails until
-  someone runs `pnpm --filter @shortwin/client idl:sync && pnpm --filter @shortwin/client generate`
-  on a build of this branch.
-- **Web app.**
-  - `apps/web/src/features/lend/sweep.ts` must add the pump-UVA leg off the pump venues
-    (AIR-05).
-  - `previews.ts`' `wipeSweepPending` must test `totalShares === 0n` instead of
-    `wipeLive(market)` (AIR-08).
-  - `PoolDrained` (6108) needs a row in `apps/web/src/config/errors.ts` and in `previews.ts`'
-    `MATH_ERRORS`, and a `REFUSALS` entry in `gen_lend_vectors.py` (AIR-07).
-  - `lend_vectors.json` must be regenerated: `pool_model` changed in AIR-02, AIR-03, AIR-07,
-    AIR-08 and AIR-12.
-  - The settlement previews must vest an S1 excess (AIR-21) and price the tokens at 0 on a
-    venue that cannot execute (AIR-09).
-- **Indexer.** `vest_bal` is zeroed at every flush that rolls the epoch (AIR-07). A flush
-  without a roll emits no event, so `vest_bal` stays stale until the next `PriceCranked`.
-  Closing that needs a new event field, which changes the IDL.
-- **Test harness.** In one KI-66 dust profile (seed 66), the LiteSVM replay of the pool trace
-  stops at one withdrawal: the host model refuses it with `NegativePending` and the program pays
-  it out (0, 0). The math crate and the model agree on every vector. The profile was reseeded,
-  and the replay needs a follow-up.
-- **Keeper.** The keeper core builds and its tests pass on this branch (see the gate). These
-  behaviours still need a decision or a change:
-  - `monitor.rs`' `latch_action` flags any deploy-slot change, but after a pure extension the
-    program now answers `VenueNotUpgraded` (AIR-01).
-  - The exit predictions should use AIR-10's tier cap on PumpSwap. Without it the keeper may
-    send liquidations the program refuses, which wastes fees but is not unsafe.
-  - The S3-chain predictions should use AIR-19's market mark.
+The fixes left the follow-ups below. They are done on the branch `air-followups` (`main` @
+`4497ea6` plus the commits named here, 2026-10-12/13). The keeper, indexer, web, test-harness
+and docs tracks went through adversarial reviews whose findings were fixed (the keeper's latest
+in `a1edf78` and `bf037ef`, the docs' in `72103a5` … `c6a55b5`); the client regeneration, the
+fuzz-corpus revisions and the integration's own commits had no separate review. What is still
+open is at the end of this list and in [`TODO.md`](../../../TODO.md).
 
-  The keeper changes the fixes needed are on this branch: AIR-05 (the UVA leg and the wipe
-  gate) and AIR-08 (`wipe_pending` tests `S = 0`).
-- **Design docs and known issues.** [`DOC-FOLLOWUPS.md`](DOC-FOLLOWUPS.md) has the wording.
-- **Release evidence.** A new batch of program fixes needs the rest of AUDIT.md §12's steps: a
-  full CI run, the new hashes in AUDIT.md §0 and a ≥ 24 h fuzz run. The CU figures are already
-  refreshed (`a8f9994`).
+- **Indexer: done** (`cb756ca`, `fb60d70`, `590e724`). A flush without an epoch roll emitted no
+  event, so `vest_bal` stayed stale until the next `PriceCranked`. `SolSettle` now reports
+  every flush in `vest_flushed` (a program change: the new hashes in AUDIT.md §0; the CU
+  figures refreshed in `fb60d70`), and the indexer zeroes `vest_bal` at every reported flush.
+- **Test harness: done** (`251d6e8`). T-POT's replay stopped on KI-66 dust profile seed 66 at a
+  withdrawal that the host model refused with `NegativePending` and the program paid (0, 0).
+  The program pays a withdrawal's SOL part at once, so another lender's withdrawal had already
+  drawn the pot, and an earlier claim paid this lender 266 lamports on chain against 741 in the
+  model. A settlement shortfall then left its pending at 153 on chain and −322 in the model.
+  The replay now sends such a withdrawal with `min_sol = u64::MAX` and asserts that the program
+  runs it on its own state and reverts at `SolBelowMin`, so the token side stays the model's
+  (`Stats.sol_gaps`). `ext_pot_fwd_dust_100` is back on seed 66, and its 4 such withdrawals
+  are pinned.
+- **Keeper: done.** `latch_action` no longer flags a pure `ExtendProgram` (AIR-01: `d2bb168`;
+  then `a1edf78`, a `VenueNotUpgraded` counts only from a bank at or past the deploy slot, and
+  a slot short.win refuses as not deployed is judged on the account read whole; `bf037ef`, a
+  tick's moved venues are simulated together). The exit predictions use AIR-10's tier cap on
+  PumpSwap (`2c1fce9`); the S3-chain predictions use AIR-19's market mark, and a position's S3
+  timer its own locked cap (`6a46cde`). A program not deployed in its slot (AIR-18) is retried
+  at the next tick without an alert (`8945087`).
+- **Web app: done** (`3f224c2`, `3c0f602`, `2bda5f5`, `975f757`, `abce2b1`; `2fea2c5`).
+  `PoolDrained` (6108) is in `errors.ts`, `previews.ts`' `MATH_ERRORS` and
+  `gen_lend_vectors.py`'s `REFUSALS`, and `lend_vectors.json` is regenerated (AIR-07);
+  `wipeSweepPending` tests `totalShares === 0n` (AIR-08); `sweep.ts` adds the pump-UVA leg off
+  the pump venues (AIR-05); the WASM `previewSettlement` prices the tokens at 0 on a venue that
+  cannot execute (AIR-09; AIR-21's S1 vest was already in it).
+- **IDL and `clients/js`: done** (`caa5852`). Regenerated from this branch's build; CI's
+  `codama` job passes locally. The indexer embeds the IDL, so the two committed recordings
+  holding a `revalidate_venue` made before AIR-01 were migrated in the same commit (an all-zero
+  `expected_elf_hash` appended, which is the old exact-slot check), and REPLAY's two committed
+  sessions were re-recorded (`5c4488f`).
+- **Fuzz smoke: done** (`70ac76e`, `621f8e1`). Two corpus regression tests failed since AIR-07
+  (already on `4497ea6`): the drained-pool gate refused FUZZ-M7-24H-3's late deposit, and the
+  vest flush left FUZZ-M10-24H-A's CPMM lender owed less than `CLAIM_DUST`. One action of each
+  reproducer was revised so it reaches its finding's shape again; no program change.
+- **Design docs and known issues: done** (`2c05eae`, `7618698`, `2aae952`, `18b65e2`,
+  `f6e25be`, `34105c6`, `63b673c`, then `72103a5` … `c6a55b5`, `be1c47a` and `b19655f`):
+  [`DOC-FOLLOWUPS.md`](DOC-FOLLOWUPS.md) applied, the sims' outputs regenerated,
+  the register's rows for the owner's decisions, the AIR-18 figures recomputed (`leads.md`
+  L-2's erratum).
+- **Release evidence: partly done.** The integrated branch passed a local run of the CI gate on
+  2026-10-13 (below), and AUDIT.md §0 records its build's hashes, marked as not verified. Still
+  open: a CI run (it needs a push), the verifiable build, a ≥ 24 h fuzz run (the owner did not
+  ask for one on 2026-10-12), the PostgreSQL and E2E jobs, and an external fix review.
+- **Still for the owner:** AIR-21 changes the B2-2 decision and AIR-14 widens residual 10, which
+  O18 accepted on older figures (SPEC §14, fourteenth round; known-issues KI-23, KI-52;
+  AUDIT.md §7); FE-31, the copy of `lender.residuals` (FRONTEND §13).
 
 ## Local gate
 
-CI was not run on this branch. The CI jobs ran locally instead, in WSL (Ubuntu 24.04) with the
-pinned toolchain, on this branch's build:
+CI has not run on these branches: nothing is pushed. The CI jobs ran locally instead, in WSL
+(Ubuntu 24.04) with the pinned toolchain.
+
+**The integrated branch** (2026-10-13, `air-followups` at `621f8e1`: the fixes and every
+follow-up above; test binaries at 4 threads; AUDIT.md §10 has the same run):
 
 | CI job or step | Result |
 |---|---|
-| `fmt`; `clippy -D warnings` (the workspace, `shortwin-math` and `shortwin` alone) | pass |
-| `shortwin-math`, `shortwin-math-wasm`, `squads-v4-ix` tests | 374 passed |
-| Vectors: every `gen_*.py` regenerated, no diff | pass |
-| `config_check.py` prints OK; the config-gate tests | pass |
-| The WASM build; the T-LAYOUT wasm32 check | pass |
-| Audit scope; fixture checksums and `dump-fixtures.py check` | pass |
-| Release and test-venue SBF builds: SBPF v3 flags, A49, security.txt | pass |
+| anchor-build: release and test-venue SBF builds; SBPF v3 flags, A49, security.txt; the IDL copies | pass; the hashes below; both committed IDLs equal the build's |
+| `fmt`; `clippy -D warnings` (the workspace, `shortwin-math` and `shortwin` alone); `shortwin-math`'s deny lints, `no_std`, no runtime dependency | pass |
+| `shortwin-math`, `shortwin-math-wasm`, `squads-v4-ix` tests (`PROPTEST_CASES=2000`, as CI) | 376 passed |
+| Vectors: every `gen_*.py` regenerated, no diff; `config_check.py` prints OK; the config-gate tests (8) | pass |
+| The WASM build; the T-LAYOUT wasm32 check; audit scope; fixture checksums and `dump-fixtures.py check` (265 entries) | pass |
 | `shortwin` unit tests | 75 passed |
-| LiteSVM suite (`shortwin`, `shortwin-venue-state`, `shortwin-litesvm-tests`) | 1,250 passed, 4 ignored ¹ |
-| T-POT: every pool trace replayed in full | pass (stranding table: 15,044 lamports, worst seed 435) |
-| Services: fmt, clippy, the keeper and `shortwin-gov` tests, the 121 keeper LiteSVM scenarios, the keeper binary's A49 check | 226 passed, 3 ignored |
-| CU benches (math, M1–M6) | every budget holds; figures refreshed in `a8f9994` |
+| LiteSVM suite (`shortwin`, `shortwin-venue-state`, `shortwin-litesvm-tests`; T-SIZE's 11 among them) | 1,252 passed, 0 failed, 4 ignored ¹ |
+| T-POT: every pool trace replayed in full | 5 passed (stranding table: 40 seeds, 15,044 lamports, worst 435; `ext_pot_fwd_dust_100`'s 4 `SolBelowMin` gaps) |
+| Services: fmt, clippy, the keeper and `shortwin-gov` tests, T-OPS, the keeper LiteSVM scenarios, the keeper binary's A49 check; `build-alt.sh print` | 252 passed, 3 ignored (keeper lib 86; scenarios 140, 2 ignored; `rpc_local` ignored); A49 ok; the ALT's static part 49 addresses |
+| Indexer without PostgreSQL: the indexer's unit tests; the replay harness's tests that need no database; the production indexer links no embedded Postgres | 66 passed; 5 passed; pass |
+| CU benches (math, M1–M3, M5, M6) | every budget holds; M1, M2 and M6 re-wrote rows by run-to-run noise on the same bytes (committed in `f33edf0`) |
+| m7-keeper-bench (cost, PumpSwap ALT, cascade; release) | 3 passed; its re-written figures are not committed: the committed ones still name v1.0.0's build, and the new ones fail `keeper_cost.py`'s cross-check (TODO.md) |
+| fuzz-smoke (`cargo test --release -p shortwin-fuzz`, CI's profile) | 12 + 16 passed (FUZZ-M7-24H-3's deficit 1,028.408 SOL at 999,998 ppm of its bound; FUZZ-M10-24H-A's CPMM lender owed 2,149 lamports) |
+| codama: IDL copies, `generate` leaves no diff, client typecheck and tests | pass; 29 client tests |
+| web: math-wasm build, lint, typecheck, Vitest, build | pass (lint 334 files); Vitest 769 passed, 1 skipped |
 
-¹ The four ignored tests are ignored on `main` too: they need a Surfpool fork or the pre-M4R
-builds. The suite ran before the last two test-only changes. `lender_it`, the only binary that
-reads the regenerated pool trace, was rerun on the final tree (54 passed).
+¹ The four ignored tests are ignored on `main` too: a Surfpool fork, the pre-M4R builds (two),
+and an exploration grid (`m4r_explore_liquidation_grid`).
 
 Not run here:
-- `cargo deny` and `cargo audit` (neither lockfile changed);
-- the `indexer` job's PostgreSQL tests (the indexer's unit tests pass: 63);
-- the `codama`, `web` and `web-e2e` jobs (the IDL and the clients are not regenerated);
+- `cargo deny` and `cargo audit`: not installed, and their advisory database needs a download.
+  No lockfile changed since v1.0.0 (`Cargo.lock`, `services/Cargo.lock`, the six bench
+  lockfiles, `pnpm-lock.yaml`), whose lockfiles passed both in CI run 38125079869;
+- the `indexer` job's PostgreSQL tests and its validator test, and `rpc_local` (validator);
+- `web-e2e` (Playwright on a validator);
 - the verifiable build (Docker);
-- a fuzz run.
+- a fuzz run beyond the smoke tests (no ≥ 24 h run: the owner did not ask for one on
+  2026-10-12), and the opt-in `mutants`.
 
-The build's hashes: `shortwin.so` `eafc9833…`; `complete_curve.so` `f3a47201…` (unchanged from
-v1.0.0).
+The build's hashes: `shortwin.so` `fba9dd75…` (1,634,936 B); `complete_curve.so` `f3a47201…`
+(unchanged from v1.0.0); AUDIT.md §0 has them in full, marked as not verified.
+
+**The fixes' own gate** (`ai-review-fixes`, before the follow-ups): fmt, clippy, the math tests
+(374), vectors, T-CONFIG, WASM, scope, fixtures, the SBF builds' checks, the unit tests (75),
+the LiteSVM suite (1,250 passed, 4 ignored), T-POT (stranding table 15,044 lamports), the
+services (226 passed, 3 ignored; 121 keeper scenarios), the indexer's unit tests (63) and the CU
+benches (figures refreshed in `a8f9994`) passed; codama, web, web-e2e, fuzz-smoke and the
+PostgreSQL tests did not run. Its `shortwin.so` was `eafc9833…`; `cb756ca` changed the program
+since.
 
 ## Files
 
