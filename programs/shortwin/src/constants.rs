@@ -218,12 +218,13 @@ pub const VENUE_GUARD_SLOTS_2026_10_03: [u64; VENUE_PROGRAMS] = [
     451_957_263,
 ];
 
-/// Deploy slots read on mainnet on 2026-10-13 (`check --live`): pump 454,596,459 and PumpSwap
-/// 454,596,406 (2026-10-08), pump-fees 456,132,171 (2026-10-12; an unexamined 10-08 build at
-/// 454,596,501 preceded it), Raydium AMM v4 and CPMM unchanged, Jupiter 454,465,850. A test and
+/// Deploy slots read on mainnet on 2026-10-13 (`check --live`): pump 456,494,698 (2026-10-13
+/// 15:40 UTC; its 2026-10-08 build at 454,596,459 preceded it), PumpSwap 454,596,406
+/// (2026-10-08), pump-fees 456,132,171 (2026-10-12; an unexamined 10-08 build at 454,596,501
+/// preceded it), Raydium AMM v4 and CPMM unchanged, Jupiter 454,465,850. A test and
 /// `check --live` baseline only (the program never reads it).
 pub const VENUE_GUARD_SLOTS_2026_10_13: [u64; VENUE_PROGRAMS] = [
-    454_596_459,
+    456_494_698,
     454_596_406,
     456_132_171,
     445_763_204,

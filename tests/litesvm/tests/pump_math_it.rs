@@ -35,7 +35,10 @@
 //! - venue-side rent (T-RENT's curve part): a creator vault that does not exist is topped up to
 //!   `Rent.minimum_balance(0)` from the user on buys and sells alike, with mainnet's Rent.
 //!
-//! Since the 2026-10-13 re-pin every test runs pump's 2026-10-08 build (`PumpDeploy::CURRENT`):
+//! Since the 2026-10-13 re-pin every test runs pump's 2026-10-13 build (`PumpDeploy::CURRENT`,
+//! `Oct2026Chain`; the first re-pin, to the 2026-10-08 build, measured the same figures, and
+//! `the_2026_10_13_build_runs_short_wins_paths_as_the_2026_10_08_build` replays every path below
+//! on both builds and compares every account, event and error):
 //! its v2 trades charge and pay exactly as before; a curve shorter than 166 bytes grows to 166 on
 //! its next trade, the user topping its rent reserve — `lamports − rQ −` the fee buckets — up to
 //! `minimum_balance(166)`. **T-PUMP-MATH-V3** (`v3_*`, gate G0) runs pump's own v3 trades as a
@@ -57,6 +60,7 @@
 #![allow(clippy::result_large_err)]
 
 use anchor_lang::prelude::Pubkey;
+use anchor_lang::solana_program::instruction::{AccountMeta, Instruction};
 use litesvm::LiteSVM;
 use shortwin::constants::{
     PUMP_AMM_FEE_CONFIG, PUMP_AMM_GLOBAL_CONFIG, PUMP_AMM_PROGRAM_ID, PUMP_FEE_CONFIG,
@@ -1386,13 +1390,15 @@ fn random_sequences_on_every_live_curve() {
 
 // ---- fixtures, programs, readers ---------------------------------------------------------------------
 
-/// The dumped programs are mainnet's, in the three builds the fixtures hold: the 2026-09 deploys
+/// The dumped programs are mainnet's, in the four deploys the fixtures hold: the 2026-09 deploys
 /// ARCH §8.2 names (deploy slots = `VENUE_GUARD_SLOTS_2026_09_27`), the 2026-10-02 redeploys
-/// (`VENUE_GUARD_SLOTS_2026_10_03`; both kept for T-LATCH) and the 2026-10-08/12 redeploys every
-/// fork loads ([`PumpDeploy::CURRENT`], slots = [`fork::FIXTURE_GUARD_SLOTS`] =
-/// `VENUE_GUARD_SLOTS_2026_10_13`'s): trimmed-ELF sha256 as pinned by `scripts/dump-fixtures.py`,
-/// SBPF v0, one upgrade authority, ELF headers that tell the builds apart
-/// ([`PumpDeploy::held`]), the ProgramData rebuilt to the mainnet sha256 when loaded. Every
+/// (`VENUE_GUARD_SLOTS_2026_10_03`; both kept for T-LATCH), the 2026-10-08/12 redeploys (pump's
+/// 2026-10-08 build kept for the differential) and pump's 2026-10-13 redeploy with PumpSwap's
+/// 2026-10-08 and pump-fees' 2026-10-12 builds, which every fork loads ([`PumpDeploy::CURRENT`],
+/// slots = [`fork::FIXTURE_GUARD_SLOTS`] = `VENUE_GUARD_SLOTS_2026_10_13`'s): trimmed-ELF sha256
+/// as pinned by `scripts/dump-fixtures.py`, SBPF v0, one upgrade authority, ELF headers that tell
+/// the builds apart ([`PumpDeploy::held`]), the ProgramData rebuilt to the mainnet sha256 when
+/// loaded. Every
 /// pump-state account of a group is one snapshot, the reader constants equal the program's, the
 /// statics sit at their PDAs (pump's `Global` the 1,088-byte one of the 2026-10-08 redeploy:
 /// `pump_state`'s 1,087 bytes, then `max_curve_depth` = 1), and every role of both state groups
@@ -1422,20 +1428,27 @@ fn fixtures_programs_and_readers() {
         (PumpDeploy::Oct2026Synth, PumpProgram::Pump) => {
             "6956c2f83297b6f7f06bbe8033241589c39da9650597dc5c59fb5a431906bf6f"
         }
-        (PumpDeploy::Oct2026Synth, PumpProgram::Fees) => {
+        (PumpDeploy::Oct2026Synth | PumpDeploy::Oct2026Chain, PumpProgram::Fees) => {
             "8ad2ca93c7ae97a7fb0de8a99de4d8825ccfdf89f73138cd49bda948e124b8b8"
         }
-        (PumpDeploy::Oct2026Synth, PumpProgram::Amm) => {
+        (PumpDeploy::Oct2026Synth | PumpDeploy::Oct2026Chain, PumpProgram::Amm) => {
             "3ffd5e3b5a31ccc86b434405e8a1876926da1e8685f891dc964b7f919c172ee1"
         }
+        (PumpDeploy::Oct2026Chain, PumpProgram::Pump) => {
+            "e202096978d8f20935153a4271938fd9f0a421d64c1749986b4c5c20ca2a52be"
+        }
     };
+    // The 2026-10-08/12 deploy: today's slots but pump's 2026-10-08 one.
+    let mut synth_slots = fork::FIXTURE_GUARD_SLOTS;
+    synth_slots[usize::from(PumpProgram::Pump.guard())] = fork::PUMP_DEPLOY_SLOT_2026_10_08;
     for (deploy, slots) in [
         (PumpDeploy::Sep2026, VENUE_GUARD_SLOTS_2026_09_27),
         (
             PumpDeploy::Oct2026,
             shortwin::constants::VENUE_GUARD_SLOTS_2026_10_03,
         ),
-        (PumpDeploy::Oct2026Synth, fork::FIXTURE_GUARD_SLOTS),
+        (PumpDeploy::Oct2026Synth, synth_slots),
+        (PumpDeploy::Oct2026Chain, fork::FIXTURE_GUARD_SLOTS),
     ] {
         for p in PumpProgram::ALL {
             let pd = deploy.program_data(p);
@@ -1470,7 +1483,12 @@ fn fixtures_programs_and_readers() {
             assert_eq!(prog.account.data[4..36], pd.address.to_bytes());
         }
     }
-    assert_eq!(PumpDeploy::CURRENT, PumpDeploy::Oct2026Synth);
+    assert_eq!(PumpDeploy::CURRENT, PumpDeploy::Oct2026Chain);
+    assert_eq!(
+        fork::FIXTURE_GUARD_SLOTS[usize::from(PumpProgram::Pump.guard())],
+        456_494_698,
+        "pump's 2026-10-13 redeploy"
+    );
     for p in PumpProgram::ALL {
         let g = usize::from(p.guard());
         assert_eq!(
@@ -1486,10 +1504,16 @@ fn fixtures_programs_and_readers() {
             p.program_data().name,
             "an address lookup resolves to the latest redeploy"
         );
-        // The builds' ELF headers differ pairwise (what `PumpDeploy::held` reads).
+        // The builds' ELF headers differ pairwise (what `PumpDeploy::held` reads); PumpSwap and
+        // pump-fees are one build in the last two deploys, and `held` names the newer.
         for (i, a) in PumpDeploy::ALL.into_iter().enumerate() {
             for b in &PumpDeploy::ALL[i + 1..] {
-                assert_ne!(a.elf(p)[..64], b.elf(p)[..64], "{p:?}: {a:?} vs {b:?}");
+                if a.same_build(*b, p) {
+                    assert_eq!(a.elf(p), b.elf(p), "{p:?}: {a:?} vs {b:?}");
+                    assert_ne!(p, PumpProgram::Pump);
+                } else {
+                    assert_ne!(a.elf(p)[..64], b.elf(p)[..64], "{p:?}: {a:?} vs {b:?}");
+                }
             }
         }
     }
@@ -2512,8 +2536,9 @@ fn donate(env: &mut Env, c: &PumpCurve, d: u64) {
 }
 
 /// T-PUMP-MATH-V3 (d): `migrate_v2` creates exactly `(curve_base_ata, rQ + pcQ − fee_m)` — the
-/// `curve_base_ata` read just before it, donations included — with the boost `VQR = ⌊(Y −
-/// pcQ)·2069/10⁴⌋`; the curve keeps `pcB` / `pcQ`.
+/// `curve_base_ata` read just before it, donations included — with the boost `VQR = ⌊X₁·Y₁/
+/// 10¹⁵⌋` (pump-final §3.4 (d)'s `⌊(Y − pcQ)·2069/10⁴⌋` only without a donation); the curve keeps
+/// `pcB` / `pcQ`.
 #[track_caller]
 fn migrate_and_check(env: &mut Env, c: &PumpCurve, ctx: &str) {
     let a = read::token_amount(&env.svm, &c.curve_base_ata).unwrap();
@@ -3031,5 +3056,556 @@ fn v3_buy_past_rt_reverts_on_the_2026_10_02_build() {
         Some(fork::PUMP_ERR_NOT_ENOUGH_TOKENS_TO_BUY),
         "{}",
         describe(&res)
+    );
+}
+
+// ---- the 2026-10-13 build against the 2026-10-08 build (the re-pin to 456,494,698) ------------
+
+/// Two forks of one coin driven in lockstep: `old` runs pump's 2026-10-08 build
+/// ([`PumpDeploy::Oct2026Synth`]), `new` its 2026-10-13 build ([`PumpDeploy::CURRENT`]); PumpSwap,
+/// pump-fees and every account start equal. Each fork is asked which build executes
+/// ([`Env::pump_build_running`], whose `create_v2` depth probe tells the two apart), not only
+/// which one its ProgramData holds, so the comparison cannot pass on one ELF run twice.
+struct Twin {
+    old: Env,
+    new: Env,
+    c: PumpCurve,
+    /// Transactions compared, those that failed (on both), and the compute units of the
+    /// successful ones (equal on both).
+    sent: usize,
+    failed: usize,
+    units: u64,
+}
+
+impl Twin {
+    fn fork(coin: PumpCoin) -> Self {
+        let (mut old, c) = Env::fork_pump_coin(coin);
+        fork::load_pump_deploy(&mut old.svm, PumpProgram::Pump, PumpDeploy::Oct2026Synth);
+        let (mut new, _) = Env::fork_pump_coin(coin);
+        assert_eq!(
+            PumpDeploy::held(&old.svm, PumpProgram::Pump),
+            Some(PumpDeploy::Oct2026Synth)
+        );
+        assert_eq!(
+            PumpDeploy::held(&new.svm, PumpProgram::Pump),
+            Some(PumpDeploy::Oct2026Chain)
+        );
+        // The probes run alike on both forks: refused transactions, which leave every account
+        // as they found it but for the fee the harness payer pays.
+        for (env, deploy) in [
+            (&mut old, PumpDeploy::Oct2026Synth),
+            (&mut new, PumpDeploy::Oct2026Chain),
+        ] {
+            env.warp(1);
+            assert_eq!(
+                env.pump_build_running(PumpProgram::Pump),
+                deploy,
+                "{coin:?}: the build that executes"
+            );
+        }
+        Self {
+            old,
+            new,
+            c,
+            sent: 0,
+            failed: 0,
+            units: 0,
+        }
+    }
+
+    /// The same byte-level change on both forks.
+    fn both(&mut self, f: impl Fn(&mut Env)) {
+        f(&mut self.old);
+        f(&mut self.new);
+    }
+
+    /// A keypair funded with `lamports` on both forks, with its base-token ATA and pump UVA
+    /// (paid by itself, so no fork-specific key enters an account).
+    fn user(&mut self, lamports: u64) -> (Keypair, Pubkey) {
+        let kp = Keypair::new();
+        let k = kp.pubkey();
+        self.both(|env| env.fund(&k, lamports));
+        let program = self.c.token_program.id();
+        let ixs = [
+            fork::create_ata_idempotent_ix(&k, &k, &self.c.mint, &program),
+            fork::pump_init_uva_ix(&k, &k),
+        ];
+        self.send("user setup", &ixs, &[&kp], None);
+        (kp, pda::ata(&k, &self.c.mint, &program))
+    }
+
+    /// [`Twin::compare`], and the custom code is `expect` (`None`: success).
+    #[track_caller]
+    fn send(&mut self, what: &str, ixs: &[Instruction], signers: &[&Keypair], expect: Option<u32>) {
+        let code = self.compare(what, ixs, signers);
+        assert_eq!(code, expect, "{what}");
+    }
+
+    /// Sends `ixs` on both forks and asserts one outcome: success on both or the same
+    /// `TransactionError`, the same logs once the "consumed … compute units" lines are dropped
+    /// (every `msg!`, event and error message), the same compute units on success, and every
+    /// account the instructions name byte-identical afterwards. Returns the custom code.
+    #[track_caller]
+    fn compare(&mut self, what: &str, ixs: &[Instruction], signers: &[&Keypair]) -> Option<u32> {
+        let a = self.old.send(ixs, signers);
+        let b = self.new.send(ixs, signers);
+        let view = |r: &TxResult| match r {
+            Ok(m) => (None, m.logs.clone(), m.compute_units_consumed),
+            Err(f) => (
+                Some(format!("{:?}", f.err)),
+                f.meta.logs.clone(),
+                f.meta.compute_units_consumed,
+            ),
+        };
+        let ((ea, la, ua), (eb, lb, ub)) = (view(&a), view(&b));
+        let strip = |l: Vec<String>| -> Vec<String> {
+            l.into_iter()
+                .filter(|s| !(s.contains(" consumed ") && s.ends_with(" compute units")))
+                .collect()
+        };
+        assert_eq!(
+            ea,
+            eb,
+            "{}: error\n{}\n----\n{}",
+            what,
+            describe(&a),
+            describe(&b)
+        );
+        assert_eq!(strip(la), strip(lb), "{what}: logs");
+        if ea.is_none() {
+            assert_eq!(ua, ub, "{what}: compute units");
+            self.units += ua;
+        } else {
+            self.failed += 1;
+        }
+        self.sent += 1;
+        let mut keys: Vec<Pubkey> = ixs
+            .iter()
+            .flat_map(|ix| ix.accounts.iter().map(|m| m.pubkey))
+            .collect();
+        keys.sort();
+        keys.dedup();
+        for k in keys {
+            assert_eq!(
+                self.old.svm.get_account(&k),
+                self.new.svm.get_account(&k),
+                "{what}: account {k}"
+            );
+        }
+        custom_code(&a)
+    }
+}
+
+/// The re-pin's differential (gate G0b, the 2026-10-13 redeploy at 456,494,698): pump's
+/// 2026-10-13 build runs every path short.win uses and every third-party move the harness makes
+/// exactly as its 2026-10-08 build — the same errors, logs (every event, `msg!` and error
+/// message), compute units, and account bytes after each transaction:
+///
+/// - on each live SOL curve of both state groups (49 to 166 bytes, SPL Token and Token-2022;
+///   the shorter ones grow to 166 on their first trade): `buy_v2`, `sell_v2`,
+///   `buy_exact_quote_in_v2` (short.win's legs today) and `buy_v3`, `sell_v3`,
+///   `buy_exact_quote_in_v3` (its legs after P2), then each refusal those legs can meet — 6002 /
+///   6003 one unit past a bound, 6042 below a minimum out, 6021 past `rT` on v2;
+/// - on `near166`: the synthetic migration (`buy_v3(rT + δ)`, then 6005 on every trade of the
+///   complete curve) and `migrate_v2`, with and without a token donation to `curve_base_ata`;
+///   `buy_exact_quote_in_v3` past `rT`;
+/// - on `cashback166`: 6094 on every v3 trade, v2 trades and `claim_cashback`; the mayhem, the
+///   complete unmigrated and the migrated synthetic curves: whatever each answers, the same.
+///
+/// The ELF diff (`tests/fixtures/README.md`) found only `create_v2` and its quote derivation
+/// changed; short.win never calls them.
+#[test]
+fn the_2026_10_13_build_runs_short_wins_paths_as_the_2026_10_08_build() {
+    const SOL: u64 = 1_000_000_000;
+    let (mut sent, mut failed, mut units) = (0, 0, 0);
+    let mut tally = |t: &Twin| {
+        sent += t.sent;
+        failed += t.failed;
+        units += t.units;
+    };
+    for coin in PumpCoin::LIVE_SOL
+        .into_iter()
+        .chain(PumpCoin::LIVE_SOL_2026_10_13)
+    {
+        let mut t = Twin::fork(coin);
+        let c = t.c;
+        let (u, ata) = t.user(10_000 * SOL);
+        let up = u.pubkey();
+        let (fr, bb) = (
+            fork::pump_fee_recipient(&t.new.svm, 1),
+            fork::pump_buyback_fee_recipient(&t.new.svm, 1),
+        );
+        let v2 = |t: &Twin, kind: PumpV2, a: u64, b: u64| {
+            c.v2_ix(&t.new.svm, kind, &up, &ata, &fr, &bb, a, b)
+        };
+        let v3 = |kind: fork::PumpV3, a: u64, b: u64| c.v3_ix(kind, &up, &ata, &bb, a, b, None);
+        let q = (c.state(&t.new.svm).real_token_reserves / 20).max(1);
+        let ctx = |s: &str| format!("{coin:?}: {s}");
+        let ix = v2(&t, PumpV2::Buy, q, u64::MAX);
+        t.send(&ctx("buy_v2"), &[ix], &[&u], None);
+        let ix = v2(&t, PumpV2::Sell, q / 2, 0);
+        t.send(&ctx("sell_v2"), &[ix], &[&u], None);
+        // (an exact-in buy with `min_tokens_out` = 0 is `BuyZeroAmount`, 6020, on both builds)
+        let ix = v2(&t, PumpV2::BuyExactQuoteIn, SOL / 3, 1);
+        t.send(&ctx("buy_exact_quote_in_v2"), &[ix], &[&u], None);
+        let ix = v3(fork::PumpV3::Buy, q / 2, u64::MAX);
+        t.send(&ctx("buy_v3"), &[ix], &[&u], None);
+        let ix = v3(fork::PumpV3::Sell, q / 4, 0);
+        t.send(&ctx("sell_v3"), &[ix], &[&u], None);
+        let ix = v3(fork::PumpV3::BuyExactQuoteIn, SOL / 5, 1);
+        t.send(&ctx("buy_exact_quote_in_v3"), &[ix], &[&u], None);
+        let ix = v3(fork::PumpV3::Buy, q / 2, u64::MAX);
+        t.send(
+            &ctx("buy_v3 with partial_fill"),
+            &[spump::with_partial_fill(ix, false)],
+            &[&u],
+            None,
+        );
+        // The refusals: one unit past each bound.
+        let ix = v2(&t, PumpV2::Buy, q, 1);
+        t.send(&ctx("buy_v2 over max"), &[ix], &[&u], Some(6002));
+        let ix = v2(&t, PumpV2::Sell, q / 8, u64::MAX);
+        t.send(&ctx("sell_v2 under min"), &[ix], &[&u], Some(6003));
+        let ix = v3(fork::PumpV3::Buy, q, 1);
+        t.send(&ctx("buy_v3 over max"), &[ix], &[&u], Some(6002));
+        let ix = v3(fork::PumpV3::Sell, q / 8, u64::MAX);
+        t.send(&ctx("sell_v3 under min"), &[ix], &[&u], Some(6003));
+        let ix = v3(fork::PumpV3::BuyExactQuoteIn, SOL / 5, u64::MAX);
+        t.send(
+            &ctx("buy_exact_quote_in_v3 under min"),
+            &[ix],
+            &[&u],
+            Some(6042),
+        );
+        let rt = c.state(&t.new.svm).real_token_reserves;
+        let ix = v2(&t, PumpV2::Buy, rt + 1, u64::MAX);
+        t.send(
+            &ctx("buy_v2 past rT"),
+            &[ix],
+            &[&u],
+            Some(fork::PUMP_ERR_NOT_ENOUGH_TOKENS_TO_BUY),
+        );
+        assert_eq!(
+            c.data_len(&t.new.svm),
+            fork::CURVE_LEN_2026_10_08,
+            "{coin:?}"
+        );
+        tally(&t);
+    }
+
+    // The synthetic migration on near166, without and with a donation to curve_base_ata (before
+    // the completion, and after it), and `migrate_v2`.
+    for donation in [0, 1_000_000_000_000] {
+        let mut t = Twin::fork(PumpCoin::Near166);
+        let c = t.c;
+        let (u, ata) = t.user(2_000 * SOL);
+        let bb = fork::pump_buyback_fee_recipient(&t.new.svm, 1);
+        let program = c.token_program.id();
+        let donate = |t: &mut Twin, d: u64| {
+            let holder = Keypair::new();
+            let h = holder.pubkey();
+            t.both(|env| env.fund(&h, SOL));
+            let ix = fork::create_ata_idempotent_ix(&h, &h, &c.mint, &program);
+            t.send("holder ATA", &[ix], &[&holder], None);
+            let src = pda::ata(&h, &c.mint, &program);
+            t.both(|env| fork::set_token_amount(&mut env.svm, &src, d));
+            let decimals = t.new.svm.get_account(&c.mint).unwrap().data[44];
+            let mut data = vec![12u8];
+            data.extend_from_slice(&d.to_le_bytes());
+            data.push(decimals);
+            let ix = Instruction {
+                program_id: program,
+                accounts: vec![
+                    AccountMeta::new(src, false),
+                    AccountMeta::new_readonly(c.mint, false),
+                    AccountMeta::new(c.curve_base_ata, false),
+                    AccountMeta::new_readonly(h, true),
+                ],
+                data,
+            };
+            t.send("donation", &[ix], &[&holder], None);
+        };
+        if donation > 0 {
+            donate(&mut t, donation);
+        }
+        let rt = c.state(&t.new.svm).real_token_reserves;
+        let ix = c.v3_ix(
+            fork::PumpV3::Buy,
+            &u.pubkey(),
+            &ata,
+            &bb,
+            rt + 10_000_000_000_000,
+            u64::MAX,
+            None,
+        );
+        let ctx = format!("near166, donation {donation}");
+        t.send(&format!("{ctx}: buy_v3(rT + δ)"), &[ix], &[&u], None);
+        assert!(c.state(&t.new.svm).complete, "{ctx}: complete");
+        for (kind, bound) in [(fork::PumpV3::Buy, u64::MAX), (fork::PumpV3::Sell, 0)] {
+            let ix = c.v3_ix(kind, &u.pubkey(), &ata, &bb, 1_000_000, bound, None);
+            t.send(
+                &format!("{ctx}: {kind:?} on the complete curve"),
+                &[ix],
+                &[&u],
+                Some(fork::PUMP_ERR_BONDING_CURVE_COMPLETE),
+            );
+        }
+        if donation > 0 {
+            donate(&mut t, donation);
+        }
+        let migrator = Keypair::new();
+        let m = migrator.pubkey();
+        t.both(|env| env.fund(&m, 10 * SOL));
+        let mig = spump::migrate_v2_ix(&t.new.svm, &m, &c);
+        t.send(
+            &format!("{ctx}: migrate_v2"),
+            &[spump::cu_limit_ix(600_000), mig],
+            &[&migrator],
+            None,
+        );
+        assert!(c.state(&t.new.svm).is_migrated(), "{ctx}");
+        let ix = c.v3_ix(
+            fork::PumpV3::Buy,
+            &u.pubkey(),
+            &ata,
+            &bb,
+            1_000_000,
+            u64::MAX,
+            None,
+        );
+        t.send(
+            &format!("{ctx}: buy_v3 on the migrated curve"),
+            &[ix],
+            &[&u],
+            Some(fork::PUMP_ERR_BONDING_CURVE_COMPLETE),
+        );
+        tally(&t);
+    }
+
+    // buy_exact_quote_in_v3 past rT: the rest from the would-be pool.
+    let mut t = Twin::fork(PumpCoin::Near166);
+    let c = t.c;
+    let (u, ata) = t.user(2_000 * SOL);
+    let bb = fork::pump_buyback_fee_recipient(&t.new.svm, 1);
+    let ix = c.v3_ix(
+        fork::PumpV3::BuyExactQuoteIn,
+        &u.pubkey(),
+        &ata,
+        &bb,
+        200 * SOL,
+        1,
+        None,
+    );
+    t.send("near166: buy_exact_quote_in_v3 past rT", &[ix], &[&u], None);
+    assert!(c.state(&t.new.svm).complete);
+    tally(&t);
+
+    // The cashback coin: every v3 trade refused (6094); v2 trades and claim_cashback run.
+    let mut t = Twin::fork(PumpCoin::Cashback166);
+    let c = t.c;
+    let (u, ata) = t.user(100 * SOL);
+    let up = u.pubkey();
+    let (fr, bb) = (
+        fork::pump_fee_recipient(&t.new.svm, 1),
+        fork::pump_buyback_fee_recipient(&t.new.svm, 1),
+    );
+    t.both(|env| fork::set_token_amount(&mut env.svm, &ata, 1_000_000_000));
+    for kind in [
+        fork::PumpV3::Buy,
+        fork::PumpV3::Sell,
+        fork::PumpV3::BuyExactQuoteIn,
+    ] {
+        let (a, b) = match kind {
+            fork::PumpV3::Buy => (1_000_000, u64::MAX),
+            fork::PumpV3::Sell => (1_000_000, 0),
+            fork::PumpV3::BuyExactQuoteIn => (SOL, 1),
+        };
+        let ix = c.v3_ix(kind, &up, &ata, &bb, a, b, None);
+        t.send(
+            &format!("cashback166: {kind:?}"),
+            &[ix],
+            &[&u],
+            Some(fork::PUMP_ERR_CASHBACK_COIN_NOT_SUPPORTED),
+        );
+    }
+    let q = c.state(&t.new.svm).real_token_reserves / 50;
+    let ix = c.v2_ix(&t.new.svm, PumpV2::Buy, &up, &ata, &fr, &bb, q, u64::MAX);
+    t.send("cashback166: buy_v2", &[ix], &[&u], None);
+    let ix = c.v2_ix(&t.new.svm, PumpV2::Sell, &up, &ata, &fr, &bb, q / 2, 0);
+    t.send("cashback166: sell_v2", &[ix], &[&u], None);
+    let code = t.compare(
+        "cashback166: claim_cashback",
+        &[spump::claim_cashback_ix(&up)],
+        &[],
+    );
+    println!("cashback166: claim_cashback → {code:?} on both builds");
+    tally(&t);
+
+    // The curves short.win refuses or that are no longer live: the same answer on both builds.
+    for coin in [
+        PumpCoin::Mayhem166,
+        PumpCoin::SyntheticStuck,
+        PumpCoin::GraduatedSynthetic,
+    ] {
+        let mut t = Twin::fork(coin);
+        let c = t.c;
+        let (u, ata) = t.user(100 * SOL);
+        let up = u.pubkey();
+        let (fr, bb) = (
+            fork::pump_fee_recipient(&t.new.svm, 1),
+            fork::pump_buyback_fee_recipient(&t.new.svm, 1),
+        );
+        for kind in [PumpV2::Buy, PumpV2::Sell] {
+            let b = if kind == PumpV2::Sell { 0 } else { u64::MAX };
+            let ix = c.v2_ix(&t.new.svm, kind, &up, &ata, &fr, &bb, 1_000_000, b);
+            let code = t.compare(&format!("{coin:?}: {kind:?} v2"), &[ix], &[&u]);
+            println!("{coin:?}: {kind:?} v2 → {code:?} on both builds");
+        }
+        for kind in [fork::PumpV3::Buy, fork::PumpV3::Sell] {
+            let b = if kind == fork::PumpV3::Sell {
+                0
+            } else {
+                u64::MAX
+            };
+            let ix = c.v3_ix(kind, &up, &ata, &bb, 1_000_000, b, None);
+            let code = t.compare(&format!("{coin:?}: {kind:?}"), &[ix], &[&u]);
+            println!("{coin:?}: {kind:?} → {code:?} on both builds");
+        }
+        tally(&t);
+    }
+    // The total varies from run to run: the users are random keys, whose PDA and ATA bump
+    // searches cost different units. Only the per-transaction equality is asserted.
+    println!(
+        "G0b differential: {sent} transactions on pump's 2026-10-08 and 2026-10-13 builds, \
+         {failed} refused on both with the same error; equal logs, accounts and compute units \
+         per transaction ({units} CU over the successful ones in this run, random keys)"
+    );
+    assert!(sent >= 150 && failed >= 60, "{sent} / {failed}");
+}
+
+/// What pump's 2026-10-13 redeploy changed, on the dumped ELFs: `create_v2` of a coin quoted in
+/// a nested pump coin (short.win never calls `create_v2`). `Q` is the `synthetic_stuck` coin
+/// (depth 1, quoted in the pump coin `W5vQ…`, whose curve is the chain's depth-0 root and not in
+/// the dump), and a `QuoteControl` admitting no mint stands at its PDA (the dump holds none):
+///
+/// 1. `max_curve_depth` = 1 (the dumped `Global`'s, slot 456,395,752; the depth probe sets it):
+///    the new curve's depth 2 is refused `CurveDepthExceeded` (6105) by both builds, the
+///    2026-10-13 one naming its cap of 5;
+/// 2. `max_curve_depth` = 2 (mainnet's since slot 456,495,021, so depth-2 coins can be created
+///    there): `Q`'s complete, unmigrated curve is refused `QuoteCurveAwaitingMigration` (6107)
+///    by both, the 2026-10-13 build's message speaking of the quote chain;
+/// 3. `Q`'s curve patched live: the 2026-10-08 build creates the depth-2 coin from `Q`'s curve
+///    alone (its `initial_virtual_quote_reserves` derived from `Q`'s stored one); the 2026-10-13
+///    build refuses `QuoteChainAccountsRequired` (6109) without the root's curve;
+/// 4. with a live depth-0 SOL curve written as the root's (`near166`'s bytes): both create the
+///    coin, the 2026-10-08 build ignoring the extra account (the same reserves as in 3), the
+///    2026-10-13 build deriving them through the chain from the root's live reserves.
+#[test]
+fn the_2026_10_13_build_requires_the_quote_chain_in_create_v2() {
+    // The new curve's `initial_virtual_quote_reserves` (@142) per build: (Q alone, with root).
+    let mut ivqr = Vec::new();
+    for deploy in [PumpDeploy::Oct2026Synth, PumpDeploy::Oct2026Chain] {
+        let chain = deploy == PumpDeploy::Oct2026Chain;
+        let (mut env, q) = Env::fork_pump_coin(PumpCoin::SyntheticStuck);
+        fork::load_pump_deploy(&mut env.svm, PumpProgram::Pump, deploy);
+        env.warp(1);
+        assert_eq!(env.pump_build_running(PumpProgram::Pump), deploy);
+        let has = |logs: &[String], s: &str| logs.iter().any(|l| l.contains(s));
+        // 1. Too deep at max_curve_depth 1 (the dump's).
+        env.warp(1);
+        let (code, logs) = env.pump_create_v2_depth_probe();
+        assert_eq!(
+            code,
+            Some(fork::PUMP_ERR_CURVE_DEPTH_EXCEEDED),
+            "{deploy:?}"
+        );
+        assert_eq!(
+            has(&logs, fork::PUMP_DEPTH_CAP_MESSAGE),
+            chain,
+            "{deploy:?}"
+        );
+        // 2. Deep enough at mainnet's max_curve_depth (2), but Q's curve is complete and not
+        //    migrated.
+        let qc = fork::pump_quote_control();
+        let acc = fork::empty_quote_control(&env.svm);
+        env.svm.set_account(qc, acc).unwrap();
+        let mut g = env.svm.get_account(&PUMP_GLOBAL).unwrap();
+        assert_eq!(
+            g.data[fork::PUMP_OFF_GLOBAL_MAX_CURVE_DEPTH],
+            1,
+            "the dump's"
+        );
+        g.data[fork::PUMP_OFF_GLOBAL_MAX_CURVE_DEPTH] = 2;
+        env.svm.set_account(PUMP_GLOBAL, g).unwrap();
+        let create = |env: &mut Env, chain_accounts: &[Pubkey]| {
+            env.warp(1);
+            let user = env.funded_keypair();
+            let mint = Keypair::new();
+            let ix = fork::pump_create_v2_ix(
+                &user.pubkey(),
+                &mint.pubkey(),
+                fork::pump_coin_quote_accounts(&mint.pubkey(), &q, chain_accounts),
+            );
+            let res = env.send(&[spump::cu_limit_ix(400_000), ix], &[&user, &mint]);
+            (res, mint.pubkey())
+        };
+        let (res, _) = create(&mut env, &[]);
+        assert_eq!(
+            custom_code(&res),
+            Some(fork::PUMP_ERR_QUOTE_CURVE_AWAITING_MIGRATION),
+            "{deploy:?}: {}",
+            describe(&res)
+        );
+        let logs = res.as_ref().err().unwrap().meta.logs.clone();
+        assert_eq!(
+            has(&logs, "A quote-chain coin's curve"),
+            chain,
+            "{deploy:?}"
+        );
+        // 3. Q live: the 2026-10-08 build reads Q alone, the 2026-10-13 one wants the chain.
+        let mut c = env.svm.get_account(&q.curve).unwrap();
+        c.data[48] = 0;
+        env.svm.set_account(q.curve, c).unwrap();
+        let created = |env: &Env, mint: &Pubkey| {
+            let d = env.svm.get_account(&pda::bonding_curve(mint)).unwrap().data;
+            assert_eq!(
+                (d.len(), d[141]),
+                (fork::CURVE_LEN_2026_10_08, 2),
+                "depth 2"
+            );
+            u64::from_le_bytes(d[142..150].try_into().unwrap())
+        };
+        let (res, mint) = create(&mut env, &[]);
+        let alone = if chain {
+            assert_eq!(
+                custom_code(&res),
+                Some(fork::PUMP_ERR_QUOTE_CHAIN_ACCOUNTS_REQUIRED),
+                "{}",
+                describe(&res)
+            );
+            None
+        } else {
+            ok(res, "2026-10-08: a depth-2 coin from Q's curve alone");
+            Some(created(&env, &mint))
+        };
+        // 4. With a live depth-0 SOL curve as the root's (near166's bytes at W5vQ…'s PDA).
+        let root = pda::bonding_curve(&q.quote_mint);
+        let near = fork::fixture("pump_near166_curve").account.clone();
+        env.svm.set_account(root, near).unwrap();
+        let (res, mint) = create(&mut env, &[root]);
+        ok(res, &format!("{deploy:?}: with the root's curve"));
+        let with_root = created(&env, &mint);
+        println!(
+            "{deploy:?}: ivqr of the depth-2 coin: Q alone {alone:?}, with the root {with_root}"
+        );
+        ivqr.push((alone, with_root));
+    }
+    assert_eq!(
+        ivqr,
+        [
+            (Some(41_982_750_120_570), 41_982_750_120_570),
+            (None, 66_510_807_491_306),
+        ],
+        "2026-10-08: Q's stored reserves, the root ignored; 2026-10-13: through the chain"
     );
 }

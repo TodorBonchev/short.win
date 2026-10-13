@@ -193,7 +193,7 @@ fn a_v1_sale_is_paid_from_the_vault_less_the_buckets() {
             PumpDeploy::Sep2026 => {
                 ok(res);
             }
-            PumpDeploy::Oct2026 | PumpDeploy::Oct2026Synth => {
+            PumpDeploy::Oct2026 | PumpDeploy::Oct2026Synth | PumpDeploy::Oct2026Chain => {
                 assert_eq!(
                     custom_code(&res),
                     Some(PAMM_ERR_INSUFFICIENT_REAL_QUOTE),

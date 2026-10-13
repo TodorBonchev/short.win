@@ -1,5 +1,6 @@
-//! The PumpSwap side of the 2026-10-13 re-pin (pump and PumpSwap of 2026-10-08, pump-fees of
-//! 2026-10-12; `fork::PumpDeploy::Oct2026Synth`).
+//! The PumpSwap side of the 2026-10-13 re-pin (PumpSwap of 2026-10-08, pump-fees of 2026-10-12,
+//! as `fork::PumpDeploy::Oct2026Synth` and `Oct2026Chain` both hold them; pump's 2026-10-13
+//! redeploy changed neither).
 //!
 //! **T-PFEE-CPI** (PUMP-2026-10-13-5): short.win's curve legs will stop CPIing pump-fees, but its
 //! PumpSwap legs still pass pump-fees as `fee_program`, and PumpSwap invokes it there — so the
@@ -140,9 +141,9 @@ fn hex(b: &[u8]) -> String {
 fn r_pfee_withdraw_probe() {
     use solana_keypair::Keypair;
     let (mut env, _) = Env::fork_pump_coin(fork::PumpCoin::Fresh166);
-    assert_eq!(
-        env.pump_build_running(PumpProgram::Fees),
-        PumpDeploy::Oct2026Synth
+    assert!(
+        env.pump_build_running(PumpProgram::Fees)
+            .same_build(PumpDeploy::Oct2026Synth, PumpProgram::Fees)
     );
     let mut data = fork::PUMP_FEES_WITHDRAW.to_vec();
     data.extend_from_slice(&[0; 16]);
@@ -489,9 +490,9 @@ fn r_pfee_withdraw_probe() {
 fn pump_fees_runs_read_only_inside_a_pumpswap_leg() {
     for coin in [PammCoin::Mature, PammCoin::Legacy261] {
         let (mut env, pm, q) = setup(coin);
-        assert_eq!(
-            env.pump_build_running(PumpProgram::Fees),
-            PumpDeploy::Oct2026Synth,
+        assert!(
+            env.pump_build_running(PumpProgram::Fees)
+                .same_build(PumpDeploy::Oct2026Synth, PumpProgram::Fees),
             "{coin:?}: the 2026-10-12 pump-fees runs"
         );
         let mut b = env.borrower();

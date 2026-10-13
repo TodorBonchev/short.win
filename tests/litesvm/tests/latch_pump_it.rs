@@ -2,8 +2,8 @@
 //! §8.2, §9 M5; A7, R4B-7; I17; U5), on the pump fork of `shortwin_litesvm_tests::fork`: the
 //! real pump (10,485,760 B), pump-fees (948,989 B) and PumpSwap (10,485,760 B) ProgramData
 //! accounts, dumped at their mainnet deploy slots, which `initialize_config` recorded as
-//! `guard_slot` (`fork::FIXTURE_GUARD_SLOTS`: the 2026-10-08/12 redeploys since the 2026-10-13
-//! re-pin).
+//! `guard_slot` (`fork::FIXTURE_GUARD_SLOTS`: since the 2026-10-13 re-pin pump's redeploy of
+//! 2026-10-13, PumpSwap's of 2026-10-08 and pump-fees' of 2026-10-12).
 //!
 //! The upgrade mainnet itself made is replayed too (M10 pump revalidation): the 2026-09 builds
 //! (`fork::PumpDeploy::Sep2026`, the slots `VENUE_GUARD_SLOTS_2026_09_27` names) upgraded by the
@@ -386,7 +386,7 @@ fn donate_lamports(env: &mut Env, pm: &PumpMarket, lamports: u64) {
 // ---- tests ----------------------------------------------------------------------------------
 
 /// The dumped ProgramData are the real accounts at the compile-time addresses, with the deploy
-/// slots of `fork::FIXTURE_GUARD_SLOTS` (the 2026-10-02 redeploys), the sizes of ARCH §6.5 and
+/// slots of `fork::FIXTURE_GUARD_SLOTS` (the re-pin's builds), the sizes of ARCH §6.5 and
 /// one upgrade authority for all three programs (ARCH §5.5); `initialize_config` recorded exactly
 /// those slots. An unchanged header is not an upgrade and writes nothing.
 #[test]
@@ -920,7 +920,7 @@ fn the_2026_10_pump_redeploys_latch_until_revalidated() {
     );
 
     // The redeploys, in mainnet's order: the loader writes each slot and the 2026-10-02 ELF
-    // (not `PumpDeploy::CURRENT`'s, the 2026-10-08/12 builds since the 2026-10-13 re-pin).
+    // (not `PumpDeploy::CURRENT`'s, the 2026-10-13 re-pin's builds).
     let mut slots = Vec::new();
     for program in [PumpProgram::Amm, PumpProgram::Pump, PumpProgram::Fees] {
         env.warp(1);
