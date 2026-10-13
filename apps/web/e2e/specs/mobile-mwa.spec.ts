@@ -400,6 +400,9 @@ test.describe('Mobile Wallet Adapter (flag on)', { tag: '@scaffold' }, () => {
             await copy.tap();
             await expect(copy).toHaveText('Copied');
             expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(page.url());
+            // The confirmation is brief: the button reads "Copy link" again (and the PNG shows the
+            // chooser at rest, not a race against the 1.2 s timer).
+            await expect(copy).toHaveText(walletCopy('wallet.webview.copy'));
             const url = page.url();
             const origin = new URL(url).origin;
             for (const w of MOBILE_WALLETS) {

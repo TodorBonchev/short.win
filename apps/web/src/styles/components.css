@@ -2296,6 +2296,12 @@ a.menu-item {
     color: var(--text-1);
 }
 
+/* A social app's in-app browser block inside the no-wallet chooser (FE-33): the outer padding only,
+   so its text and Copy link line up with the open-in links below. */
+.wallet-chooser .wallet-chooser {
+    padding: 0;
+}
+
 .wallet-links {
     display: flex;
     flex-direction: column;

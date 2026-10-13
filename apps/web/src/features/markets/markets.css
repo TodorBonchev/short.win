@@ -90,11 +90,28 @@ h2.mk-intro-title {
    the first market (sideways: the list's filter; a 390 px screen has no room for a row) shows on
    the first screen: the heading row (How it works, Hide) and "What can go wrong" with its sentence
    and its two links. "Short a token" and "Lend a token" are what How it works explains, one tap
-   away. Layout only: no text changes. */
+   away. Layout only: no text changes.
+   The heading row stays one row: where the three do not fit (a 320 px phone with a wide system
+   font: DejaVu Sans set Hide on a row of its own, 40 px more, and pushed the first market under
+   the bars), the heading wraps inside its own box beside How it works and Hide (M3, 2026-10-13). */
 @media (max-width: 399.98px) and (max-height: 699.98px),
     (min-width: 640px) and (max-width: 1023.98px) and (pointer: coarse) and (orientation: landscape) {
     .mk-intro-part:not([data-tone="risk"]) {
         display: none;
+    }
+
+    .mk-intro-head {
+        flex-wrap: nowrap;
+    }
+
+    h2.mk-intro-title {
+        flex: 0 1 auto;
+        min-width: 0;
+    }
+
+    .mk-intro-head > .mk-intro-link,
+    .mk-intro-head > .mk-intro-hide {
+        flex: none;
     }
 }
 
