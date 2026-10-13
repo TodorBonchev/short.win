@@ -5,8 +5,9 @@
 tablets and desktops, the owner's request of 2026-10-09, §7.6–§7.7 and §13 "M10-RESP changes"; v1.5 adds the
 owner's thirteenth-round UX items — newcomer help, the deposit order, one coverage notice, the Claim
 wording and the 12 px floor, §13 "Thirteenth round"; 2026-10-13 adds the Mobile Wallet Adapter,
-O-6 lifted by the owner — §5.4 (6), §9.3, §10.2 and §13 "Mobile wallets", its E2E run and the
-owner's device test still pending; v1.0 of 2026-10-01 was the contract the four
+O-6 lifted by the owner — §5.4 (6), §9.3, §10.2 and §13 "Mobile wallets", its E2E runs and the
+responsive gate passed the same day (§10.2, §10.5), the owner's device test still pending; v1.0 of
+2026-10-01 was the contract the four
 parallel tracks — MARKETS, LEND, SHORT, E2E — built against, §12). Owner decision for the visual
 style: **dark trading terminal** — dense, dark, data-first, as memecoin traders know it from
 Photon / BullX / Axiom, and still accessible (§7, §8).*
@@ -70,10 +71,14 @@ gate (eight viewports, 63–65 states each) 96 tests pass. *The Mobile Wallet Ad
 the owner on 2026-10-13; §5.4 (6), §9.3, §10.2, §13 "Mobile wallets" and FE-32):* built and on by
 default behind `VITE_ENABLE_MOBILE_WALLET_ADAPTER`, the library loaded on eligible Android browsers
 only; `vitest run` 87 files, 963 tests passed, 1 opt-in file skipped (the fake MWA wallet against the
-real library among them). The Android E2E project and its specs are written (the default run lists
-123 tests: 70 desktop, 26 phone, 27 Android), but no browser run has passed yet: the first E2E run,
-the responsive gate and the reviewed `android/` screenshots are pending (§13 "Mobile wallets"), and
-the owner's real-device test precedes the release (FE-32).
+real library among them). *The first browser runs (M3, 2026-10-13; Playwright's Chromium 1243):*
+the default E2E run of 123 tests passes — 121 passed (70 desktop, 26 phone, 25 Android) and 2
+skipped (`mobile-mwa`'s flag-off tests) in 17.9 min —, the Android project with the adapter built
+off (`SHORTWIN_E2E_MWA=0`) 8 passed and 19 skipped, and the responsive gate (eight viewports,
+63–65 states each) 96 tests pass with no finding; the reviewed `e2e/screenshots/android/` set
+holds 9 PNGs. The adapter's code needed no change; two layout fixes and a steadier M12 screenshot
+did (§13 "Mobile wallets", "The first browser runs"). The owner's real-device test precedes the
+release (FE-32).
 
 ---
 
@@ -294,7 +299,9 @@ parts — "Short a token", "Lend a token", "What can go wrong" — of one senten
 `borrower.liquidation` and `lender.risks` are rendered verbatim (§3.11). The strip is compact: on a
 short phone (under 400 × 700 px) and a phone held sideways (§7.6's landscape-phone tier) it keeps
 only the heading row and "What can go wrong" with its sentence and its links (sideways, the title
-on the left, the sentence beside it and the links under the sentence), so the first market shows
+on the left, the sentence beside it and the links under the sentence; *M3, 2026-10-13:* the heading
+row stays one row there — where the three do not fit, "New to short.win?" wraps inside its own box
+beside How it works and Hide instead of Hide taking a row of its own), so the first market shows
 on the first screen (held sideways, the list's filter: a 390 px screen has no room for a row) —
 the responsive gate checks that at every viewport (§10.5); How it works explains the other two
 parts. Hide
@@ -2279,8 +2286,8 @@ local-network step, and the host observer), so no `'unsafe-inline'`, font or ima
 `frame-src` (Firefox for Android unsupported, FE-34); Permissions-Policy and COOP unchanged — never
 list `local-network-access` / `loopback-network` (their default allowlist, `'self'`, is what the
 adapter needs). `upgrade-insecure-requests` kept (Chromium does not upgrade localhost; the E2E's
-T-UIR probe is to check Blink, its first browser run pending (§13 "Mobile wallets"); a device
-check is §13 FE-32). Flag off: the policy is byte for byte the one above. `csp.test.ts` pins both,
+T-UIR probe confirms it in Blink — Chromium 1243, since its first run on 2026-10-13 (§10.2); a
+device check is §13 FE-32). Flag off: the policy is byte for byte the one above. `csp.test.ts` pins both,
 in full.
 
 No inline scripts or styles in the HTML, no `eval`, no third-party scripts, fonts or images (wallet
@@ -2467,8 +2474,11 @@ price, caps), close / add-margin previews, P&L and risk.
   `mobile-shell` runs there too: without an injected wallet its chooser shows the adapter's entry
   and the open-elsewhere block (with the flag off, the iPhone's dialog); its PNGs go to
   `e2e/screenshots/android/` (with the flag off, to `.e2e/screenshots/android-mwa-off/` only, so
-  CI's artifact keeps the default build's set). *Status (2026-10-13):* written, but not yet run in
-  a browser (§13 "Mobile wallets"): what follows says what the specs assert, not what a run showed.
+  CI's artifact keeps the default build's set). *Status (M3, 2026-10-13; Playwright's Chromium
+  1243, headless shell):* the Android project passes — 25 passed and 2 skipped (the flag-off
+  tests) in 3.2–3.4 min, global setup's seed and build included —, and with `SHORTWIN_E2E_MWA=0`
+  8 passed and 19 skipped in 2.0–2.2 min. Every spec below passed on its first run with the
+  adapter's code unchanged (§13 "Mobile wallets", "The first browser runs").
   - **The intent and the app switch** (`e2e/wallet/mwa-hooks.js`, an init script the `mwa` fixture
     installs): `URLSearchParams.prototype.set` is wrapped to record each association as the
     protocol builds the intent (`association`, `port`, `navigator.userActivation.isActive`,
@@ -2476,8 +2486,8 @@ price, caps), close / add-margin previews, P&L and risk.
     after an association (the protocol's 3 s launch detection) is followed 50 ms later by a
     synthetic `blur` — the wallet app coming to the front — unless `__mwaE2E.launch =
     'not-found'`; `__mwaE2E.returnToPage()` dispatches `focus`. Headless Chromium has no app for
-    `solana-wallet:`, so the page should stay (M2 asserts the URL unchanged after the intent; were
-    it to navigate, CDP's `Page.frameRequestedNavigation` would stand in for the hooks).
+    `solana-wallet:`, and the page stays (M2 asserts the URL unchanged after the intent; it held
+    from the first run, so CDP's `Page.frameRequestedNavigation` is not needed).
   - **The wallet** (`e2e/wallet/fake-mwa.ts`): a protocol-level MWA wallet app in Node behind
     `page.routeWebSocket(/^ws:\/\/localhost:\d+\/solana-wallet$/)`, with `node:crypto` only:
     HELLO_REQ verified against the launched association key (ECDSA P-256, IEEE-P1363) and port,
@@ -2510,7 +2520,8 @@ price, caps), close / add-margin previews, P&L and risk.
     the session closed (`wallet`, Retry), M10 / M10b a sending-only wallet and per-account
     features in MWA ids (connected, no signer: the deposit form's no-signer state; no "sends itself" badge; neither
     sign call made), M11 the CSP probes, M12 a Telegram in-app browser (no entry; Copy link writes
-    the page's URL; `android/wallet-in-app-browser.png`), M13 / M14 the reauthorization declined or
+    the page's URL, and reads "Copy link" again after its confirmation, so the PNG shows the chooser
+    at rest; `android/wallet-in-app-browser.png`), M13 / M14 the reauthorization declined or
     closed (`wallet-changed` within 1 s of the wallet's answer — the fake's `answeredAt` against
     the page's `performance.timeOrigin + performance.now()`, one clock —, "Close and review
     again", the header "Connect wallet"), M15 the wallet never answers the sign (Cancel enabled
@@ -2520,9 +2531,10 @@ price, caps), close / add-margin previews, P&L and risk.
     DOM), M18 another account at the reauthorization (`wallet-changed`; the header shows the new
     account), T-UIR (Blink keeps `ws://localhost` and `http://localhost` under
     `upgrade-insecure-requests` on a route-fulfilled `https://` page; its `fetch` is bounded at
-    2 s in case Chromium's own local-network check holds it, and whether that check interferes —
-    then the test gets `--disable-features=LocalNetworkAccessChecks`, or Playwright 1.63's
-    `local-network-access` permission — is decided on the first browser run). Flag off
+    2 s in case Chromium's own local-network check holds it — in Chromium 1243 it does not: the
+    whole test takes about 1.1 s, so the fetch settled at once, and the test needs neither
+    `--disable-features=LocalNetworkAccessChecks` nor Playwright 1.63's `local-network-access`
+    permission). Flag off
     (`SHORTWIN_E2E_MWA=0 pnpm --filter web e2e --project chain-android`): no entry, today's
     no-wallet dialog, no script
     carrying the library (its cache key, `SolanaMobileWalletAdapterDefaultAuthorizationCache`, not
@@ -2754,8 +2766,16 @@ row at least 48 px tall in the phone's sheet) and the open-elsewhere block — t
 Android project's at 412 px (§10.2); `phone` (390, iPhone) keeps the iOS states. The gate must
 stay at zero findings on them (44 px rows under a coarse pointer, text ≥ 12 px — the hint is
 `--fs-xs`, the O-4 floor —, no tap covers); their PNGs are new baselines (the capture's, in
-`$SHORTWIN_SHOTS_DIR`: no committed set). The gate's first run on the flag-on build is pending
-(§13 "Mobile wallets").
+`$SHORTWIN_SHOTS_DIR`: no committed set). *M3 (2026-10-13):* the gate's first run on the flag-on
+build found one state, `phone-xs/markets` — not a wallet state: the first market row 10.6 px too
+low (its top at 578.6 px, the fixed bars at 584 px). The M3 host has no Inter, `--font-ui`'s first
+family, so Chromium takes the next, `system-ui`, which fontconfig resolves to DejaVu Sans, its
+default sans-serif (the host also has the Ubuntu fonts, which no family in the stack names).
+DejaVu Sans is wider than the fonts the gate passed with before and set the intro's Hide on a
+row of its own. `markets.css` now keeps that heading row one row on a short phone (§3.3, the
+intro strip). The gate then passed: 96 tests, eight viewports, 63–65 states each, no
+finding — the wallet states at 320 and 360 px with the adapter's entry and the open-elsewhere
+block among them.
 
 ---
 
@@ -3120,7 +3140,7 @@ edits `disclosures.ts` (copy changes need the owner) or `errors.ts`.
 | FE-29 | `/.well-known/security.txt`'s `Expires` (2027-09-30) must be rotated before 2027-08-31: a mainnet build and `check:headers` refuse 30 days or less ahead | open (operations) |
 | FE-30 | The claim-time pot syncs (KI66-R4, §3.6): the size check compiles without lookup tables (an upper bound: a v0 wallet with the protocol ALT could carry a sync more), and a sync is dropped only when the claim's own pre-review simulation fails on it — a target that closes or changes between that simulation and a stale review's re-simulation at Sign fails the review with `AccountNotInitialized` (3012), or `AccountOwnedByWrongProgram` (3007) on the `lender` account once someone funded the closed address, both of which the review's Retry rebuilds (`tx/errors.ts`; the rebuild leaves the closed target out, or refuses a claim of the claimant's own closed position). The judgement covered the indexer's first 24 lenders, largest raw share count first, so a large current lender could push an absent surplus holder out. *Ninth round (owner, 2026-10-08):* the lenders behind the share epoch (or with a forward chain) first, then the rest, paged further than 24 when needed, ranked by the simulated gain; 3007 mapped like 3012. *As built (the builder's choices under that decision, confirmed by the owner on 2026-10-09, tenth round, with the indexer's `max_page_limit` floor of 200):* the indexer's additive `epoch=behind` / `current` filter (INDEXER §9.2), 50 a page, paged further while the best ≤ 4 do not cover the shortfall, ≤ 4 pages (≤ 200 lenders; the bound's reason in §3.6); every row of either list is read whatever its epoch, so an indexer lagging or leading the RPC's share epoch only reorders the reads. What stays: a market with more than 200 lenders behind its share epoch is judged on the first 200 of them (largest raw share count first); the behind list's request counts toward the 4 pages even when it is empty or unfiltered, so a market with no lender behind its share epoch is judged on at most 150 current lenders, and an indexer without the filter spends the pages on its whole list in raw share order; an indexer that has not ingested a rebase lists the newly behind lenders among its current ones; and a sync that moved a surplus leaves its lender listed as behind, so a later claim re-reads it at no gain | closed (owner, 2026-10-08; the filter, the bound and the page-limit floor confirmed 2026-10-09) |
 | FE-31 | `lender.residuals` (§4.2) quotes the held-model loss to lenders and the protocol from before AIR-22 ("about 2.06 SOL on a fresh position and about 8.02 SOL on one open for 25 days"); under AIR-22's lower-median growth the sim gives about 3.34 and 4.54 SOL (ECON §8.2, §12.6; known-issues KI-03). The copy lives in `disclosures.ts` and this document together (`disclosures.test.ts`; `m9-review/ux.test.tsx` pins the two figures) and a copy change needs the owner (§12.2), so the three change in one commit once the owner approves the new figures. *Approved by the owner on 2026-10-13:* the paragraph now reads "about 3.34 SOL on a fresh position and about 4.54 SOL on one open for 25 days at 90% utilisation" in `disclosures.ts` and §4.2, and `ux.test.tsx` pins the new figures and that the old ones are gone | closed (owner, 2026-10-13) |
-| FE-32 | **The Mobile Wallet Adapter** (O-6 lifted on 2026-10-13): built, and on by default (`VITE_ENABLE_MOBILE_WALLET_ADAPTER`).<br>**Playwright is to cover it with a protocol-level fake wallet** (§10.2): the specs are written and the fake is held to the real library in Vitest, but no browser run has passed yet (§13 "Mobile wallets", the E2E row).<br>**What only a phone shows:** the Android intent and the app switch, Chrome's "Apps on device" prompt, `upgrade-insecure-requests` on `ws://localhost`, a discarded background tab, which real wallets implement MWA and which signer row each is in (only the `solana:signTransaction` path signs, §5.4 (6)), how wallets answer a revoked token or a switched account at the reauthorization, and returning to Chrome without deciding. This is the owner's device test (DEVELOPMENT "Mobile wallets on a real device"; record the devices, versions and date here and in the AUDIT O-6 row). It needs HTTPS devnet and mainnet builds of the flag-on app; who hosts them, and where, is still the owner's decision. | **open: the first E2E run, then the owner's device test, before the release** |
+| FE-32 | **The Mobile Wallet Adapter** (O-6 lifted on 2026-10-13): built, and on by default (`VITE_ENABLE_MOBILE_WALLET_ADAPTER`).<br>**Playwright covers it with a protocol-level fake wallet** (§10.2): the Android project, its flag-off run, the whole default run and the responsive gate passed on 2026-10-13 (M3; §13 "Mobile wallets", the E2E row), and the fake is held to the real library in Vitest.<br>**What only a phone shows:** the Android intent and the app switch, Chrome's "Apps on device" prompt, `upgrade-insecure-requests` on `ws://localhost`, a discarded background tab, which real wallets implement MWA and which signer row each is in (only the `solana:signTransaction` path signs, §5.4 (6)), how wallets answer a revoked token or a switched account at the reauthorization, and returning to Chrome without deciding. This is the owner's device test (DEVELOPMENT "Mobile wallets on a real device"; record the devices, versions and date here and in the AUDIT O-6 row). It needs HTTPS devnet and mainnet builds of the flag-on app; who hosts them, and where, is still the owner's decision. | **open: the owner's device test, before the release** (the E2E passed on 2026-10-13) |
 | FE-33 | **Social-app in-app browsers** are detected by user agent only (`; wv)`, Telegram, Twitter, Instagram, FBAN / FBAV / FB_IAB, Line). Apps that open links in SFSafariViewController or Custom Tabs are not detected, but those handle universal links. A universal link may not leave a WebView, so the app offers Copy link. MWA does not register in WebViews. | by design |
 | FE-34 | **Firefox for Android:** MWA is not registered there, because its protocol frames a `solana-wallet:` URL that the CSP refuses (no `frame-src`). The open-in links remain. | by design |
 | FE-35 | **MWA library calls that never settle** (wallet-standard-mobile 0.7.0): a failed reauthorization at Sign, a wallet that never answers after the association, the library spinner closed after the handshake, a Disconnect during a sign. The app bounds each one: Cancel while signing (after 5 s), the sign ended when the connected MWA account changes, the connect ended 10 s after the page is back in front (at most 120 s) with MWA's connect lock reset, and the library's hosts removed at insertion. The abandoned library call keeps its socket until the wallet closes it or the page unloads. Re-check at each package update (the drift test forces it). | mitigated; upstream fix wanted |
@@ -3143,7 +3163,8 @@ accepted (§9.3). Web only: no program, keeper, indexer or client change.
 | Registration | `wallet/platform.ts` (`mwaEligible`, `isInAppBrowser`), `mwa.ts`, `localNetwork.ts` (Chrome's local-network permission, asked from a tap), `mwaCall.ts` (R-C1), `mobileWalletAdapter.ts` (`registerMwa` once from `App.tsx`, verified against the plugin's list; the chain-scoped cache; the app's `onWalletNotFound`; `removeLibraryUi`); `public/icon-192.png` (`scripts/icon-192.ts`) | `platform`, `mwaEligible.agree`, `mobileWalletAdapter`, `mwaCall`, `localNetwork` |
 | The chooser and the copy | `copyWallet.ts` (the 7 strings, §4.3), "Use installed wallet" (unique name only), the open-elsewhere block, the in-app-browser block with Copy link, the not-found reopen, no "sends itself" badge for MWA, the connect guard; five test ids (§11.1) | `wallet.test.tsx` (a)–(l), `mwaConnect.agree`, `copy` (70 / 150) |
 | Sign path, way out, errors | the prefetch for every wallet (§5.4 step 2); the local-network and launch notices (`tx-sign-notice`); R-S1 (Cancel after 5 s), R-S2 (`wallet-changed`), no send after an abort; the signer policy (`mwaSignerOk`, `useWallet`, asserted again at Sign); the MWA error rows (§5.9); `WalletCallError.sending` | `useTxFlow`, `errors`, `m9-review/tx`, `TxReviewModal`, `mwaSigner.agree` |
-| E2E | the `<profile>-android` project, `SHORTWIN_E2E_MWA`, the seeded `android` wallet, the init-script hooks and the protocol-level fake wallet app, `mobile-mwa.spec.ts` (M1–M18, T-UIR, the flag-off describe), `mobile-shell` on Android, `wallet.spec.ts` on the desktop; CI's `web-e2e` adds the flag-off Android run (§10.2, §10.4) | `e2e/wallet/fake-mwa.test.ts` (the fake against the real library, Vitest); the E2E runs themselves were not run on M2's host, whose Chromium cannot start (its system libraries `libnspr4`, `libnss3`, `libasound2` are not installed, and that host's network policy does not reach the Ubuntu archive to install them): **pending** — the Android run, the flag-off Android run, the whole suite and the responsive gate (§10.5), then the reviewed `e2e/screenshots/android/` set |
+| E2E | the `<profile>-android` project, `SHORTWIN_E2E_MWA`, the seeded `android` wallet, the init-script hooks and the protocol-level fake wallet app, `mobile-mwa.spec.ts` (M1–M18, T-UIR, the flag-off describe), `mobile-shell` on Android, `wallet.spec.ts` on the desktop; CI's `web-e2e` adds the flag-off Android run (§10.2, §10.4) | `e2e/wallet/fake-mwa.test.ts` (the fake against the real library, Vitest); *M3 (2026-10-13; Playwright's Chromium 1243, once the host's missing `libnspr4`, `libnss3` and `libasound2` were installed with the owner's approval):* the Android project 25 passed, 2 skipped (the flag-off tests); `SHORTWIN_E2E_MWA=0` 8 passed, 19 skipped; the whole default run 121 passed, 2 skipped (17.9 min); the responsive gate 96 passed with no finding (§10.5); the reviewed `e2e/screenshots/android/` set (9 PNGs) |
+| The first browser runs (M3, 2026-10-13) | Every Android spec passed on its first run with the adapter's code unchanged: the tap's user activation at the intent (M2, M5), M5's 1 s with every `getLatestBlockhash` held 6 s, M13 / M14's 1 s after the wallet's answer, the lend sheet's selectors, T-UIR without a Local Network Access flag or permission, and M8's new page load, silent reconnect, Cancel and Disconnect inside the 10 s; `location.assign('solana-wallet:…')` leaves headless Chromium's page where it is. Three fixes, none weakening an assertion: (1) the responsive gate's only finding, `phone-xs/markets` (DejaVu Sans, `system-ui` on a host without Inter (§10.5), set the intro's Hide on a row of its own and the first market row 10.6 px under the first screen): the intro's heading row stays one row on a short phone (`markets.css`, §3.3); (2) the in-app-browser block nested in the no-wallet chooser sat 4 px inside the open-in links (two `.wallet-chooser` paddings): the inner one has none (`components.css`); (3) M12 waited for nothing after Copy link, so its PNG raced the 1.2 s "Copied" confirmation: it now waits for "Copy link" to return (an added assertion) | E2E (`mobile-mwa`, `mobile-shell`, the whole run), the `responsive` gate; `e2e/screenshots/android/` reviewed by eye at 412 px, the gate's Android wallet PNGs at 320 and 360 px (rendered in DejaVu Sans, the M3 host's fontconfig default sans-serif, which `--font-ui` falls through to as the host has no Inter; the phone and desktop sets came from another host's fonts) |
 | Docs | §1, §2, §2.1, §2.2, §5.4 step 2 and (6), §5.9, §7.7, §9.3, §9.6, §10.1, §10.2, §10.5, §11.1, §13 FE-32 … FE-35; AUDIT §7's O-6 row; ARCHITECTURE §1.1; DEVELOPMENT "Web E2E" and "Mobile wallets on a real device" (the owner's checklist) | `copy.test.ts`, `testids.test.ts` |
 
 ### AI review follow-ups (2026-10-12/13; one approved text changed, FE-31, with the owner's approval)

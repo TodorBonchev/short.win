@@ -1018,8 +1018,12 @@ signing as the seeded `android` wallet) with init-script hooks standing in for A
 switch (`e2e/wallet/mwa-hooks.js`) — and writes `e2e/screenshots/android/`; `SHORTWIN_E2E_MWA=0`
 builds the app with the adapter off for `mobile-mwa`'s flag-off tests (its `mobile-shell` PNGs go
 to `.e2e/screenshots/android-mwa-off/` only; FRONTEND.md §10.2). The fake is also held to the real
-library by Vitest (`e2e/wallet/fake-mwa.test.ts`, in `pnpm --filter web test`); the Android
-project's first browser run is still pending (FRONTEND.md §13 "Mobile wallets"). CI's
+library by Vitest (`e2e/wallet/fake-mwa.test.ts`, in `pnpm --filter web test`). *M3
+(2026-10-13), the first browser runs:* the Android project 25 passed and 2 skipped (the flag-off
+tests; ≈ 3.4 min with the seed and the build), with `SHORTWIN_E2E_MWA=0` 8 passed and 19
+skipped (≈ 2.2 min), the whole default run 121 passed and 2 skipped (70 desktop, 26 phone, 25
+Android; ≈ 18 min), the responsive gate 96 passed with no finding (≈ 21 min; FRONTEND.md §13
+"Mobile wallets"). CI's
 `web-e2e` job runs them all and keeps the screenshots as an artifact. Not in the default run:
 `responsive` (`@responsive`; FRONTEND.md §10.5) — every page and state at eight viewports from a
 320 px phone (and a landscape phone) to a 1440 px desktop, a PNG each in `$SHORTWIN_SHOTS_DIR/<viewport>/` and the layout
@@ -1098,9 +1102,9 @@ everything. The seeded addresses are in `.e2e/state.json`, the generated (throwa
 ### Mobile wallets on a real device (O-6; the owner's checklist)
 
 The Mobile Wallet Adapter is on by default since 2026-10-13 (FRONTEND.md §5.4 (6)); the owner's
-real-device test precedes the release (FRONTEND.md §13 FE-32). Playwright is to cover it against
-a protocol-level fake wallet (Web E2E above; its first browser run is pending, FRONTEND.md §13
-"Mobile wallets"); only a phone shows the Android intent and the app switch, Chrome's "Apps on
+real-device test precedes the release (FRONTEND.md §13 FE-32). Playwright covers it against a
+protocol-level fake wallet (Web E2E above; every Android spec passed on 2026-10-13, FRONTEND.md
+§13 "Mobile wallets"); only a phone shows the Android intent and the app switch, Chrome's "Apps on
 device" prompt, `upgrade-insecure-requests` on `ws://localhost`, a discarded tab and what real
 wallets do. This is the checklist: record each result in the Result
 column (or a copy of the table, linked from FE-32), then the devices, versions and date in
