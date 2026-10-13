@@ -46,8 +46,20 @@ Writes, under ``tests/fixtures/``:
   ``accounts/pump_2026_10/*.bin``: the three pump programs as redeployed at slots 452,654,932 /
   452,655,002 / 452,654,882; ELFs only, ``pump_state`` / ``pamm_state`` stay the state, whose
   layouts the redeploy kept apart from appended fee buckets, and ``pump_programs`` keeps the
-  2026-09 deploys for T-LATCH). Each of them is pinned (deploy slot, trimmed-ELF or account sha256) and a fetch that reads anything
-  else stops before it writes a file;
+  2026-09 deploys for T-LATCH); ``pump_programs_2026_10_13``
+  (``programs/{pump,pump_amm}_2026_10_08.so``, ``programs/pump_fees_2026_10_12.so`` and
+  ``accounts/pump_2026_10_13/*.bin``: the pump and PumpSwap redeploys of 2026-10-08 at slots
+  454,596,459 / 454,596,406 and pump-fees' of 2026-10-12 at 456,132,171, the 2026-10-13 re-pin; the
+  2026-10-02 group stays T-LATCH's "before"). Each of them is pinned (deploy slot, trimmed-ELF or
+  account sha256) and a fetch that reads anything else stops before it writes a file;
+- ``accounts/pump_2026_10_13/*.bin`` (group ``pump_state_2026_10_13``): the state the 2026-10-08/12
+  builds introduced, in one ``getMultipleAccounts`` call: pump's 1,088-byte ``Global``, both
+  ``FeeConfig`` accounts and PumpSwap's ``GlobalConfig`` (re-dumped so the group is self-contained),
+  and one set of accounts per coin role (``PUMP_COINS_2026_10_13``: 166-byte curves near completion,
+  minutes old and carrying fee buckets, dormant 141- and 151-byte curves, a complete unmigrated
+  and a migrated synthetic completion, a cashback and a mayhem curve, a WSOL pool carrying fee
+  buckets);
+  ``fetch --group pump_state_2026_10_13 --coin fresh166=latest`` takes the newest ``create_v2``;
 - ``manifest.json``: one entry per account (address, owner, lamports, executable, rent epoch,
   space, **slot**, sha256, purpose, decoded fields) and one snapshot record per fetch;
 - ``SHA256SUMS``: every fixture file (CI: ``cd tests/fixtures && sha256sum -c SHA256SUMS``).
@@ -592,10 +604,14 @@ def _pad(d, n):
 
 
 def decode_curve(d):
-    """`BondingCurve` (R-PUMP §2.1; missing trailing fields read as zero, as pump reads them)."""
-    p = _pad(d, 151)
+    """`BondingCurve` (R-PUMP §2.1; missing trailing fields read as zero, as pump reads them).
+    A curve longer than 125 bytes also decodes the fields pump appended since (IDL
+    `types.BondingCurve`): the fee buckets @125 / @133 (2026-10-02) and `depth` @141,
+    `initial_virtual_quote_reserves` @142, `post_complete_base_out` @150 and
+    `post_complete_quote_in` @158 (2026-10-08, 166 B)."""
+    p = _pad(d, 166)
     vt, vq, rt, rq, supply = struct.unpack_from("<QQQQQ", p, 8)
-    return {
+    out = {
         "len": len(d),
         "virtual_token_reserves": vt,
         "virtual_quote_reserves": vq,
@@ -611,6 +627,16 @@ def decode_curve(d):
         "can_edit_creator_fee": p[123],
         "is_holder_reward": p[124],
     }
+    if len(d) > 125:
+        out.update({
+            "creator_fee_bucket": u64_at(p, 125),
+            "protocol_fees_bucket": u64_at(p, 133),
+            "depth": p[141],
+            "initial_virtual_quote_reserves": u64_at(p, 142),
+            "post_complete_base_out": u64_at(p, 150),
+            "post_complete_quote_in": u64_at(p, 158),
+        })
+    return out
 
 
 def _keys(d, off, n):
@@ -618,7 +644,9 @@ def _keys(d, off, n):
 
 
 def decode_pump_global(d):
-    """pump `Global` (R-PUMP §2.2; IDL offsets)."""
+    """pump `Global` (R-PUMP §2.2; IDL offsets; `max_curve_depth` @1087 since the 2026-10-08
+    redeploy, 1,088 B)."""
+    extra = {"max_curve_depth": d[1087]} if len(d) > 1087 else {}
     return {
         "authority": key_at(d, 9),
         "fee_recipients": [key_at(d, 41)] + _keys(d, 162, 7),
@@ -636,7 +664,7 @@ def decode_pump_global(d):
         "whitelisted_quote_mint": key_at(d, 1013),
         "creator_fee_configurable": d[1045],
         "max_configurable_creator_fee_bps": u64_at(d, 1046),
-    }
+    } | extra
 
 
 def _tiers(d, off):
@@ -666,8 +694,11 @@ def decode_fee_config(d):
 
 
 def decode_pamm_pool(d):
-    """PumpSwap `Pool` (R-VEN §1.2)."""
+    """PumpSwap `Pool` (R-VEN §1.2; the fee buckets @271 / @279 of the 2026-10-02 redeploy on a
+    pool of at least 287 bytes)."""
     p = _pad(d, 301)
+    extra = ({"protocol_fees_bucket": u64_at(p, 271), "creator_fees_bucket": u64_at(p, 279)}
+             if len(d) >= 287 else {})
     return {
         "len": len(d),
         "pool_bump": p[8],
@@ -686,7 +717,7 @@ def decode_pamm_pool(d):
         "creator_fee_bps": u64_at(p, 261),
         "can_edit_creator_fee": p[269],
         "is_holder_reward": p[270],
-    }
+    } | extra
 
 
 def decode_global_config(d):
@@ -1003,6 +1034,416 @@ def check_pump(m):
             problems.append(f"{role}: no curve base ATA fixture")
         if pvalid:
             p = decode_pamm_pool(read_file(pe["file"]))
+            for k, mk in (("pool_base_token_account", "base_mint"),
+                          ("pool_quote_token_account", "quote_mint")):
+                v = by_addr.get(p[k], {}).get("decoded", {})
+                if v.get("mint") != p[mk] or v.get("owner") != pool:
+                    problems.append(f"{role}: pool vault {k} mint/owner mismatch")
+    return problems
+
+
+# ---- the state of the 2026-10-08/12 redeploys (group pump_state_2026_10_13) ---------------------
+#
+# One getMultipleAccounts call over the statics the new builds changed or every new role reads —
+# pump's `Global` as the 2026-10-08 redeploy extended it (1,088 B, `max_curve_depth` @1087), pump's
+# `FeeConfig`, PumpSwap's `GlobalConfig` and `FeeConfig` (re-dumped so the group is
+# self-contained; the snapshot records how each compares with `pump_state`'s bytes) — and one set
+# of accounts per coin **role** (`PUMP_COINS_2026_10_13`): 166-byte curves (near completion with
+# fee buckets, minutes old, carrying large buckets), dormant 141- and 151-byte curves the next
+# trade grows to 166, a complete unmigrated synthetic completion, a migrated one with its pool, a
+# cashback and a mayhem curve, and a WSOL pool carrying fee buckets. `pump_state` stays the state
+# of the older suites and T-LATCH; the harness resolves an address both groups hold to this one.
+
+PUMP_STATE_2026_10_13 = "pump_state_2026_10_13"
+# `vQ − rQ` (`initial_virtual_quote_reserves`) of a SOL `create_v2` curve.
+IVQR_SOL = 30_000_000_000
+
+# The group's statics: (manifest name, address, purpose).
+PUMP_STATICS_2026_10_13 = [
+    ("pump_global_1088", PUMP_GLOBAL, "pump Global as the 2026-10-08 redeploy extended it "
+     "(1,088 B): bytes 0..1087 in `pump_state`'s layout, @1087 `max_curve_depth` (u8); the reader "
+     "and every curve test (role `global_1088`)"),
+    ("pump_fee_config_2026_10_13", PUMP_FEE_CONFIG, "pump-fees FeeConfig of pump (the curve's "
+     "market-cap tiers), which v3 trades read directly (no pump-fees CPI)"),
+    ("pump_pamm_global_config_2026_10_13", PAMM_GLOBAL_CONFIG, "PumpSwap GlobalConfig "
+     "(disable_flags, recipient lists)"),
+    ("pump_pamm_fee_config_2026_10_13", PAMM_FEE_CONFIG, "pump-fees FeeConfig of PumpSwap (the "
+     "canonical pools' market-cap tiers)"),
+]
+
+# (role, mint, expectation, purpose); re-checked on every fetch (`role_problem_2026_10_13`).
+PUMP_COINS_2026_10_13 = [
+    (
+        "near166",
+        "CZN9Ysi89cAvnkuR2cNCM5t32BNHNdnXTJ5HPd4Npump",
+        "near166",
+        "a live SOL, non-cashback, non-mayhem 166-byte curve near completion (rT <= NEAR_RT_MAX) "
+        "carrying both fee buckets: v3 synthetic exits past rT, the differential (T-PUMP-MATH-V3 "
+        "(b))",
+    ),
+    (
+        "fresh166",
+        "8aUT1att91Rjurcvm4z8xu1yjUuEazRVux4eSq2gpump",
+        "fresh166",
+        "a create_v2 curve minutes old (166 bytes, Token-2022, ivqr 30e9 = vQ - rQ): the default "
+        "venue on the 2026-10-08 build",
+    ),
+    (
+        "buckets166",
+        "FfEVFW3nZspBefEDKk1Un5UJyBiB9oCpoRJ5ffA9pump",
+        "buckets166",
+        "a live 166-byte SOL curve carrying large fee buckets (creator_fee @125, protocol_fees "
+        "@133): bucket handling",
+    ),
+    (
+        "grow141",
+        "E414Tuyx8D6UnwgU16XeKDQyHF6UfL4o6NFuGocNpump",
+        "grow141",
+        "a dormant live SOL curve of 141 bytes (last traded on the 2026-10-02 build): the next "
+        "trade grows it to 166",
+    ),
+    (
+        "grow151",
+        "3VBb7Ej86VxKVJEBSpRKsNe7gVTo9tRZza4yqpYVpump",
+        "grow151",
+        "a dormant live SOL curve of 151 bytes: the next trade grows it to 166",
+    ),
+    (
+        "synthetic_stuck",
+        "9kTYjcB2KhTNF3MjWjp4vgeCEjNiEojDEc8et1zRqigJ",
+        "synthetic_stuck",
+        "curve E1bYRCNq...: complete and unmigrated after a synthetic completion, depth 1 "
+        "(quoted in a pump coin), post_complete_base_out / quote_in set: a reader vector; "
+        "short.win refuses it (CurveQuoteNotSol)",
+    ),
+    (
+        "graduated_synthetic",
+        "98u8RJzuhezFwkCFVdSe1bPoQ6e2DdRG79kQ19vkpump",
+        "graduated_synthetic",
+        "98u8RJ's curve 2ncbKy3K... (completed by a synthetic buy, tx 2vVRr9eg...) and its "
+        "canonical pool D4PACvyr... migrate_v2 created at (X1, Y1): the pc* fields kept after "
+        "migration",
+    ),
+    (
+        "cashback166",
+        "4eegvKYhyJ2Uq6moore2f21JrDponqYdqBfrfG9Rpump",
+        "cashback166",
+        "curve 8oe1sfhK...: a live 166-byte SOL cashback coin, which v3 trades refuse (6094): "
+        "T-LISTING (owner D1)",
+    ),
+    (
+        "mayhem166",
+        "8GoErkdxCRuscAYHbpGhLFVZQkG4tekiAwUW5F21pump",
+        "mayhem166",
+        "curve 5jQXNPKb...: a live 166-byte mayhem-mode curve whose vQ - rQ differs from its ivqr: "
+        "the guard and the listing refusal",
+    ),
+    (
+        "wsol_pool_buckets",
+        "GbMfpnmsavwc5uHCqhbuFrSLdtggJiAxub7UKQ2hpump",
+        "wsol_pool_buckets",
+        "pool ERtQ5Uhn...: a canonical WSOL PumpSwap pool carrying both fee buckets (@271, @279): "
+        "PUMP-2026-10-1 live",
+    ),
+]
+
+
+def quote_offset_consistent(c):
+    """pump's `vQ − rQ == initial_virtual_quote_reserves` (vacuous when `ivqr` or `vT` is 0)."""
+    ivqr = c.get("initial_virtual_quote_reserves", 0)
+    return (ivqr == 0 or c["virtual_token_reserves"] == 0
+            or c["virtual_quote_reserves"] - c["real_quote_reserves"] == ivqr)
+
+
+def role_problem_2026_10_13(expect, c, mint_owner, pool):
+    """Why a coin no longer fits its `pump_state_2026_10_13` role (None if it does). `c` is
+    `decode_curve`'s dict, `pool` the decoded canonical pool when it is valid (else None)."""
+    live = not c["complete"]
+    sol = c["quote_mint"] == SYSTEM
+    normal = sol and not c["is_mayhem_mode"] and not c["is_cashback_coin"]
+    n = c["len"]
+    g = lambda k: c.get(k, 0)  # noqa: E731
+    buckets = g("creator_fee_bucket") > 0 and g("protocol_fees_bucket") > 0
+    pc = g("post_complete_base_out") > 0 and g("post_complete_quote_in") > 0
+    migrated = c["complete"] and c["virtual_token_reserves"] == 0
+    checks = {
+        "near166": live and normal and n == 166 and g("depth") == 0
+        and c["real_token_reserves"] <= NEAR_RT_MAX and buckets,
+        "fresh166": live and normal and n == 166 and g("depth") == 0 and mint_owner == TOKEN_2022
+        and g("initial_virtual_quote_reserves") == IVQR_SOL and quote_offset_consistent(c),
+        "buckets166": live and normal and n == 166 and g("depth") == 0 and buckets,
+        "grow141": live and normal and n == 141,
+        "grow151": live and normal and n == 151,
+        "synthetic_stuck": bool(c["complete"]) and c["virtual_token_reserves"] > 0
+        and g("depth") == 1 and not sol and pc,
+        "graduated_synthetic": migrated and normal and pc and pool is not None,
+        "cashback166": live and sol and c["is_cashback_coin"] == 1 and not c["is_mayhem_mode"]
+        and n == 166,
+        "mayhem166": live and c["is_mayhem_mode"] == 1 and n == 166
+        and not quote_offset_consistent(c),
+        "wsol_pool_buckets": migrated and normal and pool is not None and pool["len"] >= 287
+        and pool.get("protocol_fees_bucket", 0) > 0 and pool.get("creator_fees_bucket", 0) > 0,
+    }
+    if expect not in checks:
+        return f"unknown expectation {expect}"
+    return None if checks[expect] else f"no longer `{expect}`: {c}"
+
+
+def latest_create_166(rpc, blocks=40):
+    """The mint of the newest `create_v2` coin whose curve fits `fresh166` (for `--coin
+    fresh166=latest`): finalized blocks, newest first."""
+    slot = rpc.call("getSlot", [{"commitment": "finalized"}])
+    for s in range(slot, slot - blocks, -1):
+        try:
+            events = _events_in_block(rpc, s)
+        except SystemExit as e:
+            print(f"skip block {s}: {e}", file=sys.stderr)
+            continue
+        for mint in [m for kind, m, _ in events if kind == "create"]:
+            _, (vm, vc) = rpc.multiple([mint, curve_of(mint)])
+            if vm is None or vc is None:
+                continue
+            c = decode_curve(decode_value(vc)["data"])
+            if role_problem_2026_10_13("fresh166", c, vm["owner"], None) is None:
+                return mint
+    raise SystemExit(f"no fresh166 create in the last {blocks} finalized blocks; pass "
+                     "--coin fresh166=MINT")
+
+
+def pump_coins_2026_10_13(overrides, rpc=None):
+    """`PUMP_COINS_2026_10_13` with `role=MINT` overrides (`fresh166=latest`: the newest
+    `create_v2` that fits the role); roles of `PUMP_COINS` are left to `pump_coins`."""
+    over = dict(o.split("=", 1) for o in overrides or [])
+    roles = {r for r, _, _, _ in PUMP_COINS_2026_10_13}
+    unknown = set(over) - roles - {r for r, _, _, _ in PUMP_COINS}
+    if unknown:
+        raise SystemExit(f"unknown coin roles: {sorted(unknown)}")
+    if over.get("fresh166") == "latest":
+        over["fresh166"] = latest_create_166(rpc)
+        print(f"fresh166 = {over['fresh166']} (the newest create_v2 that fits the role)")
+    return [(r, over.get(r, mint), x, p) for r, mint, x, p in PUMP_COINS_2026_10_13]
+
+
+def fetch_pump_state_2026_10_13(rpc, coins, m):
+    """Group `pump_state_2026_10_13`: its statics and every role's accounts in one
+    getMultipleAccounts call (one slot)."""
+    # 1. What the derived keys depend on: GlobalConfig (none of its keys is derived here), the
+    #    mints (token program), the curves (creator, quote), the canonical pools; then the quote
+    #    mints of the curves not quoted in SOL (their token program).
+    roots = [PUMP_GLOBAL, PAMM_GLOBAL_CONFIG]
+    for _, mint, _, _ in coins:
+        roots += [mint, curve_of(mint), canonical_pool_of(mint)[0]]
+    _, vals = rpc.multiple(roots)
+    if vals[0] is None or vals[1] is None:
+        raise SystemExit("pump Global or PumpSwap GlobalConfig missing")
+    derived = {}
+    for i, (role, mint, expect, _) in enumerate(coins):
+        vm, vc, vp = vals[2 + 3 * i: 5 + 3 * i]
+        if vm is None or vc is None:
+            raise SystemExit(f"{role}: mint {mint} or its curve does not exist")
+        c = decode_curve(decode_value(vc)["data"])
+        pool_d = decode_value(vp)["data"] if vp else None
+        valid = pool_valid_for(mint, canonical_pool_of(mint)[0], vp and vp["owner"], pool_d)
+        pool = decode_pamm_pool(pool_d) if valid else None
+        why = role_problem_2026_10_13(expect, c, vm["owner"], pool)
+        if why:
+            raise SystemExit(f"role {role} ({mint}): {why}; pick another and pass "
+                             f"--coin {role}=MINT")
+        derived[role] = {"token_program": vm["owner"], "creator": c["creator"], "pool": pool,
+                         "quote_mint": None if c["quote_mint"] == SYSTEM else c["quote_mint"]}
+    quotes = sorted({d["quote_mint"] for d in derived.values() if d["quote_mint"]})
+    quote_program = {}
+    if quotes:
+        _, qv = rpc.multiple(quotes)
+        for q, v in zip(quotes, qv):
+            if v is None:
+                raise SystemExit(f"quote mint {q} does not exist")
+            quote_program[q] = v["owner"]
+
+    # 2. The account list (first name wins for shared accounts).
+    plan, seen = [], {}
+
+    def add(name, addr, purpose, role=None, may_be_absent=False):
+        if addr in seen:
+            return
+        seen[addr] = name
+        plan.append((name, addr, purpose, role, may_be_absent))
+
+    for name, addr, purpose in PUMP_STATICS_2026_10_13:
+        add(name, addr, purpose)
+    for role, mint, expect, purpose in coins:
+        dv = derived[role]
+        tp, curve = dv["token_program"], curve_of(mint)
+        pre = f"pump_{role}"
+        add(f"{pre}_mint", mint, f"mint of the `{role}` coin: {purpose}", role)
+        add(f"{pre}_curve", curve, f"BondingCurve of the `{role}` coin: {purpose}", role)
+        add(f"{pre}_curve_base_ata", ata(curve, mint, tp), f"the `{role}` curve's token ATA "
+            "(associated_bonding_curve)", role)
+        add(f"{pre}_creator_vault", pda([b"creator-vault", dv["creator"]], PUMP),
+            f"pump creator vault of the `{role}` curve's creator", role, may_be_absent=True)
+        sharing = pda([b"sharing-config", mint], PUMP_FEES)
+        if dv["creator"] == sharing:
+            add(f"{pre}_sharing_config", sharing, f"pump-fees sharing-config of the `{role}` mint "
+                "(the curve's creator)", role, may_be_absent=True)
+        if dv["quote_mint"]:
+            q = dv["quote_mint"]
+            add(f"{pre}_quote_mint", q, f"the `{role}` curve's quote mint (a curve of depth > 0 "
+                "is quoted in another pump coin)", role)
+            add(f"{pre}_curve_quote_ata", ata(curve, q, quote_program[q]), f"the `{role}` "
+                "curve's quote ATA (associated_quote_bonding_curve)", role)
+        if dv["pool"]:
+            pool, authority = canonical_pool_of(mint)
+            p = dv["pool"]
+            boost = pda([b"boost_vault", pool], PUMP_AMM)
+            ccva = pda([b"creator_vault", p["coin_creator"]], PUMP_AMM)
+            add(f"{pre}_pool", pool, f"the `{role}` coin's canonical PumpSwap Pool", role)
+            add(f"{pre}_pool_base_vault", p["pool_base_token_account"], "the pool's base vault", role)
+            add(f"{pre}_pool_quote_vault", p["pool_quote_token_account"], "the pool's WSOL vault",
+                role)
+            add(f"{pre}_lp_mint", p["lp_mint"], "the pool's LP mint", role)
+            add(f"{pre}_pool_authority", authority, "pump PDA [\"pool-authority\", mint] (the "
+                "pool's creator)", role, may_be_absent=True)
+            add(f"{pre}_boost_vault", boost, "PumpSwap PDA [\"boost_vault\", pool]", role,
+                may_be_absent=True)
+            add(f"{pre}_boost_vault_ata", ata(boost, WSOL, TOKEN), "the boost vault's WSOL ATA "
+                "(absent once the boost has run)", role, may_be_absent=True)
+            add(f"{pre}_coin_creator_vault_authority", ccva, "PumpSwap PDA [\"creator_vault\", "
+                "pool.coin_creator]", role, may_be_absent=True)
+            add(f"{pre}_coin_creator_vault_ata", ata(ccva, WSOL, TOKEN), "its WSOL ATA (T11)", role,
+                may_be_absent=True)
+    if len(plan) > 100:
+        raise SystemExit(f"{len(plan)} accounts do not fit one getMultipleAccounts call")
+
+    # 3. One call, one slot.
+    slot, vals = rpc.multiple([a for _, a, _, _, _ in plan])
+    block_time = None
+    try:
+        block_time = rpc.call("getBlockTime", [slot])
+    except SystemExit as e:
+        print(f"WARNING: getBlockTime({slot}): {e}", file=sys.stderr)
+    entries, files, by_addr = [], [], {}
+    for (name, addr, purpose, role, may_be_absent), v in zip(plan, vals):
+        e = {"name": name, "group": PUMP_STATE_2026_10_13}
+        if role:
+            e["role"] = role
+        e.update({"purpose": purpose, "address": addr, "slot": slot})
+        if v is None:
+            if not may_be_absent:
+                raise SystemExit(f"{name} {addr} does not exist at slot {slot}")
+            e["absent"] = True
+            entries.append(e)
+            continue
+        a = decode_value(v)
+        d = a["data"]
+        rel = f"{PUMP_2026_10_13_ACCOUNT_DIR}/{name}.bin"
+        write_file(rel, d)
+        files.append(rel)
+        e.update({"owner": a["owner"], "lamports": a["lamports"], "executable": a["executable"],
+                  "rent_epoch": a["rent_epoch"], "space": len(d), "sha256": sha256(d),
+                  "file": rel})
+        decoded = decode_pump_account(a["owner"], d)
+        if decoded is not None:
+            e["decoded"] = decoded
+        entries.append(e)
+        by_addr[addr] = (a["owner"], d)
+    # 4. The dumped state must still fit every role and name what step 1 derived.
+    for role, mint, expect, _ in coins:
+        _, cd = by_addr[curve_of(mint)]
+        c = decode_curve(cd)
+        pool, _ = canonical_pool_of(mint)
+        po, pd_ = by_addr.get(pool, (None, None))
+        valid = pool_valid_for(mint, pool, po, pd_)
+        why = role_problem_2026_10_13(expect, c, by_addr[mint][0],
+                                      decode_pamm_pool(pd_) if valid else None)
+        if why:
+            raise SystemExit(f"role {role} changed between the two reads: {why}")
+        if c["creator"] != derived[role]["creator"]:
+            raise SystemExit(f"role {role}: the curve's creator changed between the two reads")
+    # 5. How the statics compare with `pump_state`'s bytes (a record, not a pin).
+    old = {e["address"]: e for e in m["accounts"]
+           if e.get("group") == "pump_state" and not e.get("absent")}
+    versus = {}
+    for name, addr, _ in PUMP_STATICS_2026_10_13:
+        d = by_addr[addr][1]
+        o = old.get(addr)
+        if o is None:
+            versus[name] = "no pump_state fixture"
+            continue
+        od = read_file(o["file"])
+        if d == od:
+            versus[name] = f"equal to {o['name']} (pump_state, slot {o['slot']:,})"
+        elif d[:len(od)] == od:
+            versus[name] = (f"{o['name']}'s {len(od):,} bytes (pump_state, slot {o['slot']:,}) "
+                            f"followed by {d[len(od):].hex()}")
+        else:
+            diff = [i for i in range(min(len(d), len(od))) if d[i] != od[i]]
+            versus[name] = (f"differs from {o['name']} (pump_state, slot {o['slot']:,}): "
+                            f"{len(od):,} -> {len(d):,} bytes, {len(diff)} differing bytes from "
+                            f"offset {diff[0] if diff else len(od)}")
+    snapshot = {
+        "group": PUMP_STATE_2026_10_13,
+        "slot": slot,
+        "block_time": block_time,
+        "block_time_utc": dt.datetime.fromtimestamp(block_time, dt.UTC).strftime(
+            "%Y-%m-%dT%H:%M:%SZ") if block_time else None,
+        "fetched_at": now_utc(),
+        "rpc": rpc.used,
+        "method": "one getMultipleAccounts call (base64) over every account below (absent ones "
+        "recorded as such), so all of them are the mainnet state at `slot`; a first call read "
+        "Global, GlobalConfig, the mints, curves and canonical pools (a second the quote mints of "
+        "curves not quoted in SOL) to derive the rest",
+        "coins": {role: mint for role, mint, _, _ in coins},
+        "versus_pump_state": versus,
+    }
+    return entries, files, snapshot
+
+
+def check_pump_2026_10_13(m):
+    """Offline cross-checks of group `pump_state_2026_10_13`; returns a list of problems."""
+    problems = []
+    state = [e for e in m["accounts"] if e.get("group") == PUMP_STATE_2026_10_13]
+    by_addr = {e["address"]: e for e in state}
+    by_name = {e["name"]: e for e in state}
+    slots = {e["slot"] for e in state}
+    if len(slots) > 1:
+        problems.append(f"{PUMP_STATE_2026_10_13} spans several slots: {sorted(slots)}")
+    for name, addr, _ in PUMP_STATICS_2026_10_13:
+        e = by_name.get(name)
+        if e is None or e.get("absent") or e["address"] != addr:
+            problems.append(f"static {name} {addr} is not a fixture")
+    g = by_name.get("pump_global_1088")
+    if g and not g.get("absent") and g["space"] != 1088:
+        problems.append(f"pump_global_1088: {g['space']} bytes, not 1,088")
+    snap = next((s for s in m.get("snapshots", []) if s["group"] == PUMP_STATE_2026_10_13), None)
+    coins = snap["coins"] if snap else {}
+    expect_of = {r: x for r, _, x, _ in PUMP_COINS_2026_10_13}
+    pinned = {r: mint for r, mint, _, _ in PUMP_COINS_2026_10_13}
+    if coins != pinned:
+        problems.append(f"{PUMP_STATE_2026_10_13} was dumped with coins {coins}, but "
+                        f"PUMP_COINS_2026_10_13 pins {pinned}: pin the dumped mints")
+    for role, mint in coins.items():
+        me, ce = by_addr.get(mint), by_addr.get(curve_of(mint))
+        if not me or not ce or me.get("absent") or ce.get("absent"):
+            problems.append(f"{role}: mint or curve missing")
+            continue
+        c = decode_curve(read_file(ce["file"]))
+        pool, _ = canonical_pool_of(mint)
+        pe = by_addr.get(pool)
+        pd_ = read_file(pe["file"]) if pe and not pe.get("absent") else None
+        valid = bool(pd_) and pool_valid_for(mint, pool, pe["owner"], pd_)
+        why = role_problem_2026_10_13(expect_of.get(role, "?"), c, me["owner"],
+                                      decode_pamm_pool(pd_) if valid else None)
+        if why:
+            problems.append(f"{role}: {why}")
+        base = by_addr.get(ata(curve_of(mint), mint, me["owner"]))
+        if not base or base.get("absent"):
+            problems.append(f"{role}: no curve base ATA fixture")
+        else:
+            dec = base.get("decoded", {})
+            if dec.get("mint") != mint or dec.get("owner") != curve_of(mint):
+                problems.append(f"{role}: curve base ATA mint/owner mismatch")
+        if valid:
+            p = decode_pamm_pool(pd_)
             for k, mk in (("pool_base_token_account", "base_mint"),
                           ("pool_quote_token_account", "quote_mint")):
                 v = by_addr.get(p[k], {}).get("decoded", {})
@@ -1527,6 +1968,35 @@ PUMP_PROGRAMS_2026_10 = [
         452_654_882,
     ),
 ]
+# The redeploys the 2026-10-13 re-pin pins: pump and PumpSwap of 2026-10-08 (the
+# synthetic migration, multi-hop, the 166-byte curve) and pump-fees of 2026-10-12 (an unexamined
+# 10-08 build at 454,596,501 preceded it and can no longer be fetched). The trimmed hashes are the
+# ELFs read at slots 456,311,559–456,311,578. Never refresh `pump_programs_2026_10`: T-LATCH starts
+# from it.
+PUMP_2026_10_13_ACCOUNT_DIR = "accounts/pump_2026_10_13"
+PUMP_PROGRAMS_2026_10_13 = [
+    (
+        "pump_2026_10_08",
+        PUMP,
+        "B5MvUwXdiW1NMM6QFFD3ssPKBujD4zMohncbM73Z2BQu",
+        "6956c2f83297b6f7f06bbe8033241589c39da9650597dc5c59fb5a431906bf6f",
+        454_596_459,
+    ),
+    (
+        "pump_amm_2026_10_08",
+        PUMP_AMM,
+        "6naEzKeUuFh1Jeeu51NXQgr5qkXgXtc9WKNct4xynVJc",
+        "3ffd5e3b5a31ccc86b434405e8a1876926da1e8685f891dc964b7f919c172ee1",
+        454_596_406,
+    ),
+    (
+        "pump_fees_2026_10_12",
+        PUMP_FEES,
+        "75Uu23mqWBb8LM8vDppqC1mQAnCcBuLXhVaDezVMQLRw",
+        "8ad2ca93c7ae97a7fb0de8a99de4d8825ccfdf89f73138cd49bda948e124b8b8",
+        456_132_171,
+    ),
+]
 SPL_PROGRAMS = [
     (
         "token_2022",
@@ -1589,6 +2059,21 @@ PROGRAM_SOURCES = {
         }
         for name in ("pump_2026_10", "pump_fees_2026_10", "pump_amm_2026_10")
     },
+    **{
+        name: {
+            "repository": "https://crates.io/crates/pump-rust-client (no public program source)",
+            "commit": None,
+            "status": "UNVERIFIED: no published source or verified build. The interface is "
+            "pump-public-docs 2293f9a6's IDL / pump-rust-client 0.4.0's (the live discriminators "
+            "and errors; tests/fixtures/README.md). "
+            + ("0.4.0's artifacts/pump_fees.so (853,528 B) is not this build; its `withdraw` "
+               "(b712469c946da122, PDA seed `referral-vault`) is in no IDL, and the 2026-10-08 "
+               "pump-fees build (slot 454,596,501) it replaced can no longer be fetched"
+               if name.startswith("pump_fees") else
+               "Not compared byte for byte with 0.4.0's artifacts"),
+        }
+        for name in ("pump_2026_10_08", "pump_amm_2026_10_08", "pump_fees_2026_10_12")
+    },
     "squads_v4": {
         "repository": "https://github.com/Squads-Protocol/v4",
         "commit": "64af7330413d5c85cbbccfd8c27a05d45b6e666f",
@@ -1615,6 +2100,15 @@ M10_GROUP_USE = {
         "state stays `pump_state`'s and `pamm_state`'s (the redeploy appends fee buckets to "
         "`BondingCurve` @125 and `Pool` @271 and keeps every other layout; the configs equal the "
         "fixture bytes at slot 452,964,363), and `pump_programs` keeps the 2026-09 deploys for "
+        "T-LATCH",
+    ),
+    "pump_programs_2026_10_13": (
+        "The 2026-10-08/12 redeploys (the 2026-10-13 re-pin): synthetic migration, multi-hop, "
+        "the 166-B curve; every curve and PumpSwap suite runs it",
+        "the ELF as redeployed on 2026-10-08 (pump, PumpSwap) or 2026-10-12 (pump-fees) "
+        "(UNVERIFIED source, see `source`). The ELF only: the state the new builds introduced "
+        "(166-byte curves, the 1,088-byte Global, synthetic completions) is group "
+        "`pump_state_2026_10_13`'s; `pump_programs_2026_10` keeps the 2026-10-02 deploys for "
         "T-LATCH",
     ),
     "spl_programs": (
@@ -1759,7 +2253,8 @@ def check_m10(m, only=None):
 
     for group, programs in (("raydium_cpmm_2026_10", CPMM_PROGRAMS_2026_10),
                             ("spl_programs", SPL_PROGRAMS), ("squads_programs", SQUADS_PROGRAMS),
-                            ("pump_programs_2026_10", PUMP_PROGRAMS_2026_10)):
+                            ("pump_programs_2026_10", PUMP_PROGRAMS_2026_10),
+                            ("pump_programs_2026_10_13", PUMP_PROGRAMS_2026_10_13)):
         if only not in (None, group):
             continue
         by_name = in_group(group)
@@ -1813,12 +2308,15 @@ PUMP_GROUPS = ("pump_programs", "pump_state")
 # `pamm_synthetic` is derived from `pamm_state` and must follow it.
 PAMM_GROUPS = ("pamm_state", "pamm_synthetic")
 M10_PROGRAM_GROUPS = ("raydium_cpmm_2026_10", "spl_programs", "squads_programs",
-                      "pump_programs_2026_10")
-GROUPS = RAYDIUM_GROUPS + PUMP_GROUPS + PAMM_GROUPS + M10_PROGRAM_GROUPS
+                      "pump_programs_2026_10", "pump_programs_2026_10_13")
+# The state the 2026-10-08/12 redeploys introduced (the 2026-10-13 re-pin), after its programs.
+PUMP_STATE_2026_10_13_GROUPS = ("pump_state_2026_10_13",)
+GROUPS = (RAYDIUM_GROUPS + PUMP_GROUPS + PAMM_GROUPS + M10_PROGRAM_GROUPS
+          + PUMP_STATE_2026_10_13_GROUPS)
 # Every directory whose files are all managed (SHA256SUMS lines outside them are kept verbatim).
 MANAGED_DIRS = (ACCOUNT_DIR, PUMP_ACCOUNT_DIR, PAMM_ACCOUNT_DIR, CPMM_2026_10_ACCOUNT_DIR,
-                PUMP_2026_10_ACCOUNT_DIR, SPL_ACCOUNT_DIR, SQUADS_ACCOUNT_DIR, PROGRAM_DIR,
-                IDL_DIR)
+                PUMP_2026_10_ACCOUNT_DIR, PUMP_2026_10_13_ACCOUNT_DIR, SPL_ACCOUNT_DIR,
+                SQUADS_ACCOUNT_DIR, PROGRAM_DIR, IDL_DIR)
 
 
 def managed(entry):
@@ -2159,7 +2657,8 @@ def fetch_state(rpc):
 def pump_coins(overrides):
     """`PUMP_COINS` with `role=MINT` overrides applied."""
     over = dict(o.split("=", 1) for o in overrides or [])
-    unknown = set(over) - {r for r, _, _, _ in PUMP_COINS}
+    unknown = (set(over) - {r for r, _, _, _ in PUMP_COINS}
+               - {r for r, _, _, _ in PUMP_COINS_2026_10_13})
     if unknown:
         raise SystemExit(f"unknown coin roles: {sorted(unknown)}")
     return [(r, over.get(r, mint), x, p) for r, mint, x, p in PUMP_COINS]
@@ -2193,6 +2692,12 @@ def cmd_fetch(args):
         elif g == "pump_programs_2026_10":
             entries, files, snap = fetch_programs(rpc, PUMP_PROGRAMS_2026_10, g,
                                                   PUMP_2026_10_ACCOUNT_DIR)
+        elif g == "pump_programs_2026_10_13":
+            entries, files, snap = fetch_programs(rpc, PUMP_PROGRAMS_2026_10_13, g,
+                                                  PUMP_2026_10_13_ACCOUNT_DIR)
+        elif g == PUMP_STATE_2026_10_13:
+            entries, files, snap = fetch_pump_state_2026_10_13(
+                rpc, pump_coins_2026_10_13(args.coin, rpc), m)
         elif g == "spl_programs":
             entries, files, snap = fetch_spl(rpc)
         elif g == "squads_programs":
@@ -2211,8 +2716,9 @@ def cmd_fetch(args):
         "pamm_state bytes, marked `synthetic`) and the M10 program groups (raydium_cpmm_2026_10: "
         "the CPMM redeploy; spl_programs: the mainnet Token-2022 and spl-memo; squads_programs: "
         "Squads v4, its ProgramConfig and the vendored IDL; pump_programs_2026_10: the pump, "
-        "pump-fees and PumpSwap redeploys) are written by "
-        "scripts/dump-fixtures.py; `snapshots` records the slot and RPC of each group "
+        "pump-fees and PumpSwap redeploys of 2026-10-02; pump_programs_2026_10_13: those of "
+        "2026-10-08/12) and the state those introduced (group pump_state_2026_10_13) are written "
+        "by scripts/dump-fixtures.py; `snapshots` records the slot and RPC of each group "
         "(`vendored`: files taken from a pinned source)."
     )
     commit_files()
@@ -2223,7 +2729,7 @@ def cmd_fetch(args):
             managed_files += entry_files(e)
     write_sums(managed_files)
     # A role whose account was present at an earlier dump and is absent now leaves a stale file.
-    for rel_dir in (PUMP_ACCOUNT_DIR, PAMM_ACCOUNT_DIR):
+    for rel_dir in (PUMP_ACCOUNT_DIR, PAMM_ACCOUNT_DIR, PUMP_2026_10_13_ACCOUNT_DIR):
         full = os.path.join(FIXTURES, rel_dir)
         if os.path.isdir(full):
             for f in os.listdir(full):
@@ -2329,6 +2835,9 @@ def check(m, only=None):
             problems.append(f"raydium_state spans several slots: {sorted(slots)}")
     if only in (None, "pump_state") and any(e["group"] == "pump_state" for e in entries):
         problems += check_pump(m)
+    if only in (None, PUMP_STATE_2026_10_13) and any(
+            e["group"] == PUMP_STATE_2026_10_13 for e in entries):
+        problems += check_pump_2026_10_13(m)
     if only in (None, "pamm_state", "pamm_synthetic") and any(
             e["group"] in PAMM_GROUPS for e in entries):
         problems += check_pamm(m, only)
@@ -2407,7 +2916,7 @@ def cmd_check_live(args):
     targets = [(lb, p, pd_, sl) for lb, p, pd_, sl in venues]
     seen = {p for _, p, _, _ in targets}
     for name, program, program_data, _, _ in (CPMM_PROGRAMS_2026_10 + SPL_PROGRAMS + SQUADS_PROGRAMS
-                                              + PUMP_PROGRAMS_2026_10):
+                                              + PUMP_PROGRAMS_2026_10 + PUMP_PROGRAMS_2026_10_13):
         if program not in seen:
             targets.append((name, program, program_data, None))
             seen.add(program)

@@ -1,5 +1,5 @@
 {
-  "description": "Mainnet accounts, programs and transactions dumped for the program tests (ARCHITECTURE §1.2, §8.2). Each entry records how it was fetched; SHA256SUMS pins the bytes (CI: cd tests/fixtures && sha256sum -c SHA256SUMS). The Raydium entries (groups raydium_programs and raydium_state), the pump entries (groups pump_programs and pump_state) and the PumpSwap entries (group pamm_state, and pamm_synthetic: pools derived offline from pamm_state bytes, marked `synthetic`) and the M10 program groups (raydium_cpmm_2026_10: the CPMM redeploy; spl_programs: the mainnet Token-2022 and spl-memo; squads_programs: Squads v4, its ProgramConfig and the vendored IDL; pump_programs_2026_10: the pump, pump-fees and PumpSwap redeploys) are written by scripts/dump-fixtures.py; `snapshots` records the slot and RPC of each group (`vendored`: files taken from a pinned source).",
+  "description": "Mainnet accounts, programs and transactions dumped for the program tests (ARCHITECTURE §1.2, §8.2). Each entry records how it was fetched; SHA256SUMS pins the bytes (CI: cd tests/fixtures && sha256sum -c SHA256SUMS). The Raydium entries (groups raydium_programs and raydium_state), the pump entries (groups pump_programs and pump_state) and the PumpSwap entries (group pamm_state, and pamm_synthetic: pools derived offline from pamm_state bytes, marked `synthetic`) and the M10 program groups (raydium_cpmm_2026_10: the CPMM redeploy; spl_programs: the mainnet Token-2022 and spl-memo; squads_programs: Squads v4, its ProgramConfig and the vendored IDL; pump_programs_2026_10: the pump, pump-fees and PumpSwap redeploys of 2026-10-02; pump_programs_2026_10_13: those of 2026-10-08/12) and the state those introduced (group pump_state_2026_10_13) are written by scripts/dump-fixtures.py; `snapshots` records the slot and RPC of each group (`vendored`: files taken from a pinned source).",
   "accounts": [
     {
       "name": "pyth_sol_usd_shard0",
@@ -6505,6 +6505,2074 @@
         "upgrade_authority": "7gZufwwAo17y5kg8FMyJy2phgpvv9RSdzWtdXiWHjFr8",
         "e_flags": 0
       }
+    },
+    {
+      "name": "pump_2026_10_08_program",
+      "group": "pump_programs_2026_10_13",
+      "purpose": "the pump_2026_10_08 program account (upgradeable loader; names its ProgramData). The 2026-10-08/12 redeploys (the 2026-10-13 re-pin): synthetic migration, multi-hop, the 166-B curve; every curve and PumpSwap suite runs it",
+      "address": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "lamports": 9693912471,
+      "executable": true,
+      "rent_epoch": 18446744073709551615,
+      "space": 36,
+      "slot": 456395407,
+      "sha256": "8101492b544ce08703d5de95363bf796e7e4cd17d03639cfe603071fb59652eb",
+      "file": "accounts/pump_2026_10_13/pump_2026_10_08_program.bin",
+      "decoded": {
+        "program_data": "B5MvUwXdiW1NMM6QFFD3ssPKBujD4zMohncbM73Z2BQu"
+      }
+    },
+    {
+      "name": "pump_2026_10_08_program_data",
+      "group": "pump_programs_2026_10_13",
+      "purpose": "pump_2026_10_08 ProgramData: the ELF as redeployed on 2026-10-08 (pump, PumpSwap) or 2026-10-12 (pump-fees) (UNVERIFIED source, see `source`). The ELF only: the state the new builds introduced (166-byte curves, the 1,088-byte Global, synthetic completions) is group `pump_state_2026_10_13`'s; `pump_programs_2026_10` keeps the 2026-10-02 deploys for T-LATCH. Stored as header ‖ ELF; the account is header ‖ ELF ‖ zeros up to `space`, whose sha256 is `sha256` (fork.rs rebuilds and checks it)",
+      "address": "B5MvUwXdiW1NMM6QFFD3ssPKBujD4zMohncbM73Z2BQu",
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "lamports": 53268311040,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 10485760,
+      "slot": 456395411,
+      "sha256": "8c8f6aae2324281b2199c4314e6a041b707ef0cb9bcb132c677b7bb6289d8772",
+      "files": {
+        "header": "accounts/pump_2026_10_13/pump_2026_10_08_program_data_header.bin",
+        "elf": "programs/pump_2026_10_08.so"
+      },
+      "elf_len": 1891800,
+      "elf_sha256": "615683543366014df940f515f7808bed6d85fd4e58baa0e161011796357153f4",
+      "elf_trimmed_len": 1891785,
+      "elf_trimmed_sha256": "6956c2f83297b6f7f06bbe8033241589c39da9650597dc5c59fb5a431906bf6f",
+      "elf_trimmed_sha256_expected": "6956c2f83297b6f7f06bbe8033241589c39da9650597dc5c59fb5a431906bf6f",
+      "deploy_slot_expected": 454596459,
+      "source": {
+        "repository": "https://crates.io/crates/pump-rust-client (no public program source)",
+        "commit": null,
+        "status": "UNVERIFIED: no published source or verified build. The interface is pump-public-docs 2293f9a6's IDL / pump-rust-client 0.4.0's (the live discriminators and errors; tests/fixtures/README.md). Not compared byte for byte with 0.4.0's artifacts"
+      },
+      "decoded": {
+        "deploy_slot": 454596459,
+        "upgrade_authority": "7gZufwwAo17y5kg8FMyJy2phgpvv9RSdzWtdXiWHjFr8",
+        "e_flags": 0
+      }
+    },
+    {
+      "name": "pump_amm_2026_10_08_program",
+      "group": "pump_programs_2026_10_13",
+      "purpose": "the pump_amm_2026_10_08 program account (upgradeable loader; names its ProgramData). The 2026-10-08/12 redeploys (the 2026-10-13 re-pin): synthetic migration, multi-hop, the 166-B curve; every curve and PumpSwap suite runs it",
+      "address": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "lamports": 1260746836,
+      "executable": true,
+      "rent_epoch": 18446744073709551615,
+      "space": 36,
+      "slot": 456395419,
+      "sha256": "8a28beaa6366bb6236a8b455b61b280f430b4da6583becf73fd229886844e0da",
+      "file": "accounts/pump_2026_10_13/pump_amm_2026_10_08_program.bin",
+      "decoded": {
+        "program_data": "6naEzKeUuFh1Jeeu51NXQgr5qkXgXtc9WKNct4xynVJc"
+      }
+    },
+    {
+      "name": "pump_amm_2026_10_08_program_data",
+      "group": "pump_programs_2026_10_13",
+      "purpose": "pump_amm_2026_10_08 ProgramData: the ELF as redeployed on 2026-10-08 (pump, PumpSwap) or 2026-10-12 (pump-fees) (UNVERIFIED source, see `source`). The ELF only: the state the new builds introduced (166-byte curves, the 1,088-byte Global, synthetic completions) is group `pump_state_2026_10_13`'s; `pump_programs_2026_10` keeps the 2026-10-02 deploys for T-LATCH. Stored as header ‖ ELF; the account is header ‖ ELF ‖ zeros up to `space`, whose sha256 is `sha256` (fork.rs rebuilds and checks it)",
+      "address": "6naEzKeUuFh1Jeeu51NXQgr5qkXgXtc9WKNct4xynVJc",
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "lamports": 53268311040,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 10485760,
+      "slot": 456395421,
+      "sha256": "868a875eba7f4dccb9d028319f23634b34370d6512290d52ecda1a07dc1f6889",
+      "files": {
+        "header": "accounts/pump_2026_10_13/pump_amm_2026_10_08_program_data_header.bin",
+        "elf": "programs/pump_amm_2026_10_08.so"
+      },
+      "elf_len": 1233464,
+      "elf_sha256": "3c83d286afda2ac79b9c7284b6cbc931757342a48bd0be22db94e37b409ebee4",
+      "elf_trimmed_len": 1233449,
+      "elf_trimmed_sha256": "3ffd5e3b5a31ccc86b434405e8a1876926da1e8685f891dc964b7f919c172ee1",
+      "elf_trimmed_sha256_expected": "3ffd5e3b5a31ccc86b434405e8a1876926da1e8685f891dc964b7f919c172ee1",
+      "deploy_slot_expected": 454596406,
+      "source": {
+        "repository": "https://crates.io/crates/pump-rust-client (no public program source)",
+        "commit": null,
+        "status": "UNVERIFIED: no published source or verified build. The interface is pump-public-docs 2293f9a6's IDL / pump-rust-client 0.4.0's (the live discriminators and errors; tests/fixtures/README.md). Not compared byte for byte with 0.4.0's artifacts"
+      },
+      "decoded": {
+        "deploy_slot": 454596406,
+        "upgrade_authority": "7gZufwwAo17y5kg8FMyJy2phgpvv9RSdzWtdXiWHjFr8",
+        "e_flags": 0
+      }
+    },
+    {
+      "name": "pump_fees_2026_10_12_program",
+      "group": "pump_programs_2026_10_13",
+      "purpose": "the pump_fees_2026_10_12 program account (upgradeable loader; names its ProgramData). The 2026-10-08/12 redeploys (the 2026-10-13 re-pin): synthetic migration, multi-hop, the 166-B curve; every curve and PumpSwap suite runs it",
+      "address": "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "lamports": 6046721,
+      "executable": true,
+      "rent_epoch": 18446744073709551615,
+      "space": 36,
+      "slot": 456395428,
+      "sha256": "cc9077315efa761cfe0b52aae08678ccda2a07e0fa2b374c98a1d51a1b4ce079",
+      "file": "accounts/pump_2026_10_13/pump_fees_2026_10_12_program.bin",
+      "decoded": {
+        "program_data": "75Uu23mqWBb8LM8vDppqC1mQAnCcBuLXhVaDezVMQLRw"
+      }
+    },
+    {
+      "name": "pump_fees_2026_10_12_program_data",
+      "group": "pump_programs_2026_10_13",
+      "purpose": "pump_fees_2026_10_12 ProgramData: the ELF as redeployed on 2026-10-08 (pump, PumpSwap) or 2026-10-12 (pump-fees) (UNVERIFIED source, see `source`). The ELF only: the state the new builds introduced (166-byte curves, the 1,088-byte Global, synthetic completions) is group `pump_state_2026_10_13`'s; `pump_programs_2026_10` keeps the 2026-10-02 deploys for T-LATCH. Stored as header ‖ ELF; the account is header ‖ ELF ‖ zeros up to `space`, whose sha256 is `sha256` (fork.rs rebuilds and checks it)",
+      "address": "75Uu23mqWBb8LM8vDppqC1mQAnCcBuLXhVaDezVMQLRw",
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "lamports": 4821514360,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 948989,
+      "slot": 456395430,
+      "sha256": "3cf9ee9a380c0ced31171802d402551910ceb8c4819ede4ef44aaf63a12dbfac",
+      "files": {
+        "header": "accounts/pump_2026_10_13/pump_fees_2026_10_12_program_data_header.bin",
+        "elf": "programs/pump_fees_2026_10_12.so"
+      },
+      "elf_len": 873256,
+      "elf_sha256": "5b6ceda57863f0dcc3e0e3623052f8342c2c81883379699e71d7ed5383cb3dcf",
+      "elf_trimmed_len": 873241,
+      "elf_trimmed_sha256": "8ad2ca93c7ae97a7fb0de8a99de4d8825ccfdf89f73138cd49bda948e124b8b8",
+      "elf_trimmed_sha256_expected": "8ad2ca93c7ae97a7fb0de8a99de4d8825ccfdf89f73138cd49bda948e124b8b8",
+      "deploy_slot_expected": 456132171,
+      "source": {
+        "repository": "https://crates.io/crates/pump-rust-client (no public program source)",
+        "commit": null,
+        "status": "UNVERIFIED: no published source or verified build. The interface is pump-public-docs 2293f9a6's IDL / pump-rust-client 0.4.0's (the live discriminators and errors; tests/fixtures/README.md). 0.4.0's artifacts/pump_fees.so (853,528 B) is not this build; its `withdraw` (b712469c946da122, PDA seed `referral-vault`) is in no IDL, and the 2026-10-08 pump-fees build (slot 454,596,501) it replaced can no longer be fetched"
+      },
+      "decoded": {
+        "deploy_slot": 456132171,
+        "upgrade_authority": "7gZufwwAo17y5kg8FMyJy2phgpvv9RSdzWtdXiWHjFr8",
+        "e_flags": 0
+      }
+    },
+    {
+      "name": "pump_global_1088",
+      "group": "pump_state_2026_10_13",
+      "purpose": "pump Global as the 2026-10-08 redeploy extended it (1,088 B): bytes 0..1087 in `pump_state`'s layout, @1087 `max_curve_depth` (u8); the reader and every curve test (role `global_1088`)",
+      "address": "4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf",
+      "slot": 456395752,
+      "owner": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "lamports": 4089842911,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 1088,
+      "sha256": "32729edb5b0dca0257e24f7bb9655008092456b7e22e512a9e6039decc450032",
+      "file": "accounts/pump_2026_10_13/pump_global_1088.bin",
+      "decoded": {
+        "authority": "FFWtrEQ4B4PKQoVuHYzZq8FabGkVatYzDpEVHsK5rrhF",
+        "fee_recipients": [
+          "62qc2CNXwrYqQScmEdiZFFAnJR262PxWEuNQtxfafNgV",
+          "7VtfL8fvgNfhz17qKRMjzQEXgbdpnHHHQRh54R9jP2RJ",
+          "7hTckgnGnLQR6sdH7YkqFTAA7VwTfYFaZ6EhEsU3saCX",
+          "9rPYyANsfQZw3DnDmKE3YCQF5E8oD89UXoHn9JFEhJUz",
+          "AVmoTthdrX6tKt4nDjco2D775W2YK3sDhxPcMmzUAmTY",
+          "CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM",
+          "FWsW1xNtWscwNmKv6wVsU1iTzRN6wmmk3MjxRP5tT7hz",
+          "G5UZAVbAf46s7cKWoyKu8kYTip9DGTpbLZ2qa9Aq69dP"
+        ],
+        "initial_virtual_token_reserves": 1073000000000000,
+        "initial_virtual_sol_reserves": 30000000000,
+        "initial_real_token_reserves": 793100000000000,
+        "token_total_supply": 1000000000000000,
+        "fee_basis_points": 95,
+        "withdraw_authority": "39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg",
+        "pool_migration_fee": 15000001,
+        "creator_fee_basis_points": 5,
+        "reserved_fee_recipients": [
+          "GesfTA3X2arioaHp8bbKdjG9vJtskViWACZoYvxp4twS",
+          "4budycTjhs9fD6xw62VBducVTNgMgJJ5BgtKq7mAZwn6",
+          "8SBKzEQU4nLSzcwF4a74F2iaUDQyTfjGndn6qUWBnrpR",
+          "4UQeTP1T39KZ9Sfxzo3WR5skgsaP6NZa87BAkuazLEKH",
+          "8sNeir4QsLsJdYpc9RZacohhK1Y5FLU3nC5LXgYB4aa6",
+          "Fh9HmeLNUMVCvejxCtCL2DbYaRyBFVJ5xrWkLnMH6fdk",
+          "463MEnMeGyJekNZFQSTUABBEbLnvMTALbT6ZmsxAbAdq",
+          "6AUH3WEHucYZyC61hqpqYUWVto5qA5hjHuNQ32GNnNxA"
+        ],
+        "buyback_fee_recipients": [
+          "5YxQFdt3Tr9zJLvkFccqXVUwhdTWJQc1fFg2YPbxvxeD",
+          "9M4giFFMxmFGXtc3feFzRai56WbBqehoSeRE5GK7gf7",
+          "GXPFM2caqTtQYC2cJ5yJRi9VDkpsYZXzYdwYpGnLmtDL",
+          "3BpXnfJaUTiwXnJNe7Ej1rcbzqTTQUvLShZaWazebsVR",
+          "5cjcW9wExnJJiqgLjq7DEG75Pm6JBgE1hNv4B2vHXUW6",
+          "EHAAiTxcdDwQ3U4bU6YcMsQGaekdzLS3B5SmYo46kJtL",
+          "5eHhjP8JaYkz83CWwvGU2uMUXefd3AazWGx4gpcuEEYD",
+          "A7hAgCzFw14fejgCp387JUJRMNyz4j89JKnhtKU8piqW"
+        ],
+        "buyback_basis_points": 5000,
+        "whitelisted_quote_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "creator_fee_configurable": 1,
+        "max_configurable_creator_fee_bps": 300,
+        "max_curve_depth": 1
+      }
+    },
+    {
+      "name": "pump_fee_config_2026_10_13",
+      "group": "pump_state_2026_10_13",
+      "purpose": "pump-fees FeeConfig of pump (the curve's market-cap tiers), which v3 trades read directly (no pump-fees CPI)",
+      "address": "8Wf5TiAheLUqBrKXeYg2JtAFFMWtKdG2BSFgqUcPVwTt",
+      "slot": 456395752,
+      "owner": "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+      "lamports": 37292293,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 4097,
+      "sha256": "3504fae20640e15bd441257ab118aa96fb4e99190defc06a01aae26b307bf204",
+      "file": "accounts/pump_2026_10_13/pump_fee_config_2026_10_13.bin",
+      "decoded": {
+        "bump": 253,
+        "admin": "FFWtrEQ4B4PKQoVuHYzZq8FabGkVatYzDpEVHsK5rrhF",
+        "flat_fees": {
+          "lp": 0,
+          "protocol": 95,
+          "creator": 30
+        },
+        "fee_tiers": [
+          {
+            "threshold": 0,
+            "lp": 0,
+            "protocol": 95,
+            "creator": 30
+          }
+        ],
+        "stable_fee_tiers": [
+          {
+            "threshold": 0,
+            "lp": 0,
+            "protocol": 95,
+            "creator": 30
+          }
+        ],
+        "exotic_flat_fees": {
+          "lp": 0,
+          "protocol": 95,
+          "creator": 30
+        }
+      }
+    },
+    {
+      "name": "pump_pamm_global_config_2026_10_13",
+      "group": "pump_state_2026_10_13",
+      "purpose": "PumpSwap GlobalConfig (disable_flags, recipient lists)",
+      "address": "ADyA8hdefvWN2dbGGWFotbzWxrAvLW83WG6QCVXvJKqw",
+      "slot": 456395752,
+      "owner": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+      "lamports": 9272823,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 949,
+      "sha256": "a698009a419d0b8c56ff257626d15cba305c4989a602fa86e65ca252b2c200f4",
+      "file": "accounts/pump_2026_10_13/pump_pamm_global_config_2026_10_13.bin",
+      "decoded": {
+        "admin": "FFWtrEQ4B4PKQoVuHYzZq8FabGkVatYzDpEVHsK5rrhF",
+        "lp_fee_basis_points": 20,
+        "protocol_fee_basis_points": 5,
+        "disable_flags": 0,
+        "protocol_fee_recipients": [
+          "62qc2CNXwrYqQScmEdiZFFAnJR262PxWEuNQtxfafNgV",
+          "7VtfL8fvgNfhz17qKRMjzQEXgbdpnHHHQRh54R9jP2RJ",
+          "7hTckgnGnLQR6sdH7YkqFTAA7VwTfYFaZ6EhEsU3saCX",
+          "9rPYyANsfQZw3DnDmKE3YCQF5E8oD89UXoHn9JFEhJUz",
+          "AVmoTthdrX6tKt4nDjco2D775W2YK3sDhxPcMmzUAmTY",
+          "FWsW1xNtWscwNmKv6wVsU1iTzRN6wmmk3MjxRP5tT7hz",
+          "G5UZAVbAf46s7cKWoyKu8kYTip9DGTpbLZ2qa9Aq69dP",
+          "JCRGumoE9Qi5BBgULTgdgTLjSgkCMSbF62ZZfGs84JeU"
+        ],
+        "coin_creator_fee_basis_points": 5,
+        "reserved_fee_recipients": [
+          "GesfTA3X2arioaHp8bbKdjG9vJtskViWACZoYvxp4twS",
+          "4budycTjhs9fD6xw62VBducVTNgMgJJ5BgtKq7mAZwn6",
+          "8SBKzEQU4nLSzcwF4a74F2iaUDQyTfjGndn6qUWBnrpR",
+          "4UQeTP1T39KZ9Sfxzo3WR5skgsaP6NZa87BAkuazLEKH",
+          "8sNeir4QsLsJdYpc9RZacohhK1Y5FLU3nC5LXgYB4aa6",
+          "Fh9HmeLNUMVCvejxCtCL2DbYaRyBFVJ5xrWkLnMH6fdk",
+          "463MEnMeGyJekNZFQSTUABBEbLnvMTALbT6ZmsxAbAdq",
+          "6AUH3WEHucYZyC61hqpqYUWVto5qA5hjHuNQ32GNnNxA"
+        ],
+        "buyback_fee_recipients": [
+          "5YxQFdt3Tr9zJLvkFccqXVUwhdTWJQc1fFg2YPbxvxeD",
+          "9M4giFFMxmFGXtc3feFzRai56WbBqehoSeRE5GK7gf7",
+          "GXPFM2caqTtQYC2cJ5yJRi9VDkpsYZXzYdwYpGnLmtDL",
+          "3BpXnfJaUTiwXnJNe7Ej1rcbzqTTQUvLShZaWazebsVR",
+          "5cjcW9wExnJJiqgLjq7DEG75Pm6JBgE1hNv4B2vHXUW6",
+          "EHAAiTxcdDwQ3U4bU6YcMsQGaekdzLS3B5SmYo46kJtL",
+          "5eHhjP8JaYkz83CWwvGU2uMUXefd3AazWGx4gpcuEEYD",
+          "A7hAgCzFw14fejgCp387JUJRMNyz4j89JKnhtKU8piqW"
+        ],
+        "buyback_basis_points": 5000,
+        "boost_authority": "HTVZVEQMBsNanubDPTs3CxDAEGNFQHJY8c1441iy2S5r",
+        "boost_enabled": 1,
+        "creator_fee_configurable": 1,
+        "max_configurable_creator_fee_bps": 300
+      }
+    },
+    {
+      "name": "pump_pamm_fee_config_2026_10_13",
+      "group": "pump_state_2026_10_13",
+      "purpose": "pump-fees FeeConfig of PumpSwap (the canonical pools' market-cap tiers)",
+      "address": "5PHirr8joyTMp9JMm6nW7hNDVyEYdkzDqazxPD7RaTjx",
+      "slot": 456395752,
+      "owner": "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+      "lamports": 33103977,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 4097,
+      "sha256": "d8706882a217e82af619b754e37beedf9338a25787ebec717e7d69d2cf347c9d",
+      "file": "accounts/pump_2026_10_13/pump_pamm_fee_config_2026_10_13.bin",
+      "decoded": {
+        "bump": 255,
+        "admin": "FFWtrEQ4B4PKQoVuHYzZq8FabGkVatYzDpEVHsK5rrhF",
+        "flat_fees": {
+          "lp": 25,
+          "protocol": 5,
+          "creator": 0
+        },
+        "fee_tiers": [
+          {
+            "threshold": 0,
+            "lp": 2,
+            "protocol": 93,
+            "creator": 30
+          },
+          {
+            "threshold": 420000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 95
+          },
+          {
+            "threshold": 1470000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 90
+          },
+          {
+            "threshold": 2460000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 85
+          },
+          {
+            "threshold": 3440000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 80
+          },
+          {
+            "threshold": 4420000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 75
+          },
+          {
+            "threshold": 9820000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 70
+          },
+          {
+            "threshold": 14740000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 65
+          },
+          {
+            "threshold": 19650000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 60
+          },
+          {
+            "threshold": 24560000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 55
+          },
+          {
+            "threshold": 29470000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 50
+          },
+          {
+            "threshold": 34380000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 45
+          },
+          {
+            "threshold": 39300000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 40
+          },
+          {
+            "threshold": 44210000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 35
+          },
+          {
+            "threshold": 49120000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 30
+          },
+          {
+            "threshold": 54030000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 28
+          },
+          {
+            "threshold": 58940000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 25
+          },
+          {
+            "threshold": 63860000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 23
+          },
+          {
+            "threshold": 68770000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 20
+          },
+          {
+            "threshold": 73681000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 18
+          },
+          {
+            "threshold": 78590000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 15
+          },
+          {
+            "threshold": 83500000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 13
+          },
+          {
+            "threshold": 88400000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 10
+          },
+          {
+            "threshold": 93330000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 8
+          },
+          {
+            "threshold": 98240000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 5
+          }
+        ],
+        "stable_fee_tiers": [
+          {
+            "threshold": 0,
+            "lp": 2,
+            "protocol": 93,
+            "creator": 30
+          },
+          {
+            "threshold": 59000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 95
+          },
+          {
+            "threshold": 300000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 90
+          },
+          {
+            "threshold": 500000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 85
+          },
+          {
+            "threshold": 700000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 80
+          },
+          {
+            "threshold": 900000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 75
+          },
+          {
+            "threshold": 2000000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 70
+          },
+          {
+            "threshold": 3000000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 65
+          },
+          {
+            "threshold": 4000000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 60
+          },
+          {
+            "threshold": 5000000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 55
+          },
+          {
+            "threshold": 6000000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 50
+          },
+          {
+            "threshold": 7000000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 45
+          },
+          {
+            "threshold": 8000000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 40
+          },
+          {
+            "threshold": 9000000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 35
+          },
+          {
+            "threshold": 10000000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 30
+          },
+          {
+            "threshold": 11000000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 28
+          },
+          {
+            "threshold": 12000000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 25
+          },
+          {
+            "threshold": 13000000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 23
+          },
+          {
+            "threshold": 14000000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 20
+          },
+          {
+            "threshold": 15000000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 18
+          },
+          {
+            "threshold": 16000000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 15
+          },
+          {
+            "threshold": 17000000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 13
+          },
+          {
+            "threshold": 18000000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 10
+          },
+          {
+            "threshold": 19000000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 8
+          },
+          {
+            "threshold": 20000000000000,
+            "lp": 20,
+            "protocol": 5,
+            "creator": 5
+          }
+        ],
+        "exotic_flat_fees": {
+          "lp": 20,
+          "protocol": 5,
+          "creator": 5
+        }
+      }
+    },
+    {
+      "name": "pump_near166_mint",
+      "group": "pump_state_2026_10_13",
+      "role": "near166",
+      "purpose": "mint of the `near166` coin: a live SOL, non-cashback, non-mayhem 166-byte curve near completion (rT <= NEAR_RT_MAX) carrying both fee buckets: v3 synthetic exits past rT, the differential (T-PUMP-MATH-V3 (b))",
+      "address": "CZN9Ysi89cAvnkuR2cNCM5t32BNHNdnXTJ5HPd4Npump",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 2722880,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 408,
+      "sha256": "75900eb9ae2ccf174702f1921b9af3eb4928827991225f1a15e28dac2a97a811",
+      "file": "accounts/pump_2026_10_13/pump_near166_mint.bin",
+      "decoded": {
+        "program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "supply": 999818465159445,
+        "decimals": 6,
+        "mint_authority": null,
+        "freeze_authority": null,
+        "extension_types": [
+          18,
+          19
+        ]
+      }
+    },
+    {
+      "name": "pump_near166_curve",
+      "group": "pump_state_2026_10_13",
+      "role": "near166",
+      "purpose": "BondingCurve of the `near166` coin: a live SOL, non-cashback, non-mayhem 166-byte curve near completion (rT <= NEAR_RT_MAX) carrying both fee buckets: v3 synthetic exits past rT, the differential (T-PUMP-MATH-V3 (b))",
+      "address": "4uUBLA8LmTLeva9DMJmSRgyUaL4NJJD3JkfpYnUFRv9a",
+      "slot": 456395752,
+      "owner": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "lamports": 66714221969,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 166,
+      "sha256": "487053adefe204587c39aba9db4a6fe487e16a121ee0618932bf09f49dffddab",
+      "file": "accounts/pump_2026_10_13/pump_near166_curve.bin",
+      "decoded": {
+        "len": 166,
+        "virtual_token_reserves": 333021296825365,
+        "virtual_quote_reserves": 96660487854,
+        "real_token_reserves": 53121296825365,
+        "real_quote_reserves": 66660487854,
+        "token_total_supply": 1000000000000000,
+        "complete": 0,
+        "creator": "8Ycbh1bSdLLxTxqLhkHfB7npyS4bTAzVGuBzC1Ax4u4K",
+        "is_mayhem_mode": 0,
+        "is_cashback_coin": 0,
+        "quote_mint": "11111111111111111111111111111111",
+        "creator_fee_bps": 0,
+        "can_edit_creator_fee": 0,
+        "is_holder_reward": 0,
+        "creator_fee_bucket": 20222168,
+        "protocol_fees_bucket": 32018427,
+        "depth": 0,
+        "initial_virtual_quote_reserves": 30000000000,
+        "post_complete_base_out": 0,
+        "post_complete_quote_in": 0
+      }
+    },
+    {
+      "name": "pump_near166_curve_base_ata",
+      "group": "pump_state_2026_10_13",
+      "role": "near166",
+      "purpose": "the `near166` curve's token ATA (associated_bonding_curve)",
+      "address": "GVUpXoe3pBKawJMwLLgWLLfzLtcasGNZjZgQe3MPcvYs",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 1513840,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 170,
+      "sha256": "0fb537a35994cebcb2b264284086b2c9dbab33d1ad8db17e6a6fa946623c1a56",
+      "file": "accounts/pump_2026_10_13/pump_near166_curve_base_ata.bin",
+      "decoded": {
+        "mint": "CZN9Ysi89cAvnkuR2cNCM5t32BNHNdnXTJ5HPd4Npump",
+        "owner": "4uUBLA8LmTLeva9DMJmSRgyUaL4NJJD3JkfpYnUFRv9a",
+        "amount": 260021296825365,
+        "delegate": null,
+        "state": 1,
+        "is_native": null
+      }
+    },
+    {
+      "name": "pump_near166_creator_vault",
+      "group": "pump_state_2026_10_13",
+      "role": "near166",
+      "purpose": "pump creator vault of the `near166` curve's creator",
+      "address": "3U3WyMF44C2iS3fUmtfpmJZB7poPT5YEbNB5D2RRwxwV",
+      "slot": 456395752,
+      "owner": "11111111111111111111111111111111",
+      "lamports": 4309041268,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "file": "accounts/pump_2026_10_13/pump_near166_creator_vault.bin"
+    },
+    {
+      "name": "pump_fresh166_mint",
+      "group": "pump_state_2026_10_13",
+      "role": "fresh166",
+      "purpose": "mint of the `fresh166` coin: a create_v2 curve minutes old (166 bytes, Token-2022, ivqr 30e9 = vQ - rQ): the default venue on the 2026-10-08 build",
+      "address": "8aUT1att91Rjurcvm4z8xu1yjUuEazRVux4eSq2gpump",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 2727960,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 409,
+      "sha256": "bbecd61ccaa19790f5372cda8b543516e98f63d3e894ebec0dfc7cb21180b183",
+      "file": "accounts/pump_2026_10_13/pump_fresh166_mint.bin",
+      "decoded": {
+        "program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "supply": 1000000000000000,
+        "decimals": 6,
+        "mint_authority": null,
+        "freeze_authority": null,
+        "extension_types": [
+          18,
+          19
+        ]
+      }
+    },
+    {
+      "name": "pump_fresh166_curve",
+      "group": "pump_state_2026_10_13",
+      "role": "fresh166",
+      "purpose": "BondingCurve of the `fresh166` coin: a create_v2 curve minutes old (166 bytes, Token-2022, ivqr 30e9 = vQ - rQ): the default venue on the 2026-10-08 build",
+      "address": "3xFYWBnMZJjCuWh5WaB1ajRBvxp8z9xdW8K18uVATTtT",
+      "slot": 456395752,
+      "owner": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "lamports": 574290342,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 166,
+      "sha256": "4ee872afcf7c8c895b867886a0c3cfa149d397a3e0ce0604ad03703500ca31e8",
+      "file": "accounts/pump_2026_10_13/pump_fresh166_curve.bin",
+      "decoded": {
+        "len": 166,
+        "virtual_token_reserves": 1052896801991732,
+        "virtual_quote_reserves": 30572796822,
+        "real_token_reserves": 772996801991732,
+        "real_quote_reserves": 572796822,
+        "token_total_supply": 1000000000000000,
+        "complete": 0,
+        "creator": "G3Vj4aA6fjtFfuBhoUMskjGrP5ks1pReXTSPRydMMeeh",
+        "is_mayhem_mode": 0,
+        "is_cashback_coin": 0,
+        "quote_mint": "11111111111111111111111111111111",
+        "creator_fee_bps": 0,
+        "can_edit_creator_fee": 0,
+        "is_holder_reward": 0,
+        "creator_fee_bucket": 0,
+        "protocol_fees_bucket": 0,
+        "depth": 0,
+        "initial_virtual_quote_reserves": 30000000000,
+        "post_complete_base_out": 0,
+        "post_complete_quote_in": 0
+      }
+    },
+    {
+      "name": "pump_fresh166_curve_base_ata",
+      "group": "pump_state_2026_10_13",
+      "role": "fresh166",
+      "purpose": "the `fresh166` curve's token ATA (associated_bonding_curve)",
+      "address": "FaqpMbCds9Vx82io5k4Zqmh1BnDKVTi1yvaGDeJTjXu4",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 1513840,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 170,
+      "sha256": "bec2cb997ad56688db3266cb8629f3a5fefbfe19931d236e82597160ff30ff18",
+      "file": "accounts/pump_2026_10_13/pump_fresh166_curve_base_ata.bin",
+      "decoded": {
+        "mint": "8aUT1att91Rjurcvm4z8xu1yjUuEazRVux4eSq2gpump",
+        "owner": "3xFYWBnMZJjCuWh5WaB1ajRBvxp8z9xdW8K18uVATTtT",
+        "amount": 979896801991732,
+        "delegate": null,
+        "state": 1,
+        "is_native": null
+      }
+    },
+    {
+      "name": "pump_fresh166_creator_vault",
+      "group": "pump_state_2026_10_13",
+      "role": "fresh166",
+      "purpose": "pump creator vault of the `fresh166` curve's creator",
+      "address": "8FLdhec5ygPWFWDrU7bb5S7dXUhLVng2rSa2oyjyeJx3",
+      "slot": 456395752,
+      "owner": "11111111111111111111111111111111",
+      "lamports": 926662,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "file": "accounts/pump_2026_10_13/pump_fresh166_creator_vault.bin"
+    },
+    {
+      "name": "pump_fresh166_sharing_config",
+      "group": "pump_state_2026_10_13",
+      "role": "fresh166",
+      "purpose": "pump-fees sharing-config of the `fresh166` mint (the curve's creator)",
+      "address": "G3Vj4aA6fjtFfuBhoUMskjGrP5ks1pReXTSPRydMMeeh",
+      "slot": 456395752,
+      "owner": "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+      "lamports": 5852160,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 1024,
+      "sha256": "45000f94841520613398b9869f6286c3c0bb1ceb2ac253fe57e860df1a37f2c5",
+      "file": "accounts/pump_2026_10_13/pump_fresh166_sharing_config.bin"
+    },
+    {
+      "name": "pump_buckets166_mint",
+      "group": "pump_state_2026_10_13",
+      "role": "buckets166",
+      "purpose": "mint of the `buckets166` coin: a live 166-byte SOL curve carrying large fee buckets (creator_fee @125, protocol_fees @133): bucket handling",
+      "address": "FfEVFW3nZspBefEDKk1Un5UJyBiB9oCpoRJ5ffA9pump",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 2570480,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 378,
+      "sha256": "68f601de5444e763a0ef65f5aa9e9dbc0ed07d8dbff9114308c2351bc6ca2bbc",
+      "file": "accounts/pump_2026_10_13/pump_buckets166_mint.bin",
+      "decoded": {
+        "program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "supply": 999999999999999,
+        "decimals": 6,
+        "mint_authority": null,
+        "freeze_authority": null,
+        "extension_types": [
+          18,
+          19
+        ]
+      }
+    },
+    {
+      "name": "pump_buckets166_curve",
+      "group": "pump_state_2026_10_13",
+      "role": "buckets166",
+      "purpose": "BondingCurve of the `buckets166` coin: a live 166-byte SOL curve carrying large fee buckets (creator_fee @125, protocol_fees @133): bucket handling",
+      "address": "6Gp3UvE2skvhNAAVzB8oNtAdVKFbMESfgfwv7qc3KbGe",
+      "slot": 456395752,
+      "owner": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "lamports": 42979668290,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 166,
+      "sha256": "a31b073cd57bfccda5c838f5d94467b6667d35359f7632f323956750d1261fa4",
+      "file": "accounts/pump_2026_10_13/pump_buckets166_curve.bin",
+      "decoded": {
+        "len": 166,
+        "virtual_token_reserves": 450121363164474,
+        "virtual_quote_reserves": 71514048047,
+        "real_token_reserves": 170221363164474,
+        "real_quote_reserves": 41514048047,
+        "token_total_supply": 1000000000000000,
+        "complete": 0,
+        "creator": "7xEC31D8am6AJi8WFegkX4eCgmxABce6fVNjzXnnZBFS",
+        "is_mayhem_mode": 0,
+        "is_cashback_coin": 0,
+        "quote_mint": "11111111111111111111111111111111",
+        "creator_fee_bps": 0,
+        "can_edit_creator_fee": 0,
+        "is_holder_reward": 0,
+        "creator_fee_bucket": 566758769,
+        "protocol_fees_bucket": 897367954,
+        "depth": 0,
+        "initial_virtual_quote_reserves": 30000000000,
+        "post_complete_base_out": 0,
+        "post_complete_quote_in": 0
+      }
+    },
+    {
+      "name": "pump_buckets166_curve_base_ata",
+      "group": "pump_state_2026_10_13",
+      "role": "buckets166",
+      "purpose": "the `buckets166` curve's token ATA (associated_bonding_curve)",
+      "address": "3tMNKpwaq4xBpGFuiqusfk59ZMv2p9uLu9nRNN8nAzQY",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 1513840,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 170,
+      "sha256": "05cac9a5216e3b201d62a34a693fadc545821de8c326d51bbf26ea05b60646e3",
+      "file": "accounts/pump_2026_10_13/pump_buckets166_curve_base_ata.bin",
+      "decoded": {
+        "mint": "FfEVFW3nZspBefEDKk1Un5UJyBiB9oCpoRJ5ffA9pump",
+        "owner": "6Gp3UvE2skvhNAAVzB8oNtAdVKFbMESfgfwv7qc3KbGe",
+        "amount": 377121363164474,
+        "delegate": null,
+        "state": 1,
+        "is_native": null
+      }
+    },
+    {
+      "name": "pump_buckets166_creator_vault",
+      "group": "pump_state_2026_10_13",
+      "role": "buckets166",
+      "purpose": "pump creator vault of the `buckets166` curve's creator",
+      "address": "DCCPDBiC5S3YSDxqTfuLFNz7e6P6q3iCuZmJk2AHWHh8",
+      "slot": 456395752,
+      "owner": "11111111111111111111111111111111",
+      "lamports": 61257275,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "file": "accounts/pump_2026_10_13/pump_buckets166_creator_vault.bin"
+    },
+    {
+      "name": "pump_grow141_mint",
+      "group": "pump_state_2026_10_13",
+      "role": "grow141",
+      "purpose": "mint of the `grow141` coin: a dormant live SOL curve of 141 bytes (last traded on the 2026-10-02 build): the next trade grows it to 166",
+      "address": "E414Tuyx8D6UnwgU16XeKDQyHF6UfL4o6NFuGocNpump",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 2743200,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 412,
+      "sha256": "c986365f099995b2bfba9819306fa1532e9fc74b5493ca63edf88ddcded15bf9",
+      "file": "accounts/pump_2026_10_13/pump_grow141_mint.bin",
+      "decoded": {
+        "program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "supply": 1000000000000000,
+        "decimals": 6,
+        "mint_authority": null,
+        "freeze_authority": null,
+        "extension_types": [
+          18,
+          19
+        ]
+      }
+    },
+    {
+      "name": "pump_grow141_curve",
+      "group": "pump_state_2026_10_13",
+      "role": "grow141",
+      "purpose": "BondingCurve of the `grow141` coin: a dormant live SOL curve of 141 bytes (last traded on the 2026-10-02 build): the next trade grows it to 166",
+      "address": "5dhwnFQJqwViP1DKgvsPajy2ER2aQNTqufCiqE7kLjiZ",
+      "slot": 456395752,
+      "owner": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "lamports": 15996677494,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 141,
+      "sha256": "e037d50f84012db8774909d3a643410bfeb95ee78ff14f74e3759f9100e955e8",
+      "file": "accounts/pump_2026_10_13/pump_grow141_curve.bin",
+      "decoded": {
+        "len": 141,
+        "virtual_token_reserves": 699853948566607,
+        "virtual_quote_reserves": 45995310974,
+        "real_token_reserves": 419953948566607,
+        "real_quote_reserves": 15995310974,
+        "token_total_supply": 1000000000000000,
+        "complete": 0,
+        "creator": "8WxiYdy7sccrEf4twFqGQivXDnJFZn6fFXg8oMLNBV35",
+        "is_mayhem_mode": 0,
+        "is_cashback_coin": 0,
+        "quote_mint": "11111111111111111111111111111111",
+        "creator_fee_bps": 0,
+        "can_edit_creator_fee": 0,
+        "is_holder_reward": 0,
+        "creator_fee_bucket": 0,
+        "protocol_fees_bucket": 0,
+        "depth": 0,
+        "initial_virtual_quote_reserves": 0,
+        "post_complete_base_out": 0,
+        "post_complete_quote_in": 0
+      }
+    },
+    {
+      "name": "pump_grow141_curve_base_ata",
+      "group": "pump_state_2026_10_13",
+      "role": "grow141",
+      "purpose": "the `grow141` curve's token ATA (associated_bonding_curve)",
+      "address": "CCXiE6uD8n8AZUnurhcr2pzzNx4okd7k3wAmpAqKQfh1",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 1513840,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 170,
+      "sha256": "0177969a6d0ac1e5fcf79d009d5d0ae2427969069b3a3a3e65e805456f16349d",
+      "file": "accounts/pump_2026_10_13/pump_grow141_curve_base_ata.bin",
+      "decoded": {
+        "mint": "E414Tuyx8D6UnwgU16XeKDQyHF6UfL4o6NFuGocNpump",
+        "owner": "5dhwnFQJqwViP1DKgvsPajy2ER2aQNTqufCiqE7kLjiZ",
+        "amount": 626853948566607,
+        "delegate": null,
+        "state": 1,
+        "is_native": null
+      }
+    },
+    {
+      "name": "pump_grow141_creator_vault",
+      "group": "pump_state_2026_10_13",
+      "role": "grow141",
+      "purpose": "pump creator vault of the `grow141` curve's creator",
+      "address": "9hBJL3UFmqeMrcW9TaoefWx4iZYvNRQhBD4JNDYZQfu2",
+      "slot": 456395752,
+      "owner": "11111111111111111111111111111111",
+      "lamports": 94972254,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "file": "accounts/pump_2026_10_13/pump_grow141_creator_vault.bin"
+    },
+    {
+      "name": "pump_grow151_mint",
+      "group": "pump_state_2026_10_13",
+      "role": "grow151",
+      "purpose": "mint of the `grow151` coin: a dormant live SOL curve of 151 bytes: the next trade grows it to 166",
+      "address": "3VBb7Ej86VxKVJEBSpRKsNe7gVTo9tRZza4yqpYVpump",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 3737520,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 409,
+      "sha256": "29ef95b234beba8ec053afa938284d9bc1e5694112a4cf646f030e5f41c283e3",
+      "file": "accounts/pump_2026_10_13/pump_grow151_mint.bin",
+      "decoded": {
+        "program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "supply": 1000000000000000,
+        "decimals": 6,
+        "mint_authority": null,
+        "freeze_authority": null,
+        "extension_types": [
+          18,
+          19
+        ]
+      }
+    },
+    {
+      "name": "pump_grow151_curve",
+      "group": "pump_state_2026_10_13",
+      "role": "grow151",
+      "purpose": "BondingCurve of the `grow151` coin: a dormant live SOL curve of 151 bytes: the next trade grows it to 166",
+      "address": "F8zKPZxAgyaLTc8raabud7kmUDQvdUimNpCytZtH4H54",
+      "slot": 456395752,
+      "owner": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "lamports": 49175388360,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 151,
+      "sha256": "c80fb2bc7af39ade71aa5f754ba1fdf518be00a28992a21a146914244f4ea4ff",
+      "file": "accounts/pump_2026_10_13/pump_grow151_curve.bin",
+      "decoded": {
+        "len": 151,
+        "virtual_token_reserves": 406575707776511,
+        "virtual_quote_reserves": 79173446520,
+        "real_token_reserves": 126675707776511,
+        "real_quote_reserves": 49173446520,
+        "token_total_supply": 1000000000000000,
+        "complete": 0,
+        "creator": "G9pD7L9bE879pdipxvjk8GqKrRu9xUkVRuxj2cN496Do",
+        "is_mayhem_mode": 0,
+        "is_cashback_coin": 0,
+        "quote_mint": "11111111111111111111111111111111",
+        "creator_fee_bps": 0,
+        "can_edit_creator_fee": 0,
+        "is_holder_reward": 0,
+        "creator_fee_bucket": 0,
+        "protocol_fees_bucket": 0,
+        "depth": 0,
+        "initial_virtual_quote_reserves": 0,
+        "post_complete_base_out": 0,
+        "post_complete_quote_in": 0
+      }
+    },
+    {
+      "name": "pump_grow151_curve_base_ata",
+      "group": "pump_state_2026_10_13",
+      "role": "grow151",
+      "purpose": "the `grow151` curve's token ATA (associated_bonding_curve)",
+      "address": "C29ZzeUkgSMPuf1qd48VhQNzAJ8wykyezxquWsZ7LYB9",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 2074080,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 170,
+      "sha256": "8c0bb20f6be2ed09a4b56bfb885123fd8af72c59e859386d0c3d3c90deee9f9f",
+      "file": "accounts/pump_2026_10_13/pump_grow151_curve_base_ata.bin",
+      "decoded": {
+        "mint": "3VBb7Ej86VxKVJEBSpRKsNe7gVTo9tRZza4yqpYVpump",
+        "owner": "F8zKPZxAgyaLTc8raabud7kmUDQvdUimNpCytZtH4H54",
+        "amount": 333575707776511,
+        "delegate": null,
+        "state": 1,
+        "is_native": null
+      }
+    },
+    {
+      "name": "pump_grow151_creator_vault",
+      "group": "pump_state_2026_10_13",
+      "role": "grow151",
+      "purpose": "pump creator vault of the `grow151` curve's creator",
+      "address": "BoZKn72mGTMnw5w4VkGYCEGtPTqzT9kHYg6u3GhUKKqp",
+      "slot": 456395752,
+      "owner": "11111111111111111111111111111111",
+      "lamports": 611239451,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "file": "accounts/pump_2026_10_13/pump_grow151_creator_vault.bin"
+    },
+    {
+      "name": "pump_synthetic_stuck_mint",
+      "group": "pump_state_2026_10_13",
+      "role": "synthetic_stuck",
+      "purpose": "mint of the `synthetic_stuck` coin: curve E1bYRCNq...: complete and unmigrated after a synthetic completion, depth 1 (quoted in a pump coin), post_complete_base_out / quote_in set: a reader vector; short.win refuses it (CurveQuoteNotSol)",
+      "address": "9kTYjcB2KhTNF3MjWjp4vgeCEjNiEojDEc8et1zRqigJ",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 2860040,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 435,
+      "sha256": "fb3bf33d1285cb89a5e8122de8cd047627697041520df2fd1426334b2ebc48dc",
+      "file": "accounts/pump_2026_10_13/pump_synthetic_stuck_mint.bin",
+      "decoded": {
+        "program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "supply": 1000000000000000,
+        "decimals": 6,
+        "mint_authority": null,
+        "freeze_authority": null,
+        "extension_types": [
+          18,
+          19
+        ]
+      }
+    },
+    {
+      "name": "pump_synthetic_stuck_curve",
+      "group": "pump_state_2026_10_13",
+      "role": "synthetic_stuck",
+      "purpose": "BondingCurve of the `synthetic_stuck` coin: curve E1bYRCNq...: complete and unmigrated after a synthetic completion, depth 1 (quoted in a pump coin), post_complete_base_out / quote_in set: a reader vector; short.win refuses it (CurveQuoteNotSol)",
+      "address": "E1bYRCNq72Tyos6tsiMRokitMDJtzcPoKmkmdX8PdCHg",
+      "slot": 456395752,
+      "owner": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "lamports": 1493520,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 166,
+      "sha256": "ac98ed1d0ea354fbfa34a94d44e8ac1f78918309ef59a61caf6e68bf3f47870c",
+      "file": "accounts/pump_2026_10_13/pump_synthetic_stuck_curve.bin",
+      "decoded": {
+        "len": 166,
+        "virtual_token_reserves": 279900000000000,
+        "virtual_quote_reserves": 19072196698539,
+        "real_token_reserves": 0,
+        "real_quote_reserves": 14097072881278,
+        "token_total_supply": 1000000000000000,
+        "complete": 1,
+        "creator": "J7nauu6zCJue4Fyz5dxcMvL8tv6z545gTCAaCU2uk1d2",
+        "is_mayhem_mode": 0,
+        "is_cashback_coin": 0,
+        "quote_mint": "W5vQGEpVR9wmWjWdKuEug1GmfwrUio44365KrDupump",
+        "creator_fee_bps": 100,
+        "can_edit_creator_fee": 0,
+        "is_holder_reward": 0,
+        "creator_fee_bucket": 0,
+        "protocol_fees_bucket": 0,
+        "depth": 1,
+        "initial_virtual_quote_reserves": 4975123817261,
+        "post_complete_base_out": 125468585973711,
+        "post_complete_quote_in": 21720607727767
+      }
+    },
+    {
+      "name": "pump_synthetic_stuck_curve_base_ata",
+      "group": "pump_state_2026_10_13",
+      "role": "synthetic_stuck",
+      "purpose": "the `synthetic_stuck` curve's token ATA (associated_bonding_curve)",
+      "address": "CQCXKUxFevw2EeaW7ufNxF9htrbvW9SVxB8mir41hoRd",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 1513840,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 170,
+      "sha256": "a1fcafd3d9481b7b6d45e9f0d0c7e606917957e579b6c7244d35ec0e1573394f",
+      "file": "accounts/pump_2026_10_13/pump_synthetic_stuck_curve_base_ata.bin",
+      "decoded": {
+        "mint": "9kTYjcB2KhTNF3MjWjp4vgeCEjNiEojDEc8et1zRqigJ",
+        "owner": "E1bYRCNq72Tyos6tsiMRokitMDJtzcPoKmkmdX8PdCHg",
+        "amount": 81431414026289,
+        "delegate": null,
+        "state": 1,
+        "is_native": null
+      }
+    },
+    {
+      "name": "pump_synthetic_stuck_creator_vault",
+      "group": "pump_state_2026_10_13",
+      "role": "synthetic_stuck",
+      "purpose": "pump creator vault of the `synthetic_stuck` curve's creator",
+      "address": "ELgBGBSfx5mbVg5ouHnwmoPcfZHPS1yQqB7TVqjh1mod",
+      "slot": 456395752,
+      "absent": true
+    },
+    {
+      "name": "pump_synthetic_stuck_sharing_config",
+      "group": "pump_state_2026_10_13",
+      "role": "synthetic_stuck",
+      "purpose": "pump-fees sharing-config of the `synthetic_stuck` mint (the curve's creator)",
+      "address": "J7nauu6zCJue4Fyz5dxcMvL8tv6z545gTCAaCU2uk1d2",
+      "slot": 456395752,
+      "owner": "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+      "lamports": 5852160,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 1024,
+      "sha256": "8f974814128457004ae30af9b40a6211aa1b0e2c9583198a8af424208a9890ac",
+      "file": "accounts/pump_2026_10_13/pump_synthetic_stuck_sharing_config.bin"
+    },
+    {
+      "name": "pump_synthetic_stuck_quote_mint",
+      "group": "pump_state_2026_10_13",
+      "role": "synthetic_stuck",
+      "purpose": "the `synthetic_stuck` curve's quote mint (a curve of depth > 0 is quoted in another pump coin)",
+      "address": "W5vQGEpVR9wmWjWdKuEug1GmfwrUio44365KrDupump",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 2656840,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 395,
+      "sha256": "0eaf50ebb489c6aff951c57378a72cc65eb81d523bd742b5f3c3032f5c150b3d",
+      "file": "accounts/pump_2026_10_13/pump_synthetic_stuck_quote_mint.bin",
+      "decoded": {
+        "program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "supply": 994925684084508,
+        "decimals": 6,
+        "mint_authority": null,
+        "freeze_authority": null,
+        "extension_types": [
+          18,
+          19
+        ]
+      }
+    },
+    {
+      "name": "pump_synthetic_stuck_curve_quote_ata",
+      "group": "pump_state_2026_10_13",
+      "role": "synthetic_stuck",
+      "purpose": "the `synthetic_stuck` curve's quote ATA (associated_quote_bonding_curve)",
+      "address": "Ajzs3XRjvvhbvLWJrkb3M5PgRgGMYTphPXwaR2fPD5PN",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 1513840,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 170,
+      "sha256": "51fbd0c9d4be5d149ddfaa3ea4deeed8273a4f5900c2338a7cc34becd26c5cdc",
+      "file": "accounts/pump_2026_10_13/pump_synthetic_stuck_curve_quote_ata.bin",
+      "decoded": {
+        "mint": "W5vQGEpVR9wmWjWdKuEug1GmfwrUio44365KrDupump",
+        "owner": "E1bYRCNq72Tyos6tsiMRokitMDJtzcPoKmkmdX8PdCHg",
+        "amount": 35817680609045,
+        "delegate": null,
+        "state": 1,
+        "is_native": null
+      }
+    },
+    {
+      "name": "pump_graduated_synthetic_mint",
+      "group": "pump_state_2026_10_13",
+      "role": "graduated_synthetic",
+      "purpose": "mint of the `graduated_synthetic` coin: 98u8RJ's curve 2ncbKy3K... (completed by a synthetic buy, tx 2vVRr9eg...) and its canonical pool D4PACvyr... migrate_v2 created at (X1, Y1): the pc* fields kept after migration",
+      "address": "98u8RJzuhezFwkCFVdSe1bPoQ6e2DdRG79kQ19vkpump",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 2743200,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 412,
+      "sha256": "08df8524eb38e3f93ae26d75314c2fd1dc581aef528cab578d83500c18fc084c",
+      "file": "accounts/pump_2026_10_13/pump_graduated_synthetic_mint.bin",
+      "decoded": {
+        "program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "supply": 961047067860876,
+        "decimals": 6,
+        "mint_authority": null,
+        "freeze_authority": null,
+        "extension_types": [
+          18,
+          19
+        ]
+      }
+    },
+    {
+      "name": "pump_graduated_synthetic_curve",
+      "group": "pump_state_2026_10_13",
+      "role": "graduated_synthetic",
+      "purpose": "BondingCurve of the `graduated_synthetic` coin: 98u8RJ's curve 2ncbKy3K... (completed by a synthetic buy, tx 2vVRr9eg...) and its canonical pool D4PACvyr... migrate_v2 created at (X1, Y1): the pc* fields kept after migration",
+      "address": "2ncbKy3KtAhiG2gWR2y6Mu5AtujUJMM8VAtpnwQFWJnC",
+      "slot": 456395752,
+      "owner": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "lamports": 1493520,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 166,
+      "sha256": "72eb4b27d04ba05e57164e51f2afb90281664594e640dad903209a980873757b",
+      "file": "accounts/pump_2026_10_13/pump_graduated_synthetic_curve.bin",
+      "decoded": {
+        "len": 166,
+        "virtual_token_reserves": 0,
+        "virtual_quote_reserves": 0,
+        "real_token_reserves": 0,
+        "real_quote_reserves": 0,
+        "token_total_supply": 1000000000000000,
+        "complete": 1,
+        "creator": "DkKYt1rYyneycmPkFDoQXUfaUwdDRn3w93Lpf42162tM",
+        "is_mayhem_mode": 0,
+        "is_cashback_coin": 0,
+        "quote_mint": "11111111111111111111111111111111",
+        "creator_fee_bps": 0,
+        "can_edit_creator_fee": 0,
+        "is_holder_reward": 0,
+        "creator_fee_bucket": 0,
+        "protocol_fees_bucket": 0,
+        "depth": 0,
+        "initial_virtual_quote_reserves": 30000000000,
+        "post_complete_base_out": 6238850918425,
+        "post_complete_quote_in": 2642475552
+      }
+    },
+    {
+      "name": "pump_graduated_synthetic_curve_base_ata",
+      "group": "pump_state_2026_10_13",
+      "role": "graduated_synthetic",
+      "purpose": "the `graduated_synthetic` curve's token ATA (associated_bonding_curve)",
+      "address": "BBruA3ZhSBCayyjbX2CDJXr4z25yoMTdhrSr14FJw5yC",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 1513840,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 170,
+      "sha256": "a2ae44bbb67b0540a565be2f699b39666f6a8330ca2af840f6432049d6903355",
+      "file": "accounts/pump_2026_10_13/pump_graduated_synthetic_curve_base_ata.bin",
+      "decoded": {
+        "mint": "98u8RJzuhezFwkCFVdSe1bPoQ6e2DdRG79kQ19vkpump",
+        "owner": "2ncbKy3KtAhiG2gWR2y6Mu5AtujUJMM8VAtpnwQFWJnC",
+        "amount": 0,
+        "delegate": null,
+        "state": 1,
+        "is_native": null
+      }
+    },
+    {
+      "name": "pump_graduated_synthetic_creator_vault",
+      "group": "pump_state_2026_10_13",
+      "role": "graduated_synthetic",
+      "purpose": "pump creator vault of the `graduated_synthetic` curve's creator",
+      "address": "CZt7yWh2SAwy5gBdBLDuW11sueSRxfBha1Y4VnsfB6mo",
+      "slot": 456395752,
+      "owner": "11111111111111111111111111111111",
+      "lamports": 650240,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "file": "accounts/pump_2026_10_13/pump_graduated_synthetic_creator_vault.bin"
+    },
+    {
+      "name": "pump_graduated_synthetic_pool",
+      "group": "pump_state_2026_10_13",
+      "role": "graduated_synthetic",
+      "purpose": "the `graduated_synthetic` coin's canonical PumpSwap Pool",
+      "address": "D4PACvyrY7uYmxUmQZYRUDsSjywJUg4Eq5RT8E53BN4o",
+      "slot": 456395752,
+      "owner": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+      "lamports": 2179320,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 301,
+      "sha256": "e6fd2593c9e984e9b2b74cd76514c9b8f75ae90ef9feb7fc82bb6505eadec5a9",
+      "file": "accounts/pump_2026_10_13/pump_graduated_synthetic_pool.bin",
+      "decoded": {
+        "len": 301,
+        "pool_bump": 254,
+        "index": 0,
+        "creator": "6sgYepyJy4BXUBQnQzsgtutfdxfTGJajh88Q8Y2ny4tm",
+        "base_mint": "98u8RJzuhezFwkCFVdSe1bPoQ6e2DdRG79kQ19vkpump",
+        "quote_mint": "So11111111111111111111111111111111111111112",
+        "lp_mint": "H5qVmhaoesXJ7qyBoXpRxaCgExXxp49UWEP8PkjAYxwK",
+        "pool_base_token_account": "9e6rf7EJMnFGXYDc7YfRiVVTHZeq1SKaz3NvHvgEygen",
+        "pool_quote_token_account": "Ff8mQYTA8zgVBGeTek5TSQFrfVTJMHnF4BabHEBDT7CB",
+        "lp_supply": 4193388285909,
+        "coin_creator": "DkKYt1rYyneycmPkFDoQXUfaUwdDRn3w93Lpf42162tM",
+        "is_mayhem_mode": 0,
+        "is_cashback_coin": 0,
+        "virtual_quote_reserves": 17584491489,
+        "creator_fee_bps": 0,
+        "can_edit_creator_fee": 0,
+        "is_holder_reward": 0,
+        "protocol_fees_bucket": 0,
+        "creator_fees_bucket": 13827
+      }
+    },
+    {
+      "name": "pump_graduated_synthetic_pool_base_vault",
+      "group": "pump_state_2026_10_13",
+      "role": "graduated_synthetic",
+      "purpose": "the pool's base vault",
+      "address": "9e6rf7EJMnFGXYDc7YfRiVVTHZeq1SKaz3NvHvgEygen",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 1513840,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 170,
+      "sha256": "d80ff72d030af5cb40d921708bb5b6c79f120cf7d4f248518d5467d0eccca011",
+      "file": "accounts/pump_2026_10_13/pump_graduated_synthetic_pool_base_vault.bin",
+      "decoded": {
+        "mint": "98u8RJzuhezFwkCFVdSe1bPoQ6e2DdRG79kQ19vkpump",
+        "owner": "D4PACvyrY7uYmxUmQZYRUDsSjywJUg4Eq5RT8E53BN4o",
+        "amount": 954834143789829,
+        "delegate": null,
+        "state": 1,
+        "is_native": null
+      }
+    },
+    {
+      "name": "pump_graduated_synthetic_pool_quote_vault",
+      "group": "pump_state_2026_10_13",
+      "role": "graduated_synthetic",
+      "purpose": "the pool's WSOL vault",
+      "address": "Ff8mQYTA8zgVBGeTek5TSQFrfVTJMHnF4BabHEBDT7CB",
+      "slot": 456395752,
+      "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "lamports": 1488233488,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 165,
+      "sha256": "4b3fb8e0e020d895cb90652e23ade89ee87ef049cd613af535c4a90c7fc27c57",
+      "file": "accounts/pump_2026_10_13/pump_graduated_synthetic_pool_quote_vault.bin",
+      "decoded": {
+        "mint": "So11111111111111111111111111111111111111112",
+        "owner": "D4PACvyrY7uYmxUmQZYRUDsSjywJUg4Eq5RT8E53BN4o",
+        "amount": 1486745048,
+        "delegate": null,
+        "state": 1,
+        "is_native": 1488440
+      }
+    },
+    {
+      "name": "pump_graduated_synthetic_lp_mint",
+      "group": "pump_state_2026_10_13",
+      "role": "graduated_synthetic",
+      "purpose": "the pool's LP mint",
+      "address": "H5qVmhaoesXJ7qyBoXpRxaCgExXxp49UWEP8PkjAYxwK",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 1066800,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 82,
+      "sha256": "1ebfb50187af3400762b5e33522fbe585b738c01d33b744a8f7878014d63c2c2",
+      "file": "accounts/pump_2026_10_13/pump_graduated_synthetic_lp_mint.bin",
+      "decoded": {
+        "program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "supply": 0,
+        "decimals": 9,
+        "mint_authority": "D4PACvyrY7uYmxUmQZYRUDsSjywJUg4Eq5RT8E53BN4o",
+        "freeze_authority": null,
+        "extension_types": []
+      }
+    },
+    {
+      "name": "pump_graduated_synthetic_pool_authority",
+      "group": "pump_state_2026_10_13",
+      "role": "graduated_synthetic",
+      "purpose": "pump PDA [\"pool-authority\", mint] (the pool's creator)",
+      "address": "6sgYepyJy4BXUBQnQzsgtutfdxfTGJajh88Q8Y2ny4tm",
+      "slot": 456395752,
+      "absent": true
+    },
+    {
+      "name": "pump_graduated_synthetic_boost_vault",
+      "group": "pump_state_2026_10_13",
+      "role": "graduated_synthetic",
+      "purpose": "PumpSwap PDA [\"boost_vault\", pool]",
+      "address": "ESUA3gDe9jadYwf6qA8Em3HkAuHNAmHMLxJMgjVQvVt3",
+      "slot": 456395752,
+      "absent": true
+    },
+    {
+      "name": "pump_graduated_synthetic_boost_vault_ata",
+      "group": "pump_state_2026_10_13",
+      "role": "graduated_synthetic",
+      "purpose": "the boost vault's WSOL ATA (absent once the boost has run)",
+      "address": "3u2Abn1wJQ3QH9ijayXG9vA1pBuwjSxrpudvwWW4kwZq",
+      "slot": 456395752,
+      "absent": true
+    },
+    {
+      "name": "pump_graduated_synthetic_coin_creator_vault_authority",
+      "group": "pump_state_2026_10_13",
+      "role": "graduated_synthetic",
+      "purpose": "PumpSwap PDA [\"creator_vault\", pool.coin_creator]",
+      "address": "DF5somfD3NGX6NCYzo3ZWMTJpVKeTncsw6ouPhGB28RK",
+      "slot": 456395752,
+      "absent": true
+    },
+    {
+      "name": "pump_graduated_synthetic_coin_creator_vault_ata",
+      "group": "pump_state_2026_10_13",
+      "role": "graduated_synthetic",
+      "purpose": "its WSOL ATA (T11)",
+      "address": "GRAguGoBka3EsoDE3ijkgUWBrNzYhnp9f4p9JVuEeCaZ",
+      "slot": 456395752,
+      "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "lamports": 1502878,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 165,
+      "sha256": "f73c6425990b16c4e7860365aa4157618f35b79c54939af51637047d1c96f855",
+      "file": "accounts/pump_2026_10_13/pump_graduated_synthetic_coin_creator_vault_ata.bin",
+      "decoded": {
+        "mint": "So11111111111111111111111111111111111111112",
+        "owner": "DF5somfD3NGX6NCYzo3ZWMTJpVKeTncsw6ouPhGB28RK",
+        "amount": 14438,
+        "delegate": null,
+        "state": 1,
+        "is_native": 1488440
+      }
+    },
+    {
+      "name": "pump_cashback166_mint",
+      "group": "pump_state_2026_10_13",
+      "role": "cashback166",
+      "purpose": "mint of the `cashback166` coin: curve 8oe1sfhK...: a live 166-byte SOL cashback coin, which v3 trades refuse (6094): T-LISTING (owner D1)",
+      "address": "4eegvKYhyJ2Uq6moore2f21JrDponqYdqBfrfG9Rpump",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 3660960,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 398,
+      "sha256": "8337acc436acf62757b1002af7d5c24a107f14200fdd1b847697c1a1bbeee2d2",
+      "file": "accounts/pump_2026_10_13/pump_cashback166_mint.bin",
+      "decoded": {
+        "program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "supply": 1000000000000000,
+        "decimals": 6,
+        "mint_authority": null,
+        "freeze_authority": null,
+        "extension_types": [
+          18,
+          19
+        ]
+      }
+    },
+    {
+      "name": "pump_cashback166_curve",
+      "group": "pump_state_2026_10_13",
+      "role": "cashback166",
+      "purpose": "BondingCurve of the `cashback166` coin: curve 8oe1sfhK...: a live 166-byte SOL cashback coin, which v3 trades refuse (6094): T-LISTING (owner D1)",
+      "address": "8oe1sfhKhqgtbmXjrDXN4MReWh2y9sG1SgkA2qvagfLa",
+      "slot": 456395752,
+      "owner": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "lamports": 21194383,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 166,
+      "sha256": "18a7d3d4994a71c49fe9d374d2e8adcc160d6190d1ad0b1bc1cdeb45cf599a04",
+      "file": "accounts/pump_2026_10_13/pump_cashback166_curve.bin",
+      "decoded": {
+        "len": 166,
+        "virtual_token_reserves": 1072311853215493,
+        "virtual_quote_reserves": 30019252543,
+        "real_token_reserves": 792411853215493,
+        "real_quote_reserves": 19252543,
+        "token_total_supply": 1000000000000000,
+        "complete": 0,
+        "creator": "9AVeMVwzivhB4tCQ8ouMfcgFquBokRxKQQeKgTAiQLPG",
+        "is_mayhem_mode": 0,
+        "is_cashback_coin": 1,
+        "quote_mint": "11111111111111111111111111111111",
+        "creator_fee_bps": 0,
+        "can_edit_creator_fee": 0,
+        "is_holder_reward": 0,
+        "creator_fee_bucket": 0,
+        "protocol_fees_bucket": 0,
+        "depth": 0,
+        "initial_virtual_quote_reserves": 0,
+        "post_complete_base_out": 0,
+        "post_complete_quote_in": 0
+      }
+    },
+    {
+      "name": "pump_cashback166_curve_base_ata",
+      "group": "pump_state_2026_10_13",
+      "role": "cashback166",
+      "purpose": "the `cashback166` curve's token ATA (associated_bonding_curve)",
+      "address": "B75SPc6NQyAQWoSd3zi4QJidEsvTvKqsFDp92Lw8Away",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 2074080,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 170,
+      "sha256": "1f9a70803a96435a239934f3c5a94c3636fed65238e5575156b63d3268215175",
+      "file": "accounts/pump_2026_10_13/pump_cashback166_curve_base_ata.bin",
+      "decoded": {
+        "mint": "4eegvKYhyJ2Uq6moore2f21JrDponqYdqBfrfG9Rpump",
+        "owner": "8oe1sfhKhqgtbmXjrDXN4MReWh2y9sG1SgkA2qvagfLa",
+        "amount": 999311853215493,
+        "delegate": null,
+        "state": 1,
+        "is_native": null
+      }
+    },
+    {
+      "name": "pump_cashback166_creator_vault",
+      "group": "pump_state_2026_10_13",
+      "role": "cashback166",
+      "purpose": "pump creator vault of the `cashback166` curve's creator",
+      "address": "4wUfLdfpDFRszN4gjpfgE3pzKBLWtc8k6Mcoh1y1gxQg",
+      "slot": 456395752,
+      "owner": "11111111111111111111111111111111",
+      "lamports": 8238163,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "file": "accounts/pump_2026_10_13/pump_cashback166_creator_vault.bin"
+    },
+    {
+      "name": "pump_mayhem166_mint",
+      "group": "pump_state_2026_10_13",
+      "role": "mayhem166",
+      "purpose": "mint of the `mayhem166` coin: curve 5jQXNPKb...: a live 166-byte mayhem-mode curve whose vQ - rQ differs from its ivqr: the guard and the listing refusal",
+      "address": "8GoErkdxCRuscAYHbpGhLFVZQkG4tekiAwUW5F21pump",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 2672080,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 398,
+      "sha256": "4e98d48046e438b5e0831293ff5cf7bb7860dfa3f03fb22c7b3434c09ae24bfa",
+      "file": "accounts/pump_2026_10_13/pump_mayhem166_mint.bin",
+      "decoded": {
+        "program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "supply": 2000000000000000,
+        "decimals": 6,
+        "mint_authority": null,
+        "freeze_authority": null,
+        "extension_types": [
+          18,
+          19
+        ]
+      }
+    },
+    {
+      "name": "pump_mayhem166_curve",
+      "group": "pump_state_2026_10_13",
+      "role": "mayhem166",
+      "purpose": "BondingCurve of the `mayhem166` coin: curve 5jQXNPKb...: a live 166-byte mayhem-mode curve whose vQ - rQ differs from its ivqr: the guard and the listing refusal",
+      "address": "5jQXNPKbpM3gPKnW24P5BwMpGNiBH8WTrzpsK9kGBBsX",
+      "slot": 456395752,
+      "owner": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "lamports": 1493523,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 166,
+      "sha256": "fb1b38a473519bfbde138c7db3aa054a6df321692b773137587984f3e7011099",
+      "file": "accounts/pump_2026_10_13/pump_mayhem166_curve.bin",
+      "decoded": {
+        "len": 166,
+        "virtual_token_reserves": 1382070854748581,
+        "virtual_quote_reserves": 457699651,
+        "real_token_reserves": 1102170854748581,
+        "real_quote_reserves": 3,
+        "token_total_supply": 1000000000000000,
+        "complete": 0,
+        "creator": "K6Eh9fwKkrhVNq6SpRtJn7F4Myi3HUst5QP8x5BKHnR",
+        "is_mayhem_mode": 1,
+        "is_cashback_coin": 0,
+        "quote_mint": "11111111111111111111111111111111",
+        "creator_fee_bps": 0,
+        "can_edit_creator_fee": 0,
+        "is_holder_reward": 0,
+        "creator_fee_bucket": 0,
+        "protocol_fees_bucket": 0,
+        "depth": 0,
+        "initial_virtual_quote_reserves": 30000000000,
+        "post_complete_base_out": 0,
+        "post_complete_quote_in": 0
+      }
+    },
+    {
+      "name": "pump_mayhem166_curve_base_ata",
+      "group": "pump_state_2026_10_13",
+      "role": "mayhem166",
+      "purpose": "the `mayhem166` curve's token ATA (associated_bonding_curve)",
+      "address": "5oGQkJnm4XeAtcLuAiSJN6xYANpVPNhuB9URLbuAmPQp",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 1513840,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 170,
+      "sha256": "4110c49be5a5bfcda463c5877dc7e1bf9a11e5ad73e089ca80566f5980a2899d",
+      "file": "accounts/pump_2026_10_13/pump_mayhem166_curve_base_ata.bin",
+      "decoded": {
+        "mint": "8GoErkdxCRuscAYHbpGhLFVZQkG4tekiAwUW5F21pump",
+        "owner": "5jQXNPKbpM3gPKnW24P5BwMpGNiBH8WTrzpsK9kGBBsX",
+        "amount": 1309070854748581,
+        "delegate": null,
+        "state": 1,
+        "is_native": null
+      }
+    },
+    {
+      "name": "pump_mayhem166_creator_vault",
+      "group": "pump_state_2026_10_13",
+      "role": "mayhem166",
+      "purpose": "pump creator vault of the `mayhem166` curve's creator",
+      "address": "5mK3UtJXqv7Vdibip82dmLAfgJMCfUEKavj15STpDewZ",
+      "slot": 456395752,
+      "owner": "11111111111111111111111111111111",
+      "lamports": 18797004,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "file": "accounts/pump_2026_10_13/pump_mayhem166_creator_vault.bin"
+    },
+    {
+      "name": "pump_wsol_pool_buckets_mint",
+      "group": "pump_state_2026_10_13",
+      "role": "wsol_pool_buckets",
+      "purpose": "mint of the `wsol_pool_buckets` coin: pool ERtQ5Uhn...: a canonical WSOL PumpSwap pool carrying both fee buckets (@271, @279): PUMP-2026-10-1 live",
+      "address": "GbMfpnmsavwc5uHCqhbuFrSLdtggJiAxub7UKQ2hpump",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 2768600,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 417,
+      "sha256": "150c5e6f33908e4095a14099c02071d1a62fc012eabab4e2ee3c71e14b7c498f",
+      "file": "accounts/pump_2026_10_13/pump_wsol_pool_buckets_mint.bin",
+      "decoded": {
+        "program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "supply": 953120710457808,
+        "decimals": 6,
+        "mint_authority": null,
+        "freeze_authority": null,
+        "extension_types": [
+          18,
+          19
+        ]
+      }
+    },
+    {
+      "name": "pump_wsol_pool_buckets_curve",
+      "group": "pump_state_2026_10_13",
+      "role": "wsol_pool_buckets",
+      "purpose": "BondingCurve of the `wsol_pool_buckets` coin: pool ERtQ5Uhn...: a canonical WSOL PumpSwap pool carrying both fee buckets (@271, @279): PUMP-2026-10-1 live",
+      "address": "HV7ryZEzFZ9CdeKTGajcFbF91SqxucLxaUCSd5wEgvHk",
+      "slot": 456395752,
+      "owner": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "lamports": 1493520,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 166,
+      "sha256": "8e706b14398e81b8fa60d85b32437e6e543d0e7b0c9991b5ff20086ac356d81c",
+      "file": "accounts/pump_2026_10_13/pump_wsol_pool_buckets_curve.bin",
+      "decoded": {
+        "len": 166,
+        "virtual_token_reserves": 0,
+        "virtual_quote_reserves": 0,
+        "real_token_reserves": 0,
+        "real_quote_reserves": 0,
+        "token_total_supply": 1000000000000000,
+        "complete": 1,
+        "creator": "8j9GjW8Z9Do1fpFeaHt82gdmQ6vc7GDk4WZGFy4i2mhL",
+        "is_mayhem_mode": 0,
+        "is_cashback_coin": 0,
+        "quote_mint": "11111111111111111111111111111111",
+        "creator_fee_bps": 0,
+        "can_edit_creator_fee": 0,
+        "is_holder_reward": 0,
+        "creator_fee_bucket": 0,
+        "protocol_fees_bucket": 0,
+        "depth": 0,
+        "initial_virtual_quote_reserves": 30000000000,
+        "post_complete_base_out": 0,
+        "post_complete_quote_in": 0
+      }
+    },
+    {
+      "name": "pump_wsol_pool_buckets_curve_base_ata",
+      "group": "pump_state_2026_10_13",
+      "role": "wsol_pool_buckets",
+      "purpose": "the `wsol_pool_buckets` curve's token ATA (associated_bonding_curve)",
+      "address": "CNZpcDKnWGHhzuymGN5mFBRxCUbrJ61NKjRwBiB25FED",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 1513840,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 170,
+      "sha256": "bc93c06a1e73220265248948272b0cec04c57cdcd79f4260f6b824600852550f",
+      "file": "accounts/pump_2026_10_13/pump_wsol_pool_buckets_curve_base_ata.bin",
+      "decoded": {
+        "mint": "GbMfpnmsavwc5uHCqhbuFrSLdtggJiAxub7UKQ2hpump",
+        "owner": "HV7ryZEzFZ9CdeKTGajcFbF91SqxucLxaUCSd5wEgvHk",
+        "amount": 0,
+        "delegate": null,
+        "state": 1,
+        "is_native": null
+      }
+    },
+    {
+      "name": "pump_wsol_pool_buckets_creator_vault",
+      "group": "pump_state_2026_10_13",
+      "role": "wsol_pool_buckets",
+      "purpose": "pump creator vault of the `wsol_pool_buckets` curve's creator",
+      "address": "8w3dwA62nSbFCsZMzA9m6KvNJGXgV4nCVY8vFoRBwnfb",
+      "slot": 456395752,
+      "owner": "11111111111111111111111111111111",
+      "lamports": 650240,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "file": "accounts/pump_2026_10_13/pump_wsol_pool_buckets_creator_vault.bin"
+    },
+    {
+      "name": "pump_wsol_pool_buckets_sharing_config",
+      "group": "pump_state_2026_10_13",
+      "role": "wsol_pool_buckets",
+      "purpose": "pump-fees sharing-config of the `wsol_pool_buckets` mint (the curve's creator)",
+      "address": "8j9GjW8Z9Do1fpFeaHt82gdmQ6vc7GDk4WZGFy4i2mhL",
+      "slot": 456395752,
+      "owner": "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+      "lamports": 5852160,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 1024,
+      "sha256": "e6d414df5ddcdc3d4fc45f8f44eadadd1ba89d9618c210f2d54ad6fa0f117c18",
+      "file": "accounts/pump_2026_10_13/pump_wsol_pool_buckets_sharing_config.bin"
+    },
+    {
+      "name": "pump_wsol_pool_buckets_pool",
+      "group": "pump_state_2026_10_13",
+      "role": "wsol_pool_buckets",
+      "purpose": "the `wsol_pool_buckets` coin's canonical PumpSwap Pool",
+      "address": "ERtQ5UhnSHJWb8exNA1BYumVnr27huYRhx3Ni2NFh88S",
+      "slot": 456395752,
+      "owner": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+      "lamports": 2179320,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 301,
+      "sha256": "ed0fdea71e2d0255b3f3b86328ab01cd0abcebbe1ffb1d638de84622abc68163",
+      "file": "accounts/pump_2026_10_13/pump_wsol_pool_buckets_pool.bin",
+      "decoded": {
+        "len": 301,
+        "pool_bump": 255,
+        "index": 0,
+        "creator": "DbVqBqN7VEfvebrS9p51wyrq8uc9fqpe9QQKVgfYpkHD",
+        "base_mint": "GbMfpnmsavwc5uHCqhbuFrSLdtggJiAxub7UKQ2hpump",
+        "quote_mint": "So11111111111111111111111111111111111111112",
+        "lp_mint": "6uBjW8pWqF6jYBqecverdViJE9fbqjPVjf75m4EUQh1E",
+        "pool_base_token_account": "2JFoUAchgHwZqojeyhN29iDaUrpVxDqoQnLZSp7tgLca",
+        "pool_quote_token_account": "By8Nx4Ln8AVnrCuvm7PSfCUXh8WqJvbXrdbyGsTPrSPM",
+        "lp_supply": 4193388314675,
+        "coin_creator": "8j9GjW8Z9Do1fpFeaHt82gdmQ6vc7GDk4WZGFy4i2mhL",
+        "is_mayhem_mode": 0,
+        "is_cashback_coin": 0,
+        "virtual_quote_reserves": 17578321397,
+        "creator_fee_bps": 0,
+        "can_edit_creator_fee": 0,
+        "is_holder_reward": 0,
+        "protocol_fees_bucket": 3758999,
+        "creator_fees_bucket": 2425161
+      }
+    },
+    {
+      "name": "pump_wsol_pool_buckets_pool_base_vault",
+      "group": "pump_state_2026_10_13",
+      "role": "wsol_pool_buckets",
+      "purpose": "the pool's base vault",
+      "address": "2JFoUAchgHwZqojeyhN29iDaUrpVxDqoQnLZSp7tgLca",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 1513840,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 170,
+      "sha256": "da3106e566701c10ad5edd92a58fbe654b1cd0db4f359718528f78709651aae1",
+      "file": "accounts/pump_2026_10_13/pump_wsol_pool_buckets_pool_base_vault.bin",
+      "decoded": {
+        "mint": "GbMfpnmsavwc5uHCqhbuFrSLdtggJiAxub7UKQ2hpump",
+        "owner": "ERtQ5UhnSHJWb8exNA1BYumVnr27huYRhx3Ni2NFh88S",
+        "amount": 313064452308941,
+        "delegate": null,
+        "state": 1,
+        "is_native": null
+      }
+    },
+    {
+      "name": "pump_wsol_pool_buckets_pool_quote_vault",
+      "group": "pump_state_2026_10_13",
+      "role": "wsol_pool_buckets",
+      "purpose": "the pool's WSOL vault",
+      "address": "By8Nx4Ln8AVnrCuvm7PSfCUXh8WqJvbXrdbyGsTPrSPM",
+      "slot": 456395752,
+      "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "lamports": 41565129296,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 165,
+      "sha256": "f0166d7849a1b82a69dfc2616669b7e64875cf02cd9203d2080ea379a221e582",
+      "file": "accounts/pump_2026_10_13/pump_wsol_pool_buckets_pool_quote_vault.bin",
+      "decoded": {
+        "mint": "So11111111111111111111111111111111111111112",
+        "owner": "ERtQ5UhnSHJWb8exNA1BYumVnr27huYRhx3Ni2NFh88S",
+        "amount": 41563640856,
+        "delegate": null,
+        "state": 1,
+        "is_native": 1488440
+      }
+    },
+    {
+      "name": "pump_wsol_pool_buckets_lp_mint",
+      "group": "pump_state_2026_10_13",
+      "role": "wsol_pool_buckets",
+      "purpose": "the pool's LP mint",
+      "address": "6uBjW8pWqF6jYBqecverdViJE9fbqjPVjf75m4EUQh1E",
+      "slot": 456395752,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 1066800,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 82,
+      "sha256": "8d4d8a6a8818483c50f55616452069eca3f26a8293a6e37a8179ce8b774b5283",
+      "file": "accounts/pump_2026_10_13/pump_wsol_pool_buckets_lp_mint.bin",
+      "decoded": {
+        "program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "supply": 0,
+        "decimals": 9,
+        "mint_authority": "ERtQ5UhnSHJWb8exNA1BYumVnr27huYRhx3Ni2NFh88S",
+        "freeze_authority": null,
+        "extension_types": []
+      }
+    },
+    {
+      "name": "pump_wsol_pool_buckets_pool_authority",
+      "group": "pump_state_2026_10_13",
+      "role": "wsol_pool_buckets",
+      "purpose": "pump PDA [\"pool-authority\", mint] (the pool's creator)",
+      "address": "DbVqBqN7VEfvebrS9p51wyrq8uc9fqpe9QQKVgfYpkHD",
+      "slot": 456395752,
+      "absent": true
+    },
+    {
+      "name": "pump_wsol_pool_buckets_boost_vault",
+      "group": "pump_state_2026_10_13",
+      "role": "wsol_pool_buckets",
+      "purpose": "PumpSwap PDA [\"boost_vault\", pool]",
+      "address": "9A7EJBn3tNT8ggXKkAewx336pFxU85QbiD9BDjUSGUbe",
+      "slot": 456395752,
+      "absent": true
+    },
+    {
+      "name": "pump_wsol_pool_buckets_boost_vault_ata",
+      "group": "pump_state_2026_10_13",
+      "role": "wsol_pool_buckets",
+      "purpose": "the boost vault's WSOL ATA (absent once the boost has run)",
+      "address": "7MfqBTvN4c9tBuiXeCMsfAJRMUtQRVBWH6FoEqHBUmo8",
+      "slot": 456395752,
+      "absent": true
+    },
+    {
+      "name": "pump_wsol_pool_buckets_coin_creator_vault_authority",
+      "group": "pump_state_2026_10_13",
+      "role": "wsol_pool_buckets",
+      "purpose": "PumpSwap PDA [\"creator_vault\", pool.coin_creator]",
+      "address": "4rXnVKJD1fkVpivbCun852aMfuZcMjuWzpn9tkKTZX2c",
+      "slot": 456395752,
+      "absent": true
+    },
+    {
+      "name": "pump_wsol_pool_buckets_coin_creator_vault_ata",
+      "group": "pump_state_2026_10_13",
+      "role": "wsol_pool_buckets",
+      "purpose": "its WSOL ATA (T11)",
+      "address": "GrCaznUL4Sk9Mv2jYgrsma78b2kV7VEYhN9m3XAd9rxq",
+      "slot": 456395752,
+      "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "lamports": 2172222979,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 165,
+      "sha256": "792a43fd8aa3559f04ead9a9cd245ad7bac35c1dcfb624efa560cf79059bd4c4",
+      "file": "accounts/pump_2026_10_13/pump_wsol_pool_buckets_coin_creator_vault_ata.bin",
+      "decoded": {
+        "mint": "So11111111111111111111111111111111111111112",
+        "owner": "4rXnVKJD1fkVpivbCun852aMfuZcMjuWzpn9tkKTZX2c",
+        "amount": 2170734539,
+        "delegate": null,
+        "state": 1,
+        "is_native": 1488440
+      }
     }
   ],
   "snapshots": [
@@ -6612,6 +8680,40 @@
       "fetched_at": "2026-10-03T14:51:46Z",
       "rpc": "https://api.mainnet-beta.solana.com",
       "method": "getAccountInfo (base64) of each program and ProgramData account; `solana program dump -um <program> out.so` gives the same ELF bytes followed by the zero padding"
+    },
+    {
+      "group": "pump_programs_2026_10_13",
+      "slot": 456395404,
+      "fetched_at": "2026-10-13T09:38:17Z",
+      "rpc": "https://api.mainnet-beta.solana.com",
+      "method": "getAccountInfo (base64) of each program and ProgramData account; `solana program dump -um <program> out.so` gives the same ELF bytes followed by the zero padding"
+    },
+    {
+      "group": "pump_state_2026_10_13",
+      "slot": 456395752,
+      "block_time": 1791884359,
+      "block_time_utc": "2026-10-13T09:39:19Z",
+      "fetched_at": "2026-10-13T09:39:28Z",
+      "rpc": "https://api.mainnet-beta.solana.com",
+      "method": "one getMultipleAccounts call (base64) over every account below (absent ones recorded as such), so all of them are the mainnet state at `slot`; a first call read Global, GlobalConfig, the mints, curves and canonical pools (a second the quote mints of curves not quoted in SOL) to derive the rest",
+      "coins": {
+        "near166": "CZN9Ysi89cAvnkuR2cNCM5t32BNHNdnXTJ5HPd4Npump",
+        "fresh166": "8aUT1att91Rjurcvm4z8xu1yjUuEazRVux4eSq2gpump",
+        "buckets166": "FfEVFW3nZspBefEDKk1Un5UJyBiB9oCpoRJ5ffA9pump",
+        "grow141": "E414Tuyx8D6UnwgU16XeKDQyHF6UfL4o6NFuGocNpump",
+        "grow151": "3VBb7Ej86VxKVJEBSpRKsNe7gVTo9tRZza4yqpYVpump",
+        "synthetic_stuck": "9kTYjcB2KhTNF3MjWjp4vgeCEjNiEojDEc8et1zRqigJ",
+        "graduated_synthetic": "98u8RJzuhezFwkCFVdSe1bPoQ6e2DdRG79kQ19vkpump",
+        "cashback166": "4eegvKYhyJ2Uq6moore2f21JrDponqYdqBfrfG9Rpump",
+        "mayhem166": "8GoErkdxCRuscAYHbpGhLFVZQkG4tekiAwUW5F21pump",
+        "wsol_pool_buckets": "GbMfpnmsavwc5uHCqhbuFrSLdtggJiAxub7UKQ2hpump"
+      },
+      "versus_pump_state": {
+        "pump_global_1088": "pump_global's 1,087 bytes (pump_state, slot 451,675,432) followed by 01",
+        "pump_fee_config_2026_10_13": "equal to pump_fee_config (pump_state, slot 451,675,432)",
+        "pump_pamm_global_config_2026_10_13": "equal to pamm_global_config (pump_state, slot 451,675,432)",
+        "pump_pamm_fee_config_2026_10_13": "equal to pamm_fee_config (pump_state, slot 451,675,432)"
+      }
     }
   ]
 }
