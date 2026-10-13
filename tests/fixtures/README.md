@@ -21,7 +21,9 @@ how the harness loads them.
 | `pamm_state`, `pamm_synthetic` | `accounts/pamm/*` | PumpSwap pools (M6). The synthetic group is derived offline |
 | `raydium_cpmm_2026_10` (M10) | `programs/raydium_cpmm_2026_10.so`, `accounts/raydium_cpmm_2026_10/*` | CPMM **as redeployed at 452,376,460**. This group holds the ELF only. The pools and configs stay `raydium_state`'s, because the redeploy kept their layouts (AmmConfig 236 B, PoolState 637 B) and the 21 live configs still equal the fixture bytes. Every CPMM test loads this build |
 | `spl_programs` (M10) | `programs/token_2022.so`, `accounts/spl/*`, `programs/spl_memo_v3.so` | the deployed Token-2022 (upgradeable, a verified build) and spl-memo v3 (BPFLoader2, where the account data *is* the ELF) |
-| `pump_programs_2026_10` (M10) | `programs/pump{,_fees,_amm}_2026_10.so`, `accounts/pump_2026_10/*` | pump, pump-fees and PumpSwap **as redeployed on 2026-10-02**. ELFs only: the state stays `pump_state`'s and `pamm_state`'s, because the redeploy only appends fee buckets (`BondingCurve` @125/@133, `Pool` @271/@279) and pump `Global`, both `FeeConfig`s, `GlobalConfig` and the volume accumulators still equal the fixture bytes on mainnet (slot 452,964,363). Every curve and PumpSwap test loads this group |
+| `pump_programs_2026_10` (M10) | `programs/pump{,_fees,_amm}_2026_10.so`, `accounts/pump_2026_10/*` | pump, pump-fees and PumpSwap **as redeployed on 2026-10-02**. ELFs only: the state stays `pump_state`'s and `pamm_state`'s, because the redeploy only appends fee buckets (`BondingCurve` @125/@133, `Pool` @271/@279) and pump `Global`, both `FeeConfig`s, `GlobalConfig` and the volume accumulators still equal the fixture bytes on mainnet (slot 452,964,363). T-LATCH's "before" since the 2026-10-13 re-pin |
+| `pump_programs_2026_10_13` | `programs/pump_2026_10_08.so`, `programs/pump_amm_2026_10_08.so`, `programs/pump_fees_2026_10_12.so`, `accounts/pump_2026_10_13/*_program*.bin` | pump and PumpSwap **as redeployed on 2026-10-08** and pump-fees **as redeployed on 2026-10-12** (the 2026-10-13 re-pin; dumped at slot 456,395,404). Every curve and PumpSwap test loads this group |
+| `pump_state_2026_10_13` | `accounts/pump_2026_10_13/*` | the state those builds introduced, one snapshot (slot 456,395,752): pump's 1,088-byte `Global` (`pump_state`'s 1,087 bytes, then `max_curve_depth` = 1), pump's `FeeConfig`, PumpSwap's `GlobalConfig` and `FeeConfig` (byte-identical to `pump_state`'s), and ten coin roles: 166-byte curves (`near166`, `fresh166`, `buckets166`), dormant 141- and 151-byte curves (`grow141`, `grow151`), a complete unmigrated synthetic completion of depth 1 (`synthetic_stuck`), a migrated one with its pool (`graduated_synthetic`, 98u8RJ), a cashback and a mayhem 166-byte curve, a WSOL pool carrying fee buckets (`wsol_pool_buckets`). An address both state groups hold resolves to this group |
 | `squads_programs` (M10) | `programs/squads_v4.so`, `accounts/squads/*`, `idl/squads_multisig_program.json` | Squads v4 (immutable), its `ProgramConfig` and the IDL 2.1.0 vendored from `Squads-Protocol/v4@64af733` |
 
 Program groups are stored as `header ‖ ELF`. The mainnet ProgramData account is `header ‖ ELF ‖
@@ -39,6 +41,9 @@ The M10 groups are pinned in the script:
 | pump `6EF8rrec…` | 452,654,932 (authority `7gZufwwA…`) | `b0b777c6…0c75` | UNVERIFIED: no public source; the release of `pump-rust-client` 0.2.0's unreleased artifacts (below) |
 | PumpSwap `pAMMBay6…` | 452,654,882 (authority `7gZufwwA…`) | `01557035…3cc3` | the same |
 | pump-fees `pfeeUxB6…` | 452,655,002 (authority `7gZufwwA…`) | `f166c296…62fd` | the same |
+| pump `6EF8rrec…` | 454,596,459 (authority `7gZufwwA…`) | `6956c2f8…bf6f` | UNVERIFIED: the interface of pump-public-docs `2293f9a6` / `pump-rust-client` 0.4.0 |
+| PumpSwap `pAMMBay6…` | 454,596,406 (authority `7gZufwwA…`) | `3ffd5e3b…2ee1` | the same |
+| pump-fees `pfeeUxB6…` | 456,132,171 (authority `7gZufwwA…`) | `8ad2ca93…b8b8` | UNVERIFIED: 0.4.0's `pump_fees.so` (853,528 B) is not this build; its `withdraw` is in no IDL (below); the 2026-10-08 build it replaced (454,596,501) can no longer be fetched |
 
 A fetch that reads anything other than these pins stops before it writes a file. The script
 stages every file and writes them, `manifest.json` and `SHA256SUMS` only after every group it
@@ -55,12 +60,15 @@ fetched has passed its checks.
   `venuePrograms()`).
 - Every `Env` runs on the mainnet SPL ELFs (WP-3).
 - WP-7 uses `squads_programs`.
-- Every curve and PumpSwap test, bench and fuzz profile runs on `pump_programs_2026_10` (the M10
-  pump revalidation). `fork.rs` keeps loading `pump_programs` too and picks a build by name
-  (`PumpDeploy::Oct2026`, the default `PumpDeploy::CURRENT`, or `PumpDeploy::Sep2026`); an
-  address lookup resolves to the redeploy, and `fork::FIXTURE_GUARD_SLOTS` carries its three
-  deploy slots (= `VENUE_GUARD_SLOTS_2026_10_03`, the newest baseline). The web e2e validator
-  deploys the same builds.
+- Every curve and PumpSwap test, bench and fuzz profile runs on `pump_programs_2026_10_13` (the
+  2026-10-13 re-pin). `fork.rs` keeps loading `pump_programs` and `pump_programs_2026_10` too and
+  picks a build by name (`PumpDeploy::Oct2026Synth`, the default `PumpDeploy::CURRENT`;
+  `PumpDeploy::Oct2026`; `PumpDeploy::Sep2026`); an address lookup resolves to the latest
+  redeploy, and `fork::FIXTURE_GUARD_SLOTS` carries its three deploy slots (=
+  `VENUE_GUARD_SLOTS_2026_10_13`, the newest baseline). `Env::pump_build_running` tells the
+  three builds apart by the instructions each added (pump `buy_v3`, then `multi_hop_curve_swap`;
+  PumpSwap `buy_v2`, then `multi_hop_swap`; pump-fees `withdraw`). The coin roles of both state
+  groups load with their own snapshot's clock. The web e2e validator deploys the same builds.
 
 `raydium_programs` stays for T-LATCH. It is the deploy that `VENUE_GUARD_SLOTS_2026_09_27` names.
 `latch_raydium_it`'s `the_2026_10_cpmm_redeploy_latches_until_revalidated` starts from it and
@@ -164,6 +172,75 @@ What the release does (on the dumped ELFs, `pamm_it::buckets`, `pump_it::buckets
   141-byte curves; 165,688 WSOL pools of 301 and 48 of 287 bytes), but the buckets are live on
   venues short.win does not list: 904 non-SOL-quote curves of 151 bytes, 627 of 141 bytes
   and 265 non-WSOL pools of 301 bytes hold non-zero buckets.
+
+## pump 2026-10-08 and pump-fees 2026-10-12 redeploys: what the re-pin measured (gate G0)
+
+`check --live` at slot 456,392,667 (2026-10-13) found pump, PumpSwap and pump-fees redeployed
+again (454,596,459 / 454,596,406 / 456,132,171) and Jupiter at 454,465,850; after the two
+groups above and `VENUE_GUARD_SLOTS_2026_10_13` it is clean (slot 456,395,860). On the dumped
+ELFs, with short.win's adapter unchanged:
+
+- **v2 (short.win's legs today), T-PUMP-MATH:** every cost, proceeds and error code as before. A
+  curve shorter than **166** bytes grows to 166 on its next v2 or v3 trade, its rent reserve
+  topped up by the user (76,200 lamports from 151 B; 261,600 on the 49-byte legacy curve, whose
+  reserve is the old rent): out of `S` on short.win's sale, one System transfer more in that
+  leg's trace (`trace_pump_it`: an open 19 entries with the creator-vault top-up). pump counts
+  the reserve as `lamports − rQ −` the fee buckets: on a 141- and a 151-byte curve with
+  planted buckets (20,000 + 30,000) a v2 and a v3 buy each topped up 127,000 / 76,200, the
+  full shortfall (`a_bucketed_short_curve_grows_with_its_reserve_net_of_the_buckets`;
+  `fork::curve_growth_top_up` is the harness's one model of it, the I13 hook's included).
+- **v3 (`pump_math_it::v3_*`, T-PUMP-MATH-V3):** a buy's input is `⌊q·vQ/(vT − q)⌋ + 1` — `⌈⌉`
+  off an exact division; on all 400 exact divisions constructed pump took `⌊⌋ + 1`, the v2
+  charge —, a sale's `⌊⌋`, each fee `⌈⌉` per component; the buyback is paid out and the rest of
+  the fees stays in the buckets outside `rQ`; `vQ − rQ` is unchanged. Events carry `ix_name`
+  `buy` / `sell` / `buy_exact_quote_in` and the zero `fee_recipient`; a coin without a creator
+  pays no creator fee though its event names the tier's bps.
+- **Synthetic migration:** `buy_v3(rT + δ)` buys `rT` on the curve, then `δ` from the would-be
+  pool `(X_s, Y_s)` = (the live `curve_base_ata − rT`, donations counted; `rQ + n₁ − fee`) at
+  `⌈Y_s·δ/(X_s − δ)⌉` (`⌈⌉` on an exact division), both parts at the curve's fee tier at its
+  pre-trade market cap (`⌊vQ·supply/vT⌋`, the live supply). The tier tripwire (e) shows it: a
+  synthetic `FeeConfig` gives each market cap a part could be rated at (the curve before the
+  trade and at completion, the would-be pool before and after the pool part, the curve before
+  at the fixed 10¹⁵ supply) a tier of its own, with a bottom and a top tier holding none and
+  the stable tiers, `flat_fees` and `exotic_flat_fees` bps of their own; on `near166` both
+  parts named the tier of the curve's pre-trade market cap at the live supply alone (80 / 25
+  bps), and the user paid exactly that charge (45,906,126,201). `B̂_v3` with that schedule on
+  both legs covers it by 4 lamports (bound 7). short.win's `φ` (`fees::pump_curve`) rates the
+  same pre-trade curve at the fixed 10¹⁵ supply, which on this burned coin is another tier (70
+  / 22 bps), and `B̂_v3` at it is 59,057,853 lamports under the charge. So a multi-tier curve
+  `FeeConfig` together with a burned supply makes `B̂_v3` undercut pump's charge, and an exit
+  fails 6002: the M5 live-supply deviation
+  (`tripwire_the_curve_tier_market_cap_uses_the_live_mint_supply`) reaches the synthetic leg
+  too. The live curve `FeeConfig` is one flat tier, so no quote differs today; (e) pins it as a
+  tripwire that flips when the math resolves the tier at the live supply.
+- **Synthetic migration, events and pool:** `TradeEvent`, `CompleteEvent`,
+  `PostCompleteBuyEvent`; `post_complete_base_out` = δ, `post_complete_quote_in` = the pool
+  part, `rQ` without it, `vQ − rQ = ivqr`. `buy_exact_quote_in_v3` past `rT` spends the rest by
+  the v2 exact-quote-in rule and takes `⌊(in − 1)·X_s/(Y_s + in − 1)⌋`. `migrate_v2` then
+  creates the effective reserves `(X₁, Y₁)` = (the live `curve_base_ata`, `rQ + pcQ − fee`),
+  with a donation before or after the completion. Its boost is `VQR = ⌊X₁·Y₁/10¹⁵⌋`; the
+  spec's `⌊(Y − pcQ)·2069/10⁴⌋` holds only while no token was donated (a 3e12 donation after
+  the completion: 17,852,426,396 against 17,584,506,040; `vault + VQR = Y₁` either way). On a
+  cashback coin `buy_v3`, `buy_exact_quote_in_v3` and `sell_v3` each fail 6094; the 2026-10-02
+  build reverts a buy past `rT` (6021).
+- **pump-fees inside short.win's PumpSwap legs (`pamm_it::v3_era`, T-PFEE-CPI):** one
+  `get_fees` / `get_fees_with_quote_mint` per sale and per buy, on `[PumpSwap's FeeConfig,
+  PumpSwap]`, read-only; never `withdraw`, no short.win account.
+- **pump-fees `withdraw` (R-PFEE, from the ELF: `pamm_it::v3_era::r_pfee_withdraw_probe`):**
+  accounts `user` (signer, writable), `referral_vault` (a system account at PDA(pump-fees,
+  `["referral-vault", user]`), writable), `quote_mint`, `vault_ata` (writable, token authority
+  `referral_vault`), `user_ata` (writable, token authority `user`), `token_program`,
+  `system_program`, `event_authority`, `program`; `user_ata` must be `user`'s (2015 on another
+  owner's ATA). It moves the vault ATA's whole balance to `user_ata` (6036 `NothingToWithdraw`
+  when empty); the vault PDA's lamports and `user`'s stay. Its writable accounts are `user`,
+  the vault PDA derived from it, that PDA's ATA and an ATA `user` owns: never a `FeeConfig`, a
+  pool or a curve. A short.win account could be among them only if a program short.win invokes
+  forwarded the trader PDA's signature into `withdraw` as `user` (a signer stays one in nested
+  CPIs). T-PFEE-CPI shows the 2026-10-08 PumpSwap does not: it calls only `get_fees` /
+  `get_fees_with_quote_mint`, read-only. Were one to, `withdraw` could only credit the trader
+  PDA's own ATA from its own referral vault. So R-PFEE's stop rule does not trigger on these
+  builds; pinning pump-fees' 2026-10-12 build on mainnet (`initialize_config`, or Emergency's
+  `revalidate_venue`) stays the owner's step.
 
 ## Commands
 
