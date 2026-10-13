@@ -212,8 +212,11 @@ describe('M9-UX-2: lenders are told the O19 residuals that fall on them', () => 
         expect(text).toMatch(/sets nothing aside for the lenders/);
         expect(text).toMatch(/penalty/);
         expect(text).toMatch(/\brent\b/);
-        expect(text).toContain('2.06 SOL');
-        expect(text).toContain('8.02 SOL');
+        // FE-31 (owner, 2026-10-13): the held model under AIR-22's lower-median growth
+        // (sandwich.out, Tier A, no reserve: fresh +3.340, aged 25 d at 90 % +4.543).
+        expect(text).toContain('3.34 SOL');
+        expect(text).toContain('4.54 SOL');
+        expect(text).not.toMatch(/2\.06 SOL|8\.02 SOL/);
     });
     it('Raydium pool pinning and the notional-cap exceedance, in a lender’s framing', () => {
         expect(text).toMatch(/thinner pool/);

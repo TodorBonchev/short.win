@@ -874,7 +874,7 @@ Checkbox: “I understand I give up my unvested income.”
 #### `lender.residuals` — Known limits (accepted by the protocol)
 
 *Severity:* info · *Acknowledgement:* none · *Source:* ARCH §8.5, §10 O19 (OWNER-M7-11, R4B-10); ECON §8.2, §9.3, §9.5 (KI-65, KI65-REV-SEC1), §12.9–§12.11
-*Shown:* Lend → Deposit (collapsed `<details>`), FAQ link. *v1.2 (M9-UX-2):* the three O19 residuals that fall on lenders — the liquidation that reserves nothing (ARCH §8.5's Tier A figures), Raydium pool pinning by a standing minimum position (R4B-10), the notional-cap exceedance of M7-SEC-4 in a lender's framing — were missing and are added. *M10 (owner decision of 2026-10-07, seventh round: approved):* the last paragraph, KI-65's conversion-order residual after a rebase (known-issues KI-65)
+*Shown:* Lend → Deposit (collapsed `<details>`), FAQ link. *v1.2 (M9-UX-2):* the three O19 residuals that fall on lenders — the liquidation that reserves nothing (ARCH §8.5's Tier A figures), Raydium pool pinning by a standing minimum position (R4B-10), the notional-cap exceedance of M7-SEC-4 in a lender's framing — were missing and are added. *M10 (owner decision of 2026-10-07, seventh round: approved):* the last paragraph, KI-65's conversion-order residual after a rebase (known-issues KI-65). *FE-31 (approved by the owner on 2026-10-13):* the liquidation paragraph's Tier A figures are the held model's under AIR-22's lower-median growth (ECON §8.2, §12.6; `sim/out/attacks/sandwich.out`, no reserve: fresh +3.340, aged 25 d at 90 % +4.543 SOL; before AIR-22 2.06 / 8.02 SOL)
 
 > If lenders withdraw ahead of a loss, those who leave first can take more than their fair share and those who stay less: about 4% of value at 90% utilisation, up to about 11% at 50–60%.
 >
@@ -886,7 +886,7 @@ Checkbox: “I understand I give up my unvested income.”
 >
 > Small positions depend on short.win’s own keeper. A liquidating keeper is paid at least the SOL-settlement keeper reward.
 >
-> A liquidation sets nothing aside for the lenders: when buying the tokens back uses up the position’s vault, the lenders and the protocol lose the penalty and, on a position open for a long time, the rent the vault no longer covers. In the protocol’s Tier A model this is about 2.06 SOL on a fresh position and about 8.02 SOL on one open for 25 days at 90% utilisation.
+> A liquidation sets nothing aside for the lenders: when buying the tokens back uses up the position’s vault, the lenders and the protocol lose the penalty and, on a position open for a long time, the rent the vault no longer covers. In the protocol’s Tier A model this is about 3.34 SOL on a fresh position and about 4.54 SOL on one open for 25 days at 90% utilisation.
 >
 > A minimum-size position held open can stop a Raydium market from moving to a deeper pool, so the market can stay on a thinner pool than it could use. The emergency multisig can pause new shorts to clear it.
 >
@@ -2891,9 +2891,9 @@ edits `disclosures.ts` (copy changes need the owner) or `errors.ts`.
 | FE-28 | `lender.risks` (§4.2) lists the one-off income that vests but not "rent paid above what accrued, such as the minimum rent of an early exit", which vests since M10-8C-1 (ECON §9.4; the Claim form's note already says it). The copy lives in `disclosures.ts` and this document together (`disclosures.test.ts` pins them verbatim), so both change in one commit | open (copy) |
 | FE-29 | `/.well-known/security.txt`'s `Expires` (2027-09-30) must be rotated before 2027-08-31: a mainnet build and `check:headers` refuse 30 days or less ahead | open (operations) |
 | FE-30 | The claim-time pot syncs (KI66-R4, §3.6): the size check compiles without lookup tables (an upper bound: a v0 wallet with the protocol ALT could carry a sync more), and a sync is dropped only when the claim's own pre-review simulation fails on it — a target that closes or changes between that simulation and a stale review's re-simulation at Sign fails the review with `AccountNotInitialized` (3012), or `AccountOwnedByWrongProgram` (3007) on the `lender` account once someone funded the closed address, both of which the review's Retry rebuilds (`tx/errors.ts`; the rebuild leaves the closed target out, or refuses a claim of the claimant's own closed position). The judgement covered the indexer's first 24 lenders, largest raw share count first, so a large current lender could push an absent surplus holder out. *Ninth round (owner, 2026-10-08):* the lenders behind the share epoch (or with a forward chain) first, then the rest, paged further than 24 when needed, ranked by the simulated gain; 3007 mapped like 3012. *As built (the builder's choices under that decision, confirmed by the owner on 2026-10-09, tenth round, with the indexer's `max_page_limit` floor of 200):* the indexer's additive `epoch=behind` / `current` filter (INDEXER §9.2), 50 a page, paged further while the best ≤ 4 do not cover the shortfall, ≤ 4 pages (≤ 200 lenders; the bound's reason in §3.6); every row of either list is read whatever its epoch, so an indexer lagging or leading the RPC's share epoch only reorders the reads. What stays: a market with more than 200 lenders behind its share epoch is judged on the first 200 of them (largest raw share count first); the behind list's request counts toward the 4 pages even when it is empty or unfiltered, so a market with no lender behind its share epoch is judged on at most 150 current lenders, and an indexer without the filter spends the pages on its whole list in raw share order; an indexer that has not ingested a rebase lists the newly behind lenders among its current ones; and a sync that moved a surplus leaves its lender listed as behind, so a later claim re-reads it at no gain | closed (owner, 2026-10-08; the filter, the bound and the page-limit floor confirmed 2026-10-09) |
-| FE-31 | `lender.residuals` (§4.2) quotes the held-model loss to lenders and the protocol from before AIR-22 ("about 2.06 SOL on a fresh position and about 8.02 SOL on one open for 25 days"); under AIR-22's lower-median growth the sim gives about 3.34 and 4.54 SOL (ECON §8.2, §12.6; known-issues KI-03). The copy lives in `disclosures.ts` and this document together (`disclosures.test.ts`; `m9-review/ux.test.tsx` pins the two figures) and a copy change needs the owner (§12.2), so the three change in one commit once the owner approves the new figures | open (owner: copy) |
+| FE-31 | `lender.residuals` (§4.2) quotes the held-model loss to lenders and the protocol from before AIR-22 ("about 2.06 SOL on a fresh position and about 8.02 SOL on one open for 25 days"); under AIR-22's lower-median growth the sim gives about 3.34 and 4.54 SOL (ECON §8.2, §12.6; known-issues KI-03). The copy lives in `disclosures.ts` and this document together (`disclosures.test.ts`; `m9-review/ux.test.tsx` pins the two figures) and a copy change needs the owner (§12.2), so the three change in one commit once the owner approves the new figures. *Approved by the owner on 2026-10-13:* the paragraph now reads "about 3.34 SOL on a fresh position and about 4.54 SOL on one open for 25 days at 90% utilisation" in `disclosures.ts` and §4.2, and `ux.test.tsx` pins the new figures and that the old ones are gone | closed (owner, 2026-10-13) |
 
-### AI review follow-ups (2026-10-12; no approved text changed)
+### AI review follow-ups (2026-10-12/13; one approved text changed, FE-31, with the owner's approval)
 
 The web side of the AI review's fixes (`docs/audit/ai-review/`; `3f224c2` … `abce2b1`):
 
@@ -2921,7 +2921,10 @@ The web side of the AI review's fixes (`docs/audit/ai-review/`; `3f224c2` … `a
   takes it (`rent::lender_credit_carried`), so the pending credit is the prologue's to the
   lamport (it could read 1 lamport low; §3.6; `previews.test.ts`, the facade's `smoke.cjs`).
 - CI (`33491a3`): the `web` job runs the facade's Node smoke test (§10.4).
-- Open: FE-31.
+- FE-31 (approved by the owner on 2026-10-13): the one approved text these follow-ups change.
+  `lender.residuals`' liquidation paragraph quotes the held model's Tier A figures under
+  AIR-22's lower-median growth, about 3.34 SOL fresh and 4.54 SOL aged (were 2.06 / 8.02;
+  §4.2, §13 FE-31).
 
 ### Thirteenth round (v1.4 → v1.5)
 
