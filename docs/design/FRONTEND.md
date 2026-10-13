@@ -22,7 +22,7 @@ tests:
 |---|---|---|---|
 | Disclosure copy | `src/config/disclosures.ts` | every disclosure's id, title, body, acknowledgement text (§4) | `disclosures.test.ts` (SPEC §5.3 verbatim; every paragraph present in §4 of this file) |
 | `data-testid` contract | `src/config/testids.ts` | every test id and prefix (§11) | `testids.test.ts` (unique; every id present in §11) |
-| Program error messages | `src/config/errors.ts` | a human message and an action for each code 6000–6105 (§5.9) | `errors.test.ts` (against `@shortwin/client`'s constants) |
+| Program error messages | `src/config/errors.ts` | a human message and an action for each code 6000–6108 (§5.9) | `errors.test.ts` (against `@shortwin/client`'s constants) |
 | Pinned program ids | `src/config/programs.ts` | the programs a transaction may invoke (§9.1) | `programs.test.ts` (against `constants.rs`, the client, `complete_curve`) |
 | Route tree | `src/router.tsx` | paths, typed search parameters, page components and their props (§3.2) | `router.test.tsx` (every route renders in the shell) |
 | Transaction pipeline | `src/tx/types.ts`, `useTxFlow.ts`, `TxReviewModal.tsx` | `TxPlan`, the stages, the review (§5) | `tx/*.test.ts` |
@@ -417,11 +417,20 @@ below).
   the "You may be repaid in SOL" acknowledgement → the sticky submit. The texts are verbatim: only
   their place moved (v1.4 had the acknowledgement above the amount and the risks below the submit). A source with CPI Guard
   shows `token.cpiGuard` (`lendCpiGuardNotice`, plain deposit disabled) and the opt-in bracket
-  (`lendCpiGuardBracket`, FE-1). `deposit(amount, min_shares)`; `WipeSweepPending` → prepend the
-  permissionless sweep bundle (ARCH §3.3, §3.9: `sweep_trader`, on pump venues pump's
-  `claim_cashback` first when the UVA holds cashback, on PumpSwap pAMM `init_user_volume_accumulator`
-  when missing); a lender behind on epochs gets `ShareEpoch` remaining accounts
-  (`getShareEpochAccountMetas`) or `sync_lender` first.
+  (`lendCpiGuardBracket`, FE-1). `deposit(amount, min_shares)`; `WipeSweepPending` (*AIR-08,
+  `2bda5f5`:* whenever `S = 0` with a sweep bit clear — after a full wipe or after the last
+  lender's exit, which clears both bits) → prepend the permissionless sweep bundle (ARCH §3.3,
+  §3.9: `sweep_trader`, on pump venues pump's `claim_cashback` first when the UVA holds cashback,
+  on PumpSwap pAMM `init_user_volume_accumulator` when missing; *AIR-05, `975f757`:* wherever the
+  market's `pump_uva` is set, also on a curve market that left pump, pump's `claim_cashback`
+  first and `sweep_trader` with the trader's pump UVA alone as its token leg). After the last
+  lender's exit that sweep passes no wipe record and books the trader's SOL to the protocol
+  (KI-10); the sweep notice says which (`lend-sweep-notice` `data-kind`), and the review title
+  names the step "sweep after the last exit", or "post-wipe sweep" after a wipe. *AIR-07:* a
+  deposit into a drained pool is refused `PoolDrained` (6108, action `wait`: at most 1/1,000 of
+  the pool's tokens unborrowed; `3c0f602`), and the WASM deposit preview refuses it the same way
+  (`MATH_ERRORS`, `3f224c2`). A lender behind on epochs
+  gets `ShareEpoch` remaining accounts (`getShareEpochAccountMetas`) or `sync_lender` first.
 - **Withdraw:** shares (or %), Max = the pro-rata allowance (`previewAllowance`), preview tokens and
   SOL (`previewWithdraw`), lock and `lock_until` after the withdrawal (`previewLock`,
   `previewLockUntil`), destination account (ATA created idempotently if missing; memo flag →
@@ -1681,7 +1690,7 @@ byte 2 at 165, TLV from 166): `CpiGuard` (extension 11, `lock_cpi`) and `MemoTra
 
 | Source | Mapping |
 |---|---|
-| `{ InstructionError: [i, { Custom: n }] }`, n ∈ 6000–6105 (*M10:* 6105 `AuthoritiesNotDistinct`, action `admin`), failing program short.win (from the logs' **first** "Program … failed": the innermost failing program logs first and every caller up the CPI stack repeats the code after it; v1.0 said "last", which attributed a CPI'd Token-2022 error to short.win — fixed at integration) | `config/errors.ts`: name, message, action (`retry`, `adjust`, `wait`, `blocked`, `report`, `admin`) |
+| `{ InstructionError: [i, { Custom: n }] }`, n ∈ 6000–6108 (*M10:* 6105 `AuthoritiesNotDistinct`, action `admin`; 6106 `EpochRecordReadOnly`, `retry`; 6107 `RebaseNeedsOwner`, `blocked`; *AIR-07:* 6108 `PoolDrained`, `wait`; *AIR-08:* 6084 `WipeSweepPending`'s message also covers a pool every lender left), failing program short.win (from the logs' **first** "Program … failed": the innermost failing program logs first and every caller up the CPI stack repeats the code after it; v1.0 said "last", which attributed a CPI'd Token-2022 error to short.win — fixed at integration) | `config/errors.ts`: name, message, action (`retry`, `adjust`, `wait`, `blocked`, `report`, `admin`) |
 | same, failing program Token / Token-2022 | 1 insufficient tokens, 4 owner mismatch, 17 frozen, 36 memo required, 42 CPI Guard |
 | `InstructionError` built-ins | `InsufficientFunds`, `ComputationalBudgetExceeded`, others → `report` |
 | transaction-level | `InsufficientFundsForFee`, `InsufficientFundsForRent`, `AccountNotFound`, `BlockhashNotFound`, `AccountInUse`, block / account cost limits, `ProgramAccountNotFound` |
@@ -2708,7 +2717,7 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `lend-blocked-reason` | `T.lendBlocked` | why a lend action is refused now; `data-code` = the program error name (e.g. MintUnsafeFlagged, LenderBehindEpochs, NegativePending) |
 | `lend-position-<…>` | `T.lendPosition` | the panel's position summary; `<field>` ∈ shares, share-bps, value, claimable, lock; `data-value` raw |
 | `lend-slippage-input` | `T.lendSlippageInput` | tolerance in % for `min_shares` / `min_tokens` (default 0.5, FE-D6) |
-| `lend-sweep-notice` | `T.lendSweepNotice` | the post-wipe sweep bundle will be prepended to the deposit |
+| `lend-sweep-notice` | `T.lendSweepNotice` | the post-wipe sweep bundle will be prepended to the deposit; `data-kind` ∈ wipe (after a full wipe), emptied (*AIR-08:* every lender left; the sweep books the trader's SOL to the protocol) |
 | `lend-sync-submit` | `T.lendSyncSubmit` | `sync_lender` of the own position when it is behind more share epochs than one transaction carries |
 | `withdraw-destination-select` | `T.withdrawDestination` | destination token account select (ATA first; a missing ATA is created idempotently); `data-memo` true/false |
 | `withdraw-percent-<…>` | `T.withdrawPercent` | `<pct>` ∈ 25, 50, 75 (*M10-RESP*: 75 added; a chip, `aria-pressed` while the input holds that share): fills that share of the holding |
@@ -2873,6 +2882,23 @@ edits `disclosures.ts` (copy changes need the owner) or `errors.ts`.
 | FE-28 | `lender.risks` (§4.2) lists the one-off income that vests but not "rent paid above what accrued, such as the minimum rent of an early exit", which vests since M10-8C-1 (ECON §9.4; the Claim form's note already says it). The copy lives in `disclosures.ts` and this document together (`disclosures.test.ts` pins them verbatim), so both change in one commit | open (copy) |
 | FE-29 | `/.well-known/security.txt`'s `Expires` (2027-09-30) must be rotated before 2027-08-31: a mainnet build and `check:headers` refuse 30 days or less ahead | open (operations) |
 | FE-30 | The claim-time pot syncs (KI66-R4, §3.6): the size check compiles without lookup tables (an upper bound: a v0 wallet with the protocol ALT could carry a sync more), and a sync is dropped only when the claim's own pre-review simulation fails on it — a target that closes or changes between that simulation and a stale review's re-simulation at Sign fails the review with `AccountNotInitialized` (3012), or `AccountOwnedByWrongProgram` (3007) on the `lender` account once someone funded the closed address, both of which the review's Retry rebuilds (`tx/errors.ts`; the rebuild leaves the closed target out, or refuses a claim of the claimant's own closed position). The judgement covered the indexer's first 24 lenders, largest raw share count first, so a large current lender could push an absent surplus holder out. *Ninth round (owner, 2026-10-08):* the lenders behind the share epoch (or with a forward chain) first, then the rest, paged further than 24 when needed, ranked by the simulated gain; 3007 mapped like 3012. *As built (the builder's choices under that decision, confirmed by the owner on 2026-10-09, tenth round, with the indexer's `max_page_limit` floor of 200):* the indexer's additive `epoch=behind` / `current` filter (INDEXER §9.2), 50 a page, paged further while the best ≤ 4 do not cover the shortfall, ≤ 4 pages (≤ 200 lenders; the bound's reason in §3.6); every row of either list is read whatever its epoch, so an indexer lagging or leading the RPC's share epoch only reorders the reads. What stays: a market with more than 200 lenders behind its share epoch is judged on the first 200 of them (largest raw share count first); the behind list's request counts toward the 4 pages even when it is empty or unfiltered, so a market with no lender behind its share epoch is judged on at most 150 current lenders, and an indexer without the filter spends the pages on its whole list in raw share order; an indexer that has not ingested a rebase lists the newly behind lenders among its current ones; and a sync that moved a surplus leaves its lender listed as behind, so a later claim re-reads it at no gain | closed (owner, 2026-10-08; the filter, the bound and the page-limit floor confirmed 2026-10-09) |
+| FE-31 | `lender.residuals` (§4.2) quotes the held-model loss to lenders and the protocol from before AIR-22 ("about 2.06 SOL on a fresh position and about 8.02 SOL on one open for 25 days"); under AIR-22's lower-median growth the sim gives about 3.34 and 4.54 SOL (ECON §8.2, §12.6; known-issues KI-03). The copy lives in `disclosures.ts` and this document together (`disclosures.test.ts`; `m9-review/ux.test.tsx` pins the two figures) and a copy change needs the owner (§12.2), so the three change in one commit once the owner approves the new figures | open (owner: copy) |
+
+### AI review follow-ups (2026-10-12; no approved text changed)
+
+The web side of the AI review's fixes (`docs/audit/ai-review/`; `3f224c2` … `abce2b1`):
+
+- AIR-07 (`3f224c2`, `3c0f602`): `PoolDrained` (6108, action `wait`) in `errors.ts` and in the
+  WASM previews' `MATH_ERRORS`; `errors.test.ts` now holds the table to the program's
+  `ShortwinError` enum, so it passes before and after the client regeneration; the lend vectors
+  regenerated on the fixed `pool_model` (84 cases, a `last_share_borrowed` state among them).
+- AIR-08 (`2bda5f5`): the sweep before a deposit whenever `S = 0`, the sweep notice's
+  `data-kind` and the review title "sweep after the last exit" (§3.6, §11).
+- AIR-05 (`975f757`): pump's `claim_cashback` and the pump-UVA token leg on any market whose
+  `pump_uva` is set (§3.6).
+- AIR-09 (`abce2b1`): the WASM `previewSettlement` prices the tokens at 0 on a venue that cannot
+  execute (its new `executable` argument has no caller yet); AIR-21's S1 vest was already in it.
+- Open: the generated client (`clients/js`) is not regenerated; FE-31.
 
 ### Thirteenth round (v1.4 → v1.5)
 
