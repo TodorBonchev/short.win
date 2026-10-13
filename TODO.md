@@ -4,8 +4,9 @@ The AI-review fixes (AIR-01 … AIR-24) are merged. Details, commits and tests f
 [`docs/audit/ai-review/README.md`](docs/audit/ai-review/README.md); design-doc wording is in
 [`docs/audit/ai-review/DOC-FOLLOWUPS.md`](docs/audit/ai-review/DOC-FOLLOWUPS.md).
 
-The follow-ups are done on the branch `air-followups` (2026-10-12/13; not pushed, so not through
-CI). Each ticked item names its commits; what is still open is under [What remains](#what-remains).
+The follow-ups are done on the branch `air-followups` (2026-10-12/13; pushed with `[skip ci]` at
+the owner's request, so not through CI). Each ticked item names its commits; what is still open
+is under [What remains](#what-remains).
 
 ## Decisions (owner)
 
@@ -82,42 +83,55 @@ the register's rows in `18b65e2`).
       hash for pump-fees, AMM v4, CPMM and Jupiter; request ≥ 0.6 M CU after an extension, or a
       limit sized by simulation (≈ 0.48 M estimated near the 10 MiB cap; KI-69 (e)). `f6e25be`;
       the CU ask raised from 0.5 M in `72103a5`, `eeee640`, `7a92078`.
-- [ ] Full CI run on the fixed code, new hashes in `docs/AUDIT.md` §0, a ≥ 24 h fuzz run
-      (AUDIT.md §12).
+- [ ] Full CI run on the fixed code and new hashes in `docs/AUDIT.md` §0 (the ≥ 24 h fuzz run of
+      AUDIT.md §12 is waived for this batch: approved by the owner 2026-10-13).
   - [x] A local run of every CI job that can run here, on the integrated branch (2026-10-13,
         `621f8e1`; AUDIT.md §10, the review's README "Local gate"). `11d359b`. The final
         review's fixes after it (`ed014ce`, `b1d86d4`, `33491a3`: the web, the WASM facade and
         CI only) ran CI's web job, the facade's tests and its smoke test (their commit messages).
   - [x] The build's hashes in AUDIT.md §0, marked as not verified (local `anchor build`; no
         verifiable build, no CI). `11d359b`
-  - [ ] CI on GitHub: it needs a push.
-  - [ ] A ≥ 24 h fuzz run: the owner did not ask for one on 2026-10-12.
+  - [ ] CI on GitHub: the branch is pushed with `[skip ci]` at the owner's request (2026-10-13),
+        so CI has not run.
+  - [x] A ≥ 24 h fuzz run: **waived** for the AI-review batch, not deferred (approved by the
+        owner 2026-10-13; the owner did not ask for one on 2026-10-12). No such run was made.
+        `255ce60`
 
 ## What remains
 
 Gathered from the follow-up tracks' reports and the integrated gate of 2026-10-13.
 
-**Owner**
-- [ ] SPEC §14 (fourteenth round) asks the owner to confirm three changes, drafted from the code
+**Owner** (all approved by the owner 2026-10-13)
+- [x] SPEC §14 (fourteenth round) asks the owner to confirm three changes, drafted from the code
       and the sims, not from an owner decision: AIR-21 changes the B2-2 decision (an S1 now vests
       its take above market value; a genuine S1 loss still vests only its rent top-up); AIR-09
       counts the tokens at 0 on a venue that cannot execute, so of an S3 there only `R_due` stays
       immediate (KI-24, accepted on the behaviour before it); and AIR-14 widens §2.6 residual 10,
       which O18 accepted on the `9aade3e` figures (a held drain now forces 181 levels instead of
-      69; known-issues KI-23, KI-52; AUDIT.md §7).
-- [ ] FE-31: approve the `lender.residuals` copy (≈ 3.34 SOL fresh, ≈ 4.54 SOL aged, from 2.06 /
+      69; known-issues KI-23, KI-52; AUDIT.md §7). **Approved by the owner 2026-10-13:** AIR-21
+      and AIR-09 confirmed, AIR-14's widening accepted; SPEC §14, known-issues, AUDIT.md §6/§7,
+      the review's README (decision 9), ECON and ARCH say so. `255ce60`
+- [x] FE-31: approve the `lender.residuals` copy (≈ 3.34 SOL fresh, ≈ 4.54 SOL aged, from 2.06 /
       8.02); then `apps/web/src/config/disclosures.ts`, `ux.test.tsx` and FRONTEND.md change
-      together.
-- [ ] "No 24 h fuzz run" (2026-10-12): if it waives the release evidence rather than only this
+      together. **Approved by the owner 2026-10-13;** the three changed together, the figures
+      checked against `sim/out/attacks/sandwich.out` (Tier A, no reserve: +3.340 / +4.543).
+      `43aa127` (the decision recorded in `255ce60`)
+- [x] "No 24 h fuzz run" (2026-10-12): if it waives the release evidence rather than only this
       stage, the "not yet through CI, a ≥ 24 h fuzz run or a fix review" qualifiers change
       together: known-issues' status definition and §7 lead-in, AUDIT.md's after-the-tag status
-      bullet and §6 "Fixed" bullet, and the review's README caveat.
-- [ ] The indexer embeds the IDL, so it can no longer decode the two-argument `revalidate_venue`
+      bullet and §6 "Fixed" bullet, and the review's README caveat. **Approved by the owner
+      2026-10-13: waived** for the AI-review batch (not deferred). The qualifiers now read "not
+      yet through CI or an external fix review", with the waiver dated; AUDIT.md §12 and
+      `findings.md` carry a dated note, their rule unchanged. `255ce60`
+- [x] The indexer embeds the IDL, so it can no longer decode the two-argument `revalidate_venue`
       of a build before AIR-01 (a backfill would quarantine it). This matters only if such a
-      build was ever deployed and its history must be indexed.
+      build was ever deployed and its history must be indexed. **Approved by the owner
+      2026-10-13:** accepted, no legacy decoder (INDEXER §3.6; the review's README decision 12).
+      `255ce60`
 
 **Release evidence (needs CI or tools not on the local machine)**
-- [ ] CI on GitHub, after a push. The jobs not run locally: `deny` (`cargo deny`, `cargo audit`;
+- [ ] CI on GitHub: the branch is pushed with `[skip ci]` at the owner's request (2026-10-13),
+      so CI has not run. The jobs not run locally: `deny` (`cargo deny`, `cargo audit`;
       no lockfile changed since v1.0.0), `verifiable-build` (Docker), `web-e2e` (Playwright on a
       validator), `indexer`'s PostgreSQL and validator tests.
 - [ ] `rpc_local` (manual, no CI job runs it): `SHORTWIN_RPC_URL=http://127.0.0.1:8899 cargo test
@@ -131,8 +145,9 @@ Gathered from the follow-up tracks' reports and the integrated gate of 2026-10-1
 - [ ] `scripts/mutants.sh` (CI's opt-in `mutants` job, nightly or `workflow_dispatch`): run on
       every earlier batch, not on the AI review's fixes (it builds into target directories of its
       own, which this machine's disk budget does not allow).
-- [ ] A ≥ 24 h fuzz run on the fixed program (AUDIT.md §12), and an external fix review
-      (`docs/audit/findings.md`).
+- [ ] An external fix review (`docs/audit/findings.md`).
+- [x] A ≥ 24 h fuzz run on the fixed program (AUDIT.md §12): **waived** for this batch
+      (approved by the owner 2026-10-13); no such run was made. `255ce60`
 - [ ] The PostgreSQL indexer tests on the migrated and re-recorded inputs: `ingest_sessions`,
       `api_replayed`, `security_ingest`, and the replay harness's
       `every_session_replays_into_the_chain_state`,
