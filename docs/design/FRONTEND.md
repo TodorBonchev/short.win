@@ -2428,9 +2428,10 @@ Playwright's Chromium in the user cache; profile `chain`). *As built:* `web-e2e`
 (no tag filter since the integration) and uploads the `screens` PNGs on every run, the report,
 traces and logs on failure. *Since 2026-10-13* the `web` job also runs the facade's Node smoke
 test after the math-wasm build (`crates/shortwin-math-wasm/js/smoke.cjs` on a `wasm-bindgen
---target nodejs` build of the same `.wasm`): until then only the type check guarded the facade's
-JS interface, e.g. `previewSettlement`'s trailing `executable`, which a JS caller that leaves it
-out passes as `false`.
+--target nodejs` build of the same `.wasm`). The app's own facade calls run under Vitest, which
+loads the real `.wasm`; a facade function no app code calls, such as `previewSettlement` (whose
+trailing `executable` a JS caller that leaves it out passes as `false`), was until then checked
+from JS only by the smoke test, which no job ran.
 
 ### 10.5 Responsive capture (M10; `e2e/specs/responsive.spec.ts`, `@responsive`)
 

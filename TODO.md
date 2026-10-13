@@ -98,11 +98,13 @@ the register's rows in `18b65e2`).
 Gathered from the follow-up tracks' reports and the integrated gate of 2026-10-13.
 
 **Owner**
-- [ ] SPEC §14 (fourteenth round) asks for two confirmations, drafted from the code and the sims,
-      not from an owner decision: AIR-21 changes the B2-2 decision (an S1 now vests its take above
-      market value; a genuine S1 loss still vests only its rent top-up), and AIR-14 widens §2.6
-      residual 10, which O18 accepted on the `9aade3e` figures (a held drain now forces 181
-      levels instead of 69; known-issues KI-23, KI-52; AUDIT.md §7).
+- [ ] SPEC §14 (fourteenth round) asks the owner to confirm three changes, drafted from the code
+      and the sims, not from an owner decision: AIR-21 changes the B2-2 decision (an S1 now vests
+      its take above market value; a genuine S1 loss still vests only its rent top-up); AIR-09
+      counts the tokens at 0 on a venue that cannot execute, so of an S3 there only `R_due` stays
+      immediate (KI-24, accepted on the behaviour before it); and AIR-14 widens §2.6 residual 10,
+      which O18 accepted on the `9aade3e` figures (a held drain now forces 181 levels instead of
+      69; known-issues KI-23, KI-52; AUDIT.md §7).
 - [ ] FE-31: approve the `lender.residuals` copy (≈ 3.34 SOL fresh, ≈ 4.54 SOL aged, from 2.06 /
       8.02); then `apps/web/src/config/disclosures.ts`, `ux.test.tsx` and FRONTEND.md change
       together.

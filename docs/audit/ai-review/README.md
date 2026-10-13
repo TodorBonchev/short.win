@@ -250,9 +250,10 @@ open is at the end of this list and in [`TODO.md`](../../../TODO.md).
   2026-10-13 (below), and AUDIT.md §0 records its build's hashes, marked as not verified. Still
   open: a CI run (it needs a push), the verifiable build, a ≥ 24 h fuzz run (the owner did not
   ask for one on 2026-10-12), the PostgreSQL and E2E jobs, and an external fix review.
-- **Still for the owner:** AIR-21 changes the B2-2 decision and AIR-14 widens residual 10, which
-  O18 accepted on older figures (SPEC §14, fourteenth round; known-issues KI-23, KI-52;
-  AUDIT.md §7); FE-31, the copy of `lender.residuals` (FRONTEND §13).
+- **Still for the owner:** AIR-21 changes the B2-2 decision, AIR-09 counts a venue's tokens at 0
+  when it cannot execute, and AIR-14 widens residual 10, which O18 accepted on older figures
+  (SPEC §14, fourteenth round; known-issues KI-23, KI-24, KI-52; AUDIT.md §7); FE-31, the copy
+  of `lender.residuals` (FRONTEND §13).
 
 ## Local gate
 
