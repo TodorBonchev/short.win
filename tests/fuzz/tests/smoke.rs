@@ -347,9 +347,10 @@ fn deficit_tripwire_on_fuzz_m7_24h_3() {
 /// M10 (FUZZ-M10-24H-A, KI-65): the wind-down's second claim pass leaves exactly ECON §9.4's
 /// I-P6 residue — rounding — and the final-tree 24 h runs' reproducers pass. On CPMM the last
 /// lender, its shares all withdrawn, stays owed more than `CLAIM_DUST` of the accumulators'
-/// carry while none of its realised SOL is left and the pot is empty
-/// (`wind-down-owed-rounding`). The rebase-orphan credit the oracle used to accept above the
-/// hooks' dust cap (`wind-down-orphan-credit`) is gone with KI-65's cumulative conversion (ECON
+/// carry while none of its realised SOL is left and the pot is empty (`wind-down-owed-rounding`:
+/// 2,149 lamports; since AIR-07's vest flush the recorded list left 943, so its action 45 now
+/// sells). The rebase-orphan credit the oracle used to accept above the hooks' dust cap
+/// (`wind-down-orphan-credit`) is gone with KI-65's cumulative conversion (ECON
 /// §9.5): on the curve corpus file, and on run B's three largest cases — 19,131,900,419 lamports
 /// left on the mock, 890,963,742 on CPMM, 552,350,825 on PumpSwap, each with `S = 1` orphan
 /// share that the vest the leavers forfeited released to — every share has a holder, the last
