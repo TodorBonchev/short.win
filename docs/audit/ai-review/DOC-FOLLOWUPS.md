@@ -23,6 +23,10 @@ AUD = `docs/AUDIT.md`.
   extension can latch once; 96-bit truncated fingerprint; an exact-slot revalidation records the
   supplied hash unchecked; extensions refresh `flagged_slot` while flagged; the keeper still pages
   `VenueUpgraded` after an extension).
+  *Superseded (2026-10-12/13): the runbook asks for ≥ 0.6 M CU or a limit sized by simulation
+  (≈ 0.48 M estimated for pump-fees near the 10 MiB cap; KI-69 (e); `72103a5`, `eeee640`,
+  `7a92078`); the zero-tail scan costs ≈ 1 CU per 250 B; since `d2bb168` the keeper neither flags
+  nor pages a pure extension of a fingerprinted venue (`a1edf78`, `bf037ef`).*
 
 ## AIR-02 — the vest end rounds down
 

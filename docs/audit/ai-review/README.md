@@ -281,7 +281,9 @@ Not run here:
 - `cargo deny` and `cargo audit`: not installed, and their advisory database needs a download.
   No lockfile changed since v1.0.0 (`Cargo.lock`, `services/Cargo.lock`, the six bench
   lockfiles, `pnpm-lock.yaml`), whose lockfiles passed both in CI run 38125079869;
-- the `indexer` job's PostgreSQL tests and its validator test, and `rpc_local` (validator);
+- the `indexer` job's PostgreSQL tests and its validator test (both need PostgreSQL);
+- `rpc_local` (manual: no CI job runs it; the keeper track ran it against a local
+  `solana-test-validator` at `8945087`, 1 passed, and `services/common` has not changed since);
 - `web-e2e` (Playwright on a validator);
 - the verifiable build (Docker);
 - a fuzz run beyond the smoke tests (no ≥ 24 h run: the owner did not ask for one on

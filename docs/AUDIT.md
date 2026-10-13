@@ -472,13 +472,15 @@ not report these as findings unless the stated bound is wrong or can be exceeded
 **Status by owner decision** (SPEC §14, ARCH §10):
 - **Accepted by the owner:** the real-venue held sandwich (KI-01's and KI-02's figures,
   2026-10-03), the late-depositor shortfall as designed with the warning's 1 % / 1 SOL
-  thresholds (KI-53, 2026-10-03), B2-2 kept as built (KI-52, 2026-10-03), the extras-denylist
+  thresholds (KI-53, 2026-10-03), B2-2 kept as built (KI-52, 2026-10-03; AIR-21's change to S1
+  not yet confirmed), the extras-denylist
   residuals (KI-54 … KI-57, 2026-10-03), the first-trade venue rent on short pump accounts
   (KI-64, PUMP-2026-10-2, 2026-10-03), the Squads layout (KI-45, 2026-10-02), the per-touch
   floor of a current or parked lender (KI-68, 2026-10-08, ninth round: at most 1 lamport of
   entitlement and 1 of realised SOL per third-party touch, each touch costing its sender a
   transaction fee; the cumulative-floor alternative, a program change, not taken), and the earlier
-  rows marked accepted (KI-12, KI-22 … KI-24, KI-27, KI-28's M6R-4, KI-29, KI-30, KI-35), and
+  rows marked accepted (KI-12, KI-22 … KI-24 (KI-23 on the figures before AIR-14), KI-27, KI-28's
+  M6R-4, KI-29, KI-30, KI-35), and
   the margin of a PumpSwap position opened while a deposit is held (KI-26, M6D residual 16,
   2026-10-09, eleventh round: as built; pricing it on the burned depth, a program change, not
   taken), and O18's residuals as disclosed (KI-16 … KI-21, KI-25, 2026-10-09, eleventh round,
@@ -526,7 +528,9 @@ not report these as findings unless the stated bound is wrong or can be exceeded
   floor away up to 1 lamport of that lender's entitlement and of its realised SOL, left in
   `lender_sol` as rounding) is accepted since the ninth round (above).
 - **Open** (build default in force; §7): the rest of O19 (KI-03 … KI-10 are disclosed but not
-  signed off), OWNER-M6SK-1 (KI-28) and the M7 keeper items. O18 is decided (2026-10-09,
+  signed off), OWNER-M6SK-1 (KI-28), the M7 keeper items, and the two confirmations the AI
+  review's fixes ask for (SPEC §14 fourteenth round): AIR-21's S1 vest, which changes B2-2
+  (KI-52), and AIR-14's widening of ECON §12.12 residual 10 (KI-23). O18 is decided (2026-10-09,
   eleventh round: its rules accepted as the v1.0.0 design and the §2 residuals it disclosed,
   KI-16 … KI-21 and KI-25, accepted as disclosed; §7).
 
@@ -804,14 +808,14 @@ The full gate (G-full in the M10 plan; CI's `ci.yml`) also runs fmt and clippy w
 `621f8e1`: the AI review's fixes and their follow-ups `cb756ca` … `621f8e1`, the program from
 `cb756ca`; WSL Ubuntu 24.04 on a 12-core, 6 GB machine, test binaries at 4 threads; a local
 stand-in for CI's jobs, `gate.sh`, plus the codama, web, fuzz-smoke, m7-keeper-bench and
-indexer steps; logs `~/.agent-logs/gt`). The SBF builds ran in place (`shortwin`, its
-test-venue build and `mock_cpamm` recompiled; `complete_curve` was fresh) and every test loaded
-them:
+indexer steps; the logs are not committed). The SBF builds ran in place (`shortwin`,
+`complete_curve`, `mock_cpamm` and the test-venue build all recompiled; `complete_curve` came
+out byte-identical to v1.0.0's) and every test loaded them:
 
 | Step (CI job) | Result |
 |---|---|
 | anchor build + `scripts/build-test-venue.sh` | `shortwin.so` `fba9dd75…4fdf55` (1,634,936 B), `complete_curve.so` `f3a47201…6d42` (unchanged), test-venue `shortwin.so` `63ee71aa…b05c` (1,670,064 B), `mock_cpamm.so` `4cf17007…7ab9`: each byte-identical to the build at `63b673c`; both IDLs equal the committed copies (§0's AI-review table) |
-| SBPF v3; A49; security.txt | `e_flags` 0x3 on all three release ELFs; A49 ok (the test-venue build carries its marker and the mock id, the release builds neither); `security.txt` valid (`--forbid-placeholders --source-release v1.0.0`), none in the test-venue build |
+| SBPF v3; A49; security.txt | `e_flags` 0x3 on both release ELFs and on `mock_cpamm.so`; A49 ok (the test-venue build carries its marker and the mock id, the release builds neither); `security.txt` valid (`--forbid-placeholders --source-release v1.0.0`), none in the test-venue build |
 | fmt (with cu-math's); `shortwin-math`'s deny lints, `no_std`, no runtime dependency; clippy `-D warnings` on `-p shortwin-math`, the workspace, `-p shortwin`, the services and the keeper alone, the benches | clean |
 | lockfiles | no change since v1.0.0 (`Cargo.lock`, `services/Cargo.lock`, the six bench lockfiles, `pnpm-lock.yaml`) |
 | `cargo test -p shortwin-math -p shortwin-math-wasm -p squads-v4-ix` (`PROPTEST_CASES=2000`, as CI's test job) | 376 passed, 0 failed |
@@ -832,7 +836,9 @@ Not run: CI (nothing pushed); `cargo deny` and `cargo audit` (not installed here
 advisory database needs a download; no lockfile changed since v1.0.0, whose CI run 38125079869
 passed both); the verifiable build (Docker is not available here: §0's AI-review hashes are not
 verified); the `indexer` job's PostgreSQL tests (no embedded PostgreSQL here) and its
-`ingest_rpc_validator`, and `rpc_local` (no validator); `web-e2e` (no Playwright browser); a
+`ingest_rpc_validator` (a validator and PostgreSQL); `rpc_local` (manual: no CI job runs it; the
+keeper track ran it against a local `solana-test-validator` at `8945087`, 1 passed, and
+`services/common` has not changed since); `web-e2e` (no Playwright browser); a
 timed fuzz run (the ≥ 24 h run on these bytes is not done: the owner did not ask for one on
 2026-10-12) and `mutants`.
 

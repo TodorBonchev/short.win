@@ -107,8 +107,18 @@ Gathered from the follow-up tracks' reports and the integrated gate of 2026-10-1
 **Release evidence (needs CI or tools not on the local machine)**
 - [ ] CI on GitHub, after a push. The jobs not run locally: `deny` (`cargo deny`, `cargo audit`;
       no lockfile changed since v1.0.0), `verifiable-build` (Docker), `web-e2e` (Playwright on a
-      validator), `indexer`'s PostgreSQL and validator tests, `rpc_local` (validator).
-- [ ] The verifiable build must reproduce AUDIT.md §0's AI-review hashes before they count.
+      validator), `indexer`'s PostgreSQL and validator tests.
+- [ ] `rpc_local` (manual, no CI job runs it): `SHORTWIN_RPC_URL=http://127.0.0.1:8899 cargo test
+      --manifest-path services/Cargo.toml -p shortwin-services-common --test rpc_local -- --ignored`
+      against `solana-test-validator`; last run by the keeper track at `8945087` (1 passed),
+      `services/common` unchanged since.
+- [ ] Release as 1.0.x (owner decision of 2026-10-02; SPEC §14): bump the version in
+      `programs/*/Cargo.toml`, which `security.txt`'s `source_release` carries; then CI and the
+      verifiable build on that tree, and its hashes in AUDIT.md §0 (the 1.0.0-versioned hashes
+      there are a local build's, not verified).
+- [ ] `scripts/mutants.sh` (CI's opt-in `mutants` job, nightly or `workflow_dispatch`): run on
+      every earlier batch, not on the AI review's fixes (it builds into target directories of its
+      own, which this machine's disk budget does not allow).
 - [ ] A ≥ 24 h fuzz run on the fixed program (AUDIT.md §12), and an external fix review
       (`docs/audit/findings.md`).
 - [ ] The PostgreSQL indexer tests on the migrated and re-recorded inputs: `ingest_sessions`,
