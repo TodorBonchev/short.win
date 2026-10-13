@@ -26,7 +26,7 @@ Compute units of every PumpSwap-path instruction and the `→ PumpSwap` graduati
 | `liquidate` | SPL Token, 261 B (legacy261): after a real pump (× 2.8), both legs | 174033 | 174033 | 75196 | 300000 | §6.1 `liquidate` / `expire` PumpSwap | 17 | 16 (≤ 19) | 3 |
 | `expire` | SPL Token, 261 B (legacy261): past the deadline, healthy | 172032 | 172032 | 75197 | 300000 | §6.1 `liquidate` / `expire` PumpSwap | 17 | 16 (≤ 19) | 3 |
 | `liquidate` | Token-2022, 301 B, boost spent (mature): costliest — normalising, creator change, last recipients | 195356 | 195356 | 79419 | 300000 | §6.1 `liquidate` / `expire` PumpSwap | 20 | 16 (≤ 19) | 3 |
-| `liquidate` | graduation path: on the migrated pool after the warm-up | 196969 | 196969 | 94489 | 300000 | §6.1 `liquidate` / `expire` PumpSwap | 17 | 16 (≤ 19) | 3 |
+| `liquidate` | graduation path: on the migrated pool after the warm-up | 196948 | 196948 | 94489 | 300000 | §6.1 `liquidate` / `expire` PumpSwap | 17 | 16 (≤ 19) | 3 |
 | `sol_settle` | Token-2022, 301 B, boost spent (mature): healthy, the no-change call | 52242 | 52242 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
 | `sol_settle` | Token-2022, 301 B, boost spent (mature): S3 under the buy halt (disable_flags bit 3), after s3_wait_s | 57964 | 57964 | — | 150000 | §6.1 `sol_settle` | 2 | 2 (≤ 5) | 2 |
 | `crank_price` | Token-2022, 301 B, boost spent (mature): roll + record (first crank of a second) | 34932 | 34932 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |

@@ -16,22 +16,22 @@ Compute units of every M1 instruction (ARCH §9 M1) on the SBF program (`anchor 
 | `flag_venue_upgraded` | pump, 10 MiB ProgramData (U5) | 6036 | 6036 | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` |
 | `revalidate_venue` | pump, 109 B mock ProgramData | 8506 | 8506 | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` |
 | `revalidate_venue` | pump, 10 MiB ProgramData (U5) | 8506 | 8506 | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` |
-| `create_market` | SPL Token mint, `None` venue | 66545 | 66545 | 250000 | §6.1 `create_market` |
-| `create_market` | Token-2022 mint, `None` venue | 76901 | 76901 | 250000 | §6.1 `create_market` |
+| `create_market` | SPL Token mint, `None` venue | 60545 | 60545 | 250000 | §6.1 `create_market` |
+| `create_market` | Token-2022 mint, `None` venue | 51401 | 51401 | 250000 | §6.1 `create_market` |
 | `flag_unsafe_mint` | freeze authority set | 6425 | 6425 | 60000 | no §6.1 row; crank class (§6.1 `crank_price`) |
-| `deposit` | first deposit, SPL Token | 34827 | 34827 | 100000 | §6.1 `deposit` / `withdraw` |
-| `deposit` | first deposit, Token-2022 | 38047 | 38047 | 100000 | §6.1 `deposit` / `withdraw` |
-| `deposit` | second deposit, SPL Token | 31168 | 31168 | 100000 | §6.1 `deposit` / `withdraw` |
+| `deposit` | first deposit, SPL Token | 36327 | 36327 | 100000 | §6.1 `deposit` / `withdraw` |
+| `deposit` | first deposit, Token-2022 | 36547 | 36547 | 100000 | §6.1 `deposit` / `withdraw` |
+| `deposit` | second deposit, SPL Token | 28147 | 28147 | 100000 | §6.1 `deposit` / `withdraw` |
 | `withdraw` | half the shares, SPL Token | 31631 | 31631 | 100000 | §6.1 `deposit` / `withdraw` |
 | `claim_sol` | pays a covered balance | 16420 | 16420 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |
 | `cover_deficit` | 1,000,000 lamports | 16719 | 16719 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |
 | `sync_lender` | lender on the current epoch | 14189 | 14189 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |
 | `deposit` | 1 rebase record behind, written | 34616 | 34616 | 100000 | §6.1 `deposit` / `withdraw` |
-| `deposit` | 3 rebase records behind, written | 45684 | 45684 | 100000 | §6.1 `deposit` / `withdraw` |
+| `deposit` | 3 rebase records behind, written | 44184 | 44184 | 100000 | §6.1 `deposit` / `withdraw` |
 | `deposit` | 8 rebase records behind, written | 68232 | 68232 | 100000 | §6.1 `deposit` / `withdraw` |
 | `deposit` | 12 rebase records behind, written | 86744 | 86744 | 100000 | §6.1 `deposit` / `withdraw` |
 | `withdraw` | 1 rebase record behind, written | 36635 | 36635 | 100000 | §6.1 `deposit` / `withdraw` |
-| `withdraw` | 3 rebase records behind, written | 46203 | 46203 | 100000 | §6.1 `deposit` / `withdraw` |
+| `withdraw` | 3 rebase records behind, written | 46222 | 46222 | 100000 | §6.1 `deposit` / `withdraw` |
 | `withdraw` | 8 rebase records behind, written | 70251 | 70251 | 100000 | §6.1 `deposit` / `withdraw` |
 | `withdraw` | 12 rebase records behind, written | 90263 | 90263 | 100000 | §6.1 `deposit` / `withdraw` |
 | `claim_sol` | 1 rebase record behind, written | 21412 | 21412 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |
