@@ -590,6 +590,7 @@ export type UnpaidRentMarket = Pick<
     | 'totalShares'
     | 'rentBasis'
     | 'rentAggr'
+    | 'lenderCreditRem'
     | 'lastAccrualTs'
     | 'utilKinkBps'
     | 'tokensFree'
@@ -631,9 +632,10 @@ export function lamportsAtPrice(amount: bigint, priceWad: bigint): bigint | null
 /**
  * The lender rent the next instruction's prologue credits to `receivable` at `now` (the program's
  * `market_now`): `RentBasis.lenderCredit` — `rent::accrue` over `now − last_accrual_ts` at `P_ema`
- * and the stored utilisation, weighed by `Market.rent_aggr` (`engine::prologue::accrue`). 0 with no
+ * and the stored utilisation, weighed by `Market.rent_aggr`, with the remainder the market carries
+ * from its last accrual (`Market.lender_credit_rem`, AIR-03; `engine::prologue::accrue`). 0 with no
  * open position, no price or no time elapsed. A math error is the program's too (the deposit's
- * prologue would refuse `MathOverflow`), so it reads as 0 here.
+ * prologue would refuse it), so it reads as 0 here.
  */
 export function pendingLenderCredit(m: MathModule, market: UnpaidRentMarket, now: bigint): bigint {
     const dt = now - market.lastAccrualTs;
@@ -644,7 +646,8 @@ export function pendingLenderCredit(m: MathModule, market: UnpaidRentMarket, now
     try {
         const util = m.utilizationBps(market.tokensFree, market.borrowedQ);
         const pEma = market.emaPrice ? u128(market.emaPrice) : 0n;
-        return basis.lenderCredit(a[0] ?? 0n, a[1] ?? 0n, a[2] ?? 0n, pEma, util, market.utilKinkBps, dt);
+        const rem = u128(market.lenderCreditRem);
+        return basis.lenderCredit(a[0] ?? 0n, a[1] ?? 0n, a[2] ?? 0n, pEma, util, market.utilKinkBps, dt, rem);
     } catch {
         return 0n;
     } finally {

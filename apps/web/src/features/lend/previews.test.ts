@@ -591,13 +591,16 @@ describe('the pool’s unpaid rent at a deposit (ECON §9.4, lender.unpaidRent)'
     // One open position in the aggregate: q = 10⁹ raw at Tier A's curve (10 % / 50 % / 1,000 %),
     // rent_protocol_bps 1,500 — `A_j = q·coef_j·(10⁴ − 1,500)` (`rent::Aggr::add`).
     const A = [1_000n, 5_000n, 100_000n].map((c) => 1_000_000_000n * c * 8_500n);
-    const accruing = (o: { receivable?: bigint; lastAccrualTs?: bigint; aggr?: readonly bigint[] } = {}) =>
+    const accruing = (
+        o: { receivable?: bigint; lastAccrualTs?: bigint; aggr?: readonly bigint[]; rem?: bigint } = {},
+    ) =>
         fakeMarket(
             { tokensFree: 10n ** 12n, totalShares: S, receivable: o.receivable ?? 0n },
             {
                 lastAccrualTs: o.lastAccrualTs ?? 1_000n,
                 emaPrice: bigIntToPodU128(WAD),
                 rentAggr: (o.aggr ?? A).map((a) => bigIntToPodU128(a)),
+                lenderCreditRem: bigIntToPodU128(o.rem ?? 0n),
             },
         );
 
@@ -645,6 +648,16 @@ describe('the pool’s unpaid rent at a deposit (ECON §9.4, lender.unpaidRent)'
         // Nothing elapsed, or no open position: nothing pending.
         expect(pendingLenderCredit(m, accruing(), 1_000n)).toBe(0n);
         expect(pendingLenderCredit(m, accruing({ aggr: [0n, 0n, 0n] }), 1_000n + 86_400n)).toBe(0n);
+        // AIR-03: the remainder the market carries (`lender_credit_rem`) joins the floor, as the
+        // prologue's `rent::lender_credit_carried`. The day is 232,876 + 260/365 lamports, so 105/365
+        // of the denominator completes the lamport and one unit less does not. A remainder at the
+        // denominator would refuse the prologue (`InvalidInput`): 0 here.
+        const DEN = 10_000n * 10_000n * 31_536_000n * WAD;
+        const edge = (105n * DEN) / 365n;
+        expect(pendingLenderCredit(m, accruing({ rem: edge - 1n }), 1_000n + 86_400n)).toBe(232_876n);
+        expect(pendingLenderCredit(m, accruing({ rem: edge }), 1_000n + 86_400n)).toBe(232_877n);
+        expect(pendingLenderCredit(m, accruing({ rem: DEN }), 1_000n + 86_400n)).toBe(0n);
+        expect(previewUnpaidRent(m, accruing({ rem: edge }), 1_000n + 86_400n, 1n, 1n).pending).toBe(232_877n);
 
         // A pool whose rent nothing has credited yet (stored receivable 0, keepers quiet): the rows show.
         const shares = 1_000_000_000_000n;

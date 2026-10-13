@@ -397,7 +397,8 @@ below).
   token value). *M10 (owner decision of 2026-10-03; ECON §9.4's late-depositor shortfall):* the
   pool's unpaid rent as the deposit meets it — `Market.receivable` plus the lender credit the
   deposit's prologue books over `market_now − last_accrual_ts` (`pendingLenderCredit`, the WASM
-  `RentBasis.lenderCredit` on `rent_aggr`) — (row "Unpaid rent in the pool",
+  `RentBasis.lenderCredit` on `rent_aggr` with the carried `lender_credit_rem`, AIR-03) — (row
+  "Unpaid rent in the pool",
   `lend-preview-unpaid-rent`) and this deposit's part of it should none be paid,
   ⌈receivable·shares/(S + shares)⌉ at the pool's size after the deposit (`previewUnpaidRent`, the
   split in plain integers `unpaidRentExposure`; row "This deposit’s part if it is never paid",
@@ -2910,6 +2911,10 @@ The web side of the AI review's fixes (`docs/audit/ai-review/`; `3f224c2` … `a
   program's exit risk cap (`exitRiskCapBps` = `VenueState::exit_risk_cap_bps`: on PumpSwap at most
   the tier at `P_ema`), so a PumpSwap position below a tier boundary no longer reads riskier than
   `liquidate` judges it (§3.8; `state.test.ts`, `previews.test.ts`).
+- AIR-03 (the same review): the deposit's unpaid-rent preview (`pendingLenderCredit`) passes the
+  market's carried `lender_credit_rem` to the WASM `RentBasis.lenderCredit`, which now takes it
+  (`rent::lender_credit_carried`), so the pending credit is the prologue's to the lamport (it could
+  read 1 lamport low; §3.6; `previews.test.ts`, the facade's `smoke.cjs`).
 - Open: FE-31.
 
 ### Thirteenth round (v1.4 → v1.5)

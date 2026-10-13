@@ -75,7 +75,16 @@ assert.equal(pos.due(later), 100_000_000n);
 // The lenders' credit of that year from the aggregate `A_j = q·coef_j·(10⁴ − 1,500)`: 85 % of it.
 const share = 10_000n - 1_500n;
 const [a0, a1, a2] = [1_000n, 5_000n, 100_000n].map((c) => 1_000_000_000n * c * share);
-assert.equal(open.lenderCredit(a0, a1, a2, WAD, 0, 8_000, 31_536_000n), 85_000_000n);
+assert.equal(open.lenderCredit(a0, a1, a2, WAD, 0, 8_000, 31_536_000n, 0n), 85_000_000n);
+// AIR-03: the market's carried remainder (`Market.lender_credit_rem`) joins the floor. A day is
+// 232,876 + 260/365 lamports, so 105/365 of the denominator completes the lamport; a remainder
+// at the denominator throws, and so does a call without one.
+const DEN = 10_000n * 10_000n * 31_536_000n * WAD;
+const edge = (105n * DEN) / 365n;
+assert.equal(open.lenderCredit(a0, a1, a2, WAD, 0, 8_000, 86_400n, edge - 1n), 232_876n);
+assert.equal(open.lenderCredit(a0, a1, a2, WAD, 0, 8_000, 86_400n, edge), 232_877n);
+assert.throws(() => open.lenderCredit(a0, a1, a2, WAD, 0, 8_000, 86_400n, DEN), /invalid input/);
+assert.throws(() => open.lenderCredit(a0, a1, a2, WAD, 0, 8_000, 86_400n));
 // Liquidation with the keeper floor at K_s (N22): 15 + a top-up of 5 from the borrower.
 const liq = m.previewLiquidation(1_000n, 600n, 100n, 500n, 550n, 1_500, 1_000, 5_000, 2_000, 3_000, 20n);
 assert.equal(liq.buyback + liq.keeper + liq.protocol + liq.lenders + liq.borrower, 1_000n);

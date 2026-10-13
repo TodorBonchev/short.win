@@ -279,6 +279,7 @@ export function fakeMarket(
             | 'emaPrice'
             | 'rentBasis'
             | 'rentAggr'
+            | 'lenderCreditRem'
             | 'utilKinkBps'
         >
     > = {},
@@ -300,6 +301,7 @@ export function fakeMarket(
         // No open position: nothing accrues.
         rentBasis: [0n, 0n, 0n].map(bigIntToPodU128),
         rentAggr: [0n, 0n, 0n].map(bigIntToPodU128),
+        lenderCreditRem: bigIntToPodU128(0n),
         utilKinkBps: 8_000,
         ...o,
     } as unknown as Market;

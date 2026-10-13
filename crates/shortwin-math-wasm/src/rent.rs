@@ -99,9 +99,11 @@ impl RentBasis {
     }
 
     /// The lenders' rent credit of that accrual: [`RentBasis::accrue`]'s increments weighed by
-    /// the market's aggregate `Market.rent_aggr = [a0, a1, a2]` (`rent::lender_credit`, floored)
-    /// — what the next instruction's prologue adds to `acc` and to `receivable` (ARCH §3.0
-    /// step 4, `engine::prologue::accrue`).
+    /// the market's aggregate `Market.rent_aggr = [a0, a1, a2]`, plus the remainder `rem` the
+    /// market carries from its previous accrual (`Market.lender_credit_rem`), floored
+    /// (`rent::lender_credit_carried`, AIR-03) — what the next instruction's prologue adds to
+    /// `acc` and to `receivable` (ARCH §3.0 step 4, `engine::prologue::accrue`). Throws
+    /// `invalid input` if `rem` is not below the denominator `10⁴·10⁴·31,536,000·WAD`.
     #[allow(clippy::too_many_arguments)]
     #[wasm_bindgen(js_name = lenderCredit)]
     pub fn lender_credit(
@@ -113,10 +115,12 @@ impl RentBasis {
         util_bps: u32,
         kink_bps: u32,
         dt: u64,
+        rem: u128,
     ) -> Result<u64, JsError> {
         let mut b = self.0;
         let delta = mrent::accrue(&mut b, p_ema, util_bps, kink_bps, dt)?;
-        Ok(mrent::lender_credit(&Aggr { a: [a0, a1, a2] }, &delta)?)
+        let (credit, _) = mrent::lender_credit_carried(&Aggr { a: [a0, a1, a2] }, &delta, rem)?;
+        Ok(credit)
     }
 }
 
@@ -165,7 +169,7 @@ impl PositionRent {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[allow(clippy::unwrap_used, clippy::arithmetic_side_effects)]
 mod tests {
     use super::*;
 
@@ -198,9 +202,37 @@ mod tests {
         aggr.add(1_000_000_000, &terms, 1_500).unwrap();
         let [a0, a1, a2] = aggr.a;
         let open = RentBasis::new(0, 0, 0);
-        let credit = open.lender_credit(a0, a1, a2, wad, 0, 8_000, 31_536_000);
+        let credit = open.lender_credit(a0, a1, a2, wad, 0, 8_000, 31_536_000, 0);
         assert_eq!(credit.unwrap(), 85_000_000);
-        let none = open.lender_credit(a0, a1, a2, wad, 0, 8_000, 0);
+        let none = open.lender_credit(a0, a1, a2, wad, 0, 8_000, 0, 0);
         assert_eq!(none.unwrap(), 0);
+    }
+
+    #[test]
+    fn lender_credit_carries_the_markets_remainder() {
+        // AIR-03: the prologue credits `⌊(Σ A_j·δJ_j + rem)/DEN⌋` with the market's
+        // `lender_credit_rem`. A day of the position above is 8.5·10⁷/365 = 232,876 + 260/365
+        // lamports, so a remainder of 105/365 of the denominator completes the lamport and one
+        // unit less does not.
+        let wad = shortwin_math::num::WAD;
+        let den = 10_000 * 10_000 * 31_536_000 * wad;
+        let terms = RentTerms {
+            base_bps: 1_000,
+            slope1_bps: 5_000,
+            slope2_bps: 100_000,
+        };
+        let mut aggr = Aggr::default();
+        aggr.add(1_000_000_000, &terms, 1_500).unwrap();
+        let [a0, a1, a2] = aggr.a;
+        let open = RentBasis::new(0, 0, 0);
+        let day = |rem: u128| {
+            open.lender_credit(a0, a1, a2, wad, 0, 8_000, 86_400, rem)
+                .unwrap()
+        };
+        let edge = 105 * den / 365;
+        assert_eq!(day(0), 232_876);
+        assert_eq!(day(edge - 1), 232_876);
+        assert_eq!(day(edge), 232_877);
+        assert_eq!(day(den - 1), 232_877);
     }
 }
