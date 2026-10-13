@@ -225,7 +225,13 @@ open is at the end of this list and in [`TODO.md`](../../../TODO.md).
   `gen_lend_vectors.py`'s `REFUSALS`, and `lend_vectors.json` is regenerated (AIR-07);
   `wipeSweepPending` tests `totalShares === 0n` (AIR-08); `sweep.ts` adds the pump-UVA leg off
   the pump venues (AIR-05); the WASM `previewSettlement` prices the tokens at 0 on a venue that
-  cannot execute (AIR-09; AIR-21's S1 vest was already in it).
+  cannot execute (AIR-09; AIR-21's S1 vest was already in it). After the final review of the
+  follow-ups (2026-10-13): a position's risk view (its CR, the CR on the ring, the liquidation
+  price) takes AIR-10's exit risk cap, the tier at `P_ema` on PumpSwap, as the program and the
+  keeper do (`ed014ce`); the deposit's unpaid-rent preview carries AIR-03's remainder, through a
+  `rem` argument of the WASM `RentBasis.lenderCredit` (`b1d86d4`); CI's `web` job runs the
+  facade's Node smoke test (`33491a3`). These change only the web, the WASM facade and CI, after
+  the local gate below; each commit message records its tests.
 - **IDL and `clients/js`: done** (`caa5852`). Regenerated from this branch's build; CI's
   `codama` job passes locally. The indexer embeds the IDL, so the two committed recordings
   holding a `revalidate_venue` made before AIR-01 were migrated in the same commit (an all-zero

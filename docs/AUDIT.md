@@ -842,6 +842,13 @@ keeper track ran it against a local `solana-test-validator` at `8945087`, 1 pass
 timed fuzz run (the ≥ 24 h run on these bytes is not done: the owner did not ask for one on
 2026-10-12) and `mutants`.
 
+After this gate, the final review of the follow-ups changed only the web, the WASM facade and
+CI's `web` job (`ed014ce` AIR-10's exit risk cap in a position's risk view, `b1d86d4` AIR-03's
+remainder in the unpaid-rent preview, `33491a3` the facade's Node smoke test in CI; the program
+bytes, the IDL and the client unchanged). Their own runs, as their commit messages record: CI's
+`web` job locally (Biome 334 files, typecheck, **771 passed, 1 skipped**, the build), the
+facade's tests (26 passed), its clippy and fmt, and `js/smoke.cjs` on a Node build.
+
 **The web batches after FE-30** (the web only; the program bytes, the IDL, the client and the
 indexer unchanged; each batch's gate as its commit message records it):
 - **The M10-RESP batch** (m1-core `acbe323`, 2026-10-09/10, the tree of `m10/resp` `2cff70b`: phone

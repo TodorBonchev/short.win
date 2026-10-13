@@ -45,6 +45,14 @@ the register's rows in `18b65e2`).
         `lend_vectors.json` (pool_model changed in AIR-02/03/07/08/12). `3f224c2`
   - [x] Settlement previews: vest an S1 excess (AIR-21); tokens at 0 on a venue that cannot
         execute (AIR-09). AIR-21 was already in the WASM `previewSettlement`; AIR-09 `abce2b1`.
+  - [x] From the final review (2026-10-13): `features/short/previews.ts` judges a position's risk
+        view at AIR-10's exit risk cap (the tier at `P_ema` on PumpSwap), as the program and the
+        keeper. `ed014ce`
+  - [x] From the final review: the unpaid-rent preview carries AIR-03's `lender_credit_rem`
+        (the WASM `RentBasis.lenderCredit` takes it). `b1d86d4`
+  - [x] From the final review: CI's `web` job runs the WASM facade's Node smoke test
+        (`crates/shortwin-math-wasm/js/smoke.cjs`, the only JS-side check of AIR-09's
+        `executable`). `33491a3`
 - [x] Keeper:
   - [x] `monitor.rs` `latch_action`: don't flag a pure `ExtendProgram` (the program answers
         `VenueNotUpgraded`, AIR-01). `d2bb168`; its review's fixes `a1edf78` (a stale or
@@ -77,7 +85,9 @@ the register's rows in `18b65e2`).
 - [ ] Full CI run on the fixed code, new hashes in `docs/AUDIT.md` §0, a ≥ 24 h fuzz run
       (AUDIT.md §12).
   - [x] A local run of every CI job that can run here, on the integrated branch (2026-10-13,
-        `621f8e1`; AUDIT.md §10, the review's README "Local gate"). `11d359b`
+        `621f8e1`; AUDIT.md §10, the review's README "Local gate"). `11d359b`. The final
+        review's fixes after it (`ed014ce`, `b1d86d4`, `33491a3`: the web, the WASM facade and
+        CI only) ran CI's web job, the facade's tests and its smoke test (their commit messages).
   - [x] The build's hashes in AUDIT.md §0, marked as not verified (local `anchor build`; no
         verifiable build, no CI). `11d359b`
   - [ ] CI on GitHub: it needs a push.

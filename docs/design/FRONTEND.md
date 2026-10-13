@@ -2910,15 +2910,16 @@ The web side of the AI review's fixes (`docs/audit/ai-review/`; `3f224c2` … `a
   `PoolDrained` 6108, `SolSettle.vestFlushed`, `revalidate_venue`'s `expectedElfHash`, the new
   `VenueGuard` and `Market` fields), and `errors.test.ts` again requires one table row per
   client constant (`2fea2c5`).
-- AIR-10 (the final review of the follow-ups, 2026-10-13): a position's risk view — the CR, the
-  CR on the ring, the liquidation price, and the open preview's liquidation price — takes the
-  program's exit risk cap (`exitRiskCapBps` = `VenueState::exit_risk_cap_bps`: on PumpSwap at most
-  the tier at `P_ema`), so a PumpSwap position below a tier boundary no longer reads riskier than
-  `liquidate` judges it (§3.8; `state.test.ts`, `previews.test.ts`).
-- AIR-03 (the same review): the deposit's unpaid-rent preview (`pendingLenderCredit`) passes the
-  market's carried `lender_credit_rem` to the WASM `RentBasis.lenderCredit`, which now takes it
-  (`rent::lender_credit_carried`), so the pending credit is the prologue's to the lamport (it could
-  read 1 lamport low; §3.6; `previews.test.ts`, the facade's `smoke.cjs`).
+- AIR-10 (`ed014ce`; the final review of the follow-ups, 2026-10-13): a position's risk view —
+  the CR, the CR on the ring, the liquidation price, and the open preview's liquidation price —
+  takes the program's exit risk cap (`exitRiskCapBps` = `VenueState::exit_risk_cap_bps`: on
+  PumpSwap at most the tier at `P_ema`), so a PumpSwap position below a tier boundary no longer
+  reads riskier than `liquidate` judges it (§3.8; `state.test.ts`, `previews.test.ts`).
+- AIR-03 (`b1d86d4`; the same review): the deposit's unpaid-rent preview (`pendingLenderCredit`)
+  passes the market's carried `lender_credit_rem` to the WASM `RentBasis.lenderCredit`, which now
+  takes it (`rent::lender_credit_carried`), so the pending credit is the prologue's to the
+  lamport (it could read 1 lamport low; §3.6; `previews.test.ts`, the facade's `smoke.cjs`).
+- CI (`33491a3`): the `web` job runs the facade's Node smoke test (§10.4).
 - Open: FE-31.
 
 ### Thirteenth round (v1.4 → v1.5)
