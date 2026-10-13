@@ -2307,6 +2307,18 @@ a.menu-item {
     min-height: max(36px, var(--tap-min));
 }
 
+/* The Mobile Wallet Adapter entry: "Use installed wallet" over its second line (O-6, §5.4 (6)). */
+.menu-item-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.menu-item-hint {
+    font-size: var(--fs-xs);
+    color: var(--text-2);
+}
+
 .wallet-install {
     display: flex;
     flex-wrap: wrap;

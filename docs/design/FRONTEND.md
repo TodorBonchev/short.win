@@ -1119,13 +1119,19 @@ Checkbox: “I understand my position can be liquidated or settled in SOL.”
 The owner's thirteenth round (2026-10-10; audit findings D-03, D-21, D-23) adds copy that is not a
 disclosure: the markets list's intro strip (§3.3), the glossary, How it works (§3.11), the links to
 it, the Short panel's link to the coverage banner (O-2, §3.4) and the Claim button (O-5, §3.6).
-**Every string below — all 143 — was approved as written by the owner on 2026-10-11 (thirteenth
-round)**, word for word, as the file `apps/web/scripts/owner-copy.ts` prints it (with each string's
-id, where it shows and the sources of each claim). Like an approved disclosure's text (§4.1), a
-string changes only with the owner's approval, and the code and this section change together.
+**Every string below but the mobile group — all 143 — was
+approved as written by the owner on 2026-10-11 (thirteenth round)**, word for word, as the file
+`apps/web/scripts/owner-copy.ts` prints it (with each string's id, where it shows and the sources
+of each claim). **The mobile group's 7 strings** (the wallet chooser on a phone and the Mobile
+Wallet Adapter's review notices, §5.4 (6); `src/config/copyWallet.ts`, the owner file's section 8)
+**were approved as drafted by the owner on 2026-10-13 (O-6 lifted)**, byte for byte: straight
+apostrophes and no final full stops. 150 strings in all. Like an approved disclosure's text
+(§4.1), a string changes only with the owner's approval, and the code and this section change
+together.
 
 Rules (as §4.1 for disclosures): the text has one home — `src/config/copy.ts` (`COPY`, each string
-with its id, where and sources; `HOW_IT_WORKS`, the page's order) and `src/config/glossary.ts`
+with its id, where and sources, the mobile group spread in from `copyWallet.ts`, which the shell's
+wallet chooser imports alone; `HOW_IT_WORKS`, the page's order) and `src/config/glossary.ts`
 (`GLOSSARY`); components render it through `copy()` / the glossary control and never retype it;
 `copy.test.ts` and `glossary.test.ts` fail unless this section carries every string verbatim
 (regenerate it with `node scripts/owner-copy.ts --doc` after a change, in the same change). A
@@ -1297,6 +1303,23 @@ simulation would pay 0 is held with "Nothing to claim yet" (§3.6). No string ch
   > Review claim · {c} SOL now · syncs may add up to {g} SOL
 - `claim.note.shortfall` (Lend → Claim: the note above the button, appended when there is a shortfall (10,000 lamports or more: CLAIM_DUST_LAMPORTS, owner, 2026-10-11) (replaces “{g} SOL credited to you is not paid in yet. A claim first syncs other lenders whose surplus can fund it, where there are any.”)):
   > {g} SOL of what is credited to you cannot be claimed now. Some of it may be rent that open positions still owe: it is paid when they end, and taken back from the lenders if it never is. Some may be allocated to other lenders’ shares beyond their own credit. A claim first syncs those lenders where it finds any, which moves that excess to the pot; the review shows what the claim will pay.
+
+**Mobile wallets** (`src/config/copyWallet.ts`; O-6, approved as drafted by the owner on 2026-10-13 (O-6 lifted)):
+
+- `wallet.openIn.more` (A phone or tablet with wallets listed (header sheet and inline under Connect wallet): the label above “Open in Backpack / Phantom / Solflare”, after the entries (`wallet-open-elsewhere`)):
+  > Or open this page in a wallet app
+- `wallet.webview.open` (A social app’s in-app browser with no wallet (Telegram, X, Instagram, Facebook, Line, an Android WebView): the chooser’s first line (`wallet-in-app-browser`)):
+  > Open this page in your browser
+- `wallet.webview.copy` (The button after it: copies this page’s address (“Copied” for 1.2 s, as “Copy address”) (`wallet-copy-link`)):
+  > Copy link
+- `wallet.mwa.label` (The Mobile Wallet Adapter’s entry (Android browsers): its label. The wallet’s own name, “Mobile Wallet Adapter”, stays its test id and shows in the account menu and the review):
+  > Use installed wallet
+- `wallet.mwa.hint` (The Mobile Wallet Adapter entry’s second line (`wallet-mwa-hint`)):
+  > Opens your wallet app on this phone
+- `wallet.mwa.localNetwork` (The Mobile Wallet Adapter entry’s second line while Chrome’s local-network permission is not granted (asked or denied); and beside Sign in the review when the connected wallet is the Mobile Wallet Adapter and the permission is missing (`tx-sign-notice`, `data-reason="local-network"`)):
+  > Allow 'Apps on device' so this page can reach your wallet app
+- `wallet.mwa.retry` (The review, beside Sign, when the wallet app could not be launched; the review stays open and nothing was sent (`tx-sign-notice`, `data-reason="launch"`)):
+  > Couldn't open your wallet app. Tap Sign again
 
 **The glossary control** (`src/config/glossary.ts` `GLOSSARY_UI`):
 
@@ -2556,7 +2579,7 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `search-results` | `T.searchResults` | listbox |
 | `search-result-<…>` | `T.searchResult` | `<mint>`; an option (a valid mint always yields one) |
 | `wallet-button` | `T.walletButton` | opens the wallet menu; `aria-expanded` |
-| `wallet-menu` | `T.walletMenu` | role=menu when it lists wallets or account actions; *M10-RESP:* without a wallet, `role="dialog"` "Connect a wallet" (install / open-in links) |
+| `wallet-menu` | `T.walletMenu` | role=menu when it lists wallets or account actions; *M10-RESP:* without a wallet, `role="dialog"` "Connect a wallet" (install / open-in links); *O-6 (2026-10-13):* with the Mobile Wallet Adapter on Android, its entry reads "Use installed wallet" (`data-mwa`, `data-local-network`) |
 | `wallet-option-<…>` | `T.walletOption` | `<wallet name>` as the wallet reports it (the E2E wallet: `ShortWin E2E`); *v1.2:* a second wallet with the same name is `<name> (2)`, and so on (M9-SEC-8); `data-duplicate` = its rank |
 | `wallet-address` | `T.walletAddress` | connected address; `data-value` = full base58 |
 | `wallet-disconnect` | `T.walletDisconnect` | menu item |
@@ -2608,7 +2631,11 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `table-sort-dir-<…>` | `T.tableSortDir` | *M10-RESP:* `<table test id>`; the sort direction button: its label names the order ("Descending" / "Ascending"), `data-order` ∈ desc, asc; a tap flips it |
 | `connect-cta-<…>` | `T.connectCta` | *M10-RESP:* `<surface>` ∈ short, lend, positions, lend-dashboard, position; an enabled "Connect wallet" that opens the inline chooser below it |
 | `reveal-<…>` | `T.reveal` | *M10-RESP:* `<kind>` (e.g. `mint`, `address`, `wallet`); a truncated value's popover with the full value, Copy and Explorer |
-| `wallet-open-in-<…>` | `T.walletOpenIn` | *M10-RESP:* `<wallet>` ∈ backpack, phantom, solflare; on a mobile device without a wallet: the wallet's universal "browse" link to this page (§5.4) |
+| `wallet-open-in-<…>` | `T.walletOpenIn` | *M10-RESP:* `<wallet>` ∈ backpack, phantom, solflare; on a mobile device without a wallet: the wallet's universal "browse" link to this page (§5.4); *O-6:* also after the wallet entries on a mobile device (`wallet-open-elsewhere`) |
+| `wallet-open-elsewhere` | `T.walletOpenElsewhere` | *O-6 (2026-10-13):* a mobile device with wallets listed: "Or open this page in a wallet app", the three `wallet-open-in-<…>` links and, off mainnet, the cluster hint — after the entries, outside `role="menu"` (§5.4 (6)) |
+| `wallet-in-app-browser` | `T.walletInAppBrowser` | *O-6:* a social app's in-app browser without a wallet (`isInAppBrowser`): "Open this page in your browser", first in the chooser |
+| `wallet-copy-link` | `T.walletCopyLink` | *O-6:* its "Copy link" button: copies this page's address ("Copied" for 1.2 s) |
+| `wallet-mwa-hint` | `T.walletMwaHint` | *O-6:* the Mobile Wallet Adapter entry's second line: "Opens your wallet app on this phone", or the local-network permission text while Chrome's permission is not granted |
 | `wallet-install-<…>` | `T.walletInstall` | *M10-RESP:* `<wallet>` as above; the wallet's website |
 | `wallet-reload` | `T.walletReload` | *M10-RESP:* "Already in a wallet's browser? Reload" / "I installed one: reload" |
 | `wallet-copy-address` | `T.walletCopyAddress` | *M10-RESP:* connected menu: copy the full address |
@@ -2619,6 +2646,7 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `tx-sign-hint` | `T.txSignHint` | *M10-RESP:* "Tick the acknowledgement above to sign" — a button that focuses the first unticked acknowledgement; only while one blocks signing |
 | `tx-sign-hold` | `T.txSignHold` | *Thirteenth round (second approval pass, 2026-10-11):* why a successful simulation is not offered for signing (`TxPlan.holdSign`) — a claim whose simulation pays 0 lamports reads "Nothing to claim yet" (§3.6); beside the disabled Sign, in place of `tx-sign-hint` |
 | `tx-confirmed-link` | `T.txConfirmedLink` | *M10-RESP:* after landing: the flow's next step (e.g. View position), when the plan has one (the explorer is `tx-explorer-link`) |
+| `tx-sign-notice` | `T.txSignNotice` | *O-6 (2026-10-13):* the Mobile Wallet Adapter's notice beside an enabled Sign, the review kept open: `data-reason` ∈ local-network ("Allow 'Apps on device' so this page can reach your wallet app"), launch ("Couldn't open your wallet app. Tap Sign again") (§5.4 (6)) |
 
 ### 11.2 Markets table, market page, create market, protocol status (MARKETS)
 

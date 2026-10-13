@@ -11,9 +11,13 @@
  * written into the copy, §4.1 rule 5); until the config is read the page shows a placeholder
  * skeleton, never a word in its place. `[label](target)` is a link: `/path`, `/path#anchor` or
  * `#anchor` on the same page.
+ *
+ * The mobile-wallet strings (`copyWallet.ts`, spread below) were approved as drafted by the owner on
+ * 2026-10-13 (O-6 lifted; FRONTEND.md §4.3).
  */
 
 import { type CopyEntry, c, NAV_COPY } from './copyNav.ts';
+import { WALLET_COPY } from './copyWallet.ts';
 
 export type { CopyEntry };
 
@@ -254,6 +258,9 @@ export const COPY = {
         'Lend → Claim: the note above the button, appended when there is a shortfall (10,000 lamports or more: CLAIM_DUST_LAMPORTS, owner, 2026-10-11) (replaces “{g} SOL credited to you is not paid in yet. A claim first syncs other lenders whose surplus can fund it, where there are any.”)',
         'ECON §9.4 (“rent is paid only at exit”; a shortfall is debited pro-rata; touch: surplus = (real − claimed) − max(pending, 0) moves to MarketVault.unmatched; “Why the pot”); build.ts claimPlanFrom, gatherPotSyncs; plans.ts (the review title).',
     ),
+
+    // ---- O-6: mobile wallets (`copyWallet.ts`; approved as drafted on 2026-10-13) ----------------
+    ...WALLET_COPY,
 } as const satisfies Record<string, CopyEntry>;
 
 export type CopyId = keyof typeof COPY;

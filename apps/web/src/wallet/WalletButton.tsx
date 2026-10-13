@@ -15,13 +15,18 @@
  * the browser's / OS Back closes it; closing it any other way pops that entry, and a menu link
  * replaces it. Without a wallet the popup is a dialog with the open-in-wallet links (mobile) or the
  * install links (desktop); with wallets or an account, its entries are a `role="menu"`.
+ *
+ * The Mobile Wallet Adapter (O-6, §5.4 (6)): when the library reports that no wallet app answered a
+ * Connect (`mwaWalletNotFound`, set only while that wallet is not connected), the header chooser
+ * reopens — the open-in links are then in front of the user — once the wallet is idle; a report
+ * older than `MWA_NOT_FOUND_FRESH_MS` is dropped without reopening.
  */
 
 import type { Address } from '@solana/kit';
 import { useConnectedWallet, useDisconnect, useWalletStatus } from '@solana/kit-plugin-wallet/react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useRouter } from '@tanstack/react-router';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { qk } from '../api/keys.ts';
 import { Button } from '../components/Button.tsx';
 import { useSheetMode } from '../components/Sheet.tsx';
@@ -31,6 +36,7 @@ import { formatSol, shortAddress } from '../lib/format.ts';
 import { useStore } from '../lib/store.ts';
 import { useAppClient } from '../rpc/context.tsx';
 import { PHONE, useMedia } from '../styles/breakpoints.ts';
+import { MWA_NOT_FOUND_FRESH_MS, mwaWalletNotFound } from './mwa.ts';
 import { NoWallet, useWalletList, WalletOptions } from './WalletChooser.tsx';
 import { walletChooser, walletNotice, wasChosen } from './walletUi.ts';
 
@@ -185,16 +191,19 @@ export function WalletButton() {
     const phone = useMedia(PHONE);
     /** Whether the current history entry is the popup's own (pushed on a phone). */
     const backed = () => router?.history.location.state.walletSheet === true;
-    const setOpen = (v: boolean) => {
-        walletChooser.set(v ? 'header' : null);
-        if (v && phone && router && !backed()) {
-            void router.navigate({
-                href: router.history.location.href,
-                state: (prev) => ({ ...prev, walletSheet: true }),
-                resetScroll: false,
-            });
-        }
-    };
+    const setOpen = useCallback(
+        (v: boolean) => {
+            walletChooser.set(v ? 'header' : null);
+            if (v && phone && router && router.history.location.state.walletSheet !== true) {
+                void router.navigate({
+                    href: router.history.location.href,
+                    state: (prev) => ({ ...prev, walletSheet: true }),
+                    resetScroll: false,
+                });
+            }
+        },
+        [phone, router],
+    );
     const box = useRef<HTMLDivElement>(null);
     const menu = useRef<HTMLDivElement>(null);
     const titleId = useId();
@@ -285,6 +294,15 @@ export function WalletButton() {
     const warming = status === 'pending' || status === 'reconnecting';
     const noWallet = !connected && wallets.length === 0;
     const busy = warming || status === 'connecting';
+    // No wallet app answered an MWA Connect: once idle, the header chooser reopens with the open-in
+    // links (a fresh report only; a stale one is dropped).
+    const notFoundAt = useStore(mwaWalletNotFound);
+    const isConnected = !!connected;
+    useEffect(() => {
+        if (notFoundAt === null || isConnected || busy) return;
+        mwaWalletNotFound.set(null);
+        if (Date.now() - notFoundAt < MWA_NOT_FOUND_FRESH_MS) setOpen(true);
+    }, [notFoundAt, isConnected, busy, setOpen]);
     useEffect(() => {
         if (busy || !focusWhenReady.current) return;
         focusWhenReady.current = false;

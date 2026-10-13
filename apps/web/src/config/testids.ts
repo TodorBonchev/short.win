@@ -92,6 +92,14 @@ export const T = {
     walletMyLending: 'wallet-my-lending',
     /** The header wallet popup's ✕ (a phone's bottom sheet; hidden from 640 px up). */
     walletSheetClose: 'wallet-sheet-close',
+    // appended by the mobile wallets (O-6, 2026-10-13; FRONTEND.md §5.4 (6), §11.1)
+    /** A mobile device with wallets listed: the open-in links after the entries (outside the menu). */
+    walletOpenElsewhere: 'wallet-open-elsewhere',
+    /** A social app's in-app browser without a wallet: "Open this page in your browser" and Copy link. */
+    walletInAppBrowser: 'wallet-in-app-browser',
+    walletCopyLink: 'wallet-copy-link',
+    /** The Mobile Wallet Adapter entry's second line (or the local-network permission text). */
+    walletMwaHint: 'wallet-mwa-hint',
 
     // ---- markets table (MARKETS) ----------------------------------------------------------
     marketsTable: 'markets-table',
@@ -337,6 +345,8 @@ export const T = {
     txSignHold: 'tx-sign-hold',
     /** After landing: View position / Open in explorer. */
     txConfirmedLink: 'tx-confirmed-link',
+    /** The Mobile Wallet Adapter's notice beside Sign (the review stays open); `data-reason`. */
+    txSignNotice: 'tx-sign-notice',
 
     // ---- disclosures (scaffold) -----------------------------------------------------------
     disclosure: p<DisclosureId>('disclosure'),

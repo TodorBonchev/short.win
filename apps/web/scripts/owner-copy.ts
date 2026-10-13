@@ -8,12 +8,15 @@
  *
  * Approved as written by the owner on 2026-10-11 (thirteenth round): `copy.test.ts` /
  * `glossary.test.ts` check that FRONTEND.md §4.3 carries every string verbatim — this file's `--doc`
- * block exactly, and all 143 of them — so a string cannot change without §4.3 changing with it.
+ * block exactly, and all 150 of them — so a string cannot change without §4.3 changing with it.
+ * The 7 mobile-wallet strings (section 8, `src/config/copyWallet.ts`) were approved as drafted by
+ * the owner on 2026-10-13 (O-6 lifted).
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { COPY, type CopyId, HOW_IT_WORKS } from '../src/config/copy.ts';
+import { WALLET_COPY } from '../src/config/copyWallet.ts';
 import { DISCLOSURES } from '../src/config/disclosures.ts';
 import { GLOSSARY, GLOSSARY_UI, type GlossaryEntry, type GlossaryId } from '../src/config/glossary.ts';
 import { GLOSSARY_SOURCES } from '../src/config/glossarySources.ts';
@@ -72,6 +75,18 @@ const STRIP = ids([
 const LINKS = ids(['nav.howItWorks', 'more.howItWorks.title', 'more.howItWorks.sub']);
 const COVERAGE = ids(['coverage.link.inline', 'coverage.link.sheet']);
 const CLAIM = ids(['claim.label.full', 'claim.label.syncs', 'claim.note.shortfall']);
+/** O-6 (2026-10-13): the mobile wallet chooser and the Mobile Wallet Adapter's review notices. */
+const MOBILE = ids([
+    'wallet.openIn.more',
+    'wallet.webview.open',
+    'wallet.webview.copy',
+    'wallet.mwa.label',
+    'wallet.mwa.hint',
+    'wallet.mwa.localNetwork',
+    'wallet.mwa.retry',
+]);
+/** The approval line §4.3 carries for the mobile group (`copy.test.ts` checks it). */
+export const MOBILE_APPROVAL = 'approved as drafted by the owner on 2026-10-13 (O-6 lifted)';
 
 /** The How it works page in its order: page-level strings, then the blocks. */
 function pageIds(): CopyId[] {
@@ -97,7 +112,7 @@ function copyTable(list: readonly CopyId[]): string {
 
 export function ownerCopy(): string {
     const all = Object.keys(COPY) as CopyId[];
-    const listed = new Set<string>([...STRIP, ...pageIds(), ...LINKS, ...COVERAGE, ...CLAIM]);
+    const listed = new Set<string>([...STRIP, ...pageIds(), ...LINKS, ...COVERAGE, ...CLAIM, ...MOBILE]);
     const missing = all.filter((id) => !listed.has(id));
     if (missing.length) throw new Error(`owner-copy: strings not placed in a group: ${missing.join(', ')}`);
     const glossaryCount = Object.keys(GLOSSARY).length;
@@ -114,7 +129,7 @@ export function ownerCopy(): string {
         '- Source keys: SPEC = docs/SPEC.md, ECON = docs/design/ECONOMICS.md, ARCH = docs/design/ARCHITECTURE.md, FE = docs/design/FRONTEND.md, INDEXER = docs/design/INDEXER.md, D: = an approved disclosure in `apps/web/src/config/disclosures.ts`. Code paths are under `apps/web/src/` unless they start with `programs/`, `crates/` or `services/`.',
         '- O-1 (the deposit order) and O-4 (the 12 px floor) add no words: O-1 moves `lender.risks`, `lender.lossHistory`, `market.creatorSelfDealing`, `lender.residuals` and `lender.solRepayment` (with its checkbox) below the preview, verbatim.',
         '',
-        `Counts: intro strip ${STRIP.length}; glossary control ${Object.keys(GLOSSARY_UI).length}; glossary entries ${glossaryCount}; How it works ${pageIds().length}; links to the page ${LINKS.length}; O-2 ${COVERAGE.length}; O-5 ${CLAIM.length} (one of them unchanged). Total ${STRIP.length + Object.keys(GLOSSARY_UI).length + glossaryCount + pageIds().length + LINKS.length + COVERAGE.length + CLAIM.length}.`,
+        `Counts: intro strip ${STRIP.length}; glossary control ${Object.keys(GLOSSARY_UI).length}; glossary entries ${glossaryCount}; How it works ${pageIds().length}; links to the page ${LINKS.length}; O-2 ${COVERAGE.length}; O-5 ${CLAIM.length} (one of them unchanged); mobile wallets ${MOBILE.length} (section 8, approved on 2026-10-13). Total ${STRIP.length + Object.keys(GLOSSARY_UI).length + glossaryCount + pageIds().length + LINKS.length + COVERAGE.length + CLAIM.length + MOBILE.length}.`,
         '',
         '## 1. The intro strip above the markets list (O-3 (a), `markets-intro`)',
         '',
@@ -210,6 +225,12 @@ export function ownerCopy(): string {
         '',
         'Also decided that day: the amended `borrower.liquidation` ¶3 (FE §4.2), the compact intro’s height breakpoint `(max-width: 399.98px) and (max-height: 699.98px)` (FE §7.6) and the header’s lone ⓘ, accepted until a design pass after the audit (FE §7.2); and, asked after the approval’s review, the Claim **only when syncs can pay** (§6 above; FE §3.6, §3.8): {g} is capped by what the syncs can move, so a shortfall no sync can fund no longer enables a claim that pays 0.',
         '',
+        '## 8. Mobile wallets (O-6 lifted; approved as drafted on 2026-10-13)',
+        '',
+        `The wallet chooser on a phone and the Mobile Wallet Adapter’s notices in the review (FE §5.4 (6); \`src/config/copyWallet.ts\`), drafted by the mobile survey and ${MOBILE_APPROVAL}, byte for byte: straight apostrophes and no final full stops, unlike the rest of the copy. Everything else these surfaces show is existing text (“Open in Backpack / Phantom / Solflare ↗”, “Set your wallet to <cluster> first.”, “Copied”, “Cancelled in your wallet.”, “Connect a wallet that can sign.”, “Close and review again”).`,
+        '',
+        copyTable(MOBILE),
+        '',
     );
     return `${out.join('\n')}\n`;
 }
@@ -219,7 +240,10 @@ export function docBlock(): string {
     const out: string[] = [BEGIN, ''];
     const para = (id: string, where: string, text: string) => out.push(`- \`${id}\` (${where}):`, `  > ${text}`);
     out.push('**Intro strip, How it works, links, O-2, O-5** (`src/config/copy.ts`):', '');
-    for (const id of Object.keys(COPY) as CopyId[]) para(id, COPY[id].where, COPY[id].text);
+    const mobile = new Set<string>(Object.keys(WALLET_COPY));
+    for (const id of Object.keys(COPY) as CopyId[]) if (!mobile.has(id)) para(id, COPY[id].where, COPY[id].text);
+    out.push('', `**Mobile wallets** (\`src/config/copyWallet.ts\`; O-6, ${MOBILE_APPROVAL}):`, '');
+    for (const id of MOBILE) para(id, COPY[id].where, COPY[id].text);
     out.push('', '**The glossary control** (`src/config/glossary.ts` `GLOSSARY_UI`):', '');
     for (const [id, text] of Object.entries(GLOSSARY_UI)) para(id, 'the ⓘ', text);
     out.push('', '**Glossary entries** (`src/config/glossary.ts`; *beside*: the labels it attaches to):', '');
