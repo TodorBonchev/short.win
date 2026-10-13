@@ -141,6 +141,12 @@ export const STANDARD_POOL_TOKENS = 206_900_000_000_000n;
  */
 export const PAMM_POOL_LEN_2026_10 = 287;
 export const PUMP_CURVE_LEN_2026_10 = 141;
+/**
+ * What `create_v2` allocates and every trade grows a shorter bonding curve to since pump's 2026-10-08
+ * redeploy (through `post_complete_quote_in` @158), charging that trade the rent: 76,200–259,080
+ * lamports from 151–115 bytes at 5,080 per byte (PUMP-2026-10-2). PumpSwap pools keep 287.
+ */
+export const PUMP_CURVE_LEN_2026_10_08 = 166;
 /** `fees::PUMP_CURVE_MCAP_SUPPLY` (10¹⁵): the curve's fee-tier supply and the new pool's base supply. */
 export const PUMP_CURVE_MCAP_SUPPLY = 1_000_000_000_000_000n;
 /** The mock venue's protocol share of the trade fee, ppm (`mock_cpamm::PROTOCOL_FEE_RATE`). */

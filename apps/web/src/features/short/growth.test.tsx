@@ -1,6 +1,7 @@
 /**
  * PUMP-2026-10-2 (disclosed; the owner's decision of 2026-10-03): since pump's 2026-10-02 redeploys
- * the first trade on a PumpSwap pool shorter than 287 bytes, or a curve shorter than 141, grows the
+ * the first trade on a PumpSwap pool shorter than 287 bytes — and since its 2026-10-08 redeploy on a
+ * curve shorter than 166 (141 before) — grows the
  * account and charges that trade its rent, which the program nets out of an open's proceeds; an open
  * whose tolerance cannot cover it fails `ProceedsBelowMin` (6063) though no price moved
  * (`pamm_it::gates::t_rent_a_short_pool_grows_on_the_sale`: on the 211-byte pool at minimum rent no
@@ -79,7 +80,7 @@ beforeEach(() => {
 });
 
 describe('PUMP-2026-10-2: an open on a pump account its first trade grows', () => {
-    it('is a PumpSwap pool under 287 bytes or a curve under 141, as the dumped fixtures are', () => {
+    it('is a PumpSwap pool under 287 bytes or a curve under 166, as the dumped fixtures are', () => {
         for (const [name, want] of [
             ['pamm_legacy211_pool', 'pool'],
             ['pamm_legacy261_pool', 'pool'],
@@ -103,10 +104,24 @@ describe('PUMP-2026-10-2: an open on a pump account its first trade grows', () =
             [115, 'curve'],
             [125, 'curve'],
             [140, 'curve'],
-            [141, null],
-            [151, null],
+            [141, 'curve'],
+            [150, 'curve'],
+            [151, 'curve'],
+            [165, 'curve'],
+            [166, null],
         ] as const) {
             expect(venueGrowth(snapshot('pump_curve', len)), `curve ${len}`).toBe(want);
+        }
+        for (const [name, want] of [
+            ['pump_grow141_curve', 'curve'],
+            ['pump_grow151_curve', 'curve'],
+            ['pump_near_curve', 'curve'],
+            ['pump_near166_curve', null],
+            ['pump_fresh166_curve', null],
+        ] as const) {
+            const a = fixtureAccount(name);
+            if (!a) throw new Error(name);
+            expect(venueGrowth({ kind: 'pump_curve', read: [a] }), name).toBe(want);
         }
         expect(venueGrowth(snapshot('pump_swap', null))).toBeNull();
         expect(venueGrowth(snapshot('raydium_cpmm', 211))).toBeNull();

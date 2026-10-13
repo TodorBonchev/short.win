@@ -119,17 +119,20 @@ const SYSVAR_PREFIX = 'Sysvar';
  * The dumped venue programs: `[program id, ELF path, upgrade authority]` for `--upgradeable-program`.
  * CPMM is the 2026-10 redeploy (group `raydium_cpmm_2026_10`, M10 WP-2), the build every CPMM test
  * runs on; its program account and upgrade authority equal `raydium_programs`' 445,763,504 build's.
- * pump, PumpSwap and pump-fees are their 2026-10-02 redeploys (group `pump_programs_2026_10`, the
- * M10 pump revalidation), with the same program accounts and upgrade authority as `pump_programs`'.
+ * pump and PumpSwap are their 2026-10-08 redeploys and pump-fees its 2026-10-12 one (group
+ * `pump_programs_2026_10_13`, the 2026-10-13 re-pin; trimmed ELFs `6956c2f8…`, `3ffd5e3b…`,
+ * `8ad2ca93…`), with the same program accounts and upgrade authority as `pump_programs`'; the state
+ * those builds introduced (group `pump_state_2026_10_13`: the 1,088-byte `Global`, 166-byte curves)
+ * is loaded after `pump_state`, so an address both hold takes the newer bytes.
  */
 export function venuePrograms(): [string, string, string][] {
     const m = manifest();
     const out: [string, string, string][] = [];
     const byName = new Map(m.accounts.map((a) => [a.name, a]));
     for (const [prog, dataName] of [
-        ['pump_2026_10_program', 'pump_2026_10_program_data'],
-        ['pump_amm_2026_10_program', 'pump_amm_2026_10_program_data'],
-        ['pump_fees_2026_10_program', 'pump_fees_2026_10_program_data'],
+        ['pump_2026_10_08_program', 'pump_2026_10_08_program_data'],
+        ['pump_amm_2026_10_08_program', 'pump_amm_2026_10_08_program_data'],
+        ['pump_fees_2026_10_12_program', 'pump_fees_2026_10_12_program_data'],
         ['raydium_amm_v4_program', 'raydium_amm_v4_program_data'],
         ['raydium_cpmm_2026_10_program', 'raydium_cpmm_2026_10_program_data'],
     ] as const) {
