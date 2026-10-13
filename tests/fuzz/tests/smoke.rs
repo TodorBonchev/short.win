@@ -292,13 +292,14 @@ fn tmin_minimises_an_injected_failure() {
 }
 
 /// M10: the deficit tripwire and the wind-down's second claim pass on FUZZ-M7-24H-3's reproducer
-/// (a late depositor owing ≈ 1,044 SOL, its pro-rata share of a near-cap short's shortfall). The
-/// deficit sits at its bound — the late depositor's share of the shortfall the exit's events and
-/// the receivable show — within the dust, and the run fails the tripwire once the bound is scaled
-/// to 99 %: a debit 1 % above the lender's share would be caught; a receivable over-credited by
-/// 1 SOL fails its cross-check against the position's `credited_for`. The first pass's claim of the
-/// seeding lender finds `lender_sol` short until the late depositor covers; the second pass pays
-/// it, and nothing is left owed.
+/// (a late depositor owing ≈ 1,028 SOL, its pro-rata share of a near-cap short's shortfall; since
+/// AIR-07's drain gate the seeding lender leaves 1.98 ‰ of the claims unborrowed, else the late
+/// deposit is refused `PoolDrained` and nothing is owed). The deficit sits at its bound — the late
+/// depositor's share of the shortfall the exit's events and the receivable show — within the dust,
+/// and the run fails the tripwire once the bound is scaled to 99 %: a debit 1 % above the lender's
+/// share would be caught; a receivable over-credited by 1 SOL fails its cross-check against the
+/// position's `credited_for`. The first pass's claim of the seeding lender finds `lender_sol` short
+/// until the late depositor covers; the second pass pays it, and nothing is left owed.
 #[test]
 fn deficit_tripwire_on_fuzz_m7_24h_3() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

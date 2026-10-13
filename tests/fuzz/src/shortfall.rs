@@ -40,8 +40,8 @@
 //! with the deficit.
 //!
 //! Before M10 the wind-down funded deficits of any size with no check at all (22961b0);
-//! FUZZ-M7-24H-3's reproducer (≈ 1,044 SOL, a late depositor's 59 % of the shortfall) sits at
-//! ≈ 100 % of its bound.
+//! FUZZ-M7-24H-3's reproducer (≈ 1,028 SOL since AIR-07's drain gate, a late depositor's 58.6 %
+//! of the shortfall) sits at ≈ 100 % of its bound.
 
 use std::collections::BTreeMap;
 
