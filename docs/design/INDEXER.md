@@ -421,10 +421,10 @@ by" is the program as built (grep of `emit_cpi!` / `emit!`). [L] = log event.
 | `Close` | `close_short` | `fees`: `rent_lender` = rent − rent_protocol, `rent_protocol` | position → `closed`; `T += q`, `ΣB_Q −= q`, `open_positions −= 1`, `total_notional_open −= n_open`, `open_vault −= v`, `max_q_hwm := 0` if no position is left; `lender_sol += rent − rent_protocol`; `protocol_fees += rent_protocol` |
 | `Liquidate` | `liquidate` | `fees`: `rent_lender`, `rent_protocol` (both `derived`, §6.5), `liq_penalty_lender/_protocol/_keeper`, `liq_keeper_topup` | position → `liquidated` (`liquidated_expired = expired`); as `Close` with `q` from the position; `lender_sol += rent − ⌊rent·p⌋ + penalty_lender`; `protocol_fees += ⌊rent·p⌋ + penalty_protocol` |
 | `Expire` | `expire` | `fees`: `rent_lender`, `rent_protocol` (`derived`), `expiry_fee` (lenders), `expiry_keeper_reward` | position → `expired`; as `Close`; `lender_sol += rent − ⌊rent·p⌋ + expiry_fee`; `protocol_fees += ⌊rent·p⌋` |
-| `SolSettle` | `sol_settle` | `settlements` (§8.4); `fees`: `settle_keeper_reward` (k_s) | position → `settled` (`settle_condition`); `ΣB_Q −= q` (T unchanged: the tokens are extinguished), `open_positions −= 1`, `total_notional_open −= n_open`, `open_vault −= v`; `lender_sol += lender_amount` |
+| `SolSettle` | `sol_settle` | `settlements` (§8.4); `fees`: `settle_keeper_reward` (k_s) | position → `settled` (`settle_condition`); `ΣB_Q −= q` (T unchanged: the tokens are extinguished), `open_positions −= 1`, `total_notional_open −= n_open`, `open_vault −= v`; `lender_sol += lender_amount`; `vest_bal := 0` when `vest_flushed > 0` (AIR-07: the settlement flushed the vest, with or without an epoch roll) |
 | `SettleArmed` | `sol_settle` | — | position `armed = true`, `s_count`, `s_since`, `arm_count += 1` |
 | `SettleDisarmed` | `sol_settle` | — | position `armed = false`, `disarm_count += 1` |
-| `EpochRolled` | `sol_settle` (a settlement that rolls) | `share_epochs` (`full_wipe = num = 0`) | `S := ⌊S·num/den⌋`, `share_epoch := epoch + 1`, `wipe_live := (num = 0)`, `vest_bal := 0` on a full wipe; lender counts recomputed; `lender_sol += record_donation` (§6.4; `events.derived`) |
+| `EpochRolled` | `sol_settle` (a settlement that rolls) | `share_epochs` (`full_wipe = num = 0`) | `S := ⌊S·num/den⌋`, `share_epoch := epoch + 1`, `wipe_live := (num = 0)`, `vest_bal := 0` on a full wipe, `vest_bal := record_donation` on a rebase with `vest_flushed > 0` (the record's donation vests anew after the flush); lender counts recomputed; `lender_sol += record_donation` (§6.4; `events.derived`) |
 | `ProtocolFeesSwept` | `sweep_protocol_fees` | `protocol_sweeps` | `protocol_fees −= amount` |
 | `MarginAdded` | `add_margin` | — | position `margin_added += amount`, `v += amount`; `open_vault += amount` |
 | `PriceCranked` | `crank_price` | `market_snapshots` (cranker = fee payer) | price columns (`spot_wad`, `ema_price`, `ema_liq`, `liq_slow`, `ema_count`, `lb_lo/hi`, `util_bps`, `rent_basis`, `vest_bal`), `tier` |
@@ -449,6 +449,10 @@ by" is the program as built (grep of `emit_cpi!` / `emit!`). [L] = log event.
 | `VenueExtrasSet` | `set_venue_extras` | — | `venue_extras[(venue, ix)]` := version, keys, stable_version |
 | `CurveCompleted` [L] | complete_curve (the straddle's tx1) | — | none (graduation timeline in `events`) |
 | `CurveAlreadyComplete` [L] | complete_curve | — | none |
+
+**`vest_bal` and the lender events** (AIR-07; `project::vest_after`): a `Deposit`, `Withdraw`,
+`ClaimSol`, `DeficitCovered` or `LenderSynced` with `s_after = 0` sets `vest_bal := 0` (R3B-2: the
+last shares are paid the vest first; the program holds no vest while `S = 0`).
 
 **Instructions without an event** that still matter: `initialize_config` (its `InitConfigArgs` →
 the first `protocol_params_history` row and `protocol_state.venue_enabled`); `crank_sol_usd` (the
@@ -506,7 +510,8 @@ twice — the program's own Borsh type and an IDL walker over the embedded
 | `open_vault_lamports` | [E] | Σ `v` of open positions (= Σ open `ShortPosition.v`) |
 | `lender_sol`, `protocol_fees` | [E] | the ledgers of §6.4 (= `MarketVault.lender_sol`, `.protocol_fees`) |
 | `lender_count` | [E] | lenders whose shares, converted to the current epoch (§6.3), are > 0 |
-| price columns, `tier`, `util_bps`, `vest_bal`, `rent_basis*` | [E\*] / [A] | last `PriceCranked` / `Open` in chain order, or a newer account snapshot (`price_source`) |
+| price columns, `tier`, `util_bps`, `rent_basis*` | [E\*] / [A] | last `PriceCranked` / `Open` in chain order, or a newer account snapshot (`price_source`) |
+| `vest_bal` | [E\*] / [A] | the last `PriceCranked` (or a newer account snapshot), and 0 after every reported flush: `SolSettle.vest_flushed > 0`; `EpochRolled` (full wipe → 0; flushing rebase → `record_donation`); a lender event with `s_after = 0` (AIR-07; `project::vest_after`). Lumps vested since the last crank are not tracked. `markets.vest_bal` is not served by the API; `PriceSnapshot.vest_bal` is the crank's `market_snapshots` row |
 | route chains | [E\*] | last `RouteChainChanged`; cleared by `PoolSwitched` |
 | `coin_creator` | [A] | the refresher (`cached_creator` / pool cache), else a venue trade's creator field |
 
@@ -1119,7 +1124,7 @@ takes a query permit. Unknown routes are rate-limited.
 
 | Session | From | Covers |
 |---|---|---|
-| `mock_lifecycle` (committed, thinned to its first and last checkpoints) | a scripted `Env` scenario on the mock venue, 836 transactions, 62 checkpoints | S1, S2, S3, CR liquidation, expiry, a wipe with a donation and a trader sweep, a rebase, every lender instruction, the Emergency's powers, the latch, the unsafe-mint flag |
+| `mock_lifecycle` (committed, thinned to its first and last checkpoints) | a scripted `Env` scenario on the mock venue, 836 transactions, 62 checkpoints (*AIR-07, `590e724`:* recorded at test time 966 transactions and 74 checkpoints; the committed copy is the older recording, migrated to `SolSettle.vest_flushed`, not re-recorded) | S1, S2, S3, CR liquidation, expiry, a wipe with a donation and a trader sweep, a flushing rebase whose pre-funded record's donation vests anew (M5), a vest flush without an epoch roll (M6), the last shares leaving a running vest (M7), every lender instruction, the Emergency's powers, the latch, the unsafe-mint flag |
 | `mock_admin` (committed, thinned) | `Env` on the mock | every `ConfigChange` kind through the timelock, a cancel, locked terms across a `Params` change, the coverage pause and the Emergency's clear, extras, an arm then a disarm |
 | `keeper_liquidation`, `keeper_coverage_pause` | `services/keeper-litesvm` (`Harness`) | the keeper's v1 / v0 batches; the O17 drill with the coverage key installed through the real timelock |
 | `raydium_lifecycle`, `pool_switch` | the Raydium fork | AMM v4 and CPMM, a close, keeper liquidations on both, S3 on an admin-halted pool; `PoolProposed`, `PoolSwitchCancelled`, `PoolSwitched` |
@@ -1143,6 +1148,9 @@ For each session: ingest into a fresh database **up to each checkpoint** and ass
    `borrowed_q`, `borrowed_q_by_tier`, `total_shares`, `share_epoch`, `open_positions`,
    `total_notional_open`, `max_q_hwm`, `venue`, flags, `coverage_cleared_at`, the Raydium pool cache's
    pool and `pool_d`, `fp_*`); [E\*] columns where the market's last observing invocation emitted them.
+   `vest_bal` ([E\*]): 0 wherever the checkpoint's vest is flushed (`vest_bal = 0` with
+   `vest_end > vest_last`), and equal to the harness model's at every checkpoint
+   (`assert::vest_vs_model`; AIR-07).
 2. **Vaults:** `lender_sol`, `protocol_fees` equal `MarketVault`'s (the §6.4 ledgers).
 3. **Positions:** every open `ShortPosition` ↔ a `positions` row with status `open` and equal `q, s,
    v, n_open, fee_open, deadline, tier, s_armed/s_count/s_since`, `m` = `positions.m +
@@ -1182,7 +1190,12 @@ This is the M8 exit criterion "replays an E2E session into correct DB state" (§
 `assert::replay_session` runs items 1–13 on each of the eight sessions through
 `ingest::ingest_session` / `ingest::rebuild` / the finality tracker (no skip path: the pipeline is
 built); the assertions are also run on the harness's own reference writer (`seed.rs`), where a
-tampered row is caught by each assertion family.
+tampered row is caught by each assertion family (a stale `vest_bal` on a flushed market
+included). The reference model (`chain::check_session`, `Model::check_against`) compares its
+`vest_bal` with the chain
+in two cases: right after the event that set it (the market's last event, in the last
+transaction applied: a crank's snapshot, a reported flush, or a flushing rebase's record
+donation), and wherever the chain's vest is flushed, where it must be 0.
 
 ### 11.5 Decoder unit tests (INGEST)
 
@@ -1191,6 +1204,9 @@ Synthetic transactions built in Rust (Borsh-serialised `shortwin::events::*` beh
 1–4; a forged "Program data:" line from another program (rejected); a CPMM-discriminator event from
 CLMM (rejected); `Log truncated`; failed transactions; v0 lookup-table and v1 key resolution; the
 `ConfigChange` hash check. Then the committed sessions of §11.3 end-to-end through `to_raw_tx`.
+`the_committed_sessions_decode_with_the_current_layouts` (no database): every committed session
+decodes with no short.win payload refused, so a layout change (an appended event field, as
+`SolSettle.vest_flushed`) must migrate or re-record the fixtures.
 
 **On recorded mainnet transactions (M10 GC-F1).** `tests/venue_mainnet.rs` runs the gap-calibration
 crawler's recorded mainnet transactions (`scripts/gapcal/tests/fixtures`, about 20 per venue, each
@@ -1375,9 +1391,12 @@ track reads (§9.2's read model, §6's projections) needs that track's agreement
   (1,369 transactions; the projections equal the chain at all 159 checkpoints; idempotent
   re-ingest, rebuild, out-of-order delivery, rollback with the rollups), plus `the_contract_rules_equal_the_chain_at_every_checkpoint`,
   `the_assertions_hold_on_a_faithful_database_and_catch_tampering`, the analytics reproductions
-  and catalog coverage (8 tests); `cargo test -p shortwin-indexer --test ingest_sessions` — INGEST's
-  fourteen fixtures and REPLAY's committed two, each matching the chain, with ordering, rebuild,
-  rollback and single-writer tests (6).
+  and catalog coverage (8 tests; *AIR-07, `590e724`:* `mock_lifecycle` gained M5–M7, so these
+  totals change; they stay as measured at M8 until CI's PostgreSQL run, which has not run on
+  the AI review's follow-ups, re-measures them);
+  `cargo test -p shortwin-indexer --test ingest_sessions` — INGEST's fourteen fixtures and
+  REPLAY's committed two, each matching the chain, with ordering, rebuild, rollback and
+  single-writer tests (6).
 - *"API contract tests":* `api_contract` (6), `api_limits` (6), `api_ws` (6) on the seed and
   `api_replayed` (1, ≈ 1,800 responses on sixteen replayed sessions, 48 accounts compared with the
   chain through the API).
