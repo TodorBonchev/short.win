@@ -1085,7 +1085,8 @@ mod tests {
     );
 
     /// T-INDEXER `post_complete_buy_event_row`: `2vVRr9eg…`'s `PostCompleteBuyEvent` is named on
-    /// pump only (its discriminator in the 2026-10-08 ELF, not the 2026-10-02 one) and becomes a
+    /// pump only (its discriminator in the 2026-10-08 ELF and the 2026-10-13 one mainnet runs since
+    /// the re-pin, not the 2026-10-02 one) and becomes a
     /// second pump trade row: a buy of `base_out` = 6,238,850,918,425 for `quote_in + fee +
     /// creator_fee` = 2,642,475,552 + 25,103,518 + 7,927,427 lamports, on the curve's key, priced
     /// on the would-be pool's reserves after the buy (200,661,149,081,575, 87,632,834,741) — the
@@ -1095,7 +1096,9 @@ mod tests {
     fn post_complete_buy_event_row() {
         let d = anchor_event_discriminator("PostCompleteBuyEvent");
         assert_eq!(d, [0x6f, 0xb0, 0x6d, 0x8b, 0x31, 0x6c, 0xd5, 0xfb]);
-        assert!(emits(&elf("pump_2026_10_08"), &d));
+        for build in ["pump_2026_10_08", "pump_2026_10_13"] {
+            assert!(emits(&elf(build), &d), "{build}");
+        }
         assert!(!emits(&elf("pump_2026_10"), &d));
         let post = unhex(SYNTH_POST);
         assert_eq!(venue_event_name(&PUMP, &post), Some("PostCompleteBuyEvent"));
