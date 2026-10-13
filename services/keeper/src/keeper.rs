@@ -39,13 +39,14 @@
 //! every covered market's pool and CPMM config against the last tick (Raydium admin actions:
 //! route lost or restored, status, open time, fee against the opens and hard caps), as alerts.
 //! A moved slot the header cannot judge (AIR-01: a fingerprinted venue's with its latch bit clear)
-//! is judged by the flag's own simulation — the program's rule on the whole account — so an
-//! upgrade is still flagged before the exits, and the loader's permissionless `ExtendProgram`
-//! (`VenueNotUpgraded`, from a bank that holds the deploy the header showed) is neither flagged
-//! nor paged. What needs the whole ProgramData (a slot that simulation could not judge —
-//! refused, answered from a bank before the deploy, or short.win not deployed in that slot —, a
-//! move during a review, the record of the deploy under review, Token-2022's changes) is read
-//! after the exits and cranks, all in one read, and judged by the same rule.
+//! is judged by the flag's own simulation — the program's rule on the whole account, all such
+//! venues of the tick simulated together (one priority price, one blockhash, the simulations in
+//! parallel) — so an upgrade is still flagged before the exits, and the loader's permissionless
+//! `ExtendProgram` (`VenueNotUpgraded`, from a bank that holds the deploy the header showed) is
+//! neither flagged nor paged. What needs the whole ProgramData (a slot that simulation could not
+//! judge — refused, answered from a bank before the deploy, or short.win not deployed in that
+//! slot —, a move during a review, the record of the deploy under review, Token-2022's changes)
+//! is read after the exits and cranks, all in one read, and judged by the same rule.
 //!
 //! **List-only markets** (M5): covered like any market with their detection set as ReadSet — one
 //! with positions open (a curve that graduated elsewhere) is observed on the no-route cadence and
@@ -3567,10 +3568,10 @@ impl<C: Chain> Keeper<C> {
     ///
     /// AIR-01: a moved slot the header cannot judge with the venue's bit clear
     /// ([`LatchAction::Inspect`]: a fingerprint recorded) is judged here too, by the program: the
-    /// flag's simulation is its rule on the whole account, once the other venues are done
-    /// ([`Self::judge_inspected`]). An upgrade passes — paged, and flagged in the slot it is
-    /// seen, before the tick's exits and cranks; the loader's `ExtendProgram` answers
-    /// `VenueNotUpgraded` from a bank that holds the deploy — booked
+    /// flag's simulation is its rule on the whole account — every such venue of the tick
+    /// together, after the others ([`Self::judge_inspected`]). An upgrade passes — paged, and
+    /// flagged in the slot it is seen, before the tick's exits and cranks; the loader's
+    /// `ExtendProgram` answers `VenueNotUpgraded` from a bank that holds the deploy — booked
     /// ([`Self::note_extension`]), neither flagged nor paged, and that deploy slot not simulated
     /// again. What needs the whole account is returned for [`Self::inspect_programs`], after the
     /// exits and cranks, where nothing before the exits waits on it: a slot the flag's
@@ -3603,7 +3604,7 @@ impl<C: Chain> Keeper<C> {
             return None;
         };
         let mut items = Vec::new();
-        // AIR-01: the moved slots the flag's simulation judges, after the loop.
+        // AIR-01: the moved slots the flag's simulation judges, all together after the loop.
         let mut inspect = Vec::new();
         let headers = accs.get(1..).unwrap_or(&[]);
         for (w, acc) in watched.iter().zip(headers.iter()) {
@@ -3694,11 +3695,14 @@ impl<C: Chain> Keeper<C> {
 
     /// AIR-01 (duty 10): the moved slots of [`Self::watch_programs`] the header cannot judge
     /// (`todo`: the program, its latch venue, the header's deploy slot, the latch's
-    /// `guard_slot`), judged before the tick's exits by the flag's own simulation
-    /// ([`Self::send_flag`]), each at most once a second per deploy.
+    /// `guard_slot`), judged before the tick's exits by the flag's own simulation, each at most
+    /// once a second per deploy ([`Self::flag_due`]). They are simulated together
+    /// ([`Self::simulate_flags`]): one priority price and one blockhash, read at the same time,
+    /// then the simulations in parallel — two round trips for any number of venues, where one
+    /// venue after another cost three each.
     ///
-    /// - The program would flag it: paged, flagged (sent at the exit priority ceiling) and,
-    ///   landed, its record read after the exits.
+    /// - The program would flag it: paged, flagged ([`Self::send_flag_now`]: simulated again
+    ///   and sent at the exit priority ceiling) and, landed, its record read after the exits.
     /// - `VenueNotUpgraded` from a bank at or past the header's deploy slot — a bank that holds
     ///   that deploy: the loader's `ExtendProgram`, booked ([`Self::note_extension`]).
     /// - `VenueNotUpgraded` from a bank before it — a node of an RPC pool behind the header
@@ -3718,8 +3722,21 @@ impl<C: Chain> Keeper<C> {
         report: &mut TickReport,
         items: &mut Vec<(monitor::WatchedProgram, u64, Inspection)>,
     ) {
-        for (w, venue, slot, known) in todo {
-            match self.send_flag(venue, slot, now, report).await {
+        let due: Vec<(monitor::WatchedProgram, u8, u64, u64)> = todo
+            .into_iter()
+            .filter(|(_, venue, slot, _)| self.flag_due(*venue, *slot, now))
+            .collect();
+        if due.is_empty() {
+            return;
+        }
+        let venues: Vec<u8> = due.iter().map(|(_, venue, _, _)| *venue).collect();
+        let sims = self.simulate_flags(&venues, now, report).await;
+        for ((w, venue, slot, known), sim) in due.into_iter().zip(sims) {
+            let flag = match sim {
+                Some(sent) => self.flag_outcome(venue, slot, sent),
+                None => self.send_flag_now(venue, slot, now, report).await,
+            };
+            match flag {
                 FlagSent::Landed => {
                     self.page_upgrade(&w, venue, slot, known);
                     self.flag_landed(venue, slot, report);
@@ -3760,7 +3777,7 @@ impl<C: Chain> Keeper<C> {
                         },
                     ));
                 }
-                // Attempted for this deploy this second already.
+                // Filtered by `flag_due` above.
                 FlagSent::Throttled => {}
                 FlagSent::Failed(failure) => {
                     items.push((
@@ -3774,6 +3791,112 @@ impl<C: Chain> Keeper<C> {
                 }
             }
         }
+    }
+
+    /// AIR-01 (duty 10): `flag_venue_upgraded(venue)` of each of `venues` simulated as
+    /// [`Self::send_ixs`] would, but together: one priority price (each writes only the
+    /// `VenueGuard`) and one blockhash, read at the same time, then every simulation at once.
+    /// Per venue: the outcome a send would have come to before sending — `SimFailed`,
+    /// `NotDeployed` ([`Self::deployed_this_slot`]), `TooLarge`, `DryRun` or an error — or
+    /// `None` where the simulation passed (an upgrade: [`Self::send_flag_now`] sends it, after
+    /// simulating it again) or the cluster refused the v1 format (the next attempt is v0's).
+    async fn simulate_flags(
+        &mut self,
+        venues: &[u8],
+        now: i64,
+        report: &mut TickReport,
+    ) -> Vec<Option<anyhow::Result<Sent>>> {
+        let writable = [pda::venue_guard()];
+        let (price, blockhash) = futures::join!(
+            self.priority_price(&writable, true),
+            self.chain.latest_blockhash()
+        );
+        let blockhash = match blockhash {
+            Ok(bh) => bh,
+            Err(e) => {
+                return venues
+                    .iter()
+                    .map(|_| Some(Err(anyhow!("getLatestBlockhash: {e:#}"))))
+                    .collect();
+            }
+        };
+        let format = self.format(now);
+        let alts = if format == TxFormat::V0 {
+            self.lookup_tables.clone()
+        } else {
+            Vec::new()
+        };
+        let budget = ComputeBudget {
+            unit_price: price,
+            ..ComputeBudget::SIMULATION
+        };
+        // Each venue's transaction: `Ok(None)` too large, `Err` not built.
+        let mut built = Vec::with_capacity(venues.len());
+        for venue in venues {
+            let t = match ixs::flag_venue_upgraded(*venue) {
+                Ok(ix) => tx::build(format, &self.payer, &[], &[ix], &budget, blockhash, &alts)
+                    .map(|t| tx::fits(format, &t).then_some(t)),
+                Err(e) => {
+                    let detail = format!("flag_venue_upgraded({venue}): {e:#}");
+                    report.errors.push(detail.clone());
+                    Err(anyhow!(detail))
+                }
+            };
+            built.push(t);
+        }
+        let chain = &self.chain;
+        let sims = futures::future::join_all(built.iter().map(|t| async move {
+            match t {
+                Ok(Some(t)) => Some(chain.simulate(t).await),
+                _ => None,
+            }
+        }))
+        .await;
+        let mut v0 = false;
+        let mut out = Vec::with_capacity(venues.len());
+        for (t, sim) in built.into_iter().zip(sims) {
+            let verdict = match (t, sim) {
+                (Err(e), _) => Some(Err(e)),
+                (Ok(None), _) => Some(Ok(Sent::TooLarge)),
+                (Ok(Some(_)), None) => Some(Err(anyhow!("not simulated"))),
+                (Ok(Some(_)), Some(sim)) => {
+                    self.metrics.simulations += 1;
+                    match sim {
+                        Err(e) => Some(Err(e)),
+                        Ok(sim) => {
+                            if let Some(TxError::Rejected(r)) = &sim.err
+                                && (v0 || self.on_rejected(format, r, now))
+                            {
+                                // The format the cluster refused: sent the ordinary way, in v0.
+                                v0 = true;
+                                out.push(None);
+                                continue;
+                            }
+                            if let Some(TxError::Rejected(r)) = &sim.err
+                                && r.starts_with("too large")
+                            {
+                                self.metrics.simulation_failures += 1;
+                                Some(Ok(Sent::TooLarge))
+                            } else if sim.err.is_some() {
+                                self.metrics.simulation_failures += 1;
+                                match self.deployed_this_slot(&sim, now).await {
+                                    Some(program) => {
+                                        Some(Ok(Sent::NotDeployed { out: sim, program }))
+                                    }
+                                    None => Some(Ok(Sent::SimFailed { out: sim, format })),
+                                }
+                            } else if self.cfg.dry_run {
+                                Some(Ok(Sent::DryRun { out: sim }))
+                            } else {
+                                None
+                            }
+                        }
+                    }
+                }
+            };
+            out.push(verdict);
+        }
+        out
     }
 
     /// AIR-01 (duty 10): what [`Self::watch_programs`] left to the whole account, after the

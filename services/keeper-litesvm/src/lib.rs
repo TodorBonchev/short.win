@@ -22,8 +22,10 @@
 //! ([`LiteSvmChain::fail_simulations`]), header reads of a node lagging the last deploy
 //! ([`LiteSvmChain::lag_headers_of`]) and simulations served by a node that stays behind
 //! ([`LiteSvmChain::lag_simulations`]); every read and send is logged
-//! ([`LiteSvmChain::rpc_log`], M4-SEC-7: the keeper's RPC work per tick). **Timing** (M7-SEC-1,
-//! M7-SEC-6): the keeper's transactions can land seconds after the clock it read
+//! ([`LiteSvmChain::rpc_log`], M4-SEC-7: the keeper's RPC work per tick), the blockhash,
+//! priority-fee and simulation calls counted ([`LiteSvmChain::other_calls`]). **Timing**
+//! (M7-SEC-1, M7-SEC-6): the keeper's
+//! transactions can land seconds after the clock it read
 //! ([`LiteSvmChain::set_landing_delays`]), its clock can lag the chain's
 //! ([`LiteSvmChain::set_clock_lag`]), and a trade can land between its read and its transaction
 //! ([`LiteSvmChain::before_next_send`]); [`Harness::second_slow`] models a tick that waited for
@@ -99,6 +101,31 @@ pub struct LiteSvmChain {
     /// Simulations answered from a copy of the VM ([`LiteSvmChain::lag_simulations`]): the copy,
     /// its slot, how many more.
     stale_sims: RefCell<Option<(litesvm::LiteSVM, u64, usize)>>,
+    /// The calls [`Rpc`] does not log ([`LiteSvmChain::other_calls`]).
+    other: Cell<OtherCalls>,
+}
+
+/// The backend calls the [`Rpc`] log leaves out (it lists the reads and sends M4-SEC-7 measures),
+/// counted: AIR-01's cost of the flag's simulations before the exits.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct OtherCalls {
+    /// `getLatestBlockhash`.
+    pub blockhashes: usize,
+    /// `getRecentPrioritizationFees`.
+    pub priority_fees: usize,
+    /// `simulateTransaction`.
+    pub simulations: usize,
+}
+
+impl OtherCalls {
+    /// The calls made since `earlier` (a count taken before).
+    pub fn since(self, earlier: Self) -> Self {
+        Self {
+            blockhashes: self.blockhashes - earlier.blockhashes,
+            priority_fees: self.priority_fees - earlier.priority_fees,
+            simulations: self.simulations - earlier.simulations,
+        }
+    }
 }
 
 /// A source of landing delays (seconds) for [`LiteSvmChain::set_landing_delays`].
@@ -241,6 +268,7 @@ impl LiteSvmChain {
             fail_sims: Cell::new(0),
             lag_headers: Cell::new(None),
             stale_sims: RefCell::new(None),
+            other: Cell::new(OtherCalls::default()),
         }
     }
 
@@ -257,6 +285,17 @@ impl LiteSvmChain {
             .with_sigverify(false)
             .with_blockhash_check(false);
         *self.stale_sims.borrow_mut() = Some((svm, env.clock().slot, times));
+    }
+
+    /// The calls the [`Rpc`] log leaves out, so far.
+    pub fn other_calls(&self) -> OtherCalls {
+        self.other.get()
+    }
+
+    fn count(&self, f: impl FnOnce(&mut OtherCalls)) {
+        let mut c = self.other.get();
+        f(&mut c);
+        self.other.set(c);
     }
 
     /// The next `times` header reads naming no context slot (`account_headers`) answer
@@ -637,10 +676,12 @@ impl Chain for LiteSvmChain {
     }
 
     async fn latest_blockhash(&self) -> anyhow::Result<Hash> {
+        self.count(|c| c.blockhashes += 1);
         Ok(self.env.borrow().svm.latest_blockhash())
     }
 
     async fn simulate(&self, tx: &VersionedTransaction) -> anyhow::Result<TxOutcome> {
+        self.count(|c| c.simulations += 1);
         if let Some(r) = self.refused(tx) {
             return Ok(r);
         }
@@ -717,6 +758,7 @@ impl Chain for LiteSvmChain {
     }
 
     async fn recent_priority_fees(&self, _writable: &[Pubkey]) -> anyhow::Result<Vec<u64>> {
+        self.count(|c| c.priority_fees += 1);
         Ok(self.fees.borrow().clone())
     }
 

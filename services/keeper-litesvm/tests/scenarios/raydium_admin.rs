@@ -32,7 +32,8 @@
 //!   read fails too the moved slot is paged; Token-2022's extension is not paged, its upgrade is.
 //!   A `VenueNotUpgraded` answered by a node behind the header read (a context slot before the
 //!   deploy) is not booked as an extension: the whole account pages the upgrade and the next
-//!   slot flags it.
+//!   slot flags it. Two venues extended in one slot are simulated together: one priority-fee
+//!   read, one blockhash, two simulations.
 
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::Instruction;
@@ -852,10 +853,15 @@ fn air01_a_keeper_restarted_during_a_review_does_not_page_an_extension_of_its_de
 /// Revalidates AMM v4 at its fixture deploy with its trimmed ELF's hash (the ops runbook): the
 /// latch then holds its fingerprint. Returns that deploy slot.
 pub fn revalidate_v4_with_hash(h: &Harness) -> u64 {
-    let venue = GUARD_RAYDIUM_V4;
+    revalidate_with_hash(h, RaydiumProgram::AmmV4, GUARD_RAYDIUM_V4)
+}
+
+/// Revalidates Raydium `program` (latch venue `venue`) at its fixture deploy with its trimmed
+/// ELF's hash: the latch then holds its fingerprint. Returns that deploy slot.
+fn revalidate_with_hash(h: &Harness, program: RaydiumProgram, venue: u8) -> u64 {
     let slot0 = FIXTURE_GUARD_SLOTS[usize::from(venue)];
     h.with_env(|env| {
-        let reviewed = reviewed_hash(env, RaydiumProgram::AmmV4);
+        let reviewed = reviewed_hash(env, program);
         let ea = env.pause_authority.insecure_clone();
         let ix = ix::revalidate_venue_reviewed(&ea.pubkey(), venue, slot0, reviewed);
         ok(env.send(&[ix], &[&ea]));
@@ -1096,6 +1102,59 @@ fn air01_an_upgrade_a_lagging_node_simulates_is_still_flagged_and_paged() {
         custom_code(&res),
         Some(u32::from(ShortwinError::VenueUpgraded))
     );
+}
+
+/// AIR-01's cost before the exits, when a stranger extends several fingerprinted venues in one
+/// slot (four at most: pump-fees, AMM v4, CPMM, Jupiter): the flags of all the tick's moved slots
+/// the header cannot judge are simulated together — one priority-fee read and one blockhash,
+/// then the simulations (in parallel on a JSON-RPC backend). AMM v4 and CPMM revalidated with
+/// their fingerprints; a stranger extends both in one slot. The keeper's next tick books both
+/// extensions with one priority-fee read, one blockhash read and two simulations, and sends,
+/// flags and pages nothing. As first built it simulated one venue after the other, each with
+/// its own priority-fee read and blockhash: three calls per venue in a row.
+#[test]
+fn air01_venues_extended_in_one_slot_are_simulated_together() {
+    let (mut h, _ms) = ray_setup(&[FART], KeeperConfig::default());
+    let v4 = RaydiumProgram::AmmV4.id();
+    let cpmm = RaydiumProgram::Cpmm.id();
+    revalidate_v4_with_hash(&h);
+    revalidate_with_hash(&h, RaydiumProgram::Cpmm, GUARD_RAYDIUM_CPMM);
+    h.slot();
+    // A tick with nothing moved calls none of them.
+    let quiet = h.chain().other_calls();
+    let r = h.slot().clone();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert_eq!(
+        h.chain().other_calls().since(quiet),
+        shortwin_keeper_litesvm::OtherCalls::default(),
+        "{r:?}"
+    );
+
+    let (e1, e2) = h.with_env(|env| (stranger_extends(env, &v4), stranger_extends(env, &cpmm)));
+    assert_eq!(e1, e2, "one slot");
+    let (calls, sent) = (h.chain().other_calls(), h.chain().sent().len());
+    let r = h.slot().clone();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    let mut extended = r.extended.clone();
+    extended.sort();
+    let mut want = vec![(v4, e1), (cpmm, e1)];
+    want.sort();
+    assert_eq!(extended, want);
+    assert!(
+        r.flagged.is_empty() && venue_alerts(&r).is_empty(),
+        "{:?}",
+        r.alerts
+    );
+    assert_eq!(h.chain().sent().len(), sent, "nothing sent");
+    assert_eq!(
+        h.chain().other_calls().since(calls),
+        shortwin_keeper_litesvm::OtherCalls {
+            blockhashes: 1,
+            priority_fees: 1,
+            simulations: 2,
+        }
+    );
+    assert_eq!(h.keeper.metrics.venue_extensions, 2);
 }
 
 /// AIR-01 for Token-2022 (alert only; the mainnet program, extendable like any upgradeable
