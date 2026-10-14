@@ -446,11 +446,14 @@ fn math_tiers(tiers: pump::FeeTiers<'_>) -> Vec<FeeTier> {
 
 /// The curve's pricing inputs from the ReadSet (ARCH §4.2, §4.3), `None` when an account does
 /// not parse, the curve has migrated (`vT = 0`) or its base ATA holds fewer tokens than `rT`.
+/// `supply` (the named mint's, when the caller has it) resolves the synthetic exit's fee of a
+/// live curve (`CurvePricingInputs::synthetic_fees`).
 fn pricing_inputs(
     market: &Market,
     read: &[AccountInfo],
     curve: &pump::BondingCurve,
     live: &CurveState,
+    supply: Option<u64>,
     ema_fee: bool,
 ) -> Option<CurvePricingInputs> {
     let global_info = read.get(C_GLOBAL)?;
@@ -468,6 +471,11 @@ fn pricing_inputs(
         cap_bps: None,
     };
     let fees = fees::pump_curve(live.vt, live.vq, &schedule).ok()?;
+    // pump-final §5.2 (P1 correction (a)): pump charges both parts of a buy past `rT` at the
+    // curve's pre-trade market cap on the mint's live supply.
+    let synthetic_fees = supply
+        .filter(|_| !live.complete)
+        .and_then(|s| fees::pump_curve_at_supply(live.vt, live.vq, s, &schedule).ok());
     // M7-SEC-5: the fee at the stored `P_ema`'s market cap (`⌊vQ·10¹⁵/vT⌋` is the price times
     // the supply).
     let p_ema = market.ema_price.get();
@@ -486,14 +494,14 @@ fn pricing_inputs(
     if t.mint != market.mint.to_bytes() || t.owner != market.bonding_curve.to_bytes() {
         return None;
     }
-    let live_pool_tokens = u128::from(t.amount).checked_sub(live.rt)?;
+    let live_pool_tokens = t.amount.checked_sub(curve.real_token_reserves)?;
     let pfc_info = read.get(C_PAMM_FEE_CONFIG)?;
     let pfc_data = pfc_info.try_borrow_data().ok()?;
     let pfc = pump::read_fee_config(&pfc_info.owner.to_bytes(), &pfc_data).ok()?;
     let gc_info = read.get(C_PAMM_GLOBAL_CONFIG)?;
     let gc_data = gc_info.try_borrow_data().ok()?;
     let gc = pump_amm::read_global_config(&gc_info.owner.to_bytes(), &gc_data).ok()?;
-    Some(CurvePricingInputs {
+    let mut inputs = CurvePricingInputs {
         fees,
         offsets,
         live_pool_tokens,
@@ -503,18 +511,26 @@ fn pricing_inputs(
         pool_disable_flags: gc.disable_flags(),
         coin_creator_is_default: curve.creator_is_default(),
         fee_ppm_at_ema,
-    })
+        synthetic_protocol_bps: 0,
+        synthetic_creator_bps: 0,
+        synthetic_known: false,
+    };
+    inputs.set_synthetic_fees(synthetic_fees);
+    Some(inputs)
 }
 
 /// The venue state of a `PumpCurve` or `PumpMigrating` market from its key-checked ReadSet
 /// (module docs). Never fails: whatever does not parse is "not executable" (A63); a curve that
 /// parses always yields its [`CurveVenue`] (the prologue's [`sync`] reads it).
-/// `ema_fee`: also resolve the fee at the stored `P_ema`'s market cap
-/// (`CurvePricingInputs::fee_ppm_at_ema`, M7-SEC-5; `open_short`'s pre-trade read only).
+/// `supply`: the named mint's live supply, for the synthetic exit's fee
+/// (`CurvePricingInputs::synthetic_fees`; `None` leaves it unresolved). `ema_fee`: also resolve
+/// the fee at the stored `P_ema`'s market cap (`CurvePricingInputs::fee_ppm_at_ema`, M7-SEC-5;
+/// `open_short`'s pre-trade read only).
 pub fn read_state(
     market: &Market,
     kind: VenueKind,
     read: &[AccountInfo],
+    supply: Option<u64>,
     ema_fee: bool,
 ) -> VenueState {
     let mut st = VenueState::not_executable(kind);
@@ -537,7 +553,7 @@ pub fn read_state(
         _ => (CanonicalPool::Absent, None),
     };
     let pricing = if live.vt > 0 {
-        pricing_inputs(market, read, &curve, &live, ema_fee)
+        pricing_inputs(market, read, &curve, &live, supply, ema_fee)
     } else {
         None
     };

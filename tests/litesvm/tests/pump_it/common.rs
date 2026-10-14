@@ -121,6 +121,25 @@ impl VenueMarket for AsNone<'_> {
 /// The program's own venue state of `pm` now: the host build of `venues::read_state` on the
 /// ReadSet's accounts as the svm holds them (what the next instruction would read).
 pub fn host_state(env: &Env, pm: &PumpMarket) -> shortwin::venues::VenueState {
+    host_state_with(env, pm, None)
+}
+
+/// The supply of `pm`'s mint now (`supply` @36), as the program's exits, cranks, settles and opens
+/// read it from the named mint (`venues::mint_supply`).
+pub fn mint_supply(env: &Env, pm: &PumpMarket) -> u64 {
+    let m = env.svm.get_account(&pm.keys.mint).expect("mint");
+    shortwin_venue_state::mint::read_base(&m.owner.to_bytes(), &m.data)
+        .expect("mint")
+        .supply
+}
+
+/// [`host_state`] with the mint's `supply` (`venues::read_state_with`; `None` is
+/// `venues::read_state`).
+pub fn host_state_with(
+    env: &Env,
+    pm: &PumpMarket,
+    supply: Option<u64>,
+) -> shortwin::venues::VenueState {
     use anchor_lang::prelude::AccountInfo;
     let mut accs: Vec<(Pubkey, u64, Vec<u8>, Pubkey)> = pm
         .read_set(false)
@@ -136,7 +155,7 @@ pub fn host_state(env: &Env, pm: &PumpMarket) -> shortwin::venues::VenueState {
         .collect();
     let m = market(env, pm);
     let kind = m.venue_kind().expect("venue");
-    shortwin::venues::read_state(&m, kind, &infos, env.now())
+    shortwin::venues::read_state_with(&m, kind, &infos, env.now(), supply)
 }
 
 /// `crank_price` on `mm` that must succeed.

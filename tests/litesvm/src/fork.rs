@@ -2988,6 +2988,23 @@ impl PumpCurve {
     /// pump `FeeConfig.fee_tiers` and `Global.creator_fee_configurable` (readers), the curve's
     /// own `creator_fee_bps` and creator. `None` on a migrated curve (`vT = 0`).
     pub fn fees(&self, svm: &LiteSVM) -> Option<FeeBps> {
+        self.resolve_fees(svm, None)
+    }
+
+    /// The fees pump charges on both parts of a buy past `rT` by synthetic migration
+    /// (pump-final §5.2, P1 correction (a)): `fees::pump_curve_at_supply` on the curve's
+    /// `(vT, vQ)` with the mint's live supply, the inputs otherwise as [`PumpCurve::fees`].
+    /// `None` on a migrated curve.
+    pub fn synthetic_fees(&self, svm: &LiteSVM) -> Option<FeeBps> {
+        let m = svm.get_account(&self.mint).expect("mint");
+        let supply = shortwin_venue_state::mint::read_base(&m.owner.to_bytes(), &m.data)
+            .expect("mint")
+            .supply;
+        self.resolve_fees(svm, Some(supply))
+    }
+
+    /// `fees::pump_curve` (`supply` `None`, the fixed 10¹⁵) or `fees::pump_curve_at_supply`.
+    fn resolve_fees(&self, svm: &LiteSVM, supply: Option<u64>) -> Option<FeeBps> {
         let c = self.state(svm);
         let fc = svm.get_account(&PUMP_FEE_CONFIG).expect("pump FeeConfig");
         let config = pump::read_fee_config(&fc.owner.to_bytes(), &fc.data).expect("FeeConfig");
@@ -3001,17 +3018,21 @@ impl PumpCurve {
             .collect();
         let g = global_data(svm);
         let global = pump::read_global(&pump::PROGRAM, &g).expect("Global");
-        mfees::pump_curve(
+        let (vt, vq) = (
             u128::from(c.virtual_token_reserves),
             u128::from(c.virtual_quote_reserves),
-            &CurveFeeSchedule {
-                tiers: &tiers,
-                creator_fee_configurable: global.creator_fee_configurable(),
-                curve_creator_fee_bps: c.creator_fee_bps,
-                creator_is_default: c.creator_is_default(),
-                cap_bps: None,
-            },
-        )
+        );
+        let schedule = CurveFeeSchedule {
+            tiers: &tiers,
+            creator_fee_configurable: global.creator_fee_configurable(),
+            curve_creator_fee_bps: c.creator_fee_bps,
+            creator_is_default: c.creator_is_default(),
+            cap_bps: None,
+        };
+        match supply {
+            None => mfees::pump_curve(vt, vq, &schedule),
+            Some(s) => mfees::pump_curve_at_supply(vt, vq, s, &schedule),
+        }
         .ok()
     }
 

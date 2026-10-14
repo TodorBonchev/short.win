@@ -50,7 +50,10 @@
 //! the spec's bound of the charge; (b′) the same after a token donation to `curve_base_ata`;
 //! (c) `buy_exact_quote_in_v3` past `rT`; (d) `migrate_v2` seeding exactly the live
 //! `curve_base_ata` and `rQ + pcQ − fee`; (e) the pool part's fee-tier tripwire; (f) the cashback
-//! refusal 6094; (g) no synthetic path on the 2026-10-02 build.
+//! refusal 6094; (g) no synthetic path on the 2026-10-02 build. Since P1, `B̂_v3` is
+//! `shortwin_math::quote::curve_synthetic` at the synthetic fee `fees::pump_curve_at_supply` (the
+//! curve's tier on the mint's live supply, `PumpCurve::synthetic_fees`), and the boost is
+//! `quote::migration_boost`.
 //!
 //! Every transaction goes through `Env::send` (the invariant hooks run after every
 //! instruction). `PUMP_MATH_SEQ` sets the random sequence length per curve (default 30) and
@@ -74,7 +77,9 @@ use shortwin_litesvm_tests::fork::{
 use shortwin_litesvm_tests::pump::{self as spump, CurveUser};
 use shortwin_litesvm_tests::{Env, TxResult, pda, read};
 use shortwin_math::fees::{self as mfees, FeeBps, FeeTier as MathFeeTier};
-use shortwin_math::quote::{CurveState, MigrationParams, migrated_pool, sol_leg};
+use shortwin_math::quote::{
+    CurveState, MigrationParams, curve_synthetic, migrated_pool, migration_boost, sol_leg,
+};
 use shortwin_venue_state::{program_data, pump, pump_amm};
 use solana_keypair::Keypair;
 use solana_signer::Signer;
@@ -2228,9 +2233,11 @@ fn synthetic_model(
     )
 }
 
-/// `B̂_v3(rT + δ)` (§5.2): the curve leg `sol_leg::buy_exact_out(rT, vT, vQ, ε₁ = 1, φ)` plus the
-/// synthetic-pool leg `buy_exact_out(δ, X_s, Y_s, ε₁ = 1, φ)` on `migrated_pool`'s `(X_s, Y_s)`
-/// with `pool_tokens = curve_base_ata − rT` — today's primitives (`curve_synthetic` is P1's).
+/// `B̂_v3(rT + δ)` (§5.2): `shortwin_math::quote::curve_synthetic` (P1) on the pre-trade curve,
+/// the curve leg `buy_exact_out(rT, vT, vQ, ε₁ = 1, φ)` plus the synthetic-pool leg
+/// `buy_exact_out(δ, X_s, Y_s, ε₁ = 1, φ)` on `migrated_pool`'s `(X_s, Y_s)` with
+/// `pool_tokens = curve_base_ata − rT` — the live leg the adapter quotes (pump-final §5.2) —
+/// both legs at `fees`.
 fn b_hat_v3(st: &pump::BondingCurve, ata: u64, fee_m: u64, delta: u64, fees: &FeeBps) -> u64 {
     let s = CurveState {
         vt: u128::from(st.virtual_token_reserves),
@@ -2239,18 +2246,18 @@ fn b_hat_v3(st: &pump::BondingCurve, ata: u64, fee_m: u64, delta: u64, fees: &Fe
         rq: u128::from(st.real_quote_reserves),
         complete: false,
     };
+    let m = MigrationParams {
+        migration_fee: fee_m,
+        pool_tokens: u128::from(ata - st.real_token_reserves),
+        post_complete_quote_in: 0,
+    };
+    let b = curve_synthetic(st.real_token_reserves + delta, &s, fees, fees, &m).unwrap();
+    // The composition, from the primitives (and the would-be pool pump priced on).
     let leg1 = sol_leg::buy_exact_out(st.real_token_reserves, s.vt, s.vq, true, fees).unwrap();
-    let (xs, ys) = migrated_pool(
-        &s,
-        &MigrationParams {
-            migration_fee: fee_m,
-            pool_tokens: u128::from(ata - st.real_token_reserves),
-            post_complete_quote_in: 0,
-        },
-    )
-    .unwrap();
+    let (xs, ys) = migrated_pool(&s, &m).unwrap();
     let leg2 = sol_leg::buy_exact_out(delta, xs, ys, true, fees).unwrap();
-    leg1.cost + leg2.cost
+    assert_eq!(b.cost, leg1.cost + leg2.cost);
+    b.cost
 }
 
 /// §5.2's general bound on `B̂_v3 − charge`: `(1 + Σ⌈bᵢ/10⁴⌉) + (Δ₂ + Σ⌈Δ₂·bᵢ/10⁴⌉)` with
@@ -2284,6 +2291,10 @@ fn synthetic_buy(
     let ctx = format!("{:?} synthetic buy_v3 rT + {delta}", c.coin);
     let bb = CurveUser::v3_buyback_recipient(&env.svm);
     let fees = c.fees(&env.svm).expect("fees");
+    // short.win's synthetic fee (P1 correction (a)): the tier at the live supply; the live curve
+    // `FeeConfig`'s single flat tier makes it the fixed-supply one too.
+    let phi_s = c.synthetic_fees(&env.svm).expect("φ_s");
+    assert_eq!(phi_s, fees, "{ctx}: one flat tier");
     let fee_m = migration_fee(&env.svm);
     let s0 = snap(&env.svm, c, u, &bb);
     let st = s0.st;
@@ -2470,7 +2481,7 @@ fn synthetic_buy(
         "{ctx}: vQ − rQ = ivqr"
     );
     // §5.2: short.win's B̂_v3 covers the charge, by at most the bound.
-    let b = b_hat_v3(&st, s0.curve_tokens, fee_m, delta, &fees);
+    let b = b_hat_v3(&st, s0.curve_tokens, fee_m, delta, &phi_s);
     let bound = v3_bound(delta, m.x_s, &fees);
     assert!(
         b >= m.charge && b - m.charge <= bound,
@@ -2564,7 +2575,11 @@ fn migrate_and_check(env: &mut Env, c: &PumpCurve, ctx: &str) {
     // The boost is `⌊X₁·Y₁/10¹⁵⌋` (the created pool's effective reserves, the 10¹⁵ supply): the
     // spec's `⌊(Y − pcQ)·2069/10⁴⌋` (+1 at most, the pool part's rounding up keeping
     // `X₁·Y₁ ≥ 206.9e12·(Y − pcQ)`) only while no token was donated to curve_base_ata.
-    let boost = i128::try_from(u128::from(y) * u128::from(a) / 1_000_000_000_000_000).unwrap();
+    let boost = i128::try_from(migration_boost(u128::from(a), u128::from(y)).unwrap()).unwrap();
+    assert_eq!(
+        boost,
+        i128::try_from(u128::from(y) * u128::from(a) / 1_000_000_000_000_000).unwrap()
+    );
     println!(
         "{ctx}: migrate_v2 created base {base} (curve_base_ata {a}), quote vault {vault} + VQR \
          {vqr} = {} (rQ + pcQ − fee = {y}); ⌊X₁·Y₁/10¹⁵⌋ = {boost}, ⌊(Y − pcQ)·2069/10⁴⌋ = \
@@ -2572,6 +2587,27 @@ fn migrate_and_check(env: &mut Env, c: &PumpCurve, ctx: &str) {
         i128::from(vault) + vqr
     );
     assert_eq!(base, a, "{ctx}: X₁ = the live curve_base_ata");
+    // P1's `migrated_pool` with the live curve_base_ata and pcQ (pump-final §5.1, §5.4) is the
+    // pool migrate_v2 created, exactly (the curve is complete: rT = 0, no curve leg).
+    let done = CurveState {
+        vt: u128::from(st.virtual_token_reserves),
+        vq: u128::from(st.virtual_quote_reserves),
+        rt: u128::from(st.real_token_reserves),
+        rq: u128::from(st.real_quote_reserves),
+        complete: st.complete,
+    };
+    assert_eq!(
+        migrated_pool(
+            &done,
+            &MigrationParams {
+                migration_fee: fee_m,
+                pool_tokens: u128::from(a),
+                post_complete_quote_in: pcq,
+            },
+        ),
+        Some((u128::from(base), u128::from(y))),
+        "{ctx}: (X₁, Y₁)"
+    );
     assert_eq!(
         i128::from(vault) + vqr,
         i128::from(y),
@@ -2773,10 +2809,12 @@ fn v3_buy_exact_quote_in_past_rt_buys_the_rest_from_the_would_be_pool() {
 /// names tells which schedule and which market cap pump rated it at. The curve part is charged at
 /// the curve's pre-trade tier (as v2), the pool part at the candidate pinned here; the user pays
 /// exactly the charge, and `B̂_v3` with that one schedule on both legs covers it within §5.2's
-/// bound. short.win's `φ` (§5.2: `fees::pump_curve`) resolves the same pre-trade curve at the
-/// fixed 10¹⁵ supply instead: on this burned coin that is another tier, and `B̂_v3` at it falls
-/// below the charge — the M5 live-supply deviation, now on the synthetic leg too, pinned here as
-/// a tripwire (no quote differs under the live single flat tier).
+/// bound. That schedule is short.win's synthetic `φ_s` since P1 (correction (a):
+/// `fees::pump_curve_at_supply` on the mint's live supply, `PumpCurve::synthetic_fees`). The
+/// existing curve path's `φ` (`fees::pump_curve`, the fixed 10¹⁵, unchanged for `q ≤ rT`)
+/// resolves the same pre-trade curve to another tier on this burned coin, and `B̂_v3` at it would
+/// fall below the charge — G0's 59,057,853-lamport finding, recorded here (the `q ≤ rT` side is
+/// `tripwire_the_curve_tier_market_cap_uses_the_live_mint_supply`'s).
 #[test]
 fn v3_tier_tripwire_pins_the_pool_parts_market_cap() {
     let (mut env, c, u) = near166_user();
@@ -2887,9 +2925,12 @@ fn v3_tier_tripwire_pins_the_pool_parts_market_cap() {
             None => format!("no entry of the FeeConfig ({bps} bps)"),
         }
     };
-    // short.win's `φ` on the pre-trade curve under these tiers (`PumpCurve::fees` =
-    // `fees::pump_curve`, the market cap at the fixed 10¹⁵ supply).
+    // short.win's fees on the pre-trade curve under these tiers: the curve path's `φ`
+    // (`PumpCurve::fees` = `fees::pump_curve`, the market cap at the fixed 10¹⁵ supply) and the
+    // synthetic legs' `φ_s` (`PumpCurve::synthetic_fees` = `fees::pump_curve_at_supply`, the
+    // mint's live supply).
     let phi = c.fees(&env.svm).expect("φ");
+    let phi_s = c.synthetic_fees(&env.svm).expect("φ_s");
     let s0 = snap(&env.svm, &c, &u, &bb);
     let ix = u.buy_v3_ix(&env.svm, &c, rt + delta, u64::MAX);
     let meta = ok(
@@ -2957,24 +2998,30 @@ fn v3_tier_tripwire_pins_the_pool_parts_market_cap() {
         "the user paid the charge"
     );
     // §5.2: one schedule prices both legs of B̂_v3. At pump's (the tier of the curve's pre-trade
-    // market cap at the live supply) it covers the charge within the bound.
-    let b = b_hat_v3(&st, a, fee_m, delta, &curve_fees);
+    // market cap at the live supply) it covers the charge within the bound — and that is
+    // short.win's synthetic φ_s since P1 (correction (a)).
+    assert_eq!(
+        phi_s, curve_fees,
+        "φ_s is the tier pump charged on both parts"
+    );
+    let b = b_hat_v3(&st, a, fee_m, delta, &phi_s);
     let bound = v3_bound(delta, x_s, &curve_fees);
     assert!(
         b >= charge && b - charge <= bound,
-        "B̂_v3 at pump's tier {b} vs charge {charge} (bound {bound})"
+        "B̂_v3 at φ_s {b} vs charge {charge} (bound {bound})"
     );
     println!(
-        "T-PUMP-MATH-V3 (e): charge {charge}, the user paid {}; B̂_v3 at pump's tier {b} (+{}, \
-         bound {bound})",
+        "T-PUMP-MATH-V3 (e): charge {charge}, the user paid {}; B̂_v3 at short.win's φ_s {} / {} \
+         bps (pump's tier) {b} (+{}, bound {bound})",
         s0.user - s1.user,
+        phi_s.protocol,
+        phi_s.creator,
         b - charge
     );
-    // Tripwire, the M5 live-supply deviation on both legs: short.win's `φ` rates the same
-    // pre-trade curve at the fixed 10¹⁵ supply, which on this burned coin falls in another tier,
-    // and `B̂_v3` at it can then undercut pump's charge (an exit's `max_in` below it: 6002).
-    // The live curve `FeeConfig` is one flat tier, so no quote differs today. Flips when the
-    // math resolves the tier at the live supply.
+    // The record of G0's finding: the curve path's φ (unchanged for q ≤ rT, M5's open item) rates
+    // the same pre-trade curve at the fixed 10¹⁵ supply, which on this burned coin falls in
+    // another tier; B̂_v3 at it would undercut pump's charge (an exit's `max_in` below it:
+    // 6002). Without a burn the two coincide.
     let at_fixed = cands
         .iter()
         .find(|(n, _)| *n == "curve before at 10¹⁵")
@@ -2982,21 +3029,18 @@ fn v3_tier_tripwire_pins_the_pool_parts_market_cap() {
     match at_fixed {
         Some(tier) => {
             assert_eq!(phi, tier, "φ is the 10¹⁵ market cap's tier");
-            assert_ne!(phi, curve_fees, "φ is not the tier pump charged");
+            assert_ne!(phi, phi_s, "φ is not the tier pump charged");
             let b_phi = b_hat_v3(&st, a, fee_m, delta, &phi);
             println!(
-                "T-PUMP-MATH-V3 (e): short.win's φ {} / {} bps (the 10¹⁵ market cap's tier): \
-                 B̂_v3 {b_phi}, {} under the charge",
+                "T-PUMP-MATH-V3 (e): the curve path's φ {} / {} bps (the 10¹⁵ market cap's tier): \
+                 B̂_v3 at it would be {b_phi}, {} under the charge",
                 phi.protocol,
                 phi.creator,
                 i128::from(charge) - i128::from(b_phi)
             );
-            assert!(
-                b_phi < charge,
-                "B̂_v3 at φ {b_phi} vs charge {charge}: the deviation is gone, update the tripwire"
-            );
+            assert!(b_phi < charge, "B̂_v3 at φ {b_phi} vs charge {charge}");
         }
-        None => assert_eq!(phi, curve_fees, "an unburned supply: one market cap"),
+        None => assert_eq!(phi, phi_s, "an unburned supply: one market cap"),
     }
 }
 

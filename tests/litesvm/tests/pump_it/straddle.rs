@@ -6,9 +6,13 @@
 //! there. Checked here on the real pump and PumpSwap ELFs against the program's own quote (the
 //! host build of `venues::read_state` on the same accounts).
 //!
+//! Since pump's synthetic migration (pump-final §5.2) a buy past `rT` is priced at the fee pump
+//! charges both its parts, the tier of the curve's market cap on the mint's live supply: the
+//! reader resolves it from the supply its caller passes (P1 correction (a); priced from P2 on).
+//!
 //! Every instruction goes through `Env::send`: the invariant hooks run after each one.
 
-use shortwin::constants::PUMP_GLOBAL;
+use shortwin::constants::{PUMP_FEE_CONFIG, PUMP_GLOBAL};
 use shortwin_math::fees::{self, FeeBps, PammFeeSchedule};
 use shortwin_math::quote::{self as mq, MigrationParams, sol_leg};
 use shortwin_venue_state::{pump as vpump, pump_amm as vamm};
@@ -252,4 +256,102 @@ fn b_str_on_the_ema_leg_prices_the_standard_migration() {
         }
     }
     assert!(straddled > 0, "the newest entry is above rT");
+}
+
+/// P1 correction (a), the program's wiring (pump-final §5.2): the curve reader resolves the
+/// synthetic legs' fee (`CurvePricingInputs::synthetic_fees`) at the curve's market cap on the
+/// supply its caller passes — the named mint's, burned to 999,818,465,159,445 on `near166` —
+/// while every other curve fee keeps the fixed 10¹⁵. Under three tiers that split the two market
+/// caps (G0's tier tripwire: 290,200,481,257 on the live supply, 290,253,172,320 on 10¹⁵) the
+/// curve path's `φ` is 70/22 and `φ_s` 80/25, the tier pump charges a buy past `rT` at; the
+/// supply passed is the one used; without a supply (`venues::read_state`) or on a complete curve
+/// `φ_s` is unresolved, and nothing else in the state changes.
+#[test]
+fn the_reader_resolves_the_synthetic_fee_on_the_live_supply() {
+    let (mut env, pm, _) = setup(PumpCoin::Near166);
+    let supply = mint_supply(&env, &pm);
+    assert_eq!(supply, 999_818_465_159_445, "near166's burned supply");
+    let c = pm.curve.state(&env.svm);
+    let (vt, vq) = (
+        u128::from(c.virtual_token_reserves),
+        u128::from(c.virtual_quote_reserves),
+    );
+    assert_eq!(
+        (
+            vq * u128::from(supply) / vt,
+            vq * fees::PUMP_CURVE_MCAP_SUPPLY / vt
+        ),
+        (290_200_481_257, 290_253_172_320),
+        "the market caps on the live supply and on 10¹⁵"
+    );
+    let tiers = [
+        (0, [0, 90, 28]),
+        (290_174_135_726, [0, 80, 25]),
+        (290_226_826_789, [0, 70, 22]),
+    ];
+    fork::set_fee_config(
+        &mut env.svm,
+        &PUMP_FEE_CONFIG,
+        [0, 95, 30],
+        &tiers,
+        &tiers,
+        [0, 95, 30],
+    );
+    let pricing = |st: &shortwin::venues::VenueState| {
+        st.curve
+            .as_ref()
+            .and_then(|cv| cv.pricing.clone())
+            .expect("the curve's pricing inputs")
+    };
+    let st = host_state_with(&env, &pm, Some(supply));
+    assert!(st.executable, "a live curve");
+    let p = pricing(&st);
+    assert_eq!(p.fees, FeeBps::new(0, 70, 22), "the curve path: 10¹⁵");
+    assert_eq!(
+        p.synthetic_fees(),
+        Some(FeeBps::new(0, 80, 25)),
+        "φ_s: the live supply's tier"
+    );
+    assert_eq!(
+        p.synthetic_fees(),
+        pm.curve.synthetic_fees(&env.svm),
+        "the harness's φ_s (pump_math_it's tripwire)"
+    );
+    // The supply passed is the one used: at 10¹⁵ φ_s is the curve path's tier.
+    let at_1e15 = pricing(&host_state_with(&env, &pm, Some(1_000_000_000_000_000)));
+    assert_eq!(at_1e15.synthetic_fees(), Some(p.fees));
+    // Without a supply: unresolved, the rest of the state unchanged.
+    let without = host_state(&env, &pm);
+    let pw = pricing(&without);
+    assert_eq!(pw.synthetic_fees(), None, "no supply, no φ_s");
+    assert_eq!(
+        (
+            without.executable,
+            without.x,
+            without.y,
+            without.r,
+            without.fee_ppm,
+            pw.fees,
+            pw.live_pool_tokens,
+            pw.fee_ppm_at_ema
+        ),
+        (
+            st.executable,
+            st.x,
+            st.y,
+            st.r,
+            st.fee_ppm,
+            p.fees,
+            p.live_pool_tokens,
+            p.fee_ppm_at_ema
+        )
+    );
+    // A complete curve (an outside buy of all of rT: migrating) has no synthetic route.
+    buy_down_to(&mut env, &pm, 0);
+    let done = host_state_with(&env, &pm, Some(supply));
+    assert!(
+        done.curve.as_ref().is_some_and(|cv| cv.migrating()),
+        "migrating"
+    );
+    assert_eq!(pricing(&done).synthetic_fees(), None, "complete: no φ_s");
 }

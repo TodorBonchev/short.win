@@ -422,8 +422,10 @@ pub struct CurvePricingInputs {
     pub fees: FeeBps,
     /// `vT − rT`, `vQ − rQ` of the live curve.
     pub offsets: CurveOffsets,
-    /// The live leg's `X_p = curve_base_ata.amount − rT` (C4; ARCH §4.3).
-    pub live_pool_tokens: u128,
+    /// The live leg's `X_p = curve_base_ata.amount − rT` (C4; ARCH §4.3): a `u64`, as the token
+    /// amount it is taken from (narrowed in pump-final P1 so that the synthetic fee fits without
+    /// growing `VenueState`, G-6).
+    pub live_pool_tokens: u64,
     /// `Global.pool_migration_fee` (@146).
     pub migration_fee: u64,
     /// PumpSwap `FeeConfig.fee_tiers` (C5), in account order.
@@ -441,9 +443,53 @@ pub struct CurvePricingInputs {
     /// curve's fee at the stored EMA price's market cap; `u32::MAX` without a price
     /// ([`VenueState::cap_fee_ppm`]).
     pub fee_ppm_at_ema: u32,
+    /// [`CurvePricingInputs::synthetic_fees`]'s protocol component (bps).
+    synthetic_protocol_bps: u32,
+    /// [`CurvePricingInputs::synthetic_fees`]'s creator component (bps).
+    synthetic_creator_bps: u32,
+    /// [`CurvePricingInputs::synthetic_fees`] is known.
+    synthetic_known: bool,
 }
 
 impl CurvePricingInputs {
+    /// The fee pump charges on both parts of a buy past `rT` by synthetic migration (pump-final
+    /// §5.2, P1 correction (a)): `fees::pump_curve_at_supply` on the live `(vT, vQ)` with the
+    /// mint's **live** supply — pump's tier rule (R-PUMP Update U10), where [`fees`](Self::fees)
+    /// keeps the fixed 10¹⁵ of ARCH §4.2 for every existing path. `None` on a complete curve,
+    /// without the mint's supply ([`read_state`]) and for a component above `u32::MAX` bps: no
+    /// synthetic route then. For `CurvePricing::synthetic` once the curve adapter trades v3
+    /// (pump-final §6.2).
+    ///
+    /// Stored packed (two `u32` and a flag in the `live_pool_tokens` narrowing and the struct's
+    /// padding; the curve charges no LP fee): `VenueState` keeps its size, because
+    /// `execute_pool_switch` keeps venue states on its 4 KiB stack frame (an `Option<FeeBps>`
+    /// field here pushed its handler 128 bytes over) and the pool-selection instructions box
+    /// several on the 32 KiB heap (a 48-byte growth overflowed it in M7-SEC-5).
+    pub fn synthetic_fees(&self) -> Option<FeeBps> {
+        self.synthetic_known.then(|| {
+            FeeBps::new(
+                0,
+                u64::from(self.synthetic_protocol_bps),
+                u64::from(self.synthetic_creator_bps),
+            )
+        })
+    }
+
+    /// Stores [`CurvePricingInputs::synthetic_fees`] (`None` for a component above `u32::MAX`
+    /// bps, or a non-zero LP component, which the curve never charges).
+    fn set_synthetic_fees(&mut self, fees: Option<FeeBps>) {
+        let packed = fees.filter(|f| f.lp == 0).and_then(|f| {
+            Some((
+                u32::try_from(f.protocol).ok()?,
+                u32::try_from(f.creator).ok()?,
+            ))
+        });
+        let (protocol, creator) = packed.unwrap_or_default();
+        self.synthetic_protocol_bps = protocol;
+        self.synthetic_creator_bps = creator;
+        self.synthetic_known = packed.is_some();
+    }
+
     /// `CurvePricing` at the live fee, with the deterministic migration of the EMA leg (the
     /// standard `X_p`, ARCH §4.3; no post-complete quote) and the post-migration pool's schedule:
     /// `base_supply` 10¹⁵ (`fees::PammFeeSchedule`: a coin that has not graduated yet;
@@ -692,7 +738,7 @@ impl VenueState {
         Some(Quoter::Curve(CurveQuoter {
             pricing: inputs.curve_pricing(),
             live: c.live,
-            live_pool_tokens: inputs.live_pool_tokens,
+            live_pool_tokens: u128::from(inputs.live_pool_tokens),
             migrating: c.migrating(),
         }))
     }
@@ -829,8 +875,9 @@ pub fn read_state(market: &Market, kind: VenueKind, read: &[AccountInfo], now: i
 
 /// [`read_state`] with the mint's live `supply` (`mint.supply` @36 of the named mint): PumpSwap's
 /// fee tier is chosen on the market cap `effective_quote·supply/base` (ARCH §4.2; `None` makes a
-/// PumpSwap market not executable). The other venues ignore it (the curve's tier uses 10¹⁵,
-/// ARCH §4.2 as built).
+/// PumpSwap market not executable). On the curve it resolves only the synthetic exit's fee
+/// (`CurvePricingInputs::synthetic_fees`, pump's tier on the live supply; pump-final §5.2): every
+/// other curve fee keeps the fixed 10¹⁵ (ARCH §4.2 as built). Raydium ignores it.
 pub fn read_state_with(
     market: &Market,
     kind: VenueKind,
@@ -853,7 +900,7 @@ fn read_state_ema(
 ) -> VenueState {
     match kind {
         VenueKind::PumpCurve | VenueKind::PumpMigrating => {
-            pump_curve::read_state(market, kind, read, ema_fee)
+            pump_curve::read_state(market, kind, read, supply, ema_fee)
         }
         VenueKind::PumpSwap => pump_amm::read_state(market, read, supply, ema_fee),
         VenueKind::RaydiumV4 => raydium_v4::read_state(market, read, now),
@@ -1359,6 +1406,68 @@ mod tests {
         assert_eq!(
             with(VenueKind::PumpCurve, 3_000).exit_risk_cap_bps(500),
             500
+        );
+    }
+
+    /// pump-final §5.2 (P1 correction (a)): the synthetic exit's fee round-trips through its packed
+    /// form; a component above `u32::MAX` bps or an LP part leaves it unknown (no synthetic
+    /// route); and the packing costs `CurvePricingInputs` no size (`VenueState` keeps its own: the
+    /// pool-selection instructions hold several on a 4 KiB frame and a 32 KiB heap).
+    #[test]
+    fn synthetic_fees_pack_without_growing_the_venue_state() {
+        let mut c = CurvePricingInputs {
+            fees: FeeBps::new(0, 95, 30),
+            offsets: CurveOffsets { token: 1, quote: 1 },
+            live_pool_tokens: u64::MAX,
+            migration_fee: 15_000_001,
+            pool_tiers: Rc::from(Vec::new()),
+            pool_creator_fee_configurable: true,
+            pool_disable_flags: 0,
+            coin_creator_is_default: false,
+            fee_ppm_at_ema: u32::MAX,
+            synthetic_protocol_bps: 0,
+            synthetic_creator_bps: 0,
+            synthetic_known: false,
+        };
+        assert_eq!(c.synthetic_fees(), None);
+        for f in [
+            FeeBps::new(0, 80, 25),
+            FeeBps::ZERO,
+            FeeBps::new(0, u64::from(u32::MAX), u64::from(u32::MAX)),
+        ] {
+            c.set_synthetic_fees(Some(f));
+            assert_eq!(c.synthetic_fees(), Some(f));
+        }
+        for f in [
+            Some(FeeBps::new(0, u64::from(u32::MAX) + 1, 30)),
+            Some(FeeBps::new(0, 95, u64::MAX)),
+            Some(FeeBps::new(1, 95, 30)),
+            None,
+        ] {
+            c.set_synthetic_fees(f);
+            assert_eq!(c.synthetic_fees(), None, "{f:?}");
+        }
+        // The fields P1 added fill the `u128 → u64` narrowing of `live_pool_tokens` and padding:
+        // the size before P1 (a `u128` `live_pool_tokens`, no synthetic fee) is this layout's.
+        #[allow(dead_code)]
+        struct BeforeP1 {
+            fees: FeeBps,
+            offsets: CurveOffsets,
+            live_pool_tokens: u128,
+            migration_fee: u64,
+            pool_tiers: Rc<[FeeTier]>,
+            pool_creator_fee_configurable: bool,
+            pool_disable_flags: u8,
+            coin_creator_is_default: bool,
+            fee_ppm_at_ema: u32,
+        }
+        assert_eq!(
+            core::mem::size_of::<CurvePricingInputs>(),
+            core::mem::size_of::<BeforeP1>()
+        );
+        assert_eq!(
+            core::mem::size_of::<Option<CurvePricingInputs>>(),
+            core::mem::size_of::<Option<BeforeP1>>()
         );
     }
 

@@ -26,7 +26,9 @@
 //! program's reader (`venues::read_state_boxed_for_exit`, as the program's exits do with the named
 //! mint); without it a PumpSwap market would read as not executable. That reader also resolves
 //! the fee at the stored `P_ema`'s market cap, which caps the exits' risk view (AIR-10;
-//! [`venue_state`]).
+//! [`venue_state`]). **Pump curve** (pump-final §5.2): the mint's supply resolves the fee pump
+//! charges on a buy past `rT` by synthetic migration (`CurvePricingInputs::synthetic_fees`), so a
+//! `PumpCurve` market's mint is read too.
 
 use std::collections::HashMap;
 
@@ -87,7 +89,8 @@ pub struct MarketView {
     pub positions: Vec<PositionView>,
     /// The venue's `VenueExtras` account (extras sets for trading exits), if any.
     pub extras: Option<Box<VenueExtras>>,
-    /// The mint's live supply (read for PumpSwap markets only: the fee tier's market cap).
+    /// The mint's live supply (read for PumpSwap markets — the fee tier's market cap — and pump
+    /// curve markets — the synthetic exit's fee tier, pump-final §5.2).
     pub supply: Option<u64>,
 }
 
@@ -313,9 +316,9 @@ pub async fn load_with_positions<C: Chain>(
             Err(e) => skipped.push((*key, e.to_string())),
         }
     }
-    // Second pass: the venue accounts (a PumpSwap market's mint after its ReadSet: the supply)
-    // and the extras accounts.
-    let with_mint = |p: &Partial| p.kind == VenueKind::PumpSwap;
+    // Second pass: the venue accounts (a PumpSwap or live-curve market's mint after its ReadSet:
+    // the supply) and the extras accounts.
+    let with_mint = |p: &Partial| matches!(p.kind, VenueKind::PumpSwap | VenueKind::PumpCurve);
     let mut venue_keys: Vec<Pubkey> = partial
         .iter()
         .flat_map(|p| {

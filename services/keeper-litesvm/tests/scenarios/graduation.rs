@@ -39,6 +39,9 @@
 //! - **`None → PumpCurve` re-detection**: a list-only market whose detection set shows a live
 //!   curve is cranked onto it, and the keeper then creates the trader's base ATA and pump UVA the
 //!   re-detection does not create, once; an open lands on the curve.
+//! - **The synthetic fee's supply** (pump-final §5.2, P1 correction (a)): the keeper's view of a
+//!   curve market carries its mint's live supply and the program's state on it, so the fee of a
+//!   buy past `rT` is the tier pump charges, two curve markets read in one batch.
 
 use anchor_lang::prelude::Pubkey;
 use anchor_lang::solana_program::instruction::Instruction;
@@ -936,4 +939,91 @@ fn a_list_only_market_is_redetected_and_prepared_by_the_keeper() {
         let (res, _) = env.open(&pm, &mut b, q);
         ok(res);
     });
+}
+
+/// pump-final §5.2, P1 correction (a), on the keeper's side: a tick reads a `PumpCurve` market's
+/// mint after its ReadSet and hands the supply to the program's reader, so the keeper's view
+/// carries the fee pump charges a buy past `rT` (the tier of the curve's market cap on the live
+/// supply). Two curve markets in one read — `near166` (supply burned to 999,818,465,159,445)
+/// first, `buckets166` second — under three tiers that split near166's two market caps: each view
+/// carries its own mint's supply, its own ReadSet accounts and the program's state on them with
+/// that supply (a misplaced mint slot would shift the second market's ReadSet), and near166's
+/// `φ_s` is the live supply's 80/25 where its curve path keeps the 10¹⁵ tier, 70/22.
+#[test]
+fn the_keepers_view_resolves_a_curve_markets_synthetic_fee_on_its_mint() {
+    use shortwin::constants::PUMP_FEE_CONFIG;
+    use shortwin::venues::VenueState;
+    use shortwin_keeper::view;
+    use shortwin_math::fees::FeeBps;
+
+    let (mut env, a) = Env::fork_pump_coin(PumpCoin::Near166);
+    let b = env.load_pump_coin(PumpCoin::Buckets166);
+    ok(env.list_pump(&a));
+    ok(env.list_pump(&b));
+    let pa = env.pump_market_listed(PumpSpec::new(PumpCoin::Near166, 0), a);
+    let pb = env.pump_market_listed(PumpSpec::new(PumpCoin::Buckets166, 0), b);
+    let tiers = [
+        (0, [0, 90, 28]),
+        (290_174_135_726, [0, 80, 25]),
+        (290_226_826_789, [0, 70, 22]),
+    ];
+    fork::set_fee_config(
+        &mut env.svm,
+        &PUMP_FEE_CONFIG,
+        [0, 95, 30],
+        &tiers,
+        &tiers,
+        [0, 95, 30],
+    );
+    let h = Harness::new(env, KeeperConfig::default());
+    let cv = shortwin_keeper_litesvm::block_on(view::load(h.chain(), &[pa.market(), pb.market()]))
+        .expect("view");
+    let supply = |pm: &PumpMarket| {
+        h.with_env(|env| {
+            let m = env.svm.get_account(&pm.keys.mint).expect("mint");
+            shortwin_venue_state::mint::read_base(&m.owner.to_bytes(), &m.data)
+                .expect("mint")
+                .supply
+        })
+    };
+    let (sa, sb) = (supply(&pa), supply(&pb));
+    assert_eq!(sa, 999_818_465_159_445, "near166's burned supply");
+    assert_ne!(sa, sb, "two supplies");
+    let fees_of = |st: &VenueState| {
+        let p = st
+            .curve
+            .as_ref()
+            .and_then(|c| c.pricing.as_ref())
+            .expect("the curve's pricing inputs");
+        (p.fees, p.synthetic_fees())
+    };
+    let now = h.with_env(|env| env.now());
+    let mut seen = Vec::new();
+    for (pm, s) in [(&pa, sa), (&pb, sb)] {
+        let mv = cv.market(&pm.market()).expect("loaded");
+        assert_eq!(mv.kind, VenueKind::PumpCurve);
+        assert_eq!(mv.supply, Some(s), "its own mint's supply");
+        let keys: Vec<Pubkey> = pm.read_set(false).iter().map(|m| m.pubkey).collect();
+        assert_eq!(mv.read_keys, keys);
+        let accs = read_accounts(&h, pm);
+        assert_eq!(mv.read_accounts, accs, "its own ReadSet accounts");
+        // The program's reader on the same accounts with that supply.
+        let market = stored(&h, pm);
+        let want = view::with_account_infos(&keys, &accs, |infos| {
+            shortwin::venues::read_state_with(&market, VenueKind::PumpCurve, infos, now, Some(s))
+        });
+        assert!(mv.state.executable && want.executable, "live curves");
+        assert_eq!(
+            (mv.state.x, mv.state.y, mv.state.r, mv.state.fee_ppm),
+            (want.x, want.y, want.r, want.fee_ppm)
+        );
+        assert_eq!(fees_of(&mv.state), fees_of(&want));
+        seen.push(fees_of(&mv.state));
+    }
+    assert_eq!(
+        seen[0],
+        (FeeBps::new(0, 70, 22), Some(FeeBps::new(0, 80, 25))),
+        "near166: φ on 10¹⁵, φ_s on the live supply"
+    );
+    assert!(seen[1].1.is_some(), "buckets166's φ_s resolved too");
 }
