@@ -22,16 +22,33 @@
 //! | 32 | `real_quote_reserves` u64 | | 115 | `creator_fee_bps` u64 |
 //! | 40 | `token_total_supply` u64 | | 123 | `can_edit_creator_fee` bool |
 //! | 48 | `complete` bool | | 124 | `is_holder_reward` bool |
-//! | 49 | `creator` | | 125.. | zero padding |
+//! | 49 | `creator` | | 125 | `creator_fee` u64 (v3's creator-fee bucket) |
+//! | | | | 133 | `protocol_fees` u64 (v3's protocol-fee bucket) |
+//! | | | | 141 | `depth` u8 (0 for a SOL / USDC curve) |
+//! | | | | 142 | `initial_virtual_quote_reserves` u64 |
+//! | | | | 150 | `post_complete_base_out` u64 |
+//! | | | | 158 | `post_complete_quote_in` u64 |
 //!
-//! **Length variants** (every one is live on mainnet and in `tests/fixtures/accounts/pump/`;
+//! The six fields from @125 arrived with pump's 2026-10-08 redeploy (deploy slot 454,596,459;
+//! IDL `types.BondingCurve`): the v3 trades keep their fees on the curve in the two buckets until
+//! pump sweeps them (outside `real_quote_reserves`); `initial_virtual_quote_reserves` is
+//! `vQ − rQ` of a `create_v2` curve (pump keeps `vQ − rQ` equal to it, [`BondingCurve::
+//! quote_offset_consistent`]); the buy that crosses `rT` by pump's synthetic migration writes
+//! `post_complete_base_out` / `post_complete_quote_in` (`pcB` / `pcQ`): the tokens it bought from
+//! the would-be PumpSwap pool and the quote it paid into it, which `migrate_v2` adds to the pool
+//! on top of `rQ − pool_migration_fee` (pump-final §4, §5.4).
+//!
+//! **Length variants** (every one is live on mainnet and in `tests/fixtures/accounts/pump*/`;
 //! fields past the end read as 0 / false / default — pump itself zero-pads them, [DOCS]
 //! `PUMP_PROGRAM_README.md` — and so does this reader):
 //!
-//! - [`CURVE_LEN_V2`] = 125: what `create_v2` allocates today (the layout through
+//! - [`CURVE_LEN_2026_10_08`] = 166: what `create_v2` allocates since pump's 2026-10-08 redeploy,
+//!   and what every v2 / v3 trade grows a shorter curve to (the layout through
+//!   `post_complete_quote_in`);
+//! - [`CURVE_LEN_V2`] = 125: what `create_v2` allocated before (the layout through
 //!   `is_holder_reward`, no padding; R-PUMP Update 2026-09-29 U5 corrects §2.1's "151");
 //! - [`CURVE_LEN_EXTENDED`] = 151: a curve grown by `extend_account` (clients prepend it, 125 →
-//!   151; most live curves);
+//!   151; most live curves before 2026-10-08);
 //! - [`CURVE_LEN_LEGACY_EXTENDED`] = 150: pre-2025 curves extended for the creator-fee upgrade
 //!   (e.g. Fartcoin's);
 //! - [`CURVE_MIN_LEN`] = 115: what the docs say `buy_v2` / `sell_v2` top a shorter curve up to
@@ -40,10 +57,12 @@
 //! - [`CURVE_LEN_ORIGINAL`] = 49: the 2024 layout (through `complete`: no creator, hence no
 //!   creator fee), still held by legacy SPL-Token curves nobody has traded since.
 //!
-//! The deployed pump (deploy slot 449,734,335) grows any curve shorter than 125 bytes to
+//! pump's 2026-09 build (deploy slot 449,734,335) grew any curve shorter than 125 bytes to
 //! [`CURVE_LEN_V2`] on its first v2 trade, the user topping the curve's rent reserve
-//! (`lamports − real_quote_reserves`) up to `minimum_balance(125)`
-//! (`tests/litesvm/tests/pump_math_it.rs`); the reader is indifferent to all of these lengths.
+//! (`lamports − real_quote_reserves`) up to `minimum_balance(125)`; the 2026-10-02 build grew it to
+//! 141 and the 2026-10-08 build grows it to [`CURVE_LEN_2026_10_08`], the reserve net of the two
+//! fee buckets (`tests/litesvm/tests/pump_math_it.rs`). The reader is indifferent to all of these
+//! lengths.
 //!
 //! Lifecycle (R-PUMP §7; Corrections 1): live while `!complete`; `complete` with `vT > 0` is
 //! "migrating" (every trade reverts 6005, `migrate_v2` not yet run); `complete` with `vT == 0` has
@@ -57,7 +76,9 @@
 //! `fee_recipients[7]` @162 (the 8 normal recipients), `withdraw_authority` @113,
 //! `pool_migration_fee` @146, `reserved_fee_recipient` @483 plus `reserved_fee_recipients[7]` @516
 //! (mayhem coins), `buyback_fee_recipients[8]` @741, `buyback_basis_points` @997,
-//! `creator_fee_configurable` @1045.
+//! `creator_fee_configurable` @1045. Since pump's 2026-10-08 redeploy the account is 1,088 bytes
+//! ([`GLOBAL_LEN_2026_10_08`]): `max_curve_depth` u8 @1087 ([`OFF_GLOBAL_MAX_CURVE_DEPTH`]), which
+//! short.win does not read; [`GLOBAL_LEN`] stays the minimum.
 //!
 //! # pump-fees `FeeConfig` (PDA `["fee_config", program]` under `pfee`, discriminator `8f3492bbdb7b4c9b`)
 //!
@@ -117,7 +138,10 @@ pub const BONDING_CURVE_DISCRIMINATOR: [u8; 8] = [0x17, 0xb7, 0xf8, 0x37, 0x60, 
 /// `buy_v2` / `sell_v2` top-up length; the deployed ELF grows shorter curves to
 /// [`CURVE_LEN_V2`]).
 pub const CURVE_MIN_LEN: usize = 115;
-/// What `create_v2` allocates today: the layout through `is_holder_reward`.
+/// What `create_v2` allocates and every v2 / v3 trade grows a shorter curve to since pump's
+/// 2026-10-08 redeploy (deploy slot 454,596,459): the layout through `post_complete_quote_in`.
+pub const CURVE_LEN_2026_10_08: usize = 166;
+/// What `create_v2` allocated before 2026-10-08: the layout through `is_holder_reward`.
 pub const CURVE_LEN_V2: usize = 125;
 /// A curve grown by `extend_account` today (125 → 151).
 pub const CURVE_LEN_EXTENDED: usize = 151;
@@ -152,6 +176,18 @@ pub const OFF_CREATOR_FEE_BPS: usize = 115;
 pub const OFF_CAN_EDIT_CREATOR_FEE: usize = 123;
 /// `is_holder_reward` (bool).
 pub const OFF_IS_HOLDER_REWARD: usize = 124;
+/// `creator_fee` (u64): the creator fee a v3 trade keeps on the curve until pump sweeps it.
+pub const OFF_CREATOR_FEE_BUCKET: usize = 125;
+/// `protocol_fees` (u64): the protocol fee (net of the buyback) a v3 trade keeps on the curve.
+pub const OFF_PROTOCOL_FEES_BUCKET: usize = 133;
+/// `depth` (u8): 0 for a SOL / USDC curve, `n` for a curve quoted in a depth-`n − 1` pump coin.
+pub const OFF_DEPTH: usize = 141;
+/// `initial_virtual_quote_reserves` (u64): `vQ − rQ` of a `create_v2` curve.
+pub const OFF_INITIAL_VIRTUAL_QUOTE_RESERVES: usize = 142;
+/// `post_complete_base_out` (u64, `pcB`): written by the completing buy's synthetic pool part.
+pub const OFF_POST_COMPLETE_BASE_OUT: usize = 150;
+/// `post_complete_quote_in` (u64, `pcQ`): written by the completing buy's synthetic pool part.
+pub const OFF_POST_COMPLETE_QUOTE_IN: usize = 158;
 
 /// The fields of a `BondingCurve` short.win reads.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -174,6 +210,21 @@ pub struct BondingCurve {
     pub creator_fee_bps: u64,
     pub can_edit_creator_fee: bool,
     pub is_holder_reward: bool,
+    /// `creator_fee` @125: the creator-fee bucket (v3 trades; outside `rQ`).
+    pub creator_fee_bucket: u64,
+    /// `protocol_fees` @133: the protocol-fee bucket (v3 trades; outside `rQ`).
+    pub protocol_fees_bucket: u64,
+    /// `depth` @141: 0 for a SOL / USDC curve (a plain `u8`, not a bool).
+    pub depth: u8,
+    /// `initial_virtual_quote_reserves` @142 (`ivqr`): `vQ − rQ` of a `create_v2` curve; 0 on a
+    /// legacy curve pump never backfilled.
+    pub initial_virtual_quote_reserves: u64,
+    /// `post_complete_base_out` @150 (`pcB`): the tokens the completing buy took from the
+    /// would-be pool (synthetic migration); 0 without a pool part.
+    pub post_complete_base_out: u64,
+    /// `post_complete_quote_in` @158 (`pcQ`): the quote the completing buy paid into the would-be
+    /// pool (fees excluded); `migrate_v2` adds it to the pool. 0 without a pool part.
+    pub post_complete_quote_in: u64,
 }
 
 impl BondingCurve {
@@ -202,6 +253,18 @@ impl BondingCurve {
     /// Complete with `vT == 0`: migrated (the virtual reserves are zeroed by `migrate`).
     pub fn is_migrated(&self) -> bool {
         self.complete && self.virtual_token_reserves == 0
+    }
+
+    /// pump's invariant `vQ − rQ == initial_virtual_quote_reserves` (vacuous when `ivqr` is 0 —
+    /// legacy curves pump never backfilled — or after migration, `vT == 0`). Every trade keeps it
+    /// (`rQ` excludes a synthetic buy's pool part, pump-final V5); a mayhem curve breaks it.
+    pub fn quote_offset_consistent(&self) -> bool {
+        self.initial_virtual_quote_reserves == 0
+            || self.virtual_token_reserves == 0
+            || self
+                .virtual_quote_reserves
+                .checked_sub(self.real_quote_reserves)
+                == Some(self.initial_virtual_quote_reserves)
     }
 }
 
@@ -238,6 +301,12 @@ pub fn read_curve(owner: &Key, data: &[u8]) -> Result<BondingCurve, ReadError> {
         creator_fee_bps: u64_at(data, OFF_CREATOR_FEE_BPS),
         can_edit_creator_fee: bool_at(data, OFF_CAN_EDIT_CREATOR_FEE)?,
         is_holder_reward: bool_at(data, OFF_IS_HOLDER_REWARD)?,
+        creator_fee_bucket: u64_at(data, OFF_CREATOR_FEE_BUCKET),
+        protocol_fees_bucket: u64_at(data, OFF_PROTOCOL_FEES_BUCKET),
+        depth: u8_at(data, OFF_DEPTH),
+        initial_virtual_quote_reserves: u64_at(data, OFF_INITIAL_VIRTUAL_QUOTE_RESERVES),
+        post_complete_base_out: u64_at(data, OFF_POST_COMPLETE_BASE_OUT),
+        post_complete_quote_in: u64_at(data, OFF_POST_COMPLETE_QUOTE_IN),
     })
 }
 
@@ -245,8 +314,14 @@ pub fn read_curve(owner: &Key, data: &[u8]) -> Result<BondingCurve, ReadError> {
 
 /// `sha256("account:Global")[..8]`.
 pub const GLOBAL_DISCRIMINATOR: [u8; 8] = [0xa7, 0xe8, 0xe8, 0xb1, 0xc8, 0x6c, 0x72, 0x7f];
-/// The `Global` layout's length (the Borsh value and the allocation).
+/// The `Global` layout's length before pump's 2026-10-08 redeploy: the minimum [`read_global`]
+/// accepts (every field short.win reads lies in it).
 pub const GLOBAL_LEN: usize = 1_087;
+/// `Global.max_curve_depth` (u8; 2026-10-08): the deepest quote chain `create_v2` accepts. Not
+/// read by short.win (it lists SOL curves only, `depth == 0`).
+pub const OFF_GLOBAL_MAX_CURVE_DEPTH: usize = 1_087;
+/// The `Global` allocation since pump's 2026-10-08 redeploy (tests only).
+pub const GLOBAL_LEN_2026_10_08: usize = 1_088;
 /// Recipients per list (a list's head field plus its 7-entry array, or the 8-entry buyback list).
 pub const RECIPIENTS: usize = 8;
 
@@ -776,6 +851,20 @@ pub(crate) mod tests {
         assert_eq!(CURVE_LEN_V2 + 26, CURVE_LEN_EXTENDED);
         assert_eq!(OFF_CREATOR_FEE_BPS, CURVE_MIN_LEN);
         assert_eq!(OFF_COMPLETE + 1, CURVE_LEN_ORIGINAL);
+        // The 2026-10-08 fields (IDL `types.BondingCurve`): two u64 buckets, a u8, three u64s.
+        assert_eq!(OFF_CREATOR_FEE_BUCKET, CURVE_LEN_V2);
+        assert_eq!(OFF_CREATOR_FEE_BUCKET + 8, OFF_PROTOCOL_FEES_BUCKET);
+        assert_eq!(OFF_PROTOCOL_FEES_BUCKET + 8, OFF_DEPTH);
+        assert_eq!(OFF_DEPTH + 1, OFF_INITIAL_VIRTUAL_QUOTE_RESERVES);
+        assert_eq!(
+            OFF_INITIAL_VIRTUAL_QUOTE_RESERVES + 8,
+            OFF_POST_COMPLETE_BASE_OUT
+        );
+        assert_eq!(OFF_POST_COMPLETE_BASE_OUT + 8, OFF_POST_COMPLETE_QUOTE_IN);
+        assert_eq!(OFF_POST_COMPLETE_QUOTE_IN + 8, CURVE_LEN_2026_10_08);
+        assert_eq!(CURVE_LEN_2026_10_08, 166);
+        assert_eq!(OFF_GLOBAL_MAX_CURVE_DEPTH, GLOBAL_LEN);
+        assert_eq!(OFF_GLOBAL_MAX_CURVE_DEPTH + 1, GLOBAL_LEN_2026_10_08);
         // Global: the IDL's field sizes add up to the live allocation.
         assert_eq!(
             OFF_GLOBAL_FEE_RECIPIENTS + 7 * 32,
@@ -1006,6 +1095,18 @@ pub(crate) mod tests {
         };
     }
 
+    /// Mainnet dumps of group `pump_state_2026_10_13` (`tests/fixtures/manifest.json`; dumped
+    /// after pump's 2026-10-08 redeploy, `scripts/dump-fixtures.py`).
+    macro_rules! fixture_2026_10_13 {
+        ($name:literal) => {
+            include_bytes!(concat!(
+                "../../../tests/fixtures/accounts/pump_2026_10_13/",
+                $name,
+                ".bin"
+            ))
+        };
+    }
+
     /// `(vT, vQ, rT, rQ)`.
     fn reserves(c: &BondingCurve) -> (u64, u64, u64, u64) {
         (
@@ -1120,12 +1221,178 @@ pub(crate) mod tests {
             &fixture!("pump_fartcoin_curve")[..],
             &hex(FARTCOIN_CURVE_HEX)[..]
         );
+
+        // Group `pump_state_2026_10_13` (after pump's 2026-10-08 redeploy): the 166-byte curves
+        // `create_v2` allocates now, the 141 / 151-byte ones v3 grows, and the roles short.win
+        // refuses (cashback while live, mayhem, a curve quoted in another pump coin).
+        let curves: [(&[u8], usize); 10] = [
+            (fixture_2026_10_13!("pump_fresh166_curve"), 166),
+            (fixture_2026_10_13!("pump_near166_curve"), 166),
+            (fixture_2026_10_13!("pump_buckets166_curve"), 166),
+            (fixture_2026_10_13!("pump_grow141_curve"), 141),
+            (fixture_2026_10_13!("pump_grow151_curve"), 151),
+            (fixture_2026_10_13!("pump_synthetic_stuck_curve"), 166),
+            (fixture_2026_10_13!("pump_graduated_synthetic_curve"), 166),
+            (fixture_2026_10_13!("pump_cashback166_curve"), 166),
+            (fixture_2026_10_13!("pump_mayhem166_curve"), 166),
+            (fixture_2026_10_13!("pump_wsol_pool_buckets_curve"), 166),
+        ];
+        for (d, len) in curves {
+            assert_eq!(d.len(), len);
+            let c = read(d);
+            assert_eq!(c.token_total_supply, 1_000_000_000_000_000);
+            assert!(c.is_live() || c.is_migrating() || c.is_migrated());
+        }
+        let fresh = read(fixture_2026_10_13!("pump_fresh166_curve"));
+        assert_eq!(
+            reserves(&fresh),
+            (
+                1_052_896_801_991_732,
+                30_572_796_822,
+                772_996_801_991_732,
+                572_796_822
+            )
+        );
+        assert!(fresh.is_live() && fresh.is_sol_quote() && !fresh.is_mayhem_mode);
+        assert_eq!(
+            (fresh.depth, fresh.initial_virtual_quote_reserves),
+            (0, 30_000_000_000)
+        );
+        assert!(fresh.quote_offset_consistent());
+        let near = read(fixture_2026_10_13!("pump_near166_curve"));
+        assert_eq!(
+            reserves(&near),
+            (
+                333_021_296_825_365,
+                96_660_487_854,
+                53_121_296_825_365,
+                66_660_487_854
+            )
+        );
+        assert_eq!(
+            (near.creator_fee_bucket, near.protocol_fees_bucket),
+            (20_222_168, 32_018_427)
+        );
+        let buckets = read(fixture_2026_10_13!("pump_buckets166_curve"));
+        assert_eq!(
+            (buckets.creator_fee_bucket, buckets.protocol_fees_bucket),
+            (566_758_769, 897_367_954)
+        );
+        assert!(buckets.is_live() && buckets.quote_offset_consistent());
+        let cashback = read(fixture_2026_10_13!("pump_cashback166_curve"));
+        assert!(cashback.is_cashback_coin && cashback.is_live() && cashback.is_sol_quote());
+        let mayhem = read(fixture_2026_10_13!("pump_mayhem166_curve"));
+        assert!(mayhem.is_mayhem_mode && mayhem.is_live());
     }
 
-    /// pump `Global` at the snapshot (R-PUMP §2.2, Update 2026-09-29 U3: unchanged).
+    /// T-READER (pump-final §4): the 2026-10-08 fields of the dumped curves.
+    #[test]
+    fn reads_post_complete_fields() {
+        let read = |d: &[u8]| read_curve(&PROGRAM, d).unwrap();
+        // `E1bYRCNq…` (role `synthetic_stuck`): completed by a synthetic buy and never migrated;
+        // quoted in a depth-0 pump coin (short.win refuses it, `CurveQuoteNotSol`).
+        let stuck = read(fixture_2026_10_13!("pump_synthetic_stuck_curve"));
+        assert!(stuck.is_migrating() && !stuck.is_sol_quote());
+        assert_eq!(
+            reserves(&stuck),
+            (
+                279_900_000_000_000,
+                19_072_196_698_539,
+                0,
+                14_097_072_881_278
+            )
+        );
+        assert_eq!(
+            (
+                stuck.post_complete_base_out,
+                stuck.post_complete_quote_in,
+                stuck.depth,
+                stuck.initial_virtual_quote_reserves
+            ),
+            (
+                125_468_585_973_711,
+                21_720_607_727_767,
+                1,
+                4_975_123_817_261
+            )
+        );
+        // `rQ` excludes the pool part: `vQ − rQ` is still `ivqr` (pump-final V5).
+        assert!(stuck.quote_offset_consistent());
+        // 98u8RJ's curve `2ncbKy3K…` (role `graduated_synthetic`): migrated (`vT = 0`) and still
+        // carrying the pool part of its completing buy `2vVRr9eg…`.
+        let grad = read(fixture_2026_10_13!("pump_graduated_synthetic_curve"));
+        assert!(grad.is_migrated());
+        assert_eq!(
+            (grad.post_complete_base_out, grad.post_complete_quote_in),
+            (6_238_850_918_425, 2_642_475_552)
+        );
+        assert_eq!(
+            (grad.depth, grad.initial_virtual_quote_reserves),
+            (0, 30_000_000_000)
+        );
+        assert!(grad.quote_offset_consistent(), "vacuous after migration");
+        // Shorter curves read the six fields as zero.
+        for d in [
+            &fixture_2026_10_13!("pump_grow141_curve")[..],
+            &fixture_2026_10_13!("pump_grow151_curve")[..],
+            &fixture!("pump_near_curve")[..],
+            &fixture!("pump_legacy150_curve")[..],
+            &fixture!("pump_fresh_curve")[..],
+            &fixture!("pump_legacy115_curve")[..],
+        ] {
+            let c = read(d);
+            assert_eq!(
+                (
+                    c.creator_fee_bucket,
+                    c.protocol_fees_bucket,
+                    c.depth,
+                    c.initial_virtual_quote_reserves,
+                    c.post_complete_base_out,
+                    c.post_complete_quote_in
+                ),
+                (0, 0, 0, 0, 0, 0),
+                "{} bytes",
+                d.len()
+            );
+            assert!(c.quote_offset_consistent(), "vacuous without ivqr");
+        }
+        // A mayhem curve breaks pump's quote-offset invariant (its `vQ` is set by the mayhem
+        // program): 457,699,651 − 3 ≠ 30e9.
+        let mayhem = read(fixture_2026_10_13!("pump_mayhem166_curve"));
+        assert_eq!(mayhem.initial_virtual_quote_reserves, 30_000_000_000);
+        assert!(!mayhem.quote_offset_consistent());
+        // The helper's arms on a patched live curve: consistent, broken, `vQ < rQ`.
+        let mut d = *fixture_2026_10_13!("pump_near166_curve");
+        let c = read(&d);
+        assert!(c.is_live() && c.quote_offset_consistent());
+        d[OFF_INITIAL_VIRTUAL_QUOTE_RESERVES..OFF_INITIAL_VIRTUAL_QUOTE_RESERVES + 8]
+            .copy_from_slice(&29_999_999_999u64.to_le_bytes());
+        assert!(!read(&d).quote_offset_consistent());
+        d[OFF_REAL_QUOTE_RESERVES..OFF_REAL_QUOTE_RESERVES + 8]
+            .copy_from_slice(&u64::MAX.to_le_bytes());
+        assert!(!read(&d).quote_offset_consistent());
+        // `depth` is a plain u8: any value reads (no bool check).
+        let mut d = *fixture_2026_10_13!("pump_fresh166_curve");
+        d[OFF_DEPTH] = 5;
+        assert_eq!(read(&d).depth, 5);
+    }
+
+    /// pump `Global` at the snapshot (R-PUMP §2.2, Update 2026-09-29 U3: unchanged), and the
+    /// 1,088-byte account of group `pump_state_2026_10_13` (role `global_1088`): the same first
+    /// 1,087 bytes, then `max_curve_depth` (1 at that dump; mainnet set 2 at slot 456,495,021).
     #[test]
     fn reads_the_dumped_global() {
-        let g = read_global(&PROGRAM, fixture!("pump_global")).unwrap();
+        let old: &[u8] = fixture!("pump_global");
+        let new: &[u8] = fixture_2026_10_13!("pump_global_1088");
+        assert_eq!((old.len(), new.len()), (GLOBAL_LEN, GLOBAL_LEN_2026_10_08));
+        assert_eq!(&new[..GLOBAL_LEN], old);
+        assert_eq!(new[OFF_GLOBAL_MAX_CURVE_DEPTH], 1);
+        for d in [old, new] {
+            check_dumped_global(&read_global(&PROGRAM, d).unwrap());
+        }
+    }
+
+    fn check_dumped_global(g: &Global<'_>) {
         assert_eq!(
             g.authority(),
             b58("FFWtrEQ4B4PKQoVuHYzZq8FabGkVatYzDpEVHsK5rrhF")
