@@ -261,6 +261,7 @@ impl CurveCtx {
             migration: MigrationParams {
                 migration_fee: self.migration_fee,
                 pool_tokens: shortwin::venues::STANDARD_POOL_TOKENS,
+                post_complete_quote_in: 0,
             },
             pool: PammFeeSchedule {
                 tiers: &self.pool_tiers,
@@ -270,6 +271,9 @@ impl CurveCtx {
                 coin_creator_is_default: self.creator_is_default,
                 cap_bps: None,
             },
+            // B̂_str above rT, as the program's adapter prices it until it trades v3
+            // (pump-final §6).
+            synthetic: None,
         }
     }
 

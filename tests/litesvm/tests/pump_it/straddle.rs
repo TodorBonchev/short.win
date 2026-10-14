@@ -92,6 +92,7 @@ fn b_str_prices_the_executed_bundle() {
         &MigrationParams {
             migration_fee,
             pool_tokens: base_ata - live.rt,
+            post_complete_quote_in: 0,
         },
     )
     .unwrap();
@@ -240,6 +241,7 @@ fn b_str_on_the_ema_leg_prices_the_standard_migration() {
             &MigrationParams {
                 migration_fee: cq.pricing.migration.migration_fee,
                 pool_tokens: shortwin::venues::STANDARD_POOL_TOKENS,
+                post_complete_quote_in: 0,
             },
             &cq.pricing.pool,
         )

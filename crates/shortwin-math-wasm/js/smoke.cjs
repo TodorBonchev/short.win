@@ -16,7 +16,7 @@ assert.equal(typeof m.version(), "string");
 const pamm = new m.PammSchedule(10n ** 15n, true, 0, false);
 pamm.addTier(0n, 2, 93, 30);
 pamm.addTier(420_000_000_000n, 20, 5, 95);
-const curve = m.Venue.pumpCurve(new m.Fees(0, 95, 30), 279_900_000_000_000n, 30_000_000_000n, 15_000_001n, 206_900_000_000_000n, pamm);
+const curve = m.Venue.pumpCurve(new m.Fees(0, 95, 30), 279_900_000_000_000n, 30_000_000_000n, 15_000_001n, 206_900_000_000_000n, 0n, pamm);
 const s = new m.CurveState(824_130_602_106_172n, 39_059_343_535n, 544_230_602_106_172n, 9_059_343_535n, false);
 const q = 10_000_000_000_000n;
 const b = curve.buyCurve(q, s);
@@ -29,6 +29,44 @@ assert.equal(m.exceedsCap(curve.onewayPpm(), 124), true); // fee gates compare p
 assert.equal(m.exceedsCap(curve.onewayPpm(), 125), false);
 // A curve venue has no (x, y) quote: the thrown Error carries the MathError text.
 assert.throws(() => curve.buy(q, 1n, 1n), /invalid input/);
+
+// pump-final §5 (P1): pump's synthetic migration on G0's near166 curve (pump charged
+// 22,944,563,744 for rT + 10e12; B̂_v3 is 2 above), the migrated pool with pcQ (98u8RJ),
+// ρ and the boost.
+const sched = new m.CurveSchedule(true, 0, false);
+sched.addTier(0n, 0, 95, 30);
+const near = new m.CurveState(333_021_296_825_365n, 96_660_487_854n, 53_121_296_825_365n, 66_660_487_854n, false);
+const fLive = sched.resolveAtSupply(near.vt, near.vq, 999_818_465_159_445n);
+assert.equal(fLive.protocol, 95);
+const nearVenue = m.Venue.pumpCurve(sched.resolve(near.vt, near.vq), 279_900_000_000_000n, 30_000_000_000n, 15_000_001n, 206_900_000_000_000n, 0n, pamm);
+const synthetic = nearVenue.withSynthetic(fLive);
+const qSyn = 53_121_296_825_365n + 10_000_000_000_000n;
+assert.equal(synthetic.buyCurve(qSyn, near).cost, 22_944_563_746n);
+assert.ok(nearVenue.buyCurve(qSyn, near).cost > 22_944_563_746n); // B̂_str without withSynthetic
+assert.equal(synthetic.buyCurve(53_121_296_825_365n + 206_900_000_000_000n, near), undefined); // q − rT ≥ X_s
+assert.throws(() => m.Venue.rayV4(25n, 10_000n).withSynthetic(fLive), /invalid input/);
+// P1 correction (a) under G0's tier tripwire: on near166's burned supply the 10¹⁵ market cap
+// (290,253,172,320) sits in the 70/22 tier, the live supply's (290,200,481,257) in the 80/25 one,
+// which pump charged for rT + 50e12 (45,906,126,201): B̂_v3 covers it only at resolveAtSupply's fee.
+const tiers = new m.CurveSchedule(true, 0, false);
+tiers.addTier(0n, 0, 90, 28);
+tiers.addTier(290_174_135_726n, 0, 80, 25);
+tiers.addTier(290_226_826_789n, 0, 70, 22);
+const fFixed = tiers.resolve(near.vt, near.vq);
+const fTier = tiers.resolveAtSupply(near.vt, near.vq, 999_818_465_159_445n);
+assert.deepEqual([fFixed.protocol, fFixed.creator], [70, 22]);
+assert.deepEqual([fTier.protocol, fTier.creator], [80, 25]);
+const tierVenue = m.Venue.pumpCurve(fFixed, 279_900_000_000_000n, 30_000_000_000n, 15_000_001n, 206_900_000_000_000n, 0n, pamm);
+const q50 = 53_121_296_825_365n + 50_000_000_000_000n;
+assert.equal(tierVenue.withSynthetic(fTier).buyCurve(q50, near).cost, 45_906_126_205n);
+assert.equal(tierVenue.withSynthetic(fFixed).buyCurve(q50, near).cost, 45_906_126_201n - 59_057_853n);
+const done = new m.CurveState(279_900_000_000_000n, 115_005_359_190n, 0n, 85_005_359_190n, true);
+const pool1 = done.migratedPool(15_000_001n, 200_661_149_081_575n, 2_642_475_552n);
+assert.deepEqual([pool1.x, pool1.y], [200_661_149_081_575n, 87_632_834_741n]);
+const pool0 = done.migratedPool(15_000_001n, 206_900_000_000_000n, 0n);
+assert.equal(m.migratingFvPrice(WAD, pool0.x, pool0.y, pool1.x, pool1.y) / 10n ** 12n, 1_063_149n); // ρ
+assert.equal(m.migratingFvPrice(1n, 1n, 1n, 0n, 1n), undefined);
+assert.equal(m.migrationBoost(pool1.x, pool1.y), 17_584_505_316n);
 
 // Raydium AMM v4 (R-RAY §3.5 (A)); u128 reserves round-trip through BigInt.
 const v4 = m.Venue.rayV4(25n, 10_000n);

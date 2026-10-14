@@ -236,10 +236,12 @@ proptest! {
         let curve = CurvePricing {
             fees: FeeBps::new(0, 95, 30),
             offsets: CurveOffsets::of(&live).expect("offsets"),
-            migration: MigrationParams { migration_fee: 15_000_001, pool_tokens: 206_900_000_000_000 },
+            migration: MigrationParams { migration_fee: 15_000_001, pool_tokens: 206_900_000_000_000,
+                                         post_complete_quote_in: 0 },
             pool: PammFeeSchedule { tiers: &tiers, base_supply: 1_000_000_000_000_000,
                                     creator_fee_configurable: true, pool_creator_fee_bps: 0,
                                     coin_creator_is_default: false, cap_bps: None },
+            synthetic: None,
         };
         let l = sqrt_u128(vt * vq, Rounding::Floor);
         let p0 = vq * WAD / vt;
@@ -308,6 +310,7 @@ fn straddle_dip_at_rt_is_bounded() {
         migration: MigrationParams {
             migration_fee: 15_000_001,
             pool_tokens: 206_900_000_000_000,
+            post_complete_quote_in: 0,
         },
         pool: PammFeeSchedule {
             tiers: &tiers,
@@ -317,6 +320,7 @@ fn straddle_dip_at_rt_is_bounded() {
             coin_creator_is_default: false,
             cap_bps: None,
         },
+        synthetic: None,
     };
     let rt64 = u64::try_from(rt).expect("fits");
     let a = curve.buy(rt64, &s).expect("curve").cost;
@@ -354,6 +358,7 @@ fn curve_liquidation_price_finds_the_first_crossing() {
         migration: MigrationParams {
             migration_fee: 15_000_001,
             pool_tokens: 206_900_000_000_000,
+            post_complete_quote_in: 0,
         },
         pool: PammFeeSchedule {
             tiers: &tiers,
@@ -363,6 +368,7 @@ fn curve_liquidation_price_finds_the_first_crossing() {
             coin_creator_is_default: false,
             cap_bps: None,
         },
+        synthetic: None,
     };
     let l = sqrt_u128(live.vt * live.vq, Rounding::Floor);
     let q = 14_365_431_703u64;

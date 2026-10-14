@@ -241,6 +241,7 @@ fn curve_and_straddle_match_sim() {
     let mig = MigrationParams {
         migration_fee: f.pump_migration_fee.0,
         pool_tokens: f.pump_pool_tokens.0,
+        post_complete_quote_in: 0,
     };
     let pool = sched(&tiers, f.pump_supply.0);
     let (mut straddles, mut emas, mut capped) = (0, 0, 0);
@@ -278,6 +279,7 @@ fn curve_and_straddle_match_sim() {
             offsets: off,
             migration: mig,
             pool,
+            synthetic: None,
         };
 
         let b = quote::curve_straddle(q, &state, &fee, &mig, &pool).map(|b| b.cost);

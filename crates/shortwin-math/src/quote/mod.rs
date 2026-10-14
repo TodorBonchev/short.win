@@ -21,7 +21,9 @@
 //! tier; ECON §3.1, ARCH §4.2, R3B-7 b), never re-resolved at the hypothetical price:
 //! [`Pricing`] and [`CurvePricing`] carry resolved fees for exactly that reason. The one
 //! resolution on a hypothetical state is the straddle's post-migration pool, whose
-//! PumpSwap tier is read at that pool's own market cap (ARCH §4.3, as the sim).
+//! PumpSwap tier is read at that pool's own market cap (ARCH §4.3, as the sim). pump's
+//! synthetic migration ([`curve_synthetic`]) charges both of its parts at the curve's own
+//! (live) tier, so it takes resolved fees too.
 //! Every quote here fits `u128` (ECON §2.2: `Q·Y < 1.1·10³⁷`), so each division takes
 //! `mul_div`'s `u128` path within those bounds.
 
@@ -34,7 +36,11 @@ pub mod straddle;
 
 pub use pricing::{CurvePricing, Pricing};
 pub use reprice::{CurveOffsets, curve_reprice, liquidity, reprice, reprice_token};
-pub use straddle::{CurveState, MigrationParams, curve_straddle, curve_two_leg, migrated_pool};
+pub use straddle::{
+    CurveState, MIGRATION_BOOST_DIVISOR, MigrationParams, STANDARD_POOL_TOKENS, curve_straddle,
+    curve_synthetic, curve_two_leg, migrated_pool, migrating_fv, migrating_fv_price,
+    migration_boost,
+};
 
 use crate::num::{Rounding, mul_div};
 

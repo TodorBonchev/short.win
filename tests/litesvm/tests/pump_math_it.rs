@@ -2245,6 +2245,7 @@ fn b_hat_v3(st: &pump::BondingCurve, ata: u64, fee_m: u64, delta: u64, fees: &Fe
         &MigrationParams {
             migration_fee: fee_m,
             pool_tokens: u128::from(ata - st.real_token_reserves),
+            post_complete_quote_in: 0,
         },
     )
     .unwrap();

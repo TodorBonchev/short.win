@@ -6,12 +6,13 @@
 //! `(x, y) = reprice(l, p)` (the liquidation EMA leg, the D4 margin; ECON §2.3), so the
 //! program, the keeper and the WASM facade dispatch the same way: [`Pricing`] for the
 //! constant-product pools (PumpSwap, Raydium AMM v4, CPMM), [`CurvePricing`] for the pump
-//! curve, whose buyback depends on `rT` (`B̂_str` above it, V1-9) and so needs a
-//! [`CurveState`] rather than `(X, Y)` (review F-S3).
+//! curve, whose buyback depends on `rT` (`B̂_v3` above it on a live curve, `B̂_str` on a
+//! migrating market's states; pump-final §5.3) and so needs a [`CurveState`] rather than
+//! `(X, Y)` (review F-S3).
 
 use super::{
     BuyQuote, CurveOffsets, CurveState, MigrationParams, SellQuote, cpmm, curve_reprice,
-    curve_straddle, ray_v4, reprice, sol_leg,
+    curve_straddle, curve_synthetic, ray_v4, reprice, sol_leg,
 };
 use crate::error::MathError;
 use crate::fees::{CpmmFees, FeeBps, PammFeeSchedule, RayV4Fee};
@@ -108,14 +109,16 @@ impl Pricing {
     }
 }
 
-/// The pump bonding curve as a venue (ECON §3.1, §5.3, §10.2; ARCH §4.3, §5.4): its
-/// resolved fees, the constant offsets that make a repriced state know its `rT`, the
-/// migration, and the PumpSwap fee schedule of the post-migration pool that `B̂_str`
-/// prices on. Build it at the live fee for execution quotes and with
-/// [`CurvePricing::capped`] for risk quotes (ARCH §4.3, V2-1).
+/// The pump bonding curve as a venue (ECON §3.1, §5.3, §10.2; ARCH §4.3, §5.4; pump-final
+/// §5.3): its resolved fees, the constant offsets that make a repriced state know its `rT`,
+/// the migration, the PumpSwap fee schedule of the post-migration pool that `B̂_str` prices on,
+/// and whether (and at which fee) a buy past `rT` executes by pump's synthetic migration. Build
+/// it at the live fee for execution quotes and with [`CurvePricing::capped`] for risk quotes
+/// (ARCH §4.3, V2-1).
 #[derive(Clone, Copy, Debug)]
 pub struct CurvePricing<'a> {
-    /// The curve's resolved fees (`fees::pump_curve` on the live state).
+    /// The curve's resolved fees (`fees::pump_curve` on the live state): every quote up to
+    /// `rT`, sales, and `φ` of the fee gates.
     pub fees: FeeBps,
     /// `vT − rT`, `vQ − rQ` of the live curve ([`CurveOffsets::of`]).
     pub offsets: CurveOffsets,
@@ -123,14 +126,25 @@ pub struct CurvePricing<'a> {
     pub migration: MigrationParams,
     /// Fee schedule of the post-migration pool (tier resolved at its market cap).
     pub pool: PammFeeSchedule<'a>,
+    /// `Some(φ_s)`: the live curve buys past `rT` by pump's synthetic migration (`buy_v3`), so
+    /// `q > rT` is [`curve_synthetic`]'s `B̂_v3` with both legs at `φ_s`, the curve tier at its
+    /// pre-trade market cap on the mint's live supply (`fees::pump_curve_at_supply`; what pump
+    /// charges there, P1 correction (a)). Set for a live (`!complete`), non-cashback, non-mayhem
+    /// curve whose mint supply is known. `None` on a `PumpMigrating` market, whose EMA-leg ring
+    /// states (`curve_at`, `complete = false`) must price `q > rT` on the real pool at the
+    /// PumpSwap tier ([`curve_straddle`]'s `B̂_str`), never at the curve's fee (pump-final G-2).
+    pub synthetic: Option<FeeBps>,
 }
 
 impl CurvePricing<'_> {
-    /// Buyback of `q` on `state` along the executed path: [`curve_straddle`] (the curve for
-    /// `q ≤ rT`, `B̂_str` on the post-migration pool above it). `None` exactly when that
-    /// is.
+    /// Buyback of `q` on `state` along the executed path: the curve for `q ≤ rT`; above it
+    /// [`curve_synthetic`] (`B̂_v3`) when [`synthetic`](Self::synthetic) is set, else
+    /// [`curve_straddle`] (`B̂_str` on the post-migration pool). `None` exactly when that is.
     pub fn buy(&self, q: u64, state: &CurveState) -> Option<BuyQuote> {
-        curve_straddle(q, state, &self.fees, &self.migration, &self.pool)
+        match &self.synthetic {
+            Some(fees) => curve_synthetic(q, state, &self.fees, fees, &self.migration),
+            None => curve_straddle(q, state, &self.fees, &self.migration, &self.pool),
+        }
     }
 
     /// Exact-in sale of `q` on `state` (`sol_leg::sell_exact_in` on `(vT, vQ)`, paid out
@@ -144,19 +158,22 @@ impl CurvePricing<'_> {
     }
 
     /// `B̂(q; curve_reprice(L, P))`: the curve at price `P` with liquidity `L` and the
-    /// live offsets, straddle included (ECON §5.3; ARCH §4.3 EMA leg, FV, `B̂_ref`). The
-    /// curve's fees are the live ones (R3B-7 b); the straddle's pool tier is resolved at
-    /// the migrated pool's market cap (ARCH §4.3, as the sim).
+    /// live offsets, above `rT` as [`buy`](Self::buy) (ECON §5.3; ARCH §4.3 EMA leg, FV,
+    /// `B̂_ref`). The curve's fees are the live ones (R3B-7 b), the synthetic legs' too; the
+    /// straddle's pool tier is resolved at the migrated pool's market cap (ARCH §4.3, as the
+    /// sim).
     pub fn buy_repriced(&self, q: u64, l: u128, p: u128) -> Option<BuyQuote> {
         self.buy(q, &curve_reprice(l, p, self.offsets)?)
     }
 
-    /// The risk view (ARCH §4.3, V2-1): the curve's fees and the post-migration pool's
-    /// capped at `cap_bps` (a lower existing pool cap is kept), each as one combined fee at
-    /// the cap when above it ([`FeeBps::capped`]; the sims' `quote_at` with `cap_ppm`).
+    /// The risk view (ARCH §4.3, V2-1): the curve's fees, the synthetic legs' and the
+    /// post-migration pool's capped at `cap_bps` (a lower existing pool cap is kept), each as
+    /// one combined fee at the cap when above it ([`FeeBps::capped`]; the sims' `quote_at`
+    /// with `cap_ppm`).
     pub fn capped(&self, cap_bps: u64) -> Self {
         let mut c = *self;
         c.fees = self.fees.capped(cap_bps);
+        c.synthetic = self.synthetic.map(|f| f.capped(cap_bps));
         c.pool.cap_bps = Some(self.pool.cap_bps.map_or(cap_bps, |k| k.min(cap_bps)));
         c
     }
@@ -176,10 +193,11 @@ impl CurvePricing<'_> {
     ///
     /// `B̂_str` dips (≈ 0.02 %) where `rT(P)` falls below `q`, so one bisection over all
     /// `P` can miss the first crossing. This searches the curve regime (`rT(P) ≥ q`, the
-    /// curve quote, non-decreasing in `P`) first and the pool regime above it only if the
-    /// curve regime never crosses. In the pool regime `B̂_str` is flat up to the rounding
-    /// of `Y_p` (a few lamports) until `rT(P) = 0` and increasing after, so the result
-    /// there is exact up to that rounding. Off-chain only (≤ 260 quotes).
+    /// curve quote, non-decreasing in `P`) first and the regime above it only if the
+    /// curve regime never crosses. There `B̂_str` is flat up to the rounding of `Y_p` (a few
+    /// lamports) until `rT(P) = 0` and increasing after, so the result is exact up to that
+    /// rounding. `B̂_v3` has no dip at `rT` with one fee schedule; the two-regime search is
+    /// correct for it as for any shape (pump-final §5.2). Off-chain only (≤ 260 quotes).
     ///
     /// Errors: as [`liquidation_price`].
     pub fn liquidation_price(
@@ -309,6 +327,7 @@ mod tests {
             migration: MigrationParams {
                 migration_fee: 15_000_001,
                 pool_tokens: 206_900_000_000_000,
+                post_complete_quote_in: 0,
             },
             pool: PammFeeSchedule {
                 tiers: &tiers,
@@ -318,6 +337,7 @@ mod tests {
                 coin_creator_is_default: false,
                 cap_bps: None,
             },
+            synthetic: None,
         };
         let q = 150_000_000_000_000;
         let b = c.buy(q, &s).unwrap();
@@ -350,6 +370,100 @@ mod tests {
         };
         assert_eq!(c.sell(1_000_000, &done), None);
         assert_eq!(c.buy(1, &done), None);
+    }
+
+    /// T-MATH-5 (pump-final §5.3): `synthetic` routes `q > rT` through `curve_synthetic` at its
+    /// own fee (the live-supply tier) on the live and the repriced state; `None` keeps `B̂_str`
+    /// at the pool tier. The capped view caps the synthetic fee too.
+    #[test]
+    fn curve_pricing_is_synthetic() {
+        use crate::fees::{FeeTier, PammFeeSchedule};
+        use crate::quote::{
+            CurveOffsets, CurveState, MigrationParams, curve_reprice, curve_synthetic,
+            migrated_pool,
+        };
+        let s = CurveState {
+            vt: 400_000_000_000_000,
+            vq: 80_475_000_000,
+            rt: 120_100_000_000_000,
+            rq: 50_475_000_000,
+            complete: false,
+        };
+        let tiers = [FeeTier {
+            threshold: 0,
+            fees: FeeBps::new(2, 93, 30),
+        }];
+        let straddle = CurvePricing {
+            fees: FeeBps::new(0, 95, 30),
+            offsets: CurveOffsets::of(&s).unwrap(),
+            migration: MigrationParams {
+                migration_fee: 15_000_001,
+                pool_tokens: 206_900_000_000_000,
+                post_complete_quote_in: 0,
+            },
+            pool: PammFeeSchedule {
+                tiers: &tiers,
+                base_supply: 1_000_000_000_000_000,
+                creator_fee_configurable: true,
+                pool_creator_fee_bps: 0,
+                coin_creator_is_default: false,
+                cap_bps: None,
+            },
+            synthetic: None,
+        };
+        let phi_s = FeeBps::new(0, 80, 25);
+        let c = CurvePricing {
+            synthetic: Some(phi_s),
+            ..straddle
+        };
+        let rt = u64::try_from(s.rt).unwrap();
+        let q = 150_000_000_000_000;
+        let b = c.buy(q, &s).unwrap();
+        assert_eq!(
+            Some(b),
+            curve_synthetic(q, &s, &c.fees, &phi_s, &c.migration)
+        );
+        assert_eq!(
+            straddle.buy(q, &s),
+            curve_straddle(q, &s, &c.fees, &c.migration, &c.pool)
+        );
+        assert!(b.cost < straddle.buy(q, &s).unwrap().cost);
+        // Up to rT both are the curve quote at the curve path's fee.
+        for q in [1, rt] {
+            assert_eq!(c.buy(q, &s), straddle.buy(q, &s));
+            assert_eq!(
+                c.buy(q, &s),
+                sol_leg::buy_exact_out(q, s.vt, s.vq, true, &c.fees)
+            );
+        }
+        // Both legs at φ_s: the curve leg is not the curve path's quote of rT.
+        let leg1 = sol_leg::buy_exact_out(rt, s.vt, s.vq, true, &phi_s).unwrap();
+        let (xs, ys) = migrated_pool(&s, &c.migration).unwrap();
+        let leg2 = sol_leg::buy_exact_out(q - rt, xs, ys, true, &phi_s).unwrap();
+        assert_eq!(b.cost, leg1.cost + leg2.cost);
+        // Repriced (the EMA leg): curve_synthetic on curve_reprice.
+        let (l, p) = (
+            crate::quote::liquidity(s.vt, s.vq).unwrap(),
+            s.vq * crate::num::WAD / s.vt,
+        );
+        let ema = curve_reprice(l, p, c.offsets).unwrap();
+        assert!(u128::from(q) > ema.rt);
+        assert_eq!(c.buy_repriced(q, l, p), c.buy(q, &ema));
+        assert_eq!(
+            c.buy_repriced(q, l, p),
+            curve_synthetic(q, &ema, &c.fees, &phi_s, &c.migration)
+        );
+        // Capped: both curve fees at the cap, never above the live quote.
+        let risk = c.capped(100);
+        assert_eq!(
+            (risk.fees, risk.synthetic),
+            (FeeBps::new(0, 100, 0), Some(FeeBps::new(0, 100, 0)))
+        );
+        assert!(risk.buy(q, &s).unwrap().cost < b.cost);
+        assert_eq!(c.capped(500).synthetic, Some(phi_s));
+        assert_eq!(straddle.capped(100).synthetic, None);
+        // φ of the gates is the curve path's fee either way.
+        assert_eq!(c.oneway_ppm(), straddle.oneway_ppm());
     }
 
     #[test]

@@ -328,6 +328,150 @@ fn ref_cp_sell(a: u64, x: u128, y: u128, f: &CpmmFees) -> Option<SellQuote> {
     })
 }
 
+/// ECON §3.1's post-migration pool (pump-final §5.1): `Y_p = rQ + (⌈rT·vQ/(vT − rT)⌉ + 1) −
+/// fee + pcQ` (`n` 0 when `rT = 0`); `None` exactly where `quote::migrated_pool` is.
+fn ref_migrated_pool(s: &CurveState, m: &MigrationParams) -> Option<(u128, u128)> {
+    let fee = m.migration_fee;
+    let y = if s.rt == 0 {
+        (b(s.rq) >= b(fee)).then(|| b(s.rq) - fee)
+    } else if s.rt >= s.vt {
+        None
+    } else {
+        let n = ceil(&(b(s.rt) * s.vq), &(b(s.vt) - s.rt)).expect("vt > rt") + 1u8;
+        (u64_of(&n).is_some() && b(s.rq) + &n >= b(fee)).then(|| b(s.rq) + n - fee)
+    }?;
+    u128_of(&y)?;
+    Some((m.pool_tokens, u128_of(&(y + m.post_complete_quote_in))?))
+}
+
+/// pump-final §5.2's `B̂_v3`: up to `rT` the curve at `f`; above it `rT` on the curve plus
+/// `q − rT` on [`ref_migrated_pool`]'s would-be pool, both at `fs`, `ε₁ = 1` on both legs.
+fn ref_synthetic(
+    q: u64,
+    s: &CurveState,
+    f: &FeeBps,
+    fs: &FeeBps,
+    m: &MigrationParams,
+) -> Option<BuyQuote> {
+    if q == 0 || s.complete {
+        return None;
+    }
+    if u128::from(q) <= s.rt {
+        return ref_sol_buy(q, s.vt, s.vq, true, f);
+    }
+    let (c1, n1) = if s.rt == 0 {
+        (0, 0)
+    } else {
+        let l = ref_sol_buy(u64::try_from(s.rt).ok()?, s.vt, s.vq, true, fs)?;
+        (l.cost, l.net)
+    };
+    let (xs, ys) = ref_migrated_pool(s, m)?;
+    let l2 = ref_sol_buy(u64::try_from(u128::from(q) - s.rt).ok()?, xs, ys, true, fs)?;
+    Some(BuyQuote {
+        cost: u64_of(&(b(l2.cost) + c1))?,
+        net: u64_of(&(b(l2.net) + n1))?,
+        ..l2
+    })
+}
+
+/// pump's charge for `buy_v3(rT + q₂)` by synthetic migration (pump-final §5.2; T-PUMP-MATH-V3
+/// (b)): the curve part `n₁ᵖ = ⌈rT·vQ/(vT − rT)⌉` (`v2`: `⌊·⌋ + 1`, what pump charged on the
+/// exact divisions G0 measured), the pool part `n₂ᵖ = ⌈Y_sᵖ·q₂/(X_s − q₂)⌉` on
+/// `Y_sᵖ = rQ + n₁ᵖ − fee`, each fee component `⌈n·b/10⁴⌉` per part. `None` without such a trade.
+fn ref_pump_charge(
+    s: &CurveState,
+    q2: u64,
+    x_s: u128,
+    fee_m: u64,
+    f: &FeeBps,
+    v2: bool,
+) -> Option<B> {
+    if s.rt == 0 || s.rt >= s.vt || q2 == 0 || u128::from(q2) >= x_s {
+        return None;
+    }
+    let rest = b(s.vt) - s.rt;
+    let num = b(s.rt) * s.vq;
+    let n1 = if v2 {
+        floor(&num, &rest)? + 1u8
+    } else {
+        ceil(&num, &rest)?
+    };
+    let ysp = b(s.rq) + &n1;
+    if ysp < b(fee_m) {
+        return None;
+    }
+    let ysp = ysp - fee_m;
+    let n2 = ceil(&(&ysp * q2), &(b(x_s) - q2))?;
+    let part = |n: &B| {
+        n + ref_fee(n, f.lp, 10_000)
+            + ref_fee(n, f.protocol, 10_000)
+            + ref_fee(n, f.creator, 10_000)
+    };
+    Some(part(&n1) + part(&n2))
+}
+
+/// pump-final §5.2's general bound on `B̂_v3 − charge`: `(1 + Σᵢ⌈bᵢ/10⁴⌉) + (Δ₂ +
+/// Σᵢ⌈Δ₂·bᵢ/10⁴⌉)` with `Δ₂ = 1 + ⌈q₂/(X_s − q₂)⌉` over the non-zero fee components.
+fn v3_bound(q2: u64, x_s: u128, f: &FeeBps) -> B {
+    let d2 = ceil(&b(q2), &(b(x_s) - q2)).expect("q₂ < X_s") + 1u8;
+    let mut out = b(1u8) + &d2;
+    for c in [f.lp, f.protocol, f.creator].into_iter().filter(|&c| c > 0) {
+        out += ref_fee(&b(1u8), c, 10_000) + ref_fee(&d2, c, 10_000);
+    }
+    out
+}
+
+/// A live curve for the synthetic-exit properties: the standard offsets (`vT − rT` 279.9e12,
+/// `vQ − rQ` 30e9, on the standard curve `vT·vQ ≈ 1.073e15·30e9`) or random ones; with `exact`,
+/// `rT·vQ` is made a multiple of `vT − rT` (pump-final T-MATH-3: exact divisions on purpose).
+fn synthetic_curve(
+    standard: bool,
+    off_t: u128,
+    off_q: u128,
+    rt: u128,
+    rq: u128,
+    exact: bool,
+) -> CurveState {
+    let (off_t, off_q) = if standard {
+        (279_900_000_000_000, 30_000_000_000)
+    } else {
+        (off_t, off_q)
+    };
+    let vt = off_t + rt;
+    let mut vq = if standard {
+        (1_073_000_000_000_000u128 * 30_000_000_000).div_ceil(vt)
+    } else {
+        off_q + rq
+    };
+    let mut rt = rt;
+    if exact {
+        // rT·vQ/(vT − rT) exact: rT = k·d/g and vQ = j·g with g | d, or (any d) vQ a multiple of
+        // d / gcd(rT, d).
+        let d = off_t;
+        if d % 2_048 == 0 {
+            let unit = d / 2_048;
+            rt = (rt / unit).max(1) * unit;
+            vq = vq.div_ceil(2_048) * 2_048;
+        } else {
+            let mut g = (rt, d);
+            while g.1 != 0 {
+                g = (g.1, g.0 % g.1);
+            }
+            let step = d / g.0;
+            vq = vq.div_ceil(step) * step;
+        }
+    }
+    let vt = off_t + rt;
+    let vq = vq.max(off_q + 1);
+    CurveState {
+        vt,
+        vq,
+        rt,
+        rq: vq - off_q,
+        complete: false,
+    }
+}
+
 // ------------------------------------------------------------------ differential
 
 proptest! {
@@ -627,7 +771,8 @@ proptest! {
         let sched = PammFeeSchedule { tiers: &tiers, base_supply: 1_000_000_000_000_000,
                                       creator_fee_configurable: true, pool_creator_fee_bps: 0,
                                       coin_creator_is_default: false, cap_bps: None };
-        let mig = MigrationParams { migration_fee: 15_000_001, pool_tokens: 206_900_000_000_000 };
+        let mig = MigrationParams { migration_fee: 15_000_001, pool_tokens: 206_900_000_000_000,
+                                    post_complete_quote_in: 0 };
         let fee = FeeBps::new(0, 95, 30);
         // Live leg and an EMA leg at price·k/8.
         let l = sqrt_u128(vt * vq, Rounding::Floor);
@@ -656,34 +801,28 @@ proptest! {
     }
 
     /// Any curve state and size: the executed-path quote is the curve quote up to `rT`
-    /// and the pool quote on the migrated pool above it, with no panic anywhere.
+    /// and the pool quote on the migrated pool (with a synthetic buy's `pcQ`, pump-final §5.1)
+    /// above it, with no panic anywhere.
     #[test]
     fn straddle_equals_composition(q in amount(), vt in reserve(), vq in reserve(), rt in reserve(),
                                    rq in reserve(), complete: bool, fee in any::<u64>(),
-                                   pool_tokens in reserve(), f in sane_fee_bps(), supply: u64) {
+                                   pool_tokens in reserve(), f in sane_fee_bps(), supply: u64,
+                                   pcq in prop_oneof![Just(0u64), any::<u64>(), 0u64..100_000_000_000]) {
         let s = CurveState { vt, vq, rt, rq, complete };
-        let mig = MigrationParams { migration_fee: fee, pool_tokens };
+        let mig = MigrationParams { migration_fee: fee, pool_tokens, post_complete_quote_in: pcq };
         let tiers = [FeeTier { threshold: 0, fees: FeeBps::new(2, 93, 30) },
                      FeeTier { threshold: 420_000_000_000, fees: FeeBps::new(20, 5, 95) }];
         let sched = PammFeeSchedule { tiers: &tiers, base_supply: supply, creator_fee_configurable: true,
                                       pool_creator_fee_bps: 0, coin_creator_is_default: false, cap_bps: None };
-        // Reference migrated pool: Y_p = rQ + (⌈rT·vQ/(vT − rT)⌉ + 1) − fee (ECON §3.1 n).
-        let pool = if rt == 0 {
-            (b(rq) >= b(fee)).then(|| b(rq) - fee)
-        } else if rt >= vt {
-            None
-        } else {
-            let n = ceil(&(b(rt) * vq), &(b(vt) - rt)).expect("vt > rt") + 1u8;
-            (u64_of(&n).is_some() && b(rq) + &n >= b(fee)).then(|| b(rq) + n - fee)
-        }
-        .and_then(|y| u128_of(&y));
-        prop_assert_eq!(quote::migrated_pool(&s, &mig), pool.map(|y| (pool_tokens, y)));
+        // Reference migrated pool: Y_p = rQ + (⌈rT·vQ/(vT − rT)⌉ + 1) − fee + pcQ (ECON §3.1 n).
+        let pool = ref_migrated_pool(&s, &mig);
+        prop_assert_eq!(quote::migrated_pool(&s, &mig), pool);
         let want = if q == 0 || complete {
             None
         } else if u128::from(q) <= rt {
             ref_sol_buy(q, vt, vq, true, &f)
         } else {
-            pool.and_then(|yp| {
+            pool.and_then(|(_, yp)| {
                 let pf = fees::pump_amm(yp, pool_tokens, &sched).ok()?;
                 ref_sol_buy(q, pool_tokens, yp, false, &pf)
             })
@@ -692,6 +831,262 @@ proptest! {
         let _ = quote::curve_two_leg(q, &s, &f, &mig, &sched);
         if let Some(off) = CurveOffsets::of(&s) {
             let _ = quote::curve_reprice(vq, vt, off);
+        }
+    }
+
+    // -------------------------------------------------------------- synthetic (B̂_v3)
+
+    /// T-MATH-3 (pump-final §5.2): on any state, `curve_synthetic` is its composition — the
+    /// curve quote up to `rT` (equal to `curve_straddle` there), above it the curve leg for `rT`
+    /// plus the would-be pool's leg for `q − rT`, both at the synthetic fee with `ε₁ = 1` —
+    /// `None` exactly when that is, in particular iff `q − rT ≥ X_s` once the curve leg and the
+    /// pool are defined, and no panic anywhere. `CurvePricing` routes `q > rT` through it when
+    /// `synthetic` is set.
+    #[test]
+    fn synthetic_equals_composition(q in amount(), vt in reserve(), vq in reserve(), rt in reserve(),
+                                    rq in reserve(), complete: bool, fee in any::<u64>(),
+                                    pool_tokens in reserve(), f in sane_fee_bps(), fs in sane_fee_bps(),
+                                    pcq in prop_oneof![3 => Just(0u64), 1 => any::<u64>()]) {
+        let s = CurveState { vt, vq, rt, rq, complete };
+        let mig = MigrationParams { migration_fee: fee, pool_tokens, post_complete_quote_in: pcq };
+        let got = quote::curve_synthetic(q, &s, &f, &fs, &mig);
+        prop_assert_eq!(got, ref_synthetic(q, &s, &f, &fs, &mig));
+        let tiers = [FeeTier { threshold: 0, fees: FeeBps::new(2, 93, 30) }];
+        let sched = PammFeeSchedule { tiers: &tiers, base_supply: 1_000_000_000_000_000,
+                                      creator_fee_configurable: true, pool_creator_fee_bps: 0,
+                                      coin_creator_is_default: false, cap_bps: None };
+        if u128::from(q) <= rt {
+            prop_assert_eq!(got, quote::curve_straddle(q, &s, &f, &mig, &sched));
+        } else if q > 0 && !complete {
+            let leg1 = rt == 0 || u64::try_from(rt).ok()
+                .and_then(|r| sol_leg::buy_exact_out(r, vt, vq, true, &fs)).is_some();
+            if let (true, Some((xs, _))) = (leg1, quote::migrated_pool(&s, &mig))
+                && u128::from(q) - rt >= xs
+            {
+                prop_assert_eq!(got, None, "q − rT ≥ X_s: pump's NotEnoughTokensToBuy");
+            }
+        }
+        if let Some(offsets) = CurveOffsets::of(&s) {
+            let c = quote::CurvePricing { fees: f, offsets, migration: mig, pool: sched,
+                                          synthetic: Some(fs) };
+            prop_assert_eq!(c.buy(q, &s), got);
+            let st = quote::CurvePricing { synthetic: None, ..c };
+            prop_assert_eq!(st.buy(q, &s), quote::curve_straddle(q, &s, &f, &mig, &sched));
+        }
+    }
+
+    /// T-MATH-3 (pump-final §5.2): `B̂_v3` covers pump's charge for `buy_v3(rT + q₂)` — the v3
+    /// model (`n₁ᵖ = ⌈⌉`) and the v2 one (`⌊⌋ + 1`, what pump charged on G0's exact divisions) —
+    /// by at most §5.2's general bound `(1 + Σ⌈bᵢ/10⁴⌉) + (Δ₂ + Σ⌈Δ₂·bᵢ/10⁴⌉)` over the full
+    /// domain `q₂ < X_s`, and by at most 7 lamports for `q₂ ≤ X_s/2` (fee components up to
+    /// 5,000 bps; the per-market cap keeps every position there, C8). Standard and random
+    /// curves, any would-be pool (`X_s` with or without a donation), exact divisions of both
+    /// parts generated on purpose.
+    #[test]
+    fn synthetic_covers_pumps_charge(standard in prop_oneof![2 => Just(true), 1 => Just(false)],
+                                     off_t in 1_000_000_000_000u128..1_100_000_000_000_000,
+                                     off_q in 1_000_000_000u128..200_000_000_000,
+                                     rt in 1u128..800_000_000_000_000,
+                                     rq in 0u128..500_000_000_000,
+                                     exact: bool,
+                                     x_s in prop_oneof![2 => Just(206_900_000_000_000u128),
+                                                        1 => 206_900_000_000_000u128..420_000_000_000_000,
+                                                        1 => 1_000_000_000_000u128..1_000_000_000_000_000],
+                                     q2_mode in 0u8..4, q2_raw: u64,
+                                     protocol in prop_oneof![3 => 0u64..=300, 1 => 0u64..=10_000],
+                                     creator in prop_oneof![3 => 0u64..=300, 1 => 0u64..=10_000],
+                                     fee_m in prop_oneof![3 => Just(15_000_001u64), 1 => 0u64..1_000_000_000]) {
+        let s = synthetic_curve(standard, off_t, off_q, rt, rq, exact);
+        if s.rq < u128::from(fee_m) {
+            return Ok(());
+        }
+        let q2: u64 = match q2_mode {
+            0 => u64::try_from((u128::from(q2_raw) % (x_s - 1)) + 1).unwrap(),
+            1 => u64::try_from((u128::from(q2_raw) % (x_s / 2)) + 1).unwrap(),
+            2 => u64::try_from(x_s / 2).unwrap(),
+            _ => u64::try_from(x_s - 1 - u128::from(q2_raw % 1_000)).unwrap(),
+        };
+        let Ok(rt64) = u64::try_from(s.rt) else { return Ok(()); };
+        let Some(q) = rt64.checked_add(q2) else { return Ok(()); };
+        let f = FeeBps::new(0, protocol, creator);
+        let mig = MigrationParams { migration_fee: fee_m, pool_tokens: x_s, post_complete_quote_in: 0 };
+        let got = quote::curve_synthetic(q, &s, &f, &f, &mig);
+        let bound = v3_bound(q2, x_s, &f);
+        for v2 in [false, true] {
+            let Some(charge) = ref_pump_charge(&s, q2, x_s, fee_m, &f, v2) else { continue };
+            match got {
+                Some(bq) => {
+                    let quote = b(bq.cost);
+                    prop_assert!(quote >= charge, "B̂_v3 {} below pump's charge {} (v2 {})", bq.cost, charge, v2);
+                    prop_assert!(&quote - &charge <= bound, "B̂_v3 {} − charge {} above the bound {}", bq.cost, charge, bound);
+                    if 2 * u128::from(q2) <= x_s && protocol <= 5_000 && creator <= 5_000 {
+                        prop_assert!(&quote - &charge <= b(7u8), "B̂_v3 {} − charge {} > 7", bq.cost, charge);
+                    }
+                }
+                // Undefined only when an amount leaves u64: then so does the charge plus the bound.
+                None => prop_assert!(charge + &bound > b(u64::MAX), "no quote for a charge that fits"),
+            }
+        }
+    }
+
+    /// T-MATH-3 (pump-final §5.2): with one fee schedule `B̂_v3` is non-decreasing in `q`, and
+    /// continuous at `rT`: `B̂_v3(rT + 1) − B̂_v3(rT)` is the would-be pool's quote for one
+    /// token (≤ 4 lamports on a standard curve at today's fees). The risk view (capped) never
+    /// quotes above the live one.
+    #[test]
+    fn synthetic_monotone_and_continuous(standard in prop_oneof![3 => Just(true), 1 => Just(false)],
+                                         off_t in 1_000_000_000_000u128..1_100_000_000_000_000,
+                                         off_q in 1_000_000_000u128..200_000_000_000,
+                                         rt in 1u128..800_000_000_000_000,
+                                         rq in 15_000_001u128..500_000_000_000,
+                                         x_s in prop_oneof![2 => Just(206_900_000_000_000u128),
+                                                            1 => 1_000_000_000_000u128..1_000_000_000_000_000],
+                                         q1 in 1u64..1_200_000_000_000_000, q2 in 1u64..1_200_000_000_000_000,
+                                         f in sane_fee_bps(), cap in 0u64..400) {
+        let s = synthetic_curve(standard, off_t, off_q, rt, rq, false);
+        let mig = MigrationParams { migration_fee: 15_000_001, pool_tokens: x_s, post_complete_quote_in: 0 };
+        let f = FeeBps::new(0, f.protocol, f.creator);
+        let (lo, hi) = (q1.min(q2), q1.max(q2));
+        let a = quote::curve_synthetic(lo, &s, &f, &f, &mig);
+        let c = quote::curve_synthetic(hi, &s, &f, &f, &mig);
+        if let (Some(a), Some(c)) = (a, c) {
+            prop_assert!(a.cost <= c.cost, "{} -> {}: {} > {}", lo, hi, a.cost, c.cost);
+        }
+        if c.is_some() {
+            prop_assert!(a.is_some(), "defined at {} but not at {}", hi, lo);
+        }
+        let rt64 = u64::try_from(s.rt).unwrap();
+        if let (Some(at), Some(past), Some((xs, ys))) = (
+            quote::curve_synthetic(rt64, &s, &f, &f, &mig),
+            quote::curve_synthetic(rt64 + 1, &s, &f, &f, &mig),
+            quote::migrated_pool(&s, &mig),
+        ) {
+            let one = sol_leg::buy_exact_out(1, xs, ys, true, &f).unwrap();
+            prop_assert_eq!(past.cost - at.cost, one.cost);
+            if standard && x_s == 206_900_000_000_000 && f.protocol <= 100 && f.creator <= 100 {
+                prop_assert!(one.cost <= 4, "{}", one.cost);
+            }
+        }
+        // Capped ≤ live, on both sides of rT.
+        let tiers = [FeeTier { threshold: 0, fees: FeeBps::new(2, 93, 30) }];
+        let offsets = CurveOffsets::of(&s).unwrap();
+        let c = quote::CurvePricing { fees: f, offsets, migration: mig,
+                                      pool: PammFeeSchedule { tiers: &tiers, base_supply: 1_000_000_000_000_000,
+                                                              creator_fee_configurable: true, pool_creator_fee_bps: 0,
+                                                              coin_creator_is_default: false, cap_bps: None },
+                                      synthetic: Some(f) };
+        for q in [lo, hi] {
+            if let (Some(live), Some(risk)) = (c.buy(q, &s), c.capped(cap).buy(q, &s)) {
+                prop_assert!(risk.cost <= live.cost, "capped {} > live {}", risk.cost, live.cost);
+            }
+        }
+    }
+
+    /// T-MATH-3 (pump-final §5.2, D3): on standard curves at today's fees, `B̂_v3` is never more
+    /// than ≈ 2.4 bps above `B̂_str` (the dip region just above `rT`: the curve's final price over
+    /// the would-be pool's, 115,005,359,190/279.9e12 against 84,990,359,189/206.9e12 = 1.000244,
+    /// plus a few lamports of rounding), and below it once `q − rT` is a few percent of `X_s`.
+    #[test]
+    fn synthetic_sits_at_most_2_4_bps_above_the_straddle(sold_frac in 1u64..1_000_000,
+                                                         extra in prop_oneof![1u64..1_000_000_000,
+                                                                              1u64..10_000_000_000_000,
+                                                                              1u64..150_000_000_000_000]) {
+        let (vt0, vs0, rt0) = (1_073_000_000_000_000u128, 30_000_000_000u128, 793_100_000_000_000u128);
+        let sold = rt0 * u128::from(sold_frac) / 1_000_000;
+        let vt = vt0 - sold;
+        let vq = (vt0 * vs0).div_ceil(vt);
+        let s = CurveState { vt, vq, rt: rt0 - sold, rq: vq - vs0, complete: false };
+        let tiers = [
+            FeeTier { threshold: 0, fees: FeeBps::new(2, 93, 30) },
+            FeeTier { threshold: 420_000_000_000, fees: FeeBps::new(20, 5, 95) },
+        ];
+        let sched = PammFeeSchedule { tiers: &tiers, base_supply: 1_000_000_000_000_000,
+                                      creator_fee_configurable: true, pool_creator_fee_bps: 0,
+                                      coin_creator_is_default: false, cap_bps: None };
+        let mig = MigrationParams { migration_fee: 15_000_001, pool_tokens: 206_900_000_000_000,
+                                    post_complete_quote_in: 0 };
+        let fee = FeeBps::new(0, 95, 30);
+        let q = u64::try_from(s.rt).unwrap() + extra;
+        let (Some(v3), Some(st)) = (quote::curve_synthetic(q, &s, &fee, &fee, &mig),
+                                    quote::curve_straddle(q, &s, &fee, &mig, &sched)) else {
+            return Ok(());
+        };
+        prop_assert!(u128::from(v3.cost) * 1_000_000 <= u128::from(st.cost) * 1_000_245 + 8_000_000,
+                     "B̂_v3 {} vs B̂_str {}", v3.cost, st.cost);
+        if 50 * u128::from(extra) >= 206_900_000_000_000 {
+            prop_assert!(v3.cost < st.cost, "B̂_v3 {} vs B̂_str {}", v3.cost, st.cost);
+        }
+    }
+
+    // -------------------------------------------------------------- migrating FV (ρ)
+
+    /// T-MATH-4 (pump-final §5.4): without a pool part (`pcQ = 0`) `migrating_fv` is the FV of
+    /// before pump's v3 — the pool of `pool_tokens` at `P`, at its own tier, ε₁ = 0 — whatever
+    /// `pool_tokens` is (the standard 206.9e12, or a donation-inflated live balance the caller
+    /// would not pass without a pool part), and ρ = 1 returns `P` itself.
+    #[test]
+    fn migrating_fv_price_is_identity_without_pc(q in amount(), p in reprice_arg(), rq in reserve(),
+                                                 fee in prop_oneof![Just(15_000_001u64), any::<u64>()],
+                                                 pool_tokens in prop_oneof![Just(206_900_000_000_000u128),
+                                                                            206_900_000_000_000u128..1_000_000_000_000_000,
+                                                                            reserve()],
+                                                 x in 1u128..u128::MAX, y in 1u128..u128::MAX) {
+        let done = CurveState { vt: 279_900_000_000_000, vq: rq.saturating_add(30_000_000_000), rt: 0, rq,
+                                complete: true };
+        let tiers = [FeeTier { threshold: 0, fees: FeeBps::new(2, 93, 30) },
+                     FeeTier { threshold: 420_000_000_000, fees: FeeBps::new(20, 5, 95) }];
+        let sched = PammFeeSchedule { tiers: &tiers, base_supply: 1_000_000_000_000_000,
+                                      creator_fee_configurable: true, pool_creator_fee_bps: 0,
+                                      coin_creator_is_default: false, cap_bps: None };
+        let m = MigrationParams { migration_fee: fee, pool_tokens, post_complete_quote_in: 0 };
+        let old = quote::migrated_pool(&done, &m).and_then(|(xp, yp)| {
+            let f = fees::pump_amm(yp, xp, &sched).ok()?;
+            let (x, y) = quote::reprice(quote::liquidity(xp, yp).ok()?, p)?;
+            sol_leg::buy_exact_out(q, x, y, false, &f)
+        });
+        prop_assert_eq!(quote::migrating_fv(q, p, &done, &m, &sched), old);
+        prop_assert_eq!(quote::migrating_fv_price(p, x, y, x, y), Some(p));
+    }
+
+    /// T-MATH-4 (pump-final §5.4): after a synthetic pool part `pcB` priced on the would-be pool
+    /// `(206.9e12 + D, Y₀)` (a donation `D` before the buy, `D′` after it), FV at the frozen
+    /// pool's price `P(X₀, Y₀)` prices the pool `migrate_v2` creates, `(X₁, Y₁)` = (the live
+    /// `curve_base_ata`, `Y₀ + pcQ`): `p'` is within `⌈ρ⌉ + 2` of `P(X₁, Y₁)` (in WAD units), so
+    /// `reprice(L₁, p')` is `(X₁, Y₁)` up to `reprice`'s own `√P` granularity. A donation after
+    /// the pool part lowers `p'`.
+    #[test]
+    fn migrating_fv_price_reprices_to_the_post_buy_pool(rq in 20_000_000_000u128..200_000_000_000,
+                                                        d_before in prop_oneof![Just(0u128), 1u128..300_000_000_000_000],
+                                                        d_after in prop_oneof![Just(0u128), 1u128..300_000_000_000_000],
+                                                        pcb_frac in 1u64..999_000) {
+        let fee = 15_000_001u64;
+        let x0 = 206_900_000_000_000u128;
+        let y0 = rq - u128::from(fee);
+        let xs = x0 + d_before;
+        let pcb = xs * u128::from(pcb_frac) / 1_000_000;
+        // pump's pool part: n₂ᵖ = ⌈Y₀·pcB/(X_s − pcB)⌉ on the donation-inclusive X_s.
+        let pcq = u64::try_from((y0 * pcb).div_ceil(xs - pcb)).unwrap();
+        let a = xs - pcb + d_after;
+        let done = CurveState { vt: 279_900_000_000_000, vq: rq + 30_000_000_000, rt: 0, rq, complete: true };
+        let m = MigrationParams { migration_fee: fee, pool_tokens: a, post_complete_quote_in: pcq };
+        let (x1, y1) = quote::migrated_pool(&done, &m).unwrap();
+        prop_assert_eq!((x1, y1), (a, y0 + u128::from(pcq)));
+        let wad = 1_000_000_000_000_000_000u128;
+        let p0 = y0 * wad / x0;
+        let p1 = y1 * wad / x1;
+        let p = quote::migrating_fv_price(p0, x0, y0, x1, y1).unwrap();
+        let rho_ceil = (y1 * x0).div_ceil(x1 * y0);
+        prop_assert!(p.abs_diff(p1) <= rho_ceil + 2, "p' {} vs P(X₁, Y₁) {} (ρ ≤ {})", p, p1, rho_ceil);
+        let (x, y) = quote::reprice(quote::liquidity(x1, y1).unwrap(), p).unwrap();
+        // reprice's own granularity: `isqrt⁺(P)` moves X and Y by up to 1/√P relatively, the
+        // floored L by up to 10⁹/√P raw units.
+        let sp = u128::try_from(b(p).sqrt()).unwrap();
+        prop_assert!(x.abs_diff(x1) <= 2 * x1 / sp + 64, "X {} vs X₁ {}", x, x1);
+        prop_assert!(y.abs_diff(y1) <= 2 * y1 / sp + 64, "Y {} vs Y₁ {}", y, y1);
+        if d_after > 0 {
+            let without = MigrationParams { pool_tokens: xs - pcb, ..m };
+            let (xw, yw) = quote::migrated_pool(&done, &without).unwrap();
+            prop_assert!(quote::migrating_fv_price(p0, x0, y0, xw, yw).unwrap() >= p);
         }
     }
 

@@ -79,6 +79,7 @@ fn migrating_fv_quote(env: &Env, pm: &PumpMarket, q: u64, p: u128, cap_bps: u64)
         &MigrationParams {
             migration_fee: global.pool_migration_fee(),
             pool_tokens: shortwin::venues::STANDARD_POOL_TOKENS,
+            post_complete_quote_in: 0,
         },
     )
     .unwrap();
@@ -267,6 +268,7 @@ fn migrate_v2_on_the_real_elf_graduates_the_market_onto_its_pool() {
         &MigrationParams {
             migration_fee: fee,
             pool_tokens,
+            post_complete_quote_in: 0,
         },
     )
     .unwrap();

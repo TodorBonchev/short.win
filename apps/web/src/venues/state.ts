@@ -694,7 +694,9 @@ function curveVenue(m: MathModule, c: CurvePricingInputs, poolTokens: bigint): W
     );
     try {
         for (const t of c.schedules.poolTiers) sch.addTier(t.threshold, t.lp, t.protocol, t.creator);
-        return m.Venue.pumpCurve(f, c.offsetToken, c.offsetQuote, c.migrationFee, poolTokens, sch);
+        // No post-complete quote and B̂_str above rT until the web follows the v3 adapter
+        // (pump-final §8, P5: postCompleteQuoteIn and withSynthetic).
+        return m.Venue.pumpCurve(f, c.offsetToken, c.offsetQuote, c.migrationFee, poolTokens, 0n, sch);
     } finally {
         f.free();
         sch.free();

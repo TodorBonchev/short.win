@@ -109,16 +109,35 @@ impl CurveSchedule {
         self.tiers.add(threshold, lp, protocol, creator);
     }
 
-    /// The live fees of a trade on the curve state `(vT, vQ)` (`fees::pump_curve`).
+    /// The live fees of a trade on the curve state `(vT, vQ)` (`fees::pump_curve`: the market
+    /// cap on the fixed 10¹⁵ supply).
     pub fn resolve(&self, vt: u128, vq: u128) -> Result<Fees, JsError> {
-        let s = CurveFeeSchedule {
+        Ok(Fees(fees::pump_curve(vt, vq, &self.schedule())?))
+    }
+
+    /// The fees pump charges on both parts of a buy past `rT` by synthetic migration
+    /// (`fees::pump_curve_at_supply`): the tier at the curve's market cap on the mint's live
+    /// `supply` (pump-final §5.2). Pass them to `Venue.withSynthetic`.
+    #[wasm_bindgen(js_name = resolveAtSupply)]
+    pub fn resolve_at_supply(&self, vt: u128, vq: u128, supply: u64) -> Result<Fees, JsError> {
+        Ok(Fees(fees::pump_curve_at_supply(
+            vt,
+            vq,
+            supply,
+            &self.schedule(),
+        )?))
+    }
+}
+
+impl CurveSchedule {
+    fn schedule(&self) -> CurveFeeSchedule<'_> {
+        CurveFeeSchedule {
             tiers: &self.tiers.0,
             creator_fee_configurable: self.creator_fee_configurable,
             curve_creator_fee_bps: self.curve_creator_fee_bps,
             creator_is_default: self.creator_is_default,
             cap_bps: None,
-        };
-        Ok(Fees(fees::pump_curve(vt, vq, &s)?))
+        }
     }
 }
 
@@ -348,25 +367,52 @@ impl CurveState {
         self.0.complete
     }
 
-    /// The canonical pool right after migration, `(X_p, Y_p)` (`quote::migrated_pool`).
+    /// The canonical pool right after migration, `(X_p, Y_p)` (`quote::migrated_pool`):
+    /// `poolTokens` the tokens it is seeded with (206.9e12, or the live `curve_base_ata` after a
+    /// synthetic pool part), `postCompleteQuoteIn` the curve's `pcQ` (0 without a pool part).
     #[wasm_bindgen(js_name = migratedPool)]
-    pub fn migrated_pool(&self, migration_fee: u64, pool_tokens: u128) -> Option<Reserves> {
+    pub fn migrated_pool(
+        &self,
+        migration_fee: u64,
+        pool_tokens: u128,
+        post_complete_quote_in: u64,
+    ) -> Option<Reserves> {
         let m = MigrationParams {
             migration_fee,
             pool_tokens,
+            post_complete_quote_in,
         };
         quote::migrated_pool(&self.0, &m).map(|(x, y)| Reserves { x, y })
     }
 }
 
-/// The pump curve as a venue: its own fees, the offsets for repricing, and the
-/// post-migration pool of the straddle (ARCH §4.3, V1-9); an owned `quote::CurvePricing`.
+/// FV's price on a migrating curve after a synthetic pool part, `⌈⌈p·Y₁/Y₀⌉·X₀/X₁⌉`
+/// (`quote::migrating_fv_price`, pump-final §5.4): `(X₀, Y₀)` the pool without the pool part
+/// (`migratedPool(fee, 206.9e12, 0)`), `(X₁, Y₁)` the pool `migrate_v2` creates. `undefined` on
+/// `X₁ = 0` or `Y₀ = 0`. Return no FV at all when the program would not define one
+/// (`postCompleteKnown` false, pump-final §6.1.5).
+#[wasm_bindgen(js_name = migratingFvPrice)]
+pub fn migrating_fv_price(p: u128, x0: u128, y0: u128, x1: u128, y1: u128) -> Option<u128> {
+    quote::migrating_fv_price(p, x0, y0, x1, y1)
+}
+
+/// `migrate_v2`'s boost into the new pool's `virtual_quote_reserves`, `⌊X₁·Y₁/10¹⁵⌋`
+/// (`quote::migration_boost`, P1 correction (b)).
+#[wasm_bindgen(js_name = migrationBoost)]
+pub fn migration_boost(x1: u128, y1: u128) -> Option<u128> {
+    quote::migration_boost(x1, y1)
+}
+
+/// The pump curve as a venue: its own fees, the offsets for repricing, the post-migration
+/// pool of the straddle (ARCH §4.3, V1-9), and the synthetic exit's fee when it trades v3
+/// (pump-final §5.3); an owned `quote::CurvePricing`.
 #[derive(Clone, Debug)]
 struct CurveVenue {
     fees: FeeBps,
     offsets: CurveOffsets,
     migration: MigrationParams,
     pool: PammSchedule,
+    synthetic: Option<FeeBps>,
 }
 
 impl CurveVenue {
@@ -376,6 +422,7 @@ impl CurveVenue {
             offsets: self.offsets,
             migration: self.migration,
             pool: self.pool.schedule(),
+            synthetic: self.synthetic,
         }
     }
 }
@@ -436,8 +483,10 @@ impl Venue {
     }
 
     /// The pump curve: its resolved fees, the offsets `vT − rT` and `vQ − rQ`, the
-    /// migration (`pool_migration_fee`, tokens seeded into the pool) and the PumpSwap fee
-    /// schedule of the post-migration pool.
+    /// migration (`pool_migration_fee`, tokens seeded into the pool, the curve's
+    /// `post_complete_quote_in`) and the PumpSwap fee schedule of the post-migration pool.
+    /// Above `rT` it prices `B̂_str` on that pool; `withSynthetic` switches a live curve to
+    /// pump's synthetic migration (`B̂_v3`).
     #[wasm_bindgen(js_name = pumpCurve)]
     pub fn pump_curve(
         fees: &Fees,
@@ -445,6 +494,7 @@ impl Venue {
         offset_quote: u128,
         migration_fee: u64,
         pool_tokens: u128,
+        post_complete_quote_in: u64,
         pool: &PammSchedule,
     ) -> Venue {
         Venue(Kind::Curve(Box::new(CurveVenue {
@@ -456,9 +506,24 @@ impl Venue {
             migration: MigrationParams {
                 migration_fee,
                 pool_tokens,
+                post_complete_quote_in,
             },
             pool: pool.clone(),
+            synthetic: None,
         })))
+    }
+
+    /// This curve with buys past `rT` priced as pump executes them by synthetic migration
+    /// (`CurvePricing::synthetic`, `quote::curve_synthetic`, pump-final §5.2–§5.3): `rT` on
+    /// the curve plus the rest on the would-be pool, both at `syntheticFees` — the tier at the
+    /// curve's market cap on the mint's live supply (`CurveSchedule.resolveAtSupply`). For a live
+    /// (not complete), non-cashback, non-mayhem curve only; a migrating market keeps `B̂_str`.
+    /// Throws `invalid input` on a pool venue.
+    #[wasm_bindgen(js_name = withSynthetic)]
+    pub fn with_synthetic(&self, synthetic_fees: &Fees) -> Result<Venue, JsError> {
+        let mut c = self.curve()?.clone();
+        c.synthetic = Some(synthetic_fees.0);
+        Ok(Venue(Kind::Curve(Box::new(c))))
     }
 
     /// The risk view: every fee at `min(φ_live, capBps)` (ARCH §4.3, V2-1), for CR, the
@@ -471,6 +536,7 @@ impl Venue {
                 let capped = c.pricing().capped(cap);
                 let mut c = c.clone();
                 c.fees = capped.fees;
+                c.synthetic = capped.synthetic;
                 c.pool.cap_bps = capped.pool.cap_bps;
                 Kind::Curve(c)
             }
@@ -515,9 +581,9 @@ impl Venue {
         Ok(self.pricing()?.sell(q, x, y, real_quote_cap).map(SellQuote))
     }
 
-    /// Buyback of `q` on a curve state along the executed path (`CurvePricing::buy`,
-    /// `quote::curve_straddle`): the curve for `q ≤ rT`, all of `q` on the post-migration
-    /// pool above it.
+    /// Buyback of `q` on a curve state along the executed path (`CurvePricing::buy`): the
+    /// curve for `q ≤ rT`; above it `B̂_v3` after `withSynthetic` (`quote::curve_synthetic`),
+    /// else all of `q` on the post-migration pool (`quote::curve_straddle`).
     #[wasm_bindgen(js_name = buyCurve)]
     pub fn buy_curve(&self, q: u64, state: &CurveState) -> Result<Option<BuyQuote>, JsError> {
         Ok(self.curve()?.pricing().buy(q, &state.0).map(BuyQuote))
@@ -603,6 +669,7 @@ mod tests {
             30_000_000_000,
             15_000_001,
             206_900_000_000_000,
+            0,
             &pamm,
         );
         let s = CurveState::new(
@@ -628,6 +695,118 @@ mod tests {
         assert!(r.abs_diff(485_764_635) < 100_000);
         let p_liq = v.liquidation_price(q, 2 * r, 12_500, l, p).unwrap();
         assert!(p_liq > p && p_liq < 2 * p);
+    }
+
+    /// pump-final §5.2–§5.5: `withSynthetic` prices a buy past `rT` as `quote::curve_synthetic`
+    /// (G0's `near166` buy of `rT + 10e12`: pump charged 22,944,563,744, `B̂_v3` +2); without it
+    /// the curve keeps `B̂_str`. `resolveAtSupply` takes the tier of the live supply's market cap
+    /// where `resolve` takes the 10¹⁵ one (G0's tier tripwire, P1 correction (a)). The migrated
+    /// pool with `pcQ`, ρ and the boost as in the crate.
+    #[test]
+    fn pump_curve_synthetic() {
+        let mut pamm = PammSchedule::new(1_000_000_000_000_000, true, 0, false);
+        pamm.add_tier(0, 2, 93, 30);
+        let mut sched = CurveSchedule::new(true, 0, false);
+        sched.add_tier(0, 0, 95, 30);
+        let s = CurveState::new(
+            333_021_296_825_365,
+            96_660_487_854,
+            53_121_296_825_365,
+            66_660_487_854,
+            false,
+        );
+        let f = sched.resolve(s.vt(), s.vq()).unwrap();
+        let fs = sched
+            .resolve_at_supply(s.vt(), s.vq(), 999_818_465_159_445)
+            .unwrap();
+        assert_eq!(fs, f, "one flat tier: the live supply changes nothing");
+        let v = Venue::pump_curve(
+            &f,
+            279_900_000_000_000,
+            30_000_000_000,
+            15_000_001,
+            206_900_000_000_000,
+            0,
+            &pamm,
+        );
+        let syn = v.with_synthetic(&fs).unwrap();
+        let q = 53_121_296_825_365 + 10_000_000_000_000;
+        let b = syn.buy_curve(q, &s).unwrap().unwrap();
+        assert_eq!(b.cost(), 22_944_563_746);
+        let mig = MigrationParams {
+            migration_fee: 15_000_001,
+            pool_tokens: 206_900_000_000_000,
+            post_complete_quote_in: 0,
+        };
+        assert_eq!(
+            Some(b.0),
+            quote::curve_synthetic(q, &s.0, &f.0, &fs.0, &mig)
+        );
+        let straddle = v.buy_curve(q, &s).unwrap().unwrap();
+        assert!(straddle.cost() > b.cost());
+        // Below rT both price the curve; the capped view caps the synthetic legs too.
+        assert_eq!(
+            syn.buy_curve(1_000, &s).unwrap(),
+            v.buy_curve(1_000, &s).unwrap()
+        );
+        assert!(syn.capped(100).buy_curve(q, &s).unwrap().unwrap().cost() < b.cost());
+        // P1 correction (a) under G0's tier tripwire: on this burned supply the fixed 10¹⁵ puts
+        // the market cap (290,253,172,320) in the 70/22 tier, the live supply (290,200,481,257) in
+        // the 80/25 one, which pump charged for rT + 50e12 (45,906,126,201): B̂_v3 covers it at
+        // resolveAtSupply's fee and falls 59,057,853 under it at resolve's.
+        let mut tiers = CurveSchedule::new(true, 0, false);
+        tiers.add_tier(0, 0, 90, 28);
+        tiers.add_tier(290_174_135_726, 0, 80, 25);
+        tiers.add_tier(290_226_826_789, 0, 70, 22);
+        let f_fixed = tiers.resolve(s.vt(), s.vq()).unwrap();
+        let f_live = tiers
+            .resolve_at_supply(s.vt(), s.vq(), 999_818_465_159_445)
+            .unwrap();
+        assert_eq!((f_fixed.protocol(), f_fixed.creator()), (70, 22));
+        assert_eq!((f_live.protocol(), f_live.creator()), (80, 25));
+        let at_1e15 = tiers
+            .resolve_at_supply(s.vt(), s.vq(), 1_000_000_000_000_000)
+            .unwrap();
+        assert_eq!(at_1e15, f_fixed, "resolve is the 10¹⁵ supply");
+        let tv = Venue::pump_curve(
+            &f_fixed,
+            279_900_000_000_000,
+            30_000_000_000,
+            15_000_001,
+            206_900_000_000_000,
+            0,
+            &pamm,
+        );
+        let q50 = 53_121_296_825_365 + 50_000_000_000_000;
+        let cost = |fs: &Fees| {
+            tv.with_synthetic(fs)
+                .unwrap()
+                .buy_curve(q50, &s)
+                .unwrap()
+                .unwrap()
+                .cost()
+        };
+        assert_eq!(cost(&f_live), 45_906_126_205);
+        assert_eq!(cost(&f_fixed), 45_906_126_201 - 59_057_853);
+        // migratedPool with pcQ (98u8RJ), ρ and the boost.
+        let done = CurveState::new(
+            279_900_000_000_000,
+            115_005_359_190,
+            0,
+            85_005_359_190,
+            true,
+        );
+        let p = done
+            .migrated_pool(15_000_001, 200_661_149_081_575, 2_642_475_552)
+            .unwrap();
+        assert_eq!((p.x(), p.y()), (200_661_149_081_575, 87_632_834_741));
+        let p0 = done
+            .migrated_pool(15_000_001, 206_900_000_000_000, 0)
+            .unwrap();
+        let rho = migrating_fv_price(WAD, p0.x(), p0.y(), p.x(), p.y()).unwrap();
+        assert_eq!(rho / 1_000_000_000_000, 1_063_149);
+        assert_eq!(migrating_fv_price(1, 1, 1, 0, 1), None);
+        assert_eq!(migration_boost(p.x(), p.y()), Some(17_584_505_316));
     }
 
     #[test]

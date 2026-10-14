@@ -152,6 +152,68 @@ fn load() -> File {
     common::load_vectors("quotes", "mainnet.json")
 }
 
+/// `synthetic.json` (`gen_synthetic.py`): pump's synthetic completions and their migrations.
+#[derive(Deserialize)]
+struct SyntheticFile {
+    synthetic_completions: Vec<Synthetic>,
+}
+
+#[derive(Deserialize)]
+struct Synthetic {
+    sig: String,
+    mint: String,
+    instruction: String,
+    /// `buy_v3`: `amount`, `max_sol_cost`; `buy_exact_quote_in_v3`: `spendable_quote_in`,
+    /// `min_tokens_out`.
+    arg0: Dec<u64>,
+    arg1: Dec<u64>,
+    curve_base_ata_before: Dec<u128>,
+    curve_base_ata_after: Dec<u128>,
+    curve_part: CurvePart,
+    pool_part: PoolPart,
+    migration: SyntheticMigration,
+}
+
+#[derive(Deserialize)]
+struct CurvePart {
+    ix_name: String,
+    sol_amount: Dec<u64>,
+    token_amount: Dec<u64>,
+    vt_after: Dec<u128>,
+    vq_after: Dec<u128>,
+    rt_after: Dec<u128>,
+    rq_after: Dec<u128>,
+    fee_bps: Dec<u64>,
+    fee: Dec<u64>,
+    creator_fee_bps: Dec<u64>,
+    creator_fee: Dec<u64>,
+}
+
+#[derive(Deserialize)]
+struct PoolPart {
+    base_out: Dec<u64>,
+    quote_in: Dec<u64>,
+    fee_basis_points: Dec<u64>,
+    fee: Dec<u64>,
+    creator_fee_basis_points: Dec<u64>,
+    creator_fee: Dec<u64>,
+    pool_base_reserves_before: Dec<u128>,
+    pool_quote_reserves_before: Dec<u128>,
+    pool_base_reserves_after: Dec<u128>,
+    pool_quote_reserves_after: Dec<u128>,
+}
+
+#[derive(Deserialize)]
+struct SyntheticMigration {
+    mint_amount: Dec<u128>,
+    sol_amount: Dec<u128>,
+    pool_migration_fee: Dec<u64>,
+    pool_base_amount: Dec<u128>,
+    pool_quote_amount: Dec<u128>,
+    pool_quote_vault_after: Dec<u128>,
+    boost_vault_ata_after: Dec<u128>,
+}
+
 #[test]
 fn pump_curve_trades() {
     let f = load();
@@ -222,6 +284,7 @@ fn pump_migrations() {
         let params = MigrationParams {
             migration_fee: m.migration_fee.0,
             pool_tokens: m.pool_tokens.0,
+            post_complete_quote_in: 0,
         };
         let rt = u64::try_from(m.rt.0).unwrap();
         let fees = FeeBps::new(0, 0, 0);
@@ -243,6 +306,198 @@ fn pump_migrations() {
             m.sig
         );
     }
+}
+
+/// `⌈n·bps/10⁴⌉`, a pump fee component.
+fn fee_up(n: u64, bps: u64) -> u64 {
+    u64::try_from((u128::from(n) * u128::from(bps)).div_ceil(10_000)).unwrap()
+}
+
+/// T-MATH-2 (pump-final §5; P1): pump's synthetic completions on mainnet (`synthetic.json`, 11
+/// completing buys past `rT` and their `migrate_v2`), against the quote track:
+///
+/// - the curve part charged `n₁ = ⌈rT·vQ/(vT − rT)⌉` (v3) on the pre-trade curve, each fee
+///   `⌈n₁·bps/10⁴⌉`, and left `rQ` without the pool part (`vT − rT`, `rT = 0`);
+/// - the would-be pool is `migrated_pool` on the pre-trade curve with `pool_tokens =
+///   curve_base_ata − rT`: `X_s` exactly, `Y_s` within the curve quote's `+1` of
+///   `rQ + n₁ − fee`; the pool part paid `⌈Y_s·pcB/(X_s − pcB)⌉` (`buy_v3`) or bought
+///   `⌊(in − 1)·X_s/(Y_s + in − 1)⌋` (`buy_exact_quote_in_v3`; `2vVRr9eg…`: 6,238,850,918,425);
+/// - `migrated_pool` on the completed curve with the live `curve_base_ata` and `pcQ` is exactly
+///   the pool `migrate_v2` created (`CompletePumpAmmMigrationEvent`, `CreatePoolEvent`), and the
+///   boost it moved to the boost vault is `migration_boost` = `⌊X₁·Y₁/10¹⁵⌋` (correction (b));
+/// - ρ > 1 on every one (a pool part raises the opening price; 98u8RJ's 1.063149…);
+/// - `28ZvRwwN…` (`buy_v3`): pump's charge 2,630,159,794 ≤ `curve_synthetic` ≤ charge + §5.2's
+///   bound (≤ 7), within the user's `max_sol_cost`.
+#[test]
+fn pump_synthetic_completions() {
+    let f: SyntheticFile = common::load_vectors("quotes", "synthetic.json");
+    assert_eq!(f.synthetic_completions.len(), 11);
+    let mut buy_v3 = 0;
+    for c in &f.synthetic_completions {
+        let (cp, pp, m) = (&c.curve_part, &c.pool_part, &c.migration);
+        let sig = &c.sig;
+        let (rt, n1) = (cp.token_amount.0, cp.sol_amount.0);
+        assert_eq!(cp.rt_after.0, 0, "{sig}: the curve completes");
+        let pre = CurveState {
+            vt: cp.vt_after.0 + u128::from(rt),
+            vq: cp.vq_after.0 - u128::from(n1),
+            rt: u128::from(rt),
+            rq: cp.rq_after.0 - u128::from(n1),
+            complete: false,
+        };
+        // The curve part: v3's ⌈⌉, the fees ⌈⌉ per component, the pool part not in rQ.
+        let n1_v3 = (u128::from(rt) * pre.vq).div_ceil(pre.vt - pre.rt);
+        assert_eq!(u128::from(n1), n1_v3, "{sig}: n₁");
+        let fees = FeeBps::new(0, cp.fee_bps.0, cp.creator_fee_bps.0);
+        assert_eq!((cp.fee_bps.0, cp.creator_fee_bps.0), (95, 30), "{sig}");
+        assert_eq!(
+            (cp.fee.0, cp.creator_fee.0),
+            (fee_up(n1, 95), fee_up(n1, 30)),
+            "{sig}"
+        );
+        assert_eq!(
+            (pp.fee_basis_points.0, pp.creator_fee_basis_points.0),
+            (95, 30),
+            "{sig}: the pool part at the curve's schedule"
+        );
+        // The would-be pool the pool part priced on.
+        let fee_m = m.pool_migration_fee.0;
+        assert_eq!(fee_m, 15_000_001, "{sig}");
+        let x_s = c.curve_base_ata_before.0 - u128::from(rt);
+        let live = MigrationParams {
+            migration_fee: fee_m,
+            pool_tokens: x_s,
+            post_complete_quote_in: 0,
+        };
+        let (xq, yq) = quote::migrated_pool(&pre, &live).unwrap();
+        assert_eq!(
+            (pp.pool_base_reserves_before.0, xq),
+            (x_s, x_s),
+            "{sig}: X_s = curve_base_ata − rT"
+        );
+        let y_s = pp.pool_quote_reserves_before.0;
+        assert_eq!(y_s, pre.rq + u128::from(n1) - u128::from(fee_m), "{sig}");
+        assert_eq!(yq, y_s + 1, "{sig}: the curve quote's n₁ is ⌈⌉ + 1");
+        // The pool part.
+        let (pcb, pcq) = (pp.base_out.0, pp.quote_in.0);
+        assert_eq!(
+            (pp.fee.0, pp.creator_fee.0),
+            (fee_up(pcq, 95), fee_up(pcq, 30)),
+            "{sig}"
+        );
+        assert_eq!(
+            (
+                pp.pool_base_reserves_after.0,
+                pp.pool_quote_reserves_after.0
+            ),
+            (x_s - u128::from(pcb), y_s + u128::from(pcq)),
+            "{sig}"
+        );
+        assert_eq!(
+            c.curve_base_ata_after.0, pp.pool_base_reserves_after.0,
+            "{sig}: the pool part leaves the live curve_base_ata"
+        );
+        match c.instruction.as_str() {
+            "buy_v3" => {
+                buy_v3 += 1;
+                assert_eq!(cp.ix_name, "buy", "{sig}: the event's name is not v3's");
+                let q = c.arg0.0;
+                assert_eq!(q, rt + pcb, "{sig}: amount = rT + pcB");
+                let q2 = u128::from(pcb);
+                assert_eq!(
+                    u128::from(pcq),
+                    (y_s * q2).div_ceil(x_s - q2),
+                    "{sig}: n₂ = ⌈Y_s·q₂/(X_s − q₂)⌉"
+                );
+                let charge =
+                    n1 + fee_up(n1, 95) + fee_up(n1, 30) + pcq + fee_up(pcq, 95) + fee_up(pcq, 30);
+                let b = quote::curve_synthetic(q, &pre, &fees, &fees, &live)
+                    .unwrap()
+                    .cost;
+                // §5.2's bound with Δ₂ = 1 + ⌈q₂/(X_s − q₂)⌉ = 2 (q₂ ≤ X_s/2): ≤ 7.
+                assert!(2 * q2 <= x_s, "{sig}");
+                assert!(
+                    b >= charge && b - charge <= 7,
+                    "{sig}: B̂_v3 {b} vs charge {charge}"
+                );
+                assert!(charge <= c.arg1.0, "{sig}: within max_sol_cost");
+                if sig.starts_with("28ZvRwwN") {
+                    assert_eq!((charge, b), (2_630_159_794, 2_630_159_796), "{sig}");
+                }
+            }
+            "buy_exact_quote_in_v3" => {
+                assert_eq!(cp.ix_name, "buy_exact_quote_in", "{sig}");
+                let qin = u128::from(pcq);
+                assert_eq!(
+                    u128::from(pcb),
+                    (qin - 1) * x_s / (y_s + qin - 1),
+                    "{sig}: out = ⌊(in − 1)·X_s/(Y_s + in − 1)⌋"
+                );
+                assert!(
+                    n1 + fee_up(n1, 95) + fee_up(n1, 30) + pcq + fee_up(pcq, 95) + fee_up(pcq, 30)
+                        <= c.arg0.0,
+                    "{sig}: within the spend"
+                );
+                if sig.starts_with("2vVRr9eg") {
+                    assert_eq!((pcb, pcq), (6_238_850_918_425, 2_642_475_552), "{sig}");
+                    assert_eq!(c.mint, "98u8RJzuhezFwkCFVdSe1bPoQ6e2DdRG79kQ19vkpump");
+                }
+            }
+            other => panic!("{sig}: {other}"),
+        }
+        // migrate_v2: the pool §5.4 prices, exactly.
+        let done = CurveState {
+            vt: cp.vt_after.0,
+            vq: cp.vq_after.0,
+            rt: 0,
+            rq: cp.rq_after.0,
+            complete: true,
+        };
+        let after = MigrationParams {
+            migration_fee: fee_m,
+            pool_tokens: c.curve_base_ata_after.0,
+            post_complete_quote_in: pcq,
+        };
+        let (x1, y1) = quote::migrated_pool(&done, &after).unwrap();
+        assert_eq!(
+            (x1, y1),
+            (m.mint_amount.0, m.sol_amount.0),
+            "{sig}: the created pool"
+        );
+        assert_eq!(
+            (m.pool_base_amount.0, m.pool_quote_amount.0),
+            (x1, y1),
+            "{sig}"
+        );
+        assert_eq!(
+            (x1, y1),
+            (
+                pp.pool_base_reserves_after.0,
+                pp.pool_quote_reserves_after.0
+            ),
+            "{sig}: the would-be pool after the pool part"
+        );
+        let boost = quote::migration_boost(x1, y1).unwrap();
+        assert_eq!(
+            (y1 - m.pool_quote_vault_after.0, m.boost_vault_ata_after.0),
+            (boost, boost),
+            "{sig}: the boost ⌊X₁·Y₁/10¹⁵⌋"
+        );
+        // ρ: the pool part raises the opening price above the frozen curve's pool.
+        let standard = MigrationParams {
+            migration_fee: fee_m,
+            pool_tokens: quote::STANDARD_POOL_TOKENS,
+            post_complete_quote_in: 0,
+        };
+        let (x0, y0) = quote::migrated_pool(&done, &standard).unwrap();
+        assert_eq!((x0, y0), (x_s, y_s), "{sig}: no donation before the buy");
+        let rho = quote::migrating_fv_price(1_000_000_000_000_000_000, x0, y0, x1, y1).unwrap();
+        assert!(rho > 1_000_000_000_000_000_000, "{sig}: ρ {rho}");
+        if sig.starts_with("2vVRr9eg") {
+            assert_eq!(rho / 1_000_000_000_000, 1_063_149, "ρ(98u8RJ)");
+        }
+    }
+    assert_eq!(buy_v3, 1);
 }
 
 #[test]

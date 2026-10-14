@@ -216,6 +216,7 @@ fn migrate_v2_moves_rq_and_leaves_the_buckets() {
         &MigrationParams {
             migration_fee,
             pool_tokens: base_ata - live.rt,
+            post_complete_quote_in: 0,
         },
     )
     .unwrap();

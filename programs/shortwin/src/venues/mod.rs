@@ -445,9 +445,10 @@ pub struct CurvePricingInputs {
 
 impl CurvePricingInputs {
     /// `CurvePricing` at the live fee, with the deterministic migration of the EMA leg (the
-    /// standard `X_p`, ARCH §4.3) and the post-migration pool's schedule: `base_supply` 10¹⁵
-    /// (`fees::PammFeeSchedule`: a coin that has not graduated yet; `shortwin_sim.CPPool
-    /// .graduate`), a new pool's own `creator_fee_bps` 0.
+    /// standard `X_p`, ARCH §4.3; no post-complete quote) and the post-migration pool's schedule:
+    /// `base_supply` 10¹⁵ (`fees::PammFeeSchedule`: a coin that has not graduated yet;
+    /// `shortwin_sim.CPPool.graduate`), a new pool's own `creator_fee_bps` 0. Above `rT` it prices
+    /// `B̂_str` (`synthetic: None`) until the adapter trades v3 (pump-final §6).
     pub fn curve_pricing(&self) -> CurvePricing<'_> {
         CurvePricing {
             fees: self.fees,
@@ -455,6 +456,7 @@ impl CurvePricingInputs {
             migration: MigrationParams {
                 migration_fee: self.migration_fee,
                 pool_tokens: STANDARD_POOL_TOKENS,
+                post_complete_quote_in: 0,
             },
             pool: PammFeeSchedule {
                 tiers: &self.pool_tiers,
@@ -464,6 +466,7 @@ impl CurvePricingInputs {
                 coin_creator_is_default: self.coin_creator_is_default,
                 cap_bps: None,
             },
+            synthetic: None,
         }
     }
 }
@@ -496,6 +499,10 @@ pub struct CurveQuoter<'a> {
 
 /// A venue's quotes at one fee view (ARCH §4.3 "two fee views"): the live fee for execution
 /// quotes, [`Quoter::capped`] for risk quotes (V2-1). Every quote is `None` (`+∞`) when undefined.
+// The curve variant carries its whole `CurvePricing` by value (since pump-final §5.3 also the
+// synthetic exit's fee, 32 bytes more): a `Quoter` is built per quote from the `VenueState` and
+// copied freely; boxing the variant would cost a heap allocation per quote and the `Copy`.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Copy, Debug)]
 pub enum Quoter<'a> {
     /// A constant-product pool on `(X, Y)`.

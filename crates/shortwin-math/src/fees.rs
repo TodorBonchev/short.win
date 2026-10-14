@@ -42,8 +42,12 @@ fn above_cap(phi_ppm: u128, cap_bps: u64) -> bool {
     phi_ppm > u128::from(cap_bps).saturating_mul(u128::from(PPM_PER_BPS))
 }
 
-/// pump-fees fixes the market-cap basis of non-mayhem coins at 10¹⁵ raw units
-/// (1 B tokens, 6 decimals) on the curve (R-PUMP §4 step 1).
+/// The market-cap supply basis [`pump_curve`] takes: 10¹⁵ raw units (1 B tokens, 6 decimals),
+/// R-PUMP §4 step 1. The deployed pump resolves the curve's tier on the mint's **live** supply
+/// instead (R-PUMP Update U10, ARCH §4.2's open item); the two differ only after a burn and only
+/// when a tier threshold lies between the two market caps, which pump's single curve tier
+/// (threshold 0) rules out today. The synthetic exit's fee ([`pump_curve_at_supply`], pump-final
+/// §5.2) takes the live supply.
 pub const PUMP_CURVE_MCAP_SUPPLY: u128 = 1_000_000_000_000_000;
 
 /// Fee rates charged on the SOL leg of a pump venue (pump curve, PumpSwap), in bps of
@@ -153,11 +157,39 @@ pub struct CurveFeeSchedule<'a> {
 /// `mcap = ⌊vQ·10¹⁵/vT⌋`, tier by [`fee_tier`], the curve's creator override if
 /// `creator_fee_configurable ∧ curve_creator_fee_bps ≠ 0`, creator 0 for a default
 /// creator. The curve charges only the protocol and creator components; `lp` is 0.
+/// [`pump_curve_at_supply`] with [`PUMP_CURVE_MCAP_SUPPLY`] (see there for the live supply).
 ///
 /// Errors: `DivByZero` if `vt == 0` (a migrated curve); `InvalidInput` for empty tiers;
 /// `Overflow` if the market cap exceeds `u128`.
 pub fn pump_curve(vt: u128, vq: u128, s: &CurveFeeSchedule<'_>) -> Result<FeeBps, MathError> {
-    let mcap = mul_div(vq, PUMP_CURVE_MCAP_SUPPLY, vt, Rounding::Floor)?;
+    curve_fees_at(vt, vq, PUMP_CURVE_MCAP_SUPPLY, s)
+}
+
+/// [`pump_curve`] with the market cap on `supply`: `mcap = ⌊vQ·supply/vT⌋`. With the mint's
+/// **live** supply this is the tier the deployed pump charges (R-PUMP Update U10): on both parts
+/// of a buy past `rT` by synthetic migration, each at the curve's **pre-trade** market cap
+/// (pump-final §3.4 (e), measured on pump's 2026-10-08 and 2026-10-13 ELFs), so it is the `φ` of
+/// [`curve_synthetic`](crate::quote::curve_synthetic)'s two legs (P1 correction (a): at the fixed
+/// 10¹⁵ a burned supply under a multi-tier `FeeConfig` gave a cheaper tier than pump charged, and
+/// `B̂_v3` fell 59,057,853 lamports below the charge in G0's tripwire).
+///
+/// Errors: as [`pump_curve`].
+pub fn pump_curve_at_supply(
+    vt: u128,
+    vq: u128,
+    supply: u64,
+    s: &CurveFeeSchedule<'_>,
+) -> Result<FeeBps, MathError> {
+    curve_fees_at(vt, vq, u128::from(supply), s)
+}
+
+fn curve_fees_at(
+    vt: u128,
+    vq: u128,
+    supply: u128,
+    s: &CurveFeeSchedule<'_>,
+) -> Result<FeeBps, MathError> {
+    let mcap = mul_div(vq, supply, vt, Rounding::Floor)?;
     let tier = fee_tier(s.tiers, mcap)?;
     let creator = if s.creator_is_default {
         0
@@ -523,6 +555,58 @@ mod tests {
         c.cap_bps = Some(50);
         assert_eq!(pump_curve(1, 1, &c).unwrap(), FeeBps::new(0, 50, 0));
         assert_eq!(pump_curve(0, 1, &c), Err(MathError::DivByZero));
+        assert_eq!(pump_curve_at_supply(0, 1, 1, &c), Err(MathError::DivByZero));
+    }
+
+    /// pump's curve tier on the mint's live supply (R-PUMP Update U10; pump-final §3.4 (e)):
+    /// G0's tripwire on `near166` (supply 999,818,465,159,445 after burns, `(vT, vQ)` =
+    /// (333,021,296,825,365, 96,660,487,854)): the pre-trade market cap is 290,200,481,257 at the
+    /// live supply and 290,253,172,320 at 10¹⁵, on either side of the tier threshold
+    /// 290,226,826,789, so pump charged 80 / 25 bps where the fixed supply reads 70 / 22.
+    #[test]
+    fn curve_tier_at_the_live_supply() {
+        let tiers = [
+            FeeTier {
+                threshold: 0,
+                fees: FeeBps::new(0, 90, 28),
+            },
+            FeeTier {
+                threshold: 290_174_135_726,
+                fees: FeeBps::new(0, 80, 25),
+            },
+            FeeTier {
+                threshold: 290_226_826_789,
+                fees: FeeBps::new(0, 70, 22),
+            },
+        ];
+        let s = CurveFeeSchedule {
+            tiers: &tiers,
+            creator_fee_configurable: true,
+            curve_creator_fee_bps: 0,
+            creator_is_default: false,
+            cap_bps: None,
+        };
+        let (vt, vq) = (333_021_296_825_365, 96_660_487_854);
+        let live = pump_curve_at_supply(vt, vq, 999_818_465_159_445, &s).unwrap();
+        assert_eq!(live, FeeBps::new(0, 80, 25));
+        assert_eq!(pump_curve(vt, vq, &s).unwrap(), FeeBps::new(0, 70, 22));
+        // The fixed basis is the 10¹⁵ supply exactly.
+        assert_eq!(
+            pump_curve_at_supply(vt, vq, 1_000_000_000_000_000, &s),
+            pump_curve(vt, vq, &s)
+        );
+        assert_eq!(
+            pump_curve_at_supply(
+                vt,
+                vq,
+                999_818_465_159_445,
+                &CurveFeeSchedule {
+                    cap_bps: Some(50),
+                    ..s
+                }
+            ),
+            Ok(FeeBps::new(0, 50, 0))
+        );
     }
 
     #[test]
