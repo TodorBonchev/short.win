@@ -11,6 +11,7 @@
 //! | `flows` | open → close to the lamport on the curve (Token-2022 125- and 115-byte curves, a legacy SPL-Token 115-byte curve without a creator, the 151-byte extended curve), every delta against `shortwin-math` on the readers' view |
 //! | `refusals` | every `open_short` refusal on a curve market, in the program's order |
 //! | `structure` | I14: every ReadSet / TradeExtras slot of open, close, crank and `sol_settle` key-checked; any listed buyback recipient; a creator change needs no new account (v3 names no creator vault); extras on the sell leg ride along (appended to the `sell_v3` CPI), a hostile set is bypassed with `previous` (G-H2); the curve and its ATAs on every extras site and the borrower on the keeper exits are `DeniedAccount` (M10 batch 3) |
+//! | `extras` | T-V3-ADAPTER (pump-final §6.1): each of the 10 TradeExtras slots, the live buyback list, a foreign or missing pump UVA, the v2-era list of 20; T-PDA-USER on a synthetic buy |
 //! | `rent` | T-RENT (curve): no creator-vault top-up under v3 (an empty vault costs a sale and a buy nothing), the UVA paid at listing; a short curve's growth to 166 bytes (the 2026-10-08 redeploy) out of `S`, and a sale whose `S_exp` tolerance cannot cover it refused `ProceedsBelowMin` (short.win's net check) |
 //! | `pda` | T-PDA-USER (curve): `buy_v3` / `sell_v3` with the trader PDA as `user` under CPI on the IDL's 17 accounts, read off the inner instructions |
 //! | `straddle` | above `rT` (pump-final §5.2): a close completes the curve by synthetic migration; `B̂_v3` is the live quote and `B̂_str` still prices the post-migration pool (a third party's completion, `migrate_v2`, PumpSwap `buy`) on the real ELFs; the EMA leg's `B̂_v3` on the standard migration; the reader's synthetic fee on the mint's live supply (pump-final P1 correction (a)) |
@@ -29,6 +30,7 @@
 mod buckets;
 mod common;
 mod exits;
+mod extras;
 mod fees;
 mod flows;
 mod graduation;
