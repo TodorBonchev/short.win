@@ -142,6 +142,13 @@ impl Env {
         )
     }
 
+    /// [`Env::new`] with the short.win ELF at `path` instead of the build under test — another
+    /// release of the program (T-SELF-UPGRADE runs shortwin 1.0.0, `tests/fixtures/shortwin/`,
+    /// and upgrades it by the loader to the build under test). The config is not initialized.
+    pub fn with_program_so(path: &std::path::Path) -> Self {
+        Self::with_program(path, "the fixture's README")
+    }
+
     fn with_program(path: &std::path::Path, how: &str) -> Self {
         let so = std::fs::read(path).unwrap_or_else(|e| {
             panic!(

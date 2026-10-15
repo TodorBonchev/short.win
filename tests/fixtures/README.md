@@ -2,7 +2,8 @@
 
 Accounts, programs and one IDL dumped from mainnet for the program tests (ARCHITECTURE §1.2,
 §8.2). `scripts/dump-fixtures.py` writes and checks every file here except the Pyth dump
-(`accounts/pyth_sol_usd_shard0.*`, recorded by hand in `manifest.json`); its docstring is the
+(`accounts/pyth_sol_usd_shard0.*`, recorded by hand in `manifest.json`) and short.win's own 1.0.0
+build (`shortwin/shortwin_1_0_0.so`, built from the release tag; below); its docstring is the
 reference, and docs/DEVELOPMENT.md ("The Raydium mainnet fork (M3) and its fixtures") describes
 how the harness loads them.
 
@@ -356,6 +357,32 @@ builds:**
   exact divisions in (a), the one in (b)), the pool part `⌈⌉`; both within §5.2's bound.
 - §3.5's growth from the 49-byte legacy curve: 261,600 lamports measured (its reserve holds the
   old rent), not 594,360.
+
+## shortwin 1.0.0 (T-SELF-UPGRADE)
+
+`shortwin/shortwin_1_0_0.so` is short.win's own release 1.0.0, the program a Governance upgrade
+replaces (pump-final §14 T-SELF-UPGRADE, `tests/litesvm/tests/upgrade_it.rs`). It is not a
+mainnet dump: short.win was never deployed. It is the `v1.0.0` tag (`e4895c2`, = `audit-1`)
+built on 2026-10-15 in a worktree of its own with the pinned toolchain, exactly as
+docs/AUDIT.md §0 records the release build:
+
+```sh
+git worktree add --detach ../wt/v100 v1.0.0 && cd ../wt/v100
+anchor build --tools-version v1.57 --arch v3 --ignore-keys   # offline; 2.5 min
+sha256sum target/deploy/shortwin.so
+```
+
+| File | sha256 | trimmed-ELF sha256 (executable hash) | bytes |
+|---|---|---|---|
+| `shortwin/shortwin_1_0_0.so` | `4d19c582…1f75` | `52a29a51…186b` | 1,609,616 |
+
+Both equal AUDIT.md §0's **verified** 1.0.0 hashes (solana-verify 0.5.2 in the digest-pinned
+image, `scripts/verifiable-build.sh --local --compare`, and CI run 38125079869's verifiable build
+on `7b2121d`); the same build's `complete_curve.so` (`f3a47201…6d42`) and `mock_cpamm.so`
+(`4cf17007…7ab9`) equal theirs too. This fixture's own build was a local `anchor build`, not a
+verifiable build: Docker is not available on the machine that made it. Its bytes are the verified
+build's because they are equal, not because the image produced them. The test refuses a file
+whose sha256 differs. `dump-fixtures.py` does not manage `shortwin/`; `SHA256SUMS` pins it.
 
 ## Commands
 
