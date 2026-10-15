@@ -104,11 +104,7 @@ export async function closeTrade(
     const p = previewCloseFor(math, s, pos, inp.slippageBps);
     if (!p) {
         const mx = positionMetrics(math, s, pos);
-        throw mx.straddle
-            ? because('CurveStraddle')
-            : mx.insufficientVault
-              ? because('InsufficientVault')
-              : new PlanError('No buyback quote now.');
+        throw mx.insufficientVault ? because('InsufficientVault') : new PlanError('No buyback quote now.');
     }
     const candidates = await extrasFor(s, 'buy');
     const build: PlanBuilder = (extras) =>

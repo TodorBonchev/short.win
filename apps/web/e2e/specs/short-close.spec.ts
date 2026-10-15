@@ -32,7 +32,6 @@ test.describe('short: close', { tag: '@short' }, () => {
         // The preview follows the venue accounts (§3.7: recomputed on every new slot).
         await expect.poll(async () => dataValue(pnl), { timeout: 30_000 }).toBeLessThan(pnlBefore);
         const payout = await dataValue(app.id(T.closePreview('payout')));
-        await expect(app.id(T.closeStraddleNotice)).toHaveCount(0);
         await app.a11y('position detail');
 
         await app.id(T.closeSubmit).click();

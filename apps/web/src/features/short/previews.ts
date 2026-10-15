@@ -591,7 +591,9 @@ export interface PositionMetrics {
     readonly vEff: bigint;
     /**
      * The live buyback quote at the live fee (closes) and at the position's exit risk fee
-     * (liquidation; `exitRiskCapBps`, which the CRs and the liquidation price take too).
+     * (liquidation; `exitRiskCapBps`, which the CRs and the liquidation price take too). On a live
+     * curve past `rT` both are `B̂_v3`: the close completes the curve by pump's synthetic migration
+     * in one instruction (pump-final §5.2; owner D3).
      */
     readonly buyback: bigint | null;
     readonly buybackRisk: bigint | null;
@@ -602,10 +604,11 @@ export interface PositionMetrics {
     readonly payout: bigint | null;
     readonly pnl: bigint | null;
     readonly timeLeftS: bigint;
-    /** `true` when the buyback (and rent and `ert`) exceeds the vault: a close refuses `InsufficientVault`. */
+    /**
+     * `true` when the buyback (and rent and `ert`) exceeds the vault: a close refuses
+     * `InsufficientVault`. `false` without a buyback quote (`buyback` is `null` then).
+     */
     readonly insufficientVault: boolean;
-    /** A live curve with `q > rT`: a close refuses `CurveStraddle` (FE-3). */
-    readonly straddle: boolean;
 }
 
 /** The live metrics of an open position on its market's snapshot (§3.8). */
@@ -649,14 +652,15 @@ export function positionMetrics(math: MathModule, s: MarketSnapshot, pos: ShortP
             : (withVenue(math, s.venue, { live: false, capBps }, (v) =>
                   v.liquidationPrice(pos.q, vEff, pos.crLiqBps, l, pSpot),
               ) ?? null);
-    const insufficientVault = live === null || live + rentDue + pos.ert > pos.v;
+    // Without a buyback quote (no route, or past a curve's rT without the synthetic route) the
+    // close has nothing to compare: no quote, not a thin vault.
+    const insufficientVault = live !== null && live + rentDue + pos.ert > pos.v;
     let payout: bigint | null = null;
     if (live !== null && !insufficientVault) {
         const w = math.previewClose(pos.v, live, rentDue, pos.rentProtocolBps);
         payout = w.borrower;
         w.free();
     }
-    const rt = s.kind === 'pump_curve' ? (s.venue.curve?.live.rt ?? null) : null;
     return {
         rentDue,
         rentAccrued,
@@ -670,7 +674,6 @@ export function positionMetrics(math: MathModule, s: MarketSnapshot, pos: ShortP
         pnl: payout === null ? null : payout - pos.m - pos.feeOpen,
         timeLeftS: pos.deadline > s.now ? pos.deadline - s.now : 0n,
         insufficientVault,
-        straddle: rt !== null && pos.q > rt,
     };
 }
 
@@ -684,7 +687,10 @@ export interface ClosePreview {
     readonly maxBuybackCost: bigint;
 }
 
-/** The close preview (`close_short` steps 3–6): `null` when a close would refuse (see `positionMetrics`). */
+/**
+ * The close preview (`close_short` steps 3–6): `null` when a close would refuse (see
+ * `positionMetrics`). Defined whenever the live buyback is: past a live curve's `rT` at `B̂_v3`.
+ */
 export function previewCloseFor(
     math: MathModule,
     s: MarketSnapshot,
@@ -692,7 +698,7 @@ export function previewCloseFor(
     slippageBps: number,
 ): ClosePreview | null {
     const mx = positionMetrics(math, s, pos);
-    if (mx.buyback === null || mx.insufficientVault || mx.straddle) return null;
+    if (mx.buyback === null || mx.insufficientVault) return null;
     const w = math.previewClose(pos.v, mx.buyback, mx.rentDue, pos.rentProtocolBps);
     try {
         return {

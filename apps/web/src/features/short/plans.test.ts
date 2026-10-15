@@ -34,7 +34,7 @@ import {
 } from './plans.ts';
 import { assignTier, previewCloseFor, previewOpen } from './previews.ts';
 import { decodePosition, exposureQ } from './snapshot.ts';
-import { programVectors, testMath, vectorCase, vectorSnapshot } from './testing.ts';
+import { programVectors, pumpVectors, testMath, vectorCase, vectorSnapshot } from './testing.ts';
 
 const lifetime = { blockhash: '11111111111111111111111111111111' as Blockhash, lastValidBlockHeight: 1n };
 
@@ -257,6 +257,60 @@ describe('the plans build exactly the instructions the program executed', () => 
             const ix = plan.instructions[0];
             if (!ix) throw new Error('instruction');
             expect(flat(ix)).toEqual((c as unknown as { ix: unknown }).ix);
+        });
+    }
+});
+
+describe('pump v3: the curve plans build exactly what the program executed (pump-final §8)', () => {
+    // `pump-vectors.json`: the release build on pump's 2026-10-13 ELFs (near166). The open and both
+    // closes carry the curve ReadSet and the 10 v3 TradeExtras (lists.ts, P4's port) — the harness
+    // names the live Global's first buyback recipient, so the plan picks index 0 (the app picks at
+    // random, FRONTEND §5.1). A close past rT is the same instruction as any other close.
+    const U64_MAX = (1n << 64n) - 1n;
+    const flat = (ix: Instruction) => ({
+        program: ix.programAddress,
+        accounts: (ix.accounts ?? []).map((a) => ({ key: a.address, signer: a.role >= 2, writable: a.role % 2 === 1 })),
+        data: Buffer.from(ix.data ?? new Uint8Array()).toString('hex'),
+    });
+    const first = () => 0;
+
+    // The borrower's opens and closes (the liquidation case is the keeper's, which the app never plans).
+    for (const c of pumpVectors().filter((x) => x.kind === 'open' || x.kind === 'close')) {
+        it(`${c.name} (${c.kind})`, async () => {
+            const { s } = await vectorSnapshot(c);
+            const signer = createNoopSigner(c.borrower as Address);
+            const tp = s.config.tiers[3];
+            if (!tp) throw new Error('tier');
+            const plan =
+                c.kind === 'open'
+                    ? await planOpenShort({
+                          snapshot: s,
+                          signer,
+                          symbol: 'NEAR',
+                          q: BigInt(c.q ?? 0),
+                          minProceeds: 0n,
+                          maxMargin: U64_MAX,
+                          maxOpenFee: U64_MAX,
+                          tier: tp,
+                          extras: NO_EXTRAS,
+                          nonce: BigInt(c.nonce),
+                          pick: first,
+                      })
+                    : await planCloseShort({
+                          snapshot: s,
+                          signer,
+                          symbol: 'NEAR',
+                          position: c.position as Address,
+                          q: 0n,
+                          maxBuybackCost: U64_MAX,
+                          extras: NO_EXTRAS,
+                          pick: first,
+                      });
+            const ix = plan.instructions.find((i) => i.programAddress === SHORTWIN_PROGRAM_ADDRESS);
+            if (!ix) throw new Error('instruction');
+            expect(flat(ix)).toEqual((c as unknown as { ix: unknown }).ix);
+            // 15 named accounts for an open (13 for a close), the 7-account ReadSet, 10 TradeExtras.
+            expect(ix.accounts?.length).toBe((c.kind === 'open' ? 15 : 13) + 7 + 10);
         });
     }
 });

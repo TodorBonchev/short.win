@@ -8,14 +8,16 @@
  *
  * Approved as written by the owner on 2026-10-11 (thirteenth round): `copy.test.ts` /
  * `glossary.test.ts` check that FRONTEND.md §4.3 carries every string verbatim — this file's `--doc`
- * block exactly, and all 150 of them — so a string cannot change without §4.3 changing with it.
+ * block exactly, and all 152 of them — so a string cannot change without §4.3 changing with it.
  * The 7 mobile-wallet strings (section 8, `src/config/copyWallet.ts`) were approved as drafted by
- * the owner on 2026-10-13 (O-6 lifted).
+ * the owner on 2026-10-13 (O-6 lifted), and so were the 2 error texts of pump's v3 adapter
+ * (section 9, `src/config/copyPump.ts`; pump-final D4).
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { COPY, type CopyId, HOW_IT_WORKS } from '../src/config/copy.ts';
+import { PUMP_COPY } from '../src/config/copyPump.ts';
 import { WALLET_COPY } from '../src/config/copyWallet.ts';
 import { DISCLOSURES } from '../src/config/disclosures.ts';
 import { GLOSSARY, GLOSSARY_UI, type GlossaryEntry, type GlossaryId } from '../src/config/glossary.ts';
@@ -87,6 +89,10 @@ const MOBILE = ids([
 ]);
 /** The approval line §4.3 carries for the mobile group (`copy.test.ts` checks it). */
 export const MOBILE_APPROVAL = 'approved as drafted by the owner on 2026-10-13 (O-6 lifted)';
+/** pump-final D4 (2026-10-13): the program's two error texts of pump's v3 adapter, which the app shows. */
+const PUMP = ids(['error.curveCashbackCoin', 'error.curveStraddle']);
+/** The approval line §4.3 carries for the pump group (`copy.test.ts` checks it). */
+export const PUMP_APPROVAL = 'approved as drafted by the owner on 2026-10-13 (pump-final D4)';
 
 /** The How it works page in its order: page-level strings, then the blocks. */
 function pageIds(): CopyId[] {
@@ -112,7 +118,7 @@ function copyTable(list: readonly CopyId[]): string {
 
 export function ownerCopy(): string {
     const all = Object.keys(COPY) as CopyId[];
-    const listed = new Set<string>([...STRIP, ...pageIds(), ...LINKS, ...COVERAGE, ...CLAIM, ...MOBILE]);
+    const listed = new Set<string>([...STRIP, ...pageIds(), ...LINKS, ...COVERAGE, ...CLAIM, ...MOBILE, ...PUMP]);
     const missing = all.filter((id) => !listed.has(id));
     if (missing.length) throw new Error(`owner-copy: strings not placed in a group: ${missing.join(', ')}`);
     const glossaryCount = Object.keys(GLOSSARY).length;
@@ -129,7 +135,7 @@ export function ownerCopy(): string {
         '- Source keys: SPEC = docs/SPEC.md, ECON = docs/design/ECONOMICS.md, ARCH = docs/design/ARCHITECTURE.md, FE = docs/design/FRONTEND.md, INDEXER = docs/design/INDEXER.md, D: = an approved disclosure in `apps/web/src/config/disclosures.ts`. Code paths are under `apps/web/src/` unless they start with `programs/`, `crates/` or `services/`.',
         '- O-1 (the deposit order) and O-4 (the 12 px floor) add no words: O-1 moves `lender.risks`, `lender.lossHistory`, `market.creatorSelfDealing`, `lender.residuals` and `lender.solRepayment` (with its checkbox) below the preview, verbatim.',
         '',
-        `Counts: intro strip ${STRIP.length}; glossary control ${Object.keys(GLOSSARY_UI).length}; glossary entries ${glossaryCount}; How it works ${pageIds().length}; links to the page ${LINKS.length}; O-2 ${COVERAGE.length}; O-5 ${CLAIM.length} (one of them unchanged); mobile wallets ${MOBILE.length} (section 8, approved on 2026-10-13). Total ${STRIP.length + Object.keys(GLOSSARY_UI).length + glossaryCount + pageIds().length + LINKS.length + COVERAGE.length + CLAIM.length + MOBILE.length}.`,
+        `Counts: intro strip ${STRIP.length}; glossary control ${Object.keys(GLOSSARY_UI).length}; glossary entries ${glossaryCount}; How it works ${pageIds().length}; links to the page ${LINKS.length}; O-2 ${COVERAGE.length}; O-5 ${CLAIM.length} (one of them unchanged); mobile wallets ${MOBILE.length} (section 8, approved on 2026-10-13); pump’s v3 adapter ${PUMP.length} (section 9, pump-final D4, approved on 2026-10-13). Total ${STRIP.length + Object.keys(GLOSSARY_UI).length + glossaryCount + pageIds().length + LINKS.length + COVERAGE.length + CLAIM.length + MOBILE.length + PUMP.length}.`,
         '',
         '## 1. The intro strip above the markets list (O-3 (a), `markets-intro`)',
         '',
@@ -231,6 +237,12 @@ export function ownerCopy(): string {
         '',
         copyTable(MOBILE),
         '',
+        '## 9. pump’s v3 adapter (pump-final D4; approved as drafted on 2026-10-13)',
+        '',
+        `The program’s two new error texts (\`programs/shortwin/src/errors.rs\`), which the app shows where the program refuses (\`src/config/copyPump.ts\`, \`src/config/errors.ts\`): drafted in pump-final §17 and ${PUMP_APPROVAL}, byte for byte as the program returns them — a straight apostrophe, and no final full stop on \`CurveStraddle\`, unlike the rest of the error table. The close form’s straddle notice and its words are removed (a close past a live curve’s rT completes the curve in one instruction; FE-3 closed); nothing else is added (pump-final G-8).`,
+        '',
+        copyTable(PUMP),
+        '',
     );
     return `${out.join('\n')}\n`;
 }
@@ -240,10 +252,16 @@ export function docBlock(): string {
     const out: string[] = [BEGIN, ''];
     const para = (id: string, where: string, text: string) => out.push(`- \`${id}\` (${where}):`, `  > ${text}`);
     out.push('**Intro strip, How it works, links, O-2, O-5** (`src/config/copy.ts`):', '');
-    const mobile = new Set<string>(Object.keys(WALLET_COPY));
-    for (const id of Object.keys(COPY) as CopyId[]) if (!mobile.has(id)) para(id, COPY[id].where, COPY[id].text);
+    const own = new Set<string>([...Object.keys(WALLET_COPY), ...Object.keys(PUMP_COPY)]);
+    for (const id of Object.keys(COPY) as CopyId[]) if (!own.has(id)) para(id, COPY[id].where, COPY[id].text);
     out.push('', `**Mobile wallets** (\`src/config/copyWallet.ts\`; O-6, ${MOBILE_APPROVAL}):`, '');
     for (const id of MOBILE) para(id, COPY[id].where, COPY[id].text);
+    out.push(
+        '',
+        `**pump’s v3 adapter: the program’s error texts** (\`src/config/copyPump.ts\`; ${PUMP_APPROVAL}):`,
+        '',
+    );
+    for (const id of PUMP) para(id, COPY[id].where, COPY[id].text);
     out.push('', '**The glossary control** (`src/config/glossary.ts` `GLOSSARY_UI`):', '');
     for (const [id, text] of Object.entries(GLOSSARY_UI)) para(id, 'the ⓘ', text);
     out.push('', '**Glossary entries** (`src/config/glossary.ts`; *beside*: the labels it attaches to):', '');

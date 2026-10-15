@@ -13,10 +13,12 @@
  * `#anchor` on the same page.
  *
  * The mobile-wallet strings (`copyWallet.ts`, spread below) were approved as drafted by the owner on
- * 2026-10-13 (O-6 lifted; FRONTEND.md §4.3).
+ * 2026-10-13 (O-6 lifted; FRONTEND.md §4.3), and so were the two program-error texts of pump's v3
+ * adapter (`copyPump.ts`, pump-final D4).
  */
 
 import { type CopyEntry, c, NAV_COPY } from './copyNav.ts';
+import { PUMP_COPY } from './copyPump.ts';
 import { WALLET_COPY } from './copyWallet.ts';
 
 export type { CopyEntry };
@@ -261,6 +263,9 @@ export const COPY = {
 
     // ---- O-6: mobile wallets (`copyWallet.ts`; approved as drafted on 2026-10-13) ----------------
     ...WALLET_COPY,
+
+    // ---- pump-final D4: the v3 adapter's two error texts (`copyPump.ts`; as drafted, 2026-10-13) --
+    ...PUMP_COPY,
 } as const satisfies Record<string, CopyEntry>;
 
 export type CopyId = keyof typeof COPY;

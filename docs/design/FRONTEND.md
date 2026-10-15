@@ -6,7 +6,10 @@ tablets and desktops, the owner's request of 2026-10-09, §7.6–§7.7 and §13 
 owner's thirteenth-round UX items — newcomer help, the deposit order, one coverage notice, the Claim
 wording and the 12 px floor, §13 "Thirteenth round"; 2026-10-13 adds the Mobile Wallet Adapter,
 O-6 lifted by the owner — §5.4 (6), §9.3, §10.2 and §13 "Mobile wallets", its E2E runs and the
-responsive gate passed the same day (§10.2, §10.5), the owner's device test still pending; v1.0 of
+responsive gate passed the same day (§10.2, §10.5), the owner's device test still pending;
+2026-10-15 follows pump's v3 adapter (design pump-final §8, the owner's decisions of 2026-10-13) —
+a close past a live curve's `rT` completes it in one instruction (FE-3 closed), a live cashback
+curve is refused, the two D4 strings, §5.9, §5.11 and §13 "pump v3"; v1.0 of
 2026-10-01 was the contract the four
 parallel tracks — MARKETS, LEND, SHORT, E2E — built against, §12). Owner decision for the visual
 style: **dark trading terminal** — dense, dark, data-first, as memecoin traders know it from
@@ -25,7 +28,7 @@ tests:
 |---|---|---|---|
 | Disclosure copy | `src/config/disclosures.ts` | every disclosure's id, title, body, acknowledgement text (§4) | `disclosures.test.ts` (SPEC §5.3 verbatim; every paragraph present in §4 of this file) |
 | `data-testid` contract | `src/config/testids.ts` | every test id and prefix (§11) | `testids.test.ts` (unique; every id present in §11) |
-| Program error messages | `src/config/errors.ts` | a human message and an action for each code 6000–6108 (§5.9) | `errors.test.ts` (against `@shortwin/client`'s constants) |
+| Program error messages | `src/config/errors.ts` | a human message and an action for each code 6000–6109 (§5.9) | `errors.test.ts` (against `@shortwin/client`'s constants) |
 | Pinned program ids | `src/config/programs.ts` | the programs a transaction may invoke (§9.1) | `programs.test.ts` (against `constants.rs`, the client, `complete_curve`) |
 | Route tree | `src/router.tsx` | paths, typed search parameters, page components and their props (§3.2) | `router.test.tsx` (every route renders in the shell) |
 | Transaction pipeline | `src/tx/types.ts`, `useTxFlow.ts`, `TxReviewModal.tsx` | `TxPlan`, the stages, the review (§5) | `tx/*.test.ts` |
@@ -103,7 +106,7 @@ Owner items (each has a recommendation, which is what the scaffold assumes until
 |---|---|---|
 | FE-1 | **CPI Guard deposits.** ARCH §3.3: "a lender whose token account has `CpiGuard.lock_cpi` cannot deposit through our CPI; the frontend detects it. A delegate-based deposit path is v1.1." Options: (a) block and explain (use another account, or turn CPI Guard off in the wallet); (b) additionally offer an opt-in **bracket** in one transaction: Token-2022 `DisableCpiGuard` → `deposit` → `EnableCpiGuard`, all top-level and signed by the owner, so the guard is off only inside that transaction. | (b), opt-in per deposit, with the `token.cpiGuard` disclosure; (a) is the default state of the panel. The E2E covers both (§10.3). |
 | FE-2 | **Wallet-modified transactions.** Some wallets add or change priority-fee instructions in `solana:signTransaction`. | Accept compute-budget-only changes (a raised fee is shown after signing), refuse anything else (§5.8). |
-| FE-3 | **Curve straddle close by the borrower.** A close that would complete the Pump.fun curve fails `CurveStraddle`; the exit is a ≥ 3-transaction Jito bundle (ARCH §5.4). Submitting bundles from the browser needs a block-engine endpoint (CSP, availability) and is UNVERIFIED on a live engine. | Not in M9: the position page explains the state (`closeStraddleNotice`); the keeper's graduation bundle exits it (T + 8 s) and the borrower can add margin meanwhile. Revisit with v1.1's `ExitInProgress`. |
+| FE-3 | ~~**Curve straddle close by the borrower.**~~ **Closed (2026-10-15, design pump-final §8; owner D1–D4 of 2026-10-13).** It was: a close that would complete the Pump.fun curve failed `CurveStraddle`, the exit a ≥ 3-transaction Jito bundle the browser could not send. Since short.win trades every curve leg on pump's v3, a close of `q > rT` is one `close_short`: `buy_v3` buys `rT` on the curve and the rest from the would-be pool (synthetic migration), priced `B̂_v3`, and the market moves to `PumpMigrating` in that instruction. | The close form previews and sends it like any other close (§5.11); `closeStraddleNotice` and its words are removed. `CurveStraddle` (6031) now means a buyback beyond the curve and its would-be pool, unreachable under the per-market cap (pump-final C8); its message maps if returned. |
 | FE-4 | **Geo-restriction (SPEC R6).** | At the CDN edge per legal advice; the app shows no jurisdiction UI of its own in M9 (placeholder footer text only after legal review). |
 | FE-5 | **Degraded-market listing.** `/v1/markets` has no flag filter; the status page filters the first pages client-side on `flags.paused_coverage` / `route_broken`. | Accept for M9; an indexer follow-up adds `flag=` filters (INDEXER §14). |
 | FE-6 | **Priority-fee ceiling for users.** | 1,000,000 µlamports/CU by default (`VITE_PRIORITY_FEE_MAX_MICROLAMPORTS`); the keeper's own ceiling (O17) is 100,000. |
@@ -121,8 +124,8 @@ the lender dashboard (shares, SOL claimable, locks, vesting); protocol status (d
 coverage-paused markets, the venue upgrade latch, route-broken); every disclosure of §4.
 
 **Not in M9:** liquidation, expiry and `sol_settle` buttons (keeper instructions; the UI shows the
-state and history, never sends them); governance / Emergency instructions; the borrower's straddle
-bundle (FE-3); Jupiter (v1.1); partial closes, limit orders, copy trading (SPEC §8 deferred);
+state and history, never sends them); governance / Emergency instructions; Jupiter (v1.1); partial
+closes, limit orders, copy trading (SPEC §8 deferred);
 charts beyond a price sparkline from `/candles` (optional, MARKETS). *M10-RESP (owner, 2026-10-09):*
 the app is no longer laptop-only — phones, tablets and desktops are all targets (§7.6). *O-6 lifted
 (2026-10-13):* the Mobile Wallet Adapter is built and on by default on Android browsers (§5.4 (6));
@@ -682,7 +685,7 @@ a confirmed open, close or add margin also pushes a toast (View position / Explo
   timeline (`/v1/positions/{pubkey}`); **add margin** (`addMarginInput`, CR after →
   `addMarginPreviewCr`, `add_margin(amount)`); **close** (`closeSlippageInput`; preview buyback
   `B̂_live`, rent, payout, P&L; `close_short(max_buyback_cost = ⌈B̂·(1 + slippage)⌉)`; `InsufficientVault`
-  → suggest add margin; `CurveStraddle` → `closeStraddleNotice`, FE-3).
+  → suggest add margin; past a live curve's `rT` the same preview at `B̂_v3`, §5.11; FE-3 closed).
 - **Positions and position detail as built (M10-RESP, §7.6):** the dashboard leads with a totals
   line (`positions-totals`: count, vault, P&L, rent due) and folds the risk explanation into a
   "How risk is graded" toggle with the real badges. Column priorities: 1 market, risk, CR, P&L,
@@ -1142,13 +1145,17 @@ Checkbox: “I understand my position can be liquidated or settled in SOL.”
 The owner's thirteenth round (2026-10-10; audit findings D-03, D-21, D-23) adds copy that is not a
 disclosure: the markets list's intro strip (§3.3), the glossary, How it works (§3.11), the links to
 it, the Short panel's link to the coverage banner (O-2, §3.4) and the Claim button (O-5, §3.6).
-**Every string below but the mobile group — all 143 — was
+**Every string below but the mobile and pump groups — all 143 — was
 approved as written by the owner on 2026-10-11 (thirteenth round)**, word for word, as the file
 `apps/web/scripts/owner-copy.ts` prints it (with each string's id, where it shows and the sources
 of each claim). **The mobile group's 7 strings** (the wallet chooser on a phone and the Mobile
 Wallet Adapter's review notices, §5.4 (6); `src/config/copyWallet.ts`, the owner file's section 8)
 **were approved as drafted by the owner on 2026-10-13 (O-6 lifted)**, byte for byte: straight
-apostrophes and no final full stops. 150 strings in all. Like an approved disclosure's text
+apostrophes and no final full stops. **The pump group's 2 strings** (the program's error texts
+6109 `CurveCashbackCoin` and 6031 `CurveStraddle`, §5.9; `src/config/copyPump.ts`, the owner
+file's section 9) **were approved as drafted by the owner on 2026-10-13 (pump-final D4)**, byte
+for byte as the program returns them: a straight apostrophe and no final full stop on
+`CurveStraddle`. 152 strings in all. Like an approved disclosure's text
 (§4.1), a string changes only with the owner's approval, and the code and this section change
 together.
 
@@ -1343,6 +1350,13 @@ simulation would pay 0 is held with "Nothing to claim yet" (§3.6). No string ch
   > Allow 'Apps on device' so this page can reach your wallet app
 - `wallet.mwa.retry` (The review, beside Sign, when the wallet app could not be launched; the review stays open and nothing was sent (`tx-sign-notice`, `data-reason="launch"`)):
   > Couldn't open your wallet app. Tap Sign again
+
+**pump’s v3 adapter: the program’s error texts** (`src/config/copyPump.ts`; approved as drafted by the owner on 2026-10-13 (pump-final D4)):
+
+- `error.curveCashbackCoin` (Create market: the listing refusal of a live cashback curve, above its code (`create-check-reason-CurveCashbackCoin`); the review’s error when the program refuses a transaction with 6109 `CurveCashbackCoin` (src/config/errors.ts)):
+  > pump.fun's current trades do not support cashback coins on the curve. This coin can be shorted once it graduates to PumpSwap.
+- `error.curveStraddle` (The review’s error when the program refuses a close with 6031 `CurveStraddle` (src/config/errors.ts): a buyback past what the live curve and its would-be pool hold, which the per-market cap keeps out of reach (pump-final C8)):
+  > Buyback exceeds what the curve and its post-migration pool can deliver
 
 **The glossary control** (`src/config/glossary.ts` `GLOSSARY_UI`):
 
@@ -1782,7 +1796,7 @@ byte 2 at 165, TLV from 166): `CpiGuard` (extension 11, `lock_cpi`) and `MemoTra
 
 | Source | Mapping |
 |---|---|
-| `{ InstructionError: [i, { Custom: n }] }`, n ∈ 6000–6108 (*M10:* 6105 `AuthoritiesNotDistinct`, action `admin`; 6106 `EpochRecordReadOnly`, `retry`; 6107 `RebaseNeedsOwner`, `blocked`; *AIR-07:* 6108 `PoolDrained`, `wait`; *AIR-08:* 6084 `WipeSweepPending`'s message also covers a pool every lender left), failing program short.win (from the logs' **first** "Program … failed": the innermost failing program logs first and every caller up the CPI stack repeats the code after it; v1.0 said "last", which attributed a CPI'd Token-2022 error to short.win — fixed at integration) | `config/errors.ts`: name, message, action (`retry`, `adjust`, `wait`, `blocked`, `report`, `admin`) |
+| `{ InstructionError: [i, { Custom: n }] }`, n ∈ 6000–6109 (*M10:* 6105 `AuthoritiesNotDistinct`, action `admin`; 6106 `EpochRecordReadOnly`, `retry`; 6107 `RebaseNeedsOwner`, `blocked`; *AIR-07:* 6108 `PoolDrained`, `wait`; *AIR-08:* 6084 `WipeSweepPending`'s message also covers a pool every lender left; *pump v3 (D1 (a), D4):* 6109 `CurveCashbackCoin`, `blocked`, and 6031 `CurveStraddle`'s new text, both the program's own as drafted, §4.3), failing program short.win (from the logs' **first** "Program … failed": the innermost failing program logs first and every caller up the CPI stack repeats the code after it; v1.0 said "last", which attributed a CPI'd Token-2022 error to short.win — fixed at integration) | `config/errors.ts`: name, message, action (`retry`, `adjust`, `wait`, `blocked`, `report`, `admin`) |
 | same, failing program Token / Token-2022 | 1 insufficient tokens, 4 owner mismatch, 17 frozen, 36 memo required, 42 CPI Guard |
 | `InstructionError` built-ins | `InsufficientFunds`, `ComputationalBudgetExceeded`, others → `report` |
 | transaction-level | `InsufficientFundsForFee`, `InsufficientFundsForRent`, `AccountNotFound`, `BlockhashNotFound`, `AccountInUse`, block / account cost limits, `ProgramAccountNotFound` |
@@ -1803,8 +1817,10 @@ new quote", "A new review adds that step" — never "Try again: the app adds it"
 *M10 batch 4 (PUMP-2026-10-2; disclosed, the owner's decision of 2026-10-03):* a plan may carry
 `refineError(e)`, which the flow applies to a failed simulation's mapped error — the message
 only; kind, code and action stay. The open plan sets it when the venue account its sale would
-grow is short (`venueGrowth`: a PumpSwap pool under 287 bytes, P0, or a curve under 141 bytes,
-C0, of the snapshot's ReadSet): since the pump venues' 2026-10-02 redeploys the first trade on
+grow is short (`venueGrowth`: a PumpSwap pool under 287 bytes, P0, or a curve under 166 bytes,
+C0, of the snapshot's ReadSet — 141 until pump's 2026-10-08 redeploy, which grows every shorter
+curve to 166 on its next trade, 76,200–259,080 lamports from the listable 151–115 bytes at 5,080
+per byte, PUMP-2026-10-2): since the pump venues' 2026-10-02 redeploys the first trade on
 such an account grows it and charges that trade the rent (81,280–386,080 lamports measured),
 which the program nets out of the proceeds, so an open whose tolerance cannot cover it fails
 `ProceedsBelowMin` though no price moved. short.win's `ProceedsBelowMin` there reads "This pool
@@ -1834,11 +1850,32 @@ review: the only case where the message is not about the growth).
 | `close_short(max_buyback_cost)` | slippage | `⌈B̂_live·(1 + slippage)⌉` |
 | `add_margin(amount)` | amount | ≤ wallet SOL − fee reserve (0.01 SOL kept) |
 
-### 5.11 Curve straddle (FE-3)
+*pump v3 (2026-10-15; design pump-final §6.3, §8, owner D1 (a)):* pump's v3 trades refuse a
+cashback coin (6094), so a **live** cashback curve cannot be listed: `classifyPump` refuses it with
+`CurveCashbackCoin` (6109) as the program's `classify_pump_with` does, on the live branch only, and
+Create market shows the program's text as drafted (§4.3) above the code; a live curve of depth ≠ 0
+is refused `CurveQuoteNotSol` (defence in depth). A complete cashback curve still lists
+(`PumpMigrating`, then PumpSwap once it graduates), and on a market whose curve is a live cashback
+one the venue is not executable (`readVenueState`: observed only once complete, §6.1.6).
 
-When `q > rT` on a live curve the close fails `CurveStraddle`. The position page shows
-`closeStraddleNotice` (the 6031 message) and the add-margin action; the borrower's own Jito bundle
-is not in M9.
+### 5.11 A close past the curve's `rT` (FE-3 closed)
+
+*v1.0–2026-10-13:* a close of `q > rT` on a live curve failed `CurveStraddle`, and the position page
+showed `closeStraddleNotice`; the exit was the keeper's 3-transaction Jito bundle. **Since the
+v3 adapter (2026-10-15, design pump-final §5.2, §8; owner D3):** it is an ordinary close. One
+`close_short` buys `rT` on the curve and `q − rT` from the would-be pool by pump's synthetic
+migration (`buy_v3`) and moves the market to `PumpMigrating` in the same instruction. The preview
+prices `B̂_v3` — the curve leg and the pool leg at the curve's fee on the mint's live supply, `φ_s`
+(`CurvePricingInputs.syntheticFees`; the facade's `withSynthetic`) — and the transaction, the
+review and `max_buyback_cost` are the usual close's. A curve without that route (cashback, mayhem, a
+read without the mint's supply) has no buyback quote past `rT`, so the form says "No buyback quote
+now" and offers nothing to sign. The notice and its words are removed (D4); `CurveStraddle`'s new
+text maps if the program ever returns it (a buyback beyond what the curve and its would-be pool
+hold, unreachable under the per-market cap, pump-final C8). The risk view prices the same path
+capped (CR, liquidation price), and on a `PumpMigrating` market the EMA leg and FV price the pool
+`migrate_v2` will create: after a synthetic pool part its tokens are the live `curve_base_ata` and
+its SOL includes `pcQ`, FV ρ-scaled, and no FV when the post-complete fields are not known
+(`fvRepriced`, the facade's `migratingFv`; pump-final §5.4, §6.1.5).
 
 ---
 
@@ -3019,8 +3056,7 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `add-margin-submit` | `T.addMarginSubmit` | opens the review |
 | `close-slippage-input` | `T.closeSlippageInput` | max slippage on the buyback |
 | `close-preview-<…>` | `T.closePreview` | `<field>` ∈ buyback, rent, payout, pnl |
-| `close-straddle-notice` | `T.closeStraddleNotice` | CurveStraddle explanation (FE-3) |
-| `close-submit` | `T.closeSubmit` | opens the review |
+| `close-submit` | `T.closeSubmit` | opens the review (*2026-10-15, pump v3:* `close-straddle-notice` is removed with FE-3, §5.11) |
 | `short-submit-reason` | `T.shortSubmitReason` | *M10-RESP:* why `short-submit` is disabled, one line in the form's sticky foot (`role=status`; `data-reason` while there is one); while the acknowledgement blocks it, a button that focuses the box |
 | `positions-totals` | `T.positionsTotals` | *M10-RESP:* the dashboard's totals line — count, vault, P&L (sign and arrow), rent due |
 | `positions-empty-cta` | `T.positionsEmptyCta` | *M10-RESP:* "Open a short" (to `/markets`) when there are no open positions |
@@ -3124,7 +3160,7 @@ edits `disclosures.ts` (copy changes need the owner) or `errors.ts`.
 | FE-13 | Price charts: an optional sparkline from `/candles`; a full chart is not in M9 | by design |
 | FE-14 | "Why this tier" shows the Tier A / B thresholds in USD and SOL, the pool's age and its basis, and SOL/USD with its age, but not the pool's own locked liquidity Λ in USD: that needs live reserves from the venue layer's `tradeContext` or an indexer field | open (MARKETS follow-up) |
 | FE-15 | WASM facade gaps — **closed in M10**: `spotNearEma`, `pOpenMax`, `lambdaBps`, `lockedDepth`, `lockedSol`, `lockedFloorOk`, `mintCheck` (over `shortwin_venue_state::mint::check`; the further reasons are `check` re-run with each earlier rule lifted) and `previewWithdrawal` (withdraw, `LastSharesBorrowed`, claim, as the handler composes them: the tokens, the SOL part and the lender afterwards, so the panel shows the lock a withdrawal leaves, §3.6) are exported; the TypeScript ports are deleted (frozen in `src/m10-fe15/legacy.ts` as the test oracle of `parity.test.ts`). Frontend only, no program bytecode | closed (M10) |
-| FE-16 | The vector generators `venues/vectors/keeper_vectors.rs` and `features/short/vectors/program_vectors.rs` run outside the web build (copied into `services/keeper/examples` and `tests/litesvm/examples`, instructions in each header); moving them into those crates would let CI regenerate the vectors | open |
+| FE-16 | The vector generators `venues/vectors/keeper_vectors.rs` and `features/short/vectors/program_vectors.rs` run outside the web build (copied into `services/keeper/examples` and `tests/litesvm/examples`, instructions in each header; *pump v3:* `program_vectors.rs pump` writes `pump-vectors.json`); moving them into those crates would let CI regenerate the vectors | open |
 | FE-17 | `raydiumCandidates` runs the keeper's four `getProgramAccounts` discovery calls from the browser; public mainnet RPCs may refuse or throttle them on AMM v4 — an indexer endpoint or a dedicated discovery RPC | open (M11) |
 | FE-18 | Validator E2E (M10): `lend-post-wipe` lands the post-wipe bundle `[sweep_trader, deposit]` after an organic full wipe on the **mock** venue, and the wiped lender claims through the live and then the final record; `lend-claim-sync` lands `[sync_lender(other), claim_sol]` with a pot draw (the pot afterwards exactly before + the simulated surplus − the draw); `lend-sweep-cashback` lands the bundle's venue claim encodings (pump and PumpSwap `claim_cashback`, pAMM `init_user_volume_accumulator`) **by themselves** on the dumped ELFs, on an unused trader PDA. **Open:** one transaction composing the pump / PumpSwap venue claims with `sweep_trader` (token leg, UVA) and `deposit` on a wiped pump / PumpSwap market — it needs a pump / PumpSwap wipe on the validator (Node trade encoders and a cashback-coin curve fixture); LiteSVM covers it today (`m5_sec_curve_it`, `pamm_it::gates`) | partly closed (M10): the mock-venue bundle, the claim-time sync and the venue claim encodings on a validator; the pump / PumpSwap composite bundle is open (M11) |
 | FE-19 | While the indexer is down the chain-only views fill `{creatorFee}` with "n/a (indexer unavailable)" and the `lender.lossHistory` numbers with "—"; the indexer mock's lender deposit / withdrawal history is 0 (it derives responses from chain state; profile `full` serves the real values) | by design |
@@ -3144,6 +3180,24 @@ edits `disclosures.ts` (copy changes need the owner) or `errors.ts`.
 | FE-33 | **Social-app in-app browsers** are detected by user agent only (`; wv)`, Telegram, Twitter, Instagram, FBAN / FBAV / FB_IAB, Line). Apps that open links in SFSafariViewController or Custom Tabs are not detected, but those handle universal links. A universal link may not leave a WebView, so the app offers Copy link. MWA does not register in WebViews. | by design |
 | FE-34 | **Firefox for Android:** MWA is not registered there, because its protocol frames a `solana-wallet:` URL that the CSP refuses (no `frame-src`). The open-in links remain. | by design |
 | FE-35 | **MWA library calls that never settle** (wallet-standard-mobile 0.7.0): a failed reauthorization at Sign, a wallet that never answers after the association, the library spinner closed after the handshake, a Disconnect during a sign. The app bounds each one: Cancel while signing (after 5 s), the sign ended when the connected MWA account changes, the connect ended 10 s after the page is back in front (at most 120 s) with MWA's connect lock reset, and the library's hosts removed at insertion. The abandoned library call keeps its socket until the wallet closes it or the page unloads. Re-check at each package update (the drift test forces it). | mitigated; upstream fix wanted |
+
+### pump v3 (2026-10-15; design pump-final §8, PUMP-V3 P5)
+
+The web side of pump's v3 adapter, on the owner's decisions of 2026-10-13 (D1 (a): a live cashback
+curve is refused; D2: the straddle bundle and `complete_curve` are retired; D3: `B̂_v3` is the risk
+and exit price above `rT`; D4: the two error texts as drafted). P4 had already ported the curve
+TradeExtras (`lists.ts`: pump's 10 v3 keys, `T4`–`T8` writable; `lists.test.ts` held to the
+regenerated keeper vectors). The web deploys after the program upgrade (pump-final §15 step 3):
+the 10-key list is refused by shortwin 1.0.0.
+
+| Item | Change | Tests |
+|---|---|---|
+| Reader | `readCurve` reads the 166-byte layout's six fields (@125 `creator_fee`, @133 `protocol_fees`, @141 `depth` u8, @142 `ivqr`, @150 `pcB`, @158 `pcQ`; 0 past a shorter curve's end) and `quoteOffsetConsistent` (`vQ − rQ = ivqr`, vacuous on a legacy or migrated curve); `PUMP_GLOBAL_LEN` stays 1,087 | `readers.test.ts`: every dumped curve's fields against the manifest, `synthetic_stuck`, `graduated_synthetic`, zeros on 141 / 151 B, `mayhem166` inconsistent, the 1,088-byte `Global` |
+| Venue state (`venues/state.ts`) | `listable` needs `depth = 0`; `executable` refuses a live cashback curve (a complete one stays observed, §6.1.6). `CurvePricingInputs` gains `syntheticFees` (`φ_s`: the curve's tier on the mint's **live** supply, the facade's `resolveAtSupply`; `null` on a complete, cashback or mayhem curve or without the supply), `postCompleteQuoteIn`, `postComplete`, `postCompleteKnown`; `curvePricing` is `null` on a live curve carrying `pc*` (G-3). The curve venue passes `pcQ` and, with a route, `withSynthetic(φ_s)`: past `rT` a live curve quotes `B̂_v3`, without a route nothing (`null`, not `B̂_str`). The EMA leg's pool tokens are 206.9e12, or the live `curve_base_ata` after a pool part (§5.4). `fvRepriced` ports `Quoter::fv_repriced`: on a migrating curve the facade's new `migratingFv` (ρ-scaled onto the pool `migrate_v2` creates), `null` when the post-complete fields are not known. The fee gates and the caps keep the 10¹⁵ `φ` (`feePpm`, `feePpmAtEma`), as the program's `oneway_ppm` does | `state.test.ts` "pump v3": near166's `rT + 10e12` at 22,944,563,746 (pump charged 22,944,563,744 on the 2026-10-13 ELF), continuity at `rT`, the capped view, `afterSale` (under G0's seven-tier curve `FeeConfig` a sale moves `φ_s` from 80 / 25 to 90 / 28: re-resolved, and equal to a fresh read of the post-sale accounts), no route without the supply; the cashback, depth, mayhem and G-3 guards; 98u8RJ's completion forged onto near166 — the EMA leg = PumpSwap's buy on `(X₁, Y₁)` exactly, FV ρ-scaled within 1 bps of that pool's buy, unchanged without a pool part, lower after a donation, capped, and `null` for the three unknown states |
+| Listing (`venues/detect.ts`) | `classifyPump`, on the live branch only: a cashback coin `CurveCashbackCoin` (6109), a depth ≠ 0 `CurveQuoteNotSol` (§5.9) | `state.test.ts` (cashback166 refused, complete cashback lists as `pump_migrating`; depth 1 refused) |
+| Previews, close (`previews.ts`, `trades.ts`, `CloseForm.tsx`) | `PositionMetrics.straddle` and the `CurveStraddle` refusal are gone: a close past `rT` previews and sends at `B̂_v3` (§5.11). The notice, its `close-straddle-notice` test id and its words are removed (D4, G-8: nothing new). `insufficientVault` no longer counts a missing quote as a thin vault ("No buyback quote now") | `vectors/pump-vectors.json` (new; `program_vectors.rs pump`: the **release** build on pump's 2026-10-13 ELFs in LiteSVM, near166): the open preview equals `open_short` (`sell_v3` proceeds, `N_open`, `B̂_ema`, margin, fee, vault, tier, deadline); the close below `rT` and the close past it equal `close_short` — the preview is the program's own `b_live` (`B̂_v3` past `rT`, 692,998,557 against pump's charge of 692,998,555), the payout what the program paid less that slack; the keeper's `liquidate` past `rT` (T-SYNTH-2's ECON D@80 % on the fresh curve, the crowd's buy down to `q/2`): the position metrics equal its event — `B̂_v3` at the live fee (`b_live`) and at the exit risk cap (`b_live_risk`), the EMA leg's CR on the newest ring entry (`cr_ema_bps`) and `R_due` — and the liquidation price is the spot (the event's spot CR is on the robust spot, which the web does not model); `plans.test.ts` builds both opens and closes exactly as the program executed them (the 7-account ReadSet, the 10 TradeExtras); `positions.test.tsx` |
+| The D4 strings | `src/config/copyPump.ts` holds the program's two texts as drafted (§4.3's pump group): `errors.ts` takes 6031 and 6109 from it — byte for byte the program's `#[msg]`, a straight apostrophe and no final full stop on `CurveStraddle` | `copy.test.ts` (the drafted texts, the program's `errors.rs`, `errors.ts` and §4.3 held to each other; 72 / 152), `errors.test.ts` |
+| WASM | `Venue.migratingFv(q, p, state)` (`quote::migrating_fv`); the package rebuilt | `quotes::tests::migrating_fv_follows_the_post_complete_pool`; `js/smoke.cjs` |
 
 ### Mobile wallets (2026-10-13; O-6 lifted)
 

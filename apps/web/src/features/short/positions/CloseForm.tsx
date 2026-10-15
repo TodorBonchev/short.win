@@ -2,8 +2,9 @@
  * Close a position (FRONTEND.md §3.8, §5.10): the buyback at the live quote, the rent due, what
  * comes back and the P&L, `close_short(max_buyback_cost = ⌈B̂_live·(1 + slippage)⌉)` through the
  * pipeline. A close that would refuse says why before anything is signed: `InsufficientVault`
- * (add margin first), `CurveStraddle` (the curve cannot sell `q` tokens: FE-3, the keeper's
- * graduation bundle exits it), no route.
+ * (add margin first), no route. A close past a live curve's `rT` is an ordinary close at `B̂_v3`:
+ * it completes the curve by pump's synthetic migration in the same instruction (pump-final §5.2,
+ * §8; FE-3 closed), so it has no notice of its own.
  */
 import type { ShortPosition } from '@shortwin/client';
 import type { Address } from '@solana/kit';
@@ -68,13 +69,11 @@ export function CloseForm({
         [!slipOk, REASON.slippage],
         [
             !preview,
-            mx.straddle
-                ? 'Cannot close on the curve now'
-                : venueCannot
-                  ? 'The venue cannot trade now'
-                  : mx.insufficientVault
-                    ? 'Add margin first: the vault cannot cover the buyback'
-                    : 'No buyback quote now',
+            venueCannot
+                ? 'The venue cannot trade now'
+                : mx.insufficientVault
+                  ? 'Add margin first: the vault cannot cover the buyback'
+                  : 'No buyback quote now',
         ],
         [stale, REASON.stale],
         [trade.building, REASON.building],
@@ -101,28 +100,14 @@ export function CloseForm({
             <h3 id="close-title" className="short-section-title" tabIndex={-1}>
                 Close
             </h3>
-            {mx.straddle && (
-                <div
-                    className="banner"
-                    data-tone="warn"
-                    role="status"
-                    data-testid={T.closeStraddleNotice}
-                    data-code="CurveStraddle"
-                >
-                    <div>
-                        <strong>Cannot close on the curve now.</strong> {errorByName('CurveStraddle')?.message} Your
-                        position is exited by the keeper once the curve graduates; you can add margin meanwhile.
-                    </div>
-                </div>
-            )}
-            {!mx.straddle && venueCannot && (
+            {venueCannot && (
                 <div className="banner" data-tone="warn" role="status">
                     {snapshot.kind === 'pump_migrating'
                         ? errorByName('VenueMigrating')?.message
                         : errorByName('NoRoute')?.message}
                 </div>
             )}
-            {!mx.straddle && !venueCannot && mx.insufficientVault && (
+            {!venueCannot && mx.insufficientVault && (
                 <div className="banner" data-tone="danger" role="status" data-code="InsufficientVault">
                     {errorByName('InsufficientVault')?.message} Add margin to close.
                 </div>

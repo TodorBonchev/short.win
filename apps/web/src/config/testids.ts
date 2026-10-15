@@ -268,7 +268,6 @@ export const T = {
     addMarginSubmit: 'add-margin-submit',
     closeSlippageInput: 'close-slippage-input',
     closePreview: p<'buyback' | 'rent' | 'payout' | 'pnl'>('close-preview'),
-    closeStraddleNotice: 'close-straddle-notice',
     closeSubmit: 'close-submit',
     // appended by TRADE (M10-RESP; FRONTEND.md §7.6, §11.4)
     /** Why the Short submit is disabled, one line (`data-reason` while there is one). */

@@ -11,7 +11,7 @@ import type { Address } from '@solana/kit';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { programError } from '../../config/errors.ts';
 import type { MathModule } from '../../math/load.ts';
-import { type FeeBps, notExecutable, quoteBuy } from '../../venues/state.ts';
+import { type FeeBps, notExecutable, quoteBuy, spotPrice } from '../../venues/state.ts';
 import {
     assignTier,
     capsFor,
@@ -23,7 +23,7 @@ import {
     withTolerance,
 } from './previews.ts';
 import { type AccountSource, type ChainSnapshot, decodePosition, exposureQ } from './snapshot.ts';
-import { programVectors, testMath, type VectorCase, vectorSnapshot } from './testing.ts';
+import { programVectors, pumpVectors, testMath, type VectorCase, vectorCase, vectorSnapshot } from './testing.ts';
 
 type Case = VectorCase;
 const vectors = { cases: programVectors() };
@@ -44,7 +44,8 @@ const big = (v: string | number | undefined) => BigInt(v ?? 0);
 const errName = (code: number | null | undefined) => (code ? (programError(code)?.name ?? String(code)) : null);
 
 describe('the open preview equals open_short', () => {
-    const opens = vectors.cases.filter((c) => c.kind === 'open');
+    // The mock venue's opens and pump v3's on near166 (`sell_v3` on the 2026-10-13 ELF).
+    const opens = [...vectors.cases, ...pumpVectors()].filter((c) => c.kind === 'open');
 
     it('covers successful opens on SPL and Token-2022 and refusals', () => {
         expect(opens.filter((c) => c.result.ok).length).toBeGreaterThanOrEqual(4);
@@ -140,6 +141,58 @@ describe('the close preview equals close_short', () => {
         });
     }
 
+    // pump v3 (design pump-final §5.2, §8): the release build on pump's 2026-10-13 ELF. Below `rT`
+    // the curve leg; past it the crowd bought the curve down to q/2 and one `close_short` bought rT on
+    // the curve and the rest from the would-be pool, completing it. The preview is the program's own
+    // quote `B̂_live` (`B̂_v3` past rT), at most §5.2's 7 lamports above pump's charge, and the
+    // payout what the program paid less that slack (FE-3 closed: no CurveStraddle).
+    for (const name of ['pump-close-below-rt', 'pump-close-past-rt']) {
+        it(`${name} (pump v3)`, async () => {
+            const c = vectorCase(name);
+            const { s, get } = await snapshotOf(c);
+            const pos = decodePosition(get(c.position as Address));
+            if (!pos) throw new Error('position');
+            const e = c.result.event ?? {};
+            expect(c.result.ok).toBe(true);
+            expect(s.kind).toBe('pump_curve');
+            expect(s.venue.executable).toBe(true);
+            expect(s.venue.curve?.pricing?.syntheticFees).not.toBeNull();
+            expect(pos.q > (s.venue.curve?.live.rt ?? 0n)).toBe(name === 'pump-close-past-rt');
+            const slack = big(e.bLive) - big(e.buybackCost);
+            expect(slack >= 0n && slack <= 7n).toBe(true);
+            const mx = positionMetrics(math, s, pos);
+            expect(mx.rentDue).toBe(big(e.rent));
+            expect(mx.buyback).toBe(big(e.bLive));
+            expect(mx.insufficientVault).toBe(false);
+            const pv = previewCloseFor(math, s, pos, 100);
+            expect(pv).not.toBeNull();
+            if (!pv) return;
+            expect(pv.buyback).toBe(big(e.bLive));
+            expect(pv.rent).toBe(big(e.rent));
+            expect(pv.rentProtocol).toBe(big(e.rentProtocol));
+            expect(pv.payout).toBe(big(e.borrowerPayout) - slack);
+            expect(pv.maxBuybackCost >= big(e.bLive)).toBe(true);
+            expect(mx.crBps !== null && mx.crBps > BigInt(pos.crLiqBps)).toBe(true);
+            if (name !== 'pump-close-past-rt') return;
+            // Without the mint's supply there is no synthetic route: no quote past rT, so no
+            // preview — "No buyback quote now", not a thin vault.
+            const noRoute = {
+                ...s,
+                venue: {
+                    ...s.venue,
+                    curve: s.venue.curve && {
+                        ...s.venue.curve,
+                        pricing: s.venue.curve.pricing && { ...s.venue.curve.pricing, syntheticFees: null },
+                    },
+                },
+            };
+            const none = positionMetrics(math, noRoute, pos);
+            expect(none.buyback).toBeNull();
+            expect(none.insufficientVault).toBe(false);
+            expect(previewCloseFor(math, noRoute, pos, 100)).toBeNull();
+        });
+    }
+
     it('a rise lowers the P&L below a fall', async () => {
         const rise = vectors.cases.find((x) => x.name === 'spl-close-after-rise');
         const fall = vectors.cases.find((x) => x.name === 'spl-close-after-fall');
@@ -153,6 +206,43 @@ describe('the close preview equals close_short', () => {
         };
         expect((await pnl(rise)) < 0n).toBe(true);
         expect((await pnl(fall)) > 0n).toBe(true);
+    });
+});
+
+describe("the risk view equals liquidate past a curve's rT (pump v3)", () => {
+    // T-SYNTH-2 (design pump-final §5.2, §8): ECON's D@80 % position on the fresh curve, the crowd's
+    // buy down to rT = q/2, and the keeper's `liquidate` landing on the curve in the second dumped
+    // here (the release build on pump's 2026-10-13 ELF). Its event is the program's risk view
+    // (`liquidate::assess`): the execution quote `B̂_v3` (`b_live`), `B̂_v3` at the position's exit
+    // risk cap (`b_live_risk`, `VenueState::buy_risk`) and the EMA leg's CR on the newest ring entry
+    // (`cr_ema_bps`, the capped `buy_xy`). The position's metrics reproduce each to the lamport and
+    // the basis point. (The event's spot CR is on the robust spot at `max(L_live, L_ema')`, which
+    // the web does not model: its spot CR is the live risk quote's, below `L` here as well.)
+    it('pump-liquidate-past-rt', async () => {
+        const c = vectorCase('pump-liquidate-past-rt');
+        const { s, get } = await snapshotOf(c);
+        const pos = decodePosition(get(c.position as Address));
+        if (!pos) throw new Error('position');
+        const e = c.result.event ?? {};
+        expect(c.result.ok).toBe(true);
+        expect(s.kind).toBe('pump_curve');
+        expect(s.venue.executable).toBe(true);
+        expect(s.venue.curve?.pricing?.syntheticFees).not.toBeNull();
+        expect(pos.q > (s.venue.curve?.live.rt ?? pos.q)).toBe(true);
+        const mx = positionMetrics(math, s, pos);
+        expect(mx.rentDue).toBe(big(e.rent));
+        expect(mx.buyback).toBe(big(e.bLive));
+        expect(mx.buybackRisk).toBe(big(e.bLiveRisk));
+        expect(mx.crEmaBps).toBe(big(e.crEmaBps));
+        const L = BigInt(pos.crLiqBps);
+        expect(big(e.crSpotBps) < L && big(e.crEmaBps) < L).toBe(true);
+        expect(mx.crBps).toBe(math.crBps(mx.vEff, big(e.bLiveRisk)));
+        expect(mx.crBps !== null && mx.crBps < L).toBe(true);
+        // Already below L at the spot: the liquidation price is the spot itself.
+        expect(mx.liqPriceWad).toBe(spotPrice(math, s.venue));
+        // pump charged at most §5.2's 7 lamports below the program's quote.
+        const slack = big(e.bLive) - big(e.buybackCost);
+        expect(slack >= 0n && slack <= 7n).toBe(true);
     });
 });
 

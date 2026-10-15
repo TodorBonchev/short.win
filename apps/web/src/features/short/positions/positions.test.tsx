@@ -87,7 +87,7 @@ describe('close form', () => {
     it('previews exactly what close_short paid', async () => {
         const { c, s, pos } = await closeCase('spl-close-after-fall');
         wallet.address = c.borrower;
-        render(
+        const { container } = render(
             <ToastProvider>
                 <CloseForm math={math} snapshot={s} position={c.position as Address} pos={pos} symbol="MOCK" />
             </ToastProvider>,
@@ -97,7 +97,8 @@ describe('close form', () => {
         expect(v(T.closePreview('rent'))).toBe(String(e.rent));
         expect(v(T.closePreview('payout'))).toBe(String(e.borrowerPayout));
         expect(BigInt(v(T.closePreview('pnl')) ?? 0)).toBe(BigInt(String(e.borrowerPayout)) - pos.m - pos.feeOpen);
-        expect(screen.queryByTestId(T.closeStraddleNotice)).toBeNull();
+        // No notice: nothing stands in the way of this close.
+        expect(container.querySelector('.banner')).toBeNull();
         expect((screen.getByTestId(T.closeSubmit) as HTMLButtonElement).disabled).toBe(false);
         expect(screen.getByTestId(T.closeReason).textContent).toBe('');
     });

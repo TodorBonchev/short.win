@@ -2,8 +2,9 @@
  * SHORT track — one position (FRONTEND.md §3.8): the dashboard fields live from the chain (`Q`
  * owed, vault, CR on both legs, liquidation price, rent, P&L if closed now, time left), the terms
  * locked at open, the settlement state and how the position can end, the event timeline from the
- * indexer; add margin (CR preview) and close (buyback, rent, payout, P&L; the straddle notice on a
- * completing curve, FE-3). A closed position shows its exit from the indexer.
+ * indexer; add margin (CR preview) and close (buyback, rent, payout, P&L; past a live curve's `rT`
+ * at `B̂_v3`, the close completing the curve: FE-3 closed). A closed position shows its exit from
+ * the indexer.
  */
 import { fetchMaybeMarket } from '@shortwin/client';
 import type { Address } from '@solana/kit';

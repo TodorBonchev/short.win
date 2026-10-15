@@ -15,6 +15,7 @@ import type { Address } from '@solana/kit';
 import type { MathModule } from '../math/load.ts';
 import { DEFAULT_KEY } from './bytes.ts';
 import {
+    CURVE_MIN_LEN,
     type KindName,
     MOCK_PROTOCOL_FEE_RATE,
     PAMM_BUY_DISABLED_BIT,
@@ -38,6 +39,7 @@ import {
     mockReserves,
     pammReserves,
     pammVirtualPart,
+    quoteOffsetConsistent,
     type RawAccount,
     readAmmInfo,
     readCpmmConfig,
@@ -102,12 +104,21 @@ export interface CurveLive {
     readonly complete: boolean;
 }
 
-/** The curve's pricing inputs (`CurvePricingInputs`), `null` when an account does not parse or `vT = 0`. */
+/**
+ * The curve's pricing inputs (`CurvePricingInputs`, pump-final §6.1.5, §6.2), `null` when an
+ * account does not parse, `vT = 0`, or a **live** curve carries post-complete fields (G-3: pump
+ * writes `pcB` / `pcQ` only in the buy that completes a curve; not executable, A63's cap-only risk
+ * view).
+ */
 export interface CurvePricingInputs {
+    /** The curve's fee at its market cap on the fixed 10¹⁵ supply (ARCH §4.2): `φ`, every gate's. */
     readonly fees: FeeBps;
     readonly offsetToken: bigint;
     readonly offsetQuote: bigint;
-    /** The live leg's `X_p = curve_base_ata.amount − rT`. */
+    /**
+     * `curve_base_ata.amount − rT`: the live leg's `X_s` (the synthetic exit's pool part, donations
+     * included as pump prices it) and, after a synthetic pool part, the migrating pool's `X₁`.
+     */
     readonly livePoolTokens: bigint;
     readonly migrationFee: bigint;
     readonly schedules: CurveSchedules;
@@ -115,6 +126,26 @@ export interface CurvePricingInputs {
     readonly poolDisableFlags: number;
     /** The fee (ppm) at the stored `P_ema`'s market cap; `U32_MAX` without a price. */
     readonly feePpmAtEma: number;
+    /**
+     * `CurvePricingInputs::synthetic_fees`: on a live, non-cashback, non-mayhem curve the fee pump
+     * charges on both parts of a buy past `rT` by synthetic migration (`buy_v3`), its tier at the
+     * curve's market cap on the mint's **live** supply `φ_s` (pump-final §5.2, P1 correction (a));
+     * `null` without that route — a complete, cashback or mayhem curve, a read without the supply.
+     * Above `rT` a live curve then quotes `B̂_v3`; without it nothing executes there.
+     */
+    readonly syntheticFees: FeeBps | null;
+    /** The mint's supply `syntheticFees` resolved on (`afterSale` re-resolves it). */
+    readonly supply: bigint | null;
+    /** A complete curve's `post_complete_quote_in` (`pcQ` @158): `migrate_v2` adds it to the pool. 0 when live. */
+    readonly postCompleteQuoteIn: bigint;
+    /** A complete curve whose completing buy had a pool part (`pcB` or `pcQ` non-zero). */
+    readonly postComplete: boolean;
+    /**
+     * The post-complete fields are known (§6.1.5): always without a pool part; with one, `pcB` and
+     * `pcQ` were written together and pump's `vQ − rQ = ivqr` holds. When false a migrating
+     * curve has no FV (`fvRepriced` is `null`: S3 gives the lenders the whole take).
+     */
+    readonly postCompleteKnown: boolean;
 }
 
 export interface CurveView {
@@ -197,6 +228,31 @@ export function resolveCurveFees(m: MathModule, s: CurveSchedules, vt: bigint, v
     try {
         for (const t of s.curveTiers) sch.addTier(t.threshold, t.lp, t.protocol, t.creator);
         return feesOf(sch.resolve(vt, vq));
+    } catch {
+        return null;
+    } finally {
+        sch.free();
+    }
+}
+
+/**
+ * A live curve's synthetic-exit fee `φ_s` (`CurvePricingInputs::synthetic_fees`): `fees::
+ * pump_curve_at_supply` on `(vT, vQ)` and the mint's live `supply` — pump's tier rule for a buy past
+ * `rT` (pump-final §5.2). `null` when it does not resolve or carries an LP part, which the curve
+ * never charges (the program then stores no route).
+ */
+export function resolveSyntheticFees(
+    m: MathModule,
+    s: CurveSchedules,
+    vt: bigint,
+    vq: bigint,
+    supply: bigint,
+): FeeBps | null {
+    const sch = new m.CurveSchedule(s.creatorFeeConfigurable, s.curveCreatorFeeBps, s.creatorIsDefault);
+    try {
+        for (const t of s.curveTiers) sch.addTier(t.threshold, t.lp, t.protocol, t.creator);
+        const f = feesOf(sch.resolveAtSupply(vt, vq, supply));
+        return f.lp === 0 ? f : null;
     } catch {
         return null;
     } finally {
@@ -422,10 +478,14 @@ function curveState(
         ? canonicalPoolState(at(read, CURVE_SLOT.canonicalPool), market.mint, authority).state
         : 'absent';
     const pricing = c.vt > 0n ? curvePricing(m, market, read, c, live, ctx) : null;
-    const listable = ca.data.length >= 115 && c.quoteMint === DEFAULT_KEY && !c.isMayhemMode;
+    // What short.win lists and observes: a SOL curve, not mayhem, ≥ 115 bytes; depth 0 is defence
+    // in depth (a SOL curve has depth 0).
+    const listable = ca.data.length >= CURVE_MIN_LEN && c.quoteMint === DEFAULT_KEY && !c.isMayhemMode && c.depth === 0;
     const reserves = c.vt > 0n && c.vq > 0n;
     const migrating = c.complete && c.vt > 0n;
-    const executable = listable && reserves && !c.complete && pricing !== null;
+    // D1 (a): pump's v3 refuses a cashback coin (6094), so a live cashback curve never executes; a
+    // complete one is still observed and priced as migrating (pump-final §6.1.6, R-4).
+    const executable = listable && !c.isCashbackCoin && reserves && !c.complete && pricing !== null;
     const observed = listable && reserves && (executable || migrating);
     return {
         ...st,
@@ -446,6 +506,10 @@ function curvePricing(
     live: CurveLive,
     ctx: ReadContext,
 ): CurvePricingInputs | null {
+    const [pcb, pcq] = [c.postCompleteBaseOut, c.postCompleteQuoteIn];
+    const postComplete = pcb !== 0n || pcq !== 0n;
+    // G-3: pump writes pc* only in the buy that completes the curve; on a live curve they are unknown.
+    if (!c.complete && postComplete) return null;
     const ga = at(read, CURVE_SLOT.global);
     const fa = at(read, CURVE_SLOT.feeConfig);
     const ba = at(read, CURVE_SLOT.curveBaseAta);
@@ -477,6 +541,12 @@ function curvePricing(
         const f = resolveCurveFees(m, schedules, live.vt, vqEma);
         if (f) feePpmAtEma = onewayPpm(m, f);
     }
+    // pump-final §5.2 (P1 correction (a)): a buy past rT is charged at the curve's market cap on
+    // the mint's live supply. v3 refuses a cashback coin (6094; D1 (a)) and short.win does not list
+    // mayhem: no synthetic route for either, nor for a complete curve.
+    const route = !c.complete && !c.isCashbackCoin && !c.isMayhemMode;
+    const syntheticFees =
+        route && ctx.supply !== null ? resolveSyntheticFees(m, schedules, live.vt, live.vq, ctx.supply) : null;
     return {
         fees,
         offsetToken: live.vt - live.rt,
@@ -486,6 +556,13 @@ function curvePricing(
         schedules,
         poolDisableFlags: gc.disableFlags,
         feePpmAtEma,
+        syntheticFees,
+        supply: ctx.supply,
+        postCompleteQuoteIn: c.complete ? pcq : 0n,
+        postComplete: c.complete && postComplete,
+        // The migrating rule relies on rQ excluding the pool part (V5), which pump's invariant
+        // vQ − rQ = ivqr checks, and on pcB and pcQ being written together.
+        postCompleteKnown: !c.complete || !postComplete || ((pcb !== 0n) === (pcq !== 0n) && quoteOffsetConsistent(c)),
     };
 }
 
@@ -684,6 +761,13 @@ function poolVenue(m: MathModule, p: PoolPricing): WasmVenue {
     }
 }
 
+/**
+ * The curve as the facade's venue (`CurvePricingInputs::curve_pricing`): its fees and offsets,
+ * the migration — `poolTokens` and, after a synthetic pool part, `pcQ` — the post-migration pool's
+ * PumpSwap schedule, and on a live curve with a synthetic route `withSynthetic(φ_s)`, so a buy past
+ * `rT` prices `B̂_v3` (pump-final §5.2–§5.3); a migrating market's buys past a ring state's `rT`
+ * keep `B̂_str` on the real pool (G-2).
+ */
 function curveVenue(m: MathModule, c: CurvePricingInputs, poolTokens: bigint): WasmVenue {
     const f = new m.Fees(c.fees.lp, c.fees.protocol, c.fees.creator);
     const sch = new m.PammSchedule(
@@ -694,9 +778,16 @@ function curveVenue(m: MathModule, c: CurvePricingInputs, poolTokens: bigint): W
     );
     try {
         for (const t of c.schedules.poolTiers) sch.addTier(t.threshold, t.lp, t.protocol, t.creator);
-        // No post-complete quote and B̂_str above rT until the web follows the v3 adapter
-        // (pump-final §8, P5: postCompleteQuoteIn and withSynthetic).
-        return m.Venue.pumpCurve(f, c.offsetToken, c.offsetQuote, c.migrationFee, poolTokens, 0n, sch);
+        const pcq = c.postComplete ? c.postCompleteQuoteIn : 0n;
+        const v = m.Venue.pumpCurve(f, c.offsetToken, c.offsetQuote, c.migrationFee, poolTokens, pcq, sch);
+        if (!c.syntheticFees) return v;
+        const sf = new m.Fees(c.syntheticFees.lp, c.syntheticFees.protocol, c.syntheticFees.creator);
+        try {
+            return v.withSynthetic(sf);
+        } finally {
+            sf.free();
+            v.free();
+        }
     } finally {
         f.free();
         sch.free();
@@ -704,9 +795,19 @@ function curveVenue(m: MathModule, c: CurvePricingInputs, poolTokens: bigint): W
 }
 
 /**
- * Runs `fn` with the facade's venue of `s` (a pool's resolved pricing, or the curve: `live` uses
- * the live leg's `X_p`, else the deterministic `STANDARD_POOL_TOKENS` of the EMA leg), capped at
- * `capBps` when given (the risk view, V2-1), and frees it. `null` without pricing.
+ * The migration's pool tokens (`CurvePricingInputs::curve_pricing`, pump-final §5.4): the live
+ * leg's `X_s` for an execution quote (`Quoter::buy_live`), else the EMA leg's — the deterministic
+ * `STANDARD_POOL_TOKENS`, or after a synthetic pool part the live `curve_base_ata` (`rT = 0`), the
+ * tokens pump priced the pool part on and `migrate_v2` seeds, donations included.
+ */
+function poolTokensOf(c: CurvePricingInputs, live: boolean): bigint {
+    return live || c.postComplete ? c.livePoolTokens : STANDARD_POOL_TOKENS;
+}
+
+/**
+ * Runs `fn` with the facade's venue of `s` (a pool's resolved pricing, or the curve with
+ * `poolTokensOf`), capped at `capBps` when given (the risk view, V2-1: the synthetic legs and the
+ * post-migration pool's tier too), and frees it. `null` without pricing.
  */
 export function withVenue<T>(
     m: MathModule,
@@ -716,8 +817,7 @@ export function withVenue<T>(
 ): T | null {
     let v: WasmVenue | null = null;
     if (s.pricing) v = poolVenue(m, s.pricing);
-    else if (s.curve?.pricing)
-        v = curveVenue(m, s.curve.pricing, opts.live ? s.curve.pricing.livePoolTokens : STANDARD_POOL_TOKENS);
+    else if (s.curve?.pricing) v = curveVenue(m, s.curve.pricing, poolTokensOf(s.curve.pricing, opts.live));
     if (!v) return null;
     let use = v;
     try {
@@ -770,9 +870,15 @@ export function quoteSell(m: MathModule, s: VenueState, q: bigint): Sell | null 
     });
 }
 
-/** `B̂_live(q)` at the live fee, or at `min(φ_live, capBps)` (`VenueState::buy` / `buy_risk`). */
+/**
+ * `B̂_live(q)` at the live fee, or at `min(φ_live, capBps)` (`VenueState::buy` / `buy_risk`). On a
+ * live curve past `rT`: `B̂_v3`, pump's synthetic migration in one `buy_v3` (pump-final §5.2); a
+ * curve without that route (no `φ_s`) executes nothing there, so the quote is `null` (`+∞`).
+ */
 export function quoteBuy(m: MathModule, s: VenueState, q: bigint, capBps?: number): Buy | null {
     if (!s.executable) return null;
+    const c = s.curve;
+    if (c && !c.live.complete && !c.pricing?.syntheticFees && q > c.live.rt) return null;
     return withVenue(m, s, { live: true, capBps }, (v) => {
         if (s.curve) {
             const cs = curveStateOf(m, s.curve.live);
@@ -789,8 +895,10 @@ export function quoteBuy(m: MathModule, s: VenueState, q: bigint, capBps?: numbe
 
 /**
  * `B̂(q; x, y)` on a hypothetical state — a ring entry's cached reprojection (the EMA leg, the D4
- * margin): a pool on `(x, y)`; the curve at `(vT, vQ) = (x, y)` with the live offsets and the
- * deterministic migration (`Quoter::buy_xy`). `capBps` gives the risk view.
+ * margin): a pool on `(x, y)`; the curve at `(vT, vQ) = (x, y)` with the live offsets and the EMA
+ * leg's migration (`Quoter::buy_xy`: above that state's `rT`, `B̂_v3` with 206.9e12 tokens on a live
+ * curve, `B̂_str` on the pool `migrate_v2` will create on a migrating one). `capBps` gives the risk
+ * view.
  */
 export function quoteBuyAt(m: MathModule, s: VenueState, q: bigint, x: bigint, y: bigint, capBps?: number): Buy | null {
     if (x === 0n) return null;
@@ -826,13 +934,18 @@ export function afterSale(m: MathModule, s: VenueState, q: bigint, sale: Sell): 
             complete: false,
         };
         const fees = resolveCurveFees(m, c.schedules, live.vt, live.vq) ?? c.fees;
+        // The synthetic route's fee follows the market cap on the same live supply.
+        const syntheticFees =
+            c.syntheticFees && c.supply !== null
+                ? resolveSyntheticFees(m, c.schedules, live.vt, live.vq, c.supply)
+                : c.syntheticFees;
         return {
             ...s,
             x: live.vt,
             y: live.vq,
             r: live.rq,
             feePpm: onewayPpm(m, fees),
-            curve: { ...s.curve, live, pricing: { ...c, fees } },
+            curve: { ...s.curve, live, pricing: { ...c, fees, syntheticFees } },
         };
     }
     if (s.pricing?.type === 'pumpSwap' && s.pool?.schedule) {
@@ -848,7 +961,36 @@ export function afterSale(m: MathModule, s: VenueState, q: bigint, sale: Sell): 
     return { ...s, x: sale.tokenAfter, y: sale.solAfter, r: sale.solAfter };
 }
 
-/** The live curve's real token reserve `rT` (a close of `q > rT` fails `CurveStraddle`). */
+/**
+ * `B̂_FV(P, L)` (ARCH §4.5; `Quoter::fv_repriced`): `B̂(q; reprice(L, P))`, except on a stuck
+ * migration (a migrating curve), where it prices the pool `migrate_v2` will create at `P`
+ * (pump-final §5.4, the facade's `migratingFv`): `(X₁, Y₁)` with 206.9e12 tokens, or the live
+ * `curve_base_ata` and `+ pcQ` after a synthetic pool part, repriced to `√(X₁·Y₁)` at `P` — ρ-scaled
+ * after a pool part — at that pool's PumpSwap tier. `null` (FV undefined) on a migrating curve whose
+ * post-complete fields are not known (§6.1.5: `sol_settle`'s S3 then gives the lenders the whole
+ * take). `capBps` gives the risk view (S3 prices at the exit risk cap).
+ */
+export function fvRepriced(m: MathModule, s: VenueState, q: bigint, l: bigint, p: bigint, capBps?: number): Buy | null {
+    const c = s.curve;
+    if (!s.pricing && c?.migrating && c.pricing) {
+        if (!c.pricing.postCompleteKnown) return null;
+        return withVenue(m, s, { live: false, capBps }, (v) => {
+            const cs = curveStateOf(m, c.live);
+            try {
+                return takeBuy(v.migratingFv(q, p, cs));
+            } finally {
+                cs.free();
+            }
+        });
+    }
+    return withVenue(m, s, { live: false, capBps }, (v) => takeBuy(v.buyRepriced(q, l, p)));
+}
+
+/**
+ * The live curve's real token reserve `rT`: a buyback past it completes the curve — `rT` on the
+ * curve, the rest from the would-be pool by pump's synthetic migration (`buy_v3`, pump-final §5.2)
+ * — and moves the market to migrating in that instruction.
+ */
 export function curveRealTokens(s: VenueState): bigint | null {
     return s.kind === 'pump_curve' && s.curve ? s.curve.live.rt : null;
 }

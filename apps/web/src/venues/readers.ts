@@ -146,9 +146,36 @@ export interface BondingCurve {
     readonly creatorFeeBps: bigint;
     readonly canEditCreatorFee: boolean;
     readonly isHolderReward: boolean;
+    /** `creator_fee` @125: the creator-fee bucket (v3 trades; outside `rQ`). */
+    readonly creatorFeeBucket: bigint;
+    /** `protocol_fees` @133: the protocol-fee bucket (v3 trades; outside `rQ`). */
+    readonly protocolFeesBucket: bigint;
+    /** `depth` @141: 0 for a SOL / USDC curve (a plain `u8`, not a bool). */
+    readonly depth: number;
+    /** `initial_virtual_quote_reserves` @142 (`ivqr`): `vQ − rQ` of a `create_v2` curve, 0 on a legacy one. */
+    readonly initialVirtualQuoteReserves: bigint;
+    /** `post_complete_base_out` @150 (`pcB`): what the completing buy took from the would-be pool. */
+    readonly postCompleteBaseOut: bigint;
+    /** `post_complete_quote_in` @158 (`pcQ`): what it paid into it; `migrate_v2` adds it to the pool. */
+    readonly postCompleteQuoteIn: bigint;
 }
 
-/** pump `BondingCurve` (`pump::read_curve`): owner pump, discriminator, every bool 0 / 1. */
+/**
+ * pump's invariant `vQ − rQ == initial_virtual_quote_reserves` (`BondingCurve::
+ * quote_offset_consistent`): vacuous when `ivqr` is 0 (a legacy curve) or `vT` is 0 (migrated).
+ */
+export function quoteOffsetConsistent(c: BondingCurve): boolean {
+    return (
+        c.initialVirtualQuoteReserves === 0n ||
+        c.vt === 0n ||
+        (c.vq >= c.rq && c.vq - c.rq === c.initialVirtualQuoteReserves)
+    );
+}
+
+/**
+ * pump `BondingCurve` (`pump::read_curve`): owner pump, discriminator, every bool 0 / 1; the fields
+ * of the 166-byte layout (2026-10-08: @125–@158) read 0 past the end of a shorter curve.
+ */
 export function readCurve(owner: Address, d: Uint8Array): Read<BondingCurve> {
     if (owner !== PUMP_PROGRAM) return err('WrongOwner');
     if (!hasDiscriminator(d, BONDING_CURVE_DISCRIMINATOR)) return err('WrongTag');
@@ -169,6 +196,12 @@ export function readCurve(owner: Address, d: Uint8Array): Read<BondingCurve> {
         creatorFeeBps: u64At(d, 115),
         canEditCreatorFee: canEdit as boolean,
         isHolderReward: holder as boolean,
+        creatorFeeBucket: u64At(d, 125),
+        protocolFeesBucket: u64At(d, 133),
+        depth: u8At(d, 141),
+        initialVirtualQuoteReserves: u64At(d, 142),
+        postCompleteBaseOut: u64At(d, 150),
+        postCompleteQuoteIn: u64At(d, 158),
     });
 }
 

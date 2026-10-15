@@ -11,7 +11,7 @@ import { type AccountSource, assembleSnapshot, type ChainSnapshot } from './snap
 
 export interface VectorCase {
     readonly name: string;
-    readonly kind: 'open' | 'close' | 'add_margin';
+    readonly kind: 'open' | 'close' | 'add_margin' | 'liquidate';
     readonly mint: string;
     readonly borrower: string;
     readonly nonce: number;
@@ -30,8 +30,10 @@ export interface VectorCase {
 }
 
 let cases: VectorCase[] | null = null;
+let pumpCases: VectorCase[] | null = null;
 let math: MathModule | null = null;
 
+/** The mock venue's vectors (the test-venue build). */
 export function programVectors(): VectorCase[] {
     cases ??= (
         JSON.parse(readRepo('apps/web/src/features/short/vectors/program-vectors.json')) as { cases: VectorCase[] }
@@ -39,8 +41,21 @@ export function programVectors(): VectorCase[] {
     return cases;
 }
 
+/**
+ * pump v3's (`pump-vectors.json`, design pump-final §8): the release build on pump's dumped
+ * 2026-10-13 ELFs, a curve market on `near166` — two opens (`sell_v3`), a close below `rT`, and a
+ * close past it that completes the curve by synthetic migration (`B̂_v3`) — and the keeper's
+ * `liquidate` past `rT` on ECON's D@80 % curve (the program's risk view in its event).
+ */
+export function pumpVectors(): VectorCase[] {
+    pumpCases ??= (
+        JSON.parse(readRepo('apps/web/src/features/short/vectors/pump-vectors.json')) as { cases: VectorCase[] }
+    ).cases;
+    return pumpCases;
+}
+
 export function vectorCase(name: string): VectorCase {
-    const c = programVectors().find((x) => x.name === name);
+    const c = [...programVectors(), ...pumpVectors()].find((x) => x.name === name);
     if (!c) throw new Error(`no vector ${name}`);
     return c;
 }

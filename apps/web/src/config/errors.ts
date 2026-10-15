@@ -12,6 +12,8 @@
  * possible on this market now), `report` (should not happen from this app: show the code and a
  * report link), `admin` (an instruction this app never sends).
  */
+import { PUMP_COPY } from './copyPump.ts';
+
 export type ErrorAction = 'retry' | 'adjust' | 'wait' | 'blocked' | 'report' | 'admin';
 
 export interface ProgramErrorInfo {
@@ -125,7 +127,8 @@ const ROWS: readonly Row[] = [
         'blocked',
         'This market’s route is marked broken. New shorts are refused; exits are not paused.',
     ],
-    [6031, 'CurveStraddle', 'wait', 'Buyback exceeds what the curve and its post-migration pool can deliver.'],
+    // pump-final D4: the program's text, as drafted (`copyPump.ts`, FRONTEND §4.3).
+    [6031, 'CurveStraddle', 'wait', PUMP_COPY['error.curveStraddle'].text],
     [6032, 'VenueDisabled', 'blocked', 'New shorts are disabled for this venue.'],
     [
         6033,
@@ -353,12 +356,8 @@ const ROWS: readonly Row[] = [
         'wait',
         'This pool is drained: at most 1/1,000 of its tokens are unborrowed. Deposits wait until repayments or settlements free more.',
     ],
-    [
-        6109,
-        'CurveCashbackCoin',
-        'blocked',
-        'pump.fun’s current trades do not support cashback coins on the curve. This coin can be shorted once it graduates to PumpSwap.',
-    ],
+    // pump-final D4: the program's text, as drafted (`copyPump.ts`, FRONTEND §4.3).
+    [6109, 'CurveCashbackCoin', 'blocked', PUMP_COPY['error.curveCashbackCoin'].text],
 ];
 
 export const PROGRAM_ERRORS: ReadonlyMap<number, ProgramErrorInfo> = new Map(

@@ -7,7 +7,7 @@ import type { Address } from '@solana/kit';
 import { describe, expect, it } from 'vitest';
 import { initMathSync } from '../math/load.ts';
 import { readRepoBytes } from '../test/repo.ts';
-import { PUMP_PROGRAM, TOKEN_2022_PROGRAM, TOKEN_PROGRAM } from './constants.ts';
+import { PUMP_CURVE_LEN_2026_10_08, PUMP_PROGRAM, TOKEN_2022_PROGRAM, TOKEN_PROGRAM } from './constants.ts';
 import {
     ata,
     bondingCurve,
@@ -24,6 +24,7 @@ import {
     PAMM_POOL_OFF_PROTOCOL_FEES,
     pammReserves,
     pammVirtualPart,
+    quoteOffsetConsistent,
     readAmmInfo,
     readCpmmConfig,
     readCpmmPool,
@@ -121,8 +122,62 @@ describe('pump', () => {
             expect(c?.creatorFeeBps).toBe(big(d.creator_fee_bps));
             if (typeof d.creator === 'string') expect(c?.creator).toBe(d.creator);
             if (typeof d.quote_mint === 'string') expect(c?.quoteMint).toBe(d.quote_mint);
+            // The 166-byte layout's fields (2026-10-08, @125–@158): 0 past the end of a shorter curve.
+            if ('post_complete_quote_in' in d) {
+                expect(c?.creatorFeeBucket).toBe(big(d.creator_fee_bucket));
+                expect(c?.protocolFeesBucket).toBe(big(d.protocol_fees_bucket));
+                expect(c?.depth).toBe(d.depth);
+                expect(c?.initialVirtualQuoteReserves).toBe(big(d.initial_virtual_quote_reserves));
+                expect(c?.postCompleteBaseOut).toBe(big(d.post_complete_base_out));
+                expect(c?.postCompleteQuoteIn).toBe(big(d.post_complete_quote_in));
+            } else if (a.data.length <= 125) {
+                expect([c?.creatorFeeBucket, c?.depth, c?.postCompleteQuoteIn]).toEqual([0n, 0, 0n]);
+            }
         });
     }
+
+    it('the post-complete fields (pump-final §4: reads_post_complete_fields)', () => {
+        const curve = (n: string) => value(readCurve(acc(n).owner, acc(n).data));
+        const stuck = curve('pump_synthetic_stuck_curve');
+        expect([stuck?.postCompleteBaseOut, stuck?.postCompleteQuoteIn]).toEqual([
+            125_468_585_973_711n,
+            21_720_607_727_767n,
+        ]);
+        expect([stuck?.depth, stuck?.initialVirtualQuoteReserves]).toEqual([1, 4_975_123_817_261n]);
+        expect(stuck && quoteOffsetConsistent(stuck)).toBe(true);
+        const graduated = curve('pump_graduated_synthetic_curve');
+        expect([graduated?.postCompleteBaseOut, graduated?.postCompleteQuoteIn]).toEqual([
+            6_238_850_918_425n,
+            2_642_475_552n,
+        ]);
+        // Migrated (vT = 0): the invariant is vacuous.
+        expect(graduated && quoteOffsetConsistent(graduated)).toBe(true);
+        // Zeros on the 141- and 151-byte curves; mayhem breaks vQ − rQ = ivqr.
+        for (const n of ['pump_grow141_curve', 'pump_grow151_curve']) {
+            const c = curve(n);
+            expect(
+                [c?.postCompleteBaseOut, c?.postCompleteQuoteIn, c?.depth, c?.initialVirtualQuoteReserves],
+                n,
+            ).toEqual([0n, 0n, 0, 0n]);
+            expect(c && quoteOffsetConsistent(c), n).toBe(true);
+        }
+        const mayhem = curve('pump_mayhem166_curve');
+        expect(mayhem && quoteOffsetConsistent(mayhem)).toBe(false);
+        const near = curve('pump_near166_curve');
+        expect(near && quoteOffsetConsistent(near)).toBe(true);
+        expect(acc('pump_near166_curve').data.length).toBe(PUMP_CURVE_LEN_2026_10_08);
+    });
+
+    it('Global: the 1,088-byte 2026-10-08 layout reads as the 1,087-byte one', () => {
+        const a = acc('pump_global_1088');
+        expect(a.data.length).toBe(1_088);
+        const g = value(readPumpGlobal(a.owner, a.data));
+        const d = dec('pump_global_1088');
+        expect(g?.poolMigrationFee).toBe(big(d.pool_migration_fee));
+        expect(g?.creatorFeeConfigurable).toBe(true);
+        const old = value(readPumpGlobal(a.owner, a.data.subarray(0, 1_087)));
+        expect(old?.buybackFeeRecipients).toEqual(g?.buybackFeeRecipients);
+    });
 
     it('Global: the recipient lists, the migration fee, creator_fee_configurable', () => {
         const a = acc('pump_global');

@@ -44,7 +44,14 @@ export function classifyPump(
     if (c.value.isMayhemMode) return { error: 'CurveMayhemUnsupported' };
     if (c.value.quoteMint !== DEFAULT_KEY) return { error: 'CurveQuoteNotSol' };
     if (bc.data.length < CURVE_MIN_LEN) return { error: 'CurveNeedsExtend' };
-    if (!c.value.complete) return { class: 'pump_curve' };
+    if (!c.value.complete) {
+        // pump-final §6.3 (owner D1 (a)), on the live branch only: pump's v3 trades refuse a cashback
+        // coin (6094), so a live cashback curve is refused until it graduates; a complete one lists as
+        // before (PumpMigrating, PumpSwap). A SOL curve has depth 0 (defence in depth).
+        if (c.value.isCashbackCoin) return { error: 'CurveCashbackCoin' };
+        if (c.value.depth !== 0) return { error: 'CurveQuoteNotSol' };
+        return { class: 'pump_curve' };
+    }
     const pool = canonicalPoolState(cp, mint, authority).state;
     if (pool === 'valid') return { class: 'pump_swap' };
     if (pool === 'unreadable') return { class: 'pump_pool_unreadable' };
