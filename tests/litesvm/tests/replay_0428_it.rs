@@ -9,7 +9,10 @@
 //! a new one on the fixtures — R-PUMP Update U4, R-VEN Update H5), so the "requires a new trailing
 //! account" behaviour is modelled on the TEST-ONLY mock venue's `required_extras` knob, exactly as
 //! T-REPLAY-PDA (`engine_it::o6`) models a per-mint-PDA change. Here the added account is a fixed
-//! key (the 2026-04-28 shape), on both the sell leg (opens) and the buy leg (closes / exits).
+//! key (the 2026-04-28 shape), on both the sell leg (opens) and the buy leg (closes / exits). On
+//! the real curve since pump-final §6 (the v3 list), `pump_it::structure` shows a published extra
+//! appended to the `sell_v3` and `buy_v3` CPIs after the IDL's 17 accounts — a synthetic buyback
+//! past `rT` included — and ignored by pump.
 //!
 //! It shows: the change strands every exit (the mock's `ExtrasMismatch`); the Emergency multisig
 //! publishes the fixed account for the sell and buy kinds; opens and exits recover through the

@@ -9,8 +9,8 @@
 //! 2026-10-02 builds (`fork::PumpDeploy::Oct2026`, the slots `VENUE_GUARD_SLOTS_2026_10_03` names —
 //! the first with pump's v3 trades, which short.win's curve adapter needs; the 2026-09 builds have
 //! none) upgraded by the loader to the current builds' ELFs, with positions opened on the old
-//! builds and exited on the new ones, which latch curve opens until Emergency revalidates the
-//! loader's slots.
+//! builds and exited on the new ones — a synthetic exit past `rT` among them (pump-final §14
+//! T-LATCH) — which latch curve opens until Emergency revalidates the loader's slots.
 //!
 //! An upgrade here is a **real** one: the upgradeable loader's own `Upgrade` instruction, with a
 //! buffer holding the redeploy's dumped ELF (`fork::PumpDeploy::CURRENT`) and the program's real
@@ -79,6 +79,8 @@ use solana_signer::Signer;
 
 const SPL: PumpCoin = PumpCoin::Legacy115;
 const T22: PumpCoin = PumpCoin::T22_115;
+/// The 151-byte curve near completion (the synthetic exit across the upgrade).
+const NEAR: PumpCoin = PumpCoin::Near;
 
 /// The ProgramData sizes of ARCH §6.5 [V9].
 const PUMP_PROGRAM_DATA_LEN: usize = 10_485_760;
@@ -836,12 +838,16 @@ fn one_upgrade_per_slot() {
 /// 132,080 lamports of growth out of `S` — and the loader's own `Upgrade` installs the current
 /// builds' ELFs (`PumpDeploy::CURRENT`: pump 2026-10-13, PumpSwap 2026-10-08, pump-fees
 /// 2026-10-12) in mainnet's order (PumpSwap, pump, pump-fees). The programs answer as the new
-/// builds. Flagged by anyone, they refuse opens on both curve markets, while a top-up, a close, a
+/// builds. Flagged by anyone, they refuse opens on every curve market, while a top-up, a close, a
 /// liquidation after a real pump and an expiry run on the new pump by `buy_v3` — whose buybacks
 /// grow the curves to 166 bytes, the Token-2022 one for another 127,000 lamports of rent, which
-/// I13 re-quotes on the build pump's ProgramData holds (`PumpDeploy::held`). Only the loader's
-/// slots revalidate, all three before a curve opens again; then opens land on the redeploy.
-/// (T-LATCH's synthetic exit across the upgrade is P3's.)
+/// I13 re-quotes on the build pump's ProgramData holds (`PumpDeploy::held`). A third market on the
+/// near-complete 151-byte curve carries a position opened on the 2026-10-02 build (whose `buy_v3`
+/// cannot buy past `rT`, T-PUMP-MATH-V3 (g)); after the upgrade the crowd leaves `rT = q/2` and
+/// its close is a **synthetic** exit on the new pump (pump-final §5.2: `rT` on the curve, `q − rT`
+/// from the would-be pool, `PumpMigrating` in the same instruction), latched or not. Only the
+/// loader's slots revalidate, all three before a curve opens again; then opens land on the
+/// redeploy.
 #[test]
 fn the_2026_10_08_pump_redeploys_latch_until_revalidated() {
     // The fork as of 2026-10-03: the 2026-10-02 builds, the baseline the program constant names.
@@ -855,6 +861,7 @@ fn the_2026_10_08_pump_redeploys_latch_until_revalidated() {
     env.load_pump_statics();
     let spl_curve = env.load_pump_coin(SPL);
     let t22_curve = env.load_pump_coin(T22);
+    let near_curve = env.load_pump_coin(NEAR);
     env.set_pump_rent();
     env.set_pump_clock();
     let old = |program: PumpProgram| VENUE_GUARD_SLOTS_2026_10_03[usize::from(program.guard())];
@@ -885,6 +892,8 @@ fn the_2026_10_08_pump_redeploys_latch_until_revalidated() {
         add_market(&mut env, t22_curve),
     ];
     let [(spl, qs), (t22, qt)] = &markets;
+    let (near, qn) = add_market(&mut env, near_curve);
+    let (b_syn, n_syn) = open_ok(&mut env, &near, qn);
     let curve_len =
         |env: &Env, pm: &PumpMarket| read::account(&env.svm, &pm.curve.curve).unwrap().data.len();
     // The Token-2022 curve's rent reserve held at `minimum_balance(115)` (the dump's is
@@ -964,6 +973,7 @@ fn the_2026_10_08_pump_redeploys_latch_until_revalidated() {
     for (pm, q) in &markets {
         assert_err(&try_open(&mut env, pm, *q), E::VenueUpgraded);
     }
+    assert_err(&try_open(&mut env, &near, qn), E::VenueUpgraded);
 
     // Exits never read the latch (I10), and buy back on the new pump: a top-up, a close on the
     // Token-2022 curve (its buyback grows it to 166 bytes) ...
@@ -988,6 +998,39 @@ fn the_2026_10_08_pump_redeploys_latch_until_revalidated() {
         reserve(&env, t22),
         rent(&env, PumpDeploy::CURRENT.curve_len()),
         "the redeploy's growth, 127,000 more, out of the buyback (I13 re-quotes it)"
+    );
+    // ... a synthetic close on the near-complete curve: the crowd leaves `rT = q/2`, the close's
+    // `buy_v3(q)` completes the curve past `rT` on the new pump (the 2026-10-02 build could not) ...
+    let u = CurveUser::new(&mut env, &near.curve);
+    let rt = near.curve.state(&env.svm).real_token_reserves;
+    ok(u.buy(&mut env, &near.curve, rt - qn / 2, u64::MAX));
+    env.warp(1);
+    let vault0 = read::token_amount(&env.svm, &near.keys.pool_vault).unwrap();
+    let meta = ok(env.close(&near, &b_syn, n_syn));
+    let c: Close = events::one(&meta);
+    assert_eq!(c.q, qn);
+    assert_eq!(
+        read::token_amount(&env.svm, &near.keys.pool_vault).unwrap() - vault0,
+        qn
+    );
+    assert_eq!(
+        fork::pump_post_complete_buy_events(&meta).len(),
+        1,
+        "a pool part"
+    );
+    let s = near.curve.state(&env.svm);
+    assert!(
+        s.complete && s.post_complete_base_out == qn - qn / 2,
+        "pcB = q − rT"
+    );
+    assert_eq!(
+        env.market(&near.market()).venue_kind(),
+        Some(shortwin::state::VenueKind::PumpMigrating)
+    );
+    assert_eq!(
+        env.venue_guard().upgraded,
+        GUARD_MASK_PUMP_CURVE,
+        "still latched"
     );
     // ... a liquidation after a real pump on the SPL Token curve ...
     let vault0 = read::token_amount(&env.svm, &spl.keys.pool_vault).unwrap();

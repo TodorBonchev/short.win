@@ -311,6 +311,85 @@ fn extras_on_the_sell_leg_ride_along_and_a_hostile_set_is_bypassed() {
     assert_eq!(prev.s, plain.s, "previous: the harmless set");
 }
 
+/// T-REPLAY on the v3 list (pump-final §14; A41, V2-6; the additive-account shape of pump's
+/// 2026-04-28 change, which `replay_0428_it` replays against the mock's `required_extras`): the
+/// Emergency publishes a fixed extra on the curve's **buy** leg and a close selects `current`:
+/// short.win appends it to the `buy_v3` CPI after the IDL's 17 accounts (the plain close's list
+/// plus the extra last), pump ignores the trailing account, and the close costs what the same
+/// close without extras costs, from the same state — a plain buyback on a 115-byte curve, and a
+/// synthetic one past `rT` on the near-complete curve (the crowd left `rT = q/2`; the same
+/// `buy_v3` completes the curve, pump's `PostCompleteBuyEvent` with it).
+#[test]
+fn extras_on_the_buy_leg_ride_along_on_buy_v3() {
+    use shortwin::venues::EXTRAS_SET_CURRENT;
+    for (coin, synthetic) in [(PumpCoin::T22_115, false), (PumpCoin::Near166, true)] {
+        let (mut env, pm, q) = setup(coin);
+        let mut b = env.borrower();
+        let (_, nonce, _) = open_ok(&mut env, &pm, &mut b, q);
+        env.tick(&pm, 2);
+        if synthetic {
+            buy_down_to(&mut env, &pm, q / 2);
+        }
+        env.warp(1);
+        let extra = env.funded_keypair().pubkey();
+        let ea = env.pause_authority.insecure_clone();
+        let publish = shortwin_litesvm_tests::engine::set_venue_extras_ix(
+            &ea.pubkey(),
+            VenueKind::PumpCurve as u8,
+            shortwin::state::EXTRAS_IX_BUY as u8,
+            vec![fixed_extra(extra)],
+        );
+        ok(env.send(&[publish], &[&ea]));
+        let seed =
+            AccountMeta::new_readonly(pda::venue_extras_seed(VenueKind::PumpCurve as u8), false);
+        let harmless = [seed, AccountMeta::new_readonly(extra, false)];
+        let saved = env.svm.clone();
+        let close = |sel: u8, extras: &[AccountMeta]| {
+            let sel = ExtrasSel {
+                set: sel,
+                bumps: [0; 4],
+            };
+            with_cu_limit(
+                &pm,
+                close_short_ix(&pm, &b.key(), nonce, u64::MAX, sel, extras),
+            )
+        };
+        let ixs = close(ExtrasSel::NONE.set, &[]);
+        let meta = ok(env.send(&ixs, &[&b.kp]));
+        let plain: Close = events::one(&meta);
+        let plain_cpi = curve_leg_cpi_accounts(&env, &ixs, &meta);
+        assert_eq!(
+            plain_cpi.len(),
+            shortwin::venues::pump_curve::TRADE_CPI_ORDER.len(),
+            "the IDL's 17 accounts"
+        );
+        let pool_parts = fork::pump_post_complete_buy_events(&meta).len();
+        assert_eq!(pool_parts, usize::from(synthetic));
+        env.svm = saved;
+        let ixs = close(EXTRAS_SET_CURRENT, &harmless);
+        let meta = ok(env.send(&ixs, &[&b.kp]));
+        let with: Close = events::one(&meta);
+        let with_cpi = curve_leg_cpi_accounts(&env, &ixs, &meta);
+        assert_eq!(
+            with_cpi.split_last(),
+            Some((&extra, plain_cpi.as_slice())),
+            "{coin:?}: buy_v3 carries the extra last"
+        );
+        assert_eq!(
+            (with.q, with.buyback_cost, with.b_live),
+            (plain.q, plain.buyback_cost, plain.b_live),
+            "{coin:?}: the same buyback"
+        );
+        assert_eq!(fork::pump_post_complete_buy_events(&meta).len(), pool_parts);
+        if synthetic {
+            assert_eq!(
+                market(&env, &pm).venue_kind(),
+                Some(VenueKind::PumpMigrating)
+            );
+        }
+    }
+}
+
 /// M10 batch 3 on the curve (ARCH §2.4 rule 4; `engine::pool_and_borrower_denied_extras`): the
 /// bonding curve (its SOL reserve), its base ATA and its quote ATA — and, on the keeper exits, the
 /// position's borrower — each published as a fixed extra, are `DeniedAccount` on `open_short`,

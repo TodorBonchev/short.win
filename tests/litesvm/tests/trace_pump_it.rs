@@ -10,7 +10,8 @@
 //!   `crank_price` (roll and record; `PumpCurve → PumpMigrating`, `PumpMigrating → None`,
 //!   `None → PumpCurve`), `open_short` (a wallet's first open, a repeat borrower, with
 //!   normalisation, with a short curve's growth), `close_short` (plain, normalising, a completing
-//!   buyback, a synthetic completion above `rT`), `liquidate`, `expire`, `sol_settle` (no-op; S3
+//!   buyback, a synthetic completion above `rT`), `liquidate` and `expire` (each also a synthetic
+//!   completion above `rT`), `sol_settle` (no-op; S3
 //!   on `PumpMigrating` and on `None`), `sweep_trader`'s token leg, `flag_venue_upgraded` and
 //!   `revalidate_venue`. Every curve leg is one pump CPI at height 2 (`sell_v3` / `buy_v3`,
 //!   pump-final §6.1) whose token, System and event CPIs sit at height 3, the peak: short.win
@@ -20,7 +21,8 @@
 //! - **Worst-case transactions** (ComputeBudget included): the largest open and close, an atomic
 //!   sandwich of an open with the curve's own trades, the most opens of one wallet in one
 //!   transaction, a batch of four cranks that all move their market to `PumpMigrating`, the
-//!   keeper's `[crank, liquidate | expire | sol_settle S3]`, the three pump latch flags — each ≤ 64
+//!   keeper's `[crank, liquidate | expire | sol_settle S3]` (the exits also past `rT`), the three
+//!   pump latch flags — each ≤ 64
 //!   (`MAX_INSTRUCTION_TRACE_LENGTH`); one open more is refused by the runtime itself.
 //!
 //! Figures against ARCH §6.2's curve column (open 9 + 1 + 2 = 12, ≤ 15; exits 11 + 1 = 12,
@@ -448,6 +450,77 @@ fn expired(coin: PumpCoin) -> (Env, PumpMarket, Borrower, u64, Keypair) {
     env.warp(deadline + 1 - now);
     env.tick(&pm, 3);
     let keeper = env.funded_keypair();
+    (env, pm, b, nonce, keeper)
+}
+
+/// pump `Global`'s initial reserves (`vT`, `vQ`, `rT`: ECON's `PumpCurve.at_progress(0)`).
+const PUMP_VT0: u64 = 1_073_000_000_000_000;
+const PUMP_VS0: u64 = 30_000_000_000;
+const PUMP_RT0: u64 = 793_100_000_000_000;
+/// ECON's `D@80%` market (`synthetic_exit_it`'s T-SYNTH-2): the tokens the fresh curve sold.
+const D80_SOLD: u64 = 634_480_000_000_000;
+
+/// The keeper's simulated `[crank, exit]` retried every second (cranked when not yet) until it
+/// succeeds; the clock at that second, uncranked.
+fn until_exit(
+    env: &mut Env,
+    pm: &PumpMarket,
+    keeper: &Keypair,
+    exit: &Instruction,
+    max_s: usize,
+) -> bool {
+    for _ in 0..max_s {
+        env.warp(1);
+        let ixs = [
+            pump::cu_limit_ix(pump::CURVE_KEEPER_EXIT_CU),
+            crank_price_ix(pm),
+            exit.clone(),
+        ];
+        if simulate(env, &ixs, &[keeper]).is_some() {
+            return true;
+        }
+        env.crank(pm);
+    }
+    false
+}
+
+/// A position past `rT` the keeper liquidates (T-SYNTH-2's path): ECON's `D@80%` market (the fresh
+/// curve at pump's initial reserves, the crowd's `buy_v2` of 80 % of `rT₀`), a position of `vT/200`
+/// 30 cranked seconds old, the crowd leaving `rT = q/2` (the price × 2.4); liquidatable at the
+/// returned, uncranked second.
+fn liquidatable_synthetic() -> (Env, PumpMarket, Borrower, u64, Keypair) {
+    let (mut env, c) = Env::fork_pump_coin(PumpCoin::Fresh);
+    fork::set_curve_reserves(&mut env.svm, &c.curve, PUMP_VT0, PUMP_VS0, PUMP_RT0, 0);
+    let crowd = CurveUser::new(&mut env, &c);
+    env.fund(&crowd.kp.pubkey(), 2_000_000_000_000);
+    ok(crowd.buy(&mut env, &c, D80_SOLD, u64::MAX));
+    let (pm, q) = add_market(&mut env, c);
+    let mut b = env.borrower();
+    let (res, nonce) = env.open(&pm, &mut b, q);
+    ok(res);
+    env.tick(&pm, 30);
+    buy_down_to(&mut env, &pm.curve, q / 2);
+    let keeper = env.funded_keypair();
+    let liq = liquidate_ix(&pm, &keeper.pubkey(), &b.key(), nonce);
+    assert!(
+        until_exit(&mut env, &pm, &keeper, &liq, 900),
+        "never liquidatable"
+    );
+    (env, pm, b, nonce, keeper)
+}
+
+/// An expired position past `rT` on the near-complete curve: three cranked seconds past its
+/// deadline the crowd leaves `rT = q/2`; the keeper's `[crank, expire]` succeeds at the returned,
+/// uncranked second (the EMA has followed).
+fn expired_synthetic() -> (Env, PumpMarket, Borrower, u64, Keypair) {
+    let (mut env, pm, b, nonce, keeper) = expired(NEAR);
+    let q = env.position(&pm, &b.key(), nonce).q;
+    buy_down_to(&mut env, &pm.curve, q / 2);
+    let exp = expire_ix(&pm, &keeper.pubkey(), &b.key(), nonce);
+    assert!(
+        until_exit(&mut env, &pm, &keeper, &exp, 600),
+        "never expired"
+    );
     (env, pm, b, nonce, keeper)
 }
 
@@ -881,9 +954,32 @@ fn close_short() {
     assert_eq!((entries(&meta, 1), peak(&meta)), (15, 3));
 }
 
-/// A liquidation after a real pump and an expiry at the deadline: the exit shape (9).
+/// A liquidation after a real pump and an expiry at the deadline: the exit shape (9); past `rT`
+/// (ECON's D@80 % position liquidated, an expiry on the near-complete curve) the synthetic
+/// completion's (12; pump-final §6.6).
 #[test]
 fn liquidate_and_expire() {
+    let (mut env, pm, b, nonce, keeper) = liquidatable_synthetic();
+    env.crank(&pm);
+    let ixs = keeper_tx(liquidate_ix(&pm, &keeper.pubkey(), &b.key(), nonce));
+    let meta = send(&mut env, &ixs, &[&keeper]);
+    let _: Liquidate = events::one(&meta);
+    assert_eq!(fork::pump_post_complete_buy_events(&meta).len(), 1);
+    let s = shown(&env, "liquidate (synthetic)", &ixs, &meta, 1);
+    assert_eq!(s, exit_shape(false, Buy::Synthetic), "{s:?}");
+    assert_eq!(pump_calls(&s), 1);
+    assert_eq!((entries(&meta, 1), peak(&meta)), (12, 3));
+
+    let (mut env, pm, b, nonce, keeper) = expired_synthetic();
+    env.crank(&pm);
+    let ixs = keeper_tx(expire_ix(&pm, &keeper.pubkey(), &b.key(), nonce));
+    let meta = send(&mut env, &ixs, &[&keeper]);
+    let _: Expire = events::one(&meta);
+    assert_eq!(fork::pump_post_complete_buy_events(&meta).len(), 1);
+    let s = shown(&env, "expire (synthetic)", &ixs, &meta, 1);
+    assert_eq!(s, exit_shape(false, Buy::Synthetic), "{s:?}");
+    assert_eq!((entries(&meta, 1), peak(&meta)), (12, 3));
+
     for coin in VARIANTS {
         let (mut env, pm, b, nonce, keeper) = liquidatable(coin);
         env.crank(&pm);
@@ -1173,11 +1269,39 @@ fn a_crank_batch_of_four_transitions() {
     }
 }
 
-/// The keeper's exits with their crank: `[CB×2, crank, liquidate | expire]` (2 + 2 + 9),
-/// `[CB×2, crank, sol_settle S3]` on `PumpMigrating` and on `None` (2 + 2 + 2); the latch duty
-/// (§7.1 duty 10): the three pump programs flagged in one transaction (2 + 3·2).
+/// The keeper's exits with their crank: `[CB×2, crank, liquidate | expire]` (2 + 2 + 9; past `rT`,
+/// a synthetic completion, 2 + 2 + 12), `[CB×2, crank, sol_settle S3]` on `PumpMigrating` and on
+/// `None` (2 + 2 + 2); the latch duty (§7.1 duty 10): the three pump programs flagged in one
+/// transaction (2 + 3·2).
 #[test]
 fn worst_case_keeper_transactions() {
+    let (mut env, pm, b, nonce, keeper) = liquidatable_synthetic();
+    let ixs = with_cb(vec![
+        crank_price_ix(&pm),
+        liquidate_ix(&pm, &keeper.pubkey(), &b.key(), nonce),
+    ]);
+    let n = worst(
+        &mut env,
+        "CB×2 + crank + liquidate (synthetic)",
+        &ixs,
+        &[&keeper],
+        3,
+    );
+    assert_eq!(n, 2 + 2 + 12);
+    let (mut env, pm, b, nonce, keeper) = expired_synthetic();
+    let ixs = with_cb(vec![
+        crank_price_ix(&pm),
+        expire_ix(&pm, &keeper.pubkey(), &b.key(), nonce),
+    ]);
+    let n = worst(
+        &mut env,
+        "CB×2 + crank + expire (synthetic)",
+        &ixs,
+        &[&keeper],
+        3,
+    );
+    assert_eq!(n, 2 + 2 + 12);
+
     for coin in VARIANTS {
         let (mut env, pm, b, nonce, keeper) = liquidatable(coin);
         let ixs = with_cb(vec![

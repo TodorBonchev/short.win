@@ -31,8 +31,11 @@
 //!
 //! **Crank batches**: the largest `k` whose v0 batch fits, on the four live curves of the dump,
 //! executed as one transaction (at least the keeper's v0 batch of 4, ARCH §7.1 duty 7). Also
-//! measured: the keeper's composite `ComputeBudget ×2 + crank_price + liquidate` (ARCH §6.2) and an
-//! exit carrying a Jito tip transfer (duty 3's bundle path).
+//! asserted (pump-final §6.6: the v3 TradeExtras are 10 keys, the v2 list's 20 did not fit): the
+//! keeper's composite `ComputeBudget ×2 + crank_price + liquidate` (ARCH §6.2), a liquidation
+//! carrying a Jito tip transfer (duty 3's bundle path) and the tipped composite, each with the
+//! largest extras set; and the synthetic exits past `rT` (a client close; the keeper's tipped
+//! `[crank_price, expire]`), executed through the tables.
 //!
 //! Run with `-- --nocapture` for the table.
 
@@ -289,18 +292,6 @@ fn assert_fits_unsigned(what: &str, env: &Env, ixs: &[Instruction]) {
         assert!(size <= TX_MAX, "{what} through {}: {size} B", alt.name);
         assert!(keys <= ACCOUNTS_MAX, "{what}: {keys} accounts");
     }
-}
-
-/// Measures `ixs` (with the compute budget) through both tables without asserting a fit;
-/// returns the separate-payer sizes (bytes, accounts) through (a) and (b).
-fn sizes(env: &Env, signer: &Keypair, ixs: &[Instruction]) -> [(usize, usize); 2] {
-    let all = with_budget(ixs);
-    let bh = env.svm.latest_blockhash();
-    let t = tables(&env.svm);
-    [
-        measure(&v0_tx(&env.payer, &[signer], &all, &t[0], bh)),
-        measure(&v0_tx(&env.payer, &[signer], &all, &t[1], bh)),
-    ]
 }
 
 /// Sends `ixs` (with the compute budget) as a v0 transaction through `alt` (installed in the VM),
@@ -677,27 +668,31 @@ fn every_curve_transaction_fits_and_executes_through_the_protocol_alt() {
             &keeper,
             std::slice::from_ref(&liq),
         );
-        let composite = sizes(&env, &keeper, &[crank_price_ix(&pm), liq.clone()]);
-        let tipped = sizes(
+        // pump-final §6.6: the v3 TradeExtras (10 keys, 4 fewer inline and 6 fewer table keys
+        // than v2's 20) bring the keeper's composite, the tipped liquidation and the tipped
+        // composite with the largest extras set within v0 (ARCH:1868 measured 1,223 B and
+        // 1,278 B for the first two on the v2 list).
+        assert_fits(
+            "crank_price + liquidate (4 extras; keeper composite)",
+            &env,
+            &keeper,
+            &[crank_price_ix(&pm), liq.clone()],
+        );
+        assert_fits(
+            "liquidate (4 extras) + Jito tip transfer",
             &env,
             &keeper,
             &[liq.clone(), tip_transfer(&keeper.pubkey(), 1)],
         );
-        println!(
-            "  {:<52} A28 {} B / {} accounts; build-alt {} B / {} accounts",
-            "crank_price + liquidate (4 extras; keeper composite)",
-            composite[0].0,
-            composite[0].1,
-            composite[1].0,
-            composite[1].1
-        );
-        println!(
-            "  {:<52} A28 {} B / {} accounts; build-alt {} B / {} accounts",
-            "liquidate (4 extras) + Jito tip transfer",
-            tipped[0].0,
-            tipped[0].1,
-            tipped[1].0,
-            tipped[1].1
+        assert_fits(
+            "crank_price + liquidate (4 extras) + Jito tip",
+            &env,
+            &keeper,
+            &[
+                crank_price_ix(&pm),
+                liq.clone(),
+                tip_transfer(&keeper.pubkey(), 1),
+            ],
         );
         // Without extras (the keeper's normal case) both fit through either table.
         let plain = liquidate_x(&pm, &keeper.pubkey(), &b3.key(), n3, ExtrasSel::NONE, &[]);
@@ -894,6 +889,113 @@ fn migration_paths_fit_and_execute_through_the_protocol_alt() {
         }
     }
     assert!(settled, "S3 on the graduated-elsewhere market");
+}
+
+/// `simulate_transaction` of `ixs` with the compute budget, paid by the harness payer (nothing is
+/// committed): whether it would succeed.
+fn would_land(env: &Env, ixs: &[Instruction], signers: &[&Keypair]) -> bool {
+    let all = with_budget(ixs);
+    let mut keys: Vec<&Keypair> = vec![&env.payer];
+    keys.extend(signers.iter().copied());
+    let tx = solana_transaction::Transaction::new_signed_with_payer(
+        &all,
+        Some(&env.payer.pubkey()),
+        &keys,
+        env.svm.latest_blockhash(),
+    );
+    env.svm.simulate_transaction(tx).is_ok()
+}
+
+/// Synthetic exits past `rT` (pump-final §5.2, §6.6, §12's T-SIZE of the keeper's v3 exits): on the
+/// near-complete curve the crowd leaves `rT = q/2`, and the exit's `buy_v3(q)` buys `rT` on the
+/// curve and `q − rT` from the would-be pool. Its accounts are the ordinary exit's (the same 17 of
+/// `buy_v3`), so it fits as any exit does; executed through the tables with the largest extras set:
+/// a client close through (a), and — on a second fork, past the deadline — the keeper's tipped
+/// `[crank_price, expire]` through (b), the largest keeper transaction. Each completes the curve
+/// (`PumpMigrating` in the instruction, pump's `PostCompleteBuyEvent`).
+#[test]
+fn synthetic_exits_fit_and_execute_through_the_protocol_alt() {
+    // The client's synthetic close.
+    let (mut env, c) = Env::fork_pump_coin(NEAR);
+    let (pm, q) = add_market(&mut env, c);
+    let [a, b] = install_tables(&mut env);
+    let (sel, extras) = worst_extras(&mut env);
+    let mut bo = env.borrower();
+    env.warp(1);
+    ok(send_v0_hooked(
+        &mut env,
+        &[open_x(&pm, &bo, q, sel, &extras)],
+        &[&bo.kp],
+        &b,
+    ));
+    let n = bo.next_nonce;
+    bo.next_nonce += 1;
+    env.tick(&pm, 2);
+    let u = CurveUser::new(&mut env, &pm.curve);
+    let rt = pm.curve.state(&env.svm).real_token_reserves;
+    ok(u.buy(&mut env, &pm.curve, rt - q / 2, u64::MAX));
+    env.warp(1);
+    let close = close_short_ix(&pm, &bo.key(), n, u64::MAX, sel, &extras);
+    assert_fits(
+        "close_short past rT (synthetic; 4 extras)",
+        &env,
+        &bo.kp,
+        std::slice::from_ref(&close),
+    );
+    let meta = ok(send_v0_hooked(&mut env, &[close], &[&bo.kp], &a));
+    let ev: Close = one(&meta);
+    assert_eq!(ev.q, q);
+    assert_eq!(fork::pump_post_complete_buy_events(&meta).len(), 1);
+    let ev: VenueStateChanged = one(&meta);
+    assert_eq!(ev.to, VenueKind::PumpMigrating as u8);
+
+    // The keeper's tipped synthetic expiry.
+    let (mut env, c) = Env::fork_pump_coin(NEAR);
+    let (pm, q) = add_market(&mut env, c);
+    let [_, b] = install_tables(&mut env);
+    let (sel, extras) = worst_extras(&mut env);
+    let mut bo = env.borrower();
+    let (res, n) = env.open(&pm, &mut bo, q);
+    ok(res);
+    let keeper = env.funded_keypair();
+    let deadline = env.position(&pm, &bo.key(), n).deadline;
+    let now = env.now();
+    env.warp(deadline + 1 - now);
+    env.tick(&pm, 3);
+    let u = CurveUser::new(&mut env, &pm.curve);
+    let rt = pm.curve.state(&env.svm).real_token_reserves;
+    ok(u.buy(&mut env, &pm.curve, rt - q / 2, u64::MAX));
+    let exit = || {
+        [
+            crank_price_ix(&pm),
+            expire_x(&pm, &keeper.pubkey(), &bo.key(), n, sel, &extras),
+            tip_transfer(&keeper.pubkey(), 1_000_000),
+        ]
+    };
+    assert_fits(
+        "crank_price + expire past rT (4 extras) + Jito tip",
+        &env,
+        &keeper,
+        &exit(),
+    );
+    let mut landed = None;
+    for _ in 0..600 {
+        env.warp(1);
+        if would_land(&env, &exit(), &[&keeper]) {
+            landed = Some(ok(send_v0_hooked(&mut env, &exit(), &[&keeper], &b)));
+            break;
+        }
+        env.crank(&pm);
+    }
+    let meta = landed.expect("the synthetic expiry lands");
+    let ev: Expire = one(&meta);
+    assert!(ev.buyback_cost > 0);
+    assert_eq!(fork::pump_post_complete_buy_events(&meta).len(), 1);
+    assert!(pm.curve.state(&env.svm).complete);
+    assert_eq!(
+        env.market(&pm.market()).venue_kind(),
+        Some(VenueKind::PumpMigrating)
+    );
 }
 
 /// Crank batches (ARCH §6.4 table, §7.1 duty 7): the four live curves of the dump. Every batch
