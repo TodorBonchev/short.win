@@ -43,7 +43,6 @@ import {
     PUMP_FEE_CONFIG,
     PUMP_FEES_PROGRAM,
     PUMP_GLOBAL,
-    PUMP_GLOBAL_VOLUME_ACCUMULATOR,
     PUMP_PROGRAM,
     RAY_CACHE,
     RAYDIUM_CPMM_AUTHORITY,
@@ -61,7 +60,6 @@ import {
     pammLpMint,
     pammPoolV2,
     pammUserVolumeAccumulator,
-    pumpCreatorVault,
     venueExtras as venueExtrasPda,
     wsolAta,
 } from './pda.ts';
@@ -303,6 +301,12 @@ export class VenueError extends Error {
     }
 }
 
+/**
+ * A `PumpCurve` trade's TradeExtras T0–T9 for pump's v3 trades (pump-final §6.1.1; the keeper's
+ * `pump_trade_extras`): W at T4–T8. T7 is a buyback recipient of the live `Global`; v3 names no fee
+ * recipient, creator vault or pump-fees account. T5 is the market's cached trader WSOL ATA, else
+ * derived (`pump_curve::trader_wsol_ata`).
+ */
 async function pumpTradeExtras(
     m: MarketKeys,
     read: readonly (RawAccount | null)[],
@@ -314,34 +318,17 @@ async function pumpTradeExtras(
     const curve = c ? value(readCurve(c.owner, c.data)) : null;
     if (!global) throw new VenueError('NoRoute', 'pump Global not read');
     if (!curve) throw new VenueError('NoRoute', 'bonding curve not read');
-    const fee = recipient(global.feeRecipients, pick(global.feeRecipients, m));
     const buyback = recipient(global.buybackFeeRecipients, pick(global.buybackFeeRecipients, m));
-    const vault = curve.creator === m.cachedCreator ? m.cachedCreatorVault : await pumpCreatorVault(curve.creator);
-    const [feeAta, buybackAta, traderWsolAta, vaultAta] = await Promise.all([
-        wsolAta(fee),
-        wsolAta(buyback),
-        wsolAta(m.trader),
-        wsolAta(vault),
-    ]);
+    const traderWsolAta = m.traderWsolAta !== DEFAULT_KEY ? m.traderWsolAta : await wsolAta(m.trader);
     return [
         meta(PUMP_PROGRAM, false),
         meta(PUMP_EVENT_AUTHORITY, false),
-        meta(PUMP_FEES_PROGRAM, false),
         meta(WSOL_MINT, false),
         meta(TOKEN_PROGRAM, false),
-        meta(ASSOCIATED_TOKEN_PROGRAM, false),
-        meta(fee, true),
-        meta(feeAta, true),
-        meta(buyback, true),
-        meta(buybackAta, true),
         meta(m.curveQuoteAta, true),
         meta(traderWsolAta, true),
-        meta(vault, true),
-        meta(vaultAta, true),
-        meta(m.sharingConfig, false),
-        meta(PUMP_GLOBAL_VOLUME_ACCUMULATOR, false),
         meta(m.pumpUva, true),
-        meta(m.pumpUvaQuoteAta, true),
+        meta(buyback, true),
         meta(m.traderBaseAta, true),
         meta(SYSTEM_PROGRAM, false),
     ];

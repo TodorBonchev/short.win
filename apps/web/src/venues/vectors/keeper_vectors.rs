@@ -354,8 +354,9 @@ fn main() {
     }
 
     // Pump curve: the `fresh` fixture coin, listed (the program's own cache writers), the live
-    // `Global` and the curve as dumped; then the same market whose cached creator differs from
-    // the live curve's (the creator vault re-derived, R-PUMP §8).
+    // `Global` and the curve as dumped — pump v3's 10-key list (pump-final §6.1.1); then the same
+    // market whose cached creator differs from the live curve's (v3 names no creator vault: the
+    // same list).
     let fresh_mint = pk("4mNDC2YAJRWsnbC1mS4KkiLbUorVwLJ7PBsJX7Vzpump");
     let mut curve_m = base_market(fresh_mint, pk(TOKEN_2022));
     curve_m.bonding_curve = pk("6mXpsJNUoaGpPmdHKhtwcAoUqDS6KzsHL6dwTryCMG8v");

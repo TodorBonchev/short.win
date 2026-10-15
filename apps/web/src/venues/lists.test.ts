@@ -124,11 +124,12 @@ describe('venue account lists = the keeper venue.rs', () => {
         const seen = new Set<string>();
         for (let i = 0; i < 24; i++) {
             const x = await tradeExtras('pump_curve', m, read);
-            seen.add(x[6]?.address ?? '');
+            // T7, the buyback recipient of pump v3's list (pump-final §6.1.1).
+            seen.add(x[7]?.address ?? '');
         }
         const global = JSON.parse(readRepo('tests/fixtures/manifest.json')).accounts.find(
             (a: { name: string }) => a.name === 'pump_global',
-        ).decoded.fee_recipients as string[];
+        ).decoded.buyback_fee_recipients as string[];
         for (const k of seen) expect(global).toContain(k);
         expect(seen.size).toBeGreaterThan(1);
     });
