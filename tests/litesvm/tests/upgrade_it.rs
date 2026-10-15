@@ -8,7 +8,8 @@
 //! and was not verified). It trades the curve with `sell_v2` / `buy_v2` and the 20-key v2-era
 //! TradeExtras (`pump::v2_trade_extras`); the build under test with `sell_v3` / `buy_v3` and 10.
 //!
-//! **The upgrade is the loader's own**: `ExtendProgram` of short.win's ProgramData to the new ELF's
+//! **The upgrade is the loader's own** (`Env::upgrade_shortwin`, shared with the keeper-litesvm
+//! `upgrade_window` scenario): `ExtendProgram` of short.win's ProgramData to the new ELF's
 //! size (the build under test is 25,808 bytes longer), one slot later a buffer holding the new ELF
 //! under the upgrade authority, then `Upgrade` signed by that authority (`Env::upgrade_authority`,
 //! a real signature) — what Governance's vault transaction executes after its time lock (§15: at
@@ -37,53 +38,12 @@
 #[path = "pump_curve_support.rs"]
 mod support;
 
-use anchor_lang::solana_program::bpf_loader_upgradeable;
+use shortwin_litesvm_tests::env::{
+    SHORTWIN_1_0_0_EXECUTABLE_HASH, SHORTWIN_1_0_0_LEN, shortwin_1_0_0_so, trimmed_elf,
+};
 use shortwin_litesvm_tests::fixtures::MarketKeys;
-use shortwin_venue_state::program_data;
 use solana_account::Account;
 use support::*;
-
-/// AUDIT.md §0: the verified 1.0.0 `shortwin.so` — the file's sha256, its trimmed ELF's (the
-/// executable hash `solana-verify get-program-hash` and verify.osec.io compare), its length.
-const V1_0_0_SHA256: &str = "4d19c582f399f4a217a6d24725ad5dc3cb6b6308ff346a8f24312d41a01c1f75";
-const V1_0_0_EXECUTABLE_HASH: &str =
-    "52a29a5155503e56f1592a722651925b6f5bd55fdf1e8f2b1bc3be35eb78186b";
-const V1_0_0_LEN: usize = 1_609_616;
-
-/// `SysvarRent111111111111111111111111111111111`.
-const SYSVAR_RENT: Pubkey = Pubkey::from_str_const("SysvarRent111111111111111111111111111111111");
-/// `SysvarC1ock11111111111111111111111111111111`.
-const SYSVAR_CLOCK: Pubkey = Pubkey::from_str_const("SysvarC1ock11111111111111111111111111111111");
-
-/// `elf` without its trailing zero bytes (what the executable hash covers).
-fn trimmed(elf: &[u8]) -> &[u8] {
-    let end = elf.iter().rposition(|&b| b != 0).map_or(0, |i| i + 1);
-    &elf[..end]
-}
-
-/// The 1.0.0 fixture's path, its bytes checked against AUDIT.md §0.
-fn v1_0_0_so() -> std::path::PathBuf {
-    let path = fork::fixtures_dir().join("shortwin/shortwin_1_0_0.so");
-    let elf = std::fs::read(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    assert_eq!(elf.len(), V1_0_0_LEN);
-    assert_eq!(
-        fork::sha256_hex(&elf),
-        V1_0_0_SHA256,
-        "the fixture is AUDIT's verified 1.0.0 build"
-    );
-    assert_eq!(fork::sha256_hex(trimmed(&elf)), V1_0_0_EXECUTABLE_HASH);
-    path
-}
-
-/// The trimmed ELF sha256 short.win's ProgramData holds now.
-fn deployed_hash(env: &Env) -> String {
-    let pd = env
-        .svm
-        .get_account(&pda::program_data())
-        .expect("ProgramData");
-    let elf = program_data::trimmed_elf(&pd.owner.to_bytes(), &pd.data).expect("a ProgramData");
-    fork::sha256_hex(elf)
-}
 
 /// A curve market as shortwin 1.0.0's clients and keeper address it: the same ReadSet, the
 /// v2-era TradeExtras T0–T19.
@@ -118,8 +78,12 @@ fn v2<'a>(env: &Env, pm: &'a PumpMarket) -> V2<'a> {
 /// guard slots), the current pump, PumpSwap and pump-fees builds and statics, the coins, mainnet's
 /// Rent and `near166`'s snapshot clock.
 fn fork_on_1_0_0(coins: &[PumpCoin]) -> (Env, Vec<PumpCurve>) {
-    let mut env = Env::with_program_so(&v1_0_0_so());
-    assert_eq!(deployed_hash(&env), V1_0_0_EXECUTABLE_HASH, "1.0.0 runs");
+    let mut env = Env::with_program_so(&shortwin_1_0_0_so());
+    assert_eq!(
+        env.deployed_shortwin_hash(),
+        SHORTWIN_1_0_0_EXECUTABLE_HASH,
+        "1.0.0 runs"
+    );
     let args = env.default_init_args();
     ok(env.initialize_config(args));
     env.load_pump_programs();
@@ -139,67 +103,6 @@ fn add_market(env: &mut Env, c: PumpCurve) -> (PumpMarket, u64) {
     let pm = env.pump_market_listed(PumpSpec::new(c.coin, q * 40), c);
     env.crank(&pm);
     (pm, q)
-}
-
-/// short.win's own upgrade to `elf` (module docs): `ExtendProgram` when the ProgramData is too
-/// small, one slot later the buffer and the loader's `Upgrade` signed by the upgrade authority.
-/// Returns the upgrade's slot; the clock is one second later (the new program is visible).
-fn upgrade_shortwin(env: &mut Env, elf: &[u8]) -> u64 {
-    let pd = pda::program_data();
-    let cap = env.svm.get_account(&pd).unwrap().data.len() - program_data::HEADER_LEN;
-    if elf.len() > cap {
-        let payer = env.funded_keypair();
-        let more = u32::try_from(elf.len() - cap).unwrap();
-        let ix = fork::extend_program_ix(&shortwin::ID, &payer.pubkey(), more);
-        ok(env.send(&[ix], &[&payer]));
-        env.warp(1);
-    }
-    let authority = env.upgrade_authority.insecure_clone();
-    let mut data = vec![1, 0, 0, 0, 1];
-    data.extend_from_slice(authority.pubkey().as_ref());
-    data.extend_from_slice(elf);
-    let buffer = Pubkey::new_unique();
-    let lamports = env.svm.minimum_balance_for_rent_exemption(data.len());
-    env.svm
-        .set_account(
-            buffer,
-            Account {
-                lamports,
-                data,
-                owner: bpf_loader_upgradeable::ID,
-                executable: false,
-                rent_epoch: 0,
-            },
-        )
-        .unwrap();
-    let spill = env.funded_keypair().pubkey();
-    let upgrade = Instruction {
-        program_id: bpf_loader_upgradeable::ID,
-        accounts: vec![
-            AccountMeta::new(pd, false),
-            AccountMeta::new(shortwin::ID, false),
-            AccountMeta::new(buffer, false),
-            AccountMeta::new(spill, false),
-            AccountMeta::new_readonly(SYSVAR_RENT, false),
-            AccountMeta::new_readonly(SYSVAR_CLOCK, false),
-            AccountMeta::new_readonly(authority.pubkey(), true),
-        ],
-        data: vec![3, 0, 0, 0],
-    };
-    let slot = env.clock().slot;
-    ok(env.send(&[upgrade], &[&authority]));
-    let header = {
-        let a = env.svm.get_account(&pd).unwrap();
-        program_data::read(&a.owner.to_bytes(), &a.data).expect("a ProgramData header")
-    };
-    assert_eq!(header.slot, slot, "the loader records the upgrade's slot");
-    assert_eq!(
-        header.upgrade_authority,
-        Some(authority.pubkey().to_bytes()),
-        "the authority is kept"
-    );
-    env.warp(1);
-    slot
 }
 
 /// `simulate_transaction` of `ixs` (nothing is committed): whether it would succeed.
@@ -298,13 +201,13 @@ fn v1_0_0_positions_close_and_liquidate_after_the_v3_upgrade() {
     // Governance's upgrade to the build under test.
     let new_elf = std::fs::read(shortwin_litesvm_tests::env::program_so_path()).unwrap();
     assert!(
-        new_elf.len() > V1_0_0_LEN,
+        new_elf.len() > SHORTWIN_1_0_0_LEN,
         "the ProgramData must grow first"
     );
-    upgrade_shortwin(&mut env, &new_elf);
+    env.upgrade_shortwin(&new_elf);
     assert_eq!(
-        deployed_hash(&env),
-        fork::sha256_hex(trimmed(&new_elf)),
+        env.deployed_shortwin_hash(),
+        fork::sha256_hex(trimmed_elf(&new_elf)),
         "the build under test runs"
     );
     assert_eq!(snapshot(&env, &kept), held, "the upgrade wrote no account");

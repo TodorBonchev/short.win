@@ -62,6 +62,40 @@ pub fn test_venue_so_path() -> PathBuf {
     )
 }
 
+/// AUDIT.md §0: the verified 1.0.0 `shortwin.so` — the file's sha256, its trimmed ELF's (the
+/// executable hash `solana-verify get-program-hash` and verify.osec.io compare), its length.
+pub const SHORTWIN_1_0_0_SHA256: &str =
+    "4d19c582f399f4a217a6d24725ad5dc3cb6b6308ff346a8f24312d41a01c1f75";
+pub const SHORTWIN_1_0_0_EXECUTABLE_HASH: &str =
+    "52a29a5155503e56f1592a722651925b6f5bd55fdf1e8f2b1bc3be35eb78186b";
+pub const SHORTWIN_1_0_0_LEN: usize = 1_609_616;
+
+/// `elf` without its trailing zero bytes (what the executable hash covers).
+pub fn trimmed_elf(elf: &[u8]) -> &[u8] {
+    let end = elf.iter().rposition(|&b| b != 0).map_or(0, |i| i + 1);
+    &elf[..end]
+}
+
+/// Path of shortwin 1.0.0, `tests/fixtures/shortwin/shortwin_1_0_0.so` (the `v1.0.0` tag built
+/// with the pinned toolchain; the fixtures README says how), its bytes checked against AUDIT.md
+/// §0's verified hashes: T-SELF-UPGRADE and the keeper's upgrade window (pump-final §7, §15) run
+/// it and upgrade it by the loader ([`Env::upgrade_shortwin`]).
+pub fn shortwin_1_0_0_so() -> PathBuf {
+    let path = fork::fixtures_dir().join("shortwin/shortwin_1_0_0.so");
+    let elf = std::fs::read(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    assert_eq!(elf.len(), SHORTWIN_1_0_0_LEN);
+    assert_eq!(
+        fork::sha256_hex(&elf),
+        SHORTWIN_1_0_0_SHA256,
+        "the fixture is AUDIT's verified 1.0.0 build"
+    );
+    assert_eq!(
+        fork::sha256_hex(trimmed_elf(&elf)),
+        SHORTWIN_1_0_0_EXECUTABLE_HASH
+    );
+    path
+}
+
 /// Runs `send` — a transaction sent around [`Env::send`]: a litesvm-token builder's
 /// `.send()`, [`LiteSVM::airdrop`] — and then expires the blockhash, as [`Env::send`] does.
 /// Every such helper in the harness goes through here (FUZZ-M7-24H-2).
@@ -147,6 +181,95 @@ impl Env {
     /// and upgrades it by the loader to the build under test). The config is not initialized.
     pub fn with_program_so(path: &std::path::Path) -> Self {
         Self::with_program(path, "the fixture's README")
+    }
+
+    /// short.win's own upgrade to `elf` by the loader, as Governance's vault transaction executes
+    /// it after its time lock (pump-final §15: at a slot nobody chooses): `ExtendProgram` of its
+    /// ProgramData to the new ELF's size when it is too small, one slot later a buffer holding
+    /// `elf` under the upgrade authority (only the buffer is planted: the loader's `Write` chunks
+    /// would carry the same bytes), then the loader's `Upgrade` signed by
+    /// [`Env::upgrade_authority`] (a real signature). Returns the upgrade's slot, which the
+    /// ProgramData header records; the clock is then one second later (the new program visible).
+    pub fn upgrade_shortwin(&mut self, elf: &[u8]) -> u64 {
+        use anchor_lang::solana_program::bpf_loader_upgradeable;
+        use anchor_lang::solana_program::instruction::AccountMeta;
+        use shortwin_venue_state::program_data;
+        const SYSVAR_RENT: Pubkey =
+            Pubkey::from_str_const("SysvarRent111111111111111111111111111111111");
+        const SYSVAR_CLOCK: Pubkey =
+            Pubkey::from_str_const("SysvarC1ock11111111111111111111111111111111");
+        let pd = pda::program_data();
+        let cap = self
+            .svm
+            .get_account(&pd)
+            .expect("short.win's ProgramData")
+            .data
+            .len()
+            - program_data::HEADER_LEN;
+        if elf.len() > cap {
+            let payer = self.funded_keypair();
+            let more = u32::try_from(elf.len() - cap).expect("a u32 extension");
+            let ix = fork::extend_program_ix(&shortwin::ID, &payer.pubkey(), more);
+            crate::errors::ok(self.send(&[ix], &[&payer]));
+            self.warp(1);
+        }
+        let authority = self.upgrade_authority.insecure_clone();
+        let mut data = vec![1, 0, 0, 0, 1];
+        data.extend_from_slice(authority.pubkey().as_ref());
+        data.extend_from_slice(elf);
+        let buffer = Pubkey::new_unique();
+        let lamports = self.svm.minimum_balance_for_rent_exemption(data.len());
+        self.svm
+            .set_account(
+                buffer,
+                solana_account::Account {
+                    lamports,
+                    data,
+                    owner: bpf_loader_upgradeable::ID,
+                    executable: false,
+                    rent_epoch: 0,
+                },
+            )
+            .expect("the upgrade buffer");
+        let spill = self.funded_keypair().pubkey();
+        let upgrade = Instruction {
+            program_id: bpf_loader_upgradeable::ID,
+            accounts: vec![
+                AccountMeta::new(pd, false),
+                AccountMeta::new(shortwin::ID, false),
+                AccountMeta::new(buffer, false),
+                AccountMeta::new(spill, false),
+                AccountMeta::new_readonly(SYSVAR_RENT, false),
+                AccountMeta::new_readonly(SYSVAR_CLOCK, false),
+                AccountMeta::new_readonly(authority.pubkey(), true),
+            ],
+            data: vec![3, 0, 0, 0],
+        };
+        let slot = self.clock().slot;
+        crate::errors::ok(self.send(&[upgrade], &[&authority]));
+        let header = {
+            let a = self.svm.get_account(&pd).expect("short.win's ProgramData");
+            program_data::read(&a.owner.to_bytes(), &a.data).expect("a ProgramData header")
+        };
+        assert_eq!(header.slot, slot, "the loader records the upgrade's slot");
+        assert_eq!(
+            header.upgrade_authority,
+            Some(authority.pubkey().to_bytes()),
+            "the authority is kept"
+        );
+        self.warp(1);
+        slot
+    }
+
+    /// The trimmed ELF sha256 short.win's ProgramData holds now.
+    pub fn deployed_shortwin_hash(&self) -> String {
+        let pd = self
+            .svm
+            .get_account(&pda::program_data())
+            .expect("short.win's ProgramData");
+        let elf = shortwin_venue_state::program_data::trimmed_elf(&pd.owner.to_bytes(), &pd.data)
+            .expect("a ProgramData");
+        fork::sha256_hex(elf)
     }
 
     fn with_program(path: &std::path::Path, how: &str) -> Self {
