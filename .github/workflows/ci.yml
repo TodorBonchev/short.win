@@ -818,16 +818,18 @@ jobs:
     # release feature set, without the TEST-ONLY `test-venue`), cargo-deny and cargo-audit on its
     # lockfile, the keeper's unit tests and its LiteSVM scenarios (duties 1–4, batching, degraded mode, duty 10's venue
     # monitor, M4's duty 5 Raydium fast path and duty 12 pool monitor, M5's duty 6 on the pump
-    # curve — migrate_v2 and the straddle bundle with the complete_curve helper — and M6's move
-    # onto PumpSwap, PumpSwap exits, the post-wipe claims and duty 13's sweep_trader; M7's
-    # degraded mode with the on-chain coverage pause — the drill, the budget, a restart, the role
-    # unset or rotated, two instances (coverage_pause) —, duty 11's crank_sol_usd (oracle) and the
-    # PumpSwap 4-extras T-SIZE through the keeper's tables (pamm_alt); every keeper transaction
-    # under the invariant hooks) against the anchor-build artifacts, and the A49 check that the
-    # keeper binary carries no mock-venue code. The M7 benches (m7_cost, cascade) are #[ignore]d
-    # here and run in release in m7-keeper-bench; the indexer's tests (M8) run in `indexer`. M10
-    # (WP-7): the governance tool `shortwin-gov` (services/ops) — its unit tests and T-OPS, the
-    # whole governance sequence through its command line on the mainnet Squads ELF.
+    # curve — migrate_v2, and since pump v3 the synthetic exits past rT with the same-tick
+    # graduation (graduation) and the two TradeExtras lists across short.win 1.0.0's upgrade
+    # (upgrade_window) — and M6's move onto PumpSwap, PumpSwap exits, the post-wipe claims and
+    # duty 13's sweep_trader; M7's degraded mode with the on-chain coverage pause — the drill,
+    # the budget, a restart, the role unset or rotated, two instances (coverage_pause) —, duty
+    # 11's crank_sol_usd (oracle) and the PumpSwap 4-extras T-SIZE through the keeper's tables
+    # (pamm_alt); every keeper transaction under the invariant hooks) against the anchor-build
+    # artifacts, and the A49 check that the keeper binary carries no mock-venue code. The M7
+    # benches (m7_cost, cascade) are #[ignore]d here and run in release in m7-keeper-bench; the
+    # indexer's tests (M8) run in `indexer`. M10 (WP-7): the governance tool `shortwin-gov`
+    # (services/ops) — its unit tests and T-OPS, the whole governance sequence through its command
+    # line on the mainnet Squads ELF.
     if: github.event_name != 'schedule'
     needs: anchor-build
     runs-on: ubuntu-24.04
@@ -862,6 +864,8 @@ jobs:
           SHORTWIN_TEST_VENUE_SO: ${{ github.workspace }}/target/test-venue/deploy/shortwin.so
           MOCK_CPAMM_SO: ${{ github.workspace }}/target/deploy/mock_cpamm.so
           SHORTWIN_SO: ${{ github.workspace }}/target/deploy/shortwin.so
+          # shortwin-gov's gov_e2e deploys complete_curve (the keeper no longer does) until its
+          # retirement (pump-final §11).
           COMPLETE_CURVE_SO: ${{ github.workspace }}/target/deploy/complete_curve.so
         run: >-
           cargo test --manifest-path services/Cargo.toml --workspace --locked

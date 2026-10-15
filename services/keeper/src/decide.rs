@@ -13,10 +13,20 @@
 //! `min(φ_live, venue_fee_hard_cap_bps_pos)` (V2-1) — on PumpSwap also at most φ at `P_ema`, the
 //! tier a same-transaction trade cannot raise (AIR-10: `VenueState::exit_risk_cap_bps` on the
 //! exits' venue read, [`crate::view::venue_state`]) —, through the venue's own quoter
-//! (`VenueState::quoter`: a constant-product pool, or the pump curve with `B̂_str` above `rT`,
-//! ARCH §4.3) — the program's `engine::bounds` and `engine::arming` quote the same way. The
-//! keeper therefore acts at the first second the program would accept; every send is still
-//! simulated first (duty 3), and the program remains the only judge.
+//! (`VenueState::quoter`: a constant-product pool, or the pump curve, ARCH §4.3 — on a live curve
+//! above `rT` pump's synthetic exit `B̂_v3` at the synthetic fee `φ_s` on the mint's live supply,
+//! on a `PumpMigrating` market the post-migration pool on the post-complete fields, ρ-scaled for
+//! FV: pump-final §5.2–§5.4, the program's own crates, nothing re-implemented here) — the
+//! program's `engine::bounds` and `engine::arming` quote the same way. The keeper therefore acts
+//! at the first second the program would accept; every send is still simulated first (duty 3),
+//! and the program remains the only judge.
+//!
+//! **A position whose `Q` exceeds its live curve's `rT`** (pump-final §5.2, owner D3) is priced
+//! at `B̂_v3` and exits like any other: its `liquidate` / `expire` buys `rT` on the curve and
+//! `Q − rT` from the would-be pool in one `buy_v3`, completing the curve (the market moves to
+//! `PumpMigrating` in that instruction), with `buyback_allowed` and σ judged on `B̂_v3` (C5: above
+//! σ_max it goes to `sol_settle` at once). The 3-transaction straddle bundle of M5/M6 is retired
+//! (owner D2). [`PositionEval::synthetic`] marks such an exit.
 //!
 //! **Plans** ([`Plan`]), per position:
 //!
@@ -26,7 +36,6 @@
 //! | venue executable, the post-change warm-up running (`ema_warm > 0` after the roll; M4R) | `Watch` (exits refuse `EmaWarmingUp`, `sol_settle` decides nothing: observe every second until the gate) |
 //! | not liquidatable, not armed | `Idle` / `Watch` (near a threshold: per-second coverage) |
 //! | armed and not liquidatable | `SolSettle` (it keeps the clock or disarms on box evidence; duty 4) |
-//! | liquidatable on a live pump curve with `Q > rT` (M5; ARCH §5.1 "straddle") | `Straddle` (the 3-transaction bundle of §5.4, [`crate::graduation`]: complete, migrate, the transition onto the pool; the exit follows at the warm-up's gate, M6; while the bundle does not go out the keeper calls `sol_settle`) |
 //! | liquidatable, completed bucket stale | `Observe` (observe this second, act the next) |
 //! | liquidatable, normal buyback allowed, expired and not CR-liquidatable | `Expire` / `ExpireWait` |
 //! | liquidatable, normal buyback allowed | `Liquidate` / `LiquidateWait` (fixed δ; retry next second) |
@@ -135,12 +144,6 @@ pub enum Plan {
     ExpireWait,
     SolSettle,
     S3Probe,
-    /// A liquidatable position on a live pump curve whose `Q` exceeds the curve's `rT` (ARCH
-    /// §5.1, §5.4): pump reverts any buy above `rT`, so no exit can run on the curve; the
-    /// keeper's straddle bundle ([`crate::graduation`]) completes the curve (`complete_curve`),
-    /// migrates it (`migrate_v2`) and moves the market onto the new pool (tx3, M6); the exit on the
-    /// pool follows at the post-change warm-up's gate.
-    Straddle,
 }
 
 impl Plan {
@@ -148,22 +151,20 @@ impl Plan {
     pub const fn acts(self) -> bool {
         matches!(
             self,
-            Self::Liquidate | Self::Expire | Self::SolSettle | Self::S3Probe | Self::Straddle
+            Self::Liquidate | Self::Expire | Self::SolSettle | Self::S3Probe
         )
     }
 
-    /// Order of attempts within a market: liquidations, expiries, straddles, settlements,
-    /// probes.
+    /// Order of attempts within a market: liquidations, expiries, settlements, probes.
     const fn rank(self) -> u8 {
         match self {
             Self::Liquidate => 0,
             Self::Expire => 1,
-            Self::Straddle => 2,
-            Self::SolSettle => 3,
-            Self::S3Probe => 4,
-            Self::LiquidateWait | Self::ExpireWait | Self::Observe => 5,
-            Self::Watch => 6,
-            Self::Idle => 7,
+            Self::SolSettle => 2,
+            Self::S3Probe => 3,
+            Self::LiquidateWait | Self::ExpireWait | Self::Observe => 4,
+            Self::Watch => 5,
+            Self::Idle => 6,
         }
     }
 }
@@ -199,9 +200,12 @@ pub struct PositionEval {
     /// route-broken flag, or a live fee above the lower of the global hard cap and the cap the
     /// position locked: AIR-19, [`Projection::position_no_route`]).
     pub s3_due: bool,
-    /// On a live pump curve, `Q` exceeds the curve's real token reserves `rT` (no buy on the
-    /// curve can close it: the straddle of ARCH §5.4).
-    pub straddle: bool,
+    /// On a live pump curve, `Q` exceeds the curve's real token reserves `rT`: the position's exit
+    /// is pump's synthetic migration (`buy_v3` of `rT` on the curve and `Q − rT` from the would-be
+    /// pool, priced `B̂_v3`, pump-final §5.2) and completes the curve. Informational: the plan is
+    /// the ordinary one ([module docs](self)); the keeper counts such exits
+    /// (`synthetic_exits`).
+    pub synthetic: bool,
     /// The position waits only for a fresh reference (M7D-2): the completed bucket is stale and
     /// the position is expired, or its EMA leg holds and its live CR at the risk fee is below L
     /// (with a fresh bucket the spot leg would follow the live price) — on a venue that executes,
@@ -296,7 +300,7 @@ pub fn evaluate(
     let expired = now >= pos.deadline;
     let armed = pos.s_armed != 0;
     // The risk view of the venue's own quoter (the program's `engine::bounds` / `arming`):
-    // a pool, or the curve with `B̂_str` above `rT` (ARCH §4.3).
+    // a pool, or the curve with `B̂_v3` above a live curve's `rT` (pump-final §5.2; ARCH §4.3).
     let risk_pricing = st.quoter().map(|p| p.capped(cap));
 
     // Live CR at the risk fee (duty 1's "live CR").
@@ -352,9 +356,9 @@ pub fn evaluate(
     let s3_timer = settle::s3_due(&chain, &pos.s3_terms(), now, true);
     let s3_due = s3_timer && (liquidatable || !st.executable);
 
-    // ARCH §5.1 "curve live && q > rT": the exits refuse `CurveStraddle` (pump reverts a buy
-    // above `rT`, 6021), the bundle of §5.4 is the way out.
-    let straddle = mv.kind == VenueKind::PumpCurve
+    // pump-final §5.2: a live curve's exit past `rT` is pump's synthetic migration, priced
+    // `B̂_v3` by the quotes above; it plans as any exit (owner D3) and completes the curve.
+    let synthetic = mv.kind == VenueKind::PumpCurve
         && st
             .curve
             .as_ref()
@@ -383,8 +387,6 @@ pub fn evaluate(
     } else if !liquidatable {
         // Armed, not liquidatable: the call keeps the clock or disarms (box evidence).
         Plan::SolSettle
-    } else if straddle {
-        Plan::Straddle
     } else if !fresh {
         if armed {
             Plan::SolSettle
@@ -446,7 +448,7 @@ pub fn evaluate(
         r_due,
         k_s,
         s3_due,
-        straddle,
+        synthetic,
         stale_exit,
     })
 }

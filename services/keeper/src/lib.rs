@@ -26,15 +26,18 @@
 //!    `pool_fast_route_s`, propose the deepest eligible candidate (opening the collection
 //!    window, or improving someone else's), and `execute_pool_switch` at the first second after
 //!    the window; a failing market without positions is observed to keep its chain.
-//! 6. **Graduation** ([`graduation`]; M5, M6): pump `migrate_v2` top-level as soon as a covered
-//!    market's curve completes (ADOPTED Q16), then — as soon as the canonical pool is valid — the
-//!    `→ PumpSwap` transition in one transaction (the pool accounts the trades require,
-//!    `crank_price` onto the pool, the pool's first observation); the straddle bundle of ARCH §5.4
-//!    for a liquidatable position whose `Q` exceeds its live curve's `rT` (tx1 `complete_curve` of
-//!    the `complete-curve` helper, tx2 `migrate_v2`, tx3 the transition), sent through a Jito
-//!    block engine — the exit on the pool follows at the post-change warm-up's gate (`T + 8`);
-//!    **right after a full wipe** the venue cashback claims and `sweep_trader` ([`sweep`]), so the
-//!    market takes deposits and opens again.
+//! 6. **Graduation** ([`graduation`]; M5, M6; pump-final §7): pump `migrate_v2` top-level as soon
+//!    as a covered market's curve completes (ADOPTED Q16) — also right after the keeper's own
+//!    exit completed it —, then — as soon as the canonical pool is valid — the `→ PumpSwap`
+//!    transition in one transaction (the pool accounts the trades require, `crank_price` onto the
+//!    pool, the pool's first observation); the market's other positions exit on the pool at the
+//!    post-change warm-up's gate (`T + 8`). A liquidatable position whose `Q` exceeds its live
+//!    curve's `rT` is liquidated or expired like any other: pump v3's synthetic migration buys past
+//!    `rT` inside the exit, priced `B̂_v3` (the straddle bundle and the `complete-curve` helper
+//!    are retired, owner D2); for one release the curve exits carry the TradeExtras list the
+//!    deployed short.win parses (v3, or 1.0.0's: [`venue::CurveExtrasFormat`]). **Right after a
+//!    full wipe** the venue cashback claims and `sweep_trader` ([`sweep`]), so the market takes
+//!    deposits and opens again.
 //! 8. **The global budget** ([`budget`]; owner decision A of 2026-10-01): one daily budget `G`
 //!    funding markets in order of their lenders' value at risk `V = ΣB_Q·P_ema`; covered markets
 //!    (positions and `V ≥ var_floor_lamports`) hold entitlements in rank order, the rest is the
@@ -99,10 +102,12 @@
 //! The chain is pluggable ([`shortwin_services_common::Chain`]): JSON-RPC for a real cluster
 //! (the binary), an in-process LiteSVM backend for tests (`services/keeper-litesvm`).
 //! Venue kinds ([`venue`]): Raydium AMM v4 and CPMM (M3); the pump curve and a migrating curve
-//! (M5: the curve adapter's ReadSet and TradeExtras, the risk view through the program's own
-//! quoter, `B̂_str` above `rT`); PumpSwap (M6: the adapter's ReadSet and TradeExtras, the mint's
-//! supply read for the fee tier, `disable_flags` watched by duty 10); the TEST-ONLY mock
-//! (`test-venue` feature).
+//! (M5; pump v3 since pump-final §7: the curve adapter's ReadSet and TradeExtras, the risk view
+//! through the program's own quoter — `B̂_v3` above a live curve's `rT` at the synthetic fee on
+//! the mint's supply, which the keeper reads, the post-complete fields on a migrating curve —,
+//! duty 10 on pump's post-complete fields); PumpSwap (M6: the adapter's ReadSet and TradeExtras,
+//! the mint's supply read for the fee tier, `disable_flags` watched by duty 10); the TEST-ONLY
+//! mock (`test-venue` feature).
 
 pub mod alerts;
 pub mod alt;
@@ -126,5 +131,6 @@ pub mod view;
 pub use alerts::{Alert, DegradedReason, PauseUnavailable};
 pub use config::KeeperConfig;
 pub use keeper::{
-    ExitKind, ExitRecord, ExitResult, Keeper, PoolActionRecord, PoolResult, TickReport, V1Support,
+    CurveFormatRecord, ExitKind, ExitRecord, ExitResult, Keeper, PoolActionRecord, PoolResult,
+    TickReport, V1Support,
 };

@@ -2,7 +2,7 @@
 //!
 //! ```text
 //! shortwin-keeper --rpc <url> --keypair <file> [--config keeper.toml] [--tick-ms 400]
-//!                 [--metrics 127.0.0.1:9464] [--discovery-rpc <url>] [--block-engine <url>]
+//!                 [--metrics 127.0.0.1:9464] [--discovery-rpc <url>]
 //!                 [--coverage-keypair <file>] [--once]
 //! ```
 //!
@@ -11,9 +11,9 @@
 //! unpause opens per market); it is required with `coverage_pause.enabled = true`, and only one
 //! running instance should be enabled.
 //!
-//! `--block-engine` (or `graduation.block_engine`) sends the straddle bundles (duty 6, ARCH §5.4)
-//! to a Jito block engine, e.g. `https://mainnet.block-engine.jito.wtf`; without one they are not
-//! sent (the keeper alerts and calls `sol_settle` instead).
+//! `--block-engine` is removed with the straddle bundle it served (pump-final §7, owner D2: a curve
+//! position past `rT` exits by pump v3's synthetic migration in its own `liquidate` / `expire`);
+//! naming it is refused.
 //!
 //! `--discovery-rpc` (or `pool_select.discovery_rpc` in the configuration) sends the Raydium
 //! pool discovery's `getProgramAccounts` calls to another endpoint (duty 12).
@@ -38,15 +38,13 @@ struct Args {
     tick_ms: u64,
     metrics: Option<String>,
     discovery_rpc: Option<String>,
-    block_engine: Option<String>,
     coverage_keypair: Option<String>,
     once: bool,
 }
 
 fn usage() -> &'static str {
     "usage: shortwin-keeper --rpc <url> --keypair <file> [--config keeper.toml] [--tick-ms 400] \
-     [--metrics 127.0.0.1:9464] [--discovery-rpc <url>] [--block-engine <url>] \
-     [--coverage-keypair <file>] [--once]"
+     [--metrics 127.0.0.1:9464] [--discovery-rpc <url>] [--coverage-keypair <file>] [--once]"
 }
 
 fn parse_args() -> anyhow::Result<Args> {
@@ -56,7 +54,6 @@ fn parse_args() -> anyhow::Result<Args> {
     let mut tick_ms = 400;
     let mut metrics = None;
     let mut discovery_rpc = None;
-    let mut block_engine = None;
     let mut coverage_keypair = None;
     let mut once = false;
     let mut it = std::env::args().skip(1);
@@ -72,7 +69,10 @@ fn parse_args() -> anyhow::Result<Args> {
             "--tick-ms" => tick_ms = val()?.parse().context("--tick-ms")?,
             "--metrics" => metrics = Some(val()?),
             "--discovery-rpc" => discovery_rpc = Some(val()?),
-            "--block-engine" => block_engine = Some(val()?),
+            "--block-engine" => bail!(
+                "--block-engine: {}",
+                shortwin_keeper::config::REMOVED_GRADUATION_MESSAGE
+            ),
             "--coverage-keypair" => coverage_keypair = Some(val()?),
             "--once" => once = true,
             "-h" | "--help" => bail!("{}", usage()),
@@ -86,7 +86,6 @@ fn parse_args() -> anyhow::Result<Args> {
         tick_ms,
         metrics,
         discovery_rpc,
-        block_engine,
         coverage_keypair,
         once,
     })
@@ -131,15 +130,7 @@ async fn main() -> anyhow::Result<()> {
     };
     let payer = read_keypair_file(&args.keypair)
         .map_err(|e| anyhow::anyhow!("reading {}: {e}", args.keypair))?;
-    let mut chain = RpcChain::new(args.rpc.clone());
-    let engine = args
-        .block_engine
-        .clone()
-        .or_else(|| cfg.graduation.block_engine().map(str::to_string));
-    if let Some(url) = &engine {
-        tracing::info!(%url, "Jito block engine (straddle bundles)");
-        chain = chain.with_block_engine(url);
-    }
+    let chain = RpcChain::new(args.rpc.clone());
     let discovery = args
         .discovery_rpc
         .clone()

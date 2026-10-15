@@ -9,7 +9,7 @@ use anchor_lang::{InstructionData, ToAccountMetas};
 use shortwin::state::{Market, VenueKind};
 
 use crate::pda;
-use crate::venue::{self, ExtrasChoice};
+use crate::venue::{self, CurveExtrasFormat, ExtrasChoice};
 use crate::view::{MarketView, PositionView};
 
 fn build(
@@ -54,10 +54,19 @@ pub fn crank_price_with(market: &Pubkey, mint: &Pubkey, keys: &[Pubkey]) -> Inst
 }
 
 /// `ReadSet ++ TradeExtras ++ Extras` of a trading exit: the ReadSet writable per the venue's
-/// trade marks ([`venue::read_writable`]).
-fn trade_remaining(mv: &MarketView, extras: &ExtrasChoice) -> anyhow::Result<Vec<AccountMeta>> {
+/// trade marks ([`venue::read_writable`]), a `PumpCurve` market's TradeExtras in `format`.
+fn trade_remaining(
+    mv: &MarketView,
+    extras: &ExtrasChoice,
+    format: CurveExtrasFormat,
+) -> anyhow::Result<Vec<AccountMeta>> {
     let mut v = venue::read_metas(mv.kind, &mv.read_keys, true)?;
-    v.extend(venue::trade_extras(mv.kind, &mv.market, &mv.read_accounts)?);
+    v.extend(venue::trade_extras_as(
+        mv.kind,
+        &mv.market,
+        &mv.read_accounts,
+        format,
+    )?);
     v.extend(extras.metas.iter().cloned());
     Ok(v)
 }
@@ -197,12 +206,24 @@ pub fn detection_set(market: &Market) -> [Pubkey; 2] {
     [market.bonding_curve, market.canonical_pool]
 }
 
-/// `liquidate(extras)` of `pos` by `keeper` (ARCH §3.6).
+/// `liquidate(extras)` of `pos` by `keeper` (ARCH §3.6); a curve market's TradeExtras are the v3
+/// list ([`liquidate_as`] for the other).
 pub fn liquidate(
     keeper: &Pubkey,
     mv: &MarketView,
     pos: &PositionView,
     extras: &ExtrasChoice,
+) -> anyhow::Result<Instruction> {
+    liquidate_as(keeper, mv, pos, extras, CurveExtrasFormat::V3)
+}
+
+/// [`liquidate`] with a curve market's TradeExtras in `format` (pump-final §7's upgrade window).
+pub fn liquidate_as(
+    keeper: &Pubkey,
+    mv: &MarketView,
+    pos: &PositionView,
+    extras: &ExtrasChoice,
+    format: CurveExtrasFormat,
 ) -> anyhow::Result<Instruction> {
     let m = &mv.market;
     Ok(build(
@@ -223,16 +244,28 @@ pub fn liquidate(
             program: shortwin::ID,
         },
         shortwin::instruction::Liquidate { extras: extras.sel },
-        trade_remaining(mv, extras)?,
+        trade_remaining(mv, extras, format)?,
     ))
 }
 
-/// `expire(extras)` of `pos` by `keeper` (ARCH §3.7).
+/// `expire(extras)` of `pos` by `keeper` (ARCH §3.7); a curve market's TradeExtras are the v3
+/// list ([`expire_as`] for the other).
 pub fn expire(
     keeper: &Pubkey,
     mv: &MarketView,
     pos: &PositionView,
     extras: &ExtrasChoice,
+) -> anyhow::Result<Instruction> {
+    expire_as(keeper, mv, pos, extras, CurveExtrasFormat::V3)
+}
+
+/// [`expire`] with a curve market's TradeExtras in `format` (pump-final §7's upgrade window).
+pub fn expire_as(
+    keeper: &Pubkey,
+    mv: &MarketView,
+    pos: &PositionView,
+    extras: &ExtrasChoice,
+    format: CurveExtrasFormat,
 ) -> anyhow::Result<Instruction> {
     let m = &mv.market;
     Ok(build(
@@ -253,7 +286,7 @@ pub fn expire(
             program: shortwin::ID,
         },
         shortwin::instruction::Expire { extras: extras.sel },
-        trade_remaining(mv, extras)?,
+        trade_remaining(mv, extras, format)?,
     ))
 }
 

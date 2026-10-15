@@ -680,17 +680,222 @@ impl PoolWatch {
     }
 }
 
+// ---- pump curves (pump-final §7) ------------------------------------------------------------
+
+/// What duty 10 reports about a pump curve market (pump-final §7, §6.1.5): pump's post-complete
+/// fields and the invariant they rely on, read with the program's own reader
+/// (`shortwin_venue_state::pump`) and priced with the program's own math
+/// (`shortwin_math::quote::migrated_pool`, the market's `CurvePricingInputs`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct CurveFindings {
+    /// A live curve whose `vQ − rQ ≠ ivqr` (`BondingCurve::quote_offset_consistent` false):
+    /// `(vQ, rQ, ivqr)`.
+    pub quote_offset_inconsistent: Option<(u64, u64, u64)>,
+    /// A live curve carrying post-complete fields (G-3: not executable, A63's cap-only risk
+    /// view): `(pcB, pcQ)`.
+    pub live_post_complete: Option<(u64, u64)>,
+    /// A complete, unmigrated curve whose post-complete fields are not known (§6.1.5: FV
+    /// undefined, an S3 gives the lenders the whole take): `(pcB, pcQ)`.
+    pub migrating_fv_undefined: Option<(u64, u64)>,
+    /// On a complete, unmigrated curve with known fields: `ρ − 1` in bps
+    /// ([`rho_minus_one_bps`] on §5.4's `(X₀, Y₀)` and `(X₁, Y₁)`; 0 without a pool part).
+    pub synthetic_completion_delta_bps: Option<i64>,
+    /// On a complete, unmigrated curve: `A + pcB − 206.9e12`, the tokens donated to
+    /// `curve_base_ata` (`A` its live balance, `rT = 0`).
+    pub curve_base_ata_donation: Option<i128>,
+}
+
+/// `ρ − 1` in bps, `⌊Y₁·X₀·10⁴ / (X₁·Y₀)⌋ − 10⁴` (pump-final §5.4: `ρ = P(X₁,Y₁)/P(X₀,Y₀)`, the
+/// price of the pool `migrate_v2` will create over the same curve's without its pool part or a
+/// donation). `None` on a zero denominator or an overflow.
+pub fn rho_minus_one_bps(x0: u128, y0: u128, x1: u128, y1: u128) -> Option<i64> {
+    let num = y1.checked_mul(x0)?.checked_mul(10_000)?;
+    let den = x1.checked_mul(y0)?;
+    let ratio = num.checked_div(den)?;
+    i64::try_from(ratio).ok()?.checked_sub(10_000)
+}
+
+/// [`CurveFindings`] of a `PumpCurve` or `PumpMigrating` market (`None` on any other venue or
+/// when its curve does not parse). A live curve is checked for pump's invariant and for
+/// post-complete fields; a complete, unmigrated one for known post-complete fields, its `ρ` and
+/// the donation to `curve_base_ata`; a migrated one (`vT = 0`) reports nothing.
+pub fn curve_findings(mv: &MarketView) -> Option<CurveFindings> {
+    use shortwin_math::quote::{MigrationParams, STANDARD_POOL_TOKENS, migrated_pool};
+    if !matches!(mv.kind, VenueKind::PumpCurve | VenueKind::PumpMigrating) {
+        return None;
+    }
+    let acc = mv
+        .read_accounts
+        .get(shortwin::venues::pump_curve::C_CURVE)?
+        .as_ref()?;
+    let curve = shortwin_venue_state::pump::read_curve(&acc.owner.to_bytes(), &acc.data).ok()?;
+    let mut f = CurveFindings::default();
+    let (pcb, pcq) = (curve.post_complete_base_out, curve.post_complete_quote_in);
+    if !curve.complete {
+        if !curve.quote_offset_consistent() {
+            f.quote_offset_inconsistent = Some((
+                curve.virtual_quote_reserves,
+                curve.real_quote_reserves,
+                curve.initial_virtual_quote_reserves,
+            ));
+        }
+        if pcb != 0 || pcq != 0 {
+            f.live_post_complete = Some((pcb, pcq));
+        }
+        return Some(f);
+    }
+    let Some(c) = mv.state.curve.as_ref().filter(|c| c.migrating()) else {
+        return Some(f);
+    };
+    let Some(inputs) = c.pricing.as_ref() else {
+        return Some(f);
+    };
+    f.curve_base_ata_donation = Some(
+        i128::from(inputs.live_pool_tokens) + i128::from(pcb)
+            - i128::try_from(STANDARD_POOL_TOKENS).unwrap_or(i128::MAX),
+    );
+    if !inputs.post_complete_known() {
+        f.migrating_fv_undefined = Some((pcb, pcq));
+        return Some(f);
+    }
+    let m = inputs.curve_pricing().migration;
+    let base = MigrationParams {
+        migration_fee: m.migration_fee,
+        pool_tokens: STANDARD_POOL_TOKENS,
+        post_complete_quote_in: 0,
+    };
+    f.synthetic_completion_delta_bps =
+        match (migrated_pool(&c.live, &base), migrated_pool(&c.live, &m)) {
+            (Some((x0, y0)), Some((x1, y1))) => rho_minus_one_bps(x0, y0, x1, y1),
+            _ => None,
+        };
+    Some(f)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use shortwin::constants::{
-        GUARD_RAYDIUM_CPMM, GUARD_RAYDIUM_V4, RAYDIUM_V4_PROGRAM_ID, VENUE_GUARD_SLOTS_2026_09_27,
+        GUARD_RAYDIUM_CPMM, GUARD_RAYDIUM_V4, RAYDIUM_V4_PROGRAM_ID, VENUE_GUARD_SLOTS_2026_10_13,
     };
 
+    /// The latch as the 2026-10-13 re-pin baselines it (`VENUE_GUARD_SLOTS_2026_10_13`;
+    /// pump-final §7: duty 10's baseline).
     fn guard() -> VenueGuard {
         let mut g: VenueGuard = bytemuck::Zeroable::zeroed();
-        g.guard_slot = VENUE_GUARD_SLOTS_2026_09_27;
+        g.guard_slot = VENUE_GUARD_SLOTS_2026_10_13;
         g
+    }
+
+    /// pump-final §5.4: `ρ − 1` on 98u8RJ's synthetic completion (V4: `(X₀, Y₀)` = (206.9e12,
+    /// 84,990,359,189), `(X₁, Y₁)` = (200,661,149,081,575, 87,632,834,741), ρ = 1.063149…) is
+    /// 631 bps; without a pool part 0; a donation alone (`X₁` above 206.9e12, `Y₁ = Y₀`) is
+    /// negative; zero reserves give nothing.
+    #[test]
+    fn rho_minus_one_is_the_post_complete_pools_price_over_the_curves() {
+        let (x0, y0) = (206_900_000_000_000u128, 84_990_359_189u128);
+        let (x1, y1) = (200_661_149_081_575u128, 87_632_834_741u128);
+        assert_eq!(rho_minus_one_bps(x0, y0, x1, y1), Some(631));
+        assert_eq!(rho_minus_one_bps(x0, y0, x0, y0), Some(0));
+        assert_eq!(
+            rho_minus_one_bps(x0, y0, x0 + 1_000_000_000_000, y0),
+            Some(-49)
+        );
+        assert_eq!(rho_minus_one_bps(x0, y0, 0, y1), None);
+        assert_eq!(rho_minus_one_bps(x0, 0, x1, y1), None);
+    }
+
+    /// A 166-byte pump curve with the given reserves and post-complete fields (the reader's
+    /// offsets), as a market's ReadSet C0 on `kind`.
+    fn curve_market(
+        kind: VenueKind,
+        complete: bool,
+        (vq, rq, ivqr): (u64, u64, u64),
+        (pcb, pcq): (u64, u64),
+    ) -> MarketView {
+        use shortwin_venue_state::pump;
+        let mut d = vec![0u8; pump::CURVE_LEN_2026_10_08];
+        d[..8].copy_from_slice(&pump::BONDING_CURVE_DISCRIMINATOR);
+        d[8..16].copy_from_slice(&500_000_000_000_000u64.to_le_bytes());
+        d[16..24].copy_from_slice(&vq.to_le_bytes());
+        d[24..32].copy_from_slice(&100_000_000_000_000u64.to_le_bytes());
+        d[32..40].copy_from_slice(&rq.to_le_bytes());
+        d[48] = u8::from(complete);
+        let at = |d: &mut Vec<u8>, o: usize, v: u64| d[o..o + 8].copy_from_slice(&v.to_le_bytes());
+        at(&mut d, pump::OFF_INITIAL_VIRTUAL_QUOTE_RESERVES, ivqr);
+        at(&mut d, pump::OFF_POST_COMPLETE_BASE_OUT, pcb);
+        at(&mut d, pump::OFF_POST_COMPLETE_QUOTE_IN, pcq);
+        let m: Market = bytemuck::Zeroable::zeroed();
+        let mut read = vec![None; shortwin::venues::pump_curve::READ_LEN];
+        read[shortwin::venues::pump_curve::C_CURVE] = Some(AccountData {
+            lamports: 1,
+            owner: shortwin::constants::PUMP_PROGRAM_ID,
+            executable: false,
+            data: d,
+        });
+        MarketView {
+            key: Pubkey::new_unique(),
+            market: Box::new(m),
+            vault: Box::new(shortwin_math::pool::Vault::new()),
+            kind,
+            read_keys: Vec::new(),
+            read_accounts: read,
+            state: shortwin::venues::VenueState::not_executable(kind),
+            positions: Vec::new(),
+            extras: None,
+            supply: None,
+        }
+    }
+
+    /// Duty 10 on live curves (pump-final §7): pump's invariant `vQ − rQ = ivqr` (vacuous for
+    /// `ivqr = 0`) and post-complete fields on a live curve (G-3) are reported; a curve without
+    /// either reports nothing, as does another venue.
+    #[test]
+    fn duty_10_reports_a_live_curves_broken_invariant_and_post_complete_fields() {
+        let k = VenueKind::PumpCurve;
+        let ok = curve_market(
+            k,
+            false,
+            (40_000_000_000, 10_000_000_000, 30_000_000_000),
+            (0, 0),
+        );
+        assert_eq!(curve_findings(&ok), Some(CurveFindings::default()));
+        let legacy = curve_market(k, false, (40_000_000_000, 10_000_000_000, 0), (0, 0));
+        assert_eq!(curve_findings(&legacy), Some(CurveFindings::default()));
+        let broken = curve_market(
+            k,
+            false,
+            (40_000_000_000, 10_000_000_001, 30_000_000_000),
+            (0, 0),
+        );
+        assert_eq!(
+            curve_findings(&broken).unwrap().quote_offset_inconsistent,
+            Some((40_000_000_000, 10_000_000_001, 30_000_000_000))
+        );
+        let pc = curve_market(
+            k,
+            false,
+            (40_000_000_000, 10_000_000_000, 30_000_000_000),
+            (5, 0),
+        );
+        let f = curve_findings(&pc).unwrap();
+        assert_eq!(f.live_post_complete, Some((5, 0)));
+        assert_eq!(f.quote_offset_inconsistent, None);
+        // A complete curve's fields are not a live curve's: its state has no pricing here (the
+        // migrating findings need the program's state), so nothing is reported.
+        let done = curve_market(
+            VenueKind::PumpMigrating,
+            true,
+            (40_000_000_000, 1, 30_000_000_000),
+            (5, 0),
+        );
+        assert_eq!(curve_findings(&done), Some(CurveFindings::default()));
+        let mut other = ok.clone();
+        other.kind = VenueKind::PumpSwap;
+        assert_eq!(curve_findings(&other), None);
+        let mut unread = ok;
+        unread.read_accounts = Vec::new();
+        assert_eq!(curve_findings(&unread), None);
     }
 
     #[test]

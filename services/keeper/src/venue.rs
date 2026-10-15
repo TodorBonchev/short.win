@@ -12,15 +12,24 @@
 //! it), and a slot it only reads stays read-only — a CPMM `AmmConfig` is shared by every pool
 //! on that config, so write-locking it would contend with all of them (ARCH §6.6).
 //!
-//! **Pump curve** (M5): a `PumpCurve` or `PumpMigrating` market's ReadSet is the curve adapter's
-//! own (`shortwin::venues::pump_curve::read_keys`: C0 curve W, C1 `Global`, C2 pump `FeeConfig`,
-//! C3 the canonical pool, C4 the curve's base ATA W, C5 / C6 PumpSwap's fee and global configs),
-//! and a `PumpCurve` trade's TradeExtras T0–T19 ([`trade_extras`]) come from the adapter's key
-//! functions and the market's curve cache, with the three slots the program checks against the
-//! **live** state read from this tick's ReadSet accounts: T6 / T8 a fee and a buyback recipient of
-//! the live `Global` (one per market, spread by the mint's first byte so the keeper's exits do not
-//! all write-lock the same recipient), T12 / T13 the creator vault of the live `curve.creator`
-//! (R-PUMP §8). A `PumpMigrating` market has no trade (exits pause, `VenueMigrating`).
+//! **Pump curve** (M5; pump v3 since pump-final §6.1): a `PumpCurve` or `PumpMigrating` market's
+//! ReadSet is the curve adapter's own (`shortwin::venues::pump_curve::read_keys`: C0 curve W, C1
+//! `Global`, C2 pump `FeeConfig`, C3 the canonical pool, C4 the curve's base ATA W, C5 / C6
+//! PumpSwap's fee and global configs), and a `PumpCurve` trade's TradeExtras T0–T9
+//! ([`trade_extras`]) are the program's fixed slots (`pump_curve::fixed_trade_keys`) and T7, the
+//! one slot the program checks against the **live** state read from this tick's ReadSet accounts:
+//! a buyback recipient of the live `Global` (one per market, spread by the mint's first byte so
+//! the keeper's exits do not all write-lock the same recipient). pump's v3 trades name no fee
+//! recipient, creator vault or pump-fees account. A `PumpMigrating` market has no trade (exits
+//! pause, `VenueMigrating`).
+//!
+//! **The upgrade window** (pump-final §7, §15 "Release coordination"): shortwin 1.0.0's curve
+//! adapter trades pump v2 with the 20-key list T0–T19 ([`pump_trade_extras_v2`]: the live
+//! `Global`'s fee and buyback recipients at T6 / T8, the live creator's vault at T12 / T13). A
+//! Governance upgrade executes at a slot nobody chooses, so for one release the keeper carries
+//! both lists ([`CurveExtrasFormat`]) and picks the one the deployed short.win parses, per
+//! short.win's ProgramData deploy slot, by simulation ([`format_evidence`]; `crate::keeper`). The
+//! next release deletes V2.
 //!
 //! **PumpSwap** (M6): the ReadSet is the adapter's own (`shortwin::venues::pump_amm::read_keys`: P0
 //! the canonical pool W, P1 its base vault W, P2 its WSOL vault W, P3 `GlobalConfig`, P4 the
@@ -136,13 +145,103 @@ pub fn read_metas(
         .collect())
 }
 
+/// Which `PumpCurve` TradeExtras list a trade carries (module docs, "The upgrade window").
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum CurveExtrasFormat {
+    /// shortwin 1.0.0's curve adapter (pump `sell_v2` / `buy_v2`): T0–T19
+    /// ([`pump_trade_extras_v2`]). Kept for one release.
+    V2,
+    /// The v3 adapter (pump `sell_v3` / `buy_v3`, pump-final §6.1.1): T0–T9
+    /// (`pump_curve::TRADE_LEN`).
+    V3,
+}
+
+impl CurveExtrasFormat {
+    /// shortwin 1.0.0's `pump_curve::TRADE_LEN`.
+    pub const V2_TRADE_LEN: usize = 20;
+
+    /// The list's length.
+    pub const fn trade_len(self) -> usize {
+        match self {
+            Self::V2 => Self::V2_TRADE_LEN,
+            Self::V3 => pump_curve::TRADE_LEN,
+        }
+    }
+
+    /// The other format.
+    pub const fn other(self) -> Self {
+        match self {
+            Self::V2 => Self::V3,
+            Self::V3 => Self::V2,
+        }
+    }
+}
+
+/// What one simulated (or sent) trading exit says about the `CurveExtrasFormat` it carried
+/// ([`format_evidence`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FormatEvidence {
+    /// The deployed short.win got past account parsing (`venues::parse`, the first thing a
+    /// keeper exit does after its venue and mint checks): it succeeded, or failed on a later
+    /// check or inside the venue. The format is the deployed program's.
+    Parsed,
+    /// It failed on account parsing: `BadRemainingAccounts` (a 10-key list on 1.0.0, which takes
+    /// 20) or `VenueAccountMismatch` (a 20-key list on the v3 build, whose parser takes the first
+    /// 10 keys and refuses T2). The other format may be the deployed one.
+    ParseFailed,
+    /// Nothing is known: a failure before account parsing (an Anchor account constraint, the
+    /// market's own checks: `AccountMismatch`, `ConfigVersion`, `NoRoute`, `VenueMigrating`) or
+    /// without a custom error.
+    Unknown,
+}
+
+/// [`FormatEvidence`] of a simulation's or transaction's outcome `out`.
+pub fn format_evidence(out: &shortwin_services_common::TxOutcome) -> FormatEvidence {
+    use shortwin::errors::ShortwinError as E;
+    let Some(err) = out.err.as_ref() else {
+        return FormatEvidence::Parsed;
+    };
+    // A venue's own failure (pump's 6002, a token program's): short.win parsed the lists and
+    // reached the CPI.
+    if crate::events::failing_program(out).is_some_and(|p| p != shortwin::ID) {
+        return FormatEvidence::Parsed;
+    }
+    let Some(code) = err.custom_code() else {
+        return FormatEvidence::Unknown;
+    };
+    let is = |e: E| code == u32::from(e);
+    if is(E::BadRemainingAccounts) || is(E::VenueAccountMismatch) {
+        FormatEvidence::ParseFailed
+    } else if code < 6_000
+        || is(E::AccountMismatch)
+        || is(E::ConfigVersion)
+        || is(E::NoRoute)
+        || is(E::VenueMigrating)
+    {
+        FormatEvidence::Unknown
+    } else {
+        FormatEvidence::Parsed
+    }
+}
+
 /// The TradeExtras metas of a market on `kind` (after the ReadSet in `liquidate` / `expire`);
 /// `read` is this tick's ReadSet accounts (in [`read_set`]'s order), which the pump curve's
-/// live-checked slots come from.
+/// live-checked slots come from. A `PumpCurve` trade carries the v3 list
+/// ([`CurveExtrasFormat::V3`]; [`trade_extras_as`] for the other).
 pub fn trade_extras(
     kind: VenueKind,
     market: &Market,
     read: &[Option<AccountData>],
+) -> anyhow::Result<Vec<AccountMeta>> {
+    trade_extras_as(kind, market, read, CurveExtrasFormat::V3)
+}
+
+/// [`trade_extras`] with a `PumpCurve` trade's list in `curve` format (the other venues have one).
+pub fn trade_extras_as(
+    kind: VenueKind,
+    market: &Market,
+    read: &[Option<AccountData>],
+    curve: CurveExtrasFormat,
 ) -> anyhow::Result<Vec<AccountMeta>> {
     let metas = |keys: &[Pubkey], writable: &[usize]| {
         keys.iter()
@@ -180,7 +279,10 @@ pub fn trade_extras(
                 AccountMeta::new(market.trader_wsol, false),
             ])
         }
-        VenueKind::PumpCurve => pump_trade_extras(market, read),
+        VenueKind::PumpCurve => match curve {
+            CurveExtrasFormat::V3 => pump_trade_extras(market, read),
+            CurveExtrasFormat::V2 => pump_trade_extras_v2(market, read),
+        },
         VenueKind::PumpSwap => pamm_trade_extras(market, read),
         VenueKind::PumpMigrating => bail!("a migrating curve has no trade (VenueMigrating)"),
         VenueKind::None => bail!("a list-only market has no trade (NoRoute)"),
@@ -443,8 +545,6 @@ fn pamm_trade_extras(
 /// A `PumpCurve` trade's TradeExtras T0–T9 for pump's v3 trades (pump-final §6.1.1, ARCH §3.12;
 /// module docs): W at T4–T8. T7 is a buyback recipient of the live `Global` (the selection rule
 /// of [`pump_recipients`]); v3 names no fee recipient, creator vault or pump-fees account.
-/// (The 20-key list of the v2 adapter, for a shortwin 1.0.0 deployment, and the per-deploy-slot
-/// choice between the two are pump-final §7's upgrade window.)
 fn pump_trade_extras(
     market: &Market,
     read: &[Option<AccountData>],
@@ -460,6 +560,62 @@ fn pump_trade_extras(
         (pump_curve::trader_wsol_ata(market), true),
         (market.pump_uva, true),
         (buyback, true),
+        (market.trader_base_ata, true),
+        (anchor_lang::system_program::ID, false),
+    ];
+    Ok(keys
+        .into_iter()
+        .map(|(k, w)| {
+            if w {
+                AccountMeta::new(k, false)
+            } else {
+                AccountMeta::new_readonly(k, false)
+            }
+        })
+        .collect())
+}
+
+/// shortwin 1.0.0's `PumpCurve` TradeExtras T0–T19 for pump's v2 trades (ARCH §3.12 as audited;
+/// module docs, "The upgrade window"), W at T6–T13 and T16–T18: T6 / T8 a fee and a buyback
+/// recipient of the live `Global` ([`pump_recipients`]), T12 / T13 the creator vault of the live
+/// `curve.creator` (the cache's when it is the cached creator, R-PUMP §8) and its WSOL ATA, the
+/// rest the market's curve cache and pump's constants — the list the keeper sent before the v3
+/// adapter, kept for one release (pump-final §7).
+pub fn pump_trade_extras_v2(
+    market: &Market,
+    read: &[Option<AccountData>],
+) -> anyhow::Result<Vec<AccountMeta>> {
+    use shortwin::constants::{
+        ASSOCIATED_TOKEN_PROGRAM_ID, PUMP_EVENT_AUTHORITY, PUMP_FEES_PROGRAM_ID,
+        PUMP_GLOBAL_VOLUME_ACCUMULATOR, PUMP_PROGRAM_ID, TOKEN_PROGRAM_ID, WSOL_MINT,
+    };
+    let (fee_recipient, buyback) = pump_recipients(market, read)?;
+    let (_, curve) = live_curve_accounts(read)?;
+    let creator = Pubkey::new_from_array(curve.creator);
+    let vault = if creator == market.cached_creator {
+        market.cached_creator_vault
+    } else {
+        pump_curve::creator_vault(&creator)
+    };
+    let keys: [(Pubkey, bool); CurveExtrasFormat::V2_TRADE_LEN] = [
+        (PUMP_PROGRAM_ID, false),
+        (PUMP_EVENT_AUTHORITY, false),
+        (PUMP_FEES_PROGRAM_ID, false),
+        (WSOL_MINT, false),
+        (TOKEN_PROGRAM_ID, false),
+        (ASSOCIATED_TOKEN_PROGRAM_ID, false),
+        (fee_recipient, true),
+        (pump_curve::wsol_ata(&fee_recipient), true),
+        (buyback, true),
+        (pump_curve::wsol_ata(&buyback), true),
+        (market.curve_quote_ata, true),
+        (pump_curve::wsol_ata(&market.trader), true),
+        (vault, true),
+        (pump_curve::wsol_ata(&vault), true),
+        (market.sharing_config, false),
+        (PUMP_GLOBAL_VOLUME_ACCUMULATOR, false),
+        (market.pump_uva, true),
+        (market.pump_uva_quote_ata, true),
         (market.trader_base_ata, true),
         (anchor_lang::system_program::ID, false),
     ];
@@ -957,8 +1113,171 @@ mod tests {
             lists.push(x);
         }
         assert_eq!(lists[0], lists[1], "v3 names no creator vault");
+        assert_eq!(
+            lists[0],
+            trade_extras_as(
+                VenueKind::PumpCurve,
+                &m,
+                &{
+                    let mut read: Vec<Option<AccountData>> = vec![None; pump_curve::READ_LEN];
+                    read[pump_curve::C_CURVE] = Some(curve(cached));
+                    read[pump_curve::C_GLOBAL] = Some(global(fee, bb));
+                    read
+                },
+                CurveExtrasFormat::V3
+            )
+            .unwrap(),
+            "trade_extras is the V3 list"
+        );
         // No Global read: no trade.
         assert!(trade_extras(VenueKind::PumpCurve, &m, &[]).is_err());
+    }
+
+    /// pump-final §7, the upgrade window: the V2 list is shortwin 1.0.0's T0–T19 — the live
+    /// `Global`'s fee and buyback recipients (the mint's first byte picks the entry) with their WSOL
+    /// ATAs, the live creator's vault (the cache's when it is the cached creator, else derived) and
+    /// its WSOL ATA, the cached curve keys — writable at T6–T13 and T16–T18, no signer; the other
+    /// venues have one list whatever the format.
+    #[test]
+    fn the_v2_curve_list_is_shortwin_1_0_0s() {
+        use shortwin::constants::{
+            ASSOCIATED_TOKEN_PROGRAM_ID, PUMP_EVENT_AUTHORITY, PUMP_FEES_PROGRAM_ID,
+            PUMP_GLOBAL_VOLUME_ACCUMULATOR, PUMP_PROGRAM_ID, TOKEN_PROGRAM_ID, WSOL_MINT,
+        };
+        let mut m = market(false, Pubkey::new_unique());
+        m.bonding_curve = Pubkey::new_unique();
+        m.canonical_pool = Pubkey::new_unique();
+        m.trader = Pubkey::new_unique();
+        m.trader_base_ata = Pubkey::new_unique();
+        m.mint = Pubkey::new_from_array([3u8; 32]);
+        let cached = Pubkey::new_unique();
+        pump_curve::write_cache(&mut m, &cached);
+        let fee: [Pubkey; 8] = core::array::from_fn(|_| Pubkey::new_unique());
+        let bb: [Pubkey; 8] = core::array::from_fn(|_| Pubkey::new_unique());
+        for (creator, vault) in [
+            (cached, m.cached_creator_vault),
+            (Pubkey::new_unique(), Pubkey::default()),
+        ] {
+            let mut read: Vec<Option<AccountData>> = vec![None; pump_curve::READ_LEN];
+            read[pump_curve::C_CURVE] = Some(curve(creator));
+            read[pump_curve::C_GLOBAL] = Some(global(fee, bb));
+            let x =
+                trade_extras_as(VenueKind::PumpCurve, &m, &read, CurveExtrasFormat::V2).unwrap();
+            assert_eq!(x.len(), CurveExtrasFormat::V2.trade_len());
+            assert_eq!(x.len(), 20);
+            let vault = if vault == Pubkey::default() {
+                pump_curve::creator_vault(&creator)
+            } else {
+                vault
+            };
+            let want = [
+                PUMP_PROGRAM_ID,
+                PUMP_EVENT_AUTHORITY,
+                PUMP_FEES_PROGRAM_ID,
+                WSOL_MINT,
+                TOKEN_PROGRAM_ID,
+                ASSOCIATED_TOKEN_PROGRAM_ID,
+                fee[3],
+                pump_curve::wsol_ata(&fee[3]),
+                bb[3],
+                pump_curve::wsol_ata(&bb[3]),
+                m.curve_quote_ata,
+                pump_curve::wsol_ata(&m.trader),
+                vault,
+                pump_curve::wsol_ata(&vault),
+                m.sharing_config,
+                PUMP_GLOBAL_VOLUME_ACCUMULATOR,
+                m.pump_uva,
+                m.pump_uva_quote_ata,
+                m.trader_base_ata,
+                anchor_lang::system_program::ID,
+            ];
+            assert_eq!(x.iter().map(|a| a.pubkey).collect::<Vec<_>>(), want);
+            let w: Vec<usize> = x
+                .iter()
+                .enumerate()
+                .filter(|(_, a)| a.is_writable)
+                .map(|(i, _)| i)
+                .collect();
+            assert_eq!(w, [6, 7, 8, 9, 10, 11, 12, 13, 16, 17, 18]);
+            assert!(x.iter().all(|a| !a.is_signer));
+        }
+        assert!(
+            trade_extras_as(VenueKind::PumpCurve, &m, &[], CurveExtrasFormat::V2).is_err(),
+            "no Global read: no trade"
+        );
+        for f in [CurveExtrasFormat::V2, CurveExtrasFormat::V3] {
+            assert_eq!(f.other().other(), f);
+            assert_eq!(
+                trade_extras_as(VenueKind::RaydiumV4, &m, &[], f).unwrap(),
+                trade_extras(VenueKind::RaydiumV4, &m, &[]).unwrap()
+            );
+        }
+        assert_eq!(CurveExtrasFormat::V3.trade_len(), pump_curve::TRADE_LEN);
+    }
+
+    /// pump-final §7: what an exit's simulation says about the TradeExtras format it carried —
+    /// success, a later refusal or a venue's own failure got past account parsing; the parser's
+    /// two refusals did not; a failure before it (an Anchor constraint, the market's own checks)
+    /// or without a custom error says nothing.
+    #[test]
+    fn format_evidence_reads_the_account_parsing_refusals() {
+        use shortwin::errors::ShortwinError as E;
+        use shortwin_services_common::{TxError, TxOutcome};
+        let refused = |program: Pubkey, code: Option<u32>| TxOutcome {
+            err: Some(match code {
+                Some(code) => TxError::Custom { index: 1, code },
+                None => TxError::Instruction {
+                    index: 1,
+                    detail: "InvalidAccountData".into(),
+                },
+            }),
+            logs: vec![
+                format!("Program {program} invoke [1]"),
+                format!("Program {program} failed: custom program error"),
+            ],
+            ..TxOutcome::default()
+        };
+        let sw = shortwin::ID;
+        let c = |e: E| Some(u32::from(e));
+        assert_eq!(
+            format_evidence(&TxOutcome::default()),
+            FormatEvidence::Parsed
+        );
+        for e in [E::BadRemainingAccounts, E::VenueAccountMismatch] {
+            assert_eq!(
+                format_evidence(&refused(sw, c(e))),
+                FormatEvidence::ParseFailed
+            );
+        }
+        for e in [
+            E::ExitBoundNotMet,
+            E::UseSolSettle,
+            E::NotLiquidatable,
+            E::EmaWarmingUp,
+        ] {
+            assert_eq!(format_evidence(&refused(sw, c(e))), FormatEvidence::Parsed);
+        }
+        // pump's 6002 behind short.win's CPI: pump is the failing program the logs name first.
+        let pump = shortwin::constants::PUMP_PROGRAM_ID;
+        assert_eq!(
+            format_evidence(&refused(pump, Some(6_002))),
+            FormatEvidence::Parsed
+        );
+        for code in [
+            c(E::AccountMismatch),
+            c(E::ConfigVersion),
+            c(E::NoRoute),
+            c(E::VenueMigrating),
+            Some(2_006),
+            None,
+        ] {
+            assert_eq!(
+                format_evidence(&refused(sw, code)),
+                FormatEvidence::Unknown,
+                "{code:?}"
+            );
+        }
     }
 
     /// M6-SEC-4: the exit's `create_idempotent(T11)` goes out only on a PumpSwap market whose live

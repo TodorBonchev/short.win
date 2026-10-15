@@ -19,9 +19,12 @@
 //! transactions ([`LiteSvmChain::set_v1`], to exercise the v0 fallback), the recent
 //! priority fees the backend reports ([`LiteSvmChain::set_priority_fees`]), whole-account
 //! reads of a key that fail ([`LiteSvmChain::fail_reads_of`]), simulations that fail
-//! ([`LiteSvmChain::fail_simulations`]), header reads of a node lagging the last deploy
-//! ([`LiteSvmChain::lag_headers_of`]) and simulations served by a node that stays behind
-//! ([`LiteSvmChain::lag_simulations`]); every read and send is logged
+//! ([`LiteSvmChain::fail_simulations`]), exit simulations short.win refuses with a given error
+//! ([`LiteSvmChain::refuse_exit_simulations`], or only those its own account parsing passes:
+//! [`LiteSvmChain::refuse_parsed_exit_simulations`]), header reads of a node lagging the last
+//! deploy ([`LiteSvmChain::lag_headers_of`]) and simulations — all, or the exits' — served by a
+//! node that stays behind ([`LiteSvmChain::lag_simulations`],
+//! [`LiteSvmChain::lag_exit_simulations`]); every read and send is logged
 //! ([`LiteSvmChain::rpc_log`], M4-SEC-7: the keeper's RPC work per tick), the blockhash,
 //! priority-fee and simulation calls counted ([`LiteSvmChain::other_calls`]). **Timing**
 //! (M7-SEC-1, M7-SEC-6): the keeper's
@@ -31,14 +34,9 @@
 //! ([`LiteSvmChain::before_next_send`]); [`Harness::second_slow`] models a tick that waited for
 //! its confirmations (the next tick's clock a second later than the tick's own).
 //!
-//! **Bundles** (the straddle, ARCH §5.4; U22): [`LiteSvmChain`] executes a bundle as Jito does —
-//! its transactions in order, in one slot (the blockhash is the one the bundle was built with,
-//! checked once), all-or-nothing (the VM is restored when one fails) — each through
-//! [`send_with_hooks`]; `simulate_bundle` runs them in order on a clone. A test can refuse bundles
-//! ([`LiteSvmChain::set_bundles`]: a chain without a block engine) and make the next bundle
-//! pre-flight report one transaction as failed ([`LiteSvmChain::fail_next_bundle_simulation`]:
-//! the keeper's V1-9 fallback). [`load_complete_curve`] deploys the straddle helper
-//! (`target/deploy/complete_curve.so`, or `$COMPLETE_CURVE_SO`).
+//! **No bundles** (pump-final §7, owner D2): the keeper sends none since the straddle bundle's
+//! retirement, so this backend keeps the trait's refusing `send_bundle` / `simulate_bundle` (its
+//! in-process Jito executor and the `complete-curve` helper's loader left with the straddle).
 //!
 //! [`Harness`] couples the environment, a funded keeper and the clock: one keeper tick per
 //! slot or per second.
@@ -56,7 +54,7 @@ use shortwin_keeper::{Keeper, KeeperConfig, TickReport};
 use shortwin_litesvm_tests::{Env, invariants, read};
 use shortwin_services_common::tx::{self, TxFormat};
 use shortwin_services_common::{
-    AccountData, BundleOutcome, Chain, ChainClock, InnerIx, Memcmp, TxError, TxOutcome,
+    AccountData, Chain, ChainClock, InnerIx, Memcmp, TxError, TxOutcome,
 };
 use solana_hash::Hash;
 use solana_keypair::Keypair;
@@ -75,16 +73,12 @@ pub struct LiteSvmChain {
     fees: RefCell<Vec<u64>>,
     sent: RefCell<Vec<SentTx>>,
     rpc: RefCell<Vec<Rpc>>,
-    bundles: Cell<bool>,
-    bundles_sent: RefCell<Vec<SentBundle>>,
-    before_bundle: RefCell<Option<BeforeBundle>>,
-    fail_bundle_sim: Cell<Option<(usize, u32)>>,
     /// Seconds the keeper's clock read lags the chain's (M7-SEC-1: a `confirmed` read on mainnet
     /// is 1–2 slots behind the tip its transactions land at).
     clock_lag: Cell<i64>,
     /// Runs before the next `send` executes (a trade landing between the keeper's read and its
     /// transaction; M7-SEC-2 (b)).
-    before_send: RefCell<Option<BeforeBundle>>,
+    before_send: RefCell<Option<BeforeSend>>,
     /// Landing latency (M7-SEC-1, M7-SEC-6): before each `send` executes, the chain's clock
     /// advances by the next value of this source (seconds; 0: the second the keeper read), so
     /// the keeper's transaction lands later than the clock it read — as a `confirmed` read plus
@@ -99,8 +93,13 @@ pub struct LiteSvmChain {
     /// times ([`LiteSvmChain::lag_headers_of`]).
     lag_headers: Cell<Option<(Pubkey, u64, usize)>>,
     /// Simulations answered from a copy of the VM ([`LiteSvmChain::lag_simulations`]): the copy,
-    /// its slot, how many more.
-    stale_sims: RefCell<Option<(litesvm::LiteSVM, u64, usize)>>,
+    /// its slot, how many more, and whether only exits' ([`LiteSvmChain::lag_exit_simulations`]).
+    stale_sims: RefCell<Option<(litesvm::LiteSVM, u64, usize, bool)>>,
+    /// The custom error short.win's `liquidate` / `expire` simulations are refused with, and
+    /// whether only where its own account parsing passes
+    /// ([`LiteSvmChain::refuse_exit_simulations`],
+    /// [`LiteSvmChain::refuse_parsed_exit_simulations`]).
+    refuse_exits: Cell<Option<(u32, bool)>>,
     /// The calls [`Rpc`] does not log ([`LiteSvmChain::other_calls`]).
     other: Cell<OtherCalls>,
 }
@@ -131,24 +130,9 @@ impl OtherCalls {
 /// A source of landing delays (seconds) for [`LiteSvmChain::set_landing_delays`].
 pub type LandingDelays = Box<dyn FnMut() -> i64>;
 
-/// What runs when the next bundle reaches the chain, before it executes (a trade landing between
-/// the keeper's read and its bundle).
-type BeforeBundle = Box<dyn FnOnce(&mut Env)>;
-
-/// A bundle the keeper sent (for assertions).
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SentBundle {
-    /// Each transaction as sent.
-    pub txs: Vec<SentTx>,
-    /// Top-level instructions of each transaction (ComputeBudget included).
-    pub top: Vec<usize>,
-    /// Instruction-trace entries of each transaction that ran (top-level instructions, ComputeBudget
-    /// included, plus every inner instruction; ARCH §6.2).
-    pub trace: Vec<usize>,
-    /// Compute units of each transaction that ran.
-    pub units: Vec<u64>,
-    pub landed: bool,
-}
+/// What runs when the keeper's next send reaches the chain, before it executes (a trade landing
+/// between the keeper's read and its transaction).
+type BeforeSend = Box<dyn FnOnce(&mut Env)>;
 
 /// One backend call, as a JSON-RPC backend would make it (M4-SEC-7's measurements).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -159,8 +143,6 @@ pub enum Rpc {
     ProgramAccounts,
     /// `sendTransaction` of a transaction naming these short.win instruction count.
     Send { instructions: usize },
-    /// `sendBundle` of this many transactions (a block engine call).
-    SendBundle { txs: usize },
 }
 
 impl Rpc {
@@ -168,7 +150,7 @@ impl Rpc {
     pub fn calls(&self) -> usize {
         match self {
             Self::Accounts(keys) => keys.len().div_ceil(100).max(1),
-            Self::ProgramAccounts | Self::Send { .. } | Self::SendBundle { .. } => 1,
+            Self::ProgramAccounts | Self::Send { .. } => 1,
         }
     }
 }
@@ -257,10 +239,6 @@ impl LiteSvmChain {
             fees: RefCell::new(Vec::new()),
             sent: RefCell::new(Vec::new()),
             rpc: RefCell::new(Vec::new()),
-            bundles: Cell::new(true),
-            bundles_sent: RefCell::new(Vec::new()),
-            before_bundle: RefCell::new(None),
-            fail_bundle_sim: Cell::new(None),
             clock_lag: Cell::new(0),
             before_send: RefCell::new(None),
             landing: RefCell::new(None),
@@ -268,8 +246,29 @@ impl LiteSvmChain {
             fail_sims: Cell::new(0),
             lag_headers: Cell::new(None),
             stale_sims: RefCell::new(None),
+            refuse_exits: Cell::new(None),
             other: Cell::new(OtherCalls::default()),
         }
+    }
+
+    /// While `code` is set, every simulation (`simulate`) of a transaction carrying short.win's
+    /// `liquidate` or `expire` is answered as the program's refusal of that instruction with
+    /// custom error `code` (Anchor's error log, `custom program error`), the VM untouched: what a
+    /// short.win build whose account parsing neither of the keeper's curve TradeExtras lists
+    /// matches answers, or a market whose ReadSet or VenueExtras fails that parsing (pump-final
+    /// §7). `None` turns it off. Other simulations run as usual.
+    pub fn refuse_exit_simulations(&self, code: Option<u32>) {
+        self.refuse_exits.set(code.map(|c| (c, false)));
+    }
+
+    /// [`Self::refuse_exit_simulations`] only where short.win's own account parsing passes the
+    /// exit's lists: a simulation the program refuses on account parsing itself
+    /// (`BadRemainingAccounts`, `VenueAccountMismatch`) is answered as it ran. What a market whose
+    /// VenueExtras fail `parse_extras` — after the TradeExtras parser — answers (pump-final §7):
+    /// the list the deployed build takes is refused with `code`, the other by that parser. `None`
+    /// turns it off.
+    pub fn refuse_parsed_exit_simulations(&self, code: Option<u32>) {
+        self.refuse_exits.set(code.map(|c| (c, true)));
     }
 
     /// The next `times` simulations (`simulate`) are answered from the VM as it is now, with
@@ -278,13 +277,38 @@ impl LiteSvmChain {
     /// read showed). The copy checks no signature and no blockhash (the keeper's blockhash is
     /// newer than it).
     pub fn lag_simulations(&self, times: usize) {
+        self.lag(times, false);
+    }
+
+    /// [`Self::lag_simulations`] for the next `times` simulations of a transaction carrying
+    /// short.win's `liquidate` or `expire` only (pump-final §7: a curve exit simulated on a bank
+    /// before short.win's upgrade the keeper's header read showed); the others run as usual.
+    pub fn lag_exit_simulations(&self, times: usize) {
+        self.lag(times, true);
+    }
+
+    fn lag(&self, times: usize, exits_only: bool) {
         let env = self.env.borrow();
         let svm = env
             .svm
             .clone()
             .with_sigverify(false)
             .with_blockhash_check(false);
-        *self.stale_sims.borrow_mut() = Some((svm, env.clock().slot, times));
+        *self.stale_sims.borrow_mut() = Some((svm, env.clock().slot, times, exits_only));
+    }
+
+    /// `tx` simulated on the VM, or on the copy of [`Self::lag_simulations`] while it answers.
+    fn run_simulation(&self, tx: &VersionedTransaction) -> TxOutcome {
+        let env = self.env.borrow();
+        let alts = lookup_tables(&env, tx);
+        if let Some((svm, slot, times, exits_only)) = self.stale_sims.borrow_mut().as_mut()
+            && *times > 0
+            && (!*exits_only || exit_index(&env, tx).is_some())
+        {
+            *times -= 1;
+            return simulated(svm, tx, &alts, *slot);
+        }
+        simulated(&env.svm, tx, &alts, env.clock().slot)
     }
 
     /// The calls the [`Rpc`] log leaves out, so far.
@@ -348,33 +372,9 @@ impl LiteSvmChain {
 
     /// Every `send` from now on lands `delays()` seconds after the clock the keeper read (the
     /// chain's clock advances by that much, two and a half slots a second, before the
-    /// transaction executes); `None` turns it off. Bundles and simulations are unaffected.
+    /// transaction executes); `None` turns it off. Simulations are unaffected.
     pub fn set_landing_delays(&self, delays: Option<LandingDelays>) {
         *self.landing.borrow_mut() = delays;
-    }
-
-    /// The next `simulate_bundle` reports transaction `tx` (0-based) as failed with custom error
-    /// `code` (its later transactions not run), once: a pre-flight failure the keeper's V1-9
-    /// fallback must handle (the bundle then goes out without it). The chain itself is unchanged.
-    pub fn fail_next_bundle_simulation(&self, tx: usize, code: u32) {
-        self.fail_bundle_sim.set(Some((tx, code)));
-    }
-
-    /// Runs `f` on the environment when the next bundle reaches the chain — after the keeper's
-    /// read and pre-flight, before the bundle executes: T-STRADDLE's "a curve trade lands between
-    /// the keeper's read and the bundle". The bundle's blockhash stays the one it was built with.
-    pub fn before_next_bundle(&self, f: impl FnOnce(&mut Env) + 'static) {
-        *self.before_bundle.borrow_mut() = Some(Box::new(f));
-    }
-
-    /// Accept (or refuse, as a chain without a block engine) bundles.
-    pub fn set_bundles(&self, accepted: bool) {
-        self.bundles.set(accepted);
-    }
-
-    /// Every bundle sent so far.
-    pub fn bundles_sent(&self) -> Vec<SentBundle> {
-        self.bundles_sent.borrow().clone()
     }
 
     /// Every backend call so far, in order (M4-SEC-7).
@@ -418,6 +418,80 @@ fn lookup_tables(env: &Env, tx: &VersionedTransaction) -> Vec<AddressLookupTable
             tx::parse_lookup_table(l.account_key, &a.owner, &a.data).ok()
         })
         .collect()
+}
+
+/// The index of `tx`'s first short.win `liquidate` or `expire` instruction, if any.
+fn exit_index(env: &Env, tx: &VersionedTransaction) -> Option<u8> {
+    use anchor_lang::Discriminator;
+    let alts = lookup_tables(env, tx);
+    let ixs = tx::decompile(tx, &alts).ok()?;
+    let i = ixs.iter().position(|ix| {
+        ix.program_id == shortwin::ID
+            && (ix
+                .data
+                .starts_with(shortwin::instruction::Liquidate::DISCRIMINATOR)
+                || ix
+                    .data
+                    .starts_with(shortwin::instruction::Expire::DISCRIMINATOR))
+    })?;
+    u8::try_from(i).ok()
+}
+
+/// short.win's refusal of top-level instruction `index` with custom error `code`, as a simulation
+/// in `slot` reports it ([`LiteSvmChain::refuse_exit_simulations`]).
+fn injected_refusal(index: u8, code: u32, slot: u64) -> TxOutcome {
+    let id = shortwin::ID;
+    TxOutcome {
+        err: Some(TxError::Custom { index, code }),
+        logs: vec![
+            format!("Program {id} invoke [1]"),
+            format!(
+                "Program log: AnchorError thrown in keeper-litesvm (injected). Error Code: \
+                 Injected. Error Number: {code}. Error Message: an injected refusal."
+            ),
+            format!("Program {id} failed: custom program error: {code:#x}"),
+        ],
+        slot,
+        ..TxOutcome::default()
+    }
+}
+
+/// Whether `out` is short.win's own refusal on account parsing (`BadRemainingAccounts`,
+/// `VenueAccountMismatch`; [`LiteSvmChain::refuse_parsed_exit_simulations`]).
+fn parse_refusal(out: &TxOutcome) -> bool {
+    use shortwin::errors::ShortwinError as E;
+    out.err
+        .as_ref()
+        .and_then(TxError::custom_code)
+        .filter(|c| {
+            *c == u32::from(E::BadRemainingAccounts) || *c == u32::from(E::VenueAccountMismatch)
+        })
+        .is_some_and(|c| {
+            let failed = format!(
+                "Program {} failed: custom program error: {c:#x}",
+                shortwin::ID
+            );
+            out.logs.contains(&failed)
+        })
+}
+
+/// `tx` simulated on `svm` as a node at `slot` answers it.
+fn simulated(
+    svm: &litesvm::LiteSVM,
+    tx: &VersionedTransaction,
+    alts: &[AddressLookupTableAccount],
+    slot: u64,
+) -> TxOutcome {
+    match svm.simulate_transaction(tx.clone()) {
+        Ok(info) => outcome(tx, alts, &info.meta, None, slot),
+        Err(f) => outcome(
+            tx,
+            alts,
+            &f.meta,
+            Some(TxError::from_transaction_error(f.err)),
+            slot,
+        ),
+    }
 }
 
 /// The outcome of `tx` run in `slot` (its metadata `meta`, its failure `err`).
@@ -689,35 +763,19 @@ impl Chain for LiteSvmChain {
             self.fail_sims.set(left);
             anyhow::bail!("simulateTransaction: injected failure");
         }
-        if let Some((svm, slot, times)) = self.stale_sims.borrow_mut().as_mut()
-            && *times > 0
-        {
-            *times -= 1;
-            let alts = lookup_tables(&self.env.borrow(), tx);
-            return Ok(match svm.simulate_transaction(tx.clone()) {
-                Ok(info) => outcome(tx, &alts, &info.meta, None, *slot),
-                Err(f) => outcome(
-                    tx,
-                    &alts,
-                    &f.meta,
-                    Some(TxError::from_transaction_error(f.err)),
-                    *slot,
-                ),
-            });
+        let refusal = self.refuse_exits.get().and_then(|(code, after_parse)| {
+            let env = self.env.borrow();
+            exit_index(&env, tx)
+                .map(|index| (injected_refusal(index, code, env.clock().slot), after_parse))
+        });
+        match refusal {
+            Some((injected, false)) => Ok(injected),
+            Some((injected, true)) => {
+                let out = self.run_simulation(tx);
+                Ok(if parse_refusal(&out) { out } else { injected })
+            }
+            None => Ok(self.run_simulation(tx)),
         }
-        let env = self.env.borrow();
-        let alts = lookup_tables(&env, tx);
-        let slot = env.clock().slot;
-        Ok(match env.svm.simulate_transaction(tx.clone()) {
-            Ok(info) => outcome(tx, &alts, &info.meta, None, slot),
-            Err(f) => outcome(
-                tx,
-                &alts,
-                &f.meta,
-                Some(TxError::from_transaction_error(f.err)),
-                slot,
-            ),
-        })
     }
 
     async fn send(&self, tx: &VersionedTransaction) -> anyhow::Result<TxOutcome> {
@@ -761,179 +819,6 @@ impl Chain for LiteSvmChain {
         self.count(|c| c.priority_fees += 1);
         Ok(self.fees.borrow().clone())
     }
-
-    async fn send_bundle(&self, txs: &[VersionedTransaction]) -> anyhow::Result<BundleOutcome> {
-        if !self.bundles.get() {
-            anyhow::bail!("no block engine configured: bundles cannot be sent");
-        }
-        if txs.is_empty() || txs.len() > 5 {
-            anyhow::bail!("a bundle holds 1 to 5 transactions, not {}", txs.len());
-        }
-        self.rpc
-            .borrow_mut()
-            .push(Rpc::SendBundle { txs: txs.len() });
-        let mut env = self.env.borrow_mut();
-        // One slot: every transaction must carry the blockhash the chain had when the bundle
-        // arrived; each then runs with the blockhash check off (the harness expires the
-        // blockhash after every send).
-        let latest = env.svm.latest_blockhash();
-        if let Some(f) = self.before_bundle.borrow_mut().take() {
-            f(&mut env);
-        }
-        if let Some(i) = txs
-            .iter()
-            .position(|t| *t.message.recent_blockhash() != latest)
-        {
-            return Ok(BundleOutcome {
-                detail: format!("tx{}: BlockhashNotFound", i + 1),
-                ..BundleOutcome::default()
-            });
-        }
-        let before = env.svm.clone();
-        // A bundle that fails commits nothing: neither does the session recording.
-        let recording = env.recording_mark();
-        env.svm = before.clone().with_blockhash_check(false);
-        let mut outs = Vec::with_capacity(txs.len());
-        let mut record = SentBundle {
-            txs: Vec::new(),
-            top: Vec::new(),
-            trace: Vec::new(),
-            units: Vec::new(),
-            landed: false,
-        };
-        let mut failed: Option<usize> = None;
-        for (i, tx) in txs.iter().enumerate() {
-            let alts = lookup_tables(&env, tx);
-            let res = send_with_hooks(&mut env, tx);
-            let slot = env.clock().slot;
-            let (out, trace) = match &res {
-                Ok(meta) => (
-                    outcome(tx, &alts, meta, None, slot),
-                    tx.message.instructions().len()
-                        + meta.inner_instructions.iter().map(Vec::len).sum::<usize>(),
-                ),
-                Err(f) => (
-                    outcome(
-                        tx,
-                        &alts,
-                        &f.meta,
-                        Some(TxError::from_transaction_error(f.err.clone())),
-                        slot,
-                    ),
-                    0,
-                ),
-            };
-            let ixs = tx::decompile(tx, &alts).unwrap_or_default();
-            record.txs.push(sent_record(tx, &ixs, &out, slot));
-            record.top.push(tx.message.instructions().len());
-            record.trace.push(trace);
-            record.units.push(out.units_consumed);
-            let ok = out.ok();
-            outs.push(out);
-            if !ok {
-                failed = Some(i);
-                break;
-            }
-        }
-        let landed = failed.is_none();
-        if landed {
-            // The harness's VM checks blockhashes (`LiteSVM::new`); restore that.
-            env.svm = std::mem::replace(&mut env.svm, before).with_blockhash_check(true);
-            env.svm.expire_blockhash();
-        } else {
-            // All-or-nothing: nothing of the bundle is committed.
-            env.svm = before;
-            env.recording_rollback(recording);
-        }
-        record.landed = landed;
-        self.bundles_sent.borrow_mut().push(record);
-        let detail = failed
-            .and_then(|i| outs.get(i).map(|o| format!("tx{}: {:?}", i + 1, o.err)))
-            .unwrap_or_default();
-        Ok(BundleOutcome {
-            id: format!("litesvm-bundle-{}", self.bundles_sent.borrow().len()),
-            landed,
-            txs: outs,
-            detail,
-        })
-    }
-
-    async fn simulate_bundle(
-        &self,
-        txs: &[VersionedTransaction],
-    ) -> anyhow::Result<Vec<TxOutcome>> {
-        if !self.bundles.get() {
-            anyhow::bail!("no bundle simulation on this chain");
-        }
-        let env = self.env.borrow();
-        let mut svm = env
-            .svm
-            .clone()
-            .with_sigverify(false)
-            .with_blockhash_check(false);
-        let mut outs = Vec::with_capacity(txs.len());
-        let fail = self.fail_bundle_sim.take();
-        for (i, tx) in txs.iter().enumerate() {
-            if let Some(r) = self.refused(tx) {
-                outs.push(r);
-                break;
-            }
-            if let Some((at, code)) = fail
-                && at == i
-            {
-                outs.push(TxOutcome {
-                    err: Some(TxError::Custom { index: 0, code }),
-                    ..TxOutcome::default()
-                });
-                break;
-            }
-            let alts = lookup_tables(&env, tx);
-            let slot = env.clock().slot;
-            let out = match svm.send_transaction(tx.clone()) {
-                Ok(meta) => outcome(tx, &alts, &meta, None, slot),
-                Err(f) => outcome(
-                    tx,
-                    &alts,
-                    &f.meta,
-                    Some(TxError::from_transaction_error(f.err)),
-                    slot,
-                ),
-            };
-            let ok = out.ok();
-            outs.push(out);
-            if !ok {
-                break;
-            }
-        }
-        Ok(outs)
-    }
-}
-
-/// Path of the straddle helper's SBF build: `$COMPLETE_CURVE_SO`, else
-/// `target/deploy/complete_curve.so` (`anchor build --tools-version v1.57 --arch v3`).
-pub fn complete_curve_so() -> std::path::PathBuf {
-    std::env::var_os("COMPLETE_CURVE_SO").map_or_else(
-        || {
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("../../target/deploy/complete_curve.so")
-        },
-        std::path::PathBuf::from,
-    )
-}
-
-/// Deploys the `complete-curve` helper (ARCH §5.4, A66) into `env` at its program id.
-pub fn load_complete_curve(env: &mut Env) {
-    let path = complete_curve_so();
-    let so = std::fs::read(&path).unwrap_or_else(|e| {
-        panic!(
-            "cannot read {}: {e}. Build it first: `anchor build --tools-version v1.57 --arch v3` \
-             (or set COMPLETE_CURVE_SO)",
-            path.display()
-        )
-    });
-    env.svm
-        .add_program(complete_curve::ID, &so)
-        .unwrap_or_else(|e| panic!("add_program(complete_curve): {e:?}"));
 }
 
 /// Writes an active address lookup table holding `addresses` at `key` (as the ALT program

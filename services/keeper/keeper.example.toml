@@ -175,38 +175,16 @@ rank_keys_per_tick = 200
 discoveries_per_tick = 2
 
 [graduation]
-# Duty 6 (ARCH §2.5, §5.1, §5.4, §7.1): call pump migrate_v2 top-level as soon as a covered market's
-# curve completes (ADOPTED Q16), alone in its transaction, then the -> PumpSwap transition (the pool's
-# missing accounts, crank_price onto the pool and its first observation) in the same second. On
-# again in M6 (M5-SEC-4 suspended it).
+# Duty 6 (ARCH §2.5, §5.1, §7.1): call pump migrate_v2 top-level as soon as a covered market's
+# curve completes (ADOPTED Q16) -- also right after the keeper's own synthetic exit completed it --
+# alone in its transaction, then the -> PumpSwap transition (the pool's missing accounts,
+# crank_price onto the pool and its first observation) in the same second. On again in M6
+# (M5-SEC-4 suspended it).
 migrate = true
-# The straddle bundle for a liquidatable position whose Q exceeds the curve's real tokens rT:
-# tx1 complete_curve (the complete-curve helper reads rT at execution), tx2 migrate_v2, tx3 the
-# transition onto the new pool; the exit follows at the post-change warm-up's gate. Needs a Jito
-# block engine.
-straddle = true
-# Send tx1 + tx2 alone when tx3 cannot be built or fails its pre-flight (ARCH §5.4's keeper
-# fallback): the next second's crank makes the transition.
-send_without_exit = true
-# complete_curve's max_sol_cost above the keeper's quote of the rT it read (bps), and the most the
-# keeper spends completing one curve (lamports; it keeps the tokens it buys).
-complete_slippage_bps = 500
-max_complete_lamports = 20000000000
-# The Jito tip the bundle's last transaction pays (lamports), to these accounts in turn.
-tip_lamports = 100000
-tip_accounts = [
-  "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
-  "HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe",
-  "Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY",
-  "ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49",
-  "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
-  "ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt",
-  "DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL",
-  "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT",
-]
-# The block engine bundles go to (e.g. "https://mainnet.block-engine.jito.wtf"); empty: none. The
-# binary's --block-engine overrides it.
-block_engine = ""
+# pump-final §7 (owner D2): the straddle bundle's keys (straddle, send_without_exit,
+# complete_slippage_bps, max_complete_lamports, tip_lamports, tip_accounts, block_engine) are
+# removed and refused: a curve position past rT exits by pump v3's synthetic migration in its own
+# liquidate / expire.
 
 [sweep]
 # Duties 6 and 13 (ARCH §7.1; R4A-7): right after a full wipe, the venue cashback claims the trader

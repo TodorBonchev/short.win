@@ -569,10 +569,22 @@ fn every_session_replays_into_the_chain_state() {
 // ---- the catalog --------------------------------------------------------------------------------
 
 /// Kinds no session reaches, with the reason.
-const NEVER_EMITTED: [(&str, &str); 1] = [(
-    "VenueRewardsClaimed",
-    "claim_venue_rewards is not built: the program never emits it",
-)];
+const NEVER_EMITTED: [(&str, &str); 3] = [
+    (
+        "VenueRewardsClaimed",
+        "claim_venue_rewards is not built: the program never emits it",
+    ),
+    (
+        "CurveCompleted",
+        "complete_curve has no caller since the keeper's straddle bundle was retired (pump-final \
+         §7, owner D2); its ingestion leaves with the helper (P6)",
+    ),
+    (
+        "CurveAlreadyComplete",
+        "complete_curve has no caller since the keeper's straddle bundle was retired (pump-final \
+         §7, owner D2); its ingestion leaves with the helper (P6)",
+    ),
+];
 
 #[test]
 fn the_sessions_cover_the_event_catalog() {

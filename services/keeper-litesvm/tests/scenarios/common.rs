@@ -15,9 +15,10 @@ pub const Q: u64 = 3_000_000_000_000;
 
 /// `cfg` covering every market with open positions (`var_floor_lamports` 0). The fork scenarios'
 /// positions are small — well below the global budget's 1-SOL value-at-risk floor (owner decision
-/// A of 2026-10-01; ARCH §7.1 duty 8) — and what they test (straddles, wipes, exits and per-second
-/// coverage on the pump and PumpSwap venues) are the duties of a covered market; below the floor a
-/// market gets the idle cadence only, which the `budget` scenarios test.
+/// A of 2026-10-01; ARCH §7.1 duty 8) — and what they test (synthetic curve exits, graduations,
+/// wipes, exits and per-second coverage on the pump and PumpSwap venues) are the duties of a
+/// covered market; below the floor a market gets the idle cadence only, which the `budget`
+/// scenarios test.
 pub fn covering_all(mut cfg: KeeperConfig) -> KeeperConfig {
     cfg.budget.var_floor_lamports = 0;
     cfg
@@ -52,6 +53,20 @@ use shortwin_litesvm_tests::{errors, pda, read};
 use solana_keypair::Keypair;
 use solana_signer::Signer;
 use solana_transaction::Transaction;
+
+/// A System transfer of `lamports` from `from` (signer) to `to` (a donation to a PDA).
+pub fn transfer_ix(from: &Pubkey, to: &Pubkey, lamports: u64) -> Instruction {
+    let mut data = vec![2u8, 0, 0, 0];
+    data.extend_from_slice(&lamports.to_le_bytes());
+    Instruction {
+        program_id: anchor_lang::system_program::ID,
+        accounts: vec![
+            anchor_lang::solana_program::instruction::AccountMeta::new(*from, true),
+            anchor_lang::solana_program::instruction::AccountMeta::new(*to, false),
+        ],
+        data,
+    }
+}
 
 /// An outside keeper that only simulates: the oracle of "would the program accept this
 /// exit now" against which the keeper's timing is checked.

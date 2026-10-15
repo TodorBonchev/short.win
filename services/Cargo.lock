@@ -4366,7 +4366,6 @@ dependencies = [
  "anchor-lang",
  "anyhow",
  "bytemuck",
- "complete-curve",
  "futures",
  "serde",
  "shortwin",
@@ -4392,7 +4391,6 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "anyhow",
- "complete-curve",
  "litesvm",
  "shortwin",
  "shortwin-keeper",

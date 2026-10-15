@@ -52,10 +52,10 @@ pub struct MarketMetrics {
     pub pool_switches: u64,
     /// pump `migrate_v2` calls of the keeper landed (duty 6).
     pub migrations: u64,
-    /// Straddle bundles of the keeper landed (duty 6; ARCH §5.4).
-    pub straddles: u64,
-    /// `→ PumpSwap` transitions the keeper landed (duty 6, M6: its own transaction or a
-    /// straddle bundle's tx3).
+    /// pump-final §7: the keeper's landed liquidations and expiries that bought past a live
+    /// curve's `rT` by pump's synthetic migration (`B̂_v3`), completing the curve.
+    pub synthetic_exits: u64,
+    /// `→ PumpSwap` transitions the keeper landed (duty 6, M6).
     pub transitions: u64,
     /// `sweep_trader` calls of the keeper landed (duties 6 and 13), with the venue cashback claims
     /// among them.
@@ -87,6 +87,16 @@ pub struct MarketMetrics {
     pub paused_coverage: bool,
     /// Degraded (1) or not (0).
     pub degraded: bool,
+    /// Duty 10 (pump-final §7) on a `PumpMigrating` market, at its last read: `ρ − 1` in bps —
+    /// the price of the pool `migrate_v2` will create (after a synthetic pool part: the live
+    /// `curve_base_ata`, `rQ − fee + pcQ`) over the same curve's without the pool part or a
+    /// donation (pump-final §5.4; 0 without a pool part); `None` off a migrating market or
+    /// when it does not compute (the post-complete fields not known, an unreadable input).
+    pub synthetic_completion_delta_bps: Option<i64>,
+    /// Duty 10 on a `PumpMigrating` market: the tokens donated to `curve_base_ata`,
+    /// `A + pcB − 206.9e12` (pump-final §5.4; negative only if pump's own accounting broke);
+    /// `None` off a migrating market.
+    pub curve_base_ata_donation: Option<i128>,
     /// The last second covered.
     last_covered: i64,
 }
@@ -192,6 +202,14 @@ pub struct Metrics {
     /// `ExpireWait`; once per position and tick).
     pub b_ratio_landed: Histogram,
     pub b_ratio_wait: Histogram,
+    /// pump-final §7: the keeper's landed synthetic curve exits, all markets
+    /// (`MarketMetrics::synthetic_exits`).
+    pub synthetic_exits: u64,
+    /// pump-final §7, the upgrade window: curve exits whose TradeExtras format had to be found
+    /// (no format known for the deployed short.win's deploy slot, or the known one refused on
+    /// account parsing), and those where neither format got past account parsing.
+    pub curve_format_probes: u64,
+    pub curve_format_failures: u64,
 }
 
 impl Metrics {
@@ -324,6 +342,26 @@ impl Metrics {
         );
         g(
             &mut s,
+            "shortwin_keeper_synthetic_exits_total",
+            "Liquidations and expiries that bought past a live curve's rT by pump's synthetic \
+             migration and completed it (pump-final §7).",
+            self.synthetic_exits,
+        );
+        g(
+            &mut s,
+            "shortwin_keeper_curve_format_probes_total",
+            "Curve exits whose TradeExtras format (v3, or shortwin 1.0.0's v2) was found by \
+             simulation (pump-final §7's upgrade window).",
+            self.curve_format_probes,
+        );
+        g(
+            &mut s,
+            "shortwin_keeper_curve_format_failures_total",
+            "Curve exits that got past account parsing with neither TradeExtras format.",
+            self.curve_format_failures,
+        );
+        g(
+            &mut s,
             "shortwin_keeper_markets_idle_skipped_total",
             "Below-floor markets not read by a tick: their idle crank not due (decision A).",
             self.markets_idle_skipped,
@@ -440,7 +478,12 @@ impl Metrics {
             ("migrations", "pump migrate_v2 calls landed.", |m| {
                 m.migrations
             }),
-            ("straddles", "Straddle bundles landed.", |m| m.straddles),
+            (
+                "synthetic_exits",
+                "Liquidations and expiries that bought past a live curve's rT (pump v3 synthetic \
+                 migration) and completed it.",
+                |m| m.synthetic_exits,
+            ),
             (
                 "transitions",
                 "Transitions onto the canonical PumpSwap pool landed.",
@@ -544,6 +587,35 @@ impl Metrics {
                 let _ = writeln!(s, "{full}{{market=\"{k}\"}} {}", get(m));
             }
         }
+        // Duty 10 on `PumpMigrating` markets (pump-final §7): signed gauges, only for the markets
+        // that have one.
+        type Signed = (
+            &'static str,
+            &'static str,
+            fn(&MarketMetrics) -> Option<i128>,
+        );
+        let signed: [Signed; 2] = [
+            (
+                "synthetic_completion_delta_bps",
+                "rho - 1 in bps on a migrating curve: the pool migrate_v2 will create over the \
+                 curve's without its synthetic pool part or a donation (pump-final §5.4).",
+                |m| m.synthetic_completion_delta_bps.map(i128::from),
+            ),
+            (
+                "curve_base_ata_donation",
+                "Tokens donated to a migrating curve's curve_base_ata: A + pcB - 206.9e12.",
+                |m| m.curve_base_ata_donation,
+            ),
+        ];
+        for (name, help, get) in signed {
+            let full = format!("shortwin_keeper_market_{name}");
+            let _ = writeln!(s, "# HELP {full} {help}\n# TYPE {full} gauge");
+            for (k, m) in &self.markets {
+                if let Some(v) = get(m) {
+                    let _ = writeln!(s, "{full}{{market=\"{k}\"}} {v}");
+                }
+            }
+        }
         s
     }
 }
@@ -571,6 +643,28 @@ mod tests {
         assert!(out.contains("# TYPE shortwin_keeper_market_budget_rank gauge"));
         assert!(out.contains("# TYPE shortwin_keeper_market_budget_refused counter"));
         assert!(out.contains("# TYPE shortwin_keeper_budget_free_lamports gauge"));
+        // pump-final §7: the synthetic exits, and the migrating-curve gauges only where set.
+        m.market(k).synthetic_exits = 2;
+        m.synthetic_exits = 2;
+        let j = Pubkey::new_unique();
+        m.market(j).synthetic_completion_delta_bps = Some(-12);
+        m.market(j).curve_base_ata_donation = Some(1_000_000);
+        let out = m.render();
+        assert!(out.contains(&format!(
+            "shortwin_keeper_market_synthetic_exits{{market=\"{k}\"}} 2"
+        )));
+        assert!(out.contains("shortwin_keeper_synthetic_exits_total 2"));
+        assert!(out.contains("# TYPE shortwin_keeper_market_synthetic_completion_delta_bps gauge"));
+        assert!(out.contains(&format!(
+            "shortwin_keeper_market_synthetic_completion_delta_bps{{market=\"{j}\"}} -12"
+        )));
+        assert!(out.contains(&format!(
+            "shortwin_keeper_market_curve_base_ata_donation{{market=\"{j}\"}} 1000000"
+        )));
+        assert!(!out.contains(&format!(
+            "shortwin_keeper_market_curve_base_ata_donation{{market=\"{k}\"}}"
+        )));
+        assert!(!out.contains("straddles"));
     }
 
     /// U28's histogram: cumulative buckets, `+Inf`, sum and count, per outcome.

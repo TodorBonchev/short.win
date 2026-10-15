@@ -11,13 +11,15 @@
 //! - A cluster that refuses a transaction before running it (e.g. a v1 transaction on a
 //!   cluster without SIMD-0385, an oversized transaction) is reported as
 //!   [`TxError::Rejected`], which the keeper's v1 → v0 fallback keys on.
-//! - `send_bundle` (the straddle, ARCH §5.4; U22) goes to a **Jito block engine** when one is
-//!   configured ([`RpcChain::with_block_engine`]): `sendBundle` with the base64 transactions
+//! - `send_bundle` (U22; no keeper duty sends one since the straddle bundle's retirement,
+//!   pump-final §7) goes to a **Jito block engine** when one is configured
+//!   ([`RpcChain::with_block_engine`]): `sendBundle` with the base64 transactions
 //!   (docs.jito.wtf, "sendBundle": `POST <engine>/api/v1/bundles`, params `[[tx…], {"encoding":
 //!   "base64"}]`, result the bundle id). Whether it landed is read from the **cluster**, not the
 //!   engine: every transaction's signature confirmed (a bundle is all-or-nothing) or, at the
 //!   confirmation timeout, none — so the engine's status endpoints are not relied on.
-//!   **UNVERIFIED** against a live block engine (T-STRADDLE runs the bundle in-process).
+//!   **UNVERIFIED** against a live block engine (T-STRADDLE ran the bundle in-process until the
+//!   straddle's retirement).
 
 use std::time::Duration;
 

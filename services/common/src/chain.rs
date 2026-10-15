@@ -9,9 +9,10 @@
 //! ([`TxOutcome::inner`]) so the keeper can decode events from a simulation exactly as from a
 //! landed transaction.
 //!
-//! Bundles (ARCH §5.4, the straddle; U22): [`Chain::send_bundle`] and
-//! [`Chain::simulate_bundle`] have refusing defaults; the JSON-RPC backend sends through a Jito
-//! block engine when one is configured, the in-process backend executes them atomically.
+//! Bundles (U22): [`Chain::send_bundle`] and [`Chain::simulate_bundle`] have refusing defaults;
+//! the JSON-RPC backend sends through a Jito block engine when one is configured. No keeper duty
+//! sends a bundle since the straddle bundle's retirement (pump-final §7, owner D2); the transport
+//! stays for duty 3's Jito path (U8, not built).
 
 use solana_hash::Hash;
 use solana_pubkey::Pubkey;
@@ -245,9 +246,7 @@ pub trait Chain {
     /// Simulates `txs` in order, each on the state the ones before it left (a bundle's
     /// pre-flight); stops at the first failure. The default refuses: a plain JSON-RPC node
     /// simulates one transaction at a time, so a bundle whose later transactions depend on the
-    /// earlier ones (the straddle's `migrate_v2` on the curve tx1 completes) cannot be
-    /// pre-flighted there — the keeper then simulates the first transaction alone and relies
-    /// on the bundle's all-or-nothing execution.
+    /// earlier ones cannot be pre-flighted there.
     async fn simulate_bundle(
         &self,
         txs: &[VersionedTransaction],

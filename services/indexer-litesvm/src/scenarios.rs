@@ -22,8 +22,8 @@
 //! | [`keeper_coverage_pause`] | test-venue, mock | O17's drill: an outage, the keeper's pause, a liquidation under it, the automatic unpause |
 //! | [`raydium_lifecycle`] | release, AMM v4 + CPMM fork | listings, a close, keeper liquidations on both venues, S3 on an admin-halted pool |
 //! | [`pool_switch`] | release, AMM v4 fork | the fast path: `PoolProposed`, `PoolSwitchCancelled`, `PoolSwitched` |
-//! | [`pump_graduation`] | release, pump + PumpSwap fork | curve open / close, the straddle bundle (`CurveCompleted`, `VenueStateChanged`), an expiry and an exit on PumpSwap |
-//! | [`pump_graduation_raced`] | release, pump + PumpSwap fork | the straddle raced by an outsider (`CurveAlreadyComplete`) |
+//! | [`pump_graduation`] | release, pump + PumpSwap fork | curve open / close, the keeper's synthetic expiry past `rT` (pump v3 completes the curve in the exit: `VenueStateChanged`), `migrate_v2` and the transition, an exit on PumpSwap |
+//! | [`pump_graduation_raced`] | release, pump + PumpSwap fork | the keeper's expiry raced by a third party's synthetic completion (the expiry fails on chain), then the graduation and the expiry on the pool |
 
 // `TxResult` is LiteSVM's own `TransactionResult` (as in the harness).
 #![allow(clippy::result_large_err)]
@@ -1163,20 +1163,22 @@ pub fn pool_switch() -> Session {
 }
 
 /// The `pump_graduation` session (the release build on the mainnet fork with the dumped pump,
-/// pump-fees and PumpSwap ELFs and the `complete-curve` helper; the keeper with its default
-/// configuration): a pump-curve market on the near-complete curve; an open and a close on the
-/// curve; a position made a straddle (`q > rT`) by an outside buyer and expired — the keeper's
-/// straddle bundle (tx1 `complete_curve`, tx2 `migrate_v2`, tx3 the transition) moves the market
-/// onto PumpSwap (`VenueStateChanged`, `CurveCompleted`) and the keeper expires the position on the
-/// pool after the warm-up; once PumpSwap's boost window is over, an open on the pool, a ×3 pump
-/// and the keeper's exit of it.
+/// pump-fees and PumpSwap ELFs; the keeper with its default configuration): a pump-curve market on
+/// the near-complete curve; an open and a close on the curve; a position past `rT` (`q > rT`, an
+/// outside buyer took the curve down to `q/2`) and expired — the keeper's `expire` buys `rT` on the
+/// curve and `q − rT` from the would-be pool by pump v3's synthetic migration, completing the curve
+/// (`VenueStateChanged → PumpMigrating`), and in the same tick the keeper's `migrate_v2` and
+/// transition move the market onto PumpSwap (pump-final §7; the straddle bundle and
+/// `complete_curve` are retired); once PumpSwap's boost window is over, an open on the pool, a ×3
+/// pump and the keeper's exit of it.
 pub fn pump_graduation() -> Session {
     pump_session("pump_graduation", false)
 }
 
-/// [`pump_graduation`] with the straddle raced: an outsider completes the curve after the
-/// keeper's read and pre-flight, before its bundle executes — tx1 `complete_curve` finds the
-/// curve complete and does nothing (`CurveAlreadyComplete`), tx2 migrates, tx3 transitions.
+/// [`pump_graduation`] with the keeper's expiry raced: a third party's `buy_v3(rT + δ)` completes
+/// the curve synthetically after the keeper's simulation, before its expiry lands — the expiry fails
+/// on chain (`VenueMigrating`, nothing written); the keeper's next tick migrates and transitions,
+/// and it expires the position on the pool after the warm-up.
 pub fn pump_graduation_raced() -> Session {
     pump_session("pump_graduation_raced", true)
 }
@@ -1190,24 +1192,19 @@ fn pump_session(name: &str, raced: bool) -> Session {
     let c = env.load_pump_coin(PumpCoin::Near);
     env.set_pump_rent();
     env.set_pump_clock();
-    shortwin_keeper_litesvm::load_complete_curve(&mut env);
     ok(env.list_pump(&c));
     let q = c.state(&env.svm).virtual_token_reserves / 200;
     let pm = env.pump_market_listed(PumpSpec::new(PumpCoin::Near, q * 40), c);
     let mut h = covering_keeper(env);
     h.chain().set_priority_fees(vec![5_000]);
-    let tips = h.keeper.config().graduation.tip_accounts.clone();
-    h.with_env(|env| {
-        for k in &tips {
-            env.fund(&k.parse().expect("tip account"), 1_000_000_000);
-        }
-    });
     // An open and a close on the curve.
     let (a, na) = h.with_env(|env| open_on(env, &pm, q));
     h.seconds(3);
     h.with_env(|env| ok(env.close(&pm, &a, na)));
     h.seconds(2);
-    // A straddle: an outsider buys the curve down to q/2, the position expires.
+    // Past `rT`: an outsider buys the curve down to q/2; the position expires (the market cranked
+    // at most every 10 minutes up to a second after the deadline, so the keeper's next tick holds a
+    // fresh reference and its first send is the expiry).
     let (b, nb) = h.with_env(|env| open_on(env, &pm, q));
     h.with_env(|env| {
         env.warp(2);
@@ -1215,15 +1212,37 @@ fn pump_session(name: &str, raced: bool) -> Session {
         let rt = pm.curve.state(&env.svm).real_token_reserves;
         ok(u.buy(env, &pm.curve, rt - q / 2, u64::MAX));
         let deadline = env.position(&pm, &b.key(), nb).deadline;
-        let now = env.now();
-        env.warp(deadline - now + 1);
+        while env.now() < deadline + 1 {
+            let step = (deadline + 1 - env.now()).min(600);
+            env.warp(step);
+            env.crank(&pm);
+        }
     });
     if raced {
+        // The third party's synthetic completion lands between the keeper's simulation and its
+        // transaction, on the same bank (its accounts made first; recorded, with the blockhash the
+        // keeper's transaction carries left valid).
         let c = pm.curve;
-        h.chain().before_next_bundle(move |env| {
+        let third = h.with_env(|env| {
             let u = CurveUser::new(env, &c);
+            env.fund(&u.kp.pubkey(), 2_000 * 1_000_000_000);
+            u
+        });
+        h.chain().before_next_send(move |env| {
             let rt = c.state(&env.svm).real_token_reserves;
-            ok(u.buy(env, &c, rt, u64::MAX));
+            let ix = third.buy_v3_ix(&env.svm, &c, rt + rt / 4, u64::MAX);
+            let tx = solana_transaction::Transaction::new_signed_with_payer(
+                &[shortwin_litesvm_tests::pump::cu_limit_ix(400_000), ix],
+                Some(&third.kp.pubkey()),
+                &[&third.kp],
+                env.svm.latest_blockhash(),
+            );
+            env.execute_recorded(tx.into())
+                .expect("the third party's synthetic completion");
+            assert!(
+                c.state(&env.svm).complete,
+                "the third party completed the curve"
+            );
         });
     }
     let mut expired = false;
@@ -1234,7 +1253,14 @@ fn pump_session(name: &str, raced: bool) -> Session {
             break;
         }
     }
-    assert!(expired, "{name}: the straddled position was never expired");
+    assert!(expired, "{name}: the position past rT was never expired");
+    // Raced, the keeper's expiry is the one send that failed (on chain, `VenueMigrating`).
+    let failed = h.chain().sent().iter().filter(|s| !s.ok).count();
+    assert_eq!(
+        failed,
+        usize::from(raced),
+        "{name}: the keeper's failed sends"
+    );
     let pam = h.with_env(|env| PammMarket::graduated(&env.svm, &pm));
     h.seconds(10);
     // Opens wait out PumpSwap's boost window (`BoostInProgress`): the boost drained to dust or

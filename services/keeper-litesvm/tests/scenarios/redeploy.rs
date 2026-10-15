@@ -509,11 +509,7 @@ fn a_sweep_refused_while_short_win_is_not_deployed_lands_the_next_slot() {
     let trader = mm.keys().trader;
     let donor = env.funded_keypair();
     ok(env.send(
-        &[shortwin_keeper::graduation::tip_ix(
-            &donor.pubkey(),
-            &trader,
-            1_000_000,
-        )],
+        &[transfer_ix(&donor.pubkey(), &trader, 1_000_000)],
         &[&donor],
     ));
     let cfg = KeeperConfig {

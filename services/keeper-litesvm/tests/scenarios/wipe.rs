@@ -420,11 +420,7 @@ fn the_keeper_sweeps_what_lands_on_the_trader_side() {
     ));
     env.fund(&ata, 5_000_000);
     ok(env.send(
-        &[shortwin_keeper::graduation::tip_ix(
-            &donor.pubkey(),
-            &trader,
-            1_000_000,
-        )],
+        &[transfer_ix(&donor.pubkey(), &trader, 1_000_000)],
         &[&donor],
     ));
     let ata_lamports = read::lamports(&env.svm, &ata);

@@ -8,7 +8,7 @@ workspace's lockfile.
 |---|---|
 | `common/` (`shortwin-services-common`) | The chain-client abstraction (`Chain`: clock, accounts, account headers, program accounts — also by exact size, a `dataSize` filter on JSON-RPC —, blockhash, simulate, send, recent priority fees, Jito bundles: send and pre-flight), its JSON-RPC backend (`RpcChain`; bundles through a Jito block engine's `sendBundle`, **UNVERIFIED** against a live engine), transaction building: v1 (SIMD-0385) with a v0 fallback (ComputeBudget instructions, optional lookup tables), `⌈simulated × 1.1⌉` compute units, sizes, decompilation |
 | `keeper/` (`shortwin-keeper`) | Keeper v1 (ARCH §7.1 duties 1–14 on every venue, with duty 5's Raydium fast path and M7's O17 degraded mode through the `coverage_authority`) and its binary; `shortwin-build-alt`, the protocol address lookup table of A28 (`scripts/build-alt.sh`) and M7's per-market tables |
-| `keeper-litesvm/` (`shortwin-keeper-litesvm`) | TEST-ONLY: the in-process LiteSVM backend (the program-test harness's invariant hooks after every instruction of every keeper transaction; bundles executed in order and all-or-nothing) and the keeper's scenario tests on the mock venue and on the Raydium and pump mainnet forks |
+| `keeper-litesvm/` (`shortwin-keeper-litesvm`) | TEST-ONLY: the in-process LiteSVM backend (the program-test harness's invariant hooks after every instruction of every keeper transaction) and the keeper's scenario tests on the mock venue and on the Raydium and pump mainnet forks, and across short.win's own upgrade from 1.0.0 (`upgrade_window`) |
 | `indexer/` (`shortwin-indexer`) | The indexer and API (ARCH §7.2, M8; contract [`docs/design/INDEXER.md`](../docs/design/INDEXER.md)): RPC backfill and live ingest of short.win, complete_curve and venue events into Postgres (`migrations/`), projections and analytics, axum REST + WebSocket (`openapi.yaml`), one binary `shortwin-indexer` (`migrate`, `backfill`, `live`, `serve`, `rollups`, `run`, `replay`, `rebuild`); its TEST-ONLY `embedded-pg` feature runs PostgreSQL 17 from the user cache (no Docker, no root); the reference deployment is `indexer/deploy/` |
 | `ops/` (`shortwin-ops`) | `shortwin-gov`, the Squads v4 governance tool (M10 WP-7; [below](#governance-shortwin-gov-m10)): creates the Governance and Emergency multisigs, initializes the config with their vaults, stages / approves / executes / cancels vault transactions (the checked upgrade-authority transfer, `Authorities` changes, upgrades, every admin instruction; the transaction-buffer path for large messages), applies timelocked changes, verifies the whole layout |
 | `indexer-litesvm/` (`shortwin-indexer-litesvm`) | TEST-ONLY: records LiteSVM sessions (the program-test harness, the keeper scenarios) in the indexer's session format and replays them into an embedded Postgres, asserting the indexed state against the chain (INDEXER.md §11.3, §11.4) |
@@ -159,16 +159,53 @@ What it does, per tick (one every `--tick-ms`, 400 ms by default, about a slot;
   **requested** limit. The keeper requests at most 12,000,000 CU of exits per market per slot and
   20,000,000 across its exits in a slot; the rest of a cascade (most under-collateralised first)
   goes out in the next slot (`ExitResult::Deferred`, metric `exits_deferred`).
-- **Duty 6, graduation** (`graduation.rs`, config `[graduation]`; M5, M6; ARCH §2.5, §5.1, §5.4,
-  §7.1): the keeper covers `PumpCurve` and `PumpMigrating` markets with the curve adapter's own
-  ReadSet and, for a curve exit, its TradeExtras T0–T19 (a fee and a buyback recipient of the live
-  `Global`, the live creator's vault); its risk view is the program's own quoter
-  (`VenueState::quoter`: `B̂_str` above `rT`).
+- **Duty 6, graduation** (`graduation.rs`, config `[graduation]`; M5, M6; ARCH §2.5, §5.1, §7.1;
+  pump-final §7): the keeper covers `PumpCurve` and `PumpMigrating` markets with the curve
+  adapter's own ReadSet and, for a curve exit, pump v3's TradeExtras T0–T9 (a buyback recipient of
+  the live `Global` at T7, the market's cached curve keys); its risk view is the program's own
+  quoter (`VenueState::quoter`: `B̂_v3` above a live curve's `rT`, at the synthetic fee on the
+  mint's live supply, which the keeper reads with the ReadSet; the post-complete fields and a
+  ρ-scaled FV on a migrating curve).
+  - **Exits past `rT`** (pump-final §5.2, owner D1 (a), D2, D3): a liquidatable or expired position
+    whose `Q` exceeds its live curve's `rT` is liquidated or expired like any other — pump's
+    `buy_v3` buys `rT` on the curve and `Q − rT` from the would-be pool in the exit itself
+    (synthetic migration), priced `B̂_v3`, and the market moves to `PumpMigrating` in that
+    instruction; `buyback_allowed` and σ are judged on `B̂_v3`, so above `σ_max` the position goes
+    to `sol_settle` (S2) at once. The keeper then sends `migrate_v2` and the transition in the same
+    tick (metric `synthetic_exits`). The 3-transaction Jito straddle bundle, the `complete-curve`
+    helper, `Plan::Straddle` and `Alert::StraddleWaiting` are retired; `[graduation] straddle`,
+    `send_without_exit`, `complete_slippage_bps`, `max_complete_lamports`, `tip_lamports`,
+    `tip_accounts`, `block_engine` and the binary's `--block-engine` are refused ("removed: pump
+    v3 exits need no bundle (design pump-final)").
+  - **The TradeExtras format across short.win's upgrade** (pump-final §7, §15 "Release
+    coordination"; for one release): the keeper builds both a curve exit's v3 list (10 keys) and
+    shortwin 1.0.0's (20, `venue::pump_trade_extras_v2`), and uses the one the deployed short.win
+    parses, known per short.win's ProgramData deploy slot (its header, read once a tick when a curve
+    exit is due). At start-up and at each new deploy slot the first curve exit is simulated with V3,
+    then with V2 when V3 fails on account parsing (`BadRemainingAccounts`, `VenueAccountMismatch`);
+    the format that gets past account parsing is kept until the deploy slot changes (an exit with
+    it failing on account parsing tries the other at once). Neither, on a deploy slot no exit has
+    found the format of: `Alert::CurveExtrasFormatUnknown`, once per position, deploy slot and pair
+    of refusal codes, with the program's error lines (metrics `curve_format_probes`,
+    `curve_format_failures`; `TickReport::curve_formats`). The same two codes come from a market's
+    own ReadSet (`check_read`) or VenueExtras (`parse_extras`): the error lines' source lines tell
+    which, and if other curve markets' exits parse, the cause is that market's. Neither on a deploy
+    slot whose format an exit already found is that exit's own refusal: the known format's is
+    paged (`ExitRefused`, its detail the program's error line), and the format stays. Every send is
+    simulated first, on a bank at or past the deploy slot read — a node of an RPC pool behind that
+    read answers for the build before, so the exit is not sent and is tried again the next tick
+    (an error of the tick) —, so the Governance upgrade costs no failed send (keeper-litesvm
+    `upgrade_window`). On 1.0.0 a curve exit past `rT` is refused `CurveStraddle` (its exits
+    never buy past `rT`, and the bundle is retired): the keeper sends the position's `sol_settle`
+    instead — S2 when its legs hold, else a no-op crank, at most once a second — pages nothing, and
+    exits it past `rT` on the first tick after the upgrade (§15 step 1). The next release deletes
+    V2.
   - **`migrate_v2` as soon as a curve completes** (ADOPTED Q16; on by default again in M6): a
     covered market whose curve is complete with `vT > 0` and whose canonical PumpSwap pool does
     not exist gets pump's `migrate_v2` — top-level, alone with its compute budget (A15), its 27
-    IDL accounts and the two boost accounts — at most once a second. A failure raises
-    `Alert::MigrateFailed` once and is retried every second.
+    IDL accounts and the two boost accounts — at most once a second, and right after the keeper's
+    own exit completed the curve. A failure raises `Alert::MigrateFailed` once and is retried every
+    second.
   - **The `→ PumpSwap` transition** (M6): as soon as a curve market's canonical pool is valid
     (after the keeper's `migrate_v2` or anyone's; with `migrate` off too) the keeper sends one
     transaction: the accounts the pool's trades require that do not exist (ARCH §3.12's existence
@@ -179,23 +216,6 @@ What it does, per tick (one every `--tick-ms`, 400 ms by default, about a slot;
     first observation). No `extend_account`: a fresh 271-byte pool trades as it is. A PumpSwap
     market whose accounts are missing (a listing, someone else's transition) gets them created;
     `Alert::TransitionFailed` on a failure.
-  - **The straddle** (`Plan::Straddle`): a liquidatable position whose `Q` exceeds its live
-    curve's `rT` cannot exit on the curve (pump reverts 6021, `CurveStraddle`). The keeper builds
-    ARCH §5.4's Jito bundle — tx1: its base ATA and `complete_curve(max_sol_cost)` of the
-    `complete-curve` helper (`programs/complete_curve`: it reads `rT` at execution, so a curve
-    trade between the keeper's read and the bundle cannot break it; `max_sol_cost` = the keeper's
-    quote + `complete_slippage_bps` + a rent allowance); tx2: `migrate_v2`; tx3: the transition
-    above; the tip on tx3 — pre-flights it (`simulate_bundle` where the chain can, else tx1 alone)
-    and sends it through the block engine (`--block-engine`). **The exit is not in tx3** (as built;
-    ARCH §5.4 puts it there): the transition marks the post-change warm-up and a keeper
-    `liquidate` / `expire` fails `EmaWarmingUp` until the eighth post-transition bucket is
-    integrated, so it would revert the bundle; the keeper observes every second after the bundle
-    and exits at the first second the program accepts — `T + 8` at the earliest, with tx3's own
-    bucket (OWNER-M6R-4). When tx3's pre-flight fails the bundle goes out as tx1 + tx2
-    (`send_without_exit`, on by default: V1-9) and the keeper's transition follows at once. Without
-    a block engine the keeper raises `Alert::StraddleWaiting` once and calls `sol_settle` for the
-    position each second (it arms, keeps the clock or settles S1 / S2). The keeper keeps the
-    tokens it buys (`max_complete_lamports` caps the spend).
   - **List-only markets** (M5, M6): a list-only (`None`) market is covered with its detection set
     `[bonding_curve, canonical_pool]` as ReadSet (the program's own for `crank_price` and
     `sol_settle`). One with positions open — a curve that graduated elsewhere — is observed on the
@@ -381,8 +401,10 @@ What it does, per tick (one every `--tick-ms`, 400 ms by default, about a slot;
     watch starts afresh on the new pool.
 - Per-market metrics (coverage seconds, observations, exits, settlements, CU, lamports, misses,
   bursts, gaps, venue admin changes, pool proposals / executions / switches, migrations,
-  straddles, transitions, sweeps, cashback claims, exits deferred, coverage pauses and unpauses,
-  budget degradations, the `paused_coverage` flag, degraded) and `venue_flags`,
+  synthetic exits, transitions, sweeps, cashback claims, exits deferred, coverage pauses and
+  unpauses, budget degradations, the `paused_coverage` flag, degraded; on a migrating curve the
+  gauges `synthetic_completion_delta_bps` (ρ − 1) and `curve_base_ata_donation`) and
+  `venue_flags`, `synthetic_exits`, `curve_format_{probes,failures}`,
   `venue_extensions` (a venue's or Token-2022's ProgramData extended, not upgraded: AIR-01),
   `not_deployed` (refusals of a program deployed in the refused slot: AIR-18),
   `pool_discoveries`, `coverage_pause_failures`, `oracle_{cranks,reads,refusals,lamports}` in the
@@ -401,15 +423,13 @@ loader's one-slot "Program is not deployed" is told apart by the program's Progr
 AIR-18, [below](#extendprogram-griefing-air-18-accepted-by-the-owner-on-2026-10-12)).
 
 Not yet (later milestones, ARCH §7.1): Jito bundles with tips for liquidations (the priority-fee
-RPC path is built; T-SIZE shows a tip transfer fits the worst Raydium exit; the straddle's bundle
-is built, duty 6); Yellowstone gRPC subscriptions (the keeper polls `getMultipleAccounts` /
+RPC path is built; T-SIZE shows a tip transfer fits the worst Raydium exit; `services/common`
+keeps the block-engine transport, which no duty uses since the straddle bundle's retirement,
+pump-final §7); Yellowstone gRPC subscriptions (the keeper polls `getMultipleAccounts` /
 `getProgramAccounts`, and watches admin actions through the accounts they write rather than the
 admin's transactions; it sees other parties' pool selection through the market's state, not their
-transactions); bundle pre-flight of tx2 / tx3 on a plain RPC node (which cannot simulate them
-before tx1 lands: the keeper then gives them fixed limits, `MIGRATE_CU` / `UNSIMULATED_CU`) and a
-policy for bundles the block engine keeps dropping; selling the tokens a straddle leaves the
-keeper; duty 13's lender pot (`sync_lender`, `sweep_protocol_fees`); building per-market lookup
-tables automatically at a listing (`shortwin-build-alt market` builds one on request).
+transactions); duty 13's lender pot (`sync_lender`, `sweep_protocol_fees`); building per-market
+lookup tables automatically at a listing (`shortwin-build-alt market` builds one on request).
 
 ### Run
 
@@ -418,7 +438,6 @@ cargo build --manifest-path services/Cargo.toml -p shortwin-keeper --release
 services/target/release/shortwin-keeper --rpc https://… --keypair keeper.json \
   --config services/keeper/keeper.example.toml --metrics 127.0.0.1:9464 \
   [--discovery-rpc https://…]   # getProgramAccounts for the pool discovery (default: --rpc)
-  [--block-engine https://mainnet.block-engine.jito.wtf]   # the straddle's bundles (duty 6)
   [--coverage-keypair coverage.json]   # the designated pauser's coverage_authority (O17)
 ```
 
@@ -668,11 +687,16 @@ $G approve --ms emergency --index <n> --config gov.toml --rpc <url> --key emg-me
   prints), and stages `revalidate_venue(index, slot, hash)`. Before approving, compare all 64
   hex digits with the trimmed ELF the fork suites ran on. The full hashes are pinned in
   [`scripts/dump-fixtures.py`](../scripts/dump-fixtures.py) (AMM v4 in `PROGRAMS`, CPMM in
-  `CPMM_PROGRAMS_2026_10`, pump-fees in `PUMP_PROGRAMS_2026_10`) and recorded as
-  `elf_trimmed_sha256` in [`tests/fixtures/manifest.json`](../tests/fixtures/manifest.json)
+  `CPMM_PROGRAMS_2026_10`, pump-fees in `PUMP_PROGRAMS_2026_10_13` since the 2026-10-13 re-pin:
+  its 2026-10-12 build) and recorded as `elf_trimmed_sha256` in
+  [`tests/fixtures/manifest.json`](../tests/fixtures/manifest.json)
   (`raydium_amm_v4_program_data`, `raydium_cpmm_2026_10_program_data`,
-  `pump_fees_2026_10_program_data`). [`tests/fixtures/README.md`](../tests/fixtures/README.md)
-  shortens them to 12 digits and gives none for AMM v4. The execution records the account's
+  `pump_fees_2026_10_12_program_data`; the latch baseline is `VENUE_GUARD_SLOTS_2026_10_13`).
+  [`tests/fixtures/README.md`](../tests/fixtures/README.md) shortens them to 12 digits and gives
+  none for AMM v4. **pump-fees' 2026-10-12 build is not revalidated on mainnet before R-PFEE**
+  (pump-final §3.2, PUMP-2026-10-13-5: `withdraw`'s accounts and authority read from a mainnet
+  transaction or the ELF and recorded in the audit addendum; stop if it can write an account
+  short.win's legs pass or a `FeeConfig` short.win reads). The execution records the account's
   length and the hash's first 12 bytes. From then on a pure extension of that venue is
   `VenueNotUpgraded`; a moved deploy slot latches it only if the account kept the recorded
   length (an `Upgrade`, even of the same ELF) or its trimmed ELF no longer matches or is above
@@ -730,7 +754,8 @@ see:
   back-off. `crank_price` and `sol_settle` make no venue CPI and keep landing.
 - **short.win extended:** every short.win instruction fails for the rest of the slot (the
   keeper's cranks and exits, users' transactions), and the keeper treats its refusals the same
-  way. **complete_curve extended:** the straddle bundle fails for the rest of the slot.
+  way. (complete_curve, until it leaves the release with P6, has no caller: the keeper's
+  straddle bundle is retired, pump-final §7.)
 - **No action is needed** unless `Alert::ProgramNotDeployed` pages. The keeper ticks every
   400 ms by default (`--tick-ms 400`, about one slot), so its next tick is always in a later
   slot; each further blocked slot costs the attacker another extension, and the griefing ends
@@ -756,8 +781,7 @@ What the keeper does (AIR-18, `8945087`):
   program and refused slot in a tick.
 - A refused crank batch defers the rest of the queue to the next tick. A flag refused this way
   is sent again the next tick; for an AIR-01 slot the account is read whole after the exits, so
-  an upgrade is paged at once, without `VenueFlagFailed` (`a1edf78`). The straddle's pre-flight
-  is judged the same way; a bundle the block engine drops is not, because it returns no outcome.
+  an upgrade is paged at once, without `VenueFlagFailed` (`a1edf78`).
 
 The upgrade step stays: **extend ProgramData before staging an upgrade to a larger ELF.**
 `stage-upgrade` refuses an ELF that does not fit and names the `solana program extend <program>
@@ -782,10 +806,9 @@ short.win's test-venue build (`scripts/build-test-venue.sh`, or `SHORTWIN_TEST_V
 mock venue (`anchor build --tools-version v1.57 --arch v3` → `target/deploy/mock_cpamm.so`, or
 `MOCK_CPAMM_SO`) for the mock scenarios, and the release build (`target/deploy/shortwin.so`, or
 `SHORTWIN_SO`) with the committed mainnet fixtures (`tests/fixtures`) for the Raydium and pump
-ones; `graduation` also loads the straddle helper (`target/deploy/complete_curve.so`, or
-`COMPLETE_CURVE_SO`). Every keeper transaction — each transaction of a bundle too — runs the
-harness's invariant hooks after every instruction; a bundle executes in order and all-or-nothing
-(the in-process backend restores the VM when one of its transactions fails).
+ones; `upgrade_window` starts from shortwin 1.0.0 (`tests/fixtures/shortwin/shortwin_1_0_0.so`,
+checked against AUDIT §0's hashes) and upgrades it to the release build by the loader. Every
+keeper transaction runs the harness's invariant hooks after every instruction.
 
 M7 scenarios: `coverage_pause` (the T-COVERAGE drill — an outage and an exhausted budget pause
 opens through `set_coverage_pause` in the same tick, exits and lender flows land under the pause,
@@ -833,16 +856,20 @@ derivation) and moves the market onto its pool in the same second (the pool acco
 with `migrate` off a third party's migration is still moved onto the pool; a graduation with a
 position open: the keeper sends no exit during the warm-up and liquidates the position on the
 pool in the first second an outside key's simulation passes (+16 s after a ×3 pump right after the
-transition); ★ the straddle bundle — the curve bought down by an outsider, or by the borrower
-itself (`rT − q + 1`, M5-SEC-4) — lands as three transactions (tx1 18 entries, tx2 53, tx3 17
-with the tip; ≤ 1,143 B each), the market is on its pool, and the keeper expires the position at
-`T + 8` exactly, an outside key's `expire` refused `EmaWarmingUp` at every second before; V1-9: a
-tx3 that fails its pre-flight leaves tx1 + tx2 (tip on tx2) and the keeper's own transition
-follows at once; ★ a curve buy between the keeper's pre-flight and its bundle does not break it,
-and a sale that lifts the completion above `max_sol_cost` reverts the whole bundle (pump 6002,
-nothing committed) before the next second's bundle lands; without a block engine the straddle
-waits; below the straddle (`Q ≤ rT`) the keeper expires a curve position on the curve with the
-adapter's own account lists; a curve migrated elsewhere with an expired position open goes `→
+transition); ★ pump-final §7: on a D@80 % curve bought down below two positions' `Q`, the
+keeper's `liquidate` of the first completes the curve by pump's synthetic migration (the v3 list,
+pump's pool part `q − rT`), the keeper migrates and transitions the market in the same tick, and
+the second position is liquidated on the pool at `T + 8`; the same with two expired positions on
+`near166` — the curve bought down by an outsider, or by the borrower itself (`rT − q + 1`,
+M5-SEC-4) — the other expired on the pool at `T + 8` exactly, an outside key's `expire` refused
+`EmaWarmingUp` at every second before; a position past `rT` whose `σ_max` is below σ(`B̂_v3`)
+plans `SolSettle` and settles S2, no buyback sent; a third party's synthetic completion between
+the keeper's simulation and its expiry: the expiry fails on chain (`VenueMigrating`, nothing
+written), the next tick graduates the market and the position expires on the pool at the gate;
+duty 10 alerts a live curve carrying post-complete fields or breaking `vQ − rQ = ivqr` and a
+migrating curve with unknown post-complete fields, once each, and reports a migrating curve's
+`ρ − 1`; below `rT` (`Q ≤ rT`) the keeper expires a curve position on the curve with the v3
+list; a curve migrated elsewhere with an expired position open goes `→
 None` at the keeper's first crank, which keeps the S3 chain on the no-route cadence and settles
 the position in S3 exactly when the chain has run `s3_wait_s` (on the detection set); a list-only
 market whose curve becomes readable is cranked onto it, its trader accounts are created once, and

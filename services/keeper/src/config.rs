@@ -399,72 +399,44 @@ impl PoolSelectConfig {
     }
 }
 
-/// Graduation duties (ARCH §2.5, §5.1, §5.4, §7.1 duty 6; [`crate::graduation`]).
+/// Graduation duties (ARCH §2.5, §5.1, §7.1 duty 6; [`crate::graduation`]).
+///
+/// pump-final §7 (owner D2): the straddle bundle's keys — `straddle`, `send_without_exit`,
+/// `complete_slippage_bps`, `max_complete_lamports`, `tip_lamports`, `tip_accounts`,
+/// `block_engine` — are removed, and a configuration that still names one is refused
+/// ([`KeeperConfig::from_toml`], [`REMOVED_GRADUATION_KEYS`]): a curve position past `rT` exits by
+/// pump v3's synthetic migration in its own `liquidate` / `expire`, with no bundle.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, deny_unknown_fields)]
 pub struct GraduationConfig {
     /// Call pump `migrate_v2` top-level as soon as a covered market's curve completes (ADOPTED
-    /// Q16), then the `→ PumpSwap` transition in the same second: true (M6; M5 suspended it,
-    /// M5-SEC-4, because a migrated curve's market could not reach its pool).
+    /// Q16) — including right after the keeper's own exit completed it — then the `→ PumpSwap`
+    /// transition in the same second: true (M6; M5 suspended it, M5-SEC-4, because a migrated
+    /// curve's market could not reach its pool).
     pub migrate: bool,
-    /// Send the straddle bundle (tx1 `complete_curve`, tx2 `migrate_v2`, tx3 the transition onto
-    /// the new pool) for a liquidatable position whose `Q` exceeds the curve's `rT`: true. Needs a
-    /// block engine (`--block-engine`).
-    pub straddle: bool,
-    /// Send tx1 + tx2 alone when tx3 cannot be built or fails its pre-flight (ARCH §5.4's keeper
-    /// fallback, V1-9): true (M6: the keeper's own transition follows right after the bundle, and
-    /// the position is an ordinary PumpSwap position from then on; M5 had no transition and kept
-    /// it false).
-    pub send_without_exit: bool,
-    /// `max_sol_cost` of `complete_curve` above the keeper's quote of buying the `rT` it read, in
-    /// bps (a curve sale between the read and the bundle raises the cost; beyond this pump
-    /// reverts tx1 and the bundle): 500.
-    pub complete_slippage_bps: u32,
-    /// The most the keeper spends completing one curve, lamports (it keeps the `rT` tokens it
-    /// buys; ECON §10.1): 20 SOL.
-    pub max_complete_lamports: u64,
-    /// The Jito tip the bundle's last transaction pays, lamports: 100,000.
-    pub tip_lamports: u64,
-    /// The Jito tip accounts (base58), used in turn: the eight mainnet ones.
-    pub tip_accounts: Vec<String>,
-    /// The Jito block engine bundles go to (e.g. `https://mainnet.block-engine.jito.wtf`); empty:
-    /// none (the binary's `--block-engine` overrides it).
-    pub block_engine: String,
 }
 
 impl Default for GraduationConfig {
     fn default() -> Self {
-        Self {
-            migrate: true,
-            straddle: true,
-            send_without_exit: true,
-            complete_slippage_bps: 500,
-            max_complete_lamports: 20_000_000_000,
-            tip_lamports: 100_000,
-            tip_accounts: crate::graduation::JITO_TIP_ACCOUNTS
-                .iter()
-                .map(|s| (*s).to_string())
-                .collect(),
-            block_engine: String::new(),
-        }
+        Self { migrate: true }
     }
 }
 
-impl GraduationConfig {
-    /// The tip accounts.
-    pub fn tip_keys(&self) -> anyhow::Result<Vec<Pubkey>> {
-        self.tip_accounts
-            .iter()
-            .map(|s| Pubkey::from_str(s).with_context(|| format!("tip account {s}")))
-            .collect()
-    }
+/// `[graduation]` keys of the retired straddle bundle (pump-final §7, owner D2): a configuration
+/// naming one fails to load with [`REMOVED_GRADUATION_MESSAGE`].
+pub const REMOVED_GRADUATION_KEYS: [&str; 7] = [
+    "straddle",
+    "send_without_exit",
+    "complete_slippage_bps",
+    "max_complete_lamports",
+    "tip_lamports",
+    "tip_accounts",
+    "block_engine",
+];
 
-    /// The block engine, if one is set.
-    pub fn block_engine(&self) -> Option<&str> {
-        let s = self.block_engine.trim();
-        (!s.is_empty()).then_some(s)
-    }
-}
+/// Why a retired `[graduation]` key (or the binary's `--block-engine`) is refused.
+pub const REMOVED_GRADUATION_MESSAGE: &str =
+    "removed: pump v3 exits need no bundle (design pump-final)";
 
 /// The trader side's value and the venue cashback (ARCH §7.1 duty 6 "right after a full wipe",
 /// duty 13; [`crate::sweep`]). PROPOSED ops knobs (ECON §15 names none).
@@ -553,7 +525,8 @@ impl Default for KeeperConfig {
 impl KeeperConfig {
     /// Parses and checks a TOML configuration. `[budget] per_market_daily_lamports` (M7's
     /// per-market budget) is refused with its own message: the global budget replaced it (owner
-    /// decision A of 2026-10-01).
+    /// decision A of 2026-10-01); so is a key of the retired straddle bundle
+    /// ([`REMOVED_GRADUATION_KEYS`], pump-final §7).
     pub fn from_toml(s: &str) -> anyhow::Result<Self> {
         let raw: toml::Table = toml::from_str(s).context("keeper configuration")?;
         if raw
@@ -566,6 +539,11 @@ impl KeeperConfig {
                  the keeper budget is global — set global_daily_lamports (and var_floor_lamports, \
                  reserve_margin_bps, tail_share_bps); ARCHITECTURE §7.1 duty 8"
             );
+        }
+        if let Some(g) = raw.get("graduation").and_then(toml::Value::as_table)
+            && let Some(key) = REMOVED_GRADUATION_KEYS.iter().find(|k| g.contains_key(**k))
+        {
+            bail!("[graduation] {key}: {REMOVED_GRADUATION_MESSAGE}");
         }
         let cfg: Self = toml::from_str(s).context("keeper configuration")?;
         cfg.validate()?;
@@ -642,13 +620,6 @@ impl KeeperConfig {
         if p.discoveries_per_tick == 0 {
             bail!("pool_select.discoveries_per_tick must be positive");
         }
-        let g = &self.graduation;
-        if g.complete_slippage_bps > 10_000 {
-            bail!("graduation.complete_slippage_bps above 10,000");
-        }
-        if g.straddle && (g.tip_lamports == 0 || g.tip_keys()?.is_empty()) {
-            bail!("graduation: a bundle needs a tip (tip_lamports > 0 and a tip account)");
-        }
         let w = &self.sweep;
         if w.check_interval_s <= 0 || w.cashback_interval_s <= 0 {
             bail!("sweep intervals must be positive");
@@ -724,8 +695,6 @@ mod tests {
             discovery_rpc = "https://gpa.example"
             [graduation]
             migrate = false
-            send_without_exit = false
-            block_engine = "https://mainnet.block-engine.jito.wtf"
             [sweep]
             cashback_min_lamports = 1
             "#
@@ -779,23 +748,44 @@ mod tests {
         assert_eq!(cfg.pool_select.discovery_rpc(), Some("https://gpa.example"));
         assert!(cfg.pool_select.enabled);
         assert_eq!(KeeperConfig::default().pool_select.discovery_rpc(), None);
-        assert!(!cfg.graduation.send_without_exit && !cfg.graduation.migrate);
-        // M6: the migrate_v2 duty (with the → PumpSwap transition) and ARCH §5.4's tx1 + tx2
-        // fallback are on by default again (M5-SEC-4 suspended them).
+        assert!(!cfg.graduation.migrate);
+        // M6: the migrate_v2 duty (with the → PumpSwap transition) is on by default again
+        // (M5-SEC-4 suspended it).
         let d = KeeperConfig::default();
-        assert!(d.graduation.migrate && d.graduation.send_without_exit);
+        assert!(d.graduation.migrate);
         assert_eq!(cfg.sweep.cashback_min_lamports, 1);
         assert!(cfg.sweep.post_wipe && cfg.sweep.sweep);
         assert_eq!(d.sweep.cashback_interval_s, 7 * 86_400);
+    }
+
+    /// pump-final §7 (owner D2): every key of the retired straddle bundle is refused with the
+    /// removal's own message, whatever its value; `migrate` stays.
+    #[test]
+    fn the_straddle_bundles_keys_are_refused_as_removed() {
+        for (key, value) in [
+            ("straddle", "true"),
+            ("straddle", "false"),
+            ("send_without_exit", "true"),
+            ("complete_slippage_bps", "500"),
+            ("max_complete_lamports", "20000000000"),
+            ("tip_lamports", "100000"),
+            ("tip_accounts", "[]"),
+            ("block_engine", "\"https://mainnet.block-engine.jito.wtf\""),
+        ] {
+            let e =
+                KeeperConfig::from_toml(&format!("[graduation]\nmigrate = true\n{key} = {value}"))
+                    .unwrap_err()
+                    .to_string();
+            assert!(e.contains(REMOVED_GRADUATION_MESSAGE), "{key}: {e}");
+            assert!(e.contains(key), "{key}: {e}");
+        }
         assert_eq!(
-            cfg.graduation.block_engine(),
-            Some("https://mainnet.block-engine.jito.wtf")
+            REMOVED_GRADUATION_MESSAGE,
+            "removed: pump v3 exits need no bundle (design pump-final)"
         );
-        assert_eq!(KeeperConfig::default().graduation.block_engine(), None);
-        assert_eq!(
-            KeeperConfig::default().graduation.tip_keys().unwrap().len(),
-            8
-        );
+        assert!(KeeperConfig::from_toml("[graduation]\nmigrate = false").is_ok());
+        // Named outside `[graduation]` it is only an unknown key.
+        assert!(KeeperConfig::from_toml("straddle = true").is_err());
     }
 
     #[test]
@@ -817,10 +807,6 @@ mod tests {
             "[pool_select]\nfast_discovery_interval_s = 600",
             "[pool_select]\ndiscoveries_per_tick = 0",
             "[pool_select]\nunknown = 1",
-            "[graduation]\ncomplete_slippage_bps = 10001",
-            "[graduation]\ntip_lamports = 0",
-            "[graduation]\ntip_accounts = []",
-            "[graduation]\ntip_accounts = [\"nope\"]",
             "[graduation]\nunknown = 1",
             "[sweep]\ncheck_interval_s = 0",
             "[sweep]\nunknown = 1",

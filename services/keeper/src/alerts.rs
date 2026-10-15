@@ -140,7 +140,11 @@ pub enum Alert {
     /// The cluster refused a v1 transaction: batches fall back to v0.
     V1Unsupported { reason: String },
     /// An exit the keeper's projection expected was refused by the program in simulation
-    /// (custom error `code`), or failed on a venue with every extras set.
+    /// (custom error `code`), or failed on a venue with every extras set. `detail`: the error and
+    /// the program's own error line (`AnchorError thrown in <source>:<line>. Error Code: …`), if
+    /// any — on a curve exit refused with both TradeExtras lists on a deploy slot whose format an
+    /// exit found, the known format's refusal, whose source line tells the ReadSet's
+    /// (`check_read`) or VenueExtras' (`parse_extras`) parser from the TradeExtras one.
     ExitRefused {
         market: Pubkey,
         position: Pubkey,
@@ -265,14 +269,53 @@ pub enum Alert {
     /// on chain (retried every second while the curve stays unmigrated); alerted once per
     /// market and detail. Positions pause (`VenueMigrating`) until someone migrates.
     MigrateFailed { market: Pubkey, detail: String },
-    /// Duty 6: a liquidatable position's `Q` exceeds its live curve's `rT` (ARCH §5.4) and the
-    /// straddle bundle is not sent or did not land (`reason`: no block engine, the completion
-    /// above `max_complete_lamports`, a failed pre-flight, a dropped bundle); the keeper calls
-    /// `sol_settle` for it instead. Alerted once per position and reason.
-    StraddleWaiting {
+    /// pump-final §7, the upgrade window: a curve exit of `position` on `market` got past
+    /// short.win's account parsing with neither TradeExtras list — the v3 list (10 keys) nor
+    /// shortwin 1.0.0's (20) — on the short.win deployed at ProgramData deploy slot `deploy_slot`
+    /// (`None`: unreadable), at which no exit had found the format; `detail` holds both
+    /// refusals with the program's error lines. Once per position, deploy slot and pair of
+    /// refusal codes, again after an exit on the market parses; the refusals themselves are
+    /// `ExitRefused` at each attempt. The keeper's curve exits fail until one parses (it tries
+    /// both again at the next exit): check which short.win is deployed, and the live `Global`'s
+    /// buyback list (T7) and the trader's pump UVA (T6) the v3 list names. The same codes come
+    /// from the market's ReadSet (`check_read`) or VenueExtras (`parse_extras`): the source line
+    /// in each error line tells which, and if other curve markets' exits parse
+    /// (`TickReport::curve_formats`), the cause is this market's.
+    CurveExtrasFormatUnknown {
         market: Pubkey,
         position: Pubkey,
-        reason: String,
+        deploy_slot: Option<u64>,
+        detail: String,
+    },
+    /// Duty 10 (pump-final §7): a covered live curve breaks pump's own invariant `vQ − rQ =
+    /// initial_virtual_quote_reserves` (`BondingCurve::quote_offset_consistent`). Nothing
+    /// short.win prices assumes it while the curve is live; on completion the post-complete
+    /// fields would not be known (an S3 there gives the lenders the whole take,
+    /// [`Alert::MigratingFvUndefined`]). Once per market while it lasts.
+    CurveQuoteOffsetInconsistent {
+        market: Pubkey,
+        virtual_quote_reserves: u64,
+        real_quote_reserves: u64,
+        initial_virtual_quote_reserves: u64,
+    },
+    /// Duty 10 (pump-final §6.1.5 G-3): a covered **live** curve carries post-complete fields
+    /// (`pcB` @150 or `pcQ` @158 non-zero), which pump writes only in the buy that completes a
+    /// curve: the curve is not executable (no route: the S3 chain counts) and its risk view is
+    /// A63's cap-only view on the curve's own reserves. Once per market while it lasts.
+    LiveCurvePostComplete {
+        market: Pubkey,
+        post_complete_base_out: u64,
+        post_complete_quote_in: u64,
+    },
+    /// Duty 10 (pump-final §6.1.5): a covered `PumpMigrating` curve's post-complete fields are not
+    /// known (only one of `pcB` / `pcQ` written, or `vQ − rQ ≠ ivqr` after a pool part): its FV is
+    /// undefined, so an S3 there gives the lenders the whole take and the borrower 0 (the
+    /// documented exception to A63's cap-only rule). The owner may want to act before
+    /// `max_migration_pause_s + s3_wait_s` (≈ 70 min) runs out. Once per market while it lasts.
+    MigratingFvUndefined {
+        market: Pubkey,
+        post_complete_base_out: u64,
+        post_complete_quote_in: u64,
     },
     /// Duty 6 (M6): the keeper's `→ PumpSwap` transition of `market` (the pool's accounts, the
     /// crank onto the pool) or the creation of the pool accounts its trades require failed; the
@@ -319,10 +362,14 @@ impl Alert {
             | Self::OracleUnreadable { .. } => {
                 tracing::error!(alert = ?self, "oracle alert");
             }
-            Self::MigrateFailed { .. }
-            | Self::StraddleWaiting { .. }
-            | Self::TransitionFailed { .. } => {
+            Self::MigrateFailed { .. } | Self::TransitionFailed { .. } => {
                 tracing::error!(alert = ?self, "graduation alert");
+            }
+            Self::CurveExtrasFormatUnknown { .. }
+            | Self::CurveQuoteOffsetInconsistent { .. }
+            | Self::LiveCurvePostComplete { .. }
+            | Self::MigratingFvUndefined { .. } => {
+                tracing::error!(alert = ?self, "pump curve alert");
             }
             Self::SweepFailed {
                 post_wipe: true, ..
