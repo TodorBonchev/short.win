@@ -999,11 +999,13 @@ and flip CPI Guard or required memos for the race tests; since M10 also a full w
 `sync_lender` (`simulateClaimSol`, `simulateSyncLender`), emit_cpi event decoding (`eventsOf`) and
 an empty `sweep_trader` that credits a market's pending rent (`accrue`).
 
-**Specs** (22 files, 58 tests at M10; *M10-RESP:* 28 files with the four `mobile-*` specs (`responsive` is opt-in) — and a default run of 77 tests, 60 desktop and 17 phone; *thirteenth round:* 30 files with `guide` and `mobile-guide`, a default run of 87 tests, 65 desktop and 22 phone; *O-6 (`playwright test --list`, 2026-10-13):* 32 files with `focus`, `mobile-focus` and `mobile-mwa` (33 with the opt-in `responsive`), a default run of 123 tests, 70 desktop, 26 phone and 27 Android — `mobile-mwa`'s 21 include its two flag-off tests, skipped in a flag-on run as its 19 flag-on tests are with `SHORTWIN_E2E_MWA=0`): `harness`, `smoke`, `wallet`, `frame` (`@scaffold`); `markets`,
+**Specs** (22 files, 58 tests at M10; *M10-RESP:* 28 files with the four `mobile-*` specs (`responsive` is opt-in) — and a default run of 77 tests, 60 desktop and 17 phone; *thirteenth round:* 30 files with `guide` and `mobile-guide`, a default run of 87 tests, 65 desktop and 22 phone; *O-6 (`playwright test --list`, 2026-10-13):* 32 files with `focus`, `mobile-focus` and `mobile-mwa` (33 with the opt-in `responsive`), a default run of 123 tests, 70 desktop, 26 phone and 27 Android — `mobile-mwa`'s 21 include its two flag-off tests, skipped in a flag-on run as its 19 flag-on tests are with `SHORTWIN_E2E_MWA=0`; *pump v3 (2026-10-15):* 33 files with `short-close-curve`, a default run of 124 tests, 71 desktop, 26 phone and 27 Android): `harness`, `smoke`, `wallet`, `frame` (`@scaffold`); `markets`,
 `create-market`, `status`, `fallback` (`@markets`); `lend-deposit`, `lend-cpi-guard`,
 `lend-withdraw-memo`, `lend-claim`, `keyboard`, and since M10 (FE-18) `lend-post-wipe`,
 `lend-claim-sync`, `lend-sweep-cashback` (`@lend`); `short-open`, `short-close`,
-`add-margin`, `positions`, `tx-errors` (`@short`); `screens` (`@screens`: every page and state as
+`short-close-curve` (pump v3: a close past the dumped near166 curve's `rT` on pump's 2026-10-13
+ELF, the curve completed by synthetic migration in one `close_short`; its lender's tokens are
+planted at genesis, `curveLender`), `add-margin`, `positions`, `tx-errors` (`@short`); `screens` (`@screens`: every page and state as
 a full-height PNG in `.e2e/screenshots/`, axe on each, 1024 px without sideways scroll;
 `SHORTWIN_E2E_SCREENSHOTS=update` writes the reviewed set in `e2e/screenshots/`). *M10-RESP:* two
 Playwright projects — `<profile>` (the desktop, 1440 × 900: every spec above) and `<profile>-phone`

@@ -111,6 +111,12 @@ export const KEY_NAMES = {
         // O-6: the Android project's Mobile Wallet Adapter specs (mobile-mwa.spec.ts): only the fake
         // MWA wallet (e2e/wallet/fake-mwa.ts) signs as it.
         'android',
+        // pump v3 (design pump-final §8): short-close-curve.spec.ts — the borrower who opens and
+        // closes on the near166 curve, its lender (tokens planted at genesis: `curveLenderAccount`)
+        // and the third party that buys the curve down past the position's q.
+        'curve',
+        'curveLender',
+        'curveCrowd',
     ],
 } as const;
 

@@ -9,13 +9,14 @@
  * - optionally (`SHORTWIN_E2E_VENUES`, default on) the dumped mainnet venue state of
  *   `tests/fixtures` (Raydium pools and configs, pump / PumpSwap globals, curves and pools, the Pyth
  *   SOL/USD account), for create-market's venue detection on real accounts. The venue programs
- *   themselves are deployed with `--upgradeable-program` (venuePrograms()).
+ *   themselves are deployed with `--upgradeable-program` (venuePrograms()). With them, the
+ *   `curveLender` wallet's `near166` tokens for pump v3's curve E2E (`curveLenderAccount`).
  */
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { VENUE_EXTRAS_DISCRIMINATOR } from '@shortwin/client';
 import type { Address } from '@solana/kit';
-import { getProgramDerivedAddress } from '@solana/kit';
+import { getAddressEncoder, getProgramDerivedAddress } from '@solana/kit';
 import { PATHS } from '../env.ts';
 import { LAMPORTS_PER_SOL, PROGRAMS } from './chain.ts';
 import { KEY_NAMES, loadSecretKey, publicKeyOf } from './keys.ts';
@@ -213,6 +214,34 @@ async function mockVenueExtras(): Promise<AccountJson> {
     return accountJson(address, rentExempt(data.length), PROGRAMS.shortwin, data);
 }
 
+/** The near166 coin's tokens `curveLender` lends (pump v3's E2E; 40 positions of 1.5 M tokens). */
+export const CURVE_LEND_RAW = 60_000_000_000_000n;
+
+/**
+ * `curveLender`'s token account of the dumped `near166` mint (pump v3's E2E, design pump-final §8):
+ * pump's mints have no mint authority, so genesis plants the balance — the curve's own base ATA
+ * (Token-2022, its extensions included) as the template, with the owner and the amount replaced, at
+ * `ATA(curveLender, mint)`.
+ */
+async function curveLenderAccount(lender: Address): Promise<AccountJson> {
+    const byName = new Map(manifest().accounts.map((a) => [a.name, a]));
+    const mint = byName.get('pump_near166_mint');
+    const template = byName.get('pump_near166_curve_base_ata');
+    if (!mint?.owner || !template?.file) throw new Error('fixture manifest lacks pump_near166 (pump_state_2026_10_13)');
+    const data = new Uint8Array(readFileSync(join(PATHS.fixtures, template.file)));
+    data.set(getAddressEncoder().encode(lender), 32);
+    new DataView(data.buffer, data.byteOffset, data.byteLength).setBigUint64(64, CURVE_LEND_RAW, true);
+    const [address] = await getProgramDerivedAddress({
+        programAddress: PROGRAMS.ata,
+        seeds: [
+            getAddressEncoder().encode(lender),
+            getAddressEncoder().encode(mint.owner as Address),
+            getAddressEncoder().encode(mint.address as Address),
+        ],
+    });
+    return accountJson(address, rentExempt(data.length), mint.owner, data);
+}
+
 export interface GenesisResult {
     readonly accounts: number;
     readonly keys: Readonly<Record<string, Address>>;
@@ -231,7 +260,10 @@ export async function writeGenesis(opts: { venues: boolean; mockExtras: boolean 
         accounts.push(accountJson(pk, sol * LAMPORTS_PER_SOL, SYSTEM, new Uint8Array(0)));
     }
     if (opts.mockExtras) accounts.push(await mockVenueExtras());
-    if (opts.venues) accounts.push(...fixtureAccounts());
+    if (opts.venues) {
+        accounts.push(...fixtureAccounts());
+        accounts.push(await curveLenderAccount(keys.curveLender as Address));
+    }
     for (const a of accounts) writeFileSync(join(PATHS.accounts, `${a.pubkey}.json`), JSON.stringify(a));
     return { accounts: accounts.length, keys };
 }

@@ -81,7 +81,12 @@ off (`SHORTWIN_E2E_MWA=0`) 8 passed and 19 skipped, and the responsive gate (eig
 63–65 states each) 96 tests pass with no finding; the reviewed `e2e/screenshots/android/` set
 holds 9 PNGs. The adapter's code needed no change; two layout fixes and a steadier M12 screenshot
 did (§13 "Mobile wallets", "The first browser runs"). The owner's real-device test precedes the
-release (FE-32).
+release (FE-32). *pump v3 (2026-10-15; §5.11, §13 "pump v3"):* `vitest run` 87 files, 1,021 tests
+passed, 1 opt-in file skipped (the curve previews, plans and the liquidation's risk view held to
+the program on pump's 2026-10-13 ELF, `pump-vectors.json`); the default E2E run of 124 tests (71 desktop with
+`short-close-curve`, 26 phone, 27 Android) passes — 122 passed and 2 skipped in 17.8 min —, the
+Android project with the adapter built off 8 passed and 19 skipped, and the responsive gate
+(eight viewports, 63–65 states each) 96 tests pass with no finding (errors 0, axe 0).
 
 ---
 
@@ -2613,6 +2618,7 @@ must refuse, §5.8), `raiseFeeNext(price)` (a compute-budget-only change — the
 | `lend-sweep-cashback.spec.ts` | *M10 (FE-18):* the bundle's pump / PumpSwap cashback claims built by `sweep.ts` (`readSweepFacts` / `cashbackClaimIxs`: pump and PumpSwap `claim_cashback`, pAMM `init_user_volume_accumulator`), landed by themselves on the dumped ELFs on an unused trader PDA — no wipe, sweep or deposit |
 | `short-open.spec.ts` | every preview field present and equal to the simulated position (`q`, `s`, `m`, `v`), the borrower disclosure gate, blocked states (coverage pause) |
 | `short-close.spec.ts` | P&L after a mock price move, close, payout delta |
+| `short-close-curve.spec.ts` | *pump v3 (2026-10-15, design pump-final §8; FE-3 closed):* the dumped near166 curve listed and lent from Node, an open of 1.5 M tokens in the Short panel (`sell_v3`, the 10 v3 TradeExtras), a third party's `buy_v3` down to `q/2`, then the position page's close at `B̂_v3` — one `close_short` completes the curve by synthetic migration (`pcB = q − rT`) and moves the market to `PumpMigrating`; axe at 0 on the panel, the position page and the close review |
 | `add-margin.spec.ts` | CR preview and the confirmed CR |
 | `positions.spec.ts` | dashboard fields, risk badge after a price move, time left |
 | `status.spec.ts` | coverage-paused market listed, venue rows |
@@ -3153,7 +3159,7 @@ edits `disclosures.ts` (copy changes need the owner) or `errors.ts`.
 |---|---|---|
 | FE-1 … FE-6 | Owner items of §0 | open (owner) |
 | FE-7 | ARCH §9's M9 row names "Playwright E2E on Surfpool"; Surfpool needs live mainnet and the network (INDEXER §11.3), so the E2E runs on `solana-test-validator` with the test-venue build and dumped fixtures (§10.2). A Surfpool profile can be added later for the real venues. | flagged deviation |
-| FE-8 | The mock venue drives the trading E2E; real-venue trading paths are covered by the SHORT track's unit vectors (keeper-derived account lists, fixture readers) and by the program's fork tests, not by a browser test against a live venue. | by design |
+| FE-8 | The mock venue drives the trading E2E; real-venue trading paths are covered by the SHORT track's unit vectors (keeper-derived account lists, fixture readers) and by the program's fork tests, not by a browser test against a live venue. *pump v3 (2026-10-15):* one exception, `short-close-curve` opens and closes on the dumped pump curve (pump's 2026-10-13 ELF) through the UI; the other real venues stay as before | by design |
 | FE-9 | Mainnet acceptance of `withdraw`'s CPI'd memo (T-MEMO, U17) | met on the mainnet build (M10: LiteSVM and the E2E run mainnet's Token-2022 and spl-memo v3 ELFs, §5.7, §10.2); a mainnet transaction is M11's (TMEMO-10) |
 | FE-10 | Indexer follow-ups: `flag=` filters on `/v1/markets` (FE-5); a `borrower:<owner>` WebSocket channel would replace per-position subscriptions (≤ 40 rows live today) | open (indexer) |
 | FE-11 | Wallets with only `solana:signAndSendTransaction` cannot be checked before sending (§5.4); they are labelled and checked post hoc (*v1.2:* implemented — `checkLanded`, `wallet-sends-itself-badge`, `unknown-outcome` instead of `expired`; M9-SEC-1). Refusing such wallets for writes altogether is the stricter alternative (FE-21) | by design |
@@ -3200,6 +3206,7 @@ the 10-key list is refused by shortwin 1.0.0.
 | The D4 strings | `src/config/copyPump.ts` holds the program's two texts as drafted (§4.3's pump group): `errors.ts` takes 6031 and 6109 from it — byte for byte the program's `#[msg]`, a straight apostrophe and no final full stop on `CurveStraddle` | `copy.test.ts` (the drafted texts, the program's `errors.rs`, `errors.ts` and §4.3 held to each other; 72 / 152), `errors.test.ts` |
 | D2 (`complete_curve` retired) | `programs.ts`, `describe.ts`, the `/security` page and its security.txt, `SECURITY.md`'s scope table; the E2E validator no longer deploys `complete_curve.so` (the `full` profile's indexer config keeps its id until the indexer drops its ingestion, P6) | `programs.test.ts`, `securityPolicy.test.ts` |
 | WASM | `Venue.migratingFv(q, p, state)` (`quote::migrating_fv`); the package rebuilt | `quotes::tests::migrating_fv_follows_the_post_complete_pool`; `js/smoke.cjs` |
+| E2E | `short-close-curve.spec.ts`: near166 listed and lent from Node (the lender's tokens planted at genesis: pump's mints have no authority), an open in the Short panel on the curve, a third party's `buy_v3` down to `q/2`, the close on the position page at `B̂_v3`, the curve complete with `pcB = q − rT` and the market `PumpMigrating`; axe at 0, no CSP violation | §10.2 |
 
 ### Mobile wallets (2026-10-13; O-6 lifted)
 
