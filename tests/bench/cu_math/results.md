@@ -26,3 +26,5 @@ Per-call compute units of `shortwin-math` on SBF v3 (platform-tools v1.57, Mollu
 | `persist::liq_ema_leg(3)`, every entry below `L` (PumpSwap quote + CR each) | — | 2908 | 3490 |
 | `sustained_growth(3)` (full ring, a pump) | — | 1518 | 1770 |
 | `pool::cal_advance` (one day elapsed) | — | 261 | 314 |
+| `quote::curve_synthetic` past `rT` (`B̂_v3`: the curve leg and the would-be pool's part; pump-final §5.2) | — | 2429 | 2915 |
+| `quote::migrating_fv` after a synthetic pool part (ρ-scaled, at the pool's PumpSwap tier; pump-final §5.4) | — | 4743 | 5692 |

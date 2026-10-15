@@ -66,8 +66,11 @@ this package's own dependency list (`shortwin-math` for the scenario self-checks
 - Mollusk and LiteSVM report the same CU for every measured case (the bench fails otherwise).
 - `open_short` varies by ≈ 1.5 k CU per extra bump iteration from run to run: it derives the
   new `ShortPosition` (and a first `WalletExposure`) PDA with a canonical bump search for a
-  fresh random borrower key (as the M1 bench notes for its PDA-creating cases). Every other
-  figure is stable.
+  fresh random borrower key (as the M1 bench notes for its PDA-creating cases), and so do the
+  traces that hold an open (the sandwich, four opens of one wallet). Some rows also vary by
+  19–21 CU between runs (the closes, `expire`; an open on top of its bump search); the others
+  are stable. `results.md` and `trace.md` hold one run's figures: a re-run that differs from them
+  only by this noise is not committed (AUDIT.md §10).
 - Every measured instruction is far inside its §6.1 budget.
 - **ARCH §6.2 is low for `open_short` on the mock/Raydium path**: 15 entries for a wallet's
   first open (the table's 13 omits the `ShortPosition` `init` and the `WalletExposure`

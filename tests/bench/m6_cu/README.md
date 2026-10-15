@@ -91,7 +91,8 @@ cap on `X₀ = 0.93·X`).
   deadline; `sol_settle` S3 under the buy halt (`disable_flags` bit 3: the venue cannot execute, the
   crank starts the S3 chain, S3 settles `s3_wait_s` later, no venue CPI).
 - The borrowers, the keeper and a changed creator have **fixed** keys, so the reports are
-  byte-identical across runs.
+  byte-identical across runs, except on the graduation path: its two borrowers are fresh keys
+  (`env.borrower()`), and its liquidation varies by 19 CU between runs.
 
 ## Findings (see `results.md`, `trace.md` and `depth.md` for the figures)
 

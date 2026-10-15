@@ -77,7 +77,9 @@ crates added beyond the root lockfile are Mollusk's own (`mollusk-svm*`, `solana
   6 k of 60 k.
 - Cases that create a PDA for a fresh random key (`create_market`'s market, vault, pool vault
   and trader bumps; a first `deposit`'s `LenderPosition`) vary by ≈ 1.5 k CU per extra bump
-  iteration from run to run: the bump search depends on the key.
+  iteration from run to run: the bump search depends on the key. Some rows also vary by 19 CU
+  (the deposits, `withdraw` behind 3 rebase records). A re-run that differs from `results.md`
+  only by this noise is not committed (AUDIT.md §10).
 - M1 review: `Market` PDA re-derivation (`Market::is_pda`, `create_program_address`) added
   ≈ 1.6 k CU to `set_pause(market)`, `claim_sol`, `cover_deficit`, `sync_lender` and
   `sweep_protocol_fees` (M1-SEC-6); `apply_config`'s optional accounts ≈ 0.3 k.

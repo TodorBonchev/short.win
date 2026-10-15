@@ -50,3 +50,11 @@ Mollusk share (ARCH §1.1, C1-14). Findings for that pin:
 - `rent::credited_for` keeps the dot product in u128 and takes one 256-bit `mul_div` for the
   lender share (a typical position's `Σ q·coef·ΔJ·(10⁴ − p)` exceeds 2¹²⁸ only at the last
   factor): 3,239 → 2,991 CU (§6.1: 2,637, budget 3,165).
+- pump-final (P3, 2026-10-15) adds the two quotes pump's synthetic migration brought, on a
+  near-complete curve (2 M tokens left, a position of 4 M, pump's 0 / 95 / 30 bps):
+  `quote::curve_synthetic` past `rT` (`B̂_v3`, the curve leg plus the would-be pool's part)
+  2,429 CU, about two PumpSwap quotes and a `migrated_pool`; `quote::migrating_fv` after a
+  synthetic pool part (the pool `migrate_v2` will create, ρ-scaled, at its PumpSwap tier)
+  4,743 CU. Every quote a curve exit takes on a state past `rT` (the EMA leg, the box corners,
+  `B̂_ref`) is a `B̂_v3`: the M5 bench's worst-ring rows measure what that adds to `liquidate`
+  and `expire`. The other figures are unchanged by pump-final's program change.

@@ -162,6 +162,15 @@ Gathered from the follow-up tracks' reports and the integrated gate of 2026-10-1
       cross-check (PumpSwap's crank 41,437 → 41,149 requested CU, its settling `sol_settle`
       74,445 → 76,992), so they were not committed: refresh them with the sim's constants,
       `docs/design/sim/out/keeper_cost.txt` and ECON §5.8 together.
+      **pump-final §12's re-baseline trigger is met** (`m7_keeper`: re-baseline if `liquidate`
+      moves by more than 5 %, plus T-SIZE of the keeper's v3 exits). PUMP-V3 P3 measured the
+      bench on the v3 build `b3130ae2…8e31` without writing it: the curve `liquidate` is
+      133,755 consumed / 147,131 requested CU at 1,122 B (committed: 174,397 / 191,837 at
+      1,452 B, −23.3 % requested), its `expire` 131,194 / 144,314 (171,831 / 189,015); PumpSwap's
+      `liquidate` 214,447 requested (212,585) and its settling `sol_settle` 77,008 (74,445).
+      Re-baseline after P4's keeper changes, in one commit with the items above:
+      `M7_COST_WRITE=1` and `M7_CASCADE_WRITE=1`, the keeper's v3 exit sizes in `results.md`
+      (`tx_size_pump_it` already asserts the curve composites), and the P8 addendum's figures.
 
 **Re-measurements (fork or network data)**
 - [ ] O19's real-venue held sandwich, the FITX-1 fork figures and ECON §10.1's graduation rows

@@ -1,6 +1,7 @@
 //! T-CU-MATH (ARCHITECTURE §6.1, §8.1, §9 M0b): the compute units of every `shortwin-math`
-//! primitive of ARCH §6.1 (and the v0.4.1 additions) on SBF v3, measured with Mollusk, must
-//! stay within the §6.1 measured value + 20 % (new primitives: the M0b measurement + 20 %).
+//! primitive of ARCH §6.1 (and the v0.4.1 and pump-final additions) on SBF v3, measured with
+//! Mollusk, must stay within the §6.1 measured value + 20 % (new primitives: their first
+//! measurement + 20 %).
 //!
 //! Needs the bench program built for SBF first (README.md):
 //!
@@ -128,6 +129,17 @@ const ROWS: &[Row] = &[
         id::CAL_ADVANCE,
         "`pool::cal_advance` (one day elapsed)",
         261,
+    ),
+    // pump-final §5.2–§5.4 (P1), measured at P3 (2026-10-15).
+    new(
+        id::CURVE_SYNTHETIC,
+        "`quote::curve_synthetic` past `rT` (`B̂_v3`: the curve leg and the would-be pool's part; pump-final §5.2)",
+        2_429,
+    ),
+    new(
+        id::MIGRATING_FV,
+        "`quote::migrating_fv` after a synthetic pool part (ρ-scaled, at the pool's PumpSwap tier; pump-final §5.4)",
+        4_743,
     ),
 ];
 

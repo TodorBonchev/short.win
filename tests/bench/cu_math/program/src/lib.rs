@@ -77,7 +77,40 @@ pub mod id {
     pub const LIQ_EMA_LEG: u8 = 20;
     pub const SUSTAINED_GROWTH: u8 = 21;
     pub const CAL_ADVANCE: u8 = 22;
-    pub const LAST: u8 = CAL_ADVANCE;
+    pub const CURVE_SYNTHETIC: u8 = 23;
+    pub const MIGRATING_FV: u8 = 24;
+    pub const LAST: u8 = MIGRATING_FV;
+}
+
+/// pump's curve fee (one tier: lp 0, protocol 95, creator 30 bps).
+const CURVE_FEES: FeeBps = FeeBps {
+    lp: 0,
+    protocol: 95,
+    creator: 30,
+};
+/// pump's constant product `vT·vQ` at creation (1.073e15 tokens × 30 SOL) and the offsets
+/// `vT − rT`, `vQ − rQ` (pump-final §5.2).
+const CURVE_K: u128 = 1_073_000_000_000_000 * 30_000_000_000;
+const CURVE_T_OFFSET: u128 = 279_900_000_000_000;
+const CURVE_Q_OFFSET: u128 = 30_000_000_000;
+/// A near-complete curve: 2 M tokens left (`rT`), and a position of 4 M past it.
+const CURVE_RT: u128 = 2_000_000_000_000;
+const Q_PAST_RT: u64 = 4_000_000_000_000;
+/// `Global.pool_migration_fee` and the standard pool tokens (206.9e12).
+const MIGRATION_FEE: u64 = 15_000_001;
+const STANDARD_TOKENS: u128 = 206_900_000_000_000;
+
+/// The curve with `rt` tokens left (`vT·vQ = K`, the offsets constant), live.
+fn curve_at_rt(rt: u128) -> quote::CurveState {
+    let vt = CURVE_T_OFFSET + rt;
+    let vq = CURVE_K / vt;
+    quote::CurveState {
+        vt,
+        vq,
+        rt,
+        rq: vq - CURVE_Q_OFFSET,
+        complete: false,
+    }
 }
 
 fn p_spot() -> u128 {
@@ -269,6 +302,61 @@ fn ring_ops(id: u8, n: u32) -> u128 {
     acc
 }
 
+/// pump-final §5.2–§5.4 on a near-complete curve: `B̂_v3` past `rT` (the curve leg `rT` plus the
+/// pool part on the would-be pool, both at the curve's fee), and a migrating market's FV after a
+/// synthetic pool part (the pool `migrate_v2` will create, ρ-scaled, at its PumpSwap tier).
+#[inline(never)]
+fn curve_quotes(id: u8, n: u32) -> u128 {
+    let live = curve_at_rt(CURVE_RT);
+    let live_m = quote::MigrationParams {
+        migration_fee: MIGRATION_FEE,
+        pool_tokens: STANDARD_TOKENS,
+        post_complete_quote_in: 0,
+    };
+    // The same curve completed by a buy of `rT + 2 M` (pcB = 2 M, pcQ its pool part's quote).
+    let pc_b: u128 = 2_000_000_000_000;
+    let done = quote::CurveState {
+        rt: 0,
+        vt: CURVE_T_OFFSET,
+        vq: CURVE_K / CURVE_T_OFFSET,
+        rq: CURVE_K / CURVE_T_OFFSET - CURVE_Q_OFFSET,
+        complete: true,
+    };
+    let done_m = quote::MigrationParams {
+        migration_fee: MIGRATION_FEE,
+        pool_tokens: STANDARD_TOKENS - pc_b,
+        post_complete_quote_in: 1_200_000_000,
+    };
+    let tiers = [shortwin_math::fees::FeeTier {
+        threshold: 0,
+        fees: FEES,
+    }];
+    let schedule = shortwin_math::fees::PammFeeSchedule {
+        tiers: &tiers,
+        base_supply: 1_000_000_000_000_000,
+        creator_fee_configurable: false,
+        pool_creator_fee_bps: 0,
+        coin_creator_is_default: false,
+        cap_bps: Some(300),
+    };
+    let p = black_box(done.vq * WAD / done.vt);
+    let mut acc = 0u128;
+    for i in 0..n {
+        let j = black_box(u64::from(i));
+        let v = match id {
+            id::CURVE_SYNTHETIC => {
+                quote::curve_synthetic(Q_PAST_RT + j, &live, &CURVE_FEES, &CURVE_FEES, &live_m)
+                    .map_or(0, |b| u128::from(b.cost))
+            }
+            id::MIGRATING_FV => quote::migrating_fv(Q_PAST_RT + j, p, &done, &done_m, &schedule)
+                .map_or(0, |b| u128::from(b.cost)),
+            _ => 0,
+        };
+        acc = acc.wrapping_add(v);
+    }
+    acc
+}
+
 /// `cal_advance` over one elapsed day with a live bucket to drop.
 #[inline(never)]
 fn cal_advance(n: u32) -> u128 {
@@ -306,6 +394,7 @@ pub fn run(id: u8, n: u32) -> u128 {
         id::EMA_ROLL => ema_roll(n),
         id::RING_MEDIANS | id::BOX_OF | id::LIQ_EMA_LEG | id::SUSTAINED_GROWTH => ring_ops(id, n),
         id::CAL_ADVANCE => cal_advance(n),
+        id::CURVE_SYNTHETIC | id::MIGRATING_FV => curve_quotes(id, n),
         _ => 0,
     }
 }
@@ -361,6 +450,24 @@ mod tests {
         };
         assert_eq!(liq_ema_leg(&ring, below, 3), Ok(true));
         assert!(quote::reprice(L, p_spot()).is_some());
+        // B̂_v3 past rT: the curve leg plus a pool part, dearer than buying rT alone.
+        let live = curve_at_rt(CURVE_RT);
+        let m = quote::MigrationParams {
+            migration_fee: MIGRATION_FEE,
+            pool_tokens: STANDARD_TOKENS,
+            post_complete_quote_in: 0,
+        };
+        let v3 =
+            quote::curve_synthetic(Q_PAST_RT, &live, &CURVE_FEES, &CURVE_FEES, &m).expect("B̂_v3");
+        let curve_part = quote::curve_synthetic(
+            u64::try_from(CURVE_RT).unwrap(),
+            &live,
+            &CURVE_FEES,
+            &CURVE_FEES,
+            &m,
+        )
+        .expect("rT");
+        assert!(v3.cost > curve_part.cost);
         for id in 1..=id::LAST {
             assert_ne!(run(id, 3), 0, "bench {id}");
         }
